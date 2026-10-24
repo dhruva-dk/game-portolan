@@ -34,7 +34,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <main>
 
 <h1>Portolan — progress</h1>
-<p>The single source of truth for the state of the work. Spec: <code>PROMPT.md</code>. Screenshots: <code>progress/shots/</code>. Last updated: <b id="updated">2026-10-24</b> (WP2).</p>
+<p>The single source of truth for the state of the work. Spec: <code>PROMPT.md</code>. Screenshots: <code>progress/shots/</code>. Last updated: <b id="updated">2026-10-24</b> (WP3).</p>
 
 <nav>
 <a href="#protocol">Agent protocol</a><a href="#next">What comes next</a><a href="#status">Spec status</a><a href="#checks">Acceptance checks</a><a href="#captures">Captures</a><a href="#review">Review findings</a><a href="#log">Log</a><a href="#audit">Code audit</a><a href="#architecture">Architecture</a><a href="#plan">Work packages</a><a href="#schedule">Schedule</a>
@@ -62,7 +62,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <li><b>WP0</b> done (2026-10-24); its API is recorded in <a href="#arch-testing">A10</a>.</li>
 <li><b>Wave 1</b> done (2026-10-24): <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a>.</li>
 <li><b>Next in column B:</b> <a href="#wp04">WP4 Lettering</a> may start now (its dependency WP2 is done). The nib's ink and the paper it bleeds into come from <code>src/style</code>: <code>hourPalette().ink</code>, <code>STYLE_GLSL</code> (<code>tPaper</code> fibre for bleed) and, for text on scraps, <code>src/ui/parchment.ts</code>; see the API in <a href="#wp02">WP2</a>.</li>
-<li><b>Next in column A:</b> <a href="#wp03">WP3 World data &amp; geography</a> may start now (its only dependency, WP1, is done; its files are disjoint from WP2's). It builds on <code>src/sim/sphere.ts</code> (<code>cubeGrid</code>, <code>fromLatLon</code>, <code>tangentAt</code>/<code>advance</code> for bearing-and-distance placement) and the d* math; see the API in <a href="#wp01">WP1</a>.</li>
+<li><b>Wave 2, column A:</b> <a href="#wp03">WP3 World data &amp; geography</a> done (2026-10-24). <b>Next in column A:</b> <a href="#wp05">WP5 App runtime</a> may start once WP4 is under way or done (its dependencies WP1, WP2, WP3 are done). Its world worker runs <code>buildGeography()</code> (0.88 s) and <code>buildNav(geo)</code> (0.26 s) from <code>src/sim/world</code> and caches the typed arrays; see the API in <a href="#wp03">WP3</a>. WP6, WP13 and WP15 then read the same fields.</li>
 <li>Then follow the <a href="#schedule">schedule</a>: at most two packages at a time, always pairing a simulation package with a rendering/interface package.</li>
 </ol>
 </section>
@@ -74,18 +74,18 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <table>
 <tr><th>PROMPT.md section</th><th>Status</th><th>Work packages</th><th>Notes</th></tr>
 <tr id="s-standard"><td>The standard (art &amp; play)</td><td class="st not">not started</td><td>all; judged in WP33+</td><td></td></tr>
-<tr id="s-planet"><td>The world › The planet</td><td class="st not">not started</td><td>WP3, WP6, WP13, WP24</td><td>Legacy planet is seeded-random, not hand-built.</td></tr>
-<tr id="s-regions"><td>The world › The regions (12 + landmarks/perks)</td><td class="st not">not started</td><td>WP3, WP6, WP7, WP16, WP17, WP23</td><td></td></tr>
-<tr id="s-lighthouses"><td>The world › Lighthouses and harbours</td><td class="st not">not started</td><td>WP3, WP7, WP14, WP15</td><td>The legacy fishing village, huts and pier (forbidden) were deleted in WP1.</td></tr>
-<tr id="s-life"><td>The world › Life</td><td class="st not">not started</td><td>WP23</td><td></td></tr>
-<tr id="s-wind"><td>The world › Wind, currents, tides, and time</td><td class="st not">not started</td><td>WP6, WP13, WP14, WP15, WP19, WP21, WP22</td><td></td></tr>
+<tr id="s-planet"><td>The world › The planet</td><td class="st prog">in progress</td><td>WP3, WP6, WP13, WP24</td><td>WP3: the planet is hand-built data, the same every match (<code>src/sim/world</code>); open sea stays ≥ 40 u from every cut edge of the chart net. Curve and hull-down: WP13/WP24; lap time: WP6.</td></tr>
+<tr id="s-regions"><td>The world › The regions (12 + landmarks/perks)</td><td class="st prog">in progress</td><td>WP3, WP6, WP7, WP16, WP17, WP23</td><td>WP3: all twelve regions designed as stroke data with landforms, landmark and perk ids, habitats and mechanics parameters, and built into the geography fields (dumps in the WP3 log). Perks: WP7; looks: WP16/WP17.</td></tr>
+<tr id="s-lighthouses"><td>The world › Lighthouses and harbours</td><td class="st prog">in progress</td><td>WP3, WP7, WP14, WP15</td><td>The legacy fishing village, huts and pier (forbidden) were deleted in WP1. WP3: 24 lights placed on headlands, a sheltered natural harbour in every region (tested). Models and beams: WP14/WP15.</td></tr>
+<tr id="s-life"><td>The world › Life</td><td class="st not">not started</td><td>WP23</td><td>WP3 placed every species’ habitats in the region data.</td></tr>
+<tr id="s-wind"><td>The world › Wind, currents, tides, and time</td><td class="st prog">in progress</td><td>WP6, WP13, WP14, WP15, WP19, WP21, WP22</td><td>WP3: 16 fixed current lanes, the planetary tide (<code>TIDE</code>, <code>DRAFT</code>), tidal zones and tide-dependent navigation; weather odds per region. Simulation: WP6.</td></tr>
 <tr id="s-ship"><td>Being a ship</td><td class="st not">not started</td><td>WP19</td><td></td></tr>
 <tr id="s-forms"><td>Being a ship › Ship forms</td><td class="st not">not started</td><td>WP6, WP10, WP18</td><td>Legacy ship geometry is a strong base (WP18).</td></tr>
 <tr id="s-gull"><td>Being a ship › The companion gull</td><td class="st not">not started</td><td>WP9, WP10, WP23</td><td></td></tr>
 <tr id="s-match"><td>A match › Overview</td><td class="st not">not started</td><td>WP8, WP10</td><td></td></tr>
-<tr id="s-current"><td>A match › The Great Current</td><td class="st not">not started</td><td>WP8, WP11, WP22, WP24</td><td></td></tr>
+<tr id="s-current"><td>A match › The Great Current</td><td class="st prog">in progress</td><td>WP8, WP11, WP22, WP24</td><td>WP3: <code>greatCurrent(seed)</code> routes through 4–5 neighbouring regions, clear of land by ≥ 8 u over 200 seeds; every region is on some route. Riding and break-off: WP8.</td></tr>
 <tr id="s-territory"><td>A match › Territory</td><td class="st not">not started</td><td>WP7, WP20</td><td>Legacy loop-claim flood fill is reusable (WP7).</td></tr>
-<tr id="s-doubloons"><td>A match › Doubloons</td><td class="st not">not started</td><td>WP7, WP8</td><td></td></tr>
+<tr id="s-doubloons"><td>A match › Doubloons</td><td class="st not">not started</td><td>WP7, WP8</td><td>WP3 placed the fixed find sites (wrecks, caches) with regional richness.</td></tr>
 <tr id="s-chests"><td>A match › Chests and loot</td><td class="st not">not started</td><td>WP9, WP22, WP27</td><td></td></tr>
 <tr id="s-fittings"><td>A match › Fittings</td><td class="st not">not started</td><td>WP9, WP19, WP24, WP25</td><td></td></tr>
 <tr id="s-consumables"><td>A match › Consumables</td><td class="st not">not started</td><td>WP9, WP22</td><td></td></tr>
@@ -194,6 +194,20 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <section id="log">
 <h2>Log</h2>
 <p>Newest first. Each entry: date, WP, what changed, evidence (before/after screenshots), and any problems left open.</p>
+
+<div id="log-2026-10-24-wp03">
+<h3>2026-10-24 — WP3 World data and geography</h3>
+<ul>
+<li>The world as data in <code>src/sim/world/regions.ts</code>: each region drawn by hand in its own chart and placed by design (Ice Crown with three counter-turning floe rings round the Crown Light skerry; Fjords' highland cut by the Sound, its 8 u chokepoint, the Falls Fjord and blind arms; the Basalt maze of staggered column walls round a navigable Arch; kelp forests and islets round the Cathedral; Amber barrier islands with four tidal inlets at four crest heights; the Weeping Isle, 1.3× the next largest land; Glass Sea open but for its rim islet and the pale Whale Road; volcano, lava deltas, hot water and Cinder Isle; a five-lobed mangrove forest threaded by meandering creeks to the Root Gate; ring atolls with single channels and the Great Lagoon; five jungle isles crowding Spice Harbour's sound; the Maelstrom with its broken ring of skerries).</li>
+<li><code>geography.ts</code> adapts the earlier world.ts strokes (capsule SDFs, C1 coast profiles, reefs, columns, bars, cones) into height, coast, floor, region and zone fields; sites are set on the built shore; 16 fixed lanes; the seeded Great Current route. <code>nav.ts</code>: 128-per-face graph with tide levels on cells and edges.</li>
+<li>Review loop: a diagnostic reported every failing harbour, light, cut edge, low-tide blockage and current pass at once; fixes moved land off the pentagon edges toward its corners, gave harbours real coves, widened creeks for low tide, cleared the lagoon channel, and replaced guessed passes with rim half-circles plus designed crossings. Then a design pass added fjord arms, creek meanders, denser pack ice and moat pillars.</li>
+<li>Results: <code>npm test</code> 56/56 (world suite 14 tests, ~2 s); build 0.88 s fields + 0.26 s nav.</li>
+</ul>
+<div class="shots">
+<figure><a href="progress/shots/wp03-sheet.png"><img src="progress/shots/wp03-sheet.png" alt="top-down charts of the twelve regions"></a><figcaption>wp03-sheet: rows Ice Crown, Fjords, Basalt Stacks, Kelp Shallows / Amber Shoals, Weeping Isle, Glass Sea, Fire Archipelago / Mangrove Labyrinth, Coral Atolls, Spice Isles, Maelstrom (±90 u each; lights red, harbours ringed, landmark gold, wrecks ×, caches gold, tidal hatching, floes at t = 0). Full size: <code>wp03-&lt;region&gt;.png</code>.</figcaption></figure>
+<figure><a href="progress/shots/wp03-world.png"><img src="progress/shots/wp03-world.png" alt="equirectangular world map with region borders"></a><figcaption>wp03-world: the planet, equirectangular, region borders (the dodecahedron's faces).</figcaption></figure>
+</div>
+</div>
 
 <div id="log-2026-10-24-wp02">
 <h3>2026-10-24 — WP2 Style module, ink render pipeline, parchment kit</h3>
@@ -431,6 +445,7 @@ src/audio/instruments.ts  score.ts                                              
 <li><b>Per region (data):</b> id, name, vertex index; local frame (north/east tangent); pigments (land, shallows, foliage, accent, ink tint); climate and flora species; landforms as strokes in region-local coordinates (bearing, distance in u; kinds: island body capsule, ridge, cliff headland, spit, bay carve, reef ring with channel gaps, stack/column field, arch, sandbar/tidal flat with height band, cone/caldera, ice-floe field, kelp bed polygon, mangrove channel network, hot-water zone, whirlpool); the landmark (kind, position, perk id, chart symbol); harbours (≥ 1: position, facing, moorings, repair zone); lighthouses (headland position, facing, beam period); fauna habitats (species, area, count); weather tendencies (fair/fog/squall/calm weights); loot richness and fixed find sites (wrecks, caches); mechanics parameters (floe rotation rate, tide period/passages, kelp slow and hide, hot-water damage, vortex strength, channel widths); music mode and motif.</li>
 <li><b>Open sea data:</b> fixed current lanes between region pairs (great-circle arcs with width and speed); Great Current route generator (seed picks a smooth path through several regions); open-sea find richness.</li>
 <li><b>Generated fields</b> on the cube-sphere (same equal-angle mapping as territory): height (Float32 6·512²), signed coast distance, floor type (sand, rock, coral, kelp, ice, mud, black sand), region id, nav grid (6·64², passable/cost, tide-dependent cells flagged). Dynamic geography (tide level, floe positions) is evaluated in the sim on top of the static fields.</li>
+<li><i>WP3:</i> the nav grid is 6·128² (2.5 u cells), not 64², so the narrowest designed channels (7–8 u) stay connected; each nav cell and edge carries the sea level above which it opens, so routes follow the tide. Built in 0.88 s (fields) + 0.26 s (nav) on the dev Mac.</li>
 <li><b>Startup:</b> generation runs in a Web Worker; a 128²/face level for the title, full 512² while the title and harbour show; cached in IndexedDB keyed by a hash of the region data (runtime cache, not a shipped file).</li>
 </ul>
 
@@ -550,7 +565,7 @@ src/audio/instruments.ts  score.ts                                              
 
 <div class="wp" id="wp03">
 <h3>WP3 — World data and geography</h3>
-<p>Status: not started. Deps: WP1. Parallel-safe with: WP4.</p>
+<p>Status: done (2026-10-24) — twelve hand-drawn regions built into one fixed geography in 0.88 s, tide-aware nav graph in 0.26 s, 14 world tests green, top-down dumps reviewed (<a href="#log-2026-10-24-wp03">log</a>). Deps: WP1. Parallel-safe with: WP4.</p>
 <p>Scope:</p>
 <ul>
 <li>The planet: hand-built, the same every match; R = 200; open sea broad and deep between regions; every island, reef, channel, landmark, harbour and lighthouse placed by design in data; generators build fixed geometry fields from it.</li>
@@ -559,6 +574,14 @@ src/audio/instruments.ts  score.ts                                              
 <li><code>geography.ts</code>: height, coast distance, floor type, region id, nav grid on the cube-sphere (adapting legacy world.ts SDF strokes); <code>nav.ts</code> coarse graph; generation fast enough for a worker (≤ 1 s desktop at 512²).</li>
 </ul>
 <p>Owns: <code>src/sim/world/regions.ts geography.ts nav.ts</code>, <code>tests/sim/world.test.ts</code>, debug dump script <code>tests/tools/geodump.ts</code>.</p>
+<p>Built — the API later packages use:</p>
+<ul>
+<li><code>regions.ts</code>: <code>REGIONS</code> (array index = region index in every field): id, name, lat/lon, climate, pigment names (keys of <code>PIGMENTS</code>), flora, shore profile, shelf discs, strokes in the region's chart (x east, y north, u: <code>land carve bay reef</code> with passes and tidal sills, <code>bar column stacks flat cone kelp hot</code>), <code>landmark {name, perk, x, y, r}</code>, harbours, lighthouses, cascades, finds, fauna habitats, weather odds, richness, <code>rim</code> + <code>passes</code> (Great Current lanes), mechanics (kelp slow/hide, hot-water damage, floe rings, pack slow/radius, vortex, eruption period), music mode and motif. <code>TIDE {period 120 s, amp 0.6 u}</code>, <code>DRAFT</code> 0.8, <code>FLOOR</code> codes.</li>
+<li><code>geography.ts</code>: <code>buildGeography()</code> → <code>{heights, coast, floor, region, zones}</code> per territory cell plus placed <code>landmarks harbours lights cascades finds stacks floes lanes</code>; <code>ZONE</code> bits (kelp, hot, tidal, lagoon, harbour, pack, vortex); <code>CLEAR</code>; <code>CHARTS regionOf toWorld toChart chartTangent NEIGHBOURS</code>; <code>heightAt coastAt</code> (bilinear), <code>heightExact</code>, <code>navigable(geo, p, tide)</code>; <code>greatCurrent(seed)</code> → <code>{regions, points (xyz every 2 u), length}</code>.</li>
+<li><code>nav.ts</code>: <code>NAV</code> (128 per face), <code>buildNav(geo)</code> → <code>{level, edge, cost}</code>, <code>navCellOf</code>, <code>findRoute(nav, from, tide, goal, toward, out)</code> (A* or Dijkstra, ties by cell, deterministic).</li>
+<li><code>tests/tools/geodump.ts</code>: <code>node tests/tools/geodump.ts [--sheet out.png] [--only id]</code> writes the top-down charts.</li>
+<li>Left to their owners: floe motion and collision, vortex flow, tide phase (WP6); perks, finds' payouts, eruptions (WP7); worker and cache (WP5); every look (WP15–WP17).</li>
+</ul>
 <p>DoD: tests prove every region has its landmark, ≥ 1 harbour, ≥ 1 lighthouse on a headland, navigable connectivity (all regions reachable; atoll lagoon reachable only by its channel; fjord channels navigable at their narrowest), cut edges of the chart net (A8) ≥ 40 u from any land; per-region top-down ink dumps (wp03-&lt;region&gt;.png) reviewed for composition; timing logged.</p>
 </div>
 
