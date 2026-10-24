@@ -3,7 +3,8 @@
 // included. One function in two languages: SWELL_GLSL moves the sea surface (and anything drawn on it) on the GPU,
 // and Swell.displace, sample and ride are its TypeScript twin, so ships and floating things ride the surface drawn.
 // The sea fields (height, coast distance, lagoon and reef) go to the GPU as one half-float cube texture whose texels
-// sit on the sim's equal-angle cells, so hardware filtering is seamless across the cube's edges.
+// sit on the sim's equal-angle cells, so hardware filtering is seamless across the cube's edges; the sea's floors go
+// beside it as a byte cube on the same cells (seaFloorFaces).
 import * as THREE from 'three';
 import type { V3 } from '../sim/math.ts';
 import { R, TERRITORY } from '../sim/sphere.ts';
@@ -24,7 +25,8 @@ for (let i = 0; i < WAVES; i++) {
 }
 
 /**
- * GLSL (vertex or fragment). vec4 seaField(dir): x height above mean sea level, y signed coast distance (u, > 0 in
+ * GLSL (vertex or fragment). vec4 cubeAt(cube, dir): a texel of a cube texture on the TERRITORY cells (cubeTexture).
+ * vec4 seaField(dir): x height above mean sea level, y signed coast distance (u, > 0 in
  * navigable water), z lagoon, w reef. float swellAmp(depth). vec3 swell(dir, t, amp, out normal, out lift): the
  * displacement of the surface point at rest direction dir (add it to dir·(SEA_R + uSeaLevel)); lift is its height
  * in units of amp (crests > 0).
@@ -39,10 +41,11 @@ uniform float uSwellAmp;
 uniform vec3 uWindAxis;
 uniform float uWind;
 uniform float uSeaLevel;
-vec4 seaField(vec3 p) {
+vec4 cubeAt(samplerCube t, vec3 p) {
   vec3 q = p / max(max(abs(p.x), abs(p.y)), abs(p.z)); // the texels hold equal-angle cells: warp the lookup to match
-  return textureLod(tSeaField, atan(q) * 1.2732395, 0.0);
+  return textureLod(t, atan(q) * 1.2732395, 0.0);
 }
+vec4 seaField(vec3 p) { return cubeAt(tSeaField, p); }
 float swellAmp(float depth) {
   return uSwellAmp * (0.55 + 0.45 * min(uWind, 1.4)) * (0.15 + 0.85 * smoothstep(0.3, 10.0, depth));
 }
@@ -82,37 +85,54 @@ vec3 swell(vec3 p, float t, float amp, out vec3 normal, out float lift) {
 const HALF_ONE = THREE.DataUtils.toHalfFloat(1);
 
 /**
- * The six faces of the sea-field cube (RGBA half floats: height, coast distance, lagoon, reef), in the GL cube-map
- * order and orientation: face f is the sim's face f (+x −x +y −y +z −z), s runs with the sim's u and t against v.
+ * The six faces of a cube texture over the TERRITORY cells, RGBA, in the GL cube-map order and orientation: face f is
+ * the sim's face f (+x −x +y −y +z −z), s runs with the sim's u and t against v. put fills texel o from cell c.
  */
-export function seaFieldFaces(geo: Geography): Uint16Array[] {
-  const N = TERRITORY.n, NN = N * N, half = THREE.DataUtils.toHalfFloat;
-  const faces: Uint16Array[] = [];
+function cubeFaces<A extends Uint8Array | Uint16Array>(make: (n: number) => A, put: (out: A, o: number, c: number) => void): A[] {
+  const N = TERRITORY.n, NN = N * N, faces: A[] = [];
   for (let f = 0; f < 6; f++) {
-    const out = new Uint16Array(NN * 4);
-    for (let j = 0; j < N; j++) {
-      for (let i = 0; i < N; i++) {
-        const c = f * NN + (N - 1 - j) * N + i, o = (j * N + i) * 4;
-        out[o] = half(geo.heights[c]);
-        out[o + 1] = half(geo.coast[c]);
-        out[o + 2] = geo.zones[c] & ZONE.lagoon ? HALF_ONE : 0;
-        out[o + 3] = geo.floor[c] === FLOOR.coral ? HALF_ONE : 0;
-      }
-    }
+    const out = make(NN * 4);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) put(out, (j * N + i) * 4, f * NN + (N - 1 - j) * N + i);
     faces.push(out);
   }
   return faces;
 }
 
-/** Bytes of GPU memory the sea-field cube takes. */
-export const SEA_FIELD_BYTES = 6 * TERRITORY.n * TERRITORY.n * 8;
+/** The sea-field cube's faces (RGBA half floats: height, coast distance, lagoon, reef). */
+export function seaFieldFaces(geo: Geography): Uint16Array[] {
+  const half = THREE.DataUtils.toHalfFloat;
+  return cubeFaces((n) => new Uint16Array(n), (out, o, c) => {
+    out[o] = half(geo.heights[c]);
+    out[o + 1] = half(geo.coast[c]);
+    out[o + 2] = geo.zones[c] & ZONE.lagoon ? HALF_ONE : 0;
+    out[o + 3] = geo.floor[c] === FLOOR.coral ? HALF_ONE : 0;
+  });
+}
 
-function seaFieldTexture(geo: Geography): THREE.CubeTexture {
+/**
+ * The sea-floor cube's faces, on the field cube's texels (RGBA bytes, a mask each: rock (and ice), kelp, mud, black
+ * sand; sand where none is set and the field's reef is clear).
+ */
+export function seaFloorFaces(geo: Geography): Uint8Array[] {
+  return cubeFaces((n) => new Uint8Array(n), (out, o, c) => {
+    const fl = geo.floor[c];
+    out[o] = fl === FLOOR.rock || fl === FLOOR.ice ? 255 : 0;
+    out[o + 1] = fl === FLOOR.kelp ? 255 : 0;
+    out[o + 2] = fl === FLOOR.mud ? 255 : 0;
+    out[o + 3] = fl === FLOOR.blackSand ? 255 : 0;
+  });
+}
+
+/** Bytes of GPU memory the sea-field and sea-floor cubes take. */
+export const SEA_FIELD_BYTES = 6 * TERRITORY.n * TERRITORY.n * 8;
+export const SEA_FLOOR_BYTES = 6 * TERRITORY.n * TERRITORY.n * 4;
+
+/** A linearly filtered cube texture of six RGBA faces in cubeFaces' layout (read it with cubeAt). */
+export function cubeTexture(faces: (Uint8Array | Uint16Array)[], type: THREE.TextureDataType): THREE.CubeTexture {
   const N = TERRITORY.n;
-  const faces = seaFieldFaces(geo).map((d) => new THREE.DataTexture(d, N, N, THREE.RGBAFormat, THREE.HalfFloatType));
-  const cube = new THREE.CubeTexture(faces as unknown as HTMLImageElement[]);
+  const cube = new THREE.CubeTexture(faces.map((d) => new THREE.DataTexture(d, N, N, THREE.RGBAFormat, type)) as unknown as HTMLImageElement[]);
   cube.format = THREE.RGBAFormat;
-  cube.type = THREE.HalfFloatType;
+  cube.type = type;
   cube.minFilter = cube.magFilter = THREE.LinearFilter;
   cube.generateMipmaps = false;
   cube.needsUpdate = true;
@@ -166,7 +186,7 @@ export class Swell {
 
   constructor(geo: Geography) {
     this.geo = geo;
-    this.field = seaFieldTexture(geo);
+    this.field = cubeTexture(seaFieldFaces(geo), THREE.HalfFloatType);
     this.uniforms.tSeaField.value = this.field;
   }
 

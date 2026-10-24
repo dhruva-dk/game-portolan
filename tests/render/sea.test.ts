@@ -4,10 +4,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { DISC_RINGS, discShape } from '../../src/render/sea.ts';
-import { seaFieldFaces, Swell, type SwellSample } from '../../src/render/swell.ts';
-import { cellOf, horizonDistance, R, TERRITORY } from '../../src/sim/sphere.ts';
+import { DISC_RINGS, discShape, WAKE_SHIPS, WAKE_STEP, Wakes } from '../../src/render/sea.ts';
+import { seaFieldFaces, seaFloorFaces, Swell, type SwellSample } from '../../src/render/swell.ts';
+import { advance, cellOf, horizonDistance, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, heightAt } from '../../src/sim/world/geography.ts';
+import { FLOOR } from '../../src/sim/world/regions.ts';
 
 const geo = buildGeography();
 let seed = 7;
@@ -82,4 +83,46 @@ test('the sea disc reaches past the horizon at every height, its first ring a fe
     const first = (shape.reach * Math.expm1(shape.k / DISC_RINGS)) / Math.expm1(shape.k);
     assert.ok(first <= Math.max(0.1, 0.03 * h) * 1.01, `first ring ${first} at ${h}`);
   }
+});
+
+test('the sea-floor cube marks every cell of each floor it draws', () => {
+  const want = [0, 0, 0, 0], got = [0, 0, 0, 0];
+  for (const fl of geo.floor) {
+    const k = fl === FLOOR.rock || fl === FLOOR.ice ? 0 : fl === FLOOR.kelp ? 1 : fl === FLOOR.mud ? 2 : fl === FLOOR.blackSand ? 3 : -1;
+    if (k >= 0) want[k]++;
+  }
+  for (const face of seaFloorFaces(geo)) for (let o = 0; o < face.length; o++) if (face[o] === 255) got[o % 4]++;
+  assert.deepEqual(got, want);
+  assert.ok(want[0] > 0 && want[1] > 0, `rock ${want[0]}, kelp ${want[1]}`);
+});
+
+test('a wake lays the stern\'s track every WAKE_STEP u, stays where its ship passed, and frees its slot', () => {
+  const wakes = new Wakes(), p = new THREE.Vector3(0, 0, 1), f = new THREE.Vector3(1, 0, 0), np = new THREE.Vector3(), nt = new THREE.Vector3();
+  const pos = wakes.geometry.getAttribute('position').array as Float32Array, info = wakes.geometry.getAttribute('aWake').array as Float32Array;
+  const at = (j: number) => new THREE.Vector3().fromArray(pos, j * 6), birth = (j: number) => info[j * 8 + 1];
+  let t = 0;
+  const sail = (steps: number) => {
+    for (let i = 0; i < steps; i++, t += 0.1) {
+      wakes.feed(7, p, f, 3, t);
+      advance(p, f, 0.3, np, nt);
+      p.copy(np);
+      f.copy(nt);
+    }
+  };
+  sail(100);
+  for (let j = 3; j < 23; j++) {
+    const d = at(j).angleTo(at(j + 1)) * R;
+    assert.ok(d > WAKE_STEP - 1e-3 && d < WAKE_STEP + 0.31, `track points ${j}, ${j + 1} are ${d} u apart`);
+    assert.ok(birth(j) > birth(j + 1), `point ${j} laid after ${j + 1}`);
+  }
+  const mark = at(8);
+  sail(10);
+  const k = [...Array(40).keys()].findIndex((j) => at(j).distanceTo(mark) < 1e-6);
+  assert.ok(k > 8, `the laid point moved (found at ${k})`);
+  wakes.feed(8, p, f, 2, t);
+  assert.ok(wakes.ships[0].w > 0 && wakes.ships[1].w > 0 && WAKE_SHIPS >= 10);
+  wakes.forget(7);
+  assert.equal(wakes.ships[0].w, 0);
+  wakes.feed(9, p, f, 2, t);
+  assert.ok(wakes.ships[0].w > 0, 'a new ship takes the freed slot');
 });

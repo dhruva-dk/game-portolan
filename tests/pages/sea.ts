@@ -1,6 +1,6 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour, region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
-// hour=<0–24>, wind=<0–1.4>, squall=<0–1>, clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake, kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
+// hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
@@ -14,14 +14,15 @@ import { BEAM, type Lamp } from '../../src/render/light.ts';
 import { Structures } from '../../src/render/structures.ts';
 import { Flora } from '../../src/render/flora.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
-import { advance, localFrame, R } from '../../src/sim/sphere.ts';
+import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
-import { REGIONS } from '../../src/sim/world/regions.ts';
+import { FLOOR, REGIONS } from '../../src/sim/world/regions.ts';
 
 const q = new URLSearchParams(location.search);
 const view = q.get('view') ?? 'deck', wind = Number(q.get('wind') ?? 0.9), place = q.get('region');
 let hour = Number(q.get('hour') ?? 15.5);
 const hold = q.has('clock') ? Number(q.get('clock')) : null;
+const sail = Number(q.get('sail') ?? (view === 'wake' ? 3 : 0));
 type V = THREE.Vector3;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
@@ -35,7 +36,7 @@ const geoMs = performance.now() - t0;
 t0 = performance.now();
 const sea = new Sea(pipeline, geo);
 const seaMs = performance.now() - t0;
-scene.add(sea.mesh);
+scene.add(sea.mesh, sea.wake);
 t0 = performance.now();
 const terrain = new Terrain(pipeline, geo, sea.swell);
 const terrainMs = performance.now() - t0;
@@ -73,19 +74,43 @@ function aim(): void {
 
 /** A point in `region`'s waters `want` u off the coast, and a point on the land it faces. */
 function spot(region: string, want: number): { at: V; land: V } {
-  const ri = REGIONS.findIndex((r) => r.name.includes(region)), p = V(), g = V();
+  const ri = REGIONS.findIndex((r) => r.name.includes(region)), p = V();
   for (let r = 10; r < 140; r++) {
     for (let k = 0; k < 64; k++) {
       const a = (k / 64) * Math.PI * 2 + r * 0.37, x = r * Math.cos(a), y = r * Math.sin(a);
       toWorld(ri, x, y, p);
       if (Math.abs(coastAt(geo, p) - want) > 0.5 || heightAt(geo, p) > -2) continue;
-      const gx = coastAt(geo, toWorld(ri, x + 1, y, g)) - coastAt(geo, toWorld(ri, x - 1, y, g));
-      const gy = coastAt(geo, toWorld(ri, x, y + 1, g)) - coastAt(geo, toWorld(ri, x, y - 1, g));
-      const l = Math.hypot(gx, gy) || 1;
-      return { at: p.clone(), land: toWorld(ri, x - (gx / l) * want, y - (gy / l) * want, V()) as V };
+      return { at: p.clone(), land: landward(ri, x, y, want) };
     }
   }
   throw new Error(`no water ${want} u off a coast in ${region}`);
+}
+
+/** The point `want` u up the coast-distance slope from chart point (x, y) of region ri: toward the nearest land. */
+function landward(ri: number, x: number, y: number, want: number): V {
+  const g = V();
+  const gx = coastAt(geo, toWorld(ri, x + 1, y, g)) - coastAt(geo, toWorld(ri, x - 1, y, g));
+  const gy = coastAt(geo, toWorld(ri, x, y + 1, g)) - coastAt(geo, toWorld(ri, x, y - 1, g));
+  const l = Math.hypot(gx, gy) || 1;
+  return toWorld(ri, x - (gx / l) * want, y - (gy / l) * want, V()) as V;
+}
+
+/** Shallows 1–3.5 u deep over a floor of `kind`, 2–8 u off a coast: in the region known for it first, then anywhere. */
+const HOME: Partial<Record<keyof typeof FLOOR, string>> = { kelp: 'Kelp', coral: 'Coral', sand: 'Amber' };
+function floorSpot(kind: keyof typeof FLOOR): { at: V; land: V } {
+  const home = HOME[kind] ?? '\u0000', p = V();
+  const order = [...REGIONS.keys()].sort((a, b) => Number(!REGIONS[a].name.includes(home)) - Number(!REGIONS[b].name.includes(home)));
+  for (const ri of order) {
+    for (let r = 6; r < 140; r += 0.5) {
+      for (let k = 0; k < 48; k++) {
+        const a = (k / 48) * Math.PI * 2 + r * 0.37, x = r * Math.cos(a), y = r * Math.sin(a), c = coastAt(geo, toWorld(ri, x, y, p));
+        const h = heightAt(geo, p);
+        if (geo.floor[cellOf(TERRITORY, p)] !== FLOOR[kind] || c < 2 || c > 8 || h > -1 || h < -3.5) continue;
+        return { at: p.clone(), land: landward(ri, x, y, c) };
+      }
+    }
+  }
+  throw new Error(`no shallows over ${kind}`);
 }
 
 // ships riding the swell
@@ -99,8 +124,14 @@ function launch(ahead: number, aside: number, turn: number, detail = 1): void {
   const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail });
   ship.setRig(ship.rig.state('plain', 2.2, 0.7));
   scene.add(ship);
-  const lantern = sky.lights.add({ pos: V(), reach: 4.5 });
-  afloat.push({ ship, at, fwd: frameAt(at, headingToward(at, fwd.clone().add(up)) + turn).clone(), lantern });
+  const lantern = sky.lights.add({ pos: V(), reach: 4.5 }), heading = frameAt(at, headingToward(at, fwd.clone().add(up)) + turn).clone();
+  afloat.push({ ship, at, fwd: heading, lantern });
+  // under way: the wake it left over the last 20 s
+  for (let k = 40; k >= 1 && sail > 0; k--) {
+    const p = V(), t = V();
+    advance(at, heading, -sail * k * 0.5, p, t);
+    sea.wakes.feed(i, p, t, sail, (hold ?? 0) - k * 0.5);
+  }
 }
 
 function look(foot: V, toward: V | number, height: number, pitch: number): void {
@@ -156,6 +187,17 @@ if (view === 'deck') {
   const s = spot('Glass', 40);
   look(s.at, headingToward(s.at.clone().normalize(), s.land) + Math.PI, 2.5, 0.0);
   [[14, 5], [30, -10], [48, 7], [66, -10], [84, 5]].forEach(([d, x], i) => launch(d, x, 1.6 + i, d > 40 ? 0.35 : 1));
+} else if (view === 'floor') {
+  const s = floorSpot((q.get('kind') ?? 'sand') as keyof typeof FLOOR);
+  look(s.at, s.land, Number(q.get('height') ?? 7), Number(q.get('pitch') ?? -0.95));
+} else if (view === 'lane') {
+  const l = geo.lanes[Number(q.get('lane') ?? 0)];
+  look(V(l.a.x + l.b.x, l.a.y + l.b.y, l.a.z + l.b.z), V(l.b.x, l.b.y, l.b.z), Number(q.get('height') ?? 16), Number(q.get('pitch') ?? -0.6));
+  launch(14, 3, 0.2);
+} else if (view === 'wake') {
+  const s = spot('Glass', 40);
+  look(s.at, headingToward(s.at.clone().normalize(), s.land) + Math.PI, 9, -0.42);
+  launch(18, 0, 0.5);
 } else if (view === 'seam') {
   look(V(1, 1, 1), V(0, 1, 0), 24, -0.55); // a cube corner
 } else if (view === 'pole') {
@@ -166,7 +208,10 @@ if (view === 'deck') {
 aim();
 frameAt(UP, cam.heading + 1.1);
 sea.setWind(UP, F, wind);
-const weather = { wind: F.clone().multiplyScalar(wind), squall: Number(q.get('squall') ?? 0), calm: 0 };
+const calm = Number(q.get('calm') ?? 0), squall = Number(q.get('squall') ?? 0);
+sea.setWeather({ rough: (1 + 1.5 * squall) * (1 - calm), calm, squall });
+sea.swell.uniforms.uSeaLevel.value = Number(q.get('tide') ?? 0);
+const weather = { wind: F.clone().multiplyScalar(wind), squall, calm };
 
 // free camera
 let drag: { x: number; y: number } | null = null;
@@ -210,7 +255,13 @@ function frame(now: number): void {
     cam.foot.copy(outP);
   }
   aim();
-  for (const a of afloat) {
+  for (const [i, a] of afloat.entries()) {
+    if (sail > 0 && hold === null) {
+      advance(a.at, a.fwd, sail * dt, outP, outT);
+      a.at.copy(outP);
+      a.fwd.copy(outT);
+    }
+    sea.wakes.feed(i, a.at, a.fwd, sail, clock);
     sea.swell.ride(a.at, a.fwd, 6, 2, clock, ride);
     Z.copy(a.fwd).addScaledVector(ride.up, -ride.up.dot(a.fwd)).normalize();
     basis.makeBasis(X.crossVectors(ride.up, Z), ride.up, Z);

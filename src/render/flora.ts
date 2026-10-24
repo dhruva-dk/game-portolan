@@ -5,8 +5,8 @@
 // as tapered tubes. One material draws them all: a transparent wash in the region's pigment (per instance, so no two
 // crowns match), shade glazed and hatched along the plant's contours, crescent leaf marks scalloping the shadow side
 // that fade before they shrink below a few pixels, world-anchored paper, silver ink by night. Kelp and coral lie
-// under water: the sea is opaque and its shallow floors (WP13 part B) are not drawn yet, so they are laid as a veil
-// on the sea's own swelling surface, fading and cooling into the water with their true depth.
+// under water and are seen through it: drawn over the opaque sea (which paints the floor beneath them) as a veil at
+// their apparent depth, wavering under the swell, fading and cooling into the water with their true depth.
 //
 // Planting (plantBed) is fixed: a pass over the territory cells reads the drawn relief, the coast distance, the floor
 // and each region's flora, and scatters plants by integer hashes (the same every match): forests follow valleys and
@@ -309,7 +309,7 @@ export interface Species {
   far: number;
   /** Bend at the crown in a fair wind, per unit height. */
   sway: number;
-  /** Under water: laid as a veil on the sea's surface. */
+  /** Under water: seen through the sea as a veil over it. */
   veil?: true;
 }
 
@@ -526,7 +526,7 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The material: one for every species; kelp and coral as a veil on the sea.
+// The material: one for every species; kelp and coral seen through the water as a veil over the sea.
 
 const VERT = /* glsl */ `
 ${SWELL_GLSL}
@@ -567,7 +567,15 @@ void main() {
   vec4 f = seaField(dir);
   vec3 sn;
   float lift;
-  w.xyz = dir * (SEA_R + uSeaLevel + 0.035) + swell(dir, t, swellAmp(uSeaLevel - f.x), sn, lift);
+  vec3 sw = swell(dir, t, swellAmp(uSeaLevel - f.x), sn, lift);
+  // seen through clear water: raised to its apparent depth (refraction, n ≈ 4/3) and wavering under the swell's lens,
+  // the canopy riding the surface; depth-tested as the surface in front of it, so it shows over the opaque sea yet
+  // hides behind hulls and headlands
+  float d = max(vDepth, 0.0), rs = SEA_R + uSeaLevel + dot(sw, dir);
+  w.xyz += dir * (0.25 * d + dot(sw, dir) * exp(-0.8 * d)) + (sn - dir) * d * 0.6;
+  vec3 rd = normalize(w.xyz - cameraPosition);
+  float b = dot(cameraPosition, rd), disc = b * b - dot(cameraPosition, cameraPosition) + rs * rs, reach = distance(cameraPosition, w.xyz);
+  vec3 surf = cameraPosition + rd * max(min(disc > 0.0 ? -b - sqrt(disc) : reach, reach) - 0.3, 0.1);
 #else
   float bend = uWind * (0.3 + 0.7 * gust) * uSway * s * s;
   float flutter = aPart.y > 0.5 ? sin(t * 7.0 + aSeed.x * 40.0 + dot(position, vec3(9.0, 5.0, 7.0))) * 0.02 * uWind * (0.4 + gust) * s : 0.0;
@@ -582,6 +590,10 @@ void main() {
   float dist = distance(cameraPosition, root), o1 = min(uBand.w, aSeed.y), o0 = min(uBand.z, o1 * 0.8);
   vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist));
   gl_Position = projectionMatrix * viewMatrix * w;
+#ifdef VEIL
+  vec4 sc = projectionMatrix * viewMatrix * vec4(surf, 1.0);
+  gl_Position.z = sc.z / sc.w * gl_Position.w;
+#endif
 }
 `;
 
