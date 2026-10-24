@@ -1,5 +1,5 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake, kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark (WP16: the Crown Light from the pack, up the Falls Fjord, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
@@ -13,6 +13,8 @@ import { Sky } from '../../src/render/sky.ts';
 import { BEAM, type Lamp } from '../../src/render/light.ts';
 import { Structures } from '../../src/render/structures.ts';
 import { Flora } from '../../src/render/flora.ts';
+import { IceCrown } from '../../src/render/regions/iceCrown.ts';
+import { Fjords } from '../../src/render/regions/fjords.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -51,6 +53,8 @@ const structures = new Structures(style, geo, terrain.field, sky.lights, sky.bea
 const flora = new Flora(pipeline.style, geo, terrain.field, sea.swell);
 scene.add(flora.group);
 scene.add(structures.group);
+const ice = new IceCrown(style, terrain.field, sea.swell, sky), fjords = new Fjords(style, terrain.field);
+scene.add(ice.group, fjords.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -200,6 +204,15 @@ if (view === 'deck') {
   launch(18, 0, 0.5);
 } else if (view === 'seam') {
   look(V(1, 1, 1), V(0, 1, 0), 24, -0.55); // a cube corner
+} else if (view === 'crown' || view === 'fjord' || view === 'mark') {
+  const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
+  const m = REGIONS[ri].landmark, from = V(), to = V();
+  if (view === 'fjord') { toWorld(ri, -52, 5.5, from); toWorld(ri, -24, 17, to); } // up the Falls Fjord to the Great Falls
+  else if (view === 'crown') { toWorld(ri, m.x + 5, m.y - 25, from); toWorld(ri, m.x + 2, m.y, to); } // from the pack
+  else { toWorld(ri, m.x, m.y - 60, from); toWorld(ri, m.x, m.y, to); } // high above
+  const [height, pitch] = view === 'mark' ? [110, -1.1] : view === 'crown' ? [6, 0.02] : [3.4, 0.04];
+  look(from, to, Number(q.get('height') ?? height), Number(q.get('pitch') ?? pitch));
+  if (view === 'fjord') launch(15, 1.3, 0.1);
 } else if (view === 'pole') {
   look(V(Math.cos(1.37), Math.sin(1.37), 0), V(0, 1, 0), 30, -0.5);
 } else {
@@ -241,7 +254,7 @@ const ride: Riding = { position: V(), up: V() };
 const basis = new THREE.Matrix4(), X = V(), Z = V();
 let frames = 0, last = performance.now(), clock = hold ?? 0;
 const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, terrainMs,
-  terrainTriangles: 0, structureTriangles: 0, flora: flora.stats, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
+  terrainTriangles: 0, structureTriangles: 0, regionTriangles: 0, flora: flora.stats, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -272,10 +285,12 @@ function frame(now: number): void {
   sky.update(hour, clock, camera.position, weather);
   structures.update(camera.position);
   flora.update(camera);
+  ice.update(camera.position, clock, clock);
+  fjords.update(camera.position);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles, flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);
