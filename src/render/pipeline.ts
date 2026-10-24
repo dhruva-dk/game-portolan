@@ -10,8 +10,8 @@
 //      lighten with distance so the horizon stays delicate, and a world-anchored noise gives every line the wander and
 //      pressure of a nib, fixed to the thing drawn.
 //   3. Ink composite: every pixel gathers the line elements within INK_REACH pixels into an anti-aliased coverage and
-//      lays iron-gall ink over the colour (veils such as fog hide it), adds the deckle — the darker, torn tone at the
-//      frame's edge, the only screen-anchored mark — and the storm grade. Straight to the canvas at render scale 1,
+//      lays iron-gall ink over the colour (veils such as fog hide it), adds the deckle — a smooth, darker tone toward
+//      the frame's edge with no texture of its own — and the storm grade. Straight to the canvas at render scale 1,
 //      else into a target that a bilinear pass lifts to the canvas.
 //   4. Interface: `ui`, an orthographic scene in CSS px (origin top left), drawn over the canvas at full resolution.
 // No MSAA: lines carry their own coverage. 8-bit colour targets (iOS has no float32 colour buffers; nothing here
@@ -103,7 +103,7 @@ void main() {
   float fade = smoothstep(uFade.x, uFade.y, z0);
   float shadowSide = 1.0 - clamp(dot(n0, uLightView) * 0.5 + 0.5, 0.0, 1.0);
   float pressure = (0.68 + 0.64 * wander) * (0.86 + 0.28 * fibre) * weight;
-  float width = isSilhouette ? uWidth.x * (0.42 + 1.05 * shadowSide) * mix(1.0, 0.32, fade)
+  float width = isSilhouette ? uWidth.x * (0.5 + 1.0 * shadowSide) * mix(1.0, 0.32, fade)
                              : uWidth.y * crease * mix(1.0, 0.55, fade);
   float halfWidth = min(0.5 * width * pressure, ${(INK_REACH - 1.15).toFixed(2)});
   float darkness = (isSilhouette ? 1.0 : 0.82) * mix(1.0, 0.42, fade) * min(weight, 1.0);
@@ -117,7 +117,6 @@ const COMPOSITE_FRAG = /* glsl */ `
 precision highp float;
 uniform sampler2D tColor;
 uniform sampler2D tEdge;
-uniform sampler2D tPaper;
 uniform vec3 uInkLin;
 uniform vec3 uDeckle;
 uniform vec2 uCss;       // frame size, CSS px
@@ -147,13 +146,13 @@ void main() {
   }
   col = mix(col, uInkLin, cover * c.a);
 
-  // the deckle: darker, torn parchment tone at the frame's edge
-  vec2 css = gl_FragCoord.xy / uRenderPx;
-  float edge = min(min(css.x, uCss.x - css.x), min(css.y, uCss.y - css.y));
-  float tear = textureLod(tPaper, css / 1100.0, 0.0).a + 0.3 * textureLod(tPaper, css / 160.0, 0.0).r;
-  float t = edge - (tear - 0.62) * 18.0;
-  float deckle = 1.0 - smoothstep(0.0, 30.0, t);
-  col = wash(col, uDeckle, deckle * deckle * 0.3 + (1.0 - smoothstep(0.0, 3.0, t)) * 0.14);
+  // the deckle: the sheet darkened toward its edge by handling, an umber tone deepening into rounded corners. It has no
+  // texture of its own: it glazes the world's paper beneath, whose fibres, stains and washes show through it, so
+  // nothing is painted across the screen and nothing swims through it as the camera moves.
+  vec2 css = gl_FragCoord.xy / uRenderPx, e2 = min(min(css, uCss - css), vec2(200.0));
+  float edge = -14.0 * log(exp(-e2.x / 14.0) + exp(-e2.y / 14.0));
+  float deckle = 1.0 - smoothstep(-8.0, 46.0, edge);
+  col = wash(col, uDeckle, deckle * deckle * 0.34 + (1.0 - smoothstep(0.0, 2.5, edge)) * 0.12);
 
   // the storm grade (mirrors palette.ts stormGrade)
   float y = dot(col, vec3(0.2126, 0.7152, 0.0722)) / dot(SLATE, vec3(0.2126, 0.7152, 0.0722));
@@ -211,7 +210,7 @@ export class Pipeline {
    * Ink rules for the world: silhouette and crease widths at full weight (CSS px), and the view distances (world
    * units) over which lines thin and lighten toward the horizon. The camera rig sets the distances per view.
    */
-  readonly ink = { silhouette: 1.4, crease: 0.65, fadeStart: 60, fadeEnd: 520 };
+  readonly ink = { silhouette: 1.6, crease: 0.7, fadeStart: 60, fadeEnd: 520 };
   /** Storm strength over the frame, 0–1 (the storm grade). */
   storm = 0;
   readonly stats: FrameStats = {
@@ -268,7 +267,7 @@ export class Pipeline {
       uPxAngle: { value: 0 }, uRenderPx: s.uRenderPx,
     });
     this.compositePass = pass(COMPOSITE_FRAG, {
-      tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture }, tPaper: s.tPaper,
+      tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture },
       uInkLin: s.uInk, uDeckle: { value: new THREE.Vector3().fromArray(transmittance(PIGMENTS.umber)) },
       uCss: { value: this.css }, uRenderPx: s.uRenderPx, uStorm: { value: 0 },
     });

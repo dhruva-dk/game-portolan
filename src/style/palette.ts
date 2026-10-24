@@ -36,18 +36,21 @@ export function mix(a: RGB, b: RGB, t: number): RGB {
 /** Bare parchment under neutral midday light: the reference ground every pigment is authored on. */
 export const PARCHMENT = hex('#efe0c0');
 
-/** The illuminator's pigments (sRGB, as each looks on bare midday parchment at density 1). */
+/**
+ * The illuminator's pigments (sRGB): each as one transparent glaze looks on bare midday parchment at density 1, pale
+ * enough for the vellum to show through. Depth comes from density, never from opaque paint.
+ */
 export const PIGMENTS = {
   ironGall: hex('#2a211c'), // the ink: lines, hatching, lettering (a body colour)
   sepia: hex('#6b4f36'),
-  umber: hex('#87613d'),
-  ochre: hex('#d09b45'),
-  verdigris: hex('#3f9a8c'),
-  malachite: hex('#2f8a58'),
-  ultramarine: hex('#2a4ea6'),
-  indigo: hex('#263557'),
+  umber: hex('#8d6a45'),
+  ochre: hex('#d4a656'),
+  verdigris: hex('#5aa394'),
+  malachite: hex('#4c9567'),
+  ultramarine: hex('#4566b0'),
+  indigo: hex('#3e4d72'),
   vermilion: hex('#d9472b'),
-  roseMadder: hex('#c8566f'),
+  roseMadder: hex('#c7687c'),
   leadWhite: hex('#f8f3e7'), // a body colour: foam, spray, highlights
   goldLeaf: hex('#d4a64a'), // a body colour, and the only thing in the world that shines
 } as const satisfies Record<string, RGB>;
@@ -100,15 +103,15 @@ function hourKey(hour: number, paper: string, ink: string, shade: string, sunTin
 
 /** The named hours, in order through the day. Night wraps from 21:00 round to 3:30. */
 export const HOURS = {
-  night: hourKey(21.0, '#5c6789', '#14151f', '#8c95bc', '#ffffff', '#1b2142', '#3f4a78', 1),
+  night: hourKey(21.0, '#5c6789', '#14151f', '#8c95bc', '#ffffff', '#232a4c', '#46507c', 1),
   preDawn: hourKey(4.5, '#878aa6', '#1c1b27', '#a6a6c6', '#f6eef2', '#363c69', '#a9909f', 0.7),
-  dawn: hourKey(6.0, '#f0d6c6', '#2e2226', '#c9b5cd', '#fde4c8', '#8ea3cb', '#f3c6ae', 0),
-  morning: hourKey(8.5, '#f1e3c6', '#2a221d', '#bcc3d8', '#fff4dc', '#5d85c4', '#e7e4d3', 0),
-  midday: hourKey(12.0, '#efe0c0', '#28201b', '#b6bed8', '#fffaf0', '#3a67b8', '#dfe4dc', 0),
-  afternoon: hourKey(15.0, '#efdcb8', '#2a211b', '#b9b9d1', '#fff1d8', '#4a72b8', '#e9dfc8', 0),
-  goldenHour: hourKey(17.5, '#f1d4a6', '#3a2216', '#b799aa', '#ffd8a0', '#6d85b4', '#f2b673', 0),
-  dusk: hourKey(18.6, '#e8af8f', '#33201f', '#9d89ac', '#ffc89a', '#525d95', '#ea8c60', 0),
-  blueHour: hourKey(19.4, '#a69ec0', '#1f1a2a', '#8c88b3', '#e9e0f2', '#2e3a73', '#9087b7', 0.45),
+  dawn: hourKey(6.0, '#f0d6c6', '#2e2226', '#c9b5cd', '#fde4c8', '#9fb0cf', '#f2cfb8', 0),
+  morning: hourKey(8.5, '#f1e3c6', '#2a221d', '#bcc3d8', '#fff4dc', '#7a98c8', '#e7e4d3', 0),
+  midday: hourKey(12.0, '#efe0c0', '#28201b', '#b6bed8', '#fffaf0', '#6487c2', '#dfe4dc', 0),
+  afternoon: hourKey(15.0, '#efdcb8', '#2a211b', '#b9b9d1', '#fff1d8', '#6d8cc2', '#e9dfc8', 0),
+  goldenHour: hourKey(17.5, '#f1d4a6', '#3a2216', '#b799aa', '#ffd8a0', '#8296bd', '#eebd86', 0),
+  dusk: hourKey(18.6, '#e8af8f', '#33201f', '#9d89ac', '#ffc89a', '#66709f', '#e8a07a', 0),
+  blueHour: hourKey(19.4, '#a69ec0', '#1f1a2a', '#8c88b3', '#e9e0f2', '#3c4779', '#9087b7', 0.45),
 } as const satisfies Record<string, HourPalette>;
 
 export type HourName = keyof typeof HOURS;
@@ -247,9 +250,9 @@ export function trailColour(team: Team, h: HourPalette): RGB {
 /** The sea washes the waters and trails are laid over: lagoon to deep, each a wash over the hour's paper. */
 export const SEA_WASHES = {
   lagoon: { pigment: PIGMENTS.verdigris, density: 0.35 },
-  shallows: { pigment: PIGMENTS.verdigris, density: 0.8 },
-  shelf: { pigment: PIGMENTS.ultramarine, density: 0.8 },
-  deep: { pigment: PIGMENTS.indigo, density: 0.8 },
+  shallows: { pigment: PIGMENTS.verdigris, density: 0.6 },
+  shelf: { pigment: PIGMENTS.ultramarine, density: 0.6 },
+  deep: { pigment: PIGMENTS.indigo, density: 0.75 },
 } as const;
 
 export function seaColour(kind: keyof typeof SEA_WASHES, h: HourPalette): RGB {

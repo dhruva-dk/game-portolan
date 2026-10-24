@@ -37,15 +37,19 @@ const SEA_FRAG = /* glsl */ `
 in vec3 vWorld;
 uniform vec3 uIsland;
 uniform vec3 uLagoonT, uShallowT, uShelfT, uDeepT;
+uniform vec4 uDensity; // the SEA_WASHES densities, lagoon to deep
 void main() {
   vec3 up = normalize(vWorld);
   Paper q = paperAt(vWorld, up, 1.0);
   float dist = acos(clamp(dot(up, uIsland), -1.0, 1.0)) * ${R.toFixed(1)}; // from the island's centre, world units
   vec3 col = parchment(q);
-  float shallow = 1.0 - smoothstep(21.0, 34.0, dist), shelf = 1.0 - smoothstep(30.0, 70.0, dist);
-  col = wash(col, uDeepT, (1.0 - shelf) * 0.8 * granulation(q, 0.8));
-  col = wash(col, uShelfT, shelf * (1.0 - shallow) * 0.8 * granulation(q, 0.8));
-  col = wash(col, uShallowT, shallow * 0.75);
+  // the deep and the shelf bleed softly into one another; the shallows were laid after, with a frilled edge where
+  // their pigment dried into a darker ring
+  float shelf = 1.0 - smoothstep(30.0, 70.0, dist), e = dist + (q.bloom - 0.5) * 5.0;
+  float shallow = 1.0 - smoothstep(27.0, 28.2, e), dried = smoothstep(23.5, 28.0, e) * shallow;
+  col = glaze(col, uDeepT, (1.0 - shelf) * uDensity.w, 0.0, q);
+  col = glaze(col, uShelfT, shelf * (1.0 - shallow) * uDensity.z, 0.0, q);
+  col = glaze(col, uShallowT, shallow * uDensity.y, dried * 0.9, q);
   // coast rings: fine parallel lines spreading out from the shore, fainter as they go
   float ring = (dist - 21.0) / 1.5, px = fwidth(ring);
   float line = clamp(0.35 * uRenderPx + 0.5 - abs(fract(ring) - 0.5) / px, 0.0, 1.0) * step(0.5, ring) * (1.0 - smoothstep(0.0, 6.0, ring));
@@ -65,6 +69,9 @@ const sea = new THREE.Mesh(
       uShallowT: { value: transmittanceVec(SEA_WASHES.shallows.pigment) },
       uShelfT: { value: transmittanceVec(SEA_WASHES.shelf.pigment) },
       uDeepT: { value: transmittanceVec(SEA_WASHES.deep.pigment) },
+      uDensity: {
+        value: new THREE.Vector4(SEA_WASHES.lagoon.density, SEA_WASHES.shallows.density, SEA_WASHES.shelf.density, SEA_WASHES.deep.density),
+      },
     },
   }),
 );

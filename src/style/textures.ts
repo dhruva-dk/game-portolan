@@ -168,12 +168,12 @@ function paperTexture(size: number): THREE.DataTexture {
 function marksTexture(size: number): THREE.DataTexture {
   const r = rng(51);
 
-  // Foxing: rust spots of every size, most of them tiny, each a dense core in a soft irregular halo.
+  // Foxing: rust spots, most of them tiny and faint, a few darker, some gathered in loose clusters; each a dense core
+  // in a soft irregular halo.
   const fox = new Float32Array(size * size);
   const ring = fbm(size, 16, 3, 52);
-  for (let n = 0; n < 34; n++) {
-    const cx = r() * size, cy = r() * size, rad = 0.8 + r() ** 3 * 5.5, halo = rad * (2.2 + r() * 1.6);
-    const strength = 0.45 + r() * 0.55, ext = Math.ceil(halo * 1.6);
+  const spot = (cx: number, cy: number, rad: number, strength: number) => {
+    const halo = rad * (2.2 + r() * 1.6), ext = Math.ceil(halo * 1.6);
     for (let dy = -ext; dy <= ext; dy++) {
       for (let dx = -ext; dx <= ext; dx++) {
         const x = (Math.floor(cx) + dx) & (size - 1), y = (Math.floor(cy) + dy) & (size - 1);
@@ -183,16 +183,29 @@ function marksTexture(size: number): THREE.DataTexture {
         fox[i] = Math.max(fox[i], strength * Math.min(1, core * 1.8 + soft * soft * 0.35));
       }
     }
+  };
+  for (let n = 0; n < 22; n++) spot(r() * size, r() * size, 0.7 + r() ** 3 * 4.5, 0.2 + r() ** 1.5 * 0.8);
+  for (let c = 0; c < 4; c++) {
+    const cx = r() * size, cy = r() * size, reach = 6 + r() * 14;
+    for (let n = 0, count = 4 + Math.floor(r() * 8); n < count; n++) {
+      spot(cx + (r() - 0.5) * reach * 2, cy + (r() - 0.5) * reach * 2, 0.5 + r() ** 2 * 1.4, 0.15 + r() * 0.45);
+    }
   }
 
-  // Stains: where broad low-frequency noise crosses a level, water once stood and dried: a faint body and a
-  // darker tide line at its edge.
-  const field = fbm(size, 2, 5, 61);
-  const stain = new Float32Array(size * size);
-  for (let i = 0; i < stain.length; i++) {
-    const v = field[i] - 0.28;
-    const tide = Math.exp(-((v / 0.035) ** 2));
-    stain[i] = Math.min(1, (v > 0 ? 0.3 : 0) * Math.min(1, v / 0.05) + tide * 0.75);
+  // Stains: a few places where water once stood and dried, each of its own size and strength: a faint, uneven body
+  // and a darker tide line along its frilled edge. Most of the sheet is clean.
+  const stain = new Float32Array(size * size), frill = fbm(size, 12, 4, 61), body = fbm(size, 6, 3, 62);
+  for (let n = 0; n < 5; n++) {
+    const cx = r() * size, cy = r() * size, rad = size * (0.06 + r() ** 2 * 0.14);
+    const fill = 0.08 + r() * 0.22, tide = 0.2 + r() * 0.45, ext = Math.ceil(rad * 1.6);
+    for (let dy = -ext; dy <= ext; dy++) {
+      for (let dx = -ext; dx <= ext; dx++) {
+        const x = (Math.floor(cx) + dx) & (size - 1), y = (Math.floor(cy) + dy) & (size - 1), i = y * size + x;
+        const d = Math.hypot(dx, dy) / rad + frill[i] * 0.35;
+        const v = (d < 1 ? fill * (0.55 + 0.45 * d + body[i] * 0.6) : 0) + tide * Math.exp(-(((d - 1) / 0.035) ** 2));
+        stain[i] = 1 - (1 - stain[i]) * (1 - Math.min(1, Math.max(0, v)));
+      }
+    }
   }
 
   // Dry brush: bristle tracks along x, each its own darkness, broken where the loaded brush skipped the tooth.

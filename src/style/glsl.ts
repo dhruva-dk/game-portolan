@@ -168,13 +168,28 @@ Paper paperAt(vec3 p, vec3 n, float marks) {
 
 // Bare parchment (linear) under the hour's light: fibre and mottle, water stains, foxing.
 vec3 parchment(Paper q) {
-  vec3 c = uPaper * (1.0 + (q.fibre - 0.5) * 0.075 + (q.mottle - 0.5) * 0.1);
-  c = wash(c, STAIN_T, q.stain * 0.5);
+  vec3 c = uPaper * (1.0 + (q.fibre - 0.5) * 0.09 + (q.mottle - 0.5) * 0.12);
+  c = wash(c, STAIN_T, q.stain * 0.4);
   return wash(c, FOX_T, q.fox * 0.45);
 }
 
 // Density multiplier for granulation: pigment settles into the tooth, more the deeper the wash.
-float granulation(Paper q, float density) { return 1.0 + (q.grain - 0.5) * 0.4 * clamp(density - 0.25, 0.0, 1.2); }
+float granulation(Paper q, float density) { return 1.0 + (q.grain - 0.5) * 0.55 * clamp(density - 0.2, 0.0, 1.2); }
+
+// The style's wash: a transparent glaze of pigment transmittance t at density d over ground (linear: parchment(q), or
+// an earlier glaze). It only darkens what lies beneath, so the paper's tone, fibres and stains show through every
+// colour. The load is uneven (the brush's charge, and backruns where the wash bloomed), all fixed to the paper; it
+// granulates where deep; and a dark pigment is laid no deeper than GLAZE_FLOOR of the ground's value, so that its
+// hatching still carries the shadow. pool (washPool, or a wash edge of the caller's own) adds the darker ring where
+// the drying pigment gathered.
+const float GLAZE_FLOOR = 0.2;
+vec3 glaze(vec3 ground, vec3 t, float d, float pool, Paper q) {
+  d = min(d, log(GLAZE_FLOOR) / log(clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)), 1e-3, 0.999)));
+  float bloom = smoothstep(0.64, 0.68, q.bloom) * smoothstep(0.3, 0.9, d);
+  float load = (1.0 + (q.mottle - 0.5) * 0.35 + (q.bloom - 0.5) * 0.2)
+             * (1.0 - 0.18 * bloom + bloom * (1.0 - bloom));
+  return wash(ground, t, d * load * (1.0 + pool) * granulation(q, d));
+}
 
 // ---- hatching --------------------------------------------------------------------------------------------
 // One stroke of a family: line index i at fine spacing S (continuous spacing Sc, octave fraction f), lines running
@@ -241,12 +256,13 @@ float lightTone(float ndl, float nv) {
 }
 
 // ---- washes ----------------------------------------------------------------------------------------------
-// The shade glaze over the side turned from the light: flat, with a frilled edge where it backed into the drying
+// The shade glaze over the side turned from the light, kept light because the hatching carries the shadow: flat, with
+// a frilled edge where it backed into the drying
 // wash (bloom) and pigment pooled darker along that edge. Returns the glazed colour.
 vec3 shadeGlaze(vec3 col, float tone, Paper q) {
   float g = smoothstep(0.5, 0.62, tone + (q.bloom - 0.5) * 0.22);
   float rim = g * (1.0 - g) * 4.0;
-  return wash(col, uShade, g * 0.62 + rim * 0.32);
+  return wash(col, uShade, g * 0.42 + rim * 0.3);
 }
 
 // How much darker a wash pools toward the silhouette: a narrow rim of steady on-screen width where the drying
@@ -255,7 +271,8 @@ vec3 shadeGlaze(vec3 col, float tone, Paper q) {
 float washPool(vec3 n, vec3 v, Paper q) {
   float nv = abs(dot(n, v));
   float px = nv / max(fwidth(nv), 1e-4) / uRenderPx;            // CSS px to the silhouette
-  return (1.0 - smoothstep(0.0, 3.5 + 2.5 * q.bloom, px)) * 0.75 + pow(1.0 - nv, 3.0) * 0.3;
+  float ring = 1.0 - smoothstep(1.5, 7.0 + 5.0 * q.bloom, px);
+  return ring * ring * 0.9 + pow(1.0 - nv, 3.0) * 0.25;
 }
 
 // The lit side's warm glaze (strong at golden hour, nothing at midday).
@@ -455,7 +472,7 @@ void main() {
   vec3 col = goldLeaf(n, v, normalize(vWorld), vAnchor, an);
   tone *= 0.6;
 #else
-  vec3 col = wash(parchment(q), uPigment, uDensity * (1.0 + washPool(n, v, q)) * granulation(q, uDensity));
+  vec3 col = glaze(parchment(q), uPigment, uDensity, washPool(n, v, q), q);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
 #endif
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed));
@@ -471,8 +488,9 @@ void main() {
 let nextSeed = 0;
 
 /**
- * The style's standard material for solid things: a flat pigment wash over world-anchored parchment, pooled at the
- * silhouette and granulating where deep, a shade glaze with a bloomed edge, the hour's warm glaze on the lit side,
+ * The style's standard material for solid things: a transparent glaze of pigment over world-anchored parchment
+ * (uneven, pooled into a dried ring at the silhouette, granulating where deep; dark pigments laid thin), a light shade
+ * glaze with a bloomed edge, the hour's warm glaze on the lit side,
  * and hatching that follows the form, deepening to cross-hatching as the light falls away. Or gold leaf.
  */
 export function illustratedMaterial(style: Style, o: IllustratedOptions): THREE.ShaderMaterial {
