@@ -5,7 +5,10 @@
 import { hash64 } from '../../src/sim/codec.ts';
 import { STEER_MAX, idleInput, record, recorder, type Recording, type ShipInput } from '../../src/sim/input.ts';
 import * as m from '../../src/sim/math.ts';
+import { seaFor, type World } from '../../src/sim/environment.ts';
 import { runMatch } from '../../src/sim/match.ts';
+import { buildGeography } from '../../src/sim/world/geography.ts';
+import { buildNav } from '../../src/sim/world/nav.ts';
 import {
   TERRITORY, advance, angleBetween, bearingOf, cellDir, cellOf, faceUV, fromLatLon, horizonDistance, localFrame,
   tangentAt, tangentToward,
@@ -111,15 +114,26 @@ export function recordInputs(inputs: ShipInput[]): Recording {
   return rec.recording;
 }
 
+let built: World | null = null;
+
+/** The fixed world, built once. */
+export function world(): World {
+  if (!built) {
+    const geo = buildGeography();
+    built = { geo, nav: buildNav(geo) };
+  }
+  return built;
+}
+
 /** Two minutes of match with recorded inputs, straight through and resumed from a snapshot halfway. */
 function matchVectors(): { match: string; resumed: string } {
-  const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks));
-  const whole = createMatch({ seed: 20261024 });
-  runMatch(whole, recording, ticks);
-  const half = createMatch({ seed: 20261024 });
-  runMatch(half, recording, ticks / 2);
+  const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks)), seed = 20261024, sea = seaFor(world(), seed);
+  const whole = createMatch({ seed, forms: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0] });
+  runMatch(sea, whole, recording, ticks);
+  const half = createMatch({ seed, forms: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0] });
+  runMatch(sea, half, recording, ticks / 2);
   const resumed = decodeMatch(encodeMatch(half));
-  runMatch(resumed, recording, ticks);
+  runMatch(sea, resumed, recording, ticks);
   return { match: matchHash(whole), resumed: matchHash(resumed) };
 }
 

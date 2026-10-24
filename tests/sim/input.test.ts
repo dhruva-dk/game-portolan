@@ -8,11 +8,12 @@ import {
   FLAG, INPUT_FIELDS, applyControls, idleInput, inputAt, parseRecording, record, recorder, replay, type Recording,
   type ShipInput,
 } from '../../src/sim/input.ts';
+import { seaFor } from '../../src/sim/environment.ts';
 import { rngFrom, rngInt } from '../../src/sim/math.ts';
 import { runMatch, step } from '../../src/sim/match.ts';
 import { TERRITORY } from '../../src/sim/sphere.ts';
 import { SAIL, TICK, createMatch, decodeMatch, encodeMatch, matchHash } from '../../src/sim/state.ts';
-import { recordInputs, scriptedInputs } from './vectors.ts';
+import { recordInputs, scriptedInputs, world } from './vectors.ts';
 
 test('a recording replays the exact input of every tick, from any tick, through JSON', () => {
   const inputs = scriptedInputs(1, 20_000), recording = recordInputs(inputs);
@@ -67,9 +68,8 @@ test('recording refuses invalid input, and parsing refuses invalid recordings', 
 
 test('controls: sail steps stop at reefed and full; a course is set, kept, copied and dropped', () => {
   const s = createMatch({ seed: 1 }), ship = s.ships[0];
-  assert.equal(ship.sail, SAIL.plain);
+  assert.equal(ship.sail, SAIL.full, 'the fleet rides the Great Current under full sail');
   const at = (patch: Partial<ShipInput>) => applyControls(ship, { ...idleInput(), ...patch });
-  at({ sail: 1 });
   at({ sail: 1 });
   assert.equal(ship.sail, SAIL.full);
   for (let i = 0; i < 4; i++) at({ sail: -1 });
@@ -88,7 +88,7 @@ test('the same seed and inputs give the same match; any difference shows in the 
   const recording = recordInputs(scriptedInputs(7, 9000));
   const run = (seed: number, rec: Recording) => {
     const s = createMatch({ seed });
-    runMatch(s, rec, 9000);
+    runMatch(seaFor(world(), seed), s, rec, 9000);
     assert.equal(s.tick, 9000);
     return matchHash(s);
   };
@@ -103,19 +103,19 @@ test('the same seed and inputs give the same match; any difference shows in the 
 
 test('a match resumed from a snapshot at any tick ends identical to one never interrupted', () => {
   const end = 6000, recording = recordInputs(scriptedInputs(3, end));
-  const whole = createMatch({ seed: 9 });
-  runMatch(whole, recording, end);
+  const whole = createMatch({ seed: 9 }), sea = seaFor(world(), 9);
+  runMatch(sea, whole, recording, end);
   const r = rngFrom(4);
   for (let i = 0; i < 12; i++) {
     const k = i === 0 ? 0 : i === 1 ? end - 1 : rngInt(r, end);
     const s = createMatch({ seed: 9 });
-    runMatch(s, recording, k);
+    runMatch(sea, s, recording, k);
     const resumed = decodeMatch(encodeMatch(s));
-    runMatch(resumed, recording, end);
+    runMatch(sea, resumed, recording, end);
     assert.equal(matchHash(resumed), matchHash(whole), `snapshot at tick ${k}`);
   }
   // The runner is the step: stepping by hand with the replayed inputs gives the same state.
   const byHand = createMatch({ seed: 9 }), inputs = replay(recording);
-  while (byHand.tick < end) step(byHand, inputAt(inputs, byHand.tick));
+  while (byHand.tick < end) step(sea, byHand, inputAt(inputs, byHand.tick));
   assert.equal(matchHash(byHand), matchHash(whole));
 });

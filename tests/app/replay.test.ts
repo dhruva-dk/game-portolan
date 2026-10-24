@@ -5,10 +5,11 @@
 //   node --test tests/app/replay.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { seaFor } from '../../src/sim/environment.ts';
 import { runMatch } from '../../src/sim/match.ts';
 import { createMatch, matchHash } from '../../src/sim/state.ts';
 import { serve, launch, openGame } from '../harness.ts';
-import { recordInputs, scriptedInputs } from '../sim/vectors.ts';
+import { recordInputs, scriptedInputs, world } from '../sim/vectors.ts';
 
 const SEED = 0x5eed05;
 const TICKS = 450;
@@ -24,7 +25,7 @@ const RUNS: Run[] = [
 test('a replay ends on the headless hash at any frame rate across background and resume', async (t) => {
   const recording = recordInputs(scriptedInputs(SEED, TICKS));
   const headless = createMatch({ seed: SEED });
-  runMatch(headless, recording, TICKS);
+  runMatch(seaFor(world(), SEED), headless, recording, TICKS);
   const expected = matchHash(headless);
   t.diagnostic(`Node: ${expected} after ${TICKS} ticks`);
 

@@ -2,6 +2,7 @@
 // the background and coming back. The boot (main.ts), the screens and the test hooks drive the game through it.
 import type { Lettering } from '../lettering/ink.ts';
 import type { Pipeline } from '../render/pipeline.ts';
+import { seaFor } from '../sim/environment.ts';
 import { idleInput, type Recording } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
 import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
@@ -69,7 +70,7 @@ export class Game implements Runtime {
 
   private play(m: SavedMatch): void {
     if (!this.world) throw new Error('play: the world has not arrived');
-    this.session = new Session(m, idleInput); // the live input source until the match controls (WP25) supply it
+    this.session = new Session(seaFor(this.world, m.state.seed), m, idleInput); // the live input source until the match controls (WP25) supply it
     this.loop.run(this.session);
     this.shell.go('match');
     void clearMatch(); // a saved match is spent once it plays again, and a new match replaces it

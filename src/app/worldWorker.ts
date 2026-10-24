@@ -2,17 +2,14 @@
 // while the title letters itself in, and keeps them in IndexedDB under a hash of the simulation's source
 // (__WORLD_KEY__, vite.config.ts), so later launches read them back in milliseconds and a changed simulation never
 // meets a stale world. The arrays move to the main thread without a copy.
-import { buildGeography, type Geography } from '../sim/world/geography.ts';
-import { buildNav, type Nav } from '../sim/world/nav.ts';
+import type { World } from '../sim/environment.ts';
+import { buildGeography } from '../sim/world/geography.ts';
+import { buildNav } from '../sim/world/nav.ts';
 import { read, write } from './save.ts';
 
 declare const __WORLD_KEY__: string;
 
-/** The fixed world every match is sailed on. */
-export interface World {
-  readonly geo: Geography;
-  readonly nav: Nav;
-}
+export type { World };
 
 /** What the worker posts: the world, the milliseconds it took to get and whether it came from the cache. */
 export interface WorldMessage {

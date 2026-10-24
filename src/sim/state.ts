@@ -2,9 +2,11 @@
 // only the step (match.ts) writes. Its shape is declared once, as codec schemas; its TypeScript types, its
 // snapshot encoding and its hash all follow from them. To add state, add a field to a schema here and bump
 // MATCH_FORMAT.version, so snapshots of the old shape are discarded rather than misread.
-import { bytes, decode, encode, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
-import { hash32, rngFrom } from './math.ts';
-import { TERRITORY } from './sphere.ts';
+import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
+import { addScaled, cross, dot, hash32, normalize, rngFrom, v3 } from './math.ts';
+import { TERRITORY, advance, tangentToward } from './sphere.ts';
+import { FORMS, GUSTS, SAILS, SLOTS, START_FITTINGS } from './tables.ts';
+import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 
 /** Seconds per tick: the simulation's fixed timestep. */
 export const TICK = 1 / 30;
@@ -15,45 +17,92 @@ export const SHIPS = 10;
  * The random streams, one generator each, so a system that draws more or fewer numbers never shifts another
  * system's draws. Captain ship i (1–9) draws from stream `captains + i − 1`.
  */
-export const STREAM = { world: 0, weather: 1, loot: 2, storm: 3, captains: 4 } as const;
+export const STREAM = { world: 0, weather: 1, wind: 2, loot: 3, storm: 4, captains: 5 } as const;
 const STREAMS = STREAM.captains + SHIPS - 1;
 
 /** The sail settings that ShipInput.sail steps between. */
 export const SAIL = { reefed: 0, plain: 1, full: 2 } as const;
 
+/** A point or direction in space: positions are unit vectors from the planet's centre, headings unit tangents. */
+const XYZ = rec(['x', f64], ['y', f64], ['z', f64]);
+
 const SHIP = rec(
+  ['form', int], // a FORM
+  ['pos', XYZ], // where the ship is
+  ['head', XYZ], // where its bow points
+  ['was', XYZ], // the position a tick ago, and the heading: the renderer interpolates from them
+  ['wasHead', XYZ],
+  ['speed', f64], // u/s through the water along the heading
+  ['rate', f64], // turn rate, rad/s, positive to starboard
+  ['shove', XYZ], // a tangent velocity in u/s from blows (collisions), dying away
   ['sail', int], // a SAIL setting
   ['course', list(int)], // the drawn course: territory cells to sail through in order; empty when steering by hand
+  ['leg', int], // the course point being sailed for
+  ['home', list(int)], // while head home is held: the route to the ship's own waters, as territory cells
+  ['homeLeg', int],
+  ['homing', bool], // head home was held last tick
+  ['torn', f64], // seconds left of sails torn by chain shot
+  ['fittings', list(rec(['kind', int], ['tier', int]), SLOTS)], // by SLOT: a FITTING and its tier
+  ['bump', f64], // this tick's impact: the closing speed in u/s, 0 when nothing was struck
+  ['bumped', int], // what was struck: −1 nothing, a ship index, or SHIPS for land
+  ['bumpOn', f64], // where on the hull: −1 the stern … 1 the bow
 );
+
+/** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
+const GUST = rec(['at', XYZ], ['age', f64], ['life', f64], ['r', f64]);
 
 const MATCH = rec(
   ['seed', int], // the match seed, a uint32
   ['tick', int], // ticks stepped; match time is tick·TICK
   ['rng', list(words(4), STREAMS)], // each STREAM's generator
   ['ships', list(SHIP, SHIPS)],
+  ['gusts', list(GUST, GUSTS.count)],
   ['owner', bytes(TERRITORY.cells)], // who holds each territory cell: 0 nobody, else ship index + 1
   ['trail', bytes(TERRITORY.cells)], // whose open trail crosses each cell, coded the same way
 );
 
 export type Ship = Value<typeof SHIP>;
+export type Gust = Value<typeof GUST>;
 export type MatchState = Value<typeof MATCH>;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 1, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 2, schema: MATCH };
 
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
   /** A uint32. */
   seed: number;
+  /** Each ship's FORM, player first; every ship sails the starting pinnace when left out. */
+  forms?: readonly number[];
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed } = setup;
+  const { seed, forms = new Array<number>(SHIPS).fill(0) } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
+  if (forms.length !== SHIPS || !forms.every((f) => Number.isInteger(f) && f >= 0 && f < FORMS.length)) {
+    throw new RangeError(`createMatch: forms ${forms} are not ${SHIPS} FORM ids`);
+  }
   const rng: Uint32Array[] = [];
   for (let s = 0; s < STREAMS; s++) rng.push(rngFrom(hash32(seed, s)));
-  const ships: Ship[] = [];
-  for (let i = 0; i < SHIPS; i++) ships.push({ sail: SAIL.plain, course: [] });
-  return { seed, tick: 0, rng, ships, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells) };
+  const route = greatCurrent(seed), ships: Ship[] = [], gusts: Gust[] = [];
+  for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, forms[i]));
+  for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
+  return { seed, tick: 0, rng, ships, gusts, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells) };
+}
+
+/** The fleet's places at the head of the Great Current: two ranks of five abreast, the player in the front centre. */
+const FILE = [0, -1, 1, -2, 2], ABREAST = 3.5, RANK_AT = [6, 2]; // RANK_AT: route points (every ~2 u) of each rank
+
+/** Ship i under full sail in its place at the head of the Great Current, ready to ride it. */
+function launch(route: CurrentRoute, i: number, form: number): Ship {
+  const p = route.points, k = 3 * RANK_AT[(i / 5) | 0], at = v3(p[k], p[k + 1], p[k + 2]);
+  const head = tangentToward(at, v3(p[k + 9], p[k + 10], p[k + 11]), v3()), pos = v3(), side = cross(v3(), head, at);
+  advance(at, side, FILE[i % 5] * ABREAST, pos, side);
+  normalize(addScaled(head, head, pos, -dot(head, pos)));
+  return {
+    form, pos, head, was: { ...pos }, wasHead: { ...head }, speed: FORMS[form].speed * SAILS[SAIL.full].speed, rate: 0,
+    shove: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
+    fittings: START_FITTINGS.map((kind) => ({ kind, tier: 0 })), bump: 0, bumped: -1, bumpOn: 0,
+  };
 }
 
 /** The snapshot of a match: everything needed to continue it exactly. */
