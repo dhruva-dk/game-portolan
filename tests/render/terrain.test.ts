@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { CHUNK, GROUND, LEVELS, TerrainField, buildChunks, groundAt, template, type Surface } from '../../src/render/terrain.ts';
+import { KEEP, CHUNK, GROUND, LEVELS, TerrainField, buildChunks, groundAt, template, type Surface } from '../../src/render/terrain.ts';
 import { TERRITORY, cellDir } from '../../src/sim/sphere.ts';
 import { v3 } from '../../src/sim/math.ts';
 import { buildGeography } from '../../src/sim/world/geography.ts';
@@ -86,4 +86,15 @@ test('the surface queries follow the mesh: heights at its vertices, outward norm
   assert.equal(groundAt(region('spiceIsles'), 3, 0.3), GROUND.cliff);
   assert.equal(groundAt(region('basaltStacks'), 3, 0.3), GROUND.basalt);
   assert.equal(groundAt(region('mangroveLabyrinth'), 0.5, 0.99), GROUND.mud);
+});
+
+test('the carving keeps the geography at and below the highest tide, and eases tall land to the planet scale', () => {
+  let sim = 0, drawn = 0;
+  for (let c = 0; c < geo.heights.length; c++) {
+    const h = geo.heights[c], r = field.relief[c];
+    if (h <= KEEP) assert.equal(r, h);
+    else assert.ok(r >= KEEP, `cell ${c}: ${r} under the shore`);
+    if (h > 4) { sim += h; drawn += r; }
+  }
+  assert.ok(drawn < sim * 0.95, `drawn ${drawn} of ${sim}`);
 });

@@ -7,17 +7,25 @@
 // vertices onto the coarser line; the whole planet's land is then one index buffer and one draw call. The planet's
 // curve is real geometry, as for the sea, so distant islands sink hull-down behind it.
 //
-// The waterline is the sea's own: the land is never laid below the sea's surface, and the fragment discards
-// wherever the sea's field (the same cube texture the sea reads) puts water, then inks the inner half of the sea's
-// coast line, so the land meets the coast rings and foam exactly. The ground is washed in each region's pigments:
-// sand by its colour (white, gold, black, mud, ice, shingle) with tide lines and grains, rock and cliffs in strata,
-// basalt in hexagonal columns, scree stippled, ice glazed blue, uplands in the foliage wash; hatching follows the
-// slope's contours and deepens to cross-hatching away from the light; the composite inks silhouettes and creases.
+// The land is drawn from the geography's heights carved into believable landforms (Relief, below): hills, saddles,
+// crags and peaks in place of flat tops, gullies cut down the fall line into ravines, wave-cut benches at the cliffs'
+// feet and strata stepping the slopes, all brought to the planet's scale; every cell at or below the highest tide keeps
+// the geography's height, so the sim's coast is the drawn one. The waterline is the sea's own: the land is never laid
+// below the sea's surface, and the fragment discards wherever the sea's field (the same cube texture the sea reads)
+// puts water (sheer walls keep their own sub-cell foot rather than be sawn into teeth along it), then inks the inner
+// half of the sea's coast line, so the land meets the coast rings and foam exactly. Finer than the cells, the shader
+// lights sub-cell relief (ridged lumps, the lips of the beds) and draws the ground in each region's pigments: sand by
+// its colour with tide lines, ripples, grains and pebbles; rock in beds bent by folds, tilted by the region's dip and
+// broken along faults, with staggered joints and fissures; basalt in hexagonal columns; volcanic crust cracked; ice
+// striated; scree stippled densest in the talus fans at the cliffs' feet, with boulders and outcrops; moss, lichen and
+// dry ground in the washes, which pool where grounds meet. Hatching follows the beds on rock and the contours
+// elsewhere, deepening to cross-hatching away from the light; the brow and foot of every cliff are inked, heavier near
+// the eye; the composite inks silhouettes and creases.
 import * as THREE from 'three';
 import { inkMaterial, transmittanceVec } from '../style/glsl.ts';
 import { PIGMENTS, type RGB } from '../style/palette.ts';
 import { v3, type V3 } from '../sim/math.ts';
-import { R, TERRITORY, cellOf, faceUV, gnomonicDir, type FaceUV } from '../sim/sphere.ts';
+import { R, TERRITORY, cellDir, cellOf, faceUV, gnomonicDir, type FaceUV } from '../sim/sphere.ts';
 import { CHARTS, type Geography } from '../sim/world/geography.ts';
 import { FLOOR, REGIONS, TIDE, type Region } from '../sim/world/regions.ts';
 import type { Pipeline } from './pipeline.ts';
@@ -86,6 +94,153 @@ export function groundAt(ri: number, height: number, up: number): Ground {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// Relief: the geography's heights carved for drawing into the landforms a master engraver draws from life. The sim's
+// coast is untouched: every cell at or below KEEP keeps its height to the bit, so the waterline at every tide is the
+// geography's, and the carving fades in above it. Above, (0) the profile from the shore is a cliff where the coast is
+// cliffed and a slope rising inland where it is not, so headlands alternate with hills running down to coves; (1) wave-cut benches hold the first cells under a cliff at the
+// highest tide's shelf, so sea cliffs step down to the water; (2) a domain-warped ridged field lifts the land inland
+// into hills, saddles and peaks, so no top is a flat mesa; (3) outcrops roughen it at the cells' own scale; (4) gullies
+// are cut down the fall line (noise stretched along the coast distance's gradient), notching the cliff edges into
+// ravines; (5) tall land is eased down to the planet's scale, so islands read as land on a globe from orbit rather
+// than pillars while deck views keep their cliffs; (6) strata step the slopes into benches (basalt in taller columnar
+// steps). Each region's style comes from its own data (reliefOf).
+
+/** Heights at or below this, u, are the geography's own: the highest tide with a margin, so the sim's waterline holds. */
+export const KEEP = TIDE.amp + 0.25;
+
+export interface Relief {
+  /** Relief amplitude, u: the region's cliff height, 2 … 18. */
+  amp: number;
+  /** Cliffed coast, ridged crags (0 rounded … 1 jagged), gully depth, strata terracing and wave-cut benches, shares. */
+  sheer: number;
+  crag: number;
+  gully: number;
+  terrace: number;
+  bench: number;
+  /** Strata step, u (basalt's columns stand in taller steps). */
+  step: number;
+}
+
+/** How region r's land is carved, from its own data: cliff height, landform, sand and climate. Ice rounds and low
+ *  sand islands barely rise; the high regions (Fjords, Weeping Isle, Basalt) are craggy and deeply gullied; volcanic
+ *  land is the most jagged; basalt terraces in columns. */
+export function reliefOf(r: Region): Relief {
+  const form = landformOf(r), amp = THREE.MathUtils.clamp(r.shore.cliffH, 2, 18), high = THREE.MathUtils.clamp((amp - 3) / 12, 0, 1);
+  const flat = form === 2 || amp <= 3;
+  return {
+    amp,
+    sheer: form === 2 ? 0.5 : sandOf(r) === 'black' ? 0.4 : 0.25 + 0.5 * high,
+    crag: form === 2 ? 0.15 : sandOf(r) === 'black' ? 0.95 : amp <= 3 ? 0.1 : 0.4 + 0.5 * high,
+    gully: form === 2 ? 0.35 : 0.45 + 0.55 * high,
+    terrace: form === 1 ? 0.8 : flat ? 0 : 0.25 + 0.3 * high,
+    bench: flat ? 0 : 0.35 + 0.4 * high,
+    step: form === 1 ? 1.5 : 1.15,
+  };
+}
+
+const smooth = (a: number, b: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+function hash3(x: number, y: number, z: number): number {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+const smin = (a: number, b: number, k: number): number => {
+  const t = Math.min(1, Math.max(0, 0.5 + (0.5 * (b - a)) / k));
+  return b + (a - b) * t - k * t * (1 - t);
+};
+const ease = (t: number): number => t * t * t * (t * (t * 6 - 15) + 10);
+/** Value noise in [−1, 1] on the unit lattice. */
+function noise3(x: number, y: number, z: number): number {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), u = ease(x - ix), v = ease(y - iy), w = ease(z - iz);
+  const a = hash3(ix, iy, iz), b = hash3(ix + 1, iy, iz), c = hash3(ix, iy + 1, iz), d = hash3(ix + 1, iy + 1, iz);
+  const e = hash3(ix, iy, iz + 1), f = hash3(ix + 1, iy, iz + 1), g = hash3(ix, iy + 1, iz + 1), k = hash3(ix + 1, iy + 1, iz + 1);
+  const ab = a + (b - a) * u, cd = c + (d - c) * u, ef = e + (f - e) * u, gk = g + (k - g) * u;
+  const lo = ab + (cd - ab) * v;
+  return 2 * (lo + (ef + (gk - ef) * v - lo) * w) - 1;
+}
+/** Ridged multifractal in [0, 1]: sharp crests, each octave weighted by the one above (crags on the crests). */
+function ridged(x: number, y: number, z: number, octaves: number): number {
+  let sum = 0, norm = 0, amp = 1, weight = 1, f = 1;
+  for (let o = 0; o < octaves; o++) {
+    const r = 1 - Math.abs(noise3(x * f, y * f, z * f)), s = r * r * weight;
+    sum += s * amp;
+    norm += amp;
+    weight = Math.min(1, s * 1.8);
+    amp *= 0.5;
+    f *= 2.07;
+  }
+  return sum / norm;
+}
+function fbm3(x: number, y: number, z: number, octaves: number): number {
+  let sum = 0, norm = 0, amp = 1, f = 1;
+  for (let o = 0; o < octaves; o++) {
+    sum += amp * noise3(x * f + o * 17.1, y * f, z * f);
+    norm += amp;
+    amp *= 0.5;
+    f *= 2.03;
+  }
+  return sum / norm;
+}
+
+/** Every cell's drawn height: the geography's at or below KEEP, carved above it. */
+export function carve(geo: Geography): Float32Array {
+  const H = geo.heights, C = geo.coast, out = Float32Array.from(H), styles = REGIONS.map(reliefOf);
+  const d = v3(), di = v3(), dj = v3();
+  for (let c = 0; c < H.length; c++) {
+    const h = H[c];
+    if (h <= KEEP) continue;
+    const s = styles[geo.region[c]], i = c % N, j = Math.floor(c / N) % N, inland = Math.max(0, -C[c]);
+    cellDir(TERRITORY, c, d);
+    const x = d.x * R, y = d.y * R, z = d.z * R;
+    // the fall line (seaward, unit): the coast distance's gradient toward the cell's neighbours on its face
+    let gx = 0, gy = 0, gz = 0;
+    if (i < N - 1 && j < N - 1) {
+      cellDir(TERRITORY, c + 1, di);
+      cellDir(TERRITORY, c + N, dj);
+      const a = C[c + 1] - C[c], b = C[c + N] - C[c];
+      const ex = di.x - d.x, ey = di.y - d.y, ez = di.z - d.z, el = Math.hypot(ex, ey, ez);
+      const nx = dj.x - d.x, ny = dj.y - d.y, nz = dj.z - d.z, nl = Math.hypot(nx, ny, nz);
+      gx = (a * ex) / el + (b * nx) / nl; gy = (a * ey) / el + (b * ny) / nl; gz = (a * ez) / el + (b * nz) / nl;
+      const gl = Math.hypot(gx, gy, gz);
+      if (gl > 1e-3) { gx /= gl; gy /= gl; gz /= gl; } else gx = gy = gz = 0;
+    }
+    const w = smooth(KEEP, KEEP + 2, h), rise = smooth(0, 3 + 0.4 * s.amp, inland);
+    let e = h - KEEP;
+    const k = smooth(-0.3, 0.3, noise3(x / 17 + 1.7, y / 17, z / 17) + s.sheer - 0.5);
+    const slope = (0.3 + 0.25 * (1 + noise3(x / 11, y / 11 + 4.4, z / 11))) * (0.5 + s.amp / 18);
+    e = smin(e, s.amp * 0.45 * (0.2 + 0.8 * k) + inland * slope, 1);
+    const bench = k * s.bench * smooth(2, 5, h) * (1 - smooth(0.9, 1.7, inland)) * smooth(-0.1, 0.25, noise3(x / 7, y / 7, z / 7));
+    e += (0.15 - e) * bench;
+    const wb = w * (1 - 0.85 * bench);
+    const qx = x / 26 + 0.9 * noise3(x / 41, y / 41, z / 41), qy = y / 26 + 0.9 * noise3(x / 41 + 5.2, y / 41, z / 41);
+    const qz = z / 26 + 0.9 * noise3(x / 41, y / 41 + 9.7, z / 41);
+    const round = 0.5 + 0.5 * fbm3(qx * 0.8, qy * 0.8, qz * 0.8, 2);
+    const shape = Math.min(1.2, round + (1.6 * ridged(qx, qy, qz, 4) - round) * s.crag);
+    e += wb * s.amp * rise * (0.6 * shape - 0.25);
+    e += wb * s.amp * 0.5 * smooth(4, 30, inland) * (0.5 + 0.5 * round); // great islands climb to a massif
+    e += wb * s.amp * (0.04 + 0.07 * s.crag) * fbm3(x / 2.6, y / 2.6, z / 2.6, 2);
+    // moving inland by D moves the gully sample by D/5 down the fall line: channels five times longer than wide
+    const gf = 1 / 4.5, gs = inland * gf * 0.8;
+    const n1 = noise3(x * gf + gx * gs, y * gf + gy * gs, z * gf + gz * gs);
+    const n2 = noise3(2.1 * (x * gf + gx * gs) + 3.3, 2.1 * (y * gf + gy * gs), 2.1 * (z * gf + gz * gs));
+    const cut = Math.max(1 - smooth(0, 0.22, Math.abs(n1)), 0.6 * (1 - smooth(0, 0.16, Math.abs(n2))));
+    e -= wb * s.gully * cut * Math.max(0, Math.min(e, s.amp)) * 0.55 * (1 - smooth(8, 22, inland));
+    e = Math.max(e, Math.min(h - KEEP, 0.12));
+    let hr = KEEP + (e * 0.85) / (1 + e / 40);
+    if (s.terrace > 0) {
+      const off = 0.8 * noise3(x / 30, y / 30, z / 30), t = (hr - KEEP + off) / s.step, fl = Math.floor(t);
+      const stepped = KEEP + (fl + smooth(0.55, 0.95, t - fl)) * s.step - off;
+      hr += (stepped - hr) * s.terrace * wb * (0.5 + 0.5 * noise3(x / 9, y / 9 + 3.1, z / 9));
+    }
+    out[c] = Math.max(hr, KEEP + Math.min(h - KEEP, 0.1));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // The terrain field: corner heights, positions and normals, and the surface queries B (structures) and C (flora)
 // place things with.
 
@@ -107,6 +262,8 @@ export interface Surface {
 
 export class TerrainField {
   readonly geo: Geography;
+  /** Every cell's drawn height (carve). */
+  readonly relief: Float32Array;
   private readonly cells: number[] = [];
   private readonly d = v3();
   private readonly uv: FaceUV = { face: 0, u: 0, v: 0 };
@@ -115,12 +272,13 @@ export class TerrainField {
 
   constructor(geo: Geography) {
     this.geo = geo;
+    this.relief = carve(geo);
   }
 
-  /** Height of corner (i, j) of face f's cell grid, i, j ∈ [−1, N + 1]: the mean of the distinct cells round it
-   *  (found by direction on or past a face edge, summed in cell order so every face gets the same bits). */
+  /** Height of corner (i, j) of face f's cell grid, i, j ∈ [−1, N + 1]: the mean of the distinct cells' drawn heights round
+   *  it (found by direction on or past a face edge, summed in cell order so every face gets the same bits). */
   corner(f: number, i: number, j: number): number {
-    const H = this.geo.heights;
+    const H = this.relief;
     if (i > 0 && i < N && j > 0 && j < N) {
       const b = f * NN + (j - 1) * N + i - 1;
       return 0.25 * (H[b] + H[b + 1] + H[b + N] + H[b + N + 1]);
@@ -372,12 +530,13 @@ flat in int vRegion;
 uniform vec4 uLand[${NR}];
 uniform vec4 uFoliage[${NR}];
 uniform vec4 uSand[${NR}];
-uniform vec4 uShore[${NR}]; // beach top u, cliff height u, landform (0 strata, 1 basalt, 2 ice), mud shore
+uniform vec4 uShore[${NR}];  // beach top u, cliff height u, landform (0 strata, 1 basalt, 2 ice), mud shore
+uniform vec4 uRelief[${NR}]; // crag share, volcanic, shingle beach, the beds' dip bearing (rad, chart plane)
 uniform vec3 uChartE[${NR}];
 uniform vec3 uChartN[${NR}];
-uniform vec2 uFade;         // the composite's line fade, u from the eye
+uniform vec2 uFade;          // the composite's line fade, u from the eye
 const float CLIFF_UP = ${SLOPES.cliff.toFixed(3)}, SCREE_UP = ${SLOPES.scree.toFixed(3)}, TIDE_AMP = ${TIDE.amp.toFixed(3)};
-const float STRATA = 1.15, COLUMN = 1.5, LINE_CSS = 0.45, COAST_CSS = 0.6;
+const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS = 0.6;
 const vec3 ULTRA_T = ${vec(transmittanceVec(PIGMENTS.ultramarine))};
 
 // ink coverage of a line d field units from its centre, half-width w CSS px, the field changing fw per render px
@@ -407,37 +566,110 @@ float stipple(vec2 x, float upx, float dens, float seed) {
   return mix(dotsAt(x, C, upx, dens, seed + lo), dotsAt(x, 2.0 * C, upx, dens, seed + lo + 1.0), lvl - lo);
 }
 
+// value noise in [-1, 1] on the unit lattice
+float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+float noise3(vec3 p) {
+  vec3 i = floor(p), f = p - i, u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  float a = hash13(i), b = hash13(i + vec3(1, 0, 0)), c = hash13(i + vec3(0, 1, 0)), d = hash13(i + vec3(1, 1, 0));
+  float e = hash13(i + vec3(0, 0, 1)), g = hash13(i + vec3(1, 0, 1)), k = hash13(i + vec3(0, 1, 1)), l = hash13(i + vec3(1, 1, 1));
+  return 2.0 * mix(mix(mix(a, b, u.x), mix(c, d, u.x), u.y), mix(mix(e, g, u.x), mix(k, l, u.x), u.y), u.z) - 1.0;
+}
+// relief finer than the mesh's cells, u: lumps (ridged by the region's crag share), each octave fading out before it
+// would alias
+float fineRelief(vec3 p, float upx, float crag) {
+  float a = 0.0, s = 1.0, f = 0.55;
+  for (int o = 0; o < 3; o++) {
+    float k = 1.0 - smoothstep(0.12, 0.35, upx * f);
+    if (k <= 0.0) break;
+    float n = noise3(p * f + float(o) * 7.31);
+    a += s * k * mix(n, 1.0 - 2.0 * abs(n), crag);
+    s *= 0.42;
+    f *= 2.3;
+  }
+  return a;
+}
+// the normal tilted by a height field b over the surface (screen-space surface gradient)
+vec3 bumped(vec3 n, vec3 p, float b) {
+  vec3 sx = dFdx(p), sy = dFdy(p), r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1);
+  return normalize(abs(det) * n - sign(det) * (dFdx(b) * r1 + dFdy(b) * r2));
+}
+// one stone per jittered cell of C u (where its hash falls under dens): its outline's ink (x) and its side away from
+// the sun (y), fading in once it is a few px across
+vec2 stones(vec2 x, float C, float dens, float seed, vec2 sun, float upx) {
+  vec2 cell = floor(x / C), c = (cell + 0.3 + 0.4 * vec2(hash12(cell + seed), hash12(cell.yx + seed + 1.7))) * C;
+  float r = C * (0.1 + 0.17 * hash12(cell + seed + 8.3));
+  vec2 o = x - c;
+  float d = length(o) - r, on = step(hash12(cell + seed + 4.1), dens) * smoothstep(1.2, 2.5, r / (upx * uRenderPx));
+  return on * vec2(inkLine(d, upx, LINE_CSS * 0.75), step(d, 0.0) * smoothstep(0.0, 0.7, -dot(o, sun) / r));
+}
+
 void main() {
   vec3 dir = normalize(vWorld);
   vec4 f = seaField(dir);
   float above = f.x - uSeaLevel; // the sea paints depth = uSeaLevel - f.x: one waterline for both
-  if (above < -0.5) discard;
+  vec3 n0 = normalize(vNormal);
+  float up0 = dot(n0, dir);
+  // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
+  // field's waterline
+  bool wall = up0 < 0.4;
+  if (above < -0.5 && !wall) discard;
   int ri = vRegion;
-  vec4 shore = uShore[ri], land = uLand[ri], fol = uFoliage[ri], sand = uSand[ri];
-  vec3 n = normalize(vNormal), v = normalize(cameraPosition - vWorld);
-  float h = length(vWorld) - SEA_R, up = dot(n, dir), dist = distance(cameraPosition, vWorld);
+  vec4 shore = uShore[ri], land = uLand[ri], fol = uFoliage[ri], sand = uSand[ri], rel = uRelief[ri];
+  vec3 E = uChartE[ri], NC = uChartN[ri], v = normalize(cameraPosition - vWorld);
+  float h = length(vWorld) - SEA_R, dist = distance(cameraPosition, vWorld);
   float upx = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
-  vec2 pl = vec2(dot(vWorld, uChartE[ri]), dot(vWorld, uChartN[ri]));
-  Paper q = paperAt(vWorld, n, 1.0);
+  float near = 1.0 - smoothstep(uFade.x, uFade.y, dist);
+  vec2 pl = vec2(dot(vWorld, E), dot(vWorld, NC));
+  Paper q = paperAt(vWorld, n0, 1.0);
 
-  // grounds, blended where washes meet along noise-warped edges
+  // grounds by the mesh's slope, blended where washes meet along noise-warped edges; talus fans at the cliffs' feet
   float bleed = (q.bloom - 0.5) * 0.08 + (q.mottle - 0.5) * 0.06;
-  float cliff = 1.0 - smoothstep(CLIFF_UP - 0.05, CLIFF_UP + 0.05, up + bleed);
-  float steep = (1.0 - cliff) * (1.0 - smoothstep(SCREE_UP - 0.04, SCREE_UP + 0.04, up + bleed));
+  float cliff = 1.0 - smoothstep(CLIFF_UP - 0.05, CLIFF_UP + 0.05, up0 + bleed);
+  float steep = (1.0 - cliff) * (1.0 - smoothstep(SCREE_UP - 0.04, SCREE_UP + 0.04, up0 + bleed));
   float low = 1.0 - smoothstep(shore.x - 0.3, shore.x + 0.3, h + bleed * 6.0);
   float beach = (1.0 - cliff - steep) * low, meadow = 1.0 - cliff - steep - beach;
-  float pool = max(washPool(n, v, q), 1.0 - smoothstep(0.0, 1.2, -f.y)); // the land's washes pool along the shore
+  float talus = steep * (1.0 - smoothstep(0.25, 0.45, h / max(shore.y, 1.0)));
+
+  // the beds: bent by folds, tilted by the region's dip, broken into blocks along faults
+  float fold = 0.9 * noise3(vWorld / 9.0) + 0.3 * noise3(vWorld / 3.1);
+  vec2 dip = vec2(cos(rel.w), sin(rel.w));
+  float fault = floor(dot(pl, vec2(-dip.y, dip.x)) / 7.0 + 0.6 * noise3(vWorld / 13.0));
+  float bed = h + fold + 0.05 * dot(pl, dip) + (hash11(fault * 7.3 + float(ri)) - 0.5) * 1.4;
+  float band = bed / STRATA + (q.mottle - 0.5) * 0.3, bh = hash11(floor(band) * 1.37 + float(ri) * 5.1);
+
+  // light on relief finer than the cells: lumps, and the beds' lips catching the light near the eye
+  float rough = mix(0.06, 0.38, cliff + steep) * (1.0 - 0.7 * beach) * (shore.z > 1.5 ? 0.4 : 1.0);
+  float b = rough * fineRelief(vWorld, upx, rel.x);
+  if (shore.z < 0.5) b += 0.16 * (cliff + steep) * smoothstep(0.62, 0.92, fract(band)) * (1.0 - smoothstep(0.1, 0.3, upx));
+  vec3 n = bumped(n0, vWorld, b);
+
+  // washes by ground: rock with moss and lichen on its ledges, sand darker where wet, the uplands' green with dry
+  // ground showing through; all pooling along the shore and where rock meets the slopes above and below it
+  float pool = max(max(washPool(n, v, q), 1.0 - smoothstep(0.0, 1.2, -f.y)), 4.0 * cliff * (1.0 - cliff));
   vec3 ground = parchment(q);
-  float band = h / STRATA + (q.mottle - 0.5) * 0.3, bh = hash11(floor(band) * 1.37 + float(ri) * 5.1);
-  vec3 rock = glaze(ground, land.rgb, land.a * (0.7 + 0.6 * bh * cliff), pool, q);
+  float patchy = noise3(vWorld / 4.0);
+  vec3 rock = glaze(ground, land.rgb, land.a * (0.7 + 0.6 * bh * cliff + 0.15 * patchy), pool, q);
+  rock = mix(rock, glaze(rock, fol.rgb, 0.35, pool, q), smoothstep(0.2, 0.7, patchy) * steep * (1.0 - rel.y));
   float wet = 1.0 - smoothstep(0.0, TIDE_AMP + 0.15, above);
-  vec3 sandC = glaze(ground, sand.rgb, sand.a * (1.0 + 0.45 * wet), pool, q);
-  vec3 green = glaze(ground, fol.rgb, fol.a * (1.0 + 0.015 * max(h, 0.0)), pool, q);
-  vec3 col = rock * (cliff + steep) + sandC * beach + green * meadow;
+  vec3 sandC = glaze(ground, sand.rgb, sand.a * (1.0 + 0.45 * wet + 0.12 * patchy), pool, q);
+  vec3 green = glaze(ground, fol.rgb, fol.a * (1.0 + 0.015 * max(h, 0.0) + 0.25 * patchy), pool, q);
+  green = mix(green, glaze(ground, land.rgb, land.a * 0.6, pool, q), smoothstep(0.35, 0.9, -patchy) * 0.6);
+  // slopes short of sheer carry the uplands' growth where the ground allows (not on ice, basalt, lava or the talus),
+  // the rock showing through in patches
+  float veg = smoothstep(-0.3, 0.3, patchy + 0.3 - 1.2 * talus) * (1.0 - rel.y) * step(shore.z, 0.5) * 0.85;
+  vec3 col = rock * cliff + mix(rock, green, veg) * steep + sandC * beach + green * meadow;
 
   float lines = 0.0;
+  vec2 across = normalize(vec2(-dot(n0, NC), dot(n0, E)) + 1e-4);
+  float jc = dot(pl, across) / JOINT; // along the face
   if (shore.z > 1.5) {
-    col = wash(col, ULTRA_T, 0.35 * (cliff + steep) + 0.12); // ice: blue-white, its faces glazed deeper
+    // ice: blue-white, its faces glazed deeper and striated, crevasses across the slopes
+    col = wash(col, ULTRA_T, (0.35 + 0.1 * patchy) * (cliff + steep) + 0.12);
+    float stria = jc * 1.3 + 0.8 * noise3(vWorld / 2.0);
+    lines += inkLine(abs(fract(stria) - 0.5), min(fwidth(stria), 0.4), LINE_CSS * 0.6) * cliff * 0.45 * step(0.4, hash11(floor(stria)));
+    float crev = bed / 2.3 + 0.5 * fold;
+    lines += inkLine(abs(fract(crev) - 0.5), min(fwidth(crev), 0.4), LINE_CSS * 0.6) * steep * 0.4 * step(0.5, hash11(floor(crev) + fault));
   } else if (shore.z > 0.5) {
     // basalt: hexagonal joints, upright on the faces and tiled across the tops, each column its own load
     vec4 hx = hexCell(pl / COLUMN);
@@ -445,33 +677,55 @@ void main() {
     col = wash(col, land.rgb, (cliff + steep) * 0.35 * hash12(hx.zw));
     lines += inkLine(rim, length(fwidth(pl)) / COLUMN, LINE_CSS) * (1.0 - low) * 0.8;
   } else {
-    lines += inkLine(abs(fract(band + 0.5) - 0.5), fwidth(band), LINE_CSS) * cliff * step(0.3, bh) * 0.75; // strata
+    // strata: the lip of each hard bed inked (soft ones run unbroken), joints staggered bed by bed, a fissure now and
+    // then through several
+    lines += inkLine(abs(fract(band + 0.5) - 0.5), min(fwidth(band), 0.5), LINE_CSS) * (cliff + 0.5 * steep) * step(0.3, bh) * 0.75;
+    float js = jc + hash11(floor(band) * 3.1) * 3.7;
+    lines += inkLine(abs(fract(js) - 0.5), min(fwidth(js), 0.5), LINE_CSS * 0.7) * cliff * step(0.55, hash12(vec2(floor(js), floor(band)))) * 0.6;
+    float fs = jc * 0.23 + 0.4 * noise3(vWorld / 3.0);
+    lines += inkLine(abs(fract(fs) - 0.5), min(fwidth(fs), 0.5), LINE_CSS * 0.9) * cliff * step(0.8, hash11(floor(fs) + fault)) * 0.7;
   }
-  lines += stipple(pl, upx, 0.45, 3.0) * steep * step(h, shore.y * 0.8);                                 // scree
-  lines += inkLine(-f.y - 0.9 - (q.mottle - 0.5) * 0.3, fwidth(f.y), LINE_CSS * 0.8) * beach * 0.55;        // tide lines
+  if (rel.y > 0.5) {
+    // volcanic: the lava's crust cracked into plates
+    vec2 cw = pl / 1.4 + 0.7 * vec2(noise3(vWorld / 2.2), noise3(vWorld / 2.2 + 5.0)), cf = abs(fract(cw) - 0.5);
+    lines += inkLine(0.5 - max(cf.x, cf.y), length(fwidth(cw)), LINE_CSS * 0.6) * (meadow + steep) * 0.55;
+  }
+  vec2 sunPl = normalize(vec2(dot(uSun, E), dot(uSun, NC)) + 1e-4);
+  vec2 rocks = stones(pl, 0.9, 0.5, 21.0, sunPl, upx) * talus + stones(pl, 1.7, 0.16, 33.0, sunPl, upx) * (meadow * rel.x + steep)
+    + stones(pl, 0.32, 0.75, 41.0, sunPl, upx) * beach * rel.z;                                         // boulders, outcrops, pebbles
+  col = mix(col, hatchInk(0.6), rocks.y * 0.35 * near);
+  lines += rocks.x;
+  lines += stipple(pl, upx, 0.45 + 0.3 * talus, 3.0) * steep * (1.0 - veg) * step(h, shore.y * 0.8);                  // scree
+  lines += inkLine(-f.y - 0.9 - (q.mottle - 0.5) * 0.3, fwidth(f.y), LINE_CSS * 0.8) * beach * 0.55;    // tide lines
   lines += inkLine(-f.y - 2.1 - (q.bloom - 0.5) * 0.4, fwidth(f.y), LINE_CSS * 0.7) * beach * 0.35;
-  lines += stipple(pl, upx, 0.16, 9.0) * beach * 0.6;                                                    // grains
+  lines += stipple(pl, upx, 0.16, 9.0) * beach * 0.6;                                                // grains
+  float rip = -f.y / 0.45 + 0.7 * noise3(vWorld / 2.5);                                              // wind ripples
+  lines += inkLine(abs(fract(rip) - 0.5), min(fwidth(rip), 0.5), LINE_CSS * 0.6) * beach * (1.0 - rel.z) * (1.0 - shore.w)
+    * 0.3 * step(0.0, patchy) * smoothstep(1.0, 2.5, -f.y);
   lines += inkLine(abs(fract(-f.y / 0.7 + 0.5) - 0.5), fwidth(f.y) / 0.7, LINE_CSS * 0.7) * beach * shore.w
-    * 0.5 * (1.0 - smoothstep(2.0, 5.0, -f.y));                                                           // mud ripples
+    * 0.5 * (1.0 - smoothstep(2.0, 5.0, -f.y));                                                       // mud ripples
+  // the brow and foot of every cliff, heavier near the eye
+  lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low);
 
-  // light: the shade and lit glazes, then hatching along the slope's contours (true height), straightened on the
-  // flats by the region's chart plane, deepening to cross-hatching away from the light
+  // light: the shade and lit glazes, then hatching along the beds on rock and the contours elsewhere (straightened on
+  // the flats by the region's chart plane), deepening to cross-hatching away from the light
   float ndl = dot(n, uSun), tone = max(lightTone(ndl, abs(dot(n, v))), 0.22 * cliff);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
-  vec2 hc = vec2(h + 0.12 * pl.y, pl.x + 0.7 * pl.y), hdx = dFdx(hc), hdy = dFdy(hc);
+  vec2 hc = vec2(mix(h + 0.12 * pl.y, bed, cliff + steep), pl.x + 0.7 * pl.y), hdx = dFdx(hc), hdy = dFdy(hc);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, float(ri) * 3.7));
-  col = mix(col, hatchInk(0.7), clamp(lines, 0.0, 1.0) * (1.0 - smoothstep(uFade.x, uFade.y, dist)));
+  col = mix(col, hatchInk(0.7), clamp(lines, 0.0, 1.0) * near);
   if (uNight > 0.0) {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;
     col = mix(col, uSilver, 0.65 * hatching(rot2(0.6) * hc, rot2(0.6) * hdx, rot2(0.6) * hdy, lit * 0.26, 11.0));
   }
-  // the inner half of the sea's waterline, and nothing past it
+  // the inner half of the sea's waterline, and nothing past it (a wall's foot meets the sea's own coast rings)
   float cw = COAST_CSS * uRenderPx;
-  col = mix(col, uInk, 0.9 * (1.0 - smoothstep(cw - 0.5, cw + 0.5, above / max(fwidth(above), 1e-4))));
-  if (above < 0.0) discard;
-  writeInk(candle(col, vWorld), n);
+  col = mix(col, uInk, (wall ? 0.0 : 0.9) * (1.0 - smoothstep(cw - 0.5, cw + 0.5, above / max(fwidth(above), 1e-4))));
+  if (above < 0.0 && !wall) discard;
+  writeInk(candle(col, vWorld), n0);
 }
 `;
+
 
 function terrainMaterial(pipeline: Pipeline, swell: Swell): THREE.ShaderMaterial {
   const e = (ri: number) => CHARTS[ri].e, nn = (ri: number) => CHARTS[ri].n;
@@ -483,6 +737,7 @@ function terrainMaterial(pipeline: Pipeline, swell: Swell): THREE.ShaderMaterial
       uFoliage: { value: REGIONS.map((r) => v4(PIGMENTS[r.pigments.foliage], LOAD.foliage)) },
       uSand: { value: REGIONS.map((r) => v4(...SANDS[sandOf(r)])) },
       uShore: { value: REGIONS.map((r) => new THREE.Vector4(beachTop(r), r.shore.cliffH, landformOf(r), sandOf(r) === 'mud' ? 1 : 0)) },
+      uRelief: { value: REGIONS.map((r, i) => new THREE.Vector4(reliefOf(r).crag, sandOf(r) === 'black' ? 1 : 0, sandOf(r) === 'shingle' ? 1 : 0, i * 2.4)) },
       uChartE: { value: REGIONS.map((_, i) => new THREE.Vector3(e(i).x, e(i).y, e(i).z)) },
       uChartN: { value: REGIONS.map((_, i) => new THREE.Vector3(nn(i).x, nn(i).y, nn(i).z)) },
       uFade: { value: new THREE.Vector2(pipeline.ink.fadeStart, pipeline.ink.fadeEnd) },
