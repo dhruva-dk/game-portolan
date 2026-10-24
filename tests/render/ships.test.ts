@@ -105,3 +105,70 @@ test('the rigging never clips through the sails', () => {
   assert.deepEqual([...clips].slice(0, 25).map(([k, v]) => `${k} — ${v}`), []);
   assert.ok(states > 1000, `${states} states`);
 });
+
+// ---- part B: emblems, chart silhouettes, levels of detail ---------------------------------------------------------
+import { EMBLEMS, emblemAtlas } from '../../src/render/ships/emblems.ts';
+import { silhouetteAtlas } from '../../src/render/ships/silhouettes.ts';
+import { FLEET_TRIANGLES, LODS, LOD_BUDGET, buildLevel, chooseLods } from '../../src/render/ships/shipwright.ts';
+
+test('the 31 emblems: distinct charges on a roundel, crisp', () => {
+  const cell = 128, W = 8 * cell, a = emblemAtlas(cell), charges: Uint8Array[] = [];
+  assert.equal(EMBLEMS.length, 31);
+  EMBLEMS.forEach((name, k) => {
+    const ox = (k % 8) * cell, oy = (3 - Math.floor(k / 8)) * cell, g = new Uint8Array(cell * cell);
+    let field = 0, charge = 0, soft = 0;
+    for (let j = 0; j < cell; j++) for (let i = 0; i < cell; i++) {
+      const o = 4 * ((oy + j) * W + ox + i), c = a[o + 1];
+      field += a[o] / 255;
+      charge += c / 255;
+      g[j * cell + i] = c;
+      if (c > 40 && c < 215) soft++;
+    }
+    const n = cell * cell;
+    assert.ok(field / n > 0.6 && field / n < 0.75, `${name}: a roundel (${(field / n).toFixed(2)})`);
+    assert.ok(charge / field > 0.12 && charge / field < 0.75, `${name}: the charge covers ${(charge / field).toFixed(2)} of the field`);
+    assert.ok(soft / charge < 0.5, `${name}: crisp edges (${(soft / charge).toFixed(2)})`);
+    charges.push(g);
+  });
+  for (let i = 0; i < 31; i++) for (let j = i + 1; j < 31; j++) {
+    let d = 0;
+    for (let k = 0; k < cell * cell; k++) d += Math.abs(charges[i][k] - charges[j][k]);
+    assert.ok(d / (255 * cell * cell) > 0.04, `${EMBLEMS[i]} and ${EMBLEMS[j]} differ (${(d / (255 * cell * cell)).toFixed(3)})`);
+  }
+});
+
+test('the chart silhouettes: readable by heading from above, bigger with every form', () => {
+  const cell = 64, W = 4 * cell, a = silhouetteAtlas(cell);
+  const sum = (col: number, row: number, c: number, y0 = 0, y1 = cell) => {
+    let s = 0;
+    for (let j = y0; j < y1; j++) for (let i = 0; i < cell; i++) s += a[4 * ((row * cell + j) * W + col * cell + i) + c];
+    return s / 255;
+  };
+  const area = FORM_NAMES.map((_, i) => sum(i, 1, 0) + sum(i, 1, 1));
+  FORM_NAMES.forEach((name, i) => {
+    // the hull's own length in the plan cell, bow up: a pointed bow against a square stern
+    const rows = Array.from({ length: cell }, (_, j) => sum(i, 0, 0, j, j + 1)), lit = rows.flatMap((r, j) => (r > 0.5 ? [j] : []));
+    const j0 = lit[0], j1 = lit[lit.length - 1] + 1, fifth = Math.max(2, Math.round((j1 - j0) * 0.12));
+    const bow = sum(i, 0, 0, j1 - fifth, j1), stern = sum(i, 0, 0, j0, j0 + fifth);
+    // or, where the ends are alike, the bowsprit and the head reaching out beyond the stem
+    const all = Array.from({ length: cell }, (_, j) => sum(i, 0, 3, j, j + 1)).flatMap((r, j) => (r > 0.5 ? [j] : []));
+    const ahead = all[all.length - 1] + 1 - j1, astern = j0 - all[0];
+    assert.ok(stern > bow * 1.2 || ahead > astern + 1, `${name}: readable by heading (ends ${stern.toFixed(0)} / ${bow.toFixed(0)}, overhang ${astern} / ${ahead})`);
+    if (i) assert.ok(area[i] > area[i - 1], `${name}: bigger in profile than the ${FORM_NAMES[i - 1]} (${area[i].toFixed(0)} / ${area[i - 1].toFixed(0)})`);
+  });
+});
+
+test('levels of detail: every form within its budget at every level, ten ships within the fleet budget', () => {
+  const tris = Object.fromEntries(FORM_NAMES.map((form) => [form, LODS.map((lod) => buildLevel(new Rig(form), lod).triangles)]));
+  console.log('triangles hero/mid/far', JSON.stringify(tris));
+  for (const form of FORM_NAMES) {
+    LODS.forEach((lod, i) => assert.ok(tris[form][i] <= LOD_BUDGET[lod], `${form} ${lod}: ${tris[form][i]} > ${LOD_BUDGET[lod]}`));
+    assert.ok(tris[form][0] > tris[form][1] && tris[form][1] > tris[form][2], `${form}: each level lighter than the last`);
+  }
+  // ten galleons all large on screen: the smallest give way until the fleet fits, the nearest keeps hero detail
+  const g = tris.galleon, lv = chooseLods(Array.from({ length: 10 }, (_, i) => 900 - i * 10), Array(10).fill(g), Array(10).fill(0));
+  assert.ok(lv.reduce((s, l) => s + g[l], 0) <= FLEET_TRIANGLES, `fleet ${lv.join('')}`);
+  assert.equal(lv[0], 0);
+  // hysteresis: a hero ship just under the threshold stays hero; a mid ship there does not climb
+  assert.deepEqual(chooseLods([220, 220], [g, g], [0, 1]), [0, 1]);
+});
