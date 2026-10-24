@@ -1,0 +1,237 @@
+// The planet's geometry: its radius, the cube-sphere grids that territory and every world field live on, and
+// great-circle helpers. Positions are unit direction vectors from the planet's centre; distances along the
+// surface are in world units (u). +y is the north pole.
+import { PI, addScaled, cross, datan, datan2, dcos, dot, dsin, dtan, length, normalize, set, v3, type V3 } from './math.ts';
+
+/** Planet radius at sea level, u (1 u ≈ 7 m). */
+export const R = 200;
+/** Cells per cube-face edge of the territory grid. */
+export const GRID = 512;
+/** Area quanta per square unit: cell areas are whole numbers of quanta, so sums of them are exact in any order. */
+export const AREA_Q = 16777216; // 2^24
+
+// ---------------------------------------------------------------------------------------------------------------
+// Cube-sphere mapping. A direction is projected onto the face of the unit cube it points through (gnomonic
+// coordinates), then warped by a = atan(g)·4/π so equal steps in a are equal angles and cells are nearly equal in
+// area (largest/smallest ≈ 1.41). The renderer mirrors this mapping exactly.
+//   face 0 +X: u = −z/|x|, v =  y/|x|     face 1 −X: u =  z/|x|, v = y/|x|
+//   face 2 +Y: u =  x/|y|, v = −z/|y|     face 3 −Y: u =  x/|y|, v = z/|y|
+//   face 4 +Z: u =  x/|z|, v =  y/|z|     face 5 −Z: u = −x/|z|, v = y/|z|
+// Ties go to the lower face number. On an n-grid, cell = face·n² + j·n + i, with column i from u and row j from v.
+
+export interface FaceUV {
+  face: number;
+  /** In [−1, 1]: plain gnomonic from gnomonicUV, equal-angle from faceUV. */
+  u: number;
+  v: number;
+}
+
+/** The cube face a direction points through, and its plain gnomonic coordinates on it. */
+export function gnomonicUV(p: V3, out: FaceUV): FaceUV {
+  const ax = Math.abs(p.x), ay = Math.abs(p.y), az = Math.abs(p.z);
+  if (ax >= ay && ax >= az) {
+    out.face = p.x >= 0 ? 0 : 1;
+    out.u = (p.x >= 0 ? -p.z : p.z) / ax;
+    out.v = p.y / ax;
+  } else if (ay >= az) {
+    out.face = p.y >= 0 ? 2 : 3;
+    out.u = p.x / ay;
+    out.v = (p.y >= 0 ? -p.z : p.z) / ay;
+  } else {
+    out.face = p.z >= 0 ? 4 : 5;
+    out.u = (p.z >= 0 ? p.x : -p.x) / az;
+    out.v = p.y / az;
+  }
+  return out;
+}
+
+/** The cube face a direction points through, and its equal-angle coordinates on it. */
+export function faceUV(p: V3, out: FaceUV): FaceUV {
+  gnomonicUV(p, out);
+  out.u = datan(out.u) * (4 / PI);
+  out.v = datan(out.v) * (4 / PI);
+  return out;
+}
+
+/** The unit direction through the point (gu, gv) of a face of the unit cube. */
+export function gnomonicDir(face: number, gu: number, gv: number, out: V3): V3 {
+  switch (face) {
+    case 0: set(out, 1, gv, -gu); break;
+    case 1: set(out, -1, gv, gu); break;
+    case 2: set(out, gu, 1, -gv); break;
+    case 3: set(out, gu, -1, gv); break;
+    case 4: set(out, gu, gv, 1); break;
+    default: set(out, -gu, gv, -1);
+  }
+  return normalize(out);
+}
+
+/** The unit direction at equal-angle face coordinates (u, v); values slightly past ±1 continue past the edge. */
+export function faceDir(face: number, u: number, v: number, out: V3): V3 {
+  return gnomonicDir(face, dtan(u * (PI / 4)), dtan(v * (PI / 4)), out);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Grids. A CubeGrid is static data, built once: its topology across face edges and its exact cell areas.
+
+export interface CubeGrid {
+  /** Cells per face edge, a power of two. */
+  readonly n: number;
+  readonly log: number;
+  /** 6·n² */
+  readonly cells: number;
+  /** Neighbour across each face edge: [face·4 + side (−u, +u, −v, +v)]·n + position along the edge. */
+  readonly edge: Int32Array;
+  /** Spherical area of the cell at each position of a face (the same on all six), in AREA_Q quanta. */
+  readonly area: Float64Array;
+  /** Sum of every cell's area, quanta: 4πR²·AREA_Q to within half a quantum per cell. */
+  readonly totalArea: number;
+}
+
+const probe = v3();
+const scratchUV: FaceUV = { face: 0, u: 0, v: 0 };
+
+/** The cell of an n-grid containing direction p. */
+export function cellOf(grid: CubeGrid, p: V3): number {
+  const n = grid.n, f = faceUV(p, scratchUV);
+  const i = Math.min(n - 1, Math.max(0, Math.floor((f.u + 1) * 0.5 * n)));
+  const j = Math.min(n - 1, Math.max(0, Math.floor((f.v + 1) * 0.5 * n)));
+  return (f.face << (2 * grid.log)) + (j << grid.log) + i;
+}
+
+/** The direction through the centre of a cell. */
+export function cellDir(grid: CubeGrid, cell: number, out: V3): V3 {
+  const n = grid.n, i = cell & (n - 1), j = (cell >> grid.log) & (n - 1);
+  return faceDir(cell >> (2 * grid.log), ((i + 0.5) / n) * 2 - 1, ((j + 0.5) / n) * 2 - 1, out);
+}
+
+/** The k-th of a cell's four neighbours (k: 0 −u, 1 +u, 2 −v, 3 +v), continuing across face edges. */
+export function neighbor(grid: CubeGrid, cell: number, k: number): number {
+  const n = grid.n, log = grid.log, i = cell & (n - 1), j = (cell >> log) & (n - 1), e = (cell >> (2 * log)) * 4 * n;
+  if (k === 0) return i > 0 ? cell - 1 : grid.edge[e + j];
+  if (k === 1) return i < n - 1 ? cell + 1 : grid.edge[e + n + j];
+  if (k === 2) return j > 0 ? cell - n : grid.edge[e + 2 * n + i];
+  return j < n - 1 ? cell + n : grid.edge[e + 3 * n + i];
+}
+
+/** A cell's spherical area, quanta. */
+export function cellArea(grid: CubeGrid, cell: number): number {
+  return grid.area[cell & (grid.n * grid.n - 1)];
+}
+
+/** Build an n-grid (n a power of two). */
+export function cubeGrid(n: number): CubeGrid {
+  const log = 31 - Math.clz32(n);
+  if (n < 2 || 1 << log !== n) throw new RangeError(`cubeGrid: ${n} is not a power of two`);
+  const grid = { n, log, cells: 6 * n * n, edge: new Int32Array(24 * n), area: new Float64Array(n * n), totalArea: 0 };
+
+  // Probing a hair past each face edge lands in the neighbouring face's border cell at the same place along the
+  // shared edge.
+  const e = 1 + 1e-6;
+  for (let f = 0; f < 6; f++) {
+    for (let k = 0; k < n; k++) {
+      const t = ((k + 0.5) / n) * 2 - 1, b = f * 4 * n + k;
+      grid.edge[b] = cellOf(grid, faceDir(f, -e, t, probe));
+      grid.edge[b + n] = cellOf(grid, faceDir(f, e, t, probe));
+      grid.edge[b + 2 * n] = cellOf(grid, faceDir(f, t, -e, probe));
+      grid.edge[b + 3 * n] = cellOf(grid, faceDir(f, t, e, probe));
+    }
+  }
+
+  // A gnomonic rectangle [x0, x1]×[y0, y1] on a face of the unit cube subtends F(x1, y1) − F(x0, y1) − F(x1, y0) +
+  // F(x0, y0) steradians, with F(x, y) = atan(xy / √(1 + x² + y²)).
+  const g = new Float64Array(n + 1), F = new Float64Array((n + 1) * (n + 1));
+  for (let k = 0; k <= n; k++) g[k] = dtan(((k / n) * 2 - 1) * (PI / 4));
+  for (let j = 0; j <= n; j++) {
+    for (let i = 0; i <= n; i++) F[j * (n + 1) + i] = datan((g[i] * g[j]) / Math.sqrt(1 + g[i] * g[i] + g[j] * g[j]));
+  }
+  let total = 0;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const a = j * (n + 1) + i, b = a + n + 1;
+      const q = Math.round((F[b + 1] - F[b] - F[a + 1] + F[a]) * R * R * AREA_Q);
+      grid.area[j * n + i] = q;
+      total += 6 * q;
+    }
+  }
+  grid.totalArea = total;
+  return grid;
+}
+
+/** The territory grid: GRID² cells per face, each ≤ 1.0 u across. */
+export const TERRITORY = cubeGrid(GRID);
+
+// ---------------------------------------------------------------------------------------------------------------
+// Great circles and local frames. Directions along the surface are unit tangent vectors, which stay well defined
+// at the poles; compass bearings (radians clockwise from north) are for data and display.
+
+const Y = v3(0, 1, 0);
+const T1 = v3(), T2 = v3();
+
+/** The unit direction at latitude and longitude (radians; longitude grows eastward). */
+export function fromLatLon(lat: number, lon: number, out: V3): V3 {
+  const c = dcos(lat);
+  return set(out, c * dcos(lon), dsin(lat), -c * dsin(lon));
+}
+
+/**
+ * The local east and north at p, forming a right-handed frame (east, north, up = p). At the poles, where east is
+ * undefined, the frame continues the one along longitude 0.
+ */
+export function localFrame(p: V3, east: V3, north: V3): void {
+  cross(east, Y, p);
+  if (length(east) > 0) normalize(east);
+  else set(east, 0, 0, -1);
+  cross(north, p, east);
+}
+
+/** The compass bearing of tangent t at p. */
+export function bearingOf(p: V3, t: V3): number {
+  localFrame(p, T1, T2);
+  return datan2(dot(t, T1), dot(t, T2));
+}
+
+/** The unit tangent at p with compass bearing b. */
+export function tangentAt(p: V3, b: number, out: V3): V3 {
+  localFrame(p, T1, T2);
+  const s = dsin(b), c = dcos(b);
+  return set(out, T2.x * c + T1.x * s, T2.y * c + T1.y * s, T2.z * c + T1.z * s);
+}
+
+/** The unit tangent at p along the great circle toward q (zero if q is p or its antipode). */
+export function tangentToward(p: V3, q: V3, out: V3): V3 {
+  return normalize(addScaled(out, q, p, -dot(p, q)));
+}
+
+/**
+ * Sail from p along tangent t for `dist` u of great circle: outP is the arrival point and outT the direction of
+ * travel carried along to it. Both are renormalised, so repeated steps never drift off the sphere. Outputs may
+ * alias inputs.
+ */
+export function advance(p: V3, t: V3, dist: number, outP: V3, outT: V3): void {
+  const a = dist / R, c = dcos(a), s = dsin(a);
+  const px = p.x * c + t.x * s, py = p.y * c + t.y * s, pz = p.z * c + t.z * s;
+  const tx = t.x * c - p.x * s, ty = t.y * c - p.y * s, tz = t.z * c - p.z * s;
+  normalize(set(outP, px, py, pz));
+  const d = tx * outP.x + ty * outP.y + tz * outP.z;
+  normalize(set(outT, tx - outP.x * d, ty - outP.y * d, tz - outP.z * d));
+}
+
+/** The angle between two unit directions, accurate at every angle (atan2 of sine and cosine). */
+export function angleBetween(a: V3, b: V3): number {
+  return datan2(length(cross(T1, a, b)), dot(a, b));
+}
+
+/** Distance along the surface between two unit directions, u. */
+export function surfaceDistance(a: V3, b: V3): number {
+  return R * angleBetween(a, b);
+}
+
+/**
+ * Distance along the surface to the horizon from height h above the sea, u: R·acos(R / (R + h)), computed as
+ * R·atan(√(h(2R + h)) / R) to stay exact for small h. ≈ √(2Rh) for h ≪ R. The top of an object of height h2 is in
+ * sight from height h1 while the two are less than horizonDistance(h1) + horizonDistance(h2) apart.
+ */
+export function horizonDistance(h: number): number {
+  return R * datan2(Math.sqrt(h * (2 * R + h)), R);
+}
