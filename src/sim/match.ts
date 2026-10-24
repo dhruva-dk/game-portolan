@@ -6,6 +6,7 @@ import { earn, forage, scoop } from './economy.ts';
 import { over } from './end.ts';
 import { brew, stir, type Sea } from './environment.ts';
 import { applyControls, idleInput, inputAt, replay, type Recording, type ShipInput } from './input.ts';
+import { items } from './items.ts';
 import { coast, ride } from './opening.ts';
 import { collide, sail } from './sailing.ts';
 import { PHASE, SHIPS, type MatchState } from './state.ts';
@@ -13,8 +14,8 @@ import { storm } from './storm.ts';
 import { chart } from './territory.ts';
 import { newSight, noteFog, survey } from './visibility.ts';
 
-/** The captains' input until they think for themselves (WP11): hands off the helm. */
-const CAPTAIN: ShipInput = idleInput();
+/** Each ship's input this tick: the player's, then the captains', hands off the helm until they think for themselves (WP11). */
+const INPUTS: ShipInput[] = Array.from({ length: SHIPS }, idleInput);
 
 /** What every ship sees this tick, surveyed once the hulls have moved: whom its guns may engage (and, WP11, what its captain knows). */
 const SIGHT = Array.from({ length: SHIPS }, newSight);
@@ -25,8 +26,9 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   state.events.length = 0;
   brew(sea, state);
   stir(sea, state);
+  INPUTS[0] = player;
   for (let i = 0; i < SHIPS; i++) {
-    const ship = state.ships[i], input = i === 0 ? player : CAPTAIN;
+    const ship = state.ships[i], input = INPUTS[i];
     if (ship.phase === PHASE.sunk) continue;
     applyControls(ship, input);
     if (ship.phase === PHASE.riding) ride(sea, state, i, input);
@@ -38,6 +40,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   collide(state);
   survey(sea, state, SIGHT);
   combat(sea, state, SIGHT);
+  items(sea, state, INPUTS, SIGHT);
   chart(state);
   noteFog(state);
   storm(state);

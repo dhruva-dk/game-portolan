@@ -3,6 +3,7 @@
 // spills its purse, frees its sea, pays its sinker's bounty and drops one of its fittings as a chest. When one ship is
 // left afloat it has won and the match stands still; result() then explains the match.
 import { spill } from './economy.ts';
+import { afloatChest } from './items.ts';
 import { rngInt, set } from './math.ts';
 import { AREA_Q } from './sphere.ts';
 import { EVENT, PHASE, STREAM, afloat, chronicle, emit, type Entry, type MatchState } from './state.ts';
@@ -50,7 +51,7 @@ export function sink(state: MatchState, i: number, by: number, cause: number): v
   if (left === 1) win(state);
 }
 
-/** One of sunk ship i's fittings, drawn on the loot stream, leaves the wreck in a chest (WP9 says how chests are taken). */
+/** One of sunk ship i's fittings, drawn on the loot stream, leaves the wreck in a chest of its tier (items.ts: sailing over it opens it). */
 function dropChest(state: MatchState, i: number): void {
   const ship = state.ships[i];
   let n = 0;
@@ -60,8 +61,7 @@ function dropChest(state: MatchState, i: number): void {
   for (const f of ship.fittings) {
     if (f.kind === FITTING.none) continue;
     if (k-- > 0) continue;
-    state.chests.push({ at: { ...ship.pos }, fitting: { kind: f.kind, tier: f.tier }, from: i });
-    emit(state, EVENT.chest, i, f.kind, ship.pos, f.tier);
+    afloatChest(state, ship.pos, f.tier, f, i);
     f.kind = FITTING.none;
     f.tier = 0;
     return;

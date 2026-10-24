@@ -180,7 +180,7 @@ test('a scripted match runs from the opening to the last ship afloat, and its re
   assert.ok(me.claimed > 0 && me.bank >= 4 * END.bounty);
   r.ships.forEach((f, i) => assert.equal(f.treasure, Math.floor(s.ships[i].bank * TREASURE.share * TREASURE.place[f.place - 1])));
   for (const [t, i, by, cause] of WIN) assert.deepEqual([r.ships[i].tick, r.ships[i].by, r.ships[i].cause], [t, by, cause]);
-  assert.equal(s.chests.length, SHIPS - 1);
+  assert.equal(s.chests.length + s.ships.filter((ship) => ship.offer.length > 0).length, SHIPS - 1, 'each sinking dropped a chest, afloat or opened on a deck');
   for (const c of s.chests) assert.ok(apart(c.at, s.ships[c.from].pos) < 1e-9, 'each chest floats at its wreck');
   const kinds = r.timeline.map((e) => e.kind), loops = kinds.filter((k) => k === EVENT.loop).length;
   assert.deepEqual([kinds[0], kinds[1], kinds.at(-1)], [EVENT.breakOff, EVENT.home, EVENT.win]);

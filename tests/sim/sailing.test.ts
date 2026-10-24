@@ -212,7 +212,7 @@ test('waters, landmarks, fittings, torn sails, gusts, light airs and gales trim 
   near(speed(), 1);
 
   const at = (strength: number, gust: number, stormSails: boolean) =>
-    settledSpeed(FORM.caravel, SAIL.plain, 0, { v: v3(), strength, steady: 0, gust }, { speed: 1, turn: 1, stormSails }) / REFERENCE;
+    settledSpeed(FORM.caravel, SAIL.plain, 0, { v: v3(), strength, steady: 0, gust }, { speed: 1, turn: 1, stormSails, drive: 0 }) / REFERENCE;
   near(at(1, 1, false), 1.14); // the heart of a gust
   near(at(0.5, 0, false), 0.7); // light airs
   near(at(2.4, 0, false), 0.7); // a gale without storm sails

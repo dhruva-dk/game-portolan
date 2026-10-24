@@ -244,27 +244,32 @@ function bridge(a: number, b: number): number {
 }
 
 /**
- * Ship i sails from cell `from` into its edge neighbour c. A rival's trail there breaks (not the player's on its first
- * voyage, before its first loop closes); its own trail there is nothing. Its own waters close its open trail; any other
- * cell extends the trail, or starts one when the ship has just left its waters.
+ * Ship i sails from cell `from` into its edge neighbour c. A rival's trail there breaks, as far as it can (breakTrail); its own trail there is nothing. Its own waters close its open trail; any other
+ * cell extends the trail, or starts one when the ship has just left its waters, unless a rival's cutwater cut it lately
+ * (Ship.cut).
  */
 function enter(state: MatchState, i: number, from: number, c: number): void {
   const ship = state.ships[i], mark = i + 1, t = state.trail[c];
-  if (t !== 0 && t !== mark && !(t === 1 && state.charm)) breakTrail(state, t - 1, i, c);
+  if (t !== 0 && t !== mark) breakTrail(state, t - 1, i, c);
   if (state.owner[c] === mark) {
     if (ship.laid.length > 0) closeLoop(state, i);
     return;
   }
-  if (ship.laid.length === 0 && state.owner[from] !== mark) return;
+  if (ship.laid.length === 0 && (state.owner[from] !== mark || ship.cut > 0)) return;
   if (state.trail[c] !== mark) {
     ship.laid.push(c);
     state.trail[c] = mark;
   }
 }
 
-/** Ship j's trail washes away where ship `by` crossed it at cell c: the loop is lost and the purse spills there. */
-function breakTrail(state: MatchState, j: number, by: number, c: number): void {
-  const ship = state.ships[j], cells = ship.laid.slice(), lost = ship.purse, at = cellDir(TERRITORY, c, v3());
+/**
+ * Ship j's open trail washes away where ship `by` crossed or cut it, at cell c: the loop is lost and the purse spills
+ * there. It holds while j is warded (Ship.ward), and the player's holds on its first voyage until its first loop closes.
+ */
+export function breakTrail(state: MatchState, j: number, by: number, c: number): void {
+  const ship = state.ships[j];
+  if (ship.laid.length === 0 || ship.ward > 0 || (j === 0 && state.charm)) return;
+  const cells = ship.laid.slice(), lost = ship.purse, at = cellDir(TERRITORY, c, v3());
   wash(state, j);
   ship.purse = 0;
   emit(state, EVENT.broken, j, by, at, lost, cells);

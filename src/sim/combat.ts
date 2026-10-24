@@ -13,16 +13,16 @@ import { BUMPED, scald, velocityOf } from './sailing.ts';
 import { R, TERRITORY, cellDir, cellOf } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, afloat, chronicle, emit, fullHull, type MatchState, type Ship, type Shot } from './state.ts';
 import {
-  BATTERIES, BATTERY, BOWS, CASTLE, EFFECT, FIRE, FORMS, GUNNERY, GUNS, RAM, ROCKS, SLOT, STEM_POST, type Gun,
+  BATTERIES, BATTERY, BOWS, CASTLE, CHASERS, EFFECT, FIRE, FITTING, FORMS, GUNNERY, GUNS, PUMPS, RAM, ROCKS, SLOT, STEM_POST, type Gun,
 } from './tables.ts';
-import { reloadSpeed, repairRate, sheltered } from './territory.ts';
+import { breakTrail, reloadSpeed, repairRate, sheltered } from './territory.ts';
 import type { Sight } from './visibility.ts';
 import { ZONE } from './world/geography.ts';
 
 const A = v3(), B = v3(), D = v3(), P = v3(), Q = v3(), U = v3(), W = v3(), X = v3(), STAR = v3();
 
 /** The ship sails (or is breaking off the current): it fights, and can be fought. */
-const fights = (ship: Ship): boolean => ship.phase === PHASE.sailing || ship.phase === PHASE.peeling;
+export const fights = (ship: Ship): boolean => ship.phase === PHASE.sailing || ship.phase === PHASE.peeling;
 
 /** The distance in u between two points close together on the sphere (the chord). */
 const apart = (a: V3, b: V3): number => R * Math.sqrt(Math.max(0, 2 - 2 * dot(a, b)));
@@ -81,16 +81,23 @@ function blows(state: MatchState): void {
   }
 }
 
-/** Ship i rams ship j: harder the faster they close, the heavier the rammer and the stronger its bow; it takes a little itself. */
+/**
+ * Ship i rams ship j: harder the faster they close, the heavier the rammer and the stronger its bow; it takes a little
+ * itself. A cutwater also cuts j's open trail, and j lays none for a while (Ship.cut), unless a ward holds it.
+ */
 function ram(state: MatchState, i: number, j: number): void {
   const a = state.ships[i], b = state.ships[j], fit = a.fittings[SLOT.bow], bow = BOWS[fit.kind] ?? STEM_POST;
   const m = FORMS[a.form].mass, hurt = RAM.damage * (a.bump - RAM.speed) * bow.power[fit.tier] * ((2 * m) / (m + FORMS[b.form].mass));
   emit(state, EVENT.ram, j, i, normalize(addScaled(P, a.pos, b.pos, 1)), hurt);
   damage(state, j, hurt, i, CAUSE.ram);
   damage(state, i, hurt * RAM.recoil * bow.recoil, j, CAUSE.ram);
+  if (bow.cut[fit.tier] > 0 && afloat(b) && b.ward === 0) {
+    breakTrail(state, j, i, cellOf(TERRITORY, b.pos));
+    b.cut = Math.max(b.cut, bow.cut[fit.tier]);
+  }
 }
 
-/** Ship i's tick of fire, hot water and embers, then mending where it lies (territory.ts repairRate) and reloading. */
+/** Ship i's tick of fire, hot water and embers, then mending where it lies (territory.ts repairRate) and by its pumps anywhere, and reloading. */
 function endure(sea: Sea, state: MatchState, i: number): void {
   const ship = state.ships[i];
   if (!fights(ship)) return;
@@ -104,7 +111,8 @@ function endure(sea: Sea, state: MatchState, i: number): void {
     ignite(state, i, FIRE.ember, -1);
   }
   if (!afloat(ship)) return;
-  ship.hull = Math.min(fullHull(ship.form, ship.fittings), ship.hull + repairRate(sea, state, i) * TICK);
+  const h = ship.fittings[SLOT.hull], pumps = h.kind === FITTING.pumps ? PUMPS[h.tier] : 0;
+  ship.hull = Math.min(fullHull(ship.form, ship.fittings), ship.hull + (repairRate(sea, state, i) + pumps) * TICK);
   const reload = TICK * reloadSpeed(sea, state, i);
   for (let k = 0; k < BATTERIES; k++) ship.reload[k] = Math.max(0, ship.reload[k] - reload);
 }
@@ -122,7 +130,7 @@ export function launch(state: MatchState, i: number, kind: number, from: V3, to:
   state.shots.push({
     ship: i, kind, from: { x: from.x, y: from.y, z: from.z }, to: { x: to.x, y: to.y, z: to.z }, age: 0,
     time: Math.max(TICK, d / gun.speed), top: gun.loft * d, power: gun.damage[tier] * (1 - gun.falloff * Math.min(1, d / gun.range)),
-    effect: gun.effect, lasting: gun.lasting, blast: gun.blast,
+    effect: gun.effect, lasting: gun.lasting[tier], blast: gun.blast,
   });
 }
 
@@ -153,7 +161,11 @@ function flies(sea: Sea, state: MatchState, shot: Shot, open: number): boolean {
   shot.age = Math.min(shot.time, shot.age + TICK);
   const landed = shot.age >= shot.time;
   if (shot.blast > 0) {
-    if (landed) burst(state, shot, open);
+    if (landed) {
+      const struck = burst(state, shot.ship, shot.to, shot.blast, shot.power, shot.effect, shot.lasting, open);
+      emit(state, EVENT.shell, shot.ship, -1, shot.to, struck);
+      if (struck === 0) emit(state, EVENT.splash, shot.ship, -1, shot.to, 0);
+    }
     return !landed;
   }
   shotAt(shot, shot.age, B);
@@ -169,7 +181,7 @@ function flies(sea: Sea, state: MatchState, shot: Shot, open: number): boolean {
   if (hit >= 0) {
     set(D, B.x - A.x, B.y - A.y, B.z - A.z);
     const c = dot(D, state.ships[hit].head) / Math.sqrt(dot(D, D));
-    strike(state, shot, hit, normalize(addScaled(P, A, D, first)), shot.power * (1 + GUNNERY.rake * c * c));
+    strike(state, shot.ship, hit, normalize(addScaled(P, A, D, first)), shot.power * (1 + GUNNERY.rake * c * c), shot.effect, shot.lasting);
     return false;
   }
   const ashore = aground(sea, state, B);
@@ -177,24 +189,30 @@ function flies(sea: Sea, state: MatchState, shot: Shot, open: number): boolean {
   return !(ashore || landed);
 }
 
-/** A lobbed shell bursts where it fell, striking every hull within its blast; else it splashes. */
-function burst(state: MatchState, shot: Shot, open: number): void {
-  let struck = false;
+/**
+ * A shell or a powder keg (items.ts) of ship `by` bursts at `at`, striking every hull open to fire (`open`, targets())
+ * within `radius` u of it but `by`'s own, for `hurt` with an EFFECT lasting `lasting` s. Returns how many it struck.
+ */
+export function burst(state: MatchState, by: number, at: V3, radius: number, hurt: number, effect: number, lasting: number, open: number): number {
+  let struck = 0;
   for (let j = 0; j < SHIPS; j++) {
-    if (j === shot.ship || (open & (1 << j)) === 0 || !afloat(state.ships[j]) || pass(shot.to, shot.to, state.ships[j], shot.blast) > 1) continue;
-    strike(state, shot, j, shot.to, shot.power);
-    struck = true;
+    if (j === by || (open & (1 << j)) === 0 || !afloat(state.ships[j]) || !touches(state.ships[j], at, radius)) continue;
+    strike(state, by, j, at, hurt, effect, lasting);
+    struck++;
   }
-  if (!struck) emit(state, EVENT.splash, shot.ship, -1, shot.to, 0);
+  return struck;
 }
 
-/** A shot strikes ship j at `at` for `hurt` hull, with its EFFECT. */
-function strike(state: MatchState, shot: Shot, j: number, at: V3, hurt: number): void {
-  emit(state, EVENT.hit, j, shot.ship, at, hurt);
-  damage(state, j, hurt, shot.ship, CAUSE.gun);
-  if (shot.effect === EFFECT.tear) state.ships[j].torn = Math.max(state.ships[j].torn, shot.lasting);
-  else if (shot.effect === EFFECT.burn) ignite(state, j, shot.lasting, shot.ship);
+/** Ship `by`'s shot strikes ship j at `at` for `hurt` hull, with an EFFECT lasting `lasting` s. */
+function strike(state: MatchState, by: number, j: number, at: V3, hurt: number, effect: number, lasting: number): void {
+  emit(state, EVENT.hit, j, by, at, hurt);
+  damage(state, j, hurt, by, CAUSE.gun);
+  if (effect === EFFECT.tear) state.ships[j].torn = Math.max(state.ships[j].torn, lasting);
+  else if (effect === EFFECT.burn) ignite(state, j, lasting, by);
 }
+
+/** Whether `at` lies within `radius` u of the ship's hull. */
+export const touches = (ship: Ship, at: V3, radius: number): boolean => pass(at, at, ship, radius) <= 1;
 
 /**
  * Where the path a → b first comes within `radius` u of ship's hull (its keel, a segment along the heading, widened by
@@ -222,13 +240,17 @@ const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 // ---------------------------------------------------------------------------------------------------------------
 // Batteries: each fires on its own once reloaded, at the nearest rival in sight it bears on.
 
-/** Ship i's batteries that have reloaded and bear on a rival among `seen` (in sight, and open to fire) fire. */
+/**
+ * Ship i's batteries that have reloaded and bear on a rival among `seen` (in sight, and open to fire) fire: the
+ * broadsides and the castle with its broadside fitting's guns, the stern with its stern chasers.
+ */
 function batteries(sea: Sea, state: MatchState, seen: number, i: number): void {
-  const ship = state.ships[i], fit = ship.fittings[SLOT.broadside], gun = GUNS[fit.kind], form = FORMS[ship.form];
-  if (gun === undefined || seen === 0 || !fights(ship)) return;
+  const ship = state.ships[i], form = FORMS[ship.form];
+  if (seen === 0 || !fights(ship)) return;
   cross(STAR, ship.head, ship.pos);
   for (let k = 0; k < BATTERIES; k++) {
-    if (ship.reload[k] > 0 || (k === BATTERY.castle && !form.castle)) continue;
+    const fit = ship.fittings[k === BATTERY.stern ? SLOT.stern : SLOT.broadside], gun = GUNS[fit.kind];
+    if (gun === undefined || ship.reload[k] > 0 || (k === BATTERY.castle && !form.castle)) continue;
     const j = bearing(sea, state, seen, i, k, gun, Q);
     if (j < 0) continue;
     broadside(state, i, k, gun, fit, Q);
@@ -248,7 +270,7 @@ function bearing(sea: Sea, state: MatchState, seen: number, i: number, k: number
     if (d > near) continue;
     set(D, P.x - ship.pos.x, P.y - ship.pos.y, P.z - ship.pos.z);
     const ahead = dot(D, ship.head), abeam = dot(D, STAR), off = within * Math.sqrt(dot(D, D));
-    const bears = k === BATTERY.castle ? ahead < 0 && Math.abs(abeam) <= off : (k === BATTERY.starboard ? abeam > 0 : abeam < 0) && Math.abs(ahead) <= off;
+    const bears = k >= BATTERY.castle ? ahead < 0 && Math.abs(abeam) <= off : (k === BATTERY.starboard ? abeam > 0 : abeam < 0) && Math.abs(ahead) <= off;
     if (!bears) continue;
     best = j;
     near = d;
@@ -270,18 +292,18 @@ function lead(sea: Sea, state: MatchState, i: number, j: number, speed: number, 
 }
 
 /**
- * Battery k of ship i fires, laid on `at`: its guns spread along the deck (the castle's across the stern) fire
+ * Battery k of ship i fires, laid on `at`: its guns spread along the deck (the castle's and the chasers' across the stern) fire
  * parallel, each ball falling wide of where it was laid by the gun's spread and the gunners' wildness.
  */
 function broadside(state: MatchState, i: number, k: number, gun: Gun, fit: { kind: number; tier: number }, at: V3): void {
-  const ship = state.ships[i], form = FORMS[ship.form], castle = k === BATTERY.castle;
-  const guns = castle ? CASTLE.guns : form.guns, axis = castle ? STAR : ship.head;
-  const span = (castle ? form.beam : form.half) * GUNNERY.deck, scatter = gun.spread + GUNNERY.wild * (1 - ship.gunnery);
+  const ship = state.ships[i], form = FORMS[ship.form], astern = k >= BATTERY.castle;
+  const guns = k === BATTERY.castle ? CASTLE.guns : k === BATTERY.stern ? CHASERS.guns : form.guns, axis = astern ? STAR : ship.head;
+  const span = (astern ? form.beam : form.half) * GUNNERY.deck, scatter = gun.spread + GUNNERY.wild * (1 - ship.gunnery);
   const roll = hash32(hash32(state.seed, state.tick), i * BATTERIES + k);
   for (let n = 0; n < guns; n++) {
     const off = guns > 1 ? (span * ((2 * n) / (guns - 1) - 1)) / R : 0;
     normalize(addScaled(A, ship.pos, axis, off));
-    if (castle) normalize(addScaled(A, A, ship.head, -form.half / R));
+    if (astern) normalize(addScaled(A, A, ship.head, -form.half / R));
     normalize(addScaled(B, at, axis, off));
     set(D, B.x - A.x, B.y - A.y, B.z - A.z);
     cross(X, D, B);

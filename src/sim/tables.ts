@@ -208,12 +208,15 @@ export const DAY = {
 export const VORTEX = { fall: 0.4, grip: 1.2, carry: 4, keep: 0.5, still: 0.02 };
 
 // ---------------------------------------------------------------------------------------------------------------
-// Fittings (ids and slots: WP6, for the sailing modifiers; WP9 adds the rest of their rules)
+// Fittings, consumables and chests (PROMPT.md, Chests and loot, Fittings, Consumables): ids, slots and the sailing
+// modifiers (WP6); the rest of their rules (WP9, items.ts, with the guns and rams in the combat section)
 
 export const SLOT = { bow: 0, broadside: 1, stern: 2, rig: 3, hull: 4, lookout: 5 } as const;
 export const SLOTS = 6;
 /** Pigment tiers; a fitting's tier scales its strength. */
 export const TIERS = 5;
+/** The pigment tiers, dullest first: a chest glows in its tier's colour as the gull carries it, before it lands. */
+export const PIGMENT_TIER = { ironGall: 0, verdigris: 1, ultramarine: 2, vermilion: 3, goldLeaf: 4 } as const;
 
 export const FITTING = {
   none: 0,
@@ -225,13 +228,58 @@ export const FITTING = {
   sternGlass: 18, crowsNest: 19, lookout: 20,
 } as const;
 
-/** What every ship starts with, by slot: the stem post and the light guns, at the first tier. */
-export const START_FITTINGS: readonly number[] = [FITTING.stemPost, FITTING.lightGuns, 0, 0, 0, 0];
+/** By FITTING, the slot it goes in (none: −1). */
+export const FITTING_SLOT: readonly number[] = [-1, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
+
+/**
+ * What a captain sets out with by its rank tier (items.ts startingFittings; WP10 and WP11 fit the fleet out), slot by
+ * slot: the fitting each slot holds from rank tier `at`, every one at the brightest pigment tier in the loot pool a
+ * rank below (the first at the first rank), so higher-ranked captains sail better fitted.
+ */
+export const OUTFIT: readonly { readonly at: number; readonly kind: number }[] = [
+  { at: 1, kind: FITTING.stemPost }, { at: 1, kind: FITTING.lightGuns }, { at: 4, kind: FITTING.sternChasers },
+  { at: 3, kind: FITTING.spareCanvas }, { at: 2, kind: FITTING.doubledPlanking }, { at: 5, kind: FITTING.crowsNest },
+];
+
+/** What every ship starts with, by slot, at the first tier: the first rank's outfit, the stem post and the light guns. */
+export const START_FITTINGS: readonly number[] = OUTFIT.map((o) => (o.at <= 1 ? o.kind : FITTING.none));
 
 /** By tier: spare canvas and copper sheathing add speed, the lateen mizzen tightens the turn. */
 export const SPARE_CANVAS = [0.04, 0.06, 0.08, 0.1, 0.12];
 export const COPPER = [0.03, 0.045, 0.06, 0.075, 0.09];
 export const LATEEN_MIZZEN = [0.08, 0.12, 0.16, 0.2, 0.24];
+/** Storm sails by tier: the share of speed gained in a gale (TRIM.gale) where other rigs lose it; at the first tier only nothing is lost. */
+export const STORM_SAILS = [0, 0.03, 0.06, 0.09, 0.12];
+/** Pumps by tier: hull points a second mended anywhere, besides any harbour's or home waters' mending (combat.ts). */
+export const PUMPS = [0.15, 0.25, 0.35, 0.45, 0.55];
+/** By tier, u: how far astern the stern glass's inset shows the sea, and how far the lookout points out ships it knows of (items.ts). */
+export const STERN_GLASS = [25, 30, 35, 40, 45];
+export const LOOKOUT = [40, 50, 60, 70, 80];
+
+/** Consumables: item ids after the fittings' (an offer holds either). A ship has three slots, each stacking one kind. */
+export const CONSUMABLE = { patchKit: 21, ward: 22, gust: 23, fogFlask: 24, flare: 25 } as const;
+export const CONSUMABLE_SLOTS = 3;
+
+/**
+ * By CONSUMABLE from the patch kit, the seconds each is at work once used (items.ts): the patch kit restores `patch` of
+ * the full hull over its time; the ward takes every blow and holds the open trail (combat.ts damage, territory.ts
+ * breakTrail); the gust drives the ship `gust` faster (sailing.ts trim); the fog flask hides ship and trail from every
+ * rival, and the flare shows its ship every ship within SIGHT.flare (visibility.ts).
+ */
+export const CONSUMABLES = { time: [3, 4, 4, 20, 6], patch: 0.35, gust: 0.4 };
+
+/**
+ * Loot (items.ts). Pigment tier k enters the loot pool at the player's rank tier `enters[k]` (MatchSetup.rank, the
+ * first rank 1). A chest's tier is drawn by `weight`, each tier's growing by `climb` for every rank tier past its entry
+ * and × the region's richness once for every tier above the first, so higher ranks and richer seas bring brighter
+ * chests. Each of a chest's offers is a consumable with chance `consumable` by tier, a stack of `count` by tier, else a
+ * fitting of the chest's tier. A ship takes a chest by sailing within `reach` u of it; a fitting it swaps out floats
+ * `astern` u behind its stern. Captains count a consumable `worth` a pigment tier each (items.ts worth).
+ */
+export const LOOT = {
+  enters: [1, 2, 3, 5, 7], weight: [1, 0.5, 0.25, 0.12, 0.06], climb: 0.5,
+  consumable: [0.45, 0.4, 0.35, 0.3, 0.25], count: [1, 1, 2, 2, 3], reach: 0.8, astern: 1.5, worth: 0.5,
+};
 
 // ---------------------------------------------------------------------------------------------------------------
 // Territory, trails and doubloons (WP7)
@@ -322,12 +370,18 @@ export const END = { bounty: 60 };
 // ---------------------------------------------------------------------------------------------------------------
 // Combat (WP8)
 
-/** A ship's batteries: its two broadsides, and the carrack's heavy stern castle firing astern. */
-export const BATTERY = { port: 0, starboard: 1, castle: 2 } as const;
-export const BATTERIES = 3;
+/**
+ * A ship's batteries: its two broadsides, the carrack's heavy stern castle firing astern, and its stern fitting (the
+ * stern chasers firing on their own, the powder kegs and the mortar: items.ts), each reloading in Ship.reload.
+ */
+export const BATTERY = { port: 0, starboard: 1, castle: 2, stern: 3 } as const;
+export const BATTERIES = 4;
 
 /** What a shot does besides holing the hull, for its `lasting` s: tear the sails (Ship.torn, TRIM.torn), or set the hull afire (FIRE). */
 export const EFFECT = { none: 0, tear: 1, burn: 2 } as const;
+
+/** By tier: nothing. */
+const NIL: readonly number[] = [0, 0, 0, 0, 0];
 
 /** A gun fitting's battery: how it bears, reloads, strikes and flies. */
 export interface Gun {
@@ -347,21 +401,61 @@ export interface Gun {
   readonly loft: number;
   /** u: a shell lobbed over everything bursts where it falls, striking hulls this close; 0 for shot fired flat, striking the first hull in its path. */
   readonly blast: number;
-  /** An EFFECT on a hull it strikes, lasting `lasting` s. */
+  /** An EFFECT on a hull it strikes, lasting `lasting` s by tier. */
   readonly effect: number;
-  readonly lasting: number;
+  readonly lasting: readonly number[];
 }
 
 /**
- * By FITTING: the light guns, the starting guns, short-ranged and quick to reload. WP9 adds the long and swivel guns,
- * chain shot (EFFECT.tear), heated shot (EFFECT.burn), the stern chasers and the mortar (blast) as rows.
+ * By FITTING, the guns that fire on their own: the light guns, the starting guns, short-ranged and quick to reload;
+ * the long guns, reaching far but slow to reload; the swivel guns, quick and short; chain shot, tearing sails
+ * (EFFECT.tear); heated shot, setting fires (EFFECT.burn); the stern chasers, firing astern (BATTERY.stern).
  */
 export const GUNS: Readonly<Partial<Record<number, Gun>>> = {
   [FITTING.lightGuns]: {
     range: 22, arc: 0.45, reload: 2.5, damage: [6, 6.6, 7.2, 7.8, 8.4], falloff: 0.4, spread: 0.05, speed: 30, loft: 0.06,
-    blast: 0, effect: EFFECT.none, lasting: 0,
+    blast: 0, effect: EFFECT.none, lasting: NIL,
+  },
+  [FITTING.longGuns]: {
+    range: 40, arc: 0.35, reload: 5, damage: [7.5, 8.25, 9, 9.75, 10.5], falloff: 0.3, spread: 0.03, speed: 40, loft: 0.08,
+    blast: 0, effect: EFFECT.none, lasting: NIL,
+  },
+  [FITTING.swivelGuns]: {
+    range: 14, arc: 0.7, reload: 0.9, damage: [2.6, 2.9, 3.2, 3.5, 3.8], falloff: 0.5, spread: 0.07, speed: 28, loft: 0.04,
+    blast: 0, effect: EFFECT.none, lasting: NIL,
+  },
+  [FITTING.chainShot]: {
+    range: 18, arc: 0.45, reload: 3.5, damage: [3, 3.3, 3.6, 3.9, 4.2], falloff: 0.4, spread: 0.06, speed: 26, loft: 0.06,
+    blast: 0, effect: EFFECT.tear, lasting: [3, 4, 5, 6, 7],
+  },
+  [FITTING.heatedShot]: {
+    range: 18, arc: 0.45, reload: 4, damage: [3.5, 3.85, 4.2, 4.55, 4.9], falloff: 0.4, spread: 0.06, speed: 26, loft: 0.06,
+    blast: 0, effect: EFFECT.burn, lasting: [2, 2.75, 3.5, 4.25, 5],
+  },
+  [FITTING.sternChasers]: {
+    range: 24, arc: 0.4, reload: 2.5, damage: [5, 5.5, 6, 6.5, 7], falloff: 0.4, spread: 0.05, speed: 32, loft: 0.06,
+    blast: 0, effect: EFFECT.none, lasting: NIL,
   },
 };
+
+/** The stern chasers: `guns` firing across the stern, bearing within their arc of it. */
+export const CHASERS = { guns: 2 };
+
+/**
+ * The mortar (items.ts), fired by hand and bearing all round (no arc): its shell flies over islands and hulls alike
+ * and bursts where it falls, striking every hull within its blast.
+ */
+export const MORTAR: Gun = {
+  range: 45, arc: 0, reload: 8, damage: [10, 11.5, 13, 14.5, 16], falloff: 0, spread: 0, speed: 16, loft: 0.5,
+  blast: 2.5, effect: EFFECT.none, lasting: NIL,
+};
+
+/**
+ * Powder kegs (items.ts), dropped astern on their own, one each `reload` s, while a rival in sight follows within
+ * `range` u and `arc` rad of the stern. A keg arms after `arm` s and explodes once a rival's hull comes within
+ * `trigger` u, or where it floats when its `fuse` s burn out, striking every rival hull within `blast` u for `damage` by tier.
+ */
+export const KEGS = { reload: 4, range: 14, arc: 0.7, arm: 0.6, trigger: 0.6, fuse: 25, blast: 2.5, damage: [9, 10.5, 12, 13.5, 15] };
 
 /** The carrack's heavy stern castle: `guns` of its broadside fitting firing astern, bearing within `arc` rad of the stern. */
 export const CASTLE = { guns: 2, arc: 0.5 };
@@ -381,17 +475,25 @@ export const GUNNERY = { ball: 0.15, rake: 0.5, wild: 0.1, deck: 0.6, passes: 3 
  */
 export const RAM = { bow: 0.5, speed: 0.6, damage: 3.5, recoil: 0.2 };
 
-/** A bow fitting's ramming power by tier and the share of the recoil it takes. */
+/** A bow fitting's ramming power by tier, the share of the recoil it takes, and the seconds by tier a ship it rams lays no trail. */
 export interface Bow {
   readonly power: readonly number[];
   readonly recoil: number;
+  readonly cut: readonly number[];
 }
 
 /** The stem post, the starting ram: weak. A bow without a row in BOWS rams as the stem post. */
-export const STEM_POST: Bow = { power: [1, 1.1, 1.2, 1.3, 1.4], recoil: 1 };
+export const STEM_POST: Bow = { power: [1, 1.1, 1.2, 1.3, 1.4], recoil: 1, cut: NIL };
 
-/** By FITTING (WP9 adds the iron ram and the cutwater). */
-export const BOWS: Readonly<Partial<Record<number, Bow>>> = { [FITTING.stemPost]: STEM_POST };
+/**
+ * By FITTING: the stem post; the iron ram, striking twice as hard and shrugging off half the recoil; the cutwater,
+ * striking a little harder, which also cuts the rammed ship's open trail (combat.ts ram) so it lays none for `cut` s.
+ */
+export const BOWS: Readonly<Partial<Record<number, Bow>>> = {
+  [FITTING.stemPost]: STEM_POST,
+  [FITTING.ironRam]: { power: [2, 2.3, 2.6, 2.9, 3.2], recoil: 0.5, cut: NIL },
+  [FITTING.cutwater]: { power: [1.2, 1.3, 1.4, 1.5, 1.6], recoil: 0.8, cut: [3, 4, 5, 6, 7] },
+};
 
 /** Reefs and rocks: a hull striking land faster than `speed` u/s loses `damage` hull per u/s over it. */
 export const ROCKS = { speed: 1.5, damage: 4 };

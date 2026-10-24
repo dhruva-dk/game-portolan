@@ -13,7 +13,7 @@ import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
 import { PHASE, SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
 import { inStorm } from './storm.ts';
 import {
-  BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, STORM, TRIM, VORTEX,
+  BUMP, CONSUMABLES, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, STORM, STORM_SAILS, TRIM, VORTEX,
 } from './tables.ts';
 import { holds } from './territory.ts';
 import { ZONE, heightAt } from './world/geography.ts';
@@ -37,11 +37,12 @@ export function pointOfSail(form: number, c: number): number {
 export interface Trim {
   speed: number;
   turn: number;
-  /** Storm sails: no speed lost in high wind or in the storm. */
+  /** Storm sails: no speed lost in high wind or in the storm; by their tier, `drive` gained in a gale instead. */
   stormSails: boolean;
+  drive: number;
 }
 
-export const newTrim = (): Trim => ({ speed: 1, turn: 1, stormSails: false });
+export const newTrim = (): Trim => ({ speed: 1, turn: 1, stormSails: false, drive: 0 });
 
 export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
   const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos), holder = state.owner[cell] - 1;
@@ -55,12 +56,14 @@ export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
   if (rig.kind === FITTING.lateenMizzen) turn *= 1 + LATEEN_MIZZEN[rig.tier];
   if (hull.kind === FITTING.copperSheathing) speed *= 1 + COPPER[hull.tier];
   if (ship.torn > 0) speed *= 1 - TRIM.torn;
+  if (ship.boost > 0) speed *= 1 + CONSUMABLES.gust; // a gust (items.ts)
   if ((zone & ZONE.kelp) !== 0 && waters.kelp) speed *= waters.kelp.slow;
   if ((zone & ZONE.pack) !== 0 && waters.packSlow) speed *= waters.packSlow;
   if (rig.kind !== FITTING.stormSails && inStorm(state, ship.pos)) speed *= 1 - STORM.labour; // sails labour in the storm
   out.speed = speed;
   out.turn = turn;
   out.stormSails = rig.kind === FITTING.stormSails;
+  out.drive = out.stormSails ? STORM_SAILS[rig.tier] : 0;
   return out;
 }
 
@@ -81,7 +84,7 @@ export function scald(sea: Sea, state: MatchState, i: number): number {
 export function settledSpeed(form: number, sail: number, c: number, wind: Wind, t: Trim): number {
   const s = wind.strength, g = TRIM.gale;
   const airs = s < 1 ? TRIM.calm + (1 - TRIM.calm) * s : 1;
-  const gale = t.stormSails ? 0 : g.loss * Math.max(0, Math.min(1, (s - g.from) / (g.to - g.from)));
+  const gale = (t.stormSails ? -t.drive : g.loss) * Math.max(0, Math.min(1, (s - g.from) / (g.to - g.from)));
   return FORMS[form].speed * SAILS[sail].speed * (1 + (pointOfSail(form, c) - 1) * wind.steady) * airs * (1 - gale)
     * (1 + TRIM.gust * wind.gust) * t.speed;
 }

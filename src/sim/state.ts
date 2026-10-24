@@ -9,7 +9,7 @@ import {
 } from './math.ts';
 import { R, TERRITORY, advance } from './sphere.ts';
 import {
-  BATTERIES, COINS, DAY, DOUBLED_PLANKING, FITTING, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
+  BATTERIES, COINS, CONSUMABLE_SLOTS, DAY, DOUBLED_PLANKING, FITTING, FITTING_SLOT, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
 } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 import { REGIONS } from './world/regions.ts';
@@ -44,8 +44,11 @@ const FIND_SITES = REGIONS.reduce((n, r) => n + r.finds.length, 0);
 /** A point or direction in space: positions are unit vectors from the planet's centre, headings unit tangents. */
 const XYZ = rec(['x', f64], ['y', f64], ['z', f64]);
 
-/** A fitting in a slot: a FITTING and its tier. */
+/** An item and its tier: a FITTING in a slot or a chest, or an offer on deck (a FITTING or a CONSUMABLE). */
 const FIT = rec(['kind', int], ['tier', int]);
+
+/** A consumable slot: its CONSUMABLE (0 while empty) and how many. */
+const STOCK = rec(['kind', int], ['count', int]);
 
 const SHIP = rec(
   ['form', int], // a FORM
@@ -86,7 +89,12 @@ const SHIP = rec(
   ['fogged', list(bool)], // beside `laid`: whether each cell was laid in fog, never to show on rival charts (visibility.ts)
   ['fire', f64], // seconds left of the fire burning its hull (combat.ts ignite), and the ship that set it (−1 none)
   ['fireBy', int],
-  ['ward', f64], // seconds left of its ward (WP9 lights and burns it): combat.ts damage takes nothing from the hull meanwhile
+  ['ward', f64], // seconds left of its ward (items.ts lights and burns it): combat.ts damage takes nothing, its trail cannot break
+  ['patch', f64], // seconds left of its patch kit's mending, and of its gust's drive (items.ts; sailing.ts trim)
+  ['boost', f64],
+  ['cut', f64], // seconds left that it lays no trail, its last one cut by a rival's cutwater (combat.ts ram, territory.ts)
+  ['consumables', list(STOCK, CONSUMABLE_SLOTS)],
+  ['offer', list(FIT)], // the chest opened on its deck: the three items it offers until one is chosen (items.ts); empty when none
   ['reload', list(f64, BATTERIES)], // by BATTERY, seconds until it has reloaded (combat.ts)
   ['gunnery', f64], // how well its gunners lead a moving target, 0 … 1 (Outfit.gunnery)
   ['harm', list(f64, SHIPS)], // the hull it has lost to each ship: the captains remember who hurt them
@@ -110,8 +118,14 @@ const HAPPENING = rec(['kind', int], ['ship', int], ['by', int], ['at', XYZ], ['
 /** A timeline entry: an EVENT the results remember, at its tick. */
 const ENTRY = rec(['tick', int], ['kind', int], ['ship', int], ['by', int], ['amount', f64]);
 
-/** A chest afloat at its wreck: the fitting a sinking dropped, from the ship that sank (WP9: what else it holds, how it is taken). */
-const CHEST = rec(['at', XYZ], ['fitting', FIT], ['from', int]);
+/**
+ * A chest afloat (items.ts), glowing in its pigment tier: the fitting it holds, a sinking's or a swap's (FITTING.none
+ * for loot alone), and the ship that dropped it, which cannot take it back (−1 none). A ship sailing over it opens it.
+ */
+const CHEST = rec(['at', XYZ], ['tier', int], ['fitting', FIT], ['from', int]);
+
+/** A powder keg afloat (items.ts): the ship that dropped it, where, its age in s and its powder's tier. */
+const KEG = rec(['ship', int], ['at', XYZ], ['age', f64], ['tier', int]);
 
 /** A sinking: the ship, the ship that sank it (−1 none), its CAUSE and its tick. */
 const SINKING = rec(['ship', int], ['by', int], ['cause', int], ['tick', int]);
@@ -143,10 +157,12 @@ const MATCH = rec(
   ['finds', list(f64, FIND_SITES)], // each find site's wait: seconds until it is back to take, 0 while it is there
   ['leader', int], // the ship flying the gold-leaf pennant, holding the most sea; −1 while nobody holds any
   ['charm', bool], // the first voyage: the player's trail cannot break until its first loop closes
+  ['rank', int], // the player's rank tier (MatchSetup.rank): how bright the loot pool runs (items.ts)
   ['events', list(HAPPENING)], // this tick's events, cleared at the start of each step
   ['timeline', list(ENTRY)], // the events the results remember
   ['storm', rec(['origin', XYZ], ['calms', list(CALM)])], // where the storm rises, revealed from the first tick, and its plan (stormPlan)
   ['chests', list(CHEST)], // chests afloat
+  ['kegs', list(KEG)], // powder kegs afloat, in the order dropped
   ['shots', list(SHOT)], // shots in flight, in the order fired
   ['sunk', list(SINKING)], // the sinkings, in the order they happened: the finishing order from the last place up
   ['winner', int], // the last ship afloat once the match is over; −1 while it runs
@@ -162,11 +178,12 @@ export type Entry = Value<typeof ENTRY>;
 export type Chest = Value<typeof CHEST>;
 export type Sinking = Value<typeof SINKING>;
 export type Shot = Value<typeof SHOT>;
+export type Keg = Value<typeof KEG>;
 
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 8, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 9, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -185,7 +202,7 @@ export const EVENT = {
   thrown: 12, // a ship rode the Great Current to its end and was thrown off there: by the region, amount u down it
   sunk: 13, // a ship sank: by the ship that sank it (−1 none), amount its CAUSE
   bounty: 14, // a sinker's bounty: ship the sinker, by the ship it sank, amount the doubloons
-  chest: 15, // a sinking dropped a chest at `at`: ship whose, by the FITTING in it, amount its tier
+  chest: 15, // a chest came afloat at `at` (a sinking, a swap, a gull's loss): ship whose (−1 none), by the FITTING in it (none: loot), amount its tier
   win: 16, // the match is over: ship the last afloat, amount the u² it holds
   freed: 17, // a sunk ship's sea fell to nobody: amount its u², cells
   broadside: 18, // a battery fired (muzzle smoke, "a broadside fired"): by the rival it bore on, at the ship, amount its BATTERY
@@ -195,6 +212,14 @@ export const EVENT = {
   struck: 22, // ship struck reef or rock at speed: amount the hull it lost
   ablaze: 23, // ship's hull caught fire: by who set it (−1 embers), amount the seconds it will burn
   engage: 24, // timeline only: a rival first drew ship's hull: by the rival, amount the CAUSE
+  opened: 25, // ship opened a chest at `at`, its three offers on deck (Ship.offer): by who dropped it (−1 none), amount its tier
+  chosen: 26, // ship chose an offer (the timeline's "chests chosen" too): by the item, amount its tier
+  swapped: 27, // ship's new fitting displaced its old one, now afloat astern in a chest: by the old FITTING, amount its tier
+  used: 28, // ship used a consumable: by the CONSUMABLE, amount how many are left in the slot
+  keg: 29, // ship dropped a powder keg at `at`: amount its tier
+  kegBurst: 30, // ship's powder keg exploded at `at`: by the rival that set it off (−1 its fuse burnt out), amount the hulls struck
+  mortar: 31, // ship fired its mortar at `at`: by the rival aimed at (SHIPS: a point by hand), amount the shell's flight in s
+  shell: 32, // ship's shell burst where it fell, at `at`: amount the hulls struck
 } as const;
 
 /** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
@@ -232,14 +257,17 @@ export interface MatchSetup {
   hour?: number;
   /** The career's first match (PROMPT.md, The first voyage): the player's first loop always succeeds. */
   firstVoyage?: boolean;
+  /** The player's rank tier, the first 1 (WP10): brighter pigments enter the loot pool as it rises (items.ts); 1. */
+  rank?: number;
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed, fleet = new Array<Outfit>(SHIPS).fill({}), hour = startHour(seed), firstVoyage = false } = setup;
+  const { seed, fleet = new Array<Outfit>(SHIPS).fill({}), hour = startHour(seed), firstVoyage = false, rank = 1 } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
   if (fleet.length !== SHIPS) throw new RangeError(`createMatch: a fleet of ${fleet.length} ships, not ${SHIPS}`);
   fleet.forEach(check);
   if (!(hour >= 0 && hour < 24)) throw new RangeError(`createMatch: hour ${hour} is not in 0…24`);
+  if (!Number.isInteger(rank) || rank < 1) throw new RangeError(`createMatch: rank tier ${rank} is not a whole number from 1`);
   const rng: Uint32Array[] = [];
   for (let s = 0; s < STREAMS; s++) rng.push(rngFrom(hash32(seed, s)));
   const route = greatCurrent(seed), ships: Ship[] = [], gusts: Gust[] = [];
@@ -249,15 +277,15 @@ export function createMatch(setup: MatchSetup): MatchState {
   const coins = Array.from({ length: COINS.count }, () => ({ kind: AFLOAT.coin, at: v3(0, 0, 1), value: 0, age: 0 }));
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
-    coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, events: [], timeline: [],
-    storm: stormPlan(rng[STREAM.storm]), chests: [], shots: [], sunk: [], winner: -1,
+    coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, rank, events: [], timeline: [],
+    storm: stormPlan(rng[STREAM.storm]), chests: [], kegs: [], shots: [], sunk: [], winner: -1,
   };
 }
 
 /** Throws unless createMatch can fit out ship i as outfit o says. */
 function check(o: Outfit, i: number): void {
   const whole = (x: number | undefined, below = Infinity): boolean => x === undefined || (Number.isInteger(x) && x >= 0 && x < below);
-  const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f) => whole(f.kind) && whole(f.tier, TIERS)));
+  const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f, s) => (f.kind === FITTING.none || FITTING_SLOT[f.kind] === s) && whole(f.tier, TIERS)));
   const share = o.gunnery === undefined || (o.gunnery >= 0 && o.gunnery <= 1);
   if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !whole(o.gull) || !fits || !share) {
     throw new RangeError(`createMatch: ship ${i}'s outfit cannot be fitted out`);
@@ -330,6 +358,7 @@ function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
     speed: OPENING.way, rate: 0, shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0,
     homing: false, torn: 0, fittings, bump: 0, bumped: -1, bumpOn: 0, laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
     hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [], fire: 0, fireBy: -1, ward: 0,
+    patch: 0, boost: 0, cut: 0, consumables: Array.from({ length: CONSUMABLE_SLOTS }, () => ({ kind: 0, count: 0 })), offer: [],
     reload: new Array<number>(BATTERIES).fill(0), gunnery, harm: new Array<number>(SHIPS).fill(0),
   };
 }
