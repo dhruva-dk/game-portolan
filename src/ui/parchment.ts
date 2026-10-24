@@ -58,7 +58,9 @@ function vec3Of(c: RGB, linear = false): string {
 
 let nextSeed = 0;
 
-function uiMaterial(style: Style, fragmentShader: string, uniforms: Record<string, THREE.IUniform>): THREE.ShaderMaterial {
+/** An interface material: the fragment shader gets STYLE_GLSL, the shared UI_GLSL (vLocal in CSS px, uiPaper,
+ * uiParchment, inkLine, writeUi) and the style's uniforms. Also used by the lettering (src/lettering/ink.ts). */
+export function uiMaterial(style: Style, fragmentShader: string, uniforms: Record<string, THREE.IUniform>): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3,
     vertexShader: UI_VERT,
