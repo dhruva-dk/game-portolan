@@ -279,6 +279,35 @@ export interface Outfit {
   gunnery?: number;
 }
 
+/** A habit of the player as a captain expects it (Mind): its value (meaningless, −1, at confidence 0) and how sure it is, permille. */
+export interface Expect {
+  value: number;
+  confidence: number;
+}
+
+/**
+ * What a captain brings to a match from the career (career/learn.ts mindOf; PROMPT.md, Captains learn the player; The
+ * first voyage), for its brain (WP11, WP12) to act on: a habit once its confidence reaches the career's LEARNING.known (500).
+ */
+export interface Mind {
+  /** The first voyage: it sails at its gentlest, slow to fight and slow to chase. */
+  gentle: boolean;
+  /** 0, or 1 … 3: the player sank it in their last match(es) together, and it hunts the player that much harder. */
+  grudge: number;
+  /** The region (REGIONS index) the player breaks off the current into: more captains break off there. */
+  breakOff: Expect;
+  /** The radius of the player's loops, u: hunters patrol beyond its border. */
+  loop: Expect;
+  /** Rivals' trails the player breaks in a match, tenths: guard the trail. */
+  raids: Expect;
+  /** The hull the player runs at, percent of full; 0, it stands and fights. Press it when it is wounded. */
+  run: Expect;
+  /** The margin it keeps inside the calm's edge while the storm closes, u; below 0 it lingers in the storm. */
+  storm: Expect;
+  /** The FITTING kinds the player favours, surest first, those it is sure of only. */
+  fittings: readonly number[];
+}
+
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
   /** A uint32. */
@@ -291,6 +320,10 @@ export interface MatchSetup {
   firstVoyage?: boolean;
   /** The player's rank tier, the first 1 (WP10): brighter pigments enter the loot pool as it rises (items.ts); 1. */
   rank?: number;
+  /** What each captain brings from the career, in fleet order, the player's entry null (WP10): its brain reads it (WP11, WP12); the match does not yet. */
+  minds?: readonly (Mind | null)[];
+  /** The find sites (Geography.finds) the player's career chart marks from earlier matches (WP10): its chart and HUD show them. */
+  known?: readonly number[];
 }
 
 export function createMatch(setup: MatchSetup): MatchState {

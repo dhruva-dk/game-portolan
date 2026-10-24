@@ -125,6 +125,7 @@ test('the unlock schedule: the caravel at Levante, the carrack at Ostro, the gal
 test('each match draws the nine captains nearest the player, fitted out by rank and temperament', () => {
   const c = newCareer(3);
   c.player.points = 420;
+  c.match = 1; // past the first voyage, whose captains sail at their gentlest (learn.test.ts)
   const drawn = draw(c), far = (i: number): number => Math.abs(c.captains[i].points - 420), worst = Math.max(...drawn.map(far));
   assert.equal(drawn.length, SHIPS - 1);
   for (let i = 0; i < LEAGUE; i++) if (!drawn.includes(i)) assert.ok(far(i) >= worst);

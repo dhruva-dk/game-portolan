@@ -2,15 +2,19 @@
 // unlocks, treasure, the league moving on, the form the player sails, and the gull trained with treasure.
 import type { MatchResult } from '../sim/end.ts';
 import { GULL, PIGMENT_TIER } from '../sim/tables.ts';
+import { remember } from './learn.ts';
 import { TRAITS, draw, leagueRound, type Trait } from './league.ts';
 import { RANK, clampPoints, copyCareer, rankDeltas, tierOf, unlockedForms, type Career, type GullLevels } from './state.ts';
+import type { Voyage } from './voyage.ts';
 
 /**
  * The career after the match it set up (setup.ts toSetup) ended in `result`: every ship in it moves by the rank
  * formula, the player never below the tier it has reached; the player's treasure comes home; the captains who did
- * not sail race their own matches (league.ts leagueRound).
+ * not sail race their own matches (league.ts leagueRound). Each captain in it keeps its record against the player and
+ * its grudge; given the player's `voyage` (voyage.ts), the profile and the captains learn from it and the career chart
+ * inks it (learn.ts remember).
  */
-export function applyResult(career: Career, result: MatchResult): Career {
+export function applyResult(career: Career, result: MatchResult, voyage?: Voyage): Career {
   const next = copyCareer(career), sailed = draw(career), d = rankDeltas(result.ships), p = next.player;
   p.points = Math.max((p.tier - 1) * RANK.tier, clampPoints(p.points + d[0])); // the player sails ship 0
   p.tier = Math.max(p.tier, tierOf(p.points));
@@ -18,6 +22,7 @@ export function applyResult(career: Career, result: MatchResult): Career {
   sailed.forEach((id, k) => {
     next.captains[id].points = clampPoints(next.captains[id].points + d[k + 1]);
   });
+  remember(next, sailed, result, voyage);
   leagueRound(next, sailed);
   next.match++;
   return next;

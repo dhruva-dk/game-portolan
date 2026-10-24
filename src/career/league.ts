@@ -119,7 +119,7 @@ export function captainOutfit(career: Career, id: number): Outfit {
   };
 }
 
-/** The nine captains nearest the player's rank points, nearest first (ties to the lower league index). */
+/** The nine captains nearest the player's rank points, nearest first (ties to the lower league index): on the first voyage, the player at none, the nine lowest. */
 export function draw(career: Career): number[] {
   const p = career.player.points, far = (i: number): number => Math.abs(career.captains[i].points - p);
   return Array.from({ length: LEAGUE }, (_, i) => i).sort((a, b) => far(a) - far(b) || a - b).slice(0, SHIPS - 1);
