@@ -2,14 +2,20 @@
 // the background and coming back. The boot (main.ts), the screens and the test hooks drive the game through it.
 import type { Lettering } from '../lettering/ink.ts';
 import type { Pipeline } from '../render/pipeline.ts';
+import { applyResult } from '../career/progress.ts';
+import { toSetup } from '../career/setup.ts';
+import { newCareer, type Career } from '../career/state.ts';
+import { over, result } from '../sim/end.ts';
 import { seaFor } from '../sim/environment.ts';
 import { idleInput, type Recording } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
 import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
 import { Loop } from './loop.ts';
-import { clearMatch, saveMatch, type SavedMatch } from './save.ts';
+import { clearMatch, saveCareer, saveMatch, type SavedMatch } from './save.ts';
 import { Session } from './session.ts';
 import type { World, WorldMessage } from './worldWorker.ts';
+
+const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0];
 
 export class Game implements Runtime {
   readonly pipeline: Pipeline;
@@ -17,6 +23,8 @@ export class Game implements Runtime {
   readonly shell: Shell;
   world: World | null = null;
   session: Session | null = null;
+  /** The career (WP10): set sail fits out its next match, and a voyage's result comes home when its match ends. */
+  career: Career | null = null;
   /** The world has arrived and the screen the game opens on is up. */
   ready = false;
   /** Milliseconds from navigation start to the first frame of the title, and what the world cost. */
@@ -32,9 +40,11 @@ export class Game implements Runtime {
     });
   }
 
-  /** The world from the worker and the match saved when the app last went to the background, which resumes. */
-  arrive(m: WorldMessage, saved: SavedMatch | null): void {
+  /** The world from the worker, the saved career (a new one when there is none) and the match saved when the app last
+   * went to the background, which resumes. */
+  arrive(m: WorldMessage, saved: SavedMatch | null, career: Career | null = null): void {
     this.world = m.world;
+    this.career = career ?? newCareer(randomSeed());
     this.perf.worldMs = m.ms;
     this.perf.worldCached = m.cached;
     if (saved) this.play(saved);
@@ -42,7 +52,8 @@ export class Game implements Runtime {
   }
 
   setSail(): void {
-    this.startMatch({ seed: crypto.getRandomValues(new Uint32Array(1))[0] }, null, null);
+    if (!this.career) throw new Error('setSail: the career has not arrived');
+    this.startMatch(toSetup(this.career, randomSeed()).setup, null, null);
   }
 
   startMatch(setup: MatchSetup, recording: Recording | null, stopAt: number | null): void {
@@ -78,6 +89,11 @@ export class Game implements Runtime {
 
   private end(): void {
     if (!this.session) return;
+    const { state, recording } = this.session;
+    if (this.career && recording === null && over(state)) { // a voyage the player sailed: its result comes home, saved on the device
+      this.career = applyResult(this.career, result(state));
+      void saveCareer(this.career);
+    }
     this.session = null;
     this.loop.run(null);
     void clearMatch();

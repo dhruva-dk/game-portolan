@@ -5,7 +5,7 @@
 import { App } from '@capacitor/app';
 import { Game } from './app/game.ts';
 import { installHooks } from './app/hooks.ts';
-import { loadMatch } from './app/save.ts';
+import { loadCareer, loadMatch } from './app/save.ts';
 import type { WorldMessage } from './app/worldWorker.ts';
 import { Lettering } from './lettering/ink.ts';
 import { Pipeline } from './render/pipeline.ts';
@@ -32,5 +32,5 @@ function loadWorld(): Promise<WorldMessage> {
   });
 }
 
-const [world, saved] = await Promise.all([loadWorld(), loadMatch()]);
-game.arrive(world, saved);
+const [world, saved, career] = await Promise.all([loadWorld(), loadMatch(), loadCareer()]);
+game.arrive(world, saved, career);

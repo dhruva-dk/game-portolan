@@ -1,14 +1,15 @@
 // Saving on the device: one IndexedDB database with a store per kind of record. The match in progress is saved as
 // its codec snapshot, the very bytes the match hash covers, so nothing that decides the match's future can be left
 // out; a record that does not decode in full is discarded, never half-loaded.
+import { decodeCareer, encodeCareer, type Career } from '../career/state.ts';
 import { parseRecording, type Recording } from '../sim/input.ts';
 import { decodeMatch, encodeMatch, type MatchState } from '../sim/state.ts';
 
 const DB = 'portolan';
-const DB_VERSION = 1;
-/** The match in progress, and the generated world (worldWorker.ts). Adding a store bumps DB_VERSION. */
-type Store = 'match' | 'world';
-const STORES: readonly Store[] = ['match', 'world'];
+const DB_VERSION = 2;
+/** The career, the match in progress, and the generated world (worldWorker.ts). Adding a store bumps DB_VERSION. */
+type Store = 'career' | 'match' | 'world';
+const STORES: readonly Store[] = ['career', 'match', 'world'];
 
 let db: Promise<IDBDatabase> | null = null;
 
@@ -70,6 +71,21 @@ export async function loadMatch(): Promise<SavedMatch | null> {
     return { state: decodeMatch(r.snapshot), recording: r.recording && parseRecording(r.recording), stopAt: r.stopAt };
   } catch {
     await clearMatch();
+    return null;
+  }
+}
+
+/** The career, saved after every match as its codec bytes: the very bytes careerHash covers. */
+export const saveCareer = (c: Career): Promise<void> => write('career', 'current', encodeCareer(c));
+
+/** The saved career, or null when there is none; an unreadable one is deleted, never half-loaded. */
+export async function loadCareer(): Promise<Career | null> {
+  const bytes = await read<Uint8Array>('career', 'current');
+  if (bytes === undefined) return null;
+  try {
+    return decodeCareer(bytes);
+  } catch {
+    await request('career', 'readwrite', (s) => s.delete('current'));
     return null;
   }
 }
