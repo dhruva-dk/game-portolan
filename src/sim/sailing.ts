@@ -11,8 +11,9 @@ import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, ty
 import { helmOf } from './route.ts';
 import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
 import { PHASE, SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
+import { inStorm } from './storm.ts';
 import {
-  BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM, VORTEX,
+  BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, STORM, TRIM, VORTEX,
 } from './tables.ts';
 import { holds } from './territory.ts';
 import { ZONE, heightAt } from './world/geography.ts';
@@ -56,6 +57,7 @@ export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
   if (ship.torn > 0) speed *= 1 - TRIM.torn;
   if ((zone & ZONE.kelp) !== 0 && waters.kelp) speed *= waters.kelp.slow;
   if ((zone & ZONE.pack) !== 0 && waters.packSlow) speed *= waters.packSlow;
+  if (rig.kind !== FITTING.stormSails && inStorm(state, ship.pos)) speed *= 1 - STORM.labour; // sails labour in the storm
   out.speed = speed;
   out.turn = turn;
   out.stormSails = rig.kind === FITTING.stormSails;

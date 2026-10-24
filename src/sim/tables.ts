@@ -314,12 +314,53 @@ const RIDE = 15;
 export const OPENING = { ride: RIDE, way: RIDE - GREAT_CURRENT.speed, peel: 0.6, settle: 3, most: 8 };
 
 /**
- * The end of the match. A match is laid out over `length` s, about ten minutes (the storm's phases, WP8 part C, close
- * over it), and lasts no longer than `deadline` s: by then the storm has covered the sea and whoever is still afloat
- * founders in it (end.ts deadline). A sinking pays its sinker `bounty` doubloons into the bank, twice over for sinking
- * the pennant's holder: worth a loop's purse, so a fight can pay as well as charting, and the leader is a prize.
+ * A sinking pays its sinker `bounty` doubloons into the bank, twice over for sinking the pennant's holder: worth a
+ * loop's purse, so a fight can pay as well as charting, and the leader is a prize. The storm ends every match (STORM).
  */
-export const END = { length: 600, deadline: 720, bounty: 60 };
+export const END = { bounty: 60 };
+
+/** Doubled planking by tier: the share of its form's hull points it adds. */
+export const DOUBLED_PLANKING = [0.15, 0.22, 0.3, 0.38, 0.45];
+
+/**
+ * The storm (PROMPT.md, The storm), phase by phase: each `move`s at that second of the match and sweeps for `sweep` s
+ * to a calm of radius `calm` u (arc), then holds until the next moves; inside it a ship loses `rate` hull a second.
+ * The first is announced at `announce` s, each after it the moment the one before holds, so every phase is on the
+ * chart 20–45 s before it moves. The calms close from seven-tenths of the planet to a final calm 30 u across, close
+ * enough that the last ships must fight, held from 550 s; the last phase closes it to nothing by 600 s at a rate that
+ * sinks the stoutest hull in under 20 s, so every match is over by about ten minutes and a quarter, and sooner when the
+ * last ships fight. In the storm sails labour, losing `labour` of their speed without storm sails, and lookouts see
+ * `sight` as far. The territory scan passes over every row of the territory grid once every `scan` ticks.
+ */
+export const STORM = {
+  announce: 45,
+  phases: [
+    { move: 90, sweep: 60, calm: 400, rate: 0.2 },
+    { move: 195, sweep: 60, calm: 260, rate: 0.4 },
+    { move: 300, sweep: 45, calm: 160, rate: 0.7 },
+    { move: 390, sweep: 40, calm: 90, rate: 1.2 },
+    { move: 465, sweep: 30, calm: 44, rate: 2 },
+    { move: 525, sweep: 25, calm: 15, rate: 4 },
+    { move: 570, sweep: 30, calm: 0, rate: 12 },
+  ],
+  labour: 0.25,
+  sight: 0.45,
+  scan: 30,
+};
+
+/**
+ * Sight (visibility.ts), u above the sea by FORM: the lookout's eye on deck, the masthead (seen first over the curve)
+ * and the hull's top (hull-down below it); a crow's nest raises the eye, by tier. In clear air a lookout sees `clear`
+ * u, less in fog, squalls and the storm; a flare reveals every ship within `flare` u.
+ */
+export const SIGHT = {
+  eye: [0.9, 1, 1.2, 1.4],
+  mast: [3, 3.6, 4.4, 5],
+  hull: [0.4, 0.5, 0.7, 0.8],
+  crowsNest: [1.5, 2, 2.5, 3, 3.5],
+  clear: 70,
+  flare: 90,
+};
 
 /**
  * Treasure brought home (PROMPT.md, The results): `share` of the bank (the rest pays the crew) times the finishing

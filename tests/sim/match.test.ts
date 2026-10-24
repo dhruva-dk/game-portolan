@@ -2,7 +2,7 @@
 // with the storm's origin revealed; break-offs at different moments making homes in different regions; the ride to the
 // end and the throw-off; the captains' view of the passage; sink(), the entry point combat and the storm call, with its
 // order, purse, bounty, chest and freed sea; the last ship afloat; scripted matches from the opening to the end and
-// their results; the fast-forward after the player sinks, to the deadline; snapshot/resume at random ticks; the setup;
+// their results; the fast-forward after the player sinks, to the storm's end; snapshot/resume at random ticks; the setup;
 // and the tick's cost against A9.
 //   node --test tests/sim/match.test.ts
 import { test } from 'node:test';
@@ -17,7 +17,7 @@ import { R } from '../../src/sim/sphere.ts';
 import {
   AFLOAT, CAUSE, EVENT, PHASE, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState,
 } from '../../src/sim/state.ts';
-import { END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, TREASURE } from '../../src/sim/tables.ts';
+import { END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { regionOf } from '../../src/sim/world/geography.ts';
 import { world } from './vectors.ts';
@@ -191,20 +191,18 @@ test('a scripted match runs from the opening to the last ship afloat, and its re
 test('when the player sinks, the rest of the match resolves at once, to the end it would have had', () => {
   const s = play(sea, createMatch({ seed: SEED, fleet: FLEET }), S(20), LOSS, S(110) + 1), idle = idleInput();
   assert.ok(s.ships[0].phase === PHASE.sunk && !over(s));
-  const out = decodeMatch(encodeMatch(s)), last = Math.round(END.deadline / TICK);
+  const out = decodeMatch(encodeMatch(s)), close = STORM.phases[STORM.phases.length - 1];
   resolve(sea, s);
   const r = result(s), me = r.ships[0];
   assert.deepEqual([me.place, me.by, me.cause, me.tick], [SHIPS - 2, 4, CAUSE.gun, S(110)]);
   assert.equal(r.timeline.at(-1)?.kind, EVENT.sunk);
-  // Nobody fights yet, so the deadline ends it: the storm takes the rest, least sea first.
-  assert.equal(r.ticks, last);
-  while (out.tick < last) step(sea, out, idle);
-  const held = out.ships.map((ship) => ship.held);
-  step(sea, out, idle);
+  // Nobody fights yet, so the storm ends it: its last phase closes the final calm and the rest founder in it.
+  assert.ok(r.ticks <= S(close.move + close.sweep + FORMS[3].hull / close.rate), `over at ${r.ticks * TICK} s`);
+  while (!over(out)) step(sea, out, idle);
   assert.equal(matchHash(out), matchHash(s), 'the fast-forward is the match played out');
   const late = out.sunk.slice(LOSS.length);
   assert.equal(late.length, SHIPS - 1 - LOSS.length);
-  assert.ok(late.every((d, k) => d.cause === CAUSE.storm && d.by === -1 && d.tick === last && (k === 0 || held[late[k - 1].ship] <= held[d.ship])));
+  assert.ok(late.every((d) => d.cause === CAUSE.storm && d.by === -1));
 });
 
 test('a match resumed from a snapshot at random ticks ends exactly as the match played through', () => {

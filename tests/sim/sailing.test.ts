@@ -79,6 +79,7 @@ test('a caravel under plain sail in a fair wind rounds the equator in six minute
       course.push(cellOf(TERRITORY, p));
     }
     const s = match(FORM.caravel, fromLatLon(0, 0, v3()), PI / 2, SAIL.plain, seed), ship = s.ships[0], idle = input();
+    for (const calm of s.storm.calms) calm.r = PI; // the storm held off: this is the sails' own pace
     step(waters, s, input({ course }));
     let lon = 0, last = 0;
     while (lon < 2 * PI && s.tick < 450 / TICK) {

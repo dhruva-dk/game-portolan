@@ -4,10 +4,13 @@
 // MATCH_FORMAT.version, so snapshots of the old shape are discarded rather than misread.
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
 import {
-  addScaled, cross, dot, hash32, normalize, rngDir, rngFrom, rngInt, rngRange, set, v3, type V3,
+  PI, addScaled, cross, dacos, dcos, dot, dsin, hash32, normalize, rngDir, rngFloat, rngFrom, rngInt, rngRange, set, v3,
+  type Rng, type V3,
 } from './math.ts';
-import { TERRITORY, advance } from './sphere.ts';
-import { COINS, DAY, FORM, FORMS, GUSTS, OPENING, SLOTS, SPELL, START_FITTINGS, TIERS, WEATHER } from './tables.ts';
+import { R, TERRITORY, advance } from './sphere.ts';
+import {
+  COINS, DAY, DOUBLED_PLANKING, FITTING, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
+} from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 import { REGIONS } from './world/regions.ts';
 
@@ -77,6 +80,10 @@ const SHIP = rec(
   ['held', f64], // the sea it holds, AREA_Q quanta: whole numbers, so exact in any order (territory.ts keeps it)
   ['prize', int], // the find site it is holding beside to take: −1 none
   ['holding', f64], // the seconds it has held there
+  ['hull', f64], // hull points left: it sinks at none (combat.ts damage); fullHull when it sets out
+  ['flask', f64], // seconds left of its fog flask, and of its flare (WP9 lights and burns them; visibility.ts reads them)
+  ['flare', f64],
+  ['fogged', list(bool)], // beside `laid`: whether each cell was laid in fog, never to show on rival charts (visibility.ts)
 );
 
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
@@ -103,6 +110,9 @@ const CHEST = rec(['at', XYZ], ['fitting', FIT], ['from', int]);
 /** A sinking: the ship, the ship that sank it (−1 none), its CAUSE and its tick. */
 const SINKING = rec(['ship', int], ['by', int], ['cause', int], ['tick', int]);
 
+/** A calm of the storm's plan: the storm-free cap round `at`, of angular radius r. */
+const CALM = rec(['at', XYZ], ['r', f64]);
+
 const MATCH = rec(
   ['seed', int], // the match seed, a uint32
   ['tick', int], // ticks stepped; match time is tick·TICK
@@ -119,7 +129,7 @@ const MATCH = rec(
   ['charm', bool], // the first voyage: the player's trail cannot break until its first loop closes
   ['events', list(HAPPENING)], // this tick's events, cleared at the start of each step
   ['timeline', list(ENTRY)], // the events the results remember
-  ['storm', rec(['origin', XYZ])], // the storm: where it rises, revealed from the first tick (part C adds its phases)
+  ['storm', rec(['origin', XYZ], ['calms', list(CALM)])], // where the storm rises, revealed from the first tick, and its plan (stormPlan)
   ['chests', list(CHEST)], // chests afloat
   ['sunk', list(SINKING)], // the sinkings, in the order they happened: the finishing order from the last place up
   ['winner', int], // the last ship afloat once the match is over; −1 while it runs
@@ -138,7 +148,7 @@ export type Sinking = Value<typeof SINKING>;
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 6, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 7, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -213,7 +223,7 @@ export function createMatch(setup: MatchSetup): MatchState {
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
     coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, events: [], timeline: [],
-    storm: { origin: rngDir(rng[STREAM.storm], v3()) }, chests: [], sunk: [], winner: -1,
+    storm: stormPlan(rng[STREAM.storm]), chests: [], sunk: [], winner: -1,
   };
 }
 
@@ -231,6 +241,36 @@ function startHour(seed: number): number {
   const rng = rngFrom(hash32(seed, STREAMS)); // a generator of its own, numbered past every stream
   const [from, to] = DAY.starts[rngInt(rng, DAY.starts.length)];
   return rngRange(rng, from, to);
+}
+
+/** A ship's full hull: its form's hull points, and more with doubled planking. */
+export function fullHull(form: number, fittings: readonly { kind: number; tier: number }[]): number {
+  const h = fittings[SLOT.hull];
+  return FORMS[form].hull * (1 + (h.kind === FITTING.doubledPlanking ? DOUBLED_PLANKING[h.tier] : 0));
+}
+
+/**
+ * The storm's plan, drawn on its stream (storm.ts sweeps it): its origin, anywhere; the final calm, anywhere clear of
+ * the origin, a uniform draw over the sphere, so it falls in every region as often as the region's share of the
+ * planet; then, from the last but one back to the first, each calm's centre on the great circle from the final calm
+ * toward the origin's antipode, as far along as a uniform draw within what keeps it inside the calm before it (calm 0:
+ * all but the origin) and round the calm after it. The last phase closes the final calm to nothing where it lies.
+ */
+export function stormPlan(rng: Rng): MatchState['storm'] {
+  const origin = rngDir(rng, v3()), r = STORM.phases.map((p) => p.calm / R), n = r.length, end = v3();
+  do rngDir(rng, end); while (dot(end, origin) > dcos(r[n - 2]));
+  const far = v3(-origin.x, -origin.y, -origin.z), c = dot(end, far), d = dacos(Math.max(-1, Math.min(1, c)));
+  const w = d > 1e-9 ? normalize(addScaled(v3(), far, end, -c)) : v3();
+  const x = new Array<number>(n).fill(0);
+  for (let k = n - 3; k >= 0; k--) {
+    const give = r[k] - r[k + 1], lo = Math.max(0, d - PI + r[k], x[k + 1] - give), hi = Math.min(d, x[k + 1] + give);
+    x[k] = lo + (hi - lo) * rngFloat(rng);
+  }
+  const calms = x.map((a, k) => {
+    const ca = dcos(a), sa = dsin(a);
+    return { at: normalize(v3(end.x * ca + w.x * sa, end.y * ca + w.y * sa, end.z * ca + w.z * sa)), r: r[k] };
+  });
+  return { origin, calms };
 }
 
 /**
@@ -261,6 +301,7 @@ function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
     form, pigment, pattern, gull, phase: PHASE.riding, ride, peel: 0, pos, head, was: { ...pos }, wasHead: { ...head },
     speed: OPENING.way, rate: 0, shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0,
     homing: false, torn: 0, fittings, bump: 0, bumped: -1, bumpOn: 0, laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
+    hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [],
   };
 }
 

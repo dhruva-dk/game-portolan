@@ -2,13 +2,15 @@
 // match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
 // inside. Each system appends its call here, in the order the rules need.
 import { earn, forage, scoop } from './economy.ts';
-import { deadline, over } from './end.ts';
+import { over } from './end.ts';
 import { brew, stir, type Sea } from './environment.ts';
 import { applyControls, idleInput, inputAt, replay, type Recording, type ShipInput } from './input.ts';
 import { coast, ride } from './opening.ts';
 import { collide, sail } from './sailing.ts';
 import { PHASE, SHIPS, type MatchState } from './state.ts';
+import { storm } from './storm.ts';
 import { chart } from './territory.ts';
+import { noteFog } from './visibility.ts';
 
 /** The captains' input until they think for themselves (WP11): hands off the helm. */
 const CAPTAIN: ShipInput = idleInput();
@@ -31,10 +33,11 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   }
   collide(state);
   chart(state);
+  noteFog(state);
+  storm(state);
   earn(sea, state);
   forage(sea, state);
   scoop(state);
-  deadline(state);
   state.tick++;
 }
 
@@ -46,7 +49,7 @@ export function runMatch(sea: Sea, state: MatchState, recording: Recording, tick
 
 /**
  * The rest of the match at once, headless, once the player has sunk (PROMPT.md, Sinking and the end): the very steps
- * it would have taken, to its end, which the deadline (end.ts) guarantees.
+ * it would have taken, to its end, which the storm's last phase guarantees (storm.ts).
  */
 export function resolve(sea: Sea, state: MatchState): void {
   const still = idleInput();

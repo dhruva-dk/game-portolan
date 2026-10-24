@@ -1,18 +1,16 @@
 // Sinking and the end (PROMPT.md, A match: Sinking and the end, The results). Every sinking goes through sink() —
-// combat's (WP8 part B), the storm's (part C) and the deadline's below — which ranks the ship by the order it sank,
+// combat's (WP8 part B) and the storm's (part C) — which ranks the ship by the order it sank,
 // spills its purse, frees its sea, pays its sinker's bounty and drops one of its fittings as a chest. When one ship is
 // left afloat it has won and the match stands still; result() then explains the match.
 import { spill } from './economy.ts';
 import { rngInt, set } from './math.ts';
 import { AREA_Q } from './sphere.ts';
-import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, afloat, chronicle, emit, type Entry, type MatchState } from './state.ts';
+import { EVENT, PHASE, STREAM, afloat, chronicle, emit, type Entry, type MatchState } from './state.ts';
 import { END, FITTING, MOMENTS, TREASURE } from './tables.ts';
 import { founder } from './territory.ts';
 
 /** The player's ship. */
 const PLAYER = 0;
-/** The deadline's tick. */
-const LAST = Math.round(END.deadline / TICK);
 /** The timeline's kinds whose `by` is a ship, so a moment of the player's when it is either one (part B adds the fights). */
 const RIVALRY: readonly number[] = [EVENT.broken, EVENT.lead, EVENT.sunk];
 
@@ -76,23 +74,6 @@ function win(state: MatchState): void {
   state.winner = w;
   emit(state, EVENT.win, w, -1, ship.pos, ship.held / AREA_Q);
   chronicle(state, EVENT.win, w, -1, ship.held / AREA_Q);
-}
-
-/**
- * The step's last system. At END.deadline the storm has covered the sea (part C closes it by then), and the ships
- * still afloat founder in it, the one holding the least sea first (then the poorer bank, then the lower index), until
- * one is left: no match runs on, and a fast-forward always ends.
- */
-export function deadline(state: MatchState): void {
-  if (state.tick < LAST) return;
-  while (!over(state)) {
-    let w = -1;
-    for (let i = 0; i < SHIPS; i++) {
-      const s = state.ships[i], o = w >= 0 ? state.ships[w] : null;
-      if (afloat(s) && (o === null || s.held < o.held || (s.held === o.held && s.bank < o.bank))) w = i;
-    }
-    sink(state, w, -1, CAUSE.storm);
-  }
 }
 
 /** One ship's match, for the results and the career. */
