@@ -74,6 +74,13 @@ test('a replay ends on the headless hash at any frame rate across background and
       const hash = await game.hook((g): string => g.matchHash());
       t.diagnostic(`${run.name}: background at tick ${stopped}, ${hash}`);
       assert.equal(hash, expected, 'the same hash as headless in Node');
+      // Held at stopAt the loop still draws every frame: drawing only reads the match, so the hash cannot move.
+      const redrawn = await game.hook(async (g): Promise<[number, number, string | null]> => {
+        const f0 = g.perf.frames;
+        while (g.perf.frames - f0 < 10) await new Promise((done) => setTimeout(done, 50));
+        return [g.perf.frames - f0, g.tick, g.matchHash()];
+      });
+      assert.deepEqual(redrawn.slice(1), [TICKS, expected], `${redrawn[0]} more frames drawn leave the match unchanged`);
       game.assertClean();
       await game.close();
     });

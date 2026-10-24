@@ -386,7 +386,12 @@ export function createSky(ctx: RenderContext): RenderModule {
   return {
     frame(f) {
       waters ??= seaFor(ctx.world, f.state.seed);
-      foot.copy(ctx.camera.position).normalize();
+      // The camera's foot. Until something places the camera it sits at the planet's centre, which has no foot (and no
+      // territory cell for windAt to look up), so the sky stands over the first ship instead.
+      const eye = ctx.camera.position, ship = f.state.ships[0]?.pos;
+      if (eye.lengthSq() > 1e-9) foot.copy(eye).normalize();
+      else if (ship) foot.set(ship.x, ship.y, ship.z).normalize();
+      else foot.set(0, 0, 1);
       windAt(waters, f.state, foot, wind);
       skyAt(f.state, foot, weather);
       w.wind.set(wind.v.x, wind.v.y, wind.v.z).normalize().multiplyScalar(wind.strength);
