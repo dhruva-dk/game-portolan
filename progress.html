@@ -209,6 +209,8 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <li>S-005: the sea still uses a default wind (sim windAt wiring crashed non-match screens) — fix in WP21. — <b>fixed by WP21 (27e4e96)</b>: render/weather.ts <code>Air</code> (<code>airOf(scene)</code>) reads the sim's wind over the eye whenever a match exists and a fair trade wind otherwise; the sea, sky clouds, rain and spray use it (tests/render/weather.test.ts). Verified in every wp21 shot (WP21b bdf4412).</li>
 <li>S-006 (WP16a): neither the Crown Light nor the Great Falls reads clearly from orbit; the Great Falls is hidden from capture 18's camera; fjord water is not the deep green the spec asks for (sea depth wash per region).</li>
 <li>S-007: WP9a/WP9b sim tick-budget and claim-timing tests fail when the machine is loaded (three agents running) — measure CPU time per tick, not wall time, and keep real headroom under A9 (tick mean is 0.16–0.27 ms against 0.3 ms before captains exist).</li>
+<li>S-008 (WP21b): a dark arc band crosses the squall and opening-bruise shots (wp21-*), cause unknown (not the two causes WP21b fixed). S-002 (blotchy open sea) also still open after WP21b re-shot it.</li>
+<li>S-009 (WP16c): kelp from flora.ts reads as grass at deck level; Kelp Cathedral light rays barely visible from the hero camera. (WP16b): basalt columns look smooth at hero distance; the Arch crest does not stand out from orbit.</li>
 </ul>
 </div>
 <div id="review-latest">
