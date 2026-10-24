@@ -10,7 +10,7 @@ import type { ShipInput } from './input.ts';
 import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
 import { helmOf } from './route.ts';
 import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
-import { SHIPS, TICK, type MatchState, type Ship } from './state.ts';
+import { SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
 import {
   BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM, VORTEX,
 } from './tables.ts';
@@ -232,7 +232,10 @@ const D = v3(), U = v3(), UB = v3(), SEP = v3(), DV = v3();
 
 /** Every pair of ships, in index order, after all have moved. */
 export function collide(state: MatchState): void {
-  for (let i = 0; i < SHIPS; i++) for (let j = i + 1; j < SHIPS; j++) contact(state, i, j);
+  for (let i = 0; i < SHIPS; i++) {
+    if (!afloat(state.ships[i])) continue;
+    for (let j = i + 1; j < SHIPS; j++) if (afloat(state.ships[j])) contact(state, i, j);
+  }
 }
 
 function contact(state: MatchState, i: number, j: number): void {

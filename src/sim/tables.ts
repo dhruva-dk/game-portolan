@@ -297,3 +297,37 @@ export const FINDS = {
   flotsam: { value: 5, pieces: 4, scatter: 3, every: 15, life: 75 },
   bottle: { value: 35, every: 40, life: 240, tries: 16 },
 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// The opening and the end of the match (WP8)
+
+const RIDE = 15;
+
+/**
+ * The opening on the Great Current. The fleet rides its centreline at `ride` u/s, three times a ship's way, so the
+ * longest route (about 1600 u through five regions) is ridden in under two minutes and each region it passes is a
+ * choice of some seconds. A ship breaking off keeps `way` u/s through the water (the riding speed less the current's),
+ * comes about `peel` rad off the current's line, and makes its home where it has slowed, clear of the current: after
+ * `settle` of its form's time constants of losing way (FORMS drag), when the ride's extra way is all but gone. A hull that cannot get clear
+ * (steered back onto the current, or held against a shore) makes it after `most` s wherever it is.
+ */
+export const OPENING = { ride: RIDE, way: RIDE - GREAT_CURRENT.speed, peel: 0.6, settle: 3, most: 8 };
+
+/**
+ * The end of the match. A match is laid out over `length` s, about ten minutes (the storm's phases, WP8 part C, close
+ * over it), and lasts no longer than `deadline` s: by then the storm has covered the sea and whoever is still afloat
+ * founders in it (end.ts deadline). A sinking pays its sinker `bounty` doubloons into the bank, twice over for sinking
+ * the pennant's holder: worth a loop's purse, so a fight can pay as well as charting, and the leader is a prize.
+ */
+export const END = { length: 600, deadline: 720, bounty: 60 };
+
+/**
+ * Treasure brought home (PROMPT.md, The results): `share` of the bank (the rest pays the crew) times the finishing
+ * place's multiplier, winner first. It falls steeply over the first places and gently after, so outlasting one more
+ * ship is always worth something and winning pays four times the first to sink, while a rich bank still counts at
+ * every place.
+ */
+export const TREASURE = { share: 0.5, place: [2, 1.6, 1.35, 1.15, 1, 0.9, 0.8, 0.7, 0.6, 0.5] };
+
+/** The results' timeline keeps the player's `loops` largest loops among all its other moments, so it stays short. */
+export const MOMENTS = { loops: 3 };

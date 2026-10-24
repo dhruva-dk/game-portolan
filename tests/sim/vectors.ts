@@ -128,9 +128,9 @@ export function world(): World {
 /** Two minutes of match with recorded inputs, straight through and resumed from a snapshot halfway. */
 function matchVectors(): { match: string; resumed: string } {
   const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks)), seed = 20261024, sea = seaFor(world(), seed);
-  const whole = createMatch({ seed, forms: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0] });
+  const whole = createMatch({ seed, fleet: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0].map((form) => ({ form })) });
   runMatch(sea, whole, recording, ticks);
-  const half = createMatch({ seed, forms: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0] });
+  const half = createMatch({ seed, fleet: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0].map((form) => ({ form })) });
   runMatch(sea, half, recording, ticks / 2);
   const resumed = decodeMatch(encodeMatch(half));
   runMatch(sea, resumed, recording, ticks);

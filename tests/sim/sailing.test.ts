@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { LOW_WATER, aground, currentAt, seaFor, type Sea } from '../../src/sim/environment.ts';
 import { FLAG, STEER_MAX, idleInput, type ShipInput } from '../../src/sim/input.ts';
 import { PI, length, v3, type V3 } from '../../src/sim/math.ts';
-import { matchHash } from '../../src/sim/state.ts';
+import { PHASE, matchHash } from '../../src/sim/state.ts';
 import { step } from '../../src/sim/match.ts';
 import { planHome } from '../../src/sim/route.ts';
 import { BUMPED, newTrim, pointOfSail, settledSpeed, trim, turningRadius } from '../../src/sim/sailing.ts';
@@ -25,8 +25,9 @@ const WEEPING = REGIONS.findIndex((r) => r.id === 'weepingIsle');
 
 /** A match in fair weather with ship 0 at p heading along bearing b (radians from north), making way under `sail`. */
 function match(forms: number | number[], p: V3, b: number, sail: number = SAIL.plain, seed = SEED): MatchState {
-  const s = createMatch({ seed, forms: Array.isArray(forms) ? forms : new Array(SHIPS).fill(forms) });
+  const s = createMatch({ seed, fleet: (Array.isArray(forms) ? forms : new Array<number>(SHIPS).fill(forms)).map((form) => ({ form })) });
   for (const spell of s.weather) spell.life = 1e9; // no spell is ever sent: the weather's own tests are in environment.test.ts
+  for (const ship of s.ships) ship.phase = PHASE.sailing; // the whole fleet at sea, off the Great Current
   put(s, 0, p, tangentAt(p, b, v3()), sail);
   return s;
 }
@@ -177,6 +178,7 @@ test('full sail is fastest and reefed slowest; every form gathers way with its o
 
 test('waters, landmarks, fittings, torn sails, gusts, light airs and gales trim the way', () => {
   const s = createMatch({ seed: SEED }), ship = s.ships[0], T = newTrim(), cell = cellOf(TERRITORY, ship.pos);
+  ship.phase = PHASE.sailing; // at sea, off the Great Current
   const mark = (perk: string) => sea.marks[sea.geo.landmarks.findIndex((l) => l.perk === perk)];
   const speed = () => trim(sea, s, 0, T).speed, near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-12, `${a} ≠ ${b}`);
   near(speed(), 1);

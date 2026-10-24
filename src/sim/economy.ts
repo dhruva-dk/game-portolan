@@ -5,7 +5,7 @@
 import { aground, currentAt, type Sea } from './environment.ts';
 import { addScaled, cross, dcos, dot, dsin, hash32, normalize, rngInt, rngRange, set, v3, type V3 } from './math.ts';
 import { AREA_Q, R, TERRITORY, advance, cellOf } from './sphere.ts';
-import { AFLOAT, EVENT, SHIPS, STREAM, TICK, chronicle, emit, type Coin, type MatchState } from './state.ts';
+import { AFLOAT, EVENT, SHIPS, STREAM, TICK, afloat, chronicle, emit, type Coin, type MatchState } from './state.ts';
 import { CALDERA, COINS, ECONOMY, FINDS, FORMS, PERK } from './tables.ts';
 import { holder } from './territory.ts';
 import { REGIONS } from './world/regions.ts';
@@ -68,12 +68,12 @@ function scatter(state: MatchState, at: V3, amount: number, n: number, radius: n
   for (let k = 0; k < n; k++) {
     const r = (radius / R) * Math.sqrt((k + 0.5) / n), c = dcos(k * GOLDEN) * r, s = dsin(k * GOLDEN) * r;
     normalize(set(P, at.x + E.x * c + N.x * s, at.y + E.y * c + N.y * s, at.z + E.z * c + N.z * s));
-    afloat(state, P, amount / n, kind);
+    float(state, P, amount / n, kind);
   }
 }
 
 /** One thing of an AFLOAT kind comes afloat at `at`, worth `value`. */
-function afloat(state: MatchState, at: V3, value: number, kind: number): void {
+function float(state: MatchState, at: V3, value: number, kind: number): void {
   const thing = state.coins[slot(state)];
   set(thing.at, at.x, at.y, at.z);
   thing.kind = kind;
@@ -106,6 +106,7 @@ export function scoop(state: MatchState): void {
       continue;
     }
     for (let i = 0; i < SHIPS && coin.value > 0; i++) {
+      if (!afloat(state.ships[i])) continue;
       const p = state.ships[i].pos, dx = p.x - coin.at.x, dy = p.y - coin.at.y, dz = p.z - coin.at.z;
       if (dx * dx + dy * dy + dz * dz <= REACH) take(state, i, coin);
     }
@@ -139,7 +140,7 @@ export function forage(sea: Sea, state: MatchState): void {
   if (state.tick > 0 && state.tick % BOTTLE_EVERY === 0) castBottle(sea, state);
   rain(sea, state);
   for (let k = 0; k < state.finds.length; k++) state.finds[k] = Math.max(0, state.finds[k] - TICK);
-  for (let i = 0; i < SHIPS; i++) hold(sea, state, i);
+  for (let i = 0; i < SHIPS; i++) if (afloat(state.ships[i])) hold(sea, state, i);
 }
 
 /**
@@ -192,7 +193,7 @@ function castBottle(sea: Sea, state: MatchState): void {
     set(P, s * dcos(a), s * dsin(a), z);
     if (aground(sea, state, P)) continue;
     const amount = FINDS.bottle.value * REGIONS[sea.geo.region[cellOf(TERRITORY, P)]].richness;
-    afloat(state, P, amount, AFLOAT.bottle);
+    float(state, P, amount, AFLOAT.bottle);
     emit(state, EVENT.afloat, -1, AFLOAT.bottle, P, amount);
     return;
   }
@@ -239,7 +240,7 @@ function rain(sea: Sea, state: MatchState): void {
     const c = dcos(a), s = dsin(a);
     advance(mark.pos, set(DIR, e.x * c + N.x * s, e.y * c + N.y * s, e.z * c + N.z * s), d, P, V);
     if (aground(sea, state, P) || (who >= 0 && state.owner[cellOf(TERRITORY, P)] !== who + 1)) continue;
-    afloat(state, P, CALDERA.value / (BURST / DROP), AFLOAT.coin);
+    float(state, P, CALDERA.value / (BURST / DROP), AFLOAT.coin);
     return;
   }
 }

@@ -13,7 +13,7 @@ import { PI, cross, dot, length, normalize, v3, type V3 } from '../../src/sim/ma
 import { step } from '../../src/sim/match.ts';
 import { BUMPED, apparentWind, newTrim, scald, trim } from '../../src/sim/sailing.ts';
 import { R, TERRITORY, cellDir, cellOf, tangentToward } from '../../src/sim/sphere.ts';
-import { SAIL, TICK, createMatch, type MatchState, type Ship } from '../../src/sim/state.ts';
+import { PHASE, SAIL, TICK, createMatch, type MatchState, type Ship } from '../../src/sim/state.ts';
 import {
   DAY, FITTING, FORMS, GREAT_CURRENT, GUSTS, SAILS, SLOT, SPELL, VORTEX, WEATHER, WIND,
 } from '../../src/sim/tables.ts';
@@ -171,6 +171,7 @@ function sheltered(p: V3): boolean {
 function fairMatch(): MatchState {
   const s = createMatch({ seed: SEED });
   for (const spell of s.weather) spell.life = 1e9;
+  for (const ship of s.ships) ship.phase = PHASE.sailing; // at sea, off the Great Current
   return s;
 }
 

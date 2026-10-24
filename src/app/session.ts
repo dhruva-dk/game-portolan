@@ -1,6 +1,7 @@
 // The match in progress: its state, where the player's input comes from (the controls, or a recording replayed
 // from any tick) and the tick at which a replay holds still. Only step() advances it, one tick at a time.
 import type { Sea } from '../sim/environment.ts';
+import { over } from '../sim/end.ts';
 import { inputAt, replay, type Recording, type Replay, type ShipInput } from '../sim/input.ts';
 import { step } from '../sim/match.ts';
 import type { MatchState } from '../sim/state.ts';
@@ -31,7 +32,7 @@ export class Session implements SavedMatch, Stepper {
   }
 
   step(): boolean {
-    if (this.held) return false;
+    if (this.held || over(this.state)) return false;
     step(this.sea, this.state, this.replay ? inputAt(this.replay, this.state.tick) : this.controls());
     return true;
   }

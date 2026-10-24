@@ -8,7 +8,7 @@ import { bankPurse, fill, spill } from './economy.ts';
 import { timeOf, type Sea } from './environment.ts';
 import { cross, dcos, dot, dsin, normalize, set, v3, type V3 } from './math.ts';
 import { AREA_Q, GRID, R, TERRITORY, cellDir, cellOf, neighbor } from './sphere.ts';
-import { EVENT, SHIPS, chronicle, emit, type MatchState } from './state.ts';
+import { EVENT, SHIPS, afloat, chronicle, emit, type MatchState } from './state.ts';
 import { HARBOUR, HOME, PERK } from './tables.ts';
 import { ZONE } from './world/geography.ts';
 import type { Perk } from './world/regions.ts';
@@ -122,7 +122,7 @@ export function beamMarks(sea: Sea, state: MatchState, i: number): number {
   let mask = 0;
   for (let j = 0; j < SHIPS; j++) {
     const p = state.ships[j].pos, near = dot(p, light);
-    if (j === i || near < BEAM_REACH || near >= 1) continue;
+    if (j === i || near < BEAM_REACH || near >= 1 || !afloat(state.ships[j])) continue;
     if (dot(p, beam) >= BEAM_HALF * Math.sqrt(1 - near * near)) mask |= 1 << j; // within its half-width of the bearing
   }
   return mask;
@@ -132,16 +132,16 @@ export function beamMarks(sea: Sea, state: MatchState, i: number): number {
 export function intruders(state: MatchState, i: number): number {
   let mask = 0;
   for (let j = 0; j < SHIPS; j++) {
-    if (j !== i && state.owner[cellOf(TERRITORY, state.ships[j].pos)] === i + 1) mask |= 1 << j;
+    if (j !== i && afloat(state.ships[j]) && state.owner[cellOf(TERRITORY, state.ships[j].pos)] === i + 1) mask |= 1 << j;
   }
   return mask;
 }
 
 /**
  * Ink ship i's home disc round it: every cell whose centre lies within HOME.radius becomes its sea, whoever held it.
- * WP8's opening calls this where the ship slows after breaking off the Great Current.
+ * WP8's opening calls this where the ship slows after breaking off the Great Current. Returns the u² inked.
  */
-export function inkHome(state: MatchState, i: number): void {
+export function inkHome(state: MatchState, i: number): number {
   const p = state.ships[i].pos, cells: number[] = [];
   let n = 0, inked = 0;
   SEEN[n++] = cellOf(TERRITORY, p);
@@ -162,6 +162,7 @@ export function inkHome(state: MatchState, i: number): void {
   }
   for (let k = 0; k < n; k++) LABEL[SEEN[k]] = 0;
   emit(state, EVENT.home, i, -1, p, inked / AREA_Q, cells);
+  return inked / AREA_Q;
 }
 
 /** The storm swallows `cells`: they lose their owners and their colour runs (WP8 calls this as the storm closes). */
@@ -176,6 +177,19 @@ export function swallow(state: MatchState, cells: ArrayLike<number>): void {
     lost.push(c);
   }
   if (lost.length > 0) emit(state, EVENT.swallow, -1, -1, ORIGIN, swallowed / AREA_Q, lost);
+}
+
+/** Ship i has sunk (WP8's sink): its open trail washes away and its sea falls to nobody. */
+export function founder(state: MatchState, i: number): void {
+  const ship = state.ships[i], mark = i + 1, held = ship.held, freed: number[] = [];
+  wash(state, i);
+  if (held === 0) return;
+  for (let c = 0; c < CELLS; c++) {
+    if (state.owner[c] !== mark) continue;
+    own(state, c, 0);
+    freed.push(c);
+  }
+  emit(state, EVENT.freed, i, -1, ship.pos, held / AREA_Q, freed);
 }
 
 /**

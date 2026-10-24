@@ -3,9 +3,11 @@
 // snapshot encoding and its hash all follow from them. To add state, add a field to a schema here and bump
 // MATCH_FORMAT.version, so snapshots of the old shape are discarded rather than misread.
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
-import { addScaled, cross, dot, hash32, normalize, rngFrom, rngInt, rngRange, v3, type V3 } from './math.ts';
-import { TERRITORY, advance, tangentToward } from './sphere.ts';
-import { COINS, DAY, FORMS, GUSTS, SAILS, SLOTS, SPELL, START_FITTINGS, WEATHER } from './tables.ts';
+import {
+  addScaled, cross, dot, hash32, normalize, rngDir, rngFrom, rngInt, rngRange, set, v3, type V3,
+} from './math.ts';
+import { TERRITORY, advance } from './sphere.ts';
+import { COINS, DAY, FORM, FORMS, GUSTS, OPENING, SLOTS, SPELL, START_FITTINGS, TIERS, WEATHER } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 import { REGIONS } from './world/regions.ts';
 
@@ -27,14 +29,29 @@ export const SAIL = { reefed: 0, plain: 1, full: 2 } as const;
 /** What floats for any hull to scoop (MatchState.coins): coins spilled or rained, flotsam wrecks shed, drifting bottles. */
 export const AFLOAT = { coin: 0, flotsam: 1, bottle: 2 } as const;
 
+/** Where a ship is in its match: riding the Great Current, peeling off it until its home inks, at sea, or sunk. */
+export const PHASE = { riding: 0, peeling: 1, sailing: 2, sunk: 3 } as const;
+
+/** How a ship sank (Sinking.cause, EVENT.sunk's amount): to combat (WP8 part B) or the storm (part C, and the deadline). */
+export const CAUSE = { gun: 0, ram: 1, fire: 2, rocks: 3, hotWater: 4, storm: 5 } as const;
+
 /** The find sites: the wrecks and island caches of every region (Geography.finds order). */
 const FIND_SITES = REGIONS.reduce((n, r) => n + r.finds.length, 0);
 
 /** A point or direction in space: positions are unit vectors from the planet's centre, headings unit tangents. */
 const XYZ = rec(['x', f64], ['y', f64], ['z', f64]);
 
+/** A fitting in a slot: a FITTING and its tier. */
+const FIT = rec(['kind', int], ['tier', int]);
+
 const SHIP = rec(
   ['form', int], // a FORM
+  ['pigment', int], // the hull's pigment and the sails' pattern, as the career fitted it out (MatchSetup.fleet)
+  ['pattern', int],
+  ['gull', int], // the companion gull's level (WP9)
+  ['phase', int], // a PHASE
+  ['ride', f64], // u down the Great Current: where it rides, or where it left the current
+  ['peel', f64], // seconds since it broke off: its home inks where it has slowed, clear of the current
   ['pos', XYZ], // where the ship is
   ['head', XYZ], // where its bow points
   ['was', XYZ], // the position a tick ago, and the heading: the renderer interpolates from them
@@ -50,7 +67,7 @@ const SHIP = rec(
   ['homeLeg', int],
   ['homing', bool], // head home was held last tick
   ['torn', f64], // seconds left of sails torn by chain shot
-  ['fittings', list(rec(['kind', int], ['tier', int]), SLOTS)], // by SLOT: a FITTING and its tier
+  ['fittings', list(FIT, SLOTS)], // by SLOT
   ['bump', f64], // this tick's impact: the closing speed in u/s, 0 when nothing was struck
   ['bumped', int], // what was struck: −1 nothing, a ship index, or SHIPS for land
   ['bumpOn', f64], // where on the hull: −1 the stern … 1 the bow
@@ -80,6 +97,12 @@ const HAPPENING = rec(['kind', int], ['ship', int], ['by', int], ['at', XYZ], ['
 /** A timeline entry: an EVENT the results remember, at its tick. */
 const ENTRY = rec(['tick', int], ['kind', int], ['ship', int], ['by', int], ['amount', f64]);
 
+/** A chest afloat at its wreck: the fitting a sinking dropped, from the ship that sank (WP9: what else it holds, how it is taken). */
+const CHEST = rec(['at', XYZ], ['fitting', FIT], ['from', int]);
+
+/** A sinking: the ship, the ship that sank it (−1 none), its CAUSE and its tick. */
+const SINKING = rec(['ship', int], ['by', int], ['cause', int], ['tick', int]);
+
 const MATCH = rec(
   ['seed', int], // the match seed, a uint32
   ['tick', int], // ticks stepped; match time is tick·TICK
@@ -96,6 +119,10 @@ const MATCH = rec(
   ['charm', bool], // the first voyage: the player's trail cannot break until its first loop closes
   ['events', list(HAPPENING)], // this tick's events, cleared at the start of each step
   ['timeline', list(ENTRY)], // the events the results remember
+  ['storm', rec(['origin', XYZ])], // the storm: where it rises, revealed from the first tick (part C adds its phases)
+  ['chests', list(CHEST)], // chests afloat
+  ['sunk', list(SINKING)], // the sinkings, in the order they happened: the finishing order from the last place up
+  ['winner', int], // the last ship afloat once the match is over; −1 while it runs
 );
 
 export type Ship = Value<typeof SHIP>;
@@ -104,8 +131,14 @@ export type Spell = Value<typeof WEATHER_SPELL>;
 export type MatchState = Value<typeof MATCH>;
 export type Coin = Value<typeof COIN>;
 export type Happening = Value<typeof HAPPENING>;
+export type Entry = Value<typeof ENTRY>;
+export type Chest = Value<typeof CHEST>;
+export type Sinking = Value<typeof SINKING>;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 5, schema: MATCH };
+/** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
+export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
+
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 6, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -120,6 +153,13 @@ export const EVENT = {
   find: 8, // a ship took a wreck or cache: by the find site (Geography.finds), at the site, amount
   afloat: 9, // flotsam or a bottle came afloat: by its AFLOAT kind, at where, amount its worth
   erupt: 10, // the Caldera erupted: ship its holder (−1 nobody), at the Caldera, amount the doubloons it rains
+  breakOff: 11, // a ship broke off the Great Current: by the region it peels into, amount u down the current
+  thrown: 12, // a ship rode the Great Current to its end and was thrown off there: by the region, amount u down it
+  sunk: 13, // a ship sank: by the ship that sank it (−1 none), amount its CAUSE
+  bounty: 14, // a sinker's bounty: ship the sinker, by the ship it sank, amount the doubloons
+  chest: 15, // a sinking dropped a chest at `at`: ship whose, by the FITTING in it, amount its tier
+  win: 16, // the match is over: ship the last afloat, amount the u² it holds
+  freed: 17, // a sunk ship's sea fell to nobody: amount its u², cells
 } as const;
 
 /** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
@@ -132,12 +172,25 @@ export function chronicle(state: MatchState, kind: number, ship: number, by: num
   state.timeline.push({ tick: state.tick, kind, ship, by, amount });
 }
 
+/** How the career fits out one ship for a match; what it leaves out, the ship starts with. */
+export interface Outfit {
+  /** A FORM; the pinnace. */
+  form?: number;
+  /** The hull's pigment and the sails' pattern, as the shipwright numbers its swatches; the ship's index, plain sails. */
+  pigment?: number;
+  pattern?: number;
+  /** For each SLOT a FITTING and its tier (0 … TIERS − 1); START_FITTINGS at the first tier. */
+  fittings?: readonly { kind: number; tier: number }[];
+  /** The companion gull's level (WP9); 1, the gull every captain starts with. */
+  gull?: number;
+}
+
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
   /** A uint32. */
   seed: number;
-  /** Each ship's FORM, player first; every ship sails the starting pinnace when left out. */
-  forms?: readonly number[];
+  /** The ten ships as the career fits them out, player first; every ship takes an Outfit's defaults when left out. */
+  fleet?: readonly Outfit[];
   /** The hour it starts at, 0 ≤ hour < 24; anywhere in one of the day's openings (DAY.starts), by the seed, when left out. */
   hour?: number;
   /** The career's first match (PROMPT.md, The first voyage): the player's first loop always succeeds. */
@@ -145,23 +198,32 @@ export interface MatchSetup {
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed, forms = new Array<number>(SHIPS).fill(0), hour = startHour(seed), firstVoyage = false } = setup;
+  const { seed, fleet = new Array<Outfit>(SHIPS).fill({}), hour = startHour(seed), firstVoyage = false } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
-  if (forms.length !== SHIPS || !forms.every((f) => Number.isInteger(f) && f >= 0 && f < FORMS.length)) {
-    throw new RangeError(`createMatch: forms ${forms} are not ${SHIPS} FORM ids`);
-  }
+  if (fleet.length !== SHIPS) throw new RangeError(`createMatch: a fleet of ${fleet.length} ships, not ${SHIPS}`);
+  fleet.forEach(check);
   if (!(hour >= 0 && hour < 24)) throw new RangeError(`createMatch: hour ${hour} is not in 0…24`);
   const rng: Uint32Array[] = [];
   for (let s = 0; s < STREAMS; s++) rng.push(rngFrom(hash32(seed, s)));
   const route = greatCurrent(seed), ships: Ship[] = [], gusts: Gust[] = [];
-  for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, forms[i]));
+  for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, fleet[i]));
   for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
   const weather = Array.from({ length: WEATHER.count }, () => ({ kind: SPELL.fair, at: v3(0, 0, 1), v: v3(), r: 0, age: 0, life: 0 }));
   const coins = Array.from({ length: COINS.count }, () => ({ kind: AFLOAT.coin, at: v3(0, 0, 1), value: 0, age: 0 }));
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
     coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, events: [], timeline: [],
+    storm: { origin: rngDir(rng[STREAM.storm], v3()) }, chests: [], sunk: [], winner: -1,
   };
+}
+
+/** Throws unless createMatch can fit out ship i as outfit o says. */
+function check(o: Outfit, i: number): void {
+  const whole = (x: number | undefined, below = Infinity): boolean => x === undefined || (Number.isInteger(x) && x >= 0 && x < below);
+  const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f) => whole(f.kind) && whole(f.tier, TIERS)));
+  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !whole(o.gull) || !fits) {
+    throw new RangeError(`createMatch: ship ${i}'s outfit cannot be fitted out`);
+  }
 }
 
 /** The hour a match starts at when its setup leaves it out: anywhere in one of the day's openings, by the seed. */
@@ -171,20 +233,34 @@ function startHour(seed: number): number {
   return rngRange(rng, from, to);
 }
 
-/** The fleet's places at the head of the Great Current: two ranks of five abreast, the player in the front centre. */
-const FILE = [0, -1, 1, -2, 2], ABREAST = 3.5, RANK_AT = [6, 2]; // RANK_AT: route points (every ~2 u) of each rank
+/**
+ * The fleet's places on the Great Current: two ranks of five abreast, the player in the front centre. Ship i rides
+ * LANE[i] u to starboard of the current's centreline; the front rank starts 12 u down it, the rear rank 4 u.
+ */
+export const LANE: readonly number[] = [0, -3.5, 3.5, -7, 7, 0, -3.5, 3.5, -7, 7];
+const START = [12, 4];
+const AT = v3(), SIDE = v3();
 
-/** Ship i under full sail in its place at the head of the Great Current, ready to ride it. */
-function launch(route: CurrentRoute, i: number, form: number): Ship {
-  const p = route.points, k = 3 * RANK_AT[(i / 5) | 0], at = v3(p[k], p[k + 1], p[k + 2]);
-  const head = tangentToward(at, v3(p[k + 9], p[k + 10], p[k + 11]), v3()), pos = v3(), side = cross(v3(), head, at);
-  advance(at, side, FILE[i % 5] * ABREAST, pos, side);
+/** The pose `lane` u to starboard of the Great Current's centreline, `s` u down it (held at its ends): where, and heading down it. */
+export function onCurrent(route: CurrentRoute, s: number, lane: number, pos: V3, head: V3): void {
+  const p = route.points, n = p.length / 3, f = Math.min(Math.max(s / 2, 0), n - 1), k = Math.min(Math.floor(f), n - 2);
+  const t = f - k, a = 3 * k, b = a + 3;
+  normalize(set(AT, p[a] + (p[b] - p[a]) * t, p[a + 1] + (p[b + 1] - p[a + 1]) * t, p[a + 2] + (p[b + 2] - p[a + 2]) * t));
+  set(head, p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]);
+  normalize(addScaled(head, head, AT, -dot(head, AT)));
+  advance(AT, cross(SIDE, head, AT), lane, pos, SIDE);
   normalize(addScaled(head, head, pos, -dot(head, pos)));
+}
+
+/** Ship i as outfit o fits it out, under full sail in its place on the Great Current, riding it. */
+function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
+  const { form = FORM.pinnace, pigment = i, pattern = 0, gull = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
+  const fittings = o.fittings ? o.fittings.map(({ kind, tier }) => ({ kind, tier })) : START_FITTINGS.map((kind) => ({ kind, tier: 0 }));
+  onCurrent(route, ride, LANE[i], pos, head);
   return {
-    form, pos, head, was: { ...pos }, wasHead: { ...head }, speed: FORMS[form].speed * SAILS[SAIL.full].speed, rate: 0,
-    shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
-    fittings: START_FITTINGS.map((kind) => ({ kind, tier: 0 })), bump: 0, bumped: -1, bumpOn: 0,
-    laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
+    form, pigment, pattern, gull, phase: PHASE.riding, ride, peel: 0, pos, head, was: { ...pos }, wasHead: { ...head },
+    speed: OPENING.way, rate: 0, shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0,
+    homing: false, torn: 0, fittings, bump: 0, bumped: -1, bumpOn: 0, laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
   };
 }
 

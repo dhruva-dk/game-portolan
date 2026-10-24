@@ -3,8 +3,7 @@
 // the fixed current lanes, the seed's Great Current and the Maelstrom's vortex; the tide's rise and fall; and what is
 // solid at each moment: the ground at the tide's level and the Ice Crown's turning floes.
 import {
-  PI, addScaled, cross, dasin, dcos, dot, dsin, hash32, length, normalize, rngFrom, rngInt, rngRange, set, v3, type Rng,
-  type V3,
+  PI, addScaled, cross, dasin, dcos, dot, dsin, hash32, length, normalize, rngDir, rngFrom, rngInt, rngRange, set, v3, type Rng, type V3,
 } from './math.ts';
 import { R, TERRITORY, advance, cellDir, cellOf, neighbor } from './sphere.ts';
 import { STREAM, TICK, type Gust, type MatchState, type Spell } from './state.ts';
@@ -52,7 +51,7 @@ export function seaFor(world: World, seed: number): Sea {
   const rng = rngFrom(hash32(seed, 0x77696e64)), swirls: Swirl[] = [];
   for (let k = 0; k < WIND.terms; k++) {
     swirls.push({
-      axis: randomDir(rng, v3()), spin: randomDir(rng, v3()), drift: rngRange(rng, WIND.drift[0], WIND.drift[1]),
+      axis: rngDir(rng, v3()), spin: rngDir(rng, v3()), drift: rngRange(rng, WIND.drift[0], WIND.drift[1]),
       amp: rngRange(rng, 0.6, 1), freq: rngRange(rng, WIND.freq[0], WIND.freq[1]), phase: rngRange(rng, 0, 2 * PI),
     });
   }
@@ -95,12 +94,6 @@ function voyageCosts(sea: Sea): Float32Array {
     }
   }
   return cost;
-}
-
-/** A direction uniformly over the sphere. */
-function randomDir(rng: Rng, out: V3): V3 {
-  const z = rngRange(rng, -1, 1), r = Math.sqrt(1 - z * z), lon = rngRange(rng, 0, 2 * PI);
-  return set(out, r * dcos(lon), r * dsin(lon), z);
 }
 
 export const timeOf = (state: MatchState): number => state.tick * TICK;
@@ -212,10 +205,10 @@ export function stir(sea: Sea, state: MatchState): void {
 function spawn(rng: Rng, gust: Gust, weather: readonly Spell[]): void {
   const first = gust.life === 0, squall = weather[rngInt(rng, weather.length)];
   if (squall.kind === SPELL.squall && vigour(squall) > 0.5) {
-    randomDir(rng, AWAY);
+    rngDir(rng, AWAY);
     normalize(addScaled(AWAY, AWAY, squall.at, -dot(AWAY, squall.at)));
     advance(squall.at, AWAY, rngRange(rng, 0, CORE * squall.r), gust.at, AWAY);
-  } else randomDir(rng, gust.at);
+  } else rngDir(rng, gust.at);
   gust.r = rngRange(rng, GUSTS.radius[0], GUSTS.radius[1]);
   gust.life = rngRange(rng, GUSTS.life[0], GUSTS.life[1]);
   gust.age = first ? rngRange(rng, 0, gust.life) : 0;
@@ -248,7 +241,7 @@ export function brew(sea: Sea, state: MatchState): void {
 /** The spell after one that has ended; the first in its slot starts part-way through its life, as gusts do. */
 function forecast(sea: Sea, rng: Rng, spell: Spell, t: number): void {
   const first = spell.life === 0;
-  randomDir(rng, spell.at);
+  rngDir(rng, spell.at);
   const odds = REGIONS[sea.geo.region[cellOf(TERRITORY, spell.at)]].weather;
   const squall = odds.squall * (coastAt(sea.geo, spell.at) >= WEATHER.open ? WEATHER.openSquall : 1);
   const x = rngRange(rng, 0, odds.fair + odds.fog + squall + odds.calm);
@@ -290,8 +283,11 @@ export function currentAt(sea: Sea, p: V3, out: V3): V3 {
   return greatCurrentAt(sea, p, out);
 }
 
-/** Adds the Great Current at p to `out`. Its centreline is a point every ~2 u: a coarse pass, then a fine one. */
-function greatCurrentAt(sea: Sea, p: V3, out: V3): V3 {
+/**
+ * Adds the Great Current at p to `out` (the opening asks it whether a ship is clear of the current). Its centreline is
+ * a point every ~2 u: a coarse pass, then a fine one.
+ */
+export function greatCurrentAt(sea: Sea, p: V3, out: V3): V3 {
   const pts = sea.current.points, n = pts.length / 3, half = GREAT_CURRENT.width / 2, COARSE = 8;
   let best = 0, near = Infinity;
   for (let k = 0; k < n; k += COARSE) {

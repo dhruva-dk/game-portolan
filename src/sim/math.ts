@@ -269,3 +269,9 @@ export function rngInt(r: Rng, n: number): number {
 export function rngChance(r: Rng, p: number): boolean {
   return rngFloat(r) < p;
 }
+
+/** A direction uniformly over the sphere. */
+export function rngDir(r: Rng, out: V3): V3 {
+  const z = rngRange(r, -1, 1), s = Math.sqrt(1 - z * z), lon = rngRange(r, 0, 2 * PI);
+  return set(out, s * dcos(lon), s * dsin(lon), z);
+}
