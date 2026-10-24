@@ -202,6 +202,8 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <li>S-003 (same frame): dark smudges under islands look like floating shadows — check sea-floor/terrain-under-water compositing (WP13/WP15).</li>
 <li>S-004: the Weeping Isle still reads as a drum with a continuous cliff band (WP15d note) — fix in its region package.</li>
 <li>S-005: the sea still uses a default wind (sim windAt wiring crashed non-match screens) — fix in WP21.</li>
+<li>S-006 (WP16a): neither the Crown Light nor the Great Falls reads clearly from orbit; the Great Falls is hidden from capture 18's camera; fjord water is not the deep green the spec asks for (sea depth wash per region).</li>
+<li>S-007: WP9a/WP9b sim tick-budget and claim-timing tests fail when the machine is loaded (three agents running) — measure CPU time per tick, not wall time, and keep real headroom under A9 (tick mean is 0.16–0.27 ms against 0.3 ms before captains exist).</li>
 </ul>
 </div>
 <div id="review-latest">
