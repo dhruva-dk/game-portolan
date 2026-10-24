@@ -637,12 +637,16 @@ function levelFor(c: Chunk, d: number, k: number): number {
   return L;
 }
 
+/** Each scene's terrain, for the modules built after it (structures stand on its field). */
+export const terrains = new WeakMap<THREE.Object3D, Terrain>();
+
 /** The composition root's terrain (MODULES): it meets the sea built before it. */
 export function createTerrain(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene);
   if (!sea) throw new Error('createTerrain: the sea module is built first (MODULES order)');
   const terrain = new Terrain(ctx.pipeline, ctx.world.geo, sea.swell);
   ctx.scene.add(terrain.mesh);
+  terrains.set(ctx.scene, terrain);
   return {
     frame() {},
     dispose() {

@@ -440,6 +440,8 @@ export interface IllustratedOptions {
   anchor?: 'world' | 'object';
   /** Gold leaf instead of a wash. */
   gold?: boolean;
+  /** Per-vertex pigments (aPaint, aTint) with per-instance stone and accent (aStone, aAccent) instead of one pigment. */
+  painted?: boolean;
   /** Strength of stains and foxing, default 1 on the planet frame and 0.3 on the object frame. */
   marks?: number;
   inkWeight?: number;
@@ -453,12 +455,30 @@ out vec3 vNormal;
 out vec3 vAnchor;
 out vec3 vAnchorN;
 out vec2 vUv;
+#ifdef PAINTED
+in vec4 aPaint; // pigment transmittance, wash density (below 0: gold leaf)
+in float aTint; // 0: the part's own pigment, 1: the instance's stone, 2: its accent
+in vec3 aStone;
+in vec3 aAccent;
+out vec4 vPaint;
+#endif
 void main() {
-  vec4 w = modelMatrix * vec4(position, 1.0);
+#ifdef USE_INSTANCING
+  mat4 model = modelMatrix * instanceMatrix;
+#else
+  mat4 model = modelMatrix;
+#endif
+  vec4 w = model * vec4(position, 1.0);
   vWorld = w.xyz;
-  vNormal = normalize(mat3(modelMatrix) * normal);
+  vNormal = normalize(mat3(model) * normal);
+#ifdef PAINTED
+  vPaint = vec4(aTint > 1.5 ? aAccent : aTint > 0.5 ? aStone : aPaint.rgb, aPaint.w);
+#endif
 #ifdef ANCHOR_OBJECT
-  vAnchor = position * length(modelMatrix[0].xyz);
+  vAnchor = position * length(model[0].xyz);
+#ifdef USE_INSTANCING
+  vAnchor += instanceMatrix[3].xyz; // each instance on its own stretch of the sheet
+#endif
   vAnchorN = normal;
 #else
   vAnchor = w.xyz;
@@ -482,6 +502,9 @@ uniform vec2 uHatchScale;
 uniform float uHatchAngle;
 uniform float uMarks;
 uniform float uSeed;
+#ifdef PAINTED
+in vec4 vPaint;
+#endif
 void main() {
   float facing = gl_FrontFacing ? 1.0 : -1.0;
   vec3 n = normalize(vNormal) * facing, an = normalize(vAnchorN) * facing;
@@ -496,7 +519,16 @@ void main() {
   hc = rot2(uHatchAngle) * hc;
   vec2 hdx = dFdx(hc), hdy = dFdy(hc);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v)));
-#ifdef GOLD
+#if defined(PAINTED)
+  vec3 col;
+  if (vPaint.w < 0.0) {
+    col = goldLeaf(n, v, normalize(vWorld), vAnchor, an);
+    tone *= 0.6;
+  } else {
+    col = glaze(parchment(q), vPaint.rgb, vPaint.w, washPool(n, v, q), q);
+    col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
+  }
+#elif defined(GOLD)
   vec3 col = goldLeaf(n, v, normalize(vWorld), vAnchor, an);
   tone *= 0.6;
 #else
@@ -528,6 +560,7 @@ export function illustratedMaterial(style: Style, o: IllustratedOptions): THREE.
   if (objectFrame) defines.ANCHOR_OBJECT = true;
   if (h.mode === 'uv') defines.HATCH_UV = true;
   if (o.gold) defines.GOLD = true;
+  if (o.painted) defines.PAINTED = true;
   return inkMaterial(style, {
     vertexShader: ILLUSTRATED_VERT,
     fragmentShader: ILLUSTRATED_FRAG,

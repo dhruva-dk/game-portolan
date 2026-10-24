@@ -102,28 +102,30 @@ void main() {
   float k = floor(sa / RAY_STEP + 0.5), da = sa - k * RAY_STEP, flame = mod(k, 2.0);
   float rlen = mix(1.6, 1.2, flame), rt = clamp((sr - 1.0) / rlen, 0.0, 1.0);
   float ray = max(abs(da * sr - flame * 0.17 * sin(rt * 9.42) * rt) - mix(0.16, 0.12, flame) * (1.0 - rt), sr - 1.0 - rlen);
-  float sun = min(sr - 1.0, ray) + step(cs, 0.0) * 1e3, fs = fwidth(sun);
-  float leaf = (1.0 - smoothstep(-fs, fs, sun)) * uSunVis;
-  col = mix(col, parchment(q), (1.0 - smoothstep(1.4, 4.0 + 1.2 * wob, sr)) * uSunVis * (0.4 + 0.2 * (1.0 - uGlowAmt)));
+  // the far hemisphere is masked after the derivatives are taken: a jump in sun there inked its rim, a dotted great
+  // circle across the sky
+  float sunVis = uSunVis * step(0.0, cs), sun = min(sr - 1.0, ray), fs = fwidth(sun);
+  float leaf = (1.0 - smoothstep(-fs, fs, sun)) * sunVis;
+  col = mix(col, parchment(q), (1.0 - smoothstep(1.4, 4.0 + 1.2 * wob, sr)) * sunVis * (0.4 + 0.2 * (1.0 - uGlowAmt)));
   if (cs > 0.9) {
     vec3 n = normalize(-uSunDir + (sp.x * uSunX + sp.y * uSunY) * (0.45 * step(sr, 1.0)));
     col = mix(col, goldLeaf(n, tilt, normalize(uUp - uSunDir), vec3(sp * 0.45, 1.0), vec3(0.0, 0.0, 1.0)), leaf);
   }
-  col = mix(col, uInk, (penLine(sun, 1.5) + penLine(sr - 0.8, 0.7) * step(sr, 1.0)) * uSunVis);
+  col = mix(col, uInk, (penLine(sun, 1.5) + penLine(sr - 0.8, 0.7) * step(sr, 1.0)) * sunVis);
 
   // the moon in silver, its limb hatched, the sky lifted round it
   float cm = dot(d, uMoonDir);
   vec2 mp = vec2(dot(d, uMoonX), dot(d, uMoonY)) / max(cm, 0.05) / ${MOON_R};
-  float mr = length(mp) + step(cm, 0.0) * 1e3, fm = fwidth(mr);
+  float moonVis = uMoonVis * step(0.0, cm), mr = length(mp), fm = fwidth(mr);
   vec2 mh = rot2(0.5) * mp * 30.0, mhx = dFdx(mh), mhy = dFdy(mh);
-  col = mix(col, uSilver * 0.55 + col * 0.45, (1.0 - smoothstep(1.2, 4.0 + wob, mr)) * 0.3 * uMoonVis);
+  col = mix(col, uSilver * 0.55 + col * 0.45, (1.0 - smoothstep(1.2, 4.0 + wob, mr)) * 0.3 * moonVis);
   if (cm > 0.9) {
     float maria = smoothstep(0.5, 0.75, texture(tMarks, mp * 0.18 + 0.31).g);
     vec3 face = wash(uSilver, uSlate, 0.35 * maria + 0.1 * (texture(tPaper, mp * 0.3).r - 0.5));
     face = mix(face, hatchInk(0.3), 0.8 * hatching(mh, mhx, mhy, smoothstep(0.55, 1.0, mr) * 0.5, 9.0));
-    col = mix(col, face, (1.0 - smoothstep(1.0 - fm, 1.0 + fm, mr)) * uMoonVis);
+    col = mix(col, face, (1.0 - smoothstep(1.0 - fm, 1.0 + fm, mr)) * moonVis);
   }
-  col = mix(col, uInk, penLine(mr - 1.0, 1.2) * uMoonVis);
+  col = mix(col, uInk, penLine(mr - 1.0, 1.2) * moonVis);
 
   // gold-leaf stars, fixed in the heavens as they turn with the hour: four points, eight on the brightest
   if (uStarVis > 0.0) {
@@ -253,7 +255,7 @@ export class Sky {
   /** The light registry: ships add their lanterns here. */
   readonly lights: Lights;
   private readonly style: Style;
-  private readonly beams: Beams;
+  readonly beams: Beams;
   private readonly dome: THREE.Mesh;
   private readonly clouds: THREE.Mesh;
   private readonly cloudAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLOUDS.count * 4), 4);
@@ -377,8 +379,12 @@ export class Sky {
 }
 
 /** The composition root's sky (MODULES): the hour, the wind and the weather over the camera's foot, every frame. */
+/** Each scene's sky, for the modules built after it (structures register their lamps in its lights). */
+export const skies = new WeakMap<THREE.Object3D, Sky>();
+
 export function createSky(ctx: RenderContext): RenderModule {
   const sky = new Sky(ctx.pipeline.style, ctx.world.geo);
+  skies.set(ctx.scene, sky);
   ctx.scene.add(sky.group);
   const foot = new THREE.Vector3(), wind = newWind(), weather = newSky();
   const w = { wind: new THREE.Vector3(), squall: 0, calm: 0 };

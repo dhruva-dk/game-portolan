@@ -1,5 +1,5 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light, region=<name> (deck, high, orbit), off=<u offshore> (deck),
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour, region=<name> (deck, high, orbit), off=<u offshore> (deck),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
@@ -10,7 +10,8 @@ import type { Riding } from '../../src/render/swell.ts';
 import { Ship } from '../../src/render/ships/shipwright.ts';
 import type { FormName } from '../../src/render/ships/forms.ts';
 import { Sky } from '../../src/render/sky.ts';
-import type { Lamp } from '../../src/render/light.ts';
+import { BEAM, type Lamp } from '../../src/render/light.ts';
+import { Structures } from '../../src/render/structures.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, localFrame, R } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -42,6 +43,10 @@ scene.add(terrain.mesh);
 // the sky: the hour's wash, clouds, the sun or the moon and stars, the light every material reads, lamps and beams
 const sky = new Sky(style, geo);
 scene.add(sky.group);
+
+// lighthouses on their headlands and the harbours' moorings, stood on the terrain, their lamps in the sky's registry
+const structures = new Structures(style, geo, terrain.field, sky.lights, sky.beams);
+scene.add(structures.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -108,16 +113,32 @@ if (view === 'deck') {
   if (off <= 11) { launch(24, -7, -0.6); launch(40, 9, 2.2, 0.35); }
 } else if (view === 'light') {
   // offshore of the lighthouse whose seaward view looks back most nearly west, over three ships with lanterns
-  const WEST = -1.75, reach = Number(q.get('off') ?? 45), o = reach / 45;
-  let best = { off: Infinity, at: V(), lamp: V() };
-  for (const l of geo.lights) {
-    const lamp = V(l.pos.x, l.pos.y, l.pos.z).normalize(), at = V();
+  // off=curve: as far off as leaves only the lantern over the curve from the camera's height (hull-down)
+  const WEST = -1.75, height = Number(q.get('height') ?? 6), curve = q.get('off') === 'curve';
+  const reachFor = (lamp: V) => (curve
+    ? Math.sqrt(2 * R * height) + 0.85 * Math.sqrt(2 * R * (Math.max(heightAt(geo, lamp), 0) + BEAM.tower))
+    : Number(q.get('off') ?? 45));
+  let best = { off: Infinity, at: V(), lamp: V(), reach: 45, i: 0 };
+  for (const [i, l] of geo.lights.entries()) {
+    const lamp = V(l.pos.x, l.pos.y, l.pos.z).normalize(), at = V(), reach = reachFor(lamp);
     advance(lamp, V(l.facing.x, l.facing.y, l.facing.z), reach, at, V());
     const d = headingToward(at, lamp) - WEST, off = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
-    if (heightAt(geo, at) < -2 && off < best.off) best = { off, at, lamp };
+    if (heightAt(geo, at) < -2 && off < best.off) best = { off, at, lamp, reach, i };
   }
-  look(best.at, best.lamp, Number(q.get('height') ?? 6), Number(q.get('pitch') ?? -0.15));
+  // pitch=lamp: looking up to the lighthouse's lantern, which sits a little above the middle of the frame
+  const pitch = q.get('pitch') === 'lamp'
+    ? Math.atan2(structures.towers[best.i].lamp.length() - R - height, best.reach) - 0.08
+    : Number(q.get('pitch') ?? -0.15);
+  look(best.at, best.lamp, height, pitch);
+  const o = Math.min(best.reach / 45, 1.4);
   launch(12 * o, -5, 1.2); launch(20 * o, 7, -0.7); launch(31 * o, -11, 2.4, 0.6);
+} else if (view === 'harbour') {
+  // from outside the harbour's mouth, looking in over the mole and its lamp at a ship moored at the anchorage
+  const ri = REGIONS.findIndex((r) => r.name.includes(place ?? 'Spice'));
+  const h = structures.harbours.find((x) => x.region === ri) ?? structures.harbours[0], at = V();
+  advance(h.pos.clone(), h.mouth.clone(), h.r * 1.6, at, V());
+  look(at, h.pos, Number(q.get('height') ?? 5), Number(q.get('pitch') ?? -0.2));
+  launch(h.r * 1.6, 1, 1.3);
 } else if (view === 'high') {
   const s = spot(place ?? 'Coral', 40);
   look(s.at, s.land, 34, -0.5);
@@ -172,7 +193,7 @@ const ride: Riding = { position: V(), up: V() };
 const basis = new THREE.Matrix4(), X = V(), Z = V();
 let frames = 0, last = performance.now(), clock = hold ?? 0;
 const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, terrainMs,
-  terrainTriangles: 0, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
+  terrainTriangles: 0, structureTriangles: 0, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -195,9 +216,11 @@ function frame(now: number): void {
     a.lantern.pos.copy(ride.position).addScaledVector(ride.up, 2.4).addScaledVector(Z, -2.6);
   }
   sky.update(hour, clock, camera.position, weather);
+  structures.update(camera.position);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
+    structureTriangles: structures.triangles,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);

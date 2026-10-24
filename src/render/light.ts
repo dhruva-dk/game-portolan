@@ -221,6 +221,7 @@ void main() {
 export class Beams {
   readonly mesh: THREE.Mesh;
   private readonly uLit = { value: 0 };
+  private readonly lamps: Lamp[] = [];
 
   constructor(style: Style, geo: Geography, lights: Lights) {
     const { rings, segments } = BEAM, per = (rings + 1) * (segments + 1), n = geo.lights.length * 2 * per;
@@ -230,7 +231,7 @@ export class Beams {
     geo.lights.forEach((l, i) => {
       const dir = new THREE.Vector3(l.pos.x, l.pos.y, l.pos.z).normalize();
       const at = dir.clone().multiplyScalar(R + Math.max(heightAt(geo, dir), 0) + BEAM.tower);
-      lights.add({ pos: at, reach: BEAM.reach });
+      this.lamps.push(lights.add({ pos: at, reach: BEAM.reach }));
       for (const side of [1, -1]) {
         const first = v;
         for (let a = 0; a <= rings; a++) {
@@ -259,6 +260,14 @@ export class Beams {
       vertexShader: BEAM_VERTEX, fragmentShader: BEAM_FRAGMENT, uniforms: { uLit: this.uLit }, veil: true, side: THREE.DoubleSide,
     }));
     this.mesh.frustumCulled = false;
+  }
+
+  /** Moves light i's lamp and beam to `pos`: its lighthouse (structures.ts) seats the lantern there. */
+  seat(i: number, pos: THREE.Vector3): void {
+    this.lamps[i].pos.copy(pos);
+    const a = this.mesh.geometry.getAttribute('aLamp') as THREE.BufferAttribute, per = 2 * (BEAM.rings + 1) * (BEAM.segments + 1);
+    for (let v = i * per; v < (i + 1) * per; v++) a.setXYZ(v, pos.x, pos.y, pos.z);
+    a.needsUpdate = true;
   }
 
   /** How far the lamps are lit (Lights.sky.lit): the beams show and fade with them. */
