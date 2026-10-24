@@ -171,6 +171,9 @@ float rain(vec2 st, float sp, float len, float fall, float slant, float css, flo
 }
 `;
 
+/** The rain round the eye, u: the curtain drawn (its radius), and the far one found along each ray through it (radius, top). */
+const RAIN = { near: 7, far: 22, top: 40 };
+
 const CURTAIN_VERTEX = /* glsl */ `
 in vec4 aCentre; // the circle's centre (unit) and angular radius
 in vec4 aShape;  // height (u), strength, seed, foot below the sea (u)
@@ -180,8 +183,10 @@ out vec3 vNormal;
 out vec2 vAt;
 out vec4 vShape;
 out float vCirc;
+out vec3 vAxis;
 void main() {
   vec3 c = aCentre.xyz;
+  vAxis = c;
   vec3 e1 = normalize(abs(c.y) < 0.9 ? cross(vec3(0.0, 1.0, 0.0), c) : cross(vec3(1.0, 0.0, 0.0), c)), e2 = cross(c, e1);
   float th = position.x * 6.2831853, rho = aCentre.w;
   vec3 radial = cos(th) * e1 + sin(th) * e2;
@@ -199,6 +204,8 @@ in vec3 vNormal;
 in vec2 vAt;
 in vec4 vShape;
 in float vCirc;
+in vec3 vAxis;
+uniform float uSeaR;
 uniform vec3 uWindT;
 uniform float uFlash;
 uniform float uRain;
@@ -271,13 +278,21 @@ void main() {
   col = mix(col, hatchInk(0.8), hatching(tilt * hc, tilt * hx, tilt * hy, 0.7, seed));
   col = mix(col, uInk, pen(bank * H, 1.4));
 #else
-  // rain round the eye: near, long dark strokes; far, a finer, greyer curtain; ash falls as slow grey flecks
-  float near = step(vCirc, 80.0);
-  float r = rain(hc, mix(0.3, 0.45, near), mix(1.8, 3.0, near), mix(16.0, 22.0, near), slant * 1.2, mix(0.6, 0.9, near), seed);
-  float ash = rain(hc, 0.5, 0.25, 1.4, slant * 2.0, 1.4, seed + 9.0);
-  float fade = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.6, 1.0, h));
-  a = fade * (uRain * (0.12 * (1.0 - near) + mix(0.45, 0.65, near) * r) + uAsh * (0.2 + 0.5 * ash));
-  col = mix(glaze(paper, uSlate, 1.0 + uAsh, 0.0, q), mix(hatchInk(0.75), uSilver, 0.6 * uNight), clamp(1.5 * r * uRain, 0.0, 1.0));
+  // rain round the eye in one pass: near, long dark strokes on this curtain; far, a finer, greyer curtain found along the
+  // same ray, so the two layers keep their parallax without a second full-screen layer; ash falls as slow grey flecks
+  vec3 rd = normalize(vWorld - cameraPosition), o2 = cameraPosition - vAxis * dot(cameraPosition, vAxis), d2 = rd - vAxis * dot(rd, vAxis);
+  float A = max(dot(d2, d2), 1e-6), B = dot(o2, d2), tf = (-B + sqrt(max(B * B - A * (dot(o2, o2) - ${(RAIN.far ** 2).toFixed(1)}), 0.0))) / A;
+  vec3 pf = cameraPosition + rd * tf, rf = normalize(o2 + d2 * tf);
+  vec3 e1 = normalize(abs(vAxis.y) < 0.9 ? cross(vec3(0.0, 1.0, 0.0), vAxis) : cross(vec3(1.0, 0.0, 0.0), vAxis)), e2 = cross(vAxis, e1);
+  float hf = (length(pf) - uSeaR - vShape.w) / (${RAIN.top.toFixed(1)} - vShape.w);
+  vec2 hcf = vec2(mod(atan(dot(rf, e2), dot(rf, e1)), 6.2831853) * ${RAIN.far.toFixed(1)}, hf * ${RAIN.top.toFixed(1)});
+  float rn = rain(hc, 0.45, 3.0, 22.0, slant * 1.2, 0.9, seed), rfar = rain(hcf, 0.3, 1.8, 16.0, slant * 1.2, 0.6, seed + 1.4);
+  float fadeN = smoothstep(0.0, 0.05, h) * (1.0 - smoothstep(0.6, 1.0, h)), fadeF = smoothstep(0.0, 0.05, hf) * (1.0 - smoothstep(0.6, 1.0, hf));
+  float an = fadeN * (uRain * 0.65 * rn + uAsh * (0.2 + 0.5 * rain(hc, 0.5, 0.25, 1.4, slant * 2.0, 1.4, seed + 9.0)));
+  float af = fadeF * (uRain * (0.12 + 0.45 * rfar) + uAsh * (0.2 + 0.5 * rain(hcf, 0.5, 0.25, 1.4, slant * 2.0, 1.4, seed + 10.4)));
+  a = an + af * (1.0 - an);
+  float kn = clamp(1.5 * rn * uRain, 0.0, 1.0), kf = clamp(1.5 * rfar * uRain, 0.0, 1.0);
+  col = mix(glaze(paper, uSlate, 1.0 + uAsh, 0.0, q), mix(hatchInk(0.75), uSilver, 0.6 * uNight), (kn * an + kf * af * (1.0 - an)) / max(a, 1e-3));
 #endif
   // what lies beyond the eye's short sight sinks into the same veil of paper as the sea there
   float veil = uVeil * smoothstep(0.3 * uRange, 1.1 * uRange, distance(vWorld, cameraPosition)) * 0.9;
@@ -353,22 +368,28 @@ export class Curtains {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The veil of short sight: three paper shells round the eye, each hiding a share of everything beyond it.
+// The veil of short sight: two paper shells round the eye, each hiding a share of everything beyond it (the outer one
+// lays two shares in one pass).
 
 const VEIL_VERTEX = /* glsl */ `
 in float aReach;
+in float aLayers;
 uniform float uRange;
 out vec3 vDir;
 out float vK;
+out float vLayers;
 void main() {
   vDir = position;
   vK = aReach;
+  vLayers = aLayers;
   gl_Position = projectionMatrix * viewMatrix * vec4(cameraPosition + position * aReach * uRange, 1.0);
+  gl_Position.z = min(gl_Position.z, 0.99999 * gl_Position.w); // beyond the far plane the shell stays whole, not cut to a ring
 }`;
 
 const VEIL_FRAGMENT = /* glsl */ `
 in vec3 vDir;
 in float vK;
+in float vLayers;
 uniform float uVeil;
 uniform float uGrey;
 uniform vec3 uSlate;
@@ -376,10 +397,12 @@ ${NOISE_GLSL}
 void main() {
   Paper q = paperAt(vDir * 40.0, vDir, 0.0);
   float n = fbm(vDir.xz * 5.0 + vDir.y * 3.0 + vK * 3.1 + uTime * 0.02);
-  writeVeil(glaze(parchment(q), uSlate, 1.4 * uGrey, 0.0, q), uVeil * (0.36 + 0.3 * n));
+  writeVeil(glaze(parchment(q), uSlate, 1.4 * uGrey, 0.0, q), 1.0 - pow(1.0 - uVeil * (0.36 + 0.3 * n), vLayers));
 }`;
 
-const REACHES = [0.45, 0.75, 1.05];
+/** The shells' reaches (× the sight range), and the shares of veil each lays. */
+const REACHES = [0.45, 0.9];
+const LAYERS = [1, 2];
 
 // ---------------------------------------------------------------------------------------------------------------
 // Spray: lead-white flecks flicked off the crests round the eye on a world-anchored lattice, carried downwind.
@@ -544,14 +567,16 @@ export class Weather {
 
   constructor(style: Style) {
     const u = this.u;
-    this.fog = new Curtains(style, CURTAIN.fog, MAX_SPELLS, 160, 6, u, THREE.FrontSide, 2);
-    this.squalls = new Curtains(style, CURTAIN.squall, MAX_SPELLS, 160, 8, u, THREE.FrontSide, 2);
-    this.rain = new Curtains(style, CURTAIN.rain, 2, 48, 4, u, THREE.BackSide, 5);
+    // banks and squalls are tens of u across: 64 cells round keep each circle true to a tenth of a u (the wall needs 320)
+    this.fog = new Curtains(style, CURTAIN.fog, MAX_SPELLS, 64, 6, u, THREE.FrontSide, 2);
+    this.squalls = new Curtains(style, CURTAIN.squall, MAX_SPELLS, 64, 8, u, THREE.FrontSide, 2);
+    this.rain = new Curtains(style, CURTAIN.rain, 1, 48, 4, u, THREE.BackSide, 5);
     this.lightning = new Lightning(style, 11);
     const sphere = new THREE.SphereGeometry(1, 40, 20), vg = new THREE.InstancedBufferGeometry();
     vg.index = sphere.index;
     vg.setAttribute('position', sphere.getAttribute('position'));
     vg.setAttribute('aReach', new THREE.InstancedBufferAttribute(Float32Array.from(REACHES).reverse(), 1));
+    vg.setAttribute('aLayers', new THREE.InstancedBufferAttribute(Float32Array.from(LAYERS).reverse(), 1));
     vg.instanceCount = REACHES.length;
     this.veil = new THREE.Mesh(vg, inkMaterial(style, { vertexShader: VEIL_VERTEX, fragmentShader: VEIL_FRAGMENT, uniforms: u, veil: true, side: THREE.BackSide }));
     this.veil.renderOrder = 1.5; // before the curtains, which veil themselves by distance
@@ -598,13 +623,16 @@ export class Weather {
     for (let k = 0; k < state.weather.length; k++) {
       const spell = state.weather[k], vig = vigour(spell);
       if ((spell.kind !== SPELL.fog && spell.kind !== SPELL.squall) || vig < 0.01) continue;
-      const at = spell.at, apart = Math.acos(Math.max(-1, Math.min(1, foot.x * at.x + foot.y * at.y + foot.z * at.z))) * R - spell.r;
+      const at = spell.at, d = Math.acos(Math.max(-1, Math.min(1, foot.x * at.x + foot.y * at.y + foot.z * at.z))) * R, apart = d - spell.r;
       if (apart > REACH) continue;
+      // a curtain is never seen from within: under it, the rain round the eye and the short sight take over
+      const rho = spell.kind === SPELL.fog ? fogAngle(spell) : 0, ring = rho > 0 ? rho * R : (spell.kind === SPELL.fog ? 0.6 : 0.8) * spell.r;
+      const out = THREE.MathUtils.smoothstep(d, ring, ring + 12);
+      if (out <= 0) continue;
       if (spell.kind === SPELL.fog) {
-        const rho = fogAngle(spell);
-        this.fog.add(at, rho > 0 ? rho : (0.6 * spell.r) / R, 8 + 0.12 * spell.r, rho > 0 ? 0.97 : 0.5 * vig, k * 1.37);
+        this.fog.add(at, ring / R, 8 + 0.12 * spell.r, (rho > 0 ? 0.97 : 0.5 * vig) * out, k * 1.37);
       } else {
-        this.squalls.add(at, (0.8 * spell.r) / R, 30, vig, k * 1.37);
+        this.squalls.add(at, ring / R, 30, vig * out, k * 1.37);
         if (vig > 0.6 && apart < Math.min(boltApart, 160)) {
           boltApart = apart;
           this.bolt = spell;
@@ -619,8 +647,7 @@ export class Weather {
     u.uAsh.value = this.ash;
     this.rain.begin();
     if (rain > 0.02 || this.ash > 0.02) {
-      this.rain.add(foot, 7 / R, 30, 1, 1.3, -3);
-      this.rain.add(foot, 22 / R, 40, 1, 2.7, -3);
+      this.rain.add(foot, RAIN.near / R, 30, 1, 1.3, -3);
     }
     this.rain.end();
     this.veil.visible = u.uVeil.value > 0.01;

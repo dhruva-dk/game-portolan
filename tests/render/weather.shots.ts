@@ -1,8 +1,8 @@
 // Captures WP21's weather and storm over real headless matches (tests/render/weather.html) on both devices: a fog bank
 // hiding a ship's lantern, a squall at the blue hour, a calm mirror, the opening's bruise on the horizon, the storm wall
-// from outside and inside, the final calm ring (wp21-<scene>-<device>.png, contact sheets wp21-sheet-<device>.png).
-// Logs draw calls and triangles per scene.
-//   node tests/render/weather.shots.ts [outDir] [--only=<scene>]     (default outDir: progress/shots)
+// from outside and inside, the final calm ring, the open sea from the high camera (wp21-<scene>-<device>.png, contact sheets wp21-sheet-<device>.png).
+// Logs draw calls, triangles per scene group and GPU frame time per scene.
+//   node tests/render/weather.shots.ts [outDir] [--only=<scene>] [--device=ipad|iphone]     (default outDir: progress/shots)
 import { basename, join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
@@ -11,7 +11,8 @@ import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 const args = process.argv.slice(2);
 const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
-const SCENES = ['fog', 'squall', 'calm', 'bruise', 'outside', 'inside', 'ring'].filter((s) => !only || s === only);
+const SCENES = ['fog', 'squall', 'calm', 'bruise', 'outside', 'inside', 'ring', 'sea'].filter((s) => !only || s === only);
+const devices = (args.find((a) => a.startsWith('--device='))?.slice(9) ?? 'ipad,iphone').split(',') as DeviceName[];
 const STRIKE = new Set(['outside', 'ring']);
 
 async function sheet(browser: Browser, files: string[], out: string): Promise<void> {
@@ -28,14 +29,15 @@ const server = await serve();
 const { browser, renderer } = await launch();
 console.log(`renderer: ${renderer}`);
 try {
-  for (const device of ['ipad', 'iphone'] as DeviceName[]) {
+  for (const device of devices) {
     const files: string[] = [];
     for (const scene of SCENES) {
       const game = await openGame(browser, `${server.url}tests/render/weather.html`, { device, hook: '__weather', query: { scene } });
       await game.until((g) => g.ready, undefined, 240000);
-      const info = await game.page.evaluate((strike) => {
-        const w = (window as unknown as { __weather: { seed: number; hour: number; tick: number; lamps: number; stats(): unknown; strike(): unknown } }).__weather;
-        return { seed: w.seed, hour: w.hour, tick: w.tick, lamps: w.lamps, stats: strike ? w.strike() : w.stats() };
+      const info = await game.page.evaluate(async (strike) => {
+        type Hook = { seed: number; hour: number; tick: number; lamps: number; stats(): unknown; strike(): unknown; budget(): unknown; gpu(frames: number): Promise<unknown> };
+        const w = (window as unknown as { __weather: Hook }).__weather, budget = w.budget(), gpu = await w.gpu(40);
+        return { seed: w.seed, hour: w.hour, tick: w.tick, lamps: w.lamps, stats: strike ? w.strike() : w.stats(), budget, gpu };
       }, STRIKE.has(scene));
       const file = join(outDir, `wp21-${scene}-${device}.png`);
       await game.page.screenshot({ path: file, scale: 'css' });
