@@ -16,7 +16,7 @@ import { tideOf } from '../sim/environment.ts';
 import type { V3 } from '../sim/math.ts';
 import { horizonDistance, R } from '../sim/sphere.ts';
 import { LANE_TAPER } from '../sim/tables.ts';
-import { newSky, skyAt } from '../sim/weather.ts';
+import { airOf } from './weather.ts';
 import type { Geography } from '../sim/world/geography.ts';
 import type { Pipeline } from './pipeline.ts';
 import { cubeTexture, SEA_FIELD_BYTES, SEA_FLOOR_BYTES, seaFloorFaces, Swell, SWELL_GLSL } from './swell.ts';
@@ -129,7 +129,8 @@ uniform float uHorizon; // straight-line distance from the eye to the horizon, u
 uniform float uStrokes; // the share of cells that carry a wave stroke
 uniform float uCaps;    // the share of crests breaking white
 uniform float uCalm;    // 0…1: the sea laid flat as a mirror
-uniform float uSquall;  // 0…1: the sea roughened and greyed
+uniform float uSquall;
+uniform vec4 uStormCalm;  // 0…1: the sea roughened and greyed
 uniform samplerCube tSeaFloor;   // masks: rock (and ice), kelp, mud, black sand
 uniform vec4 uLaneA[MAX_LANES];  // a current arc's start (unit) and half-width, u
 uniform vec4 uLaneB[MAX_LANES];  // its end (unit) and speed, u/s
@@ -331,18 +332,25 @@ void main() {
   }
 
   // depth washes: the swell's faces turned from the sun take a little more, the far sea pales toward the horizon
-  float tone = clamp(1.0 - 3.0 * dot(vNormal - dir, uSun), 0.75, 1.3) * (1.0 - 0.5 * far);
+  // fine, even washes (S-002): the paper's mottle and blooms only breathe in them, never blotch
+  float tone = clamp(1.0 - 1.4 * dot(vNormal - dir, uSun), 0.88, 1.14) * (1.0 - 0.5 * far);
+  Paper qs = q;
+  qs.mottle = 0.5 + 0.3 * (q.mottle - 0.5);
+  qs.bloom = 0.5 + 0.3 * (q.bloom - 0.5);
   vec2 sh = layer(depth, fwD), shEnd = layer(16.0 + 4.0 * wob - depth, fwD);
-  vec2 shelf = layer(depth - 3.0 - 1.5 * wob, fwD), deep = layer(depth - 24.0 - 6.0 * wob, fwD);
-  col = glaze(col, SHALLOWS_T, SHALLOWS_D * tone * sh.x * shEnd.x * (1.0 - lagoon), 0.5 * shEnd.y + 0.3 * sh.y, q);
-  col = glaze(col, SHELF_T, SHELF_D * tone * shelf.x * (1.0 - lagoon), 0.5 * shelf.y, q);
-  col = glaze(col, DEEP_T, DEEP_D * tone * deep.x, 0.5 * deep.y, q);
-  col = glaze(col, LAGOON_T, LAGOON_D * tone * lagoon * sh.x, 0.0, q);
+  vec2 shelf = layer(depth - 3.0 - 1.5 * wob, fwD), deep = layer(depth - 24.0 - 2.5 * wob, fwD);
+  col = glaze(col, SHALLOWS_T, SHALLOWS_D * tone * sh.x * shEnd.x * (1.0 - lagoon), 0.5 * shEnd.y + 0.3 * sh.y, qs);
+  col = glaze(col, SHELF_T, SHELF_D * tone * shelf.x * (1.0 - lagoon), 0.4 * shelf.y, qs);
+  col = glaze(col, DEEP_T, DEEP_D * tone * deep.x, 0.25 * deep.y, qs);
+  col = glaze(col, LAGOON_T, LAGOON_D * tone * lagoon * sh.x, 0.0, qs);
   // the swell's backs, turned from the sun, take one more glaze laid with a frilled, pooled edge: brushed bands
-  float back = -10.0 * dot(vNormal - dir, uSun) + 0.6 * (q.mottle - 0.5);
+  float back = -10.0 * dot(vNormal - dir, uSun) + 0.2 * (q.mottle - 0.5);
   vec2 band = layer(back - 0.3, fwidth(back));
-  col = glaze(col, SHELF_T, 0.11 * band.x * water * (1.0 - far) * (1.0 - uCalm), 0.7 * band.y, q);
+  col = glaze(col, SHELF_T, 0.08 * band.x * water * (1.0 - far) * (1.0 - uCalm), 0.5 * band.y, qs);
   col = glaze(col, MUD_T, 0.25 * uSquall * water * (1.0 - far), 0.0, q); // a squall greys the sea
+  // the sea the storm holds (outside its calm) heaves grey under it
+  float stormSea = 1.0 - smoothstep(uStormCalm.w - 0.004, uStormCalm.w + 0.002, dot(dir, uStormCalm.xyz));
+  col = glaze(glaze(col, MUD_T, 0.4 * stormSea * water, 0.0, q), DEEP_T, 0.3 * stormSea * water, 0.0, q);
   // the swell read as form: its backs hatched along the crests
   float backT = clamp(-6.0 * dot(vNormal - dir, uSun) - 0.1, 0.0, 1.0) * water * near * (1.0 - uCalm) * diag;
   col = mix(col, hatchInk(0.35), 0.55 * hatching(hc, hdx, hdy, 0.42 * backT, 5.0));
@@ -681,6 +689,7 @@ export class Sea {
     uCaps: { value: 0.04 },
     uCalm: { value: 0 },
     uSquall: { value: 0 },
+    uStormCalm: { value: new THREE.Vector4(0, 0, 1, -2) },
     tSeaFloor: { value: null as unknown as THREE.CubeTexture },
     uLaneA: { value: Array.from({ length: MAX_LANES }, () => new THREE.Vector4()) },
     uLaneB: { value: Array.from({ length: MAX_LANES }, () => new THREE.Vector4()) },
@@ -766,6 +775,11 @@ export class Sea {
     this.local.uTerritory.value = map ? 1 : 0;
   }
 
+  /** The storm's calm (render/storm.ts): the sea outside the cap round `at` (cos of its angular radius) heaves grey. */
+  setStorm(at: V3, cos: number): void {
+    this.local.uStormCalm.value.set(at.x, at.y, at.z, cos);
+  }
+
   /** Stroke and whitecap shares from the wind and the weather. */
   private marks(): void {
     const w = this.weather, wind = Math.min(this.wind, 1.4);
@@ -808,17 +822,17 @@ export class Sea {
 /** The sea each scene was built with: modules that meet the water share its swell and fields; ships feed its wakes. */
 export const seas = new WeakMap<THREE.Object3D, Sea>();
 
-/** The composition root's sea (MODULES): built when a match screen opens; the weather and the tide at the eye's foot. */
+/** The composition root's sea (MODULES): built when a match screen opens; the wind, the weather and the tide at the eye's foot (the air). */
 export function createSea(ctx: RenderContext): RenderModule {
   const sea = new Sea(ctx.pipeline, ctx.world.geo);
   seas.set(ctx.scene, sea);
   ctx.scene.add(sea.mesh, sea.wake);
-  const sky = newSky(), foot = new THREE.Vector3();
   return {
     frame(f) {
       ctx.pipeline.style.uniforms.uTime.value = f.clock;
-      foot.copy(ctx.camera.position).normalize();
-      sea.setWeather(skyAt(f.state, foot, sky), f.dt);
+      const air = airOf(ctx.scene).update(ctx.world, f.state, ctx.camera.position);
+      sea.setWind(air.foot, air.toward, air.strength);
+      sea.setWeather(air.sea, f.dt);
       sea.swell.uniforms.uSeaLevel.value = tideOf(f.state);
     },
     dispose() {

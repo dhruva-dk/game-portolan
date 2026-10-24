@@ -10,10 +10,12 @@ import type { Pipeline } from './pipeline.ts';
 import { createFlora } from './flora.ts';
 import { createSea } from './sea.ts';
 import { createSky } from './sky.ts';
+import { createStorm } from './storm.ts';
 import { createStructures } from './structures.ts';
 import { createTerrain } from './terrain.ts';
 import { createTerritory } from './territory.ts';
 import { createTrails } from './trails.ts';
+import { createWeather } from './weather.ts';
 import { REGION_MODULES } from './regions/index.ts';
 
 /** What a module is built with. */
@@ -37,7 +39,7 @@ export interface RenderModule {
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
 /** The render modules, updated in this order every frame. Append-only (A6). */
-const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES];
+const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm];
 
 export class WorldView {
   readonly scene = new THREE.Scene();

@@ -7,12 +7,12 @@
 import * as THREE from 'three';
 import { inkMaterial, transmittanceVec, type Style } from '../style/glsl.ts';
 import { hex, STORM_SLATE } from '../style/palette.ts';
-import { newWind, seaFor, windAt, type Sea as Waters } from '../sim/environment.ts';
 import { R } from '../sim/sphere.ts';
 import { DAY } from '../sim/tables.ts';
-import { hourOf, newSky, skyAt } from '../sim/weather.ts';
+import { hourOf } from '../sim/weather.ts';
 import type { Geography } from '../sim/world/geography.ts';
 import { AURORA_GLSL, Beams, glslLinear, Lights, MAX_HALOS } from './light.ts';
+import { airOf } from './weather.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 const { smoothstep } = THREE.MathUtils;
@@ -157,8 +157,17 @@ out vec3 vToEye;
 out vec3 vWorld;
 out float vSize;
 flat out float vSeed;
+uniform float uSeaR;
 void main() {
-  vec3 c = aCloud.xyz, toEye = normalize(cameraPosition - c), right = cross(normalize(c), toEye);
+  // never between the camera and the action (S-001): a cloud near the line of sight down to the sea in view slides
+  // clear of it, so the ship and its trail always show; clouds toward the horizon, off that line, stay where they are
+  vec3 c = aCloud.xyz, fwd = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+  float bq = dot(cameraPosition, fwd), disc = bq * bq - dot(cameraPosition, cameraPosition) + uSeaR * uSeaR;
+  float reach = disc > 0.0 ? max(-bq - sqrt(disc), 0.0) : 0.0, ahead = dot(c - cameraPosition, fwd);
+  vec3 off = c - cameraPosition - fwd * clamp(ahead, 0.0, reach);
+  float d = length(off), push = reach > 0.0 && ahead > 0.0 ? max(1.05 * aCloud.w + 0.18 * min(ahead, reach) - d, 0.0) : 0.0;
+  c += (d > 1e-3 ? off / d : normalize(c)) * push;
+  vec3 toEye = normalize(cameraPosition - c), right = cross(normalize(c), toEye);
   right = dot(right, right) < 1e-6 ? normalize(cross(vec3(0.0, 0.0, 1.0), toEye) + vec3(1e-4, 0.0, 0.0)) : normalize(right);
   vUv = position.xy;
   vRight = right;
@@ -270,7 +279,7 @@ export class Sky {
     uSunY: { value: new THREE.Vector3() }, uMoonDir: { value: new THREE.Vector3() }, uMoonX: { value: new THREE.Vector3() },
     uMoonY: { value: new THREE.Vector3() }, uCelestial: { value: new THREE.Matrix3() }, uGlowAmt: { value: 0 },
     uSunVis: { value: 0 }, uMoonVis: { value: 0 }, uStarVis: { value: 0 }, uGrey: { value: 0 }, uAurora: { value: 0 },
-    uSlate: { value: transmittanceVec(STORM_SLATE) },
+    uSlate: { value: transmittanceVec(STORM_SLATE) }, uSeaR: { value: R },
   };
 
   constructor(style: Style, geo: Geography, seed = 7) {
@@ -386,23 +395,13 @@ export function createSky(ctx: RenderContext): RenderModule {
   const sky = new Sky(ctx.pipeline.style, ctx.world.geo);
   skies.set(ctx.scene, sky);
   ctx.scene.add(sky.group);
-  const foot = new THREE.Vector3(), wind = newWind(), weather = newSky();
   const w = { wind: new THREE.Vector3(), squall: 0, calm: 0 };
-  let waters: Waters | null = null;
   return {
     frame(f) {
-      waters ??= seaFor(ctx.world, f.state.seed);
-      // The camera's foot. Until something places the camera it sits at the planet's centre, which has no foot (and no
-      // territory cell for windAt to look up), so the sky stands over the first ship instead.
-      const eye = ctx.camera.position, ship = f.state.ships[0]?.pos;
-      if (eye.lengthSq() > 1e-9) foot.copy(eye).normalize();
-      else if (ship) foot.set(ship.x, ship.y, ship.z).normalize();
-      else foot.set(0, 0, 1);
-      windAt(waters, f.state, foot, wind);
-      skyAt(f.state, foot, weather);
-      w.wind.set(wind.v.x, wind.v.y, wind.v.z).normalize().multiplyScalar(wind.strength);
-      w.squall = weather.squall;
-      w.calm = weather.calm;
+      const air = airOf(ctx.scene).update(ctx.world, f.state, ctx.camera.position);
+      w.wind.copy(air.toward).multiplyScalar(air.strength);
+      w.squall = Math.max(air.sky.squall, air.storm);
+      w.calm = air.sky.calm * (1 - air.storm);
       sky.update(hourOf(f.state), f.clock, ctx.camera.position, w);
     },
     dispose() {
