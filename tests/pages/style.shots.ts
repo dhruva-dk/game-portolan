@@ -1,7 +1,9 @@
 // Captures the style gallery (tests/pages/style.html) at both devices: the deck view at four hours, the high and
-// orbit views at golden hour, and a full-resolution detail of lines, hatching and washes.
+// orbit views in the afternoon (frames at CSS resolution, to keep progress/ light), and a detail of lines, hatching
+// and washes at full device resolution.
 //   node tests/pages/style.shots.ts [outDir] [--only=<substring>]     (default outDir: progress/shots, files wp02-*)
 import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
@@ -18,6 +20,7 @@ const SHOTS: { name: string; view: string; hour: number; ui?: boolean; detail?: 
   { name: 'detail', view: 'deck', hour: 15.5, ui: false, detail: true },
 ];
 
+await mkdir(outDir, { recursive: true });
 const server = await serve();
 const { browser, renderer } = await launch();
 console.log(`renderer: ${renderer}`);
@@ -34,7 +37,7 @@ try {
       if (s.detail) {
         const { width, height } = game.device;
         await game.page.screenshot({ path: file, clip: { x: width * 0.3, y: height * 0.38, width: width * 0.36, height: height * 0.4 } });
-      } else await game.screenshot(file);
+      } else await game.page.screenshot({ path: file, scale: 'css' });
       game.assertClean();
       console.log(file, JSON.stringify(await game.hook((g) => g.stats())));
       await game.close();

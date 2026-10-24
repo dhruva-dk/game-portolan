@@ -154,7 +154,7 @@ void main() {
   vec2 p = vLocal;
   float aa = max(fwidth(p.x), 1e-3);
   float r = length(p), ang = atan(p.x, -p.y);                       // 0 at twelve o'clock, clockwise (y down)
-  float rr = uRadius * (1.0 + 0.012 * (textureLod(tPaper, vec2(ang * 0.6, uSeed), 0.0).a - 0.5));
+  float rr = uRadius * (1.0 + 0.012 * (textureLod(tPaper, vec2(ang * 0.6, uSeed), 0.0).a - 0.5) - 0.04 * uPressed);
   float d = rr - r;
   float cover = clamp(d / aa + 0.5, 0.0, 1.0);
   float shadow = 0.3 * smoothstep(-5.0, 3.0, rr - length(p - vec2(2.5, 3.5)));
@@ -209,7 +209,6 @@ export class ButtonBase extends THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMate
   /** Pressed (0–1): the bevel flips to the sunken side and the medallion settles onto the page. */
   set pressed(v: number) {
     this.material.uniforms.uPressed.value = v;
-    this.scale.setScalar(1 - 0.04 * v);
   }
 
   set disabled(v: number) {

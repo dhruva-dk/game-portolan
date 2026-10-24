@@ -153,7 +153,7 @@ void main() {
   float tear = textureLod(tPaper, css / 1100.0, 0.0).a + 0.3 * textureLod(tPaper, css / 160.0, 0.0).r;
   float t = edge - (tear - 0.62) * 18.0;
   float deckle = 1.0 - smoothstep(0.0, 30.0, t);
-  col = wash(col, uDeckle, deckle * deckle * 0.32 + (1.0 - smoothstep(0.0, 3.0, t)) * 0.22);
+  col = wash(col, uDeckle, deckle * deckle * 0.3 + (1.0 - smoothstep(0.0, 3.0, t)) * 0.14);
 
   // the storm grade (mirrors palette.ts stormGrade)
   float y = dot(col, vec3(0.2126, 0.7152, 0.0722)) / dot(SLATE, vec3(0.2126, 0.7152, 0.0722));

@@ -227,14 +227,17 @@ if (params.get('ui') !== '0') {
   vignette.set(Math.PI, 0.75);
   ui.push({
     place(w, h, inset) {
-      hull.position.set(inset.left + 24 + 115, 22 + 29, 0);
-      card.position.set(inset.left + 24 + 165, h - inset.bottom - 18 - 78, 0);
+      // the interface keeps its size on the iPad and shrinks to fit the short side of an iPhone
+      const k = Math.min(1, h / 720), m = 24 * k;
+      for (const o of [hull, card, swatches, ...buttons]) o.scale.setScalar(k);
+      hull.position.set(inset.left + m + 115 * k, m + 29 * k, 0);
+      card.position.set(inset.left + m + 165 * k, h - inset.bottom - m - 78 * k, 0);
       swatches.position.copy(card.position);
-      const bx = w - inset.right - 24, by = h - inset.bottom - 24;
-      buttons[3].position.set(bx - 38, by - 38, 0);
-      buttons[0].position.set(bx - 38 - 84, by - 30, 0);
-      buttons[1].position.set(bx - 38 - 4, by - 30 - 84, 0);
-      buttons[2].position.set(bx - 38 - 74, by - 30 - 74, 0);
+      const bx = w - inset.right - m, by = h - inset.bottom - m;
+      buttons[3].position.set(bx - 38 * k, by - 38 * k, 0);
+      buttons[0].position.set(bx - 122 * k, by - 30 * k, 0);
+      buttons[1].position.set(bx - 42 * k, by - 114 * k, 0);
+      buttons[2].position.set(bx - 112 * k, by - 104 * k, 0);
       vignette.setView(w, h);
     },
   });
