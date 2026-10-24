@@ -39,7 +39,7 @@ function pilot(off: number): (s: MatchState) => ShipInput {
     const input = idleInput();
     if (s.tick >= off) input.flags = FLAG.breakOff;
     if (s.ships[0].phase === PHASE.sailing) {
-      if ((s.tick - off) % S(50) < S(20)) input.steer = 30;
+      if ((s.tick - off) % S(50) < S(20)) input.steer = 60; // a turn that takes it out of its home waters and round
       else input.flags |= FLAG.headHome;
     }
     return input;
@@ -91,7 +91,7 @@ test('the fleet rides the Great Current abreast from the first tick, with the st
   assert.ok(s.ships.every((ship) => ship.held === 0 && ship.laid.length === 0), 'nobody has waters or a trail yet');
 });
 
-test('breaking off at different moments makes the home in different regions', { todo: 'a home can take 10 s or more to ink after breaking off: see the WP8 div, Remaining' }, () => {
+test('breaking off at different moments makes the home in different regions', () => {
   // The middle of each region's stretch of the current, as a captain reads the passage.
   const start = createMatch({ seed: SEED }).ships[0].ride, p = newPassage(), moments: number[] = [];
   for (let s = start; ; ) {

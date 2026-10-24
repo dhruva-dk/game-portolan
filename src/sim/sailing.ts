@@ -10,7 +10,7 @@ import type { ShipInput } from './input.ts';
 import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
 import { helmOf } from './route.ts';
 import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
-import { SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
+import { PHASE, SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
 import {
   BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM, VORTEX,
 } from './tables.ts';
@@ -234,9 +234,16 @@ const D = v3(), U = v3(), UB = v3(), SEP = v3(), DV = v3();
 export function collide(state: MatchState): void {
   for (let i = 0; i < SHIPS; i++) {
     if (!afloat(state.ships[i])) continue;
-    for (let j = i + 1; j < SHIPS; j++) if (afloat(state.ships[j])) contact(state, i, j);
+    for (let j = i + 1; j < SHIPS; j++) if (afloat(state.ships[j]) && !makesWay(state.ships[i], state.ships[j])) contact(state, i, j);
   }
 }
+
+/**
+ * The fleet riding the Great Current makes way for a ship peeling off it: they never touch, so it slips out between
+ * the riders' lanes from any place in the ranks instead of being boxed in by ships it cannot move (opening.ts).
+ */
+const makesWay = (a: Ship, b: Ship): boolean =>
+  (a.phase === PHASE.riding && b.phase === PHASE.peeling) || (a.phase === PHASE.peeling && b.phase === PHASE.riding);
 
 function contact(state: MatchState, i: number, j: number): void {
   const a = state.ships[i], b = state.ships[j], fa = FORMS[a.form], fb = FORMS[b.form];

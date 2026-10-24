@@ -5,13 +5,15 @@
 // then on the current is water like any other: a fast highway everyone knows (environment.ts currentAt).
 import { greatCurrentAt, type Sea } from './environment.ts';
 import { FLAG, type ShipInput } from './input.ts';
-import { set, v3 } from './math.ts';
-import { EVENT, LANE, PHASE, TICK, chronicle, emit, onCurrent, type MatchState } from './state.ts';
+import { cross, dot, dsin, normalize, set, v3, type V3 } from './math.ts';
+import { EVENT, LANE, PHASE, TICK, chronicle, emit, onCurrent, type MatchState, type Ship } from './state.ts';
 import { FORMS, OPENING } from './tables.ts';
 import { inkHome } from './territory.ts';
 import { regionOf } from './world/geography.ts';
 
-const P = v3(), H = v3(), FLOW = v3();
+const P = v3(), H = v3(), FLOW = v3(), STARBOARD = v3();
+/** The sine of the least angle off the current's line a peeling hull is held at until it is clear. */
+const PEEL = dsin(OPENING.peel);
 
 /** How far down the Great Current it ends, u: its last centreline point (they lie every 2 u). */
 const endOf = (sea: Sea): number => 2 * (sea.current.points.length / 3 - 1);
@@ -48,18 +50,31 @@ function breakOff(state: MatchState, i: number, steer: number, kind: number): vo
 }
 
 /**
- * One tick of ship i after it broke off: once it has slowed — OPENING.settle of its form's time constants of losing
- * way — and is clear of the current (or OPENING.most s have passed), its home disc inks itself round it (the timeline remembers the region) and it is at sea.
+ * One tick of ship i after it broke off. Until it is clear of the current it is held at least OPENING.peel off the
+ * current's line where it is now (holdOff), so a current curving after it, a blow from a rider or the way dying away
+ * never carry it on down the lane. Once it has slowed — OPENING.settle of its form's time constants of losing way —
+ * and is clear of the current (or OPENING.most s have passed), its home disc inks itself round it (the timeline
+ * remembers the region) and it is at sea.
  */
 export function coast(sea: Sea, state: MatchState, i: number): void {
-  const ship = state.ships[i];
+  const ship = state.ships[i], f = greatCurrentAt(sea, ship.pos, set(FLOW, 0, 0, 0)), on = f.x !== 0 || f.y !== 0 || f.z !== 0;
   ship.peel += TICK;
-  if (ship.peel < OPENING.settle * FORMS[ship.form].drag) return;
-  const f = greatCurrentAt(sea, ship.pos, set(FLOW, 0, 0, 0));
-  if ((f.x !== 0 || f.y !== 0 || f.z !== 0) && ship.peel < OPENING.most) return;
+  if (on) holdOff(ship, normalize(f));
+  if (ship.peel < OPENING.settle * FORMS[ship.form].drag || (on && ship.peel < OPENING.most)) return;
   const region = regionOf(ship.pos);
   chronicle(state, EVENT.home, i, region, inkHome(state, i));
   ship.phase = PHASE.sailing;
+}
+
+/**
+ * A peeling ship on the current, flowing `along`: unless its helm is turning it back, it turns toward the side of the
+ * current's line its head lies on (or is turning to) at the rate that brings it OPENING.peel off that line over its
+ * form's helm time constant, or faster if it is turning that way faster already.
+ */
+function holdOff(ship: Ship, along: V3): void {
+  const b = dot(ship.head, normalize(cross(STARBOARD, along, ship.pos))), side = b !== 0 ? Math.sign(b) : Math.sign(ship.rate);
+  if (side === 0 || side * ship.rate < 0 || side * b >= PEEL) return;
+  ship.rate = side * Math.max(side * ship.rate, (PEEL - side * b) / FORMS[ship.form].helm);
 }
 
 /** Where the Great Current is taking a ship riding it: what a captain weighs to break off (WP11), and the interface shows. */
