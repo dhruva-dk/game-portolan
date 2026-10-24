@@ -9,6 +9,7 @@ files. To add an entry, append one line: `- <name> — <source URL> — <author>
 
 - three — https://threejs.org — three.js authors — MIT (runtime)
 - vite — https://vite.dev — Evan You and Vite contributors — MIT (build)
+- @capacitor/app — https://capacitorjs.com/docs/apis/app — Ionic and Capacitor contributors — MIT (runtime: the app going to the background and back, to save and resume the match)
 - typescript — https://www.typescriptlang.org — Microsoft — Apache-2.0 (dev)
 - playwright — https://playwright.dev — Microsoft — Apache-2.0 (tests)
 - @types/three, @types/node — https://github.com/DefinitelyTyped/DefinitelyTyped — DefinitelyTyped contributors — MIT (dev)

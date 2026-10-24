@@ -6,7 +6,6 @@
 //   node --test tests/sim/world.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { performance } from 'node:perf_hooks';
 import { PI, dot, normalize, v3, type V3 } from '../../src/sim/math.ts';
 import { R, TERRITORY, cellArea, cellDir, cellOf, neighbor } from '../../src/sim/sphere.ts';
 import { DRAFT, REGIONS, TIDE } from '../../src/sim/world/regions.ts';
@@ -15,12 +14,17 @@ import {
 } from '../../src/sim/world/geography.ts';
 import { NAV, buildNav, findRoute, navCellOf, type Nav } from '../../src/sim/world/nav.ts';
 
-let t0 = performance.now();
+// CPU time, not wall time: the browser tests running beside this one must not make the build look slow.
+const cpuMs = (): number => {
+  const u = process.cpuUsage();
+  return (u.user + u.system) / 1000;
+};
+let t0 = cpuMs();
 const geo = buildGeography();
-const buildMs = performance.now() - t0;
-t0 = performance.now();
+const buildMs = cpuMs() - t0;
+t0 = cpuMs();
 const nav = buildNav(geo);
-const navMs = performance.now() - t0;
+const navMs = cpuMs() - t0;
 console.log(`# buildGeography ${buildMs.toFixed(0)} ms, buildNav ${navMs.toFixed(0)} ms`);
 
 const LOW = -TIDE.amp + 0.01, HIGH = TIDE.amp - 0.01;
