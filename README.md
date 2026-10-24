@@ -25,6 +25,25 @@ npm run preview   # serve dist/ locally to check it
 `dist/` is self-contained (relative paths, every texture and library bundled, no requests to other hosts),
 so it can be hosted from any static host or folder.
 
+## iOS
+
+```sh
+npm run ios                                        # iPad Pro 13-inch simulator
+npm run ios -- --device iphone --shot shot.png     # iPhone 17 Pro Max, and a screenshot once the game runs
+```
+
+One command builds the web game, syncs it into the Capacitor project in `ios/` (configured by
+`capacitor.config.ts`; Swift Package Manager, no CocoaPods), builds the app with `xcodebuild`, boots a
+simulator headless with `xcrun simctl` (no Xcode or Simulator window), turns it to landscape, installs and
+launches the app. It needs Xcode and an iOS Simulator runtime (`xcodebuild -downloadPlatform iOS`). The app's
+output, including the web view's console, goes to `$TMPDIR/portolan-ios/app.log`. `tests/ios.ts` exports
+the same steps for tests (`simulator`, `boot`, `install`, `launch`, `screenshot`, `backgroundAndResume`,
+`appProblems`); its comments explain the simulator workarounds.
+
+The app is landscape-only and full screen, with the status bar and home indicator hidden. It ships no image
+files: the launch screen is plain parchment and the app icon set is empty. An app icon, if one is added, must be
+generated in code like every other image.
+
 ## Controls
 
 The ship is always under way; you work the helm.
@@ -49,8 +68,18 @@ Install the test browser once with `npx playwright install chromium`.
 npm test                    # acceptance checks 1–3: territory geometry, distinct bots, determinism
 npm run perf                # acceptance check 4: frame rate through a full day at Retina resolution
 npm run capture -- shots/   # every required screenshot, scripted and seeded, into shots/
+npm run check:assets        # no image, model, font, or audio files in the source or the build
 npm run typecheck
 ```
+
+Browser tests and captures run on `tests/harness.ts`: `serve()` starts Vite (dev or production build),
+`launch()` starts headless Chromium with WebGL on the GPU (ANGLE over Metal), `DEVICES` defines the iPhone and
+iPad landscape profiles (the only place they are defined), and `openGame()` opens the game on one with touch,
+pixel ratio, and safe areas emulated. The returned `Game` scripts touch (`tap`, `drag`, `pinch`, `gesture`,
+`touch`), reads and waits on the game's `window.__portolan` hook (`hook`, `until`), takes screenshots at device
+resolution, throttles the CPU, and records console errors, warnings, and stray requests (`problems`,
+`assertClean`). `node --test tests/harness.test.ts` checks the harness itself (`SHOTS=dir` keeps its
+screenshots).
 
 - **Determinism** (`tests/determinism.test.ts`) records a scripted captain's helm while running a seed headless
   in Node, replays it in Chromium with full rendering at 30 and then 20 fps with a pause in the globe menu in
