@@ -137,6 +137,8 @@ uniform vec4 uLaneN[MAX_LANES];  // the pole of its great circle (a × b, unit);
 uniform vec4 uShips[WAKE_SHIPS]; // each ship's waterline point (u) and mast height (0: none)
 uniform samplerCube tTerritory;  // WP20: rgb the owner's wash transmittance (1 where unowned), a 1 where owned
 uniform float uTerritory;        // 1 once WP20 lays its map
+uniform samplerCube tFlood;      // WP20's moments: r the cell's place in its moment, g its slot·32, b 255 inside one (r, g ·b)
+uniform vec4 uFlood[8];          // WP20's moment slots: x kind (1 flood, 2 wash-out), y front u or progress, z reach u, w dryness
 const vec3 LAGOON_T = ${washT('lagoon')}, SHALLOWS_T = ${washT('shallows')}, SHELF_T = ${washT('shelf')}, DEEP_T = ${washT('deep')};
 const float LAGOON_D = ${washD('lagoon')}, SHALLOWS_D = ${washD('shallows')}, SHELF_D = ${washD('shelf')}, DEEP_D = ${washD('deep')};
 const vec3 SAND_T = ${T('ochre')}, ROCK_T = ${T('umber')}, CORAL_T = ${T('roseMadder')}, KELP_T = ${T('malachite')};
@@ -391,15 +393,34 @@ void main() {
   }
 
   // WP20's territory: the owner's wash with a wavering pooled edge, granulating, a narrow hatched band inside the
-  // border and the border inked in the owner's pigment
+  // border and the border inked in the owner's pigment. Its moments: a claim floods in from its trail as a wet wash
+  // behind a wavering front with a dark pooled rim, granulating, drying to the flat tint before the border and its
+  // hatching are inked; sea the storm swallows or a wreck frees runs, thins and washes out.
   if (uTerritory > 0.0) {
-    vec4 tt = cubeAt(tTerritory, dir);
-    float own = tt.a - 0.5 + 0.1 * wob, fo = fwidth(own);
+    vec4 tt = cubeAt(tTerritory, dir), fl = cubeAt(tFlood, dir);
+    float own = tt.a - 0.5 + 0.1 * wob, wet = 0.0, thin = 1.0;
+    float runs = 0.45 * (tri(tPaper, P / 6.0, tw).g - 0.5) + 0.25 * tri(tPaper, P / 1.9, tw).b;
+    if (fl.b > 0.01) {
+      vec4 ev = uFlood[int(fl.g / fl.b * 7.97 + 0.5)];
+      float r = fl.r / fl.b, inside = smoothstep(0.3, 0.8, fl.b);
+      if (ev.x > 0.5 && ev.x < 1.5) {
+        float lag = ev.y - r * ev.z + (2.0 * wob + 1.5 * (q.bloom - 0.5)) * min(0.12 * ev.z, 2.5);
+        own = mix(own, min(own, 0.3 * lag), inside);
+        wet = (1.0 - ev.w) * inside * exp(-max(lag, 0.0) / (1.5 + 0.1 * ev.z));
+      } else if (ev.x > 1.5) {
+        float due = 0.12 + 0.5 * r + runs;
+        own = mix(own, min(own, 2.5 * (due - ev.y)), inside);
+        thin = 1.0 - 0.75 * inside * smoothstep(due - 0.45, due, ev.y);
+        tt.rgb = mix(tt.rgb, vec3(1.0), 0.4 * (1.0 - thin));
+      }
+    }
+    float fo = fwidth(own), dry = 1.0 - smoothstep(0.04, 0.35, wet);
     vec2 lay = layer(own, fo);
-    col = glaze(col, tt.rgb, TERRITORY_D * lay.x * water, 0.6 * lay.y, q);
-    col = mix(col, hatchInk(0.3), 0.5 * hatching(hc, hdx, hdy, 0.4, 19.0) * lay.x * (1.0 - smoothstep(0.0, 0.3, own)) * water);
+    float td = TERRITORY_D * thin * (1.0 + 1.3 * wet + 1.6 * wet * (q.grain - 0.4));
+    col = glaze(col, tt.rgb, td * lay.x * water, (0.6 + 3.0 * wet) * lay.y, q);
+    col = mix(col, hatchInk(0.3), 0.5 * dry * thin * hatching(hc, hdx, hdy, 0.4, 19.0) * lay.x * (1.0 - smoothstep(0.0, 0.3, own)) * water);
     float bw = 0.9 * uRenderPx;
-    col = mix(col, wash(uPaper, tt.rgb, 2.2), 0.85 * water * (1.0 - smoothstep(bw - 0.5, bw + 0.5, abs(own) / max(fo, 1e-5))));
+    col = mix(col, wash(uPaper, tt.rgb, 2.2), 0.85 * dry * thin * water * (1.0 - smoothstep(bw - 0.5, bw + 0.5, abs(own) / max(fo, 1e-5))));
   }
 
   // coast rings, fading outward and wherever they would pack tighter than a few pixels
@@ -667,6 +688,8 @@ export class Sea {
     uShips: { value: this.wakes.ships },
     tTerritory: { value: null as THREE.CubeTexture | null },
     uTerritory: { value: 0 },
+    tFlood: { value: null as THREE.CubeTexture | null },
+    uFlood: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
   };
 
   constructor(pipeline: Pipeline, geo: Geography) {
@@ -733,10 +756,13 @@ export class Sea {
    * laid out as seaFieldFaces (cubeTexture, RGBA bytes on the TERRITORY cells, linear filtering): rgb the owner's
    * wash transmittance (transmittanceVec of its pigment; white where unowned), a 1 where owned. The 0.5 contour of a
    * is the border, drawn with the style's pooled, granulating wash edge, a narrow hatched band and an inked line in
-   * the owner's pigment. Update its faces in place (needsUpdate) as cells change; null hides territory.
+   * the owner's pigment. Update its faces in place (needsUpdate) as cells change; null hides territory. `moments` and
+   * `slots` time its moments (territory.ts: floods and wash-outs).
    */
-  setTerritory(map: THREE.CubeTexture | null): void {
+  setTerritory(map: THREE.CubeTexture | null, moments: THREE.CubeTexture | null = null, slots = this.local.uFlood.value): void {
     this.local.tTerritory.value = map;
+    this.local.tFlood.value = moments;
+    this.local.uFlood.value = slots;
     this.local.uTerritory.value = map ? 1 : 0;
   }
 
