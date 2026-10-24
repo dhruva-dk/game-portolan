@@ -21,7 +21,7 @@ import { FITTING, SLOT, STORM } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { newSight, survey } from '../../src/sim/visibility.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
-import { world } from './vectors.ts';
+import { unarmed, world } from './vectors.ts';
 
 const SEED = 20261024, W = world(), sea = seaFor(W, SEED);
 const S = (seconds: number): number => Math.round(seconds / TICK);
@@ -158,7 +158,7 @@ function idleMatch(seed: number, each?: (s: MatchState, ms: number) => void, fro
 test('the storm alone ends every match, by its last phase', (t) => {
   const n = Number(process.env.PORTOLAN_MATCHES ?? 6), minutes: number[] = [];
   for (let m = 0; m < n; m++) {
-    const s = idleMatch(hash32(SEED, m));
+    const s = idleMatch(hash32(SEED, m), undefined, unarmed(createMatch({ seed: hash32(SEED, m) }))); // guns struck below
     assert.ok(s.sunk.every((d) => d.cause === CAUSE.storm && d.by === -1));
     assert.ok(s.tick <= CLOSED + S(20), `seed ${m} over at ${s.tick * TICK} s`);
     minutes.push((s.tick * TICK) / 60);

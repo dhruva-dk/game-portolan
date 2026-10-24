@@ -17,10 +17,10 @@ import { R } from '../../src/sim/sphere.ts';
 import {
   AFLOAT, CAUSE, EVENT, PHASE, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState,
 } from '../../src/sim/state.ts';
-import { SLOT, END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
+import { END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { regionOf } from '../../src/sim/world/geography.ts';
-import { world } from './vectors.ts';
+import { unarmed, world } from './vectors.ts'; // unarmed: only the script or the storm sinks a ship
 
 const SEED = 20261024, sea = seaFor(world(), SEED);
 const S = (seconds: number): number => Math.round(seconds / TICK);
@@ -71,11 +71,6 @@ function play(sea: Sea, s: MatchState, off: number, dooms: readonly Doom[], unti
   return s;
 }
 
-/** The fleet with its guns struck below, so only the script or the storm sinks a ship (combat.test.ts fights). */
-function unarmed(s: MatchState): MatchState {
-  for (const ship of s.ships) ship.fittings[SLOT.broadside] = { kind: FITTING.none, tier: 0 };
-  return s;
-}
 
 test('the fleet rides the Great Current abreast from the first tick, with the storm\'s origin revealed', () => {
   const s = createMatch({ seed: SEED });

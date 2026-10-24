@@ -16,7 +16,7 @@ import { SAIL, SHIPS, TICK, createMatch, type MatchState } from '../../src/sim/s
 import { FITTING, FORM, FORMS, PILOT, REFERENCE, SAILS, SLOT } from '../../src/sim/tables.ts';
 import { coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
 import { DRAFT, REGIONS } from '../../src/sim/world/regions.ts';
-import { world } from './vectors.ts';
+import { unarmed, world } from './vectors.ts';
 
 const SEED = 20261024;
 const sea = seaFor(world(), SEED);
@@ -80,6 +80,7 @@ test('a caravel under plain sail in a fair wind rounds the equator in six minute
       course.push(cellOf(TERRITORY, p));
     }
     const s = match(FORM.caravel, fromLatLon(0, 0, v3()), PI / 2, SAIL.plain, seed), ship = s.ships[0], idle = input();
+    unarmed(s, 1); // the rest of the fleet lies off the head of the current, guns struck below: nothing ends the match mid-lap
     for (const calm of s.storm.calms) calm.r = PI; // the storm held off: this is the sails' own pace
     step(waters, s, input({ course }));
     let lon = 0, last = 0;

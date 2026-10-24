@@ -14,6 +14,8 @@ import {
   tangentAt, tangentToward,
 } from '../../src/sim/sphere.ts';
 import { createMatch, decodeMatch, encodeMatch, matchHash } from '../../src/sim/state.ts';
+import type { MatchState } from '../../src/sim/state.ts';
+import { FITTING, SLOT } from '../../src/sim/tables.ts';
 
 /** The hash of doubles' exact bits. */
 function digest(values: ArrayLike<number>): string {
@@ -139,4 +141,10 @@ function matchVectors(): { match: string; resumed: string } {
 
 export function vectors(): Record<string, string> {
   return { math: mathVectors(), rng: rngVectors(), sphere: sphereVectors(), ...matchVectors() };
+}
+
+/** Strikes below the guns of ships `from` on, so no broadside sinks them (combat.test.ts fights): the sea, the sails and the storm alone. */
+export function unarmed(s: MatchState, from = 0): MatchState {
+  for (let i = from; i < s.ships.length; i++) s.ships[i].fittings[SLOT.broadside] = { kind: FITTING.none, tier: 0 };
+  return s;
 }
