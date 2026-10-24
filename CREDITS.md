@@ -12,3 +12,4 @@ files. To add an entry, append one line: `- <name> — <source URL> — <author>
 - typescript — https://www.typescriptlang.org — Microsoft — Apache-2.0 (dev)
 - playwright — https://playwright.dev — Microsoft — Apache-2.0 (tests)
 - @types/three, @types/node — https://github.com/DefinitelyTyped/DefinitelyTyped — DefinitelyTyped contributors — MIT (dev)
+- Chromium and WebKit browser builds for Playwright (`npx playwright install chromium webkit`) — https://playwright.dev/docs/browsers — The Chromium Authors; Apple and the WebKit contributors — BSD-3-Clause; LGPL-2.1 and BSD-2-Clause (tests: Chromium for the harness, WebKit as the iOS engine in the determinism vectors)

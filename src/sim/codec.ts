@@ -89,6 +89,18 @@ class Writer {
     this.buf[this.n++] = v;
   }
 
+  /** Runs of equal bytes as (run length, value) pairs. */
+  runs(a: Uint8Array): void {
+    for (let i = 0; i < a.length; ) {
+      const b = a[i];
+      let j = i + 1;
+      while (j < a.length && a[j] === b) j++;
+      this.varint(j - i);
+      this.byte(b);
+      i = j;
+    }
+  }
+
   fail(what: string): never {
     throw new TypeError(`encode: ${this.path.join('.')} is not ${what}`);
   }
@@ -113,15 +125,7 @@ class Writer {
         return;
       case 'bytes': {
         if (!(v instanceof Uint8Array) || v.length !== kind.length) this.fail(`a Uint8Array(${kind.length})`);
-        // Runs of equal bytes as (run length, value) pairs.
-        for (let i = 0; i < v.length; ) {
-          const b = v[i];
-          let j = i + 1;
-          while (j < v.length && v[j] === b) j++;
-          this.varint(j - i);
-          this.byte(b);
-          i = j;
-        }
+        this.runs(v);
         return;
       }
       case 'words': {

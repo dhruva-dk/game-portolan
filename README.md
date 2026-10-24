@@ -1,10 +1,14 @@
 # Portolan
 
-An Age of Discovery territory game on a planet small enough that the horizon always curves. You sail a
-galleon against twenty rival captains: leave your waters, lay a trail across the sea, come home to close
-the loop and the enclosed sea floods with your colour. Cut a rival's open trail and it sinks.
+A naval battle royale for iPhone and iPad on a hand-built ocean planet drawn as a living portolan chart. Ten
+ships ride a great ocean current across the planet, peel off into the region of their choosing, claim the sea by
+sailing loops out of their own waters, and fight to be the last one afloat while a storm closes in. Between
+matches the player climbs a league of thirty rival captains that learn how it plays. Every image, sound, letter
+and note is generated in code.
 
-Everything is generated in code from a seed: the planet, islands, vegetation, ships and the match itself.
+[PROMPT.md](PROMPT.md) is the specification. The game is being built in work packages; [progress.html](progress.html)
+(open it straight from disk) shows the state of every part, the acceptance checks, the captures, the log and what
+comes next.
 
 ## Run
 
@@ -12,8 +16,8 @@ Everything is generated in code from a seed: the planet, islands, vegetation, sh
 npm start
 ```
 
-Installs the dependencies on first run, then serves the game at http://localhost:5173 and opens it.
-Needs Node.js 24 or newer. Add `?seed=42` to the URL for another planet and match.
+Installs the dependencies on first run, then serves the game at http://localhost:5173 and opens it. Needs
+Node.js 24 or newer.
 
 ## Build
 
@@ -22,8 +26,7 @@ npm run build     # static site in dist/
 npm run preview   # serve dist/ locally to check it
 ```
 
-`dist/` is self-contained (relative paths, every texture and library bundled, no requests to other hosts),
-so it can be hosted from any static host or folder.
+`dist/` is self-contained (relative paths, everything bundled, no requests to other hosts).
 
 ## iOS
 
@@ -44,62 +47,58 @@ The app is landscape-only and full screen, with the status bar and home indicato
 files: the launch screen is plain parchment and the app icon set is empty. An app icon, if one is added, must be
 generated in code like every other image.
 
-## Controls
-
-The ship is always under way; you work the helm.
-
-| Input | Action |
-| --- | --- |
-| Mouse | The ship steers for the sea under the cursor (hold course by keeping the cursor near the ship) |
-| A / D or ← / → | Turn to port / starboard; a tap nudges, holding swings the helm hard over |
-| W or ↑ | Ease the helm: alone it checks the swing and holds the course, with a turn key it turns gently |
-| S or ↓ | Hard over: alone it tightens the current turn, with a turn key it turns at full rudder at once |
-| Drag | Orbit the camera |
-| Wheel | Zoom from deck level out to the whole planet |
-| Hold T | Run the time of day fast (the match is unaffected) |
-| M | Globe menu with the live planet and the standings; pauses the match |
-| N | Mute |
-
 ## Tests
 
-Install the test browser once with `npx playwright install chromium`.
+Install the test browsers once with `npx playwright install chromium webkit`.
 
 ```sh
-npm test                    # acceptance checks 1–3: territory geometry, distinct bots, determinism
-npm run perf                # acceptance check 4: frame rate through a full day at Retina resolution
-npm run capture -- shots/   # every required screenshot, scripted and seeded, into shots/
+npm test                    # every tests/**/*.test.ts
 npm run check:assets        # no image, model, font, or audio files in the source or the build
 npm run typecheck
 ```
 
-Browser tests and captures run on `tests/harness.ts`: `serve()` starts Vite (dev or production build),
-`launch()` starts headless Chromium with WebGL on the GPU (ANGLE over Metal), `DEVICES` defines the iPhone and
-iPad landscape profiles (the only place they are defined), and `openGame()` opens the game on one with touch,
-pixel ratio, and safe areas emulated. The returned `Game` scripts touch (`tap`, `drag`, `pinch`, `gesture`,
-`touch`), reads and waits on the game's `window.__portolan` hook (`hook`, `until`), takes screenshots at device
-resolution, throttles the CPU, and records console errors, warnings, and stray requests (`problems`,
-`assertClean`). `node --test tests/harness.test.ts` checks the harness itself (`SHOTS=dir` keeps its
-screenshots).
-
-- **Determinism** (`tests/determinism.test.ts`) records a scripted captain's helm while running a seed headless
-  in Node, replays it in Chromium with full rendering at 30 and then 20 fps with a pause in the globe menu in
-  between, and compares the territory hashes at the same tick.
-- **Performance** (`tests/perf.ts`) serves a production build in a 1512×982 window at device pixel ratio 2,
-  sweeps the clock through all 24 hours (storm included) while the match runs, and reports mean fps, 1% low,
-  worst frame and the dynamic render scale per hour. Close other GPU-heavy apps while it runs.
-- **Captures** (`tests/capture.ts`) find each gameplay moment (an open trail, a closing loop, a sinking, a respawn,
-  a crowd of ships) by running the seeded match headless first, then replay it in the browser and frame it.
-- `node tests/shot.ts --out shot.png --hour 17.5` takes a single screenshot of a running dev server (flags in the
-  file header).
+- `tests/sim/` tests the simulation kernel: the accuracy of the deterministic math against `Math.*`
+  (`math.test.ts`), the cube-sphere grids and great circles (`sphere.test.ts`), the state codec and hash
+  (`codec.test.ts`), inputs, recordings, replay and resuming from snapshots (`input.test.ts`), the purity rules
+  of `src/sim` and `src/career` (`purity.test.ts`), and the determinism vectors of `vectors.ts`, which must be
+  bit-identical in Node, Chromium and WebKit (`determinism-vectors.test.ts`).
+- Browser tests and captures run on `tests/harness.ts`: `serve()` starts Vite (dev or production build),
+  `launch()` starts headless Chromium with WebGL on the GPU (ANGLE over Metal), `DEVICES` defines the iPhone and
+  iPad landscape profiles (the only place they are defined), and `openGame()` opens the game on one with touch,
+  pixel ratio, and safe areas emulated. The returned `Game` scripts touch (`tap`, `drag`, `pinch`, `gesture`,
+  `touch`), reads and waits on the game's `window.__portolan` hook (`hook`, `until`), takes screenshots at
+  device resolution, throttles the CPU, and records console errors, warnings, and stray requests (`problems`,
+  `assertClean`). `tests/harness.test.ts` checks the harness itself (`SHOTS=dir` keeps its screenshots).
 
 ## Code
 
-`src/main.ts` boots the game and runs the fixed-step loop. `src/sim.ts` is the deterministic match (it runs
-headless, with no renderer), `src/world.ts` the seeded planet it plays on and `src/bots.ts` the rival captains,
-who steer only through the same helm input as the player. `src/audio.ts` synthesizes the sound,
-`src/craft.ts` holds the procedural-geometry kit the modelling modules share, and every other file in `src/`
-draws one part of the world or the chart interface, named for what it draws.
+Layers, each in its own folder under `src/` (the full module plan is in progress.html, Architecture):
+
+| Folder | What it holds |
+| --- | --- |
+| `sim/` | The deterministic simulation: every game rule, run headless on a fixed 1/30 s tick. |
+| `career/` | The career state and its deterministic update from each match's result. |
+| `style/` | The one style module: pigments, line, hatching, washes, paper, generated textures. |
+| `lettering/` | The cancelleresca hand: glyphs as pen strokes, the broad-nib renderer. |
+| `render/` | The three.js world; reads the match state, never writes it. |
+| `ui/` | Screens, the HUD and touch controls, which turn touch into ship inputs. |
+| `audio/` | Synthesized sound and score. |
+| `app/` | Boot, the fixed-step loop, saving and resuming, test hooks. |
+
+`src/sim` and `src/career` give bit-identical results in Node and in every browser engine: they use no
+transcendental `Math` function (the engines disagree in the last bits; `src/sim/math.ts` builds sine, arctangent,
+exponential and logarithm from exactly rounded operations), no clock, no `Math.random`, and nothing outside
+themselves; `tests/sim/purity.test.ts` enforces it. The kernel:
+
+- `math.ts`: the deterministic functions, vectors, and seeded sfc32 generators kept in the state.
+- `sphere.ts`: the planet's radius, the cube-sphere grids that territory and the world fields live on, exact cell
+  areas, local frames, great-circle movement, the horizon.
+- `codec.ts`: schemas from which a state's type, versioned binary encoding and 64-bit hash all follow.
+- `state.ts`: the match state, created from a match setup; `encodeMatch`/`decodeMatch` are its snapshot and
+  `matchHash` its hash.
+- `input.ts`: `ShipInput`, the only way the player and the captains act on a match; recordings and replay.
+- `match.ts`: the step, which runs every system in order once per tick, and the headless runner.
 
 ## Credits
 
-Third-party textures and libraries, with sources and licences, are listed in [CREDITS.md](CREDITS.md).
+Libraries and tools, with sources and licences, are listed in [CREDITS.md](CREDITS.md).

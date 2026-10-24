@@ -164,6 +164,13 @@ test('match states round-trip, and a late-match snapshot is small', (t) => {
   assert.equal(matchHash(decodeMatch(b)), matchHash(late));
   t.diagnostic(`late-match snapshot ${(b.length / 1024).toFixed(1)} KB (target ≤ 300 KB)`);
   assert.ok(b.length <= 300 * 1024);
+  const time = (f: () => unknown) => {
+    for (let i = 0; i < 3; i++) f(); // warm up
+    const t0 = performance.now();
+    for (let i = 0; i < 10; i++) f();
+    return ((performance.now() - t0) / 10).toFixed(1);
+  };
+  t.diagnostic(`encode ${time(() => encodeMatch(late))} ms, decode ${time(() => decodeMatch(b))} ms, hash ${time(() => matchHash(late))} ms`);
 
   // Random states of the match schema too, run-heavy territory and all.
   const r = rngFrom(3);
