@@ -39,7 +39,11 @@ const firstCell = (b: number): number => ((b >> BFACE) << FACE_SHIFT) + ((((b >>
 const BARRIER = -1;
 const LABEL = new Int32Array(TERRITORY.cells), SEEN = new Int32Array(TERRITORY.cells);
 const BLABEL = new Int32Array(BLOCKS), BSTATE = new Uint8Array(BLOCKS), BSEEN = new Int32Array(BLOCKS), CLASSED = new Int32Array(BLOCKS);
+const BHELD = new Uint8Array(BLOCKS); // a classed block holding anyone's sea
 const LOSS = new Float64Array(SHIPS + 1);
+// The closing ship's mark in all eight bytes of a double, to claim a clean block's rows with; and, by flood region,
+// 1 when it is enclosed (not the outside).
+const MARK = new Float64Array(1), MARK_BYTES = new Uint8Array(MARK.buffer), inner: number[] = [];
 // The flood's regions: union-find parents, areas (quanta), and queues of nodes to spread from (cell c is node c, block b
 // node CELLS + b), each a list threaded through NEXT from its front to its back, so regions that meet splice their
 // queues in one step; the closing ship's mark, the owner map, the region spreading now, and the lists' counts.
@@ -314,6 +318,7 @@ function closeLoop(state: MatchState, i: number): void {
     }
   }
   const outer = flood();
+  for (let r = 0; r < parent.length; r++) inner[r] = find(r) === outer ? 0 : 1;
   let gained = 0;
   LOSS.fill(0);
   for (const c of laid) {
@@ -321,27 +326,23 @@ function closeLoop(state: MatchState, i: number): void {
     LABEL[c] = 0;
     gained += claim(c);
   }
-  for (let k = 0, l = 0, inside = false; k < seen; k++) {
+  for (let k = 0; k < seen; k++) {
     const c = SEEN[k];
-    if (LABEL[c] !== l) { // the cells of one region come in runs
-      l = LABEL[c];
-      inside = find(l - 1) !== outer;
-    }
-    if (inside) gained += claim(c);
+    if (inner[LABEL[c] - 1] === 1) gained += claim(c);
     LABEL[c] = 0;
   }
+  MARK_BYTES.fill(me);
+  const full = MARK[0];
   for (let k = 0; k < bseen; k++) {
-    const b = BSEEN[k];
-    if (find(BLABEL[b] - 1) === outer) continue;
+    const b = BSEEN[k], first = firstCell(b);
+    if (inner[BLABEL[b] - 1] === 0) continue;
     gained += BAREA[b & BAREA_MASK];
-    for (let w = firstCell(b) >> 2, j = 0; j < B; j++, w += ROW_WORDS) {
-      for (let k = w; k < w + BLOCK_WORDS; k++) {
-        if (words[k] !== 0) for (let c = k << 2; c < (k << 2) + 4; c++) LOSS[owner[c]] += AREA[c & FACE_MASK];
-        words[k] = mine;
-      }
+    if (BHELD[b] === 1) { // others' sea in it (LOSS[0], nobody's, is never read)
+      for (let row = first, j = 0; j < B; j++, row += GRID) for (let c = row; c < row + B; c++) LOSS[owner[c]] += AREA[c & FACE_MASK];
     }
+    for (let e = first >> 3, j = 0; j < B; j++, e += ROW_EIGHTS) for (let x = e; x < e + BLOCK_EIGHTS; x++) eights[x] = full;
   }
-  for (let k = 0; k < classed; k++) BSTATE[CLASSED[k]] = BLABEL[CLASSED[k]] = 0;
+  for (let k = 0; k < classed; k++) BSTATE[CLASSED[k]] = BLABEL[CLASSED[k]] = BHELD[CLASSED[k]] = 0;
   for (let k = 1; k <= SHIPS; k++) state.ships[k - 1].held -= LOSS[k];
   ship.held += gained;
   const cells = laid.slice();
@@ -448,17 +449,17 @@ function edgeCell(c0: number, k: number, t: number): number {
 
 /**
  * Block b, classed on first sight: CLEAN when it holds none of the closing ship's sea (its trail's blocks are DIRTY).
- * Most blocks are open sea nobody holds, settled by one pass over their bytes eight at a time, as doubles (zero only
- * when every byte is, but for −0, whose top byte 0x80 no mark reaches); only held blocks are searched for the closing
- * ship's mark, byte by byte a word at a time.
+ * Most blocks are open sea nobody holds, settled by one sum over their bytes eight at a time, as doubles: no mark
+ * reaches a byte's top bit, so each is a finite double ≥ 0 and the sum is zero only when every byte is. Only held
+ * blocks are searched for the closing ship's mark, byte by byte a word at a time.
  */
 function classify(b: number): number {
   if (BSTATE[b] !== 0) return BSTATE[b];
   const first = firstCell(b);
-  let state = CLEAN, held = false;
-  for (let e = first >> 3, j = 0; j < B && !held; j++, e += ROW_EIGHTS) {
-    for (let k = e; k < e + BLOCK_EIGHTS; k++) if (eights[k] !== 0) held = true;
-  }
+  let state = CLEAN, sum = 0;
+  for (let e = first >> 3, j = 0; j < B; j++, e += ROW_EIGHTS) for (let k = e; k < e + BLOCK_EIGHTS; k++) sum += eights[k];
+  const held = sum !== 0;
+  BHELD[b] = held ? 1 : 0;
   for (let w = first >> 2, j = 0; held && j < B && state === CLEAN; j++, w += ROW_WORDS) {
     for (let k = w; k < w + BLOCK_WORDS; k++) {
       const x = words[k] ^ mine;
