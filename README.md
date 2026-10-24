@@ -38,10 +38,11 @@ npm run ios -- --device iphone --shot shot.png     # iPhone 17 Pro Max, and a sc
 One command builds the web game, syncs it into the Capacitor project in `ios/` (configured by
 `capacitor.config.ts`; Swift Package Manager, no CocoaPods), builds the app with `xcodebuild`, boots a
 simulator headless with `xcrun simctl` (no Xcode or Simulator window), turns it to landscape, installs and
-launches the app. It needs Xcode and an iOS Simulator runtime (`xcodebuild -downloadPlatform iOS`). The app's
-output, including the web view's console, goes to `$TMPDIR/portolan-ios/app.log`. `tests/ios.ts` exports
-the same steps for tests (`simulator`, `boot`, `install`, `launch`, `screenshot`, `backgroundAndResume`,
-`appProblems`); its comments explain the simulator workarounds.
+launches the app. It needs Xcode 27 and an iOS 27 Simulator runtime (`xcodebuild -downloadPlatform iOS`);
+each device runs on the newest iOS 27 runtime that supports it. The app's output, including the web view's
+console, goes to `$TMPDIR/portolan-ios/app.log`. `tests/ios.ts` exports the same steps for tests
+(`simulator`, `boot`, `install`, `launch`, `screenshot`, `backgroundAndResume`, `appProblems`); its
+comments explain each step.
 
 The app is landscape-only and full screen, with the status bar and home indicator hidden. It ships no image
 files: the launch screen is plain parchment and the app icon set is empty. An app icon, if one is added, must be

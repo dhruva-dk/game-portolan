@@ -52,39 +52,39 @@ export async function buildApp(): Promise<string> {
 }
 
 /**
- * The UDID of this project's simulator for a device profile ("Portolan <label>"), created on the newest iOS
- * runtime if it does not exist yet, so tests never disturb the developer's own simulators.
+ * The UDID of this project's simulator for a device profile ("Portolan <label>"), created if it does not exist yet,
+ * so tests never disturb the developer's own simulators. It runs on the newest installed iOS runtime of the selected
+ * Xcode's major version (iOS 27 for Xcode 27) that supports the device type. Runtimes made for one new device are
+ * skipped (iOS 27.1 24A94425 runs only the iPhone Duo), and an older runtime is an error, never a quiet fallback.
  */
 export function simulator(device: DeviceName = 'ipad'): string {
   const { label, simulator: type } = DEVICES[device];
   const name = `Portolan ${label}`;
+  const major = execFileSync('xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-version'], { encoding: 'utf8' })
+    .trim().split('.')[0];
+  const { runtimes } = JSON.parse(simctl('list', '-j', 'runtimes', 'available')) as {
+    runtimes: { identifier: string; platform: string; version: string; supportedDeviceTypes: { identifier: string }[] }[];
+  };
+  const runtime = runtimes
+    .filter((r) => r.platform === 'iOS' && r.version.split('.')[0] === major
+      && r.supportedDeviceTypes.some((t) => t.identifier === type))
+    .sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true })).pop();
+  if (!runtime) throw new Error(`no iOS ${major} Simulator runtime runs the ${label}: run \`xcodebuild -downloadPlatform iOS\``);
   const { devices } = JSON.parse(simctl('list', '-j', 'devices', 'available')) as {
     devices: Record<string, { name: string; udid: string }[]>;
   };
-  const found = Object.values(devices).flat().find((d) => d.name === name);
-  if (found) return found.udid;
-  const { runtimes } = JSON.parse(simctl('list', '-j', 'runtimes', 'available')) as {
-    runtimes: { identifier: string; platform: string; version: string }[];
-  };
-  const ios = runtimes.filter((r) => r.platform === 'iOS')
-    .sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true })).pop();
-  if (!ios) throw new Error('no iOS Simulator runtime installed: run `xcodebuild -downloadPlatform iOS`');
-  return simctl('create', name, type, ios.identifier);
+  const found = devices[runtime.identifier]?.find((d) => d.name === name);
+  return found ? found.udid : simctl('create', name, type, runtime.identifier);
 }
 
 /**
- * Boot a simulator headless (simctl never opens Simulator.app), wait until it has finished booting, and make it
- * ready for the game:
- * - Malloc=1 for every process it launches, so WebKit uses the system allocator. On this host (macOS 27, Xcode
- *   26.2, iOS 26.3 runtime) WebKit's own allocator crashed every page with real JavaScript (in Safari too); with
- *   the system allocator about half of launches start cleanly, and launch() retries the rest. Simulator only.
- * - Landscape, as the game is held. A headless simulator otherwise stays in portrait, where iPadOS letterboxes a
- *   landscape-only app.
+ * Boot a simulator headless (simctl never opens Simulator.app), wait until it has finished booting, and turn it to
+ * landscape, as the game is held: a headless simulator otherwise stays in portrait, where iPadOS letterboxes a
+ * landscape-only app.
  */
 export function boot(udid: string): void {
   if (!simctl('list', 'devices', udid).includes('(Booted)')) simctl('boot', udid);
   simctl('bootstatus', udid, '-b');
-  simctl('spawn', udid, 'launchctl', 'setenv', 'Malloc', '1');
   rotate(udid, 3);
 }
 
@@ -105,29 +105,26 @@ export function install(udid: string, app = APP): void {
 /**
  * Launch the app fresh (any running copy is terminated first), its output and the web view's console streaming to
  * `log` until it exits, and wait until the page has run for `settle` seconds. Returns the app's process id.
- * On this host the iOS 26.3 runtime's web content process often dies while it starts (a protection fault reading
- * the dyld shared cache or inside JavaScriptCore, seen in Safari too), so a launch whose web view dies is retried.
  */
-export async function launch(udid: string, log = APP_LOG, settle = 8, attempts = 5): Promise<number> {
+export async function launch(udid: string, log = APP_LOG, settle = 8): Promise<number> {
   mkdirSync(dirname(log), { recursive: true });
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    const old = pid(udid), fd = openSync(log, 'w');
-    // --console-pty: the app writes to a terminal, so its output is line-buffered and arrives as it happens.
-    spawn('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', udid, APP_ID], {
-      detached: true, stdio: ['ignore', fd, fd],
-    }).unref();
-    closeSync(fd);
-    let now = 0;
-    for (let i = 0; i < 100 && (!now || now === old); i++) {
-      await sleep(100);
-      now = pid(udid);
-    }
-    if (!now || now === old) throw new Error(`${APP_ID} did not launch; see ${log}`);
-    await sleep(settle * 1000);
-    if (!readFileSync(log, 'utf8').includes('WebView process terminated')) return now;
-    console.warn(`ios: the web view died while starting (attempt ${attempt} of ${attempts}); see ${log}`);
+  const old = pid(udid), fd = openSync(log, 'w');
+  // --console-pty: the app writes to a terminal, so its output is line-buffered and arrives as it happens.
+  spawn('xcrun', ['simctl', 'launch', '--console-pty', '--terminate-running-process', udid, APP_ID], {
+    detached: true, stdio: ['ignore', fd, fd],
+  }).unref();
+  closeSync(fd);
+  let now = 0;
+  for (let i = 0; i < 100 && (!now || now === old); i++) {
+    await sleep(100);
+    now = pid(udid);
   }
-  throw new Error(`${APP_ID}'s web view kept dying; see ${log} and ~/Library/Logs/DiagnosticReports/`);
+  if (!now || now === old) throw new Error(`${APP_ID} did not launch; see ${log}`);
+  await sleep(settle * 1000);
+  if (readFileSync(log, 'utf8').includes('WebView process terminated')) {
+    throw new Error(`${APP_ID}'s web view died while starting; see ${log} and ~/Library/Logs/DiagnosticReports/`);
+  }
+  return now;
 }
 
 /** The web view's console errors and warnings in the app's log, and any crash of its web content process. */
@@ -157,14 +154,10 @@ export async function backgroundAndResume(udid: string, seconds = 3): Promise<[n
   return [before, pid(udid)];
 }
 
-/**
- * Save a screenshot as PNG at the device's full resolution, upright. simctl captures the portrait framebuffer, so
- * the landscape picture that boot() turned the device to lies on its side and is turned back here.
- */
+/** Save a screenshot as PNG at the device's full resolution, upright in the device's orientation. */
 export function screenshot(udid: string, path: string): void {
   mkdirSync(dirname(path), { recursive: true });
   simctl('io', udid, 'screenshot', '--type=png', path);
-  execFileSync('sips', ['--rotate', '-90', path], { stdio: 'ignore' });
 }
 
 if (import.meta.main) {
@@ -182,7 +175,8 @@ if (import.meta.main) {
   if (!a['no-build']) done(`built ${await buildApp()}`);
   const udid = simulator(device);
   boot(udid);
-  done(`booted ${DEVICES[device].label} (${udid}) headless, in landscape`);
+  const os = [...simctl('list', 'devices', udid).split(udid)[0].matchAll(/-- (iOS [\d.]+) --/g)].pop()?.[1];
+  done(`booted ${DEVICES[device].label} on ${os} (${udid}) headless, in landscape`);
   install(udid);
   done(`launched ${APP_ID} (pid ${await launch(udid)}); its output: ${APP_LOG}`);
   if (a.shot) {

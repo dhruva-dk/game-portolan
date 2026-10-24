@@ -2,8 +2,9 @@
 // normally rotates one: a headless simulator stays in portrait, where iPadOS letterboxes a landscape-only app.
 //   sim-orientation <udid> <orientation>    (UIDeviceOrientation: 1 portrait, 3 landscape left, 4 landscape right)
 // Like Simulator.app, it sends the device a GraphicsServices "purple" event through its PurpleWorkspacePort,
-// looked up with the private CoreSimulator framework. The event layout below was found by experiment on Xcode 26.2
-// with the iOS 26.3 runtime: an 80-byte mach message with id 123 holding a GSEvent record of type 50 (device
+// looked up with the private CoreSimulator framework; simctl has no orientation option (Xcode 27.1). The event
+// layout below was found by experiment on Xcode 26.2 with the iOS 26.3 runtime and still holds on Xcode 27.1 with
+// the iOS 27.0 runtime: an 80-byte mach message with id 123 holding a GSEvent record of type 50 (device
 // orientation changed) with the host flag 0x20000, its info size (4) at byte 72 and the orientation at byte 76.
 import Foundation
 
