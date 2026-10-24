@@ -4,7 +4,8 @@
 // wp16-<device>-sheet.png, and both together, wp16-sheet.png). Each frame logs draw calls and triangles (the regions'
 // share) for A9.
 // Part B: the Arch over the Basalt Stacks' maze in late afternoon (capture 19), a lane of the maze at deck, the Arch from
-// high above. A name prefix (e.g. basalt) takes only those shots, as sheets wp16-<prefix>-<device>-sheet.png.
+// high above. Part C: the Kelp Cathedral through clear water at midday, a ship half-hidden in the kelp (capture 20), at
+// deck among the canopy, the Cathedral from high above. A name prefix (e.g. basalt) takes only those shots, as sheets wp16-<prefix>-<device>-sheet.png.
 //   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -20,6 +21,9 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['basalt-hero', { view: 'basalt', hour: '16.5' }],
   ['basalt-weave', { view: 'weave', hour: '16.5' }],
   ['basalt-arch-orbit', { view: 'mark', region: 'Basalt', hour: '16.5' }],
+  ['kelp-hero', { view: 'kelp', hour: '12' }],
+  ['kelp-deck', { view: 'kelpdeck', hour: '12' }],
+  ['kelp-cathedral-orbit', { view: 'mark', region: 'Kelp', hour: '12' }],
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();

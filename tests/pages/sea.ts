@@ -1,5 +1,5 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark|basalt|weave (WP16: the Crown Light from the pack, up the Falls Fjord, the Arch over the Basalt Stacks' walls, down a lane of their maze, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark|basalt|weave|kelp|kelpdeck (WP16: the Crown Light from the pack, up the Falls Fjord, the Arch over the Basalt Stacks' walls, down a lane of their maze, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
@@ -16,6 +16,7 @@ import { Flora } from '../../src/render/flora.ts';
 import { IceCrown } from '../../src/render/regions/iceCrown.ts';
 import { Fjords } from '../../src/render/regions/fjords.ts';
 import { BasaltStacks } from '../../src/render/regions/basaltStacks.ts';
+import { KelpShallows } from '../../src/render/regions/kelpShallows.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -56,7 +57,8 @@ scene.add(flora.group);
 scene.add(structures.group);
 const ice = new IceCrown(style, terrain.field, sea.swell, sky), fjords = new Fjords(style, terrain.field);
 const basalt = new BasaltStacks(style, terrain.field, sea.swell);
-scene.add(ice.group, fjords.group, basalt.group);
+const kelpShallows = new KelpShallows(style, terrain.field, sea.swell);
+scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -206,6 +208,13 @@ if (view === 'deck') {
   launch(18, 0, 0.5);
 } else if (view === 'seam') {
   look(V(1, 1, 1), V(0, 1, 0), 24, -0.55); // a cube corner
+} else if (view === 'kelp' || view === 'kelpdeck') {
+  const ri = REGIONS.findIndex((r) => r.id === 'kelpShallows'), from = V(), to = V();
+  if (view === 'kelp') { toWorld(ri, 3, -24, from); toWorld(ri, 0, 4, to); } // the Kelp Cathedral through clear water, a ship in the kelp (capture 20)
+  else { toWorld(ri, 15, 19, from); toWorld(ri, 24, 26, to); } // at deck among the canopy
+  look(from, to, Number(q.get('height') ?? (view === 'kelp' ? 22 : 3.2)), Number(q.get('pitch') ?? (view === 'kelp' ? -0.75 : -0.06)));
+  if (view === 'kelp') launch(19.8, 7.6, 1.1); // at the door among the piers
+  else launch(10, 0.5, 0.25);
 } else if (view === 'basalt' || view === 'weave') {
   const ri = REGIONS.findIndex((r) => r.id === 'basaltStacks'), from = V(), to = V();
   if (view === 'basalt') { toWorld(ri, -6, -40, from); toWorld(ri, 0, 0, to); } // the Arch over the maze's walls (capture 19)
@@ -296,10 +305,11 @@ function frame(now: number): void {
   ice.update(camera.position, clock, clock);
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
+  kelpShallows.update(camera.position, clock);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles, flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + kelpShallows.triangles, flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);
