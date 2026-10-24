@@ -34,7 +34,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <main>
 
 <h1>Portolan — progress</h1>
-<p>The single source of truth for the state of the work. Spec: <code>PROMPT.md</code>. Screenshots: <code>progress/shots/</code>. Last updated: <b id="updated">2026-10-24</b> (WP3).</p>
+<p>The single source of truth for the state of the work. Spec: <code>PROMPT.md</code>. Screenshots: <code>progress/shots/</code>. Last updated: <b id="updated">2026-10-24</b> (WP4).</p>
 
 <nav>
 <a href="#protocol">Agent protocol</a><a href="#next">What comes next</a><a href="#status">Spec status</a><a href="#checks">Acceptance checks</a><a href="#captures">Captures</a><a href="#review">Review findings</a><a href="#log">Log</a><a href="#audit">Code audit</a><a href="#architecture">Architecture</a><a href="#plan">Work packages</a><a href="#schedule">Schedule</a>
@@ -61,8 +61,8 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <ol>
 <li><b>WP0</b> done (2026-10-24); its API is recorded in <a href="#arch-testing">A10</a>.</li>
 <li><b>Wave 1</b> done (2026-10-24): <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a>.</li>
-<li><b>Next in column B:</b> <a href="#wp04">WP4 Lettering</a> may start now (its dependency WP2 is done). The nib's ink and the paper it bleeds into come from <code>src/style</code>: <code>hourPalette().ink</code>, <code>STYLE_GLSL</code> (<code>tPaper</code> fibre for bleed) and, for text on scraps, <code>src/ui/parchment.ts</code>; see the API in <a href="#wp02">WP2</a>.</li>
-<li><b>Wave 2, column A:</b> <a href="#wp03">WP3 World data &amp; geography</a> done (2026-10-24). <b>Next in column A:</b> <a href="#wp05">WP5 App runtime</a> may start once WP4 is under way or done (its dependencies WP1, WP2, WP3 are done). Its world worker runs <code>buildGeography()</code> (0.88 s) and <code>buildNav(geo)</code> (0.26 s) from <code>src/sim/world</code> and caches the typed arrays; see the API in <a href="#wp03">WP3</a>. WP6, WP13 and WP15 then read the same fields.</li>
+<li><b>Wave 2, column B:</b> <a href="#wp04">WP4 Lettering</a> done (2026-10-24). <b>Next in column B:</b> <a href="#wp18">WP18 Shipwright</a> (wave 3, beside WP5). Every later screen letters its text with <code>Lettering</code>/<code>InkText</code> (<code>src/lettering/ink.ts</code>); WP5 creates the one <code>Lettering</code> at boot and calls <code>setPixelRatio</code> on resize; the chart's names (WP24) and the title (WP26, <code>swash: true</code>, <code>progress</code>) use the same hand; see the API in <a href="#wp04">WP4</a>.</li>
+<li><b>Wave 2, column A:</b> <a href="#wp03">WP3 World data &amp; geography</a> done (2026-10-24). <b>Next in column A:</b> <a href="#wp05">WP5 App runtime</a> may start now (its dependencies WP1, WP2, WP3 are done). Its world worker runs <code>buildGeography()</code> (0.88 s) and <code>buildNav(geo)</code> (0.26 s) from <code>src/sim/world</code> and caches the typed arrays; see the API in <a href="#wp03">WP3</a>. WP6, WP13 and WP15 then read the same fields.</li>
 <li>Then follow the <a href="#schedule">schedule</a>: at most two packages at a time, always pairing a simulation package with a rendering/interface package.</li>
 </ol>
 </section>
@@ -104,7 +104,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <tr id="s-saving"><td>The career › Saving</td><td class="st prog">in progress</td><td>WP1, WP5, WP10</td><td>WP1: match snapshot codec (<code>encodeMatch</code>/<code>decodeMatch</code>); resuming at any tick continues identically (tested). IndexedDB and background/resume: WP5; career: WP10.</td></tr>
 <tr id="s-controls"><td>Controls (touch, haptics)</td><td class="st not">not started</td><td>WP24, WP25</td><td>Legacy is mouse/keyboard only.</td></tr>
 <tr id="s-hud"><td>The interface › The match screen</td><td class="st not">not started</td><td>WP25</td><td></td></tr>
-<tr id="s-lettering"><td>The interface › Lettering (cancelleresca)</td><td class="st not">not started</td><td>WP4</td><td>Legacy draws no text at all.</td></tr>
+<tr id="s-lettering"><td>The interface › Lettering (cancelleresca)</td><td class="st done">done</td><td>WP4</td><td>WP4: the complete hand as pen strokes under a broad nib at 38°, ink bleeding into the fibres, crisp from 11 CSS px (every stroke of every glyph ≥ 0.6 coverage at ×2 and ×3) to the title; joins, optical kerning, swash capitals and flourish, stroke-by-stroke reveal (<a href="#wp04">API</a>). Each screen letters its strings with it as it is built; check 7's on-screen half is WP31's.</td></tr>
 <tr id="s-title"><td>The interface › The title</td><td class="st not">not started</td><td>WP26</td><td></td></tr>
 <tr id="s-rendering"><td>The look › The rendering (paper, ink, hatching, watercolour, pigments, one style module)</td><td class="st prog">in progress</td><td>WP2, then every render WP</td><td>WP2 built the one style module (<code>src/style</code>), the ink pipeline and the parchment kit, proven on the <a href="#wp02">style gallery</a>; each render WP draws its materials with it.</td></tr>
 <tr id="s-sea"><td>The look › The sea</td><td class="st not">not started</td><td>WP13</td><td></td></tr>
@@ -194,6 +194,22 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <section id="log">
 <h2>Log</h2>
 <p>Newest first. Each entry: date, WP, what changed, evidence (before/after screenshots), and any problems left open.</p>
+
+<div id="log-2026-10-24-wp04">
+<h3>2026-10-24 — WP4 Lettering: the cancelleresca</h3>
+<ul>
+<li>The hand: 95 glyphs after Arrighi's <i>La Operina</i> written as pen strokes in the scribe's order and swept by a broad nib (38°, slant 8°), so thick and thin come from direction alone; pointed a-ovals, arches branching from the stem, clubbed ascenders, capitals with hairline lead-ins and swash hoods, joins from the baseline flick into the next stem, optical kerning, dots and t-bars added after the word. Ink: iron-gall thinning to brown between dips, pooled at stroke edges and ends, wicking along the parchment's fibres at display sizes, wet and dark at the pen's front while lettering in. API and decision (no atlas) in <a href="#wp04">WP4</a>.</li>
+<li>Tests (<code>tests/lettering/lettering.test.ts</code>, 7, all green; suite 63/63): every character of every bold name in PROMPT.md and the captain's card line is in the hand; output bit-identical across runs and independent of other work; layout metrics (linear scale, joins, alignment, wrapping, anchors, writing order); no two letters closer than <code>MIN_GAP</code> (3844 pairs); exact coverage and stroke thickness w·sinθ + t·cosθ; at 11 CSS px ×2 and ×3 every stroke of every glyph peaks ≥ 0.6 coverage.</li>
+<li>Cost: a 13 px label 0.4 ms (Node, M1 Pro); the title at iPad size 0.2 s and 8.0 MB (RGBA8, written once; <code>rasterizeText</code> is pure, so WP5/WP26 may move it to a worker); the specimen sheets hold 0.4–13 MB of rasters. Console clean.</li>
+<li>Open: the capitals carry restrained swashes (the title's P and the chart's names use the swash hood and closing flourish); if review asks for grander display capitals, add swash forms per capital in <code>glyphs.ts</code>.</li>
+</ul>
+<figure><a href="progress/shots/wp04-ipad-specimen.png"><img src="progress/shots/wp04-ipad-specimen.png" alt="the specimen sheet, iPad"></a><figcaption>wp04-ipad-specimen: minuscules, capitals, figures and marks, two pangrams</figcaption></figure>
+<figure><a href="progress/shots/wp04-ipad-names.png"><img src="progress/shots/wp04-ipad-names.png" alt="captains, regions and winds, iPad"></a><figcaption>wp04-ipad-names: the thirty captains, the twelve regions (swash), the eight winds in ink and vermilion</figcaption></figure>
+<figure><a href="progress/shots/wp04-iphone-small.png"><img src="progress/shots/wp04-iphone-small.png" alt="interface sizes at device resolution, iPhone"></a><figcaption>wp04-iphone-small: 11, 12 and 13 CSS px at the iPhone's 3×, on a scrap and button bases (device resolution)</figcaption></figure>
+<figure><a href="progress/shots/wp04-ipad-small.png"><img src="progress/shots/wp04-ipad-small.png" alt="interface sizes at device resolution, iPad"></a><figcaption>wp04-ipad-small: the same at the iPad's 2×</figcaption></figure>
+<figure><a href="progress/shots/wp04-iphone-frames.png"><img src="progress/shots/wp04-iphone-frames.png" alt="Portolan lettering itself in"></a><figcaption>wp04-iphone-frames: <i>Portolan</i> lettering itself in, stroke by stroke (the t's bar comes after the word)</figcaption></figure>
+<figure><a href="progress/shots/wp04-ipad-title.png"><img src="progress/shots/wp04-ipad-title.png" alt="the title half-lettered, iPad"></a><figcaption>wp04-ipad-title: the title at 62 %, wet ink at the pen's front (also wp04-iphone-title, wp04-ipad-frames, wp04-iphone-specimen, wp04-iphone-names)</figcaption></figure>
+</div>
 
 <div id="log-2026-10-24-wp03">
 <h3>2026-10-24 — WP3 World data and geography</h3>
@@ -407,7 +423,8 @@ src/career/state.ts  league.ts  progress.ts  profile.ts  chart.ts  setup.ts     
 
 src/style/palette.ts  textures.ts  glsl.ts                                                              WP2
 tests/pages/style.html  style.ts  style.shots.ts   the style gallery and its captures (outside the build)   WP2
-src/lettering/glyphs.ts  nib.ts  text.ts                                                                WP4
+src/lettering/glyphs.ts  nib.ts  text.ts  ink.ts   ductus, nib + raster, layout, ink on screen         WP4
+tests/pages/lettering.html  lettering.ts  lettering.shots.ts   the specimen and its captures (outside the build)   WP4
 
 src/render/pipeline.ts         renderer, MRT, ink/composite pass, dynamic resolution, budget counters   WP2
 src/render/world.ts            render composition root (append-only registrations)                     WP5
@@ -587,10 +604,18 @@ src/audio/instruments.ts  score.ts                                              
 
 <div class="wp" id="wp04">
 <h3>WP4 — Lettering: the cancelleresca</h3>
-<p>Status: not started. Deps: WP2. Parallel-safe with: WP3.</p>
+<p>Status: done (2026-10-24) — the cancelleresca complete (95 glyphs + swash forms), crisp at 11 CSS px and beautiful at title size; specimen at both devices; 7 tests green (<a href="#log-2026-10-24-wp04">log</a>). Deps: WP2. Parallel-safe with: WP3.</p>
 <p>Scope: The interface › Lettering in full — a complete sixteenth-century Italian chancery hand (upper and lower case, numerals, punctuation incl. ’ “ ” – · : ; ! ? &amp; and the wind initials), each glyph as pen strokes; broad-edged nib at a fixed angle (thick/thin from stroke direction), ink bleed into fibres; kerning and joins; a glyph atlas generated at startup at sizes from the title down to the smallest iPhone HUD numerals (crisp, legible); a stroke-by-stroke drawing animation API (for the title and region names lettering onto the chart); drawing APIs for WebGL quads and offline canvas art (cards, chart).</p>
-<p>Owns: <code>src/lettering/glyphs.ts nib.ts text.ts</code>, <code>tests/lettering/*</code>, <code>tests/pages/lettering.*</code>.</p>
+<p>Owns: <code>src/lettering/glyphs.ts nib.ts text.ts ink.ts</code>, <code>tests/lettering/*</code>, <code>tests/pages/lettering.*</code>.</p>
 <p>DoD: specimen sheet (all glyphs, pangrams, numerals, all 30 captain names, 12 region names) captured at both devices (wp04-*.png); smallest-size legibility shot at iPhone scale; animation frames of "Portolan" lettering itself; atlas memory reported.</p>
+<p><b>Built (API for later WPs).</b> Decision: no glyph atlas. Each distinct text is written once by the nib at the device's own resolution (joins and kerning across letters, exact pixels at every size, the writing time per pixel for the reveal) and cached; a 13 px label takes 0.4 ms.</p>
+<ul>
+<li><code>src/lettering/glyphs.ts</code> (pure): <code>METRICS</code> (x-height 10 units = 4.5 nib widths, ascender 19, capitals 15, figures 12, descender −9, nib 2.2, hairline 0.22, pen angle 38°, slant 8°, space 5.5), <code>GLYPHS</code> (a–z, A–Z, 0–9, <code>.,:;!?'"’‘”“-–—−+×·/()%&amp;</code>, space): strokes in writing order, SVG-subset paths, roles <code>entry</code>/<code>exit</code>/<code>late</code>, <code>taper</code>, <code>swash</code> form; <code>isLower</code>. Built from shared moves (branching arch, pointed a-oval, clubbed ascender, capital stem with lead-in) so the hand stays one hand.</li>
+<li><code>src/lettering/nib.ts</code> (pure): <code>flatten(ops, tol, maxStep)</code>, <code>sweep(line, nib, widthAt, out)</code> (one convex hull of the nib rectangle per segment), <code>Raster</code> (exact signed-area coverage after font-rs, union by clamped winding, no seams; <code>paint</code> keeps the earliest writing time and the ink load), <code>blur</code>.</li>
+<li><code>src/lettering/text.ts</code> (pure): <code>layoutText(text, {size (em, CSS px; x-height 0.4 em), align, valign: baseline|top|middle|bottom, maxWidth, lineHeight, swash})</code> → <code>{lines, box, strokes (CSS px, t0/t1 s, ink), duration, unit}</code>: joins (minuscule exit → stem lead-in), optical kerning from ink profiles (<code>MIN_GAP</code>, <code>letterGap(a, b)</code>), dots and t-bars written after the word, ink thinning between dips; <code>rasterizeText(layout, pixelRatio)</code> → RGBA (coverage, bled coverage, writing time, ink load) with its CSS offset. Throws on a character outside the hand.</li>
+<li><code>src/lettering/ink.ts</code>: <code>new Lettering(style, devicePixelRatio, onBytes)</code> (pass <code>(b) =&gt; pipeline.registerTexture('lettering', b)</code>), <code>.text(content, {…TextOptions, pigment: 'ink'|PigmentName (goldLeaf shines), progress, opacity})</code> → <code>InkText</code> (a <code>ui</code>-scene mesh; position = anchor; <code>text</code>, <code>progress</code> 0–1, <code>opacity</code>, <code>duration</code> s, <code>layout</code>, <code>dispose()</code>), <code>setPixelRatio</code>, <code>bytes</code>; cache shared between meshes, idle rasters kept to 6 MB. <code>LETTERING_GLSL</code> (<code>letterInk</code>, <code>letterInkColour</code>) for any material sampling a text raster (the chart's names). <code>uiMaterial</code> is now exported from <code>src/ui/parchment.ts</code> for it.</li>
+<li>Specimen: <code>tests/pages/lettering.html</code> (<code>?sheet=specimen|names|small|title|frames&amp;progress=&amp;animate=1&amp;hour=</code>, hook <code>window.__lettering</code>); <code>node tests/pages/lettering.shots.ts [outDir] [--only=…]</code> retakes every wp04 shot. Tests: <code>tests/lettering/lettering.test.ts</code>.</li>
+</ul>
 </div>
 
 <div class="wp" id="wp05">

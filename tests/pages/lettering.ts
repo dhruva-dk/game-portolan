@@ -56,8 +56,8 @@ let animate = false;
 if (sheet === 'specimen') {
   const big = H * 0.105, small = H * 0.058;
   stack([
-    ['abcdefghijklmnopqrstuvwxyz', big],
-    ['ABCDEFGHIJKLMNOPQRSTUVWXYZ', big],
+    ['abcdefghijklm nopqrstuvwxyz', big],
+    ['ABCDEFGHIJKLM NOPQRSTUVWXYZ', big],
     ['0123456789 .,:;!? ’‘ ”“ -–—−+×·/()%&', big],
     ['Quel vituperabile xenofobo zelante assaggia il whisky ed esclama: alleluja!', small],
     ['The quick brown fox jumps over the lazy dog. Has learned you break off at the volcano.', small],
