@@ -277,9 +277,13 @@ export class Sea {
   }
 }
 
+/** The sea each scene was built with: modules that meet the water (terrain) share its swell and fields. */
+export const seas = new WeakMap<THREE.Object3D, Sea>();
+
 /** The composition root's sea (MODULES): built when a match screen opens. */
 export function createSea(ctx: RenderContext): RenderModule {
   const sea = new Sea(ctx.pipeline, ctx.world.geo);
+  seas.set(ctx.scene, sea);
   ctx.scene.add(sea.mesh);
   return {
     frame(f) {
@@ -287,6 +291,7 @@ export function createSea(ctx: RenderContext): RenderModule {
     },
     dispose() {
       ctx.scene.remove(sea.mesh);
+      seas.delete(ctx.scene);
       sea.dispose();
     },
   };

@@ -1,10 +1,11 @@
-// The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|coast|hull|seam|pole|curve|light,
+// The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light, region=<name> (deck, high, orbit), off=<u offshore> (deck),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { Sea } from '../../src/render/sea.ts';
+import { Terrain } from '../../src/render/terrain.ts';
 import type { Riding } from '../../src/render/swell.ts';
 import { Ship } from '../../src/render/ships/shipwright.ts';
 import type { FormName } from '../../src/render/ships/forms.ts';
@@ -16,7 +17,7 @@ import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/
 import { REGIONS } from '../../src/sim/world/regions.ts';
 
 const q = new URLSearchParams(location.search);
-const view = q.get('view') ?? 'deck', wind = Number(q.get('wind') ?? 0.9);
+const view = q.get('view') ?? 'deck', wind = Number(q.get('wind') ?? 0.9), place = q.get('region');
 let hour = Number(q.get('hour') ?? 15.5);
 const hold = q.has('clock') ? Number(q.get('clock')) : null;
 type V = THREE.Vector3;
@@ -33,6 +34,10 @@ t0 = performance.now();
 const sea = new Sea(pipeline, geo);
 const seaMs = performance.now() - t0;
 scene.add(sea.mesh);
+t0 = performance.now();
+const terrain = new Terrain(pipeline, geo, sea.swell);
+const terrainMs = performance.now() - t0;
+scene.add(terrain.mesh);
 
 // the sky: the hour's wash, clouds, the sun or the moon and stars, the light every material reads, lamps and beams
 const sky = new Sky(style, geo);
@@ -97,9 +102,10 @@ function look(foot: V, toward: V | number, height: number, pitch: number): void 
   cam.pitch = pitch;
 }
 if (view === 'deck') {
-  const s = spot('Coral', 11);
+  const off = Number(q.get('off') ?? 11), s = spot(place ?? 'Coral', off);
   look(s.at, s.land, 3.2, -0.07);
-  launch(9, 4, 1.3); launch(24, -7, -0.6); launch(40, 9, 2.2, 0.35);
+  launch(9, 4, 1.3);
+  if (off <= 11) { launch(24, -7, -0.6); launch(40, 9, 2.2, 0.35); }
 } else if (view === 'light') {
   // offshore of the lighthouse whose seaward view looks back most nearly west, over three ships with lanterns
   const WEST = -1.75, reach = Number(q.get('off') ?? 45), o = reach / 45;
@@ -113,9 +119,12 @@ if (view === 'deck') {
   look(best.at, best.lamp, Number(q.get('height') ?? 6), Number(q.get('pitch') ?? -0.15));
   launch(12 * o, -5, 1.2); launch(20 * o, 7, -0.7); launch(31 * o, -11, 2.4, 0.6);
 } else if (view === 'high') {
-  const s = spot('Coral', 40);
+  const s = spot(place ?? 'Coral', 40);
   look(s.at, s.land, 34, -0.5);
   launch(30, 2, 0.9);
+} else if (view === 'orbit') {
+  const s = spot(place ?? 'Spice', 45);
+  look(s.at, s.land, 120, -0.9);
 } else if (view === 'coast') {
   const s = spot('Spice', 9);
   look(s.at, s.land, 13, -0.72);
@@ -162,7 +171,8 @@ resize();
 const ride: Riding = { position: V(), up: V() };
 const basis = new THREE.Matrix4(), X = V(), Z = V();
 let frames = 0, last = performance.now(), clock = hold ?? 0;
-const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, setHour: (h: number) => (hour = h) };
+const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, terrainMs,
+  terrainTriangles: 0, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -186,7 +196,10 @@ function frame(now: number): void {
   }
   sky.update(hour, clock, camera.position, weather);
   pipeline.render(scene, camera, dt);
-  Object.assign(hook, { ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls });
+  Object.assign(hook, {
+    ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
+    terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
+  });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

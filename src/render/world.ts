@@ -9,6 +9,7 @@ import type { MatchState } from '../sim/state.ts';
 import type { Pipeline } from './pipeline.ts';
 import { createSea } from './sea.ts';
 import { createSky } from './sky.ts';
+import { createTerrain } from './terrain.ts';
 
 /** What a module is built with. */
 export interface RenderContext {
@@ -31,7 +32,7 @@ export interface RenderModule {
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
 /** The render modules, updated in this order every frame. Append-only (A6). */
-const MODULES: readonly ModuleFactory[] = [createSea, createSky];
+const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain];
 
 export class WorldView {
   readonly scene = new THREE.Scene();
