@@ -154,3 +154,56 @@ export function pose(out: THREE.Matrix4, origin: V, up: V, fwd: V, yaw: number, 
   if (tilt) out.multiply(TIP.makeRotationX(tilt));
   return out.scale(Y.set(sx, sy, sz));
 }
+
+/** Each facet of a built kit: its first vertex index, centre, outward normal and corners (valid during the call). */
+function eachFacet(g: THREE.BufferGeometry, fn: (i: number, centre: V, normal: V, corners: readonly V[]) => void): void {
+  const pos = g.getAttribute('position'), a = vec(), b = vec(), c = vec(), n = vec(), m = vec(), corners = [a, b, c];
+  for (let i = 0; i + 2 < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, i + 1);
+    c.fromBufferAttribute(pos, i + 2);
+    n.subVectors(b, a).cross(m.subVectors(c, a)).normalize();
+    fn(i, m.copy(a).add(b).add(c).divideScalar(3), n, corners);
+  }
+}
+
+/** Sets each facet's aTint (0 the kit's own wash, 1 the instance's stone, 2 its accent; see perInstance) from its
+ *  centre and outward normal. */
+export function tintFacets(g: THREE.BufferGeometry, pick: (centre: V, normal: V) => number): THREE.BufferGeometry {
+  const tint = g.getAttribute('aTint') as THREE.BufferAttribute;
+  eachFacet(g, (i, c, n) => {
+    const t = pick(c, n);
+    for (let k = 0; k < 3; k++) tint.setX(i + k, t);
+  });
+  return g;
+}
+
+/** Hatching uvs facet by facet, for illustratedMaterial({ hatch: { mode: 'uv', scale } }): each facet's strokes run
+ *  its own way, along(centre, normal, out) laid into the facet; u along the strokes, v across, in kit units / `per`. */
+export function facetUV(g: THREE.BufferGeometry, along: (centre: V, normal: V, out: V) => V, per: readonly [number, number] = [1, 1]): THREE.BufferGeometry {
+  const uv = new Float32Array(2 * g.getAttribute('position').count), d = vec(), e = vec();
+  eachFacet(g, (i, c, n, corners) => {
+    along(c, n, d).addScaledVector(n, -d.dot(n));
+    if (d.lengthSq() < 1e-6) {
+      const side = Math.abs(n.y) < 0.9;
+      d.set(side ? 0 : 1, side ? 1 : 0, 0).addScaledVector(n, -(side ? n.y : n.x));
+    }
+    d.normalize();
+    e.crossVectors(n, d);
+    corners.forEach((p, k) => {
+      uv[2 * (i + k)] = p.dot(d) / per[0];
+      uv[2 * (i + k) + 1] = p.dot(e) / per[1];
+    });
+  });
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/** Per-instance stone and accent transmittances (aStone, aAccent) for a painted kit drawn up to `capacity` times. */
+export function perInstance(g: THREE.BufferGeometry, capacity: number): { stone: THREE.InstancedBufferAttribute; accent: THREE.InstancedBufferAttribute } {
+  const make = () => new THREE.InstancedBufferAttribute(new Float32Array(3 * Math.max(capacity, 1)), 3);
+  const stone = make(), accent = make();
+  g.setAttribute('aStone', stone);
+  g.setAttribute('aAccent', accent);
+  return { stone, accent };
+}

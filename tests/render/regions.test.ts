@@ -8,6 +8,7 @@ import { REGIONS } from '../../src/sim/world/regions.ts';
 import { TerrainField, type Surface } from '../../src/render/terrain.ts';
 import { arcOf } from '../../src/render/regions/fjords.ts';
 import { crownOf } from '../../src/render/regions/iceCrown.ts';
+import { BASE, planStacks } from '../../src/render/regions/basaltStacks.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
 const S: Surface = { height: 0, normal: new THREE.Vector3(), up: 1, ground: 0, region: 0 };
@@ -35,4 +36,22 @@ test("the Crown Light's seracs are bedded in the skerry", () => {
     const h = p.length() - R;
     assert.ok(field.surface(p.normalize(), 0, S).height >= h - 1e-6, 'a serac stands above the ground');
   }
+});
+
+test("the Basalt Stacks' columns cover the sim's stacks and stand over the rock", () => {
+  const ri = REGIONS.findIndex((r) => r.id === 'basaltStacks'), plan = planStacks(field);
+  const upright = plan.prisms.filter((p) => p.u.dot(p.o.clone().normalize()) > 0.99999);
+  for (const st of geo.stacks.filter((s) => s.region === ri)) {
+    const c = v(st.pos), n = v(st.facing), e = new THREE.Vector3().crossVectors(n, c);
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * 2 * Math.PI, d = 0.85 * st.r;
+      const q = c.clone().multiplyScalar(R).addScaledVector(e, d * Math.cos(a)).addScaledVector(n, d * Math.sin(a)).normalize();
+      assert.ok(upright.some((p) => p.u.angleTo(q) * R < p.r), `a gap in a stack of radius ${st.r.toFixed(2)}`);
+    }
+  }
+  for (const p of upright) {
+    if (p.u.angleTo(plan.arch.at) * R < 10) continue; // the Arch's piers end inside its entablature
+    assert.ok(BASE + p.len >= field.surface(p.u, 0, S).height + 0.25, 'a column top under the rock');
+  }
+  assert.ok(plan.crest >= 18.4 && plan.colonies.length > 20, `crest ${plan.crest}, ${plan.colonies.length} colonies`);
 });

@@ -3,18 +3,24 @@
 // (capture 18), and each landmark from high above (wp16-<device>-<shot>.png, a contact sheet per device,
 // wp16-<device>-sheet.png, and both together, wp16-sheet.png). Each frame logs draw calls and triangles (the regions'
 // share) for A9.
-//   node tests/pages/regions.shots.ts [outDir]
+// Part B: the Arch over the Basalt Stacks' maze in late afternoon (capture 19), a lane of the maze at deck, the Arch from
+// high above. A name prefix (e.g. basalt) takes only those shots, as sheets wp16-<prefix>-<device>-sheet.png.
+//   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { launch, openGame, root, serve } from '../harness.ts';
 
 const outDir = process.argv[2] ?? join(root, 'progress/shots');
-const SHOTS: readonly (readonly [string, Record<string, string>])[] = [
+const only = process.argv[3] ?? '', tag = only ? `${only}-` : '';
+const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['ice-crown', { view: 'crown', hour: '23' }],
   ['crown-light-orbit', { view: 'mark', region: 'Ice', hour: '23' }],
   ['fjord', { view: 'fjord', hour: '8' }],
   ['great-falls-orbit', { view: 'mark', region: 'Fjords', hour: '8' }],
-];
+  ['basalt-hero', { view: 'basalt', hour: '16.5' }],
+  ['basalt-weave', { view: 'weave', hour: '16.5' }],
+  ['basalt-arch-orbit', { view: 'mark', region: 'Basalt', hour: '16.5' }],
+] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();
 const { browser, renderer } = await launch();
@@ -45,10 +51,10 @@ try {
       frames.push(png.toString('base64'));
       labels.push(`${device} · ${name}`);
     }
-    await sheet(frames, SHOTS.map(([name]) => name), 2, device === 'ipad' ? 520 : 600, join(outDir, `wp16-${device}-sheet.png`));
+    await sheet(frames, SHOTS.map(([name]) => name), 2, device === 'ipad' ? 520 : 600, join(outDir, `wp16-${tag}${device}-sheet.png`));
     all.push(...frames);
   }
-  await sheet(all, labels, 4, 420, join(outDir, 'wp16-sheet.png'));
+  await sheet(all, labels, 4, 420, join(outDir, `wp16-${tag}sheet.png`));
 } finally {
   await browser.close();
   await server.close();
