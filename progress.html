@@ -58,6 +58,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <!-- ============================================================ -->
 <section id="next">
 <h2>What comes next</h2>
+<p>WP7 (2026-10-24): bring the loop claim under 3 ms worst case (see WP7 Remaining), then part B; WP8 calls <code>inkHome</code>, <code>swallow</code>, <code>spill</code>, reads <code>leader</code> and <code>intruders</code>.</p>
 <ol>
 <li><b>WP0</b> done (2026-10-24); its API is recorded in <a href="#arch-testing">A10</a>.</li>
 <li><b>Wave 1</b> done (2026-10-24): <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a>.</li>
@@ -195,6 +196,7 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <!-- ============================================================ -->
 <section id="log">
 <h2>Log</h2>
+<p id="log-2026-10-24-wp07a"><b>2026-10-24 — WP7 part A.</b> Territory, trails, loops, breaking, coins, income, pennant, first-voyage charm, storm swallow; format 4. Check 1 passes (Δ ≤ 1.8 %, all within derived bounds); claim cost 3.5–5 ms worst against the 3 ms target, still open.</p>
 <p>Newest first. Each entry: date, WP, what changed, evidence (before/after screenshots), and any problems left open.</p>
 
 
@@ -720,7 +722,7 @@ src/audio/instruments.ts  score.ts                                              
 
 <div class="wp" id="wp07">
 <h3>WP7 — Territory, trails and doubloons</h3>
-<p>Status: not started. Deps: WP6. Parallel-safe with: WP14.</p>
+<p>Status: in progress (2026-10-24) — part A done but for the claim-cost bound (3.5–5 ms measured against ≤ 3 ms); part B remaining. Check 1 passes at θ 10–89° about both poles (<a href="#log-2026-10-24-wp07a">log</a>). Deps: WP6. Parallel-safe with: WP14.</p>
 <p>Scope:</p>
 <ul>
 <li>Territory: home waters; a small home disc inks itself where a ship slows after break-off; leaving waters lays an open trail; returning closes the loop — everything enclosed by trail and old border becomes its sea, including rivals' sea; purse banked. Breaking: a rival crossing an open trail breaks it — trail washes away, loop lost, unbanked purse spills as floating coins at the break, no hull damage; own-trail crossing does nothing (adapt legacy claim flood fill).</li>
@@ -733,6 +735,14 @@ src/audio/instruments.ts  score.ts                                              
 </ul>
 <p>Owns: <code>src/sim/territory.ts economy.ts</code>, <code>tables.ts</code> (economy section), <code>tests/sim/territory.test.ts economy.test.ts</code>, <code>tests/acceptance/check1-territory.test.ts</code>.</p>
 <p>DoD: check 1 passes at several θ in both hemispheres with the tolerance argument written in the test header and recorded in <a href="#check-1">checks</a>; break/spill/bank/income/finds/perk tests; claim cost ≤ 3 ms worst case measured.</p>
+<p><b>Built (part A) — the API the renderer, the captains, WP8/WP9 and part B use.</b></p>
+<ul>
+<li><code>territory.ts</code>: <code>chart(state)</code>, the step's territory system after <code>collide</code>: each ship's move <code>was</code>→<code>pos</code> entered cell by cell (0.15 u samples, diagonal steps bridged, so trails are edge-connected and no crossing is missed); leaving its waters starts a trail (<code>Ship.laid</code>, map <code>trail</code>), a rival entering a trail cell breaks it (washes away, purse spilled at the break), its own trail does nothing, re-entering its waters closes the loop; then the pennant (<code>state.leader</code>, the holder keeps it through ties). Loop close: own sea ∪ trail is the barrier; regions race from the trail's neighbours (union-find; clean 16×16 blocks flooded whole, a word at a time, cells elsewhere) and all but the largest are claimed — rivals' sea, islands, self-crossing pockets, across faces and poles; rivals' trails inside stay open. <code>inkHome(state, i)</code> (WP8's opening: the disc where the ship slows), <code>swallow(state, cells)</code> (WP8's storm), <code>atHome</code>, <code>repairRate</code> (HOME.repair; WP8 mends), <code>gullPrice</code> (HOME.gull; WP9), <code>intruders</code> (bitmask; WP8's chart marks; the slow is sailing.ts <code>trim</code>), <code>holds</code> (moved from sailing.ts).</li>
+<li><code>economy.ts</code>: <code>fill</code> (ECONOMY.trail per u up to the form's purse), <code>bankPurse</code>, <code>earn</code> (income per u² straight to the bank), <code>spill(state, at, amount, from)</code> (coins spiralling out; WP8's sinkings use it too), <code>scoop</code> (any hull in reach: the bank, or an open trail's purse up to its room); coins sink after COINS.life.</li>
+<li><code>state.ts</code> format 4: Ship <code>laid purse bank held</code> (quanta); <code>coins[64]</code>, <code>leader</code>, <code>charm</code> (<code>MatchSetup.firstVoyage</code>: the player's trail cannot break until its first loop closes), <code>events</code> (cleared each step; <code>EVENT</code> home, loop (u², the trail's cells), broken, spill, bank, scoop, swallow, lead), <code>timeline</code> (loop, broken, lead); <code>emit</code>, <code>chronicle</code>. <code>tables.ts</code>: <code>HOME ECONOMY COINS</code>. <code>match.ts</code>: chart → earn → scoop.</li>
+<li>Tests: <code>tests/sim/territory.test.ts</code> (10), <code>economy.test.ts</code> (4), <code>tests/acceptance/check1-territory.test.ts</code>.</li>
+</ul>
+<p><b>Remaining.</b> Part A: the claim cost — median of five on the dev Mac: 0.6–1.2 ms at θ = 10°, 2–4 ms at 30°, 3.5–5 ms from 50° to the half-planet loop (89°); the cost test is a <code>todo</code> until it holds. Profile: block classing ≈ 40 %, the race ≈ 35 %, claiming ≈ 25 %; next try spans inside dirty blocks and a coarser second block level. The spec status rows for Territory and Doubloons are not yet updated. Part B: the twelve landmark perks (beside <code>holds</code>), finds in <code>economy.ts</code> (wrecks, flotsam, drifting bottles, island caches with hold-position, regional richness), harbour repair speed (beside <code>repairRate</code>), the Caldera's doubloon rain.</p>
 </div>
 
 <div class="wp" id="wp08">

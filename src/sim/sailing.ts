@@ -14,8 +14,9 @@ import { SHIPS, TICK, type MatchState, type Ship } from './state.ts';
 import {
   BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM, VORTEX,
 } from './tables.ts';
+import { holds } from './territory.ts';
 import { ZONE, heightAt } from './world/geography.ts';
-import { REGIONS, type Perk } from './world/regions.ts';
+import { REGIONS } from './world/regions.ts';
 
 /** Ship.bumped when nothing was struck, and when it was land. */
 export const BUMPED = { nothing: -1, land: SHIPS } as const;
@@ -40,12 +41,6 @@ export interface Trim {
 }
 
 export const newTrim = (): Trim => ({ speed: 1, turn: 1, stormSails: false });
-
-/** Whether ship i holds a landmark's perk: the landmark lies in its waters. */
-export function holds(sea: Sea, state: MatchState, i: number, perk: Perk): boolean {
-  const k = sea.geo.landmarks.findIndex((l) => l.perk === perk);
-  return k >= 0 && state.owner[sea.marks[k]] === i + 1;
-}
 
 export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
   const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos), holder = state.owner[cell] - 1;

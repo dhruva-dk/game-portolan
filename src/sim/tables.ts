@@ -232,3 +232,29 @@ export const START_FITTINGS: readonly number[] = [FITTING.stemPost, FITTING.ligh
 export const SPARE_CANVAS = [0.04, 0.06, 0.08, 0.1, 0.12];
 export const COPPER = [0.03, 0.045, 0.06, 0.075, 0.09];
 export const LATEEN_MIZZEN = [0.08, 0.12, 0.16, 0.2, 0.24];
+
+// ---------------------------------------------------------------------------------------------------------------
+// Territory, trails and doubloons (WP7)
+
+/** Home waters: the disc a ship inks where it slows after breaking off, and what its own waters give it. */
+export const HOME = {
+  radius: 10, // u: the home disc's radius
+  repair: 0.5, // hull points a second mended inside your own waters (WP8 mends the hull)
+  gull: 0.75, // a gull call costs this share of its price inside your own waters (WP9)
+};
+
+/** What doubloons are earned at (PROMPT.md, Doubloons). */
+export const ECONOMY = {
+  trail: 0.6, // into the purse per u sailed on an open trail, up to the form's purse: a pinnace fills its 120 in 200 u
+  income: 1 / 60000, // a second per u² held, straight into the bank: one doubloon a minute for every 1000 u²
+};
+
+/** Floating coins: a spill scatters its doubloons as up to `most` coins of about `each`, within `scatter` u. */
+export const COINS = {
+  count: 64, // coins afloat at once; a spill into a full sea takes the oldest coins' places
+  each: 15,
+  most: 8,
+  scatter: 2.5, // u
+  reach: 1.5, // u: a hull passing this close scoops a coin
+  life: 90, // s afloat before a coin sinks
+};

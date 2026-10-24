@@ -3,9 +3,9 @@
 // snapshot encoding and its hash all follow from them. To add state, add a field to a schema here and bump
 // MATCH_FORMAT.version, so snapshots of the old shape are discarded rather than misread.
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
-import { addScaled, cross, dot, hash32, normalize, rngFrom, rngInt, rngRange, v3 } from './math.ts';
+import { addScaled, cross, dot, hash32, normalize, rngFrom, rngInt, rngRange, v3, type V3 } from './math.ts';
 import { TERRITORY, advance, tangentToward } from './sphere.ts';
-import { DAY, FORMS, GUSTS, SAILS, SLOTS, SPELL, START_FITTINGS, WEATHER } from './tables.ts';
+import { COINS, DAY, FORMS, GUSTS, SAILS, SLOTS, SPELL, START_FITTINGS, WEATHER } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 
 /** Seconds per tick: the simulation's fixed timestep. */
@@ -47,6 +47,10 @@ const SHIP = rec(
   ['bump', f64], // this tick's impact: the closing speed in u/s, 0 when nothing was struck
   ['bumped', int], // what was struck: −1 nothing, a ship index, or SHIPS for land
   ['bumpOn', f64], // where on the hull: −1 the stern … 1 the bow
+  ['laid', list(int)], // the open trail: the territory cells it crosses, in the order laid; empty when none is open
+  ['purse', f64], // doubloons won on the open trail: lost if it breaks, banked when its loop closes
+  ['bank', f64], // doubloons banked, safe for the match
+  ['held', f64], // the sea it holds, AREA_Q quanta: whole numbers, so exact in any order (territory.ts keeps it)
 );
 
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
@@ -58,6 +62,15 @@ const GUST = rec(['at', XYZ], ['age', f64], ['life', f64], ['r', f64]);
  */
 const WEATHER_SPELL = rec(['kind', int], ['at', XYZ], ['v', XYZ], ['r', f64], ['age', f64], ['life', f64]);
 
+/** A coin afloat, worth `value` doubloons (0: a free place), sinking at COINS.life seconds of age. */
+const COIN = rec(['at', XYZ], ['value', f64], ['age', f64]);
+
+/** An EVENT: its kind, the ship it is about, the other ship in it (−1 none), where, how much, and the cells it touched. */
+const HAPPENING = rec(['kind', int], ['ship', int], ['by', int], ['at', XYZ], ['amount', f64], ['cells', list(int)]);
+
+/** A timeline entry: an EVENT the results remember, at its tick. */
+const ENTRY = rec(['tick', int], ['kind', int], ['ship', int], ['by', int], ['amount', f64]);
+
 const MATCH = rec(
   ['seed', int], // the match seed, a uint32
   ['tick', int], // ticks stepped; match time is tick·TICK
@@ -68,14 +81,43 @@ const MATCH = rec(
   ['hour', f64], // the hour the match started at; hourOf (weather.ts) gives the hour now
   ['owner', bytes(TERRITORY.cells)], // who holds each territory cell: 0 nobody, else ship index + 1
   ['trail', bytes(TERRITORY.cells)], // whose open trail crosses each cell, coded the same way
+  ['coins', list(COIN, COINS.count)], // the coins afloat
+  ['leader', int], // the ship flying the gold-leaf pennant, holding the most sea; −1 while nobody holds any
+  ['charm', bool], // the first voyage: the player's trail cannot break until its first loop closes
+  ['events', list(HAPPENING)], // this tick's events, cleared at the start of each step
+  ['timeline', list(ENTRY)], // the events the results remember
 );
 
 export type Ship = Value<typeof SHIP>;
 export type Gust = Value<typeof GUST>;
 export type Spell = Value<typeof WEATHER_SPELL>;
 export type MatchState = Value<typeof MATCH>;
+export type Coin = Value<typeof COIN>;
+export type Happening = Value<typeof HAPPENING>;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 3, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 4, schema: MATCH };
+
+/** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
+export const EVENT = {
+  home: 0, // a ship inked its home disc: amount its u², cells the disc
+  loop: 1, // a loop closed: amount the u² claimed, cells the trail that closed it
+  broken: 2, // a trail broke: ship its owner, by the rival that crossed it, at the break, amount the purse lost, cells the trail
+  spill: 3, // doubloons spilled as coins round `at`: ship whose they were, amount
+  bank: 4, // a purse banked: amount
+  scoop: 5, // a ship scooped a coin at `at`: amount
+  swallow: 6, // the storm swallowed sea: amount its u², cells
+  lead: 7, // the pennant passed to ship (−1 nobody) from by: amount the u² the new holder holds
+} as const;
+
+/** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
+export function emit(state: MatchState, kind: number, ship: number, by: number, at: V3, amount: number, cells: number[] = []): void {
+  state.events.push({ kind, ship, by, at: { x: at.x, y: at.y, z: at.z }, amount, cells });
+}
+
+/** Enter an event in the match's timeline, which the results read. */
+export function chronicle(state: MatchState, kind: number, ship: number, by: number, amount: number): void {
+  state.timeline.push({ tick: state.tick, kind, ship, by, amount });
+}
 
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
@@ -85,10 +127,12 @@ export interface MatchSetup {
   forms?: readonly number[];
   /** The hour it starts at, 0 ≤ hour < 24; anywhere in one of the day's openings (DAY.starts), by the seed, when left out. */
   hour?: number;
+  /** The career's first match (PROMPT.md, The first voyage): the player's first loop always succeeds. */
+  firstVoyage?: boolean;
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed, forms = new Array<number>(SHIPS).fill(0), hour = startHour(seed) } = setup;
+  const { seed, forms = new Array<number>(SHIPS).fill(0), hour = startHour(seed), firstVoyage = false } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
   if (forms.length !== SHIPS || !forms.every((f) => Number.isInteger(f) && f >= 0 && f < FORMS.length)) {
     throw new RangeError(`createMatch: forms ${forms} are not ${SHIPS} FORM ids`);
@@ -100,8 +144,10 @@ export function createMatch(setup: MatchSetup): MatchState {
   for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, forms[i]));
   for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
   const weather = Array.from({ length: WEATHER.count }, () => ({ kind: SPELL.fair, at: v3(0, 0, 1), v: v3(), r: 0, age: 0, life: 0 }));
+  const coins = Array.from({ length: COINS.count }, () => ({ at: v3(0, 0, 1), value: 0, age: 0 }));
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
+    coins, leader: -1, charm: firstVoyage, events: [], timeline: [],
   };
 }
 
@@ -125,6 +171,7 @@ function launch(route: CurrentRoute, i: number, form: number): Ship {
     form, pos, head, was: { ...pos }, wasHead: { ...head }, speed: FORMS[form].speed * SAILS[SAIL.full].speed, rate: 0,
     shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
     fittings: START_FITTINGS.map((kind) => ({ kind, tier: 0 })), bump: 0, bumped: -1, bumpOn: 0,
+    laid: [], purse: 0, bank: 0, held: 0,
   };
 }
 
