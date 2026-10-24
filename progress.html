@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portolan progress</title>
+<style>
+:root { --paper: #f3e9d2; --ink: #2a1d12; --sepia: #6b4a2b; --rule: #cdb98f; --done: #3d6b3f; --prog: #b07a1e; --not: #8a7a66; --bad: #a8392a; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 Georgia, "Times New Roman", serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 30px; margin: 0 0 4px; }
+h2 { font-size: 22px; margin: 40px 0 10px; border-bottom: 2px solid var(--sepia); padding-bottom: 4px; }
+h3 { font-size: 17px; margin: 22px 0 6px; color: var(--sepia); }
+nav { margin: 12px 0 20px; padding: 8px 12px; border: 1px solid var(--rule); background: #efe2c4; }
+nav a { margin-right: 14px; color: var(--sepia); }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 14px; }
+th, td { border: 1px solid var(--rule); padding: 5px 7px; vertical-align: top; text-align: left; }
+th { background: #eadcbc; }
+code, pre { font: 13px/1.45 Menlo, Consolas, monospace; }
+pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow-x: auto; white-space: pre-wrap; }
+.st { font-weight: bold; white-space: nowrap; }
+.done { color: var(--done); } .prog { color: var(--prog); } .not { color: var(--not); } .fail { color: var(--bad); }
+.ph { display: inline-block; min-width: 150px; padding: 18px 6px; border: 1px dashed var(--rule); color: var(--not); font: 11px Menlo, monospace; text-align: center; }
+.shots img, td img { max-width: 100%; border: 1px solid var(--rule); }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.shots figure { margin: 0; } .shots figcaption { font-size: 12px; color: var(--sepia); }
+.wp { border: 1px solid var(--rule); background: #f7efdc; padding: 4px 14px 10px; margin: 14px 0; }
+.wp h3 { margin-top: 10px; }
+.note { border-left: 4px solid var(--prog); padding: 4px 10px; background: #f0e1bf; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Portolan — progress</h1>
+<p>The single source of truth for the state of the work. Spec: <code>PROMPT.md</code>. Screenshots: <code>progress/shots/</code>. Last updated: <b id="updated">2026-10-24</b> (WP-audit, architect).</p>
+
+<nav>
+<a href="#protocol">Agent protocol</a><a href="#next">What comes next</a><a href="#status">Spec status</a><a href="#checks">Acceptance checks</a><a href="#captures">Captures</a><a href="#review">Review findings</a><a href="#log">Log</a><a href="#audit">Code audit</a><a href="#architecture">Architecture</a><a href="#plan">Work packages</a><a href="#schedule">Schedule</a>
+</nav>
+
+<!-- ============================================================ -->
+<section id="protocol">
+<h2>Agent protocol (read first)</h2>
+<ol>
+<li>Read this page top to bottom, then <code>PROMPT.md</code> in full. PROMPT.md is the spec; every line of it is required. Nothing here may weaken it.</li>
+<li>Pick the work package (WP) you were assigned in <a href="#plan">Work packages</a>. Check its dependencies are <span class="done">done</span>. Set its status line to <code>Status: in progress (YYYY-MM-DD)</code>.</li>
+<li>Touch only the files your WP owns, plus the append-only registration lines in the <a href="#arch-shared">shared files</a>. Another agent may be working in the same checkout: re-read a shared file immediately before editing it, never reformat files you do not own, and <b>stage only your own paths</b> (<code>git add &lt;paths&gt;</code>, never <code>git add -A</code>).</li>
+<li>Legacy code from the earlier game is reference material only. It is deleted from the tree in WP1; read it with <code>git show 6ce29f2:src/&lt;file&gt;.ts</code> (see <a href="#audit">Code audit</a> for what is worth adapting). Never re-add <code>src/assets/</code> or any image, model, font or audio file.</li>
+<li>Before finishing: <code>npm run typecheck</code>, <code>npm test</code>, and the checks/captures named in your WP's definition of done; the console must be free of errors and warnings. Save your evidence as <code>progress/shots/wpNN-*.png</code> (before and after where relevant).</li>
+<li>Update this page: your WP status (<code>done (date)</code> with a one-line result), the <a href="#status">spec status</a> rows you advanced, <a href="#checks">acceptance check</a> results, <a href="#captures">captures</a>, a dated <a href="#log">log</a> entry with before/after screenshots, and <a href="#next">what comes next</a>. Keep every section's <code>id</code> stable; edit with text tools; keep one table row per line.</li>
+<li>Commit on <code>main</code> with message <code>WPnn: &lt;title&gt;</code> and the trailer line <code>Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;</code>. List any new library in <code>CREDITS.md</code> with source and licence.</li>
+<li>Code standard (PROMPT.md "How to work"): every line earns its place; no dead code, duplication, speculative features or placeholder art left behind; create files only when needed; prefer the carefully built procedural solution over the shortcut.</li>
+</ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="next">
+<h2>What comes next</h2>
+<ol>
+<li><b>WP0</b> (external, in progress 2026-10-24): the toolchain agent is adding Capacitor (<code>capacitor.config.ts</code>, <code>ios/</code>, <code>npm run ios</code> in <code>tests/ios.ts</code>) and the reusable Playwright harness (<code>tests/harness.ts</code>, <code>tests/harness.test.ts</code>). When it lands, record its API under <a href="#arch-testing">Test &amp; capture infrastructure</a> if it differs from what is written there.</li>
+<li><b>Wave 1:</b> start <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a> in parallel (disjoint files) once WP0 has committed (WP1 deletes legacy tests and edits <code>package.json</code> scripts, which WP0 is touching now).</li>
+<li>Then follow the <a href="#schedule">schedule</a>: at most two packages at a time, always pairing a simulation package with a rendering/interface package.</li>
+</ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="status">
+<h2>State of each PROMPT.md section</h2>
+<p>Status values: <span class="done">done</span> (meets the spec, verified) · <span class="prog">in progress</span> · <span class="not">not started</span>. Nothing from the earlier game counts as done: it was a different game in a different (photoreal) style.</p>
+<table>
+<tr><th>PROMPT.md section</th><th>Status</th><th>Work packages</th><th>Notes</th></tr>
+<tr id="s-standard"><td>The standard (art &amp; play)</td><td class="st not">not started</td><td>all; judged in WP33+</td><td></td></tr>
+<tr id="s-planet"><td>The world › The planet</td><td class="st not">not started</td><td>WP3, WP6, WP13, WP24</td><td>Legacy planet is seeded-random, not hand-built.</td></tr>
+<tr id="s-regions"><td>The world › The regions (12 + landmarks/perks)</td><td class="st not">not started</td><td>WP3, WP6, WP7, WP16, WP17, WP23</td><td></td></tr>
+<tr id="s-lighthouses"><td>The world › Lighthouses and harbours</td><td class="st not">not started</td><td>WP3, WP7, WP14, WP15</td><td>Legacy has a fishing village/huts/pier: forbidden, deleted in WP1.</td></tr>
+<tr id="s-life"><td>The world › Life</td><td class="st not">not started</td><td>WP23</td><td></td></tr>
+<tr id="s-wind"><td>The world › Wind, currents, tides, and time</td><td class="st not">not started</td><td>WP6, WP13, WP14, WP15, WP19, WP21, WP22</td><td></td></tr>
+<tr id="s-ship"><td>Being a ship</td><td class="st not">not started</td><td>WP19</td><td></td></tr>
+<tr id="s-forms"><td>Being a ship › Ship forms</td><td class="st not">not started</td><td>WP6, WP10, WP18</td><td>Legacy ship geometry is a strong base (WP18).</td></tr>
+<tr id="s-gull"><td>Being a ship › The companion gull</td><td class="st not">not started</td><td>WP9, WP10, WP23</td><td></td></tr>
+<tr id="s-match"><td>A match › Overview</td><td class="st not">not started</td><td>WP8, WP10</td><td></td></tr>
+<tr id="s-current"><td>A match › The Great Current</td><td class="st not">not started</td><td>WP8, WP11, WP22, WP24</td><td></td></tr>
+<tr id="s-territory"><td>A match › Territory</td><td class="st not">not started</td><td>WP7, WP20</td><td>Legacy loop-claim flood fill is reusable (WP7).</td></tr>
+<tr id="s-doubloons"><td>A match › Doubloons</td><td class="st not">not started</td><td>WP7, WP8</td><td></td></tr>
+<tr id="s-chests"><td>A match › Chests and loot</td><td class="st not">not started</td><td>WP9, WP22, WP27</td><td></td></tr>
+<tr id="s-fittings"><td>A match › Fittings</td><td class="st not">not started</td><td>WP9, WP19, WP24, WP25</td><td></td></tr>
+<tr id="s-consumables"><td>A match › Consumables</td><td class="st not">not started</td><td>WP9, WP22</td><td></td></tr>
+<tr id="s-combat"><td>A match › Combat</td><td class="st not">not started</td><td>WP8, WP22</td><td></td></tr>
+<tr id="s-storm"><td>A match › The storm</td><td class="st not">not started</td><td>WP8, WP21</td><td></td></tr>
+<tr id="s-sinking"><td>A match › Sinking and the end</td><td class="st not">not started</td><td>WP8, WP19, WP24, WP27</td><td></td></tr>
+<tr id="s-results"><td>A match › The results</td><td class="st not">not started</td><td>WP8, WP27</td><td></td></tr>
+<tr id="s-rank"><td>The career › Rank</td><td class="st not">not started</td><td>WP10, WP27</td><td></td></tr>
+<tr id="s-league"><td>The career › The league</td><td class="st not">not started</td><td>WP10</td><td></td></tr>
+<tr id="s-captains"><td>The career › The captains (30)</td><td class="st not">not started</td><td>WP10, WP11, WP18</td><td></td></tr>
+<tr id="s-thinking"><td>The career › How captains think</td><td class="st not">not started</td><td>WP11, WP24</td><td></td></tr>
+<tr id="s-learning"><td>The career › Captains learn the player</td><td class="st not">not started</td><td>WP10, WP12, WP26</td><td></td></tr>
+<tr id="s-careerchart"><td>The career › The career chart</td><td class="st not">not started</td><td>WP10, WP27</td><td></td></tr>
+<tr id="s-harbour"><td>The career › The harbour</td><td class="st not">not started</td><td>WP26</td><td></td></tr>
+<tr id="s-firstvoyage"><td>The career › The first voyage</td><td class="st not">not started</td><td>WP7, WP10, WP27</td><td></td></tr>
+<tr id="s-saving"><td>The career › Saving</td><td class="st not">not started</td><td>WP1, WP5, WP10</td><td></td></tr>
+<tr id="s-controls"><td>Controls (touch, haptics)</td><td class="st not">not started</td><td>WP24, WP25</td><td>Legacy is mouse/keyboard only.</td></tr>
+<tr id="s-hud"><td>The interface › The match screen</td><td class="st not">not started</td><td>WP25</td><td></td></tr>
+<tr id="s-lettering"><td>The interface › Lettering (cancelleresca)</td><td class="st not">not started</td><td>WP4</td><td>Legacy draws no text at all.</td></tr>
+<tr id="s-title"><td>The interface › The title</td><td class="st not">not started</td><td>WP26</td><td></td></tr>
+<tr id="s-rendering"><td>The look › The rendering (paper, ink, hatching, watercolour, pigments, one style module)</td><td class="st not">not started</td><td>WP2</td><td>Legacy is photoreal PBR + scanned textures.</td></tr>
+<tr id="s-sea"><td>The look › The sea</td><td class="st not">not started</td><td>WP13</td><td></td></tr>
+<tr id="s-trails"><td>The look › Territory and trails</td><td class="st not">not started</td><td>WP20</td><td></td></tr>
+<tr id="s-sky"><td>The look › Sky, light, and weather</td><td class="st not">not started</td><td>WP14, WP16, WP17, WP21</td><td></td></tr>
+<tr id="s-decktochart"><td>The look › From deck to chart</td><td class="st not">not started</td><td>WP24</td><td></td></tr>
+<tr id="s-readability"><td>The look › Readability</td><td class="st not">not started</td><td>WP2, WP19, WP20, WP25</td><td></td></tr>
+<tr id="s-sound"><td>Sound and music</td><td class="st not">not started</td><td>WP28, WP29</td><td>Legacy has synth SFX, no music.</td></tr>
+<tr id="s-performance"><td>Performance and platform</td><td class="st prog">in progress</td><td>WP0, WP1, WP5, WP30, WP32</td><td>WP0 (Capacitor + harness) under way in parallel.</td></tr>
+<tr id="s-architecture"><td>Architecture</td><td class="st not">not started</td><td>WP1, WP5, all sim WPs</td><td>Designed below (<a href="#architecture">Architecture</a>); nothing implemented yet.</td></tr>
+<tr id="s-howtowork"><td>How to work (code, tools, progress.html)</td><td class="st prog">in progress</td><td>all</td><td>progress.html created 2026-10-24.</td></tr>
+<tr id="s-acceptance"><td>Acceptance checks</td><td class="st not">not started</td><td>WP5, WP7, WP12, WP30, WP31, WP32</td><td></td></tr>
+<tr id="s-testing"><td>Testing</td><td class="st prog">in progress</td><td>WP0, WP31, WP32</td><td>Harness being built by WP0.</td></tr>
+<tr id="s-captures"><td>Captures (29 × 2 resolutions)</td><td class="st not">not started</td><td>WP31 (+ contributors per capture)</td><td></td></tr>
+<tr id="s-review"><td>Review</td><td class="st not">not started</td><td>WP33+</td><td></td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="checks">
+<h2>Acceptance checks</h2>
+<p>None may be weakened, skipped or removed. Results record date, command, numbers, and pass/fail. Machine-readable outputs go to <code>progress/checks/checkN.json</code>.</p>
+<table>
+<tr><th>#</th><th>Check</th><th>Owner</th><th>Command (planned)</th><th>Latest result</th></tr>
+<tr id="check-1"><td>1</td><td>Territory geometry: loop round a circle of latitude θ claims 2πR²(1 − cos θ) within a stated, justified tolerance</td><td>WP7</td><td><code>npm run check -- 1</code></td><td class="not">no result yet (legacy sim passed an equivalent test at 0.2–1.0 % error inside a derived bound; method reusable)</td></tr>
+<tr id="check-2"><td>2</td><td>Determinism: Node headless vs Chromium rendered at another frame rate with background-and-resume mid-match → identical match-state and career-state hashes</td><td>WP5 (path), WP31 (final)</td><td><code>npm run check -- 2</code></td><td class="not">no result yet</td></tr>
+<tr id="check-3"><td>3</td><td>Captains: 200-match tournament; six distinct temperament profiles, hunters lead sinkings; rank margin; scripted player countered within 5 matches, counter fades within 5</td><td>WP12</td><td><code>npm run check -- 3</code></td><td class="not">no result yet</td></tr>
+<tr id="check-4"><td>4</td><td>Pacing: 200 matches end in 9–11 min; every region chosen for break-off; final calm uniform over regions</td><td>WP12</td><td><code>npm run check -- 4</code></td><td class="not">no result yet</td></tr>
+<tr id="check-5"><td>5</td><td>Touch: full career (first voyage, 3 matches, gull upgrade, form change) by touch only, iPhone and iPad viewports</td><td>WP31</td><td><code>npm run check -- 5</code></td><td class="not">no result yet</td></tr>
+<tr id="check-6"><td>6</td><td>Budgets: full match at largest-iPad resolution, GPU on, CPU throttled; frame time, draw calls, triangles, texture memory, sim tick within stated budgets</td><td>WP30</td><td><code>npm run check -- 6</code></td><td class="not">no result yet</td></tr>
+<tr id="check-7"><td>7</td><td>Generated assets: no image/model/font/audio files in source or build; every on-screen string drawn in the generated hand</td><td>WP31 (WP1 removes the jpgs)</td><td><code>npm run check -- 7</code></td><td class="fail">would fail today: 44 .jpg textures in <code>src/assets/</code>, inline SVG favicon in <code>index.html</code></td></tr>
+<tr id="check-8"><td>8</td><td>iOS: Capacitor build, headless iPad Simulator via simctl, title → harbour → full match → results; every capture via <code>simctl io</code>, iPad captures match Chromium</td><td>WP32 (on WP0 toolchain)</td><td><code>npm run check -- 8</code></td><td class="not">no result yet</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="captures">
+<h2>Captures</h2>
+<p>Scripted and seeded (see <a href="#arch-testing">capture pipeline</a>). Files: <code>progress/shots/&lt;name&gt;-iphone.png</code> (iPhone 17 Pro Max landscape, 956×440 CSS @3) and <code>progress/shots/&lt;name&gt;-ipad.png</code> (iPad Pro 13", 1376×1032 CSS @2); iOS Simulator versions in <code>progress/shots/ios/&lt;name&gt;-ipad.png</code>. Replace a placeholder <code>&lt;span class="ph"&gt;…&lt;/span&gt;</code> with <code>&lt;a href="…"&gt;&lt;img src="…"&gt;&lt;/a&gt;</code> when taken.</p>
+<table>
+<tr><th>Capture</th><th>What it shows</th><th>Built by</th><th>iPhone</th><th>iPad</th><th>Verdict</th></tr>
+<tr id="cap-01"><td><code>01-title</code></td><td>Portolan half-lettered over the turning planet, golden hour</td><td>WP26, WP4, WP14</td><td><span class="ph">01-title-iphone.png</span></td><td><span class="ph">01-title-ipad.png</span></td><td></td></tr>
+<tr id="cap-02"><td><code>02-harbour</code></td><td>Caravel moored, lamp-lit harbour at dusk, gull on masthead, form choice + nine cards</td><td>WP26, WP18, WP19, WP23</td><td><span class="ph">02-harbour-iphone.png</span></td><td><span class="ph">02-harbour-ipad.png</span></td><td></td></tr>
+<tr id="cap-03"><td><code>03-current</code></td><td>Riding the Great Current, low chase cam, rivals alongside, islands over the curve, storm bruise</td><td>WP8, WP22, WP24, WP21</td><td><span class="ph">03-current-iphone.png</span></td><td><span class="ph">03-current-ipad.png</span></td><td></td></tr>
+<tr id="cap-04"><td><code>04-break-off</code></td><td>Peeling off into the Coral Atolls, two rivals peeling off behind</td><td>WP8, WP17, WP24</td><td><span class="ph">04-break-off-iphone.png</span></td><td><span class="ph">04-break-off-ipad.png</span></td><td></td></tr>
+<tr id="cap-05"><td><code>05-open-trail</code></td><td>Glass Sea, long open trail, swollen purse, hunter bending toward trail, full iPhone HUD</td><td>WP20, WP25, WP11, WP17</td><td><span class="ph">05-open-trail-iphone.png</span></td><td><span class="ph">05-open-trail-ipad.png</span></td><td></td></tr>
+<tr id="cap-06"><td><code>06-loop-closing</code></td><td>Signature: large loop flooding vermilion, coins streaming, camera pulled back</td><td>WP20, WP22, WP24</td><td><span class="ph">06-loop-closing-iphone.png</span></td><td><span class="ph">06-loop-closing-ipad.png</span></td><td></td></tr>
+<tr id="cap-07"><td><code>07-gull-drop</code></td><td>Gull, wings spread, releasing a glowing ultramarine chest onto the deck</td><td>WP23, WP22, WP9</td><td><span class="ph">07-gull-drop-iphone.png</span></td><td><span class="ph">07-gull-drop-ipad.png</span></td><td></td></tr>
+<tr id="cap-08"><td><code>08-chest-choice</code></td><td>Three-item choice: vermilion fitting, ultramarine fitting, verdigris consumable</td><td>WP27, WP25</td><td><span class="ph">08-chest-choice-iphone.png</span></td><td><span class="ph">08-chest-choice-ipad.png</span></td><td></td></tr>
+<tr id="cap-09"><td><code>09-broadside</code></td><td>Broadsides among the Basalt Stacks in fog, grey-wash smoke, splashes, splinters</td><td>WP22, WP16, WP21, WP19</td><td><span class="ph">09-broadside-iphone.png</span></td><td><span class="ph">09-broadside-ipad.png</span></td><td></td></tr>
+<tr id="cap-10"><td><code>10-sinking</code></td><td>Galleon rolling under, gold-leaf pennant last, flotsam and a chest floating up</td><td>WP19, WP22</td><td><span class="ph">10-sinking-iphone.png</span></td><td><span class="ph">10-sinking-ipad.png</span></td><td></td></tr>
+<tr id="cap-11"><td><code>11-storm</code></td><td>Storm wall over held sea, colour running out, pen-stroke rain, gold-leaf lightning</td><td>WP21, WP20</td><td><span class="ph">11-storm-iphone.png</span></td><td><span class="ph">11-storm-ipad.png</span></td><td></td></tr>
+<tr id="cap-12"><td><code>12-final-calm</code></td><td>Last three ships in a small calm circle, storm on every side</td><td>WP21, WP8</td><td><span class="ph">12-final-calm-iphone.png</span></td><td><span class="ph">12-final-calm-ipad.png</span></td><td></td></tr>
+<tr id="cap-13"><td><code>13-chart</code></td><td>Full chart mid-match: unrolled planet, rhumb lines, wind roses, washes, ships, storm, names</td><td>WP24</td><td><span class="ph">13-chart-iphone.png</span></td><td><span class="ph">13-chart-ipad.png</span></td><td></td></tr>
+<tr id="cap-14"><td><code>14-results</code></td><td>Wind rose with a new point inking, league table moving, timeline</td><td>WP27</td><td><span class="ph">14-results-iphone.png</span></td><td><span class="ph">14-results-ipad.png</span></td><td></td></tr>
+<tr id="cap-15"><td><code>15-career-chart</code></td><td>Career chart two-thirds inked, five regions named, rest faint sketch</td><td>WP27, WP10</td><td><span class="ph">15-career-chart-iphone.png</span></td><td><span class="ph">15-career-chart-ipad.png</span></td><td></td></tr>
+<tr id="cap-16"><td><code>16-night</code></td><td>Night on the Glass Sea: bioluminescent wakes, glowing whale, lighthouse beams, gold-leaf stars</td><td>WP14, WP17, WP23, WP15</td><td><span class="ph">16-night-iphone.png</span></td><td><span class="ph">16-night-ipad.png</span></td><td></td></tr>
+<tr id="cap-17"><td><code>17-ice-crown</code></td><td>Ice Crown under aurora, Crown Light on its skerry, floes and seals</td><td>WP16, WP14, WP23</td><td><span class="ph">17-ice-crown-iphone.png</span></td><td><span class="ph">17-ice-crown-ipad.png</span></td><td></td></tr>
+<tr id="cap-18"><td><code>18-fjords</code></td><td>Deep in a fjord at morning, cliffs and falls, a rival in ambush</td><td>WP16</td><td><span class="ph">18-fjords-iphone.png</span></td><td><span class="ph">18-fjords-ipad.png</span></td><td></td></tr>
+<tr id="cap-19"><td><code>19-basalt-stacks</code></td><td>The Arch and columns, late afternoon, puffins wheeling</td><td>WP16, WP23</td><td><span class="ph">19-basalt-stacks-iphone.png</span></td><td><span class="ph">19-basalt-stacks-ipad.png</span></td><td></td></tr>
+<tr id="cap-20"><td><code>20-kelp-shallows</code></td><td>Kelp Cathedral through clear water at midday, otters, ship half-hidden in kelp</td><td>WP16, WP13, WP23</td><td><span class="ph">20-kelp-shallows-iphone.png</span></td><td><span class="ph">20-kelp-shallows-ipad.png</span></td><td></td></tr>
+<tr id="cap-21"><td><code>21-amber-shoals</code></td><td>Low tide in gold light, Sandbar Light, wading birds</td><td>WP16, WP23</td><td><span class="ph">21-amber-shoals-iphone.png</span></td><td><span class="ph">21-amber-shoals-ipad.png</span></td><td></td></tr>
+<tr id="cap-22"><td><code>22-weeping-isle</code></td><td>Weeping Isle at dawn, cascades all round, a ship tracing the enclosing loop</td><td>WP16, WP20</td><td><span class="ph">22-weeping-isle-iphone.png</span></td><td><span class="ph">22-weeping-isle-ipad.png</span></td><td></td></tr>
+<tr id="cap-23"><td><code>23-coral-atolls</code></td><td>Great Lagoon from a low camera at midday, turtles, the single reef channel</td><td>WP17, WP23</td><td><span class="ph">23-coral-atolls-iphone.png</span></td><td><span class="ph">23-coral-atolls-ipad.png</span></td><td></td></tr>
+<tr id="cap-24"><td><code>24-spice-isles</code></td><td>Spice Harbour at golden hour, flowering jungle, ships crowding in</td><td>WP17, WP15</td><td><span class="ph">24-spice-isles-iphone.png</span></td><td><span class="ph">24-spice-isles-ipad.png</span></td><td></td></tr>
+<tr id="cap-25"><td><code>25-fire-archipelago</code></td><td>Caldera erupting at dusk, lava steaming, ash, gold raining into a ship's waters</td><td>WP17, WP21, WP22</td><td><span class="ph">25-fire-archipelago-iphone.png</span></td><td><span class="ph">25-fire-archipelago-ipad.png</span></td><td></td></tr>
+<tr id="cap-26"><td><code>26-mangrove-labyrinth</code></td><td>Shaded mangrove channel, herons, ship rounding a root arch into a rival</td><td>WP17, WP23</td><td><span class="ph">26-mangrove-labyrinth-iphone.png</span></td><td><span class="ph">26-mangrove-labyrinth-ipad.png</span></td><td></td></tr>
+<tr id="cap-27"><td><code>27-glass-sea</code></td><td>Glass Sea at noon, mirror to the horizon, whales, a single trail</td><td>WP17, WP13, WP20</td><td><span class="ph">27-glass-sea-iphone.png</span></td><td><span class="ph">27-glass-sea-ipad.png</span></td><td></td></tr>
+<tr id="cap-28"><td><code>28-maelstrom</code></td><td>From high behind a ship on the outer spiral, spray, turning sky</td><td>WP17, WP14, WP24</td><td><span class="ph">28-maelstrom-iphone.png</span></td><td><span class="ph">28-maelstrom-ipad.png</span></td><td></td></tr>
+<tr id="cap-29"><td><code>29-weather</code></td><td>Rain squall at the blue hour, pen-stroke rain, fog bank hiding a ship's lantern</td><td>WP21, WP14</td><td><span class="ph">29-weather-iphone.png</span></td><td><span class="ph">29-weather-ipad.png</span></td><td></td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="review">
+<h2>Review findings</h2>
+<p>Each review is by a fresh reviewer agent (see <a href="#wp33">WP33</a>). Record every finding as one row: id (<code>R1-001</code>…), severity (blocker / major / minor), where (capture, screen, or system), the flaw, fix WP, fix commit, status. A finding is closed only when the fix is verified by a new capture or test.</p>
+<div id="review-latest">
+<p><i>No review yet.</i></p>
+<table>
+<tr><th>Id</th><th>Severity</th><th>Where</th><th>Flaw</th><th>Fixed by</th><th>Status</th></tr>
+</table>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="log">
+<h2>Log</h2>
+<p>Newest first. Each entry: date, WP, what changed, evidence (before/after screenshots), and any problems left open.</p>
+
+<div id="log-2026-10-24-audit">
+<h3>2026-10-24 — Audit and master plan (architect)</h3>
+<ul>
+<li>Read PROMPT.md in full; surveyed the ~22k lines of the earlier game (16 modules in <code>src/</code>, 6 test scripts) — see <a href="#audit">Code audit</a>.</li>
+<li>Ran the earlier game headless in Chromium (ANGLE/Metal, GPU) at the iPhone 17 Pro Max and iPad Pro 13" viewports. No console errors or warnings. Time to playable: 19.4 s on a cold Vite start, 6.6 s warm, on a desktop Mac GPU (the spec wants &lt; 5 s to the title on an A14). Frame rate ≈ 56–58 fps on the Mac GPU.</li>
+<li>Ran legacy <code>tests/territory.test.ts</code>: passes (cap areas within 0.23–0.97 %, inside a derived tolerance) — the claim algorithm and the tolerance argument carry over to check 1.</li>
+<li>What the baseline shows: a photoreal ocean (PBR water, glitter, volumetric clouds, AgX grade), a neon glowing trail, realistic ships with red sails. Only the round papyrus HUD chart and the globe-menu frame (wind rose, fleur-de-lis, rhumbs) approach the target look. Islands float/shadow oddly from orbit (dark blobs in the planet view). Keyboard/mouse controls, no text, no touch, no menus. Nothing meets PROMPT.md's ink-and-watercolour standard.</li>
+<li>Designed the target architecture and broke PROMPT.md into 32 work packages plus review cycles (below).</li>
+</ul>
+<div class="shots">
+<figure><a href="progress/shots/baseline-1-deck-iphone.png"><img src="progress/shots/baseline-1-deck-iphone.png" alt="baseline deck view, iPhone"></a><figcaption>baseline-1: legacy deck view, golden hour, iPhone viewport (dpr 2)</figcaption></figure>
+<figure><a href="progress/shots/baseline-2-deck-ipad.png"><img src="progress/shots/baseline-2-deck-ipad.png" alt="baseline deck view, iPad"></a><figcaption>baseline-2: legacy deck view, midday, iPad viewport (dpr 1)</figcaption></figure>
+<figure><a href="progress/shots/baseline-3-globe-menu-ipad.png"><img src="progress/shots/baseline-3-globe-menu-ipad.png" alt="baseline globe menu"></a><figcaption>baseline-3: legacy globe menu (closest to target framing; photoreal globe)</figcaption></figure>
+<figure><a href="progress/shots/baseline-4-planet-iphone.png"><img src="progress/shots/baseline-4-planet-iphone.png" alt="baseline planet from orbit"></a><figcaption>baseline-4: legacy planet from orbit (floating clouds, dark island blobs)</figcaption></figure>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="audit">
+<h2>Code audit of the earlier game (commit 6ce29f2)</h2>
+<p>The earlier game was a paper.io-style territory game (21 ships, cutting a trail sinks its owner, respawns, seeded random planet) rendered photoreally with scanned textures. Its engineering is generally careful and well commented. Its rules, world, controls and look are all wrong for PROMPT.md. Fates: <b>adapt</b> = move the named parts into the new module and rewrite the rest; <b>rewrite</b> = new code, legacy only as reference; <b>delete</b>. All legacy files are removed from the tree in WP1 and stay readable via <code>git show 6ce29f2:&lt;path&gt;</code>.</p>
+<table>
+<tr><th>File (lines)</th><th>What it does</th><th>Quality</th><th>Fate → new home (WP)</th></tr>
+<tr><td><code>src/sim.ts</code> (1016)</td><td>Deterministic match: d* math (sin/cos/atan/atan2/asin/tan from + − × ÷ √ only), sfc32 RNG, vectors, equal-angle cube-sphere grid (GRID 512/face) with 4-neighbour topology across faces and exact integer-quantised cell areas, trail tracing, balanced multi-front flood-fill loop claim, ship physics/collisions, wind field.</td><td>High</td><td><b>Adapt</b>: math, RNG (make state serialisable), grid, cell areas → <code>src/sim/math.ts</code>, <code>src/sim/sphere.ts</code> (WP1); claim flood fill → <code>src/sim/territory.ts</code> (WP7); collision ideas → WP6. Rules (trail-cut sinks, respawn, 5 classes incl. fluyt), owner-only hash: rewrite.</td></tr>
+<tr><td><code>src/world.ts</code> (1311)</td><td>Seeded random archipelagos; each island built from SDF strokes in its tangent plane (capsules, discs, reef rings, columns, cones, sandbars), C1 height profiles (berm, lagoon, reef, shelf), site placement (lighthouse, village, hut, pier, arch, stack, caldera, channel, buoy).</td><td>High</td><td><b>Adapt</b> the stroke/SDF vocabulary and height profiles → <code>src/sim/world/geography.ts</code> (WP3). Random layout → replaced by designed region data. Village/hut/pier/buoy/pole: delete (no settlements).</td></tr>
+<tr><td><code>src/bots.ts</code> (704)</td><td>20 captains, 5 strategies (cautious, greedy, hunter, defender, opportunist), rectangular bites, rival-arrival vs home-time threat timing, deterministic.</td><td>Medium-high for old rules</td><td><b>Rewrite</b> (WP11/WP12) for six temperaments, limited perception, combat, items, learning. Reuse the threat-timing idea.</td></tr>
+<tr><td><code>src/main.ts</code> (502)</td><td>Boot, fixed-step loop with interpolation, keyboard/mouse helm, orbit camera, day clock, <code>window.__game</code> test hooks.</td><td>Medium</td><td><b>Rewrite</b> (WP5); loop/interpolation/hook patterns reusable.</td></tr>
+<tr><td><code>src/ocean.ts</code> (1043)</td><td>Photoreal water: great-circle Gerstner swell mirrored TS/GLSL, reflection/refraction, glitter, surf, foam, wakes.</td><td>High, wrong style</td><td><b>Rewrite</b> as ink sea (WP13); keep the TS/GLSL-mirrored great-circle swell for ship bobbing.</td></tr>
+<tr><td><code>src/terrain.ts</code> (1609)</td><td>Seamless quadtree terrain over the cube-sphere sampled from the height field; triplanar scanned materials, strata, caustics.</td><td>High, wrong style</td><td><b>Adapt</b> quadtree/LOD meshing (WP15); rewrite materials; drop textures.</td></tr>
+<tr><td><code>src/flora.ts</code> (2367)</td><td>Instanced LOD vegetation (palms, mangroves, jungle, pines, scrub, kelp, coral), tile culling, one wind-bending vertex program; bark textures.</td><td>High, wrong style</td><td><b>Adapt</b> species generators and instancing/culling (WP15, WP16, WP17); rewrite shading.</td></tr>
+<tr><td><code>src/structures.ts</code> (1632)</td><td>Lighthouses with beacons; stilt-hut fishing village, pier, nets, chimneys, skiffs; buoys and poles.</td><td>Medium</td><td>Lighthouse geometry: <b>adapt</b> (WP15). Everything human-made besides lighthouses/harbours: <b>delete</b>.</td></tr>
+<tr><td><code>src/ships.ts</code> (2657)</td><td>Procedural ships for 5 classes: hull form from stations, strakes, wales, gunports, decks, lateen and square rigs, shrouds as ribbons, bones for yards/rudder/masts, flags, emblem atlas drawn on canvas, LODs, sinking/respawn.</td><td>High</td><td><b>Adapt</b> geometry (Form, Mesher, buildHull, buildRig, SailMesher, emblems) → <code>src/render/ships/</code> (WP18) for 4 forms (drop fluyt); rewrite materials; motion/damage/sinking new (WP19).</td></tr>
+<tr><td><code>src/territory.ts</code> (1028)</td><td>Ownership bake per cube face, Gaussian-smoothed share field + B-spline crisp borders, flood/sweep/drain animations, glowing trail ribbons.</td><td>High</td><td><b>Adapt</b> bake, smoothing and partial uploads (WP20); rewrite look (watercolour flood, patterned pen trails).</td></tr>
+<tr><td><code>src/sky.ts</code> (1906)</td><td>Physically based atmosphere LUT, ray-marched clouds, sky-cube IBL, shadows, light registry, day clock, shared GLSL.</td><td>High, wrong style</td><td><b>Rewrite</b> (WP14); light-registry idea reusable.</td></tr>
+<tr><td><code>src/fx.ts</code> (1963)</td><td>GPU particle ring buffers + closed-form continuous effects: smoke, embers, ash, mist, rain, spray, floes, bergs, debris, bioluminescence.</td><td>High, wrong style</td><td><b>Adapt</b> ring-buffer architecture (WP21, WP22); rewrite looks; floes become sim-driven (WP6/WP16).</td></tr>
+<tr><td><code>src/post.ts</code> (708)</td><td>HDR targets, GTAO, light shafts, bloom, AgX, FXAA, dynamic resolution.</td><td>High, wrong style</td><td><b>Rewrite</b> as the ink pipeline (WP2); keep the dynamic-resolution controller idea. No bloom/HDR in the new look.</td></tr>
+<tr><td><code>src/chart.ts</code> (1800)</td><td>Canvas ink line art (fleur-de-lis, wind roses, rhumb networks, galleon), round HUD chart, unrolling globe menu with pennant leaderboard, loader; photo papyrus.</td><td>Medium-high</td><td><b>Adapt</b> ink line-art routines (rose, rhumbs, fleur) into WP24/WP25; rewrite the chart as the unrolled net; drop the papyrus photo.</td></tr>
+<tr><td><code>src/craft.ts</code> (287)</td><td>Geometry kit: tube, lathe, box, sinks; casks, driftwood; value noise/fbm; cube-field sampling; tangent normal GLSL.</td><td>High</td><td><b>Adapt</b> → <code>src/render/craft.ts</code> (created by WP18, shared by geometry WPs).</td></tr>
+<tr><td><code>src/audio.ts</code> (923)</td><td>Offline synthesis bank (pink/brown noise, resonators, creak, snap, luff, thud, splinter, bubbles, thunder, groan, bell), soundscape graph with parameter glides. No music.</td><td>Medium-high</td><td><b>Adapt</b> synthesis → <code>src/audio/sfx.ts</code> (WP28); score is new (WP29).</td></tr>
+<tr><td><code>src/assets/*.jpg</code> (44 files, 18 MB)</td><td>Scanned CC0 textures + papyrus photo.</td><td>—</td><td><b>Delete</b> (WP1) with their CREDITS entries. Forbidden by PROMPT.md.</td></tr>
+<tr><td><code>tests/territory.test.ts</code></td><td>Check-1 method: scripted loop on a latitude circle; tolerance derived from path deviation, cell diagonal and home-disc rim.</td><td>High</td><td><b>Adapt</b> → check 1 (WP7).</td></tr>
+<tr><td><code>tests/determinism.test.ts</code>, <code>capture.ts</code></td><td>Node vs Chromium replay at 30/20 fps with pause; captures found headless then replayed.</td><td>High</td><td><b>Adapt</b> the approach (WP5, WP31) on the WP0 harness.</td></tr>
+<tr><td><code>tests/tournament.test.ts</code>, <code>perf.ts</code>, <code>shot.ts</code></td><td>Old bot tournament, 24-hour fps sweep, ad-hoc screenshot tool.</td><td>Medium</td><td><b>Rewrite</b> (WP12, WP30); <code>shot.ts</code> superseded by WP0's <code>tests/harness.ts</code>.</td></tr>
+<tr><td><code>index.html</code>, <code>package.json</code>, <code>vite.config.ts</code>, <code>tsconfig.json</code></td><td>Shell page (inline SVG favicon = an image), scripts, relative base build, strict TS.</td><td>—</td><td>Favicon/DOM text removed (WP5). Scripts redefined by WP0/WP1/WP5. tsconfig strictness kept.</td></tr>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<section id="architecture">
+<h2>Architecture</h2>
+
+<h3 id="arch-numbers">Key numbers</h3>
+<table>
+<tr><th>Quantity</th><th>Value</th><th>Why</th></tr>
+<tr><td>Planet radius R</td><td>200 u (1 u ≈ 7 m)</td><td>Equator 1256.6 u. A caravel at plain sail in a fair wind (reference speed) sails 3.49 u/s → 6 min round the equator, as specified. Hard test in WP6.</td></tr>
+<tr><td>Region spacing</td><td>63.43° between adjacent icosahedron vertices ≈ 221 u</td><td>Region core radius ≈ 60–75 u leaves ≥ 70 u of open sea between regions. Rings at latitude ±26.565° (atan ½); upper ring at longitudes 0°, 72°…; lower ring offset 36°.</td></tr>
+<tr><td>Sim tick</td><td>TICK = 1/30 s; a 10-min match ≈ 18 000 ticks</td><td>Headroom on A14 and for the 200-match tournaments. Rendering interpolates; controls get immediate cosmetic feedback (stick, rudder, heel lead) so 33 ms tick granularity is not felt.</td></tr>
+<tr><td>Territory grid</td><td>512 cells per cube-face edge (1.57 M cells), equal-angle mapping; exact cell areas in integer quanta</td><td>Largest cell diagonal ≈ 1.0 u; ships are ~4–7 u long. Proven in legacy check 1.</td></tr>
+<tr><td>Ships per match</td><td>10 (player + 9 captains); league 30 captains + player</td><td>PROMPT.md.</td></tr>
+<tr><td>Devices (harness)</td><td>iphone: 956×440 CSS @3, safe L/R 62, B 20 · ipad: 1376×1032 CSS @2, safe B 20</td><td>Defined only in <code>tests/harness.ts</code> (WP0). Layout must also fit the smallest supported iPhone (iPhone 13 mini 812×375, safe L/R 50, B 21): WP25 adds it as a layout-only device.</td></tr>
+</table>
+
+<h3 id="arch-layers">A1. Layers and the one rule</h3>
+<pre>
+src/sim/     deterministic simulation: all game rules, captains, world geography. No DOM, no three, no audio, no clock.
+src/career/  deterministic career state and its pure update from a match result. Same purity rules as sim.
+src/style/   the one style module: palette, pigments, line/hatch/wash/paper definitions, generated textures.
+src/lettering/  cancelleresca glyphs, broad-nib renderer, layout.
+src/render/  three.js world rendering; reads sim state + events, never writes them.
+src/ui/      screens, HUD, touch controls (→ inputs), haptics.
+src/audio/   synthesized sound and score; reads sim state + events.
+src/app/     boot, fixed-step loop, save/resume, test hooks, world worker.
+</pre>
+<p>Render, UI and audio only read <code>MatchState</code> and the per-tick event list. The player and the captains change the match only through the same <code>ShipInput</code> struct. A purity test (WP1) fails the build if <code>src/sim</code> or <code>src/career</code> import anything outside themselves or use a banned construct.</p>
+
+<h3 id="arch-determinism">A2. Determinism specification</h3>
+<ul>
+<li><b>Why:</b> the iOS app runs in WKWebView (JavaScriptCore). JSC and V8 both give IEEE-754 round-to-nearest results for <code>+ − × ÷</code>, <code>Math.sqrt</code>, <code>Math.fround</code>, integer/bit ops — and JS never fuses multiply-adds — but <code>Math.sin/cos/tan/asin/acos/atan/atan2/exp/log/pow/cbrt/hypot/sinh/…</code> are implementation-defined and differ between engines (and even between V8 versions and constant-folded vs runtime paths, notably <code>**</code>).</li>
+<li><b>Allowed in sim/career:</b> <code>+ − × ÷ %</code>, comparisons, bit ops, <code>Math.sqrt abs floor ceil round trunc sign min max imul clz32 fround</code>, typed arrays, plain arrays and plain objects with fixed shapes.</li>
+<li><b>Banned in sim/career</b> (enforced by <code>tests/sim/purity.test.ts</code>): every transcendental <code>Math.*</code>, <code>Math.random</code>, the <code>**</code> operator, <code>Date</code>, <code>performance</code>, timers, <code>async</code>/promises inside a step, <code>Intl</code>/<code>toLocale*</code>/<code>localeCompare</code>, <code>for…in</code>, <code>Object.keys/values/entries</code> on map-like objects, <code>Map</code>/<code>Set</code> in state, <code>Array.prototype.sort</code> without a total-order comparator (ties broken by id), string-formatted floats in hashes, any global (<code>navigator</code>, <code>location</code>, <code>window</code>), and imports of three/DOM/render/ui/audio.</li>
+<li><b>Deterministic math (<code>src/sim/math.ts</code>):</b> <code>dsin dcos dtan</code> (Cody–Waite reduction by π/2 with a two-constant split, then polynomials), <code>datan datan2 dasin dacos</code> (argument halving + series, as legacy), <code>dexp</code> (x = k·ln2 + r, polynomial, exact power-of-two scaling built from bits), <code>dlog</code> (exponent/mantissa split via DataView bits, atanh series), <code>dpow</code> only where unavoidable (prefer repeated multiplication). Target absolute error ≤ 1e-12 on game ranges; outputs are pure functions of input bits. Unit tests measure error against <code>Math.*</code> in Node.</li>
+<li><b>RNG:</b> sfc32 seeded via splitmix32, state = four uint32 held <i>in the match state</i>. Named streams so systems do not perturb each other: world events, weather, loot, storm, and one per captain. Streams derived as <code>hash32(matchSeed, streamId)</code>.</li>
+<li><b>Order:</b> every loop over ships/entities runs in index order; entity arrays are append-in-order with tombstones compacted deterministically; no iteration over hash maps.</li>
+<li><b>Cross-engine proof:</b> a determinism-vector test (fixed input set → hash of every d* output and of a 2-minute seeded match) runs in Node, Chromium and Playwright <b>WebKit</b> (JavaScriptCore — the closest proxy for WKWebView), and the iOS Simulator run in check 8 logs the same hashes. Any mismatch is a blocker.</li>
+</ul>
+
+<h3 id="arch-state">A3. Match state, serialisation, hashing, inputs, replay</h3>
+<ul>
+<li><b><code>MatchState</code></b> (<code>src/sim/state.ts</code>) is one plain-data object graph: header (format version, seed, tick, RNG streams), environment (wind phase, weather cells, tide phase, floe angles, storm phase/timers, caldera timer, hour), ships[10] (pose and previous pose, speed, turn, sail setting, hull, fire, list, fittings[6] {kind, tier}, consumables[3] {kind, count}, purse, bank, gull state, effect timers, trail cell list, home info, alive, sink order), territory <code>owner</code> and <code>trailOwner</code> (<code>Uint8Array(6·512²)</code>), entities (projectiles, coins, chests, finds, kegs, shells), captain minds (all AI memory as numbers), stats and the timeline log. No closures, class instances with hidden fields, Maps or Sets.</li>
+<li><b>Codec</b> (<code>src/sim/codec.ts</code>): versioned little-endian binary writer/reader (Float64 for reals, varints for ints, RLE for the territory arrays). <code>encode(state)</code> → bytes; <code>decode(bytes)</code> → state; <code>hashState(state)</code> = 64-bit two-lane hash over <code>encode(state)</code>. Because save/resume uses exactly the hashed bytes, the test "for random k: decode(encode(state at k)), run to the end → same final hash as uninterrupted" proves the snapshot is complete. Snapshot size target ≤ 300 KB.</li>
+<li><b><code>ShipInput</code></b> (<code>src/sim/input.ts</code>), one per ship per tick, integers only: <code>steer</code> int8 (−127…127), <code>sail</code> −1/0/+1 step, <code>flags</code> bitfield (breakOff, headHome held, callGull, useAimed, dive, …), <code>consumable</code> slot or −1, <code>aim</code> target as a territory cell index or −1 (auto-aim), <code>chestPick</code> 0–2 or −1, <code>course</code> (list of cell indices; set/cleared as an event). The UI quantises touch to this struct; captains emit the same struct from inside the step.</li>
+<li><b>Recording</b>: the player's inputs as change events <code>(tick, field, value)</code>, compact JSON; replay reconstructs the identical per-tick struct. Recordings are test data (in <code>tests/</code>), never game assets.</li>
+<li><b>Pause</b> (chart open) = the loop stops stepping; the sim never sees wall time. Background → snapshot to IndexedDB on <code>visibilitychange</code>/Capacitor <code>App</code> pause; resume decodes and continues from that tick.</li>
+<li><b>Results</b>: the step emits a <code>MatchResult</code> when one ship remains: finish order, sea claimed, sinkings, treasure (share of bank × position multiplier), timeline (break-off, loops closed, trails lost, chests chosen, fights, sinking/win), and the observed player-style metrics the career needs.</li>
+</ul>
+
+<h3 id="arch-career">A4. Career state model</h3>
+<ul>
+<li><b><code>CareerState</code></b> (<code>src/career/state.ts</code>), plain JSON-able, <b>integers only</b> (fixed-point per-mille for learned weights): version, career seed, match index, player {rank points, tier reached (never lost), treasure, unlocked forms, selected form, gull {talons, wings, eye, beak, dive levels; plumage marks list (trait, level, tier pigment)}, style profile (break-off region histogram, loop-size mean, raid rate, run-hull threshold, fitting preferences, storm handling — each a decayed fixed-point average)}, captains[30] {rank points, tier, form, start-fitting tier, gull levels, learned counter-weights per habit with fade, record vs player (met, sunk by player, sank player), grudge flag}, career chart {seen-cell bitset on a coarse cube grid, discovered loot sites, regions named bitmask}, first-voyage flag, recent results for cards.</li>
+<li><b>Pure functions:</b> <code>matchSetup(career, seed)</code> → opponents (nine nearest rank; for the first voyage the nine lowest at gentlest), their forms/fittings/gulls/learned counters, player's form/gull; <code>careerAfterMatch(career, result)</code> → new career (rank points from position + sea + sinkings, treasure, unlocks, profile update with fade, captain learning for those who shared the match, grudges, chart discoveries); <code>leagueRound(career)</code> resolves captains' own results from <code>Rng(hash(careerSeed, matchIndex))</code>.</li>
+<li><b>Hash</b>: canonical binary encoding with a fixed field order (never <code>JSON.stringify</code> key order). Settings (sound, music, haptics, reduced motion) are stored separately and excluded from the career hash.</li>
+<li><b>Saving</b>: career after every match and the match snapshot on background, both in IndexedDB (<code>src/app/save.ts</code>); a corrupt or version-mismatched snapshot is discarded, never half-loaded.</li>
+</ul>
+
+<h3 id="arch-layout">A5. Module layout</h3>
+<pre>
+src/main.ts                    boot: world worker, style textures, lettering atlas, shell              WP5
+src/app/loop.ts                fixed-step accumulator, interpolation alpha, pause/freeze render clock   WP5
+src/app/save.ts                IndexedDB career + match snapshot                                       WP5
+src/app/hooks.ts               window.__portolan test hooks                                             WP5
+src/app/worldWorker.ts         geography generation off the main thread (+ IndexedDB cache)            WP5
+
+src/sim/math.ts  sphere.ts  state.ts  codec.ts  input.ts                                               WP1
+src/sim/world/regions.ts       the 12 regions as DATA (+ currents network, finds, habitats)            WP3
+src/sim/world/geography.ts     fields built from the data (height, coast distance, floor, region, nav)  WP3
+src/sim/world/nav.ts           coarse navigation graph (head-home route, captains' pathing)            WP3
+src/sim/tables.ts              shared tuning tables: forms (WP6), economy (WP7), storm (WP8), fittings/consumables/tiers (WP9)
+src/sim/environment.ts         wind, weather cells, tides, currents, hour, floes, vortex, hot water     WP6
+src/sim/sailing.ts  route.ts   ship motion, collisions, head-home and drawn-course following           WP6
+src/sim/territory.ts  economy.ts   trails, loops, breaks, waters, perks; purse/bank/income/finds       WP7
+src/sim/opening.ts  combat.ts  storm.ts  visibility.ts  match.ts   Great Current, combat, storm, sight, step order, end, results   WP8
+src/sim/items.ts  gull.ts      fittings, consumables, chests, loot, gull calls and traits               WP9
+src/sim/captains/perception.ts  brain.ts  temperaments.ts                                               WP11, WP12
+
+src/career/state.ts  league.ts  progress.ts  profile.ts  chart.ts  setup.ts                             WP10
+
+src/style/palette.ts  textures.ts  glsl.ts                                                              WP2
+src/lettering/glyphs.ts  nib.ts  text.ts                                                                WP4
+
+src/render/pipeline.ts         renderer, MRT, ink/composite pass, dynamic resolution, budget counters   WP2
+src/render/world.ts            render composition root (append-only registrations)                     WP5
+src/render/sea.ts  swell.ts                                                                             WP13
+src/render/sky.ts  light.ts                                                                             WP14
+src/render/terrain.ts  structures.ts  flora.ts                                                          WP15
+src/render/regions/&lt;region&gt;.ts  (iceCrown fjords basaltStacks kelpShallows amberShoals weepingIsle)   WP16
+src/render/regions/&lt;region&gt;.ts  (coralAtolls spiceIsles fireArchipelago mangroveLabyrinth glassSea maelstrom)   WP17
+src/render/craft.ts  ships/shipwright.ts  ships/emblems.ts                                              WP18
+src/render/ships/shipView.ts                                                                            WP19
+src/render/territory.ts  trails.ts                                                                      WP20
+src/render/weather.ts  storm.ts                                                                         WP21
+src/render/fx.ts  currents.ts                                                                           WP22
+src/render/fauna.ts  gull.ts                                                                            WP23
+src/render/camera.ts  chart.ts                                                                          WP24
+
+src/ui/shell.ts  safeArea.ts                                                                            WP5
+src/ui/parchment.ts            parchment scraps, ink frames, button bases for every screen            WP2
+src/ui/controls.ts  hud.ts  icons.ts  haptics.ts                                                        WP25
+src/ui/title.ts  harbour.ts  cards.ts  settings.ts                                                      WP26
+src/ui/chestChoice.ts  results.ts  careerChart.ts  tutorial.ts                                          WP27
+
+src/audio/engine.ts  sfx.ts                                                                             WP28
+src/audio/instruments.ts  score.ts                                                                      WP29
+</pre>
+<p>A WP may merge or split a listed file when that is clearer; it then updates this layout. Do not create files for features that are not yet being built.</p>
+
+<h3 id="arch-shared">A6. Shared files protocol</h3>
+<p>These files are touched by several packages. Edits are small and append-only, made near the end of the package, after re-reading the file: <code>src/render/world.ts</code> (register a render module), <code>src/ui/shell.ts</code> (register a screen), <code>src/sim/match.ts</code> (system order — sim WPs run serially, so no conflicts), <code>src/sim/state.ts</code> + <code>codec.ts</code> (add state fields; bump the format version), <code>src/sim/tables.ts</code> (own section per WP), <code>src/app/hooks.ts</code> (add a hook), <code>package.json</code> scripts, <code>CREDITS.md</code>, <code>progress.html</code>.</p>
+
+<h3 id="arch-world">A7. World data</h3>
+<ul>
+<li><b>Same world every match and career.</b> <code>regions.ts</code> is a hand-authored table; <code>geography.ts</code> builds every field from it deterministically (d* math) so the sim (collision, depth, kelp, tide passages) and the renderer (meshes, textures) share exactly one geography.</li>
+<li><b>Placement</b> (proposal; WP3 may refine with reasons): north pole <i>Ice Crown</i>; upper ring (lat +26.57°) at lon 0/72/144/216/288: <i>Fjords, Basalt Stacks, Kelp Shallows, Amber Shoals, Weeping Isle</i>; lower ring (lat −26.57°) at lon 36/108/180/252/324: <i>Glass Sea, Fire Archipelago, Mangrove Labyrinth, Coral Atolls, Spice Isles</i>; south pole <i>Maelstrom</i>. Each region's Voronoi cell is one face of the dual dodecahedron (equal areas, which also makes check 4's "final calm per region" uniform by symmetry).</li>
+<li><b>Per region (data):</b> id, name, vertex index; local frame (north/east tangent); pigments (land, shallows, foliage, accent, ink tint); climate and flora species; landforms as strokes in region-local coordinates (bearing, distance in u; kinds: island body capsule, ridge, cliff headland, spit, bay carve, reef ring with channel gaps, stack/column field, arch, sandbar/tidal flat with height band, cone/caldera, ice-floe field, kelp bed polygon, mangrove channel network, hot-water zone, whirlpool); the landmark (kind, position, perk id, chart symbol); harbours (≥ 1: position, facing, moorings, repair zone); lighthouses (headland position, facing, beam period); fauna habitats (species, area, count); weather tendencies (fair/fog/squall/calm weights); loot richness and fixed find sites (wrecks, caches); mechanics parameters (floe rotation rate, tide period/passages, kelp slow and hide, hot-water damage, vortex strength, channel widths); music mode and motif.</li>
+<li><b>Open sea data:</b> fixed current lanes between region pairs (great-circle arcs with width and speed); Great Current route generator (seed picks a smooth path through several regions); open-sea find richness.</li>
+<li><b>Generated fields</b> on the cube-sphere (same equal-angle mapping as territory): height (Float32 6·512²), signed coast distance, floor type (sand, rock, coral, kelp, ice, mud, black sand), region id, nav grid (6·64², passable/cost, tide-dependent cells flagged). Dynamic geography (tide level, floe positions) is evaluated in the sim on top of the static fields.</li>
+<li><b>Startup:</b> generation runs in a Web Worker; a 128²/face level for the title, full 512² while the title and harbour show; cached in IndexedDB keyed by a hash of the region data (runtime cache, not a shipped file).</li>
+</ul>
+
+<h3 id="arch-rendering">A8. Rendering approach (the illustrated style on a sphere)</h3>
+<ul>
+<li><b>Frame graph (WebGL2):</b> (1) scene pass at dynamic resolution into two targets: colour (washes + hatching computed in materials, authored in display space — no HDR, no tone mapping, no bloom) and a normal/depth/object-class target; (2) one full-screen ink composite: silhouette and crease lines from depth/normal/class discontinuities (silhouettes 1.5–2.5 px swelling with nearness, creases ≤ 1 px, both fading with distance so the horizon stays delicate; line wobble from world-anchored noise), wash pooling (darkening near edges), the deckle (darker tone at the frame edge — the only screen-anchored effect), and per-hour grade from the palette; (3) UI in an orthographic pass. No MSAA; lines carry their own coverage. Half-float targets only (iOS lacks float32 colour buffers).</li>
+<li><b>Paper anchored to the world:</b> every material calls <code>paper(p)</code> from <code>style/glsl.ts</code>: fibre and grain from generated tileable textures sampled in the planet frame (sea, terrain), the object frame (ships, props), or by direction (sky). Grain octave chosen by log₂(camera distance) and cross-faded, so grain size is stable on screen yet never slides; foxing and stains are low-frequency and planet-anchored, so the chart and the globe share the same stains.</li>
+<li><b>Hatching:</b> tonal art maps generated at startup (6 tones × stroke-preserving mips, 256²), sampled in surface-aligned coordinates (island-local triplanar with direction following the slope; ship planking UVs; cloud billboards), parallel hatching deepening to cross-hatching as N·L and occlusion fall. Shadow is drawn, never darkened.</li>
+<li><b>Watercolour:</b> flat pigment washes mixed subtractively over paper; darker pooling at wash edges (from distance fields where available — coast, territory border — and the composite edge pass elsewhere); granulation (world-anchored noise) in deeper washes; soft bleed via noise-warped boundaries.</li>
+<li><b>Pigments:</b> only the illuminator's palette (iron-gall black, sepia, umber, ochre, verdigris, malachite, ultramarine, indigo, vermilion, rose madder, lead white, gold leaf) plus the captains' named pigments derived from them. Gold leaf is the only view-dependent shine.</li>
+<li><b>Sea mesh:</b> a camera-centred geodesic disc (polar grid, geometric radial spacing, reaching past the horizon) positioned on the sphere in the vertex shader — one draw call, no seams or pinching anywhere including the poles. Depth wash and coastline rings come from the geography textures; wave pen strokes are procedural in the fragment shader on a world-anchored jittered grid, oriented by the wind; foam from coast distance and the wake buffer. Territory washes are composited inside the sea shader (chunk owned by WP20).</li>
+<li><b>Terrain:</b> island patches built once from the height field (quadtree LOD from legacy terrain.ts), never crossing the chart net's cut edges (they lie in open sea by construction).</li>
+<li><b>Deck → chart (one unbroken zoom).</b> A single parameter z ∈ [0, 1] drives camera and morph. z 0→0.5: the camera lifts from chase to orbit; ships shrink to silhouettes, relief eases to chart relief. At orbit the world is drawn as the <i>chart globe</i>: twelve pentagonal sheets, one per region — the dodecahedron dual to the region icosahedron, so <b>every region sits at the centre of its own sheet</b> and every cut edge runs through open sea halfway between regions (≥ 40 u from any coast). Swapping the sea disc for the chart globe happens where both render identically, so there is no visible cut. z 0.5→1: each sheet flattens (sphere → gnomonic plane) and the sheets unfold about their hinges along a spanning tree (two "flowers" of 1 + 5 sheets joined at one edge), coming to rest flat on parchment like printed globe gores; per-sheet transforms are 12 uniforms. On the chart: a wind rose at each region with its 16-rhumb network (black winds, green half-winds, red quarter-winds), region names in calligraphy, coastlines in ink, territory washes, ships as inked silhouettes with heading arrows, the storm as a bruise of wet ink. In a match the net is laid out with the player's current region at the centre of a flower, so local courses never cross a cut; the career chart uses the fixed Ice-Crown/Maelstrom layout. <i>Decision record:</i> a single whole-world projection (Hammer/Aitoff) was rejected because the far-side regions (and, centred on a region, its antipodal region) would be smeared along the rim; the dodecahedral net keeps all twelve regions undistorted (gnomonic scale error ≤ ~1.25 at sheet corners) and literally unrolls. If the review judges the net unreadable as a portolan, revisit here.</li>
+<li><b>Pause freeze:</b> world animations read a render clock that stops while the chart is open (spray hangs, smoke stops, gull wings stay spread); only the zoom has its own clock.</li>
+<li><b>Night:</b> per-hour palette table (dawn, morning, midday, afternoon, golden hour, dusk, blue hour, night, pre-dawn) interpolated by hour; night swaps light hatching for silver-ink highlights, lights are painted glow washes, beams are hatched rotating cones. Lighting is computed in the player's local frame from the global match hour.</li>
+</ul>
+
+<h3 id="arch-budgets">A9. Mobile performance budgets (iPhone 13 / A14 iPad, 60 fps)</h3>
+<table>
+<tr><th>Budget</th><th>Limit</th><th>How measured (check 6, WP30)</th></tr>
+<tr><td>Frame time</td><td>p95 ≤ 16.7 ms, p99 ≤ 20 ms through a full match with storm</td><td>Chromium, GPU on, ipad device (2752×2064 px), CPU throttled via CDP <code>Emulation.setCPUThrottlingRate</code>; rate justified by a single-core benchmark ratio dev-Mac : A14 (expect ≈ 2.5–4×)</td></tr>
+<tr><td>Main-thread CPU per frame</td><td>≤ 7 ms (render prep ≤ 4, sim ≤ 1.5 amortised, UI+audio ≤ 1.5)</td><td>In-game counters exposed on <code>__portolan.perf</code></td></tr>
+<tr><td>Sim tick</td><td>mean ≤ 1.0 ms, p99 ≤ 3 ms (throttled Chromium, 10 ships, storm active); Node mean ≤ 0.3 ms</td><td>Tick timer around <code>step()</code></td></tr>
+<tr><td>Draw calls</td><td>≤ 200 per frame (deck view, worst case); ≤ 100 on the chart</td><td><code>renderer.info.render.calls</code></td></tr>
+<tr><td>Triangles</td><td>≤ 500 k submitted per frame</td><td><code>renderer.info.render.triangles</code></td></tr>
+<tr><td>Texture memory</td><td>≤ 150 MB GPU incl. render targets; no texture &gt; 4096²</td><td>Own registry in <code>render/pipeline.ts</code> (bytes per texture/target)</td></tr>
+<tr><td>Render scale</td><td>dynamic 0.6–1.0 × device pixels; fixed 1.0 for captures</td><td>Controller in pipeline; hook to pin</td></tr>
+<tr><td>Startup to title</td><td>&lt; 5 s on A14 ⇒ ≤ 5 s throttled Chromium, ≤ 1.5 s unthrottled</td><td>Timestamp from navigation start to first title frame</td></tr>
+<tr><td>Memory</td><td>JS heap ≤ 300 MB; no steady-state per-frame allocation</td><td>Heap samples during check 6</td></tr>
+<tr><td>Thermal headroom</td><td>GPU frame ≤ 11 ms typical</td><td>Spector/timing on Mac + Simulator observation; no frame-rate decay over a full match</td></tr>
+</table>
+
+<h3 id="arch-testing">A10. Test &amp; capture infrastructure</h3>
+<ul>
+<li><b>Harness (WP0, being built now):</b> <code>tests/harness.ts</code> — <code>serve({production})</code>, <code>launch()</code> (GPU via ANGLE/Metal, SwiftShader fallback), <code>openGame(browser, url, {device: 'iphone'|'ipad', query})</code> with touch, landscape, DPR and safe areas, <code>game.until(g =&gt; …)</code> on <code>window.__portolan</code>, touch gestures (<code>drag</code>, taps, pinch), <code>screenshot</code>, <code>assertClean()</code> (no console errors/warnings, no network), CPU throttling. <code>tests/ios.ts</code> — <code>npm run ios [-- --device ipad|iphone] [--shot out.png]</code>: build, <code>cap sync</code>, xcodebuild, headless simctl boot/install/launch, screenshot. Later WPs build on these and must not fork them.</li>
+<li><b>Game hooks</b> (<code>window.__portolan</code>, WP5): <code>ready</code>, <code>loadCareer(fixture)</code>, <code>startMatch({seed, recording?})</code>, <code>setSpeed(n)</code> (n ticks per frame — results unchanged), <code>setFrameRate(fps)</code>, <code>pinRenderScale(s)</code>, <code>camera(preset)</code>, <code>background()</code>/<code>resume()</code>, <code>matchHash()</code>, <code>careerHash()</code>, <code>events</code>, <code>perf</code>, <code>screen</code>. Hooks drive state for tests; they never alter rules.</li>
+<li><b>Unit tests</b>: <code>node --test</code> under <code>tests/sim/</code>, <code>tests/career/</code>, etc.; <code>npm test</code> stays under ~2 min.</li>
+<li><b>Acceptance</b>: <code>tests/acceptance/checkN-*.ts</code>; <code>npm run check -- N</code>; results to <code>progress/checks/checkN.json</code> and the <a href="#checks">checks table</a>. Tournaments (checks 3, 4) use <code>worker_threads</code> over all cores.</li>
+<li><b>Captures</b> (WP31): <code>tests/captures/scenes.ts</code> defines the 29 scenes (career fixture, region/hour/weather conditions, the moment, camera preset, HUD state). <code>tests/captures/find.ts</code> searches seeds and scripted inputs headless until the conditions hold and writes <code>tests/captures/scenes.lock.json</code> (seed, recording, tick). <code>tests/captures/take.ts</code> replays each in Chromium at both devices and writes <code>progress/shots/&lt;name&gt;-&lt;device&gt;.png</code>; the iOS variant writes <code>progress/shots/ios/</code>. Non-match screens (title, harbour, chest choice, results, career chart) come from career fixtures. The hour and weather always come from the seed — never from a debug override — so captures are real matches.</li>
+<li><b>Determinism (check 2)</b>: run a recording headless in Node → match + career hashes; replay in Chromium with full rendering at 20 fps (and in WebKit), call <code>background()</code> mid-match, reload the page, <code>resume()</code>, finish → identical hashes.</li>
+<li><b>Touch (check 5)</b>: only <code>game.drag/tap/pinch</code> — no hooks that change state — through first voyage, three matches, a gull upgrade and a form change, at both devices (time-accelerated with <code>setSpeed</code>).</li>
+<li><b>Assets (check 7)</b>: scan <code>src/</code>, <code>index.html</code> and <code>dist/</code> for image/model/font/audio extensions, data URIs and magic bytes; assert the DOM has no visible text nodes and the canvas is the only drawing surface.</li>
+<li><b>iOS (check 8)</b>: on WP0's <code>tests/ios.ts</code>; the app reads a launch argument (via Capacitor) to run a scripted session (autoplay title → harbour → match → results) and logs hashes and capture cues; the host takes <code>xcrun simctl io &lt;udid&gt; screenshot</code> at each cue and compares iPad captures with Chromium's (stated SSIM threshold).</li>
+</ul>
+
+<h3 id="arch-platform">A11. Platform notes and risks</h3>
+<ul>
+<li><b>JSC vs V8 numerics</b> — mitigated by A2 and the WebKit run in every determinism test.</li>
+<li><b>Startup &lt; 5 s on A14</b> — legacy took 6.6 s warm on a Mac. Mitigation: worker generation, staged LOD, IndexedDB cache, shader warm-up spread over title/harbour, lazy region dressing.</li>
+<li><b>Tournament runtime</b> — 200 matches × 18 000 ticks needs Node tick ≤ 0.3 ms and worker parallelism.</li>
+<li><b>WKWebView audio</b> — AudioContext must resume on the first touch; the ringer switch can mute WebAudio unless the audio session is set to playback (WP32 configures it natively in the Capacitor project).</li>
+<li><b>Chart net readability</b> — see the decision record in A8.</li>
+<li><b>Context limits</b> — region dressing and ships are large; each WP owns few files and reads legacy files selectively (<code>git show 6ce29f2:src/ships.ts | sed -n …</code>).</li>
+</ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="plan">
+<h2>Work packages</h2>
+<p>Every requirement in PROMPT.md is assigned below; the <a href="#status">status table</a> maps sections to packages. Each package is sized for one fresh agent within ~150 k tokens of working context. "Parallel-safe with" lists packages whose files are disjoint and whose dependencies allow running at the same time (never more than two at once). Every DoD implicitly includes: typecheck and <code>npm test</code> green, console clean, evidence screenshots in <code>progress/shots/wpNN-*.png</code>, this page updated, commit of owned paths only.</p>
+
+<div class="wp" id="wp00">
+<h3>WP0 — Toolchain: Capacitor iOS and Playwright harness (external)</h3>
+<p>Status: in progress (2026-10-24), by the toolchain agent. Deps: none. Parallel-safe with: this audit.</p>
+<p>Scope: Capacitor wrapper and <code>ios/</code> project; one command builds the iOS app and runs it in the Simulator (<code>npm run ios</code>); reusable Playwright harness with device definitions, touch, safe areas, console/network cleanliness, CPU throttling. Owns: <code>capacitor.config.ts</code>, <code>ios/</code>, <code>tests/harness.ts</code>, <code>tests/harness.test.ts</code>, <code>tests/ios.ts</code>, their <code>package.json</code> entries. DoD: as set by its own brief; record the final API in <a href="#arch-testing">A10</a>.</p>
+</div>
+
+<div class="wp" id="wp01">
+<h3>WP1 — Sim kernel and legacy retirement</h3>
+<p>Status: not started. Deps: WP0 committed. Parallel-safe with: WP2.</p>
+<p>Scope:</p>
+<ul>
+<li>Architecture: one deterministic simulation, fixed timestep, seeded RNG, no clock/frame rate, bit-identical in Node and every browser, headless — the kernel every sim WP builds on (A2, A3).</li>
+<li><code>math.ts</code>: d* functions incl. new <code>dexp dlog dacos</code> (+ <code>dpow</code> if needed), vectors; <code>Rng</code> with state stored in plain arrays and named streams.</li>
+<li><code>sphere.ts</code>: equal-angle cube-sphere grid, neighbours across faces, exact cell areas, great-circle helpers, horizon distance <code>√(2Rh)</code> (adapted from legacy sim.ts).</li>
+<li><code>state.ts</code>/<code>codec.ts</code>: <code>MatchState</code> skeleton (header, RNG streams, ships, territory arrays, entity lists), binary codec with RLE, 64-bit state hash; <code>input.ts</code>: <code>ShipInput</code>, recording/replay format; a headless runner <code>runMatch(setup, recording) → {state, hash}</code> stub that later WPs fill.</li>
+<li>Purity test (banned constructs/imports, A2); cross-engine determinism-vector test in Node, Chromium and Playwright WebKit (install <code>webkit</code> via Playwright; record in CREDITS).</li>
+<li>Generated, not imported: delete <code>src/assets/</code>, all legacy <code>src/*.ts</code> (record the commit to read them from), legacy tests that import them (<code>tests/territory|tournament|determinism.test.ts</code>, <code>capture.ts</code>, <code>perf.ts</code>, <code>shot.ts</code> unless WP0 adopted it); remove texture rows from <code>CREDITS.md</code>; rewrite <code>README.md</code> for the new game (run, test, layout); leave <code>src/main.ts</code> as a minimal boot that WP5 replaces.</li>
+</ul>
+<p>Owns: <code>src/sim/math.ts sphere.ts state.ts codec.ts input.ts</code>, <code>tests/sim/math.test.ts sphere.test.ts codec.test.ts purity.test.ts determinism-vectors.test.ts</code>, deletions above, <code>README.md</code>, <code>CREDITS.md</code>, <code>package.json</code> test scripts.</p>
+<p>DoD: d* max error ≤ 1e-12 on stated ranges (table in log); codec round-trip property test over random states; determinism vectors identical in Node/Chromium/WebKit; purity test catches a seeded violation; no image files anywhere in <code>src/</code>; <code>npm start</code> serves a blank parchment page without errors.</p>
+</div>
+
+<div class="wp" id="wp02">
+<h3>WP2 — Style module and ink render pipeline</h3>
+<p>Status: not started. Deps: none (WP0 harness for screenshots). Parallel-safe with: WP1.</p>
+<p>Scope:</p>
+<ul>
+<li>The look › The rendering: paper (world-anchored grain, stains, foxing, deckle at frame edge), ink lines (silhouette swell, interior thin, distance fade, wobble), hatching (tonal art maps, parallel → cross-hatching following form), watercolour (flat washes, edge pooling, granulation, bleed), pigments (the illuminator's palette; gold leaf the only shine), <b>one style module</b> used by every material, effect and the interface.</li>
+<li>Palette data: pigments in sRGB, the per-hour palette table (dawn rose/pale gold, midday ultramarine, golden hour amber/vermilion, blue hour violet, night indigo/silver/candlelight), the ten team pigment pairs and ten trail patterns (solid, dashed, dotted, double, dash-dot, long-dash, triple, chain, wave, zigzag) — Readability: an automated test asserts every pair of team colours stays distinct (ΔE thresholds) against parchment and sea at every hour palette and the storm grade, and patterns distinguish teams without colour.</li>
+<li>Texture generation once at startup (paper fibre/stain tiles, TAM stack, granulation noise, brush/dry-brush masks), registered with sizes for the texture-memory budget.</li>
+<li><code>render/pipeline.ts</code>: WebGL2 renderer, MRT scene pass, ink composite pass, deckle, hour grade, dynamic resolution controller, counters for draw calls/triangles/texture bytes (A8, A9).</li>
+<li>The interface's share of the style: <code>src/ui/parchment.ts</code> — torn parchment scraps, ink frames, button bases and the threat-vignette/deckle primitives every screen and the HUD draw with.</li>
+<li>A style gallery test page (<code>tests/pages/style.html</code>, outside the game build) rendering primitive solids, a terrain-like surface and UI scraps at several hours and distances.</li>
+</ul>
+<p>Owns: <code>src/style/palette.ts textures.ts glsl.ts</code>, <code>src/ui/parchment.ts</code>, <code>src/render/pipeline.ts</code>, <code>tests/style/*.test.ts</code>, <code>tests/pages/style.*</code>.</p>
+<p>DoD: gallery captured at both devices and four hours (wp02-*.png) showing paper that stays fixed to surfaces while the camera moves (two-frame diff test), lines swelling/fading with distance, hatch tones, washes with pooling/granulation; readability test green; texture budget reported; no screen-space paper except the deckle.</p>
+</div>
+
+<div class="wp" id="wp03">
+<h3>WP3 — World data and geography</h3>
+<p>Status: not started. Deps: WP1. Parallel-safe with: WP4.</p>
+<p>Scope:</p>
+<ul>
+<li>The planet: hand-built, the same every match; R = 200; open sea broad and deep between regions; every island, reef, channel, landmark, harbour and lighthouse placed by design in data; generators build fixed geometry fields from it.</li>
+<li>The regions: all twelve at icosahedron vertices (placement in A7) with palette keys, landforms, wildlife habitats, mechanics parameters and landmark/perk ids exactly as the PROMPT.md table: Ice Crown floes/bergs/skerry; Fjords sheer cliffs and long narrow channels (chokepoints); Basalt Stacks pillar maze and the Arch; Kelp Shallows kelp beds and rocky islets; Amber Shoals tidal flats and sandbars with tide passages; Weeping Isle one great island (the largest enclosure); Coral Atolls ring lagoons with single channels and the Great Lagoon; Spice Isles dense crowded landfall; Fire Archipelago volcano, hot water zones, black sand; Mangrove Labyrinth twisting channels and the Root Gate; Glass Sea open water with no cover; Maelstrom whirlpool and spiral currents.</li>
+<li>Lighthouses on headlands throughout; ≥ 1 harbour per region (natural, no settlements). Fixed current lanes; Great Current route generator; find sites (wrecks, caches) with regional richness (Spice richest finds, Fire most lucrative).</li>
+<li><code>geography.ts</code>: height, coast distance, floor type, region id, nav grid on the cube-sphere (adapting legacy world.ts SDF strokes); <code>nav.ts</code> coarse graph; generation fast enough for a worker (≤ 1 s desktop at 512²).</li>
+</ul>
+<p>Owns: <code>src/sim/world/regions.ts geography.ts nav.ts</code>, <code>tests/sim/world.test.ts</code>, debug dump script <code>tests/tools/geodump.ts</code>.</p>
+<p>DoD: tests prove every region has its landmark, ≥ 1 harbour, ≥ 1 lighthouse on a headland, navigable connectivity (all regions reachable; atoll lagoon reachable only by its channel; fjord channels navigable at their narrowest), cut edges of the chart net (A8) ≥ 40 u from any land; per-region top-down ink dumps (wp03-&lt;region&gt;.png) reviewed for composition; timing logged.</p>
+</div>
+
+<div class="wp" id="wp04">
+<h3>WP4 — Lettering: the cancelleresca</h3>
+<p>Status: not started. Deps: WP2. Parallel-safe with: WP3.</p>
+<p>Scope: The interface › Lettering in full — a complete sixteenth-century Italian chancery hand (upper and lower case, numerals, punctuation incl. ’ “ ” – · : ; ! ? &amp; and the wind initials), each glyph as pen strokes; broad-edged nib at a fixed angle (thick/thin from stroke direction), ink bleed into fibres; kerning and joins; a glyph atlas generated at startup at sizes from the title down to the smallest iPhone HUD numerals (crisp, legible); a stroke-by-stroke drawing animation API (for the title and region names lettering onto the chart); drawing APIs for WebGL quads and offline canvas art (cards, chart).</p>
+<p>Owns: <code>src/lettering/glyphs.ts nib.ts text.ts</code>, <code>tests/lettering/*</code>, <code>tests/pages/lettering.*</code>.</p>
+<p>DoD: specimen sheet (all glyphs, pangrams, numerals, all 30 captain names, 12 region names) captured at both devices (wp04-*.png); smallest-size legibility shot at iPhone scale; animation frames of "Portolan" lettering itself; atlas memory reported.</p>
+</div>
+
+<div class="wp" id="wp05">
+<h3>WP5 — App runtime, shell and test hooks</h3>
+<p>Status: not started. Deps: WP1, WP2, WP3. Parallel-safe with: WP18.</p>
+<p>Scope: <code>npm start</code> runs the game; boot sequence (world worker with IndexedDB cache, style textures, lettering atlas) with a startup timer; fixed-step loop with interpolation, catch-up limit, render clock that freezes on pause; screen state machine (title → harbour → match → results → harbour) with minimal screens that WP26/WP27 replace; background/resume (<code>visibilitychange</code> + Capacitor <code>App</code> events) using the codec snapshot — "resumes exactly where it stopped"; safe-area reader (CSS <code>env()</code> probe) honoured by layout; <code>window.__portolan</code> hooks (A10); <code>render/world.ts</code> composition root; <code>index.html</code> without the SVG favicon or any DOM text; browser half of check 2 (replay a recording at another frame rate with background/reload/resume and report hashes).</p>
+<p>Owns: <code>src/main.ts</code>, <code>src/app/*</code>, <code>src/ui/shell.ts safeArea.ts</code>, <code>src/render/world.ts</code>, <code>index.html</code>, <code>tests/app/*</code>.</p>
+<p>DoD: harness test opens the game on both devices with a clean console; replay test gives identical hash at 60/20 fps with background-and-resume (using the WP1 runner stub); startup time logged; pause freezes render clock (test).</p>
+</div>
+
+<div class="wp" id="wp06">
+<h3>WP6 — Sailing, wind and environment</h3>
+<p>Status: not started. Deps: WP3, WP5. Parallel-safe with: WP13.</p>
+<p>Scope:</p>
+<ul>
+<li>Ship forms table (speed, turning, hull, guns per side, purse capacity) for pinnace/caravel/carrack/galleon; momentum and turning circle per form; sails reefed/plain/full (full faster with wider turns, reefed slower and tightest); caravel's lateen points closest to the wind.</li>
+<li>Wind: one planetary field shifting slowly through each match with gusts; speed ±15 % with point of sail; exported apparent wind for sails/flags/smoke/foliage. Currents: fixed fast lanes and the Great Current carry ships. Tides on a visible rhythm opening/closing passages (Amber Shoals, Atolls). Weather from the seed: fog banks, rain squalls (stronger gusting wind, rougher sea, shorter sight), calms (wind drops, slower ships, flat sea), fair between; drift with the wind; regional tendencies (fog Fjords/Basalt, squalls open sea, calms Glass Sea/Amber Shoals). Time of day: start hour from the seed, sun advancing so ten minutes cover a visible stretch.</li>
+<li>Regional movement mechanics: floes drift on slow rotation, lanes open/close, slow going among them; narrow fjord channels; kelp slows and hides (flag for visibility); mangrove tight channels; Maelstrom flings ships round the vortex; hot-water zones flagged for combat.</li>
+<li>Collisions with land and ships (impact speed reported for reef/rock and ramming damage in WP8). Head home: shortest safe route back to own waters, predictable (exported for captains). Drawn course following until the stick is touched.</li>
+<li>Hooks for modifiers: home-waters +10 %, Whale Road +20 %, rival slow in waters (Root Gate ×2), storm sails, spare canvas, lateen mizzen, chain shot, gust.</li>
+</ul>
+<p>Owns: <code>src/sim/environment.ts sailing.ts route.ts</code>, <code>src/sim/tables.ts</code> (forms section), <code>tests/sim/sailing.test.ts environment.test.ts</code>.</p>
+<p>DoD: test: caravel plain sail, fair wind, equator lap 360 s ± 5 %; point-of-sail curve within ±15 %; turning circles ordered by form; tide passages open/close on schedule; weather tendencies statistically per region over 200 seeds; head-home route deterministic and safe; determinism vectors still green.</p>
+</div>
+
+<div class="wp" id="wp07">
+<h3>WP7 — Territory, trails and doubloons</h3>
+<p>Status: not started. Deps: WP6. Parallel-safe with: WP14.</p>
+<p>Scope:</p>
+<ul>
+<li>Territory: home waters; a small home disc inks itself where a ship slows after break-off; leaving waters lays an open trail; returning closes the loop — everything enclosed by trail and old border becomes its sea, including rivals' sea; purse banked. Breaking: a rival crossing an open trail breaks it — trail washes away, loop lost, unbanked purse spills as floating coins at the break, no hull damage; own-trail crossing does nothing (adapt legacy claim flood fill).</li>
+<li>What home waters give: slow repair, +10 % speed, cheaper gull, steady income; rivals inside slowed and marked on the owner's chart. Harbours repair quickly (harbour speed).</li>
+<li>Landmarks: enclosing a landmark grants its perk while it stays inside your waters — all twelve perks implemented here or as flags consumed by later WPs (Crown Light beam marks; Great Falls repair ×2; Arch reload −⅓; Kelp Cathedral hidden on rival charts in your waters; Sandbar Light chests ×2 faster; Weeping Isle income ×2; Great Lagoon harbour-speed repair and no rival fire inside; Spice Harbour gull half price; Caldera doubloon rain into your waters on its eruption rhythm; Root Gate rivals slowed ×2; Whale Road +20 % everywhere; the Eye launch at full speed leaving the vortex under your colour).</li>
+<li>Leading: most sea flies the gold-leaf pennant (state flag); sinking it pays double. Storm swallowing removes ownership (API for WP8).</li>
+<li>Doubloons: sailing distance on an open trail fills the purse (capacity per form); territory income straight to bank; plunder hooks; finds — wrecks, flotsam (scoop by sailing through), drifting bottles, island caches (hold position a few seconds) with regional richness.</li>
+<li>First voyage rule: the player's first loop always succeeds.</li>
+<li>Acceptance check 1 with a stated, justified tolerance (adapt legacy derivation).</li>
+</ul>
+<p>Owns: <code>src/sim/territory.ts economy.ts</code>, <code>tables.ts</code> (economy section), <code>tests/sim/territory.test.ts economy.test.ts</code>, <code>tests/acceptance/check1-territory.test.ts</code>.</p>
+<p>DoD: check 1 passes at several θ in both hemispheres with the tolerance argument written in the test header and recorded in <a href="#check-1">checks</a>; break/spill/bank/income/finds/perk tests; claim cost ≤ 3 ms worst case measured.</p>
+</div>
+
+<div class="wp" id="wp08">
+<h3>WP8 — Opening, combat, storm, sight and match flow</h3>
+<p>Status: not started. Deps: WP7. Parallel-safe with: WP15.</p>
+<p>Scope:</p>
+<ul>
+<li>A match: ten ships, one life each, last afloat wins, ranking by sink order; fully determined by setup (career + seed) and inputs.</li>
+<li>The Great Current: seeded route through several regions; all ships ride it at speed; swipe-up break-off peels the ship into the region it is passing; ships riding to the end are thrown off there; the current stays as a known fast highway; the storm's origin is revealed at the start.</li>
+<li>Combat: hull points by form and fittings; damage from cannon, ramming (scaled with closing speed; rammer takes a little), fire over time, reefs/rocks struck at speed, Fire Archipelago hot water and embers, and the storm. Broadsides fire automatically when a rival is inside a side's arc and range; projectiles; aimed fittings resolve tap auto-aim and drag targets.</li>
+<li>The storm: origin anywhere, phases closing toward a final calm anywhere (uniform over the sphere ⇒ uniform over regions); each phase announced before it moves, then sweeps and holds; damage rising each phase, sails labour, visibility drops; swallows territory; final calm small enough to force a fight.</li>
+<li>Sight (<code>visibility.ts</code>): what each ship can see — curvature horizon by eye height and target height (crow's nest raises), weather (fog hides ships and trails from outside; trails laid in fog never show on rival charts; squalls shorten sight), kelp hiding, fog flask, Kelp Cathedral, marks (waters, Crown Light beam, flare, gull eye/dive). Used by captains and by the player's chart.</li>
+<li>Sinking and the end: sunk ship spills purse and drops one fitting as a chest; bounty to the sinker (double for the leader); when the player sinks, the rest can resolve at once (fast-forward); <code>MatchResult</code> with finishing order, sea claimed, sinkings, treasure (share of bank × position multiplier) and the timeline of deciding moments.</li>
+</ul>
+<p>Owns: <code>src/sim/opening.ts combat.ts storm.ts visibility.ts match.ts</code>, <code>tables.ts</code> (storm/combat sections), <code>tests/sim/combat.test.ts storm.test.ts visibility.test.ts match.test.ts</code>.</p>
+<p>DoD: scripted-input matches run headless to completion with plausible timelines; storm phase geometry tests (nested calms, uniform final calm over 10 000 seeds); hull-down horizon test; snapshot/resume test at random ticks over full matches; per-tick cost measured.</p>
+</div>
+
+<div class="wp" id="wp09">
+<h3>WP9 — Fittings, consumables, chests and the gull (sim)</h3>
+<p>Status: not started. Deps: WP8. Parallel-safe with: WP16.</p>
+<p>Scope:</p>
+<ul>
+<li>Chests and loot: five pigment tiers (iron-gall, verdigris, ultramarine, vermilion, gold leaf), tier readable before landing (exported for glow and gull effort); opening offers three items, choose one; a fitting replaces its slot and the old one drops as a chest for anyone; consumables fill three slots, stacking by kind. Loot tables by tier, rank (higher tiers enter as rank rises) and region richness.</li>
+<li>Fittings (six slots on every form; all five tiers scale strength): Bow — stem post, iron ram, cutwater (breaks target's open trail; target cannot lay a new one for a few seconds). Broadside — light, long, swivel guns, chain shot (tears sails, slows), heated shot (fires). Stern — stern chasers, powder kegs, mortar (lobs over islands at a chosen point). Rig — spare canvas, lateen mizzen, storm sails. Hull — copper sheathing (faster, immune to hot water), doubled planking, pumps. Lookout — stern glass, crow's nest, lookout (flags for render/UI).</li>
+<li>Consumables: patch kit (hull over 3 s), ward (absorbs damage; trail unbreakable for a few seconds), gust, fog flask (hidden from rival charts and lookouts), flare (reveal within a wide radius to you alone).</li>
+<li>The gull in a match: call by spending doubloons (price; home-waters discount; Spice Harbour half); flies over the horizon and returns with a chest in seconds (Wings; Sandbar Light ×2), circles and drops it on deck; rivals that see the gull see its destination; a ship that sinks before the chest lands loses it to the sea for anyone. Traits from career: Talons (max tier), Wings, Eye (scouts and marks loot and ships beyond the horizon), Beak (snatch back a share of spilled purse), Dive (reveal + slow nearest rival, cooldown by level).</li>
+</ul>
+<p>Owns: <code>src/sim/items.ts gull.ts</code>, <code>tables.ts</code> (fittings/consumables/tiers sections), <code>tests/sim/items.test.ts gull.test.ts</code>.</p>
+<p>DoD: every fitting and consumable has a behaviour test at tiers 1 and 5; gull delivery/loss/Beak/Dive tests; loot pool gating by rank; landmark perks that touch items honoured (Arch, Sandbar Light, Spice Harbour, Great Lagoon).</p>
+</div>
+
+<div class="wp" id="wp10">
+<h3>WP10 — Career, league and saving</h3>
+<p>Status: not started. Deps: WP8 (MatchResult). Parallel-safe with: WP17 (and WP9 if scheduled together — disjoint files).</p>
+<p>Scope: Rank (eight winds Greco → Tramontana, 100 points each, tiers never lost; unlocks pigment tiers, and forms at Levante/Ostro/Ponente); rank points from position, sea claimed and ships sunk; treasure; the league (exactly the thirty captains of the PROMPT.md table with meaning, temperament, form, pigments, emblem); draw the nine nearest the player's rank; between matches resolve captains' results against one another from the career state; higher-ranked captains start with better fittings and stronger gulls; captains choose forms by temperament; gull upgrades bought with treasure (Talons 4, Wings 4, Eye 4, Beak 3, Dive 3 levels) and the plumage record (marks per level in the tier pigment; gold-leaf wingtips at the top of every trait); the player profile (break-off place, loop size, raid rate, hull at which it runs, favoured fittings, storm handling) and each captain's learning from shared matches, fading over matches; memory of being sunk (record vs player, harder hunting next time); card one-liners ("Has learned you break off at the volcano."); the career chart data (inks what was seen: coastlines, reefs, currents, lighthouses, harbours, landmarks, wrecks, caches; loot sites remembered for later matches; region named on first entry); first voyage setup (nine lowest captains at their gentlest); saving after every match; career codec and hash (A4).</p>
+<p>Owns: <code>src/career/*</code>, <code>tests/career/*</code>.</p>
+<p>DoD: property tests: same career + result ⇒ same career hash; tiers never lost; unlock schedule; league drift over 100 simulated rounds looks alive (captains rise and fall); learning increments and fades; card lines for each learned habit; save/load round trip.</p>
+</div>
+
+<div class="wp" id="wp11">
+<h3>WP11 — Captains I: perception, temperaments, play</h3>
+<p>Status: not started. Deps: WP9, WP10. Parallel-safe with: WP19.</p>
+<p>Scope: How captains think — each tick from what its own ship and gull can see (<code>visibility.ts</code>; nothing beyond the horizon unless its gull scouted it), its temperament, rank, memory of the player and its seeded stream; same rules and only the same <code>ShipInput</code>. Six temperaments with distinct sailing: hunters stalk open trails and wounded ships; expanders patient loops; raiders break trails for purses and run; turtles hold rich home waters and punish intruders; opportunists wait at the edge of fights; gamblers draw enormous loops and chase gold-leaf chests. Rank scaling (reaction time, shot leading, loop and storm judgement, item timing). Telegraphing (a hunter's course bends toward a trail before it strikes; a gambler visibly commits; a turtle turns to face an intruder) and an exported intent heading for chart arrows. Break-off choice by temperament and knowledge of the player. A recognisable per-captain signature (course, loop shapes, distance from fights, the moment it runs). Item use: gull calls, chest picks, consumables, aimed fittings, head-home.</p>
+<p>Owns: <code>src/sim/captains/perception.ts brain.ts temperaments.ts</code>, <code>tests/sim/captains.test.ts</code>.</p>
+<p>DoD: perception test (no knowledge beyond sight); per-temperament behaviour unit scenarios; 20-match smoke tournament shows distinct profiles; tick cost of nine captains within budget; captains never issue inputs a player could not.</p>
+</div>
+
+<div class="wp" id="wp12">
+<h3>WP12 — Captains II: learning, tournaments, checks 3 and 4, pacing</h3>
+<p>Status: not started. Deps: WP11. Parallel-safe with: WP20.</p>
+<p>Scope: captains learn the player in play (huge loops ⇒ hunters patrol beyond its border; favourite break-off ⇒ more captains break off there; runs when wounded ⇒ they press when it is wounded); grudge behaviour; the 200-match tournament runner (<code>worker_threads</code>); check 3 (distinct temperament profiles over sea claimed, trails broken, ships sunk, loot taken, finishing position; hunters lead sinkings; a stated rank margin; scripted player countered within five matches and the counter fades within five after it changes habits); check 4 (9–11 min matches; every region chosen as a break-off by someone; final calm per region roughly equal with a stated chi-square bound); tune economy, storm timing and captain parameters until both pass with margin — every match has calm, tension and payoff.</p>
+<p>Owns: learning parts of <code>src/sim/captains/*</code>, tuning values in <code>tables.ts</code>, <code>tests/tools/tournament.ts</code>, <code>tests/acceptance/check3-captains.test.ts check4-pacing.test.ts</code>, <code>progress/checks/check3.json check4.json</code>.</p>
+<p>DoD: checks 3 and 4 pass and are recorded with numbers and the stated margins; runtime of the tournament logged.</p>
+</div>
+
+<div class="wp" id="wp13">
+<h3>WP13 — The sea</h3>
+<p>Status: not started. Deps: WP2, WP3, WP5. Parallel-safe with: WP6.</p>
+<p>Scope: The look › The sea — bare parchment washed with depth (deep indigo → ultramarine shelves → verdigris shallows → pale lagoons); coastlines traced by rings of fine parallel lines spreading from shore; waves as small animated pen strokes riding the swell in the wind direction; lead-white dry-brush foam at coasts, reefs, bows and wakes; shallows showing floors in hatched rock, coral, sand ripples and swaying kelp. Seamless camera-centred sea mesh (A8); render swell (great-circle Gerstner from legacy, TS + GLSL) for ships and floating things; calm-mirror and squall-rough states from sim weather; the planet's curve always visible with hull-down sinking of distant objects (masthead last) and delicate far horizon; territory chunk hook for WP20; wake buffer.</p>
+<p>Owns: <code>src/render/sea.ts swell.ts</code>, <code>tests/render/sea.*</code>.</p>
+<p>DoD: shots at deck and high camera, four hours, calm and squall, a coast with rings and foam, shallows over each floor type (wp13-*.png); hull-down test shot; no seams at cube edges or poles (pole shot); draw calls/triangles reported.</p>
+</div>
+
+<div class="wp" id="wp14">
+<h3>WP14 — Sky, light, time of day and night</h3>
+<p>Status: not started. Deps: WP2, WP5. Parallel-safe with: WP7.</p>
+<p>Scope: The sky as a painted wash deepening to the zenith; clouds outlined in ink and shaded by hatching, drifting with the wind; the sun a gold-leaf disc with drawn rays; each hour's hand-picked palette (dawn rose/pale gold, midday clear ultramarine, golden hour amber/vermilion, blue hour violet); night drawn as by candlelight (indigo washes, silver-ink highlights, gold-leaf stars, silver moon, warm lantern and lighthouse glows; every ship and coast readable); the shared light registry and lighting uniforms for every material; lighthouse beam primitive (turning at night); GLSL hooks for aurora and bioluminescence used by WP16/WP17.</p>
+<p>Owns: <code>src/render/sky.ts light.ts</code>, <code>tests/render/sky.*</code>.</p>
+<p>DoD: a 24-hour strip of shots at a fixed view (wp14-hours.png) plus night readability shot with ships and coast; palette transitions smooth; gold leaf glints only on gold.</p>
+</div>
+
+<div class="wp" id="wp15">
+<h3>WP15 — Terrain, lighthouses, harbours and flora</h3>
+<p>Status: not started. Deps: WP3, WP13, WP14. Parallel-safe with: WP8.</p>
+<p>Scope: island terrain meshes from geography (quadtree LOD adapted from legacy; no seams, pinching or floating); ink/hatch/wash land materials driven by region palettes (cliff strata, beaches by sand colour, rock, ice, basalt, mud); coastline inking; lighthouses on headlands everywhere — well kept, warmly lit, beautiful, beams turning at night, of unknown origin, never ruined or spooky; harbours (≥ 1 per region) as natural sheltered moorings with no houses, villages or signs of people; the shared instanced flora system (pines, palms, broadleaf jungle, flowering trees, mangrove, grasses, kelp, coral) bending in the planetary wind, with LOD and culling; foliage driven by the wind field.</p>
+<p>Owns: <code>src/render/terrain.ts structures.ts flora.ts</code>, <code>tests/render/terrain.*</code>.</p>
+<p>DoD: shots of a generic island from deck/high/orbit at three hours, a lighthouse at dusk and at night with beam, a harbour (wp15-*.png); budget numbers for a full region in view.</p>
+</div>
+
+<div class="wp" id="wp16">
+<h3>WP16 — Regions I: Ice Crown, Fjords, Basalt Stacks, Kelp Shallows, Amber Shoals, Weeping Isle</h3>
+<p>Status: not started. Deps: WP15. Parallel-safe with: WP17 (or WP9).</p>
+<p>Scope (each with its pigments, landforms, life habitats and one landmark that is the most beautiful thing in the region and reads clearly from orbit): Ice Crown — pack ice, tilted bergs, blue-white and silver inks, floes rotating with the sim, seals' floes, the Crown Light on its ice-bound skerry, aurora ribbons of verdigris and rose madder at night. Fjords — sheer cliffs streaked with falls, dark pine, deep green water, mist, the Great Falls. Basalt Stacks — hexagonal columns, sea arches, drifting fog banks, the Arch. Kelp Shallows — golden-green kelp forests swaying under clear water, rocky islets, the Kelp Cathedral, ships half-hidden in kelp. Amber Shoals — tidal flats and sandbars in warm gold light, rippled sand, the visible tide, the Sandbar Light. Weeping Isle — one towering cloud-forest mountain with cascades falling into the sea all round it.</p>
+<p>Owns: <code>src/render/regions/iceCrown.ts fjords.ts basaltStacks.ts kelpShallows.ts amberShoals.ts weepingIsle.ts</code>.</p>
+<p>DoD: per region a hero shot at its capture's hour plus an orbit shot of the landmark (wp16-*.png), self-critiqued against PROMPT.md captures 17–22; budgets per region.</p>
+</div>
+
+<div class="wp" id="wp17">
+<h3>WP17 — Regions II: Coral Atolls, Spice Isles, Fire Archipelago, Mangrove Labyrinth, Glass Sea, Maelstrom</h3>
+<p>Status: not started. Deps: WP15. Parallel-safe with: WP16 (or WP10).</p>
+<p>Scope: Coral Atolls — ring lagoons, white sand, palms, turquoise shallows, reef mazes with single channels, the Great Lagoon. Spice Isles — dense jungle, flowering trees, ochre and vermilion, Spice Harbour. Fire Archipelago — smoking volcano, lava meeting the sea in steam, black sand, falling ash, the Caldera erupting on its rhythm (gold rain visual hook for WP22). Mangrove Labyrinth — arching roots, shaded green channels, still water, the Root Gate. Glass Sea — vast calm mirror under open sky, glowing blue-green bioluminescence at night tracing wakes and whales, the Whale Road. Maelstrom — great whirlpool, spiral currents, spray, a sky that turns with it, the Eye.</p>
+<p>Owns: <code>src/render/regions/coralAtolls.ts spiceIsles.ts fireArchipelago.ts mangroveLabyrinth.ts glassSea.ts maelstrom.ts</code>.</p>
+<p>DoD: per region a hero shot at its capture's hour plus an orbit shot of the landmark (wp17-*.png), self-critiqued against captures 16, 23–28; budgets per region.</p>
+</div>
+
+<div class="wp" id="wp18">
+<h3>WP18 — The shipwright</h3>
+<p>Status: not started. Deps: WP2. Parallel-safe with: WP5 (and any sim WP).</p>
+<p>Scope: Ship forms — one procedural shipwright building pinnace, caravel (lateen rig), carrack (heavy stern castle) and galleon, each with its own hull lines, rig, castles and ornament; planking, wales, gunports matching guns per side, deadeyes, shrouds, ratlines, sail seams, reef points, carved stern ornament (scrollwork, knots, waves, sunbursts); rigging never clips the sails (geometric test over every yard/brace state); ink materials (plank lines, hatching, washes in the captain's two pigments); the 31 emblems (30 captains + the player's) on the mainsail; no faces or eyes; LODs and a chart-silhouette atlas. Adapt legacy ships.ts geometry; create <code>src/render/craft.ts</code> from legacy craft.ts.</p>
+<p>Owns: <code>src/render/craft.ts</code>, <code>src/render/ships/shipwright.ts emblems.ts</code>, <code>tests/render/ships.*</code>, <code>tests/pages/ships.*</code>.</p>
+<p>DoD: a turntable sheet of all four forms in three captains' colours at hero and far LOD (wp18-*.png); emblem sheet; clipping test green; triangle counts per LOD within budget.</p>
+</div>
+
+<div class="wp" id="wp19">
+<h3>WP19 — Ships alive: motion, sails, damage, sinking, fittings</h3>
+<p>Status: not started. Deps: WP9, WP13, WP18. Parallel-safe with: WP11.</p>
+<p>Scope: Being a ship — heel into turns and under a press of sail, lift on swells, bow through chop, surge on gusts; sails tighten when eager, shiver when hit, hang slack and torn when badly damaged; sails always show the truth (full and drawing on a reach, flattened close-hauled, billowing forward on a run; reefed/plain/full); pennants streaming; the leader's gold-leaf pennant seen from far; stern lanterns brighter in battle, guttering when the hull is low; damage (holes, splintered rails, smoke, fire, deepening list); sinking (roll, fill, slip beneath, pennant last, the sea closing in rings of ink); fittings visible on the body (copper sheathing glint, ram bow, cutwater, swivel guns on the rails, long guns, stern chasers, mortar, spare canvas, lateen mizzen, storm sails, doubled planking, pumps, crow's nest, stern glass); immediate cosmetic response to the helm; ship readability by silhouette at iPhone arm's length.</p>
+<p>Owns: <code>src/render/ships/shipView.ts</code> (+ <code>sails.ts</code> if split), <code>tests/render/shipView.*</code>.</p>
+<p>DoD: shots/sequence of each point of sail, damage stages, a full sinking sequence, each fitting visible (wp19-*.png); no rigging/sail clipping during animation.</p>
+</div>
+
+<div class="wp" id="wp20">
+<h3>WP20 — Territory and trails rendering</h3>
+<p>Status: not started. Deps: WP7, WP13. Parallel-safe with: WP12.</p>
+<p>Scope: home waters washed in the owner's colour with an inked border in its pigment and a narrow band of hatching inside; the home disc inking itself after break-off; trails as pen strokes laid live behind each ship with nib pressure and wobble, each team with its pattern as well as colour; closing a loop — the signature: the enclosed sea floods as a watercolour wash blooming inward from the trail, wet edges spreading, granulating, then drying to a flat tint (camera pull-back, coins, chord and haptic triggered via events for WP22/WP24/WP25/WP28); broken trails washing away in runs of ink; storm-swallowed sea whose colour runs and washes out; no flicker at borders or gaps in trails; readability of every team colour at every hour and in the storm. Adapt legacy bake/smoothing/partial uploads.</p>
+<p>Owns: <code>src/render/territory.ts trails.ts</code>, <code>tests/render/territory.*</code>.</p>
+<p>DoD: frame sequence of a large loop flooding (wp20-flood-*.png), break wash-away, storm wash-out, ten patterns side by side at four hours; flicker test (pixel stability of borders over a slow camera move).</p>
+</div>
+
+<div class="wp" id="wp21">
+<h3>WP21 — Weather and the storm</h3>
+<p>Status: not started. Deps: WP8, WP13, WP14. Parallel-safe with: WP22.</p>
+<p>Scope: fog as paper left unpainted (ships and trails inside hidden consistently with sim sight); rain as fine diagonal pen strokes; squalls with gusting wind and rougher sea; calms laying the sea flat as a mirror; spray as flicked lead white; smoke and ash as grey wash; lightning as a crack of gold leaf; weather seen coming on the horizon; the storm — a wall of wet, bleeding ink and driving pen-stroke rain lit by gold-leaf lightning, the sea beneath heaving and grey; its origin as a dark bruise of wet ink on the horizon at the start; phase announcements visible on the horizon; visibility drop inside.</p>
+<p>Owns: <code>src/render/weather.ts storm.ts</code>, <code>tests/render/weather.*</code>.</p>
+<p>DoD: shots of fog bank, squall, calm, storm wall from outside/inside, final calm ring (wp21-*.png); budgets in the storm.</p>
+</div>
+
+<div class="wp" id="wp22">
+<h3>WP22 — Combat, reward and current effects</h3>
+<p>Status: not started. Deps: WP9, WP13. Parallel-safe with: WP21.</p>
+<p>Scope: cannon fire drawn as ink (muzzle smoke in grey wash, shot as small dark strokes, splashes as rings and spray, hits as splinters and a shiver through the target's sails), fire, ramming impacts, powder kegs, mortar shells, chain shot, heated-shot embers; coins (streaming into the purse on a loop close with the burst, spilled floating coins at a break, Caldera gold rain); chests (tier glow readable at a glance, floating chests, landing on deck); sinking ink rings with WP19; the ward's shimmering St Elmo's fire, gust, fog flask, flare; the Great Current as a fast glowing current and the fixed current lanes as foam and ink streaks; dolphin/bow-wave spray hooks. Adapt legacy GPU ring-buffer architecture.</p>
+<p>Owns: <code>src/render/fx.ts currents.ts</code>, <code>tests/render/fx.*</code>.</p>
+<p>DoD: shots of a broadside exchange, loop-close coin burst, chest glows of all five tiers, each consumable effect, the Great Current (wp22-*.png); particle budgets.</p>
+</div>
+
+<div class="wp" id="wp23">
+<h3>WP23 — Life and the companion gull</h3>
+<p>Status: not started. Deps: WP3, WP9, WP14. Parallel-safe with: WP24.</p>
+<p>Scope: Life — gulls everywhere, puffins on the stacks, seals on the ice, otters in the kelp, wading birds on the shoals, turtles in the atolls, herons in the mangroves, whales in the Glass Sea, dolphins running alongside ships in open water; drawn in the same ink, read by silhouette and motion; reacting (flocks lift as a ship approaches, dolphins ride bow waves, whales sound when cannon fire starts); no humans anywhere. The companion gull — herring gull in ink and grey wash with black wingtips; rides the masthead idle, wheels overhead in danger, calls when it spots something; flies off over the horizon and returns with the chest (effort shows the tier), circles and drops it; the dive; plumage marks from career levels in tier pigments, gold-leaf wingtips at the top.</p>
+<p>Owns: <code>src/render/fauna.ts gull.ts</code>, <code>tests/render/fauna.*</code>.</p>
+<p>DoD: species sheet, reaction sequences, gull call-to-drop sequence, plumage at several career states (wp23-*.png); budgets with full flocks.</p>
+</div>
+
+<div class="wp" id="wp24">
+<h3>WP24 — Camera, deck-to-chart and the chart</h3>
+<p>Status: not started. Deps: WP4, WP5, WP8, WP11, WP13, WP20. Parallel-safe with: WP23.</p>
+<p>Scope: the chase camera (behind and above, swings with turns; pinch between low over the deck and high behind the masts; crow's nest raises it); the opening (ships racing side by side under full sail, regions sweeping past over the curve, settling low and close for the break-off); loop pull-back proportional to the claim; sinking camera rising to watch the sea close, then the match on the chart; reduced-motion variants; the pause freeze; the deck→orbit→chart unbroken zoom with the dodecahedral net unroll (A8) and its reverse, world returning to life the moment the camera reaches the deck; pinch-out into the chart and back; the chart content — rhumb lines from wind roses, coastlines in ink, region names in calligraphy, territory washes, ships in sight as small inked silhouettes with short heading arrows, the storm bruise and next phase, weather, gull-marked loot, landmarks readable from orbit; drawing a course with a finger (→ course input), tapping the edge to zoom back and resume; the compact round chart inset (your waters, rivals in sight, gull-marked loot, the storm) rendered for WP25.</p>
+<p>Owns: <code>src/render/camera.ts chart.ts</code>, <code>tests/render/chart.*</code>.</p>
+<p>DoD: a frame sequence of the full zoom (wp24-zoom-*.png) with no cut/fade/hitch; chart shot at both devices; course drawing test via harness touch; net seam never crosses land (test); compact chart shot.</p>
+</div>
+
+<div class="wp" id="wp25">
+<h3>WP25 — Controls, match HUD and haptics</h3>
+<p>Status: not started. Deps: WP4, WP5, WP9, WP24. Parallel-safe with: WP26.</p>
+<p>Scope: Controls — landscape touch only: left-half floating stick (turn; flick up/down steps reefed/plain/full), right side gull call with price, three consumable slots, aimed-fitting button (tap auto-aims, drag aims by hand), head home (hold), swipe up to break off, pinch for camera, tap the compact chart to open the chart; haptics for loop close (scaled to size), a rival touching your open trail, hit taken, broadside fired, chest landing, storm's edge, crossing into your waters, sinking (Capacitor Haptics; settings toggle). The match screen — ink on parchment scraps inside the safe areas, out of the frame's centre: top-left hull bar as a rope fraying as it empties with the ward's glow, stern-glass inset (rear-view spyglass lens) below when fitted; top-centre ships afloat and the storm's next move as a dial; top-right compact chart; lower-right gull call, purse pouch swelling with unbanked doubloons, bank, consumables, aimed-fitting button, head home; lower-left stick and current sail setting; lookout edge marks when fitted; darkening ink vignette on a threat's side; six fittings as small inked icons in their tier pigments along the bottom. Every indicator that can be graphic is graphic; numbers in the generated hand. Layout verified on iphone, ipad and the smallest iPhone (layout-only device added to the harness with WP0's agreement or by this WP).</p>
+<p>Owns: <code>src/ui/controls.ts hud.ts icons.ts haptics.ts</code>, <code>tests/ui/hud.*</code>.</p>
+<p>DoD: full-HUD shots at all three device sizes (wp25-*.png); touch tests for every control through the harness; latency from touch to visible response ≤ one frame cosmetically.</p>
+</div>
+
+<div class="wp" id="wp26">
+<h3>WP26 — Title, harbour and settings</h3>
+<p>Status: not started. Deps: WP4, WP10, WP14, WP19, WP23 (parchment kit from WP2). Parallel-safe with: WP25.</p>
+<p>Scope: The title — the planet turning slowly over parchment while "Portolan" letters itself stroke by stroke, then the harbour. The harbour is the menu — a calm lamp-lit scene on parchment at dusk, the ship at its mooring, the gull on the masthead; choose the ship form (unlocked only); spend treasure on the gull (traits, costs, plumage preview); read the league table; read the nine captains' cards (name, meaning, temperament, form, pigments, emblem, learned one-liner, record against the player); unroll the career chart (WP27 view); settings for sound, music, haptics and reduced motion; set sail. Startup to title within budget.</p>
+<p>Owns: <code>src/ui/title.ts harbour.ts cards.ts settings.ts</code> (+ <code>src/render/harbourScene.ts</code> if needed), <code>tests/ui/harbour.*</code>.</p>
+<p>DoD: title animation frames and harbour shots at both devices (wp26-*.png); touch flow test harbour → set sail; settings persist and apply.</p>
+</div>
+
+<div class="wp" id="wp27">
+<h3>WP27 — Chest choice, results, career chart, first voyage, sinking flow</h3>
+<p>Status: not started. Deps: WP10, WP24, WP25, WP26. Parallel-safe with: WP28.</p>
+<p>Scope: the three-item chest choice on parchment (items as inked icons in their tier pigments; choose one); when the player sinks — camera rises, the match plays out on the chart, skip to results with the rest resolved at once; the results screen explains the match (finishing position, sea claimed, ships sunk, treasure brought home; a short timeline of the deciding moments — break-off, loops, lost trails, chests chosen, fights, how it sank or won; rank points inked onto the wind rose; the league table moving to its new order; the next nine captains with their cards); the career chart view (new career mostly blank with coastlines barely sketched; inks what was seen; loot sites; region names lettered in calligraphy on first entry; a finished chart is a beautiful thing); the first voyage teaching through play with a few words of lettering at the right moments (break off, steer, close a first loop, call the gull and choose from a chest, fire a broadside, run from the storm); the player always understands why it won or lost.</p>
+<p>Owns: <code>src/ui/chestChoice.ts results.ts careerChart.ts tutorial.ts</code>, <code>tests/ui/results.*</code>.</p>
+<p>DoD: shots of chest choice, results with rose inking and table moving, career chart at 0 %/⅔/100 % inked, each tutorial moment (wp27-*.png); a scripted first voyage completes by touch.</p>
+</div>
+
+<div class="wp" id="wp28">
+<h3>WP28 — Audio I: engine and soundscape</h3>
+<p>Status: not started. Deps: WP5, WP9. Parallel-safe with: WP27 (any UI/render WP).</p>
+<p>Scope: audio starts on the first touch; everything synthesized: wind in the rigging rising with speed, the hull's creak, the bow wave, canvas filling and flogging, rain, surf on reefs, ice grinding, steam hissing at the volcano, the Maelstrom's roar; gull calls, puffins, seals, whale song; cannon, splashes, splinters, fire, the long groan of a sinking; coins with rising pitch as they stream in, the loop-closing chord, the chest landing on deck; spatial mix and buses; sound/music volume settings. Adapt legacy synthesis.</p>
+<p>Owns: <code>src/audio/engine.ts sfx.ts</code>, <code>tests/audio/*</code> (offline-render tests: deterministic buffers, no clipping, CPU per frame).</p>
+<p>DoD: offline renders of each sound saved as waveform plots (PNG) in <code>progress/shots/wp28-*.png</code> (no audio files committed); CPU budget measured.</p>
+</div>
+
+<div class="wp" id="wp29">
+<h3>WP29 — Audio II: the score</h3>
+<p>Status: not started. Deps: WP28. Parallel-safe with: WP30 (or WP27).</p>
+<p>Scope: period music on synthesized lute, recorder, viol, psaltery and frame drum; each region its own mode and motif (data in regions.ts); adaptive layers for calm sailing, danger nearby, battle, the storm's advance, the final calm, victory and defeat, changing on the beat; title and harbour music; loop chord in the current key.</p>
+<p>Owns: <code>src/audio/instruments.ts score.ts</code>, <code>tests/audio/score.*</code>.</p>
+<p>DoD: offline-rendered score excerpts per region and per layer as spectrogram/piano-roll PNGs (wp29-*.png); transition-on-beat test; CPU budget.</p>
+</div>
+
+<div class="wp" id="wp30">
+<h3>WP30 — Performance, startup and budgets (check 6)</h3>
+<p>Status: not started. Deps: WP13–WP27. Parallel-safe with: WP29 only (it may touch any render file).</p>
+<p>Scope: Performance and platform — steady 60 fps through a full match with every ship, effect and the storm, no thermal throttling (headroom), generated textures made once at startup, startup to title &lt; 5 s on the oldest device; check 6 harness (A9) and the optimisation needed anywhere in <code>src/render</code>, <code>src/ui</code>, <code>src/app</code> to pass it; stated per-frame budgets justified for the A14.</p>
+<p>Owns: <code>tests/acceptance/check6-budgets.ts</code>, <code>progress/checks/check6.json</code>; edits across render/ui/app for performance (announce in log).</p>
+<p>DoD: check 6 passes with margin and is recorded with the CPU-throttle justification; startup measured; no visual regressions (before/after captures of the affected scenes).</p>
+</div>
+
+<div class="wp" id="wp31">
+<h3>WP31 — Captures and browser acceptance (checks 2, 5, 7)</h3>
+<p>Status: not started. Deps: WP30 (all features present). Parallel-safe with: WP32.</p>
+<p>Scope: all 29 captures scripted and seeded at iphone and ipad (scene definitions, headless finder, replay — A10), each judged for composition, palette, line, light, mood and readability and re-staged until each is App-Store-worthy; check 2 end to end (Node vs Chromium at another frame rate with background-and-resume, plus WebKit); check 5 full touch career at both devices; check 7 generated-assets scan; zero console errors/warnings and zero network requests across every run (offline); update the captures grid and checks; final README/CREDITS pass.</p>
+<p>Owns: <code>tests/captures/*</code>, <code>tests/acceptance/check2-determinism.test.ts check5-touch.ts check7-assets.test.ts</code>, <code>progress/shots/&lt;capture&gt;-*.png</code>.</p>
+<p>DoD: 58 captures in the grid; checks 2, 5, 7 pass and are recorded.</p>
+</div>
+
+<div class="wp" id="wp32">
+<h3>WP32 — iOS (check 8)</h3>
+<p>Status: not started. Deps: WP0, WP27; captures step after WP31's scene definitions exist. Parallel-safe with: WP31.</p>
+<p>Scope: the app builds with Capacitor and runs offline in the iOS Simulator; safe areas around the notch/Dynamic Island/home indicator; haptics native plugin; background/resume via the App plugin; audio session set to playback; scripted autoplay via launch argument (title → harbour → full match → results) on an iPad booted headless with <code>xcrun simctl</code>; determinism hashes from JavaScriptCore compared with Node; every capture taken with <code>simctl io … screenshot</code> and the iPad captures compared with their Chromium counterparts (stated SSIM threshold); startup time in the Simulator.</p>
+<p>Owns: <code>tests/ios-check.ts</code> (on top of WP0's <code>tests/ios.ts</code>), native project settings in <code>ios/</code> (coordinate with WP0), <code>progress/shots/ios/*</code>.</p>
+<p>DoD: check 8 passes and is recorded; iOS captures in the grid.</p>
+</div>
+
+<div class="wp" id="wp33">
+<h3>WP33 — Review R1 (fresh harsh critic)</h3>
+<p>Status: not started. Deps: WP31, WP32. Parallel-safe with: nothing (reviewer works alone).</p>
+<p>Scope: PROMPT.md "Review": an independent reviewer with fresh context that has not seen the code, the conversation or any earlier review. It receives only PROMPT.md, the captures and the running game, which it plays through scripted touch on the harness. It judges every capture against PROMPT.md and the play by playing, and reports every flaw — style breaks (realistic shading, screen-space textures, inconsistent line, off-palette colour), unreadable frames, team colours blurring, UI over the action, distorted geometry, seams or pinching, floating/intersecting objects, rigging clipping sails, border flicker, trail gaps, broken animation, camera problems, text not in the generated hand or illegible, any human form or settlement, slow/vague/unfair controls, stupid/unfair/indistinguishable captains, dragging or abrupt matches, unclear losses, console errors and warnings.</p>
+<p>Owns: <a href="#review">Review findings</a> only (no code). DoD: every finding recorded with id, severity, where, evidence screenshot.</p>
+</div>
+
+<div class="wp" id="wp34">
+<h3>WP34+ — Fix rounds, then review again until clean</h3>
+<p>Status: not started. Deps: the preceding review.</p>
+<p>Scope: group the findings by domain into fix packages <code>F1a</code>, <code>F1b</code>, … each sized like a WP and owning disjoint files (at most two in parallel); each fix re-takes the affected captures, re-runs the affected checks, and records "how it was fixed" against each finding. Then <code>R2</code>: a new reviewer with fresh context reviews again; repeat <code>F2</code>, <code>R3</code>, … The game is done when a fresh reviewer finds nothing to fix and every acceptance check passes.</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="schedule">
+<h2>Schedule (at most two packages at a time)</h2>
+<table>
+<tr><th>Wave</th><th>Package A (sim / career / infra)</th><th>Package B (render / UI / audio)</th></tr>
+<tr><td>0</td><td>WP0 toolchain (external, running)</td><td>— (this audit)</td></tr>
+<tr><td>1</td><td>WP1 Sim kernel &amp; legacy retirement</td><td>WP2 Style module &amp; ink pipeline</td></tr>
+<tr><td>2</td><td>WP3 World data &amp; geography</td><td>WP4 Lettering</td></tr>
+<tr><td>3</td><td>WP5 App runtime, shell, hooks</td><td>WP18 Shipwright</td></tr>
+<tr><td>4</td><td>WP6 Sailing, wind, environment</td><td>WP13 Sea</td></tr>
+<tr><td>5</td><td>WP7 Territory, trails, doubloons (check 1)</td><td>WP14 Sky, light, night</td></tr>
+<tr><td>6</td><td>WP8 Opening, combat, storm, sight, match flow</td><td>WP15 Terrain, lighthouses, harbours, flora</td></tr>
+<tr><td>7</td><td>WP9 Fittings, consumables, chests, gull</td><td>WP16 Regions I</td></tr>
+<tr><td>8</td><td>WP10 Career, league, saving</td><td>WP17 Regions II</td></tr>
+<tr><td>9</td><td>WP11 Captains I</td><td>WP19 Ships alive</td></tr>
+<tr><td>10</td><td>WP12 Captains II (checks 3, 4)</td><td>WP20 Territory &amp; trails rendering</td></tr>
+<tr><td>11</td><td>WP21 Weather &amp; storm</td><td>WP22 Combat, reward &amp; current FX</td></tr>
+<tr><td>12</td><td>WP23 Life &amp; companion gull</td><td>WP24 Camera, deck-to-chart, chart</td></tr>
+<tr><td>13</td><td>WP25 Controls, HUD, haptics</td><td>WP26 Title, harbour, settings</td></tr>
+<tr><td>14</td><td>WP28 Audio I</td><td>WP27 Chest choice, results, career chart, first voyage</td></tr>
+<tr><td>15</td><td>WP30 Performance (check 6)</td><td>WP29 Audio II: score</td></tr>
+<tr><td>16</td><td>WP31 Captures, checks 2/5/7</td><td>WP32 iOS (check 8)</td></tr>
+<tr><td>17+</td><td>WP33 Review R1 → F1a ‖ F1b → R2 → … until a fresh reviewer finds nothing and all checks pass</td><td></td></tr>
+</table>
+<p>If a package finishes early, the next package in its column may start provided its dependencies are done and its files are disjoint from the running package.</p>
+</section>
+
+</main>
+</body>
+</html>
