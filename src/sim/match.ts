@@ -1,7 +1,7 @@
 // The match step: every system of the simulation, in order, once per tick. It is the only code that writes the
 // match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
 // inside. Each system appends its call here, in the order the rules need.
-import { earn, scoop } from './economy.ts';
+import { earn, forage, scoop } from './economy.ts';
 import { brew, stir, type Sea } from './environment.ts';
 import { applyControls, idleInput, inputAt, replay, type Recording, type ShipInput } from './input.ts';
 import { collide, sail } from './sailing.ts';
@@ -23,7 +23,8 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   }
   collide(state);
   chart(state);
-  earn(state);
+  earn(sea, state);
+  forage(sea, state);
   scoop(state);
   state.tick++;
 }

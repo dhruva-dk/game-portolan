@@ -1,4 +1,4 @@
-// WP7 part A, territory: the home disc and what its waters give, trails laid beyond it and the purse they fill, loops
+// WP7, territory: the home disc and what its waters and the harbours and landmarks give, trails laid beyond it and the purse they fill, loops
 // closing (round a cube corner, through a self-crossing trail, round a rival's sea, its open trail and an island's
 // landmark), breaking and the coins it spills, the first voyage's charmed loop, the storm swallowing sea, the pennant
 // and the snapshot, all through chart(), the step's territory system, with the ships' poses scripted.
@@ -6,15 +6,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { seaFor } from '../../src/sim/environment.ts';
-import { cross, normalize, v3, type V3 } from '../../src/sim/math.ts';
+import { cross, dot, normalize, v3, type V3 } from '../../src/sim/math.ts';
 import { AREA_Q, R, TERRITORY, advance, cellOf } from '../../src/sim/sphere.ts';
 import {
   EVENT, MATCH_FORMAT, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type Happening, type MatchState,
 } from '../../src/sim/state.ts';
-import { COINS, ECONOMY, FORMS, HOME } from '../../src/sim/tables.ts';
-import { atHome, chart, gullPrice, holds, inkHome, intruders, repairRate, swallow } from '../../src/sim/territory.ts';
+import { COINS, ECONOMY, FORMS, HARBOUR, HOME, PERK } from '../../src/sim/tables.ts';
+import {
+  atHome, beamMarks, chart, chestSpeed, crownBeam, gullPrice, holds, inkHome, intruders, perksOf, reloadSpeed, repairRate,
+  sheltered, swallow, unseen,
+} from '../../src/sim/territory.ts';
 import { world } from './vectors.ts';
 
+const sea = seaFor(world(), 1); // the land: the harbours and the landmarks whose perks part B grants
 const STEP = 3.5 * TICK; // u a tick
 const A = normalize(v3(0.8, 0.2, 0.5)); // anywhere: territory never reads the land
 const DISC = 2 * Math.PI * R * R * (1 - Math.cos(HOME.radius / R));
@@ -92,13 +96,13 @@ test('the home disc inks round the ship; its waters mend, cheapen the gull and m
   assert.equal(inked.amount, held);
   assert.equal(inked.cells.length, s.owner.filter((o) => o === 1).length);
   assert.ok(atHome(s, 0));
-  assert.equal(repairRate(s, 0), HOME.repair);
-  assert.equal(gullPrice(s, 0, 100), 100 * HOME.gull);
+  assert.equal(repairRate(sea, s, 0), HOME.repair);
+  assert.equal(gullPrice(sea, s, 0, 100), 100 * HOME.gull);
   assert.equal(intruders(s, 0), 0);
   park(s, 3, local(A, 4, -3));
   assert.equal(intruders(s, 0), 1 << 3);
-  assert.equal(repairRate(s, 3), 0);
-  assert.equal(gullPrice(s, 3, 100), 100);
+  assert.equal(repairRate(sea, s, 3), 0);
+  assert.equal(gullPrice(sea, s, 3, 100), 100);
   chart(s);
   assert.equal(s.leader, 0);
 });
@@ -249,8 +253,69 @@ test('territory, trails, purses, coins and the timeline survive a snapshot', () 
   glide(s, [[1, local(A, 20, 10)]]);
   route(s, 0, [A, local(A, 0, -20)]);
   assert.ok(s.ships[0].laid.length > 0 && s.coins.some((c) => c.value > 0));
-  assert.equal(MATCH_FORMAT.version, 4);
+  assert.equal(MATCH_FORMAT.version, 5);
   const back = decodeMatch(encodeMatch(s));
   assert.equal(matchHash(back), matchHash(s));
   assert.deepEqual([back.ships[0].laid, back.coins, back.timeline], [s.ships[0].laid, s.coins, s.timeline]);
+});
+
+// Part B: what the harbours and the landmarks' perks give. (The Root Gate and the Whale Road are tested through trim in
+// sailing.test.ts, the Eye's launch in environment.test.ts, the Weeping Isle and the Caldera in economy.test.ts.)
+
+/** The landmark carrying a perk. */
+const landmark = (perk: string) => sea.geo.landmarks.find((l) => l.perk === perk)!;
+
+/** Ship i holds the landmark carrying `perk`: the landmark's cell becomes its sea. */
+function grant(s: MatchState, perk: string, i: number): void {
+  s.owner[sea.marks[sea.geo.landmarks.indexOf(landmark(perk))]] = i + 1;
+}
+
+test('harbours mend any hull at harbour speed; home waters slowly, twice as fast with the Great Falls; the Great Lagoon at harbour speed and out of fire while held', () => {
+  const s = createMatch({ seed: 5 }), ship = s.ships[0];
+  assert.equal(new Set(sea.geo.harbours.map((h) => h.region)).size, sea.geo.landmarks.length); // a harbour in every region
+  for (const h of sea.geo.harbours) {
+    ship.pos = { ...h.pos };
+    assert.equal(repairRate(sea, s, 0), HARBOUR.repair);
+  }
+  ship.pos = { ...A };
+  assert.equal(repairRate(sea, s, 0), 0);
+  s.owner[cellOf(TERRITORY, A)] = 1;
+  assert.equal(repairRate(sea, s, 0), HOME.repair);
+  grant(s, 'greatFalls', 0);
+  assert.equal(repairRate(sea, s, 0), HOME.repair * PERK.greatFalls);
+  const lagoon = landmark('greatLagoon').pos;
+  ship.pos = { ...lagoon };
+  s.ships[1].pos = { ...lagoon };
+  assert.ok(!sheltered(sea, s, 0));
+  grant(s, 'greatLagoon', 0);
+  assert.ok(sheltered(sea, s, 0) && !sheltered(sea, s, 1));
+  assert.equal(repairRate(sea, s, 0), HARBOUR.repair);
+});
+
+test('the Arch, the Sandbar Light, Spice Harbour and the Kelp Cathedral give their holder its edge, and nobody else', () => {
+  const s = createMatch({ seed: 5 }), held = ['arch', 'sandbarLight', 'spiceHarbour', 'kelpCathedral'];
+  s.ships[0].pos = { ...A };
+  s.ships[1].pos = { ...A };
+  const edge = (i: number) => [reloadSpeed(sea, s, i), chestSpeed(sea, s, i), gullPrice(sea, s, i, 100), unseen(sea, s, i)];
+  assert.deepEqual(edge(0), [1, 1, 100, false]);
+  for (const perk of held) grant(s, perk, 0);
+  assert.deepEqual(edge(0), [PERK.arch, PERK.sandbarLight, 100 * PERK.spiceHarbour, false]);
+  s.owner[cellOf(TERRITORY, A)] = 1; // in its own waters: off rival charts, and its gull cheaper still
+  assert.deepEqual(edge(0), [PERK.arch, PERK.sandbarLight, 100 * HOME.gull * PERK.spiceHarbour, true]);
+  assert.deepEqual(edge(1), [1, 1, 100, false]);
+  const marks = held.reduce((m, perk) => m | (1 << sea.geo.landmarks.indexOf(landmark(perk))), 0);
+  assert.deepEqual([perksOf(sea, s, 0), perksOf(sea, s, 1)], [marks, 0]);
+});
+
+test("the Crown Light's turning beam marks the rivals in it on its holder's chart", () => {
+  const s = createMatch({ seed: 5 }), light = landmark('crownLight').pos, beam = crownBeam(sea, s, v3()), d = v3();
+  for (const ship of s.ships) ship.pos = normalize(v3(-light.x, -light.y, -light.z)); // the fleet out of its reach
+  advance(light, beam, 30, s.ships[3].pos, d);
+  advance(light, beam, PERK.crownLight.reach + 10, s.ships[4].pos, d); // in line, but beyond its reach
+  assert.equal(beamMarks(sea, s, 0), 0); // nobody holds it
+  grant(s, 'crownLight', 0);
+  assert.deepEqual([beamMarks(sea, s, 0), beamMarks(sea, s, 3)], [1 << 3, 0]);
+  s.tick += Math.round(PERK.crownLight.period / 4 / TICK); // a quarter turn on, clockwise
+  assert.equal(beamMarks(sea, s, 0), 0);
+  assert.ok(Math.abs(dot(crownBeam(sea, s, v3()), beam)) < 1e-9);
 });

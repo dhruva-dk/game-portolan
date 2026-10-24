@@ -249,12 +249,51 @@ export const ECONOMY = {
   income: 1 / 60000, // a second per u² held, straight into the bank: one doubloon a minute for every 1000 u²
 };
 
-/** Floating coins: a spill scatters its doubloons as up to `most` coins of about `each`, within `scatter` u. */
+/** What floats (MatchState.coins): a spill scatters its doubloons as up to `most` coins of about `each`, within `scatter` u. */
 export const COINS = {
-  count: 64, // coins afloat at once; a spill into a full sea takes the oldest coins' places
+  count: 96, // things afloat at once (coins, flotsam, bottles); a full sea gives the oldest one's place to the new
   each: 15,
   most: 8,
   scatter: 2.5, // u
-  reach: 1.5, // u: a hull passing this close scoops a coin
+  reach: 1.5, // u: a hull passing this close scoops a coin, flotsam or a bottle
   life: 90, // s afloat before a coin sinks
+};
+
+/** Harbours: any hull in a harbour's waters (Geography ZONE.harbour) mends at harbour speed. */
+export const HARBOUR = {
+  repair: 4, // hull points a second (WP8 mends the hull)
+};
+
+/**
+ * What the landmarks' perks give while the landmark lies in the holder's waters (PROMPT.md, The regions). The Root
+ * Gate and the Whale Road are in TRIM, the Eye in VORTEX (sailing.ts), the Caldera in CALDERA.
+ */
+export const PERK = {
+  crownLight: { reach: 70, half: 0.15, period: 12 }, // the beam: u, half-width rad, s a turn
+  greatFalls: 2, // home-waters repair ×
+  arch: 4 / 3, // reload speed × (WP8, WP9)
+  sandbarLight: 2, // gull chest flight speed × (WP9)
+  weepingIsle: 2, // income ×
+  spiceHarbour: 0.5, // gull price ×
+};
+
+/**
+ * The Caldera erupts every `eruption` s of its region's mechanics, for `burst` s: a coin worth its share of `value`
+ * falls every `drop` s within `spread` u of its shore, into its holder's waters (`tries` points, else into the crater), or
+ * anywhere at sea round it while nobody holds it.
+ */
+export const CALDERA = { burst: 8, drop: 0.5, value: 90, spread: 24, tries: 8 };
+
+/**
+ * Finds (PROMPT.md, Doubloons), worth `value` × their region's richness. A wreck or an island cache is taken by holding
+ * within `reach` u of it for `hold` s, and is back `refill` s (± `jitter` of that) later. Every `every` s a wreck there
+ * to take sheds flotsam (`pieces` within `scatter` u), and a bottle comes afloat somewhere at sea (`tries` points); both
+ * drift on the currents, are scooped by sailing through them like coins, and are gone after `life` s.
+ */
+export const FINDS = {
+  wreck: { value: 40, reach: 4, hold: 4, refill: 180 },
+  cache: { value: 75, reach: 9, hold: 6, refill: 300 },
+  jitter: 0.25,
+  flotsam: { value: 5, pieces: 4, scatter: 3, every: 15, life: 75 },
+  bottle: { value: 35, every: 40, life: 240, tries: 16 },
 };

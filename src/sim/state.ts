@@ -7,6 +7,7 @@ import { addScaled, cross, dot, hash32, normalize, rngFrom, rngInt, rngRange, v3
 import { TERRITORY, advance, tangentToward } from './sphere.ts';
 import { COINS, DAY, FORMS, GUSTS, SAILS, SLOTS, SPELL, START_FITTINGS, WEATHER } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
+import { REGIONS } from './world/regions.ts';
 
 /** Seconds per tick: the simulation's fixed timestep. */
 export const TICK = 1 / 30;
@@ -22,6 +23,12 @@ const STREAMS = STREAM.captains + SHIPS - 1;
 
 /** The sail settings that ShipInput.sail steps between. */
 export const SAIL = { reefed: 0, plain: 1, full: 2 } as const;
+
+/** What floats for any hull to scoop (MatchState.coins): coins spilled or rained, flotsam wrecks shed, drifting bottles. */
+export const AFLOAT = { coin: 0, flotsam: 1, bottle: 2 } as const;
+
+/** The find sites: the wrecks and island caches of every region (Geography.finds order). */
+const FIND_SITES = REGIONS.reduce((n, r) => n + r.finds.length, 0);
 
 /** A point or direction in space: positions are unit vectors from the planet's centre, headings unit tangents. */
 const XYZ = rec(['x', f64], ['y', f64], ['z', f64]);
@@ -51,6 +58,8 @@ const SHIP = rec(
   ['purse', f64], // doubloons won on the open trail: lost if it breaks, banked when its loop closes
   ['bank', f64], // doubloons banked, safe for the match
   ['held', f64], // the sea it holds, AREA_Q quanta: whole numbers, so exact in any order (territory.ts keeps it)
+  ['prize', int], // the find site it is holding beside to take: −1 none
+  ['holding', f64], // the seconds it has held there
 );
 
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
@@ -62,8 +71,8 @@ const GUST = rec(['at', XYZ], ['age', f64], ['life', f64], ['r', f64]);
  */
 const WEATHER_SPELL = rec(['kind', int], ['at', XYZ], ['v', XYZ], ['r', f64], ['age', f64], ['life', f64]);
 
-/** A coin afloat, worth `value` doubloons (0: a free place), sinking at COINS.life seconds of age. */
-const COIN = rec(['at', XYZ], ['value', f64], ['age', f64]);
+/** Something afloat, of an AFLOAT kind, worth `value` doubloons (0: a free place), gone at the end of its kind's life. */
+const COIN = rec(['kind', int], ['at', XYZ], ['value', f64], ['age', f64]);
 
 /** An EVENT: its kind, the ship it is about, the other ship in it (−1 none), where, how much, and the cells it touched. */
 const HAPPENING = rec(['kind', int], ['ship', int], ['by', int], ['at', XYZ], ['amount', f64], ['cells', list(int)]);
@@ -81,7 +90,8 @@ const MATCH = rec(
   ['hour', f64], // the hour the match started at; hourOf (weather.ts) gives the hour now
   ['owner', bytes(TERRITORY.cells)], // who holds each territory cell: 0 nobody, else ship index + 1
   ['trail', bytes(TERRITORY.cells)], // whose open trail crosses each cell, coded the same way
-  ['coins', list(COIN, COINS.count)], // the coins afloat
+  ['coins', list(COIN, COINS.count)], // what floats: coins, flotsam, bottles
+  ['finds', list(f64, FIND_SITES)], // each find site's wait: seconds until it is back to take, 0 while it is there
   ['leader', int], // the ship flying the gold-leaf pennant, holding the most sea; −1 while nobody holds any
   ['charm', bool], // the first voyage: the player's trail cannot break until its first loop closes
   ['events', list(HAPPENING)], // this tick's events, cleared at the start of each step
@@ -95,7 +105,7 @@ export type MatchState = Value<typeof MATCH>;
 export type Coin = Value<typeof COIN>;
 export type Happening = Value<typeof HAPPENING>;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 4, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 5, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -104,9 +114,12 @@ export const EVENT = {
   broken: 2, // a trail broke: ship its owner, by the rival that crossed it, at the break, amount the purse lost, cells the trail
   spill: 3, // doubloons spilled as coins round `at`: ship whose they were, amount
   bank: 4, // a purse banked: amount
-  scoop: 5, // a ship scooped a coin at `at`: amount
+  scoop: 5, // a ship scooped something afloat at `at`: by its AFLOAT kind, amount
   swallow: 6, // the storm swallowed sea: amount its u², cells
   lead: 7, // the pennant passed to ship (−1 nobody) from by: amount the u² the new holder holds
+  find: 8, // a ship took a wreck or cache: by the find site (Geography.finds), at the site, amount
+  afloat: 9, // flotsam or a bottle came afloat: by its AFLOAT kind, at where, amount its worth
+  erupt: 10, // the Caldera erupted: ship its holder (−1 nobody), at the Caldera, amount the doubloons it rains
 } as const;
 
 /** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
@@ -144,10 +157,10 @@ export function createMatch(setup: MatchSetup): MatchState {
   for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, forms[i]));
   for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
   const weather = Array.from({ length: WEATHER.count }, () => ({ kind: SPELL.fair, at: v3(0, 0, 1), v: v3(), r: 0, age: 0, life: 0 }));
-  const coins = Array.from({ length: COINS.count }, () => ({ at: v3(0, 0, 1), value: 0, age: 0 }));
+  const coins = Array.from({ length: COINS.count }, () => ({ kind: AFLOAT.coin, at: v3(0, 0, 1), value: 0, age: 0 }));
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
-    coins, leader: -1, charm: firstVoyage, events: [], timeline: [],
+    coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, events: [], timeline: [],
   };
 }
 
@@ -171,7 +184,7 @@ function launch(route: CurrentRoute, i: number, form: number): Ship {
     form, pos, head, was: { ...pos }, wasHead: { ...head }, speed: FORMS[form].speed * SAILS[SAIL.full].speed, rate: 0,
     shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
     fittings: START_FITTINGS.map((kind) => ({ kind, tier: 0 })), bump: 0, bumped: -1, bumpOn: 0,
-    laid: [], purse: 0, bank: 0, held: 0,
+    laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
   };
 }
 

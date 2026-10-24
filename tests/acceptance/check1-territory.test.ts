@@ -137,6 +137,6 @@ for (const [name, pole] of POLES) {
   for (const deg of [10, 30, 50, 70]) test(`check 1: θ = ${deg}° from the ${name} pole`, () => check(name, pole, deg));
 }
 test('check 1 at θ = 89°: the loop that halves the planet, the most the flood ever visits', () => check('north', v3(0, 1, 0), 89));
-test('claim cost ≤ 3 ms for every loop', { todo: 'not met yet: 3.5–5 ms measured for θ ≥ 50° (progress.html, WP7)' }, () => {
+test('claim cost ≤ 3 ms for every loop', { todo: 'not met yet: 2.9–3.1 ms measured at θ = 70° (progress.html, WP7)' }, () => {
   assert.ok(Math.max(...costs) <= 3, `the slowest claim took ${Math.max(...costs)} ms`);
 });
