@@ -1,9 +1,10 @@
 // Being a ship under way. The helm answers with the momentum and turning circle of the ship's form; the sails'
 // three settings trade speed against the turn; the point of sail, the waters, the landmarks held, the fittings,
-// torn canvas and gusts trim the speed; the current and any shove carry the ship; land and other ships stop it, and
+// torn canvas, gusts, kelp and pack ice trim the speed; the current, the Maelstrom's grip and any shove carry the
+// ship; land, floes and other ships stop it, and
 // the closing speed of every blow is reported in the ship's bump fields for the damage of reefs, rocks and rams (WP8).
 import {
-  aground, currentAt, newWind, windAt, type Sea, type Wind,
+  aground, currentAt, newWind, offFloe, timeOf, vortexAt, windAt, type Sea, type Wind,
 } from './environment.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
@@ -11,10 +12,10 @@ import { helmOf } from './route.ts';
 import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
 import { SHIPS, TICK, type MatchState, type Ship } from './state.ts';
 import {
-  BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM,
+  BUMP, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, TRIM, VORTEX,
 } from './tables.ts';
-import { heightAt } from './world/geography.ts';
-import type { Perk } from './world/regions.ts';
+import { ZONE, heightAt } from './world/geography.ts';
+import { REGIONS, type Perk } from './world/regions.ts';
 
 /** Ship.bumped when nothing was struck, and when it was land. */
 export const BUMPED = { nothing: -1, land: SHIPS } as const;
@@ -22,7 +23,7 @@ export const BUMPED = { nothing: -1, land: SHIPS } as const;
 /** Per-tick approach to a target with time constant tau: x += (target − x)·k. */
 const approach = (tau: number): number => 1 - dexp(-TICK / tau);
 const K = FORMS.map((f) => ({ accel: approach(f.accel), drag: approach(f.drag), helm: approach(f.helm) }));
-const K_SHOVE = approach(BUMP.shove);
+const K_SHOVE = approach(BUMP.shove), K_GRIP = approach(VORTEX.grip), K_CARRY = approach(VORTEX.carry);
 
 /** A form's point-of-sail speed factor; c is the cosine of the angle off the wind, 1 head to wind, −1 dead before it. */
 export function pointOfSail(form: number, c: number): number {
@@ -30,7 +31,7 @@ export function pointOfSail(form: number, c: number): number {
   return 1 + POINT * (-f.close * c - f.reach * (2 * c * c - 1));
 }
 
-/** What the waters, the landmarks held, the fittings and torn canvas make of a ship's speed and turn. */
+/** What the waters (whose, kelp, pack ice), the landmarks held, the fittings and torn canvas make of speed and turn. */
 export interface Trim {
   speed: number;
   turn: number;
@@ -47,7 +48,8 @@ export function holds(sea: Sea, state: MatchState, i: number, perk: Perk): boole
 }
 
 export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
-  const ship = state.ships[i], holder = state.owner[cellOf(TERRITORY, ship.pos)] - 1;
+  const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos), holder = state.owner[cell] - 1;
+  const zone = sea.geo.zones[cell], waters = REGIONS[sea.geo.region[cell]].mechanics;
   const rig = ship.fittings[SLOT.rig], hull = ship.fittings[SLOT.hull];
   let speed = 1, turn = 1;
   if (holder === i) speed *= 1 + TRIM.home;
@@ -57,10 +59,22 @@ export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
   if (rig.kind === FITTING.lateenMizzen) turn *= 1 + LATEEN_MIZZEN[rig.tier];
   if (hull.kind === FITTING.copperSheathing) speed *= 1 + COPPER[hull.tier];
   if (ship.torn > 0) speed *= 1 - TRIM.torn;
+  if ((zone & ZONE.kelp) !== 0 && waters.kelp) speed *= waters.kelp.slow;
+  if ((zone & ZONE.pack) !== 0 && waters.packSlow) speed *= waters.packSlow;
   out.speed = speed;
   out.turn = turn;
   out.stormSails = rig.kind === FITTING.stormSails;
   return out;
+}
+
+/**
+ * The hull ship i loses each second to the Fire Archipelago's hot water where it lies (WP8 deals it): none outside the
+ * hot zones, and none to a copper-sheathed hull.
+ */
+export function scald(sea: Sea, state: MatchState, i: number): number {
+  const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos);
+  if ((sea.geo.zones[cell] & ZONE.hot) === 0 || ship.fittings[SLOT.hull].kind === FITTING.copperSheathing) return 0;
+  return REGIONS[sea.geo.region[cell]].mechanics.hotDamage ?? 0;
 }
 
 /**
@@ -83,6 +97,7 @@ const W = newWind(), T = newTrim(), V = v3(), P1 = v3(), H1 = v3(), PROBE = v3()
 /** Ship i's tick: the helm, the way it gathers or loses, the turn, and the move over the sea. */
 export function sail(sea: Sea, state: MatchState, i: number, input: ShipInput): void {
   const ship = state.ships[i], form = FORMS[ship.form], k = K[ship.form];
+  grip(sea, state, i);
   copy(ship.was, ship.pos);
   copy(ship.wasHead, ship.head);
   ship.bump = 0;
@@ -109,10 +124,30 @@ export function sail(sea: Sea, state: MatchState, i: number, input: ShipInput): 
   set(ship.shove, ship.shove.x * (1 - K_SHOVE), ship.shove.y * (1 - K_SHOVE), ship.shove.z * (1 - K_SHOVE));
 }
 
-/** The ship's velocity over the ground, u/s: its way along the heading, the current and any shove. */
+const FLOW = v3();
+
+/**
+ * The Maelstrom's grip: inside the vortex its water takes the hull round with it (ship.fling closes on its flow);
+ * leaving it, a ship keeps VORTEX.keep of that way, or all of it under its own colour (The Eye: launched at full
+ * speed), and the way then dies off. Runs before `was` moves on, while it is still where the ship was a tick ago.
+ */
+function grip(sea: Sea, state: MatchState, i: number): void {
+  const ship = state.ships[i], f = ship.fling;
+  if (vortexAt(ship.pos, FLOW)) {
+    set(f, f.x + (FLOW.x - f.x) * K_GRIP, f.y + (FLOW.y - f.y) * K_GRIP, f.z + (FLOW.z - f.z) * K_GRIP);
+    return;
+  }
+  if (f.x === 0 && f.y === 0 && f.z === 0) return;
+  const keep = vortexAt(ship.was, FLOW) && !holds(sea, state, i, 'eye') ? VORTEX.keep : 1, s = keep * (1 - K_CARRY);
+  if (dot(f, f) * s * s < VORTEX.still * VORTEX.still) set(f, 0, 0, 0);
+  else set(f, f.x * s, f.y * s, f.z * s);
+}
+
+/** The ship's velocity over the ground, u/s: its way along the heading, the current, the vortex's carry and any shove. */
 export function velocityOf(sea: Sea, ship: Ship, out: V3): V3 {
   currentAt(sea, ship.pos, out);
   addScaled(out, out, ship.head, ship.speed);
+  addScaled(out, out, ship.fling, 1);
   return addScaled(out, out, ship.shove, 1);
 }
 
@@ -129,13 +164,14 @@ function move(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): void 
   velocityOf(sea, ship, V);
   const on = tryMove(sea, state, ship, grounded);
   if (on === null) return;
-  shoreNormal(sea, PROBE, V, N);
+  shoreNormal(sea, state, PROBE, V, N);
   const into = -dot(V, N);
   if (into > 0) {
     report(ship, into, BUMPED.land, on);
     addScaled(V, V, N, into);
     ship.speed *= 1 - (1 - LAND.keep) * Math.max(0, -dot(ship.head, N));
     addScaled(ship.shove, ship.shove, N, Math.max(0, -dot(ship.shove, N)));
+    addScaled(ship.fling, ship.fling, N, Math.max(0, -dot(ship.fling, N)));
   }
   tryMove(sea, state, ship, grounded);
 }
@@ -163,11 +199,16 @@ function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): nu
   copy(ship.pos, P1);
   copy(ship.head, H1);
   addScaled(ship.shove, ship.shove, P1, -dot(ship.shove, P1));
+  addScaled(ship.fling, ship.fling, P1, -dot(ship.fling, P1));
   return null;
 }
 
-/** The unit tangent at p pointing off the shore, down the slope of the ground; straight back along v where it is flat. */
-function shoreNormal(sea: Sea, p: V3, v: V3, out: V3): V3 {
+/**
+ * The unit tangent at p pointing off what it struck: off the floe, or off the shore down the slope of the ground, or
+ * straight back along v where the ground is flat.
+ */
+function shoreNormal(sea: Sea, state: MatchState, p: V3, v: V3, out: V3): V3 {
+  if (offFloe(sea, timeOf(state), p, out)) return out;
   const d = 0.6 / R;
   localFrame(p, E, NN);
   const gx = heightAt(sea.geo, normalize(addScaled(P1, p, E, d))) - heightAt(sea.geo, normalize(addScaled(P1, p, E, -d)));
@@ -222,8 +263,9 @@ function contact(state: MatchState, i: number, j: number): void {
   const ia = 1 / fa.mass, ib = 1 / fb.mass, share = ia / (ia + ib), pen = touch - gap;
   shift(a, SEP, -pen * share);
   shift(b, SEP, pen * (1 - share));
-  set(DV, a.head.x * a.speed + a.shove.x - b.head.x * b.speed - b.shove.x, a.head.y * a.speed + a.shove.y
-    - b.head.y * b.speed - b.shove.y, a.head.z * a.speed + a.shove.z - b.head.z * b.speed - b.shove.z);
+  set(DV, a.head.x * a.speed + a.shove.x + a.fling.x - b.head.x * b.speed - b.shove.x - b.fling.x,
+    a.head.y * a.speed + a.shove.y + a.fling.y - b.head.y * b.speed - b.shove.y - b.fling.y,
+    a.head.z * a.speed + a.shove.z + a.fling.z - b.head.z * b.speed - b.shove.z - b.fling.z);
   const closing = dot(DV, SEP);
   if (closing <= 0) return;
   const impulse = ((1 + BUMP.restitution) * closing) / (ia + ib);

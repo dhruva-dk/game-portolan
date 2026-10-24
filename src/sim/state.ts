@@ -3,9 +3,9 @@
 // snapshot encoding and its hash all follow from them. To add state, add a field to a schema here and bump
 // MATCH_FORMAT.version, so snapshots of the old shape are discarded rather than misread.
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Value } from './codec.ts';
-import { addScaled, cross, dot, hash32, normalize, rngFrom, v3 } from './math.ts';
+import { addScaled, cross, dot, hash32, normalize, rngFrom, rngInt, rngRange, v3 } from './math.ts';
 import { TERRITORY, advance, tangentToward } from './sphere.ts';
-import { FORMS, GUSTS, SAILS, SLOTS, START_FITTINGS } from './tables.ts';
+import { DAY, FORMS, GUSTS, SAILS, SLOTS, SPELL, START_FITTINGS, WEATHER } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 
 /** Seconds per tick: the simulation's fixed timestep. */
@@ -35,6 +35,7 @@ const SHIP = rec(
   ['speed', f64], // u/s through the water along the heading
   ['rate', f64], // turn rate, rad/s, positive to starboard
   ['shove', XYZ], // a tangent velocity in u/s from blows (collisions), dying away
+  ['fling', XYZ], // the Maelstrom's carry, u/s tangent: its water's way, kept a while after leaving it
   ['sail', int], // a SAIL setting
   ['course', list(int)], // the drawn course: territory cells to sail through in order; empty when steering by hand
   ['leg', int], // the course point being sailed for
@@ -51,21 +52,30 @@ const SHIP = rec(
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
 const GUST = rec(['at', XYZ], ['age', f64], ['life', f64], ['r', f64]);
 
+/**
+ * A weather spell, of a SPELL kind (a fog bank, a squall, a calm, or a fair rest): its centre, its drift (u/s tangent)
+ * and outer radius (u), rising and fading over its life. Never yet sent while life = 0.
+ */
+const WEATHER_SPELL = rec(['kind', int], ['at', XYZ], ['v', XYZ], ['r', f64], ['age', f64], ['life', f64]);
+
 const MATCH = rec(
   ['seed', int], // the match seed, a uint32
   ['tick', int], // ticks stepped; match time is tick·TICK
   ['rng', list(words(4), STREAMS)], // each STREAM's generator
   ['ships', list(SHIP, SHIPS)],
   ['gusts', list(GUST, GUSTS.count)],
+  ['weather', list(WEATHER_SPELL, WEATHER.count)],
+  ['hour', f64], // the hour the match started at; hourOf (weather.ts) gives the hour now
   ['owner', bytes(TERRITORY.cells)], // who holds each territory cell: 0 nobody, else ship index + 1
   ['trail', bytes(TERRITORY.cells)], // whose open trail crosses each cell, coded the same way
 );
 
 export type Ship = Value<typeof SHIP>;
 export type Gust = Value<typeof GUST>;
+export type Spell = Value<typeof WEATHER_SPELL>;
 export type MatchState = Value<typeof MATCH>;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 2, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 3, schema: MATCH };
 
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
@@ -73,20 +83,33 @@ export interface MatchSetup {
   seed: number;
   /** Each ship's FORM, player first; every ship sails the starting pinnace when left out. */
   forms?: readonly number[];
+  /** The hour it starts at, 0 ≤ hour < 24; anywhere in one of the day's openings (DAY.starts), by the seed, when left out. */
+  hour?: number;
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed, forms = new Array<number>(SHIPS).fill(0) } = setup;
+  const { seed, forms = new Array<number>(SHIPS).fill(0), hour = startHour(seed) } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
   if (forms.length !== SHIPS || !forms.every((f) => Number.isInteger(f) && f >= 0 && f < FORMS.length)) {
     throw new RangeError(`createMatch: forms ${forms} are not ${SHIPS} FORM ids`);
   }
+  if (!(hour >= 0 && hour < 24)) throw new RangeError(`createMatch: hour ${hour} is not in 0…24`);
   const rng: Uint32Array[] = [];
   for (let s = 0; s < STREAMS; s++) rng.push(rngFrom(hash32(seed, s)));
   const route = greatCurrent(seed), ships: Ship[] = [], gusts: Gust[] = [];
   for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, forms[i]));
   for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
-  return { seed, tick: 0, rng, ships, gusts, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells) };
+  const weather = Array.from({ length: WEATHER.count }, () => ({ kind: SPELL.fair, at: v3(0, 0, 1), v: v3(), r: 0, age: 0, life: 0 }));
+  return {
+    seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
+  };
+}
+
+/** The hour a match starts at when its setup leaves it out: anywhere in one of the day's openings, by the seed. */
+function startHour(seed: number): number {
+  const rng = rngFrom(hash32(seed, STREAMS)); // a generator of its own, numbered past every stream
+  const [from, to] = DAY.starts[rngInt(rng, DAY.starts.length)];
+  return rngRange(rng, from, to);
 }
 
 /** The fleet's places at the head of the Great Current: two ranks of five abreast, the player in the front centre. */
@@ -100,7 +123,7 @@ function launch(route: CurrentRoute, i: number, form: number): Ship {
   normalize(addScaled(head, head, pos, -dot(head, pos)));
   return {
     form, pos, head, was: { ...pos }, wasHead: { ...head }, speed: FORMS[form].speed * SAILS[SAIL.full].speed, rate: 0,
-    shove: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
+    shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0, homing: false, torn: 0,
     fittings: START_FITTINGS.map((kind) => ({ kind, tier: 0 })), bump: 0, bumped: -1, bumpOn: 0,
   };
 }

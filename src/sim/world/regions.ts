@@ -121,6 +121,11 @@ export interface Region {
     packSlow?: number;
     packR?: number;
     vortex?: Vortex;
+    /**
+     * Mangrove Labyrinth: the roots break the wind within `reach` u of the banks, down to `still` of its strength at
+     * the bank, and unsettle its direction (WP6).
+     */
+    shelter?: { reach: number; still: number };
     /** The Caldera's eruption period, s. */
     eruption?: number;
   };
@@ -505,7 +510,7 @@ export const REGIONS: readonly Region[] = [
     weather: { fair: 5, fog: 3, squall: 2, calm: 2 },
     richness: 1.2,
     rim: 82, passes: [],
-    mechanics: {},
+    mechanics: { shelter: { reach: 10, still: 0.45 } },
     music: { mode: 'dorian', motif: [0, 3, 5, 7, 5, 10, 7] },
   },
   {

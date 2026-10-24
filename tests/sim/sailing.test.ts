@@ -23,9 +23,10 @@ const input = (patch: Partial<ShipInput> = {}): ShipInput => ({ ...idleInput(), 
 const apart = (a: V3, b: V3) => R * Math.sqrt(Math.max(0, (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2));
 const WEEPING = REGIONS.findIndex((r) => r.id === 'weepingIsle');
 
-/** A match with ship 0 at p heading along bearing b (radians from north), making its way under `sail`. */
+/** A match in fair weather with ship 0 at p heading along bearing b (radians from north), making way under `sail`. */
 function match(forms: number | number[], p: V3, b: number, sail: number = SAIL.plain, seed = SEED): MatchState {
   const s = createMatch({ seed, forms: Array.isArray(forms) ? forms : new Array(SHIPS).fill(forms) });
+  for (const spell of s.weather) spell.life = 1e9; // no spell is ever sent: the weather's own tests are in environment.test.ts
   put(s, 0, p, tangentAt(p, b, v3()), sail);
   return s;
 }

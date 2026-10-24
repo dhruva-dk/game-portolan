@@ -153,6 +153,61 @@ export const GREAT_CURRENT = { width: 18, speed: 5.5, taper: 30 };
 export const LANE_TAPER = 12;
 
 // ---------------------------------------------------------------------------------------------------------------
+// Weather, the hour and the regions' moving waters (WP6)
+
+/** What a weather spell is; a fair spell is a slot resting before the seed sends its next. */
+export const SPELL = { fair: 0, fog: 1, squall: 2, calm: 3 } as const;
+
+/** The weather (PROMPT.md, Wind, currents, tides, and time). */
+export const WEATHER = {
+  /** Spells over the planet at once, fair ones included. */
+  count: 48,
+  /** By SPELL: outer radius in u and life in s (a fair spell has no extent; its life is the rest before the next). */
+  spells: [
+    { r: [0, 0], life: [20, 50] },
+    { r: [26, 48], life: [60, 120] },
+    { r: [22, 40], life: [50, 90] },
+    { r: [34, 60], life: [70, 140] },
+  ],
+  /** Seconds a spell takes to rise, and to fade. */
+  rise: 15,
+  /** Depth is full where 1 − (d/r)² ≥ 1/core: over the inner ~77 % of the radius, thinning to nothing at the edge. */
+  core: 2.5,
+  /** Spells drift downwind at this fraction of the wind, re-taking its direction every `stride` ticks. */
+  drift: 0.15,
+  stride: 30,
+  /** Farther than `open` u from any coast is the open sea, where squalls form `openSquall` times as often. */
+  open: 40,
+  openSquall: 3.5,
+  /** Fog this deep hides ships and trails, and a trail laid in it never shows on rival charts. */
+  veil: 0.5,
+  /**
+   * At a spell's heart: sight × fog.sight in fog; the wind's strength × (1 + squall.wind), sight × squall.sight and
+   * the sea's roughness × squall.rough in a squall; the wind's strength × (1 − calm.drop) and a flat sea in a calm.
+   */
+  fog: { sight: 0.3 },
+  squall: { wind: 0.5, sight: 0.55, rough: 1.8 },
+  calm: { drop: 0.75 },
+};
+
+/** The hour (PROMPT.md, Time of day): the sun advances `rate` hours a second, so ten minutes of play cover 3.5 hours. */
+export const DAY = {
+  rate: 3.5 / 600,
+  /** The openings a match starts in, hours: dawn into morning, afternoon into dusk, the blue hour into night. */
+  starts: [[4.75, 5.75], [14.25, 15.25], [18, 18.75]],
+  /** The sun rises at `sunrise` and sets twelve hours later; its path leans `tilt` from the zenith (noon stands at 60°). */
+  sunrise: 6,
+  tilt: PI / 6,
+};
+
+/**
+ * The Maelstrom (PROMPT.md, The regions): its swirl falls by `fall` from the eye wall to the rim; its water closes a
+ * hull's way on its flow with time constant `grip` s; a ship leaving it keeps `keep` of that way (all of it under its
+ * own colour: The Eye), which dies off with time constant `carry` s until under `still` u/s.
+ */
+export const VORTEX = { fall: 0.4, grip: 1.2, carry: 4, keep: 0.5, still: 0.02 };
+
+// ---------------------------------------------------------------------------------------------------------------
 // Fittings (ids and slots: WP6, for the sailing modifiers; WP9 adds the rest of their rules)
 
 export const SLOT = { bow: 0, broadside: 1, stern: 2, rig: 3, hull: 4, lookout: 5 } as const;
