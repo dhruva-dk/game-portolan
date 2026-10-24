@@ -210,7 +210,9 @@ void main() {
   col = mix(col, white, lead * 0.9);
   col = mix(col, pen, waves * 0.95);
   col = mix(col, uInk, coast * 0.9);
-  writeInk(col, normalize(dir + 0.3 * (vNormal - dir)));
+  // the far sea goes into the sky's horizon wash (render/sky.ts lays the same), so sea and sky meet at every hour
+  col = mix(col, uSkyHorizon * parchment(q) / uPaper, far * far * 0.6);
+  writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)));
 }
 `;
 

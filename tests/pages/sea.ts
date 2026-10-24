@@ -1,6 +1,6 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea over the real geography, ships
-// riding the swell, and a free camera. Query: view=deck|high|coast|hull|seam|pole|curve, hour=<0–24>, wind=<0–1.4>,
-// clock=<s> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|coast|hull|seam|pole|curve|light,
+// hour=<0–24>, wind=<0–1.4>, squall=<0–1>, clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
@@ -8,14 +8,16 @@ import { Sea } from '../../src/render/sea.ts';
 import type { Riding } from '../../src/render/swell.ts';
 import { Ship } from '../../src/render/ships/shipwright.ts';
 import type { FormName } from '../../src/render/ships/forms.ts';
-import { inkMaterial, linearVec } from '../../src/style/glsl.ts';
+import { Sky } from '../../src/render/sky.ts';
+import type { Lamp } from '../../src/render/light.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, localFrame, R } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
 
 const q = new URLSearchParams(location.search);
-const view = q.get('view') ?? 'deck', hour = Number(q.get('hour') ?? 15.5), wind = Number(q.get('wind') ?? 0.9);
+const view = q.get('view') ?? 'deck', wind = Number(q.get('wind') ?? 0.9);
+let hour = Number(q.get('hour') ?? 15.5);
 const hold = q.has('clock') ? Number(q.get('clock')) : null;
 type V = THREE.Vector3;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -23,7 +25,6 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const canvas = document.querySelector('canvas')!;
 const pipeline = new Pipeline(canvas), style = pipeline.style;
 pipeline.pinScale(1);
-style.setHour(hour);
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
 let t0 = performance.now();
 const geo = buildGeography();
@@ -33,20 +34,9 @@ const sea = new Sea(pipeline, geo);
 const seaMs = performance.now() - t0;
 scene.add(sea.mesh);
 
-// a stand-in sky (the real one is WP15's): the hour's wash from horizon to zenith, never inked
-const skyUp = V();
-const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), inkMaterial(style, {
-  id: 0, side: THREE.BackSide,
-  uniforms: { uUp: { value: skyUp }, uZenith: { value: linearVec(style.palette.skyZenith) }, uLow: { value: linearVec(style.palette.skyHorizon) } },
-  vertexShader: 'out vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `in vec3 vDir; uniform vec3 uUp; uniform vec3 uZenith; uniform vec3 uLow;
-  void main() {
-    vec3 d = normalize(vDir);
-    Paper q = paperAt(d * 400.0, d, 0.0);
-    writeInk(mix(uLow, uZenith, smoothstep(-0.02, 0.7, dot(d, uUp))) * parchment(q) / uPaper, -d);
-  }`,
-}));
-scene.add(sky);
+// the sky: the hour's wash, clouds, the sun or the moon and stars, the light every material reads, lamps and beams
+const sky = new Sky(style, geo);
+scene.add(sky.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -88,7 +78,7 @@ function spot(region: string, want: number): { at: V; land: V } {
 // ships riding the swell
 const CAPTAINS: (readonly [RGB, RGB])[] = [[P.vermilion, P.black], [P.ultramarine, P.gold], [P.teal, P.cream]];
 const FORMS: FormName[] = ['caravel', 'galleon', 'carrack', 'pinnace'];
-const afloat: { ship: Ship; at: V; fwd: V }[] = [];
+const afloat: { ship: Ship; at: V; fwd: V; lantern: Lamp }[] = [];
 /** A ship `ahead` u along the camera's heading and `aside` u to its right, sailing `turn` rad off that heading. */
 function launch(ahead: number, aside: number, turn: number, detail = 1): void {
   const i = afloat.length, up = cam.foot.clone().normalize(), fwd = frameAt(up, cam.heading).clone();
@@ -96,7 +86,8 @@ function launch(ahead: number, aside: number, turn: number, detail = 1): void {
   const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail });
   ship.setRig(ship.rig.state('plain', 2.2, 0.7));
   scene.add(ship);
-  afloat.push({ ship, at, fwd: frameAt(at, headingToward(at, fwd.clone().add(up)) + turn).clone() });
+  const lantern = sky.lights.add({ pos: V(), reach: 4.5 });
+  afloat.push({ ship, at, fwd: frameAt(at, headingToward(at, fwd.clone().add(up)) + turn).clone(), lantern });
 }
 
 function look(foot: V, toward: V | number, height: number, pitch: number): void {
@@ -109,6 +100,18 @@ if (view === 'deck') {
   const s = spot('Coral', 11);
   look(s.at, s.land, 3.2, -0.07);
   launch(9, 4, 1.3); launch(24, -7, -0.6); launch(40, 9, 2.2, 0.35);
+} else if (view === 'light') {
+  // offshore of the lighthouse whose seaward view looks back most nearly west, over three ships with lanterns
+  const WEST = -1.75, reach = Number(q.get('off') ?? 45), o = reach / 45;
+  let best = { off: Infinity, at: V(), lamp: V() };
+  for (const l of geo.lights) {
+    const lamp = V(l.pos.x, l.pos.y, l.pos.z).normalize(), at = V();
+    advance(lamp, V(l.facing.x, l.facing.y, l.facing.z), reach, at, V());
+    const d = headingToward(at, lamp) - WEST, off = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+    if (heightAt(geo, at) < -2 && off < best.off) best = { off, at, lamp };
+  }
+  look(best.at, best.lamp, Number(q.get('height') ?? 6), Number(q.get('pitch') ?? -0.15));
+  launch(12 * o, -5, 1.2); launch(20 * o, 7, -0.7); launch(31 * o, -11, 2.4, 0.6);
 } else if (view === 'high') {
   const s = spot('Coral', 40);
   look(s.at, s.land, 34, -0.5);
@@ -130,10 +133,7 @@ if (view === 'deck') {
 aim();
 frameAt(UP, cam.heading + 1.1);
 sea.setWind(UP, F, wind);
-// the sun from the west-southwest, climbing and falling with the hour (the moon by night)
-const el = Math.max(0.12, Math.sin(((hour - 6) / 12) * Math.PI) * 1.05);
-frameAt(UP, cam.heading - 2.2);
-style.uniforms.uSun.value.copy(UP).multiplyScalar(Math.sin(el)).addScaledVector(F, Math.cos(el)).normalize();
+const weather = { wind: F.clone().multiplyScalar(wind), squall: Number(q.get('squall') ?? 0), calm: 0 };
 
 // free camera
 let drag: { x: number; y: number } | null = null;
@@ -162,7 +162,7 @@ resize();
 const ride: Riding = { position: V(), up: V() };
 const basis = new THREE.Matrix4(), X = V(), Z = V();
 let frames = 0, last = performance.now(), clock = hold ?? 0;
-const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, geoMs, seaMs };
+const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -176,17 +176,17 @@ function frame(now: number): void {
     cam.foot.copy(outP);
   }
   aim();
-  sky.position.copy(camera.position);
-  skyUp.copy(UP);
   for (const a of afloat) {
     sea.swell.ride(a.at, a.fwd, 6, 2, clock, ride);
     Z.copy(a.fwd).addScaledVector(ride.up, -ride.up.dot(a.fwd)).normalize();
     basis.makeBasis(X.crossVectors(ride.up, Z), ride.up, Z);
     a.ship.quaternion.setFromRotationMatrix(basis);
     a.ship.position.copy(ride.position);
+    a.lantern.pos.copy(ride.position).addScaledVector(ride.up, 2.4).addScaledVector(Z, -2.6);
   }
+  sky.update(hour, clock, camera.position, weather);
   pipeline.render(scene, camera, dt);
-  if (++frames === 3) Object.assign(hook, { ready: true, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls });
+  Object.assign(hook, { ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

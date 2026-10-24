@@ -25,6 +25,8 @@ export const PAPER_TILE_CSS = 280;
 export const HATCH_SPACING_CSS = 4.6;
 /** World units per tile of the foxing and stain marks: two incommensurate scales, so the pattern never repeats. */
 export const MARK_SCALES: readonly [number, number] = [41, 67];
+/** How many lamps (render/light.ts) lay their warm pools through candle() at once: the nearest to the eye. */
+export const MAX_GLOWS = 8;
 
 const glslVec3 = (c: RGB) => `vec3(${c.map((x) => x.toFixed(5)).join(', ')})`;
 const lin = (c: RGB) => glslVec3(toLinear(c));
@@ -45,6 +47,10 @@ export interface StyleUniforms {
   uNight: THREE.IUniform<number>;
   uRenderPx: THREE.IUniform<number>; // render pixels per CSS px (device pixel ratio × render scale)
   uTime: THREE.IUniform<number>; // render clock, seconds; it stops while the chart is open
+  uSkyZenith: THREE.IUniform<THREE.Vector3>; // linear: the hour's sky wash high and low, and its glow toward a low sun
+  uSkyHorizon: THREE.IUniform<THREE.Vector3>;
+  uSkyGlow: THREE.IUniform<THREE.Vector3>;
+  uGlows: THREE.IUniform<THREE.Vector4[]>; // the nearest lamps (render/light.ts): world position, reach (0 = unlit)
 }
 
 export interface Style {
@@ -71,6 +77,10 @@ export function createStyle(): Style {
     uNight: { value: 0 },
     uRenderPx: { value: 1 },
     uTime: { value: 0 },
+    uSkyZenith: { value: v() },
+    uSkyHorizon: { value: v() },
+    uSkyGlow: { value: v() },
+    uGlows: { value: Array.from({ length: MAX_GLOWS }, () => new THREE.Vector4()) },
   };
   const style = {
     textures,
@@ -85,6 +95,9 @@ export function createStyle(): Style {
       uniforms.uSunTint.value.fromArray(toLinear(p.sunTint));
       uniforms.uSilver.value.fromArray(toLinear(p.silver));
       uniforms.uNight.value = p.night;
+      uniforms.uSkyZenith.value.fromArray(toLinear(p.skyZenith));
+      uniforms.uSkyHorizon.value.fromArray(toLinear(p.skyHorizon));
+      uniforms.uSkyGlow.value.fromArray(toLinear(p.skyGlow));
     },
   };
   style.setHour(12);
@@ -130,6 +143,10 @@ uniform vec3 uSilver;
 uniform float uNight;
 uniform float uRenderPx;
 uniform float uTime;
+uniform vec3 uSkyZenith;
+uniform vec3 uSkyHorizon;
+uniform vec3 uSkyGlow;
+uniform vec4 uGlows[${MAX_GLOWS}];
 `;
 
 /** Everything a style shader draws with. Requires the uniforms above (included by inkMaterial and uiMaterial). */
@@ -277,6 +294,17 @@ float washPool(vec3 n, vec3 v, Paper q) {
 
 // The lit side's warm glaze (strong at golden hour, nothing at midday).
 vec3 sunGlaze(vec3 col, float ndl, float tone) { return wash(col, uSunTint, clamp(ndl, 0.0, 1.0) * (1.0 - tone) * 0.7); }
+
+// Lamplight by night: within each lamp's reach (uGlows) the page is seen as by candlelight, the hour's cool paper
+// relit warm. Every scene material calls it last, at its world position; by day every reach is 0.
+vec3 candle(vec3 col, vec3 p) {
+  float g = 0.0;
+  for (int i = 0; i < ${MAX_GLOWS}; i++) {
+    float f = max(1.0 - distance(p, uGlows[i].xyz) / max(uGlows[i].w, 1e-3), 0.0) * step(1e-3, uGlows[i].w);
+    g += f * f;
+  }
+  return mix(col, col * ${lin(hex('#f4d6a2'))} / max(uPaper, vec3(0.02)), min(g, 1.0) * 0.85);
+}
 
 // ---- gold leaf -------------------------------------------------------------------------------------------
 // Burnished gold leaf, the only thing that shines: a crinkled mirror, deep where it reflects the sea and bright where
@@ -481,7 +509,7 @@ void main() {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;
     col = mix(col, uSilver, 0.65 * hatching(rot2(0.6) * hc, rot2(0.6) * hdx, rot2(0.6) * hdy, lit * 0.26, uSeed + 11.0));
   }
-  writeInk(col, n);
+  writeInk(candle(col, vWorld), n);
 }
 `;
 
