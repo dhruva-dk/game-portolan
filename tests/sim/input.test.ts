@@ -5,39 +5,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FLAG, INPUT_FIELDS, STEER_MAX, applyControls, idleInput, inputAt, parseRecording, record, recorder, replay,
-  type Recording, type ShipInput,
+  FLAG, INPUT_FIELDS, applyControls, idleInput, inputAt, parseRecording, record, recorder, replay, type Recording,
+  type ShipInput,
 } from '../../src/sim/input.ts';
-import { rngChance, rngFrom, rngInt, type Rng } from '../../src/sim/math.ts';
+import { rngFrom, rngInt } from '../../src/sim/math.ts';
 import { runMatch, step } from '../../src/sim/match.ts';
 import { TERRITORY } from '../../src/sim/sphere.ts';
 import { SAIL, TICK, createMatch, decodeMatch, encodeMatch, matchHash } from '../../src/sim/state.ts';
-
-/** A player who acts like a thumb: holds the helm for a while, steps the sails, now and then draws a course. */
-function scriptedInputs(seed: number, ticks: number): ShipInput[] {
-  const r: Rng = rngFrom(seed), inputs: ShipInput[] = [], held = idleInput();
-  for (let t = 0; t < ticks; t++) {
-    const input = { ...held, sail: 0, consumable: -1, chestPick: -1, course: null as number[] | null };
-    if (rngChance(r, 0.05)) held.steer = input.steer = rngInt(r, 2 * STEER_MAX + 1) - STEER_MAX;
-    if (rngChance(r, 0.01)) input.sail = rngChance(r, 0.5) ? 1 : -1;
-    if (rngChance(r, 0.01)) held.flags = input.flags = rngInt(r, 32);
-    if (rngChance(r, 0.003)) input.consumable = rngInt(r, 3);
-    if (rngChance(r, 0.003)) held.aim = input.aim = rngChance(r, 0.5) ? -1 : rngInt(r, TERRITORY.cells);
-    if (rngChance(r, 0.002)) input.chestPick = rngInt(r, 3);
-    if (rngChance(r, 0.002)) input.course = rngChance(r, 0.2) ? [] : Array.from({ length: 1 + rngInt(r, 40) }, () => rngInt(r, TERRITORY.cells));
-    inputs.push(input);
-  }
-  return inputs;
-}
-
-function recordAll(inputs: ShipInput[]): Recording {
-  const rec = recorder();
-  inputs.forEach((input, t) => record(rec, t, input));
-  return rec.recording;
-}
+import { recordInputs, scriptedInputs } from './vectors.ts';
 
 test('a recording replays the exact input of every tick, from any tick, through JSON', () => {
-  const inputs = scriptedInputs(1, 20_000), recording = recordAll(inputs);
+  const inputs = scriptedInputs(1, 20_000), recording = recordInputs(inputs);
   const changes = recording.events.length;
   assert.ok(changes < inputs.length / 2, `${changes} change events for ${inputs.length} ticks`);
 
@@ -107,7 +85,7 @@ test('controls: sail steps stop at reefed and full; a course is set, kept, copie
 });
 
 test('the same seed and inputs give the same match; any difference shows in the hash', () => {
-  const recording = recordAll(scriptedInputs(7, 9000));
+  const recording = recordInputs(scriptedInputs(7, 9000));
   const run = (seed: number, rec: Recording) => {
     const s = createMatch({ seed });
     runMatch(s, rec, 9000);
@@ -117,14 +95,14 @@ test('the same seed and inputs give the same match; any difference shows in the 
   const h = run(42, recording);
   assert.equal(run(42, recording), h);
   assert.notEqual(run(43, recording), h);
-  assert.notEqual(run(42, recordAll(scriptedInputs(8, 9000))), h);
+  assert.notEqual(run(42, recordInputs(scriptedInputs(8, 9000))), h);
   assert.notEqual(matchHash(createMatch({ seed: 42 })), h, 'the inputs reach the state');
   assert.equal(9000 * TICK, 300, 'five minutes of match');
   for (const seed of [-1, 2 ** 32, 1.5, NaN]) assert.throws(() => createMatch({ seed }), RangeError);
 });
 
 test('a match resumed from a snapshot at any tick ends identical to one never interrupted', () => {
-  const end = 6000, recording = recordAll(scriptedInputs(3, end));
+  const end = 6000, recording = recordInputs(scriptedInputs(3, end));
   const whole = createMatch({ seed: 9 });
   runMatch(whole, recording, end);
   const r = rngFrom(4);
