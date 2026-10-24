@@ -1,6 +1,7 @@
 // The match step: every system of the simulation, in order, once per tick. It is the only code that writes the
 // match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
 // inside. Each system appends its call here, in the order the rules need.
+import { combat } from './combat.ts';
 import { earn, forage, scoop } from './economy.ts';
 import { over } from './end.ts';
 import { brew, stir, type Sea } from './environment.ts';
@@ -10,10 +11,13 @@ import { collide, sail } from './sailing.ts';
 import { PHASE, SHIPS, type MatchState } from './state.ts';
 import { storm } from './storm.ts';
 import { chart } from './territory.ts';
-import { noteFog } from './visibility.ts';
+import { newSight, noteFog, survey } from './visibility.ts';
 
 /** The captains' input until they think for themselves (WP11): hands off the helm. */
 const CAPTAIN: ShipInput = idleInput();
+
+/** What every ship sees this tick, surveyed once the hulls have moved: whom its guns may engage (and, WP11, what its captain knows). */
+const SIGHT = Array.from({ length: SHIPS }, newSight);
 
 /** Advance the match on its sea by one tick of TICK seconds, with the player's input for this tick. Once over, it stands still. */
 export function step(sea: Sea, state: MatchState, player: ShipInput): void {
@@ -32,6 +36,8 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
     }
   }
   collide(state);
+  survey(sea, state, SIGHT);
+  combat(sea, state, SIGHT);
   chart(state);
   noteFog(state);
   storm(state);

@@ -9,7 +9,7 @@ import {
 } from './math.ts';
 import { R, TERRITORY, advance } from './sphere.ts';
 import {
-  COINS, DAY, DOUBLED_PLANKING, FITTING, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
+  BATTERIES, COINS, DAY, DOUBLED_PLANKING, FITTING, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
 } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 import { REGIONS } from './world/regions.ts';
@@ -84,6 +84,12 @@ const SHIP = rec(
   ['flask', f64], // seconds left of its fog flask, and of its flare (WP9 lights and burns them; visibility.ts reads them)
   ['flare', f64],
   ['fogged', list(bool)], // beside `laid`: whether each cell was laid in fog, never to show on rival charts (visibility.ts)
+  ['fire', f64], // seconds left of the fire burning its hull (combat.ts ignite), and the ship that set it (−1 none)
+  ['fireBy', int],
+  ['ward', f64], // seconds left of its ward (WP9 lights and burns it): combat.ts damage takes nothing from the hull meanwhile
+  ['reload', list(f64, BATTERIES)], // by BATTERY, seconds until it has reloaded (combat.ts)
+  ['gunnery', f64], // how well its gunners lead a moving target, 0 … 1 (Outfit.gunnery)
+  ['harm', list(f64, SHIPS)], // the hull it has lost to each ship: the captains remember who hurt them
 );
 
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
@@ -110,6 +116,16 @@ const CHEST = rec(['at', XYZ], ['fitting', FIT], ['from', int]);
 /** A sinking: the ship, the ship that sank it (−1 none), its CAUSE and its tick. */
 const SINKING = rec(['ship', int], ['by', int], ['cause', int], ['tick', int]);
 
+/**
+ * A shot in flight (combat.ts launch): fired by `ship` from its `kind` of FITTING, flying along the great circle from
+ * `from` to where it falls, `to`, in `time` s, `age` s of it flown, `top` u high at mid-flight (drawn only). It strikes
+ * for `power` hull with an EFFECT lasting `lasting` s; a shell with `blast` > 0 flies over everything and bursts where it falls.
+ */
+const SHOT = rec(
+  ['ship', int], ['kind', int], ['from', XYZ], ['to', XYZ], ['age', f64], ['time', f64], ['top', f64],
+  ['power', f64], ['effect', int], ['lasting', f64], ['blast', f64],
+);
+
 /** A calm of the storm's plan: the storm-free cap round `at`, of angular radius r. */
 const CALM = rec(['at', XYZ], ['r', f64]);
 
@@ -131,6 +147,7 @@ const MATCH = rec(
   ['timeline', list(ENTRY)], // the events the results remember
   ['storm', rec(['origin', XYZ], ['calms', list(CALM)])], // where the storm rises, revealed from the first tick, and its plan (stormPlan)
   ['chests', list(CHEST)], // chests afloat
+  ['shots', list(SHOT)], // shots in flight, in the order fired
   ['sunk', list(SINKING)], // the sinkings, in the order they happened: the finishing order from the last place up
   ['winner', int], // the last ship afloat once the match is over; −1 while it runs
 );
@@ -144,11 +161,12 @@ export type Happening = Value<typeof HAPPENING>;
 export type Entry = Value<typeof ENTRY>;
 export type Chest = Value<typeof CHEST>;
 export type Sinking = Value<typeof SINKING>;
+export type Shot = Value<typeof SHOT>;
 
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 7, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 8, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -170,6 +188,13 @@ export const EVENT = {
   chest: 15, // a sinking dropped a chest at `at`: ship whose, by the FITTING in it, amount its tier
   win: 16, // the match is over: ship the last afloat, amount the u² it holds
   freed: 17, // a sunk ship's sea fell to nobody: amount its u², cells
+  broadside: 18, // a battery fired (muzzle smoke, "a broadside fired"): by the rival it bore on, at the ship, amount its BATTERY
+  hit: 19, // a shot struck ship ("a hit taken": splinters, a shiver through its sails): by the shooter, at where, amount the hull it struck for
+  splash: 20, // a shot fell at `at` without striking a hull: ship the shooter, amount 1 on land, 0 in the sea
+  ram: 21, // ship was rammed by `by`: at the pair, amount the hull it struck for
+  struck: 22, // ship struck reef or rock at speed: amount the hull it lost
+  ablaze: 23, // ship's hull caught fire: by who set it (−1 embers), amount the seconds it will burn
+  engage: 24, // timeline only: a rival first drew ship's hull: by the rival, amount the CAUSE
 } as const;
 
 /** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
@@ -193,6 +218,8 @@ export interface Outfit {
   fittings?: readonly { kind: number; tier: number }[];
   /** The companion gull's level (WP9); 1, the gull every captain starts with. */
   gull?: number;
+  /** How well its gunners lead a moving target, 0 (where it is) … 1 (where it will be), by the captain's rank (WP11); 1. */
+  gunnery?: number;
 }
 
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
@@ -223,7 +250,7 @@ export function createMatch(setup: MatchSetup): MatchState {
   return {
     seed, tick: 0, rng, ships, gusts, weather, hour, owner: new Uint8Array(TERRITORY.cells), trail: new Uint8Array(TERRITORY.cells),
     coins, finds: new Array<number>(FIND_SITES).fill(0), leader: -1, charm: firstVoyage, events: [], timeline: [],
-    storm: stormPlan(rng[STREAM.storm]), chests: [], sunk: [], winner: -1,
+    storm: stormPlan(rng[STREAM.storm]), chests: [], shots: [], sunk: [], winner: -1,
   };
 }
 
@@ -231,7 +258,8 @@ export function createMatch(setup: MatchSetup): MatchState {
 function check(o: Outfit, i: number): void {
   const whole = (x: number | undefined, below = Infinity): boolean => x === undefined || (Number.isInteger(x) && x >= 0 && x < below);
   const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f) => whole(f.kind) && whole(f.tier, TIERS)));
-  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !whole(o.gull) || !fits) {
+  const share = o.gunnery === undefined || (o.gunnery >= 0 && o.gunnery <= 1);
+  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !whole(o.gull) || !fits || !share) {
     throw new RangeError(`createMatch: ship ${i}'s outfit cannot be fitted out`);
   }
 }
@@ -294,14 +322,15 @@ export function onCurrent(route: CurrentRoute, s: number, lane: number, pos: V3,
 
 /** Ship i as outfit o fits it out, under full sail in its place on the Great Current, riding it. */
 function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
-  const { form = FORM.pinnace, pigment = i, pattern = 0, gull = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
+  const { form = FORM.pinnace, pigment = i, pattern = 0, gull = 1, gunnery = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
   const fittings = o.fittings ? o.fittings.map(({ kind, tier }) => ({ kind, tier })) : START_FITTINGS.map((kind) => ({ kind, tier: 0 }));
   onCurrent(route, ride, LANE[i], pos, head);
   return {
     form, pigment, pattern, gull, phase: PHASE.riding, ride, peel: 0, pos, head, was: { ...pos }, wasHead: { ...head },
     speed: OPENING.way, rate: 0, shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0,
     homing: false, torn: 0, fittings, bump: 0, bumped: -1, bumpOn: 0, laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
-    hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [],
+    hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [], fire: 0, fireBy: -1, ward: 0,
+    reload: new Array<number>(BATTERIES).fill(0), gunnery, harm: new Array<number>(SHIPS).fill(0),
   };
 }
 

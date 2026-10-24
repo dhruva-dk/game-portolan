@@ -17,7 +17,7 @@ import { R } from '../../src/sim/sphere.ts';
 import {
   AFLOAT, CAUSE, EVENT, PHASE, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState,
 } from '../../src/sim/state.ts';
-import { END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
+import { SLOT, END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { regionOf } from '../../src/sim/world/geography.ts';
 import { world } from './vectors.ts';
@@ -71,6 +71,12 @@ function play(sea: Sea, s: MatchState, off: number, dooms: readonly Doom[], unti
   return s;
 }
 
+/** The fleet with its guns struck below, so only the script or the storm sinks a ship (combat.test.ts fights). */
+function unarmed(s: MatchState): MatchState {
+  for (const ship of s.ships) ship.fittings[SLOT.broadside] = { kind: FITTING.none, tier: 0 };
+  return s;
+}
+
 test('the fleet rides the Great Current abreast from the first tick, with the storm\'s origin revealed', () => {
   const s = createMatch({ seed: SEED });
   assert.ok(Math.abs(length(s.storm.origin) - 1) < 1e-12);
@@ -119,7 +125,7 @@ test('breaking off at different moments makes the home in different regions', ()
 });
 
 test('a ship that rides to the end of the current is thrown off there and makes its home past it', () => {
-  const s = createMatch({ seed: SEED }), p = passage(sea, s.ships[0].ride, newPassage()), idle = idleInput();
+  const s = unarmed(createMatch({ seed: SEED })), p = passage(sea, s.ships[0].ride, newPassage()), idle = idleInput();
   while (s.ships.some((ship) => ship.phase !== PHASE.sailing) && s.tick < S(200)) step(sea, s, idle);
   const thrown = s.timeline.filter((e) => e.kind === EVENT.thrown), pts = sea.current.points, k = pts.length - 3;
   const tip = v3(pts[k], pts[k + 1], pts[k + 2]), mine = thrown.find((e) => e.ship === 0);
@@ -172,7 +178,7 @@ test('a sinking spills the purse, frees the sea, pays the bounty (double for the
 });
 
 test('a scripted match runs from the opening to the last ship afloat, and its results explain it', () => {
-  const s = play(sea, createMatch({ seed: SEED, fleet: FLEET }), S(20), WIN), r = result(s), me = r.ships[0];
+  const s = play(sea, unarmed(createMatch({ seed: SEED, fleet: FLEET })), S(20), WIN), r = result(s), me = r.ships[0];
   assert.deepEqual([s.winner, s.tick, r.ticks], [0, S(230), S(230)]);
   assert.deepEqual(r.order, [0, ...WIN.map(([, i]) => i).reverse()]);
   assert.deepEqual([me.place, me.sank, me.by, me.cause], [1, 4, -1, -1]);
@@ -189,7 +195,7 @@ test('a scripted match runs from the opening to the last ship afloat, and its re
 });
 
 test('when the player sinks, the rest of the match resolves at once, to the end it would have had', () => {
-  const s = play(sea, createMatch({ seed: SEED, fleet: FLEET }), S(20), LOSS, S(110) + 1), idle = idleInput();
+  const s = play(sea, unarmed(createMatch({ seed: SEED, fleet: FLEET })), S(20), LOSS, S(110) + 1), idle = idleInput();
   assert.ok(s.ships[0].phase === PHASE.sunk && !over(s));
   const out = decodeMatch(encodeMatch(s)), close = STORM.phases[STORM.phases.length - 1];
   resolve(sea, s);

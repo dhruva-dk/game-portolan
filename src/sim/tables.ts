@@ -319,6 +319,89 @@ export const OPENING = { ride: RIDE, way: RIDE - GREAT_CURRENT.speed, peel: 0.6,
  */
 export const END = { bounty: 60 };
 
+// ---------------------------------------------------------------------------------------------------------------
+// Combat (WP8)
+
+/** A ship's batteries: its two broadsides, and the carrack's heavy stern castle firing astern. */
+export const BATTERY = { port: 0, starboard: 1, castle: 2 } as const;
+export const BATTERIES = 3;
+
+/** What a shot does besides holing the hull, for its `lasting` s: tear the sails (Ship.torn, TRIM.torn), or set the hull afire (FIRE). */
+export const EFFECT = { none: 0, tear: 1, burn: 2 } as const;
+
+/** A gun fitting's battery: how it bears, reloads, strikes and flies. */
+export interface Gun {
+  /** u: the farthest it is laid. */
+  readonly range: number;
+  /** rad: half the arc it bears on, either side of the beam (a broadside) or of the stern (stern guns). */
+  readonly arc: number;
+  /** s to reload after firing. */
+  readonly reload: number;
+  /** The hull a ball strikes for at the muzzle, by tier, and the share of it lost by full range. */
+  readonly damage: readonly number[];
+  readonly falloff: number;
+  /** How far a ball falls from where it was laid, across and along the line of fire, as a share of the distance. */
+  readonly spread: number;
+  /** u/s the shot flies at, and the height of its arc at mid-flight as a share of the distance (drawn only). */
+  readonly speed: number;
+  readonly loft: number;
+  /** u: a shell lobbed over everything bursts where it falls, striking hulls this close; 0 for shot fired flat, striking the first hull in its path. */
+  readonly blast: number;
+  /** An EFFECT on a hull it strikes, lasting `lasting` s. */
+  readonly effect: number;
+  readonly lasting: number;
+}
+
+/**
+ * By FITTING: the light guns, the starting guns, short-ranged and quick to reload. WP9 adds the long and swivel guns,
+ * chain shot (EFFECT.tear), heated shot (EFFECT.burn), the stern chasers and the mortar (blast) as rows.
+ */
+export const GUNS: Readonly<Partial<Record<number, Gun>>> = {
+  [FITTING.lightGuns]: {
+    range: 22, arc: 0.45, reload: 2.5, damage: [6, 6.6, 7.2, 7.8, 8.4], falloff: 0.4, spread: 0.05, speed: 30, loft: 0.06,
+    blast: 0, effect: EFFECT.none, lasting: 0,
+  },
+};
+
+/** The carrack's heavy stern castle: `guns` of its broadside fitting firing astern, bearing within `arc` rad of the stern. */
+export const CASTLE = { guns: 2, arc: 0.5 };
+
+/**
+ * Gunnery. A ball within `ball` u of a hull strikes it; one striking along the hull's length, raking it from bow or
+ * stern, does up to 1 + `rake` times what one striking its beam does. Gunners of gunnery g (0 … 1, Ship.gunnery) lead
+ * their target by g of its way over the shot's flight and lay their guns `wild` × (1 − g) wider. A battery's guns are
+ * spread over `deck` of the hull's length (the castle's over its beam) and fire parallel.
+ */
+export const GUNNERY = { ball: 0.15, rake: 0.5, wild: 0.1, deck: 0.6, passes: 3 };
+
+/**
+ * Ramming: a hull striking another with its bow (Ship.bumpOn ≥ `bow`) at a closing speed over `speed` u/s holes it for
+ * `damage` hull per u/s over that, × its bow's power (BOWS) and × 2m / (m + m′) by the forms' masses; the rammer takes
+ * `recoil` of it, × its bow's recoil.
+ */
+export const RAM = { bow: 0.5, speed: 0.6, damage: 3.5, recoil: 0.2 };
+
+/** A bow fitting's ramming power by tier and the share of the recoil it takes. */
+export interface Bow {
+  readonly power: readonly number[];
+  readonly recoil: number;
+}
+
+/** The stem post, the starting ram: weak. A bow without a row in BOWS rams as the stem post. */
+export const STEM_POST: Bow = { power: [1, 1.1, 1.2, 1.3, 1.4], recoil: 1 };
+
+/** By FITTING (WP9 adds the iron ram and the cutwater). */
+export const BOWS: Readonly<Partial<Record<number, Bow>>> = { [FITTING.stemPost]: STEM_POST };
+
+/** Reefs and rocks: a hull striking land faster than `speed` u/s loses `damage` hull per u/s over it. */
+export const ROCKS = { speed: 1.5, damage: 4 };
+
+/**
+ * Fire burns `rate` hull a second while it lasts. In the Fire Archipelago's hot water embers set a hull alight
+ * `embers` times a second on average, copper-sheathed or not, for `ember` s.
+ */
+export const FIRE = { rate: 1.5, embers: 1 / 25, ember: 5 };
+
 /** Doubled planking by tier: the share of its form's hull points it adds. */
 export const DOUBLED_PLANKING = [0.15, 0.22, 0.3, 0.38, 0.45];
 
