@@ -130,8 +130,8 @@ test('vector helpers', () => {
   assert.equal(m.length(m.v3(3, 4, 12)), 13);
   assert.ok(Math.abs(m.length(m.normalize(m.v3(1e-100, 3e-100, -2e-100))) - 1) < 1e-15);
   assert.deepEqual(m.normalize(m.v3()), { x: 0, y: 0, z: 0 });
-  assert.deepEqual(m.copy(out, a), a);
-  assert.notEqual(m.copy(out, a), a);
+  assert.equal(m.set(out, 1, 2, 3), out);
+  assert.deepEqual(out, a);
 });
 
 // ---------------------------------------------------------------------------------------------------------------

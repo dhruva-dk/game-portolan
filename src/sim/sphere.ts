@@ -27,7 +27,7 @@ export interface FaceUV {
 }
 
 /** The cube face a direction points through, and its plain gnomonic coordinates on it. */
-export function gnomonicUV(p: V3, out: FaceUV): FaceUV {
+function gnomonicUV(p: V3, out: FaceUV): FaceUV {
   const ax = Math.abs(p.x), ay = Math.abs(p.y), az = Math.abs(p.z);
   if (ax >= ay && ax >= az) {
     out.face = p.x >= 0 ? 0 : 1;

@@ -4,11 +4,10 @@
 // but not on Math.sin, Math.exp and the other transcendental functions: V8 (Node, Chromium) and JavaScriptCore
 // (Safari, the iOS app's web view) return different last bits. Everything here is built from the exact
 // operations only, so every result is a pure function of the input bits on every engine. Accuracy against the
-// engines' own functions is measured over the stated ranges by tests/sim/math.test.ts (worst cases near 1e-16).
+// engines' own functions is measured over the stated ranges by tests/sim/math.test.ts (worst cases under 1e-15).
 
 export const PI = 3.141592653589793;
 export const HALF_PI = PI / 2;
-export const TAU = 2 * PI;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Trigonometry. x is reduced to r = x − k·π/2 with |r| ≤ π/4 by Cody–Waite: π/2 = PIO2_HI + PIO2_LO, where
@@ -187,10 +186,6 @@ export function set(out: V3, x: number, y: number, z: number): V3 {
   out.y = y;
   out.z = z;
   return out;
-}
-
-export function copy(out: V3, a: V3): V3 {
-  return set(out, a.x, a.y, a.z);
 }
 
 export const dot = (a: V3, b: V3): number => a.x * b.x + a.y * b.y + a.z * b.z;

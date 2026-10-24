@@ -59,7 +59,7 @@ function tsFiles(dir: string): string[] {
 }
 
 /** Every purity violation under `root`, as "file:line: what". */
-export function purityViolations(root: string): string[] {
+function purityViolations(root: string): string[] {
   const areas = AREAS.map((a) => ({ dir: join(root, a.dir) + sep, mayImport: a.mayImport.map((d) => join(root, d) + sep) }));
   const files = areas.flatMap((a) => tsFiles(a.dir));
   const program = ts.createProgram(files, OPTIONS);

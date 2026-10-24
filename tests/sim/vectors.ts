@@ -25,7 +25,7 @@ const spread = (r: m.Rng, top: number) => (m.rngFloat(r) - 0.5) * 2 * TENS[m.rng
 
 function mathVectors(): string {
   const r = m.rngFrom(1), out: number[] = [];
-  const special = [0, -0, 1e-300, -1e-300, 0.5, -0.5, 1, -1, 2, m.HALF_PI, m.PI, -m.PI, m.TAU, 1e-8, 355, 103993, m.TRIG_RANGE];
+  const special = [0, -0, 1e-300, -1e-300, 0.5, -0.5, 1, -1, 2, m.HALF_PI, m.PI, -m.PI, 2 * m.PI, 1e-8, 355, 103993, m.TRIG_RANGE];
   for (let i = 0; i < 20_000; i++) {
     const x = i < special.length ? special[i] : i & 1 ? (m.rngFloat(r) - 0.5) * 4 * m.PI : spread(r, 6);
     out.push(m.dsin(x), m.dcos(x), m.dtan(x));
