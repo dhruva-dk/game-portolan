@@ -3,6 +3,7 @@
 //   node --test tests/sim/sailing.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { over } from '../../src/sim/end.ts';
 import { LOW_WATER, aground, currentAt, seaFor, type Sea } from '../../src/sim/environment.ts';
 import { FLAG, STEER_MAX, idleInput, type ShipInput } from '../../src/sim/input.ts';
 import { PI, length, v3, type V3 } from '../../src/sim/math.ts';
@@ -83,6 +84,7 @@ test('a caravel under plain sail in a fair wind rounds the equator in six minute
     step(waters, s, input({ course }));
     let lon = 0, last = 0;
     while (lon < 2 * PI && s.tick < 450 / TICK) {
+      assert.ok(!over(s), `seed ${seed}: the match ended at ${(s.tick * TICK).toFixed(1)} s, mid-lap`); // step() would stand still
       step(waters, s, idle);
       assert.notEqual(ship.bumped, BUMPED.land, 'never touches land');
       const now = Math.atan2(-ship.pos.z, ship.pos.x);

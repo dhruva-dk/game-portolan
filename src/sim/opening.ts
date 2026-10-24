@@ -6,6 +6,7 @@
 import { greatCurrentAt, type Sea } from './environment.ts';
 import { FLAG, type ShipInput } from './input.ts';
 import { cross, dot, dsin, normalize, set, v3, type V3 } from './math.ts';
+import { BUMPED } from './sailing.ts';
 import { EVENT, LANE, PHASE, TICK, chronicle, emit, onCurrent, type MatchState, type Ship } from './state.ts';
 import { FORMS, OPENING } from './tables.ts';
 import { inkHome } from './territory.ts';
@@ -31,6 +32,11 @@ export function ride(sea: Sea, state: MatchState, i: number, input: ShipInput): 
   ship.speed = OPENING.way; // a blow from a ship peeling across the fleet never knocks a rider out of its lane
   ship.rate = 0;
   set(ship.shove, 0, 0, 0);
+  // Each tick's blows are its own (as sail() clears them): a rider never carries an old impact off the current, where
+  // combat would read it as a ram on whatever ship it was once reported against.
+  ship.bump = 0;
+  ship.bumped = BUMPED.nothing;
+  ship.bumpOn = 0;
   if (ship.ride === end) breakOff(state, i, 0, EVENT.thrown);
   else if ((input.flags & FLAG.breakOff) !== 0) breakOff(state, i, input.steer, EVENT.breakOff);
 }

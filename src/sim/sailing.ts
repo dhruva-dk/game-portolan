@@ -241,11 +241,13 @@ export function collide(state: MatchState): void {
 }
 
 /**
- * The fleet riding the Great Current makes way for a ship peeling off it: they never touch, so it slips out between
- * the riders' lanes from any place in the ranks instead of being boxed in by ships it cannot move (opening.ts).
+ * The fleet riding the Great Current keeps its formation and makes way for a ship peeling off it: riders never touch
+ * each other (their lanes carry them, and where the lanes fold round a tight bend their hulls pass), nor a peeling
+ * ship, so it slips out between the riders' lanes from any place in the ranks instead of being boxed in by ships it
+ * cannot move (opening.ts).
  */
 const makesWay = (a: Ship, b: Ship): boolean =>
-  (a.phase === PHASE.riding && b.phase === PHASE.peeling) || (a.phase === PHASE.peeling && b.phase === PHASE.riding);
+  (a.phase === PHASE.riding && b.phase !== PHASE.sailing) || (b.phase === PHASE.riding && a.phase !== PHASE.sailing);
 
 function contact(state: MatchState, i: number, j: number): void {
   const a = state.ships[i], b = state.ships[j], fa = FORMS[a.form], fb = FORMS[b.form];
