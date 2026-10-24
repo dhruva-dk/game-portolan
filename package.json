@@ -10,12 +10,16 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/territory.test.ts tests/tournament.test.ts tests/determinism.test.ts tests/harness.test.ts",
     "perf": "node tests/perf.ts",
-    "capture": "node tests/capture.ts"
+    "capture": "node tests/capture.ts",
+    "ios": "node tests/ios.ts"
   },
   "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
     "three": "0.186.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.3",
     "@types/node": "24.19.2",
     "@types/three": "0.186.0",
     "playwright": "1.64.1",
