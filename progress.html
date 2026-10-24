@@ -59,8 +59,8 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <section id="next">
 <h2>What comes next</h2>
 <ol>
-<li><b>WP0</b> (external, in progress 2026-10-24): the toolchain agent is adding Capacitor (<code>capacitor.config.ts</code>, <code>ios/</code>, <code>npm run ios</code> in <code>tests/ios.ts</code>) and the reusable Playwright harness (<code>tests/harness.ts</code>, <code>tests/harness.test.ts</code>). When it lands, record its API under <a href="#arch-testing">Test &amp; capture infrastructure</a> if it differs from what is written there.</li>
-<li><b>Wave 1:</b> start <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a> in parallel (disjoint files) once WP0 has committed (WP1 deletes legacy tests and edits <code>package.json</code> scripts, which WP0 is touching now).</li>
+<li><b>WP0</b> done (2026-10-24); its API is recorded in <a href="#arch-testing">A10</a>.</li>
+<li><b>Wave 1</b> (in progress 2026-10-24): <a href="#wp01">WP1 Sim kernel &amp; legacy retirement</a> and <a href="#wp02">WP2 Style module &amp; ink pipeline</a> in parallel.</li>
 <li>Then follow the <a href="#schedule">schedule</a>: at most two packages at a time, always pairing a simulation package with a rendering/interface package.</li>
 </ol>
 </section>
@@ -111,11 +111,11 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <tr id="s-decktochart"><td>The look › From deck to chart</td><td class="st not">not started</td><td>WP24</td><td></td></tr>
 <tr id="s-readability"><td>The look › Readability</td><td class="st not">not started</td><td>WP2, WP19, WP20, WP25</td><td></td></tr>
 <tr id="s-sound"><td>Sound and music</td><td class="st not">not started</td><td>WP28, WP29</td><td>Legacy has synth SFX, no music.</td></tr>
-<tr id="s-performance"><td>Performance and platform</td><td class="st prog">in progress</td><td>WP0, WP1, WP5, WP30, WP32</td><td>WP0 (Capacitor + harness) under way in parallel.</td></tr>
+<tr id="s-performance"><td>Performance and platform</td><td class="st prog">in progress</td><td>WP0, WP1, WP5, WP30, WP32</td><td>WP0 done: TypeScript/three/Vite web game wrapped with Capacitor; <code>npm run ios</code> builds and runs it headless in the iPad Simulator.</td></tr>
 <tr id="s-architecture"><td>Architecture</td><td class="st not">not started</td><td>WP1, WP5, all sim WPs</td><td>Designed below (<a href="#architecture">Architecture</a>); nothing implemented yet.</td></tr>
 <tr id="s-howtowork"><td>How to work (code, tools, progress.html)</td><td class="st prog">in progress</td><td>all</td><td>progress.html created 2026-10-24.</td></tr>
 <tr id="s-acceptance"><td>Acceptance checks</td><td class="st not">not started</td><td>WP5, WP7, WP12, WP30, WP31, WP32</td><td></td></tr>
-<tr id="s-testing"><td>Testing</td><td class="st prog">in progress</td><td>WP0, WP31, WP32</td><td>Harness being built by WP0.</td></tr>
+<tr id="s-testing"><td>Testing</td><td class="st prog">in progress</td><td>WP0, WP31, WP32</td><td>WP0 harness done: headless Chromium on the GPU, iPhone/iPad landscape with touch and safe areas, console checks; iPad Simulator headless via <code>tests/ios.ts</code>.</td></tr>
 <tr id="s-captures"><td>Captures (29 × 2 resolutions)</td><td class="st not">not started</td><td>WP31 (+ contributors per capture)</td><td></td></tr>
 <tr id="s-review"><td>Review</td><td class="st not">not started</td><td>WP33+</td><td></td></tr>
 </table>
@@ -192,6 +192,16 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <section id="log">
 <h2>Log</h2>
 <p>Newest first. Each entry: date, WP, what changed, evidence (before/after screenshots), and any problems left open.</p>
+
+<div id="log-2026-10-24-wp00">
+<h3>2026-10-24 — WP0 Toolchain (toolchain agent; recorded by WP1)</h3>
+<ul>
+<li>Capacitor 8 wraps the web game (<code>capacitor.config.ts</code>, <code>ios/</code>, Swift Package Manager). <code>npm run ios</code> builds, syncs, boots an iPad Simulator headless, rotates it to landscape, installs and launches; verified end to end with a <code>simctl</code> screenshot.</li>
+<li>Playwright harness (<code>tests/harness.ts</code>) on the real GPU (ANGLE over Metal, M1 Pro, checked by WebGL renderer string), both devices with touch and CDP-emulated safe areas; <code>npm test</code> runs <code>tests/harness.test.ts</code>. API in <a href="#arch-testing">A10</a>.</li>
+<li><code>npm run check:assets</code> failed as expected on the 44 <code>src/assets/*.jpg</code> and their 44 copies in <code>dist/</code>.</li>
+<li>Open: the Simulator's WebKit crashes at page start about half the time on this host (retried 5×; see <a href="#arch-platform">A11</a>). <code>tests/shot.ts</code> duplicated the harness and is deleted with the legacy code in WP1.</li>
+</ul>
+</div>
 
 <div id="log-2026-10-24-audit">
 <h3>2026-10-24 — Audit and master plan (architect)</h3>
@@ -393,7 +403,7 @@ src/audio/instruments.ts  score.ts                                              
 
 <h3 id="arch-testing">A10. Test &amp; capture infrastructure</h3>
 <ul>
-<li><b>Harness (WP0, being built now):</b> <code>tests/harness.ts</code> — <code>serve({production})</code>, <code>launch()</code> (GPU via ANGLE/Metal, SwiftShader fallback), <code>openGame(browser, url, {device: 'iphone'|'ipad', query})</code> with touch, landscape, DPR and safe areas, <code>game.until(g =&gt; …)</code> on <code>window.__portolan</code>, touch gestures (<code>drag</code>, taps, pinch), <code>screenshot</code>, <code>assertClean()</code> (no console errors/warnings, no network), CPU throttling. <code>tests/ios.ts</code> — <code>npm run ios [-- --device ipad|iphone] [--shot out.png]</code>: build, <code>cap sync</code>, xcodebuild, headless simctl boot/install/launch, screenshot. Later WPs build on these and must not fork them.</li>
+<li><b>Harness (WP0, done):</b> <code>tests/harness.ts</code> exports <code>root</code>, <code>DEVICES</code> (the only device definitions: iphone = iPhone 17 Pro Max 956×440 CSS @3, safe area top/right/bottom/left 0/62/20/62; ipad = iPad Pro 13" (M5) 1376×1032 @2, 0/0/25/0; each with its <code>simulator</code> device type), <code>serve({production})</code> (Vite dev server, or a fresh build previewed from a temp dir), <code>launch({headed})</code> → <code>{browser, renderer, gpu}</code> (Chromium on the real GPU, ANGLE over Metal, verified by the WebGL renderer string; SwiftShader fallback with a warning), <code>webglRenderer(page)</code>, <code>openGame(browser, url, {device, query, hook})</code> → <code>Game</code> (viewport, DPR, touch, landscape; safe areas emulated through CDP so <code>env(safe-area-inset-*)</code> works). <code>Game</code>: <code>hook(fn, arg)</code> and <code>until(fn, arg, timeout)</code> on <code>window.__portolan</code>, <code>touch(fingers)</code>, <code>gesture(paths, ms)</code>, <code>tap</code>, <code>drag</code>, <code>pinch(center, fromSpan, toSpan, ms, angle)</code> (real multi-touch), <code>screenshot(path)</code> at device resolution, <code>throttleCPU(rate)</code>, <code>problems()</code>/<code>assertClean()</code> (console errors, warnings, stray requests), <code>close()</code>. <code>tests/harness.test.ts</code> checks the harness and needs the page to create a <code>&lt;canvas&gt;</code>. <code>tests/ios.ts</code> — <code>npm run ios [-- --device ipad|iphone] [--shot out.png] [--wait s] [--no-build]</code>: vite build, <code>cap sync</code>, xcodebuild, headless simctl boot, rotation to landscape (<code>tests/sim-orientation.swift</code>, a private framework, because a headless iPad boots portrait and letterboxes the landscape-only app), install, launch; exports <code>buildApp</code>, <code>simulator</code>, <code>boot</code>, <code>rotate</code>, <code>install</code>, <code>launch</code> (retries up to 5×, see A11), <code>screenshot</code>, <code>backgroundAndResume</code>, <code>appProblems</code>, <code>terminate</code>, <code>pid</code>; the web view console goes to <code>$TMPDIR/portolan-ios/app.log</code>. <code>npm run check:assets</code> (<code>tests/check-assets.ts</code>) is the file half of check 7. Toolchain: Node 26 runs <code>.ts</code> tests directly; Xcode 26.2 with the iOS 26.3.1 simulator runtime. Later WPs build on these and must not fork them.</li>
 <li><b>Game hooks</b> (<code>window.__portolan</code>, WP5): <code>ready</code>, <code>loadCareer(fixture)</code>, <code>startMatch({seed, recording?})</code>, <code>setSpeed(n)</code> (n ticks per frame — results unchanged), <code>setFrameRate(fps)</code>, <code>pinRenderScale(s)</code>, <code>camera(preset)</code>, <code>background()</code>/<code>resume()</code>, <code>matchHash()</code>, <code>careerHash()</code>, <code>events</code>, <code>perf</code>, <code>screen</code>. Hooks drive state for tests; they never alter rules.</li>
 <li><b>Unit tests</b>: <code>node --test</code> under <code>tests/sim/</code>, <code>tests/career/</code>, etc.; <code>npm test</code> stays under ~2 min.</li>
 <li><b>Acceptance</b>: <code>tests/acceptance/checkN-*.ts</code>; <code>npm run check -- N</code>; results to <code>progress/checks/checkN.json</code> and the <a href="#checks">checks table</a>. Tournaments (checks 3, 4) use <code>worker_threads</code> over all cores.</li>
@@ -411,6 +421,7 @@ src/audio/instruments.ts  score.ts                                              
 <li><b>Tournament runtime</b> — 200 matches × 18 000 ticks needs Node tick ≤ 0.3 ms and worker parallelism.</li>
 <li><b>WKWebView audio</b> — AudioContext must resume on the first touch; the ringer switch can mute WebAudio unless the audio session is set to playback (WP32 configures it natively in the Capacitor project).</li>
 <li><b>Chart net readability</b> — see the decision record in A8.</li>
+<li><b>iOS Simulator WebKit (WP0)</b> — on this macOS 27 + Xcode 26.2 host the simulator's WebKit crashes at page start about half the time (Safari too); <code>launch()</code> retries up to 5×. A matching Xcode 27 / iOS 27 runtime is the likely real fix (WP32). Simulator WebGL max texture size is 8192.</li>
 <li><b>Context limits</b> — region dressing and ships are large; each WP owns few files and reads legacy files selectively (<code>git show 6ce29f2:src/ships.ts | sed -n …</code>).</li>
 </ul>
 </section>
@@ -422,13 +433,13 @@ src/audio/instruments.ts  score.ts                                              
 
 <div class="wp" id="wp00">
 <h3>WP0 — Toolchain: Capacitor iOS and Playwright harness (external)</h3>
-<p>Status: in progress (2026-10-24), by the toolchain agent. Deps: none. Parallel-safe with: this audit.</p>
+<p>Status: done (2026-10-24), by the toolchain agent — Capacitor iOS app runs headless in the Simulator with one command; Playwright harness on the real GPU with both devices, touch and safe areas; <code>npm run check:assets</code>. Commits <code>a3d933d</code>, <code>bccdf15</code>, <code>042aeb2</code>, <code>655c5bf</code>. Deps: none. Parallel-safe with: this audit.</p>
 <p>Scope: Capacitor wrapper and <code>ios/</code> project; one command builds the iOS app and runs it in the Simulator (<code>npm run ios</code>); reusable Playwright harness with device definitions, touch, safe areas, console/network cleanliness, CPU throttling. Owns: <code>capacitor.config.ts</code>, <code>ios/</code>, <code>tests/harness.ts</code>, <code>tests/harness.test.ts</code>, <code>tests/ios.ts</code>, their <code>package.json</code> entries. DoD: as set by its own brief; record the final API in <a href="#arch-testing">A10</a>.</p>
 </div>
 
 <div class="wp" id="wp01">
 <h3>WP1 — Sim kernel and legacy retirement</h3>
-<p>Status: not started. Deps: WP0 committed. Parallel-safe with: WP2.</p>
+<p>Status: in progress (2026-10-24). Deps: WP0 committed. Parallel-safe with: WP2.</p>
 <p>Scope:</p>
 <ul>
 <li>Architecture: one deterministic simulation, fixed timestep, seeded RNG, no clock/frame rate, bit-identical in Node and every browser, headless — the kernel every sim WP builds on (A2, A3).</li>
