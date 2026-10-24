@@ -5,6 +5,7 @@ import { combat } from './combat.ts';
 import { earn, forage, scoop } from './economy.ts';
 import { over } from './end.ts';
 import { brew, stir, type Sea } from './environment.ts';
+import { gullEyes, gulls } from './gull.ts';
 import { applyControls, idleInput, inputAt, replay, type Recording, type ShipInput } from './input.ts';
 import { items } from './items.ts';
 import { coast, ride } from './opening.ts';
@@ -38,10 +39,11 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
     }
   }
   collide(state);
-  survey(sea, state, SIGHT);
+  survey(sea, state, SIGHT, gullEyes(state));
   combat(sea, state, SIGHT);
   items(sea, state, INPUTS, SIGHT);
   chart(state);
+  gulls(sea, state, INPUTS, SIGHT);
   noteFog(state);
   storm(state);
   earn(sea, state);

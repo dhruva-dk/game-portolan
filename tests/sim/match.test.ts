@@ -223,10 +223,10 @@ test('a match resumed from a snapshot at random ticks ends exactly as the match 
 test('the setup fits out every ship as the career says, with defaults for what it leaves out', () => {
   const none = { kind: FITTING.none, tier: 0 };
   const fittings = [{ kind: FITTING.ironRam, tier: 2 }, { kind: FITTING.longGuns, tier: 1 }, none, none, none, none];
-  const fleet = Array.from({ length: SHIPS }, (_, i) => (i === 4 ? { form: 3, pigment: 11, pattern: 2, fittings, gull: 3 } : {}));
+  const fleet = Array.from({ length: SHIPS }, (_, i) => (i === 4 ? { form: 3, pigment: 11, pattern: 2, fittings, gull: { talons: 3, dive: 2 } } : {}));
   const s = createMatch({ seed: SEED, fleet }), a = s.ships[4], b = s.ships[1];
-  assert.deepEqual([a.form, a.pigment, a.pattern, a.gull, a.fittings], [3, 11, 2, 3, fittings]);
-  assert.deepEqual([b.form, b.pigment, b.pattern, b.gull, b.fittings.map((f) => f.kind)], [0, 1, 0, 1, START_FITTINGS]);
+  assert.deepEqual([a.form, a.pigment, a.pattern, a.gull.talons, a.fittings], [3, 11, 2, 3, fittings]);
+  assert.deepEqual([b.form, b.pigment, b.pattern, b.gull.talons, b.fittings.map((f) => f.kind)], [0, 1, 0, 0, START_FITTINGS]);
   assert.throws(() => createMatch({ seed: SEED, fleet: fleet.slice(1) }), RangeError);
   assert.throws(() => createMatch({ seed: SEED, fleet: fleet.map((o, i) => (i === 2 ? { form: FORMS.length } : o)) }), RangeError);
   assert.throws(() => createMatch({ seed: SEED, fleet: fleet.map((o, i) => (i === 2 ? { fittings: fittings.slice(1) } : o)) }), RangeError);

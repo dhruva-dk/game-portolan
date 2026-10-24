@@ -557,3 +557,31 @@ export const TREASURE = { share: 0.5, place: [2, 1.6, 1.35, 1.15, 1, 0.9, 0.8, 0
 
 /** The results' timeline keeps the player's `loops` largest loops among all its other moments, so it stays short. */
 export const MOMENTS = { loops: 3 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// The companion gull (WP9, gull.ts)
+
+/**
+ * The companion gull in a match (PROMPT.md, The companion gull); arrays by trait level, 0 untrained. `levels`: each
+ * trait's top. A call costs `price` doubloons (territory.ts gullPrice: HOME.gull at home, PERK.spiceHarbour holding
+ * Spice Harbour); its chest takes `flight` s by Wings (÷ PERK.sandbarLight holding the Sandbar Light), shared between
+ * its `legs`: flying off `far` u along the bow, away over the horizon, back, once round its ship `circle` u out. It
+ * flies `fly` u high, seen that far over the curve. Talons is the brightest pigment tier it carries: its level. Eye: it
+ * scouts `ahead` u before the bow, `height` u aloft, marking loot within that height's horizon. Beak: the share of a
+ * spilled purse it snatches back. Dive: its cooldown (s), its reach (u), how near a point aimed by hand a rival must be
+ * (u), how long it holds over the rival marking it (s), and the share of the rival's speed the strike leaves. Danger,
+ * when it wheels overhead: the hull under this share of full, a rival in sight this near (u), the storm this near (u).
+ */
+export const GULL = {
+  levels: { talons: 4, wings: 4, eye: 4, beak: 3, dive: 3 },
+  price: 60,
+  flight: [12, 10, 8.5, 7, 6],
+  legs: { out: 0.25, away: 0.3, back: 0.3, circle: 0.15 },
+  far: 60,
+  circle: 4,
+  fly: 8,
+  eye: { ahead: [0, 20, 30, 40, 50], height: [0, 6, 9, 12, 15] },
+  beak: [0, 0.25, 0.4, 0.6],
+  dive: { cool: [0, 30, 22, 15], reach: 40, near: 10, hold: 4, check: 0.5 },
+  danger: { hull: 0.4, near: 30, storm: 15 },
+};

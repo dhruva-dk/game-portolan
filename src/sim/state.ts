@@ -9,7 +9,7 @@ import {
 } from './math.ts';
 import { R, TERRITORY, advance } from './sphere.ts';
 import {
-  BATTERIES, COINS, CONSUMABLE_SLOTS, DAY, DOUBLED_PLANKING, FITTING, FITTING_SLOT, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
+  GULL, BATTERIES, COINS, CONSUMABLE_SLOTS, DAY, DOUBLED_PLANKING, FITTING, FITTING_SLOT, FORM, FORMS, GUSTS, OPENING, SLOT, SLOTS, SPELL, START_FITTINGS, STORM, TIERS, WEATHER,
 } from './tables.ts';
 import { greatCurrent, type CurrentRoute } from './world/geography.ts';
 import { REGIONS } from './world/regions.ts';
@@ -35,6 +35,10 @@ export const AFLOAT = { coin: 0, flotsam: 1, bottle: 2 } as const;
 /** Where a ship is in its match: riding the Great Current, peeling off it until its home inks, at sea, or sunk. */
 export const PHASE = { riding: 0, peeling: 1, sailing: 2, sunk: 3 } as const;
 
+/** Where a ship's companion gull is (gull.ts): riding the masthead, wheeling overhead in danger, flying off for a chest,
+ * away over the horizon, bringing it back, circling to drop it, holding over a rival it dove on. */
+export const FLIGHT = { mast: 0, wheel: 1, out: 2, away: 3, back: 4, circle: 5, dive: 6 } as const;
+
 /** How a ship sank (Sinking.cause, EVENT.sunk's amount): to combat (WP8 part B) or the storm (part C, and the deadline). */
 export const CAUSE = { gun: 0, ram: 1, fire: 2, rocks: 3, hotWater: 4, storm: 5 } as const;
 
@@ -50,11 +54,30 @@ const FIT = rec(['kind', int], ['tier', int]);
 /** A consumable slot: its CONSUMABLE (0 while empty) and how many. */
 const STOCK = rec(['kind', int], ['count', int]);
 
+/** A ship's companion gull (gull.ts): its traits as the career trained them (Outfit.gull) and what it is doing. */
+const COMPANION = rec(
+  ['talons', int], // trait levels, 0 untrained … GULL.levels
+  ['wings', int],
+  ['eye', int],
+  ['beak', int],
+  ['dive', int],
+  ['flight', int], // a FLIGHT
+  ['at', XYZ], // where it flies: its ship's masthead while perched
+  ['dir', XYZ], // the tangent it flew off along for its chest
+  ['span', f64], // the seconds its chest takes in all, by Wings and the Sandbar Light
+  ['time', f64], // seconds left of its leg, or of its hold over the rival it dove on
+  ['tier', int], // the pigment tier of the chest it fetches and carries (its glow, its labour): −1 none
+  ['prey', int], // the rival it dove on: −1 none
+  ['cool', f64], // seconds until it can dive again
+  ['spied', int], // the rivals in its ship's sight last tick, by ship bit: it calls at one new to it
+  ['site', int], // the find site its Eye marks nearest its ship: −1 none
+);
+
 const SHIP = rec(
   ['form', int], // a FORM
   ['pigment', int], // the hull's pigment and the sails' pattern, as the career fitted it out (MatchSetup.fleet)
   ['pattern', int],
-  ['gull', int], // the companion gull's level (WP9)
+  ['gull', COMPANION], // its companion gull
   ['phase', int], // a PHASE
   ['ride', f64], // u down the Great Current: where it rides, or where it left the current
   ['peel', f64], // seconds since it broke off: its home inks where it has slowed, clear of the current
@@ -169,6 +192,7 @@ const MATCH = rec(
 );
 
 export type Ship = Value<typeof SHIP>;
+export type Gull = Value<typeof COMPANION>;
 export type Gust = Value<typeof GUST>;
 export type Spell = Value<typeof WEATHER_SPELL>;
 export type MatchState = Value<typeof MATCH>;
@@ -183,7 +207,7 @@ export type Keg = Value<typeof KEG>;
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 9, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 10, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -220,6 +244,14 @@ export const EVENT = {
   kegBurst: 30, // ship's powder keg exploded at `at`: by the rival that set it off (−1 its fuse burnt out), amount the hulls struck
   mortar: 31, // ship fired its mortar at `at`: by the rival aimed at (SHIPS: a point by hand), amount the shell's flight in s
   shell: 32, // ship's shell burst where it fell, at `at`: amount the hulls struck
+  called: 33, // ship called its gull for a chest: amount the doubloons it paid
+  departed: 34, // ship's gull flew off over the horizon, out of every sight: at where
+  returning: 35, // ship's gull came back into sight carrying its chest: at where, amount the chest's tier
+  landed: 36, // ship's gull dropped its chest on deck (alongside while the deck is full: items.ts deliver): amount its tier
+  chestLost: 37, // ship sank before its gull's chest landed: it falls into the sea at `at` for anyone, amount its tier
+  dive: 38, // ship's gull dove on rival `by`, checking and revealing it: at the rival, amount the seconds it holds over it
+  snatch: 39, // ship's gull snatched back purse spilled at a break: by the rival that broke the trail, at the break, amount
+  spotted: 40, // ship's gull called at something spotted: by a rival new to sight, or −1 a find site its Eye marks (amount; −1 a rival), at it
 } as const;
 
 /** Record an event of this tick (the step clears them first); `cells` is kept, not copied. */
@@ -241,8 +273,8 @@ export interface Outfit {
   pattern?: number;
   /** For each SLOT a FITTING and its tier (0 … TIERS − 1); START_FITTINGS at the first tier. */
   fittings?: readonly { kind: number; tier: number }[];
-  /** The companion gull's level (WP9); 1, the gull every captain starts with. */
-  gull?: number;
+  /** The companion gull's trait levels as the career trained them (WP10), each 0 untrained … GULL.levels; all 0, the gull every captain starts with. */
+  gull?: { talons?: number; wings?: number; eye?: number; beak?: number; dive?: number };
   /** How well its gunners lead a moving target, 0 (where it is) … 1 (where it will be), by the captain's rank (WP11); 1. */
   gunnery?: number;
 }
@@ -286,8 +318,9 @@ export function createMatch(setup: MatchSetup): MatchState {
 function check(o: Outfit, i: number): void {
   const whole = (x: number | undefined, below = Infinity): boolean => x === undefined || (Number.isInteger(x) && x >= 0 && x < below);
   const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f, s) => (f.kind === FITTING.none || FITTING_SLOT[f.kind] === s) && whole(f.tier, TIERS)));
+  const g = o.gull ?? {}, trained = (['talons', 'wings', 'eye', 'beak', 'dive'] as const).every((t) => whole(g[t], GULL.levels[t] + 1));
   const share = o.gunnery === undefined || (o.gunnery >= 0 && o.gunnery <= 1);
-  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !whole(o.gull) || !fits || !share) {
+  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !trained || !fits || !share) {
     throw new RangeError(`createMatch: ship ${i}'s outfit cannot be fitted out`);
   }
 }
@@ -350,11 +383,11 @@ export function onCurrent(route: CurrentRoute, s: number, lane: number, pos: V3,
 
 /** Ship i as outfit o fits it out, under full sail in its place on the Great Current, riding it. */
 function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
-  const { form = FORM.pinnace, pigment = i, pattern = 0, gull = 1, gunnery = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
+  const { form = FORM.pinnace, pigment = i, pattern = 0, gull = {}, gunnery = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
   const fittings = o.fittings ? o.fittings.map(({ kind, tier }) => ({ kind, tier })) : START_FITTINGS.map((kind) => ({ kind, tier: 0 }));
   onCurrent(route, ride, LANE[i], pos, head);
   return {
-    form, pigment, pattern, gull, phase: PHASE.riding, ride, peel: 0, pos, head, was: { ...pos }, wasHead: { ...head },
+    form, pigment, pattern, gull: companion(gull, pos), phase: PHASE.riding, ride, peel: 0, pos, head, was: { ...pos }, wasHead: { ...head },
     speed: OPENING.way, rate: 0, shove: v3(), fling: v3(), sail: SAIL.full, course: [], leg: 0, home: [], homeLeg: 0,
     homing: false, torn: 0, fittings, bump: 0, bumped: -1, bumpOn: 0, laid: [], purse: 0, bank: 0, held: 0, prize: -1, holding: 0,
     hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [], fire: 0, fireBy: -1, ward: 0,
@@ -365,6 +398,11 @@ function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
 
 /** The snapshot of a match: everything needed to continue it exactly. */
 export const encodeMatch = (state: MatchState): Uint8Array => encode(MATCH_FORMAT, state);
+
+/** A companion gull trained as the career says, riding the masthead of a ship at `pos`. */
+function companion({ talons = 0, wings = 0, eye = 0, beak = 0, dive = 0 }: NonNullable<Outfit['gull']>, pos: V3): Gull {
+  return { talons, wings, eye, beak, dive, flight: FLIGHT.mast, at: { ...pos }, dir: v3(), span: 0, time: 0, tier: -1, prey: -1, cool: 0, spied: 0, site: -1 };
+}
 
 /** A match from its snapshot; throws on anything but an intact snapshot of the current format. */
 export const decodeMatch = (bytes: Uint8Array): MatchState => decode(MATCH_FORMAT, bytes);

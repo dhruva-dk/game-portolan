@@ -13,11 +13,15 @@ import { FITTING, FORMS, SIGHT, SLOT, STORM, TIERS } from './tables.ts';
 import { beamMarks, intruders, unseen } from './territory.ts';
 import { inFog, newSky, skyAt, veiled } from './weather.ts';
 
-/** A lookout aloft besides the ship's own (WP9's gull): where it flies, how high (u), and the rival it dives on (−1 none). */
+/**
+ * A ship's gull aloft (gull.ts gullEyes): where it flies, how high (u), the rival it holds over after a dive (−1 none),
+ * and whether it scouts, a lookout besides the ship's own.
+ */
 export interface Eye {
   at: V3;
   height: number;
   dive: number;
+  scouts: boolean;
 }
 
 /** What one ship sees this tick, as bitmasks by ship index (never its own bit). */
@@ -30,9 +34,11 @@ export interface Sight {
   marks: number;
   /** How far it sees through the air now, u. */
   range: number;
+  /** Rivals' gulls aloft in its sight, by their ships' bits: each flies to and from its own ship, so where it goes shows (gull.ts bound). */
+  gulls: number;
 }
 
-export const newSight = (): Sight => ({ ships: 0, hulls: 0, marks: 0, range: 0 });
+export const newSight = (): Sight => ({ ships: 0, hulls: 0, marks: 0, range: 0, gulls: 0 });
 
 /** Horizon distances (u) of the lookout's eye by form and crow's nest (index 0 none, 1 + tier), of mastheads and of hulls by form. */
 const EYE = FORMS.map((_, f) => Array.from({ length: TIERS + 1 }, (_, k) => horizonDistance(SIGHT.eye[f] + (k > 0 ? SIGHT.crowsNest[k - 1] : 0))));
@@ -46,7 +52,7 @@ export function eyeReach(state: MatchState, i: number): number {
   return EYE[ship.form][look.kind === FITTING.crowsNest ? 1 + look.tier : 0];
 }
 
-const SKY = newSky(), AIR = new Float64Array(SHIPS), REACH = new Float64Array(SHIPS), CELL = v3();
+const SKY = newSky(), AIR = new Float64Array(SHIPS), REACH = new Float64Array(SHIPS), WING = new Float64Array(SHIPS), CELL = v3();
 
 /**
  * Whether a lookout at `from`, its eye's horizon `reach` u, sees ship j through `air` u of air: its masthead (2), its
@@ -60,8 +66,9 @@ function spot(sea: Sea, state: MatchState, from: V3, reach: number, air: number,
 }
 
 /**
- * What every ship sees now, into out[i] (zero for a ship that has sunk). gulls[i], when given, is ship i's gull aloft,
- * a second lookout (WP9). A rival under a fog flask or kept off charts by the Kelp Cathedral is never seen or marked.
+ * What every ship sees now, into out[i] (zero for a ship that has sunk). gulls[i], when given, is ship i's gull aloft
+ * (gull.ts gullEyes): seen by the rivals in sight of it, and a second lookout while it scouts. A rival under a fog
+ * flask or kept off charts by the Kelp Cathedral is never seen or marked.
  */
 export function survey(sea: Sea, state: MatchState, out: Sight[], gulls?: readonly (Eye | null)[]): Sight[] {
   const calm = calmNow(state);
@@ -71,23 +78,29 @@ export function survey(sea: Sea, state: MatchState, out: Sight[], gulls?: readon
     if (!afloat(ship) || ship.flask > 0 || unseen(sea, state, i)) hidden |= 1 << i;
     AIR[i] = SIGHT.clear * skyAt(state, ship.pos, SKY).sight * (dot(ship.pos, calm.at) < calm.cos ? STORM.sight : 1);
     REACH[i] = eyeReach(state, i);
+    const gull = gulls?.[i];
+    WING[i] = gull ? horizonDistance(gull.height) : 0;
   }
   for (let i = 0; i < SHIPS; i++) {
     const o = out[i], ship = state.ships[i], gull = gulls?.[i] ?? null;
-    o.ships = o.hulls = o.marks = 0;
+    o.ships = o.hulls = o.marks = o.gulls = 0;
     o.range = AIR[i];
     if (!afloat(ship)) {
       o.range = 0;
       continue;
     }
-    const gullReach = gull ? horizonDistance(gull.height) : 0;
+    const scout = gull?.scouts ? gull : null, scoutReach = scout ? horizonDistance(scout.height) : 0;
     for (let j = 0; j < SHIPS; j++) {
       if (j === i || (hidden & (1 << j)) !== 0) continue;
       const air = Math.min(AIR[i], AIR[j]);
-      const seen = spot(sea, state, ship.pos, REACH[i], air, j) | (gull ? spot(sea, state, gull.at, gullReach, air, j) : 0);
+      const seen = spot(sea, state, ship.pos, REACH[i], air, j) | (scout ? spot(sea, state, scout.at, scoutReach, air, j) : 0);
       if (seen !== 0) o.ships |= 1 << j;
       if (seen === 3) o.hulls |= 1 << j;
       if (ship.flare > 0 && dot(ship.pos, state.ships[j].pos) >= FLARE_COS) o.marks |= 1 << j;
+    }
+    for (let j = 0; j < SHIPS; j++) {
+      const g = j === i ? null : gulls?.[j];
+      if (g && dot(ship.pos, g.at) >= dcos(Math.min(AIR[i], REACH[i] + WING[j]) / R) && !veiled(sea.geo, state, ship.pos, g.at)) o.gulls |= 1 << j;
     }
     if (gull && gull.dive >= 0 && gull.dive !== i) o.marks |= 1 << gull.dive;
     o.marks = (o.marks | intruders(state, i) | beamMarks(sea, state, i)) & ~hidden;

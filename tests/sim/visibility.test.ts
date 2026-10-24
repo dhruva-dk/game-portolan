@@ -142,7 +142,7 @@ test('a flare marks rivals beyond the horizon, a fog flask hides a ship from eve
   assert.equal(seen(s), 0, 'under its fog flask even close by');
   s.ships[0].flare = s.ships[1].flask = 0;
   place(s, 1, 80);
-  const gull = { at: v3(), height: 15, dive: -1 }, gulls = [gull, null, null, null, null, null, null, null, null, null];
+  const gull = { at: v3(), height: 15, dive: -1, scouts: true }, gulls = [gull, null, null, null, null, null, null, null, null, null];
   advance(P, T, 60, gull.at, v3());
   assert.ok((survey(sea, s, out, gulls)[0].ships & 2) !== 0 && (out[0].marks & 2) === 0);
   gull.dive = 1;
