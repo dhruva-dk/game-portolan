@@ -191,6 +191,16 @@ pre { background: #efe4ca; border: 1px solid var(--rule); padding: 8px; overflow
 <section id="review">
 <h2>Review findings</h2>
 <p>Each review is by a fresh reviewer agent (see <a href="#wp33">WP33</a>). Record every finding as one row: id (<code>R1-001</code>…), severity (blocker / major / minor), where (capture, screen, or system), the flaw, fix WP, fix commit, status. A finding is closed only when the fix is verified by a new capture or test.</p>
+<div id="spot-checks">
+<h3>Orchestrator spot checks (pre-review; fix in the owning WP or the first fix round)</h3>
+<ul>
+<li>S-001 (wp20-flood-0-open, high camera): a low cloud floats mid-frame over the action and hides the trail — clouds must never sit between a gameplay camera and the ship/trail (fade or lift clouds near the camera's line of sight).</li>
+<li>S-002 (same frame): the open sea reads as large blotchy light/dark camouflage patches — the depth wash / pigment-load unevenness is too coarse and too contrasty; it should read as delicate depth washes with fine variation (WP13 owner).</li>
+<li>S-003 (same frame): dark smudges under islands look like floating shadows — check sea-floor/terrain-under-water compositing (WP13/WP15).</li>
+<li>S-004: the Weeping Isle still reads as a drum with a continuous cliff band (WP15d note) — fix in its region package.</li>
+<li>S-005: the sea still uses a default wind (sim windAt wiring crashed non-match screens) — fix in WP21.</li>
+</ul>
+</div>
 <div id="review-latest">
 <p><i>No review yet.</i></p>
 <table>
