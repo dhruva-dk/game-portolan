@@ -1,5 +1,5 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour, region=<name> (deck, high, orbit), off=<u offshore> (deck),
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour, region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
@@ -12,6 +12,7 @@ import type { FormName } from '../../src/render/ships/forms.ts';
 import { Sky } from '../../src/render/sky.ts';
 import { BEAM, type Lamp } from '../../src/render/light.ts';
 import { Structures } from '../../src/render/structures.ts';
+import { Flora } from '../../src/render/flora.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, localFrame, R } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -46,6 +47,8 @@ scene.add(sky.group);
 
 // lighthouses on their headlands and the harbours' moorings, stood on the terrain, their lamps in the sky's registry
 const structures = new Structures(style, geo, terrain.field, sky.lights, sky.beams);
+const flora = new Flora(pipeline.style, geo, terrain.field, sea.swell);
+scene.add(flora.group);
 scene.add(structures.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
@@ -108,7 +111,7 @@ function look(foot: V, toward: V | number, height: number, pitch: number): void 
 }
 if (view === 'deck') {
   const off = Number(q.get('off') ?? 11), s = spot(place ?? 'Coral', off);
-  look(s.at, s.land, 3.2, -0.07);
+  look(s.at, s.land, Number(q.get('height') ?? 3.2), Number(q.get('pitch') ?? -0.07));
   launch(9, 4, 1.3);
   if (off <= 11) { launch(24, -7, -0.6); launch(40, 9, 2.2, 0.35); }
 } else if (view === 'light') {
@@ -140,8 +143,8 @@ if (view === 'deck') {
   look(at, h.pos, Number(q.get('height') ?? 5), Number(q.get('pitch') ?? -0.2));
   launch(h.r * 1.6, 1, 1.3);
 } else if (view === 'high') {
-  const s = spot(place ?? 'Coral', 40);
-  look(s.at, s.land, 34, -0.5);
+  const s = spot(place ?? 'Coral', Number(q.get('off') ?? 40));
+  look(s.at, s.land, Number(q.get('height') ?? 34), Number(q.get('pitch') ?? -0.5));
   launch(30, 2, 0.9);
 } else if (view === 'orbit') {
   const s = spot(place ?? 'Spice', 45);
@@ -193,7 +196,7 @@ const ride: Riding = { position: V(), up: V() };
 const basis = new THREE.Matrix4(), X = V(), Z = V();
 let frames = 0, last = performance.now(), clock = hold ?? 0;
 const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, terrainMs,
-  terrainTriangles: 0, structureTriangles: 0, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
+  terrainTriangles: 0, structureTriangles: 0, flora: flora.stats, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -217,10 +220,11 @@ function frame(now: number): void {
   }
   sky.update(hour, clock, camera.position, weather);
   structures.update(camera.position);
+  flora.update(camera);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles,
+    structureTriangles: structures.triangles, flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);

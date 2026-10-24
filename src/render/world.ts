@@ -7,6 +7,7 @@ import type { Frame } from '../app/loop.ts';
 import type { World } from '../app/worldWorker.ts';
 import type { MatchState } from '../sim/state.ts';
 import type { Pipeline } from './pipeline.ts';
+import { createFlora } from './flora.ts';
 import { createSea } from './sea.ts';
 import { createSky } from './sky.ts';
 import { createStructures } from './structures.ts';
@@ -33,7 +34,7 @@ export interface RenderModule {
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
 /** The render modules, updated in this order every frame. Append-only (A6). */
-const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures];
+const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora];
 
 export class WorldView {
   readonly scene = new THREE.Scene();
