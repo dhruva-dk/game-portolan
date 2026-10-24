@@ -11,7 +11,8 @@
     "test": "node --test tests/territory.test.ts tests/tournament.test.ts tests/determinism.test.ts tests/harness.test.ts",
     "perf": "node tests/perf.ts",
     "capture": "node tests/capture.ts",
-    "ios": "node tests/ios.ts"
+    "ios": "node tests/ios.ts",
+    "check:assets": "vite build --logLevel warn && node tests/check-assets.ts"
   },
   "dependencies": {
     "@capacitor/core": "8.5.3",
