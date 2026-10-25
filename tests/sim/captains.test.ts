@@ -7,16 +7,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MODE, helm, intent, think } from '../../src/sim/captains/brain.ts';
+import { apart } from '../../src/sim/captains/perception.ts';
+import { reachOf, standoff, styleOf } from '../../src/sim/captains/temperaments.ts';
 import { aground, greatCurrentAt, seaFor } from '../../src/sim/environment.ts';
 import { gullEyes } from '../../src/sim/gull.ts';
+import { startingFittings } from '../../src/sim/items.ts';
 import { FLAG, idleInput, record, recorder, type ShipInput } from '../../src/sim/input.ts';
 import { lastInputs, step } from '../../src/sim/match.ts';
 import { dot, set, v3, type V3 } from '../../src/sim/math.ts';
-import { R, TERRITORY, advance, cellOf, tangentAt, tangentToward } from '../../src/sim/sphere.ts';
+import { R, TERRITORY, advance, cellDir, cellOf, tangentAt, tangentToward } from '../../src/sim/sphere.ts';
 import {
   EVENT, PHASE, SAIL, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState, type Mind, type Outfit,
 } from '../../src/sim/state.ts';
-import { FORMS } from '../../src/sim/tables.ts';
+import { FITTING, FORMS, HOME, SLOT } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { newSight, survey } from '../../src/sim/visibility.ts';
 import { ZONE } from '../../src/sim/world/geography.ts';
@@ -319,4 +322,137 @@ test('nine captains keep the tick within A9 (Node mean ≤ 0.3 ms)', (t) => {
   const bare = cost(fleet(6, () => ({ captain: undefined }))), crewed = cost(fleet(6));
   t.diagnostic(`tick with nine captains: CPU mean ${crewed.cpu.toFixed(3)} ms, wall mean ${crewed.mean.toFixed(3)} ms, p99 ${crewed.p99.toFixed(3)} ms; without: CPU mean ${bare.cpu.toFixed(3)} ms, p99 ${bare.p99.toFixed(3)} ms`);
   assert.ok(crewed.cpu < 0.3, `CPU mean ${crewed.cpu.toFixed(3)} ms`);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Temperaments (temperaments.ts): each one's own sailing, shown in a short scene, and every captain's signature.
+
+const T = { hunter: 0, expander: 1, raider: 2, turtle: 3, opportunist: 4, gambler: 5 } as const;
+/** Captain 1 of temperament t (tier 6), its outfit amended, and the ships in `keep` without captains. */
+const lone = (t: number, keep: number[], amend: Outfit = {}): MatchState =>
+  scene(fleet(6, (i) => (i === 1 ? { captain: { temperament: t, tier: 6 }, ...amend } : { captain: undefined })), [1, ...keep]);
+/** How nearly ship i's chart arrow points at p (1: dead on). */
+const bearing = (s: MatchState, i: number, p: V3): number => dot(intent(s, i, v3()), tangentToward(s.ships[i].pos, p, v3()));
+const closing = (mode: number): boolean => mode === MODE.stalk || mode === MODE.fight || mode === MODE.ram;
+/** Starting fittings of tier 6 with these FITTING kinds by SLOT. */
+function fitted(kinds: Record<number, number>): Outfit {
+  return { fittings: startingFittings(6).map((f, slot) => (slot in kinds ? { kind: kinds[slot], tier: 1 } : { ...f })) };
+}
+
+test('a hunter stalks a wounded ship from beyond its guns, where an expander lets it be', () => {
+  const [hunter, expander] = [T.hunter, T.expander].map((t) => {
+    const s = lone(t, [2], fitted({ [SLOT.broadside]: FITTING.none, [SLOT.bow]: FITTING.none })); // no guns, no ram: it can only stalk
+    place(s, 1, OPEN, 0);
+    place(s, 2, at(OPEN, 0.3, 15), 2);
+    s.ships[2].hull *= 0.4;
+    decision(s, 1);
+    return { mode: s.ships[1].captain.mode, arrow: bearing(s, 1, s.ships[2].pos) };
+  });
+  assert.equal(hunter.mode, MODE.stalk);
+  assert.ok(hunter.arrow > 0.5, 'its arrow toward the wounded ship, led for where it will be');
+  assert.ok(!closing(expander.mode), `the expander keeps to its business (mode ${expander.mode})`);
+});
+
+test('a turtle turns to face an intruder in its waters, reefed, before it strikes; an expander does not', () => {
+  const [s, e] = [T.turtle, T.expander].map((t) => {
+    const st = lone(t, [2]);
+    place(st, 1, OPEN, 0);
+    place(st, 2, at(OPEN, Math.PI / 2, HOME.radius), Math.PI);
+    decision(st, 1);
+    return st;
+  });
+  const c = s.ships[1].captain, to = tangentToward(s.ships[1].pos, s.ships[2].pos, v3());
+  assert.equal(c.mode, MODE.face);
+  assert.equal(c.trim, SAIL.reefed, 'it squares up');
+  assert.ok(c.tell > 0 && bearing(s, 1, s.ships[2].pos) > 0.95 && dot(s.ships[1].head, to) < 0.5, 'its arrow swings onto the intruder before its bow');
+  let struck = false;
+  run(s, S(4), (st) => (struck ||= closing(st.ships[1].captain.mode)));
+  assert.ok(struck, 'then it strikes');
+  assert.notEqual(e.ships[1].captain.mode, MODE.face);
+});
+
+test('a raider breaks trails for the purse and runs for home with it, where a hunter strikes on', () => {
+  const after = (t: number, purse: number): number => {
+    const s = lone(t, [2]), ship = s.ships[1];
+    place(s, 1, OPEN, 0);
+    place(s, 2, at(OPEN, Math.PI, 150), Math.PI); // the trail's owner far out of sight
+    lay(s, 2, at(OPEN, 0.5, 25), 2, 30);
+    decision(s, 1); // its home inks where it stands; the trail draws it
+    ship.held = 1000;
+    ship.purse = purse * FORMS[ship.form].purse;
+    lay(s, 1, OPEN, Math.PI / 2, 6); // its own trail open
+    decision(s, 1);
+    return ship.captain.mode;
+  };
+  assert.equal(after(T.raider, 0), MODE.hunt, 'an empty purse: it raids');
+  assert.equal(after(T.raider, 0.5), MODE.home, 'a purse worth the raid: it runs for home');
+  assert.equal(after(T.hunter, 0.5), MODE.hunt, 'a hunter strikes on');
+});
+
+test('an opportunist lies off a fight between others and pounces on the one it weakens', () => {
+  const lurker = (t: number): MatchState => {
+    const s = lone(t, [2, 3]), mid = at(OPEN, 0.4, 30);
+    place(s, 1, OPEN, 0);
+    place(s, 2, at(mid, 0.4 + Math.PI, 7), Math.PI / 2);
+    place(s, 3, at(mid, 0.4, 7), Math.PI / 2);
+    decision(s, 1);
+    return s;
+  };
+  const s = lurker(T.opportunist), c = s.ships[1].captain, off = apart(c.goal, at(OPEN, 0.4, 30));
+  assert.equal(c.mode, MODE.lurk);
+  assert.ok(off > 25 && off < 45, `it lies ${off.toFixed(1)} u off the fight`);
+  s.ships[2].hull *= 0.3;
+  decision(s, 1);
+  assert.ok(closing(s.ships[1].captain.mode), `it pounces (mode ${s.ships[1].captain.mode})`);
+  assert.notEqual(lurker(T.expander).ships[1].captain.mode, MODE.lurk);
+});
+
+test('a gambler draws enormous loops and visibly commits to each, swinging round to it before it sets out', () => {
+  const s = createMatch({ seed: SEED, fleet: fleet(6, (i) => (i === 1 ? { captain: { temperament: T.gambler, tier: 6 } } : i === 4 ? {} : { captain: undefined })) });
+  const far = [0, 0];
+  let committed = 0, swung = 0;
+  run(s, S(150), (st) => {
+    [1, 4].forEach((i, k) => st.ships[i].phase === PHASE.sailing && (far[k] = Math.max(far[k], apart(st.ships[i].pos, st.ships[i].captain.anchor))));
+    const c = st.ships[1].captain;
+    if (c.plan.length === 0 || c.tell === 0) return;
+    committed++;
+    if (bearing(st, 1, cellDir(TERRITORY, c.plan[c.plan.length >> 1], v3())) > 0.9) swung++;
+  });
+  assert.ok(committed > 0 && swung > 0, `it commits (${committed} ticks, arrow on the loop ${swung})`);
+  assert.ok(far[0] > 2 * far[1], `its loops reach ${far[0].toFixed(0)} u, a turtle's ${far[1].toFixed(0)} u`);
+});
+
+test('a captain aims its mortar by hand, where the rival will be', () => {
+  const s = lone(T.hunter, [2], fitted({ [SLOT.stern]: FITTING.mortar }));
+  place(s, 1, OPEN, 0);
+  place(s, 2, at(OPEN, 0.6, 28), 0.6 + Math.PI / 2);
+  s.ships[2].speed = 6;
+  const { input } = decision(s, 1);
+  assert.ok((input.flags & FLAG.useAimed) !== 0 && input.aim >= 0, 'it fires at a point, as a drag would');
+  const lead = apart(cellDir(TERRITORY, input.aim, v3()), s.ships[2].pos);
+  assert.ok(lead > 1 && lead < 12, `led ${lead.toFixed(1)} u ahead of the rival`);
+});
+
+test('every league captain sails its temperament under its own signature, the same in every match', () => {
+  const base = createMatch({ seed: SEED, fleet: fleet(6) }).ships[1];
+  const of = (id: number): ReturnType<typeof styleOf> => styleOf({ ...base, pigment: id, captain: { ...base.captain, temperament: Math.floor(id / 5) } });
+  const all = Array.from({ length: 30 }, (_, id) => of(id));
+  assert.equal(new Set(all.map((x) => JSON.stringify(x))).size, 30, 'thirty signatures');
+  assert.equal(new Set(all.map((x) => Math.sign(x.wheel))).size, 2, 'loops wheeling both ways round their homes');
+  assert.deepEqual(styleOf(createMatch({ seed: SEED + 1, fleet: fleet(6, () => ({ pigment: 7 })) }).ships[2]), of(7), 'Marea sails the same in another match');
+  for (let g = 25; g < 30; g++) for (let t = 15; t < 20; t++) assert.ok(of(g).loop > 2 * of(t).loop, 'every gambler loops wider than every turtle');
+  assert.ok(all.every((x, id) => (x.bold >= 0.7) === (id >= 25 || (id >= 10 && id < 15))), 'raiders and gamblers ride the vortex, no one else');
+});
+
+test('captains sail by the habits of the player they know: its fittings, its loops, its raids', () => {
+  const sure = (value: number): { value: number; confidence: number } => ({ value, confidence: 900 });
+  const mind: Mind = { gentle: false, grudge: 0, breakOff: NONE, loop: sure(70), raids: sure(30), run: NONE, storm: NONE, fittings: [FITTING.ironRam] };
+  const s = createMatch({ seed: SEED, fleet: fleet(6), minds: Array.from({ length: SHIPS }, (_, i) => (i === 0 ? null : mind)) });
+  const naive = createMatch({ seed: SEED, fleet: fleet(6) });
+  const [hunter, expander] = [s.ships[1], s.ships[2]];
+  assert.deepEqual(hunter.captain.fittings, [FITTING.ironRam]);
+  assert.deepEqual(decodeMatch(encodeMatch(s)).ships[1].captain.fittings, [FITTING.ironRam], 'carried through a snapshot');
+  assert.ok(standoff(hunter.captain, styleOf(hunter), 0) > standoff(hunter.captain, styleOf(hunter), 3), 'it lies farther off a player who favours the ram');
+  assert.ok(reachOf(hunter.captain, styleOf(hunter), HOME.radius) > reachOf(naive.ships[1].captain, styleOf(naive.ships[1]), HOME.radius), 'a hunter patrols beyond the player\'s loops');
+  assert.ok(reachOf(expander.captain, styleOf(expander), HOME.radius) < reachOf(naive.ships[2].captain, styleOf(naive.ships[2]), HOME.radius), 'it draws its loops in, guarding its trail from a raider');
 });

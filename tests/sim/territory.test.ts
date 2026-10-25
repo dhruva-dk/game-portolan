@@ -253,7 +253,7 @@ test('territory, trails, purses, coins and the timeline survive a snapshot', () 
   glide(s, [[1, local(A, 20, 10)]]);
   route(s, 0, [A, local(A, 0, -20)]);
   assert.ok(s.ships[0].laid.length > 0 && s.coins.some((c) => c.value > 0));
-  assert.equal(MATCH_FORMAT.version, 11); // WP11's schema, with the captains
+  assert.equal(MATCH_FORMAT.version, 12); // WP11's schema, with the captains and the player's fittings they know
   const back = decodeMatch(encodeMatch(s));
   assert.equal(matchHash(back), matchHash(s));
   assert.deepEqual([back.ships[0].laid, back.coins, back.timeline], [s.ships[0].laid, s.coins, s.timeline]);
