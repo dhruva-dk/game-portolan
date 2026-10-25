@@ -20,6 +20,7 @@ import { KelpShallows } from '../../src/render/regions/kelpShallows.ts';
 import { AmberShoals } from '../../src/render/regions/amberShoals.ts';
 import { WeepingIsle } from '../../src/render/regions/weepingIsle.ts';
 import { CoralAtolls } from '../../src/render/regions/coralAtolls.ts';
+import { SpiceIsles } from '../../src/render/regions/spiceIsles.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -66,6 +67,8 @@ const weeping = new WeepingIsle(style, terrain.field, sea.swell);
 scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group, amberShoals.group, weeping.group);
 const coral = new CoralAtolls(style, terrain.field, sea.swell); // WP17 part A
 scene.add(coral.group);
+const spice = new SpiceIsles(style, terrain.field); // WP17 part B
+scene.add(spice.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -255,6 +258,15 @@ if (view === 'deck') {
   if (view === 'coral') { toWorld(ri, ch.crest.x + od * Math.cos(ob), ch.crest.y + od * Math.sin(ob), from); toWorld(ri, ch.crest.x + 30 * Math.cos(b + aim * 0.01), ch.crest.y + 30 * Math.sin(b + aim * 0.01), to); }
   else { toWorld(ri, 1.5, -19, from); toWorld(ri, 9.4, -14.3, to); } // over the outer reef's surf to the motu at the Great Lagoon's mouth, the hulk on its shore
   look(from, to, Number(q.get('height') ?? (view === 'coral' ? 4 : 2.6)), Number(q.get('pitch') ?? (view === 'coral' ? -0.2 : -0.12)));
+} else if (view === 'spice' || view === 'spiceshore') {
+  const ri = REGIONS.findIndex((r) => r.id === 'spiceIsles'), from = V(), to = V(), m = REGIONS[ri].landmark;
+  const ox = Number(q.get('ox') ?? 0), oy = Number(q.get('oy') ?? 0);
+  // capture 24: Spice Harbour at golden hour from the sound, its quays and godowns under the flowering jungle, ships
+  // crowding in through the mouth
+  if (view === 'spice') { toWorld(ri, m.x + 14 + ox, m.y - 26 + oy, from); toWorld(ri, m.x - 1, m.y + 3, to); }
+  else { toWorld(ri, 14 + ox, -10 + oy, from); toWorld(ri, 28, -4, to); } // low off the east island's jungle shore: the forest edge over the beach
+  look(from, to, Number(q.get('height') ?? (view === 'spice' ? 8 : 2.6)), Number(q.get('pitch') ?? (view === 'spice' ? -0.16 : -0.02)));
+  if (view === 'spice') { launch(13, -2, 0.25, 0.6); launch(19, 2.5, -0.1, 0.6); launch(24, -1.5, 0.2, 0.35); launch(10, 5, -0.5, 0.6); }
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();
@@ -340,11 +352,11 @@ function frame(now: number): void {
   ice.update(camera.position, clock, clock);
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
-  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position);
+  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position); spice.update(camera.position);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles + coral.triangles), flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles + coral.triangles + spice.triangles), flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);
