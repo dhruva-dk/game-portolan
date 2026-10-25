@@ -10,13 +10,13 @@ import { LESSON } from '../career/voyage.ts';
 import { over } from '../sim/end.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, afloat } from '../sim/state.ts';
-import { ChestChoice } from './chestChoice.ts';
+import { ChestChoice, chestLayout } from './chestChoice.ts';
 import { Controls } from './controls.ts';
 import { Haptics } from './haptics.ts';
 import { HudState, hudLayout, type HudLayout } from './hud.ts';
 import { HudView } from './icons.ts';
 import { ButtonBase, Scrap } from './parchment.ts';
-import { ResultsSheet, SkipCard, fateWords, resultsModel } from './results.ts';
+import { ResultsSheet, SkipCard, fateWords, resultsModel, skipLayout } from './results.ts';
 import { safeRect, type Rect, type View } from './safeArea.ts';
 import { applySettings, onSettings, settings, type Settings } from './settings.ts';
 import { CompactChart } from '../render/compactchart.ts';
@@ -24,7 +24,7 @@ import { COURSE, CourseDrawing } from '../render/course.ts';
 import { prefersReducedMotion } from '../render/camera.ts';
 import { TEAMS } from '../style/palette.ts';
 import type { Screen, ScreenContext, Touch } from './shell.ts';
-import { TutorialOverlay, newTutorial, type Anchors } from './tutorial.ts';
+import { TutorialOverlay, newTutorial, sense, type Anchors, type Moment } from './tutorial.ts';
 
 /** The screens drawn on the bare page have no world beneath them. */
 const BARE = { scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera() };
@@ -139,6 +139,8 @@ interface Wp25Probe {
  *  prompt, the chest's sheet and chip, the skip card, the seconds since she sank (−1 afloat) and the results' button. */
 interface Wp27Probe {
   lesson?: () => number;
+  /** What the first voyage's prompts read of the match now (S-019: the loop's waits for `homeward`). */
+  moment?: () => Moment | null;
   tutorial?: () => { shown: number[]; closed: number[] } | null;
   lessons?: () => number[];
   prompt?: () => Rect | null;
@@ -153,7 +155,12 @@ const probe27 = (): Wp27Probe | undefined => (globalThis as { __wp27?: Wp27Probe
 /** WP27: once the player's ship is gone the match plays out on the chart this many times faster than the clock, the
  *  skip card comes up `skipAfter` s after she sank, and the results follow the end after `beat` s (`rushed` s when
  *  the player skipped or watched from the chart). */
-const SINKING = { playOut: 3, skipAfter: 1.5, beat: 3, rushed: 0.6 } as const;
+const SINKING = { playOut: 3, skipAfter: 1.5, skipLate: 15, beat: 3, rushed: 0.6 } as const;
+/** S-019: the skip card comes up over the match playing out: once the chart has opened whole (z past this), at least
+ *  `skipAfter` s after she sank, and in any case by `skipLate` s (the player may pinch back down to the sea). */
+const SKIP_Z = 0.98;
+/** The safe area with the skip card's band kept clear at its foot, so the chart is framed whole above the card. */
+const banded = (v: View): View['safe'] => ({ ...v.safe, bottom: Math.max(v.safe.bottom, skipLayout(v).band) });
 
 /** WP27: the stowed chest's chip, beside the compact chart on the side away from the screen's edge. */
 function chipOf(L: HudLayout): Rect {
@@ -164,11 +171,12 @@ function chipOf(L: HudLayout): Rect {
 /** WP27: where each first-voyage prompt points: the stick's thumb, head home, the gull, the broadside's fitting, the storm's dial. */
 function anchorsOf(L: HudLayout): Anchors {
   const at = (kind: string) => { const b = L.buttons.find((q) => q.kind === kind); return b && { x: b.x, y: b.y }; };
-  const guns = L.fittings[1];
+  const guns = L.fittings[1], c = chestLayout(L.view, 3, L), p = c.panel; // a chest offers three (items.ts OFFERS)
   return {
     stick: { x: L.stick.x + L.stick.width * (L.left ? 0.74 : 0.26), y: L.stick.y + L.stick.height * 0.72 },
     home: at('home'), gull: at('gull'), guns: guns && { x: guns.x, y: guns.y },
     storm: { x: L.top.x + L.top.width / 2, y: L.top.y + L.top.height / 2 },
+    deck: { x: c.left ? p.x + p.width : p.x, y: p.y + Math.min(p.height, 112 * c.k) - 28 * c.k }, // the chest's panel
   };
 }
 
@@ -212,12 +220,13 @@ export function match(ctx: ScreenContext): Screen {
   let hudNow: HudLayout | null = null; // the HUD's layout in force
   if (p27) {
     p27.lesson = () => tutorial?.showing ?? -1;
+    p27.moment = () => (rt.voyage ? sense(session.state, rt.voyage) : null);
     p27.tutorial = () => tutorial && { shown: [...tutorial.state.shown], closed: [...tutorial.state.closed] };
     p27.lessons = () => [...(rt.voyage?.lessons ?? [])];
     p27.prompt = () => tutorial?.card ?? null;
     p27.chest = () => { const l = chest.sheetLayout; return l && { cards: l.cards, later: l.later }; };
     p27.chip = () => chest.chipRect;
-    p27.skip = () => (sunk >= SINKING.skipAfter ? skip.button : null);
+    p27.skip = () => (skip.group.visible ? skip.button : null);
     p27.sunk = () => sunk;
   }
   const veil = document.createElement('div'); // the paper veil over a reduced-motion cut (the rig's zoom.veil, 1 → 0)
@@ -237,7 +246,7 @@ export function match(ctx: ScreenContext): Screen {
     chart = new CompactChart(px);
     Object.assign(chart.canvas.style, { position: 'fixed', left: `${L.chart.x + (L.chart.width - px) / 2}px`, top: `${L.chart.y + (L.chart.height - px) / 2}px`, pointerEvents: 'none', zIndex: '2' });
     chart.mount(document.body);
-    chest.layout(v, chipOf(L));
+    chest.layout(v, chipOf(L), L);
     tutorial?.layout(v, anchorsOf(L));
     if (sunk >= 0) skip.layout(v);
     if (probe) probe.layout = L;
@@ -297,7 +306,7 @@ export function match(ctx: ScreenContext): Screen {
     scene: view.scene,
     camera: view.camera,
     layout(v) {
-      view.layout(v.width, v.height, v.safe);
+      view.layout(v.width, v.height, sunk >= 0 ? banded(v) : v.safe);
       vw = v.width; vh = v.height;
       relayout(v);
     },
@@ -317,17 +326,19 @@ export function match(ctx: ScreenContext): Screen {
         const fate = state.sunk.find((q) => q.ship === 0), c = rt.career;
         ending = fate && c ? fateWords(c, draw(c), fate.by, fate.cause) : 'Sunk';
         controls.reset();
-        if (lastView) skip.layout(lastView);
+        if (lastView) { skip.layout(lastView); view.layout(lastView.width, lastView.height, banded(lastView)); }
+        skip.group.visible = false;
         ui.add(skip.group);
       }
       if (sunk >= 0) {
         sunk += f.dt;
-        skip.group.visible = sunk >= SINKING.skipAfter;
+        skip.group.visible ||= sunk >= SINKING.skipAfter && (rig.z >= SKIP_Z || sunk >= SINKING.skipLate);
         skip.set(ending, state.ships.filter(afloat).length, rushing);
         if (skip.group.visible) skip.frame(f.dt);
       }
       hud.group.visible = !gone;
       chest.group.visible = !open && !gone;
+      if (tutorial && chest.waiting && tutorial.showing === LESSON.chest) tutorial.fold(); // stowed by "Later": nothing to touch now
       if (tutorial) tutorial.group.visible = !open && !gone && (!chest.open || tutorial.showing === LESSON.chest); // over the sheet, only its own prompt
       chest.frame(f.dt);
       tutorial?.frame(f.dt);

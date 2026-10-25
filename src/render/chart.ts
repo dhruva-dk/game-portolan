@@ -342,10 +342,12 @@ export function geographyCube(world: World): THREE.CubeTexture {
   return cubeTexture(faces, THREE.UnsignedByteType);
 }
 
-/** The ships the player's chart shows: those in its sight or marked, never the sunk; its own always. */
+/** The ships the player's chart shows: those in its sight or marked, never the sunk; its own always. Once the player
+ *  has gone down the match plays out on the chart (WP27, PROMPT.md, Sinking and the end): every ship still afloat. */
 export function chartShips(state: MatchState, sight: Sight | null): number {
   let mask = 1 << PLAYER;
-  if (sight) mask |= sight.ships | sight.marks;
+  if (state.ships[PLAYER]?.phase === PHASE.sunk) mask = (1 << Math.min(SHIPS, state.ships.length)) - 1;
+  else if (sight) mask |= sight.ships | sight.marks;
   for (let i = 0; i < SHIPS && i < state.ships.length; i++) if (state.ships[i].phase === PHASE.sunk && i !== PLAYER) mask &= ~(1 << i);
   return mask;
 }
@@ -567,6 +569,8 @@ export class Chart {
     const net = this.net, fit = net.fit(camera, view), b = builder(), pxU = this.uniforms.uPxU.value;
     const ink = [...linearVec(PIGMENTS.ironGall).toArray(), 2], mine = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
     const inv = new THREE.Matrix3(), p = V();
+    // WP27 (S-019): once the player has gone down the chart is the match playing out: its hulls drawn half again as large
+    const big = state.ships[PLAYER]?.phase === PHASE.sunk ? 1.5 : 1;
     this.drawn = 0;
     // WP24 part D: under the ships, the current, the player's waters, trails, landmarks, loot and the course
     chartContent(b, net, state, this.world, mask, pxU, fit.up, this.draft);
@@ -575,6 +579,7 @@ export class Chart {
       if (!(mask & (1 << i))) continue;
       const ship = state.ships[i], k = net.sheetOf(ship.pos), c = net.centres[k];
       this.drawn |= 1 << i;
+      if (ship.phase === PHASE.sunk) continue; // the player gone down: chartmarks.ts marks the place
       const up = fit.up.clone().applyMatrix3(inv.setFromMatrix4(net.final[k]).invert());
       up.addScaledVector(c, -up.dot(c)).normalize();
       const right = new THREE.Vector3().crossVectors(up, c).normalize();
@@ -583,7 +588,7 @@ export class Chart {
       const head = i === PLAYER ? ship.head : ship.captain.intent;
       const hd = new THREE.Vector3(head.x, head.y, head.z).addScaledVector(c, -(head.x * c.x + head.y * c.y + head.z * c.z));
       if (hd.lengthSq() < 1e-10) hd.copy(up); else hd.normalize();
-      const s = 9 * pxU, flip = hd.dot(right) < 0 ? -1 : 1, rect = silhouetteRect(FORM_NAMES[ship.form] ?? 'caravel', 'profile');
+      const s = 9 * big * pxU, flip = hd.dot(right) < 0 ? -1 : 1, rect = silhouetteRect(FORM_NAMES[ship.form] ?? 'caravel', 'profile');
       const col = i === PLAYER ? mine : ink;
       const Q = (x: number, y: number) => o.clone().addScaledVector(right, x * s).addScaledVector(up, y * s + s * 0.6);
       const sil = [...ink.slice(0, 3), 1];

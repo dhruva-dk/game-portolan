@@ -46,7 +46,7 @@ if (shot.startsWith('chest')) {
   else ship.offer.push({ kind: FITTING.longGuns, tier: 3 }, { kind: FITTING.copperSheathing, tier: 2 }, { kind: CONSUMABLE.patchKit, tier: 1 });
   const l = chestLayout(view);
   drawChestChoice(g, chestOffers(ship), l, 3, -1, shot === 'chest-gold');
-  if (close) clip = { x: l.cards[0].x - 6, y: l.sheet.y + 8, width: l.cards[2].x + l.cards[2].width - l.cards[0].x + 12, height: l.cards[0].y + l.cards[0].height * 0.62 - l.sheet.y };
+  if (close) clip = { x: l.sheet.x - 4, y: l.sheet.y - 4, width: l.sheet.width + 8, height: l.sheet.height + 8 }; // the whole panel, its cards uncut
 } else if (shot === 'skip') {
   sea(g);
   drawSkip(g, skipLayout(view), "Sunk by Lanza's guns", 6, false, 2);

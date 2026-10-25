@@ -21,8 +21,10 @@ import { CHART_GRID } from '../../src/career/voyage.ts';
 import { cellDir } from '../../src/sim/sphere.ts';
 import { v3 } from '../../src/sim/math.ts';
 import { cardLines } from './results.lines.ts';
-import { chestLayout, chestOffers, chestPick, pickAt } from '../../src/ui/chestChoice.ts';
+import { centreOf, chestLayout, chestOffers, chestPick, pickAt } from '../../src/ui/chestChoice.ts';
+import { hudLayout, type HudButton } from '../../src/ui/hud.ts';
 import { MIN_TARGET, safeOf, within } from '../../src/ui/inkpage.ts';
+import type { Rect } from '../../src/ui/safeArea.ts';
 import { nextLayout, resultsLayout, resultsModel, skipLayout } from '../../src/ui/results.ts';
 import { newTutorial, promptLayout, sense, tutorialOver, tutorialStep, type Moment } from '../../src/ui/tutorial.ts';
 import { world } from '../sim/vectors.ts';
@@ -31,6 +33,7 @@ import { inkChart, madeMatch } from './results.fixtures.ts';
 const IPHONE = { width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
 const IPAD = { width: 1376, height: 1032, dpr: 2, safe: { top: 24, right: 0, bottom: 20, left: 0 } };
 const VIEWS = [IPHONE, IPAD];
+const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test('a touch on the card a captain would take gives its very chestPick, through the input validator and the sim', () => {
   const { setup } = toSetup(newCareer(3), 77), sea = seaFor(world(), 77), state = createMatch(setup), ship = state.ships[0];
@@ -127,14 +130,17 @@ test('the first voyage, scripted: each lesson prompted once, in its moment, in o
   const run = (from: number, to: number, o: Partial<Moment>, lesson = -1, at = -1): void => {
     for (let tick = from; tick < to; tick++) {
       if (tick === at) lessons[lesson] = tick;
-      const k = tutorialStep(t, { tick, breakOff: lessons[LESSON.breakOff] >= 0, offer: false, rivalNear: false, stormNear: false, lessons, ...o });
+      const k = tutorialStep(t, { tick, breakOff: lessons[LESSON.breakOff] >= 0, offer: false, rivalNear: false, stormNear: false, homeward: true, lessons, ...o });
       if (k >= 0 && k !== prev) seen.push(k);
       prev = k;
     }
   };
-  run(0, 300, {}, LESSON.breakOff, 260);
-  run(300, 700, {}, LESSON.steer, 600);
-  run(700, 1400, {}, LESSON.loop, 1200);
+  run(0, 300, { homeward: false }, LESSON.breakOff, 260);
+  run(300, 700, { homeward: false }, LESSON.steer, 600);
+  run(700, 900, { homeward: false }); // S-019: still inside her waters, head home would do nothing: no loop prompt yet
+  assert.equal(t.shown[LESSON.loop], -1, 'the loop prompt waits until head home can close one');
+  run(900, 1400, {}, LESSON.loop, 1200);
+  assert.ok(t.shown[LESSON.loop] >= 900);
   run(1400, 1900, {}, LESSON.gull, 1700);
   run(1900, 2300, { offer: true }, LESSON.chest, 2200);
   run(2300, 2700, { rivalNear: true }, LESSON.broadside, 2600);
@@ -147,7 +153,7 @@ test('the first voyage, scripted: each lesson prompted once, in its moment, in o
   const u = newTutorial(), early = new Array<number>(LESSONS).fill(-1);
   early[LESSON.breakOff] = 10;
   let shown = -1;
-  for (let tick = 0; tick < 900; tick++) { const k = tutorialStep(u, { tick, breakOff: true, offer: tick >= 300, rivalNear: false, stormNear: false, lessons: early }); if (k === LESSON.chest && shown < 0) shown = tick; }
+  for (let tick = 0; tick < 900; tick++) { const k = tutorialStep(u, { tick, breakOff: true, offer: tick >= 300, rivalNear: false, stormNear: false, homeward: true, lessons: early }); if (k === LESSON.chest && shown < 0) shown = tick; }
   assert.equal(u.shown[LESSON.breakOff], -1);
   assert.ok(u.shown[LESSON.steer] >= 0 && shown >= 300 && shown <= 300 + 7 * 30 + 1, `chest shown at ${shown}`);
 });
@@ -162,6 +168,7 @@ test('the first voyage on the real sim: the moments come from the match itself, 
     step(sea, state, idleInput());
     observe(v, sea, state);
     const k = tutorialStep(t, sense(state, v));
+    if (k === LESSON.loop && prev !== k) assert.ok(state.ships[0].laid.length > 0, 'the loop prompt only with an open trail out of her waters');
     if (k >= 0 && k !== prev) seen.push(k);
     prev = k;
   }
@@ -175,7 +182,7 @@ test('every sheet fits the safe area of the iPhone and the iPad, with targets of
     const s = safeOf(view), c = chestLayout(view);
     assert.ok(within(c.sheet, s));
     for (const r of [...c.cards, c.later]) { assert.ok(within(r, c.sheet)); assert.ok(r.width >= MIN_TARGET && r.height >= MIN_TARGET); }
-    assert.ok(c.cards.every((r) => r.y + r.height <= c.later.y));
+    assert.ok(c.cards.every((r) => within(r, c.panel) && !overlaps(r, c.later)));
     const r = resultsLayout(view);
     assert.ok(within(r.page, s));
     for (const col of [r.left, r.mid, r.right, r.cont]) assert.ok(within(col, r.page));
@@ -193,6 +200,28 @@ test('every sheet fits the safe area of the iPhone and the iPad, with targets of
     assert.ok(n.cells.every((c) => within(c, n.page) && c.y >= n.cont.y + n.cont.height));
     const k = skipLayout(view);
     assert.ok(within(k.card, s) && within(k.button, k.card) && k.button.width >= MIN_TARGET && k.button.height >= MIN_TARGET);
+  }
+});
+
+test('S-019: the chest choice leaves the match in sight and in hand: clear of the centre, the stick and every control, on the free thumb’s side', () => {
+  const box = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : { x: b.x - b.hit, y: b.y - b.hit, width: 2 * b.hit, height: 2 * b.hit });
+  for (const view of VIEWS) for (const left of [false, true]) {
+    const L = hudLayout(view, left), c = chestLayout(view, 3, L), s = safeOf(view), name = `${view.width} ${left ? 'left' : 'right'}-handed`;
+    const drawn = [c.panel, c.later];
+    for (const r of drawn) {
+      assert.ok(within(r, s), `${name}: in the safe area`);
+      assert.ok(!overlaps(r, centreOf(s)), `${name}: out of the frame's centre (the ship and the sea ahead)`);
+      assert.ok(!overlaps(r, L.stick), `${name}: clear of the stick's half`);
+      for (const [k, q] of [['hull', L.hull], ['top', L.top], ['purse', L.purse], ['sail', L.sail]] as const) assert.ok(!overlaps(r, q), `${name}: clear of the ${k}`);
+      for (const f of L.fittings) assert.ok(!overlaps(r, { x: f.x - f.r, y: f.y - f.r, width: 2 * f.r, height: 2 * f.r }), `${name}: clear of the fittings`);
+      for (const b of L.buttons) if (b.kind !== 'chart' || c.column) assert.ok(!overlaps(r, box(b)), `${name}: clear of ${b.kind}`);
+    }
+    // the free thumb's side; the iPad's column clear of the compact chart too, the iPhone's row over its slot only
+    assert.ok(c.cards.every((q) => (left ? q.x + q.width <= s.x + s.width / 2 : q.x >= s.x + s.width / 2)), `${name}: on the thumb's side`);
+    assert.equal(c.column, view === IPAD, `${name}: ${c.column ? 'column' : 'row'}`);
+    if (c.column) assert.ok(!overlaps(c.panel, L.chart));
+    assert.ok(c.cards.every((q) => q.width >= MIN_TARGET && q.height >= 90), `${name}: cards a thumb can take`);
+    assert.ok(c.panel.height <= s.height * 0.5, `${name}: a compact panel, ${c.panel.height.toFixed(0)} of ${s.height} tall`);
   }
 });
 

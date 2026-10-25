@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { Career } from '../career/state.ts';
 import { LESSON, LESSONS, type Voyage } from '../career/voyage.ts';
 import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
-import { R } from '../sim/sphere.ts';
+import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { TICK, afloat, type MatchState } from '../sim/state.ts';
 import { INK, nib, ring } from './icons.ts';
 import { SEPIA, VERMILION, clamp01, clampRect, ease, inkRect, inset, inside, letter, quad, safeOf, scrap, type G, type Pt } from './inkpage.ts';
@@ -20,6 +20,7 @@ import type { Touch } from './shell.ts';
 export const TUTORIAL = { open: 4, hold: 3, wait: 16, hurry: 7, gap: 2, near: 30 } as const;
 
 export type Anchor = 'stick' | 'home' | 'gull' | 'deck' | 'guns' | 'storm';
+// 'deck': the chest's panel, at the middle of its inner edge (part B: the match gives it; else the top left)
 /** By LESSON, the words and the control they point at. */
 export const PROMPTS: readonly { readonly words: string; readonly sub: string; readonly anchor: Anchor }[] = [
   { words: 'Leave the current', sub: 'steer out of the stream', anchor: 'stick' },
@@ -38,6 +39,9 @@ export interface Moment {
   offer: boolean;
   rivalNear: boolean;
   stormNear: boolean;
+  /** Head home would close a loop now: the ship is out of its waters with an open trail behind it (S-019: never prompt
+   *  a press that does nothing, as it would inside her home). */
+  homeward: boolean;
   lessons: readonly number[];
 }
 
@@ -48,7 +52,8 @@ export function sense(state: MatchState, v: Voyage): Moment {
     const s = state.ships[j], ls = Math.hypot(s.pos.x, s.pos.y, s.pos.z) || 1;
     if (afloat(s) && (me.pos.x * s.pos.x + me.pos.y * s.pos.y + me.pos.z * s.pos.z) / (lm * ls) > cosNear) near = true;
   }
-  return { tick: state.tick, breakOff: v.breakOff >= 0, offer: me.offer.length > 0, rivalNear: near && afloat(me), stormNear: v.storm > 0, lessons: v.lessons };
+  const homeward = afloat(me) && me.laid.length > 0 && state.owner[cellOf(TERRITORY, me.pos)] !== 1;
+  return { tick: state.tick, breakOff: v.breakOff >= 0, offer: me.offer.length > 0, rivalNear: near && afloat(me), stormNear: v.storm > 0, homeward, lessons: v.lessons };
 }
 
 /** The tutorial's state: the lesson showing (−1 none) and since when; by LESSON the tick it was shown and folded (−1 not yet). */
@@ -71,7 +76,7 @@ function due(t: Tutorial, m: Moment, k: number): boolean {
   switch (k) {
     case LESSON.breakOff: return m.tick * TICK >= TUTORIAL.open;
     case LESSON.steer: return past(LESSON.breakOff);
-    case LESSON.loop: return past(LESSON.steer) && m.breakOff;
+    case LESSON.loop: return past(LESSON.steer) && m.breakOff && m.homeward;
     case LESSON.gull: return past(LESSON.loop);
     case LESSON.chest: return m.offer;
     case LESSON.broadside: return m.rivalNear && past(LESSON.steer);
@@ -137,14 +142,19 @@ export function promptLayout(view: View, lesson: number, leftHanded = false, anc
     : { x: s.x + s.width / 2, y: s.y + s.height / 2 });
   const w = 300 * k, h = (PROMPTS[lesson].sub ? 80 : 56) * k;
   let cx = at.x + (s.x + s.width / 2 - at.x) * 0.55, cy = at.y + (s.y + s.height * 0.42 - at.y) * 0.55;
-  if (a === 'deck') {
+  const panel = a === 'deck' ? anchors.deck : undefined;
+  if (panel) { // S-019: beside the chest's panel, on the side toward the middle, an arrow to its cards
+    const side = panel.x > s.x + s.width / 2 ? -1 : 1;
+    cx = panel.x + side * (74 * k + w / 2);
+    cy = panel.y;
+  } else if (a === 'deck') {
     cx = s.x + w / 2 + 8 * k;
     cy = s.y + h / 2 + 8 * k;
   } else if (a === 'storm') cy = at.y + 70 * k + h / 2;
   const card = clampRect({ x: cx - w / 2, y: cy - h / 2, width: w, height: h }, inset(s, 4));
   const ringR = 40 * k, x0 = Math.min(card.x, at.x - ringR), y0 = Math.min(card.y, at.y - ringR);
   const x1 = Math.max(card.x + card.width, at.x + ringR), y1 = Math.max(card.y + card.height, at.y + ringR);
-  const bounds = a === 'deck' ? inset(card, -6) : { x: x0 - 6, y: y0 - 6, width: x1 - x0 + 12, height: y1 - y0 + 12 };
+  const bounds = a === 'deck' && !panel ? inset(card, -6) : { x: x0 - 6, y: y0 - 6, width: x1 - x0 + 12, height: y1 - y0 + 12 };
   return { lesson, at, card, bounds, k };
 }
 
@@ -160,7 +170,7 @@ export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
   if (a <= 0) return;
   g.save();
   g.globalAlpha *= a;
-  if (P.anchor !== 'deck') {
+  if (P.anchor !== 'deck' || pl.bounds.width > r.width + 12.5) { // the chest's prompt: an arrow to the panel, no ring
     const from = toward(r, at), dx = at.x - from[0], dy = at.y - from[1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
     const end: Pt = [at.x - ux * 34 * k, at.y - uy * 34 * k], mid: Pt = [(from[0] + end[0]) / 2 - uy * len * 0.16, (from[1] + end[1]) / 2 + ux * len * 0.16];
     const pa = clamp01((t - 0.25) / 0.6), curve = quad(from, mid, end, 20);
@@ -170,7 +180,7 @@ export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
       nib(g, [[end[0] - bx * 12 * k - by * 7 * k, end[1] - by * 12 * k + bx * 7 * k], end, [end[0] - bx * 12 * k + by * 7 * k, end[1] - by * 12 * k - bx * 7 * k]], 2.2 * k, 1, VERMILION);
     }
     const pulse = 0.5 + 0.5 * Math.sin(t * 4.2);
-    nib(g, ring(at.x, at.y, (28 + 5 * pulse) * k, 7 + lesson), 1.8 * k, clamp01((t - 0.6) / 0.6), VERMILION, 0.45 + 0.4 * pulse);
+    if (P.anchor !== 'deck') nib(g, ring(at.x, at.y, (28 + 5 * pulse) * k, 7 + lesson), 1.8 * k, clamp01((t - 0.6) / 0.6), VERMILION, 0.45 + 0.4 * pulse);
   }
   scrap(g, r, 600 + lesson);
   inkRect(g, inset(r, 4 * k), 610 + lesson, clamp01(t / 0.6), SEPIA, 1.1 * k);
@@ -201,6 +211,14 @@ export class TutorialOverlay {
     this.state = state;
     this.leftHanded = leftHanded;
     this.cue = cue;
+  }
+
+  /** Folds the prompt showing, as a tap on it would (the chest's, once "Later" has stowed the chest). */
+  fold(): void {
+    if (this.shown < 0) return;
+    dismiss(this.state, this.tick);
+    this.shown = -1;
+    this.rebuild();
   }
 
   /** The lesson whose prompt is up (−1 none) and its scrap, which a tap folds. */

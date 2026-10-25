@@ -471,14 +471,16 @@ export class ResultsSheet {
 
 export const RESULTS_GOLD = GOLD;
 
-export interface SkipLayout { card: Rect; button: Rect; k: number }
+/** `band`: CSS px from the card's top (and a margin) to the screen's foot, which the chart keeps clear (S-019: the
+ *  match plays out on the chart framed whole above the card, never under it). */
+export interface SkipLayout { card: Rect; button: Rect; k: number; band: number }
 
-/** The skip card at the foot of the safe area, clear of the chart's middle; its button at the right. */
+/** The skip card on the foot of the safe area, a slim strip; its button at the right. */
 export function skipLayout(view: View): SkipLayout {
-  const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), w = Math.min(s.width - 16, 470 * k), h = Math.max(MIN_TARGET + 20, 66 * k);
-  const card = { x: s.x + (s.width - w) / 2, y: s.y + s.height - h - 6 * k, width: w, height: h };
-  const bw = 176 * k, bh = Math.max(MIN_TARGET, 46 * k);
-  return { card, button: { x: card.x + w - bw - 10 * k, y: card.y + (h - bh) / 2, width: bw, height: bh }, k };
+  const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), w = Math.min(s.width - 16, 470 * k), h = Math.max(MIN_TARGET + 12, 56 * k);
+  const card = { x: s.x + (s.width - w) / 2, y: s.y + s.height - h - 2 * k, width: w, height: h };
+  const bw = 176 * k, bh = Math.max(MIN_TARGET, 44 * k);
+  return { card, button: { x: card.x + w - bw - 8 * k, y: card.y + (h - bh) / 2, width: bw, height: bh }, k, band: view.height - card.y + 6 * k };
 }
 
 /** How she sank, how many sail on while the match plays out on the chart, and the way straight to the results. */

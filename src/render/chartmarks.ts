@@ -9,7 +9,7 @@ import type { World } from '../app/worldWorker.ts';
 import { seaFor, type Sea } from '../sim/environment.ts';
 import { gullMarks } from '../sim/gull.ts';
 import { cellDir, neighbor, R, TERRITORY } from '../sim/sphere.ts';
-import { SHIPS, type MatchState } from '../sim/state.ts';
+import { PHASE, SHIPS, type MatchState } from '../sim/state.ts';
 import { GREAT_CURRENT } from '../sim/tables.ts';
 import { linearVec } from '../style/glsl.ts';
 import { PIGMENTS } from '../style/palette.ts';
@@ -150,6 +150,7 @@ function diamond(b: Builder, net: Net, at: XYZ, fitUp: THREE.Vector3, r: number,
 
 const X_MARK = [[-1, -1, 1, 1], [-1, 1, 1, -1]];
 const GULL_MARK = [[-1, 0.2, -0.5, 0.55, 0, 0.15, 0.5, 0.55, 1, 0.2]];
+const WRECK_RING = Array.from({ length: 21 }, (_, i) => [Math.cos((i / 20) * Math.PI * 2), Math.sin((i / 20) * Math.PI * 2)]).flat();
 
 /** The Great Current: its banks dashed and chevrons riding its middle downstream, every CURRENT_CHEVRON px. */
 function current(b: Builder, net: Net, sea: Sea, pxU: number, col: readonly number[]): void {
@@ -207,6 +208,13 @@ export function chartContent(b: Builder, net: Net, state: MatchState, world: Wor
     const dirs = laid.map(cellAt);
     if (i === PLAYER) stroke(b, net, dirs, 0.95 * pxU, mine);
     else stroke(b, net, dirs, 0.75 * pxU, ink, (2.5 + (i % 4)) * pxU, 2.2 * pxU);
+  }
+  // WP27 (S-019): where the player went down, once she is gone and the match plays out on the chart: a vermilion cross
+  // in a ring (chart.ts draws no hull for her then)
+  const me = state.ships[PLAYER];
+  if (me && me.phase === PHASE.sunk) {
+    picture(b, net, me.pos, fitUp, 6 * pxU, X_MARK, 1.2 * pxU, mine);
+    picture(b, net, me.pos, fitUp, 10 * pxU, [WRECK_RING], 0.8 * pxU, mine);
   }
   // the landmarks, each drawn standing over its spot
   if (sea) for (let k = 0; k < sea.geo.landmarks.length; k++) {

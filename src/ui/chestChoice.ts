@@ -1,13 +1,14 @@
 // WP27: the chest choice (PROMPT.md, Chests and loot): a chest opened on deck offers three items and the player
-// chooses one. The offers come up as three inked cards on a parchment sheet, each the item's icon in its tier's
+// chooses one. The offers come up as three inked cards on a compact parchment panel (S-019: never over the ship, the sea
+// ahead or a control, since the match runs on; see chestLayout), each the item's icon in its tier's
 // pigment (iron gall, verdigris, ultramarine, vermilion; the top tier framed in burnished gold leaf) glowing as the
 // chest did, its name lettered in the hand, what it does, and what it means for this ship: the fitting it would replace
 // in its slot, or the stack a consumable joins. A touch on a card chooses it as ShipInput.chestPick, the very index a
 // captain's bestPick() would give for that card; an offer the ship cannot take (its three stores full of other kinds) is
 // struck through and will not take a touch. The match never stops for the choice (the offers wait on deck until one is
 // chosen, items.ts), so "Later" folds the sheet away and the chest stays on deck until the player opens it again from
-// a chip beside the compact chart: the chest in its tier's pigment, glowing (part B). The sheet takes only the touches
-// that land on its cards or "Later"; a thumb on the stick steers on beneath it.
+// a chip beside the compact chart: the chest in its tier's pigment, glowing (part B). The panel takes only the touches
+// that land on it or "Later"; a thumb on the stick steers on, the other thumb's fan stays in reach.
 import * as THREE from 'three';
 import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
 import { OFFERS, bestPick, canTake, isConsumable, worth, type Item } from '../sim/items.ts';
@@ -17,6 +18,7 @@ import { INK, TIER, consumableIcon, mortarIcon, nib, ring, wash } from './icons.
 import {
   GOLD_DARK, MIN_TARGET, OCHRE, PAPER, SEPIA, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, quad, rgba, safeOf, scrap, type G, type Pt,
 } from './inkpage.ts';
+import { hudLayout, type HudButton, type HudLayout } from './hud.ts';
 import type { Rect, View } from './safeArea.ts';
 import type { Touch } from './shell.ts';
 
@@ -81,6 +83,9 @@ export function chestOffers(ship: Ship): Offer[] {
   });
 }
 
+/** "1 use", "3 uses". */
+export const uses = (n: number): string => (n === 1 ? '1 use' : `${n} uses`);
+
 /** What taking it means for this ship, in a few words. */
 export function consequence(o: Offer): string {
   if (!o.takeable) return 'Your stores are full';
@@ -93,21 +98,59 @@ export const chestPick = (offers: readonly Offer[], k: number): number => (offer
 
 export interface ChestLayout {
   view: View;
+  /** Everything the choice draws: the panel and its "Later". */
   sheet: Rect;
+  /** The parchment behind the cards (a touch on it is the choice's, never the controls' beneath). */
+  panel: Rect;
   cards: Rect[];
   later: Rect;
   /** Scale of the lettering and rules, 1 on the iPhone. */
   k: number;
+  /** The cards stacked down the thumb's edge (room enough between the compact chart and the thumb's fan: the iPad),
+   *  else side by side across the top corner on the thumb's side, over the compact chart's slot (the iPhone). */
+  column: boolean;
+  /** Mirrored for the left hand: on the left, where its thumb's fan is. */
+  left: boolean;
 }
 
-/** The sheet centred in the safe area, the cards side by side, "Later" beneath. */
-export function chestLayout(view: View, n: number = OFFERS): ChestLayout {
-  const s = safeOf(view), w = Math.min(s.width - 16, Math.max(560, s.height * 1.9), 940), h = Math.min(s.height - 12, w * 0.55);
-  const k = Math.max(1, Math.min(1.5, h / 408)), x = s.x + (s.width - w) / 2, y = s.y + (s.height - h) / 2;
-  const top = 64 * k, bottom = 66 * k, gap = 16 * k, pad = 22 * k, cw = (w - 2 * pad - (n - 1) * gap) / n, ch = h - top - bottom;
-  const cards = Array.from({ length: n }, (_, i) => ({ x: x + pad + i * (cw + gap), y: y + top, width: cw, height: ch }));
-  const bw = 180 * k, bh = Math.max(MIN_TARGET, 48 * k);
-  return { view, sheet: { x, y, width: w, height: h }, cards, later: { x: x + (w - bw) / 2, y: y + h - bottom + (bottom - bh) / 2, width: bw, height: bh }, k };
+/** The frame's centre, which nothing of the interface may cover (PROMPT.md, The match screen; WP25's 40 % box). */
+export const centreOf = (s: Rect): Rect => ({ x: s.x + s.width * 0.3, y: s.y + s.height * 0.3, width: s.width * 0.4, height: s.height * 0.4 });
+const hitBox = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : { x: b.x - b.hit, y: b.y - b.hit, width: 2 * b.hit, height: 2 * b.hit });
+const meets = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** A compact choice that never hides the match (it never pauses): clear of the frame's centre (the ship and the sea
+ *  ahead), of the stick's half and of every control, on the side of the thumb that is free to choose (mirrored for the
+ *  left hand). Where there is room between the compact chart and the thumb's fan (the iPad) the cards stack down the
+ *  thumb's edge under a header with "Later"; else (the iPhone) they sit side by side in the top corner, over the compact
+ *  chart's slot, with "Later" a tab beneath the outer card, clear of the fan. `hud` is the match's own layout. */
+export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hudLayout(view, false)): ChestLayout {
+  const s = safeOf(view), left = hud.left === true, k = Math.max(1, Math.min(1.45, hud.u)), c = centreOf(s), m = 6 * k, gap = 8 * k;
+  const fan = hud.buttons.filter((b) => b.kind !== 'chart').map(hitBox);
+  const fanTop = Math.min(s.y + s.height, ...fan.map((b) => b.y));
+  const edge = left ? s.x + m : s.x + s.width - m, inner = left ? c.x - gap : c.x + c.width + gap;
+  // the column: from under the compact chart to over the fan, down the thumb's edge
+  const top = hud.chart.y + hud.chart.height + gap, bottom = fanTop - gap, head = Math.max(MIN_TARGET, 44 * k), cardMin = 90 * k;
+  if (bottom - top >= head + gap + n * cardMin + (n - 1) * gap + 2 * m) {
+    const w = Math.min(Math.abs(edge - inner), 310 * k), x = left ? edge : edge - w, h = bottom - top;
+    const ch = (h - 2 * m - head - gap - (n - 1) * gap) / n, y0 = top + m + head + gap;
+    const cards = Array.from({ length: n }, (_, i) => ({ x: x + m, y: y0 + i * (ch + gap), width: w - 2 * m, height: ch }));
+    const bw = Math.max(MIN_TARGET, 104 * k), later = { x: left ? x + m : x + w - m - bw, y: top + m, width: bw, height: head };
+    const sheet = { x, y: top, width: w, height: h };
+    return { view, sheet, panel: sheet, cards, later, k, column: true, left };
+  }
+  // the row: across the top corner on the thumb's side, from the top centre's scrap to the edge, down to the centre's box
+  const from = left ? hud.top.x - gap : hud.top.x + hud.top.width + gap, w = Math.abs(edge - from), x = left ? edge : from;
+  const y = s.y + m, h = Math.min(c.y, fanTop) - gap - y, cw = (w - 2 * m - (n - 1) * gap) / n;
+  const cards = Array.from({ length: n }, (_, i) => ({ x: x + m + i * (cw + gap), y: y + m, width: cw, height: h - 2 * m }));
+  // "Later": a tab under the outer card, as wide as the fan's discs leave it (never under 44 pt)
+  const ty = y + h + 2 * k, th = MIN_TARGET;
+  let later = { x: left ? x : x + w - MIN_TARGET, y: ty, width: MIN_TARGET, height: th };
+  for (const tw of [72 * k, 60 * k, 52 * k]) {
+    const r = { x: left ? x : x + w - tw, y: ty, width: tw, height: th };
+    if (!fan.some((b) => meets(b, r))) { later = r; break; }
+  }
+  const panel = { x, y, width: w, height: h };
+  return { view, sheet: { x, y, width: w, height: ty + th - y }, panel, cards, later, k, column: false, left };
 }
 
 /** What a touch at (x, y) lands on: a card's index, −2 "Later", −1 nothing. */
@@ -116,25 +159,30 @@ export function pickAt(l: ChestLayout, x: number, y: number): number {
   return l.cards.findIndex((c) => inside(c, x, y));
 }
 
-/** The whole choice as it stands `t` s after the chest opened: the sheet unfolds, the cards ink in one by one. */
+/** The whole choice as it stands `t` s after the chest opened: the panel unfolds, the cards ink in one by one. The
+ *  tier is in the cards' pigments; the column's header letters it too ("A vermilion chest"). */
 export function drawChestChoice(g: G, offers: readonly Offer[], l: ChestLayout, t: number, chosen = -1, hint = false): void {
-  const { sheet: s, k } = l, top = offers.reduce((m, o) => Math.max(m, o.item.tier), 0);
-  const open = ease(t / 0.4);
+  const { panel: s, k } = l, top = offers.reduce((m, o) => Math.max(m, o.item.tier), 0);
+  const open = ease(t / 0.3);
   if (open <= 0) return;
   scrap(g, s, 7001, { alpha: open });
-  inkRect(g, inset(s, 8 * k), 7002, clamp01(t / 0.7), SEPIA, 1.3 * k);
-  if (top >= TIERS - 1) goldLeaf(g, inset(s, 2 * k), 7003, clamp01((t - 0.2) / 0.8), 4 * k);
-  letter(g, 'Choose one', s.x + s.width / 2, s.y + 30 * k, { size: 32 * k, align: 'center', valign: 'middle', swash: true }, INK, clamp01((t - 0.1) / 0.8));
-  letter(g, chestWords(top), s.x + s.width / 2, s.y + 54 * k, { size: 14 * k, align: 'center', valign: 'middle' }, top >= TIERS - 1 ? GOLD_DARK : TIER[top] ?? SEPIA, clamp01((t - 0.5) / 0.6));
-  offers.forEach((o, i) => { if (l.cards[i]) drawCard(g, o, l.cards[i], t - 0.25 - i * 0.18, chosen, k, hint); });
-  inkButton(g, l.later, 'Later', k, chosen >= 0 ? 0 : clamp01((t - 0.9) / 0.5));
+  inkRect(g, inset(s, 4 * k), 7002, clamp01(t / 0.6), top >= TIERS - 1 ? GOLD_DARK : TIER[top] ?? SEPIA, 1.2 * k);
+  if (top >= TIERS - 1) goldLeaf(g, inset(s, 1.5 * k), 7003, clamp01((t - 0.2) / 0.8), 3 * k);
+  if (l.column) {
+    const tx = l.left ? l.later.x + l.later.width + 12 * k : s.x + 14 * k, ty = l.later.y + l.later.height / 2;
+    letter(g, chestWords(top), tx, ty, { size: 17 * k, valign: 'middle', swash: true, maxWidth: s.width - l.later.width - 30 * k }, top >= TIERS - 1 ? GOLD_DARK : TIER[top] ?? SEPIA, clamp01((t - 0.2) / 0.6));
+  }
+  offers.forEach((o, i) => { if (l.cards[i]) drawCard(g, o, l.cards[i], t - 0.15 - i * 0.14, chosen, k, hint); });
+  inkButton(g, l.later, 'Later', l.column ? k * 0.85 : Math.min(k * 0.72, l.later.width / 64), chosen >= 0 ? 0 : clamp01((t - 0.6) / 0.4));
 }
 
 function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number, hint: boolean): void {
   if (t <= 0) return;
-  const a = ease(t / 0.5), mine = chosen === o.index, dim = chosen >= 0 && !mine ? 0.3 : 1;
-  const c = { x: r.x, y: r.y + (mine ? -8 * k : (1 - a) * 14 * k), width: r.width, height: r.height };
-  const cx = c.x + c.width / 2, s = Math.min(c.width * 0.42, c.height * 0.36), iy = c.y + 18 * k + s * 0.62;
+  const a = ease(t / 0.5), mine = chosen === o.index, dim = chosen >= 0 && !mine ? 0.3 : 1, wide = r.width > r.height * 1.6;
+  const c = { x: r.x, y: r.y + (mine ? -5 * k : (1 - a) * 10 * k), width: r.width, height: r.height };
+  // the icon: on a wide card in a ring at its left, the words to its right; on a narrow one above its name
+  const s = wide ? c.height * 0.62 : Math.min(c.width * 0.5, c.height * 0.42);
+  const cx = wide ? c.x + 12 * k + s * 0.62 : c.x + c.width / 2, iy = wide ? c.y + c.height / 2 : c.y + 6 * k + s * 0.62;
   g.save();
   g.globalAlpha *= a * dim * (o.takeable ? 1 : 0.62);
   const glow = g.createRadialGradient(cx, iy, 4, cx, iy, c.width * (mine ? 0.9 : 0.7));
@@ -149,16 +197,26 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   nib(g, ring(cx, iy, s * 0.62, 31 + o.item.kind), 1.2 * k, clamp01((t - 0.1) / 0.6), o.gold ? GOLD_DARK : o.pigment);
   const pi = clamp01((t - 0.15) / 0.6);
   if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, s * 0.42, pi); // icons.ts sizes are half-extents
-  else cardIcon(g, o.slot, o.item.tier, cx, iy, s * 0.42, pi);
-  const ny = iy + s * 0.55 + 20 * k, pt = clamp01((t - 0.3) / 0.8), wmax = c.width - 24 * k;
-  letter(g, o.name, cx, ny, { size: 23 * k, align: 'center', valign: 'middle', maxWidth: wmax }, INK, pt);
-  letter(g, o.consumable ? `${o.tierWord}, ${o.count} uses` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`, cx, ny + 24 * k,
-    { size: 14 * k, align: 'center', valign: 'middle', maxWidth: wmax }, o.gold ? GOLD_DARK : o.item.tier === 0 ? SEPIA : o.pigment, pt);
-  letter(g, o.does, cx, ny + 46 * k, { size: 14.5 * k, align: 'center', valign: 'middle', maxWidth: wmax }, SEPIA, pt);
-  letter(g, consequence(o), cx, c.y + c.height - 22 * k, { size: 13.5 * k, align: 'center', valign: 'middle', maxWidth: wmax }, o.takeable ? INK : VERMILION, pt);
-  if (!o.takeable) nib(g, [[c.x + 16 * k, ny + 2 * k], [cx, ny - 3 * k], [c.x + c.width - 16 * k, ny + 1 * k]], 2 * k, pt, VERMILION);
+  else cardIcon(g, o.item.kind, o.item.tier, cx, iy, s * 0.42, pi);
+  const pt = clamp01((t - 0.3) / 0.8), tierLine = o.consumable ? `${o.tierWord}, ${uses(o.count)}` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`;
+  const tierInk = o.gold ? GOLD_DARK : o.item.tier === 0 ? SEPIA : o.pigment;
+  let ny: number, nx0: number, nx1: number;
+  if (wide) { // name, tier and slot, what it does, and what taking it means, beside the icon
+    const tx = cx + s * 0.62 + 14 * k, wmax = c.x + c.width - 10 * k - tx, lh = c.height / 4.6, y0 = c.y + c.height / 2 - 1.5 * lh;
+    ny = y0; nx0 = tx - 4 * k; nx1 = tx + wmax;
+    letter(g, o.name, tx, y0, { size: 19 * k, valign: 'middle', maxWidth: wmax }, INK, pt);
+    letter(g, tierLine, tx, y0 + lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, tierInk, pt);
+    letter(g, o.does, tx, y0 + 2 * lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, SEPIA, pt);
+    letter(g, consequence(o), tx, y0 + 3 * lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, o.takeable ? INK : VERMILION, pt);
+  } else { // a narrow card: the name and what taking it means (the tier is its pigment)
+    const wmax = c.width - 10 * k;
+    ny = iy + s * 0.62 + 11 * k; nx0 = c.x + 8 * k; nx1 = c.x + c.width - 8 * k;
+    letter(g, o.name, cx, ny, { size: 14 * k, align: 'center', valign: 'middle', maxWidth: wmax }, INK, pt);
+    letter(g, consequence(o), cx, Math.min(c.y + c.height - 10 * k, ny + 19 * k), { size: 11.5 * k, align: 'center', valign: 'middle', maxWidth: wmax }, o.takeable ? INK : VERMILION, pt);
+  }
+  if (!o.takeable) nib(g, [[nx0, ny + 2 * k], [(nx0 + nx1) / 2, ny - 3 * k], [nx1, ny + 1 * k]], 2 * k, pt, VERMILION);
   if (hint && o.best && chosen < 0) {
-    const fx = c.x + c.width - 22 * k, fy = c.y + 22 * k; // the gull's mark: a small eight-point star in gold
+    const fx = c.x + c.width - 12 * k, fy = c.y + 12 * k; // the gull's mark: a small eight-point star in gold
     for (let i = 0; i < 4; i++) {
       const an = (i * Math.PI) / 4;
       nib(g, [[fx - Math.cos(an) * 9 * k, fy - Math.sin(an) * 9 * k], [fx + Math.cos(an) * 9 * k, fy + Math.sin(an) * 9 * k]], 1.6 * k, pt, GOLD_DARK);
@@ -169,8 +227,9 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
 
 /** A fitting as the card engraves it, `h` its half-extent: the slot's thing drawn in fine line over a light wash of the
  *  tier's pigment, its shade hatched (the HUD's small glyphs, icons.ts, would read as flat signs at this size). */
-function cardIcon(g: G, slot: number, tier: number, x: number, y: number, h: number, p: number): void {
+function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: number, p: number): void {
   if (p <= 0) return;
+  const slot = FITTING_SLOT[kind] ?? -1;
   const w = 0.07 * h, P = (u: number, v: number): Pt => [x + u * h, y + v * h], line = (pts: Pt[], k = 1): void => nib(g, pts, w * k, p);
   const shade = (path: (q: G) => void, n = 7): void => { // diagonal hatching inside a shape
     g.save();
@@ -182,8 +241,132 @@ function cardIcon(g: G, slot: number, tier: number, x: number, y: number, h: num
   };
   wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.28 * p, (q) => q.arc(x, y, 0.95 * h, 0, Math.PI * 2));
   const fill = (pts: Pt[]) => (q: G): void => { q.moveTo(...pts[0]); for (const pt of pts) q.lineTo(...pt); q.closePath(); };
+  const ring2 = (u: number, v: number, r: number, seed: number, k = 1): void => line(ring(x + u * h, y + v * h, r * h, seed), k);
+  // S-019: each fitting its own engraving (two of a slot never share one): the slot's drawing below is one kind's
+  switch (kind) {
+    case FITTING.stemPost: { // an oak stem post, raked, bolted
+      const post = [P(-0.3, -0.85), P(0.1, -0.85), P(0.4, 0.85), P(0, 0.85)];
+      wash(g, OCHRE, 0.5 * p, fill(post));
+      shade(fill([P(-0.1, -0.85), P(0.1, -0.85), P(0.4, 0.85), P(0.2, 0.85)]), 6);
+      line([...post, post[0]], 1.3);
+      for (const v of [-0.45, 0.05, 0.55]) ring2(-0.1 + (v + 0.85) * 0.18, v, 0.07, 41 + v * 10, 0.9);
+      line([P(-0.75, 0.85), P(0.75, 0.85)], 0.8);
+      return;
+    }
+    case FITTING.cutwater: { // a keen blade parting a trail's dashes
+      const blade = [...quad(P(-0.85, 0.15), P(0, -0.85), P(0.9, -0.35), 10), ...quad(P(0.9, -0.35), P(0.05, -0.35), P(-0.85, 0.15), 10)];
+      wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.5 * p, fill(blade));
+      line(blade, 1.2);
+      for (const [a, b] of [[-0.9, -0.55], [-0.4, -0.1], [0.25, 0.5], [0.65, 0.9]]) line(quad(P(a, 0.55), P((a + b) / 2, 0.42), P(b, 0.55), 4), 0.9);
+      line([P(-0.05, 0.3), P(0.12, 0.75)], 0.6);
+      return;
+    }
+    case FITTING.lightGuns: case FITTING.swivelGuns: { // a short gun on a low carriage; a swivel gun on its fork and post
+      const swivel = kind === FITTING.swivelGuns, L0 = swivel ? -0.55 : -0.6, L1 = swivel ? 0.6 : 0.45, b0 = swivel ? -0.25 : -0.05;
+      const barrel = [P(L0, b0), P(L1, b0 - 0.16), P(L1 + 0.02, b0 - 0.02), P(L0 + 0.02, b0 + 0.2)];
+      wash(g, INK, 0.25 * p, fill(barrel));
+      shade(fill(barrel), 5);
+      line([...barrel, barrel[0]], 1.2);
+      ring2(L0 - 0.06, b0 + 0.1, 0.1, 3);
+      if (swivel) { line([P(-0.25, b0 + 0.05), P(-0.1, b0 + 0.3), P(0.08, b0 - 0.02)], 1.1); line([P(-0.1, b0 + 0.3), P(-0.1, 0.85)], 1.6); line([P(-0.4, 0.85), P(0.2, 0.85)], 1); }
+      else { line([P(-0.55, 0.18), P(-0.5, 0.45), P(0.35, 0.45), P(0.3, 0.05)], 1); for (const u of [-0.35, 0.18]) ring2(u, 0.52, 0.16, 5, 1.1); }
+      return;
+    }
+    case FITTING.chainShot: { // two balls and the chain between
+      for (const u of [-0.55, 0.55]) { wash(g, INK, 0.45 * p, (q) => q.arc(x + u * h, y, 0.28 * h, 0, Math.PI * 2)); ring2(u, 0, 0.28, 7 + u * 10, 1.2); }
+      for (let i = 0; i < 4; i++) { const u = -0.3 + i * 0.2; line(ring(x + (u + 0.05) * h, y + (i % 2 ? 0.06 : -0.06) * h, 0.08 * h, 11 + i), 0.8); }
+      return;
+    }
+    case FITTING.heatedShot: { // a ball glowing, flames licking up from it
+      wash(g, VERMILION, 0.4 * p, (q) => q.arc(x, y + 0.3 * h, 0.4 * h, 0, Math.PI * 2));
+      ring2(0, 0.3, 0.4, 13, 1.2);
+      for (const [u, t] of [[-0.25, -0.55], [0.05, -0.85], [0.3, -0.5]]) line(quad(P(u - 0.1, -0.05), P(u + 0.15, (t - 0.05) / 2), P(u, t), 6), 1);
+      return;
+    }
+    case FITTING.sternChasers: { // a gun run out astern over the taffrail, pointing back
+      const barrel = [P(0.7, -0.2), P(-0.85, -0.42), P(-0.86, -0.25), P(0.68, 0.05)];
+      wash(g, INK, 0.25 * p, fill(barrel));
+      shade(fill(barrel), 5);
+      line([...barrel, barrel[0]], 1.2);
+      line([P(0.9, 0.1), P(-0.3, 0.1)], 1.3);
+      line(quad(P(0.9, 0.1), P(0.95, 0.55), P(0.6, 0.85), 6), 1.2);
+      for (const u of [-0.1, 0.25, 0.6]) line([P(u, 0.1), P(u, 0.3)], 0.7);
+      return;
+    }
+    case FITTING.powderKegs: { // a keg, hooped, its fuse lit
+      const keg = [...quad(P(-0.45, -0.6), P(-0.65, 0), P(-0.45, 0.6), 8), ...quad(P(0.45, 0.6), P(0.65, 0), P(0.45, -0.6), 8)];
+      wash(g, OCHRE, 0.5 * p, fill(keg));
+      shade(fill(keg), 6);
+      line([...keg, keg[0]], 1.2);
+      for (const v of [-0.35, 0.35]) line(quad(P(-0.56, v), P(0, v + 0.08), P(0.56, v), 6), 1);
+      line(quad(P(0.1, -0.6), P(0.35, -0.85), P(0.6, -0.75), 5), 0.8);
+      wash(g, VERMILION, 0.8 * p, (q) => q.arc(x + 0.62 * h, y - 0.76 * h, 0.07 * h, 0, Math.PI * 2));
+      return;
+    }
+    case FITTING.lateenMizzen: case FITTING.stormSails: { // a lateen on its long raked yard; a small storm course, reefed
+      if (kind === FITTING.lateenMizzen) {
+        const sail = [P(-0.7, 0.55), ...quad(P(-0.7, 0.55), P(0.35, 0.2), P(0.75, -0.85), 8).slice(1), P(-0.7, 0.55)];
+        wash(g, PAPER, 0.85 * p, fill(sail));
+        shade(fill([P(-0.1, 0.4), ...quad(P(-0.1, 0.4), P(0.4, 0.15), P(0.75, -0.85), 6).slice(1)]), 5);
+        line(sail, 1);
+        line([P(-0.85, 0.75), P(0.85, -1)], 1.4);
+        line([P(0, -0.9), P(0, 0.9)], 1.5);
+      } else {
+        const sail = [...quad(P(-0.45, -0.3), P(-0.25, 0), P(-0.4, 0.3), 6), ...quad(P(0.4, 0.3), P(0.6, 0), P(0.45, -0.3), 6)];
+        wash(g, PAPER, 0.85 * p, fill(sail));
+        line([...sail, sail[0]], 1);
+        line([P(0, -0.9), P(0, 0.85)], 1.5);
+        line([P(-0.52, -0.31), P(0.52, -0.31)], 1.2);
+        for (let i = 0; i < 5; i++) line([P(-0.32 + i * 0.16, -0.12), P(-0.32 + i * 0.16, -0.04)], 0.6);
+        for (const v of [-0.7, -0.5]) line(quad(P(-0.9, v), P(-0.6, v - 0.1), P(-0.3, v), 4), 0.7);
+        for (const v of [0.55, 0.75]) line(quad(P(0.3, v), P(0.6, v - 0.1), P(0.9, v), 4), 0.7);
+      }
+      return;
+    }
+    case FITTING.doubledPlanking: { // two courses of planks, the outer laid over the inner's seams, nailed
+      for (const [v, off] of [[-0.45, 0], [-0.1, 0.25], [0.25, 0], [0.6, 0.25]] as const) {
+        const r = [P(-0.85 + off * 0.3, v), P(0.85, v), P(0.85, v + 0.3), P(-0.85 + off * 0.3, v + 0.3)];
+        wash(g, OCHRE, (off ? 0.55 : 0.35) * p, fill(r));
+        if (off) shade(fill(r), 5);
+        line([...r, r[0]], 1);
+        for (const u of [-0.45, 0.15, 0.6]) ring2(u + off * 0.2, v + 0.15, 0.04, 17, 0.7);
+      }
+      return;
+    }
+    case FITTING.pumps: { // the chain pump's barrel and brake, water running from its spout
+      const barrel = [P(-0.2, -0.7), P(0.2, -0.7), P(0.2, 0.85), P(-0.2, 0.85)];
+      wash(g, OCHRE, 0.5 * p, fill(barrel));
+      shade(fill(barrel), 5);
+      line([...barrel, barrel[0]], 1.2);
+      line([P(0, -0.7), P(0, -0.85), P(-0.75, -0.55)], 1.2);
+      line([P(0.2, -0.2), P(0.55, -0.2), P(0.6, -0.1)], 1.1);
+      for (const [u, v] of [[0.62, 0.1], [0.66, 0.35], [0.7, 0.6]]) wash(g, TIER[2], 0.7 * p, (q) => q.arc(x + u * h, y + v * h, 0.06 * h, 0, Math.PI * 2));
+      return;
+    }
+    case FITTING.sternGlass: { // the stern's lights: an arched window of leaded panes
+      const arch = [P(-0.6, 0.75), P(-0.6, -0.2), ...quad(P(-0.6, -0.2), P(0, -0.95), P(0.6, -0.2), 10).slice(1), P(0.6, 0.75)];
+      wash(g, TIER[2], 0.25 * p, fill(arch));
+      line([...arch, arch[0]], 1.3);
+      line([P(0, -0.55), P(0, 0.75)], 0.8);
+      for (const v of [-0.1, 0.3]) line([P(-0.6, v), P(0.6, v)], 0.8);
+      line([P(-0.8, 0.85), P(0.8, 0.85)], 1.3);
+      return;
+    }
+    case FITTING.crowsNest: { // the topmast and its nest, a lookout's pennant above
+      line([P(0, -0.95), P(0, 0.95)], 1.5);
+      const nest = [P(-0.42, -0.35), P(0.42, -0.35), P(0.32, 0.05), P(-0.32, 0.05)];
+      wash(g, OCHRE, 0.55 * p, fill(nest));
+      shade(fill(nest), 5);
+      line([...nest, nest[0]], 1.2);
+      for (const u of [-0.2, 0.2]) line([P(u, -0.35), P(u * 0.8, 0.05)], 0.6);
+      line([P(-0.6, 0.45), P(0.6, 0.45)], 1.1);
+      for (const s2 of [-1, 1]) line([P(0, 0.05), P(0.6 * s2, 0.95)], 0.6);
+      wash(g, VERMILION, 0.8 * p, fill([P(0, -0.95), P(0.42, -0.85), P(0, -0.75)]));
+      return;
+    }
+  }
   switch (slot) {
-    case SLOT.hull: { // the hull in profile, planked, its sheathing plated below the waterline
+    case SLOT.hull: { // copper sheathing: the hull in profile, planked, plated below the waterline (no rig: not "a ship")
       const keel = [...quad(P(0.85, -0.32), P(0.6, 0.5), P(0.05, 0.48), 10), ...quad(P(0.05, 0.48), P(-0.55, 0.48), P(-0.82, -0.18), 10)];
       wash(g, OCHRE, 0.5 * p, fill(keel));
       shade(fill([P(-0.75, 0.08), P(0.8, 0.02), ...keel.slice(4, 18)]), 8);
@@ -192,7 +375,7 @@ function cardIcon(g: G, slot: number, tier: number, x: number, y: number, h: num
       line(quad(P(-0.8, -0.04), P(0.1, 0.0), P(0.8, -0.14), 8), 0.7);
       line(quad(P(-0.75, 0.08), P(0.1, 0.12), P(0.78, 0.02), 8), 1);
       for (let i = 0; i < 6; i++) { const u = -0.5 + i * 0.2; line([P(u, 0.12), P(u + 0.02, 0.4)], 0.55); }
-      line([P(-0.1, -0.24), P(-0.1, -0.9)], 0.9);
+      for (const v of [0.22, 0.34]) line(quad(P(-0.6, v), P(0.1, v + 0.06), P(0.68, v - 0.08), 8), 0.45);
       break;
     }
     case SLOT.broadside: { // a long gun on its carriage
@@ -281,6 +464,7 @@ export class ChestChoice {
   private mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
   private offers: Offer[] = [];
   private view: View | null = null;
+  private hud: HudLayout | null = null;
   private l: ChestLayout | null = null;
   private t = 0;
   private since = 0;
@@ -332,10 +516,12 @@ export class ChestChoice {
     this.rebuild();
   }
 
-  /** The view, and where the chip for a stowed chest goes (beside the compact chart; null: none). */
-  layout(view: View, chip: Rect | null = null): void {
+  /** The view, where the chip for a stowed chest goes (beside the compact chart; null: none) and the match's HUD, whose
+   *  controls the choice stays clear of (its thumb's side mirrored for the left hand; default the right-handed one). */
+  layout(view: View, chip: Rect | null = null, hud: HudLayout | null = null): void {
     this.view = view;
     this.chip = chip;
+    this.hud = hud;
     this.rebuild();
     this.stow();
   }
@@ -345,7 +531,8 @@ export class ChestChoice {
     if (t.phase === 'down') {
       if (this.finger >= 0) return false;
       const onChip = this.stowed && this.chip !== null && inside(this.chip, t.x, t.y);
-      if (!onChip && !(this.shown && this.l !== null && pickAt(this.l, t.x, t.y) !== -1)) return false;
+      // the panel's parchment takes a touch too (a near miss between cards never reaches a control beneath it)
+      if (!onChip && !(this.shown && this.l !== null && (pickAt(this.l, t.x, t.y) !== -1 || inside(this.l.panel, t.x, t.y)))) return false;
       this.finger = t.id;
       return true;
     }
@@ -429,7 +616,7 @@ export class ChestChoice {
     drop(this.paper);
     this.mesh = this.sheet = null;
     if (!this.shown || this.view === null) return;
-    const l = this.l = chestLayout(this.view, Math.max(1, this.offers.length));
+    const l = this.l = chestLayout(this.view, Math.max(1, this.offers.length), this.hud ?? undefined);
     this.sheet = sheet(l.sheet.width, l.sheet.height, 2_000_000, this.view.dpr);
     this.mesh = sheetMesh(this.sheet);
     this.mesh.position.set(l.sheet.x + l.sheet.width / 2, l.sheet.y + l.sheet.height / 2, 0);
