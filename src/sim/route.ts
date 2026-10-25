@@ -4,7 +4,7 @@
 // so rivals know it (PROMPT.md, Controls).
 import { FLAG, STEER_MAX, type ShipInput } from './input.ts';
 import { cross, datan2, dot, normalize, set, v3, type V3 } from './math.ts';
-import { R, TERRITORY, cellDir, cellOf, tangentToward } from './sphere.ts';
+import { R, TERRITORY, cellDir, cellOf, neighbor, tangentToward } from './sphere.ts';
 import type { MatchState, Ship } from './state.ts';
 import { FORMS, HELM, PILOT } from './tables.ts';
 import { LOW_WATER, currentAt, seaLevel, timeOf, type Sea } from './environment.ts';
@@ -21,9 +21,14 @@ export function helmOf(sea: Sea, state: MatchState, i: number, input: ShipInput)
   const homing = (input.flags & FLAG.headHome) !== 0, pressed = homing && !ship.homing;
   ship.homing = homing;
   if (homing) {
-    if (pressed || (ship.home.length && (state.tick + i) % PILOT.replan === 0)) {
-      planHome(sea, state, i, ship.home);
-      ship.homeLeg = 0;
+    // Planned on the press and replanned on the cadence, an empty route too. A replan that finds no way keeps the
+    // route it had, unless the ship has no waters left at all: it is never dropped mid-voyage for a bad tick.
+    if (pressed || (state.tick + i) % PILOT.replan === 0) {
+      if (planHome(sea, state, i, PLAN) || pressed || state.owner.indexOf(i + 1) < 0) {
+        ship.home.length = 0;
+        for (const c of PLAN) ship.home.push(c);
+        ship.homeLeg = 0;
+      }
     }
     if (!ship.home.length || state.owner[cellOf(TERRITORY, ship.pos)] === i + 1) return 0; // no way home, or home
     ship.homeLeg = follow(ship, ship.home, ship.homeLeg);
@@ -43,23 +48,60 @@ export function helmOf(sea: Sea, state: MatchState, i: number, input: ShipInput)
   return s * (HELM.soft + (1 - HELM.soft) * Math.abs(s));
 }
 
-const NAV_ROUTE: number[] = [];
+const NAV_ROUTE: number[] = [], PLAN: number[] = [], NEAR: number[] = [], DEPTH: number[] = [], AT_NAV = v3();
 
 /**
  * The shortest safe route from ship i to its own waters, written into `out` as territory cells (empty when it has
  * no waters it can reach). Shortest in time: it rides the currents that help and goes round those it cannot stem
  * (Sea.voyage). Safe: it keeps off the coasts as the navigation graph weighs them, and it uses only water open at
- * low tide, unless the ship lies where only the present tide floats it. Returns whether a route exists.
+ * low tide where that reaches home, else the water the present tide opens. A hull afloat inside a coast's
+ * clearance, where its own nav cell never opens, sets out from the nearest open cell. Returns whether a route exists.
  */
 export function planHome(sea: Sea, state: MatchState, i: number, out: number[]): boolean {
-  const own = i + 1, owner = state.owner, from = navCellOf(state.ships[i].pos), nav = sea.voyage;
+  const own = i + 1, owner = state.owner, pos = state.ships[i].pos, nav = sea.voyage, now = seaLevel(timeOf(state));
   out.length = 0;
   if (owner.indexOf(own) < 0) return false; // no waters at all: nothing to search for
-  const tide = nav.level[from] < LOW_WATER ? LOW_WATER : seaLevel(timeOf(state));
-  const cost = findRoute(nav, from, tide, (c) => owner[centreOf(c)] === own, null, NAV_ROUTE);
+  const from = openNear(nav.level, pos, now);
+  if (from < 0) return false;
+  const goal = (c: number) => owner[centreOf(c)] === own;
+  let cost = nav.level[from] < LOW_WATER ? findRoute(nav, from, LOW_WATER, goal, null, NAV_ROUTE) : -1;
+  if (cost < 0) cost = findRoute(nav, from, now, goal, null, NAV_ROUTE);
   if (cost < 0) return false;
   for (const c of NAV_ROUTE) out.push(centreOf(c));
   return true;
+}
+
+/**
+ * The nav cell a route from p sets out from: p's own if the tide opens it, else the open cell nearest p within
+ * PILOT.offing steps (ties to the first found), −1 if none. A nav cell opens only where a hull's centre clears the
+ * coast by CLEAR, so a hull close inshore can float in a cell that never opens.
+ */
+function openNear(level: Float32Array, p: V3, tide: number): number {
+  const from = navCellOf(p);
+  if (level[from] < tide) return from;
+  NEAR.length = DEPTH.length = 0;
+  NEAR.push(from);
+  DEPTH.push(0);
+  let best = -1, near = -Infinity;
+  for (let q = 0; q < NEAR.length; q++) {
+    const c = NEAR[q];
+    if (level[c] < tide) {
+      const d = dot(cellDir(NAV, c, AT_NAV), p);
+      if (d > near) {
+        near = d;
+        best = c;
+      }
+    }
+    if (DEPTH[q] === PILOT.offing) continue;
+    for (let s = 0; s < 4; s++) {
+      const m = neighbor(NAV, c, s);
+      if (NEAR.indexOf(m) < 0) {
+        NEAR.push(m);
+        DEPTH.push(DEPTH[q] + 1);
+      }
+    }
+  }
+  return best;
 }
 
 const F = TERRITORY.n / NAV.n;

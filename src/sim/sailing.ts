@@ -4,7 +4,7 @@
 // ship; land, floes and other ships stop it, and
 // the closing speed of every blow is reported in the ship's bump fields for the damage of reefs, rocks and rams (WP8).
 import {
-  aground, currentAt, newWind, offFloe, timeOf, vortexAt, windAt, type Sea, type Wind,
+  aground, currentAt, newWind, offFloe, seaLevel, timeOf, vortexAt, windAt, type Sea, type Wind,
 } from './environment.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
@@ -17,7 +17,7 @@ import {
 } from './tables.ts';
 import { holds } from './territory.ts';
 import { ZONE, heightAt } from './world/geography.ts';
-import { REGIONS } from './world/regions.ts';
+import { DRAFT, REGIONS } from './world/regions.ts';
 
 /** Ship.bumped when nothing was struck, and when it was land. */
 export const BUMPED = { nothing: -1, land: SHIPS } as const;
@@ -92,7 +92,7 @@ export function settledSpeed(form: number, sail: number, c: number, wind: Wind, 
 /** The radius in u of a ship's circle with the helm hard over. */
 export const turningRadius = (form: number, sail: number, t: Trim): number => (FORMS[form].radius * SAILS[sail].radius) / t.turn;
 
-const W = newWind(), T = newTrim(), V = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), N = v3(), E = v3(), NN = v3();
+const W = newWind(), T = newTrim(), V = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), WAS = v3(), N = v3(), E = v3(), NN = v3();
 
 /** Ship i's tick: the helm, the way it gathers or loses, the turn, and the move over the sea. */
 export function sail(sea: Sea, state: MatchState, i: number, input: ShipInput): void {
@@ -181,7 +181,7 @@ const PROBES = [1, 0, -1];
 
 /**
  * Moves the ship along V for a tick unless that puts its bow, middle or stern aground (ignored while it is already
- * aground). Returns null when it moved, else where on the hull it struck (1 bow … −1 stern), with PROBE there.
+ * aground), save a part already on the shore that the move takes down it (offShore). Returns null when it moved, else where on the hull it struck (1 bow … −1 stern), with PROBE there.
  */
 function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): number | null {
   const v = length(V);
@@ -193,7 +193,7 @@ function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): nu
   if (!grounded) {
     const half = FORMS[ship.form].half / R;
     for (const on of PROBES) {
-      if (aground(sea, state, normalize(addScaled(PROBE, P1, H1, on * half)))) return on;
+      if (aground(sea, state, normalize(addScaled(PROBE, P1, H1, on * half))) && !offShore(sea, state, ship, on * half)) return on;
     }
   }
   copy(ship.pos, P1);
@@ -201,6 +201,18 @@ function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): nu
   addScaled(ship.shove, ship.shove, P1, -dot(ship.shove, P1));
   addScaled(ship.fling, ship.fling, P1, -dot(ship.fling, P1));
   return null;
+}
+
+/**
+ * Whether the hull part `at` u along the bow from the centre, at PROBE after the move, was already on the shore and
+ * the move takes it down to lower ground: a stern swung over the land as the ship came about, or left there by the
+ * ebb, does not pin the hull where it lies. A part pressing into the shore, or over a floe, still stops it.
+ */
+function offShore(sea: Sea, state: MatchState, ship: Ship, at: number): boolean {
+  const dry = seaLevel(timeOf(state)) - DRAFT, h = heightAt(sea.geo, PROBE);
+  if (!(h >= dry)) return false;
+  const was = heightAt(sea.geo, normalize(addScaled(WAS, ship.pos, ship.head, at)));
+  return was >= dry && h < was;
 }
 
 /**

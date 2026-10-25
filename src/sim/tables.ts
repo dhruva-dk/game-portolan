@@ -108,6 +108,9 @@ export const PILOT = {
   headway: 0.15,
   /** Ticks between replans of the route home while the button is held. */
   replan: 90,
+  /** Nav cells (≈ 2.5 u) round a hull lying where its own cell never opens, within CLEAR of a coast, searched for
+   * the open water a route home sets out from. */
+  offing: 3,
 };
 
 /** The modifiers on speed and turning (PROMPT.md, Territory, The regions, Fittings, Combat). */

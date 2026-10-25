@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { over } from '../../src/sim/end.ts';
-import { LOW_WATER, aground, currentAt, seaFor, type Sea } from '../../src/sim/environment.ts';
+import { LOW_WATER, aground, currentAt, seaFor, tideOf, type Sea } from '../../src/sim/environment.ts';
 import { FLAG, STEER_MAX, idleInput, type ShipInput } from '../../src/sim/input.ts';
 import { PI, length, v3, type V3 } from '../../src/sim/math.ts';
 import { PHASE, matchHash } from '../../src/sim/state.ts';
@@ -16,6 +16,7 @@ import { SAIL, SHIPS, TICK, createMatch, type MatchState } from '../../src/sim/s
 import { FITTING, FORM, FORMS, PILOT, REFERENCE, SAILS, SLOT } from '../../src/sim/tables.ts';
 import { coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
 import { DRAFT, REGIONS } from '../../src/sim/world/regions.ts';
+import { navCellOf } from '../../src/sim/world/nav.ts';
 import { unarmed, world } from './vectors.ts';
 
 const SEED = 20261024;
@@ -247,6 +248,28 @@ test('ships collide as hulls: pushed apart by mass, the closing speed reported w
   assert.ok(length(q.shove) > 2 * length(g.shove), 'the lighter hull is thrown the harder');
 });
 
+test('a ship whose stern lies over the shore (swung there coming about, or left by the ebb) sails off it', () => {
+  const half = FORMS[FORM.caravel].half, out = v3(), stern = v3(), tmp = v3(), at = (b: number, r: number, o: V3) =>
+    toWorld(WEEPING, r * Math.sin((b * PI) / 180), r * Math.cos((b * PI) / 180), o);
+  let tried = 0;
+  for (let b = 0; b < 360 && tried < 3; b += 15) {
+    for (let r = 40; r < 130; r += 0.25) {
+      const p = at(b, r, v3()), s = match(FORM.caravel, p, 0, SAIL.full), ship = s.ships[0];
+      tangentToward(p, at(b, r + 5, out), ship.head); // bow out to sea, stern towards the island
+      advance(p, ship.head, -half, stern, tmp);
+      if (aground(sea, s, p) || !aground(sea, s, stern)) continue;
+      advance(p, ship.head, half, stern, tmp);
+      if (aground(sea, s, stern)) continue;
+      tried++;
+      const from = { ...ship.pos };
+      for (let k = 0; k < 90; k++) step(sea, s, input());
+      assert.ok(apart(ship.pos, from) > 1, `off the Weeping Isle at ${b}°: moved ${apart(ship.pos, from).toFixed(2)} u in 3 s`);
+      break;
+    }
+  }
+  assert.equal(tried, 3, 'three such places tried');
+});
+
 test('a ship stops at the shore, reports the impact and never sails onto land; it can steer off', () => {
   const p = waterOut(WEEPING, 0), centre = toWorld(WEEPING, 0, 0, v3());
   const s = match(FORM.caravel, p, 0, SAIL.full), ship = s.ships[0], idle = input();
@@ -306,6 +329,45 @@ test('head home sails the shortest safe route to the ship\'s own waters, the sam
   assert.ok(!planHome(sea, lost, 0, route) && route.length === 0, 'no waters, no route');
   step(sea, lost, go);
   assert.equal(lost.ships[0].rate, 0, 'and the ship holds its course');
+  for (let c = 0; c < TERRITORY.cells; c++) if (apart(cellDir(TERRITORY, c, d), home) < 10) lost.owner[c] = 1;
+  for (let k = 0; k < PILOT.replan; k++) step(sea, lost, go);
+  assert.ok(lost.ships[0].home.length > 0, 'waters again while it is held: it finds its way home at the next replan');
+});
+
+test('head home plans from a hull afloat inside the coast\'s clearance, where the nav cell itself is closed', () => {
+  const home = waterOut(WEEPING, 180, 14), d = v3(), s = match(FORM.caravel, waterOut(WEEPING, 0), PI / 2), tide = tideOf(s);
+  for (let c = 0; c < TERRITORY.cells; c++) if (apart(cellDir(TERRITORY, c, d), home) < 10) s.owner[c] = 1;
+  let p: V3 | null = null; // afloat at any tide, yet within CLEAR of the shore, so its nav cell never opens
+  for (let b = 0; b < 360 && !p; b += 5) {
+    for (let r = 40; r < 130 && !p; r += 0.5) {
+      const q = toWorld(WEEPING, r * Math.sin((b * PI) / 180), r * Math.cos((b * PI) / 180), v3());
+      if (!(sea.voyage.level[navCellOf(q)] < tide) && heightAt(sea.geo, q) < LOW_WATER - DRAFT && !aground(sea, s, q)) p = q;
+    }
+  }
+  assert.ok(p, 'such a place exists off the Weeping Isle');
+  put(s, 0, p, tangentAt(p, 0, v3()));
+  const route: number[] = [];
+  assert.ok(planHome(sea, s, 0, route) && route.length > 0, 'a route home all the same');
+  assert.equal(s.owner[route[route.length - 1]], 1, 'it ends in the ship\'s waters');
+  step(sea, s, input({ flags: FLAG.headHome }));
+  assert.deepEqual(s.ships[0].home, route, 'and the ship sails it');
+});
+
+test('seed 4: held from tick 600, head home never loses its route on a replan and closes the loop', (t) => {
+  const sea4 = seaFor(world(), 4), s = createMatch({ seed: 4 }), ship = s.ships[0];
+  const ownWaters = () => s.owner[cellOf(TERRITORY, ship.pos)] === 1;
+  let off = -1, lost = -1;
+  while (s.tick < 600 + 3600 && ship.phase !== PHASE.sunk && !(ship.homing && ownWaters())) {
+    const go = idleInput(); // break off at tick 300, steer out for 200 ticks, hold head home from tick 600 (WP27c)
+    if (ship.phase === PHASE.riding) go.flags = s.tick >= 300 ? FLAG.breakOff : 0;
+    else if ((off = off < 0 ? s.tick : off) + 200 > s.tick) go.steer = 60;
+    if (s.tick >= 600 && ship.phase !== PHASE.riding) go.flags |= FLAG.headHome;
+    step(sea4, s, go);
+    if (ship.homing && lost < 0 && !ship.home.length && !ownWaters() && ship.phase !== PHASE.sunk) lost = s.tick;
+  }
+  t.diagnostic(`home at tick ${s.tick}`);
+  assert.equal(lost, -1, `the route home empty at tick ${lost}, out of her waters and afloat`);
+  assert.ok(ownWaters(), 'she reaches her waters on the one hold');
 });
 
 test('a drawn course is sailed point by point and dropped when the stick is touched or the course is done', () => {
