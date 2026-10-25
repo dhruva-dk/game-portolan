@@ -36,6 +36,8 @@ export const MAX_LANES = 24;
 export const WAKE_SHIPS = 16;
 /** u between the points a wake lays along the stern's path; s a wake lasts. */
 export const WAKE_STEP = 0.9, WAKE_LIFE = 14;
+/** s a stopped ship's wake (one sinking, S-019 pass g) takes to die: the wedge stops opening and the ribbon fades. */
+export const WAKE_DIE = 2.5;
 /** Points of each wake ribbon: bow, midships and stern, then the stern's track, newest first. */
 const WAKE_HEAD = 3, WAKE_PTS = WAKE_HEAD + 40;
 
@@ -691,6 +693,7 @@ void main() {
 const WAKE_VERTEX = /* glsl */ `
 ${SWELL_GLSL}
 uniform float uTime;
+uniform float uStill[${WAKE_SHIPS}]; // when each slot's ship stopped (sank), s; −1 under way
 in vec4 aFwd;  // the heading at the point (tangent), and the u its ship had sailed there
 in vec4 aWake; // side (−1, 1), birth s, speed u/s, half-width at birth u
 out vec3 vRest;
@@ -698,10 +701,14 @@ out vec3 vWorld;
 out vec2 vUv;
 out float vAge;
 out float vSpeed;
+out float vDie;
 void main() {
   vec3 dir = normalize(position);
-  float age = max(uTime - aWake.y, 0.0);
-  float hw = aWake.w + min(0.36 * aWake.z * age, 7.0); // the Kelvin wedge opening at ~20°
+  float age = max(uTime - aWake.y, 0.0), still = uStill[gl_VertexID / ${2 * WAKE_PTS}];
+  // the Kelvin wedge opening at ~20°; once her way is lost it opens no further and the whole ribbon dies away
+  float open = still < 0.0 ? age : min(age, max(still - aWake.y, 0.0));
+  float hw = aWake.w + min(0.36 * aWake.z * open, 7.0);
+  vDie = still < 0.0 ? 1.0 : 1.0 - smoothstep(0.0, ${WAKE_DIE.toFixed(1)}, uTime - still);
   vec3 side = cross(dir, aFwd.xyz);
   side /= max(length(side), 1e-6);
   vec3 p = normalize(dir * SEA_R + side * aWake.x * hw);
@@ -730,6 +737,7 @@ in vec3 vWorld;
 in vec2 vUv;
 in float vAge;
 in float vSpeed;
+in float vDie;
 ${INKS}
 const float SEA_R = ${R.toFixed(1)}, LIFE = ${WAKE_LIFE.toFixed(1)};
 void main() {
@@ -737,7 +745,7 @@ void main() {
   Paper q = paperAt(P, dir, 1.0);
   vec3 tw = triWeights(dir, 4.0);
   float u = abs(vUv.x), fu = max(fwidth(vUv.x), 1e-5) * uRenderPx;
-  float life = (1.0 - smoothstep(0.3 * LIFE, LIFE, vAge)) * smoothstep(0.15, 1.2, vSpeed);
+  float life = (1.0 - smoothstep(0.3 * LIFE, LIFE, vAge)) * smoothstep(0.15, 1.2, vSpeed) * vDie;
   float n1 = tri(tMarks, P / 1.9, tw).b, n2 = tri(tPaper, P / 0.7, tw).g;
   // lead-white dry brush: the wedge's two arms (the bow wave running on as the diverging waves) and the churned
   // track astern, catching the paper's tooth and breaking up as they age
@@ -759,12 +767,15 @@ void main() {
  * The wake buffer: every ship's bow wave and wake as one ribbon on the swell, all ships in one draw. Ships feed it
  * every frame (WP19: feed with the hull's position, heading, speed and size on the render clock); the stern's path is
  * laid as world-anchored points every WAKE_STEP u, so a wake stays where its ship passed, opening into the Kelvin
- * wedge and fading over WAKE_LIFE s. A ship no longer fed leaves its wake to fade; forget frees its slot.
+ * wedge and fading over WAKE_LIFE s. A ship no longer fed leaves its wake to fade; one stopped (sinking) has it die
+ * within WAKE_DIE s; forget frees its slot.
  */
 export class Wakes {
   readonly geometry = new THREE.BufferGeometry();
   /** Each ship's waterline point (u) and mast height, 0 when its slot is free: the calm sea mirrors them (uShips). */
   readonly ships = Array.from({ length: WAKE_SHIPS }, () => new THREE.Vector4());
+  /** When each slot's ship stopped (render clock, s), −1 under way (uStill). */
+  readonly still = new Float32Array(WAKE_SHIPS).fill(-1);
   private readonly pos = new Float32Array(WAKE_SHIPS * WAKE_PTS * 2 * 3);
   private readonly fwd = new Float32Array(WAKE_SHIPS * WAKE_PTS * 2 * 4);
   private readonly info = new Float32Array(WAKE_SHIPS * WAKE_PTS * 2 * 4);
@@ -806,6 +817,7 @@ export class Wakes {
       this.ids[s] = id;
       this.odo[s] = 0;
     }
+    this.still[s] = -1;
     const up = this.up.set(p.x, p.y, p.z).normalize();
     const f = this.f.set(forward.x, forward.y, forward.z);
     f.addScaledVector(up, -up.dot(f)).normalize();
@@ -833,12 +845,22 @@ export class Wakes {
     this.dirty = true;
   }
 
+  /** Ship `id` has lost all way (she is sinking) at render-clock time t: her wake dies within WAKE_DIE s, its wedge
+   *  opening no further, and the calm sea no longer mirrors her masts. */
+  stop(id: number, t: number): void {
+    const s = this.ids.indexOf(id);
+    if (s < 0 || this.still[s] >= 0) return;
+    this.still[s] = t;
+    this.ships[s].w = 0;
+  }
+
   /** Free ship `id`'s slot (it sank or left): its ribbon collapses at once. */
   forget(id: number): void {
     const s = this.ids.indexOf(id);
     if (s < 0) return;
     this.ids[s] = -1;
     this.ships[s].w = 0;
+    this.still[s] = -1;
     for (let j = 0; j < WAKE_PTS; j++) this.put(s, j, this.at[s], this.f.set(1, 0, 0), 0, -1e4, 0, 0);
     this.dirty = true;
   }
@@ -925,7 +947,7 @@ export class Sea {
       this.wakes.commit();
     };
     this.wake = new THREE.Mesh(this.wakes.geometry, inkMaterial(pipeline.style, {
-      vertexShader: WAKE_VERTEX, fragmentShader: WAKE_FRAGMENT, uniforms: { ...this.swell.uniforms }, veil: true, side: THREE.DoubleSide,
+      vertexShader: WAKE_VERTEX, fragmentShader: WAKE_FRAGMENT, uniforms: { ...this.swell.uniforms, uStill: { value: this.wakes.still } }, veil: true, side: THREE.DoubleSide,
     }));
     this.wake.frustumCulled = false;
   }

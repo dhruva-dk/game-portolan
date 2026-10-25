@@ -33,10 +33,11 @@ export const SEA_CLEAR = 1.2, GROUND_CLEAR = 1.6;
  *  settle a second; the loop pull-back stands off pullBack and up pullUp u at a claim of pullArea² u² (∝ √area, at
  *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking moves over rise s
  *  to sinkUp u up and sinkBack u off, swung sinkSwing rad from astern to her high side (the player, ship 0, lists to
- *  port and goes down by the stern: shipView.ts), its eye coming onto the wreck at the sea's face (S-019: she sits in
- *  the frame's middle, whole, near enough that she, her masts going under one by one, the foam and the rings read in
- *  the storm), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
- *  pennant under at 10.5, gone at 11); from liftAt s it rises liftUp u and stands off liftBack u more over lift s,
+ *  port and goes down by the stern: shipView.ts), its eye coming onto the wreck sinkAim u over the sea's face (S-019
+ *  pass g: low and near, so she is large, whole, and rolls under against the sea line, her masts going one by one,
+ *  the foam and the rings reading in the storm), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
+ *  pennant under at 10.5, gone at 11); from liftAt s it rises liftUp u and stands off liftBack u more over lift s
+ *  (to the same height and stand-off as before pass g brought the sinking's framing down and in),
  *  watching the place stay marked (foam, her ring, wreckage), then opens the chart at rise + hold s (reduced motion:
  *  holds holdRM s on the deck view and cuts); the crow's nest raises the camera by crow × its lookout's eye. */
 /** S-019: the play-out's framing on the chart (CameraRig.playFrame): the least span across, and the margin, u. */
@@ -44,7 +45,7 @@ export const PLAY_SPAN = 90, PLAY_PAD = 14, PLAY_REACH = 40;
 /** S-019: the play-out's turn of the globe at orbit, rad a second at most (the eye moves under a tenth of its height a
  *  frame), and never quicker than 0.8 s. */
 export const PLAY_TURN = 1.2;
-export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 9.5, sinkBack: 15, sinkSwing: 1.25, rise: 3.2, liftAt: 11, lift: 2.6, liftUp: 34, liftBack: 14, hold: 11.2, holdRM: 12.5, crow: 0.5 } as const;
+export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 2.6, sinkBack: 7, sinkSwing: 1.25, sinkAim: 1.6, rise: 3.2, liftAt: 11, lift: 2.6, liftUp: 41, liftBack: 22, hold: 11.2, holdRM: 12.5, crow: 0.5 } as const;
 /** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
 export const REDUCED_VEIL = 0.3;
 /** The system's reduced-motion preference (the settings' switch ORs with it: rig.reducedMotion = setting || this). */
@@ -435,7 +436,7 @@ export class CameraRig {
       const bob = rm ? 0 : (0.14 * Math.sin(clock * 1.13) + 0.07 * Math.sin(clock * 0.61 + 2)) * (1 - r);
       // (sinking: the eye comes off the sea ahead onto the wreck itself, at the water, so she is framed in the middle)
       const onto = 1 - c.sink * cw;
-      const t = this.t.copy(s).multiplyScalar(R + raise * (1 - r) * onto + bob * 0.4).addScaledVector(hv, ahead * (1 - r) * onto);
+      const t = this.t.copy(s).multiplyScalar(R + raise * (1 - r) * onto + Math.max(0, ks - kl) * CINE.sinkAim + bob * 0.4).addScaledVector(hv, ahead * (1 - r) * onto);
       const eye = this.eye.copy(t).addScaledVector(hv, -dist * Math.cos(th)).addScaledVector(s, dist * Math.sin(th) + bob);
       if (z < 0.2) this.collide(t, eye, r);
       const u = this.up.copy(s).multiplyScalar(Math.cos(th)).addScaledVector(hv, Math.sin(th));

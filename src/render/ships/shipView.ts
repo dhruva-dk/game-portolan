@@ -51,10 +51,12 @@ export const LANTERN = { reach: 6, battle: 1.5, gutter: 0.6, glow: 0.4, battleGl
 /**
  * The sinking, in seconds from the sim's sink: colours struck and a deepening list (to `list` rad) by `strike`, the
  * canvas gone by the board and spray where the rig meets the sea at `rig`, then down by the stern (or the bow) to
- * `pitch` rad from `founder`, easing `right` of her list so the masts go under one by one, the masthead pennant last under at `under`; rings of ink spread where she went down
+ * `pitch` rad from `founder`, easing `right` of her list and `level` of her pitch as the sea closes over her: she goes
+ * down quickly at first and ever more slowly (an ease-out of power `ease` to `depth` × her height), so her masts go
+ * under one by one about a second apart, the tallest with the masthead pennant last at `under`; rings of ink spread where she went down
  * (`rings`), a slick and flotsam drift on; the view is removed at `gone`, and her ring marks the place for `mark` s.
  */
-export const SINK = { strike: 1.2, rig: 3.2, founder: 5.5, under: 10.5, gone: 11, list: 0.75, pitch: 0.6, rings: [7.6, 8.4, 9.3, 10.2, 11], mark: 60, right: 0.6 } as const;
+export const SINK = { strike: 1.2, rig: 3.2, founder: 5.5, under: 10.5, gone: 11, list: 0.75, pitch: 0.42, rings: [7.6, 8.4, 9.3, 10.2, 11], mark: 60, right: 0.6, level: 0.5, depth: 0.7, ease: 1.2 } as const;
 /** Colours struck (hauled down to the rail, all but the masthead pennant) once this share of the hull is lost, and as she sinks, at `rate` a second. */
 export const STRIKE = { at: 0.88, rate: 0.8 } as const;
 
@@ -76,7 +78,7 @@ export interface Conditions {
 }
 
 const flicker = (t: number): number => 0.5 + 0.5 * Math.sin(t) * Math.sin(2.3 * t + 1.1);
-const T = { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler() };
+const T = { v4: new THREE.Vector4(), a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), e: new THREE.Euler() };
 
 export class ShipView {
   readonly ship: Ship;
@@ -275,14 +277,15 @@ export class ShipView {
     // upright as the far end lifts, so her masts stand and go under one by one, the masthead pennant last
     const cap = sinking ? 1.2 : MOTION.max, end = this.id % 2 ? -1 : 1;
     const heelGo = sinking ? this.side * (MOTION.list + (SINK.list - MOTION.list) * smoothstep(0, SINK.rig, ts) * (1 - SINK.right * smoothstep(SINK.founder - 1, SINK.under - 2, ts))) : heelTo;
-    const pitchGo = sinking ? end * SINK.pitch * smoothstep(SINK.rig, SINK.under - 1.5, ts) : Math.min(Math.max(pitchTo, -0.2), 0.2);
+    const pitchGo = sinking ? end * SINK.pitch * smoothstep(SINK.rig, SINK.founder + 1.5, ts) * (1 - SINK.level * smoothstep(SINK.founder + 1.5, SINK.under - 1, ts)) : Math.min(Math.max(pitchTo, -0.2), 0.2);
     this.heelV += (MOTION.spring * (Math.min(Math.max(heelGo, -cap), cap) - this.heel) - MOTION.damp * this.heelV) * dt;
     this.pitchV += (MOTION.spring * (pitchGo - this.pitch) - MOTION.damp * this.pitchV) * dt;
     this.heel += this.heelV * dt;
     this.pitch += this.pitchV * dt;
 
     ship.quaternion.setFromRotationMatrix(T.m.makeBasis(port, up, fwd)).multiply(T.q.setFromEuler(T.e.set(-this.pitch, 0, this.heel, 'XYZ')));
-    const under = sinking ? 0.7 * this.draft * smoothstep(0, SINK.founder, ts) + (ship.height + this.draft + 1) * Math.pow(smoothstep(SINK.founder - 0.5, SINK.under, ts), 2) : 0;
+    const goes = Math.min(Math.max((ts - SINK.founder + 0.5) / (SINK.under - SINK.founder + 0.5), 0), 1);
+    const under = sinking ? 0.7 * this.draft * smoothstep(0, SINK.founder, ts) + SINK.depth * ship.height * (1 - Math.pow(1 - goes, SINK.ease)) : 0;
     ship.position.copy(ride.position).addScaledVector(up, -MOTION.settle * this.draft * this.lost * this.lost - under);
     ship.visible = !this.gone;
     ship.updateMatrixWorld();
@@ -297,7 +300,9 @@ export class ShipView {
   /** Smoke and flame while ablaze (a thin smoke once battered), spray thrown off the bows at speed. */
   exhale(plumes: Plumes, s: Vessel, c: Conditions, dt: number, clock: number): void {
     const ship = this.ship, owed = this.owed, { a, b } = T, up = this.up, wind = T.c.copy(c.wind).normalize();
-    const smoke = s.fire > 0 ? 9 : 2.2 * smoothstep(0.55, 1, this.lost);
+    // a battered ship's thin smoke; once she is sinking (and not ablaze) it dies away as her colours come down, so no
+    // pall hides her rig going (S-019 pass g)
+    const smoke = s.fire > 0 ? 9 : 2.2 * smoothstep(0.55, 1, this.lost) * (this.sinkT < 0 ? 1 : 1 - smoothstep(0, SINK.strike, this.sinkT));
     owed[0] += smoke * dt;
     owed[1] += (s.fire > 0 ? 7 : 0) * dt;
     owed[2] += (this.sinkT < 0 ? 1 : 0) * Math.max(0, s.speed - 1.5) * 3 * (0.4 + 0.6 * c.rough) * (1 + 4 * Math.max(0, -this.pitchV)) * dt;
@@ -349,7 +354,7 @@ export class ShipView {
       plumes.spawn(SPRAY, a, b.copy(up).multiplyScalar(1.4 + 1.6 * this.rand()), 0.9 + 0.4 * this.rand(), 0.3, 1.0, 7, clock, this.rand());
     }
     if (past(SINK.rig + 0.2)) for (let j = 0; j < 3; j++) { onSea(this.side * (0.25 + 0.5 * this.rand()) * L, (this.rand() - 0.5) * 0.8 * L); foam(5, 0.22, 0.45); }
-    if (past(SINK.rig + 0.4)) for (let j = 0; j < 4; j++) { onSea(this.side * (0.3 + 0.7 * this.rand()) * 0.6 * L, (this.rand() - 0.5) * 0.7 * L); flotsam((0.14 + 0.1 * this.rand()) * L); }
+    if (past(SINK.rig + 0.4)) for (let j = 0; j < 4; j++) { onSea(this.side * (0.3 + 0.7 * this.rand()) * 0.6 * L, (this.rand() - 0.5) * 0.7 * L); flotsam((0.09 + 0.06 * this.rand()) * L); }
     if (t > SINK.founder - 0.5 && t < SINK.under && this.rand() < 2.4 * dt) { onSea((this.rand() - 0.5) * 0.7 * L, (this.rand() - 0.5) * L); flotsam((0.05 + 0.07 * this.rand()) * L); }
     // the sea boils white round her, along her length and closing in on the end she goes down by as she goes
     const end = this.id % 2 ? -1 : 1, going = smoothstep(SINK.founder, SINK.under, t);
@@ -368,11 +373,11 @@ export class ShipView {
     if (past(SINK.under - 0.4)) {
       onSea(0, -0.3 * end * L); foam(16, 0.35, 0.95);
       for (let j = 0; j < 12; j++) { onSea((this.rand() - 0.5) * 0.4 * L, (-0.3 * end + (this.rand() - 0.5) * 0.4) * L); plumes.spawn(SPRAY, a, b.copy(up).multiplyScalar(1.6 + 1.6 * this.rand()).addScaledVector(port, (this.rand() - 0.5) * 2), 1 + 0.4 * this.rand(), 0.3, 0.9, 7, clock, this.rand()); }
-      for (let j = 0; j < 6; j++) { onSea((this.rand() - 0.5) * 0.8 * L, (-0.3 * end + (this.rand() - 0.5) * 0.8) * L); flotsam((0.08 + 0.12 * this.rand()) * L, SINK.mark); }
-      onSea(0.15 * L, -0.3 * end * L); flotsam(0.17 * L, SINK.mark, CHEST);
+      for (let j = 0; j < 6; j++) { onSea((this.rand() - 0.5) * 0.8 * L, (-0.3 * end + (this.rand() - 0.5) * 0.8) * L); flotsam((0.06 + 0.07 * this.rand()) * L, SINK.mark); }
+      onSea(0.15 * L, -0.3 * end * L); flotsam(0.1 * L, SINK.mark, CHEST);
     }
     // once she is gone her ring lies on the place, still, in her pigment and foam, until the chart takes over
-    if (past(SINK.gone)) { onSea(0, -0.3 * end * L); plumes.spawn(RING, a, b.set(0, 0, 0), SINK.mark, 1.25 * L, 1.25 * L, 0, clock, this.rand(), this.tint); }
+    if (past(SINK.gone)) { onSea(0, -0.3 * end * L); plumes.spawn(RING, a, b.set(0, 0, 0), SINK.mark, 1.25 * L, 1.25 * L, 0, clock, this.rand(), T.v4.set(this.tint.x, this.tint.y, this.tint.z, 3)); }
   }
 
   /** The masthead truck the companion gull perches on (WP23), in world space. */
@@ -399,7 +404,9 @@ export class Plumes {
   private readonly at: THREE.InstancedBufferAttribute;
   private readonly info: THREE.InstancedBufferAttribute;
   private readonly tints: THREE.InstancedBufferAttribute;
+  private readonly ups: THREE.InstancedBufferAttribute;
   private readonly geo = new THREE.InstancedBufferGeometry();
+  private readonly surface = { height: 0, normal: new THREE.Vector3() };
 
   readonly capacity: number;
   readonly marks: number;
@@ -413,7 +420,9 @@ export class Plumes {
     this.at = new THREE.InstancedBufferAttribute(new Float32Array(4 * n), 4).setUsage(THREE.DynamicDrawUsage);
     this.info = new THREE.InstancedBufferAttribute(new Float32Array(4 * n), 4).setUsage(THREE.DynamicDrawUsage);
     this.tints = new THREE.InstancedBufferAttribute(new Float32Array(4 * n), 4).setUsage(THREE.DynamicDrawUsage);
+    this.ups = new THREE.InstancedBufferAttribute(new Float32Array(3 * n), 3).setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('aAt', this.at);
+    g.setAttribute('aUp', this.ups);
     g.setAttribute('aInfo', this.info);
     g.setAttribute('aTint', this.tints);
     g.instanceCount = 0;
@@ -447,9 +456,10 @@ export class Plumes {
     else this.next = (this.next + 1) % this.capacity;
   }
 
-  /** Lays the live puffs for render-clock time `clock`. */
-  update(clock: number): void {
-    const at = this.at.array as Float32Array, info = this.info.array as Float32Array, tints = this.tints.array as Float32Array, p = T.a, g = T.b;
+  /** Lays the live puffs for render-clock time `clock`; the marks on the sea ride `swell` (rising, falling and
+   *  rocking with it, S-019 pass g) when given, else lie where they were laid. */
+  update(clock: number, swell: Pick<Swell, 'sample'> | null = null): void {
+    const at = this.at.array as Float32Array, info = this.info.array as Float32Array, tints = this.tints.array as Float32Array, ups = this.ups.array as Float32Array, p = T.a, g = T.b, sf = this.surface;
     let n = 0;
     for (const q of this.puffs) {
       if (!q) continue;
@@ -457,13 +467,21 @@ export class Plumes {
       if (age < 0 || age >= 1) continue;
       p.copy(q.p).addScaledVector(q.v, t);
       if (q.grav) p.addScaledVector(g.copy(q.p).normalize(), -0.5 * q.grav * t * t);
+      if (q.kind >= RING && swell) {
+        swell.sample(p.normalize(), clock, sf);
+        p.multiplyScalar(R + sf.height + (q.kind === FLOTSAM ? 0.1 : 0.06));
+        ups.set([sf.normal.x, sf.normal.y, sf.normal.z], 3 * n);
+      } else {
+        g.copy(p).normalize();
+        ups.set([g.x, g.y, g.z], 3 * n);
+      }
       at.set([p.x, p.y, p.z, q.s0 + (q.s1 - q.s0) * Math.sqrt(age)], 4 * n);
       info.set([q.kind, age, q.seed, q.kind === SMOKE ? smoothstep(0, 0.12, age) : 1], 4 * n);
       tints.set([q.tint.x, q.tint.y, q.tint.z, q.tint.w], 4 * n);
       n++;
     }
     this.geo.instanceCount = n;
-    this.at.needsUpdate = this.info.needsUpdate = this.tints.needsUpdate = n > 0;
+    this.at.needsUpdate = this.info.needsUpdate = this.tints.needsUpdate = this.ups.needsUpdate = n > 0;
   }
 
   dispose(): void {
@@ -476,6 +494,7 @@ const PLUME_VERT = /* glsl */ `
 attribute vec4 aAt;
 attribute vec4 aInfo;
 attribute vec4 aTint;
+attribute vec3 aUp; // the sea's normal under a mark, so it rocks with the swell
 varying vec2 vUv;
 varying vec4 vInfo;
 varying vec4 vTint;
@@ -486,9 +505,11 @@ void main() {
   if (aInfo.x > 2.5) {
     // rings, slick, foam and flotsam lie flat on the sea, turned by their seed; flotsam long and thin (planks, spars),
     // round (casks) or a chest
-    vec3 n = normalize(aAt.xyz), t1 = normalize(cross(n, abs(n.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(n, t1);
+    vec3 n = normalize(aUp), t1 = normalize(cross(n, abs(n.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(n, t1);
     float ang = aInfo.z * 6.2832, r = fract(aInfo.z * 7.31);
-    vec2 q = position.xy * (aInfo.x > 4.5 && aInfo.x < 5.5 && aTint.w < 1.5 && r > 0.3 ? vec2(1.0, 0.18 + 0.25 * r) : aTint.w > 1.5 ? vec2(1.0, 0.7) : vec2(1.0));
+    // (a cask is a small round thing beside a plank or a spar, not a disc as long as one)
+    bool flot = aInfo.x > 4.5 && aInfo.x < 5.5;
+    vec2 q = position.xy * (flot && aTint.w < 1.5 && r > 0.3 ? vec2(1.0, 0.14 + 0.2 * r) : flot && aTint.w > 1.5 ? vec2(1.0, 0.7) : flot ? vec2(0.32) : vec2(1.0));
     q = vec2(cos(ang) * q.x - sin(ang) * q.y, sin(ang) * q.x + cos(ang) * q.y) * aAt.w;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(aAt.xyz + t1 * q.x + t2 * q.y, 1.0);
   } else {
@@ -524,12 +545,17 @@ void main() {
       float ang = seed * 6.283 + float(k) * 2.094 + age;
       d = min(d, length(uv - 0.34 * vec2(cos(ang), sin(ang))) - 0.5 - 0.1 * plumeHash(vec2(seed, float(k))));
     }
-    if (d > 0.05) discard;
-    float rim = (1.0 - smoothstep(0.0, 0.05, abs(d + 0.025))) * (1.0 - 0.65 * age);
+    // a soft wash: the edge ragged and feathered to nothing, the ink only in broken runs along part of the rim and a
+    // few hatches on the shadow side, thin enough that the rig behind reads through it, thinning as it rises
+    vec2 dv = uv / max(length(uv), 1e-3);
+    d += 0.14 * (plumeNoise(uv * 2.6 + seed * 11.0) - 0.5);
+    if (d > 0.02) discard;
+    float body = 1.0 - smoothstep(-0.38, 0.0, d);
+    float rim = (1.0 - smoothstep(0.0, 0.022, abs(d + 0.03))) * smoothstep(0.5, 0.62, plumeNoise(dv * 2.2 + seed * 23.0 + age)) * (1.0 - 0.8 * age);
     float shade = smoothstep(-0.2, 0.6, dot(uv, vec2(0.6, -0.8)));
-    float hatch = step(0.6, fract((gl_FragCoord.x - gl_FragCoord.y) * 0.16)) * shade * step(d, 0.0);
-    col = mix(mix(uPSmoke, uPInk, 0.25 + 0.35 * shade), uPInk, max(rim, hatch * 0.6));
-    a = fade * pow(1.0 - age, 0.8) * max(rim * 0.9, step(d, 0.0) * (0.45 + 0.3 * hatch));
+    float hatch = step(0.75, fract((gl_FragCoord.x - gl_FragCoord.y) * 0.16)) * shade * body;
+    col = mix(mix(uPSmoke, uPInk, 0.2 + 0.3 * shade), uPInk, max(rim, hatch * 0.5));
+    a = fade * pow(1.0 - age, 1.3) * max(rim * 0.55, body * (0.2 + 0.12 * hatch));
   } else if (kind < 1.5) {
     float y = uv.y * 0.5 + 0.5, w = 0.75 * pow(1.0 - y, 0.7) * (1.0 - 0.4 * age);
     float d = abs(uv.x + 0.18 * y * sin(9.0 * y + seed * 40.0 + age * 12.0)) - w;
@@ -540,49 +566,68 @@ void main() {
   } else if (kind > 2.5) {
     float r = length(uv), th = atan(uv.y, uv.x);
     if (kind < 3.5) {
-      // a ring spreading where she went down, wobbling and thinning: a line in her pigment edged in ink, white foam
-      // broken along its inside
-      float rr = 0.86 + 0.04 * sin(th * 5.0 + seed * 31.0) + 0.02 * sin(th * 11.0 - seed * 17.0), w = 0.022 + 0.026 * (1.0 - age);
-      float d = r - rr, band = 2.6 * w;
-      if (d > w || d < -w - band) discard;
-      float line = 1.0 - smoothstep(0.55 * w, w, abs(d)), edge = smoothstep(0.35 * w, 0.75 * w, abs(d)) * line;
+      // ripples spreading where she went down, drawn on the water: two broken, wavering pen arcs in ink (the outer
+      // firmer), thinning and fading as they widen, each with a wet bleed of her pigment along its inside; they lie on
+      // the sea, so they foreshorten and ride with it. Her lasting ring (w 3) is
+      // the same ripple held quiet and faint on the place.
+      float lasting = step(2.5, vTint.w), fw = max(fwidth(r), 1e-5);
+      vec2 dv = uv / max(r, 1e-3);
       vec3 pig = vTint.w > 0.5 ? vTint.xyz : uPInk;
-      float lace = smoothstep(0.3, 0.5, plumeNoise(vec2(th * 9.0, r * 14.0) + seed * 13.0));
-      float foam = (1.0 - smoothstep(0.0, band, -d - w)) * step(d, -0.5 * w) * lace;
-      col = line > 0.01 ? mix(pig, uPInk, 0.75 * edge) : uPSpray;
-      a = (1.0 - smoothstep(0.55, 1.0, age)) * max(line * 0.95, foam * 0.8);
+      float rr = 0.8 + 0.05 * sin(th * 3.0 + seed * 31.0) + 0.025 * sin(th * 7.0 - seed * 17.0) + 0.012 * sin(th * 13.0 + seed * 5.0);
+      if (abs(r - rr) > 0.06 && abs(r - 0.76 * rr) > 0.08) discard; // most of the quad lies off both ripples
+      float line = 0.0, bleed = 0.0;
+      for (int k = 0; k < 2; k++) {
+        float rk = rr * (k == 0 ? 1.0 : 0.74 + 0.03 * sin(th * 2.0 + seed * 9.0)), wk = fw * uRenderPx * (k == 0 ? 0.55 : 0.4) * (1.0 + 0.5 * (1.0 - age) * (1.0 - lasting));
+        float dk = r - rk;
+        // broken into arcs: the pen lifts where the noise round the ring falls, more as it widens
+        float on = smoothstep(0.34 + 0.18 * age * (1.0 - lasting) + 0.08 * float(k), 0.46 + 0.18 * age * (1.0 - lasting) + 0.08 * float(k), plumeNoise(dv * 2.4 + seed * 17.0 + float(k) * 5.3));
+        float lk = (1.0 - smoothstep(wk, wk + fw * 1.2, abs(dk))) * on * (k == 0 ? 1.0 : 0.6 * (1.0 - age));
+        line = max(line, lk);
+        bleed = max(bleed, (1.0 - smoothstep(0.0, 0.045, -dk)) * step(dk, 0.0) * on * (k == 0 ? 1.0 : 1.0 - age) * (0.75 + 0.25 * plumeHash(floor(gl_FragCoord.xy * 0.5))));
+      }
+      if (line + bleed < 0.003) discard;
+      col = line > 0.05 ? uPInk * 0.7 : pig;
+      a = (lasting > 0.5 ? 0.55 * (1.0 - smoothstep(0.8, 1.0, age)) : pow(1.0 - age, 1.1) * smoothstep(0.0, 0.06, age)) * max(line * 0.8, bleed * 0.14);
     } else if (kind > 5.5) {
-      // foam: a lacy lead-white patch, broken through with holes, its edge scalloped and rimmed in a fine ink line
-      float edge = 0.74 + 0.1 * sin(th * 5.0 + seed * 19.0) + 0.06 * sin(th * 9.0 - seed * 7.0) + 0.03 * sin(th * 17.0 + seed * 3.0);
+      // foam: a lacy lead-white patch, broken through with holes, its edge ragged and here and there a fine ink line
+      float edge = 0.7 + 0.32 * (plumeNoise(uv / max(r, 1e-3) * 1.6 + seed * 19.0) - 0.5) + 0.04 * sin(th * 9.0 - seed * 7.0);
       float d = r - edge * (0.85 + 0.15 * age);
       if (d > 0.04) discard;
-      float holes = smoothstep(0.5, 0.68, plumeNoise(uv * 3.2 + seed * 9.0) * (0.55 + 0.45 * r) + 0.3 * age);
-      float rim = 1.0 - smoothstep(0.0, 0.03, abs(d + 0.015));
+      float holes = smoothstep(0.4, 0.58, 0.6 * plumeNoise(uv * 3.6 + seed * 9.0) + 0.4 * plumeNoise(uv * 9.0 - seed * 4.0) + 0.25 * r + 0.35 * age - 0.1);
+      float rim = (1.0 - smoothstep(0.0, 0.03, abs(d + 0.015))) * smoothstep(0.42, 0.55, plumeNoise(uv / max(r, 1e-3) * 2.4 + seed * 5.0));
       col = mix(uPSpray, uPInk, rim);
-      a = (1.0 - age * age) * max(rim * 0.6, step(d, 0.0) * (1.0 - holes) * (0.85 - 0.4 * r));
+      // lace thinning to its edge, so the water and what lies on it read through
+      a = (1.0 - age * age) * max(rim * 0.4, (1.0 - smoothstep(-0.35, 0.0, d)) * (1.0 - holes) * (0.6 - 0.3 * r));
     } else if (kind < 4.5) {
-      // a slick: a dull grey-umber wash pooled darker at its edge, granulating
+      // a slick: a thin, dull sheen of grey-umber on the water, granulating, its edge soft and broken (no rim)
       float edge = 0.78 + 0.1 * sin(th * 3.0 + seed * 23.0) + 0.06 * sin(th * 7.0 + seed * 11.0);
-      if (r > edge) discard;
-      float pool = smoothstep(edge - 0.2, edge, r), gran = plumeHash(floor(gl_FragCoord.xy * 0.5));
-      col = mix(uPSmoke, uPInk, 0.3 + 0.45 * pool);
-      a = (0.16 + 0.3 * pool) * (0.8 + 0.2 * gran) * (1.0 - age * age);
+      float br = plumeNoise(uv * 2.8 + seed * 13.0);
+      if (r > edge || br < 0.3) discard;
+      float gran = plumeHash(floor(gl_FragCoord.xy * 0.5));
+      col = mix(uPSmoke, uPInk, 0.35);
+      a = 0.13 * (1.0 - smoothstep(edge - 0.35, edge, r)) * smoothstep(0.3, 0.55, br) * (0.75 + 0.25 * gran) * (1.0 - age * age);
     } else {
       // flotsam: a plank, spar or cask, inked round and hatched across; her chest gold leaf, banded and rimmed in ink
       float chest = step(1.5, vTint.w), cask = step(fract(seed * 7.31), 0.3) * (1.0 - chest);
-      float d = mix(max(abs(uv.x), abs(uv.y)) - 0.82, r - 0.8, cask);
-      if (d > 0.06) discard;
+      // riding awash: the sea breaks white round it and washes over part of it (the wood there seen through the water)
+      float d = mix(max(abs(uv.x), abs(uv.y)) - 0.8, r - 0.74, cask);
+      if (d > 0.18) discard;
+      float wash = plumeNoise(uv * 2.2 + seed * 29.0), lace = step(0.45, plumeNoise(uv * 9.0 + seed * 3.0));
       float rim = 1.0 - smoothstep(0.0, 0.07, abs(d + 0.035)), hatch = step(0.55, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.18));
       float bands = chest * (1.0 - smoothstep(0.06, 0.1, min(abs(uv.x - 0.35), abs(uv.x + 0.35))));
-      col = mix(mix(mix(uPSmoke, uPCore, 0.3) * 0.7, vTint.xyz * 1.15, chest), uPInk, max(max(rim, bands), 0.45 * hatch * (1.0 - chest)));
-      a = (1.0 - smoothstep(0.85, 1.0, age)) * max(rim, step(d, 0.0) * 0.85);
+      float awash = (1.0 - chest) * smoothstep(0.55, 0.7, wash);
+      float foam = step(0.0, d) * (1.0 - smoothstep(0.04, 0.16, d)) * lace;
+      col = d > 0.0 ? uPSpray : mix(mix(mix(uPSmoke, uPCore, 0.3) * 0.7, vTint.xyz * 1.15, chest), uPInk, max(max(rim, bands), 0.45 * hatch * (1.0 - chest)));
+      a = (1.0 - smoothstep(0.85, 1.0, age)) * (d > 0.0 ? 0.7 * foam : max(rim * (1.0 - 0.6 * awash), 0.85 * (1.0 - 0.65 * awash)));
     }
   } else {
-    vec2 g = uv * 3.0 + seed * 17.0, cell = floor(g), f = fract(g) - 0.5;
-    float r = plumeHash(cell), d = length(f) - 0.12 - 0.16 * r;
-    if (r < 0.3 || d > 0.05 || length(uv) > 1.0) discard;
-    col = mix(uPSpray, uPInk, 1.0 - smoothstep(0.0, 0.05, abs(d + 0.025)));
-    a = 1.0 - age;
+    // spray: lead-white drops scattered through a round, thinning cloud (jittered, never a grid of dots)
+    vec2 g = uv * 3.4 + seed * 17.0, cell = floor(g);
+    vec2 f = fract(g) - 0.5 - 0.6 * (vec2(plumeHash(cell + 1.7), plumeHash(cell + 4.3)) - 0.5);
+    float r = plumeHash(cell), d = length(f) - 0.06 - 0.12 * r;
+    if (r < 0.25 + 0.6 * length(uv) || d > 0.04 || length(uv) > 1.0) discard;
+    col = mix(uPSpray, uPInk, 0.7 * (1.0 - smoothstep(0.0, 0.04, abs(d + 0.02))));
+    a = (1.0 - age) * (0.85 - 0.25 * r) * (1.0 - smoothstep(0.55, 1.0, length(uv)));
   }
   writeVeil(col, a);
 }`;
@@ -656,12 +701,13 @@ export class Fleet implements RenderModule {
       v.update(s, f, c, sea.swell);
       const shot = this.shotAt[i];
       if (shot) v.struckAt(shot);
-      if (!down) sea.wakes.feed(i, v.ship.position, v.forward, s.speed, f.clock, v.length, v.beam); // her wake lingers as she sinks
+      if (!down) sea.wakes.feed(i, v.ship.position, v.forward, s.speed, f.clock, v.length, v.beam);
+      else sea.wakes.stop(i, f.clock); // she has lost all way: her wake dies, not upstaging her going
       v.exhale(this.plumes, s, c, f.dt, f.clock);
       if (v.gone) { v.ship.visible = false; sea.wakes.forget(i); v.lit?.remove(v.lamp); v.lit = null; return; }
       shown.push(v.ship);
     });
-    this.plumes.update(f.clock);
+    this.plumes.update(f.clock, sea.swell);
     const lods = fleetLods(shown, this.ctx.camera, this.ctx.pipeline.renderer.domElement.clientHeight || 440, f.dt);
     let dressed = 0;
     for (const v of this.views) if (v?.ship.visible) dressed += v.outfit.extra(v.ship.lod);
