@@ -85,7 +85,15 @@ function signature(t: Style, id: number): Style {
   };
 }
 
-const SIGNED: readonly Style[] = STYLES.flatMap((t) => Array.from({ length: IDS }, (_, id) => signature(t, id)));
+/** Fields laid over each temperament's Style (restyle): none outside tests/tools/sweep.ts. */
+const OVER: Partial<Style>[] = [];
+const signAll = (): Style[] => STYLES.flatMap((t, k) => Array.from({ length: IDS }, (_, id) => signature({ ...t, ...OVER[k] }, id)));
+let SIGNED: readonly Style[] = signAll();
+/** Tuning hook (tests/tools/sweep.ts): temperament t sailed with the fields `o` laid over its Style, its captains' signatures redrawn. */
+export function restyle(t: number, o: Partial<Style>): void {
+  OVER[t] = o;
+  SIGNED = signAll();
+}
 
 /** The Style a captain sails by: GENTLE on the first voyage, else its temperament under its own signature. */
 export const styleOf = (ship: Ship): Style => (ship.captain.gentle ? GENTLE : SIGNED[ship.captain.temperament * IDS + (ship.pigment % IDS)]);
