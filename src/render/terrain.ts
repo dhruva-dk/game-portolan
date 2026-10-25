@@ -682,23 +682,43 @@ void main() {
   // the reef is one pale wash with its blush and turf, never confetti. Above it the motus' dry sand, bleached white:
   // warm white in the light, the shade's cool glaze in shadow.
   float mud = max(shore.w, 0.0), reef = f.w * (1.0 - smoothstep(TIDE_AMP, TIDE_AMP + 0.3, f.x + bleed * 4.0));
-  float bleached = max(-shore.w, 0.0);
+  float bleached = max(-shore.w, 0.0), reefInk = 0.0, reefShade = 0.0;
   if (reef > 0.01) {
-    float fine = 1.0 - smoothstep(0.04, 0.16, upx);
+    // near the eye a living reef pavement, never a smooth slab: warm cream-ochre limestone pitted all over (each pit
+    // a small inked hollow), coralline rose in patches, bleached rubble lying in knobs and drifts each drawn round on
+    // its shaded side, and pools that keep the sea's turquoise inside an inked rim; its flanks broken and shaded, so
+    // the edge into the water reads as a ragged lip, not a pale cliff. Wet, it darkens warm under thin water.
+    float fine = 1.0 - smoothstep(0.04, 0.16, upx), grain = 1.0 - smoothstep(0.012, 0.045, upx);
     float m1 = noise3(vWorld / 6.0), m2 = fine * noise3(vWorld / 1.2 + 3.0);
     float m3 = noise3(vWorld / 3.0 + 11.0);
     float edge = (1.0 - smoothstep(0.6, 2.8, -f.y + 1.2 * m1)) * smoothstep(-0.5, 0.1, m3 + 0.3 * m2);
     float turf = smoothstep(0.0, 0.4, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
     float bare = smoothstep(0.1, 0.5, m3 - 0.3 * m1) * (1.0 - edge) * (1.0 - turf);
-    vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.13, 0.07, fine) + 0.05 * m1, pool, q);
-    pave = mix(pave, ground * LEAD / PARCH, 0.55 * fine);
-    pave = glaze(pave, ROSE_T, mix(0.55, 0.04, fine) * edge, 0.0, q); // near the eye the blush is the ridge's, not the sand's
-    pave = glaze(glaze(pave, SEPIA_T, mix(0.3, 0.14, fine) * turf, 0.0, q), OCHRE_T, mix(0.2, 0.1, fine) * turf, 0.0, q);
-    pave = mix(pave, ground * LEAD / PARCH, 0.45 * bare);
-    float pit = fine * smoothstep(0.3, 0.5, noise3(vWorld / 1.3 + 7.0) + 0.3 * m2) * smoothstep(0.3, -0.1, above);
-    pave = glaze(pave, VERD_T, 0.5 * pit, 0.6, q);
-    // wet sand below the last tide, darker, greyer and cooler down to the water's edge
-    pave = wash(glaze(pave, SEPIA_T, 0.16 * wet * wet, 0.0, q), ULTRA_T, 0.1 * wet);
+    vec3 pave = glaze(ground * 1.03, OCHRE_T, mix(0.13, 0.12, fine) + 0.05 * m1, pool, q);
+    pave = mix(pave, ground * LEAD / PARCH, 0.2 * fine + 0.25 * bare);
+    float blush = max(edge, fine * smoothstep(0.12, 0.42, m2 - 0.35 * m1));
+    pave = glaze(pave, ROSE_T, mix(0.55, 0.24, fine) * blush, 0.0, q);
+    pave = glaze(glaze(pave, SEPIA_T, mix(0.3, 0.08, fine) * turf, 0.0, q), OCHRE_T, mix(0.2, 0.12, fine) * turf, 0.0, q);
+    // pools, a pace or two across, low on the flat: the sea's turquoise inside an inked rim
+    float pv = noise3(vWorld / 1.7 + 17.0) + 0.25 * m2 - 0.6 * smoothstep(-0.1, 0.35, above);
+    float poolK = fine * smoothstep(0.4, 0.46, pv);
+    pave = glaze(glaze(pave, VERD_T, 0.4 * poolK, 0.6, q), ULTRA_T, 0.05 * poolK, 0.0, q);
+    // rubble: bleached knobs and drifts of broken coral, lit on top, shaded and drawn round below
+    float rb = noise3(vWorld / 0.42 + 9.0) + 0.4 * noise3(vWorld / 2.4 + 5.0);
+    float rubble = fine * smoothstep(0.5, 0.58, rb) * (1.0 - poolK);
+    pave = mix(pave, ground * LEAD / PARCH * 1.02, 0.4 * rubble);
+    // pits: the limestone's honeycomb of small hollows, each a dark speck in a fine inked ring
+    float pk = noise3(vWorld / 0.16 + 3.0) + 0.3 * m2, pits = grain * smoothstep(0.6, 0.68, pk) * (1.0 - poolK);
+    pave = glaze(pave, SEPIA_T, 0.45 * pits, 0.0, q);
+    reefInk = fine * (0.7 * inkLine(rb - 0.58, fwidth(rb), LINE_CSS * 0.7) * step(0.4, noise3(vWorld / 0.3 + 1.0))
+                      + 0.8 * inkLine(pv - 0.46, fwidth(pv), LINE_CSS * 0.8)) * (1.0 - smoothstep(0.3, 0.7, -above))
+            + grain * 0.6 * inkLine(pk - 0.6, fwidth(pk), LINE_CSS * 0.5) * (1.0 - poolK);
+    // flanks broken and shaded: the lip into the water is ragged and darker, never a pale cliff
+    float flank = smoothstep(0.02, 0.3, 1.0 - up0) * (0.7 + 0.6 * m2);
+    pave = glaze(pave, SEPIA_T, 0.18 * flank, 0.0, q);
+    reefShade = fine * clamp(0.5 * rubble * smoothstep(0.55, 0.62, rb) + 0.6 * flank + 0.5 * pits, 0.0, 1.0);
+    // wet below the last tide: darker and warmer under its film of water, the sea's green in it
+    pave = glaze(glaze(pave, SEPIA_T, 0.05 * wet * wet, 0.0, q), VERD_T, 0.1 * wet, 0.0, q);
     col = mix(col, pave, reef * (1.0 - meadow));
   }
   col = mix(col, ground * LEAD / PARCH, bleached * beach * (1.0 - reef) * (1.0 - 0.6 * wet) * 0.7 * (0.85 + 0.3 * patchy));
@@ -763,6 +783,7 @@ void main() {
   lines += inkLine(abs(fract(rr) - 0.5), min(fwidth(rr), 0.5), LINE_CSS * 0.55) * nearR * reef * wet * 0.45 * smoothstep(-0.25, 0.25, noise3(vWorld / 1.6 + 5.0));
   float strand = (1.0 - smoothstep(0.03, 0.12, abs(above - 0.8 * TIDE_AMP + 0.12 * noise3(vWorld / 2.2)))) * smoothstep(-0.2, 0.2, noise3(vWorld / 1.1 + 2.0));
   lines += stipple(pl, upx, 0.75, 5.0) * nearR * strand * 0.9;
+  lines += reefInk * reef * (1.0 - meadow);
   // the brow and foot of every cliff, heavier near the eye
   lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low);
 
@@ -772,6 +793,8 @@ void main() {
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
   vec2 hc = vec2(mix(h + 0.12 * pl.y, bed, (cliff + steep) * (1.0 - reef)), pl.x + 0.7 * pl.y), hdx = dFdx(hc), hdy = dFdy(hc);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, float(ri) * 3.7));
+  // the reef pavement's own shading near the eye: its rubble's undersides, its pits and its broken flanks, hatched
+  if (reefShade * reef > 0.01) col = mix(col, hatchInk(0.6), reef * hatching(hc * 2.3, hdx * 2.3, hdy * 2.3, 0.3 * reefShade, 7.3));
   col = mix(col, hatchInk(0.7), clamp(lines, 0.0, 1.0) * near);
   if (uNight > 0.0) {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;

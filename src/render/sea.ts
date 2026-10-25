@@ -17,7 +17,7 @@ import type { V3 } from '../sim/math.ts';
 import { cellOf, horizonDistance, R, TERRITORY } from '../sim/sphere.ts';
 import { LANE_TAPER } from '../sim/tables.ts';
 import { airOf } from './weather.ts';
-import { CHARTS, coastAt, type Geography, heightAt } from '../sim/world/geography.ts';
+import { CHARTS, coastAt, type Geography, heightAt, ZONE } from '../sim/world/geography.ts';
 import { DRAFT, FLOOR, REGIONS, TIDE } from '../sim/world/regions.ts';
 import type { Pipeline } from './pipeline.ts';
 import { cubeTexture, SEA_FIELD_BYTES, SEA_FLOOR_BYTES, seaFloorFaces, Swell, SWELL_GLSL } from './swell.ts';
@@ -68,10 +68,11 @@ export function discShape(height: number, out: DiscShape): DiscShape {
 }
 
 /** The surf's rule, one for the shader and the coral plan (WP17): white water breaks over coral reef within `reach` u
- *  seaward of the coast where the water `out` u farther seaward is deeper than `deep` u (an exposed reef front) and the
+ *  seaward of the coast where the water `out` u farther seaward is deeper than `deep` u and neither it nor the water `far`
+ *  u out is a lagoon (an exposed reef front, where the open swell meets it: a lagoon's side and a pass's inner reach lie calm), and the
  *  reef is shoal enough to strike a keel at low water (the sim's height through `strike`), so a pass a hull clears at
  *  every tide stays unbroken; lace lies wherever the reef would strike a keel now (`lace`: depth through the draught). */
-export const SURF = { reach: 7.5, out: 6, deep: [4, 7], strike: [-TIDE.amp - DRAFT - 0.5, -TIDE.amp - DRAFT + 0.1], lace: [DRAFT - 0.25, DRAFT] } as const;
+export const SURF = { reach: 7.5, out: 6, deep: [4, 7], far: 13, strike: [-TIDE.amp - DRAFT - 0.5, -TIDE.amp - DRAFT + 0.1], lace: [DRAFT - 0.25, DRAFT] } as const;
 const ramp = (a: number, b: number, x: number): number => THREE.MathUtils.smoothstep(x, a, b);
 const S1 = new THREE.Vector3(), S2 = new THREE.Vector3(), S3 = new THREE.Vector3();
 /** How much white water the surf can lay at `dir` (0–1, its envelope: the sets break within it) at sea level `level`. */
@@ -82,7 +83,9 @@ export function surfAt(geo: Geography, dir: V3, level: number): number {
   S1.crossVectors(d, Math.abs(d.y) < 0.9 ? S2.set(0, 1, 0) : S2.set(1, 0, 0)).normalize();
   S2.crossVectors(d, S1);
   const gx = coastAt(geo, S1.clone().multiplyScalar(0.8 / R).add(d).normalize()) - y, gy = coastAt(geo, S2.clone().multiplyScalar(0.8 / R).add(d).normalize()) - y;
-  const out = S1.multiplyScalar(gx).addScaledVector(S2, gy).addScaledVector(d, 1e-5).normalize().multiplyScalar(SURF.out / R).add(d).normalize();
+  const sea = S1.multiplyScalar(gx).addScaledVector(S2, gy).addScaledVector(d, 1e-5).normalize();
+  const far = S2.copy(sea).multiplyScalar(SURF.far / R).add(d).normalize(), out = sea.multiplyScalar(SURF.out / R).add(d).normalize();
+  if ((geo.zones[cellOf(TERRITORY, out)] | geo.zones[cellOf(TERRITORY, far)]) & ZONE.lagoon) return 0;
   return ramp(SURF.deep[0], SURF.deep[1], level - heightAt(geo, out)) * ramp(SURF.strike[0], SURF.strike[1], h);
 }
 /** How much lace lies at `dir` at sea level `level` (0–1): over reef that would strike a keel now. */
@@ -185,7 +188,7 @@ const float LAGOON_D = ${washD('lagoon')}, SHALLOWS_D = ${washD('shallows')}, SH
 const vec3 SAND_T = ${T('ochre')}, ROCK_T = ${T('umber')}, CORAL_T = ${T('roseMadder')}, KELP_T = ${T('malachite')};
 const vec3 MUD_T = ${T('sepia')}, BLACK_T = ${T('ironGall')}, TURQ_T = ${T('verdigris')}, CREAM_T = ${T('ochre')};
 const float LANE_TAPER = ${LANE_TAPER.toFixed(1)}, TERRITORY_D = 0.6;
-const float SURF_REACH = ${SURF.reach.toFixed(2)}, SURF_OUT = ${SURF.out.toFixed(2)};
+const float SURF_REACH = ${SURF.reach.toFixed(2)}, SURF_OUT = ${SURF.out.toFixed(2)}, SURF_FAR = ${SURF.far.toFixed(2)};
 const vec2 SURF_DEEP = vec2(${SURF.deep.map((v) => v.toFixed(2)).join(', ')}), SURF_STRIKE = vec2(${SURF.strike.map((v) => v.toFixed(2)).join(', ')}), SURF_LACE = vec2(${SURF.lace.map((v) => v.toFixed(2)).join(', ')});
 ${INKS}
 // coast rings: the first RING0 u off the solid contour, then spreading by RING_G; widths in CSS px
@@ -570,6 +573,8 @@ void main() {
   float kr = floor(rx + 0.5), rw2 = RING_CSS * uRenderPx * (1.0 - 0.08 * kr);
   float ring = (1.0 - smoothstep(rw2 - 0.5, rw2 + 0.5, abs(rx - kr) / max(fx, 1e-5))) * step(-0.5, kr) * step(kr, RINGS - 0.5)
              * pow(0.8, max(kr, 0.0)) * (0.75 + 0.6 * fine) * smoothstep(2.5, 5.0, 1.0 / max(fx, 1e-5)) * water * (1.0 - far);
+  // (chart notation: over clear water a low eye sees through, depth grades in the washes, never in beaded rings)
+  ring *= mix(1.0, smoothstep(10.0, 24.0, length(cameraPosition) - SEA_R - uSeaLevel), clear);
   float cw = COAST_CSS * uRenderPx;
   float coast = 1.0 - smoothstep(cw - 0.5, cw + 0.5, abs(depth) / max(fwD, 1e-4));
 
@@ -584,13 +589,15 @@ void main() {
   // foam left behind each line in lace; far off the break draws together into one broken ribbon of lead white along
   // the reef's edge. The lagoons lie calm: the break stands only where deep water lies a few u seaward.
   vec2 xs = clear > 0.0 ? vec2(dot(P, uClearE), dot(P, uClearN)) : xp;
-  float fwY = max(fwidth(f.y), 1e-4), surf = 0.0, face = 0.0, swellInk = 0.0, keel = 0.0;
+  float fwY = max(fwidth(f.y), 1e-4), surf = 0.0, face = 0.0, swellInk = 0.0, keel = 0.0, surfInk = 0.0;
   if (f.w > 0.02 && f.y < SURF_REACH && depth > -0.4) {
     vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
     vec2 g = vec2(seaField(normalize(dir + t1 * (0.8 / SEA_R))).y, seaField(normalize(dir + t2 * (0.8 / SEA_R))).y) - f.y;
     vec3 seaward = normalize(t1 * g.x + t2 * g.y + dir * 1e-5);
-    float exposed = f.w * smoothstep(SURF_DEEP.x, SURF_DEEP.y, uSeaLevel - seaField(normalize(dir + seaward * (SURF_OUT / SEA_R))).x)
-                  * smoothstep(SURF_STRIKE.x, SURF_STRIKE.y, f.x);
+    vec4 fo = seaField(normalize(dir + seaward * (SURF_OUT / SEA_R)));
+    float exposed = f.w * smoothstep(SURF_DEEP.x, SURF_DEEP.y, uSeaLevel - fo.x) * smoothstep(SURF_STRIKE.x, SURF_STRIKE.y, f.x);
+    // (a lagoon's side lies calm: no break where the water seaward, near or farther out, is a lagoon)
+    if (exposed > 0.0) exposed *= 1.0 - smoothstep(0.2, 0.6, max(fo.z, seaField(normalize(dir + seaward * (SURF_FAR / SEA_R))).z));
     if (exposed > 0.0) {
       float s = f.y + 0.3 * wob + 0.08 * fine, detail = 1.0 - smoothstep(0.06, 0.22, upx);
       for (int k = 0; k < 3; k++) {
@@ -603,6 +610,9 @@ void main() {
         float lace = vnoise(xs / 0.45 + fk * 5.0 + set);
         float body = smoothstep(-fwY, fwY, lineD) * (1.0 - smoothstep(back * (0.25 + 0.75 * lace), back, lineD));
         surf = max(surf, body * broke * spent * run);
+        // the pen along each broken line's crest, where it curls over, broken along its length; gone as it is spent
+        surfInk = max(surfInk, (1.0 - smoothstep(0.5, 1.3, abs(lineD) / fwY / uRenderPx)) * broke * smoothstep(-1.0, 1.0, sk) * run
+                               * step(0.32, vnoise(xs / 1.4 + vec2(fk * 2.1 + set * 1.7, set))));
         face = max(face, smoothstep(-0.55 - 0.3 * broke, -0.05, lineD) * step(lineD, 0.0) * smoothstep(4.0, 1.6, sk) * (1.0 - broke) * run);
         swellInk = max(swellInk, (1.0 - smoothstep(0.5, 1.3, abs(lineD) / fwY / uRenderPx)) * smoothstep(7.0, 5.5, sk) * (1.0 - smoothstep(3.5, 1.8, sk)) * run);
       }
@@ -610,7 +620,10 @@ void main() {
       // (no thinner than a few px from high)
       float rw = max(0.9, 5.0 * upx);
       float ribbon = (1.0 - smoothstep(rw, rw + 1.0 + upx, abs(s - 0.4))) * smoothstep(0.2, 0.34, vnoise(xs / 3.0));
+      // (its seaward edge drawn: a broken pen line where the swell rears)
+      float ribbonInk = (1.0 - smoothstep(0.5, 1.2, abs(s - 0.4 - rw) / fwY / uRenderPx)) * smoothstep(0.24, 0.4, vnoise(xs / 3.0 + 7.0));
       surf = mix(ribbon * 0.85, surf, detail) * exposed;
+      surfInk = mix(0.6 * ribbonInk, surfInk, detail) * exposed;
       face *= exposed * detail;
       swellInk *= exposed * detail * near;
     }
@@ -660,7 +673,9 @@ void main() {
   col = glaze(col, TURQ_T, 0.55 * face, 0.0, q);
   col = mix(col, hatchInk(0.4), 0.35 * face * hatching(hc, hdx, hdy, 0.5, 29.0));
   col = mix(col, pen, swellInk * 0.6);
-  col = mix(col, white, smoothstep(0.25, 0.55, surf * (0.6 + 0.5 * q.grain)) * 0.95);
+  // the surf's white is the paper's, laid thin over the water, under its pen line
+  col = mix(col, mix(parchment(q) * 1.03, white, 0.35), smoothstep(0.25, 0.55, surf * (0.6 + 0.5 * q.grain)) * 0.8);
+  col = mix(col, pen, surfInk * 0.8);
   col = mix(col, white, drift * 0.7);
   col = mix(col, pen, laneInk * 0.8);
   col = mix(col, white, laneFoam * 0.85);

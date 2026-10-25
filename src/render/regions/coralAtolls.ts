@@ -556,31 +556,33 @@ void main() {
     a = smoothstep(0.74, 0.8, fl) * (1.0 - s) * rise * (1.0 - smoothstep(0.1, 0.45, ph)) * 0.85;
     col = mix(parchment(q), uFoam, 0.7);
   } else {
-    // the white water in streaks along the reef, densest along the crest; ahead of it the face's water glazed green
-    // with foam running down it; behind it lace opening into holes and threads, more as it slumps; its top and ends
-    // ragged and soft, never a cut edge
+    // the break as an engraver draws it: a pen line along the roll's top, curling over at the lip, broken along its
+    // length; the paper left white for the foam under it, opening behind into lace (threads and holes, thinner as it
+    // slumps); ahead of it the face's thin green glaze hatched along its fall. Never a body of paint: the white is the
+    // paper's, laid thin, and the water shows through every part of it
     float along = vAt.x, lumpy = n3(vWorld * 9.0 + vec3(set));
     float streak = n3(vec3(along * 1.1, u * 7.0 + y * 5.0, set * 5.3 + vSeed)) + 0.45 * n3(vec3(along * 3.7, u * 19.0 + y * 13.0, set));
     float lace = n3(vWorld * 6.0 + vec3(0.3 * uTime, set, 0.0)) + 0.35 * n3(vWorld * 15.0 + vec3(set));
     float crest = smoothstep(0.08, 0.24, u) * (1.0 - smoothstep(0.42, 0.7, u));
     float tail = smoothstep(0.38, 0.7, u);
-    float dense = mix(mix(0.62, 1.05, crest), 0.5, tail) - 0.3 * slump;
-    float white = smoothstep(1.32 - dense - 0.06, 1.32 - dense + 0.06, 0.55 * streak + 0.45 * lace + 0.2 * crest);
+    float dense = mix(mix(0.5, 0.92, crest), 0.3, tail) - 0.3 * slump;
+    float white = smoothstep(1.32 - dense - 0.05, 1.32 - dense + 0.05, 0.55 * streak + 0.45 * lace + 0.2 * crest);
     float face = (1.0 - rise * 0.7) * (1.0 - slump) * (1.0 - smoothstep(0.12, 0.3, u)) * smoothstep(-0.1, 0.05, y);
     float ragged = smoothstep(0.0, 0.3, nv + 0.35 * (lumpy - 0.5)) * (1.0 - smoothstep(0.3, 0.5, abs(vEnd) + 0.12 * (lumpy - 0.5)));
-    a = max(white, 0.45 * face) * ragged * (1.0 - smoothstep(0.8, 1.0, u)) * smoothstep(-0.12, 0.0, y);
-    // the paper left white with a body of lead white, a soft cool shade on the side from the sun and under the rolls,
-    // hatched only in the deepest of it; the face's thin green glaze, hatched along its fall
-    col = mix(parchment(q) * 1.02, uFoam, 0.6);
+    // the pen: the crest line along the roll's top and the lip's curl under it, each broken now and then
+    float fu = max(fwidth(u), 1e-4);
+    float top = (1.0 - smoothstep(0.5, 1.3, abs(u - 0.3 - 0.04 * (lumpy - 0.5)) / fu)) * step(0.3, n3(vec3(along * 1.6, set * 2.3, vSeed * 5.0)));
+    float lip = (1.0 - smoothstep(0.4, 1.1, abs(u - 0.13 - 0.05 * lumpy) / fu)) * step(0.48, n3(vec3(along * 3.1 + 4.0, set, vSeed * 3.0)));
+    float pen = max(top, 0.75 * lip) * (1.0 - 0.6 * slump) * (1.0 - smoothstep(0.32, 0.5, abs(vEnd) + 0.12 * (lumpy - 0.5)));
+    a = max(max(white * mix(0.72, 0.5, tail), 0.3 * face) * ragged, pen * 0.85) * (1.0 - smoothstep(0.8, 1.0, u)) * smoothstep(-0.12, 0.0, y);
+    col = parchment(q) * 1.04;
     float tone = lightTone(ndl, nv);
-    col = mix(col, wash(col, uShade, 0.7), 0.55 * smoothstep(0.25, 0.9, tone));
-    col = mix(col, uFace, (1.0 - white) * 0.8 + 0.25 * (1.0 - smoothstep(0.0, 0.08, y)));
+    col = mix(col, wash(col, uShade, 0.5), 0.3 * smoothstep(0.4, 0.95, tone));
+    col = mix(col, uFace, (1.0 - white) * 0.75 + 0.25 * (1.0 - smoothstep(0.0, 0.08, y)));
     vec2 c = vec2(x * 9.0 + y * 4.0, y * 9.0 - x * 2.0);
-    float hat = hatching(c, dFdx(c), dFdy(c), 0.5 * smoothstep(0.5, 1.0, tone) + 0.45 * face * (1.0 - white), 7.0);
-    col = mix(col, hatchInk(0.3), 0.3 * hat);
-    // a broken pen line now and then along the rolls' tops where the white water turns from the eye
-    float edge = (1.0 - smoothstep(0.08, 0.2, nv)) * step(0.58, n3(vec3(x * 4.0, set, vSeed * 9.0))) * crest * white;
-    col = mix(col, hatchInk(0.5), edge * 0.6);
+    float hat = hatching(c, dFdx(c), dFdy(c), 0.45 * face * (1.0 - white) + 0.3 * smoothstep(0.6, 1.0, tone) * white, 7.0);
+    col = mix(col, hatchInk(0.35), 0.45 * hat);
+    col = mix(col, hatchInk(0.8), pen);
   }
   if (a < 0.03) discard;
   writeVeil(col, min(a, 0.96) * (1.0 - smoothstep(40.0, 62.0, vDist)));
@@ -780,8 +782,10 @@ export function planCoral(field: TerrainField): CoralPlan {
       const gx = coastAt(geo, chartDir(RI, px + 0.5, py)) - coastAt(geo, chartDir(RI, px - 0.5, py));
       const gy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5)), gl = Math.hypot(gx, gy);
       if (gl < 1e-4) continue;
-      // the break, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
-      for (const [back, tall] of [[0, 0.42 + 0.22 * sr()], [1.1, 0.16 + 0.08 * sr()]]) {
+      // (none on a pass's sides: the swell meets the reef's outer front, not the water running in across the channel)
+      if ([2, 4, 6].some((k) => open(px + (k * gx) / gl, py + (k * gy) / gl))) continue;
+      // the break, a low curl, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
+      for (const [back, tall] of [[0, 0.24 + 0.12 * sr()], [1.1, 0.08 + 0.05 * sr()]]) {
         const bx = px - (back * gx) / gl, by = py - (back * gy) / gl, d = chartDir(RI, bx, by), ground = heightAt(geo, d);
         if (back > 0 && ground > TIDE.amp * 0.5) continue;
         const at = lift(d, -0.04), sy = tall * (0.6 + 0.4 * loud);
