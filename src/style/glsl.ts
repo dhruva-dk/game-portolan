@@ -441,6 +441,9 @@ export function inkMaterial(style: Style, o: InkMaterialOptions): THREE.ShaderMa
 }
 
 export interface IllustratedOptions {
+  /** A surface's own drawing (GLSL in main, before the hatching: it may change col, tone and the hatch coordinates hc,
+   *  hdx, hdy; vWorld, n, v, q and, when painted, vPaint are in scope), e.g. structures.ts' coursed masonry. */
+  surface?: string;
   /** The pigment, as it looks on midday parchment at density 1 (a PIGMENTS entry or any palette colour). */
   pigment: RGB;
   /** Wash density: below 1 a thin tint, above 1 deep and granulating. */
@@ -476,6 +479,7 @@ in float aTint; // 0: the part's own pigment, 1: the instance's stone, 2: its ac
 in vec3 aStone;
 in vec3 aAccent;
 out vec4 vPaint;
+out float vTint;
 #endif
 void main() {
 #ifdef USE_INSTANCING
@@ -488,6 +492,7 @@ void main() {
   vNormal = normalize(mat3(model) * normal);
 #ifdef PAINTED
   vPaint = vec4(aTint > 1.5 ? aAccent : aTint > 0.5 ? aStone : aPaint.rgb, aPaint.w);
+  vTint = aTint;
 #endif
 #ifdef ANCHOR_OBJECT
   vAnchor = position * length(model[0].xyz);
@@ -519,6 +524,7 @@ uniform float uMarks;
 uniform float uSeed;
 #ifdef PAINTED
 in vec4 vPaint;
+in float vTint;
 #endif
 void main() {
   float facing = gl_FrontFacing ? 1.0 : -1.0;
@@ -550,6 +556,7 @@ void main() {
   vec3 col = glaze(parchment(q), uPigment, uDensity, washPool(n, v, q), q);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
 #endif
+  /*SURFACE*/
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed));
   if (uNight > 0.0) {
     // by candlelight the lit side is picked out in silver ink instead of left bare
@@ -578,7 +585,7 @@ export function illustratedMaterial(style: Style, o: IllustratedOptions): THREE.
   if (o.painted) defines.PAINTED = true;
   return inkMaterial(style, {
     vertexShader: ILLUSTRATED_VERT,
-    fragmentShader: ILLUSTRATED_FRAG,
+    fragmentShader: o.surface ? ILLUSTRATED_FRAG.replace('/*SURFACE*/', o.surface) : ILLUSTRATED_FRAG,
     defines,
     id: o.id,
     inkWeight: o.inkWeight,

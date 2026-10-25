@@ -165,6 +165,47 @@ function lampKit(): THREE.BufferGeometry {
   return k.build();
 }
 
+/** Dressed stone drawn as coursed ashlar at world scale, whatever a run's stretch (S-020: stretched block geometry and
+ *  the material's level hatch read as lumber): courses ~0.24 u high of blocks 0.45–0.8 u long, perpends staggered
+ *  course by course, each block its own grey-ochre load, its arrises worn (joints broken, the lower edge in shadow, the
+ *  upper caught by the light); a dark wet band up to high water and olive weed below mean sea with a ragged fringe;
+ *  the shade hatched near upright, never along the courses like wood grain. `all`: every surface of the kit is stone;
+ *  otherwise only the painted parts tinted with the region's stone (a lamp's pillar). For `illustratedMaterial`'s
+ *  `surface` (painted materials). */
+export function masonrySurface(all: boolean): string {
+  return /* glsl */ `{
+    float hgt = length(vWorld) - ${R.toFixed(1)};
+    vec3 upw = normalize(vWorld), ta = abs(cross(upw, n)), ua = abs(upw);
+    float vert = 1.0 - smoothstep(0.55, 0.8, abs(dot(n, upw)));
+    float m = ${all ? '1.0' : 'step(0.5, vTint) * step(vTint, 1.5)'};
+    // along the face: the world axis most along it, less its rise with height, so the perpends stand upright
+    vec3 ax = ta.x > ta.y && ta.x > ta.z ? vec3(1.0, 0.0, 0.0) : ta.y > ta.z ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0);
+    float s = dot(vWorld, ax) - dot(upw, ax) * hgt;
+    vec2 top = ua.y > max(ua.x, ua.z) ? vWorld.xz : ua.x > ua.z ? vWorld.yz : vWorld.xy;
+    float cy = mix(top.y / 0.7, hgt / 0.24, vert), course = floor(cy);
+    float sl = mix(top.x, s, vert) / (0.45 + 0.35 * hash11(course * 3.17 + 0.4)) + hash11(course * 7.13 + 1.0), bx = floor(sl);
+    float fy = fract(cy), fx = fract(sl), bh = hash12(vec2(course, bx) + 0.37), bk = hash12(vec2(bx, course) + 5.1);
+    // each block its own load, cooler or warmer, lighter or darker; the arrises worn
+    col = mix(col, mix(col, vec3(dot(col, vec3(0.3, 0.45, 0.25))), 0.35) * vec3(0.92, 0.95, 1.02), m * (0.45 + 0.4 * bh));
+    col *= 1.0 - m * (0.1 * bk + 0.16 * vert * (1.0 - smoothstep(0.0, 0.22, fy)) + 0.06 * (1.0 - smoothstep(0.0, 0.08, min(fx, 1.0 - fx))));
+    col = mix(col, vec3(1.0), m * vert * 0.07 * smoothstep(0.82, 1.0, fy));
+    float jy = min(fy, 1.0 - fy) / max(fwidth(cy), 1e-4), jx = min(fx, 1.0 - fx) / max(fwidth(sl), 1e-4);
+    float worn = smoothstep(0.2, 0.42, q.mottle + 0.25 * (bh - 0.5));
+    float joint = (1.0 - smoothstep(0.35 * uRenderPx, 0.35 * uRenderPx + 1.0, min(jy, jx))) * worn;
+    col = mix(col, hatchInk(0.75), m * 0.8 * joint);
+    // wet and dark up to high water, weed below mean sea, its fringe ragged
+    float wet = vert * (1.0 - smoothstep(${TIDE.amp.toFixed(2)} - 0.05, ${TIDE.amp.toFixed(2)} + 0.3 + 0.2 * (q.bloom - 0.5), hgt));
+    col *= 1.0 - m * 0.55 * wet;
+    float weed = vert * (1.0 - smoothstep(0.02, 0.14, hgt - 0.22 * hash11(floor(s * 14.0)) + 0.1 * (q.mottle - 0.5)));
+    col = mix(col, vec3(0.2, 0.25, 0.12), m * 0.8 * weed);
+    // shade hatched near upright down each face
+    vec2 mc = vec2(s + 0.3 * hgt, hgt), mdx = dFdx(mc), mdy = dFdy(mc);
+    float k = step(0.5, m * vert);
+    hc = mix(hc, mc, k); hdx = mix(hdx, mdx, k); hdy = mix(hdy, mdy, k);
+    tone *= 1.0 - 0.3 * k; // the joints carry the face, the hatching only its shade
+  }`;
+}
+
 /** A boulder: a jagged faceted stone, its wash darker low down where the sea wets it. */
 function rockKit(): THREE.BufferGeometry {
   const g = new THREE.IcosahedronGeometry(1, 1), p = g.getAttribute('position');
@@ -436,6 +477,7 @@ export class Structures {
   readonly towers: Tower[];
   readonly harbours: Mooring[];
   private readonly material: THREE.ShaderMaterial;
+  private readonly masonry: THREE.ShaderMaterial;
   /** Near and far lighthouses, rocks, bollards, posts, harbour lamps: six draw calls. */
   private readonly draws: Instances[];
   private readonly stone: THREE.Vector3[];
@@ -453,6 +495,8 @@ export class Structures {
     this.harbours = layHarbours(geo, field);
     this.lights = lights;
     this.material = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide });
+    // the harbour lamps' pillars in coursed masonry (their stone-tinted parts), the boulders and bollards natural stone
+    this.masonry = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide, surface: masonrySurface(false) });
     // the region's land pigment lightened toward a warm limestone, and its accent for the band
     this.stone = REGIONS.map((r) => transmittanceVec(PIGMENTS[r.pigments.land]).lerp(transmittanceVec(PIGMENTS.ochre), 0.45));
     this.accent = REGIONS.map((r) => transmittanceVec(PIGMENTS[r.pigments.accent]));
@@ -463,7 +507,7 @@ export class Structures {
       new Instances(rockKit(), this.material, sum(hs, (m) => m.rocks.length) + sum(this.towers, (tw) => tw.rocks.length)),
       new Instances(bollardKit(), this.material, sum(hs, (m) => m.bollards.length)),
       new Instances(postKit(), this.material, sum(hs, (m) => m.posts.length)),
-      new Instances(lampKit(), this.material, hs.length),
+      new Instances(lampKit(), this.masonry, hs.length),
     ];
     this.lamps = hs.map((h) => lights.add({ pos: h.lamp, reach: HARBOUR.reach }));
     this.state = new Int8Array(t + hs.length).fill(-1);
@@ -524,6 +568,7 @@ export class Structures {
     for (const l of this.lamps) this.lights.remove(l);
     for (const d of this.draws) d.dispose();
     this.material.dispose();
+    this.masonry.dispose();
   }
 }
 

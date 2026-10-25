@@ -18,7 +18,7 @@ import { coastAt, heightAt } from '../../sim/world/geography.ts';
 import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
 import { floraMaterial, rainGeometry, type RainForm } from '../flora.ts';
 import { seas } from '../sea.ts';
-import { MOLE } from '../structures.ts';
+import { masonrySurface, MOLE } from '../structures.ts';
 import type { Swell } from '../swell.ts';
 import { GROUND, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
 import type { RenderContext, RenderModule } from '../world.ts';
@@ -177,17 +177,15 @@ function godownKit(seed: number): THREE.BufferGeometry {
   return b.build();
 }
 
-/** A run of quay 1 long: cut-stone courses from the bed up to a coping at y = 0 (its face to +z), weed at the foot. */
+/** A run of quay 1 long: a battered face from the bed up to a coping at y = 0 (its face to +z), its hearting behind;
+ *  the courses, joints, wet band and weed are the masonry's drawing (structures.ts), at world scale whatever the run's
+ *  stretch (stretched blocks read as planks, S-020). */
 function quayKit(): THREE.BufferGeometry {
   const b = new Brush(W.stone);
-  b.pick = (c, n) => (n.y > 0.5 ? W.stone : c.y < -1.15 ? W.weed : (Math.floor((c.y + 3) * 5) + Math.floor((c.x + 3) * (Math.floor((c.y + 3) * 5) % 2 ? 2 : 2.5))) % 3 === 0 ? W.stoneDark : W.stone);
-  // courses as separate blocks so their joints ink
-  for (let row = 0; row < 7; row++) {
-    const y0 = -1.6 + row * 0.2, off = row % 2 ? 0.25 : 0;
-    for (let k = -1; k <= 1; k++) if (Math.abs(k * 0.5 + off) < 0.6) b.box(vec(k * 0.5 + off, y0 + 0.1, 0.34 - 0.012 * (6 - row)), 0.245, 0.097, 0.18);
-  }
-  b.box(vec(0, -0.02, 0.18), 0.5, 0.06, 0.36); // the coping
-  b.box(vec(0, -0.9, -0.2), 0.5, 0.82, 0.25); // the hearting
+  b.box(vec(0, -0.8, 0.3), 0.5, 0.8, 0.06);  // the face
+  b.box(vec(0, -1.45, 0.36), 0.5, 0.15, 0.04); // the plinth course, set out at the foot
+  b.box(vec(0, -0.03, 0.2), 0.5, 0.05, 0.18); // the coping, overhanging the face
+  b.box(vec(0, -0.9, -0.12), 0.5, 0.82, 0.38); // the hearting
   return b.build();
 }
 
@@ -387,6 +385,7 @@ export class SpiceIsles {
   readonly birds: readonly V[];
   readonly voices: readonly { at: V; loud: number; kind: 'jungle' | 'harbour' }[];
   private readonly material: THREE.ShaderMaterial;
+  private readonly masonry: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), each part's foliage, blossom and seed (the flora material's)] */
   private readonly lod: [Draw, Part[], number, number, Float32Array][];
@@ -402,7 +401,10 @@ export class SpiceIsles {
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
-    this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), [...plan.quays, ...plan.walls, ...plan.mole]), fixed(heapKit(5), plan.heaps), fixed(stairKit(), plan.stairs)];
+    // the quay, terrace walls, mole and stairs in coursed masonry (structures.ts), never the timber's level hatch
+    this.masonry = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, surface: masonrySurface(true) });
+    const dressed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.masonry, parts.length).fill(parts.map((p) => p.m));
+    this.fixed = [fixed(godownKit(3), plan.godowns), dressed(quayKit(), [...plan.quays, ...plan.walls, ...plan.mole]), fixed(heapKit(5), plan.heaps), dressed(stairKit(), plan.stairs)];
     // the trees are the shared flora's rainforest kits in its material (bending in the wind, blossom in soft dabs,
     // leaf outlines broken into clumps), whole near the eye and sketched further off, dissolving between by its stipple
     const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04 });
@@ -464,6 +466,7 @@ export class SpiceIsles {
 
   dispose(): void {
     this.material.dispose();
+    this.masonry.dispose();
     for (const m of this.trees) m.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
