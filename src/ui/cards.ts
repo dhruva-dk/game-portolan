@@ -64,9 +64,9 @@ export interface HarbourLayout {
 }
 
 const rect = (x: number, y: number, width: number, height: number): Rect => ({ x, y, width, height });
-const SETTING_ROWS = ['sound', 'music', 'haptics', 'reducedMotion'] as const;
+const SETTING_ROWS = ['sound', 'music', 'haptics', 'reducedMotion', 'leftHanded'] as const;
 export const SETTING_WORDS: Readonly<Record<(typeof SETTING_ROWS)[number], string>> = {
-  sound: 'Sound', music: 'Music', haptics: 'Haptics', reducedMotion: 'Reduced motion',
+  sound: 'Sound', music: 'Music', haptics: 'Haptics', reducedMotion: 'Reduced motion', leftHanded: 'Left-handed',
 };
 export { SETTING_ROWS };
 
@@ -127,16 +127,22 @@ export function harbourLayout(view: View, page: Page): HarbourLayout {
       cells.push(rect(x0 + (i % cols) * (cw + gap), B.y + row * (ch + gap), cw, ch));
     }
   } else if (page === 'settings') {
-    const rh = B.height / (SETTING_ROWS.length + 1), bh = Math.max(MIN_TARGET, Math.min(rh - 3, tH)), dot = Math.max(MIN_TARGET, 50 * s), x0 = B.x + B.width * 0.4;
+    // the volumes a row each, the switches two to a row (so WP25's left-handed switch fits the smallest iPhone)
+    const lines = 2 + Math.ceil((SETTING_ROWS.length - 2) / 2), half = B.width / 2;
+    const rh = B.height / (lines + 1), bh = Math.max(MIN_TARGET, Math.min(rh - 3, tH)), dot = Math.max(MIN_TARGET, 50 * s), x0 = B.x + B.width * 0.4;
     SETTING_ROWS.forEach((k, i) => {
-      const row = rect(B.x, B.y + i * rh, B.width, rh);
+      const level = k === 'sound' || k === 'music', j = i - 2;
+      const row = level ? rect(B.x, B.y + i * rh, B.width, rh) : rect(B.x + (j % 2) * half, B.y + (2 + Math.floor(j / 2)) * rh, half, rh);
       cells.push(row);
       const y = row.y + (rh - bh) / 2;
-      if (k === 'sound' || k === 'music') {
+      if (level) {
         for (let v = 0; v < 5; v++) targets.push({ id: `level:${k}:${v}`, kind: 'level', key: k, value: v, ...rect(x0 + v * (dot + 6 * s), y, dot, bh) });
-      } else targets.push({ id: `toggle:${k}`, kind: 'toggle', key: k, ...rect(x0, y, 132 * s, bh) });
+      } else {
+        const tw = Math.max(MIN_TARGET, Math.min(132 * s, half * 0.36));
+        targets.push({ id: `toggle:${k}`, kind: 'toggle', key: k, ...rect(row.x + half - tw - 10 * s, y, tw, bh) });
+      }
     });
-    const y = B.y + SETTING_ROWS.length * rh + (rh - bh) / 2, w = 156 * s, gap = 14 * s, mid = B.x + B.width / 2;
+    const y = B.y + lines * rh + (rh - bh) / 2, w = 156 * s, gap = 14 * s, mid = B.x + B.width / 2;
     targets.push({ id: 'toggle:quality', kind: 'toggle', key: 'quality', ...rect(mid - 1.5 * w - gap, y, w, bh) }); // WP26b graphics, cycled
     targets.push({ id: 'link:credits', kind: 'link', key: 'credits', ...rect(mid - w / 2, y, w, bh) });
     targets.push({ id: 'link:reset', kind: 'link', key: 'reset', ...rect(mid + w / 2 + gap, y, w, bh) });
