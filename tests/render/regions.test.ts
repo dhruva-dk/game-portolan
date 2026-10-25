@@ -10,6 +10,9 @@ import { arcOf } from '../../src/render/regions/fjords.ts';
 import { crownOf } from '../../src/render/regions/iceCrown.ts';
 import { BASE, planStacks } from '../../src/render/regions/basaltStacks.ts';
 import { planKelp } from '../../src/render/regions/kelpShallows.ts';
+import { open, planAmber, shoal } from '../../src/render/regions/amberShoals.ts';
+import { chartDir } from '../../src/render/regions/kit.ts';
+import { navigable } from '../../src/sim/world/geography.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
 const S: Surface = { height: 0, normal: new THREE.Vector3(), up: 1, ground: 0, region: 0 };
@@ -75,4 +78,24 @@ test("the Kelp Shallows' canopy floats over deep kelp, the Cathedral's kelp reac
     assert.ok(h > 0 && h < TIDE.amp, 'a tide pool outside the tide');
   }
   for (const m of plan.wrack) assert.ok(p.setFromMatrixPosition(m).length() - R >= TIDE.amp - 0.06, 'wrack below the strand line');
+});
+
+test("the Amber Shoals: the north-east sill is dry and shut at low water and a passage at high, as its riffles and streaks show; the Sandbar Light's dressing is bedded", () => {
+  const plan = planAmber(field), ri = REGIONS.findIndex((r) => r.id === 'amberShoals');
+  const sill = chartDir(ri, 23, 32), unit = chartDir(ri, 24, 32).distanceTo(sill);
+  assert.ok(heightAt(geo, sill) > -TIDE.amp, 'the sill uncovers at low water');
+  assert.ok(!navigable(geo, sill, -TIDE.amp) && navigable(geo, sill, TIDE.amp), 'the sill shuts at low water and passes at high');
+  const crest = plan.riffles.filter((r) => r.dir.distanceTo(sill) < 6 * unit && Math.abs(r.floor + 0.45) < 0.2);
+  const streaks = plan.streaks.filter((s) => s.dir.distanceTo(sill) < 6 * unit);
+  assert.ok(crest.length > 2 && streaks.length > 4, `the sill has ${crest.length} riffles and ${streaks.length} streaks`);
+  assert.ok(crest.some((r) => shoal(0 - r.floor) > 0) && crest.every((r) => shoal(TIDE.amp - r.floor) <= 0), 'riffles at half tide, none at high water');
+  assert.ok(streaks.every((s) => !open(-TIDE.amp - s.floor)) && streaks.some((s) => open(TIDE.amp - s.floor)), 'streaks run only once the sill passes');
+  for (const s of streaks) if (open(TIDE.amp - s.floor)) assert.ok(navigable(geo, s.dir, TIDE.amp), 'a streak runs where the sim is shut');
+  for (const b of [...plan.stones, ...plan.blocks, ...plan.drifts]) {
+    const h = field.surface(b.dir, -10, S).height;
+    assert.ok(b.low < h && b.high > h, `a part floats or is buried: ${b.low.toFixed(2)} < ${h.toFixed(2)} < ${b.high.toFixed(2)}`);
+  }
+  assert.ok(plan.stones.length > 20 && plan.blocks.length >= 4 && plan.drifts.length >= 3, `${plan.stones.length} stones, ${plan.blocks.length} blocks, ${plan.drifts.length} drifts`);
+  assert.ok(plan.tower.up.distanceTo(chartDir(ri, 40, 3)) < 5 * unit, 'the Sandbar Light stands at the landmark');
+  assert.ok(plan.ripples.length > 200 && plan.channels.length > 10 && plan.feeding.length > 10, `${plan.ripples.length} ripples, ${plan.channels.length} channels, ${plan.feeding.length} feeding`);
 });

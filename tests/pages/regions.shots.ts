@@ -6,6 +6,8 @@
 // Part B: the Arch over the Basalt Stacks' maze in late afternoon (capture 19), a lane of the maze at deck, the Arch from
 // high above. Part C: the Kelp Cathedral through clear water at midday, a ship half-hidden in the kelp (capture 20), at
 // deck among the canopy, the Cathedral from high above. A name prefix (e.g. basalt) takes only those shots, as sheets wp16-<prefix>-<device>-sheet.png.
+// Part D: the Amber Shoals at low tide in gold light up the spit to the Sandbar Light (capture 21), the north-east inlet's
+// sill at low and high water (the passage shut, then open), the light from high above, the shoals in a calm.
 //   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -24,6 +26,11 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['kelp-hero', { view: 'kelp', hour: '12' }],
   ['kelp-deck', { view: 'kelpdeck', hour: '12' }],
   ['kelp-cathedral-orbit', { view: 'mark', region: 'Kelp', hour: '12' }],
+  ['amber-hero', { view: 'amber', hour: '17', tide: '-0.6' }],
+  ['amber-pass-low', { view: 'amberpass', hour: '17', tide: '-0.6' }],
+  ['amber-pass-high', { view: 'amberpass', hour: '17', tide: '0.6' }],
+  ['amber-light-orbit', { view: 'mark', region: 'Amber', hour: '17', tide: '-0.6' }],
+  ['amber-calm', { view: 'amber', hour: '17', tide: '-0.3', calm: '1' }],
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();
