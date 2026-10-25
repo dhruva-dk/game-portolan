@@ -263,10 +263,10 @@ if (view === 'deck') {
   const ox = Number(q.get('ox') ?? 0), oy = Number(q.get('oy') ?? 0);
   // capture 24: Spice Harbour at golden hour from the sound, its quays and godowns under the flowering jungle, ships
   // crowding in through the mouth
-  if (view === 'spice') { toWorld(ri, m.x + 14 + ox, m.y - 26 + oy, from); toWorld(ri, m.x - 1, m.y + 3, to); }
+  if (view === 'spice') { toWorld(ri, m.x + 3 + ox, m.y - 24 + oy, from); toWorld(ri, m.x - 1, m.y + 9, to); }
   else { toWorld(ri, 14 + ox, -10 + oy, from); toWorld(ri, 28, -4, to); } // low off the east island's jungle shore: the forest edge over the beach
-  look(from, to, Number(q.get('height') ?? (view === 'spice' ? 8 : 2.6)), Number(q.get('pitch') ?? (view === 'spice' ? -0.16 : -0.02)));
-  if (view === 'spice') { launch(13, -2, 0.25, 0.6); launch(19, 2.5, -0.1, 0.6); launch(24, -1.5, 0.2, 0.35); launch(10, 5, -0.5, 0.6); }
+  look(from, to, Number(q.get('height') ?? (view === 'spice' ? 10 : 2.6)), Number(q.get('pitch') ?? (view === 'spice' ? -0.2 : -0.02)));
+  if (view === 'spice') { launch(13, -8, 0.5, 0.6); launch(17, 8.5, -0.4, 0.6); launch(25, -10, 0.3, 0.35); launch(8, 6, -0.3, 0.6); }
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();

@@ -192,7 +192,7 @@ function flowerKit(seed: number, gold: boolean, far: boolean): THREE.BufferGeome
 }
 
 /** The forest edge 1 tall: understory banked into a wall, broad leaves and lower masses. */
-function edgeKit(seed: number): THREE.BufferGeometry {
+export function edgeKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.leaf);
   b.pick = foliage;
   for (let k = 0; k < 5; k++) {
@@ -253,6 +253,16 @@ function quayKit(): THREE.BufferGeometry {
   return b.build();
 }
 
+/** A flight of steps up a terrace's riser, 1 wide: treads from the lower terrace (y = −1.6, z = +0.5) to the coping
+ *  (y = 0, z = −0.5), between stone cheeks. */
+function stairKit(): THREE.BufferGeometry {
+  const b = new Brush(W.stone);
+  b.pick = (_c, n) => (n.y > 0.5 ? W.stone : W.stoneDark);
+  for (let k = 0; k < 8; k++) b.box(vec(0, -1.6 + (k + 1) * 0.1, -k * 0.0625), 0.32, (k + 1) * 0.1, 0.5 - 0.0625 * k);
+  for (const x of [-0.4, 0.4]) b.box(vec(x, -0.75, 0), 0.08, 0.8, 0.55);
+  return b.build();
+}
+
 /** A heap on the apron 1 across: sacks piled on a pallet, corded bales, and a drying bed on trestles under a woven mat
  *  heaped with mace, turmeric and cloves. */
 function heapKit(seed: number): THREE.BufferGeometry {
@@ -275,6 +285,8 @@ function heapKit(seed: number): THREE.BufferGeometry {
 export interface Part { m: THREE.Matrix4; at: V; dir: V; base: number; ground: number; sim: number; top: number; reach: number }
 export interface SpicePlan {
   emergents: Part[]; flowers: [Part[], Part[]]; edge: Part[]; godowns: Part[]; quays: Part[]; heaps: Part[];
+  /** The town's terraces: retaining walls faced like the quay, and flights of steps up their risers. */
+  walls: Part[]; stairs: Part[];
   /** The quay's face (unit directions round the anchorage) and the water off it a hull can lie in. */
   quay: V[]; berths: V[];
   birds: V[]; voices: { at: V; loud: number; kind: 'jungle' | 'harbour' }[];
@@ -288,7 +300,7 @@ export function planSpice(field: TerrainField): SpicePlan {
   const sim = (x: number, y: number): number => heightAt(geo, chartDir(RI, x, y));
   const tan = (x: number, y: number, dx: number, dy: number): V =>
     chartDir(RI, x + dx * 0.25, y + dy * 0.25).sub(chartDir(RI, x - dx * 0.25, y - dy * 0.25)).normalize();
-  const plan: SpicePlan = { emergents: [], flowers: [[], []], edge: [], godowns: [], quays: [], heaps: [], quay: [], berths: [], birds: [], voices: [] };
+  const plan: SpicePlan = { emergents: [], flowers: [[], []], edge: [], godowns: [], quays: [], heaps: [], walls: [], stairs: [], quay: [], berths: [], birds: [], voices: [] };
   const place = (list: Part[], x: number, y: number, o: { base?: number; sink: number; fwd: V; yaw?: number; tilt?: number; s: number; sy?: number; sz?: number; kitH: number; reach: number }): Part => {
     const dir = chartDir(RI, x, y), ground = field.surface(dir, -10, S).height, base = o.base ?? ground - o.sink, sy = o.sy ?? o.s, at = lift(dir, base);
     const p: Part = { m: pose(new THREE.Matrix4(), at, dir, o.fwd, o.yaw ?? 0, o.tilt ?? 0, o.s, sy, o.sz ?? o.s), at, dir, base, ground, sim: heightAt(geo, dir), top: base + o.kitH * sy, reach: o.reach };
@@ -331,6 +343,30 @@ export function planSpice(field: TerrainField): SpicePlan {
       break;
     }
   }
+  // the town climbing behind: the terrace's riser faced with a retaining wall (a flight of steps every 30°), and on
+  // each terrace above it a house under vermilion tiles where the ground is level enough for its plinth
+  for (let a = 0; a < 360; a += 5) {
+    const off = Math.abs(((a - fb + 540) % 360) - 180);
+    if (off < 55) continue;
+    const ux = Math.sin(a * DEG), uy = Math.cos(a * DEG), at = (d: number): [number, number] => [hb.x + ux * d, hb.y + uy * d];
+    let rises = 0;
+    for (let d = hb.r + 4; d < hb.r + 15 && rises < 4; d += 0.35) {
+      const [x0, y0] = at(d), [x1, y1] = at(d + 0.9), g0 = groundAt(field, chartDir(RI, x0, y0)), g1 = groundAt(field, chartDir(RI, x1, y1));
+      if (g1 - g0 < 0.75 || g0 < LAND || sim(x0, y0) < LAND) continue;
+      rises++;
+      const [wx, wy] = at(d + 0.55), fwd = tan(wx, wy, -ux, -uy), w = Math.max(0.75, (d + 0.55) * 5 * DEG * 1.15), stair = a % 30 === 15;
+      place(stair ? plan.stairs : plan.walls, wx, wy, { base: g1 + 0.05, sink: 0, fwd, s: stair ? 0.9 : w, sy: (g1 - g0 + 0.5) / 1.6, sz: 1, kitH: 0, reach: 0.5 });
+      taken.push({ x: wx, y: wy, r: 1 });
+      const [gx, gy] = at(d + 2.4), vx = -uy, vy = ux;
+      const corners = [[1.4, 1], [-1.4, 1], [1.4, -1], [-1.4, -1], [0, 0]].map(([s, f]) => groundAt(field, chartDir(RI, gx + vx * s - ux * f, gy + vy * s - uy * f)));
+      const lo = Math.min(...corners), hi = Math.max(...corners);
+      if (hi - lo < 0.7 && lo > LAND && !taken.some((p) => Math.hypot(p.x - gx, p.y - gy) < 2.6 && p.r > 1)) {
+        place(plan.godowns, gx, gy, { base: hi - 0.3, sink: 0, fwd: tan(gx, gy, -ux, -uy), yaw: 0.1 * (rnd() - 0.5), s: 0.95, kitH: 2.1, reach: 1.6 });
+        taken.push({ x: gx, y: gy, r: 2.4 });
+      }
+      d += 1.5;
+    }
+  }
   // the forest: emergents, flowering groves and the edge behind the beaches, on gentle ground dry at high water
   const fr = seeded(825), clear = (x: number, y: number, r: number): boolean => !taken.some((p) => Math.hypot(p.x - x, p.y - y) < p.r + r);
   for (let y = -62; y <= 62; y += SPICE.step) {
@@ -339,7 +375,16 @@ export function planSpice(field: TerrainField): SpicePlan {
       if (sim(px, py) <= LAND + 0.3) continue;
       const dir = chartDir(RI, px, py);
       field.surface(dir, -10, S);
-      if (S.up < 0.78 || S.ground === GROUND.beach || S.ground === GROUND.mud) continue;
+      // the town's terraces: garden trees in blossom between the houses
+      const town = Math.hypot(px - hb.x, py - hb.y);
+      if (town < hb.r + 15) {
+        if (S.up > 0.7 && town > hb.r + 5 && r < 0.3 && clear(px, py, 1.4)) {
+          place(plan.flowers[r < 0.12 ? 1 : 0], px, py, { sink: 0.1, fwd: tan(px, py, 1, 0), yaw: fr() * TAU, s: 1.9 + 0.7 * fr(), kitH: 0.95, reach: 0.8 });
+          taken.push({ x: px, y: py, r: 1 });
+        }
+        continue;
+      }
+      if (S.up < 0.68 || S.ground === GROUND.beach || S.ground === GROUND.mud) continue;
       const inland = -coastAt(geo, dir), fwd = tan(px, py, 1, 0);
       const cx = coastAt(geo, chartDir(RI, px + 0.5, py)) - coastAt(geo, chartDir(RI, px - 0.5, py)), cy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5));
       const cl = Math.hypot(cx, cy) || 1, seaward = chartDir(RI, px + (1.8 * cx) / cl, py + (1.8 * cy) / cl);
@@ -395,12 +440,12 @@ export class SpiceIsles {
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
-    this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), plan.quays), fixed(heapKit(5), plan.heaps)];
+    this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), [...plan.quays, ...plan.walls]), fixed(heapKit(5), plan.heaps), fixed(stairKit(), plan.stairs)];
     const lod: [THREE.BufferGeometry, Part[], number, number][] = [
       [emergentKit(17, false), plan.emergents, 0, SPICE.near], [emergentKit(17, true), plan.emergents, SPICE.near, SPICE.far],
       [flowerKit(21, false, false), plan.flowers[0], 0, SPICE.near], [flowerKit(21, false, true), plan.flowers[0], SPICE.near, SPICE.far],
-      [flowerKit(27, true, false), plan.flowers[1], 0, SPICE.near], [flowerKit(27, true, true), plan.flowers[1], SPICE.near, SPICE.far],
-      [edgeKit(9), plan.edge, 0, SPICE.edge]];
+      [flowerKit(27, true, false), plan.flowers[1], 0, SPICE.near], [flowerKit(27, true, true), plan.flowers[1], SPICE.near, SPICE.far]];
+    // the understory bank (edgeKit) read as flat dark mounds at the beach: left out until a finer kit reads as leaves
     this.lod = lod.map(([kit, parts, from, to]) => [new Draw(kit, this.material, parts.length), parts, from, to]);
     this.group.add(...this.draws.map((d) => d.mesh));
   }

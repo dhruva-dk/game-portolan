@@ -27,7 +27,7 @@ import type { Geography } from '../sim/world/geography.ts';
 import { DRAFT, FLOOR, REGIONS, TIDE, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
-import { GROUND, groundAt, terrains, type Ground, type Surface, type TerrainField } from './terrain.ts';
+import { GROUND, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 /** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores. */
@@ -182,8 +182,10 @@ function pineKit(lod: number): Kit {
 type Crown = 'jungle' | 'flowering' | 'cloud' | 'mangrove' | 'shrub';
 /** Leaf masses (x, y, z, r, squash) per crown, near and far. */
 const CROWNS: Record<Crown, readonly (readonly number[])[][]> = {
-  jungle: [[[0, 0.78, 0, 0.32, 0.7], [0.26, 0.7, 0.1, 0.25, 0.75], [-0.23, 0.68, -0.12, 0.26, 0.75], [0.04, 0.7, -0.28, 0.24, 0.8],
-    [-0.08, 0.64, 0.25, 0.22, 0.8]], [[0, 0.74, 0, 0.38, 0.7], [0.15, 0.68, 0.14, 0.27, 0.8]]],
+  // rainforest crowns broken into flat, spreading clumps at stepped heights (never one rounded dome), sky between them
+  jungle: [[[0, 0.86, 0, 0.2, 0.55], [0.34, 0.74, 0.12, 0.19, 0.5], [-0.3, 0.78, -0.16, 0.2, 0.5], [0.1, 0.7, -0.36, 0.18, 0.55],
+    [-0.14, 0.66, 0.33, 0.17, 0.55], [-0.34, 0.6, 0.16, 0.15, 0.6]],
+    [[0, 0.8, 0, 0.3, 0.5], [0.26, 0.7, 0.1, 0.2, 0.55], [-0.22, 0.68, -0.14, 0.2, 0.55]]],
   flowering: [[[0, 0.78, 0, 0.3, 0.75], [0.22, 0.7, 0.06, 0.22, 0.8], [-0.2, 0.69, -0.08, 0.22, 0.8], [0.02, 0.72, -0.24, 0.2, 0.8]],
     [[0, 0.76, 0, 0.34, 0.75], [0.14, 0.7, 0.1, 0.22, 0.8]]],
   cloud: [[[0, 0.62, 0, 0.21, 0.9], [0.1, 0.8, 0.05, 0.22, 0.9], [-0.08, 0.95, -0.02, 0.16, 0.9], [-0.12, 0.7, 0.1, 0.17, 0.9]],
@@ -449,13 +451,17 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
   const kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : [])]
     .map((k) => KINDS.indexOf(k)));
   const keys: number[] = [], kindOf: number[] = [], mats: number[] = [], cols: number[] = [], seeds: number[] = [];
-  const dir = v3(), surf: Surface = { height: 0, normal: V(), up: 1, ground: GROUND.meadow, region: 0 };
+  const dir = v3(), surf: Surface = { height: 0, normal: V(), up: 1, ground: GROUND.meadow, region: 0 }, towns = townsOf(geo);
   const cellU = ((Math.PI / 2) * R) / N, per = Math.ceil(N / PATCH), m4 = new THREE.Matrix4(), X = V(), Y = V(), Z = V(), P = V(), nrm = V();
   for (let f = 0; f < 6; f++) {
     for (let j = 3; j < N - 3; j++) {
       for (let i = 3; i < N - 3; i++) {
         const c = f * NN + j * N + i, ri = geo.region[c], ks = kinds[ri], h = H[c], floor = geo.floor[c];
         if (!ks.length || h < -10 || (h < -0.7 && floor !== FLOOR.kelp && floor !== FLOOR.coral)) continue;
+        if (towns.length && h > 0) { // a town's quay and lower terraces are built on, not planted
+          gnomonicDir(f, Math.tan(angle(i + 0.5)), Math.tan(angle(j + 0.5)), dir);
+          if (towns.some((hb) => { const L = Math.hypot(hb.pos.x, hb.pos.y, hb.pos.z); return hb.region === ri && R * Math.hypot(dir.x - hb.pos.x / L, dir.y - hb.pos.y / L, dir.z - hb.pos.z / L) < hb.r + 8.5; })) continue;
+        }
         const gx = (H[c + 1] - H[c - 1]) / (2 * cellU), gy = (H[c + N] - H[c - N]) / (2 * cellU), up = 1 / Math.sqrt(1 + gx * gx + gy * gy);
         let ring = 0;
         for (const o of RING) ring += H[c + o];

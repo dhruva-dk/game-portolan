@@ -124,6 +124,8 @@ export interface Relief {
   bench: number;
   /** Strata step, u (basalt's columns stand in taller steps). */
   step: number;
+  /** How far inland (u) the gullies run before fading (rainforest valleys cut back to the summits). */
+  reach: number;
 }
 
 /** How region r's land is carved, from its own data: cliff height, landform, sand and climate. Ice rounds and low
@@ -132,6 +134,9 @@ export interface Relief {
 export function reliefOf(r: Region): Relief {
   const form = landformOf(r), amp = THREE.MathUtils.clamp(r.shore.cliffH, 2, 18), high = THREE.MathUtils.clamp((amp - 3) / 12, 0, 1);
   const flat = form === 2 || amp <= 3;
+  // rainforest land weathers deep: no bare beds stepping its slopes, knife-edge ridges and spurs between ravines cut
+  // back to the summits, few sea cliffs but rocky headlands between coves
+  if (r.flora.includes('jungle')) return { amp, sheer: 0.18, crag: 0.85, gully: 1.15, terrace: 0, bench: 0.3, step: 1.15, reach: 34 };
   return {
     amp,
     sheer: form === 2 ? 0.5 : sandOf(r) === 'black' ? 0.4 : 0.25 + 0.5 * high,
@@ -140,6 +145,7 @@ export function reliefOf(r: Region): Relief {
     terrace: form === 1 ? 0.8 : flat ? 0 : 0.25 + 0.3 * high,
     bench: flat ? 0 : 0.35 + 0.4 * high,
     step: form === 1 ? 1.5 : 1.15,
+    reach: 22,
   };
 }
 
@@ -191,9 +197,14 @@ function fbm3(x: number, y: number, z: number, octaves: number): number {
 }
 
 /** Every cell's drawn height: the geography's at or below KEEP, carved above it. */
+/** A harbour that is its region's landmark is a town: level made ground along its quay, terraces climbing behind
+ *  (carve), built on rather than planted (flora). */
+export const townsOf = (geo: Geography): Geography['harbours'] => geo.harbours.filter((hb) => geo.landmarks.some((m) =>
+  m.region === hb.region && Math.hypot(m.pos.x - hb.pos.x, m.pos.y - hb.pos.y, m.pos.z - hb.pos.z) < m.r * 1.5));
 export function carve(geo: Geography): Float32Array {
   const H = geo.heights, C = geo.coast, out = Float32Array.from(H), styles = REGIONS.map(reliefOf);
   const d = v3(), di = v3(), dj = v3();
+  const towns = townsOf(geo);
   for (let c = 0; c < H.length; c++) {
     const h = H[c];
     if (h <= KEEP) continue;
@@ -232,13 +243,22 @@ export function carve(geo: Geography): Float32Array {
     const n1 = noise3(x * gf + gx * gs, y * gf + gy * gs, z * gf + gz * gs);
     const n2 = noise3(2.1 * (x * gf + gx * gs) + 3.3, 2.1 * (y * gf + gy * gs), 2.1 * (z * gf + gz * gs));
     const cut = Math.max(1 - smooth(0, 0.22, Math.abs(n1)), 0.6 * (1 - smooth(0, 0.16, Math.abs(n2))));
-    e -= wb * s.gully * cut * Math.max(0, Math.min(e, s.amp)) * 0.55 * (1 - smooth(8, 22, inland));
+    e -= wb * s.gully * cut * Math.max(0, Math.min(e, s.amp)) * 0.55 * (1 - smooth(8, s.reach, inland));
     e = Math.max(e, Math.min(h - KEEP, 0.12));
     let hr = KEEP + (e * 0.85) / (1 + e / 40);
     if (s.terrace > 0) {
       const off = 0.8 * noise3(x / 30, y / 30, z / 30), t = (hr - KEEP + off) / s.step, fl = Math.floor(t);
       const stepped = KEEP + (fl + smooth(0.55, 0.95, t - fl)) * s.step - off;
       hr += (stepped - hr) * s.terrace * wb * (0.5 + 0.5 * noise3(x / 9, y / 9 + 3.1, z / 9));
+    }
+    for (const hb of towns) {
+      if (hb.region !== geo.region[c]) continue;
+      const pl = Math.hypot(hb.pos.x, hb.pos.y, hb.pos.z), ox = d.x - hb.pos.x / pl, oy = d.y - hb.pos.y / pl, oz = d.z - hb.pos.z / pl;
+      const dd = Math.hypot(ox, oy, oz) * R, town = 1 - smooth(hb.r + 9, hb.r + 15, dd);
+      if (town <= 0) continue;
+      // the quay's apron 6 u deep at the coping, then terraces 1.25 u high every 2.6 u up the slope, each riser a wall
+      const t = Math.max(0, inland - 6) / 2.6, fl = Math.floor(t), level = KEEP + 0.15 + 1.25 * (fl + smooth(0.8, 1, t - fl));
+      hr += (Math.min(hr, level) - hr) * town;
     }
     out[c] = Math.max(hr, KEEP + Math.min(h - KEEP, 0.1));
   }
