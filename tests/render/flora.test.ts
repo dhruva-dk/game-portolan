@@ -24,7 +24,7 @@ test('the planet is planted densely with every region its own flora, the same ev
   for (let i = 0; i < bed.count; i++) seen[geo.region[cellOf(TERRITORY, root(i).normalize())]].add(KINDS[bed.kind[i]]);
   REGIONS.forEach((r, ri) => {
     for (const f of r.flora) assert.ok(seen[ri].has(f), `${r.name}: no ${f}`);
-    for (const k of seen[ri]) assert.ok(r.flora.includes(k as never) || k === 'reed', `${r.name}: ${k} does not grow there`);
+    for (const k of seen[ri]) assert.ok(r.flora.includes(k as never) || k === 'reed' || (k === 'pandanus' && r.flora.includes('jungle')), `${r.name}: ${k} does not grow there`);
   });
 });
 

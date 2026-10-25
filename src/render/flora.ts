@@ -20,7 +20,7 @@
 // the same way, so nothing pops.
 import * as THREE from 'three';
 import { inkMaterial, transmittanceVec, type Style } from '../style/glsl.ts';
-import { PIGMENTS, type RGB } from '../style/palette.ts';
+import { mix, PIGMENTS, type RGB } from '../style/palette.ts';
 import { v3 } from '../sim/math.ts';
 import { R, TERRITORY, gnomonicDir } from '../sim/sphere.ts';
 import type { Geography } from '../sim/world/geography.ts';
@@ -30,8 +30,9 @@ import { SWELL_GLSL, type Swell } from './swell.ts';
 import { GROUND, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
-/** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores. */
-export type FloraKind = RegionFlora | 'reed';
+/** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores and pandanus at the edge of
+ *  the rainforest's beaches. */
+export type FloraKind = RegionFlora | 'reed' | 'pandanus';
 
 const TAU = Math.PI * 2;
 const V = (x = 0, y = 0, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
@@ -52,6 +53,7 @@ const paint = (c: RGB, density: number): Paint => {
 };
 const BARK = paint(PIGMENTS.sepia, 0.6), PALM_BARK = paint(PIGMENTS.umber, 0.6), ROOT = paint(PIGMENTS.umber, 0.75);
 const MOSS = paint(PIGMENTS.verdigris, 0.55), SEED = paint(PIGMENTS.umber, 0.9);
+const PALE_BARK = paint(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.45), 0.5);
 /** Leaf masses take the instance's foliage (tint 1) or blossom (tint 2); only the density is the kit's. */
 const LEAF: Paint = [1, 1, 1, 1.05], BLADE: Paint = [1, 1, 1, 0.9];
 /** aTint: 0 the kit's pigment, 1 the instance's foliage, 2 its blossom. aPart: sway weight (0 root … 1 crown),
@@ -103,25 +105,38 @@ class Kit {
     }
   }
 
-  /** A clustered leaf mass: an icosphere lobed into clumps, flat-bottomed, lit as a soft dome and darker beneath;
-   *  vertices on its upper side whose pattern exceeds `bloom` carry the blossom. */
-  mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2, dab = 0): void {
+  /** A clustered leaf mass: an icosphere lobed into clumps, its underside drawn up by `under`, lit as a soft dome and
+   *  darker beneath (`open` < 1: deeper in the crown's shade); vertices on its upper side whose pattern exceeds `bloom`
+   *  carry the blossom whole, or (dab) a blossom weight the material breaks into soft dabs, thick on the sunward top. */
+  mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2, dab = 0, under = 0.6, open = 1): void {
     const ico = new THREE.IcosahedronGeometry(1, detail), pos = ico.getAttribute('position'), q = V(), p = V(), n = V();
     for (let k = 0; k < pos.count; k += 3) {
       const ids = [0, 1, 2].map((m) => {
         q.fromBufferAttribute(pos, k + m);
         const lobe = 1 + 0.22 * Math.sin(q.x * 4.1 + seed) * Math.sin(q.y * 3.7 + seed * 1.7) * Math.sin(q.z * 4.3 + seed * 2.3)
           + 0.09 * Math.sin((q.x + q.z) * 9 + seed * 3.1);
-        p.set(q.x * r * lobe, q.y * r * lobe * squash * (q.y < 0 ? 0.6 : 1), q.z * r * lobe).add(c);
-        n.copy(q).addScaledVector(UP, 0.3).normalize();
-        // blossom as the pattern lays it, or (dab) broken dabs face by face, thicker on the sunward top
-        const blossom = dab ? q.y > -0.25 && hash(k, Math.round(seed * 97), 7) < dab * (0.55 + 0.6 * q.y)
-          : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom;
-        return this.vert(p, n, LEAF, blossom ? 2 : 1, p.y, MASS, 0.35 + 0.65 * smooth(-0.8, 0.6, q.y));
+        p.set(q.x * r * lobe, q.y * r * lobe * squash * (q.y < 0 ? under : 1), q.z * r * lobe).add(c);
+        n.copy(q); // its sphere's normal: the outline's, through the squash (the material lifts it toward the light)
+        // aTint 1 + w: w the blossom (1 whole, as the pattern lays it; below 1 a weight for the material's dabs)
+        const w = dab ? Math.min(0.95, dab * smooth(-0.45, 0.75, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
+          : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom ? 1 : 0;
+        return this.vert(p, n, LEAF, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
       });
       this.tri(ids[0], ids[1], ids[2]);
     }
     ico.dispose();
+  }
+
+  /** A billowing foliage clump: a core mass crowned by smaller lobes round its upper side, each lit on its own top and
+   *  shaded under it, so the clump's outline swells in rounded billows (never one plate). */
+  billow(c: THREE.Vector3, r0: number, squash: number, lobes: number, detail: number, seed: number, dab = 0, open = 1): void {
+    const r = r0 * 1.12; // drawn a little large: the material bites its outline back into rounded clumps
+    this.mass(c, r, squash, detail, seed, 2, dab, 0.75, open * 0.85);
+    for (let i = 0; i < lobes; i++) {
+      const a = seed * 1.7 + (i / lobes) * TAU + 0.5 * Math.sin(seed + i * 3.1), el = 0.25 + 0.55 * hash(i, Math.round(seed * 31), 3);
+      const o = V(Math.cos(a) * Math.cos(el), Math.sin(el) * squash, Math.sin(a) * Math.cos(el)).multiplyScalar(r * 0.78);
+      this.mass(o.add(c), r * (0.4 + 0.2 * hash(i, Math.round(seed * 31), 5)), squash * 1.15, 0, seed + i * 5.3, 2, dab * 1.1, 0.8, open);
+    }
   }
 
   /** A thin leaf or blade sheet from `base` along `dir` curving by `bend`, `segs` long; `jag` serrates its edges
@@ -230,41 +245,99 @@ function crownKit(lod: number, crown: Crown): Kit {
   return k;
 }
 
-/** A rainforest tree 1 tall (the Spice Isles' jungle and flowering trees, S-020): a bole forking high, leaning off its
- *  foot, under a broad broken crown of many leaf masses of varied size and height (never one stamped shape), a lower
- *  sub-canopy tree beside it, lianas hanging from its limbs, and at its feet an understory of dark low masses and fern
- *  fronds; a flowering tree's blossom lies in broken dabs over the green, thick on some masses and thin on others. */
-function rainKit(lod: number, flowering: boolean, seed: number): Kit {
-  const k = new Kit(), far = lod > 0;
+/** A rainforest tree 1 tall, drawn as an engraver draws one from a boat offshore (S-020). `canopy`: a bole forking low
+ *  into limbs under a deep crown massed into billowing clumps of many sizes at stepped heights, a sub-canopy crown
+ *  under its rim, creepers draping from the rim, lianas hanging in loops and curls, and at its feet an understory of
+ *  low billows, fern fronds and broad leaves, so from the side the leaf runs from the crown to the ground. `flowering`:
+ *  a lower, rounder crown whose clumps carry a blossom weight (soft dabs, thick on the sunward tops). `emergent`: a
+ *  pale buttressed bole standing clear of the canopy under a broad, irregular, two-tiered crown of clumps on long
+ *  fanning limbs, lianas hanging from it (never a lollipop). Far: the bole and a few billows. */
+export type RainForm = 'canopy' | 'flowering' | 'emergent';
+function rainKit(lod: number, form: RainForm, seed: number): Kit {
+  const k = new Kit(), far = lod > 0, em = form === 'emergent', fl = form === 'flowering';
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
-  const lean = V((rnd() - 0.5) * 0.14, 0, (rnd() - 0.5) * 0.14), top = (flowering ? 0.46 : 0.56) + 0.06 * rnd();
-  const fork = V(0, top, 0).add(lean);
-  k.tube([V(0, -0.06, 0), V(lean.x * 0.4, top * 0.5, lean.z * 0.4), fork], [0.045, 0.03, 0.022], far ? 3 : 6, BARK);
-  const N = far ? (flowering ? 2 : 3) : flowering ? 7 : 10, spread = flowering ? 0.26 : 0.36;
-  for (let i = 0; i < N; i++) {
-    const a = i * 2.39996 + rnd() * 0.9, d = i === 0 ? 0.03 : spread * (0.35 + 0.65 * Math.sqrt(rnd())), r = (far ? 0.13 : 0.08) + (far ? 0.1 : 0.12) * rnd();
-    const c = V(Math.cos(a) * d, top + 0.12 + 0.2 * rnd() - 0.22 * d * d, Math.sin(a) * d).add(lean);
-    if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.4)], [0.018, 0.007], 3, BARK);
-    k.mass(c, r, 0.45 + 0.35 * rnd(), !far && i < (flowering ? 4 : 3) ? 1 : 0, seed * 3.1 + i * 2.37, 2, flowering ? 0.2 + 0.55 * rnd() : 0);
+  const lean = V((rnd() - 0.5) * 0.12, 0, (rnd() - 0.5) * 0.12), forkY = (em ? 0.46 : fl ? 0.34 : 0.4) + 0.05 * rnd();
+  const fork = V(0, forkY, 0).add(lean), bark = em ? PALE_BARK : BARK, dab = fl ? 0.85 : 0;
+  k.tube([V(0, -0.06, 0), V(lean.x * 0.3 + 0.015, forkY * 0.5, lean.z * 0.3), fork], em ? [0.05, 0.032, 0.026] : [0.045, 0.03, 0.024], far ? 3 : 5, bark);
+  if (em && !far) for (let i = 0; i < 4; i++) { // buttresses: thin flanges flaring from the bole's foot
+    const a = (i / 4) * TAU + rnd(), o = V(Math.cos(a), 0, Math.sin(a)), nn = V(-o.z, 0, o.x);
+    k.tri(k.vert(V(0, 0.2, 0), nn, bark, 0, 0, WOOD, 0.8), k.vert(o.clone().multiplyScalar(0.13).setY(-0.03), nn, bark, 0, 0, WOOD, 0.6), k.vert(V(0, -0.03, 0), nn, bark, 0, 0, WOOD, 0.5));
   }
-  // the sub-canopy: a smaller tree to one side, its rounder crown lower and darker
-  const sa = rnd() * TAU, sub = V(Math.cos(sa) * 0.3, 0, Math.sin(sa) * 0.3);
-  if (!far) k.tube([sub.clone().setY(-0.04), sub.clone().setY(0.3)], [0.022, 0.014], 3, BARK);
-  for (let i = 0; i < (far ? 1 : 3); i++) k.mass(sub.clone().add(V((rnd() - 0.5) * 0.14, 0.34 + 0.08 * rnd(), (rnd() - 0.5) * 0.14)), 0.09 + 0.05 * rnd(), 0.8, 0, seed + 40 + i);
+  // the crown: billowing clumps, the largest high in the middle, the rest round it at stepped heights, wider and lower
+  // toward the rim (an emergent's in two tiers), each on a limb from the fork
+  const spread = em ? 0.46 : fl ? 0.3 : 0.4, top = em ? 0.93 : fl ? 0.8 : 0.86, C = far ? (em ? 3 : 2) : em ? 7 : 5;
+  const rims: THREE.Vector3[] = [];
+  for (let i = 0; i < C; i++) {
+    const a = i * 2.39996 + rnd() * 0.8, d = i === 0 && !em ? 0.02 : spread * (far ? (em ? 0.62 : 0.5) : 0.4 + 0.6 * Math.sqrt(rnd()));
+    // far: a broad crown in two or three billows, the lower one slung low over the bole (never a tuft on a pole)
+    const tier = (em && i >= 5) || (far && i === 1) ? 0.16 : 0, r = far ? (em ? 0.18 : i ? 0.21 : fl ? 0.25 : 0.27) : (i === 0 ? 0.2 : 0.11 + 0.08 * rnd()) * (em ? 0.85 : 1);
+    const c = V(Math.cos(a) * d, top - r * 0.6 - tier - (em ? 0.18 : 0.3) * (d / spread) ** 2 + 0.05 * rnd(), Math.sin(a) * d).add(lean);
+    if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
+    k.billow(c, r, em ? 0.66 : 0.74, far ? (i ? (em ? 1 : 0) : 2) : i ? 2 : 3, 0, seed * 3.1 + i * 2.37, dab, tier ? 0.8 : 1);
+    if (d > spread * 0.6) rims.push(c);
+  }
   if (far) return k;
-  // lianas looping down from the limbs, the understory's low masses and fern fronds at the feet
-  for (let i = 0; i < 3; i++) {
-    const a = rnd() * TAU, d = 0.12 + 0.18 * rnd(), x = Math.cos(a) * d + lean.x, zz = Math.sin(a) * d + lean.z;
-    k.tube([V(x, top + 0.05, zz), V(x * 1.05, top - 0.2 - 0.1 * rnd(), zz * 1.05), V(x * 1.1, 0.02, zz * 1.1)], [0.006, 0.005, 0.004], 3, ROOT);
+  // the sub-canopy under the rim (none under an emergent: the canopy round it is its own)
+  if (!em) {
+    const sa = rnd() * TAU, sub = V(Math.cos(sa) * 0.28, 0, Math.sin(sa) * 0.28);
+    k.tube([sub.clone().setY(-0.04), sub.clone().setY(0.26)], [0.02, 0.012], 3, BARK);
+    k.billow(sub.clone().setY(0.3 + 0.05 * rnd()), 0.15, 0.8, 1, 0, seed + 40, dab * 0.6, 0.75);
   }
-  for (let i = 0; i < 4; i++) {
-    const a = rnd() * TAU, d = 0.08 + 0.22 * rnd();
-    k.mass(V(Math.cos(a) * d, 0.05 + 0.04 * rnd(), Math.sin(a) * d), 0.06 + 0.06 * rnd(), 0.9, 0, seed + 60 + i);
+  // lianas: loops slung between limbs, sagging in a curve, and strands hanging from the rim in a slow S to a curl
+  const sling = (a: THREE.Vector3, b: THREE.Vector3, sag: number): void => {
+    const pts: THREE.Vector3[] = [];
+    for (let s = 0; s <= 4; s++) pts.push(a.clone().lerp(b, s / 4).setY(a.y + (b.y - a.y) * (s / 4) - sag * Math.sin((Math.PI * s) / 4)));
+    k.tube(pts, pts.map(() => 0.005), 3, ROOT);
+  };
+  for (let i = 0; i + 1 < rims.length && i < 2; i++) sling(rims[i].clone().setY(rims[i].y - 0.05), rims[i + 1].clone().setY(rims[i + 1].y - 0.05), 0.12 + 0.12 * rnd());
+  for (let i = 0; i < (em ? 3 : 1); i++) {
+    const a = rnd() * TAU, d = spread * (0.5 + 0.4 * rnd()), x = Math.cos(a) * d + lean.x, zz = Math.sin(a) * d + lean.z, y0 = top - 0.12;
+    const len = em ? 0.35 + 0.15 * rnd() : y0 - 0.06, pts: THREE.Vector3[] = [];
+    for (let s = 0; s <= 4; s++) {
+      const t = s / 4, sw = 0.035 * Math.sin(t * 4 + i);
+      pts.push(V(x + sw * Math.sin(a), y0 - len * t, zz - sw * Math.cos(a)));
+    }
+    const end = pts[4]; // the curl at its foot
+    pts.push(V(end.x + 0.025 * Math.cos(a), end.y + 0.015, end.z + 0.025 * Math.sin(a)));
+    k.tube(pts, pts.map((_, s) => 0.006 - 0.0005 * s), 3, ROOT);
   }
-  for (let f = 0; f < 3; f++) {
-    const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a)), base = h.clone().multiplyScalar(0.1 + 0.1 * rnd());
-    k.sheet(base, h.clone().multiplyScalar(0.16).addScaledVector(UP, 0.12), V(0, -0.1, 0), 0.04, 3, 0.55, 0.3, LEAF, 1);
+  if (em) return k;
+  // the understory: low billows, fern fronds and broad leaves at the feet, so no stem stands on bare ground
+  const sa0 = rnd() * TAU;
+  for (let i = 0; i < 2; i++) {
+    const a = sa0 + i * 2.1 + rnd(), d = 0.16 + 0.22 * rnd();
+    k.billow(V(Math.cos(a) * d, 0.08 + 0.05 * rnd(), Math.sin(a) * d), 0.11 + 0.05 * rnd(), 0.85, 1, 0, seed + 60 + i, 0, 0.7);
+  }
+  for (let f = 0; f < 2; f++) {
+    const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a)), base = h.clone().multiplyScalar(0.06 + 0.12 * rnd()), broad = f % 2 === 1;
+    k.sheet(base, h.clone().multiplyScalar(broad ? 0.12 : 0.17).addScaledVector(UP, broad ? 0.16 : 0.12), V(0, -0.1, 0), broad ? 0.05 : 0.035, 3, broad ? 0 : 0.55, 0.3, LEAF, 1);
+  }
+  return k;
+}
+
+/** The rainforest's strand, 1 tall, where it meets the beach: a pandanus (a leaning, forking trunk on a cone of stilt
+ *  roots, a spiky tuft of long drooping strap leaves at each branch's tip) rising out of a bank of strand scrub, low
+ *  billows of leaf spilling onto the sand, so the forest's edge comes down to the beach as a wall of leaf. */
+function pandanusKit(lod: number): Kit {
+  const k = new Kit(), far = lod > 0, tips = [V(0.2, 0.86, 0.05), V(-0.12, 0.92, -0.1), V(0.02, 0.74, 0.2)].slice(0, far ? 1 : 3);
+  const fork = V(0.06, 0.45, 0);
+  k.tube([V(0, 0.12, 0), V(0.03, 0.3, 0), fork], [0.03, 0.026, 0.022], 3, PALM_BARK);
+  if (!far) for (let i = 0; i < 4; i++) { // stilt roots splaying into the sand
+    const a = (i / 4) * TAU + 0.4;
+    k.tube([V(0, 0.16, 0), V(Math.cos(a) * 0.08, 0.06, Math.sin(a) * 0.08), V(Math.cos(a) * 0.13, -0.03, Math.sin(a) * 0.13)], [0.01, 0.009, 0.008], 3, PALM_BARK);
+  }
+  for (const [t, tip] of tips.entries()) {
+    k.tube([fork, V((fork.x + tip.x) / 2, (fork.y + tip.y) / 2 + 0.05, (fork.z + tip.z) / 2), tip], [0.02, 0.016, 0.013], 3, PALM_BARK);
+    const L = far ? 5 : 7;
+    for (let l = 0; l < L; l++) {
+      const az = l * 2.39996 + t, rise = 0.5 - 0.9 * ((l * 0.618) % 1), h = V(Math.cos(az), 0, Math.sin(az)), len = 0.3 + 0.08 * Math.sin(l * 1.9);
+      k.sheet(tip, h.clone().multiplyScalar(len).addScaledVector(UP, rise * len), V(0, -0.5 * len, 0), 0.022, far ? 2 : 3, 0.25, 0.5, LEAF, 1);
+    }
+  }
+  for (let i = 0; i < (far ? 1 : 4); i++) { // the strand scrub banked round its foot
+    const a = i * 2.4 + 0.7, d = 0.18 + 0.2 * ((i * 0.618) % 1), y = 0.07 + 0.1 * ((i * 0.38) % 1);
+    k.billow(V(Math.cos(a) * d, y, Math.sin(a) * d), 0.14 + 0.05 * ((i * 0.71) % 1), 0.8, far ? 1 : 2, 0, 70 + i * 3.3, 0, 0.8);
   }
   return k;
 }
@@ -360,8 +433,8 @@ export interface Species {
 
 export const FLORA: Record<FloraKind, Species> = {
   pine: { kit: pineKit, size: [2.0, 3.4], near: 55, far: 300, sway: 0.05 },
-  jungle: { kit: (l) => rainKit(l, false, 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
-  floweringTree: { kit: (l) => rainKit(l, true, 11), size: [1.9, 2.8], near: 42, far: 280, sway: 0.05 },
+  jungle: { kit: (l) => rainKit(l, 'canopy', 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
+  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [1.9, 2.8], near: 42, far: 280, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
   palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
@@ -371,10 +444,16 @@ export const FLORA: Record<FloraKind, Species> = {
   grass: { kit: () => tuftKit(false), size: [0.25, 0.45], near: 34, far: 0, sway: 0.3 },
   duneGrass: { kit: () => tuftKit(false), size: [0.3, 0.5], near: 34, far: 0, sway: 0.35 },
   reed: { kit: () => tuftKit(true), size: [0.5, 0.9], near: 40, far: 0, sway: 0.25 },
+  pandanus: { kit: pandanusKit, size: [1.5, 2.4], near: 45, far: 160, sway: 0.06 },
   kelp: { kit: kelpKit, size: [1.6, 2.4], near: 70, far: 0, sway: 0.22, veil: true },
   coral: { kit: coralKit, size: [0.35, 0.6], near: 120, far: 0, sway: 0, veil: true },
 };
 export const KINDS = Object.keys(FLORA) as FloraKind[];
+
+/** A rainforest tree's kit as geometry (the Spice Isles' emergents and flowering trees, in floraMaterial). */
+export function rainGeometry(form: RainForm, lod: number, seed: number): THREE.BufferGeometry {
+  return rainKit(lod, form, seed).geometry();
+}
 
 /** A species' kit as geometry (region packages draw hero plants with it and floraMaterial). */
 export function kitGeometry(kind: FloraKind, lod: number): THREE.BufferGeometry {
@@ -418,7 +497,7 @@ interface Cell { ground: Ground; height: number; up: number; inland: number; she
 export const TREES: readonly FloraKind[] = ['pine', 'jungle', 'floweringTree', 'cloudForest', 'treeFern'];
 /** Whether a land species takes the exact surface's ground: dune grass and palms the beach crest, reeds the mud, every other
  *  species open ground, rock and scree (mangroves stand in the tide, kelp and coral under it). */
-const grows = (kind: FloraKind, g: Ground): boolean => (kind === 'duneGrass' || kind === 'palm' ? g === GROUND.meadow || g === GROUND.beach
+const grows = (kind: FloraKind, g: Ground): boolean => (kind === 'duneGrass' || kind === 'palm' || kind === 'pandanus' ? g === GROUND.meadow || g === GROUND.beach
   : kind === 'reed' ? g === GROUND.mud || g === GROUND.meadow : g === GROUND.meadow || g === GROUND.rock || g === GROUND.scree);
 const wooded = (c: Cell): number => (c.up > 0.6 && c.inland > 1.2 && c.depth < -0.3
   ? smooth(0.6, 0.8, c.up) * Math.min(1.4, Math.max(0.12, 0.75 + 0.9 * c.shelter)) * (1 - smooth(0.6, 1, c.alt)) : 0);
@@ -433,6 +512,8 @@ function density(kind: FloraKind, c: Cell): number {
     case 'cloudForest': return 0.3 * wooded(c) * grove(0.15, 0.4) * (0.6 + c.alt);
     case 'treeFern': return 0.12 * wooded(c) * (1.2 - c.alt);
     case 'palm': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.65)) && c.inland > 0.3 && c.up > 0.75 ? 0.35 * (1 - smooth(1, 9, c.inland)) : 0;
+    // the rainforest's edge: pandanus and strand scrub along the top of the beach under the leaning palms
+    case 'pandanus': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.55)) && c.inland > 0.2 && c.up > 0.72 ? 0.6 * (1 - smooth(3, 8, c.inland)) : 0;
     case 'mangrove': return c.height > -0.7 && c.height < 1.8 && c.inland < 6 && c.up > 0.75 ? 0.25 : 0;
     case 'heather': return land && c.up > 0.66 && (g === GROUND.meadow || g === GROUND.rock || g === GROUND.scree)
       ? 0.3 * (0.25 + 0.75 * (1 - c.grove)) * (0.6 + Math.max(0, -c.shelter)) : 0;
@@ -465,6 +546,7 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
     case 'grass': return [to(fol, 'ochre', 0.25 + 0.35 * u), fol];
     case 'duneGrass': return [to(T('ochre'), 'malachite', 0.25 * u), fol];
     case 'reed': return [to(T('ochre'), 'umber', 0.35 * u), fol];
+    case 'pandanus': return [to(fol, u < 0.6 ? 'ochre' : 'verdigris', 0.15 + 0.25 * w), fol];
     case 'kelp': return [to(T('ochre'), 'malachite', 0.35 + 0.25 * u), fol];
     case 'coral': return [u < 0.35 ? to(T('ochre'), 'roseMadder', 0.55) : u < 0.7 ? to(T('roseMadder'), 'ultramarine', 0.3) : to(T('verdigris'), 'ochre', 0.35), T(w < 0.6 ? 'leadWhite' : 'ochre')]; // reef pigments: ochre-rose, lilac and sage, cream-white tips
   }
@@ -489,7 +571,8 @@ export interface Bed {
 export function plantBed(geo: Geography, field: TerrainField): Bed {
   const H = field.relief, peak = new Float32Array(REGIONS.length).fill(1);
   for (let c = 0; c < H.length; c++) peak[geo.region[c]] = Math.max(peak[geo.region[c]], H[c]);
-  const kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : [])]
+  const kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : []),
+    ...(r.flora.includes('jungle') ? ['pandanus' as const] : [])]
     .map((k) => KINDS.indexOf(k)));
   const keys: number[] = [], kindOf: number[] = [], mats: number[] = [], cols: number[] = [], seeds: number[] = [];
   const dir = v3(), surf: Surface = { height: 0, normal: V(), up: 1, ground: GROUND.meadow, region: 0 }, towns = townsOf(geo);
@@ -532,7 +615,7 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
             X.copy(nrm).addScaledVector(P, -nrm.dot(P)); // downhill
             if (X.lengthSq() < 1e-10) X.set(-P.z, 0, P.x);
             X.normalize();
-            if (kind === 'palm') Y.addScaledVector(X, 0.12 + 0.2 * z); // palms lean out over the shore
+            if (kind === 'palm' || kind === 'pandanus') Y.addScaledVector(X, (kind === 'palm' ? 0.12 : 0.05) + 0.2 * z); // palms lean out over the shore
             Y.normalize();
             X.addScaledVector(Y, -X.dot(Y)).normalize();
             if (kind !== 'palm') X.applyAxisAngle(Y, z * TAU);
@@ -600,6 +683,9 @@ out vec3 vUp;
 out float vFade;
 out float vDepth;
 out float vEdge;
+out float vBlossom;
+out vec3 vBloom;
+out vec3 vSil;
 void main() {
   mat4 model = modelMatrix * instanceMatrix;
   vec3 root = model[3].xyz, up = normalize(root);
@@ -608,7 +694,9 @@ void main() {
   wdir /= max(length(wdir), 1e-4);
   vec3 side = cross(up, wdir);
   vec4 w = model * vec4(position, 1.0);
-  vNormal = normalize(mat3(model) * normal);
+  // a leaf mass carries its sphere's normal (its outline's), and is lit as a soft dome lifted toward the light
+  vSil = normalize(mat3(model) * normal);
+  vNormal = aPart.y > 0.5 && aPart.y < 1.5 ? normalize(mat3(model) * normalize(normal + vec3(0.0, 0.3, 0.0))) : vSil;
   // gusts ripple downwind across the canopies
   float gust = 0.5 + 0.5 * sin(dot(root, wdir) * 0.42 - t * 2.4 + 1.3 * sin(dot(root, side) * 0.23 + t * 0.37));
 #ifdef VEIL
@@ -641,7 +729,9 @@ void main() {
   vWorld = w.xyz;
   vUp = up;
   vPart = aPart;
-  vPaint = vec4(aTint > 1.5 ? aBloom : aTint > 0.5 ? aFoliage : aPaint.rgb, aPaint.w);
+  vPaint = vec4(aTint > 0.5 ? aFoliage : aPaint.rgb, aPaint.w);
+  vBlossom = aTint > 0.5 ? aTint - 1.0 : 0.0;
+  vBloom = aBloom;
   float dist = distance(cameraPosition, root), o1 = min(uBand.w, max(aSeed.y * uCut.x, uCut.y)), o0 = min(uBand.z, o1 * 0.8);
   vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist)) * seen;
   gl_Position = projectionMatrix * viewMatrix * w;
@@ -661,7 +751,11 @@ in vec3 vUp;
 in float vFade;
 in float vDepth;
 in float vEdge;
+in float vBlossom;
+in vec3 vBloom;
+in vec3 vSil;
 uniform float uFar;
+uniform vec3 uOchre;
 uniform float uSeed;
 uniform vec3 uWater;
 float fhash(vec3 p) {
@@ -669,12 +763,35 @@ float fhash(vec3 p) {
   p += dot(p, p.yxz + 33.33);
   return fract((p.x + p.y) * p.z);
 }
+float vnoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(fhash(i), fhash(i + vec3(1, 0, 0)), f.x), mix(fhash(i + vec3(0, 1, 0)), fhash(i + vec3(1, 1, 0)), f.x), f.y),
+    mix(mix(fhash(i + vec3(0, 0, 1)), fhash(i + vec3(1, 0, 1)), f.x), mix(fhash(i + vec3(0, 1, 1)), fhash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+// blossom as a watercolourist dabs it over the crown's green: soft-edged dabs of many sizes (world-anchored cells, some
+// left bare as the weight allows), a few ochre among the vermilion; once a dab shrinks toward a pixel it melts into the
+// wash it averages to, so a flowering crown reads as a warm blush from afar (S-020: never facets)
+float blossomAt(vec3 p, float w, out float other) {
+  float b = 0.0;
+  other = 0.0;
+  for (int o = 0; o < 3; o++) {
+    vec3 c = p * (o == 0 ? 2.4 : o == 1 ? 5.0 : 11.0), cell = floor(c);
+    vec3 j = vec3(fhash(cell + 3.1), fhash(cell + 5.7), fhash(cell + 8.3)) - 0.5;
+    float r = length(fract(c) - 0.5 - 0.35 * j), rr = 0.24 + 0.2 * fhash(cell + 11.9), px = length(fwidth(c));
+    float d = smoothstep(rr + 0.5 * px + 0.06, rr - 0.08, r) * step(fhash(cell + 13.3), w * (o == 0 ? 0.7 : o == 1 ? 0.95 : 0.8));
+    d = mix(d, w * 0.55, smoothstep(0.7, 1.4, px));
+    other = max(other, d * step(0.72, fhash(cell + 17.7)));
+    b = max(b, d);
+  }
+  return w > 0.99 ? 1.0 : max(b, 0.1 * w);
+}
 void main() {
   vec3 v = normalize(cameraPosition - vWorld), n = normalize(vNormal);
   if (vPart.y > 1.5 && dot(n, v) < 0.0) n = -n; // a thin sheet is lit from the side it is seen
   Paper q = paperAt(vWorld, n, 1.0);
 #ifdef VEIL
-  vec3 col = glaze(parchment(q), vPaint.rgb, vPaint.w, 0.35, q);
+  vec3 col = glaze(parchment(q), mix(vPaint.rgb, vBloom, clamp(vBlossom, 0.0, 1.0)), vPaint.w, 0.35, q);
   col = mix(col, hatchInk(0.15), 0.6 * smoothstep(0.5, 0.9, vEdge));
   float d = max(vDepth, 0.0);
   col = glaze(col, uWater, 0.75 * (1.0 - exp(-d * 0.6)), 0.3, q); // tinted by the water over it, never garnish (WP17)
@@ -683,11 +800,21 @@ void main() {
   // levels and thinning dissolve by a stipple anchored to the world: the far level fills what the near one leaves
   float h = fhash(floor(vWorld * 9.0));
   if (uFar < 0.5 ? h >= vFade : h < 1.0 - vFade) discard;
+  if (vPart.y > 0.5 && vPart.y < 1.5) {
+    // a leaf mass's outline breaks into rounded clumps of leaf where it turns from the eye (never a polygon's edge),
+    // the clumps world-anchored and gone before they shrink below a few pixels
+    // (its sphere's normal's turn from the eye traces a rounded outline inside the facets', bitten by the clumps)
+    vec3 lc = vWorld * 3.4;
+    float nv = dot(normalize(vSil), v), rim = sqrt(max(0.0, 1.0 - nv * nv)), nz = 0.6 * vnoise(lc) + 0.4 * vnoise(lc * 2.7 + 7.0), lpx = length(fwidth(lc));
+    if (rim > mix(0.56 + 0.42 * nz, 1.1, smoothstep(0.35, 0.9, lpx))) discard;
+  }
+  float other = 0.0, bloom = vBlossom > 0.01 ? blossomAt(vWorld, vBlossom, other) : 0.0;
+  vec3 pig = mix(vPaint.rgb, mix(vBloom, uOchre, other * 0.8), bloom);
   vec3 side = normalize(cross(vUp, abs(vUp.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec2 hc = vec2(dot(vWorld, vUp), dot(vWorld, side) + 0.7 * dot(vWorld, cross(vUp, side)));
   vec2 hdx = dFdx(hc), hdy = dFdy(hc);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v))) * mix(0.45, 1.0, vPart.z);
-  vec3 col = glaze(parchment(q), vPaint.rgb, vPaint.w, washPool(n, v, q), q);
+  vec3 col = glaze(parchment(q), pig, vPaint.w, washPool(n, v, q), q);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed));
   if (vPart.y > 0.5) {
@@ -727,7 +854,7 @@ export function floraMaterial(style: Style, swell: Swell, o: FloraMaterialOption
   return inkMaterial(style, {
     vertexShader: VERT, fragmentShader: FRAG, defines: o.veil ? { VEIL: true } : {}, id: o.id, veil: o.veil, side: THREE.DoubleSide,
     uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 },
-      uSeed: { value: 3.7 }, uWater: { value: T('verdigris') } },
+      uSeed: { value: 3.7 }, uWater: { value: T('verdigris') }, uOchre: { value: T('ochre') } },
   });
 }
 

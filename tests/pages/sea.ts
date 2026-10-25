@@ -67,7 +67,7 @@ const weeping = new WeepingIsle(style, terrain.field, sea.swell);
 scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group, amberShoals.group, weeping.group);
 const coral = new CoralAtolls(style, terrain.field, sea.swell); // WP17 part A
 scene.add(coral.group);
-const spice = new SpiceIsles(style, terrain.field); // WP17 part B
+const spice = new SpiceIsles(style, terrain.field, sea.swell); // WP17 part B
 scene.add(spice.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch

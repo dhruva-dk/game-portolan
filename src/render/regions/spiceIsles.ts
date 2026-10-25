@@ -2,9 +2,9 @@
 // main island. The terrain draws the volcanic islands and their beaches and the shared flora their jungle; this module
 // layers the forest and builds the harbour, every piece placed from the sim's own heights and seated on the drawn
 // ground, none of it in a hull's water (tested). The forest: emergent trees standing out of the canopy on pale
-// buttressed boles, their flat crowns hung with lianas; flowering trees in vermilion and in ochre, their blossom on
-// the crowns' sunlit tops, clustered into blooming groves; the forest edge banked up behind every beach as a wall of
-// understory. Spice Harbour, the region's mark from orbit: a cut-stone quay round the landward side of the anchorage
+// buttressed boles, their broad two-tiered crowns of billowing clumps hung with lianas; flowering trees in vermilion
+// and in ochre, their blossom in soft dabs thickest on the crowns' sunlit tops, clustered into blooming groves (both the
+// shared flora's rainforest kits, in its material); the forest's edge is the flora's strand. Spice Harbour, the region's mark from orbit: a cut-stone quay round the landward side of the anchorage
 // (the mole and its lamp are structures.ts'), an apron of spice sacks and bales and drying beds heaped with mace,
 // turmeric and cloves, and behind it a crescent of open godowns under hipped vermilion-tiled roofs, each on a masonry
 // plinth, its bays stacked with sacks (well kept, of unknown origin, no doors, signs or dwellings, as the harbours are).
@@ -12,11 +12,14 @@
 // and loudness, and the harbour), `plan.quay`/`plan.berths` (the harbour's quay line and the water off it, for cameras,
 // captures and the gull's landfall).
 import * as THREE from 'three';
-import { illustratedMaterial, type Style } from '../../style/glsl.ts';
-import { mix, PIGMENTS } from '../../style/palette.ts';
+import { illustratedMaterial, transmittanceVec, type Style } from '../../style/glsl.ts';
+import { mix, PIGMENTS, type RGB } from '../../style/palette.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
 import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
+import { floraMaterial, rainGeometry, type RainForm } from '../flora.ts';
+import { seas } from '../sea.ts';
 import { MOLE } from '../structures.ts';
+import type { Swell } from '../swell.ts';
 import { GROUND, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
 import type { RenderContext, RenderModule } from '../world.ts';
 import { chartDir, Draw, Kit, lift, pose, regionSeen, seeded, vec, type V, washOf, type Wash } from './kit.ts';
@@ -125,82 +128,6 @@ const foliage = (c: V, n: V): Wash => {
   const h = hash(Math.round(c.x * 40), Math.round(c.y * 40), Math.round(c.z * 40));
   return n.y < -0.3 ? W.leafShade : n.y > 0.45 ? (h < 0.35 ? W.leafLit : h < 0.7 ? W.leafSun : W.leaf) : h < 0.25 ? W.leafCool : h < 0.5 ? W.leafShade : W.leaf;
 };
-
-/** An emergent 1 tall: a pale bole flared into buttresses, limbs fanning out high, a broad flat crown of leaf masses
- *  standing clear of the canopy, lianas hanging from it (far: the bole and three masses). */
-function emergentKit(seed: number, far: boolean): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.bole), n = far ? 2 : 6, path: V[] = [], radii: number[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = (i / n) * 0.78;
-    path.push(vec(0.02 * Math.sin(t * 6 + seed), t, 0.03 * Math.sin(t * 4 + 2 * seed)));
-    radii.push(i === 0 ? 0.045 : 0.032 - 0.014 * t);
-  }
-  b.pick = (c) => (hash(Math.round(c.y * 30), seed) < 0.25 ? W.boleDark : W.bole);
-  b.tube(path, radii, far ? 3 : 6);
-  const top = path[n], masses = far ? 3 : 7, R0 = 0.24 + 0.05 * rnd();
-  if (!far) {
-    // buttresses: thin flanges at the foot
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * TAU + rnd(), o = vec(Math.cos(a), 0, Math.sin(a));
-      b.tri(vec(0, 0.16, 0), o.clone().multiplyScalar(0.12).setY(-0.02), vec(0, -0.02, 0));
-    }
-    b.pick = null;
-    b.wash = W.boleDark;
-    for (let k = 0; k < 5; k++) {
-      const a = (k / 5) * TAU + rnd(), end = vec(Math.cos(a) * R0 * 0.8, top.y + 0.1 + 0.05 * rnd(), Math.sin(a) * R0 * 0.8);
-      b.tube([top.clone().setY(top.y - 0.06), top.clone().lerp(end, 0.5).setY(top.y + 0.06), end], [0.014, 0.01, 0.006], 3);
-    }
-    // lianas hung from the crown's rim, twisting down past the canopy
-    b.wash = W.liana;
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * TAU + 0.6 + rnd(), r0 = R0 * (0.7 + 0.2 * rnd()), drop = 0.3 + 0.25 * rnd();
-      let prev = vec(Math.cos(a) * r0, top.y + 0.04, Math.sin(a) * r0);
-      for (let i = 1; i <= 4; i++) {
-        const p = vec(Math.cos(a) * (r0 - 0.02 * i) + 0.01 * Math.sin(i * 2 + k), top.y + 0.04 - (drop * i) / 4, Math.sin(a) * (r0 - 0.02 * i));
-        const side = vec(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.005);
-        b.quad(prev.clone().sub(side), prev.clone().add(side), p.clone().add(side), p.clone().sub(side));
-        prev = p;
-      }
-    }
-  }
-  b.pick = foliage;
-  for (let k = 0; k < masses; k++) {
-    const a = (k / masses) * TAU + rnd(), r = k === 0 ? 0 : R0 * (0.55 + 0.35 * rnd());
-    const c = vec(Math.cos(a) * r, top.y + 0.13 + 0.05 * rnd() - 0.04 * (r / R0), Math.sin(a) * r), s = 0.12 + 0.05 * rnd();
-    b.mass(c, vec(s * 1.25, s * 0.5, s * 1.25), far ? 5 : 6, far ? 3 : 4, seed * 13 + k);
-  }
-  return b.build();
-}
-
-/** A flowering tree 1 tall: a short forked trunk under a rounded crown, its sunlit top in blossom (vermilion or
- *  ochre), green through the shade beneath. */
-function flowerKit(seed: number, gold: boolean, far: boolean): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.boleDark), n = far ? 1 : 3, path: V[] = [], radii: number[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = (i / n) * 0.5;
-    path.push(vec(0.04 * Math.sin(t * 5 + seed), t, 0));
-    radii.push(0.045 - 0.03 * t);
-  }
-  b.tube(path, radii, far ? 3 : 5);
-  if (!far) for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * TAU + rnd();
-    b.tube([path[n], vec(Math.cos(a) * 0.2, 0.68, Math.sin(a) * 0.2)], [0.02, 0.01], 3);
-  }
-  // blossom as a watercolourist dabs it: broken vermilion and ochre over the green, thick in drifts across the crown
-  // and thin between them, more on the sunward top (S-020: never a red ball)
-  const [hot, pale, other] = gold ? [W.gold, W.goldPale, W.bloom] : [W.bloom, W.bloomPale, W.gold];
-  b.pick = (c, nn) => {
-    const h = hash(Math.round(c.x * 60), Math.round(c.y * 60), Math.round(c.z * 60) + seed);
-    const drift = 0.5 + 0.5 * Math.sin(c.x * 13 + seed) * Math.sin(c.z * 11 - 2 * seed) * Math.cos(c.y * 9), dens = (0.1 + 0.5 * drift) * (0.45 + 0.75 * Math.max(0, nn.y));
-    return h < dens * 0.55 ? hot : h < dens * 0.8 ? pale : h < dens ? other : foliage(c, nn);
-  };
-  const masses = far ? 4 : 9;
-  for (let k = 0; k < masses; k++) {
-    const a = (k / masses) * TAU * 1.6 + rnd(), r = k === 0 ? 0.02 : 0.26 * (0.35 + 0.65 * rnd()), s = 0.09 + 0.12 * rnd();
-    b.mass(vec(Math.cos(a) * r, 0.7 + 0.14 * rnd() - 0.5 * r * r, Math.sin(a) * r), vec(s, s * (0.55 + 0.3 * rnd()), s * (0.8 + 0.4 * rnd())), far ? 5 : 6, far ? 3 : 4, seed * 7 + k);
-  }
-  return b.build();
-}
 
 /** The forest edge 1 tall: understory banked into a wall, broad leaves and lower masses. */
 export function edgeKit(seed: number): THREE.BufferGeometry {
@@ -432,7 +359,7 @@ export function planSpice(field: TerrainField): SpicePlan {
       }
       if (!clear(px, py, 2)) continue;
       if (r < 0.07) {
-        const p = place(plan.emergents, px, py, { sink: 0.15, fwd, yaw: fr() * TAU, tilt: 0.04 * (fr() - 0.5), s: 5.2 + 1.8 * fr(), kitH: 0.95, reach: 1.8 });
+        const p = place(plan.emergents, px, py, { sink: 0.15, fwd, yaw: fr() * TAU, tilt: 0.04 * (fr() - 0.5), s: 4.6 + 1.6 * fr(), kitH: 0.95, reach: 1.8 });
         if (plan.birds.length < 80 && fr() < 0.5) plan.birds.push(lift(dir, p.top));
       } else if (r < 0.07 + 0.32 * grove * grove) {
         const gold = Math.sin(0.33 * px + 0.7) * Math.cos(0.29 * py - 0.4) > 0.1;
@@ -461,11 +388,12 @@ export class SpiceIsles {
   readonly voices: readonly { at: V; loud: number; kind: 'jungle' | 'harbour' }[];
   private readonly material: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
-  /** [draw, parts, from, to (u from the eye)] */
-  private readonly lod: [Draw, Part[], number, number][];
+  /** [draw, parts, from, to (u from the eye), each part's foliage, blossom and seed (the flora material's)] */
+  private readonly lod: [Draw, Part[], number, number, Float32Array][];
+  private readonly trees: THREE.ShaderMaterial[];
   private readonly seen = vec(1e9, 0, 0);
 
-  constructor(style: Style, field: TerrainField) {
+  constructor(style: Style, field: TerrainField, swell: Swell) {
     const plan = (this.plan = planSpice(field));
     this.birds = plan.birds;
     this.voices = plan.voices;
@@ -475,12 +403,31 @@ export class SpiceIsles {
     this.material.polygonOffsetUnits = -2;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), [...plan.quays, ...plan.walls, ...plan.mole]), fixed(heapKit(5), plan.heaps), fixed(stairKit(), plan.stairs)];
-    const lod: [THREE.BufferGeometry, Part[], number, number][] = [
-      [emergentKit(17, false), plan.emergents, 0, SPICE.near], [emergentKit(17, true), plan.emergents, SPICE.near, SPICE.far],
-      [flowerKit(21, false, false), plan.flowers[0], 0, SPICE.near], [flowerKit(21, false, true), plan.flowers[0], SPICE.near, SPICE.far],
-      [flowerKit(27, true, false), plan.flowers[1], 0, SPICE.near], [flowerKit(27, true, true), plan.flowers[1], SPICE.near, SPICE.far]];
-    // the understory bank (edgeKit) read as flat dark mounds at the beach: left out until a finer kit reads as leaves
-    this.lod = lod.map(([kit, parts, from, to]) => [new Draw(kit, this.material, parts.length), parts, from, to]);
+    // the trees are the shared flora's rainforest kits in its material (bending in the wind, blossom in soft dabs,
+    // leaf outlines broken into clumps), whole near the eye and sketched further off, dissolving between by its stipple
+    const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04 });
+    const far = floraMaterial(style, swell, { band: new THREE.Vector4(SPICE.near * 0.85, SPICE.near, SPICE.far * 0.8, SPICE.far), sway: 0.04, far: true,
+      id: near.uniforms.uInkId.value as number });
+    this.trees = [near, far];
+    const T = (c: RGB): THREE.Vector3 => transmittanceVec(c), tint = (parts: Part[], k: number): Float32Array => {
+      const t = new Float32Array(parts.length * 8);
+      parts.forEach((p, i) => {
+        const u = hash(p.at.x * 9, p.at.z * 9, k), w = hash(p.at.y * 9, p.at.x * 7, k + 1);
+        const fo = T(mix(PIGMENTS.malachite, u < 0.5 ? PIGMENTS.verdigris : PIGMENTS.ochre, 0.1 + 0.3 * w));
+        const bl = k === 0 ? fo : T(mix(k === 1 ? PIGMENTS.vermilion : PIGMENTS.ochre, PIGMENTS.roseMadder, 0.25 * u));
+        t.set([fo.x, fo.y, fo.z, bl.x, bl.y, bl.z, w, SPICE.far], i * 8);
+      });
+      return t;
+    };
+    const lod: [RainForm, number, Part[], number, number, number][] = [
+      ['emergent', 17, plan.emergents, 0, SPICE.near, 0], ['emergent', 17, plan.emergents, SPICE.near * 0.85, SPICE.far, 0],
+      ['flowering', 21, plan.flowers[0], 0, SPICE.near, 1], ['flowering', 21, plan.flowers[0], SPICE.near * 0.85, SPICE.far, 1],
+      ['flowering', 27, plan.flowers[1], 0, SPICE.near, 2], ['flowering', 27, plan.flowers[1], SPICE.near * 0.85, SPICE.far, 2]];
+    this.lod = lod.map(([form, seed, parts, from, to, k]) => {
+      const g = rainGeometry(form, from ? 1 : 0, seed).toNonIndexed();
+      for (const [name, size] of [['aFoliage', 3], ['aBloom', 3], ['aSeed', 2]] as const) g.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, parts.length) * size), size));
+      return [new Draw(g, from ? far : near, parts.length), parts, from, to, tint(parts, k)];
+    });
     this.group.add(...this.draws.map((d) => d.mesh));
   }
 
@@ -493,12 +440,20 @@ export class SpiceIsles {
     this.group.visible = regionSeen(RI, eye, 90);
     if (!this.group.visible || eye.distanceToSquared(this.seen) < 2.25) return;
     this.seen.copy(eye);
-    for (const [d, parts, from, to] of this.lod) {
+    for (const [d, parts, from, to, tint] of this.lod) {
+      const g = d.mesh.geometry, [fo, bl, sd] = ['aFoliage', 'aBloom', 'aSeed'].map((k) => (g.getAttribute(k) as THREE.InstancedBufferAttribute).array as Float32Array);
+      let n = 0;
       d.begin();
-      for (const p of parts) {
+      parts.forEach((p, i) => {
         const r2 = eye.distanceToSquared(p.at);
-        if (r2 >= from * from && r2 < to * to) d.add(p.m);
-      }
+        if (r2 < from * from || r2 >= to * to) return;
+        d.add(p.m);
+        fo.set(tint.subarray(i * 8, i * 8 + 3), n * 3);
+        bl.set(tint.subarray(i * 8 + 3, i * 8 + 6), n * 3);
+        sd.set(tint.subarray(i * 8 + 6, i * 8 + 8), n * 2);
+        n++;
+      });
+      for (const k of ['aFoliage', 'aBloom', 'aSeed']) g.getAttribute(k).needsUpdate = true;
       d.end();
     }
   }
@@ -509,15 +464,16 @@ export class SpiceIsles {
 
   dispose(): void {
     this.material.dispose();
+    for (const m of this.trees) m.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
 }
 
 /** The composition root's Spice Isles (MODULES): the layered jungle and Spice Harbour's quay, apron and godowns. */
 export function createSpiceIsles(ctx: RenderContext): RenderModule {
-  const terrain = terrains.get(ctx.scene);
-  if (!terrain) throw new Error('createSpiceIsles: the terrain is built first (MODULES order)');
-  const spice = new SpiceIsles(ctx.pipeline.style, terrain.field);
+  const terrain = terrains.get(ctx.scene), sea = seas.get(ctx.scene);
+  if (!terrain || !sea) throw new Error('createSpiceIsles: the sea and the terrain are built first (MODULES order)');
+  const spice = new SpiceIsles(ctx.pipeline.style, terrain.field, sea.swell);
   ctx.scene.add(spice.group);
   return {
     frame() {
