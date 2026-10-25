@@ -704,7 +704,8 @@ void main() {
   float mud = max(shore.w, 0.0), reef = f.w * (1.0 - smoothstep(TIDE_AMP, TIDE_AMP + 0.3, f.x + bleed * 4.0));
   float bleached = max(-shore.w, 0.0), reefInk = 0.0, reefShade = 0.0;
   if (reef > 0.01) {
-    // near the eye a living reef pavement, never a smooth slab: warm cream-ochre limestone pitted all over (each pit
+    // near the eye a living reef pavement, never a smooth slab: warm cream-ochre limestone (little lead grey, its turf
+    // a light olive-ochre film, so it never reads taupe) pitted all over (each pit
     // a small inked hollow), coralline rose in patches, bleached rubble lying in knobs and drifts each drawn round on
     // its shaded side, and pools that keep the sea's turquoise inside an inked rim; its flanks broken and shaded, so
     // the edge into the water reads as a ragged lip, not a pale cliff. Wet, it darkens warm under thin water.
@@ -712,13 +713,13 @@ void main() {
     float m1 = noise3(vWorld / 6.0), m2 = fine * noise3(vWorld / 1.2 + 3.0);
     float m3 = noise3(vWorld / 3.0 + 11.0);
     float edge = (1.0 - smoothstep(0.6, 2.8, -f.y + 1.2 * m1)) * smoothstep(-0.5, 0.1, m3 + 0.3 * m2);
-    float turf = smoothstep(0.0, 0.4, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
+    float turf = smoothstep(0.15, 0.55, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
     float bare = smoothstep(0.1, 0.5, m3 - 0.3 * m1) * (1.0 - edge) * (1.0 - turf);
-    vec3 pave = glaze(ground * 1.03, OCHRE_T, mix(0.13, 0.12, fine) + 0.05 * m1, pool, q);
-    pave = mix(pave, ground * LEAD / PARCH, 0.2 * fine + 0.25 * bare);
+    vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.17, 0.15, fine) + 0.05 * m1, pool, q);
+    pave = mix(pave, ground * LEAD / PARCH, 0.08 * fine + 0.12 * bare);
     float blush = max(edge, fine * smoothstep(0.12, 0.42, m2 - 0.35 * m1));
     pave = glaze(pave, ROSE_T, mix(0.55, 0.24, fine) * blush, 0.0, q);
-    pave = glaze(glaze(pave, SEPIA_T, mix(0.3, 0.08, fine) * turf, 0.0, q), OCHRE_T, mix(0.2, 0.12, fine) * turf, 0.0, q);
+    pave = glaze(glaze(pave, SEPIA_T, mix(0.1, 0.05, fine) * turf, 0.0, q), OCHRE_T, mix(0.16, 0.1, fine) * turf, 0.0, q);
     // pools, a pace or two across, low on the flat: the sea's turquoise inside an inked rim
     float pv = noise3(vWorld / 1.7 + 17.0) + 0.25 * m2 - 0.6 * smoothstep(-0.1, 0.35, above);
     float poolK = fine * smoothstep(0.4, 0.46, pv);

@@ -41,7 +41,7 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['weeping-orbit', { view: 'orbit', region: 'Weeping', hour: '9' }],
   ['weeping-night', { view: 'weeping', hour: '22' }],
   ['weeping-rain', { view: 'weeping', hour: '7', squall: '1' }],
-  ['coral-hero', { view: 'coral', hour: '12', tide: '0.1' }],
+  ['coral-hero', { view: 'coral', hour: '12', tide: '0.1', off: '-14' }], // 14 u in from the rim's crest: the lagoon before the pass
   ['coral-shore', { view: 'coralshore', hour: '15', tide: '-0.2' }],
   ['coral-high', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1' }],
   ['coral-orbit', { view: 'orbit', region: 'Coral', hour: '12', tide: '0.1' }],

@@ -228,12 +228,12 @@ function arc(cx: number, cy: number, r: number, a0: number, a1: number): number[
 }
 
 // The Coral Atolls' rings (knots: bearing, radius, width, crest), shared by their strokes and their motu.
-/** The Great Lagoon: its windward reef flat up to 9 u broad, its leeward rim a narrow causeway, one channel in from the
- *  south-south-west; the reef always awash, never a hull's water. */
+/** The Great Lagoon: its windward reef flat up to 9 u broad, its algal ridge dry at half tide; its leeward rim a narrow
+ *  flat under a film of water at half tide; one channel in from the south-south-west; never a hull's water. */
 const GREAT = reef(8, 6, [
   0, 25, 4.5, 0.4, 25, 26.5, 6, 0.45, 55, 27.5, 7.5, 0.45, 80, 30, 8, 0.45, 104, 29.5, 8, 0.45, 126, 27, 6.5, 0.45,
-  144, 29.5, 7.5, 0.45, 163, 28, 6, 0.4, 174, 24.5, 5, 0.4, 192, 23.5, 4, 0.35, 205, 23.5, 4, 0.35, 220, 24, 3.6, 0.3,
-  242, 27, 3.4, 0.3, 268, 26, 3.2, 0.3, 294, 23, 3.2, 0.3, 318, 24.5, 3.6, 0.35, 338, 23, 3.8, 0.4,
+  144, 29.5, 7.5, 0.45, 163, 28, 6, 0.4, 174, 24.5, 5, 0.3, 192, 23.5, 4, 0.15, 205, 23.5, 4, 0.15, 220, 24, 3.6, 0.15,
+  242, 27, 3.4, 0.15, 268, 26, 3.2, 0.2, 294, 23, 3.2, 0.25, 318, 24.5, 3.6, 0.3, 338, 23, 3.8, 0.4,
 ], [gap(205, 4.6)], { lagoon: 4.5, great: true });
 /** South-west: nearly closed, a long motu to windward, its harbour inside the channel from the east. */
 const SW_ATOLL = reef(-40, -30, [
