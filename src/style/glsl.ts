@@ -171,16 +171,26 @@ struct Paper { float fibre; float grain; float mottle; float bloom; float fox; f
 
 // The parchment at anchor-frame point p with anchor-frame normal n. marks scales the stains and foxing (1 on the
 // planet; less on small objects, where a spot would look like damage). Call outside any branch (derivatives).
-Paper paperAt(vec3 p, vec3 n, float marks) {
-  vec3 w = triWeights(n, 4.0);
+// The paper's grain fields (fibre, grain, mottle, bloom) at p, triplanar weights w.
+vec4 paperGrain(vec3 p, vec3 w) {
   float upx = max(length(dFdx(p)), length(dFdy(p)));             // anchor units per render pixel
   float k = log2(max(upx * uRenderPx * PAPER_TILE, 1e-5));
   float lo = floor(k), f = k - lo, s0 = exp2(lo);
   float lod = max(log2(512.0 / (PAPER_TILE * uRenderPx)), 0.0);  // the tile always spans PAPER_TILE CSS px
   vec4 g = mix(triLod(tPaper, p / s0, w, lod), triLod(tPaper, p / (2.0 * s0) + 0.371, w, lod), f);
   g = (g - 0.5) * inversesqrt(f * f + (1.0 - f) * (1.0 - f)) + 0.5; // two independent octaves average to less contrast
+  return g;
+}
+Paper paperAt(vec3 p, vec3 n, float marks) {
+  vec3 w = triWeights(n, 4.0);
+  vec4 g = paperGrain(p, w);
   vec4 m0 = tri(tMarks, p / MARK_SCALES.x, w), m1 = tri(tMarks, p / MARK_SCALES.y + 0.5, w);
   return Paper(g.r, g.g, g.b, g.a, max(m0.r, m1.r * 0.75) * marks, max(m0.g, m1.g) * marks);
+}
+// paperAt(p, n, 0.0) without the marks' six taps, for what never carries stains or foxing (veils, WP30a).
+Paper paperPlain(vec3 p, vec3 n) {
+  vec4 g = paperGrain(p, triWeights(n, 4.0));
+  return Paper(g.r, g.g, g.b, g.a, 0.0, 0.0);
 }
 
 // Bare parchment (linear) under the hour's light: fibre and mottle, water stains, foxing.
@@ -201,6 +211,7 @@ float granulation(Paper q, float density) { return 1.0 + (q.grain - 0.5) * 0.55 
 // the drying pigment gathered.
 const float GLAZE_FLOOR = 0.2;
 vec3 glaze(vec3 ground, vec3 t, float d, float pool, Paper q) {
+  if (d <= 0.0) return ground; // nothing laid (the wash below would multiply by t⁰ = 1): often a whole surface (WP30a)
   d = min(d, log(GLAZE_FLOOR) / log(clamp(dot(t, vec3(0.2126, 0.7152, 0.0722)), 1e-3, 0.999)));
   float bloom = smoothstep(0.64, 0.68, q.bloom) * smoothstep(0.3, 0.9, d);
   float load = (1.0 + (q.mottle - 0.5) * 0.35 + (q.bloom - 0.5) * 0.2)

@@ -232,6 +232,63 @@ const hook = {
     pipeline.render(view.scene, camera, 1 / 60);
     return out;
   },
+  /**
+   * WP30a: GPU ms of each pass of a frame (median over `frames`: a timer query around every renderer.render call — scene,
+   * edges, composite, interface), then the scene pass with each top-level group hidden in turn (its cost is the
+   * difference). Null without EXT_disjoint_timer_query_webgl2. Driven by tests/render/gpu.timing.ts.
+   */
+  async profile(frames = 30) {
+    const gl = pipeline.renderer.getContext() as WebGL2RenderingContext, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    if (!ext) return null;
+    const r = pipeline.renderer, plain = r.render.bind(r), next = () => new Promise((done) => requestAnimationFrame(done));
+    let open = false, capture: [string, WebGLQuery][] | null = null;
+    r.render = (s: THREE.Object3D, c: THREE.Camera) => {
+      if (open || !capture) return plain(s, c);
+      const q = gl.createQuery()!, quads = capture.filter(([k]) => k !== 'scene' && k !== 'ui').length;
+      open = true;
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+      plain(s, c);
+      gl.endQuery(ext.TIME_ELAPSED_EXT);
+      open = false;
+      capture.push([s === view.scene ? 'scene' : s === pipeline.ui ? 'ui' : (['edges', 'mask', 'composite', 'present'][quads] ?? 'other'), q]);
+    };
+    const run = async (n: number) => {
+      const per: Record<string, number[]> = {};
+      for (let k = 0; k < n; k++) {
+        capture = [];
+        pipeline.render(view.scene, camera, 1 / 60);
+        const qs: [string, WebGLQuery][] = capture;
+        capture = null;
+        for (let w = 0; w < 30 && !gl.getQueryParameter(qs[qs.length - 1][1], gl.QUERY_RESULT_AVAILABLE); w++) await next();
+        const ok = !gl.getParameter(ext.GPU_DISJOINT_EXT);
+        for (const [name, q] of qs) {
+          if (ok && gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) (per[name] ??= []).push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
+          gl.deleteQuery(q);
+        }
+      }
+      const med: Record<string, number> = {};
+      let total = 0;
+      for (const [name, v] of Object.entries(per)) {
+        v.sort((x, y) => x - y);
+        med[name] = +v[v.length >> 1].toFixed(2);
+        total += med[name];
+      }
+      med.total = +total.toFixed(2);
+      return med;
+    };
+    const passes = await run(frames), groups: Record<string, number> = {};
+    const named = new Map<THREE.Object3D, string>([[weather.group, 'weather'], [storm.group, 'storm']]);
+    for (const [k, c] of view.scene.children.entries()) {
+      if (!c.visible) continue;
+      c.visible = false;
+      const without = await run(Math.ceil(frames / 2));
+      c.visible = true;
+      const ms = +(passes.scene - without.scene).toFixed(2);
+      if (Math.abs(ms) >= 0.05) groups[named.get(c) ?? `${k}:${c.name || c.type}/${c.children.length}`] = ms;
+    }
+    r.render = plain;
+    return { passes, groups };
+  },
   /** GPU frame time over `frames` renders, ms (median, p90): timer queries where the browser has them, else to readback. */
   async gpu(frames = 40) {
     const gl = pipeline.renderer.getContext() as WebGL2RenderingContext, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');

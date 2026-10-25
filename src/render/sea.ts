@@ -396,8 +396,10 @@ void main() {
     vec3 fd = flow / sp;
     float kl = smoothstep(0.02, 0.5, sp) * water;
     col = glaze(col, SHELF_T, 0.1 * kl, 0.0, q);
-    laneInk = kl * near * marks(P, dir, fd, upx, 1.5, 0.55, 41.0, 1, uTime * (1.0 + 2.0 * sp));
-    laneFoam = kl * near * max(marks(P, dir, fd, upx, 0.9, 0.3, 57.0, 1, uTime * (1.4 + 2.5 * sp)), edge * step(0.05, fine));
+    if (near > 0.0) {
+      laneInk = kl * near * marks(P, dir, fd, upx, 1.5, 0.55, 41.0, 1, uTime * (1.0 + 2.0 * sp));
+      laneFoam = kl * near * max(marks(P, dir, fd, upx, 0.9, 0.3, 57.0, 1, uTime * (1.4 + 2.5 * sp)), edge * step(0.05, fine));
+    }
   }
 
   // WP20's territory: the owner's wash with a wavering pooled edge, granulating, a narrow hatched band inside the
@@ -426,7 +428,8 @@ void main() {
     vec2 lay = layer(own, fo);
     float td = TERRITORY_D * thin * (1.0 + 1.3 * wet + 1.6 * wet * (q.grain - 0.4));
     col = glaze(col, tt.rgb, td * lay.x * water, (0.6 + 3.0 * wet) * lay.y, q);
-    col = mix(col, hatchInk(0.3), 0.5 * dry * thin * hatching(hc, hdx, hdy, 0.4, 19.0) * lay.x * (1.0 - smoothstep(0.0, 0.3, own)) * water);
+    float hb = 0.5 * dry * thin * lay.x * (1.0 - smoothstep(0.0, 0.3, own)) * water; // hatching takes no implicit derivatives
+    if (hb > 0.0) col = mix(col, hatchInk(0.3), hb * hatching(hc, hdx, hdy, 0.4, 19.0));
     float bw = 0.9 * uRenderPx;
     col = mix(col, wash(uPaper, tt.rgb, 2.2), 0.85 * dry * thin * water * (1.0 - smoothstep(bw - 0.5, bw + 0.5, abs(own) / max(fo, 1e-5))));
   }
@@ -463,9 +466,14 @@ void main() {
   // wave strokes ride the crests downwind at two scales, thinning toward the horizon; crests break white as the wind
   // rises; a squall drives spindrift down the wind in streaks
   float riding = mix(0.6, 1.0, smoothstep(-0.4, 0.6, vLift)) * water * smoothstep(0.8, 2.5, depth) * near * (1.0 - lead);
-  float waves = riding * max(marks(P, dir, wind, upx, STROKE_CELL, uStrokes, 0.0, 0, 0.0),
-                             smoothstep(0.1, 0.6, vLift) * marks(P, dir, wind, upx, 2.8 * STROKE_CELL, 0.5 * uStrokes, 13.0, 0, 0.0));
-  float caps = riding * smoothstep(0.3, 0.8, vLift) * marks(P, dir, wind, upx, 1.7 * STROKE_CELL, uCaps, 23.0, 0, 0.0);
+  // (each set is drawn only where it can show: marks take no derivatives, so they may sit in a branch — WP30a)
+  float waves = 0.0, caps = 0.0, crestK = smoothstep(0.1, 0.6, vLift), capK = riding * smoothstep(0.3, 0.8, vLift);
+  if (riding > 0.0) {
+    waves = marks(P, dir, wind, upx, STROKE_CELL, uStrokes, 0.0, 0, 0.0);
+    if (crestK > 0.0) waves = max(waves, crestK * marks(P, dir, wind, upx, 2.8 * STROKE_CELL, 0.5 * uStrokes, 13.0, 0, 0.0));
+    waves *= riding;
+    if (capK > 0.0) caps = capK * marks(P, dir, wind, upx, 1.7 * STROKE_CELL, uCaps, 23.0, 0, 0.0);
+  }
   float spin = uSquall > 0.01 ? uSquall * water * near * marks(P, dir, wind, upx, 1.8, 0.45, 67.0, 1, uTime * 3.0) : 0.0;
 
   vec3 white = leadWhite(), pen = penInk();

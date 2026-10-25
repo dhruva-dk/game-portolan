@@ -9,6 +9,9 @@
 //      Silhouettes swell on the side turned from the light and with nearness, creases stay thin, both thin out and
 //      lighten with distance so the horizon stays delicate, and a world-anchored noise gives every line the wander and
 //      pressure of a nib, fixed to the thing drawn.
+//   2b. Mask (WP30a): one texel per MASK_BLOCK² pixels, set where any line element lies within INK_REACH of the block
+//      (25 bilinear taps on texel corners, each testing four elements). Most of a frame has none, and the composite
+//      skips its gather there: the same lines for a fraction of the taps.
 //   3. Ink composite: every pixel gathers the line elements within INK_REACH pixels into an anti-aliased coverage and
 //      lays iron-gall ink over the colour (veils such as fog hide it), adds the deckle — a smooth, darker tone toward
 //      the frame's edge with no texture of its own — and the storm grade. Straight to the canvas at render scale 1,
@@ -112,11 +115,29 @@ void main() {
 }
 `;
 
+/** Pixels per side of a mask texel's block. */
+const MASK_BLOCK = 4;
+const MASK_TAPS = (MASK_BLOCK + 2 * INK_REACH) / 2;
+const MASK_FRAG = /* glsl */ `
+precision highp float;
+uniform sampler2D tEdge; // bilinear: a tap on a texel corner averages the four elements round it
+layout(location = 0) out vec4 outMask;
+void main() {
+  vec2 size = vec2(textureSize(tEdge, 0)), a = floor(gl_FragCoord.xy) * ${MASK_BLOCK}.0 - ${INK_REACH}.0;
+  float hit = 0.0;
+  for (int y = 0; y < ${MASK_TAPS}; y++) {
+    for (int x = 0; x < ${MASK_TAPS}; x++) hit = max(hit, textureLod(tEdge, (a + vec2(2 * x + 1, 2 * y + 1)) / size, 0.0).r);
+  }
+  outMask = vec4(hit > 0.0 ? 1.0 : 0.0);
+}
+`;
+
 const SLATE = toLinear(STORM_SLATE);
 const COMPOSITE_FRAG = /* glsl */ `
 precision highp float;
 uniform sampler2D tColor;
 uniform sampler2D tEdge;
+uniform sampler2D tMask;
 uniform vec3 uInkLin;
 uniform vec3 uDeckle;
 uniform vec2 uCss;       // frame size, CSS px
@@ -132,16 +153,18 @@ void main() {
   vec3 col = toLinear(c.rgb);
 
   float cover = 0.0;
-  for (int y = -${INK_REACH}; y <= ${INK_REACH}; y++) {
-    for (int x = -${INK_REACH}; x <= ${INK_REACH}; x++) {
-      if (x * x + y * y > ${INK_REACH * INK_REACH}) continue;
-      vec4 e = texelFetch(tEdge, clamp(px + ivec2(x, y), ivec2(0), last), 0);
-      if (e.r == 0.0) continue;
-      float a = (e.b - 0.5) * 6.2831853;
-      vec2 n = vec2(cos(a), sin(a)), q = -vec2(float(x), float(y));
-      float across = abs(dot(q, n) - (e.a * 4.0 - 2.0));
-      float along = abs(dot(q, vec2(-n.y, n.x)));
-      cover = max(cover, e.r * clamp(e.g * 4.0 - across + 0.5, 0.0, 1.0) * clamp((1.25 - along) * 2.0, 0.0, 1.0));
+  if (texelFetch(tMask, px / ${MASK_BLOCK}, 0).r > 0.0) { // a line element lies near (the mask pass)
+    for (int y = -${INK_REACH}; y <= ${INK_REACH}; y++) {
+      for (int x = -${INK_REACH}; x <= ${INK_REACH}; x++) {
+        if (x * x + y * y > ${INK_REACH * INK_REACH}) continue;
+        vec4 e = texelFetch(tEdge, clamp(px + ivec2(x, y), ivec2(0), last), 0);
+        if (e.r == 0.0) continue;
+        float a = (e.b - 0.5) * 6.2831853;
+        vec2 n = vec2(cos(a), sin(a)), q = -vec2(float(x), float(y));
+        float across = abs(dot(q, n) - (e.a * 4.0 - 2.0));
+        float along = abs(dot(q, vec2(-n.y, n.x)));
+        cover = max(cover, e.r * clamp(e.g * 4.0 - across + 0.5, 0.0, 1.0) * clamp((1.25 - along) * 2.0, 0.0, 1.0));
+      }
     }
   }
   col = mix(col, uInkLin, cover * c.a);
@@ -218,12 +241,14 @@ export class Pipeline {
   };
 
   private readonly scene: THREE.WebGLRenderTarget;
-  private readonly edges = target(false);
+  private readonly edges = target(true); // bilinear for the mask's corner taps; the composite fetches texels
+  private readonly mask = target(false);
   private readonly inked = target(true);
   private readonly textures = new Map<string, number>();
   private readonly quad: THREE.Mesh;
   private readonly quadCamera = new THREE.Camera();
   private readonly edgePass: THREE.ShaderMaterial;
+  private readonly maskPass: THREE.ShaderMaterial;
   private readonly compositePass: THREE.ShaderMaterial;
   private readonly presentPass: THREE.ShaderMaterial;
   private readonly auxClear = new Float32Array([0.5, 0.5, 0, 0]);
@@ -266,8 +291,9 @@ export class Pipeline {
       uLightView: { value: new THREE.Vector3() }, uFade: { value: new THREE.Vector2() }, uWidth: { value: new THREE.Vector2() },
       uPxAngle: { value: 0 }, uRenderPx: s.uRenderPx,
     });
+    this.maskPass = pass(MASK_FRAG, { tEdge: { value: this.edges.texture } });
     this.compositePass = pass(COMPOSITE_FRAG, {
-      tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture },
+      tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture }, tMask: { value: this.mask.texture },
       uInkLin: s.uInk, uDeckle: { value: new THREE.Vector3().fromArray(transmittance(PIGMENTS.umber)) },
       uCss: { value: this.css }, uRenderPx: s.uRenderPx, uStorm: { value: 0 },
     });
@@ -328,6 +354,7 @@ export class Pipeline {
     e.uWidth.value.set(this.ink.silhouette * renderPx, this.ink.crease * renderPx);
     e.uPxAngle.value = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / (h * camera.zoom);
     this.draw(this.edgePass, this.edges);
+    this.draw(this.maskPass, this.mask);
 
     // 3. composite, 4. present
     this.compositePass.uniforms.uStorm.value = this.storm;
@@ -361,11 +388,12 @@ export class Pipeline {
     const w = Math.max(1, Math.round(this.css.x * this.dpr * s)), h = Math.max(1, Math.round(this.css.y * this.dpr * s));
     this.scene.setSize(w, h);
     this.edges.setSize(w, h);
+    this.mask.setSize(Math.ceil(w / MASK_BLOCK), Math.ceil(h / MASK_BLOCK));
     if (s === 1) this.inked.setSize(1, 1);
     else this.inked.setSize(w, h);
     this.style.uniforms.uRenderPx.value = this.dpr * s;
-    // colour + aux + 32-bit depth, the edge target, and the upscaled frame when the scale is below 1
-    this.stats.targetBytes = w * h * (4 + 4 + 4 + 4) + this.inked.width * this.inked.height * 4;
+    // colour + aux + 32-bit depth, the edge target, the mask, and the upscaled frame when the scale is below 1
+    this.stats.targetBytes = w * h * (4 + 4 + 4 + 4) + (this.inked.width * this.inked.height + this.mask.width * this.mask.height) * 4;
   }
 
   // Dynamic resolution in 5 % steps, from frame times alone. Two slow frames within about half a second drop a

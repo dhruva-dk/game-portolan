@@ -222,7 +222,7 @@ void main() {
   float s = vAt.x * vCirc, h = vAt.y, H = vShape.x, hu = h * H, seed = vShape.z;
   vec3 up = normalize(vWorld), tang = normalize(cross(up, vNormal));
   float slant = clamp(dot(uWindT, tang), -1.6, 1.6) * 0.42;
-  Paper q = paperAt(vWorld, vNormal, 0.0);
+  Paper q = paperPlain(vWorld, vNormal);
   vec3 paper = parchment(q);
   vec2 hc = vec2(s, hu), hx = dFdx(hc), hy = dFdy(hc);
   mat2 tilt = rot2(0.3);
@@ -395,7 +395,7 @@ uniform float uGrey;
 uniform vec3 uSlate;
 ${NOISE_GLSL}
 void main() {
-  Paper q = paperAt(vDir * 40.0, vDir, 0.0);
+  Paper q = paperPlain(vDir * 40.0, vDir);
   float n = fbm(vDir.xz * 5.0 + vDir.y * 3.0 + vK * 3.1 + uTime * 0.02);
   writeVeil(glaze(parchment(q), uSlate, 1.4 * uGrey, 0.0, q), 1.0 - pow(1.0 - uVeil * (0.36 + 0.3 * n), vLayers));
 }`;

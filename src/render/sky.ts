@@ -67,7 +67,7 @@ void main() {
   vec3 d = normalize(vDir);
   float el = dot(d, uUp);
   vec3 tw = triWeights(d, 4.0);
-  Paper q = paperAt(d * 400.0, d, 0.0);
+  Paper q = paperPlain(d * 400.0, d);
   float wob = tri(tPaper, d * 2.2, tw).b - 0.5, fine = tri(tPaper, d * 9.0, tw).g - 0.5;
   vec3 fwd = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
   // gold leaf on the page glints as the page tilts: here, as the view turns
