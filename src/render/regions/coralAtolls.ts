@@ -59,6 +59,10 @@ const W = {
   pole: washOf(PIGMENTS.sepia, 0.85),
   crownLit: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.45), 0.5), crownSun: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.6),
   crownShade: washOf(mix(PIGMENTS.malachite, PIGMENTS.indigo, 0.25), 0.8),
+  // a grove seen from the sea at noon: silver-grey boles, the crowns sunlit through and their hanging fronds a cool green
+  bole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.45), 0.45), boleRing: washOf(PIGMENTS.sepia, 0.5),
+  crownHang: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.55), crownNoon: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.62), 0.4),
+  frondDry: washOf(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.25), 0.55),
   timber: washOf(PIGMENTS.sepia, 0.9), weed: washOf(PIGMENTS.verdigris, 0.95),
 };
 
@@ -108,14 +112,14 @@ function spike(b: Brush, a: V, tip: V, r: number, turn = 0): void {
 /** The triangles laid so far by a brush. */
 const laid = (b: Brush): number => (b.kit as unknown as { pos: number[] }).pos.length / 9;
 /** A crown's normals: frond facets above its heart (y > topY) turned up, lit as the arching upper face; those hanging below
- *  turned down, so the crown's underside falls into shade. */
-function crownNormals(g: THREE.BufferGeometry, [a0, a1]: [number, number], topY: number): THREE.BufferGeometry {
+ *  turned down by `hang` < 0, so the crown's underside falls into shade (or out and up by `hang` ≥ 0, lit through). */
+function crownNormals(g: THREE.BufferGeometry, [a0, a1]: [number, number], topY: number, hang = -0.6): THREE.BufferGeometry {
   const nrm = g.getAttribute('normal') as THREE.BufferAttribute, pos = g.getAttribute('position') as THREE.BufferAttribute, f = vec();
   for (let t = a0; t < a1; t++) {
     const cy = (pos.getY(3 * t) + pos.getY(3 * t + 1) + pos.getY(3 * t + 2)) / 3, up = cy > topY - 0.03;
     f.fromBufferAttribute(nrm, 3 * t);
-    if (f.y < 0 === up) f.negate();
-    f.multiplyScalar(up ? 0.45 : 0.7).add(vec(0, up ? 1 : -0.6, 0)).normalize();
+    if (f.y < 0 === (up || hang >= 0)) f.negate(); // (a crown lit through at noon: its hanging fronds face out and up)
+    f.multiplyScalar(up ? 0.45 : 0.7).add(vec(0, up ? 1 : hang, 0)).normalize();
     for (let v = 0; v < 3; v++) nrm.setXYZ(3 * t + v, f.x, f.y, f.z);
   }
   return g;
@@ -154,14 +158,14 @@ function blob(b: Brush, c: V, r: number): void {
 /** A coconut palm 1 tall: a ringed trunk with a swollen bole curving to +z, a crown of pinnate fronds swept to the lee
  *  (+z), fresh ones pale and upright, old ones yellowed and drooping, a dead one hanging, a cluster of nuts. */
 function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.trunk), n = far ? 2 : young ? 4 : 7, bend = young ? 0.12 : 0.26 + 0.14 * rnd();
+  const rnd = seeded(seed), b = new Brush(W.bole), n = far ? 2 : young ? 4 : 7, bend = young ? 0.12 : 0.26 + 0.14 * rnd();
   const path: V[] = [], radii: number[] = [];
   for (let i = 0; i <= n; i++) {
     const t = i / n;
     path.push(vec(0.015 * Math.sin(t * 4 + seed), t, bend * t * t + 0.05 * t * Math.sin(t * 3 + seed)));
     radii.push((i === 0 ? 0.058 : 0.036 - 0.012 * t) * (young ? 1.5 : 1));
   }
-  b.pick = (c) => (Math.floor(c.y * 26) % 2 ? W.trunk : W.scar);
+  b.pick = (c) => (Math.floor(c.y * 26) % 3 ? W.bole : W.boleRing);
   tube(b, path, radii, far ? 3 : 6);
   b.pick = null;
   const top = path[n], Y = vec(0, 1, 0), count = far ? 8 : young ? 9 : 12, L = young ? 0.62 : 0.5, SEG = far ? 2 : 5, fronds = laid(b);
@@ -169,14 +173,14 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
     const phi = (k / count) * TAU + 0.3 * rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi) + 0.6).normalize(), age = k % 4;
     const droop = young ? 0.35 + 0.25 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : 0.45 - 0.06 * age;
     const len = L * (0.85 + 0.3 * rnd()) * (age === 0 ? 0.8 : 1), side = vec().crossVectors(d, Y).normalize();
-    b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDead : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
-    const tone = b.wash, kept = tone === W.frondDead || tone === W.frondOld;
+    b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDry : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
+    const tone = b.wash, kept = tone === W.frondDry || tone === W.frondOld;
     let prev = top.clone();
     for (let i = 1; i <= SEG; i++) {
       const s = i / SEG, p = top.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (rise * s - droop * s * s));
       const w = len * 0.2 * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
       // the crown lit where it arches above its heart, shadowed where it hangs below
-      if (!kept) b.wash = mid.y > top.y - 0.03 ? (age === 0 ? W.crownLit : W.crownSun) : W.crownShade;
+      if (!kept) b.wash = mid.y > top.y - 0.03 ? (age === 0 || far ? W.crownNoon : W.crownLit) : W.crownHang;
       // (far off the blades lie flatter, lit as a crown is seen from afar, not a dark fringe)
       const hang = vec(0, far ? -len * 0.02 : -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
       b.tri(prev, p, mid.clone().addScaledVector(side, w).add(hang));
@@ -189,7 +193,7 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
   const lit: [number, number] = [fronds, laid(b)];
   b.wash = W.nut;
   for (let k = 0; k < (far ? 0 : young ? 2 : 5); k++) blob(b, top.clone().add(vec(0.035 * Math.cos(k * 2.4), -0.035 - 0.015 * (k % 2), 0.035 * Math.sin(k * 2.4))), 0.026);
-  return crownNormals(b.kit.build(), lit, top.y);
+  return crownNormals(b.kit.build(), lit, top.y, 0.35);
 }
 
 /** A coconut palm 1 tall drawn close, as an engraver draws one: a curved trunk swollen at the bole and ringed with leaf
@@ -488,40 +492,63 @@ function driftKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A channel withy 1.85 tall: a weathered driven pole under a broom topmark. */
+/** A channel withy 2 tall: a driven pole, its foot weed-green, under a tight broom topmark (a bundle of twigs bound on
+ *  and splayed upward), dark against sea and sky so it reads as a mark. */
 function stakeKit(): THREE.BufferGeometry {
   const b = new Brush(W.pole);
-  tube(b, [vec(0, -0.3, 0), vec(0.02, 1.6, 0)], [0.045, 0.03], 4);
-  for (let k = 0; k < 4; k++) spike(b, vec(0.02, 1.45, 0), vec(0.02 + 0.16 * Math.cos(k * 1.6), 1.85, 0.16 * Math.sin(k * 1.6)), 0.015, k);
+  b.pick = (c) => (c.y < 0.45 ? W.weed : W.pole);
+  tube(b, [vec(0, -0.3, 0), vec(0.01, 0.8, 0), vec(0.02, 1.5, 0)], [0.04, 0.034, 0.026], 5);
+  b.pick = null;
+  for (let k = 0; k < 11; k++) {
+    const a = k * 2.4, r = 0.1 + 0.09 * (((k * 7) % 3) / 2);
+    spike(b, vec(0.02, 1.38, 0), vec(0.02 + r * Math.cos(a), 1.86 + 0.14 * (((k * 5) % 3) / 2), r * Math.sin(a)), 0.024, k);
+  }
+  blob(b, vec(0.02, 1.42, 0), 0.04); // the binding
   return b.kit.build();
 }
 
-/** A hulk 1 long on x: keel, stem and sternpost, ribs broken off at different heights, a strake of planking on the low
- *  side, a mast stump; weed-green where the tide washes it. */
+/** A hulk 1 long on x (bow +x), heeled on its low side (−z) with its back broken: a canted keel, the stem standing and
+ *  the sternpost snapped, curved frames rising from the keel to the turn of the bilge and broken off at different
+ *  heights (shorter on the high side), the low side still planked in ragged strakes with gaps, a garboard strake left
+ *  on the high side, a mast stump; weed-green where the tide washes it. Its shape reads as a hull's from any side. */
 function hulkKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.timber), RIB = 10;
-  b.pick = (c) => (c.y < 0.07 ? W.weed : W.timber);
-  tube(b, [vec(-0.55, 0.02, 0), vec(0, -0.01, 0), vec(0.5, 0.03, 0)], [0.025, 0.03, 0.025], 4);
-  spike(b, vec(0.5, 0, 0), vec(0.6, 0.38, 0), 0.03);
-  spike(b, vec(-0.55, 0, 0), vec(-0.58, 0.34, 0), 0.03);
+  const rnd = seeded(seed), b = new Brush(W.timber), RIB = 11, DEPTH = 0.36;
+  b.pick = (c) => (c.y < 0.06 ? W.weed : W.timber);
+  // the hull's surface: x along it, u from the keel (0) to the gunwale (1), sd the side; the keel rises toward the bow
+  // and the stern half sags where the back broke
+  const beam = (x: number): number => 0.21 * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(x) / 0.52, 2.4)));
+  const at = (x: number, u: number, sd: number): V => {
+    const z = sd * beam(x) * Math.sin(Math.min(1.2 * u, 1) * Math.PI * 0.5) * (1 - 0.06 * Math.max(0, u - 0.8) / 0.2);
+    const rise = 0.14 * Math.max(0, x) ** 2, sag = x < -0.12 ? 0.22 * (x + 0.12) : 0;
+    return vec(x, 0.02 + DEPTH * (0.6 * u + 0.4 * u * u) + rise + sag, z);
+  };
+  // keel, stem and the snapped sternpost
+  tube(b, [-0.52, -0.3, -0.12, 0.1, 0.3, 0.5].map((x) => at(x, 0, 1)), [0.026, 0.03, 0.032, 0.03, 0.028, 0.025], 4);
+  tube(b, [at(0.5, 0, 1), vec(0.56, 0.2, 0), vec(0.6, 0.42, 0), vec(0.58, 0.5, 0)], [0.026, 0.024, 0.022, 0.018], 4);
+  tube(b, [at(-0.52, 0, 1), vec(-0.56, 0.08, 0), vec(-0.57, 0.17, 0.01)], [0.026, 0.024, 0.02], 4);
+  // frames: curved ribs from the keel, broken off; the high side (+z) worse
   for (let i = 0; i < RIB; i++) {
-    const x = -0.45 + (0.9 * i) / (RIB - 1), beam = 0.2 * Math.sin(Math.PI * (0.15 + (0.7 * i) / (RIB - 1)));
+    const x = -0.44 + (0.88 * i) / (RIB - 1);
     for (const sd of [-1, 1]) {
-      const keep = 2 + Math.floor(rnd() * 3);
-      const pts = [vec(x, 0, 0), vec(x, 0.06, sd * beam * 0.7), vec(x, 0.16, sd * beam), vec(x, 0.27, sd * beam * 1.02), vec(x, 0.36, sd * beam * 0.95)].slice(0, keep + 1);
-      for (let j = 0; j + 1 < pts.length; j++) {
-        const a = pts[j], c = pts[j + 1], dx = 0.014;
-        b.tri(vec(a.x - dx, a.y, a.z), vec(c.x - dx, c.y, c.z), vec(c.x + dx, c.y, c.z));
-        b.tri(vec(a.x - dx, a.y, a.z), vec(c.x + dx, c.y, c.z), vec(a.x + dx, a.y, a.z));
-      }
+      const top = sd < 0 ? 0.65 + 0.35 * rnd() : 0.3 + 0.6 * rnd(), n = 4, pts: V[] = [];
+      for (let k = 0; k <= n; k++) pts.push(at(x, (k / n) * top, sd));
+      tube(b, pts, pts.map((_, k) => 0.015 - 0.004 * (k / n)), 3);
     }
   }
-  for (let i = 1; i < RIB - 2; i++) {
-    const x0 = -0.45 + (0.9 * i) / (RIB - 1), x1 = x0 + 0.9 / (RIB - 1);
-    b.tri(vec(x0, 0.06, -0.13), vec(x1, 0.06, -0.13), vec(x1, 0.15, -0.19));
-    b.tri(vec(x0, 0.06, -0.13), vec(x1, 0.15, -0.19), vec(x0, 0.15, -0.19));
-  }
-  tube(b, [vec(0.05, 0, 0), vec(0.07, 0.55, 0.02)], [0.022, 0.016], 4);
+  // strakes of planking: the low side from the bilge to near the gunwale, ragged at their ends and broken into gaps;
+  // a garboard strake on the high side
+  const strake = (u0: number, u1: number, sd: number, from: number, to: number, gap: number): void => {
+    for (let i = from; i < to; i++) {
+      if (rnd() < gap) continue;
+      const x0 = -0.44 + (0.88 * i) / (RIB - 1), x1 = -0.44 + (0.88 * (i + 1)) / (RIB - 1), lift = 0.004;
+      const p = [at(x0, u0, sd), at(x1, u0, sd), at(x1, u1 - (i === to - 1 ? 0.06 * rnd() : 0), sd), at(x0, u1, sd)].map((v) => v.add(vec(0, 0, sd * lift)));
+      b.tri(p[0], p[1], p[2]);
+      b.tri(p[0], p[2], p[3]);
+    }
+  };
+  for (const [u0, u1, from, to, gap] of [[0.05, 0.24, 0, RIB - 1, 0.05], [0.27, 0.45, 1, RIB - 2, 0.15], [0.48, 0.64, 2, RIB - 3, 0.3], [0.67, 0.8, 3, 7, 0.4]] as const) strake(u0, u1, -1, from, to, gap);
+  strake(0.05, 0.22, 1, 2, RIB - 3, 0.35);
+  tube(b, [at(0.08, 0.05, 1).setZ(0), vec(0.1, 0.62, 0.05)], [0.024, 0.016], 4);
   return b.kit.build();
 }
 
@@ -582,7 +609,7 @@ vec3 shape(float x, float u, vec3 o, mat3 B, float ph, float set) {
   // across neighbouring parts), its ends sink into the neighbours'
   float zc = mix(0.3, 0.02, slump);
   float lumps = n3((o + B * vec3(x, 0.0, 0.0)) * 2.2 + vec3(set * 3.1));
-  float h = mix(0.45, 1.0, rise) * mix(1.0, 0.3, slump) * (0.75 + 0.5 * lumps) * sqrt(1.0 - smoothstep(0.28, 0.5, abs(x)));
+  float h = mix(0.6, 1.0, rise) * mix(1.0, 0.5, slump) * (0.75 + 0.5 * lumps) * sqrt(1.0 - smoothstep(0.28, 0.5, abs(x)));
   vec2 zy = section(u, zc, h);
   return vec3(x, zy.y, zy.x);
 }
@@ -817,24 +844,29 @@ export function planCoral(field: TerrainField): CoralPlan {
   // its centre line until the reef stops a keel at any tide
   for (const c of plan.channels) {
     const rc = Math.hypot(c.crest.x - c.centre.x, c.crest.y - c.centre.y), ux = (c.crest.x - c.centre.x) / rc, uy = (c.crest.y - c.centre.y) / rc;
-    const across = (d: number, sd: number, beyond: number): { x: number; y: number } | null => {
+    const across = (d: number, sd: number, beyond: number, edge: number): { x: number; y: number } | null => {
       const x0 = c.centre.x + (rc + d) * ux, y0 = c.centre.y + (rc + d) * uy;
-      for (let t = CLEAR; t < 9; t += 0.25) {
-        if (sim(x0 - sd * uy * t, y0 + sd * ux * t) < BLOCK) continue;
+      for (let t = CLEAR; t < 11; t += 0.25) {
+        if (sim(x0 - sd * uy * t, y0 + sd * ux * t) < edge) continue;
         const x = x0 - sd * uy * (t + beyond), y = y0 + sd * ux * (t + beyond);
-        return sim(x, y) >= BLOCK ? { x, y } : null;
+        return sim(x, y) >= edge ? { x, y } : null;
       }
       return null;
     };
-    for (const d of c.great ? [3, 1, -1, -3, -5, -7].filter((d) => d >= -Math.min(8, 0.45 * rc)) : [1.5, -1]) {
+    // the withies stand where a keel strikes at mean tide, through the mouth (outside the crest) and in, both sides,
+    // tall enough to stand well clear of high water
+    for (const d of c.great ? [8, 6, 4, 2, 0, -2, -4, -6].filter((d) => d >= -Math.min(8, 0.45 * rc)) : [1.5, -1]) {
       for (const sd of [-1, 1]) {
-        const e = across(d, sd, 0.4);
-        if (e && !open(e.x, e.y, 1.1)) place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.06 * (rnd() - 0.5), s: 1 + 0.25 * rnd(), kitH: 1.85 });
+        const e = across(d, sd, 0.4, -DRAFT);
+        if (!e || open(e.x, e.y, 1.1)) continue;
+        const g = groundAt(field, chartDir(RI, e.x, e.y)), sc = 1 + 0.15 * rnd(), sy = Math.max(sc, (TIDE.amp + 0.9 - (g - 0.3)) / 2);
+        place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.08 * (rnd() - 0.5), s: sc, sy, kitH: 2 });
       }
     }
-    const e = c.great ? across(0, 1, 1.4) : null;
+    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, broadside to a ship coming in
+    const e = c.great ? across(0, 1, 1.4, BLOCK) : null;
     if (e && !open(e.x, e.y, 2.5)) {
-      const p = place(plan.hulks, e.x, e.y, { sink: 0.12, fwd: tan(e.x, e.y, ux, uy), yaw: 0.4, tilt: 0.3, s: 3.4, kitH: 0.4 });
+      const p = place(plan.hulks, e.x, e.y, { sink: 0.1, fwd: tan(e.x, e.y, uy, -ux), yaw: -0.45, tilt: 0.32, s: 3.4, kitH: 0.62 });
       plan.seabirds.push(lift(p.dir, p.top));
     }
   }
@@ -854,7 +886,7 @@ export function planCoral(field: TerrainField): CoralPlan {
       const gy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5)), gl = Math.hypot(gx, gy);
       if (gl < 1e-4) continue;
       // the break, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
-      for (const [back, tall] of [[0, 0.3 + 0.16 * sr()], [1.1, 0.16 + 0.08 * sr()]]) {
+      for (const [back, tall] of [[0, 0.42 + 0.22 * sr()], [1.1, 0.16 + 0.08 * sr()]]) {
         const bx = px - (back * gx) / gl, by = py - (back * gy) / gl, d = chartDir(RI, bx, by), ground = heightAt(geo, d);
         if (back > 0 && ground > TIDE.amp * 0.5) continue;
         const at = lift(d, -0.04), sy = tall * (0.6 + 0.4 * loud);

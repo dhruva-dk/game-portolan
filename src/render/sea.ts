@@ -349,6 +349,7 @@ void main() {
   vec2 xc = vec2(dot(Pf, uClearE), dot(Pf, uClearN)), xcx = dFdx(xc), xcy = dFdy(xc);
   float cpx = max(max(length(xcx), length(xcy)), 1e-5);
   float vis = exp(-max(uSeaLevel - ff.x, 0.0) * mix(0.34, 0.17, max(max(lagoon, fl.g), clear))) * water
+            * (1.0 - 0.7 * clear * smoothstep(4.5, 7.5, uSeaLevel - ff.x)) // the floor lost in the clear water's deep
             * (1.0 - pow(1.0 - clamp(dot(V, vNormal), 0.0, 1.0), 5.0)) * (1.0 - 0.6 * uSquall) * (1.0 - smoothstep(30.0, 110.0, dist));
   if (vis > 0.02) {
     float fpx = max(max(length(xdx), length(xdy)), 1e-5), mk = smoothstep(0.0, 0.05, leadF);
@@ -445,7 +446,7 @@ void main() {
   // clear tropical water: palest over the sand at the beach, turquoise through the lagoons and over the reef flats, then
   // down the drop-off ultramarine laid from a wavering edge where the drying wash pooled (each reef drawn round by its
   // own contour), and the turquoise let go at a second edge farther out; a low eye sees more sky in it
-  vec2 drop = layer(depth - 6.0 - 1.8 * wob - 0.5 * fine, fwD), open = layer(depth - 15.0 - 4.0 * wob, fwD);
+  vec2 drop = layer(depth - 4.8 - 0.9 * wob - 0.4 * fine, fwD), open = layer(depth - 15.0 - 4.0 * wob, fwD);
   if (clear > 0.0) {
     float glance = 0.6 + 0.4 * smoothstep(0.02, 0.3, dot(V, dir));
     // inside a ring (the lagoon cells, blurred over ~5 u so their edges never show) the deep water darkens softly, with
@@ -455,9 +456,10 @@ void main() {
                       + seaField(normalize(dir + t2 * (2.6 / SEA_R))).z + seaField(normalize(dir - t2 * (2.6 / SEA_R))).z);
     ring = smoothstep(0.15, 0.85, ring);
     float dk = mix(drop.x, 0.75 * smoothstep(3.5, 10.0, depth + 1.5 * wob), ring);
-    float turq = smoothstep(0.0, 0.9, depth) * (0.42 + 0.26 * smoothstep(1.0, 4.0, depth)) * (1.0 - 0.45 * dk) * (1.0 - open.x);
+    // (the deep reads dark even to a low eye: a pass's water is the one dark way through the pale reef)
+    float turq = smoothstep(0.0, 0.9, depth) * (0.42 + 0.26 * smoothstep(1.0, 4.0, depth)) * (1.0 - 0.7 * dk) * (1.0 - open.x);
     col = glaze(col, TURQ_T, clear * water * glance * turq * tone, 0.6 * open.y, qs);
-    col = glaze(col, SHELF_T, clear * water * glance * 0.24 * dk * (1.0 - 0.5 * open.x), 1.2 * drop.y * (1.0 - ring), qs);
+    col = glaze(col, SHELF_T, clear * water * mix(glance, 1.0, 0.6) * 0.42 * dk * (1.0 - 0.35 * open.x), 1.2 * drop.y * (1.0 - ring), qs);
   }
   // the swell's backs, turned from the sun, take one more glaze laid with a frilled, pooled edge: brushed bands
   float back = -10.0 * dot(vNormal - dir, uSun) + 0.2 * (q.mottle - 0.5);

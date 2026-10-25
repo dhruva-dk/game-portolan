@@ -554,7 +554,7 @@ out float vEdge;
 void main() {
   mat4 model = modelMatrix * instanceMatrix;
   vec3 root = model[3].xyz, up = normalize(root);
-  float H = length(model[1].xyz), t = uTime, s = aPart.x;
+  float H = length(model[1].xyz), t = uTime, s = aPart.x, seen = 1.0;
   vec3 wdir = cross(uWindAxis, up);
   wdir /= max(length(wdir), 1e-4);
   vec3 side = cross(up, wdir);
@@ -580,6 +580,8 @@ void main() {
   vec3 rd = normalize(w.xyz - cameraPosition);
   float b = dot(cameraPosition, rd), disc = b * b - dot(cameraPosition, cameraPosition) + rs * rs, reach = distance(cameraPosition, w.xyz);
   vec3 surf = cameraPosition + rd * max(min(disc > 0.0 ? -b - sqrt(disc) : reach, reach) - 0.3, 0.1);
+  // past the sea's horizon (beyond the ray's lowest point, -b) the sea's bulge hides it: never seen through the planet
+  seen = 1.0 - smoothstep(0.0, 4.0, reach + b);
 #else
   float bend = uWind * (0.3 + 0.7 * gust) * uSway * s * s;
   float flutter = aPart.y > 0.5 ? sin(t * 7.0 + aSeed.x * 40.0 + dot(position, vec3(9.0, 5.0, 7.0))) * 0.02 * uWind * (0.4 + gust) * s : 0.0;
@@ -592,7 +594,7 @@ void main() {
   vPart = aPart;
   vPaint = vec4(aTint > 1.5 ? aBloom : aTint > 0.5 ? aFoliage : aPaint.rgb, aPaint.w);
   float dist = distance(cameraPosition, root), o1 = min(uBand.w, max(aSeed.y * uCut.x, uCut.y)), o0 = min(uBand.z, o1 * 0.8);
-  vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist));
+  vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist)) * seen;
   gl_Position = projectionMatrix * viewMatrix * w;
 #ifdef VEIL
   vec4 sc = projectionMatrix * viewMatrix * vec4(surf, 1.0);
