@@ -30,6 +30,7 @@ import type { Sight } from '../visibility.ts';
 import { ZONE } from '../world/geography.ts';
 import { REGIONS } from '../world/regions.ts';
 import { apart, knows, newPercept, perceive } from './perception.ts';
+import { lure, pressAt } from './learning.ts';
 import { reachOf, standoff, styleOf, wary, type Style } from './temperaments.ts';
 
 type Captain = Ship['captain'];
@@ -82,7 +83,10 @@ const share = (ship: Ship): number => ship.hull / fullHull(ship.form, ship.fitti
 const byWant = (mode: number): boolean => mode === MODE.fight || mode === MODE.flee || mode === MODE.face;
 
 /** Whether ship i has a captain at its helm: never the player's (index 0), nor a ship fitted out without one (Outfit.captain). */
-export const captained = (state: MatchState, i: number): boolean => i > 0 && state.ships[i].captain.temperament >= 0;
+export const captained = (state: MatchState, i: number): boolean => state.ships[i].captain.temperament >= 0;
+
+/** Whether the player's own ship sails under a captain's brain (the scripted players of tests/tools/tournament.ts): it issues only the player's controls, on the first captain's stream. */
+export const piloted = (state: MatchState): boolean => state.ships[0].captain.temperament >= 0;
 
 const P = newPercept(), SV = newStormView(), PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 const EMPTY: number[] = [], F = v3(), H = v3(), G = v3(), Q = v3(), T = v3(), U = v3(), V = v3(), STAR = v3(), STAR2 = v3();
@@ -179,7 +183,7 @@ export function think(sea: Sea, state: MatchState, i: number, sight: Sight, out:
   if (!afloat(ship) || !captained(state, i)) return;
   c.since += TICK;
   if (--c.think > 0) return;
-  const rng = state.rng[STREAM.captains + i - 1];
+  const rng = state.rng[STREAM.captains + Math.max(0, i - 1)];
   c.think = Math.round(by(BRAIN.react, c.skill) * (c.gentle ? 1.5 : 1)) + rngInt(rng, BRAIN.jitter + 1);
   perceive(sea, state, i, sight, P);
   stormView(state, SV);
@@ -224,7 +228,7 @@ function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
 function regionWorth(state: MatchState, i: number, r: number): number {
   const ship = state.ships[i], c = ship.captain, style = styleOf(ship), taste = (hash32(state.seed, i * 64 + r) & 0xffff) / 0xffff;
   let w = REGIONS[r].richness * (1 + 0.5 * style.guard) + 0.4 * taste; // a turtle sets most store by rich waters
-  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff === r) w += c.gentle ? -0.5 : (style.fight - 0.5) * 0.8 + 0.15 * c.grudge;
+  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff === r) w += lure(c, style); // the player's waters, by its temperament (learning.ts)
   return w;
 }
 
@@ -364,7 +368,7 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   const ship = state.ships[i], c = ship.captain, j = P.rival;
   if (j < 0) return -1;
   const r = state.ships[j], d = P.rivalD, theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
-  let will = style.fight + (0.6 + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
+  let will = style.fight + (0.3 + 0.6 * style.fight + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
   if (style.guard > 0 && intrudes(state, i, j)) will += style.guard;
   if (j === 0) {
     will += 0.15 * c.grudge;
@@ -380,7 +384,7 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
     return MODE.ram;
   }
   const gun = GUNS[ship.fittings[SLOT.broadside].kind];
-  if (gun === undefined || d > gun.range * BRAIN.engage) return -1;
+  if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1)) return -1;
   broadside(sea, state, i, j, gun, style);
   c.target = j;
   return MODE.fight;
@@ -407,10 +411,10 @@ function broadside(sea: Sea, state: MatchState, i: number, j: number, gun: Gun, 
 
 /** The nearest open rival trail its chart shows, when worth the raid by its Style, the trail's length and distance, and a grudge. */
 function hunts(i: number, state: MatchState, style: Style, was: number): boolean {
-  const c = state.ships[i].captain, owner = P.trail;
-  if (owner < 0 || P.trailD > BRAIN.hunt || (c.gentle && owner === 0)) return false;
+  const c = state.ships[i].captain, owner = P.trail, reach = BRAIN.hunt * Math.min(1.35, 0.6 + 0.4 * style.raid); // a raider goes farther for a trail
+  if (owner < 0 || P.trailD > reach || (c.gentle && owner === 0)) return false;
   if (was === MODE.hunt && c.target === owner && c.since > BRAIN.wait) return false;
-  const want = style.raid * Math.min(1.5, P.trailLen / 25) * (1 - P.trailD / BRAIN.hunt) + (owner === 0 ? 0.1 * c.grudge : 0);
+  const want = style.raid * Math.min(1.5, P.trailLen / 25) * (1 - P.trailD / reach) + (owner === 0 ? 0.1 * c.grudge : 0);
   if (want < 0.2) return false;
   cellDir(TERRITORY, P.trailCell, c.goal);
   c.target = owner;
@@ -442,9 +446,14 @@ const intrudes = (state: MatchState, i: number, j: number): boolean => {
  */
 function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Style, was: number, aim: number): number {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
-  if (style.stalk === 0) return -1;
-  let j = -1, d = BRAIN.stalk;
-  if (r >= 0 && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < 0.7 && P.rivalD < d) [j, d] = [r, P.rivalD];
+  if (style.stalk === 0 && c.grudge === 0) return -1;
+  const keen = style.stalk >= 0.8, weak = keen ? 0.85 : 0.7; // a hunter scents a wound sooner and from farther
+  let j = -1, d = BRAIN.stalk * (keen ? 1.4 : 1);
+  if (r >= 0 && (style.stalk > 0 || r === 0) && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < (r === 0 ? Math.max(pressAt(c), weak) : weak) && P.rivalD < d) [j, d] = [r, P.rivalD];
+  if (j < 0 && c.grudge > 0 && !c.gentle && knows(P, 0) && afloat(state.ships[0]) && share(ship) > 0.5) { // a grudge: it stalks the player whenever it sees it
+    const e = apart(ship.pos, state.ships[0].pos);
+    if (e < BRAIN.stalk * (1 + 0.5 * c.grudge)) [j, d] = [0, e];
+  }
   for (let k = 0; style.stalk >= 0.8 && k < SHIPS; k++) {
     const g = state.ships[k].gull.flight;
     if (k === i || (sight.gulls & (1 << k)) === 0 || (g !== FLIGHT.back && g !== FLIGHT.circle) || !afloat(state.ships[k])) continue;

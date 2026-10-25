@@ -1,7 +1,8 @@
 // The match step: every system of the simulation, in order, once per tick. It is the only code that writes the
 // match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
 // inside. Each system appends its call here, in the order the rules need.
-import { helm, think } from './captains/brain.ts';
+import { helm, piloted, think } from './captains/brain.ts';
+import { watch } from './captains/learning.ts';
 import { combat } from './combat.ts';
 import { earn, forage, scoop } from './economy.ts';
 import { over } from './end.ts';
@@ -32,7 +33,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   brew(sea, state);
   stir(sea, state);
   INPUTS[0] = player;
-  for (let i = 1; i < SHIPS; i++) helm(state, i, INPUTS[i]);
+  for (let i = piloted(state) ? 0 : 1; i < SHIPS; i++) helm(state, i, INPUTS[i]);
   for (let i = 0; i < SHIPS; i++) {
     const ship = state.ships[i], input = INPUTS[i];
     if (ship.phase === PHASE.sunk) continue;
@@ -45,7 +46,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   }
   collide(state);
   survey(sea, state, SIGHT, gullEyes(state));
-  for (let i = 1; i < SHIPS; i++) think(sea, state, i, SIGHT[i], INPUTS[i]);
+  for (let i = piloted(state) ? 0 : 1; i < SHIPS; i++) think(sea, state, i, SIGHT[i], INPUTS[i]);
   combat(sea, state, SIGHT);
   items(sea, state, INPUTS, SIGHT);
   chart(state);
@@ -56,6 +57,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   forage(sea, state);
   scoop(state);
   state.tick++;
+  for (let i = 1; i < SHIPS; i++) watch(state, i, SIGHT[i]); // what each captain saw the player do this tick (captains/learning.ts)
 }
 
 /** Step a match headless with recorded player inputs until it reaches `tick` or is over. */

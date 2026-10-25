@@ -63,7 +63,7 @@ test('the smoke tournament: twenty matches, six distinct temperament profiles', 
   }
   t.diagnostic(`nearest profiles: ${pair}, ${nearest.toFixed(2)} spreads apart`);
   assert.ok(nearest > 0.25, `${pair} too alike (${nearest.toFixed(2)})`);
-  const [hunter, expander, raider, turtle, , gambler] = mean;
-  assert.ok(gambler.sea > Math.max(hunter.sea, expander.sea, raider.sea, turtle.sea), 'gamblers claim the most sea');
-  assert.ok(hunter.broken > Math.max(expander.broken, turtle.broken), 'hunters break more trails than expanders and turtles');
+  const [hunter, expander, raider, turtle, opportunist, gambler] = mean;
+  assert.ok(Math.max(expander.sea, gambler.sea) > Math.max(hunter.sea, raider.sea, turtle.sea, opportunist.sea), 'expanders and gamblers claim the most sea');
+  assert.ok(raider.broken > Math.max(hunter.broken, expander.broken, gambler.broken), 'raiders break more trails than hunters, expanders and gamblers');
 });

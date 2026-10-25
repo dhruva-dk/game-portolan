@@ -104,6 +104,10 @@ const CAPTAIN = rec(
   ['trim', int], // the SAIL setting it wants
   ['avoid', f64], // rad to starboard it bears off its goal, clearing a hazard
   ['felt', f64], // its hull when it last decided: less now, it is under fire
+  ['watches', bool], // whether it learns the player in play (captains/learning.ts): sent with a Mind, past the first voyage
+  ['learnt', int], // the KNOW bits it has learned in play this match
+  ['seen', int], // the player's loops it has seen closed this match
+  ['eyed', int], // bit 0: the player was holding for home when it last saw it
 );
 
 const SHIP = rec(
@@ -241,7 +245,7 @@ export type Keg = Value<typeof KEG>;
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 12, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 13, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -483,6 +487,7 @@ function captainOf(who: Outfit['captain'], mind: Mind | null): Ship['captain'] {
     grudge: mind?.grudge ?? 0, knows, breakOff: mind?.breakOff.value ?? -1, loop: mind?.loop.value ?? -1, raids: mind?.raids.value ?? -1,
     run: mind?.run.value ?? -1, margin: mind?.storm.value ?? 0, fittings: mind ? [...mind.fittings] : [], mode: 0, target: -1, goal: v3(), want: v3(), intent: v3(), anchor: v3(),
     plan: [], tell: 0, since: 0, think: 1, loops: 0, trim: SAIL.full, avoid: 0, felt: 0,
+    watches: mind !== null && !mind.gentle, learnt: 0, seen: 0, eyed: 0,
   };
 }
 
