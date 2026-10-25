@@ -17,7 +17,7 @@ import { illustratedMaterial, transmittanceVec, type Style } from '../style/glsl
 import { PIGMENTS, type RGB } from '../style/palette.ts';
 import type { V3 } from '../sim/math.ts';
 import { R } from '../sim/sphere.ts';
-import { heightAt, type Geography } from '../sim/world/geography.ts';
+import { heightAt, regionOf, type Geography } from '../sim/world/geography.ts';
 import { REGIONS, TIDE } from '../sim/world/regions.ts';
 import type { Beams, Lamp, Lights } from './light.ts';
 import { skies } from './sky.ts';
@@ -294,6 +294,8 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
   const S = newSurface(), n = HARBOUR.rays, step = (2 * Math.PI) / n;
   return geo.harbours.map((hb, index) => {
     const rng = seeded(index + 1), up = unit(hb.pos), [f, s] = tangents(up, hb.facing), r = hb.r, mole = r * HARBOUR.mole;
+    // in a coral lagoon the mole is a causeway of coral blocks a man can heave, not a ring of crags as wide as the reef
+    const k = REGIONS[regionOf(hb.pos)]?.flora.includes('coral') ? 0.4 : 1;
     const ground = (p: THREE.Vector3) => field.surface(p, -TIDE.amp, S).height;
     const shore = Array.from({ length: n }, (_, a) => {
       for (let t = 0.6; t <= 1.6 * r; t += 0.4) if (heightAt(geo, along(up, f, s, a * step, t)) > 0) return t;
@@ -320,13 +322,13 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     for (const [landA, mouthEnd, landR] of arms) {
       let from = landA, rFrom = landR;
       if (Math.abs(mouthEnd - from) > HARBOUR.arm) [from, rFrom] = [mouthEnd - Math.sign(mouthEnd - from) * HARBOUR.arm, mole];
-      const span = mouthEnd - from, count = Math.max(2, Math.ceil((Math.abs(span) * mole) / HARBOUR.spacing));
+      const span = mouthEnd - from, count = Math.max(2, Math.ceil((Math.abs(span) * mole) / (HARBOUR.spacing * k)));
       for (let i = 0; i <= count; i++) {
         const u = i / count, a = from + span * u, rad = THREE.MathUtils.lerp(rFrom, mole, u * u * (3 - 2 * u));
         for (let row = 0; row < 3; row++) {
           if (row && rng() < 0.35) continue;
-          const sc = (i === count && !row ? 1.7 : 0.8 + 0.55 * rng()) * (row ? 0.6 : 1);
-          const p = along(up, f, s, a + (rng() - 0.5) * 0.04, rad + (row ? (row === 1 ? -1 : 1) * (0.8 + 0.3 * rng()) : (rng() - 0.5) * 0.4));
+          const sc = (i === count && !row ? 1.7 : 0.8 + 0.55 * rng()) * (row ? 0.6 : 1) * k;
+          const p = along(up, f, s, a + (rng() - 0.5) * 0.04, rad + (row ? (row === 1 ? -1 : 1) * (0.8 + 0.3 * rng()) * k : (rng() - 0.5) * 0.4 * k));
           const m = boulder(p, f, sc, rng, ground(p), 0.2 + 0.3 * rng()), top = m.elements[12] * p.x + m.elements[13] * p.y + m.elements[14] * p.z - R;
           rocks.push(m);
           const crown = top + 0.75 * new THREE.Vector3().setFromMatrixColumn(m, 1).length();
@@ -340,7 +342,7 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     for (const { t, a } of land) {
       if (rng() < 0.6) {
         const p = along(up, f, s, (a + rng() - 0.5) * step, t + (rng() - 0.6) * 0.8);
-        rocks.push(boulder(p, f, 0.35 + 0.45 * rng(), rng, ground(p), -Infinity));
+        rocks.push(boulder(p, f, (0.35 + 0.45 * rng()) * k, rng, ground(p), -Infinity));
       }
       if (taken.length >= Math.min(5, Math.max(2, hb.moorings))) continue;
       if (taken.some((b) => Math.min(Math.abs(a - b), n - Math.abs(a - b)) < 2)) continue;

@@ -691,16 +691,27 @@ void main() {
     float turf = smoothstep(0.0, 0.4, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
     float bare = smoothstep(0.1, 0.5, m3 - 0.3 * m1) * (1.0 - edge) * (1.0 - turf);
     vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.13, 0.07, fine) + 0.05 * m1, pool, q);
-    pave = mix(pave, ground * LEAD / PARCH, 0.35 * fine);
-    pave = glaze(pave, ROSE_T, mix(0.55, 0.25, fine) * edge, 0.0, q);
-    pave = glaze(glaze(pave, SEPIA_T, 0.3 * turf, 0.0, q), OCHRE_T, 0.2 * turf, 0.0, q);
+    pave = mix(pave, ground * LEAD / PARCH, 0.55 * fine);
+    pave = glaze(pave, ROSE_T, mix(0.55, 0.04, fine) * edge, 0.0, q); // near the eye the blush is the ridge's, not the sand's
+    pave = glaze(glaze(pave, SEPIA_T, mix(0.3, 0.14, fine) * turf, 0.0, q), OCHRE_T, mix(0.2, 0.1, fine) * turf, 0.0, q);
     pave = mix(pave, ground * LEAD / PARCH, 0.45 * bare);
     float pit = fine * smoothstep(0.3, 0.5, noise3(vWorld / 1.3 + 7.0) + 0.3 * m2) * smoothstep(0.3, -0.1, above);
     pave = glaze(pave, VERD_T, 0.5 * pit, 0.6, q);
-    pave = wash(pave, ULTRA_T, 0.05 * wet);
+    // wet sand below the last tide, darker, greyer and cooler down to the water's edge
+    pave = wash(glaze(pave, SEPIA_T, 0.16 * wet * wet, 0.0, q), ULTRA_T, 0.1 * wet);
     col = mix(col, pave, reef * (1.0 - meadow));
   }
   col = mix(col, ground * LEAD / PARCH, bleached * beach * (1.0 - reef) * (1.0 - 0.6 * wet) * 0.7 * (0.85 + 0.3 * patchy));
+  if (bleached > 0.0) {
+    // shells and coral grit strewn on the coral sand near the eye, a hand long (~0.03 u): cream, now and then rose, a dark
+    // fleck of shadow at the lip
+    vec2 sg = pl / 0.3, si = floor(sg), so = fract(sg) - 0.5 - 0.6 * (vec2(hash12(si), hash12(si + 3.1)) - 0.5);
+    float sh = hash12(si + 7.7), sd = length(so * vec2(1.0, 1.6)) * 0.3, near = 1.0 - smoothstep(0.004, 0.01, upx);
+    float has = near * step(0.8, sh) * (1.0 - smoothstep(0.012, 0.016, sd));
+    vec3 shc = ground * LEAD / PARCH;
+    col = mix(col, mix(shc, shc * ROSE_T, 0.45 * step(0.94, sh)), 0.9 * has);
+    col *= 1.0 - 0.3 * has * smoothstep(0.0, 0.3, so.y);
+  }
 
   float lines = 0.0;
   vec2 across = normalize(vec2(-dot(n0, NC), dot(n0, E)) + 1e-4);
@@ -746,6 +757,12 @@ void main() {
     * 0.3 * step(0.0, patchy) * smoothstep(1.0, 2.5, -f.y);
   lines += inkLine(abs(fract(-f.y / 0.7 + 0.5) - 0.5), fwidth(f.y) / 0.7, LINE_CSS * 0.7) * beach * mud
     * 0.5 * (1.0 - smoothstep(2.0, 5.0, -f.y));                                                       // mud ripples
+  // coral sand near the eye: ripple marks the ebb left on the wet sand, parallel to the water's edge and breaking off;
+  // the strandline at the last high water, a broken line of weed, grit and shell; shells strewn above and below it
+  float nearR = f.w * (1.0 - smoothstep(0.04, 0.16, upx)), rr = rip * 1.7;
+  lines += inkLine(abs(fract(rr) - 0.5), min(fwidth(rr), 0.5), LINE_CSS * 0.55) * nearR * reef * wet * 0.45 * smoothstep(-0.25, 0.25, noise3(vWorld / 1.6 + 5.0));
+  float strand = (1.0 - smoothstep(0.03, 0.12, abs(above - 0.8 * TIDE_AMP + 0.12 * noise3(vWorld / 2.2)))) * smoothstep(-0.2, 0.2, noise3(vWorld / 1.1 + 2.0));
+  lines += stipple(pl, upx, 0.75, 5.0) * nearR * strand * 0.9;
   // the brow and foot of every cliff, heavier near the eye
   lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low);
 

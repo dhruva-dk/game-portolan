@@ -39,8 +39,8 @@ export const LOW = -TIDE.amp - DRAFT, BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp 
 export const CORAL = { step: 1, near: 55, palms: 45, drawn: 24, leaflets: 14, lee: [-0.95, -0.3] as const } as const;
 /** Clearance (u) of reef, surf and foam from a channel's centre line. */
 export const CLEAR = 1.6;
-/** Ground (u) above which a coral stands dry at mean tide: drawn as a low massive head, never a stalked table. */
-const DRY = -0.05;
+/** Every reef-front coral's top lies at least this far under the lowest water (u). */
+export const UNDER = -TIDE.amp - 0.12;
 /** The motus' dressing grid (u). */
 const MOTU = 0.6;
 
@@ -353,120 +353,18 @@ function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return g;
 }
 
-/** Living coral's pigments under clear water: cream ridges and dark meander grooves, ochre-rose, lilac, sage, the pale
- *  growing tips, a cool shade where a form turns under; bleached rubble, cream and grey. */
+/** The reef flat's dead stone: bleached rubble, cream and grey, weathered grey limestone, a cool shade beneath. */
 const C = {
-  cream: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.3), 0.5), groove: washOf(mix(PIGMENTS.ochre, PIGMENTS.sepia, 0.5), 0.6),
-  rose: washOf(mix(PIGMENTS.ochre, PIGMENTS.roseMadder, 0.55), 0.42), lilac: washOf(mix(PIGMENTS.roseMadder, PIGMENTS.ultramarine, 0.3), 0.38),
-  fan: washOf(mix(PIGMENTS.roseMadder, PIGMENTS.ultramarine, 0.4), 0.6), sage: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.35), 0.38),
-  tip: washOf(PIGMENTS.leadWhite, 0.85), shade: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.3), 0.45),
+  shade: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.3), 0.45),
   rubble: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.15), 0.62), grey: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.3), 0.5),
-  blush: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.roseMadder, 0.35), 0.45),
 };
 
-/** A rounded head r across at (x, z), h tall, lofted pole-ward in `rings` rings of k points, its rim wavering. */
-function dome(b: Brush, x: number, z: number, r: number, h: number, k: number, rings: number, ph: number): void {
-  b.kit.loft(Array.from({ length: rings + 1 }, (_, i) => {
-    const a = (i / rings) * (Math.PI / 2);
-    return ring(k, (j) => -0.03 + h * Math.sin(a) + 0.008 * Math.sin(j * 2.1 + i + ph), (j) => Math.max(r * Math.cos(a) * (0.9 + 0.1 * Math.sin(j * 1.3 + ph)), 0.003))
-      .map((p) => p.add(vec(x, 0, z)));
-  }));
-}
-
-/** A patch of massive corals 1 across, ≤ 0.3 tall, each head of believable size beside a hull: a brain coral's dome,
- *  its meander grooves drawn dark over the cream ridges, a sage boulder coral, an ochre-rose and a lilac knob; all
- *  smooth, cool where they turn under. */
-function massiveKit(seed: number, far = false, dead = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(C.cream);
-  const heads: [number, number, number][] = [[0.08, 0.04, 0.3], [-0.26, -0.16, 0.19], [0.26, -0.28, 0.15], [-0.17, 0.3, 0.13]];
-  heads.slice(0, far || dead ? 3 : 4).forEach(([hx, hz, r], kind) => {
-    const ph = rnd() * TAU, body = dead ? [C.rubble, C.grey, C.sage][kind] : [C.cream, C.sage, C.rose, C.lilac][kind];
-    b.pick = (c, n) => {
-      if (n.y < 0.15) return C.shade;
-      if (dead) return c.y > 0.04 + 0.5 * r * 0.45 ? C.sage : body; // a micro-atoll: its dead crown flat and greyed with algae, its rim bleached
-      if (kind !== 0) return body;
-      const x = (c.x - hx) / r, z = (c.z - hz) / r, m = Math.sin(x * 8 + 2.4 * Math.sin(z * 6 + ph)) + Math.sin(z * 7 + 2 * Math.sin(x * 5 - ph));
-      return Math.abs(m) < 0.4 ? C.groove : body;
-    };
-    dome(b, hx, hz, r, r * (dead ? 0.45 : 0.72 + 0.2 * rnd()), far || dead ? 8 : kind ? 9 : 14, far || dead ? 2 : kind ? 3 : 5, ph);
-  });
-  return smooth(b.kit.build());
-}
-
-/** A flat ribbon from a to c, w wide, lying in the plane with normal `nrm`. */
-function ribbon(b: Brush, a: V, c: V, w: number, nrm: V): void {
-  const p = vec().subVectors(c, a).cross(nrm).normalize().multiplyScalar(w);
-  b.tri(a.clone().add(p), a.clone().sub(p), c.clone().sub(p));
-  b.tri(a.clone().add(p), c.clone().sub(p), c.clone().add(p));
-}
-
-/** A sea fan h tall at `at`, broadside across the current (yaw): ribs fanning up from its holdfast, laced across. */
-function seaFan(b: Brush, at: V, yaw: number, h: number): void {
-  const side = vec(Math.cos(yaw), 0, Math.sin(yaw)), nrm = vec(-Math.sin(yaw), 0, Math.cos(yaw)), ribs: V[][] = [];
-  b.pick = null;
-  b.wash = C.fan;
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 6 - 0.5) * 1.8, d = side.clone().multiplyScalar(Math.sin(a)).add(vec(0, Math.cos(a), 0));
-    const pts = [0, 0.4, 0.72, 1].map((s) => at.clone().addScaledVector(d, h * s * (0.8 + 0.2 * Math.cos(2.5 * a))).addScaledVector(nrm, 0.03 * s * s));
-    ribs.push(pts);
-    for (let j = 0; j < 3; j++) ribbon(b, pts[j], pts[j + 1], 0.009 * (1 - j / 4), nrm);
-  }
-  for (let j = 2; j < 4; j++) for (let i = 0; i < 6; i++) ribbon(b, ribs[i][j], ribs[i + 1][j], 0.005, nrm);
-}
-
-/** A staghorn thicket 1 across, ~0.3 tall: slender branches forking up and out, lilac or ochre-rose, their growing tips
- *  cream-white, cool shade in the thicket's heart; a lilac sea fan standing in it. */
-function branchKit(seed: number, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), body = seed % 2 ? C.lilac : C.rose, b = new Brush(body);
-  const paint = (c: V): Wash => (c.y > 0.22 ? C.tip : c.y > 0.06 ? body : C.shade);
-  const grow = (from: V, dir: V, len: number, r: number, depth: number): void => {
-    const to = from.clone().addScaledVector(dir, len);
-    b.pick = depth === 0 ? (c) => (c.y > 0.12 ? C.tip : paint(c)) : paint;
-    stick(b, from, to, r, r * 0.75, depth === 0);
-    if (depth === 0) return;
-    for (const turn of [-0.5, 0.45 + 0.2 * rnd()]) {
-      const d = dir.clone().applyAxisAngle(vec(0, 1, 0), turn * 1.5).add(vec(0, 0.5, 0)).normalize();
-      grow(to, d, len * (0.72 + 0.12 * rnd()), r * 0.74, depth - 1);
-    }
-  };
-  for (let k = 0; k < (far ? 5 : 7); k++) {
-    const a = (k / 7) * TAU + 0.5 * rnd(), out = 0.04 + 0.32 * rnd();
-    grow(vec(out * Math.cos(a), -0.03, out * Math.sin(a)), vec(0.45 * Math.cos(a), 0.9, 0.45 * Math.sin(a)).normalize(), (0.1 + 0.035 * rnd()) * (far ? 1.7 : 1), 0.02, far ? 0 : 2);
-  }
-  if (!far) seaFan(b, vec(0.3 - 0.6 * (seed % 2), -0.02, 0.28), 0.4 + rnd(), 0.28);
-  return smooth(b.kit.build());
-}
-
-/** A spread of table corals 1 across, ≤ 0.22 tall: three plates on stout stalks, ribbed out from the heart (sage and
- *  cream), the rim scalloped and white, cool shade beneath. */
-function tableKit(seed: number, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(C.shade), k = far ? 8 : 16;
-  for (const [x, z, y, R0] of ([[0.06, 0.02, 0.2, 0.3], [-0.3, -0.22, 0.13, 0.17], [0.28, -0.3, 0.1, 0.13]] as const).slice(0, far ? 1 : 3)) {
-    b.pick = null;
-    b.wash = C.shade;
-    tube(b, [vec(x, -0.04, z), vec(x + 0.01, y * 0.6, z), vec(x + 0.015, y - 0.01, z)], [0.05 * R0 / 0.3, 0.035 * R0 / 0.3, 0.045 * R0 / 0.3], 5);
-    const top = vec(x + 0.015, y + 0.012, z);
-    const rim = ring(k, (j) => y - 0.012 + 0.008 * Math.sin(j * 1.7 + seed), (j) => R0 * (0.84 + 0.16 * Math.abs(Math.sin(j * 1.9 + seed)) + 0.06 * rnd())).map((p) => p.add(vec(x, 0, z)));
-    const lip = rim.map((p) => p.clone().sub(top).multiplyScalar(1.05).add(top).setY(p.y - 0.022));
-    for (let j = 0; j < k; j++) {
-      const a = rim[j], c = rim[(j + 1) % k];
-      b.wash = j % 2 ? C.sage : C.cream;
-      b.tri(top, c, a);
-      b.wash = C.tip;
-      b.tri(a, c, lip[(j + 1) % k]);
-      b.wash = C.shade;
-      b.tri(a, lip[(j + 1) % k], lip[j]);
-    }
-  }
-  return b.kit.build();
-}
-
-/** A reef-flat paving slab or beachrock slab 1 across: a low worn limestone pad with a ragged edge, pale and smooth on
- *  top with a rose algal blush at its rim and grey pits, undercut in cool shade. */
+/** A reef-flat paving slab or beachrock slab 1 across: a thin worn limestone plate bedded in the sand, its ragged edge
+ *  barely proud of it, pale and smooth on top with grey pits and a weathered grey rim. */
 function slabKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = 12, jit = Array.from({ length: k }, (_, j) => 0.78 + 0.14 * Math.sin(j * 2.3 + seed) + 0.12 * rnd()), b = new Brush(C.rubble);
-  b.pick = (c, n) => (n.y < 0.35 ? C.shade : Math.hypot(c.x, c.z) > 0.36 ? C.blush : hash(Math.floor(c.x * 9) + seed, Math.floor(c.z * 9)) > 0.86 ? C.grey : C.rubble);
-  b.kit.loft([ring(k, -0.05, (j) => 0.47 * jit[j]), ring(k, 0.045, (j) => 0.5 * jit[j]), ring(k, 0.075, (j) => 0.44 * jit[j]), ring(k, 0.09, (j) => 0.3 * jit[j]), ring(k, 0.095, (j) => 0.12 * jit[j])]);
+  const rnd = seeded(seed), k = 12, jit = Array.from({ length: k }, (_, j) => 0.72 + 0.16 * Math.sin(j * 2.3 + seed) + 0.16 * rnd()), b = new Brush(C.rubble);
+  b.pick = (c, n) => (n.y < 0.35 ? C.shade : Math.hypot(c.x, c.z) > 0.38 || hash(Math.floor(c.x * 9) + seed, Math.floor(c.z * 9)) > 0.86 ? C.grey : C.rubble);
+  b.kit.loft([ring(k, -0.06, (j) => 0.46 * jit[j]), ring(k, 0.025, (j) => 0.5 * jit[j]), ring(k, 0.045, (j) => 0.42 * jit[j]), ring(k, 0.055, (j) => 0.26 * jit[j]), ring(k, 0.058, (j) => 0.1 * jit[j])]);
   return smooth(b.kit.build());
 }
 
@@ -790,20 +688,17 @@ export function planCoral(field: TerrainField): CoralPlan {
       // the reef: a hull grounds here at low water at least (and no part reaching within CLEAR of a channel's line)
       if (open(px, py, CLEAR + 0.9)) continue;
       if (h >= BLOCK) {
-        if (Math.abs(coastAt(geo, dir)) < 1.2 && h > 0.1 && r > 0.8) place(plan.slabs, px, py, { sink: 0.05, fwd: out, tilt: 0.12, s: 0.6 + 0.5 * rnd(), sy: 1.4, hug: true, kitH: 0.1 });
-        else if (seaward && r < 0.35) place(plan.slabs, px, py, { sink: 0.04, fwd: east, yaw, s: 0.4 + 0.45 * rnd(), sy: 1.2, hug: true, kitH: 0.1 });
-        else if (seaward && windward && r < 0.6) place(plan.boulders, px, py, { sink: 0.1, fwd: east, yaw, tilt: 0.3 * (rnd() - 0.5), s: 0.3 + 0.55 * rnd(), kitH: 0.42 });
-        else if (r < 0.62) {
-          const k = rnd();
-          if (k < 0.4) place(plan.heads, px, py, { sink: 0.08, fwd: east, yaw, s: 0.6 + rnd(), kitH: 0.46 });
-          else if (k < 0.75) place(plan.branches, px, py, { sink: 0.05, fwd: east, yaw, s: 0.7 + 0.8 * rnd(), kitH: 0.45 });
-          else place(plan.tables, px, py, { sink: 0.04, fwd: east, yaw, s: 0.7 + 0.7 * rnd(), kitH: 0.36 });
-        }
+        if (Math.abs(coastAt(geo, dir)) < 1.2 && h > 0.1 && r > 0.8) place(plan.slabs, px, py, { sink: 0.03, fwd: out, tilt: 0.1, s: 0.4 + 0.35 * rnd(), hug: true, kitH: 0.06 });
+        else if (seaward && r < 0.35) place(plan.slabs, px, py, { sink: 0.03, fwd: east, yaw, s: 0.3 + 0.3 * rnd(), hug: true, kitH: 0.06 });
+        else if (seaward && windward && r < 0.6) place(plan.boulders, px, py, { sink: 0.1, fwd: east, yaw, tilt: 0.3 * (rnd() - 0.5), s: 0.22 + 0.2 * rnd(), kitH: 0.42 });
+        // no living coral on the flat: it would stand at the waterline; dead rubble, bedded, a hand to a forearm across
+        else if (r < 0.78) place(plan.boulders, px, py, { sink: 0.06, fwd: east, yaw, tilt: 0.2 * (rnd() - 0.5), s: 0.14 + 0.16 * rnd(), sy: 0.6 * (0.14 + 0.16 * rnd()), kitH: 0.42 });
       } else if (r < 0.5) {
-        // the reef front: awash at low water, crossed at high, so every top stays under a keel then
+        // the reef front: corals whose tops stay under the lowest water, so the sea paints them on its floor, seen through
+        // the water and tinted by its depth (sea.ts); never drawn standing at or above the waterline
         const k = rnd(), kind: [Part[], number, number] = k < 0.4 ? [plan.heads, 0.46, 0.08] : k < 0.75 ? [plan.branches, 0.45, 0.05] : [plan.tables, 0.36, 0.04];
-        const s = Math.min(0.7 + 0.9 * rnd(), (BLOCK - 0.05 - (ground - kind[2])) / kind[1]);
-        if (s >= 0.35) {
+        const s = Math.min(0.7 + 0.9 * rnd(), (UNDER - (ground - kind[2])) / kind[1]);
+        if (s >= 0.2) {
           const p = place(kind[0], px, py, { sink: kind[2], fwd: east, yaw, s, kitH: kind[1] });
           if (plan.fish.length < 160 && rnd() < 0.4) plan.fish.push(p.dir);
         }
@@ -941,14 +836,9 @@ export class CoralAtolls {
       fixed(shrubKit(9), plan.shrubs),
       fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes), fixed(hulkKit(8), plan.hulks),
     ];
-    // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it); palms
-    // in full near the eye, sketched beyond
+    // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it; the
+    // reef-front corals are the sea's, painted on its floor under the water); palms in full near the eye, sketched beyond
     const near: [THREE.BufferGeometry, Part[], number, number, boolean][] = [
-      // tables and thickets only where the water stands over them at mean tide; on the dry flat, low massive heads
-      ...([[massiveKit, plan.heads.filter((p) => p.ground <= DRY), 2], [(s: number, far?: boolean) => massiveKit(s, far, true), [...plan.heads, ...plan.branches, ...plan.tables].filter((p) => p.ground > DRY), 3],
-        [branchKit, plan.branches.filter((p) => p.ground <= DRY), 6], [tableKit, plan.tables.filter((p) => p.ground <= DRY), 7]] as [typeof massiveKit, Part[], number][])
-        .flatMap(([kit, parts, seed]): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
-        [kit(seed), parts, 0, CORAL.drawn, false], [kit(seed, true), parts, CORAL.drawn, CORAL.near, false]]),
       [slabKit(12), plan.slabs, 0, CORAL.near, true], [boulderKit(13), plan.boulders, 0, CORAL.near, false],
       ...[11, 29, 23].flatMap((seed, k): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
         [palmNearKit(seed, k === 2), plan.palms[k], 0, CORAL.leaflets, false], [palmKit(seed, k === 2), plan.palms[k], CORAL.leaflets, CORAL.palms, false],

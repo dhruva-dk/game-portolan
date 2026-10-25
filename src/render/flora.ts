@@ -329,7 +329,7 @@ export const FLORA: Record<FloraKind, Species> = {
   duneGrass: { kit: () => tuftKit(false), size: [0.3, 0.5], near: 34, far: 0, sway: 0.35 },
   reed: { kit: () => tuftKit(true), size: [0.5, 0.9], near: 40, far: 0, sway: 0.25 },
   kelp: { kit: kelpKit, size: [1.6, 2.4], near: 70, far: 0, sway: 0.22, veil: true },
-  coral: { kit: coralKit, size: [0.9, 1.6], near: 120, far: 0, sway: 0, veil: true },
+  coral: { kit: coralKit, size: [0.35, 0.6], near: 120, far: 0, sway: 0, veil: true },
 };
 export const KINDS = Object.keys(FLORA) as FloraKind[];
 
@@ -398,8 +398,10 @@ function density(kind: FloraKind, c: Cell): number {
     case 'duneGrass': return land && (g === GROUND.meadow || g === GROUND.beach) && c.inland < 7 && c.height > 0.8 ? 1.1 : 0;
     case 'reed': return land && (g === GROUND.mud || g === GROUND.meadow) && c.inland < 4 ? 0.35 : 0;
     case 'kelp': return c.floor === FLOOR.kelp && c.depth > 1 && c.depth < 10 ? 0.3 : 0;
-    // coral only on the reef a hull grounds on at low water, so the heads seen through the water mark a true hazard
-    case 'coral': return c.floor === FLOOR.coral && c.depth > 0.35 && c.depth < TIDE.amp + DRAFT ? 0.55 : 0;
+    // coral standing only down the reef's slopes, so deep that its heads (≤ 0.33 u tall) lie well under the lowest
+    // water, seen through it and tinted by it, never at or on the waterline (WP17); the sea paints the reef's own heads,
+    // those a hull grounds on, on its floor
+    case 'coral': return c.floor === FLOOR.coral && c.depth > TIDE.amp + DRAFT + 0.9 && c.depth < 3.6 ? 0.3 : 0;
   }
 }
 
@@ -628,8 +630,8 @@ void main() {
   vec3 col = glaze(parchment(q), vPaint.rgb, vPaint.w, 0.35, q);
   col = mix(col, hatchInk(0.15), 0.6 * smoothstep(0.5, 0.9, vEdge));
   float d = max(vDepth, 0.0);
-  col = glaze(col, uWater, 0.55 * (1.0 - exp(-d * 0.25)), 0.3, q);
-  writeVeil(candle(col, vWorld), vFade * (0.45 + 0.45 * exp(-d * 0.22)));
+  col = glaze(col, uWater, 0.75 * (1.0 - exp(-d * 0.6)), 0.3, q); // tinted by the water over it, never garnish (WP17)
+  writeVeil(candle(col, vWorld), vFade * (0.3 + 0.6 * exp(-d * 0.5)));
 #else
   // levels and thinning dissolve by a stipple anchored to the world: the far level fills what the near one leaves
   float h = fhash(floor(vWorld * 9.0));

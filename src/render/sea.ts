@@ -348,7 +348,7 @@ void main() {
   // the clear region's chart plane under the floor point (its coral is laid there, unstretched)
   vec2 xc = vec2(dot(Pf, uClearE), dot(Pf, uClearN)), xcx = dFdx(xc), xcy = dFdy(xc);
   float cpx = max(max(length(xcx), length(xcy)), 1e-5);
-  float vis = exp(-max(uSeaLevel - ff.x, 0.0) * mix(0.34, 0.17, max(max(lagoon, fl.g), clear))) * water
+  float vis = exp(-max(uSeaLevel - ff.x, 0.0) * mix(mix(0.34, 0.17, max(lagoon, fl.g)), 0.12, clear)) * water
             * (1.0 - 0.7 * clear * smoothstep(4.5, 7.5, uSeaLevel - ff.x)) // the floor lost in the clear water's deep
             * (1.0 - pow(1.0 - clamp(dot(V, vNormal), 0.0, 1.0), 5.0)) * (1.0 - 0.6 * uSquall) * (1.0 - smoothstep(30.0, 110.0, dist));
   if (vis > 0.02) {
@@ -373,52 +373,65 @@ void main() {
     fc = mix(fc, hatchInk(rt), hatching(x * 1.3, xdx * 1.3, xdy * 1.3, 0.85 * rt, 13.0) * rock * mk);
     fc = mix(fc, hatchInk(0.7), 0.85 * crack * fl.r * mk);
     }
-    // coral: heads strewn over the reef's slopes, each with a lumpy outline of its own: brain domes furrowed by
-    // meanders, staghorn thickets forking out from their hearts to pale growing tips, table plates ribbed from their
-    // stalks; rose madder, ochre and cream, hatched on the side turned from the sun, a shadow cast on the sand beside
-    // (in the clear region on its chart plane, so no head is stretched)
-    if (coral > 0.0) {
+    // coral: the reef's heads as an engraver draws them through the water: crowded in patches with bare sand and rubble
+    // between, no two alike (a few big bommies, smaller heads gathered round them, each its own size, lobes and wandering
+    // edge): brain domes furrowed by meanders, branching thickets stippled with their pale tips, plates, dark soft corals;
+    // dimmed by the depth over them (and the water's glaze laid over the floor), the shade glazed, hatched and outlined
+    // only while shallow and large enough to read, the outline broken and softening as they lie deeper; a shadow cast on
+    // the sand beside (in the clear region on its chart plane, so no head is stretched)
+    float cw = max(coral, 0.55 * clear * sand * smoothstep(0.3, 0.7, ff.z)); // the lagoon's sand: patch reefs, sparser
+    if (cw > 0.0) {
     bool onChart = clear > 0.0;
     vec2 xr = onChart ? xc : x, Lr = onChart ? normalize(vec2(dot(uSun, uClearE), dot(uSun, uClearN)) + 1e-6) : L;
-    float rpx = onChart ? cpx : fpx, mkr = onChart ? 1.0 : mk, idC;
-    vec4 cc = cells(xr / 1.4, idC);
-    vec2 o = -cc.zw * 1.4;
-    float d = length(o), th = atan(o.y, o.x), kind = fract(idC * 7.31), has = coral * step(0.14, idC);
-    float rad = (0.26 + 0.24 * fract(idC * 3.7)) * (1.0 + 0.16 * sin(3.0 * th + idC * 41.0) + 0.09 * sin(7.0 * th + idC * 17.0));
-    float head = has * (1.0 - smoothstep(-rpx, rpx, d - rad));
-    float shadow = has * (1.0 - smoothstep(-rpx, rpx, length(o + Lr * 0.2 * rad) - rad)) * (1.0 - head);
-    float shade = clamp(0.45 - 0.9 * dot(o / rad, Lr), 0.0, 1.0);
-    fc = glaze(fc, ROCK_T, 0.4 * shadow, 0.0, q);
-    float tint = fract(idC * 13.7), ink = 0.0, pale = 0.0;
-    if (kind < 0.45) {
-      // a brain dome: cream to rose, its meanders wandering across it
-      fc = glaze(fc, mix(CREAM_T, CORAL_T, tint), (0.35 + 0.25 * tint) * head, 0.0, q);
-      float w = textureLod(tMarks, xr / 0.9, 0.0).g, mz = dot(o, vec2(cos(idC * 9.0), sin(idC * 9.0))) / 0.075 + 3.0 * w + 0.6 * sin(d * 9.0);
-      ink = head * (1.0 - smoothstep(0.3, 1.0, abs(fract(mz) - 0.5) * 0.075 / rpx / uRenderPx)) * smoothstep(3.0, 6.0, 0.075 / rpx) * 0.6;
-    } else if (kind < 0.8) {
-      // staghorn: forked branches out from the heart, the sand and shadow between them, the tips pale
-      float a = th * 7.0 / 6.2831853 + idC * 5.0, sp = abs(fract(a) - 0.5) * 6.2831853 / 7.0 * d;
-      float a2 = a * 2.0 + 0.5, sp2 = abs(fract(a2) - 0.5) * 6.2831853 / 14.0 * d;
-      float twig = d < 0.45 * rad ? sp : min(sp, sp2), wd = 0.045 * (1.0 - 0.5 * d / rad) + rpx;
-      float br = head * (1.0 - smoothstep(wd - rpx, wd + rpx, twig));
-      fc = glaze(fc, ROCK_T, 0.3 * head * (1.0 - br), 0.0, q);
-      fc = glaze(fc, mix(CORAL_T, CREAM_T, tint), (0.5 + 0.2 * tint) * br, 0.0, q);
-      pale = br * smoothstep(0.7, 0.95, d / rad);
-      ink = head * (1.0 - br) * (1.0 - smoothstep(wd, wd + 2.0 * rpx, twig)) * 0.5;
-    } else {
-      // a table plate on its stalk, ribbed out from the middle, its rim shading the sand below
-      fc = glaze(fc, mix(TURQ_T, CREAM_T, tint), 0.4 * head, 0.0, q);
-      float rib = abs(fract(th * 26.0 / 6.2831853) - 0.5) * 6.2831853 / 26.0 * d;
-      ink = head * (1.0 - smoothstep(0.3, 1.0, rib / rpx / uRenderPx)) * smoothstep(0.2, 0.4, d / rad) * smoothstep(4.0, 8.0, 0.24 / rpx) * 0.4;
-      fc = glaze(fc, ROCK_T, 0.35 * shadow, 0.0, q);
+    vec2 xrx = onChart ? xcx : xdx, xry = onChart ? xcy : xdy;
+    float rpx = onChart ? cpx : fpx, mkr = onChart ? 1.0 : mk, cpxPx = rpx * uRenderPx;
+    float fdep = max(uSeaLevel - ff.x, 0.0), shallow = 1.0 - smoothstep(0.6, 2.6, fdep), dim = mix(0.75, 1.0, shallow);
+    float crowd = smoothstep(0.3, 0.72, textureLod(tMarks, xr / 13.0 + 0.37, 0.0).b + 0.3 * (n1 - 0.5));
+    fc = glaze(fc, ROCK_T, 0.16 * cw * crowd * smoothstep(0.45, 0.75, n2) * dim, 0.0, q); // rubble and grit between
+    for (int sI = 0; sI < 2; sI++) {
+      float sc = sI == 0 ? 3.4 : 1.15, idC;
+      vec4 cc = cells(xr / sc + float(sI) * 17.3, idC);
+      float has = smoothstep(0.08, 0.3, cw) * (sI == 0 ? step(1.0 - (0.3 + 0.3 * crowd) * min(1.0, 2.0 * cw), idC) : step(1.0 - (0.15 + 0.65 * crowd) * min(1.0, 2.0 * cw), idC));
+      if (has <= 0.0) continue;
+      vec2 o = -cc.zw * sc;
+      float d = length(o), th = atan(o.y, o.x), kind = fract(idC * 7.31), tint = fract(idC * 13.7);
+      float r0 = sI == 0 ? 0.32 + 0.5 * fract(idC * 3.7) : 0.1 + 0.3 * pow(fract(idC * 3.7), 1.5);
+      float rad = r0 * (0.85 + 0.45 * vnoise(o / r0 * 1.4 + idC * 91.0) + 0.1 * sin(floor(2.0 + 4.0 * fract(idC * 2.9)) * th + idC * 41.0));
+      float head = has * (1.0 - smoothstep(-rpx, rpx, d - rad));
+      float shadow = has * (1.0 - smoothstep(-rpx, rpx, length(o + Lr * 0.25 * rad) - rad)) * (1.0 - head);
+      float shade = clamp(0.4 - 0.9 * dot(o / rad, Lr), 0.0, 1.0), big = smoothstep(6.0, 22.0, rad / cpxPx);
+      fc = glaze(fc, ROCK_T, 0.5 * shadow * dim, 0.0, q);
+      // the living mass, dark against the sand as heads are seen from a boat (umber to olive, mottled)
+      fc = mix(fc, fc * mix(vec3(0.2, 0.16, 0.13), vec3(0.17, 0.21, 0.14), tint), (0.6 + 0.3 * vnoise(xr / 0.3 + idC * 7.0)) * head * dim);
+      float ink = 0.0, pale = 0.0;
+      if (kind < 0.36) {
+        // a brain or boulder dome: cream to rose or sage, its meanders wandering across it
+        fc = glaze(fc, mix(mix(CREAM_T, CORAL_T, tint), KELP_T, step(0.7, tint) * 0.6), (0.3 + 0.25 * tint) * head * dim, 0.0, q);
+        float w = textureLod(tMarks, xr / 0.9, 0.0).g, mz = dot(o, vec2(cos(idC * 9.0), sin(idC * 9.0))) / 0.06 + 3.0 * w + 0.6 * sin(d * 11.0);
+        ink = head * (1.0 - smoothstep(0.3, 1.0, abs(fract(mz) - 0.5) * 0.06 / cpxPx)) * smoothstep(3.0, 6.0, 0.06 / cpxPx) * 0.45;
+      } else if (kind < 0.66) {
+        // a branching thicket: dark between its branches, the branches a tangle stippled with pale growing tips
+        float tw = vnoise(xr / 0.07 + idC * 13.0), twig = abs(tw - 0.5), wd = 0.07 + 0.04 * (1.0 - d / rad);
+        float br = mix(0.35 * head, head * (1.0 - smoothstep(wd - 0.03, wd + 0.03, twig)), smoothstep(1.5, 4.0, 0.07 / cpxPx));
+        fc = glaze(fc, ROCK_T, 0.32 * head * dim, 0.0, q);
+        fc = glaze(fc, mix(CORAL_T, CREAM_T, tint), (0.45 + 0.2 * tint) * br * dim, 0.0, q);
+        pale = br * step(0.75, vnoise(xr / 0.035 + 3.0)) * smoothstep(3.0, 6.0, 0.035 / cpxPx);
+      } else if (kind < 0.84) {
+        // a plate: flat and pale, a ring of growth, its rim shading the sand below further out
+        fc = glaze(fc, mix(TURQ_T, CREAM_T, tint), 0.32 * head * dim, 0.0, q);
+        fc = glaze(fc, ROCK_T, 0.2 * shadow * dim, 0.0, q);
+        ink = head * (1.0 - smoothstep(0.3, 1.0, abs(fract(d / rad * 3.0 + 0.3 * vnoise(o * 9.0)) - 0.5) * rad / 3.0 / cpxPx)) * 0.25 * big;
+      } else {
+        // a dark soft coral or a dead head furred with turf: olive and umber, mottled
+        fc = glaze(fc, mix(KELP_T, ROCK_T, tint), (0.35 + 0.2 * vnoise(xr / 0.12)) * head * dim, 0.0, q);
+      }
+      // shade glazed on the side turned from the sun; hatched and outlined only while shallow and large on the page
+      fc = glaze(fc, ROCK_T, 0.3 * shade * head * dim, 0.0, q);
+      float edge = has * (1.0 - smoothstep(0.4, 1.2, abs(d - rad) / cpxPx)) * (0.2 + 0.8 * shade) * step(0.35, vnoise(vec2(th * 2.5, idC * 37.0)));
+      fc = mix(fc, hatchInk(0.5), hatching(xr * 1.6, xrx * 1.6, xry * 1.6, 0.45 * shade * head, 17.0) * mkr * shallow * big);
+      fc = mix(fc, hatchInk(0.55), max(edge * 0.5 * big, ink) * mkr * shallow);
+      fc = mix(fc, LEAD * uPaper / PARCH, 0.45 * pale * shallow);
     }
-    // the outline drawn heavier on the shaded side, light where the sun strikes, the shade hatched; the water between
-    // softens the lines as the head lies deeper
-    float soft = 1.0 - 0.6 * smoothstep(0.3, 2.5, uSeaLevel - ff.x);
-    float edge = has * (1.0 - smoothstep(0.4, 1.2, abs(d - rad) / rpx / uRenderPx)) * (0.25 + 0.75 * shade);
-    fc = mix(fc, hatchInk(0.5), hatching(xr * 1.6, (onChart ? xcx : xdx) * 1.6, (onChart ? xcy : xdy) * 1.6, 0.45 * shade * head, 17.0) * mkr * soft);
-    fc = mix(fc, hatchInk(0.55), max(edge * 0.55, ink) * mkr * soft);
-    fc = mix(fc, LEAD * uPaper / PARCH, 0.55 * pale);
     }
     // kelp: the forest floor in its own shade, holdfasts and blades swaying with the swell
     if (fl.g > 0.0) {
@@ -459,7 +472,7 @@ void main() {
     // (the deep reads dark even to a low eye: a pass's water is the one dark way through the pale reef)
     float turq = smoothstep(0.0, 0.9, depth) * (0.42 + 0.26 * smoothstep(1.0, 4.0, depth)) * (1.0 - 0.7 * dk) * (1.0 - open.x);
     col = glaze(col, TURQ_T, clear * water * glance * turq * tone, 0.6 * open.y, qs);
-    col = glaze(col, SHELF_T, clear * water * mix(glance, 1.0, 0.6) * 0.42 * dk * (1.0 - 0.35 * open.x), 1.2 * drop.y * (1.0 - ring), qs);
+    col = glaze(col, SHELF_T, clear * water * mix(glance, 1.0, 0.6) * 0.42 * dk * (1.0 - 0.35 * open.x), 0.4 * drop.y * (1.0 - ring), qs); // a soft pooled edge, never a sticker's outline
   }
   // the swell's backs, turned from the sun, take one more glaze laid with a frilled, pooled edge: brushed bands
   float back = -10.0 * dot(vNormal - dir, uSun) + 0.2 * (q.mottle - 0.5);
@@ -630,9 +643,12 @@ void main() {
   float riding = mix(0.6, 1.0, smoothstep(-0.4, 0.6, vLift)) * water * smoothstep(0.8, 2.5, depth) * near * (1.0 - lead);
   // (each set is drawn only where it can show: marks take no derivatives, so they may sit in a branch — WP30a)
   float waves = 0.0, caps = 0.0, crestK = smoothstep(0.1, 0.6, vLift), capK = riding * smoothstep(0.3, 0.8, vLift);
+  // a lagoon inside its reef is sheltered: the open sea's strokes give way to small close-set wavelets, lighter
+  float sheltered = clear * smoothstep(0.3, 0.7, f.z);
   if (riding > 0.0) {
     waves = marks(P, dir, wind, upx, STROKE_CELL, uStrokes, 0.0, 0, 0.0);
     if (crestK > 0.0) waves = max(waves, crestK * marks(P, dir, wind, upx, 2.8 * STROKE_CELL, 0.5 * uStrokes, 13.0, 0, 0.0));
+    if (sheltered > 0.0) waves = mix(waves, 0.6 * marks(P, dir, wind, upx, 0.45 * STROKE_CELL, min(1.0, 1.4 * uStrokes), 31.0, 0, 0.0), sheltered);
     waves *= riding;
     if (capK > 0.0) caps = capK * marks(P, dir, wind, upx, 1.7 * STROKE_CELL, uCaps, 23.0, 0, 0.0);
   }
