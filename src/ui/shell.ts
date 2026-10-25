@@ -12,7 +12,9 @@ import type { World } from '../app/worldWorker.ts';
 import type { Lettering } from '../lettering/ink.ts';
 import type { Pipeline } from '../render/pipeline.ts';
 import { readView, type View } from './safeArea.ts';
-import { harbour, match, results, title } from './screens.ts';
+import { harbour } from './harbour.ts'; // WP26
+import { match, results } from './screens.ts';
+import { title } from './title.ts'; // WP26
 
 export type ScreenName = 'title' | 'harbour' | 'match' | 'results';
 

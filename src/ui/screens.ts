@@ -12,6 +12,7 @@ import { HudState, hudLayout } from './hud.ts';
 import { HudView } from './icons.ts';
 import { ButtonBase, Scrap } from './parchment.ts';
 import { safeRect, type View } from './safeArea.ts';
+import { applySettings, settings } from './settings.ts';
 import type { Screen, ScreenContext, Touch } from './shell.ts';
 
 /** The screens drawn on the bare page have no world beneath them. */
@@ -122,6 +123,8 @@ export function match(ctx: ScreenContext): Screen {
   // WP25: the controls feed the session's input, the HUD reads the match, the haptics feel each tick's events
   const ui = new THREE.Group(), controls = new Controls(), hud = new HudView(ctx.pipeline.style, ctx.lettering), reading = new HudState(), haptics = new Haptics();
   ui.add(hud.group);
+  // WP26: the settings in force — haptics on or off, reduced motion for the camera's lift (WP24)
+  applySettings(settings(), { haptics, motion: (view.rig as unknown as { zoom?: { reducedMotion: boolean } }).zoom });
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), globe = new THREE.Sphere(new THREE.Vector3(), R), hit = new THREE.Vector3();
   let vw = 1, vh = 1;
   controls.pick = (x, y) => {
