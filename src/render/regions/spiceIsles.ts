@@ -352,7 +352,7 @@ export function planSpice(field: TerrainField): SpicePlan {
       // blooming groves: a slow field picks where they gather, and which bloom gold and which vermilion
       const grove = 0.5 + 0.5 * Math.sin(0.21 * px + 1.3 * Math.sin(0.17 * py)) * Math.cos(0.19 * py - 1.1 * Math.sin(0.23 * px));
       if (edge && q < 0.85 && clear(px, py, 1)) {
-        place(plan.edge, px, py, { sink: 0.1, fwd: tan(px, py, cx / cl, cy / cl), yaw: 0.5 * (fr() - 0.5), s: 1.2 + 0.7 * fr(), sy: 1.1 + 0.6 * fr(), kitH: 0.75, reach: 1 });
+        place(plan.edge, px, py, { sink: 0.1, fwd: tan(px, py, cx / cl, cy / cl), yaw: 0.5 * (fr() - 0.5), s: 2 + 0.8 * fr(), sy: 2.2 + 0.8 * fr(), kitH: 0.95, reach: 1.5 });
         continue;
       }
       if (!clear(px, py, 2)) continue;
@@ -424,7 +424,9 @@ export class SpiceIsles {
     const lod: [RainForm, number, Part[], number, number, number][] = [
       ['emergent', 17, plan.emergents, 0, SPICE.near, 0], ['emergent', 17, plan.emergents, SPICE.near * 0.85, SPICE.far, 0],
       ['flowering', 21, plan.flowers[0], 0, SPICE.near, 1], ['flowering', 21, plan.flowers[0], SPICE.near * 0.85, SPICE.far, 1],
-      ['flowering', 27, plan.flowers[1], 0, SPICE.near, 2], ['flowering', 27, plan.flowers[1], SPICE.near * 0.85, SPICE.far, 2]];
+      ['flowering', 27, plan.flowers[1], 0, SPICE.near, 2], ['flowering', 27, plan.flowers[1], SPICE.near * 0.85, SPICE.far, 2],
+      // the forest's edge over the beaches: a wall of saplings, ferns and draped climbers under the canopy
+      ['edge', 31, plan.edge, 0, SPICE.near, 0], ['edge', 31, plan.edge, SPICE.near * 0.85, SPICE.edge, 0]];
     this.lod = lod.map(([form, seed, parts, from, to, k]) => {
       const g = rainGeometry(form, from ? 1 : 0, seed).toNonIndexed();
       for (const [name, size] of [['aFoliage', 3], ['aBloom', 3], ['aSeed', 2]] as const) g.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, parts.length) * size), size));

@@ -252,8 +252,9 @@ function crownKit(lod: number, crown: Crown): Kit {
  *  a lower, rounder crown whose clumps carry a blossom weight (soft dabs, thick on the sunward tops). `emergent`: a
  *  pale buttressed bole standing clear of the canopy under a broad, irregular, two-tiered crown of clumps on long
  *  fanning limbs, lianas hanging from it (never a lollipop). Far: the bole and a few billows. */
-export type RainForm = 'canopy' | 'flowering' | 'emergent';
+export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge';
 function rainKit(lod: number, form: RainForm, seed: number): Kit {
+  if (form === 'edge') return edgeKit(lod, seed);
   const k = new Kit(), far = lod > 0, em = form === 'emergent', fl = form === 'flowering';
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
@@ -317,12 +318,47 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
   // the understory: low billows, fern fronds and broad leaves at the feet, so no stem stands on bare ground
   const sa0 = rnd() * TAU;
   for (let i = 0; i < 2; i++) {
-    const a = sa0 + i * 2.1 + rnd(), d = 0.16 + 0.22 * rnd();
-    k.billow(V(Math.cos(a) * d, 0.08 + 0.05 * rnd(), Math.sin(a) * d), 0.11 + 0.05 * rnd(), 0.85, 1, 0, seed + 60 + i, 0, 0.7);
+    // saplings and edge growth standing to the crown's underside, one hard by the bole, so no stem shows between the
+    // leaf at the foot and the canopy (S-020)
+    const a = sa0 + i * 2.1 + rnd(), d = i ? 0.2 + 0.18 * rnd() : 0.08 + 0.06 * rnd();
+    k.billow(V(Math.cos(a) * d, 0.17 + 0.06 * rnd(), Math.sin(a) * d), 0.14 + 0.05 * rnd(), 1.2, 1, 0, seed + 60 + i, 0, 0.7);
   }
   for (let f = 0; f < 2; f++) {
     const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a)), base = h.clone().multiplyScalar(0.06 + 0.12 * rnd()), broad = f % 2 === 1;
     k.sheet(base, h.clone().multiplyScalar(broad ? 0.12 : 0.17).addScaledVector(UP, broad ? 0.16 : 0.12), V(0, -0.1, 0), broad ? 0.05 : 0.035, 3, broad ? 0 : 0.55, 0.3, LEAF, 1);
+  }
+  return k;
+}
+
+/** The rainforest's edge, 1 tall and about as wide, where the forest meets the light of a beach or the water (S-020):
+ *  saplings and edge growth banked from the ground to the canopy's underside, ferns at its foot, and climbers draped
+ *  down its face in curtains of leaf, so from the shore the eye meets a wall of jungle, not the stems behind it. */
+function edgeKit(lod: number, seed: number): Kit {
+  const k = new Kit(), far = lod > 0;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  if (far) {
+    for (let i = 0; i < 3; i++) k.billow(V((i - 1) * 0.34, 0.3 + 0.22 * (i % 2), 0), 0.24, 0.85, 1, 0, seed + i * 3.7, 0, 0.85);
+    return k;
+  }
+  // the bank: overlapping clumps in three staggered tiers from the ground to the canopy's underside, broad at the foot,
+  // the saplings carrying the upper tier hidden inside it (no stem shows)
+  for (let i = 0; i < 4; i++) k.billow(V((i - 1.5) * 0.3 + 0.06 * rnd(), 0.2 + 0.06 * rnd(), 0.12 * (rnd() - 0.5)), 0.22 + 0.05 * rnd(), 0.85, 1, 0, seed + i * 2.9, 0, 0.75);
+  for (let i = 0; i < 3; i++) k.billow(V((i - 1) * 0.34 + 0.08 * (rnd() - 0.5), 0.47 + 0.08 * rnd(), 0.12 * (rnd() - 0.5)), 0.2 + 0.04 * rnd(), 0.82, 1, 0, seed + 10 + i * 2.3, 0, 0.85);
+  for (let i = 0; i < 2; i++) {
+    const c = V((i - 0.5) * 0.4 + 0.08 * (rnd() - 0.5), 0.72 + 0.08 * rnd(), 0.1 * (rnd() - 0.5));
+    k.tube([V(c.x * 0.9, 0.3, c.z), c.clone().setY(c.y - 0.08)], [0.014, 0.008], 3, BARK);
+    k.billow(c, 0.18 + 0.04 * rnd(), 0.8, 2, 0, seed + 20 + i * 3.1, 0, 0.95);
+  }
+  // climbers draped down its face from the upper tier, broad leaves on long hanging runners, both faces
+  for (let i = 0; i < 4; i++) {
+    const f = i % 2 ? -1 : 1, x = (rnd() - 0.5) * 0.8;
+    k.sheet(V(x, 0.8 + 0.08 * rnd(), f * 0.2), V(0.06 * (rnd() - 0.5), -0.5 - 0.15 * rnd(), f * 0.12), V(0, 0, f * 0.05), 0.05, 4, 0.45, 0.2, LEAF, 1);
+  }
+  // ferns at its foot, arching out toward the light
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a));
+    k.sheet(h.clone().multiplyScalar(0.12 + 0.2 * rnd()).setY(0.02), h.clone().multiplyScalar(0.2).addScaledVector(UP, 0.14), V(0, -0.12, 0), 0.04, 3, 0.55, 0.3, LEAF, 1);
   }
   return k;
 }
