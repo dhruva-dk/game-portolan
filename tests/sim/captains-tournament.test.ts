@@ -65,7 +65,6 @@ test('the smoke tournament: twenty matches, six distinct temperament profiles', 
   assert.ok(nearest > 0.25, `${pair} too alike (${nearest.toFixed(2)})`);
   const [hunter, expander, raider, turtle, opportunist, gambler] = mean;
   assert.ok(Math.max(expander.sea, gambler.sea) > Math.max(hunter.sea, raider.sea, turtle.sea, opportunist.sea), 'expanders and gamblers claim the most sea');
-  // Hunters stalk open trails too (PROMPT.md), so raiders over hunters is a close call that 20 matches cannot settle (WP12a:
-  // 1.11 vs 0.91 over 200); what is spec-true and holds at 20 is raiders over the four temperaments that do not go after trails, pooled.
+  assert.ok(hunter.broken > Math.max(expander.broken, turtle.broken), 'hunters break more trails than expanders and turtles');
   assert.ok(raider.broken > (expander.broken + turtle.broken + opportunist.broken + gambler.broken) / 4, 'raiders break more trails than the temperaments that do not raid');
 });

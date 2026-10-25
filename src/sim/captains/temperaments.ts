@@ -2,7 +2,7 @@
 // temperament is a Style over the skills every captain shares (brain.ts): the size and lean of its loops, its appetite
 // for fights, raids and finds, the moment it runs, its daring with the vortex and the Great Current, and the skills
 // only some temperaments put first (stalk, edge, guard, commit, bolt, gold):
-//   hunters stalk open trails, wounded ships and ships a gull gives away, and patrol beyond the player's loops;
+//   hunters stalk open trails, wounded ships and ships a gull gives away, and patrol beyond the player's huge loops;
 //   expanders draw broad, patient loops and leave them for nothing much; raiders break trails for the purse and run
 //   for home with it; turtles hold rich home waters and turn to face an intruder before they strike; opportunists
 //   hang off a fight between others and pounce on whoever it weakens; gamblers draw enormous loops, swing their bows
@@ -13,7 +13,7 @@
 // from the storm and its daring — the same in every match it sails, so a player comes to know it.
 import { hash32 } from '../math.ts';
 import { KNOW, type Ship } from '../state.ts';
-import { FITTING } from '../tables.ts';
+import { FITTING, HOME } from '../tables.ts';
 
 type Captain = Ship['captain'];
 
@@ -101,11 +101,20 @@ export const styleOf = (ship: Ship): Style => (ship.captain.gentle ? GENTLE : SI
 /** 0 … 1: how much it guards its trail, knowing the player breaks rivals' trails (Mind.raids, tenths a match: two a match is all). */
 export const wary = (c: Captain): number => ((c.knows & KNOW.raids) !== 0 ? unit(c.raids / 20) : 0);
 
-/** u its next loop reaches beyond its home's rim (`rim`): its Style's, beyond the player's loops for a hunter that knows them (Mind.loop), drawn in as it guards its trail. */
-export function reachOf(c: Captain, style: Style, rim: number): number {
-  const patrol = style.stalk >= 0.8 && (c.knows & KNOW.loop) !== 0 ? 1.15 * c.loop - rim : 0;
-  return Math.max(style.loop, patrol) * (1 - 0.3 * wary(c));
-}
+/** u its next loop reaches beyond its home's rim: its Style's, drawn in as it guards its trail. */
+export const reachOf = (c: Captain, style: Style): number => style.loop * (1 - 0.3 * wary(c));
+
+/**
+ * A hunter's patrol beyond the player's border (brain.ts patrols): it patrols once it knows the player's loops are
+ * wide, their measure (Mind.loop: the radius of a disc of a loop's area) `wide` u or more (large or huge, as its card
+ * says), round the player's home `beyond` × that measure out past its rim, where such loops' trails run, making for a
+ * point `step` rad farther round at a time.
+ */
+export const PATROL = { wide: 20, beyond: 1.5, step: 0.6 } as const;
+
+/** u from the player's home a hunter patrols at, by what it knows of the player's loops (PATROL); 0, it does not patrol. */
+export const patrolOf = (c: Captain, style: Style): number =>
+  style.stalk >= 0.8 && (c.knows & KNOW.loop) !== 0 && c.loop >= PATROL.wide ? HOME.radius + PATROL.beyond * c.loop : 0;
 
 /** Its standoff from the player, by the fittings the player favours (Mind.fittings, surest first): clear of a ram bow's or swivels' reach, inside long guns' or a mortar's. */
 const WARY: Readonly<Record<number, number>> = {

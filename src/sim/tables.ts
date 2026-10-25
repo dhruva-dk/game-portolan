@@ -530,21 +530,24 @@ export const DOUBLED_PLANKING = [0.15, 0.22, 0.3, 0.38, 0.45];
  * to a calm of radius `calm` u (arc), then holds until the next moves; inside it a ship loses `rate` hull a second.
  * The first is announced at `announce` s, each after it the moment the one before holds, so every phase is on the
  * chart 20–45 s before it moves. The calms close from seven-tenths of the planet to a final calm 30 u across, close
- * enough that the last ships must fight, held from 550 s; the last phase closes it to nothing by 600 s at a rate that
- * sinks the stoutest hull in under 20 s, so every match is over by about ten minutes and a quarter, and sooner when the
- * last ships fight. In the storm sails labour, losing `labour` of their speed without storm sails, and lookouts see
- * `sight` as far. The territory scan passes over every row of the territory grid once every `scan` ticks.
+ * enough that the last ships must fight, held from 610 s. Until then the storm wears a hull down slowly (a caught ship
+ * can still make the calm, and the sea it swallows is what drives the fleet together), so the match is paced by the
+ * squeeze and the fights it forces (check 4: 9–11 min); the last phase closes the final calm to nothing by 648 s at a
+ * rate that sinks the stoutest hull (a galleon behind doubled planking) in under 10 s, so every match is over within
+ * eleven minutes, and sooner when the last ships fight. In the storm sails labour, losing `labour` of their speed
+ * without storm sails, and lookouts see `sight` as far. The territory scan passes over every row of the territory grid
+ * once every `scan` ticks.
  */
 export const STORM = {
-  announce: 45,
+  announce: 115,
   phases: [
-    { move: 90, sweep: 60, calm: 400, rate: 0.2 },
-    { move: 195, sweep: 60, calm: 260, rate: 0.4 },
-    { move: 300, sweep: 45, calm: 160, rate: 0.7 },
-    { move: 390, sweep: 40, calm: 90, rate: 1.2 },
-    { move: 465, sweep: 30, calm: 44, rate: 2 },
-    { move: 525, sweep: 25, calm: 15, rate: 4 },
-    { move: 570, sweep: 30, calm: 0, rate: 12 },
+    { move: 160, sweep: 60, calm: 400, rate: 0.1 },
+    { move: 265, sweep: 60, calm: 260, rate: 0.2 },
+    { move: 370, sweep: 45, calm: 160, rate: 0.3 },
+    { move: 460, sweep: 40, calm: 90, rate: 0.4 },
+    { move: 535, sweep: 30, calm: 44, rate: 0.6 },
+    { move: 590, sweep: 20, calm: 15, rate: 3 },
+    { move: 630, sweep: 18, calm: 0, rate: 24 },
   ],
   labour: 0.25,
   sight: 0.45,

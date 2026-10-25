@@ -31,7 +31,7 @@ import { ZONE } from '../world/geography.ts';
 import { REGIONS } from '../world/regions.ts';
 import { apart, knows, newPercept, perceive } from './perception.ts';
 import { lure, pressAt } from './learning.ts';
-import { reachOf, standoff, styleOf, wary, type Style } from './temperaments.ts';
+import { PATROL, patrolOf, reachOf, standoff, styleOf, wary, type Style } from './temperaments.ts';
 
 type Captain = Ship['captain'];
 
@@ -65,7 +65,7 @@ export const BRAIN = {
   engage: 1.5, // × its guns' range: how near a rival must be for it to close and fight
   ram: 30, // u: the farthest it drives in to ram from
   hunt: 45, // u: the farthest open trail it goes for
-  stalk: 90, // u: the farthest it stalks a ship, or lies off a fight
+  stalk: 90, // u: the farthest it stalks a ship, lies off a fight, or patrols from its own home
   loot: 40, // u: the farthest find it goes for
   wait: 35, // s it pursues one trail or find before giving it up
   lead: [4, 20], // s to spare it keeps over the storm's sweep
@@ -203,7 +203,6 @@ export function think(sea: Sea, state: MatchState, i: number, sight: Sight, out:
     return;
   }
   if (ship.phase === PHASE.peeling) return;
-  if (c.mode === MODE.ride || c.mode === MODE.peel) set(c.anchor, ship.pos.x, ship.pos.y, ship.pos.z); // its home inked here
   const hurt = ship.hull < c.felt - 1e-6;
   c.felt = ship.hull;
   act(sea, state, i, out, hurt, rng);
@@ -224,9 +223,10 @@ export function intent(state: MatchState, i: number, out: V3): V3 {
  * Whether captain i, riding, breaks off now: the region it is passing against the one the current reaches next
  * (opening.ts passage) by their richness, its own taste (by the seed), the storm rising near, and where it knows the
  * player breaks off; the longer it rides the less it asks, and it waits for a better region only if that comes soon —
- * the bolder (Style.bold), the more it asks and the longer it rides on for richer waters. Save hunters and
- * opportunists, who go where the ships go, it rides on past a rival that has just broken off within BRAIN.danger, so
- * as not to ink its home within that rival's guns — unless these are the waters it knows the player breaks off into.
+ * the bolder (Style.bold), the more it asks and the longer it rides on for richer waters. It rides on past a rival
+ * that has broken off within BRAIN.danger, so as not to ink its home within that rival's guns — a hunter too, which
+ * finds its prey later, and an opportunist, which waits off fights rather than starting them — unless these are the
+ * waters it knows the player breaks off into.
  */
 function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
   const ship = state.ships[i], t = state.tick * TICK, style = styleOf(ship), bold = style.bold;
@@ -235,7 +235,7 @@ function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
   if (PASS.untilEnd < 3) return true;
   const c = ship.captain, sought = (c.knows & KNOW.breakOff) !== 0 && c.breakOff === PASS.region;
   if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, style) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false; // it rides on for the waters it knows the player breaks off into
-  if (style.stalk < 0.8 && style.edge === 0 && !sought && PASS.untilEnd > 6 && beside(state, i)) return false; // it rides on past a rival breaking off: no home within its guns; hunters and opportunists follow
+  if (!sought && PASS.untilEnd > 6 && beside(state, i)) return false; // it rides on past a rival breaking off: no home within its guns
   const here = regionWorth(state, i, PASS.region) - 0.6 * Math.max(0, dot(ship.pos, state.storm.origin) - 0.6) / 0.4;
   const ahead = PASS.next >= 0 ? regionWorth(state, i, PASS.next) : -Infinity;
   return here >= 1.3 + 0.5 * (bold - 0.3) - 0.02 * t && (here >= ahead || PASS.untilNext > 12 * (1 + bold));
@@ -326,6 +326,7 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   if (mode < 0) mode = lurks(state, i, sight, style);
   if (mode < 0) mode = loots(sea, state, i, style, was);
   if (mode < 0) mode = waylays(state, i, style);
+  if (mode < 0) mode = patrols(state, i, style);
   if (mode < 0) mode = loops(sea, state, i, style, rng, was);
   if (mode !== was || c.target !== aim) {
     c.since = 0;
@@ -499,7 +500,9 @@ function quarter(state: MatchState, i: number, j: number): boolean {
 
 /** The nearest open rival trail its chart shows, when worth the raid by its Style, the trail's length and distance, and a grudge. */
 function hunts(i: number, state: MatchState, style: Style, was: number): boolean {
-  const c = state.ships[i].captain, owner = P.trail, reach = BRAIN.hunt * Math.min(1.35, 0.6 + 0.4 * style.raid); // a raider goes farther for a trail
+  const c = state.ships[i].captain, owner = P.trail;
+  // a raider goes farther for a trail; a hunter patrolling for the player's (patrols) goes for one as far as it stalks a ship
+  const reach = owner === 0 && patrolOf(c, style) > 0 ? BRAIN.stalk : BRAIN.hunt * Math.min(1.35, 0.6 + 0.4 * style.raid);
   if (owner < 0 || P.trailD > reach || (c.gentle && owner === 0)) return false;
   if (was === MODE.hunt && c.target === owner && c.since > BRAIN.wait) return false;
   const want = style.raid * Math.min(1.5, P.trailLen / 25) * (1 - P.trailD / reach) + (owner === 0 ? 0.1 * c.grudge : 0);
@@ -615,6 +618,23 @@ function waylays(state: MatchState, i: number, style: Style): number {
 }
 
 /**
+ * A hunter that knows the player draws wide loops (temperaments.ts PATROL), with the player's home (which every chart
+ * shows) within BRAIN.stalk of its own and little purse to bank, patrols beyond the player's border: round that home
+ * where such loops' trails run, always making for a point PATROL.step farther round in the sense its own loops wheel,
+ * inside the coming calm by its margin, so the player's long open trails run out into its reach (hunts).
+ */
+function patrols(state: MatchState, i: number, style: Style): number {
+  const ship = state.ships[i], c = ship.captain, p = state.ships[0], den = p.captain.anchor, ring = patrolOf(c, style);
+  if (ring <= 0 || p.held <= 0 || !afloat(p) || ship.purse >= 0.5 * FORMS[ship.form].purse || apart(c.anchor, den) > BRAIN.stalk) return -1;
+  const calm = SV.announced ? SV.next : SV.calm;
+  along(den, turned(toward(den, ship.pos, ship.head, T), den, Math.sign(style.wheel) * PATROL.step, U), ring, G);
+  if (dot(G, calm.at) < dcos(Math.max(0, calm.r - stormMargin(c, style) / R))) return -1;
+  set(c.goal, G.x, G.y, G.z);
+  c.target = -1;
+  return MODE.roam;
+}
+
+/**
  * The richest find in reach for the distance — a chest by its tier (a gold-leaf one by Style.gold, and that much
  * farther), flotsam and coins by their worth, a wreck or cache to hold beside — or −1. Sailing a loop, it leaves it
  * only for a find worth the more the less its appetite (an expander's patience).
@@ -677,7 +697,7 @@ const LOBE: readonly (readonly [number, number])[] = [[-1, 0.55], [-0.5, 1], [0.
 function planLoop(sea: Sea, state: MatchState, i: number, style: Style, rng: Rng): boolean {
   const ship = state.ships[i], c = ship.captain, calm = SV.announced ? SV.next : SV.calm, margin = stormMargin(c, style);
   const inside = dcos(Math.max(0, calm.r - margin / R));
-  let reach = Math.min(reachOf(c, style, HOME.radius) * (1 + style.stretch) * (0.85 + 0.3 * rngFloat(rng)), 0.4 * (calm.r * R - margin));
+  let reach = Math.min(reachOf(c, style) * (1 + style.stretch) * (0.85 + 0.3 * rngFloat(rng)), 0.4 * (calm.r * R - margin));
   toward(c.anchor, ship.pos, ship.head, T); // bearings from the anchor, 0 toward the ship
   const width = 0.6 - 0.3 * style.stretch, first = c.loops * style.wheel;
   for (let round = 0; round < 2; round++, reach *= 0.6) {

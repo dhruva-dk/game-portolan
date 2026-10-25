@@ -68,6 +68,7 @@ export function coast(sea: Sea, state: MatchState, i: number): void {
   if (on) holdOff(ship, normalize(f));
   if (ship.peel < OPENING.settle * FORMS[ship.form].drag || (on && ship.peel < OPENING.most)) return;
   const region = regionOf(ship.pos);
+  set(ship.captain.anchor, ship.pos.x, ship.pos.y, ship.pos.z); // the heart of its waters, on every chart (Ship.captain.anchor)
   chronicle(state, EVENT.home, i, region, inkHome(state, i));
   ship.phase = PHASE.sailing;
 }

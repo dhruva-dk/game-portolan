@@ -30,7 +30,7 @@ import { startingFittings } from '../../src/sim/items.ts';
 import { step } from '../../src/sim/match.ts';
 import { passage, type Passage } from '../../src/sim/opening.ts';
 import type { V3 } from '../../src/sim/math.ts';
-import { R } from '../../src/sim/sphere.ts';
+import { R, TERRITORY, cellOf } from '../../src/sim/sphere.ts';
 import { AFLOAT, EVENT, KNOW, PHASE, SHIPS, TICK, createMatch, type MatchSetup, type MatchState, type Outfit } from '../../src/sim/state.ts';
 import { CAPTAINS, GUNNERY, captainForm, captainGull } from '../../src/career/league.ts';
 import { applyResult } from '../../src/career/progress.ts';
@@ -45,7 +45,8 @@ export const STATS = ['sea', 'held', 'broken', 'purse', 'sunk', 'loot', 'spoils'
 export type Stat = (typeof STATS)[number];
 /** A captain's tally, with diagnostics: sinkings by cause, killer's mode and victim; time and hurt dealt by mode; fate, how it sank (CAUSE; −1 afloat at the end), at, the minute it sank or the match ended. */
 export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[]; kmode: number[]; kvict: number[]; tmode: number[]; dmode: number[]; fate: number; at: number };
-export interface MatchOut { m: number; minutes: number; ms: number; rows: Row[] }
+/** A tournament match: its length, the region its storm's final calm fell in, the cost of running it, each captain's row. */
+export interface MatchOut { m: number; minutes: number; calm: number; ms: number; rows: Row[] }
 
 const LIMIT = Math.round(1200 / TICK), SAMPLE = 30, WIDTH = Number(process.env.WORKERS) || availableParallelism();
 const PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
@@ -140,19 +141,25 @@ export function tournamentMatch(m: number): MatchOut {
   });
   const sea = seaFor(geo(), seed), s = createMatch({ seed, fleet, rank: 5 });
   const { rows, ticks } = play(sea, s, null, null);
-  const out = rows.slice(1).map((r) => ({ ...r, m, tier: berth(m, r.i).tier }));
-  return { m, minutes: (ticks * TICK) / 60, ms: performance.now() - t0, rows: out };
+  const out = rows.slice(1).map((r) => ({ ...r, m, tier: berth(m, r.i).tier })), calms = s.storm.calms;
+  return { m, minutes: (ticks * TICK) / 60, calm: geo().geo.region[cellOf(TERRITORY, calms[calms.length - 2].at)], ms: performance.now() - t0, rows: out };
 }
 
-/** What a captain's learning adds, measured in one match: captains breaking off into the first habit's region and into the current habit's, captains near the player (mean over the ticks it sails, within NEAR u), how far hunters' loops reach from their homes (u, mean of each one's farthest), the player's trails broken by captains, the player's place. */
-export interface Measure { follow: number; followNow: number; near: number; reach: number; broken: number; place: number }
+/**
+ * What a captain's learning adds, measured in one match: captains breaking off into the first habit's region and into
+ * the current habit's; captains near the player (within NEAR u, mean over the ticks it sails); hunters patrolling
+ * beyond its border, where its trails run (out of its waters, nearer its home than the farthest its open trails have
+ * reached so far, mean over the ticks it sails); the player's trails broken by captains and by hunters; the sea it
+ * claimed (u², its loops) and its place.
+ */
+export interface Measure { follow: number; followNow: number; near: number; patrol: number; broken: number; cut: number; sea: number; place: number }
 export interface CareerMatch { j: number; seed: number; learn: Measure; naive: Measure; knewRegion: number; knewLoop: number; learnt: number }
 export interface CareerJob { kind: 'career'; k: number; a: Habit; b: Habit; matches: number; change: number }
 export const NEAR = 60;
 
 function measured(sea: Sea, setup: MatchSetup, habit: Habit, first: number, voyage: Voyage | null): { m: Measure; s: MatchState; knewRegion: number; knewLoop: number } {
-  const s = createMatch(setup), far = new Array<number>(SHIPS).fill(0);
-  let near = 0, sailing = 0, knewRegion = 0, knewLoop = 0, trails = 0;
+  const s = createMatch(setup);
+  let near = 0, patrol = 0, sailing = 0, knewRegion = 0, knewLoop = 0, trails = 0, cut = 0, reach = 0;
   for (let i = 1; i < SHIPS; i++) {
     const c = s.ships[i].captain;
     if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff === first) knewRegion++;
@@ -160,24 +167,30 @@ function measured(sea: Sea, setup: MatchSetup, habit: Habit, first: number, voya
   }
   const { rows } = play(sea, s, habit, voyage, (st) => {
     const p = st.ships[0];
-    for (const e of st.events) if (e.kind === EVENT.broken && e.ship === 0 && e.by >= 1) trails++;
-    for (let i = 1; i < SHIPS; i++) {
-      const q = st.ships[i], c = q.captain;
-      if (q.phase === PHASE.sunk || q.phase === PHASE.riding || q.phase === PHASE.peeling) continue;
-      if (c.temperament === 0 && (c.anchor.x || c.anchor.y || c.anchor.z)) far[i] = Math.max(far[i], ang(q.pos, c.anchor));
-      if (p.phase !== PHASE.sunk && p.phase !== PHASE.riding && ang(q.pos, p.pos) < NEAR) near++;
+    for (const e of st.events) if (e.kind === EVENT.broken && e.ship === 0 && e.by >= 1) {
+      trails++;
+      if (st.ships[e.by].captain.temperament === 0) cut++;
     }
-    if (p.phase !== PHASE.sunk && p.phase !== PHASE.riding) sailing++;
+    if (p.phase === PHASE.sunk || p.phase === PHASE.riding || p.phase === PHASE.peeling) return;
+    sailing++;
+    if (p.laid.length > 0) reach = Math.max(reach, ang(p.pos, p.captain.anchor));
+    for (let i = 1; i < SHIPS; i++) {
+      const q = st.ships[i];
+      if (q.phase === PHASE.sunk || q.phase === PHASE.riding || q.phase === PHASE.peeling) continue;
+      if (ang(q.pos, p.pos) < NEAR) near++;
+      if (q.captain.temperament === 0 && ang(q.pos, p.captain.anchor) < reach && st.owner[cellOf(TERRITORY, q.pos)] !== 1) patrol++;
+    }
   });
-  const hunters = rows.slice(1).filter((r) => r.temperament === 0).map((r) => far[r.i]);
   return {
     s, knewRegion, knewLoop,
     m: {
       follow: rows.slice(1).filter((r) => r.region === first).length,
       followNow: rows.slice(1).filter((r) => r.region === habit.region).length,
       near: near / Math.max(1, sailing),
-      reach: hunters.length ? hunters.reduce((a, b) => a + b, 0) / hunters.length : 0,
+      patrol: patrol / Math.max(1, sailing),
       broken: trails,
+      cut,
+      sea: rows[0].sea,
       place: rows[0].place,
     },
   };
@@ -299,10 +312,10 @@ if (!isMainThread && (workerData as { tournamentWorker?: boolean } | null)?.tour
     const [ra, rb] = habitRegions(), t0 = performance.now();
     const runs = await pool<CareerMatch[]>(Array.from({ length: careers }, (_, k) => ({ kind: 'career' as const, k, a: { region: ra, temperament: 5 }, b: { region: rb, temperament: 3 }, matches: 10, change: 5 })), width);
     console.log(`${careers} careers, habits ${ra}→${rb}: ${((performance.now() - t0) / 1000).toFixed(1)} s`);
-    console.log(' j  follow(learn-naive)  now    near    reach  broken  knewRegion knewLoop learnt');
+    console.log(' j  follow(learn-naive)  now    near   patrol  broken  cut     sea  place  knewRegion knewLoop learnt');
     for (let j = 0; j < 10; j++) {
       const d = (f: keyof Measure): number => mean(runs.map((r) => r[j].learn[f] - r[j].naive[f]));
-      console.log(`${String(j + 1).padStart(2)} ${d('follow').toFixed(2).padStart(10)} ${d('followNow').toFixed(2).padStart(14)} ${d('near').toFixed(2).padStart(7)} ${d('reach').toFixed(1).padStart(8)} ${d('broken').toFixed(2).padStart(7)} ${mean(runs.map((r) => r[j].knewRegion)).toFixed(1).padStart(9)} ${mean(runs.map((r) => r[j].knewLoop)).toFixed(1).padStart(8)} ${mean(runs.map((r) => r[j].learnt)).toFixed(1).padStart(6)}`);
+      console.log(`${String(j + 1).padStart(2)} ${d('follow').toFixed(2).padStart(10)} ${d('followNow').toFixed(2).padStart(14)} ${d('near').toFixed(2).padStart(7)} ${d('patrol').toFixed(2).padStart(8)} ${d('broken').toFixed(2).padStart(7)} ${d('cut').toFixed(2).padStart(5)} ${d('sea').toFixed(0).padStart(7)} ${d('place').toFixed(2).padStart(6)} ${mean(runs.map((r) => r[j].knewRegion)).toFixed(1).padStart(9)} ${mean(runs.map((r) => r[j].knewLoop)).toFixed(1).padStart(8)} ${mean(runs.map((r) => r[j].learnt)).toFixed(1).padStart(6)}`);
     }
     Object.assign(report, { careers: runs, habits: [ra, rb] });
   }

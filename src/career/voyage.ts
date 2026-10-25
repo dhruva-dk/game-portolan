@@ -33,9 +33,9 @@ export const LESSONS = 7;
 export interface Voyage {
   /** The region (REGIONS index) the player first broke off the Great Current into, −1 none. */
   breakOff: number;
-  /** Loops closed, and the u² they claimed, each rounded. */
-  loops: number;
-  area: number;
+  /** The u² its loops claimed, each rounded, summed, and their squares summed: its loops' size weighed by the sea each claims. */
+  sea: number;
+  seaSq: number;
   /** Rivals' trails it broke. */
   raids: number;
   /** Hits it took; the runs it made from the rival that last hit it, and the hull it ran at, percent of full, summed. */
@@ -63,7 +63,7 @@ export interface Voyage {
 }
 
 export const newVoyage = (): Voyage => ({
-  breakOff: -1, loops: 0, area: 0, raids: 0, hits: 0, runs: 0, runHull: 0, storm: 0, margin: 0, samples: 0,
+  breakOff: -1, sea: 0, seaSq: 0, raids: 0, hits: 0, runs: 0, runHull: 0, storm: 0, margin: 0, samples: 0,
   fittings: new Array<number>(FITTINGS).fill(0), seen: new Uint8Array(CHART_CELLS >> 3), found: new Uint8Array(FIND_SITES),
   entered: new Array<number>(REGIONS.length).fill(-1), lessons: new Array<number>(LESSONS).fill(-1), foe: -1, foeHit: 0, away: 0,
 });
@@ -115,8 +115,9 @@ export function observe(v: Voyage, sea: Sea, state: MatchState): void {
       if (v.breakOff < 0) v.breakOff = e.by;
       first(v, LESSON.breakOff, t);
     } else if (e.kind === EVENT.loop) {
-      v.loops++;
-      v.area += Math.round(e.amount);
+      const a = Math.round(e.amount);
+      v.sea += a;
+      v.seaSq += a * a;
       first(v, LESSON.loop, t);
     } else if ((e.kind === EVENT.hit || e.kind === EVENT.ram) && e.by > 0) {
       v.hits++;
@@ -165,9 +166,10 @@ export function observe(v: Voyage, sea: Sea, state: MatchState): void {
 
 /**
  * What one match showed of the player's habits (state.ts BINS), null where it showed nothing: the region it broke off
- * into; its loops' mean radius, u; the trails it broke; the hull it ran at, mean percent (0: it was hit and never ran,
- * it stood and fought); the mean margin it kept inside the calm while the storm closed, u; the fittings beyond the
- * starting kit it carried for a quarter of the match or more.
+ * into; its loops' radius, u, over its loops weighed by the sea each claims (a scrap closed in passing counts for
+ * little); the trails it broke; the hull it ran at, mean percent (0: it was hit and never ran, it stood and fought);
+ * the mean margin it kept inside the calm while the storm closed, u; the fittings beyond the starting kit it carried
+ * for a quarter of the match or more.
  */
 export interface Habits {
   breakOff: number | null;
@@ -185,7 +187,7 @@ export function habitsOf(v: Voyage): Habits {
   });
   return {
     breakOff: v.breakOff >= 0 ? v.breakOff : null,
-    loop: v.loops > 0 ? Math.round(Math.sqrt(v.area / v.loops / PI)) : null,
+    loop: v.sea > 0 ? Math.round(Math.sqrt(v.seaSq / v.sea / PI)) : null,
     raids: v.raids,
     run: v.runs > 0 ? Math.round(v.runHull / v.runs) : v.hits > 0 ? 0 : null,
     storm: v.storm > 0 ? Math.round(v.margin / v.storm) : null,

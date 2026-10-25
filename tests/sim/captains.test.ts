@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MODE, helm, intent, think } from '../../src/sim/captains/brain.ts';
 import { apart } from '../../src/sim/captains/perception.ts';
-import { reachOf, standoff, styleOf } from '../../src/sim/captains/temperaments.ts';
+import { PATROL, patrolOf, reachOf, standoff, styleOf } from '../../src/sim/captains/temperaments.ts';
 import { aground, greatCurrentAt, seaFor } from '../../src/sim/environment.ts';
 import { gullEyes } from '../../src/sim/gull.ts';
 import { startingFittings } from '../../src/sim/items.ts';
@@ -19,7 +19,7 @@ import { R, TERRITORY, advance, cellDir, cellOf, tangentAt, tangentToward } from
 import {
   EVENT, PHASE, SAIL, SHIPS, TICK, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState, type Mind, type Outfit,
 } from '../../src/sim/state.ts';
-import { FITTING, FORMS, HOME, SLOT } from '../../src/sim/tables.ts';
+import { FITTING, FORMS, HOME, SLOT, STORM } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { newSight, survey } from '../../src/sim/visibility.ts';
 import { ZONE } from '../../src/sim/world/geography.ts';
@@ -79,6 +79,13 @@ function place(state: MatchState, i: number, p: V3, b = 0): void {
   tangentAt(p, b, ship.head);
   set(ship.wasHead, ship.head.x, ship.head.y, ship.head.z);
   ship.speed = 2;
+}
+
+/** Ship i's home inked where it is, as when it slows after breaking off (opening.ts coast). */
+function settle(state: MatchState, i: number): void {
+  const p = state.ships[i].pos;
+  set(state.ships[i].captain.anchor, p.x, p.y, p.z);
+  inkHome(state, i);
 }
 
 /** A scene: only the ships kept stay in the match. */
@@ -187,7 +194,7 @@ test('a captain breaks an open trail it can see, telegraphing the strike', () =>
 
 test('a captain outruns the storm', () => {
   const s = scene(fleet(6, nobody), [1, 2]);
-  s.tick = S(160); // the first phase has swept and holds
+  s.tick = S(STORM.phases[0].move + STORM.phases[0].sweep + 10); // the first phase has swept and holds
   const calm = s.storm.calms[0];
   let p: V3 | null = null;
   for (let b = 0; b < 128 && p === null; b++) {
@@ -357,6 +364,7 @@ test('a turtle turns to face an intruder in its waters, reefed, before it strike
   const [s, e] = [T.turtle, T.expander].map((t) => {
     const st = lone(t, [2]);
     place(st, 1, OPEN, 0);
+    settle(st, 1);
     place(st, 2, at(OPEN, Math.PI / 2, HOME.radius), Math.PI);
     decision(st, 1);
     return st;
@@ -453,6 +461,33 @@ test('captains sail by the habits of the player they know: its fittings, its loo
   assert.deepEqual(hunter.captain.fittings, [FITTING.ironRam]);
   assert.deepEqual(decodeMatch(encodeMatch(s)).ships[1].captain.fittings, [FITTING.ironRam], 'carried through a snapshot');
   assert.ok(standoff(hunter.captain, styleOf(hunter), 0) > standoff(hunter.captain, styleOf(hunter), 3), 'it lies farther off a player who favours the ram');
-  assert.ok(reachOf(hunter.captain, styleOf(hunter), HOME.radius) > reachOf(naive.ships[1].captain, styleOf(naive.ships[1]), HOME.radius), 'a hunter patrols beyond the player\'s loops');
-  assert.ok(reachOf(expander.captain, styleOf(expander), HOME.radius) < reachOf(naive.ships[2].captain, styleOf(naive.ships[2]), HOME.radius), 'it draws its loops in, guarding its trail from a raider');
+  assert.ok(patrolOf(hunter.captain, styleOf(hunter)) > 0 && patrolOf(naive.ships[1].captain, styleOf(naive.ships[1])) === 0, 'a hunter patrols beyond the player\'s loops');
+  assert.ok(reachOf(expander.captain, styleOf(expander)) < reachOf(naive.ships[2].captain, styleOf(naive.ships[2])), 'it draws its loops in, guarding its trail from a raider');
+});
+
+test('a hunter that knows the player draws huge loops patrols beyond its border and goes for its long open trails', () => {
+  const loops = (value: number): Mind => ({ gentle: false, grudge: 0, breakOff: NONE, loop: { value, confidence: 900 }, raids: NONE, run: NONE, storm: NONE, fittings: [] });
+  const den = OPEN, ring = HOME.radius + PATROL.beyond * 40;
+  const hunter = (mind: Mind | null): MatchState => {
+    const s = scene(fleet(6, nobody), [0, 1], [null, mind, ...Array.from({ length: SHIPS - 2 }, () => null)]);
+    for (const [i, p] of [[0, den], [1, at(den, 1, 40)]] as const) {
+      place(s, i, p, 0);
+      settle(s, i);
+    }
+    place(s, 0, at(den, 1 + Math.PI, 150), 0); // the player out on a loop, far out of sight: its home is on every chart
+    decision(s, 1);
+    return s;
+  };
+  const knowing = hunter(loops(40)), c = knowing.ships[1].captain, d = apart(c.goal, den);
+  assert.equal(c.mode, MODE.roam, 'it patrols');
+  assert.ok(Math.abs(d - ring) < 1 && knowing.owner[cellOf(TERRITORY, c.goal)] !== 1, `beyond the player's border, ${d.toFixed(1)} u from its home`);
+  assert.ok(apart(c.goal, knowing.ships[1].pos) > 10, 'making round it, not straight in');
+  for (const s of [hunter(null), hunter(loops(12))]) assert.notEqual(s.ships[1].captain.mode, MODE.roam, 'a naive hunter, or one that knows the player\'s loops are small, draws its own loop');
+  const cut = (s: MatchState): number => {
+    lay(s, 0, at(s.ships[1].pos, 0.3, 52), 1.9, 40); // a long open trail of the player's, beyond a hunter's usual reach
+    decision(s, 1);
+    return s.ships[1].captain.mode;
+  };
+  assert.equal(cut(hunter(loops(40))), MODE.hunt, 'it goes for the long trail');
+  assert.notEqual(cut(hunter(null)), MODE.hunt, 'a naive hunter leaves it');
 });

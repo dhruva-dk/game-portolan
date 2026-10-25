@@ -2,11 +2,12 @@
 // what each captain knows of the player (career/learn.ts, carried in through its Mind); within a match a captain that
 // watches the player (one the career sent with a Mind, past the first voyage) learns from what it sees it do there and
 // then, and sails by it at once through the same skills (brain.ts): only what it could have seen — the player in its
-// sight, from its deck or its gull, in the tick it did it:
+// sight, from its deck or its gull, in the tick it did it, and the sea its loops claim, which every chart shows:
+//   it closes a loop (seen on the chart): its loops are that size, the measure moving toward each one but a scrap
+//     smaller than a home disc (KNOW.loop); a hunter that knows them wide patrols beyond its border and goes for its
+//     trails from farther (temperaments.ts PATROL, brain.ts patrols);
 //   it breaks off the Great Current into a region: that is where it breaks off (KNOW.breakOff), and a captain still
 //     riding weighs that region by its temperament (lure: hunters, raiders and opportunists follow; turtles shun it);
-//   it closes a loop: its loops are that size, the measure moving toward each one seen (KNOW.loop): a hunter patrols
-//     beyond them (temperaments.ts reachOf);
 //   it breaks a trail: it raids, and a captain guards its own trail the more (KNOW.raids, temperaments.ts wary);
 //   it turns for home with its hull broken: it runs at that hull (KNOW.run), and the captains press it as it weakens
 //     toward that hull (pressAt; brain.ts engages and stalks).
@@ -15,23 +16,31 @@
 // A grudge (Mind.grudge: the player sank it) makes a captain stalk the player whenever it sees it (brain.ts stalks),
 // follow it into the region it breaks off into, and close on it from farther.
 import { EVENT, KNOW, afloat, fullHull, type MatchState, type Ship } from '../state.ts';
+import { HOME } from '../tables.ts';
 import type { Sight } from '../visibility.ts';
 import type { Style } from './temperaments.ts';
 
 type Captain = Ship['captain'];
 
-/** In-play learning: how far a measure moves toward each sighting once known, the raid a sighting adds (tenths a match), the hull share below which a turn for home reads as running. */
-export const WATCH = { rate: 0.5, raid: 5, wounded: 0.85 } as const;
+/** In-play learning: how far a measure moves toward each sighting once known, the raid a sighting adds (tenths a match), the hull share below which a turn for home reads as running, the u² under which a loop is a scrap closed in passing (a home disc's). */
+export const WATCH = { rate: 0.5, raid: 5, wounded: 0.85, scrap: Math.PI * HOME.radius * HOME.radius } as const;
 
 const know = (c: Captain, bit: number): void => {
   c.knows |= bit;
   c.learnt |= bit;
 };
 
-/** Captain i watches the player through the tick just stepped: its events, and the player as its sight shows it. */
+/** Captain i watches the player through the tick just stepped: its events, its loops on the chart, and the player as its sight shows it. */
 export function watch(state: MatchState, i: number, sight: Sight): void {
   const ship = state.ships[i], c = ship.captain, p = state.ships[0];
   if (!c.watches || !afloat(ship)) return;
+  for (const e of state.events) {
+    if (e.kind !== EVENT.loop || e.ship !== 0 || e.amount < WATCH.scrap) continue;
+    const r = Math.sqrt(e.amount / Math.PI); // its loops' measure, as the career takes it (voyage.ts habitsOf)
+    c.loop = (c.knows & KNOW.loop) !== 0 ? c.loop + WATCH.rate * (r - c.loop) : r;
+    c.seen++;
+    know(c, KNOW.loop);
+  }
   if ((sight.ships & 1) === 0) {
     c.eyed = 0;
     return;
@@ -40,11 +49,6 @@ export function watch(state: MatchState, i: number, sight: Sight): void {
     if (e.kind === EVENT.breakOff && e.ship === 0) {
       c.breakOff = e.by;
       know(c, KNOW.breakOff);
-    } else if (e.kind === EVENT.loop && e.ship === 0 && e.amount > 0) {
-      const r = Math.sqrt(e.amount / Math.PI); // its loops' measure, as the career takes it (voyage.ts habitsOf)
-      c.loop = (c.knows & KNOW.loop) !== 0 ? c.loop + WATCH.rate * (r - c.loop) : r;
-      c.seen++;
-      know(c, KNOW.loop);
     } else if (e.kind === EVENT.broken && e.by === 0) {
       c.raids = ((c.knows & KNOW.raids) !== 0 ? Math.max(0, c.raids) : 0) + WATCH.raid;
       know(c, KNOW.raids);

@@ -4,7 +4,9 @@
 //     taken and finishing place, and hunters lead in ships sunk;
 //   - higher-ranked captains finish ahead of lower-ranked captains by a clear, stated margin;
 //   - a scripted player that always breaks off into one region and draws large loops is measurably countered within
-//     five matches, and the counter fades within five matches after the script changes its habits.
+//     five matches, and the counter fades within five matches after the script changes its habits. Asserted on the
+//     region (captains following it there); the loops' counter (hunters patrolling beyond its border, brain.ts
+//     patrols) is recorded beside it, not yet asserted (progress.html WP12, Remaining).
 // The stated margins are MARGIN's. The numbers are recorded in progress/checks/check3.json before anything is asserted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -54,10 +56,10 @@ test('check 3: captains — 200 matches, six distinct temperaments, rank margin,
   let fadedAfter = 0;
   for (let j = MATCHES - 1; j >= CHANGE && follow[j] <= MARGIN.off; j--) fadedAfter = j - CHANGE + 1;
   const perMatch = follow.map((x, j) => ({
-    match: j + 1, follow: x, near: excess(j, 'near'), reach: excess(j, 'reach'), broken: excess(j, 'broken'),
+    match: j + 1, follow: x, patrol: excess(j, 'patrol'), near: excess(j, 'near'), broken: excess(j, 'broken'), cut: excess(j, 'cut'), sea: excess(j, 'sea'), place: excess(j, 'place'),
     knewRegion: mean(careers.map((c) => c[j].knewRegion)), knewLoop: mean(careers.map((c) => c[j].knewLoop)), learnt: mean(careers.map((c) => c[j].learnt)),
   }));
-  for (const m of perMatch) t.diagnostic(`career match ${m.match}: +${m.follow.toFixed(2)} follow into region ${ra}, near ${m.near.toFixed(2)}, hunters' reach ${m.reach.toFixed(1)} u, knew region ${m.knewRegion.toFixed(1)}, knew loops ${m.knewLoop.toFixed(1)}, learnt in play ${m.learnt.toFixed(1)}`);
+  for (const m of perMatch) t.diagnostic(`career match ${m.match}: ${m.follow.toFixed(2)} follow into region ${ra}, ${m.patrol.toFixed(2)} hunters beyond its border, near ${m.near.toFixed(2)}, its trails broken ${m.broken.toFixed(2)} (by hunters ${m.cut.toFixed(2)}), its sea ${m.sea.toFixed(0)} u², place ${m.place.toFixed(2)}, knew region ${m.knewRegion.toFixed(1)}, knew loops ${m.knewLoop.toFixed(1)}, learnt in play ${m.learnt.toFixed(1)}`);
   t.diagnostic(`countered at match ${counteredAt || 'never'}; faded ${fadedAfter || 'never'} matches after the change`);
 
   const record = {

@@ -1,9 +1,10 @@
 // Sweep (WP12 tuning): named variants of the captains' tuning, each over the same tournament matches (0 … n−1) on
 // worker_threads, one compact table per variant: per temperament check 3's five spec stats (sea, broken, sunk, loot,
-// place) and its sinkings by the killer's mode (flee/fight/ram/hunt/face/loop/home), then check 3's distinct-profile,
-// hunters' lead and rank numbers (--detail: how and when each sank, whom it sank, hurt and time by mode). A variant lays
+// place) and its sinkings by the killer's mode (flee/fight/ram/hunt/face/loop/home), then check 4's match lengths and
+// check 3's distinct-profile, hunters' lead and rank numbers (--detail: how and when each sank, whom it sank, hurt and time by mode). A variant lays
 // Style fields over temperaments (by index: career/league.ts TEMPERAMENT), sets brain TUNE knobs and fits out kits
-// (tables.ts KITS, FITTING kinds by slot); each worker applies them from the defaults before a variant's matches, so
+// (tables.ts KITS, FITTING kinds by slot) and moves the storm (tables.ts STORM: its announcement and phases by index,
+// `shift` s added to every phase's move); each worker applies them from the defaults before a variant's matches, so
 // nothing in the source changes between runs. t values scale with √n: at 100 matches they read about 0.71 of a
 // 200-match run's.
 //   node tests/tools/sweep.ts --matches 100 --workers 5 --variants '[{"name":"base"},{"name":"shy","tune":{"shy":0.5},"style":{"1":{"run":0.8}}}]'
@@ -12,21 +13,26 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { TUNE } from '../../src/sim/captains/brain.ts';
 import { restyle, STYLES, type Style } from '../../src/sim/captains/temperaments.ts';
-import { KITS } from '../../src/sim/tables.ts';
+import { KITS, STORM } from '../../src/sim/tables.ts';
 import { NAMES, mean, placesByTier, profiles, tournamentMatch, welch, type MatchOut } from './tournament.ts';
 
-interface Variant { name: string; tune?: Partial<typeof TUNE>; style?: Record<string, Partial<Style>>; kit?: Record<string, number[]> }
+type Phase = (typeof STORM.phases)[number];
+interface Variant { name: string; tune?: Partial<typeof TUNE>; style?: Record<string, Partial<Style>>; kit?: Record<string, number[]>; storm?: { announce?: number; shift?: number; phases?: Record<string, Partial<Phase>> } }
 const SPEC = ['sea', 'broken', 'sunk', 'loot', 'place'] as const;
 const KILL_MODES = [10, 8, 9, 7, 12, 3, 4]; // brain.ts MODE: flee, fight, ram, hunt, face, loop, home
 
 if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWorker) {
   const variants = (workerData as { variants: Variant[] }).variants, tune0 = { ...TUNE }, styles0 = STYLES.map((s) => ({ ...s })), kits0 = KITS.map((k) => [...k]);
+  const announce0 = STORM.announce, phases0 = STORM.phases.map((p) => ({ ...p }));
   let on = -1;
   parentPort!.on('message', ({ k, v, m }: { k: number; v: number; m: number }) => {
     if (v !== on) {
       Object.assign(TUNE, tune0, variants[v].tune ?? {});
       styles0.forEach((s, t) => restyle(t, { ...s, ...(variants[v].style?.[t] ?? {}) }));
       kits0.forEach((k, t) => KITS[t].splice(0, k.length, ...(variants[v].kit?.[t] ?? k)));
+      const st = variants[v].storm ?? {};
+      STORM.announce = st.announce ?? announce0;
+      phases0.forEach((p, k) => Object.assign(STORM.phases[k], p, { move: p.move + (st.shift ?? 0) }, st.phases?.[k] ?? {}));
       on = v;
     }
     parentPort!.postMessage({ k, out: tournamentMatch(m) });
@@ -61,7 +67,10 @@ if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWork
   variants.forEach((vr, v) => {
     const ms = out.slice(v * n, (v + 1) * n), rows = ms.flatMap((x) => x.rows), p = profiles(rows);
     const tick = ms.reduce((a, x) => a + x.ms, 0) / ms.reduce((a, x) => a + x.minutes * 60 * 30, 0);
-    console.log(`== ${vr.name} ${JSON.stringify({ ...vr.tune, ...vr.style, ...vr.kit })}  match ${mean(ms.map((x) => x.minutes)).toFixed(2)} min, tick ${tick.toFixed(3)} ms`);
+    const len = ms.map((x) => x.minutes).sort((a, b) => a - b), at = (q: number): string => len[Math.round(q * (len.length - 1))].toFixed(2);
+    console.log(`== ${vr.name} ${JSON.stringify({ ...vr.tune, ...vr.style, ...vr.kit, ...vr.storm })}  match ${mean(len).toFixed(2)} min, tick ${tick.toFixed(3)} ms`);
+    const died = (storm: boolean): string => Array.from({ length: 12 }, (_, k) => (rows.filter((r) => r.fate >= 0 && (r.fate === 5) === storm && Math.min(11, Math.floor(r.at)) === k).length / n).toFixed(2)).join(' ');
+    console.log(`match min/q1/median/q3/max ${[0, 0.25, 0.5, 0.75, 1].map(at).join('/')} min, ${len.filter((x) => x >= 9 && x <= 11).length} of ${n} in 9–11 (short: ${ms.filter((x) => x.minutes < 9).map((x) => `${x.m} ${x.minutes.toFixed(1)}`).join(', ')}); sunk a match by minute 0…11, by the storm ${died(true)}, else ${died(false)}`);
     p.forEach((x, t) => {
       const mine = rows.filter((r) => r.temperament === t), km = KILL_MODES.map((k) => mean(mine.map((r) => r.kmode[k])).toFixed(2));
       console.log(`${NAMES[t].padEnd(11)} ${SPEC.map((f) => x.mean[f].toFixed(f === 'sea' || f === 'loot' ? 0 : 2).padStart(6)).join('')}  k ${km.join('/')}`);

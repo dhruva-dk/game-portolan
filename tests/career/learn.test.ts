@@ -14,6 +14,7 @@ import { GLYPHS } from '../../src/lettering/glyphs.ts';
 import { result, sink, type Finish, type MatchResult } from '../../src/sim/end.ts';
 import { seaFor, type Sea } from '../../src/sim/environment.ts';
 import { idleInput } from '../../src/sim/input.ts';
+import { startingFittings } from '../../src/sim/items.ts';
 import { step } from '../../src/sim/match.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, createMatch, type Expect, type MatchState, type Mind } from '../../src/sim/state.ts';
 import { FITTING } from '../../src/sim/tables.ts';
@@ -35,7 +36,7 @@ function voyage(h: { breakOff?: number; loop?: number; raids?: number; run?: num
   const v = newVoyage();
   v.samples = 100;
   if (h.breakOff !== undefined) v.breakOff = h.breakOff;
-  if (h.loop !== undefined) [v.loops, v.area] = [1, Math.round(Math.PI * h.loop * h.loop)];
+  if (h.loop !== undefined) [v.sea, v.seaSq] = [Math.round(Math.PI * h.loop * h.loop), Math.round(Math.PI * h.loop * h.loop) ** 2];
   v.raids = h.raids ?? 0;
   if (h.run !== undefined) [v.hits, v.runs, v.runHull] = [1, h.run > 0 ? 1 : 0, h.run];
   if (h.storm !== undefined) [v.storm, v.margin] = [1, h.storm];
@@ -173,6 +174,7 @@ test('the first voyage: the nine lowest captains at their gentlest and the first
   assert.equal(setup.minds?.[0], null);
   for (let k = 1; k < SHIPS; k++) {
     assert.equal(setup.fleet?.[k].gunnery, GENTLE.gunnery);
+    assert.deepEqual(setup.fleet?.[k].fittings, startingFittings(1), 'the starting ram and guns, whatever its temperament');
     assert.equal(setup.minds?.[k]?.gentle, true);
   }
   const s2 = toSetup(applyResult(c, finish()), 5).setup;
@@ -186,7 +188,7 @@ test('the first voyage: the nine lowest captains at their gentlest and the first
   at(40, [EVENT.breakOff, EVENT.loop]);
   at(90, [EVENT.called, EVENT.chosen, EVENT.broadside, EVENT.loop]);
   assert.deepEqual([LESSON.breakOff, LESSON.loop, LESSON.gull, LESSON.chest, LESSON.broadside].map((l) => v.lessons[l]), [40, 40, 90, 90, 90]);
-  assert.deepEqual([v.lessons[LESSON.steer], v.lessons[LESSON.storm], v.loops], [-1, -1, 2]);
+  assert.deepEqual([v.lessons[LESSON.steer], v.lessons[LESSON.storm], v.sea], [-1, -1, 2]);
 });
 
 test('the same career, result and voyage make the same career; all it has learned saves and loads bit for bit', () => {
