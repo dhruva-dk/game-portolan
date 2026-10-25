@@ -13,6 +13,7 @@ import { planKelp } from '../../src/render/regions/kelpShallows.ts';
 import { open, planAmber, shoal } from '../../src/render/regions/amberShoals.ts';
 import { chartDir } from '../../src/render/regions/kit.ts';
 import { planWeeping } from '../../src/render/regions/weepingIsle.ts';
+import { BLOCK, groundAt, LAND, LOW, planCoral } from '../../src/render/regions/coralAtolls.ts';
 import { DRAFT } from '../../src/sim/world/regions.ts';
 import { navigable } from '../../src/sim/world/geography.ts';
 
@@ -123,4 +124,32 @@ test('the Weeping Isle: a fall at every sim cascade and streaks all round, each 
   }
   assert.ok(plan.boulders.length > 100 && plan.clumps.length > 300 && plan.ferns.length > 120, `${plan.boulders.length} boulders, ${plan.clumps.length} clumps, ${plan.ferns.length} ferns`);
   console.log(`weeping: missing ${missing.join(',')}; ${plan.falls.length} falls (${plan.falls.filter((f) => f.sim).length} sim), ${plan.crags.length} crags, ${plan.boulders.length}/${plan.clumps.length}/${plan.ferns.length} dressing, ${plan.dashes.length} dashes, ${plan.puffs.length} puffs, spire ${spire?.top.toFixed(1)}, ${ms.toFixed(0)} ms`);
+});
+
+test('the Coral Atolls: each ring has its channels, open at every tide with no reef, surf or foam in them; reef parts only where a hull grounds at low water; every part seated', () => {
+  const plan = planCoral(field), ri = REGIONS.findIndex((r) => r.id === 'coralAtolls');
+  const gaps = REGIONS[ri].strokes.reduce((n, s) => n + (s.k === 'reef' ? s.gaps.filter((g) => g.crest === null).length : 0), 0);
+  assert.equal(plan.channels.filter((c) => c.great).length, 1, 'the Great Lagoon has a single channel');
+  assert.equal(plan.channels.length, gaps, 'one channel per open gap in the sim');
+  assert.ok(plan.sills.length >= 1, "the north-west atoll's back door is a sill");
+  const reef = [...plan.heads, ...plan.branches, ...plan.tables, ...plan.slabs, ...plan.boulders];
+  const solids = [...reef, ...plan.stakes, ...plan.hulks];
+  for (const c of plan.channels) {
+    for (const d of c.line) {
+      assert.ok(navigable(geo, d, -TIDE.amp), `channel ${c.bearing}° open at low water`);
+      for (const p of solids) assert.ok(p.dir.distanceTo(d) * R > 1, `no reef part in channel ${c.bearing}°`);
+      for (const f of [...plan.surf, ...plan.lace]) assert.ok(f.dir.distanceTo(d) * R > 1, `no surf or foam in channel ${c.bearing}°`);
+    }
+  }
+  for (const p of reef) assert.ok(p.sim >= LOW, 'reef only where a hull grounds at low water');
+  for (const p of [...plan.heads, ...plan.branches, ...plan.tables]) if (p.sim < BLOCK) assert.ok(p.top <= BLOCK - 0.04, 'reef-front coral under a keel at high water');
+  for (const s of [...plan.surf, ...plan.lace]) assert.ok(s.sim >= LOW);
+  for (const p of [...plan.palms.flat(), ...plan.pandanus, ...plan.shrubs]) assert.ok(p.sim > LAND, 'trees on land dry at high water');
+  for (const p of [...plan.palms.flat(), ...plan.pandanus, ...plan.shrubs, ...plan.drift, ...solids]) {
+    const g = groundAt(field, p.dir);
+    assert.ok(p.base <= g + 0.02 && p.base >= g - 0.35, `seated: foot ${p.base.toFixed(2)} on ground ${g.toFixed(2)}`);
+  }
+  const n = { palms: plan.palms.flat().length, pandanus: plan.pandanus.length, shrubs: plan.shrubs.length, reef: reef.length, surf: plan.surf.length, lace: plan.lace.length, stakes: plan.stakes.length, hulks: plan.hulks.length, channels: plan.channels.map((c) => `${c.bearing}°/${c.width.toFixed(1)}`) };
+  console.log('coral plan', JSON.stringify(n));
+  assert.ok(n.palms >= 50 && n.surf >= 300 && n.stakes >= 8 && n.hulks === 1, JSON.stringify(n));
 });

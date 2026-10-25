@@ -8,5 +8,6 @@ import { createBasaltStacks } from './basaltStacks.ts';
 import { createKelpShallows } from './kelpShallows.ts';
 import { createAmberShoals } from './amberShoals.ts';
 import { createWeepingIsle } from './weepingIsle.ts';
+import { createCoralAtolls } from './coralAtolls.ts';
 
-export const REGION_MODULES: readonly ((ctx: RenderContext) => RenderModule)[] = [createIceCrown, createFjords, createBasaltStacks, createKelpShallows, createAmberShoals, createWeepingIsle];
+export const REGION_MODULES: readonly ((ctx: RenderContext) => RenderModule)[] = [createIceCrown, createFjords, createBasaltStacks, createKelpShallows, createAmberShoals, createWeepingIsle, createCoralAtolls];

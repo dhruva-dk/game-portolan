@@ -19,6 +19,7 @@ import { BasaltStacks } from '../../src/render/regions/basaltStacks.ts';
 import { KelpShallows } from '../../src/render/regions/kelpShallows.ts';
 import { AmberShoals } from '../../src/render/regions/amberShoals.ts';
 import { WeepingIsle } from '../../src/render/regions/weepingIsle.ts';
+import { CoralAtolls } from '../../src/render/regions/coralAtolls.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -63,6 +64,8 @@ const kelpShallows = new KelpShallows(style, terrain.field, sea.swell);
 const amberShoals = new AmberShoals(style, terrain.field, sea.swell);
 const weeping = new WeepingIsle(style, terrain.field, sea.swell);
 scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group, amberShoals.group, weeping.group);
+const coral = new CoralAtolls(style, terrain.field, sea.swell); // WP17 part A
+scene.add(coral.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -242,6 +245,12 @@ if (view === 'deck') {
   }
   look(from, to, Number(q.get('height') ?? (view === 'weeping' ? 7 : 3.2)), Number(q.get('pitch') ?? (view === 'weeping' ? 0.03 : 0.26)));
   launch(14, 0.5, 0.1);
+} else if (view === 'coral' || view === 'coralshore') {
+  const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), from = V(), to = V();
+  const ch = coral.plan.channels.find((c) => c.great)!, b = (ch.bearing * Math.PI) / 180;
+  if (view === 'coral') { toWorld(ri, ch.crest.x + 13 * Math.cos(b + 0.45), ch.crest.y + 13 * Math.sin(b + 0.45), from); toWorld(ri, ch.centre.x - 3, ch.centre.y - 6, to); } // low off the reef at midday, along its surf to the single channel and the Great Lagoon beyond (capture 23)
+  else { toWorld(ri, 46, 24, from); toWorld(ri, 28, 21, to); } // over the outer reef's surf to a motu's palms
+  look(from, to, Number(q.get('height') ?? (view === 'coral' ? 4.5 : 2.6)), Number(q.get('pitch') ?? (view === 'coral' ? -0.16 : -0.12)));
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();
@@ -327,11 +336,11 @@ function frame(now: number): void {
   ice.update(camera.position, clock, clock);
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
-  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position);
+  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position, clock);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles), flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles + coral.triangles), flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);
