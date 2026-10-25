@@ -23,7 +23,7 @@ const BEAM_REACH = dcos(PERK.crownLight.reach / R), BEAM_HALF = dcos(PERK.crownL
 const ORIGIN = v3(), P = v3(), D = v3(), RIGHT = v3(), BEAM = v3();
 
 // The flood works on blocks of B×B cells where it can: a block holding none of the closing ship's sea and none of its
-// trail is clean, flooded whole; the rest are flooded cell by cell. Blocks tile the faces exactly, so a block's edge
+// trail is clean, flooded whole; the rest a row run at a time. Blocks tile the faces exactly, so a block's edge
 // is its cells' edges and every adjacency across it is a cell's (sphere.ts neighbor, across faces too).
 const BLOG = 4, B = 1 << BLOG, BLOG2 = LOG - BLOG, BM = (GRID >> BLOG) - 1, BFACE = 2 * BLOG2, BLOCKS = 6 << BFACE;
 const CLEAN = 1, DIRTY = 2, ROW_WORDS = GRID >> 2, BLOCK_WORDS = B >> 2, ROW_EIGHTS = GRID >> 3, BLOCK_EIGHTS = B >> 3;
@@ -38,6 +38,9 @@ const firstCell = (b: number): number => ((b >> BFACE) << FACE_SHIFT) + ((((b >>
 // cells and clean blocks labelled and the blocks classed, in order, to claim and to reset. LOSS: sea lost, by owner.
 const BARRIER = -1;
 const LABEL = new Int32Array(TERRITORY.cells), SEEN = new Int32Array(TERRITORY.cells);
+// A run of open cells along a dirty block's row, labelled and queued as one node: SPAN[first cell] = its last cell
+// (SEEN lists runs by their first cells).
+const SPAN = new Int32Array(TERRITORY.cells);
 const BLABEL = new Int32Array(BLOCKS), BSTATE = new Uint8Array(BLOCKS), BSEEN = new Int32Array(BLOCKS), CLASSED = new Int32Array(BLOCKS);
 const BHELD = new Uint8Array(BLOCKS); // a classed block holding anyone's sea
 const LOSS = new Float64Array(SHIPS + 1);
@@ -332,9 +335,11 @@ function closeLoop(state: MatchState, i: number): void {
     gained += claim(c);
   }
   for (let k = 0; k < seen; k++) {
-    const c = SEEN[k];
-    if (inner[LABEL[c] - 1] === 1) gained += claim(c);
-    LABEL[c] = 0;
+    const lo = SEEN[k], hi = SPAN[lo], won = inner[LABEL[lo] - 1] === 1;
+    for (let c = lo; c <= hi; c++) {
+      if (won) gained += claim(c);
+      LABEL[c] = 0;
+    }
   }
   MARK_BYTES.fill(me);
   const full = MARK[0];
@@ -416,16 +421,16 @@ function flood(): number {
  * faces' edges included), else to each of those cells.
  */
 function expand(node: number): void {
-  if (node < CELLS) {
-    const i = node & (B - 1), j = (node >> LOG) & (B - 1);
-    if (i > 0) visitCell(node - 1);
-    else dispatch(step(node, 0));
-    if (i < B - 1) visitCell(node + 1);
-    else dispatch(step(node, 1));
-    if (j > 0) visitCell(node - GRID);
-    else dispatch(step(node, 2));
-    if (j < B - 1) visitCell(node + GRID);
-    else dispatch(step(node, 3));
+  if (node < CELLS) { // a run lo…hi along one row of a dirty block: its two ends, then the rows above and below
+    const lo = node, hi = SPAN[node], j = (node >> LOG) & (B - 1);
+    if ((lo & (B - 1)) > 0) visitCell(lo - 1);
+    else dispatch(step(lo, 0));
+    if ((hi & (B - 1)) < B - 1) visitCell(hi + 1);
+    else dispatch(step(hi, 1));
+    if (j > 0) for (let c = lo; c <= hi; c++) visitCell(c - GRID);
+    else for (let c = lo; c <= hi; c++) dispatch(step(c, 2));
+    if (j < B - 1) for (let c = lo; c <= hi; c++) visitCell(c + GRID);
+    else for (let c = lo; c <= hi; c++) dispatch(step(c, 3));
     return;
   }
   const c0 = firstCell(node - CELLS);
@@ -499,15 +504,27 @@ function visitBlock(b: number): void {
   } else if (l - 1 !== root) meet(l - 1);
 }
 
-/** An open cell joins the region spreading now and is queued; another region's merges with it; the barrier stops it. */
+/**
+ * An open cell joins the region spreading now with the open run along its block's row around it, queued as one node
+ * (the run's first cell); another region's merges with it; the barrier stops it. A region's cells are the same set
+ * as cell by cell (the run is edge-connected and open), and areas are whole quanta, so the claim is bit-identical.
+ */
 function visitCell(c: number): void {
   if (owner[c] === me) return;
   const l = LABEL[c];
   if (l === 0) {
-    LABEL[c] = root + 1;
-    area[root] += AREA[c & FACE_MASK];
-    SEEN[seen++] = c;
-    enqueue(c);
+    const label = root + 1, row = c & ~(B - 1);
+    let lo = c, hi = c, a = 0;
+    while (lo > row && owner[lo - 1] !== me && LABEL[lo - 1] === 0) lo--;
+    while (hi < row + B - 1 && owner[hi + 1] !== me && LABEL[hi + 1] === 0) hi++;
+    for (let x = lo; x <= hi; x++) {
+      LABEL[x] = label;
+      a += AREA[x & FACE_MASK];
+    }
+    area[root] += a;
+    SPAN[lo] = hi;
+    SEEN[seen++] = lo;
+    enqueue(lo);
   } else if (l > 0 && l - 1 !== root) meet(l - 1);
 }
 
