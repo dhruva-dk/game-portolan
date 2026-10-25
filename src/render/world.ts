@@ -17,6 +17,7 @@ import { createTerritory } from './territory.ts';
 import { createTrails } from './trails.ts';
 import { createWeather } from './weather.ts';
 import { REGION_MODULES } from './regions/index.ts';
+import { createShips } from './ships/shipView.ts';
 
 /** What a module is built with. */
 export interface RenderContext {
@@ -39,7 +40,7 @@ export interface RenderModule {
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
 /** The render modules, updated in this order every frame. Append-only (A6). */
-const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm];
+const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm, createShips];
 
 export class WorldView {
   readonly scene = new THREE.Scene();
