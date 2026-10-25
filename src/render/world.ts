@@ -20,6 +20,8 @@ import { REGION_MODULES } from './regions/index.ts';
 import { createShips } from './ships/shipView.ts';
 import { createEffects } from './fx.ts';
 import { createCurrents } from './currents.ts';
+import { createEffects } from './fx.ts';
+import { createCurrents } from './currents.ts';
 import { CameraRig, zoomPhases, type Insets, type RigView } from './camera.ts';
 import { Chart, CHART_LAYER, groundOf } from './chart.ts';
 import { territories } from './territory.ts';
