@@ -231,7 +231,8 @@ float marks(vec3 P, vec3 n, vec3 t, float upx, float cell, float share, float se
     wd /= max(length(wd), 1e-4);
     vec2 x = onPlane(P, i) - wd * scroll;
     float sd = seed + float(i) * 7.1 + lo * 3.3;
-    ink = max(ink, wts[i] * mix(mark(x, wd, C, upx, sd, share, kind), mark(x, wd, 2.0 * C, upx, sd + 3.3, share, kind), f));
+    float m0 = mark(x, wd, C, upx, sd, share, kind); // the coarser octave only where it blends in (f = 0 at the near clamp, WP30b)
+    ink = max(ink, wts[i] * (f > 0.0 ? mix(m0, mark(x, wd, 2.0 * C, upx, sd + 3.3, share, kind), f) : m0));
   }
   return ink;
 }
@@ -285,7 +286,10 @@ void main() {
   float si = length(vt), st = si / 1.33, tt = st * inversesqrt(max(1.0 - st * st, 1e-3)), dd = max(depth, 0.0);
   vec3 Pf = P - vt / max(si, 1e-4) * dd * tt + (vNormal - dir) * dd * 1.2;
   vec3 dirF = normalize(Pf);
-  vec4 ff = seaField(dirF), fl = cubeAt(tSeaFloor, dirF);
+  // the floor is gone by 110 u (vis): past that, no taps (explicit LOD, safe in a branch; rip's fwidth may jump at the
+  // seam, where vis is already 0 — WP30b)
+  vec4 ff = vec4(0.0), fl = vec4(0.0);
+  if (dist < 110.0) { ff = seaField(dirF); fl = cubeAt(tSeaFloor, dirF); }
   float leadF;
   int pf = planeOf(dirF, leadF);
   vec2 x = onPlane(Pf, pf), xdx = onPlane(dFdx(Pf), pf), xdy = onPlane(dFdy(Pf), pf);
@@ -305,6 +309,7 @@ void main() {
     fc = glaze(fc, SAND_T, 0.3 * smoothstep(0.0, 0.1, r) * (1.0 - smoothstep(0.1, 0.4, r)) * ripples, 0.0, q);
     fc = mix(fc, hatchInk(0.3), 0.55 * crest * ripples);
     // rock: boulders and ledges cracked apart, hatched on the side turned from the sun
+    if (fl.r > 0.0) { // each floor's cells, hatching and marks only where it lies (WP30b)
     float idR;
     vec4 cr = cells(x / 1.8, idR);
     float rock = fl.r * step(0.12, idR), rt = clamp(0.3 + 1.4 * dot(cr.zw, L), 0.0, 1.0);
@@ -312,7 +317,9 @@ void main() {
     fc = glaze(fc, ROCK_T, (0.4 + 0.35 * idR) * fl.r, 0.0, q);
     fc = mix(fc, hatchInk(rt), hatching(x * 1.3, xdx * 1.3, xdy * 1.3, 0.85 * rt, 13.0) * rock * mk);
     fc = mix(fc, hatchInk(0.7), 0.85 * crack * fl.r * mk);
+    }
     // coral: heads ringed in ink, the brain domes banded within, the branching ones stippled; rose madder and ochre
+    if (coral > 0.0) {
     float idC;
     vec4 cc = cells(x / 1.15, idC);
     float rad = 0.28 + 0.14 * idC, head = coral * (1.0 - smoothstep(rad - 0.03, rad, cc.x));
@@ -322,12 +329,15 @@ void main() {
     float dots = step(hash12(floor(x * 6.0) + 3.1), 0.2) * smoothstep(2.5, 5.0, 1.0 / (6.0 * fpx)) * step(0.6, idC);
     fc = glaze(fc, idC < 0.5 ? CORAL_T : SAND_T, (0.45 + 0.45 * idC) * head, 0.0, q);
     fc = mix(fc, hatchInk(0.5), max(ringC * 0.9, max(bands * 0.5, dots * 0.45) * head) * mk);
+    }
     // kelp: the forest floor in its own shade, holdfasts and blades swaying with the swell
+    if (fl.g > 0.0) {
     fc = glaze(fc, KELP_T, 0.5 * fl.g, 0.0, q);
     fc = glaze(fc, ROCK_T, 0.25 * fl.g * n1, 0.0, q);
     vec2 sway = rot2(0.5 * sin(uTime * 0.8 + dot(x, vec2(0.21, 0.17)))) * normalize(onPlane(wind, pf) + 1e-6);
     float blades = mark(x, sway, 1.1, fpx, 31.0, 0.75, 2) * smoothstep(4.0, 9.0, 1.1 / fpx);
     fc = mix(fc, hatchInk(0.55), 0.8 * blades * fl.g * mk);
+    }
     col = mix(col, fc, vis);
   }
 
@@ -456,12 +466,18 @@ void main() {
     foam = max(foam, laceZone * (1.0 - smoothstep(0.4, 1.2, (cl.y - cl.x) * 0.4 / upx / uRenderPx))
                      * (0.55 + 0.45 * sin(uTime * 0.9 + 6.0 * wob + 3.0 * idL)));
   }
-  float lead = smoothstep(0.42, 0.62, foam * (0.5 + 0.55 * q.grain + 0.45 * tri(tMarks, P / 2.3, tw).b));
+  // foam's and drift's tMarks taps only where they can show (explicit gradients, so in a branch — WP30b)
+  vec3 pl = P / 2.3, pb = (P + wind * uTime * 0.3) / 3.3, plx = dFdx(pl), ply = dFdy(pl), pbx = dFdx(pb), pby = dFdy(pb);
+  float lead = 0.0;
+  if (foam > 0.0) lead = smoothstep(0.42, 0.62, foam * (0.5 + 0.55 * q.grain + 0.45 * triGrad(tMarks, pl, tw, plx, ply).b));
   // drift lines: broken threads of foam lying along the shore, drifting downwind
-  float fy = max(fwidth(f.y), 1e-5) * uRenderPx, br = tri(tMarks, (P + wind * uTime * 0.3) / 3.3, tw).g;
-  float drift = max((1.0 - smoothstep(0.3, 1.0, abs(f.y - 1.4 - 0.6 * wob) / fy)) * step(0.45, br),
-                    0.6 * (1.0 - smoothstep(0.3, 0.9, abs(f.y - 2.7 - 0.9 * wob) / fy)) * step(0.5, br))
-              * water * near * smoothstep(0.3, 1.0, depth) * (1.0 - lead);
+  float fy = max(fwidth(f.y), 1e-5) * uRenderPx, drift = 0.0;
+  float d1 = 1.0 - smoothstep(0.3, 1.0, abs(f.y - 1.4 - 0.6 * wob) / fy), d2 = 0.6 * (1.0 - smoothstep(0.3, 0.9, abs(f.y - 2.7 - 0.9 * wob) / fy));
+  float dk = water * near * smoothstep(0.3, 1.0, depth) * (1.0 - lead);
+  if (max(d1, d2) * dk > 0.0) {
+    float br = triGrad(tMarks, pb, tw, pbx, pby).g;
+    drift = max(d1 * step(0.45, br), d2 * step(0.5, br)) * dk;
+  }
 
   // wave strokes ride the crests downwind at two scales, thinning toward the horizon; crests break white as the wind
   // rises; a squall drives spindrift down the wind in streaks

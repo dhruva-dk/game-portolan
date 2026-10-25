@@ -165,6 +165,10 @@ vec4 triLod(sampler2D t, vec3 p, vec3 w, float lod) {
   return textureLod(t, p.yz, lod) * w.x + textureLod(t, p.zx, lod) * w.y + textureLod(t, p.xy, lod) * w.z;
 }
 vec4 tri(sampler2D t, vec3 p, vec3 w) { return texture(t, p.yz) * w.x + texture(t, p.zx) * w.y + texture(t, p.xy) * w.z; }
+// tri with explicit gradients (dx, dy: dFdx(p), dFdy(p) taken outside), so it may sit in a branch (WP30b).
+vec4 triGrad(sampler2D t, vec3 p, vec3 w, vec3 dx, vec3 dy) {
+  return textureGrad(t, p.yz, dx.yz, dy.yz) * w.x + textureGrad(t, p.zx, dx.zx, dy.zx) * w.y + textureGrad(t, p.xy, dx.xy, dy.xy) * w.z;
+}
 
 // ---- paper -----------------------------------------------------------------------------------------------
 struct Paper { float fibre; float grain; float mottle; float bloom; float fox; float stain; };

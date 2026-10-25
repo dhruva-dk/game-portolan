@@ -237,7 +237,7 @@ const hook = {
    * edges, composite, interface), then the scene pass with each top-level group hidden in turn (its cost is the
    * difference). Null without EXT_disjoint_timer_query_webgl2. Driven by tests/render/gpu.timing.ts.
    */
-  async profile(frames = 30) {
+  async profile(frames = 30, quantile = 0.5) { // quantile < 0.5 (e.g. 0.1) resists other GPU work on a loaded machine (WP30b)
     const gl = pipeline.renderer.getContext() as WebGL2RenderingContext, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
     if (!ext) return null;
     const r = pipeline.renderer, plain = r.render.bind(r), next = () => new Promise((done) => requestAnimationFrame(done));
@@ -270,7 +270,7 @@ const hook = {
       let total = 0;
       for (const [name, v] of Object.entries(per)) {
         v.sort((x, y) => x - y);
-        med[name] = +v[v.length >> 1].toFixed(2);
+        med[name] = +v[Math.min(v.length - 1, Math.floor(v.length * quantile))].toFixed(2);
         total += med[name];
       }
       med.total = +total.toFixed(2);
@@ -310,7 +310,7 @@ const hook = {
       }
     }
     ms.sort((x, y) => x - y);
-    return { timer: !!ext, median: +ms[ms.length >> 1].toFixed(2), p90: +ms[Math.floor(ms.length * 0.9)].toFixed(2) };
+    return { timer: !!ext, median: +ms[ms.length >> 1].toFixed(2), p90: +ms[Math.floor(ms.length * 0.9)].toFixed(2), p10: +ms[Math.floor(ms.length * 0.1)].toFixed(2) };
   },
 };
 (window as unknown as { __weather: typeof hook }).__weather = hook;
