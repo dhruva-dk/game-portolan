@@ -327,12 +327,28 @@ function pandanusKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** Beach scrub: a lumpy mound 1 across, lit on top, dark at its skirt. */
+/** Beach scrub (naupaka, beach heliotrope) ~1 across: a cloud of leafy lobes, each rounded and lumpy, its surface
+ *  bristling with fleshy leaves fanned out in rosettes so its outline is ragged foliage, never a faceted mound; lit on
+ *  top, dark at its skirt. */
 function shrubKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = 9, jit = Array.from({ length: 4 * k }, () => 0.75 + 0.5 * rnd()), b = new Brush(W.shrub);
-  b.pick = (c, n) => (n.y > 0.75 ? W.shrubLit : c.y < 0.1 ? W.shade : W.shrub);
-  b.kit.loft([0, 0.2, 0.36, 0.46].map((y, i) => ring(k, y, (j) => [0.5, 0.48, 0.34, 0.12][i] * jit[i * k + j])));
-  return b.kit.build();
+  const rnd = seeded(seed), k = 11, b = new Brush(W.shrub);
+  b.pick = (c, n) => (n.y > 0.6 ? W.shrubLit : c.y < 0.1 ? W.shade : W.shrub);
+  const lobes: [number, number, number, number][] = [[0, 0, 0.3, 0.42], [0.2, 0.1, 0.22, 0.33], [-0.2, -0.06, 0.22, 0.3], [0.04, -0.22, 0.18, 0.26], [-0.08, 0.22, 0.17, 0.24]];
+  for (const [cx, cz, r, h] of lobes) {
+    const jit = Array.from({ length: 5 * k }, () => 0.8 + 0.4 * rnd());
+    b.kit.loft([0, 0.3, 0.6, 0.85, 1].map((y, i) => ring(k, y * h, (j) => [1, 1.02, 0.86, 0.56, 0.16][i] * r * jit[i * k + j]).map((p) => p.add(vec(cx, 0, cz)))));
+  }
+  const lobed = laid(b);
+  // the leaves: rosettes of short fleshy blades over every lobe, pointing out and up from its surface
+  for (const [cx, cz, r, h] of lobes) {
+    for (let i = 0; i < 12; i++) {
+      const a = rnd() * TAU, e = 0.15 + 0.8 * rnd(), out = vec(Math.cos(a) * Math.cos(e * 1.4), Math.sin(e * 1.4), Math.sin(a) * Math.cos(e * 1.4));
+      const foot = vec(cx + out.x * r * 0.85, Math.max(0.03, out.y * h * 0.9), cz + out.z * r * 0.85);
+      spike(b, foot, foot.clone().addScaledVector(out, 0.09 + 0.08 * rnd()).add(vec(0, 0.04, 0)), 0.035, rnd() * TAU);
+    }
+  }
+  const end = laid(b);
+  return liftNormals(smooth(b.kit.build()), [[lobed, end]]);
 }
 
 /** Smooth a kit's normals where facets meet at a point, so a rounded form reads round: no facet steps, no polygon

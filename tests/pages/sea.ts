@@ -262,8 +262,10 @@ if (view === 'deck') {
   // the lagoon's pale water fills the near and middle ground, the pass runs out as the one dark way between the reef's
   // two arms (their surf, the withies), to the open sea (from outside, a low eye sees the lagoon only as a sliver)
   if (view === 'coral') { toWorld(ri, ch.crest.x + od * Math.cos(ob), ch.crest.y + od * Math.sin(ob), from); toWorld(ri, ch.crest.x + 30 * Math.cos(b + aim * 0.01), ch.crest.y + 30 * Math.sin(b + aim * 0.01), to); }
-  else { toWorld(ri, 1.5, -19, from); toWorld(ri, 9.4, -14.3, to); } // over the outer reef's surf to the motu at the Great Lagoon's mouth, the hulk on its shore
-  look(from, to, Number(q.get('height') ?? (view === 'coral' ? 4 : 2.6)), Number(q.get('pitch') ?? (view === 'coral' ? -0.2 : -0.12)));
+  // the shore: low over the lagoon's edge inside the south-east motu, along its beach (the reef flat at low water, the
+  // grove leaning out over it) to the windward motus across the lagoon; the hulk at the mouth stays behind the eye
+  else { toWorld(ri, Number(q.get('fx') ?? 20.5), Number(q.get('fy') ?? -17.5), from); toWorld(ri, Number(q.get('tx') ?? 25.5), Number(q.get('ty') ?? -4.5), to); }
+  look(from, to, Number(q.get('height') ?? (view === 'coral' ? 4 : 2.2)), Number(q.get('pitch') ?? (view === 'coral' ? -0.2 : -0.1)));
 } else if (view === 'spice' || view === 'spiceshore') {
   const ri = REGIONS.findIndex((r) => r.id === 'spiceIsles'), from = V(), to = V(), m = REGIONS[ri].landmark;
   const ox = Number(q.get('ox') ?? 0), oy = Number(q.get('oy') ?? 0);
