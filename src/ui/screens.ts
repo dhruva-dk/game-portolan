@@ -9,7 +9,8 @@ import { draw } from '../career/league.ts';
 import { LESSON } from '../career/voyage.ts';
 import { over } from '../sim/end.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
-import { PHASE, afloat } from '../sim/state.ts';
+import { PHASE, afloat, type MatchState } from '../sim/state.ts';
+import { calmNow } from '../sim/storm.ts';
 import { ChestChoice } from './chestChoice.ts';
 import { Controls } from './controls.ts';
 import { Haptics } from './haptics.ts';
@@ -148,6 +149,8 @@ interface Wp27Probe {
   chip?: () => Rect | null;
   skip?: () => Rect | null;
   sunk?: () => number;
+  /** Ships afloat now (1 once her sinking has ended the match). */
+  afloat?: () => number;
   results?: () => { page: number; button: Rect | null };
 }
 const probe27 = (): Wp27Probe | undefined => (globalThis as { __wp27?: Wp27Probe }).__wp27;
@@ -159,6 +162,32 @@ const SINKING = { playOut: 3, skipAfter: 1.5, skipLate: 15, beat: 3, rushed: 0.6
 /** S-019: the skip card comes up over the match playing out: once the chart has opened whole (z past this), at least
  *  `skipAfter` s after she sank, and in any case by `skipLate` s (the player may pinch back down to the sea). */
 const SKIP_Z = 0.98;
+/** S-019: the play-out frames the storm's calm by RING points round its edge (when the calm is under PLAY_CALM rad
+ *  across, else her wreck's seas and the ships afloat alone). */
+const RING = 32, PLAY_CALM = 1;
+const AXES = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+/** S-019: what the chart frames as the match plays out on it (CameraRig.playOut), into `po`: the storm's calm round its
+ *  edge (while it is under PLAY_CALM rad across) and every ship afloat; on the first call, where the zoom turns to and
+ *  the chart is rooted, the calm's centre (her wreck while the storm has not yet closed in). */
+function playOut(state: MatchState, po: { toward: THREE.Vector3; ring: THREE.Vector3[]; ships: THREE.Vector3[] }, first: boolean): void {
+  const c = calmNow(state), small = c.r < PLAY_CALM, me = state.ships[0].pos;
+  if (first) po.toward.set(small ? c.at.x : me.x, small ? c.at.y : me.y, small ? c.at.z : me.z).normalize();
+  po.ring.length = 0;
+  if (small) {
+    const [a, e1, e2] = AXES, cr = Math.cos(c.r), sr = Math.sin(c.r);
+    a.set(c.at.x, c.at.y, c.at.z).normalize();
+    e1.set(Math.abs(a.x) < 0.9 ? 1 : 0, Math.abs(a.x) < 0.9 ? 0 : 1, 0).addScaledVector(a, -e1.dot(a)).normalize();
+    e2.crossVectors(a, e1);
+    for (let i = 0; i < RING; i++) {
+      const th = (i / RING) * Math.PI * 2;
+      po.ring.push((RING_DIRS[i] ??= new THREE.Vector3()).copy(a).multiplyScalar(cr).addScaledVector(e1, Math.cos(th) * sr).addScaledVector(e2, Math.sin(th) * sr));
+    }
+  }
+  po.ships.length = 0;
+  state.ships.forEach((q, i) => { if (afloat(q)) po.ships.push((SHIP_DIRS[i] ??= new THREE.Vector3()).set(q.pos.x, q.pos.y, q.pos.z).normalize()); });
+}
+const RING_DIRS: THREE.Vector3[] = [], SHIP_DIRS: THREE.Vector3[] = [];
+
 /** The safe area with the skip card's band kept clear at its foot, so the chart is framed whole above the card. */
 const banded = (v: View): View['safe'] => ({ ...v.safe, bottom: Math.max(v.safe.bottom, skipLayout(v).band) });
 
@@ -204,6 +233,7 @@ export function match(ctx: ScreenContext): Screen {
   const skip = new SkipCard(() => { rushing = true; rt.skip(); }, (c) => rt.audio?.engine.ui(c));
   ui.add(chest.group);
   if (tutorial) ui.add(tutorial.group);
+  const framed = { toward: new THREE.Vector3(), ring: [] as THREE.Vector3[], ships: [] as THREE.Vector3[] }; // S-019: the play-out's frame on the chart
   let sunk = -1, ending = '', rushing = false, closing: number | null = null; // seconds since she sank (−1 afloat); seconds left before the results
   let hudNow: HudLayout | null = null; // the HUD's layout in force
   if (p27) {
@@ -216,6 +246,7 @@ export function match(ctx: ScreenContext): Screen {
     p27.chip = () => chest.chipRect;
     p27.skip = () => (skip.group.visible ? skip.button : null);
     p27.sunk = () => sunk;
+    p27.afloat = () => session.state.ships.filter(afloat).length;
   }
   const veil = document.createElement('div'); // the paper veil over a reduced-motion cut (the rig's zoom.veil, 1 → 0)
   Object.assign(veil.style, { position: 'fixed', inset: '0', background: '#efe0c0', opacity: '0', pointerEvents: 'none', zIndex: '3' });
@@ -319,6 +350,8 @@ export function match(ctx: ScreenContext): Screen {
         ui.add(skip.group);
       }
       if (sunk >= 0) {
+        playOut(state, framed, !rig.playOut);
+        if (!rig.playOut) { view.chart.rootAt = framed.toward; rig.playOut = framed; }
         sunk += f.dt;
         skip.group.visible ||= sunk >= SINKING.skipAfter && (rig.z >= SKIP_Z || sunk >= SINKING.skipLate);
         skip.set(ending, state.ships.filter(afloat).length, rushing);
@@ -336,7 +369,9 @@ export function match(ctx: ScreenContext): Screen {
         if ((chart.canvas.style.display === 'none') !== hide) chart.canvas.style.display = hide ? 'none' : 'block';
         if (!hide) chart.draw(state, world, view.sight(state), f.clock, Math.min(3, devicePixelRatio || 1));
       }
-      if (over(state)) { // the end: the results after a beat on deck, at once from the chart
+      // the end: the results after a beat on deck, at once from the chart; when her own sinking ended it (the last but
+      // one), only once the camera has watched the sea close over her (S-019: the sinking is a moment, never cut short)
+      if (over(state) && (!gone || closing !== null || rig.chartOpen || rig.cine.opened)) {
         closing ??= gone ? SINKING.rushed : SINKING.beat;
         closing -= f.dt;
         if (closing <= 0) { closing = Infinity; queueMicrotask(() => rt.show('results')); }
@@ -381,7 +416,7 @@ export function results(ctx: ScreenContext): Screen {
   const rt = ctx.runtime, o = rt.outcome;
   if (!o) return notice(ctx, 'The voyage ends', 0.12, false, () => rt.show('harbour'));
   const ui = new THREE.Group(), back = new THREE.Group();
-  const sheet = new ResultsSheet(resultsModel(o.before, o.after, o.result, o.drawn, o.voyage), () => rt.show('harbour'), (c) => rt.audio?.engine.ui(c));
+  const sheet = new ResultsSheet(resultsModel(o.before, o.after, o.result, o.drawn, o.voyage, o.gull), () => rt.show('harbour'), (c) => rt.audio?.engine.ui(c));
   ui.add(back, sheet.group);
   const p27 = probe27();
   if (p27) p27.results = () => ({ page: sheet.page, button: sheet.button });

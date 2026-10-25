@@ -51,8 +51,17 @@ async function sinking(game: Game, dev: string): Promise<boolean> {
   const sank = (await screen(game)) === 'match' && (await p27<number>(game, 'sunk')) >= 0;
   if (sank) {
     // the camera risen over the wreck, watching the sea close over her as she founders (shipView.ts SINK: 5.5–10.5 s)
-    await game.page.waitForFunction(() => ((window as Win).__wp27.sunk?.() ?? 0) >= 8, null, { timeout: 60_000, polling: 'raf' }).catch(() => {});
-    await shot(game, dev, 'sinking');
+    const watched = await game.page.waitForFunction(() => ((window as Win).__wp27.sunk?.() ?? 0) >= 8, null, { timeout: 60_000, polling: 'raf' }).then(() => true).catch(() => false);
+    const onDeck = (await screen(game)) === 'match';
+    check(`${dev} sunk: the camera watches her founder (8 s after she sank, still on the match)`, watched && onDeck);
+    if (onDeck) await shot(game, dev, 'sinking');
+  }
+  // her sinking ended the match (the last but one): nothing plays out; the results follow the watch
+  const last = sank && (await p27<number>(game, 'afloat')) <= 1;
+  if (last) {
+    const after = await game.until((g) => g.screen === 'results', undefined, 30_000).then(() => true).catch(() => false);
+    check(`${dev} sunk last but one: the results follow once the sea has closed over her`, after);
+    return false; // the play-out and the skip did not run: the next voyage must show them
   }
   // the skip card comes up once the chart has opened whole on the match playing out (the watch and the zoom take ~12 s
   // of the rig's clock, longer in wall time when frames are slow)
@@ -192,7 +201,7 @@ async function voyage(dev: DeviceName): Promise<void> {
   await game.tap({ x: s.left + (d.width - s.left - s.right) / 2, y: s.top + (d.height - s.top - s.bottom) * 0.42 });
   await game.until((g) => g.screen === 'match' && g.tick > 300, undefined, 60_000);
   check(`${dev} the second voyage has no prompts`, (await p27(game, 'tutorial')) === null && (await p27<number>(game, 'lesson')) === -1);
-  if (!sankFirst) check(`${dev} she sank in one of two voyages: the sinking flow ran`, await sinking(game, dev));
+  if (!sankFirst) check(`${dev} she sank with rivals left in one of two voyages: the play-out and the skip ran`, await sinking(game, dev));
   console.log(`     ${dev}: first voyage by touch in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   const problems = game.problems();
   check(`${dev} console clean`, problems.length === 0, problems.slice(0, 3).join(' | '));

@@ -21,7 +21,7 @@ import { captainCard, leagueRows, nineCards, type Card } from './cards.ts';
 import { itemName } from './chestChoice.ts';
 import { INK, nib, pouch, ring, shipGlyph, strongbox, wash } from './icons.ts';
 import {
-  GOLD, GOLD_DARK, MIN_TARGET, OCHRE, ORDINALS, PAPER, SEPIA, VERDIGRIS, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, kite, letter, rgba, safeOf, scrap,
+  GOLD, GOLD_DARK, MIN_TARGET, fitSize, widthOf, OCHRE, ORDINALS, PAPER, SEPIA, VERDIGRIS, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, kite, letter, rgba, safeOf, scrap,
   type G,
 } from './inkpage.ts';
 import type { Rect, View } from './safeArea.ts';
@@ -55,7 +55,13 @@ export function pigmentHex(name: string): string {
   return FALLBACK[name] ?? SEPIA;
 }
 
-export interface TimelineLine { tick: number; clock: string; text: string; tone: 'good' | 'bad' | 'plain' }
+/** A moment on the timeline: `kind` its EVENT key ('end' the ending), `rank` how much it decided the match (0 most:
+ *  the break-off and the end; 4 least), `amount` what it counts (sea, doubloons), for merging runs (timelineFit). */
+export interface TimelineLine { tick: number; clock: string; text: string; tone: 'good' | 'bad' | 'plain'; kind: string; rank: number; amount: number }
+/** S-019: the gull's moments, as the match screen heard them (EVENT, ship 0): the timeline tells them too. */
+export const GULL_MOMENTS: readonly number[] = [EVENT.called, EVENT.landed, EVENT.dive, EVENT.snatch];
+/** S-019: the page's smaller figures (the timeline's times, the league's places and points), em CSS px × k. */
+export const FIGURE = 14;
 export interface Fate { ship: number; name: string; pigments: [string, string]; place: number; fate: string; byYou: boolean }
 export interface LeagueMove { key: number; name: string; from: number; to: number; points: number; player: boolean }
 export interface ResultsModel {
@@ -90,7 +96,7 @@ export function fateWords(c: Career, drawn: readonly number[], by: number, cause
 }
 
 /** The page's content: `drawn` are the league ids of ships 1–9 (toSetup), `after` = applyResult(before, result, voyage). */
-export function resultsModel(before: Career, after: Career, result: MatchResult, drawn: readonly number[], voyage?: Voyage): ResultsModel {
+export function resultsModel(before: Career, after: Career, result: MatchResult, drawn: readonly number[], voyage?: Voyage, gull: readonly Entry[] = []): ResultsModel {
   const me = result.ships[0];
   const nameOf = (ship: number): string => shipName(before, drawn, ship);
   const sunkBy = (by: number, cause: number): string => fateWords(before, drawn, by, cause);
@@ -98,6 +104,7 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
   const lineOf = (e: Entry): TimelineLine | null => {
     const key = EVENT_KEY[e.kind] ?? '', mine = e.ship === 0;
     let text: string, tone: TimelineLine['tone'] = 'plain';
+    const rank = DECIDES[key === 'broken' && !mine ? 'raid' : key === 'sunk' && mine ? 'end' : key] ?? 4;
     switch (key) {
       case 'breakOff': text = REGIONS[e.by] ? `Broke off into ${lower(REGIONS[e.by].name)}` : 'Broke off the Great Current'; tone = 'good'; break;
       case 'thrown': text = 'Thrown off the end of the Great Current'; break;
@@ -106,7 +113,11 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
       case 'engage': text = `A fight with ${lower(nameOf(e.by))}`; break;
       case 'loop': text = `Closed a loop, ${Math.round(e.amount)} of sea`; tone = 'good'; break;
       case 'broken': if (mine) { text = `${cap(lower(nameOf(e.by)))} broke your trail`; tone = 'bad'; } else { text = `Broke ${lower(nameOf(e.ship))}'s trail`; tone = 'good'; } break;
-      case 'chosen': text = `Chose the ${itemName(e.by)}`; break;
+      case 'chosen': text = `Chose the ${itemName(e.by)}`; tone = 'good'; break;
+      case 'called': text = `Sent the gull for a chest, ${Math.round(e.amount)} doubloons`; break;
+      case 'landed': text = 'The gull brought its chest aboard'; tone = 'good'; break;
+      case 'dive': text = `The gull dove on ${lower(nameOf(e.by))}`; break;
+      case 'snatch': text = `The gull snatched back ${Math.round(e.amount)} doubloons`; tone = 'good'; break;
       case 'bank': text = `Banked ${Math.round(e.amount)} doubloons`; tone = 'good'; break;
       case 'sunk': if (mine) { text = sunkBy(e.by, Math.round(e.amount)); tone = 'bad'; } else { text = `Sank ${lower(nameOf(e.ship))}`; tone = 'good'; } break;
       default:
@@ -114,12 +125,15 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
         text = /find|found|treasure|scoop/i.test(key) ? 'Took a find' : cap(key.replace(/([A-Z])/g, ' $1').toLowerCase());
         tone = mine ? 'good' : 'plain';
     }
-    return { tick: e.tick, clock: clock(e.tick), text, tone };
+    return { tick: e.tick, clock: clock(e.tick), text, tone, kind: key, rank, amount: e.amount };
   };
   const timeline: TimelineLine[] = [];
-  for (const e of result.timeline) { const l = lineOf(e); if (l) timeline.push(l); }
-  if (won) timeline.push({ tick: result.ticks, clock: clock(result.ticks), text: 'Last afloat: the sea is yours', tone: 'good' });
-  else if (!result.timeline.some((e) => EVENT_KEY[e.kind] === 'sunk' && e.ship === 0)) timeline.push({ tick: me.tick, clock: clock(me.tick), text: ending, tone: 'bad' });
+  // the sim's timeline and the gull's moments (only hers, while she was afloat), in the order they came
+  const end = won ? result.ticks : me.tick, heard = gull.filter((e) => e.ship === 0 && GULL_MOMENTS.includes(e.kind) && e.tick <= end);
+  const all = [...result.timeline, ...heard].map((e, i) => ({ e, i })).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i);
+  for (const { e } of all) { const l = lineOf(e); if (l) timeline.push(l); }
+  if (won) timeline.push({ tick: result.ticks, clock: clock(result.ticks), text: 'Last afloat: the sea is yours', tone: 'good', kind: 'end', rank: 0, amount: 0 });
+  else if (!result.timeline.some((e) => EVENT_KEY[e.kind] === 'sunk' && e.ship === 0)) timeline.push({ tick: me.tick, clock: clock(me.tick), text: ending, tone: 'bad', kind: 'end', rank: 0, amount: 0 });
   const fates: Fate[] = [];
   for (let i = 1; i < SHIPS; i++) {
     const f = result.ships[i], id = drawn[i - 1];
@@ -141,6 +155,49 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
 
 export interface ResultsLayout { view: View; page: Rect; left: Rect; mid: Rect; right: Rect; rose: { x: number; y: number; r: number }; cont: Rect; k: number }
 
+/** How much each kind of moment decided the match (TimelineLine.rank): what timelineFit keeps when the page is short. */
+const DECIDES: Record<string, number> = { end: 0, breakOff: 0, thrown: 0, home: 1, chosen: 1, sunk: 1, broken: 1, lead: 2, loop: 2, raid: 2, engage: 3, called: 3, landed: 3, fetched: 3, dive: 3, snatch: 3, bank: 3 };
+/** Runs of one kind told as one line when the page is short: the words for n of them, `sum` their amounts. */
+const RUNS: Record<string, (n: number, sum: number) => string> = {
+  loop: (n, sum) => `Closed ${n} loops, ${Math.round(sum)} of sea`,
+  raid: (n) => `Broke ${n} rivals' trails`,
+  bank: (n, sum) => `Banked ${n} times, ${Math.round(sum)} doubloons`,
+  find: (n) => `Took ${n} finds`,
+};
+const runKind = (l: TimelineLine): string => (l.kind === 'broken' && l.tone === 'good' ? 'raid' : /find|found|treasure|scoop/i.test(l.kind) ? 'find' : l.kind);
+
+/**
+ * S-019: the timeline as the page has room for it, `rows` lines: every moment when they fit; else runs of a kind told
+ * as one line (three loops closed in a row: "Closed 3 loops, 940 of sea", at the first one's time, ranked a step
+ * higher than any one of them), a call and its
+ * landing as one ("The gull fetched a chest", at the call's time), then the least decisive moments left out (the latest first among
+ * equals), never the ending. Nothing is elided by a bare "…": what is shown is what decided the match, in order.
+ */
+export function timelineFit(lines: readonly TimelineLine[], rows: number): TimelineLine[] {
+  if (lines.length <= rows) return [...lines];
+  const out: TimelineLine[] = [];
+  for (const l of lines) {
+    const last = out[out.length - 1], k = runKind(l);
+    if (l.kind === 'landed') { // told with the call that sent her (the latest still waiting)
+      const c = out.findLastIndex((x) => x.kind === 'called');
+      if (c >= 0) { out[c] = { ...out[c], kind: 'fetched', text: `The gull fetched a chest, ${Math.round(out[c].amount)} doubloons`, tone: 'good' }; continue; }
+    }
+    if (last && RUNS[k] && runKind(last) === k) {
+      const n = (last as TimelineLine & { n?: number }).n ?? 1;
+      // a run counts for more than any one of it: a rank nearer the top
+      out[out.length - 1] = Object.assign({ ...last, text: RUNS[k](n + 1, last.amount + l.amount), amount: last.amount + l.amount, rank: Math.max(1, DECIDES[k] - 1) }, { n: n + 1 });
+      continue;
+    }
+    out.push(l);
+  }
+  while (out.length > Math.max(1, rows)) {
+    let drop = -1;
+    for (let i = 0; i < out.length - 1; i++) if (drop < 0 || out[i].rank >= out[drop].rank) drop = i;
+    out.splice(drop, 1);
+  }
+  return out;
+}
+
 /** Three columns on the page: the place and the rose, the voyage, the league; "The next voyage" at the foot of the third. */
 export function resultsLayout(view: View): ResultsLayout {
   const page = inset(safeOf(view), 6), k = Math.max(1, Math.min(1.45, page.height / 408)), pad = 16 * k, gap = 14 * k;
@@ -149,6 +206,10 @@ export function resultsLayout(view: View): ResultsLayout {
   const r = Math.min(lw * 0.36, ih * 0.2), bw = Math.min(rw, 200 * k), bh = Math.max(MIN_TARGET, 50 * k);
   return { view, page, left, mid, right, rose: { x: x0 + lw / 2, y: y0 + 106 * k + r, r }, cont: { x: right.x + rw - bw, y: y0 + ih - bh, width: bw, height: bh }, k };
 }
+
+/** The timeline's time column, CSS px from the column's left to its rule: the widest time ("10:00") at FIGURE, 8 × k
+ *  clear of the rule. */
+export const timeColumn = (k: number): number => widthOf('10:00', { size: FIGURE * k }) + 8 * k + 2;
 
 /** Seconds until everything is written: the results, the next voyage's page. */
 export const RESULTS_END = 6.4;
@@ -287,18 +348,18 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
 
 function drawTimeline(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   if (t <= 0) return;
-  const M = l.mid, k = l.k, top = M.y + 108 * k, row = 21 * k, foot = (m.named.length || (m.firstVoyage && m.lessons.length) ? 22 * k : 0);
+  const M = l.mid, k = l.k, top = M.y + 108 * k, row = 21 * k, words = footWords(m);
+  // the foot's line, and room for its second when it wraps (S-019: clear of the fates' numbers under it)
+  const two = !!words && widthOf(words, { size: 13 * k }) > M.width, foot = words ? (two ? 39 * k : 22 * k) : 0;
   const bottom = M.y + M.height - 62 * k - foot;
   letter(g, 'The voyage', M.x, top - 18 * k, { size: 18 * k, valign: 'middle', swash: true }, INK, clamp01(t / 0.8));
   const fit = Math.max(2, Math.floor((bottom - top) / row));
-  const lines = m.timeline.length <= fit ? m.timeline : [...m.timeline.slice(0, fit - 2), null, m.timeline[m.timeline.length - 1]];
-  const rx = M.x + 44 * k;
+  const lines = timelineFit(m.timeline, fit), rx = M.x + timeColumn(k);
   nib(g, [[rx, top - 4 * k], [rx, top + row * Math.max(0.5, lines.length - 0.6)]], 1 * k, clamp01(t / 2), SEPIA);
   lines.forEach((e, i) => {
     const p = clamp01((t - 0.3 - i * 0.32) / 0.6), y = top + row * (i + 0.2);
     if (p <= 0) return;
-    if (e === null) { letter(g, '...', rx + 12 * k, y, { size: 14 * k, valign: 'middle' }, SEPIA, p); return; }
-    letter(g, e.clock, rx - 8 * k, y, { size: 12 * k, align: 'right', valign: 'middle' }, SEPIA, p);
+    letter(g, e.clock, rx - 8 * k, y, { size: FIGURE * k, align: 'right', valign: 'middle' }, SEPIA, p);
     g.save();
     g.globalAlpha *= p;
     g.beginPath();
@@ -306,12 +367,14 @@ function drawTimeline(g: G, m: ResultsModel, l: ResultsLayout, t: number): void 
     g.fillStyle = e.tone === 'good' ? VERDIGRIS : e.tone === 'bad' ? VERMILION : SEPIA;
     g.fill();
     g.restore();
-    letter(g, e.text, rx + 12 * k, y, { size: 14.5 * k, valign: 'middle', maxWidth: M.width - 58 * k }, e.tone === 'bad' ? VERMILION : INK, p);
+    letter(g, e.text, rx + 12 * k, y, { size: fitSize(e.text, 14.5 * k, M.width - (rx - M.x) - 14 * k, FIGURE * k), valign: 'middle', maxWidth: M.width - (rx - M.x) - 12 * k }, e.tone === 'bad' ? VERMILION : INK, p);
   });
-  const fy = M.y + M.height - 60 * k, pf = clamp01((t - 2.6) / 0.8);
-  if (m.named.length) letter(g, `First named: ${m.named.map(lower).join(', ')}`, M.x, fy, { size: 13 * k, valign: 'middle', maxWidth: M.width }, VERDIGRIS, pf);
-  else if (m.firstVoyage && m.lessons.length) letter(g, `Learned ${m.lessons.length} of the seven ways of the sea`, M.x, fy, { size: 13 * k, valign: 'middle', maxWidth: M.width }, VERDIGRIS, pf);
+  const fy = M.y + M.height - 60 * k - (two ? 17 * k : 0), pf = clamp01((t - 2.6) / 0.8);
+  if (words) letter(g, words, M.x, fy, { size: 13 * k, valign: 'middle', maxWidth: M.width }, VERDIGRIS, pf);
 }
+/** The line at the voyage's foot: the seas first named, else on the first voyage the ways learned; '' none. */
+const footWords = (m: ResultsModel): string =>
+  m.named.length ? `First named: ${m.named.map(lower).join(', ')}` : m.firstVoyage && m.lessons.length ? `Learned ${m.lessons.length} of the seven ways of the sea` : '';
 
 function drawFates(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   if (t <= 0 || m.fates.length === 0) return;
@@ -350,9 +413,9 @@ function drawLeague(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
     if (slot < -1 || slot > rows) continue;
     const y = top + row * (slot + 0.5);
     if (r.player) wash(g, OCHRE, 0.32, (gg) => gg.rect(Rr.x - 2, y - row * 0.45, Rr.width + 4, row * 0.9));
-    letter(g, String(Math.round(place)), Rr.x + 20 * k, y, { size: 13 * k, align: 'right', valign: 'middle' }, SEPIA);
-    letter(g, r.name, Rr.x + 28 * k, y, { size: 14.5 * k, valign: 'middle', maxWidth: Rr.width - 84 * k }, INK);
-    letter(g, String(r.points), Rr.x + Rr.width - 4 * k, y, { size: 13 * k, align: 'right', valign: 'middle' }, SEPIA);
+    letter(g, String(Math.round(place)), Rr.x + 22 * k, y, { size: FIGURE * k, align: 'right', valign: 'middle' }, SEPIA);
+    letter(g, r.name, Rr.x + 30 * k, y, { size: fitSize(r.name, 14.5 * k, Rr.width - 88 * k, FIGURE * k), valign: 'middle', maxWidth: Rr.width - 86 * k }, INK);
+    letter(g, String(r.points), Rr.x + Rr.width - 4 * k, y, { size: FIGURE * k, align: 'right', valign: 'middle' }, SEPIA);
     if (r.to !== r.from && mv > 0) {
       const up = r.to < r.from, ax = Rr.x + Rr.width - 44 * k, d = (up ? -1 : 1) * 5 * k;
       nib(g, [[ax - 4 * k, y - d], [ax, y + d], [ax + 4 * k, y - d]], 1.4 * k, mv, up ? VERDIGRIS : VERMILION);

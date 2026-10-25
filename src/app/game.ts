@@ -9,7 +9,7 @@ import { newCareer, type Career } from '../career/state.ts';
 import { newVoyage, observe, toLetter, type Voyage } from '../career/voyage.ts';
 import { over, result } from '../sim/end.ts';
 import { seaFor } from '../sim/environment.ts';
-import type { MatchState } from '../sim/state.ts';
+import type { Entry, MatchState } from '../sim/state.ts';
 import { idleInput, type Recording, type ShipInput } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
 import { Shell, type Outcome, type Runtime, type ScreenName } from '../ui/shell.ts';
@@ -18,6 +18,7 @@ import { clearMatch, saveCareer, saveMatch, type SavedMatch } from './save.ts';
 import { Session } from './session.ts';
 import type { GameAudio } from '../audio/soundscape.ts';
 import { applySettings, onSettings, settings } from '../ui/settings.ts';
+import { GULL_MOMENTS } from '../ui/results.ts';
 import type { World, WorldMessage } from './worldWorker.ts';
 
 const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -45,6 +46,8 @@ export class Game implements Runtime {
   /** WP27: the player's voyage in this match, watched after every tick (null for a replay), and the last one home. */
   voyage: Voyage | null = null;
   outcome: Outcome | null = null;
+  /** S-019: the player's gull moments heard this match (results.ts GULL_MOMENTS), for the results' timeline. */
+  private gull: Entry[] = [];
   /** The world has arrived and the screen the game opens on is up. */
   ready = false;
   /** Milliseconds from navigation start to the first frame of the title, and what the world cost. */
@@ -120,6 +123,7 @@ export class Game implements Runtime {
     if (!this.world) throw new Error('play: the world has not arrived');
     this.session = new Session(seaFor(this.world, m.state.seed), m, () => (this.input ?? idleInput)()); // the match controls (WP25) set `input`
     this.voyage = m.recording === null ? newVoyage() : null; // a resumed match is watched from where it resumed
+    this.gull = [];
     this.audio?.startMatch(this.session.sea);
     this.loop.run(this.stepper(this.session));
     this.shell.go('match');
@@ -134,6 +138,7 @@ export class Game implements Runtime {
         const moved = session.step();
         if (moved) {
           if (voyage) observe(voyage, session.sea, session.state);
+          for (const e of session.state.events) if (e.ship === 0 && GULL_MOMENTS.includes(e.kind)) this.gull.push({ tick: session.state.tick, kind: e.kind, ship: e.ship, by: e.by, amount: e.amount });
           audio?.tick(session.state);
           this.onTick?.(session.state);
         }
@@ -148,7 +153,7 @@ export class Game implements Runtime {
     if (this.career && recording === null && voyage && over(state)) { // a voyage the player sailed: its result comes home, saved on the device
       const before = this.career, r = result(state);
       this.career = applyResult(before, r, voyage);
-      this.outcome = { before, after: this.career, result: r, drawn: draw(before), voyage, charted: !news(before, voyage) };
+      this.outcome = { before, after: this.career, result: r, drawn: draw(before), voyage, gull: this.gull, charted: !news(before, voyage) };
       void saveCareer(this.career);
     }
     this.voyage = null;

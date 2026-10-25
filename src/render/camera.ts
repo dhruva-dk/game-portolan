@@ -36,6 +36,11 @@ export const SEA_CLEAR = 1.2, GROUND_CLEAR = 1.6;
  *  middle, whole), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
  *  pennant under at 10.5), then opens the chart (reduced motion: holds holdRM s on the deck view and cuts); the crow's
  *  nest raises the camera by crow × its lookout's eye. */
+/** S-019: the play-out's framing on the chart (CameraRig.playFrame): the least span across, and the margin, u. */
+export const PLAY_SPAN = 90, PLAY_PAD = 14, PLAY_REACH = 40;
+/** S-019: the play-out's turn of the globe at orbit, rad a second at most (the eye moves under a tenth of its height a
+ *  frame), and never quicker than 0.8 s. */
+export const PLAY_TURN = 1.2;
 export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 36, sinkBack: 20, rise: 3.2, hold: 6.5, holdRM: 8, crow: 0.5 } as const;
 /** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
 export const REDUCED_VEIL = 0.3;
@@ -254,6 +259,16 @@ export class CameraRig {
   /** WP24 part D: the cinematic moves' weights (CINE), eased each frame: the opening's ride beside the fleet, the
    *  sinking's rise, the loop pull-back, the crow's nest raise (u). hold pins them (captures). */
   readonly cine = { open: 0, sink: 0, pull: 0, want: 0, crow: 0, sunkFor: 0, opened: false, tick: -1, hold: false };
+  /** S-019: once she is gone, what the chart frames while the match plays out (screens.ts sets it each frame): `ring`,
+   *  sphere directions round the storm's calm (none while the calm is too large to frame: the chart whole), `ships`,
+   *  every ship afloat; `toward`, where the zoom turns to at orbit (the calm's centre, which the chart is rooted on:
+   *  Chart.rootAt). Null: the zoom rises over the ship and the chart is framed whole. */
+  playOut: { toward: THREE.Vector3; ring: readonly THREE.Vector3[]; ships: readonly THREE.Vector3[] } | null = null;
+  /** The play-out's framing on the flat chart, eased: centre, distance; primed on the first frame it is asked for. */
+  private readonly pfC = V(); private pfD = 0; private pfPrimed = false; private pfDt = 0;
+  /** The play-out's turn of the globe at orbit, 0 → 1 over turnFor s (PLAY_TURN), and its angle, rad (−1 not begun). */
+  private turned = 0; private turnAngle = -1;
+  private readonly sw = V(); private readonly hw = V(); private readonly qa = new THREE.Quaternion(); private readonly qb = new THREE.Quaternion();
   /** Reduced motion (settings || prefers-reduced-motion): every move cuts or holds, nothing glides, bobs or swings. */
   get reducedMotion(): boolean { return this.zoom.reducedMotion; }
   set reducedMotion(v: boolean) { this.zoom.reducedMotion = v; }
@@ -309,6 +324,7 @@ export class CameraRig {
   /** One frame: dt the render step (0 while paused), clock the render clock (stops on pause). */
   frame(state: MatchState, alpha: number, clock: number, dt: number, zoomDt = dt): void {
     this.zoom.step(zoomDt);
+    this.pfDt = zoomDt;
     this.ship(state, alpha);
     this.cineStep(state, zoomDt);
     const s = this.s, h = this.h;
@@ -364,12 +380,35 @@ export class CameraRig {
       c.sunkFor += h;
       c.sink = rm ? 0 : ease(c.sunkFor / CINE.rise);
       if (!c.opened && c.sunkFor >= (rm ? CINE.holdRM : CINE.rise + CINE.hold)) { c.opened = true; this.zoom.open(); }
+      // S-019: the play-out: the zoom holds at orbit while the globe turns from the wreck to the storm's calm (at most
+      // PLAY_TURN rad a second, eased), then the chart unrolls round the calm
+      const po = this.playOut, zoom = this.zoom;
+      if (po && c.opened && this.turned < 1) {
+        if (this.turnAngle < 0) this.turnAngle = Math.acos(clamp(this.s.dot(po.toward), -1, 1));
+        if (rm || this.turnAngle < 0.02) this.turned = 1;
+        else {
+          if (zoom.target > LIFT_DECK + 0.5) zoom.target = LIFT_DECK + 0.5;
+          if (zoom.z >= 0.5 - 1e-3) this.turned = Math.min(1, this.turned + h / Math.max(0.8, this.turnAngle / PLAY_TURN));
+        }
+        if (this.turned >= 1) zoom.open();
+      }
     } else { c.sunkFor = 0; c.sink = 0; c.opened = false; }
+    if (!this.playOut) { this.turned = 0; this.turnAngle = -1; }
   }
 
   /** Places the camera for the current lift (no smoothing here: a pure function of the follow state). */
   private pose(clock: number): void {
-    const s = this.s, zoom = this.zoom, z = zoom.z, ph = zoomPhases(z);
+    const zoom = this.zoom, z = zoom.z, ph = zoomPhases(z);
+    // S-019: in the play-out the globe turns at orbit from the wreck to the storm's calm (cineStep), the follow heading
+    // carried along, so the chart unrolls round the calm
+    const po = this.playOut, ws = po ? easeIO(this.turned) : 0;
+    const s = this.sw.copy(this.s), hCam = this.hw.copy(this.hCam);
+    if (!po) this.pfPrimed = false;
+    if (po && ws > 0 && z > 0) {
+      this.qb.identity().slerp(this.qa.setFromUnitVectors(this.s, po.toward), ws);
+      s.applyQuaternion(this.qb).normalize();
+      hCam.applyQuaternion(this.qb).addScaledVector(s, -hCam.dot(s)).normalize();
+    }
     const d = clamp(zoom.deckLift, 0, 1), rm = zoom.reducedMotion;
     // WP24 part D: the cinematic moves, gone by the rise: the opening lower and further off, swung toward the beam; the
     // crow's nest, the loop pull-back and the sinking's rise lifting and standing off
@@ -380,13 +419,13 @@ export class CameraRig {
     const dist0 = Math.hypot(up, back), th0 = Math.atan2(up, back);
     // north in the ship's tangent plane: the chart is drawn north-up, so the view swings to it near orbit
     const north = this.north.copy(AXIS_N).addScaledVector(s, -AXIS_N.dot(s));
-    if (north.lengthSq() < 1e-8) north.copy(this.hCam); else north.normalize();
+    if (north.lengthSq() < 1e-8) north.copy(hCam); else north.normalize();
     // unwrapped while the zoom is under way, so a heading near south never flips the swing's side
-    let sw = signedAngle(this.hCam, north, s);
+    let sw = signedAngle(hCam, north, s);
     if (z <= 0 || !Number.isFinite(this.swingPrev)) this.swingPrev = sw;
     else { while (sw - this.swingPrev > Math.PI) sw -= 2 * Math.PI; while (sw - this.swingPrev < -Math.PI) sw += 2 * Math.PI; this.swingPrev = sw; }
     const swing = sw * ease((z - 0.22) / 0.28);
-    const hv = turn(this.hCam, s, swing + c.open * CINE.openSwing * cw, this.hv);
+    const hv = turn(hCam, s, swing + c.open * CINE.openSwing * cw, this.hv);
     if (z < 0.5 || !this.net) {
       const r = ph.rise, dist = dist0 * Math.pow(ORBIT_DIST / dist0, r), th = lerp(th0, Math.PI / 2, r);
       const bob = rm ? 0 : (0.14 * Math.sin(clock * 1.13) + 0.07 * Math.sin(clock * 0.61 + 2)) * (1 - r);
@@ -404,11 +443,12 @@ export class CameraRig {
     // past orbit: square over the flattening, unrolling net, its root (the player's region) fixed
     const net = this.net, fit = net.fit(this.camera, this.view);
     net.pose(ph.unfold);
-    const t = net.toNet(s, ph.flat, this.t).lerp(fit.centre, ph.unfold);
+    const fr = po ? this.playFrame(po, fit) : fit;
+    const t = net.toNet(s, ph.flat, this.t).lerp(fr.centre, ph.unfold);
     const b = this.tmp.copy(s).lerp(net.normal, ph.flat).normalize();
     const u = this.up.copy(north).lerp(fit.up, ph.unfold);
     u.addScaledVector(b, -u.dot(b)).normalize();
-    const dist = ORBIT_DIST * Math.pow(fit.dist / ORBIT_DIST, ph.unfold);
+    const dist = ORBIT_DIST * Math.pow(fr.dist / ORBIT_DIST, ph.unfold);
     // the safe area: centre the net in the safe rect
     const sx = (this.view.safe.left - this.view.safe.right) / 2, sy = (this.view.safe.bottom - this.view.safe.top) / 2, k = this.unitsPerPx(dist) * ph.unfold;
     const right = this.tmp2.crossVectors(u, b);
@@ -416,6 +456,47 @@ export class CameraRig {
     const eye = this.eye.copy(t).addScaledVector(b, dist);
     this.place(eye, t, u, 0);
     this.setFar(dist + R * 2.5);
+  }
+
+  /** S-019: the play-out's framing on the flat chart: the box round the calm's ring and the ships afloat near it,
+   *  within the net, at least PLAY_SPAN u across, PLAY_PAD more on each side; eased so the frame follows the closing
+   *  storm without a cut; the whole chart when there is no ring or the box is as large. What lies across a cut of the
+   *  net (laid out far from the calm's centre: further than 1.5 × the ring's median reach, PLAY_REACH more for a ship)
+   *  is left out, so a torn ring or a straggler in the storm never pulls the frame onto empty paper. */
+  private playFrame(po: NonNullable<CameraRig['playOut']>, fit: ReturnType<Net['fit']>): { centre: THREE.Vector3; dist: number } {
+    const net = this.net!, p = this.tmp, cx = fit.centre.dot(fit.right), cy = fit.centre.dot(fit.up);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    if (po.ring.length > 0) {
+      net.toFlat(po.toward, p);
+      const ox = p.dot(fit.right) - cx, oy = p.dot(fit.up) - cy, at: [number, number, number][] = [];
+      for (const d of po.ring) { net.toFlat(d, p); const x = p.dot(fit.right) - cx, y = p.dot(fit.up) - cy; at.push([x, y, Math.hypot(x - ox, y - oy)]); }
+      const reach = 1.5 * [...at].sort((a, b) => a[2] - b[2])[at.length >> 1][2];
+      const add = (x: number, y: number) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
+      for (const [x, y, d] of at) if (d <= reach) add(x, y);
+      for (const d of po.ships) {
+        net.toFlat(d, p);
+        const x = p.dot(fit.right) - cx, y = p.dot(fit.up) - cy;
+        if (Math.hypot(x - ox, y - oy) <= reach + PLAY_REACH) add(x, y);
+      }
+    }
+    const hw = fit.width / 2, hh = fit.height / 2;
+    if (!(x1 >= x0)) { x0 = -hw; x1 = hw; y0 = -hh; y1 = hh; }
+    const grow = (a: number, b: number, half: number): [number, number] => {
+      const m = (a + b) / 2, r = Math.max((b - a) / 2 + PLAY_PAD, PLAY_SPAN / 2);
+      return [clamp(m - r, -half, half), clamp(m + r, -half, half)];
+    };
+    [x0, x1] = grow(x0, x1, hw); [y0, y1] = grow(y0, y1, hh);
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2), W = Math.max(1, this.view.width), H = Math.max(1, this.view.height), sf = this.view.safe;
+    const sw = (W - sf.left - sf.right) / W, sh = (H - sf.top - sf.bottom) / H;
+    let dist = Math.max((y1 - y0) / 2 / (tanV * sh), (x1 - x0) / 2 / (tanV * (W / H) * sw));
+    const c = this.tmp2.copy(fit.centre).addScaledVector(fit.right, (x0 + x1) / 2).addScaledVector(fit.up, (y0 + y1) / 2);
+    if (dist >= fit.dist) { dist = fit.dist; c.copy(fit.centre); }
+    const k = this.pfPrimed && !this.zoom.reducedMotion ? 1 - Math.exp(-this.pfDt * 1.2) : 1;
+    this.pfC.lerp(c, k);
+    this.pfD = this.pfPrimed ? Math.exp(lerp(Math.log(this.pfD), Math.log(dist), k)) : dist;
+    if (!this.pfPrimed) this.pfC.copy(c);
+    this.pfPrimed = true;
+    return { centre: this.pfC, dist: this.pfD };
   }
 
   private setFar(far: number): void {

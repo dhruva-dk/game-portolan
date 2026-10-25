@@ -4,7 +4,7 @@
 // ui scene) and the world scene drawn beneath it. The shell fits the canvas to the view and its safe area, hands
 // each finger to the screen that is up, and draws that screen's frames.
 import type { ShipInput } from '../sim/input.ts';
-import type { MatchState } from '../sim/state.ts';
+import type { Entry, MatchState } from '../sim/state.ts';
 import type * as THREE from 'three';
 import type { Frame } from '../app/loop.ts';
 import type { Session } from '../app/session.ts';
@@ -52,6 +52,8 @@ export interface Outcome {
   readonly result: MatchResult;
   readonly drawn: readonly number[];
   readonly voyage: Voyage;
+  /** S-019: the gull's moments as the match was heard (results.ts GULL_MOMENTS), for the timeline. */
+  readonly gull: readonly Entry[];
   charted: boolean;
 }
 

@@ -148,3 +148,38 @@ test('chart content: the edge of the player\'s waters, the known loot, a vignett
   console.log(`chart content: ${edge.length} edge cells, ${loot.finds.length} known find sites, ${loot.chests.length} chests`);
   for (const l of sea.geo.landmarks) assert.ok(VIGNETTES[l.perk], `a vignette for ${l.perk}`);
 });
+
+test('S-019: the play-out swings from the wreck to the storm\'s calm and frames it whole with the ships afloat, without a cut', () => {
+  const { state } = scripted(), camera = cam(), net = new Net(), rig = new CameraRig(camera, ground, net);
+  rig.layout(VIEW);
+  const at = state.ships[0].pos, wreck = new THREE.Vector3(at.x, at.y, at.z).normalize();
+  // the calm a quarter of the way round the world (the farthest swing a sinking needs), 44 u across its radius
+  const e = new THREE.Vector3(0, 1, 0).addScaledVector(wreck, -wreck.y).normalize(), toward = wreck.clone().multiplyScalar(Math.cos(1.6)).addScaledVector(e, Math.sin(1.6));
+  const f = new THREE.Vector3().crossVectors(toward, e).normalize(), g = new THREE.Vector3().crossVectors(toward, f), r = 44 / R;
+  const ring = Array.from({ length: 32 }, (_, i) => toward.clone().multiplyScalar(Math.cos(r)).addScaledVector(f, Math.cos(i / 5.09) * Math.sin(r)).addScaledVector(g, Math.sin(i / 5.09) * Math.sin(r)));
+  const ships = [0.5, 1.9, 3.3].map((a) => toward.clone().multiplyScalar(Math.cos(r * 0.7)).addScaledVector(f, Math.cos(a) * Math.sin(r * 0.7)).addScaledVector(g, Math.sin(a) * Math.sin(r * 0.7)));
+  state.ships[0].phase = PHASE.sunk;
+  net.layout(net.sheetOf(toward)); // Chart.rootAt: the chart rooted on the calm while on the deck
+  // and a straggler far off in the storm, across the net from the calm: left out of the frame
+  const far = wreck.clone().negate();
+  rig.playOut = { toward, ring, ships: [...ships, far] };
+  let worst = 0, frames = 0, clock = 0;
+  const prev = new THREE.Vector3();
+  for (; frames < 60 * 20 && !(rig.z >= 1 && frames > 60 * 12); frames++) {
+    clock += 1 / 60;
+    rig.frame(state, 1, clock, 1 / 60, 1 / 60);
+    const p = camera.position, alt = Math.max(4, Math.min(p.length() - R, rig.z > 0.6 ? p.dot(net.normal) - R : Infinity));
+    assert.ok(Number.isFinite(p.x + p.y + p.z), `finite at frame ${frames}`);
+    if (frames > 0) worst = Math.max(worst, p.distanceTo(prev) / alt);
+    prev.copy(p);
+  }
+  assert.ok(rig.z >= 1, 'the chart opens on the play-out');
+  // every ring point and ship inside the safe rect; the calm at least 40 % of the safe height across
+  const px = (d: THREE.Vector3) => { const q = net.toFlat(d, new THREE.Vector3()).project(camera); return [(q.x + 1) / 2 * VIEW.width, (1 - q.y) / 2 * VIEW.height]; };
+  const s = VIEW.safe, pts = [...ring, ...ships].map(px), ys = ring.map((d) => px(d)[1]);
+  for (const [x, y] of pts) assert.ok(x >= s.left - 1 && x <= VIEW.width - s.right + 1 && y >= s.top - 1 && y <= VIEW.height - s.bottom + 1, `in the safe rect: ${x.toFixed(0)}, ${y.toFixed(0)}`);
+  const across = (Math.max(...ys) - Math.min(...ys)) / (VIEW.height - s.top - s.bottom);
+  console.log(`play-out: ${frames} frames, worst step ${(worst * 100).toFixed(1)} % of altitude, the calm ${(across * 100).toFixed(0)} % of the safe height`);
+  assert.ok(across >= 0.4, 'the calm is framed large enough to follow');
+  assert.ok(worst < 0.1, 'no cut: the eye moves under a tenth of its altitude a frame through the swing');
+});

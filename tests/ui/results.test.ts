@@ -12,7 +12,7 @@ import { seaFor } from '../../src/sim/environment.ts';
 import { idleInput, inputAt, parseRecording, record, recorder, replay } from '../../src/sim/input.ts';
 import { bestPick, isConsumable } from '../../src/sim/items.ts';
 import { step } from '../../src/sim/match.ts';
-import { afloat, createMatch } from '../../src/sim/state.ts';
+import { afloat, createMatch, EVENT, TICK } from '../../src/sim/state.ts';
 import { CONSUMABLE, FITTING, FITTING_SLOT, TIERS } from '../../src/sim/tables.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
 import { careerChartData, regionCells, unrollMask } from '../../src/ui/careerChart.ts';
@@ -26,7 +26,7 @@ import { layoutText } from '../../src/lettering/text.ts';
 import { hudLayout, type HudButton } from '../../src/ui/hud.ts';
 import { inset, MIN_LETTER, MIN_TARGET, safeOf, widthOf, within } from '../../src/ui/inkpage.ts';
 import type { Rect } from '../../src/ui/safeArea.ts';
-import { nextLayout, resultsLayout, resultsModel, skipLayout } from '../../src/ui/results.ts';
+import { FIGURE, nextLayout, resultsLayout, resultsModel, skipLayout, timeColumn, timelineFit } from '../../src/ui/results.ts';
 import { newTutorial, promptLayout, sense, tutorialOver, tutorialStep, type Moment } from '../../src/ui/tutorial.ts';
 import { world } from '../sim/vectors.ts';
 import { inkChart, madeMatch } from './results.fixtures.ts';
@@ -309,3 +309,30 @@ function cellBin(cell: number): { x: number; y: number } {
   const d = cellDir(CHART_GRID, cell, v3()), len = Math.hypot(d.x, d.y, d.z);
   return { x: Math.min(359, Math.floor(((Math.atan2(d.z, d.x) + Math.PI) / (2 * Math.PI)) * 360)), y: Math.min(179, Math.floor(((Math.PI / 2 - Math.asin(d.y / len)) / Math.PI) * 180)) };
 }
+
+test('S-019: the timeline tells the gull and the chests, leaves no bare gap when short of room, and its figures read on an iPhone', () => {
+  const before = newCareer(21), { drawn } = toSetup(before, 99), result = madeMatch(4), voyage = newVoyage(), after = applyResult(before, result, voyage);
+  const t0 = result.timeline[0].tick, at = (s: number) => t0 + Math.round(s / TICK);
+  const gull = [{ tick: at(20), kind: EVENT.called, ship: 0, by: -1, amount: 12 }, { tick: at(50), kind: EVENT.landed, ship: 0, by: -1, amount: 1 },
+    { tick: at(60), kind: EVENT.called, ship: 3, by: -1, amount: 12 }, { tick: result.ships[0].tick + 99, kind: EVENT.dive, ship: 0, by: 2, amount: 4 }];
+  // a long voyage: twelve more loops on the sim's timeline, in a run while she was afloat
+  const span = result.ships[0].tick - t0, loops = Array.from({ length: 12 }, (_, i) => ({ tick: t0 + Math.round(span * (0.55 + i * 0.02)), kind: EVENT.loop, ship: 0, by: -1, amount: 100 + i }));
+  const long = { ...result, timeline: [...result.timeline, ...loops].sort((a, b) => a.tick - b.tick) };
+  const m = resultsModel(before, after, long, drawn, voyage, gull), text = m.timeline.map((l) => l.text).join(' | ');
+  assert.ok(text.includes('Sent the gull for a chest, 12 doubloons') && text.includes('The gull brought its chest aboard'), text);
+  assert.ok(!text.includes('dove'), 'nothing of hers after she sank; no other ship\'s gull');
+  assert.ok(m.timeline.every((l, i) => i === 0 || l.tick >= m.timeline[i - 1].tick), 'in order');
+  for (const view of [IPHONE, MINI, IPAD]) {
+    const l = resultsLayout(view), rows = 7, fit = timelineFit(m.timeline, rows), shown = fit.map((x) => x.text).join(' | ');
+    assert.ok(fit.length <= rows && fit.length >= Math.min(rows, 3), `${fit.length} lines in ${rows}`);
+    assert.ok(fit.every((x) => !/^\.+$|…/.test(x.text)), `no bare gap: ${shown}`);
+    assert.ok(fit.every((x, i) => i === 0 || x.tick >= fit[i - 1].tick), 'in order');
+    for (const want of [/^Broke off into/, /^Chose the Long Guns/, /^Closed \d+ loops, \d+ of sea/, /^Sunk by /]) assert.ok(fit.some((x) => want.test(x.text)), `${want} in ${shown}`);
+    const short = resultsModel(before, after, result, drawn, voyage, gull).timeline; // eleven moments
+    assert.ok(timelineFit(short, 10).some((x) => /^The gull fetched a chest, 12 doubloons/.test(x.text)), 'a call and its landing told as one');
+    assert.ok(fit[fit.length - 1].kind === 'end' || /^Sunk by /.test(fit[fit.length - 1].text), 'the ending last');
+    // the times and the league's figures at FIGURE × k (≥ 14 em px, well above MIN_LETTER), "10:00" inside its column
+    assert.ok(FIGURE * l.k >= MIN_LETTER + 3, `figures at ${(FIGURE * l.k).toFixed(1)}`);
+    assert.ok(timeColumn(l.k) - 8 * l.k >= widthOf('10:00', { size: FIGURE * l.k }) && timeColumn(l.k) < l.mid.width * 0.3, 'the time column holds the widest time');
+  }
+});

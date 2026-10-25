@@ -139,6 +139,13 @@ export class Net {
     return out.multiplyScalar(R * (1 - flat) + (R / d) * flat).applyMatrix4(this.mats[k]);
   }
 
+  /** Where a sphere direction lies on the flat chart (unfold 1), whatever the pose now. */
+  toFlat(dir: { x: number; y: number; z: number }, out: THREE.Vector3): THREE.Vector3 {
+    const k = this.sheetOf(dir), c = this.centres[k];
+    out.set(dir.x, dir.y, dir.z).normalize();
+    return out.multiplyScalar(R / Math.max(0.2, out.dot(c))).applyMatrix4(this.final[k]);
+  }
+
   /** The sphere direction under a point of the flat chart (unfold 1), or null off the net. */
   fromNet(p: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 | null {
     const inv = new THREE.Matrix4(), q = V();
@@ -151,8 +158,9 @@ export class Net {
     return null;
   }
 
-  /** The framing of the flat chart for a camera and view: centre, up (north-ish, the net's long axis across), distance. */
-  fit(camera: THREE.PerspectiveCamera, view: RigView): { centre: THREE.Vector3; up: THREE.Vector3; right: THREE.Vector3; dist: number } {
+  /** The framing of the flat chart for a camera and view: centre, up (north-ish, the net's long axis across), distance;
+   *  the net's extent across (right) and up, u. */
+  fit(camera: THREE.PerspectiveCamera, view: RigView): { centre: THREE.Vector3; up: THREE.Vector3; right: THREE.Vector3; dist: number; width: number; height: number } {
     const key = `${this.root}:${camera.fov}:${view.width}x${view.height}:${view.safe.left},${view.safe.right},${view.safe.top},${view.safe.bottom}`;
     const o = this.fitOut;
     if (key === this.fitKey) return o;
@@ -357,6 +365,9 @@ export interface ChartFrame { z: number; flat: number; unfold: number; reveal: n
 /** The chart's meshes and their per-frame state (layer 1: the camera shows it only once the zoom is under way). */
 export class Chart {
   readonly net: Net;
+  /** Where the chart is rooted when it next unrolls (re-rooted only on the deck): the player's ship, or this when set
+   *  (S-019: once she is gone, the storm's calm, so its circle lies whole on the root and its ring of sheets). */
+  rootAt: { x: number; y: number; z: number } | null = null;
   readonly group = new THREE.Group();
   readonly uniforms = {
     uSheet: { value: [] as THREE.Matrix4[] },
@@ -599,7 +610,8 @@ export class Chart {
           [Q(-flip, 1), rect.x, rect.y + rect.w], [Q(flip, 1), rect.x + rect.z, rect.y + rect.w],
           [Q(flip, -1), rect.x + rect.z, rect.y], [Q(-flip, -1), rect.x, rect.y],
         ];
-        for (const j of [0, 3, 1, 1, 3, 2]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
+        // S-019: a hull heading left is the quad mirrored, so its triangles wind the other way (the marks cull back faces)
+        for (const j of flip > 0 ? [0, 3, 1, 1, 3, 2] : [0, 1, 3, 1, 2, 3]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
       }
       // WP24 part D: the captain's emblem flown over the hull (the player's gull), from the sails' atlas
       const em = i === PLAYER ? PLAYER_EMBLEM : ship.pattern > 0 ? EMBLEMS[(ship.pattern - 1) % EMBLEMS.length] : null;
@@ -610,8 +622,9 @@ export class Chart {
         for (const j of [0, 3, 1, 1, 3, 2]) vert(eb, eq[j][0], k, null, 0, ec, eq[j][1], eq[j][2]);
       }
       // the arrow: a shaft and a head from the hull along where it is heading
-      const side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * big * pxU, wS = 0.9 * big * pxU, wH = 3.6 * big * pxU;
-      const a0 = o.clone().addScaledVector(hd, 4 * big * pxU), a1 = o.clone().addScaledVector(hd, L - 6 * big * pxU), tip = o.clone().addScaledVector(hd, L);
+      // (in the play-out the hull grows twice and the arrow less, so the ship, not its arrow, is what reads)
+      const ab = big > 1 ? 1.3 : 1, side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * ab * pxU, wS = 0.9 * ab * pxU, wH = 3.6 * ab * pxU;
+      const a0 = o.clone().addScaledVector(hd, 4 * big * pxU), a1 = o.clone().addScaledVector(hd, Math.max(L - 6 * ab * pxU, 4 * big * pxU + 2 * pxU)), tip = o.clone().addScaledVector(hd, Math.max(L, 4 * big * pxU + 8 * pxU));
       const sh = [a0.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, wS), a0.clone().addScaledVector(side, wS)];
       for (const j of [0, 1, 2, 0, 2, 3]) vert(b, sh[j], k, null, 0, col, 0, 0);
       for (const v of [a1.clone().addScaledVector(side, -wH), tip, a1.clone().addScaledVector(side, wH)]) vert(b, v, k, null, 0, col, 0, 0);
@@ -667,10 +680,7 @@ export class Chart {
   /** One frame of the chart at zoom z (camera.ts zoomPhases), for the player's sight. */
   frame(state: MatchState, f: ChartFrame, camera: THREE.PerspectiveCamera, view: RigView, sight: Sight | null, territory: THREE.CubeTexture | null): void {
     const net = this.net, u = this.uniforms;
-    if (f.z <= 0) {
-      const p = state.ships[PLAYER].pos;
-      net.layout(net.sheetOf(p));
-    }
+    if (f.z <= 0) net.layout(net.sheetOf(this.rootAt ?? state.ships[PLAYER].pos));
     net.pose(f.unfold);
     u.uFlat.value = f.flat;
     const dist = f.z < 0.5 ? camera.position.length() - R : camera.position.dot(net.normal) - R;
