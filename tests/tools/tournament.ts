@@ -41,7 +41,7 @@ export const NAMES = ['hunter', 'expander', 'raider', 'turtle', 'opportunist', '
 /** Per captain: sea claimed (u², its loops), steady sea (u², its holding averaged over the match), trails broken, the purses they cost their owners, ships sunk, loot taken (scooped and found), spoils (coins scooped and bounties: loot from fights), finishing place. */
 export const STATS = ['sea', 'held', 'broken', 'purse', 'sunk', 'loot', 'spoils', 'place'] as const;
 export type Stat = (typeof STATS)[number];
-export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[] };
+export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[]; kmode: number[]; kvict: number[] };
 export interface MatchOut { m: number; minutes: number; ms: number; rows: Row[] }
 
 const LIMIT = Math.round(1200 / TICK), SAMPLE = 30;
@@ -76,7 +76,7 @@ const ang = (a: V3, b: V3): number => R * Math.acos(Math.max(-1, Math.min(1, a.x
 
 /** Sail match s to its end: the player idle, or piloted to `pilot`; each captain's tally from the events; `hook` every tick. */
 function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | null, hook?: (s: MatchState) => void): { rows: Row[]; ticks: number } {
-  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
+  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(15).fill(0), kvict: new Array<number>(7).fill(0), sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
   const out: number[] = new Array<number>(SHIPS).fill(-1), input = idleInput(), p = s.ships[0];
   if (pilot) Object.assign(p.captain, { temperament: pilot.temperament, skill: 0.6 });
   let sunk = 0, over = false, k = 0, samples = 0;
@@ -108,6 +108,8 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
         if (e.by >= 0) {
           rows[e.by].sunk++;
           rows[e.by].causes[e.amount]++;
+          rows[e.by].kmode[s.ships[e.by].captain.mode]++; // the killer's mode and the victim's temperament (+1: the player is 0)
+          rows[e.by].kvict[s.ships[e.ship].captain.temperament + 1]++;
         }
       } else if (e.kind === EVENT.win) over = true;
     }

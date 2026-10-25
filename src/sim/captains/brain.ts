@@ -220,9 +220,24 @@ function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
   passage(sea, ship.ride, PASS);
   if (t < BRAIN.ride) return false;
   if (PASS.untilEnd < 3) return true;
+  const c = ship.captain;
+  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, styleOf(ship)) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false; // it rides on for the waters it knows the player breaks off into
   const here = regionWorth(state, i, PASS.region) - 0.6 * Math.max(0, dot(ship.pos, state.storm.origin) - 0.6) / 0.4;
   const ahead = PASS.next >= 0 ? regionWorth(state, i, PASS.next) : -Infinity;
   return here >= 1.3 + 0.5 * (bold - 0.3) - 0.02 * t && (here >= ahead || PASS.untilNext > 12 * (1 + bold));
+}
+
+const LOOK: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
+
+/** Whether the Great Current, ridden on from s, still passes region r (its course is on every chart; opening.ts passage). */
+function passesOn(sea: Sea, s: number, r: number): boolean {
+  const t0 = passage(sea, s, LOOK).untilEnd, v = 10 / Math.max(1e-6, t0 - passage(sea, s + 10, LOOK).untilEnd); // u/s down the current
+  for (let k = 0, at = s; k < 8; k++, at += v * LOOK.untilNext + 1) {
+    passage(sea, at, LOOK);
+    if (LOOK.region === r) return true;
+    if (LOOK.next < 0) return false;
+  }
+  return false;
 }
 
 function regionWorth(state: MatchState, i: number, r: number): number {
@@ -284,8 +299,9 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   else if (threatened(state, i, style, was)) mode = MODE.home;
   if (mode < 0) mode = guards(state, i, style, was, aim);
   if (mode < 0) mode = engages(sea, state, i, style);
+  if (mode < 0 && style.stalk >= 0.8) mode = stalks(sea, state, i, sight, style, was, aim); // a hunter finishes the wounded before it raids
   if (mode < 0 && hunts(i, state, style, was)) mode = MODE.hunt;
-  if (mode < 0) mode = stalks(sea, state, i, sight, style, was, aim);
+  if (mode < 0 && style.stalk < 0.8) mode = stalks(sea, state, i, sight, style, was, aim);
   if (mode < 0) mode = lurks(state, i, sight, style);
   if (mode < 0) mode = loots(sea, state, i, style, was);
   if (mode < 0) mode = waylays(state, i, style);
@@ -297,7 +313,7 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   c.mode = mode;
   const reach = standoff(c, style, c.target) * (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0); // closing under full sail, fighting under plain
   const lying = (mode === MODE.hold || mode === MODE.lurk) && apart(ship.pos, c.goal) < 12;
-  c.trim = mode === MODE.fight ? (P.rivalD > reach ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
+  c.trim = mode === MODE.fight ? ((c.target >= 0 ? apart(ship.pos, state.ships[c.target].pos) : P.rivalD) > reach || (style.stalk >= 0.8 && c.target >= 0 && share(state.ships[c.target]) < 0.6) ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
   const hasty = mode === MODE.flee || mode === MODE.storm || mode === MODE.ram;
   c.avoid = mode === MODE.loop || mode === MODE.home ? 0 : clearing(sea, state, ship, style, hasty);
   intend(ship);
@@ -352,6 +368,7 @@ function threatened(state: MatchState, i: number, style: Style, was: number): bo
     return true;
   }
   if (P.rival < 0) return false;
+  if (style.stalk >= 0.8 && (was === MODE.fight || was === MODE.ram || was === MODE.stalk) && share(ship) > 0.5) return false; // a hunter on its prey rides out the threat
   if (c.gentle && P.rival === 0 && P.rivalD < BRAIN.gentle) return true;
   if (style.commit > 0 && was === MODE.loop && share(ship) > 0.5) return false;
   if (P.rivalD > by(BRAIN.threat, c.skill) * (style.bolt ? 1.5 : 1) * (P.rival === 0 ? 1 + 0.5 * wary(c) : 1)) return false;
@@ -365,11 +382,23 @@ function threatened(state: MatchState, i: number, style: Style, was: number): bo
  * it. It rams when its bow or weight make that favourable, else brings a broadside to bear within reach of its guns.
  */
 function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
-  const ship = state.ships[i], c = ship.captain, j = P.rival;
+  const ship = state.ships[i], c = ship.captain, keen = style.stalk >= 0.8;
+  let j = P.rival, d = P.rivalD;
   if (j < 0) return -1;
-  const r = state.ships[j], d = P.rivalD, theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
+  if (keen) { // a hunter turns its guns on the weakest hull it reads within reach, not merely the nearest
+    const far = (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0) * BRAIN.engage;
+    let low = (P.hulls & (1 << j)) !== 0 ? share(state.ships[j]) : 1;
+    for (let k = 0; k < SHIPS; k++) {
+      if (k === i || k === j || (P.hulls & (1 << k)) === 0 || !afloat(state.ships[k])) continue;
+      const e = apart(ship.pos, state.ships[k].pos), h = share(state.ships[k]);
+      if (e < far && h < low - 0.15) [j, d, low] = [k, e, h];
+    }
+  }
+  const r = state.ships[j], theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
   let will = style.fight + (0.3 + 0.6 * style.fight + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
   if (style.guard > 0 && intrudes(state, i, j)) will += style.guard;
+  if (keen) will -= 0.8 * Math.max(0, 1 - ((P.hulls & (1 << j)) !== 0 ? power(ship) / power(r) : 1)); // a hunter picks its fights: never a stronger ship than its own
+  else if (style.edge === 0 && theirs < 0.6 && another(state, i, j, d)) will -= 0.35; // another ship is on the wounded one first: it leaves it the kill
   if (j === 0) {
     will += 0.15 * c.grudge;
     if ((c.knows & KNOW.run) !== 0 && c.run > 0 && theirs * 100 <= c.run + 10) will += 0.3;
@@ -377,7 +406,8 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   if (will < 0.55) return -1;
   const bow = BOWS[ship.fittings[SLOT.bow].kind], mass = FORMS[ship.form].mass / FORMS[r.form].mass;
-  if (!c.gentle && d < BRAIN.ram && mine > 0.5 && (bow !== undefined ? theirs < 0.8 || mass >= 1 : mass >= 1.5 && theirs < 0.4)) {
+  const finish = keen && theirs < 0.6 && mine > theirs + 0.1; // a hunter commits to the kill: it drives in on a ship it has broken, bow or none
+  if (!c.gentle && (finish ? d < 2 * BRAIN.ram && (bow !== undefined || mass >= 1.5) : d < BRAIN.ram && mine > 0.5 && (bow !== undefined ? theirs < 0.8 || mass >= 1 : mass >= 1.5 && theirs < 0.4))) {
     velocityOf(sea, r, V); // where it will be when the bow arrives, as far ahead as the captain's eye leads
     normalize(addScaled(c.goal, r.pos, V, (c.skill * d) / Math.max(1, ship.speed) / R));
     c.target = j;
@@ -385,7 +415,7 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   const gun = GUNS[ship.fittings[SLOT.broadside].kind];
   if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1)) return -1;
-  broadside(sea, state, i, j, gun, style);
+  broadside(sea, state, i, j, gun, style, d);
   c.target = j;
   return MODE.fight;
 }
@@ -395,17 +425,17 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
  * nearer; turned in toward the rival when beyond its standoff, away when inside it. A captain of rank lays off for
  * where the rival will be.
  */
-function broadside(sea: Sea, state: MatchState, i: number, j: number, gun: Gun, style: Style): void {
+function broadside(sea: Sea, state: MatchState, i: number, j: number, gun: Gun, style: Style, d: number): void {
   const ship = state.ships[i], c = ship.captain, r = state.ships[j], pos = ship.pos;
   velocityOf(sea, r, V);
-  normalize(addScaled(Q, r.pos, V, (c.skill * (P.rivalD / gun.speed + 1)) / R));
+  normalize(addScaled(Q, r.pos, V, (c.skill * (d / gun.speed + 1)) / R));
   toward(pos, Q, ship.head, T);
   cross(H, pos, T); // the heading with the rival on the starboard beam
   let side = dot(H, ship.head) >= 0 ? 1 : -1;
   const port = ship.reload[BATTERY.port], starboard = ship.reload[BATTERY.starboard];
   if (port === 0 && starboard > 0 && -dot(H, ship.head) > -0.3) side = -1;
   else if (starboard === 0 && port > 0 && dot(H, ship.head) > -0.3) side = 1;
-  const a = clamp((P.rivalD - standoff(c, style, j) * gun.range) / (0.5 * gun.range), -1, 1), ca = dcos(a), sa = dsin(a);
+  const a = clamp((d - standoff(c, style, j) * gun.range * (style.stalk >= 0.8 && share(r) < 0.6 ? 0.6 : 1)) /* a hunter closes on a broken ship */ / (0.5 * gun.range), -1, 1), ca = dcos(a), sa = dsin(a);
   normalize(set(c.want, side * H.x * ca + T.x * sa, side * H.y * ca + T.y * sa, side * H.z * ca + T.z * sa));
 }
 
@@ -434,6 +464,15 @@ function guards(state: MatchState, i: number, style: Style, was: number, aim: nu
   return MODE.face;
 }
 
+/** Whether another ship it knows lies nearer the wounded ship j than its own d: the kill is that ship's to take. */
+function another(state: MatchState, i: number, j: number, d: number): boolean {
+  for (let k = 0; k < SHIPS; k++) if (k !== i && k !== j && knows(P, k) && afloat(state.ships[k]) && apart(state.ships[k].pos, state.ships[j].pos) < d) return true;
+  return false;
+}
+
+/** A ship's strength as a rival reads it hull-up: its hull by its form's guns. */
+const power = (ship: Ship): number => Math.max(1, ship.hull) * (1 + 0.25 * FORMS[ship.form].guns);
+
 const intrudes = (state: MatchState, i: number, j: number): boolean => {
   const p = state.ships[j].pos;
   return state.owner[cellOf(TERRITORY, p)] === i + 1 || apart(p, state.ships[i].captain.anchor) < HOME.radius + 4;
@@ -448,8 +487,13 @@ function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Sty
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (style.stalk === 0 && c.grudge === 0) return -1;
   const keen = style.stalk >= 0.8, weak = keen ? 0.85 : 0.7; // a hunter scents a wound sooner and from farther
-  let j = -1, d = BRAIN.stalk * (keen ? 1.4 : 1);
+  let j = -1, d = BRAIN.stalk * (keen ? 1.8 : 1);
   if (r >= 0 && (style.stalk > 0 || r === 0) && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < (r === 0 ? Math.max(pressAt(c), weak) : weak) && P.rivalD < d) [j, d] = [r, P.rivalD];
+  for (let k = 0; keen && k < SHIPS; k++) { // a hunter reads every hull it sees for the weakest
+    if (k === i || k === j || (P.hulls & (1 << k)) === 0 || !afloat(state.ships[k]) || share(state.ships[k]) >= weak) continue;
+    const e = apart(ship.pos, state.ships[k].pos);
+    if (e < BRAIN.stalk * 1.8 && (j < 0 || share(state.ships[k]) < share(state.ships[j]) - 0.15)) [j, d] = [k, e];
+  }
   if (j < 0 && c.grudge > 0 && !c.gentle && knows(P, 0) && afloat(state.ships[0]) && share(ship) > 0.5) { // a grudge: it stalks the player whenever it sees it
     const e = apart(ship.pos, state.ships[0].pos);
     if (e < BRAIN.stalk * (1 + 0.5 * c.grudge)) [j, d] = [0, e];
@@ -460,7 +504,8 @@ function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Sty
     const at = bound(state, k), e = at === null ? Infinity : apart(ship.pos, at);
     if (e < d) [j, d] = [k, e];
   }
-  if (j < 0 || (was === MODE.stalk && aim === j && c.since > BRAIN.wait)) return -1;
+  if (keen && j >= 0 && (P.hulls & (1 << j)) !== 0 && power(ship) < 1.1 * power(state.ships[j])) j = -1; // only prey it is the stronger of, read hull-up
+  if (j < 0 || (was === MODE.stalk && aim === j && c.since > BRAIN.wait * (keen ? 2 : 1))) return -1; // a hunter stalks twice as long
   const prey = state.ships[j];
   if (knows(P, j)) velocityOf(sea, prey, V);
   else set(V, 0, 0, 0);

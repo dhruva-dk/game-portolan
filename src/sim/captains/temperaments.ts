@@ -57,10 +57,10 @@ export const GENTLE: Style = { ...BASE, loop: 15, stretch: 0.2, fight: 0.15, rai
 
 /** The temperaments' Styles, by career/league.ts TEMPERAMENT: hunter, expander, raider, turtle, opportunist, gambler. */
 export const STYLES: readonly Style[] = [
-  { ...BASE, loop: 16, stretch: 0.75, fight: 0.45, raid: 0.35, run: 0.45, margin: 12, loot: 0.3, bold: 0.5, standoff: 0.7, stalk: 1, edge: 1 },
+  { ...BASE, loop: 11, stretch: 0.75, fight: 0.6, raid: 0.65, run: 0.45, margin: 12, loot: 0.2, bold: 0.5, standoff: 0.6, stalk: 1 },
   { ...BASE, loop: 36, stretch: 0.1, wheel: 1.0, fight: 0.05, raid: 0, run: 0.85, margin: 16, loot: 0.1, bold: 0.15, standoff: 0.85 },
   { ...BASE, loop: 16, stretch: 0.45, fight: 0.25, raid: 2, run: 0.6, margin: 14, loot: 0.55, bold: 0.8, standoff: 0.95, bolt: true },
-  { ...BASE, loop: 9, stretch: 0.1, wheel: 2.1, fight: 0.2, raid: 0.1, run: 0.3, margin: 18, loot: 0.3, bold: 0.05, standoff: 0.75, guard: 0.8 },
+  { ...BASE, loop: 7, stretch: 0.1, wheel: 2.1, fight: 0.2, raid: 0.1, run: 0.3, margin: 18, loot: 0.3, bold: 0.05, standoff: 0.75, guard: 0.8 },
   { ...BASE, loop: 18, stretch: 0.35, fight: 0.1, raid: 0.25, run: 0.45, margin: 14, loot: 1, bold: 0.3, standoff: 1, stalk: 0.7, edge: 1.6 },
   { ...BASE, loop: 44, stretch: 0.6, wheel: 2.9, fight: 0.35, raid: 0.15, run: 0.2, margin: 8, loot: 0.8, bold: 0.9, standoff: 0.6, commit: 1.4, gold: 3 },
 ];

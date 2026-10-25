@@ -63,7 +63,7 @@ export function watch(state: MatchState, i: number, sight: Sight): void {
 /** What knowing the region the player breaks off into adds to that region's worth for captain c: its temperament's pull toward the player's waters, and its grudge. */
 export function lure(c: Captain, style: Style): number {
   if (c.gentle) return -0.5;
-  return 0.3 * style.fight + 0.25 * Math.min(1, style.raid) + 0.3 * style.stalk + 0.15 * Math.min(1, style.edge) - 0.3 * style.guard + 0.15 + 0.15 * c.grudge;
+  return 0.5 + 0.4 * style.fight + 0.4 * Math.min(1, style.raid) + 0.5 * style.stalk + 0.3 * Math.min(1, style.edge) - 0.8 * style.guard + 0.2 * c.grudge;
 }
 
 /** The hull share below which captain c reads the player as worth pressing: farther above 0.7 when it knows the player runs when wounded. */
