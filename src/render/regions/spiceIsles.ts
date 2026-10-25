@@ -32,11 +32,11 @@ export const BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
 /** The quay's coping over mean sea (u); trees drawn whole within `near` u, sketched to `far`; the understory to `edge`. */
 export const SPICE = { quay: TIDE.amp + 0.4, near: 32, far: 300, edge: 70, step: 1.3 } as const;
 
-/** Capture 24's ships in Spice Harbour (chart x, y; bow toward x, y): two lying along the quay at its berths, one
- *  warping in to the third, one in the mouth, one standing in from the sound; every hull's length floats at low water
- *  (regions test). Each is drawn at the level of detail the game's fleet chooser gives it. */
-export const SPICE_SHIPS: readonly (readonly [number, number, number, number])[] = [
-  [-8.4, 6.3, -3, 6.5], [-4.3, 3.8, -1.6, -0.4], [-12, 3.6, -13, -1.4], [-6.2, -3.5, -7, 3], [-1.5, -12.5, -5, -4],
+/** Capture 24's ships in Spice Harbour (chart x, y; bow toward x, y; detail): two lying along the quay at its berths,
+ *  one warping in to the third, one in the mouth, one standing in from the sound; every hull's length floats at low
+ *  water (regions test). */
+export const SPICE_SHIPS: readonly (readonly [number, number, number, number, number])[] = [
+  [-8.4, 6.3, -3, 6.5, 0.6], [-4.3, 3.8, -1.6, -0.4, 0.6], [-12, 3.6, -13, -1.4, 0.6], [-6.2, -3.5, -7, 3, 0.6], [-1.5, -12.5, -5, -4, 0.35],
 ];
 
 const W = {

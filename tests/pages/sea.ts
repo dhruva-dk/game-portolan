@@ -7,7 +7,7 @@ import { Pipeline } from '../../src/render/pipeline.ts';
 import { Sea } from '../../src/render/sea.ts';
 import { Terrain } from '../../src/render/terrain.ts';
 import type { Riding } from '../../src/render/swell.ts';
-import { chooseLods, fleetLods, LODS, Ship } from '../../src/render/ships/shipwright.ts';
+import { Ship } from '../../src/render/ships/shipwright.ts';
 import type { FormName } from '../../src/render/ships/forms.ts';
 import { Sky } from '../../src/render/sky.ts';
 import { BEAM, type Lamp } from '../../src/render/light.ts';
@@ -135,17 +135,14 @@ function floorSpot(kind: keyof typeof FLOOR): { at: V; land: V } {
 const CAPTAINS: (readonly [RGB, RGB])[] = [[P.vermilion, P.black], [P.ultramarine, P.gold], [P.teal, P.cream]];
 const FORMS: FormName[] = ['caravel', 'galleon', 'carrack', 'pinnace'];
 const afloat: { ship: Ship; at: V; fwd: V; lantern: Lamp }[] = [];
-/** Ships staged at every level of detail, each drawn at the level the game's fleet chooser gives it (its size on screen, the fleet's share of A9). */
-const fleet: Ship[] = [];
 /** A ship `ahead` u along the camera's heading and `aside` u to its right, sailing `turn` rad off that heading. */
 /** A ship `ahead` u before the eye and `aside` u off its line, turned `turn` (or, given `moor`, at its unit `at` in
  *  navigable water, its bow toward `to`). */
-function launch(ahead: number, aside: number, turn: number, detail: number | 'game' = 1, moor?: { at: V; to: V; furl?: boolean }): void {
+function launch(ahead: number, aside: number, turn: number, detail = 1, moor?: { at: V; to: V; furl?: boolean }): void {
   const i = afloat.length, up = cam.foot.clone().normalize(), fwd = moor ? moor.to.clone().sub(moor.at) : frameAt(up, cam.heading).clone();
   const at = moor ? moor.at.clone().normalize() : up.clone().multiplyScalar(R).addScaledVector(fwd, ahead).addScaledVector(tmp.crossVectors(fwd, up), aside).normalize();
   if (moor) turn = 0;
-  const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail: detail === 'game' ? undefined : detail });
-  if (detail === 'game') fleet.push(ship);
+  const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail });
   // moored at the quay or riding at anchor, her sails furled on bare yards; coming in, under reduced sail
   const rig = ship.rig.state(moor && moor.furl === false ? 'reefed' : 'plain', 2.2, 0.7);
   if (moor?.furl) for (const s of rig.sails) s.set = 0;
@@ -276,11 +273,11 @@ if (view === 'deck') {
   else { toWorld(ri, 14 + ox, -10 + oy, from); toWorld(ri, 28, -4, to); } // low off the east island's jungle shore: the forest edge over the beach
   look(from, to, Number(q.get('height') ?? (view === 'spice' ? 10 : 2.6)), Number(q.get('pitch') ?? (view === 'spice' ? -0.2 : -0.02)));
   // ships at the quay's berths and coming in through the mouth, each where the sim floats it at every tide (regions test)
-  if (view === 'spice') for (const [x, y, tx, ty] of SPICE_SHIPS) {
+  if (view === 'spice') for (const [x, y, tx, ty, d] of SPICE_SHIPS) {
     const at = V(), to = V();
     toWorld(ri, x, y, at);
     toWorld(ri, tx, ty, to);
-    launch(0, 0, 0, 'game', { at, to, furl: y > -10 }); // all but the ship in the mouth lie at the berths; each at the game's level of detail
+    launch(0, 0, 0, d, { at, to, furl: y > -10 }); // all but the ship in the mouth lie at the berths
   }
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
@@ -361,11 +358,6 @@ function frame(now: number): void {
     a.ship.position.copy(ride.position);
     a.lantern.pos.copy(ride.position).addScaledVector(ride.up, 2.4).addScaledVector(Z, -2.6);
   }
-  // the game's levels of detail: set outright on the first frames (no dissolve into the shot), then as the game does
-  if (fleet.length && frames < 2) {
-    const lv = chooseLods(fleet.map((s) => s.screenPx(camera, innerHeight)), fleet.map((s) => s.lodTriangles), fleet.map((s) => LODS.indexOf(s.lod)));
-    fleet.forEach((s, i) => s.setLod(LODS[lv[i]], 0));
-  } else if (fleet.length) fleetLods(fleet, camera, innerHeight, dt);
   sky.update(hour, clock, camera.position, weather);
   structures.update(camera.position);
   flora.update(camera);

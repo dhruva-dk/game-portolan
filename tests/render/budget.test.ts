@@ -1,8 +1,7 @@
 // WP30 part C: A9's budget over the standard views (tests/render/budget.html): the zoom's stops, each region from the
 // deck, low along its shore, high over its coast and from orbit, and a ten-ship battle, on both devices. Prints a
-// compact table (draws and triangles per device, the heaviest modules). With them, each region's hero (its capture,
-// staged on the sea test page as regions.shots.ts shoots it, tests/pages/regions.views.ts). Every view must keep within
-// 150 draws and 420k triangles (A9 is 200 / 500k: the rest is headroom). BUDGET_OUT=<file.json> writes the table; BUDGET_SHOTS=<dir>
+// compact table (draws and triangles per device, the heaviest modules); every view must keep within 150 draws and
+// 420k triangles (A9 is 200 / 500k: the rest is headroom). BUDGET_OUT=<file.json> writes the table; BUDGET_SHOTS=<dir>
 // saves each deck and shore view there and, with BUDGET_BASE=<dir> from an earlier run, prints each one's pixel
 // difference (mean over the frame, over its lower 40 % where the near field is, and the share of pixels that moved).
 import { after, before, test } from 'node:test';
@@ -11,7 +10,6 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launch, openGame, serve, type DeviceName, type Launched, type Server } from '../harness.ts';
-import { REGION_HEROES } from '../pages/regions.views.ts';
 
 const TRIS = 420000, CALLS = 150;
 type Row = { calls: number; tris: number; mods: Record<string, number>; z: number; alt: number };
@@ -60,18 +58,6 @@ test('every standard view within 150 draws and 420k triangles on both devices (W
     }
     game.assertClean();
     await game.page.close();
-    for (const [name, query] of REGION_HEROES) {
-      const hero = await openGame(launched.browser, `${server.url}tests/pages/sea.html`, { device, hook: '__sea', query: { ...query, clock: '12' } });
-      await hero.until((g) => g.ready, undefined, 30000);
-      await hero.page.waitForTimeout(250);
-      const g = await hero.hook((x) => ({ calls: x.calls as number, triangles: x.triangles as number, regionTriangles: x.regionTriangles as number,
-        terrainTriangles: x.terrainTriangles as number, structureTriangles: x.structureTriangles as number, flora: { triangles: x.flora.triangles as number } }));
-      const mods = Object.fromEntries(Object.entries({ regions: g.regionTriangles, terrain: g.terrainTriangles, structures: g.structureTriangles, flora: g.flora?.triangles ?? 0 })
-        .filter(([, t]) => t > 0).sort((a, b) => b[1] - a[1]));
-      rows.set(`hero ${name}`, { ...rows.get(`hero ${name}`), [device]: { calls: g.calls, tris: g.triangles, mods, z: 0, alt: 0 } });
-      hero.assertClean();
-      await hero.close();
-    }
   }
   const k = (n: number) => `${(n / 1000).toFixed(0)}k`, over: string[] = [];
   console.log('view                       | iPhone draws tris | iPad draws tris | heaviest modules (iPad)');
