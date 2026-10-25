@@ -7,7 +7,8 @@ import { toSetup } from '../career/setup.ts';
 import { newCareer, type Career } from '../career/state.ts';
 import { over, result } from '../sim/end.ts';
 import { seaFor } from '../sim/environment.ts';
-import { idleInput, type Recording } from '../sim/input.ts';
+import type { MatchState } from '../sim/state.ts';
+import { idleInput, type Recording, type ShipInput } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
 import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
 import { Loop, type Stepper } from './loop.ts';
@@ -26,6 +27,9 @@ export class Game implements Runtime {
   session: Session | null = null;
   /** The sound (WP28): unlocked on the first touch; null where Web Audio is unavailable. */
   readonly audio: GameAudio | null = GameAudio.create();
+  /** WP25: the player's input source and every tick's listener while the match screen is up (Runtime). */
+  input: (() => ShipInput) | undefined;
+  onTick: ((s: MatchState) => void) | null = null;
   /** The career (WP10): set sail fits out its next match, and a voyage's result comes home when its match ends. */
   career: Career | null = null;
   /** The world has arrived and the screen the game opens on is up. */
@@ -89,7 +93,7 @@ export class Game implements Runtime {
 
   private play(m: SavedMatch): void {
     if (!this.world) throw new Error('play: the world has not arrived');
-    this.session = new Session(seaFor(this.world, m.state.seed), m, idleInput); // the live input source until the match controls (WP25) supply it
+    this.session = new Session(seaFor(this.world, m.state.seed), m, () => (this.input ?? idleInput)()); // the match controls (WP25) set `input`
     this.audio?.startMatch(this.session.sea);
     this.loop.run(this.stepper(this.session));
     this.shell.go('match');
@@ -99,8 +103,7 @@ export class Game implements Runtime {
   /** The session as the loop steps it, its events heard after every tick (WP28). */
   private stepper(session: Session): Stepper {
     const audio = this.audio;
-    if (!audio) return session;
-    return { step: () => { const moved = session.step(); if (moved) audio.tick(session.state); return moved; } };
+    return { step: () => { const moved = session.step(); if (moved) { audio?.tick(session.state); this.onTick?.(session.state); } return moved; } };
   }
 
   private end(): void {

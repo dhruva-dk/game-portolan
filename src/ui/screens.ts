@@ -4,6 +4,12 @@
 import * as THREE from 'three';
 import { InkText, type InkTextOptions } from '../lettering/ink.ts';
 import { WorldView, type MatchFrame } from '../render/world.ts';
+import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
+import { PHASE } from '../sim/state.ts';
+import { Controls } from './controls.ts';
+import { Haptics } from './haptics.ts';
+import { HudState, hudLayout } from './hud.ts';
+import { HudView } from './icons.ts';
 import { ButtonBase, Scrap } from './parchment.ts';
 import { safeRect, type View } from './safeArea.ts';
 import type { Screen, ScreenContext, Touch } from './shell.ts';
@@ -113,24 +119,55 @@ export function match(ctx: ScreenContext): Screen {
   if (!world || !session) throw new Error('match: no match in progress');
   const view = new WorldView(ctx.pipeline, world);
   const frame: MatchFrame & { dt: number; clock: number; alpha: number } = { dt: 0, clock: 0, alpha: 1, state: session.state };
+  // WP25: the controls feed the session's input, the HUD reads the match, the haptics feel each tick's events
+  const ui = new THREE.Group(), controls = new Controls(), hud = new HudView(ctx.pipeline.style, ctx.lettering), reading = new HudState(), haptics = new Haptics();
+  ui.add(hud.group);
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), globe = new THREE.Sphere(new THREE.Vector3(), R), hit = new THREE.Vector3();
+  let vw = 1, vh = 1;
+  controls.pick = (x, y) => {
+    ndc.set((x / vw) * 2 - 1, 1 - (y / vh) * 2);
+    ray.setFromCamera(ndc, view.camera);
+    return ray.ray.intersectSphere(globe, hit) ? cellOf(TERRITORY, hit) : -1;
+  };
+  controls.riding = () => session.state.ships[0].phase === PHASE.riding;
+  controls.onAct = (a) => { haptics.play(a === 'sail' ? 'sail' : 'tap'); };
+  ctx.runtime.input = () => controls.input();
+  ctx.runtime.onTick = (s) => haptics.events(s.events, 0);
   return {
-    ui: new THREE.Group(),
+    ui,
     scene: view.scene,
     camera: view.camera,
-    layout: (v) => view.layout(v.width, v.height, v.safe),
+    layout(v) {
+      view.layout(v.width, v.height, v.safe);
+      vw = v.width; vh = v.height;
+      const L = hudLayout(v);
+      controls.reset();
+      controls.layout = L;
+      hud.setLayout(L);
+    },
     frame(f) {
       view.drive = true;
       frame.dt = f.dt;
       frame.clock = f.clock;
       frame.alpha = f.alpha;
       view.frame(frame);
+      const m = reading.update(session.sea, session.state, 0);
+      haptics.watch({ gullFlight: m.gull.flight, inHome: m.inHome, stormEdge: m.storm.edge });
+      haptics.flush();
+      hud.frame(m, controls.view(), f.dt);
     },
     touch(t) {
-      view.rig.pinch.touch(t); // WP24: two fingers zoom deck ↔ chart; one finger is WP25's
+      if (view.rig.chartOpen) { controls.reset(); view.rig.pinch.touch(t); return; }
+      for (const c of controls.touch(t)) view.rig.pinch.touch(c); // WP24: two fingers zoom deck ↔ chart; one finger is WP25's
     },
     // WP24: opening the chart pauses the match; the world holds still mid-motion while the camera lifts (PROMPT.md)
     paused: () => view.rig.chartOpen,
-    dispose: () => view.dispose(),
+    dispose: () => {
+      ctx.runtime.input = undefined;
+      ctx.runtime.onTick = null;
+      hud.dispose();
+      view.dispose();
+    },
   };
 }
 

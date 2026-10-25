@@ -3,6 +3,8 @@
 // time it comes up and disposed when it goes; it owns its interface (a group of meshes in CSS px in the pipeline's
 // ui scene) and the world scene drawn beneath it. The shell fits the canvas to the view and its safe area, hands
 // each finger to the screen that is up, and draws that screen's frames.
+import type { ShipInput } from '../sim/input.ts';
+import type { MatchState } from '../sim/state.ts';
 import type * as THREE from 'three';
 import type { Frame } from '../app/loop.ts';
 import type { Session } from '../app/session.ts';
@@ -22,6 +24,10 @@ export interface Runtime {
   setSail(): void;
   /** Leave for a screen other than the match, ending any match. */
   show(name: Exclude<ScreenName, 'match'>): void;
+  /** WP25: the player's input for the next tick, set by the match screen's controls (idle when unset). */
+  input?: (() => ShipInput) | undefined;
+  /** WP25: hears every tick's state after it steps (the haptics feel each tick's events). */
+  onTick?: ((s: MatchState) => void) | null;
 }
 
 export interface ScreenContext {
