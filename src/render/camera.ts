@@ -314,7 +314,8 @@ export class CameraRig {
       want = Math.max(want, need(m, 0.6) / f);
     }
     want = Math.max(0, want) * (1 - r);
-    this.raise = want > this.raise ? Math.min(want, this.raise + 0.6) : Math.max(want, this.raise - 0.12);
+    // rise at once when the ground or the line to the ship needs it; ease back down only when descending
+    this.raise = want > this.raise ? want : Math.max(want, this.raise - 0.12);
     if (this.raise > 0) eye.addScaledVector(dir.copy(eye).normalize(), this.raise);
     // last guard: never below the floor at the eye itself
     const floor = R + Math.max(0, this.heightAt(dir.copy(eye).normalize())) + SEA_CLEAR;
