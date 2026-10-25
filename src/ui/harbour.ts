@@ -4,13 +4,14 @@
 // unrolled over the harbour, its heading inked in by the quill (at once with reduced motion). Layout and rules are
 // in cards.ts (tested in Node); this file draws them and answers touches.
 import * as THREE from 'three';
+import { QUALITY } from '../render/pipeline.ts';
 import { saveCareer } from '../app/save.ts';
 import { TRAITS, type Trait } from '../career/league.ts';
 import { GULL_PRICES } from '../career/progress.ts';
 import { newCareer, type Career } from '../career/state.ts';
 import { chartInked } from '../career/voyage.ts';
 import type { InkText, InkTextOptions } from '../lettering/ink.ts';
-import { drop, emblemSheet, gullMarks, gullSheet, harbourArt, sheetMesh, shipSheet, type GullMarks, type HarbourArt } from '../render/harbourScene.ts';
+import { SEAL_CY, bytesOf, drop, emblemSheet, sealSheet, gullMarks, gullSheet, harbourArt, sheetMesh, shipSheet, type GullMarks, type HarbourArt } from '../render/harbourScene.ts';
 import {
   LABELS, PARENT, SETTING_ROWS, SETTING_WORDS, TITLES, formChoices, gullRows, harbourAct, harbourLayout, hit, leagueRows, nineCards, statusLine,
   type HarbourLayout, type Page, type Target,
@@ -63,7 +64,7 @@ export function harbour(ctx: ScreenContext): Screen {
 
   let view: View | null = null, page: Page = 'home', L: HarbourLayout | null = null, H: HarbourLayout | null = null;
   let art: HarbourArt | null = null, artKey = '';
-  let seal: ButtonBase | null = null;
+  let seal: THREE.Group | null = null, sealPress = 0, sealDown = false;
   let clock = 0, unroll = 1;
   let note: InkText | null = null, noteAt = -9;
   let finger: { id: number; target: Target } | null = null;
@@ -109,7 +110,13 @@ export function harbour(ctx: ScreenContext): Screen {
     drop(home);
     const l = H!, c = career(), sl = l.seal!;
     home.visible = page === 'home';
-    seal = new ButtonBase(style, sl.r);
+    // WP26b the set-sail seal: red wax with an embossed rose and ribbon tails, pressed like a signet (frame)
+    const ss = sealSheet(sl.r, view!.dpr), sm = sheetMesh(ss);
+    sm.position.set(0, ss.h / 2 - sl.r * SEAL_CY, 0);
+    sm.renderOrder = ORDER.seal;
+    ctx.pipeline.registerTexture('seal', bytesOf(ss));
+    seal = new THREE.Group();
+    seal.add(sm);
     seal.position.set(sl.x, sl.y, 0);
     seal.renderOrder = ORDER.seal;
     home.add(seal);
@@ -208,6 +215,7 @@ export function harbour(ctx: ScreenContext): Screen {
             leaf.add(b);
             if (t.value === STEPS - 1) text(leaf, VOLUME_WORDS[level]!, { size: 15 * s, align: 'left', valign: 'middle', opacity: 0.8 }, t.x + t.width + 10 * s, t.y + t.height / 2);
           } else if (t.kind === 'toggle') {
+            if (t.key === 'quality') { tag(leaf, t, `${QUALITY[st.quality]?.name ?? 'Finest'} graphics`, {}, ORDER.card); continue; }
             const on = st[t.key as 'haptics' | 'reducedMotion'];
             tag(leaf, t, on ? 'On' : 'Off', on ? { pigment: 'verdigris' } : {}, ORDER.card);
           }
@@ -290,6 +298,7 @@ export function harbour(ctx: ScreenContext): Screen {
         buildLeaf(false);
         return;
       case 'toggle': {
+        if (t.key === 'quality') { void setSettings({ quality: (settings().quality + 1) % QUALITY.length }); uiSound('tap'); buildLeaf(false); return; }
         const k = t.key as 'haptics' | 'reducedMotion';
         void setSettings({ [k]: !settings()[k] } as Partial<Settings>);
         uiSound('tap');
@@ -320,9 +329,15 @@ export function harbour(ctx: ScreenContext): Screen {
       const still = settings().reducedMotion;
       if (holder.career !== shown) { shown = holder.career; buildArt(); buildHome(); buildLeaf(false); }
       art?.frame(f.clock, still);
-      if (seal) {
-        seal.disabled = rt.world && live() ? 0 : 1;
-        seal.pressed = finger?.target.kind === 'sail' ? 1 : 0;
+      if (seal) { // the seal sinks into the page under the finger with a tap, and springs back; faint while the world is still coming
+        const ready = !!rt.world && live(), down = ready && finger?.target.kind === 'sail';
+        if (down && !sealDown) uiSound('tap');
+        sealDown = down;
+        sealPress += ((down ? 1 : 0) - sealPress) * Math.min(1, f.dt * (down ? 24 : 10));
+        const breathe = still ? 1 : 1 + 0.012 * Math.sin(f.clock * 1.7);
+        seal.scale.setScalar((1 - 0.085 * sealPress) * breathe);
+        seal.rotation.z = -0.07 * sealPress;
+        for (const m of seal.children) ((m as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = ready ? 1 - 0.12 * sealPress : 0.45;
       }
       unroll = Math.min(1, unroll + f.dt / 0.34);
       const e = 1 - Math.pow(1 - unroll, 3);

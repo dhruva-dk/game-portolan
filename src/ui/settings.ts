@@ -10,22 +10,28 @@ export interface Settings {
   music: number;
   haptics: boolean;
   reducedMotion: boolean;
+  /** WP26 graphics quality, 0 Swift · 1 Fine · 2 Finest (QUALITY in render/pipeline.ts): the dynamic resolution's ceiling and the detail governors. */
+  quality: number;
+  /** WP25 part B: the controls and the match HUD mirrored for the left hand. */
+  leftHanded: boolean;
 }
 
 /** Volume steps: silent, ¼, ½, ¾, full. */
 export const STEPS = 5;
 export const SETTINGS_KEY = 'settings';
 
-export const defaults = (reducedMotion = false): Settings => ({ sound: 1, music: 0.75, haptics: true, reducedMotion });
+export const defaults = (reducedMotion = false): Settings => ({ sound: 1, music: 0.75, haptics: true, reducedMotion, quality: 2, leftHanded: false });
 
 const vol = (x: unknown, d: number): number =>
   typeof x === 'number' && Number.isFinite(x) ? Math.round(Math.min(1, Math.max(0, x)) * (STEPS - 1)) / (STEPS - 1) : d;
 const flag = (x: unknown, d: boolean): boolean => (typeof x === 'boolean' ? x : d);
 
 /** Saved settings made safe: anything missing or malformed falls back to `base`. */
+const tier = (v: unknown, b: number): number => (v === 0 || v === 1 || v === 2 ? v : b);
+
 export function sanitize(v: unknown, base: Settings = defaults()): Settings {
   const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>;
-  return { sound: vol(o.sound, base.sound), music: vol(o.music, base.music), haptics: flag(o.haptics, base.haptics), reducedMotion: flag(o.reducedMotion, base.reducedMotion) };
+  return { sound: vol(o.sound, base.sound), music: vol(o.music, base.music), haptics: flag(o.haptics, base.haptics), reducedMotion: flag(o.reducedMotion, base.reducedMotion), quality: tier(o.quality, base.quality), leftHanded: flag(o.leftHanded, base.leftHanded) };
 }
 
 /** What the settings apply to: the audio engine's buses, the haptics, anything that moves (the camera rig). */
@@ -33,12 +39,14 @@ export interface Targets {
   audio?: { setVolumes(v: { sound?: number; music?: number }): void } | null | undefined;
   haptics?: { enabled: boolean } | null | undefined;
   motion?: { reducedMotion: boolean } | null | undefined;
+  quality?: { setQuality(tier: number): void } | null | undefined;
 }
 
 export function applySettings(s: Settings, t: Targets): void {
   t.audio?.setVolumes({ sound: s.sound, music: s.music });
   if (t.haptics) t.haptics.enabled = s.haptics;
   if (t.motion) t.motion.reducedMotion = s.reducedMotion;
+  if (t.quality) t.quality.setQuality(s.quality);
 }
 
 /** Where settings are kept: the device database by default; tests swap in a map. */

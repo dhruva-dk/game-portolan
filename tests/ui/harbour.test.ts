@@ -114,7 +114,7 @@ test('settings are kept on the device, read back and applied', async () => {
   storage.write = async (k, v) => { kept.set(k, structuredClone(v)); };
   forgetSettings();
   assert.deepEqual(settings(), defaults(false));
-  const chosen = { sound: 0.5, music: 0, haptics: false, reducedMotion: true };
+  const chosen = { sound: 0.5, music: 0, haptics: false, reducedMotion: true, quality: 1, leftHanded: false };
   await setSettings(chosen);
   assert.deepEqual(kept.get('settings'), chosen);
   forgetSettings();
@@ -130,4 +130,20 @@ test('settings are kept on the device, read back and applied', async () => {
   forgetSettings();
   assert.deepEqual(await loadSettings(), defaults(false), 'an unreadable record keeps the defaults');
   forgetSettings();
+});
+
+// WP26b the graphics quality: a setting kept with the others and applied to the pipeline's dynamic resolution
+import { QUALITY } from '../../src/render/pipeline.ts';
+
+test('the graphics quality is a setting, kept, sanitized and applied to the pipeline', () => {
+  assert.equal(defaults().quality, 2, 'Finest, the full controller, by default');
+  assert.equal(sanitize({ quality: 0 }).quality, 0);
+  assert.equal(sanitize({ quality: 7 }).quality, 2);
+  const page = harbourLayout({ width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 21, left: 62 } }, 'settings');
+  assert.ok(page.targets.some((x) => x.id === 'toggle:quality'), 'a control on the settings page');
+  const seen: number[] = [];
+  applySettings({ ...defaults(), quality: 1 }, { quality: { setQuality: (tier: number) => { seen.push(tier); } } });
+  assert.deepEqual(seen, [1]);
+  assert.deepEqual(QUALITY.map((q) => [q.floor, q.ceiling]), [[12, 15], [12, 18], [12, 20]], 'tiers bound the render scale, never below its floor');
+  assert.deepEqual(QUALITY.map((q) => q.detail), [0.6, 0.8, 1]);
 });

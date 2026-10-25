@@ -346,6 +346,48 @@ export function emblemSheet(w: number, h: number, pigments: readonly [string, st
 
 // ——— the harbour ———
 
+/** The seal's centre below the top of its sheet, in seal radii (the ribbon tails hang lower). */
+export const SEAL_CY = 1.12;
+
+/** WP26b the set-sail seal: a blot of vermilion wax with a spilt, uneven rim, a raised ring of beads and an embossed
+ * eight-point rose catching the dusk light from the upper left, over swallow-tailed ribbons of ultramarine and verdigris. */
+export function sealSheet(R: number, dpr: number): Sheet {
+  const w = R * 3.3, h = R * 2.5, s = sheet(w, h, 0.22e6, dpr), g = s.g, r = rng(1588), cx = w / 2, cy = R * SEAL_CY;
+  for (const side of [-1, 1]) {
+    const X = (k: number) => cx + side * R * k;
+    const tail: Path = (q) => { q.beginPath(); q.moveTo(X(0.45), cy - R * 0.02); q.quadraticCurveTo(X(1.1), cy + R * 0.12, X(1.6), cy + R * 0.42); q.lineTo(X(1.36), cy + R * 0.66); q.lineTo(X(1.48), cy + R * 0.92); q.quadraticCurveTo(X(0.98), cy + R * 0.64, X(0.4), cy + R * 0.52); q.closePath(); };
+    wash(g, tail, side < 0 ? WASH.ultramarine : WASH.verdigris, 0.72, r);
+    hatch(g, tail, Math.min(X(0.4), X(1.6)), cy, R * 1.2, R * 0.95, side < 0 ? 0.6 : -0.6, 2.6, INK, 0.5, 0.32, r);
+    stroke(g, tail, 1.2);
+    stroke(g, (q) => { q.beginPath(); q.moveTo(X(0.5), cy + R * 0.12); q.quadraticCurveTo(X(1.05), cy + R * 0.26, X(1.44), cy + R * 0.5); }, 0.6, 0.55);
+  }
+  const N = 72, jag = Array.from({ length: N }, (_, i) => 1 + 0.04 * Math.sin(i * 0.87 + 1.3) + 0.045 * (r() - 0.5) + (i % 17 === 5 ? 0.08 : 0) + (i % 23 === 11 ? 0.06 : 0));
+  const blob: Path = (q) => { q.beginPath(); for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2, k = R * jag[i % N]!, x = cx + Math.cos(a) * k, y = cy + Math.sin(a) * k; if (i) q.lineTo(x, y); else q.moveTo(x, y); } q.closePath(); };
+  const disc = (k: number): Path => (q) => { q.beginPath(); q.arc(cx, cy, R * k, 0, Math.PI * 2); };
+  fill(g, blob, '#9b2a1a', 0.92);
+  wash(g, blob, WASH.vermilion, 0.85, r);
+  hatch(g, blob, cx - R * 0.1, cy - R * 0.1, R * 1.2, R * 1.2, 0.75, 2.2, INK, 0.55, 0.3, r); // the wax's shadowed side
+  wash(g, disc(0.74), WASH.vermilion, 0.5, r, false);
+  stroke(g, blob, 1.6);
+  stroke(g, disc(0.78), 1.3, 0.85);
+  stroke(g, disc(0.7), 0.7, 0.7);
+  for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2; fill(g, (q) => { q.beginPath(); q.arc(cx + Math.cos(a) * R * 0.74, cy + Math.sin(a) * R * 0.74, R * 0.022, 0, Math.PI * 2); }, INK, 0.6); }
+  const rr = R * 0.56;
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 4, l = i % 2 ? rr * 0.62 : rr, wd = rr * (i % 2 ? 0.11 : 0.16);
+    const tx = cx + Math.cos(a) * l, ty = cy + Math.sin(a) * l, nx = -Math.sin(a) * wd, ny = Math.cos(a) * wd;
+    const half = (sg: number): Path => (q) => { q.beginPath(); q.moveTo(cx, cy); q.lineTo(cx + Math.cos(a) * wd * 1.3 + sg * nx, cy + Math.sin(a) * wd * 1.3 + sg * ny); q.lineTo(tx, ty); q.closePath(); };
+    const lit = Math.cos(a + Math.PI * 0.75) > 0; // the face turned to the upper-left light is the paler one
+    fill(g, half(1), lit ? '#e9a184' : '#6e1c10', 0.75);
+    fill(g, half(-1), lit ? '#6e1c10' : '#e9a184', 0.6);
+    stroke(g, half(1), 0.7, 0.85); stroke(g, half(-1), 0.7, 0.85);
+  }
+  fill(g, disc(0.07), WASH.ochre, 0.9); stroke(g, disc(0.07), 0.8);
+  stroke(g, (q) => { q.beginPath(); q.arc(cx, cy, R * 0.88, Math.PI * 1.08, Math.PI * 1.42); }, 2.2, 0.55, '#f8dcc4'); // the wax's gleam
+  stroke(g, (q) => { q.beginPath(); q.arc(cx, cy, R * 0.62, Math.PI * 1.12, Math.PI * 1.36); }, 1.4, 0.4, '#f8dcc4');
+  return s;
+}
+
 export interface HarbourArt { readonly group: THREE.Group; readonly bytes: number; frame(t: number, still: boolean): void }
 
 function glowTexture(): THREE.CanvasTexture {

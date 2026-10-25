@@ -6,7 +6,7 @@ import type { InkText } from '../lettering/ink.ts';
 import { drop, titleArt, type TitleArt } from '../render/harbourScene.ts';
 import { Scrap } from './parchment.ts';
 import { safeRect } from './safeArea.ts';
-import { loadSettings, settings, uiSound } from './settings.ts';
+import { applySettings, loadSettings, settings, uiSound } from './settings.ts';
 import type { Screen, ScreenContext } from './shell.ts';
 
 const BARE = { scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera() };
@@ -15,7 +15,7 @@ const PEN_DOWN = 0.35;
 let settingsRead = false;
 
 export function title(ctx: ScreenContext): Screen {
-  if (!settingsRead) { settingsRead = true; void loadSettings(); }
+  if (!settingsRead) { settingsRead = true; void loadSettings().then((s) => applySettings(s, { quality: ctx.pipeline })); }
   const ui = new THREE.Group();
   let art: TitleArt | null = null, word: InkText | null = null, hint: InkText | null = null;
   let start: number | null = null, left = false;

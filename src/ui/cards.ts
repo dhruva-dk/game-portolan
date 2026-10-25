@@ -136,9 +136,10 @@ export function harbourLayout(view: View, page: Page): HarbourLayout {
         for (let v = 0; v < 5; v++) targets.push({ id: `level:${k}:${v}`, kind: 'level', key: k, value: v, ...rect(x0 + v * (dot + 6 * s), y, dot, bh) });
       } else targets.push({ id: `toggle:${k}`, kind: 'toggle', key: k, ...rect(x0, y, 132 * s, bh) });
     });
-    const y = B.y + SETTING_ROWS.length * rh + (rh - bh) / 2, w = 160 * s;
-    targets.push({ id: 'link:credits', kind: 'link', key: 'credits', ...rect(B.x + B.width / 2 - w - 12 * s, y, w, bh) });
-    targets.push({ id: 'link:reset', kind: 'link', key: 'reset', ...rect(B.x + B.width / 2 + 12 * s, y, w, bh) });
+    const y = B.y + SETTING_ROWS.length * rh + (rh - bh) / 2, w = 156 * s, gap = 14 * s, mid = B.x + B.width / 2;
+    targets.push({ id: 'toggle:quality', kind: 'toggle', key: 'quality', ...rect(mid - 1.5 * w - gap, y, w, bh) }); // WP26b graphics, cycled
+    targets.push({ id: 'link:credits', kind: 'link', key: 'credits', ...rect(mid - w / 2, y, w, bh) });
+    targets.push({ id: 'link:reset', kind: 'link', key: 'reset', ...rect(mid + w / 2 + gap, y, w, bh) });
   } else if (page === 'reset') {
     const w = 190 * s, h = Math.max(52, 56 * s), y = B.y + B.height * 0.62;
     targets.push({ id: 'confirm:yes', kind: 'confirm', key: 'yes', ...rect(B.x + B.width / 2 - w - 16 * s, y, w, h) });

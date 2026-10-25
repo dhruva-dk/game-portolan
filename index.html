@@ -14,6 +14,16 @@
     </style>
   </head>
   <body>
+    <canvas id="ink"></canvas>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // WP26 the GPU wakes while the modules load: the game's WebGL2 context is made here with the renderer's own
+      // attributes (three.js takes it over) and washed with the parchment, so the first sync GL call in the pipeline
+      // finds the GPU process already up (a cold start spent ~0.27 s waiting in it) and the screen is never black.
+      try {
+        const gl = document.getElementById('ink').getContext('webgl2', { alpha: false, antialias: false, depth: true, stencil: false, premultipliedAlpha: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+        if (gl) { gl.clearColor(0.79, 0.68, 0.5, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
+      } catch (e) { /* the pipeline makes its own */ }
+    </script>
   </body>
 </html>

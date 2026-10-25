@@ -10,8 +10,8 @@ import type { WorldMessage } from './app/worldWorker.ts';
 import { Lettering } from './lettering/ink.ts';
 import { Pipeline } from './render/pipeline.ts';
 
-const canvas = document.createElement('canvas');
-document.body.append(canvas);
+// WP26 index.html made the canvas and its context while the modules loaded (the GPU wakes in parallel)
+const canvas = (document.getElementById('ink') as HTMLCanvasElement | null) ?? document.body.appendChild(document.createElement('canvas'));
 const pipeline = new Pipeline(canvas);
 const lettering = new Lettering(pipeline.style, devicePixelRatio, (bytes) => pipeline.registerTexture('lettering', bytes));
 const game = new Game(canvas, pipeline, lettering);

@@ -14,7 +14,8 @@ import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
 import { Loop, type Stepper } from './loop.ts';
 import { clearMatch, saveCareer, saveMatch, type SavedMatch } from './save.ts';
 import { Session } from './session.ts';
-import { GameAudio } from '../audio/soundscape.ts';
+import type { GameAudio } from '../audio/soundscape.ts';
+import { applySettings, onSettings, settings } from '../ui/settings.ts';
 import type { World, WorldMessage } from './worldWorker.ts';
 
 const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -26,7 +27,8 @@ export class Game implements Runtime {
   world: World | null = null;
   session: Session | null = null;
   /** The sound (WP28): unlocked on the first touch; null where Web Audio is unavailable. */
-  readonly audio: GameAudio | null = GameAudio.create();
+  /** The sound, woken after the title's first frame (its module and AudioContext cost ~0.2 s at boot). */
+  audio: GameAudio | null = null;
   /** WP25: the player's input source and every tick's listener while the match screen is up (Runtime). */
   input: (() => ShipInput) | undefined;
   onTick: ((s: MatchState) => void) | null = null;
@@ -40,13 +42,19 @@ export class Game implements Runtime {
   constructor(canvas: HTMLCanvasElement, pipeline: Pipeline, lettering: Lettering) {
     this.pipeline = pipeline;
     this.shell = new Shell(canvas, { pipeline, lettering, runtime: this });
+    const quality = () => applySettings(settings(), { quality: pipeline }); // WP26 the graphics quality in force
+    quality();
+    onSettings(quality);
     this.shell.go('title');
     let held = false; // WP24: the screen's pause (the open chart) drives the loop on each change; test hooks may still pause it
     this.loop = new Loop((f) => {
       this.shell.frame(f);
       if (this.shell.paused !== held) { held = this.shell.paused; this.loop.paused = held; }
       this.audio?.frame(f.dt, this.session?.state ?? null);
-      if (this.perf.startup === 0) this.perf.startup = performance.now();
+      if (this.perf.startup === 0) {
+        this.perf.startup = performance.now();
+        void import('../audio/soundscape.ts').then((m) => { this.audio = m.GameAudio.create(); });
+      }
     });
   }
 

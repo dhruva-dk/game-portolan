@@ -221,6 +221,14 @@ export interface FrameStats {
 }
 
 const MIN_STEP = 12, MAX_STEP = 20; // render scale in twentieths of the device resolution: 0.6–1.0
+/** WP26 graphics quality, the player's choice (settings.quality): the dynamic resolution's floor and ceiling in twentieths
+ * and the detail factor the flora and structure governors scale their reach by. Finest, the default, is the full controller. */
+export const QUALITY = [
+  { name: 'Swift', floor: MIN_STEP, ceiling: 15, detail: 0.6 },
+  { name: 'Fine', floor: MIN_STEP, ceiling: 18, detail: 0.8 },
+  { name: 'Finest', floor: MIN_STEP, ceiling: MAX_STEP, detail: 1 },
+] as const;
+export type QualityTier = (typeof QUALITY)[number];
 const PROBE_SECONDS = 5; // after the first frame the scale climbs quickly to find what the GPU sustains
 
 export class Pipeline {
@@ -260,6 +268,8 @@ export class Pipeline {
   private pinned: number | null = null;
   private clock = 0;
   private ceiling = MAX_STEP;
+  /** WP26 the graphics quality in force (setQuality). */
+  quality: QualityTier = QUALITY[2];
   private ceilingTime = 0;
   private calm = 0;
   private sinceRise = Infinity;
@@ -326,6 +336,11 @@ export class Pipeline {
 
   get renderScale(): number {
     return this.pinned ?? this.step / MAX_STEP;
+  }
+
+  /** WP26 a graphics quality tier: the controller works within its range, stepping down into it a frame at a time. */
+  setQuality(tier: number): void {
+    this.quality = QUALITY[Math.max(0, Math.min(QUALITY.length - 1, Math.round(tier)))]!;
   }
 
   /** Draw one frame. dt: seconds since the last frame (drives the dynamic resolution). */
@@ -408,14 +423,16 @@ export class Pipeline {
     this.calm = this.slow > 0.5 ? 0 : this.calm + dt;
     this.sinceRise += dt;
     this.ceilingTime -= dt;
-    if (this.ceilingTime <= 0) this.ceiling = MAX_STEP;
+    if (this.ceilingTime <= 0) this.ceiling = this.quality.ceiling;
     let next = this.step;
-    if (this.slow > 1.8 && this.step > MIN_STEP && this.hold <= 0) {
+    if (this.step > this.quality.ceiling) {
+      next = this.step - 1; // a lower quality was chosen: down into its range
+    } else if (this.slow > 1.8 && this.step > this.quality.floor && this.hold <= 0) {
       next = this.step - 1;
       this.ceiling = next;
       this.ceilingTime = this.sinceRise < 8 && this.clock > PROBE_SECONDS ? 60 : 15;
       this.hold = 0.3;
-    } else if (this.calm > (this.clock < PROBE_SECONDS ? 0.5 : 10) && this.step < this.ceiling) {
+    } else if (this.calm > (this.clock < PROBE_SECONDS ? 0.5 : 10) && this.step < Math.min(this.ceiling, this.quality.ceiling)) {
       next = this.step + 1;
       this.sinceRise = 0;
     }
