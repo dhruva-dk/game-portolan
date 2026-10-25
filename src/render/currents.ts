@@ -3,7 +3,9 @@
 // ink strokes shearing past each other, fastest down the middle; chevrons surging downstream; broken foam lines along
 // both banks with eddies spilling beyond; a granulating ochre glow with gold glimmers riding it, brightest while the
 // fleet rides it out at the opening. Ships riding it throw bow spray and leave foam streaks (fx.ts). One draw; its
-// window follows the eye, the whole route in view from high up.
+// window follows the eye, the whole route in view from high up. While the eye stays low over the player's wreck the
+// ribbon (a flat strip the swell would cut into hard-edged pools and ruled bars) dries off the sea in broken patches,
+// a soft watercolour going, and comes back as the eye rises to the chart (S-019 (s)).
 import * as THREE from 'three';
 import { seaFor, type Sea as Waters } from '../sim/environment.ts';
 import { R } from '../sim/sphere.ts';
@@ -21,6 +23,9 @@ import type { MatchFrame, RenderContext, RenderModule } from './world.ts';
  * strokes' pace over the current's own speed, and the glow at rest and added while the whole fleet rides.
  */
 export const CURRENT = { segments: 192, arcs: 8, lift: 0.25, bank: 1.3, reach: 160, pace: 1.25, glow: 0.5, ride: 0.6 } as const;
+
+/** u: under this eye height (above the sinking's lift, CINE.liftUp) the ribbon holds off the player's wreck. */
+const HOLD_ALT = 45;
 
 const at = (pts: Float64Array, k: number) => ({ x: pts[3 * k], y: pts[3 * k + 1], z: pts[3 * k + 2] });
 
@@ -54,7 +59,7 @@ export class CurrentView implements RenderModule {
     this.geo.setIndex(index);
     this.uniforms = {
       uCurClock: { value: 0 }, uCurSpeed: { value: GREAT_CURRENT.speed * CURRENT.pace }, uCurGlow: { value: CURRENT.glow + CURRENT.ride },
-      uCurLength: { value: 1 }, uCurTaper: { value: GREAT_CURRENT.taper },
+      uCurLength: { value: 1 }, uCurTaper: { value: GREAT_CURRENT.taper }, uCurHold: { value: 1 },
       uCurInk: { value: TINT.deep }, uCurFoam: { value: TINT.foam }, uCurWash: { value: TINT.ochre }, uCurGold: { value: TINT.gold },
     };
     const m = inkMaterial(ctx.pipeline.style, { uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG, veil: true, side: THREE.DoubleSide });
@@ -83,6 +88,10 @@ export class CurrentView implements RenderModule {
     const glow = this.uniforms.uCurGlow;
     glow.value += (CURRENT.glow + CURRENT.ride * riding - glow.value) * Math.min(1, 1.5 * f.dt);
     this.uniforms.uCurClock.value = f.clock;
+    // the player sunk and the eye low over her: the ribbon dries off in about 1.5 s; it comes back as the eye rises
+    const hold = this.uniforms.uCurHold, low = st.ships[0]?.phase === PHASE.sunk && this.ctx.camera.position.length() - R < HOLD_ALT;
+    hold.value = Math.min(1, Math.max(0, (hold.value as number) + (low ? -1 : 1) * f.dt / 1.5));
+    this.mesh.visible &&= (hold.value as number) > 0;
     this.ride(st, f.clock);
   }
 
@@ -165,7 +174,7 @@ void main() {
 }`;
 
 const FRAG = /* glsl */ `
-uniform float uCurClock, uCurSpeed, uCurGlow, uCurLength, uCurTaper;
+uniform float uCurClock, uCurSpeed, uCurGlow, uCurLength, uCurTaper, uCurHold;
 uniform vec3 uCurInk, uCurFoam, uCurWash, uCurGold;
 varying vec3 vFlow;
 float cuHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -199,6 +208,11 @@ void main() {
   float a = max(0.32 * glow + 0.6 * glim, 0.75 * stroke + 0.55 * chev);
   col = mix(col, uCurFoam, max(foam, eddy));
   a = max(a, 0.9 * foam + 0.6 * eddy) * ends * (1.0 - smoothstep(1.15, 1.3, ax));
+  // held off the wreck: it dries off in broken, soft-edged patches (two octaves of noise in the water's own frame)
+  if (uCurHold < 1.0) {
+    float dry = 0.65 * cuNoise(vec2(s * 0.09, x * 1.7)) + 0.35 * cuNoise(vec2(s * 0.31 + 5.0, x * 5.3));
+    a *= smoothstep(1.0 - uCurHold, 1.0 - uCurHold + 0.3, dry) * smoothstep(0.0, 0.5, uCurHold);
+  }
   if (a < 0.01) discard;
   writeVeil(col, min(a, 1.0));
 }`;
