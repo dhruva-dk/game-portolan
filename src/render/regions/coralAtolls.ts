@@ -736,7 +736,9 @@ export function planCoral(field: TerrainField): CoralPlan {
       const ox = gl > 1e-4 ? -gx / gl : 1, oy = gl > 1e-4 ? -gy / gl : 0;
       const inland = -coastAt(geo, dir), leeFwd = tan(px, py, lee[0], lee[1]);
       const grove = 0.5 + 0.5 * Math.sin(0.8 * px + 2 * Math.sin(0.5 * py)) * Math.cos(0.6 * py - 1.7 * Math.sin(0.4 * px));
-      if (inland < 0.5) {
+      // (a motu only a few paces across is still palm-capped: its palms stand on its crest, leaning out over the water,
+      // so a far motu is never a bare sand sliver, S-021)
+      if (inland < 0.5 && !(inland >= 0.18 && sim(px, py) > LAND + 0.12 && r < 0.55)) {
         if (r < 0.1) place(plan.drift, px, py, { sink: 0.02, fwd: tan(px, py, -oy, ox), yaw: 0.6 * (lr() - 0.5), s: 0.8 + lr(), hug: true, kitH: 0.08 });
         else if (r > 0.93) plan.turtles.nest.push(dir);
         continue;
