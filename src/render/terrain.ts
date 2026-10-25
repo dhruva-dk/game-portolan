@@ -541,6 +541,7 @@ uniform vec3 uChartE[${NR}];
 uniform vec3 uChartN[${NR}];
 uniform vec2 uFade;          // the composite's line fade, u from the eye
 const float CLIFF_UP = ${SLOPES.cliff.toFixed(3)}, SCREE_UP = ${SLOPES.scree.toFixed(3)}, TIDE_AMP = ${TIDE.amp.toFixed(3)};
+const float CELL_U = ${CELL_U.toFixed(4)};
 const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS = 0.6;
 const vec3 ULTRA_T = ${vec(transmittanceVec(PIGMENTS.ultramarine))};
 const vec3 ROSE_T = ${vec(transmittanceVec(PIGMENTS.roseMadder))}, OCHRE_T = ${vec(transmittanceVec(PIGMENTS.ochre))};
@@ -618,12 +619,14 @@ void main() {
   float above = f.x - uSeaLevel; // the sea paints depth = uSeaLevel - f.x: one waterline for both
   vec3 n0 = normalize(vNormal);
   float up0 = dot(n0, dir);
-  // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
-  // field's waterline
-  bool wall = up0 < 0.4;
-  if (above < -0.5 && !wall) discard;
   int ri = vRegion;
   vec4 shore = uShore[ri], land = uLand[ri], fol = uFoliage[ri], sand = uSand[ri], rel = uRelief[ri];
+  // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
+  // field's waterline; never on reef, whose flank under the water is the sea's to paint, nor (on the low coral cays of
+  // a white-sand region, which have no cliffs) further out than a cell, where the mesh's faces at a drowned shelf's
+  // edge stood above the sea (both showed as slivers and a smear of pigments round the atolls)
+  bool wall = up0 < 0.4 && f.w < 0.5 && (shore.w > -0.5 || f.y < CELL_U);
+  if (above < -0.5 && !wall) discard;
   vec3 E = uChartE[ri], NC = uChartN[ri], v = normalize(cameraPosition - vWorld);
   float h = length(vWorld) - SEA_R, dist = distance(cameraPosition, vWorld);
   float upx = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
@@ -672,19 +675,32 @@ void main() {
   // the rock showing through in patches
   float veg = smoothstep(-0.3, 0.3, patchy + 0.3 - 1.2 * talus) * (1.0 - rel.y) * step(shore.z, 0.5) * 0.85;
   vec3 col = rock * cliff + mix(rock, green, veg) * steep + sandC * beach + green * meadow;
-  // coral: where the floor is reef the ground is the reef's own: up to the high-water line an algal pavement mottled
-  // rose, ochre and bleached grey, pitted with pools that keep the sea's turquoise, its fronts the same pitted limestone
-  // (never bedded rock); above it the motus' dry sand bleached white
+  // coral: where the floor is reef the ground is the reef's own: up to the high-water line a pavement of bleached
+  // limestone under a veneer of white coral sand, cooler and darker where wet; a blush of coralline algae along its
+  // edge, olive turf and rubble in broad soft patches, and near the eye pools that keep the sea's turquoise; its fronts
+  // the same limestone (never bedded rock). The fine mottle is laid only where it is several px across, so from high
+  // the reef is one pale wash with its blush and turf, never confetti. Above it the motus' dry sand, bleached white:
+  // warm white in the light, the shade's cool glaze in shadow.
   float mud = max(shore.w, 0.0), reef = f.w * (1.0 - smoothstep(TIDE_AMP, TIDE_AMP + 0.3, f.x + bleed * 4.0));
+  float bleached = max(-shore.w, 0.0);
   if (reef > 0.01) {
-    float m1 = noise3(vWorld / 1.7), m2 = noise3(vWorld / 0.6 + 3.0);
-    vec3 pave = glaze(ground, mix(OCHRE_T, ROSE_T, smoothstep(-0.3, 0.4, m1)), 0.5 + 0.3 * m2, pool, q);
-    pave = glaze(pave, SEPIA_T, 0.25 * smoothstep(0.1, 0.6, -m1 + 0.4 * m2), 0.0, q);
-    float pit = smoothstep(0.25, 0.45, noise3(vWorld / 0.9 + 7.0) + 0.3 * m2) * smoothstep(0.3, -0.1, above);
-    pave = glaze(pave, VERD_T, 0.8 * pit, 0.6, q);
+    float fine = 1.0 - smoothstep(0.04, 0.16, upx);
+    float m1 = noise3(vWorld / 6.0), m2 = fine * noise3(vWorld / 1.2 + 3.0);
+    float m3 = noise3(vWorld / 3.0 + 11.0);
+    float edge = (1.0 - smoothstep(0.6, 2.8, -f.y + 1.2 * m1)) * smoothstep(-0.5, 0.1, m3 + 0.3 * m2);
+    float turf = smoothstep(0.0, 0.4, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
+    float bare = smoothstep(0.1, 0.5, m3 - 0.3 * m1) * (1.0 - edge) * (1.0 - turf);
+    vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.13, 0.07, fine) + 0.05 * m1, pool, q);
+    pave = mix(pave, ground * LEAD / PARCH, 0.35 * fine);
+    pave = glaze(pave, ROSE_T, mix(0.55, 0.25, fine) * edge, 0.0, q);
+    pave = glaze(glaze(pave, SEPIA_T, 0.3 * turf, 0.0, q), OCHRE_T, 0.2 * turf, 0.0, q);
+    pave = mix(pave, ground * LEAD / PARCH, 0.45 * bare);
+    float pit = fine * smoothstep(0.3, 0.5, noise3(vWorld / 1.3 + 7.0) + 0.3 * m2) * smoothstep(0.3, -0.1, above);
+    pave = glaze(pave, VERD_T, 0.5 * pit, 0.6, q);
+    pave = wash(pave, ULTRA_T, 0.05 * wet);
     col = mix(col, pave, reef * (1.0 - meadow));
   }
-  col = mix(col, ground * LEAD / PARCH, max(-shore.w, 0.0) * beach * (1.0 - reef) * (1.0 - wet) * 0.5 * (0.8 + 0.4 * patchy));
+  col = mix(col, ground * LEAD / PARCH, bleached * beach * (1.0 - reef) * (1.0 - 0.6 * wet) * 0.7 * (0.85 + 0.3 * patchy));
 
   float lines = 0.0;
   vec2 across = normalize(vec2(-dot(n0, NC), dot(n0, E)) + 1e-4);

@@ -439,96 +439,135 @@ function hulkKit(seed: number): THREE.BufferGeometry {
  *  top's height. */
 /** The break's white water standing off the reef, 1 long (x −½…½) and 1 high, faced seaward (+z): a sheet bellied
  *  toward the sea and its top falling back over the reef. */
-function spillKit(): THREE.BufferGeometry {
-  const pos: number[] = [], NX = 6, NY = 4;
-  const at = (i: number, j: number): number[] => {
-    const x = i / NX - 0.5, y = (j / NY) * 1.3 - 0.3; // its foot well under the water, riding the swell or not
-    return [x, y, 0.3 * Math.max(y, 0) - 0.55 * Math.max(y, 0) ** 2];
+// The white water as a low bore lying along the reef: a grid along it (x) and across it (aU: 0 its front foot under
+// the water, 0.3 the crest, 1 its spent tail on the reef; past 1 the spray flung off the crest). The vertex shader lays
+// its section (BORE) as each set rears, spills and slumps; the rest shape here keeps the bounds. All within the kit's
+// unit box (x and z in ±0.5), so a part's footprint is its scale. `spray` adds the spray's rows (near the eye only).
+function spillKit(nx: number, nu: number, spray: boolean): THREE.BufferGeometry {
+  const pos: number[] = [], us: number[] = [], rows = nu + (spray ? 2 : 0);
+  const at = (i: number, j: number): void => {
+    const x = i / nx - 0.5, u = j <= nu ? j / nu : 1 + (j - nu) * 0.25;
+    const s = Math.max(0, (Math.min(u, 1) - 0.3) / 0.7), z = u < 0.3 ? 0.3 : 0.3 - 0.8 * s, y = u < 0.3 ? u / 0.3 : 1 - s;
+    pos.push(x, y + Math.max(0, u - 1), z);
+    us.push(u);
   };
-  for (let j = 0; j < NY; j++) {
-    for (let i = 0; i < NX; i++) pos.push(...at(i, j), ...at(i + 1, j), ...at(i + 1, j + 1), ...at(i, j), ...at(i + 1, j + 1), ...at(i, j + 1));
+  for (let j = 0; j < rows; j++) {
+    if (spray && j === nu) continue; // the spray stands free of the tail
+    for (let i = 0; i < nx; i++) for (const [a, b] of [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]) at(a, b);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aU', new THREE.Float32BufferAttribute(us, 1));
   return g;
 }
 
-const SPILL_VERT = /* glsl */ `
-uniform float uSeaLevel, uTime;
-varying vec3 vWorld;
-varying vec2 vAt; // u along the sheet (offset per sheet) and up from the water
-varying float vH, vPhase, vDist, vSeed, vEnd;
-void main() {
-  vEnd = position.x;
-  vec3 o = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
-  wp.xyz += normalize(o) * uSeaLevel;
-  vSeed = fract(sin(dot(floor(o * 4.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-  float sx = length(instanceMatrix[0].xyz), sy = length(instanceMatrix[1].xyz);
-  vAt = vec2(position.x * sx + 7.0 * vSeed, position.y * sy);
-  vH = sy;
-  vWorld = wp.xyz;
-  // the sets peel along the reef (a slow drift of phase with place), each sheet a little apart from its neighbours
-  vPhase = uTime / 7.5 + dot(o, vec3(0.031, 0.047, 0.023)) + 0.1 * vSeed;
-  vDist = distance(wp.xyz, cameraPosition);
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}`;
-
-const SPILL_FRAG = /* glsl */ `
-uniform vec3 uFoam, uFace;
-varying vec3 vWorld;
-varying vec2 vAt;
-varying float vH, vPhase, vDist, vSeed, vEnd;
-float h1(float x) { return fract(sin(x * 91.7 + 13.1) * 43758.5453); }
+const BORE = /* glsl */ `
 float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float n3(vec3 p) {
   vec3 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}`;
+
+const SPILL_VERT = /* glsl */ `
+uniform float uSeaLevel, uTime;
+in float aU;
+varying vec3 vWorld, vN;
+varying vec2 vAt; // u along the bore (offset per part) and up from the water
+varying float vU, vPhase, vDist, vSeed, vEnd, vH;
+${BORE}
+// the bore's section at u, the crest at zc and its height h (kit units: z seaward, y up): a rounded front rolling down
+// to its foot under the water, the white water behind it sloping away over the reef to a thin spent tail; past u = 1
+// the spray, flung up and back off the crest
+vec2 section(float u, float zc, float h) {
+  if (u < 0.3) { float a = u / 0.3 * 1.5707963; return vec2(zc + 0.17 * cos(a), h * (-0.25 + 1.25 * sin(a))); }
+  if (u > 1.0) { float s = u - 1.0; return vec2(zc - 0.12 - 0.5 * s, h * (1.0 + 1.6 * s)); }
+  float s = (u - 0.3) / 0.7;
+  return vec2(mix(zc, -0.5, s), h * mix(0.04, 1.0, (1.0 - s) * (1.0 - s) * (1.0 + 2.0 * s)));
 }
-// the white water's top: rounded rolls of foam (u), drawn as an engraver draws them, each a bulging arc
-float rolls(float x, float size, float seed) {
-  float c = floor(x / size), top = 0.0;
-  for (int k = -1; k <= 1; k++) {
-    float ci = c + float(k), r = size * (0.55 + 0.45 * h1(ci + seed)), cx = (ci + 0.5 + 0.35 * (h1(ci * 1.7 + seed) - 0.5)) * size;
-    float dx = x - cx;
-    top = max(top, sqrt(max(r * r - dx * dx, 0.0)) + size * 0.9 * h1(ci * 3.1 + seed));
-  }
-  return top;
+vec3 shape(float x, float u, vec3 o, mat3 B, float ph, float set) {
+  float rise = smoothstep(0.0, 0.14, ph), slump = smoothstep(0.16, 0.8, ph);
+  // the crest rolls in over the reef as it spills; the line is lumpy along its length (the rolls of foam, the same
+  // across neighbouring parts), its ends sink into the neighbours'
+  float zc = mix(0.3, 0.02, slump);
+  float lumps = n3((o + B * vec3(x, 0.0, 0.0)) * 2.2 + vec3(set * 3.1));
+  float h = mix(0.45, 1.0, rise) * mix(1.0, 0.3, slump) * (0.75 + 0.5 * lumps) * sqrt(1.0 - smoothstep(0.28, 0.5, abs(x)));
+  vec2 zy = section(u, zc, h);
+  return vec3(x, zy.y, zy.x);
 }
 void main() {
-  // a set: the crest rears green and spills (phase 0–0.14), the white water stands, tumbles and slumps (to 0.75), then
-  // lies low and lacy on the reef until the next
+  vEnd = position.x;
+  vU = aU;
+  mat4 M = modelMatrix * instanceMatrix;
+  vec3 o = (M * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vSeed = fract(sin(dot(floor(o * 4.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  // the sets peel along the reef (a slow drift of phase with place), each part a little apart from its neighbours
+  vPhase = uTime / 7.5 + dot(o, vec3(0.031, 0.047, 0.023)) + 0.06 * vSeed;
+  float ph = fract(vPhase), set = floor(vPhase);
+  mat3 B = mat3(M);
+  vec3 p = shape(position.x, aU, o, B, ph, set);
+  vec3 px = shape(position.x + 0.02, aU, o, B, ph, set), pu = shape(position.x, aU + (aU < 1.0 ? 0.02 : 0.05), o, B, ph, set);
+  vN = normalize(cross(B * (px - p), B * (pu - p)));
+  vec4 wp = M * vec4(p, 1.0);
+  wp.xyz += normalize(o) * uSeaLevel;
+  float sx = length(instanceMatrix[0].xyz), sy = length(instanceMatrix[1].xyz);
+  vAt = vec2(position.x * sx + 7.0 * vSeed, p.y * sy);
+  vH = sy;
+  vWorld = wp.xyz;
+  vDist = distance(wp.xyz, cameraPosition);
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+
+const SPILL_FRAG = /* glsl */ `
+uniform vec3 uFoam, uFace;
+varying vec3 vWorld, vN;
+varying vec2 vAt;
+varying float vU, vPhase, vDist, vSeed, vEnd, vH;
+${BORE}
+void main() {
+  // a set: the crest rears green and spills (phase 0–0.14), the white water tumbles in over the reef and slumps (to
+  // 0.8), then lies low and lacy until the next
   float ph = fract(vPhase), set = floor(vPhase), rise = smoothstep(0.0, 0.14, ph), slump = smoothstep(0.16, 0.8, ph);
-  float H = vH * mix(0.4, 1.0, rise) * mix(1.0, 0.35, slump), x = vAt.x, y = vAt.y;
-  // a sheet's two ends taper into its neighbours'
-  float ends = sqrt(1.0 - smoothstep(0.34, 0.5, abs(vEnd) + 0.08 * (n3(vWorld * 2.0) - 0.5)));
-  float top = 0.45 * H + 0.55 * H * rolls(x + 0.12 * uTime, 0.32, set * 7.3 + vSeed * 50.0) / 0.55
-            + 0.2 * H * (n3(vWorld * 1.3 + vec3(set)) - 0.5);
-  top *= ends;
-  float aa = max(fwidth(y), 1e-4);
-  float body = 1.0 - smoothstep(top - aa, top + aa, y);
-  // lace: round holes opening in the white water toward the top and as it slumps
-  float holes = smoothstep(0.62, 0.7, n3(vWorld * 8.0 + vec3(0.3 * uTime, set, 0.0))) * smoothstep(0.35, 0.9, y / max(top, 1e-3)) * mix(0.5, 1.0, slump);
-  // spray flung up off the spilling crest
-  float spray = step(0.82, n3(vWorld * 14.0 + vec3(0.0, -2.0 * uTime, set))) * (1.0 - slump) * rise
-              * smoothstep(top, top + 0.04, y) * (1.0 - smoothstep(top + 0.04, top + 0.6 * vH, y));
-  // the broken ink of the rolls' tops
-  float edge = (1.0 - smoothstep(0.6 * aa, 1.8 * aa, abs(y - top + 1.2 * aa))) * step(0.42, n3(vec3(x * 6.0, set, vSeed * 9.0)));
-  float a = max(max(body * (1.0 - 0.85 * holes), 0.7 * spray), 0.8 * edge);
+  float u = vU, y = vAt.y, x = vAt.x;
+  vec3 n = normalize(vN), v = normalize(cameraPosition - vWorld);
+  float nv = abs(dot(n, v)), ndl = dot(n, uSun);
+  float a;
+  vec3 col;
+  Paper q = paperPlain(vWorld, n);
+  if (u > 1.0) {
+    // spray: flecks flung off the spilling crest and carried back over it by the wind, gone as it slumps
+    float s = (u - 1.0) / 0.5, fl = n3(vWorld * vec3(13.0, 6.0, 13.0) + vec3(0.0, -2.5 * uTime, set));
+    a = smoothstep(0.74, 0.8, fl) * (1.0 - s) * rise * (1.0 - smoothstep(0.1, 0.45, ph)) * 0.85;
+    col = mix(parchment(q), uFoam, 0.7);
+  } else {
+    // the white water in streaks along the reef, densest along the crest; ahead of it the face's water glazed green
+    // with foam running down it; behind it lace opening into holes and threads, more as it slumps; its top and ends
+    // ragged and soft, never a cut edge
+    float along = vAt.x, lumpy = n3(vWorld * 9.0 + vec3(set));
+    float streak = n3(vec3(along * 1.1, u * 7.0 + y * 5.0, set * 5.3 + vSeed)) + 0.45 * n3(vec3(along * 3.7, u * 19.0 + y * 13.0, set));
+    float lace = n3(vWorld * 6.0 + vec3(0.3 * uTime, set, 0.0)) + 0.35 * n3(vWorld * 15.0 + vec3(set));
+    float crest = smoothstep(0.08, 0.24, u) * (1.0 - smoothstep(0.42, 0.7, u));
+    float tail = smoothstep(0.38, 0.7, u);
+    float dense = mix(mix(0.62, 1.05, crest), 0.5, tail) - 0.3 * slump;
+    float white = smoothstep(1.32 - dense - 0.06, 1.32 - dense + 0.06, 0.55 * streak + 0.45 * lace + 0.2 * crest);
+    float face = (1.0 - rise * 0.7) * (1.0 - slump) * (1.0 - smoothstep(0.12, 0.3, u)) * smoothstep(-0.1, 0.05, y);
+    float ragged = smoothstep(0.0, 0.3, nv + 0.35 * (lumpy - 0.5)) * (1.0 - smoothstep(0.3, 0.5, abs(vEnd) + 0.12 * (lumpy - 0.5)));
+    a = max(white, 0.45 * face) * ragged * (1.0 - smoothstep(0.8, 1.0, u)) * smoothstep(-0.12, 0.0, y);
+    // the paper left white with a body of lead white, a soft cool shade on the side from the sun and under the rolls,
+    // hatched only in the deepest of it; the face's thin green glaze, hatched along its fall
+    col = mix(parchment(q) * 1.02, uFoam, 0.6);
+    float tone = lightTone(ndl, nv);
+    col = mix(col, wash(col, uShade, 0.7), 0.55 * smoothstep(0.25, 0.9, tone));
+    col = mix(col, uFace, (1.0 - white) * 0.8 + 0.25 * (1.0 - smoothstep(0.0, 0.08, y)));
+    vec2 c = vec2(x * 9.0 + y * 4.0, y * 9.0 - x * 2.0);
+    float hat = hatching(c, dFdx(c), dFdy(c), 0.5 * smoothstep(0.5, 1.0, tone) + 0.45 * face * (1.0 - white), 7.0);
+    col = mix(col, hatchInk(0.3), 0.3 * hat);
+    // a broken pen line now and then along the rolls' tops where the white water turns from the eye
+    float edge = (1.0 - smoothstep(0.08, 0.2, nv)) * step(0.58, n3(vec3(x * 4.0, set, vSeed * 9.0))) * crest * white;
+    col = mix(col, hatchInk(0.5), edge * 0.6);
+  }
   if (a < 0.03) discard;
-  Paper q = paperPlain(vWorld, normalize(vWorld));
-  // the paper left white with a body of lead white; at its foot and while the crest rears, the green face glazed thin
-  // and hatched along its fall; the shade under the rolls hatched
-  vec3 col = mix(parchment(q) * 1.02, uFoam, 0.6);
-  float face = (1.0 - rise * 0.85) * (1.0 - slump) * (1.0 - smoothstep(0.2 * top, 0.7 * top, y)) * body;
-  col = mix(col, uFace, 0.55 * face + 0.15 * (1.0 - smoothstep(0.0, 0.12, y)) * body);
-  vec2 c = vec2(x * 9.0 + y * 4.0, y * 9.0 - x * 2.0);
-  float shade = 0.45 * face + 0.3 * (1.0 - smoothstep(0.0, 0.3 * top, y)) + 0.2 * smoothstep(0.6, 0.8, n3(vWorld * 3.0 + vec3(set)));
-  float hat = hatching(c, dFdx(c), dFdy(c), shade, 7.0);
-  col = mix(col, hatchInk(0.3), 0.3 * hat * body);
-  col = mix(col, hatchInk(0.5), edge * 0.8);
   writeVeil(col, min(a, 0.96) * (1.0 - smoothstep(40.0, 62.0, vDist)));
 }`;
 
@@ -725,7 +764,7 @@ export function planCoral(field: TerrainField): CoralPlan {
       const gy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5)), gl = Math.hypot(gx, gy);
       if (gl < 1e-4) continue;
       // the break, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
-      for (const [back, tall] of [[0, 0.42 + 0.25 * sr()], [1.1, 0.25 + 0.15 * sr()]]) {
+      for (const [back, tall] of [[0, 0.3 + 0.16 * sr()], [1.1, 0.16 + 0.08 * sr()]]) {
         const bx = px - (back * gx) / gl, by = py - (back * gy) / gl, d = chartDir(RI, bx, by), ground = heightAt(geo, d);
         if (back > 0 && ground > TIDE.amp * 0.5) continue;
         const at = lift(d, -0.04), sy = tall * (0.6 + 0.4 * loud);
@@ -758,6 +797,8 @@ export class CoralAtolls {
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), drawn only while dry] */
   private readonly near: [Draw, Part[], number, number, boolean][];
+  /** The break's draws (near, far): white water only where the reef under it is awash. */
+  private readonly spills: Draw[];
   private drawn = NaN;
   private readonly swell: Swell;
   private readonly seen = vec(1e9, 0, 0);
@@ -795,7 +836,8 @@ export class CoralAtolls {
     // the break standing off the reef near the eye (past ~60 u the sea's own ribbon of white is the surf)
     this.spillMaterial = inkMaterial(style, { vertexShader: SPILL_VERT, fragmentShader: SPILL_FRAG, veil: true, side: THREE.DoubleSide,
       uniforms: { uSeaLevel: swell.uniforms.uSeaLevel, uFoam: { value: linearVec(PIGMENTS.leadWhite) }, uFace: { value: linearVec(PIGMENTS.verdigris) } } });
-    this.near.push([new Draw(spillKit(), this.spillMaterial, plan.spill.length), plan.spill, 0, 62, false]);
+    this.spills = [new Draw(spillKit(10, 7, true), this.spillMaterial, plan.spill.length), new Draw(spillKit(5, 4, false), this.spillMaterial, plan.spill.length)];
+    this.near.push([this.spills[0], plan.spill, 0, CORAL.drawn, false], [this.spills[1], plan.spill, CORAL.drawn, 62, false]);
     this.group.add(...this.draws.map((d) => d.mesh));
   }
 
@@ -812,10 +854,11 @@ export class CoralAtolls {
     this.seen.copy(eye);
     this.drawn = level;
     for (const [d, parts, from, to, dry] of this.near) {
+      const wet = this.spills.includes(d);
       d.begin();
       for (const p of parts) {
         const r2 = eye.distanceToSquared(p.at);
-        if (r2 >= from * from && r2 < to * to && (!dry || p.ground > level - 0.02)) d.add(p.m);
+        if (r2 >= from * from && r2 < to * to && (!dry || p.ground > level - 0.02) && (!wet || p.ground < level - 0.08)) d.add(p.m);
       }
       d.end();
     }

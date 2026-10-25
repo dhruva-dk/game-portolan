@@ -591,8 +591,10 @@ void main() {
         face = max(face, smoothstep(-0.55 - 0.3 * broke, -0.05, lineD) * step(lineD, 0.0) * smoothstep(4.0, 1.6, sk) * (1.0 - broke) * run);
         swellInk = max(swellInk, (1.0 - smoothstep(0.5, 1.3, abs(lineD) / fwY / uRenderPx)) * smoothstep(7.0, 5.5, sk) * (1.0 - smoothstep(3.5, 1.8, sk)) * run);
       }
-      // the break far off: one ribbon along the reef's edge, broken where the reef bends
-      float ribbon = (1.0 - smoothstep(0.9, 1.9, abs(s - 0.4))) * smoothstep(0.32, 0.45, vnoise(xs / 3.0));
+      // the break far off: one ribbon along the reef's edge, broken only now and then (a line, never specks)
+      // (no thinner than a few px from high)
+      float rw = max(0.9, 5.0 * upx);
+      float ribbon = (1.0 - smoothstep(rw, rw + 1.0 + upx, abs(s - 0.4))) * smoothstep(0.2, 0.34, vnoise(xs / 3.0));
       surf = mix(ribbon * 0.85, surf, detail) * exposed;
       face *= exposed * detail;
       swellInk *= exposed * detail * near;
