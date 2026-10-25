@@ -5,21 +5,23 @@
 // won) written in one by one with the quill; the nine rivals' fates as roundels in their captains' pigments; the rank
 // points inking onto the portolan wind rose (Greco to Tramontana) with a promotion lettered in vermilion; the league
 // table sliding to its new order; the seas first named and, on the first voyage, the lessons learned. A tap finishes
-// the writing; "To harbour" goes on. Everything is read from MatchResult, the career before and after, and the Voyage.
+// the writing; "The next voyage" turns the page to the nine captains the player will face next, each with its card
+// (part B), and "To harbour" goes on. Everything is read from MatchResult, the career before and after, and the Voyage.
+// While the player's ship is gone and the match plays out on the chart, the skip card (part B) says how she sank and
+// how many sail on, and goes straight to the results.
 import * as THREE from 'three';
 import { RANK, tierOf, type Career } from '../career/state.ts';
 import { toLetter, type Voyage } from '../career/voyage.ts';
-import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
+import { drop, emblemSheet, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
 import type { MatchResult } from '../sim/end.ts';
 import { EVENT, SHIPS, TICK, type Entry } from '../sim/state.ts';
 import { REGIONS } from '../sim/world/regions.ts';
 import { NAMED_PIGMENTS } from '../style/palette.ts';
-import { captainCard, leagueRows } from './cards.ts';
-import { kite } from './careerChart.ts';
+import { captainCard, leagueRows, nineCards, type Card } from './cards.ts';
 import { itemName } from './chestChoice.ts';
 import { INK, nib, pouch, ring, shipGlyph, strongbox, wash } from './icons.ts';
 import {
-  GOLD, GOLD_DARK, MIN_TARGET, OCHRE, ORDINALS, PAPER, SEPIA, VERDIGRIS, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, rgba, safeOf, scrap,
+  GOLD, GOLD_DARK, MIN_TARGET, OCHRE, ORDINALS, PAPER, SEPIA, VERDIGRIS, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, kite, letter, rgba, safeOf, scrap,
   type G,
 } from './inkpage.ts';
 import type { Rect, View } from './safeArea.ts';
@@ -73,20 +75,35 @@ export interface ResultsModel {
   /** LESSONs done this match (the first voyage). */
   lessons: number[];
   firstVoyage: boolean;
+  /** The nine captains of the next voyage, nearest the new rank first, each with its card. */
+  next: Card[];
+}
+
+/** Ship `ship`'s captain as the page names it: `drawn` are the league ids of ships 1–9 (toSetup). */
+const shipName = (c: Career, drawn: readonly number[], ship: number): string =>
+  ship === 0 ? 'you' : ship > 0 && ship < SHIPS && drawn[ship - 1] !== undefined ? captainCard(c, drawn[ship - 1]).name : 'the sea';
+
+/** How a ship went down, `by` the ship that sank it (−1 none) of a CAUSE (end.ts sink). */
+export function fateWords(c: Career, drawn: readonly number[], by: number, cause: number): string {
+  const by_ = lower(shipName(c, drawn, by));
+  return by === 0 ? 'Sunk by you' : by > 0 && cause >= 0 && cause <= 2 ? `Sunk by ${by_}'s ${CAUSE_WORDS[cause]}` : by > 0 ? `Sunk by ${by_}` : `Lost to ${CAUSE_WORDS[cause] ?? 'the sea'}`;
 }
 
 /** The page's content: `drawn` are the league ids of ships 1–9 (toSetup), `after` = applyResult(before, result, voyage). */
 export function resultsModel(before: Career, after: Career, result: MatchResult, drawn: readonly number[], voyage?: Voyage): ResultsModel {
   const me = result.ships[0];
-  const nameOf = (ship: number): string => (ship === 0 ? 'you' : ship > 0 && ship < SHIPS && drawn[ship - 1] !== undefined ? captainCard(before, drawn[ship - 1]).name : 'the sea');
-  const sunkBy = (by: number, cause: number): string =>
-    by === 0 ? 'Sunk by you' : by > 0 && cause >= 0 && cause <= 2 ? `Sunk by ${lower(nameOf(by))}'s ${CAUSE_WORDS[cause]}` : by > 0 ? `Sunk by ${lower(nameOf(by))}` : `Lost to ${CAUSE_WORDS[cause] ?? 'the sea'}`;
+  const nameOf = (ship: number): string => shipName(before, drawn, ship);
+  const sunkBy = (by: number, cause: number): string => fateWords(before, drawn, by, cause);
   const won = me.place === 1, ending = won ? 'Last afloat as the storm closed' : sunkBy(me.by, me.cause);
   const lineOf = (e: Entry): TimelineLine | null => {
     const key = EVENT_KEY[e.kind] ?? '', mine = e.ship === 0;
     let text: string, tone: TimelineLine['tone'] = 'plain';
     switch (key) {
-      case 'home': text = voyage && voyage.breakOff >= 0 ? `Broke off into ${lower(REGIONS[voyage.breakOff].name)}` : 'Broke off and inked a home'; tone = 'good'; break;
+      case 'breakOff': text = REGIONS[e.by] ? `Broke off into ${lower(REGIONS[e.by].name)}` : 'Broke off the Great Current'; tone = 'good'; break;
+      case 'thrown': text = 'Thrown off the end of the Great Current'; break;
+      case 'home': text = `Inked a home, ${Math.round(e.amount)} of sea`; tone = 'good'; break;
+      case 'lead': if (mine) { text = 'Took the gold pennant'; tone = 'good'; } else { text = e.ship > 0 ? `${cap(lower(nameOf(e.ship)))} took the pennant from you` : 'The pennant came down'; tone = 'bad'; } break;
+      case 'engage': text = `A fight with ${lower(nameOf(e.by))}`; break;
       case 'loop': text = `Closed a loop, ${Math.round(e.amount)} of sea`; tone = 'good'; break;
       case 'broken': if (mine) { text = `${cap(lower(nameOf(e.by)))} broke your trail`; tone = 'bad'; } else { text = `Broke ${lower(nameOf(e.ship))}'s trail`; tone = 'good'; } break;
       case 'chosen': text = `Chose the ${itemName(e.by)}`; break;
@@ -94,7 +111,7 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
       case 'sunk': if (mine) { text = sunkBy(e.by, Math.round(e.amount)); tone = 'bad'; } else { text = `Sank ${lower(nameOf(e.ship))}`; tone = 'good'; } break;
       default:
         if (!key) return null;
-        text = /pennant/i.test(key) ? (mine ? 'Took the gold pennant' : `${cap(lower(nameOf(e.ship)))} took the pennant`) : /find|found|treasure|scoop/i.test(key) ? 'Took a find' : cap(key.replace(/([A-Z])/g, ' $1').toLowerCase());
+        text = /find|found|treasure|scoop/i.test(key) ? 'Took a find' : cap(key.replace(/([A-Z])/g, ' $1').toLowerCase());
         tone = mine ? 'good' : 'plain';
     }
     return { tick: e.tick, clock: clock(e.tick), text, tone };
@@ -118,13 +135,13 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
     place: me.place, won, ending, claimed: Math.round(me.claimed), sank: me.sank, bank: Math.round(me.bank), treasure: Math.round(me.treasure), timeline, fates,
     rank: { before: pb, after: pa, tierBefore: tierOf(pb), tierAfter: ta, wind: RANK.winds[ta - 1], promoted: after.player.tier > before.player.tier, perTier: RANK.tier },
     league, named: voyage ? toLetter(before, voyage).map((n) => REGIONS[n.region].name) : [],
-    lessons: voyage ? voyage.lessons.flatMap((t, k) => (t >= 0 ? [k] : [])) : [], firstVoyage: before.match === 0,
+    lessons: voyage ? voyage.lessons.flatMap((t, k) => (t >= 0 ? [k] : [])) : [], firstVoyage: before.match === 0, next: nineCards(after),
   };
 }
 
 export interface ResultsLayout { view: View; page: Rect; left: Rect; mid: Rect; right: Rect; rose: { x: number; y: number; r: number }; cont: Rect; k: number }
 
-/** Three columns on the page: the place and the rose, the voyage, the league; "To harbour" at the foot of the third. */
+/** Three columns on the page: the place and the rose, the voyage, the league; "The next voyage" at the foot of the third. */
 export function resultsLayout(view: View): ResultsLayout {
   const page = inset(safeOf(view), 6), k = Math.max(1, Math.min(1.45, page.height / 408)), pad = 16 * k, gap = 14 * k;
   const iw = page.width - 2 * pad - 2 * gap, ih = page.height - 2 * pad, x0 = page.x + pad, y0 = page.y + pad, lw = iw * 0.27, mw = iw * 0.4, rw = iw - lw - mw;
@@ -133,8 +150,9 @@ export function resultsLayout(view: View): ResultsLayout {
   return { view, page, left, mid, right, rose: { x: x0 + lw / 2, y: y0 + 106 * k + r, r }, cont: { x: right.x + rw - bw, y: y0 + ih - bh, width: bw, height: bh }, k };
 }
 
-/** Seconds until everything is written. */
+/** Seconds until everything is written: the results, the next voyage's page. */
 export const RESULTS_END = 6.4;
+export const NEXT_END = 2.6;
 
 export function drawResults(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   const { page, k } = l;
@@ -148,7 +166,56 @@ export function drawResults(g: G, m: ResultsModel, l: ResultsLayout, t: number):
   drawTimeline(g, m, l, t - 1.2);
   drawFates(g, m, l, t - 3.4);
   drawLeague(g, m, l, t - 3.6);
-  inkButton(g, l.cont, 'To harbour', k, clamp01((t - 1.4) / 0.6));
+  inkButton(g, l.cont, 'The next voyage', k, clamp01((t - 1.4) / 0.6));
+}
+
+export interface NextLayout { view: View; page: Rect; cells: Rect[]; cont: Rect; k: number }
+
+/** The next voyage's page: the heading and "To harbour" across the top, the nine cards three by three beneath. */
+export function nextLayout(view: View): NextLayout {
+  const page = inset(safeOf(view), 6), k = Math.max(1, Math.min(1.45, page.height / 408)), pad = 14 * k, gap = 8 * k;
+  const bh = Math.max(MIN_TARGET, 46 * k), bw = Math.min(190 * k, page.width * 0.3), head = bh + 12 * k;
+  const x0 = page.x + pad, y0 = page.y + pad + head, cw = (page.width - 2 * pad - 2 * gap) / 3, ch = (page.y + page.height - pad - y0 - 2 * gap) / 3;
+  const cells = Array.from({ length: 9 }, (_, i) => ({ x: x0 + (i % 3) * (cw + gap), y: y0 + Math.floor(i / 3) * (ch + gap), width: cw, height: ch }));
+  return { view, page, cells, cont: { x: page.x + page.width - pad - bw, y: page.y + pad, width: bw, height: bh }, k };
+}
+
+/** The nine captains of the next voyage written in, `t` s after the page turned; `emblems` by card, drawn by the caller. */
+export function drawNextNine(g: G, m: ResultsModel, l: NextLayout, t: number, emblems: readonly (CanvasImageSource | null)[] = []): void {
+  const { page, k } = l;
+  scrap(g, page, 5201, { alpha: ease(t / 0.3) });
+  inkRect(g, inset(page, 7 * k), 5202, clamp01(t / 0.7), SEPIA, 1.3 * k);
+  const hy = l.cont.y + l.cont.height / 2, x = page.x + 16 * k;
+  letter(g, 'The next voyage', x, hy - 6 * k, { size: 26 * k, valign: 'middle', swash: true }, INK, clamp01(t / 0.8));
+  letter(g, `The nine captains nearest your rank, ${m.rank.wind}`, x + 4 * k, hy + 16 * k, { size: 13 * k, valign: 'middle' }, SEPIA, clamp01((t - 0.3) / 0.6));
+  m.next.forEach((c, i) => { if (l.cells[i]) drawCaptain(g, c, l.cells[i], k, clamp01((t - 0.35 - i * 0.12) / 0.6), emblems[i] ?? null, 5300 + i * 7); });
+  inkButton(g, l.cont, 'To harbour', k, clamp01((t - 1) / 0.6));
+}
+
+/** One captain's card: its emblem, name and meaning, temperament, form and wind, what it remembers of you. */
+function drawCaptain(g: G, c: Card, r: Rect, k: number, p: number, emblem: CanvasImageSource | null, seed: number): void {
+  if (p <= 0) return;
+  const u = Math.min(12 * k, r.height / 8.6), pad = 7 * k, ew = u * 2.3, eh = u * 2.8, x = r.x + pad + 2 * k, mw = r.width - 2 * pad - ew - 6 * k;
+  g.save();
+  g.globalAlpha *= ease(p / 0.5);
+  scrap(g, r, seed, { tint: '#f4e9d0', shadow: false });
+  g.restore();
+  inkRect(g, inset(r, 3 * k), seed + 1, p, pigmentHex(c.pigments[0]), 1.1 * k);
+  if (emblem) {
+    g.save();
+    g.globalAlpha *= p;
+    g.drawImage(emblem, r.x + r.width - pad - ew, r.y + pad, ew, eh);
+    g.restore();
+  }
+  let y = r.y + pad + u * 0.85;
+  letter(g, c.name, x, y, { size: u * 1.5, valign: 'middle', swash: true, maxWidth: mw }, INK, p);
+  y += u * 1.45;
+  letter(g, `“${c.meaning}”`, x, y, { size: u * 0.95, valign: 'middle', maxWidth: mw }, SEPIA, p);
+  y += u * 1.3;
+  letter(g, `${c.temperament} · ${c.form} · ${c.wind}`, x, y, { size: u, valign: 'middle', maxWidth: r.width - 2 * pad }, INK, p);
+  y += u * 0.75;
+  letter(g, c.line, x, y, { size: u * 0.95, valign: 'top', maxWidth: r.width - 2 * pad, lineHeight: 1.12 }, c.record === c.line ? SEPIA : VERMILION, p);
+  if (c.record !== c.line) letter(g, c.record, x, r.y + r.height - pad, { size: u * 0.9, valign: 'bottom', maxWidth: r.width - 2 * pad }, SEPIA, p);
 }
 
 function drawPlace(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
@@ -198,12 +265,20 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   cells.forEach(([n, label], i) => {
     const p = clamp01((t - i * 0.25) / 0.6), cx = M.x + cw * (i + 0.5);
     if (p <= 0) return;
-    if (i === 0) {
-      wash(g, VERDIGRIS, 0.35 * p, (gg) => gg.rect(cx - s * 0.4, y - s * 0.4, s * 0.8, s * 0.8));
-      for (let j = 0; j < 5; j++) nib(g, [[cx - s * 0.4 + j * s * 0.2, y + s * 0.4], [cx - s * 0.4 + j * s * 0.2 + s * 0.2, y - s * 0.4]], 0.8 * k, p, INK);
+    if (i === 0) { // a patch of sea claimed, as the chart draws one: washed, hatched inside its line
+      const edge = ring(cx, y, s * 0.6, 23, -Math.PI / 2, Math.PI * 2, 18).map(([x, yy], j): [number, number] => { const f = 1 + 0.12 * Math.sin(j * 2.3); return [cx + (x - cx) * f, y + (yy - y) * f * 0.8]; });
+      const patch = (gg: G): void => { gg.moveTo(...edge[0]); for (const q of edge) gg.lineTo(...q); gg.closePath(); };
+      wash(g, VERDIGRIS, 0.4 * p, patch);
+      g.save();
+      g.beginPath();
+      patch(g);
+      g.clip();
+      for (let j = -3; j <= 3; j++) nib(g, [[cx + j * s * 0.17 - s * 0.35, y + s * 0.5], [cx + j * s * 0.17 + s * 0.35, y - s * 0.5]], 0.7 * k, p, INK, 0.6);
+      g.restore();
+      nib(g, edge, 1.3 * k, p, INK);
     } else if (i === 1) shipGlyph(g, cx, y, s, p);
     else if (i === 2) strongbox(g, cx, y, s, p);
-    else pouch(g, cx, y, s, Math.max(1, n), p);
+    else pouch(g, cx, y - 0.12 * s, s * 0.82, 200, p); // a full purse's size, clear of its figure
     const q = Math.min(1, Math.round(ease((t - i * 0.25) / 1.2) * 12) / 12);
     letter(g, String(Math.round(n * q)), cx, y + 30 * k, { size: 21 * k, align: 'center', valign: 'middle' }, INK, 1, p);
     letter(g, label, cx, y + 50 * k, { size: 12 * k, align: 'center', valign: 'middle' }, SEPIA, p);
@@ -212,7 +287,7 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
 
 function drawTimeline(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   if (t <= 0) return;
-  const M = l.mid, k = l.k, top = M.y + 98 * k, row = 21 * k, foot = (m.named.length || (m.firstVoyage && m.lessons.length) ? 22 * k : 0);
+  const M = l.mid, k = l.k, top = M.y + 108 * k, row = 21 * k, foot = (m.named.length || (m.firstVoyage && m.lessons.length) ? 22 * k : 0);
   const bottom = M.y + M.height - 62 * k - foot;
   letter(g, 'The voyage', M.x, top - 18 * k, { size: 18 * k, valign: 'middle', swash: true }, INK, clamp01(t / 0.8));
   const fit = Math.max(2, Math.floor((bottom - top) / row));
@@ -298,6 +373,10 @@ export class ResultsSheet {
   private acc = 0;
   private line = -1;
   private raised = false;
+  /** The leaf up: 0 the results, 1 the next voyage (written in from `t` = 0 again). */
+  private leaf = 0;
+  private nl: NextLayout | null = null;
+  private emblems: HTMLCanvasElement[] = [];
 
   readonly model: ResultsModel;
   private readonly onContinue: () => void;
@@ -310,8 +389,15 @@ export class ResultsSheet {
     cue('page');
   }
 
+  /** The leaf up (0 the results, 1 the next voyage) and where its button is. */
+  get page(): number { return this.leaf; }
+  get button(): Rect | null { return this.leaf === 0 ? this.l?.cont ?? null : this.nl?.cont ?? null; }
+
   layout(view: View): void {
     drop(this.group);
+    this.nl = nextLayout(view);
+    const u = Math.min(12 * this.nl.k, this.nl.cells[0].height / 8.6);
+    this.emblems = this.model.next.map((c) => emblemSheet(u * 2.3, u * 2.8, c.pigments, c.emblem, view.dpr).canvas);
     const l = this.l = resultsLayout(view);
     this.sheet = sheet(l.page.width, l.page.height, 3_000_000, view.dpr);
     this.mesh = sheetMesh(this.sheet);
@@ -323,18 +409,33 @@ export class ResultsSheet {
 
   touch(t: Touch): boolean {
     if (t.phase !== 'up' || this.l === null) return true;
-    if (this.t < RESULTS_END) {
-      this.t = RESULTS_END;
+    const end = this.leaf === 0 ? RESULTS_END : NEXT_END, b = this.button;
+    if (this.t < end) {
+      this.t = end;
       this.cue('tap');
       this.redraw();
-    } else if (inside(this.l.cont, t.x, t.y)) {
-      this.cue('confirm');
-      this.onContinue();
+    } else if (b && inside(b, t.x, t.y)) {
+      if (this.leaf === 1) {
+        this.cue('confirm');
+        this.onContinue();
+        return true;
+      }
+      this.leaf = 1;
+      this.t = this.acc = 0;
+      this.cue('page');
+      this.redraw();
     }
     return true;
   }
 
   frame(dt: number): void {
+    if (this.leaf === 1) {
+      if (this.t >= NEXT_END + 0.5) return;
+      this.t += dt;
+      this.acc += dt;
+      if (this.acc >= 1 / 30 || this.t >= NEXT_END) { this.acc = 0; this.redraw(); }
+      return;
+    }
     if (this.t >= RESULTS_END + 0.5) return;
     this.t += dt;
     const line = Math.floor((this.t - 1.5) / 0.32);
@@ -361,10 +462,116 @@ export class ResultsSheet {
     s.g.clearRect(0, 0, s.w, s.h);
     s.g.save();
     s.g.translate(-l.page.x, -l.page.y);
-    drawResults(s.g, this.model, l, this.t);
+    if (this.leaf === 1 && this.nl) drawNextNine(s.g, this.model, this.nl, this.t, this.emblems);
+    else drawResults(s.g, this.model, l, this.t);
     s.g.restore();
     if (m.material.map) m.material.map.needsUpdate = true;
   }
 }
 
 export const RESULTS_GOLD = GOLD;
+
+export interface SkipLayout { card: Rect; button: Rect; k: number }
+
+/** The skip card at the foot of the safe area, clear of the chart's middle; its button at the right. */
+export function skipLayout(view: View): SkipLayout {
+  const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), w = Math.min(s.width - 16, 470 * k), h = Math.max(MIN_TARGET + 20, 66 * k);
+  const card = { x: s.x + (s.width - w) / 2, y: s.y + s.height - h - 6 * k, width: w, height: h };
+  const bw = 176 * k, bh = Math.max(MIN_TARGET, 46 * k);
+  return { card, button: { x: card.x + w - bw - 10 * k, y: card.y + (h - bh) / 2, width: bw, height: bh }, k };
+}
+
+/** How she sank, how many sail on while the match plays out on the chart, and the way straight to the results. */
+export function drawSkip(g: G, l: SkipLayout, ending: string, afloat: number, rushing: boolean, t: number): void {
+  const { card: c, k } = l, p = clamp01(t / 0.6), x = c.x + 16 * k, mw = l.button.x - x - 10 * k;
+  if (p <= 0) return;
+  g.save();
+  g.globalAlpha *= ease(p);
+  scrap(g, c, 5401, { tint: '#f4e9d0' });
+  g.restore();
+  inkRect(g, inset(c, 5 * k), 5402, p, SEPIA, 1.2 * k);
+  letter(g, ending, x, c.y + c.height * 0.36, { size: 17 * k, valign: 'middle', swash: true, maxWidth: mw }, VERMILION, p);
+  const sail = afloat === 1 ? 'One ship sails on' : `${afloat} ships sail on`;
+  letter(g, rushing ? 'The rest of the match is resolved' : `${sail}; the match plays out on the chart`, x, c.y + c.height * 0.7, { size: 12.5 * k, valign: 'middle', maxWidth: mw }, SEPIA, clamp01((t - 0.3) / 0.6));
+  inkButton(g, l.button, rushing ? 'Resolving' : 'To the results', k, clamp01((t - 0.4) / 0.5), rushing ? SEPIA : INK);
+}
+
+/** The sinking flow's card (PROMPT.md, Sinking and the end): up once the player's ship is gone; its button skips. */
+export class SkipCard {
+  readonly group = new THREE.Group();
+  private sheet: Sheet | null = null;
+  private mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private l: SkipLayout | null = null;
+  private view: View | null = null;
+  private t = 0;
+  private finger = -1;
+  private words = { ending: '', afloat: 0, rushing: false };
+  private readonly onSkip: () => void;
+  private readonly cue: (c: ResultsCue) => void;
+
+  constructor(onSkip: () => void, cue: (c: ResultsCue) => void = () => {}) {
+    this.onSkip = onSkip;
+    this.cue = cue;
+  }
+
+  /** Where the button is (null until laid out). */
+  get button(): Rect | null { return this.l?.button ?? null; }
+
+  layout(view: View): void {
+    this.view = view;
+    drop(this.group);
+    const l = this.l = skipLayout(view);
+    this.sheet = sheet(l.card.width, l.card.height, 600_000, view.dpr);
+    this.mesh = sheetMesh(this.sheet);
+    this.mesh.position.set(l.card.x + l.card.width / 2, l.card.y + l.card.height / 2, 0);
+    this.mesh.renderOrder = 30;
+    this.group.add(this.mesh);
+    this.redraw();
+  }
+
+  /** What the card says; redrawn when it changes. */
+  set(ending: string, afloat: number, rushing: boolean): void {
+    const w = this.words;
+    if (w.ending === ending && w.afloat === afloat && w.rushing === rushing) return;
+    this.words = { ending, afloat, rushing };
+    this.redraw();
+  }
+
+  touch(t: Touch): boolean {
+    const b = this.l?.button;
+    if (!b) return false;
+    if (t.phase === 'down') {
+      if (this.finger >= 0 || !inside(b, t.x, t.y)) return false;
+      this.finger = t.id;
+      return true;
+    }
+    if (t.id !== this.finger) return false;
+    if (t.phase === 'up' || t.phase === 'cancel') {
+      this.finger = -1;
+      if (t.phase === 'up' && inside(b, t.x, t.y) && !this.words.rushing) {
+        this.cue('confirm');
+        this.onSkip();
+      }
+    }
+    return true;
+  }
+
+  frame(dt: number): void {
+    if (this.t > 1) return;
+    this.t += dt;
+    this.redraw();
+  }
+
+  dispose(): void { drop(this.group); }
+
+  private redraw(): void {
+    const s = this.sheet, l = this.l, m = this.mesh;
+    if (!s || !l || !m || !this.view) return;
+    s.g.clearRect(0, 0, s.w, s.h);
+    s.g.save();
+    s.g.translate(-l.card.x, -l.card.y);
+    drawSkip(s.g, l, this.words.ending, this.words.afloat, this.words.rushing, this.t);
+    s.g.restore();
+    if (m.material.map) m.material.map.needsUpdate = true;
+  }
+}

@@ -2,15 +2,17 @@
 // the background and coming back. The boot (main.ts), the screens and the test hooks drive the game through it.
 import type { Lettering } from '../lettering/ink.ts';
 import type { Pipeline } from '../render/pipeline.ts';
+import { draw } from '../career/league.ts';
 import { applyResult } from '../career/progress.ts';
 import { toSetup } from '../career/setup.ts';
 import { newCareer, type Career } from '../career/state.ts';
+import { newVoyage, observe, toLetter, type Voyage } from '../career/voyage.ts';
 import { over, result } from '../sim/end.ts';
 import { seaFor } from '../sim/environment.ts';
 import type { MatchState } from '../sim/state.ts';
 import { idleInput, type Recording, type ShipInput } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
-import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
+import { Shell, type Outcome, type Runtime, type ScreenName } from '../ui/shell.ts';
 import { Loop, type Stepper } from './loop.ts';
 import { clearMatch, saveCareer, saveMatch, type SavedMatch } from './save.ts';
 import { Session } from './session.ts';
@@ -19,6 +21,12 @@ import { applySettings, onSettings, settings } from '../ui/settings.ts';
 import type { World, WorldMessage } from './worldWorker.ts';
 
 const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0];
+/** WP27: ms of stepping a frame while the rest of a match is resolved for the results (the player skipped). */
+const RUSH_MS = 30;
+
+/** The voyage brought the career chart something new to ink: seas, a region's name or a loot site. */
+const news = (before: Career, v: Voyage): boolean =>
+  v.seen.some((b, i) => (b & ~before.chart.seen[i]) !== 0) || toLetter(before, v).length > 0 || v.found.some((f, k) => f > 0 && before.chart.found[k] === 0);
 
 export class Game implements Runtime {
   readonly pipeline: Pipeline;
@@ -34,6 +42,9 @@ export class Game implements Runtime {
   onTick: ((s: MatchState) => void) | null = null;
   /** The career (WP10): set sail fits out its next match, and a voyage's result comes home when its match ends. */
   career: Career | null = null;
+  /** WP27: the player's voyage in this match, watched after every tick (null for a replay), and the last one home. */
+  voyage: Voyage | null = null;
+  outcome: Outcome | null = null;
   /** The world has arrived and the screen the game opens on is up. */
   ready = false;
   /** Milliseconds from navigation start to the first frame of the title, and what the world cost. */
@@ -50,6 +61,7 @@ export class Game implements Runtime {
     this.loop = new Loop((f) => {
       this.shell.frame(f);
       if (this.shell.paused !== held) { held = this.shell.paused; this.loop.paused = held; }
+      this.loop.rate = this.shell.rate;
       this.audio?.frame(f.dt, this.session?.state ?? null);
       if (this.perf.startup === 0) {
         this.perf.startup = performance.now();
@@ -78,6 +90,11 @@ export class Game implements Runtime {
     this.play({ state: createMatch(setup), recording, stopAt });
   }
 
+  /** The player has sunk: the rest of the match is resolved as fast as the frames allow (PROMPT.md, Sinking and the end). */
+  skip(): void {
+    if (this.session && !over(this.session.state)) this.loop.rush = RUSH_MS;
+  }
+
   show(name: Exclude<ScreenName, 'match'>): void {
     this.end();
     this.shell.go(name);
@@ -102,25 +119,39 @@ export class Game implements Runtime {
   private play(m: SavedMatch): void {
     if (!this.world) throw new Error('play: the world has not arrived');
     this.session = new Session(seaFor(this.world, m.state.seed), m, () => (this.input ?? idleInput)()); // the match controls (WP25) set `input`
+    this.voyage = m.recording === null ? newVoyage() : null; // a resumed match is watched from where it resumed
     this.audio?.startMatch(this.session.sea);
     this.loop.run(this.stepper(this.session));
     this.shell.go('match');
     void clearMatch(); // a saved match is spent once it plays again, and a new match replaces it
   }
 
-  /** The session as the loop steps it, its events heard after every tick (WP28). */
+  /** The session as the loop steps it, the voyage watched (WP27) and its events heard after every tick (WP28). */
   private stepper(session: Session): Stepper {
-    const audio = this.audio;
-    return { step: () => { const moved = session.step(); if (moved) { audio?.tick(session.state); this.onTick?.(session.state); } return moved; } };
+    const audio = this.audio, voyage = this.voyage;
+    return {
+      step: () => {
+        const moved = session.step();
+        if (moved) {
+          if (voyage) observe(voyage, session.sea, session.state);
+          audio?.tick(session.state);
+          this.onTick?.(session.state);
+        }
+        return moved;
+      },
+    };
   }
 
   private end(): void {
     if (!this.session) return;
-    const { state, recording } = this.session;
-    if (this.career && recording === null && over(state)) { // a voyage the player sailed: its result comes home, saved on the device
-      this.career = applyResult(this.career, result(state));
+    const { state, recording } = this.session, voyage = this.voyage;
+    if (this.career && recording === null && voyage && over(state)) { // a voyage the player sailed: its result comes home, saved on the device
+      const before = this.career, r = result(state);
+      this.career = applyResult(before, r, voyage);
+      this.outcome = { before, after: this.career, result: r, drawn: draw(before), voyage, charted: !news(before, voyage) };
       void saveCareer(this.career);
     }
+    this.voyage = null;
     this.audio?.endMatch();
     this.session = null;
     this.loop.run(null);

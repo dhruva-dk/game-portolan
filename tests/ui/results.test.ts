@@ -15,11 +15,15 @@ import { step } from '../../src/sim/match.ts';
 import { afloat, createMatch } from '../../src/sim/state.ts';
 import { CONSUMABLE, FITTING, FITTING_SLOT, TIERS } from '../../src/sim/tables.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
-import { careerChartData } from '../../src/ui/careerChart.ts';
+import { careerChartData, regionCells, unrollMask } from '../../src/ui/careerChart.ts';
+import { draw } from '../../src/career/league.ts';
+import { CHART_GRID } from '../../src/career/voyage.ts';
+import { cellDir } from '../../src/sim/sphere.ts';
+import { v3 } from '../../src/sim/math.ts';
 import { cardLines } from './results.lines.ts';
 import { chestLayout, chestOffers, chestPick, pickAt } from '../../src/ui/chestChoice.ts';
 import { MIN_TARGET, safeOf, within } from '../../src/ui/inkpage.ts';
-import { resultsLayout, resultsModel } from '../../src/ui/results.ts';
+import { nextLayout, resultsLayout, resultsModel, skipLayout } from '../../src/ui/results.ts';
 import { newTutorial, promptLayout, sense, tutorialOver, tutorialStep, type Moment } from '../../src/ui/tutorial.ts';
 import { world } from '../sim/vectors.ts';
 import { inkChart, madeMatch } from './results.fixtures.ts';
@@ -182,5 +186,32 @@ test('every sheet fits the safe area of the iPhone and the iPad, with targets of
       assert.ok(within(p.card, s), `lesson ${k}`);
       assert.ok(p.card.height >= MIN_TARGET);
     }
+    // part B: the next voyage's page, the skip card, the stowed chest's chip beside the compact chart
+    const n = nextLayout(view);
+    assert.ok(within(n.page, s) && within(n.cont, n.page) && n.cont.width >= MIN_TARGET && n.cont.height >= MIN_TARGET);
+    assert.equal(n.cells.length, 9);
+    assert.ok(n.cells.every((c) => within(c, n.page) && c.y >= n.cont.y + n.cont.height));
+    const k = skipLayout(view);
+    assert.ok(within(k.card, s) && within(k.button, k.card) && k.button.width >= MIN_TARGET && k.button.height >= MIN_TARGET);
   }
 });
+
+test('part B: the results end with the next voyage’s nine, and the chart inks a voyage’s seas in the order it entered them', () => {
+  const before = newCareer(5), result = madeMatch(3), voyage = newVoyage(), { drawn } = toSetup(before, 3);
+  const after = applyResult(before, result, voyage), m = resultsModel(before, after, result, drawn, voyage);
+  assert.deepEqual(m.next.map((c) => c.id), draw(after));
+  voyage.entered[4] = 90;
+  voyage.entered[7] = 600;
+  const mask = unrollMask(voyage.entered), region = regionCells(), mean = (r: number): number => {
+    let sum = 0, n = 0;
+    region.forEach((q, cell) => { if (q === r) { const { x, y } = cellBin(cell); sum += mask[y * 360 + x]; n++; } });
+    return sum / n;
+  };
+  assert.ok(mean(4) < mean(7) && mean(7) < mean(1), `${mean(4).toFixed(2)} < ${mean(7).toFixed(2)} < ${mean(1).toFixed(2)}`);
+});
+
+/** A chart cell's bin on the 360 × 180 plate (careerChart.ts). */
+function cellBin(cell: number): { x: number; y: number } {
+  const d = cellDir(CHART_GRID, cell, v3()), len = Math.hypot(d.x, d.y, d.z);
+  return { x: Math.min(359, Math.floor(((Math.atan2(d.z, d.x) + Math.PI) / (2 * Math.PI)) * 360)), y: Math.min(179, Math.floor(((Math.PI / 2 - Math.asin(d.y / len)) / Math.PI) * 180)) };
+}

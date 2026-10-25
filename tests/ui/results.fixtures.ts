@@ -7,7 +7,7 @@ import { FITTING } from '../../src/sim/tables.ts';
 import { regionCells } from '../../src/ui/careerChart.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
 
-/** A finished match with the player at `place`: it broke off, closed loops, lost a trail to ship 3, chose long guns, broke ship 6's trail, sank ship 4, and (placed) was sunk by ship 5. */
+/** A finished match with the player at `place`: it broke off into region 2 and inked its home, closed loops, lost a trail to ship 3, chose long guns, broke ship 6's trail, sank ship 4, and (placed) was sunk by ship 5. */
 export function madeMatch(place: number): MatchResult {
   const order = Array.from({ length: SHIPS - 1 }, (_, i) => i + 1);
   order.splice(place - 1, 0, 0);
@@ -17,6 +17,7 @@ export function madeMatch(place: number): MatchResult {
   })).sort((a, b) => a.ship - b.ship);
   const me = ships[0];
   const timeline = [
+    { tick: 120, kind: EVENT.breakOff, ship: 0, by: 2, amount: 40 },
     { tick: 140, kind: EVENT.home, ship: 0, by: -1, amount: 310 },
     { tick: 900, kind: EVENT.loop, ship: 0, by: -1, amount: 420 },
     { tick: 1500, kind: EVENT.broken, ship: 0, by: 3, amount: 40 },

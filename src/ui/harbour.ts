@@ -23,8 +23,9 @@ import type { Rect, View } from './safeArea.ts';
 import { STEPS, applySettings, onSettings, setSettings, setUiSound, settings, uiSound, type Settings, type UiSound } from './settings.ts';
 import type { Runtime, Screen, ScreenContext } from './shell.ts';
 
-/** WP27 seam: the career chart's view, drawn into the ledger's body when the player unrolls it. */
-export type ChartPage = (ctx: ScreenContext, body: Rect, career: Career) => THREE.Object3D;
+/** WP27 seam: the career chart's view, drawn into the ledger's body when the player unrolls it; its frame(dt), once the
+ *  ledger is open, inks in what the last voyage brought. */
+export type ChartPage = (ctx: ScreenContext, body: Rect, career: Career) => THREE.Object3D & { frame?(dt: number): void };
 let chartPage: ChartPage | null = null;
 export const setChartPage = (f: ChartPage | null): void => { chartPage = f; };
 
@@ -65,10 +66,11 @@ export function harbour(ctx: ScreenContext): Screen {
   const live = (): boolean => !!holder.career;
   let shown = holder.career;
 
-  let view: View | null = null, page: Page = 'home', L: HarbourLayout | null = null, H: HarbourLayout | null = null;
+  // WP27: home from a voyage that brought the chart something new, the harbour opens on the chart as it inks it in
+  let view: View | null = null, page: Page = rt.outcome?.charted === false ? 'chart' : 'home', L: HarbourLayout | null = null, H: HarbourLayout | null = null;
   let art: HarbourArt | null = null, artKey = '';
   let seal: THREE.Group | null = null, sealPress = 0, sealDown = false;
-  let clock = 0, unroll = 1;
+  let clock = 0, unroll = page === 'home' ? 1 : 0, chartLeaf: ReturnType<ChartPage> | null = null;
   let h3: Harbour3D | null = null, h3Wait = false, h3Frames = 0, disposed = false; // WP26c the 3D harbour, built lazily
   let note: InkText | null = null, noteAt = -9;
   let finger: { id: number; target: Target } | null = null;
@@ -131,6 +133,7 @@ export function harbour(ctx: ScreenContext): Screen {
 
   function buildLeaf(fresh: boolean): void {
     drop(leaf);
+    chartLeaf = null;
     note = null;
     leaf.scale.set(1, 1, 1);
     leaf.position.set(0, 0, 0);
@@ -196,7 +199,7 @@ export function harbour(ctx: ScreenContext): Screen {
         });
         break;
       case 'chart': {
-        if (chartPage) { leaf.add(chartPage(ctx, B, c)); break; }
+        if (chartPage) { leaf.add(chartLeaf = chartPage(ctx, B, c)); break; }
         const inked = chartInked(c), pct = inked.length ? Math.round(inked.reduce((a, b) => a + b, 0) / inked.length / 10) : 0;
         text(leaf, `Your portolan: ${pct}% of the world inked`, { size: 22 * s, align: 'center', valign: 'middle' }, cx, B.y + B.height * 0.4);
         text(leaf, 'Every coast you sight is drawn in; sail, and the chart fills.', { size: 16 * s, align: 'center', valign: 'middle', opacity: 0.8 }, cx, B.y + B.height * 0.56);
@@ -360,6 +363,7 @@ export function harbour(ctx: ScreenContext): Screen {
         for (const m of seal.children) ((m as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = ready ? 1 - 0.12 * sealPress : 0.45;
       }
       unroll = Math.min(1, unroll + f.dt / 0.34);
+      if (unroll >= 1) chartLeaf?.frame?.(f.dt);
       const e = 1 - Math.pow(1 - unroll, 3);
       if (L?.ledger) {
         leaf.scale.y = Math.max(0.03, e);

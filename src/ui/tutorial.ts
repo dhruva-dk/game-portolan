@@ -19,14 +19,14 @@ import type { Touch } from './shell.ts';
 /** Seconds: the first prompt waits `open`; a prompt stays at least `hold`, at most `wait` (`hurry` with an urgent one due); `gap` between calm ones; a rival within `near` u is in range. */
 export const TUTORIAL = { open: 4, hold: 3, wait: 16, hurry: 7, gap: 2, near: 30 } as const;
 
-export type Anchor = 'stick' | 'chart' | 'gull' | 'deck' | 'guns' | 'storm';
+export type Anchor = 'stick' | 'home' | 'gull' | 'deck' | 'guns' | 'storm';
 /** By LESSON, the words and the control they point at. */
 export const PROMPTS: readonly { readonly words: string; readonly sub: string; readonly anchor: Anchor }[] = [
   { words: 'Leave the current', sub: 'steer out of the stream', anchor: 'stick' },
   { words: 'Steer with your thumb', sub: 'the sails set your speed', anchor: 'stick' },
-  { words: 'Close a loop', sub: 'sail home to claim the sea', anchor: 'chart' },
+  { words: 'Close a loop', sub: 'sail home to claim the sea', anchor: 'home' },
   { words: 'Call the gull', sub: 'it brings a chest', anchor: 'gull' },
-  { words: 'Choose one', sub: '', anchor: 'deck' },
+  { words: 'Touch the one you want', sub: '', anchor: 'deck' }, // the sheet itself is headed "Choose one"
   { words: 'Fire a broadside', sub: 'turn your side to them', anchor: 'guns' },
   { words: 'Run from the storm', sub: 'keep inside the calm', anchor: 'storm' },
 ];
@@ -122,16 +122,19 @@ export interface PromptLayout {
   k: number;
 }
 
-/** Where the scrap and its arrow go for a lesson (the WP25 HUD's thumb zones, mirrored for the left-handed). */
-export function promptLayout(view: View, lesson: number, leftHanded = false): PromptLayout {
+/** Where the controls are on screen (the match screen gives the HUD's own layout, part B). */
+export type Anchors = Partial<Record<Anchor, { x: number; y: number }>>;
+
+/** Where the scrap and its arrow go for a lesson: at `anchors`' control, else the WP25 HUD's thumb zones, mirrored for the left-handed. */
+export function promptLayout(view: View, lesson: number, leftHanded = false, anchors: Anchors = {}): PromptLayout {
   const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), a = PROMPTS[lesson].anchor;
   const fx = (f: number): number => s.x + s.width * (leftHanded ? 1 - f : f);
-  const at = a === 'stick' ? { x: fx(0.13), y: s.y + s.height * 0.74 }
+  const at = anchors[a] ?? (a === 'stick' ? { x: fx(0.13), y: s.y + s.height * 0.74 }
     : a === 'guns' ? { x: fx(0.87), y: s.y + s.height * 0.74 }
     : a === 'gull' ? { x: fx(0.87), y: s.y + s.height * 0.42 }
-    : a === 'chart' ? { x: fx(0.9), y: s.y + s.height * 0.16 }
+    : a === 'home' ? { x: fx(0.95), y: s.y + s.height * 0.6 }
     : a === 'storm' ? { x: s.x + s.width * 0.5, y: s.y + 26 * k }
-    : { x: s.x + s.width / 2, y: s.y + s.height / 2 };
+    : { x: s.x + s.width / 2, y: s.y + s.height / 2 });
   const w = 300 * k, h = (PROMPTS[lesson].sub ? 80 : 56) * k;
   let cx = at.x + (s.x + s.width / 2 - at.x) * 0.55, cy = at.y + (s.y + s.height * 0.42 - at.y) * 0.55;
   if (a === 'deck') {
@@ -187,6 +190,8 @@ export class TutorialOverlay {
   private t = 0;
   private acc = 0;
   private tick = 0;
+  private anchors: Anchors = {};
+  private finger = -1; // the finger that landed on the scrap
 
   readonly state: Tutorial;
   private readonly leftHanded: boolean;
@@ -197,6 +202,10 @@ export class TutorialOverlay {
     this.leftHanded = leftHanded;
     this.cue = cue;
   }
+
+  /** The lesson whose prompt is up (−1 none) and its scrap, which a tap folds. */
+  get showing(): number { return this.shown; }
+  get card(): Rect | null { return this.pl?.card ?? null; }
 
   update(match: MatchState, v: Voyage): number {
     this.tick = match.tick;
@@ -210,16 +219,28 @@ export class TutorialOverlay {
     return k;
   }
 
-  layout(view: View): void {
+  /** The view, and where its controls are (the HUD's layout). */
+  layout(view: View, anchors: Anchors = {}): void {
     this.view = view;
+    this.anchors = anchors;
     this.rebuild();
   }
 
+  /** True when the prompt took the touch: a finger that landed on its scrap, to its end; a tap there folds it. */
   touch(t: Touch): boolean {
-    if (this.pl === null || t.phase !== 'up' || !inside(this.pl.card, t.x, t.y)) return false;
-    dismiss(this.state, this.tick);
-    this.shown = -1;
-    this.rebuild();
+    if (t.phase === 'down') {
+      if (this.finger >= 0 || this.pl === null || !inside(this.pl.card, t.x, t.y)) return false;
+      this.finger = t.id;
+      return true;
+    }
+    if (t.id !== this.finger) return false;
+    if (t.phase === 'move') return true;
+    this.finger = -1;
+    if (t.phase === 'up' && this.pl !== null && inside(this.pl.card, t.x, t.y)) {
+      dismiss(this.state, this.tick);
+      this.shown = -1;
+      this.rebuild();
+    }
     return true;
   }
 
@@ -242,7 +263,7 @@ export class TutorialOverlay {
     drop(this.group);
     this.mesh = this.sheet = this.pl = null;
     if (this.shown < 0 || this.view === null) return;
-    const pl = this.pl = promptLayout(this.view, this.shown, this.leftHanded), b = pl.bounds;
+    const pl = this.pl = promptLayout(this.view, this.shown, this.leftHanded, this.anchors), b = pl.bounds;
     this.sheet = sheet(b.width, b.height, 900_000, this.view.dpr);
     this.mesh = sheetMesh(this.sheet);
     this.mesh.position.set(b.x + b.width / 2, b.y + b.height / 2, 0);

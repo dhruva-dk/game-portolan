@@ -1,6 +1,7 @@
 // The frame loop. The match advances in fixed TICK steps paid for out of an accumulator of real time, at most
 // MAX_CATCH_UP a frame, so after a stall the match slows instead of spiralling; the simulation never sees the
-// frame time. Frames draw between the last two ticks at the interpolation alpha. The render clock that world
+// frame time. Once the player has sunk the match may run faster than the wall clock (rate) or be resolved as fast as
+// the frames allow (rush). Frames draw between the last two ticks at the interpolation alpha. The render clock that world
 // animations read stops while the match is paused (the chart is open) or the app is in the background, so spray
 // hangs and smoke stands still. Rendering reads the match and never feeds back into it.
 import { TICK } from '../sim/state.ts';
@@ -36,6 +37,11 @@ export class Loop {
   speed: number | null = null;
   /** Tests: draw at most this many frames a second; null for every display frame. */
   frameRate: number | null = null;
+  /** Match seconds per wall second (WP27: the match plays out faster on the chart once the player has sunk). */
+  rate = 1;
+  /** WP27: resolve the match as fast as the frames allow, stepping up to this many ms a frame (the skip to the
+   *  results); null: paced by real time. */
+  rush: number | null = null;
   clock = 0;
   /** Frames drawn, main-thread milliseconds of the last one, and the ticks of the current match and their times. */
   readonly perf = { frames: 0, frame: 0, tickMean: 0, tickMax: 0, ticks: 0 };
@@ -57,6 +63,8 @@ export class Loop {
     this.sim = sim;
     this.acc = 0;
     this.alpha = 1;
+    this.rate = 1;
+    this.rush = null;
     Object.assign(this.perf, { tickMean: 0, tickMax: 0, ticks: 0 });
   }
 
@@ -89,23 +97,35 @@ export class Loop {
   };
 
   private advance(dt: number): void {
+    if (this.rush !== null) {
+      const until = performance.now() + this.rush;
+      do if (!this.step()) return; while (performance.now() < until);
+      this.alpha = 1;
+      return;
+    }
     const budget = this.speed ?? MAX_CATCH_UP;
-    if (this.speed === null) this.acc += dt;
+    if (this.speed === null) this.acc += dt * this.rate;
     let n = 0;
     while (n < budget && (this.speed !== null || this.acc >= TICK)) {
-      const t0 = performance.now();
-      if (!this.sim!.step()) {
-        this.acc = 0;
-        this.alpha = 1;
-        return;
-      }
-      this.time(performance.now() - t0);
+      if (!this.step()) return;
       if (this.speed === null) this.acc -= TICK;
       n++;
     }
     if (this.speed !== null) this.acc = TICK;
     else if (n === budget) this.acc = Math.min(this.acc, TICK); // what could not be made up is dropped
     this.alpha = this.acc / TICK;
+  }
+
+  /** One tick, timed; false (and the accumulator emptied) once the match goes no further. */
+  private step(): boolean {
+    const t0 = performance.now();
+    if (!this.sim!.step()) {
+      this.acc = 0;
+      this.alpha = 1;
+      return false;
+    }
+    this.time(performance.now() - t0);
+    return true;
   }
 
   private time(ms: number): void {

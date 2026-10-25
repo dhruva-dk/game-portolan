@@ -1,22 +1,29 @@
-// WP27 shots page: one part-A sheet drawn full screen on a 2D canvas at the device's size (results.shots.ts):
-// ?shot=chest|chest-gold|results|results-mid|results-won|chart-0|chart-23|chart-100|lesson-<k>&dev=iphone|ipad
+// WP27 shots page: one sheet drawn full screen on a 2D canvas at the device's size and pixel ratio (results.shots.ts):
+// ?shot=chest|chest-gold|results|results-mid|results-won|chart-0|chart-23|chart-100|lesson-<k>&dev=iphone|ipad; part B:
+// next (the next voyage's nine), skip (the sinking flow's card), chart-geo-<0|23|100> (the world's coasts and sites),
+// unroll-<0|1|2|3> (the chart inking a voyage: start, the seas blooming, the names lettering, done); a `-close` suffix
+// on chest/chest-gold/results sets __wp27.clip to the icons or the tallies for a close-up.
 import { applyResult } from '../../src/career/progress.ts';
 import { toSetup } from '../../src/career/setup.ts';
-import { RANK, newCareer, tierOf } from '../../src/career/state.ts';
+import { inkChart as inkVoyage } from '../../src/career/learn.ts';
+import { RANK, copyCareer, newCareer, tierOf, type Career } from '../../src/career/state.ts';
 import { LESSON, newVoyage } from '../../src/career/voyage.ts';
-import { sheet } from '../../src/render/harbourScene.ts';
+import { emblemSheet, sheet } from '../../src/render/harbourScene.ts';
+import { buildGeography } from '../../src/sim/world/geography.ts';
 import { createMatch } from '../../src/sim/state.ts';
 import { CONSUMABLE, FITTING } from '../../src/sim/tables.ts';
-import { drawCareerChart } from '../../src/ui/careerChart.ts';
+import { UNROLL, drawCareerChart, drawUnroll, unrollOf } from '../../src/ui/careerChart.ts';
 import { chestLayout, chestOffers, drawChestChoice } from '../../src/ui/chestChoice.ts';
 import { rgba, type G } from '../../src/ui/inkpage.ts';
-import { drawResults, resultsLayout, resultsModel } from '../../src/ui/results.ts';
+import { drawNextNine, drawResults, drawSkip, nextLayout, resultsLayout, resultsModel, skipLayout } from '../../src/ui/results.ts';
 import { drawPrompt, promptLayout } from '../../src/ui/tutorial.ts';
 import { inkChart, madeMatch } from './results.fixtures.ts';
 
-const q = new URLSearchParams(location.search), shot = q.get('shot') ?? 'chest', dev = q.get('dev') ?? 'iphone';
-const view = dev === 'ipad' ? { width: 1376, height: 1032, dpr: 2, safe: { top: 24, right: 0, bottom: 20, left: 0 } } : { width: 956, height: 440, dpr: 2, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
-const s = sheet(view.width, view.height, 12_000_000, 2), g = s.g;
+const q = new URLSearchParams(location.search), full = q.get('shot') ?? 'chest', dev = q.get('dev') ?? 'iphone';
+const close = full.endsWith('-close'), shot = full.replace(/-close$/, ''), dpr = devicePixelRatio || 2;
+const view = dev === 'ipad' ? { width: 1376, height: 1032, dpr, safe: { top: 24, right: 0, bottom: 20, left: 0 } } : { width: 956, height: 440, dpr, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
+const s = sheet(view.width, view.height, 12_000_000, dpr), g = s.g;
+let clip: { x: number; y: number; width: number; height: number } | null = null;
 s.canvas.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:10';
 document.body.appendChild(s.canvas);
 
@@ -37,8 +44,13 @@ if (shot.startsWith('chest')) {
   ship.offer.length = 0;
   if (shot === 'chest-gold') ship.offer.push({ kind: FITTING.ironRam, tier: 4 }, { kind: FITTING.crowsNest, tier: 2 }, { kind: CONSUMABLE.fogFlask, tier: 3 });
   else ship.offer.push({ kind: FITTING.longGuns, tier: 3 }, { kind: FITTING.copperSheathing, tier: 2 }, { kind: CONSUMABLE.patchKit, tier: 1 });
-  drawChestChoice(g, chestOffers(ship), chestLayout(view), 3, -1, shot === 'chest-gold');
-} else if (shot.startsWith('results')) {
+  const l = chestLayout(view);
+  drawChestChoice(g, chestOffers(ship), l, 3, -1, shot === 'chest-gold');
+  if (close) clip = { x: l.cards[0].x - 6, y: l.sheet.y + 8, width: l.cards[2].x + l.cards[2].width - l.cards[0].x + 12, height: l.cards[0].y + l.cards[0].height * 0.62 - l.sheet.y };
+} else if (shot === 'skip') {
+  sea(g);
+  drawSkip(g, skipLayout(view), "Sunk by Lanza's guns", 6, false, 2);
+} else if (shot.startsWith('results') || shot === 'next') {
   const place = shot === 'results-won' ? 1 : 3, before = newCareer(17);
   before.match = 4;
   before.player.points = RANK.tier * 2 - 6;
@@ -50,18 +62,41 @@ if (shot.startsWith('chest')) {
   const after = applyResult(before, result, voyage);
   g.fillStyle = '#3e4d52';
   g.fillRect(0, 0, view.width, view.height);
-  drawResults(g, resultsModel(before, after, result, drawn, voyage), resultsLayout(view), shot === 'results-mid' ? 3.9 : 8);
-} else if (shot.startsWith('chart')) {
-  const c = newCareer(9), f = shot === 'chart-100' ? 1 : shot === 'chart-23' ? 2 / 3 : 0;
-  if (f > 0) {
-    inkChart(c, f, f >= 1 ? 99 : 5);
-    c.match = f >= 1 ? 61 : 14;
-    c.player.points = f >= 1 ? RANK.top : RANK.tier * 3 + 10;
-    c.player.tier = tierOf(c.player.points);
+  const m = resultsModel(before, after, result, drawn, voyage);
+  if (shot === 'next') {
+    const l = nextLayout(view), u = Math.min(12 * l.k, l.cells[0].height / 8.6);
+    drawNextNine(g, m, l, 4, m.next.map((c) => emblemSheet(u * 2.3, u * 2.8, c.pigments, c.emblem, dpr).canvas));
+  } else {
+    const l = resultsLayout(view);
+    drawResults(g, m, l, shot === 'results-mid' ? 3.9 : 8);
+    if (close) clip = { x: l.mid.x - 8, y: l.page.y + 6, width: l.mid.width + 16, height: 92 * l.k };
   }
-  drawCareerChart(g, c, view.width, view.height, 1);
+} else if (shot.startsWith('chart')) {
+  const f = shot.endsWith('-100') ? 1 : shot.endsWith('-23') ? 2 / 3 : 0;
+  drawCareerChart(g, inked(f), view.width, view.height, 1, { geo: shot.startsWith('chart-geo') ? buildGeography() : null });
+} else if (shot.startsWith('unroll-')) {
+  // a career a third inked with three seas named, home from a voyage that saw two thirds and entered two seas more
+  const before = inked(1 / 3, 3), seen = inked(2 / 3, 5), voyage = newVoyage();
+  voyage.seen.set(seen.chart.seen);
+  seen.chart.named.forEach((n, r) => { if (n.match >= 0 && before.chart.named[r].match < 0) voyage.entered[r] = 300 + 200 * n.match; });
+  const after = copyCareer(before);
+  inkVoyage(after, voyage);
+  after.match++;
+  const u = unrollOf(before, after, voyage, buildGeography(), view.width, view.height, dpr);
+  drawUnroll(g, u, [0, UNROLL.ink * 0.55, UNROLL.names + UNROLL.every * 0.9, u.end][Number(shot.slice(7))] ?? 0);
 } else if (shot.startsWith('lesson-')) {
   sea(g);
   drawPrompt(g, promptLayout(view, Number(shot.slice(7))), 3);
 }
-(window as unknown as { __wp27: { done: boolean } }).__wp27 = { done: true };
+/** A career whose chart is inked to `f`, with `named` regions named (all at f = 1), its rank to match. */
+function inked(f: number, named = f >= 1 ? 99 : 5): Career {
+  const c = newCareer(9);
+  if (f <= 0) return c;
+  inkChart(c, f, named);
+  c.match = f >= 1 ? 61 : 14;
+  c.player.points = f >= 1 ? RANK.top : RANK.tier * 3 + 10;
+  c.player.tier = tierOf(c.player.points);
+  return c;
+}
+
+(window as unknown as { __wp27: { done: boolean; clip: typeof clip } }).__wp27 = { done: true, clip };

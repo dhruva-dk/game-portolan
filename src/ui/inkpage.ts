@@ -241,3 +241,13 @@ export function quad(a: Pt, c: Pt, b: Pt, n = 16): Pt[] {
   }
   return out;
 }
+
+/** A compass point: a kite from the centre, one half dark and one light, as the rose painters shaded them. */
+export function kite(g: G, cx: number, cy: number, an: number, len: number, wid: number, dark: string, light: string, k: number): void {
+  const tip: [number, number] = [cx + Math.sin(an) * len, cy - Math.cos(an) * len];
+  const l: [number, number] = [cx + Math.sin(an - Math.PI / 2) * wid, cy - Math.cos(an - Math.PI / 2) * wid];
+  const r: [number, number] = [cx + Math.sin(an + Math.PI / 2) * wid, cy - Math.cos(an + Math.PI / 2) * wid];
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(...l); g.lineTo(...tip); g.closePath(); g.fillStyle = dark; g.fill();
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(...r); g.lineTo(...tip); g.closePath(); g.fillStyle = light; g.fill();
+  g.beginPath(); g.moveTo(...l); g.lineTo(...tip); g.lineTo(...r); g.strokeStyle = rgba(INK, 0.85); g.lineWidth = 0.7 * k; g.stroke();
+}

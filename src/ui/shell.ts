@@ -11,6 +11,10 @@ import type { Session } from '../app/session.ts';
 import type { World } from '../app/worldWorker.ts';
 import type { Lettering } from '../lettering/ink.ts';
 import type { Pipeline } from '../render/pipeline.ts';
+import type { GameAudio } from '../audio/soundscape.ts';
+import type { Career } from '../career/state.ts';
+import type { Voyage } from '../career/voyage.ts';
+import type { MatchResult } from '../sim/end.ts';
 import { readView, type View } from './safeArea.ts';
 import { harbour } from './harbour.ts'; // WP26
 import { match, results } from './screens.ts';
@@ -30,6 +34,25 @@ export interface Runtime {
   input?: (() => ShipInput) | undefined;
   /** WP25: hears every tick's state after it steps (the haptics feel each tick's events). */
   onTick?: ((s: MatchState) => void) | null;
+  /** WP27: the career, the sound (null until it wakes), the player's voyage in the match being sailed (watched after
+   *  every tick; null for a replay) and the match it last sailed as it came home (null before one). */
+  readonly career: Career | null;
+  readonly audio: GameAudio | null;
+  readonly voyage: Voyage | null;
+  readonly outcome: Outcome | null;
+  /** WP27: the player has sunk: the rest of the match is resolved as fast as the frames allow. */
+  skip(): void;
+}
+
+/** WP27: a match the player sailed, come home: the career before and after it, its result, the nine league captains
+ *  drawn for ships 1–9 and the voyage; `charted` once the career chart has inked what it brought (or it brought nothing). */
+export interface Outcome {
+  readonly before: Career;
+  readonly after: Career;
+  readonly result: MatchResult;
+  readonly drawn: readonly number[];
+  readonly voyage: Voyage;
+  charted: boolean;
 }
 
 export interface ScreenContext {
@@ -57,6 +80,8 @@ export interface Screen {
   touch(t: Touch): void;
   /** WP24: true while the screen holds the match still (the open chart): the loop stops the ticks and the render clock. */
   paused?(): boolean;
+  /** WP27: match seconds per wall second (the sinking's play-out on the chart); 1 when absent. */
+  rate?(): number;
   dispose(): void;
 }
 
@@ -104,6 +129,9 @@ export class Shell {
 
   /** The current screen holds the match still (WP24: the chart is open). */
   get paused(): boolean { return this.screen?.paused?.() ?? false; }
+
+  /** The current screen's pace for the match (WP27). */
+  get rate(): number { return this.screen?.rate?.() ?? 1; }
 
   frame(f: Frame): void {
     const s = this.screen!;

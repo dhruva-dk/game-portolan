@@ -5,15 +5,17 @@
 // in its slot, or the stack a consumable joins. A touch on a card chooses it as ShipInput.chestPick, the very index a
 // captain's bestPick() would give for that card; an offer the ship cannot take (its three stores full of other kinds) is
 // struck through and will not take a touch. The match never stops for the choice (the offers wait on deck until one is
-// chosen, items.ts), so "Later" folds the sheet away and the chest stays on deck until the player opens it again.
+// chosen, items.ts), so "Later" folds the sheet away and the chest stays on deck until the player opens it again from
+// a chip beside the compact chart: the chest in its tier's pigment, glowing (part B). The sheet takes only the touches
+// that land on its cards or "Later"; a thumb on the stick steers on beneath it.
 import * as THREE from 'three';
 import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
 import { OFFERS, bestPick, canTake, isConsumable, worth, type Item } from '../sim/items.ts';
 import type { Ship } from '../sim/state.ts';
-import { CONSUMABLE, FITTING, FITTING_SLOT, LOOT, TIERS } from '../sim/tables.ts';
-import { INK, TIER, consumableIcon, fittingIcon, nib, ring, wash } from './icons.ts';
+import { CONSUMABLE, FITTING, FITTING_SLOT, LOOT, SLOT, TIERS } from '../sim/tables.ts';
+import { INK, TIER, consumableIcon, mortarIcon, nib, ring, wash } from './icons.ts';
 import {
-  GOLD_DARK, MIN_TARGET, SEPIA, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, rgba, safeOf, scrap, type G,
+  GOLD_DARK, MIN_TARGET, OCHRE, PAPER, SEPIA, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, quad, rgba, safeOf, scrap, type G, type Pt,
 } from './inkpage.ts';
 import type { Rect, View } from './safeArea.ts';
 import type { Touch } from './shell.ts';
@@ -147,7 +149,7 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   nib(g, ring(cx, iy, s * 0.62, 31 + o.item.kind), 1.2 * k, clamp01((t - 0.1) / 0.6), o.gold ? GOLD_DARK : o.pigment);
   const pi = clamp01((t - 0.15) / 0.6);
   if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, s * 0.42, pi); // icons.ts sizes are half-extents
-  else fittingIcon(g, o.slot, o.item.kind, o.item.tier, cx, iy, s * 0.42, pi);
+  else cardIcon(g, o.slot, o.item.tier, cx, iy, s * 0.42, pi);
   const ny = iy + s * 0.55 + 20 * k, pt = clamp01((t - 0.3) / 0.8), wmax = c.width - 24 * k;
   letter(g, o.name, cx, ny, { size: 23 * k, align: 'center', valign: 'middle', maxWidth: wmax }, INK, pt);
   letter(g, o.consumable ? `${o.tierWord}, ${o.count} uses` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`, cx, ny + 24 * k,
@@ -165,7 +167,108 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   g.restore();
 }
 
-export type ChestCue = 'page' | 'tap' | 'confirm' | 'back';
+/** A fitting as the card engraves it, `h` its half-extent: the slot's thing drawn in fine line over a light wash of the
+ *  tier's pigment, its shade hatched (the HUD's small glyphs, icons.ts, would read as flat signs at this size). */
+function cardIcon(g: G, slot: number, tier: number, x: number, y: number, h: number, p: number): void {
+  if (p <= 0) return;
+  const w = 0.07 * h, P = (u: number, v: number): Pt => [x + u * h, y + v * h], line = (pts: Pt[], k = 1): void => nib(g, pts, w * k, p);
+  const shade = (path: (q: G) => void, n = 7): void => { // diagonal hatching inside a shape
+    g.save();
+    g.beginPath();
+    path(g);
+    g.clip();
+    for (let i = 0; i < n * 2; i++) { const u = -1 + i / n; nib(g, [P(u - 0.4, 1), P(u + 0.4, -1)], w * 0.45, p, INK, 0.5); }
+    g.restore();
+  };
+  wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.28 * p, (q) => q.arc(x, y, 0.95 * h, 0, Math.PI * 2));
+  const fill = (pts: Pt[]) => (q: G): void => { q.moveTo(...pts[0]); for (const pt of pts) q.lineTo(...pt); q.closePath(); };
+  switch (slot) {
+    case SLOT.hull: { // the hull in profile, planked, its sheathing plated below the waterline
+      const keel = [...quad(P(0.85, -0.32), P(0.6, 0.5), P(0.05, 0.48), 10), ...quad(P(0.05, 0.48), P(-0.55, 0.48), P(-0.82, -0.18), 10)];
+      wash(g, OCHRE, 0.5 * p, fill(keel));
+      shade(fill([P(-0.75, 0.08), P(0.8, 0.02), ...keel.slice(4, 18)]), 8);
+      line(keel, 1.4);
+      line([P(-0.82, -0.18), P(0.85, -0.32)], 1.4);
+      line(quad(P(-0.8, -0.04), P(0.1, 0.0), P(0.8, -0.14), 8), 0.7);
+      line(quad(P(-0.75, 0.08), P(0.1, 0.12), P(0.78, 0.02), 8), 1);
+      for (let i = 0; i < 6; i++) { const u = -0.5 + i * 0.2; line([P(u, 0.12), P(u + 0.02, 0.4)], 0.55); }
+      line([P(-0.1, -0.24), P(-0.1, -0.9)], 0.9);
+      break;
+    }
+    case SLOT.broadside: { // a long gun on its carriage
+      const barrel = [P(-0.75, -0.05), P(0.82, -0.3), P(0.84, -0.12), P(-0.72, 0.2)];
+      wash(g, INK, 0.25 * p, fill(barrel));
+      shade(fill([P(-0.73, 0.08), P(0.83, -0.21), P(0.84, -0.12), P(-0.72, 0.2)]), 6);
+      line([...barrel, barrel[0]], 1.2);
+      line(ring(x - 0.8 * h, y + 0.07 * h, 0.11 * h, 3), 1);
+      for (const u of [-0.25, 0.35]) line([P(u, -0.02 - (u + 0.75) * 0.16), P(u + 0.01, 0.12 - (u + 0.75) * 0.17)], 1.3);
+      line([P(-0.62, 0.22), P(-0.55, 0.5), P(0.4, 0.5), P(0.35, 0.05)], 1);
+      for (const u of [-0.42, 0.24]) { line(ring(x + u * h, y + 0.55 * h, 0.2 * h, 5), 1.1); line([P(u - 0.2, 0.55), P(u + 0.2, 0.55)], 0.5); }
+      break;
+    }
+    case SLOT.bow: { // a ram's beak, banded
+      const beak = [P(-0.8, -0.42), P(0.88, 0.02), P(-0.8, 0.44)];
+      wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.45 * p, fill(beak));
+      shade(fill([P(-0.8, 0.02), P(0.88, 0.02), P(-0.8, 0.44)]), 6);
+      line([...beak], 1.3);
+      line([P(-0.8, 0.02), P(0.88, 0.02)], 0.6);
+      for (const u of [-0.45, -0.1]) line([P(u, -0.42 + (u + 0.8) * 0.25 + 0.01), P(u, 0.44 - (u + 0.8) * 0.25 - 0.01)], 1.2);
+      line([P(-0.8, -0.6), P(-0.8, 0.62)], 1.4);
+      break;
+    }
+    case SLOT.stern: mortarIcon(g, x, y, h * 0.8, p, tier); break;
+    case SLOT.rig: { // a mast and its course, bellied by the wind
+      const sail = [...quad(P(-0.55, -0.55), P(-0.2, -0.15), P(-0.5, 0.3), 8), ...quad(P(0.5, 0.3), P(0.85, -0.15), P(0.55, -0.55), 8)];
+      wash(g, PAPER, 0.85 * p, fill(sail));
+      shade(fill([P(0.15, -0.55), ...quad(P(0.55, -0.55), P(0.85, -0.15), P(0.5, 0.3), 8), P(0.15, 0.3)]), 6);
+      line([...sail, sail[0]], 1);
+      line([P(0, -0.9), P(0, 0.85)], 1.5);
+      line([P(-0.62, -0.56), P(0.62, -0.56)], 1.2);
+      line([P(-0.56, 0.31), P(0.56, 0.31)], 1.2);
+      wash(g, VERMILION, 0.8 * p, fill([P(0, -0.9), P(0.42, -0.8), P(0, -0.72)]));
+      break;
+    }
+    default: { // the lookout's glass, drawn out
+      const tube = (a: number, b: number, r0: number, r1: number): Pt[] => [P(a, 0.4 - (a + 0.8) * 0.5 - r0), P(b, 0.4 - (b + 0.8) * 0.5 - r1), P(b, 0.4 - (b + 0.8) * 0.5 + r1), P(a, 0.4 - (a + 0.8) * 0.5 + r0)];
+      for (const [a, b, r0, r1] of [[-0.8, -0.25, 0.1, 0.12], [-0.25, 0.25, 0.14, 0.16], [0.25, 0.8, 0.19, 0.24]] as const) {
+        const t = tube(a, b, r0, r1);
+        wash(g, OCHRE, 0.45 * p, fill(t));
+        shade(fill([t[3], t[2], P(b, 0.4 - (b + 0.8) * 0.5), P(a, 0.4 - (a + 0.8) * 0.5)]), 5);
+        line([...t, t[0]], 1.1);
+      }
+      break;
+    }
+  }
+}
+
+/** What the choice sounds: the sheet unfolding, a refused touch, the pick, "Later", and a stowed chest opened again
+ *  (the chest's own sound, engine.chestOpen(tier)). */
+export type ChestCue = 'page' | 'tap' | 'confirm' | 'back' | 'open';
+
+/** The stowed chest's chip: a small scrap with a drawn chest (oak washed in ochre, planked and hatched, its iron bands
+ *  and the scrap's rule in the tier's pigment) in a glow, lettered "Chest". */
+export function drawChestChip(g: G, r: Rect, tier: number): void {
+  const k = r.height / 52, cx = r.x + r.width / 2, cy = r.y + r.height * 0.4, s = 15 * k, pig = TIER[Math.max(0, Math.min(TIERS - 1, tier))], top = tier >= TIERS - 1;
+  const band = top ? GOLD_DARK : pig;
+  scrap(g, inset(r, 2), 7101, { tint: '#f4e9d0' });
+  if (top) goldLeaf(g, inset(r, 2), 7102, 1, 3 * k);
+  else inkRect(g, inset(r, 5 * k), 7103, 1, pig, 1.4 * k);
+  const glow = g.createRadialGradient(cx, cy, 2, cx, cy, s * 2);
+  glow.addColorStop(0, rgba(tier === 0 ? OCHRE : pig, tier === 0 ? 0.3 : 0.5));
+  glow.addColorStop(1, rgba(tier === 0 ? OCHRE : pig, 0));
+  g.fillStyle = glow;
+  g.fillRect(cx - s * 2, cy - s * 2, s * 4, s * 4);
+  const y0 = cy - 0.1 * s, y1 = y0 + 0.85 * s, dome = ring(cx, y0, s, 7, -Math.PI, Math.PI, 16).map(([x, y]): [number, number] => [x, y0 + (y - y0) * 0.55]);
+  wash(g, OCHRE, 0.62, (q) => { q.rect(cx - s, y0, 2 * s, 0.85 * s); });
+  wash(g, OCHRE, 0.38, (q) => { q.moveTo(...dome[0]); for (const pt of dome) q.lineTo(...pt); q.closePath(); });
+  for (let i = 0; i < 5; i++) { const x = cx + s * (0.32 + i * 0.15); nib(g, [[x, y0 + 0.12 * s], [x - 0.18 * s, y1 - 0.08 * s]], 0.7 * k, 1, SEPIA, 0.55); } // the shade
+  nib(g, [[cx - s, y0 + 0.42 * s], [cx + s, y0 + 0.42 * s]], 0.8 * k, 1, SEPIA, 0.7); // a plank's seam
+  nib(g, [[cx - s, y0], [cx + s, y0], [cx + s, y1], [cx - s, y1], [cx - s, y0]], 1.5 * k);
+  nib(g, dome, 1.5 * k);
+  for (const f of [-0.62, 0.62]) nib(g, [[cx + f * s, y0 - 0.43 * s], [cx + f * s, y1]], 2.2 * k, 1, band, 0.95); // the iron bands
+  nib(g, [[cx - 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 - 0.05 * s]], 1.3 * k, 1, top ? GOLD_DARK : INK); // the hasp
+  letter(g, 'Chest', cx, r.y + r.height - 9 * k, { size: 12 * k, align: 'center', valign: 'middle' }, top ? GOLD_DARK : INK);
+}
 
 /**
  * The choice in the match: watches the player's ship each tick and unfolds the sheet when a chest opens on its deck;
@@ -173,6 +276,7 @@ export type ChestCue = 'page' | 'tap' | 'confirm' | 'back';
  */
 export class ChestChoice {
   readonly group = new THREE.Group();
+  private readonly paper = new THREE.Group(); // the sheet, when it is up
   private sheet: Sheet | null = null;
   private mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
   private offers: Offer[] = [];
@@ -184,6 +288,10 @@ export class ChestChoice {
   private pick = -1;
   private shown = false;
   private stowed = false;
+  private finger = -1; // the finger that landed on a card, "Later" or the chip
+  private chip: Rect | null = null;
+  private chipMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
+  private clock = 0;
 
   private readonly cue: (c: ChestCue) => void;
   private readonly hint: boolean;
@@ -191,19 +299,26 @@ export class ChestChoice {
   constructor(cue: (c: ChestCue) => void = () => {}, hint = false) {
     this.cue = cue;
     this.hint = hint;
+    this.group.add(this.paper);
   }
 
   get open(): boolean { return this.shown; }
   /** A chest waits on deck, folded away by "Later" (the HUD shows it; reopen() unfolds it). */
   get waiting(): boolean { return this.stowed; }
+  /** The sheet's layout while it is up, and the chip's place while a chest is stowed (null otherwise). */
+  get sheetLayout(): ChestLayout | null { return this.shown ? this.l : null; }
+  get chipRect(): Rect | null { return this.stowed ? this.chip : null; }
+  /** The chest's tier: its richest offer's. */
+  get tier(): number { return this.offers.reduce((m, o) => Math.max(m, o.item.tier), 0); }
 
   watch(ship: Ship): void {
     const has = ship.offer.length > 0;
     if (has && !this.shown && !this.stowed && this.chosen < 0) this.show(ship);
     else if (!has && this.shown && this.chosen < 0) this.hide();
-    if (!has && !this.shown) {
+    if (!has && !this.shown && (this.chosen >= 0 || this.stowed)) {
       this.chosen = -1;
       this.stowed = false;
+      this.stow();
     }
   }
 
@@ -212,23 +327,42 @@ export class ChestChoice {
     this.stowed = false;
     this.shown = true;
     this.t = 1;
-    this.cue('page');
+    this.cue('open');
+    this.stow();
     this.rebuild();
   }
 
-  layout(view: View): void {
+  /** The view, and where the chip for a stowed chest goes (beside the compact chart; null: none). */
+  layout(view: View, chip: Rect | null = null): void {
     this.view = view;
+    this.chip = chip;
     this.rebuild();
+    this.stow();
   }
 
-  /** True when the sheet took the touch. */
+  /** True when the choice took the touch: one that landed on a card, "Later" or the chip, to its end. */
   touch(t: Touch): boolean {
-    if (!this.shown || this.l === null) return false;
-    if (t.phase !== 'up') return true;
+    if (t.phase === 'down') {
+      if (this.finger >= 0) return false;
+      const onChip = this.stowed && this.chip !== null && inside(this.chip, t.x, t.y);
+      if (!onChip && !(this.shown && this.l !== null && pickAt(this.l, t.x, t.y) !== -1)) return false;
+      this.finger = t.id;
+      return true;
+    }
+    if (t.id !== this.finger) return false;
+    if (t.phase === 'move') return true;
+    this.finger = -1;
+    if (t.phase === 'cancel') return true;
+    if (this.stowed) {
+      if (this.chip !== null && inside(this.chip, t.x, t.y)) this.reopen();
+      return true;
+    }
+    if (!this.shown || this.l === null) return true;
     const k = pickAt(this.l, t.x, t.y);
     if (k === -2 && this.chosen < 0) {
       this.stowed = true;
       this.hide();
+      this.stow();
       this.cue('back');
     } else if (k >= 0 && this.chosen < 0) {
       const p = chestPick(this.offers, k);
@@ -249,6 +383,8 @@ export class ChestChoice {
   }
 
   frame(dt: number): void {
+    this.clock += dt;
+    if (this.chipMesh) this.chipMesh.scale.setScalar(1 + 0.05 * Math.sin(this.clock * 4)); // the stowed chest breathes
     if (!this.shown) return;
     this.t += dt;
     this.since += dt;
@@ -256,7 +392,29 @@ export class ChestChoice {
     else if (this.t < 2.4 || this.chosen >= 0) this.redraw();
   }
 
-  dispose(): void { this.hide(); }
+  dispose(): void {
+    this.hide();
+    this.stowed = false;
+    this.stow();
+  }
+
+  /** The chip, up while a chest is stowed. */
+  private stow(): void {
+    if (this.chipMesh) {
+      drop(this.chipMesh);
+      this.group.remove(this.chipMesh);
+      this.chipMesh = null;
+    }
+    const r = this.chip;
+    if (!this.stowed || r === null || this.view === null) return;
+    const s = sheet(r.width, r.height, 200_000, this.view.dpr);
+    s.g.translate(-r.x, -r.y);
+    drawChestChip(s.g, r, this.tier);
+    this.chipMesh = sheetMesh(s);
+    this.chipMesh.position.set(r.x + r.width / 2, r.y + r.height / 2, 0);
+    this.chipMesh.renderOrder = 30;
+    this.group.add(this.chipMesh);
+  }
 
   private show(ship: Ship): void {
     this.offers = chestOffers(ship);
@@ -268,7 +426,7 @@ export class ChestChoice {
   }
 
   private rebuild(): void {
-    drop(this.group);
+    drop(this.paper);
     this.mesh = this.sheet = null;
     if (!this.shown || this.view === null) return;
     const l = this.l = chestLayout(this.view, Math.max(1, this.offers.length));
@@ -276,7 +434,7 @@ export class ChestChoice {
     this.mesh = sheetMesh(this.sheet);
     this.mesh.position.set(l.sheet.x + l.sheet.width / 2, l.sheet.y + l.sheet.height / 2, 0);
     this.mesh.renderOrder = 30;
-    this.group.add(this.mesh);
+    this.paper.add(this.mesh);
     this.redraw();
   }
 
@@ -293,7 +451,7 @@ export class ChestChoice {
 
   private hide(): void {
     this.shown = false;
-    drop(this.group);
+    drop(this.paper);
     this.mesh = this.sheet = null;
   }
 }
