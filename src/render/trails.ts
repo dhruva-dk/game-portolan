@@ -140,6 +140,8 @@ export class Trails {
   private readonly strokes: (Stroke | null)[] = new Array<Stroke | null>(STROKES).fill(null);
   private readonly live = new Int32Array(SHIPS).fill(-1);
   private readonly touched = Array.from({ length: STROKES }, () => [STROKE_PTS, -1]);
+  /** WP30 part C: each stroke's segments in the index (drawLive). */
+  private readonly segs = new Int32Array(STROKES).fill(-1);
   private readonly uniforms = {
     uBand: { value: BAND },
     uStroke: { value: Array.from({ length: STROKES }, () => new THREE.Vector4()) },
@@ -159,7 +161,7 @@ export class Trails {
         idx[k] = a; idx[k + 1] = idx[k + 4] = a + 1; idx[k + 2] = idx[k + 3] = a + 2; idx[k + 5] = a + 3;
       }
     }
-    this.geometry.setIndex(new THREE.BufferAttribute(idx, 1));
+    this.geometry.setIndex(new THREE.BufferAttribute(idx, 1).setUsage(THREE.DynamicDrawUsage));
     for (let v = 0; v < STROKES * STROKE_PTS * 2; v++) {
       this.pos[v * 3 + 2] = 1;
       this.info.set([v & 1 ? 1 : -1, Math.floor(v / (2 * STROKE_PTS)), 0, -1], v * 4);
@@ -176,7 +178,7 @@ export class Trails {
 
   /** Triangles the strokes submit. */
   get triangles(): number {
-    return this.geometry.index!.count / 3;
+    return Math.min(this.geometry.index!.count, this.geometry.drawRange.count) / 3;
   }
 
   /**
@@ -302,8 +304,33 @@ export class Trails {
     t[1] = Math.max(t[1], j1);
   }
 
+  /** WP30 part C: index only the strokes' laid segments (the points past a stroke's head wait collapsed, and free
+   *  strokes draw nothing), rebuilt when a stroke starts, grows or clears: the trails cost what is laid, not their
+   *  capacity. */
+  private drawLive(): void {
+    let changed = false;
+    for (let s = 0; s < STROKES; s++) {
+      const st = this.strokes[s], n = st ? Math.min(st.count + 1, STROKE_PTS - 1) : 0;
+      if (n !== this.segs[s]) { this.segs[s] = n; changed = true; }
+    }
+    if (!changed) return;
+    const index = this.geometry.index!, idx = index.array as Uint32Array;
+    let k = 0;
+    for (let s = 0; s < STROKES; s++) {
+      for (let j = 0; j < this.segs[s]; j++, k += 6) {
+        const a = (s * STROKE_PTS + j) * 2;
+        idx[k] = a; idx[k + 1] = idx[k + 4] = a + 1; idx[k + 2] = idx[k + 3] = a + 2; idx[k + 5] = a + 3;
+      }
+    }
+    this.geometry.setDrawRange(0, k);
+    index.clearUpdateRanges();
+    index.addUpdateRange(0, k);
+    index.needsUpdate = true;
+  }
+
   /** Send the points that changed (only their ranges). */
   private commit(): void {
+    this.drawLive();
     for (let s = 0; s < STROKES; s++) {
       const t = this.touched[s];
       if (t[1] < t[0]) continue;

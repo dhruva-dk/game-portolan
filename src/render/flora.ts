@@ -199,14 +199,16 @@ function crownKit(lod: number, crown: Crown): Kit {
   const k = new Kit(), masses = CROWNS[crown][lod], top = crown === 'mangrove' ? 0.5 : crown === 'cloud' ? 0.55 : 0.56;
   if (crown !== 'shrub') {
     k.tube([V(0, crown === 'mangrove' ? 0.12 : -0.06, 0), V(0.02, top * 0.55, 0), V(-0.01, top, 0)], [0.042, 0.03, 0.02], lod ? 3 : 6, BARK);
-    if (!lod) for (const m of masses) k.tube([V(-0.01, top * 0.92, 0), V(m[0] * 0.8, m[1] - m[3] * 0.4, m[2] * 0.8)], [0.02, 0.008], 3, BARK);
+    if (!lod && crown !== 'mangrove') for (const m of masses) k.tube([V(-0.01, top * 0.92, 0), V(m[0] * 0.8, m[1] - m[3] * 0.4, m[2] * 0.8)], [0.02, 0.008], 3, BARK);
   }
   if (crown === 'mangrove') {
     const roots = lod ? 4 : 8;
     for (let i = 0; i < roots; i++) {
       const a = (i / roots) * TAU + 0.4 * Math.sin(i * 1.7), reach = 0.36 + 0.1 * Math.sin(i * 2.9), pts: THREE.Vector3[] = [];
-      for (let s = 0; s <= (lod ? 2 : 4); s++) {
-        const t = s / (lod ? 2 : 4), rr = reach * t, y = 0.3 * (1 - t) + 0.34 * Math.sin(Math.PI * t) * (1 - 0.4 * t) - 0.14 * t;
+      // WP30 part C: three segments near (sampled at the arch's crown, not evenly), two far; the crown's short branches
+      // stay hidden in its low masses, so the near mangrove leaves them out
+      for (const t of lod ? [0, 0.5, 1] : [0, 0.3, 0.62, 1]) {
+        const rr = reach * t, y = 0.3 * (1 - t) + 0.34 * Math.sin(Math.PI * t) * (1 - 0.4 * t) - 0.14 * t;
         pts.push(V(Math.cos(a) * rr, y, Math.sin(a) * rr));
       }
       k.tube(pts, pts.map((_, s) => 0.022 - 0.002 * s), 3, ROOT);
@@ -833,7 +835,7 @@ export class Flora {
 
 /** WP30 part C: the flora's share of A9's triangles: the reach governor holds the plants in view under it, drawing in
  *  the far level and the thinning (to KF_MIN of their reach) and then the near level (to KN_MIN). */
-const FLORA_TRIS = 140000, KF_MIN = 0.4, KN_MIN = 0.4;
+const FLORA_TRIS = 140000, KF_MIN = 0.33, KN_MIN = 0.4;
 
 /** Each scene's flora, for the region packages built after it. */
 export const floras = new WeakMap<THREE.Object3D, Flora>();
