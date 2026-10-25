@@ -88,6 +88,7 @@ export const captained = (state: MatchState, i: number): boolean => state.ships[
 /** Whether the player's own ship sails under a captain's brain (the scripted players of tests/tools/tournament.ts): it issues only the player's controls, on the first captain's stream. */
 export const piloted = (state: MatchState): boolean => state.ships[0].captain.temperament >= 0;
 
+const QTR = v3();
 const P = newPercept(), SV = newStormView(), PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 const EMPTY: number[] = [], F = v3(), H = v3(), G = v3(), Q = v3(), T = v3(), U = v3(), V = v3(), STAR = v3(), STAR2 = v3();
 
@@ -313,7 +314,7 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   c.mode = mode;
   const reach = standoff(c, style, c.target) * (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0); // closing under full sail, fighting under plain
   const lying = (mode === MODE.hold || mode === MODE.lurk) && apart(ship.pos, c.goal) < 12;
-  c.trim = mode === MODE.fight ? ((c.target >= 0 ? apart(ship.pos, state.ships[c.target].pos) : P.rivalD) > reach || (style.stalk >= 0.8 && c.target >= 0 && share(state.ships[c.target]) < 0.6) ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
+  c.trim = mode === MODE.fight ? ((c.target >= 0 ? apart(ship.pos, state.ships[c.target].pos) : P.rivalD) > reach || style.stalk >= 0.8 ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
   const hasty = mode === MODE.flee || mode === MODE.storm || mode === MODE.ram;
   c.avoid = mode === MODE.loop || mode === MODE.home ? 0 : clearing(sea, state, ship, style, hasty);
   intend(ship);
@@ -346,7 +347,8 @@ function stormGoal(state: MatchState, i: number, style: Style): boolean {
 /** Wounded below its Style's run share (a lesser captain holds on longer) with a rival near: it runs, home-ward if home lies away from the rival. */
 function flees(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain;
-  if (P.rival < 0 || P.rivalD > BRAIN.danger || share(ship) >= style.run * (0.75 + 0.25 * c.skill)) return false;
+  const r = P.rival, outgunned = style.stalk >= 0.8 && r >= 0 && (P.hulls & (1 << r)) !== 0 && share(ship) < 0.7 && power(state.ships[r]) > 1.2 * power(ship); // a hunter breaks off from a ship that outguns it
+  if (r < 0 || P.rivalD > BRAIN.danger || (share(ship) >= style.run * (0.75 + 0.25 * c.skill) && !outgunned)) return false;
   toward(ship.pos, state.ships[P.rival].pos, ship.head, T);
   set(c.want, -T.x, -T.y, -T.z);
   if (ship.held > 0 && dot(toward(ship.pos, c.anchor, ship.head, U), T) < 0) normalize(addScaled(c.want, c.want, U, 1));
@@ -396,6 +398,10 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   const r = state.ships[j], theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
   let will = style.fight + (0.3 + 0.6 * style.fight + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
+  if (keen && theirs > 0.55) { // a hunter lets a sound ship that runs from it go: a stern chase into its chasers is no hunt
+    velocityOf(sea, r, V);
+    if (dot(V, toward(ship.pos, r.pos, ship.head, T)) > 0.5 * Math.sqrt(dot(V, V))) will -= 0.5;
+  }
   if (style.guard > 0 && intrudes(state, i, j)) will += style.guard;
   if (keen) will -= 0.8 * Math.max(0, 1 - ((P.hulls & (1 << j)) !== 0 ? power(ship) / power(r) : 1)); // a hunter picks its fights: never a stronger ship than its own
   else if (style.edge === 0 && theirs < 0.6 && another(state, i, j, d)) will -= 0.35; // another ship is on the wounded one first: it leaves it the kill
@@ -406,15 +412,15 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   if (will < 0.55) return -1;
   const bow = BOWS[ship.fittings[SLOT.bow].kind], mass = FORMS[ship.form].mass / FORMS[r.form].mass;
-  const finish = keen && theirs < 0.6 && mine > theirs + 0.1; // a hunter commits to the kill: it drives in on a ship it has broken, bow or none
-  if (!c.gentle && (finish ? d < 2 * BRAIN.ram && (bow !== undefined || mass >= 1.5) : d < BRAIN.ram && mine > 0.5 && (bow !== undefined ? theirs < 0.8 || mass >= 1 : mass >= 1.5 && theirs < 0.4))) {
+  const finish = keen && theirs < 0.4 && mine > theirs + 0.1; // a hunter fights with its broadsides and rams only to finish a ship they have broken
+  if (!c.gentle && (finish ? d < 1.5 * BRAIN.ram && (bow !== undefined || mass >= 1 || theirs < 0.25) : !keen && d < BRAIN.ram && mine > 0.5 && (bow !== undefined ? theirs < 0.8 || mass >= 1 : mass >= 1.5 && theirs < 0.4))) {
     velocityOf(sea, r, V); // where it will be when the bow arrives, as far ahead as the captain's eye leads
     normalize(addScaled(c.goal, r.pos, V, (c.skill * d) / Math.max(1, ship.speed) / R));
     c.target = j;
     return MODE.ram;
   }
   const gun = GUNS[ship.fittings[SLOT.broadside].kind];
-  if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1)) return -1;
+  if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1) * (keen ? 1.6 : 1)) return -1; // a hunter takes up the chase from farther, its guns run out
   broadside(sea, state, i, j, gun, style, d);
   c.target = j;
   return MODE.fight;
@@ -435,8 +441,27 @@ function broadside(sea: Sea, state: MatchState, i: number, j: number, gun: Gun, 
   const port = ship.reload[BATTERY.port], starboard = ship.reload[BATTERY.starboard];
   if (port === 0 && starboard > 0 && -dot(H, ship.head) > -0.3) side = -1;
   else if (starboard === 0 && port > 0 && dot(H, ship.head) > -0.3) side = 1;
-  const a = clamp((d - standoff(c, style, j) * gun.range * (style.stalk >= 0.8 && share(r) < 0.6 ? 0.6 : 1)) /* a hunter closes on a broken ship */ / (0.5 * gun.range), -1, 1), ca = dcos(a), sa = dsin(a);
+  const keen = style.stalk >= 0.8, loaded = (side > 0 ? starboard : port) === 0 && d < gun.range;
+  let a = clamp((d - standoff(c, style, j) * gun.range * (keen && share(r) < 0.6 ? 0.6 : 1)) /* a hunter closes on a broken ship */ / (0.5 * gun.range), -1, 1);
+  if (keen && loaded) a = clamp(a, -0.7 * gun.arc, 0.7 * gun.arc); // a hunter yaws a loaded battery onto its prey, inside the arc, so the guns bear
+  else if (keen && a > 0 && quarter(state, i, j)) { // reloading, it closes hard for the prey's quarter, wide of its stern chasers
+    set(c.want, T.x, T.y, T.z);
+    return;
+  } else if (keen && a > 0) a = Math.min(1.45, 1.45 * Math.sqrt(a)); // reloading, it closes hard
+  const ca = dcos(a), sa = dsin(a);
   normalize(set(c.want, side * H.x * ca + T.x * sa, side * H.y * ca + T.y * sa, side * H.z * ca + T.z * sa));
+}
+
+/** Ship i inside the cone astern of rival j that stern chasers sweep (and a margin): the heading for a point on j's quarter, out of that cone, into T. */
+function quarter(state: MatchState, i: number, j: number): boolean {
+  const pos = state.ships[i].pos, r = state.ships[j];
+  cross(U, r.head, r.pos); // the rival's starboard
+  set(QTR, pos.x - r.pos.x, pos.y - r.pos.y, pos.z - r.pos.z);
+  const aft = -dot(QTR, r.head), lat = dot(QTR, U);
+  if (aft <= 0 || Math.abs(lat) > 0.9 * aft) return false;
+  normalize(addScaled(QTR, Q, U, (lat >= 0 ? 1 : -1) * aft));
+  toward(pos, QTR, state.ships[i].head, T);
+  return true;
 }
 
 /** The nearest open rival trail its chart shows, when worth the raid by its Style, the trail's length and distance, and a grudge. */
@@ -486,7 +511,7 @@ const intrudes = (state: MatchState, i: number, j: number): boolean => {
 function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Style, was: number, aim: number): number {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (style.stalk === 0 && c.grudge === 0) return -1;
-  const keen = style.stalk >= 0.8, weak = keen ? 0.85 : 0.7; // a hunter scents a wound sooner and from farther
+  const keen = style.stalk >= 0.8, weak = keen ? 0.6 : 0.7; // a hunter stalks a ship that is broken, not one merely scratched (that runs, chasers aft), and from farther
   let j = -1, d = BRAIN.stalk * (keen ? 1.8 : 1);
   if (r >= 0 && (style.stalk > 0 || r === 0) && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < (r === 0 ? Math.max(pressAt(c), weak) : weak) && P.rivalD < d) [j, d] = [r, P.rivalD];
   for (let k = 0; keen && k < SHIPS; k++) { // a hunter reads every hull it sees for the weakest
