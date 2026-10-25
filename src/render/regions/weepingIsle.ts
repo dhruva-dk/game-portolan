@@ -304,8 +304,8 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     if (h < 0.25 || heightAt(geo, p) < -DRAFT + 0.1 || !clear(px, py, 1)) continue;
     if (h < 4.5 && upv > 0.5) {
       const above = Math.max(g(px * 0.94, py * 0.94), g(px * 0.9, py * 0.9));
-      if (above > h + 6 && rng() < 0.85) {
-        const sc = 0.35 + 1.1 * rng() ** 2 * (above > h + 12 ? 1.5 : 1);
+      if (above > h + 3 && rng() < 0.85) {
+        const sc = 0.35 + 1.1 * rng() ** 2 * (above > h + 7 ? 1.5 : 1);
         boulders.push(spot(p, h, p, rng() * TAU, (rng() - 0.5) * 0.4, sc, 0.25 * sc));
       }
     }
