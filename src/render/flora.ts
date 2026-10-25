@@ -271,10 +271,14 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
   for (let i = 0; i < C; i++) {
     const a = i * 2.39996 + rnd() * 0.8, d = i === 0 && !em ? 0.02 : spread * (far ? (em ? 0.62 : 0.5) : 0.4 + 0.6 * Math.sqrt(rnd()));
     // far: a broad crown in two or three billows, the lower one slung low over the bole (never a tuft on a pole)
-    const tier = (em && i >= 5) || (far && i === 1) ? 0.16 : 0, r = far ? (em ? 0.18 : i ? 0.21 : fl ? 0.25 : 0.27) : (i === 0 ? 0.2 : 0.11 + 0.08 * rnd()) * (em ? 0.85 : 1);
+    const tier = (em && i >= 5) || (far && i === 1) ? 0.16 : 0, r = far ? (em ? (i ? 0.2 : 0.22) : i ? 0.21 : fl ? 0.25 : 0.27) : (i === 0 ? 0.2 : 0.11 + 0.08 * rnd()) * (em ? 0.85 : 1);
     const c = V(Math.cos(a) * d, top - r * 0.6 - tier - (em ? 0.18 : 0.3) * (d / spread) ** 2 + 0.05 * rnd(), Math.sin(a) * d).add(lean);
-    if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
-    k.billow(c, r, em ? 0.66 : 0.74, far ? (i ? (em ? 1 : 0) : 2) : i ? 2 : 3, 0, seed * 3.1 + i * 2.37, dab, tier ? 0.8 : 1);
+    // far, an emergent's bole runs on up into a crown massed over it, its limbs into the clumps round it (S-020: a bare
+    // pale bole with its clumps off to the sides read as a pole on the skyline)
+    if (em && far) c.set(Math.cos(a) * d * (i ? 0.62 : 0.15), forkY + (i ? 0.2 : 0.3) - tier * 0.5, Math.sin(a) * d * (i ? 0.62 : 0.15)).add(lean);
+    if (em && far) k.tube([fork, c.clone().setY(c.y - r * 0.2)], [0.022, 0.012], 3, bark);
+    else if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
+    k.billow(c, r, em ? 0.66 : 0.74, far ? (i ? (em ? 1 : 0) : em ? 1 : 2) : i ? 2 : 3, 0, seed * 3.1 + i * 2.37, dab, tier ? 0.8 : 1);
     if (d > spread * 0.6) rims.push(c);
   }
   if (far) return k;
