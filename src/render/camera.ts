@@ -39,19 +39,43 @@ export function zoomPhases(z: number): { rise: number; flat: number; unfold: num
   return { rise: easeIO(z / 0.5), flat: ease((z - 0.5) / 0.16), unfold: easeIO((z - 0.66) / 0.34) };
 }
 
-/** The zoom's ceiling in log-altitude per second (≈ 7 % of the eye's height a frame at 60 fps). */
-export const ZOOM_LOG_RATE = 4.2;
-const DIST_LOW = Math.hypot(DECK_LOW.up, DECK_LOW.back);
-const LN_DECK = Math.log(Math.hypot(DECK_HIGH.up, DECK_HIGH.back) / DIST_LOW) + 0.8;
-// the rise: the eye's distance (pow) plus its climb from behind the ship to overhead (sin θ), plus the swing north
-const LN_RISE = Math.log(ORBIT_DIST / DIST_LOW) + 1.25;
-/** The eye's step per unit lift as a share of its height: the deck pinch, the rise (eased, with the swing north),
- *  then the flatten and the unroll's pan to the net's centre. */
-function logSlope(lift: number): number {
-  if (lift < LIFT_DECK) return LN_DECK;
-  const z = Math.min(lift - LIFT_DECK, 1), a = Math.max(0, z - 0.01), b = Math.min(1, z + 0.01);
-  const p = zoomPhases(a), q = zoomPhases(b), d = (k: 'rise' | 'flat' | 'unfold') => (q[k] - p[k]) / (b - a);
-  return Math.max(3, LN_RISE * d('rise') + (z > 0.2 && z < 0.5 ? 2.2 : 0) + 0.45 * d('flat') + 1.6 * d('unfold'));
+/** The zoom's pace: the eye's step a second as a share of its height (≈ 9.3 % a frame at 60 fps), held through the
+ *  whole move so the climb reads as one even glide; and how fast that pace is gathered and shed, per second². */
+export const ZOOM_LOG_RATE = 5.6;
+export const ZOOM_LOG_ACCEL = 55;
+/** Under the deck's top the match runs again (the chart's pause lifts there), so the ship's own motion adds to the
+ *  eye's: the zoom's pace there is cut to this share, closing and pinching (opening, the match is already paused). */
+export const ZOOM_DECK_PACE = 0.6;
+/** Closing, above the deck: the eye comes down onto a ship the follow is about to take up again, a touch gentler. */
+export const ZOOM_DOWN_PACE = 0.8;
+/** WP24 part C: the eye's measured step per unit lift as a share of its height (max(4 u, altitude)), at lift k / 40:
+ *  the rig's own pose swept over ship positions and four headings (the deck pinch, the rise with its climb overhead
+ *  and its swing north, the flatten, the unroll's pan), with 5 % to spare below orbit and 12 % past it (where the pan
+ *  depends on the ship's place on its sheet). Regenerate with the WP24 sweep whenever pose() changes. */
+const ZOOM_SLOPE: readonly number[] = [
+  3.78, 3.66, 3.45, 3.26, 3.09, 2.94, 2.8, 2.68, 2.56, 2.46, 2.36, 2.27, 2.18, 2.11, 2.03, 1.97, 1.9, 1.84, 1.79, 1.73,
+  1.69, 1.64, 1.59, 1.55, 1.51, 1.47, 1.44, 1.4, 1.37, 1.34, 1.31, 1.28, 1.25, 1.23, 1.2, 1.18, 1.15, 1.13, 1.11, 1.09,
+  1.07, 0.79, 2.23, 4.3, 6.83, 9.57, 12.24, 14.61, 16.65, 18.65, 19.76, 17.28, 13.56, 10.47, 7.78, 5.49, 3.61, 2.15, 1.08, 0.5,
+  1.19, 3.2, 4.32, 4.54, 4.45, 3.59, 1.95, 0.5, 1.23, 2.69, 4.6, 6.82, 9.13, 10.72, 9.5, 6.44, 4.17, 2.47, 1.24, 0.5,
+  0.5,
+];
+const KNOT = 40;
+const ZOOM_S: readonly number[] = ZOOM_SLOPE.reduce<number[]>((s, v, i) => (i ? [...s, s[i - 1] + (ZOOM_SLOPE[i - 1] + v) / (2 * KNOT)] : [0]), []);
+function slopeAt(lift: number): number {
+  const x = clamp(lift, 0, LIFT_CHART) * KNOT, i = Math.min(ZOOM_SLOPE.length - 2, Math.floor(x));
+  return ZOOM_SLOPE[i] + (ZOOM_SLOPE[i + 1] - ZOOM_SLOPE[i]) * (x - i);
+}
+/** The eye's log-altitude path from the deck's foot to the open chart (∫ slope): the zoom runs along it. */
+export function zoomS(lift: number): number {
+  const x = clamp(lift, 0, LIFT_CHART) * KNOT, i = Math.min(ZOOM_SLOPE.length - 2, Math.floor(x)), t = x - i;
+  const a = ZOOM_SLOPE[i], b = ZOOM_SLOPE[i + 1];
+  return ZOOM_S[i] + (a * t + ((b - a) * t * t) / 2) / KNOT;
+}
+/** zoomS's inverse (every slope is positive, so the path is monotonic). */
+export function zoomLift(s: number): number {
+  let lo = 0, hi = LIFT_CHART;
+  for (let k = 0; k < 48; k++) { const m = (lo + hi) / 2; if (zoomS(m) < s) lo = m; else hi = m; }
+  return (lo + hi) / 2;
 }
 
 /**
@@ -70,6 +94,8 @@ export class Zoom {
   private lastT = 0;
   private lastRaw = 0;
   private rate = 0;
+  /** The free move's pace along zoomS, per second. */
+  private sv = 0;
 
   get z(): number { return clamp(this.lift - LIFT_DECK, 0, 1); }
   get deckLift(): number { return clamp(this.lift, 0, LIFT_DECK); }
@@ -105,22 +131,35 @@ export class Zoom {
   open(): void { if (this.target <= LIFT_DECK) this.deck = Math.min(this.target, LIFT_DECK); this.target = LIFT_CHART; this.turn(); }
   close(): void { this.target = this.deck; this.turn(); }
   /** A reversal mid-move turns at once: momentum against the new way is mostly shed. */
-  private turn(): void { if ((this.target - this.lift) * this.vel < 0) this.vel *= 0.2; }
+  private turn(): void { if ((this.target - this.lift) * this.vel < 0) { this.vel *= 0.2; this.sv = 0; } }
   /** Sets the deck pinch directly (camera presets, tests). */
-  set(lift: number): void { this.lift = this.target = clamp(lift, 0, LIFT_CHART); this.vel = 0; if (lift <= LIFT_DECK) this.deck = this.lift; }
+  set(lift: number): void { this.lift = this.target = clamp(lift, 0, LIFT_CHART); this.vel = 0; this.sv = 0; if (lift <= LIFT_DECK) this.deck = this.lift; }
 
   step(dt: number): void {
-    const w = this.held ? 22 : this.reducedMotion ? 14 : 5.2, h = Math.min(dt, 1 / 30);
-    // exact critically damped step: no overshoot at any frame rate
-    const x0 = this.lift - this.target, e = Math.exp(-w * h), prev = this.lift;
-    const v0 = this.vel;
-    this.lift = this.target + (x0 + (v0 + w * x0) * h) * e;
-    this.vel = (v0 - (v0 + w * x0) * w * h) * e;
-    // no frame moves the eye by more than a small share of its height: below orbit the lift is capped in
-    // log-altitude per second (the deck pinch and the rise), so the zoom reads as one even, unbroken climb
-    const slope = logSlope(prev), dl = this.lift - prev, cap = slope > 0 ? (ZOOM_LOG_RATE * h) / slope : Infinity;
-    if (Math.abs(dl) > cap) { this.lift = prev + Math.sign(dl) * cap; this.vel = h > 0 ? (Math.sign(dl) * cap) / h : 0; }
-    if (Math.abs(this.lift - this.target) < 1e-5 && Math.abs(this.vel) < 1e-4) { this.lift = this.target; this.vel = 0; }
+    const h = Math.min(dt, 1 / 30), prev = this.lift;
+    if (!(h > 0)) return;
+    if (this.held) {
+      // the fingers: a stiff critically damped follow, capped a frame in log-altitude like the free move
+      const w = 22, x0 = this.lift - this.target, e = Math.exp(-w * h), v0 = this.vel;
+      this.lift = this.target + (x0 + (v0 + w * x0) * h) * e;
+      this.vel = (v0 - (v0 + w * x0) * w * h) * e;
+      const cap = (ZOOM_LOG_RATE * (prev < LIFT_DECK ? ZOOM_DECK_PACE : 1) * h) / slopeAt(prev), dl = this.lift - prev;
+      if (Math.abs(dl) > cap) { this.lift = prev + Math.sign(dl) * cap; this.vel = (Math.sign(dl) * cap) / h; }
+      this.sv = (zoomS(this.lift) - zoomS(prev)) / h;
+    } else {
+      // WP24 part C: free, the move runs along the eye's log-altitude path: it gathers pace at ZOOM_LOG_ACCEL, holds
+      // ZOOM_LOG_RATE (the same share of the eye's height every frame, deck to orbit to chart) and brakes onto the
+      // target, never past it: about 1.3 s deck to chart where the old capped spring took 2.8 s
+      const s = zoomS(this.lift), goal = zoomS(this.target), r = goal - s;
+      if (Math.abs(r) < 1e-9) { this.lift = this.target; this.vel = this.sv = 0; return; }
+      const pace = ZOOM_LOG_RATE * (r > 0 ? 1 : this.lift < LIFT_DECK + 0.05 ? ZOOM_DECK_PACE : ZOOM_DOWN_PACE);
+      const want = Math.sign(r) * Math.min(pace, Math.sqrt(2 * ZOOM_LOG_ACCEL * Math.abs(r)));
+      this.sv += clamp(want - this.sv, -ZOOM_LOG_ACCEL * h, ZOOM_LOG_ACCEL * h);
+      const next = s + this.sv * h;
+      if ((goal - next) * r <= 0) { this.lift = this.target; this.sv = 0; } else this.lift = zoomLift(next);
+      this.vel = (this.lift - prev) / h;
+    }
+    if (Math.abs(this.lift - this.target) < 1e-5 && Math.abs(this.vel) < 1e-4) { this.lift = this.target; this.vel = 0; this.sv = 0; }
   }
 }
 

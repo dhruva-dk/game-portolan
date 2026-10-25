@@ -44,6 +44,11 @@ const CELL_U = ((Math.PI / 2) * R) / N;
 /** A level is fine enough while its height error stays under SPLIT_PX and its vertex spacing under SPACING_PX
  *  (render px); a chunk turns coarser only once both hold with HYSTERESIS to spare. */
 const SPLIT_PX = 4, SPACING_PX = 48, HYSTERESIS = 0.7;
+/** WP24 part C: how far the limits are relaxed (×) while the zoom lifts the eye toward orbit (world.ts sets it each
+ *  frame: 1 on the deck, 2.5 from z 0.28), so the hemisphere swinging into view keeps A9's triangle budget; the eye is
+ *  climbing fast there and the chart globe soaks in over the world from z 0.34. */
+let coarsen = 1;
+export function setTerrainCoarsen(k: number): void { coarsen = Math.max(1, k); }
 /** A chunk stays in view while within this share of its distance outside the frustum, so turning the eye rebuilds
  *  the index buffer only now and then. */
 const FRUSTUM_MARGIN = 0.15;
@@ -821,7 +826,7 @@ export class Terrain {
         continue;
       }
       const d = Math.max(0.05, near) / pxPerRad, cur = this.level[k];
-      const loose = levelFor(c, d, 1), strict = levelFor(c, d, HYSTERESIS);
+      const loose = levelFor(c, d, coarsen), strict = levelFor(c, d, HYSTERESIS * coarsen);
       want[k] = cur >= strict && cur <= loose ? cur : loose;
     }
     for (let moved = true; moved;) {

@@ -15,6 +15,7 @@ import { cellOf, fromLatLon, R, TERRITORY } from '../sim/sphere.ts';
 import { PHASE, SHIPS, type MatchState } from '../sim/state.ts';
 import type { Sight } from '../sim/visibility.ts';
 import { REGIONS } from '../sim/world/regions.ts';
+import { newStormView, stormView, type Calm } from '../sim/storm.ts';
 import { inkMaterial, linearVec, type Style } from '../style/glsl.ts';
 import { PIGMENTS } from '../style/palette.ts';
 import { cubeTexture } from './swell.ts';
@@ -362,7 +363,12 @@ export class Chart {
   private readonly geo: THREE.CubeTexture | null;
   private readonly markGeo: THREE.BufferGeometry;
   private labelRoot = -1;
-  private readonly labelSize: [number, number, number][] = [];
+  /** WP24 part C: the smallest name's capitals on the open chart, CSS px (the browser test holds it ≥ 11). */
+  capPx = 0;
+  private labelPx = 0;
+  private readonly labelForm: number[][] = [];
+  private readonly stormV = newStormView();
+  private readonly labelSize: [number, number, number, number, number][] = [];
 
   constructor(style: Style, world: World | null, net = new Net()) {
     this.net = net;
@@ -439,12 +445,21 @@ export class Chart {
     this.lines = new THREE.Mesh(geometry(lb), mat(LINE_FRAG, { uAlpha: { value: 0 } }, 0.5, true));
     this.lines.renderOrder = 11;
     // region names: one atlas, quads laid out per root so they read upright on the open chart
-    const rasters = REGIONS.slice(0, SHEETS).map((r) => rasterizeText(layoutText(r.name, { size: 44, align: 'center', valign: 'middle', swash: true }), 2));
+    // WP24 part C: a name with a space also has a two-line form, for a sheet too narrow for it on one
+    const opts = { size: 44, align: 'center', valign: 'middle', swash: true } as const;
+    const forms = REGIONS.slice(0, SHEETS).map((r) => {
+      const one = rasterizeText(layoutText(r.name, opts), 2);
+      const two = r.name.includes(' ') ? rasterizeText(layoutText(r.name, { ...opts, maxWidth: one.width * 0.31 }), 2) : null;
+      return two && two.width < one.width * 0.8 ? [one, two] : [one];
+    });
+    let at = 0;
+    for (const f of forms) { this.labelForm.push(f.map((_, i) => at + i)); at += f.length; }
+    const rasters = forms.flat();
     const W = Math.max(...rasters.map((r) => r.width)), Hs = rasters.reduce((s, r) => s + r.height + 2, 0), atlas = new Uint8Array(W * Hs * 4);
     let row = 0;
     for (const r of rasters) {
       for (let y = 0; y < r.height; y++) atlas.set(r.data.subarray(y * r.width * 4, (y + 1) * r.width * 4), ((row + y) * W + Math.floor((W - r.width) / 2)) * 4);
-      this.labelSize.push([row / Hs, (row + r.height) / Hs, r.width / W]);
+      this.labelSize.push([row / Hs, (row + r.height) / Hs, r.width / W, r.width, r.height]);
       row += r.height + 2;
     }
     const tex = new THREE.DataTexture(atlas, W, Hs, THREE.RGBAFormat);
@@ -469,22 +484,41 @@ export class Chart {
   }
 
   /** Re-lays the names and the parchment for the current root (on the chart they read upright). */
-  private relabel(camera: THREE.PerspectiveCamera, view: RigView): void {
+  private relabel(camera: THREE.PerspectiveCamera, view: RigView, pxU: number): void {
     const net = this.net, fit = net.fit(camera, view), b = builder(), ink = [...linearVec(PIGMENTS.ironGall).toArray(), 1];
-    const aspect = this.labels.userData.aspect as number[];
     const inv = new THREE.Matrix3();
+    // WP24 part C: names sized in screen px on the open chart (capitals 12–18 CSS px by the sheet's size on screen) and
+    // fitted to their sheet: the band clear of the wind rose where the sheet is widest, on one line or two, centred on
+    // that band's chord; shrunk to fit, never under 11 px (capPx records the smallest)
+    const capPx = Math.min(18, Math.max(12, (0.095 * 247) / pxU)), ku = (capPx * pxU) / LABEL_CAP_RPX, floor = 11 / capPx;
+    let least = Infinity;
     for (let k = 0; k < SHEETS; k++) {
       // the chart's up carried back into sheet k's folded plane
       const m = inv.setFromMatrix4(net.final[k]).invert(), up = fit.up.clone().applyMatrix3(m), c = net.centres[k];
       up.addScaledVector(c, -up.dot(c)).normalize();
-      // WP24 part B: names sized for the iPhone chart (row ≈ 25 CSS px there, capitals ≈ 11 px; iPad ≈ 35 px)
-      const right = new THREE.Vector3().crossVectors(up, c).normalize(), h = 50, w = h * aspect[k];
-      const o = c.clone().multiplyScalar(R).addScaledVector(up, -66);
-      const [v0, v1, uw] = this.labelSize[k], u0 = 0.5 - uw / 2, u1 = 0.5 + uw / 2;
+      const right = new THREE.Vector3().crossVectors(up, c).normalize();
+      const poly = net.faces[k].map((i): [number, number] => { const q = net.corners[i], p = q.clone().multiplyScalar(R / q.dot(c)); return [p.dot(right), p.dot(up)]; });
+      let best = { score: -Infinity, s: 0.4, x: 0, y: -66, form: this.labelForm[k][0] };
+      for (const form of this.labelForm[k]) {
+        if (best.s >= floor) break;
+        const w = this.labelSize[form][3] * ku, h = this.labelSize[form][4] * ku;
+        for (const side of [-1, 1]) for (let d = 0; d <= 40; d += 5) {
+          const y = side * (LABEL_ROSE + h / 2 + d), lo = chordAt(poly, y - h / 2), hi = chordAt(poly, y + h / 2);
+          if (!lo || !hi) continue;
+          const x0 = Math.max(lo[0], hi[0]), x1 = Math.min(lo[1], hi[1]), s = Math.min(1, ((x1 - x0) * 0.9) / w);
+          const score = s - d * 1e-3 - (side > 0 ? 0.02 : 0);
+          if (score > best.score) best = { score, s, x: (x0 + x1) / 2, y, form };
+        }
+      }
+      const [v0, v1, uw, wr, hr] = this.labelSize[best.form], sc = Math.max(floor, best.s), w = wr * ku * sc, h = hr * ku * sc;
+      least = Math.min(least, capPx * sc);
+      const u0 = 0.5 - uw / 2, u1 = 0.5 + uw / 2, o = c.clone().multiplyScalar(R).addScaledVector(right, best.x).addScaledVector(up, best.y);
       const P = (x: number, y: number) => o.clone().addScaledVector(right, x * w / 2).addScaledVector(up, y * h / 2);
       const q: [THREE.Vector3, number, number][] = [[P(-1, 1), u0, v0], [P(1, 1), u1, v0], [P(1, -1), u1, v1], [P(-1, -1), u0, v1]];
       for (const i of [0, 3, 1, 1, 3, 2]) vert(b, q[i][0], k, null, 0, ink, q[i][1], q[i][2]);
     }
+    this.capPx = least;
+    this.labelPx = pxU;
     this.labels.geometry.dispose();
     this.labels.geometry = geometry(b);
     // the parchment: a wide sheet 2.4 R beneath the root's plane, its own grain coordinates in vDir
@@ -543,10 +577,50 @@ export class Chart {
       for (const j of [0, 1, 2, 0, 2, 3]) vert(b, sh[j], k, null, 0, col, 0, 0);
       for (const v of [a1.clone().addScaledVector(side, -wH), tip, a1.clone().addScaledVector(side, wH)]) vert(b, v, k, null, 0, col, 0, 0);
     }
+    this.stormMarks(b, state, pxU);
     const g = geometry(b);
     for (const name of ['position', 'dir', 'sheet', 'perp', 'sideW', 'colour', 'uv']) this.markGeo.setAttribute(name, g.getAttribute(name));
     this.markGeo.setDrawRange(0, b.sheet.length);
   }
+  /** WP24 part C: the storm on the chart, screen-sized like the ships: the wall (the calm's edge) inked with hatching
+   *  toward the storm, and the next shrink, once announced, as a dashed vermilion ring. */
+  private stormMarks(b: Builder, state: MatchState, pxU: number): void {
+    const v = stormView(state, this.stormV);
+    const wall = [...linearVec(PIGMENTS.ironGall).toArray(), 2], next = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
+    if (v.calm.r < Math.PI - 1e-3) this.ring(b, v.calm, wall, 1.3 * pxU, false, 7 * pxU);
+    if (v.announced && v.next.r < v.calm.r - 1e-4) this.ring(b, v.next, next, 0.8 * pxU, true, 0);
+  }
+
+  private ring(b: Builder, calm: Calm, col: readonly number[], half: number, dash: boolean, tick: number): void {
+    const net = this.net, a = new THREE.Vector3(calm.at.x, calm.at.y, calm.at.z).normalize();
+    const e1 = new THREE.Vector3().crossVectors(a, Math.abs(a.y) < 0.9 ? AXIS_N : new THREE.Vector3(1, 0, 0)).normalize();
+    const e2 = new THREE.Vector3().crossVectors(a, e1), cr = Math.cos(calm.r), sr = Math.sin(calm.r);
+    const d = V(), out = V(), prev = V(), cur = V(), side = V(), t = V(), N = 240;
+    let pk = -1;
+    for (let i = 0; i <= N; i++) {
+      const th = (i / N) * Math.PI * 2, ct = Math.cos(th), st = Math.sin(th);
+      d.copy(a).multiplyScalar(cr).addScaledVector(e1, ct * sr).addScaledVector(e2, st * sr);
+      const k = net.sheetOf(d), c = net.centres[k];
+      cur.copy(d).multiplyScalar(R / Math.max(0.2, d.dot(c)));
+      const len = t.subVectors(cur, prev).length();
+      if (i > 0 && k === pk && len > 1e-6 && (!dash || i % 4 < 2)) {
+        side.crossVectors(c, t).normalize().multiplyScalar(half);
+        const q = [prev.clone().sub(side), cur.clone().sub(side), cur.clone().add(side), prev.clone().add(side)];
+        for (const j of [0, 1, 2, 0, 2, 3]) vert(b, q[j], k, null, 0, col, 0, 0);
+        if (tick > 0 && i % 3 === 0) {
+          // a hatch toward the storm along the cap's outward tangent, raked a little along the wall
+          out.copy(a).multiplyScalar(-sr).addScaledVector(e1, ct * cr).addScaledVector(e2, st * cr);
+          out.addScaledVector(c, -out.dot(c)).normalize();
+          const tip = cur.clone().addScaledVector(out, tick).addScaledVector(t, (0.35 * tick) / len), w = t.clone().multiplyScalar((half * 0.6) / len);
+          const hq = [cur.clone().sub(w), tip.clone().addScaledVector(w, -0.3), tip.clone().addScaledVector(w, 0.3), cur.clone().add(w)];
+          for (const j of [0, 1, 2, 0, 2, 3]) vert(b, hq[j], k, null, 0, col, 0, 0);
+        }
+      }
+      prev.copy(cur);
+      pk = k;
+    }
+  }
+
 
   /** One frame of the chart at zoom z (camera.ts zoomPhases), for the player's sight. */
   frame(state: MatchState, f: ChartFrame, camera: THREE.PerspectiveCamera, view: RigView, sight: Sight | null, territory: THREE.CubeTexture | null): void {
@@ -555,11 +629,12 @@ export class Chart {
       const p = state.ships[PLAYER].pos;
       net.layout(net.sheetOf(p));
     }
-    if (this.labelRoot !== net.root) this.relabel(camera, view);
     net.pose(f.unfold);
     u.uFlat.value = f.flat;
     const dist = f.z < 0.5 ? camera.position.length() - R : camera.position.dot(net.normal) - R;
     u.uPxU.value = (2 * Math.max(1, dist) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)) / Math.max(1, view.height);
+    const pxU = u.uPxU.value as number;
+    if (this.labelRoot !== net.root || (f.unfold > 0.5 && Math.abs(pxU - this.labelPx) > 0.03 * pxU)) this.relabel(camera, view, pxU);
     const sm = this.sheets.material as THREE.ShaderMaterial;
     sm.uniforms.uReveal.value = f.reveal;
     sm.uniforms.tTerr.value = territory ?? this.geo;
@@ -591,6 +666,21 @@ void main() {
   vDir = dir; vNormal = vec3(0.0, 0.0, 1.0); vColour = vec4(0.0); vUv = vec2(0.0);
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`;
+
+/** The x extent of a convex polygon's chord at height y, or null off it. */
+function chordAt(poly: readonly [number, number][], y: number): [number, number] | null {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+    if ((ay - y) * (by - y) > 0 || ay === by) continue;
+    const x = ax + ((y - ay) / (by - ay)) * (bx - ax);
+    lo = Math.min(lo, x);
+    hi = Math.max(hi, x);
+  }
+  return hi > lo ? [lo, hi] : null;
+}
+/** A name's capitals in its raster (0.6 em at 44 px, pixel ratio 2), and the wind rose's clear radius on a sheet, u. */
+const LABEL_CAP_RPX = 0.6 * 44 * 2, LABEL_ROSE = 40;
 
 export const CHART_LAYER = LAYER_CHART;
 /** Height of the ground under a unit direction, u above mean sea level (the camera's collision). */

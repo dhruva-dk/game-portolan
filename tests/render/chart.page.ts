@@ -41,13 +41,27 @@ while (state.tick < at) {
 
 const hook = {
   ready: true,
+  /** WP24 part C (diagnosis): each top-level scene object's triangles at a lift, by drawing the frame without it. */
+  breakdown(lift: number) {
+    const base = this.stop(lift).tris, out: [string, number][] = [];
+    for (const o of view.scene.children) {
+      if (!o.visible) continue;
+      o.visible = false;
+      const t = this.stop(lift).tris;
+      o.visible = true;
+      out.push([String(o.userData.module ?? o.type), base - t]);
+    }
+    const sum = new Map<string, number>();
+    for (const [k, v] of out) sum.set(k, (sum.get(k) ?? 0) + v);
+    return { base, top: [...sum].sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, v]) => `${k} ${(v / 1000).toFixed(0)}k`) };
+  },
   stop(lift: number) {
     rig.zoom.set(lift);
     for (let k = 0; k < 45; k++) frame(1 / 60, false);
     info.reset();
     frame(1 / 60, true);
     const z = rig.z, alt = z < 0.5 ? camera.position.length() - R : camera.position.dot(view.chart.net.normal) - R;
-    return { calls: info.render.calls, tris: info.render.triangles, z, drawn: view.chart.drawn, expected: chartShips(state, view.sight(state)), alt };
+    return { calls: info.render.calls, tris: info.render.triangles, z, drawn: view.chart.drawn, expected: chartShips(state, view.sight(state)), alt, cap: view.chart.capPx };
   },
   sequence() {
     rig.zoom.set(0.35);

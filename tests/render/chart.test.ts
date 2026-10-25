@@ -21,6 +21,8 @@ import { helm, scripted } from './territory.match.ts';
 const W = world(), ground = groundOf(W), N = TERRITORY.n;
 const coastAt = (d: THREE.Vector3) => W.geo.coast[cellOf(TERRITORY, d)];
 const VIEW = { width: 956, height: 440, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
+/** Frames of the zoom over A9's budget, by device and lift (the browser test records, the last test holds them to none). */
+const overBudget: string[] = [];
 
 test('the net: twelve sheets on the regions, seams in open sea, unrolled flat and closed, screen ↔ globe round trip', () => {
   const net = new Net();
@@ -68,11 +70,11 @@ test('the zoom opens and closes monotonically, reverses mid-move and follows the
   z.set(0.4);
   z.open();
   let prev = z.lift, t = 0, near = 0;
-  while (z.lift < 2 - 1e-4 && t < 6) { z.step(dt); assert.ok(z.lift >= prev - 1e-12, 'opening never steps back'); prev = z.lift; t += dt; if (!near && z.lift > 1.984) near = t; }
-  assert.ok(near < 3 && t < 4.5, `open to 99 % in ${near.toFixed(2)} s, settled in ${t.toFixed(2)} s`);
+  while (z.lift < 2 - 1e-4 && t < 4) { z.step(dt); assert.ok(z.lift >= prev - 1e-12, 'opening never steps back'); prev = z.lift; t += dt; if (!near && z.lift > 1.984) near = t; }
+  assert.ok(near < 1.5 && t < 3, `open to 99 % in ${near.toFixed(2)} s, settled in ${t.toFixed(2)} s`);
   assert.ok(z.chartOpen);
   z.close();
-  for (let k = 0; k < 330; k++) { z.step(dt); assert.ok(z.lift <= prev + 1e-12, 'closing never steps back'); prev = z.lift; }
+  for (let k = 0; k < 240; k++) { z.step(dt); assert.ok(z.lift <= prev + 1e-12, 'closing never steps back'); prev = z.lift; }
   assert.ok(Math.abs(z.lift - 0.4) < 1e-4 && !z.chartOpen, 'closing returns to the deck pinch it left');
   z.open();
   for (let k = 0; k < 20; k++) z.step(dt);
@@ -81,14 +83,14 @@ test('the zoom opens and closes monotonically, reverses mid-move and follows the
   z.step(dt);
   z.step(dt);
   assert.ok(z.lift < mid + 0.05, 'a reversal mid-move turns at once');
-  for (let k = 0; k < 360; k++) z.step(dt);
+  for (let k = 0; k < 300; k++) z.step(dt);
   assert.ok(Math.abs(z.lift - 0.4) < 1e-4, 'and settles on the deck');
   z.grab(0);
   z.pinch(0.5, 0.1);
   for (let k = 0; k < 30; k++) z.step(dt);
   assert.ok(z.lift > 1, `closing the fingers lifts toward the chart (${z.lift.toFixed(2)})`);
   z.release();
-  for (let k = 0; k < 360; k++) z.step(dt);
+  for (let k = 0; k < 300; k++) z.step(dt);
   assert.ok(z.lift === 2 || z.lift === 0.4, `let go, it settles open or shut (${z.lift})`);
 });
 
@@ -185,7 +187,7 @@ test('the transition is monotonic and reversible from the deck to the chart and 
   assert.ok(ph.flat === 1 && ph.unfold === 1);
   rig.zoom.close();
   for (let k = 0; k < 600 && rig.z > 0; k++) rig.frame(state, 1, 0, 0, 1 / 60);
-  for (let k = 0; k < 300; k++) rig.frame(state, 1, 0, 0, 1 / 60);
+  for (let k = 0; k < 120; k++) rig.frame(state, 1, 0, 0, 1 / 60);
   assert.ok(cam.position.distanceTo(start) < 1e-3 && cam.quaternion.angleTo(q0) < 1e-4, `back on the deck where it left (${cam.position.distanceTo(start).toExponential(1)} u)`);
 });
 
@@ -238,13 +240,20 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
     }
     // WP24 part B: the zoom as a frame sequence (deck → mid → rise → swap → orbit → flatten → unroll → chart), budgets at every frame
     const SEQ = [['deck', 0.3], ['high', 0.95], ['rise', 1.22], ['swap', 1.42], ['orbit', 1.5], ['flatten', 1.62], ['unroll', 1.8], ['chart', 2]] as const;
+    // the whole approach to orbit and the swap window, frame by frame where the world and the chart globe meet
+    for (const lift of [1.26, 1.3, 1.33, 1.35, 1.38, 1.45, 1.49]) {
+      const r = await game.page.evaluate((l) => (window as unknown as { __chart: { stop(l: number): Stats } }).__chart.stop(l), lift);
+      console.log(`wp24c ${device} window lift ${lift}: ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris`);
+      if (r.calls > 200 || r.tris > 500000) overBudget.push(`${device} lift ${lift}: ${r.calls} draws, ${r.tris} tris`);
+      if (lift === 1.26 || lift === 1.3) console.log(`wp24c ${device} breakdown ${lift}: ${JSON.stringify(await game.page.evaluate((l) => (window as unknown as { __chart: { breakdown(l: number): unknown } }).__chart.breakdown(l), lift))}`);
+    }
     for (const [k, [name, lift]] of SEQ.entries()) {
       const r = await game.page.evaluate((l) => (window as unknown as { __chart: { stop(l: number): Stats } }).__chart.stop(l), lift);
-      console.log(`wp24b ${device} ${k} ${name}: z ${r.z.toFixed(2)}, ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris`);
-      // the swap window draws the world and the chart globe together: over the triangle budget, recorded for part C
-      if (name === 'swap') { if (r.tris > 500000) console.log(`wp24b ${device} swap OVER BUDGET: ${r.tris} tris (part C)`); }
-      else assert.ok(r.calls <= (r.z >= 0.5 ? 100 : 200) && r.tris <= 500000, `${device} ${name}: within budget`);
-      const file = join(out, `wp24b-${device}-${k}-${name}.png`);
+      console.log(`wp24c ${device} ${k} ${name}: z ${r.z.toFixed(2)}, ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris`);
+      // the swap window draws the world and the chart globe together: the world's fine layers stand down there (part C)
+      assert.ok(r.calls <= (r.z >= 0.5 ? 100 : 200) && r.tris <= 500000, `${device} ${name}: within budget (${r.calls} draws, ${r.tris} tris)`);
+      if (name === 'chart') { const cap = (r as Stats & { cap: number }).cap; console.log(`wp24c ${device} names: smallest capitals ${cap.toFixed(1)} CSS px`); assert.ok(cap >= 11, `${device}: names' capitals ≥ 11 CSS px (${cap.toFixed(1)})`); }
+      const file = join(out, `wp24c-${device}-${k}-${name}.png`);
       await game.page.screenshot({ path: file, scale: 'css' });
       seq.push(file);
     }
@@ -261,4 +270,8 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
   await page.setContent(`<body style="margin:0;background:#efe0c0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${imgs.map((src, k) => `<figure style="margin:0"><img src="${src}" style="width:100%;display:block"><figcaption style="font:15px serif">${files[k].split('/').pop()}</figcaption></figure>`).join('')}</body>`);
   await page.screenshot({ path: join(out, 'wp24-sheet.png'), fullPage: true });
   await page.close();
+});
+
+test('A9 holds at every frame of the zoom: the approach to orbit and the swap window (WP24 part C)', () => {
+  assert.deepEqual(overBudget, [], 'frames of the zoom over 200 draws or 500k triangles');
 });

@@ -12,14 +12,12 @@ import { createSea } from './sea.ts';
 import { createSky } from './sky.ts';
 import { createStorm } from './storm.ts';
 import { createStructures } from './structures.ts';
-import { createTerrain } from './terrain.ts';
+import { createTerrain, setTerrainCoarsen } from './terrain.ts';
 import { createTerritory } from './territory.ts';
 import { createTrails } from './trails.ts';
 import { createWeather } from './weather.ts';
 import { REGION_MODULES } from './regions/index.ts';
 import { createShips } from './ships/shipView.ts';
-import { createEffects } from './fx.ts';
-import { createCurrents } from './currents.ts';
 import { createEffects } from './fx.ts';
 import { createCurrents } from './currents.ts';
 import { createFauna } from './fauna.ts';
@@ -53,6 +51,13 @@ type ModuleFactory = (ctx: RenderContext) => RenderModule;
 /** The render modules, updated in this order every frame. Append-only (A6). */
 const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm, createShips, createEffects, createCurrents, createFauna];
 
+/** WP24 part C: modules whose detail is a pixel or two once the zoom lifts the eye toward orbit, each stood down past
+ *  the z it is listed with (the chart globe soaks in from 0.34; the ships stay, their chart marks take over at 0.4), so
+ *  the world, and the world and the chart globe together, keep A9's triangle budget at every frame of the zoom. */
+const FINE: ReadonlyMap<ModuleFactory, number> = new Map<ModuleFactory, number>([
+  [createStructures, 0.25], [createFlora, 0.25], [createEffects, 0.25], ...REGION_MODULES.map((m): [ModuleFactory, number] => [m, 0.3]), [createTrails, 0.34],
+]);
+
 export class WorldView {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
@@ -67,10 +72,19 @@ export class WorldView {
   private sea: Sea | null = null;
   private seaSeed = NaN;
   private readonly sights: Sight[] = Array.from({ length: SHIPS }, newSight);
+  /** WP24 part C: the fine modules' scene objects, and those stood down this frame. */
+  private readonly fine: [THREE.Object3D, number][] = [];
+  private readonly stoodDown: THREE.Object3D[] = [];
 
   constructor(pipeline: Pipeline, world: World) {
     const ctx: RenderContext = { pipeline, world, scene: this.scene, camera: this.camera };
-    this.modules = MODULES.map((build) => build(ctx));
+    this.modules = MODULES.map((build) => {
+      const n = this.scene.children.length, m = build(ctx);
+      for (const c of this.scene.children.slice(n)) c.userData.module ??= build.name;
+      const at = FINE.get(build);
+      if (at !== undefined) for (const c of this.scene.children.slice(n)) this.fine.push([c, at]);
+      return m;
+    });
     this.world = world;
     this.chart = new Chart(pipeline.style, world);
     this.scene.add(this.chart.group);
@@ -91,17 +105,23 @@ export class WorldView {
   }
 
   frame(f: MatchFrame): void {
+    for (const o of this.stoodDown) o.visible = true;
+    this.stoodDown.length = 0;
+    setTerrainCoarsen(1);
     if (this.drive) {
       const sight = this.sight(f.state), rig = this.rig;
       rig.seen = sight.ships;
       rig.frame(f.state, f.alpha, f.clock, rig.chartOpen ? 0 : f.dt, f.dt);
       const z = rig.z, ph = zoomPhases(z), r = Math.min(1, Math.max(0, (z - 0.34) / 0.16)), L = this.camera.layers;
+      const lod = Math.min(1, Math.max(0, (z - 0.12) / 0.16));
+      setTerrainCoarsen(1 + 1.5 * lod * lod * (3 - 2 * lod));
       this.chart.frame(f.state, { z, ...ph, reveal: r * r * (3 - 2 * r) }, this.camera, this.view, sight, territories.get(this.scene)?.wash ?? null);
       if (z <= 0.34) L.set(0);
       else if (z < 0.5) { L.set(0); L.enable(CHART_LAYER); }
       else L.set(CHART_LAYER);
     }
     for (const m of this.modules) m.frame(f);
+    if (this.drive) for (const [o, at] of this.fine) if (this.rig.z > at && o.visible) { o.visible = false; this.stoodDown.push(o); }
   }
 
   dispose(): void {
