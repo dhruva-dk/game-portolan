@@ -22,6 +22,7 @@ import { createEffects } from './fx.ts';
 import { createCurrents } from './currents.ts';
 import { createEffects } from './fx.ts';
 import { createCurrents } from './currents.ts';
+import { createFauna } from './fauna.ts';
 import { CameraRig, zoomPhases, type Insets, type RigView } from './camera.ts';
 import { Chart, CHART_LAYER, groundOf } from './chart.ts';
 import { territories } from './territory.ts';
@@ -50,7 +51,7 @@ export interface RenderModule {
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
 /** The render modules, updated in this order every frame. Append-only (A6). */
-const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm, createShips, createEffects, createCurrents];
+const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm, createShips, createEffects, createCurrents, createFauna];
 
 export class WorldView {
   readonly scene = new THREE.Scene();
