@@ -150,6 +150,8 @@ export interface HudLayout {
   readonly fittings: readonly Disc[];
   /** The threat marks ride this rect's border. */
   readonly edge: Rect;
+  /** WP25 part B: mirrored for the left hand (the stick on the right half, the fan about the lower-left corner). */
+  readonly left?: boolean;
 }
 
 /** Half the 44 pt minimum touch target. */
@@ -165,7 +167,7 @@ const FAN: readonly (readonly [ButtonKind, number, number, number])[] = [
   ['c2', 108, 232, 21],
 ];
 
-export function hudLayout(view: View): HudLayout {
+export function hudLayout(view: View, left = false): HudLayout {
   const s = safeRect(view);
   const u = Math.min(1.3, Math.max(0.85, s.height / 420));
   const m = 10 * u, L = s.x, T = s.y, Rt = s.x + s.width, B = s.y + s.height;
@@ -181,7 +183,7 @@ export function hudLayout(view: View): HudLayout {
   const share: Rect = { x: L + m, y: hull.y + hull.height + 4 * u, width: 120 * u, height: 20 * u };
   const tw = 210 * u;
   const fit = 28 * u, fx = s.x + s.width * 0.42 - 2.5 * fit; // left of centre, clear of the purse
-  return {
+  const out: HudLayout = {
     view,
     safe: s,
     u,
@@ -197,6 +199,20 @@ export function hudLayout(view: View): HudLayout {
     purse: { x: Rt - 375 * u, y: B - 64 * u, width: 100 * u, height: 60 * u },
     fittings: Array.from({ length: 6 }, (_, i) => ({ x: fx + i * fit, y: B - 15 * u, r: 11 * u })),
     edge: { x: L + 14 * u, y: T + 14 * u, width: s.width - 28 * u, height: s.height - 28 * u },
+  };
+  return left ? mirrorLayout(out) : out;
+}
+
+/** WP25 part B: the left-handed layout: every scrap and control mirrored about the screen's centre line (the stick on
+ *  the right half, the right thumb's fan about the lower-left corner, the compact chart top-left, the wind rose and the
+ *  sail setting lower-right). The lettering itself still reads left to right. */
+export function mirrorLayout(L: HudLayout): HudLayout {
+  const W = L.view.width;
+  const r = (q: Rect): Rect => ({ x: W - q.x - q.width, y: q.y, width: q.width, height: q.height });
+  const d = (q: Disc): Disc => ({ x: W - q.x, y: q.y, r: q.r });
+  return {
+    ...L, left: !L.left, safe: r(L.safe), buttons: L.buttons.map((b) => ({ ...b, x: W - b.x })), stick: r(L.stick), hull: r(L.hull), share: r(L.share),
+    sternGlass: d(L.sternGlass), top: r(L.top), chart: r(L.chart), compass: d(L.compass), sail: r(L.sail), purse: r(L.purse), fittings: L.fittings.map(d), edge: r(L.edge),
   };
 }
 

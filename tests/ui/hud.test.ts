@@ -291,3 +291,20 @@ test('haptics: patterns, rests, events for the player only, the limiter', () => 
   h.enabled = false;
   assert.equal(h.play('ram'), false);
 });
+
+test('WP25 part B: the left-handed layout mirrors every control inside the safe area; the stick takes the right half', () => {
+  const views: View[] = [{ width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } }, { width: 1376, height: 1032, dpr: 2, safe: { top: 0, right: 0, bottom: 25, left: 0 } }];
+  for (const v of views) {
+    const R = hudLayout(v), L = hudLayout(v, true);
+    assert.equal(L.left, true);
+    assert.ok(Math.abs(L.stick.x - (v.width - R.stick.x - R.stick.width)) < 1e-6 && L.stick.x >= v.width / 2 - 1, 'the stick on the right half');
+    assert.ok(L.chart.x < v.width / 2 && L.compass.x > v.width / 2, 'the compact chart top-left, the wind rose lower-right');
+    for (const b of L.buttons) { const h = (b.w ?? 2 * b.r) / 2; assert.ok(b.x - h >= L.safe.x - 0.5 && b.x + h <= L.safe.x + L.safe.width + 0.5, b.kind); }
+    const c = new Controls(() => 0);
+    c.layout = L;
+    const x = L.stick.x + L.stick.width * 0.4, y = L.stick.y + L.stick.height * 0.55;
+    c.touch({ id: 1, phase: 'down', x, y } as Parameters<Controls['touch']>[0]);
+    c.touch({ id: 1, phase: 'move', x: x + 50, y } as Parameters<Controls['touch']>[0]);
+    assert.ok(c.input().steer > 0, 'the right thumb steers');
+  }
+});

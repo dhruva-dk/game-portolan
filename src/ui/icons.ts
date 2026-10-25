@@ -249,12 +249,20 @@ export function rose(g: G, x: number, y: number, r: number, heading: number, win
 }
 
 /** A chevron on the frame toward a rival, heavier and redder the nearer. */
-export function chevron(g: G, x: number, y: number, bearing: number, near: number, s: number, p = 1): void {
-  const a = bearing - Math.PI / 2, w = s * (0.7 + 0.6 * near);
-  const tip: Pt = [x + Math.cos(a) * w * 0.6, y + Math.sin(a) * w * 0.6];
-  const l: Pt = [x + Math.cos(a + 2.4) * w, y + Math.sin(a + 2.4) * w], r: Pt = [x + Math.cos(a - 2.4) * w, y + Math.sin(a - 2.4) * w];
-  wash(g, PIG.vermilion, (0.2 + 0.6 * near) * p, poly([l, tip, r, [x, y], l]));
-  nib(g, [l, tip, r], 1.4 + 1.6 * near, p);
+export function chevron(g: G, x: number, y: number, bearing: number, near: number, s: number, p = 1, pig: string = PIG.vermilion): void {
+  // WP25 part B: more weight: a notched arrowhead washed in the captain's pigment, its ink thickening as it nears, and
+  // the distance as dots trailing behind it (three far off, two closing, one upon you)
+  const a = bearing - Math.PI / 2, w = s * (0.85 + 0.75 * near), ca = Math.cos(a), sa = Math.sin(a);
+  const tip: Pt = [x + ca * w * 0.75, y + sa * w * 0.75], notch: Pt = [x + ca * w * 0.08, y + sa * w * 0.08];
+  const l: Pt = [x + Math.cos(a + 2.45) * w, y + Math.sin(a + 2.45) * w], r: Pt = [x + Math.cos(a - 2.45) * w, y + Math.sin(a - 2.45) * w];
+  wash(g, pig, (0.5 + 0.45 * near) * p, poly([l, tip, r, notch, l]));
+  nib(g, [l, tip, r, notch, l], 1.9 + 2.4 * near, p);
+  const dots = near > 0.66 ? 1 : near > 0.33 ? 2 : 3;
+  for (let i = 0; i < dots; i++) {
+    const k = w * (0.6 + 0.45 * i), dx = x - ca * k, dy = y - sa * k, rr = 1.4 + 0.9 * near;
+    wash(g, pig, 0.9 * p, (q) => { q.moveTo(dx + rr, dy); q.arc(dx, dy, rr, 0, Math.PI * 2); });
+    nib(g, ring(dx, dy, rr, i, 0, Math.PI * 2, 8), 0.8, p, INK, 0.7);
+  }
 }
 
 // ---- the view
@@ -293,6 +301,8 @@ export class HudView {
   private drawn = -1;
   private sig = '';
   private stickSig = '';
+  /** WP25 part B: the captain's pigment for ship j (the match sets it; the rival arrows wash in it). */
+  pigment: (ship: number) => string = () => PIG.vermilion;
 
   constructor(style: Style, lettering: Lettering) {
     this.style = style;
@@ -313,6 +323,9 @@ export class HudView {
     scrap(L.top.x, L.top.y, L.top.width, L.top.height, 1);
     scrap(L.chart.x, L.chart.y, L.chart.width, L.chart.height, 2);
     scrap(L.purse.x, L.purse.y, L.purse.width, L.purse.height, 3);
+    // WP25 part B: the wind rose and the sail setting on a scrap of their own so they read over a busy sea
+    const lo = Math.min(L.compass.x - L.compass.r, L.sail.x), hi = Math.max(L.compass.x + L.compass.r, L.sail.x + L.sail.width);
+    scrap(lo - 7 * u, L.compass.y - L.compass.r - 6 * u, hi - lo + 14 * u, 2 * L.compass.r + 12 * u, 4);
     for (const b of L.buttons) {
       if (b.kind === 'chart') continue;
       const bb = new ButtonBase(this.style, b.r);
@@ -452,7 +465,7 @@ export class HudView {
       else if (b.kind[0] === 'c') { const s = m.consumables[Number(b.kind[1])]; consumableIcon(g, s && s.count > 0 ? s.kind : 0, b.x, b.y, b.r * 0.6, p); }
     }
     m.fittings.forEach((f, i) => { const d = L.fittings[i]; if (d) fittingIcon(g, i, f.kind, f.tier, d.x, d.y, d.r, ink(10 + i * 0.3)); });
-    for (const t of m.threats) { const [x, y] = edgePoint(L.edge, t.bearing); chevron(g, x, y, t.bearing, t.near, 9 * u, ink(4)); }
+    for (const t of m.threats) { const [x, y] = edgePoint(L.edge, t.bearing); chevron(g, x, y, t.bearing, t.near, 11 * u, ink(4), this.pigment(t.ship)); }
     if (m.storm.edge) wash(g, PIG.indigo, 0.12, (q) => { q.rect(0, 0, width, height); q.rect(L.safe.x + 30 * u, L.safe.y + 30 * u, L.safe.width - 60 * u, L.safe.height - 60 * u); });
     tex.needsUpdate = true;
   }
