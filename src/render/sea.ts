@@ -631,12 +631,19 @@ void main() {
     }
   }
   // lace over every reach of reef a keel would strike at this tide, drifting and pulsing with the swell; far off, a pale
-  // stipple of it
-  float laceZone = max(f.w * (1.0 - smoothstep(SURF_LACE.x, SURF_LACE.y, depth)) * mix(near, 1.0, clear), (1.0 - smoothstep(0.6, 1.8, shore)) * near) * water * mix(diag, 1.0, clear);
+  // stipple of it; in the shore's wash only a narrow band off the fringe, thinning out from it (no threads lie loose on
+  // the still water beyond)
+  float laceZone = max(f.w * (1.0 - smoothstep(SURF_LACE.x, SURF_LACE.y, depth)) * mix(near, 1.0, clear), (1.0 - smoothstep(0.3, 1.1, shore)) * near) * water * mix(diag, 1.0, clear);
   if (laceZone > 0.02) {
+    // the net's threads are the walls between bubbles: bent (the cells looked up through a slow warp, never the straight
+    // bisectors of a Voronoi net, which read as cracked glass, S-020), swelling and thinning along their length and
+    // broken into runs, so no wall runs straight into a Y
     float idL, lcell = 0.8 * max(1.0, upx * uRenderPx * 6.0 / 0.8);
-    vec4 cl = cells(xs / lcell + wp * uTime * 0.05, idL);
-    float net = (1.0 - smoothstep(0.4, 1.2, (cl.y - cl.x) * lcell * 0.5 / upx / uRenderPx)) * (0.55 + 0.45 * sin(uTime * 0.9 + 6.0 * wob + 3.0 * idL));
+    vec2 lx = xs / lcell + wp * uTime * 0.05;
+    lx += 0.5 * vec2(vnoise(lx * 0.6 + 3.7), vnoise(lx * 0.6 + 11.3)) + 0.32 * vec2(vnoise(lx * 1.7 + 7.9), vnoise(lx * 1.7 + 1.3)) - 0.41;
+    vec4 cl = cells(lx, idL);
+    float thread = vnoise(lx * 2.3 + 5.0 * idL), wall = (cl.y - cl.x) * lcell * 0.5 / upx / uRenderPx / (0.6 + 0.8 * thread);
+    float net = (1.0 - smoothstep(0.4, 1.2, wall)) * smoothstep(0.32, 0.5, thread) * (0.55 + 0.45 * sin(uTime * 0.9 + 6.0 * wob + 3.0 * idL));
     keel = f.w * (1.0 - smoothstep(SURF_LACE.x, SURF_LACE.y, depth)) * water;
     foam = max(foam, laceZone * net * mix(1.0, 0.7, keel));
   }
