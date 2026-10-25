@@ -17,7 +17,7 @@ import type { Sight } from '../sim/visibility.ts';
 import { REGIONS } from '../sim/world/regions.ts';
 import { newStormView, stormView, type Calm } from '../sim/storm.ts';
 import { inkMaterial, linearVec, type Style } from '../style/glsl.ts';
-import { PIGMENTS } from '../style/palette.ts';
+import { PIGMENTS, TEAMS } from '../style/palette.ts';
 import { cubeTexture } from './swell.ts';
 import { FORM_NAMES } from './ships/forms.ts';
 import { silhouetteRect, silhouetteTexture } from './ships/silhouettes.ts';
@@ -569,8 +569,8 @@ export class Chart {
     const net = this.net, fit = net.fit(camera, view), b = builder(), pxU = this.uniforms.uPxU.value;
     const ink = [...linearVec(PIGMENTS.ironGall).toArray(), 2], mine = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
     const inv = new THREE.Matrix3(), p = V();
-    // WP27 (S-019): once the player has gone down the chart is the match playing out: its hulls drawn half again as large
-    const big = state.ships[PLAYER]?.phase === PHASE.sunk ? 1.5 : 1;
+    // WP27 (S-019): once the player has gone down the chart is the match playing out: its hulls drawn twice as large
+    const big = state.ships[PLAYER]?.phase === PHASE.sunk ? 2 : 1;
     this.drawn = 0;
     // WP24 part D: under the ships, the current, the player's waters, trails, landmarks, loot and the course
     chartContent(b, net, state, this.world, mask, pxU, fit.up, this.draft);
@@ -590,13 +590,17 @@ export class Chart {
       if (hd.lengthSq() < 1e-10) hd.copy(up); else hd.normalize();
       const s = 9 * big * pxU, flip = hd.dot(right) < 0 ? -1 : 1, rect = silhouetteRect(FORM_NAMES[ship.form] ?? 'caravel', 'profile');
       const col = i === PLAYER ? mine : ink;
-      const Q = (x: number, y: number) => o.clone().addScaledVector(right, x * s).addScaledVector(up, y * s + s * 0.6);
-      const sil = [...ink.slice(0, 3), 1];
-      const q: [THREE.Vector3, number, number][] = [
-        [Q(-flip, 1), rect.x, rect.y + rect.w], [Q(flip, 1), rect.x + rect.z, rect.y + rect.w],
-        [Q(flip, -1), rect.x + rect.z, rect.y], [Q(-flip, -1), rect.x, rect.y],
-      ];
-      for (const j of [0, 3, 1, 1, 3, 2]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
+      // WP27d (S-019): the hull in her captain's pigment (TEAMS, as her sails and trail), over the same silhouette in
+      // iron gall a little larger, so each reads as a ship and whose against parchment, sea and storm alike
+      const pig = [...linearVec(TEAMS[ship.pigment % TEAMS.length].primary).toArray(), 1];
+      for (const [grow, sil] of [[1.16, [...ink.slice(0, 3), 1]], [1, pig]] as const) {
+        const Q = (x: number, y: number) => o.clone().addScaledVector(right, x * s * grow).addScaledVector(up, y * s * grow + s * 0.6);
+        const q: [THREE.Vector3, number, number][] = [
+          [Q(-flip, 1), rect.x, rect.y + rect.w], [Q(flip, 1), rect.x + rect.z, rect.y + rect.w],
+          [Q(flip, -1), rect.x + rect.z, rect.y], [Q(-flip, -1), rect.x, rect.y],
+        ];
+        for (const j of [0, 3, 1, 1, 3, 2]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
+      }
       // WP24 part D: the captain's emblem flown over the hull (the player's gull), from the sails' atlas
       const em = i === PLAYER ? PLAYER_EMBLEM : ship.pattern > 0 ? EMBLEMS[(ship.pattern - 1) % EMBLEMS.length] : null;
       if (em) {
@@ -606,8 +610,8 @@ export class Chart {
         for (const j of [0, 3, 1, 1, 3, 2]) vert(eb, eq[j][0], k, null, 0, ec, eq[j][1], eq[j][2]);
       }
       // the arrow: a shaft and a head from the hull along where it is heading
-      const side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * pxU, wS = 0.9 * pxU, wH = 3.6 * pxU;
-      const a0 = o.clone().addScaledVector(hd, 4 * pxU), a1 = o.clone().addScaledVector(hd, L - 6 * pxU), tip = o.clone().addScaledVector(hd, L);
+      const side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * big * pxU, wS = 0.9 * big * pxU, wH = 3.6 * big * pxU;
+      const a0 = o.clone().addScaledVector(hd, 4 * big * pxU), a1 = o.clone().addScaledVector(hd, L - 6 * big * pxU), tip = o.clone().addScaledVector(hd, L);
       const sh = [a0.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, wS), a0.clone().addScaledVector(side, wS)];
       for (const j of [0, 1, 2, 0, 2, 3]) vert(b, sh[j], k, null, 0, col, 0, 0);
       for (const v of [a1.clone().addScaledVector(side, -wH), tip, a1.clone().addScaledVector(side, wH)]) vert(b, v, k, null, 0, col, 0, 0);

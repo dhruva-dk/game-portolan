@@ -50,10 +50,11 @@ async function sinking(game: Game, dev: string): Promise<boolean> {
   // sunk, or the end with her afloat (she won: the caller tests the flow on the next voyage)
   const sank = (await screen(game)) === 'match' && (await p27<number>(game, 'sunk')) >= 0;
   if (sank) {
-    await game.page.waitForTimeout(1200);
-    await shot(game, dev, 'sinking'); // the camera rising to watch the sea close over her
+    // the camera risen over the wreck, watching the sea close over her as she founders (shipView.ts SINK: 5.5–10.5 s)
+    await game.page.waitForFunction(() => ((window as Win).__wp27.sunk?.() ?? 0) >= 8, null, { timeout: 60_000, polling: 'raf' }).catch(() => {});
+    await shot(game, dev, 'sinking');
   }
-  // the skip card comes up once the chart has opened whole on the match playing out (the rise and the zoom take ~6 s
+  // the skip card comes up once the chart has opened whole on the match playing out (the watch and the zoom take ~12 s
   // of the rig's clock, longer in wall time when frames are slow)
   const skipAt = sank ? await waitFor<R>(game, 'skip', 40_000) : null;
   check(`${dev} sunk: the skip card comes up over the chart`, !sank || skipAt !== null);

@@ -31,9 +31,12 @@ export const SEA_CLEAR = 1.2, GROUND_CLEAR = 1.6;
 /** WP24 part D: the cinematic moves. The opening rides beside the fleet (swung openSwing rad off the stern toward the
  *  beam, lower by openLow, openBack u further off) and settles behind the ship through the break-off at no more than
  *  settle a second; the loop pull-back stands off pullBack and up pullUp u at a claim of pullArea² u² (∝ √area, at
- *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking rises sinkUp u over rise s, holds hold s, then opens the chart
- *  (reduced motion: holds holdRM s and cuts); the crow's nest raises the camera by crow × its lookout's eye. */
-export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 60, sinkBack: 14, rise: 3.2, hold: 1.2, holdRM: 1.5, crow: 0.5 } as const;
+ *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking rises sinkUp u and
+ *  stands off sinkBack u over rise s, its eye coming onto the wreck at the sea's face (S-019: she sits in the frame's
+ *  middle, whole), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
+ *  pennant under at 10.5), then opens the chart (reduced motion: holds holdRM s on the deck view and cuts); the crow's
+ *  nest raises the camera by crow × its lookout's eye. */
+export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 36, sinkBack: 20, rise: 3.2, hold: 6.5, holdRM: 8, crow: 0.5 } as const;
 /** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
 export const REDUCED_VEIL = 0.3;
 /** The system's reduced-motion preference (the settings' switch ORs with it: rig.reducedMotion = setting || this). */
@@ -387,7 +390,9 @@ export class CameraRig {
     if (z < 0.5 || !this.net) {
       const r = ph.rise, dist = dist0 * Math.pow(ORBIT_DIST / dist0, r), th = lerp(th0, Math.PI / 2, r);
       const bob = rm ? 0 : (0.14 * Math.sin(clock * 1.13) + 0.07 * Math.sin(clock * 0.61 + 2)) * (1 - r);
-      const t = this.t.copy(s).multiplyScalar(R + raise * (1 - r) + bob * 0.4).addScaledVector(hv, ahead * (1 - r));
+      // (sinking: the eye comes off the sea ahead onto the wreck itself, at the water, so she is framed in the middle)
+      const onto = 1 - c.sink * cw;
+      const t = this.t.copy(s).multiplyScalar(R + raise * (1 - r) * onto + bob * 0.4).addScaledVector(hv, ahead * (1 - r) * onto);
       const eye = this.eye.copy(t).addScaledVector(hv, -dist * Math.cos(th)).addScaledVector(s, dist * Math.sin(th) + bob);
       if (z < 0.2) this.collide(t, eye, r);
       const u = this.up.copy(s).multiplyScalar(Math.cos(th)).addScaledVector(hv, Math.sin(th));

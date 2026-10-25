@@ -21,9 +21,10 @@ import { CHART_GRID } from '../../src/career/voyage.ts';
 import { cellDir } from '../../src/sim/sphere.ts';
 import { v3 } from '../../src/sim/math.ts';
 import { cardLines } from './results.lines.ts';
-import { centreOf, chestLayout, chestOffers, chestPick, pickAt } from '../../src/ui/chestChoice.ts';
+import { cardFace, centreOf, chestLayout, chestOffers, chestPick, chestWords, headerOf, itemDoes, itemName, laterSize, pickAt, TIER_WORDS, type Offer } from '../../src/ui/chestChoice.ts';
+import { layoutText } from '../../src/lettering/text.ts';
 import { hudLayout, type HudButton } from '../../src/ui/hud.ts';
-import { MIN_TARGET, safeOf, within } from '../../src/ui/inkpage.ts';
+import { inset, MIN_LETTER, MIN_TARGET, safeOf, widthOf, within } from '../../src/ui/inkpage.ts';
 import type { Rect } from '../../src/ui/safeArea.ts';
 import { nextLayout, resultsLayout, resultsModel, skipLayout } from '../../src/ui/results.ts';
 import { newTutorial, promptLayout, sense, tutorialOver, tutorialStep, type Moment } from '../../src/ui/tutorial.ts';
@@ -33,6 +34,8 @@ import { inkChart, madeMatch } from './results.fixtures.ts';
 const IPHONE = { width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
 const IPAD = { width: 1376, height: 1032, dpr: 2, safe: { top: 24, right: 0, bottom: 20, left: 0 } };
 const VIEWS = [IPHONE, IPAD];
+/** The smallest supported iPhone (tests/ui/hud.test.ts's mini), for what must fit there. */
+const MINI = { width: 812, height: 375, dpr: 3, safe: { top: 0, right: 50, bottom: 21, left: 50 } };
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 test('a touch on the card a captain would take gives its very chestPick, through the input validator and the sim', () => {
@@ -222,6 +225,68 @@ test('S-019: the chest choice leaves the match in sight and in hand: clear of th
     if (c.column) assert.ok(!overlaps(c.panel, L.chart));
     assert.ok(c.cards.every((q) => q.width >= MIN_TARGET && q.height >= 90), `${name}: cards a thumb can take`);
     assert.ok(c.panel.height <= s.height * 0.5, `${name}: a compact panel, ${c.panel.height.toFixed(0)} of ${s.height} tall`);
+    assert.ok(c.cards.every((q) => within(q, c.panel)), `${name}: the cards inside the panel`);
+  }
+  // WP27d: every first-voyage prompt sits clear of the frame's centre and of every control, mirrored for the left hand,
+  // its words inside its scrap at a readable size, down to the smallest iPhone (the chest's beside the panel)
+  const disc = (d: { x: number; y: number; r: number }): Rect => ({ x: d.x - d.r, y: d.y - d.r, width: 2 * d.r, height: 2 * d.r });
+  for (const view of [IPHONE, MINI, IPAD]) {
+    const cards: Rect[][] = [];
+    for (const left of [false, true]) {
+      const L = hudLayout(view, left), s = safeOf(view), chest = chestLayout(view, 3, L), name = `${view.width} ${left ? 'left' : 'right'}-handed`;
+      const controls: [string, Rect][] = [['hull', L.hull], ['share', L.share], ['top', L.top], ['compact chart', L.chart], ['sail', L.sail], ['purse', L.purse],
+        ['wind rose', disc(L.compass)], ['stern glass', disc(L.sternGlass)], ...L.fittings.map((f, i): [string, Rect] => [`fitting ${i}`, disc(f)]), ...L.buttons.map((b): [string, Rect] => [b.kind, box(b)])];
+      const rest = { x: L.stick.x, y: L.stick.y + L.stick.height / 2, width: L.stick.width, height: L.stick.height / 2 };
+      cards.push([]);
+      for (let k = 0; k < LESSONS; k++) {
+        const p = promptLayout(view, k, left, L), c = p.card, what = `${name}: prompt ${k}`;
+        cards[cards.length - 1].push(c);
+        assert.ok(within(c, s), `${what}: in the safe area`);
+        assert.ok(!overlaps(c, centreOf(s)), `${what}: out of the frame's centre`);
+        for (const [n, q] of controls) assert.ok(!overlaps(c, q), `${what}: clear of the ${n}`);
+        assert.ok(!overlaps(c, rest), `${what}: clear of where the stick comes up`);
+        if (k === LESSON.chest) assert.ok(!overlaps(c, chest.sheet), `${what}: beside the chest's panel, not on it`);
+        for (const w of p.words) {
+          assert.ok(w.o.size >= MIN_LETTER, `${what}: "${w.text}" at ${w.o.size.toFixed(1)}`);
+          const b = layoutText(w.text, w.o).box;
+          assert.ok(within({ x: w.x + b.left, y: w.y + b.top, width: b.right - b.left, height: b.bottom - b.top }, inset(c, 4)), `${what}: "${w.text}" inside its scrap`);
+        }
+      }
+    }
+    cards[0].forEach((r, k) => { const m = cards[1][k]; assert.ok(Math.abs(view.width - r.x - r.width - m.x) < 1 && Math.abs(r.y - m.y) < 1, `${view.width}: prompt ${k} mirrored for the left hand`); });
+  }
+  // WP27d: every string on every card fits inside its card's frame, at a readable size, down to the smallest iPhone:
+  // each item at the iron-gall and gold tiers, with each consequence it can have (an empty slot, in place of the longest
+  // name in that slot, stores full, a stack)
+  const offerOf = (kind: number, tier: number, replaces: number, takeable = true): Offer => {
+    const consumable = kind >= CONSUMABLE.patchKit, slot = consumable ? -1 : FITTING_SLOT[kind];
+    return { index: 0, item: { kind, tier }, name: itemName(kind), does: itemDoes(kind), consumable, slot, pigment: '#4566b0', tierWord: TIER_WORDS[tier], gold: tier === TIERS - 1,
+      takeable, replaces: replaces > 0 ? { kind: replaces, tier: 0 } : null, count: consumable ? 3 : 0, worth: 0, best: false };
+  };
+  const kinds = [...Object.values(FITTING).filter((f) => f > 0), ...Object.values(CONSUMABLE)];
+  const longest = (slot: number): number => kinds.filter((f) => f < CONSUMABLE.patchKit && FITTING_SLOT[f] === slot).reduce((a, b) => (widthOf(itemName(b), { size: 12 }) > widthOf(itemName(a), { size: 12 }) ? b : a));
+  const boxOf = (w: { text: string; x: number; y: number; o: Parameters<typeof layoutText>[1] }): Rect => { const b = layoutText(w.text, w.o).box; return { x: w.x + b.left, y: w.y + b.top, width: b.right - b.left, height: b.bottom - b.top }; };
+  for (const view of [IPHONE, MINI, IPAD]) for (const left of [false, true]) {
+    const L = hudLayout(view, left), c = chestLayout(view, 3, L), name = `${view.width} ${left ? 'left' : 'right'}-handed`;
+    assert.ok(c.cards.every((q) => within(q, c.panel)), `${name}: the cards inside the panel`);
+    const ls = laterSize(c);
+    assert.ok(ls >= MIN_LETTER && widthOf('Later', { size: ls }) <= c.later.width - 8, `${name}: "Later" fits its tab at ${ls.toFixed(1)}`);
+    if (c.column) for (let t = 0; t < TIERS; t++) { const h = headerOf(c); assert.ok(h.size >= MIN_LETTER && widthOf(chestWords(t), { size: h.size, swash: true }) <= h.w, `${name}: the header fits`); }
+    for (const kind of kinds) for (const tier of [0, TIERS - 1]) {
+      const fitting = kind < CONSUMABLE.patchKit, cases = fitting ? [offerOf(kind, tier, 0), offerOf(kind, tier, longest(FITTING_SLOT[kind]))] : [offerOf(kind, tier, 0), offerOf(kind, tier, 0, false)];
+      for (const o of cases) for (const card of c.cards) {
+        const k = c.k, f = cardFace(o, card, k), frame = inset(card, 5 * k), what = `${name}: ${o.name} (${o.replaces ? `in place of ${itemName(o.replaces.kind)}` : o.takeable ? 'free' : 'full'})`;
+        const icon = { x: f.icon.x - f.icon.r, y: f.icon.y - f.icon.r, width: 2 * f.icon.r, height: 2 * f.icon.r };
+        assert.ok(within(icon, frame), `${what}: the roundel inside the card`);
+        const boxes = f.words.map(boxOf);
+        f.words.forEach((w, i) => {
+          assert.ok(w.o.size >= MIN_LETTER, `${what}: "${w.text}" at ${w.o.size.toFixed(1)} ≥ ${MIN_LETTER}`);
+          assert.ok(within(boxes[i], frame), `${what}: "${w.text}" inside the card (${JSON.stringify(boxes[i])} in ${JSON.stringify(frame)})`);
+          assert.ok(!overlaps(boxes[i], icon), `${what}: "${w.text}" clear of the roundel`);
+          for (let j = 0; j < i; j++) assert.ok(!overlaps(boxes[i], boxes[j]), `${what}: "${w.text}" clear of "${f.words[j].text}"`);
+        });
+      }
+    }
   }
 });
 

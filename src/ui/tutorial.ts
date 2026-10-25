@@ -12,7 +12,10 @@ import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { TICK, afloat, type MatchState } from '../sim/state.ts';
 import { INK, nib, ring } from './icons.ts';
-import { SEPIA, VERMILION, clamp01, clampRect, ease, inkRect, inset, inside, letter, quad, safeOf, scrap, type G, type Pt } from './inkpage.ts';
+import type { TextOptions } from '../lettering/text.ts';
+import { centreOf, chestLayout, type Words } from './chestChoice.ts';
+import { hudLayout, mirrorLayout, type HudButton, type HudLayout } from './hud.ts';
+import { MIN_LETTER, MIN_TARGET, SEPIA, VERMILION, clamp01, ease, inkRect, inset, inside, layoutOf, letter, quad, scrap, type G, type Pt } from './inkpage.ts';
 import type { Rect, View } from './safeArea.ts';
 import type { Touch } from './shell.ts';
 
@@ -125,38 +128,78 @@ export interface PromptLayout {
   /** The sheet's bounds: the card, the arrow and the ring. */
   bounds: Rect;
   k: number;
+  /** The words and the line under them, as letter() draws them (the fit test measures them). */
+  words: Words[];
 }
 
 /** Where the controls are on screen (the match screen gives the HUD's own layout, part B). */
 export type Anchors = Partial<Record<Anchor, { x: number; y: number }>>;
 
-/** Where the scrap and its arrow go for a lesson: at `anchors`' control, else the WP25 HUD's thumb zones, mirrored for the left-handed. */
-export function promptLayout(view: View, lesson: number, leftHanded = false, anchors: Anchors = {}): PromptLayout {
-  const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), a = PROMPTS[lesson].anchor;
-  const fx = (f: number): number => s.x + s.width * (leftHanded ? 1 - f : f);
-  const at = anchors[a] ?? (a === 'stick' ? { x: fx(0.13), y: s.y + s.height * 0.74 }
-    : a === 'guns' ? { x: fx(0.87), y: s.y + s.height * 0.74 }
-    : a === 'gull' ? { x: fx(0.87), y: s.y + s.height * 0.42 }
-    : a === 'home' ? { x: fx(0.95), y: s.y + s.height * 0.6 }
-    : a === 'storm' ? { x: s.x + s.width * 0.5, y: s.y + 26 * k }
-    : { x: s.x + s.width / 2, y: s.y + s.height / 2 });
-  const w = 300 * k, h = (PROMPTS[lesson].sub ? 80 : 56) * k;
-  let cx = at.x + (s.x + s.width / 2 - at.x) * 0.55, cy = at.y + (s.y + s.height * 0.42 - at.y) * 0.55;
-  const panel = a === 'deck' ? anchors.deck : undefined;
-  if (panel) { // S-019: beside the chest's panel, on the side toward the middle, an arrow to its cards
-    const side = panel.x > s.x + s.width / 2 ? -1 : 1;
-    cx = panel.x + side * (74 * k + w / 2);
-    cy = panel.y;
-  } else if (a === 'deck') {
-    cx = s.x + w / 2 + 8 * k;
-    cy = s.y + h / 2 + 8 * k;
-  } else if (a === 'storm') cy = at.y + 70 * k + h / 2;
-  const card = clampRect({ x: cx - w / 2, y: cy - h / 2, width: w, height: h }, inset(s, 4));
+/** Where each prompt points in the HUD `L`: the stick's thumb, head home, the gull, the broadside's fitting, the
+ *  storm's dial, the chest's panel. */
+export function anchorsOf(L: HudLayout): Anchors {
+  const at = (kind: string) => { const b = L.buttons.find((q) => q.kind === kind); return b && { x: b.x, y: b.y }; };
+  const guns = L.fittings[1], c = chestLayout(L.view, 3, L), p = c.panel; // a chest offers three (items.ts OFFERS)
+  return {
+    stick: { x: L.stick.x + L.stick.width * (L.left ? 0.74 : 0.26), y: L.stick.y + L.stick.height * 0.72 },
+    home: at('home'), gull: at('gull'), guns: guns && { x: guns.x, y: guns.y },
+    storm: { x: L.top.x + L.top.width / 2, y: L.top.y + L.top.height / 2 },
+    deck: { x: c.left ? p.x + p.width : p.x, y: p.y + Math.min(p.height, 112 * c.k) - 28 * c.k },
+  };
+}
+
+/** What a prompt's scrap must leave clear in the HUD `L` (S-019): the frame's centre (the ship and the sea ahead),
+ *  every scrap and control (the hull rope, the top centre, the compact chart, the stern glass, the wind rose, the sail,
+ *  the purse, the fittings, every button of the fan), where the stick comes up (the lower half of its half), and the chest's panel. */
+export function keepClear(L: HudLayout, lesson = -1): Rect[] {
+  const disc = (d: { x: number; y: number; r: number }): Rect => ({ x: d.x - d.r, y: d.y - d.r, width: 2 * d.r, height: 2 * d.r });
+  const hit = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : disc({ x: b.x, y: b.y, r: b.hit }));
+  const st = L.stick, rest = { x: st.x, y: st.y + st.height / 2, width: st.width, height: st.height / 2 }; // where the stick comes up
+  const out = [centreOf(L.safe), L.hull, L.share, L.top, L.chart, L.sail, L.purse, disc(L.compass), disc(L.sternGlass),
+    ...L.fittings.map(disc), ...L.buttons.map(hit), rest];
+  if (lesson < 0 || PROMPTS[lesson].anchor === 'deck') out.push(chestLayout(L.view, 3, L).sheet);
+  return out;
+}
+
+/** The scrap's lettering, the card at (0, 0): the words and the line under them, sized to the screen (never under
+ *  MIN_LETTER), and the card's size around them. */
+function promptFace(lesson: number, kk: number): { words: Words[]; width: number; height: number } {
+  const P = PROMPTS[lesson], pad = 7 * kk, side = 16 * kk;
+  const wo: TextOptions = { size: Math.max(MIN_LETTER, 20 * kk), align: 'center', valign: 'top', swash: true };
+  const so: TextOptions = { size: Math.max(MIN_LETTER, 13 * kk), align: 'center', valign: 'top' };
+  const wb = layoutOf(P.words, wo).box, sb = P.sub ? layoutOf(P.sub, so).box : null;
+  const width = Math.max(wb.right - wb.left, sb ? sb.right - sb.left : 0) + 2 * side;
+  const words: Words[] = [{ text: P.words, x: width / 2, y: pad, o: wo, colour: INK }];
+  let tall = wb.bottom - wb.top;
+  if (P.sub && sb) { words.push({ text: P.sub, x: width / 2, y: pad + tall, o: so, colour: SEPIA }); tall += sb.bottom - sb.top - 1 * kk; }
+  const height = Math.max(MIN_TARGET, tall + 2 * pad), dy = (height - tall - 2 * pad) / 2; // a tap folds it: a 44 pt target at least
+  return { words: words.map((q) => ({ ...q, y: q.y + dy })), width, height };
+}
+
+/** Where the scrap and its arrow go for a lesson in the HUD `hud`: the nearest place to its control that leaves the
+ *  centre and every control clear (keepClear), found in the right-handed layout and mirrored for the left hand. */
+export function promptLayout(view: View, lesson: number, leftHanded = false, hud: HudLayout = hudLayout(view, leftHanded)): PromptLayout {
+  const L = hud, R = L.left ? mirrorLayout(L) : L, s = R.safe, kk = Math.min(1.45, s.height / 420), k = Math.max(1, kk), a = PROMPTS[lesson].anchor;
+  const at = anchorsOf(L)[a] ?? { x: s.x + s.width / 2, y: s.y + s.height / 2 }, aim = anchorsOf(R)[a] ?? at;
+  const f = promptFace(lesson, kk), w = f.width, h = f.height, room = inset(s, 4), clear = keepClear(R, lesson).map((q) => inset(q, -6 * R.u));
+  let best: Rect | null = null, score = Infinity;
+  for (let y = room.y; y + h <= room.y + room.height; y += 2) for (let x = room.x; x + w <= room.x + room.width; x += 2) {
+    const r = { x, y, width: w, height: h };
+    if (clear.some((q) => meets(q, r))) continue;
+    const dx = Math.max(x - aim.x, 0, aim.x - x - w), dy = Math.max(y - aim.y, 0, aim.y - y - h), d = Math.hypot(dx, dy);
+    if (d < score - 1e-6) { score = d; best = r; }
+  }
+  // (nowhere clear, never seen on a supported device: the top-left corner of the safe area, as small as it is)
+  let card = best ?? { x: room.x, y: room.y, width: w, height: h };
+  if (L.left) card = { ...card, x: view.width - card.x - card.width };
+  const words = f.words.map((q) => ({ ...q, x: q.x + card.x, y: q.y + card.y }));
   const ringR = 40 * k, x0 = Math.min(card.x, at.x - ringR), y0 = Math.min(card.y, at.y - ringR);
   const x1 = Math.max(card.x + card.width, at.x + ringR), y1 = Math.max(card.y + card.height, at.y + ringR);
-  const bounds = a === 'deck' && !panel ? inset(card, -6) : { x: x0 - 6, y: y0 - 6, width: x1 - x0 + 12, height: y1 - y0 + 12 };
-  return { lesson, at, card, bounds, k };
+  const bounds = { x: x0 - 6, y: y0 - 6, width: x1 - x0 + 12, height: y1 - y0 + 12 };
+  return { lesson, at, card, bounds, k, words };
 }
+
+const meets = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 function toward(r: Rect, p: { x: number; y: number }): Pt {
   const cx = r.x + r.width / 2, cy = r.y + r.height / 2, dx = p.x - cx, dy = p.y - cy;
@@ -170,7 +213,7 @@ export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
   if (a <= 0) return;
   g.save();
   g.globalAlpha *= a;
-  if (P.anchor !== 'deck' || pl.bounds.width > r.width + 12.5) { // the chest's prompt: an arrow to the panel, no ring
+  { // an arrow to the control (to the chest's panel: no ring)
     const from = toward(r, at), dx = at.x - from[0], dy = at.y - from[1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
     const end: Pt = [at.x - ux * 34 * k, at.y - uy * 34 * k], mid: Pt = [(from[0] + end[0]) / 2 - uy * len * 0.16, (from[1] + end[1]) / 2 + ux * len * 0.16];
     const pa = clamp01((t - 0.25) / 0.6), curve = quad(from, mid, end, 20);
@@ -184,8 +227,7 @@ export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
   }
   scrap(g, r, 600 + lesson);
   inkRect(g, inset(r, 4 * k), 610 + lesson, clamp01(t / 0.6), SEPIA, 1.1 * k);
-  letter(g, P.words, r.x + r.width / 2, P.sub ? r.y + 30 * k : r.y + r.height / 2, { size: 25 * k, align: 'center', valign: 'middle', swash: true }, INK, clamp01((t - 0.15) / 0.9));
-  if (P.sub) letter(g, P.sub, r.x + r.width / 2, r.y + 59 * k, { size: 15 * k, align: 'center', valign: 'middle' }, SEPIA, clamp01((t - 0.7) / 0.8));
+  pl.words.forEach((w, i) => letter(g, w.text, w.x, w.y, w.o, w.colour, clamp01(i === 0 ? (t - 0.15) / 0.9 : (t - 0.7) / 0.8)));
   g.restore();
 }
 
@@ -200,7 +242,7 @@ export class TutorialOverlay {
   private t = 0;
   private acc = 0;
   private tick = 0;
-  private anchors: Anchors = {};
+  private hud: HudLayout | null = null;
   private finger = -1; // the finger that landed on the scrap
 
   readonly state: Tutorial;
@@ -238,9 +280,9 @@ export class TutorialOverlay {
   }
 
   /** The view, and where its controls are (the HUD's layout). */
-  layout(view: View, anchors: Anchors = {}): void {
+  layout(view: View, hud: HudLayout | null = null): void {
     this.view = view;
-    this.anchors = anchors;
+    this.hud = hud;
     this.rebuild();
   }
 
@@ -281,7 +323,7 @@ export class TutorialOverlay {
     drop(this.group);
     this.mesh = this.sheet = this.pl = null;
     if (this.shown < 0 || this.view === null) return;
-    const pl = this.pl = promptLayout(this.view, this.shown, this.leftHanded, this.anchors), b = pl.bounds;
+    const pl = this.pl = promptLayout(this.view, this.shown, this.leftHanded, this.hud ?? hudLayout(this.view, this.leftHanded)), b = pl.bounds;
     this.sheet = sheet(b.width, b.height, 900_000, this.view.dpr);
     this.mesh = sheetMesh(this.sheet);
     this.mesh.position.set(b.x + b.width / 2, b.y + b.height / 2, 0);

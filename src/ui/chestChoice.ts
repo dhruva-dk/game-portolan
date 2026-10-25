@@ -16,9 +16,10 @@ import type { Ship } from '../sim/state.ts';
 import { CONSUMABLE, FITTING, FITTING_SLOT, LOOT, SLOT, TIERS } from '../sim/tables.ts';
 import { INK, TIER, consumableIcon, mortarIcon, nib, ring, wash } from './icons.ts';
 import {
-  GOLD_DARK, MIN_TARGET, OCHRE, PAPER, SEPIA, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, quad, rgba, safeOf, scrap, type G, type Pt,
+  GOLD_DARK, MIN_LETTER, MIN_TARGET, OCHRE, fitSize, layoutOf, PAPER, SEPIA, VERMILION, clamp01, ease, goldLeaf, inkButton, inkRect, inset, inside, letter, quad, rgba, safeOf, scrap, type G, type Pt,
 } from './inkpage.ts';
 import { hudLayout, type HudButton, type HudLayout } from './hud.ts';
+import type { TextOptions } from '../lettering/text.ts';
 import type { Rect, View } from './safeArea.ts';
 import type { Touch } from './shell.ts';
 
@@ -140,8 +141,9 @@ export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hud
   }
   // the row: across the top corner on the thumb's side, from the top centre's scrap to the edge, down to the centre's box
   const from = left ? hud.top.x - gap : hud.top.x + hud.top.width + gap, w = Math.abs(edge - from), x = left ? edge : from;
-  const y = s.y + m, h = Math.min(c.y, fanTop) - gap - y, cw = (w - 2 * m - (n - 1) * gap) / n;
-  const cards = Array.from({ length: n }, (_, i) => ({ x: x + m + i * (cw + gap), y: y + m, width: cw, height: h - 2 * m }));
+  // (the cards close-set, 4 pt in and 5 apart, so their words fit down to the smallest iPhone)
+  const y = s.y + m, h = Math.min(c.y, fanTop) - gap - y, mc = 4 * k, gc = 5 * k, cw = (w - 2 * mc - (n - 1) * gc) / n;
+  const cards = Array.from({ length: n }, (_, i) => ({ x: x + mc + i * (cw + gc), y: y + mc, width: cw, height: h - 2 * mc }));
   // "Later": a tab under the outer card, as wide as the fan's discs leave it (never under 44 pt)
   const ty = y + h + 2 * k, th = MIN_TARGET;
   let later = { x: left ? x : x + w - MIN_TARGET, y: ty, width: MIN_TARGET, height: th };
@@ -152,6 +154,11 @@ export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hud
   const panel = { x, y, width: w, height: h };
   return { view, sheet: { x, y, width: w, height: ty + th - y }, panel, cards, later, k, column: false, left };
 }
+
+/** "Later"'s lettering, em CSS px (inkButton letters at 21 × its scale): as large as its tab holds, never under MIN_LETTER. */
+export const laterSize = (l: ChestLayout): number => Math.max(MIN_LETTER, 21 * (l.column ? l.k * 0.85 : Math.min(l.k * 0.72, l.later.width / 64)));
+/** The column's header ("A vermilion chest"), em CSS px, and the width it may take. */
+export const headerOf = (l: ChestLayout): { size: number; w: number } => ({ size: 17 * l.k, w: l.panel.width - l.later.width - 30 * l.k });
 
 /** What a touch at (x, y) lands on: a card's index, −2 "Later", −1 nothing. */
 export function pickAt(l: ChestLayout, x: number, y: number): number {
@@ -170,19 +177,41 @@ export function drawChestChoice(g: G, offers: readonly Offer[], l: ChestLayout, 
   if (top >= TIERS - 1) goldLeaf(g, inset(s, 1.5 * k), 7003, clamp01((t - 0.2) / 0.8), 3 * k);
   if (l.column) {
     const tx = l.left ? l.later.x + l.later.width + 12 * k : s.x + 14 * k, ty = l.later.y + l.later.height / 2;
-    letter(g, chestWords(top), tx, ty, { size: 17 * k, valign: 'middle', swash: true, maxWidth: s.width - l.later.width - 30 * k }, top >= TIERS - 1 ? GOLD_DARK : TIER[top] ?? SEPIA, clamp01((t - 0.2) / 0.6));
+    const hd = headerOf(l);
+    letter(g, chestWords(top), tx, ty, { size: hd.size, valign: 'middle', swash: true, maxWidth: hd.w }, top >= TIERS - 1 ? GOLD_DARK : TIER[top] ?? SEPIA, clamp01((t - 0.2) / 0.6));
   }
   offers.forEach((o, i) => { if (l.cards[i]) drawCard(g, o, l.cards[i], t - 0.15 - i * 0.14, chosen, k, hint); });
-  inkButton(g, l.later, 'Later', l.column ? k * 0.85 : Math.min(k * 0.72, l.later.width / 64), chosen >= 0 ? 0 : clamp01((t - 0.6) / 0.4));
+  inkButton(g, l.later, 'Later', laterSize(l) / 21, chosen >= 0 ? 0 : clamp01((t - 0.6) / 0.4));
+}
+
+/** One line (or wrapped block) of a card's lettering, as letter() draws it at (x, y); the fit test measures it. */
+export interface Words { text: string; x: number; y: number; o: TextOptions; colour: string }
+/** A card's face, `c` the card: its roundel and every string on it, each fitted inside the card's frame (S-019): a
+ *  string shrinks to fit its line, never under MIN_LETTER, then wraps; the words sit from the card's foot up and the
+ *  roundel takes what they leave. A wide card (the iPad's column) has the roundel at its left and four lines beside it. */
+export function cardFace(o: Offer, c: Rect, k: number): { icon: { x: number; y: number; r: number }; words: Words[]; wide: boolean } {
+  const wide = c.width > c.height * 1.6, pad = 7 * k, cons = consequence(o), consInk = o.takeable ? INK : VERMILION;
+  const tall = (text: string, w: TextOptions): number => { const b = layoutOf(text, w).box; return b.bottom - b.top; };
+  if (wide) { // name, tier and slot, what it does, and what taking it means, beside the icon
+    const r = c.height * 0.384, x = c.x + 12 * k + r, tx = x + r + 14 * k, wmax = c.x + c.width - 10 * k - tx, lh = c.height / 4.6, y0 = c.y + c.height / 2 - 1.5 * lh;
+    const tierLine = o.consumable ? `${o.tierWord}, ${uses(o.count)}` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`;
+    const line = (text: string, size: number, i: number, colour: string): Words => ({ text, x: tx, y: y0 + i * lh, o: { size: fitSize(text, size, wmax), valign: 'middle', maxWidth: wmax }, colour });
+    return { icon: { x, y: c.y + c.height / 2, r }, wide, words: [line(o.name, 19 * k, 0, INK), line(tierLine, 12.5 * k, 1, o.gold ? GOLD_DARK : o.item.tier === 0 ? SEPIA : o.pigment), line(o.does, 12.5 * k, 2, SEPIA), line(cons, 12.5 * k, 3, consInk)] };
+  }
+  // a narrow card (the iPhone's row): the name and what taking it means under the roundel (the tier is its pigment)
+  const w = c.width - 2 * pad, x = c.x + c.width / 2;
+  const no: TextOptions = { size: fitSize(o.name, 14 * k, w), align: 'center', valign: 'top', maxWidth: w, lineHeight: 1.08 };
+  const co: TextOptions = { size: fitSize(cons, 12.5 * k, w), align: 'center', valign: 'top', maxWidth: w, lineHeight: 1.08 };
+  const cy = c.y + c.height - pad - tall(cons, co), ny = cy - 1.5 * k - tall(o.name, no), room = ny - 2 * k - (c.y + pad);
+  const r = Math.max(7 * k, Math.min(c.width * 0.31, room / 2));
+  return { icon: { x, y: c.y + pad + room / 2, r }, wide, words: [{ text: o.name, x, y: ny, o: no, colour: INK }, { text: cons, x, y: cy, o: co, colour: consInk }] };
 }
 
 function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number, hint: boolean): void {
   if (t <= 0) return;
-  const a = ease(t / 0.5), mine = chosen === o.index, dim = chosen >= 0 && !mine ? 0.3 : 1, wide = r.width > r.height * 1.6;
+  const a = ease(t / 0.5), mine = chosen === o.index, dim = chosen >= 0 && !mine ? 0.3 : 1;
   const c = { x: r.x, y: r.y + (mine ? -5 * k : (1 - a) * 10 * k), width: r.width, height: r.height };
-  // the icon: on a wide card in a ring at its left, the words to its right; on a narrow one above its name
-  const s = wide ? c.height * 0.62 : Math.min(c.width * 0.5, c.height * 0.42);
-  const cx = wide ? c.x + 12 * k + s * 0.62 : c.x + c.width / 2, iy = wide ? c.y + c.height / 2 : c.y + 6 * k + s * 0.62;
+  const f = cardFace(o, c, k), cx = f.icon.x, iy = f.icon.y, rr = f.icon.r;
   g.save();
   g.globalAlpha *= a * dim * (o.takeable ? 1 : 0.62);
   const glow = g.createRadialGradient(cx, iy, 4, cx, iy, c.width * (mine ? 0.9 : 0.7));
@@ -193,27 +222,14 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   scrap(g, c, 9100 + o.index * 37 + o.item.kind, { tint: '#f4e9d0' });
   if (o.gold) goldLeaf(g, c, 9200 + o.index, clamp01(t / 0.8));
   else inkRect(g, inset(c, 5 * k), 9300 + o.index, clamp01(t / 0.8), o.pigment, 1.8 * k);
-  wash(g, o.pigment, 0.16, (gg) => { gg.beginPath(); gg.arc(cx, iy, s * 0.62, 0, Math.PI * 2); });
-  nib(g, ring(cx, iy, s * 0.62, 31 + o.item.kind), 1.2 * k, clamp01((t - 0.1) / 0.6), o.gold ? GOLD_DARK : o.pigment);
+  wash(g, o.pigment, 0.16, (gg) => { gg.beginPath(); gg.arc(cx, iy, rr, 0, Math.PI * 2); });
+  nib(g, ring(cx, iy, rr, 31 + o.item.kind), 1.2 * k, clamp01((t - 0.1) / 0.6), o.gold ? GOLD_DARK : o.pigment);
   const pi = clamp01((t - 0.15) / 0.6);
-  if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, s * 0.42, pi); // icons.ts sizes are half-extents
-  else cardIcon(g, o.item.kind, o.item.tier, cx, iy, s * 0.42, pi);
-  const pt = clamp01((t - 0.3) / 0.8), tierLine = o.consumable ? `${o.tierWord}, ${uses(o.count)}` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`;
-  const tierInk = o.gold ? GOLD_DARK : o.item.tier === 0 ? SEPIA : o.pigment;
-  let ny: number, nx0: number, nx1: number;
-  if (wide) { // name, tier and slot, what it does, and what taking it means, beside the icon
-    const tx = cx + s * 0.62 + 14 * k, wmax = c.x + c.width - 10 * k - tx, lh = c.height / 4.6, y0 = c.y + c.height / 2 - 1.5 * lh;
-    ny = y0; nx0 = tx - 4 * k; nx1 = tx + wmax;
-    letter(g, o.name, tx, y0, { size: 19 * k, valign: 'middle', maxWidth: wmax }, INK, pt);
-    letter(g, tierLine, tx, y0 + lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, tierInk, pt);
-    letter(g, o.does, tx, y0 + 2 * lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, SEPIA, pt);
-    letter(g, consequence(o), tx, y0 + 3 * lh, { size: 12.5 * k, valign: 'middle', maxWidth: wmax }, o.takeable ? INK : VERMILION, pt);
-  } else { // a narrow card: the name and what taking it means (the tier is its pigment)
-    const wmax = c.width - 10 * k;
-    ny = iy + s * 0.62 + 11 * k; nx0 = c.x + 8 * k; nx1 = c.x + c.width - 8 * k;
-    letter(g, o.name, cx, ny, { size: 14 * k, align: 'center', valign: 'middle', maxWidth: wmax }, INK, pt);
-    letter(g, consequence(o), cx, Math.min(c.y + c.height - 10 * k, ny + 19 * k), { size: 11.5 * k, align: 'center', valign: 'middle', maxWidth: wmax }, o.takeable ? INK : VERMILION, pt);
-  }
+  if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, rr * 0.68, pi); // icons.ts sizes are half-extents
+  else cardIcon(g, o.item.kind, o.item.tier, cx, iy, rr * 0.68, pi);
+  const pt = clamp01((t - 0.3) / 0.8);
+  for (const w of f.words) letter(g, w.text, w.x, w.y, w.o, w.colour, pt);
+  const nm = f.words[0], nb = layoutOf(nm.text, nm.o).box, ny = nm.y + (nb.top + nb.bottom) / 2, nx0 = nm.x + nb.left - 3 * k, nx1 = nm.x + nb.right + 3 * k;
   if (!o.takeable) nib(g, [[nx0, ny + 2 * k], [(nx0 + nx1) / 2, ny - 3 * k], [nx1, ny + 1 * k]], 2 * k, pt, VERMILION);
   if (hint && o.best && chosen < 0) {
     const fx = c.x + c.width - 12 * k, fy = c.y + 12 * k; // the gull's mark: a small eight-point star in gold

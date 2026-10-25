@@ -14,6 +14,9 @@ export const OCHRE = '#d4a656', ULTRAMARINE = '#4566b0';
 export const GOLD = '#d4a64a', GOLD_DARK = '#93691c', GOLD_LIGHT = '#f6e3a2';
 /** Touch targets: at least 44 pt (Apple HIG). */
 export const MIN_TARGET = 44;
+/** The least lettering on an iPhone, em CSS px: the smallest interface size the hand is tested legible at
+ *  (tests/lettering: no stroke fades at 11 px). S-019: nothing in the match flow is set smaller. */
+export const MIN_LETTER = 11;
 export const ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
 
 export const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -68,6 +71,12 @@ export function layoutOf(text: string, o: TextOptions): TextLayout {
   return l;
 }
 export const widthOf = (text: string, o: TextOptions): number => { const b = layoutOf(text, o).box; return b.right - b.left; };
+/** The largest size from `size` down to `min` (never under MIN_LETTER) at which `text` fits `w` on one line, else that least. */
+export function fitSize(text: string, size: number, w: number, min = MIN_LETTER): number {
+  const least = Math.max(MIN_LETTER, Math.min(size, min));
+  for (let s = size; s > least; s -= 0.25) if (widthOf(text, { size: s }) <= w) return s;
+  return least;
+}
 
 /**
  * Letter `text` at (x, y) (the anchor text.ts places by `align`/`valign`) in `colour`, written up to `p` (0–1) of the

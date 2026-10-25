@@ -10,7 +10,7 @@ import { LESSON } from '../career/voyage.ts';
 import { over } from '../sim/end.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, afloat } from '../sim/state.ts';
-import { ChestChoice, chestLayout } from './chestChoice.ts';
+import { ChestChoice } from './chestChoice.ts';
 import { Controls } from './controls.ts';
 import { Haptics } from './haptics.ts';
 import { HudState, hudLayout, type HudLayout } from './hud.ts';
@@ -24,7 +24,7 @@ import { COURSE, CourseDrawing } from '../render/course.ts';
 import { prefersReducedMotion } from '../render/camera.ts';
 import { TEAMS } from '../style/palette.ts';
 import type { Screen, ScreenContext, Touch } from './shell.ts';
-import { TutorialOverlay, newTutorial, sense, type Anchors, type Moment } from './tutorial.ts';
+import { TutorialOverlay, newTutorial, sense, type Moment } from './tutorial.ts';
 
 /** The screens drawn on the bare page have no world beneath them. */
 const BARE = { scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera() };
@@ -168,18 +168,6 @@ function chipOf(L: HudLayout): Rect {
   return { x: L.left ? c.x + c.width + gap : c.x - gap - w, y: c.y + (c.height - h) / 2, width: w, height: h };
 }
 
-/** WP27: where each first-voyage prompt points: the stick's thumb, head home, the gull, the broadside's fitting, the storm's dial. */
-function anchorsOf(L: HudLayout): Anchors {
-  const at = (kind: string) => { const b = L.buttons.find((q) => q.kind === kind); return b && { x: b.x, y: b.y }; };
-  const guns = L.fittings[1], c = chestLayout(L.view, 3, L), p = c.panel; // a chest offers three (items.ts OFFERS)
-  return {
-    stick: { x: L.stick.x + L.stick.width * (L.left ? 0.74 : 0.26), y: L.stick.y + L.stick.height * 0.72 },
-    home: at('home'), gull: at('gull'), guns: guns && { x: guns.x, y: guns.y },
-    storm: { x: L.top.x + L.top.width / 2, y: L.top.y + L.top.height / 2 },
-    deck: { x: c.left ? p.x + p.width : p.x, y: p.y + Math.min(p.height, 112 * c.k) - 28 * c.k }, // the chest's panel
-  };
-}
-
 /** The match in progress, drawn by the render modules; its interface and controls come with WP25. */
 export function match(ctx: ScreenContext): Screen {
   const { world, session } = ctx.runtime;
@@ -247,7 +235,7 @@ export function match(ctx: ScreenContext): Screen {
     Object.assign(chart.canvas.style, { position: 'fixed', left: `${L.chart.x + (L.chart.width - px) / 2}px`, top: `${L.chart.y + (L.chart.height - px) / 2}px`, pointerEvents: 'none', zIndex: '2' });
     chart.mount(document.body);
     chest.layout(v, chipOf(L), L);
-    tutorial?.layout(v, anchorsOf(L));
+    tutorial?.layout(v, L);
     if (sunk >= 0) skip.layout(v);
     if (probe) probe.layout = L;
   }
