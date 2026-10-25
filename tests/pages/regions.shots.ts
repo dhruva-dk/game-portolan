@@ -9,7 +9,7 @@
 // Part D: the Amber Shoals at low tide in gold light up the spit to the Sandbar Light (capture 21), the north-east inlet's
 // sill at low and high water (the passage shut, then open), the light from high above, the shoals in a calm.
 // WP17 part A: the Coral Atolls at midday off the Great Lagoon's reef, along its surf to the staked single channel
-// (capture 23), a motu's shore over the reef flat at low water, the Great Lagoon from high above.
+// (capture 23), a motu's shore over the reef flat at low water, the Great Lagoon from high above and from orbit.
 //   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -41,7 +41,8 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['weeping-rain', { view: 'weeping', hour: '7', squall: '1' }],
   ['coral-hero', { view: 'coral', hour: '12', tide: '0.1' }],
   ['coral-shore', { view: 'coralshore', hour: '15', tide: '-0.2' }],
-  ['coral-orbit', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1' }],
+  ['coral-high', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1' }],
+  ['coral-orbit', { view: 'orbit', region: 'Coral', hour: '12', tide: '0.1' }],
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();

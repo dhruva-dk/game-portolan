@@ -24,7 +24,7 @@ import { PIGMENTS, type RGB } from '../style/palette.ts';
 import { v3 } from '../sim/math.ts';
 import { R, TERRITORY, gnomonicDir } from '../sim/sphere.ts';
 import type { Geography } from '../sim/world/geography.ts';
-import { FLOOR, REGIONS, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
+import { DRAFT, FLOOR, REGIONS, TIDE, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
 import { GROUND, groundAt, terrains, type Ground, type Surface, type TerrainField } from './terrain.ts';
@@ -398,7 +398,8 @@ function density(kind: FloraKind, c: Cell): number {
     case 'duneGrass': return land && (g === GROUND.meadow || g === GROUND.beach) && c.inland < 7 && c.height > 0.8 ? 1.1 : 0;
     case 'reed': return land && (g === GROUND.mud || g === GROUND.meadow) && c.inland < 4 ? 0.35 : 0;
     case 'kelp': return c.floor === FLOOR.kelp && c.depth > 1 && c.depth < 10 ? 0.3 : 0;
-    case 'coral': return c.floor === FLOOR.coral && c.depth > 0.35 && c.depth < 6 ? 0.55 : 0;
+    // coral only on the reef a hull grounds on at low water, so the heads seen through the water mark a true hazard
+    case 'coral': return c.floor === FLOOR.coral && c.depth > 0.35 && c.depth < TIDE.amp + DRAFT ? 0.55 : 0;
   }
 }
 

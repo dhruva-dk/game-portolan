@@ -336,7 +336,7 @@ function frame(now: number): void {
   ice.update(camera.position, clock, clock);
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
-  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position, clock);
+  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
