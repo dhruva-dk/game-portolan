@@ -5,6 +5,8 @@
 // in cards.ts (tested in Node); this file draws them and answers touches.
 import * as THREE from 'three';
 import { QUALITY } from '../render/pipeline.ts';
+import type { Harbour3D, HarbourLook } from '../render/harbour3d.ts';
+import type { RGB } from '../style/palette.ts';
 import { saveCareer } from '../app/save.ts';
 import { TRAITS, type Trait } from '../career/league.ts';
 import { GULL_PRICES } from '../career/progress.ts';
@@ -48,6 +50,7 @@ function audioOf(rt: Runtime): { volumes: Volumes | null; ui: ((n: UiSound) => v
 
 const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]! >>> 1;
 const marksOf = (c: Career): GullMarks => gullMarks(TRAITS.map((t) => c.player.gull[t]), TRAITS.map((t) => GULL_PRICES[t].length));
+const lookOf = (c: Career): HarbourLook => ({ form: c.player.form, pigments: (c.player as { pigments?: readonly [RGB, RGB] }).pigments ?? null, marks: marksOf(c) });
 
 export function harbour(ctx: ScreenContext): Screen {
   const ui = new THREE.Group(), scene = new THREE.Group(), home = new THREE.Group(), leaf = new THREE.Group();
@@ -66,6 +69,7 @@ export function harbour(ctx: ScreenContext): Screen {
   let art: HarbourArt | null = null, artKey = '';
   let seal: THREE.Group | null = null, sealPress = 0, sealDown = false;
   let clock = 0, unroll = 1;
+  let h3: Harbour3D | null = null, h3Wait = false, h3Frames = 0, disposed = false; // WP26c the 3D harbour, built lazily
   let note: InkText | null = null, noteAt = -9;
   let finger: { id: number; target: Target } | null = null;
   const inking: { t: InkText; delay: number; at: number | null }[] = [];
@@ -313,10 +317,12 @@ export function harbour(ctx: ScreenContext): Screen {
   }
 
   return {
-    ...BARE,
+    get scene() { return h3?.scene ?? BARE.scene; }, // WP26c the 3D harbour once built, the bare world until then
+    get camera() { return h3?.camera ?? BARE.camera; },
     ui,
     layout(v) {
       view = v;
+      h3?.layout(v.width, v.height);
       H = harbourLayout(v, 'home');
       L = page === 'home' ? H : harbourLayout(v, page);
       artKey = '';
@@ -329,6 +335,20 @@ export function harbour(ctx: ScreenContext): Screen {
       const still = settings().reducedMotion;
       if (holder.career !== shown) { shown = holder.career; buildArt(); buildHome(); buildLeaf(false); }
       art?.frame(f.clock, still);
+      if (!h3 && !h3Wait && ++h3Frames > 1) { // WP26c the 3D harbour, built once the harbour has drawn its first frame
+        h3Wait = true;
+        void import('../render/harbour3d.ts').then((m) => {
+          if (disposed) return;
+          h3 = new m.Harbour3D(style, lookOf(career()), ctx.pipeline.quality.detail);
+          if (view) h3.layout(view.width, view.height);
+          scene.visible = false; // the 2D illustration gives way to the inked 3D harbour
+        });
+      }
+      if (h3) {
+        h3.setCareer(lookOf(career())); // the shipwright's form and pigments, the gull's plumage, live
+        h3.setDetail(ctx.pipeline.quality.detail);
+        h3.frame(f.clock, f.dt, still, page === 'home' ? 0 : 1);
+      }
       if (seal) { // the seal sinks into the page under the finger with a tap, and springs back; faint while the world is still coming
         const ready = !!rt.world && live(), down = ready && finger?.target.kind === 'sail';
         if (down && !sealDown) uiSound('tap');
@@ -366,6 +386,9 @@ export function harbour(ctx: ScreenContext): Screen {
       if (t.phase === 'up' && hit(L, t.x, t.y)?.id === target.id) act(target);
     },
     dispose() {
+      disposed = true;
+      h3?.dispose();
+      h3 = null;
       drop(ui);
       unhear();
       setUiSound(null);

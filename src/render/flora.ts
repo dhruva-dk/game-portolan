@@ -750,6 +750,8 @@ export class Flora {
   /** WP30 part C: the reach governor's scales: the far level's and the thinning distances (kF), then the near level's (kN). */
   private kF = 1;
   private kN = 1;
+  /** WP26c the graphics quality's detail (Pipeline.quality.detail): Swift and Fine draw the plants in nearer. */
+  detail = 1;
 
   constructor(style: Style, geo: Geography, field: TerrainField, swell: Swell) {
     this.bed = plantBed(geo, field);
@@ -783,12 +785,12 @@ export class Flora {
     seen.length = 0;
     for (const p of bed.patches) {
       const d = p.centre.distanceTo(eye) - p.radius;
-      if (d > this.reach * this.kF || Math.acos(Math.min(1, p.centre.dot(eye) / (p.centre.length() * el))) > horizon + p.radius / R) continue;
+      if (d > this.reach * this.kF * this.detail || Math.acos(Math.min(1, p.centre.dot(eye) / (p.centre.length() * el))) > horizon + p.radius / R) continue;
       if (this.frustum.intersectsSphere(this.sphere.set(p.centre, p.radius + 6 + 0.1 * Math.max(d, 0)))) seen.push({ p, d });
     }
     seen.sort((a, b) => a.d - b.d);
     // the dissolve bands follow the governor's reach, so plants drawn in still dissolve by the stipple
-    const kN = this.kN, kF = this.kF;
+    const kN = this.kN * this.detail, kF = this.kF * this.detail;
     KINDS.forEach((kind, k) => this.draws[k].forEach((d, lod) => {
       if (!d) return;
       const sp = FLORA[kind], u = (d.mesh.material as THREE.ShaderMaterial).uniforms, nr = sp.near * kN, fr = sp.far * kF;
@@ -849,6 +851,7 @@ export function createFlora(ctx: RenderContext): RenderModule {
   floras.set(ctx.scene, flora);
   return {
     frame() {
+      flora.detail = ctx.pipeline.quality.detail; // WP26c the graphics quality
       flora.update(ctx.camera);
     },
     dispose() {
