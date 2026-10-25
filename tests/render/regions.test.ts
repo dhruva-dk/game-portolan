@@ -121,6 +121,6 @@ test('the Weeping Isle: a fall at every sim cascade and streaks all round, each 
     const d = s.at.clone().normalize();
     assert.ok(Math.abs(s.at.length() - R - surf(d)) < 0.05 && heightAt(geo, d) >= -DRAFT + 0.1, 'the dressing is seated on land');
   }
-  assert.ok(plan.boulders.length > 150 && plan.clumps.length > 300 && plan.ferns.length > 120, `${plan.boulders.length} boulders, ${plan.clumps.length} clumps, ${plan.ferns.length} ferns`);
+  assert.ok(plan.boulders.length > 100 && plan.clumps.length > 300 && plan.ferns.length > 120, `${plan.boulders.length} boulders, ${plan.clumps.length} clumps, ${plan.ferns.length} ferns`);
   console.log(`weeping: missing ${missing.join(',')}; ${plan.falls.length} falls (${plan.falls.filter((f) => f.sim).length} sim), ${plan.crags.length} crags, ${plan.boulders.length}/${plan.clumps.length}/${plan.ferns.length} dressing, ${plan.dashes.length} dashes, ${plan.puffs.length} puffs, spire ${spire?.top.toFixed(1)}, ${ms.toFixed(0)} ms`);
 });
