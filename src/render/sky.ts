@@ -63,6 +63,17 @@ const float RAY_STEP = 6.2831853 / 16.0;
 const vec3 PALE_GOLD = ${glslLinear(hex('#f5dc96'))};
 ${PEN_GLSL}
 ${AURORA_GLSL}
+float hashC(float x) { return fract(sin(x * 91.7 + 13.1) * 43758.5453); }
+// the outline of a bank of cumulus along the horizon: domes in n cells round it (rad above the horizon)
+float cumulusTop(float az, float n, float flat_, float seed) {
+  float cw = 6.2831853 / n, u = az / cw, ci = floor(u), top = 0.0;
+  for (int k = -2; k <= 2; k++) {
+    float c = mod(ci + float(k), n) + seed * 17.0, r = cw * (0.7 + 0.9 * hashC(c));
+    float dx = az - (ci + float(k) + 0.5 + 0.5 * (hashC(c * 1.7) - 0.5)) * cw;
+    top = max(top, step(0.3, hashC(c * 2.3)) * (0.5 * r * hashC(c * 2.9) + flat_ * sqrt(max(r * r - dx * dx, 0.0))));
+  }
+  return top;
+}
 void main() {
   vec3 d = normalize(vDir);
   float el = dot(d, uUp);
@@ -73,19 +84,41 @@ void main() {
   // gold leaf on the page glints as the page tilts: here, as the view turns
   vec3 tilt = normalize(-d + 1.5 * (fwd - d));
 
-  // the horizon wash over the whole sky (the colour the far sea pales into), then the zenith laid over it in three
-  // washes, each higher than the last, each edge wavering and pooled where it dried
+  // the horizon wash over the whole sky (the colour the far sea pales into), then the zenith laid over it as one graded
+  // wash, wet in wet: strongest overhead, thinning to the haze at the horizon, its load uneven with the brush and the
+  // paper, a soft backrun here and there, and one wavering pooled edge high up where the second pass dried
   vec3 col = glaze(parchment(q), uSkyHorizon / uPaper, 1.0, 0.0, q);
   vec3 tz = uSkyZenith / max(uSkyHorizon, vec3(1e-3));
-  float dz = 0.3 * smoothstep(-0.05, 0.6, el), pool = 0.0;
-  for (int i = 0; i < 3; i++) {
-    float fi = float(i);
-    float e = el - (0.035 + 0.1 * fi + 0.025 * fi * fi) - (0.03 + 0.02 * fi) * wob - 0.006 * fine;
-    float fw = fwidth(e), inside = smoothstep(-fw, fw, e);
-    dz += 0.7 / 3.0 * inside;
-    pool = max(pool, inside * (1.0 - smoothstep(0.0, 0.012 + 0.015 * q.bloom, e)));
+  // (elevation counted from the sea's horizon, which dips below the eye's level as the eye climbs over the globe)
+  float eh = el + sqrt(max(1.0 - pow(${R.toFixed(1)} / max(length(cameraPosition), ${R.toFixed(1)}), 2.0), 0.0));
+  float eg = max(eh + 0.025 * wob + 0.004 * fine, 0.0);
+  float dz = 0.06 + 0.94 * (1.0 - exp(-eg * 2.4)) * (1.0 + 0.12 * wob);
+  float e2 = eh - 0.42 - 0.06 * wob - 0.006 * fine, fw2 = fwidth(e2), in2 = smoothstep(-fw2, fw2, e2);
+  dz += 0.1 * in2;
+  float pool = in2 * (1.0 - smoothstep(0.0, 0.012 + 0.015 * q.bloom, e2));
+  Paper qz = q; // laid evenly: the paper's mottle only breathes in it, never blotches
+  qz.mottle = 0.5 + 0.35 * (q.mottle - 0.5);
+  qz.bloom = 0.5 + 0.35 * (q.bloom - 0.5);
+  col = glaze(col, tz, dz, 0.2 * pool, qz);
+  // trade-wind cloud over the horizon by day: banks of cumulus heaped along the sky's foot, the paper left white in them
+  // with their bellies glazed blue-grey, softening into the haze with distance; never inked (they are far)
+  vec3 hn = normalize(d - el * uUp + 1e-5), hw = triWeights(hn, 4.0);
+  float bank = smoothstep(0.4, 0.6, tri(tPaper, hn * 1.1, hw).b);
+  vec3 ax = normalize(cross(uUp, abs(uUp.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0))), ay = cross(uUp, ax);
+  float caz = atan(dot(d, ay), dot(d, ax));
+  // heaped domes, big then small on their shoulders, as a watercolourist rounds a cumulus' head
+  float big = cumulusTop(caz, 240.0, 1.0, 1.0), small = cumulusTop(caz + 0.004, 640.0, 1.0, 7.0);
+  float top = bank * (big + small * step(0.004, big)), base = 0.004 + 0.002 * wob;
+  float cd = min(top - eh, eh - base), cfw = fwidth(cd);
+  // (a sea-level view's: from high over the globe the banks would stand on the limb as peaks)
+  float low = 1.0 - smoothstep(8.0, 24.0, length(cameraPosition) - ${R.toFixed(1)});
+  float cloud = smoothstep(-cfw, cfw, cd) * step(0.002, top) * uSunVis * (1.0 - uGrey) * low;
+  if (cloud > 0.0) {
+    float belly = 1.0 - smoothstep(0.0, 0.6 * top, eh), rim = 1.0 - smoothstep(0.0, 0.004, cd);
+    vec3 cc = glaze(parchment(q), uSlate / uPaper, 0.22 * belly + 0.05, 0.5 * rim, q);
+    cc = mix(cc, col, 0.2 + 0.25 * (1.0 - bank));
+    col = mix(col, cc, cloud);
   }
-  col = glaze(col, tz, dz, 0.45 * pool, q);
 
   // the low sky toward the sun runs into the hour's glow, wet in wet, pale gold close round the sun
   vec3 hd = d - el * uUp, hs = uSunDir - dot(uSunDir, uUp) * uUp;

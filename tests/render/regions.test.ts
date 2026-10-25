@@ -143,6 +143,7 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   const reach = ({ m: { elements: e } }: { m: THREE.Matrix4 }): number => 0.5 * Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10])); // half its kit's span
   for (const c of plan.channels) {
     for (const p of solids) assert.ok(toLine(c, p.dir) - (plan.stakes.includes(p) ? 0.05 : reach(p)) >= CLEAR, `no reef part within ${CLEAR} u of channel ${c.bearing}°: ${toLine(c, p.dir).toFixed(2)}`);
+    for (const p of plan.spill) assert.ok(toLine(c, p.dir) - reach(p) >= CLEAR, `no breaking white water within ${CLEAR} u of channel ${c.bearing}°: ${toLine(c, p.dir).toFixed(2)}`);
     for (let i = 0; i + 1 < c.line.length; i++) {
       const a = c.line[i], b = c.line[i + 1], across = a.clone().cross(b).normalize();
       for (let s = 0; s <= 1; s += 0.5) {
@@ -169,12 +170,13 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   for (const p of reef) assert.ok(p.sim >= LOW, 'reef only where a hull grounds at low water');
   for (const p of [...plan.heads, ...plan.branches, ...plan.tables]) if (p.sim < BLOCK) assert.ok(p.top <= BLOCK - 0.04, 'reef-front coral under a keel at high water');
   for (const d of plan.surf) assert.ok(heightAt(geo, d) >= LOW - 0.5, 'surf only over reef that strikes a keel at low water');
+  for (const p of plan.spill) assert.ok(surfAt(geo, p.dir, 0) > 0.3 || p.sim <= TIDE.amp * 0.5, 'the break stands only where the surf breaks, and the spent water only over reef awash');
   for (const p of [...plan.palms.flat(), ...plan.pandanus, ...plan.shrubs]) assert.ok(p.sim > LAND, 'trees on land dry at high water');
   for (const p of [...plan.palms.flat(), ...plan.pandanus, ...plan.shrubs, ...plan.drift, ...solids]) {
     const g = groundAt(field, p.dir);
     assert.ok(p.base <= g + 0.02 && p.base >= g - 0.35, `seated: foot ${p.base.toFixed(2)} on ground ${g.toFixed(2)}`);
   }
-  const n = { palms: plan.palms.flat().length, pandanus: plan.pandanus.length, shrubs: plan.shrubs.length, reef: reef.length, surf: plan.surf.length, stakes: plan.stakes.length, hulks: plan.hulks.length, channels: plan.channels.map((c) => `${c.bearing}°/${c.width.toFixed(1)}`) };
+  const n = { palms: plan.palms.flat().length, pandanus: plan.pandanus.length, shrubs: plan.shrubs.length, reef: reef.length, surf: plan.surf.length, spill: plan.spill.length, stakes: plan.stakes.length, hulks: plan.hulks.length, channels: plan.channels.map((c) => `${c.bearing}°/${c.width.toFixed(1)}`) };
   console.log('coral plan', JSON.stringify(n));
-  assert.ok(n.palms >= 100 && n.reef >= 1600 && n.surf >= 880 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
+  assert.ok(n.palms >= 100 && n.reef >= 1600 && n.surf >= 880 && n.spill >= 1000 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
 });

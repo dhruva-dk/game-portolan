@@ -17,7 +17,7 @@
 // (WP23: palm crowns and the hulk), `voices` (WP28: the surf's places and loudness), `plan.channels`/`plan.sills`
 // (the passes, for cameras and captures).
 import * as THREE from 'three';
-import { illustratedMaterial, type Style } from '../../style/glsl.ts';
+import { illustratedMaterial, inkMaterial, linearVec, type Style } from '../../style/glsl.ts';
 import { PIGMENTS } from '../../style/palette.ts';
 import { R } from '../../sim/sphere.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
@@ -34,11 +34,13 @@ const TAU = 2 * Math.PI, DEG = Math.PI / 180;
 /** Sim heights (u above mean sea): below LOW a hull floats at every tide, at or above BLOCK at none, above LAND dry at
  *  high water. */
 export const LOW = -TIDE.amp - DRAFT, BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
-/** Grid step (u); reef corals and pavement drawn within `near` u of the eye, palms in full within `palms`; the trade
- *  wind's lee (chart). */
-export const CORAL = { step: 1, near: 55, palms: 45, lee: [-0.95, -0.3] as const } as const;
+/** Grid step (u); reef corals and pavement drawn within `near` u of the eye (in full within `drawn`, the pandanus too),
+ *  palms leaflet by leaflet within `leaflets`, in full within `palms`, sketched beyond; the trade wind's lee (chart). */
+export const CORAL = { step: 1, near: 55, palms: 45, drawn: 24, leaflets: 14, lee: [-0.95, -0.3] as const } as const;
 /** Clearance (u) of reef, surf and foam from a channel's centre line. */
 export const CLEAR = 1.6;
+/** Ground (u) above which a coral stands dry at mean tide: drawn as a low massive head, never a stalked table. */
+const DRY = -0.05;
 /** The motus' dressing grid (u). */
 const MOTU = 0.6;
 
@@ -48,7 +50,8 @@ const W = {
   frondDead: washOf(PIGMENTS.umber, 0.85), nut: washOf(PIGMENTS.ochre, 0.95),
   leaf: washOf(PIGMENTS.verdigris, 0.85), root: washOf(PIGMENTS.umber, 0.7), fruit: washOf(PIGMENTS.vermilion, 0.6),
   shrub: washOf(PIGMENTS.malachite, 0.9), shrubLit: washOf(PIGMENTS.verdigris, 0.6), shade: washOf(PIGMENTS.umber, 0.6),
-  coral: washOf(PIGMENTS.ochre, 0.55), rose: washOf(PIGMENTS.roseMadder, 0.34), tip: washOf(PIGMENTS.leadWhite, 0.9),
+  coral: washOf(PIGMENTS.ochre, 0.42), coralPale: washOf(PIGMENTS.ochre, 0.2), algae: washOf(PIGMENTS.verdigris, 0.3),
+  rose: washOf(PIGMENTS.roseMadder, 0.3), tip: washOf(PIGMENTS.leadWhite, 0.9),
   table: washOf(PIGMENTS.verdigris, 0.55), under: washOf(PIGMENTS.sepia, 0.65),
   bleach: washOf(PIGMENTS.leadWhite, 0.65), rock: washOf(PIGMENTS.sepia, 0.45),
   sand: washOf(PIGMENTS.leadWhite, 0.75), sandEdge: washOf(PIGMENTS.ochre, 0.3),
@@ -100,6 +103,34 @@ function spike(b: Brush, a: V, tip: V, r: number, turn = 0): void {
   for (let j = 0; j < 3; j++) b.tri(f[j], f[(j + 1) % 3], tip);
 }
 
+/** The triangles laid so far by a brush. */
+const laid = (b: Brush): number => (b.kit as unknown as { pos: number[] }).pos.length / 9;
+/** Turn the normals of triangles [from, to) up toward the kit's +y, so foliage hangs lit as its upper face. */
+function liftNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][]): THREE.BufferGeometry {
+  const nrm = g.getAttribute('normal') as THREE.BufferAttribute, f = vec();
+  for (const [a0, a1] of ranges) {
+    for (let t = a0; t < a1; t++) {
+      f.fromBufferAttribute(nrm, 3 * t);
+      if (f.y < 0) f.negate();
+      f.multiplyScalar(0.45).add(vec(0, 1, 0)).normalize();
+      for (let v = 0; v < 3; v++) nrm.setXYZ(3 * t + v, f.x, f.y, f.z);
+    }
+  }
+  return g;
+}
+
+/** An open three-sided stick from `a` (r0) to `b` (r1), closed in a blunt point when `cap`. */
+function stick(br: Brush, a: V, b: V, r0: number, r1: number, cap: boolean): void {
+  const [u, w] = frame(vec().subVectors(b, a).normalize());
+  const at = (p: V, r: number, j: number): V => p.clone().addScaledVector(u, r * Math.cos((j / 3) * TAU)).addScaledVector(w, r * Math.sin((j / 3) * TAU));
+  for (let j = 0; j < 3; j++) {
+    const a0 = at(a, r0, j), a1 = at(a, r0, j + 1), b0 = at(b, r1, j), b1 = at(b, r1, j + 1);
+    br.tri(a0, a1, b1);
+    br.tri(a0, b1, b0);
+    if (cap) br.tri(b0, b1, b.clone().addScaledVector(vec().subVectors(b, a).normalize(), r1 * 1.5));
+  }
+}
+
 function blob(b: Brush, c: V, r: number): void {
   const p = [vec(r, 0, 0), vec(-r, 0, 0), vec(0, r, 0), vec(0, -r, 0), vec(0, 0, r), vec(0, 0, -r)].map((v) => v.add(c));
   for (const [i, j, k] of [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]]) b.tri(p[i], p[j], p[k]);
@@ -118,17 +149,18 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
   b.pick = (c) => (Math.floor(c.y * 26) % 2 ? W.trunk : W.scar);
   tube(b, path, radii, far ? 3 : 6);
   b.pick = null;
-  const top = path[n], Y = vec(0, 1, 0), count = far ? 8 : young ? 9 : 12, L = young ? 0.62 : 0.5, SEG = far ? 2 : 5;
+  const top = path[n], Y = vec(0, 1, 0), count = far ? 8 : young ? 9 : 12, L = young ? 0.62 : 0.5, SEG = far ? 2 : 5, fronds = laid(b);
   for (let k = 0; k < count; k++) {
     const phi = (k / count) * TAU + 0.3 * rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi) + 0.6).normalize(), age = k % 4;
-    const droop = young ? 0.35 + 0.25 * age : 0.5 + 0.45 * age, rise = young ? 0.55 : 0.4 - 0.08 * age;
+    const droop = young ? 0.35 + 0.25 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : 0.45 - 0.06 * age;
     const len = L * (0.85 + 0.3 * rnd()) * (age === 0 ? 0.8 : 1), side = vec().crossVectors(d, Y).normalize();
-    b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDead : age === 3 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
+    b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDead : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
     let prev = top.clone();
     for (let i = 1; i <= SEG; i++) {
       const s = i / SEG, p = top.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (rise * s - droop * s * s));
       const w = len * 0.2 * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
-      const hang = vec(0, -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
+      // (far off the blades lie flatter, lit as a crown is seen from afar, not a dark fringe)
+      const hang = vec(0, far ? -len * 0.02 : -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
       b.tri(prev, p, mid.clone().addScaledVector(side, w).add(hang));
       b.tri(p, prev, mid.clone().addScaledVector(side, -w).add(hang));
       b.tri(mid, p, p.clone().addScaledVector(side, 0.8 * w).add(low));
@@ -136,8 +168,110 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
       prev = p;
     }
   }
+  const lit: [number, number] = [fronds, laid(b)];
   b.wash = W.nut;
   for (let k = 0; k < (far ? 0 : young ? 2 : 5); k++) blob(b, top.clone().add(vec(0.035 * Math.cos(k * 2.4), -0.035 - 0.015 * (k % 2), 0.035 * Math.sin(k * 2.4))), 0.026);
+  return liftNormals(b.kit.build(), [lit]);
+}
+
+/** A coconut palm 1 tall drawn close, as an engraver draws one: a curved trunk swollen at the bole and ringed with leaf
+ *  scars, a crown of pinnate fronds (a pale spear upright, the mature arching out and drooping, the old hanging
+ *  yellowed, a dead one brown along the trunk), each rachis hung with leaflets folded down in a V, a cluster of nuts
+ *  in the crown's heart, the fronds' undersides shaded by the hatching. Leans to +z. */
+function palmNearKit(seed: number, young: boolean): THREE.BufferGeometry {
+  const rnd = seeded(seed), b = new Brush(W.trunk), n = young ? 6 : 9, bend = young ? 0.12 : 0.26 + 0.14 * rnd();
+  const path: V[] = [], radii: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    path.push(vec(0.015 * Math.sin(t * 4 + seed), t, bend * t * t + 0.05 * t * Math.sin(t * 3 + seed)));
+    radii.push((i === 0 ? 0.064 : i === 1 ? 0.046 : 0.036 - 0.01 * t) * (young ? 1.5 : 1));
+  }
+  b.pick = (c) => (Math.floor(c.y * 34) % 3 === 0 ? W.scar : W.trunk);
+  tube(b, path, radii, 7);
+  b.pick = null;
+  const top = path[n], Y = vec(0, 1, 0), count = young ? 11 : 15, L = young ? 0.62 : 0.52, SEG = 9;
+  const lit: [number, number][] = [];
+  const tris = (): number => laid(b);
+  for (let k = 0; k < count; k++) {
+    const phi = (k / count) * TAU * 2.6 + 0.3 * rnd(), age = k === 0 ? -1 : k % 4;
+    const d = vec(Math.sin(phi), 0, Math.cos(phi) + (age < 0 ? 0 : 0.5)).normalize();
+    const droop = age < 0 ? 0.1 : young ? 0.35 + 0.25 * age : 0.55 + 0.45 * age, rise = age < 0 ? 0.9 : young ? 0.55 : 0.42 - 0.08 * age;
+    const dead = age === 3 && !young && k % 8 === 3, len = L * (0.85 + 0.3 * rnd()) * (age < 0 ? 0.3 : age === 0 ? 0.85 : 1);
+    const side = vec().crossVectors(d, Y).normalize(), wash = dead ? W.frondDead : age === 3 ? W.frondOld : age <= 0 ? W.frondPale : W.frond;
+    const pts = Array.from({ length: SEG + 1 }, (_, i) => {
+      const s = i / SEG;
+      return top.clone().addScaledVector(d, len * s * (dead ? 0.4 : 1)).addScaledVector(Y, dead ? -len * 0.9 * s : len * (rise * s - droop * s * s));
+    });
+    // the rachis, a thin ribbon (the spear a furled blade)
+    b.wash = age < 0 ? W.frondPale : W.frondOld;
+    for (let i = 0; i < SEG; i++) {
+      const w = (age < 0 ? 0.02 : 0.006) * (1 - i / SEG);
+      b.tri(pts[i].clone().addScaledVector(side, w), pts[i + 1], pts[i].clone().addScaledVector(side, -w));
+    }
+    // the leaflets, one a side at every step, folded down from the rachis, longest mid-frond; lit as the frond's
+    // upper face (their normals turned up), so they hang light against the sky, not as a dark fringe
+    b.wash = wash;
+    const from = tris();
+    for (let i = 1; i <= SEG && age >= 0; i++) {
+      const s = i / SEG, along = vec().subVectors(pts[i], pts[i - 1]).normalize();
+      const ll = len * 0.34 * Math.sin(Math.PI * (0.12 + 0.8 * s)) * (0.8 + 0.4 * rnd());
+      for (const sd of [-1, 1]) {
+        const base = pts[i - 1].clone().lerp(pts[i], sd < 0 ? 0.3 : 0.7), fall = 0.35 + 0.6 * s + 0.35 * rnd() + (age === 3 ? 0.5 : 0);
+        const dirL = side.clone().multiplyScalar(sd * Math.cos(fall)).addScaledVector(Y, -Math.sin(fall)).addScaledVector(along, 0.5).normalize();
+        const tip = base.clone().addScaledVector(dirL, ll), half = along.clone().multiplyScalar(0.012 * len);
+        b.wash = dead ? W.frondDead : (i + (sd > 0 ? 1 : 0)) % 3 === 0 ? (age === 3 ? W.frond : W.frondPale) : wash;
+        b.tri(base.clone().sub(half), base.clone().add(half), tip);
+      }
+    }
+    lit.push([from, tris()]);
+  }
+  b.wash = W.nut;
+  for (let k = 0; k < (young ? 2 : 6); k++) blob(b, top.clone().add(vec(0.04 * Math.cos(k * 2.4), -0.04 - 0.02 * (k % 2), 0.04 * Math.sin(k * 2.4))), 0.03);
+  return liftNormals(b.kit.build(), lit);
+}
+
+/** A pandanus ~0.9 tall drawn close: a leaning trunk ringed with scars on a cone of curved stilt roots, three limbs
+ *  each crowned by a spiral tuft of long keeled strap leaves arching and drooping, one hung with its great segmented
+ *  fruit, orange-red. */
+function pandanusNearKit(seed: number): THREE.BufferGeometry {
+  const rnd = seeded(seed), b = new Brush(W.trunk), Y = vec(0, 1, 0), foot = vec(0, 0.24, 0.04), fork = vec(0.02, 0.58, 0.12);
+  b.pick = (c) => (Math.floor(c.y * 40) % 3 === 0 ? W.scar : W.trunk);
+  tube(b, [foot, vec(0.01, 0.4, 0.08), fork], [0.042, 0.035, 0.03], 6);
+  b.pick = null;
+  b.wash = W.root;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * TAU + 0.4 * rnd(), r = 0.16 + 0.08 * rnd(), from = vec(0, 0.12 + 0.12 * rnd(), 0.03);
+    const end = vec(r * Math.cos(a), -0.02, r * Math.sin(a) + 0.04), knee = from.clone().lerp(end, 0.5).add(vec(0.25 * r * Math.cos(a), 0.05, 0.25 * r * Math.sin(a)));
+    stick(b, from, knee, 0.013, 0.011, false);
+    stick(b, knee, end, 0.011, 0.009, false);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * TAU + rnd(), end = fork.clone().add(vec(0.2 * Math.cos(a), 0.22 + 0.08 * rnd(), 0.2 * Math.sin(a)));
+    b.wash = W.trunk;
+    tube(b, [fork, fork.clone().lerp(end, 0.5).add(vec(0, 0.04, 0)), end], [0.024, 0.019, 0.015], 5);
+    for (let j = 0; j < 20; j++) {
+      const q = j * 2.4 + 0.2 * rnd(), up = 0.3 + 0.6 * rnd(), d = vec(Math.cos(q), 0, Math.sin(q)), len = 0.3 + 0.1 * rnd();
+      const side = vec().crossVectors(d, Y).normalize();
+      b.wash = j % 6 === 5 ? W.frondOld : j % 2 ? W.leaf : W.frond;
+      let prev = end.clone(), w0 = 0.02;
+      for (let i = 1; i <= 3; i++) {
+        const s = i / 3, p = end.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (up * s - (0.9 + up) * s * s));
+        const w1 = 0.02 * (1 - 0.7 * s), keel = vec(0, -0.008, 0);
+        b.tri(prev, p, prev.clone().addScaledVector(side, w0).add(keel));
+        b.tri(p, p.clone().addScaledVector(side, w1).add(keel), prev.clone().addScaledVector(side, w0).add(keel));
+        b.tri(p, prev, prev.clone().addScaledVector(side, -w0).add(keel));
+        b.tri(p, prev.clone().addScaledVector(side, -w0).add(keel), p.clone().addScaledVector(side, -w1).add(keel));
+        prev = p;
+        w0 = w1;
+      }
+    }
+    if (k === 0) {
+      const c = end.clone().add(vec(0.02, -0.08, 0)), kf = 8;
+      b.pick = (cc) => (Math.floor((Math.atan2(cc.z - c.z, cc.x - c.x) + Math.PI) * 2.5 + cc.y * 40) % 2 ? W.fruit : W.nut);
+      b.kit.loft([-0.05, -0.03, 0.0, 0.03, 0.05].map((y, i) => ring(kf, y, () => 0.055 * [0.4, 0.85, 1, 0.85, 0.35][i]).map((p) => p.add(c))));
+      b.pick = null;
+    }
+  }
   return b.kit.build();
 }
 
@@ -179,40 +313,62 @@ function shrubKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A massive (brain or boulder) coral head 1 across, 0.46 tall: rose and ochre on top, dark beneath. */
-function massiveKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = 8, jit = Array.from({ length: 4 * k }, () => 0.8 + 0.4 * rnd()), b = new Brush(W.coral);
-  b.pick = (c, n) => (n.y > 0.7 ? (hash(c.x, c.z) > 0.5 ? W.rose : W.coral) : n.y < 0.2 ? W.under : W.coral);
-  b.kit.loft([-0.05, 0.16, 0.32, 0.42].map((y, i) => ring(k, (j) => y + 0.04 * Math.sin(j * 2.3 + i), (j) => [0.5, 0.5, 0.38, 0.16][i] * jit[i * k + j])));
+/** A brain coral 1 across, 0.2 tall, grown up to the low-water mark: a low dome whose meandering ridges show as bands
+ *  of pale and deeper ochre, a living rim of rose, the dead crown of a micro-atoll greyed with algae. */
+function massiveKit(seed: number, far = false): THREE.BufferGeometry {
+  const rnd = seeded(seed), k = far ? 7 : 12, jit = Array.from({ length: 5 * k }, () => 0.88 + 0.24 * rnd()), b = new Brush(W.coral);
+  const ph = rnd() * TAU;
+  b.pick = (c, n) => {
+    if (n.y < 0.25) return W.under;
+    if (c.y > 0.17) return W.algae;
+    const m = Math.sin(c.x * 26 + 2.2 * Math.sin(c.z * 19 + ph)) + 0.6 * Math.sin(c.z * 23 + ph);
+    return c.y < 0.07 ? W.rose : m > 0.2 ? W.coralPale : W.coral;
+  };
+  const rings = far ? [0, 2, 4] : [0, 1, 2, 3, 4];
+  b.kit.loft(rings.map((i) => ring(k, (j) => [-0.04, 0.06, 0.13, 0.18, 0.2][i] + 0.012 * Math.sin(j * 2.3 + i + seed), (j) => [0.5, 0.48, 0.4, 0.27, 0.1][i] * jit[i * k + j])));
   return b.kit.build();
 }
 
-/** A staghorn clump 0.45 tall: forked prongs with pale growing tips. */
-function branchKit(seed: number): THREE.BufferGeometry {
+/** A thicket of branching (staghorn) coral 1 across, ~0.26 tall: stout trunks forking twice, the growing tips pale,
+ *  ochre and umber below where the light fails. */
+function branchKit(seed: number, far = false): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.coral);
-  b.pick = (c) => (c.y > 0.3 ? W.tip : c.y > 0.15 ? W.rose : W.coral);
-  for (let k = 0; k < 9; k++) {
-    const a = (k / 9) * TAU + 0.5 * rnd(), lean = 0.3 + 0.6 * rnd(), foot = vec(0.12 * Math.cos(a) * rnd(), -0.04, 0.12 * Math.sin(a) * rnd());
-    const tip = foot.clone().add(vec(0.3 * lean * Math.cos(a), 0.42 * (0.7 + 0.3 * rnd()), 0.3 * lean * Math.sin(a))), mid = foot.clone().lerp(tip, 0.45);
-    spike(b, foot, tip, 0.035, a);
-    spike(b, mid, mid.clone().add(vec(0.15 * Math.cos(a + 0.9), 0.16, 0.15 * Math.sin(a + 0.9))), 0.022, a);
+  b.pick = (c) => (c.y > 0.21 ? W.tip : c.y > 0.12 ? W.coralPale : c.y > 0.04 ? W.coral : W.under);
+  const grow = (from: V, dir: V, len: number, r: number, depth: number): void => {
+    const to = from.clone().addScaledVector(dir, len);
+    stick(b, from, to, r, r * 0.7, depth === 0);
+    if (depth === 0) return;
+    for (const turn of [-0.55, 0.5 + 0.2 * rnd()]) {
+      const d = dir.clone().applyAxisAngle(vec(0, 1, 0), turn * 1.4).add(vec(0, 0.35, 0)).normalize();
+      grow(to, d.lerp(vec(dir.x, d.y, dir.z).normalize(), 0.3).normalize(), len * (0.65 + 0.15 * rnd()), r * 0.72, depth - 1);
+    }
+  };
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * TAU + 0.6 * rnd(), out = 0.06 + 0.12 * rnd();
+    grow(vec(out * Math.cos(a), -0.03, out * Math.sin(a)), vec(0.55 * Math.cos(a), 0.8, 0.55 * Math.sin(a)).normalize(), (0.12 + 0.04 * rnd()) * (far ? 1.6 : 1), 0.03, far ? 0 : 2);
   }
   return b.kit.build();
 }
 
-/** A table coral 1 across on its stalk, 0.36 tall, its plate's rim pale. */
-function tableKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.under), k = 9;
-  spike(b, vec(0, 0.3, 0), vec(0, -0.05, 0), 0.07);
-  const top = vec(0.03, 0.34, 0), rim = ring(k, (j) => 0.3 + 0.05 * Math.sin(j * 1.7 + seed), () => 0.5 * (0.8 + 0.35 * rnd()));
-  const lip = rim.map((p) => p.clone().multiplyScalar(1.04).setY(p.y - 0.06));
-  for (let j = 0; j < k; j++) {
-    const a = rim[j], c = rim[(j + 1) % k];
-    b.wash = hash(a.x, a.z) > 0.4 ? W.table : W.coral;
-    b.tri(top, c, a);
-    b.wash = W.tip;
-    b.tri(a, c, lip[(j + 1) % k]);
-    b.tri(a, lip[(j + 1) % k], lip[j]);
+/** A table coral 1 across on its stalk, 0.2 tall: a plate ribbed out from its heart, its rim scalloped and pale, a
+ *  smaller tier beneath it, umber in the shade under the plate. */
+function tableKit(seed: number, far = false): THREE.BufferGeometry {
+  const rnd = seeded(seed), b = new Brush(W.under), k = far ? 8 : 14;
+  tube(b, [vec(0, -0.04, 0), vec(0.01, 0.1, 0), vec(0.02, 0.16, 0)], [0.07, 0.05, 0.06], 5);
+  for (const [y, R0, off] of ([[0.19, 0.5, 0], [0.1, 0.3, 0.12]] as const).slice(0, far ? 1 : 2)) {
+    const top = vec(0.02 + off, y + 0.015, off * 0.5);
+    const rim = ring(k, (j) => y - 0.02 + 0.012 * Math.sin(j * 1.7 + seed), (j) => R0 * (0.82 + 0.18 * Math.abs(Math.sin(j * 1.9 + seed)) + 0.08 * rnd()));
+    for (const p of rim) p.add(vec(off, 0, off * 0.5));
+    const lip = rim.map((p) => p.clone().sub(top).multiplyScalar(1.06).add(top).setY(p.y - 0.035));
+    for (let j = 0; j < k; j++) {
+      const a = rim[j], c = rim[(j + 1) % k];
+      b.wash = j % 2 ? W.coral : W.coralPale;
+      b.tri(top, c, a);
+      b.wash = W.tip;
+      b.tri(a, c, lip[(j + 1) % k]);
+      b.wash = W.under;
+      b.tri(a, lip[(j + 1) % k], lip[j]);
+    }
   }
   return b.kit.build();
 }
@@ -281,6 +437,101 @@ function hulkKit(seed: number): THREE.BufferGeometry {
 
 /** A placed part: its matrix, foot point and direction, foot and drawn-ground heights, the sim's height there, and its
  *  top's height. */
+/** The break's white water standing off the reef, 1 long (x −½…½) and 1 high, faced seaward (+z): a sheet bellied
+ *  toward the sea and its top falling back over the reef. */
+function spillKit(): THREE.BufferGeometry {
+  const pos: number[] = [], NX = 6, NY = 4;
+  const at = (i: number, j: number): number[] => {
+    const x = i / NX - 0.5, y = (j / NY) * 1.3 - 0.3; // its foot well under the water, riding the swell or not
+    return [x, y, 0.3 * Math.max(y, 0) - 0.55 * Math.max(y, 0) ** 2];
+  };
+  for (let j = 0; j < NY; j++) {
+    for (let i = 0; i < NX; i++) pos.push(...at(i, j), ...at(i + 1, j), ...at(i + 1, j + 1), ...at(i, j), ...at(i + 1, j + 1), ...at(i, j + 1));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return g;
+}
+
+const SPILL_VERT = /* glsl */ `
+uniform float uSeaLevel, uTime;
+varying vec3 vWorld;
+varying vec2 vAt; // u along the sheet (offset per sheet) and up from the water
+varying float vH, vPhase, vDist, vSeed, vEnd;
+void main() {
+  vEnd = position.x;
+  vec3 o = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+  wp.xyz += normalize(o) * uSeaLevel;
+  vSeed = fract(sin(dot(floor(o * 4.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  float sx = length(instanceMatrix[0].xyz), sy = length(instanceMatrix[1].xyz);
+  vAt = vec2(position.x * sx + 7.0 * vSeed, position.y * sy);
+  vH = sy;
+  vWorld = wp.xyz;
+  // the sets peel along the reef (a slow drift of phase with place), each sheet a little apart from its neighbours
+  vPhase = uTime / 7.5 + dot(o, vec3(0.031, 0.047, 0.023)) + 0.1 * vSeed;
+  vDist = distance(wp.xyz, cameraPosition);
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+
+const SPILL_FRAG = /* glsl */ `
+uniform vec3 uFoam, uFace;
+varying vec3 vWorld;
+varying vec2 vAt;
+varying float vH, vPhase, vDist, vSeed, vEnd;
+float h1(float x) { return fract(sin(x * 91.7 + 13.1) * 43758.5453); }
+float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float n3(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+// the white water's top: rounded rolls of foam (u), drawn as an engraver draws them, each a bulging arc
+float rolls(float x, float size, float seed) {
+  float c = floor(x / size), top = 0.0;
+  for (int k = -1; k <= 1; k++) {
+    float ci = c + float(k), r = size * (0.55 + 0.45 * h1(ci + seed)), cx = (ci + 0.5 + 0.35 * (h1(ci * 1.7 + seed) - 0.5)) * size;
+    float dx = x - cx;
+    top = max(top, sqrt(max(r * r - dx * dx, 0.0)) + size * 0.9 * h1(ci * 3.1 + seed));
+  }
+  return top;
+}
+void main() {
+  // a set: the crest rears green and spills (phase 0–0.14), the white water stands, tumbles and slumps (to 0.75), then
+  // lies low and lacy on the reef until the next
+  float ph = fract(vPhase), set = floor(vPhase), rise = smoothstep(0.0, 0.14, ph), slump = smoothstep(0.16, 0.8, ph);
+  float H = vH * mix(0.4, 1.0, rise) * mix(1.0, 0.35, slump), x = vAt.x, y = vAt.y;
+  // a sheet's two ends taper into its neighbours'
+  float ends = sqrt(1.0 - smoothstep(0.34, 0.5, abs(vEnd) + 0.08 * (n3(vWorld * 2.0) - 0.5)));
+  float top = 0.45 * H + 0.55 * H * rolls(x + 0.12 * uTime, 0.32, set * 7.3 + vSeed * 50.0) / 0.55
+            + 0.2 * H * (n3(vWorld * 1.3 + vec3(set)) - 0.5);
+  top *= ends;
+  float aa = max(fwidth(y), 1e-4);
+  float body = 1.0 - smoothstep(top - aa, top + aa, y);
+  // lace: round holes opening in the white water toward the top and as it slumps
+  float holes = smoothstep(0.62, 0.7, n3(vWorld * 8.0 + vec3(0.3 * uTime, set, 0.0))) * smoothstep(0.35, 0.9, y / max(top, 1e-3)) * mix(0.5, 1.0, slump);
+  // spray flung up off the spilling crest
+  float spray = step(0.82, n3(vWorld * 14.0 + vec3(0.0, -2.0 * uTime, set))) * (1.0 - slump) * rise
+              * smoothstep(top, top + 0.04, y) * (1.0 - smoothstep(top + 0.04, top + 0.6 * vH, y));
+  // the broken ink of the rolls' tops
+  float edge = (1.0 - smoothstep(0.6 * aa, 1.8 * aa, abs(y - top + 1.2 * aa))) * step(0.42, n3(vec3(x * 6.0, set, vSeed * 9.0)));
+  float a = max(max(body * (1.0 - 0.85 * holes), 0.7 * spray), 0.8 * edge);
+  if (a < 0.03) discard;
+  Paper q = paperPlain(vWorld, normalize(vWorld));
+  // the paper left white with a body of lead white; at its foot and while the crest rears, the green face glazed thin
+  // and hatched along its fall; the shade under the rolls hatched
+  vec3 col = mix(parchment(q) * 1.02, uFoam, 0.6);
+  float face = (1.0 - rise * 0.85) * (1.0 - slump) * (1.0 - smoothstep(0.2 * top, 0.7 * top, y)) * body;
+  col = mix(col, uFace, 0.55 * face + 0.15 * (1.0 - smoothstep(0.0, 0.12, y)) * body);
+  vec2 c = vec2(x * 9.0 + y * 4.0, y * 9.0 - x * 2.0);
+  float shade = 0.45 * face + 0.3 * (1.0 - smoothstep(0.0, 0.3 * top, y)) + 0.2 * smoothstep(0.6, 0.8, n3(vWorld * 3.0 + vec3(set)));
+  float hat = hatching(c, dFdx(c), dFdy(c), shade, 7.0);
+  col = mix(col, hatchInk(0.3), 0.3 * hat * body);
+  col = mix(col, hatchInk(0.5), edge * 0.8);
+  writeVeil(col, min(a, 0.96) * (1.0 - smoothstep(40.0, 62.0, vDist)));
+}`;
+
 export interface Part { m: THREE.Matrix4; at: V; dir: V; base: number; ground: number; sim: number; top: number }
 /** A pass through a reef ring (bearing in degrees from chart east, width u at the crest) and its centre line (outside
  *  in, 1 u apart). */
@@ -290,6 +541,9 @@ export interface CoralPlan {
   boulders: Part[]; drift: Part[]; stakes: Part[]; hulks: Part[];
   /** Where the surf breaks at mean tide (SURF's rule, 1 u apart). */
   surf: V[];
+  /** The break standing up off the water near the eye: spilling white water along each exposed reef front (SURF's rule,
+   *  ~0.9 u apart, faced seaward). */
+  spill: Part[];
   /** Passes open at every tide; sills a hull clears only at high water. */
   channels: Channel[]; sills: Channel[];
   turtles: { swim: V[]; nest: V[] }; fish: V[]; seabirds: V[]; voices: { at: V; loud: number }[];
@@ -306,7 +560,7 @@ export function planCoral(field: TerrainField): CoralPlan {
     chartDir(RI, x + dx * 0.25, y + dy * 0.25).sub(chartDir(RI, x - dx * 0.25, y - dy * 0.25)).normalize();
   const plan: CoralPlan = {
     palms: [[], [], []], pandanus: [], shrubs: [], heads: [], branches: [], tables: [], slabs: [], boulders: [],
-    drift: [], stakes: [], hulks: [], surf: [], channels: [], sills: [], turtles: { swim: [], nest: [] }, fish: [],
+    drift: [], stakes: [], hulks: [], surf: [], spill: [], channels: [], sills: [], turtles: { swim: [], nest: [] }, fish: [],
     seabirds: [], voices: [],
   };
   const place = (list: Part[], x: number, y: number, o: { sink: number; fwd: V; yaw?: number; tilt?: number; s: number; sy?: number; sz?: number; hug?: boolean; kitH: number }): Part => {
@@ -449,10 +703,34 @@ export function planCoral(field: TerrainField): CoralPlan {
         if (e && !open(e.x, e.y, 1.1)) place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.06 * (rnd() - 0.5), s: 1 + 0.25 * rnd(), kitH: 1.85 });
       }
     }
-    const e = c.great ? across(0, 1, 3.5) : null;
+    const e = c.great ? across(0, 1, 1.4) : null;
     if (e && !open(e.x, e.y, 2.5)) {
       const p = place(plan.hulks, e.x, e.y, { sink: 0.12, fwd: tan(e.x, e.y, ux, uy), yaw: 0.4, tilt: 0.3, s: 3.4, kitH: 0.4 });
       plan.seabirds.push(lift(p.dir, p.top));
+    }
+  }
+  // the break's white water standing off the reef front, on a fine grid thinned to ~0.9 u (none over a pass)
+  const taken = new Set<string>(), sr = seeded(719);
+  for (let y = -66; y <= 66; y += 0.45) {
+    for (let x = -66; x <= 66; x += 0.45) {
+      const px = x + (sr() - 0.5) * 0.4, py = y + (sr() - 0.5) * 0.4, dir = chartDir(RI, px, py);
+      const c = coastAt(geo, dir);
+      if (c < -0.1 || c > 1.1) continue;
+      const loud = surfAt(geo, dir, 0);
+      if (loud < 0.3 || open(px, py, CLEAR + 1.3)) continue;
+      const key = `${Math.round(px / 0.9)},${Math.round(py / 0.9)}`;
+      if (taken.has(key)) continue;
+      taken.add(key);
+      const gx = coastAt(geo, chartDir(RI, px + 0.5, py)) - coastAt(geo, chartDir(RI, px - 0.5, py));
+      const gy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5)), gl = Math.hypot(gx, gy);
+      if (gl < 1e-4) continue;
+      // the break, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
+      for (const [back, tall] of [[0, 0.42 + 0.25 * sr()], [1.1, 0.25 + 0.15 * sr()]]) {
+        const bx = px - (back * gx) / gl, by = py - (back * gy) / gl, d = chartDir(RI, bx, by), ground = heightAt(geo, d);
+        if (back > 0 && ground > TIDE.amp * 0.5) continue;
+        const at = lift(d, -0.04), sy = tall * (0.6 + 0.4 * loud);
+        plan.spill.push({ m: pose(new THREE.Matrix4(), at, d, tan(bx, by, gx / gl, gy / gl), 0.25 * (sr() - 0.5), 0, 1.5 + 0.6 * sr(), sy, 1 - 0.4 * Math.sign(back)), at, dir: d, base: -0.04, ground, sim: ground, top: sy });
+      }
     }
   }
   // the surf's voices: its breakers binned 10 u apart, loudest where most break
@@ -476,6 +754,7 @@ export class CoralAtolls {
   /** WP28: where the surf breaks and how loud (0–1). */
   readonly voices: readonly { at: V; loud: number }[];
   private readonly material: THREE.ShaderMaterial;
+  private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), drawn only while dry] */
   private readonly near: [Draw, Part[], number, number, boolean][];
@@ -496,16 +775,27 @@ export class CoralAtolls {
     this.material.polygonOffsetUnits = -2;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [
-      fixed(pandanusKit(5), plan.pandanus), fixed(shrubKit(9), plan.shrubs),
+      fixed(shrubKit(9), plan.shrubs),
       fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes), fixed(hulkKit(8), plan.hulks),
     ];
     // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it); palms
     // in full near the eye, sketched beyond
-    const near: [THREE.BufferGeometry, Part[], number, number, boolean][] = [[massiveKit(2), plan.heads, 0, CORAL.near, false], [branchKit(6), plan.branches, 0, CORAL.near, false],
-      [tableKit(7), plan.tables, 0, CORAL.near, false], [slabKit(12), plan.slabs, 0, CORAL.near, true], [boulderKit(13), plan.boulders, 0, CORAL.near, false],
+    const near: [THREE.BufferGeometry, Part[], number, number, boolean][] = [
+      // tables and thickets only where the water stands over them at mean tide; on the dry flat, low massive heads
+      ...([[massiveKit, [...plan.heads, ...[...plan.branches, ...plan.tables].filter((p) => p.ground > DRY)], 2],
+        [branchKit, plan.branches.filter((p) => p.ground <= DRY), 6], [tableKit, plan.tables.filter((p) => p.ground <= DRY), 7]] as [typeof massiveKit, Part[], number][])
+        .flatMap(([kit, parts, seed]): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
+        [kit(seed), parts, 0, CORAL.drawn, false], [kit(seed, true), parts, CORAL.drawn, CORAL.near, false]]),
+      [slabKit(12), plan.slabs, 0, CORAL.near, true], [boulderKit(13), plan.boulders, 0, CORAL.near, false],
       ...[11, 29, 23].flatMap((seed, k): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
-        [palmKit(seed, k === 2), plan.palms[k], 0, CORAL.palms, false], [palmKit(seed, k === 2, true), plan.palms[k], CORAL.palms, 1e4, false]])];
+        [palmNearKit(seed, k === 2), plan.palms[k], 0, CORAL.leaflets, false], [palmKit(seed, k === 2), plan.palms[k], CORAL.leaflets, CORAL.palms, false],
+        [palmKit(seed, k === 2, true), plan.palms[k], CORAL.palms, 1e4, false]]),
+      [pandanusNearKit(5), plan.pandanus, 0, CORAL.drawn, false], [pandanusKit(5), plan.pandanus, CORAL.drawn, 1e4, false]];
     this.near = near.map(([kit, parts, from, to, dry]) => [new Draw(kit, this.material, parts.length), parts, from, to, dry]);
+    // the break standing off the reef near the eye (past ~60 u the sea's own ribbon of white is the surf)
+    this.spillMaterial = inkMaterial(style, { vertexShader: SPILL_VERT, fragmentShader: SPILL_FRAG, veil: true, side: THREE.DoubleSide,
+      uniforms: { uSeaLevel: swell.uniforms.uSeaLevel, uFoam: { value: linearVec(PIGMENTS.leadWhite) }, uFace: { value: linearVec(PIGMENTS.verdigris) } } });
+    this.near.push([new Draw(spillKit(), this.spillMaterial, plan.spill.length), plan.spill, 0, 62, false]);
     this.group.add(...this.draws.map((d) => d.mesh));
   }
 
@@ -537,6 +827,7 @@ export class CoralAtolls {
 
   dispose(): void {
     this.material.dispose();
+    this.spillMaterial.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
 }

@@ -421,7 +421,7 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
     case 'duneGrass': return [to(T('ochre'), 'malachite', 0.25 * u), fol];
     case 'reed': return [to(T('ochre'), 'umber', 0.35 * u), fol];
     case 'kelp': return [to(T('ochre'), 'malachite', 0.35 + 0.25 * u), fol];
-    case 'coral': return [to(T('roseMadder'), 'ochre', u), T(w < 0.33 ? 'vermilion' : w < 0.66 ? 'leadWhite' : 'ochre')];
+    case 'coral': return [to(T('ochre'), 'roseMadder', 0.2 + 0.3 * u), T(w < 0.4 ? 'leadWhite' : w < 0.7 ? 'ochre' : 'verdigris')]; // reef pigments: tan, rose, bleached and blue-green tips
   }
 }
 

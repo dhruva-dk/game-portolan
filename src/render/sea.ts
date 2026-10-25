@@ -320,8 +320,9 @@ void main() {
   float dist = length(V);
   V /= dist;
   float far = smoothstep(0.3, 1.0, dist / uHorizon), near = 1.0 - smoothstep(0.25, 0.7, dist / uHorizon);
-  float lagoon = smoothstep(0.3, 0.7, f.z);
   float clear = smoothstep(uClear.w - 0.03, uClear.w, dot(dir, uClear.xyz));
+  // clear water is graded by depth alone (below), so the sim's lagoon cells never show their straight edges in it
+  float lagoon = mix(smoothstep(0.3, 0.7, f.z), 1.0, clear);
   vec3 wind = normalize(cross(uWindAxis, dir) + 1e-6);
   float leadP;
   int pd = planeOf(dir, leadP);
@@ -410,10 +411,12 @@ void main() {
       ink = head * (1.0 - smoothstep(0.3, 1.0, rib / rpx / uRenderPx)) * smoothstep(0.2, 0.4, d / rad) * smoothstep(4.0, 8.0, 0.24 / rpx) * 0.4;
       fc = glaze(fc, ROCK_T, 0.35 * shadow, 0.0, q);
     }
-    // the outline drawn heavier on the shaded side, light where the sun strikes, the shade hatched
+    // the outline drawn heavier on the shaded side, light where the sun strikes, the shade hatched; the water between
+    // softens the lines as the head lies deeper
+    float soft = 1.0 - 0.6 * smoothstep(0.3, 2.5, uSeaLevel - ff.x);
     float edge = has * (1.0 - smoothstep(0.4, 1.2, abs(d - rad) / rpx / uRenderPx)) * (0.25 + 0.75 * shade);
-    fc = mix(fc, hatchInk(0.5), hatching(xr * 1.6, (onChart ? xcx : xdx) * 1.6, (onChart ? xcy : xdy) * 1.6, 0.75 * shade * head, 17.0) * mkr);
-    fc = mix(fc, hatchInk(0.55), max(edge * 0.8, ink) * mkr);
+    fc = mix(fc, hatchInk(0.5), hatching(xr * 1.6, (onChart ? xcx : xdx) * 1.6, (onChart ? xcy : xdy) * 1.6, 0.45 * shade * head, 17.0) * mkr * soft);
+    fc = mix(fc, hatchInk(0.55), max(edge * 0.55, ink) * mkr * soft);
     fc = mix(fc, LEAD * uPaper / PARCH, 0.55 * pale);
     }
     // kelp: the forest floor in its own shade, holdfasts and blades swaying with the swell
@@ -445,9 +448,16 @@ void main() {
   vec2 drop = layer(depth - 6.0 - 1.8 * wob - 0.5 * fine, fwD), open = layer(depth - 15.0 - 4.0 * wob, fwD);
   if (clear > 0.0) {
     float glance = 0.6 + 0.4 * smoothstep(0.02, 0.3, dot(V, dir));
-    float turq = smoothstep(0.0, 0.9, depth) * (0.42 + 0.26 * smoothstep(1.0, 4.0, depth)) * (1.0 - 0.45 * drop.x) * (1.0 - open.x);
+    // inside a ring (the lagoon cells, blurred over ~5 u so their edges never show) the deep water darkens softly, with
+    // no drawn edge: the sim's flat lagoon floor and carved throats would ink straight-edged contours
+    vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
+    float ring = 0.2 * (f.z + seaField(normalize(dir + t1 * (2.6 / SEA_R))).z + seaField(normalize(dir - t1 * (2.6 / SEA_R))).z
+                      + seaField(normalize(dir + t2 * (2.6 / SEA_R))).z + seaField(normalize(dir - t2 * (2.6 / SEA_R))).z);
+    ring = smoothstep(0.15, 0.85, ring);
+    float dk = mix(drop.x, 0.75 * smoothstep(3.5, 10.0, depth + 1.5 * wob), ring);
+    float turq = smoothstep(0.0, 0.9, depth) * (0.42 + 0.26 * smoothstep(1.0, 4.0, depth)) * (1.0 - 0.45 * dk) * (1.0 - open.x);
     col = glaze(col, TURQ_T, clear * water * glance * turq * tone, 0.6 * open.y, qs);
-    col = glaze(col, SHELF_T, clear * water * glance * 0.24 * drop.x * (1.0 - 0.5 * open.x), 1.2 * drop.y, qs);
+    col = glaze(col, SHELF_T, clear * water * glance * 0.24 * dk * (1.0 - 0.5 * open.x), 1.2 * drop.y * (1.0 - ring), qs);
   }
   // the swell's backs, turned from the sun, take one more glaze laid with a frilled, pooled edge: brushed bands
   float back = -10.0 * dot(vNormal - dir, uSun) + 0.2 * (q.mottle - 0.5);

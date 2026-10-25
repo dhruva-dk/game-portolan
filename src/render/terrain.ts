@@ -635,6 +635,10 @@ void main() {
   float bleed = (q.bloom - 0.5) * 0.08 + (q.mottle - 0.5) * 0.06;
   float cliff = 1.0 - smoothstep(CLIFF_UP - 0.05, CLIFF_UP + 0.05, up0 + bleed);
   float steep = (1.0 - cliff) * (1.0 - smoothstep(SCREE_UP - 0.04, SCREE_UP + 0.04, up0 + bleed));
+  // white coral sand: a sand cay's or reef's flank up to the beach is sand and pavement, never a rock wall of beds
+  float cay = max(-shore.w, 0.0) * (1.0 - smoothstep(shore.x + 0.2, shore.x + 0.8, h));
+  cliff *= 1.0 - cay;
+  steep *= 1.0 - cay;
   float low = 1.0 - smoothstep(shore.x - 0.3, shore.x + 0.3, h + bleed * 6.0);
   float beach = (1.0 - cliff - steep) * low, meadow = 1.0 - cliff - steep - beach;
   float talus = steep * (1.0 - smoothstep(0.25, 0.45, h / max(shore.y, 1.0)));
@@ -651,6 +655,7 @@ void main() {
   float b = rough * fineRelief(vWorld, upx, rel.x);
   if (shore.z < 0.5) b += 0.16 * (cliff + steep) * smoothstep(0.62, 0.92, fract(band)) * (1.0 - smoothstep(0.1, 0.3, upx));
   vec3 n = bumped(n0, vWorld, b);
+  n = normalize(mix(n, normalize(vWorld), 0.85 * cay)); // a cay lies low and flat in the light (its cells' steep facets unshaded)
 
   // washes by ground: rock with moss and lichen on its ledges, sand darker where wet, the uplands' green with dry
   // ground showing through; all pooling along the shore and where rock meets the slopes above and below it
