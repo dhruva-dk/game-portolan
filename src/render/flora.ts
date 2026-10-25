@@ -277,7 +277,14 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
     // pale bole with its clumps off to the sides read as a pole on the skyline)
     if (em && far) c.set(Math.cos(a) * d * (i ? 0.62 : 0.15), forkY + (i ? 0.2 : 0.3) - tier * 0.5, Math.sin(a) * d * (i ? 0.62 : 0.15)).add(lean);
     if (em && far) k.tube([fork, c.clone().setY(c.y - r * 0.2)], [0.022, 0.012], 3, bark);
-    else if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
+    else if (em && !far) {
+      // near, a limb rises steeply from the fork and arches out, tapering, and forks under its clump: never a straight
+      // stick (S-020); dark under the crown, the twigs ending in the leaf
+      const end = c.clone().setY(c.y - r * 0.25), elbow = fork.clone().lerp(end, 0.45).setY(fork.y + (end.y - fork.y) * 0.75);
+      k.tube([fork, elbow, end], [0.026, 0.016, 0.008], 4, BARK);
+      const side = V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(r * 0.7 * (rnd() < 0.5 ? -1 : 1));
+      k.tube([elbow, end.clone().add(side).setY(end.y + r * 0.15)], [0.011, 0.005], 3, BARK);
+    } else if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
     k.billow(c, r, em ? 0.66 : 0.74, far ? (i ? (em ? 1 : 0) : em ? 1 : 2) : i ? 2 : 3, 0, seed * 3.1 + i * 2.37, dab, tier ? 0.8 : 1);
     if (d > spread * 0.6) rims.push(c);
   }
@@ -295,7 +302,7 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
     k.tube(pts, pts.map(() => 0.005), 3, ROOT);
   };
   for (let i = 0; i + 1 < rims.length && i < 2; i++) sling(rims[i].clone().setY(rims[i].y - 0.05), rims[i + 1].clone().setY(rims[i + 1].y - 0.05), 0.12 + 0.12 * rnd());
-  for (let i = 0; i < (em ? 3 : 1); i++) {
+  for (let i = 0; i < (em ? 2 : 1); i++) {
     const a = rnd() * TAU, d = spread * (0.5 + 0.4 * rnd()), x = Math.cos(a) * d + lean.x, zz = Math.sin(a) * d + lean.z, y0 = top - 0.12;
     const len = em ? 0.35 + 0.15 * rnd() : y0 - 0.06, pts: THREE.Vector3[] = [];
     for (let s = 0; s <= 4; s++) {
