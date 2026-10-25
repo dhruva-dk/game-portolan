@@ -45,7 +45,7 @@ export const PLAY_SPAN = 90, PLAY_PAD = 14, PLAY_REACH = 40;
 /** S-019: the play-out's turn of the globe at orbit, rad a second at most (the eye moves under a tenth of its height a
  *  frame), and never quicker than 0.8 s. */
 export const PLAY_TURN = 1.2;
-export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 2.6, sinkBack: 7, sinkSwing: 1.25, sinkAim: 1.6, rise: 3.2, liftAt: 11, lift: 2.6, liftUp: 41, liftBack: 22, hold: 11.2, holdRM: 12.5, crow: 0.5 } as const;
+export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 4.2, sinkBack: 11.4, sinkFov: 32, sinkSwing: 1.25, sinkAim: 1.6, rise: 3.2, liftAt: 11, lift: 2.6, liftUp: 41, liftBack: 22, hold: 11.2, holdRM: 12.5, crow: 0.5 } as const;
 /** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
 export const REDUCED_VEIL = 0.3;
 /** The system's reduced-motion preference (the settings' switch ORs with it: rig.reducedMotion = setting || this). */
@@ -263,6 +263,8 @@ export class CameraRig {
   /** WP24 part D: the cinematic moves' weights (CINE), eased each frame: the opening's ride beside the fleet, the
    *  sinking's rise, the loop pull-back, the crow's nest raise (u). hold pins them (captures). */
   readonly cine = { open: 0, sink: 0, pull: 0, want: 0, crow: 0, sunkFor: 0, opened: false, tick: -1, hold: false };
+  /** The deck's field of view, ° (the sinking narrows it to CINE.sinkFov). */
+  private fov0: number | undefined;
   /** S-019: once she is gone, what the chart frames while the match plays out (screens.ts sets it each frame): `ring`,
    *  sphere directions round the storm's calm (none while the calm is too large to frame: the chart whole), `ships`,
    *  every ship afloat; `toward`, where the zoom turns to at orbit (the calm's centre, which the chart is rooted on:
@@ -418,6 +420,11 @@ export class CameraRig {
     // crow's nest, the loop pull-back and the sinking's rise lifting and standing off
     const c = this.cine, cw = 1 - ph.rise;
     const ks = c.sink * cw, kl = (c.sink > 0 && !c.hold ? ease((c.sunkFor - CINE.liftAt) / CINE.lift) : 0) * cw;
+    // the sinking watched through a longer lens (sinkFov°, stood off to keep her size): her masts go under together, not
+    // splayed like a broken umbrella, and the sea line stays flat behind her; back to the deck's lens as she lifts
+    this.fov0 ??= this.camera.fov;
+    const fov = lerp(this.fov0, CINE.sinkFov, ks * (1 - kl));
+    if (Math.abs(this.camera.fov - fov) > 1e-4) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     const up = lerp(lerp(DECK_LOW.up, DECK_HIGH.up, d) * (1 - CINE.openLow * c.open) + (c.crow + c.pull * CINE.pullUp) * cw, CINE.sinkUp, ks) + kl * CINE.liftUp;
     const back = lerp(lerp(DECK_LOW.back, DECK_HIGH.back, d) + this.stand + (c.open * CINE.openBack + c.pull * CINE.pullBack) * cw, CINE.sinkBack, ks) + kl * CINE.liftBack;
     const raise = lerp(DECK_LOW.raise, DECK_HIGH.raise, d), ahead = lerp(DECK_LOW.ahead, DECK_HIGH.ahead, d);

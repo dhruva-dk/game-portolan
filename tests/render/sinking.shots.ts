@@ -1,15 +1,15 @@
-// WP27 pass g (S-019 (g)) shots: the sinking itself, about a second apart, in clear weather and in the storm, on the
-// iPhone and the iPad (tests/render/sinking.page.ts): progress/shots/wp27g-<device>-sink-<weather>-<k>.png at the
+// WP27 pass h (S-019) shots: the sinking itself, a second apart from 5 to 12 s, in clear weather and in the storm, on the
+// iPhone and the iPad (tests/render/sinking.page.ts): progress/shots/wp27h-<device>-sink-<weather>-<k>.png at the
 // seconds after she sank in AT (1: rolled over, down by the stern, the sea over her rail; 2–4: her masts going under
 // one by one; 5: the masthead pennant last; 6: the sea closed over her, ripples, wreckage and her chest riding the
-// swell), and the sheet wp27g-sheet.png.
+// swell), and the sheet wp27h-sheet.png.
 //   node tests/render/sinking.shots.ts        (SINK_OUT=<dir> writes there instead of progress/shots; SINK_AT=5,6.5,…
 //   shoots those seconds instead; SINK_ONLY=iphone-clear shoots one device and weather)
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
-const AT: [string, number][] = (process.env.SINK_AT?.split(',').map(Number) ?? [5, 6, 7, 8, 9.5, 11.2]).map((t, i) => [`${i + 1}`, t]);
+const AT: [string, number][] = (process.env.SINK_AT?.split(',').map(Number) ?? [5, 6, 7, 8, 9, 10, 11, 12]).map((t, i) => [`${i + 1}`, t]);
 const out = process.env.SINK_OUT ?? join(root, 'progress/shots'), only = process.env.SINK_ONLY;
 const server = await serve();
 const { browser, gpu, renderer } = await launch();
@@ -27,7 +27,7 @@ try {
       for (const [k, t] of AT) {
         const r = await game.page.evaluate((t) => (window as unknown as { __sink: { at(t: number): Got } }).__sink.at(t), t);
         console.log(`${device} ${weather} ${k} (${t} s): z ${r.z.toFixed(2)}, ${r.dist.toFixed(1)} u off, ${r.alt.toFixed(1)} u up, hull ${r.visible ? 'shown' : 'gone'}, rings ${r.rings}, foam ${r.foam}, flotsam ${r.flotsam}, slick ${r.slick}`);
-        const file = join(out, `wp27g-${device}-sink-${weather}-${k}.png`);
+        const file = join(out, `wp27h-${device}-sink-${weather}-${k}.png`);
         await game.page.screenshot({ path: file, scale: 'css' });
         files.push([file, `${device} ${weather} ${k}: ${t} s`]);
       }
@@ -37,8 +37,8 @@ try {
   }
   const page = await browser.newPage({ viewport: { width: 2000, height: 100 } });
   const imgs = await Promise.all(files.map(async ([f, label]) => [`data:image/png;base64,${(await readFile(f)).toString('base64')}`, label]));
-  await page.setContent(`<body style="margin:0;background:#efe0c0;display:grid;grid-template-columns:repeat(${Math.min(AT.length, 6)},1fr);gap:6px;font:13px sans-serif">${imgs.map(([src, label]) => `<figure style="margin:0"><img src="${src}" style="width:100%;display:block"><figcaption>${label}</figcaption></figure>`).join('')}</body>`);
-  await page.screenshot({ path: join(out, 'wp27g-sheet.png'), fullPage: true });
+  await page.setContent(`<body style="margin:0;background:#efe0c0;display:grid;grid-template-columns:repeat(${Math.min(AT.length, 8)},1fr);gap:6px;font:13px sans-serif">${imgs.map(([src, label]) => `<figure style="margin:0"><img src="${src}" style="width:100%;display:block"><figcaption>${label}</figcaption></figure>`).join('')}</body>`);
+  await page.screenshot({ path: join(out, 'wp27h-sheet.png'), fullPage: true });
   await page.close();
 } finally {
   await browser.close();
