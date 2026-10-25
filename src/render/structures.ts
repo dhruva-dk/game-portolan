@@ -30,6 +30,9 @@ import type { RenderContext, RenderModule } from './world.ts';
 export const TOWER = { lamp: 6, plinth: 2.7, foot: 1.3, setBack: 4, near: 80 } as const;
 /** A harbour: rays cast round the anchorage for the shore, the mole's radius (share of the harbour's), the spacing
  *  of its boulders (u), the longest arm (rad), the lamp's height in its own frame and its reach. */
+/** Spice Harbour's built mole: its arms from the flanks `land` rad off the mouth to `mouth` rad, at `r` of the
+ *  harbour's radius, its wall `half` u either side of its line, its coping over mean sea (u). */
+export const MOLE = { land: 1.55, mouth: 1.08, r: 1.3, half: 0.95, coping: TIDE.amp + 0.4 } as const;
 export const HARBOUR = { rays: 32, mole: 0.85, spacing: 1.25, arm: 2.2, lamp: 1.91, reach: 10 } as const;
 
 type Paint = readonly [RGB | 'stone' | 'accent' | 'gold', number];
@@ -295,13 +298,20 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
   return geo.harbours.map((hb, index) => {
     const rng = seeded(index + 1), up = unit(hb.pos), [f, s] = tangents(up, hb.facing), r = hb.r, mole = r * HARBOUR.mole;
     // in a coral lagoon the mole is a causeway of coral blocks a man can heave, not a ring of crags as wide as the reef
-    const k = REGIONS[regionOf(hb.pos)]?.flora.includes('coral') ? 0.4 : 1;
+    // Spice Harbour's mole is built (spiceIsles.ts lays its dressed stone): here only its rubble toe, stones a man can
+    // heave, along two short arms from the flanks that leave the mouth wide open (MOLE: angles off the mouth, radius)
+    const built = REGIONS[regionOf(hb.pos)]?.id === 'spiceIsles';
+    const k = REGIONS[regionOf(hb.pos)]?.flora.includes('coral') ? 0.4 : built ? 0.3 : 1;
     const ground = (p: THREE.Vector3) => field.surface(p, -TIDE.amp, S).height;
     const shore = Array.from({ length: n }, (_, a) => {
       for (let t = 0.6; t <= 1.6 * r; t += 0.4) if (heightAt(geo, along(up, f, s, a * step, t)) > 0) return t;
       return Infinity;
     });
     const open = shore.map((t) => t > 1.1 * r), allOpen = open.every(Boolean);
+    const shoreAt = (a: number): number => {
+      for (let t = MOLE.r * r; t <= 2.2 * r; t += 0.25) if (heightAt(geo, along(up, f, s, a, t)) > 0) return t + 0.5;
+      return MOLE.r * r;
+    };
     // the widest run of open rays is the way out: the mouth at its middle, the mole's arms either side
     let start = 0, len = 0;
     for (let a = 0; a < n; a++) {
@@ -312,7 +322,8 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     }
     const mouthA = allOpen ? 0 : (start + (len - 1) / 2) * step, half = allOpen ? 0.4 : Math.min(0.4, len * step * 0.2);
     const arms: [number, number, number][] = []; // land end angle, mouth end angle, land end radius
-    if (allOpen) arms.push([mouthA - half - HARBOUR.arm, mouthA - half, mole], [mouthA + half + HARBOUR.arm, mouthA + half, mole]);
+    if (built) arms.push([-MOLE.land, -MOLE.mouth, shoreAt(-MOLE.land)], [MOLE.land, MOLE.mouth, shoreAt(MOLE.land)]);
+    else if (allOpen) arms.push([mouthA - half - HARBOUR.arm, mouthA - half, mole], [mouthA + half + HARBOUR.arm, mouthA + half, mole]);
     else if (len > 0) {
       arms.push([(start - 0.5) * step, mouthA - half, Math.min(shore[(start + n - 1) % n] + 0.6, 1.2 * r)]);
       arms.push([(start + len - 0.5) * step, mouthA + half, Math.min(shore[(start + len) % n] + 0.6, 1.2 * r)]);
@@ -322,9 +333,20 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     for (const [landA, mouthEnd, landR] of arms) {
       let from = landA, rFrom = landR;
       if (Math.abs(mouthEnd - from) > HARBOUR.arm) [from, rFrom] = [mouthEnd - Math.sign(mouthEnd - from) * HARBOUR.arm, mole];
-      const span = mouthEnd - from, count = Math.max(2, Math.ceil((Math.abs(span) * mole) / (HARBOUR.spacing * k)));
+      const end = built ? MOLE.r * r : mole, span = mouthEnd - from, count = Math.max(2, Math.ceil((Math.abs(span) * end) / (HARBOUR.spacing * k)));
       for (let i = 0; i <= count; i++) {
-        const u = i / count, a = from + span * u, rad = THREE.MathUtils.lerp(rFrom, mole, u * u * (3 - 2 * u));
+        const u = i / count, a = from + span * u, rad = THREE.MathUtils.lerp(rFrom, end, u * u * (3 - 2 * u));
+        if (built) {
+          // the toe: stones either side of the dressed wall, under its face; the head's lamp on the coping
+          for (const side of [-1, 1]) for (let j = 0; j < 2; j++) {
+            const p = along(up, f, s, a + (rng() - 0.5) * 0.05, rad + side * (MOLE.half + 0.25 * rng()));
+            rocks.push(boulder(p, f, (0.8 + 0.6 * rng()) * k, rng, ground(p), -Infinity));
+          }
+          const p = along(up, f, s, a, rad);
+          if (i === count && (!head || Math.abs(span) > head.span)) head = { p, top: MOLE.coping, span: Math.abs(span) };
+          else if (i % 3 === 1) bollards.push(stand(p, f, MOLE.coping - 0.05, new THREE.Vector3(0.7, 0.7, 0.7), rng() * 6.283));
+          continue;
+        }
         for (let row = 0; row < 3; row++) {
           if (row && rng() < 0.35) continue;
           const sc = (i === count && !row ? 1.7 : 0.8 + 0.55 * rng()) * (row ? 0.6 : 1) * k;
@@ -340,7 +362,7 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     // rocks along the waterline of the sheltered shore, and something to moor to at the water's edge
     const land = shore.map((t, a) => ({ t, a })).filter((x) => x.t < Infinity).sort((x, y) => x.t - y.t), taken: number[] = [];
     for (const { t, a } of land) {
-      if (rng() < 0.6) {
+      if (!built && rng() < 0.6) {
         const p = along(up, f, s, (a + rng() - 0.5) * step, t + (rng() - 0.6) * 0.8);
         rocks.push(boulder(p, f, (0.35 + 0.45 * rng()) * k, rng, ground(p), -Infinity));
       }

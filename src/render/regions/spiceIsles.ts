@@ -16,6 +16,7 @@ import { illustratedMaterial, type Style } from '../../style/glsl.ts';
 import { mix, PIGMENTS } from '../../style/palette.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
 import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
+import { MOLE } from '../structures.ts';
 import { GROUND, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
 import type { RenderContext, RenderModule } from '../world.ts';
 import { chartDir, Draw, Kit, lift, pose, regionSeen, seeded, vec, type V, washOf, type Wash } from './kit.ts';
@@ -27,6 +28,13 @@ const TAU = 2 * Math.PI, DEG = Math.PI / 180;
 export const BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
 /** The quay's coping over mean sea (u); trees drawn whole within `near` u, sketched to `far`; the understory to `edge`. */
 export const SPICE = { quay: TIDE.amp + 0.4, near: 32, far: 300, edge: 70, step: 1.3 } as const;
+
+/** Capture 24's ships in Spice Harbour (chart x, y; bow toward x, y; detail): two lying along the quay at its berths,
+ *  one warping in to the third, one in the mouth, one standing in from the sound; every hull's length floats at low
+ *  water (regions test). */
+export const SPICE_SHIPS: readonly (readonly [number, number, number, number, number])[] = [
+  [-8.4, 6.3, -3, 6.5, 0.6], [-4.3, 3.8, -1.6, -0.4, 0.6], [-12, 3.6, -13, -1.4, 0.6], [-6.2, -3.5, -7, 3, 0.6], [-1.5, -12.5, -5, -4, 0.35],
+];
 
 const W = {
   bole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.5), 0.5), boleDark: washOf(PIGMENTS.sepia, 0.7),
@@ -178,15 +186,18 @@ function flowerKit(seed: number, gold: boolean, far: boolean): THREE.BufferGeome
     const a = (k / 3) * TAU + rnd();
     b.tube([path[n], vec(Math.cos(a) * 0.2, 0.68, Math.sin(a) * 0.2)], [0.02, 0.01], 3);
   }
-  const [hot, pale] = gold ? [W.gold, W.goldPale] : [W.bloom, W.bloomPale];
+  // blossom as a watercolourist dabs it: broken vermilion and ochre over the green, thick in drifts across the crown
+  // and thin between them, more on the sunward top (S-020: never a red ball)
+  const [hot, pale, other] = gold ? [W.gold, W.goldPale, W.bloom] : [W.bloom, W.bloomPale, W.gold];
   b.pick = (c, nn) => {
-    const h = hash(Math.round(c.x * 50), Math.round(c.y * 50), Math.round(c.z * 50) + seed);
-    return nn.y > 0.15 && h < 0.78 ? (h < 0.5 ? hot : pale) : nn.y > -0.2 && h < 0.3 ? hot : foliage(c, nn);
+    const h = hash(Math.round(c.x * 60), Math.round(c.y * 60), Math.round(c.z * 60) + seed);
+    const drift = 0.5 + 0.5 * Math.sin(c.x * 13 + seed) * Math.sin(c.z * 11 - 2 * seed) * Math.cos(c.y * 9), dens = (0.1 + 0.5 * drift) * (0.45 + 0.75 * Math.max(0, nn.y));
+    return h < dens * 0.55 ? hot : h < dens * 0.8 ? pale : h < dens ? other : foliage(c, nn);
   };
-  const masses = far ? 3 : 8;
+  const masses = far ? 4 : 9;
   for (let k = 0; k < masses; k++) {
-    const a = (k / masses) * TAU * 1.6 + rnd(), r = k === 0 ? 0 : 0.2 * (0.5 + 0.5 * rnd()), s = 0.17 + 0.06 * rnd();
-    b.mass(vec(Math.cos(a) * r, 0.72 + (k === 0 ? 0.08 : 0.07 * (rnd() - 0.4)), Math.sin(a) * r), vec(s, s * 0.75, s), far ? 5 : 6, far ? 3 : 4, seed * 7 + k);
+    const a = (k / masses) * TAU * 1.6 + rnd(), r = k === 0 ? 0.02 : 0.26 * (0.35 + 0.65 * rnd()), s = 0.09 + 0.12 * rnd();
+    b.mass(vec(Math.cos(a) * r, 0.7 + 0.14 * rnd() - 0.5 * r * r, Math.sin(a) * r), vec(s, s * (0.55 + 0.3 * rnd()), s * (0.8 + 0.4 * rnd())), far ? 5 : 6, far ? 3 : 4, seed * 7 + k);
   }
   return b.build();
 }
@@ -287,6 +298,8 @@ export interface SpicePlan {
   emergents: Part[]; flowers: [Part[], Part[]]; edge: Part[]; godowns: Part[]; quays: Part[]; heaps: Part[];
   /** The town's terraces: retaining walls faced like the quay, and flights of steps up their risers. */
   walls: Part[]; stairs: Part[];
+  /** Spice Harbour's mole: its dressed stone, a run along each face of the wall. */
+  mole: Part[];
   /** The quay's face (unit directions round the anchorage) and the water off it a hull can lie in. */
   quay: V[]; berths: V[];
   birds: V[]; voices: { at: V; loud: number; kind: 'jungle' | 'harbour' }[];
@@ -300,7 +313,7 @@ export function planSpice(field: TerrainField): SpicePlan {
   const sim = (x: number, y: number): number => heightAt(geo, chartDir(RI, x, y));
   const tan = (x: number, y: number, dx: number, dy: number): V =>
     chartDir(RI, x + dx * 0.25, y + dy * 0.25).sub(chartDir(RI, x - dx * 0.25, y - dy * 0.25)).normalize();
-  const plan: SpicePlan = { emergents: [], flowers: [[], []], edge: [], godowns: [], quays: [], heaps: [], walls: [], stairs: [], quay: [], berths: [], birds: [], voices: [] };
+  const plan: SpicePlan = { emergents: [], flowers: [[], []], edge: [], godowns: [], quays: [], heaps: [], walls: [], stairs: [], mole: [], quay: [], berths: [], birds: [], voices: [] };
   const place = (list: Part[], x: number, y: number, o: { base?: number; sink: number; fwd: V; yaw?: number; tilt?: number; s: number; sy?: number; sz?: number; kitH: number; reach: number }): Part => {
     const dir = chartDir(RI, x, y), ground = field.surface(dir, -10, S).height, base = o.base ?? ground - o.sink, sy = o.sy ?? o.s, at = lift(dir, base);
     const p: Part = { m: pose(new THREE.Matrix4(), at, dir, o.fwd, o.yaw ?? 0, o.tilt ?? 0, o.s, sy, o.sz ?? o.s), at, dir, base, ground, sim: heightAt(geo, dir), top: base + o.kitH * sy, reach: o.reach };
@@ -341,6 +354,27 @@ export function planSpice(field: TerrainField): SpicePlan {
       place(plan.godowns, gx, gy, { base: hi - 0.35, sink: 0, fwd: out(gx, gy), yaw: 0.06 * (rnd() - 0.5), s: 1.3, kitH: 2.1, reach: 2.2 });
       taken.push({ x: gx, y: gy, r: 3.2 });
       break;
+    }
+  }
+  // the mole: two short arms of dressed stone from the flanks, the mouth between them wide open on the sound
+  // (structures.ts' MOLE: its rubble toe and the lamp on its head are laid there); a run along either face of the
+  // wall, bedded on the sea floor, all outside the sim's harbour (its disc of `r`) where hulls lie
+  for (const side of [-1, 1]) {
+    const ray = (th: number): [number, number] => [Math.sin(Math.PI + side * th), Math.cos(Math.PI + side * th)];
+    let land = MOLE.r * hb.r;
+    for (const [ux, uy] = ray(MOLE.land); land <= 2.2 * hb.r && sim(hb.x + ux * land, hb.y + uy * land) <= 0; land += 0.25);
+    const arc = (u: number): [number, number] => {
+      const th = MOLE.land + (MOLE.mouth - MOLE.land) * u, rr = land + 0.5 + (MOLE.r * hb.r - land - 0.5) * u * u * (3 - 2 * u), [ux, uy] = ray(th);
+      return [hb.x + ux * rr, hb.y + uy * rr];
+    };
+    const n = Math.ceil((land + 0.5) * (MOLE.land - MOLE.mouth) / 0.9) + 3;
+    for (let i = 0; i < n; i++) {
+      const [x0, y0] = arc(i / n), [x1, y1] = arc((i + 1) / n), mx = (x0 + x1) / 2, my = (y0 + y1) / 2, len = Math.hypot(x1 - x0, y1 - y0);
+      const nx = (y1 - y0) / len, ny = -(x1 - x0) / len, g = groundAt(field, chartDir(RI, mx, my)), sy = Math.max(1, (MOLE.coping - g + 0.4) / 1.7);
+      for (const face of [-1, 1]) {
+        const wx = mx + face * nx * 0.25, wy = my + face * ny * 0.25;
+        place(plan.mole, wx, wy, { base: MOLE.coping, sink: 0, fwd: tan(wx, wy, face * nx, face * ny), s: len * 1.06, sy, sz: 1.3, kitH: 0, reach: MOLE.half });
+      }
     }
   }
   // the town climbing behind: the terrace's riser faced with a retaining wall (a flight of steps every 30°), and on
@@ -440,7 +474,7 @@ export class SpiceIsles {
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
-    this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), [...plan.quays, ...plan.walls]), fixed(heapKit(5), plan.heaps), fixed(stairKit(), plan.stairs)];
+    this.fixed = [fixed(godownKit(3), plan.godowns), fixed(quayKit(), [...plan.quays, ...plan.walls, ...plan.mole]), fixed(heapKit(5), plan.heaps), fixed(stairKit(), plan.stairs)];
     const lod: [THREE.BufferGeometry, Part[], number, number][] = [
       [emergentKit(17, false), plan.emergents, 0, SPICE.near], [emergentKit(17, true), plan.emergents, SPICE.near, SPICE.far],
       [flowerKit(21, false, false), plan.flowers[0], 0, SPICE.near], [flowerKit(21, false, true), plan.flowers[0], SPICE.near, SPICE.far],

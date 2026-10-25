@@ -15,7 +15,7 @@ import { chartDir } from '../../src/render/regions/kit.ts';
 import { planWeeping } from '../../src/render/regions/weepingIsle.ts';
 import { BLOCK, CLEAR, groundAt, LAND, LOW, planCoral } from '../../src/render/regions/coralAtolls.ts';
 import { laceAt, surfAt } from '../../src/render/sea.ts';
-import { BLOCK as SPICE_BLOCK, groundAt as spiceGround, LAND as SPICE_LAND, planSpice } from '../../src/render/regions/spiceIsles.ts';
+import { BLOCK as SPICE_BLOCK, groundAt as spiceGround, LAND as SPICE_LAND, planSpice, SPICE_SHIPS } from '../../src/render/regions/spiceIsles.ts';
 import { DRAFT } from '../../src/sim/world/regions.ts';
 import { navigable } from '../../src/sim/world/geography.ts';
 
@@ -184,14 +184,14 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
 
 test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at high water; every part seated; the harbour has its quay, godowns and apron', () => {
   const plan = planSpice(field), hb = REGIONS.findIndex((r) => r.id === 'spiceIsles');
-  const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge], works = [...plan.godowns, ...plan.quays, ...plan.heaps];
+  const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge], works = [...plan.godowns, ...plan.quays, ...plan.heaps, ...plan.walls, ...plan.stairs];
   for (const p of [...trees, ...works]) assert.ok(p.sim >= SPICE_BLOCK, `no part in a hull's water: sim ${p.sim.toFixed(2)}`);
   // the quay's face, where it meets the water, and a godown's or heap's whole footprint stand on ground no hull floats over
   for (const p of plan.quays) {
     const e = p.m.elements, face = new THREE.Vector3(e[12], e[13], e[14]).addScaledVector(new THREE.Vector3(e[8], e[9], e[10]).normalize(), 0.56).normalize();
     assert.ok(heightAt(geo, face) >= SPICE_BLOCK, `the quay's face stands where a hull grounds: ${heightAt(geo, face).toFixed(2)}`);
   }
-  for (const p of [...plan.godowns, ...plan.heaps, ...plan.emergents]) {
+  for (const p of [...plan.godowns, ...plan.heaps, ...plan.emergents, ...plan.walls, ...plan.stairs]) {
     const e = p.m.elements, x = new THREE.Vector3(e[0], e[1], e[2]).normalize(), z = new THREE.Vector3(e[8], e[9], e[10]).normalize();
     for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const d = p.at.clone().addScaledVector(x, a * p.reach).addScaledVector(z, b * p.reach * 0.6).normalize();
@@ -207,5 +207,17 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   for (const p of plan.quays) assert.ok(spiceGround(field, p.dir) <= p.base + 0.5 && spiceGround(field, p.dir) >= p.base - 1.6, 'the quay bedded');
   const n = { emergents: plan.emergents.length, flowers: plan.flowers.map((f) => f.length), edge: plan.edge.length, godowns: plan.godowns.length, quays: plan.quays.length, heaps: plan.heaps.length, berths: plan.berths.length, birds: plan.birds.length, voices: plan.voices.length, region: hb };
   console.log('spice plan', JSON.stringify(n));
+  // the mole stands outside the sim's harbour (the disc a hull may lie in), on two short arms that leave the mouth open
+  const hbr = REGIONS[hb].harbours[0], anchor = chartDir(hb, hbr.x, hbr.y);
+  assert.ok(plan.mole.length >= 10, 'the mole is built');
+  for (const p of plan.mole) assert.ok(p.dir.angleTo(anchor) * R >= hbr.r + 1, `the mole clear of the harbour's water: ${(p.dir.angleTo(anchor) * R).toFixed(2)} u`);
+  // capture 24's ships float along their whole length at low water
+  for (const [x, y, tx, ty] of SPICE_SHIPS) {
+    const l = Math.hypot(tx - x, ty - y), ux = (tx - x) / l, uy = (ty - y) / l;
+    for (const d of [-2.9, 0, 2.9]) for (const b of [-0.5, 0.5]) {
+      const h = heightAt(geo, chartDir(hb, x + ux * d - uy * b, y + uy * d + ux * b));
+      assert.ok(h < -TIDE.amp - DRAFT, `a staged ship afloat at low water: ${h.toFixed(2)}`);
+    }
+  }
   assert.ok(n.godowns >= 4 && n.quays >= 30 && n.heaps >= 8 && n.emergents >= 50 && plan.flowers.every((f) => f.length >= 30) && n.edge >= 40, JSON.stringify(n));
 });

@@ -20,7 +20,7 @@ import { KelpShallows } from '../../src/render/regions/kelpShallows.ts';
 import { AmberShoals } from '../../src/render/regions/amberShoals.ts';
 import { WeepingIsle } from '../../src/render/regions/weepingIsle.ts';
 import { CoralAtolls } from '../../src/render/regions/coralAtolls.ts';
-import { SpiceIsles } from '../../src/render/regions/spiceIsles.ts';
+import { SPICE_SHIPS, SpiceIsles } from '../../src/render/regions/spiceIsles.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -136,13 +136,16 @@ const CAPTAINS: (readonly [RGB, RGB])[] = [[P.vermilion, P.black], [P.ultramarin
 const FORMS: FormName[] = ['caravel', 'galleon', 'carrack', 'pinnace'];
 const afloat: { ship: Ship; at: V; fwd: V; lantern: Lamp }[] = [];
 /** A ship `ahead` u along the camera's heading and `aside` u to its right, sailing `turn` rad off that heading. */
-function launch(ahead: number, aside: number, turn: number, detail = 1): void {
-  const i = afloat.length, up = cam.foot.clone().normalize(), fwd = frameAt(up, cam.heading).clone();
-  const at = up.clone().multiplyScalar(R).addScaledVector(fwd, ahead).addScaledVector(tmp.crossVectors(fwd, up), aside).normalize();
+/** A ship `ahead` u before the eye and `aside` u off its line, turned `turn` (or, given `moor`, at its unit `at` in
+ *  navigable water, its bow toward `to`). */
+function launch(ahead: number, aside: number, turn: number, detail = 1, moor?: { at: V; to: V }): void {
+  const i = afloat.length, up = cam.foot.clone().normalize(), fwd = moor ? moor.to.clone().sub(moor.at) : frameAt(up, cam.heading).clone();
+  const at = moor ? moor.at.clone().normalize() : up.clone().multiplyScalar(R).addScaledVector(fwd, ahead).addScaledVector(tmp.crossVectors(fwd, up), aside).normalize();
+  if (moor) turn = 0;
   const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail });
   ship.setRig(ship.rig.state('plain', 2.2, 0.7));
   scene.add(ship);
-  const lantern = sky.lights.add({ pos: V(), reach: 4.5 }), heading = frameAt(at, headingToward(at, fwd.clone().add(up)) + turn).clone();
+  const lantern = sky.lights.add({ pos: V(), reach: 4.5 }), heading = frameAt(at, headingToward(at, moor ? moor.to : fwd.clone().add(up)) + turn).clone();
   afloat.push({ ship, at, fwd: heading, lantern });
   // under way: the wake it left over the last 20 s
   for (let k = 40; k >= 1 && sail > 0; k--) {
@@ -266,7 +269,13 @@ if (view === 'deck') {
   if (view === 'spice') { toWorld(ri, m.x + 3 + ox, m.y - 24 + oy, from); toWorld(ri, m.x - 1, m.y + 9, to); }
   else { toWorld(ri, 14 + ox, -10 + oy, from); toWorld(ri, 28, -4, to); } // low off the east island's jungle shore: the forest edge over the beach
   look(from, to, Number(q.get('height') ?? (view === 'spice' ? 10 : 2.6)), Number(q.get('pitch') ?? (view === 'spice' ? -0.2 : -0.02)));
-  if (view === 'spice') { launch(13, -8, 0.5, 0.6); launch(17, 8.5, -0.4, 0.6); launch(25, -10, 0.3, 0.35); launch(8, 6, -0.3, 0.6); }
+  // ships at the quay's berths and coming in through the mouth, each where the sim floats it at every tide (regions test)
+  if (view === 'spice') for (const [x, y, tx, ty, d] of SPICE_SHIPS) {
+    const at = V(), to = V();
+    toWorld(ri, x, y, at);
+    toWorld(ri, tx, ty, to);
+    launch(0, 0, 0, d, { at, to });
+  }
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();

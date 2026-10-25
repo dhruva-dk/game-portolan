@@ -105,7 +105,7 @@ class Kit {
 
   /** A clustered leaf mass: an icosphere lobed into clumps, flat-bottomed, lit as a soft dome and darker beneath;
    *  vertices on its upper side whose pattern exceeds `bloom` carry the blossom. */
-  mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2): void {
+  mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2, dab = 0): void {
     const ico = new THREE.IcosahedronGeometry(1, detail), pos = ico.getAttribute('position'), q = V(), p = V(), n = V();
     for (let k = 0; k < pos.count; k += 3) {
       const ids = [0, 1, 2].map((m) => {
@@ -114,7 +114,9 @@ class Kit {
           + 0.09 * Math.sin((q.x + q.z) * 9 + seed * 3.1);
         p.set(q.x * r * lobe, q.y * r * lobe * squash * (q.y < 0 ? 0.6 : 1), q.z * r * lobe).add(c);
         n.copy(q).addScaledVector(UP, 0.3).normalize();
-        const blossom = q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom;
+        // blossom as the pattern lays it, or (dab) broken dabs face by face, thicker on the sunward top
+        const blossom = dab ? q.y > -0.25 && hash(k, Math.round(seed * 97), 7) < dab * (0.55 + 0.6 * q.y)
+          : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom;
         return this.vert(p, n, LEAF, blossom ? 2 : 1, p.y, MASS, 0.35 + 0.65 * smooth(-0.8, 0.6, q.y));
       });
       this.tri(ids[0], ids[1], ids[2]);
@@ -228,6 +230,45 @@ function crownKit(lod: number, crown: Crown): Kit {
   return k;
 }
 
+/** A rainforest tree 1 tall (the Spice Isles' jungle and flowering trees, S-020): a bole forking high, leaning off its
+ *  foot, under a broad broken crown of many leaf masses of varied size and height (never one stamped shape), a lower
+ *  sub-canopy tree beside it, lianas hanging from its limbs, and at its feet an understory of dark low masses and fern
+ *  fronds; a flowering tree's blossom lies in broken dabs over the green, thick on some masses and thin on others. */
+function rainKit(lod: number, flowering: boolean, seed: number): Kit {
+  const k = new Kit(), far = lod > 0;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  const lean = V((rnd() - 0.5) * 0.14, 0, (rnd() - 0.5) * 0.14), top = (flowering ? 0.46 : 0.56) + 0.06 * rnd();
+  const fork = V(0, top, 0).add(lean);
+  k.tube([V(0, -0.06, 0), V(lean.x * 0.4, top * 0.5, lean.z * 0.4), fork], [0.045, 0.03, 0.022], far ? 3 : 6, BARK);
+  const N = far ? (flowering ? 2 : 3) : flowering ? 7 : 10, spread = flowering ? 0.26 : 0.36;
+  for (let i = 0; i < N; i++) {
+    const a = i * 2.39996 + rnd() * 0.9, d = i === 0 ? 0.03 : spread * (0.35 + 0.65 * Math.sqrt(rnd())), r = (far ? 0.13 : 0.08) + (far ? 0.1 : 0.12) * rnd();
+    const c = V(Math.cos(a) * d, top + 0.12 + 0.2 * rnd() - 0.22 * d * d, Math.sin(a) * d).add(lean);
+    if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.4)], [0.018, 0.007], 3, BARK);
+    k.mass(c, r, 0.45 + 0.35 * rnd(), !far && i < (flowering ? 4 : 3) ? 1 : 0, seed * 3.1 + i * 2.37, 2, flowering ? 0.2 + 0.55 * rnd() : 0);
+  }
+  // the sub-canopy: a smaller tree to one side, its rounder crown lower and darker
+  const sa = rnd() * TAU, sub = V(Math.cos(sa) * 0.3, 0, Math.sin(sa) * 0.3);
+  if (!far) k.tube([sub.clone().setY(-0.04), sub.clone().setY(0.3)], [0.022, 0.014], 3, BARK);
+  for (let i = 0; i < (far ? 1 : 3); i++) k.mass(sub.clone().add(V((rnd() - 0.5) * 0.14, 0.34 + 0.08 * rnd(), (rnd() - 0.5) * 0.14)), 0.09 + 0.05 * rnd(), 0.8, 0, seed + 40 + i);
+  if (far) return k;
+  // lianas looping down from the limbs, the understory's low masses and fern fronds at the feet
+  for (let i = 0; i < 3; i++) {
+    const a = rnd() * TAU, d = 0.12 + 0.18 * rnd(), x = Math.cos(a) * d + lean.x, zz = Math.sin(a) * d + lean.z;
+    k.tube([V(x, top + 0.05, zz), V(x * 1.05, top - 0.2 - 0.1 * rnd(), zz * 1.05), V(x * 1.1, 0.02, zz * 1.1)], [0.006, 0.005, 0.004], 3, ROOT);
+  }
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * TAU, d = 0.08 + 0.22 * rnd();
+    k.mass(V(Math.cos(a) * d, 0.05 + 0.04 * rnd(), Math.sin(a) * d), 0.06 + 0.06 * rnd(), 0.9, 0, seed + 60 + i);
+  }
+  for (let f = 0; f < 3; f++) {
+    const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a)), base = h.clone().multiplyScalar(0.1 + 0.1 * rnd());
+    k.sheet(base, h.clone().multiplyScalar(0.16).addScaledVector(UP, 0.12), V(0, -0.1, 0), 0.04, 3, 0.55, 0.3, LEAF, 1);
+  }
+  return k;
+}
+
 /** A palm (or a tree fern): a ringed trunk curving up (the fern's short and straight) under a crown of arching
  *  pinnate fronds. */
 function palmKit(lod: number, fern: boolean): Kit {
@@ -319,8 +360,8 @@ export interface Species {
 
 export const FLORA: Record<FloraKind, Species> = {
   pine: { kit: pineKit, size: [2.0, 3.4], near: 55, far: 300, sway: 0.05 },
-  jungle: { kit: (l) => crownKit(l, 'jungle'), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
-  floweringTree: { kit: (l) => crownKit(l, 'flowering'), size: [1.9, 2.8], near: 42, far: 280, sway: 0.05 },
+  jungle: { kit: (l) => rainKit(l, false, 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
+  floweringTree: { kit: (l) => rainKit(l, true, 11), size: [1.9, 2.8], near: 42, far: 280, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
   palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
@@ -653,9 +694,12 @@ void main() {
     // crescent leaf marks scalloping the masses, densest in shade, gone before they shrink to noise
     vec3 an = abs(n), c = vWorld * 5.5;
     vec2 lp = an.x > an.y && an.x > an.z ? c.yz : an.y > an.z ? c.xz : c.xy;
+    // each cell's mark its own: turned, sized, and some cells left bare, so no one glyph repeats down a crown
     vec2 cell = floor(lp), o = vec2(fhash(vec3(cell, 1.0)), fhash(vec3(cell, 2.0))) - 0.5, f = fract(lp) - 0.5 - 0.35 * o;
+    float g3 = fhash(vec3(cell, 3.0)), turn = 1.6 * (g3 - 0.5), sz = 0.7 + 0.5 * fhash(vec3(cell, 4.0));
+    f = mat2(cos(turn), sin(turn), -sin(turn), cos(turn)) * f / sz;
     float r = length(f), px = length(fwidth(lp));
-    float arc = smoothstep(0.38, 0.31, r) * smoothstep(0.2, 0.27, r) * smoothstep(0.05, -0.1, f.y);
+    float arc = smoothstep(0.38, 0.31, r) * smoothstep(0.2, 0.27, r) * smoothstep(0.05, -0.1 + 0.25 * o.x, f.y) * step(0.28, g3);
     col = mix(col, hatchInk(tone), arc * clamp(0.9 - 0.7 * tone, 0.15, 0.9) * (1.0 - smoothstep(0.18, 0.5, px)));
   }
   if (uNight > 0.0) {

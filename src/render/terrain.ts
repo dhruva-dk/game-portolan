@@ -772,7 +772,8 @@ void main() {
   } else {
     // strata: the lip of each hard bed inked (soft ones run unbroken), joints staggered bed by bed, a fissure now and
     // then through several
-    lines += inkLine(abs(fract(band + 0.5) - 0.5), min(fwidth(band), 0.5), LINE_CSS) * (cliff + 0.5 * steep) * step(0.3, bh) * 0.75 * (1.0 - reef);
+    // (only where rock shows: soil and growth bury the beds, so a wooded slope never rings with them, S-020)
+    lines += inkLine(abs(fract(band + 0.5) - 0.5), min(fwidth(band), 0.5), LINE_CSS) * (cliff + 0.5 * steep * (1.0 - veg)) * step(0.3, bh) * 0.75 * (1.0 - reef);
     float js = jc + hash11(floor(band) * 3.1) * 3.7;
     lines += inkLine(abs(fract(js) - 0.5), min(fwidth(js), 0.5), LINE_CSS * 0.7) * cliff * step(0.55, hash12(vec2(floor(js), floor(band)))) * 0.6 * (1.0 - reef);
     float fs = jc * 0.23 + 0.4 * noise3(vWorld / 3.0);
