@@ -70,7 +70,7 @@ if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWork
     const len = ms.map((x) => x.minutes).sort((a, b) => a - b), at = (q: number): string => len[Math.round(q * (len.length - 1))].toFixed(2);
     console.log(`== ${vr.name} ${JSON.stringify({ ...vr.tune, ...vr.style, ...vr.kit, ...vr.storm })}  match ${mean(len).toFixed(2)} min, tick ${tick.toFixed(3)} ms`);
     const died = (storm: boolean): string => Array.from({ length: 12 }, (_, k) => (rows.filter((r) => r.fate >= 0 && (r.fate === 5) === storm && Math.min(11, Math.floor(r.at)) === k).length / n).toFixed(2)).join(' ');
-    console.log(`match min/q1/median/q3/max ${[0, 0.25, 0.5, 0.75, 1].map(at).join('/')} min, ${len.filter((x) => x >= 9 && x <= 11).length} of ${n} in 9–11 (short: ${ms.filter((x) => x.minutes < 9).map((x) => `${x.m} ${x.minutes.toFixed(1)}`).join(', ')}); sunk a match by minute 0…11, by the storm ${died(true)}, else ${died(false)}`);
+    console.log(`match min/q1/median/q3/max ${[0, 0.25, 0.5, 0.75, 1].map(at).join('/')} min, ${len.filter((x) => x >= 9 && x <= 11).length} of ${n} in 9–11 (short: ${ms.filter((x) => x.minutes < 9).map((x) => `${x.m} ${x.minutes.toFixed(1)}`).join(', ')}); sunk a match by minute 0…11, by the storm ${died(true)}, else ${died(false)}; the last to fall sunk by the storm in ${ms.filter((x) => x.rows.filter((r) => r.fate >= 0).sort((a, b) => a.at - b.at).at(-1)?.fate === 5).length}`);
     p.forEach((x, t) => {
       const mine = rows.filter((r) => r.temperament === t), km = KILL_MODES.map((k) => mean(mine.map((r) => r.kmode[k])).toFixed(2));
       console.log(`${NAMES[t].padEnd(11)} ${SPEC.map((f) => x.mean[f].toFixed(f === 'sea' || f === 'loot' ? 0 : 2).padStart(6)).join('')}  k ${km.join('/')}`);

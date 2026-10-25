@@ -131,8 +131,8 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
   return { rows, ticks: k };
 }
 
-/** Tournament match m. */
-export function tournamentMatch(m: number): MatchOut {
+/** Tournament match m; `hook` every tick (diagnostics). */
+export function tournamentMatch(m: number, hook?: (s: MatchState) => void): MatchOut {
   const t0 = performance.now(), seed = 12000 + m;
   const fleet: Outfit[] = Array.from({ length: SHIPS }, (_, i) => {
     if (i === 0) return {};
@@ -140,7 +140,7 @@ export function tournamentMatch(m: number): MatchOut {
     return outfit(ids[(i + Math.floor(m / 6)) % ids.length], tier);
   });
   const sea = seaFor(geo(), seed), s = createMatch({ seed, fleet, rank: 5 });
-  const { rows, ticks } = play(sea, s, null, null);
+  const { rows, ticks } = play(sea, s, null, null, hook);
   const out = rows.slice(1).map((r) => ({ ...r, m, tier: berth(m, r.i).tier })), calms = s.storm.calms;
   return { m, minutes: (ticks * TICK) / 60, calm: geo().geo.region[cellOf(TERRITORY, calms[calms.length - 2].at)], ms: performance.now() - t0, rows: out };
 }
