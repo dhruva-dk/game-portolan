@@ -3,6 +3,7 @@
 // streams and of hash32, and speed (reported, not asserted). Ranges and measured worst errors are printed as a
 // table (copied into progress.html's log).
 //   node --test tests/sim/math.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as m from '../../src/sim/math.ts';
@@ -225,9 +226,9 @@ test('speed of the d* functions against Math.*', (t) => {
   for (let i = 0; i < N; i++) xs[i] = m.rngRange(r, -10, 10);
   const time = (f: (x: number) => number) => {
     let s = 0;
-    const t0 = performance.now();
+    const t0 = cpuNow();
     for (let i = 0; i < N; i++) s += f(xs[i]);
-    return [((performance.now() - t0) * 1e6) / N, s] as const;
+    return [((cpuNow() - t0) * 1e6) / N, s] as const;
   };
   const pairs: [string, (x: number) => number, (x: number) => number][] = [
     ['sin', m.dsin, Math.sin], ['cos', m.dcos, Math.cos], ['tan', m.dtan, Math.tan], ['atan', m.datan, Math.atan],

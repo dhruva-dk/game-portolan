@@ -3,6 +3,7 @@
 // rival charts; squalls and the storm shortening sight; kelp hiding; the flare, the fog flask and the gull; the marks
 // of rivals in your waters; and the survey's cost.
 //   node --test tests/sim/visibility.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { seaFor } from '../../src/sim/environment.ts';
@@ -170,9 +171,9 @@ test('the survey of all ten ships is cheap (within A9 beside the step)', (t) => 
     Object.assign(s.weather[k], { kind: k % 2 ? SPELL.fog : SPELL.squall, at, v: v3(), r: 30, age: WEATHER.rise, life: 1e6 });
   }
   for (let k = 0; k < 200; k++) survey(sea, s, out);
-  const t0 = performance.now(), n = 2000;
+  const t0 = cpuNow(), n = 2000;
   for (let k = 0; k < n; k++) survey(sea, s, out);
-  const ms = (performance.now() - t0) / n;
+  const ms = (cpuNow() - t0) / n;
   t.diagnostic(`survey of ${SHIPS} ships × ${SHIPS - 1} rivals: ${(ms * 1000).toFixed(1)} µs`);
   assert.ok(ms < 0.1);
 });

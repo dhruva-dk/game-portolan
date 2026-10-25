@@ -4,6 +4,7 @@
 // sails; the sea it swallows; the match lengths the storm alone produces while the captains sit idle (until WP11);
 // snapshot/resume over whole matches; and the tick's cost with the storm active and every ship's sight surveyed.
 //   node --test tests/sim/storm.test.ts      PORTOLAN_MATCHES=300 for the full match-length distribution
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { over } from '../../src/sim/end.ts';
@@ -148,9 +149,9 @@ function idleMatch(seed: number, each?: (s: MatchState, ms: number) => void, fro
   const off = S(5 + rngInt(rngFrom(seed), 30));
   while (!over(s)) {
     input.flags = s.tick >= off ? FLAG.breakOff : 0;
-    const t0 = performance.now();
+    const t0 = cpuNow();
     step(water, s, input);
-    each?.(s, performance.now() - t0);
+    each?.(s, cpuNow() - t0);
   }
   return s;
 }
@@ -175,9 +176,9 @@ test('a whole match resumed from snapshots at random ticks ends exactly as playe
   const rng = rngFrom(SEED), at = [1 + rngInt(rng, S(100)), S(100) + rngInt(rng, S(100)), S(200) + rngInt(rng, S(100))];
   const snaps: Uint8Array[] = [], cost: number[] = [], sights = Array.from({ length: SHIPS }, newSight);
   const whole = idleMatch(SEED, (s, ms) => {
-    const t0 = performance.now();
+    const t0 = cpuNow();
     survey(sea, s, sights);
-    cost.push(ms + performance.now() - t0);
+    cost.push(ms + cpuNow() - t0);
     if (at.includes(s.tick)) snaps.push(encodeMatch(s));
   });
   assert.equal(snaps.length, at.length);

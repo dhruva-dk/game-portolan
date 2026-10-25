@@ -2,6 +2,7 @@
 // wind a ship's sails and pennants show, the lanes and the Great Current carrying ships (part A); the tide's
 // passages, the weather, the hour, the regions' moving waters and the tick budget (part B).
 //   node --test tests/sim/environment.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -455,9 +456,9 @@ test('the Fire Archipelago\'s hot water scalds hulls, all but copper-sheathed on
 test('the sim stays within its tick budget (A9: Node mean ≤ 0.3 ms, ten ships under all the weather)', (t) => {
   const s = createMatch({ seed: SEED }), idle = idleInput(), times: number[] = [];
   for (let k = 0; k < 3600; k++) {
-    const t0 = performance.now();
+    const t0 = cpuNow();
     step(sea, s, idle);
-    times.push(performance.now() - t0);
+    times.push(cpuNow() - t0);
   }
   const warm = times.slice(300).sort((a, b) => a - b), mean = warm.reduce((a, b) => a + b, 0) / warm.length;
   t.diagnostic(`tick: mean ${(1000 * mean).toFixed(0)} µs, p99 ${(1000 * warm[Math.floor(0.99 * warm.length)]).toFixed(0)} µs`);

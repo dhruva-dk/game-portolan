@@ -2,6 +2,7 @@
 // canonical, bad values and bad bytes are refused, the hash sees every bit, and a realistic match snapshot is
 // small.
 //   node --test tests/sim/codec.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Kind } from '../../src/sim/codec.ts';
@@ -166,9 +167,9 @@ test('match states round-trip, and a late-match snapshot is small', (t) => {
   assert.ok(b.length <= 300 * 1024);
   const time = (f: () => unknown) => {
     for (let i = 0; i < 3; i++) f(); // warm up
-    const t0 = performance.now();
+    const t0 = cpuNow();
     for (let i = 0; i < 10; i++) f();
-    return ((performance.now() - t0) / 10).toFixed(1);
+    return ((cpuNow() - t0) / 10).toFixed(1);
   };
   t.diagnostic(`encode ${time(() => encodeMatch(late))} ms, decode ${time(() => decodeMatch(b))} ms, hash ${time(() => matchHash(late))} ms`);
 

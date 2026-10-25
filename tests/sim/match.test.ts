@@ -5,6 +5,7 @@
 // their results; the fast-forward after the player sinks, to the storm's end; snapshot/resume at random ticks; the setup;
 // and the tick's cost against A9.
 //   node --test tests/sim/match.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { over, result, sink } from '../../src/sim/end.ts';
@@ -64,9 +65,9 @@ function play(sea: Sea, s: MatchState, off: number, dooms: readonly Doom[], unti
   while (!over(s) && s.tick < until) {
     for (const [t, i, by, cause] of dooms) if (t === s.tick) sink(s, i, by, cause);
     if (over(s)) break;
-    const input = helm(s), t0 = cost ? performance.now() : 0;
+    const input = helm(s), t0 = cost ? cpuNow() : 0;
     step(sea, s, input);
-    if (cost) cost.push(performance.now() - t0);
+    if (cost) cost.push(cpuNow() - t0);
   }
   return s;
 }

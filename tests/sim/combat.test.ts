@@ -5,6 +5,7 @@
 // aiming by tap and by drag; sinking through sink() with its bounty, twice over for the leader; determinism,
 // snapshot/resume with shot in flight, and the tick's cost with all ten ships fighting.
 //   node --test tests/sim/combat.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aim, combat, ignite, launch } from '../../src/sim/combat.ts';
@@ -317,9 +318,9 @@ test('the tick\'s cost with ten ships fighting (A9: Node mean ≤ 0.3 ms)', (t) 
   const s = melee(), cost: number[] = [];
   let shots = 0;
   for (let k = 0; k < S(40); k++) {
-    const t0 = performance.now();
+    const t0 = cpuNow();
     step(sea, s, idleInput());
-    cost.push(performance.now() - t0);
+    cost.push(cpuNow() - t0);
     shots = Math.max(shots, s.shots.length);
   }
   const sorted = cost.slice().sort((x, y) => x - y), mean = cost.reduce((x, y) => x + y, 0) / cost.length;

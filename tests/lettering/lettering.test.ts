@@ -1,5 +1,6 @@
 // The cancelleresca: every character the game needs is in the hand, the writing is deterministic, the layout's
 // metrics hold, the nib's geometry is exact, and nothing vanishes at the smallest interface size.
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -113,9 +114,9 @@ test('legible at the smallest interface size: no stroke of any glyph fades out',
 test('interface text is quick to write', () => {
   const label = () => rasterizeText(layoutText('1,250', { size: 13 }), 3);
   for (let i = 0; i < 5; i++) label();
-  const t0 = performance.now();
+  const t0 = cpuNow();
   for (let i = 0; i < 20; i++) label();
-  const ms = (performance.now() - t0) / 20;
+  const ms = (cpuNow() - t0) / 20;
   console.log(`a 13 px label at 3×: ${ms.toFixed(2)} ms`);
   assert.ok(ms < 10);
 });

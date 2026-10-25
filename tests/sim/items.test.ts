@@ -3,6 +3,7 @@
 // dropped by a swap and by a sinking; stacking; the gull's seam (deliver); the starting fittings by rank; the Arch and
 // the Great Lagoon; determinism, snapshot/resume with chests, kegs and shells afloat, and the tick's cost.
 //   node --test tests/sim/items.test.ts
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { combat, damage } from '../../src/sim/combat.ts';
@@ -561,9 +562,9 @@ test('determinism: a brawl with every item runs identically, and resumes identic
 test('the tick\'s cost with ten ships fighting with their items stays within A9 (Node mean ≤ 0.3 ms)', (t) => {
   const s = brawl(), script = scriptedInputs(SEED + 1, S(30)), cost: number[] = [];
   for (const input of script) {
-    const t0 = performance.now();
+    const t0 = cpuNow();
     step(sea, s, input);
-    cost.push(performance.now() - t0);
+    cost.push(cpuNow() - t0);
   }
   const warm = cost.slice(60).sort((x, y) => x - y), mean = warm.reduce((x, y) => x + y, 0) / warm.length;
   const p99 = warm[Math.floor(warm.length * 0.99)];

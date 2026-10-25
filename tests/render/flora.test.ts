@@ -1,5 +1,6 @@
 // The shared flora (WP15 part C): planted the same every match, each species where it belongs, kits light enough
 // for a whole forested region in view.
+import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -10,7 +11,7 @@ import { FLORA, KINDS, TREES, kitGeometry, plantBed } from '../../src/render/flo
 import { GROUND, TerrainField, type Surface } from '../../src/render/terrain.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
-const t0 = performance.now(), bed = plantBed(geo, field), ms = performance.now() - t0;
+const t0 = cpuNow(), bed = plantBed(geo, field), ms = cpuNow() - t0;
 const root = (i: number): THREE.Vector3 => new THREE.Vector3(bed.matrix[i * 16 + 12], bed.matrix[i * 16 + 13], bed.matrix[i * 16 + 14]);
 
 test('the planet is planted densely with every region its own flora, the same every match', () => {
