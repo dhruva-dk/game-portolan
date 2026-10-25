@@ -51,6 +51,7 @@ function offset(p: Point, fwd: Point, a: number, d: number): Point {
 export class Soundscape {
   private readonly ids = new Map<Bed, number>();
   private readonly quiet = new Map<Bed, number>();
+  private readonly sent = new Map<Bed, [number, number, number]>();
   private readonly r = rng(0x5ea5);
   private sail = -1;
   private readonly engine: AudioEngine;
@@ -77,11 +78,17 @@ export class Soundscape {
       let id = this.ids.get(b);
       if (id === undefined) {
         if (g <= 0.01) continue;
-        id = this.engine.loop(b, { gain: 0.01 });
+        id = this.engine.loop(b, { gain: 0.01, cutoff: cutoff < 20000 ? cutoff : undefined });
         if (!id) continue;
         this.ids.set(b, id);
+        this.sent.delete(b);
       }
-      this.engine.setVoice(id, { gain: g, rate, cutoff }, 0.6);
+      // steer it only when the scene has moved it audibly: every automation event keeps the audio thread busy
+      const was = this.sent.get(b);
+      if (!was || Math.abs(g - was[0]) > 0.01 + 0.03 * was[0] || Math.abs(rate / was[1] - 1) > 0.004 || Math.abs(cutoff / was[2] - 1) > 0.04) {
+        this.engine.setVoice(id, { gain: g, rate, cutoff: cutoff < 20000 ? cutoff : undefined }, 0.6);
+        this.sent.set(b, [g, rate, cutoff]);
+      }
       const q = g <= 0.01 ? (this.quiet.get(b) ?? 0) + dt : 0;
       this.quiet.set(b, q);
       if (q > 4) { this.engine.stopVoice(id, 0.5); this.ids.delete(b); }

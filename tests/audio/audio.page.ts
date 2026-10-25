@@ -45,7 +45,8 @@ export async function each(): Promise<{ name: string; seconds: number; peak: num
 export async function storm() {
   const seconds = 8, ctx = new OfflineAudioContext(2, seconds * RATE, RATE), e = new AudioEngine(ctx);
   const used: SoundName[] = ['cannon', 'cannonFar', 'hit', 'splash', 'explosion', 'groan', 'coin'];
-  for (const n of used) for (let v = 0; v < SOUNDS[n].variants; v++) e.prepare(n, v);
+  // the bank as the game's worker leaves it: these and every bed rendered before the fight (voice starts are timed, not synthesis)
+  for (const n of [...used, ...SOUND_NAMES.filter((x) => SOUNDS[x].loop)]) for (let v = 0; v < SOUNDS[n].variants; v++) e.prepare(n, v);
   const scape = new Soundscape(e), s = calmScene();
   Object.assign(s, { wind: 1.6, gust: 1, rough: 1.5, rain: 1, storm: 0.9, coast: 0.8, harbour: 0.5, maelstrom: 0.6, steam: 0.5, night: 1, speed: 6 });
   let seed = 12345;
@@ -70,7 +71,25 @@ export async function storm() {
   let maxSfx = 0, maxAll = 0;
   for (let t = 0; t < seconds; t += 0.005) { maxSfx = Math.max(maxSfx, e.active(t, 'sfx')); maxAll = Math.max(maxAll, e.active(t)); }
   const t1 = performance.now(), b = await ctx.startRendering(), renderMs = performance.now() - t1;
-  return { ...scan(b), ceiling: CEILING, maxSfx, cap: VOICES.sfx, maxAll, nodesPeak: maxAll * 4 + 17, ...e.stats, renderMsPerSecond: renderMs / seconds, playUs, calls };
+  return { ...scan(b), ceiling: CEILING, maxSfx, cap: VOICES.sfx, maxAll, nodesPeak: maxAll * 4 + 17, ...e.stats, renderMsPerSecond: renderMs / seconds, seconds, playUs, calls };
+}
+
+/** A sound asked for 1.3 s ahead: no nodes until just before it sounds, then heard on time; one stopped before it was
+ * built never sounds. */
+export async function ahead(): Promise<{ nodesBefore: number; onset: number; stoppedPeak: number }> {
+  const heard = async (delay: number): Promise<[number, number]> => {
+    const ctx = new OfflineAudioContext(2, 3 * RATE, RATE), e = new AudioEngine(ctx);
+    e.prepare('cannon', 0);
+    e.play('cannon', { variant: 0, delay });
+    const nodes = e.nodes, d = (await ctx.startRendering()).getChannelData(0);
+    for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > 1e-3) return [nodes, i / RATE];
+    return [nodes, -1];
+  };
+  const [nodesBefore, late] = await heard(1.3), [, now] = await heard(0), onset = late - now; // the delay as heard
+  const ctx2 = new OfflineAudioContext(2, 2 * RATE, RATE), e2 = new AudioEngine(ctx2);
+  e2.prepare('bell', 0);
+  e2.stopVoice(e2.play('bell', { variant: 0, delay: 0.8 }), 0.1);
+  return { nodesBefore, onset, stoppedPeak: scan(await ctx2.startRendering()).peak };
 }
 
 export function events(): { kinds: number; started: number; errors: string[] } {
