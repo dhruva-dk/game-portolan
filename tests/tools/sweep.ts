@@ -1,28 +1,32 @@
 // Sweep (WP12 tuning): named variants of the captains' tuning, each over the same tournament matches (0 … n−1) on
 // worker_threads, one compact table per variant: per temperament check 3's five spec stats (sea, broken, sunk, loot,
-// place) and its sinkings by the killer's mode (flee/fight/ram/hunt/face/loop/home), then check 3's distinct-profile, hunters' lead
-// and rank numbers. A variant lays Style fields over temperaments (by index: career/league.ts TEMPERAMENT) and sets
-// brain TUNE knobs; each worker applies them from the defaults before a variant's matches, so nothing in the source
-// changes between runs. t values scale with √n: at 100 matches they read about 0.71 of a 200-match run's.
-//   node tests/tools/sweep.ts --matches 100 --variants '[{"name":"base"},{"name":"shy","tune":{"shy":0.3},"style":{"1":{"run":0.9}}}]'
+// place) and its sinkings by the killer's mode (flee/fight/ram/hunt/face/loop/home), then check 3's distinct-profile,
+// hunters' lead and rank numbers (--detail: how and when each sank, whom it sank, hurt and time by mode). A variant lays
+// Style fields over temperaments (by index: career/league.ts TEMPERAMENT), sets brain TUNE knobs and fits out kits
+// (tables.ts KITS, FITTING kinds by slot); each worker applies them from the defaults before a variant's matches, so
+// nothing in the source changes between runs. t values scale with √n: at 100 matches they read about 0.71 of a
+// 200-match run's.
+//   node tests/tools/sweep.ts --matches 100 --workers 5 --variants '[{"name":"base"},{"name":"shy","tune":{"shy":0.5},"style":{"1":{"run":0.8}}}]'
 import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { TUNE } from '../../src/sim/captains/brain.ts';
 import { restyle, STYLES, type Style } from '../../src/sim/captains/temperaments.ts';
+import { KITS } from '../../src/sim/tables.ts';
 import { NAMES, mean, placesByTier, profiles, tournamentMatch, welch, type MatchOut } from './tournament.ts';
 
-interface Variant { name: string; tune?: Partial<typeof TUNE>; style?: Record<string, Partial<Style>> }
+interface Variant { name: string; tune?: Partial<typeof TUNE>; style?: Record<string, Partial<Style>>; kit?: Record<string, number[]> }
 const SPEC = ['sea', 'broken', 'sunk', 'loot', 'place'] as const;
 const KILL_MODES = [10, 8, 9, 7, 12, 3, 4]; // brain.ts MODE: flee, fight, ram, hunt, face, loop, home
 
 if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWorker) {
-  const variants = (workerData as { variants: Variant[] }).variants, tune0 = { ...TUNE }, styles0 = STYLES.map((s) => ({ ...s }));
+  const variants = (workerData as { variants: Variant[] }).variants, tune0 = { ...TUNE }, styles0 = STYLES.map((s) => ({ ...s })), kits0 = KITS.map((k) => [...k]);
   let on = -1;
   parentPort!.on('message', ({ k, v, m }: { k: number; v: number; m: number }) => {
     if (v !== on) {
       Object.assign(TUNE, tune0, variants[v].tune ?? {});
       styles0.forEach((s, t) => restyle(t, { ...s, ...(variants[v].style?.[t] ?? {}) }));
+      kits0.forEach((k, t) => KITS[t].splice(0, k.length, ...(variants[v].kit?.[t] ?? k)));
       on = v;
     }
     parentPort!.postMessage({ k, out: tournamentMatch(m) });
@@ -57,12 +61,14 @@ if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWork
   variants.forEach((vr, v) => {
     const ms = out.slice(v * n, (v + 1) * n), rows = ms.flatMap((x) => x.rows), p = profiles(rows);
     const tick = ms.reduce((a, x) => a + x.ms, 0) / ms.reduce((a, x) => a + x.minutes * 60 * 30, 0);
-    console.log(`== ${vr.name} ${JSON.stringify({ ...vr.tune, ...vr.style })}  match ${mean(ms.map((x) => x.minutes)).toFixed(2)} min, tick ${tick.toFixed(3)} ms`);
+    console.log(`== ${vr.name} ${JSON.stringify({ ...vr.tune, ...vr.style, ...vr.kit })}  match ${mean(ms.map((x) => x.minutes)).toFixed(2)} min, tick ${tick.toFixed(3)} ms`);
     p.forEach((x, t) => {
       const mine = rows.filter((r) => r.temperament === t), km = KILL_MODES.map((k) => mean(mine.map((r) => r.kmode[k])).toFixed(2));
       console.log(`${NAMES[t].padEnd(11)} ${SPEC.map((f) => x.mean[f].toFixed(f === 'sea' || f === 'loot' ? 0 : 2).padStart(6)).join('')}  k ${km.join('/')}`);
       if (process.argv.includes('--detail')) { // sinkings by every killer mode and by cause, hurt dealt by mode, time by mode (shares)
         const sum = (f: 'kmode' | 'kvict' | 'causes' | 'dmode' | 'tmode'): string => { const v = mine[0][f].map((_, k) => mean(mine.map((r) => r[f][k]))), all = v.reduce((a, y) => a + y, 0) || 1; return v.map((y) => (f === 'kmode' || f === 'kvict' || f === 'causes' ? y : y / all).toFixed(2)).join(' '); };
+        const fate = [0, 1, 2, 3, 4, 5].map((c) => mine.filter((r) => r.fate === c).length / mine.length), sank = mine.filter((r) => r.fate >= 0);
+        console.log(`   sunk by gun/ram/fire/rocks/hot/storm ${fate.map((y) => y.toFixed(2)).join(' ')}, at ${mean(sank.map((r) => r.at)).toFixed(2)} min (quartiles ${[0.25, 0.5, 0.75].map((q) => sank.map((r) => r.at).sort((a, b) => a - b)[Math.floor(q * sank.length)]?.toFixed(1)).join(' ')})`);
         console.log(`   kvict ${sum('kvict')}\n   kmode ${sum('kmode')} | causes ${sum('causes')}\n   dmode ${sum('dmode')}\n   tmode ${sum('tmode')}`);
       }
     });

@@ -114,7 +114,7 @@ export function captainGull(tier: number, temperament: number): GullLevels {
 export function captainOutfit(career: Career, id: number): Outfit {
   const tier = tierOf(career.captains[id].points), { temperament } = CAPTAINS[id];
   return {
-    form: captainForm(id, tier), pigment: id, pattern: 1 + temperament, fittings: startingFittings(tier),
+    form: captainForm(id, tier), pigment: id, pattern: 1 + temperament, fittings: startingFittings(tier, temperament),
     gull: captainGull(tier, temperament), gunnery: GUNNERY[tier - 1],
   };
 }

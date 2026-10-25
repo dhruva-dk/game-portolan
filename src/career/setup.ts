@@ -15,7 +15,7 @@ export const GENTLE = { gunnery: 0.2 } as const;
 export function toSetup(career: Career, seed: number): { setup: MatchSetup; drawn: number[] } {
   const drawn = draw(career), { player } = career, first = career.match === 0;
   const outfit = (id: number): Outfit => ({
-    ...(first ? { ...captainOutfit(career, id), fittings: startingFittings(1), gull: captainGull(1, CAPTAINS[id].temperament), gunnery: GENTLE.gunnery } : captainOutfit(career, id)),
+    ...(first ? { ...captainOutfit(career, id), fittings: startingFittings(1, CAPTAINS[id].temperament), gull: captainGull(1, CAPTAINS[id].temperament), gunnery: GENTLE.gunnery } : captainOutfit(career, id)),
     captain: { temperament: CAPTAINS[id].temperament, tier: first ? 1 : tierOf(career.captains[id].points) },
   });
   return {

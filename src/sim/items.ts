@@ -13,8 +13,8 @@ import { addScaled, dcos, dot, normalize, rngFloat, rngInt, set, v3, type V3 } f
 import { R, TERRITORY, cellOf } from './sphere.ts';
 import { EVENT, SHIPS, STREAM, TICK, afloat, chronicle, emit, fullHull, type MatchState, type Ship } from './state.ts';
 import {
-  BATTERY, CONSUMABLE, CONSUMABLES, EFFECT, FITTING, FITTING_SLOT, FORMS, KEGS, LOOKOUT, LOOT, MORTAR, OUTFIT, SIGHT, SLOT,
-  STERN_GLASS, TIERS,
+  BATTERY, CONSUMABLE, CONSUMABLES, EFFECT, FITTING, FITTING_SLOT, FORMS, KEGS, KITS, LOOKOUT, LOOT, MORTAR, OUTFIT, SIGHT,
+  SLOT, STERN_GLASS, TIERS,
 } from './tables.ts';
 import type { Sight } from './visibility.ts';
 import { REGIONS } from './world/regions.ts';
@@ -270,7 +270,7 @@ function kegs(state: MatchState, open: number): void {
 /**
  * What taking an item is worth to a ship, in pigment tiers gained: a fitting, its tier over what its slot holds (an
  * empty slot counts below the first tier), so a sidegrade is worth nothing and a downgrade less; a consumable,
- * LOOT.worth for each in its stack; −Infinity for what it cannot take. Captains weigh it by temperament.
+ * LOOT.worth for each in its stack; −Infinity for what it cannot take.
  */
 export function worth(ship: Ship, item: Item): number {
   if (!canTake(ship, item)) return -Infinity;
@@ -279,11 +279,14 @@ export function worth(ship: Ship, item: Item): number {
   return item.tier + 1 - (held.kind === FITTING.none ? 0 : held.tier + 1);
 }
 
-/** The offer on the ship's deck worth the most to it (worth()), the first of equals, as ShipInput.chestPick; −1 for none it can take. */
+/**
+ * The offer on the ship's deck worth the most to it (worth()), half a tier more to a captain when it is of its
+ * temperament's kit (KITS), the first of equals, as ShipInput.chestPick; −1 for none it can take.
+ */
 export function bestPick(ship: Ship): number {
   let best = -1, most = -Infinity;
   for (let k = 0; k < ship.offer.length; k++) {
-    const w = worth(ship, ship.offer[k]);
+    const w = worth(ship, ship.offer[k]) + (KITS[ship.captain.temperament]?.includes(ship.offer[k].kind) ? 0.5 : 0);
     if (w > most) {
       most = w;
       best = k;
@@ -292,10 +295,10 @@ export function bestPick(ship: Ship): number {
   return best;
 }
 
-/** The fittings a captain of a rank tier sets out with (MatchSetup.fleet, Outfit.fittings), slot by slot (OUTFIT). */
-export function startingFittings(rank: number): Item[] {
-  const tier = poolTop(rank - 1);
-  return OUTFIT.map(({ at, kind }) => (rank >= at ? { kind, tier } : { kind: FITTING.none, tier: 0 }));
+/** The fittings a captain of a rank tier sets out with (MatchSetup.fleet, Outfit.fittings), slot by slot (OUTFIT's ranks), of its temperament's kinds (KITS), or OUTFIT's without one. */
+export function startingFittings(rank: number, temperament = -1): Item[] {
+  const tier = poolTop(rank - 1), kit = KITS[temperament];
+  return OUTFIT.map(({ at, kind }, s) => (rank >= at ? { kind: kit ? kit[s] : kind, tier } : { kind: FITTING.none, tier: 0 }));
 }
 
 /** A fitting's strength by tier from its table while it is of `kind`, else 0. */

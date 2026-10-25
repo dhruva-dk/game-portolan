@@ -241,6 +241,22 @@ export const OUTFIT: readonly { readonly at: number; readonly kind: number }[] =
   { at: 3, kind: FITTING.spareCanvas }, { at: 2, kind: FITTING.doubledPlanking }, { at: 5, kind: FITTING.crowsNest },
 ];
 
+/**
+ * How each temperament (career/league.ts TEMPERAMENTS) fits out (WP12): by slot, the kind it sets out with over OUTFIT's
+ * ranks (items.ts startingFittings), and favours in a chest's offer (bestPick). Hunters ram with iron behind doubled
+ * planking and fight with the light guns; turtles keep the plain outfit's light guns and planking to punish intruders;
+ * the temperaments that shun a fight load chain shot to tear a pursuer's sails and slip it: expanders and opportunists
+ * behind doubled planking, gamblers on copper for their loops; raiders cut trails with the cutwater and run on copper.
+ */
+export const KITS: number[][] = [
+  [FITTING.ironRam, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
+  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
+  [FITTING.cutwater, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.copperSheathing, FITTING.crowsNest],
+  [FITTING.stemPost, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
+  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
+  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.copperSheathing, FITTING.crowsNest],
+];
+
 /** What every ship starts with, by slot, at the first tier: the first rank's outfit, the stem post and the light guns. */
 export const START_FITTINGS: readonly number[] = OUTFIT.map((o) => (o.at <= 1 ? o.kind : FITTING.none));
 

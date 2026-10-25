@@ -2,6 +2,8 @@
 //
 //   node tests/tools/tournament.ts [--matches 200] [--careers 0] [--workers N] [--json out.json]
 //
+// Workers: N, else the WORKERS environment variable (check 3 on a shared machine: WORKERS=5 npm test -- …), else every core.
+//
 // A match: nine captains of every rank and temperament on a seeded sea (seed 12000 + m), every temperament and every
 // tier taking every berth in turn under a league captain's identity (its signature) and its rank's kit (league.ts
 // captainOutfit: form, fittings, gull, gunners), the player's ship idle (it rides the Great Current to its end). Each
@@ -41,10 +43,11 @@ export const NAMES = ['hunter', 'expander', 'raider', 'turtle', 'opportunist', '
 /** Per captain: sea claimed (u², its loops), steady sea (u², its holding averaged over the match), trails broken, the purses they cost their owners, ships sunk, loot taken (scooped and found), spoils (coins scooped and bounties: loot from fights), finishing place. */
 export const STATS = ['sea', 'held', 'broken', 'purse', 'sunk', 'loot', 'spoils', 'place'] as const;
 export type Stat = (typeof STATS)[number];
-export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[]; kmode: number[]; kvict: number[]; tmode: number[]; dmode: number[] };
+/** A captain's tally, with diagnostics: sinkings by cause, killer's mode and victim; time and hurt dealt by mode; fate, how it sank (CAUSE; −1 afloat at the end), at, the minute it sank or the match ended. */
+export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[]; kmode: number[]; kvict: number[]; tmode: number[]; dmode: number[]; fate: number; at: number };
 export interface MatchOut { m: number; minutes: number; ms: number; rows: Row[] }
 
-const LIMIT = Math.round(1200 / TICK), SAMPLE = 30;
+const LIMIT = Math.round(1200 / TICK), SAMPLE = 30, WIDTH = Number(process.env.WORKERS) || availableParallelism();
 const PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 let GEO: ReturnType<typeof world> | null = null;
 const geo = (): ReturnType<typeof world> => (GEO ??= world());
@@ -56,7 +59,7 @@ const IDS = NAMES.map((_, t) => CAPTAINS.flatMap((c, id) => (c.temperament === t
 /** A captain's outfit at a tier, as the career fits it (league.ts captainOutfit), without a career. */
 export function outfit(id: number, tier: number): Outfit {
   const t = CAPTAINS[id].temperament;
-  return { form: captainForm(id, tier), pigment: id, pattern: 1 + t, fittings: startingFittings(tier), gull: captainGull(tier, t), gunnery: GUNNERY[tier - 1], captain: { temperament: t, tier } };
+  return { form: captainForm(id, tier), pigment: id, pattern: 1 + t, fittings: startingFittings(tier, t), gull: captainGull(tier, t), gunnery: GUNNERY[tier - 1], captain: { temperament: t, tier } };
 }
 
 /** The regions the Great Current passes on `sea`, in order. */
@@ -76,7 +79,7 @@ const ang = (a: V3, b: V3): number => R * Math.acos(Math.max(-1, Math.min(1, a.x
 
 /** Sail match s to its end: the player idle, or piloted to `pilot`; each captain's tally from the events; `hook` every tick. */
 function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | null, hook?: (s: MatchState) => void): { rows: Row[]; ticks: number } {
-  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(15).fill(0), kvict: new Array<number>(7).fill(0), tmode: new Array<number>(15).fill(0), dmode: new Array<number>(15).fill(0), sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
+  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(15).fill(0), kvict: new Array<number>(7).fill(0), tmode: new Array<number>(15).fill(0), dmode: new Array<number>(15).fill(0), fate: -1, at: 0, sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
   const out: number[] = new Array<number>(SHIPS).fill(-1), input = idleInput(), p = s.ships[0];
   if (pilot) Object.assign(p.captain, { temperament: pilot.temperament, skill: 0.6 });
   let sunk = 0, over = false, k = 0, samples = 0;
@@ -107,6 +110,8 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
       else if (e.kind === EVENT.hit && e.by >= 0) rows[e.by].dmode[s.ships[e.by].captain.mode] += e.amount; // hurt dealt by the striker's mode (diagnostic)
       else if (e.kind === EVENT.sunk) {
         out[e.ship] = sunk++;
+        rows[e.ship].fate = e.amount;
+        rows[e.ship].at = (s.tick * TICK) / 60;
         if (e.by >= 0) {
           rows[e.by].sunk++;
           rows[e.by].causes[e.amount]++;
@@ -120,6 +125,7 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
   for (let i = 0; i < SHIPS; i++) {
     rows[i].place = out[i] >= 0 ? SHIPS - out[i] : 1 + afloat.indexOf(i);
     rows[i].held /= Math.max(1, samples);
+    if (out[i] < 0) rows[i].at = (k * TICK) / 60;
   }
   return { rows, ticks: k };
 }
@@ -214,7 +220,7 @@ function run(job: Job): unknown {
 }
 
 /** Run jobs on `width` workers, each pulling the next job as it finishes; results by job index. */
-export async function pool<T>(jobs: readonly Job[], width = availableParallelism()): Promise<T[]> {
+export async function pool<T>(jobs: readonly Job[], width = WIDTH): Promise<T[]> {
   const out: T[] = new Array<T>(jobs.length);
   let next = 0;
   await Promise.all(Array.from({ length: Math.max(1, Math.min(width, jobs.length)) }, () => new Promise<void>((done, fail) => {
@@ -237,7 +243,7 @@ export async function pool<T>(jobs: readonly Job[], width = availableParallelism
 
 export interface Tournament { matches: MatchOut[]; rows: Row[]; wall: number; workerSeconds: number; meanMinutes: number }
 /** The tournament of `n` matches. */
-export async function tournament(n = 200, width = availableParallelism()): Promise<Tournament> {
+export async function tournament(n = 200, width = WIDTH): Promise<Tournament> {
   const t0 = performance.now();
   const matches = (await pool<MatchOut>(Array.from({ length: n }, (_, m) => ({ kind: 'match' as const, m })), width)).sort((a, b) => a.m - b.m);
   return {
@@ -281,7 +287,7 @@ if (!isMainThread && (workerData as { tournamentWorker?: boolean } | null)?.tour
     return k > 0 ? Number(process.argv[k + 1]) : d;
   };
   const jk = process.argv.indexOf('--json'), json = jk > 0 ? process.argv[jk + 1] : null;
-  const n = arg('matches', 200), careers = arg('careers', 0), width = arg('workers', availableParallelism());
+  const n = arg('matches', 200), careers = arg('careers', 0), width = arg('workers', WIDTH);
   const report: Record<string, unknown> = {};
   if (n > 0) {
     const t = await tournament(n, width);

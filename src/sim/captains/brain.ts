@@ -83,14 +83,13 @@ const share = (ship: Ship): number => ship.hull / fullHull(ship.form, ship.fitti
 /**
  * Tuning knobs (WP12; tests/tools/sweep.ts sets them per variant): shy, how much less a captain that avoids fights
  * (Style.fight < 0.1: expanders) wants one; scatter, how hard a runner (not a hunter) bears away from every other rival
- * it reads near, not only the one it runs from; wide, how much farther off a captain runs whose Style.fight is under
- * calm; finish,
- * the prey's hull share under which a hunter stays on a ship it has broken (and is sounder than) rather than run;
- * storm, × BRAIN.ram within which a hunter finishes a broken ship before it keeps ahead of the storm;
- * steal, how much more a hunter wants a wounded ship another is already on; ram, × BRAIN.ram a hunter drives its bow
- * in from to finish a ship it has broken; fin, the hull share under which a hunter's prey counts as broken, to ram.
+ * it reads near, not only the one it runs from; finish, the prey's hull share under which a hunter stays on a ship it
+ * has broken (and is sounder than) rather than run; storm, × BRAIN.ram within which a hunter finishes a broken ship
+ * before it keeps ahead of the storm; steal, how much more a hunter wants a wounded ship another is already on; ram,
+ * × BRAIN.ram a hunter drives its bow in from to finish a ship it has broken; fin, the hull share under which a
+ * hunter's prey counts as broken, to ram.
  */
-export const TUNE = { shy: 0, scatter: 0, wide: 0, finish: 0, steal: 0, ram: 1.5, fin: 0.4, storm: 0, calm: 0.1 }; // the defaults change nothing
+export const TUNE = { shy: 0.3, scatter: 1, finish: 0.4, steal: 0.3, ram: 1.5, fin: 0.4, storm: 2 };
 const byWant = (mode: number): boolean => mode === MODE.fight || mode === MODE.flee || mode === MODE.face;
 
 /** Whether ship i has a captain at its helm: never the player's (index 0), nor a ship fitted out without one (Outfit.captain). */
@@ -225,18 +224,27 @@ export function intent(state: MatchState, i: number, out: V3): V3 {
  * Whether captain i, riding, breaks off now: the region it is passing against the one the current reaches next
  * (opening.ts passage) by their richness, its own taste (by the seed), the storm rising near, and where it knows the
  * player breaks off; the longer it rides the less it asks, and it waits for a better region only if that comes soon —
- * the bolder (Style.bold), the more it asks and the longer it rides on for richer waters.
+ * the bolder (Style.bold), the more it asks and the longer it rides on for richer waters. Save hunters and
+ * opportunists, who go where the ships go, it rides on past a rival that has just broken off within BRAIN.danger, so
+ * as not to ink its home within that rival's guns — unless these are the waters it knows the player breaks off into.
  */
 function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
-  const ship = state.ships[i], t = state.tick * TICK, bold = styleOf(ship).bold;
+  const ship = state.ships[i], t = state.tick * TICK, style = styleOf(ship), bold = style.bold;
   passage(sea, ship.ride, PASS);
   if (t < BRAIN.ride) return false;
   if (PASS.untilEnd < 3) return true;
-  const c = ship.captain;
-  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, styleOf(ship)) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false; // it rides on for the waters it knows the player breaks off into
+  const c = ship.captain, sought = (c.knows & KNOW.breakOff) !== 0 && c.breakOff === PASS.region;
+  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, style) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false; // it rides on for the waters it knows the player breaks off into
+  if (style.stalk < 0.8 && style.edge === 0 && !sought && PASS.untilEnd > 6 && beside(state, i)) return false; // it rides on past a rival breaking off: no home within its guns; hunters and opportunists follow
   const here = regionWorth(state, i, PASS.region) - 0.6 * Math.max(0, dot(ship.pos, state.storm.origin) - 0.6) / 0.4;
   const ahead = PASS.next >= 0 ? regionWorth(state, i, PASS.next) : -Infinity;
   return here >= 1.3 + 0.5 * (bold - 0.3) - 0.02 * t && (here >= ahead || PASS.untilNext > 12 * (1 + bold));
+}
+
+/** Whether a rival it sees has broken off within BRAIN.danger of it. */
+function beside(state: MatchState, i: number): boolean {
+  for (let k = 0; k < SHIPS; k++) if (k !== i && knows(P, k) && afloat(state.ships[k]) && state.ships[k].phase !== PHASE.riding && apart(state.ships[i].pos, state.ships[k].pos) < BRAIN.danger) return true;
+  return false;
 }
 
 const LOOK: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
@@ -362,15 +370,14 @@ function flees(state: MatchState, i: number, style: Style): boolean {
   const r = P.rival, prey = r >= 0 && (P.hulls & (1 << r)) !== 0 ? share(state.ships[r]) : 1;
   if (style.stalk >= 0.8 && prey < TUNE.finish && prey < share(ship)) return false; // a hunter stays on a ship it has broken: it finishes it
   const outgunned = style.stalk >= 0.8 && r >= 0 && (P.hulls & (1 << r)) !== 0 && share(ship) < 0.7 && power(state.ships[r]) > 1.2 * power(ship); // a hunter breaks off from a ship that outguns it
-  const wide = style.fight < TUNE.calm ? BRAIN.danger * (1 + TUNE.wide) : BRAIN.danger; // a captain slow to fight runs from farther
-  if (r < 0 || P.rivalD > wide || (share(ship) >= style.run * (0.75 + 0.25 * c.skill) && !outgunned)) return false;
+  if (r < 0 || P.rivalD > BRAIN.danger || (share(ship) >= style.run * (0.75 + 0.25 * c.skill) && !outgunned)) return false;
   toward(ship.pos, state.ships[P.rival].pos, ship.head, T);
   set(c.want, -T.x, -T.y, -T.z);
   if (TUNE.scatter > 0 && style.stalk < 0.8) { // a runner bears away from every rival it reads near, not only the one it runs from
     for (let k = 0; k < SHIPS; k++) {
       if (k === i || k === r || (P.hulls & (1 << k)) === 0 || !afloat(state.ships[k])) continue;
       const e = apart(ship.pos, state.ships[k].pos);
-      if (e < wide) addScaled(c.want, c.want, toward(ship.pos, state.ships[k].pos, ship.head, U), -TUNE.scatter * (1 - e / wide));
+      if (e < BRAIN.danger) addScaled(c.want, c.want, toward(ship.pos, state.ships[k].pos, ship.head, U), -TUNE.scatter * (1 - e / BRAIN.danger));
     }
     if (dot(c.want, c.want) > 1e-6) normalize(c.want);
     else set(c.want, -T.x, -T.y, -T.z);
