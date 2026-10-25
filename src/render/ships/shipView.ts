@@ -56,7 +56,7 @@ export const LANTERN = { reach: 6, battle: 1.5, gutter: 0.6, glow: 0.4, battleGl
  * under one by one about a second apart, the tallest with the masthead pennant last at `under`; rings of ink spread where she went down
  * (`rings`), a slick and flotsam drift on; the view is removed at `gone`, and her ring marks the place for `mark` s.
  */
-export const SINK = { strike: 1.2, rig: 3.2, founder: 5.5, under: 10.5, gone: 11, list: 0.75, pitch: 0.42, rings: [7.6, 8.4, 9.3, 10.2, 11], mark: 60, right: 0.6, level: 0.5, depth: 0.7, ease: 1.2 } as const;
+export const SINK = { strike: 1.2, rig: 3.2, founder: 5.5, under: 10.5, gone: 11, list: 0.75, pitch: 0.42, rings: [7.6, 8.4, 9.3, 10.2, 11], chest: 8.3, mark: 60, right: 0.6, level: 0.5, depth: 0.7, ease: 1.2 } as const;
 /** Colours struck (hauled down to the rail, all but the masthead pennant) once this share of the hull is lost, and as she sinks, at `rate` a second. */
 export const STRIKE = { at: 0.88, rate: 0.8 } as const;
 
@@ -374,8 +374,9 @@ export class ShipView {
       onSea(0, -0.3 * end * L); foam(16, 0.35, 0.95);
       for (let j = 0; j < 12; j++) { onSea((this.rand() - 0.5) * 0.4 * L, (-0.3 * end + (this.rand() - 0.5) * 0.4) * L); plumes.spawn(SPRAY, a, b.copy(up).multiplyScalar(1.6 + 1.6 * this.rand()).addScaledVector(port, (this.rand() - 0.5) * 2), 1 + 0.4 * this.rand(), 0.3, 0.9, 7, clock, this.rand()); }
       for (let j = 0; j < 6; j++) { onSea((this.rand() - 0.5) * 0.8 * L, (-0.3 * end + (this.rand() - 0.5) * 0.8) * L); flotsam((0.06 + 0.07 * this.rand()) * L, SINK.mark); }
-      onSea(0.15 * L, -0.3 * end * L); flotsam(0.1 * L, SINK.mark, CHEST);
     }
+    // her chest breaks free and floats up beside her as she rolls under, the gold pennant still above it (capture 10)
+    if (past(SINK.chest)) { onSea(this.side * 0.55 * this.beam + 0.1 * L, -0.15 * end * L); flotsam(0.11 * L, SINK.mark, CHEST); }
     // once she is gone her ring lies on the place, still, in her pigment and foam, until the chart takes over
     if (past(SINK.gone)) { onSea(0, -0.3 * end * L); plumes.spawn(RING, a, b.set(0, 0, 0), SINK.mark, 1.25 * L, 1.25 * L, 0, clock, this.rand(), T.v4.set(this.tint.x, this.tint.y, this.tint.z, 3)); }
   }
@@ -574,8 +575,8 @@ void main() {
       vec2 dv = uv / max(r, 1e-3);
       vec3 pig = vTint.w > 0.5 ? vTint.xyz : uPInk;
       float rr = 0.8 + 0.05 * sin(th * 3.0 + seed * 31.0) + 0.025 * sin(th * 7.0 - seed * 17.0) + 0.012 * sin(th * 13.0 + seed * 5.0);
-      if (abs(r - rr) > 0.06 && abs(r - 0.76 * rr) > 0.08) discard; // most of the quad lies off both ripples
-      float line = 0.0, bleed = 0.0;
+      if (abs(r - rr) > 0.1 && abs(r - 0.76 * rr) > 0.1) discard; // most of the quad lies off both ripples
+      float line = 0.0, bleed = 0.0, lip = 0.0;
       for (int k = 0; k < 2; k++) {
         float rk = rr * (k == 0 ? 1.0 : 0.74 + 0.03 * sin(th * 2.0 + seed * 9.0)), wk = fw * uRenderPx * (k == 0 ? 0.55 : 0.4) * (1.0 + 0.5 * (1.0 - age) * (1.0 - lasting));
         float dk = r - rk;
@@ -583,21 +584,26 @@ void main() {
         float on = smoothstep(0.34 + 0.18 * age * (1.0 - lasting) + 0.08 * float(k), 0.46 + 0.18 * age * (1.0 - lasting) + 0.08 * float(k), plumeNoise(dv * 2.4 + seed * 17.0 + float(k) * 5.3));
         float lk = (1.0 - smoothstep(wk, wk + fw * 1.2, abs(dk))) * on * (k == 0 ? 1.0 : 0.6 * (1.0 - age));
         line = max(line, lk);
+        // white water riding just outside the pen line: the ripple's crest, so it reads on a near-black sea too
+        lip = max(lip, (1.0 - smoothstep(0.008, 0.022, abs(dk - wk - 0.025))) * on * (k == 0 ? 1.0 : 0.7 * (1.0 - age)) * (0.6 + 0.4 * plumeNoise(dv * 9.0 + seed * 3.0)));
         bleed = max(bleed, (1.0 - smoothstep(0.0, 0.045, -dk)) * step(dk, 0.0) * on * (k == 0 ? 1.0 : 1.0 - age) * (0.75 + 0.25 * plumeHash(floor(gl_FragCoord.xy * 0.5))));
       }
-      if (line + bleed < 0.003) discard;
-      col = line > 0.05 ? uPInk * 0.7 : pig;
-      a = (lasting > 0.5 ? 0.55 * (1.0 - smoothstep(0.8, 1.0, age)) : pow(1.0 - age, 1.1) * smoothstep(0.0, 0.06, age)) * max(line * 0.8, bleed * 0.14);
+      if (line + bleed + lip < 0.003) discard;
+      col = line > 0.05 ? uPInk * 0.7 : lip > 2.0 * bleed ? uPSpray : pig;
+      a = (lasting > 0.5 ? 0.55 * (1.0 - smoothstep(0.8, 1.0, age)) : pow(1.0 - age, 1.1) * smoothstep(0.0, 0.06, age)) * max(max(line * 0.8, lip * 0.5), bleed * 0.14);
     } else if (kind > 5.5) {
       // foam: a lacy lead-white patch, broken through with holes, its edge ragged and here and there a fine ink line
       float edge = 0.7 + 0.32 * (plumeNoise(uv / max(r, 1e-3) * 1.6 + seed * 19.0) - 0.5) + 0.04 * sin(th * 9.0 - seed * 7.0);
       float d = r - edge * (0.85 + 0.15 * age);
       if (d > 0.04) discard;
-      float holes = smoothstep(0.4, 0.58, 0.6 * plumeNoise(uv * 3.6 + seed * 9.0) + 0.4 * plumeNoise(uv * 9.0 - seed * 4.0) + 0.25 * r + 0.35 * age - 0.1);
-      float rim = (1.0 - smoothstep(0.0, 0.03, abs(d + 0.015))) * smoothstep(0.42, 0.55, plumeNoise(uv / max(r, 1e-3) * 2.4 + seed * 5.0));
-      col = mix(uPSpray, uPInk, rim);
-      // lace thinning to its edge, so the water and what lies on it read through
-      a = (1.0 - age * age) * max(rim * 0.4, (1.0 - smoothstep(-0.35, 0.0, d)) * (1.0 - holes) * (0.6 - 0.3 * r));
+      float hv = 0.6 * plumeNoise(uv * 3.6 + seed * 9.0) + 0.4 * plumeNoise(uv * 9.0 - seed * 4.0) + 0.25 * r + 0.35 * age - 0.1;
+      float holes = smoothstep(0.4, 0.58, hv), fh = max(fwidth(hv), 1e-4);
+      float rim = (1.0 - smoothstep(0.0, 0.025, abs(d + 0.015))) * smoothstep(0.42, 0.55, plumeNoise(uv / max(r, 1e-3) * 2.4 + seed * 5.0));
+      // the lace's pen: a fine broken line round its holes, as a draughtsman nets foam
+      float body = 1.0 - smoothstep(-0.35, 0.0, d), net = (1.0 - smoothstep(0.6, 1.6, abs(hv - 0.49) / fh / uRenderPx)) * body * step(0.4, plumeNoise(uv * 5.0 + seed * 2.0));
+      col = mix(uPSpray, uPInk, max(rim, 0.8 * net));
+      // lace thinning to its edge, so the water and what lies on it read through; lead white, so it holds on dark water
+      a = (1.0 - age * age) * max(max(rim * 0.7, net * 0.45), body * (1.0 - holes) * (0.78 - 0.3 * r));
     } else if (kind < 4.5) {
       // a slick: a thin, dull sheen of grey-umber on the water, granulating, its edge soft and broken (no rim)
       float edge = 0.78 + 0.1 * sin(th * 3.0 + seed * 23.0) + 0.06 * sin(th * 7.0 + seed * 11.0);
@@ -610,14 +616,24 @@ void main() {
       // flotsam: a plank, spar or cask, inked round and hatched across; her chest gold leaf, banded and rimmed in ink
       float chest = step(1.5, vTint.w), cask = step(fract(seed * 7.31), 0.3) * (1.0 - chest);
       // riding awash: the sea breaks white round it and washes over part of it (the wood there seen through the water)
-      float d = mix(max(abs(uv.x), abs(uv.y)) - 0.8, r - 0.74, cask);
+      // planks and spars broken off ragged at the ends, the chest's corners eased; a cask round
+      float rag = (1.0 - chest) * 0.16 * plumeNoise(vec2(uv.y * 7.0 + sign(uv.x) * 3.0, seed * 37.0));
+      vec2 bq = abs(uv) - vec2(0.8 - rag - 0.08, 0.72);
+      float d = mix(length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - 0.08, r - 0.74, cask);
       if (d > 0.18) discard;
       float wash = plumeNoise(uv * 2.2 + seed * 29.0), lace = step(0.45, plumeNoise(uv * 9.0 + seed * 3.0));
-      float rim = 1.0 - smoothstep(0.0, 0.07, abs(d + 0.035)), hatch = step(0.55, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.18));
-      float bands = chest * (1.0 - smoothstep(0.06, 0.1, min(abs(uv.x - 0.35), abs(uv.x + 0.35))));
+      float rim = 1.0 - smoothstep(0.0, 0.045, abs(d + 0.03)), hatch = step(0.55, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.18));
+      // its side: the plank's thickness and the chest's front face, in shadow below a pen line (a box, not a tile)
+      float ey = mix(-0.42, -0.28, chest), sideF = (1.0 - cask) * smoothstep(ey + 0.02, ey - 0.02, uv.y) * step(d, 0.0);
+      float edgeL = (1.0 - cask) * (1.0 - smoothstep(0.02, 0.05, abs(uv.y - ey))) * step(d, 0.0);
+      // gold-leaf bands over lid and front, a clasp on the front, lit along the lid's edge
+      float bands = chest * (1.0 - smoothstep(0.06, 0.1, min(abs(uv.x - 0.4), abs(uv.x + 0.4))));
+      float clasp = chest * sideF * (1.0 - smoothstep(0.08, 0.12, max(abs(uv.x), abs(uv.y + 0.55))));
       float awash = (1.0 - chest) * smoothstep(0.55, 0.7, wash);
       float foam = step(0.0, d) * (1.0 - smoothstep(0.04, 0.16, d)) * lace;
-      col = d > 0.0 ? uPSpray : mix(mix(mix(uPSmoke, uPCore, 0.3) * 0.7, vTint.xyz * 1.15, chest), uPInk, max(max(rim, bands), 0.45 * hatch * (1.0 - chest)));
+      vec3 body = mix(mix(uPSmoke, uPCore, 0.3) * 0.7, mix(vTint.xyz * 0.55, uPInk, 0.15), chest) * (1.0 - 0.4 * sideF);
+      vec3 leaf = mix(uPCore, vec3(1.0, 0.86, 0.45), 0.5 + 0.5 * step(0.5, plumeNoise(uv * 6.0 + seed)));
+      col = d > 0.0 ? uPSpray : mix(mix(body, leaf, max(bands, clasp) * (1.0 - 0.3 * sideF)), uPInk, max(0.8 * max(rim, edgeL), 0.45 * hatch * max(1.0 - chest, sideF)));
       a = (1.0 - smoothstep(0.85, 1.0, age)) * (d > 0.0 ? 0.7 * foam : max(rim * (1.0 - 0.6 * awash), 0.85 * (1.0 - 0.65 * awash)));
     }
   } else {
