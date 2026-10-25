@@ -22,6 +22,8 @@ import { cubeTexture } from './swell.ts';
 import { FORM_NAMES } from './ships/forms.ts';
 import { silhouetteRect, silhouetteTexture } from './ships/silhouettes.ts';
 import type { RigView } from './camera.ts';
+import { chartContent } from './chartmarks.ts';
+import { EMBLEMS, emblemRect, emblemTexture, PLAYER_EMBLEM } from './ships/emblems.ts';
 
 const SHEETS = 12, PLAYER = 0, LAYER_CHART = 1;
 const V = () => new THREE.Vector3();
@@ -189,9 +191,9 @@ export class Net {
 
 // --- geometry: every layer carries a sphere direction and a sheet, so one vertex function morphs them all --------
 
-interface Builder { dir: number[]; sheet: number[]; perp: number[]; side: number[]; colour: number[]; uv: number[] }
-const builder = (): Builder => ({ dir: [], sheet: [], perp: [], side: [], colour: [], uv: [] });
-function vert(b: Builder, p: THREE.Vector3, k: number, perp: THREE.Vector3 | null, side: number, col: readonly number[], u: number, v: number): void {
+export interface Builder { dir: number[]; sheet: number[]; perp: number[]; side: number[]; colour: number[]; uv: number[] }
+export const builder = (): Builder => ({ dir: [], sheet: [], perp: [], side: [], colour: [], uv: [] });
+export function vert(b: Builder, p: THREE.Vector3, k: number, perp: THREE.Vector3 | null, side: number, col: readonly number[], u: number, v: number): void {
   const d = p.clone().normalize();
   b.dir.push(d.x, d.y, d.z); b.sheet.push(k);
   b.perp.push(perp ? perp.x : 0, perp ? perp.y : 0, perp ? perp.z : 0); b.side.push(side);
@@ -254,7 +256,8 @@ const SHEET_FRAG = NOISE + /* glsl */ `
 uniform samplerCube tGeo;
 uniform samplerCube tTerr;
 uniform float uHasTerr, uReveal;
-uniform vec3 uCInk, uCSepia, uCLand, uCHill, uCParch;
+uniform vec3 uCInk, uCSepia, uCLand, uCHill, uCParch, uCSea, uCDeep;
+uniform float uMatch;
 void main() {
   vec3 n = normalize(vDir);
   vec4 g = texture(tGeo, n);
@@ -282,6 +285,12 @@ void main() {
   float e = vColour.x;
   col *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 7.0, e));
   col = mix(col, uCSepia, inkLine(e - 1.2, 0.5) * 0.7);
+  // A8's matched swap (WP24 part D): where the front has just passed, the paper still carries the shaded world's own
+  // colour fields at orbit (the sea's wash, shallow to deep by distance from shore, the land's tint) and settles to the
+  // chart's as the front moves on, so the change reads as ink settling into the same picture, not a crossfade
+  vec3 world = uCParch * mix(uCSea, uCDeep, smoothstep(2.0, 50.0, coast)) * (0.96 + 0.06 * grain);
+  world = mix(world, uCParch * uCLand * 0.92, land);
+  col = mix(col, world, uMatch * (1.0 - smoothstep(0.0, 0.45, edge)));
   col = mix(col, uCInk, line);
   col = mix(col, col * 0.78, front);
   writeInk(col, vNormal);
@@ -360,6 +369,12 @@ export class Chart {
   readonly back: THREE.Mesh;
   /** The ships drawn on the chart last frame (bits by ship). */
   drawn = 0;
+  /** WP24 part D: the captains' emblems flown over the ship marks (one draw, the sails' emblem atlas). */
+  readonly emblems: THREE.Mesh;
+  /** WP24 part D: the stroke a finger is drawing (sphere directions; course.ts CourseDrawing.points), inked live. */
+  draft: readonly { x: number; y: number; z: number }[] = [];
+  private readonly world: World | null;
+  private readonly emblemGeo: THREE.BufferGeometry;
   private readonly geo: THREE.CubeTexture | null;
   private readonly markGeo: THREE.BufferGeometry;
   private labelRoot = -1;
@@ -404,7 +419,7 @@ export class Chart {
       }
     }
     this.sheets = new THREE.Mesh(geometry(sb), mat(SHEET_FRAG, {
-      tGeo: { value: this.geo }, tTerr: { value: this.geo }, uHasTerr: { value: 0 }, uReveal: { value: 0 },
+      tGeo: { value: this.geo }, tTerr: { value: this.geo }, uHasTerr: { value: 0 }, uReveal: { value: 0 }, uMatch: { value: 0 }, uCSea: { value: tint(PIGMENTS.verdigris, 0.32) }, uCDeep: { value: tint(PIGMENTS.ultramarine, 0.42) },
       uCInk: { value: lin('ironGall') }, uCSepia: { value: lin('sepia') }, uCLand: { value: new THREE.Vector3(1.0, 0.86, 0.6) },
       uCHill: { value: new THREE.Vector3(0.82, 0.7, 0.55) }, uCParch: { value: parch },
     }, 0, false));
@@ -473,9 +488,13 @@ export class Chart {
     this.markGeo = geometry(builder());
     this.marks = new THREE.Mesh(this.markGeo, mat(TEX_FRAG, { tMap: { value: silhouetteTexture() }, uAlpha: { value: 0 }, uMode: { value: 1 } }, 1.3, true));
     this.marks.renderOrder = 13;
+    this.world = world;
+    this.emblemGeo = geometry(builder());
+    this.emblems = new THREE.Mesh(this.emblemGeo, mat(TEX_FRAG, { tMap: { value: emblemTexture() }, uAlpha: { value: 0 }, uMode: { value: 1 } }, 1.3, true));
+    this.emblems.renderOrder = 14;
     // the parchment the net comes to rest on, far beneath the closed globe
     this.back = new THREE.Mesh(new THREE.BufferGeometry(), mat(BACK_FRAG, { uCParch: { value: parch.clone().multiplyScalar(0.97) } }, 0, false, 254));
-    for (const m of [this.back, this.sheets, this.lines, this.labels, this.marks]) {
+    for (const m of [this.back, this.sheets, this.lines, this.labels, this.marks, this.emblems]) {
       m.frustumCulled = false;
       m.layers.set(LAYER_CHART);
       this.group.add(m);
@@ -549,6 +568,9 @@ export class Chart {
     const ink = [...linearVec(PIGMENTS.ironGall).toArray(), 2], mine = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
     const inv = new THREE.Matrix3(), p = V();
     this.drawn = 0;
+    // WP24 part D: under the ships, the current, the player's waters, trails, landmarks, loot and the course
+    chartContent(b, net, state, this.world, mask, pxU, fit.up, this.draft);
+    const eb = builder();
     for (let i = 0; i < SHIPS && i < state.ships.length; i++) {
       if (!(mask & (1 << i))) continue;
       const ship = state.ships[i], k = net.sheetOf(ship.pos), c = net.centres[k];
@@ -570,6 +592,14 @@ export class Chart {
         [Q(flip, -1), rect.x + rect.z, rect.y], [Q(-flip, -1), rect.x, rect.y],
       ];
       for (const j of [0, 3, 1, 1, 3, 2]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
+      // WP24 part D: the captain's emblem flown over the hull (the player's gull), from the sails' atlas
+      const em = i === PLAYER ? PLAYER_EMBLEM : ship.pattern > 0 ? EMBLEMS[(ship.pattern - 1) % EMBLEMS.length] : null;
+      if (em) {
+        const er = emblemRect(em), es = 4.4 * pxU, ec = [...col.slice(0, 3), 1];
+        const E = (x: number, y: number) => o.clone().addScaledVector(right, x * es).addScaledVector(up, y * es + s * 2.3);
+        const eq: [THREE.Vector3, number, number][] = [[E(-1, 1), er.x, er.y + er.w], [E(1, 1), er.x + er.z, er.y + er.w], [E(1, -1), er.x + er.z, er.y], [E(-1, -1), er.x, er.y]];
+        for (const j of [0, 3, 1, 1, 3, 2]) vert(eb, eq[j][0], k, null, 0, ec, eq[j][1], eq[j][2]);
+      }
       // the arrow: a shaft and a head from the hull along where it is heading
       const side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * pxU, wS = 0.9 * pxU, wH = 3.6 * pxU;
       const a0 = o.clone().addScaledVector(hd, 4 * pxU), a1 = o.clone().addScaledVector(hd, L - 6 * pxU), tip = o.clone().addScaledVector(hd, L);
@@ -581,6 +611,9 @@ export class Chart {
     const g = geometry(b);
     for (const name of ['position', 'dir', 'sheet', 'perp', 'sideW', 'colour', 'uv']) this.markGeo.setAttribute(name, g.getAttribute(name));
     this.markGeo.setDrawRange(0, b.sheet.length);
+    const eg = geometry(eb);
+    for (const name of ['position', 'dir', 'sheet', 'perp', 'sideW', 'colour', 'uv']) this.emblemGeo.setAttribute(name, eg.getAttribute(name));
+    this.emblemGeo.setDrawRange(0, eb.sheet.length);
   }
   /** WP24 part C: the storm on the chart, screen-sized like the ships: the wall (the calm's edge) inked with hatching
    *  toward the storm, and the next shrink, once announced, as a dashed vermilion ring. */
@@ -637,6 +670,7 @@ export class Chart {
     if (this.labelRoot !== net.root || (f.unfold > 0.5 && Math.abs(pxU - this.labelPx) > 0.03 * pxU)) this.relabel(camera, view, pxU);
     const sm = this.sheets.material as THREE.ShaderMaterial;
     sm.uniforms.uReveal.value = f.reveal;
+    sm.uniforms.uMatch.value = ease((0.5 - f.z) / 0.1);
     sm.uniforms.tTerr.value = territory ?? this.geo;
     sm.uniforms.uHasTerr.value = territory ? 1 : 0;
     // over the world the soaking globe is laid on top; once the world is gone the sheets test depth among themselves
@@ -644,6 +678,7 @@ export class Chart {
     (this.lines.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.z - 0.42) / 0.14);
     (this.labels.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.unfold - 0.55) / 0.4);
     (this.marks.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.z - 0.4) / 0.12);
+    (this.emblems.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.z - 0.4) / 0.12);
     this.back.visible = f.z >= 0.5;
     if (f.z > 0.3) this.ships(state, chartShips(state, sight), camera, view);
     else this.drawn = 0;
@@ -651,7 +686,7 @@ export class Chart {
 
   dispose(): void {
     this.group.removeFromParent();
-    for (const m of [this.back, this.sheets, this.lines, this.labels, this.marks]) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+    for (const m of [this.back, this.sheets, this.lines, this.labels, this.marks, this.emblems]) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
     this.geo?.dispose();
   }
 }
@@ -683,6 +718,11 @@ function chordAt(poly: readonly [number, number][], y: number): [number, number]
 const LABEL_CAP_RPX = 0.6 * 44 * 2, LABEL_ROSE = 40;
 
 export const CHART_LAYER = LAYER_CHART;
+/** A multiplicative tint: white toward a pigment by k (linear). */
+function tint(c: Parameters<typeof linearVec>[0], k: number): THREE.Vector3 {
+  const [r, g, b] = linearVec(c).toArray();
+  return new THREE.Vector3(1 + (r - 1) * k, 1 + (g - 1) * k, 1 + (b - 1) * k);
+}
 /** Height of the ground under a unit direction, u above mean sea level (the camera's collision). */
 export function groundOf(world: World): (dir: { x: number; y: number; z: number }) => number {
   return (dir) => world.geo.heights[cellOf(TERRITORY, dir)];

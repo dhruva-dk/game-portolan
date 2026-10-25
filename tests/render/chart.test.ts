@@ -275,3 +275,37 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
 test('A9 holds at every frame of the zoom: the approach to orbit and the swap window (WP24 part C)', () => {
   assert.deepEqual(overBudget, [], 'frames of the zoom over 200 draws or 500k triangles');
 });
+
+// --- WP24 part D in the browser --------------------------------------------------------------------------------
+test('WP24 part D: chart close-ups, the swap, the opening, sinking, pull-back and crow\'s-nest cameras, the compact chart: budgets, shots', async () => {
+  const out = join(root, 'progress/shots'), files: [string, string][] = [], over: string[] = [];
+  type D = { calls: number; tris: number; z: number; shown?: number; expected?: number };
+  type H = { d(n: string): D; closeup(t: string): D; swapMatch(): { before: number[]; mid: number[]; late: number[] } };
+  const PLAN: [string, string[]][] = [['40', ['opening', 'compact']], ['600', ['chart', 'close:near', 'close:current', 'close:landmark', 'swap:1.36', 'swap:1.39', 'swap:1.42', 'swap:1.46', 'open:0.5', 'pull:0.8', 'sink:0.45', 'sink:1', 'crow:1', 'compact']]];
+  for (const device of ['iphone', 'ipad'] as DeviceName[]) {
+    const s = DEVICES[device].safeArea;
+    for (const [at, names] of PLAN) {
+      const game = await openGame(launched.browser, `${server.url}tests/render/chart.html`, { device, hook: '__chart', query: { at, safe: `${s.top},${s.right},${s.bottom},${s.left}` } });
+      await game.until((g) => g.ready, undefined, 240000);
+      for (const name of names) {
+        const r = await game.page.evaluate((n) => { const h = (window as unknown as { __chart: H }).__chart; return n.startsWith('close:') ? h.closeup(n.slice(6)) : h.d(n); }, name);
+        const ok = r.calls <= (r.z >= 0.5 ? 100 : 150) && r.tris <= 420000;
+        console.log(`wp24d ${device} t${at} ${name}: z ${r.z.toFixed(2)}, ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris${r.shown !== undefined ? `, compact shows ${r.shown.toString(2)} of sight ${r.expected!.toString(2)}` : ''}`);
+        if (!ok) over.push(`${device} ${name}: ${r.calls} draws, ${r.tris} tris`);
+        if (r.shown !== undefined) assert.equal(r.shown & ~r.expected!, 0, `${device}: the compact chart shows only ships in sight`);
+        const file = join(out, `wp24d-${device}-${at === '40' ? 'start-' : ''}${name.replace(/[:.]/g, '-')}.png`);
+        await game.page.screenshot({ path: file, scale: 'css' });
+        files.push([file, `${device} ${at === '40' ? 'tick 40 ' : ''}${name}`]);
+      }
+      if (at === '600') console.log(`wp24d ${device} swap colour (mean RGB, the globe's middle): ${JSON.stringify(await game.page.evaluate(() => (window as unknown as { __chart: H }).__chart.swapMatch()))}`);
+      game.assertClean();
+      await game.page.close();
+    }
+  }
+  const page = await launched.browser.newPage({ viewport: { width: 1800, height: 1000 } });
+  const imgs = await Promise.all(files.map(async ([f, label]) => [`data:image/png;base64,${(await readFile(f)).toString('base64')}`, label]));
+  await page.setContent(`<body style="margin:0;background:#efe0c0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font:12px sans-serif">${imgs.map(([src, label]) => `<figure style="margin:0"><img src="${src}" style="width:100%;display:block"><figcaption>${label}</figcaption></figure>`).join('')}</body>`);
+  await page.screenshot({ path: join(out, 'wp24d-sheet.png'), fullPage: true });
+  await page.close();
+  assert.deepEqual(over, [], 'every WP24 part D view within A9 (420k triangles, 150 draws; the chart 100)');
+});

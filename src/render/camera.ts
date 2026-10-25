@@ -11,7 +11,8 @@
 // would block its line to the ship.
 import * as THREE from 'three';
 import { R } from '../sim/sphere.ts';
-import { PHASE, SHIPS, type MatchState } from '../sim/state.ts';
+import { EVENT, PHASE, SHIPS, type MatchState } from '../sim/state.ts';
+import { crowsNest } from '../sim/items.ts';
 import type { Net } from './chart.ts';
 
 interface XYZ { x: number; y: number; z: number }
@@ -27,6 +28,18 @@ export const ORBIT_DIST = 380;
 export const LIFT_DECK = 1, LIFT_CHART = 2;
 /** Eye clearance over the sea and the ground, u. */
 export const SEA_CLEAR = 1.2, GROUND_CLEAR = 1.6;
+/** WP24 part D: the cinematic moves. The opening rides beside the fleet (swung openSwing rad off the stern toward the
+ *  beam, lower by openLow, openBack u further off) and settles behind the ship through the break-off at no more than
+ *  settle a second; the loop pull-back stands off pullBack and up pullUp u at a claim of pullArea² u² (∝ √area, at
+ *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking rises sinkUp u over rise s, holds hold s, then opens the chart
+ *  (reduced motion: holds holdRM s and cuts); the crow's nest raises the camera by crow × its lookout's eye. */
+export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 60, sinkBack: 14, rise: 3.2, hold: 1.2, holdRM: 1.5, crow: 0.5 } as const;
+/** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
+export const REDUCED_VEIL = 0.3;
+/** The system's reduced-motion preference (the settings' switch ORs with it: rig.reducedMotion = setting || this). */
+export function prefersReducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 const PLAYER = 0;
 const clamp = (x: number, a: number, b: number) => (x < a ? a : x > b ? b : x);
@@ -88,6 +101,8 @@ export class Zoom {
   target = 0.35;
   vel = 0;
   reducedMotion = false;
+  /** WP24 part D: the paper veil over a reduced-motion cut, 1 → 0 over REDUCED_VEIL s (the shell fades a paper layer by it). */
+  veil = 0;
   private held = false;
   private base = 0;
   private deck = 0.35;
@@ -138,6 +153,13 @@ export class Zoom {
   step(dt: number): void {
     const h = Math.min(dt, 1 / 30), prev = this.lift;
     if (!(h > 0)) return;
+    // WP24 part D: reduced motion: no flight between the deck and the chart: the lift cuts to its target under a
+    // short paper veil (the fingers still move it directly)
+    if (this.reducedMotion && !this.held) {
+      if (this.lift !== this.target) { this.lift = this.target; this.vel = this.sv = 0; this.veil = 1; }
+      else this.veil = Math.max(0, this.veil - h / REDUCED_VEIL);
+      return;
+    }
     if (this.held) {
       // the fingers: a stiff critically damped follow, capped a frame in log-altitude like the free move
       const w = 22, x0 = this.lift - this.target, e = Math.exp(-w * h), v0 = this.vel;
@@ -226,6 +248,12 @@ export class CameraRig {
   seen = 0;
   /** Eye raise held for terrain, u (rises at once, eases back). */
   raise = 0;
+  /** WP24 part D: the cinematic moves' weights (CINE), eased each frame: the opening's ride beside the fleet, the
+   *  sinking's rise, the loop pull-back, the crow's nest raise (u). hold pins them (captures). */
+  readonly cine = { open: 0, sink: 0, pull: 0, want: 0, crow: 0, sunkFor: 0, opened: false, tick: -1, hold: false };
+  /** Reduced motion (settings || prefers-reduced-motion): every move cuts or holds, nothing glides, bobs or swings. */
+  get reducedMotion(): boolean { return this.zoom.reducedMotion; }
+  set reducedMotion(v: boolean) { this.zoom.reducedMotion = v; }
   private view: RigView = { width: 1, height: 1, safe: { top: 0, right: 0, bottom: 0, left: 0 } };
   private readonly s = V(); private readonly h = V(); private readonly hCam = V(); private readonly hPrev = V();
   private swingPrev = NaN;
@@ -238,6 +266,7 @@ export class CameraRig {
   readonly net: Net | null;
   constructor(camera: THREE.PerspectiveCamera, heightAt: (dir: XYZ) => number, net: Net | null = null) {
     this.camera = camera; this.heightAt = heightAt; this.net = net;
+    this.zoom.reducedMotion = prefersReducedMotion();
   }
 
   layout(view: RigView): void { this.view = view; }
@@ -278,6 +307,7 @@ export class CameraRig {
   frame(state: MatchState, alpha: number, clock: number, dt: number, zoomDt = dt): void {
     this.zoom.step(zoomDt);
     this.ship(state, alpha);
+    this.cineStep(state, zoomDt);
     const s = this.s, h = this.h;
     if (!this.primed || !finite(this.hCam)) { this.hCam.copy(h); this.hPrev.copy(h); this.yawVel = 0; this.omega = 0; this.primed = true; }
     // carry the follow heading over the curve, then spring it after the heading, ahead into the turn, toward the focus
@@ -308,11 +338,41 @@ export class CameraRig {
     this.pose(clock);
   }
 
+  /** WP24 part D: the cinematic moves' weights for this frame (real time: the sinking runs on while the chart opens). */
+  private cineStep(state: MatchState, real: number): void {
+    const c = this.cine, me = state.ships[PLAYER], rm = this.zoom.reducedMotion, h = Math.min(Math.max(real, 0), 1 / 30);
+    if (c.hold) return;
+    const first = c.tick < 0;
+    // the opening: beside the fleet riding the Great Current, settling behind the ship through the break-off
+    const open = !rm && me.phase === PHASE.riding ? 1 : 0;
+    c.open = first || rm ? open : c.open + clamp((open - c.open) * (1 - Math.exp(-h * 1.5)), -CINE.settle * h, CINE.settle * h);
+    // the loop pull-back: the camera stands off in proportion to the claim (the root of its area), then eases home
+    if (state.tick !== c.tick) {
+      c.tick = state.tick;
+      for (const e of state.events) if (e.kind === EVENT.loop && e.ship === PLAYER) c.want = Math.max(c.want, clamp(Math.sqrt(Math.max(0, e.amount)) / CINE.pullArea, 0.12, 1));
+    }
+    if (rm) c.want = c.pull = 0;
+    else { c.pull += clamp((c.want - c.pull) * (1 - Math.exp(-h * 2.2)), -CINE.pullRate * h, CINE.pullRate * h); c.want *= Math.exp(-h / CINE.pullHold); }
+    // the crow's nest raises the chase camera with its lookout's eye (under reduced motion it steps, never glides)
+    const crow = crowsNest(me) * CINE.crow;
+    c.crow = rm || first ? crow : c.crow + clamp((crow - c.crow) * (1 - Math.exp(-h * 1.5)), -CINE.crowRate * h, CINE.crowRate * h);
+    // sinking: the camera rises to watch the sea close over her, then the chart opens on the match
+    if (me.phase === PHASE.sunk) {
+      c.sunkFor += h;
+      c.sink = rm ? 0 : ease(c.sunkFor / CINE.rise);
+      if (!c.opened && c.sunkFor >= (rm ? CINE.holdRM : CINE.rise + CINE.hold)) { c.opened = true; this.zoom.open(); }
+    } else { c.sunkFor = 0; c.sink = 0; c.opened = false; }
+  }
+
   /** Places the camera for the current lift (no smoothing here: a pure function of the follow state). */
   private pose(clock: number): void {
     const s = this.s, zoom = this.zoom, z = zoom.z, ph = zoomPhases(z);
     const d = clamp(zoom.deckLift, 0, 1), rm = zoom.reducedMotion;
-    const up = lerp(DECK_LOW.up, DECK_HIGH.up, d), back = lerp(DECK_LOW.back, DECK_HIGH.back, d) + this.stand;
+    // WP24 part D: the cinematic moves, gone by the rise: the opening lower and further off, swung toward the beam; the
+    // crow's nest, the loop pull-back and the sinking's rise lifting and standing off
+    const c = this.cine, cw = 1 - ph.rise;
+    const up = lerp(DECK_LOW.up, DECK_HIGH.up, d) * (1 - CINE.openLow * c.open) + (c.crow + c.pull * CINE.pullUp + c.sink * CINE.sinkUp) * cw;
+    const back = lerp(DECK_LOW.back, DECK_HIGH.back, d) + this.stand + (c.open * CINE.openBack + c.pull * CINE.pullBack + c.sink * CINE.sinkBack) * cw;
     const raise = lerp(DECK_LOW.raise, DECK_HIGH.raise, d), ahead = lerp(DECK_LOW.ahead, DECK_HIGH.ahead, d);
     const dist0 = Math.hypot(up, back), th0 = Math.atan2(up, back);
     // north in the ship's tangent plane: the chart is drawn north-up, so the view swings to it near orbit
@@ -323,7 +383,7 @@ export class CameraRig {
     if (z <= 0 || !Number.isFinite(this.swingPrev)) this.swingPrev = sw;
     else { while (sw - this.swingPrev > Math.PI) sw -= 2 * Math.PI; while (sw - this.swingPrev < -Math.PI) sw += 2 * Math.PI; this.swingPrev = sw; }
     const swing = sw * ease((z - 0.22) / 0.28);
-    const hv = turn(this.hCam, s, swing, this.hv);
+    const hv = turn(this.hCam, s, swing + c.open * CINE.openSwing * cw, this.hv);
     if (z < 0.5 || !this.net) {
       const r = ph.rise, dist = dist0 * Math.pow(ORBIT_DIST / dist0, r), th = lerp(th0, Math.PI / 2, r);
       const bob = rm ? 0 : (0.14 * Math.sin(clock * 1.13) + 0.07 * Math.sin(clock * 0.61 + 2)) * (1 - r);
