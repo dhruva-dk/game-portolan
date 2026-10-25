@@ -23,9 +23,9 @@ import { R, TERRITORY, angleBetween, cellDir, cellOf, tangentToward } from '../s
 import { FLIGHT, KNOW, PHASE, SAIL, SHIPS, STREAM, TICK, afloat, fullHull, type MatchState, type Ship } from '../state.ts';
 import { newStormView, stormView, type Calm } from '../storm.ts';
 import {
-  BATTERY, BOWS, CONSUMABLE, FITTING, FORMS, GULL, GUNS, HELM, HOME, MORTAR, PIGMENT_TIER, PILOT, SLOT, type Gun,
+  BATTERY, BOWS, CONSUMABLE, FITTING, FORMS, GULL, GUNS, HELM, HOME, MORTAR, PIGMENT_TIER, PILOT, SAILS, SLOT, type Gun,
 } from '../tables.ts';
-import { atHome } from '../territory.ts';
+import { atHome, holds } from '../territory.ts';
 import type { Sight } from '../visibility.ts';
 import { ZONE } from '../world/geography.ts';
 import { REGIONS } from '../world/regions.ts';
@@ -52,6 +52,7 @@ export const MODE = {
   face: 12, // turning its bow on an intruder in its waters, reefed: a turtle's tell before it strikes
   lurk: 13, // lying off a fight between others, waiting for one to weaken
   stalk: 14, // closing on a wounded ship, or a laden one a gull gave away, from beyond its guns' reach
+  mend: 15, // making for a harbour (or the Great Lagoon it holds) to mend its hull, and lying in it reefed
 } as const;
 
 /** The brain's timings and reaches; pairs run from skill 0 to skill 1. */
@@ -69,11 +70,15 @@ export const BRAIN = {
   loot: 40, // u: the farthest find it goes for
   wait: 35, // s it pursues one trail or find before giving it up
   lead: [4, 20], // s to spare it keeps over the storm's sweep
-  probe: [5, 10, 16], // u ahead it looks for hazards
+  probe: [5, 10, 16], // u ahead it looks for hazards, for a turning circle up to `circle` u (wider: as much farther)
+  circle: 10,
   gap: 4, // u between the points of a drawn loop
   patch: [0.3, 0.55], // hull share it patches at
   full: 0.95, // share of its form's purse at which its purse is full: home to bank it
   gentle: 30, // u a gentle captain keeps from the player
+  mend: 120, // u: the farthest harbour it makes for to mend
+  mended: 0.9, // hull share at which it leaves the harbour, mended
+  inside: 0.4, // the most of a calm's radius it keeps as its margin from the storm: in a small calm it holds its own ground, not the centre
 };
 
 const by = (pair: readonly number[], s: number): number => pair[0] + (pair[1] - pair[0]) * s;
@@ -318,6 +323,7 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   if (stormGoal(state, i, style) && !(style.stalk >= 0.8 && prey)) mode = MODE.storm; // a hunter finishes a broken ship before the storm
   else if (flees(state, i, style)) mode = MODE.flee;
   else if (threatened(state, i, style, was)) mode = MODE.home;
+  if (mode < 0) mode = mends(sea, state, i, style, was);
   if (mode < 0) mode = guards(state, i, style, was, aim);
   if (mode < 0) mode = engages(sea, state, i, style);
   if (mode < 0 && style.stalk >= 0.8) mode = stalks(sea, state, i, sight, style, was, aim); // a hunter finishes the wounded before it raids
@@ -334,15 +340,16 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   }
   c.mode = mode;
   const reach = standoff(c, style, c.target) * (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0); // closing under full sail, fighting under plain
-  const lying = (mode === MODE.hold || mode === MODE.lurk) && apart(ship.pos, c.goal) < 12;
+  const lying = ((mode === MODE.hold || mode === MODE.lurk) && apart(ship.pos, c.goal) < 12) || (mode === MODE.mend && apart(ship.pos, c.goal) < HOME.radius);
   c.trim = mode === MODE.fight ? ((c.target >= 0 ? apart(ship.pos, state.ships[c.target].pos) : P.rivalD) > reach || style.stalk >= 0.8 ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
   const hasty = mode === MODE.flee || mode === MODE.storm || mode === MODE.ram;
   c.avoid = mode === MODE.loop || mode === MODE.home ? 0 : clearing(sea, state, ship, style, hasty);
+  if (Math.abs(c.avoid) >= 1) c.trim = SAIL.reefed; // coming about off foul water, it shortens sail: the tightest turn and the softest blow
   intend(ship);
 }
 
 /** The margin it keeps inside the storm's coming calm: a shrewder captain keeps the full margin of its Style. */
-const stormMargin = (c: Captain, style: Style): number => style.margin * (0.5 + 0.5 * c.skill);
+const stormMargin = (c: Captain, style: Style, calm: Calm): number => Math.min(style.margin * (0.5 + 0.5 * c.skill), BRAIN.inside * calm.r * R);
 
 /**
  * The storm (stormView: what every chart announces): in it, it makes for the calm; inside, while a phase is announced,
@@ -350,7 +357,7 @@ const stormMargin = (c: Captain, style: Style): number => style.margin * (0.5 + 
  * the calm now to the next between the phase's move and its hold — and makes for a point its margin inside that calm.
  */
 function stormGoal(state: MatchState, i: number, style: Style): boolean {
-  const ship = state.ships[i], c = ship.captain, pos = ship.pos, margin = stormMargin(c, style);
+  const ship = state.ships[i], c = ship.captain, pos = ship.pos, margin = stormMargin(c, style, SV.announced ? SV.next : SV.calm);
   const inNow = dot(pos, SV.calm.at) >= SV.calm.cos, calm: Calm = SV.announced ? SV.next : SV.calm;
   if (inNow && !SV.announced) return false;
   const d = R * angleBetween(pos, calm.at), safe = calm.r * R - margin;
@@ -363,6 +370,31 @@ function stormGoal(state: MatchState, i: number, style: Style): boolean {
   along(calm.at, toward(calm.at, pos, ship.head, T), Math.max(0, Math.min(d, safe) - 0.5 * margin), c.goal);
   c.target = -1;
   return true;
+}
+
+/**
+ * Mending (PROMPT.md, The sea: harbours mend a hull fast, and the Great Lagoon its holder's): wounded below its Style's
+ * mend share — the reckless hold on lowest — it breaks off to mend rather than fight on: it makes for the nearest
+ * harbour within BRAIN.mend that lies inside the coming calm by its margin (or the Great Lagoon while it holds it), else
+ * for its own home, and lies there reefed until its hull is sound again (BRAIN.mended). Bound for a harbour with its
+ * trail open and home the nearer, it closes the trail first (loops).
+ */
+function mends(sea: Sea, state: MatchState, i: number, style: Style, was: number): number {
+  const ship = state.ships[i], c = ship.captain;
+  if (share(ship) >= (was === MODE.mend ? BRAIN.mended : style.mend)) return -1;
+  const calm = SV.announced ? SV.next : SV.calm, inside = dcos(Math.max(0, calm.r - stormMargin(c, style, calm) / R));
+  let best = BRAIN.mend, at: V3 | null = null;
+  for (const h of sea.geo.harbours) { // it lies inside the harbour's mouth, with the open sea to swing through
+    const d = apart(ship.pos, h.pos);
+    if (d < best && dot(h.pos, calm.at) >= inside) [best, at] = [d, along(h.pos, h.facing, 0.5 * h.r, F)];
+  }
+  const lagoon = sea.geo.landmarks.find((l) => l.perk === 'greatLagoon');
+  if (lagoon !== undefined && holds(sea, state, i, 'greatLagoon') && apart(ship.pos, lagoon.pos) < best) [best, at] = [apart(ship.pos, lagoon.pos), lagoon.pos];
+  if (at === null && state.owner[cellOf(TERRITORY, c.anchor)] === i + 1 && dot(c.anchor, calm.at) >= inside) at = c.anchor; // no harbour in reach: its own waters mend it, slowly
+  if (at === null || (at !== c.anchor && ship.laid.length > 0 && apart(ship.pos, c.anchor) < best)) return -1;
+  set(c.goal, at.x, at.y, at.z);
+  c.target = -1;
+  return MODE.mend;
 }
 
 /** Wounded below its Style's run share (a lesser captain holds on longer) with a rival near: it runs, home-ward if home lies away from the rival. */
@@ -628,7 +660,7 @@ function patrols(state: MatchState, i: number, style: Style): number {
   if (ring <= 0 || p.held <= 0 || !afloat(p) || ship.purse >= 0.5 * FORMS[ship.form].purse || apart(c.anchor, den) > BRAIN.stalk) return -1;
   const calm = SV.announced ? SV.next : SV.calm;
   along(den, turned(toward(den, ship.pos, ship.head, T), den, Math.sign(style.wheel) * PATROL.step, U), ring, G);
-  if (dot(G, calm.at) < dcos(Math.max(0, calm.r - stormMargin(c, style) / R))) return -1;
+  if (dot(G, calm.at) < dcos(Math.max(0, calm.r - stormMargin(c, style, calm) / R))) return -1;
   set(c.goal, G.x, G.y, G.z);
   c.target = -1;
   return MODE.roam;
@@ -695,7 +727,7 @@ const LOBE: readonly (readonly [number, number])[] = [[-1, 0.55], [-0.5, 1], [0.
  * a gap apart clear of hazards and inside the coming calm by its margin; tried on six bearings, then smaller.
  */
 function planLoop(sea: Sea, state: MatchState, i: number, style: Style, rng: Rng): boolean {
-  const ship = state.ships[i], c = ship.captain, calm = SV.announced ? SV.next : SV.calm, margin = stormMargin(c, style);
+  const ship = state.ships[i], c = ship.captain, calm = SV.announced ? SV.next : SV.calm, margin = stormMargin(c, style, calm);
   const inside = dcos(Math.max(0, calm.r - margin / R));
   let reach = Math.min(reachOf(c, style) * (1 + style.stretch) * (0.85 + 0.3 * rngFloat(rng)), 0.4 * (calm.r * R - margin));
   toward(c.anchor, ship.pos, ship.head, T); // bearings from the anchor, 0 toward the ship
@@ -738,16 +770,16 @@ function hazard(sea: Sea, state: MatchState, ship: Ship, style: Style, p: V3, ha
 
 const SWERVE = [0, 0.5, -0.5, 1, -1, 1.6, -1.6];
 
-/** The angle to starboard it bears off its heading for the goal so that the water BRAIN.probe ahead is clear; about, when nothing is. */
+/** The angle to starboard it bears off its heading for the goal so that the water BRAIN.probe ahead (the farther as its turning circle is the wider) is clear; about, when nothing is. */
 function clearing(sea: Sea, state: MatchState, ship: Ship, style: Style, hasty: boolean): number {
   const c = ship.captain, pos = ship.pos, mode = c.mode;
   if (byWant(mode)) normalize(addScaled(H, c.want, pos, -dot(c.want, pos)));
   else toward(pos, c.goal, ship.head, H);
-  const turn = ship.rate < 0 ? -1 : 1;
+  const turn = ship.rate < 0 ? -1 : 1, look = Math.max(1, (FORMS[ship.form].radius * SAILS[ship.sail].radius) / BRAIN.circle);
   for (const a of SWERVE) {
     turned(H, pos, a * turn, U);
     let clear = true;
-    for (const d of BRAIN.probe) if (hazard(sea, state, ship, style, along(pos, U, d, V), hasty)) clear = false;
+    for (const d of BRAIN.probe) if (hazard(sea, state, ship, style, along(pos, U, d * look, V), hasty)) clear = false;
     if (clear) return a * turn;
   }
   return 2.6 * turn;

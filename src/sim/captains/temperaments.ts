@@ -29,6 +29,8 @@ export interface Style {
   raid: number;
   /** Share of its full hull it runs at with a rival near. */
   run: number;
+  /** Share of its full hull below which it breaks off to mend in a harbour rather than fight on (brain.ts mends): the reckless hold on lowest. */
+  mend: number;
   /** u it keeps inside the storm's coming calm. */
   margin: number;
   /** 0 … 1: its appetite for chests and finds (below 1 it keeps to a loop it sails for lesser ones), and its daring with hazards (from 0.7 it rides the vortex) and the Great Current (riding on for richer waters). */
@@ -53,16 +55,16 @@ export interface Style {
 const BASE = { wheel: 2.4, stalk: 0, edge: 0, guard: 0, commit: 0, bolt: false, gold: 1 };
 
 /** The first voyage's captains (Mind.gentle): slow to fight and slow to chase, never raiding, running early, drawing small loops. */
-export const GENTLE: Style = { ...BASE, loop: 15, stretch: 0.2, fight: 0.15, raid: 0, run: 0.6, margin: 18, loot: 0.7, bold: 0, standoff: 1 };
+export const GENTLE: Style = { ...BASE, loop: 15, stretch: 0.2, fight: 0.15, raid: 0, run: 0.6, mend: 0.6, margin: 18, loot: 0.7, bold: 0, standoff: 1 };
 
 /** The temperaments' Styles, by career/league.ts TEMPERAMENT: hunter, expander, raider, turtle, opportunist, gambler. */
 export const STYLES: readonly Style[] = [
-  { ...BASE, loop: 11, stretch: 0.75, fight: 0.6, raid: 0.65, run: 0.5, margin: 18, loot: 0.2, bold: 0.5, standoff: 0.6, stalk: 1 },
-  { ...BASE, loop: 36, stretch: 0.1, wheel: 1.0, fight: 0.05, raid: 0, run: 0.7, margin: 16, loot: 0, bold: 0.15, standoff: 0.85 },
-  { ...BASE, loop: 16, stretch: 0.45, fight: 0.25, raid: 2, run: 0.6, margin: 14, loot: 0.55, bold: 0.8, standoff: 0.95, bolt: true },
-  { ...BASE, loop: 7, stretch: 0.1, wheel: 0.6, fight: 0.2, raid: 0.1, run: 0.45, margin: 18, loot: 0.45, bold: 0.05, standoff: 0.75, guard: 0.5 },
-  { ...BASE, loop: 12, stretch: 0.35, fight: 0.1, raid: 0.25, run: 0.45, margin: 14, loot: 1, bold: 0.3, standoff: 1, stalk: 0.35, edge: 1.6 },
-  { ...BASE, loop: 56, stretch: 0.6, wheel: 2.9, fight: 0.35, raid: 0.15, run: 0.2, margin: 8, loot: 0.45, bold: 0.9, standoff: 0.6, commit: 1.4, gold: 6 },
+  { ...BASE, loop: 11, stretch: 0.75, fight: 0.6, raid: 0.65, run: 0.5, mend: 0.7, margin: 18, loot: 0.2, bold: 0.5, standoff: 0.6, stalk: 1 },
+  { ...BASE, loop: 36, stretch: 0.1, wheel: 1.0, fight: 0.05, raid: 0, run: 0.7, mend: 0.65, margin: 16, loot: 0, bold: 0.15, standoff: 0.85 },
+  { ...BASE, loop: 16, stretch: 0.45, fight: 0.25, raid: 2, run: 0.6, mend: 0.5, margin: 14, loot: 0.55, bold: 0.8, standoff: 0.95, bolt: true },
+  { ...BASE, loop: 7, stretch: 0.1, wheel: 0.6, fight: 0.2, raid: 0.1, run: 0.45, mend: 0.6, margin: 18, loot: 0.45, bold: 0.05, standoff: 0.75, guard: 0.5 },
+  { ...BASE, loop: 12, stretch: 0.35, fight: 0.1, raid: 0.25, run: 0.45, mend: 0.55, margin: 14, loot: 1, bold: 0.3, standoff: 1, stalk: 0.35, edge: 1.6 },
+  { ...BASE, loop: 56, stretch: 0.6, wheel: 2.9, fight: 0.35, raid: 0.15, run: 0.2, mend: 0.2, margin: 8, loot: 0.45, bold: 0.9, standoff: 0.6, commit: 1.4, gold: 6 },
 ];
 
 /** Captain identities a signature is drawn for (Ship.pigment: a captain's CAPTAINS index). */

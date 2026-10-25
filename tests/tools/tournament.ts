@@ -80,7 +80,7 @@ const ang = (a: V3, b: V3): number => R * Math.acos(Math.max(-1, Math.min(1, a.x
 
 /** Sail match s to its end: the player idle, or piloted to `pilot`; each captain's tally from the events; `hook` every tick. */
 function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | null, hook?: (s: MatchState) => void): { rows: Row[]; ticks: number } {
-  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(15).fill(0), kvict: new Array<number>(7).fill(0), tmode: new Array<number>(15).fill(0), dmode: new Array<number>(15).fill(0), fate: -1, at: 0, sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
+  const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(16).fill(0), kvict: new Array<number>(7).fill(0), tmode: new Array<number>(16).fill(0), dmode: new Array<number>(16).fill(0), fate: -1, at: 0, sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
   const out: number[] = new Array<number>(SHIPS).fill(-1), input = idleInput(), p = s.ships[0];
   if (pilot) Object.assign(p.captain, { temperament: pilot.temperament, skill: 0.6 });
   let sunk = 0, over = false, k = 0, samples = 0;
