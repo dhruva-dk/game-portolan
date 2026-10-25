@@ -1,6 +1,7 @@
 // Shared by the region modules (WP16, WP17; see index.ts): repeatable randoms, faceted kits washed facet by facet for
 // illustratedMaterial({ painted: true }), instanced draws, parts posed on the planet, and whether a region is in view.
 import * as THREE from 'three';
+import { belowHorizon } from '../terrain.ts';
 import { transmittanceVec } from '../../style/glsl.ts';
 import type { RGB } from '../../style/palette.ts';
 import { R } from '../../sim/sphere.ts';
@@ -104,16 +105,92 @@ export class Kit {
   }
 }
 
+/** WP30 part C: the eye the region heroes' instances are culled for (world.ts sets it each frame); a new epoch once the
+ *  eye has moved or turned far enough (the frustum test is widened to cover the turn allowed between epochs). */
+export class CullView {
+  readonly frustum = new THREE.Frustum();
+  readonly eye = vec();
+  readonly dir = vec();
+  eyeR = R;
+  pxPerRad = 1;
+  epoch = 0;
+  private readonly last = vec(Infinity, 0, 0);
+  private readonly look = vec();
+  private readonly fwd = vec();
+  private readonly vp = new THREE.Matrix4();
+
+  set(camera: THREE.PerspectiveCamera, pxHeight: number): this {
+    camera.updateMatrixWorld();
+    const f = camera.getWorldDirection(this.fwd), e = camera.position, el = e.length();
+    if (this.last.distanceTo(e) < Math.max(1.2, 0.015 * (el - R)) && f.dot(this.look) > 0.996) return this;
+    this.last.copy(e);
+    this.look.copy(f);
+    this.eye.copy(e);
+    this.eyeR = el;
+    this.dir.copy(e).divideScalar(el);
+    this.frustum.setFromProjectionMatrix(this.vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    this.pxPerRad = pxHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+    this.epoch++;
+    return this;
+  }
+}
+
+/** Cull every visible Draw under `root` for the eye (Draw.cull). */
+export function cullDraws(root: THREE.Object3D, view: CullView): void {
+  root.traverseVisible((o) => (o.userData.draw as Draw | undefined)?.cull(view));
+}
+
+/** An instance whose bounding radius spans fewer render px than this (× 0.6–1.4 by instance, so they go one by one) is
+ *  a speck the ink pass cannot resolve: left out. */
+const SPECK_PX = 1.5;
+const CM = new THREE.Matrix4(), CC = vec(), CD = vec(), CS = new THREE.Sphere();
+
 /** One instanced draw call of a kit, refilled whenever its parts move. */
 export class Draw {
   readonly mesh: THREE.InstancedMesh;
   private n = 0;
+  /** WP30 part C: the instances as last filled (matrices, per-instance attributes) while cull() draws those in view. */
+  private snap: { n: number; m: Float32Array; attrs: [THREE.InstancedBufferAttribute, Float32Array][] } | null = null;
+  private dirty = false;
+  private epoch = -1;
 
   constructor(kit: THREE.BufferGeometry, material: THREE.Material, capacity: number) {
     this.mesh = new THREE.InstancedMesh(kit, material, Math.max(capacity, 1));
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
+    this.mesh.userData.draw = this;
+  }
+
+  /** WP30 part C: draw only the instances above the horizon, in the frustum and wider than a speck (from the fill
+   *  kept aside), once per new eye epoch or fill; culled instances cannot be seen, specks are below the ink's grain. */
+  cull(v: CullView): void {
+    const mesh = this.mesh, im = mesh.instanceMatrix, g = mesh.geometry;
+    if (this.dirty) {
+      const attrs = Object.values(g.attributes).filter((a): a is THREE.InstancedBufferAttribute => (a as THREE.InstancedBufferAttribute).isInstancedBufferAttribute);
+      this.snap = { n: this.n, m: (im.array as Float32Array).slice(0, this.n * 16), attrs: attrs.map((a) => [a, (a.array as Float32Array).slice(0, this.n * a.itemSize)]) };
+      this.dirty = false;
+    } else if (this.epoch === v.epoch) return;
+    this.epoch = v.epoch;
+    const s = this.snap;
+    if (!s || s.n === 0) return;
+    if (!g.boundingSphere) g.computeBoundingSphere();
+    const gs = g.boundingSphere!, dst = im.array as Float32Array;
+    let n = 0;
+    for (let j = 0; j < s.n; j++) {
+      CM.fromArray(s.m, j * 16).premultiply(mesh.matrixWorld);
+      CC.copy(gs.center).applyMatrix4(CM);
+      const r = gs.radius * CM.getMaxScaleOnAxis(), cr = CC.length(), d = Math.max(0.05, CC.distanceTo(v.eye) - r);
+      if ((r * v.pxPerRad) / d < SPECK_PX * (0.6 + 0.8 * ((j * 0.6180339887) % 1))) continue;
+      if (!v.frustum.intersectsSphere(CS.set(CC, r + 6 + 0.1 * d))) continue;
+      if (cr > 1e-6 && belowHorizon(CD.copy(CC).divideScalar(cr), Math.asin(Math.min(1, r / cr)), cr + r, v.dir, v.eyeR)) continue;
+      dst.set(s.m.subarray(j * 16, j * 16 + 16), n * 16);
+      for (const [a, src] of s.attrs) (a.array as Float32Array).set(src.subarray(j * a.itemSize, (j + 1) * a.itemSize), n * a.itemSize);
+      n++;
+    }
+    mesh.count = n;
+    im.needsUpdate = true;
+    for (const [a] of s.attrs) a.needsUpdate = true;
   }
 
   get triangles(): number {
@@ -131,6 +208,7 @@ export class Draw {
   end(): void {
     this.mesh.count = this.n;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.dirty = true;
   }
 
   fill(ms: readonly THREE.Matrix4[]): this {

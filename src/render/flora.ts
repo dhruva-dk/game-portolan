@@ -532,6 +532,7 @@ const VERT = /* glsl */ `
 ${SWELL_GLSL}
 uniform float uTime;
 uniform vec4 uBand; // fade in over x → y u from the eye, out over z → w (or the plant's own thinning distance)
+uniform vec2 uCut; // WP30 part C: the plant's thinning distance × x, at least y (the reach governor)
 uniform float uSway;
 in vec4 aPaint;
 in float aTint;
@@ -587,7 +588,7 @@ void main() {
   vUp = up;
   vPart = aPart;
   vPaint = vec4(aTint > 1.5 ? aBloom : aTint > 0.5 ? aFoliage : aPaint.rgb, aPaint.w);
-  float dist = distance(cameraPosition, root), o1 = min(uBand.w, aSeed.y), o0 = min(uBand.z, o1 * 0.8);
+  float dist = distance(cameraPosition, root), o1 = min(uBand.w, max(aSeed.y * uCut.x, uCut.y)), o0 = min(uBand.z, o1 * 0.8);
   vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist));
   gl_Position = projectionMatrix * viewMatrix * w;
 #ifdef VEIL
@@ -668,7 +669,7 @@ export interface FloraMaterialOptions {
 export function floraMaterial(style: Style, swell: Swell, o: FloraMaterialOptions): THREE.ShaderMaterial {
   return inkMaterial(style, {
     vertexShader: VERT, fragmentShader: FRAG, defines: o.veil ? { VEIL: true } : {}, id: o.id, veil: o.veil, side: THREE.DoubleSide,
-    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 },
+    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 },
       uSeed: { value: 3.7 }, uWater: { value: T('verdigris') } },
   });
 }
@@ -744,6 +745,9 @@ export class Flora {
   private readonly sphere = new THREE.Sphere();
   private readonly seen: { p: Patch; d: number }[] = [];
   private readonly reach = Math.max(...KINDS.map((k) => FLORA[k].far || FLORA[k].near));
+  /** WP30 part C: the reach governor's scales: the far level's and the thinning distances (kF), then the near level's (kN). */
+  private kF = 1;
+  private kN = 1;
 
   constructor(style: Style, geo: Geography, field: TerrainField, swell: Swell) {
     this.bed = plantBed(geo, field);
@@ -777,20 +781,42 @@ export class Flora {
     seen.length = 0;
     for (const p of bed.patches) {
       const d = p.centre.distanceTo(eye) - p.radius;
-      if (d > this.reach || Math.acos(Math.min(1, p.centre.dot(eye) / (p.centre.length() * el))) > horizon + p.radius / R) continue;
+      if (d > this.reach * this.kF || Math.acos(Math.min(1, p.centre.dot(eye) / (p.centre.length() * el))) > horizon + p.radius / R) continue;
       if (this.frustum.intersectsSphere(this.sphere.set(p.centre, p.radius + 6 + 0.1 * Math.max(d, 0)))) seen.push({ p, d });
     }
     seen.sort((a, b) => a.d - b.d);
+    // the dissolve bands follow the governor's reach, so plants drawn in still dissolve by the stipple
+    const kN = this.kN, kF = this.kF;
+    KINDS.forEach((kind, k) => this.draws[k].forEach((d, lod) => {
+      if (!d) return;
+      const sp = FLORA[kind], u = (d.mesh.material as THREE.ShaderMaterial).uniforms, nr = sp.near * kN, fr = sp.far * kF;
+      if (lod) (u.uBand.value as THREE.Vector4).set(nr * 0.85, nr, fr * 0.8, fr);
+      else (u.uBand.value as THREE.Vector4).set(-1, 0, nr * (sp.far ? 0.85 : 0.75), nr);
+      (u.uCut.value as THREE.Vector2).set(sp.far ? kF : kN, sp.far ? nr : 0);
+    }));
     for (const d of this.all) d.n = 0;
     for (const { p } of seen) {
       for (let i = p.start; i < p.end; i++) {
-        const k = bed.kind[i], sp = FLORA[KINDS[k]], [near, far] = this.draws[k], cut = bed.seed[i * 2 + 1];
+        const k = bed.kind[i], sp = FLORA[KINDS[k]], [near, far] = this.draws[k], nr = sp.near * kN;
+        const cut = sp.far ? Math.max(bed.seed[i * 2 + 1] * kF, nr) : bed.seed[i * 2 + 1] * kN;
         const dist = this.at.set(bed.matrix[i * 16 + 12], bed.matrix[i * 16 + 13], bed.matrix[i * 16 + 14]).distanceTo(eye);
-        if (dist < Math.min(sp.near, cut)) near!.put(bed, i);
-        if (far && dist > sp.near * 0.85 && dist < Math.min(sp.far, cut)) far.put(bed, i);
+        if (dist < Math.min(nr, cut)) near!.put(bed, i);
+        if (far && dist > nr * 0.85 && dist < Math.min(sp.far * kF, cut)) far.put(bed, i);
       }
     }
     for (const d of this.all) d.commit();
+    // WP30 part C: over FLORA_TRIS, draw the reach in (far level and thinning first, then the near level) and refill
+    // next frame; well under it, let it out again a step per refill
+    const tris = this.all.reduce((a, d) => a + d.triangles, 0);
+    if (tris > FLORA_TRIS && (this.kF > KF_MIN || this.kN > KN_MIN)) {
+      const s = THREE.MathUtils.clamp(Math.sqrt(FLORA_TRIS / tris) * 0.97, 0.6, 0.99);
+      if (this.kF > KF_MIN) this.kF = Math.max(KF_MIN, this.kF * s);
+      else this.kN = Math.max(KN_MIN, this.kN * s);
+      this.eye.set(Infinity, 0, 0);
+    } else if (tris < FLORA_TRIS * 0.7) {
+      if (this.kN < 1) this.kN = Math.min(1, this.kN * 1.06);
+      else if (this.kF < 1) this.kF = Math.min(1, this.kF * 1.06);
+    }
   }
 
   /** Draw calls, triangles and instances submitted, and GPU bytes held (kits and instance buffers). */
@@ -804,6 +830,10 @@ export class Flora {
     for (const d of this.all) d.dispose();
   }
 }
+
+/** WP30 part C: the flora's share of A9's triangles: the reach governor holds the plants in view under it, drawing in
+ *  the far level and the thinning (to KF_MIN of their reach) and then the near level (to KN_MIN). */
+const FLORA_TRIS = 140000, KF_MIN = 0.4, KN_MIN = 0.4;
 
 /** Each scene's flora, for the region packages built after it. */
 export const floras = new WeakMap<THREE.Object3D, Flora>();

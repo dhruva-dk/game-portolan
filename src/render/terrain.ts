@@ -497,7 +497,7 @@ export function template(L: number, mask: number): Uint32Array {
 }
 
 /** Whether everything within `spread` of `dir`, up to radius `top`, lies behind the sea's horizon from the eye. */
-function belowHorizon(dir: THREE.Vector3, spread: number, top: number, eyeDir: THREE.Vector3, eyeR: number): boolean {
+export function belowHorizon(dir: THREE.Vector3, spread: number, top: number, eyeDir: THREE.Vector3, eyeR: number): boolean {
   const ang = Math.acos(THREE.MathUtils.clamp(dir.dot(eyeDir), -1, 1)) - spread;
   return ang > Math.acos(Math.min(1, R / eyeR)) + Math.acos(Math.min(1, R / Math.max(R, top)));
 }

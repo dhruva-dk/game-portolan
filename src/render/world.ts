@@ -22,6 +22,7 @@ import { createEffects } from './fx.ts';
 import { createCurrents } from './currents.ts';
 import { createFauna } from './fauna.ts';
 import { CameraRig, zoomPhases, type Insets, type RigView } from './camera.ts';
+import { CullView, cullDraws } from './regions/kit.ts';
 import { Chart, CHART_LAYER, groundOf } from './chart.ts';
 import { territories } from './territory.ts';
 import { seaFor, type Sea } from '../sim/environment.ts';
@@ -55,7 +56,7 @@ const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, 
  *  the z it is listed with (the chart globe soaks in from 0.34; the ships stay, their chart marks take over at 0.4), so
  *  the world, and the world and the chart globe together, keep A9's triangle budget at every frame of the zoom. */
 const FINE: ReadonlyMap<ModuleFactory, number> = new Map<ModuleFactory, number>([
-  [createStructures, 0.25], [createFlora, 0.25], [createEffects, 0.25], ...REGION_MODULES.map((m): [ModuleFactory, number] => [m, 0.3]), [createTrails, 0.34],
+  [createStructures, 0.25], [createFlora, 0.25], [createEffects, 0.25], ...REGION_MODULES.map((m): [ModuleFactory, number] => [m, 0.25]), [createTrails, 0.34],
 ]);
 
 export class WorldView {
@@ -75,6 +76,10 @@ export class WorldView {
   /** WP24 part C: the fine modules' scene objects, and those stood down this frame. */
   private readonly fine: [THREE.Object3D, number][] = [];
   private readonly stoodDown: THREE.Object3D[] = [];
+  /** WP30 part C: the region modules' scene objects, their instances culled for the eye each frame (kit.ts Draw.cull). */
+  private readonly heroes: THREE.Object3D[] = [];
+  private readonly cullView = new CullView();
+  private readonly canvas: HTMLCanvasElement;
 
   constructor(pipeline: Pipeline, world: World) {
     const ctx: RenderContext = { pipeline, world, scene: this.scene, camera: this.camera };
@@ -83,9 +88,11 @@ export class WorldView {
       for (const c of this.scene.children.slice(n)) c.userData.module ??= build.name;
       const at = FINE.get(build);
       if (at !== undefined) for (const c of this.scene.children.slice(n)) this.fine.push([c, at]);
+      if ((REGION_MODULES as readonly ModuleFactory[]).includes(build)) this.heroes.push(...this.scene.children.slice(n));
       return m;
     });
     this.world = world;
+    this.canvas = pipeline.renderer.domElement;
     this.chart = new Chart(pipeline.style, world);
     this.scene.add(this.chart.group);
     this.rig = new CameraRig(this.camera, groundOf(world), this.chart.net);
@@ -121,6 +128,8 @@ export class WorldView {
       else L.set(CHART_LAYER);
     }
     for (const m of this.modules) m.frame(f);
+    this.cullView.set(this.camera, this.canvas.height);
+    for (const o of this.heroes) if (o.visible) cullDraws(o, this.cullView);
     if (this.drive) for (const [o, at] of this.fine) if (this.rig.z > at && o.visible) { o.visible = false; this.stoodDown.push(o); }
   }
 
