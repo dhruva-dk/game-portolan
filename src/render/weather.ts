@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import type { World } from '../app/worldWorker.ts';
 import { newWind, seaFor, tideOf, windAt, type Sea as Waters } from '../sim/environment.ts';
 import { R } from '../sim/sphere.ts';
-import { SHIPS, type MatchState, type Spell } from '../sim/state.ts';
+import { PHASE, SHIPS, TICK, type MatchState, type Spell } from '../sim/state.ts';
 import { calmNow } from '../sim/storm.ts';
 import { SIGHT, SPELL, STORM, WEATHER } from '../sim/tables.ts';
 import { newSight, survey } from '../sim/visibility.ts';
@@ -42,6 +42,9 @@ export class Air {
   range = SIGHT.clear;
   /** The eye's height over the sea, u: the veil of short sight lifts off high cameras (sight is a lookout's, on deck). */
   altitude = 0;
+  /** S-019 (g): 0–1 over the first seconds after the player sank: her lookout gone, the veil of short sight lifts off
+   *  the camera watching her go down, so the sinking reads in the storm (its rain and grey sea stay). */
+  watch = 0;
   /** The sea's state for Sea.setWeather: the weather's, heaving and grey in the storm. */
   readonly sea = { rough: 1, calm: 0, squall: 0 };
   waters: Waters | null = null;
@@ -58,6 +61,8 @@ export class Air {
     if (this.toward.lengthSq() < 1e-8) this.toward.set(1, 0, 0).addScaledVector(this.foot, -this.foot.x);
     this.toward.normalize();
     const sky = this.sky;
+    const me = state?.ships[0], sank = me && me.phase === PHASE.sunk ? state.sunk.find((q) => q.ship === 0) : undefined;
+    this.watch = sank ? THREE.MathUtils.smoothstep((state!.tick - sank.tick) * TICK, 0, 2.5) : 0;
     if (!state) {
       Object.assign(sky, newSky());
       this.strength = 1;
@@ -140,7 +145,7 @@ export type WeatherUniforms = ReturnType<typeof weatherUniforms>;
 
 /** The veil of short sight from the air: how much paper closes in, how far off, and how grey. */
 export function setSight(u: WeatherUniforms, air: Air): void {
-  u.uVeil.value = Math.min(1, Math.max(0, 1.15 * (1 - air.range / SIGHT.clear))) * (1 - THREE.MathUtils.smoothstep(air.altitude, 8, 30));
+  u.uVeil.value = Math.min(1, Math.max(0, 1.15 * (1 - air.range / SIGHT.clear))) * (1 - THREE.MathUtils.smoothstep(air.altitude, 8, 30)) * (1 - 0.85 * air.watch);
   u.uRange.value = air.range;
   u.uGrey.value = Math.max(air.sky.squall, air.storm);
 }

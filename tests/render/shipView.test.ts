@@ -144,7 +144,7 @@ import { ShipMesher } from '../../src/render/ships/mesher.ts';
 import { sailLocal, trim, type Anchor } from '../../src/render/ships/rig.ts';
 import { FORM_NAMES } from '../../src/render/ships/forms.ts';
 import { LOD_BUDGET } from '../../src/render/ships/shipwright.ts';
-import { FLOTSAM, RING, SINK, SLICK, STRIKE } from '../../src/render/ships/shipView.ts';
+import { FLOTSAM, FOAM, RING, SINK, SLICK, SPRAY, STRIKE } from '../../src/render/ships/shipView.ts';
 
 test('sinking: colours struck and a deepening list, the canvas gone, down by an end, rings, slick and flotsam, then gone', () => {
   const s = vessel(2), v = new ShipView(style, 4, s), plumes = new Plumes(style), c = cond(V(0, 1, 0), 1);
@@ -165,6 +165,11 @@ test('sinking: colours struck and a deepening list, the canvas gone, down by an 
   until(SINK.gone + 0.2);
   assert.ok(v.gone && !v.ship.visible && v.lamp.reach === 0, 'gone, the lantern drowned');
   assert.ok(plumes.live(SLICK, clock) > 0 && plumes.live(FLOTSAM, clock) > 6, 'the slick and flotsam linger');
+  assert.ok(plumes.live(FOAM, clock) > 0, 'foam where the sea closed over her');
+  // S-019 (g): her ring marks the place long after, and a fleet's spray never wipes the marks out
+  for (let k = 0; k < plumes.capacity * 2; k++) plumes.spawn(SPRAY, V(0, R, 0), V(0, 0, 0), 1, 0.1, 0.2, 0, clock, 0.5);
+  until(SINK.gone + 30);
+  assert.ok(plumes.live(RING, clock) >= 1 && plumes.live(FLOTSAM, clock) > 6, `the place stays marked: ${plumes.live(RING, clock)} rings, ${plumes.live(FLOTSAM, clock)} flotsam`);
 });
 
 test('a beaten ship strikes her colours (the masthead pennant last) and hoists them again once repaired', () => {

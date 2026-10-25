@@ -31,17 +31,20 @@ export const SEA_CLEAR = 1.2, GROUND_CLEAR = 1.6;
 /** WP24 part D: the cinematic moves. The opening rides beside the fleet (swung openSwing rad off the stern toward the
  *  beam, lower by openLow, openBack u further off) and settles behind the ship through the break-off at no more than
  *  settle a second; the loop pull-back stands off pullBack and up pullUp u at a claim of pullArea² u² (∝ √area, at
- *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking rises sinkUp u and
- *  stands off sinkBack u over rise s, its eye coming onto the wreck at the sea's face (S-019: she sits in the frame's
- *  middle, whole), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
- *  pennant under at 10.5), then opens the chart (reduced motion: holds holdRM s on the deck view and cuts); the crow's
- *  nest raises the camera by crow × its lookout's eye. */
+ *  least 12 %, at most pullRate a second so no frame cuts), easing home over pullHold s; the sinking moves over rise s
+ *  to sinkUp u up and sinkBack u off, swung sinkSwing rad from astern to her high side (the player, ship 0, lists to
+ *  port and goes down by the stern: shipView.ts), its eye coming onto the wreck at the sea's face (S-019: she sits in
+ *  the frame's middle, whole, near enough that she, her masts going under one by one, the foam and the rings read in
+ *  the storm), and holds while she founders and the sea closes over her (shipView.ts SINK: founders at 5.5 s, the
+ *  pennant under at 10.5, gone at 11); from liftAt s it rises liftUp u and stands off liftBack u more over lift s,
+ *  watching the place stay marked (foam, her ring, wreckage), then opens the chart at rise + hold s (reduced motion:
+ *  holds holdRM s on the deck view and cuts); the crow's nest raises the camera by crow × its lookout's eye. */
 /** S-019: the play-out's framing on the chart (CameraRig.playFrame): the least span across, and the margin, u. */
 export const PLAY_SPAN = 90, PLAY_PAD = 14, PLAY_REACH = 40;
 /** S-019: the play-out's turn of the globe at orbit, rad a second at most (the eye moves under a tenth of its height a
  *  frame), and never quicker than 0.8 s. */
 export const PLAY_TURN = 1.2;
-export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 36, sinkBack: 20, rise: 3.2, hold: 6.5, holdRM: 8, crow: 0.5 } as const;
+export const CINE = { openSwing: 0, openLow: 0, openBack: 0, settle: 0.3, pullArea: 160, pullRate: 0.18, crowRate: 1.2, pullBack: 26, pullUp: 16, pullHold: 3.5, sinkUp: 9.5, sinkBack: 15, sinkSwing: 1.25, rise: 3.2, liftAt: 11, lift: 2.6, liftUp: 34, liftBack: 14, hold: 11.2, holdRM: 12.5, crow: 0.5 } as const;
 /** WP24 part D: s the paper veil takes to lift after a reduced-motion cut. */
 export const REDUCED_VEIL = 0.3;
 /** The system's reduced-motion preference (the settings' switch ORs with it: rig.reducedMotion = setting || this). */
@@ -413,8 +416,9 @@ export class CameraRig {
     // WP24 part D: the cinematic moves, gone by the rise: the opening lower and further off, swung toward the beam; the
     // crow's nest, the loop pull-back and the sinking's rise lifting and standing off
     const c = this.cine, cw = 1 - ph.rise;
-    const up = lerp(DECK_LOW.up, DECK_HIGH.up, d) * (1 - CINE.openLow * c.open) + (c.crow + c.pull * CINE.pullUp + c.sink * CINE.sinkUp) * cw;
-    const back = lerp(DECK_LOW.back, DECK_HIGH.back, d) + this.stand + (c.open * CINE.openBack + c.pull * CINE.pullBack + c.sink * CINE.sinkBack) * cw;
+    const ks = c.sink * cw, kl = (c.sink > 0 && !c.hold ? ease((c.sunkFor - CINE.liftAt) / CINE.lift) : 0) * cw;
+    const up = lerp(lerp(DECK_LOW.up, DECK_HIGH.up, d) * (1 - CINE.openLow * c.open) + (c.crow + c.pull * CINE.pullUp) * cw, CINE.sinkUp, ks) + kl * CINE.liftUp;
+    const back = lerp(lerp(DECK_LOW.back, DECK_HIGH.back, d) + this.stand + (c.open * CINE.openBack + c.pull * CINE.pullBack) * cw, CINE.sinkBack, ks) + kl * CINE.liftBack;
     const raise = lerp(DECK_LOW.raise, DECK_HIGH.raise, d), ahead = lerp(DECK_LOW.ahead, DECK_HIGH.ahead, d);
     const dist0 = Math.hypot(up, back), th0 = Math.atan2(up, back);
     // north in the ship's tangent plane: the chart is drawn north-up, so the view swings to it near orbit
@@ -425,7 +429,7 @@ export class CameraRig {
     if (z <= 0 || !Number.isFinite(this.swingPrev)) this.swingPrev = sw;
     else { while (sw - this.swingPrev > Math.PI) sw -= 2 * Math.PI; while (sw - this.swingPrev < -Math.PI) sw += 2 * Math.PI; this.swingPrev = sw; }
     const swing = sw * ease((z - 0.22) / 0.28);
-    const hv = turn(hCam, s, swing + c.open * CINE.openSwing * cw, this.hv);
+    const hv = turn(hCam, s, swing + (c.open * CINE.openSwing + c.sink * CINE.sinkSwing) * cw, this.hv);
     if (z < 0.5 || !this.net) {
       const r = ph.rise, dist = dist0 * Math.pow(ORBIT_DIST / dist0, r), th = lerp(th0, Math.PI / 2, r);
       const bob = rm ? 0 : (0.14 * Math.sin(clock * 1.13) + 0.07 * Math.sin(clock * 0.61 + 2)) * (1 - r);

@@ -287,8 +287,13 @@ void main() {
   // the shore's rings of fine lines spreading out from the coast
   float q = coast / 1.6, ring = coast > 0.8 && coast < 12.0 ? inkLine((fract(q + 0.5) - 0.5) * 1.6, 0.42) * (1.0 - coast / 12.0) : 0.0;
   float line = max(inkLine(coast, 1.05), max(ring * 0.55, hatch * 0.35));
+  // territory (WP20's wash: rgb the owner's transmittance bled outward, a the smoothed ownership whose 0.5 contour is
+  // the border): a light wash of the owner's pigment inside the border and a fine line on it, as the sea draws it, so a
+  // dark captain's claim reads as a bounded claim, never a flat grey stain (S-019 (h))
   vec4 t = texture(tTerr, n);
-  col *= mix(vec3(1.0), t.rgb, uHasTerr * 0.85);
+  float own = smoothstep(0.42, 0.58, t.a) * uHasTerr, rim = inkLine(t.a - 0.5, 0.55) * uHasTerr;
+  col *= mix(vec3(1.0), t.rgb, 0.24 * own);
+  col = mix(col, col * t.rgb, 0.75 * rim);
   // the gore's border: a pooled edge and a fine sepia rule
   float e = vColour.x;
   col *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 7.0, e));
