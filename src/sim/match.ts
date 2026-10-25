@@ -1,6 +1,7 @@
 // The match step: every system of the simulation, in order, once per tick. It is the only code that writes the
 // match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
 // inside. Each system appends its call here, in the order the rules need.
+import { helm, think } from './captains/brain.ts';
 import { combat } from './combat.ts';
 import { earn, forage, scoop } from './economy.ts';
 import { over } from './end.ts';
@@ -15,10 +16,13 @@ import { storm } from './storm.ts';
 import { chart } from './territory.ts';
 import { newSight, noteFog, survey } from './visibility.ts';
 
-/** Each ship's input this tick: the player's, then the captains', hands off the helm until they think for themselves (WP11). */
+/** Each ship's input this tick: the player's as given, the captains' from their brains (captains/brain.ts helm, then think). */
 const INPUTS: ShipInput[] = Array.from({ length: SHIPS }, idleInput);
 
-/** What every ship sees this tick, surveyed once the hulls have moved: whom its guns may engage (and, WP11, what its captain knows). */
+/** The inputs of the last step, by ship: the player's as given, the captains' as their brains gave them. */
+export const lastInputs = (): readonly ShipInput[] => INPUTS;
+
+/** What every ship sees this tick, surveyed once the hulls have moved: whom its guns may engage, and all its captain knows of its rivals. */
 const SIGHT = Array.from({ length: SHIPS }, newSight);
 
 /** Advance the match on its sea by one tick of TICK seconds, with the player's input for this tick. Once over, it stands still. */
@@ -28,6 +32,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   brew(sea, state);
   stir(sea, state);
   INPUTS[0] = player;
+  for (let i = 1; i < SHIPS; i++) helm(state, i, INPUTS[i]);
   for (let i = 0; i < SHIPS; i++) {
     const ship = state.ships[i], input = INPUTS[i];
     if (ship.phase === PHASE.sunk) continue;
@@ -40,6 +45,7 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   }
   collide(state);
   survey(sea, state, SIGHT, gullEyes(state));
+  for (let i = 1; i < SHIPS; i++) think(sea, state, i, SIGHT[i], INPUTS[i]);
   combat(sea, state, SIGHT);
   items(sea, state, INPUTS, SIGHT);
   chart(state);

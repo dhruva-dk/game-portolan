@@ -131,7 +131,7 @@ test('each match draws the nine captains nearest the player, fitted out by rank 
   for (let i = 0; i < LEAGUE; i++) if (!drawn.includes(i)) assert.ok(far(i) >= worst);
   const { setup } = toSetup(c, 1);
   assert.equal(setup.fleet?.length, SHIPS);
-  drawn.forEach((id, k) => assert.deepEqual(setup.fleet?.[k + 1], captainOutfit(c, id)));
+  drawn.forEach((id, k) => assert.deepEqual(setup.fleet?.[k + 1], { ...captainOutfit(c, id), captain: { temperament: CAPTAINS[id].temperament, tier: tierOf(c.captains[id].points) } }));
   for (let t = 1; t < 8; t++) {
     for (let temp = 0; temp < 6; temp++) {
       const lo = captainGull(t, temp), hi = captainGull(t + 1, temp);

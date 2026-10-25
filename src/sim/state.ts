@@ -73,6 +73,38 @@ const COMPANION = rec(
   ['site', int], // the find site its Eye marks nearest its ship: −1 none
 );
 
+/**
+ * A ship's captain (captains/brain.ts; PROMPT.md, How captains think): who it is, what it brings of the player (Mind),
+ * and where its mind is, so a snapshot resumes it mid-thought. Every ship carries one; temperament −1 where nobody
+ * steers but the player's hand or none.
+ */
+const CAPTAIN = rec(
+  ['temperament', int], // career/league.ts TEMPERAMENTS index; −1 none aboard
+  ['skill', f64], // 0 … 1 by its rank tier: how fast it reacts, how shrewdly it judges
+  ['gentle', bool], // Mind.gentle
+  ['grudge', int], // Mind.grudge
+  ['knows', int], // the habits of the player it knows, by KNOW bit; each below means nothing unless its bit is set
+  ['breakOff', int], // the Mind's habits' values: region, loop radius u, raids, run hull %, storm margin u
+  ['loop', f64],
+  ['raids', f64],
+  ['run', f64],
+  ['margin', f64],
+  ['mode', int], // what it is about (brain.ts MODE)
+  ['target', int], // the ship, chest, coin or find site it is about: −1 none
+  ['goal', XYZ], // where it makes for
+  ['want', XYZ], // the heading it holds when it steers by heading (a broadside, a run)
+  ['intent', XYZ], // the heading it shows: the chart's inked arrow
+  ['anchor', XYZ], // where its home inked: the heart of its loops
+  ['plan', list(int)], // a loop it drew, as course cells, until its helm sets the course
+  ['tell', f64], // seconds it still telegraphs a strike before committing
+  ['since', f64], // seconds since its mode or target changed
+  ['think', int], // ticks until it next decides
+  ['loops', int], // loops it has drawn
+  ['trim', int], // the SAIL setting it wants
+  ['avoid', f64], // rad to starboard it bears off its goal, clearing a hazard
+  ['felt', f64], // its hull when it last decided: less now, it is under fire
+);
+
 const SHIP = rec(
   ['form', int], // a FORM
   ['pigment', int], // the hull's pigment and the sails' pattern, as the career fitted it out (MatchSetup.fleet)
@@ -121,6 +153,7 @@ const SHIP = rec(
   ['reload', list(f64, BATTERIES)], // by BATTERY, seconds until it has reloaded (combat.ts)
   ['gunnery', f64], // how well its gunners lead a moving target, 0 … 1 (Outfit.gunnery)
   ['harm', list(f64, SHIPS)], // the hull it has lost to each ship: the captains remember who hurt them
+  ['captain', CAPTAIN], // who steers it, and their mind
 );
 
 /** A gust: a patch of stronger wind running downwind, rising and dying over its life. Never spawned while life = 0. */
@@ -207,7 +240,7 @@ export type Keg = Value<typeof KEG>;
 /** The ship has not sunk: it sails, scoops, holds, collides and is seen. */
 export const afloat = (ship: Ship): boolean => ship.phase !== PHASE.sunk;
 
-export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 10, schema: MATCH };
+export const MATCH_FORMAT: Format<typeof MATCH> = { magic: 'PTLM', version: 11, schema: MATCH };
 
 /** What happened, for the renderer, the interface and the audio (this tick's `events`) and the results (`timeline`). */
 export const EVENT = {
@@ -277,6 +310,8 @@ export interface Outfit {
   gull?: { talons?: number; wings?: number; eye?: number; beak?: number; dive?: number };
   /** How well its gunners lead a moving target, 0 (where it is) … 1 (where it will be), by the captain's rank (WP11); 1. */
   gunnery?: number;
+  /** Its captain (captains/brain.ts): its temperament (career/league.ts TEMPERAMENTS) and rank tier, 1 …; none, a ship nobody steers. */
+  captain?: { temperament: number; tier: number };
 }
 
 /** A habit of the player as a captain expects it (Mind): its value (meaningless, −1, at confidence 0) and how sure it is, permille. */
@@ -308,6 +343,12 @@ export interface Mind {
   fittings: readonly number[];
 }
 
+/** Ship.captain.knows bits: the habits of the player a captain knows (its Mind's, at confidence KNOWN or more). */
+export const KNOW = { breakOff: 1, loop: 2, raids: 4, run: 8, storm: 16 } as const;
+
+/** The confidence, permille, from which a captain acts on a habit (career/state.ts LEARNING.known). */
+const KNOWN = 500;
+
 /** Everything a match starts from besides the player's inputs. The career's match setup fills it in. */
 export interface MatchSetup {
   /** A uint32. */
@@ -320,23 +361,24 @@ export interface MatchSetup {
   firstVoyage?: boolean;
   /** The player's rank tier, the first 1 (WP10): brighter pigments enter the loot pool as it rises (items.ts); 1. */
   rank?: number;
-  /** What each captain brings from the career, in fleet order, the player's entry null (WP10): its brain reads it (WP11, WP12); the match does not yet. */
+  /** What each captain brings from the career, in fleet order, the player's entry null (WP10): each ship's captain carries it (Ship.captain). */
   minds?: readonly (Mind | null)[];
   /** The find sites (Geography.finds) the player's career chart marks from earlier matches (WP10): its chart and HUD show them. */
   known?: readonly number[];
 }
 
 export function createMatch(setup: MatchSetup): MatchState {
-  const { seed, fleet = new Array<Outfit>(SHIPS).fill({}), hour = startHour(seed), firstVoyage = false, rank = 1 } = setup;
+  const { seed, fleet = new Array<Outfit>(SHIPS).fill({}), hour = startHour(seed), firstVoyage = false, rank = 1, minds } = setup;
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new RangeError(`createMatch: seed ${seed} is not a uint32`);
   if (fleet.length !== SHIPS) throw new RangeError(`createMatch: a fleet of ${fleet.length} ships, not ${SHIPS}`);
+  if (minds !== undefined && minds.length !== SHIPS) throw new RangeError(`createMatch: ${minds.length} minds, not ${SHIPS}`);
   fleet.forEach(check);
   if (!(hour >= 0 && hour < 24)) throw new RangeError(`createMatch: hour ${hour} is not in 0…24`);
   if (!Number.isInteger(rank) || rank < 1) throw new RangeError(`createMatch: rank tier ${rank} is not a whole number from 1`);
   const rng: Uint32Array[] = [];
   for (let s = 0; s < STREAMS; s++) rng.push(rngFrom(hash32(seed, s)));
   const route = greatCurrent(seed), ships: Ship[] = [], gusts: Gust[] = [];
-  for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, fleet[i]));
+  for (let i = 0; i < SHIPS; i++) ships.push(launch(route, i, fleet[i], minds?.[i] ?? null));
   for (let g = 0; g < GUSTS.count; g++) gusts.push({ at: v3(0, 0, 1), age: 0, life: 0, r: 0 });
   const weather = Array.from({ length: WEATHER.count }, () => ({ kind: SPELL.fair, at: v3(0, 0, 1), v: v3(), r: 0, age: 0, life: 0 }));
   const coins = Array.from({ length: COINS.count }, () => ({ kind: AFLOAT.coin, at: v3(0, 0, 1), value: 0, age: 0 }));
@@ -353,7 +395,8 @@ function check(o: Outfit, i: number): void {
   const fits = o.fittings === undefined || (o.fittings.length === SLOTS && o.fittings.every((f, s) => (f.kind === FITTING.none || FITTING_SLOT[f.kind] === s) && whole(f.tier, TIERS)));
   const g = o.gull ?? {}, trained = (['talons', 'wings', 'eye', 'beak', 'dive'] as const).every((t) => whole(g[t], GULL.levels[t] + 1));
   const share = o.gunnery === undefined || (o.gunnery >= 0 && o.gunnery <= 1);
-  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !trained || !fits || !share) {
+  const crew = o.captain === undefined || (whole(o.captain.temperament) && Number.isInteger(o.captain.tier) && o.captain.tier >= 1);
+  if (!whole(o.form, FORMS.length) || !whole(o.pigment) || !whole(o.pattern) || !trained || !fits || !share || !crew) {
     throw new RangeError(`createMatch: ship ${i}'s outfit cannot be fitted out`);
   }
 }
@@ -415,7 +458,7 @@ export function onCurrent(route: CurrentRoute, s: number, lane: number, pos: V3,
 }
 
 /** Ship i as outfit o fits it out, under full sail in its place on the Great Current, riding it. */
-function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
+function launch(route: CurrentRoute, i: number, o: Outfit, mind: Mind | null): Ship {
   const { form = FORM.pinnace, pigment = i, pattern = 0, gull = {}, gunnery = 1 } = o, ride = START[(i / 5) | 0], pos = v3(), head = v3();
   const fittings = o.fittings ? o.fittings.map(({ kind, tier }) => ({ kind, tier })) : START_FITTINGS.map((kind) => ({ kind, tier: 0 }));
   onCurrent(route, ride, LANE[i], pos, head);
@@ -426,6 +469,19 @@ function launch(route: CurrentRoute, i: number, o: Outfit): Ship {
     hull: fullHull(form, fittings), flask: 0, flare: 0, fogged: [], fire: 0, fireBy: -1, ward: 0,
     patch: 0, boost: 0, cut: 0, consumables: Array.from({ length: CONSUMABLE_SLOTS }, () => ({ kind: 0, count: 0 })), offer: [],
     reload: new Array<number>(BATTERIES).fill(0), gunnery, harm: new Array<number>(SHIPS).fill(0),
+    captain: captainOf(o.captain, mind),
+  };
+}
+
+/** A ship's captain as the career sends it (Outfit.captain, with its Mind), not yet at work; temperament −1 when none is aboard. */
+function captainOf(who: Outfit['captain'], mind: Mind | null): Ship['captain'] {
+  const bit = (e: Expect, b: number): number => (e.confidence >= KNOWN ? b : 0);
+  const knows = mind ? bit(mind.breakOff, KNOW.breakOff) | bit(mind.loop, KNOW.loop) | bit(mind.raids, KNOW.raids) | bit(mind.run, KNOW.run) | bit(mind.storm, KNOW.storm) : 0;
+  return {
+    temperament: who ? who.temperament : -1, skill: who ? Math.min(1, (who.tier - 1) / 7) : 0, gentle: mind?.gentle ?? false,
+    grudge: mind?.grudge ?? 0, knows, breakOff: mind?.breakOff.value ?? -1, loop: mind?.loop.value ?? -1, raids: mind?.raids.value ?? -1,
+    run: mind?.run.value ?? -1, margin: mind?.storm.value ?? 0, mode: 0, target: -1, goal: v3(), want: v3(), intent: v3(), anchor: v3(),
+    plan: [], tell: 0, since: 0, think: 1, loops: 0, trim: SAIL.full, avoid: 0, felt: 0,
   };
 }
 
