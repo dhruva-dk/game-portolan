@@ -65,7 +65,7 @@ export class Game implements Runtime {
       this.shell.frame(f);
       if (this.shell.paused !== held) { held = this.shell.paused; this.loop.paused = held; }
       this.loop.rate = this.shell.rate;
-      this.audio?.frame(f.dt, this.session?.state ?? null);
+      this.audio?.frame(f.dt, this.session?.state ?? null, this.shell.name === 'match' ? this.shell.camera : null); // WP28b: the ear on the camera
       if (this.perf.startup === 0) {
         this.perf.startup = performance.now();
         void import('../audio/soundscape.ts').then((m) => { this.audio = m.GameAudio.create(); });

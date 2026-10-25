@@ -132,6 +132,9 @@ export class Shell {
   /** The current screen holds the match still (WP24: the chart is open). */
   get paused(): boolean { return this.screen?.paused?.() ?? false; }
 
+  /** The current screen's camera (WP28: the match's is where the listener rides). */
+  get camera(): THREE.PerspectiveCamera | null { return this.screen?.camera ?? null; }
+
   /** The current screen's pace for the match (WP27). */
   get rate(): number { return this.screen?.rate?.() ?? 1; }
 

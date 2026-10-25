@@ -34,7 +34,7 @@ after(async () => {
   await server?.close();
 });
 
-type Name = 'each' | 'storm' | 'ahead' | 'events' | 'reel';
+type Name = 'each' | 'storm' | 'ahead' | 'listener' | 'events' | 'reel';
 async function call<K extends Name>(k: K): Promise<Awaited<ReturnType<(typeof Mod)[K]>>> {
   return page.evaluate(async (name) => {
     const m = await import(/* @vite-ignore */ '/tests/audio/audio.page.ts' as string);
@@ -77,6 +77,17 @@ test('a sound scheduled ahead holds no nodes until it is about to sound, and is 
   assert.equal(r.nodesBefore, 17, 'nodes built ahead of time');
   assert.ok(Math.abs(r.onset - 1.3) < 0.004, `onset at ${r.onset} s, asked for 1.3`);
   assert.ok(r.stoppedPeak < 0.01, `a stopped voice still sounded (${r.stoppedPeak})`);
+});
+
+test('the listener rides the camera: her own sounds whole from its stand-off, the world heard from its eye', async () => {
+  const r = await call('listener');
+  console.log(`listener: ${JSON.stringify(r)}`);
+  assert.ok(r.bare.every((x) => Math.abs(x) < 1e-6), 'without a camera the ear is on the ship');
+  assert.ok(r.ear.every((x) => Math.abs(x) < 1e-6), 'the ear is not at the camera');
+  assert.ok(Math.abs(r.near - Math.hypot(8.5, 2.6)) < 0.05, `stand-off ${r.near}`);
+  assert.equal(r.own, 1, 'her own sounds are whole at the deck camera');
+  assert.ok(r.rival > r.rivalDeck && r.rival < 0.5, `a ship 30 u ahead: ${r.rival} from the camera, ${r.rivalDeck} from the deck`);
+  assert.ok(r.highOwn === 0 && r.high > 0.99, `at orbit: own ${r.highOwn}, high ${r.high}`);
 });
 
 test('every match event sounds without throwing', async () => {

@@ -5,7 +5,7 @@ import { SR } from '../../src/audio/dsp.ts';
 import { AudioEngine, CEILING, VOICES, type Point } from '../../src/audio/engine.ts';
 import { Bank, measure, render, SOUND_NAMES, SOUNDS, type SoundName } from '../../src/audio/sfx.ts';
 import { calmScene, MatchAudio, Soundscape } from '../../src/audio/soundscape.ts';
-import { EVENT } from '../../src/sim/state.ts';
+import { createMatch, EVENT } from '../../src/sim/state.ts';
 
 const RATE = 48000;
 
@@ -92,12 +92,37 @@ export async function ahead(): Promise<{ nodesBefore: number; onset: number; sto
   return { nodesBefore, onset, stoppedPeak: scan(await ctx2.startRendering()).peak };
 }
 
+/** The listener on the camera (WP24's rig): a deck camera behind and above the ship, then one risen to orbit. */
+export function listener(): { ear: number[]; near: number; own: number; rival: number; rivalDeck: number; highOwn: number; high: number; bare: number[] } {
+  const e = new AudioEngine(new OfflineAudioContext(2, RATE, RATE)), m = new MatchAudio(e, null, 0), state = createMatch({ seed: 7 });
+  const ship = state.ships[0], R = 200, u = ship.pos, h = ship.head;
+  const W = (p: Point, k = R): Point => ({ x: p.x * k, y: p.y * k, z: p.z * k });
+  const add = (...ps: Point[]): Point => ps.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }));
+  const r = { x: h.y * u.z - h.z * u.y, y: h.z * u.x - h.x * u.z, z: h.x * u.y - h.y * u.x };
+  const eyeAt = (back: number, up: number) => {
+    const p = add(W(u), W(h, -back), W(u, up));
+    return { p, matrixWorld: { elements: [r.x, r.y, r.z, 0, u.x, u.y, u.z, 0, -h.x, -h.y, -h.z, 0, p.x, p.y, p.z, 1] } };
+  };
+  m.frame(state, 1 / 60, null);
+  const bare = [e.listener.pos.x, e.listener.pos.y, e.listener.pos.z].map((x, i) => x - [u.x, u.y, u.z][i] * R);
+  const deck = eyeAt(8.5, 2.6);
+  m.frame(state, 1 / 60, deck);
+  const ahead30 = add(W(u), W(h, 30)), L = e.listener.pos;
+  const own = e.spatial(W(u)).gain, rival = e.spatial(ahead30).gain;
+  m.frame(state, 1 / 60, null);
+  const rivalDeck = e.spatial(ahead30).gain;
+  m.frame(state, 1 / 60, eyeAt(0, 380));
+  return { ear: [L.x - deck.p.x, L.y - deck.p.y, L.z - deck.p.z], near: (m.frame(state, 1 / 60, deck), e.listener.near), own, rival, rivalDeck,
+    highOwn: (m.frame(state, 1 / 60, eyeAt(0, 380)), e.spatial(W(u)).gain), high: m.scene.high, bare };
+}
+
 export function events(): { kinds: number; started: number; errors: string[] } {
   const e = new AudioEngine(new OfflineAudioContext(2, RATE, RATE)), m = new MatchAudio(e, null, 0), errors: string[] = [];
   const kinds = Object.values(EVENT);
   for (const kind of kinds) for (const ship of [0, 3]) {
     try {
-      m.event({ kind, ship, by: kind === EVENT.used ? 21 + (kind % 5) : ship === 0 ? 3 : 0, at: near(1, ship === 0 ? 0.5 : 12), amount: 2 }, (i) => near(1, i * 3));
+      const p = near(1, ship === 0 ? 0.5 : 12); // the sim's events are unit vectors; ships' positions world units
+      m.event({ kind, ship, by: kind === EVENT.used ? 21 + (kind % 5) : ship === 0 ? 3 : 0, at: { x: p.x / 200, y: p.y / 200, z: p.z / 200 }, amount: 2 }, (i) => near(1, i * 3));
     } catch (err) {
       errors.push(`${kind}: ${String(err)}`);
     }

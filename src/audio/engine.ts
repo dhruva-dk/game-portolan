@@ -16,8 +16,9 @@ import { Bank, SOUNDS, type Bus, type SoundDef, type SoundName } from './sfx.ts'
 
 export interface Point { x: number; y: number; z: number }
 
-/** Hearing on the sphere (radius 200 u): full level within `near`, gone past `far`; sound crosses `speed` u a second;
- * the listener's ear stands `eye` u above the water, which sets the horizon beyond which sound is occluded. */
+/** Hearing in world units (the sea at radius 200 u; the sim's unit vectors × 200): full level within `near` of the ear
+ * (at least; the listener widens it to its stand-off from the ship it follows), gone past `far`; sound crosses `speed`
+ * u a second; the ear's height over the water (at least `eye`) sets the horizon beyond which sound is occluded. */
 export const HEAR = { near: 2, far: 95, speed: 30, eye: 1, radius: 200 };
 /** Voices at once per pool. */
 export const VOICES: Record<Bus, number> = { sfx: 24, ambience: 14, ui: 4 };
@@ -111,8 +112,9 @@ export class AudioEngine {
   key = 293.66;
   readonly bank = new Bank();
   readonly stats = { started: 0, dropped: 0, stolen: 0, peakVoices: 0 };
-  /** The listener: on the sphere, facing `fwd` (tangent). */
-  readonly listener = { pos: { x: 0, y: 0, z: HEAR.radius } as Point, fwd: { x: 0, y: 1, z: 0 } as Point };
+  /** The listener: the ear (world units: on the sea, or the camera's eye above it), facing `fwd` (tangent), hearing at
+   * full level within `near`. */
+  readonly listener = { pos: { x: 0, y: 0, z: HEAR.radius } as Point, fwd: { x: 0, y: 1, z: 0 } as Point, near: HEAR.near };
   private readonly live: boolean;
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly last = new Map<SoundName, number>();
@@ -213,10 +215,12 @@ export class AudioEngine {
     return () => this.cues.delete(f);
   }
 
-  /** Tie the listener to the camera (or the player's ship): its position on the sphere and its facing. */
-  setListener(pos: Point, fwd: Point): void {
+  /** Tie the listener to the camera (or the player's ship): the ear in world units, its facing, and the radius heard
+   * at full level (the camera's stand-off from the ship it follows, so her own sounds stay whole). */
+  setListener(pos: Point, fwd: Point, near: number = HEAR.near): void {
     this.listener.pos = { x: pos.x, y: pos.y, z: pos.z };
     this.listener.fwd = { x: fwd.x, y: fwd.y, z: fwd.z };
+    this.listener.near = Math.max(HEAR.near, near);
   }
 
   /** How a sound at `at` is heard from the listener: level, pan, low-pass cutoff, travel delay, distance. */
@@ -225,17 +229,19 @@ export class AudioEngine {
     const L = this.listener.pos, F = this.listener.fwd;
     const dx = at.x - L.x, dy = at.y - L.y, dz = at.z - L.z, d = Math.hypot(dx, dy, dz);
     if (d < 1e-6) return { gain: 1, pan: 0, cutoff: 20000, delay: 0, d: 0 };
-    const ul = Math.hypot(L.x, L.y, L.z) || 1, ux = L.x / ul, uy = L.y / ul, uz = L.z / ul;
+    const ul = Math.hypot(L.x, L.y, L.z) || 1, ux = L.x / ul, uy = L.y / ul, uz = L.z / ul, near = this.listener.near;
     const rx = F.y * uz - F.z * uy, ry = F.z * ux - F.x * uz, rz = F.x * uy - F.y * ux, rl = Math.hypot(rx, ry, rz) || 1;
     const fl = Math.hypot(F.x, F.y, F.z) || 1;
     const side = (dx * rx + dy * ry + dz * rz) / (rl * d), ahead = (dx * F.x + dy * F.y + dz * F.z) / (fl * d);
-    const horizon = Math.sqrt(2 * HEAR.radius * HEAR.eye), occl = smooth(horizon * 0.8, horizon * 1.6, d);
-    let gain = d <= HEAR.near ? 1 : HEAR.near / d;
+    // the horizon from the ear's height: sound from beyond it comes over the swell's crests, dulled
+    const horizon = Math.sqrt(2 * HEAR.radius * Math.max(HEAR.eye, ul - HEAR.radius)), occl = smooth(horizon * 0.8, horizon * 1.6, d);
+    const beyond = Math.max(0, d - near);
+    let gain = d <= near ? 1 : near / d;
     gain *= (1 - smooth(HEAR.far * 0.75, HEAR.far, d)) * (1 - 0.5 * occl);
-    let cutoff = 18000 / (1 + d / 12);
+    let cutoff = 18000 / (1 + beyond / 12);
     if (ahead < 0) cutoff *= 1 + 0.35 * ahead;
     cutoff *= 1 - 0.85 * occl;
-    return { gain, pan: clamp(side * Math.min(1, d / HEAR.near), -0.85, 0.85), cutoff: Math.max(200, cutoff), delay: d > HEAR.near * 2 ? d / HEAR.speed : 0, d };
+    return { gain, pan: clamp(side * Math.min(1, d / Math.max(HEAR.near, Math.min(near, 6))), -0.85, 0.85), cutoff: Math.max(200, cutoff), delay: beyond > 0.3 ? beyond / HEAR.speed : 0, d };
   }
 
   private buffer(name: SoundName, v: number): AudioBuffer {
@@ -411,7 +417,7 @@ export class AudioEngine {
     if (when - this.now < LOOKAHEAD) this.build(v); else this.pending.push(v);
     this.stats.started++;
     this.stats.peakVoices = Math.max(this.stats.peakVoices, sounding.length + 1 - byName.length - byPool.length);
-    if (this.cues.size) { const cue = { sound: name, level: gain, when, near: sp.d < HEAR.near * 3 }; for (const f of this.cues) f(cue); }
+    if (this.cues.size) { const cue = { sound: name, level: gain, when, near: sp.d < this.listener.near + 4 }; for (const f of this.cues) f(cue); }
     return v.id;
   }
 
@@ -473,13 +479,13 @@ export class AudioEngine {
 
   /** A battery's broadside: guns firing in a ripple from bow to stern, booming from afar past the horizon. */
   broadside(at: Point, guns: number, opts: { delay?: number; own?: boolean } = {}): void {
-    const sp = this.spatial(at), far = sp.d > 25, g = Math.max(1, Math.round(guns));
+    const sp = this.spatial(at), far = sp.d - this.listener.near > 25, g = Math.max(1, Math.round(guns));
     let t = opts.delay ?? 0;
     for (let i = 0; i < g; i++) {
       this.play(far ? 'cannonFar' : 'cannon', { at, delay: t, pan: (g > 1 ? i / (g - 1) - 0.5 : 0) * (far ? 0.05 : 0.3), gain: 0.85 + 0.15 * this.rand() });
       t += 0.07 + 0.08 * this.rand();
     }
-    if (opts.own || sp.d < 6) { this.duck('ambience', 6, 0.6 + t); this.duck('music', 3, 0.4 + t); }
+    if (opts.own || sp.d < this.listener.near + 4) { this.duck('ambience', 6, 0.6 + t); this.duck('music', 3, 0.4 + t); }
   }
 
   /** The loop-closing chord in the score's key, sized 0…3 by the claim. */
