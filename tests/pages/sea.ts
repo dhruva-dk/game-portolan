@@ -138,12 +138,15 @@ const afloat: { ship: Ship; at: V; fwd: V; lantern: Lamp }[] = [];
 /** A ship `ahead` u along the camera's heading and `aside` u to its right, sailing `turn` rad off that heading. */
 /** A ship `ahead` u before the eye and `aside` u off its line, turned `turn` (or, given `moor`, at its unit `at` in
  *  navigable water, its bow toward `to`). */
-function launch(ahead: number, aside: number, turn: number, detail = 1, moor?: { at: V; to: V }): void {
+function launch(ahead: number, aside: number, turn: number, detail = 1, moor?: { at: V; to: V; furl?: boolean }): void {
   const i = afloat.length, up = cam.foot.clone().normalize(), fwd = moor ? moor.to.clone().sub(moor.at) : frameAt(up, cam.heading).clone();
   const at = moor ? moor.at.clone().normalize() : up.clone().multiplyScalar(R).addScaledVector(fwd, ahead).addScaledVector(tmp.crossVectors(fwd, up), aside).normalize();
   if (moor) turn = 0;
   const ship = new Ship(style, { form: FORMS[i % 4], pigments: CAPTAINS[i % 3], detail });
-  ship.setRig(ship.rig.state('plain', 2.2, 0.7));
+  // moored at the quay or riding at anchor, her sails furled on bare yards; coming in, under reduced sail
+  const rig = ship.rig.state(moor && moor.furl === false ? 'reefed' : 'plain', 2.2, 0.7);
+  if (moor?.furl) for (const s of rig.sails) s.set = 0;
+  ship.setRig(rig);
   scene.add(ship);
   const lantern = sky.lights.add({ pos: V(), reach: 4.5 }), heading = frameAt(at, headingToward(at, moor ? moor.to : fwd.clone().add(up)) + turn).clone();
   afloat.push({ ship, at, fwd: heading, lantern });
@@ -274,7 +277,7 @@ if (view === 'deck') {
     const at = V(), to = V();
     toWorld(ri, x, y, at);
     toWorld(ri, tx, ty, to);
-    launch(0, 0, 0, d, { at, to });
+    launch(0, 0, 0, d, { at, to, furl: y > -10 }); // all but the ship in the mouth lie at the berths
   }
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
