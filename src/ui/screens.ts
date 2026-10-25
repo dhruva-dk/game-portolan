@@ -117,14 +117,17 @@ export function match(ctx: ScreenContext): Screen {
     ui: new THREE.Group(),
     scene: view.scene,
     camera: view.camera,
-    layout: (v) => view.layout(v.width, v.height),
+    layout: (v) => view.layout(v.width, v.height, v.safe),
     frame(f) {
+      view.drive = true;
       frame.dt = f.dt;
       frame.clock = f.clock;
       frame.alpha = f.alpha;
       view.frame(frame);
     },
-    touch() {},
+    touch(t) {
+      view.rig.pinch.touch(t); // WP24: two fingers zoom deck ↔ chart; one finger is WP25's
+    },
     dispose: () => view.dispose(),
   };
 }
