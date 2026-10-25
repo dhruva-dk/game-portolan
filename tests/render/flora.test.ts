@@ -23,7 +23,9 @@ test('the planet is planted densely with every region its own flora, the same ev
   const seen = REGIONS.map(() => new Set<string>());
   for (let i = 0; i < bed.count; i++) seen[geo.region[cellOf(TERRITORY, root(i).normalize())]].add(KINDS[bed.kind[i]]);
   REGIONS.forEach((r, ri) => {
-    for (const f of r.flora) assert.ok(seen[ri].has(f), `${r.name}: no ${f}`);
+    // (coral is the sea's: painted on the reef floor under the water, never planted as a mesh, S-021)
+    for (const f of r.flora) if (f !== 'coral') assert.ok(seen[ri].has(f), `${r.name}: no ${f}`);
+    assert.ok(!seen[ri].has('coral'), `${r.name}: coral planted as a mesh`);
     for (const k of seen[ri]) assert.ok(r.flora.includes(k as never) || k === 'reed' || (k === 'pandanus' && r.flora.includes('jungle')), `${r.name}: ${k} does not grow there`);
   });
 });

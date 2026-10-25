@@ -24,7 +24,7 @@ import { mix, PIGMENTS, type RGB } from '../style/palette.ts';
 import { v3 } from '../sim/math.ts';
 import { R, TERRITORY, gnomonicDir } from '../sim/sphere.ts';
 import type { Geography } from '../sim/world/geography.ts';
-import { DRAFT, FLOOR, REGIONS, TIDE, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
+import { FLOOR, REGIONS, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
 import { GROUND, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
@@ -569,10 +569,10 @@ function density(kind: FloraKind, c: Cell): number {
     case 'duneGrass': return land && (g === GROUND.meadow || g === GROUND.beach) && c.inland < 7 && c.height > 0.8 ? 1.1 : 0;
     case 'reed': return land && (g === GROUND.mud || g === GROUND.meadow) && c.inland < 4 ? 0.35 : 0;
     case 'kelp': return c.floor === FLOOR.kelp && c.depth > 1 && c.depth < 10 ? 0.3 : 0;
-    // coral standing only down the reef's slopes, so deep that its heads (≤ 0.33 u tall) lie well under the lowest
-    // water, seen through it and tinted by it, never at or on the waterline (WP17); the sea paints the reef's own heads,
-    // those a hull grounds on, on its floor
-    case 'coral': return c.floor === FLOOR.coral && c.depth > TIDE.amp + DRAFT + 0.9 && c.depth < 3.6 ? 0.3 : 0;
+    // no coral meshes: a veil is not refracted, so over the lagoons' refracted floor they stood at the surface as grass
+    // tufts and violet blobs (S-021); the sea paints every reef's heads on its floor, under the water ('coral' stays the
+    // reef regions' mark: the sea's clear water, the white sand)
+    case 'coral': return 0;
   }
 }
 
