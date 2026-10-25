@@ -459,6 +459,8 @@ export const KEGS = { reload: 4, range: 14, arc: 0.7, arm: 0.6, trigger: 0.6, fu
 
 /** The carrack's heavy stern castle: `guns` of its broadside fitting firing astern, bearing within `arc` rad of the stern. */
 export const CASTLE = { guns: 2, arc: 0.5 };
+/** The aft pieces (the castle's guns and the stern chasers) are light, worked by a few hands: they reload `reload` times slower than a broadside (WP12 rule), so a ship that runs harasses its pursuer but a broadside brought to bear is what sinks ships. */
+export const AFT = { reload: 3 };
 
 /**
  * Gunnery. A ball within `ball` u of a hull strikes it; one striking along the hull's length, raking it from bow or

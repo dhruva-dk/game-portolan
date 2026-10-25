@@ -13,7 +13,7 @@ import { BUMPED, scald, velocityOf } from './sailing.ts';
 import { R, TERRITORY, cellDir, cellOf } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, afloat, chronicle, emit, fullHull, type MatchState, type Ship, type Shot } from './state.ts';
 import {
-  BATTERIES, BATTERY, BOWS, CASTLE, CHASERS, EFFECT, FIRE, FITTING, FORMS, GUNNERY, GUNS, PUMPS, RAM, ROCKS, SLOT, STEM_POST, type Gun,
+  BATTERIES, BATTERY, BOWS, AFT, CASTLE, CHASERS, EFFECT, FIRE, FITTING, FORMS, GUNNERY, GUNS, PUMPS, RAM, ROCKS, SLOT, STEM_POST, type Gun,
 } from './tables.ts';
 import { breakTrail, reloadSpeed, repairRate, sheltered } from './territory.ts';
 import type { Sight } from './visibility.ts';
@@ -254,7 +254,7 @@ function batteries(sea: Sea, state: MatchState, seen: number, i: number): void {
     const j = bearing(sea, state, seen, i, k, gun, Q);
     if (j < 0) continue;
     broadside(state, i, k, gun, fit, Q);
-    ship.reload[k] = gun.reload;
+    ship.reload[k] = gun.reload * (k >= BATTERY.castle ? AFT.reload : 1); // the aft pieces are light (tables.ts AFT)
     emit(state, EVENT.broadside, i, j, ship.pos, k);
   }
 }

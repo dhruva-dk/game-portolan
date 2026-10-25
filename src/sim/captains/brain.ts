@@ -370,7 +370,7 @@ function threatened(state: MatchState, i: number, style: Style, was: number): bo
     return true;
   }
   if (P.rival < 0) return false;
-  if (style.stalk >= 0.8 && (was === MODE.fight || was === MODE.ram || was === MODE.stalk) && share(ship) > 0.5) return false; // a hunter on its prey rides out the threat
+  if (style.stalk >= 0.8 && share(ship) > 0.5 && ship.purse < 0.5 * FORMS[ship.form].purse) return false; // a hunter meets a rival near its trail with its guns (engages); only a rich purse sends it home
   if (c.gentle && P.rival === 0 && P.rivalD < BRAIN.gentle) return true;
   if (style.commit > 0 && was === MODE.loop && share(ship) > 0.5) return false;
   if (P.rivalD > by(BRAIN.threat, c.skill) * (style.bolt ? 1.5 : 1) * (P.rival === 0 ? 1 + 0.5 * wary(c) : 1)) return false;
@@ -398,11 +398,11 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   const r = state.ships[j], theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
   let will = style.fight + (0.3 + 0.6 * style.fight + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
-  if (keen && theirs > 0.55) { // a hunter lets a sound ship that runs from it go: a stern chase into its chasers is no hunt
+  if (keen && theirs > 0.55) { // a hunter lets a sound ship that runs from it go: a long stern chase is no hunt
     velocityOf(sea, r, V);
     if (dot(V, toward(ship.pos, r.pos, ship.head, T)) > 0.5 * Math.sqrt(dot(V, V))) will -= 0.5;
   }
-  if (style.guard > 0 && intrudes(state, i, j)) will += style.guard;
+  if (style.guard > 0) will += intrudes(state, i, j) ? style.guard : ship.harm[j] > 0 ? -0.2 : -0.4; // a turtle drives intruders off its waters; it does not chase them to the kill far out
   if (keen) will -= 0.8 * Math.max(0, 1 - ((P.hulls & (1 << j)) !== 0 ? power(ship) / power(r) : 1)); // a hunter picks its fights: never a stronger ship than its own
   else if (style.edge === 0 && theirs < 0.6 && another(state, i, j, d)) will -= 0.35; // another ship is on the wounded one first: it leaves it the kill
   if (j === 0) {
@@ -511,7 +511,7 @@ const intrudes = (state: MatchState, i: number, j: number): boolean => {
 function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Style, was: number, aim: number): number {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (style.stalk === 0 && c.grudge === 0) return -1;
-  const keen = style.stalk >= 0.8, weak = keen ? 0.6 : 0.7; // a hunter stalks a ship that is broken, not one merely scratched (that runs, chasers aft), and from farther
+  const keen = style.stalk >= 0.8, weak = keen ? 0.6 : 0.7; // a hunter stalks a ship that is broken, not one merely scratched, and from farther
   let j = -1, d = BRAIN.stalk * (keen ? 1.8 : 1);
   if (r >= 0 && (style.stalk > 0 || r === 0) && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < (r === 0 ? Math.max(pressAt(c), weak) : weak) && P.rivalD < d) [j, d] = [r, P.rivalD];
   for (let k = 0; keen && k < SHIPS; k++) { // a hunter reads every hull it sees for the weakest
