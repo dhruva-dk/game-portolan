@@ -21,7 +21,7 @@ import { illustratedMaterial, inkMaterial, linearVec, type Style } from '../../s
 import { mix, PIGMENTS } from '../../style/palette.ts';
 import { R } from '../../sim/sphere.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
-import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
+import { DRAFT, REGIONS, TIDE, rimAt } from '../../sim/world/regions.ts';
 import { seas, surfAt } from '../sea.ts';
 import type { Swell } from '../swell.ts';
 import { GROUND, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
@@ -632,16 +632,16 @@ export function planCoral(field: TerrainField): CoralPlan {
     if (s.k !== 'reef') return;
     const crest: number[] = [], rad: number[] = [];
     for (let b = 0; b < 360; b++) {
-      // only the ring's own band (its ellipse ± its width), so a patch reef beyond the mouth is not taken for its crest
-      const c = Math.cos(b * DEG), sn = Math.sin(b * DEG), lc = Math.cos((b - s.rot) * DEG), ls = Math.sin((b - s.rot) * DEG);
-      const er = (s.rx * s.ry) / Math.sqrt(s.ry * s.ry * lc * lc + s.rx * s.rx * ls * ls), r0 = er - s.w - 3, r1 = er + s.w + 3;
+      // only the ring's own band (its rim ± its flat's width), so a patch reef beyond the mouth is not taken for its crest
+      const c = Math.cos(b * DEG), sn = Math.sin(b * DEG), rim = rimAt(s.rim, 90 - b), r0 = rim.r - rim.w - 3, r1 = rim.r + rim.w + 3;
       let best = -Infinity, br = r0;
       for (let rr = r0; rr <= r1; rr += 0.5) {
         const h = sim(s.x + rr * c, s.y + rr * sn);
         if (h > best) { best = h; br = rr; }
       }
       crest.push(best);
-      rad.push(br);
+      // in a deep pass the band's highest point is the lagoon floor or the sea beyond: its crest lies on the rim
+      rad.push(best < LOW ? rim.r : br);
     }
     const kinds: [(h: number) => boolean, Channel[], number][] = [[(h) => h < LOW, plan.channels, 2], [(h) => h >= LOW && h < BLOCK, plan.sills, 3]];
     for (const [pass, list, least] of kinds) {
@@ -738,15 +738,20 @@ export function planCoral(field: TerrainField): CoralPlan {
   }
   // withies on the reef edge both sides of every channel (the Great Lagoon's staked all through), and the hulk that
   // missed the Great Lagoon's, heeled on the reef flat beside its mouth: each found by walking across the channel from
-  // its centre line until the reef stops a keel at any tide
+  // its centre line, round the ring at the same distance from its centre (so the walk follows the arms as they curve
+  // away), until the reef stops a keel at any tide
   for (const c of plan.channels) {
     const rc = Math.hypot(c.crest.x - c.centre.x, c.crest.y - c.centre.y), ux = (c.crest.x - c.centre.x) / rc, uy = (c.crest.y - c.centre.y) / rc;
     const across = (d: number, sd: number, beyond: number, edge: number): { x: number; y: number } | null => {
-      const x0 = c.centre.x + (rc + d) * ux, y0 = c.centre.y + (rc + d) * uy;
-      for (let t = CLEAR; t < 11; t += 0.25) {
-        if (sim(x0 - sd * uy * t, y0 + sd * ux * t) < edge) continue;
-        const x = x0 - sd * uy * (t + beyond), y = y0 + sd * ux * (t + beyond);
-        return sim(x, y) >= edge ? { x, y } : null;
+      const r = rc + d, at = (t: number): { x: number; y: number } => {
+        const a = (sd * t) / r, ca = Math.cos(a), sa = Math.sin(a);
+        return { x: c.centre.x + r * (ux * ca - uy * sa), y: c.centre.y + r * (ux * sa + uy * ca) };
+      };
+      for (let t = CLEAR + 0.2; t < 11; t += 0.25) {
+        const q = at(t);
+        if (sim(q.x, q.y) < edge) continue;
+        const e = at(t + beyond);
+        return sim(e.x, e.y) >= edge ? e : null;
       }
       return null;
     };

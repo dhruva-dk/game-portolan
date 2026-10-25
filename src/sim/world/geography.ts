@@ -8,9 +8,11 @@
 // and bays and roughened by coastline noise; its height is a C1 profile of D (beach berm or cliff, blended by a
 // cliffness field, plus ridge relief), and the seabed runs from the shallows over the region's shelf to the abyss.
 // Reefs, bars, stacks, flats and cones join by smooth maxima. Deterministic math only: the same bits everywhere.
-import { PI, dcos, dot, dsin, dtan, hash32, normalize, rngFrom, rngInt, set, v3, type V3 } from '../math.ts';
+import { PI, datan2, dcos, dot, dsin, dtan, hash32, normalize, rngFrom, rngInt, set, v3, type V3 } from '../math.ts';
 import { R, TERRITORY, cellOf, faceUV, fromLatLon, gnomonicDir, localFrame, neighbor } from '../sphere.ts';
-import { DRAFT, FLOOR, REGIONS, TIDE, type Perk, type Region } from './regions.ts';
+import { DRAFT, FLOOR, REGIONS, TIDE, rimAt, type Perk, type Region } from './regions.ts';
+
+const RIM = { r: 0, w: 0, crest: 0 };
 
 /** Zone bits of the geography's zone field. */
 export const ZONE = { kelp: 1, hot: 2, tidal: 4, lagoon: 8, harbour: 16, pack: 32, vortex: 64 } as const;
@@ -142,7 +144,7 @@ export function chartTangent(ri: number, p: V3, b: number, out: V3): V3 {
 // ---------------------------------------------------------------------------------------------------------------
 // Compiled strokes: one flat list of primitives per region, bucketed on an 8 u grid over the chart.
 
-const SEG = 0, CUT = 1, BAY = 2, REEF = 3, BAR = 4, COL = 5, FLAT = 6, CONE = 7, KELP = 8, HOT = 9;
+const SEG = 0, CUT = 1, BAY = 2, REEF = 3, BAR = 4, COL = 5, FLAT = 6, CONE = 7, KELP = 8, HOT = 9, PATCH = 10;
 
 interface Prim {
   t: number;
@@ -152,14 +154,16 @@ interface Prim {
   /** Ridge relief or crest or column height or flat depth or cone top. */
   h: number;
   cliff: number; ch: number;
-  /** Floor of a flat; crater radius and floor of a cone; reef: ellipse axes and lagoon depth. */
+  /** Floor of a flat; crater radius and floor of a cone; reef: lagoon depth (f2). */
   f0: number; f1: number; f2: number;
   gaps: readonly number[]; // reef passes: gx, gy (unit, chart), half-width, crest (NaN: deep)
+  rim: Float64Array; // reef: its rim (radius, width, crest) at every whole degree of bearing 0 … 360 (regions.ts rimAt)
   great: boolean;
 }
 
+const NO_RIM = new Float64Array(0);
 function prim(t: number, o: Partial<Prim>): Prim {
-  return { t, ax: 0, ay: 0, bx: 0, by: 0, ra: 0, rb: 0, h: 0, cliff: 0, ch: 0, f0: 0, f1: 0, f2: 0, gaps: [], great: false, ...o };
+  return { t, ax: 0, ay: 0, bx: 0, by: 0, ra: 0, rb: 0, h: 0, cliff: 0, ch: 0, f0: 0, f1: 0, f2: 0, gaps: [], rim: NO_RIM, great: false, ...o };
 }
 
 /** A column of a stack wall or the Arch, in chart coordinates. */
@@ -212,12 +216,22 @@ function compile(region: Region, index: number): Compiled {
       case 'carve': seg(s.pts, CUT, {}, 2); break;
       case 'bay': add(prim(BAY, { ax: s.x, ay: s.y, ra: s.r }), 8); break;
       case 'reef': {
-        const a = s.rot * (PI / 180), gaps: number[] = [];
+        const gaps: number[] = [];
         for (const g of s.gaps) gaps.push(dsin(g.bearing * (PI / 180)), dcos(g.bearing * (PI / 180)), g.half, g.crest ?? NaN);
-        add(prim(REEF, { ax: s.x, ay: s.y, bx: dcos(a), by: dsin(a), ra: s.w, h: s.crest, f0: s.rx, f1: s.ry, f2: s.lagoon,
-          gaps, great: s.great, rb: Math.max(s.rx, s.ry) }), 36);
+        const rim = new Float64Array(3 * 361);
+        let rb = 0, ra = 0;
+        for (let b = 0; b <= 360; b++) {
+          rimAt(s.rim, b, RIM);
+          rim[3 * b] = RIM.r; rim[3 * b + 1] = RIM.w; rim[3 * b + 2] = RIM.crest;
+          rb = Math.max(rb, RIM.r);
+          ra = Math.max(ra, RIM.w);
+        }
+        add(prim(REEF, { ax: s.x, ay: s.y, ra: ra + 2, rb: rb + 2, f2: s.lagoon, gaps, rim, great: s.great }), 36);
         break;
       }
+      case 'patch':
+        for (let i = 0; i + 2 < s.pts.length; i += 3) add(prim(PATCH, { ax: s.pts[i], ay: s.pts[i + 1], ra: s.pts[i + 2], h: s.crest }), 14);
+        break;
       case 'bar':
         for (let i = 0; i + 3 < s.pts.length; i += 2) {
           add(prim(BAR, { ax: s.pts[i], ay: s.pts[i + 1], bx: s.pts[i + 2], by: s.pts[i + 3], ra: s.w, h: s.crest }), s.w + 16);
@@ -380,13 +394,19 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
     const p = g.prims[g.list[k]];
     switch (p.t) {
       case REEF: {
-        const lx = x - p.ax, ly = y - p.ay, rx = lx * p.bx + ly * p.by, ry = -lx * p.by + ly * p.bx, rho = hyp(rx, ry);
+        const lx = x - p.ax, ly = y - p.ay, rho = hyp(lx, ly);
         if (rho > p.rb + p.ra + 36) break;
-        const ct = rho > 1e-6 ? rx / rho : 1, st = rho > 1e-6 ? ry / rho : 0;
-        let rr = (p.f0 * p.f1) / Math.sqrt(p.f1 * p.f1 * ct * ct + p.f0 * p.f0 * st * st);
-        rr *= 1 + 0.06 * noise(ct * 1.7 + 3.1, st * 1.7 - 4.3, s + 11);
-        const t = rho - rr, hw = p.ra / 2;
-        knot(0, -hw - 5, -p.f2, 0); knot(1, -hw, p.h - 0.25, 0); knot(2, 0, p.h, 0); knot(3, hw, p.h - 0.3, -0.3);
+        // the rim at this bearing, its line and its flat's edges roughened (ragged by a few tenths of a unit, the
+        // flat's width by a fifth), so no stretch of it runs on as an even band
+        let deg = datan2(lx, ly) * (180 / PI);
+        if (deg < 0) deg += 360;
+        const ib = Math.min(359, Math.floor(deg)), fb = deg - ib, L = p.rim, o = 3 * ib, r0 = mix(L[o], L[o + 3], fb);
+        if (rho - r0 > 0.6 * p.ra + 37) break; // past the reef front's foot: the abyss either way
+        const rr = r0 + 0.45 * noise(x * 0.19 + 2.3, y * 0.19 - 1.7, s + 17);
+        const t = rho - rr, hw = (mix(L[o + 1], L[o + 4], fb) / 2) * (1 + 0.2 * noise(x * 0.13 - 4.1, y * 0.13 + 0.6, s + 18)), c = mix(L[o + 2], L[o + 5], fb);
+        // the flat: highest along its seaward edge (the algal ridge), sloping down gently to the back reef, which falls
+        // to the lagoon floor over 3 … 5 u (steeper in a small ring, so its lagoon is not all slope)
+        knot(0, -hw - Math.min(5, Math.max(3, 0.3 * r0)), -p.f2, 0); knot(1, -hw, c - 0.3, 0.06); knot(2, 0.4 * hw, c, 0); knot(3, hw, c - 0.25, -0.3);
         knot(4, hw + 4, -8, -2); knot(5, hw + 14, -24, -1); knot(6, hw + 34, DEEP, 0);
         let rh = spline(t, 7);
         if (t < -hw - 2) rh += 0.8 * knolls(x, y, 8, s + 10) * Math.max(0, -1.4 - rh);
@@ -405,6 +425,18 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
         }
         h = smax(h, rh, 1.2);
         if (p.great && t < -hw - 0.5) zone |= ZONE.lagoon;
+        break;
+      }
+      case PATCH: {
+        // a patch reef: a flat-topped coral head, its edge lobed, steep sides down to the floor round it
+        const d0 = hyp(x - p.ax, y - p.ay);
+        if (d0 > 1.45 * p.ra + 14) break;
+        const d = d0 - p.ra * (1 + 0.3 * noise(x * 0.45 + p.ax, y * 0.45 - p.ay, s + 19));
+        if (d > 14) break;
+        knot(0, -0.5 * p.ra, p.h, 0); knot(1, 0, p.h - 0.35, -0.5); knot(2, 2.5, -5, -1); knot(3, 14, DEEP, 0);
+        const ph = spline(d, 4);
+        if (ph > h - 1) floor = FLOOR.coral;
+        h = smax(h, ph, 0.8);
         break;
       }
       case BAR: {

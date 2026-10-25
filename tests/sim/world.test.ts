@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PI, dot, normalize, v3, type V3 } from '../../src/sim/math.ts';
 import { R, TERRITORY, cellArea, cellDir, cellOf, neighbor } from '../../src/sim/sphere.ts';
-import { DRAFT, REGIONS, TIDE } from '../../src/sim/world/regions.ts';
+import { DRAFT, REGIONS, TIDE, rimAt } from '../../src/sim/world/regions.ts';
 import {
   CHARTS, CLEAR, NEIGHBOURS, ZONE, buildGeography, chartTangent, coastAt, greatCurrent, heightAt, regionOf, toWorld,
 } from '../../src/sim/world/geography.ts';
@@ -141,7 +141,7 @@ test('the Great Lagoon can be entered only through its channel', () => {
   const ri = idx('coralAtolls'), reef = REGIONS[ri].strokes.find((s) => s.k === 'reef' && s.great);
   assert.ok(reef && reef.k === 'reef' && reef.gaps.length === 1);
   const lagoon = geo.landmarks[ri].pos, b = deg(reef.gaps[0].bearing);
-  const rr = (reef.rx + reef.ry) / 2, mouth = at(ri, reef.x + rr * Math.sin(b), reef.y + rr * Math.cos(b));
+  const rr = rimAt(reef.rim, reef.gaps[0].bearing).r, mouth = at(ri, reef.x + rr * Math.sin(b), reef.y + rr * Math.cos(b));
   for (const tide of [LOW, HIGH]) {
     assert.ok(flood(nav, navCellOf(ocean), tide)[navCellOf(lagoon)], 'lagoon unreachable through its channel');
     const shut = flood(nav, navCellOf(ocean), tide, (c) => R * Math.acos(Math.min(1, dot(cellDir(NAV, c, v3()), mouth))) < 14);
@@ -152,6 +152,21 @@ test('the Great Lagoon can be entered only through its channel', () => {
   assert.ok(!(geo.zones[cellOf(TERRITORY, at(ri, 8, 40))] & ZONE.lagoon));
 });
 
+test('every atoll lagoon can be entered only through its own passes', () => {
+  const ri = idx('coralAtolls');
+  for (const s of REGIONS[ri].strokes) {
+    if (s.k !== 'reef') continue;
+    const lagoon = at(ri, s.x, s.y), mouths = s.gaps.map((g) => {
+      const b = deg(g.bearing), r = rimAt(s.rim, g.bearing).r;
+      return at(ri, s.x + r * Math.sin(b), s.y + r * Math.cos(b));
+    });
+    for (const tide of [LOW, HIGH]) {
+      assert.ok(flood(nav, navCellOf(ocean), tide)[navCellOf(lagoon)], `lagoon (${s.x}, ${s.y}) unreachable at tide ${tide}`);
+      const shut = flood(nav, navCellOf(ocean), tide, (c) => mouths.some((m) => R * Math.acos(Math.min(1, dot(cellDir(NAV, c, v3()), m))) < 7));
+      assert.ok(!shut[navCellOf(lagoon)], `lagoon (${s.x}, ${s.y}) reachable with its passes shut at tide ${tide}`);
+    }
+  }
+});
 test('the Sound runs through the Fjords end to end, narrow but navigable at every tide', () => {
   const ri = idx('fjords'), sound = REGIONS[ri].strokes.filter((s) => s.k === 'carve')[0];
   assert.ok(sound && sound.k === 'carve');

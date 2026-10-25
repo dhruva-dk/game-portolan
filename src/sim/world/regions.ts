@@ -39,8 +39,11 @@ export type Mode = 'ionian' | 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 
  *           it, `cliff` 0 (beaches) … 1 (sheer cliffs), `ch` the cliff height
  *   carve   channel through land and shallows along (x, y, half-width) triples (fjords, sounds, mangrove creeks)
  *   bay     disc carved out of the land (coves, harbours)
- *   reef    elliptical reef ring around a lagoon; `crest` is the reef flat's height (above high tide: always
- *           solid), `gaps` are passes through it at bearings from its centre, deep or over a sill `crest`
+ *   reef    reef ring around a lagoon, drawn by its rim: knots (bearing, radius, width, crest) about its centre, a
+ *           smooth closed curve through them (rimAt), so a ring bulges, kinks and pinches, its reef flat broad to
+ *           windward and narrow to leeward, its crest (the flat's height) dry, awash or drowned; `gaps` are passes
+ *           through it at bearings from its centre, deep or over a sill `crest`
+ *   patch   patch reefs (bommies, coral heads) at (x, y, radius) triples, their tops at `crest`
  *   bar     sandbar or sill along (x, y) pairs, flat crest `w` either side; tidal when its crest is in the tide band
  *   column  one sea stack; `stacks` lines a wall of them along (x, y) pairs, too close for any hull between
  *   flat    level floor (banks, platforms, lagoon floors) at `depth`
@@ -51,8 +54,8 @@ export type Stroke =
   | { k: 'land'; pts: readonly number[]; top: number; cliff: number; ch: number }
   | { k: 'carve'; pts: readonly number[] }
   | { k: 'bay'; x: number; y: number; r: number }
-  | { k: 'reef'; x: number; y: number; rx: number; ry: number; rot: number; w: number; crest: number; lagoon: number;
-      gaps: readonly Gap[]; great: boolean }
+  | { k: 'reef'; x: number; y: number; rim: readonly number[]; lagoon: number; gaps: readonly Gap[]; great: boolean }
+  | { k: 'patch'; pts: readonly number[]; crest: number }
   | { k: 'bar'; pts: readonly number[]; w: number; crest: number }
   | { k: 'column'; x: number; y: number; r: number; h: number }
   | { k: 'stacks'; pts: readonly number[]; r0: number; r1: number; h0: number; h1: number }
@@ -63,6 +66,35 @@ export type Stroke =
 
 /** A pass through a reef ring: bearing from the ring's centre, half-width along the rim, sill crest (null: deep). */
 export interface Gap { bearing: number; half: number; crest: number | null }
+
+/** A reef ring's rim at one bearing: the radius of its crest line, the reef flat's width and its crest height (u). */
+export interface Rim { r: number; w: number; crest: number }
+
+/**
+ * The rim of a reef ring at compass bearing `b` (degrees): a periodic cubic (Hermite, Catmull-Rom tangents over the
+ * knots' uneven bearings) through its knots (bearing, radius, width, crest), bearings ascending in [0, 360). Plain
+ * arithmetic only, so the same bits everywhere; the renderer reads the same rim.
+ */
+export function rimAt(rim: readonly number[], b: number, out: Rim = { r: 0, w: 0, crest: 0 }): Rim {
+  const n = rim.length >> 2;
+  let x = b - 360 * Math.floor(b / 360);
+  if (x < rim[0]) x += 360;
+  let i = 0;
+  while (i + 1 < n && rim[4 * (i + 1)] <= x) i++;
+  // the knot bearings unwrapped around i: k-1, k, k+1, k+2
+  const at = (k: number): number => rim[4 * (((k % n) + n) % n)] + 360 * Math.floor(k / n);
+  const b0 = at(i - 1), b1 = at(i), b2 = at(i + 1), b3 = at(i + 2), d = b2 - b1, t = (x - b1) / d;
+  const t2 = t * t, t3 = t2 * t, h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = 3 * t2 - 2 * t3, h11 = t3 - t2;
+  const v = (k: number, c: number): number => rim[4 * (((k % n) + n) % n) + c];
+  const f = (c: number): number => {
+    const m1 = ((v(i + 1, c) - v(i - 1, c)) / (b2 - b0)) * d, m2 = ((v(i + 2, c) - v(i, c)) / (b3 - b1)) * d;
+    return h00 * v(i, c) + h10 * m1 + h01 * v(i + 1, c) + h11 * m2;
+  };
+  out.r = f(1);
+  out.w = Math.max(1.5, f(2));
+  out.crest = f(3);
+  return out;
+}
 
 export interface Landmark { name: string; perk: Perk; x: number; y: number; r: number }
 /** A natural sheltered mooring: the anchorage, the bearing out through its mouth, berths, the harbour-repair radius. */
@@ -143,9 +175,38 @@ export const DRAFT = 0.8;
 const land = (pts: number[], top = 0, cliff = 0, ch = 0): Stroke => ({ k: 'land', pts, top, cliff, ch });
 const carve = (pts: number[]): Stroke => ({ k: 'carve', pts });
 const bay = (x: number, y: number, r: number): Stroke => ({ k: 'bay', x, y, r });
-const reef = (x: number, y: number, rx: number, ry: number, rot: number, gaps: Gap[], o: { w?: number; crest?: number;
-  lagoon?: number; great?: boolean } = {}): Stroke =>
-  ({ k: 'reef', x, y, rx, ry, rot, gaps, w: o.w ?? 3, crest: o.crest ?? 0.3, lagoon: o.lagoon ?? 3.5, great: o.great ?? false });
+type Reef = Extract<Stroke, { k: 'reef' }>;
+const reef = (x: number, y: number, rim: number[], gaps: Gap[], o: { lagoon?: number; great?: boolean } = {}): Reef =>
+  ({ k: 'reef', x, y, rim, gaps, lagoon: o.lagoon ?? 3.5, great: o.great ?? false });
+/**
+ * A motu strung along a reef's rim from bearing b0 to b1 (clockwise), on the flat's seaward side (`out` of its width
+ * past the crest line): body radius `r`, tapering to low sandy spits of radius `tip` at either end, the body swelling
+ * toward `fat` (0 … 1: where along it, 0.5 midway).
+ */
+function motu(rf: Reef, b0: number, b1: number, r: number, o: { tip?: number; out?: number; top?: number; fat?: number } = {}): Stroke {
+  const tip = o.tip ?? 0.9, out = o.out ?? 0.05, fat = o.fat ?? 0.5, pts: number[] = [];
+  const rim = rimAt(rf.rim, (b0 + b1) / 2), n = Math.max(3, Math.round(((b1 - b0) * (PI / 180) * rim.r) / 3.5));
+  for (let i = 0; i <= n; i++) {
+    const u = i / n, b = b0 + (b1 - b0) * u, a = b * (PI / 180);
+    rimAt(rf.rim, b, rim);
+    const q = u < fat ? (u - fat) / fat : (u - fat) / (1 - fat), d = rim.r + out * rim.w;
+    pts.push(rf.x + d * dsin(a), rf.y + d * dcos(a), tip + (r - tip) * (1 - q * q * q * q));
+  }
+  return land(pts, o.top ?? 1.3, 0, 1);
+}
+const patch = (pts: number[], crest: number): Stroke => ({ k: 'patch', pts, crest });
+/** A low sandy spit off a motu's end: a bar from the lagoon side of the flat at bearing b, curling `sweep` degrees on
+ *  (+ clockwise) as it runs `len` u out into the lagoon; awash at high water. */
+function spit(rf: Reef, b: number, sweep: number, len: number): Stroke {
+  const pts: number[] = [], rim = { r: 0, w: 0, crest: 0 };
+  for (const u of [0, 0.5, 1]) {
+    const bu = b + sweep * u, a = bu * (PI / 180);
+    rimAt(rf.rim, bu, rim);
+    const d = rim.r - rim.w * (0.25 + 0.25 * u) - len * u * u;
+    pts.push(rf.x + d * dsin(a), rf.y + d * dcos(a));
+  }
+  return bar(pts, 0.8, 0.15);
+}
 const gap = (bearing: number, half: number, crest: number | null = null): Gap => ({ bearing, half, crest });
 const bar = (pts: number[], w: number, crest: number): Stroke => ({ k: 'bar', pts, w, crest });
 const column = (x: number, y: number, r: number, h: number): Stroke => ({ k: 'column', x, y, r, h });
@@ -165,6 +226,37 @@ function arc(cx: number, cy: number, r: number, a0: number, a1: number): number[
   }
   return out;
 }
+
+// The Coral Atolls' rings (knots: bearing, radius, width, crest), shared by their strokes and their motu.
+/** The Great Lagoon: its windward reef flat up to 9 u broad, its leeward rim a narrow causeway, one channel in from the
+ *  south-south-west; the reef always awash, never a hull's water. */
+const GREAT = reef(8, 6, [
+  0, 25, 4.5, 0.4, 25, 26.5, 6, 0.45, 55, 27.5, 7.5, 0.45, 80, 30, 8, 0.45, 104, 29.5, 8, 0.45, 126, 27, 6.5, 0.45,
+  144, 29.5, 7.5, 0.45, 163, 28, 6, 0.4, 174, 24.5, 5, 0.4, 192, 23.5, 4, 0.35, 205, 23.5, 4, 0.35, 220, 24, 3.6, 0.3,
+  242, 27, 3.4, 0.3, 268, 26, 3.2, 0.3, 294, 23, 3.2, 0.3, 318, 24.5, 3.6, 0.35, 338, 23, 3.8, 0.4,
+], [gap(205, 4.6)], { lagoon: 4.5, great: true });
+/** South-west: nearly closed, a long motu to windward, its harbour inside the channel from the east. */
+const SW_ATOLL = reef(-40, -30, [
+  0, 11, 4, 0.4, 40, 12.5, 5, 0.45, 68, 12, 4.5, 0.45, 90, 11, 3.4, 0.4, 112, 11.5, 4, 0.4, 140, 13, 4.5, 0.4,
+  176, 11, 3.5, 0.35, 210, 9.5, 3, 0.3, 250, 10, 2.8, 0.3, 290, 11.5, 3, 0.3, 325, 10, 3.2, 0.35,
+], [gap(90, 3.2)]);
+/** North-west: a horseshoe, dry from west through north to east, its southern rim drowned at high water (still a
+ *  keel's depth short, so no way in); the channel through the drowned rim and a back door over a sill at high tide. */
+const NW_ATOLL = reef(-42, 32, [
+  0, 13, 4.5, 0.45, 45, 14, 5.5, 0.45, 85, 13, 5, 0.4, 108, 13.5, 3.6, 0.15, 130, 14.5, 3, 0, 150, 14, 3, 0,
+  176, 13, 3, 0, 205, 13.5, 3, 0, 230, 12, 3, 0.15, 254, 11, 3.2, 0.35, 290, 12.5, 3.4, 0.4, 330, 12, 3.4, 0.4,
+], [gap(150, 3.4), gap(330, 3.2, -1.1)]);
+/** South-east: small and three-cornered, nearly closed, its channel on its west-north-west side. */
+const SE_ATOLL = reef(40, -40, [
+  10, 10.5, 4, 0.4, 55, 8, 4.5, 0.45, 95, 7.5, 4.5, 0.45, 130, 10, 4.5, 0.4, 175, 7.5, 3.5, 0.35, 215, 7.5, 3, 0.3,
+  250, 9.5, 3, 0.3, 280, 8.5, 2.8, 0.3, 300, 8.2, 2.8, 0.3, 320, 8.5, 3, 0.35, 342, 9, 3.2, 0.35,
+], [gap(300, 3.2)], { lagoon: 4.5 });
+/** East: a kidney, broad and long-motu'd to windward, pinched in on its lee toward the Great Lagoon; its channel
+ *  opens north-west. */
+const E_ATOLL = reef(47, 30, [
+  0, 9.5, 3.8, 0.4, 35, 9.5, 4.6, 0.45, 75, 9, 4.6, 0.45, 110, 9.5, 4.6, 0.45, 150, 10.5, 4.2, 0.4, 185, 9.5, 3.2, 0.35,
+  225, 8.5, 2.8, 0.3, 255, 7.5, 2.8, 0.3, 290, 9, 2.8, 0.3, 320, 9.5, 3, 0.35, 345, 10, 3.4, 0.4,
+], [gap(320, 3.4)], { lagoon: 5 });
 
 const UPPER = 26.565051177077990, LOWER = -UPPER; // atan(1/2), the icosahedron's rings
 
@@ -520,29 +612,44 @@ export const REGIONS: readonly Region[] = [
     shore: { sand: FLOOR.sand, floor: FLOOR.sand, berm: 0.9, cliffH: 3, shallows: [3, 1.8], shelf: [8, 10] },
     shelf: [0, 0, 64],
     strokes: [
-      // The Great Lagoon: a reef ring always awash, one channel in from the south-west.
-      reef(8, 6, 28, 22, 20, [gap(205, 4.6)], { w: 3.4, crest: 0.4, lagoon: 4.5, great: true }),
-      land([30, 18, 3, 26, 26, 2.6], 1.5, 0, 1), land([-14, 18, 3], 1.5, 0, 1), land([12, -14, 3.4, 22, -10, 2.6], 1.5, 0, 1),
-      land([-17, -12.5, 2.6], 1.5, 0, 1),
-      // Small atolls, each with its single channel; the north-west one has a back door over the reef at high tide.
-      reef(-40, -30, 11, 9, 0, [gap(90, 3.6)], { w: 3 }),
-      reef(-42, 32, 10, 12, 30, [gap(150, 3.6), gap(330, 3.4, -1.1)], { w: 3 }),
-      reef(40, -40, 9, 9, 0, [gap(300, 3.6)], { w: 2.8 }),
-      reef(50, 30, 8, 9, 0, [gap(230, 3.6)], { w: 2.8 }),
-      land([-44, 44, 2.4], 1.2, 0, 1), land([56.5, 36.5, 2.4], 1.2, 0, 1), land([46, -36, 2.4], 1.2, 0, 1),
-      // A maze of patch reefs, some dry, some awash only at low tide.
-      bar([-22, -16, -12, -30], 1.6, 0.3), bar([-30, 2, -20, 4], 1.6, -1.0), bar([-6, -40, 8, -46], 1.6, 0.3),
-      bar([20, -30, 28, -22], 1.4, -0.8), bar([-22, 48, -8, 52], 1.6, 0.3), bar([40, 0, 52, 10], 1.6, -1.2),
-      bar([-56, -6, -52, 8], 1.6, 0.3), bar([16, 50, 28, 56], 1.6, -0.9),
+      // The rings, drawn by their rims: the reef flats broad to windward (the trades blow from the east-north-east) and
+      // narrow to leeward, each ring bulging, kinking and pinching, each lagoon with its single channel.
+      GREAT, SW_ATOLL, NW_ATOLL, SE_ATOLL, E_ATOLL,
+      // Motu strung along the rims, longest to windward, sandy spits at their ends and gaps of reef flat between them.
+      motu(GREAT, 26, 64, 2.6, { fat: 0.6, out: 0.15 }), motu(GREAT, 70, 104, 2.8, { fat: 0.4, out: 0.12 }),
+      motu(GREAT, 112, 140, 2.3, { tip: 0.8, out: 0.1 }), motu(GREAT, 150, 162, 1.8, { tip: 0.8 }), motu(GREAT, 346, 372, 1.8),
+      motu(GREAT, 226, 240, 1.7, { out: -0.05, top: 1.5 }), motu(GREAT, 300, 312, 1.5, { tip: 0.8, out: -0.05, top: 1.5 }),
+      motu(SW_ATOLL, 4, 54, 2, { fat: 0.4 }), motu(SW_ATOLL, 128, 152, 1.7, { tip: 0.8 }), motu(SW_ATOLL, 300, 330, 1.5, { tip: 0.8, top: 1.5 }),
+      motu(NW_ATOLL, 14, 78, 2.2, { fat: 0.65 }), motu(NW_ATOLL, 262, 306, 1.7, { top: 1.5 }),
+      motu(SE_ATOLL, 28, 92, 2), motu(SE_ATOLL, 118, 146, 1.6, { tip: 0.8 }), motu(SE_ATOLL, 352, 380, 1.5, { tip: 0.8 }),
+      motu(E_ATOLL, 18, 118, 1.6, { fat: 0.35, out: 0.2, top: 1.6 }), motu(E_ATOLL, 134, 160, 1.5, { tip: 0.8, out: 0.15, top: 1.6 }),
+      spit(GREAT, 27, -16, 2.5), spit(GREAT, 139, 13, 2.5), spit(GREAT, 105, -4, 3), spit(E_ATOLL, 19, -16, 1.5),
+      spit(SW_ATOLL, 5, -18, 1.5), spit(NW_ATOLL, 77, 14, 1.5),
+      // Patch reefs in the lagoons: bommies, some breaking at low water, some deep under the turquoise.
+      patch([20, 15, 1.5, 21.5, 12.8, 0.8, -5, 15, 1.7, 17, -5, 1.3], 0.1), patch([25, 2, 1.1, 14, 22, 1, 24, -8, 1.2, -4, 20, 0.8], -0.4),
+      patch([2, 21, 1.3, -10, 3, 1.2, 26, 12, 1.4, 6, -2, 1, 12, 17, 0.9, -2, 10, 1.1, 20, -12, 1, 24, 20, 1.2], -1.7),
+      patch([-44, 29, 1.2], 0), patch([-38, 37, 1, -47, 36, 0.9], -1.6), patch([-43, -26, 0.9], -1.6),
+      patch([49.5, 27, 0.9, 44, 27.5, 0.8], -2),
+      // Reef mazes between the atolls: clusters of patch reefs, some dry at low water, some awash only at low tide, the
+      // sea's lanes winding between them.
+      patch([-58, -8, 2.6, -55.5, -5, 1.2, -53, 3, 2, -51, 5.5, 1.1, -57, 11, 1.5], 0.3), patch([-47, -1, 1.9, -48.5, 1.5, 1, -44.5, 7, 1.2, -61, 1, 1.3], -1),
+      patch([-25, -17, 2.4, -22.5, -19.5, 1.3, -18, -25, 1, -16, -29, 2.2, -13.5, -31, 1.2], 0.3), patch([-29, -9, 1.7, -31.5, -12, 1.1, -20, -37, 1.3], -1),
+      patch([-30, 2, 2, -26.5, 4, 1, -21, 3, 1.6, -24, -1, 0.9], -1),
+      patch([-9, -38, 1.6, -6, -40.5, 2.4, -2, -41, 1, 5, -45, 1.4, 8.5, -46, 2.1, 11, -49.5, 1], 0.3), patch([1, -37, 1.2, 14, -42, 1.4], -1),
+      patch([20, -32, 1.8, 22.5, -29, 0.9, 25, -27.5, 1.5, 30, -25, 1.1], -0.8), patch([33, -25, 1.5, 34.5, -22, 0.9], 0.2),
+      patch([-23, 48.5, 2.2, -20, 50.5, 1.2, -12, 51, 1.8, -9, 53, 2.5, -4, 55, 1.1], 0.3), patch([-15, 42, 1.5, -17.5, 44, 0.9, 0, 50, 1.2], -1.2),
+      patch([49, -1, 2.2, 51.5, 2, 1, 54, 5, 1.7, 57.5, 8.5, 1.9, 55, 11, 0.9], -1.2), patch([60, -6, 1.8, 62, -3, 1, 63, 1, 1.3], 0.3),
+      // and a sand cay or two
+      bar([16, 50, 28, 56], 1.6, -0.9), bar([34, 46, 38, 50], 1.2, 0.3),
     ],
     landmark: { name: 'The Great Lagoon', perk: 'greatLagoon', x: 8, y: 6, r: 18 },
     harbours: [{ x: -40, y: -30, facing: 90, moorings: 3, r: 6 }],
-    lighthouses: [{ x: -18, y: -13, facing: 234, period: 9 }, { x: 57, y: 37, facing: 45, period: 10 }],
+    lighthouses: [{ x: -12.7, y: -9.6, facing: 225, period: 9 }, { x: 51.5, y: 38.6, facing: 30, period: 10 }],
     cascades: [],
     finds: [
       { kind: 'wreck', x: -16, y: -46, facing: 0 }, { kind: 'wreck', x: 14, y: 10, facing: 0 },
-      { kind: 'wreck', x: 56, y: -10, facing: 0 }, { kind: 'cache', x: 30, y: 18, facing: 240 },
-      { kind: 'cache', x: -44, y: 44, facing: 180 },
+      { kind: 'wreck', x: 56, y: -10, facing: 0 }, { kind: 'cache', x: 27.9, y: 25.9, facing: 225 },
+      { kind: 'cache', x: -31.1, y: 41.2, facing: 230 },
     ],
     fauna: [
       { species: 'turtle', x: 8, y: 6, r: 20, count: 10 }, { species: 'turtle', x: -40, y: -30, r: 8, count: 4 },
