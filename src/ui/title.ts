@@ -47,9 +47,10 @@ export function title(ctx: ScreenContext): Screen {
       const t = f.clock - start, still = settings().reducedMotion;
       art?.frame(f.clock, still);
       if (!word || !hint) return;
-      word.progress = still ? 1 : (t - PEN_DOWN) / word.duration;
-      const done = still || t > PEN_DOWN + word.duration;
-      hint.opacity = done ? (still ? 0.85 : 0.6 + 0.3 * Math.sin((t - PEN_DOWN - word.duration) * 2.1)) : 0;
+      const writing = Math.min(word.duration, 2.4); // the whole name within the first seconds
+      word.progress = still ? 1 : (t - PEN_DOWN) / writing;
+      const done = still || t > PEN_DOWN + writing;
+      hint.opacity = done ? (still ? 0.85 : 0.6 + 0.3 * Math.sin((t - PEN_DOWN - writing) * 2.1)) : 0;
     },
     touch(t) {
       if (t.phase !== 'up' || left) return;

@@ -334,7 +334,7 @@ export function harbour(ctx: ScreenContext): Screen {
         const k = inking[i]!;
         if (!k.t.parent) { inking.splice(i, 1); continue; }
         k.at ??= clock + k.delay;
-        k.t.progress = still ? 1 : (clock - k.at) / Math.max(0.05, k.t.duration);
+        k.t.progress = still ? 1 : (clock - k.at) / Math.max(0.05, Math.min(k.t.duration, 0.85));
         if (k.t.progress >= 1) inking.splice(i, 1);
       }
       if (note && clock - noteAt > 2.6) { leaf.remove(note); note.dispose(); note = null; }
