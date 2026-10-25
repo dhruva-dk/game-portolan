@@ -10,9 +10,10 @@ import { seaFor } from '../sim/environment.ts';
 import { idleInput, type Recording } from '../sim/input.ts';
 import { createMatch, type MatchSetup } from '../sim/state.ts';
 import { Shell, type Runtime, type ScreenName } from '../ui/shell.ts';
-import { Loop } from './loop.ts';
+import { Loop, type Stepper } from './loop.ts';
 import { clearMatch, saveCareer, saveMatch, type SavedMatch } from './save.ts';
 import { Session } from './session.ts';
+import { GameAudio } from '../audio/soundscape.ts';
 import type { World, WorldMessage } from './worldWorker.ts';
 
 const randomSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0];
@@ -23,6 +24,8 @@ export class Game implements Runtime {
   readonly shell: Shell;
   world: World | null = null;
   session: Session | null = null;
+  /** The sound (WP28): unlocked on the first touch; null where Web Audio is unavailable. */
+  readonly audio: GameAudio | null = GameAudio.create();
   /** The career (WP10): set sail fits out its next match, and a voyage's result comes home when its match ends. */
   career: Career | null = null;
   /** The world has arrived and the screen the game opens on is up. */
@@ -36,6 +39,7 @@ export class Game implements Runtime {
     this.shell.go('title');
     this.loop = new Loop((f) => {
       this.shell.frame(f);
+      this.audio?.frame(f.dt, this.session?.state ?? null);
       if (this.perf.startup === 0) this.perf.startup = performance.now();
     });
   }
@@ -67,6 +71,7 @@ export class Game implements Runtime {
 
   /** The app goes to the background: the match stops and is saved, settling once the save has committed. */
   async background(): Promise<void> {
+    this.audio?.suspend();
     if (this.loop.suspended) return;
     this.loop.suspended = true;
     if (this.session) await saveMatch(this.session);
@@ -74,6 +79,7 @@ export class Game implements Runtime {
 
   /** The app is back: the match continues from the tick it stopped on, and the snapshot is spent. */
   async foreground(): Promise<void> {
+    this.audio?.resume();
     if (!this.loop.suspended) return;
     this.loop.suspended = false;
     if (this.session) await clearMatch();
@@ -82,9 +88,17 @@ export class Game implements Runtime {
   private play(m: SavedMatch): void {
     if (!this.world) throw new Error('play: the world has not arrived');
     this.session = new Session(seaFor(this.world, m.state.seed), m, idleInput); // the live input source until the match controls (WP25) supply it
-    this.loop.run(this.session);
+    this.audio?.startMatch(this.session.sea);
+    this.loop.run(this.stepper(this.session));
     this.shell.go('match');
     void clearMatch(); // a saved match is spent once it plays again, and a new match replaces it
+  }
+
+  /** The session as the loop steps it, its events heard after every tick (WP28). */
+  private stepper(session: Session): Stepper {
+    const audio = this.audio;
+    if (!audio) return session;
+    return { step: () => { const moved = session.step(); if (moved) audio.tick(session.state); return moved; } };
   }
 
   private end(): void {
@@ -94,6 +108,7 @@ export class Game implements Runtime {
       this.career = applyResult(this.career, result(state));
       void saveCareer(this.career);
     }
+    this.audio?.endMatch();
     this.session = null;
     this.loop.run(null);
     void clearMatch();
