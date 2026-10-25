@@ -248,10 +248,10 @@ if (view === 'deck') {
 } else if (view === 'coral' || view === 'coralshore') {
   const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), from = V(), to = V();
   const ch = coral.plan.channels.find((c) => c.great)!, b = (ch.bearing * Math.PI) / 180;
-  const ob = b + Number(q.get('swing') ?? -0.1), od = Number(q.get('off') ?? 17), aim = Number(q.get('aim') ?? 10);
+  const ob = b + Number(q.get('swing') ?? 0), od = Number(q.get('off') ?? 24), aim = Number(q.get('aim') ?? 0);
   if (view === 'coral') { toWorld(ri, ch.crest.x + od * Math.cos(ob), ch.crest.y + od * Math.sin(ob), from); toWorld(ri, ch.centre.x + aim, ch.centre.y, to); } // low off the reef at midday, up the single channel between its surf to the Great Lagoon, the hulk on the reef at its mouth (capture 23)
   else { toWorld(ri, 1.5, -19, from); toWorld(ri, 9.4, -14.3, to); } // over the outer reef's surf to the motu at the Great Lagoon's mouth, the hulk on its shore
-  look(from, to, Number(q.get('height') ?? (view === 'coral' ? 3.4 : 2.6)), Number(q.get('pitch') ?? (view === 'coral' ? -0.07 : -0.12)));
+  look(from, to, Number(q.get('height') ?? (view === 'coral' ? 2.2 : 2.6)), Number(q.get('pitch') ?? (view === 'coral' ? -0.2 : -0.12)));
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();

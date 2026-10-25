@@ -18,7 +18,7 @@
 // (the passes, for cameras and captures).
 import * as THREE from 'three';
 import { illustratedMaterial, inkMaterial, linearVec, type Style } from '../../style/glsl.ts';
-import { PIGMENTS } from '../../style/palette.ts';
+import { mix, PIGMENTS } from '../../style/palette.ts';
 import { R } from '../../sim/sphere.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
 import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
@@ -57,6 +57,8 @@ const W = {
   sand: washOf(PIGMENTS.leadWhite, 0.75), sandEdge: washOf(PIGMENTS.ochre, 0.3),
   drift: washOf(PIGMENTS.leadWhite, 0.5), driftDark: washOf(PIGMENTS.sepia, 0.5),
   pole: washOf(PIGMENTS.sepia, 0.85),
+  crownLit: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.45), 0.5), crownSun: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.6),
+  crownShade: washOf(mix(PIGMENTS.malachite, PIGMENTS.indigo, 0.25), 0.8),
   timber: washOf(PIGMENTS.sepia, 0.9), weed: washOf(PIGMENTS.verdigris, 0.95),
 };
 
@@ -105,6 +107,19 @@ function spike(b: Brush, a: V, tip: V, r: number, turn = 0): void {
 
 /** The triangles laid so far by a brush. */
 const laid = (b: Brush): number => (b.kit as unknown as { pos: number[] }).pos.length / 9;
+/** A crown's normals: frond facets above its heart (y > topY) turned up, lit as the arching upper face; those hanging below
+ *  turned down, so the crown's underside falls into shade. */
+function crownNormals(g: THREE.BufferGeometry, [a0, a1]: [number, number], topY: number): THREE.BufferGeometry {
+  const nrm = g.getAttribute('normal') as THREE.BufferAttribute, pos = g.getAttribute('position') as THREE.BufferAttribute, f = vec();
+  for (let t = a0; t < a1; t++) {
+    const cy = (pos.getY(3 * t) + pos.getY(3 * t + 1) + pos.getY(3 * t + 2)) / 3, up = cy > topY - 0.03;
+    f.fromBufferAttribute(nrm, 3 * t);
+    if (f.y < 0 === up) f.negate();
+    f.multiplyScalar(up ? 0.45 : 0.7).add(vec(0, up ? 1 : -0.6, 0)).normalize();
+    for (let v = 0; v < 3; v++) nrm.setXYZ(3 * t + v, f.x, f.y, f.z);
+  }
+  return g;
+}
 /** Turn the normals of triangles [from, to) up toward the kit's +y, so foliage hangs lit as its upper face. */
 function liftNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][]): THREE.BufferGeometry {
   const nrm = g.getAttribute('normal') as THREE.BufferAttribute, f = vec();
@@ -155,10 +170,13 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
     const droop = young ? 0.35 + 0.25 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : 0.45 - 0.06 * age;
     const len = L * (0.85 + 0.3 * rnd()) * (age === 0 ? 0.8 : 1), side = vec().crossVectors(d, Y).normalize();
     b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDead : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
+    const tone = b.wash, kept = tone === W.frondDead || tone === W.frondOld;
     let prev = top.clone();
     for (let i = 1; i <= SEG; i++) {
       const s = i / SEG, p = top.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (rise * s - droop * s * s));
       const w = len * 0.2 * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
+      // the crown lit where it arches above its heart, shadowed where it hangs below
+      if (!kept) b.wash = mid.y > top.y - 0.03 ? (age === 0 ? W.crownLit : W.crownSun) : W.crownShade;
       // (far off the blades lie flatter, lit as a crown is seen from afar, not a dark fringe)
       const hang = vec(0, far ? -len * 0.02 : -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
       b.tri(prev, p, mid.clone().addScaledVector(side, w).add(hang));
@@ -171,7 +189,7 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
   const lit: [number, number] = [fronds, laid(b)];
   b.wash = W.nut;
   for (let k = 0; k < (far ? 0 : young ? 2 : 5); k++) blob(b, top.clone().add(vec(0.035 * Math.cos(k * 2.4), -0.035 - 0.015 * (k % 2), 0.035 * Math.sin(k * 2.4))), 0.026);
-  return liftNormals(b.kit.build(), [lit]);
+  return crownNormals(b.kit.build(), lit, top.y);
 }
 
 /** A coconut palm 1 tall drawn close, as an engraver draws one: a curved trunk swollen at the bole and ringed with leaf
@@ -313,80 +331,152 @@ function shrubKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A brain coral 1 across, 0.2 tall, grown up to the low-water mark: a low dome whose meandering ridges show as bands
- *  of pale and deeper ochre, a living rim of rose, the dead crown of a micro-atoll greyed with algae. */
-function massiveKit(seed: number, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = far ? 7 : 12, jit = Array.from({ length: 5 * k }, () => 0.88 + 0.24 * rnd()), b = new Brush(W.coral);
-  const ph = rnd() * TAU;
-  b.pick = (c, n) => {
-    if (n.y < 0.25) return W.under;
-    if (c.y > 0.17) return W.algae;
-    const m = Math.sin(c.x * 26 + 2.2 * Math.sin(c.z * 19 + ph)) + 0.6 * Math.sin(c.z * 23 + ph);
-    return c.y < 0.07 ? W.rose : m > 0.2 ? W.coralPale : W.coral;
-  };
-  const rings = far ? [0, 2, 4] : [0, 1, 2, 3, 4];
-  b.kit.loft(rings.map((i) => ring(k, (j) => [-0.04, 0.06, 0.13, 0.18, 0.2][i] + 0.012 * Math.sin(j * 2.3 + i + seed), (j) => [0.5, 0.48, 0.4, 0.27, 0.1][i] * jit[i * k + j])));
-  return b.kit.build();
+/** Smooth a kit's normals where facets meet at a point, so a rounded form reads round: no facet steps, no polygon
+ *  outline inked across it. */
+function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute, nrm = g.getAttribute('normal') as THREE.BufferAttribute;
+  const acc = new Map<string, V>(), f = vec(), key = (i: number): string => `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
+  for (let i = 0; i < pos.count; i++) {
+    const k = key(i), a = acc.get(k);
+    f.fromBufferAttribute(nrm, i);
+    if (a) a.add(f);
+    else acc.set(k, f.clone());
+  }
+  for (let i = 0; i < pos.count; i++) {
+    const a = acc.get(key(i))!;
+    if (a.lengthSq() > 1e-6) nrm.setXYZ(i, ...(f.copy(a).normalize().toArray() as [number, number, number]));
+  }
+  return g;
 }
 
-/** A thicket of branching (staghorn) coral 1 across, ~0.26 tall: stout trunks forking twice, the growing tips pale,
- *  ochre and umber below where the light fails. */
+/** Living coral's pigments under clear water: cream ridges and dark meander grooves, ochre-rose, lilac, sage, the pale
+ *  growing tips, a cool shade where a form turns under; bleached rubble, cream and grey. */
+const C = {
+  cream: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.3), 0.5), groove: washOf(mix(PIGMENTS.ochre, PIGMENTS.sepia, 0.5), 0.6),
+  rose: washOf(mix(PIGMENTS.ochre, PIGMENTS.roseMadder, 0.55), 0.42), lilac: washOf(mix(PIGMENTS.roseMadder, PIGMENTS.ultramarine, 0.3), 0.38),
+  fan: washOf(mix(PIGMENTS.roseMadder, PIGMENTS.ultramarine, 0.4), 0.6), sage: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.35), 0.38),
+  tip: washOf(PIGMENTS.leadWhite, 0.85), shade: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.3), 0.45),
+  rubble: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.15), 0.62), grey: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.3), 0.5),
+  blush: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.roseMadder, 0.35), 0.45),
+};
+
+/** A rounded head r across at (x, z), h tall, lofted pole-ward in `rings` rings of k points, its rim wavering. */
+function dome(b: Brush, x: number, z: number, r: number, h: number, k: number, rings: number, ph: number): void {
+  b.kit.loft(Array.from({ length: rings + 1 }, (_, i) => {
+    const a = (i / rings) * (Math.PI / 2);
+    return ring(k, (j) => -0.03 + h * Math.sin(a) + 0.008 * Math.sin(j * 2.1 + i + ph), (j) => Math.max(r * Math.cos(a) * (0.9 + 0.1 * Math.sin(j * 1.3 + ph)), 0.003))
+      .map((p) => p.add(vec(x, 0, z)));
+  }));
+}
+
+/** A patch of massive corals 1 across, ≤ 0.3 tall, each head of believable size beside a hull: a brain coral's dome,
+ *  its meander grooves drawn dark over the cream ridges, a sage boulder coral, an ochre-rose and a lilac knob; all
+ *  smooth, cool where they turn under. */
+function massiveKit(seed: number, far = false, dead = false): THREE.BufferGeometry {
+  const rnd = seeded(seed), b = new Brush(C.cream);
+  const heads: [number, number, number][] = [[0.08, 0.04, 0.3], [-0.26, -0.16, 0.19], [0.26, -0.28, 0.15], [-0.17, 0.3, 0.13]];
+  heads.slice(0, far || dead ? 3 : 4).forEach(([hx, hz, r], kind) => {
+    const ph = rnd() * TAU, body = dead ? [C.rubble, C.grey, C.sage][kind] : [C.cream, C.sage, C.rose, C.lilac][kind];
+    b.pick = (c, n) => {
+      if (n.y < 0.15) return C.shade;
+      if (dead) return c.y > 0.04 + 0.5 * r * 0.45 ? C.sage : body; // a micro-atoll: its dead crown flat and greyed with algae, its rim bleached
+      if (kind !== 0) return body;
+      const x = (c.x - hx) / r, z = (c.z - hz) / r, m = Math.sin(x * 8 + 2.4 * Math.sin(z * 6 + ph)) + Math.sin(z * 7 + 2 * Math.sin(x * 5 - ph));
+      return Math.abs(m) < 0.4 ? C.groove : body;
+    };
+    dome(b, hx, hz, r, r * (dead ? 0.45 : 0.72 + 0.2 * rnd()), far || dead ? 8 : kind ? 9 : 14, far || dead ? 2 : kind ? 3 : 5, ph);
+  });
+  return smooth(b.kit.build());
+}
+
+/** A flat ribbon from a to c, w wide, lying in the plane with normal `nrm`. */
+function ribbon(b: Brush, a: V, c: V, w: number, nrm: V): void {
+  const p = vec().subVectors(c, a).cross(nrm).normalize().multiplyScalar(w);
+  b.tri(a.clone().add(p), a.clone().sub(p), c.clone().sub(p));
+  b.tri(a.clone().add(p), c.clone().sub(p), c.clone().add(p));
+}
+
+/** A sea fan h tall at `at`, broadside across the current (yaw): ribs fanning up from its holdfast, laced across. */
+function seaFan(b: Brush, at: V, yaw: number, h: number): void {
+  const side = vec(Math.cos(yaw), 0, Math.sin(yaw)), nrm = vec(-Math.sin(yaw), 0, Math.cos(yaw)), ribs: V[][] = [];
+  b.pick = null;
+  b.wash = C.fan;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 6 - 0.5) * 1.8, d = side.clone().multiplyScalar(Math.sin(a)).add(vec(0, Math.cos(a), 0));
+    const pts = [0, 0.4, 0.72, 1].map((s) => at.clone().addScaledVector(d, h * s * (0.8 + 0.2 * Math.cos(2.5 * a))).addScaledVector(nrm, 0.03 * s * s));
+    ribs.push(pts);
+    for (let j = 0; j < 3; j++) ribbon(b, pts[j], pts[j + 1], 0.009 * (1 - j / 4), nrm);
+  }
+  for (let j = 2; j < 4; j++) for (let i = 0; i < 6; i++) ribbon(b, ribs[i][j], ribs[i + 1][j], 0.005, nrm);
+}
+
+/** A staghorn thicket 1 across, ~0.3 tall: slender branches forking up and out, lilac or ochre-rose, their growing tips
+ *  cream-white, cool shade in the thicket's heart; a lilac sea fan standing in it. */
 function branchKit(seed: number, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.coral);
-  b.pick = (c) => (c.y > 0.21 ? W.tip : c.y > 0.12 ? W.coralPale : c.y > 0.04 ? W.coral : W.under);
+  const rnd = seeded(seed), body = seed % 2 ? C.lilac : C.rose, b = new Brush(body);
+  const paint = (c: V): Wash => (c.y > 0.22 ? C.tip : c.y > 0.06 ? body : C.shade);
   const grow = (from: V, dir: V, len: number, r: number, depth: number): void => {
     const to = from.clone().addScaledVector(dir, len);
-    stick(b, from, to, r, r * 0.7, depth === 0);
+    b.pick = depth === 0 ? (c) => (c.y > 0.12 ? C.tip : paint(c)) : paint;
+    stick(b, from, to, r, r * 0.75, depth === 0);
     if (depth === 0) return;
-    for (const turn of [-0.55, 0.5 + 0.2 * rnd()]) {
-      const d = dir.clone().applyAxisAngle(vec(0, 1, 0), turn * 1.4).add(vec(0, 0.35, 0)).normalize();
-      grow(to, d.lerp(vec(dir.x, d.y, dir.z).normalize(), 0.3).normalize(), len * (0.65 + 0.15 * rnd()), r * 0.72, depth - 1);
+    for (const turn of [-0.5, 0.45 + 0.2 * rnd()]) {
+      const d = dir.clone().applyAxisAngle(vec(0, 1, 0), turn * 1.5).add(vec(0, 0.5, 0)).normalize();
+      grow(to, d, len * (0.72 + 0.12 * rnd()), r * 0.74, depth - 1);
     }
   };
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * TAU + 0.6 * rnd(), out = 0.06 + 0.12 * rnd();
-    grow(vec(out * Math.cos(a), -0.03, out * Math.sin(a)), vec(0.55 * Math.cos(a), 0.8, 0.55 * Math.sin(a)).normalize(), (0.12 + 0.04 * rnd()) * (far ? 1.6 : 1), 0.03, far ? 0 : 2);
+  for (let k = 0; k < (far ? 5 : 7); k++) {
+    const a = (k / 7) * TAU + 0.5 * rnd(), out = 0.04 + 0.32 * rnd();
+    grow(vec(out * Math.cos(a), -0.03, out * Math.sin(a)), vec(0.45 * Math.cos(a), 0.9, 0.45 * Math.sin(a)).normalize(), (0.1 + 0.035 * rnd()) * (far ? 1.7 : 1), 0.02, far ? 0 : 2);
   }
-  return b.kit.build();
+  if (!far) seaFan(b, vec(0.3 - 0.6 * (seed % 2), -0.02, 0.28), 0.4 + rnd(), 0.28);
+  return smooth(b.kit.build());
 }
 
-/** A table coral 1 across on its stalk, 0.2 tall: a plate ribbed out from its heart, its rim scalloped and pale, a
- *  smaller tier beneath it, umber in the shade under the plate. */
+/** A spread of table corals 1 across, ≤ 0.22 tall: three plates on stout stalks, ribbed out from the heart (sage and
+ *  cream), the rim scalloped and white, cool shade beneath. */
 function tableKit(seed: number, far = false): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.under), k = far ? 8 : 14;
-  tube(b, [vec(0, -0.04, 0), vec(0.01, 0.1, 0), vec(0.02, 0.16, 0)], [0.07, 0.05, 0.06], 5);
-  for (const [y, R0, off] of ([[0.19, 0.5, 0], [0.1, 0.3, 0.12]] as const).slice(0, far ? 1 : 2)) {
-    const top = vec(0.02 + off, y + 0.015, off * 0.5);
-    const rim = ring(k, (j) => y - 0.02 + 0.012 * Math.sin(j * 1.7 + seed), (j) => R0 * (0.82 + 0.18 * Math.abs(Math.sin(j * 1.9 + seed)) + 0.08 * rnd()));
-    for (const p of rim) p.add(vec(off, 0, off * 0.5));
-    const lip = rim.map((p) => p.clone().sub(top).multiplyScalar(1.06).add(top).setY(p.y - 0.035));
+  const rnd = seeded(seed), b = new Brush(C.shade), k = far ? 8 : 16;
+  for (const [x, z, y, R0] of ([[0.06, 0.02, 0.2, 0.3], [-0.3, -0.22, 0.13, 0.17], [0.28, -0.3, 0.1, 0.13]] as const).slice(0, far ? 1 : 3)) {
+    b.pick = null;
+    b.wash = C.shade;
+    tube(b, [vec(x, -0.04, z), vec(x + 0.01, y * 0.6, z), vec(x + 0.015, y - 0.01, z)], [0.05 * R0 / 0.3, 0.035 * R0 / 0.3, 0.045 * R0 / 0.3], 5);
+    const top = vec(x + 0.015, y + 0.012, z);
+    const rim = ring(k, (j) => y - 0.012 + 0.008 * Math.sin(j * 1.7 + seed), (j) => R0 * (0.84 + 0.16 * Math.abs(Math.sin(j * 1.9 + seed)) + 0.06 * rnd())).map((p) => p.add(vec(x, 0, z)));
+    const lip = rim.map((p) => p.clone().sub(top).multiplyScalar(1.05).add(top).setY(p.y - 0.022));
     for (let j = 0; j < k; j++) {
       const a = rim[j], c = rim[(j + 1) % k];
-      b.wash = j % 2 ? W.coral : W.coralPale;
+      b.wash = j % 2 ? C.sage : C.cream;
       b.tri(top, c, a);
-      b.wash = W.tip;
+      b.wash = C.tip;
       b.tri(a, c, lip[(j + 1) % k]);
-      b.wash = W.under;
+      b.wash = C.shade;
       b.tri(a, lip[(j + 1) % k], lip[j]);
     }
   }
   return b.kit.build();
 }
 
-/** A reef-flat paving slab or beachrock slab 1 across, its facets mottled rose, ochre, grey and bleached. */
+/** A reef-flat paving slab or beachrock slab 1 across: a low worn limestone pad with a ragged edge, pale and smooth on
+ *  top with a rose algal blush at its rim and grey pits, undercut in cool shade. */
 function slabKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = 7, jit = Array.from({ length: k }, () => 0.65 + 0.5 * rnd()), b = new Brush(W.rock);
-  b.pick = (c, n) => (n.y < 0.5 ? W.under : [W.rock, W.bleach, W.bleach, W.coral][Math.floor(hash(c.x + seed, c.z) * 4)]);
-  b.kit.loft([ring(k, -0.06, (j) => 0.5 * jit[j]), ring(k, 0.07, (j) => 0.47 * jit[j]), ring(k, 0.1, (j) => 0.3 * jit[j])]);
-  return b.kit.build();
+  const rnd = seeded(seed), k = 12, jit = Array.from({ length: k }, (_, j) => 0.78 + 0.14 * Math.sin(j * 2.3 + seed) + 0.12 * rnd()), b = new Brush(C.rubble);
+  b.pick = (c, n) => (n.y < 0.35 ? C.shade : Math.hypot(c.x, c.z) > 0.36 ? C.blush : hash(Math.floor(c.x * 9) + seed, Math.floor(c.z * 9)) > 0.86 ? C.grey : C.rubble);
+  b.kit.loft([ring(k, -0.05, (j) => 0.47 * jit[j]), ring(k, 0.045, (j) => 0.5 * jit[j]), ring(k, 0.075, (j) => 0.44 * jit[j]), ring(k, 0.09, (j) => 0.3 * jit[j]), ring(k, 0.095, (j) => 0.12 * jit[j])]);
+  return smooth(b.kit.build());
 }
 
-/** A storm-thrown coral boulder 1 across: bleached rubble, grey where weathered, dark beneath. */
+/** Storm-thrown coral rubble 1 across: a heap of bleached stones and broken branch, cream where lit, grey where
+ *  weathered, cool beneath. */
 function boulderKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), k = 10, jit = Array.from({ length: 4 * k }, () => 0.7 + 0.5 * rnd()), b = new Brush(W.bleach);
-  b.pick = (c, n) => (n.y < 0 ? W.under : n.y < 0.45 && hash(c.x + seed, c.z) > 0.45 ? W.rock : W.bleach);
-  b.kit.loft([ring(k, -0.1, (j) => 0.42 * jit[j]), ring(k, 0.12, (j) => 0.5 * jit[k + j]), ring(k, 0.3, (j) => 0.4 * jit[2 * k + j]), ring(k, 0.42, (j) => 0.16 * jit[3 * k + j])]);
-  return b.kit.build();
+  const rnd = seeded(seed), b = new Brush(C.rubble), k = 8;
+  b.pick = (c, n) => (n.y < 0.05 ? C.shade : n.y < 0.5 && hash(Math.floor(c.x * 12) + seed, Math.floor(c.z * 12)) > 0.5 ? C.grey : C.rubble);
+  for (const [x, z, r, h] of [[0, 0, 0.3, 0.36], [-0.3, 0.12, 0.17, 0.2], [0.26, -0.2, 0.14, 0.16]] as const) {
+    const jit = Array.from({ length: 3 * k }, () => 0.75 + 0.45 * rnd());
+    b.kit.loft([ring(k, -0.08, (j) => r * 0.85 * jit[j]), ring(k, h * 0.45, (j) => r * jit[k + j]), ring(k, h * 0.85, (j) => r * 0.7 * jit[2 * k + j]), ring(k, h, () => r * 0.15)].map((rg) => rg.map((p) => p.add(vec(x, 0, z)))));
+  }
+  for (let i = 0; i < 2; i++) stick(b, vec(-0.1 + 0.2 * i, 0.03, 0.2 - 0.25 * i), vec(0.1 + 0.15 * rnd(), 0.05, -0.1 + 0.3 * rnd()), 0.025, 0.02, true);
+  return smooth(b.kit.build());
 }
 
 /** A bleached driftwood log 1 long on x with its root stubs. */
@@ -673,8 +763,8 @@ export function planCoral(field: TerrainField): CoralPlan {
       // the reef: a hull grounds here at low water at least (and no part reaching within CLEAR of a channel's line)
       if (open(px, py, CLEAR + 0.9)) continue;
       if (h >= BLOCK) {
-        if (Math.abs(coastAt(geo, dir)) < 1.2 && h > 0.1 && r > 0.8) place(plan.slabs, px, py, { sink: 0.05, fwd: out, tilt: 0.12, s: 0.9 + 0.8 * rnd(), sy: 1.4, hug: true, kitH: 0.1 });
-        else if (seaward && r < 0.35) place(plan.slabs, px, py, { sink: 0.04, fwd: east, yaw, s: 0.6 + 0.7 * rnd(), sy: 1.2, hug: true, kitH: 0.1 });
+        if (Math.abs(coastAt(geo, dir)) < 1.2 && h > 0.1 && r > 0.8) place(plan.slabs, px, py, { sink: 0.05, fwd: out, tilt: 0.12, s: 0.6 + 0.5 * rnd(), sy: 1.4, hug: true, kitH: 0.1 });
+        else if (seaward && r < 0.35) place(plan.slabs, px, py, { sink: 0.04, fwd: east, yaw, s: 0.4 + 0.45 * rnd(), sy: 1.2, hug: true, kitH: 0.1 });
         else if (seaward && windward && r < 0.6) place(plan.boulders, px, py, { sink: 0.1, fwd: east, yaw, tilt: 0.3 * (rnd() - 0.5), s: 0.3 + 0.55 * rnd(), kitH: 0.42 });
         else if (r < 0.62) {
           const k = rnd();
@@ -823,7 +913,7 @@ export class CoralAtolls {
     // in full near the eye, sketched beyond
     const near: [THREE.BufferGeometry, Part[], number, number, boolean][] = [
       // tables and thickets only where the water stands over them at mean tide; on the dry flat, low massive heads
-      ...([[massiveKit, [...plan.heads, ...[...plan.branches, ...plan.tables].filter((p) => p.ground > DRY)], 2],
+      ...([[massiveKit, plan.heads.filter((p) => p.ground <= DRY), 2], [(s: number, far?: boolean) => massiveKit(s, far, true), [...plan.heads, ...plan.branches, ...plan.tables].filter((p) => p.ground > DRY), 3],
         [branchKit, plan.branches.filter((p) => p.ground <= DRY), 6], [tableKit, plan.tables.filter((p) => p.ground <= DRY), 7]] as [typeof massiveKit, Part[], number][])
         .flatMap(([kit, parts, seed]): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
         [kit(seed), parts, 0, CORAL.drawn, false], [kit(seed, true), parts, CORAL.drawn, CORAL.near, false]]),

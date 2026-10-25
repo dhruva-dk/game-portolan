@@ -208,7 +208,10 @@ void main() {
   vToEye = toEye;
   vSize = aCloud.w;
   vSeed = aSeed;
-  vWorld = c + (right * position.x + vUp * position.y) * aCloud.w;
+  // a cloud stands in the sky: seen from below or level, or low over far water; one the eye looks down on from high
+  // above would lie flat on the sea as a paper disc, so it thins away as the eye rises over it
+  float seen = 1.0 - smoothstep(0.12, 0.3, dot(toEye, normalize(c)));
+  vWorld = c + (right * position.x + vUp * position.y) * aCloud.w * seen;
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }`;
 

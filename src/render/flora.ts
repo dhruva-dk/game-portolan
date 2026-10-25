@@ -285,16 +285,16 @@ function kelpKit(): Kit {
   return k;
 }
 
-/** A coral head: brain domes, branching antlers and a sea fan. */
+/** A coral head: brain domes and a staghorn clump of slender branches (no leaf-like sheet: from the deck a sheet read
+ *  as floating leaf litter). */
 function coralKit(): Kit {
   const k = new Kit();
   k.mass(V(0.12, 0, 0.05), 0.32, 0.5, 0, 1.3);
   k.mass(V(-0.26, 0, -0.12), 0.2, 0.6, 0, 4.1, -1);
-  for (let b = 0; b < 5; b++) {
-    const az = b * 1.26, o = V(-0.05, 0, -0.25), m = V(Math.cos(az) * 0.12, 0.3, Math.sin(az) * 0.12).add(o);
+  for (let b = 0; b < 9; b++) {
+    const az = b * 0.7, o = V(-0.05 + 0.18 * Math.sin(b * 2.1), 0, -0.25 + 0.12 * Math.cos(b * 1.7)), m = V(Math.cos(az) * 0.12, 0.3, Math.sin(az) * 0.12).add(o);
     k.tube([o, m, m.clone().add(V(Math.cos(az) * 0.12, 0.25, Math.sin(az) * 0.12))], [0.045, 0.03, 0.012], 3, LEAF, 2);
   }
-  k.sheet(V(0.3, 0, -0.2), V(0.05, 0.55, 0.02), V(0.1, 0, 0), 0.22, 3, 0.1, 0, LEAF, 1);
   return k;
 }
 
@@ -421,7 +421,7 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
     case 'duneGrass': return [to(T('ochre'), 'malachite', 0.25 * u), fol];
     case 'reed': return [to(T('ochre'), 'umber', 0.35 * u), fol];
     case 'kelp': return [to(T('ochre'), 'malachite', 0.35 + 0.25 * u), fol];
-    case 'coral': return [to(T('ochre'), 'roseMadder', 0.2 + 0.3 * u), T(w < 0.4 ? 'leadWhite' : w < 0.7 ? 'ochre' : 'verdigris')]; // reef pigments: tan, rose, bleached and blue-green tips
+    case 'coral': return [u < 0.35 ? to(T('ochre'), 'roseMadder', 0.55) : u < 0.7 ? to(T('roseMadder'), 'ultramarine', 0.3) : to(T('verdigris'), 'ochre', 0.35), T(w < 0.6 ? 'leadWhite' : 'ochre')]; // reef pigments: ochre-rose, lilac and sage, cream-white tips
   }
 }
 
