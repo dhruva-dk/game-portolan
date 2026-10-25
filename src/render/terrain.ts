@@ -671,12 +671,21 @@ void main() {
   vec2 dip = vec2(cos(rel.w), sin(rel.w));
   float fault = floor(dot(pl, vec2(-dip.y, dip.x)) / 7.0 + 0.6 * noise3(vWorld / 13.0));
   float bed = h + fold + 0.05 * dot(pl, dip) + (hash11(fault * 7.3 + float(ri)) - 0.5) * 1.4;
-  float band = bed / STRATA + (q.mottle - 0.5) * 0.3, bh = hash11(floor(band) * 1.37 + float(ri) * 5.1);
+  float band = bed / STRATA + 0.35 * noise3(vWorld / 1.4 + 5.0) + (q.mottle - 0.5) * 0.3, bh = hash11(floor(band) * 1.37 + float(ri) * 5.1);
+  // crags: the rock split into buttresses and gullies down the fall line (noise stretched upright: fine across the face,
+  // coarse down it), its creases the fissures; the beds show only in broken outcrops and pinch out along their length,
+  // so a face reads as ribs, fissures and broken ledges, never as stripes (S-020)
+  vec3 cp = vec3(pl, h * 0.22) + float(ri) * 3.1;
+  float rib = noise3(cp / 4.5) + 0.5 * noise3(cp / 1.6 + 7.0) + 0.22 * noise3(cp / 0.6 + 3.0);
+  float crease = 1.0 - smoothstep(0.0, 0.3, abs(rib));
+  float outcrop = smoothstep(0.0, 0.35, noise3(vWorld / 7.0 + 2.0)) * smoothstep(-0.05, 0.3, noise3(vec3(pl / 2.6, floor(band) * 1.91)));
+  float bedded = shore.z < 0.5 ? 1.0 : 0.0, crag = bedded * (1.0 - smoothstep(0.15, 0.5, upx));
 
   // light on relief finer than the cells: lumps, and the beds' lips catching the light near the eye
   float rough = mix(0.06, 0.38, cliff + steep) * (1.0 - 0.7 * beach) * (shore.z > 1.5 ? 0.4 : 1.0);
   float b = rough * fineRelief(vWorld, upx, rel.x);
-  if (shore.z < 0.5) b += 0.16 * (cliff + steep) * smoothstep(0.62, 0.92, fract(band)) * (1.0 - smoothstep(0.1, 0.3, upx));
+  if (shore.z < 0.5) b += 0.16 * (cliff + steep) * outcrop * smoothstep(0.62, 0.92, fract(band)) * (1.0 - smoothstep(0.1, 0.3, upx));
+  b += 0.8 * crag * (cliff + 0.6 * steep) * abs(rib);
   vec3 n = bumped(n0, vWorld, b);
   n = normalize(mix(n, normalize(vWorld), 0.85 * cay)); // a cay lies low and flat in the light (its cells' steep facets unshaded)
 
@@ -685,7 +694,10 @@ void main() {
   float pool = max(max(washPool(n, v, q), 1.0 - smoothstep(0.0, 1.2, -f.y)), 4.0 * cliff * (1.0 - cliff));
   vec3 ground = parchment(q);
   float patchy = noise3(vWorld / 4.0);
-  vec3 rock = glaze(ground, land.rgb, land.a * (0.7 + 0.6 * bh * cliff + 0.15 * patchy), pool, q);
+  // each face's blocks its own load (between the beds that show and the fissures), weather stains run down the faces
+  float blk = hash12(vec2(floor(band), floor(rib * 2.2 + dot(pl, vec2(0.6, 0.8)) / 3.1)));
+  float stain = smoothstep(0.2, 0.6, noise3(vec3(pl / 0.55, h * 0.05) + 13.0)) * cliff;
+  vec3 rock = glaze(ground, land.rgb, land.a * (0.75 + 0.35 * mix(0.5, blk, 0.4 + 0.6 * outcrop) * cliff + 0.15 * patchy + 0.25 * stain), pool, q);
   rock = mix(rock, glaze(rock, fol.rgb, 0.35, pool, q), smoothstep(0.2, 0.7, patchy) * steep * (1.0 - rel.y));
   float wet = 1.0 - smoothstep(0.0, TIDE_AMP + 0.15, above);
   vec3 sandC = glaze(ground, sand.rgb, sand.a * (1.0 + 0.45 * wet + 0.12 * patchy), pool, q);
@@ -771,14 +783,16 @@ void main() {
     col = wash(col, land.rgb, (cliff + steep) * 0.35 * hash12(hx.zw));
     lines += inkLine(rim, length(fwidth(pl)) / COLUMN, LINE_CSS) * (1.0 - low) * 0.8;
   } else {
-    // strata: the lip of each hard bed inked (soft ones run unbroken), joints staggered bed by bed, a fissure now and
-    // then through several
-    // (only where rock shows: soil and growth bury the beds, so a wooded slope never rings with them, S-020)
-    lines += inkLine(abs(fract(band + 0.5) - 0.5), min(fwidth(band), 0.5), LINE_CSS) * (cliff + 0.5 * steep * (1.0 - veg)) * step(0.3, bh) * 0.75 * (1.0 - reef);
-    float js = jc + hash11(floor(band) * 3.1) * 3.7;
-    lines += inkLine(abs(fract(js) - 0.5), min(fwidth(js), 0.5), LINE_CSS * 0.7) * cliff * step(0.55, hash12(vec2(floor(js), floor(band)))) * 0.6 * (1.0 - reef);
-    float fs = jc * 0.23 + 0.4 * noise3(vWorld / 3.0);
-    lines += inkLine(abs(fract(fs) - 0.5), min(fwidth(fs), 0.5), LINE_CSS * 0.9) * cliff * step(0.8, hash11(floor(fs) + fault)) * 0.7 * (1.0 - reef);
+    // strata: the lip of a hard bed inked only where an outcrop shows it, pinching out along its length; joints
+    // staggered bed by bed; the fissures down the creases between the buttresses, broken now and then; and the ribs'
+    // shaded flanks drawn round (only where rock shows: soil and growth bury the beds, so a wooded slope never rings
+    // with them, S-020)
+    float bare = (cliff + 0.5 * steep * (1.0 - veg)) * (1.0 - reef);
+    lines += inkLine(abs(fract(band + 0.5) - 0.5), min(fwidth(band), 0.5), LINE_CSS) * bare * outcrop * step(0.4, bh) * 0.7;
+    float jn = noise3(vec3(pl / 1.1, floor(band) * 2.3 + 0.5));
+    lines += inkLine(jn, fwidth(jn), LINE_CSS * 0.7) * cliff * outcrop * 0.55 * (1.0 - reef);
+    lines += inkLine(rib, fwidth(rib), LINE_CSS * 0.6) * bare * crag * smoothstep(-0.1, 0.25, noise3(cp / 3.2 + 11.0)) * 0.6;
+    col = glaze(col, SEPIA_T, 0.4 * crease * bare * bedded * (1.0 - smoothstep(0.25, 0.8, upx)), 0.0, q);   // the creases and gullies in shadow
   }
   if (rel.y > 0.5) {
     // volcanic: the lava's crust cracked into plates
@@ -807,14 +821,30 @@ void main() {
   lines += stipple(pl, upx, 0.75, 5.0) * nearR * strand * 0.9;
   lines += reefInk * reef * (1.0 - meadow);
   // the brow and foot of every cliff, heavier near the eye
-  lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low);
+  // (broken into lengths, so a rounded crag's brow never draws a ring round it)
+  lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low)
+    * mix(1.0, smoothstep(-0.25, 0.15, noise3(vWorld / 2.4 + 4.0)), crag);
 
   // light: the shade and lit glazes, then hatching along the beds on rock and the contours elsewhere (straightened on
   // the flats by the region's chart plane), deepening to cross-hatching away from the light
   float ndl = dot(n, uSun), tone = max(lightTone(ndl, abs(dot(n, v))), 0.22 * cliff);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
-  vec2 hc = vec2(mix(h + 0.12 * pl.y, bed, (cliff + steep) * (1.0 - reef)), pl.x + 0.7 * pl.y), hdx = dFdx(hc), hdy = dFdy(hc);
-  col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, float(ri) * 3.7));
+  // (bedded rock is hatched down its fall line instead, as an engraver draws a crag: strokes running down each face,
+  // bending round its buttresses, laid along whichever chart axis lies across the face so they never degenerate, so a
+  // cone or a cliff never rings with contour stripes; the uplands' contours wander, S-020)
+  float wander = 0.45 * noise3(vWorld / 6.0 + 9.0);
+  vec2 hc = vec2(mix(h + 0.12 * pl.y + wander, bed, (cliff + steep) * (1.0 - reef)), pl.x + 0.7 * pl.y), hdx = dFdx(hc), hdy = dFdy(hc);
+  vec2 fa = vec2(pl.x + 0.35 * rib, h + 0.3 * pl.y), fb = vec2(pl.y + 0.35 * rib, h + 0.3 * pl.x);
+  vec2 fadx = dFdx(fa), fady = dFdy(fa), fbdx = dFdx(fb), fbdy = dFdy(fb);
+  float fall = clamp(bedded * (cliff + steep * (1.0 - veg)) * (1.0 - reef) * 1.25, 0.0, 1.0);
+  float hcov = fall < 0.99 ? hatching(hc, hdx, hdy, tone, float(ri) * 3.7) : 0.0;
+  if (fall > 0.01) {
+    float wa = smoothstep(0.3, 0.7, across.x * across.x);
+    float fcov = (wa > 0.01 ? wa * hatching(fa, fadx, fady, tone, float(ri) * 3.7 + 1.3) : 0.0)
+      + (wa < 0.99 ? (1.0 - wa) * hatching(fb, fbdx, fbdy, tone, float(ri) * 3.7 + 2.9) : 0.0);
+    hcov = mix(hcov, fcov, fall);
+  }
+  col = mix(col, hatchInk(tone), hcov);
   // the reef pavement's own shading near the eye: its rubble's undersides, its pits and its broken flanks, hatched
   if (reefShade * reef > 0.01) col = mix(col, hatchInk(0.6), reef * hatching(hc * 2.3, hdx * 2.3, hdy * 2.3, 0.3 * reefShade, 7.3));
   col = mix(col, hatchInk(0.7), clamp(lines, 0.0, 1.0) * near);
