@@ -47,6 +47,8 @@ export interface Screen {
   layout(view: View): void;
   frame(f: Frame): void;
   touch(t: Touch): void;
+  /** WP24: true while the screen holds the match still (the open chart): the loop stops the ticks and the render clock. */
+  paused?(): boolean;
   dispose(): void;
 }
 
@@ -91,6 +93,9 @@ export class Shell {
     this.screen.layout(this.view);
     ui.add(this.screen.ui);
   }
+
+  /** The current screen holds the match still (WP24: the chart is open). */
+  get paused(): boolean { return this.screen?.paused?.() ?? false; }
 
   frame(f: Frame): void {
     const s = this.screen!;

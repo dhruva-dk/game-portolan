@@ -37,8 +37,10 @@ export class Game implements Runtime {
     this.pipeline = pipeline;
     this.shell = new Shell(canvas, { pipeline, lettering, runtime: this });
     this.shell.go('title');
+    let held = false; // WP24: the screen's pause (the open chart) drives the loop on each change; test hooks may still pause it
     this.loop = new Loop((f) => {
       this.shell.frame(f);
+      if (this.shell.paused !== held) { held = this.shell.paused; this.loop.paused = held; }
       this.audio?.frame(f.dt, this.session?.state ?? null);
       if (this.perf.startup === 0) this.perf.startup = performance.now();
     });

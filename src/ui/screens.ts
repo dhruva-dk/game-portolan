@@ -128,6 +128,8 @@ export function match(ctx: ScreenContext): Screen {
     touch(t) {
       view.rig.pinch.touch(t); // WP24: two fingers zoom deck ↔ chart; one finger is WP25's
     },
+    // WP24: opening the chart pauses the match; the world holds still mid-motion while the camera lifts (PROMPT.md)
+    paused: () => view.rig.chartOpen,
     dispose: () => view.dispose(),
   };
 }

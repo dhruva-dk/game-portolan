@@ -39,6 +39,21 @@ export function zoomPhases(z: number): { rise: number; flat: number; unfold: num
   return { rise: easeIO(z / 0.5), flat: ease((z - 0.5) / 0.16), unfold: easeIO((z - 0.66) / 0.34) };
 }
 
+/** The zoom's ceiling in log-altitude per second (≈ 7 % of the eye's height a frame at 60 fps). */
+export const ZOOM_LOG_RATE = 4.2;
+const DIST_LOW = Math.hypot(DECK_LOW.up, DECK_LOW.back);
+const LN_DECK = Math.log(Math.hypot(DECK_HIGH.up, DECK_HIGH.back) / DIST_LOW) + 0.8;
+// the rise: the eye's distance (pow) plus its climb from behind the ship to overhead (sin θ), plus the swing north
+const LN_RISE = Math.log(ORBIT_DIST / DIST_LOW) + 1.25;
+/** The eye's step per unit lift as a share of its height: the deck pinch, the rise (eased, with the swing north),
+ *  then the flatten and the unroll's pan to the net's centre. */
+function logSlope(lift: number): number {
+  if (lift < LIFT_DECK) return LN_DECK;
+  const z = Math.min(lift - LIFT_DECK, 1), a = Math.max(0, z - 0.01), b = Math.min(1, z + 0.01);
+  const p = zoomPhases(a), q = zoomPhases(b), d = (k: 'rise' | 'flat' | 'unfold') => (q[k] - p[k]) / (b - a);
+  return Math.max(3, LN_RISE * d('rise') + (z > 0.2 && z < 0.5 ? 2.2 : 0) + 0.45 * d('flat') + 1.6 * d('unfold'));
+}
+
 /**
  * The lift with its gesture and spring. While fingers hold it, it follows the pinch closely; let go above the deck
  * range and it settles open or shut by where and how fast it was moving; open()/close() run the whole move (the
@@ -97,10 +112,14 @@ export class Zoom {
   step(dt: number): void {
     const w = this.held ? 22 : this.reducedMotion ? 14 : 5.2, h = Math.min(dt, 1 / 30);
     // exact critically damped step: no overshoot at any frame rate
-    const x0 = this.lift - this.target, e = Math.exp(-w * h);
+    const x0 = this.lift - this.target, e = Math.exp(-w * h), prev = this.lift;
     const v0 = this.vel;
     this.lift = this.target + (x0 + (v0 + w * x0) * h) * e;
     this.vel = (v0 - (v0 + w * x0) * w * h) * e;
+    // no frame moves the eye by more than a small share of its height: below orbit the lift is capped in
+    // log-altitude per second (the deck pinch and the rise), so the zoom reads as one even, unbroken climb
+    const slope = logSlope(prev), dl = this.lift - prev, cap = slope > 0 ? (ZOOM_LOG_RATE * h) / slope : Infinity;
+    if (Math.abs(dl) > cap) { this.lift = prev + Math.sign(dl) * cap; this.vel = h > 0 ? (Math.sign(dl) * cap) / h : 0; }
     if (Math.abs(this.lift - this.target) < 1e-5 && Math.abs(this.vel) < 1e-4) { this.lift = this.target; this.vel = 0; }
   }
 }

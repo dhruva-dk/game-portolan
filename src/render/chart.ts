@@ -256,12 +256,14 @@ uniform float uHasTerr, uReveal;
 uniform vec3 uCInk, uCSepia, uCLand, uCHill, uCParch;
 void main() {
   vec3 n = normalize(vDir);
-  // the chart soaks through the shaded world from scattered points, a wet front ahead of it
-  float soak = vn(n * 23.0) * 0.6 + vn(n * 71.0) * 0.4, edge = uReveal * 1.25 - 0.05 - soak;
-  if (edge < 0.0) discard;
-  float front = (1.0 - smoothstep(0.0, 0.08, edge)) * step(uReveal, 0.999);
   vec4 g = texture(tGeo, n);
   float coast = (g.r * 255.0 - 128.0) * 0.5, height = g.g * 64.0;
+  // the swap (A8), no dissolve: the chart's ink settles first on the coasts the shaded world already shows (the same
+  // geography cube, so the lines land where the world's shores are), then its paper spreads out over the sea as one
+  // wet front by distance from shore, land and shallows first, the deep sea last
+  float soak = clamp(abs(coast) / 60.0, 0.0, 1.0) * 0.86 + vn(n * 71.0) * 0.14, edge = uReveal * 1.25 - 0.05 - soak;
+  if (edge < 0.0) discard;
+  float front = (1.0 - smoothstep(0.0, 0.08, edge)) * step(uReveal, 0.999);
   float grain = vn(n * 1300.0) * 0.5 + vn(n * 420.0) * 0.5;
   vec3 col = uCParch * (0.95 + 0.07 * grain);
   col *= 1.0 - 0.06 * smoothstep(0.55, 0.9, vn(n * 7.0)) - 0.04 * smoothstep(0.6, 0.95, vn(n * 31.0 + 4.0));
@@ -475,8 +477,9 @@ export class Chart {
       // the chart's up carried back into sheet k's folded plane
       const m = inv.setFromMatrix4(net.final[k]).invert(), up = fit.up.clone().applyMatrix3(m), c = net.centres[k];
       up.addScaledVector(c, -up.dot(c)).normalize();
-      const right = new THREE.Vector3().crossVectors(up, c).normalize(), h = 26, w = h * aspect[k];
-      const o = c.clone().multiplyScalar(R).addScaledVector(up, -42);
+      // WP24 part B: names sized for the iPhone chart (row ≈ 25 CSS px there, capitals ≈ 11 px; iPad ≈ 35 px)
+      const right = new THREE.Vector3().crossVectors(up, c).normalize(), h = 50, w = h * aspect[k];
+      const o = c.clone().multiplyScalar(R).addScaledVector(up, -66);
       const [v0, v1, uw] = this.labelSize[k], u0 = 0.5 - uw / 2, u1 = 0.5 + uw / 2;
       const P = (x: number, y: number) => o.clone().addScaledVector(right, x * w / 2).addScaledVector(up, y * h / 2);
       const q: [THREE.Vector3, number, number][] = [[P(-1, 1), u0, v0], [P(1, 1), u1, v0], [P(1, -1), u1, v1], [P(-1, -1), u0, v1]];
