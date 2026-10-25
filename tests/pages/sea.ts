@@ -18,6 +18,7 @@ import { Fjords } from '../../src/render/regions/fjords.ts';
 import { BasaltStacks } from '../../src/render/regions/basaltStacks.ts';
 import { KelpShallows } from '../../src/render/regions/kelpShallows.ts';
 import { AmberShoals } from '../../src/render/regions/amberShoals.ts';
+import { WeepingIsle } from '../../src/render/regions/weepingIsle.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -60,7 +61,8 @@ const ice = new IceCrown(style, terrain.field, sea.swell, sky), fjords = new Fjo
 const basalt = new BasaltStacks(style, terrain.field, sea.swell);
 const kelpShallows = new KelpShallows(style, terrain.field, sea.swell);
 const amberShoals = new AmberShoals(style, terrain.field, sea.swell);
-scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group, amberShoals.group);
+const weeping = new WeepingIsle(style, terrain.field, sea.swell);
+scene.add(ice.group, fjords.group, basalt.group, kelpShallows.group, amberShoals.group, weeping.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -228,6 +230,18 @@ if (view === 'deck') {
   else { toWorld(ri, -8, -21.5, from); toWorld(ri, 8, -21.5, to); } // down the lane between the inner walls
   look(from, to, Number(q.get('height') ?? (view === 'basalt' ? 26 : 3.2)), Number(q.get('pitch') ?? (view === 'basalt' ? -0.38 : 0.05)));
   if (view === 'weave') launch(14, 0, 0.1);
+} else if (view === 'weeping' || view === 'weepingshore') {
+  const ri = REGIONS.findIndex((r) => r.id === 'weepingIsle'), from = V(), to = V();
+  if (view === 'weeping') { toWorld(ri, 16, -80, from); toWorld(ri, 0, 0, to); } // from the loop at dawn: the mountain and its falls all round (capture 22)
+  else { // at the foot of a great southern fall, the rim and its buttresses above
+    const fall = weeping.plan.falls.filter((f) => f.sim).reduce((a, b) => (Math.abs(b.bearing - 3.3) < Math.abs(a.bearing - 3.3) ? b : a)), c = V();
+    toWorld(ri, 0, 0, c);
+    const out = fall.foot.clone().sub(c).normalize(), side = V().crossVectors(fall.foot, out).normalize();
+    from.copy(fall.foot).addScaledVector(out, 20 / R).addScaledVector(side, 9 / R).normalize();
+    to.copy(fall.lip);
+  }
+  look(from, to, Number(q.get('height') ?? (view === 'weeping' ? 7 : 3.2)), Number(q.get('pitch') ?? (view === 'weeping' ? 0.03 : 0.26)));
+  launch(14, 0.5, 0.1);
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();
@@ -246,6 +260,7 @@ aim();
 frameAt(UP, cam.heading + 1.1);
 sea.setWind(UP, F, wind);
 const calm = Number(q.get('calm') ?? 0), squall = Number(q.get('squall') ?? 0);
+weeping.wet = squall;
 sea.setWeather({ rough: (1 + 1.5 * squall) * (1 - calm), calm, squall });
 sea.swell.uniforms.uSeaLevel.value = Number(q.get('tide') ?? 0);
 const weather = { wind: F.clone().multiplyScalar(wind), squall, calm };
@@ -312,11 +327,11 @@ function frame(now: number): void {
   ice.update(camera.position, clock, clock);
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
-  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock);
+  kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles), flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles), flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);

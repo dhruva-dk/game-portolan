@@ -28,13 +28,13 @@ const GREAT = { width: 4.2, flank: 3.3, flankWidth: 1.2, river: 7 } as const;
 const SCREE = { most: 600, inland: 2.5, wall: 5 } as const;
 
 export interface ArcPoint { readonly d: number; readonly y: number }
-interface FallSite { readonly site: V; readonly f: V; readonly width: number; readonly river: number; readonly spray: number }
+export interface FallSite { readonly site: V; readonly f: V; readonly width: number; readonly river: number; readonly spray: number }
 
 const S: Surface = { height: 0, normal: vec(), up: 1, ground: 0, region: 0 };
 /** The unit direction d u out along f and l u along s from site. */
-const toward = (site: V, f: V, s: V, d: number, l: number, o = vec()): V =>
+export const toward = (site: V, f: V, s: V, d: number, l: number, o = vec()): V =>
   o.copy(site).multiplyScalar(R).addScaledVector(f, d).addScaledVector(s, l).normalize();
-const sideOf = (site: V, f: V): V => vec().crossVectors(site, f).normalize();
+export const sideOf = (site: V, f: V): V => vec().crossVectors(site, f).normalize();
 const widthAt = (w: number, i: number) => w * (1 + FALL.spread * (i / FALL.rows));
 
 /** A fall's profile out along f from its site: from its lip (where the ground first drops away) down a free-fall
@@ -58,7 +58,7 @@ export function arcOf(field: TerrainField, site: V, f: V, width: number): ArcPoi
 }
 
 /** A fall's rows of points, top to bottom: `river` rows draped over the ground upstream, its lip, then its arc. */
-function fallRows(field: TerrainField, site: V, f: V, width: number, arc: readonly ArcPoint[], river: number): V[][] {
+export function fallRows(field: TerrainField, site: V, f: V, width: number, arc: readonly ArcPoint[], river: number): V[][] {
   const s = sideOf(site, f), lip = arc[0].d, rows: V[][] = [];
   const row = (d: number, y: number | null, w: number) => Array.from({ length: FALL.cols }, (_, c) => {
     const u = c / (FALL.cols - 1), bow = y === null ? 0 : 0.1 * w * (1 - (2 * u - 1) ** 2), p = toward(site, f, s, d + bow, (u - 0.5) * w);
@@ -92,7 +92,7 @@ function streaksOf(field: TerrainField, taken: readonly V[], rng: () => number):
 }
 
 /** Vertices with named float attributes and triangles, merged into one geometry. */
-class Batch {
+export class Batch {
   readonly data: Record<string, number[]> = {};
   readonly index: number[] = [];
   private readonly sizes: Record<string, number>;
@@ -114,7 +114,7 @@ class Batch {
   }
 }
 
-function addStrip(b: Batch, rows: V[][], width: number, seed: number): void {
+export function addStrip(b: Batch, rows: V[][], width: number, seed: number): void {
   const base = b.vertices, cols = rows[0].length, mid = cols >> 1, len = [0];
   for (let i = 1; i < rows.length; i++) len.push(len[i - 1] + rows[i][mid].distanceTo(rows[i - 1][mid]));
   const total = len[len.length - 1];
@@ -131,7 +131,7 @@ function addStrip(b: Batch, rows: V[][], width: number, seed: number): void {
   }
 }
 
-function addPuff(b: Batch, p: V, w: number, h: number, seed: number, spray: number): void {
+export function addPuff(b: Batch, p: V, w: number, h: number, seed: number, spray: number): void {
   const base = b.vertices;
   for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     b.data.position.push(p.x, p.y, p.z);
@@ -150,7 +150,7 @@ float fjNoise(vec2 p) {
 float fjFbm(vec2 p) { return 0.5 * fjNoise(p) + 0.3 * fjNoise(p * 2.07 + 5.3) + 0.2 * fjNoise(p * 4.11 + 1.7); }
 `;
 
-const FALL_VERT = /* glsl */ `
+export const FALL_VERT = /* glsl */ `
 in vec4 aFall;
 in float aSeed;
 out vec3 vWorld;
@@ -169,7 +169,7 @@ void main() {
 
 // Falling water: strands of lead white running down a pale verdigris body, fine ink between them, ragged edges and a
 // foot broken into spray; shaded like a form, silvered by night.
-const FALL_FRAG = NOISE_GLSL + /* glsl */ `
+export const FALL_FRAG = NOISE_GLSL + /* glsl */ `
 in vec3 vWorld;
 in vec3 vNormal;
 in vec4 vFall; // across 0…1, arc length down it, its whole length, its width (u)
@@ -197,7 +197,7 @@ void main() {
 }
 `;
 
-const VEIL_VERT = /* glsl */ `
+export const VEIL_VERT = /* glsl */ `
 uniform float uTime;
 in vec2 aCorner;
 in vec4 aPuff; // half-width, half-height (u), seed, spray (1) or mist (0)
@@ -217,7 +217,7 @@ void main() {
 `;
 
 // Mist and spray: paper left unpainted (spray whiter, rising), its billows edged here and there with an inked curl.
-const VEIL_FRAG = NOISE_GLSL + /* glsl */ `
+export const VEIL_FRAG = NOISE_GLSL + /* glsl */ `
 in vec2 vCorner;
 in vec3 vWorld;
 in vec2 vPuff;

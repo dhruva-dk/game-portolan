@@ -12,6 +12,8 @@ import { BASE, planStacks } from '../../src/render/regions/basaltStacks.ts';
 import { planKelp } from '../../src/render/regions/kelpShallows.ts';
 import { open, planAmber, shoal } from '../../src/render/regions/amberShoals.ts';
 import { chartDir } from '../../src/render/regions/kit.ts';
+import { planWeeping } from '../../src/render/regions/weepingIsle.ts';
+import { DRAFT } from '../../src/sim/world/regions.ts';
 import { navigable } from '../../src/sim/world/geography.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
@@ -98,4 +100,27 @@ test("the Amber Shoals: the north-east sill is dry and shut at low water and a p
   assert.ok(plan.stones.length > 20 && plan.blocks.length >= 4 && plan.drifts.length >= 3, `${plan.stones.length} stones, ${plan.blocks.length} blocks, ${plan.drifts.length} drifts`);
   assert.ok(plan.tower.up.distanceTo(chartDir(ri, 40, 3)) < 5 * unit, 'the Sandbar Light stands at the landmark');
   assert.ok(plan.ripples.length > 200 && plan.channels.length > 10 && plan.feeding.length > 10, `${plan.ripples.length} ripples, ${plan.channels.length} channels, ${plan.feeding.length} feeding`);
+});
+
+test('the Weeping Isle: a fall at every sim cascade and streaks all round, each landing in open water; its rock stands bedded on land the sim knows; the dressing is seated', () => {
+  const t0 = performance.now(), plan = planWeeping(field), ri = REGIONS.findIndex((r) => r.id === 'weepingIsle'), ms = performance.now() - t0;
+  const surf = (p: THREE.Vector3) => field.surface(p, -10, S).height, wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+  const missing = REGIONS[ri].cascades.filter((c) => !plan.falls.some((f) => f.sim && Math.abs(wrap(f.bearing - (c.facing * Math.PI) / 180)) < 0.08)).map((c) => c.facing);
+  assert.ok(missing.length <= 2, `a fall at every sim cascade with a drop to the sea (missing ${missing.join(', ')})`);
+  const bs = plan.falls.map((f) => f.bearing).sort((a, b) => a - b), gaps = bs.map((b, i) => (i ? b - bs[i - 1] : b + 2 * Math.PI - bs[bs.length - 1]));
+  assert.ok(plan.falls.length >= 26 && Math.max(...gaps) < 0.8, `${plan.falls.length} falls, widest gap ${Math.max(...gaps).toFixed(2)} rad`);
+  for (const f of plan.falls) assert.ok(field.surface(f.foot, 0, S).height <= 0.1 && heightAt(geo, f.foot) < 0, 'every fall lands in open water');
+  for (const c of plan.crags) {
+    assert.ok(c.footprint.every((p) => heightAt(geo, p) >= -DRAFT + 0.1), `a ${c.kind} stands on ground the sim knows`);
+    assert.ok(c.footprint.every((p) => surf(p) > c.base + 0.5) && c.top > c.ground + 1, `a ${c.kind} is bedded below the ground all round`);
+  }
+  const spire = plan.crags.find((c) => c.kind === 'spire');
+  assert.ok(spire && spire.top > 40, `the spire tops ${spire?.top.toFixed(1)} u`);
+  assert.ok(plan.crags.filter((c) => c.kind === 'buttress').length >= 6, `${plan.crags.filter((c) => c.kind === 'buttress').length} buttresses break the cliff band`);
+  for (const s of [...plan.boulders, ...plan.clumps, ...plan.ferns]) {
+    const d = s.at.clone().normalize();
+    assert.ok(Math.abs(s.at.length() - R - surf(d)) < 0.05 && heightAt(geo, d) >= -DRAFT + 0.1, 'the dressing is seated on land');
+  }
+  assert.ok(plan.boulders.length > 150 && plan.clumps.length > 300 && plan.ferns.length > 120, `${plan.boulders.length} boulders, ${plan.clumps.length} clumps, ${plan.ferns.length} ferns`);
+  console.log(`weeping: missing ${missing.join(',')}; ${plan.falls.length} falls (${plan.falls.filter((f) => f.sim).length} sim), ${plan.crags.length} crags, ${plan.boulders.length}/${plan.clumps.length}/${plan.ferns.length} dressing, ${plan.dashes.length} dashes, ${plan.puffs.length} puffs, spire ${spire?.top.toFixed(1)}, ${ms.toFixed(0)} ms`);
 });

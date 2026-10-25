@@ -31,6 +31,12 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['amber-pass-high', { view: 'amberpass', hour: '17', tide: '0.6' }],
   ['amber-light-orbit', { view: 'mark', region: 'Amber', hour: '17', tide: '-0.6' }],
   ['amber-calm', { view: 'amber', hour: '17', tide: '-0.3', calm: '1' }],
+  ['weeping-hero', { view: 'weeping', hour: '6' }],
+  ['weeping-shore', { view: 'weepingshore', hour: '7' }],
+  ['weeping-high', { view: 'mark', region: 'Weeping', hour: '9' }],
+  ['weeping-orbit', { view: 'orbit', region: 'Weeping', hour: '9' }],
+  ['weeping-night', { view: 'weeping', hour: '22' }],
+  ['weeping-rain', { view: 'weeping', hour: '7', squall: '1' }],
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();
