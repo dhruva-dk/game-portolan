@@ -9,6 +9,10 @@ import { loadCareer, loadMatch } from './app/save.ts';
 import type { WorldMessage } from './app/worldWorker.ts';
 import { Lettering } from './lettering/ink.ts';
 import { Pipeline } from './render/pipeline.ts';
+import { setChartPage } from './ui/harbour.ts';
+
+// WP27: the career chart in the harbour ledger, loaded off the boot path.
+void import('./ui/careerChart.ts').then((m) => setChartPage(m.careerChartPage));
 
 // WP26 index.html made the canvas and its context while the modules loaded (the GPU wakes in parallel)
 const canvas = (document.getElementById('ink') as HTMLCanvasElement | null) ?? document.body.appendChild(document.createElement('canvas'));
