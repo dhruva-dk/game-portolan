@@ -32,11 +32,11 @@ export const BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
 /** The quay's coping over mean sea (u); trees drawn whole within `near` u, sketched to `far`; the understory to `edge`. */
 export const SPICE = { quay: TIDE.amp + 0.4, near: 32, far: 300, edge: 70, step: 1.3 } as const;
 
-/** Capture 24's ships in Spice Harbour (chart x, y; bow toward x, y; detail): two lying along the quay at its berths,
- *  one warping in to the third, one in the mouth, one standing in from the sound; every hull's length floats at low
- *  water (regions test). */
-export const SPICE_SHIPS: readonly (readonly [number, number, number, number, number])[] = [
-  [-8.4, 6.3, -3, 6.5, 0.6], [-4.3, 3.8, -1.6, -0.4, 0.6], [-12, 3.6, -13, -1.4, 0.6], [-6.2, -3.5, -7, 3, 0.6], [-1.5, -12.5, -5, -4, 0.35],
+/** Capture 24's ships in Spice Harbour (chart x, y; bow toward x, y): two lying along the quay at its berths, one
+ *  warping in to the third, one in the mouth, one standing in from the sound; every hull's length floats at low water
+ *  (regions test). Each is drawn at the level of detail the game's fleet chooser gives it. */
+export const SPICE_SHIPS: readonly (readonly [number, number, number, number])[] = [
+  [-8.4, 6.3, -3, 6.5], [-4.3, 3.8, -1.6, -0.4], [-12, 3.6, -13, -1.4], [-6.2, -3.5, -7, 3], [-1.5, -12.5, -5, -4],
 ];
 
 const W = {
@@ -391,6 +391,11 @@ export class SpiceIsles {
   private readonly lod: [Draw, Part[], number, number, Float32Array][];
   private readonly trees: THREE.ShaderMaterial[];
   private readonly seen = vec(1e9, 0, 0);
+  private readonly fwd = vec(0, 0, 0);
+  private readonly look = vec(0, 0, 0);
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewProj = new THREE.Matrix4();
+  private readonly ball = new THREE.Sphere();
 
   constructor(style: Style, field: TerrainField, swell: Swell) {
     const plan = (this.plan = planSpice(field));
@@ -439,11 +444,19 @@ export class SpiceIsles {
     return [...this.fixed, ...this.lod.map(([d]) => d)];
   }
 
-  /** Trees whole near the eye and sketched further off, the understory near it. */
-  update(eye: V): void {
+  /** Trees whole near the eye and sketched further off, the understory near it; with the camera, only the parts in
+   *  its view (the frustum widened for the turn allowed between refills), so nothing behind the eye is drawn. */
+  update(eye: V, camera?: THREE.Camera): void {
     this.group.visible = regionSeen(RI, eye, 90);
-    if (!this.group.visible || eye.distanceToSquared(this.seen) < 2.25) return;
+    if (!this.group.visible) return;
+    const fwd = camera ? camera.getWorldDirection(this.fwd) : null;
+    if (eye.distanceToSquared(this.seen) < 2.25 && (!fwd || fwd.dot(this.look) > 0.996)) return;
     this.seen.copy(eye);
+    if (camera && fwd) {
+      this.look.copy(fwd);
+      camera.updateMatrixWorld();
+      this.frustum.setFromProjectionMatrix(this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    }
     for (const [d, parts, from, to, tint] of this.lod) {
       const g = d.mesh.geometry, [fo, bl, sd] = ['aFoliage', 'aBloom', 'aSeed'].map((k) => (g.getAttribute(k) as THREE.InstancedBufferAttribute).array as Float32Array);
       let n = 0;
@@ -451,6 +464,11 @@ export class SpiceIsles {
       parts.forEach((p, i) => {
         const r2 = eye.distanceToSquared(p.at);
         if (r2 < from * from || r2 >= to * to) return;
+        if (camera) {
+          const h = (p.top - p.base) / 2, c = this.ball.center.copy(p.dir).multiplyScalar(h).add(p.at);
+          this.ball.radius = Math.hypot(p.reach, h) + 0.5 + 0.09 * Math.sqrt(r2);
+          if (!this.frustum.intersectsSphere(this.ball.set(c, this.ball.radius))) return;
+        }
         d.add(p.m);
         fo.set(tint.subarray(i * 8, i * 8 + 3), n * 3);
         bl.set(tint.subarray(i * 8 + 3, i * 8 + 6), n * 3);
@@ -482,7 +500,7 @@ export function createSpiceIsles(ctx: RenderContext): RenderModule {
   ctx.scene.add(spice.group);
   return {
     frame() {
-      spice.update(ctx.camera.position);
+      spice.update(ctx.camera.position, ctx.camera);
     },
     dispose() {
       ctx.scene.remove(spice.group);

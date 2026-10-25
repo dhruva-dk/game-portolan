@@ -828,6 +828,11 @@ export class CoralAtolls {
   private drawn = NaN;
   private readonly swell: Swell;
   private readonly seen = vec(1e9, 0, 0);
+  private readonly fwd = vec(0, 0, 0);
+  private readonly look = vec(0, 0, 0);
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewProj = new THREE.Matrix4();
+  private readonly ball = new THREE.Sphere();
 
   constructor(style: Style, field: TerrainField, swell: Swell) {
     const plan = (this.plan = planCoral(field));
@@ -866,20 +871,34 @@ export class CoralAtolls {
     return [...this.fixed, ...this.near.map(([d]) => d)];
   }
 
-  /** The reef's corals near the eye, the pavement only while the tide leaves it dry. */
-  update(eye: V): void {
+  /** The reef's corals near the eye, the pavement only while the tide leaves it dry; with the camera, only the parts in
+   *  its view (the frustum widened for the turn allowed between refills), so nothing behind the eye is drawn. */
+  update(eye: V, camera?: THREE.Camera): void {
     this.group.visible = regionSeen(RI, eye, 90);
     if (!this.group.visible) return;
-    const level = this.swell.uniforms.uSeaLevel.value as number;
-    if (eye.distanceToSquared(this.seen) < 2.25 && Math.abs(level - this.drawn) < 0.01) return;
+    const level = this.swell.uniforms.uSeaLevel.value as number, fwd = camera ? camera.getWorldDirection(this.fwd) : null;
+    if (eye.distanceToSquared(this.seen) < 2.25 && Math.abs(level - this.drawn) < 0.01 && (!fwd || fwd.dot(this.look) > 0.996)) return;
     this.seen.copy(eye);
     this.drawn = level;
+    if (camera && fwd) {
+      this.look.copy(fwd);
+      camera.updateMatrixWorld();
+      this.frustum.setFromProjectionMatrix(this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    }
+    const ball = this.ball;
     for (const [d, parts, from, to, dry] of this.near) {
       const wet = this.spills.includes(d);
       d.begin();
       for (const p of parts) {
         const r2 = eye.distanceToSquared(p.at);
-        if (r2 >= from * from && r2 < to * to && (!dry || p.ground > level - 0.02) && (!wet || p.ground < level - 0.08)) d.add(p.m);
+        if (r2 < from * from || r2 >= to * to || (dry && p.ground <= level - 0.02) || (wet && p.ground >= level - 0.08)) continue;
+        if (camera) {
+          const h = (p.top - p.base) / 2;
+          ball.center.copy(p.dir).multiplyScalar(h).add(p.at);
+          ball.radius = Math.max(h, 1.2 * p.m.getMaxScaleOnAxis()) + 0.5 + 0.09 * Math.sqrt(r2);
+          if (!this.frustum.intersectsSphere(ball)) continue;
+        }
+        d.add(p.m);
       }
       d.end();
     }
@@ -904,7 +923,7 @@ export function createCoralAtolls(ctx: RenderContext): RenderModule {
   ctx.scene.add(coral.group);
   return {
     frame() {
-      coral.update(ctx.camera.position);
+      coral.update(ctx.camera.position, ctx.camera);
     },
     dispose() {
       ctx.scene.remove(coral.group);
