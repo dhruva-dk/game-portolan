@@ -76,7 +76,7 @@ export function planHome(sea: Sea, state: MatchState, i: number, out: number[]):
  * PILOT.offing steps (ties to the first found), −1 if none. A nav cell opens only where a hull's centre clears the
  * coast by CLEAR, so a hull close inshore can float in a cell that never opens.
  */
-function openNear(level: Float32Array, p: V3, tide: number): number {
+export function openNear(level: Float32Array, p: V3, tide: number): number {
   const from = navCellOf(p);
   if (level[from] < tide) return from;
   NEAR.length = DEPTH.length = 0;

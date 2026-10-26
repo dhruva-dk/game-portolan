@@ -131,21 +131,24 @@ function pop(): number {
 /**
  * The cheapest route at sea level `tide` from the nav cell `from` to the first cell that satisfies `goal`, written
  * into `out` as nav cells from start to goal. `toward`, when given, is the goal's direction and steers the search
- * (A*, admissible: steps cost at least their length). Returns the route's cost in u, or −1 if no route exists.
+ * (A*, admissible: steps cost at least their length). Returns the route's cost in u, or −1 if no route exists, or
+ * none costing at most `limit` u when that is given (the search stops there). A `greed` above 1 weights the heading for
+ * the goal over the cost so far: the search spreads far less, for a route that may cost up to that much more.
  */
 export function findRoute(nav: Nav, from: number, tide: number, goal: (cell: number) => boolean, toward: V3 | null,
-  out: number[]): number {
+  out: number[], limit = Infinity, greed = 1): number {
   out.length = 0;
   if (!(nav.level[from] < tide)) return -1;
   stamp++;
   heapN = 0;
-  const h = (c: number) => (toward ? R * Math.sqrt(Math.max(0, 2 - 2 * dot(cellDir(NAV, c, DIR), toward))) : 0);
+  const h = (c: number) => (toward ? greed * R * Math.sqrt(Math.max(0, 2 - 2 * dot(cellDir(NAV, c, DIR), toward))) : 0);
   G[from] = 0;
   FROM[from] = -1;
   SEEN[from] = stamp;
   push(from, h(from));
   while (heapN > 0) {
     const c = pop(), gc = G[c];
+    if (gc > limit) return -1;
     if (goal(c)) {
       for (let k = c; k >= 0; k = FROM[k]) out.push(k);
       out.reverse();
