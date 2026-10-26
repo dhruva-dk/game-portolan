@@ -14,7 +14,7 @@ import { inkMaterial, linearVec, transmittanceVec } from '../style/glsl.ts';
 import { hex, PARCHMENT, PIGMENTS, SEA_WASHES, type PigmentName } from '../style/palette.ts';
 import { tideOf } from '../sim/environment.ts';
 import type { V3 } from '../sim/math.ts';
-import { cellOf, horizonDistance, R, TERRITORY } from '../sim/sphere.ts';
+import { cellDir, cellOf, horizonDistance, R, TERRITORY } from '../sim/sphere.ts';
 import { LANE_TAPER } from '../sim/tables.ts';
 import { airOf } from './weather.ts';
 import { CHARTS, coastAt, type Geography, heightAt, ZONE } from '../sim/world/geography.ts';
@@ -30,19 +30,11 @@ const RINGS = DISC_RINGS, SEGMENTS = 224;
 const WASH_LOAD = { lagoon: 0.5, shallows: 0.45, shelf: 0.32, deep: 0.38 } as const;
 /** Arc (u) from the coral region's centre its clear water keeps (fading over the next ~10 u). */
 const CLEAR_REACH = 105;
-/** S-028 (5): Spice Harbour's sheltered beaches are drawn from the harbour's own eyes (its hero at 10 u and its shore at
- *  2.6 u), not at deck level only: within HARBOUR_REACH u of the Spice Isles' chart centre (chord; fading over the next
- *  16 u, the nearest other region 210 u off). */
-const HARBOUR_REACH = 80;
-const HARBOUR_C = ((): V3 | null => { const ri = REGIONS.findIndex((r) => r.id === 'spiceIsles'); return ri < 0 ? null : CHARTS[ri].c; })();
-/** GLSL (after SWELL_GLSL): float harbourAt(dir), 1 in Spice Harbour's reach; float shoreSwell(dir, depth), the swell's
- *  amplitude there: dying over the beach's last shallows, so the sea's surface never rides up over the sand as a blank
- *  strip of paper ruled along the waterline (the swash up the sand is the terrain's, S-028 (5)). */
-const HARBOUR_GLSL = /* glsl */ `
-const vec3 HARBOUR_C = vec3(${(HARBOUR_C ? [HARBOUR_C.x, HARBOUR_C.y, HARBOUR_C.z] : [0, 0, 0]).map((v) => v.toFixed(6)).join(', ')});
-const float HARBOUR_R = ${HARBOUR_C ? (HARBOUR_REACH / R).toFixed(5) : '-1.0'};
-float harbourAt(vec3 dir) { return 1.0 - smoothstep(HARBOUR_R, HARBOUR_R + 0.08, length(dir - HARBOUR_C)); }
-float shoreSwell(vec3 dir, float depth) { return swellAmp(depth) * mix(1.0, smoothstep(-0.05, ${DRAFT.toFixed(2)}, depth), harbourAt(dir)); } // (full where a keel floats)
+/** GLSL (after SWELL_GLSL): float shoreSwell(dir, depth), the swell's amplitude there: dying over a sheltered beach's
+ *  last shallows (BEACH), so the sea's surface never rides up over the sand as a blank strip of paper ruled along the
+ *  waterline (the swash up the sand is the terrain's, S-028 (5)). */
+const SHORE_SWELL_GLSL = /* glsl */ `
+float shoreSwell(vec3 dir, float depth) { return swellAmp(depth) * mix(1.0, smoothstep(-0.05, ${DRAFT.toFixed(2)}, depth), beachAt(dir)); } // (full where a keel floats)
 `;
 /** Current arcs the sea draws: the geography's fixed lanes, then the streams laid with Sea.setStreams. */
 export const MAX_LANES = 24;
@@ -109,6 +101,37 @@ export function exposureAt(geo: Geography, dir: V3): number {
   }
   return Math.max(-1, Math.min(1, EXPOSE.gain * e));
 }
+/** The shore water's gate (S-029): where a beach is a gentle, sheltered sandy one, its swash, wet sand, clear shallows and
+ *  ripple light are drawn to read from up to a hero's eye (S-028 (5); deck level only elsewhere), by the shore's own
+ *  data, one gate for the sea and the terrain (packed into the sea field: swell.ts beachAt). The region's beach is
+ *  pale sand (its ground rule's beach, never mud, ice, shingle or black sand, whose water would want its own) over a
+ *  sand floor (never reef, rock, kelp or mud); the coast is sheltered (exposureAt through `ex`: a cove, a bay's head,
+ *  a sound between islands, where the swell comes in low and runs up the sand); and the seabed shelves gently from
+ *  the beach (its fall per u from 1 u up the beach to `out` u off it, rising through `fall` [0, 1] and dying through
+ *  [2, 3]: steeper than a shoal's or a tidal flat's, whose shore is the foam band's, as in the Amber Shoals, and
+ *  gentler than a cliff's foot). Laid from `band[0]` u up the beach to `band[1]` u off it, fading over the last
+ *  `fade`: the land's share for the terrain's swash and wet sand, the water's for the sea's. */
+export const BEACH = { ex: [0.15, 0.35], out: 8, fall: [0.3, 0.4, 1.5, 2.0], band: [-3, 9], fade: 2 } as const;
+const BU = new THREE.Vector3(), BV = new THREE.Vector3(), BG = new THREE.Vector3(), BQ = new THREE.Vector3(), BD = new THREE.Vector3();
+/** BEACH's gate at cell c, 0–1. */
+export function beachAt(geo: Geography, c: number): number {
+  const y = geo.coast[c];
+  if (y < BEACH.band[0] || y > BEACH.band[1] || geo.floor[c] !== FLOOR.sand || REGIONS[geo.region[c]].shore.sand !== FLOOR.sand) return 0;
+  const d = cellDir(TERRITORY, c, BD), at = (o: V3, s: number): V3 => BQ.copy(d).addScaledVector(o, s / R).normalize();
+  BU.crossVectors(d, Math.abs(d.y) < 0.9 ? BQ.set(0, 1, 0) : BQ.set(1, 0, 0)).normalize();
+  BV.crossVectors(d, BU);
+  // (seaward: up the coast distance's gradient)
+  BG.copy(BU).multiplyScalar(coastAt(geo, at(BU, 1)) - coastAt(geo, at(BU, -1))).addScaledVector(BV, coastAt(geo, at(BV, 1)) - coastAt(geo, at(BV, -1))).normalize();
+  const fall = (heightAt(geo, at(BG, -1 - y)) - heightAt(geo, at(BG, BEACH.out - y))) / (BEACH.out + 1);
+  const gentle = ramp(BEACH.fall[0], BEACH.fall[1], fall) * (1 - ramp(BEACH.fall[2], BEACH.fall[3], fall));
+  return gentle > 0 ? gentle * (1 - ramp(BEACH.ex[0], BEACH.ex[1], exposureAt(geo, d))) * (1 - ramp(BEACH.band[1] - BEACH.fade, BEACH.band[1], y)) : 0;
+}
+/** BEACH's gate on every cell. */
+export function beachGates(geo: Geography): Float32Array {
+  const g = new Float32Array(geo.heights.length);
+  for (let c = 0; c < g.length; c++) g[c] = beachAt(geo, c);
+  return g;
+}
 /**
  * GLSL (after SWELL_GLSL), one rule for the terrain's white beaches and the sea's waterline ink. float toLand(dir, h):
  * u from a point of height h to the land line, near enough within ~2 u (9 beyond): the least, over three rings of points
@@ -119,6 +142,9 @@ export function exposureAt(geo: Geography, dir: V3): number {
 export const LAND_GLSL = /* glsl */ `
 const float LAND_U = ${(TIDE.amp + 0.15).toFixed(3)}, BEACH_W = ${MOTU_BEACH.toFixed(3)}, EXPOSE_G = ${EXPOSE.gain.toFixed(3)}, SHELF_EX = ${EXPOSE.shelf.toFixed(3)};
 const vec2 EXPOSE_S = vec2(${EXPOSE.s[0].toFixed(2)}, ${EXPOSE.s[1].toFixed(2)});
+// the shore water's gate (BEACH, from beachAt) as the eye sees it: a sheltered beach's swash and shallows drawn to read
+// from up to a hero's height; from higher the chart's coast rings and the foam band draw the shore
+float beachEye(float beach) { return beach * (1.0 - smoothstep(14.0, 20.0, length(cameraPosition) - SEA_R - uSeaLevel)); }
 float toLand(vec3 dir, float h) {
   if (h >= LAND_U) return 0.0;
   float d = min(9.0, 20.0 * (LAND_U - h));
@@ -248,7 +274,7 @@ vec3 penInk() { return mix(hatchInk(0.6), uSilver, uNight * 0.7); }
 
 const VERTEX = /* glsl */ `
 ${SWELL_GLSL}
-${HARBOUR_GLSL}
+${SHORE_SWELL_GLSL}
 uniform float uTime;
 uniform vec3 uFoot;
 uniform vec3 uEast;
@@ -272,7 +298,7 @@ void main() {
 
 const FRAGMENT = /* glsl */ `
 ${SWELL_GLSL}
-${HARBOUR_GLSL}
+${SHORE_SWELL_GLSL}
 ${LAND_GLSL}
 #define MAX_LANES ${MAX_LANES}
 #define WAKE_SHIPS ${WAKE_SHIPS}
@@ -443,9 +469,7 @@ void main() {
   V /= dist;
   float far = smoothstep(0.3, 1.0, dist / uHorizon), near = 1.0 - smoothstep(0.25, 0.7, dist / uHorizon);
   float clear = smoothstep(uClear.w - 0.03, uClear.w, dot(dir, uClear.xyz));
-  float harbour = harbourAt(dir); // Spice Harbour's beaches (S-028)
-  // (its shallows and swash drawn from the harbour's eyes, up to the hero's; from high the chart draws them)
-  float hEye = harbour * (1.0 - smoothstep(14.0, 20.0, length(cameraPosition) - SEA_R - uSeaLevel));
+  float beach = beachAt(dir), bEye = beachEye(beach); // a sheltered beach's water (BEACH), drawn to read from up to a hero's eye
   // clear water is graded by depth alone (below), so the sim's lagoon cells never show their straight edges in it
   float lagoon = mix(smoothstep(0.3, 0.7, f.z), 1.0, clear);
   vec3 wind = normalize(cross(uWindAxis, dir) + 1e-6);
@@ -504,10 +528,10 @@ void main() {
     float crest = (1.0 - smoothstep(0.4, 1.2, min(r, 1.0 - r) / max(rw, 1e-5) / uRenderPx)) * step(mix(0.32, 0.45, clear), n2);
     fc = glaze(fc, SAND_T, mix(0.3, 0.2, clear) * smoothstep(0.0, 0.1, r) * (1.0 - smoothstep(0.1, 0.4, r)) * ripples, 0.0, q);
     fc = mix(fc, hatchInk(0.3), mix(0.55, 0.3, clear) * crest * ripples);
-    // S-028 (5): ripple light on Spice Harbour's sandy floor near the eye: the swell's lens gathers the sun into a net of
+    // S-028 (5): ripple light on a sheltered beach's sandy floor near the eye (BEACH): the swell's lens gathers the sun into a net of
     // bright wavering lines on the sand, drifting as it runs, finer and fainter as the water deepens; never a cracked
     // pane (the cells looked up through a slow warp)
-    float cz = hEye * sand * (1.0 - smoothstep(0.4, 2.6, uSeaLevel - ff.x)) * (1.0 - smoothstep(8.0, 18.0, dist)) * mk;
+    float cz = bEye * sand * (1.0 - smoothstep(0.4, 2.6, uSeaLevel - ff.x)) * (1.0 - smoothstep(8.0, 18.0, dist)) * mk;
     if (cz > 0.01) {
       const float CC = 0.24; // (u across a cell of the net)
       vec2 xw = x / CC + 0.95 * vec2(vnoise(x / 0.41 + uTime * 0.09), vnoise(x / 0.41 + 5.2 - uTime * 0.08)) + 0.35 * vec2(vnoise(x / 0.13 + 2.0), vnoise(x / 0.13 + 7.7));
@@ -854,9 +878,9 @@ void main() {
     col = glaze(col, TURQ_T, clear * water * glance * turq * tone * (1.0 - 0.45 * heads), 0.6 * open.y, qs); // (a head under the water's tint)
     col = glaze(col, SHELF_T, clear * water * mix(glance, 1.0, 0.6) * 0.42 * dk * (1.0 - 0.35 * open.x), 0.4 * drop.y * (1.0 - ring), qs); // a soft pooled edge, never a sticker's outline
   }
-  // S-028 (5): Spice Harbour's shallows, clear over the sand: pale gold at the water's edge where the sand shows through
-  // a hand's depth, through green, to the harbour's own water (seen into near the eye: golden hour below)
-  float hShoal = hEye * water * (1.0 - f.w) * (1.0 - smoothstep(1.6, 4.0 + wob, depth));
+  // S-028 (5): a sheltered beach's shallows (BEACH), clear over the sand: pale gold at the water's edge where the sand
+  // shows through a hand's depth, through green, to the sound's own water (seen into near the eye: golden hour below)
+  float hShoal = bEye * water * (1.0 - f.w) * (1.0 - smoothstep(1.6, 4.0 + wob, depth));
   if (hShoal > 0.0) {
     vec2 gEdge = layer(0.7 + 0.25 * wob - depth, fwD);
     col = glaze(col, SAND_T, 0.3 * gEdge.x * hShoal, 0.4 * gEdge.y, qs);
@@ -894,7 +918,7 @@ void main() {
     // how much of the sky the water gives back: a quarter looking down into it, nearly all at a glance; the glow, far
     // brighter than the water's body, takes its place sooner
     float cv = clamp(dot(V, vNormal), 0.0, 1.0), fr = 0.25 + 0.75 * pow(1.0 - cv, 3.0);
-    float shallowClear = max(clear * (1.0 - smoothstep(4.0, 12.0, depth)), hShoal); // (and Spice Harbour's, S-028)
+    float shallowClear = max(clear * (1.0 - smoothstep(4.0, 12.0, depth)), hShoal); // (and a sheltered beach's, S-028)
     float give = uLow * water * min(mix(fr, max(fr, 0.85), glow) * (1.0 - 0.75 * shallowClear), 0.92);
     col = mix(col, sky * parchment(qs) / uPaper, give);
     col = wash(col, uSunTint, 0.35 * uLow * water * shallowClear);      // the clear shallows, warmed a little
@@ -1076,30 +1100,30 @@ void main() {
   // which step from texel to texel and speckle at a low eye)
   float gentle = 0.0, ripple = 0.0, shoreLace = 1.0 - smoothstep(0.3, 1.1, shore), inshore = 0.0;
   // (a deck-level eye's detail: from higher the chart's coast rings and the foam band draw the shore, as in the Amber
-  // Shoals' flats; in Spice Harbour from the hero's height too, its swash drawn to read from there, S-028 (5))
-  float eyeH = length(cameraPosition) - SEA_R - uSeaLevel, upxTop = mix(0.09, 0.16, harbour);
-  float deckEye = max(1.0 - smoothstep(4.0, 7.0, eyeH), harbour * (1.0 - smoothstep(14.0, 20.0, eyeH)));
+  // Shoals' flats; on a sheltered beach from the hero's height too, its swash drawn to read from there: BEACH, S-028 (5))
+  float eyeH = length(cameraPosition) - SEA_R - uSeaLevel, upxTop = mix(0.09, 0.16, beach);
+  float deckEye = max(1.0 - smoothstep(4.0, 7.0, eyeH), bEye);
   if (depth < 3.5 && f.w < 0.2 && upx < upxTop && water > 0.01 && deckEye > 0.01) {
     vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
     const float E = 0.7 / SEA_R;
     vec2 rise = vec2(seaField(normalize(dir + t1 * E)).x - seaField(normalize(dir - t1 * E)).x, seaField(normalize(dir + t2 * E)).x - seaField(normalize(dir - t2 * E)).x);
     float slopeS = length(rise) / 1.4, sd = depth / max(slopeS, 0.04);
-    gentle = (1.0 - smoothstep(0.9, 1.4, slopeS)) * (1.0 - smoothstep(0.02, 0.2, f.w)) * (1.0 - smoothstep(mix(0.03, 0.09, harbour), upxTop, upx)) * deckEye;
+    gentle = (1.0 - smoothstep(0.9, 1.4, slopeS)) * (1.0 - smoothstep(0.02, 0.2, f.w)) * (1.0 - smoothstep(mix(0.03, 0.09, beach), upxTop, upx)) * deckEye;
     if (gentle > 0.01) {
       float fs = max(fwidth(sd), 1e-4);
       float bayS = min(1.0, abs(vnoise(xs / 1.9 + 3.3) - 0.5) * 4.4), pulse = 0.85 + 0.15 * sin(uTime * 0.95 + 9.0 * wob);
       float sw = max((0.06 + 0.22 * bayS) * pulse + 0.03 * fine, 2.0 * fs);
-      // (in the harbour drawn to read from its eyes, by the shore's own span across a pixel: the break's foam a thin
+      // (on a sheltered beach drawn to read from a hero's eye, by the shore's own span across a pixel: the break's foam a thin
       // broken lip at the water's edge, scalloped between the beach's cusps, round in the bays and sharp at the horns;
       // the swash up the sand is the terrain's)
-      if (harbour > 0.0) {
+      if (beach > 0.0) {
         float idB;
         vec4 cb = cells(xs / 2.6, idB);
         float bayH = smoothstep(0.0, 0.5, cb.y - cb.x);
-        sw = mix(sw, max(sw, (1.5 + 6.0 * bayH * bayH) * pulse * fs), harbour);
+        sw = mix(sw, max(sw, (1.5 + 6.0 * bayH * bayH) * pulse * fs), beach);
       }
       float edgeD = sd - sw;
-      inshore = gentle * harbour * (1.0 - smoothstep(4.5, 8.0, sd));
+      inshore = gentle * beach * (1.0 - smoothstep(4.5, 8.0, sd));
       // (solid at the water's edge, broken into foam and bubbles out to its scalloped edge)
       float lens = (1.0 - smoothstep(-fs, fs, edgeD - max(0.05, 3.0 * fs) * (vnoise(xs / 0.5) - 0.5)))
                  * max(1.0 - smoothstep(0.2 * sw, 0.45 * sw, sd), smoothstep(0.42, 0.58, vnoise(xs / 0.28 + vec2(0.0, uTime * 0.1)) + 0.25 * fine));
@@ -1113,7 +1137,7 @@ void main() {
       float ph = sqrt(max(edgeD, 0.0) + 0.3) * 4.2 + uTime / 3.4 + 0.5 * wob, wph = max(fwidth(ph), 1e-5);
       for (int k = 0; k < 2; k++) {
         float pk = ph + 0.5 * float(k), ci = floor(pk + 0.5);
-        float env = smoothstep(0.42 + 0.08 * float(k) - 0.08 * harbour, 0.62, vnoise(xs / mix(0.32, 1.1, harbour) + vec2(ci * 7.3 + float(k) * 19.0, ci * 3.1))); // (long and soft in the harbour)
+        float env = smoothstep(0.42 + 0.08 * float(k) - 0.08 * beach, 0.62, vnoise(xs / mix(0.32, 1.1, beach) + vec2(ci * 7.3 + float(k) * 19.0, ci * 3.1))); // (long and soft off a sheltered beach)
         ripple = max(ripple, (1.0 - smoothstep(0.6 * env, 0.6 * env + 0.9, abs(pk - ci) / wph / uRenderPx)) * step(0.02, env) * (1.0 - 0.4 * float(k)));
       }
       ripple *= gentle * smoothstep(0.15, 0.6, edgeD) * (1.0 - smoothstep(4.5, 8.0, sd)) * near * (1.0 - smoothstep(0.2, 0.4, wph));
@@ -1163,7 +1187,7 @@ void main() {
     // S-027: an even wallpaper of ticks over the lagoon floor)
     if (sheltered > 0.0) waves = mix(waves, 0.5 * smoothstep(0.38, 0.68, vnoise(xp / 11.0 + 0.02 * uTime) + 0.3 * (vnoise(xp / 3.7) - 0.5))
                                             * marks(P, dir, wind, upx, 0.45 * STROKE_CELL, min(1.0, 1.4 * uStrokes), 31.0, 0, 0.0), sheltered);
-    waves *= riding * (1.0 - 0.75 * inshore); // (Spice Harbour's inshore water: its ripples bend to the beach, S-028)
+    waves *= riding * (1.0 - 0.75 * inshore); // (a sheltered beach's inshore water: its ripples bend to the beach, S-028)
     if (capK > 0.0) caps = capK * marks(P, dir, wind, upx, 1.7 * STROKE_CELL, uCaps, 23.0, 0, 0.0);
   }
   float spin = uSquall > 0.01 ? uSquall * water * near * marks(P, dir, wind, upx, 1.8, 0.45, 67.0, 1, uTime * 3.0) : 0.0;
@@ -1181,7 +1205,7 @@ void main() {
   col = mix(col, pen, laneInk * 0.8);
   col = mix(col, white, laneFoam * 0.85);
   col = mix(col, pen, waves * 0.95);
-  col = mix(col, pen, ripple * (1.0 - lead) * mix(0.75, 0.5, harbour));
+  col = mix(col, pen, ripple * (1.0 - lead) * mix(0.75, 0.5, beach));
   col = mix(col, white, max(caps * 0.95, spin * 0.6));
   col = mix(col, uInk, coast * 0.9);
   // the far sea goes into the sky's horizon wash (render/sky.ts lays the same), so sea and sky meet at every hour
@@ -1213,7 +1237,7 @@ void main() {
 
 const WAKE_VERTEX = /* glsl */ `
 ${SWELL_GLSL}
-${HARBOUR_GLSL}
+${SHORE_SWELL_GLSL}
 uniform float uTime;
 uniform float uStill[${WAKE_SHIPS}]; // when each slot's ship stopped (sank), s; −1 under way
 in vec4 aFwd;  // the heading at the point (tangent), and the u its ship had sailed there
@@ -1452,7 +1476,7 @@ export class Sea {
   };
 
   constructor(pipeline: Pipeline, geo: Geography) {
-    this.swell = new Swell(geo);
+    this.swell = new Swell(geo, beachGates(geo));
     this.floor = cubeTexture(seaFloorFaces(geo), THREE.UnsignedByteType);
     this.local.tSeaFloor.value = this.floor;
     pipeline.registerTexture('sea fields', SEA_FIELD_BYTES);

@@ -608,7 +608,6 @@ const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS
 const vec3 ULTRA_T = ${vec(transmittanceVec(PIGMENTS.ultramarine))};
 const vec3 ROSE_T = ${vec(transmittanceVec(PIGMENTS.roseMadder))}, OCHRE_T = ${vec(transmittanceVec(PIGMENTS.ochre))};
 const vec3 VERD_T = ${vec(transmittanceVec(PIGMENTS.verdigris))};
-const int SPICE_RI = ${REGIONS.findIndex((r) => r.id === 'spiceIsles')}; // S-028 (5): its beaches' swash drawn from the harbour's eyes
 const vec3 LEAD = ${vec(linearVec(PIGMENTS.leadWhite))}, PARCH = ${vec(linearVec(PARCHMENT))};
 
 // ink coverage of a line d field units from its centre, half-width w CSS px, the field changing fw per render px
@@ -974,22 +973,23 @@ void main() {
   // the beach's cusps (the horns pointing to the sea, the bays running furthest up), pulsing as the swash runs and
   // falls; above that the last swash's mark, a darker wavering line on the wet sand; so the waterline is never one
   // ruled line under a strip of paper (S-022)
-  // (at deck level, as the sea's; in Spice Harbour from the hero's height too, its scallops, wet sand and lace drawn by
-  // the beach's own span across a pixel so they read from there, never a ruled line at a fixed few pixels, S-028 (5))
-  float eyeT = length(cameraPosition) - SEA_R - uSeaLevel, spiceK = (ri == SPICE_RI ? 1.0 : 0.0) * (1.0 - smoothstep(14.0, 20.0, eyeT));
-  float sandy = step(abs(shore.w), 0.5) * (1.0 - rel.y) * (1.0 - rel.z) * step(shore.z, 0.5) * (1.0 - reef) * beach
-              * max((1.0 - smoothstep(0.03, 0.09, upx)) * (1.0 - smoothstep(4.0, 7.0, eyeT)), spiceK * (1.0 - smoothstep(0.09, 0.16, upx)));
+  // (at deck level, as the sea's; on a sheltered beach (the sea's gate, BEACH: white coral sand too) from the hero's
+  // height as well, its scallops, wet sand and lace drawn by the beach's own span across a pixel so they read from
+  // there, never a ruled line at a fixed few pixels, S-028 (5))
+  float eyeT = length(cameraPosition) - SEA_R - uSeaLevel, shelterK = beachEye(beachAt(dir));
+  float sandy = (1.0 - rel.y) * (1.0 - rel.z) * (1.0 - reef) * beach
+              * max(step(abs(shore.w), 0.5) * step(shore.z, 0.5) * (1.0 - smoothstep(0.03, 0.09, upx)) * (1.0 - smoothstep(4.0, 7.0, eyeT)), shelterK * (1.0 - smoothstep(0.09, 0.16, upx)));
   float swEdge = 0.0, swMark = 0.0;
-  if (sandy > 0.01 && above < mix(0.5, 1.2, spiceK)) {
+  if (sandy > 0.01 && above < mix(0.5, 1.2, shelterK)) {
     float wd = upShore(dir, above, 0.08), fw = max(fwidth(wd), 1e-4); // (u up the beach from the water)
     float cn = noise3(vec3(pl / 2.1, 0.0) + 3.3), bay = min(1.0, abs(cn) * 2.4);    // 0 at a cusp's horn, 1 in its bay
     float run = 0.82 + 0.18 * sin(uTime * 0.95 + 5.0 * cn);
     float reach = max((0.12 + 0.3 * bay) * run, 6.0 * fw), foamW = max(0.025 + 0.04 * bay * run, 2.0 * fw);
-    // (Spice: barely up the sand at the horns, far up into the round of the bays, never less than a few pixels to a
-    // couple of dozen from the harbour's eyes; the lace's edge wavering)
-    if (spiceK > 0.0) {
+    // (a sheltered beach: barely up the sand at the horns, far up into the round of the bays, never less than a few pixels to a
+    // couple of dozen from a hero's eye; the lace's edge wavering)
+    if (shelterK > 0.0) {
       float bayC = cusp(pl / 2.6);
-      reach = mix(reach, max(0.05 + 0.32 * bayC, (3.0 + 20.0 * bayC) * fw) * run + 1.5 * fw * noise3(vec3(pl / 0.45, uTime * 0.3)), spiceK);
+      reach = mix(reach, max(0.05 + 0.32 * bayC, (3.0 + 20.0 * bayC) * fw) * run + 1.5 * fw * noise3(vec3(pl / 0.45, uTime * 0.3)), shelterK);
     }
     float film = 1.0 - smoothstep(reach - fw, reach + fw, wd);
     float grain = noise3(vec3(pl / max(0.3, 6.0 * fw), uTime * 0.2) + 1.7);
@@ -997,14 +997,14 @@ void main() {
     float rim = (1.0 - smoothstep(0.0, rimW, reach - wd)) * film * smoothstep(-0.45, 0.1, grain);          // the swash's foam edge, broken
     float bt = foamW * (0.6 + 0.6 * smoothstep(-0.5, 0.5, grain)), brk = (1.0 - smoothstep(bt - fw, bt + fw, wd)) * smoothstep(0.0, 0.3, grain); // the shore break's foam, in scraps
     float mk = reach / run + max(0.12, 4.0 * fw) + 0.08 * noise3(vec3(pl / 0.9, 2.0)), mkW = max(0.02, 1.2 * fw);
-    mk = mix(mk, reach / run + max(0.09 + 0.05 * noise3(vec3(pl / 1.7, 2.0)), (6.0 + 4.0 * noise3(vec3(pl / 1.7, 2.0))) * fw), spiceK); // (Spice: the wet band)
+    mk = mix(mk, reach / run + max(0.09 + 0.05 * noise3(vec3(pl / 1.7, 2.0)), (6.0 + 4.0 * noise3(vec3(pl / 1.7, 2.0))) * fw), shelterK); // (a sheltered beach: the wet band)
     swMark = (1.0 - smoothstep(mkW, mkW + fw, abs(wd - mk))) * smoothstep(-0.4, 0.0, noise3(vec3(pl / 0.6, 5.0))) * sandy;
     // the film: the sand darker and cooler under it
     col = glaze(glaze(col, VERD_T, 0.16 * film * sandy, 0.0, q), SEPIA_T, 0.14 * film * sandy, 0.0, q);
     float wetB = (1.0 - film) * (1.0 - smoothstep(mk - fw, mk + fw, wd)) * sandy;
-    col = glaze(col, SEPIA_T, mix(0.12, 0.32, spiceK) * wetB + 0.3 * swMark, 0.0, q); // wet below the mark
-    // (Spice: the wet sand mirrors the sky, a pale cool sheen in patches, brightest where the swash has just drained)
-    float sheen = spiceK * sandy * smoothstep(-0.1, 0.45, noise3(vec3(pl / 0.7, 9.0))) * max(0.15 * film, wetB * (1.0 - smoothstep(0.0, mk - reach, wd - reach)));
+    col = glaze(col, SEPIA_T, mix(0.12, 0.32, shelterK) * wetB + 0.3 * swMark, 0.0, q); // wet below the mark
+    // (a sheltered beach: the wet sand mirrors the sky, a pale cool sheen in patches, brightest where the swash has just drained)
+    float sheen = shelterK * sandy * smoothstep(-0.1, 0.45, noise3(vec3(pl / 0.7, 9.0))) * max(0.15 * film, wetB * (1.0 - smoothstep(0.0, mk - reach, wd - reach)));
     col = mix(col, glaze(ground * LEAD / PARCH, ULTRA_T, 0.22, 0.0, q), 0.3 * sheen);
     col = mix(col, ground * LEAD / PARCH * 1.04, 0.9 * max(rim, brk) * sandy);
     swEdge = (1.0 - smoothstep(0.4, 1.1, abs(wd - reach) / fw / uRenderPx)) * smoothstep(-0.1, 0.25, noise3(vec3(pl / 0.8, 7.0))) * sandy;

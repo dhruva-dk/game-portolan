@@ -27,7 +27,8 @@ for (let i = 0; i < WAVES; i++) {
 /**
  * GLSL (vertex or fragment). vec4 cubeAt(cube, dir): a texel of a cube texture on the TERRITORY cells (cubeTexture).
  * vec4 seaField(dir): x height above mean sea level, y signed coast distance (u, > 0 in
- * navigable water), z lagoon, w reef. float swellAmp(depth). vec3 swell(dir, t, amp, out normal, out lift): the
+ * navigable water), z lagoon, w reef. float beachAt(dir): the shore water's gate (sea.ts beachAt), packed under the
+ * reef flag as its negative (a cell is one floor: a reef is never a sand beach). float swellAmp(depth). vec3 swell(dir, t, amp, out normal, out lift): the
  * displacement of the surface point at rest direction dir (add it to dir·(SEA_R + uSeaLevel)); lift is its height
  * in units of amp (crests > 0).
  */
@@ -45,7 +46,8 @@ vec4 cubeAt(samplerCube t, vec3 p) {
   vec3 q = p / max(max(abs(p.x), abs(p.y)), abs(p.z)); // the texels hold equal-angle cells: warp the lookup to match
   return textureLod(t, atan(q) * 1.2732395, 0.0);
 }
-vec4 seaField(vec3 p) { return cubeAt(tSeaField, p); }
+vec4 seaField(vec3 p) { vec4 f = cubeAt(tSeaField, p); return vec4(f.xyz, max(f.w, 0.0)); }
+float beachAt(vec3 p) { return max(-cubeAt(tSeaField, p).w, 0.0); }
 float swellAmp(float depth) {
   return uSwellAmp * (0.55 + 0.45 * min(uWind, 1.4)) * (0.15 + 0.85 * smoothstep(0.3, 10.0, depth));
 }
@@ -98,14 +100,15 @@ function cubeFaces<A extends Uint8Array | Uint16Array>(make: (n: number) => A, p
   return faces;
 }
 
-/** The sea-field cube's faces (RGBA half floats: height, coast distance, lagoon, reef). */
-export function seaFieldFaces(geo: Geography): Uint16Array[] {
+/** The sea-field cube's faces (RGBA half floats: height, coast distance, lagoon, reef 1 or else −`beach`, the shore
+ *  water's gate per cell, sea.ts beachGates). */
+export function seaFieldFaces(geo: Geography, beach: Float32Array): Uint16Array[] {
   const half = THREE.DataUtils.toHalfFloat;
   return cubeFaces((n) => new Uint16Array(n), (out, o, c) => {
     out[o] = half(geo.heights[c]);
     out[o + 1] = half(geo.coast[c]);
     out[o + 2] = geo.zones[c] & ZONE.lagoon ? HALF_ONE : 0;
-    out[o + 3] = geo.floor[c] === FLOOR.coral ? HALF_ONE : 0;
+    out[o + 3] = geo.floor[c] === FLOOR.coral ? HALF_ONE : beach[c] > 0 ? half(-beach[c]) : 0;
   });
 }
 
@@ -184,9 +187,10 @@ export class Swell {
 
   private readonly geo: Geography;
 
-  constructor(geo: Geography) {
+  /** `beach`: the shore water's gate per cell (sea.ts beachGates), packed into the field. */
+  constructor(geo: Geography, beach: Float32Array) {
     this.geo = geo;
-    this.field = cubeTexture(seaFieldFaces(geo), THREE.HalfFloatType);
+    this.field = cubeTexture(seaFieldFaces(geo, beach), THREE.HalfFloatType);
     this.uniforms.tSeaField.value = this.field;
   }
 
