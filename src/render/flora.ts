@@ -270,11 +270,13 @@ function crownKit(lod: number, crown: Crown): Kit {
  *  (the material washes it whole, S-022). `emergent`: a pale buttressed bole standing clear of the canopy under a
  *  broad, irregular, two-tiered crown of clumps on long fanning limbs, lianas hanging from it (never a lollipop). Far:
  *  the bole and a few billows. */
-export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone' | 'pepper';
+export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone' | 'clove' | 'pepper';
 function rainKit(lod: number, form: RainForm, seed: number): Kit {
   if (form === 'edge') return edgeKit(lod, seed);
   if (form === 'pepper') return pepperKit(lod, seed);
-  if (form === 'broad' || form === 'cone') return crownedKit(lod, form, seed);
+  if (form === 'cone') return nutmegKit(lod, seed);
+  if (form === 'clove') return cloveKit(lod, seed);
+  if (form === 'broad') return crownedKit(lod, form, seed);
   const k = new Kit(), far = lod > 0, em = form === 'emergent', fl = form === 'flowering';
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
@@ -381,7 +383,7 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
  *  dome of billows skirting down to its feet, wider than tall (a fig or a rain tree). `cone`: a nutmeg's or a clove's
  *  dense crown tapering in stacked tiers of clumps from near the ground to a point. Far: the same outline in a few
  *  masses, no bole (the crown hides it). */
-function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
+function crownedKit(lod: number, form: 'broad', seed: number): Kit {
   const k = new Kit(), far = lod > 0;
   k.canopy = true;
   let z = seed * 9301 + 49297;
@@ -399,7 +401,7 @@ function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
     }
     return k;
   }
-  if (form === 'broad') {
+  {
     if (!far) k.tube([V(0, -0.06, 0), V(0.02, 0.16, 0), V(0, 0.3, 0.01)], [0.05, 0.034, 0.026], 5, BARK);
     k.billow(V(0, 0.72, 0), 0.25, 0.62, far ? 2 : 3, 0, seed * 1.3, 0, 1);
     const n = far ? 2 : 6;
@@ -416,30 +418,95 @@ function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
     }
     return k;
   }
-  k.tube([V(0, -0.06, 0), V(0.01, 0.5, 0)], [0.04, 0.022], far ? 3 : 5, BARK); // (far, S-025: its foot shows under the skirt)
-  const tiers = far ? [[0.34, 0.2, 1], [0.54, 0.17, 1], [0.72, 0.13, 1], [0.88, 0.085, 1]] : [[0.24, 0.17, 4], [0.44, 0.15, 3], [0.62, 0.13, 3], [0.79, 0.12, 1], [0.93, 0.07, 1]];
-  tiers.forEach(([y, r, n], t) => {
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU + t * 1.3 + 0.5 * rnd(), d = n > 1 ? r * (0.9 + 0.3 * rnd()) : far ? 0.05 * (t % 2 ? 1 : -1) : 0;
-      const c = V(Math.cos(a) * d, y + 0.04 * (rnd() - 0.5), Math.sin(a) * d);
-      if (far || t === 4) k.mass(c, n > 1 ? r : r * 1.3, 0.85, 0, seed + t * 7 + i, 2, 0, 0.7, 0.75 + 0.25 * (t / 4));
-      else k.billow(c, r, 0.8, t === 3 ? 2 : 1, 0, seed + t * 7 + i, 0, 0.7 + 0.3 * (t / 4));
-    }
-  });
   return k;
 }
 
-/** A pepper vine on its pole in a spice garden, 1 tall (S-025): a pale pole a little taller than the vine, the vine a
- *  narrow column of leaf clumps climbing it in a loose spiral, thinning toward the pole's head. */
-function pepperKit(lod: number, seed: number): Kit {
-  const k = new Kit(), far = lod > 0, n = far ? 3 : 7;
+/** A nutmeg tree 1 tall, as an engraver draws one in a spice garden from life (S-025 (6c); never a stack of balls): a
+ *  short trunk forking low under a dense, dark evergreen crown of irregular habit, conical to rounded (each seed its
+ *  own), its heart off to one side, a shoulder slung out lower on the other, a narrower head leaning on, sprays breaking
+ *  the outline at differing heights and reaches, and a skirt sunk in its own shade near the ground. */
+function nutmegKit(lod: number, seed: number): Kit {
+  const k = new Kit(), far = lod > 0;
   k.canopy = true;
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
-  k.tube([V(0, -0.05, 0), V(0.01, 1.0, 0)], [0.028, 0.022], far ? 3 : 4, PALE_BARK);
+  const a0 = rnd() * TAU, round = rnd(), lean = V(0.06 * Math.cos(a0 + 1), 0, 0.06 * Math.sin(a0 + 1));
+  const at = (a: number, d: number, y: number): THREE.Vector3 => V(Math.cos(a) * d, y, Math.sin(a) * d).addScaledVector(lean, y);
+  if (far) k.tube([V(0, -0.06, 0), at(0, 0, 0.3)], [0.05, 0.026], 3, BARK); // (far: within the kits' 110 triangles)
+  else k.tube([V(0, -0.06, 0), at(0, 0, 0.15), at(0, 0, 0.3)], [0.05, 0.036, 0.026], 4, BARK);
+  if (!far) for (let i = 0; i < 2; i++) k.tube([at(0, 0, 0.15), at(a0 + 2 + 2.3 * i, 0.15, 0.3)], [0.02, 0.009], 3, BARK); // limbs forking low
+  // the crown's bulk, off-centre; the shoulder lower on the far side; the head narrower and higher, leaning on (a young
+  // tree conical, an old one rounded); the tip a narrow spray
+  const parts: [THREE.Vector3, number, number, number][] = [
+    [at(a0, 0.06, 0.45), 0.26 + 0.04 * round, 1.05 - 0.15 * round, 0.95],
+    [at(a0 + Math.PI + 0.7 * (rnd() - 0.5), 0.15 + 0.05 * rnd(), 0.33 + 0.05 * rnd()), 0.18 + 0.03 * rnd(), 0.85, 0.75],
+    [at(a0 + 0.9 * (rnd() - 0.5), 0.07, 0.69 - 0.06 * round), 0.16 + 0.05 * round, 1.15 - 0.2 * round, 1],
+    [at(a0 + 1.4 * (rnd() - 0.5), 0.06 + 0.04 * rnd(), 0.88 - 0.06 * round), 0.08 + 0.02 * round, 1.4, 1]];
+  parts.forEach(([c, r, sq, open], i) => {
+    if (!far && i < 3) k.billow(c, r * 0.92, sq, 2 + (i === 0 ? 1 : 0), 1, seed * 1.7 + i * 2.3, 0, open);
+    else k.mass(c, r, sq, 0, seed * 1.7 + i * 2.3, 2, 0, 0.75, open);
+  });
+  // sprays out on the outline, each its own height and reach, so the silhouette breaks into leaf, never a rim
+  for (let i = 0, n = far ? 1 : 6; i < n; i++) {
+    const y = 0.26 + 0.52 * ((i + rnd()) / n), out = (0.3 + 0.04 * round) * (1 - 0.62 * Math.max(0, y - 0.25) / 0.6) + 0.03;
+    k.mass(at(a0 + 1.1 + i * 2.4 + 0.5 * rnd(), out, y), 0.06 + 0.035 * rnd(), 1.1, 0, seed * 2.9 + i * 1.3, 2, 0, 0.8, 0.9);
+  }
+  if (!far) k.mass(at(a0 + 2.3, 0.15, 0.22), 0.15 + 0.03 * rnd(), 0.7, 0, seed * 3.7, 2, 0, 0.5, 0.55); // the skirt, in its own shade
+  return k;
+}
+
+/** A clove tree 1 tall in a spice garden (S-025 (6c)): a slender trunk under a narrow cone of dense small leaf from low
+ *  down to a pointed head, its clumps overlapping as they climb, the centre wandering a little, sprays broken out of the
+ *  outline; its young leaf flushed red at the head and the upper sprays (the blossom weight: the material's dabs). */
+function cloveKit(lod: number, seed: number): Kit {
+  const k = new Kit(), far = lod > 0;
+  k.canopy = true;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  const a0 = rnd() * TAU, lean = V(0.05 * Math.cos(a0), 0, 0.05 * Math.sin(a0)), width = (y: number): number => 0.17 * (1 - 0.8 * Math.max(0, y - 0.28) / 0.66) + 0.015;
+  k.tube([V(0, -0.06, 0), V(lean.x * 0.25, 0.28, lean.z * 0.25)], [0.034, 0.022], far ? 3 : 4, BARK);
+  const n = far ? 5 : 7, c = V(0, 0, 0);
   for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n, a = i * 2.4 + rnd(), d = 0.05 + 0.03 * rnd(), r = (far ? 0.2 : 0.14) * (1 - 0.35 * t) + 0.02 * rnd();
-    k.mass(V(Math.cos(a) * d, 0.12 + 0.78 * t, Math.sin(a) * d), r, far ? 1.5 : 1.25, 0, seed + i * 4.1, 2, 0, 0.85, 0.7 + 0.3 * t);
+    const t = i / (n - 1), y = 0.3 + 0.56 * t;
+    c.set(c.x + 0.035 * (rnd() - 0.5), y, c.z + 0.035 * (rnd() - 0.5));
+    const at = c.clone().addScaledVector(lean, y), flush = t > 0.55 ? 0.45 + 0.5 * t : 0;
+    k.mass(at, width(y) * (0.9 + 0.2 * rnd()), 1.3, !far && t < 0.5 ? 1 : 0, seed * 1.3 + i * 2.9, 2, flush, 0.75, 0.72 + 0.28 * t);
+  }
+  for (let i = 0, m = far ? 3 : 6; i < m; i++) {
+    const y = 0.32 + 0.5 * ((i + rnd()) / m), a = a0 + i * 2.4 + 0.5 * rnd();
+    k.mass(V(Math.cos(a) * width(y), y, Math.sin(a) * width(y)).addScaledVector(lean, y), 0.045 + 0.03 * rnd(), 1.3, 0, seed * 2.1 + i * 1.7, 2, y > 0.55 ? 0.9 : 0.25, 0.8, 0.9);
+  }
+  k.mass(V(0, 0.95, 0).addScaledVector(lean, 1.1), 0.045, 1.9, 0, seed * 4.1, 2, 0.95, 0.8, 1); // the head
+  return k;
+}
+
+/** A pepper vine 1 tall in a spice garden (S-025; (6c) an untidy leafy column, never a bead string): on a pale pole
+ *  whose head stands clear (an even seed), or on a live support (odd), a slender tree whose own small head of leaf
+ *  sits over the vine; the vine's clumps crowd the support at uneven heights and reaches, gaps where the pole shows,
+ *  loose shoots hanging out from the column, thinning toward its head. */
+function pepperKit(lod: number, seed: number): Kit {
+  const k = new Kit(), far = lod > 0, live = seed % 2 === 1, n = far ? 7 : 13;
+  k.canopy = true;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  const lean = V(0.04 * (rnd() - 0.5), 0, 0.04 * (rnd() - 0.5));
+  if (live) {
+    const top = V(lean.x * 2, 1.12, lean.z * 2);
+    k.tube([V(0, -0.06, 0), V(lean.x, 0.6, lean.z), top], [0.04, 0.028, 0.018], far ? 3 : 4, BARK);
+    for (let i = 0; i < 3; i++) {
+      const a = i * 2.1 + rnd(), d = 0.07 + 0.05 * rnd();
+      if (!far) k.tube([V(top.x, 0.98, top.z), V(top.x + Math.cos(a) * d, 1.1 + 0.05 * i, top.z + Math.sin(a) * d)], [0.012, 0.006], 3, BARK);
+      k.mass(V(top.x + Math.cos(a) * d, 1.12 + 0.05 * i, top.z + Math.sin(a) * d), 0.08 + 0.03 * rnd(), 0.6, 0, seed * 1.9 + i * 3.1, 2, 0, 0.8, 1);
+    }
+  } else k.tube([V(0, -0.05, 0), V(lean.x * 2, 1.04, lean.z * 2)], [0.026, 0.02], far ? 3 : 4, PALE_BARK);
+  for (let i = 0; i < n; i++) {
+    const y = 0.05 + 0.86 * ((i + 0.8 * rnd()) / n), a = rnd() * TAU, d = 0.03 + 0.06 * rnd(), r = (far ? 0.1 : 0.075) * (1 - 0.35 * y) + 0.04 * rnd();
+    if (rnd() < 0.12) continue; // (a gap: the pole shows)
+    k.mass(V(Math.cos(a) * d + lean.x * 2 * y, y, Math.sin(a) * d + lean.z * 2 * y), r, 1.25 + 0.4 * rnd(), 0, seed + i * 4.1, 2, 0, 0.8, 0.62 + 0.38 * y);
+  }
+  for (let i = 0; i < (far ? 2 : 4); i++) { // loose shoots hanging out from the column
+    const y = 0.4 + 0.5 * rnd(), a = rnd() * TAU, d = 0.11 + 0.06 * rnd();
+    k.mass(V(Math.cos(a) * d + lean.x * 2 * y, y - 0.04, Math.sin(a) * d + lean.z * 2 * y), 0.04 + 0.02 * rnd(), 1.7, 0, seed * 2.3 + i, 2, 0, 0.8, 0.95);
   }
   return k;
 }

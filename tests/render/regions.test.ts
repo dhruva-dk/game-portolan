@@ -182,6 +182,29 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   assert.ok(n.palms >= 100 && n.reef >= 1600 && n.surf >= 880 && n.spill >= 1000 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
 });
 
+test('the Spice Isles (S-025 (6c)): the gardens and scrub keep out of every house, and the slope east of the harbour is planted', () => {
+  const plan = planSpice(field), ri = REGIONS.findIndex((r) => r.id === 'spiceIsles'), hb = REGIONS[ri].harbours[0];
+  const sown = [...plan.garden.flat(), ...plan.scrub];
+  // a plant's foot never inside a house's walls (the godown kit: 1.4 long and 0.9 deep each way, scaled)
+  for (const g of plan.godowns) {
+    const e = g.m.elements, x = new THREE.Vector3(e[0], e[1], e[2]), z = new THREE.Vector3(e[8], e[9], e[10]), sx = x.length(), sz = z.length();
+    x.normalize(); z.normalize();
+    for (const p of sown) {
+      const d = p.at.clone().sub(g.at);
+      assert.ok(Math.abs(d.dot(x)) > 1.4 * sx + 0.1 || Math.abs(d.dot(z)) > 0.9 * sz + 0.1, `a plant inside a house: ${d.dot(x).toFixed(2)}, ${d.dot(z).toFixed(2)}`);
+    }
+  }
+  // the terraced slope 11–20 u east and 6–14 u north of the harbour (capture 24's right slope) planted, not lawn
+  const box = [[11, 6], [20, 6], [20, 14], [11, 14]].map(([x, y]) => chartDir(ri, hb.x + x, hb.y + y));
+  const inside = (p: { dir: THREE.Vector3 }): boolean => {
+    for (let i = 0; i < 4; i++) if (box[i].clone().cross(box[(i + 1) % 4]).dot(p.dir) * Math.sign(box[0].clone().cross(box[1]).dot(box[2])) < 0) return false;
+    return true;
+  };
+  const n = sown.filter(inside).length;
+  console.log('spice east slope plants', n, 'gardens', plan.garden.map((g) => g.length), 'scrub', plan.scrub.length);
+  assert.ok(n >= 15, `the east slope planted: ${n}`);
+});
+
 test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at high water; every part seated; the harbour has its quay, godowns and apron', () => {
   const plan = planSpice(field), hb = REGIONS.findIndex((r) => r.id === 'spiceIsles');
   const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge, ...plan.palms, ...plan.garden.flat()], works = [...plan.godowns, ...plan.quays, ...plan.heaps, ...plan.walls, ...plan.stairs];
