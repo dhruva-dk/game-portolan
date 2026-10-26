@@ -268,15 +268,32 @@ function crownKit(lod: number, crown: Crown): Kit {
  *  (the material washes it whole, S-022). `emergent`: a pale buttressed bole standing clear of the canopy under a
  *  broad, irregular, two-tiered crown of clumps on long fanning limbs, lianas hanging from it (never a lollipop). Far:
  *  the bole and a few billows. */
-export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone';
+export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone' | 'pepper';
 function rainKit(lod: number, form: RainForm, seed: number): Kit {
   if (form === 'edge') return edgeKit(lod, seed);
+  if (form === 'pepper') return pepperKit(lod, seed);
   if (form === 'broad' || form === 'cone') return crownedKit(lod, form, seed);
   const k = new Kit(), far = lod > 0, em = form === 'emergent', fl = form === 'flowering';
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
-  const lean = V((rnd() - 0.5) * 0.12, 0, (rnd() - 0.5) * 0.12), forkY = (em ? 0.46 : fl ? 0.34 : 0.4) + 0.05 * rnd();
+  const lean = V((rnd() - 0.5) * 0.12, 0, (rnd() - 0.5) * 0.12), forkY = (em ? 0.52 : fl ? 0.34 : 0.4) + 0.05 * rnd();
   const fork = V(0, forkY, 0).add(lean), bark = em ? PALE_BARK : BARK, dab = fl ? 1.15 : 0; // a tree in flower is a mass of colour (S-022)
+  if (far && !em) {
+    // far, S-025: never a cushion on the canopy. A bole that reads at harbour distance, two limbs forking from it into
+    // a crown of separate clumps at differing heights and reaches, the sky or the shade between them (a flowering
+    // tree's spread wide and flat, a canopy tree's taller and more broken)
+    k.tube([V(0, -0.06, 0), V(lean.x * 0.3 + 0.015, forkY * 0.5, lean.z * 0.3), fork], [0.062, 0.045, 0.034], 4, bark);
+    const a0 = rnd() * TAU, top = fl ? 0.8 : 0.86;
+    k.mass(V(0.04 * Math.cos(a0), top - 0.2, 0.04 * Math.sin(a0)).add(lean), fl ? 0.27 : 0.25, fl ? 0.72 : 0.85, 0, seed * 3.1, 2, dab, 0.8, 1);
+    for (let i = 0; i < 3; i++) {
+      // (each lobe overlapping the crown's heart: one tree with a scalloped outline, never a heap of beads)
+      const a = a0 + 1.2 + i * 2.05 + 0.5 * rnd(), d = (fl ? 0.25 : 0.2) + 0.05 * rnd(), r = (fl ? 0.19 : 0.18) + 0.04 * rnd();
+      const c = V(Math.cos(a) * d, top - 0.3 - (fl ? 0.04 : 0.1) * rnd() - (i === 2 ? 0.06 : 0), Math.sin(a) * d).add(lean);
+      if (i < 2) k.tube([fork, c.clone().setY(c.y - r * 0.4)], [0.026, 0.014], 3, bark);
+      k.mass(c, r, fl ? 0.75 : 0.85, 0, seed * 3.1 + (i + 1) * 2.37, 2, dab, 0.8, i === 2 ? 0.75 : 0.9);
+    }
+    return k;
+  }
   k.tube([V(0, -0.06, 0), V(lean.x * 0.3 + 0.015, forkY * 0.5, lean.z * 0.3), fork], em ? [0.05, 0.032, 0.026] : [0.045, 0.03, 0.024], far ? 3 : 5, bark);
   if (em && !far) for (let i = 0; i < 4; i++) { // buttresses: thin flanges flaring from the bole's foot
     const a = (i / 4) * TAU + rnd(), o = V(Math.cos(a), 0, Math.sin(a)), nn = V(-o.z, 0, o.x);
@@ -361,6 +378,19 @@ function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
   const k = new Kit(), far = lod > 0;
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  if (form === 'broad' && far) {
+    // far, S-025: a short stout bole and two limbs spreading into a wide dome of separate clumps, gaps between them
+    k.tube([V(0, -0.06, 0), V(0, 0.3, 0.01)], [0.066, 0.045], 4, BARK);
+    k.mass(V(0, 0.7, 0), 0.23, 0.6, 0, seed * 1.3, 2, 0, 0.7, 1);
+    const a0 = rnd() * TAU;
+    for (let i = 0; i < 3; i++) {
+      const a = a0 + (i / 3) * TAU + 0.5 * rnd(), d = 0.34 + 0.06 * rnd(), r = 0.18 + 0.04 * rnd();
+      const c = V(Math.cos(a) * d, 0.46 + 0.1 * rnd(), Math.sin(a) * d);
+      if (i < 2) k.tube([V(0, 0.3, 0), c.clone().setY(c.y - r * 0.4)], [0.028, 0.014], 3, BARK);
+      k.mass(c, r, 0.64, 0, seed + i * 3.3, 2, 0, 0.7, i === 2 ? 0.8 : 0.92);
+    }
+    return k;
+  }
   if (form === 'broad') {
     if (!far) k.tube([V(0, -0.06, 0), V(0.02, 0.16, 0), V(0, 0.3, 0.01)], [0.05, 0.034, 0.026], 5, BARK);
     k.billow(V(0, 0.72, 0), 0.25, 0.62, far ? 2 : 3, 0, seed * 1.3, 0, 1);
@@ -378,16 +408,30 @@ function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
     }
     return k;
   }
-  if (!far) k.tube([V(0, -0.06, 0), V(0.01, 0.5, 0)], [0.035, 0.02], 5, BARK);
-  const tiers = far ? [[0.3, 0.22, 1], [0.52, 0.18, 1], [0.72, 0.13, 1], [0.88, 0.085, 1]] : [[0.24, 0.17, 4], [0.44, 0.15, 3], [0.62, 0.13, 3], [0.79, 0.12, 1], [0.93, 0.07, 1]];
+  k.tube([V(0, -0.06, 0), V(0.01, 0.5, 0)], [0.04, 0.022], far ? 3 : 5, BARK); // (far, S-025: its foot shows under the skirt)
+  const tiers = far ? [[0.34, 0.2, 1], [0.54, 0.17, 1], [0.72, 0.13, 1], [0.88, 0.085, 1]] : [[0.24, 0.17, 4], [0.44, 0.15, 3], [0.62, 0.13, 3], [0.79, 0.12, 1], [0.93, 0.07, 1]];
   tiers.forEach(([y, r, n], t) => {
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU + t * 1.3 + 0.5 * rnd(), d = n > 1 ? r * (0.9 + 0.3 * rnd()) : 0;
+      const a = (i / n) * TAU + t * 1.3 + 0.5 * rnd(), d = n > 1 ? r * (0.9 + 0.3 * rnd()) : far ? 0.05 * (t % 2 ? 1 : -1) : 0;
       const c = V(Math.cos(a) * d, y + 0.04 * (rnd() - 0.5), Math.sin(a) * d);
       if (far || t === 4) k.mass(c, n > 1 ? r : r * 1.3, 0.85, 0, seed + t * 7 + i, 2, 0, 0.7, 0.75 + 0.25 * (t / 4));
       else k.billow(c, r, 0.8, t === 3 ? 2 : 1, 0, seed + t * 7 + i, 0, 0.7 + 0.3 * (t / 4));
     }
   });
+  return k;
+}
+
+/** A pepper vine on its pole in a spice garden, 1 tall (S-025): a pale pole a little taller than the vine, the vine a
+ *  narrow column of leaf clumps climbing it in a loose spiral, thinning toward the pole's head. */
+function pepperKit(lod: number, seed: number): Kit {
+  const k = new Kit(), far = lod > 0, n = far ? 3 : 7;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  k.tube([V(0, -0.05, 0), V(0.01, 1.0, 0)], [0.028, 0.022], far ? 3 : 4, PALE_BARK);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n, a = i * 2.4 + rnd(), d = 0.05 + 0.03 * rnd(), r = (far ? 0.2 : 0.14) * (1 - 0.35 * t) + 0.02 * rnd();
+    k.mass(V(Math.cos(a) * d, 0.12 + 0.78 * t, Math.sin(a) * d), r, far ? 1.5 : 1.25, 0, seed + i * 4.1, 2, 0, 0.85, 0.7 + 0.3 * t);
+  }
   return k;
 }
 
@@ -541,8 +585,8 @@ export interface Species {
 
 export const FLORA: Record<FloraKind, Species> = {
   pine: { kit: pineKit, size: [2.0, 3.4], near: 55, far: 300, sway: 0.05 },
-  jungle: { kit: (l) => rainKit(l, 'canopy', 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
-  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [3.3, 4.6], near: 42, far: 300, sway: 0.05 },
+  jungle: { kit: (l) => rainKit(l, 'canopy', 7), size: [2.6, 4.0], near: 60, far: 300, sway: 0.045 },
+  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [3.3, 4.6], near: 60, far: 300, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
   palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
@@ -555,8 +599,8 @@ export const FLORA: Record<FloraKind, Species> = {
   pandanus: { kit: pandanusKit, size: [1.5, 2.4], near: 45, far: 160, sway: 0.06 },
   kelp: { kit: kelpKit, size: [1.6, 2.4], near: 70, far: 0, sway: 0.22, veil: true },
   coral: { kit: coralKit, size: [0.35, 0.6], near: 120, far: 0, sway: 0, veil: true },
-  broadleaf: { kit: (l) => rainKit(l, 'broad', 13), size: [2.4, 3.6], near: 42, far: 300, sway: 0.045 },
-  nutmeg: { kit: (l) => rainKit(l, 'cone', 19), size: [1.8, 3.0], near: 42, far: 300, sway: 0.05 },
+  broadleaf: { kit: (l) => rainKit(l, 'broad', 13), size: [2.4, 3.6], near: 60, far: 300, sway: 0.045 },
+  nutmeg: { kit: (l) => rainKit(l, 'cone', 19), size: [1.8, 3.0], near: 60, far: 300, sway: 0.05 },
 };
 export const KINDS = Object.keys(FLORA) as FloraKind[];
 
@@ -975,14 +1019,21 @@ void main() {
     vec3 lc = vWorld * 3.4, sil = normalize(vSil);
     float nv = dot(sil, v), rim = sqrt(max(0.0, 1.0 - nv * nv)), nz = 0.6 * vnoise(lc) + 0.4 * vnoise(lc * 2.7 + 7.0), lpx = length(fwidth(lc));
     vec3 e1 = normalize(cross(v, vUp)), e2 = cross(e1, v);
-    vec2 sp = vec2(dot(vWorld, e1), dot(vWorld, e2)) * 4.2, sa = vec2(dot(sil, e1), dot(sil, e2)), sc = floor(sp);
+    vec2 sp0 = vec2(dot(vWorld, e1), dot(vWorld, e2)) * 4.2, sa = vec2(dot(sil, e1), dot(sil, e2));
     sa = length(sa) > 1e-3 ? normalize(sa) : vec2(0.0, 1.0);
-    float st = 0.9 * (fhash(vec3(sc, 31.0)) - 0.5);
-    sa = rot2(st) * sa;
-    vec2 sf = fract(sp) - 0.5 - 0.3 * (vec2(fhash(vec3(sc, 32.0)), fhash(vec3(sc, 33.0))) - 0.5);
-    float lf = leafBody(vec2(dot(sf, sa) + 0.45, dot(sf, vec2(-sa.y, sa.x))) / 0.9) * step(0.25, fhash(vec3(sc, 34.0)));
-    float big = 1.0 - smoothstep(0.07, 0.14, length(fwidth(sp))); // the leaves at least ~8 px, else the rounded clumps
-    if (rim > mix(mix(0.56 + 0.42 * nz, 0.5 + 0.28 * nz + 0.26 * lf, big), 1.1, smoothstep(0.35, 0.9, lpx))) discard;
+    // S-025: further off, the leaves gather into sprays drawn the same way a size up (an octave per halving of the
+    // leaf's size on screen), so the outline stays lacy across the harbour, never a cushion's rounded rim
+    float oct = max(0.0, log2(length(fwidth(sp0)) / 0.09)), ok = floor(oct), lf = 0.0;
+    for (int o = 0; o < 2; o++) {
+      float kk = ok + float(o), sz = exp2(-kk);
+      vec2 sp = sp0 * sz + 17.0 * kk, sc = floor(sp);
+      vec2 sb = rot2(0.9 * (fhash(vec3(sc, 31.0)) - 0.5)) * sa;
+      vec2 sf = fract(sp) - 0.5 - 0.3 * (vec2(fhash(vec3(sc, 32.0)), fhash(vec3(sc, 33.0))) - 0.5);
+      float l = leafBody(vec2(dot(sf, sb) + 0.45, dot(sf, vec2(-sb.y, sb.x))) / 0.9) * step(0.25, fhash(vec3(sc, 34.0)));
+      lf += l * (o == 0 ? 1.0 - smoothstep(0.5, 1.0, oct - ok) : smoothstep(0.5, 1.0, oct - ok));
+    }
+    float fz = smoothstep(0.35, 0.9, lpx); // (the clump noise gone before it shrinks to speckle; the sprays stay)
+    if (rim > 0.5 + 0.28 * mix(nz, 0.5, fz) + 0.26 * lf + 0.08 * fz) discard;
   }
   // (a crown in flower thins to its leaf where it turns from the eye: its outline's turn)
   float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0;
@@ -1018,14 +1069,24 @@ void main() {
     density *= 1.0 + lBody * (0.4 * lHue - 0.12) * (1.0 - bloom);
     pig = mix(pig, lHue > 0.5 ? uOchre : uWater, 0.12 * lBody * abs(2.0 * lHue - 1.0) * (1.0 - bloom));
   }
-  vec3 col = glaze(parchment(q), pig, density, washPool(n, v, q), q);
-  col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w, 0.3, q); // the bloom laid twice, deepest in its clusters
+  // S-025: the outline selective, as an engraver draws a crown from life: the pen on its shaded side and along its top
+  // against the sky, broken where the light falls on it, the lit side left to the wash (no ring of pooled pigment there)
+  vec3 silN = normalize(vSil);
+  float isMass = vPart.y > 0.5 && vPart.y < 1.5 ? 1.0 : 0.0, litSil = dot(silN, uSun);
+  float penLit = 0.06 + 0.3 * step(0.62, vnoise(vWorld * 1.3 + 2.0));
+  float pen = mix(1.0, max(mix(penLit, 1.0, smoothstep(0.42, -0.08, litSil)), 0.75 * smoothstep(0.5, 0.85, dot(silN, vUp))), isMass);
+  // S-025 (3): a crown between the eye and a low sun is seen against the light: a darker, cooler silhouette whose
+  // blossom no longer holds its colour into the shade, rimmed with light where its edge turns up toward the sun
+  float back = smoothstep(0.3, 0.8, -dot(v, uSun)) * uLow;
+  vec3 col = glaze(parchment(q), pig, density, washPool(n, v, q) * mix(1.0, 0.25 + 0.75 * pen, isMass), q);
+  col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w * (1.0 - 0.7 * back), 0.3, q); // the bloom laid twice, deepest in its clusters
   // a crown in flower holds its colour further round into the shade, and there deepens to a cooler red (rose madder
   // over the vermilion, a warm madder over the ochre), never browning under the cool glaze
-  col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom, q), ndl, tone);
-  col = glaze(col, uRose, 0.45 * bloom * smoothstep(0.4, 0.75, tone), 0.2, q);
+  col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom * (1.0 - back), q), ndl, tone);
+  col = glaze(col, uRose, 0.45 * bloom * smoothstep(0.4, 0.75, tone) * (1.0 - back), 0.2, q);
   // (a leaf mass's shaded underside is not ruled across like a shelf, S-022: it is a deeper glaze its leaves are inked into)
-  col = glaze(col, hatchInk(0.0), 0.28 * under * (1.0 - 0.5 * tone), 0.0, q);
+  // S-025: and a crown's lower, inner clumps sit in the canopy's shade: the hollows between crowns go dark and cool
+  col = glaze(col, hatchInk(0.0), (0.28 + 0.2 * uFar) * under * (1.0 - 0.5 * tone) + isMass * uFar * 0.4 * smoothstep(0.75, 0.3, vPart.z), 0.0, q);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed) * (1.0 - 0.85 * under) * (vPart.y > 0.5 && vPart.y < 1.5 ? 0.6 : 1.0));
   col = mix(col, hatchInk(0.6), 0.75 * bink); // near the eye each truss's shaded side inked
   if (vPart.y > 0.5 && vPart.y < 1.5) {
@@ -1043,11 +1104,17 @@ void main() {
     float arc = smoothstep(0.38, 0.31, r) * smoothstep(0.2, 0.27, r) * smoothstep(0.05, -0.1 + 0.25 * o.x, f.y) * step(0.28, g3);
     col = mix(col, hatchInk(tone), arc * clamp(0.9 - 0.7 * tone, 0.15, 0.9) * (1.0 - smoothstep(0.18, 0.5, px)) * (1.0 - 0.4 * bloom));
   }
+  if (back > 0.0) {
+    float rimB = sqrt(max(0.0, 1.0 - nvB * nvB)), rimL = smoothstep(0.5, 0.9, rimB) * (0.2 + 0.8 * smoothstep(-0.2, 0.5, dot(silN, vUp)));
+    col = wash(col, uShade, 0.75 * back);
+    col = mix(col, col * vec3(0.62, 0.64, 0.74), 0.45 * back);
+    col = mix(col, wash(uPaper, uSunTint, 1.3), 0.85 * back * rimL * isMass);
+  }
   if (uNight > 0.0) {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;
     col = mix(col, uSilver, 0.65 * hatching(rot2(0.6) * hc, rot2(0.6) * hdx, rot2(0.6) * hdy, lit * 0.26, uSeed + 11.0));
   }
-  writeInk(candle(col, vWorld), n);
+  writeInk(candle(col, vWorld), n, pen * (1.0 - 0.5 * back * isMass));
 #endif
 }
 `;
