@@ -69,6 +69,45 @@ export function discShape(height: number, out: DiscShape): DiscShape {
   return out;
 }
 
+/** A motu's white beach: how far (u) its sand runs from the land line (dry at high water, the coral planner's LAND) down
+ *  onto the awash reef flat, before the shader's ragged edge (WP17, S-021). */
+export const MOTU_BEACH = 1.55;
+/**
+ * GLSL (after SWELL_GLSL), one rule for the terrain's white beaches and the sea's waterline ink. float toLand(dir, h):
+ * u from a point of height h to the land line, near enough within ~2 u (9 beyond): the least, over three rings of points
+ * round it, of the arc out to a point plus twenty times the height that point still has to climb, so it runs on
+ * smoothly and a flat or patch reef lying high but off any motu stays awash flat (the gaps between the motus never
+ * fill with sand, and a patch that never clears the land line keeps none).
+ */
+export const LAND_GLSL = /* glsl */ `
+const float LAND_U = ${(TIDE.amp + 0.15).toFixed(3)}, BEACH_W = ${MOTU_BEACH.toFixed(3)};
+float toLand(vec3 dir, float h) {
+  if (h >= LAND_U) return 0.0;
+  float d = min(9.0, 20.0 * (LAND_U - h));
+  vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
+  for (int k = 0; k < 8; k++) {
+    float a = float(k) * 0.7854 + 0.3 * float(k - 2 * (k / 2));
+    vec3 o = (t1 * cos(a) + t2 * sin(a)) / SEA_R;
+    for (int j = 1; j <= 3; j++) {
+      float r = 0.7 * float(j);
+      d = min(d, r + 20.0 * max(LAND_U - seaField(normalize(dir + r * o)).x, 0.0));
+    }
+  }
+  return d;
+}
+// how far a reef's waterline lies from any motu's beach: 0 where a beach comes down to the water (or off the reef), up to
+// 1 along the awash flat's lip; and the ink a waterline takes, full on a beach, else light and in broken lengths, so an
+// atoll is never one hard inked ring (S-021)
+float offBeach(vec3 dir, vec4 f) {
+  return f.w > 0.02 ? f.w * smoothstep(BEACH_W - 0.1, BEACH_W + 0.6, toLand(dir, f.x)) : 0.0;
+}
+float lipInk(vec3 dir, float off) {
+  vec3 P = dir * SEA_R, tw = triWeights(dir, 4.0);
+  float lengths = smoothstep(0.42, 0.58, tri(tPaper, P / 2.2 + 3.0, tw).g + 0.25 * (tri(tPaper, P / 4.1, tw).g - 0.5));
+  return mix(1.0, mix(0.15, 0.45, lengths), off);
+}
+`;
+
 /** The surf's rule, one for the shader and the coral plan (WP17): white water breaks over coral reef within `reach` u
  *  seaward of the coast where the water `out` u farther seaward is deeper than `deep` u and neither it nor the water `far`
  *  u out is a lagoon (an exposed reef front, where the open swell meets it: a lagoon's side and a pass's inner reach lie calm), and the
@@ -162,6 +201,7 @@ void main() {
 
 const FRAGMENT = /* glsl */ `
 ${SWELL_GLSL}
+${LAND_GLSL}
 #define MAX_LANES ${MAX_LANES}
 #define WAKE_SHIPS ${WAKE_SHIPS}
 in vec3 vRest;
@@ -676,13 +716,16 @@ void main() {
   ring *= mix(1.0, smoothstep(10.0, 24.0, length(cameraPosition) - SEA_R - uSeaLevel), clear);
   float cw = COAST_CSS * uRenderPx;
   float coast = 1.0 - smoothstep(cw - 0.5, cw + 0.5, abs(depth) / max(fwD, 1e-4));
-
   // foam: a fringe at the waterline, bores running in to it, the reef crests breaking as the swell lifts, and lace —
   // the foam's net of bubbles over the reefs and in the shore's wash, pulsing with the swell
   float shore = depth / max(fwD / upx, 0.02); // u to the waterline
   float run = fract(uTime / 6.5 + wob * 1.7);
   float bore = (1.0 - smoothstep(0.0, 0.3, abs(f.y - mix(2.8, 0.0, run)))) * sin(run * 3.14159) * smoothstep(3.5, 0.5, depth);
-  float foam = max(1.0 - smoothstep(0.15, 0.7 + 0.4 * wob, shore), 0.75 * bore) * water;
+  // (on a reef the waterline is the awash flat's lip, inked light and broken and its fringe thin, away from the motus'
+  // beaches: the terrain inks each beach's foot, so the islets are drawn round, never the atoll as one ring, S-021)
+  float off = (f.w > 0.02 && depth > -0.5 && shore < 1.2) ? offBeach(dir, f) : 0.0;
+  if (off > 0.0) coast *= lipInk(dir, off);
+  float foam = max((1.0 - smoothstep(0.15, 0.7 + 0.4 * wob, shore)) * (1.0 - 0.55 * off), 0.75 * bore) * water;
   // surf: along every reef's seaward front the swell comes in as pen lines, rears into a green face, breaks white and
   // spills over the reef set after set, in long lines broken along their length and peeling down the reef, the spent
   // foam left behind each line in lace; far off the break draws together into one broken ribbon of lead white along
@@ -808,7 +851,7 @@ void main() {
       col = mix(col, mix(mix(LEAF_LO, LEAF_HI, smoothstep(0.05, 0.3, path)), LEAF_GLINT, clamp(path + fine, 0.0, 1.0)), gold * smoothstep(0.08, 0.3, path));
     }
   }
-  writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)));
+  writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)), off > 0.0 ? lipInk(dir, off) : 1.0); // (the composite's line where sea meets reef as light)
 }
 `;
 

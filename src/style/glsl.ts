@@ -396,6 +396,11 @@ void writeInk(vec3 colour, vec3 worldNormal) {
   outColor = vec4(toDisplay(colour), 1.0);
   outAux = vec4(octEncode(normalize(mat3(viewMatrix) * worldNormal)), uInkId / 255.0, uInkWeight / 4.0);
 }
+// The same, its silhouette and crease lines drawn at \`weight\` of the surface's own (an awash reef's lip, drawn light).
+void writeInk(vec3 colour, vec3 worldNormal, float weight) {
+  outColor = vec4(toDisplay(colour), 1.0);
+  outAux = vec4(octEncode(normalize(mat3(viewMatrix) * worldNormal)), uInkId / 255.0, uInkWeight * weight / 4.0);
+}
 // A veil laid over the scene (fog, smoke, washes over the sea): blends its colour (linear) by alpha and hides the ink
 // beneath it by the same amount; it is never inked itself.
 void writeVeil(vec3 colour, float alpha) {
