@@ -18,6 +18,10 @@ import { laceAt, openAt, SURF, surfAt } from '../../src/render/sea.ts';
 import { BLOCK as SPICE_BLOCK, groundAt as spiceGround, LAND as SPICE_LAND, planSpice, SPICE_SHIPS } from '../../src/render/regions/spiceIsles.ts';
 import { DRAFT } from '../../src/sim/world/regions.ts';
 import { navigable } from '../../src/sim/world/geography.ts';
+import { BLOCK as FIRE_BLOCK, calderaTime, fireOf, flowNear, groundAt as fireGround, LAND as FIRE_LAND, PERIOD, planFire, VOLCANO } from '../../src/render/regions/fireArchipelago.ts';
+import { eruption } from '../../src/sim/economy.ts';
+import { CALDERA } from '../../src/sim/tables.ts';
+import { TICK, type MatchState } from '../../src/sim/state.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
 /** The Coral Atolls' rings by their rims (S-029), at every degree of bearing about each ring's centre: how far the rim
@@ -298,3 +302,43 @@ test('the Coral Atolls (S-027 (7), S-029): every ring breaks along its exposed w
   for (const [x, y] of [[60, -60], [-10, -60], [-70, 0], [0, 60]]) assert.equal(surfAt(geo, chartDir(ri, x, y), 0), 0, `no surf in open sea at (${x}, ${y})`);
 });
 
+
+test('the Fire Archipelago: the volcano stands; each fresh flow runs from the crater into hot water; nothing grows or stands on a fresh flow; nothing in a hull\'s water', () => {
+  const plan = planFire(field), ri = REGIONS.findIndex((r) => r.id === 'fireArchipelago'), m = REGIONS[ri].landmark;
+  const sim = (x: number, y: number): number => heightAt(geo, chartDir(ri, x, y));
+  // the Caldera's crater at its landmark, drawn as a cone with a crater (not melted into a dome)
+  const at = toChart(ri, plan.crater.dir);
+  assert.ok(Math.hypot(at.x - m.x, at.y - m.y) < 1e-6 && plan.crater.rim > 15 && plan.crater.rim - plan.crater.h > 3, `crater at the landmark, rim ${plan.crater.rim.toFixed(1)} over floor ${plan.crater.h.toFixed(1)}`);
+  assert.equal(plan.flows.length, 2, 'two lava deltas');
+  for (const f of plan.flows) {
+    const n = f.x.length - 1;
+    assert.ok(Math.hypot(f.x[0] - VOLCANO.x, f.y[0] - VOLCANO.y) < VOLCANO.crater + 1, 'a flow breaches the crater rim');
+    assert.ok(sim(f.x[n], f.y[n]) < 0 && geo.zones[cellOf(TERRITORY, chartDir(ri, f.x[n], f.y[n]))] & ZONE.hot, `a flow ends in the sea in hot water (${f.x[n].toFixed(1)}, ${f.y[n].toFixed(1)}: ${sim(f.x[n], f.y[n]).toFixed(2)} u)`);
+    assert.ok(f.entry > 20 && sim(f.x[0], f.y[0]) > FIRE_LAND, 'a flow runs over land to its sea entry');
+  }
+  for (const p of [...plan.snags, ...plan.palms, ...plan.tuff]) {
+    const c = toChart(ri, p.dir);
+    assert.ok(flowNear(plan.flows, c.x, c.y).d >= 1.05, 'nothing grows or stands on a fresh flow');
+    assert.ok(p.sim > FIRE_LAND, 'growth and ledges on land dry at high water');
+  }
+  for (const p of [...plan.clinker, ...plan.snags, ...plan.palms, ...plan.tuff]) {
+    assert.ok(p.sim >= FIRE_BLOCK, 'nothing in a hull\'s water');
+    assert.ok(Math.abs(fireGround(field, p.dir) - p.ground) < 1e-6 && p.base <= p.ground, 'every part seated on the drawn ground');
+  }
+  assert.ok(plan.clinker.length > 60 && plan.snags.length > 10 && plan.palms.length > 10 && plan.tuff.length > 5, JSON.stringify({ clinker: plan.clinker.length, snags: plan.snags.length, palms: plan.palms.length, tuff: plan.tuff.length }));
+});
+
+test('the Fire Archipelago: the Caldera erupts on the sim\'s rhythm (economy.ts), never a clock of its own', () => {
+  for (const seed of [1, 77, 4242]) {
+    let erupted = 0;
+    for (let tick = 0; tick < 2 * PERIOD / TICK; tick++) {
+      const state = { tick, seed } as unknown as MatchState, t = calderaTime(state), on = eruption(state) >= 0;
+      assert.ok(t >= 0 && t < PERIOD);
+      assert.equal(t < CALDERA.burst, on, 'the fire is up exactly while the sim rains gold');
+      if (on && t >= 0.8) assert.ok(fireOf(t) > 0.99, 'full fire while it erupts');
+      if (!on) assert.ok(fireOf(t) < 0.61, 'the afterglow only while it sleeps');
+      erupted += on ? 1 : 0;
+    }
+    assert.ok(Math.abs(erupted * TICK - 2 * CALDERA.burst) <= 2 * TICK, 'it erupts twice in two cycles');
+  }
+});

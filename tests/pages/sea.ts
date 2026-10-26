@@ -1,5 +1,5 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
-// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark|basalt|weave|kelp|kelpdeck|amber|amberpass (WP16: the Crown Light from the pack, up the Falls Fjord, the Arch over the Basalt Stacks' walls, down a lane of their maze, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
+// riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark|basalt|weave|kelp|kelpdeck|amber|amberpass|fire (WP16: the Crown Light from the pack, up the Falls Fjord, the Arch over the Basalt Stacks' walls, down a lane of their maze, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
 // hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>, turn=sun|<rad> (any view: faced to the sun's bearing, then aim=<rad> more); for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
@@ -21,6 +21,8 @@ import { AmberShoals } from '../../src/render/regions/amberShoals.ts';
 import { WeepingIsle } from '../../src/render/regions/weepingIsle.ts';
 import { CoralAtolls } from '../../src/render/regions/coralAtolls.ts';
 import { SPICE_SHIPS, SpiceIsles } from '../../src/render/regions/spiceIsles.ts';
+import { FireArchipelago, PERIOD as CALDERA_PERIOD } from '../../src/render/regions/fireArchipelago.ts';
+import { CALDERA } from '../../src/sim/tables.ts';
 import { NAMED_PIGMENTS as P, type RGB } from '../../src/style/palette.ts';
 import { advance, cellOf, localFrame, R, TERRITORY } from '../../src/sim/sphere.ts';
 import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
@@ -69,6 +71,10 @@ const coral = new CoralAtolls(style, terrain.field, sea.swell); // WP17 part A
 scene.add(coral.group);
 const spice = new SpiceIsles(style, terrain.field, sea.swell); // WP17 part B
 scene.add(spice.group);
+// WP17 part C: the Caldera's cycle held at caldera=<s> (seconds into it; the sim's calderaTime), running on with the clock
+const caldera = Number(q.get('caldera') ?? 40);
+const fire = new FireArchipelago(style, terrain.field, sea.swell, sky.lights);
+scene.add(fire.group);
 
 // the camera: a foot on the sphere, a compass heading, a height and a pitch
 const cam = { foot: V(0, 1, 0), heading: 0, height: 4, pitch: -0.05 };
@@ -282,6 +288,14 @@ if (view === 'deck') {
     toWorld(ri, tx, ty, to);
     launch(0, 0, 0, d, { at, to, furl: y > -10 }); // all but the ship in the mouth lie at the berths
   }
+} else if (view === 'fire') {
+  const ri = REGIONS.findIndex((r) => r.id === 'fireArchipelago'), from = V(), to = V();
+  const ox = Number(q.get('ox') ?? 0), oy = Number(q.get('oy') ?? 0);
+  // capture 25: the Caldera erupting at dusk from the sea off its south-east lava delta, the lava steaming into the sea,
+  // a ship standing in the hot water where the gold falls
+  toWorld(ri, 6 + ox, -55 + oy, from); toWorld(ri, 2, 0, to);
+  look(from, to, Number(q.get('height') ?? 4.5), Number(q.get('pitch') ?? 0.02));
+  launch(11, 3, 0.6);
 } else if (view === 'crown' || view === 'fjord' || view === 'mark') {
   const ri = view === 'crown' ? 0 : view === 'fjord' ? 1 : REGIONS.findIndex((r) => r.name.includes(place ?? 'Ice'));
   const m = REGIONS[ri].landmark, from = V(), to = V();
@@ -390,10 +404,12 @@ function frame(now: number): void {
   fjords.update(camera.position);
   basalt.update(camera.position, clock);
   kelpShallows.update(camera.position, clock); amberShoals.update(camera.position, clock); weeping.update(camera.position); coral.update(camera.position, camera); spice.update(camera.position, camera);
+  const ct = (caldera + (hold === null ? clock : 0)) % CALDERA_PERIOD;
+  fire.update(camera.position, clock, ct, ct < CALDERA.burst ? ct / CALDERA.burst : -1, weather.wind);
   pipeline.render(scene, camera, dt);
   Object.assign(hook, {
     ready: ++frames >= 3, triangles: pipeline.stats.triangles, calls: pipeline.stats.calls, terrainTriangles: terrain.triangles,
-    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles + coral.triangles + spice.triangles), flora: flora.stats,
+    structureTriangles: structures.triangles, regionTriangles: ice.triangles + fjords.triangles + basalt.triangles + (kelpShallows.triangles + amberShoals.triangles + weeping.triangles + coral.triangles + spice.triangles + fire.triangles), flora: flora.stats,
     terrainMB: terrain.bytes / 2 ** 20, textureMB: pipeline.stats.textureBytes / 2 ** 20, targetMB: pipeline.stats.targetBytes / 2 ** 20,
   });
   requestAnimationFrame(frame);

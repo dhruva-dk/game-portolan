@@ -12,6 +12,8 @@
 // (capture 23), a motu's shore over the reef flat at low water, the Great Lagoon from high above and from orbit.
 // WP17 part B: Spice Harbour at golden hour from the sound, ships crowding in (capture 24), low off a jungle shore, the
 // harbour from high above and from orbit, and across the harbour into the low sun (WP14: the sea's golden hour).
+// WP17 part C: the Caldera erupting at dusk from the sea off its south-east delta, a ship in the foreground (capture 25),
+// the Fire Archipelago from high above and from orbit while it erupts (caldera=<s> into the sim's cycle).
 //   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -50,6 +52,9 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['spice-shore', { view: 'spiceshore', hour: '16' }],
   ['spice-high', { view: 'mark', region: 'Spice', hour: '16' }],
   ['spice-orbit', { view: 'mark', region: 'Spice', hour: '16', height: '135', pitch: '-1.4', back: '26', 'iphone:height': '110', 'iphone:back': '30', 'iphone:pitch': '-1.43' }], // as coral-orbit: Spice Harbour's sound among its five islands, the horizon high (S-025)
+  ['fire-hero', { view: 'fire', hour: '18.6', caldera: '2.5' }],
+  ['fire-high', { view: 'mark', region: 'Fire', hour: '17.4', caldera: '4' }],
+  ['fire-orbit', { view: 'mark', region: 'Fire', hour: '17.4', caldera: '4', height: '135', pitch: '-1.4', back: '26', 'iphone:height': '110', 'iphone:back': '30', 'iphone:pitch': '-1.43' }], // as coral-orbit: the Caldera among its satellite cones and Cinder Isle
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();

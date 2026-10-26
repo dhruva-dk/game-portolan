@@ -26,8 +26,8 @@ import { inkMaterial, linearVec, transmittanceVec } from '../style/glsl.ts';
 import { PARCHMENT, PIGMENTS, type RGB } from '../style/palette.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { R, TERRITORY, cellDir, cellOf, faceUV, gnomonicDir, type FaceUV } from '../sim/sphere.ts';
-import { CHARTS, type Geography } from '../sim/world/geography.ts';
-import { FLOOR, REGIONS, TIDE, type Region } from '../sim/world/regions.ts';
+import { CHARTS, toChart, type Geography } from '../sim/world/geography.ts';
+import { FLOOR, REGIONS, TIDE, type Region, type Stroke } from '../sim/world/regions.ts';
 import type { Pipeline } from './pipeline.ts';
 import { exposureAt, LAND_GLSL, seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
@@ -240,6 +240,8 @@ function fbm3(x: number, y: number, z: number, octaves: number): number {
  *  (carve), built on rather than planted (flora). */
 export const townsOf = (geo: Geography): Geography['harbours'] => geo.harbours.filter((hb) => geo.landmarks.some((m) =>
   m.region === hb.region && Math.hypot(m.pos.x - hb.pos.x, m.pos.y - hb.pos.y, m.pos.z - hb.pos.z) < m.r * 1.5));
+/** Each region's volcanic cones, and the share of the sim's height they are drawn at (carve). */
+const CONE = 0.65, CONES = REGIONS.map((r) => r.strokes.filter((s): s is Extract<Stroke, { k: 'cone' }> => s.k === 'cone'));
 export function carve(geo: Geography): Float32Array {
   const H = geo.heights, C = geo.coast, out = Float32Array.from(H), styles = REGIONS.map(reliefOf);
   const d = v3(), di = v3(), dj = v3();
@@ -289,6 +291,13 @@ export function carve(geo: Geography): Float32Array {
       const off = 0.8 * noise3(x / 30, y / 30, z / 30), t = (hr - KEEP + off) / s.step, fl = Math.floor(t);
       const stepped = KEEP + (fl + smooth(0.55, 0.95, t - fl)) * s.step - off;
       hr += (stepped - hr) * s.terrace * wb * (0.5 + 0.5 * noise3(x / 9, y / 9 + 3.1, z / 9));
+    }
+    // a volcano (its region's `cone` strokes) keeps the sim's own cone, flanks, rim and crater, drawn at CONE of its
+    // height over the shore (WP17 part C): the inland slope and the massif's compression would melt it into a dome, and
+    // at full height its flanks stand at 60° (hulls only meet its foot, which is the sim's)
+    for (const k of CONES[geo.region[c]]) {
+      const at = toChart(geo.region[c], d), wc = 1 - smooth(0.7 * k.r, k.r, Math.hypot(at.x - k.x, at.y - k.y));
+      if (wc > 0) hr += (Math.max(hr, KEEP + (h - KEEP) * CONE) - hr) * wc;
     }
     for (const hb of towns) {
       if (hb.region !== geo.region[c]) continue;
