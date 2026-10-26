@@ -549,7 +549,11 @@ export class SpiceIsles {
     const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04, hand: true });
     const far = floraMaterial(style, swell, { band: new THREE.Vector4(SPICE.near * 0.85, SPICE.near, SPICE.far * 0.8, SPICE.far), sway: 0.04, far: true, hand: true,
       id: near.uniforms.uInkId.value as number });
-    this.trees = [near, far];
+    // S-028 (7b): the far flowering trees dome-lit crowns, each plant its own habit: their own draw's material, so the
+    // habit's warp never bends the other kits' bark
+    const farDome = floraMaterial(style, swell, { band: new THREE.Vector4(SPICE.near * 0.85, SPICE.near, SPICE.far * 0.8, SPICE.far), sway: 0.04, far: true, hand: true,
+      id: near.uniforms.uInkId.value as number, dome: true });
+    this.trees = [near, far, farDome];
     const T = (c: RGB): THREE.Vector3 => transmittanceVec(c), tint = (parts: Part[], k: number): Float32Array => {
       const t = new Float32Array(parts.length * 8);
       parts.forEach((p, i) => {
@@ -582,9 +586,9 @@ export class SpiceIsles {
       // a fallow plot's scrub: the edge's leaf bank, low
       ['edge', 33, plan.scrub, 0, SPICE.near, 0], ['edge', 33, plan.scrub, SPICE.near * 0.85, SPICE.far, 0]];
     this.lod = lod.map(([form, seed, parts, from, to, k]) => {
-      const g = (form === 'palm' ? kitGeometry('palm', from ? 1 : 0) : rainGeometry(form, from ? 1 : 0, seed)).toNonIndexed();
+      const kit = form === 'palm' ? kitGeometry('palm', from ? 1 : 0) : rainGeometry(form, from ? 1 : 0, seed), g = kit.toNonIndexed();
       for (const [name, size] of [['aFoliage', 3], ['aBloom', 3], ['aSeed', 2]] as const) g.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, parts.length) * size), size));
-      return [new Draw(g, from ? far : near, parts.length), parts, from, to, tint(parts, k)];
+      return [new Draw(g, from ? (kit.userData.dome ? farDome : far) : near, parts.length), parts, from, to, tint(parts, k)];
     });
     this.group.add(...this.draws.map((d) => d.mesh));
   }

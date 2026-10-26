@@ -305,7 +305,11 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
     // S-025 (6b): an irregular crown, never a cushion: the heart off to one side, a broad shoulder, a smaller lobe
     // slung low into the shade, and a spray thrown out high on its own limb, so each crown's outline and habit differ
     // (the bed varies its width and height too) and the material can sink its lower lobes into the canopy's hollows
+    // S-028 (7b): lit as one crown (Kit.dome), as pass 6d drew the far broadleaf, never a fuzzy ball lobe by lobe: each
+    // plant drawn out by bearing into its own habit (the material's dome), its outline lobed and broken by sprays, gaps
+    // through it to the shade within; a tree in flower wider and flatter (a flame tree's umbrella), a canopy tree taller
     const a0 = rnd() * TAU, top = fl ? 0.8 : 0.86;
+    k.dome = { c: V(lean.x, fl ? 0.58 : 0.62, lean.z), r: fl ? V(0.56, 0.28, 0.56) : V(0.5, 0.32, 0.5) };
     k.mass(V(0.07 * Math.cos(a0), top - 0.2, 0.07 * Math.sin(a0)).add(lean), fl ? 0.26 : 0.24, fl ? 0.7 : 0.82, 0, seed * 3.1, 2, dab, 0.8, 1);
     const lobes = fl ? [[0.3, 0.22, -0.26, 0.9], [0.27, 0.15, -0.38, 0.72], [0.36, 0.1, -0.12, 1]]
       : [[0.24, 0.2, -0.3, 0.9], [0.26, 0.14, -0.44, 0.7], [0.31, 0.09, -0.08, 1]];
@@ -1180,12 +1184,18 @@ void main() {
     }
   }
   // (a crown in flower thins to its leaf where it turns from the eye: its outline's turn)
-  float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0;
-  float bloom = vBlossom > 0.01 ? blossomAt(vWorld, vBlossom, sqrt(max(0.0, 1.0 - nvB * nvB)), other, deep, bink) : 0.0;
+  float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0, bw = vBlossom;
+  // S-028 (7b): a dome-lit crown in flower holds its blossom as a flame tree or a coral tree does, in masses of colour
+  // on its lit head and shoulders, the edges of each broken by the leaf's sprays, the leaf between them and under them
+  // (never an even fuzz of colour over the crown, never dots)
+  if (cd > 0.5) bw *= smoothstep(0.38, 0.56, 0.6 * vnoise(vWorld * 0.8 + 31.0) + 0.4 * vnoise(vWorld * 1.9 + 7.0)
+    + 0.2 * dot(n, uSun) + 0.25 * dot(n, vUp) + 0.1 * scal);
+  float bloom = bw > 0.01 ? blossomAt(vWorld, bw, sqrt(max(0.0, 1.0 - nvB * nvB)), other, deep, bink) : 0.0;
   vec3 bpig = mix(vBloom, uOchre, other * 0.8), leafPig = vPaint.rgb;
   if (vPart.y > 0.5 && vPart.y < 1.5) { // S-022: several greens, each clump warmer or cooler, mottled across the crown
-    float wc = 2.0 * vLeaf.y - 1.0 + 1.1 * (vnoise(vWorld * 0.8 + 3.0) - 0.5);
-    leafPig = mix(leafPig, wc > 0.0 ? uOchre : uWater, min(0.42, 0.34 * abs(wc)));
+    // (S-028 (7b): a dome-lit crown warmer on its lit head, its cool teal kept to its shaded side)
+    float wc = 2.0 * vLeaf.y - 1.0 + 1.1 * (vnoise(vWorld * 0.8 + 3.0) - 0.5) + cd * (1.3 * max(dot(n, uSun), 0.0) - 0.3);
+    leafPig = mix(leafPig, wc > 0.0 ? uOchre : mix(uWater, mix(uWater, uOchre, 0.4), cd), min(0.42, 0.34 * abs(wc)));
   }
   vec3 pig = mix(leafPig, bpig, bloom);
   vec3 side = normalize(cross(vUp, abs(vUp.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -1235,7 +1245,9 @@ void main() {
   // blossom no longer holds its colour into the shade, rimmed with light where its edge turns up toward the sun
   // S-025 (6d): a dome-lit crown's wash cools to a deeper green in its shade (never greyed by the shade's violet over the
   // ochre), and is modelled cluster by cluster: lighter on each cluster's sunward side, deeper between and under them
-  pig = mix(pig, uWater, cd * 0.15 * smoothstep(0.3, 0.8, tone));
+  // (S-028 (7b): cooled toward a deep sap green, verdigris broken with ochre, so a crown already cool never turns teal-blue)
+  vec3 sap = mix(uWater, uOchre, 0.4);
+  pig = mix(pig, sap, cd * 0.15 * smoothstep(0.3, 0.8, tone));
   density *= 1.0 - cd * 0.32 * clamp(clu, -1.0, 1.0) * smoothstep(0.2, 0.45, lpxL);
   vec3 col = glaze(parchment(q), pig, density, washPool(n, v, q) * mix(1.0, 0.25 + 0.75 * pen, isMass), q);
   col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w * (1.0 - 0.7 * back), 0.3, q); // the bloom laid twice, deepest in its clusters
@@ -1246,7 +1258,7 @@ void main() {
   // (a leaf mass's shaded underside is not ruled across like a shelf, S-022: it is a deeper glaze its leaves are inked into)
   // S-025: and a crown's lower, inner clumps sit in the canopy's shade: the hollows between crowns go dark and cool
   // (S-025 (6d): a dome-lit crown's shade a deeper glaze of its own green, never the ink's grey over its wash)
-  vec3 shadeInk = mix(hatchInk(0.0), mix(pig, uWater, 0.45), 0.75 * cd);
+  vec3 shadeInk = mix(hatchInk(0.0), mix(pig, sap, 0.45), 0.75 * cd);
   col = glaze(col, shadeInk, (0.28 + 0.2 * uFar) * under * (1.0 - 0.5 * tone) + isMass * uFar * 0.4 * smoothstep(0.75, 0.3, vPart.z), 0.0, q);
   col = wash(glaze(col, shadeInk, 0.55 * hollow * (1.0 - 0.4 * tone), 0.0, q), uShade, (0.35 - 0.2 * cd) * hollow);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed) * (1.0 - 0.85 * under) * (vPart.y > 0.5 && vPart.y < 1.5 ? 0.6 - 0.35 * cf * (1.0 - back) : 1.0)); // (a canopy's shade in its loops, not ruled)
