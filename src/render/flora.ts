@@ -964,7 +964,7 @@ void main() {
   // bearing and its head raised or lowered, smoothly, so every crown's outline differs (limbs and lobes alike)
   float dome = aTint > 0.5 && aPaint.g < 0.4 ? 1.0 : 0.0;
   vec3 pos = position;
-  if (aPaint.g < 0.4 || (aPart.y < 0.5 && uDome > 0.5)) {
+  if (uDome > 0.5) { // (the dome-lit kit's draw only: every other kit's bark and leaf untouched)
     float th = atan(pos.z, pos.x + 1e-5), sd = aSeed.x * 6.2832, k = smoothstep(0.25, 0.5, pos.y);
     float fr = 1.0 + k * (0.2 * sin(2.0 * th + sd) + 0.12 * sin(3.0 * th - 2.3 * sd) + 0.06 * sin(5.0 * th + 4.1 * sd));
     pos.xz *= fr;
