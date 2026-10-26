@@ -119,7 +119,7 @@ class Kit {
         p.set(q.x * r * lobe, q.y * r * lobe * squash * (q.y < 0 ? under : 1), q.z * r * lobe).add(c);
         n.copy(q); // its sphere's normal: the outline's, through the squash (the material lifts it toward the light)
         // aTint 1 + w: w the blossom (1 whole, as the pattern lays it; below 1 a weight for the material's dabs)
-        const w = dab ? Math.min(0.95, dab * smooth(-0.8, 0.3, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
+        const w = dab ? Math.min(0.95, dab * smooth(-1, 0.1, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
           : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom ? 1 : 0;
         return this.vert(p, n, LEAF, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
       });
@@ -250,9 +250,10 @@ function crownKit(lod: number, crown: Crown): Kit {
  *  into limbs under a deep crown massed into billowing clumps of many sizes at stepped heights, a sub-canopy crown
  *  under its rim, creepers draping from the rim, lianas hanging in loops and curls, and at its feet an understory of
  *  low billows, fern fronds and broad leaves, so from the side the leaf runs from the crown to the ground. `flowering`:
- *  a lower, rounder crown whose clumps carry a blossom weight (soft dabs, thick on the sunward tops). `emergent`: a
- *  pale buttressed bole standing clear of the canopy under a broad, irregular, two-tiered crown of clumps on long
- *  fanning limbs, lianas hanging from it (never a lollipop). Far: the bole and a few billows. */
+ *  a broad, spreading crown at the canopy's height whose clumps carry a blossom weight over all but their undersides
+ *  (the material washes it whole, S-022). `emergent`: a pale buttressed bole standing clear of the canopy under a
+ *  broad, irregular, two-tiered crown of clumps on long fanning limbs, lianas hanging from it (never a lollipop). Far:
+ *  the bole and a few billows. */
 export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone';
 function rainKit(lod: number, form: RainForm, seed: number): Kit {
   if (form === 'edge') return edgeKit(lod, seed);
@@ -269,7 +270,7 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
   }
   // the crown: billowing clumps, the largest high in the middle, the rest round it at stepped heights, wider and lower
   // toward the rim (an emergent's in two tiers), each on a limb from the fork
-  const spread = em ? 0.46 : fl ? 0.3 : 0.4, top = em ? 0.93 : fl ? 0.8 : 0.86, C = far ? (em ? 3 : 2) : em ? 7 : 5;
+  const spread = em ? 0.46 : fl ? 0.42 : 0.4, top = em ? 0.93 : 0.86, C = far ? (em ? 3 : 2) : em ? 7 : 5;
   const rims: THREE.Vector3[] = [];
   for (let i = 0; i < C; i++) {
     const a = i * 2.39996 + rnd() * 0.8, d = i === 0 && !em ? 0.02 : spread * (far ? (em ? 0.62 : 0.5) : 0.4 + 0.6 * Math.sqrt(rnd()));
@@ -521,7 +522,7 @@ export interface Species {
 export const FLORA: Record<FloraKind, Species> = {
   pine: { kit: pineKit, size: [2.0, 3.4], near: 55, far: 300, sway: 0.05 },
   jungle: { kit: (l) => rainKit(l, 'canopy', 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
-  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [2.9, 4.2], near: 42, far: 300, sway: 0.05 },
+  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [3.3, 4.6], near: 42, far: 300, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
   palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
@@ -851,6 +852,7 @@ in vec3 vBloom;
 in vec3 vSil;
 uniform float uFar;
 uniform vec3 uOchre;
+uniform vec3 uRose;
 uniform float uSeed;
 uniform vec3 uWater;
 float fhash(vec3 p) {
@@ -864,22 +866,37 @@ float vnoise(vec3 p) {
   return mix(mix(mix(fhash(i), fhash(i + vec3(1, 0, 0)), f.x), mix(fhash(i + vec3(0, 1, 0)), fhash(i + vec3(1, 1, 0)), f.x), f.y),
     mix(mix(fhash(i + vec3(0, 0, 1)), fhash(i + vec3(1, 0, 1)), f.x), mix(fhash(i + vec3(0, 1, 1)), fhash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
-// blossom as a watercolourist dabs it over the crown's green: soft-edged dabs of many sizes (world-anchored cells, some
-// left bare as the weight allows), a few ochre among the vermilion; once a dab shrinks toward a pixel it melts into the
-// wash it averages to, so a flowering crown reads as a warm blush from afar (S-020: never facets)
-float blossomAt(vec3 p, float w, out float other) {
-  float b = 0.0;
-  other = 0.0;
+// blossom as a watercolourist lays a tree in flower: the crown washed whole in its colour, mottled, thinning to the
+// leaf where the crown turns from the eye and under it (the green showing through at its edges); into the wash, deeper
+// clusters of bloom in a second layer (soft-edged, world-anchored, many sizes, a few ochre among the vermilion), and
+// near the eye each truss's shaded side inked. A cluster melts into the depth it averages to before it shrinks to a
+// pixel (S-020: never facets; S-022: a mass of colour across the harbour, never scattered flecks)
+float blossomAt(vec3 p, float w, float rim, out float other, out float deep, out float ink) {
+  other = 0.0; deep = 0.0; ink = 0.0;
+  if (w > 0.99) return 1.0;
+  // (the wash whole from afar; near the eye laid in masses on the paper with the leaf left between them, never the
+  // two mixed to a brown, the gaps filling as they shrink)
+  float gap = smoothstep(0.42, 0.58, 0.7 * vnoise(p * 1.6 + 5.3) + 0.3 * vnoise(p * 4.1 + 1.7));
+  float b = smoothstep(0.1, 0.45, w) * (0.82 + 0.18 * vnoise(p * 1.1 + 5.3)) * (1.0 - 0.7 * smoothstep(0.55, 0.95, rim))
+          * mix(gap, 1.0, smoothstep(0.03, 0.12, length(fwidth(p * 2.4))));
+  // the largest dabs are the trusses; the smaller gather round them as florets breaking the truss's edge, few between
+  float truss = 0.0;
   for (int o = 0; o < 3; o++) {
     vec3 c = p * (o == 0 ? 2.4 : o == 1 ? 5.0 : 11.0), cell = floor(c);
-    vec3 j = vec3(fhash(cell + 3.1), fhash(cell + 5.7), fhash(cell + 8.3)) - 0.5;
-    float r = length(fract(c) - 0.5 - 0.35 * j), rr = 0.24 + 0.2 * fhash(cell + 11.9), px = length(fwidth(c));
-    float d = smoothstep(rr + 0.5 * px + 0.06, rr - 0.08, r) * step(fhash(cell + 13.3), w * (o == 0 ? 0.7 : o == 1 ? 0.95 : 0.8));
-    d = mix(d, w * 0.85, smoothstep(0.7, 1.4, px)); // from afar a crown in flower reads as its colour (S-022)
-    other = max(other, d * step(0.72, fhash(cell + 17.7)));
-    b = max(b, d);
+    vec3 j = vec3(fhash(cell + 3.1), fhash(cell + 5.7), fhash(cell + 8.3)) - 0.5, f = fract(c) - 0.5 - 0.35 * j;
+    float r = length(f), rr = (o == 0 ? 0.28 : 0.24) + 0.2 * fhash(cell + 11.9), px = length(fwidth(c));
+    float on = step(fhash(cell + 13.3), w * (o == 0 ? 0.8 : (o == 1 ? 0.95 : 0.85) * (0.25 + 0.75 * truss)));
+    float d = smoothstep(rr + 0.5 * px + 0.06, rr - 0.08, r) * on, far = smoothstep(0.7, 1.4, px), k = o == 0 ? 0.9 : o == 1 ? 0.7 : 0.5;
+    if (o == 0) truss = smoothstep(rr + 0.3, rr, r) * on;
+    deep = max(deep, k * mix(d, 0.3 * w, far));
+    b = max(b, d * (1.0 - far));
+    other = max(other, d * (1.0 - far) * step(0.72, fhash(cell + 17.7)));
+    // (each truss and floret inked on its shaded side, broken where the cell's hash lifts the pen; a dot at a floret's heart)
+    float pen = smoothstep(0.0, -0.12, f.y) * step(0.2, fhash(cell + 21.1)) * (1.0 - smoothstep(0.55, 1.4, abs(r - rr) / max(px, 1e-4)))
+              + (o == 0 ? 0.0 : smoothstep(0.055 + px, 0.03 + 0.5 * px, r) * 0.8);
+    ink = max(ink, on * pen * (1.0 - smoothstep(0.06, 0.16, px)));
   }
-  return w > 0.99 ? 1.0 : max(b, 0.1 * w);
+  return max(b, 0.1 * w);
 }
 void main() {
   vec3 v = normalize(cameraPosition - vWorld), n = normalize(vNormal);
@@ -903,15 +920,22 @@ void main() {
     float nv = dot(normalize(vSil), v), rim = sqrt(max(0.0, 1.0 - nv * nv)), nz = 0.6 * vnoise(lc) + 0.4 * vnoise(lc * 2.7 + 7.0), lpx = length(fwidth(lc));
     if (rim > mix(0.56 + 0.42 * nz, 1.1, smoothstep(0.35, 0.9, lpx))) discard;
   }
-  float other = 0.0, bloom = vBlossom > 0.01 ? blossomAt(vWorld, vBlossom, other) : 0.0;
-  vec3 pig = mix(vPaint.rgb, mix(vBloom, uOchre, other * 0.8), bloom);
+  // (a crown in flower thins to its leaf where it turns from the eye: its outline's turn)
+  float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0;
+  float bloom = vBlossom > 0.01 ? blossomAt(vWorld, vBlossom, sqrt(max(0.0, 1.0 - nvB * nvB)), other, deep, bink) : 0.0;
+  vec3 bpig = mix(vBloom, uOchre, other * 0.8), pig = mix(vPaint.rgb, bpig, bloom);
   vec3 side = normalize(cross(vUp, abs(vUp.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec2 hc = vec2(dot(vWorld, vUp), dot(vWorld, side) + 0.7 * dot(vWorld, cross(vUp, side)));
   vec2 hdx = dFdx(hc), hdy = dFdy(hc);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v))) * mix(0.45, 1.0, vPart.z);
   vec3 col = glaze(parchment(q), pig, vPaint.w, washPool(n, v, q), q);
-  col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
+  col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w, 0.3, q); // the bloom laid twice, deepest in its clusters
+  // a crown in flower holds its colour further round into the shade, and there deepens to a cooler red (rose madder
+  // over the vermilion, a warm madder over the ochre), never browning under the cool glaze
+  col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom, q), ndl, tone);
+  col = glaze(col, uRose, 0.45 * bloom * smoothstep(0.4, 0.75, tone), 0.2, q);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed));
+  col = mix(col, hatchInk(0.6), 0.75 * bink); // near the eye each truss's shaded side inked
   if (vPart.y > 0.5) {
     // crescent leaf marks scalloping the masses, densest in shade, gone before they shrink to noise
     vec3 an = abs(n), c = vWorld * 5.5;
@@ -922,7 +946,7 @@ void main() {
     f = mat2(cos(turn), sin(turn), -sin(turn), cos(turn)) * f / sz;
     float r = length(f), px = length(fwidth(lp));
     float arc = smoothstep(0.38, 0.31, r) * smoothstep(0.2, 0.27, r) * smoothstep(0.05, -0.1 + 0.25 * o.x, f.y) * step(0.28, g3);
-    col = mix(col, hatchInk(tone), arc * clamp(0.9 - 0.7 * tone, 0.15, 0.9) * (1.0 - smoothstep(0.18, 0.5, px)));
+    col = mix(col, hatchInk(tone), arc * clamp(0.9 - 0.7 * tone, 0.15, 0.9) * (1.0 - smoothstep(0.18, 0.5, px)) * (1.0 - 0.4 * bloom));
   }
   if (uNight > 0.0) {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;
@@ -949,7 +973,7 @@ export function floraMaterial(style: Style, swell: Swell, o: FloraMaterialOption
   return inkMaterial(style, {
     vertexShader: VERT, fragmentShader: FRAG, defines: o.veil ? { VEIL: true } : {}, id: o.id, veil: o.veil, side: THREE.DoubleSide,
     uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 },
-      uSeed: { value: 3.7 }, uWater: { value: T('verdigris') }, uOchre: { value: T('ochre') } },
+      uSeed: { value: 3.7 }, uWater: { value: T('verdigris') }, uOchre: { value: T('ochre') }, uRose: { value: T('roseMadder') } },
   });
 }
 

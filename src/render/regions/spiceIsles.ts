@@ -372,7 +372,7 @@ export function planSpice(field: TerrainField): SpicePlan {
         if (plan.birds.length < 80 && fr() < 0.5) plan.birds.push(lift(dir, p.top));
       } else if (r < 0.07 + 0.45 * grove) {
         const gold = Math.sin(0.33 * px + 0.7) * Math.cos(0.29 * py - 0.4) > 0.1;
-        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: fr() * TAU, s: 3.4 + 1.4 * fr(), kitH: 0.95, reach: 1.3 });
+        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: fr() * TAU, s: 3.8 + 1.6 * fr(), kitH: 0.95, reach: 1.3 });
         if (plan.birds.length < 80 && fr() < 0.15) plan.birds.push(lift(dir, p.top));
       }
     }
