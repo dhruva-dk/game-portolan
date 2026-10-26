@@ -62,8 +62,15 @@ const LIFT = 0.03;
 
 export const GROUND = { beach: 0, mud: 1, meadow: 2, scree: 3, rock: 4, cliff: 5, ice: 6, basalt: 7 } as const;
 export type Ground = (typeof GROUND)[keyof typeof GROUND];
-/** By the surface's up·normal: sheer below `cliff`, steep below `scree`; beaches reach berm·beachRise + beachBase. */
-export const SLOPES = { cliff: 0.62, scree: 0.8, beachRise: 1.6, beachBase: 0.3 } as const;
+/** By the surface's up·normal: sheer below `cliff`, steep below `scree`; beaches reach berm·beachRise + beachBase.
+ *  Rainforest clings to far steeper ground (`clad`: sheer below [0], steep below [1]), so a jungle's slopes and spurs
+ *  are forest down to the beach, and only its true crags stand bare; its sand lies only on the strand's flat (gentler
+ *  than `strand`), the forest's leaf bank closing down to it over any rise behind (S-022). */
+export const SLOPES = { cliff: 0.62, scree: 0.8, beachRise: 1.6, beachBase: 0.3, clad: [0.42, 0.62], strand: 0.86 } as const;
+/** Whether region r's land is clad in rainforest (its slopes held by the forest: SLOPES.clad). */
+export const cladOf = (r: Region): boolean => r.flora.includes('jungle');
+/** Region r's sheer and steep thresholds of up·normal. */
+export const slopesOf = (r: Region): readonly [number, number] => (cladOf(r) ? SLOPES.clad : [SLOPES.cliff, SLOPES.scree]);
 const LOAD = { land: 0.7, foliage: 0.62 } as const;
 
 export type Sand = 'white' | 'gold' | 'black' | 'mud' | 'ice' | 'shingle';
@@ -86,15 +93,17 @@ export function sandOf(r: Region): Sand {
 export function landformOf(r: Region): number {
   return r.climate === 'polar' ? 2 : r.strokes.some((s) => s.k === 'stacks' || s.k === 'column') ? 1 : 0;
 }
-const beachTop = (r: Region): number => r.shore.berm * SLOPES.beachRise + SLOPES.beachBase;
+/** The top of region r's beach, u over mean sea. */
+export const beachTop = (r: Region): number => r.shore.berm * SLOPES.beachRise + SLOPES.beachBase;
 
 /** The ground of region `ri` at `height` u where the surface's up·normal is `up`. */
 export function groundAt(ri: number, height: number, up: number): Ground {
   const r = REGIONS[ri], form = landformOf(r);
   if (form === 2) return GROUND.ice;
-  if (up < SLOPES.cliff) return form === 1 ? GROUND.basalt : GROUND.cliff;
-  if (up < SLOPES.scree) return height < r.shore.cliffH * 0.8 ? GROUND.scree : GROUND.rock;
-  if (height < beachTop(r)) return sandOf(r) === 'mud' ? GROUND.mud : GROUND.beach;
+  const [sheer, steep] = slopesOf(r);
+  if (up < sheer) return form === 1 ? GROUND.basalt : GROUND.cliff;
+  if (up < steep) return height < r.shore.cliffH * 0.8 ? GROUND.scree : GROUND.rock;
+  if (height < beachTop(r) && (up > SLOPES.strand || !cladOf(r) || height < TIDE.amp + 0.4)) return sandOf(r) === 'mud' ? GROUND.mud : GROUND.beach;
   return GROUND.meadow;
 }
 
@@ -561,7 +570,8 @@ uniform vec4 uRelief[${NR}]; // crag share, volcanic, shingle beach, the beds' d
 uniform vec3 uChartE[${NR}];
 uniform vec3 uChartN[${NR}];
 uniform vec2 uFade;          // the composite's line fade, u from the eye
-const float CLIFF_UP = ${SLOPES.cliff.toFixed(3)}, SCREE_UP = ${SLOPES.scree.toFixed(3)}, TIDE_AMP = ${TIDE.amp.toFixed(3)};
+uniform vec3 uSlope[${NR}];  // up·normal below which the ground is sheer, and steep; 1 where rainforest clads the land
+const float TIDE_AMP = ${TIDE.amp.toFixed(3)};
 const float CELL_U = ${CELL_U.toFixed(4)};
 const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS = 0.6;
 const vec3 ULTRA_T = ${vec(transmittanceVec(PIGMENTS.ultramarine))};
@@ -642,6 +652,8 @@ void main() {
   float up0 = dot(n0, dir);
   int ri = vRegion;
   vec4 shore = uShore[ri], land = uLand[ri], fol = uFoliage[ri], sand = uSand[ri], rel = uRelief[ri];
+  vec3 slope = uSlope[ri];
+  float CLIFF_UP = slope.x, SCREE_UP = slope.y, clad = slope.z, STRAND_UP = ${SLOPES.strand.toFixed(3)};
   // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
   // field's waterline; never on reef, whose flank under the water is the sea's to paint, nor (on the low coral cays of
   // a white-sand region, which have no cliffs) further out than a cell, where the mesh's faces at a drowned shelf's
@@ -665,8 +677,10 @@ void main() {
   cliff *= 1.0 - cay;
   steep *= 1.0 - cay;
   float low = 1.0 - smoothstep(shore.x - 0.3, shore.x + 0.3, h + bleed * 6.0);
+  if (clad > 0.5) low *= max(smoothstep(STRAND_UP - 0.04, STRAND_UP + 0.03, up0 + bleed + 0.06 * (q.mottle - 0.5)),
+                             1.0 - smoothstep(TIDE_AMP + 0.25, TIDE_AMP + 0.45, h + 0.2 * bleed)); // (the foreshore sand, however steep)
   float beach = (1.0 - cliff - steep) * low, meadow = 1.0 - cliff - steep - beach;
-  float talus = steep * (1.0 - smoothstep(0.25, 0.45, h / max(shore.y, 1.0)));
+  float talus = steep * (1.0 - smoothstep(0.25, 0.45, h / max(shore.y, 1.0))) * (1.0 - clad); // (no scree under rainforest)
 
   // the beds: bent by folds, tilted by the region's dip, broken into blocks along faults
   float fold = 0.9 * noise3(vWorld / 9.0) + 0.3 * noise3(vWorld / 3.1);
@@ -708,7 +722,22 @@ void main() {
   // slopes short of sheer carry the uplands' growth where the ground allows (not on ice, basalt, lava or the talus),
   // the rock showing through in patches
   float veg = smoothstep(-0.3, 0.3, patchy + 0.3 - 1.2 * talus) * (1.0 - rel.y) * step(shore.z, 0.5) * 0.85;
+  // rainforest: its steep slopes the forest floor in the canopy's shade, never bare; its crags dark volcanic rock, only
+  // its buttresses' spines and ledges bare, ferns and scrub filling the gullies and clinging to every ledge (S-022)
+  float spine = 0.0;
+  if (clad > 0.5) {
+    vec3 shadeG = glaze(green, ULTRA_T, 0.3 + 0.15 * patchy, pool, q);
+    vec3 lava = glaze(glaze(ground, land.rgb, land.a * 0.5, pool, q), SEPIA_T, 0.85 + 0.25 * blk, pool, q);
+    lava = glaze(lava, ULTRA_T, 0.25, pool, q);
+    spine = smoothstep(0.2, 0.55, rib + 0.3 * patchy) * (1.0 - smoothstep(0.1, 0.5, noise3(vWorld / 1.3 + 6.0) + 0.4 * crease));
+    rock = mix(shadeG, lava, spine);
+    veg = 1.0 - 0.5 * spine;
+    green = mix(green, shadeG, 0.35 * steep);
+  }
   vec3 col = rock * cliff + mix(rock, green, veg) * steep + sandC * beach + green * meadow;
+  // (the clad slopes are drawn as the forest floor from here on: beds, joints, fissures and fall-line hatching only on
+  // the bare spines)
+  if (clad > 0.5) { cliff *= spine; steep *= spine; }
   // coral: where the floor is reef the ground is the reef's own: up to the high-water line a pavement of bleached
   // limestone under a veneer of white coral sand, cooler and darker where wet; a blush of coralline algae along its
   // edge, olive turf and rubble in broad soft patches, and near the eye pools that keep the sea's turquoise; its fronts
@@ -911,6 +940,7 @@ function terrainMaterial(pipeline: Pipeline, swell: Swell): THREE.ShaderMaterial
       uChartE: { value: REGIONS.map((_, i) => new THREE.Vector3(e(i).x, e(i).y, e(i).z)) },
       uChartN: { value: REGIONS.map((_, i) => new THREE.Vector3(nn(i).x, nn(i).y, nn(i).z)) },
       uFade: { value: new THREE.Vector2(pipeline.ink.fadeStart, pipeline.ink.fadeEnd) },
+      uSlope: { value: REGIONS.map((r) => new THREE.Vector3(...slopesOf(r), cladOf(r) ? 1 : 0)) },
     },
   });
   // the land wins the depth test where it lies on the sea's surface

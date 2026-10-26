@@ -27,7 +27,7 @@ import type { Geography } from '../sim/world/geography.ts';
 import { FLOOR, REGIONS, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
-import { GROUND, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
+import { GROUND, SLOPES, cladOf, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 /** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores and pandanus at the edge of
@@ -601,7 +601,7 @@ function noise(x: number, y: number, z: number): number {
 
 /** What a cell offers a plant: its ground, height, slope, distance inland, shelter (u its ring stands above it),
  *  altitude (fraction of its region's peak), grove (0 clearing … 1 grove), water depth and floor. */
-interface Cell { ground: Ground; height: number; up: number; inland: number; shelter: number; alt: number; grove: number; depth: number; floor: number; mix: number }
+interface Cell { ground: Ground; height: number; up: number; inland: number; shelter: number; alt: number; grove: number; depth: number; floor: number; mix: number; clad: boolean }
 
 /** The trees (palms apart: they fringe the beach crest): never on beach, mud, cliff, basalt or ice. */
 export const TREES: readonly FloraKind[] = ['pine', 'jungle', 'floweringTree', 'cloudForest', 'treeFern', 'broadleaf', 'nutmeg'];
@@ -609,8 +609,9 @@ export const TREES: readonly FloraKind[] = ['pine', 'jungle', 'floweringTree', '
  *  species open ground, rock and scree (mangroves stand in the tide, kelp and coral under it). */
 const grows = (kind: FloraKind, g: Ground): boolean => (kind === 'duneGrass' || kind === 'palm' || kind === 'pandanus' ? g === GROUND.meadow || g === GROUND.beach
   : kind === 'reed' ? g === GROUND.mud || g === GROUND.meadow : g === GROUND.meadow || g === GROUND.rock || g === GROUND.scree);
-const wooded = (c: Cell): number => (c.up > 0.6 && c.inland > 1.2 && c.depth < -0.3
-  ? smooth(0.6, 0.8, c.up) * Math.min(1.4, Math.max(0.12, 0.75 + 0.9 * c.shelter)) * (1 - smooth(0.6, 1, c.alt)) : 0);
+// (rainforest holds far steeper ground, down to its sheer crags: SLOPES.clad)
+const wooded = (c: Cell, [lo, hi] = c.clad ? SLOPES.clad : [0.6, 0.8]): number => (c.up > lo && c.inland > 1.2 && c.depth < -0.3
+  ? smooth(lo, hi, c.up) * Math.min(1.4, Math.max(0.12, 0.75 + 0.9 * c.shelter)) * (1 - smooth(0.6, 1, c.alt)) : 0);
 
 /** Expected plants of `kind` in a cell. */
 function density(kind: FloraKind, c: Cell): number {
@@ -626,7 +627,7 @@ function density(kind: FloraKind, c: Cell): number {
     case 'treeFern': return 0.12 * wooded(c) * (1.2 - c.alt);
     case 'palm': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.65)) && c.inland > 0.3 && c.up > 0.75 ? 0.35 * (1 - smooth(1, 9, c.inland)) : 0;
     // the rainforest's edge: pandanus and strand scrub along the top of the beach under the leaning palms
-    case 'pandanus': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.55)) && c.inland > 0.2 && c.up > 0.72 ? 0.6 * (1 - smooth(3, 8, c.inland)) : 0;
+    case 'pandanus': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.55)) && c.inland > 0.2 && c.up > 0.6 ? 0.6 * (1 - smooth(3, 8, c.inland)) : 0;
     case 'mangrove': return c.height > -0.7 && c.height < 1.8 && c.inland < 6 && c.up > 0.75 ? 0.25 : 0;
     case 'heather': return land && c.up > 0.66 && (g === GROUND.meadow || g === GROUND.rock || g === GROUND.scree)
       ? 0.3 * (0.25 + 0.75 * (1 - c.grove)) * (0.6 + Math.max(0, -c.shelter)) : 0;
@@ -686,7 +687,7 @@ export interface Bed {
 export function plantBed(geo: Geography, field: TerrainField): Bed {
   const H = field.relief, peak = new Float32Array(REGIONS.length).fill(1);
   for (let c = 0; c < H.length; c++) peak[geo.region[c]] = Math.max(peak[geo.region[c]], H[c]);
-  const kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : []),
+  const clad = REGIONS.map(cladOf), kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : []),
     ...(r.flora.includes('jungle') ? ['pandanus' as const, 'broadleaf' as const, 'nutmeg' as const] : [])]
     .map((k) => KINDS.indexOf(k)));
   const keys: number[] = [], kindOf: number[] = [], mats: number[] = [], cols: number[] = [], seeds: number[] = [];
@@ -708,7 +709,7 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
         const s = R / 9, grove = 0.7 * noise(dir.x * s, dir.y * s, dir.z * s) + 0.3 * noise(dir.x * s * 3.1, dir.y * s * 3.1, dir.z * s * 3.1);
         const cell: Cell = { ground: groundAt(ri, Math.max(h, 0.03), up), height: h, up, inland: -geo.coast[c], shelter: ring / 8 - h,
           alt: Math.max(0, h) / peak[ri], grove: smooth(0.3, 0.7, grove), depth: -h, floor,
-          mix: noise(dir.x * s * 2.3 + 17.1, dir.y * s * 2.3 - 5.3, dir.z * s * 2.3 + 9.7) }; // which of the jungle's crowns masses here
+          mix: noise(dir.x * s * 2.3 + 17.1, dir.y * s * 2.3 - 5.3, dir.z * s * 2.3 + 9.7), clad: clad[ri] }; // which of the jungle's crowns masses here
         for (const k of ks) {
           const kind = KINDS[k], sp = FLORA[kind], n = Math.floor(density(kind, cell) + hash(c, k, 1)), tree = TREES.includes(kind);
           for (let m = 0; m < n; m++) {

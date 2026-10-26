@@ -20,7 +20,7 @@ import { floraMaterial, rainGeometry, type RainForm } from '../flora.ts';
 import { seas } from '../sea.ts';
 import { masonrySurface, MOLE } from '../structures.ts';
 import type { Swell } from '../swell.ts';
-import { GROUND, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
+import { beachTop, GROUND, SLOPES, terrains, type Ground, type Surface, type TerrainField } from '../terrain.ts';
 import type { RenderContext, RenderModule } from '../world.ts';
 import { chartDir, Draw, Kit, lift, pose, regionSeen, seeded, vec, type V, washOf, type Wash } from './kit.ts';
 
@@ -338,7 +338,7 @@ export function planSpice(field: TerrainField): SpicePlan {
     }
   }
   // the forest: emergents, flowering groves and the edge behind the beaches, on gentle ground dry at high water
-  const fr = seeded(825), clear = (x: number, y: number, r: number): boolean => !taken.some((p) => Math.hypot(p.x - x, p.y - y) < p.r + r);
+  const fr = seeded(825), sr = seeded(826), STRAND = beachTop(REGION), clear = (x: number, y: number, r: number): boolean => !taken.some((p) => Math.hypot(p.x - x, p.y - y) < p.r + r);
   for (let y = -62; y <= 62; y += SPICE.step) {
     for (let x = -62; x <= 62; x += SPICE.step) {
       const px = x + (fr() - 0.5) * SPICE.step, py = y + (fr() - 0.5) * SPICE.step, r = fr(), q = fr();
@@ -354,12 +354,20 @@ export function planSpice(field: TerrainField): SpicePlan {
         }
         continue;
       }
-      if (S.up < 0.68 || S.ground === GROUND.beach || S.ground === GROUND.mud) continue;
+      // (the forest is planned on the strand as it was drawn before S-022: sand to the beach's top wherever the ground was
+      // not steep; the rise behind the sand, drawn as the forest floor since, takes the edge's leaf bank alone, from its
+      // own numbers, so the forest above stands where it stood)
+      const strand = (g: Surface): boolean => g.height < STRAND && g.up >= SLOPES.scree, rise = strand(S) && S.ground !== GROUND.beach;
+      if (S.up < 0.68 || (strand(S) && !rise) || S.ground === GROUND.mud) continue;
       const inland = -coastAt(geo, dir), fwd = tan(px, py, 1, 0);
       const cx = coastAt(geo, chartDir(RI, px + 0.5, py)) - coastAt(geo, chartDir(RI, px - 0.5, py)), cy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5));
       const cl = Math.hypot(cx, cy) || 1, seaward = chartDir(RI, px + (1.8 * cx) / cl, py + (1.8 * cy) / cl);
+      if (rise) {
+        if (sr() < 0.9) place(plan.edge, px, py, { sink: 0.1, fwd: tan(px, py, cx / cl, cy / cl), yaw: 0.5 * (sr() - 0.5), s: 2 + 0.8 * sr(), sy: 1.8 + 0.8 * sr(), kitH: 0.95, reach: 1.5 });
+        continue;
+      }
       // the forest's edge: the first wooded ground above a beach or the water
-      const edge = inland < 6 && (field.surface(seaward, -10, S).ground === GROUND.beach || heightAt(geo, seaward) < LAND + 0.3);
+      const edge = inland < 6 && (strand(field.surface(seaward, -10, S)) || heightAt(geo, seaward) < LAND + 0.3);
       // blooming groves: a slow field picks where they gather, and which bloom gold and which vermilion
       const grove = 0.5 + 0.5 * Math.sin(0.21 * px + 1.3 * Math.sin(0.17 * py)) * Math.cos(0.19 * py - 1.1 * Math.sin(0.23 * px));
       if (edge && q < 0.85 && clear(px, py, 1)) {
