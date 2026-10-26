@@ -163,24 +163,28 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
   for (let i = 0; i <= n; i++) {
     const t = i / n;
     path.push(vec(0.015 * Math.sin(t * 4 + seed), t, bend * t * t + 0.05 * t * Math.sin(t * 3 + seed)));
-    radii.push((i === 0 ? 0.058 : 0.036 - 0.012 * t) * (young ? 1.5 : 1));
+    // (far off the bole drawn a little stouter, as an engraver keeps a far trunk to one firm line: S-024, a far grove read
+    // as a trunkless mop)
+    radii.push((i === 0 ? 0.058 : 0.036 - 0.012 * t) * (young ? 1.5 : 1) * (far ? 1.15 : 1));
   }
-  b.pick = (c) => (Math.floor(c.y * 26) % 3 ? W.bole : W.boleRing);
+  b.pick = far ? null : (c) => (Math.floor(c.y * 26) % 3 ? W.bole : W.boleRing); // (far off no rings: they banded it)
   tube(b, path, radii, far ? 3 : 6);
   b.pick = null;
   const top = path[n], Y = vec(0, 1, 0), count = far ? 8 : young ? 9 : 12, L = young ? 0.62 : 0.5, SEG = far ? 2 : 5, fronds = laid(b);
   for (let k = 0; k < count; k++) {
     const phi = (k / count) * TAU + 0.3 * rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi) + 0.6).normalize(), age = k % 4;
-    const droop = young ? 0.35 + 0.25 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : 0.45 - 0.06 * age;
+    // (far off the fronds arch out flatter, so from height a crown is a star of fronds, from the sea a fountain, never a
+    // hanging mop)
+    const droop = young ? 0.35 + 0.25 * age : far ? 0.32 + 0.16 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : far ? 0.5 - 0.05 * age : 0.45 - 0.06 * age;
     const len = L * (0.85 + 0.3 * rnd()) * (age === 0 ? 0.8 : 1), side = vec().crossVectors(d, Y).normalize();
     b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDry : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
     const tone = b.wash, kept = tone === W.frondDry || tone === W.frondOld;
     let prev = top.clone();
     for (let i = 1; i <= SEG; i++) {
       const s = i / SEG, p = top.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (rise * s - droop * s * s));
-      const w = len * 0.2 * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
+      const w = len * (far ? 0.27 : 0.2) * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
       // the crown lit where it arches above its heart, shadowed where it hangs below
-      if (!kept) b.wash = mid.y > top.y - 0.03 ? (age === 0 || far ? W.crownNoon : W.crownLit) : W.crownHang;
+      if (!kept) b.wash = mid.y > top.y - 0.03 ? (far ? W.crownSun : age === 0 ? W.crownNoon : W.crownLit) : W.crownHang;
       // (far off the blades lie flatter, lit as a crown is seen from afar, not a dark fringe)
       const hang = vec(0, far ? -len * 0.02 : -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
       b.tri(prev, p, mid.clone().addScaledVector(side, w).add(hang));
@@ -841,11 +845,12 @@ export class CoralAtolls {
   readonly voices: readonly { at: V; loud: number }[];
   private readonly material: THREE.ShaderMaterial;
   private readonly fine: THREE.ShaderMaterial; // (the withies' light ink)
+  private readonly grove: THREE.ShaderMaterial; // (the palms sketched far off)
   private readonly wreck: THREE.ShaderMaterial; // (the hulk's, hatched along its keel)
   private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
-  /** [draw, parts, from, to (u from the eye), drawn only while dry] */
-  private readonly near: [Draw, Part[], number, number, boolean][];
+  /** [draw, parts, from, to (u from the eye), drawn only while dry, the share of the parts drawn] */
+  private readonly near: [Draw, Part[], number, number, boolean, number][];
   /** The break's draws (near, far): white water only where the reef under it is awash. */
   private readonly spills: Draw[];
   private drawn = NaN;
@@ -874,6 +879,16 @@ export class CoralAtolls {
     this.fine = illustratedMaterial(style, {
       pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45, anchor: 'object', hatch: { axis: [1, 0, 0] }, surface: 'tone = min(tone, 0.6);',
     });
+    // (the palms sketched far off: each crown lit as one dome of fronds whichever face of a frond the eye meets, so it
+    // reads from height as a pale green-gold star; S-024: the double-sided fronds' back faces, flipped into shade, were
+    // hatched dense and inked all round, and a grove from high read near-black; its ink light, heavier on the shaded
+    // side, and its hatching only the underside's)
+    this.grove = illustratedMaterial(style, {
+      pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.55,
+      surface: `n = normalize(vNormal); ndl = dot(n, uSun); tone = lightTone(ndl, abs(dot(n, v)));
+        col = sunGlaze(shadeGlaze(glaze(parchment(q), vPaint.rgb, vPaint.w, washPool(n, v, q), q), tone, q), ndl, tone);
+        tone = min(tone, 0.5);`,
+    });
     // (the hulk the same way along its length: each frame stands in a plane across the keel, so a stroke follows a rib
     // whole and the planking takes its strokes between the frames; never banded across its ribs, S-024)
     const wreck = (this.wreck = illustratedMaterial(style, {
@@ -886,18 +901,20 @@ export class CoralAtolls {
     ];
     // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it; the
     // reef-front corals are the sea's, painted on its floor under the water); palms in full near the eye, sketched beyond
-    const near: [THREE.BufferGeometry, Part[], number, number, boolean][] = [
+    const near: [THREE.BufferGeometry, Part[], number, number, boolean, THREE.ShaderMaterial?, number?][] = [
       [slabKit(12), plan.slabs, 0, CORAL.near, true], [boulderKit(13), plan.boulders, 0, CORAL.near, false],
-      ...[11, 29, 23].flatMap((seed, k): [THREE.BufferGeometry, Part[], number, number, boolean][] => [
+      ...[11, 29, 23].flatMap((seed, k): [THREE.BufferGeometry, Part[], number, number, boolean, THREE.ShaderMaterial?, number?][] => [
         [palmNearKit(seed, k === 2), plan.palms[k], 0, CORAL.leaflets, false], [palmKit(seed, k === 2), plan.palms[k], CORAL.leaflets, CORAL.palms, false],
-        [palmKit(seed, k === 2, true), plan.palms[k], CORAL.palms, 1e4, false]]),
+        // (far off a grove thinned, its young palms most, so its crowns stand apart with sand and shade between: S-024,
+        // the motus' 0.6 u grid packs a dozen crowns into each crown's span, one solid mass from height)
+        [palmKit(seed, k === 2, true), plan.palms[k], CORAL.palms, 1e4, false, this.grove, k === 2 ? 0.35 : 0.6]]),
       [pandanusNearKit(5), plan.pandanus, 0, CORAL.drawn, false], [pandanusKit(5), plan.pandanus, CORAL.drawn, 1e4, false]];
-    this.near = near.map(([kit, parts, from, to, dry]) => [new Draw(kit, this.material, parts.length), parts, from, to, dry]);
+    this.near = near.map(([kit, parts, from, to, dry, m, keep]) => [new Draw(kit, m ?? this.material, parts.length), parts, from, to, dry, keep ?? 1]);
     // the break standing off the reef near the eye (past ~60 u the sea's own ribbon of white is the surf)
     this.spillMaterial = inkMaterial(style, { vertexShader: SPILL_VERT, fragmentShader: SPILL_FRAG, veil: true, side: THREE.DoubleSide,
       uniforms: { uSeaLevel: swell.uniforms.uSeaLevel, uFoam: { value: linearVec(PIGMENTS.leadWhite) }, uFace: { value: linearVec(PIGMENTS.verdigris) } } });
     this.spills = [new Draw(spillKit(10, 7, true), this.spillMaterial, plan.spill.length), new Draw(spillKit(5, 4, false), this.spillMaterial, plan.spill.length)];
-    this.near.push([this.spills[0], plan.spill, 0, CORAL.drawn, false], [this.spills[1], plan.spill, CORAL.drawn, 62, false]);
+    this.near.push([this.spills[0], plan.spill, 0, CORAL.drawn, false, 1], [this.spills[1], plan.spill, CORAL.drawn, 62, false, 1]);
     this.group.add(...this.draws.map((d) => d.mesh));
   }
 
@@ -920,12 +937,12 @@ export class CoralAtolls {
       this.frustum.setFromProjectionMatrix(this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     }
     const ball = this.ball;
-    for (const [d, parts, from, to, dry] of this.near) {
+    for (const [d, parts, from, to, dry, keep] of this.near) {
       const wet = this.spills.includes(d);
       d.begin();
-      for (const p of parts) {
-        const r2 = eye.distanceToSquared(p.at);
-        if (r2 < from * from || r2 >= to * to || (dry && p.ground <= level - 0.02) || (wet && p.ground >= level - 0.08)) continue;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i], r2 = eye.distanceToSquared(p.at);
+        if ((keep < 1 && (i * 0.618034) % 1 >= keep) || r2 < from * from || r2 >= to * to || (dry && p.ground <= level - 0.02) || (wet && p.ground >= level - 0.08)) continue;
         if (camera) {
           const h = (p.top - p.base) / 2;
           ball.center.copy(p.dir).multiplyScalar(h).add(p.at);
@@ -945,6 +962,7 @@ export class CoralAtolls {
   dispose(): void {
     this.material.dispose();
     this.fine.dispose();
+    this.grove.dispose();
     this.wreck.dispose();
     this.spillMaterial.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
