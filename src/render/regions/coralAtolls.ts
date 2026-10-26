@@ -56,7 +56,7 @@ const W = {
   bleach: washOf(PIGMENTS.leadWhite, 0.65), rock: washOf(PIGMENTS.sepia, 0.45),
   sand: washOf(PIGMENTS.leadWhite, 0.75), sandEdge: washOf(PIGMENTS.ochre, 0.3),
   drift: washOf(PIGMENTS.leadWhite, 0.5), driftDark: washOf(PIGMENTS.sepia, 0.5),
-  pole: washOf(PIGMENTS.sepia, 0.85),
+  pole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.55), 0.4), poleFoot: washOf(mix(PIGMENTS.verdigris, PIGMENTS.leadWhite, 0.4), 0.4),
   crownLit: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.45), 0.5), crownSun: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.6),
   crownShade: washOf(mix(PIGMENTS.malachite, PIGMENTS.indigo, 0.25), 0.8),
   // a grove seen from the sea at noon: silver-grey boles, the crowns sunlit through and their hanging fronds a cool green
@@ -406,18 +406,19 @@ function driftKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A channel withy 2 tall: a driven pole, its foot weed-green, under a tight broom topmark (a bundle of twigs bound on
- *  and splayed upward), dark against sea and sky so it reads as a mark. */
+/** A channel withy 2 tall: a slender driven pole weathered silver-grey, its foot green where the tide washes it, under
+ *  a small broom topmark (a bundle of twigs bound on and fanning a little upward), drawn in fine light ink so it reads
+ *  as a mark yet never outweighs the lighthouse or the palms (S-024: splayed burnt tips read as pitchforks). */
 function stakeKit(): THREE.BufferGeometry {
   const b = new Brush(W.pole);
-  b.pick = (c) => (c.y < 0.45 ? W.weed : W.pole);
-  tube(b, [vec(0, -0.3, 0), vec(0.01, 0.8, 0), vec(0.02, 1.5, 0)], [0.04, 0.034, 0.026], 5);
+  b.pick = (c) => (c.y < 0.3 ? W.poleFoot : W.pole);
+  tube(b, [vec(0, -0.3, 0), vec(0.012, 0.8, 0), vec(0.02, 1.52, 0)], [0.026, 0.021, 0.016], 5);
   b.pick = null;
-  for (let k = 0; k < 11; k++) {
-    const a = k * 2.4, r = 0.1 + 0.09 * (((k * 7) % 3) / 2);
-    spike(b, vec(0.02, 1.38, 0), vec(0.02 + r * Math.cos(a), 1.86 + 0.14 * (((k * 5) % 3) / 2), r * Math.sin(a)), 0.024, k);
+  for (let k = 0; k < 7; k++) {
+    const a = k * 2.4, r = 0.035 + 0.035 * (((k * 7) % 3) / 2);
+    spike(b, vec(0.02, 1.4, 0), vec(0.02 + r * Math.cos(a), 1.78 + 0.1 * (((k * 5) % 3) / 2), r * Math.sin(a)), 0.012, k);
   }
-  blob(b, vec(0.02, 1.42, 0), 0.04); // the binding
+  blob(b, vec(0.02, 1.43, 0), 0.022); // the binding
   return b.kit.build();
 }
 
@@ -775,7 +776,7 @@ export function planCoral(field: TerrainField): CoralPlan {
     };
     // the withies stand where a keel strikes at mean tide, through the mouth (outside the crest) and in, both sides,
     // tall enough to stand well clear of high water
-    for (const d of c.great ? [8, 6, 4, 2, 0, -2, -4, -6].filter((d) => d >= -Math.min(8, 0.45 * rc)) : [1.5, -1]) {
+    for (const d of c.great ? [7, 3, -1, -5].filter((d) => d >= -Math.min(8, 0.45 * rc)) : [1.5, -1]) {
       for (const sd of [-1, 1]) {
         const e = across(d, sd, 0.4, -DRAFT);
         if (!e || open(e.x, e.y, 1.1)) continue;
@@ -837,6 +838,7 @@ export class CoralAtolls {
   /** WP28: where the surf breaks and how loud (0–1). */
   readonly voices: readonly { at: V; loud: number }[];
   private readonly material: THREE.ShaderMaterial;
+  private readonly fine: THREE.ShaderMaterial; // (the withies' light ink)
   private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), drawn only while dry] */
@@ -863,10 +865,11 @@ export class CoralAtolls {
     this.material.polygonOffset = true;
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
-    const fixed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.material, parts.length).fill(parts.map((p) => p.m));
+    this.fine = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45 });
+    const fixed = (kit: THREE.BufferGeometry, parts: Part[], m = this.material): Draw => new Draw(kit, m, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [
       fixed(shrubKit(9), plan.shrubs),
-      fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes), fixed(hulkKit(8), plan.hulks),
+      fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes, this.fine), fixed(hulkKit(8), plan.hulks),
     ];
     // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it; the
     // reef-front corals are the sea's, painted on its floor under the water); palms in full near the eye, sketched beyond
@@ -928,6 +931,7 @@ export class CoralAtolls {
 
   dispose(): void {
     this.material.dispose();
+    this.fine.dispose();
     this.spillMaterial.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
