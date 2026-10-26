@@ -1,8 +1,8 @@
 {
  "date": "2026-10-26",
  "matches": 200,
- "wall": 402.138273834,
- "workerSeconds": 1703.6129252520007,
+ "wall": 120.480035333,
+ "workerSeconds": 714.2292027049998,
  "bounds": {
   "minutes": [
    9,
@@ -13,16 +13,16 @@
   "p": 0.001
  },
  "minutes": {
-  "min": 9.652777777777777,
-  "q1": 10.125,
-  "median": 10.303888888888888,
-  "q3": 10.512222222222222,
-  "max": 10.747777777777777,
-  "mean": 10.29091388888889,
+  "min": 9.625555555555556,
+  "q1": 10.202222222222222,
+  "median": 10.395000000000001,
+  "q3": 10.537222222222223,
+  "max": 10.735000000000001,
+  "mean": 10.357852777777776,
   "inBounds": 200
  },
  "breakOff": {
-  "The Ice Crown": 99,
+  "The Ice Crown": 100,
   "The Fjords": 160,
   "The Basalt Stacks": 199,
   "The Kelp Shallows": 99,
@@ -31,7 +31,7 @@
   "The Glass Sea": 57,
   "The Fire Archipelago": 239,
   "The Mangrove Labyrinth": 155,
-  "The Coral Atolls": 189,
+  "The Coral Atolls": 188,
   "The Spice Isles": 212,
   "The Maelstrom": 134
  },
@@ -56,10 +56,10 @@
   "critical": 31.429105891015173
  },
  "pace": {
-  "firstSinking": 2.772166666666669,
-  "firstSinkingMin": 0.30666666666666664,
-  "captainsAtFinalCalm": 1.925,
+  "firstSinking": 3.0176999999999996,
+  "firstSinkingMin": 0.2822222222222222,
+  "captainsAtFinalCalm": 2.25,
   "finalCalmHeld": 10.166666666666666,
-  "lastSunkByStorm": 151
+  "lastSunkByStorm": 176
  }
 }

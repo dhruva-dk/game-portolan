@@ -7,7 +7,7 @@
 // of it: its level is the dilated maximum of (height + DRAFT). Levels below the lowest tide count as always open,
 // above the highest as never. A nav cell opens at the lowest level of its sixteen territory cells; the edge to a
 // neighbour at the lowest level over the pairs of territory cells that face each other across the shared border.
-import { dot, type V3 } from '../math.ts';
+import { dcos, dot, type V3 } from '../math.ts';
 import { R, TERRITORY, cellDir, cellOf, cubeGrid, neighbor, type CubeGrid } from '../sphere.ts';
 import { DRAFT, TIDE } from './regions.ts';
 import { CLEAR, ZONE, type Geography } from './geography.ts';
@@ -94,6 +94,14 @@ const G = new Float64Array(NAV.cells), FROM = new Int32Array(NAV.cells), SEEN = 
 const HEAP = new Int32Array(NAV.cells * 4 + 1), KEY = new Float64Array(NAV.cells * 4 + 1); // one push per edge relaxed, at most
 let stamp = 0, heapN = 0;
 const DIR = { x: 0, y: 0, z: 0 };
+/**
+ * A search with a limit gives up once it has expanded this many times the nav cells within the limit's reach of its
+ * start. Greed reopens cells, so a search that cannot succeed would reopen the open water's cells many times over:
+ * up to 2,700 expansions a cell, 108 s of one tick (WP12 part E fix pass 6, S-026). Measured over the 200 tournament
+ * matches' 74,445 successful charts: the median expands 0.2% of the cells in reach, 99% under 0.8 times them, and
+ * 99.6% under 4 times them (the rest up to 37 times); so a search that fails costs what the costliest 0.4% that succeed do.
+ */
+const WORK = 4;
 
 function less(i: number, j: number): boolean {
   return KEY[i] < KEY[j] || (KEY[i] === KEY[j] && HEAP[i] < HEAP[j]);
@@ -132,8 +140,9 @@ function pop(): number {
  * The cheapest route at sea level `tide` from the nav cell `from` to the first cell that satisfies `goal`, written
  * into `out` as nav cells from start to goal. `toward`, when given, is the goal's direction and steers the search
  * (A*, admissible: steps cost at least their length). Returns the route's cost in u, or −1 if no route exists, or
- * none costing at most `limit` u when that is given (no cell past it is searched). A `greed` above 1 weights the heading for
- * the goal over the cost so far: the search spreads far less, for a route that may cost up to that much more.
+ * none costing at most `limit` u when that is given (no cell past it is searched), or none found within WORK × the cells
+ * within the limit's reach. A `greed` above 1 weights the heading for the goal over the cost so far: the search spreads
+ * far less, for a route that may cost up to that much more.
  */
 export function findRoute(nav: Nav, from: number, tide: number, goal: (cell: number) => boolean, toward: V3 | null,
   out: number[], limit = Infinity, greed = 1): number {
@@ -146,9 +155,11 @@ export function findRoute(nav: Nav, from: number, tide: number, goal: (cell: num
   FROM[from] = -1;
   SEEN[from] = stamp;
   push(from, h(from));
+  let work = limit < Infinity ? Math.ceil((WORK * NAV.cells * (1 - dcos(Math.min(Math.PI, limit / R)))) / 2) : Infinity;
   while (heapN > 0) {
     const c = pop(), gc = G[c];
     if (gc > limit) continue; // with greed the pops are not in order of G: a cheaper route may still be queued
+    if (--work < 0) return -1; // as much work as the water in reach is worth: it finds no route
     if (goal(c)) {
       for (let k = c; k >= 0; k = FROM[k]) out.push(k);
       out.reverse();
