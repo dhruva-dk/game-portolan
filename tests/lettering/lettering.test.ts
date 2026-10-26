@@ -2,7 +2,12 @@ import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { CARD } from '../../src/career/learn.ts';
+import { CAPTAINS } from '../../src/career/league.ts';
+import { RANK } from '../../src/career/state.ts';
+import { REGIONS } from '../../src/sim/world/regions.ts';
+import { SLOT_WORDS, TIER_WORDS, itemDoes, itemName } from '../../src/ui/chestChoice.ts';
+import { PROMPTS } from '../../src/ui/tutorial.ts';
 import { GLYPHS, METRICS } from '../../src/lettering/glyphs.ts';
 import { Raster, flatten, sweep } from '../../src/lettering/nib.ts';
 import { MIN_GAP, X_HEIGHT_EM, layoutText, letterGap, rasterizeText, type TextLayout } from '../../src/lettering/text.ts';
@@ -13,9 +18,15 @@ const hash = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 test('every character the game needs is in the hand', () => {
   for (const ch of LETTERS + MARKS) assert.ok(GLYPHS[ch], `missing ${ch}`);
-  const spec = readFileSync(new URL('../../PROMPT.md', import.meta.url), 'utf8');
-  const strings = [...spec.matchAll(/\*\*([^*]+)\*\*/g), ...spec.matchAll(/\*"([^"]+)"\*/g)].map((m) => m[1]);
-  assert.ok(strings.length > 150, 'names found in PROMPT.md');
+  const kinds = Array.from({ length: 64 }, (_, k) => k).filter((k) => itemName(k) !== 'Nothing');
+  const card = Object.values(CARD).flatMap((v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : []));
+  const strings = [
+    ...CAPTAINS.flatMap((c) => [c.name, c.meaning]), ...RANK.winds, ...REGIONS.flatMap((r) => [r.name, r.landmark.name]),
+    ...kinds.flatMap((k) => [itemName(k), itemDoes(k)]), ...SLOT_WORDS, ...TIER_WORDS,
+    ...PROMPTS.flatMap((p) => [p.words, p.sub]), ...card, ...REGIONS.map((_, r) => CARD.breakOff(r)),
+    ...kinds.map((k) => CARD.fitting(k)).filter((s) => !s.includes('undefined')), CARD.record(1, 2, 3),
+  ].filter((s) => s);
+  assert.ok(strings.length > 150, 'the game\'s names');
   for (const s of strings) {
     for (const ch of s) assert.ok(GLYPHS[ch], `missing ${JSON.stringify(ch)} in ${s}`);
     assert.ok(layoutText(s, { size: 14 }).strokes.length > 0);
