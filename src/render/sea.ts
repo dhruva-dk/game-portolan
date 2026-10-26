@@ -574,9 +574,9 @@ void main() {
     float glow = az * az * (1.0 - smoothstep(-0.04, 0.3, el - 0.22 * pow(az, 4.0))) * smoothstep(-0.25, 0.05, dot(uSunDisc, up0));
     sky = mix(sky, uSkyGlow, glow); // (the pale gold round the sun's own image is the glitter path's, below)
     sky *= 0.84; // (a reflection is always a little deeper than the sky it gives back; only the glitter is brighter)
-    // how much of the sky the water gives back: little looking down into it, nearly all at a glance; the glow, far
+    // how much of the sky the water gives back: a quarter looking down into it, nearly all at a glance; the glow, far
     // brighter than the water's body, takes its place sooner
-    float cv = clamp(dot(V, vNormal), 0.0, 1.0), fr = 0.12 + 0.88 * pow(1.0 - cv, 4.0);
+    float cv = clamp(dot(V, vNormal), 0.0, 1.0), fr = 0.25 + 0.75 * pow(1.0 - cv, 3.0);
     float shallowClear = clear * (1.0 - smoothstep(4.0, 12.0, depth));
     float give = uLow * water * min(mix(fr, max(fr, 0.85), glow) * (1.0 - 0.75 * shallowClear), 0.92);
     col = mix(col, sky * parchment(qs) / uPaper, give);
