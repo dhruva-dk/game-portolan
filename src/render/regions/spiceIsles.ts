@@ -562,7 +562,9 @@ export class SpiceIsles {
         // pepper's leaf a fresher green)
         const fo = T(k === 3 ? mix(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3 + 0.2 * w), PIGMENTS.roseMadder, 0.08 + 0.1 * u)
           : k === 4 ? mix(mix(PIGMENTS.malachite, PIGMENTS.verdigris, 0.2 + 0.25 * w), PIGMENTS.indigo, 0.2 + 0.15 * u)
-          : k === 5 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.2 + 0.25 * w) : mix(PIGMENTS.malachite, u < 0.5 ? PIGMENTS.verdigris : PIGMENTS.ochre, 0.1 + 0.3 * w));
+          : k === 5 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.2 + 0.25 * w)
+          : k === 6 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.26 + 0.2 * w) // (WP15: the strand palms a light green-gold, as flora's)
+          : mix(PIGMENTS.malachite, u < 0.5 ? PIGMENTS.verdigris : PIGMENTS.ochre, 0.1 + 0.3 * w));
         const bl = k === 3 ? T(mix(mix(PIGMENTS.roseMadder, PIGMENTS.vermilion, 0.3 + 0.3 * w), PIGMENTS.umber, 0.12)) : k === 0 || k > 2 ? fo : T(mix(k === 1 ? PIGMENTS.vermilion : PIGMENTS.ochre, PIGMENTS.roseMadder, 0.25 * u));
         t.set([fo.x, fo.y, fo.z, bl.x, bl.y, bl.z, w, SPICE.far], i * 8);
       });
@@ -575,7 +577,7 @@ export class SpiceIsles {
       ['flowering', 27, plan.flowers[1], 0, SPICE.near, 2], ['flowering', 27, plan.flowers[1], SPICE.near * 0.85, SPICE.far, 2],
       // the forest's edge over the beaches: a wall of saplings, ferns and draped climbers under the canopy
       ['edge', 31, plan.edge, 0, SPICE.near, 0], ['edge', 31, plan.edge, SPICE.near * 0.85, SPICE.edge, 0],
-      ['palm', 0, plan.palms, 0, SPICE.near, 0], ['palm', 0, plan.palms, SPICE.near * 0.85, SPICE.far, 0],
+      ['palm', 0, plan.palms, 0, SPICE.near, 6], ['palm', 0, plan.palms, SPICE.near * 0.85, SPICE.far, 6],
       // the terraces' spice gardens: nutmeg (deep green), clove (its young leaf flushed red), pepper on poles
       // (S-025 (6c): two habits of nutmeg, conical and rounded, and pepper on poles and on live supports, half each)
       ['cone', 22, half(plan.garden[0], 0), 0, SPICE.near, 4], ['cone', 22, half(plan.garden[0], 0), SPICE.near * 0.85, SPICE.far, 4],

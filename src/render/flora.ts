@@ -60,6 +60,9 @@ const LEAF: Paint = [1, 1, 1, 1.05], BLADE: Paint = [1, 1, 1, 0.9];
 /** aTint: 0 the kit's pigment, 1 the instance's foliage, 2 its blossom. aPart: sway weight (0 root … 1 crown),
  *  0 wood / 1 leaf mass / 2 thin sheet (lit from the side it is seen), self-shade (0 deep inside … 1 open). */
 const WOOD = 0, MASS = 1, SHEET = 2;
+/** WP15: a palm's leaflet, a thin sheet drawn in fine light ink, its shade held light (a comb of leaflets inked at the
+ *  standard weight, each outlined, read as the darkest mass on the beach). */
+const FROND = 3;
 
 class Kit {
   private readonly a: Record<'position' | 'normal' | 'aLit' | 'aPaint' | 'aTint' | 'aPart', number[]> =
@@ -98,8 +101,8 @@ class Kit {
     this.index.push(i, j, k, i, k, l);
   }
 
-  /** A tapered tube along `path` (one radius per point). */
-  tube(path: THREE.Vector3[], radii: number[], sides: number, pt: Paint, tint = 0): void {
+  /** A tapered tube along `path` (one radius per point; its paint one, or per point: a palm's rings). */
+  tube(path: THREE.Vector3[], radii: number[], sides: number, pt: Paint | ((k: number) => Paint), tint = 0): void {
     const t = V(), s = V(), b = V(), n = V(), p = V(), first = this.a.aTint.length;
     path.forEach((c, k) => {
       t.subVectors(path[Math.min(k + 1, path.length - 1)], path[Math.max(k - 1, 0)]).normalize();
@@ -109,7 +112,7 @@ class Kit {
       for (let i = 0; i < sides; i++) {
         const a = (i / sides) * TAU;
         n.copy(s).multiplyScalar(Math.cos(a)).addScaledVector(b, Math.sin(a));
-        this.vert(p.copy(c).addScaledVector(n, radii[k]), n, pt, tint, c.y, WOOD, 1);
+        this.vert(p.copy(c).addScaledVector(n, radii[k]), n, typeof pt === 'function' ? pt(k) : pt, tint, c.y, WOOD, 1);
       }
     });
     for (let k = 0; k + 1 < path.length; k++) {
@@ -596,22 +599,131 @@ function pandanusKit(lod: number): Kit {
   return k;
 }
 
-/** A palm (or a tree fern): a ringed trunk curving up (the fern's short and straight) under a crown of arching
- *  pinnate fronds. */
-function palmKit(lod: number, fern: boolean): Kit {
-  const k = new Kit(), P = lod ? 2 : 7, lean = fern ? 0 : 0.17, height = fern ? 0.62 : 0.94, path: THREE.Vector3[] = [], radii: number[] = [];
+/** A tree fern: a short straight trunk under a crown of arching pinnate fronds. */
+function treeFernKit(lod: number): Kit {
+  const k = new Kit(), P = lod ? 2 : 7, path: THREE.Vector3[] = [], radii: number[] = [];
   for (let s = 0; s <= P; s++) {
     const t = s / P;
-    path.push(V(lean * t * t, t * height - 0.04, 0));
-    radii.push((fern ? 0.04 : 0.03) * (1 - 0.3 * t) * (s % 2 && !lod ? 0.88 : 1));
+    path.push(V(0, t * 0.62 - 0.04, 0));
+    radii.push(0.04 * (1 - 0.3 * t) * (s % 2 && !lod ? 0.88 : 1));
   }
   k.tube(path, radii, lod ? 3 : 6, PALM_BARK);
-  const crown = path[P], F = lod ? 6 : fern ? 12 : 10;
+  const crown = path[P], F = lod ? 6 : 12;
   for (let f = 0; f < F; f++) {
-    const az = (f / F) * TAU + 0.3 * Math.sin(f * 2.1), len = (fern ? 0.4 : 0.48) * (0.85 + 0.15 * Math.sin(f * 1.7));
-    const rise = fern ? 0.6 : 0.42 - 0.25 * (f % 2), h = V(Math.cos(az), 0, Math.sin(az));
-    k.sheet(crown, h.clone().multiplyScalar(len).addScaledVector(UP, rise * len), V(0, -(fern ? 0.75 : 0.95) * len, 0),
-      fern ? 0.07 : 0.075, lod ? 3 : 7, 0.55, 0.3, LEAF, 1);
+    const az = (f / F) * TAU + 0.3 * Math.sin(f * 2.1), len = 0.4 * (0.85 + 0.15 * Math.sin(f * 1.7)), h = V(Math.cos(az), 0, Math.sin(az));
+    k.sheet(crown, h.clone().multiplyScalar(len).addScaledVector(UP, 0.6 * len), V(0, -0.75 * len, 0), 0.07, lod ? 3 : 7, 0.55, 0.3, LEAF, 1);
+  }
+  return k;
+}
+
+const DEG = Math.PI / 180;
+/** The palm's own: its trunk's rings (darker, under each a little shadow), its midribs inked, a yellowed old frond and
+ *  the dead ones hanging brown, its nuts green and golden; its leaflets take the instance's foliage in a light wash. */
+const PALM_TRUNK = paint(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.5), 0.45), PALM_RING = paint(PIGMENTS.sepia, 0.55);
+const PALM_RIB = paint(mix(PIGMENTS.sepia, PIGMENTS.umber, 0.4), 0.7);
+const FROND_DRY = paint(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.25), 0.5), FROND_DEAD = paint(mix(PIGMENTS.umber, PIGMENTS.ochre, 0.4), 0.55);
+const NUT = paint(PIGMENTS.ochre, 0.8), NUT_GREEN = paint(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.5), 0.65);
+const frondWash = (density: number): Paint => [1, 1, 1, density];
+
+/** WP15: a coconut palm 1 tall drawn from life by an engraver (S-029: the shared palm read as the darkest, crudest tree
+ *  on the beach, a mop of broad dark blades): a slender trunk swollen at the bole, ringed with leaf scars, curving and
+ *  leaning to +x (seaward: the planting turns it there); a crown of pinnate fronds radiating from its top round a
+ *  golden-angle spiral, the youngest standing up, the middle arching out, the oldest drooping past the crown, each a
+ *  fine inked midrib curving out and down with a comb of leaflets hanging from both sides, shorter toward the tip, the
+ *  sky between them; under the crown a cluster of nuts and a dead frond or two hanging brown. Its leaflets are lit as
+ *  one crown (a dome's normals about its heart, never leaflet by leaflet), so its top lies near the paper and its
+ *  hanging fronds in a middle green. Far off: a plain trunk under a star of arching fronds, each a blade the comb's
+ *  width, flatter (a star from height, a fountain from the sea, never a hanging mop). */
+function palmKit(lod: number): Kit {
+  const k = new Kit(), far = lod > 0, Y = UP;
+  let z = 7;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  const at = (t: number): THREE.Vector3 => V(0.17 * t * t + 0.012 * Math.sin(t * 5), 0.92 * t - 0.04, 0.012 * Math.sin(t * 3.7));
+  const girth = (t: number): number => (0.024 - 0.007 * t + 0.02 * Math.exp(-t * 16)) * (far ? 1.2 : 1);
+  // the trunk: each ring a leaf scar a little proud and darker, the bark paling just above it and darkening again under
+  // the next ring's lip (far off no rings: they band it)
+  const R = far ? 2 : 7, scar = 0.3, path: THREE.Vector3[] = [], radii: number[] = [];
+  for (let j = 0; j <= R; j++) {
+    const t = j / R;
+    path.push(at(t));
+    radii.push(girth(t) * (far || j === 0 || j === R ? 1 : 1.1));
+    if (!far && j < R) {
+      path.push(at(t + scar / R));
+      radii.push(girth(t + scar / R));
+    }
+  }
+  k.tube(path, radii, far ? 3 : 5, far ? PALM_TRUNK : (j) => (j % 2 || j === 0 || j === 2 * R ? PALM_TRUNK : PALM_RING));
+  const top = at(1), heart = top.clone().addScaledVector(Y, 0.03), sweep = V(0.25, 0, 0);
+  // a leaflet's light: the crown's, a dome about its heart lifted toward the sky
+  const lit = (p: THREE.Vector3): THREE.Vector3 => p.clone().sub(heart).normalize().addScaledVector(Y, 0.6).normalize();
+  const sway = (p: THREE.Vector3): number => top.y + 0.4 * p.distanceTo(top);
+  const leaf = (p: THREE.Vector3, pt: Paint, tint: number, shade: number): number => k.vert(p, lit(p), pt, tint, sway(p), FROND, shade);
+  const frond = (d: THREE.Vector3, len: number, el0: number, arc: number, fold: number, sag: number, pt: Paint, tint: number, rib: Paint,
+    per: number, segs: number): void => {
+    // the midrib curving out and down, inked: a fine rib on edge (from the side the pen's line, from above hid by its comb)
+    const side = V().crossVectors(d, Y).normalize(), pts = [top.clone()], tans: THREE.Vector3[] = [];
+    for (let i = 0; i <= segs; i++) {
+      const el = el0 - arc * Math.pow(i / segs, 1.4);
+      tans.push(d.clone().multiplyScalar(Math.cos(el)).addScaledVector(Y, Math.sin(el)));
+      if (i > 0) pts.push(pts[i - 1].clone().addScaledVector(tans[i - 1].clone().add(tans[i]).normalize(), len / segs));
+    }
+    for (let i = 0; i < segs; i++) {
+      const e = (m: number, s: number): THREE.Vector3 => pts[m].clone().addScaledVector(V().crossVectors(side, tans[m]).normalize(), s * 0.007 * (1 - (0.6 * m) / segs));
+      const q = [e(i, 1), e(i, -1), e(i + 1, -1), e(i + 1, 1)].map((p) => k.vert(p, side, rib, 0, sway(p), SHEET, 0.7));
+      k.quad(q[0], q[1], q[2], q[3]);
+    }
+    // the leaflets, a comb on both sides angled toward the tip, folded down off the frond's face, sagging at their tips
+    for (let j = 0; j < per; j++) {
+      const s = 0.1 + (0.88 * (j + 0.5)) / per, f = s * segs, i = Math.min(segs - 1, Math.floor(f)), u = f - i;
+      const base = pts[i].clone().lerp(pts[i + 1], u), t = tans[i].clone().lerp(tans[i + 1], u).normalize();
+      const up = V().crossVectors(side, t).normalize(), ll = len * 0.3 * Math.pow(Math.sin(Math.PI * (0.15 + 0.8 * s)), 0.8);
+      const alpha = (62 - 26 * s) * DEG, w = len * 0.045;
+      for (const sd of [-1, 1]) {
+        const fo = fold + 0.14 * (rnd() - 0.5), across = side.clone().multiplyScalar(sd * Math.cos(fo)).addScaledVector(up, Math.sin(fo));
+        const dir = t.clone().multiplyScalar(Math.cos(alpha)).addScaledVector(across, Math.sin(alpha)).normalize();
+        const l = ll * (0.88 + 0.24 * rnd()), wide = t.clone().addScaledVector(dir, -t.dot(dir)).normalize().multiplyScalar(w / 2);
+        const tip = base.clone().addScaledVector(dir, l).addScaledVector(Y, -sag * l);
+        k.tri(leaf(base.clone().sub(wide), pt, tint, 0.7), leaf(base.clone().add(wide), pt, tint, 0.7), leaf(tip, pt, tint, 0.7));
+      }
+    }
+  };
+  const count = far ? 8 : 12, L = 0.46;
+  for (let f = 0; f < count; f++) {
+    // 0 the youngest, standing up from the heart, … 1 the oldest, drooping past the crown; swept a little seaward, so
+    // the crown is open and uneven, never a cone or a mop
+    const a = f / (count - 1), phi = f * 2.39996 + 0.35 * rnd(), d = V(Math.cos(phi), 0, Math.sin(phi)).add(sweep).normalize();
+    const len = L * (0.82 + 0.3 * rnd()) * (a < 0.08 ? 0.7 : 1);
+    if (!far) {
+      const el0 = (66 - 76 * a) * DEG, arc = (18 + 72 * a) * DEG * (0.85 + 0.3 * rnd()), fold = (a < 0.1 ? 8 : -(18 + 34 * a)) * DEG;
+      frond(d, len, el0, arc, fold, 0.1 + 0.3 * a, a > 0.9 ? FROND_DRY : frondWash(a < 0.12 ? 0.38 : 0.46 + 0.08 * a), a > 0.9 ? 0 : 1, PALM_RIB, 10, 5);
+      continue;
+    }
+    // far off: a blade the comb's width, folded down along its rib, its edge notched as the comb's
+    const side = V().crossVectors(d, Y).normalize(), el0 = (44 - 52 * a) * DEG, arc = (20 + 45 * a) * DEG, S = 3;
+    let p = top.clone(), prev: number[] = [];
+    for (let i = 0; i <= S; i++) {
+      const s = i / S, el = el0 - arc * Math.pow(s, 1.4), tan = d.clone().multiplyScalar(Math.cos(el)).addScaledVector(Y, Math.sin(el));
+      if (i > 0) p = p.clone().addScaledVector(tan, len / S);
+      const w = len * 0.26 * Math.sin(Math.PI * Math.min(1, 0.12 + s)) * (i % 2 ? 1 : 0.75), dn = V().crossVectors(side, tan).normalize();
+      const row = [p.clone().addScaledVector(side, w).addScaledVector(dn, -0.4 * w), p.clone(), p.clone().addScaledVector(side, -w).addScaledVector(dn, -0.4 * w)]
+        .map((q) => leaf(q, frondWash(0.5), 1, 0.7));
+      if (i > 0) {
+        k.quad(prev[0], row[0], row[1], prev[1]);
+        k.quad(prev[1], row[1], row[2], prev[2]);
+      }
+      prev = row;
+    }
+  }
+  if (far) return k;
+  for (let f = 0; f < 2; f++) { // a dead frond or two, hanging brown down the trunk, its leaflets folded close
+    const phi = 1.3 + 3.1 * f + rnd();
+    frond(V(Math.cos(phi), 0, Math.sin(phi)), L * (0.6 + 0.2 * rnd()), -60 * DEG, 25 * DEG, -70 * DEG, 0.1, FROND_DEAD, 0, FROND_DEAD, 5, 3);
+  }
+  for (let f = 0; f < 4; f++) { // the nuts, a cluster of green and golden under the crown
+    const q = f * 2.4 + 0.4, c = top.clone().add(V(0.04 * Math.cos(q), -0.04 - 0.015 * (f % 2), 0.04 * Math.sin(q))), r = 0.024;
+    const o = [V(1, 0, 0), V(-1, 0, 0), V(0, 1, 0), V(0, -1, 0), V(0, 0, 1), V(0, 0, -1)]
+      .map((e) => k.vert(c.clone().addScaledVector(e, r), e, f % 3 === 1 ? NUT : NUT_GREEN, 0, top.y, WOOD, 1));
+    for (const [i, j, m] of [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]]) k.tri(o[i], o[j], o[m]);
   }
   return k;
 }
@@ -691,8 +803,8 @@ export const FLORA: Record<FloraKind, Species> = {
   floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [3.3, 4.6], near: 60, far: 300, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
-  palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
-  treeFern: { kit: (l) => palmKit(l, true), size: [1.0, 1.6], near: 45, far: 150, sway: 0.07 },
+  palm: { kit: palmKit, size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
+  treeFern: { kit: treeFernKit, size: [1.0, 1.6], near: 45, far: 150, sway: 0.07 },
   heather: { kit: () => crownKit(0, 'shrub'), size: [0.3, 0.55], near: 55, far: 0, sway: 0.08 },
   scrub: { kit: () => crownKit(0, 'shrub'), size: [0.4, 0.8], near: 70, far: 0, sway: 0.07 },
   grass: { kit: () => tuftKit(false), size: [0.25, 0.45], near: 34, far: 0, sway: 0.3 },
@@ -805,7 +917,7 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
     case 'nutmeg': return [to(fol, 'indigo', 0.22 + 0.18 * u), fol]; // dark glossy cones
     case 'cloudForest': return [to(fol, 'ultramarine', 0.18 + 0.15 * u), fol];
     case 'treeFern': return [to(fol, 'verdigris', 0.3 + 0.2 * u), fol];
-    case 'palm': return [to(fol, 'verdigris', 0.2 + 0.25 * u), fol];
+    case 'palm': return [to(fol, 'ochre', 0.26 + 0.2 * u), fol]; // a light green-gold, never the beach's darkest mass (WP15)
     case 'mangrove': return [to(fol, 'umber', 0.12 + 0.2 * u), fol];
     case 'heather': return [to(fol, 'umber', 0.3 + 0.2 * u), to(T('roseMadder'), 'ultramarine', 0.3 * w)];
     case 'scrub': return [to(T('umber'), 'ochre', 0.4 * u), T('ochre')];
@@ -1215,6 +1327,7 @@ void main() {
   vec2 hc = vec2(dot(vWorld, vUp), dot(vWorld, side) + 0.7 * dot(vWorld, cross(vUp, side)));
   vec2 hdx = dFdx(hc), hdy = dFdy(hc);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v))) * mix(0.45, 1.0, vPart.z);
+  if (vPart.y > 2.5) tone = min(tone, 0.6); // (WP15: a palm's leaflets, their shade a middle green, never the darkest mass)
   // S-022: a leaf mass drawn as leaves, the instance's own (broad, pinnate or palmate), each hanging outward and down
   // from its clump's crown, each its own wash, inked most heavily on the clump's shaded underside (cross-hatched there);
   // gone before they shrink to noise
@@ -1315,7 +1428,7 @@ void main() {
     float lit = smoothstep(0.3, 0.95, ndl) * uNight;
     col = mix(col, uSilver, 0.65 * hatching(rot2(0.6) * hc, rot2(0.6) * hdx, rot2(0.6) * hdy, lit * 0.26, uSeed + 11.0));
   }
-  writeInk(candle(col, vWorld), n, pen * (1.0 - 0.5 * back * isMass));
+  writeInk(candle(col, vWorld), n, pen * (1.0 - 0.5 * back * isMass) * (vPart.y > 2.5 ? 0.45 : 1.0)); // (a palm's leaflets in fine light ink)
 #endif
 }
 `;
