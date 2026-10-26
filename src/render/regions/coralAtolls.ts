@@ -63,7 +63,10 @@ const W = {
   bole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.45), 0.45), boleRing: washOf(PIGMENTS.sepia, 0.5),
   crownHang: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.55), crownNoon: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.62), 0.4),
   frondDry: washOf(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.25), 0.55),
-  timber: washOf(PIGMENTS.sepia, 0.9), weed: washOf(PIGMENTS.verdigris, 0.95),
+  // the hulk's timber, weathered silver-grey by sun and salt (lighter than the palms), a few boards warmer or greyer
+  hulk: washOf(mix(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.42), PIGMENTS.ultramarine, 0.06), 0.5),
+  hulkGrey: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.55), 0.5), hulkWarm: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.umber, 0.45), 0.5),
+  hulkUnder: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.2), 0.55),
 };
 
 const hash = (x: number, y: number): number => {
@@ -426,49 +429,130 @@ function stakeKit(): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A hulk 1 long on x (bow +x), heeled on its low side (−z) with its back broken: a canted keel, the stem standing and
- *  the sternpost snapped, curved frames rising from the keel to the turn of the bilge and broken off at different
- *  heights (shorter on the high side), the low side still planked in ragged strakes with gaps, a garboard strake left
- *  on the high side, a mast stump; weed-green where the tide washes it. Its shape reads as a hull's from any side. */
-function hulkKit(seed: number): THREE.BufferGeometry {
-  const rnd = seeded(seed), b = new Brush(W.timber), RIB = 11, DEPTH = 0.36;
-  b.pick = (c) => (c.y < 0.06 ? W.weed : W.timber);
-  // the hull's surface: x along it, u from the keel (0) to the gunwale (1), sd the side; the keel rises toward the bow
-  // and the stern half sags where the back broke
-  const beam = (x: number): number => 0.21 * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(x) / 0.52, 2.4)));
-  const at = (x: number, u: number, sd: number): V => {
-    const z = sd * beam(x) * Math.sin(Math.min(1.2 * u, 1) * Math.PI * 0.5) * (1 - 0.06 * Math.max(0, u - 0.8) / 0.2);
-    const rise = 0.14 * Math.max(0, x) ** 2, sag = x < -0.12 ? 0.22 * (x + 0.12) : 0;
-    return vec(x, 0.02 + DEPTH * (0.6 * u + 0.4 * u * u) + rise + sag, z);
-  };
-  // keel, stem and the snapped sternpost
-  tube(b, [-0.52, -0.3, -0.12, 0.1, 0.3, 0.5].map((x) => at(x, 0, 1)), [0.026, 0.03, 0.032, 0.03, 0.028, 0.025], 4);
-  tube(b, [at(0.5, 0, 1), vec(0.56, 0.2, 0), vec(0.6, 0.42, 0), vec(0.58, 0.5, 0)], [0.026, 0.024, 0.022, 0.018], 4);
-  tube(b, [at(-0.52, 0, 1), vec(-0.56, 0.08, 0), vec(-0.57, 0.17, 0.01)], [0.026, 0.024, 0.02], 4);
-  // frames: curved ribs from the keel, broken off; the high side (+z) worse
-  for (let i = 0; i < RIB; i++) {
-    const x = -0.44 + (0.88 * i) / (RIB - 1);
-    for (const sd of [-1, 1]) {
-      const top = sd < 0 ? 0.65 + 0.35 * rnd() : 0.3 + 0.6 * rnd(), n = 4, pts: V[] = [];
-      for (let k = 0; k <= n; k++) pts.push(at(x, (k / n) * top, sd));
-      tube(b, pts, pts.map((_, k) => 0.015 - 0.004 * (k / n)), 3);
+/** The hulk's waterline, from the height above the water (hw) and above mean sea (hm): stained a little below the
+ *  neaps' high water, a dark wet band above the water, weed hanging at it and green below, and a broken lace of foam
+ *  where the water works at the timbers. */
+const WRECK = /* glsl */ `
+  float hm = length(vWorld) - ${R.toFixed(1)}, hw = hm - uSeaLevel;
+  float rag = 0.035 * sin(dot(vAnchor, vec3(9.1, 3.7, 6.3))) + 0.025 * sin(dot(vAnchor, vec3(23.0, 11.0, 17.0)));
+  float lump = sin(dot(vAnchor, vec3(5.3, 2.1, 4.7))) * sin(dot(vAnchor, vec3(-3.1, 6.7, 8.9)));
+  col *= mix(vec3(1.0), vec3(0.86, 0.84, 0.78), 1.0 - smoothstep(-0.03, 0.05, hm - 0.35 + rag));
+  col *= mix(vec3(1.0), vec3(0.42, 0.44, 0.38), 1.0 - smoothstep(0.02, 0.2, hw + rag));
+  col *= mix(vec3(1.0), vec3(0.5, 0.66, 0.34), 1.0 - smoothstep(-0.02, 0.05, hw - 0.04 + 2.5 * rag));
+  float lace = (1.0 - smoothstep(0.02, 0.05, abs(hw - 0.02 + 0.4 * rag))) * smoothstep(-0.2, 0.3, lump);
+  col = mix(col, vec3(0.92, 0.94, 0.9), 0.75 * lace);
+  tone = min(tone, 0.55) * (1.0 - lace);
+`;
+
+/** A timber's grain for its hatching: the triangles it laid [from, to) and, per ring, its centre, its frame (along,
+ *  across, depth) and its length so far. */
+interface Grain { from: number; to: number; c: V[]; t: V[]; s: V[]; d: V[]; arc: number[] }
+/** A squared timber along `path`, its half-width `sw` along `side` (kept square to the path; per point, or one for all)
+ *  and its half-depth `sd` across, tapering by `taper` toward its end; `snap` breaks its end off on a slant with one
+ *  corner splintered proud (`snap0` its start). Its grain is pushed to `grains`. */
+function timber(b: Brush, grains: Grain[], path: readonly V[], side: V | readonly V[], sw: number | readonly number[], sd: number, taper: number, snap: number, snap0 = 0): void {
+  const n = path.length, rings: V[][] = [], g: Grain = { from: laid(b), to: 0, c: [], t: [], s: [], d: [], arc: [] };
+  for (let i = 0; i < n; i++) {
+    const t = vec().subVectors(path[Math.min(i + 1, n - 1)], path[Math.max(i - 1, 0)]).normalize(), sv = Array.isArray(side) ? side[i] : (side as V);
+    const s = sv.clone().addScaledVector(t, -sv.dot(t)).normalize(), d = vec().crossVectors(t, s), f = 1 - (taper * i) / (n - 1);
+    const w = (Array.isArray(sw) ? sw[i] : (sw as number)) * f, r = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([a, c]) => path[i].clone().addScaledVector(s, a * w).addScaledVector(d, c * sd * f));
+    if (snap && i === n - 1) r.forEach((p, j) => p.addScaledVector(t, snap * (j < 2 ? (j === 0 ? 1.6 : 0.7) : -0.5)));
+    if (snap0 && i === 0) r.forEach((p, j) => p.addScaledVector(t, -snap0 * (j % 3 ? 1.4 : -0.4)));
+    rings.push(r);
+    g.c.push(path[i].clone()), g.t.push(t), g.s.push(s), g.d.push(d), g.arc.push(i ? g.arc[i - 1] + path[i].distanceTo(path[i - 1]) : 0);
+  }
+  b.kit.loft(rings);
+  g.to = laid(b);
+  grains.push(g);
+}
+/** A built kit's uv from its timbers' grain: u along each timber, v across it (skewed, so it varies on every face). */
+function grained(g: THREE.BufferGeometry, grains: readonly Grain[]): THREE.BufferGeometry {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute, uv = new Float32Array(2 * pos.count), p = vec(), o = vec();
+  for (const gr of grains) {
+    for (let v = 3 * gr.from; v < 3 * gr.to; v++) {
+      p.fromBufferAttribute(pos, v);
+      let k = 0;
+      for (let i = 1; i < gr.c.length; i++) if (gr.c[i].distanceToSquared(p) < gr.c[k].distanceToSquared(p)) k = i;
+      o.subVectors(p, gr.c[k]);
+      uv[2 * v] = gr.arc[k] + o.dot(gr.t[k]);
+      uv[2 * v + 1] = o.dot(gr.s[k]) + 0.7 * o.dot(gr.d[k]);
     }
   }
-  // strakes of planking: the low side from the bilge to near the gunwale, ragged at their ends and broken into gaps;
-  // a garboard strake on the high side
-  const strake = (u0: number, u1: number, sd: number, from: number, to: number, gap: number): void => {
-    for (let i = from; i < to; i++) {
-      if (rnd() < gap) continue;
-      const x0 = -0.44 + (0.88 * i) / (RIB - 1), x1 = -0.44 + (0.88 * (i + 1)) / (RIB - 1), lift = 0.004;
-      const p = [at(x0, u0, sd), at(x1, u0, sd), at(x1, u1 - (i === to - 1 ? 0.06 * rnd() : 0), sd), at(x0, u1, sd)].map((v) => v.add(vec(0, 0, sd * lift)));
-      b.tri(p[0], p[1], p[2]);
-      b.tri(p[0], p[2], p[3]);
-    }
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
+/** A hulk 1 long on x (bow +x), broken on the reef and drawn from life: a canted keel, the stem post curving up at the bow
+ *  and the sternpost raked at the stern, both standing; frames in pairs, squared and tapering, curving up from the keel
+ *  and broken off at ragged heights; the low side (+z, heeled down by its placement toward a ship in the lagoon) keeping
+ *  a few ragged strakes, the high side open to its ribs. Silver-grey timber, a cooler grey beneath; its wet band, weed
+ *  and lace of foam are the wreck material's, from the water's height. Every timber carries its grain as uv, so its
+ *  hatching runs along it (S-027: flat ribbons hatched across read as a crate or a picket fence). */
+function hulkKit(seed: number): THREE.BufferGeometry {
+  const rnd = seeded(seed), b = new Brush(W.hulk), grains: Grain[] = [], ST = 10, DEPTH = 0.34;
+  let tint = W.hulk;
+  b.pick = (_c, n) => (n.y < -0.55 ? W.hulkUnder : tint);
+  const tints = [W.hulk, W.hulk, W.hulkGrey, W.hulkWarm];
+  // the hull's surface: x along it, u from the keel (0) to the gunwale (1), sd the side; the keel rises toward the bow,
+  // the gunwale sheers up at both ends and the stern half sags where the back broke
+  const beam = (x: number): number => 0.165 * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(x) / 0.5, 2.4)));
+  const at = (x: number, u: number, sd: number): V => {
+    const z = sd * beam(x) * Math.sin(Math.min(1.2 * u, 1) * Math.PI * 0.5) * (1 - 0.06 * Math.max(0, u - 0.8) / 0.2);
+    const rise = 0.14 * Math.max(0, x) ** 2, sag = x < -0.12 ? 0.22 * (x + 0.12) : 0, sheer = 0.25 * x * x * u;
+    return vec(x, 0.02 + DEPTH * (0.55 * u + 0.45 * u * u) + rise + sag + sheer, z);
   };
-  for (const [u0, u1, from, to, gap] of [[0.05, 0.24, 0, RIB - 1, 0.05], [0.27, 0.45, 1, RIB - 2, 0.15], [0.48, 0.64, 2, RIB - 3, 0.3], [0.67, 0.8, 3, 7, 0.4]] as const) strake(u0, u1, -1, from, to, gap);
-  strake(0.05, 0.22, 1, 2, RIB - 3, 0.35);
-  tube(b, [at(0.08, 0.05, 1).setZ(0), vec(0.1, 0.62, 0.05)], [0.024, 0.016], 4);
-  return b.kit.build();
+  const out = (x: number, u: number, sd: number): V => {
+    const e = 0.01, a = vec().subVectors(at(x + e, u, sd), at(x - e, u, sd)), c = vec().subVectors(at(x, u + e, sd), at(x, Math.max(u - e, 0), sd));
+    const n = vec().crossVectors(a, c).normalize();
+    return n.dot(vec(0, -0.6, sd)) < 0 ? n.negate() : n;
+  };
+  // the keel, a little below the garboards, and the posts standing from its ends
+  const keel = [-0.5, -0.33, -0.16, 0, 0.16, 0.33, 0.49].map((x) => at(x, 0, 1).setZ(0).add(vec(0, -0.02, 0)));
+  timber(b, grains, keel, vec(0, 0, 1), 0.016, 0.024, 0, 0);
+  const bow = keel[keel.length - 1], stern = keel[0];
+  tint = W.hulkGrey;
+  timber(b, grains, [0, 0.09, 0.22, 0.36, 0.47].map((y, i) => bow.clone().add(vec([0, 0.05, 0.088, 0.105, 0.11][i], y, 0))), vec(0, 0, 1), 0.01, 0.014, 0.3, 0.02);
+  timber(b, grains, [0, 0.11, 0.21, 0.28].map((y, i) => stern.clone().add(vec([0, -0.03, -0.062, -0.08][i], y, 0))), vec(0, 0, 1), 0.01, 0.014, 0.25, 0.018);
+  // frames in pairs from the keel, broken off: the high side's (−z) standing tall and open, every third broken low; the
+  // low side's (+z) behind its strakes; shorter toward the ends where the hull narrows; one of each pair the shorter
+  for (let i = 0; i < ST; i++) {
+    const x = -0.42 + (0.84 * i) / (ST - 1), end = Math.abs(x) > 0.3 ? 0.8 : 1;
+    for (const sd of [-1, 1]) {
+      const top = end * (sd < 0 ? (i % 3 === 1 ? 0.4 + 0.2 * rnd() : 0.82 + 0.22 * rnd()) : 0.62 + 0.28 * rnd());
+      for (const [dx, k] of [[-0.01, 1], [0.01, 0.7 + 0.3 * rnd()]] as const) {
+        tint = tints[Math.floor(rnd() * tints.length)];
+        const u1 = top * k, pts: V[] = [];
+        for (let j = 0; j <= 5; j++) pts.push(at(x + dx, (j / 5) * u1, sd).addScaledVector(out(x + dx, (j / 5) * u1, sd), -0.01));
+        timber(b, grains, pts, vec(1, 0, 0), 0.0068, 0.01, 0.4, 0.012 + 0.012 * rnd());
+      }
+    }
+  }
+  // strakes: boards on the frames' outer faces, ragged where they broke; the low side keeps its garboards and a few
+  // above, gapped; the high side only a garboard and a stub
+  const plank = (sd: number, u0: number, u1: number, x0: number, x1: number): void => {
+    tint = tints[Math.floor(rnd() * tints.length)];
+    const segs = Math.max(2, Math.ceil((x1 - x0) / 0.045)), path: V[] = [], side: V[] = [], sw: number[] = [];
+    for (let k = 0; k <= segs; k++) {
+      const x = x0 + ((x1 - x0) * k) / segs, lo = at(x, u0, sd), hi = at(x, u1, sd), um = (u0 + u1) / 2;
+      path.push(at(x, um, sd).addScaledVector(out(x, um, sd), 0.006));
+      side.push(vec().subVectors(hi, lo));
+      sw.push(lo.distanceTo(hi) / 2);
+    }
+    timber(b, grains, path, side, sw, 0.0055, 0, 0.02 + 0.03 * rnd(), 0.02 + 0.03 * rnd());
+  };
+  const run = (sd: number, u0: number, u1: number, x0: number, x1: number, gap: number): void => {
+    if (gap > 0 && rnd() < gap) {
+      const m = x0 + (x1 - x0) * (0.3 + 0.4 * rnd()), w = 0.06 + 0.1 * rnd();
+      plank(sd, u0, u1, x0, m - w / 2);
+      plank(sd, u0, u1, m + w / 2, x1);
+    } else plank(sd, u0, u1, x0, x1);
+  };
+  for (const [u0, u1, x0, x1, gap] of [[0.02, 0.135, -0.47, 0.47, 0], [0.15, 0.265, -0.42, 0.44, 0.3], [0.28, 0.395, -0.33, 0.36, 0.6], [0.41, 0.52, -0.2, 0.3, 0.7], [0.535, 0.64, -0.06, 0.2, 0]] as const) {
+    run(1, u0, u1, x0 + 0.04 * rnd(), x1 - 0.05 * rnd(), gap);
+  }
+  plank(-1, 0.02, 0.125, -0.3, 0.38);
+  plank(-1, 0.14, 0.24, 0.06, 0.27);
+  return grained(b.kit.build(), grains);
 }
 
 /** A placed part: its matrix, foot point and direction, foot and drawn-ground heights, the sim's height there, and its
@@ -788,12 +872,13 @@ export function planCoral(field: TerrainField): CoralPlan {
         place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.08 * (rnd() - 0.5), s: sc, sy, kitH: 2 });
       }
     }
-    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, broadside to a ship coming in:
+    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, its quarter to a ship coming in
+    // (S-027: seen broadside its frames stood edge-on as a picket fence; from the quarter they curve), sunk to its bilge:
     // on the arm clockwise of the mouth (seen from inside, the right hand looking out), so a ship in the lagoon before
     // the pass sees it whole beside the channel (S-024: on the other arm it stood cut at the iPad hero's edge)
     const e = c.great ? across(0, -1, 0.5, BLOCK) : null;
     if (e && !open(e.x, e.y, 2.5)) {
-      const p = place(plan.hulks, e.x, e.y, { sink: 0.1, fwd: tan(e.x, e.y, -uy, ux), yaw: 0.45, tilt: 0.32, s: 3.4, kitH: 0.62 });
+      const p = place(plan.hulks, e.x, e.y, { sink: 0.17, fwd: tan(e.x, e.y, -uy, ux), yaw: 0.2, tilt: 0.32, s: 3.4, kitH: 0.62 });
       plan.seabirds.push(lift(p.dir, p.top));
     }
   }
@@ -846,7 +931,7 @@ export class CoralAtolls {
   private readonly material: THREE.ShaderMaterial;
   private readonly fine: THREE.ShaderMaterial; // (the withies' light ink)
   private readonly grove: THREE.ShaderMaterial; // (the palms sketched far off)
-  private readonly wreck: THREE.ShaderMaterial; // (the hulk's, hatched along its keel)
+  private readonly wreck: THREE.ShaderMaterial; // (the hulk's, hatched along each timber's grain)
   private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), drawn only while dry, the share of the parts drawn] */
@@ -889,11 +974,13 @@ export class CoralAtolls {
         col = sunGlaze(shadeGlaze(glaze(parchment(q), vPaint.rgb, vPaint.w, washPool(n, v, q), q), tone, q), ndl, tone);
         tone = min(tone, 0.5);`,
     });
-    // (the hulk the same way along its length: each frame stands in a plane across the keel, so a stroke follows a rib
-    // whole and the planking takes its strokes between the frames; never banded across its ribs, S-024)
+    // (the hulk hatched along each timber's grain (its uv), so a stroke follows a rib or a strake whole and never bands it
+    // across, S-024/S-027; its ink light, hatched only in shade; from the water's height its wet band, weed and foam)
     const wreck = (this.wreck = illustratedMaterial(style, {
-      pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.8, anchor: 'object', hatch: { axis: [1, 0, 0] }, surface: 'tone = min(tone, 0.6);',
+      pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.6, anchor: 'object', hatch: { mode: 'uv', scale: [3.4, 3.4] }, surface: WRECK,
     }));
+    wreck.fragmentShader = `uniform float uSeaLevel;\n${wreck.fragmentShader}`;
+    wreck.uniforms.uSeaLevel = swell.uniforms.uSeaLevel;
     const fixed = (kit: THREE.BufferGeometry, parts: Part[], m = this.material): Draw => new Draw(kit, m, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [
       fixed(shrubKit(9), plan.shrubs),
