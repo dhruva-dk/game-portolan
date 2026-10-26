@@ -561,6 +561,7 @@ uniform vec3 uChartE[${NR}];
 uniform vec3 uChartN[${NR}];
 uniform vec2 uFade;          // the composite's line fade, u from the eye
 const float CLIFF_UP = ${SLOPES.cliff.toFixed(3)}, SCREE_UP = ${SLOPES.scree.toFixed(3)}, TIDE_AMP = ${TIDE.amp.toFixed(3)};
+const float LAND_U = TIDE_AMP + 0.15; // dry at high water (the coral planner's LAND)
 const float CELL_U = ${CELL_U.toFixed(4)};
 const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS = 0.6;
 const vec3 ULTRA_T = ${vec(transmittanceVec(PIGMENTS.ultramarine))};
@@ -713,7 +714,22 @@ void main() {
   // the same limestone (never bedded rock). The fine mottle is laid only where it is several px across, so from high
   // the reef is one pale wash with its blush and turf, never confetti. Above it the motus' dry sand, bleached white:
   // warm white in the light, the shade's cool glaze in shadow.
-  float mud = max(shore.w, 0.0), reef = f.w * (1.0 - smoothstep(TIDE_AMP, TIDE_AMP + 0.3, f.x + bleed * 4.0));
+  // The flat ends at the land line (sim's LAND, coralAtolls.ts: dry at high water), where the motus' palms begin, so the
+  // islets are exactly as long and broad as their height says and the reef between them is awash (S-021).
+  float mud = max(shore.w, 0.0), reef = f.w * (1.0 - smoothstep(LAND_U - 0.03, LAND_U + 0.03, f.x + bleed));
+  // a motu's beach: its white sand runs down from the dry crest a pace or so onto the flat (no tree stands on it), so
+  // from any height the islet reads as white sand round its grove, ragged at its foot; a reef that never rises above
+  // the land line keeps no beach, and the gaps between the motus stay awash flat
+  float dryD = 9.0;
+  if (reef > 0.01 && shore.w < -0.5 && f.x > -0.4) {
+    for (int k = 0; k < 7; k++) {
+      float a = float(k) * 0.8976 + 0.4 * float(k - 2 * (k / 2));
+      vec3 o = (E * cos(a) + NC * sin(a)) / SEA_R;
+      if (seaField(normalize(dir + 0.7 * o)).x > LAND_U) dryD = min(dryD, 0.7);
+      else if (seaField(normalize(dir + 1.4 * o)).x > LAND_U) dryD = min(dryD, 1.4);
+    }
+  }
+  reef *= smoothstep(1.0, 1.4, dryD + 0.45 * noise3(vWorld / 1.3 + 7.0));
   float bleached = max(-shore.w, 0.0), reefInk = 0.0, reefShade = 0.0;
   if (reef > 0.01) {
     // near the eye a living reef pavement, never a smooth slab: warm cream-ochre limestone (little lead grey, its turf
@@ -727,11 +743,11 @@ void main() {
     float edge = (1.0 - smoothstep(0.6, 2.8, -f.y + 1.2 * m1)) * smoothstep(-0.5, 0.1, m3 + 0.3 * m2);
     float turf = smoothstep(0.15, 0.55, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
     float bare = smoothstep(0.1, 0.5, m3 - 0.3 * m1) * (1.0 - edge) * (1.0 - turf);
-    vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.17, 0.15, fine) + 0.05 * m1, pool, q);
+    vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.1, 0.15, fine) + 0.05 * m1, pool, q);
     pave = mix(pave, ground * LEAD / PARCH, 0.08 * fine + 0.12 * bare);
     float blush = max(edge, fine * smoothstep(0.12, 0.42, m2 - 0.35 * m1));
-    pave = glaze(pave, ROSE_T, mix(0.55, 0.24, fine) * blush, 0.0, q);
-    pave = glaze(glaze(pave, SEPIA_T, mix(0.1, 0.05, fine) * turf, 0.0, q), OCHRE_T, mix(0.16, 0.1, fine) * turf, 0.0, q);
+    pave = glaze(pave, ROSE_T, mix(0.3, 0.24, fine) * blush, 0.0, q);
+    pave = glaze(glaze(pave, SEPIA_T, 0.05 * turf, 0.0, q), OCHRE_T, 0.1 * turf, 0.0, q);
     // pools, a pace or two across, low on the flat: the sea's turquoise inside an inked rim
     float pv = noise3(vWorld / 1.7 + 17.0) + 0.25 * m2 - 0.6 * smoothstep(-0.1, 0.35, above);
     float poolK = fine * smoothstep(0.4, 0.46, pv);
@@ -752,9 +768,14 @@ void main() {
     reefShade = fine * clamp(0.5 * rubble * smoothstep(0.55, 0.62, rb) + 0.6 * flank + 0.5 * pits, 0.0, 1.0);
     // wet below the last tide: darker and warmer under its film of water, the sea's green in it
     pave = glaze(glaze(pave, SEPIA_T, 0.05 * wet * wet, 0.0, q), VERD_T, 0.1 * wet, 0.0, q);
+    // awash: the flat lies under the sea at high water and keeps a film of it at half tide, so it reads as pale wet
+    // coral and rubble under thin turquoise, never as dry land beside the motus' white sand (S-021); the film thinner
+    // near the eye, where the pavement shows through it, and thinnest where the flat stands highest
+    float film = mix(0.36, 0.24, fine) * (1.0 - 0.4 * smoothstep(0.0, TIDE_AMP, above)) * (0.85 + 0.3 * m1);
+    pave = glaze(glaze(mix(pave, ground * LEAD / PARCH * 1.04, 0.55 * (1.0 - fine)), VERD_T, film, 0.0, q), ULTRA_T, 0.1 * film, 0.0, q);
     col = mix(col, pave, reef * (1.0 - meadow));
   }
-  col = mix(col, ground * LEAD / PARCH, bleached * beach * (1.0 - reef) * (1.0 - 0.6 * wet) * 0.7 * (0.85 + 0.3 * patchy));
+  col = mix(col, ground * LEAD / PARCH * 1.05, bleached * beach * (1.0 - reef) * (1.0 - 0.6 * wet) * 0.92 * (0.9 + 0.2 * patchy));
   if (bleached > 0.0) {
     // shells and coral grit strewn on the coral sand near the eye, a hand long (~0.03 u): cream, now and then rose, a dark
     // fleck of shadow at the lip
@@ -820,6 +841,8 @@ void main() {
   float strand = (1.0 - smoothstep(0.03, 0.12, abs(above - 0.8 * TIDE_AMP + 0.12 * noise3(vWorld / 2.2)))) * smoothstep(-0.2, 0.2, noise3(vWorld / 1.1 + 2.0));
   lines += stipple(pl, upx, 0.75, 5.0) * nearR * strand * 0.9;
   lines += reefInk * reef * (1.0 - meadow);
+  // white coral sand's high-water line inked all round, so each motu reads as its own islet on the awash flat (S-021)
+  lines += inkLine(f.x - LAND_U, fwidth(f.x), LINE_CSS * 0.9) * bleached * beach * 0.85;
   // the brow and foot of every cliff, heavier near the eye
   // (broken into lengths, so a rounded crag's brow never draws a ring round it)
   lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low)
