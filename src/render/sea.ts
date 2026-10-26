@@ -11,7 +11,7 @@
 // a squall's rough grey sea); and WP20's territory washes. Bow waves and wakes are a second draw: a ribbon per ship.
 import * as THREE from 'three';
 import { inkMaterial, linearVec, transmittanceVec } from '../style/glsl.ts';
-import { PARCHMENT, PIGMENTS, SEA_WASHES, type PigmentName } from '../style/palette.ts';
+import { hex, PARCHMENT, PIGMENTS, SEA_WASHES, type PigmentName } from '../style/palette.ts';
 import { tideOf } from '../sim/environment.ts';
 import type { V3 } from '../sim/math.ts';
 import { cellOf, horizonDistance, R, TERRITORY } from '../sim/sphere.ts';
@@ -132,6 +132,7 @@ const washD = (k: keyof typeof SEA_WASHES) => (SEA_WASHES[k].density * WASH_LOAD
 /** Lead white and the pen, silvered by night: the foam's and the strokes' colours (fragment, after STYLE_GLSL). */
 const INKS = /* glsl */ `
 const vec3 LEAD = ${vec(linearVec(PIGMENTS.leadWhite))}, PARCH = ${vec(linearVec(PARCHMENT))};
+const vec3 SUN_GOLD = ${vec(linearVec(hex('#f5dc96')))}, LEAF_LO = ${vec(linearVec(hex('#c08a2c')))}, LEAF_HI = ${vec(linearVec(hex('#f4d77e')))}, LEAF_GLINT = ${vec(linearVec(hex('#fff2c8')))}; // the pale gold close round a low sun (render/sky.ts); burnished leaf
 vec3 leadWhite() { return mix(LEAD * uPaper / PARCH, uSilver, uNight * 0.6); }
 vec3 penInk() { return mix(hatchInk(0.6), uSilver, uNight * 0.7); }
 `;
@@ -556,6 +557,32 @@ void main() {
   float backT = clamp(-6.0 * dot(vNormal - dir, uSun) - 0.1, 0.0, 1.0) * water * near * (1.0 - uCalm) * diag;
   col = mix(col, hatchInk(0.35), 0.55 * hatching(hc, hdx, hdy, 0.42 * backT, 5.0));
 
+  // golden hour (uLow): the water gives back the sky. Each facet mirrors the sky along the reflected ray, washed as the
+  // sky is (render/sky.ts): high, the cool zenith; low toward the sun, the hour's glow and pale gold; low away from it,
+  // the cooler sky. That reflection takes the place of the water's own colour as the eye's glance grows shallower (never
+  // laid over it: complementary washes would mix to mud), so toward the sun the water is the glowing sky and away from
+  // it slate-blue; clear shallows keep their own colour under it, warmed a little. (Nothing at midday or by night.)
+  float sunUp = smoothstep(-0.03, 0.04, dot(uSunDisc, dir)) * uLow * water;
+  if (uLow > 0.001) {
+    vec3 up0 = normalize(cameraPosition), rv = reflect(-V, vNormal);
+    float el = dot(rv, up0), dip = sqrt(max(1.0 - pow(SEA_R / max(length(cameraPosition), SEA_R), 2.0), 0.0));
+    vec3 hs = normalize(uSunDisc - up0 * dot(uSunDisc, up0) + 1e-6), hr = normalize(rv - up0 * el + 1e-6);
+    float az = dot(hr, hs) * 0.5 + 0.5;                                  // 1 toward the sun's bearing, 0 away
+    float dz = 0.06 + 0.94 * (1.0 - exp(-max(el + dip, 0.0) * 2.4));     // the zenith's wash over the horizon's
+    dz = mix(dz, max(dz, 0.85), smoothstep(0.55, 0.1, az));              // the sky away from a low sun is the cooler
+    vec3 sky = uSkyHorizon * pow(max(uSkyZenith / max(uSkyHorizon, vec3(1e-3)), vec3(1e-3)), vec3(dz));
+    float glow = az * az * (1.0 - smoothstep(-0.04, 0.3, el - 0.22 * pow(az, 4.0))) * smoothstep(-0.25, 0.05, dot(uSunDisc, up0));
+    sky = mix(sky, uSkyGlow, glow); // (the pale gold round the sun's own image is the glitter path's, below)
+    sky *= 0.84; // (a reflection is always a little deeper than the sky it gives back; only the glitter is brighter)
+    // how much of the sky the water gives back: little looking down into it, nearly all at a glance; the glow, far
+    // brighter than the water's body, takes its place sooner
+    float cv = clamp(dot(V, vNormal), 0.0, 1.0), fr = 0.12 + 0.88 * pow(1.0 - cv, 4.0);
+    float shallowClear = clear * (1.0 - smoothstep(4.0, 12.0, depth));
+    float give = uLow * water * min(mix(fr, max(fr, 0.85), glow) * (1.0 - 0.75 * shallowClear), 0.92);
+    col = mix(col, sky * parchment(qs) / uPaper, give);
+    col = wash(col, uSunTint, 0.35 * uLow * water * shallowClear);      // the clear shallows, warmed a little
+  }
+
   // a calm lays the sea flat as a mirror: the sky's wash, and islands and ships drawn upside down in it, broken by
   // ripple strokes (the reflected ray is marched over the height field; ships are the wakes' hulls, with masts)
   if (uCalm > 0.01) {
@@ -760,6 +787,24 @@ void main() {
   col = mix(col, uInk, coast * 0.9);
   // the far sea goes into the sky's horizon wash (render/sky.ts lays the same), so sea and sky meet at every hour
   col = mix(col, uSkyHorizon * parchment(q) / uPaper, far * far * 0.6);
+  // the glitter path up the water to a low sun: short broken strokes across the path, gold leaf at its heart and ink at
+  // its flanks, lit only where a facet of the swell turns the sun's image to the eye (they come and go as the swell runs
+  // under them), over a pale gold sheen; the path narrows to the horizon (the facets' slopes, about 0.22, set its width)
+  if (sunUp > 0.001) {
+    vec3 Hs = normalize(V + uSunDisc);
+    float ch = max(dot(Hs, vNormal), 0.05), tn2 = (1.0 - ch * ch) / (ch * ch);
+    float path = exp(-tn2 / 0.05) * sunUp * (1.0 - lead) * (1.0 - coast);
+    if (path > 0.01) {
+      vec3 toward = normalize(uSunDisc - dir * dot(uSunDisc, dir) + 1e-6); // strokes lie across the path
+      // (glints are small, close-set and bold: the marks' cells at a third to a half of the wave strokes', broader strokes)
+      float gold = marks(P, dir, toward, 0.35 * upx, 0.6 * STROKE_CELL, clamp(1.8 * path - 0.1, 0.0, 0.95), 41.0, 0, 0.0) * diag;
+      float dark = marks(P, dir, toward, 0.6 * upx, 0.6 * STROKE_CELL, 0.75 * smoothstep(0.03, 0.25, path) * (1.0 - 0.7 * smoothstep(0.45, 0.85, path)), 53.0, 0, 0.0) * diag * (1.0 - gold);
+      col = mix(col, SUN_GOLD * parchment(q) / uPaper, 0.3 * smoothstep(0.3, 0.9, path));
+      col = mix(col, pen, 0.75 * dark);
+      // (gold leaf: burnished at the path's flanks, bright where it catches the sun at its heart)
+      col = mix(col, mix(mix(LEAF_LO, LEAF_HI, smoothstep(0.05, 0.3, path)), LEAF_GLINT, clamp(path + fine, 0.0, 1.0)), gold * smoothstep(0.08, 0.3, path));
+    }
+  }
   writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)));
 }
 `;

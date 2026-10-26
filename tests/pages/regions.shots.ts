@@ -11,7 +11,7 @@
 // WP17 part A: the Coral Atolls at midday off the Great Lagoon's reef, along its surf to the staked single channel
 // (capture 23), a motu's shore over the reef flat at low water, the Great Lagoon from high above and from orbit.
 // WP17 part B: Spice Harbour at golden hour from the sound, ships crowding in (capture 24), low off a jungle shore, the
-// harbour from high above and from orbit.
+// harbour from high above and from orbit, and across the harbour into the low sun (WP14: the sea's golden hour).
 //   node tests/pages/regions.shots.ts [outDir] [prefix]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -46,6 +46,7 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['coral-high', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1' }],
   ['coral-orbit', { view: 'orbit', region: 'Coral', hour: '12', tide: '0.1' }],
   ['spice-hero', { view: 'spice', hour: '17.2' }],
+  ['spice-sun', { view: 'spice', hour: '17.6', turn: 'sun', ox: '22', oy: '14', pitch: '-0.2' }], // across the harbour into the low sun: the water gives back the glowing sky, the glitter path
   ['spice-shore', { view: 'spiceshore', hour: '16' }],
   ['spice-high', { view: 'mark', region: 'Spice', hour: '16' }],
   ['spice-orbit', { view: 'orbit', region: 'Spice', hour: '16' }],

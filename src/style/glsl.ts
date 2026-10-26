@@ -44,6 +44,7 @@ export interface StyleUniforms {
   uShade: THREE.IUniform<THREE.Vector3>; // transmittance of the shade glaze
   uSunTint: THREE.IUniform<THREE.Vector3>; // transmittance of the lit-side glaze
   uLow: THREE.IUniform<number>; // 0 with the sun high (and by night) … 1 with it low: raking warm light, cool shade, cast shade
+  uSunDisc: THREE.IUniform<THREE.Vector3>; // world direction of the sun's own disc, below the horizon once set (uSun is lifted)
   uSilver: THREE.IUniform<THREE.Vector3>; // linear: night highlight ink
   uNight: THREE.IUniform<number>;
   uRenderPx: THREE.IUniform<number>; // render pixels per CSS px (device pixel ratio × render scale)
@@ -75,6 +76,7 @@ export function createStyle(): Style {
     uShade: { value: v() },
     uSunTint: { value: v() },
     uLow: { value: 0 },
+    uSunDisc: { value: new THREE.Vector3(0, 1, 0) },
     uSilver: { value: v() },
     uNight: { value: 0 },
     uRenderPx: { value: 1 },
@@ -142,6 +144,7 @@ uniform vec3 uInk;
 uniform vec3 uShade;
 uniform vec3 uSunTint;
 uniform float uLow;
+uniform vec3 uSunDisc;
 uniform vec3 uSilver;
 uniform float uNight;
 uniform float uRenderPx;

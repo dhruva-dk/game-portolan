@@ -159,6 +159,7 @@ export class Lights {
     this.style.setHour(hour);
     u.uSun.value.copy(s.light);
     u.uLow.value = lowSun(s.sunHeight);
+    u.uSunDisc.value.copy(s.sun);
     this.order.length = n;
     this.dist.length = n;
     for (let i = 0; i < n; i++) {

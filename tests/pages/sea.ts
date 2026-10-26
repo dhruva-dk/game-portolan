@@ -1,6 +1,6 @@
 // The sea test page (tests/pages/sea.html, outside the game build): the WP13 sea and WP15 terrain over the real geography, ships
 // riding the swell under the WP14 sky, and a free camera. Query: view=deck|high|orbit|coast|hull|seam|pole|curve|light|harbour|floor|lane|wake|crown|fjord|mark|basalt|weave|kelp|kelpdeck|amber|amberpass (WP16: the Crown Light from the pack, up the Falls Fjord, the Arch over the Basalt Stacks' walls, down a lane of their maze, a landmark from high above with region=), kind=rock|coral|sand|kelp (floor), lane=<i> (lane), region=<name> (deck, high, orbit), off=<u offshore> (deck, high), height=<u> and pitch=<rad> (deck, high),
-// hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>; for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
+// hour=<0–24>, wind=<0–1.4>, squall=<0–1>, calm=<0–1>, tide=<u>, sail=<u/s> (ships under way with their wakes), clock=<s>, turn=sun|<rad> (any view: faced to the sun's bearing, then aim=<rad> more); for view=light also off=<u offshore>, height=<u>, pitch=<rad> (holds the render clock for repeatable captures). Drag to look round, wheel to climb, WASD or arrows to
 // sail. window.__sea drives it from tests/pages/sea.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
@@ -10,7 +10,7 @@ import type { Riding } from '../../src/render/swell.ts';
 import { Ship } from '../../src/render/ships/shipwright.ts';
 import type { FormName } from '../../src/render/ships/forms.ts';
 import { Sky } from '../../src/render/sky.ts';
-import { BEAM, type Lamp } from '../../src/render/light.ts';
+import { BEAM, newSkyLight, skyLight, type Lamp } from '../../src/render/light.ts';
 import { Structures } from '../../src/render/structures.ts';
 import { Flora } from '../../src/render/flora.ts';
 import { IceCrown } from '../../src/render/regions/iceCrown.ts';
@@ -295,6 +295,11 @@ if (view === 'deck') {
 } else {
   look(spot('Weeping', 50).at, 0.6, 140, -0.38);
 }
+// turn=sun swings any view round to the sun's bearing at the hour (the glitter path up the water toward a low sun),
+// then by aim=<rad> more; turn=<rad> swings it by that much
+const turn = q.get('turn');
+if (turn === 'sun') cam.heading = headingToward(cam.foot, skyLight(hour, cam.foot, newSkyLight()).sun) + (view === 'coral' ? 0 : Number(q.get('aim') ?? 0));
+else if (turn) cam.heading += Number(turn);
 aim();
 frameAt(UP, cam.heading + 1.1);
 sea.setWind(UP, F, wind);
