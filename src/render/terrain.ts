@@ -29,7 +29,7 @@ import { R, TERRITORY, cellDir, cellOf, faceUV, gnomonicDir, type FaceUV } from 
 import { CHARTS, type Geography } from '../sim/world/geography.ts';
 import { FLOOR, REGIONS, TIDE, type Region } from '../sim/world/regions.ts';
 import type { Pipeline } from './pipeline.ts';
-import { LAND_GLSL, seas } from './sea.ts';
+import { exposureAt, LAND_GLSL, seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
@@ -95,15 +95,32 @@ export function landformOf(r: Region): number {
 }
 /** The top of region r's beach, u over mean sea. */
 export const beachTop = (r: Region): number => r.shore.berm * SLOPES.beachRise + SLOPES.beachBase;
+/** How the coast's exposure (sea.ts EXPOSE: +1 off a point, −1 at a bay's head) moves the sand, as on a coast drawn from
+ *  life (S-025 (4)): at a bay's head the beach's top and the foreshore's rise by up to `raise` u, so pocket beaches
+ *  gather in the coves, widest at their heads; off a point both fall below the lowest water (`bare` 0 to 1 over that
+ *  exposure) and its shore is bare rock where the sand would lie (`fore` u: the highest water's reach on clad land),
+ *  the forest or meadow above coming down to it. Only where a coast has rock to bare (`cliffH`, its cliffs' height, ramping the rule in): a low coast of
+ *  sand or mud (the shoals' dunes, the atolls' white coral cays, the mangroves' mud) keeps its sand all round. */
+export const EXPOSED = { raise: 0.5, bare: [0.25, 0.8], fore: TIDE.amp + 0.4, cliffH: [3, 5], head: 0.8, outcrop: 0.9, pitch: 7 } as const;
+/** How fully region r's sand follows its coast's exposure (0–1, EXPOSED). */
+export const exposedOf = (r: Region): number => (sandOf(r) === 'white' || sandOf(r) === 'mud' ? 0 : smooth(EXPOSED.cliffH[0], EXPOSED.cliffH[1], r.shore.cliffH));
+/** Region r's sand at exposure ex: the top of its beach on the strand's flat, the top of its foreshore sand however
+ *  steep (on clad land), and how bare a point has left its foreshore (0–1). */
+export function sandTops(r: Region, ex: number): [number, number, number] {
+  const e = ex * exposedOf(r), bare = smooth(EXPOSED.bare[0], EXPOSED.bare[1], e), lift = EXPOSED.raise * Math.max(-e, 0), lw = -TIDE.amp - 0.1;
+  return [beachTop(r) + (lw - beachTop(r)) * bare + lift, EXPOSED.fore + (lw - EXPOSED.fore) * bare + lift, bare];
+}
 
-/** The ground of region `ri` at `height` u where the surface's up·normal is `up`. */
-export function groundAt(ri: number, height: number, up: number): Ground {
+/** The ground of region `ri` at `height` u where the surface's up·normal is `up` and the coast's exposure is `ex`. */
+export function groundAt(ri: number, height: number, up: number, ex = 0): Ground {
   const r = REGIONS[ri], form = landformOf(r);
   if (form === 2) return GROUND.ice;
   const [sheer, steep] = slopesOf(r);
   if (up < sheer) return form === 1 ? GROUND.basalt : GROUND.cliff;
   if (up < steep) return height < r.shore.cliffH * 0.8 ? GROUND.scree : GROUND.rock;
-  if (height < beachTop(r) && (up > SLOPES.strand || !cladOf(r) || height < TIDE.amp + 0.4)) return sandOf(r) === 'mud' ? GROUND.mud : GROUND.beach;
+  const [top, fore, bare] = sandTops(r, ex), sandy = (t: number, f: number): boolean => height < t && (up > SLOPES.strand || !cladOf(r) || height < f);
+  if (sandy(top, fore)) return sandOf(r) === 'mud' ? GROUND.mud : GROUND.beach;
+  if (bare > 0.5 && sandy(beachTop(r), EXPOSED.fore)) return GROUND.rock;
   return GROUND.meadow;
 }
 
@@ -181,6 +198,19 @@ function noise3(x: number, y: number, z: number): number {
   const lo = ab + (cd - ab) * v;
   return 2 * (lo + (ef + (gk - ef) * v - lo) * w) - 1;
 }
+/** The carving's headland share at the world point (x, y, z) u in a region whose sheer share is `sheer`: 0 where the
+ *  land is laid down to a cove's gentle rise, 1 where it stands up as a headland. One rule for the relief, the sand
+ *  (shoreExposure) and the shader's `headland` (the same hash, bit for bit). */
+export const headlandAt = (x: number, y: number, z: number, sheer: number): number => smooth(-0.3, 0.3, noise3(x / 17 + 1.7, y / 17, z / 17) + sheer - 0.5);
+/** The exposure the sand follows at unit `dir` in region `ri` (EXPOSED): the coast's (sea.ts exposureAt) and, along it,
+ *  the carving's headlands (`head` times its headland share) and rocky outcrops (`outcrop` times a value noise of
+ *  `pitch` u), so a long smooth shore breaks into pocket beaches between rocky points, and the points stand where the
+ *  land stands up behind them. */
+export function shoreExposure(geo: Geography, dir: V3, ri: number): number {
+  const l = Math.hypot(dir.x, dir.y, dir.z), x = (dir.x / l) * R, y = (dir.y / l) * R, z = (dir.z / l) * R, p = EXPOSED.pitch;
+  const k = headlandAt(x, y, z, reliefOf(REGIONS[ri]).sheer);
+  return Math.max(-1, Math.min(1, exposureAt(geo, dir) + EXPOSED.head * k + EXPOSED.outcrop * noise3(x / p + 3.1, y / p - 1.3, z / p)));
+}
 /** Ridged multifractal in [0, 1]: sharp crests, each octave weighted by the one above (crags on the crests). */
 function ridged(x: number, y: number, z: number, octaves: number): number {
   let sum = 0, norm = 0, amp = 1, weight = 1, f = 1;
@@ -234,7 +264,7 @@ export function carve(geo: Geography): Float32Array {
     }
     const w = smooth(KEEP, KEEP + 2, h), rise = smooth(0, 3 + 0.4 * s.amp, inland);
     let e = h - KEEP;
-    const k = smooth(-0.3, 0.3, noise3(x / 17 + 1.7, y / 17, z / 17) + s.sheer - 0.5);
+    const k = headlandAt(x, y, z, s.sheer);
     const slope = (0.3 + 0.25 * (1 + noise3(x / 11, y / 11 + 4.4, z / 11))) * (0.5 + s.amp / 18);
     e = smin(e, s.amp * 0.45 * (0.2 + 0.8 * k) + inland * slope, 1);
     const bench = k * s.bench * smooth(2, 5, h) * (1 - smooth(0.9, 1.7, inland)) * smooth(-0.1, 0.25, noise3(x / 7, y / 7, z / 7));
@@ -371,7 +401,7 @@ export class TerrainField {
     out.height = Math.max(h, tide + LIFT);
     out.up = (out.normal.x * p.x + out.normal.y * p.y + out.normal.z * p.z) / l;
     out.region = this.geo.region[cellOf(TERRITORY, p)];
-    out.ground = groundAt(out.region, out.height, out.up);
+    out.ground = groundAt(out.region, out.height, out.up, out.height < 3 ? shoreExposure(this.geo, p, out.region) : 0);
     return out;
   }
 
@@ -570,7 +600,8 @@ uniform vec4 uRelief[${NR}]; // crag share, volcanic, shingle beach, the beds' d
 uniform vec3 uChartE[${NR}];
 uniform vec3 uChartN[${NR}];
 uniform vec2 uFade;          // the composite's line fade, u from the eye
-uniform vec3 uSlope[${NR}];  // up·normal below which the ground is sheer, and steep; 1 where rainforest clads the land
+uniform float uSheer[${NR}]; // the carving's sheer share (headlandAt)
+uniform vec4 uSlope[${NR}];  // up·normal below which the ground is sheer, and steep; 1 where rainforest clads the land; how fully the sand follows the coast's exposure
 const float TIDE_AMP = ${TIDE.amp.toFixed(3)};
 const float CELL_U = ${CELL_U.toFixed(4)};
 const float STRATA = 1.15, COLUMN = 1.5, JOINT = 0.9, LINE_CSS = 0.45, COAST_CSS = 0.6;
@@ -606,6 +637,25 @@ float stipple(vec2 x, float upx, float dens, float seed) {
   return mix(dotsAt(x, C, upx, dens, seed + lo), dotsAt(x, 2.0 * C, upx, dens, seed + lo + 1.0), lvl - lo);
 }
 
+// the carving's headland share (headlandAt: its value noise on the CPU's integer hash, bit for bit)
+float hashI(vec3 c) {
+  ivec3 i = ivec3(c);
+  uint h = uint(i.x) * 374761393u + uint(i.y) * 668265263u + uint(i.z) * 1274126177u;
+  h = (h ^ (h >> 13u)) * 1274126177u;
+  return float(h ^ (h >> 16u)) / 4294967296.0;
+}
+float noiseI(vec3 p) {
+  vec3 i = floor(p), f = p - i, u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  return 2.0 * mix(mix(mix(hashI(i), hashI(i + vec3(1, 0, 0)), u.x), mix(hashI(i + vec3(0, 1, 0)), hashI(i + vec3(1, 1, 0)), u.x), u.y),
+                   mix(mix(hashI(i + vec3(0, 0, 1)), hashI(i + vec3(1, 0, 1)), u.x), mix(hashI(i + vec3(0, 1, 1)), hashI(i + vec3(1, 1, 1)), u.x), u.y), u.z) - 1.0;
+}
+// shoreExposure's: the coast's exposure, the carving's headlands and the shore's rocky outcrops
+float shoreExposure(vec3 dir, float d0, float sheer) {
+  vec3 x = dir * SEA_R;
+  vec2 rise;
+  float k = smoothstep(-0.3, 0.3, noiseI(vec3(x.x / 17.0 + 1.7, x.y / 17.0, x.z / 17.0)) + sheer - 0.5);
+  return clamp(exposure(dir, d0, rise) + ${EXPOSED.head.toFixed(2)} * k + ${EXPOSED.outcrop.toFixed(2)} * noiseI(vec3(x.x / ${EXPOSED.pitch.toFixed(1)} + 3.1, x.y / ${EXPOSED.pitch.toFixed(1)} - 1.3, x.z / ${EXPOSED.pitch.toFixed(1)})), -1.0, 1.0);
+}
 // value noise in [-1, 1] on the unit lattice
 float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 float noise3(vec3 p) {
@@ -673,7 +723,7 @@ void main() {
   float up0 = dot(n0, dir);
   int ri = vRegion;
   vec4 shore = uShore[ri], land = uLand[ri], fol = uFoliage[ri], sand = uSand[ri], rel = uRelief[ri];
-  vec3 slope = uSlope[ri];
+  vec4 slope = uSlope[ri];
   float CLIFF_UP = slope.x, SCREE_UP = slope.y, clad = slope.z, STRAND_UP = ${SLOPES.strand.toFixed(3)};
   // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
   // field's waterline; never on reef, whose flank under the water is the sea's to paint, nor (on the low coral cays of
@@ -703,9 +753,19 @@ void main() {
   float cay = max(-shore.w, 0.0) * (1.0 - smoothstep(shore.x + 0.2, shore.x + 0.8, h));
   cliff *= 1.0 - cay;
   steep *= 1.0 - cay;
-  float low = 1.0 - smoothstep(shore.x - 0.3, shore.x + 0.3, h + bleed * 6.0);
-  if (clad > 0.5) low *= max(smoothstep(STRAND_UP - 0.04, STRAND_UP + 0.03, up0 + bleed + 0.06 * (q.mottle - 0.5)),
-                             1.0 - smoothstep(TIDE_AMP + 0.25, TIDE_AMP + 0.45, h + 0.2 * bleed)); // (the foreshore sand, however steep)
+  // the coast's exposure moves the sand (EXPOSED, sandTops): pocket beaches in the coves, widest at their heads; off the
+  // points bare rock where the sand would lie and the forest or meadow above coming down to it
+  float ex = slope.w > 0.0 && h < shore.x + ${(EXPOSED.raise + 0.5).toFixed(2)} ? slope.w * shoreExposure(dir, f.y, uSheer[ri]) : 0.0;
+  float bare = smoothstep(${EXPOSED.bare[0].toFixed(2)}, ${EXPOSED.bare[1].toFixed(2)}, ex), lift = ${EXPOSED.raise.toFixed(2)} * max(-ex, 0.0), lw = -TIDE_AMP - 0.1;
+  float topB = mix(shore.x, lw, bare) + lift, topF = mix(TIDE_AMP + 0.35, lw, bare) + lift;
+  float onFlat = smoothstep(STRAND_UP - 0.04, STRAND_UP + 0.03, up0 + bleed + 0.06 * (q.mottle - 0.5));
+  float low = 1.0 - smoothstep(topB - 0.3, topB + 0.3, h + bleed * 6.0), low0 = 1.0 - smoothstep(shore.x - 0.3, shore.x + 0.3, h + bleed * 6.0);
+  if (clad > 0.5) { // (the foreshore sand, however steep)
+    low *= max(onFlat, 1.0 - smoothstep(topF - 0.1, topF + 0.1, h + 0.2 * bleed));
+    low0 *= max(onFlat, 1.0 - smoothstep(TIDE_AMP + 0.25, TIDE_AMP + 0.45, h + 0.2 * bleed));
+  }
+  float scar = (1.0 - cliff) * bare * low0; // (the shore a point has bared is rock up to where its sand would lie)
+  steep = max(steep, scar);
   float beach = (1.0 - cliff - steep) * low, meadow = 1.0 - cliff - steep - beach;
   float talus = steep * (1.0 - smoothstep(0.25, 0.45, h / max(shore.y, 1.0))) * (1.0 - clad); // (no scree under rainforest)
 
@@ -757,8 +817,9 @@ void main() {
     vec3 lava = glaze(glaze(ground, land.rgb, land.a * 0.5, pool, q), SEPIA_T, 0.85 + 0.25 * blk, pool, q);
     lava = glaze(lava, ULTRA_T, 0.25, pool, q);
     spine = smoothstep(0.2, 0.55, rib + 0.3 * patchy) * (1.0 - smoothstep(0.1, 0.5, noise3(vWorld / 1.3 + 6.0) + 0.4 * crease));
+    spine = max(spine, scar); // (a bared point's shore is the crags' dark rock, washed bare by the sea)
     rock = mix(shadeG, lava, spine);
-    veg = 1.0 - 0.5 * spine;
+    veg = (1.0 - 0.5 * spine) * (1.0 - scar);
     green = mix(green, shadeG, 0.35 * steep);
   }
   vec3 col = rock * cliff + mix(rock, green, veg) * steep + sandC * beach + green * meadow;
@@ -1040,7 +1101,8 @@ function terrainMaterial(pipeline: Pipeline, swell: Swell): THREE.ShaderMaterial
       uChartE: { value: REGIONS.map((_, i) => new THREE.Vector3(e(i).x, e(i).y, e(i).z)) },
       uChartN: { value: REGIONS.map((_, i) => new THREE.Vector3(nn(i).x, nn(i).y, nn(i).z)) },
       uFade: { value: new THREE.Vector2(pipeline.ink.fadeStart, pipeline.ink.fadeEnd) },
-      uSlope: { value: REGIONS.map((r) => new THREE.Vector3(...slopesOf(r), cladOf(r) ? 1 : 0)) },
+      uSheer: { value: REGIONS.map((r) => reliefOf(r).sheer) },
+      uSlope: { value: REGIONS.map((r) => new THREE.Vector4(...slopesOf(r), cladOf(r) ? 1 : 0, exposedOf(r))) },
     },
   });
   // the land wins the depth test where it lies on the sea's surface

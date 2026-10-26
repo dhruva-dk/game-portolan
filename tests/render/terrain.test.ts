@@ -3,7 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { KEEP, CHUNK, GROUND, LEVELS, TerrainField, buildChunks, groundAt, template, type Surface } from '../../src/render/terrain.ts';
+import { KEEP, CHUNK, GROUND, LEVELS, TerrainField, buildChunks, groundAt, sandTops, template, type Surface } from '../../src/render/terrain.ts';
+import { exposureAt } from '../../src/render/sea.ts';
 import { TERRITORY, cellDir } from '../../src/sim/sphere.ts';
 import { v3 } from '../../src/sim/math.ts';
 import { buildGeography } from '../../src/sim/world/geography.ts';
@@ -97,4 +98,24 @@ test('the carving keeps the geography at and below the highest tide, and eases t
     if (h > 4) { sim += h; drawn += r; }
   }
   assert.ok(drawn < sim * 0.95, `drawn ${drawn} of ${sim}`);
+});
+
+test('the sand follows the coast\'s exposure: wider at a bay\'s head, bare rock off a point; low sandy coasts keep their own (S-025)', () => {
+  const spice = region('spiceIsles'), [top] = sandTops(REGIONS[spice], 0), [bay] = sandTops(REGIONS[spice], -1), [point] = sandTops(REGIONS[spice], 1);
+  assert.ok(bay > top && point < top, `tops: bay ${bay}, straight ${top}, point ${point}`);
+  assert.equal(groundAt(spice, 1.0, 0.99, -1), GROUND.beach);
+  assert.equal(groundAt(spice, 1.0, 0.99, 1), GROUND.rock);
+  assert.equal(groundAt(spice, 8, 0.99, 1), GROUND.meadow);
+  for (const id of ['amberShoals', 'coralAtolls', 'mangroveLabyrinth']) {
+    for (const ex of [-1, 1]) assert.equal(groundAt(region(id), 0.7, 0.99, ex), groundAt(region(id), 0.7, 0.99, 0), id);
+  }
+  // the field has both: Spice's coast has points and bays
+  let lo = 0, hi = 0;
+  const d = v3();
+  for (let c = 0; c < geo.coast.length; c += 3) {
+    if (geo.region[c] !== spice || Math.abs(geo.coast[c]) > 1) continue;
+    const e = exposureAt(geo, cellDir(TERRITORY, c, d));
+    lo = Math.min(lo, e); hi = Math.max(hi, e);
+  }
+  assert.ok(lo < -0.3 && hi > 0.5, `exposure ${lo}..${hi}`);
 });

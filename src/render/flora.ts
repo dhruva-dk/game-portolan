@@ -27,7 +27,7 @@ import type { Geography } from '../sim/world/geography.ts';
 import { FLOOR, REGIONS, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
-import { GROUND, SLOPES, cladOf, groundAt, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
+import { GROUND, SLOPES, cladOf, groundAt, shoreExposure, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 /** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores and pandanus at the edge of
@@ -848,7 +848,7 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
         for (const o of RING) ring += H[c + o];
         gnomonicDir(f, Math.tan(angle(i + 0.5)), Math.tan(angle(j + 0.5)), dir);
         const s = R / 9, grove = 0.7 * noise(dir.x * s, dir.y * s, dir.z * s) + 0.3 * noise(dir.x * s * 3.1, dir.y * s * 3.1, dir.z * s * 3.1);
-        const cell: Cell = { ground: groundAt(ri, Math.max(h, 0.03), up), height: h, up, inland: -geo.coast[c], shelter: ring / 8 - h,
+        const cell: Cell = { ground: groundAt(ri, Math.max(h, 0.03), up, h < 3 ? shoreExposure(geo, dir, ri) : 0), height: h, up, inland: -geo.coast[c], shelter: ring / 8 - h,
           alt: Math.max(0, h) / peak[ri], grove: smooth(0.3, 0.7, grove), depth: -h, floor,
           mix: noise(dir.x * s * 2.3 + 17.1, dir.y * s * 2.3 - 5.3, dir.z * s * 2.3 + 9.7), clad: clad[ri] }; // which of the jungle's crowns masses here
         for (const k of ks) {

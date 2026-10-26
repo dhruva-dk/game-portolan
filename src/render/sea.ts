@@ -72,6 +72,29 @@ export function discShape(height: number, out: DiscShape): DiscShape {
 /** A motu's white beach: how far (u) its sand runs from the land line (dry at high water, the coral planner's LAND) down
  *  onto the awash reef flat, before the shader's ragged edge (WP17, S-021). */
 export const MOTU_BEACH = 1.55;
+/** How exposed a coast is to the sea (S-025 (4)): the Laplacian of the signed coast distance (the field's y), taken over
+ *  two rings of four taps `s` u out (a cove's scale and a bay's) and made unitless (×4/s, averaged), times `gain`,
+ *  clamped to ±1. The distance's level lines open out round a point or headland (> 0) and close in at a bay's head or
+ *  between the shores of a strait (< 0); a straight shore is 0. The shore's sand and the sea's shelf follow it: the
+ *  shelf's edge lies at 3 u of depth times e^(−shelf·exposure). */
+export const EXPOSE = { s: [5, 10], gain: 1, shelf: 0.9 } as const;
+const X1 = new THREE.Vector3(), X2 = new THREE.Vector3(), XA = new THREE.Vector3(), XB = new THREE.Vector3(), XP = new THREE.Vector3(), XT = new THREE.Vector3();
+/** The coast's exposure at unit `dir` (EXPOSE; the GLSL `exposure` reads the same taps of the field's texels). */
+export function exposureAt(geo: Geography, dir: V3): number {
+  const d = XP.set(dir.x, dir.y, dir.z).normalize(), d0 = coastAt(geo, d);
+  X1.crossVectors(d, Math.abs(d.y) < 0.9 ? X2.set(0, 1, 0) : X2.set(1, 0, 0)).normalize();
+  X2.crossVectors(d, X1);
+  let e = 0;
+  for (let k = 0; k < 2; k++) {
+    const s = EXPOSE.s[k], q = s / R;
+    if (k === 0) { XA.copy(X1).multiplyScalar(q); XB.copy(X2).multiplyScalar(q); }
+    else { XA.copy(X1).add(X2).multiplyScalar(0.70711 * q); XB.copy(X2).sub(X1).multiplyScalar(0.70711 * q); }
+    let m = 0;
+    for (const [o, sg] of [[XA, 1], [XA, -1], [XB, 1], [XB, -1]] as const) m += coastAt(geo, XT.copy(d).addScaledVector(o, sg).normalize());
+    e += ((m / 4 - d0) * 2) / s;
+  }
+  return Math.max(-1, Math.min(1, EXPOSE.gain * e));
+}
 /**
  * GLSL (after SWELL_GLSL), one rule for the terrain's white beaches and the sea's waterline ink. float toLand(dir, h):
  * u from a point of height h to the land line, near enough within ~2 u (9 beyond): the least, over three rings of points
@@ -80,7 +103,8 @@ export const MOTU_BEACH = 1.55;
  * fill with sand, and a patch that never clears the land line keeps none).
  */
 export const LAND_GLSL = /* glsl */ `
-const float LAND_U = ${(TIDE.amp + 0.15).toFixed(3)}, BEACH_W = ${MOTU_BEACH.toFixed(3)};
+const float LAND_U = ${(TIDE.amp + 0.15).toFixed(3)}, BEACH_W = ${MOTU_BEACH.toFixed(3)}, EXPOSE_G = ${EXPOSE.gain.toFixed(3)}, SHELF_EX = ${EXPOSE.shelf.toFixed(3)};
+const vec2 EXPOSE_S = vec2(${EXPOSE.s[0].toFixed(2)}, ${EXPOSE.s[1].toFixed(2)});
 float toLand(vec3 dir, float h) {
   if (h >= LAND_U) return 0.0;
   float d = min(9.0, 20.0 * (LAND_U - h));
@@ -94,6 +118,23 @@ float toLand(vec3 dir, float h) {
     }
   }
   return d;
+}
+// how exposed the coast near dir is (exposureAt's rule): +1 off a point or headland, −1 at a bay's head or in a
+// sheltered strait, 0 along a straight shore; rise (out): x the depth's climb per u of coast distance across the inner
+// ring, y the deepest water on the outer
+float exposure(vec3 dir, float d0, out vec2 rise) {
+  vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
+  float e = 0.0;
+  rise = vec2(0.0);
+  for (int k = 0; k < 2; k++) {
+    float s = k == 0 ? EXPOSE_S.x : EXPOSE_S.y;
+    vec3 a = (k == 0 ? t1 : (t1 + t2) * 0.70711) * (s / SEA_R), b = (k == 0 ? t2 : (t2 - t1) * 0.70711) * (s / SEA_R);
+    vec4 pa = seaField(normalize(dir + a)), na = seaField(normalize(dir - a)), pb = seaField(normalize(dir + b)), nb = seaField(normalize(dir - b));
+    e += ((pa.y + na.y + pb.y + nb.y) * 0.25 - d0) * 2.0 / s;
+    if (k == 0) { vec2 gd = vec2(pa.y - na.y, pb.y - nb.y), gh = vec2(pa.x - na.x, pb.x - nb.x); rise.x = -dot(gh, gd) / max(dot(gd, gd), 1e-3); }
+    else rise.y = uSeaLevel - min(min(pa.x, na.x), min(pb.x, nb.x));
+  }
+  return clamp(EXPOSE_G * e, -1.0, 1.0);
 }
 // how far a reef's waterline lies from any motu's beach: 0 where a beach comes down to the water (or off the reef), up to
 // 1 along the awash flat's lip; and the ink a waterline takes, full on a beach, else light and in broken lengths, so an
@@ -691,7 +732,17 @@ void main() {
   qs.mottle = 0.5 + 0.3 * (q.mottle - 0.5);
   qs.bloom = 0.5 + 0.3 * (q.bloom - 0.5);
   vec2 sh = layer(depth, fwD), shEnd = layer(16.0 + 4.0 * wob - depth, fwD);
-  vec2 shelf = layer(depth - 3.0 - 1.5 * wob, fwD), deep = layer(depth - 24.0 - 2.5 * wob, fwD);
+  // the shelf's edge follows the coast's exposure as the shallows' sand does (S-025 (4)): far out off the bays and in the
+  // sheltered straits, in to nearly nothing under the points; only where the depth climbs with the distance from the
+  // coast and runs on down off the shelf (never over a reef, a lagoon, the clear water with its own drop, nor a shoal's
+  // flat: depths with relief of their own); near the coast (within 8–16 u), and never in over water a keel would strike
+  float shelfAt = 3.0;
+  if (f.y > -2.0 && f.y < 18.0) {
+    vec2 rise;
+    float ex = exposure(dir, f.y, rise);
+    shelfAt = max(${(DRAFT + 0.4).toFixed(2)}, 3.0 * exp(-SHELF_EX * ex * smoothstep(0.2, 0.45, rise.x) * smoothstep(6.0, 10.0, rise.y) * (1.0 - smoothstep(8.0, 16.0, f.y)) * (1.0 - f.w) * (1.0 - f.z) * (1.0 - clear)));
+  }
+  vec2 shelf = layer(depth - shelfAt * (1.0 + 0.5 * wob), fwD), deep = layer(depth - 24.0 - 2.5 * wob, fwD);
   col = glaze(col, SHALLOWS_T, SHALLOWS_D * tone * sh.x * shEnd.x * (1.0 - lagoon), 0.5 * shEnd.y + 0.3 * sh.y, qs);
   col = glaze(col, SHELF_T, SHELF_D * tone * shelf.x * (1.0 - lagoon), 0.4 * shelf.y, qs);
   col = glaze(col, DEEP_T, DEEP_D * tone * deep.x, 0.25 * deep.y, qs);
