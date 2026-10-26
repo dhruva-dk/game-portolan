@@ -16,13 +16,13 @@ import * as THREE from 'three';
 import { illustratedMaterial, transmittanceVec, type Style } from '../style/glsl.ts';
 import { mix, PIGMENTS, type RGB } from '../style/palette.ts';
 import type { V3 } from '../sim/math.ts';
-import { R } from '../sim/sphere.ts';
+import { R, TERRITORY, gnomonicDir } from '../sim/sphere.ts';
 import { heightAt, regionOf, type Geography } from '../sim/world/geography.ts';
 import { REGIONS, TIDE } from '../sim/world/regions.ts';
 import type { Beams, Lamp, Lights } from './light.ts';
 import { seas } from './sea.ts';
 import { skies } from './sky.ts';
-import { terrains, type Surface, type TerrainField } from './terrain.ts';
+import { exposedOf, sandTops, shoreExposure, terrains, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 /** A lighthouse in its own frame (u, before the site's scale): the lantern's centre `lamp` over the base, the plinth
@@ -488,6 +488,47 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
   });
 }
 
+/** The boulders heaped at the foot of every point the sea has bared (terrain.ts EXPOSED, S-028 (1)): `per` expected
+ *  per cell of the territory grid where the shore is bared, from just under the highest water (`low` u: never standing
+ *  out in the sea without its foam) up to `high` u, the largest lowest; in heaps of `heap` cells a side, each seen within `near` u of the eye. */
+export const SHORE_ROCKS = { per: 0.4, low: TIDE.amp - 0.15, high: 1.3, size: [0.12, 0.45], heap: 16, near: 110 } as const;
+export interface Heap {
+  readonly region: number;
+  readonly up: THREE.Vector3;
+  /** Its first boulder's seat on the sphere of radius R. */
+  readonly pos: THREE.Vector3;
+  readonly rocks: THREE.Matrix4[];
+}
+export function layShoreRocks(geo: Geography, field: TerrainField): Heap[] {
+  const N = TERRITORY.n, NN = N * N, H = field.relief, S = newSurface(), heaps = new Map<number, Heap>(), d = { x: 0, y: 0, z: 0 };
+  const exposed = REGIONS.map((r) => exposedOf(r) > 0), ang = (x: number) => Math.tan(((x / N) * 2 - 1) * (Math.PI / 4));
+  for (let c = 0; c < H.length; c++) {
+    const ri = geo.region[c], h = H[c];
+    if (!exposed[ri] || h < SHORE_ROCKS.low - 0.4 || h > SHORE_ROCKS.high || Math.abs(geo.coast[c]) > 3) continue;
+    const f = Math.floor(c / NN), j = Math.floor((c % NN) / N), i = c % N;
+    gnomonicDir(f, ang(i + 0.5), ang(j + 0.5), d);
+    const bare = sandTops(REGIONS[ri], shoreExposure(geo, d, ri))[2];
+    if (bare < 0.6) continue;
+    const rng = seeded(c + 7919), n = Math.floor(SHORE_ROCKS.per * bare * (1.3 - 0.6 * smoothstep(SHORE_ROCKS.low, SHORE_ROCKS.high, h)) + rng());
+    for (let k = 0; k < n; k++) {
+      gnomonicDir(f, ang(i + rng()), ang(j + rng()), d);
+      const p = unit(d), g = field.surface(p, 0, S).height;
+      if (g < SHORE_ROCKS.low || g > SHORE_ROCKS.high || S.up < 0.5) continue;
+      const lo = 1 - smoothstep(SHORE_ROCKS.low, SHORE_ROCKS.high, g), t = rng();
+      const sc = SHORE_ROCKS.size[0] + (SHORE_ROCKS.size[1] - SHORE_ROCKS.size[0]) * t * t * (0.45 + 0.55 * lo);
+      const key = f * 1e6 + Math.floor(j / SHORE_ROCKS.heap) * 1e3 + Math.floor(i / SHORE_ROCKS.heap);
+      let heap = heaps.get(key);
+      if (!heap) heaps.set(key, (heap = { region: ri, up: p.clone(), pos: p.clone().multiplyScalar(R), rocks: [] }));
+      heap.rocks.push(boulder(p, tangents(p, Math.abs(p.y) < 0.9 ? { x: 0, y: 1, z: 0 } : { x: 1, y: 0, z: 0 })[0], sc, rng, g, -Infinity));
+    }
+  }
+  return [...heaps.values()];
+}
+const smoothstep = (a: number, b: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
 // ---------------------------------------------------------------------------------------------------------------
 // Drawing
 
@@ -534,6 +575,7 @@ export class Structures {
   readonly group = new THREE.Group();
   readonly towers: Tower[];
   readonly harbours: Mooring[];
+  readonly heaps: Heap[];
   private readonly material: THREE.ShaderMaterial;
   private readonly masonry: THREE.ShaderMaterial;
   private readonly lapping: THREE.ShaderMaterial;
@@ -542,6 +584,7 @@ export class Structures {
   private readonly stone: THREE.Vector3[];
   private readonly rag: THREE.Vector3;
   private readonly accent: THREE.Vector3[];
+  private readonly dark: THREE.Vector3[];
   /** Per lighthouse 0 dropped, 1 near, 2 far; then per harbour 0 dropped, 1 seen. */
   private readonly state: Int8Array;
   private readonly lamps: Lamp[];
@@ -554,6 +597,7 @@ export class Structures {
     this.towers = layLighthouses(geo, field);
     this.towers.forEach((t, i) => beams.seat(i, t.lamp));
     this.harbours = layHarbours(geo, field);
+    this.heaps = layShoreRocks(geo, field);
     this.lights = lights;
     this.material = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide });
     // the harbour lamps' pillars in coursed masonry (their stone-tinted parts), the boulders and bollards natural stone
@@ -569,11 +613,13 @@ export class Structures {
     // a lagoon harbour's stone is the reef's own: coral rag, bleached cream-grey (never the land's golden limestone)
     this.rag = transmittanceVec(mix(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.32), PIGMENTS.sepia, 0.14));
     this.accent = REGIONS.map((r) => transmittanceVec(PIGMENTS[r.pigments.accent]));
+    // a bared point's boulders are the shore's own dark rock (terrain.ts: the crags' rock, the sea's wet band low on each)
+    this.dark = REGIONS.map((r) => { const t = transmittanceVec(mix(mix(PIGMENTS[r.pigments.land], PIGMENTS.sepia, 0.6), PIGMENTS.ultramarine, 0.3)); return t.set(t.x ** 3, t.y ** 3, t.z ** 3); });
     const t = this.towers.length, hs = this.harbours, sum = <T>(xs: T[], k: (x: T) => number) => xs.reduce((a, x) => a + k(x), 0);
     this.draws = [
       new Instances(lighthouseKit(), this.material, t),
       new Instances(farKit(), this.material, t),
-      new Instances(rockKit(), this.material, sum(hs, (m) => m.rocks.length) + sum(this.towers, (tw) => tw.rocks.length)),
+      new Instances(rockKit(), this.material, sum(hs, (m) => m.rocks.length) + sum(this.towers, (tw) => tw.rocks.length) + sum(this.heaps, (hp) => hp.rocks.length)),
       new Instances(bollardKit(), this.material, sum(hs, (m) => m.bollards.length)),
       new Instances(postKit(), this.material, sum(hs, (m) => m.posts.length)),
       new Instances(lampKit(), this.masonry, hs.length),
@@ -581,7 +627,7 @@ export class Structures {
       new Instances(lapKit(), this.lapping, sum(hs, (m) => m.lap.length)),
     ];
     this.lamps = hs.map((h) => lights.add({ pos: h.lamp, reach: HARBOUR.reach }));
-    this.state = new Int8Array(t + hs.length).fill(-1);
+    this.state = new Int8Array(t + hs.length + this.heaps.length).fill(-1);
     this.group.add(...this.draws.map((d) => d.mesh));
   }
 
@@ -597,9 +643,12 @@ export class Structures {
       if (i < t) {
         const tw = this.towers[i];
         c = this.dropped(tw.up, tw.drop) ? 0 : tw.lamp.distanceTo(eye) < TOWER.near * (this.state[i] === 1 ? 1.1 : 1) ? 1 : 2;
-      } else {
+      } else if (i < t + this.harbours.length) {
         const h = this.harbours[i - t];
         c = this.dropped(h.pos, Math.acos(R / h.lamp.length())) ? 0 : 1;
+      } else {
+        const hp = this.heaps[i - t - this.harbours.length];
+        c = this.dropped(hp.up, 0.01) || hp.pos.distanceTo(this.eye) > SHORE_ROCKS.near * (this.state[i] === 1 ? 1.1 : 1) ? 0 : 1;
       }
       if (c !== this.state[i]) [this.state[i], changed] = [c, true];
     }
@@ -628,6 +677,9 @@ export class Structures {
       lamps.set(c[5]++, h.lampMatrix, st, ac);
       for (const m of h.jetty) jetty.set(c[6]++, m, st, ac);
       for (const m of h.lap) lap.set(c[7]++, m, st, ac);
+    });
+    this.heaps.forEach((hp, k) => {
+      if (this.state[t + this.harbours.length + k]) for (const m of hp.rocks) rocks.set(c[2]++, m, this.dark[hp.region], this.accent[hp.region]);
     });
     this.draws.forEach((d, j) => d.commit(c[j]));
   }

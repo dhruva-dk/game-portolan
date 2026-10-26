@@ -822,6 +822,7 @@ void main() {
     veg = (1.0 - 0.5 * spine) * (1.0 - scar);
     green = mix(green, shadeG, 0.35 * steep);
   }
+  veg *= 1.0 - scar; // (a bared shore is the sea's, washed bare)
   vec3 col = rock * cliff + mix(rock, green, veg) * steep + sandC * beach + green * meadow;
   // (the clad slopes are drawn as the forest floor from here on: beds, joints, fissures and fall-line hatching only on
   // the bare spines)
@@ -1019,6 +1020,50 @@ void main() {
   col = mix(col, hatchInk(0.6), rocks.y * 0.35 * near);
   lines += rocks.x;
   lines += stipple(pl, upx, 0.45 + 0.3 * talus, 3.0) * steep * (1.0 - veg) * step(h, shore.y * 0.8);                  // scree
+  // a point's bared shore drawn from life (S-028 (1): never a flat slab): stepped ledges of the dark rock, bedded and
+  // jointed, each lip inked over its riser's shade and each tread weathered pale; pools left on the treads giving back
+  // the sky; cobbles heaped at the foot (structures.ts layShoreRocks heaps the boulders); a dark wet band and weed at the
+  // waterline, the wash white where the sea works at it; the forest's roots and litter stopping at the rock's edge
+  float scarFlat = 0.0;
+  if (scar > 0.01) {
+    float ledge = scar * (1.0 - cliff), aw = max(above, h - uSeaLevel); // (u over the water: the field's, never under the mesh's own)
+    // the ledges: steps of 0.3 u along the beds, broken by two sets of joints into blocks, each block's step set up or
+    // down its own way, so the lips run in short offset lengths, never as level bands
+    float lb0 = (h + 0.06 * dot(pl, dip) + 0.2 * noise3(vWorld / 2.6 + 1.0) + 0.06 * noise3(vWorld / 0.7)) / 0.3;
+    float ja = dot(pl, vec2(-dip.y, dip.x)) / 1.7 + 0.3 * noise3(vWorld / 1.8), jb = dot(pl, dip) / 2.3 + 0.3 * noise3(vWorld / 2.1 + 4.0);
+    vec2 blkId = vec2(floor(ja), floor(jb));
+    float lb = lb0 + 0.55 * hash12(blkId + floor(lb0) * 1.7), lt = fract(lb), lk = floor(lb);
+    float brk = smoothstep(-0.35, 0.0, noise3(vec3(pl / 1.6, lk * 1.7)));               // (each lip pinching out along its length)
+    float riser = smoothstep(0.55, 0.85, lt) * brk;
+    vec3 tread = glaze(mix(col, PARCH, 0.12 + 0.12 * hash12(blkId + lk)), OCHRE_T, 0.1, pool, q);
+    vec3 face = glaze(glaze(col, SEPIA_T, 0.7 + 0.3 * blk, pool, q), ULTRA_T, 0.3, pool, q);
+    col = mix(col, mix(tread, face, riser), ledge);
+    scarFlat = ledge * (1.0 - riser);
+    lines += inkLine(abs(fract(lb + 0.5) - 0.5), min(fwidth(lb), 0.5), LINE_CSS * 1.1) * ledge * brk * 0.85;    // the lips
+    float jd = min(abs(fract(ja + 0.5) - 0.5) / max(fwidth(ja), 1e-4), abs(fract(jb + 0.5) - 0.5) / max(fwidth(jb), 1e-4));
+    lines += (1.0 - smoothstep(0.4, 1.2, jd)) * ledge * step(0.3, hash12(blkId * 1.3 + lk)) * 0.7;            // the joints
+    float pn = noise3(vec3(pl / 0.55, lk * 2.3 + 4.0)) - 0.5 - 0.8 * riser - 0.6 * (1.0 - smoothstep(0.1, 0.3, lt));
+    float pw = smoothstep(0.0, 0.03, pn) * ledge * step(0.25, aw);
+    col = mix(col, glaze(glaze(glaze(ground, VERD_T, 0.5, 0.0, q), ULTRA_T, 0.6, 0.0, q), SEPIA_T, 0.25, 0.0, q), pw);  // pools
+    lines += inkLine(pn, fwidth(pn), LINE_CSS * 0.8) * ledge * step(0.25, aw) * 0.8;
+    float foot = (1.0 - smoothstep(0.15, 0.9, aw)) * ledge;
+    vec3 kb = knobs(pl, 0.8, 0.8, 61.0, sunPl, upx) * foot, kc = knobs(pl + 0.37, 0.38, 0.85, 67.0, sunPl, upx) * foot;
+    float body = max(kb.y, kc.y), lee = max(kb.z, kc.z);
+    col = mix(col, glaze(mix(col, PARCH, 0.4), SEPIA_T, 0.15, pool, q), body * (1.0 - lee));                 // cobbles
+    col = mix(col, glaze(col, SEPIA_T, 0.45, pool, q), lee);
+    lines += kb.x + kc.x;
+    float wetB = (1.0 - smoothstep(0.05, 0.4 + 0.15 * noise3(vWorld / 1.7) + 0.1 * noise3(vWorld / 0.45), aw)) * ledge;
+    col = glaze(glaze(col, SEPIA_T, 0.65 * wetB, pool, q), ULTRA_T, 0.25 * wetB, pool, q);                  // the wet band
+    float weed = (1.0 - smoothstep(0.0, 0.2 + 0.14 * noise3(vWorld / 1.1) + 0.06 * noise3(vWorld / 0.3), aw)) * smoothstep(-0.25, 0.2, noise3(vWorld / 0.8 + 3.0)) * ledge;
+    col = glaze(col, mix(fol.rgb, OCHRE_T, 0.45), 1.2 * weed, pool, q);
+    lines += stipple(pl, upx, 0.7, 13.0) * weed * 0.6;
+    float wsh = (1.0 - smoothstep(0.0, 0.04 + 0.07 * noise3(vWorld / 1.5 + 2.0), aw)) * smoothstep(0.0, 0.25, noise3(vWorld / 0.5 + 7.0)) * ledge;
+    col = mix(col, LEAD, 0.85 * wsh);                                                                        // the wash
+    float edge = smoothstep(0.1, 0.4, scar) * (1.0 - smoothstep(0.55, 0.9, scar)) * (1.0 - cliff);
+    col = glaze(col, SEPIA_T, 0.4 * edge * smoothstep(-0.3, 0.3, noise3(vWorld / 0.6 + 9.0)), pool, q);    // litter
+    float rt = noise3(vec3(pl / 0.5, 2.0));
+    lines += inkLine(rt, fwidth(rt), LINE_CSS * 0.9) * edge * 0.6 + stipple(pl, upx, 0.25, 17.0) * edge * 0.4;  // roots
+  }
   lines += inkLine(-f.y - 0.9 - (q.mottle - 0.5) * 0.3, fwidth(f.y), LINE_CSS * 0.8) * beach * 0.55 * lip;    // tide lines
   lines += inkLine(-f.y - 2.1 - (q.bloom - 0.5) * 0.4, fwidth(f.y), LINE_CSS * 0.7) * beach * 0.35 * lip;
   lines += stipple(pl, upx, 0.16, 9.0) * beach * 0.6;                                                // grains
@@ -1065,6 +1110,7 @@ void main() {
       + (wa < 0.99 ? (1.0 - wa) * hatching(fb, fbdx, fbdy, tone, float(ri) * 3.7 + 2.9) : 0.0);
     hcov = mix(hcov, fcov, fall);
   }
+  hcov *= 1.0 - 0.65 * scarFlat; // (a bared ledge's tread lies in the light; its riser keeps the hatching)
   // (the awash flat lies under its film of water: hatched lightly, never contoured as dry land)
   col = mix(col, hatchInk(tone), hcov * (1.0 - mix(0.75, 0.95, afar) * reef * (1.0 - meadow)));
   // the reef pavement's own shading near the eye: its rubble's undersides, its pits and its broken flanks, hatched

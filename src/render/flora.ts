@@ -27,7 +27,7 @@ import type { Geography } from '../sim/world/geography.ts';
 import { FLOOR, REGIONS, type Flora as RegionFlora, type Pigment, type Region } from '../sim/world/regions.ts';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
-import { GROUND, SLOPES, cladOf, groundAt, shoreExposure, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
+import { GROUND, SLOPES, cladOf, groundAt, shoreExposure, slopesOf, terrains, townsOf, type Ground, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 /** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores and pandanus at the edge of
@@ -864,6 +864,8 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
             } else {
               field.surface(dir, 0, surf);
               if (!grows(kind, surf.ground)) continue;
+              // (no tree on a point's bared shore, terrain.ts EXPOSED: the forest stops at the rock's edge, S-028 (1))
+              if (tree && surf.ground === GROUND.rock && surf.up >= slopesOf(REGIONS[ri])[1]) continue;
               [height, upness] = [surf.height, surf.up];
               nrm.copy(surf.normal);
             }
