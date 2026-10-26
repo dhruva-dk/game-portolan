@@ -244,3 +244,13 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   }
   assert.ok(n.godowns >= 4 && n.quays >= 30 && n.heaps >= 8 && n.emergents >= 50 && plan.flowers.every((f) => f.length >= 30) && n.edge >= 40, JSON.stringify(n));
 });
+
+test('the Coral Atolls (S-027 (7)): the trades break on the windward crest, never in open sea, a lagoon or on the lee', () => {
+  const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls');
+  // along a bearing out from the Great Lagoon's centre (8, 6): the most surf over its rim at mean tide
+  const most = (b: number): number => Math.max(...Array.from({ length: 60 }, (_, i) => surfAt(geo, chartDir(ri, 8 + (18 + 0.25 * i) * Math.sin((b * Math.PI) / 180), 6 + (18 + 0.25 * i) * Math.cos((b * Math.PI) / 180)), 0)));
+  assert.ok(Math.max(most(105), most(120), most(135)) > 0.8, 'the windward (east-south-east) crest breaks');
+  for (const b of [255, 270, 285]) assert.equal(most(b), 0, `the lee rim at ${b}° lies quiet`);
+  assert.equal(surfAt(geo, chartDir(ri, 8, 6), 0), 0, 'the lagoon lies calm');
+  assert.equal(surfAt(geo, chartDir(ri, 60, -60), 0), 0, 'no surf in open sea');
+});
