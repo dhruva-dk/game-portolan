@@ -62,20 +62,32 @@ const LEAF: Paint = [1, 1, 1, 1.05], BLADE: Paint = [1, 1, 1, 0.9];
 const WOOD = 0, MASS = 1, SHEET = 2;
 
 class Kit {
-  private readonly a: Record<'position' | 'normal' | 'aPaint' | 'aTint' | 'aPart', number[]> =
-    { position: [], normal: [], aPaint: [], aTint: [], aPart: [] };
+  private readonly a: Record<'position' | 'normal' | 'aLit' | 'aPaint' | 'aTint' | 'aPart', number[]> =
+    { position: [], normal: [], aLit: [], aPaint: [], aTint: [], aPart: [] };
   private readonly index: number[] = [];
   /** S-025 (6b): its leaf masses are a rainforest canopy's crowns (the material shades and inks them as a canopy). */
   canopy = false;
+  /** S-025 (6d): its leaf masses lit as one crown, a dome about `c` of radii `r` (their own normals kept for the
+   *  outline only), as an engraver washes a far crown in one tone and shades its underside, never lobe by lobe. */
+  dome: { c: THREE.Vector3; r: THREE.Vector3 } | null = null;
 
   vert(p: THREE.Vector3, n: THREE.Vector3, pt: Paint, tint: number, sway: number, part: number, shade: number): number {
-    const a = this.a;
+    const a = this.a, d = part === MASS ? this.domeN(p) : null;
     a.position.push(p.x, p.y, p.z);
     a.normal.push(n.x, n.y, n.z);
+    // the light's normal: the clump's own, or (a dome-lit crown) mostly the crown's, the clump's only a modelling touch
+    const l = d ? d.clone().multiplyScalar(0.8).addScaledVector(n, 0.2).normalize() : n;
+    a.aLit.push(l.x, l.y, l.z);
     a.aPaint.push(...pt);
     a.aTint.push(tint);
     a.aPart.push(Math.max(0, sway), part, shade);
     return a.aTint.length - 1;
+  }
+
+  /** A dome-lit crown's normal at p (null: none). */
+  domeN(p: THREE.Vector3): THREE.Vector3 | null {
+    const d = this.dome;
+    return d ? V((p.x - d.c.x) / d.r.x ** 2, (p.y - d.c.y) / d.r.y ** 2, (p.z - d.c.z) / d.r.z ** 2).normalize() : null;
   }
 
   tri(i: number, j: number, k: number): void {
@@ -126,7 +138,7 @@ class Kit {
   mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2, dab = 0, under = 0.6, open = 1): void {
     const ico = new THREE.IcosahedronGeometry(1, detail), pos = ico.getAttribute('position'), q = V(), p = V(), n = V();
     // each clump its own warmth (the material's greens, cool to warm: aPaint.r below 1; the rest is the instance's)
-    const leaf: Paint = [0.98 * (((Math.sin(seed * 12.9898 + 4.1) * 43758.5453) % 1 + 1) % 1), this.canopy ? 0.5 : 1, 1, LEAF[3]];
+    const leaf: Paint = [0.98 * (((Math.sin(seed * 12.9898 + 4.1) * 43758.5453) % 1 + 1) % 1), this.canopy ? (this.dome ? 0.3 : 0.5) : 1, 1, LEAF[3]];
     for (let k = 0; k < pos.count; k += 3) {
       const ids = [0, 1, 2].map((m) => {
         q.fromBufferAttribute(pos, k + m);
@@ -137,7 +149,8 @@ class Kit {
         // aTint 1 + w: w the blossom (1 whole, as the pattern lays it; below 1 a weight for the material's dabs)
         const w = dab ? Math.min(0.95, dab * smooth(-1, 0.1, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
           : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom ? 1 : 0;
-        return this.vert(p, n, leaf, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
+        // (its self-shade by its clump's side, or a dome-lit crown's by the crown's: deep under it, never clump by clump)
+        return this.vert(p, n, leaf, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, this.domeN(p)?.y ?? q.y)) * open);
       });
       this.tri(ids[0], ids[1], ids[2]);
     }
@@ -184,9 +197,10 @@ class Kit {
   }
 
   geometry(): THREE.BufferGeometry {
-    const g = new THREE.BufferGeometry(), sizes = { position: 3, normal: 3, aPaint: 4, aTint: 1, aPart: 3 } as const;
+    const g = new THREE.BufferGeometry(), sizes = { position: 3, normal: 3, aLit: 3, aPaint: 4, aTint: 1, aPart: 3 } as const;
     for (const [k, s] of Object.entries(sizes)) g.setAttribute(k, new THREE.Float32BufferAttribute(this.a[k as keyof typeof sizes], s));
     g.setIndex(this.index);
+    g.userData.dome = this.dome !== null; // (its material takes the plant's habit on its wood too: floraMaterial's dome)
     return g;
   }
 }
@@ -389,15 +403,18 @@ function crownedKit(lod: number, form: 'broad', seed: number): Kit {
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
   if (form === 'broad' && far) {
-    // far, S-025: a short stout bole and two limbs spreading into a wide dome of separate clumps, gaps between them
+    // far, S-025: a short stout bole and two limbs spreading into a wide dome of separate clumps, gaps between them;
+    // S-025 (6d): lit as one crown (Kit.dome), never lobe by lobe (rows of olive loaves above the town), its clumps
+    // rounder and lacier at the outline, each plant drawn out by bearing into its own habit (the material's dome)
+    k.dome = { c: V(0, 0.56, 0), r: V(0.48, 0.3, 0.48) };
     k.tube([V(0, -0.06, 0), V(0, 0.3, 0.01)], [0.066, 0.045], 4, BARK);
     const a0 = rnd() * TAU;
-    k.mass(V(0.06 * Math.cos(a0), 0.7, 0.06 * Math.sin(a0)), 0.23, 0.6, 0, seed * 1.3, 2, 0, 0.7, 1);
+    k.mass(V(0.06 * Math.cos(a0), 0.68, 0.06 * Math.sin(a0)), 0.24, 0.78, 0, seed * 1.3, 2, 0, 0.7, 1);
     for (let i = 0; i < 3; i++) { // (lobes of differing reach and size, one small spray thrown out high: S-025 (6b))
-      const a = a0 + Math.PI + (i - 1) * 2 + 0.5 * rnd(), d = [0.36, 0.28, 0.44][i] + 0.06 * rnd(), r = [0.2, 0.15, 0.1][i] + 0.04 * rnd();
+      const a = a0 + Math.PI + (i - 1) * 2 + 0.5 * rnd(), d = [0.36, 0.28, 0.44][i] + 0.06 * rnd(), r = [0.2, 0.15, 0.11][i] + 0.04 * rnd();
       const c = V(Math.cos(a) * d, [0.5, 0.38, 0.62][i] + 0.08 * rnd(), Math.sin(a) * d);
       if (i !== 1) k.tube([V(0, 0.3, 0), c.clone().setY(c.y - r * 0.4)], [0.028, 0.012], 3, BARK);
-      k.mass(c, r, 0.64, 0, seed + i * 3.3, 2, 0, 0.7, [0.92, 0.72, 1][i]);
+      k.mass(c, r, 0.8, 0, seed + i * 3.3, 2, 0, 0.7, [0.92, 0.72, 1][i]);
     }
     return k;
   }
@@ -775,7 +792,7 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
     case 'pine': return [to(fol, 'indigo', 0.4 + 0.2 * u), fol];
     case 'jungle': return [to(fol, u < 0.5 ? 'verdigris' : 'ochre', 0.12 + 0.28 * w), fol];
     case 'floweringTree': return [to(fol, 'verdigris', 0.25 * u), to(T(w < 0.55 ? r.pigments.accent : 'ochre'), 'roseMadder', 0.12 * u)];
-    case 'broadleaf': return [to(fol, 'ochre', 0.3 + 0.25 * w), fol]; // a light yellow-green dome
+    case 'broadleaf': return [to(fol, 'ochre', 0.18 + 0.25 * w), fol]; // a light yellow-green dome (S-025 (6d): greener, never khaki)
     case 'nutmeg': return [to(fol, 'indigo', 0.22 + 0.18 * u), fol]; // dark glossy cones
     case 'cloudForest': return [to(fol, 'ultramarine', 0.18 + 0.15 * u), fol];
     case 'treeFern': return [to(fol, 'verdigris', 0.3 + 0.2 * u), fol];
@@ -915,12 +932,14 @@ uniform vec2 uCut; // WP30 part C: the plant's thinning distance × x, at least 
 uniform float uSway;
 uniform float uHand; // 1: this level hands over to (or from) the other kit plant by plant
 uniform float uFar;
+uniform float uDome; // S-025 (6d): the kit's crown is dome-lit (its wood takes the plant's habit with its leaf)
 in vec4 aPaint;
 in float aTint;
 in vec3 aPart;
 in vec3 aFoliage;
 in vec3 aBloom;
 in vec2 aSeed;
+in vec3 aLit;
 out vec3 vWorld;
 out vec3 vNormal;
 out vec4 vPaint;
@@ -933,7 +952,7 @@ out float vBlossom;
 out vec3 vBloom;
 out vec3 vSil;
 out vec2 vLeaf;
-out vec2 vCanopy;
+out vec3 vCanopy;
 void main() {
   mat4 model = modelMatrix * instanceMatrix;
   vec3 root = model[3].xyz, up = normalize(root);
@@ -941,12 +960,22 @@ void main() {
   vec3 wdir = cross(uWindAxis, up);
   wdir /= max(length(wdir), 1e-4);
   vec3 side = cross(up, wdir);
-  vec4 w = model * vec4(position, 1.0);
+  // S-025 (6d): a dome-lit crown (one kit for the species) given each plant's own habit: its lobes drawn out or in by
+  // bearing and its head raised or lowered, smoothly, so every crown's outline differs (limbs and lobes alike)
+  float dome = aTint > 0.5 && aPaint.g < 0.4 ? 1.0 : 0.0;
+  vec3 pos = position;
+  if (aPaint.g < 0.4 || (aPart.y < 0.5 && uDome > 0.5)) {
+    float th = atan(pos.z, pos.x + 1e-5), sd = aSeed.x * 6.2832, k = smoothstep(0.25, 0.5, pos.y);
+    float fr = 1.0 + k * (0.2 * sin(2.0 * th + sd) + 0.12 * sin(3.0 * th - 2.3 * sd) + 0.06 * sin(5.0 * th + 4.1 * sd));
+    pos.xz *= fr;
+    pos.y += k * (pos.y - 0.3) * (0.16 * sin(th + 1.7 * sd) + 0.1 * cos(2.0 * th - sd));
+  }
+  vec4 w = model * vec4(pos, 1.0);
   // a leaf mass carries its sphere's normal (its outline's), and is lit as a soft dome lifted toward the light
   // (through the instance's own scale: a crown spread wider than tall keeps its normals, S-025 (6b))
   vec3 s2 = vec3(dot(model[0].xyz, model[0].xyz), dot(model[1].xyz, model[1].xyz), dot(model[2].xyz, model[2].xyz));
   vSil = normalize(mat3(model) * (normal / s2));
-  vNormal = aPart.y > 0.5 && aPart.y < 1.5 ? normalize(mat3(model) * (normalize(normal + vec3(0.0, 0.3, 0.0)) / s2)) : vSil;
+  vNormal = aPart.y > 0.5 && aPart.y < 1.5 ? normalize(mat3(model) * (normalize(aLit + vec3(0.0, 0.3, 0.0)) / s2)) : vSil;
   // gusts ripple downwind across the canopies
   float gust = 0.5 + 0.5 * sin(dot(root, wdir) * 0.42 - t * 2.4 + 1.3 * sin(dot(root, side) * 0.23 + t * 0.37));
 #ifdef VEIL
@@ -995,7 +1024,7 @@ void main() {
   vFade = fin * fout * seen;
   // a leaf mass's leaf (the instance's: broad, pinnate or palmate) and its clump's warmth (aPaint.r below 1: cool → warm)
   vLeaf = vec2(fract(aSeed.x * 3.71 + 0.13), aTint > 0.5 && aPaint.r < 0.99 ? aPaint.r : 0.5);
-  vCanopy = vec2(aTint > 0.5 && aPaint.g < 0.75 ? 1.0 : 0.0, position.y); // a far canopy crown's mass, and its height in the tree
+  vCanopy = vec3(aTint > 0.5 && aPaint.g < 0.75 ? 1.0 : 0.0, pos.y, dome); // a far canopy crown's mass, its height in the tree, lit as one crown
   gl_Position = projectionMatrix * viewMatrix * w;
 #ifdef VEIL
   vec4 sc = projectionMatrix * viewMatrix * vec4(surf, 1.0);
@@ -1017,7 +1046,7 @@ in float vBlossom;
 in vec3 vBloom;
 in vec3 vSil;
 in vec2 vLeaf;
-in vec2 vCanopy;
+in vec3 vCanopy;
 uniform float uFar;
 uniform vec3 uOchre;
 uniform vec3 uRose;
@@ -1087,6 +1116,10 @@ float leafInk(vec2 f, float kind, float px) {
 void main() {
   vec3 v = normalize(cameraPosition - vWorld), n = normalize(vNormal);
   if (vPart.y > 1.5 && dot(n, v) < 0.0) n = -n; // a thin sheet is lit from the side it is seen
+  // S-025 (6d): a dome-lit crown's clumps show only their faces toward the eye: where its outline or a gap bites a clump
+  // the eye sees through to the clumps, limbs and understory behind, never the clump's inside hatched as shade
+  float cd = vCanopy.z * step(0.5, vPart.y) * step(vPart.y, 1.5);
+  if (cd > 0.5 && !gl_FrontFacing) discard;
   Paper q = paperAt(vWorld, n, 1.0);
 #ifdef VEIL
   vec3 col = glaze(parchment(q), mix(vPaint.rgb, vBloom, clamp(vBlossom, 0.0, 1.0)), vPaint.w, 0.35, q);
@@ -1098,7 +1131,7 @@ void main() {
   // levels and thinning dissolve by a stipple anchored to the world: the far level fills what the near one leaves
   float h = fhash(floor(vWorld * 9.0));
   if (uFar < 0.5 ? h >= vFade : h < 1.0 - vFade) discard;
-  float scal = 0.0;
+  float scal = 0.0, clu = 0.0;
   if (vPart.y > 0.5 && vPart.y < 1.5) {
     // a leaf mass's outline breaks into rounded clumps of leaf where it turns from the eye (never a polygon's edge),
     // the clumps world-anchored and gone before they shrink below a few pixels
@@ -1128,9 +1161,21 @@ void main() {
       float kk = ok + float(o), sz = exp2(-kk);
       vec2 sp = sp0 * sz * 0.85 + 5.0 * kk + 3.1, sc = floor(sp), f = fract(sp) - 0.5 - 0.3 * (vec2(fhash(vec3(sc, 41.0)), fhash(vec3(sc, 42.0))) - 0.5);
       float r = length(f), a = smoothstep(0.34, 0.29, r) * smoothstep(0.19, 0.24, r) * smoothstep(-0.14, 0.04, f.y) * step(0.22, fhash(vec3(sc, 43.0)));
-      scal += a * (o == 0 ? 1.0 - smoothstep(0.5, 1.0, oct - ok) : smoothstep(0.5, 1.0, oct - ok));
+      float wo = o == 0 ? 1.0 - smoothstep(0.5, 1.0, oct - ok) : smoothstep(0.5, 1.0, oct - ok);
+      scal += a * wo;
+      // S-025 (6d): on a dome-lit crown each loop rounds a leaf cluster: lit on its sunward side, sunk in shade below
+      vec2 sunS = vec2(dot(uSun, e1), dot(uSun, e2));
+      float body = smoothstep(0.36, 0.22, r);
+      clu += wo * (body * (0.6 * dot(f, sunS) / 0.3 - 0.45 * smoothstep(0.05, -0.25, f.y)) - 0.35 * (1.0 - body));
     }
     if (rim > 0.5 + 0.28 * mix(nz, 0.5, fz) + 0.26 * lf + 0.08 * fz) discard;
+    // S-025 (6d): and a dome-lit crown opens in gaps between its sprays, fewest on its sunlit head, through to the dark
+    // within (gone before they shrink below a few pixels: never a sieve)
+    if (cd > 0.5) {
+      vec3 gc = vWorld * 1.5 + 23.0;
+      float gpx = length(fwidth(gc)), gn = 0.65 * vnoise(gc) + 0.35 * vnoise(gc * 2.3 + 5.0);
+      if (gn - 0.55 * smoothstep(0.18, 0.4, gpx) - 0.12 * smoothstep(0.0, 0.8, dot(normalize(vNormal), vUp)) > 0.57 - 0.08 * lf) discard;
+    }
   }
   // (a crown in flower thins to its leaf where it turns from the eye: its outline's turn)
   float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0;
@@ -1168,7 +1213,8 @@ void main() {
   }
   // S-025: the outline selective, as an engraver draws a crown from life: the pen on its shaded side and along its top
   // against the sky, broken where the light falls on it, the lit side left to the wash (no ring of pooled pigment there)
-  vec3 silN = normalize(vSil);
+  // (a dome-lit crown's sides are the crown's: its pen and its paling by which way the whole crown turns, S-025 (6d))
+  vec3 silN = normalize(mix(normalize(vSil), n, cd));
   float isMass = vPart.y > 0.5 && vPart.y < 1.5 ? 1.0 : 0.0, litSil = dot(silN, uSun);
   float penLit = 0.06 + 0.3 * step(0.62, vnoise(vWorld * 1.3 + 2.0));
   float pen = mix(1.0, max(mix(penLit, 1.0, smoothstep(0.42, -0.08, litSil)), 0.75 * smoothstep(0.5, 0.85, dot(silN, vUp))), isMass);
@@ -1181,20 +1227,31 @@ void main() {
   float back = smoothstep(0.3, 0.8, -dot(v, uSun)) * uLow;
   pen = mix(pen, smoothstep(0.12, -0.3, litSil) * (0.3 + 0.7 * smoothstep(0.35, -0.25, dot(silN, vUp))) * step(0.38, vnoise(vWorld * 2.2 + 5.0)), cf * (1.0 - back));
   density *= 1.0 - 0.5 * litRim * (1.0 - back);
+  // S-025 (6d): a dome-lit crown in one transparent wash, the paper glowing through its sunlit head
+  density *= 1.0 - cd * (0.2 * smoothstep(0.6, 0.15, tone) - 0.3 * smoothstep(0.45, 0.9, tone)) * (1.0 - back); // (tone: 0 lit … 1 shade)
   // S-025 (3): a crown between the eye and a low sun is seen against the light: a darker, cooler silhouette whose
   // blossom no longer holds its colour into the shade, rimmed with light where its edge turns up toward the sun
+  // S-025 (6d): a dome-lit crown's wash cools to a deeper green in its shade (never greyed by the shade's violet over the
+  // ochre), and is modelled cluster by cluster: lighter on each cluster's sunward side, deeper between and under them
+  pig = mix(pig, uWater, cd * 0.15 * smoothstep(0.3, 0.8, tone));
+  density *= 1.0 - cd * 0.32 * clamp(clu, -1.0, 1.0) * smoothstep(0.2, 0.45, lpxL);
   vec3 col = glaze(parchment(q), pig, density, washPool(n, v, q) * mix(1.0, 0.25 + 0.75 * pen, isMass), q);
   col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w * (1.0 - 0.7 * back), 0.3, q); // the bloom laid twice, deepest in its clusters
   // a crown in flower holds its colour further round into the shade, and there deepens to a cooler red (rose madder
   // over the vermilion, a warm madder over the ochre), never browning under the cool glaze
-  col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom * (1.0 - back), q), ndl, tone);
+  col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom * (1.0 - back) - 0.22 * cd, q), ndl, tone);
   col = glaze(col, uRose, 0.45 * bloom * smoothstep(0.4, 0.75, tone) * (1.0 - back), 0.2, q);
   // (a leaf mass's shaded underside is not ruled across like a shelf, S-022: it is a deeper glaze its leaves are inked into)
   // S-025: and a crown's lower, inner clumps sit in the canopy's shade: the hollows between crowns go dark and cool
-  col = glaze(col, hatchInk(0.0), (0.28 + 0.2 * uFar) * under * (1.0 - 0.5 * tone) + isMass * uFar * 0.4 * smoothstep(0.75, 0.3, vPart.z), 0.0, q);
-  col = wash(glaze(col, hatchInk(0.0), 0.55 * hollow * (1.0 - 0.4 * tone), 0.0, q), uShade, 0.35 * hollow);
+  // (S-025 (6d): a dome-lit crown's shade a deeper glaze of its own green, never the ink's grey over its wash)
+  vec3 shadeInk = mix(hatchInk(0.0), mix(pig, uWater, 0.45), 0.75 * cd);
+  col = glaze(col, shadeInk, (0.28 + 0.2 * uFar) * under * (1.0 - 0.5 * tone) + isMass * uFar * 0.4 * smoothstep(0.75, 0.3, vPart.z), 0.0, q);
+  col = wash(glaze(col, shadeInk, 0.55 * hollow * (1.0 - 0.4 * tone), 0.0, q), uShade, (0.35 - 0.2 * cd) * hollow);
   col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed) * (1.0 - 0.85 * under) * (vPart.y > 0.5 && vPart.y < 1.5 ? 0.6 - 0.35 * cf * (1.0 - back) : 1.0)); // (a canopy's shade in its loops, not ruled)
   col = mix(col, hatchInk(0.6), 0.75 * bink); // near the eye each truss's shaded side inked
+  // S-025 (6d): over a dome-lit crown's lit head the same loops laid in its own wash, a second glaze, never the pen:
+  // the leaf's sprays modelled in colour where the light falls
+  col = glaze(col, pig, 0.45 * scal * cd * smoothstep(0.2, 0.45, lpxL) * smoothstep(0.7, 0.2, tone) * vPaint.w, 0.2, q);
   col = mix(col, hatchInk(tone), scal * cf * smoothstep(0.2, 0.45, lpxL) * smoothstep(0.95, 0.45, tone) * 0.9 * (1.0 - 0.4 * bloom));
   if (vPart.y > 0.5 && vPart.y < 1.5) {
     float strength = clamp(0.9 - 0.6 * tone + 0.45 * under, 0.3, 0.95) * (1.0 - 0.4 * bloom);
@@ -1240,13 +1297,15 @@ export interface FloraMaterialOptions {
   hand?: boolean;
   veil?: boolean;
   id?: number;
+  /** S-025 (6d): the kit's crown is dome-lit (Kit.dome: its geometry's userData.dome). */
+  dome?: boolean;
 }
 
 /** The flora's material: kits drawn with it bend in the swell's wind (instanced; per-instance aFoliage, aBloom, aSeed). */
 export function floraMaterial(style: Style, swell: Swell, o: FloraMaterialOptions): THREE.ShaderMaterial {
   return inkMaterial(style, {
     vertexShader: VERT, fragmentShader: FRAG, defines: o.veil ? { VEIL: true } : {}, id: o.id, veil: o.veil, side: THREE.DoubleSide,
-    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 }, uHand: { value: o.hand ? 1 : 0 },
+    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 }, uDome: { value: o.dome ? 1 : 0 }, uHand: { value: o.hand ? 1 : 0 },
       uSeed: { value: 3.7 }, uWater: { value: T('verdigris') }, uOchre: { value: T('ochre') }, uRose: { value: T('roseMadder') } },
   });
 }
@@ -1338,9 +1397,10 @@ export class Flora {
       if (!totals[k] || (lod && !sp.far)) return null;
       const band = lod ? new THREE.Vector4(sp.near * 0.85, sp.near, sp.far * 0.8, sp.far)
         : new THREE.Vector4(-1, 0, sp.near * (sp.far ? 0.85 : 0.75), sp.near);
-      const material = floraMaterial(style, swell, { band, sway: sp.sway, far: lod === 1, hand: !!sp.far, veil: sp.veil, id });
+      const geometry = kitGeometry(kind, lod);
+      const material = floraMaterial(style, swell, { band, sway: sp.sway, far: lod === 1, hand: !!sp.far, veil: sp.veil, id, dome: !!geometry.userData.dome });
       id ??= material.uniforms.uInkId.value as number;
-      const d = new Draw(kitGeometry(kind, lod), material, Math.min(totals[k], lod ? CAP.far : CAP.near));
+      const d = new Draw(geometry, material, Math.min(totals[k], lod ? CAP.far : CAP.near));
       this.group.add(d.mesh);
       return d;
     }));
