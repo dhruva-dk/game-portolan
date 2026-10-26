@@ -441,16 +441,46 @@ void main() {
     // only while shallow and large enough to read, the outline broken and softening as they lie deeper; a shadow cast on
     // the sand beside (in the clear region on its chart plane, so no head is stretched)
     float cw = max(coral, 0.55 * clear * sand * smoothstep(0.3, 0.7, ff.z)); // the lagoon's sand: patch reefs, sparser
-    if (cw > 0.0) {
     bool onChart = clear > 0.0;
     vec2 xr = onChart ? xc : x, Lr = onChart ? normalize(vec2(dot(uSun, uClearE), dot(uSun, uClearN)) + 1e-6) : L;
     vec2 xrx = onChart ? xcx : xdx, xry = onChart ? xcy : xdy;
     float rpx = onChart ? cpx : fpx, mkr = onChart ? 1.0 : mk;
+    float crowd = smoothstep(0.3, 0.72, textureLod(tMarks, xr / 13.0 + 0.37, 0.0).b + 0.3 * (n1 - 0.5));
+    if (onChart) {
+      // the clear water's sand between the heads, drawn from life (S-027: bare turquoise under a wallpaper of ticks):
+      // ripples in irregular tracts (rippled ground and smooth between), their crests wandering and breaking off, inked
+      // lightly and shaded in the lee; coarse rubble spilled round the heads, each clast lit and shaded; and patches of
+      // seagrass, olive, their blades combed by the current; each drawn only while it reads, its tone kept beyond
+      float pxs = max(max(length(xrx), length(xry)), 1e-5), lamR = 0.42;
+      float tract = smoothstep(0.42, 0.62, vnoise(xr / 7.0 + 2.3) + 0.25 * (n1 - 0.5)) * sand;
+      float sR = dot(xr, vec2(0.83, 0.56)) / lamR + 1.7 * vnoise(xr / 2.6 + 9.1) + 0.6 * vnoise(xr / 0.9), fR = fract(sR);
+      // (judged across the crests on the page: crests running toward the eye stand apart long after those across it close)
+      float spR = max((abs(dot(xrx, vec2(0.83, 0.56))) + abs(dot(xry, vec2(0.83, 0.56)))) * 1.4 / lamR, 1e-5), rvR = smoothstep(5.0, 10.0, 1.0 / spR);
+      float crestR = (1.0 - smoothstep(0.6 * spR, 1.6 * spR, min(fR, 1.0 - fR))) * step(0.42, vnoise(xr / 0.7 + 4.0));
+      float leeR = smoothstep(0.0, 0.04, fR) * (1.0 - smoothstep(0.1, 0.4, fR));
+      fc = glaze(fc, mix(SAND_T, SHELF_T, 0.35), 0.2 * leeR * tract * rvR + 0.05 * tract * (1.0 - rvR), 0.0, q);
+      fc = glaze(fc, SAND_T, 0.12 * smoothstep(0.45, 0.75, vnoise(xr / 3.1 + 1.7)) * sand, 0.0, q); // paler and darker bands
+      fc = mix(fc, hatchInk(0.3), 0.32 * crestR * tract * rvR);
+      float cid;
+      vec4 cl = cells(xr / 0.22 + 3.3, cid);
+      float clast = step(0.7, cid) * (1.0 - smoothstep(0.14 + 0.5 * (cid - 0.7), 0.14 + 0.5 * (cid - 0.7) + 1.5 * pxs / 0.22, cl.x)) * smoothstep(0.15, 0.6, crowd) * cw
+                  * smoothstep(1.2, 3.0, 0.066 / pxs), cside = dot(-cl.zw, Lr) / max(cl.x, 0.05);
+      fc = glaze(fc, mix(SAND_T, ROCK_T, 0.35), 0.3 * clast, 0.0, q);
+      fc = mix(fc, LEAD * uPaper / PARCH, 0.25 * clast * smoothstep(0.0, 0.8, cside));
+      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.5), 0.45 * clast * smoothstep(0.0, -0.8, cside), 0.0, q);
+      float grass = smoothstep(0.6, 0.74, vnoise(xr / 4.3 + 5.7) + 0.12 * (n2 - 0.5)) * (1.0 - smoothstep(0.2, 0.6, crowd)) * sand;
+      if (grass > 0.0) {
+        fc = glaze(fc, mix(KELP_T, SAND_T, 0.4), 0.32 * grass * (0.75 + 0.25 * n1), 0.0, q);
+        vec2 comb = rot2(0.35 * sin(uTime * 0.7 + dot(xr, vec2(0.3, 0.2)))) * vec2(0.83, 0.56);
+        float bl = max(mark(xr, comb, 0.26, pxs, 71.0, 0.85, 2), mark(xr + 0.13, comb, 0.26, pxs, 73.0, 0.85, 2)) * smoothstep(3.0, 7.0, 0.26 / pxs);
+        fc = mix(fc, mix(hatchInk(0.3), KELP_T * uPaper, 0.35), 0.5 * bl * grass);
+      }
+    }
+    if (cw > 0.0) {
     // (what reads on the page judged by the chart's mean scale per pixel, not its most foreshortened: from a low eye the
     // heads were judged too small for any line, S-021)
     float cpxPx = (onChart ? sqrt(max(length(xcx), 1e-6) * max(length(xcy), 1e-6)) : rpx) * uRenderPx;
     float fdep = max(uSeaLevel - ff.x, 0.0), shallow = 1.0 - smoothstep(0.6, 2.6, fdep), dim = mix(onChart ? 0.85 : 0.5, 1.0, shallow);
-    float crowd = smoothstep(0.3, 0.72, textureLod(tMarks, xr / 13.0 + 0.37, 0.0).b + 0.3 * (n1 - 0.5));
     fc = glaze(fc, ROCK_T, 0.16 * cw * crowd * smoothstep(0.45, 0.75, n2) * dim, 0.0, q); // rubble and grit between
     // ink drawn while the head is large on the page; in the clear water softened by the depth over it, never lost
     float inkD = onChart ? mix(1.0, 0.6, smoothstep(1.0, 6.0, fdep)) : shallow;
@@ -462,13 +492,16 @@ void main() {
     // water seen from straight above. The sun's ray from the floor point tells the shadow cast beside it.
     vec2 away = onChart ? -normalize(vec2(dot(vt, uClearE), dot(vt, uClearN)) + 1e-6) : vec2(0.0), ray = away * min(tt, 1.2);
     float sz = clamp(dot(uSun, dirF), 0.2, 1.0), sxy = sqrt(1.0 - sz * sz);
-    vec3 sun3 = vec3(Lr * sxy, sz);
+    vec3 sun3 = normalize(vec3(Lr * max(sxy, 0.6), sz)); // (an engraver's light: never so high a head has no shade side)
     vec2 sray = -Lr * min(sxy / sz, 1.6);
-    float cG = cpxPx; // (sizes judged per CSS px)
+    float glanceK = min(length(xrx), length(xry)) / max(max(length(xrx), length(xry)), 1e-6); // the floor's squash on the page
+    float cG = cpxPx, bigHead = 0.0; // (sizes judged per CSS px; how much of the point a bommie covers)
     for (int sI = 0; sI < 2; sI++) {
       // a head's size follows how far its draw lies inside the patch's share at the point, so it swells and dwindles
       // with the patch and is never cut by it (S-024: a share decided point by point sliced heads into straight-edged
-      // slabs and thin sticks)
+      // slabs and thin sticks); in the clear water the patch read at the head's own foot, so a head is whole or absent:
+      // read point by point, a thin band of the floor's coral share along a shelf drew a head as a long pointed shard
+      // only inside the band, read as a twig floating on the water (S-027)
       float sc = sI == 0 ? 3.4 : 1.15, share = (sI == 0 ? 0.36 + 0.34 * crowd : 0.2 + 0.65 * crowd) * min(1.0, 2.0 * cw);
       float grow = smoothstep(0.02, 0.08, cw);
       vec2 xs = xr / sc + float(sI) * 17.3, ci = floor(xs), cf = fract(xs), o = vec2(0.0);
@@ -476,20 +509,34 @@ void main() {
       for (int cy = -1; cy <= 1; cy++) {
         for (int cx = -1; cx <= 1; cx++) {
           vec2 g = vec2(float(cx), float(cy)), cid = ci + g;
-          float id = hash12(cid + 5.1), e = id - (1.0 - share);
-          if (e <= 0.0) continue;
+          float id = hash12(cid + 5.1), e = id - (1.0 - share), crowdH = crowd, growH = grow, fdepH = fdep;
           vec2 oo = (cf - g - 0.15 - 0.7 * vec2(hash12(cid), hash12(cid + 17.3))) * sc;
-          float r0 = (sI == 0 ? 0.3 + 0.42 * fract(id * 3.7) : 0.1 + 0.26 * pow(fract(id * 3.7), 1.5)) * smoothstep(0.0, 0.06, e) * grow;
+          float rf = sI == 0 ? 0.32 + 0.7 * pow(fract(id * 3.7), 1.4) : 0.11 + 0.3 * pow(fract(id * 3.7), 1.5);
+          if (onChart) {
+            if (id < 0.3 || dot(oo, oo) > 9.0 * 1.21 * rf * rf) continue; // (never a head at any share, or too far)
+            vec3 dH = normalize(Pf - oo.x * uClearE - oo.y * uClearN);
+            vec4 ffH = seaField(dH), flH = cubeAt(tSeaFloor, dH);
+            float sandH = clamp(1.0 - flH.r - flH.g - flH.b - ffH.w, 0.0, 1.0), cwH = max(ffH.w, 0.55 * clear * sandH * smoothstep(0.3, 0.7, ffH.z));
+            crowdH = smoothstep(0.3, 0.72, textureLod(tMarks, (xr - oo) / 13.0 + 0.37, 0.0).b);
+            growH = smoothstep(0.02, 0.08, cwH);
+            fdepH = max(uSeaLevel - ffH.x, 0.0);
+            e = id - (1.0 - (sI == 0 ? 0.36 + 0.34 * crowdH : 0.2 + 0.65 * crowdH) * min(1.0, 2.0 * cwH));
+          }
+          if (e <= 0.0) continue;
+          float r0 = rf * (sI == 0 ? 0.8 + 0.3 * crowdH : 1.0) * smoothstep(0.0, 0.06, e) * growH;
           if (r0 < 0.03 || dot(oo, oo) > 9.0 * r0 * r0) continue;
           float kd = fract(id * 7.31);
-          // its height: a brain or boulder dome stands highest, a thicket or soft coral lower; its crown always under a
-          // film of water (S-024: nothing at the surface)
-          float hh = min(r0 * (kd < 0.55 ? 0.6 + 0.3 * fract(id * 4.3) : 0.42 + 0.15 * fract(id * 4.3)), 0.7 * fdep + 0.02);
-          // its outline lobed and knobbed (a thicket's fingered), from the bearing of the point it nears, never round
+          // its height: a brain or boulder dome stands highest, a thicket lower, a table's plate lower still on its stalk,
+          // an encrusting plate low on the rock; its crown always under a film of water (S-024: nothing at the surface)
+          float hh = min(r0 * (kd < 0.26 ? 0.6 + 0.3 * fract(id * 4.3) : kd < 0.46 ? 0.55 + 0.25 * fract(id * 4.3) : kd < 0.68 ? 0.42 + 0.15 * fract(id * 4.3)
+                              : kd < 0.84 ? 0.32 + 0.08 * fract(id * 4.3) : 0.18 + 0.1 * fract(id * 4.3)), 0.7 * fdepH + 0.02);
+          // its outline lobed and knobbed (a thicket's fingered, a table's finely scalloped), from the bearing of the point
+          // it nears, never round
           float a2 = dot(ray, ray), zs = max(dot(oo, ray) / (a2 + r0 * r0 / (hh * hh)), 0.0);
           vec2 pd = oo - ray * zs, nd = pd / (length(pd) + 1e-4);
-          float lob = kd >= 0.55 && kd < 0.8 ? 0.16 * (vnoise(nd * 4.5 + id * 53.0) - 0.5) + 0.07 * sin(floor(9.0 + 8.0 * fract(id * 2.9)) * atan(nd.y, nd.x))
-                                              : 0.26 * (vnoise(nd * 1.8 + id * 91.0) - 0.5) + 0.08 * sin(floor(2.0 + 4.0 * fract(id * 2.9)) * atan(nd.y, nd.x) + id * 41.0);
+          float lob = kd >= 0.46 && kd < 0.68 ? 0.16 * (vnoise(nd * 4.5 + id * 53.0) - 0.5) + 0.07 * sin(floor(9.0 + 8.0 * fract(id * 2.9)) * atan(nd.y, nd.x))
+                    : kd >= 0.68 && kd < 0.84 ? 0.14 * (vnoise(nd * 2.2 + id * 71.0) - 0.5) + 0.035 * sin(floor(16.0 + 10.0 * fract(id * 2.9)) * atan(nd.y, nd.x))
+                    : 0.26 * (vnoise(nd * 1.8 + id * 91.0) - 0.5) + 0.08 * sin(floor(2.0 + 4.0 * fract(id * 2.9)) * atan(nd.y, nd.x) + id * 41.0);
           float rr = r0 * (1.0 + lob), ir2 = 1.0 / (rr * rr);
           float A = a2 * ir2 + 1.0 / (hh * hh), B = dot(oo, ray) * ir2, C = dot(oo, oo) * ir2;
           float f0 = B > 0.0 ? C - B * B / A : C;
@@ -504,59 +551,121 @@ void main() {
           if (sc1 > score) { score = sc1; Fm = f0; fw = fwk; idC = id; o = oo; R = rr; H = hh; zh = max(z1, 0.0); }
         }
       }
-      float head = 1.0 - smoothstep(1.0 - fw, 1.0 + fw, Fm);
+      // (a small head where a bommie stands is behind or under it: never drawn nested inside it, S-027)
+      // (a head seen at a glance through the water is squashed on the page to a sliver: that thin it is lost in the
+      // water's glare rather than drawn as a soft stain without its structure, S-027)
+      float thin = smoothstep(0.04, 0.12, (1.0 + 0.58 * H / R) * glanceK);
+      float head = (1.0 - smoothstep(1.0 - fw, 1.0 + fw, Fm)) * (1.0 - bigHead) * thin * (onChart ? smoothstep(0.0, 0.12, cw) : 1.0);
       // its shadow on the sand (cool and pale, the water's own colour deepened: never a dark stain)
-      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.6), (onChart ? 0.22 : 0.3) * shadow * (1.0 - head) * dim, 0.0, q);
+      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.6), (onChart ? 0.22 : 0.3) * shadow * (1.0 - max(head, bigHead)) * dim, 0.0, q);
+      if (sI == 0) bigHead = head;
       if (head <= 0.0) continue;
-      // where the ray meets it: across the dome (ph, from its axis) and up it (zh); its normal and light
+      // where the ray meets it: across the dome (ph, from its axis) and up it (zh); its normal and light (a table's top
+      // flat, turned down only at its rim)
       vec2 ph = o - ray * zh;
       float rho = clamp(length(ph) / R, 0.0, 1.0), up = clamp(zh / H, 0.0, 1.0), th = atan(ph.y, ph.x);
-      vec3 nrm = normalize(vec3(ph / (R * R), zh / (H * H)));
-      float lit = clamp(dot(nrm, sun3), 0.0, 1.0), shade = 1.0 - lit, hollow = 1.0 - smoothstep(0.0, 0.5, up);
       float kind = fract(idC * 7.31), tint = fract(idC * 13.7), big = smoothstep(4.0, 12.0, R / cG);
-      // the living mass, transparent: muted ochre, cream, sage or dusty rose, mottled small and soft
-      vec3 hue = tint < 0.3 ? mix(SAND_T, CORAL_T, 0.55) : tint < 0.55 ? SAND_T : tint < 0.8 ? mix(KELP_T, SAND_T, 0.45) : mix(CORAL_T, SAND_T, 0.35);
-      float mot = vnoise(ph / (0.16 * R) + idC * 7.0);
-      fc = glaze(fc, hue, (0.52 + 0.16 * mot) * head * dim, 0.0, q);
-      float tex = 0.0, ink = 0.0, pale = 0.0, sres = smoothstep(2.0, 5.0, 0.1 * R / cG); // fine work only where it reads
-      if (kind < 0.3) {
-        // a brain dome: fine meandering grooves wandering over it, soft, a shade darker than the ridges between
-        float mz = 2.2 * vnoise(ph / (0.3 * R) + idC * 17.0) + 0.6 * vnoise(ph / (0.12 * R) + idC * 5.0);
-        float gw = abs(fract(mz) - 0.5);
-        tex = 1.6 * (1.0 - smoothstep(0.08, 0.22, gw)) * sres;
-        ink = 0.3 * (1.0 - smoothstep(0.03, 0.1, gw)) * sres * big;
-      } else if (kind < 0.55) {
-        // a boulder coral: knobbed, its surface pitted with polyps too small to draw one by one, a soft stipple
-        tex = smoothstep(0.62, 0.8, vnoise(ph / (0.05 * R) + idC * 3.0)) * sres * 0.8 + 0.5 * smoothstep(0.55, 0.85, mot);
-      } else if (kind < 0.8) {
-        // a branching thicket from over its shoulder: branches fanning out from its heart and forking, the water dark
-        // between them, their growing tips pale at the rim
-        // (each branch broken into lengths and wandering: a tangle, never the ribs of a shell)
-        float nb = floor(9.0 + 7.0 * fract(idC * 5.3)), sp = th / 6.2832 * nb + 1.4 * vnoise(ph / (0.25 * R) + idC * 11.0);
-        float f = fract(sp), tw = abs(f - 0.5), lg = vnoise(vec2(floor(sp) * 7.1 + idC * 3.0, rho * 4.5));
-        float bres = smoothstep(1.5, 4.0, 6.2832 * max(rho, 0.2) * R / nb / cG);
-        float onB = (1.0 - smoothstep(0.12, 0.22, tw)) * smoothstep(0.35, 0.5, lg);
-        tex = mix(0.4, 1.0 - onB, bres);
-        pale = onB * smoothstep(0.6, 0.9, rho) * bres;
+      bool table = kind >= 0.68 && kind < 0.84;
+      vec3 nrm = normalize(vec3(ph / (R * R), zh / (H * H)));
+      if (table) nrm = normalize(mix(vec3(0.0, 0.0, 1.0), nrm, smoothstep(0.8, 1.0, rho)));
+      float lit = clamp(dot(nrm, sun3), 0.0, 1.0), shade = 1.0 - lit, hollow = table ? 0.0 : 1.0 - smoothstep(0.0, 0.5, up);
+      // (u per render px, leaning toward the most foreshortened way; each form drawn with fewer, bolder lines as it
+      // shrinks on the page, an engraver's economy, before it softens to its tone)
+      float pxu = max(mix(cG / uRenderPx, max(length(xrx), length(xry)), 0.35), 1e-5);
+      // the living mass in transparent washes: ochre, olive, dusty rose or violet, variegated in soft patches, never a
+      // flat fill (S-027: blank grey, olive and mauve pebbles)
+      vec3 OLIVE = mix(KELP_T, SAND_T, 0.55), ROSE = mix(CORAL_T, SAND_T, 0.35), VIOLET = mix(CORAL_T, SHELF_T, 0.45);
+      vec3 hue = kind < 0.26 ? mix(SAND_T, tint < 0.5 ? OLIVE : ROSE, 0.35)    // brain: tan, olive-tan or rose-tan
+               : kind < 0.46 ? (tint < 0.4 ? SAND_T : tint < 0.7 ? ROSE : OLIVE) // massive: ochre, rose or olive
+               : kind < 0.68 ? mix(SAND_T, ROSE, 0.2 + 0.3 * tint)                // staghorn: pale ochre to rose
+               : table ? (tint < 0.6 ? OLIVE : mix(OLIVE, VIOLET, 0.45))         // table: olive or olive-violet
+               : (tint < 0.45 ? VIOLET : tint < 0.75 ? ROSE : OLIVE);             // encrusting: violet, rose or olive
+      float mot = vnoise(ph / (0.3 * R) + idC * 7.0), mot2 = vnoise(ph / (0.11 * R) + idC * 3.1);
+      fc = glaze(fc, hue, (0.5 + 0.22 * mot + 0.1 * mot2) * head * dim, 0.0, q);
+      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.4), 0.14 * head * dim, 0.0, q); // (a living head darker than the sand it stands on)
+      fc = glaze(fc, tint < 0.5 ? VIOLET : OLIVE, 0.2 * smoothstep(0.55, 0.85, mot2 + 0.3 * mot) * head * dim, 0.0, q);
+      // its structure, each form its own, drawn while it reads and fading to its tone as it shrinks on the page: ink
+      // lines, pale lit work, and the dark of shade or of the water between
+      float lines = 0.0, pale = 0.0, dark = 0.0;
+      if (kind < 0.26) {
+        // a brain coral: long meandering valleys of near-even pitch wandering over the dome, the ridges between them
+        // catching the light; the valleys inked, finer on the lit side
+        float lam = clamp(5.0 * pxu, 0.075 * R, 0.2 * R), rv = smoothstep(2.5, 6.0, lam / pxu);
+        float sv = dot(ph, vec2(cos(idC * 31.0), sin(idC * 31.0))) / lam + 2.2 * vnoise(ph / (0.32 * R) + idC * 17.0) + 0.9 * vnoise(ph / (0.13 * R) + idC * 5.0);
+        float gv = abs(fract(sv) - 0.5) * lam * 1.25, hw = lam * mix(0.07, 0.17, shade); // from the valley's floor, u
+        lines = (1.0 - smoothstep(hw - pxu, hw + pxu, gv)) * rv;
+        pale = (1.0 - smoothstep(0.0, 0.3, abs(abs(fract(sv) - 0.5) - 0.5) / 0.5)) * lit * rv;
+        dark = 0.4 * (1.0 - smoothstep(0.1 * lam, 0.3 * lam, gv)) * rv + 0.15 * (1.0 - rv);
+      } else if (kind < 0.46) {
+        // a massive boulder coral: heaped in round knobs of many sizes, each lit on its sunward flank and shaded on the
+        // other with a crescent of ink at its shaded foot, the grooves between them dark, its skin pitted with polyps
+        float lid, ls = clamp(7.0 * pxu, 0.2 * R, 0.4 * R), pid, ps = clamp(4.0 * pxu, 0.05 * R, 0.12 * R);
+        vec4 lc = cells(ph / ls + idC * 13.0, lid), pc = cells(ph / ps + idC * 5.0, pid);
+        float rl = smoothstep(2.0, 5.0, ls / pxu), kr = 0.36 + 0.2 * lid, kin = 1.0 - smoothstep(kr - 1.5 * pxu / ls, kr + 1.5 * pxu / ls, lc.x);
+        float kf = dot(-lc.zw, Lr) / kr; // across the knob toward the sun (+1) or away (−1)
+        float foot = (1.0 - smoothstep(0.6 * pxu / ls, 1.8 * pxu / ls, abs(lc.x - kr))) * smoothstep(0.0, -0.5, kf + 0.2 * shade);
+        lines = max(foot * mix(0.55, 1.0, shade) * rl,
+                    0.6 * kin * (1.0 - smoothstep(0.16, 0.16 + 1.5 * pxu / ps, pc.x)) * smoothstep(2.5, 4.5, ps / pxu) * smoothstep(0.1, 0.7, shade - 0.4 * kf));
+        dark = ((1.0 - kin) * 0.45 + 0.4 * kin * smoothstep(0.0, -0.8, kf)) * rl + 0.12 * (1.0 - rl);
+        pale = kin * smoothstep(0.1, 0.8, kf) * lit * rl;
+      } else if (kind < 0.68) {
+        // a staghorn thicket from over its shoulder: branches thrown out from its heart and forking, round in section
+        // (lit on the sun's side, inked on the other), pale at their growing tips, the dark water between them
+        float bs = clamp(12.0 * pxu, 0.17 * R, 0.4 * R), rb = 0.2 * bs, rr0 = smoothstep(1.2, 3.0, rb / pxu), dmin = 9.0, tip = 0.0;
+        vec2 bi = floor(ph / bs), nb2 = vec2(0.0);
+        for (int by = -1; by <= 1; by++) {
+          for (int bxx = -1; bxx <= 1; bxx++) {
+            vec2 gc = bi + vec2(float(bxx), float(by)), hc2 = vec2(hash12(gc + idC * 19.0), hash12(gc + idC * 23.0 + 7.1));
+            vec2 bc = (gc + 0.2 + 0.6 * hc2) * bs; // the branch's middle, u from the heart
+            float ang = atan(bc.y, bc.x) + 1.3 * (hc2.x - 0.5), fa = ang + (hc2.y < 0.5 ? 0.6 : -0.6);
+            vec2 ba = vec2(cos(ang), sin(ang)), p2 = bc + vec2(cos(fa), sin(fa)) * 0.6 * bs;
+            for (int sg = 0; sg < 2; sg++) {
+              vec2 s0 = sg == 0 ? bc - ba * 0.75 * bs : bc, s1 = sg == 0 ? bc + ba * 0.75 * bs : p2, sd = s1 - s0;
+              float bt = clamp(dot(ph - s0, sd) / dot(sd, sd), 0.0, 1.0);
+              vec2 cl2 = ph - s0 - sd * bt;
+              float d2 = length(cl2) / (1.0 - 0.35 * bt); // tapering toward the tip
+              if (d2 < dmin) { dmin = d2; nb2 = cl2 / max(length(cl2), 1e-5); tip = bt * step(0.6, length(s1) / R); }
+            }
+          }
+        }
+        float onB = 1.0 - smoothstep(rb - pxu, rb + pxu, dmin), bside = dot(nb2, Lr) * smoothstep(0.0, rb, dmin);
+        lines = (1.0 - smoothstep(0.55 * pxu, 1.4 * pxu, abs(dmin - rb))) * smoothstep(0.2, -0.4, dot(nb2, Lr) - 0.3 * shade) * rr0;
+        dark = ((1.0 - onB) * 0.65 + 0.3 * onB * smoothstep(0.0, -0.8, bside)) * rr0 + 0.25 * (1.0 - rr0);
+        pale = onB * (smoothstep(0.0, 0.8, bside) + 0.8 * smoothstep(0.6, 1.0, tip)) * rr0 + 0.4 * smoothstep(0.75, 1.0, rho) * (1.0 - rr0);
+        lit *= mix(1.0, onB, rr0);
+      } else if (table) {
+        // a table coral: a flat plate on a stalk, its top ribbed with fine rows of polyps radiating from its heart and
+        // ringed by its growth, the growing rim pale, the plate's edge dark below it
+        float nr = floor(min(36.0 + 20.0 * fract(idC * 5.3), 6.2832 * R / (5.0 * pxu))), lev = exp2(floor(log2(max(rho, 0.2) / 0.2)));
+        float sp = 6.2832 * max(rho, 0.2) * R / (nr * lev); // the rows' pitch, u
+        float ga = abs(fract(th / 6.2832 * nr * lev + 0.4 * vnoise(ph / (0.2 * R) + idC)) - 0.5) * sp;
+        lines = 0.55 * (1.0 - smoothstep(0.08 * sp, 0.08 * sp + pxu, ga)) * smoothstep(2.5, 5.0, sp / pxu) * smoothstep(0.08, 0.2, rho);
+        float grw = abs(fract(rho * 5.0 + 0.6 * vnoise(ph / (0.25 * R) + idC * 3.0)) - 0.5) * R / 5.0;
+        lines = max(lines, 0.35 * (1.0 - smoothstep(0.0, 1.2 * pxu, grw)) * smoothstep(2.5, 5.0, 0.2 * R / pxu));
+        pale = smoothstep(0.82, 0.95, rho) * (1.0 - smoothstep(0.97, 1.0, rho));
+        dark = 0.5 * smoothstep(0.96, 1.0, rho) * smoothstep(0.2, 0.7, shade);
       } else {
-        // a soft coral or a head furred with turf: sage mottled with lilac, its fingers in soft clumps
-        fc = glaze(fc, mix(KELP_T, CORAL_T, 0.3), 0.12 * smoothstep(0.4, 0.7, vnoise(ph / (0.08 * R) + idC * 9.0)) * head * dim, 0.0, q);
-        tex = 0.5 * smoothstep(0.5, 0.8, mot);
+        // an encrusting plate: low on the rock, lobed, its growth ridges following its lobed edge, a stipple of polyps
+        float rgp = R / 3.0, rg = abs(fract(rho * 3.0 + 0.25 * vnoise(ph / (0.2 * R) + idC * 3.0)) - 0.5) * rgp, pid, ps = 0.06 * R;
+        vec4 pc = cells(ph / ps + idC * 9.0, pid);
+        lines = max(0.5 * (1.0 - smoothstep(0.05 * rgp, 0.05 * rgp + pxu, rg)) * smoothstep(2.5, 5.0, rgp / pxu) * step(0.45, vnoise(ph / (0.3 * R) + idC * 7.0)),
+                    0.5 * step(0.5, pid) * (1.0 - smoothstep(0.18, 0.18 + 1.5 * pxu / ps, pc.x)) * smoothstep(2.5, 4.5, ps / pxu));
+        dark = 0.2 * smoothstep(0.5, 0.8, mot2);
       }
-      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.35), 0.16 * tex * head * dim, 0.0, q);
       // light and shade: the crown catching the sun pale, the flank turned from it and the hollow at its foot darkest,
       // cool (the water's colour deepened), never black
-      fc = mix(fc, LEAD * uPaper / PARCH, 0.22 * lit * lit * (1.0 - hollow) * head * mix(0.6, 1.0, shallow));
+      fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.35), 0.32 * dark * head * dim, 0.0, q);
+      fc = mix(fc, LEAD * uPaper / PARCH, (0.22 * lit * lit * (1.0 - hollow) + 0.26 * pale) * head * mix(0.6, 1.0, shallow));
       fc = glaze(fc, mix(ROCK_T, SHELF_T, 0.45), (0.4 * smoothstep(0.3, 1.0, shade) + 0.45 * hollow + 0.25 * smoothstep(0.55, 1.0, rho)) * head * dim, 0.0, q);
-      fc = mix(fc, LEAD * uPaper / PARCH, 0.4 * pale * inkD * head);
-      // ink: a light outline, broken, heavier on the shaded side; a few strokes down the shaded flank along its fall
-      // line, as an engraver models a dome; all softened by the depth over it
-      vec2 nd = ph / (length(ph) + 1e-4);
+      // ink: its structure's lines (heavier in shade); a light outline, broken, heavier on the shaded side; the shaded
+      // flank and the hollow under it hatched across the light, as an engraver models a head; all softened by the
+      // depth over it and lost in the water's glare
+      vec2 nd = ph / (length(ph) + 1e-4), hdir = vec2(-Lr.y, Lr.x);
       float edge = (1.0 - smoothstep(0.4, 1.6, abs(Fm - 1.0) / fw)) * step(0.4, vnoise(nd * 3.0 + idC * 37.0)) * (0.3 + 0.5 * shade);
-      float nh = floor(20.0 + 14.0 * fract(idC * 2.3)), hs = abs(fract(th / 6.2832 * nh) - 0.5) * 6.2832 / nh * length(ph) / cG * uRenderPx;
-      float fall = (1.0 - smoothstep(0.35, 0.9, hs)) * smoothstep(0.5, 0.85, shade) * smoothstep(0.45, 0.75, rho) * smoothstep(3.0, 5.0, 6.2832 * R / nh / cG);
-      float lineK = max(max(edge * 0.8, 0.45 * fall) * big, ink);
-      if (onChart) headInk = max(headInk, max(edge * 0.8 * big, lineK * head) * inkD);
+      mat2 hmat = mat2(Lr.x, hdir.x, Lr.y, hdir.y);
+      float hat = hatching(hmat * xr * 4.0, hmat * xrx * 4.0, hmat * xry * 4.0, clamp(0.8 * smoothstep(0.35, 1.0, shade) + 0.4 * hollow, 0.0, 0.85), idC * 13.0);
+      float lineK = max(max(edge * 0.8, 0.5 * hat) * big, (0.45 + 0.4 * shade) * lines);
+      if (onChart) headInk = max(headInk, max(edge * 0.8 * big, lineK * head) * inkD * thin);
       else fc = mix(fc, hatchInk(0.55), 0.6 * lineK * head * mkr * inkD);
       heads = max(heads, head);
     }
@@ -869,7 +978,10 @@ void main() {
   if (riding > 0.0) {
     waves = marks(P, dir, wind, upx, STROKE_CELL, uStrokes, 0.0, 0, 0.0);
     if (crestK > 0.0) waves = max(waves, crestK * marks(P, dir, wind, upx, 2.8 * STROKE_CELL, 0.5 * uStrokes, 13.0, 0, 0.0));
-    if (sheltered > 0.0) waves = mix(waves, 0.6 * marks(P, dir, wind, upx, 0.45 * STROKE_CELL, min(1.0, 1.4 * uStrokes), 31.0, 0, 0.0), sheltered);
+    // (in cat's-paws: ruffled patches where the breeze touches it and glassy water between, where the floor shows;
+    // S-027: an even wallpaper of ticks over the lagoon floor)
+    if (sheltered > 0.0) waves = mix(waves, 0.5 * smoothstep(0.38, 0.68, vnoise(xp / 11.0 + 0.02 * uTime) + 0.3 * (vnoise(xp / 3.7) - 0.5))
+                                            * marks(P, dir, wind, upx, 0.45 * STROKE_CELL, min(1.0, 1.4 * uStrokes), 31.0, 0, 0.0), sheltered);
     waves *= riding;
     if (capK > 0.0) caps = capK * marks(P, dir, wind, upx, 1.7 * STROKE_CELL, uCaps, 23.0, 0, 0.0);
   }
