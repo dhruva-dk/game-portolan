@@ -49,7 +49,7 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['spice-sun', { view: 'spice', hour: '17.6', turn: 'sun', ox: '22', oy: '14', pitch: '-0.2' }], // across the harbour into the low sun: the water gives back the glowing sky, the glitter path
   ['spice-shore', { view: 'spiceshore', hour: '16' }],
   ['spice-high', { view: 'mark', region: 'Spice', hour: '16' }],
-  ['spice-orbit', { view: 'orbit', region: 'Spice', hour: '16' }],
+  ['spice-orbit', { view: 'mark', region: 'Spice', hour: '16', height: '135', pitch: '-1.4', back: '26', 'iphone:height': '110', 'iphone:back': '30', 'iphone:pitch': '-1.43' }], // as coral-orbit: Spice Harbour's sound among its five islands, the horizon high (S-025)
 ] as const).filter(([name]) => name.startsWith(only));
 await mkdir(outDir, { recursive: true });
 const server = await serve();
