@@ -184,7 +184,7 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
 
 test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at high water; every part seated; the harbour has its quay, godowns and apron', () => {
   const plan = planSpice(field), hb = REGIONS.findIndex((r) => r.id === 'spiceIsles');
-  const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge], works = [...plan.godowns, ...plan.quays, ...plan.heaps, ...plan.walls, ...plan.stairs];
+  const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge, ...plan.palms, ...plan.garden.flat()], works = [...plan.godowns, ...plan.quays, ...plan.heaps, ...plan.walls, ...plan.stairs];
   for (const p of [...trees, ...works]) assert.ok(p.sim >= SPICE_BLOCK, `no part in a hull's water: sim ${p.sim.toFixed(2)}`);
   // the quay's face, where it meets the water, and a godown's or heap's whole footprint stand on ground no hull floats over
   for (const p of plan.quays) {
@@ -205,7 +205,7 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   }
   for (const p of plan.godowns) assert.ok(spiceGround(field, p.dir) <= p.base + 0.39 && spiceGround(field, p.dir) >= p.base - 1.56, 'a godown on its plinth (0.39 u over its foot, sunk 1.56 u)');
   for (const p of plan.quays) assert.ok(spiceGround(field, p.dir) <= p.base + 0.5 && spiceGround(field, p.dir) >= p.base - 1.6, 'the quay bedded');
-  const n = { emergents: plan.emergents.length, flowers: plan.flowers.map((f) => f.length), edge: plan.edge.length, godowns: plan.godowns.length, quays: plan.quays.length, heaps: plan.heaps.length, berths: plan.berths.length, birds: plan.birds.length, voices: plan.voices.length, region: hb };
+  const n = { emergents: plan.emergents.length, palms: plan.palms.length, garden: plan.garden.map((g) => g.length), flowers: plan.flowers.map((f) => f.length), edge: plan.edge.length, godowns: plan.godowns.length, quays: plan.quays.length, heaps: plan.heaps.length, berths: plan.berths.length, birds: plan.birds.length, voices: plan.voices.length, region: hb };
   console.log('spice plan', JSON.stringify(n));
   // the mole stands outside the sim's harbour (the disc a hull may lie in), on two short arms that leave the mouth open
   const hbr = REGIONS[hb].harbours[0], anchor = chartDir(hb, hbr.x, hbr.y);
