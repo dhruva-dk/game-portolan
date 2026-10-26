@@ -74,6 +74,15 @@ export function skyLight(hour: number, foot: THREE.Vector3, out: SkyLight): SkyL
   return out;
 }
 
+/**
+ * How low the sun stands, 0–1 (uLow): 0 from mid-morning to mid-afternoon and by night, rising as the sun sinks below
+ * about 37° (16 h) to 1 near 12° (17 h), and gone again soon after it sets. The light rakes, the lit side warms, the shade
+ * cools and deepens, things cast long shade and the sea glazes gold toward the sun.
+ */
+export function lowSun(sunHeight: number): number {
+  return (1 - smoothstep(sunHeight, 0.2, 0.62)) * smoothstep(sunHeight, -0.2, 0.02);
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Lamps
 
@@ -149,6 +158,7 @@ export class Lights {
     const s = skyLight(hour, eye, this.sky), u = this.style.uniforms, n = this.lamps.length;
     this.style.setHour(hour);
     u.uSun.value.copy(s.light);
+    u.uLow.value = lowSun(s.sunHeight);
     this.order.length = n;
     this.dist.length = n;
     for (let i = 0; i < n; i++) {

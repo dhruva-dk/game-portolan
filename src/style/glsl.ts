@@ -43,6 +43,7 @@ export interface StyleUniforms {
   uInk: THREE.IUniform<THREE.Vector3>; // linear
   uShade: THREE.IUniform<THREE.Vector3>; // transmittance of the shade glaze
   uSunTint: THREE.IUniform<THREE.Vector3>; // transmittance of the lit-side glaze
+  uLow: THREE.IUniform<number>; // 0 with the sun high (and by night) … 1 with it low: raking warm light, cool shade, cast shade
   uSilver: THREE.IUniform<THREE.Vector3>; // linear: night highlight ink
   uNight: THREE.IUniform<number>;
   uRenderPx: THREE.IUniform<number>; // render pixels per CSS px (device pixel ratio × render scale)
@@ -73,6 +74,7 @@ export function createStyle(): Style {
     uInk: { value: v() },
     uShade: { value: v() },
     uSunTint: { value: v() },
+    uLow: { value: 0 },
     uSilver: { value: v() },
     uNight: { value: 0 },
     uRenderPx: { value: 1 },
@@ -139,6 +141,7 @@ uniform vec3 uPaper;
 uniform vec3 uInk;
 uniform vec3 uShade;
 uniform vec3 uSunTint;
+uniform float uLow;
 uniform vec3 uSilver;
 uniform float uNight;
 uniform float uRenderPx;
@@ -282,8 +285,10 @@ vec3 hatchInk(float tone) { return mix(wash(uPaper, SEPIA_T, 1.4), uInk, 0.45 + 
 
 // The form's tone from the light: 0 facing the sun, 1 turned fully away; light reflected from the sea and sky lifts
 // the shadow again toward the silhouette, so the core of the shadow sits just past the terminator, as drawn.
+// With the sun low (uLow) the light rakes: the terminator tightens, so what faces the sun stays lit and what turns
+// from it falls into shade sooner, and the contrast grows as the sun sinks.
 float lightTone(float ndl, float nv) {
-  float t = 1.0 - smoothstep(-0.45, 0.75, ndl);
+  float t = 1.0 - smoothstep(mix(-0.45, -0.22, uLow), mix(0.75, 0.42, uLow), ndl);
   return t * (1.0 - 0.38 * pow(1.0 - nv, 2.0) * smoothstep(0.1, -0.4, ndl));
 }
 
@@ -291,10 +296,11 @@ float lightTone(float ndl, float nv) {
 // The shade glaze over the side turned from the light, kept light because the hatching carries the shadow: flat, with
 // a frilled edge where it backed into the drying
 // wash (bloom) and pigment pooled darker along that edge. Returns the glazed colour.
+// With the sun low the glaze reaches further round the form and lies deeper: the cool side of a raking light.
 vec3 shadeGlaze(vec3 col, float tone, Paper q) {
-  float g = smoothstep(0.5, 0.62, tone + (q.bloom - 0.5) * 0.22);
+  float g = smoothstep(0.5 - 0.12 * uLow, 0.62 - 0.12 * uLow, tone + (q.bloom - 0.5) * 0.22);
   float rim = g * (1.0 - g) * 4.0;
-  return wash(col, uShade, g * 0.42 + rim * 0.3);
+  return wash(col, uShade, (g * 0.42 + rim * 0.3) * (1.0 + 1.1 * uLow));
 }
 
 // How much darker a wash pools toward the silhouette: a narrow rim of steady on-screen width where the drying
@@ -307,8 +313,12 @@ float washPool(vec3 n, vec3 v, Paper q) {
   return ring * ring * 0.9 + pow(1.0 - nv, 3.0) * 0.25;
 }
 
-// The lit side's warm glaze (strong at golden hour, nothing at midday).
-vec3 sunGlaze(vec3 col, float ndl, float tone) { return wash(col, uSunTint, clamp(ndl, 0.0, 1.0) * (1.0 - tone) * 0.7); }
+// The lit side's warm glaze (strong at golden hour, nothing at midday). With the sun low, everything turned toward it
+// takes the glaze in full, however obliquely the light falls: the warm side of a raking light.
+vec3 sunGlaze(vec3 col, float ndl, float tone) {
+  float lit = mix(clamp(ndl, 0.0, 1.0), smoothstep(-0.05, 0.4, ndl), uLow);
+  return wash(col, uSunTint, lit * (1.0 - tone) * (0.7 + 0.5 * uLow));
+}
 
 // Lamplight by night: within each lamp's reach (uGlows) the page is seen as by candlelight, the hour's cool paper
 // relit warm. Every scene material calls it last, at its world position; by day every reach is 0.
