@@ -1,18 +1,3 @@
-// The weather test page (tests/render/weather.html, outside the game build): the game's own render path (WorldView,
-// every registered module) over real headless matches. Query scene=fog|squall|calm|bruise|outside|inside|ring:
-//   fog      the scripted match played until a ship sails into a fog bank; the eye on open water outside it, lanterns shown only where the sim's sight
-//            (veiled) lets the eye see them
-//   squall   the first seed whose blue hour comes within 400 s, played to it; its strongest squall well inside the calm (capture 29),
-//            a fog bank beyond it if any
-//   calm     a seed with a calm in its prime; the eye low at its heart
-//   bruise   the scripted match 2 s in, the eye behind the player on the Great Current, facing the storm's origin
-//   outside  the scripted match 350 s in (phase 3 held), the eye in the calm before the wall
-//   inside   the same, the eye in the storm looking back at the calm
-//   ring     the first seed whose unarmed match, the player steering for the calm's heart, still has ships afloat 556 s in (the
-//            final calm, capture 12); the eye high over the calm, down its well of storm wall at the last ships
-//   sea      the scripted match 60 s in, the high chase camera over open sea (S-001/S-002), the clear baseline for frame time
-// window.__weather: ready, scene, seed, hour, stats(), strike() (draws the next lightning strike), budget() (triangles per
-// scene group), gpu(frames) (GPU frame time, ms: EXT_disjoint_timer_query_webgl2 where the browser has it, else to readback).
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { skies } from '../../src/render/sky.ts';
@@ -41,7 +26,6 @@ pipeline.setSize(innerWidth, innerHeight, devicePixelRatio);
 view.layout(innerWidth, innerHeight);
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const dirOf = (p: { x: number; y: number; z: number }) => V(p.x, p.y, p.z).normalize();
-/** a moved from toward b by `u` u along the great circle (away from b when u < 0). */
 function toward(a: THREE.Vector3, b: THREE.Vector3, u: number): THREE.Vector3 {
   const t = b.clone().addScaledVector(a, -a.dot(b));
   if (t.lengthSq() < 1e-12) t.set(a.y, -a.x, 0.3).addScaledVector(a, -a.dot(t));
@@ -53,13 +37,11 @@ function place(eye: THREE.Vector3, height: number, at: THREE.Vector3, atHeight: 
   camera.up.copy(eye);
   camera.lookAt(at.clone().multiplyScalar(R + atHeight));
 }
-/** Whether p and the sea within u of it all round are open water. */
 function open(p: THREE.Vector3, u: number): boolean {
   const t = V(p.y, -p.x, 0.3).normalize();
   for (let k = 0; k < 8; k++) if (heightAt(W.geo, toward(p, t.clone().applyAxisAngle(p, (k * Math.PI) / 4), u)) > -1) return false;
   return heightAt(W.geo, p) < -1;
 }
-/** An eye u from c toward b (away when u < 0), or on the nearest bearing and distance beyond that has open water round it. */
 function eyeFrom(c: THREE.Vector3, b: THREE.Vector3, u: number): THREE.Vector3 {
   for (const d of [0, 12, 28, 48]) {
     for (const a of [0, 0.3, -0.3, 0.6, -0.6, 1, -1, 1.5, -1.5]) {
@@ -69,10 +51,6 @@ function eyeFrom(c: THREE.Vector3, b: THREE.Vector3, u: number): THREE.Vector3 {
   }
   return toward(c, b, u);
 }
-/**
- * The first seed (from 1) whose match, its first tick played (the weather is brewed then), passes `test`, which returns
- * the spell it found; `pre` screens the unplayed match cheaply first.
- */
 function findSeed(test: (s: MatchState) => Spell | null, pre: (s: MatchState) => boolean = () => true, limit = 4000): { seed: number; state: MatchState; spell: Spell } {
   for (let seed = 1; seed <= limit; seed++) {
     const state = createMatch({ seed });
@@ -83,7 +61,6 @@ function findSeed(test: (s: MatchState) => Spell | null, pre: (s: MatchState) =>
   }
   throw new Error(`no seed for ${scene}`);
 }
-/** The scripted match played until a ship lies deep in a fog bank: the match then, and the bank. */
 function fogMatch(): { seed: number; state: MatchState; spell: Spell } {
   const s = unarmed(createMatch({ seed: SEED })), sea = seaFor(W, SEED);
   while (s.tick < Math.round(400 / TICK)) {
@@ -107,7 +84,6 @@ function play(ticks: number, input: (s: MatchState) => ReturnType<typeof idleInp
   }
 }
 const lamps: THREE.Vector3[] = [];
-/** The first seed whose blue hour (19.4) comes within 400 s, played to it, and its strongest squall inside the calm then. */
 function blueHour(): { seed: number; state: MatchState; spell: Spell } {
   for (let s = 1; s <= 400; s++) {
     const m = createMatch({ seed: s }), wait = ((19.4 - hourOf(m) + 24) % 24) / DAY.rate;
@@ -115,7 +91,6 @@ function blueHour(): { seed: number; state: MatchState; spell: Spell } {
     seed = s;
     state = m;
     play(Math.round(wait / TICK), () => idleInput());
-    // the eye stands 0.8 r + 30 off it, so the squall stands that far and more inside the calm; a fog bank near it counts
     const calm = calmNow(state), heart = dirOf(calm.at);
     let best: Spell | null = null, score = 0;
     for (const w of state.weather) {
@@ -131,7 +106,6 @@ function blueHour(): { seed: number; state: MatchState; spell: Spell } {
   throw new Error('no blue-hour squall');
 }
 
-/** The scripted helm, then from the first minute steering for the calm's heart: the player rides the storm out. */
 function seek(s: MatchState): ShipInput {
   const input = helm(s);
   if (s.tick * TICK < 60) return input;
@@ -141,7 +115,6 @@ function seek(s: MatchState): ShipInput {
   input.steer = Math.round(THREE.MathUtils.clamp(-200 * Math.atan2(h.clone().cross(d).dot(up), h.dot(d)), -127, 127));
   return input;
 }
-/** The first seed whose unarmed match, played with `seek`, still has two ships afloat 556 s in: the final calm (capture 12). */
 function finalCalm(): { seed: number; state: MatchState } {
   for (let s = 1; s <= 60; s++) {
     const m = unarmed(createMatch({ seed: s })), sea = seaFor(W, s);
@@ -195,7 +168,6 @@ if (scene === 'fog' || scene === 'squall' || scene === 'calm') {
     else place(toward(at, ship, calm.r * R + 14), 5, toward(at, ship, calm.r * R - 30), 4);
   }
 }
-// the page's storm grade eases in over seconds of frames: let it settle on the eye where it now stands
 for (let k = 0; k < 12; k++) view.frame({ state, dt: 1, clock, alpha: 1 });
 const lights = skies.get(view.scene)!.lights;
 for (const d of lamps) lights.add({ pos: d.clone().multiplyScalar(R + 3), reach: 9 });
@@ -216,7 +188,6 @@ const hook = {
     draw();
     return hook.stats();
   },
-  /** Triangles per scene group (each hidden in turn) over 1000, with the total. */
   budget() {
     pipeline.render(view.scene, camera, 1 / 60);
     const total = pipeline.stats.triangles, out: Record<string, number> = { total };
@@ -232,12 +203,7 @@ const hook = {
     pipeline.render(view.scene, camera, 1 / 60);
     return out;
   },
-  /**
-   * WP30a: GPU ms of each pass of a frame (median over `frames`: a timer query around every renderer.render call — scene,
-   * edges, composite, interface), then the scene pass with each top-level group hidden in turn (its cost is the
-   * difference). Null without EXT_disjoint_timer_query_webgl2. Driven by tests/render/gpu.timing.ts.
-   */
-  async profile(frames = 30, quantile = 0.5) { // quantile < 0.5 (e.g. 0.1) resists other GPU work on a loaded machine (WP30b)
+  async profile(frames = 30, quantile = 0.5) {
     const gl = pipeline.renderer.getContext() as WebGL2RenderingContext, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
     if (!ext) return null;
     const r = pipeline.renderer, plain = r.render.bind(r), next = () => new Promise((done) => requestAnimationFrame(done));
@@ -289,7 +255,6 @@ const hook = {
     r.render = plain;
     return { passes, groups };
   },
-  /** GPU frame time over `frames` renders, ms (median, p90): timer queries where the browser has them, else to readback. */
   async gpu(frames = 40) {
     const gl = pipeline.renderer.getContext() as WebGL2RenderingContext, ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
     const ms: number[] = [], next = () => new Promise((done) => requestAnimationFrame(done));

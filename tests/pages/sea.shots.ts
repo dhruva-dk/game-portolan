@@ -1,15 +1,9 @@
-// Captures the sea test page (tests/pages/sea.html) on both devices: the deck at four hours, a calm mirror and a
-// squall, the shallows over each floor (rock, coral, sand ripples, kelp), a wake behind a ship under way, a current
-// lane, the high view and the pole; on the iPad also a coast close up, the hull-down line of ships, a cube corner and
-// the planet's curve. Each device's frames are laid out on one sheet too (wp13-<device>-sheet.png). Frames at CSS
-// resolution; draw calls, triangles and texture and target memory logged per frame.
-//   node tests/pages/sea.shots.ts [outDir] [--only=<substring>]     (default outDir: progress/shots, files wp13-*)
 import { join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const VIEWS: [string, Record<string, string>][] = [
   ['dawn', { view: 'deck', hour: '6.3' }],
@@ -49,7 +43,6 @@ try {
     }))));
     await game.close();
   }
-  // a sheet per device: every frame, captioned, four across
   for (const [device, files] of Object.entries(taken)) {
     if (!files.length) continue;
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });

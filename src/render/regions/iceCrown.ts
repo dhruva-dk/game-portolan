@@ -1,10 +1,3 @@
-// The Ice Crown (the north pole), WP16 part A. The pack: floes ride the sim's three counter-turning rings (floesAt)
-// on the swell, so the lanes between them open and close; each is a slab of old ice, undercut and melt-worn at the
-// waterline, with melt ponds on its top, a pressure ridge heaved along its rim and another across it, a fringe of
-// pancake ice that moves with it, and on some a tilted berg frozen in. Tilted, crevassed bergs stand grounded between
-// the rings over the geography's islets. The Crown Light: its skerry is ice-bound, the shore heaped with rafted slabs,
-// and a crown of leaning seracs rings the WP15 lighthouse, whose beam sweeps the pack by night under the aurora
-// (Sky.setAurora). Hooks: haulOutAt (WP23's seals), onGrind (WP28's grinding ice).
 import * as THREE from 'three';
 import { illustratedMaterial, type Style } from '../../style/glsl.ts';
 import { PIGMENTS } from '../../style/palette.ts';
@@ -23,20 +16,13 @@ import { chartDir, Draw, Kit, lift, pose, regionSeen, ring, seeded, vec, washOf,
 const RI = REGIONS.findIndex((r) => r.id === 'iceCrown');
 const RINGS = REGIONS[RI].mechanics.floes ?? [];
 const MARK = REGIONS[RI].landmark;
-/** The pack's reach from the pole (u), fringe cakes per floe and how near the eye they are drawn (u), and a floe's
- *  top over its waterline (× its size). */
 const PACK = { reach: 70, cakes: 12, fringe: 90, top: 0.1 } as const;
-/** The Crown Light's skerry: how far round the landmark its ice foot and crown are sought (u), the crown's ring round
- *  the lighthouse (u, clear of its boulders), its seracs' spacing (u), and how many seracs and slabs at most. */
 const SKERRY = { reach: 16, near: 4.3, far: 9, spacing: 1.9, seracs: 14, slabs: 240 } as const;
-/** WP28's nip: floes of neighbouring rings closing within this gap (u) grind. */
 const NIP = 0.8;
 
 const ICE = washOf(PIGMENTS.ultramarine, 0.09), BLUE = washOf(PIGMENTS.ultramarine, 0.24), DEEP = washOf(PIGMENTS.ultramarine, 0.42);
 const GROOVE = washOf(PIGMENTS.indigo, 0.6), MELT = washOf(PIGMENTS.verdigris, 0.45), POND = washOf(PIGMENTS.verdigris, 0.3);
 
-/** Ice as drawn: tops near white, walls blue-white deepening below `deep`, crevasse grooves indigo (where a facet
- *  turns from the kit's radius), melt-worn verdigris below `water`. */
 function icePaint(water: number, deep: number, grooves: boolean): (c: V, n: V) => Wash {
   return (c, n) => {
     const h = Math.hypot(n.x, n.z), r = Math.hypot(c.x, c.z);
@@ -50,8 +36,6 @@ function icePaint(water: number, deep: number, grooves: boolean): (c: V, n: V) =
 
 interface FloeKit { readonly geometry: THREE.BufferGeometry; readonly spots: readonly (readonly [number, number])[]; readonly berth: readonly [number, number] }
 
-/** A floe of radius 1: a slab of old ice undercut at the waterline, melt ponds on its top, a pressure ridge heaved
- *  along part of its rim and another across one side; two spots for seals and a berth for a berg kept clear. */
 function floeKit(seed: number): FloeKit {
   const rng = seeded(seed), k = 22, top = PACK.top, a0 = rng() * 2 * Math.PI, ph = [rng() * 6.3, rng() * 6.3];
   const rim = Array.from({ length: k }, () => 0.84 + 0.16 * rng()), base = icePaint(0.015, -1, false);
@@ -77,14 +61,12 @@ function floeKit(seed: number): FloeKit {
   return { geometry: kit.build(), spots: [polar(a0 + 1, 0.45), polar(a0 - 0.5, 0.5)], berth: polar(a0 + 4.2, 0.4) };
 }
 
-/** Pancake ice of radius 1: a disc with a raised rim. */
 function cakeKit(): THREE.BufferGeometry {
   const rng = seeded(7), k = 9, rim = Array.from({ length: k }, () => 0.85 + 0.15 * rng());
   const at = (s: number, y: number) => ring(k, y, (j) => rim[j] * s);
   return new Kit(icePaint(0.01, -1, false)).loft([at(0.9, -0.22), at(1, 0), at(0.98, 0.11), at(0.86, 0.13), at(0.7, 0.09)]).build();
 }
 
-/** A berg of radius 1 at its waterline, bedded 0.6 below it: walls grooved by crevasses, its table tilted. */
 function bergKit(seed: number): THREE.BufferGeometry {
   const rng = seeded(seed), k = 12, tip = rng() * 2 * Math.PI;
   const rad = Array.from({ length: k }, (_, j) => (j % 4 === 1 ? 0.7 : 0.88 + 0.2 * rng()));
@@ -93,7 +75,6 @@ function bergKit(seed: number): THREE.BufferGeometry {
   return new Kit(icePaint(0.03, 0.3, true)).loft([at(0.8, -0.6), at(1, 0), at(0.96, 0.35, 0.12), at(0.86, 0.62, 0.14), table]).build();
 }
 
-/** A serac 1 high: a blade of old ice from its bed (0.5 below), tapering, its top sheared at a slant. */
 function seracKit(): THREE.BufferGeometry {
   const rng = seeded(31), k = 8;
   const blade = (s: number) => (j: number) => s * (0.4 + 0.6 * Math.abs(Math.cos((j / k) * 2 * Math.PI))) * (0.9 + 0.2 * rng());
@@ -102,7 +83,6 @@ function seracKit(): THREE.BufferGeometry {
     .build();
 }
 
-/** A rafted slab of the ice foot, 0.42 above and 0.6 below its bed. */
 function slabKit(): THREE.BufferGeometry {
   const rng = seeded(43), sq = (y: number, s: number) => ring(4, y, () => s * (0.85 + 0.3 * rng()));
   return new Kit(icePaint(-0.15, 0.1, false)).loft([sq(-0.6, 0.7), sq(0.3, 0.7), sq(0.42, 0.58)]).build();
@@ -110,14 +90,11 @@ function slabKit(): THREE.BufferGeometry {
 
 const newSurface = (): Surface => ({ height: 0, normal: vec(), up: 1, ground: 0, region: 0 });
 
-/** The Crown Light's lighthouse: the region's nearest the landmark. */
 function crownTower(field: TerrainField): Tower {
   const mark = chartDir(RI, MARK.x, MARK.y);
   return layLighthouses(field.geo, field).filter((t) => t.region === RI).reduce((a, b) => (b.up.angleTo(mark) < a.up.angleTo(mark) ? b : a));
 }
 
-/** The crown round the Crown Light: seracs on the skerry SKERRY.near…far from its tower, tallest nearest it, each
- *  leaning outward and bedded below the lowest ground round its foot. */
 export function crownOf(field: TerrainField, tower = crownTower(field)): THREE.Matrix4[] {
   const geo = field.geo, S = newSurface(), rng = seeded(17), sites: { p: V; k: number }[] = [];
   for (let x = MARK.x - SKERRY.reach; x <= MARK.x + SKERRY.reach; x += 0.5) {
@@ -146,7 +123,6 @@ export function crownOf(field: TerrainField, tower = crownTower(field)): THREE.M
   });
 }
 
-/** The skerry's ice foot: rafted slabs heaped along its shore, only where no hull can float at any tide. */
 function iceFootOf(field: TerrainField, tower: Tower): THREE.Matrix4[] {
   const geo = field.geo, rng = seeded(29), out: THREE.Matrix4[] = [], fwd = vec();
   for (let x = MARK.x - SKERRY.reach; x <= MARK.x + SKERRY.reach; x += 0.7) {
@@ -161,7 +137,6 @@ function iceFootOf(field: TerrainField, tower: Tower): THREE.Matrix4[] {
   return out;
 }
 
-/** Bergs grounded between the rings, each enveloping an islet of the geography: tilted, bedded below the sea. */
 function groundedOf(field: TerrainField): THREE.Matrix4[] {
   const geo = field.geo, S = newSurface(), rng = seeded(13), tops: { p: V; h: number }[] = [];
   for (let x = -56; x <= 56; x += 1) {
@@ -197,9 +172,7 @@ interface HaulOut { readonly floe: number; readonly x: number; readonly z: numbe
 
 export class IceCrown {
   readonly group = new THREE.Group();
-  /** Where WP23's seals haul out: a floe (geo.floes index) and a spot on its top (kit units); see haulOutAt. */
   readonly haulOuts: readonly HaulOut[];
-  /** WP28: called as floes of neighbouring rings close to a nip, with the nip (valid during the call) and its strength 0…1. */
   onGrind: ((at: V, strength: number) => void) | null = null;
   private readonly style: Style;
   private readonly sky: Sky;
@@ -211,7 +184,6 @@ export class IceCrown {
   private readonly bergs: Draw;
   private readonly draws: Draw[];
   private readonly grounded: THREE.Matrix4[];
-  /** Per floe: its pose this frame, and what moves with it in its frame (fringe cakes, a frozen-in berg). */
   private readonly poses: THREE.Matrix4[];
   private readonly fringe: THREE.Matrix4[][];
   private readonly carried: (THREE.Matrix4 | null)[];
@@ -227,7 +199,7 @@ export class IceCrown {
     this.style = style;
     this.sky = sky;
     this.swell = swell;
-    this.waters = { geo } as unknown as Waters; // floesAt reads only the geography
+    this.waters = { geo } as unknown as Waters;
     this.material = illustratedMaterial(style, { pigment: PIGMENTS.leadWhite, painted: true, anchor: 'object', side: THREE.DoubleSide });
     const kits = [floeKit(11), floeKit(23)];
     this.floeDraws = kits.map((k) => new Draw(k.geometry, this.material, floes.length));
@@ -254,7 +226,6 @@ export class IceCrown {
     this.gaps = new Float32Array(floes.length).fill(Infinity);
   }
 
-  /** The pack at match time t (s) riding the swell at render clock `clock`; the aurora over the eye by night. */
   update(eye: V, t: number, clock: number): void {
     const far = this.pole.angleTo(this.at.copy(eye).normalize()) * R;
     this.sky.setAurora(this.style.palette.night * THREE.MathUtils.clamp((200 - far) / 110, 0, 1));
@@ -278,7 +249,6 @@ export class IceCrown {
     if (this.onGrind) this.grind(at);
   }
 
-  /** Haul-out i's spot on its floe's top as the floe lies this frame, into out (WP23 lays a seal there). */
   haulOutAt(i: number, out: V): V {
     const h = this.haulOuts[i];
     return out.set(h.x, PACK.top, h.z).applyMatrix4(this.poses[h.floe]);
@@ -314,7 +284,6 @@ export class IceCrown {
   }
 }
 
-/** The composition root's Ice Crown (MODULES): the pack at match time, the aurora over the eye. */
 export function createIceCrown(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene), sky = skies.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sea || !sky || !terrain) throw new Error('createIceCrown: the sea, sky and terrain are built first (MODULES order)');

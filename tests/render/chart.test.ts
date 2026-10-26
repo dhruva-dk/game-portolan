@@ -1,8 +1,3 @@
-// WP24: the camera and the chart. In Node: the net (twelve sheets, flat and closed when unrolled, seams in open sea,
-// screen ↔ globe round trip), the zoom (monotonic, reversible, interruptible), the deck camera over a long replay and
-// hundreds of coastal placements (never inside terrain or below the sea, never NaN, no cut between frames), the
-// chart's ships (only those the player can see). In the browser: draw calls and triangles at every zoom on both
-// devices, the chart's ships against the player's sight, console clean; shots of the zoom → progress/shots/wp24-*.png.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
@@ -21,7 +16,6 @@ import { helm, scripted } from './territory.match.ts';
 const W = world(), ground = groundOf(W), N = TERRITORY.n;
 const coastAt = (d: THREE.Vector3) => W.geo.coast[cellOf(TERRITORY, d)];
 const VIEW = { width: 956, height: 440, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
-/** Frames of the zoom over A9's budget, by device and lift (the browser test records, the last test holds them to none). */
 const overBudget: string[] = [];
 
 test('the net: twelve sheets on the regions, seams in open sea, unrolled flat and closed, screen ↔ globe round trip', () => {
@@ -31,7 +25,6 @@ test('the net: twelve sheets on the regions, seams in open sea, unrolled flat an
     assert.equal(net.faces[k].length, 5);
     assert.equal(W.geo.region[cellOf(TERRITORY, net.centres[k])], k, `sheet ${k} is centred on region ${k}`);
   }
-  // every cut edge (a great arc between two corners) runs through open sea
   let worst = Infinity;
   const p = new THREE.Vector3();
   for (let i = 0; i < 12; i++) for (const j of net.adj[i]) {
@@ -94,7 +87,6 @@ test('the zoom opens and closes monotonically, reverses mid-move and follows the
   assert.ok(z.lift === 2 || z.lift === 0.4, `let go, it settles open or shut (${z.lift})`);
 });
 
-/** Eye clearance over the sea/ground and along the line to the ship (sampled), u (negative = inside). */
 function clearance(cam: THREE.PerspectiveCamera, ship: THREE.Vector3): { eye: number; sight: number } {
   const eye = cam.position, d = eye.clone().normalize(), out = { eye: eye.length() - R - Math.max(0, ground(d)), sight: Infinity };
   const t = ship.clone().multiplyScalar(R + 1.5);
@@ -122,7 +114,7 @@ test('the deck camera over a long replay with zooms: never inside terrain or bel
     for (let sub = 0; sub < 2; sub++) {
       clock += 1 / 60;
       rig.frame(state, (sub + 1) / 2, clock, rig.chartOpen ? 0 : 1 / 60, 1 / 60);
-      if (rig.z <= 0) net.layout(net.sheetOf(state.ships[0].pos)); // the chart re-roots only on the deck
+      if (rig.z <= 0) net.layout(net.sheetOf(state.ships[0].pos));
       const p = cam.position;
       assert.ok(Number.isFinite(p.x + p.y + p.z) && Number.isFinite(cam.quaternion.w), `finite at tick ${tick}`);
       if (rig.z < 0.05) {
@@ -210,8 +202,6 @@ test('the chart shows only the ships the player can see (and itself), never the 
   assert.ok(hidden > 0, 'some rivals were out of sight and kept off the chart');
 });
 
-// --- in the browser ---------------------------------------------------------------------------------------------
-
 let server: Server, launched: Launched;
 before(async () => { server = await serve(); launched = await launch(); });
 after(async () => { await launched.browser.close(); await server.close(); });
@@ -220,7 +210,7 @@ const STOPS: [string, number][] = [['deck', 0.35], ['deck-high', 1], ['pull', 1.
 type Stats = { calls: number; tris: number; z: number; drawn: number; expected: number; alt: number };
 
 test('budgets at every zoom on both devices, chart ships = the player\'s sight, console clean; shots', async () => {
-  const out = join(root, 'progress/shots'), files: string[] = [], seq: string[] = [];
+  const out = join(root, 'out/shots'), files: string[] = [], seq: string[] = [];
   await mkdir(out, { recursive: true });
   for (const device of ['iphone', 'ipad'] as DeviceName[]) {
     const s = DEVICES[device].safeArea;
@@ -238,9 +228,7 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
       await game.page.screenshot({ path: file, scale: 'css' });
       files.push(file);
     }
-    // WP24 part B: the zoom as a frame sequence (deck → mid → rise → swap → orbit → flatten → unroll → chart), budgets at every frame
     const SEQ = [['deck', 0.3], ['high', 0.95], ['rise', 1.22], ['swap', 1.42], ['orbit', 1.5], ['flatten', 1.62], ['unroll', 1.8], ['chart', 2]] as const;
-    // the whole approach to orbit and the swap window, frame by frame where the world and the chart globe meet
     for (const lift of [1.26, 1.3, 1.33, 1.35, 1.38, 1.45, 1.49]) {
       const r = await game.page.evaluate((l) => (window as unknown as { __chart: { stop(l: number): Stats } }).__chart.stop(l), lift);
       console.log(`wp24c ${device} window lift ${lift}: ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris`);
@@ -250,7 +238,6 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
     for (const [k, [name, lift]] of SEQ.entries()) {
       const r = await game.page.evaluate((l) => (window as unknown as { __chart: { stop(l: number): Stats } }).__chart.stop(l), lift);
       console.log(`wp24c ${device} ${k} ${name}: z ${r.z.toFixed(2)}, ${r.calls} draws, ${(r.tris / 1000).toFixed(0)}k tris`);
-      // the swap window draws the world and the chart globe together: the world's fine layers stand down there (part C)
       assert.ok(r.calls <= (r.z >= 0.5 ? 100 : 200) && r.tris <= 500000, `${device} ${name}: within budget (${r.calls} draws, ${r.tris} tris)`);
       if (name === 'chart') { const cap = (r as Stats & { cap: number }).cap; console.log(`wp24c ${device} names: smallest capitals ${cap.toFixed(1)} CSS px`); assert.ok(cap >= 11, `${device}: names' capitals ≥ 11 CSS px (${cap.toFixed(1)})`); }
       const file = join(out, `wp24c-${device}-${k}-${name}.png`);
@@ -258,7 +245,6 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
       seq.push(file);
     }
     if (device === 'ipad') {
-      // the zoom as a frame sequence, every 6th frame of the open move
       const seq = await game.page.evaluate(() => (window as unknown as { __chart: { sequence(): number[] } }).__chart.sequence());
       assert.ok(seq.every((z, k) => k === 0 || z >= seq[k - 1]), 'the sequence rises monotonically');
     }
@@ -272,13 +258,12 @@ test('budgets at every zoom on both devices, chart ships = the player\'s sight, 
   await page.close();
 });
 
-test('A9 holds at every frame of the zoom: the approach to orbit and the swap window (WP24 part C)', () => {
+test('holds at every frame of the zoom: the approach to orbit and the swap window', () => {
   assert.deepEqual(overBudget, [], 'frames of the zoom over 200 draws or 500k triangles');
 });
 
-// --- WP24 part D in the browser --------------------------------------------------------------------------------
-test('WP24 part D: chart close-ups, the swap, the opening, sinking, pull-back and crow\'s-nest cameras, the compact chart: budgets, shots', async () => {
-  const out = join(root, 'progress/shots'), files: [string, string][] = [], over: string[] = [];
+test('chart close-ups, the swap, the opening, sinking, pull-back and crow\'s-nest cameras, the compact chart: budgets, shots', async () => {
+  const out = join(root, 'out/shots'), files: [string, string][] = [], over: string[] = [];
   type D = { calls: number; tris: number; z: number; shown?: number; expected?: number };
   type H = { d(n: string): D; closeup(t: string): D; swapMatch(): { before: number[]; mid: number[]; late: number[] } };
   const PLAN: [string, string[]][] = [['40', ['opening', 'compact']], ['600', ['chart', 'close:near', 'close:current', 'close:landmark', 'swap:1.36', 'swap:1.39', 'swap:1.42', 'swap:1.46', 'open:0.5', 'pull:0.8', 'sink:0.45', 'sink:1', 'crow:1', 'compact']]];

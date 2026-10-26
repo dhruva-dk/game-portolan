@@ -1,6 +1,3 @@
-// The career (WP10 part A): pure and deterministic, tiers never lost, the unlock schedule, a league that moves on its
-// own, the gull's training and plumage, the save's round trip, and career → match → career end to end.
-//   node --test tests/career/career.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CAPTAINS, TRAITS, captainGull, captainOutfit, draw } from '../../src/career/league.ts';
@@ -20,7 +17,6 @@ import { FORM, GULL, TREASURE } from '../../src/sim/tables.ts';
 import { NAMED_PIGMENTS } from '../../src/style/palette.ts';
 import { world } from '../sim/vectors.ts';
 
-/** A finished match made up on `seed` as result() reports one: a random order (the player at `place` when given), sea, sinkings, banks. */
 function madeUp(seed: number, place = 0): MatchResult {
   const rng = rngFrom(seed), order = Array.from({ length: SHIPS }, (_, i) => i), ships = new Array<Finish>(SHIPS);
   for (let i = SHIPS - 1; i > 0; i--) {
@@ -98,7 +94,7 @@ test('a tier once reached is never lost, and the points never fall below it', ()
   for (let seed = 1; seed <= 30; seed++) {
     let c = newCareer(seed), best = 1;
     for (let m = 0; m < 80; m++) {
-      c = applyResult(c, madeUp(seed * 1000 + m, m < 40 ? 1 + (m % 3) : SHIPS)); // a climb, then a losing streak
+      c = applyResult(c, madeUp(seed * 1000 + m, m < 40 ? 1 + (m % 3) : SHIPS));
       const { points, tier } = c.player;
       assert.ok(tier >= best && tier >= tierOf(points));
       assert.ok(points >= (tier - 1) * RANK.tier && points <= RANK.top);
@@ -125,7 +121,7 @@ test('the unlock schedule: the caravel at Levante, the carrack at Ostro, the gal
 test('each match draws the nine captains nearest the player, fitted out by rank and temperament', () => {
   const c = newCareer(3);
   c.player.points = 420;
-  c.match = 1; // past the first voyage, whose captains sail at their gentlest (learn.test.ts)
+  c.match = 1;
   const drawn = draw(c), far = (i: number): number => Math.abs(c.captains[i].points - 420), worst = Math.max(...drawn.map(far));
   assert.equal(drawn.length, SHIPS - 1);
   for (let i = 0; i < LEAGUE; i++) if (!drawn.includes(i)) assert.ok(far(i) >= worst);
@@ -164,8 +160,6 @@ test('the league moves on its own: captains rise and fall over 100 rounds', () =
   const spanned = hi.filter((h, i) => h - lo[i] >= RANK.tier).length;
   const rose = end.filter((p, i) => p - start[i] >= RANK.tier).length, fell = end.filter((p, i) => start[i] - p >= RANK.tier).length;
   const winds = new Set(end.map((p) => tierOf(p))).size, stats = JSON.stringify({ spanned, rose, fell, winds, leaders });
-  // alive: two thirds of the captains cross a whole tier's span, at least five end a tier up and five a tier down, the
-  // table stays spread over six of the eight winds, and the head of the league changes hands
   assert.ok(spanned >= 20 && rose >= 5 && fell >= 5 && winds >= 6 && leaders >= 2, stats);
 });
 

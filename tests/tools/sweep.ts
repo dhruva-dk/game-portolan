@@ -1,13 +1,3 @@
-// Sweep (WP12 tuning): named variants of the captains' tuning, each over the same tournament matches (0 … n−1) on
-// worker_threads, one compact table per variant: per temperament check 3's five spec stats (sea, broken, sunk, loot,
-// place) and its sinkings by the killer's mode (flee/fight/ram/hunt/face/loop/home), then check 4's match lengths and
-// check 3's distinct-profile, hunters' lead and rank numbers (--detail: how and when each sank, whom it sank, hurt and time by mode). A variant lays
-// Style fields over temperaments (by index: career/league.ts TEMPERAMENT), sets brain TUNE knobs and fits out kits
-// (tables.ts KITS, FITTING kinds by slot) and moves the storm (tables.ts STORM: its announcement and phases by index,
-// `shift` s added to every phase's move); each worker applies them from the defaults before a variant's matches, so
-// nothing in the source changes between runs. t values scale with √n: at 100 matches they read about 0.71 of a
-// 200-match run's.
-//   node tests/tools/sweep.ts --matches 100 --workers 5 --variants '[{"name":"base"},{"name":"shy","tune":{"shy":0.5},"style":{"1":{"run":0.8}}}]'
 import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
@@ -19,7 +9,7 @@ import { NAMES, mean, placesByTier, profiles, tournamentMatch, welch, type Match
 type Phase = (typeof STORM.phases)[number];
 interface Variant { name: string; tune?: Partial<typeof TUNE>; style?: Record<string, Partial<Style>>; kit?: Record<string, number[]>; storm?: { announce?: number; shift?: number; phases?: Record<string, Partial<Phase>> } }
 const SPEC = ['sea', 'broken', 'sunk', 'loot', 'place'] as const;
-const KILL_MODES = [10, 8, 9, 7, 12, 3, 4]; // brain.ts MODE: flee, fight, ram, hunt, face, loop, home
+const KILL_MODES = [10, 8, 9, 7, 12, 3, 4];
 
 if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWorker) {
   const variants = (workerData as { variants: Variant[] }).variants, tune0 = { ...TUNE }, styles0 = STYLES.map((s) => ({ ...s })), kits0 = KITS.map((k) => [...k]);
@@ -74,7 +64,7 @@ if (!isMainThread && (workerData as { sweepWorker?: boolean } | null)?.sweepWork
     p.forEach((x, t) => {
       const mine = rows.filter((r) => r.temperament === t), km = KILL_MODES.map((k) => mean(mine.map((r) => r.kmode[k])).toFixed(2));
       console.log(`${NAMES[t].padEnd(11)} ${SPEC.map((f) => x.mean[f].toFixed(f === 'sea' || f === 'loot' ? 0 : 2).padStart(6)).join('')}  k ${km.join('/')}`);
-      if (process.argv.includes('--detail')) { // sinkings by every killer mode and by cause, hurt dealt by mode, time by mode (shares)
+      if (process.argv.includes('--detail')) {
         const sum = (f: 'kmode' | 'kvict' | 'causes' | 'dmode' | 'tmode'): string => { const v = mine[0][f].map((_, k) => mean(mine.map((r) => r[f][k]))), all = v.reduce((a, y) => a + y, 0) || 1; return v.map((y) => (f === 'kmode' || f === 'kvict' || f === 'causes' ? y : y / all).toFixed(2)).join(' '); };
         const fate = [0, 1, 2, 3, 4, 5].map((c) => mine.filter((r) => r.fate === c).length / mine.length), sank = mine.filter((r) => r.fate >= 0);
         console.log(`   sunk by gun/ram/fire/rocks/hot/storm ${fate.map((y) => y.toFixed(2)).join(' ')}, at ${mean(sank.map((r) => r.at)).toFixed(2)} min (quartiles ${[0.25, 0.5, 0.75].map((q) => sank.map((r) => r.at).sort((a, b) => a - b)[Math.floor(q * sank.length)]?.toFixed(1)).join(' ')})`);

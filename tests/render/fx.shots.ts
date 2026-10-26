@@ -1,15 +1,9 @@
-// Captures WP22's effects (tests/render/fx.html): a ten-ship broadside exchange with shot in flight, hits, splashes, a
-// ram, fire and a shell (wp22-battle-*), chests of all five tiers afloat and opening (wp22-chests-*), a loop's claim
-// bloom with its coin stream, the banking flourish and a broken trail's tear (wp22-claim-*), and the Great Current
-// from the deck and from orbit while the fleet rides it (wp22-current-*), on iPhone and iPad; each set on a contact
-// sheet (wp22-<set>-sheet.png). Logs the frame's draw calls and triangles and the effects' share (A9).
-//   node tests/render/fx.shots.ts [outDir]
 import { join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
+const outDir = process.argv[2] ?? join(root, 'out/shots');
 type Hook = { stage(set: string): void; seek(t: number, cam: string): Record<string, number> };
 const SETS: { set: string; devices: DeviceName[]; steps: [name: string, t: number, cam: string][] }[] = [
   { set: 'battle', devices: ['iphone', 'ipad'], steps: [['0-ripple', 0.14, 'deck'], ['1-smoke', 0.6, 'deck'], ['2-banks', 2.2, 'deck'], ['3-orbit', 2.4, 'orbit']] },

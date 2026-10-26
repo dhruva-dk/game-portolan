@@ -1,7 +1,3 @@
-// WP25: the match controls, HUD layout, HUD model and haptics, without a browser. Touch → ShipInput for every
-// gesture (the validator, parseRecording, accepts every input generated), the layout on the iPhone, the iPad and the
-// smallest iPhone (inside the safe area, nothing overlapping, every hit area ≥ 44 pt, the frame's centre clear), the
-// model following the match, haptics patterns and their limiter.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { FLAG, STEER_MAX, parseRecording, record, recorder, type ShipInput } from '../../src/sim/input.ts';
@@ -13,7 +9,6 @@ import { HudState, MIN_HIT, hudLayout, type HudButton, type HudLayout } from '..
 import type { View } from '../../src/ui/safeArea.ts';
 import { scripted } from '../render/territory.match.ts';
 
-/** The harness's devices (tests/harness.ts DEVICES) plus the smallest supported iPhone, layout only. */
 const PROFILES: Record<string, View> = {
   iphone: { width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } },
   ipad: { width: 1376, height: 1032, dpr: 2, safe: { top: 0, right: 0, bottom: 25, left: 0 } },
@@ -62,10 +57,10 @@ test('stick: dead zone, expo, hysteresis, trailing origin, centred on release', 
   assert.ok(s30 > 0 && s30 < STEER_MAX / 2, `fine near the centre: ${s30}`);
   f.to(320, 300);
   assert.equal(tick().steer, STEER_MAX);
-  const o = 320 - STICK.full; // the origin trailed the thumb: coming back through it reverses at once
+  const o = 320 - STICK.full;
   f.to(o - 12, 300);
   assert.ok(tick().steer < 0);
-  f.to(o - 5, 300); // inside the dead zone but beyond release: still engaged (hysteresis)
+  f.to(o - 5, 300);
   assert.ok(tick().steer < 0);
   f.to(o - 2, 300);
   assert.equal(tick().steer, 0, 'centred inside release');
@@ -87,7 +82,7 @@ test('stick flicks step the sails once each, with a rest; while riding a flick u
   f.to(150, 240, 20); f.to(150, 275, 40);
   assert.equal(tick().sail, -1);
   f.up();
-  const slow = finger(150, 300); // a slow drag is not a flick
+  const slow = finger(150, 300);
   for (let y = 300; y > 250; y -= 4) slow.to(150, y, 40);
   assert.equal(tick().sail, 0);
   slow.up();
@@ -133,7 +128,7 @@ test('gull: tap calls it, drag onto the sea dives; consumables; head home held; 
   assert.equal(i.aim, CELL);
   for (const [k, slot] of [['c0', 0], ['c1', 1], ['c2', 2]] as const) {
     const b = btn(k);
-    finger(b.x + b.hit * 0.8, b.y).up(b.x + b.hit * 0.8, b.y); // forgiving: the edge of the hit area
+    finger(b.x + b.hit * 0.8, b.y).up(b.x + b.hit * 0.8, b.y);
     assert.equal(tick().consumable, slot);
   }
   const h = btn('home');
@@ -161,7 +156,6 @@ test('swipe up on open sea breaks off; two fingers are the camera\'s pinch and n
   s.up();
   const a = finger(200, 250);
   const twin = rig(); void twin;
-  // a second finger 60 ms after the stick's: a pinch, both handed to the camera
   const out = (() => { const b2 = finger(300, 260); return b2; })();
   void out;
   assert.equal(tick().steer, 0);
@@ -292,7 +286,7 @@ test('haptics: patterns, rests, events for the player only, the limiter', () => 
   assert.equal(h.play('ram'), false);
 });
 
-test('WP25 part B: the left-handed layout mirrors every control inside the safe area; the stick takes the right half', () => {
+test('the left-handed layout mirrors every control inside the safe area; the stick takes the right half', () => {
   const views: View[] = [{ width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } }, { width: 1376, height: 1032, dpr: 2, safe: { top: 0, right: 0, bottom: 25, left: 0 } }];
   for (const v of views) {
     const R = hudLayout(v), L = hudLayout(v, true);

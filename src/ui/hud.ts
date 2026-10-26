@@ -1,13 +1,3 @@
-// WP25: the match HUD's model and layout (the drawing is icons.ts). HudState.update reads the match for one ship
-// into a HudModel each frame: hull, ward and fire, sails, purse and bank, share of the claimed sea, ships afloat and
-// standing, the storm's next move, heading and wind, each battery's reload, consumables, the gull and its call
-// price, the aimed fitting, the six fittings, and the rivals in sight as bearings (PROMPT.md, The match screen).
-// hudLayout places every scrap and control inside the safe area, out of the frame's centre: top-left hull rope (stern
-// glass below), top-centre afloat · storm dial · standing, top-right the compact chart's slot (WP24 part D), lower-left
-// compass and sail setting under the floating stick's half, lower-right the right thumb's fan (aimed fitting nearest
-// the corner, the gull and head home a step out, the three consumables on the outer arc, the purse beside the gull), the six
-// fittings along the bottom. Sizes are in thumbs, not screens: u scales gently with the safe height and every hit
-// area is at least 44 pt across, nearest-wins (controls.ts).
 import { windAt, type Sea, type Wind } from '../sim/environment.ts';
 import { dot, v3 } from '../sim/math.ts';
 import { bearingOf, cellOf, R, TERRITORY } from '../sim/sphere.ts';
@@ -20,27 +10,27 @@ import { safeRect, type Rect, type View } from './safeArea.ts';
 export interface Threat { readonly ship: number; readonly bearing: number; readonly near: number }
 
 export interface HudModel {
-  hull: number; // 0–1 of the form's hull
+  hull: number;
   ward: boolean;
   fire: boolean;
-  sail: number; // SAIL
+  sail: number;
   torn: boolean;
   purse: number;
   bank: number;
-  share: number; // 0–1 of the sea held by every ship afloat
+  share: number;
   afloat: number;
-  rank: number; // 1 = holds the most sea
-  leader: boolean; // flies the gold-leaf pennant
+  rank: number;
+  leader: boolean;
   storm: { phase: number; announced: boolean; toMove: number; frac: number; inside: boolean; edge: boolean };
-  heading: number; // compass bearing of the bow, rad
-  wind: number; // bearing the wind blows toward, relative to the bow, rad
+  heading: number;
+  wind: number;
   windStrength: number;
-  batteries: { battery: number; reload: number }[]; // 0 ready … 1 just fired
+  batteries: { battery: number; reload: number }[];
   consumables: { kind: number; count: number }[];
   gull: { flight: number; price: number; ready: boolean; tier: number };
   aimed: { kind: number; tier: number; ready: boolean } | null;
   fittings: { kind: number; tier: number }[];
-  threats: Threat[]; // nearest first, at most 6
+  threats: Threat[];
   inHome: boolean;
   lookout: boolean;
   sternGlass: boolean;
@@ -50,10 +40,8 @@ const SV = { phase: 0, calm: newCalm(), next: newCalm(), announced: false, toMov
 const WIND = { v: v3(0, 0, 0), strength: 0, steady: 0, gust: 0 } as unknown as Wind;
 const wrap = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
-/** u of sight the threat marks fade over, and of the storm wall that counts as its edge. */
 export const NEAR = { sight: 120, edge: 30 } as const;
 
-/** The HUD's reading of the match, with what it remembers between frames (reload peaks, the storm's countdown). */
 export class HudState {
   private readonly peak = new Float64Array(BATTERIES).fill(1);
   private readonly was = new Float64Array(BATTERIES);
@@ -127,17 +115,14 @@ export class HudState {
 }
 
 export type ButtonKind = 'aimed' | 'gull' | 'home' | 'c0' | 'c1' | 'c2' | 'chart';
-/** A control: a disc (x, y its centre, r drawn, hit the touch radius) or, with w and h, a box centred on x, y. */
 export interface HudButton { readonly kind: ButtonKind; readonly x: number; readonly y: number; readonly r: number; readonly hit: number; readonly w?: number; readonly h?: number }
 export interface Disc { readonly x: number; readonly y: number; readonly r: number }
 
 export interface HudLayout {
   readonly view: View;
   readonly safe: Rect;
-  /** CSS px per thumb unit. */
   readonly u: number;
   readonly buttons: readonly HudButton[];
-  /** Where the floating stick may land: the left half. */
   readonly stick: Rect;
   readonly hull: Rect;
   readonly share: Rect;
@@ -148,16 +133,12 @@ export interface HudLayout {
   readonly sail: Rect;
   readonly purse: Rect;
   readonly fittings: readonly Disc[];
-  /** The threat marks ride this rect's border. */
   readonly edge: Rect;
-  /** WP25 part B: mirrored for the left hand (the stick on the right half, the fan about the lower-left corner). */
   readonly left?: boolean;
 }
 
-/** Half the 44 pt minimum touch target. */
 export const MIN_HIT = 22;
 
-/** The right thumb's fan about the safe area's lower-right corner: [kind, angle° (180 left, 90 up), distance u, radius u]. */
 const FAN: readonly (readonly [ButtonKind, number, number, number])[] = [
   ['aimed', 135, 76, 30],
   ['gull', 172, 150, 25],
@@ -182,7 +163,7 @@ export function hudLayout(view: View, left = false): HudLayout {
   const hull: Rect = { x: L + m, y: T + m, width: 190 * u, height: 30 * u };
   const share: Rect = { x: L + m, y: hull.y + hull.height + 4 * u, width: 120 * u, height: 20 * u };
   const tw = 210 * u;
-  const fit = 28 * u, fx = s.x + s.width * 0.42 - 2.5 * fit; // left of centre, clear of the purse
+  const fit = 28 * u, fx = s.x + s.width * 0.42 - 2.5 * fit;
   const out: HudLayout = {
     view,
     safe: s,
@@ -203,9 +184,6 @@ export function hudLayout(view: View, left = false): HudLayout {
   return left ? mirrorLayout(out) : out;
 }
 
-/** WP25 part B: the left-handed layout: every scrap and control mirrored about the screen's centre line (the stick on
- *  the right half, the right thumb's fan about the lower-left corner, the compact chart top-left, the wind rose and the
- *  sail setting lower-right). The lettering itself still reads left to right. */
 export function mirrorLayout(L: HudLayout): HudLayout {
   const W = L.view.width;
   const r = (q: Rect): Rect => ({ x: W - q.x - q.width, y: q.y, width: q.width, height: q.height });
@@ -216,7 +194,6 @@ export function mirrorLayout(L: HudLayout): HudLayout {
   };
 }
 
-/** The point on `r`'s border at compass bearing `b` from its centre (0 ahead = up, π/2 starboard = right). */
 export function edgePoint(r: Rect, b: number): [number, number] {
   const cx = r.x + r.width / 2, cy = r.y + r.height / 2, dx = Math.sin(b), dy = -Math.cos(b);
   const k = Math.min(Math.abs(dx) > 1e-6 ? r.width / 2 / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? r.height / 2 / Math.abs(dy) : Infinity);

@@ -1,6 +1,3 @@
-// WP6 part A, ships under way: the six-minute lap, the point of sail, turning circles and sail steps by form, the
-// modifiers, collisions with ships and land, head home and the drawn course — all through the real step.
-//   node --test tests/sim/sailing.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { over } from '../../src/sim/end.ts';
@@ -25,11 +22,10 @@ const input = (patch: Partial<ShipInput> = {}): ShipInput => ({ ...idleInput(), 
 const apart = (a: V3, b: V3) => R * Math.sqrt(Math.max(0, (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2));
 const WEEPING = REGIONS.findIndex((r) => r.id === 'weepingIsle');
 
-/** A match in fair weather with ship 0 at p heading along bearing b (radians from north), making way under `sail`. */
 function match(forms: number | number[], p: V3, b: number, sail: number = SAIL.plain, seed = SEED): MatchState {
   const s = createMatch({ seed, fleet: (Array.isArray(forms) ? forms : new Array<number>(SHIPS).fill(forms)).map((form) => ({ form })) });
-  for (const spell of s.weather) spell.life = 1e9; // no spell is ever sent: the weather's own tests are in environment.test.ts
-  for (const ship of s.ships) ship.phase = PHASE.sailing; // the whole fleet at sea, off the Great Current
+  for (const spell of s.weather) spell.life = 1e9;
+  for (const ship of s.ships) ship.phase = PHASE.sailing;
   put(s, 0, p, tangentAt(p, b, v3()), sail);
   return s;
 }
@@ -42,7 +38,6 @@ function put(s: MatchState, i: number, p: V3, head: V3, sail: number = SAIL.plai
   ship.speed = FORMS[ship.form].speed * SAILS[sail].speed;
 }
 
-/** Open sea far from land, from every current and from the fleet at the head of the Great Current. */
 function openSea(clear: number, waters: Sea = sea): V3 {
   const p = v3(), q = v3(), c = v3(), pts = waters.current.points, start = v3(pts[0], pts[1], pts[2]);
   for (let lon = 0; lon < 2 * PI; lon += 0.02) {
@@ -59,7 +54,6 @@ function openSea(clear: number, waters: Sea = sea): V3 {
   throw new Error('no open sea');
 }
 
-/** The first point along a bearing (degrees) of a region's chart, 55 u or more out, with `clear` u of water round it. */
 function waterOut(ri: number, bearing: number, clear = 10): V3 {
   const b = (bearing * PI) / 180;
   for (let d = 55; d < 130; d++) {
@@ -71,8 +65,6 @@ function waterOut(ri: number, bearing: number, clear = 10): V3 {
 
 test('a caravel under plain sail in a fair wind rounds the equator in six minutes (± 5 %)', (t) => {
   for (const seed of [SEED, 7, 1234, 99, 0x5eed05]) {
-    // The lap sails the seed's wind and the fixed lanes; the seed's Great Current, which may run along the equator
-    // and carry the ship or stem it, is ridden in its own test (environment.test.ts).
     const waters: Sea = { ...seaFor(world(), seed), current: { regions: [], points: new Float64Array(0), length: 0 } };
     const course: number[] = [], p = v3();
     for (let k = 0; k <= 680; k++) {
@@ -81,12 +73,12 @@ test('a caravel under plain sail in a fair wind rounds the equator in six minute
       course.push(cellOf(TERRITORY, p));
     }
     const s = match(FORM.caravel, fromLatLon(0, 0, v3()), PI / 2, SAIL.plain, seed), ship = s.ships[0], idle = input();
-    unarmed(s, 1); // the rest of the fleet lies off the head of the current, guns struck below: nothing ends the match mid-lap
-    for (const calm of s.storm.calms) calm.r = PI; // the storm held off: this is the sails' own pace
+    unarmed(s, 1);
+    for (const calm of s.storm.calms) calm.r = PI;
     step(waters, s, input({ course }));
     let lon = 0, last = 0;
     while (lon < 2 * PI && s.tick < 450 / TICK) {
-      assert.ok(!over(s), `seed ${seed}: the match ended at ${(s.tick * TICK).toFixed(1)} s, mid-lap`); // step() would stand still
+      assert.ok(!over(s), `seed ${seed}: the match ended at ${(s.tick * TICK).toFixed(1)} s, mid-lap`);
       step(waters, s, idle);
       assert.notEqual(ship.bumped, BUMPED.land, 'never touches land');
       const now = Math.atan2(-ship.pos.z, ship.pos.x);
@@ -125,7 +117,6 @@ test('the point of sail moves speed by at most 15 %, averages out over every hea
   }
 });
 
-/** No gusts for the rest of the test: they would blur what it measures. */
 function stillAir(s: MatchState): MatchState {
   for (const g of s.gusts) {
     g.life = 1e9;
@@ -134,7 +125,6 @@ function stillAir(s: MatchState): MatchState {
   return s;
 }
 
-/** The diameter of the circle ship 0 sails with the helm hard over, once settled into the turn. */
 function circle(form: number, sail: number, p: V3): number {
   const s = stillAir(match(form, p, 0, sail)), ship = s.ships[0], hard = input({ steer: STEER_MAX }), path: V3[] = [];
   for (let k = 0; k < 240; k++) step(sea, s, hard);
@@ -183,19 +173,19 @@ test('full sail is fastest and reefed slowest; every form gathers way with its o
 
 test('waters, landmarks, fittings, torn sails, gusts, light airs and gales trim the way', () => {
   const s = createMatch({ seed: SEED }), ship = s.ships[0], T = newTrim(), cell = cellOf(TERRITORY, ship.pos);
-  ship.phase = PHASE.sailing; // at sea, off the Great Current
+  ship.phase = PHASE.sailing;
   const mark = (perk: string) => sea.marks[sea.geo.landmarks.findIndex((l) => l.perk === perk)];
   const speed = () => trim(sea, s, 0, T).speed, near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-12, `${a} ≠ ${b}`);
   near(speed(), 1);
   s.owner[cell] = 1;
-  near(speed(), 1.1); // own waters
+  near(speed(), 1.1);
   s.owner[cell] = 2;
-  near(speed(), 0.9); // a rival's waters
+  near(speed(), 0.9);
   s.owner[mark('rootGate')] = 2;
-  near(speed(), 0.8); // a rival's waters, the rival holding the Root Gate
+  near(speed(), 0.8);
   s.owner[cell] = 0;
   s.owner[mark('whaleRoad')] = 1;
-  near(speed(), 1.2); // the Whale Road, everywhere
+  near(speed(), 1.2);
   s.owner[mark('whaleRoad')] = 0;
   ship.fittings[SLOT.rig] = { kind: FITTING.spareCanvas, tier: 4 };
   near(speed(), 1.12);
@@ -207,17 +197,17 @@ test('waters, landmarks, fittings, torn sails, gusts, light airs and gales trim 
   near(turningRadius(ship.form, SAIL.plain, T), FORMS[ship.form].radius / 1.16);
   ship.fittings[SLOT.rig] = { kind: FITTING.none, tier: 0 };
   ship.torn = 1;
-  near(speed(), 0.7); // chain shot
+  near(speed(), 0.7);
   for (let k = 0; k < 31; k++) step(sea, s, input());
   assert.equal(ship.torn, 0, 'torn canvas is mended in its time');
   near(speed(), 1);
 
   const at = (strength: number, gust: number, stormSails: boolean) =>
     settledSpeed(FORM.caravel, SAIL.plain, 0, { v: v3(), strength, steady: 0, gust }, { speed: 1, turn: 1, stormSails, drive: 0 }) / REFERENCE;
-  near(at(1, 1, false), 1.14); // the heart of a gust
-  near(at(0.5, 0, false), 0.7); // light airs
-  near(at(2.4, 0, false), 0.7); // a gale without storm sails
-  near(at(2.4, 0, true), 1); // storm sails lose nothing
+  near(at(1, 1, false), 1.14);
+  near(at(0.5, 0, false), 0.7);
+  near(at(2.4, 0, false), 0.7);
+  near(at(2.4, 0, true), 1);
 });
 
 test('ships collide as hulls: pushed apart by mass, the closing speed reported where each was struck', () => {
@@ -237,7 +227,6 @@ test('ships collide as hulls: pushed apart by mass, the closing speed reported w
     assert.ok(apart(a.pos, b.pos) > 2 * FORMS[FORM.caravel].beam - 0.05, 'hulls never pass through each other');
   }
 
-  // A galleon rams a pinnace amidships: the bow strikes, the side is struck, and the light hull takes the shove.
   const r = match([FORM.galleon, FORM.pinnace, 0, 0, 0, 0, 0, 0, 0, 0], p, 0), g = r.ships[0], q = r.ships[1];
   advance(p, g.head, 4.5, ahead, back);
   put(r, 1, ahead, tangentAt(ahead, PI / 2, v3()), SAIL.reefed);
@@ -255,7 +244,7 @@ test('a ship whose stern lies over the shore (swung there coming about, or left 
   for (let b = 0; b < 360 && tried < 3; b += 15) {
     for (let r = 40; r < 130; r += 0.25) {
       const p = at(b, r, v3()), s = match(FORM.caravel, p, 0, SAIL.full), ship = s.ships[0];
-      tangentToward(p, at(b, r + 5, out), ship.head); // bow out to sea, stern towards the island
+      tangentToward(p, at(b, r + 5, out), ship.head);
       advance(p, ship.head, -half, stern, tmp);
       if (aground(sea, s, p) || !aground(sea, s, stern)) continue;
       advance(p, ship.head, half, stern, tmp);
@@ -337,7 +326,7 @@ test('head home sails the shortest safe route to the ship\'s own waters, the sam
 test('head home plans from a hull afloat inside the coast\'s clearance, where the nav cell itself is closed', () => {
   const home = waterOut(WEEPING, 180, 14), d = v3(), s = match(FORM.caravel, waterOut(WEEPING, 0), PI / 2), tide = tideOf(s);
   for (let c = 0; c < TERRITORY.cells; c++) if (apart(cellDir(TERRITORY, c, d), home) < 10) s.owner[c] = 1;
-  let p: V3 | null = null; // afloat at any tide, yet within CLEAR of the shore, so its nav cell never opens
+  let p: V3 | null = null;
   for (let b = 0; b < 360 && !p; b += 5) {
     for (let r = 40; r < 130 && !p; r += 0.5) {
       const q = toWorld(WEEPING, r * Math.sin((b * PI) / 180), r * Math.cos((b * PI) / 180), v3());
@@ -358,7 +347,7 @@ test('seed 4: held from tick 600, head home never loses its route on a replan an
   const ownWaters = () => s.owner[cellOf(TERRITORY, ship.pos)] === 1;
   let off = -1, lost = -1;
   while (s.tick < 600 + 3600 && ship.phase !== PHASE.sunk && !(ship.homing && ownWaters())) {
-    const go = idleInput(); // break off at tick 300, steer out for 200 ticks, hold head home from tick 600 (WP27c)
+    const go = idleInput();
     if (ship.phase === PHASE.riding) go.flags = s.tick >= 300 ? FLAG.breakOff : 0;
     else if ((off = off < 0 ? s.tick : off) + 200 > s.tick) go.steer = 60;
     if (s.tick >= 600 && ship.phase !== PHASE.riding) go.flags |= FLAG.headHome;

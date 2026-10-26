@@ -1,7 +1,3 @@
-// Sinking and the end (PROMPT.md, A match: Sinking and the end, The results). Every sinking goes through sink() —
-// combat's (WP8 part B) and the storm's (part C) — which ranks the ship by the order it sank,
-// spills its purse, frees its sea, pays its sinker's bounty and drops one of its fittings as a chest. When one ship is
-// left afloat it has won and the match stands still; result() then explains the match.
 import { spill } from './economy.ts';
 import { afloatChest } from './items.ts';
 import { rngInt, set } from './math.ts';
@@ -10,20 +6,11 @@ import { EVENT, PHASE, STREAM, afloat, chronicle, emit, type Entry, type MatchSt
 import { END, FITTING, MOMENTS, TREASURE } from './tables.ts';
 import { founder } from './territory.ts';
 
-/** The player's ship. */
 const PLAYER = 0;
-/** The timeline's kinds whose `by` is a ship, so a moment of the player's when it is either one (part B adds the fights). */
 const RIVALRY: readonly number[] = [EVENT.broken, EVENT.lead, EVENT.sunk];
 
-/** The match is over: one ship is left afloat, the winner. */
 export const over = (state: MatchState): boolean => state.winner >= 0;
 
-/**
- * Ship i sinks, `by` the ship that sank it (−1 none), of a CAUSE: it is ranked below every ship still afloat, its purse
- * spills where it went down, its trail washes away and its sea falls to nobody, its sinker banks END.bounty (twice over
- * for sinking the pennant's holder), and one of its fittings, drawn on the loot stream, floats up in a chest at the
- * wreck. A ship already sunk, or any ship once the match is over, is left as it is.
- */
 export function sink(state: MatchState, i: number, by: number, cause: number): void {
   const ship = state.ships[i];
   if (!afloat(ship) || over(state)) return;
@@ -33,7 +20,7 @@ export function sink(state: MatchState, i: number, by: number, cause: number): v
   ship.rate = 0;
   ship.prize = -1;
   ship.holding = 0;
-  set(ship.was, ship.pos.x, ship.pos.y, ship.pos.z); // it lies still: nothing left to draw between ticks
+  set(ship.was, ship.pos.x, ship.pos.y, ship.pos.z);
   set(ship.wasHead, ship.head.x, ship.head.y, ship.head.z);
   if (ship.purse > 0) spill(state, ship.pos, ship.purse, i);
   ship.purse = 0;
@@ -51,7 +38,6 @@ export function sink(state: MatchState, i: number, by: number, cause: number): v
   if (left === 1) win(state);
 }
 
-/** One of sunk ship i's fittings, drawn on the loot stream, leaves the wreck in a chest of its tier (items.ts: sailing over it opens it). */
 function dropChest(state: MatchState, i: number): void {
   const ship = state.ships[i];
   let n = 0;
@@ -68,7 +54,6 @@ function dropChest(state: MatchState, i: number): void {
   }
 }
 
-/** The last ship afloat has won: the match is over. */
 function win(state: MatchState): void {
   const w = state.ships.findIndex(afloat), ship = state.ships[w];
   state.winner = w;
@@ -76,38 +61,22 @@ function win(state: MatchState): void {
   chronicle(state, EVENT.win, w, -1, ship.held / AREA_Q);
 }
 
-/** One ship's match, for the results and the career. */
 export interface Finish {
   ship: number;
-  /** 1 the winner … SHIPS the first to sink. */
   place: number;
-  /** The tick it sank at, or the match ended at for the winner. */
   tick: number;
-  /** The ship that sank it (−1 none, and for the winner) and its CAUSE (−1 for the winner). */
   by: number;
   cause: number;
-  /** u² of sea claimed over the match: its home disc and every loop it closed. */
   claimed: number;
-  /** Ships it sank. */
   sank: number;
-  /** Doubloons banked, and the treasure brought home: TREASURE.share of them × its place's multiplier, whole. */
   bank: number;
   treasure: number;
 }
 
-/** What a finished match was (PROMPT.md, The results). */
 export interface MatchResult {
-  /** Ships by finishing place, the winner first. */
   order: number[];
-  /** Each ship's match, by ship index. */
   ships: Finish[];
-  /**
-   * The moments that decided the player's match, in order: where it broke off the current and made its home, its
-   * MOMENTS.loops largest loops, the trails it lost and broke, the finds it took, the pennant won and lost, the ships it
-   * sank, and how it sank or won.
-   */
   timeline: Entry[];
-  /** The tick the match ended at. */
   ticks: number;
 }
 
@@ -125,7 +94,7 @@ export function result(state: MatchState): MatchResult {
       treasure: Math.floor(ship.bank * TREASURE.share * TREASURE.place[place - 1]),
     };
   });
-  const gone = state.timeline.findIndex((e) => e.kind === EVENT.sunk && e.ship === PLAYER); // what follows is not the player's
+  const gone = state.timeline.findIndex((e) => e.kind === EVENT.sunk && e.ship === PLAYER);
   const mine = state.timeline.filter((e, k) => (gone < 0 || k <= gone) && (e.ship === PLAYER || (RIVALRY.includes(e.kind) && e.by === PLAYER)));
   const loops = mine.filter((e) => e.kind === EVENT.loop).sort((a, b) => b.amount - a.amount || a.tick - b.tick);
   const kept = loops.slice(0, MOMENTS.loops);

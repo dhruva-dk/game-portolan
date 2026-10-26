@@ -1,12 +1,3 @@
-// The Basalt Stacks (WP16 part B; PROMPT.md "The regions" row 3, captures 09 and 19). Every sea stack the geography
-// places (geo.stacks, the sim's collision discs) is raised as a cluster of polygonal basalt prisms in true columnar
-// jointing: tallest at the heart, enclosing the terrain's pillar so what a hull strikes is what is drawn, each prism
-// cut by a wave-cut notch at the sea and built of drums set a hair off one another so every joint inks, each facet
-// hatched its own way, its weathered top mossed, lichened or whitened by the colonies with guano streaking down. The
-// columnar islands' shores stand as colonnade cliffs over causeway pavements stepping into the sea, boulder beaches
-// and fallen drums; spray bursts at the feet of the stacks near the eye. The Arch, the landmark: two colonnade piers
-// under an entablature whose columns fan round the gate like a sunburst, its turf crest white with guano, the one
-// bar of light at the heart of the maze's dark rings from orbit. Fog is WP21's; the puffins are WP23's (colonies).
 import * as THREE from 'three';
 import { illustratedMaterial, type Style } from '../../style/glsl.ts';
 import { PIGMENTS } from '../../style/palette.ts';
@@ -21,18 +12,11 @@ import { chartDir, Draw, facetUV, Kit, lift, perInstance, pose, regionSeen, ring
 
 const RI = REGIONS.findIndex((r) => r.id === 'basaltStacks');
 const REGION = REGIONS[RI], MARK = REGION.landmark;
-/** Where every standing column is rooted, u below mean sea: under the lowest tide, into the seabed's slope. */
 export const BASE = -2.6;
-/** The wave-cut notch at a column's foot, u above mean sea. */
 const NOTCH = [0.25, 0.95] as const;
-/** The Arch in its own frame (x across the gate, y up, z through it): a round head of radius a springing at `spring`
- *  over the gate, the entablature's half-thickness w and half-length x1, its turf crest at least `crest` (raised over
- *  any rock the terrain lifts beneath it) rising `rise` more at the middle; `rays` fans of columns round the head. */
 const ARCH = { a: 3.6, spring: 10, w: 3.15, x1: 9.6, crest: 18.4, rise: 1.6, rays: 18 };
 const SHORE = { step: 0.95, cliffs: 240, pave: 380, boulders: 280, colonies: 90 };
 const SPRAY = { near: 60 };
-/** Column kits, by length class (see classOf) and then the Arch's entablature columns: sides, seed, nominal length
- *  (places the notch; 0: none, as the entablature's columns stand clear of the sea), joints (fractions). */
 const SHAFTS = [[5, 11, 5.5, [0.8]], [6, 23, 10, [0.6]], [7, 37, 16, [0.5, 0.76]], [6, 53, 0, [0.3, 0.55, 0.8]]] as const;
 const ENTABLATURE = 3;
 const classOf = (len: number) => (len < 7.5 ? 0 : len < 13 ? 1 : 2);
@@ -47,7 +31,6 @@ const WASH = {
   guano: washOf(PIGMENTS.leadWhite, 0.6),
   spray: washOf(PIGMENTS.leadWhite, 0.22),
 };
-/** The stains a column top takes (per instance, as aStone), and the side wash a streak falls back to. */
 const STONES: readonly V[] = [PIGMENTS.malachite, PIGMENTS.leadWhite, PIGMENTS.sepia, PIGMENTS.ochre, PIGMENTS.verdigris].map((p) => washOf(p, 1).t);
 const [MOSS, GUANO, BARE, LICHEN, WEED] = [0, 1, 2, 3, 4];
 const SIDE = washOf(PIGMENTS.ironGall, 1).t;
@@ -55,18 +38,14 @@ const SIDE = washOf(PIGMENTS.ironGall, 1).t;
 const fract = (x: number) => x - Math.floor(x);
 const unit = (p: { x: number; y: number; z: number }) => vec(p.x, p.y, p.z).normalize();
 const tangent = (at: V, toward: V) => toward.clone().addScaledVector(at, -toward.dot(at)).normalize();
-/** The unit direction dx u along tangent e and dy along tangent n from unit direction u. */
 const offset = (u: V, e: V, n: V, dx: number, dy: number) => vec().copy(u).multiplyScalar(R).addScaledVector(e, dx).addScaledVector(n, dy).normalize();
 const polygon = (sides: number, rng: () => number) =>
   Array.from({ length: sides }, (_, j) => [((j + 0.35 * (rng() - 0.5)) / sides) * 2 * Math.PI, 0.9 + 0.14 * rng()] as const);
 const rim = (shape: readonly (readonly [number, number])[], y: number, s = 1, turn = 0) =>
   shape.map(([a, r]) => vec(Math.cos(a + turn) * r * s, y, Math.sin(a + turn) * r * s));
-/** Strokes down a column's sides, down its chamfers, and across its top at `seed`'s angle (turned with each instance). */
 const strokes = (seed: number) => (_c: V, n: V, out: V) =>
   Math.abs(n.y) < 0.5 ? out.set(0, 1, 0) : Math.hypot(n.x, n.z) > 0.2 ? out.set(n.x, 0, n.z) : out.set(Math.cos(seed), 0, Math.sin(seed));
 
-/** A column (y 0…1, unit circumradius): an irregular polygon on a wave-cut notch, in drums each turned a little off
- *  the one below (so each joint is a crease the ink composite draws), its top chamfered and worn. */
 function shaftKit(sides: number, seed: number, len: number, joints: readonly number[]): THREE.BufferGeometry {
   const rng = seeded(seed), shape = polygon(sides, rng), notch = len ? [(NOTCH[0] - BASE) / len, (NOTCH[1] - BASE) / len] : [-1, -1];
   const band = joints[joints.length - 1], wet = notch[1] + 0.02;
@@ -82,12 +61,10 @@ function shaftKit(sides: number, seed: number, len: number, joints: readonly num
   }
   rings.push(rim(shape, 0.97, s, turn), rim(shape, 1, 0.84 * s, turn + 0.05));
   const g = kit.loft(rings).build();
-  // the top takes the instance's stain; a third of the top drum's faces its guano streaks
   tintFacets(g, (c, n) => (c.y > 0.965 ? 1 : c.y > band && Math.abs(n.y) < 0.5 && Math.floor(fract(Math.atan2(n.z, n.x) / (2 * Math.PI)) * sides) % 3 === 0 ? 2 : 0));
   return facetUV(g, strokes(seed));
 }
 
-/** A short column of a causeway pavement (or, laid down, a fallen drum). */
 function paveKit(): THREE.BufferGeometry {
   const shape = polygon(6, seeded(41));
   const g = new Kit((c) => (c.y > 0.85 ? WASH.top : c.y < 0.35 ? WASH.wet : WASH.side[1])).loft([rim(shape, 0), rim(shape, 0.88), rim(shape, 1, 0.86)]).build();
@@ -95,7 +72,6 @@ function paveKit(): THREE.BufferGeometry {
   return facetUV(g, strokes(41));
 }
 
-/** A sea-worn boulder (y −0.5…0.75), tide-dark below its waist. */
 function boulderKit(seed: number): THREE.BufferGeometry {
   const rng = seeded(seed), j = Array.from({ length: 7 }, () => 0.8 + 0.35 * rng());
   const kit = new Kit((c, n) => (c.y < 0.05 ? WASH.wet : n.y > 0.6 ? WASH.pale : WASH.side[Math.floor(4 * fract(Math.atan2(n.z, n.x) + seed))]));
@@ -103,7 +79,6 @@ function boulderKit(seed: number): THREE.BufferGeometry {
   return facetUV(kit.build(), strokes(seed));
 }
 
-/** A burst of spray (y 0…1): three plumes flaring and leaning out from the rock. */
 function sprayKit(): THREE.BufferGeometry {
   const kit = new Kit(() => WASH.spray), turn = new THREE.Matrix4(), lean = new THREE.Matrix4();
   for (const [a, tilt, h] of [[0, 0.1, 1], [2.1, 0.45, 0.7], [4.2, 0.4, 0.55]]) {
@@ -114,7 +89,6 @@ function sprayKit(): THREE.BufferGeometry {
 }
 
 const crestAt = (x: number, crest: number) => crest + ARCH.rise * (1 - (x / ARCH.x1) ** 2);
-/** How far from the head's centre a ray at angle th (from the gate's axis, up through the crown) meets the outline. */
 function reach(th: number, crest: number): number {
   const cx = Math.cos(th), cy = Math.sin(th);
   let t = ARCH.a;
@@ -125,8 +99,6 @@ function reach(th: number, crest: number): number {
   return t;
 }
 
-/** The Arch's entablature (its own frame, see ARCH): a solid slab round the gate's head, laid in fans so each face
- *  strip is hatched along its own ray; dark faces behind the fanned columns, a damp soffit, a guano-white turf crest. */
 function archKit(crest: number): THREE.BufferGeometry {
   const { a, spring, w, rays } = ARCH, I: V[] = [], O: V[] = [];
   for (let i = 0; i <= rays; i++) {
@@ -152,12 +124,8 @@ function archKit(crest: number): THREE.BufferGeometry {
   return facetUV(kit.build(), (c, n, out) => (Math.abs(n.z) > 0.7 ? out.set(c.x, c.y - spring, 0) : Math.abs(n.y) > 0.3 ? out.set(0, 0, 1) : out.set(0, 1, 0)), [8, 0.55]);
 }
 
-/** A basalt column drawn with SHAFTS[kit]: rooted at o, its axis along u, its drums turned yaw from tangent f,
- *  circumradius r, length len; its top stained STONES[stone], guano streaking down it if `streak`. */
 export interface Prism { o: V; u: V; f: V; yaw: number; r: number; len: number; kit: number; stone: number; streak: boolean }
-/** A pavement column, fallen drum or boulder: rooted at o, up u, turned yaw, tipped tilt, scaled s. */
 export interface Part { o: V; u: V; f: V; yaw: number; tilt: number; s: V; stone: number }
-/** Where the swell bursts on a stack's foot: its direction, outward tangent, size, rate (rad/s) and phase. */
 export interface Burst { dir: V; out: V; size: number; w: number; phase: number }
 export interface Plan {
   prisms: Prism[];
@@ -165,7 +133,6 @@ export interface Plan {
   boulders: Part[];
   bursts: Burst[];
   colonies: V[];
-  /** The Arch: its entablature's crest height, and its frame (centre, across the gate, through it). */
   crest: number;
   arch: { at: V; east: V; north: V };
 }
@@ -176,7 +143,6 @@ function stoneFor(rng: () => number, far: number): number {
 }
 const topOf = (p: Prism) => p.o.clone().addScaledVector(p.u, p.len);
 
-/** Every column, pavement, boulder and burst of the region, placed once from the geography and the terrain. */
 export function planStacks(field: TerrainField): Plan {
   const geo = field.geo, rng = seeded(1603), S: Surface = { height: 0, normal: vec(), up: 1, ground: 0, region: 0 };
   const ground = (p: V) => field.surface(p, 0, S).height;
@@ -189,15 +155,12 @@ export function planStacks(field: TerrainField): Plan {
   }
   const column = (u: V, f: V, r: number, base: number, top: number, stone: number): Prism =>
     ({ o: lift(u, base), u, f, yaw: rng() * 2 * Math.PI, r, len: top - base, kit: classOf(top - base), stone, streak: stone === GUANO && rng() < 0.85 });
-  /** The highest rock under a column's footprint, dx, dy from u in the frame (e, n). */
   const footMax = (u: V, e: V, n: V, dx: number, dy: number, r: number) => {
     let h = ground(offset(u, e, n, dx, dy));
     for (let j = 0; j < 6; j++) h = Math.max(h, ground(offset(u, e, n, dx + r * Math.cos((j * Math.PI) / 3), dy + r * Math.sin((j * Math.PI) / 3))));
     return h;
   };
 
-  // the stacks: a heart column in rings packed to the sim's disc, each top over the rock; the Arch's piers end inside
-  // its entablature; the lowest ledge of each outer stack is the colonies'
   const stacks = geo.stacks.filter((s) => s.region === RI);
   for (const st of stacks) {
     const u = unit(st.pos), n = unit(st.facing), e = vec().crossVectors(n, u);
@@ -231,8 +194,6 @@ export function planStacks(field: TerrainField): Plan {
     }
   }
 
-  // the Arch's entablature columns, fanned round the gate's head: full rays from the soffit, half rays branching in
-  // from mid-face between them, each standing a little proud of the slab at both ends
   for (let i = 1; i < 2 * ARCH.rays; i++) {
     const th = (i / (2 * ARCH.rays)) * Math.PI, half = i % 2 === 1, t1 = reach(th, plan.crest), cx = Math.cos(th), cy = Math.sin(th);
     const t0 = half ? (ARCH.a + t1) / 2 : ARCH.a - 0.14, axis = east.clone().multiplyScalar(cx).addScaledVector(at, cy);
@@ -243,8 +204,6 @@ export function planStacks(field: TerrainField): Plan {
     }
   }
 
-  // the columnar islands' shores: colonnade cliffs, causeway pavements stepping down to the sea, fallen drums and
-  // boulder beaches; clear of the harbour, the lights, the Arch and the stacks
   const near = stacks.map((s) => ({ u: unit(s.pos), lim: Math.cos((s.r + 0.7) / R) }));
   const clear = [...REGION.harbours.map((h) => [h.x, h.y, h.r + 2.5]), ...REGION.lighthouses.map((l) => [l.x, l.y, 4.5]), [MARK.x, MARK.y, 11]];
   let cliffs = 0;
@@ -267,7 +226,7 @@ export function planStacks(field: TerrainField): Plan {
         plan.pave.push({ o: lift(p, base), u: p, f: east, yaw: rng() * 2 * Math.PI, tilt: 0, s: vec(r, top - base, r), stone: [MOSS, BARE, LICHEN, WEED][Math.floor(rng() * 4)] });
       } else if (c > -0.9 && h > -0.45 && h < 0.9) {
         if (rng() < 0.14 && plan.pave.length < SHORE.pave) {
-          const r = 0.4 + 0.1 * rng(); // a fallen drum, half sunk in the shingle
+          const r = 0.4 + 0.1 * rng();
           plan.pave.push({ o: lift(p, Math.max(h, -0.2) + 0.1), u: p, f: east, yaw: rng() * 2 * Math.PI, tilt: Math.PI / 2, s: vec(r, 0.7 + 0.8 * rng(), r), stone: BARE });
         } else if (rng() < 0.6 && plan.boulders.length < SHORE.boulders) {
           const s = 0.22 + 0.3 * rng() ** 2;
@@ -285,7 +244,6 @@ const placed = (p: Part) => pose(new THREE.Matrix4(), p.o, p.u, p.f, p.yaw, p.ti
 
 export class BasaltStacks {
   readonly group = new THREE.Group();
-  /** Where WP23's puffins nest: the guano-white ledge tops of the outer stacks and of the islands' colonnade cliffs. */
   readonly colonies: readonly V[];
   private readonly material: THREE.ShaderMaterial;
   private readonly draws: Draw[];
@@ -327,7 +285,6 @@ export class BasaltStacks {
     this.group.add(...this.draws.map((d) => d.mesh), this.spray.mesh);
   }
 
-  /** The bursts of spray at render clock `clock` on the stacks within reach of the eye. */
   update(eye: V, clock: number): void {
     this.group.visible = regionSeen(RI, eye, 75);
     if (!this.group.visible) return;
@@ -352,7 +309,6 @@ export class BasaltStacks {
   }
 }
 
-/** The composition root's Basalt Stacks (MODULES): the columns and the Arch, spray on the stacks near the eye. */
 export function createBasaltStacks(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sea || !terrain) throw new Error('createBasaltStacks: the sea and terrain are built first (MODULES order)');

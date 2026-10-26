@@ -1,7 +1,3 @@
-// WP26 part C: the 3D harbour keeps within 150 draws and 420k triangles on the iPhone and the iPad at every graphics
-// quality (Swift 0.6, Fine 0.8, Finest 1), pinnace or galleon, pages shut and open; and it is built from the career:
-// a new form or new pigments rebuild the ship, new plumage the gull, the same career rebuilds nothing.
-//   node --test tests/render/harbour.test.ts
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { launch, openGame, serve, type DeviceName, type Launched, type Server } from '../harness.ts';

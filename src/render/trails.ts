@@ -1,10 +1,3 @@
-// Trails (WP20): each ship's open trail as a pen stroke laid live behind it — world-anchored points every TRAIL_STEP u
-// along the stern's path (as the wakes lay theirs), the newest riding the stern so the stroke never gaps, displaced by
-// the swell and depth-tested a little nearer the eye. The nib's pressure swells and eases the stroke and its line
-// wavers; each team draws its pattern (palette.ts TEAMS, glsl.ts trailPattern) in its colour, so every ship reads
-// without colour. A rival's trail shows only where the player's sight allows (visibility.ts trailSeen). A stroke whose
-// loop closed sinks into the flood; a broken or foundered one washes away in runs of ink along the sea, thinning and
-// bleeding out. All strokes are one draw.
 import * as THREE from 'three';
 import { seas } from './sea.ts';
 import { SWELL_GLSL, type Swell } from './swell.ts';
@@ -16,31 +9,23 @@ import { cellOf, R, TERRITORY } from '../sim/sphere.ts';
 import { PHASE, SHIPS, type MatchState, type Ship } from '../sim/state.ts';
 import { trailSeen } from '../sim/visibility.ts';
 
-/** Strokes drawn at once: every ship's open trail and those still washing away. */
 export const STROKES = 16;
-/** Points per stroke and u between them: a stroke holds STROKE_PTS·TRAIL_STEP u of trail. */
 export const STROKE_PTS = 1024, TRAIL_STEP = 0.7;
-/** s a closed loop's stroke takes to sink into its flood, and a broken one to wash away. */
 export const SETTLE_TIME = 1.6, WASH_AWAY_TIME = 3.6;
-/** The band a pattern is drawn across at the deck, u; it doubles by octaves farther off, never under TRAIL_MIN_CSS. */
 const BAND = 1.4;
-/** The ribbon's width in bands: room for the nib's swell, the wobble and the runs. */
 const PAD = 3;
-/** u astern of the ship's centre the pen lays. */
 const STERN = 3;
-/** Frames between fog checks of rivals' trails. */
 const SEEN_EVERY = 15;
-/** The ship whose sight the trails are drawn for. */
 const PLAYER = 0;
 const DIE = { settle: 1, washAway: 2 } as const;
 
-const VERTEX = /* glsl */ `
+const VERTEX =  `
 ${SWELL_GLSL}
 uniform float uTime;
 uniform float uBand;
 uniform vec4 uStroke[STROKES];
-in vec4 aFwd;  // the heading there (tangent), and u along the trail
-in vec4 aInfo; // side (−1, 1), stroke slot, 0, shown 1, hidden by fog 0, unused −1
+in vec4 aFwd;
+in vec4 aInfo;
 out vec3 vRest;
 out vec3 vWorld;
 out vec2 vUv;
@@ -71,7 +56,7 @@ void main() {
 }
 `;
 
-const FRAGMENT = /* glsl */ `
+const FRAGMENT =  `
 in vec3 vRest;
 in vec3 vWorld;
 in vec2 vUv;
@@ -89,12 +74,10 @@ void main() {
   vec3 dir = normalize(vRest), P = dir * SEA_R;
   Paper q = paperAt(P, dir, 1.0);
   float s = vUv.y;
-  // the nib: pressure swelling and easing along the stroke, its line wavering a little
   float press = 0.86 + 0.14 * sin(0.57 * s + 1.9 * sin(0.21 * s)) + 0.1 * (q.mottle - 0.5);
   float t = (vUv.x - 0.05 * sin(0.83 * s + 2.3 * sin(0.29 * s))) / press;
   float age = max(vAge, 0.0), fade = 1.0, bleed = 1.0, run = 0.0;
   if (st.y > 1.5) {
-    // washing away: ink runs out of the stroke across the sea, and the stroke thins and bleeds into the water
     float k = clamp(age / WASH, 0.0, 1.0), seg = floor(s * 1.6), h = hash(seg + 13.0 * float(vSlot));
     float x = t * (hash(seg * 1.7 + 5.0) > 0.5 ? 1.0 : -1.0) - 0.15;
     float len = step(0.4, h) * (0.4 + 1.6 * h) * smoothstep(0.0, 0.6, k);
@@ -103,14 +86,13 @@ void main() {
     bleed = 1.0 + 0.8 * k;
     fade = (1.0 - smoothstep(0.5, 1.0, k)) * smoothstep(-0.1, 0.25, q.grain + 0.35 - 0.9 * k);
   } else if (st.y > 0.5) {
-    // the loop closed: the stroke sinks into the flood
     fade = 1.0 - smoothstep(0.0, SETTLE, age);
     bleed = 1.0 + 0.4 * age / SETTLE;
   }
   float tb = t / bleed, ink = trailPattern(int(st.x + 0.5), s, tb, max(fwidth(tb), 1e-4));
-  ink *= mix(1.0, smoothstep(0.2, 0.5, q.grain), smoothstep(0.84, 0.74, press)); // a dry nib where the pressure eases
+  ink *= mix(1.0, smoothstep(0.2, 0.5, q.grain), smoothstep(0.84, 0.74, press));
   vec3 lin = uTeamLin[vSlot], tr = uTeamT[vSlot];
-  vec3 col = wash(trailColour(lin, tr), tr, 0.35 * smoothstep(0.08, 0.26, abs(tb))); // ink pooling toward its edges
+  vec3 col = wash(trailColour(lin, tr), tr, 0.35 * smoothstep(0.08, 0.26, abs(tb)));
   float a = max(ink, 0.7 * run) * fade / bleed;
   if (a < 0.004) discard;
   writeVeil(candle(mix(col, wash(uPaper, tr, 0.9), run * (1.0 - ink)), vWorld), a);
@@ -121,11 +103,8 @@ interface Stroke {
   readonly ship: number;
   die: number;
   start: number;
-  /** Points laid; the head (riding the stern) is the next. */
   count: number;
-  /** u laid to the last point. */
   odo: number;
-  /** The trail's length (Ship.laid) when each point was laid, less one: its index for trailSeen. */
   readonly k: Int32Array;
   readonly last: THREE.Vector3;
   laid: number;
@@ -140,7 +119,6 @@ export class Trails {
   private readonly strokes: (Stroke | null)[] = new Array<Stroke | null>(STROKES).fill(null);
   private readonly live = new Int32Array(SHIPS).fill(-1);
   private readonly touched = Array.from({ length: STROKES }, () => [STROKE_PTS, -1]);
-  /** WP30 part C: each stroke's segments in the index (drawLive). */
   private readonly segs = new Int32Array(STROKES).fill(-1);
   private readonly uniforms = {
     uBand: { value: BAND },
@@ -176,15 +154,10 @@ export class Trails {
     this.mesh.frustumCulled = false;
   }
 
-  /** Triangles the strokes submit. */
   get triangles(): number {
     return Math.min(this.geometry.index!.count, this.geometry.drawRange.count) / 3;
   }
 
-  /**
-   * Lay the trails of `state` drawn at `alpha` between its last two ticks at render-clock `clock`, the band sized for
-   * an eye at `eye`; `seen(owner, k)` says whether the player sees cell k of a rival's trail.
-   */
   frame(state: MatchState, alpha: number, clock: number, eye: THREE.Vector3, seen: (owner: number, k: number) => boolean): void {
     if (state !== this.state) {
       this.state = state;
@@ -217,14 +190,14 @@ export class Trails {
         st.k[st.count] = k;
         this.put(s, st.count, st.odo + d, shown);
       }
-      if (st.count + 1 < STROKE_PTS) this.put(s, st.count + 1, st.odo + d, -1); // the next point waits collapsed on the head
+      if (st.count + 1 < STROKE_PTS) this.put(s, st.count + 1, st.odo + d, -1);
       if (fog && i !== PLAYER) this.fog(s, seen);
     }
     for (let s = 0; s < STROKES; s++) {
       const st = this.strokes[s];
       if (st && st.die && clock - st.start > (st.die === DIE.settle ? SETTLE_TIME : WASH_AWAY_TIME)) this.clear(s);
     }
-    const least = (TRAIL_MIN_CSS * 1.4 * Math.max(eye.length() - R, 1)) / 905; // u that span the narrowest trail at the view's distance
+    const least = (TRAIL_MIN_CSS * 1.4 * Math.max(eye.length() - R, 1)) / 905;
     this.uniforms.uBand.value = BAND * 2 ** Math.max(0, Math.ceil(Math.log2(least / BAND)));
     this.commit();
   }
@@ -234,7 +207,6 @@ export class Trails {
     (this.mesh.material as THREE.Material).dispose();
   }
 
-  /** The stern's point on the sphere (at) and the heading (f), drawn at alpha between the last two ticks. */
   private stern(ship: Ship, alpha: number): void {
     const p = this.at.set(ship.was.x + (ship.pos.x - ship.was.x) * alpha, ship.was.y + (ship.pos.y - ship.was.y) * alpha,
       ship.was.z + (ship.pos.z - ship.was.z) * alpha).normalize();
@@ -268,14 +240,12 @@ export class Trails {
     this.uniforms.uStroke.value[s].z = clock;
   }
 
-  /** Collapse stroke s and free its slot. */
   private clear(s: number): void {
     for (let v = s * STROKE_PTS * 2; v < (s + 1) * STROKE_PTS * 2; v++) this.info[v * 4 + 3] = -1;
     this.touch(s, 0, STROKE_PTS - 1);
     this.strokes[s] = null;
   }
 
-  /** Show or hide each point of rival stroke s as the player's sight allows. */
   private fog(s: number, seen: (owner: number, k: number) => boolean): void {
     const st = this.strokes[s]!;
     let k = -1, shown = 1;
@@ -286,7 +256,6 @@ export class Trails {
     this.touch(s, 0, st.count);
   }
 
-  /** Point j of stroke s at the stern (at, f), `odo` u along, shown 1, hidden 0 or unused −1. */
   private put(s: number, j: number, odo: number, shown: number): void {
     const p = this.at, f = this.f;
     for (let side = 0; side < 2; side++) {
@@ -304,9 +273,6 @@ export class Trails {
     t[1] = Math.max(t[1], j1);
   }
 
-  /** WP30 part C: index only the strokes' laid segments (the points past a stroke's head wait collapsed, and free
-   *  strokes draw nothing), rebuilt when a stroke starts, grows or clears: the trails cost what is laid, not their
-   *  capacity. */
   private drawLive(): void {
     let changed = false;
     for (let s = 0; s < STROKES; s++) {
@@ -328,7 +294,6 @@ export class Trails {
     index.needsUpdate = true;
   }
 
-  /** Send the points that changed (only their ranges). */
   private commit(): void {
     this.drawLive();
     for (let s = 0; s < STROKES; s++) {
@@ -346,7 +311,6 @@ export class Trails {
   }
 }
 
-/** The composition root's trails (MODULES): drawn for the player's sight on the scene's sea. */
 export function createTrails(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene);
   if (!sea) throw new Error('createTrails: the scene has no sea (createSea comes first in MODULES)');

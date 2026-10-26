@@ -1,14 +1,3 @@
-// WP23: the companion gull. Every ship's gull is drawn from its sim flight (Ship.gull, src/sim/gull.ts) as a herring
-// gull in ink and grey wash with black wingtips: it stands on its masthead truck (ShipView.perch) glancing about,
-// preening, stretching and calling; wheels overhead in danger, calling the alarm; flies off along the bow and drops
-// over the horizon; comes back low with its chest, labouring by the chest's tier, circles once and drops it; stoops
-// on a rival in the dive and holds over it. Its plumage records its career: each trait level adds a mark in that
-// tier's pigment (Talons: rings on the legs and, at the top, gilded feet; Wings: bars along the leading edge and a
-// broader span; Eye: a bigger eye, its ring and streaks behind it; Beak: a longer bill and bands across it; Dive: a
-// longer tail, bars across it and streamers), and a gull at the top of every trait has gold-leaf wingtips. The gulls
-// of the regions wheel over their waters and rest on the sea and the rocks, lifting as a ship comes near and settling
-// at night. One instanced draw for every gull; wingbeat, fold, head, bill, legs and the carried chest are posed in the
-// vertex shader; a ship's gull never shrinks below a readable mark, out to the chart. WP28: GullFlock.cue.
 import * as THREE from 'three';
 import { localFrame, R } from '../sim/sphere.ts';
 import { afloat, FLIGHT, type Gull, type MatchState } from '../sim/state.ts';
@@ -20,15 +9,10 @@ import { mix32, rng, TIER_TINT } from './fx.ts';
 import type { Fleet } from './ships/shipView.ts';
 import type { RenderContext } from './world.ts';
 
-/** Heights over the sea (u) and radii the gulls fly at, and the stoop's length (s). */
 export const GULL_FLY = { mast: 9, wheel: 11, wheelR: 7, out: 16, low: 1.5, back: 14, circle: 8, stoop: 0.9, hold: 4, holdR: 3 } as const;
-/** A ship's gull and a wild one (× the model, 1.4 u across the wings). */
 export const GULL_SIZE = { ship: 0.9, wild: 0.75 } as const;
-/** How far the feet are under the gull's origin (u), so it stands on the truck. */
 export const GULL_FOOT = 0.17 * GULL_SIZE.ship;
-/** Instances: every ship's gull and every wild one. */
 export const GULL_CAP = 128;
-/** A ship's gull is never drawn smaller than this × its distance (a readable mark out to the chart). */
 const GULL_READ = 0.008;
 const WILD_FAR = 160, WILD_SHY = 14;
 const LEGS = [GULL.legs.out, GULL.legs.away, GULL.legs.back, GULL.legs.circle];
@@ -36,13 +20,11 @@ const PART = { body: 0, head: 1, bill: 2, jaw: 3, inner: 4, outer: 5, tail: 6, s
 const NAMES = ['aP', 'aQ', 'aW', 'aH', 'aT', 'aD'];
 const TAU = 2 * Math.PI;
 
-/** A colour given as sRGB hex, in the pipeline's linear space. */
 export function linHex(hex: number): THREE.Vector3 {
   const c = (s: number) => { const v = ((hex >> s) & 255) / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   return new THREE.Vector3(c(16), c(8), c(0));
 }
 
-/** Every trait at its top: the gull wears gold-leaf wingtips. */
 export const gilded = (g: Gull): boolean =>
   g.talons >= GULL.levels.talons && g.wings >= GULL.levels.wings && g.eye >= GULL.levels.eye && g.beak >= GULL.levels.beak && g.dive >= GULL.levels.dive;
 
@@ -56,7 +38,6 @@ const AX = new THREE.Vector3(1, 0, 0), AZ = new THREE.Vector3(0, 0, 1);
 const clamp = THREE.MathUtils.clamp, smooth = THREE.MathUtils.smoothstep;
 const ease = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
 
-/** Ship i's position (unit) at the loop's alpha. */
 function shipAt(state: MatchState, i: number, alpha: number, out: THREE.Vector3): THREE.Vector3 {
   const s = state.ships[i];
   return out.set(s.was.x + (s.pos.x - s.was.x) * alpha, s.was.y + (s.pos.y - s.was.y) * alpha, s.was.z + (s.pos.z - s.was.z) * alpha).normalize();
@@ -71,11 +52,6 @@ function ring(c: THREE.Vector3, r: number, h: number, a: number, out: THREE.Vect
   return out.copy(c).multiplyScalar(R + h).addScaledVector(E, r * Math.cos(a)).addScaledVector(N, r * Math.sin(a));
 }
 
-/**
- * Where ship i's gull is drawn, `since` s into its sim flight: standing on its perch (GULL_FLY.mast over its ship when
- * the ship is not drawn), wheeling overhead, climbing out along the bow, dropping away over the horizon, back up and
- * home with the chest, once round its ship, or stooping on its prey and holding over it.
- */
 export function gullAim(state: MatchState, i: number, alpha: number, perch: THREE.Vector3 | null, since: number, clock: number, out: Aim): Aim {
   const g = state.ships[i].gull, ship = shipAt(state, i, alpha, C);
   const leg = g.flight >= FLIGHT.out && g.flight <= FLIGHT.circle ? clamp(1 - g.time / Math.max(1e-3, g.span * LEGS[g.flight - FLIGHT.out]), 0, 1) : 0;
@@ -88,12 +64,12 @@ export function gullAim(state: MatchState, i: number, alpha: number, perch: THRE
       return out;
     case FLIGHT.wheel: ring(ship, GULL_FLY.wheelR, GULL_FLY.wheel, clock * 0.55 + i, out.p); return out;
     case FLIGHT.out: over(g.at, GULL_FLY.mast + (GULL_FLY.out - GULL_FLY.mast) * leg, out.p); return out;
-    case FLIGHT.away: // on past its mark and down below the horizon, then round to where it comes back from
+    case FLIGHT.away:
       over(g.at, GULL_FLY.out + (GULL_FLY.low - GULL_FLY.out) * Math.min(1, 2 * leg), out.p).addScaledVector(T.set(g.dir.x, g.dir.y, g.dir.z), 60 * Math.sin(Math.PI * leg));
       return out;
     case FLIGHT.back: out.legs = 1; out.carry = g.tier; over(g.at, GULL_FLY.low + (GULL_FLY.back - GULL_FLY.low) * leg, out.p); return out;
     case FLIGHT.circle: out.legs = 1; out.carry = g.tier; over(g.at, GULL_FLY.circle, out.p); return out;
-    default: { // the dive: a stoop with the wings swept, then holding over the prey
+    default: {
       const prey = g.prey >= 0 ? shipAt(state, g.prey, alpha, D) : ship;
       if (since < GULL_FLY.stoop) { out.sweep = 1; over(prey, GULL_FLY.wheel + (1.5 - GULL_FLY.wheel) * (since / GULL_FLY.stoop), out.p); return out; }
       ring(prey, GULL_FLY.holdR, GULL_FLY.hold, clock * 1.4 + i, out.p);
@@ -102,14 +78,11 @@ export function gullAim(state: MatchState, i: number, alpha: number, perch: THRE
   }
 }
 
-/** A drawn gull's state between frames. */
 interface Bird { p: THREE.Vector3; v: THREE.Vector3; f: THREE.Vector3; bank: number; pitch: number; phase: number; amp: number; fold: number; legs: number; sweep: number; flight: number; since: number; seen: boolean; call: number; seed: number }
 const bird = (seed: number): Bird => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), f: new THREE.Vector3(1, 0, 0), bank: 0, pitch: 0, phase: 0, amp: 0, fold: 1, legs: 1, sweep: 0, flight: -1, since: 0, seen: false, call: -1, seed });
 
-/** A wild gull: its home (unit) and frame, the rock or sea it rests on, its wheel, whether it is a rester, how far it has risen. */
 interface Wild { home: THREE.Vector3; e: THREE.Vector3; n: THREE.Vector3; seat: number; r: number; h: number; w: number; rests: boolean; lift: number; b: Bird }
 
-/** Moves b to `to` (at once, or easing at `rate`/s), its heading after its way, banking into turns, pitching as it climbs or sinks. */
 function steer(b: Bird, to: THREE.Vector3, rate: number, dt: number): void {
   T.copy(b.p);
   if (rate === Infinity || dt <= 0) b.p.copy(to); else b.p.lerp(to, ease(rate, dt));
@@ -135,7 +108,6 @@ function steer(b: Bird, to: THREE.Vector3, rate: number, dt: number): void {
 const unit = (n: number, seed: number) => (mix32(n, Math.floor(seed * 1e6)) >>> 0) / 4294967296;
 const IDLE = { yaw: 0, pitch: 0, bill: 0, stretch: 0, call: -1 };
 
-/** A call every `every` s at these odds: the bill opens for 0.45 s and the head is thrown back (IDLE.bill, IDLE.call). */
 function calling(t: number, seed: number, every: number, odds: number): void {
   const w = Math.floor(t / every), u = t - w * every, on = unit(w, seed + 1) < odds && u < 0.45;
   IDLE.bill = on ? Math.sin((Math.PI * u) / 0.45) : 0;
@@ -143,7 +115,6 @@ function calling(t: number, seed: number, every: number, odds: number): void {
   IDLE.pitch += (-0.75 - IDLE.pitch) * IDLE.bill;
 }
 
-/** A standing gull's life: sharp glances about, preening into the shoulder, a stretch of the wings now and then, calls. */
 function idle(clock: number, seed: number, every: number, odds: number): typeof IDLE {
   const t = clock + seed * 37, k = Math.floor(t / 1.7), u = t / 1.7 - k, look = (m: number) => unit(m, seed) * 2 - 1;
   IDLE.yaw = THREE.MathUtils.lerp(look(k - 1), look(k), smooth(u, 0, 0.07)) * 1.2;
@@ -160,7 +131,6 @@ function idle(clock: number, seed: number, every: number, odds: number): typeof 
 }
 
 const WING = { freq: 0, amp: 0 };
-/** The wingbeat: climbing out, the chest's labour by its tier, flap-and-glide wheeling, the stoop and the hover, gliding down. */
 function wingbeat(flight: number, tier: number, since: number, clock: number, seed: number, climb: number): void {
   let f = 2.6, a = (clock * 0.13 + seed) % 1 > 0.35 ? 0.08 : 0.7;
   if (flight === FLIGHT.out || flight === FLIGHT.away) { f = 3.2; a = 0.85; }
@@ -171,7 +141,6 @@ function wingbeat(flight: number, tier: number, since: number, clock: number, se
   WING.amp = a;
 }
 
-/** The gulls of every region, from their habitats (REGIONS[].fauna 'gull'). */
 function wildGulls(height: (dir: THREE.Vector3) => number): Wild[] {
   const out: Wild[] = [];
   REGIONS.forEach((region, ri) => region.fauna.forEach((h, hi) => {
@@ -189,12 +158,6 @@ function wildGulls(height: (dir: THREE.Vector3) => number): Wild[] {
   return out;
 }
 
-/**
- * The gull model (x along the right wing, y up, z to the bill; 1.4 across the wings): lofted body and head, the bill
- * in two mandibles, each wing an inner panel and the primaries (front faces up), a square tail with Dive's
- * streamers, legs with webbed feet, and the chest it carries. Per vertex: its part, its side, and a surface coordinate
- * for the markings (wing: along the span, across the chord; tail and legs: along them).
- */
 function buildGull(g: THREE.BufferGeometry): number {
   const pos: number[] = [], part: number[] = [], side: number[] = [], uv: number[] = [], index: number[] = [];
   const v = (x: number, y: number, z: number, pa: number, s = 0, a = 0, b = 0) => { pos.push(x, y, z); part.push(pa); side.push(s); uv.push(a, b); return part.length - 1; };
@@ -246,10 +209,8 @@ function buildGull(g: THREE.BufferGeometry): number {
 
 export type GullCue = 'call' | 'takeoff' | 'land' | 'drop' | 'dive';
 
-/** Every gull in the scene, one instanced draw. */
 export class GullFlock {
   readonly mesh: THREE.Mesh;
-  /** WP28: each gull's voice and wings, by ship (index, where): a call, a takeoff, a landing, a chest dropped, a dive. */
   cue: ((cue: GullCue, ship: number, at: THREE.Vector3) => void) | null = null;
   private readonly geo = new THREE.InstancedBufferGeometry();
   private readonly data: Float32Array[];
@@ -286,17 +247,14 @@ export class GullFlock {
     return this.geo.instanceCount;
   }
 
-  /** Triangles drawn. */
   get triangles(): number {
     return this.count * this.tris;
   }
 
-  /** Where ship i's gull is drawn, or null when it is not. */
   at(i: number): THREE.Vector3 | null {
     return (this.slot[i] ?? -1) >= 0 ? this.ships[i].p : null;
   }
 
-  /** The tier of the chest ship i's gull is drawn carrying (−1 none). */
   carrying(i: number): number {
     const k = this.slot[i] ?? -1;
     return k >= 0 ? this.data[5][4 * k + 1] : -1;
@@ -306,10 +264,6 @@ export class GullFlock {
     return this.data.every((a) => a.every(Number.isFinite));
   }
 
-  /**
-   * Draws every ship's gull from its sim flight (hidden with its ship unless aloft) and the wild gulls within reach of
-   * the eye: resters lift as a ship comes within WILD_SHY u, and every wild gull settles by night.
-   */
   frame(st: MatchState, alpha: number, dt: number, clock: number, night: number, fleet: Fleet | null, eye: THREE.Vector3, ships: readonly THREE.Vector3[], sun: THREE.Vector3): void {
     (this.uniforms.uLifeClock.value as number) = clock;
     (this.uniforms.uLifeSun.value as THREE.Vector3).copy(sun);
@@ -384,7 +338,6 @@ export class GullFlock {
     (this.mesh.material as THREE.Material).dispose();
   }
 
-  /** A gull's flight changes: the cues for WP28. */
   private turn(b: Bird, flight: number, i: number): void {
     const was = b.flight;
     b.flight = flight;
@@ -409,11 +362,11 @@ export class GullFlock {
   }
 }
 
-const VERT = /* glsl */ `
+const VERT =  `
 uniform float uLifeClock, uLifeMin;
 attribute float aPart, aSide;
 attribute vec2 aUv;
-attribute vec4 aP, aQ, aW, aH, aT, aD; // place+size, turn, wing (phase, beat, fold, sweep), head (yaw, pitch, bill, legs), traits, (dive, chest, gilt, read)
+attribute vec4 aP, aQ, aW, aH, aT, aD;
 varying vec3 vRest, vWorld;
 varying vec2 vUv;
 varying float vPart;
@@ -463,7 +416,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }`;
 
-const FRAG = /* glsl */ `
+const FRAG =  `
 uniform float uLifeClock;
 uniform vec3 uLifeSun, uGWhite, uGGrey, uGInk, uGBill, uGSpot, uGLeg, uGIris, uGWood;
 uniform vec3 uTier[5];
@@ -482,7 +435,6 @@ vec3 gGilt(vec2 uv) {
   float c = gNoise(uv * 14.0), sweep = pow(max(0.0, sin(uv.x * 5.0 + uv.y * 3.0 - uLifeClock * 2.2)), 10.0);
   return mix(uTier[4] * (0.6 + 0.55 * c), vec3(1.0, 0.95, 0.8), 0.75 * sweep);
 }
-// a trait's level marks: level k (1…n) at t0 + step·(k − 1) along t, each in tier k's pigment
 vec3 gMarks(vec3 col, float t, float t0, float stp, float width, float n) {
   for (int k = 1; k <= 4; k++) {
     float fk = float(k);
@@ -497,9 +449,9 @@ void main() {
   vec3 r = vRest;
   bool gilt = vD.z > 0.5;
   vec3 col = uGWhite;
-  if (part == 0) { // white below, the grey mantle over the back
+  if (part == 0) {
     col = mix(uGWhite, uGGrey, smoothstep(0.035, 0.07, r.y) * smoothstep(0.2, 0.1, r.z));
-  } else if (part == 1) { // the pale eye, its ring, and Eye's streaks behind it
+  } else if (part == 1) {
     float d = length(vec2(r.y - 0.095, r.z - 0.305)), re = 0.011 + 0.0025 * vT.z;
     if (abs(r.x) > 0.02) {
       if (d < re * 0.45) col = uGInk;
@@ -507,10 +459,10 @@ void main() {
       else if (d < re + 0.004 + 0.002 * vT.z) col = vT.z > 0.5 ? gTier(vT.z) : uGSpot;
       else if (abs(r.y - 0.1) < 0.006) col = gMarks(col, r.z, 0.283, -0.022, 0.008, vT.z);
     }
-  } else if (part == 2 || part == 3) { // yellow, the red gonys spot, Beak's bands
+  } else if (part == 2 || part == 3) {
     col = part == 3 && r.z > 0.395 ? uGSpot : uGBill;
     col = gMarks(col, r.z, 0.365, 0.012, 0.004, vT.w);
-  } else if (part == 4 || part == 5) { // grey over, paler under, a white trailing edge, Wings' bars, black (or gilded) tips with white mirrors
+  } else if (part == 4 || part == 5) {
     bool top = gl_FrontFacing;
     col = top ? uGGrey : mix(uGWhite, uGGrey, 0.25);
     if (vUv.y > 0.82 && vUv.x < 0.75) col = uGWhite;
@@ -523,9 +475,9 @@ void main() {
     col = gMarks(uGWhite, vUv.y, 0.45, 0.16, 0.05, vD.x);
   } else if (part == 7) {
     col = gilt ? gGilt(vUv * 4.0) : gTier(vD.x);
-  } else if (part == 8) { // pink legs ringed by Talons; the feet gilded at the top
+  } else if (part == 8) {
     col = vUv.y > 0.95 ? (vT.x > 3.5 ? gGilt(r.xz * 20.0) : mix(uGLeg, uGInk, 0.25)) : gMarks(uGLeg, vUv.y, 0.25, 0.17, 0.05, vT.x);
-  } else { // the chest, banded in its tier's pigment
+  } else {
     col = abs(r.y + 0.24) < 0.012 ? (vD.y > 3.5 ? gGilt(r.xz * 20.0) : gTier(vD.y)) : uGWood;
   }
   float l = clamp(dot(n, normalize(uLifeSun)) * 0.5 + 0.5, 0.0, 1.0);

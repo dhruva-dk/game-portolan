@@ -1,12 +1,8 @@
-// Takes the WP15 part-C shots at both devices: a forested island (the Weeping Isle) from deck, high and orbit, a
-// jungle close-up, a palm-fringed cove, a pine slope, kelp under water, and two frames of wind sway; logs the frame's
-// draw calls and triangles and the flora's share (calls, triangles, instances, GPU bytes).
-// node tests/pages/flora.shots.ts [outDir]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { launch, openGame, root, serve } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
+const outDir = process.argv[2] ?? join(root, 'out/shots');
 const SHOTS: [string, Record<string, string>, number][] = [
   ['forest-deck', { view: 'deck', region: 'Weeping', off: '26', pitch: '0.04' }, 10.5],
   ['forest-high', { view: 'high', region: 'Weeping' }, 10.5],

@@ -1,15 +1,10 @@
-// Captures WP21's weather and storm over real headless matches (tests/render/weather.html) on both devices: a fog bank
-// hiding a ship's lantern, a squall at the blue hour, a calm mirror, the opening's bruise on the horizon, the storm wall
-// from outside and inside, the final calm ring, the open sea from the high camera (wp21-<scene>-<device>.png, contact sheets wp21-sheet-<device>.png).
-// Logs draw calls, triangles per scene group and GPU frame time per scene.
-//   node tests/render/weather.shots.ts [outDir] [--only=<scene>] [--device=ipad|iphone]     (default outDir: progress/shots)
 import { basename, join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const SCENES = ['fog', 'squall', 'calm', 'bruise', 'outside', 'inside', 'ring', 'sea'].filter((s) => !only || s === only);
 const devices = (args.find((a) => a.startsWith('--device='))?.slice(9) ?? 'ipad,iphone').split(',') as DeviceName[];

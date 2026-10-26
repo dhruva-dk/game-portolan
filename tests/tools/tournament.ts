@@ -1,22 +1,3 @@
-// The captains' tournament (WP12; PROMPT.md acceptance check 3), on worker_threads.
-//
-//   node tests/tools/tournament.ts [--matches 200] [--careers 0] [--workers N] [--json out.json]
-//
-// Workers: N, else the WORKERS environment variable (check 3 on a shared machine: WORKERS=5 npm test -- …), else every core.
-//
-// A match: nine captains of every rank and temperament on a seeded sea (seed 12000 + m), every temperament and every
-// tier taking every berth in turn under a league captain's identity (its signature) and its rank's kit (league.ts
-// captainOutfit: form, fittings, gull, gunners), the player's ship idle (it rides the Great Current to its end). Each
-// match is a pure function of m, so results merge in match order whatever worker ran them, and a run is the same on
-// any machine and with any number of workers.
-//
-// A career (the scripted player of check 3): a fresh career past its first voyage, the player's ship sailed by a
-// captain's brain (brain.ts piloted: the player's controls only) to a fixed habit — always breaking off into one
-// region, drawing a temperament's loops (a gambler's huge ones) — for `change` matches, then another habit (another
-// region, a turtle's small loops). Each match is sailed twice on the same seed and fleet: with the captains' minds
-// (career/learn.ts, carried in, and their learning in play) and naive (no minds, so no learning at all); what the
-// learning adds is the difference. Seeds are the first after the career's own whose Great Current passes both
-// habits' regions, so the player can keep its habit and the captains can follow it into either.
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { availableParallelism } from 'node:os';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -40,12 +21,9 @@ import { newVoyage, observe, type Voyage } from '../../src/career/voyage.ts';
 import { world } from '../sim/vectors.ts';
 
 export const NAMES = ['hunter', 'expander', 'raider', 'turtle', 'opportunist', 'gambler'] as const;
-/** Per captain: sea claimed (u², its loops), steady sea (u², its holding averaged over the match), trails broken, the purses they cost their owners, ships sunk, loot taken (scooped and found), spoils (coins scooped and bounties: loot from fights), finishing place. */
 export const STATS = ['sea', 'held', 'broken', 'purse', 'sunk', 'loot', 'spoils', 'place'] as const;
 export type Stat = (typeof STATS)[number];
-/** A captain's tally, with diagnostics: sinkings by cause, killer's mode and victim; time and hurt dealt by mode; fate, how it sank (CAUSE; −1 afloat at the end), at, the minute it sank or the match ended. */
 export type Row = Record<Stat, number> & { m: number; i: number; temperament: number; tier: number; id: number; region: number; causes: number[]; kmode: number[]; kvict: number[]; tmode: number[]; dmode: number[]; fate: number; at: number };
-/** A tournament match: its length, the region its storm's final calm fell in, the cost of running it, each captain's row. */
 export interface MatchOut { m: number; minutes: number; calm: number; ms: number; rows: Row[] }
 
 const LIMIT = Math.round(1200 / TICK), SAMPLE = 30, WIDTH = Number(process.env.WORKERS) || availableParallelism();
@@ -53,17 +31,14 @@ const PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 let GEO: ReturnType<typeof world> | null = null;
 const geo = (): ReturnType<typeof world> => (GEO ??= world());
 
-/** Berth i's temperament and tier in tournament match m: temperaments rotate by match, tiers by berth and block of six. */
 export const berth = (m: number, i: number): { temperament: number; tier: number } => ({ temperament: (i - 1 + m) % 6, tier: 1 + (((i - 1) * 5 + Math.floor(m / 6)) % 8) });
 const IDS = NAMES.map((_, t) => CAPTAINS.flatMap((c, id) => (c.temperament === t ? [id] : [])));
 
-/** A captain's outfit at a tier, as the career fits it (league.ts captainOutfit), without a career. */
 export function outfit(id: number, tier: number): Outfit {
   const t = CAPTAINS[id].temperament;
   return { form: captainForm(id, tier), pigment: id, pattern: 1 + t, fittings: startingFittings(tier, t), gull: captainGull(tier, t), gunnery: GUNNERY[tier - 1], captain: { temperament: t, tier } };
 }
 
-/** The regions the Great Current passes on `sea`, in order. */
 export function routeRegions(sea: Sea): number[] {
   const out: number[] = [];
   for (let s = 0; s < 8000; s += 4) {
@@ -74,18 +49,16 @@ export function routeRegions(sea: Sea): number[] {
   return out;
 }
 
-/** The scripted player's habit: the region it always breaks off into, and the temperament whose loops it draws. */
 export interface Habit { region: number; temperament: number }
 const ang = (a: V3, b: V3): number => R * Math.acos(Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y + a.z * b.z)));
 
-/** Sail match s to its end: the player idle, or piloted to `pilot`; each captain's tally from the events; `hook` every tick. */
 function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | null, hook?: (s: MatchState) => void): { rows: Row[]; ticks: number } {
   const rows: Row[] = Array.from({ length: SHIPS }, (_, i) => ({ m: 0, i, temperament: s.ships[i].captain.temperament, tier: 0, id: s.ships[i].pigment, region: -1, causes: [0, 0, 0, 0, 0, 0], kmode: new Array<number>(16).fill(0), kvict: new Array<number>(7).fill(0), tmode: new Array<number>(16).fill(0), dmode: new Array<number>(16).fill(0), fate: -1, at: 0, sea: 0, held: 0, broken: 0, purse: 0, sunk: 0, loot: 0, spoils: 0, place: 0 }));
   const out: number[] = new Array<number>(SHIPS).fill(-1), input = idleInput(), p = s.ships[0];
   if (pilot) Object.assign(p.captain, { temperament: pilot.temperament, skill: 0.6 });
   let sunk = 0, over = false, k = 0, samples = 0;
   for (; k < LIMIT && !over; k++) {
-    if (pilot && p.phase === PHASE.riding) { // the script: off the current into its region, never elsewhere
+    if (pilot && p.phase === PHASE.riding) {
       passage(sea, p.ride, PASS);
       p.captain.mode = PASS.region === pilot.region && s.tick * TICK >= 20 ? MODE.peel : MODE.ride;
     }
@@ -95,7 +68,7 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
     if (k % SAMPLE === 0) {
       samples++;
       for (let i = 0; i < SHIPS; i++) if (s.ships[i].phase !== PHASE.sunk) rows[i].held += s.ships[i].held;
-      for (let i = 0; i < SHIPS; i++) if (s.ships[i].phase !== PHASE.sunk) rows[i].tmode[s.ships[i].captain.mode]++; // time by mode (diagnostic)
+      for (let i = 0; i < SHIPS; i++) if (s.ships[i].phase !== PHASE.sunk) rows[i].tmode[s.ships[i].captain.mode]++;
     }
     for (const e of s.events) {
       if (e.kind === EVENT.loop && e.ship >= 0) rows[e.ship].sea += e.amount;
@@ -108,7 +81,7 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
       } else if (e.kind === EVENT.find && e.ship >= 0) rows[e.ship].loot += e.amount;
       else if (e.kind === EVENT.bounty && e.ship >= 0) rows[e.ship].spoils += e.amount;
       else if (e.kind === EVENT.breakOff && e.ship >= 0) rows[e.ship].region = e.by;
-      else if (e.kind === EVENT.hit && e.by >= 0) rows[e.by].dmode[s.ships[e.by].captain.mode] += e.amount; // hurt dealt by the striker's mode (diagnostic)
+      else if (e.kind === EVENT.hit && e.by >= 0) rows[e.by].dmode[s.ships[e.by].captain.mode] += e.amount;
       else if (e.kind === EVENT.sunk) {
         out[e.ship] = sunk++;
         rows[e.ship].fate = e.amount;
@@ -116,7 +89,7 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
         if (e.by >= 0) {
           rows[e.by].sunk++;
           rows[e.by].causes[e.amount]++;
-          rows[e.by].kmode[s.ships[e.by].captain.mode]++; // the killer's mode and the victim's temperament (+1: the player is 0)
+          rows[e.by].kmode[s.ships[e.by].captain.mode]++;
           rows[e.by].kvict[s.ships[e.ship].captain.temperament + 1]++;
         }
       } else if (e.kind === EVENT.win) over = true;
@@ -131,7 +104,6 @@ function play(sea: Sea, s: MatchState, pilot: Habit | null, voyage: Voyage | nul
   return { rows, ticks: k };
 }
 
-/** Tournament match m; `hook` every tick (diagnostics). */
 export function tournamentMatch(m: number, hook?: (s: MatchState) => void): MatchOut {
   const t0 = performance.now(), seed = 12000 + m;
   const fleet: Outfit[] = Array.from({ length: SHIPS }, (_, i) => {
@@ -145,13 +117,6 @@ export function tournamentMatch(m: number, hook?: (s: MatchState) => void): Matc
   return { m, minutes: (ticks * TICK) / 60, calm: geo().geo.region[cellOf(TERRITORY, calms[calms.length - 2].at)], ms: performance.now() - t0, rows: out };
 }
 
-/**
- * What a captain's learning adds, measured in one match: captains breaking off into the first habit's region and into
- * the current habit's; captains near the player (within NEAR u, mean over the ticks it sails); hunters patrolling
- * beyond its border, where its trails run (out of its waters, nearer its home than the farthest its open trails have
- * reached so far, mean over the ticks it sails); the player's trails broken by captains and by hunters; the sea it
- * claimed (u², its loops) and its place.
- */
 export interface Measure { follow: number; followNow: number; near: number; patrol: number; broken: number; cut: number; sea: number; place: number }
 export interface CareerMatch { j: number; seed: number; learn: Measure; naive: Measure; knewRegion: number; knewLoop: number; learnt: number }
 export interface CareerJob { kind: 'career'; k: number; a: Habit; b: Habit; matches: number; change: number }
@@ -196,10 +161,9 @@ function measured(sea: Sea, setup: MatchSetup, habit: Habit, first: number, voya
   };
 }
 
-/** A scripted player's career: `matches` matches, habit `a` for the first `change`, then habit `b`. */
 export function careerRun(job: CareerJob): CareerMatch[] {
   let career = newCareer(9000 + job.k);
-  career.match = 1; // past the first voyage: captains of rank, at their own temperaments
+  career.match = 1;
   career.player.points = 4 * RANK.tier;
   career.player.tier = tierOf(career.player.points);
   const out: CareerMatch[] = [];
@@ -219,7 +183,6 @@ export function careerRun(job: CareerJob): CareerMatch[] {
   return out;
 }
 
-/** The two regions the Great Current passes most often over the first 80 career seeds (ties to the lower index): the scripted player's two habits. */
 export function habitRegions(): [number, number] {
   const n = new Map<number, number>();
   for (let s = 30000; s < 30080; s++) for (const r of routeRegions(seaFor(geo(), s)).slice(1)) n.set(r, (n.get(r) ?? 0) + 1);
@@ -232,7 +195,6 @@ function run(job: Job): unknown {
   return job.kind === 'match' ? tournamentMatch(job.m) : careerRun(job);
 }
 
-/** Run jobs on `width` workers, each pulling the next job as it finishes; results by job index. */
 export async function pool<T>(jobs: readonly Job[], width = WIDTH): Promise<T[]> {
   const out: T[] = new Array<T>(jobs.length);
   let next = 0;
@@ -255,7 +217,6 @@ export async function pool<T>(jobs: readonly Job[], width = WIDTH): Promise<T[]>
 }
 
 export interface Tournament { matches: MatchOut[]; rows: Row[]; wall: number; workerSeconds: number; meanMinutes: number }
-/** The tournament of `n` matches. */
 export async function tournament(n = 200, width = WIDTH): Promise<Tournament> {
   const t0 = performance.now();
   const matches = (await pool<MatchOut>(Array.from({ length: n }, (_, m) => ({ kind: 'match' as const, m })), width)).sort((a, b) => a.m - b.m);
@@ -270,7 +231,6 @@ export const sd = (xs: readonly number[]): number => {
   const m = mean(xs);
   return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / Math.max(1, xs.length - 1));
 };
-/** Welch's t of a over b. */
 export const welch = (a: readonly number[], b: readonly number[]): number => (mean(a) - mean(b)) / Math.sqrt(sd(a) ** 2 / a.length + sd(b) ** 2 / b.length || 1e-18);
 
 export interface Profile { n: number; mean: Record<Stat, number>; sd: Record<Stat, number>; values: Record<Stat, number[]> }
@@ -283,7 +243,6 @@ export function profiles(rows: readonly Row[]): Profile[] {
 }
 export const placesByTier = (rows: readonly Row[]): number[][] => Array.from({ length: 8 }, (_, t) => rows.filter((r) => r.tier === t + 1).map((r) => r.place));
 
-/** The compact table: per temperament its means, then mean place by tier. */
 export function table(rows: readonly Row[]): string[] {
   const p = profiles(rows), w = [7, 9, 7, 7, 6, 6, 7, 6];
   const lines = [`temperament  ships ${STATS.map((f, k) => f.padStart(w[k])).join('')}`];

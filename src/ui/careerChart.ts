@@ -1,14 +1,3 @@
-// WP27: the career chart (PROMPT.md, The career chart): the player's life at sea as a portolan that grows. A new career
-// is bare vellum with the rhumb-line web of the old charts and the regions' bounds barely sketched in sepia; every sea
-// the player has seen (Career.chart.seen, WP10's Voyage) is laid in transparent watercolour, hatched, its bounds inked;
-// each region's name is lettered in swash capitals the match it was first entered (Career.chart.named); an anchor marks
-// where the player has broken off the Great Current (its learned habits); a compass rose with its fleur-de-lis and a
-// cartouche carry the voyages sailed, how much is inked and the wind rank reached. A finished chart is gilded. Drawn
-// as an equirectangular plate into the harbour ledger's body through WP26's seam (main.ts: setChartPage).
-// Part B: the world's own coastlines (Geography heights, contoured), barely sketched where unseen and inked where
-// seen, with the land washed and its shoals dotted; the lighthouses and harbours seen; the loot sites discovered,
-// wrecks and caches. Home from a voyage that brought something new, the page inks it in: the new seas bloom in the
-// order the voyage entered them, then each region first entered is lettered in turn (toLetter).
 import * as THREE from 'three';
 import { FIND_SITES, RANK, type Career } from '../career/state.ts';
 import { CHART_GRID, chartInked, chartSeen, toLetter, type Voyage } from '../career/voyage.ts';
@@ -23,10 +12,8 @@ import { settings } from './settings.ts';
 import { GOLD, GOLD_DARK, PAPER, PAPER_DEEP, SEPIA, VERDIGRIS, VERMILION, clamp01, goldLeaf, inkRect, kite, letter, rand, rgb, rgba, scrap, type G } from './inkpage.ts';
 import type { Rect } from './safeArea.ts';
 
-/** The watercolour each region is laid in, by REGIONS index. */
 const WASH = ['#8fb8c9', '#d4a656', '#5aa394', '#c98a5a', '#7f9a5b', '#b0694e', '#6f86a8', '#c4a24a', '#8e6fa0', '#5f8f86', '#d9b26a', '#9a6a4a', '#4f7a94', '#b47a6a'];
 const BW = 360, BH = 180;
-/** The coastline's grid: twice the chart's bins each way. */
 const LW = 2 * BW, LH = 2 * BH;
 
 interface Geo { lat: Float32Array; lon: Float32Array; region: Uint8Array; centroids: { lat: number; lon: number; cells: number }[] }
@@ -50,13 +37,11 @@ function geometry(): Geo {
   return (geo = { lat, lon, region, centroids });
 }
 
-/** By chart cell (state.ts CHART), its region. */
 export const regionCells = (): Uint8Array => geometry().region;
 
 export interface ChartRegion { region: number; name: string; lat: number; lon: number; cells: number; inked: number; named: number; breakOffs: number }
 export interface CareerChartData {
   regions: ChartRegion[];
-  /** Permille of the whole chart inked. */
   inked: number;
   named: number;
   matches: number;
@@ -66,7 +51,6 @@ export interface CareerChartData {
   finds: number;
 }
 
-/** What the chart shows, from the career alone. */
 export function careerChartData(c: Career): CareerChartData {
   const g = geometry(), inked = chartInked(c);
   let seen = 0, found = 0;
@@ -82,7 +66,6 @@ export function careerChartData(c: Career): CareerChartData {
   };
 }
 
-/** How much is inked, in words. */
 export function inkedWords(permille: number): string {
   const w = permille <= 0 ? 'Nothing yet' : permille < 80 ? 'A sliver' : permille < 200 ? 'A tenth' : permille < 290 ? 'A quarter' : permille < 420 ? 'A third'
     : permille < 580 ? 'Half' : permille < 720 ? 'Two thirds' : permille < 850 ? 'Three quarters' : permille < 1000 ? 'Nearly all' : 'All the sea';
@@ -118,7 +101,6 @@ function binned(c: Career, g: Geo): Bins {
 interface Land { geo: Geography; height: Float32Array; shoal: Uint8Array }
 let land: Land | null = null;
 
-/** The world's heights on the coastline grid, and its shoals (no hull floats there at mean tide, yet under water). */
 function landOf(geo: Geography): Land {
   if (land?.geo === geo) return land;
   const height = new Float32Array(LW * LH), shoal = new Uint8Array(LW * LH), d = v3();
@@ -136,13 +118,10 @@ function landOf(geo: Geography): Land {
   return (land = { geo, height, shoal });
 }
 
-/** By marching-squares case (corners above water: 1 top left, 2 top right, 4 bottom right, 8 bottom left), the
- *  coastline's segments between cell edges (0 top, 1 right, 2 bottom, 3 left). */
 const SEGMENTS: readonly (readonly [number, number])[][] = [
   [], [[3, 0]], [[0, 1]], [[3, 1]], [[1, 2]], [[3, 0], [1, 2]], [[0, 2]], [[3, 2]], [[2, 3]], [[0, 2]], [[0, 1], [2, 3]], [[1, 2]], [[1, 3]], [[0, 1]], [[3, 0]], [],
 ];
 
-/** The land: washed and hatched where seen, its coastline inked where seen and barely sketched elsewhere, its shoals dotted. */
 function drawLand(g: G, M: Rect, bins: Bins, ld: Land, k: number, p: number): void {
   if (p <= 0) return;
   const { height: h, shoal } = ld, sx = M.width / LW, sy = M.height / LH;
@@ -187,7 +166,7 @@ function drawLand(g: G, M: Rect, bins: Bins, ld: Land, k: number, p: number): vo
   g.setLineDash([]);
   g.fillStyle = rgba(SEPIA, 0.5);
   g.fill(dots);
-  g.strokeStyle = rgba(SEPIA, 0.22); // the shore's shading, then the line
+  g.strokeStyle = rgba(SEPIA, 0.22);
   g.lineWidth = 3.2 * k;
   g.stroke(inked);
   g.strokeStyle = rgba(INK, 0.88);
@@ -196,7 +175,6 @@ function drawLand(g: G, M: Rect, bins: Bins, ld: Land, k: number, p: number): vo
   g.restore();
 }
 
-/** Where a point of the world falls on the plate, and whether the chart has seen it. */
 function onPlate(pos: V3, M: Rect, bins: Bins): { x: number; y: number; seen: boolean } {
   const len = Math.hypot(pos.x, pos.y, pos.z) || 1, lat = Math.asin(pos.y / len), lon = Math.atan2(pos.z, pos.x);
   const fx = (lon + Math.PI) / (2 * Math.PI), fy = (Math.PI / 2 - lat) / Math.PI;
@@ -204,7 +182,6 @@ function onPlate(pos: V3, M: Rect, bins: Bins): { x: number; y: number; seen: bo
   return { x: M.x + fx * M.width, y: M.y + fy * M.height, seen: bins.seen[by * BW + bx] === 1 };
 }
 
-/** The lighthouses and harbours seen, and every loot site discovered: a wreck's hull, a cache's cross. */
 function drawSites(g: G, career: Career, geo: Geography, M: Rect, bins: Bins, k: number, p: number): void {
   if (p <= 0) return;
   for (const l of geo.lights) {
@@ -237,7 +214,6 @@ function drawSites(g: G, career: Career, geo: Geography, M: Rect, bins: Bins, k:
   });
 }
 
-/** The sixteen-point rose with its fleur-de-lis at the north. */
 export function compassRose(g: G, cx: number, cy: number, R: number, k: number, p = 1): void {
   if (p <= 0) return;
   g.save();
@@ -256,7 +232,7 @@ export function compassRose(g: G, cx: number, cy: number, R: number, k: number, 
       kite(g, cx, cy, an, R * [0.95, 0.7, 0.48][l], R * [0.13, 0.1, 0.075][l], [rgba(INK, 0.85), rgba(VERMILION, 0.85), rgba(VERDIGRIS, 0.9)][l], PAPER, k);
     }
   }
-  const ty = cy - R * 0.95; // the fleur-de-lis on the north point
+  const ty = cy - R * 0.95;
   nib(g, [[cx, ty], [cx - R * 0.03, ty - R * 0.12], [cx, ty - R * 0.24]], 1.6 * k, 1, VERMILION);
   nib(g, [[cx, ty], [cx + R * 0.03, ty - R * 0.12], [cx, ty - R * 0.24]], 1.6 * k, 1, VERMILION);
   nib(g, [[cx, ty - R * 0.04], [cx - R * 0.12, ty - R * 0.1], [cx - R * 0.15, ty - R * 0.2], [cx - R * 0.08, ty - R * 0.18]], 1.4 * k, 1, VERMILION);
@@ -269,22 +245,19 @@ export function compassRose(g: G, cx: number, cy: number, R: number, k: number, 
   g.restore();
 }
 
-/** The plate at w × h CSS px: its scale, the frame's width, the map's rect and where a longitude and latitude fall on it. */
 function plate(w: number, h: number): { k: number; frame: number; M: Rect; X: (lon: number) => number; Y: (lat: number) => number } {
   const k = Math.max(0.8, Math.min(1.6, Math.min(w / 900, h / 450))), frame = Math.max(10, Math.min(w, h) * 0.035);
   const M: Rect = { x: frame * 1.8, y: frame * 1.8, width: w - frame * 3.6, height: h - frame * 3.6 };
   return { k, frame, M, X: (lon) => M.x + ((lon + Math.PI) / (2 * Math.PI)) * M.width, Y: (lat) => M.y + ((Math.PI / 2 - lat) / Math.PI) * M.height };
 }
 
-/** A region's name on the plate, written up to `p`, inside the map and cleared from the lines beneath it by a breath of
- *  vellum, as the engravers left the lettering's ground clean. */
 function letterName(g: G, r: ChartRegion, w: number, h: number, p: number): void {
   const { k, M, X, Y } = plate(w, h), size = Math.max(12, Math.min(28, 9 + Math.sqrt(r.cells) * 0.16)) * k;
   const y = Math.max(M.y + size * 0.8, Math.min(M.y + M.height - size * 0.8, Y(r.lat))), o = { size, align: 'center', valign: 'middle', swash: true } as const;
-  const sc = Math.hypot(g.getTransform().a, g.getTransform().b), away = 8192; // shadows are in device pixels
+  const sc = Math.hypot(g.getTransform().a, g.getTransform().b), away = 8192;
   g.save();
   g.shadowColor = rgba(PAPER, 1);
-  g.shadowOffsetX = away * sc; // the letters drawn far off the plate, only their blurred vellum shadow lands under the name
+  g.shadowOffsetX = away * sc;
   for (const blur of [2.5, 7]) {
     g.shadowBlur = blur * k * sc;
     letter(g, r.name, X(r.lon) - away, y, o, PAPER, p);
@@ -293,13 +266,10 @@ function letterName(g: G, r: ChartRegion, w: number, h: number, p: number): void
   letter(g, r.name, X(r.lon), y, o, INK, p, 0.92);
 }
 
-/** How the chart is drawn: the world's geography for its coasts and sites (none: the regions' bounds alone), and the regions whose names are left for the unroll to letter. */
 export interface ChartDraw { geo?: Geography | null; unnamed?: readonly number[] }
 
-/** The whole chart at w × h CSS px, drawn up to `p` (0–1): the web, then the washes, the coasts, the bounds, the sites, the names. */
 export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 1, o: ChartDraw = {}): void {
   const gm = geometry(), data = careerChartData(career), { k, frame, M, X, Y } = plate(w, h);
-  // vellum
   const grd = g.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.2, w / 2, h / 2, Math.hypot(w, h) * 0.6);
   grd.addColorStop(0, PAPER);
   grd.addColorStop(1, PAPER_DEEP);
@@ -312,7 +282,6 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
     g.arc(rnd() * w, rnd() * h, 1 + rnd() * 9, 0, Math.PI * 2);
     g.fill();
   }
-  // the neatline and its scale band
   const b0 = frame * 1.2, t = frame * 0.6;
   g.strokeStyle = INK;
   g.lineWidth = 1.6 * k;
@@ -335,7 +304,6 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
   g.beginPath();
   g.rect(M.x, M.y, M.width, M.height);
   g.clip();
-  // the rhumb-line web: a central rose and eight about it, 32 winds each (black the winds, green the half-winds, red the quarters)
   const pw = clamp01(p * 2.5), reach = Math.hypot(M.width, M.height) * pw, ccx = M.x + M.width / 2, ccy = M.y + M.height / 2;
   const centres: [number, number][] = [[ccx, ccy]];
   for (let i = 0; i < 8; i++) centres.push([ccx + Math.sin((i * Math.PI) / 4) * M.width * 0.3, ccy - Math.cos((i * Math.PI) / 4) * M.height * 0.42]);
@@ -350,7 +318,6 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
       g.stroke();
     }
   });
-  // the washes of the seen sea, hatched through its mask
   const bins = binned(career, gm), pa = clamp01((p - 0.15) * 2);
   if (pa > 0) {
     const wc = canvas(BW, BH), wx = wc.getContext('2d')!, img = wx.createImageData(BW, BH), mc = canvas(BW, BH), mx = mc.getContext('2d')!, mimg = mx.createImageData(BW, BH);
@@ -385,7 +352,6 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
     g.restore();
   }
   if (o.geo) drawLand(g, M, bins, landOf(o.geo), k, clamp01((p - 0.2) * 2));
-  // the bounds: sketched faintly where unseen, inked where seen, the frontier of the known dotted
   const pb = clamp01((p - 0.3) * 2), sx = M.width / BW, sy = M.height / BH;
   if (pb > 0) {
     g.save();
@@ -407,14 +373,13 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
     g.fill(sketch);
     g.fillStyle = rgba(SEPIA, 0.55);
     g.fill(front);
-    g.fillStyle = o.geo ? rgba(SEPIA, 0.5) : rgba(INK, 0.78); // with the coasts drawn, the bounds step back
+    g.fillStyle = o.geo ? rgba(SEPIA, 0.5) : rgba(INK, 0.78);
     g.fill(inked);
     g.restore();
   }
   if (o.geo) drawSites(g, career, o.geo, M, bins, k, clamp01((p - 0.4) * 2));
   g.restore();
   compassRose(g, M.x + M.width * 0.88, M.y + M.height * 0.74, Math.min(M.height * 0.17, 92 * k), k, clamp01(p * 2));
-  // the names, lettered as first entered (over the rose), and the anchors of the break-offs, inside the map
   const pn = clamp01((p - 0.5) * 2.5);
   for (const r of data.regions) {
     if (r.named >= 0 && !o.unnamed?.includes(r.region)) letterName(g, r, w, h, pn);
@@ -424,7 +389,6 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
       if (r.breakOffs > 1) letter(g, String(r.breakOffs), x + 13 * k, y + 6 * k, { size: 11 * k, valign: 'middle' }, SEPIA, pn);
     }
   }
-  // the cartouche
   const cw = 240 * k, ch = 92 * k, cr: Rect = { x: M.x + 14 * k, y: M.y + M.height - ch - 14 * k, width: cw, height: ch };
   scrap(g, cr, 2719, { tint: '#f6ecd4' });
   if (data.inked >= 1000) goldLeaf(g, cr, 2720, 1, 4 * k);
@@ -434,11 +398,8 @@ export function drawCareerChart(g: G, career: Career, w: number, h: number, p = 
   letter(g, `${data.wind}, ${data.named} of ${REGIONS.length} seas named`, cr.x + cw / 2, cr.y + 72 * k, { size: 13.5 * k, align: 'center', valign: 'middle', maxWidth: cw - 16 * k }, VERMILION);
 }
 
-/** The unroll's timing, s: the new seas bloom over `ink`; the names start at `names`, each written over `name`, `every` apart. */
 export const UNROLL = { ink: 2.8, names: 1, name: 1.1, every: 0.8 } as const;
 
-/** What the unroll draws: the chart as it was and as it is (its new names left out) at the sheet's pixels, when each
- *  chart bin inks (0–1), the regions to letter in turn, the plate's size, how long it runs, and two scratch canvases. */
 export interface Unroll {
   was: HTMLCanvasElement;
   now: HTMLCanvasElement;
@@ -451,7 +412,6 @@ export interface Unroll {
   blend: HTMLCanvasElement;
 }
 
-/** The unroll from the career `before` a voyage to the career `after` it, on a w × h plate at `dpr`. */
 export function unrollOf(before: Career, after: Career, voyage: Voyage, geo: Geography | null, w: number, h: number, dpr: number): Unroll {
   const letters = toLetter(before, voyage).map((n) => n.region), data = careerChartData(after);
   const layer = (c: Career, unnamed: readonly number[] = []): HTMLCanvasElement => { const l = sheet(w, h, 2_600_000, dpr); drawCareerChart(l.g, c, w, h, 1, { geo, unnamed }); return l.canvas; };
@@ -462,20 +422,19 @@ export function unrollOf(before: Career, after: Career, voyage: Voyage, geo: Geo
   };
 }
 
-/** The unroll `t` s in: the chart as it was, the chart as it is blooming through the mask, the new names in turn. */
 export function drawUnroll(g: G, u: Unroll, t: number): void {
   const { w, h } = u, { k, M } = plate(w, h), q = (t / UNROLL.ink) * 1.15, mx = u.bins.getContext('2d')!, img = mx.createImageData(BW, BH);
   for (let j = 0; j < BW * BH; j++) img.data[j * 4 + 3] = Math.round(255 * clamp01((q - u.mask[j]) * 5));
   mx.putImageData(img, 0, 0);
   const tx = u.blend.getContext('2d')!, sx = u.blend.width / w, sy = u.blend.height / h, cw = 240 * k, ch = 92 * k, cy = M.y + M.height - ch - 14 * k;
   tx.globalCompositeOperation = 'copy';
-  tx.fillStyle = rgba(INK, q < 0.5 ? 0 : 1); // beyond the map, and over the cartouche, the chart as it is comes in at once, halfway
+  tx.fillStyle = rgba(INK, q < 0.5 ? 0 : 1);
   tx.fillRect(0, 0, u.blend.width, u.blend.height);
   tx.imageSmoothingEnabled = true;
   tx.save();
   tx.beginPath();
   tx.rect(M.x * sx, M.y * sy, M.width * sx, M.height * sy);
-  tx.rect((M.x + 14 * k + cw) * sx, cy * sy, -cw * sx, ch * sy); // the cartouche cut out (wound the other way)
+  tx.rect((M.x + 14 * k + cw) * sx, cy * sy, -cw * sx, ch * sy);
   tx.clip();
   tx.drawImage(u.bins, M.x * sx, M.y * sy, M.width * sx, M.height * sy);
   tx.restore();
@@ -487,7 +446,6 @@ export function drawUnroll(g: G, u: Unroll, t: number): void {
   u.names.forEach((r, i) => letterName(g, r, w, h, clamp01((t - UNROLL.names - i * UNROLL.every) / UNROLL.name)));
 }
 
-/** By chart bin, when the unroll inks it (0–1): the seas the voyage saw first come first, washed in with a watercolour's ragged edge. */
 export function unrollMask(entered: readonly number[]): Float32Array {
   const g = geometry(), mask = new Float32Array(BW * BH), first = new Int16Array(BW * BH).fill(-1);
   for (let i = 0; i < CHART_GRID.cells; i++) {
@@ -508,7 +466,6 @@ export function unrollMask(entered: readonly number[]): Float32Array {
   return mask;
 }
 
-/** Fractal value noise over the plate's bins (0–1, wrapping east to west): where a wash creeps ahead and where it lags. */
 function bloom(): Float32Array {
   const out = new Float32Array(BW * BH), next = rand(4127), smooth = (t: number): number => t * t * (3 - 2 * t);
   for (const [cell, amp] of [[30, 0.5], [12, 0.3], [5, 0.2]] as const) {
@@ -525,7 +482,6 @@ function bloom(): Float32Array {
   return out;
 }
 
-/** WP26's seam: the chart drawn into the ledger's body; home from a voyage that brought it something new, it inks that in. */
 export const careerChartPage: ChartPage = (ctx, body, career) => {
   const group: THREE.Group & { frame?(dt: number): void } = new THREE.Group(), dpr = typeof window === 'undefined' ? 2 : Math.min(3, window.devicePixelRatio || 2);
   const geo = ctx.runtime.world?.geo ?? null, o = ctx.runtime.outcome, s = sheet(body.width, body.height, 2_600_000, dpr);

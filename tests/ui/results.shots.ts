@@ -1,9 +1,3 @@
-// WP27 shots: the chest choice, the results (writing in and done), the career chart at 0, two thirds and all inked,
-// and each first-voyage prompt, drawn by tests/ui/results.page.ts on the iPhone and the iPad at their pixel ratios and
-// saved as progress/shots/wp27-<device>-<shot>.png (the contact sheet is gathered from them). Part B adds the next
-// voyage's nine (the skip card is shot over the real match by results.touch.ts), the chart with the world's coasts and sites, the unroll's frames, and close-ups of
-// the chest's icons and the results' tallies (wp27b-<device>-<shot>.png).
-//   node tests/ui/results.shots.ts            (WP27_SHOTS=b: part B's only)
 import { join } from 'node:path';
 import { launch, root, serve } from '../harness.ts';
 
@@ -28,7 +22,7 @@ try {
     await page.goto(`${server.url}/tests/ui/results.html?shot=${shot}&dev=${dev}`);
     await page.waitForFunction(() => (window as unknown as { __wp27?: { done: boolean } }).__wp27?.done === true, null, { timeout: 90_000 });
     const clip = await page.evaluate(() => (window as unknown as { __wp27: { clip: { x: number; y: number; width: number; height: number } | null } }).__wp27.clip);
-    await page.screenshot({ path: join(root, 'progress/shots', `${part}-${dev}-${shot}.png`), ...(clip ? { clip } : {}) });
+    await page.screenshot({ path: join(root, 'out/shots', `${part}-${dev}-${shot}.png`), ...(clip ? { clip } : {}) });
     await page.close();
     console.log(`${part}-${dev}-${shot}.png`);
   }

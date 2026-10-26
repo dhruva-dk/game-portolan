@@ -1,7 +1,3 @@
-// WP22 offline (no GPU): every event draws its effect and the same events draw the same particles; a heavy ten-ship
-// fight holds the pool and the tail to their caps with nothing NaN; chest openings grade by tier (gold leaf only at the
-// top); the Great Current's ribbon and stream arcs follow the eye and hide far off, its glow easing as the fleet peels;
-// and the effects' share of the frame (A9: two draws, a fixed handful of triangles).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -115,7 +111,7 @@ test('the Great Current follows the eye, hides far off, and its glow eases as th
   assert.equal(cur.arcs.length, 0);
 });
 
-test('the effects take two draws and a fixed handful of triangles (A9)', () => {
+test('the effects take two draws and a fixed handful of triangles', () => {
   const fx = new Effects(context()), cur = new CurrentView(context());
   const tris = 2 * fx.capacity + 2 * CURRENT.segments;
   console.log(`effects share: 2 draws, at most ${tris} triangles`);

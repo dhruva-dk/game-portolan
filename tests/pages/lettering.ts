@@ -1,11 +1,3 @@
-// The lettering specimen (outside the game build): the cancelleresca on parchment, drawn by the game's own lettering.
-//   ?sheet=specimen   every glyph: minuscules, capitals, figures and marks, and two pangrams
-//   ?sheet=names      the thirty captains, the twelve regions and the eight winds
-//   ?sheet=small      interface sizes (11–13 CSS px) on scraps and buttons, for the legibility check at device scale
-//   ?sheet=title      Portolan at title size; &progress=0–1 holds the lettering-in there, &animate=1 loops it
-//   ?sheet=frames     Portolan lettering itself in, at four moments
-//   ?hour=15          hour of the day (the palette's paper and ink)
-// window.__lettering drives it from tests/pages/lettering.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { ButtonBase, Scrap } from '../../src/ui/parchment.ts';
@@ -35,7 +27,6 @@ function put(text: string, o: InkTextOptions, x: number, y: number): InkText {
   pipeline.ui.add(m);
   return m;
 }
-/** Stacks blocks of text down the page from y, each wrapped to the page, returning the next y. */
 function stack(rows: [string, number][], y: number, gap: number): number {
   for (const [text, size] of rows) {
     const m = put(text, { size, valign: 'top', maxWidth: W - 90 }, 45, y);

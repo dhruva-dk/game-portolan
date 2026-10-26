@@ -1,14 +1,3 @@
-// WP22: the match's combat and reward effects, drawn in the style rather than lit: muzzle flashes rippling down a
-// battery bow to stern and banks of inked smoke drifting downwind; shot in flight as a ball of ink trailing its stroke,
-// with its shadow on the sea so the arc reads; splash columns with hatched rings; splinters, ink spatter and a drawn
-// impact star on a hit; a ram's crunch and spray; fire licks, embers and a rising soot column on a burning hull; mortar
-// shells smoking along their arc and bursting; chests afloat glowing by pigment tier (gold leaf, the only thing that
-// shines, at the top), opened in a burst graded by tier; doubloons flying to the purse; the claimed sea blooming in the
-// owner's wash on a loop close; the banking flourish; the broken trail's tear; St Elmo's fire, gusts, fog and flares.
-// Every effect is an instance of one pooled draw (A9), after the legacy GPU ring buffer: an event writes its particles
-// once (start, velocity, birth, life, drag, gravity, wind drift) and the vertex shader flies them; what lasts across
-// ticks (shot in flight, chests, kegs and coins afloat) is rewritten each frame into a short tail of the same buffer.
-// Every particle is a function of the events and the clock alone (seeded per tick and event), so a replay redraws it.
 import * as THREE from 'three';
 import { shotAt, shotHeight } from '../sim/combat.ts';
 import { newWind, seaFor, windAt, type Sea as Waters, type Wind } from '../sim/environment.ts';
@@ -20,14 +9,11 @@ import { inkMaterial, linearVec } from '../style/glsl.ts';
 import { fleets } from './ships/shipView.ts';
 import type { MatchFrame, RenderContext, RenderModule } from './world.ts';
 
-/** Effect kinds: billboards turned to the eye below 16, decals lying on the sea from 16. */
 export const FX = {
   smoke: 0, flash: 1, column: 2, spray: 3, splinter: 4, spatter: 5, flame: 6, ember: 7, coin: 8, glint: 9, glow: 10, shot: 11, chest: 12, burst: 13,
   ring: 16, bloom: 17, tear: 18, flourish: 19, streak: 20, mark: 21,
 } as const;
-/** Instances: the ring buffer events write into, then the tail rewritten every frame. */
 export const FX_CAP = { pool: 3072, tail: 256 } as const;
-/** The least a readable effect subtends, rad (scaled per kind in the shader), so a fight still reads from the chart. */
 const MIN_ANGLE = 0.0045;
 
 const lin = linearVec;
@@ -35,12 +21,10 @@ export const TINT = {
   ink: lin(PIGMENTS.ironGall), smoke: lin(PIGMENTS.umber), soot: lin(PIGMENTS.sepia), foam: lin(PIGMENTS.leadWhite), gold: lin(PIGMENTS.goldLeaf),
   ochre: lin(PIGMENTS.ochre), fire: lin(PIGMENTS.vermilion), ward: lin(PIGMENTS.verdigris), sea: lin(PIGMENTS.ultramarine), deep: lin(PIGMENTS.indigo),
 };
-/** A chest's tier by its pigment (PIGMENT_TIER): iron gall, verdigris, ultramarine, vermilion, gold leaf. */
 export const TIER_TINT = [TINT.ink, TINT.ward, TINT.sea, TINT.fire, TINT.gold];
 const TEAM_TINT = TEAMS.map((t) => lin(t.primary));
 const ZERO = new THREE.Vector3();
 
-/** mulberry32: a small deterministic generator. */
 export function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -53,7 +37,6 @@ export function rng(seed: number): () => number {
 export const mix32 = (a: number, b: number, c = 0): number =>
   (Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b + 0x632be5ab, 0xc2b2ae35) ^ Math.imul(c + 0x27d4eb2f, 0x165667b1)) >>> 0;
 
-/** Gravity (u/s², along the sea's normal at the start; a decal's speed along its heading), drag (1/s), wind drift, a kind's own value, tumble (rad/s). */
 export interface Opt { g?: number; drag?: number; drift?: number; par?: number; spin?: number }
 type Happening = MatchState['events'][number];
 interface Pose { p: THREE.Vector3; up: THREE.Vector3; f: THREE.Vector3; side: THREE.Vector3; v: THREE.Vector3; len: number; beam: number }
@@ -63,7 +46,6 @@ export const effects = new WeakMap<THREE.Object3D, Effects>();
 export class Effects implements RenderModule {
   readonly mesh: THREE.Mesh;
   readonly capacity = FX_CAP.pool + FX_CAP.tail;
-  /** Particles ever written into the ring buffer, and the tail's instances last frame. */
   spawned = 0;
   tail = 0;
   private readonly geo = new THREE.InstancedBufferGeometry();
@@ -100,7 +82,7 @@ export class Effects implements RenderModule {
     g.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
     g.setIndex([0, 1, 2, 0, 2, 3]);
     this.data = [0, 1, 2, 3, 4].map(() => new Float32Array(4 * n));
-    for (let i = 0; i < n; i++) this.data[0][4 * i + 3] = -1e9; // born long ago: dead
+    for (let i = 0; i < n; i++) this.data[0][4 * i + 3] = -1e9;
     this.attrs = ['aP', 'aV', 'aK', 'aM', 'aC'].map((name, k) => {
       const a = new THREE.InstancedBufferAttribute(this.data[k], 4).setUsage(THREE.DynamicDrawUsage);
       g.setAttribute(name, a);
@@ -119,12 +101,10 @@ export class Effects implements RenderModule {
     effects.set(ctx.scene, this);
   }
 
-  /** Triangles drawn. */
   get triangles(): number {
     return 2 * this.geo.instanceCount;
   }
 
-  /** Ring-buffer particles alive at `clock`, by kind when given. */
   live(clock: number, kind = -1): number {
     const [P, V, K] = this.data;
     let n = 0;
@@ -135,7 +115,6 @@ export class Effects implements RenderModule {
     return n;
   }
 
-  /** One particle: `kind` at p moving v (a decal: v its heading, g its speed), born `delay` s from now, living `life` s, growing s0 → s1 u. */
   put(kind: number, p: THREE.Vector3, v: THREE.Vector3, delay: number, life: number, s0: number, s1: number, c: THREE.Vector3, o: Opt = {}): void {
     const i = this.next, r = this.rand;
     this.next = (i + 1) % FX_CAP.pool;
@@ -161,7 +140,7 @@ export class Effects implements RenderModule {
     }
     this.burning(st, f.clock);
     this.lasting(st, f);
-    windAt(this.waters, st, st.ships[0].pos, this.wind); // the smoke drifts on the wind where the player is
+    windAt(this.waters, st, st.ships[0].pos, this.wind);
     const w = this.uniforms.uFxWind.value as THREE.Vector3;
     w.set(this.wind.v.x, this.wind.v.y, this.wind.v.z);
     if (w.lengthSq() > 1e-12) w.setLength(0.6 + Math.min(2, Math.max(0, this.wind.strength)));
@@ -200,7 +179,6 @@ export class Effects implements RenderModule {
   }
   private wasTail = 0;
 
-  /** The sea's tangent frame at p into E, N (and its normal into U). */
   private tangents(p: THREE.Vector3): void {
     const u = this.U.copy(p).normalize();
     this.E.set(0, 1, 0).cross(u);
@@ -209,7 +187,6 @@ export class Effects implements RenderModule {
     this.N.crossVectors(u, this.E);
   }
 
-  /** Ship i as drawn (fleets: riding the swell), else as the sim has her. */
   private pose(st: MatchState, i: number): Pose {
     const o = this.ps, s = st.ships[i], view = fleets.get(this.ctx.scene)?.views[i];
     if (view) { o.p.copy(view.ship.position); o.f.copy(view.forward); o.len = view.length; o.beam = view.beam; }
@@ -221,7 +198,6 @@ export class Effects implements RenderModule {
     return o;
   }
 
-  /** n of a kind thrown from p: out u/s across the sea, rise u/s up, each a little different. */
   private fling(kind: number, p: THREE.Vector3, n: number, out: number, rise: number, life: number, s: number, c: THREE.Vector3, o: Opt = {}, delay = 0): void {
     const r = this.rand;
     this.tangents(p);
@@ -232,7 +208,6 @@ export class Effects implements RenderModule {
     }
   }
 
-  /** Smoke puffs rolling out of p and growing s0 → s1, drifting downwind. */
   private puffs(p: THREE.Vector3, n: number, out: number, rise: number, life: number, s0: number, s1: number, c: THREE.Vector3, delay = 0): void {
     const r = this.rand;
     this.tangents(p);
@@ -267,14 +242,12 @@ export class Effects implements RenderModule {
     this.puffs(p, 2, 1, 0.8, 3, 0.8, 2.6 * scale, TINT.soot);
   }
 
-  /** A doubloon flying from `from` into ship o's purse, landing with a glint. */
   private coin(from: THREE.Vector3, o: Pose, delay: number, life: number): void {
     this.T.copy(o.p).addScaledVector(o.up, 1.4).addScaledVector(o.v, delay + life);
     this.toss(from, this.T, delay, life, false);
     this.put(FX.glint, this.T, ZERO, delay + life * 0.92, 0.4, 0.5, 1.0, TINT.gold);
   }
 
-  /** A doubloon thrown from `from` to land at `to` after `life` s (into the sea: with a ring). */
   private toss(from: THREE.Vector3, to: THREE.Vector3, delay: number, life: number, sea: boolean): void {
     const g = 12;
     this.V.subVectors(to, from).multiplyScalar(1 / life).addScaledVector(this.U.copy(from).normalize(), 0.5 * g * life);
@@ -282,7 +255,6 @@ export class Effects implements RenderModule {
     if (sea) this.put(FX.ring, to, ZERO, delay + life, 1.2, 0.2, 1.4, TINT.sea);
   }
 
-  /** A chest opening (or landing): a wash halo in its pigment, more rays, glints and coins the rarer, gold leaf at the top. */
   private treasure(p: THREE.Vector3, tier: number, scale: number, f: THREE.Vector3): void {
     const c = TIER_TINT[tier] ?? TINT.ink;
     this.put(FX.glow, p, ZERO, 0, 1.3 + 0.35 * tier, 1.2 * scale, (3 + 1.6 * tier) * scale, c, { par: tier });
@@ -378,7 +350,6 @@ export class Effects implements RenderModule {
     }
   }
 
-  /** Effects on one ship's deck, wherever she is drawn. */
   private aboard(st: MatchState, e: Happening): void {
     const o = this.pose(st, e.ship), r = this.rand, deck = this.Q.copy(o.p).addScaledVector(o.up, 1.4);
     switch (e.kind) {
@@ -427,7 +398,6 @@ export class Effects implements RenderModule {
     }
   }
 
-  /** WP14's consumables: St Elmo's fire round the ward, the gust's streaks, the fog flask's bank, the flare, the patch kit. */
   private consumable(o: Pose, kind: number, deck: THREE.Vector3): void {
     const r = this.rand;
     switch (kind) {
@@ -474,7 +444,7 @@ export class Effects implements RenderModule {
     const out = this.W.copy(chase ? o.f : o.side).multiplyScalar(battery === BATTERY.port || battery === BATTERY.stern ? -1 : 1);
     for (let g = 0; g < n; g++) {
       const along = chase ? (battery === BATTERY.castle ? 0.5 : -0.5) * o.len : (0.32 - (0.64 * g) / (n - 1)) * o.len;
-      const d = 0.07 * g + 0.03 * r(); // the battery ripples bow to stern
+      const d = 0.07 * g + 0.03 * r();
       const port = this.Q.copy(o.p).addScaledVector(o.f, along).addScaledVector(o.up, 1);
       if (chase) port.addScaledVector(o.side, (g - 0.5) * 0.5 * o.beam); else port.addScaledVector(out, 0.55 * o.beam);
       const muzzle = this.B.copy(port).addScaledVector(out, 0.5);
@@ -491,7 +461,6 @@ export class Effects implements RenderModule {
     }
   }
 
-  /** A loop closed: the claimed sea blooms in the owner's wash, ringed in its ink, and doubloons stream from the trail to the purse. */
   private claim(st: MatchState, e: Happening): void {
     const cells = e.cells, c = this.A.set(0, 0, 0), o = this.pose(st, e.ship), r = this.rand, tint = TEAM_TINT[e.ship % TEAM_TINT.length];
     for (const cell of cells) { cellDir(TERRITORY, cell, this.Q); c.add(this.Q); }
@@ -508,7 +477,6 @@ export class Effects implements RenderModule {
     }
   }
 
-  /** A burning hull: embers flying and, now and then, a puff of its soot column. */
   private burning(st: MatchState, clock: number): void {
     const slot = Math.floor(clock / 0.12);
     if (slot === this.fireSlot) return;
@@ -523,7 +491,6 @@ export class Effects implements RenderModule {
     });
   }
 
-  /** What lasts across ticks, into the tail: shot in flight (with its shadow and trail), chests, kegs and coins afloat. */
   private lasting(st: MatchState, f: MatchFrame): void {
     const base = FX_CAP.pool, slot = Math.floor(f.clock / 0.06), trail = slot !== this.trailSlot;
     this.trailSlot = slot;
@@ -563,14 +530,13 @@ export class Effects implements RenderModule {
 
 export const createEffects = (ctx: RenderContext): RenderModule => new Effects(ctx);
 
-const VERT = /* glsl */ `
+const VERT =  `
 uniform float uFxClock, uFxMin;
 uniform vec3 uFxWind;
 attribute vec4 aP, aV, aK, aM, aC;
 varying vec2 vUv;
-varying vec4 vK; // kind, age, seed, the kind's own value
-varying vec4 vC; // tint, stretch along the path
-// how readable each kind must stay from afar (× uFxMin, rad)
+varying vec4 vK;
+varying vec4 vC;
 const float READ[22] = float[22](0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.5, 0.5, 1.4, 0.3, 1.0, 1.4, 0.0, 0.0, 0.8, 0.0, 0.0, 0.0, 0.0, 0.5);
 void main() {
   float kind = aK.x, t = uFxClock - aP.w, age = t / aV.w;
@@ -581,7 +547,6 @@ void main() {
   vec3 up = normalize(aP.xyz);
   float s = mix(aK.y, aK.z, 1.0 - (1.0 - vK.y) * (1.0 - vK.y));
   if (kind > 15.5) {
-    // decals lie on the sea along their heading, sliding at their speed (aM.x)
     vec3 h = aV.xyz - up * dot(aV.xyz, up);
     h = dot(h, h) > 1e-10 ? normalize(h) : normalize(cross(up, abs(up.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
     vec3 c = aP.xyz + h * aM.x * t;
@@ -597,13 +562,11 @@ void main() {
   s = max(s, length(p - cameraPosition) * uFxMin * READ[int(kind)]);
   vec3 at;
   if (abs(kind - 2.0) < 0.5 || abs(kind - 6.0) < 0.5) {
-    // columns and flames stand on their foot, upright on the sea's normal, turned to the eye
     vec3 X = normalize(cross(up, view));
     float h = kind < 2.5 ? aK.z * pow(sin(3.1416 * min(1.0, vK.y * 1.25)), 0.6) + 0.2 : s * 1.8;
     float w = kind < 2.5 ? aK.y * (0.8 + 0.6 * vK.y) : s;
     at = p + X * position.x * w + up * (position.y * 0.5 + 0.5) * h;
   } else if (abs(kind - 3.0) < 0.5 || abs(kind - 7.0) < 0.5 || abs(kind - 11.0) < 0.5) {
-    // what flies stretches along its path on screen, its head where it is
     vec3 a = vel - view * dot(vel, view);
     float m = length(a);
     vec3 X = m > 1e-4 ? a / m : normalize(cross(up, view)), Y = normalize(cross(view, X));
@@ -623,7 +586,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(at, 1.0);
 }`;
 
-const FRAG = /* glsl */ `
+const FRAG =  `
 uniform float uFxClock;
 uniform vec3 uFxInk, uFxFoam, uFxGold, uFxCore, uFxFlame, uFxWood, uFxShade;
 varying vec2 vUv;
@@ -635,17 +598,13 @@ float fxNoise(vec2 p) {
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(fxHash(i), fxHash(i + vec2(1.0, 0.0)), f.x), mix(fxHash(i + vec2(0.0, 1.0)), fxHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
-// diagonal hatching on the page: on of each stroke's period
 float fxHatch(float k, float on) { return step(1.0 - on, fract((gl_FragCoord.x - gl_FragCoord.y) * k)); }
-// an inked line w wide along the zero of d
 float fxLine(float d, float w) { float f = fwidth(d); return 1.0 - smoothstep(w, w + 1.5 * f, abs(d)); }
-// burnished gold leaf: crinkled, flashing as the light sweeps across it
 vec3 fxGilt(vec2 uv, float seed) {
   float c = fxNoise(uv * 9.0 + seed * 17.0);
   float sweep = pow(max(0.0, sin(uv.x * 2.0 + uv.y * 1.3 - uFxClock * 2.4 + seed * 6.0)), 12.0);
   return mix(uFxGold * (0.55 + 0.6 * c), vec3(1.0, 0.95, 0.8), 0.8 * sweep);
 }
-// a streak's head-centred frame: head at the origin, tail running back to x = 1 − 2·st
 vec2 fxHead(vec2 uv, float st) { return vec2((uv.x - (1.0 - 1.0 / st)) * st, uv.y); }
 void main() {
   int kind = int(vK.x + 0.5);
@@ -654,7 +613,7 @@ void main() {
   float r = length(uv), th = atan(uv.y, uv.x);
   vec3 col = uFxInk;
   float a = 0.0;
-  if (kind == 0) { // smoke: lobed and growing, a broken inked rim, a granulating wash, hatched away from the light
+  if (kind == 0) {
     float d = 1e3;
     for (int k = 0; k < 5; k++) {
       float ang = seed * 6.283 + float(k) * 1.2566 + age * 0.8;
@@ -667,14 +626,14 @@ void main() {
     float h = fxHatch(0.17, 0.35) * shade * inside;
     col = mix(mix(vC.rgb, uFxInk, 0.15 + 0.35 * shade), uFxInk, max(rim, 0.7 * h));
     a = pow(1.0 - age, 1.2) * smoothstep(0.0, 0.06, age) * max(0.85 * rim, inside * (0.45 + 0.25 * shade) * (0.75 + 0.5 * fxNoise(uv * 11.0 + seed)) + 0.25 * h);
-  } else if (kind == 1) { // muzzle flash: a jagged star, white-hot core through ochre to vermilion, rimmed in ink
+  } else if (kind == 1) {
     float spikes = 0.45 + 0.5 * pow(abs(sin(th * 3.5 + seed * 20.0)), 5.0) * (0.6 + 0.4 * fxHash(vec2(floor(th * 1.11 + 3.5), seed)));
     float d = r - spikes * (0.75 + 0.45 * age);
     if (d > 0.05) discard;
     float rim = fxLine(d + 0.025, 0.025);
     col = mix(mix(mix(uFxFoam, uFxCore, smoothstep(0.0, 0.35, r)), uFxFlame, smoothstep(0.3, 0.75, r)), uFxInk, 0.9 * rim);
     a = (1.0 - age * age) * max(rim, 0.95 * step(d, 0.0));
-  } else if (kind == 2) { // splash column: lead white, flared to a fingered crown, its far flank shaded and hatched
+  } else if (kind == 2) {
     float y = uv.y * 0.5 + 0.5, w = (0.35 + 0.65 * sqrt(y)) * (1.0 - 0.15 * age);
     float crown = 1.0 - 0.22 * abs(sin(uv.x * 6.0 + seed * 30.0)) * smoothstep(0.3, 1.0, abs(uv.x) + 0.3);
     float d = max(abs(uv.x) - w, y - crown);
@@ -684,7 +643,7 @@ void main() {
     float h = fxHatch(0.2, 0.3) * side * inside, fall = fxLine(fract(uv.x * 3.0 + y * 0.4 + seed) - 0.5, 0.04) * inside;
     col = mix(mix(uFxFoam, uFxShade, 0.55 * side), uFxInk, max(rim, max(0.6 * h, 0.25 * fall)));
     a = (1.0 - age) * max(0.9 * rim, inside * (0.7 + 0.2 * h));
-  } else if (kind == 3) { // spray: lead-white drops ringed in ink, trailing
+  } else if (kind == 3) {
     float st = vC.w;
     vec2 q = fxHead(uv, st);
     float d = q.x > 0.0 ? length(q) - 0.8 : abs(q.y) - 0.8 * max(0.0, 1.0 + q.x / (2.0 * st - 1.0));
@@ -692,33 +651,33 @@ void main() {
     float rim = fxLine(d + 0.1, 0.1);
     col = mix(uFxFoam, uFxInk, rim);
     a = (1.0 - age) * max(rim, 0.9 * step(d, 0.0));
-  } else if (kind == 4) { // splinter: a tumbling plank, grained, its ends torn
+  } else if (kind == 4) {
     float d = max(abs(uv.x) - 0.95 + 0.15 * fxHash(vec2(floor(uv.y * 6.0), seed)), abs(uv.y) - 0.7);
     if (d > 0.06) discard;
     float rim = fxLine(d + 0.05, 0.05), grain = fxLine(fract(uv.y * 1.5 + 0.1 * sin(uv.x * 8.0 + seed * 9.0)) - 0.5, 0.06) * step(d, 0.0);
     col = mix(vC.rgb, uFxInk, max(rim, 0.5 * grain));
     a = (1.0 - age * age) * max(rim, step(d, 0.0));
-  } else if (kind == 5) { // ink spatter: a spiky blot spreading, droplets flung round it
+  } else if (kind == 5) {
     float edge = 0.45 + 0.25 * fxNoise(vec2(th * 2.5 + seed * 13.0, seed)) + 0.35 * pow(fxNoise(vec2(th * 7.0, seed * 3.0)), 4.0);
     vec2 cell = floor(uv * 4.0), fc = fract(uv * 4.0) - 0.5;
     float drop = step(0.82, fxHash(cell + seed)) * step(length(fc), 0.18 * fxHash(cell * 1.7 + seed));
     col = mix(uFxInk, vC.rgb, 0.15);
     a = (1.0 - age) * 0.9 * max(step(r, edge * (0.6 + 0.5 * age)), drop);
-  } else if (kind == 6) { // flame: a licking tongue, vermilion round an ochre core, rimmed in ink
+  } else if (kind == 6) {
     float y = uv.y * 0.5 + 0.5, w = 0.7 * pow(1.0 - y, 0.7) * (1.0 - 0.4 * age);
     float d = abs(uv.x + 0.2 * y * sin(9.0 * y + seed * 40.0 + uFxClock * 14.0)) - w;
     if (d > 0.06 || y < 0.03) discard;
     float rim = fxLine(d + 0.03, 0.03);
     col = mix(mix(uFxCore, uFxFlame, smoothstep(0.1, 0.55, y + abs(uv.x))), uFxInk, 0.8 * rim);
     a = (1.0 - age * age) * max(rim, 0.9 * step(d, 0.0));
-  } else if (kind == 7) { // ember: a hot spark streaking
+  } else if (kind == 7) {
     float st = vC.w;
     vec2 q = fxHead(uv, st);
     float d = q.x > 0.0 ? length(q) - 0.7 : abs(q.y) - 0.5 * max(0.0, 1.0 + q.x / (2.0 * st - 1.0));
     if (d > 0.0) discard;
     col = mix(uFxFlame, uFxCore, step(length(q), 0.45));
     a = (1.0 - age) * (q.x > 0.0 ? 1.0 : 0.6);
-  } else if (kind == 8) { // doubloon: a gilt disc spinning edge-on and back, flashing as its face meets the light
+  } else if (kind == 8) {
     float sp = uFxClock * (6.0 + 4.0 * seed) + seed * 6.283, ex = max(0.14, abs(cos(sp)));
     vec2 q = vec2(uv.x / ex, uv.y);
     float d = length(q) - 0.8;
@@ -727,13 +686,13 @@ void main() {
     col = mix(fxGilt(q * 0.5, seed) * (0.8 + 0.4 * cos(sp)), uFxInk, max(rim, 0.6 * inner));
     col = mix(col, uFxFoam, 0.7 * pow(max(0.0, cos(sp)), 30.0) * step(d, 0.0));
     a = (1.0 - smoothstep(0.85, 1.0, age)) * max(rim, step(d, 0.0));
-  } else if (kind == 9) { // glint: a four-point star twinkling
+  } else if (kind == 9) {
     vec2 dq = vec2(uv.x + uv.y, uv.x - uv.y) * 0.7071;
     float star = max(0.0, 1.0 - abs(uv.x) * 9.0 - abs(uv.y) * 1.1) + max(0.0, 1.0 - abs(uv.y) * 9.0 - abs(uv.x) * 1.1) + max(0.0, 1.0 - r * 4.0)
       + 0.5 * (max(0.0, 1.0 - abs(dq.x) * 14.0 - abs(dq.y) * 2.4) + max(0.0, 1.0 - abs(dq.y) * 14.0 - abs(dq.x) * 2.4));
     col = mix(vC.rgb, uFxFoam, smoothstep(0.4, 1.2, star));
     a = clamp(star, 0.0, 1.0) * sin(3.1416 * max(age, 0.02)) * (0.6 + 0.4 * sin(uFxClock * 11.0 + seed * 40.0));
-  } else if (kind == 10) { // a chest's glow by tier: a pooled wash halo; rays from ultramarine up, turning; gold leaf at the top
+  } else if (kind == 10) {
     float tier = par, env = age < 1e-4 ? 1.0 : smoothstep(0.0, 0.1, age) * (1.0 - age * age);
     float edge = 0.62 + 0.08 * fxNoise(vec2(th * 2.0, seed * 7.0) + uFxClock * 0.3);
     float halo = smoothstep(edge, edge - 0.45, r) * (0.35 + 0.65 * smoothstep(edge - 0.25, edge, r)) * (0.7 + 0.5 * fxNoise(uv * 7.0 + seed * 3.0));
@@ -743,7 +702,7 @@ void main() {
     col = mix(tier > 3.5 ? fxGilt(uv, seed) : vC.rgb, uFxInk, max(0.8 * ring, 0.5 * h));
     col = mix(col, tier > 3.5 ? uFxFoam : mix(vC.rgb, uFxFoam, 0.5), (tier > 3.5 ? 0.6 : 1.0) * ray);
     a = env * (0.85 + 0.15 * sin(uFxClock * 3.0 + seed * 6.0)) * (halo * (0.35 + 0.1 * tier) + ray * (0.45 + 0.1 * tier) + 0.6 * ring + 0.4 * h);
-  } else if (kind == 11) { // shot: an ink ball trailing a hatched stroke (heated: glowing; chain: two balls linked; shell: smoking)
+  } else if (kind == 11) {
     float st = vC.w;
     vec2 q = fxHead(uv, st);
     bool chain = abs(par - 2.0) < 0.5, hot = abs(par - 1.0) < 0.5 || par > 2.5;
@@ -753,7 +712,7 @@ void main() {
     if (min(ball, tail) > 0.05) discard;
     col = ball < 0.0 ? (abs(par - 1.0) < 0.5 ? mix(uFxInk, uFxFlame, 0.45) : uFxInk) : (hot ? mix(uFxFlame, uFxCore, 0.3) : uFxInk);
     a = ball < 0.0 ? 1.0 : step(tail, 0.0) * taper * (0.4 + 0.5 * fxHatch(0.3, 0.5));
-  } else if (kind == 12) { // a chest afloat (tier bands and lock in its pigment, gilt at the top), or a powder keg with its fuse spitting
+  } else if (kind == 12) {
     float d, rim;
     vec3 body;
     if (par > 4.5) {
@@ -774,7 +733,7 @@ void main() {
       col = mix(mix(body, par > 3.5 ? fxGilt(uv, seed) : vC.rgb, band), uFxInk, rim);
       a = max(rim, step(d, 0.0));
     }
-  } else if (kind == 13) { // impact: a jagged drawn star that bursts and breaks up
+  } else if (kind == 13) {
     float k = floor(th / 0.6981 + 4.5), fr = fract(th / 0.6981 + 4.5);
     float spike = mix(0.38, 0.55 + 0.4 * fxHash(vec2(k, seed)), 1.0 - abs(fr - 0.5) * 2.0);
     float d = r - spike * (0.7 + 0.5 * age);
@@ -782,26 +741,26 @@ void main() {
     float rim = fxLine(d + 0.035, 0.035);
     col = mix(mix(mix(uFxFoam, uFxCore, smoothstep(0.1, 0.45, r)), vC.rgb, smoothstep(0.35, 0.8, r)), uFxInk, rim);
     a = (1.0 - age) * max(rim, 0.9 * step(d, 0.0)) * step(1.2 * age, fxNoise(uv * 6.0 + seed * 11.0) + 0.15);
-  } else if (kind == 16) { // ring: a spreading inked ring, broken as it fades, hatched inside
+  } else if (kind == 16) {
     float rr = 0.9 - 0.05 * age;
     float ln = fxLine(r - rr, 0.02 + 0.01 * (1.0 - age)) * step(0.3 + 0.6 * age, fxNoise(vec2(th * 5.0, seed * 9.0)) + 0.25);
     float band = step(r, rr) * step(rr - 0.12, r) * fxHatch(0.25, 0.4);
     col = mix(vC.rgb, uFxInk, 0.6);
     a = (1.0 - age) * max(0.85 * ln, 0.35 * band);
-  } else if (kind == 17) { // the claim's bloom: a wash spreading wet, cauliflowered, pooling dark at its drying edge, granulating
+  } else if (kind == 17) {
     float edge = 0.86 + 0.07 * fxNoise(vec2(th * 3.0, seed * 5.0)) + 0.04 * fxNoise(vec2(th * 11.0, seed));
     float d = r - edge;
     if (d > 0.03) discard;
     float pool = smoothstep(-0.18, 0.0, d), ink = 0.6 * fxLine(d + 0.01, 0.006);
     col = mix(vC.rgb, uFxInk, 0.5 * ink + 0.15 * pool);
     a = smoothstep(0.0, 0.1, age) * (1.0 - smoothstep(0.55, 1.0, age)) * ((0.25 + 0.75 * pool) * (0.6 + 0.8 * fxNoise(uv * 23.0 + seed * 4.0)) * 0.45 + ink);
-  } else if (kind == 18) { // the broken trail's tear: a zigzag rent opening, its lips inked, the owner's wash on the flaps
+  } else if (kind == 18) {
     float z = 0.45 * (abs(fract(uv.x * 3.5 + seed * 3.0) - 0.5) * 2.0 - 0.5);
     float d = abs(uv.y - z) - (0.12 + 0.2 * age) * (1.0 - uv.x * uv.x);
     float lips = fxLine(d, 0.04), flap = step(0.0, d) * smoothstep(0.35, 0.0, d) * (0.5 + 0.5 * fxNoise(uv * 9.0 + seed));
     col = d < 0.0 ? uFxFoam : mix(vC.rgb, uFxInk, lips);
     a = (1.0 - age) * (1.0 - smoothstep(0.75, 1.0, abs(uv.x))) * max(lips, max(0.5 * flap, 0.7 * step(d, 0.0)));
-  } else if (kind == 19) { // the banking flourish: a gilt spiral the pen draws out, swelling and thinning
+  } else if (kind == 19) {
     float tt = (th + 3.1416) / 6.2832, best = 1e3, along = 0.0;
     for (int k = 0; k < 2; k++) {
       float u = (tt + float(k)) / 1.75, dd = abs(r - 0.2 - 0.7 * u);
@@ -810,12 +769,12 @@ void main() {
     float w = 0.02 + 0.05 * pow(sin(3.1416 * clamp(along, 0.0, 1.0)), 2.0);
     col = mix(fxGilt(uv, seed), uFxInk, 0.5 * fxLine(best - w, 0.01));
     a = fxLine(best, w) * step(along, min(1.0, age * 2.2)) * (1.0 - smoothstep(0.7, 1.0, age));
-  } else if (kind == 20) { // a streak of foam or wind
+  } else if (kind == 20) {
     float d = abs(uv.y) - (1.0 - uv.x * uv.x) * 0.7;
     if (d > 0.0) discard;
     col = vC.rgb;
     a = sin(3.1416 * age) * (0.55 + 0.35 * fxNoise(vec2(uv.x * 4.0, seed * 9.0)));
-  } else if (kind == 21) { // a shot's shadow on the sea, fainter the higher it flies
+  } else if (kind == 21) {
     a = (1.0 - smoothstep(0.5, 1.0, r)) * 0.4 / (1.0 + 0.15 * par);
   }
   if (a < 0.01) discard;

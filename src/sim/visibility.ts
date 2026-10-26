@@ -1,9 +1,3 @@
-// Sight (PROMPT.md: Wind, currents, tides, and time — Weather; Fittings — the crow's nest; Consumables — the fog flask
-// and the flare; How captains think). What each ship can see: rivals over the curve of the sea by the lookout's eye
-// height and theirs (the masthead shows first, then the hull), through the air the weather and the storm leave, unless
-// fog or kelp hides them from outside, a fog flask or the Kelp Cathedral keeps them off its charts; and the rivals its
-// chart marks out of sight (in its waters, in the Crown Light's beam, under its flare, under its gull's dive). One
-// survey a tick serves the captains, which see only what their ship and gull could see, and the player's chart and HUD.
 import type { Sea } from './environment.ts';
 import { dcos, dot, v3, type V3 } from './math.ts';
 import { R, TERRITORY, cellDir, horizonDistance } from './sphere.ts';
@@ -13,10 +7,6 @@ import { FITTING, FORMS, SIGHT, SLOT, STORM, TIERS } from './tables.ts';
 import { beamMarks, intruders, unseen } from './territory.ts';
 import { inFog, newSky, skyAt, veiled } from './weather.ts';
 
-/**
- * A ship's gull aloft (gull.ts gullEyes): where it flies, how high (u), the rival it holds over after a dive (−1 none),
- * and whether it scouts, a lookout besides the ship's own.
- */
 export interface Eye {
   at: V3;
   height: number;
@@ -24,29 +14,21 @@ export interface Eye {
   scouts: boolean;
 }
 
-/** What one ship sees this tick, as bitmasks by ship index (never its own bit). */
 export interface Sight {
-  /** Rivals in sight from its deck or its gull: at least their mastheads over the curve. */
   ships: number;
-  /** Of those, the ones whose hulls are up; the rest are hull-down. */
   hulls: number;
-  /** Rivals its chart marks wherever they are: in its waters, in the Crown Light's beam, under its flare or its gull's dive. */
   marks: number;
-  /** How far it sees through the air now, u. */
   range: number;
-  /** Rivals' gulls aloft in its sight, by their ships' bits: each flies to and from its own ship, so where it goes shows (gull.ts bound). */
   gulls: number;
 }
 
 export const newSight = (): Sight => ({ ships: 0, hulls: 0, marks: 0, range: 0, gulls: 0 });
 
-/** Horizon distances (u) of the lookout's eye by form and crow's nest (index 0 none, 1 + tier), of mastheads and of hulls by form. */
 const EYE = FORMS.map((_, f) => Array.from({ length: TIERS + 1 }, (_, k) => horizonDistance(SIGHT.eye[f] + (k > 0 ? SIGHT.crowsNest[k - 1] : 0))));
 const MAST = FORMS.map((_, f) => horizonDistance(SIGHT.mast[f]));
 const HULL = FORMS.map((_, f) => horizonDistance(SIGHT.hull[f]));
 const FLARE_COS = dcos(SIGHT.flare / R);
 
-/** The horizon distance of ship i's lookout: its form's eye, raised by a crow's nest. */
 export function eyeReach(state: MatchState, i: number): number {
   const ship = state.ships[i], look = ship.fittings[SLOT.lookout];
   return EYE[ship.form][look.kind === FITTING.crowsNest ? 1 + look.tier : 0];
@@ -54,22 +36,12 @@ export function eyeReach(state: MatchState, i: number): number {
 
 const SKY = newSky(), AIR = new Float64Array(SHIPS), REACH = new Float64Array(SHIPS), WING = new Float64Array(SHIPS), CELL = v3();
 
-/**
- * Whether a lookout at `from`, its eye's horizon `reach` u, sees ship j through `air` u of air: its masthead (2), its
- * hull too (3), or nothing (0). A target is up while the line from the eye to it clears the sea: within the sum of the
- * two horizon distances.
- */
 function spot(sea: Sea, state: MatchState, from: V3, reach: number, air: number, j: number): number {
   const ship = state.ships[j], c = dot(from, ship.pos);
   if (c < dcos(Math.min(air, reach + MAST[ship.form]) / R) || veiled(sea.geo, state, from, ship.pos)) return 0;
   return c >= dcos(Math.min(air, reach + HULL[ship.form]) / R) ? 3 : 2;
 }
 
-/**
- * What every ship sees now, into out[i] (zero for a ship that has sunk). gulls[i], when given, is ship i's gull aloft
- * (gull.ts gullEyes): seen by the rivals in sight of it, and a second lookout while it scouts. A rival under a fog
- * flask or kept off charts by the Kelp Cathedral is never seen or marked.
- */
 export function survey(sea: Sea, state: MatchState, out: Sight[], gulls?: readonly (Eye | null)[]): Sight[] {
   const calm = calmNow(state);
   let hidden = 0;
@@ -108,10 +80,6 @@ export function survey(sea: Sea, state: MatchState, out: Sight[], gulls?: readon
   return out;
 }
 
-/**
- * Whether ship `viewer`'s chart shows the k-th cell of ship `owner`'s open trail: its own always; a rival's unless it
- * was laid in fog, a fog flask hides it, or it lies in fog or kelp the viewer is outside of.
- */
 export function trailSeen(sea: Sea, state: MatchState, viewer: number, owner: number, k: number): boolean {
   if (viewer === owner) return true;
   const ship = state.ships[owner];
@@ -119,10 +87,6 @@ export function trailSeen(sea: Sea, state: MatchState, viewer: number, owner: nu
   return !veiled(sea.geo, state, state.ships[viewer].pos, cellDir(TERRITORY, ship.laid[k], CELL));
 }
 
-/**
- * The step's note of fog on the trails, after they are charted: each cell a ship lays is marked if it was laid in fog
- * (Ship.fogged, beside Ship.laid), so it never shows on rival charts.
- */
 export function noteFog(state: MatchState): void {
   for (const e of state.events) if (e.kind === EVENT.loop || e.kind === EVENT.broken) state.ships[e.ship].fogged.length = 0;
   for (const ship of state.ships) {

@@ -1,7 +1,3 @@
-// The render composition root: the scene and camera a match is drawn in, and the render modules that draw into
-// them. Each render package appends its module's factory to MODULES (A6). A module is built when a match screen
-// opens and disposed when it closes; every frame it reads the match state, the world and the loop's frame
-// (interpolation alpha between the previous tick and the current one, the render clock) and never writes them.
 import * as THREE from 'three';
 import type { Frame } from '../app/loop.ts';
 import type { World } from '../app/worldWorker.ts';
@@ -29,7 +25,6 @@ import { seaFor, type Sea } from '../sim/environment.ts';
 import { newSight, survey, type Sight } from '../sim/visibility.ts';
 import { SHIPS } from '../sim/state.ts';
 
-/** What a module is built with. */
 export interface RenderContext {
   readonly pipeline: Pipeline;
   readonly world: World;
@@ -37,7 +32,6 @@ export interface RenderContext {
   readonly camera: THREE.PerspectiveCamera;
 }
 
-/** A frame of the match: the state after the last tick, drawn at the loop's alpha and clock. */
 export interface MatchFrame extends Frame {
   readonly state: MatchState;
 }
@@ -49,12 +43,8 @@ export interface RenderModule {
 
 type ModuleFactory = (ctx: RenderContext) => RenderModule;
 
-/** The render modules, updated in this order every frame. Append-only (A6). */
 const MODULES: readonly ModuleFactory[] = [createSea, createSky, createTerrain, createStructures, createFlora, createTerritory, createTrails, ...REGION_MODULES, createWeather, createStorm, createShips, createEffects, createCurrents, createFauna];
 
-/** WP24 part C: modules whose detail is a pixel or two once the zoom lifts the eye toward orbit, each stood down past
- *  the z it is listed with (the chart globe soaks in from 0.34; the ships stay, their chart marks take over at 0.4), so
- *  the world, and the world and the chart globe together, keep A9's triangle budget at every frame of the zoom. */
 const FINE: ReadonlyMap<ModuleFactory, number> = new Map<ModuleFactory, number>([
   [createStructures, 0.25], [createFlora, 0.25], [createEffects, 0.25], ...REGION_MODULES.map((m): [ModuleFactory, number] => [m, 0.25]), [createTrails, 0.34],
 ]);
@@ -63,8 +53,6 @@ export class WorldView {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
   private readonly modules: RenderModule[];
-  /** WP24: the chart (layer 1) and the camera rig. The rig drives the camera only while `drive` is set (the match
-   * screen); test pages that place the camera themselves leave it off. */
   readonly chart: Chart;
   readonly rig: CameraRig;
   drive = false;
@@ -73,10 +61,8 @@ export class WorldView {
   private sea: Sea | null = null;
   private seaSeed = NaN;
   private readonly sights: Sight[] = Array.from({ length: SHIPS }, newSight);
-  /** WP24 part C: the fine modules' scene objects, and those stood down this frame. */
   private readonly fine: [THREE.Object3D, number][] = [];
   private readonly stoodDown: THREE.Object3D[] = [];
-  /** WP30 part C: the region modules' scene objects, their instances culled for the eye each frame (kit.ts Draw.cull). */
   private readonly heroes: THREE.Object3D[] = [];
   private readonly cullView = new CullView();
   private readonly canvas: HTMLCanvasElement;
@@ -98,7 +84,6 @@ export class WorldView {
     this.rig = new CameraRig(this.camera, groundOf(world), this.chart.net);
   }
 
-  /** The player's sight this frame (the chart's ships, the camera's focus). */
   sight(state: MatchState): Sight {
     if (this.seaSeed !== state.seed || !this.sea) { this.sea = seaFor(this.world, state.seed); this.seaSeed = state.seed; }
     return survey(this.sea, state, this.sights)[0];

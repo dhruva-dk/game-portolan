@@ -1,14 +1,3 @@
-// WP27: the results (PROMPT.md, The results): the end of the match explained on one parchment page so the player always
-// understands why it won or lost. The place in the hand's swash capitals and how it ended; the tallies counting up (sea
-// claimed, ships sunk, doubloons banked, treasure brought home); the timeline of the moments that decided it (where it
-// broke off, the loops it closed, the trails it lost and broke, the chests it chose, the ships it sank, how it sank or
-// won) written in one by one with the quill; the nine rivals' fates as roundels in their captains' pigments; the rank
-// points inking onto the portolan wind rose (Greco to Tramontana) with a promotion lettered in vermilion; the league
-// table sliding to its new order; the seas first named and, on the first voyage, the lessons learned. A tap finishes
-// the writing; "The next voyage" turns the page to the nine captains the player will face next, each with its card
-// (part B), and "To harbour" goes on. Everything is read from MatchResult, the career before and after, and the Voyage.
-// While the player's ship is gone and the match plays out on the chart, the skip card (part B) says how she sank and
-// how many sail on, and goes straight to the results.
 import * as THREE from 'three';
 import { RANK, tierOf, type Career } from '../career/state.ts';
 import { toLetter, type Voyage } from '../career/voyage.ts';
@@ -38,7 +27,6 @@ const FALLBACK: Record<string, string> = {
   vermilion: '#d9472b', ultramarine: '#4566b0', verdigris: '#5aa394', ochre: '#d4a656', indigo: '#3e4d72', sepia: '#6b4f36', gold: '#d4a64a', black: '#2a211c',
   white: '#f4ecd8', lead: '#8a8178', umber: '#7a5532', malachite: '#3f8f6a', azurite: '#3d5f9e', orpiment: '#d9b24a', saffron: '#d9a03a', carmine: '#a8323a', rose: '#c46a6a',
 };
-/** A captain's pigment (NAMED_PIGMENTS name) as a CSS colour. */
 export function pigmentHex(name: string): string {
   if (name.startsWith('#')) return name;
   const v = (NAMED_PIGMENTS as unknown as Record<string, unknown>)[name];
@@ -55,12 +43,8 @@ export function pigmentHex(name: string): string {
   return FALLBACK[name] ?? SEPIA;
 }
 
-/** A moment on the timeline: `kind` its EVENT key ('end' the ending), `rank` how much it decided the match (0 most:
- *  the break-off and the end; 4 least), `amount` what it counts (sea, doubloons), for merging runs (timelineFit). */
 export interface TimelineLine { tick: number; clock: string; text: string; tone: 'good' | 'bad' | 'plain'; kind: string; rank: number; amount: number }
-/** S-019: the gull's moments, as the match screen heard them (EVENT, ship 0): the timeline tells them too. */
 export const GULL_MOMENTS: readonly number[] = [EVENT.called, EVENT.landed, EVENT.dive, EVENT.snatch];
-/** S-019: the page's smaller figures (the timeline's times, the league's places and points), em CSS px × k. */
 export const FIGURE = 14;
 export interface Fate { ship: number; name: string; pigments: [string, string]; place: number; fate: string; byYou: boolean }
 export interface LeagueMove { key: number; name: string; from: number; to: number; points: number; player: boolean }
@@ -76,26 +60,20 @@ export interface ResultsModel {
   fates: Fate[];
   rank: { before: number; after: number; tierBefore: number; tierAfter: number; wind: string; promoted: boolean; perTier: number };
   league: LeagueMove[];
-  /** Regions whose names the chart letters for the first time. */
   named: string[];
-  /** LESSONs done this match (the first voyage). */
   lessons: number[];
   firstVoyage: boolean;
-  /** The nine captains of the next voyage, nearest the new rank first, each with its card. */
   next: Card[];
 }
 
-/** Ship `ship`'s captain as the page names it: `drawn` are the league ids of ships 1–9 (toSetup). */
 const shipName = (c: Career, drawn: readonly number[], ship: number): string =>
   ship === 0 ? 'you' : ship > 0 && ship < SHIPS && drawn[ship - 1] !== undefined ? captainCard(c, drawn[ship - 1]).name : 'the sea';
 
-/** How a ship went down, `by` the ship that sank it (−1 none) of a CAUSE (end.ts sink). */
 export function fateWords(c: Career, drawn: readonly number[], by: number, cause: number): string {
   const by_ = lower(shipName(c, drawn, by));
   return by === 0 ? 'Sunk by you' : by > 0 && cause >= 0 && cause <= 2 ? `Sunk by ${by_}'s ${CAUSE_WORDS[cause]}` : by > 0 ? `Sunk by ${by_}` : `Lost to ${CAUSE_WORDS[cause] ?? 'the sea'}`;
 }
 
-/** The page's content: `drawn` are the league ids of ships 1–9 (toSetup), `after` = applyResult(before, result, voyage). */
 export function resultsModel(before: Career, after: Career, result: MatchResult, drawn: readonly number[], voyage?: Voyage, gull: readonly Entry[] = []): ResultsModel {
   const me = result.ships[0];
   const nameOf = (ship: number): string => shipName(before, drawn, ship);
@@ -128,7 +106,6 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
     return { tick: e.tick, clock: clock(e.tick), text, tone, kind: key, rank, amount: e.amount };
   };
   const timeline: TimelineLine[] = [];
-  // the sim's timeline and the gull's moments (only hers, while she was afloat), in the order they came
   const end = won ? result.ticks : me.tick, heard = gull.filter((e) => e.ship === 0 && GULL_MOMENTS.includes(e.kind) && e.tick <= end);
   const all = [...result.timeline, ...heard].map((e, i) => ({ e, i })).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i);
   for (const { e } of all) { const l = lineOf(e); if (l) timeline.push(l); }
@@ -155,9 +132,7 @@ export function resultsModel(before: Career, after: Career, result: MatchResult,
 
 export interface ResultsLayout { view: View; page: Rect; left: Rect; mid: Rect; right: Rect; rose: { x: number; y: number; r: number }; cont: Rect; k: number }
 
-/** How much each kind of moment decided the match (TimelineLine.rank): what timelineFit keeps when the page is short. */
 const DECIDES: Record<string, number> = { end: 0, breakOff: 0, thrown: 0, home: 1, chosen: 1, sunk: 1, broken: 1, lead: 2, loop: 2, raid: 2, engage: 3, called: 3, landed: 3, fetched: 3, dive: 3, snatch: 3, bank: 3 };
-/** Runs of one kind told as one line when the page is short: the words for n of them, `sum` their amounts. */
 const RUNS: Record<string, (n: number, sum: number) => string> = {
   loop: (n, sum) => `Closed ${n} loops, ${Math.round(sum)} of sea`,
   raid: (n) => `Broke ${n} rivals' trails`,
@@ -166,25 +141,17 @@ const RUNS: Record<string, (n: number, sum: number) => string> = {
 };
 const runKind = (l: TimelineLine): string => (l.kind === 'broken' && l.tone === 'good' ? 'raid' : /find|found|treasure|scoop/i.test(l.kind) ? 'find' : l.kind);
 
-/**
- * S-019: the timeline as the page has room for it, `rows` lines: every moment when they fit; else runs of a kind told
- * as one line (three loops closed in a row: "Closed 3 loops, 940 of sea", at the first one's time, ranked a step
- * higher than any one of them), a call and its
- * landing as one ("The gull fetched a chest", at the call's time), then the least decisive moments left out (the latest first among
- * equals), never the ending. Nothing is elided by a bare "…": what is shown is what decided the match, in order.
- */
 export function timelineFit(lines: readonly TimelineLine[], rows: number): TimelineLine[] {
   if (lines.length <= rows) return [...lines];
   const out: TimelineLine[] = [];
   for (const l of lines) {
     const last = out[out.length - 1], k = runKind(l);
-    if (l.kind === 'landed') { // told with the call that sent her (the latest still waiting)
+    if (l.kind === 'landed') {
       const c = out.findLastIndex((x) => x.kind === 'called');
       if (c >= 0) { out[c] = { ...out[c], kind: 'fetched', text: `The gull fetched a chest, ${Math.round(out[c].amount)} doubloons`, tone: 'good' }; continue; }
     }
     if (last && RUNS[k] && runKind(last) === k) {
       const n = (last as TimelineLine & { n?: number }).n ?? 1;
-      // a run counts for more than any one of it: a rank nearer the top
       out[out.length - 1] = Object.assign({ ...last, text: RUNS[k](n + 1, last.amount + l.amount), amount: last.amount + l.amount, rank: Math.max(1, DECIDES[k] - 1) }, { n: n + 1 });
       continue;
     }
@@ -198,7 +165,6 @@ export function timelineFit(lines: readonly TimelineLine[], rows: number): Timel
   return out;
 }
 
-/** Three columns on the page: the place and the rose, the voyage, the league; "The next voyage" at the foot of the third. */
 export function resultsLayout(view: View): ResultsLayout {
   const page = inset(safeOf(view), 6), k = Math.max(1, Math.min(1.45, page.height / 408)), pad = 16 * k, gap = 14 * k;
   const iw = page.width - 2 * pad - 2 * gap, ih = page.height - 2 * pad, x0 = page.x + pad, y0 = page.y + pad, lw = iw * 0.27, mw = iw * 0.4, rw = iw - lw - mw;
@@ -207,11 +173,8 @@ export function resultsLayout(view: View): ResultsLayout {
   return { view, page, left, mid, right, rose: { x: x0 + lw / 2, y: y0 + 106 * k + r, r }, cont: { x: right.x + rw - bw, y: y0 + ih - bh, width: bw, height: bh }, k };
 }
 
-/** The timeline's time column, CSS px from the column's left to its rule: the widest time ("10:00") at FIGURE, 8 × k
- *  clear of the rule. */
 export const timeColumn = (k: number): number => widthOf('10:00', { size: FIGURE * k }) + 8 * k + 2;
 
-/** Seconds until everything is written: the results, the next voyage's page. */
 export const RESULTS_END = 6.4;
 export const NEXT_END = 2.6;
 
@@ -232,7 +195,6 @@ export function drawResults(g: G, m: ResultsModel, l: ResultsLayout, t: number):
 
 export interface NextLayout { view: View; page: Rect; cells: Rect[]; cont: Rect; k: number }
 
-/** The next voyage's page: the heading and "To harbour" across the top, the nine cards three by three beneath. */
 export function nextLayout(view: View): NextLayout {
   const page = inset(safeOf(view), 6), k = Math.max(1, Math.min(1.45, page.height / 408)), pad = 14 * k, gap = 8 * k;
   const bh = Math.max(MIN_TARGET, 46 * k), bw = Math.min(190 * k, page.width * 0.3), head = bh + 12 * k;
@@ -241,7 +203,6 @@ export function nextLayout(view: View): NextLayout {
   return { view, page, cells, cont: { x: page.x + page.width - pad - bw, y: page.y + pad, width: bw, height: bh }, k };
 }
 
-/** The nine captains of the next voyage written in, `t` s after the page turned; `emblems` by card, drawn by the caller. */
 export function drawNextNine(g: G, m: ResultsModel, l: NextLayout, t: number, emblems: readonly (CanvasImageSource | null)[] = []): void {
   const { page, k } = l;
   scrap(g, page, 5201, { alpha: ease(t / 0.3) });
@@ -253,7 +214,6 @@ export function drawNextNine(g: G, m: ResultsModel, l: NextLayout, t: number, em
   inkButton(g, l.cont, 'To harbour', k, clamp01((t - 1) / 0.6));
 }
 
-/** One captain's card: its emblem, name and meaning, temperament, form and wind, what it remembers of you. */
 function drawCaptain(g: G, c: Card, r: Rect, k: number, p: number, emblem: CanvasImageSource | null, seed: number): void {
   if (p <= 0) return;
   const u = Math.min(12 * k, r.height / 8.6), pad = 7 * k, ew = u * 2.3, eh = u * 2.8, x = r.x + pad + 2 * k, mw = r.width - 2 * pad - ew - 6 * k;
@@ -326,7 +286,7 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   cells.forEach(([n, label], i) => {
     const p = clamp01((t - i * 0.25) / 0.6), cx = M.x + cw * (i + 0.5);
     if (p <= 0) return;
-    if (i === 0) { // a patch of sea claimed, as the chart draws one: washed, hatched inside its line
+    if (i === 0) {
       const edge = ring(cx, y, s * 0.6, 23, -Math.PI / 2, Math.PI * 2, 18).map(([x, yy], j): [number, number] => { const f = 1 + 0.12 * Math.sin(j * 2.3); return [cx + (x - cx) * f, y + (yy - y) * f * 0.8]; });
       const patch = (gg: G): void => { gg.moveTo(...edge[0]); for (const q of edge) gg.lineTo(...q); gg.closePath(); };
       wash(g, VERDIGRIS, 0.4 * p, patch);
@@ -339,7 +299,7 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
       nib(g, edge, 1.3 * k, p, INK);
     } else if (i === 1) shipGlyph(g, cx, y, s, p);
     else if (i === 2) strongbox(g, cx, y, s, p);
-    else pouch(g, cx, y - 0.12 * s, s * 0.82, 200, p); // a full purse's size, clear of its figure
+    else pouch(g, cx, y - 0.12 * s, s * 0.82, 200, p);
     const q = Math.min(1, Math.round(ease((t - i * 0.25) / 1.2) * 12) / 12);
     letter(g, String(Math.round(n * q)), cx, y + 30 * k, { size: 21 * k, align: 'center', valign: 'middle' }, INK, 1, p);
     letter(g, label, cx, y + 50 * k, { size: 12 * k, align: 'center', valign: 'middle' }, SEPIA, p);
@@ -349,7 +309,6 @@ function drawTallies(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
 function drawTimeline(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
   if (t <= 0) return;
   const M = l.mid, k = l.k, top = M.y + 108 * k, row = 21 * k, words = footWords(m);
-  // the foot's line, and room for its second when it wraps (S-019: clear of the fates' numbers under it)
   const two = !!words && widthOf(words, { size: 13 * k }) > M.width, foot = words ? (two ? 39 * k : 22 * k) : 0;
   const bottom = M.y + M.height - 62 * k - foot;
   letter(g, 'The voyage', M.x, top - 18 * k, { size: 18 * k, valign: 'middle', swash: true }, INK, clamp01(t / 0.8));
@@ -372,7 +331,6 @@ function drawTimeline(g: G, m: ResultsModel, l: ResultsLayout, t: number): void 
   const fy = M.y + M.height - 60 * k - (two ? 17 * k : 0), pf = clamp01((t - 2.6) / 0.8);
   if (words) letter(g, words, M.x, fy, { size: 13 * k, valign: 'middle', maxWidth: M.width }, VERDIGRIS, pf);
 }
-/** The line at the voyage's foot: the seas first named, else on the first voyage the ways learned; '' none. */
 const footWords = (m: ResultsModel): string =>
   m.named.length ? `First named: ${m.named.map(lower).join(', ')}` : m.firstVoyage && m.lessons.length ? `Learned ${m.lessons.length} of the seven ways of the sea` : '';
 
@@ -426,7 +384,6 @@ function drawLeague(g: G, m: ResultsModel, l: ResultsLayout, t: number): void {
 
 export type ResultsCue = 'page' | 'quill' | 'confirm' | 'tap';
 
-/** The results page as interface: layout, frames (the writing), touches (finish the writing, then go on). */
 export class ResultsSheet {
   readonly group = new THREE.Group();
   private sheet: Sheet | null = null;
@@ -436,7 +393,6 @@ export class ResultsSheet {
   private acc = 0;
   private line = -1;
   private raised = false;
-  /** The leaf up: 0 the results, 1 the next voyage (written in from `t` = 0 again). */
   private leaf = 0;
   private nl: NextLayout | null = null;
   private emblems: HTMLCanvasElement[] = [];
@@ -452,7 +408,6 @@ export class ResultsSheet {
     cue('page');
   }
 
-  /** The leaf up (0 the results, 1 the next voyage) and where its button is. */
   get page(): number { return this.leaf; }
   get button(): Rect | null { return this.leaf === 0 ? this.l?.cont ?? null : this.nl?.cont ?? null; }
 
@@ -534,11 +489,8 @@ export class ResultsSheet {
 
 export const RESULTS_GOLD = GOLD;
 
-/** `band`: CSS px from the card's top (and a margin) to the screen's foot, which the chart keeps clear (S-019: the
- *  match plays out on the chart framed whole above the card, never under it). */
 export interface SkipLayout { card: Rect; button: Rect; k: number; band: number }
 
-/** The skip card on the foot of the safe area, a slim strip; its button at the right. */
 export function skipLayout(view: View): SkipLayout {
   const s = safeOf(view), k = Math.max(1, Math.min(1.45, s.height / 420)), w = Math.min(s.width - 16, 470 * k), h = Math.max(MIN_TARGET + 12, 56 * k);
   const card = { x: s.x + (s.width - w) / 2, y: s.y + s.height - h - 2 * k, width: w, height: h };
@@ -546,7 +498,6 @@ export function skipLayout(view: View): SkipLayout {
   return { card, button: { x: card.x + w - bw - 8 * k, y: card.y + (h - bh) / 2, width: bw, height: bh }, k, band: view.height - card.y + 6 * k };
 }
 
-/** How she sank, how many sail on while the match plays out on the chart, and the way straight to the results. */
 export function drawSkip(g: G, l: SkipLayout, ending: string, afloat: number, rushing: boolean, t: number): void {
   const { card: c, k } = l, p = clamp01(t / 0.6), x = c.x + 16 * k, mw = l.button.x - x - 10 * k;
   if (p <= 0) return;
@@ -561,7 +512,6 @@ export function drawSkip(g: G, l: SkipLayout, ending: string, afloat: number, ru
   inkButton(g, l.button, rushing ? 'Resolving' : 'To the results', k, clamp01((t - 0.4) / 0.5), rushing ? SEPIA : INK);
 }
 
-/** The sinking flow's card (PROMPT.md, Sinking and the end): up once the player's ship is gone; its button skips. */
 export class SkipCard {
   readonly group = new THREE.Group();
   private sheet: Sheet | null = null;
@@ -579,7 +529,6 @@ export class SkipCard {
     this.cue = cue;
   }
 
-  /** Where the button is (null until laid out). */
   get button(): Rect | null { return this.l?.button ?? null; }
 
   layout(view: View): void {
@@ -594,7 +543,6 @@ export class SkipCard {
     this.redraw();
   }
 
-  /** What the card says; redrawn when it changes. */
   set(ending: string, afloat: number, rushing: boolean): void {
     const w = this.words;
     if (w.ending === ending && w.afloat === afloat && w.rushing === rushing) return;

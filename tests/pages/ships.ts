@@ -1,11 +1,3 @@
-// The shipwright's sheets (tests/pages/ships.html, outside the game build). Query view=:
-//   turntable  the four forms in three captains' pigments, each turned to its own heading (lod=hero|far, hour=)
-//   hero       one form (form=) from the bow and from the stern quarter: carving, fittings, flags, the leader's pennant
-//   stern      one form (form=) close on its stern ornament
-//   states     the sail states            emblems  the 31 emblems in their captains' pigments
-//   fleet      the 31 captains' ships, each with its emblem on the mainsail     atlas  the chart silhouettes
-//   ten        ten ships receding from a chase camera, their levels chosen by fleetLods
-// window.__ships drives it from tests/pages/ships.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { illustratedMaterial, inkMaterial, linearVec, transmittanceVec } from '../../src/style/glsl.ts';
@@ -18,7 +10,6 @@ import type { RigState } from '../../src/render/ships/rig.ts';
 
 const q = new URLSearchParams(location.search);
 const view = q.get('view') ?? 'turntable', hour = Number(q.get('hour') ?? 15.5), form = (q.get('form') ?? 'galleon') as FormName, lod = (q.get('lod') ?? 'hero') as Lod;
-// the thirty captains (PROMPT.md, "The captains") and the player, in EMBLEMS order: pigments and preferred form
 const HERALDRY: [RGB, RGB, FormName][] = [
   [P.vermilion, P.black, 'caravel'], [P.ironGrey, P.gold, 'carrack'], [P.umber, P.white, 'pinnace'], [P.crimson, P.ochre, 'galleon'], [P.black, P.verdigris, 'carrack'],
   [P.ultramarine, P.gold, 'galleon'], [P.teal, P.cream, 'carrack'], [P.roseMadder, P.gold, 'caravel'], [P.indigo, P.silver, 'galleon'], [P.ochre, P.ultramarine, 'carrack'],
@@ -28,7 +19,7 @@ const HERALDRY: [RGB, RGB, FormName][] = [
   [P.gold, P.vermilion, 'galleon'], [P.crimson, P.black, 'caravel'], [P.stormBlue, P.white, 'carrack'], [P.gold, P.indigo, 'pinnace'], [P.saffron, P.teal, 'caravel'],
   [P.ultramarine, P.cream, 'galleon'],
 ];
-const THREE_CAPTAINS = [0, 5, 6]; // Saetta, Meridiana, Marea
+const THREE_CAPTAINS = [0, 5, 6];
 
 const canvas = document.querySelector('canvas')!;
 const pipeline = new Pipeline(canvas), style = pipeline.style;
@@ -54,12 +45,11 @@ function place(f: FormName, k: number, x: number, z: number, yaw: number, lods: 
   scene.add(ship);
   return ship;
 }
-// flat sheets: atlas cells on quads, tinted as the chart and the results will tint them
-const SPRITE_VERT = /* glsl */ `
+const SPRITE_VERT =  `
 out vec2 vUv;
 out vec3 vWorld;
 void main() { vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-const SPRITE_FRAG = /* glsl */ `
+const SPRITE_FRAG =  `
 in vec2 vUv;
 in vec3 vWorld;
 uniform sampler2D tAtlas;
@@ -101,7 +91,6 @@ if (view === 'turntable') {
   camera.position.set(0, 3.6, 15.5);
   camera.lookAt(0, 2.6, 0);
 } else if (view === 'stern') {
-  // close on the transom and quarter: the carver's scrollwork, knots, waves and sunburst, the gallery and the lights
   const ship = place(form, 6, 0, 0, Math.PI - 0.6, ['hero'], (s) => s.sails.forEach((x) => (x.set = 1)));
   ship.setLeader(true);
   ship.updateMatrixWorld();
@@ -109,7 +98,6 @@ if (view === 'turntable') {
   camera.position.copy(c).addScaledVector(n, 4.4).add(new THREE.Vector3(1.4, 1.0, 0));
   camera.lookAt(c.x, c.y + 0.3, c.z);
 } else if (view === 'states') {
-  // full and drawing, plain and billowing, reefed and flat, shivering, slack and torn, furled
   const moods: ((s: RigState) => void)[] = [
     (s) => s.sails.forEach((x) => Object.assign(x, { set: 1, fill: 0.65 })),
     (s) => s.sails.forEach((x) => (x.fill = 1)),
@@ -125,7 +113,6 @@ if (view === 'turntable') {
   EMBLEMS.forEach((e, k) => sprite(emblemTexture(), emblemRect(e), HERALDRY[k], ((k % 8) - 3.5) * 2.5, (1.5 - Math.floor(k / 8)) * 2.5, 2.3));
   sheet = { w: 20, h: 10 };
 } else if (view === 'atlas') {
-  // each form: its profile in three captains' pigments, then its plan turned through eight headings
   FORM_NAMES.forEach((f, row) => {
     const y = (1.5 - row) * 2.6;
     THREE_CAPTAINS.forEach((k, i) => sprite(silhouetteTexture(), silhouetteRect(f, 'profile'), HERALDRY[k], -10.4 + i * 3.2, y, 3));
@@ -137,7 +124,6 @@ if (view === 'turntable') {
   camera.position.set(0, 10, 24);
   camera.lookAt(0, 3, -15);
 } else {
-  // the player's ship ahead of a chase camera, nine rivals strung out to the horizon
   for (let k = 0; k < 10; k++) fleet.push(place(HERALDRY[k][2], k, k ? (k % 2 ? -1 : 1) * (3 + k * 2.5) : 0, -k * 16, Math.PI + 0.3 * ((k % 3) - 1), undefined));
   camera.position.set(0, 4.2, 11);
   camera.lookAt(0, 2.6, -8);

@@ -1,7 +1,3 @@
-// The determinism vectors: digests of everything the simulation computes from numbers, one hash per area, so a
-// difference in any last bit on any engine shows. tests/sim/determinism-vectors.test.ts takes them in Node and,
-// from a minified production bundle of this file, in Chromium (V8) and WebKit (JavaScriptCore, the engine of
-// the iOS app's web view). As later packages add systems to the match step, the match digest covers them.
 import { hash64 } from '../../src/sim/codec.ts';
 import { STEER_MAX, idleInput, record, recorder, type Recording, type ShipInput } from '../../src/sim/input.ts';
 import * as m from '../../src/sim/math.ts';
@@ -17,7 +13,6 @@ import { createMatch, decodeMatch, encodeMatch, matchHash } from '../../src/sim/
 import type { MatchState } from '../../src/sim/state.ts';
 import { FITTING, SLOT } from '../../src/sim/tables.ts';
 
-/** The hash of doubles' exact bits. */
 function digest(values: ArrayLike<number>): string {
   const bytes = new Uint8Array(values.length * 8), view = new DataView(bytes.buffer);
   for (let i = 0; i < values.length; i++) view.setFloat64(8 * i, values[i], true);
@@ -25,7 +20,6 @@ function digest(values: ArrayLike<number>): string {
 }
 
 const TENS = [1, 10, 100, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12];
-/** ±u·10^k for u uniform in [0, 1) and k uniform in [0, top]. */
 const spread = (r: m.Rng, top: number) => (m.rngFloat(r) - 0.5) * 2 * TENS[m.rngInt(r, top + 1)];
 
 function mathVectors(): string {
@@ -91,7 +85,6 @@ function sphereVectors(): string {
   return digest(out);
 }
 
-/** A player who acts like a thumb: holds the helm for a while, steps the sails, now and then draws a course. */
 export function scriptedInputs(seed: number, ticks: number): ShipInput[] {
   const r = m.rngFrom(seed), inputs: ShipInput[] = [], held = idleInput();
   for (let t = 0; t < ticks; t++) {
@@ -118,7 +111,6 @@ export function recordInputs(inputs: ShipInput[]): Recording {
 
 let built: World | null = null;
 
-/** The fixed world, built once. */
 export function world(): World {
   if (!built) {
     const geo = buildGeography();
@@ -127,7 +119,6 @@ export function world(): World {
   return built;
 }
 
-/** Two minutes of match with recorded inputs, straight through and resumed from a snapshot halfway. */
 function matchVectors(): { match: string; resumed: string } {
   const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks)), seed = 20261024, sea = seaFor(world(), seed);
   const whole = createMatch({ seed, fleet: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0].map((form, i) => ({ form, captain: i > 0 ? { temperament: (i - 1) % 6, tier: i } : undefined })) });
@@ -143,7 +134,6 @@ export function vectors(): Record<string, string> {
   return { math: mathVectors(), rng: rngVectors(), sphere: sphereVectors(), ...matchVectors() };
 }
 
-/** Strikes below the guns of ships `from` on, so no broadside sinks them (combat.test.ts fights): the sea, the sails and the storm alone. */
 export function unarmed(s: MatchState, from = 0): MatchState {
   for (let i = from; i < s.ships.length; i++) s.ships[i].fittings[SLOT.broadside] = { kind: FITTING.none, tier: 0 };
   return s;

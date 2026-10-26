@@ -1,6 +1,3 @@
-// The shipwright's geometry: hull lines that are real naval architecture, guns per side as the forms table says,
-// and the rigging never clipping through the sails — every rope and spar against every sail's cloth over the full
-// range of bracing on both tacks, every canvas, flat to billowing, shivering and slack.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -30,7 +27,6 @@ test('gunports: one, two, three and four a side', () => {
   }
 });
 
-// segment p→q against triangle abc (Möller–Trumbore)
 const _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _h = new THREE.Vector3(), _s = new THREE.Vector3(), _q = new THREE.Vector3(), _d = new THREE.Vector3();
 function hits(p: THREE.Vector3, q: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): boolean {
   _d.subVectors(q, p);
@@ -65,7 +61,6 @@ test('the rigging never clips through the sails', () => {
       const st: RigState = trim(rig, rig.state(canvas), wind);
       st.sails.forEach((s) => Object.assign(s, { fill: mood.fill, shiver: mood.shiver ?? 0, slack: mood.slack ?? 0 }, s.set ? { set: mood.set ?? 1 } : {}));
       states++;
-      // every rope (shortened at the ends where it is made fast) and every spar, as segments with a radius
       const ends = new Float32Array(6 * rig.ropes.length);
       rig.ropeEnds(st, time, ends);
       const segs: { p: THREE.Vector3; q: THREE.Vector3; r: number; what: string; owner: number }[] = [];
@@ -106,7 +101,6 @@ test('the rigging never clips through the sails', () => {
   assert.ok(states > 1000, `${states} states`);
 });
 
-// ---- part B: emblems, chart silhouettes, levels of detail ---------------------------------------------------------
 import { EMBLEMS, emblemAtlas } from '../../src/render/ships/emblems.ts';
 import { silhouetteAtlas } from '../../src/render/ships/silhouettes.ts';
 import { FLEET_TRIANGLES, LODS, LOD_BUDGET, buildLevel, chooseLods } from '../../src/render/ships/shipwright.ts';
@@ -146,11 +140,9 @@ test('the chart silhouettes: readable by heading from above, bigger with every f
   };
   const area = FORM_NAMES.map((_, i) => sum(i, 1, 0) + sum(i, 1, 1));
   FORM_NAMES.forEach((name, i) => {
-    // the hull's own length in the plan cell, bow up: a pointed bow against a square stern
     const rows = Array.from({ length: cell }, (_, j) => sum(i, 0, 0, j, j + 1)), lit = rows.flatMap((r, j) => (r > 0.5 ? [j] : []));
     const j0 = lit[0], j1 = lit[lit.length - 1] + 1, fifth = Math.max(2, Math.round((j1 - j0) * 0.12));
     const bow = sum(i, 0, 0, j1 - fifth, j1), stern = sum(i, 0, 0, j0, j0 + fifth);
-    // or, where the ends are alike, the bowsprit and the head reaching out beyond the stem
     const all = Array.from({ length: cell }, (_, j) => sum(i, 0, 3, j, j + 1)).flatMap((r, j) => (r > 0.5 ? [j] : []));
     const ahead = all[all.length - 1] + 1 - j1, astern = j0 - all[0];
     assert.ok(stern > bow * 1.2 || ahead > astern + 1, `${name}: readable by heading (ends ${stern.toFixed(0)} / ${bow.toFixed(0)}, overhang ${astern} / ${ahead})`);
@@ -165,10 +157,8 @@ test('levels of detail: every form within its budget at every level, ten ships w
     LODS.forEach((lod, i) => assert.ok(tris[form][i] <= LOD_BUDGET[lod], `${form} ${lod}: ${tris[form][i]} > ${LOD_BUDGET[lod]}`));
     assert.ok(tris[form][0] > tris[form][1] && tris[form][1] > tris[form][2], `${form}: each level lighter than the last`);
   }
-  // ten galleons all large on screen: the smallest give way until the fleet fits, the nearest keeps hero detail
   const g = tris.galleon, lv = chooseLods(Array.from({ length: 10 }, (_, i) => 900 - i * 10), Array(10).fill(g), Array(10).fill(0));
   assert.ok(lv.reduce((s, l) => s + g[l], 0) <= FLEET_TRIANGLES, `fleet ${lv.join('')}`);
   assert.equal(lv[0], 0);
-  // hysteresis: a hero ship just under the threshold stays hero; a mid ship there does not climb
   assert.deepEqual(chooseLods([220, 220], [g, g], [0, 1]), [0, 1]);
 });

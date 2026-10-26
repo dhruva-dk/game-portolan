@@ -1,6 +1,3 @@
-// The sky's light (src/render/light.ts) and the hour palettes it lays: the light never comes from below the horizon
-// and turns smoothly through the day, the sun is up by day and the full moon by night, the lamps are lit by night
-// only, and every palette colour (sky washes and glow included) blends without a jump, round midnight too.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -8,7 +5,7 @@ import { LIGHT_MIN, newSkyLight, skyLight } from '../../src/render/light.ts';
 import { hourPalette, toLinear } from '../../src/style/palette.ts';
 
 const FEET = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0.3, 0.8, -0.5), new THREE.Vector3(0.02, 1, 0.01), new THREE.Vector3(0, -1, 0.001)];
-const STEP = 0.05; // hours: about nine seconds of play
+const STEP = 0.05;
 
 test('the light stays above the horizon and turns smoothly through the day', () => {
   const a = newSkyLight(), b = newSkyLight();

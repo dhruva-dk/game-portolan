@@ -1,8 +1,3 @@
-// The chart's ships: a small inked silhouette of each form seen from above (bow up, so a sprite turned to the ship's
-// heading shows which way it sails) and from abeam, bow to the right (for the lookout marks and the results timeline),
-// drawn from the shipwright's own hull lines and rig at one scale (a galleon stays bigger than a pinnace) and
-// rasterised once into one atlas. Channels as the emblems': r = hull (the captain's first pigment), g = canvas (the
-// second), b = ink, a = coverage. Columns are FORM_NAMES; row 0 (bottom) the plan, row 1 the profile.
 import * as THREE from 'three';
 import { FORM_NAMES, type FormName } from './forms.ts';
 import { Rig } from './rig.ts';
@@ -20,12 +15,10 @@ function drawing(form: FormName, view: SilhouetteView): Drawing {
   const us = Array.from({ length: N + 1 }, (_, i) => i / N), o = new THREE.Vector3(), M = new THREE.Matrix4();
   const P = view === 'plan' ? (p: THREE.Vector3) => [p.x, p.z] : (p: THREE.Vector3) => [p.z, p.y];
   if (view === 'plan') {
-    // the stern squared off as on the old charts, against the pointed bow, so the heading reads at a glance
     const st = rig.state('plain', 2.2, 0.8), wide = 0.6 * Math.max(...us.map((u) => f.half(u, Math.min(s.maxY, f.rail(u)))));
     const at = (u: number, side: number) => { const y = Math.min(s.maxY, f.rail(u)); return [side * Math.max(f.half(u, y), wide * Math.min(1, Math.max(0, (0.25 - u) / 0.15))), f.z(u, y)]; };
     for (const u of us) hull.push(...at(u, 1));
     for (const u of [...us].reverse()) hull.push(...at(u, -1));
-    // the castles' breaks across the deck, the masts, the yards as braced and the sails' belly
     for (const d of s.decks) for (const u of [d.from, d.to]) if (u > 0.01 && u < 0.99) { const [x, z] = at(u, 1); lines.push(seg(-x, z, x, z, 0.03)); }
     for (const m of rig.masts) lines.push(circle(m.foot.x, m.foot.z + m.sections[0].zOff, Math.max(0.08, m.spec.r * 1.5)));
     rig.yards.forEach((y, k) => {
@@ -49,7 +42,6 @@ function drawing(form: FormName, view: SilhouetteView): Drawing {
       ext.push(b.z, b.y);
     }
     rig.sails.forEach((sl, i) => {
-      // square sails turned about their masts to face the viewer, foreshortened as a draughtsman draws them; lateens as they hang
       const square = rig.yards[sl.yard].kind !== 'lateen', Mi = rig.yardMatrix(st, sl.yard, M).clone().invert(), c = new THREE.Vector3().setFromMatrixPosition(M);
       const pt = (u: number, v: number) => { const p = rig.sailPoint(st, i, u, v, 0, o); if (!square) return P(p); p.applyMatrix4(Mi); return [c.z + 0.55 * p.x, c.y + p.y]; };
       const rim: number[] = [];
@@ -64,7 +56,6 @@ function drawing(form: FormName, view: SilhouetteView): Drawing {
   }
   ext.push(...hull);
   const xs = ext.filter((_, i) => i % 2 === 0), ys = ext.filter((_, i) => i % 2 === 1), body = poly(hull, CULL);
-  // from abeam, only what floats: the hull is cut off just below the waterline
   return {
     hull: view === 'plan' ? body : (x, y) => Math.max(body(x, y), -0.15 - y),
     canvas: union(...canvas), lines: union(...lines),
@@ -72,7 +63,6 @@ function drawing(form: FormName, view: SilhouetteView): Drawing {
   };
 }
 
-/** The atlas: forms × views cells of `cell` px, RGBA, bottom row first in memory. */
 export function silhouetteAtlas(cell = SILHOUETTE_CELL): Uint8Array {
   const W = FORM_NAMES.length * cell, out = new Uint8Array(4 * W * SILHOUETTE_VIEWS.length * cell);
   SILHOUETTE_VIEWS.forEach((view, row) => {
@@ -93,13 +83,11 @@ export function silhouetteAtlas(cell = SILHOUETTE_CELL): Uint8Array {
   });
   return out;
 }
-/** A form's cell in the atlas texture: (u0, v0, du, dv). */
 export function silhouetteRect(form: FormName, view: SilhouetteView): THREE.Vector4 {
   const n = FORM_NAMES.length, m = SILHOUETTE_VIEWS.length;
   return new THREE.Vector4(FORM_NAMES.indexOf(form) / n, SILHOUETTE_VIEWS.indexOf(view) / m, 1 / n, 1 / m);
 }
 let texture: THREE.DataTexture | null = null;
-/** The atlas as one mipmapped texture, made on first use. */
 export function silhouetteTexture(): THREE.DataTexture {
   if (!texture) texture = atlasTexture(silhouetteAtlas(), FORM_NAMES.length * SILHOUETTE_CELL, SILHOUETTE_VIEWS.length * SILHOUETTE_CELL);
   return texture;

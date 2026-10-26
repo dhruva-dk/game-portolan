@@ -1,16 +1,8 @@
-// Captures the terrain on the sea test page.
-//   node tests/pages/terrain.shots.ts [outDir]            WP15 part A: a generic island (the Spice Isles) from deck,
-//     high and orbit at dawn, midday and golden hour, at both devices (wp15-<device>-<view>-<hour>.png, and each
-//     device's nine as a contact sheet, wp15-<device>-sheet.png)
-//   node tests/pages/terrain.shots.ts <outDir> <prefix>   WP15d detail set: the iPad's deck, high and orbit views of
-//     the Spice Isles, a Fjords cliff close-up, a beach cove and the Weeping Isle from orbit at 16:00
-//     (<prefix>-<view>.png and <prefix>-sheet.png)
-// Each frame logs draw calls, triangles, the terrain's share and GPU memory for A9 (the orbit view holds the whole region).
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { launch, openGame, root, serve } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
+const outDir = process.argv[2] ?? join(root, 'out/shots');
 const prefix = process.argv[3];
 const VIEWS = ['deck', 'high', 'orbit'] as const;
 const HOURS = [['dawn', 6.5], ['midday', 12], ['golden', 18]] as const;

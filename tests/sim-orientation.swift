@@ -1,11 +1,3 @@
-// Turns a booted iOS Simulator to a device orientation without Simulator.app, which is the only thing that
-// normally rotates one: a headless simulator stays in portrait, where iPadOS letterboxes a landscape-only app.
-//   sim-orientation <udid> <orientation>    (UIDeviceOrientation: 1 portrait, 3 landscape left, 4 landscape right)
-// Like Simulator.app, it sends the device a GraphicsServices "purple" event through its PurpleWorkspacePort,
-// looked up with the private CoreSimulator framework; simctl has no orientation option (Xcode 27.1). The event
-// layout below was found by experiment on Xcode 26.2 with the iOS 26.3 runtime and still holds on Xcode 27.1 with
-// the iOS 27.0 runtime: an 80-byte mach message with id 123 holding a GSEvent record of type 50 (device
-// orientation changed) with the host flag 0x20000, its info size (4) at byte 72 and the orientation at byte 76.
 import Foundation
 
 let args = CommandLine.arguments
@@ -26,7 +18,6 @@ guard let device = (deviceSet.value(forKey: "devices") as! [AnyObject])
   .first(where: { ($0.value(forKey: "UDID") as! UUID).uuidString == args[1].uppercased() })
 else { fatalError("no simulator \(args[1])") }
 
-// -[SimDevice lookup:error:] returns a mach port, so it is called through its implementation, not perform().
 typealias Lookup = @convention(c) (AnyObject, Selector, NSString, UnsafeMutableRawPointer?) -> mach_port_t
 let lookup = NSSelectorFromString("lookup:error:")
 let port = unsafeBitCast(class_getMethodImplementation(object_getClass(device), lookup)!, to: Lookup.self)(
@@ -36,12 +27,12 @@ guard port != 0 else { fatalError("the simulator has no PurpleWorkspacePort; is 
 let size = 80
 let message = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 8)
 memset(message, 0, size)
-message.storeBytes(of: UInt32(MACH_MSG_TYPE_COPY_SEND), toByteOffset: 0, as: UInt32.self) // msgh_bits
-message.storeBytes(of: UInt32(size), toByteOffset: 4, as: UInt32.self) // msgh_size
-message.storeBytes(of: port, toByteOffset: 8, as: UInt32.self) // msgh_remote_port
-message.storeBytes(of: Int32(123), toByteOffset: 20, as: Int32.self) // msgh_id
-message.storeBytes(of: UInt32(50 | 0x20000), toByteOffset: 24, as: UInt32.self) // GSEvent type | host flag
-message.storeBytes(of: UInt32(4), toByteOffset: 72, as: UInt32.self) // info size
+message.storeBytes(of: UInt32(MACH_MSG_TYPE_COPY_SEND), toByteOffset: 0, as: UInt32.self)
+message.storeBytes(of: UInt32(size), toByteOffset: 4, as: UInt32.self)
+message.storeBytes(of: port, toByteOffset: 8, as: UInt32.self)
+message.storeBytes(of: Int32(123), toByteOffset: 20, as: Int32.self)
+message.storeBytes(of: UInt32(50 | 0x20000), toByteOffset: 24, as: UInt32.self)
+message.storeBytes(of: UInt32(4), toByteOffset: 72, as: UInt32.self)
 message.storeBytes(of: orientation, toByteOffset: 76, as: UInt32.self)
 let result = mach_msg(
   message.assumingMemoryBound(to: mach_msg_header_t.self), MACH_SEND_MSG, mach_msg_size_t(size), 0, 0, 0, 0)

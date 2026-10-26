@@ -1,8 +1,3 @@
-// WP26 the harbour, which is the menu: a calm lamp-lit scene at dusk drawn on parchment — the player's ship at her
-// mooring with the gull on the masthead — with the set-sail seal over the harbour mouth and parchment tags for the
-// shipwright, the gull, the league, the nine captains, the career chart and the settings. Each opens as a ledger
-// unrolled over the harbour, its heading inked in by the quill (at once with reduced motion). Layout and rules are
-// in cards.ts (tested in Node); this file draws them and answers touches.
 import * as THREE from 'three';
 import { QUALITY } from '../render/pipeline.ts';
 import type { Harbour3D, HarbourLook } from '../render/harbour3d.ts';
@@ -23,8 +18,6 @@ import type { Rect, View } from './safeArea.ts';
 import { STEPS, applySettings, onSettings, setSettings, setUiSound, settings, uiSound, type Settings, type UiSound } from './settings.ts';
 import type { Runtime, Screen, ScreenContext } from './shell.ts';
 
-/** WP27 seam: the career chart's view, drawn into the ledger's body when the player unrolls it; its frame(dt), once the
- *  ledger is open, inks in what the last voyage brought. */
 export type ChartPage = (ctx: ScreenContext, body: Rect, career: Career) => THREE.Object3D & { frame?(dt: number): void };
 let chartPage: ChartPage | null = null;
 export const setChartPage = (f: ChartPage | null): void => { chartPage = f; };
@@ -37,7 +30,6 @@ const WHY = { chosen: 'She is already yours', top: 'The gull has mastered it', s
 
 interface Volumes { setVolumes(v: { sound?: number; music?: number }): void }
 type Bag = Record<string, unknown> | null | undefined;
-/** The game's audio (WP28), duck-typed: whatever carries setVolumes and ui(), itself or its engine. */
 function audioOf(rt: Runtime): { volumes: Volumes | null; ui: ((n: UiSound) => void) | null } {
   const a = (rt as unknown as { audio?: Bag }).audio;
   let volumes: Volumes | null = null, ui: ((n: UiSound) => void) | null = null;
@@ -66,12 +58,11 @@ export function harbour(ctx: ScreenContext): Screen {
   const live = (): boolean => !!holder.career;
   let shown = holder.career;
 
-  // WP27: home from a voyage that brought the chart something new, the harbour opens on the chart as it inks it in
   let view: View | null = null, page: Page = rt.outcome?.charted === false ? 'chart' : 'home', L: HarbourLayout | null = null, H: HarbourLayout | null = null;
   let art: HarbourArt | null = null, artKey = '';
   let seal: THREE.Group | null = null, sealPress = 0, sealDown = false;
   let clock = 0, unroll = page === 'home' ? 1 : 0, chartLeaf: ReturnType<ChartPage> | null = null;
-  let h3: Harbour3D | null = null, h3Wait = false, h3Frames = 0, disposed = false; // WP26c the 3D harbour, built lazily
+  let h3: Harbour3D | null = null, h3Wait = false, h3Frames = 0, disposed = false;
   let note: InkText | null = null, noteAt = -9;
   let finger: { id: number; target: Target } | null = null;
   const inking: { t: InkText; delay: number; at: number | null }[] = [];
@@ -116,7 +107,6 @@ export function harbour(ctx: ScreenContext): Screen {
     drop(home);
     const l = H!, c = career(), sl = l.seal!;
     home.visible = page === 'home';
-    // WP26b the set-sail seal: red wax with an embossed rose and ribbon tails, pressed like a signet (frame)
     const ss = sealSheet(sl.r, view!.dpr), sm = sheetMesh(ss);
     sm.position.set(0, ss.h / 2 - sl.r * SEAL_CY, 0);
     sm.renderOrder = ORDER.seal;
@@ -320,7 +310,7 @@ export function harbour(ctx: ScreenContext): Screen {
   }
 
   return {
-    get scene() { return h3?.scene ?? BARE.scene; }, // WP26c the 3D harbour once built, the bare world until then
+    get scene() { return h3?.scene ?? BARE.scene; },
     get camera() { return h3?.camera ?? BARE.camera; },
     ui,
     layout(v) {
@@ -338,21 +328,21 @@ export function harbour(ctx: ScreenContext): Screen {
       const still = settings().reducedMotion;
       if (holder.career !== shown) { shown = holder.career; buildArt(); buildHome(); buildLeaf(false); }
       art?.frame(f.clock, still);
-      if (!h3 && !h3Wait && ++h3Frames > 1) { // WP26c the 3D harbour, built once the harbour has drawn its first frame
+      if (!h3 && !h3Wait && ++h3Frames > 1) {
         h3Wait = true;
         void import('../render/harbour3d.ts').then((m) => {
           if (disposed) return;
           h3 = new m.Harbour3D(style, lookOf(career()), ctx.pipeline.quality.detail);
           if (view) h3.layout(view.width, view.height);
-          scene.visible = false; // the 2D illustration gives way to the inked 3D harbour
+          scene.visible = false;
         });
       }
       if (h3) {
-        h3.setCareer(lookOf(career())); // the shipwright's form and pigments, the gull's plumage, live
+        h3.setCareer(lookOf(career()));
         h3.setDetail(ctx.pipeline.quality.detail);
         h3.frame(f.clock, f.dt, still, page === 'home' ? 0 : 1);
       }
-      if (seal) { // the seal sinks into the page under the finger with a tap, and springs back; faint while the world is still coming
+      if (seal) {
         const ready = !!rt.world && live(), down = ready && finger?.target.kind === 'sail';
         if (down && !sealDown) uiSound('tap');
         sealDown = down;

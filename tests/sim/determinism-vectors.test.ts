@@ -1,7 +1,3 @@
-// Cross-engine determinism (progress.html, Architecture A2): the determinism vectors of tests/sim/vectors.ts are
-// bit-identical in Node and, run from a minified production bundle as the shipped game is, in Chromium (V8) and
-// WebKit (JavaScriptCore, the engine of the iOS app's web view). Any mismatch is a blocker.
-//   node --test tests/sim/determinism-vectors.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +5,6 @@ import { chromium, webkit } from 'playwright';
 import { build } from 'vite';
 import { vectors } from './vectors.ts';
 
-/** tests/sim/vectors.ts as one minified script that defines `portolanVectors`, built like the game. */
 async function bundle(): Promise<string> {
   const result = await build({
     configFile: false,

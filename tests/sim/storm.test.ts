@@ -1,9 +1,3 @@
-// WP8 part C, the storm, headless: the plan's geometry (every calm inside the one before, the sweep shrinking the calm
-// steadily between them, the final calm clear of the origin) and the final calm's uniformity over the regions across
-// 10 000 seeds; each phase announced before it moves; damage that rises each phase; sails labouring without storm
-// sails; the sea it swallows; the match lengths the storm alone produces while the captains sit idle (until WP11);
-// snapshot/resume over whole matches; and the tick's cost with the storm active and every ship's sight surveyed.
-//   node --test tests/sim/storm.test.ts      PORTOLAN_MATCHES=300 for the full match-length distribution
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +25,6 @@ const angle = (a: V3, b: V3): number => dacos(Math.max(-1, Math.min(1, dot(a, b)
 const CLOSED = S(PH[LAST].move + PH[LAST].sweep);
 const quantile = (xs: number[], q: number): number => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(q * xs.length))];
 
-/** Ship i, sailing, at p. */
 function put(s: MatchState, i: number, p: V3): void {
   const ship = s.ships[i];
   ship.phase = PHASE.sailing;
@@ -55,7 +48,6 @@ test('every calm of the plan lies inside the one before, and the final calm fall
     assert.ok(angle(final.at, plan.origin) >= final.r, `seed ${seed}: the final calm holds the origin`);
     hits[W.geo.region[cellOf(TERRITORY, final.at)]]++;
   }
-  // Pearson's χ² against each region's share of the planet; the threshold is the 0.1 % upper tail (Wilson–Hilferty).
   let chi = 0;
   const shares: string[] = [];
   for (let k = 0; k < REGIONS.length; k++) {
@@ -77,7 +69,7 @@ test('the calm only ever shrinks, and each phase is announced before it moves', 
     for (let x = 0; x < CLOSED * TICK + 5; x += 0.5) {
       calmAt(s, x, a);
       calmAt(s, x + 0.5, b);
-      assert.ok(angle(a.at, b.at) + b.r <= a.r + 1e-6, `seed ${seed}: the calm grew at ${x} s`); // dacos near 1: ~1e-8
+      assert.ok(angle(a.at, b.at) + b.r <= a.r + 1e-6, `seed ${seed}: the calm grew at ${x} s`);
     }
     for (let k = 0; k < PH.length; k++) {
       s.tick = S(PH[k].move) - S(1);
@@ -108,7 +100,6 @@ test('inside the storm a ship loses hull at a rate that rises each phase, and it
     assert.ok(Math.abs(lost - PH[k].rate * TICK) < 1e-12 && lost > last, `phase ${k + 1}: ${lost}`);
     last = lost;
   }
-  // The same spot before the storm moves and once it is in the storm: a quarter slower, unless under storm sails.
   s.tick = S(PH[0].move + PH[0].sweep);
   const c = calmNow(s).at, p = v3(-c.x, -c.y, -c.z), ratio = (): number => {
     s.tick = 0;
@@ -143,7 +134,6 @@ test('the storm swallows the sea it covers, and only that', () => {
   }
 });
 
-/** A headless match with the captains idle and the player breaking off at a seeded moment; `each` sees every step's ms. */
 function idleMatch(seed: number, each?: (s: MatchState, ms: number) => void, from?: MatchState): MatchState {
   const water = seed === SEED ? sea : seaFor(W, seed), s = from ?? createMatch({ seed }), input = idleInput();
   const off = S(5 + rngInt(rngFrom(seed), 30));
@@ -159,7 +149,7 @@ function idleMatch(seed: number, each?: (s: MatchState, ms: number) => void, fro
 test('the storm alone ends every match, by its last phase', (t) => {
   const n = Number(process.env.PORTOLAN_MATCHES ?? 6), minutes: number[] = [];
   for (let m = 0; m < n; m++) {
-    const s = idleMatch(hash32(SEED, m), undefined, unarmed(createMatch({ seed: hash32(SEED, m) }))); // guns struck below
+    const s = idleMatch(hash32(SEED, m), undefined, unarmed(createMatch({ seed: hash32(SEED, m) })));
     assert.ok(s.sunk.every((d) => d.cause === CAUSE.storm && d.by === -1));
     assert.ok(s.tick <= CLOSED + S(20), `seed ${m} over at ${s.tick * TICK} s`);
     minutes.push((s.tick * TICK) / 60);

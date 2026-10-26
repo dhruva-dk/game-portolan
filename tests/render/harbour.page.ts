@@ -1,6 +1,3 @@
-// WP26 part C: the 3D harbour alone, for tests/render/harbour.test.ts and tests/ui/harbour3d.shots.ts.
-// window.__harbour: measure(detail, open) draws it and reports its draw calls and triangles; look(form, pigments,
-// marks) gives it a career's ship and gull and reports what it built; show(seconds) lets it live a while.
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { Harbour3D } from '../../src/render/harbour3d.ts';
 import { PIGMENTS, type RGB } from '../../src/style/palette.ts';

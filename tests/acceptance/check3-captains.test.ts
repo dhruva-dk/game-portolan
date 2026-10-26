@@ -1,28 +1,13 @@
-// Acceptance check 3 (PROMPT.md, Captains): in a headless tournament of 200 seeded matches (tests/tools/tournament.ts,
-// on worker_threads),
-//   - each of the six temperaments shows a clearly distinct profile of sea claimed, trails broken, ships sunk, loot
-//     taken and finishing place, and hunters lead in ships sunk;
-//   - higher-ranked captains finish ahead of lower-ranked captains by a clear, stated margin;
-//   - a scripted player that always breaks off into one region and draws large loops is measurably countered within
-//     five matches, and the counter fades within five matches after the script changes its habits. Asserted on the
-//     region (captains following it there); the loops' counter (hunters patrolling beyond its border, brain.ts
-//     patrols) is recorded beside it, not yet asserted (progress.html WP12, Remaining).
-// The stated margins are MARGIN's. The numbers are recorded in progress/checks/check3.json before anything is asserted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { NAMES, habitRegions, mean, placesByTier, pool, profiles, sd, table, tournament, welch, type CareerMatch, type Measure } from '../tools/tournament.ts';
 
 const SPEC = ['sea', 'broken', 'sunk', 'loot', 'place'] as const;
-/** The stated margins. */
 export const MARGIN = {
-  /** Every pair of temperaments differs in at least one of the five stats by Welch |t| ≥ pairT, and their profiles (each stat over its spread across the six) lie ≥ spread apart. */
   pairT: 4, spread: 0.5,
-  /** Hunters' ships sunk a captain exceed every other temperament's by Welch t ≥ huntT. */
   huntT: 2,
-  /** Captains of tiers 6–8 finish at least `places` places ahead of tiers 1–3, at Welch t ≥ rankT. */
   places: 1, rankT: 6,
-  /** Scripted player: countered once at least `on` more captains (mean over the careers) break off into its region than naive captains on the same seeds and fleets; faded once the excess stays ≤ `off`; each within `within` matches. */
   on: 0.5, off: 0.25, within: 5,
 } as const;
 const CAREERS = 10, MATCHES = 10, CHANGE = 5;
@@ -32,7 +17,6 @@ test('check 3: captains — 200 matches, six distinct temperaments, rank margin,
   t.diagnostic(`200 matches: ${run.wall.toFixed(1)} s wall, ${run.workerSeconds.toFixed(0)} worker-s, mean match ${run.meanMinutes.toFixed(2)} min`);
   for (const l of table(run.rows)) t.diagnostic(l);
 
-  // Distinct profiles.
   const spread = SPEC.map((f) => Math.max(1e-9, Math.max(...p.map((x) => x.mean[f])) - Math.min(...p.map((x) => x.mean[f]))));
   let nearest = Infinity, nearPair = '', weakest = Infinity, weakPair = '';
   for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) {
@@ -47,7 +31,6 @@ test('check 3: captains — 200 matches, six distinct temperaments, rank margin,
   t.diagnostic(`nearest profiles ${nearPair} ${nearest.toFixed(2)} spreads; weakest pair ${weakPair} best |t| ${weakest.toFixed(1)}; hunters' sinkings lead t ${huntT.toFixed(2)}`);
   t.diagnostic(`rank: tiers 1–3 place ${rank.low.toFixed(2)}, tiers 6–8 ${rank.high.toFixed(2)}: ${rank.margin.toFixed(2)} places, t ${rank.t.toFixed(1)}`);
 
-  // The scripted player.
   const [ra, rb] = habitRegions();
   const careers = await pool<CareerMatch[]>(Array.from({ length: CAREERS }, (_, k) => ({ kind: 'career' as const, k, a: { region: ra, temperament: 5 }, b: { region: rb, temperament: 3 }, matches: MATCHES, change: CHANGE })));
   const excess = (j: number, f: keyof Measure): number => mean(careers.map((c) => c[j].learn[f] - c[j].naive[f]));
@@ -68,8 +51,8 @@ test('check 3: captains — 200 matches, six distinct temperaments, rank margin,
     distinct: { nearest, nearPair, weakest, weakPair }, huntT, rank, placeByTier: tiers.map((x) => mean(x)), placeSdByTier: tiers.map((x) => sd(x)),
     scripted: { careers: CAREERS, habits: { first: { region: ra, loops: 'gambler' }, then: { region: rb, loops: 'turtle' } }, change: CHANGE, perMatch, counteredAt, fadedAfter },
   };
-  mkdirSync('progress/checks', { recursive: true });
-  writeFileSync('progress/checks/check3.json', `${JSON.stringify(record, null, 1)}\n`);
+  mkdirSync('out/checks', { recursive: true });
+  writeFileSync('out/checks/check3.json', `${JSON.stringify(record, null, 1)}\n`);
 
   assert.ok(nearest >= MARGIN.spread, `${nearPair} profiles too alike (${nearest.toFixed(2)} spreads)`);
   assert.ok(weakest >= MARGIN.pairT, `${weakPair} differ in no stat at |t| ≥ ${MARGIN.pairT} (${weakest.toFixed(1)})`);

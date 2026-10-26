@@ -1,34 +1,15 @@
-// The one fixed geography, built from the region data: height, signed coast distance, seabed, region and zones on
-// the territory grid, the placed sites (lights, harbours, landmarks, falls, finds, stacks, floes), the fixed current
-// lanes and the Great Current's seeded route. The simulation collides, slows and pays with these fields and the
-// renderer meshes and paints the same ones, so the two never disagree.
-//
-// Each region's strokes become one smooth height field in its local chart (stroke vocabulary adapted from the
-// earlier game's world.ts): land is a signed distance D from smooth unions of tapered capsules, carved by channels
-// and bays and roughened by coastline noise; its height is a C1 profile of D (beach berm or cliff, blended by a
-// cliffness field, plus ridge relief), and the seabed runs from the shallows over the region's shelf to the abyss.
-// Reefs, bars, stacks, flats and cones join by smooth maxima. Deterministic math only: the same bits everywhere.
 import { PI, datan2, dcos, dot, dsin, dtan, hash32, normalize, rngFrom, rngInt, set, v3, type V3 } from '../math.ts';
 import { R, TERRITORY, cellOf, faceUV, fromLatLon, gnomonicDir, localFrame, neighbor } from '../sphere.ts';
 import { DRAFT, FLOOR, REGIONS, TIDE, rimAt, type Perk, type Region } from './regions.ts';
 
 const RIM = { r: 0, w: 0, crest: 0 };
 
-/** Zone bits of the geography's zone field. */
 export const ZONE = { kelp: 1, hot: 2, tidal: 4, lagoon: 8, harbour: 16, pack: 32, vortex: 64 } as const;
-/** Water at least this far from the solid contour takes a hull's centre (nav, routes). */
 export const CLEAR = 2;
-/** The coast field is capped at ± this, u. */
 export const COAST_CAP = 60;
-/** Every feature's skirt sinks to this outside its reach, below any abyssal floor. */
 const DEEP = -60;
-/** A region's strokes reach no farther than this from its centre, u. */
 const REACH = 104;
-/** Domain warp: amplitude u, frequency 1/u. */
 const WARP_A = 1.6, WARP_F = 0.03;
-
-// ---------------------------------------------------------------------------------------------------------------
-// Smooth scalar helpers, C1 Hermite splines and 2D gradient noise (integer hashing only).
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -49,12 +30,10 @@ function herm(x: number, x0: number, x1: number, y0: number, y1: number, m0: num
   const d = x1 - x0, t = (x - x0) / d, t2 = t * t, t3 = t2 * t;
   return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * d * m0 + (3 * t2 - 2 * t3) * y1 + (t3 - t2) * d * m1;
 }
-// Knots (x, y, slope) for spline(): profiles are rebuilt per sample because their knots vary along the coast.
 const KX = new Float64Array(8), KY = new Float64Array(8), KM = new Float64Array(8);
 function knot(i: number, x: number, y: number, m: number): void {
   KX[i] = x; KY[i] = y; KM[i] = m;
 }
-/** Piecewise cubic through knots 0..n-1, flat outside. */
 function spline(x: number, n: number): number {
   if (x <= KX[0]) return KY[0];
   for (let i = 1; i < n; i++) if (x < KX[i]) return herm(x, KX[i - 1], KX[i], KY[i - 1], KY[i], KM[i - 1], KM[i]);
@@ -69,7 +48,6 @@ function lattice(ix: number, iy: number, s: number): number {
   h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
   return h ^ (h >>> 15);
 }
-/** Gradient noise, C2, roughly [−1, 1]. */
 function noise(x: number, y: number, s: number): number {
   const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
   const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
@@ -89,7 +67,6 @@ function fbm(x: number, y: number, s: number, octaves: number): number {
   }
   return sum;
 }
-/** Sparse round knolls (coral and rock heads) on a jittered grid of `cell` u: 0 between, 1 on a crest. */
 function knolls(x: number, y: number, cell: number, s: number): number {
   const fx = x / cell, fy = y / cell, ix = Math.floor(fx), iy = Math.floor(fy);
   let v = 0;
@@ -105,10 +82,6 @@ function knolls(x: number, y: number, cell: number, s: number): number {
   return v;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Region charts.
-
-/** A region's local chart: centre and the east/north tangents there. */
 export interface Chart { c: V3; e: V3; n: V3 }
 
 export const CHARTS: readonly Chart[] = REGIONS.map((r) => {
@@ -117,7 +90,6 @@ export const CHARTS: readonly Chart[] = REGIONS.map((r) => {
   return { c, e, n };
 });
 
-/** The region whose centre is nearest p: its Voronoi cell, a face of the dual dodecahedron. */
 export function regionOf(p: V3): number {
   let best = 0, bd = -2;
   for (let i = 0; i < CHARTS.length; i++) {
@@ -127,13 +99,11 @@ export function regionOf(p: V3): number {
   return best;
 }
 
-/** The unit direction at local chart point (x, y) of region `ri`. */
 export function toWorld(ri: number, x: number, y: number, out: V3): V3 {
   const k = CHARTS[ri], s = x / R, t = y / R, w = Math.sqrt(Math.max(0, 1 - s * s - t * t));
   return normalize(set(out, k.e.x * s + k.n.x * t + k.c.x * w, k.e.y * s + k.n.y * t + k.c.y * w, k.e.z * s + k.n.z * t + k.c.z * w));
 }
 
-/** The unit tangent at p pointing along compass bearing b (degrees) of region `ri`'s chart. */
 export function chartTangent(ri: number, p: V3, b: number, out: V3): V3 {
   const k = CHARTS[ri], s = dsin(b * (PI / 180)), c = dcos(b * (PI / 180));
   set(out, k.e.x * s + k.n.x * c, k.e.y * s + k.n.y * c, k.e.z * s + k.n.z * c);
@@ -141,23 +111,17 @@ export function chartTangent(ri: number, p: V3, b: number, out: V3): V3 {
   return normalize(set(out, out.x - d * p.x, out.y - d * p.y, out.z - d * p.z));
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Compiled strokes: one flat list of primitives per region, bucketed on an 8 u grid over the chart.
-
 const SEG = 0, CUT = 1, BAY = 2, REEF = 3, BAR = 4, COL = 5, FLAT = 6, CONE = 7, KELP = 8, HOT = 9, PATCH = 10;
 
 interface Prim {
   t: number;
   ax: number; ay: number; bx: number; by: number;
-  /** Radii at a and b (capsules, carves), width (bars, reefs), radius (discs). */
   ra: number; rb: number;
-  /** Ridge relief or crest or column height or flat depth or cone top. */
   h: number;
   cliff: number; ch: number;
-  /** Floor of a flat; crater radius and floor of a cone; reef: lagoon depth (f2). */
   f0: number; f1: number; f2: number;
-  gaps: readonly number[]; // reef passes: gx, gy (unit, chart), half-width, crest (NaN: deep)
-  rim: Float64Array; // reef: its rim (radius, width, crest) at every whole degree of bearing 0 … 360 (regions.ts rimAt)
+  gaps: readonly number[];
+  rim: Float64Array;
   great: boolean;
 }
 
@@ -166,10 +130,8 @@ function prim(t: number, o: Partial<Prim>): Prim {
   return { t, ax: 0, ay: 0, bx: 0, by: 0, ra: 0, rb: 0, h: 0, cliff: 0, ch: 0, f0: 0, f1: 0, f2: 0, gaps: [], rim: NO_RIM, great: false, ...o };
 }
 
-/** A column of a stack wall or the Arch, in chart coordinates. */
 export interface Column { x: number; y: number; r: number; h: number }
 
-/** The columns of a wall along a polyline, packed too close for a hull to pass between (gaps under 1 u). */
 function wallColumns(pts: readonly number[], r0: number, r1: number, h0: number, h1: number, seed: number): Column[] {
   const out: Column[] = [];
   let k = 0, carry = 0;
@@ -191,7 +153,6 @@ interface Compiled {
   region: Region;
   seed: number;
   prims: Prim[];
-  /** Bucket b lists prims start[b] … start[b+1]−1 of `list`. */
   start: Int32Array;
   list: Int32Array;
   columns: Column[];
@@ -199,7 +160,7 @@ interface Compiled {
 }
 
 const BUCKET = 8, NB = Math.ceil((2 * REACH) / BUCKET);
-const LAND_REACH = 36; // how far a land stroke's seabed runs before it reaches the abyss
+const LAND_REACH = 36;
 
 function compile(region: Region, index: number): Compiled {
   const prims: Prim[] = [], reach: number[] = [], columns: Column[] = [];
@@ -250,7 +211,6 @@ function compile(region: Region, index: number): Compiled {
   }
   for (const c of columns) add(prim(COL, { ax: c.x, ay: c.y, ra: c.r, h: c.h }), 8);
 
-  // Bucket every primitive by the box it can influence (padded by the warp).
   const counts = new Int32Array(NB * NB + 1), boxes: number[] = [];
   for (let k = 0; k < prims.length; k++) {
     const p = prims[k], r = (p.t === REEF ? p.rb + p.ra : Math.max(p.ra, p.rb)) + reach[k] + WARP_A + 2;
@@ -275,9 +235,6 @@ function compile(region: Region, index: number): Compiled {
 
 const COMPILED: readonly Compiled[] = REGIONS.map(compile);
 
-// ---------------------------------------------------------------------------------------------------------------
-// The height function of one region's chart. Results land in these scratch values.
-
 let outH = 0, outFloor: number = FLOOR.sand, outZone = 0;
 let capR = 0, segT = 0;
 
@@ -288,12 +245,10 @@ function segDist(px: number, py: number, p: Prim): number {
   return hyp(qx - dx * segT, qy - dy * segT);
 }
 
-/** The open ocean floor: an abyssal plain with broad, gentle swells. */
 function abyss(p: V3): number {
   return -47 + 3 * (1.7 * p.x * p.z + 0.6 * p.y * p.y - 0.4 * p.x + 1.1 * p.z * p.y);
 }
 
-/** Height, floor and zones at chart point (x, y) of a compiled region; `base` is the abyss there. */
 function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
   const reg = g.region, sh = reg.shore, s = g.seed;
   let h = base, floor: number = sh.floor, zone = 0;
@@ -302,7 +257,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
     outH = h; outFloor = floor; outZone = 0;
     return;
   }
-  // The region's shelf: a smooth union of discs, its edge bent by a broad warp.
   {
     const wx = x + 6 * noise(x * 0.02, y * 0.02, s + 21), wy = y + 6 * noise(x * 0.02 + 5.2, y * 0.02, s + 22);
     let D = 1e9;
@@ -315,7 +269,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
   const wx = x + WARP_A * noise(x * WARP_F, y * WARP_F, s), wy = y + WARP_A * noise(x * WARP_F + 7.3, y * WARP_F - 2.1, s + 1);
   const b = bj * NB + bi, k0 = g.start[b], k1 = g.start[b + 1];
 
-  // Land: signed distance, ridge relief, cliffness and cliff height (weighted toward the nearest strokes).
   let D = 1e9, rel = 0, clW = 0, cl = 0, hc = 0, cone = 0, coneSeen = false;
   for (let k = k0; k < k1; k++) {
     const p = g.prims[g.list[k]];
@@ -343,7 +296,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
     } else if (p.t === CONE) {
       const rho = hyp(x - p.ax, y - p.ay);
       if (rho < p.ra) {
-        // flanks steepening to the rim, the crater bowl inside, gullies down the slopes
         const uc = p.f0 / p.ra, v = 1 - (rho / p.ra - uc) / (1 - uc);
         const flank = p.h * v * v * (0.4 + 0.6 * v), q = rho / Math.max(p.f0, 1e-6);
         let c = smin(flank, p.f1 + (p.h - p.f1 + 6) * q * q * q * q, 4);
@@ -358,7 +310,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
   }
   const near = sh.shallows[0] + sh.shelf[0] + 6;
   if (D < LAND_REACH) {
-    // the coastline's wiggle: smooth arcs on beaches, crenellations under cliffs
     const fade = 1 - smoothstep(near - 4, near + 2, D);
     const n1 = fade > 0 ? fade * noise(x * 0.035, y * 0.035, s + 2) : 0, n2 = fade > 0 ? fade * noise(x * 0.055 + 9.1, y * 0.055, s + 3) : 0;
     const c = smoothstep(0.35, 0.65, cl + 0.3 * n1), hcl = hc * (0.85 + 0.25 * n2);
@@ -389,28 +340,22 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
     h = smax(h, lh, 1.5);
   }
 
-  // Reefs, bars, columns, flats; kelp and hot water.
   for (let k = k0; k < k1; k++) {
     const p = g.prims[g.list[k]];
     switch (p.t) {
       case REEF: {
         const lx = x - p.ax, ly = y - p.ay, rho = hyp(lx, ly);
         if (rho > p.rb + p.ra + 36) break;
-        // the rim at this bearing, its line and its flat's edges roughened (ragged by a few tenths of a unit, the
-        // flat's width by a fifth), so no stretch of it runs on as an even band
         let deg = datan2(lx, ly) * (180 / PI);
         if (deg < 0) deg += 360;
         const ib = Math.min(359, Math.floor(deg)), fb = deg - ib, L = p.rim, o = 3 * ib, r0 = mix(L[o], L[o + 3], fb);
-        if (rho - r0 > 0.6 * p.ra + 37) break; // past the reef front's foot: the abyss either way
+        if (rho - r0 > 0.6 * p.ra + 37) break;
         const rr = r0 + 0.45 * noise(x * 0.19 + 2.3, y * 0.19 - 1.7, s + 17);
         const t = rho - rr, hw = (mix(L[o + 1], L[o + 4], fb) / 2) * (1 + 0.2 * noise(x * 0.13 - 4.1, y * 0.13 + 0.6, s + 18)), c = mix(L[o + 2], L[o + 5], fb);
-        // the flat: highest along its seaward edge (the algal ridge), sloping down gently to the back reef, which falls
-        // to the lagoon floor over 3 … 5 u (steeper in a small ring, so its lagoon is not all slope)
         knot(0, -hw - Math.min(5, Math.max(3, 0.3 * r0)), -p.f2, 0); knot(1, -hw, c - 0.3, 0.06); knot(2, 0.4 * hw, c, 0); knot(3, hw, c - 0.25, -0.3);
         knot(4, hw + 4, -8, -2); knot(5, hw + 14, -24, -1); knot(6, hw + 34, DEEP, 0);
         let rh = spline(t, 7);
         if (t < -hw - 2) rh += 0.8 * knolls(x, y, 8, s + 10) * Math.max(0, -1.4 - rh);
-        // passes: deep channels, or sills awash at their own crest
         const ux = lx / Math.max(rho, 1e-6), uy = ly / Math.max(rho, 1e-6);
         for (let i = 0; i < p.gaps.length; i += 4) {
           const along = rr * Math.abs(ux * p.gaps[i + 1] - uy * p.gaps[i]), facing = ux * p.gaps[i] + uy * p.gaps[i + 1];
@@ -428,7 +373,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
         break;
       }
       case PATCH: {
-        // a patch reef: a flat-topped coral head, its edge lobed, steep sides down to the floor round it
         const d0 = hyp(x - p.ax, y - p.ay);
         if (d0 > 1.45 * p.ra + 14) break;
         const d = d0 - p.ra * (1 + 0.3 * noise(x * 0.45 + p.ax, y * 0.45 - p.ay, s + 19));
@@ -480,7 +424,6 @@ function sampleRegion(g: Compiled, x: number, y: number, base: number): void {
 }
 
 const LOCAL = { x: 0, y: 0 };
-/** The chart coordinates of p in region ri. */
 export function toChart(ri: number, p: V3): { x: number; y: number } {
   const k = CHARTS[ri];
   LOCAL.x = R * dot(p, k.e);
@@ -488,7 +431,6 @@ export function toChart(ri: number, p: V3): { x: number; y: number } {
   return LOCAL;
 }
 
-/** Exact height at direction p, u above mean sea level (seabed negative); also sets the floor and zone scratch. */
 function sampleAt(p: V3): number {
   const ri = regionOf(p), k = CHARTS[ri], base = abyss(p);
   const x = R * dot(p, k.e), y = R * dot(p, k.n);
@@ -500,24 +442,17 @@ export function heightExact(p: V3): number {
   return sampleAt(p);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The baked fields.
-
 export interface Placed { region: number; pos: V3; facing: V3; height: number }
 export interface Landmark extends Placed { name: string; perk: Perk; r: number }
 export interface Harbour extends Placed { moorings: number; r: number }
 export interface Light extends Placed { period: number }
 export interface Find extends Placed { kind: 'wreck' | 'cache'; richness: number }
 export interface Stack extends Placed { r: number }
-/** An Ice Crown floe at time 0: chart radius from the pole, angle (rad), size; its ring turns at ring.speed. */
 export interface Floe { ring: number; r: number; angle: number; size: number }
-/** A fixed current lane between two regions: great-circle arc a → b, width and speed. */
 export interface Lane { from: number; to: number; a: V3; b: V3; width: number; speed: number }
 
 export interface Geography {
-  /** Per territory cell (TERRITORY indexing): height u above mean sea level. */
   heights: Float32Array;
-  /** Signed distance to the mean-tide solid contour, u, capped ±COAST_CAP: positive in navigable water. */
   coast: Float32Array;
   floor: Uint8Array;
   region: Uint8Array;
@@ -536,7 +471,6 @@ const N = TERRITORY.n, NN = N * N;
 const TAN = new Float64Array(N);
 for (let i = 0; i < N; i++) TAN[i] = dtan((((i + 0.5) / N) * 2 - 1) * (PI / 4));
 
-/** Unit direction of every territory cell centre, xyz interleaved. */
 function cellDirs(): Float32Array {
   const out = new Float32Array(6 * NN * 3), p = v3();
   let k = 0;
@@ -551,10 +485,6 @@ function cellDirs(): Float32Array {
   return out;
 }
 
-/**
- * Heights, floors and zones at every cell: exact wherever a 4×4 block reaches above −20, bilinear between block
- * corners where all four lie below it (every feature's skirt is wider than a block, so none is missed).
- */
 function bake(P: Float32Array, geo: Geography): void {
   const B = 4, NBK = N / B, node = new Float32Array((NBK + 1) * (NBK + 1)), p = v3();
   const exact = (c: number) => {
@@ -568,7 +498,6 @@ function bake(P: Float32Array, geo: Geography): void {
   const q = v3();
   for (let f = 0; f < 6; f++) {
     const base = f * NN;
-    // block corners, including the far edge of the face (sampled just inside it)
     for (let b = 0; b <= NBK; b++) {
       for (let a = 0; a <= NBK; a++) {
         const i = Math.min(N - 1, a * B), j = Math.min(N - 1, b * B);
@@ -598,7 +527,6 @@ function bake(P: Float32Array, geo: Geography): void {
   }
 }
 
-/** Signed distance to the mean-tide solid contour: nearest-seed propagation (Dial buckets) from sub-cell crossings. */
 function bakeCoast(heights: Float32Array, P: Float32Array): Float32Array {
   const total = heights.length, BW = 0.5, NBUCK = COAST_CAP / BW, SOLID = -DRAFT;
   const dist = new Float32Array(total).fill(COAST_CAP), seedOf = new Int32Array(total), done = new Uint8Array(total);
@@ -649,10 +577,6 @@ function bakeCoast(heights: Float32Array, P: Float32Array): Float32Array {
   return dist;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Sites.
-
-/** Where a ray from (x, y) along bearing b crosses the mean-tide shore, as a distance along it (searching both ways). */
 function shoreAlong(ri: number, x: number, y: number, b: number): number {
   const dx = dsin(b * (PI / 180)), dy = dcos(b * (PI / 180)), p = v3();
   const wet = (t: number) => sampleAt(toWorld(ri, x + dx * t, y + dy * t, p)) < -DRAFT;
@@ -697,7 +621,6 @@ function placeSites(geo: Geography): void {
   });
 }
 
-/** Static zones that need no stroke: pack ice and the vortex (by chart radius) and harbour waters. */
 function markZones(geo: Geography, P: Float32Array): void {
   const p = v3();
   for (let c = 0; c < geo.zones.length; c++) {
@@ -710,7 +633,6 @@ function markZones(geo: Geography, P: Float32Array): void {
     if (mech.vortex && r2 < mech.vortex.r * mech.vortex.r) geo.zones[c] |= ZONE.vortex;
   }
   for (const hb of geo.harbours) {
-    // the harbour's waters: a disc of its radius round the anchorage, flood-filled through navigable cells only
     const start = cellOf(TERRITORY, hb.pos), stack = [start], lim = 1 - (hb.r * hb.r) / (2 * R * R);
     geo.zones[start] |= ZONE.harbour;
     while (stack.length) {
@@ -726,15 +648,10 @@ function markZones(geo: Geography, P: Float32Array): void {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Currents.
-
-/** Each region's five neighbours (the icosahedron's edges), nearest first. */
 export const NEIGHBOURS: readonly (readonly number[])[] = CHARTS.map((a, i) =>
   CHARTS.map((b, j) => ({ j, d: dot(a.c, b.c) })).filter((o) => o.j !== i).sort((x, y) => y.d - x.d || x.j - y.j)
     .slice(0, 5).map((o) => o.j));
 
-/** The fixed lanes: the upper ring flows east, the lower ring west, and four lanes join the poles and the rings. */
 const LANE_PAIRS: readonly (readonly [string, string])[] = [
   ['fjords', 'basaltStacks'], ['basaltStacks', 'kelpShallows'], ['kelpShallows', 'amberShoals'],
   ['amberShoals', 'weepingIsle'], ['weepingIsle', 'fjords'],
@@ -755,15 +672,12 @@ function buildLanes(): Lane[] {
   });
 }
 
-/** The point `dist` u from p along the great circle toward q. */
 function slerpToward(p: V3, q: V3, dist: number, out: V3, t: V3): V3 {
   normalize(set(t, q.x - p.x * dot(p, q), q.y - p.y * dot(p, q), q.z - p.z * dot(p, q)));
   const a = dist / R, c = dcos(a), s = dsin(a);
   return normalize(set(out, p.x * c + t.x * s, p.y * c + t.y * s, p.z * c + t.z * s));
 }
 
-/** Every lane through each region: its designed passes, then half-circles round it at its rim (W→E north and south of
- * it, N→S east and west of it), each sampled every ~6°. */
 const LANES_THROUGH: readonly (readonly (readonly number[])[])[] = REGIONS.map((r) => {
   const half = (a0: number, a1: number) => {
     const out: number[] = [];
@@ -776,13 +690,8 @@ const LANES_THROUGH: readonly (readonly (readonly number[])[])[] = REGIONS.map((
   return [...r.passes, half(270, 450), half(270, 90), half(0, 180), half(360, 180)];
 });
 
-/** The Great Current's route for a match: the regions it passes in order and its centreline every ~2 u. */
 export interface CurrentRoute { regions: number[]; points: Float64Array; length: number }
 
-/**
- * A smooth route through four or five neighbouring regions, chosen by the seed: a walk on the icosahedron that never
- * doubles back, riding through each region along the lane that best lines up with the way in and out.
- */
 export function greatCurrent(seed: number): CurrentRoute {
   const rng = rngFrom(hash32(seed, 0xc0ffee)), regions = [rngInt(rng, REGIONS.length)], n = 4 + rngInt(rng, 2);
   while (regions.length < n) {
@@ -791,7 +700,6 @@ export function greatCurrent(seed: number): CurrentRoute {
     const pool = opts.length ? opts : NEIGHBOURS[cur].filter((j) => !regions.includes(j));
     regions.push(pool[rngInt(rng, pool.length)]);
   }
-  // Each region's lane, the one whose ends point back the way the route came and on toward where it goes.
   const way: V3[] = [], p = v3();
   regions.forEach((ri, i) => {
     const toward = (j: number) => {
@@ -813,7 +721,6 @@ export function greatCurrent(seed: number): CurrentRoute {
       way.push(toWorld(ri, best[kk], best[kk + 1], v3()));
     }
   });
-  // Round every corner (Chaikin cutting on the sphere), then resample every ~2 u.
   let pts = way;
   for (let it = 0; it < 4; it++) {
     const next: V3[] = [pts[0]];
@@ -842,9 +749,6 @@ export function greatCurrent(seed: number): CurrentRoute {
   return { regions, points: new Float64Array(out), length };
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-
-/** Build the whole geography (≈ 1 s on a desktop; run it in the world worker). */
 export function buildGeography(): Geography {
   const total = 6 * NN;
   const geo: Geography = {
@@ -861,7 +765,6 @@ export function buildGeography(): Geography {
 }
 
 const UV = { face: 0, u: 0, v: 0 };
-/** A territory-cell field bilinearly interpolated at direction p. */
 function bilinear(field: Float32Array, p: V3): number {
   faceUV(p, UV);
   const fx = (UV.u + 1) * 0.5 * N - 0.5, fy = (UV.v + 1) * 0.5 * N - 0.5;
@@ -871,6 +774,4 @@ function bilinear(field: Float32Array, p: V3): number {
 }
 export const heightAt = (geo: Geography, p: V3): number => bilinear(geo.heights, p);
 export const coastAt = (geo: Geography, p: V3): number => bilinear(geo.coast, p);
-/** Whether a hull can float at p at sea level `tide` (u above mean). */
 export const navigable = (geo: Geography, p: V3, tide: number): boolean => heightAt(geo, p) < tide - DRAFT;
-

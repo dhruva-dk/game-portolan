@@ -1,10 +1,3 @@
-// WP8 part A, the opening and the match flow, headless: the fleet riding the Great Current abreast from the first tick
-// with the storm's origin revealed; break-offs at different moments making homes in different regions; the ride to the
-// end and the throw-off; the captains' view of the passage; sink(), the entry point combat and the storm call, with its
-// order, purse, bounty, chest and freed sea; the last ship afloat; scripted matches from the opening to the end and
-// their results; the fast-forward after the player sinks, to the storm's end; snapshot/resume at random ticks; the setup;
-// and the tick's cost against A9.
-//   node --test tests/sim/match.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +14,7 @@ import {
 import { END, FITTING, FORMS, MOMENTS, OPENING, START_FITTINGS, STORM, TREASURE } from '../../src/sim/tables.ts';
 import { inkHome } from '../../src/sim/territory.ts';
 import { regionOf } from '../../src/sim/world/geography.ts';
-import { unarmed, world } from './vectors.ts'; // unarmed: only the script or the storm sinks a ship
+import { unarmed, world } from './vectors.ts';
 
 const SEED = 20261024, sea = seaFor(world(), SEED);
 const S = (seconds: number): number => Math.round(seconds / TICK);
@@ -34,32 +27,27 @@ function apart(a: V3, b: V3): number {
   return R * Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-/** The player's helm in a scripted match: break off at tick `off`, then by turns sail out on a curve and head home. */
 function pilot(off: number): (s: MatchState) => ShipInput {
   return (s) => {
     const input = idleInput();
     if (s.tick >= off) input.flags = FLAG.breakOff;
     if (s.ships[0].phase === PHASE.sailing) {
-      if ((s.tick - off) % S(50) < S(20)) input.steer = 60; // a turn that takes it out of its home waters and round
+      if ((s.tick - off) % S(50) < S(20)) input.steer = 60;
       else input.flags |= FLAG.headHome;
     }
     return input;
   };
 }
 
-/** A sinking in a scripted match: at `tick`, `ship` sinks, by `by`, of `cause` (what combat and the storm will do). */
 type Doom = readonly [tick: number, ship: number, by: number, cause: number];
 
-/** Captains 1–9 sink one by one, four of them to the player, who wins at 230 s. */
 const WIN: readonly Doom[] = [
   [S(80), 5, 0, CAUSE.gun], [S(95), 2, 7, CAUSE.ram], [S(110), 9, -1, CAUSE.rocks], [S(130), 1, 0, CAUSE.gun],
   [S(150), 7, 3, CAUSE.fire], [S(170), 4, -1, CAUSE.storm], [S(190), 8, 0, CAUSE.ram], [S(210), 6, 3, CAUSE.gun],
   [S(230), 3, 0, CAUSE.gun],
 ];
-/** Two captains sink, then the player to captain 4's guns at 110 s, with seven captains still afloat. */
 const LOSS: readonly Doom[] = [[S(70), 6, 2, CAUSE.gun], [S(90), 8, -1, CAUSE.rocks], [S(110), 0, 4, CAUSE.gun]];
 
-/** Play match `s` with the scripted helm (breaking off at `off`) and sinkings, to its end or tick `until`; `cost` gets each step's ms. */
 function play(sea: Sea, s: MatchState, off: number, dooms: readonly Doom[], until = Infinity, cost?: number[]): MatchState {
   const helm = pilot(off);
   while (!over(s) && s.tick < until) {
@@ -71,7 +59,6 @@ function play(sea: Sea, s: MatchState, off: number, dooms: readonly Doom[], unti
   }
   return s;
 }
-
 
 test('the fleet rides the Great Current abreast from the first tick, with the storm\'s origin revealed', () => {
   const s = createMatch({ seed: SEED });
@@ -94,7 +81,6 @@ test('the fleet rides the Great Current abreast from the first tick, with the st
 });
 
 test('breaking off at different moments makes the home in different regions', () => {
-  // The middle of each region's stretch of the current, as a captain reads the passage.
   const start = createMatch({ seed: SEED }).ships[0].ride, p = newPassage(), moments: number[] = [];
   for (let s = start; ; ) {
     passage(sea, s, p);
@@ -155,9 +141,9 @@ test('a sinking spills the purse, frees the sea, pays the bounty (double for the
   for (const kind of [EVENT.spill, EVENT.freed, EVENT.sunk, EVENT.bounty, EVENT.chest]) {
     assert.ok(s.events.some((e) => e.kind === kind), `event ${kind}`);
   }
-  sink(s, 3, 6, CAUSE.ram); // a wreck sinks once
+  sink(s, 3, 6, CAUSE.ram);
   assert.equal(s.sunk.length, 1);
-  sink(s, 4, 5, CAUSE.ram); // the pennant's holder pays double, nobody else
+  sink(s, 4, 5, CAUSE.ram);
   assert.equal(s.ships[5].bank, bank + 3 * END.bounty);
   for (const i of [0, 1, 2, 6, 7, 8]) sink(s, i, -1, CAUSE.storm);
   assert.ok(!over(s));
@@ -198,7 +184,6 @@ test('when the player sinks, the rest of the match resolves at once, to the end 
   const r = result(s), me = r.ships[0];
   assert.deepEqual([me.place, me.by, me.cause, me.tick], [SHIPS - 2, 4, CAUSE.gun, S(110)]);
   assert.equal(r.timeline.at(-1)?.kind, EVENT.sunk);
-  // Nobody fights yet, so the storm ends it: its last phase closes the final calm and the rest founder in it.
   assert.ok(r.ticks <= S(close.move + close.sweep + FORMS[3].hull / close.rate), `over at ${r.ticks * TICK} s`);
   while (!over(out)) step(sea, out, idle);
   assert.equal(matchHash(out), matchHash(s), 'the fast-forward is the match played out');

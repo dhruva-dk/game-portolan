@@ -1,5 +1,3 @@
-// WP27 fixtures shared by tests/ui/results.test.ts and the shots page: a finished match made up as result() reports one,
-// and a career whose chart is inked to a fraction with some regions named.
 import type { Career } from '../../src/career/state.ts';
 import type { MatchResult } from '../../src/sim/end.ts';
 import { EVENT, SHIPS } from '../../src/sim/state.ts';
@@ -7,7 +5,6 @@ import { FITTING } from '../../src/sim/tables.ts';
 import { regionCells } from '../../src/ui/careerChart.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
 
-/** A finished match with the player at `place`: it broke off into region 2 and inked its home, closed loops, lost a trail to ship 3, chose long guns, broke ship 6's trail, sank ship 4, and (placed) was sunk by ship 5. */
 export function madeMatch(place: number): MatchResult {
   const order = Array.from({ length: SHIPS - 1 }, (_, i) => i + 1);
   order.splice(place - 1, 0, 0);
@@ -30,7 +27,6 @@ export function madeMatch(place: number): MatchResult {
   return { order, ships, timeline, ticks: 9000 };
 }
 
-/** Ink `fraction` of the career's chart, region by region (the frontier ragged where it stops), and name the first `named` regions touched. */
 export function inkChart(c: Career, fraction: number, named: number): void {
   const region = regionCells(), want = Math.round(fraction * region.length);
   let n = 0, k = 0;

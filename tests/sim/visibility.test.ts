@@ -1,8 +1,3 @@
-// WP8 part C, sight, headless: the curvature horizon (masthead first, then the hull; the crow's nest sees farther),
-// checked against the line of sight over the sphere; fog hiding ships inside from outside, trails laid in fog kept off
-// rival charts; squalls and the storm shortening sight; kelp hiding; the flare, the fog flask and the gull; the marks
-// of rivals in your waters; and the survey's cost.
-//   node --test tests/sim/visibility.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +17,6 @@ const SEED = 20261024, W = world(), sea = seaFor(W, SEED), out: Sight[] = Array.
 const kelp = (p: V3): boolean => (W.geo.zones[cellOf(TERRITORY, p)] & ZONE.kelp) !== 0;
 const hidingKelp = (p: V3): boolean => kelp(p) && REGIONS[W.geo.region[cellOf(TERRITORY, p)]].mechanics.kelp?.hide === true;
 
-/** A start and a heading with no kelp for 100 u along it. */
 const P = v3(), T = v3();
 for (const rng = rngFrom(SEED); ; ) {
   rngDir(rng, P);
@@ -36,7 +30,6 @@ for (const rng = rngFrom(SEED); ; ) {
   if (clear) break;
 }
 
-/** A fresh match in fair weather, before the storm, every ship sailing, all but ships 0 and 1 far away. */
 function fresh(): MatchState {
   const s = createMatch({ seed: SEED });
   for (const w of s.weather) w.life = w.age = 0;
@@ -48,13 +41,11 @@ function fresh(): MatchState {
   return s;
 }
 const place = (s: MatchState, i: number, d: number): void => advance(P, T, d, s.ships[i].pos, s.ships[i].head);
-/** What ship 0 makes of ship 1: 3 the whole ship, 2 its masthead (hull-down), 0 nothing. */
 function seen(s: MatchState): number {
   survey(sea, s, out);
   return (out[0].ships & 2 ? 2 : 0) | (out[0].hulls & 2 ? 1 : 0);
 }
 const marked = (s: MatchState): boolean => (survey(sea, s, out)[0].marks & 2) !== 0;
-/** Whether the straight line from h0 u above p0 to h1 u above p1 clears the sea. */
 function clears(p0: V3, h0: number, p1: V3, h1: number): boolean {
   const a = v3(p0.x * (R + h0), p0.y * (R + h0), p0.z * (R + h0)), b = v3(p1.x * (R + h1), p1.y * (R + h1), p1.z * (R + h1));
   const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
@@ -90,7 +81,7 @@ test('fog hides ships inside it from outside, and a trail laid in fog never show
   noteFog(s);
   place(s, 0, 0);
   assert.ok(!trailSeen(sea, s, 0, 1, 0) && trailSeen(sea, s, 1, 1, 0));
-  s.weather[0].life = 0; // the fog lifts: the trail laid in it stays off the chart, one laid after shows
+  s.weather[0].life = 0;
   assert.ok(!trailSeen(sea, s, 0, 1, 0));
   s.ships[1].laid.push(cellOf(TERRITORY, s.ships[0].pos));
   noteFog(s);

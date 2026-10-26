@@ -1,5 +1,3 @@
-// WP21: the air the renderer reads (S-005: the sim's wind over the eye in a match, a defined ambient wind without one,
-// no crash before the camera is placed) and the fog wall standing exactly where the sim's veil hides.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -42,7 +40,7 @@ test("a fog bank's wall stands where the sim's veil begins", () => {
   let checked = 0;
   for (let seed = 1; seed < 40 && checked < 6; seed++) {
     const state = createMatch({ seed });
-    step(seaFor(W, seed), state, idleInput()); // the weather is brewed on the first tick
+    step(seaFor(W, seed), state, idleInput());
     for (const spell of state.weather) {
       const a = fogAngle(spell);
       if (a === 0) continue;

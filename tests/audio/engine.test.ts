@@ -1,7 +1,3 @@
-// WP28: the audio engine in headless Chromium, rendered offline through the full graph (buses, glue compression,
-// limiter, soft-clip ceiling): every sound alone; a ten-ship broadside storm over every ambience bed (the voice limit
-// holds, nothing clips, the audio thread's CPU time and main-thread scheduling costs stay in budget); every match event.
-// With WP28_SHOTS=<dir>: a demo reel WAV into that dir (never committed) and the sheet progress/shots/wp28-sounds.png.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -17,13 +13,11 @@ before(async () => {
   server = await serve();
   launched = await launch();
   page = await launched.browser.newPage();
-  await page.goto(`${server.url}package.json`); // any page of the server's origin: the module is imported into it
+  await page.goto(`${server.url}package.json`);
   cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
 });
 
-/** CPU seconds so far: the renderer process's and its main thread's (the difference is the audio thread's, give or take
- * an idle compositor), so a loaded machine's waits are not counted. */
 async function cpu(): Promise<{ process: number; main: number }> {
   const m = new Map((await cdp.send('Performance.getMetrics')).metrics.map((x) => [x.name, x.value]));
   return { process: m.get('ProcessTime') ?? NaN, main: m.get('ThreadTime') ?? NaN };
@@ -37,7 +31,7 @@ after(async () => {
 type Name = 'each' | 'storm' | 'ahead' | 'listener' | 'events' | 'reel';
 async function call<K extends Name>(k: K): Promise<Awaited<ReturnType<(typeof Mod)[K]>>> {
   return page.evaluate(async (name) => {
-    const m = await import(/* @vite-ignore */ '/tests/audio/audio.page.ts' as string);
+    const m = await import( '/tests/audio/audio.page.ts' as string);
     return m[name]();
   }, k);
 }
@@ -53,7 +47,6 @@ test('every sound through the full graph: finite, audible, never above the ceili
 });
 
 test('a ten-ship broadside storm over every bed: the voice limit holds, nothing clips, the cost stays in budget', async () => {
-  // min of three renders, each as CPU time: the machine is shared
   const runs = [];
   for (let i = 0; i < 3; i++) {
     const a = await cpu(), s = await call('storm'), b = await cpu();
@@ -66,8 +59,6 @@ test('a ten-ship broadside storm over every bed: the voice limit holds, nothing 
   assert.ok(s.maxSfx <= s.cap, `${s.maxSfx} sfx voices at once, cap ${s.cap}`);
   assert.ok(s.stolen + s.dropped > 0, 'the voice limit was never exercised');
   assert.ok(s.nodesPeak <= 4 * (24 + 14 + 4) + 17, `${s.nodesPeak} nodes`);
-  // a deliberately overloaded storm (24 sfx voices, every bed) costs the audio thread under 60 ms per second of audio on
-  // the dev Mac (about 30 measured), so under 20% of a core on an A14, three times slower
   assert.ok(audio < 60, `audio thread ${audio.toFixed(1)} ms CPU per second of audio`);
   assert.ok(playUs < 80, `main thread ${playUs.toFixed(0)} µs per sound started`);
 });
@@ -100,6 +91,6 @@ test('demo reel and sheet (WP28_SHOTS)', { skip: !process.env.WP28_SHOTS }, asyn
   const r = await call('reel'), dir = process.env.WP28_SHOTS!;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'wp28-reel.wav'), Buffer.from(r.wav, 'base64'));
-  writeFileSync(join(root, 'progress/shots/wp28-sounds.png'), Buffer.from(r.png.split(',')[1], 'base64'));
+  writeFileSync(join(root, 'out/shots/wp28-sounds.png'), Buffer.from(r.png.split(',')[1], 'base64'));
   console.log(`reel: ${r.seconds.toFixed(1)} s`);
 });

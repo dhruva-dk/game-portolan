@@ -1,9 +1,3 @@
-// The player's voyage, watched (PROMPT.md, Captains learn the player; The career chart; The first voyage): what the
-// career takes from a match besides its result, gathered by reading the match state after every step, as the
-// renderer does, never writing it. Each tick it reads that tick's events; every VOYAGE.sample ticks it surveys what
-// the player can see, to ink the career chart, and how it sails, to learn its habits. The app keeps one Voyage beside
-// each match (observe after every step) and hands it to applyResult (progress.ts) with the result; the first voyage's
-// lettering (WP27) reads its lessons, and the chart's lettering of region names reads toLetter.
 import type { Sea } from '../sim/environment.ts';
 import { startingFittings } from '../sim/items.ts';
 import { PI, dcos, dot, v3, type V3 } from '../sim/math.ts';
@@ -16,47 +10,27 @@ import { regionOf } from '../sim/world/geography.ts';
 import { REGIONS } from '../sim/world/regions.ts';
 import { CHART, CHART_CELLS, FIND_SITES, FITTINGS, type Career } from './state.ts';
 
-/**
- * How the voyage is watched: sampled every `sample` ticks (half a second); the chart inks what lies within the
- * player's sight through the air, out to its lookout's horizon and `land` u beyond (coasts stand above the sea); a run
- * is `away` samples in a row sailing away from the rival that last hit it, within `window` ticks of the hit; the storm
- * is watched while its edge is within `watch` u of the player, and a storm run is a turn for the calm within `near` u
- * of the edge (or beyond it).
- */
 export const VOYAGE = { sample: 15, land: 20, away: 3, window: 600, watch: 60, near: 15 } as const;
 
-/** The first voyage's lessons (PROMPT.md, The first voyage): the moments its lettering answers (WP27). */
 export const LESSON = { breakOff: 0, steer: 1, loop: 2, gull: 3, chest: 4, broadside: 5, storm: 6 } as const;
 export const LESSONS = 7;
 
-/** One match of the player's, as the career watched it. Plain data, integers but for nothing. */
 export interface Voyage {
-  /** The region (REGIONS index) the player first broke off the Great Current into, −1 none. */
   breakOff: number;
-  /** The u² its loops claimed, each rounded, summed, and their squares summed: its loops' size weighed by the sea each claims. */
   sea: number;
   seaSq: number;
-  /** Rivals' trails it broke. */
   raids: number;
-  /** Hits it took; the runs it made from the rival that last hit it, and the hull it ran at, percent of full, summed. */
   hits: number;
   runs: number;
   runHull: number;
-  /** Samples while the storm's edge was near, and the margin it kept inside the calm then, u, summed (each rounded). */
   storm: number;
   margin: number;
-  /** Samples taken, and of them, by FITTING kind, those in which it carried one beyond the starting kit. */
   samples: number;
   fittings: number[];
-  /** The career chart's cells seen (state.ts CHART: cell c at byte c >> 3, bit c & 7). */
   seen: Uint8Array;
-  /** The find sites (Geography.finds) discovered: seen, taken, or marked by its gull, 1 each. */
   found: Uint8Array;
-  /** By region, the tick it first sailed into it, −1 not yet. */
   entered: number[];
-  /** By LESSON, the tick it first did it, −1 not yet. */
   lessons: number[];
-  /** The rival that last hit it (−1 none) and when, and the samples since that it has sailed away from it. */
   foe: number;
   foeHit: number;
   away: number;
@@ -68,12 +42,10 @@ export const newVoyage = (): Voyage => ({
   entered: new Array<number>(REGIONS.length).fill(-1), lessons: new Array<number>(LESSONS).fill(-1), foe: -1, foeHit: 0, away: 0,
 });
 
-/** The career chart's grid (state.ts CHART), for the renderer too. */
 export const CHART_GRID = cubeGrid(CHART.n);
 
 const STAMP = new Uint32Array(CHART_GRID.cells), QUEUE = new Int32Array(CHART_GRID.cells), DIR = v3();
 const SIGHT = Array.from({ length: SHIPS }, newSight);
-/** Fittings a ship may start with, which say nothing of the player's taste. */
 const KIT: readonly number[] = [FITTING.none, ...startingFittings(8).map((f) => f.kind)];
 let stamp = 0;
 
@@ -81,10 +53,8 @@ const first = (v: Voyage, lesson: number, tick: number): void => {
   if (v.lessons[lesson] < 0) v.lessons[lesson] = tick;
 };
 
-/** Whether chart cell `cell` is inked in `seen`. */
 export const chartSeen = (seen: Uint8Array, cell: number): boolean => (seen[cell >> 3] & (1 << (cell & 7))) !== 0;
 
-/** Ink into `seen` every chart cell within `reach` u of `p`, flooding out from its own cell. */
 function ink(seen: Uint8Array, p: V3, reach: number): void {
   const cos = dcos(Math.min(PI, reach / R)), start = cellOf(CHART_GRID, p);
   let head = 0, tail = 0;
@@ -103,7 +73,6 @@ function ink(seen: Uint8Array, p: V3, reach: number): void {
   }
 }
 
-/** Watch the match after a step: the player's events this tick and, every VOYAGE.sample ticks, its sight and sailing. */
 export function observe(v: Voyage, sea: Sea, state: MatchState): void {
   const me = state.ships[0], t = state.tick;
   for (const e of state.events) {
@@ -164,13 +133,6 @@ export function observe(v: Voyage, sea: Sea, state: MatchState): void {
   }
 }
 
-/**
- * What one match showed of the player's habits (state.ts BINS), null where it showed nothing: the region it broke off
- * into; its loops' radius, u, over its loops weighed by the sea each claims (a scrap closed in passing counts for
- * little); the trails it broke; the hull it ran at, mean percent (0: it was hit and never ran, it stood and fought);
- * the mean margin it kept inside the calm while the storm closed, u; the fittings beyond the starting kit it carried
- * for a quarter of the match or more.
- */
 export interface Habits {
   breakOff: number | null;
   loop: number | null;
@@ -195,10 +157,6 @@ export function habitsOf(v: Voyage): Habits {
   };
 }
 
-/**
- * The regions whose names the career chart letters in this match (PROMPT.md, The career chart): those entered for the
- * first time in the career, earliest first, with the tick the lettering animates at.
- */
 export function toLetter(career: Career, v: Voyage): { region: number; tick: number }[] {
   const out: { region: number; tick: number }[] = [];
   v.entered.forEach((tick, region) => {
@@ -209,7 +167,6 @@ export function toLetter(career: Career, v: Voyage): { region: number; tick: num
 
 let cellRegion: Uint8Array | null = null;
 
-/** How much of each region the career chart has inked, permille of its cells: a finished chart is 1000 everywhere. */
 export function chartInked(career: Career): number[] {
   if (cellRegion === null) {
     cellRegion = new Uint8Array(CHART_GRID.cells);

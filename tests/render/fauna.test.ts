@@ -1,8 +1,3 @@
-// WP23 offline (no GPU): life is placed the same every time, every species present and seated on the sea or the
-// land it lives on; each ship's gull follows its sim flight (perched exactly on its truck, wheeling, out, home with its
-// chest, holding over its prey in the dive) with its cues for WP28; gold-leaf wingtips only at the top of every
-// trait; life reacts (puffins lift from a ship, whales sound at gunfire, dolphins come to the bow); the same frames
-// draw the same instances; and life's share of the frame over every region and from the chart (A9).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -140,7 +135,7 @@ test('the same frames draw the same instances', () => {
   assert.deepEqual(draw(), draw());
 });
 
-test('budgets: full flocks over every region stay a sliver of the frame, and thin out from the chart (A9)', () => {
+test('budgets: full flocks over every region stay a sliver of the frame, and thin out from the chart', () => {
   const ctx = context(), fa = new Fauna(ctx), st = createMatch({ seed: 11 }), run = runner(fa, st), rows: string[] = [];
   let most = 0;
   for (let ri = 0; ri < 12; ri++) {

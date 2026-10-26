@@ -1,16 +1,3 @@
-// A captain at the helm (PROMPT.md, How captains think; The league; A match; Controls). It fills the very ShipInput
-// the player's touch fills — the stick, the sail steps, the swipe off the current, head home, the gull call, the
-// chest choice, the consumable slots, the aimed fittings, a drawn course — and nothing else. Its tick has two halves:
-// helm(), before the hulls move, works the controls from its own ship and its record (Ship.captain) alone; think(),
-// once the tick's survey is in, perceives what its ship and gull could see (perception.ts) and, when its reaction
-// time has run, decides: its mode, goal and plan go into its record, so a snapshot resumes it mid-thought.
-//
-// The skills are shared by every captain and parameterised by a Style; a temperament (temperaments.ts) is a Style and
-// priorities over the same skills, each captain sailing it under its own signature; the first voyage's captains sail
-// the GENTLE one. Rank sets one number, Ship.captain.skill (0 … 1 from the rank tier): how fast it reacts, how far ahead it leads
-// its course on a moving target, how shrewdly it judges a threat to its purse and the storm's sweep, and how well it
-// times its items; its gunners' own lead is Outfit.gunnery. Its intent shows before it acts: the heading it means
-// to hold (intent()) leads its hull, and a strike is telegraphed for BRAIN.tell s while its course bends round.
 import { siteValue } from '../economy.ts';
 import { aground, currentAt, tideOf, type Sea } from '../environment.ts';
 import { bound, callPrice, perched } from '../gull.ts';
@@ -37,119 +24,93 @@ import { PATROL, patrolOf, reachOf, standoff, styleOf, wary, type Style } from '
 
 type Captain = Ship['captain'];
 
-/** What a captain is about (Ship.captain.mode). */
 export const MODE = {
-  ride: 0, // riding the Great Current, weighing where to break off
-  peel: 1, // it has chosen: the swipe off the current, then the coast to its home
-  roam: 2, // making for its goal with nothing better to do
-  loop: 3, // sailing the loop it drew out of its waters
-  home: 4, // head home held: closing the loop
-  find: 5, // sailing through a chest or flotsam
-  hold: 6, // holding beside a wreck or cache to take it
-  hunt: 7, // breaking a rival's open trail
-  fight: 8, // bringing a broadside to bear
-  ram: 9, // driving its bow into a rival
-  flee: 10, // running, wounded
-  storm: 11, // keeping ahead of the storm
-  face: 12, // turning its bow on an intruder in its waters, reefed: a turtle's tell before it strikes
-  lurk: 13, // lying off a fight between others, waiting for one to weaken
-  stalk: 14, // closing on a wounded ship, or a laden one a gull gave away, from beyond its guns' reach
-  mend: 15, // making for a harbour (or the Great Lagoon it holds) to mend its hull, and lying in it reefed
+  ride: 0,
+  peel: 1,
+  roam: 2,
+  loop: 3,
+  home: 4,
+  find: 5,
+  hold: 6,
+  hunt: 7,
+  fight: 8,
+  ram: 9,
+  flee: 10,
+  storm: 11,
+  face: 12,
+  lurk: 13,
+  stalk: 14,
+  mend: 15,
 } as const;
 
-/** The brain's timings and reaches; pairs run from skill 0 to skill 1. */
 export const BRAIN = {
-  react: [18, 5], // ticks between decisions: 0.6 s … 0.17 s (half as long again when gentle)
-  jitter: 4, // and up to this many ticks more, from its stream
-  tell: 1.2, // s a strike is telegraphed, its course bending round, before it commits
-  ride: 5, // s every captain rides the current before it may break off
-  danger: 40, // u: a rival this near is a danger to a wounded ship
-  threat: [18, 36], // u at which a rival near threatens its open trail and purse
-  engage: 1.5, // × its guns' range: how near a rival must be for it to close and fight
-  ram: 30, // u: the farthest it drives in to ram from
-  hunt: 45, // u: the farthest open trail it goes for
-  stalk: 90, // u: the farthest it stalks a ship, lies off a fight, or patrols from its own home
-  loot: 40, // u: the farthest find it goes for
-  wait: 35, // s it pursues one trail or find before giving it up
-  lead: [4, 20], // s to spare it keeps over the storm's sweep
-  probe: [5, 10, 16], // u ahead it looks for hazards, for a turning circle up to `circle` u (wider: as much farther)
+  react: [18, 5],
+  jitter: 4,
+  tell: 1.2,
+  ride: 5,
+  danger: 40,
+  threat: [18, 36],
+  engage: 1.5,
+  ram: 30,
+  hunt: 45,
+  stalk: 90,
+  loot: 40,
+  wait: 35,
+  lead: [4, 20],
+  probe: [5, 10, 16],
   circle: 10,
-  bow: 1, // u beyond its bow it keeps clear of the shore on a turn
-  arc: 0.4, // rad between the points of a turn it looks along
-  gap: 4, // u between the points of a drawn loop
-  patch: [0.3, 0.55], // hull share it patches at
-  full: 0.95, // share of its form's purse at which its purse is full: home to bank it
-  gentle: 30, // u a gentle captain keeps from the player
-  mend: 120, // u: the farthest harbour it makes for to mend
-  mended: 0.9, // hull share at which it leaves the harbour, mended
-  corner: 50, // u: the last calms, from which no ship can keep out of another's reach
-  few: 3, // ships afloat: so few, before the last calms, keep apart
-  side: 0.6, // × the calm's radius out from its centre, where they lie
-  wide: 60, // u: before them the last few keep this far apart, beyond the longest guns
-  keep: 1.3, // × the longer guns' range a turtle away from its waters keeps from a rival
-  detour: 2.5, // the most a sea route round land is reckoned longer than the straight way, before it is charted
-  round: 1.5, // how much longer than the straight way it reckons its way to the calm, with land or a stream it cannot stem across
-  greed: 2, // its sea routes weigh the heading for the goal by this over their length so far (nav.ts findRoute): a chart, not the pilot's
-  marks: 40, // nav cells ahead along a charted route it looks for the farthest it can make good straight
-  ahead: 20, // u of water ahead it looks along once a beat, bearing for a calm it charted no way to: it charts again when that has closed
-  rechart: [32, 60, 180, 5], // it reckons its time to leave for the calm by sea in ticks [0] of every [1], and its course before the storm in ticks [0] of every [2] or within [3] u of its mark
-  inside: 0.4, // the most of a calm's radius it keeps as its margin from the storm: in a small calm it holds its own ground, not the centre
+  bow: 1,
+  arc: 0.4,
+  gap: 4,
+  patch: [0.3, 0.55],
+  full: 0.95,
+  gentle: 30,
+  mend: 120,
+  mended: 0.9,
+  corner: 50,
+  few: 3,
+  side: 0.6,
+  wide: 60,
+  keep: 1.3,
+  detour: 2.5,
+  round: 1.5,
+  greed: 2,
+  marks: 40,
+  ahead: 20,
+  rechart: [32, 60, 180, 5],
+  inside: 0.4,
 };
 
 const by = (pair: readonly number[], s: number): number => pair[0] + (pair[1] - pair[0]) * s;
 const clamp = (x: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, x));
 const share = (ship: Ship): number => ship.hull / fullHull(ship.form, ship.fittings);
-/** Whether it steers by a heading (Ship.captain.want) rather than for its goal. */
-/**
- * Tuning knobs (WP12; tests/tools/sweep.ts sets them per variant): shy, how much less a captain that avoids fights
- * (Style.fight < 0.1: expanders) wants one; scatter, how hard a runner (not a hunter) bears away from every other rival
- * it reads near, not only the one it runs from; finish, the prey's hull share under which a hunter stays on a ship it
- * has broken (and is sounder than) rather than run; storm, × BRAIN.ram within which a hunter finishes a broken ship
- * before it keeps ahead of the storm; steal, how much more a hunter wants a wounded ship another is already on; ram,
- * × BRAIN.ram a hunter drives its bow in from to finish a ship it has broken; fin, the hull share under which a
- * hunter's prey counts as broken, to ram.
- */
 export const TUNE = { shy: 0.3, scatter: 1, finish: 0.4, steal: 0.3, ram: 1.5, fin: 0.4, storm: 2 };
 const byWant = (mode: number): boolean => mode === MODE.fight || mode === MODE.flee || mode === MODE.face;
 
-/** Whether ship i has a captain at its helm: never the player's (index 0), nor a ship fitted out without one (Outfit.captain). */
 export const captained = (state: MatchState, i: number): boolean => state.ships[i].captain.temperament >= 0;
 
-/** Whether the player's own ship sails under a captain's brain (the scripted players of tests/tools/tournament.ts): it issues only the player's controls, on the first captain's stream. */
 export const piloted = (state: MatchState): boolean => state.ships[0].captain.temperament >= 0;
 
 const QTR = v3();
 const P = newPercept(), SV = newStormView(), PASS: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 const EMPTY: number[] = [], F = v3(), H = v3(), G = v3(), Q = v3(), T = v3(), U = v3(), V = v3(), STAR = v3(), STAR2 = v3();
 
-/** The unit tangent at p toward q into out, or `fallback` when q is all but p. */
 function toward(p: V3, q: V3, fallback: V3, out: V3): V3 {
   if (dot(p, q) > 1 - 1e-12) return set(out, fallback.x, fallback.y, fallback.z);
   return tangentToward(p, q, out);
 }
 
-/** The point `d` u from p along its unit tangent t, into out. */
 function along(p: V3, t: V3, d: number, out: V3): V3 {
   const c = dcos(d / R), s = dsin(d / R);
   return normalize(set(out, p.x * c + t.x * s, p.y * c + t.y * s, p.z * c + t.z * s));
 }
 
-/** The tangent t at p turned `a` rad to starboard, into out (not aliasing t). */
 function turned(t: V3, p: V3, a: number, out: V3): V3 {
   cross(STAR2, t, p);
   const c = dcos(a), s = dsin(a);
   return set(out, t.x * c + STAR2.x * s, t.y * c + STAR2.y * s, t.z * c + STAR2.z * s);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The helm: every tick, before the hulls move.
-
-/**
- * Captain i's controls this tick, into `out` (cleared first), from its ship and record alone: the sail step toward
- * the setting it wants; on the current the swipe off once it has chosen; a loop it planned, as a drawn course, and
- * no hand on the stick while it sails it; head home held; else the stick for its goal, its course bending round over
- * a telegraphed strike and bearing off a hazard ahead. A ship without a captain gets an idle input.
- */
 export function helm(state: MatchState, i: number, out: ShipInput): ShipInput {
   const ship = state.ships[i], c = ship.captain;
   out.steer = out.sail = out.flags = 0;
@@ -163,7 +124,7 @@ export function helm(state: MatchState, i: number, out: ShipInput): ShipInput {
     return out;
   }
   if (ship.phase === PHASE.peeling) return out;
-  if (c.plan.length && c.tell === 0) { // a loop it drew, once it has swung round to it
+  if (c.plan.length && c.tell === 0) {
     out.course = c.plan.slice();
     c.plan.length = 0;
     return out;
@@ -181,8 +142,8 @@ export function helm(state: MatchState, i: number, out: ShipInput): ShipInput {
     addScaled(H, c.want, pos, -dot(c.want, pos));
     if (dot(H, H) < 1e-12) set(H, ship.head.x, ship.head.y, ship.head.z);
     normalize(H);
-  } else toward(pos, c.plan.length ? cellDir(TERRITORY, c.plan[c.plan.length >> 1], Q) : c.goal, ship.head, H); // committing: its bow swung on the loop's far side
-  if (c.tell > 0 && c.plan.length === 0) { // the bend: from its heading round to the strike, over the telegraph
+  } else toward(pos, c.plan.length ? cellDir(TERRITORY, c.plan[c.plan.length >> 1], Q) : c.goal, ship.head, H);
+  if (c.tell > 0 && c.plan.length === 0) {
     const k = 0.7 * (c.tell / BRAIN.tell);
     addScaled(G, addScaled(G, set(G, 0, 0, 0), H, 1 - k), ship.head, k);
     if (dot(G, G) > 1e-6) normalize(set(H, G.x, G.y, G.z));
@@ -192,23 +153,14 @@ export function helm(state: MatchState, i: number, out: ShipInput): ShipInput {
   return out;
 }
 
-/** The stick that brings ship's bow to the heading h, as the pilot would (route.ts): easing as the turn under way will carry it. */
 function steerFor(ship: Ship, h: V3): number {
   cross(STAR, ship.head, ship.pos);
   const error = datan2(dot(h, STAR), dot(h, ship.head)), lead = FORMS[ship.form].helm + PILOT.lead;
   const want = clamp((error - ship.rate * lead) / PILOT.full, -1, 1), a = HELM.soft, m = Math.abs(want);
-  const s = (Math.sqrt(a * a + 4 * (1 - a) * m) - a) / (2 * (1 - a)); // the stick whose soft curve gives that helm
+  const s = (Math.sqrt(a * a + 4 * (1 - a) * m) - a) / (2 * (1 - a));
   return Math.round(Math.sign(want) * Math.min(1, s) * STEER_MAX);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The mind: once the tick's survey is in.
-
-/**
- * The second half of captain i's tick, with this tick's `sight` (its survey): when its reaction time has run it
- * perceives and decides, and works the controls of the moment into `out` (which helm() filled): the chest choice, a
- * consumable, the gull's call or dive, the mortar.
- */
 export function think(sea: Sea, state: MatchState, i: number, sight: Sight, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain;
   if (!afloat(ship) || !captained(state, i)) return;
@@ -229,39 +181,25 @@ export function think(sea: Sea, state: MatchState, i: number, sight: Sight, out:
   decide(sea, state, i, sight, rng);
 }
 
-/** The heading ship i shows on the chart's short inked arrow, into `out`: a captain's intent, which leads its hull; any other ship's heading. */
 export function intent(state: MatchState, i: number, out: V3): V3 {
   const ship = state.ships[i], c = ship.captain.intent;
   const src = captained(state, i) && ship.phase !== PHASE.riding && dot(c, c) > 0 ? c : ship.head;
   return set(out, src.x, src.y, src.z);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Breaking off the Great Current.
-
-/**
- * Whether captain i, riding, breaks off now: the region it is passing against the one the current reaches next
- * (opening.ts passage) by their richness, its own taste (by the seed), the storm rising near, and where it knows the
- * player breaks off; the longer it rides the less it asks, and it waits for a better region only if that comes soon —
- * the bolder (Style.bold), the more it asks and the longer it rides on for richer waters. It rides on past a rival
- * that has broken off within BRAIN.danger, so as not to ink its home within that rival's guns — a hunter too, which
- * finds its prey later, and an opportunist, which waits off fights rather than starting them — unless these are the
- * waters it knows the player breaks off into.
- */
 function breaksOff(sea: Sea, state: MatchState, i: number): boolean {
   const ship = state.ships[i], t = state.tick * TICK, style = styleOf(ship), bold = style.bold;
   passage(sea, ship.ride, PASS);
   if (t < BRAIN.ride) return false;
   if (PASS.untilEnd < 3) return true;
   const c = ship.captain, sought = (c.knows & KNOW.breakOff) !== 0 && c.breakOff === PASS.region;
-  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, style) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false; // it rides on for the waters it knows the player breaks off into
-  if (!sought && PASS.untilEnd > 6 && beside(state, i)) return false; // it rides on past a rival breaking off: no home within its guns
+  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff !== PASS.region && PASS.untilEnd > 6 && lure(c, style) > 0.5 && passesOn(sea, ship.ride, c.breakOff)) return false;
+  if (!sought && PASS.untilEnd > 6 && beside(state, i)) return false;
   const here = regionWorth(state, i, PASS.region) - 0.6 * Math.max(0, dot(ship.pos, state.storm.origin) - 0.6) / 0.4;
   const ahead = PASS.next >= 0 ? regionWorth(state, i, PASS.next) : -Infinity;
   return here >= 1.3 + 0.5 * (bold - 0.3) - 0.02 * t && (here >= ahead || PASS.untilNext > 12 * (1 + bold));
 }
 
-/** Whether a rival it sees has broken off within BRAIN.danger of it. */
 function beside(state: MatchState, i: number): boolean {
   for (let k = 0; k < SHIPS; k++) if (k !== i && knows(P, k) && afloat(state.ships[k]) && state.ships[k].phase !== PHASE.riding && apart(state.ships[i].pos, state.ships[k].pos) < BRAIN.danger) return true;
   return false;
@@ -269,9 +207,8 @@ function beside(state: MatchState, i: number): boolean {
 
 const LOOK: Passage = { region: 0, next: -1, untilNext: 0, untilEnd: 0 };
 
-/** Whether the Great Current, ridden on from s, still passes region r (its course is on every chart; opening.ts passage). */
 function passesOn(sea: Sea, s: number, r: number): boolean {
-  const t0 = passage(sea, s, LOOK).untilEnd, v = 10 / Math.max(1e-6, t0 - passage(sea, s + 10, LOOK).untilEnd); // u/s down the current
+  const t0 = passage(sea, s, LOOK).untilEnd, v = 10 / Math.max(1e-6, t0 - passage(sea, s + 10, LOOK).untilEnd);
   for (let k = 0, at = s; k < 8; k++, at += v * LOOK.untilNext + 1) {
     passage(sea, at, LOOK);
     if (LOOK.region === r) return true;
@@ -282,17 +219,14 @@ function passesOn(sea: Sea, s: number, r: number): boolean {
 
 function regionWorth(state: MatchState, i: number, r: number): number {
   const ship = state.ships[i], c = ship.captain, style = styleOf(ship), taste = (hash32(state.seed, i * 64 + r) & 0xffff) / 0xffff;
-  let w = REGIONS[r].richness * (1 + 0.5 * style.guard) + 0.4 * taste; // a turtle sets most store by rich waters
-  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff === r) w += lure(c, style); // the player's waters, by its temperament (learning.ts)
+  let w = REGIONS[r].richness * (1 + 0.5 * style.guard) + 0.4 * taste;
+  if ((c.knows & KNOW.breakOff) !== 0 && c.breakOff === r) w += lure(c, style);
   return w;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Items: the moment to use them.
-
 function act(sea: Sea, state: MatchState, i: number, out: ShipInput, hurt: boolean, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, g = ship.gull, foe = P.rival, near = P.rivalD;
-  const spare = foe !== 0 || !c.gentle || ship.harm[0] > 0; // a gentle captain turns nothing on the player unprovoked
+  const spare = foe !== 0 || !c.gentle || ship.harm[0] > 0;
   if (ship.offer.length) out.chestPick = bestPick(ship);
   out.consumable = consumable(ship, c, hurt);
   const safe = near > GULL.danger.near && share(ship) > GULL.danger.hull && rngFloat(rng) < 0.5 + 0.5 * c.skill;
@@ -302,14 +236,13 @@ function act(sea: Sea, state: MatchState, i: number, out: ShipInput, hurt: boole
   if (g.dive > 0 && g.cool === 0 && perched(g) && pressing && near < GULL.dive.reach) out.flags |= FLAG.dive;
   const sure = c.skill >= 0.5 || (P.hulls & (1 << foe)) !== 0;
   if (ship.fittings[SLOT.stern].kind === FITTING.mortar && ship.reload[BATTERY.stern] === 0 && near < MORTAR.range && near > 3 * MORTAR.blast && sure) {
-    velocityOf(sea, state.ships[foe], V); // aimed by hand, a drag at a point: where the rival will be as the shell falls, as far ahead as its eye leads
+    velocityOf(sea, state.ships[foe], V);
     normalize(addScaled(Q, state.ships[foe].pos, V, (c.skill * near) / MORTAR.speed / R));
     out.flags |= FLAG.useAimed;
     out.aim = cellOf(TERRITORY, Q);
   }
 }
 
-/** The consumable slot captain's ship uses now, the most pressing need first, or −1. */
 function consumable(ship: Ship, c: Captain, hurt: boolean): number {
   const near = P.rivalD, purse = ship.purse / FORMS[ship.form].purse;
   let k = -1;
@@ -328,19 +261,16 @@ function slotOf(ship: Ship, kind: number): number {
   return -1;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The decision: one mode, by priority, each skill setting the goal it sails for.
-
 function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, style = styleOf(ship), was = c.mode, aim = c.target;
   let mode = -1;
   const prey = P.rival >= 0 && (P.hulls & (1 << P.rival)) !== 0 && share(state.ships[P.rival]) < TUNE.fin && P.rivalD < TUNE.storm * BRAIN.ram;
-  if (stormGoal(sea, state, i, style) && !(style.stalk >= 0.8 && prey)) mode = MODE.storm; // a hunter finishes a broken ship before the storm
+  if (stormGoal(sea, state, i, style) && !(style.stalk >= 0.8 && prey)) mode = MODE.storm;
   else if (waits(state, i) || flees(state, i, style)) mode = MODE.flee;
   else if (threatened(state, i, style, was)) mode = MODE.home;
   if (mode < 0 && !holdsOn(state, i, style)) mode = mends(sea, state, i, style, was);
-  if (mode < 0 && keepsClear(state, i, style)) mode = MODE.roam; // a turtle far from its waters keeps its distance
-  if (mode < 0 && lastFew(state)) { // the last few lie on their own sides of the calm, seeking nothing
+  if (mode < 0 && keepsClear(state, i, style)) mode = MODE.roam;
+  if (mode < 0 && lastFew(state)) {
     const calm = SV.announced ? SV.next : SV.calm;
     along(calm.at, toward(calm.at, ship.pos, ship.head, T), BRAIN.side * calm.r * R, c.goal);
     c.target = -1;
@@ -348,7 +278,7 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
   }
   if (mode < 0) mode = guards(state, i, style, was, aim);
   if (mode < 0) mode = engages(sea, state, i, style);
-  if (mode < 0 && style.stalk >= 0.8) mode = stalks(sea, state, i, sight, style, was, aim); // a hunter finishes the wounded before it raids
+  if (mode < 0 && style.stalk >= 0.8) mode = stalks(sea, state, i, sight, style, was, aim);
   if (mode < 0 && hunts(i, state, style, was)) mode = MODE.hunt;
   if (mode < 0 && style.stalk < 0.8) mode = stalks(sea, state, i, sight, style, was, aim);
   if (mode < 0) mode = lurks(state, i, sight, style);
@@ -361,24 +291,18 @@ function decide(sea: Sea, state: MatchState, i: number, sight: Sight, rng: Rng):
     if (mode === MODE.hunt || mode === MODE.ram || mode === MODE.face) c.tell = BRAIN.tell;
   }
   c.mode = mode;
-  const reach = standoff(c, style, c.target) * (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0); // closing under full sail, fighting under plain
+  const reach = standoff(c, style, c.target) * (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0);
   const lying = ((mode === MODE.hold || mode === MODE.lurk) && apart(ship.pos, c.goal) < 12) || (mode === MODE.mend && berth < HOME.radius);
   c.trim = mode === MODE.fight ? ((c.target >= 0 ? apart(ship.pos, state.ships[c.target].pos) : P.rivalD) > reach || style.stalk >= 0.8 ? SAIL.full : SAIL.plain) : lying || mode === MODE.face ? SAIL.reefed : SAIL.full;
   const hasty = mode === MODE.flee || mode === MODE.storm || mode === MODE.ram;
   tight = false;
   c.avoid = mode === MODE.loop || mode === MODE.home ? 0 : clearing(sea, state, ship, style, hasty);
-  if (Math.abs(c.avoid) >= 1 || tight) c.trim = SAIL.reefed; // coming about off foul water, it shortens sail: the tightest turn and the softest blow
+  if (Math.abs(c.avoid) >= 1 || tight) c.trim = SAIL.reefed;
   intend(ship);
 }
 
-/** The margin it keeps inside the storm's coming calm: a shrewder captain keeps the full margin of its Style. */
 const stormMargin = (c: Captain, style: Style, calm: Calm): number => Math.min(style.margin * (0.5 + 0.5 * c.skill), BRAIN.inside * calm.r * R);
 
-/**
- * The storm (stormView: what every chart announces): in it, it makes for the calm; inside, while a phase is announced,
- * it leaves for the coming calm once the sweep would reach it with less than its lead to spare — the edge closes from
- * the calm now to the next between the phase's move and its hold — and makes for a point its margin inside that calm.
- */
 function stormGoal(sea: Sea, state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain, pos = ship.pos, margin = stormMargin(c, style, SV.announced ? SV.next : SV.calm);
   const inNow = dot(pos, SV.calm.at) >= SV.calm.cos, calm: Calm = SV.announced ? SV.next : SV.calm;
@@ -390,23 +314,21 @@ function stormGoal(sea: Sea, state: MatchState, i: number, style: Style): boolea
     if (d <= safe) return false;
     const nowR = SV.calm.r * R, nextR = calm.r * R, frac = nowR > nextR ? clamp((nowR - d) / (nowR - nextR), 0, 1) : 0;
     const lead = by(BRAIN.lead, c.skill), spare = SV.toMove + (SV.toHold - SV.toMove) * frac;
-    if ((d - safe) / speed + lead < spare) { // time to spare by the straight way: but round land, if land lies across it
+    if ((d - safe) / speed + lead < spare) {
       if (((d - safe) * BRAIN.detour) / speed + lead < spare) return false;
-      if (beat % BRAIN.rechart[1] >= BRAIN.rechart[0]) return was; // between its reckonings it holds to what it last decided
+      if (beat % BRAIN.rechart[1] >= BRAIN.rechart[0]) return was;
       along(calm.at, toward(calm.at, pos, ship.head, T), safe, EDGE);
       if (openWater(sea, state, ship, pos, EDGE, tideOf(state), Math.max(ship.speed, 0.5 * speed), false) || ((d - safe) * BRAIN.round) / speed + lead < spare) return false;
     }
   }
   const to = Math.max(0, Math.min(d, safe) - 0.5 * margin);
-  if (lastFew(state) && inNow && P.rival >= 0) { // the last few make for the sides of the coming calm away from each other
+  if (lastFew(state) && inNow && P.rival >= 0) {
     toward(calm.at, state.ships[P.rival].pos, ship.head, T);
     along(calm.at, set(T, -T.x, -T.y, -T.z), safe - 0.5 * margin, c.goal);
     c.target = -1;
     return true;
   }
-  if (!fresh) return true; // and to the mark it last charted
-  // When its last chart showed no way to the calm it bears for the calm's centre, and does not stop to chart again
-  // until the calm moves on to its next phase (a new centre), or, looking once a beat, it finds the water ahead closed.
+  if (!fresh) return true;
   if (was && apart(c.goal, calm.at) < 1e-3) {
     if (beat >= c.think) return true;
     if (openWater(sea, state, ship, pos, along(pos, toward(pos, calm.at, ship.head, T), Math.min(BRAIN.ahead, d), EDGE), tideOf(state), Math.max(ship.speed, 0.5 * speed), false)) return true;
@@ -418,11 +340,6 @@ function stormGoal(sea: Sea, state: MatchState, i: number, style: Style): boolea
 
 const ROUTE: number[] = [], EDGE = v3(), MARK = v3(), STEP = v3(), FLOW = v3();
 
-/**
- * Whether the water from p to q is open to ship making `way` u/s at sea level `tide` the whole way: nav cells (clear of
- * every coast by the graph's clearance) and, with `shoal`, no hazard (hazard, unhurried) every 1.5 u, and no current against it it
- * cannot stem (PILOT.stem) every 6 u.
- */
 function openWater(sea: Sea, state: MatchState, ship: Ship, p: V3, q: V3, tide: number, way: number, shoal = true): boolean {
   const nav = sea.voyage, style = styleOf(ship);
   const n = Math.ceil(apart(p, q) / 1.5), dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z, len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
@@ -435,12 +352,6 @@ function openWater(sea: Sea, state: MatchState, ship: Ship, p: V3, q: V3, tide: 
   return true;
 }
 
-/**
- * Its course to within `within` u of `to`, round land (S-023 2, 4: the pilot's graph, route.ts): with open water the
- * whole way, the near edge of that disc and the straight distance to it; with land or a coast across, the farthest
- * mark of the cheapest sea route (Sea.voyage, findRoute) it can make good straight (of its 1st, 2nd, 4th … cell), and the route's cost. The mark goes
- * into `out`; −1 (and `out` untouched) when no route costs at most `limit`.
- */
 function chart(sea: Sea, state: MatchState, ship: Ship, to: V3, within: number, limit: number, out: V3): number {
   const nav = sea.voyage, tide = tideOf(state), pos = ship.pos, d = R * angleBetween(pos, to), way = Math.max(ship.speed, 0.5 * FORMS[ship.form].speed);
   if (d <= within) {
@@ -448,7 +359,7 @@ function chart(sea: Sea, state: MatchState, ship: Ship, to: V3, within: number, 
     return 0;
   }
   along(to, toward(to, pos, ship.head, T), within, EDGE);
-  if (openWater(sea, state, ship, pos, EDGE, tide, way, false)) { // the hazards of a clear way it clears as it meets them (clearing)
+  if (openWater(sea, state, ship, pos, EDGE, tide, way, false)) {
     set(out, EDGE.x, EDGE.y, EDGE.z);
     return d - within;
   }
@@ -457,7 +368,7 @@ function chart(sea: Sea, state: MatchState, ship: Ship, to: V3, within: number, 
   const cost = findRoute(nav, from, tide, (k) => dot(cellDir(NAV, k, MARK), to) >= cos, to, ROUTE, limit, BRAIN.greed);
   if (cost < 0) return -1;
   let k = Math.min(1, ROUTE.length - 1);
-  for (let j = 2; j < Math.min(ROUTE.length, BRAIN.marks); j *= 2) { // marks 1, 2, 4 … ahead
+  for (let j = 2; j < Math.min(ROUTE.length, BRAIN.marks); j *= 2) {
     if (!openWater(sea, state, ship, pos, cellDir(NAV, ROUTE[j], MARK), tide, way, false)) break;
     k = j;
   }
@@ -465,32 +376,22 @@ function chart(sea: Sea, state: MatchState, ship: Ship, to: V3, within: number, 
   return cost;
 }
 
-/**
- * Mending (PROMPT.md, The sea: harbours mend a hull fast, and the Great Lagoon its holder's): wounded below its Style's
- * mend share — the reckless hold on lowest — it breaks off to mend rather than fight on: it makes for the nearest
- * harbour within BRAIN.mend that lies inside the coming calm by its margin (or the Great Lagoon while it holds it), else
- * for its own home, and lies there reefed until its hull is sound again (BRAIN.mended). Bound for a harbour with its
- * trail open and home the nearer, it closes the trail first (loops).
- */
-let berth = Infinity; // u from the berth mends() last chose
+let berth = Infinity;
 
 function mends(sea: Sea, state: MatchState, i: number, style: Style, was: number): number {
   const ship = state.ships[i], c = ship.captain;
   if (share(ship) >= (was === MODE.mend ? BRAIN.mended : style.mend)) return -1;
   const calm = SV.announced ? SV.next : SV.calm, inside = dcos(Math.max(0, calm.r - stormMargin(c, style, calm) / R));
   let best = BRAIN.mend, at: V3 | null = null;
-  for (const h of sea.geo.harbours) { // it lies inside the harbour's mouth, with the open sea to swing through
+  for (const h of sea.geo.harbours) {
     const d = apart(ship.pos, h.pos);
     if (d < best && dot(h.pos, calm.at) >= inside) [best, at] = [d, along(h.pos, h.facing, 0.5 * h.r, F)];
   }
   const lagoon = sea.geo.landmarks.find((l) => l.perk === 'greatLagoon');
   if (lagoon !== undefined && holds(sea, state, i, 'greatLagoon') && apart(ship.pos, lagoon.pos) < best) [best, at] = [apart(ship.pos, lagoon.pos), lagoon.pos];
-  if (at === null && state.owner[cellOf(TERRITORY, c.anchor)] === i + 1 && dot(c.anchor, calm.at) >= inside) at = c.anchor; // no harbour in reach: its own waters mend it, slowly
+  if (at === null && state.owner[cellOf(TERRITORY, c.anchor)] === i + 1 && dot(c.anchor, calm.at) >= inside) at = c.anchor;
   if (at === null || (at !== c.anchor && ship.laid.length > 0 && apart(ship.pos, c.anchor) < best)) return -1;
   berth = apart(ship.pos, at);
-  // Its course to the berth round the coast between, not across it: charted as it turns for the berth and at each mark
-  // it makes; else once a beat it looks again, and charts afresh if the water to its mark has closed (a set, a shoal),
-  // or if it found no sea route last time and steers for the berth itself, clearing the shore as it meets it.
   const beat = (state.tick + 7 * i) % BRAIN.rechart[2], way = Math.max(ship.speed, 0.5 * FORMS[ship.form].speed), charted = apart(c.goal, at) > 1e-3;
   const fresh = was !== MODE.mend || berth < HOME.radius || (charted && apart(ship.pos, c.goal) < BRAIN.rechart[3]) || (beat < c.think && (!charted || !openWater(sea, state, ship, ship.pos, c.goal, tideOf(state), way, false)));
   if (fresh && chart(sea, state, ship, at, HOME.radius, BRAIN.detour * berth + BRAIN.mend, c.goal) < 0) set(c.goal, at.x, at.y, at.z);
@@ -498,36 +399,24 @@ function mends(sea: Sea, state: MatchState, i: number, style: Style, was: number
   return MODE.mend;
 }
 
-/**
- * The last few afloat (BRAIN.few), before the last calms (BRAIN.corner), keep out of each other's reach, inside the
- * calm: the storm will bring them to it (PROMPT.md: the final calm is small enough that the last ships must fight). So no match
- * is settled long before the final calm by one ship that has sunk the rest (check 4).
- */
 function waits(state: MatchState, i: number): boolean {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (r < 0 || !lastFew(state) || P.rivalD > BRAIN.wide) return false;
   const calm = SV.announced ? SV.next : SV.calm, d = R * angleBetween(ship.pos, calm.at);
   toward(ship.pos, state.ships[r].pos, ship.head, T);
   set(c.want, -T.x, -T.y, -T.z);
-  if (d > 0.6 * calm.r * R) normalize(addScaled(c.want, c.want, toward(ship.pos, calm.at, ship.head, U), 1.2)); // bearing in, off the calm's edge
+  if (d > 0.6 * calm.r * R) normalize(addScaled(c.want, c.want, toward(ship.pos, calm.at, ship.head, U), 1.2));
   return true;
 }
 
-/** Whether it is one of the last few of the fleet afloat (BRAIN.few: the rest sunk in play), before the last calms (BRAIN.corner). */
 const lastFew = (state: MatchState): boolean => SV.calm.r * R > BRAIN.corner && state.sunk.length >= SHIPS - BRAIN.few && afloatN(state) <= BRAIN.few;
 
-/** Ships afloat. */
 function afloatN(state: MatchState): number {
   let n = 0;
   for (let k = 0; k < SHIPS; k++) if (afloat(state.ships[k])) n++;
   return n;
 }
 
-/**
- * What keeps a wounded captain from breaking off to mend (S-023 1): an intruder in the waters it guards (Style.guard),
- * or — a captain that stalks the wounded — prey it can finish in sight: a ship it reads hull-up, broken below TUNE.fin,
- * sounder than it by a tenth and weaker in power, within TUNE.storm × BRAIN.ram.
- */
 function holdsOn(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], mine = share(ship);
   if (style.guard >= 0.5 && P.rival >= 0 && intrudes(state, i, P.rival)) return true;
@@ -542,16 +431,15 @@ function holdsOn(state: MatchState, i: number, style: Style): boolean {
   return false;
 }
 
-/** Wounded below its Style's run share (a lesser captain holds on longer) with a rival near: it runs, home-ward if home lies away from the rival. */
 function flees(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain;
   const r = P.rival, prey = r >= 0 && (P.hulls & (1 << r)) !== 0 ? share(state.ships[r]) : 1;
-  if (style.stalk >= 0.8 && prey < TUNE.finish && prey < share(ship)) return false; // a hunter stays on a ship it has broken: it finishes it
-  const outgunned = style.stalk >= 0.8 && r >= 0 && (P.hulls & (1 << r)) !== 0 && share(ship) < 0.7 && power(state.ships[r]) > 1.2 * power(ship); // a hunter breaks off from a ship that outguns it
+  if (style.stalk >= 0.8 && prey < TUNE.finish && prey < share(ship)) return false;
+  const outgunned = style.stalk >= 0.8 && r >= 0 && (P.hulls & (1 << r)) !== 0 && share(ship) < 0.7 && power(state.ships[r]) > 1.2 * power(ship);
   if (r < 0 || P.rivalD > BRAIN.danger || (share(ship) >= style.run * (0.75 + 0.25 * c.skill) && !outgunned)) return false;
   toward(ship.pos, state.ships[P.rival].pos, ship.head, T);
   set(c.want, -T.x, -T.y, -T.z);
-  if (TUNE.scatter > 0 && style.stalk < 0.8) { // a runner bears away from every rival it reads near, not only the one it runs from
+  if (TUNE.scatter > 0 && style.stalk < 0.8) {
     for (let k = 0; k < SHIPS; k++) {
       if (k === i || k === r || (P.hulls & (1 << k)) === 0 || !afloat(state.ships[k])) continue;
       const e = apart(ship.pos, state.ships[k].pos);
@@ -565,12 +453,6 @@ function flees(state: MatchState, i: number, style: Style): boolean {
   return true;
 }
 
-/**
- * Home with its trail open: a raider (Style.bolt) as soon as its purse is worth the raid or its strike is home; any
- * captain with a rival near its open trail (nearer as its skill falls: a lesser captain notices late; farther for a
- * raider, and for the player when it knows the player breaks trails) while its purse is worth guarding or its hull is
- * low — save a gambler sailing out the loop it committed to. A gentle captain keeps clear of the player.
- */
 function threatened(state: MatchState, i: number, style: Style, was: number): boolean {
   const ship = state.ships[i], c = ship.captain;
   if (ship.laid.length === 0 || ship.held <= 0) return false;
@@ -579,7 +461,7 @@ function threatened(state: MatchState, i: number, style: Style, was: number): bo
     return true;
   }
   if (P.rival < 0) return false;
-  if (style.stalk >= 0.8 && share(ship) > 0.5 && ship.purse < 0.5 * FORMS[ship.form].purse) return false; // a hunter meets a rival near its trail with its guns (engages); only a rich purse sends it home
+  if (style.stalk >= 0.8 && share(ship) > 0.5 && ship.purse < 0.5 * FORMS[ship.form].purse) return false;
   if (c.gentle && P.rival === 0 && P.rivalD < BRAIN.gentle) return true;
   if (style.commit > 0 && was === MODE.loop && share(ship) > 0.5) return false;
   if (P.rivalD > by(BRAIN.threat, c.skill) * (style.bolt ? 1.5 : 1) * (P.rival === 0 ? 1 + 0.5 * wary(c) : 1)) return false;
@@ -587,16 +469,11 @@ function threatened(state: MatchState, i: number, style: Style, was: number): bo
   return ship.purse > 0.25 * FORMS[ship.form].purse || share(ship) < 0.6;
 }
 
-/**
- * A fight with the nearest rival it knows, when it is willing: by its Style, the rival's wounds (read only hull-up;
- * the more for a captain that stalks), a rival in the waters it guards, its own wounds, a grudge against the player, the player's habit of running when wounded (press it), a rival that has hurt
- * it. It rams when its bow or weight make that favourable, else brings a broadside to bear within reach of its guns.
- */
 function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   const ship = state.ships[i], c = ship.captain, keen = style.stalk >= 0.8;
   let j = P.rival, d = P.rivalD;
   if (j < 0) return -1;
-  if (keen) { // a hunter turns its guns on the weakest hull it reads within reach, not merely the nearest
+  if (keen) {
     const far = (GUNS[ship.fittings[SLOT.broadside].kind]?.range ?? 0) * BRAIN.engage;
     let low = (P.hulls & (1 << j)) !== 0 ? share(state.ships[j]) : 1;
     for (let k = 0; k < SHIPS; k++) {
@@ -607,15 +484,15 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   const r = state.ships[j], theirs = (P.hulls & (1 << j)) !== 0 ? share(r) : 1, mine = share(ship);
   let will = style.fight + (0.3 + 0.6 * style.fight + style.stalk) * (1 - theirs) + 0.3 * (mine - 0.7) + (ship.harm[j] > 0 ? 0.2 : 0);
-  if (keen && theirs > 0.55) { // a hunter lets a sound ship that runs from it go: a long stern chase is no hunt
+  if (keen && theirs > 0.55) {
     velocityOf(sea, r, V);
     if (dot(V, toward(ship.pos, r.pos, ship.head, T)) > 0.5 * Math.sqrt(dot(V, V))) will -= 0.5;
   }
-  if (style.guard > 0) will += intrudes(state, i, j) ? style.guard : ship.harm[j] > 0 ? -0.2 : -0.4; // a turtle drives intruders off its waters; it does not chase them to the kill far out
-  if (keen) will -= 0.8 * Math.max(0, 1 - ((P.hulls & (1 << j)) !== 0 ? power(ship) / power(r) : 1)); // a hunter picks its fights: never a stronger ship than its own
-  else if (style.edge === 0 && theirs < 0.6 && another(state, i, j, d)) will -= 0.35; // another ship is on the wounded one first: it leaves it the kill
-  if (keen && theirs < 0.6 && TUNE.steal > 0 && another(state, i, j, d)) will += TUNE.steal; // a hunter swoops on a wounded ship another has engaged: the kill is its
-  if (style.fight < 0.1) will -= TUNE.shy; // a captain that avoids fights leaves even a wounded ship be
+  if (style.guard > 0) will += intrudes(state, i, j) ? style.guard : ship.harm[j] > 0 ? -0.2 : -0.4;
+  if (keen) will -= 0.8 * Math.max(0, 1 - ((P.hulls & (1 << j)) !== 0 ? power(ship) / power(r) : 1));
+  else if (style.edge === 0 && theirs < 0.6 && another(state, i, j, d)) will -= 0.35;
+  if (keen && theirs < 0.6 && TUNE.steal > 0 && another(state, i, j, d)) will += TUNE.steal;
+  if (style.fight < 0.1) will -= TUNE.shy;
   if (j === 0) {
     will += 0.15 * c.grudge;
     if ((c.knows & KNOW.run) !== 0 && c.run > 0 && theirs * 100 <= c.run + 10) will += 0.3;
@@ -623,50 +500,44 @@ function engages(sea: Sea, state: MatchState, i: number, style: Style): number {
   }
   if (will < 0.55) return -1;
   const bow = BOWS[ship.fittings[SLOT.bow].kind], mass = FORMS[ship.form].mass / FORMS[r.form].mass;
-  const finish = keen && theirs < TUNE.fin && mine > theirs + 0.1; // a hunter fights with its broadsides and rams only to finish a ship they have broken
+  const finish = keen && theirs < TUNE.fin && mine > theirs + 0.1;
   if (!c.gentle && (finish ? d < TUNE.ram * BRAIN.ram && (bow !== undefined || mass >= 1 || theirs < 0.25) : !keen && d < BRAIN.ram && mine > 0.5 && (bow !== undefined ? theirs < 0.8 || mass >= 1 : mass >= 1.5 && theirs < 0.4))) {
-    velocityOf(sea, r, V); // where it will be when the bow arrives, as far ahead as the captain's eye leads
+    velocityOf(sea, r, V);
     normalize(addScaled(c.goal, r.pos, V, (c.skill * d) / Math.max(1, ship.speed) / R));
     c.target = j;
     return MODE.ram;
   }
   const gun = GUNS[ship.fittings[SLOT.broadside].kind];
-  if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1) * (keen ? 1.6 : 1)) return -1; // a hunter takes up the chase from farther, its guns run out
+  if (gun === undefined || d > gun.range * BRAIN.engage * (j === 0 ? 1 + 0.15 * c.grudge : 1) * (keen ? 1.6 : 1)) return -1;
   broadside(sea, state, i, j, gun, style, d);
   c.target = j;
   return MODE.fight;
 }
 
-/**
- * The heading that lays rival j on a beam: the side whose battery has reloaded if it is not far round, else the
- * nearer; turned in toward the rival when beyond its standoff, away when inside it. A captain of rank lays off for
- * where the rival will be.
- */
 function broadside(sea: Sea, state: MatchState, i: number, j: number, gun: Gun, style: Style, d: number): void {
   const ship = state.ships[i], c = ship.captain, r = state.ships[j], pos = ship.pos;
   velocityOf(sea, r, V);
   normalize(addScaled(Q, r.pos, V, (c.skill * (d / gun.speed + 1)) / R));
   toward(pos, Q, ship.head, T);
-  cross(H, pos, T); // the heading with the rival on the starboard beam
+  cross(H, pos, T);
   let side = dot(H, ship.head) >= 0 ? 1 : -1;
   const port = ship.reload[BATTERY.port], starboard = ship.reload[BATTERY.starboard];
   if (port === 0 && starboard > 0 && -dot(H, ship.head) > -0.3) side = -1;
   else if (starboard === 0 && port > 0 && dot(H, ship.head) > -0.3) side = 1;
   const keen = style.stalk >= 0.8, loaded = (side > 0 ? starboard : port) === 0 && d < gun.range;
-  let a = clamp((d - standoff(c, style, j) * gun.range * (keen && share(r) < 0.6 ? 0.6 : 1)) /* a hunter closes on a broken ship */ / (0.5 * gun.range), -1, 1);
-  if (keen && loaded) a = clamp(a, -0.7 * gun.arc, 0.7 * gun.arc); // a hunter yaws a loaded battery onto its prey, inside the arc, so the guns bear
-  else if (keen && a > 0 && quarter(state, i, j)) { // reloading, it closes hard for the prey's quarter, wide of its stern chasers
+  let a = clamp((d - standoff(c, style, j) * gun.range * (keen && share(r) < 0.6 ? 0.6 : 1))  / (0.5 * gun.range), -1, 1);
+  if (keen && loaded) a = clamp(a, -0.7 * gun.arc, 0.7 * gun.arc);
+  else if (keen && a > 0 && quarter(state, i, j)) {
     set(c.want, T.x, T.y, T.z);
     return;
-  } else if (keen && a > 0) a = Math.min(1.45, 1.45 * Math.sqrt(a)); // reloading, it closes hard
+  } else if (keen && a > 0) a = Math.min(1.45, 1.45 * Math.sqrt(a));
   const ca = dcos(a), sa = dsin(a);
   normalize(set(c.want, side * H.x * ca + T.x * sa, side * H.y * ca + T.y * sa, side * H.z * ca + T.z * sa));
 }
 
-/** Ship i inside the cone astern of rival j that stern chasers sweep (and a margin): the heading for a point on j's quarter, out of that cone, into T. */
 function quarter(state: MatchState, i: number, j: number): boolean {
   const pos = state.ships[i].pos, r = state.ships[j];
-  cross(U, r.head, r.pos); // the rival's starboard
+  cross(U, r.head, r.pos);
   set(QTR, pos.x - r.pos.x, pos.y - r.pos.y, pos.z - r.pos.z);
   const aft = -dot(QTR, r.head), lat = dot(QTR, U);
   if (aft <= 0 || Math.abs(lat) > 0.9 * aft) return false;
@@ -675,11 +546,8 @@ function quarter(state: MatchState, i: number, j: number): boolean {
   return true;
 }
 
-/** The nearest open rival trail its chart shows, when worth the raid by its Style, the trail's length and distance, and a grudge. */
 function hunts(i: number, state: MatchState, style: Style, was: number): boolean {
   const c = state.ships[i].captain, owner = P.trail;
-  // a raider goes farther for a trail, and a hunter, which stalks open trails (PROMPT.md), as far; a hunter patrolling
-  // for the player's (patrols) goes for one as far as it stalks a ship
   const reach = owner === 0 && patrolOf(c, style) > 0 ? BRAIN.stalk : BRAIN.hunt * (style.stalk >= 0.8 ? 1.35 : Math.min(1.35, 0.6 + 0.4 * style.raid));
   if (owner < 0 || P.trailD > reach || (c.gentle && owner === 0)) return false;
   if (was === MODE.hunt && c.target === owner && c.since > BRAIN.wait) return false;
@@ -690,10 +558,6 @@ function hunts(i: number, state: MatchState, style: Style, was: number): boolean
   return true;
 }
 
-/**
- * A rival in the waters it guards (Style.guard: turtles), the sea it holds or its home: it turns its bow on the
- * intruder under reefed sail for BRAIN.tell, its tell, before it strikes (engages, the fiercer for the intrusion).
- */
 function guards(state: MatchState, i: number, style: Style, was: number, aim: number): number {
   const ship = state.ships[i], c = ship.captain, j = P.rival;
   if (style.guard < 0.5 || j < 0 || !intrudes(state, i, j)) return -1;
@@ -703,25 +567,17 @@ function guards(state: MatchState, i: number, style: Style, was: number, aim: nu
   return MODE.face;
 }
 
-/** Whether another ship it knows lies nearer the wounded ship j than its own d: the kill is that ship's to take. */
 function another(state: MatchState, i: number, j: number, d: number): boolean {
   for (let k = 0; k < SHIPS; k++) if (k !== i && k !== j && knows(P, k) && afloat(state.ships[k]) && apart(state.ships[k].pos, state.ships[j].pos) < d) return true;
   return false;
 }
 
-/** A ship's strength as a rival reads it hull-up: its hull by its form's guns. */
 const power = (ship: Ship): number => Math.max(1, ship.hull) * (1 + 0.25 * FORMS[ship.form].guns);
 
-/** Whether p lies in the waters captain i guards: the sea it holds, or its home. */
 const guarded = (state: MatchState, i: number, p: V3): boolean => state.owner[cellOf(TERRITORY, p)] === i + 1 || apart(p, state.ships[i].captain.anchor) < HOME.radius + 4;
 
 const intrudes = (state: MatchState, i: number, j: number): boolean => guarded(state, i, state.ships[j].pos);
 
-/**
- * A turtle away from the waters it guards (PROMPT.md: turtles hold rich home waters and punish anyone who enters
- * them) keeps out of the reach of a rival's guns and its own (BRAIN.keep × the longer), bearing away from it, and in
- * toward the calm off its edge: it fires on a ship that has hurt it, or once the last calms leave no room to keep apart.
- */
 function keepsClear(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (style.guard < 0.5 || r < 0 || ship.harm[r] > 0 || guarded(state, i, ship.pos) || SV.calm.r * R <= BRAIN.corner) return false;
@@ -730,29 +586,24 @@ function keepsClear(state: MatchState, i: number, style: Style): boolean {
   const calm = SV.announced ? SV.next : SV.calm, d = R * angleBetween(ship.pos, calm.at);
   toward(ship.pos, state.ships[r].pos, ship.head, T);
   set(U, -T.x, -T.y, -T.z);
-  if (d > 0.6 * calm.r * R) normalize(addScaled(U, U, toward(ship.pos, calm.at, ship.head, V), 1.2)); // bearing in, off the calm's edge
+  if (d > 0.6 * calm.r * R) normalize(addScaled(U, U, toward(ship.pos, calm.at, ship.head, V), 1.2));
   along(ship.pos, U, BRAIN.wide, c.goal);
   c.target = -1;
   return true;
 }
 
-/**
- * Stalking (Style.stalk): a wounded rival it reads hull-up, or — a hunter — a laden one whose gull it sees bringing a
- * chest home (Sight.gulls; gull.ts bound: where the gull flies shows where its ship is). It closes under full sail on
- * where the ship will be, until it is near enough to fight, for BRAIN.wait at most.
- */
 function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Style, was: number, aim: number): number {
   const ship = state.ships[i], c = ship.captain, r = P.rival;
   if (style.stalk === 0 && c.grudge === 0) return -1;
-  const keen = style.stalk >= 0.8, weak = keen ? 0.6 : 0.7; // a hunter stalks a ship that is broken, not one merely scratched, and from farther
+  const keen = style.stalk >= 0.8, weak = keen ? 0.6 : 0.7;
   let j = -1, d = BRAIN.stalk * (keen ? 1.8 : 1);
   if (r >= 0 && (style.stalk > 0 || r === 0) && (P.hulls & (1 << r)) !== 0 && share(state.ships[r]) < (r === 0 ? Math.max(pressAt(c), weak) : weak) && P.rivalD < d) [j, d] = [r, P.rivalD];
-  for (let k = 0; keen && k < SHIPS; k++) { // a hunter reads every hull it sees for the weakest
+  for (let k = 0; keen && k < SHIPS; k++) {
     if (k === i || k === j || (P.hulls & (1 << k)) === 0 || !afloat(state.ships[k]) || share(state.ships[k]) >= weak) continue;
     const e = apart(ship.pos, state.ships[k].pos);
     if (e < BRAIN.stalk * 1.8 && (j < 0 || share(state.ships[k]) < share(state.ships[j]) - 0.15)) [j, d] = [k, e];
   }
-  if (j < 0 && c.grudge > 0 && !c.gentle && knows(P, 0) && afloat(state.ships[0]) && share(ship) > 0.5) { // a grudge: it stalks the player whenever it sees it
+  if (j < 0 && c.grudge > 0 && !c.gentle && knows(P, 0) && afloat(state.ships[0]) && share(ship) > 0.5) {
     const e = apart(ship.pos, state.ships[0].pos);
     if (e < BRAIN.stalk * (1 + 0.5 * c.grudge)) [j, d] = [0, e];
   }
@@ -762,8 +613,8 @@ function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Sty
     const at = bound(state, k), e = at === null ? Infinity : apart(ship.pos, at);
     if (e < d) [j, d] = [k, e];
   }
-  if (keen && j >= 0 && (P.hulls & (1 << j)) !== 0 && power(ship) < 1.1 * power(state.ships[j])) j = -1; // only prey it is the stronger of, read hull-up
-  if (j < 0 || (was === MODE.stalk && aim === j && c.since > BRAIN.wait * (keen ? 2 : 1))) return -1; // a hunter stalks twice as long
+  if (keen && j >= 0 && (P.hulls & (1 << j)) !== 0 && power(ship) < 1.1 * power(state.ships[j])) j = -1;
+  if (j < 0 || (was === MODE.stalk && aim === j && c.since > BRAIN.wait * (keen ? 2 : 1))) return -1;
   const prey = state.ships[j];
   if (knows(P, j)) velocityOf(sea, prey, V);
   else set(V, 0, 0, 0);
@@ -772,11 +623,6 @@ function stalks(sea: Sea, state: MatchState, i: number, sight: Sight, style: Sty
   return MODE.stalk;
 }
 
-/**
- * The edge of a fight (Style.edge: opportunists): two rivals it sees within guns' reach of each other, or a rival's
- * gull diving on a ship (Sight.gulls, bound): it makes for a point its edge off the nearest such fight, on its own
- * side, and lies there reefed until one of them weakens enough to pounce on (engages, stalks).
- */
 function lurks(state: MatchState, i: number, sight: Sight, style: Style): number {
   const ship = state.ships[i], c = ship.captain, gun = GUNS[ship.fittings[SLOT.broadside].kind];
   if (style.edge === 0 || gun === undefined) return -1;
@@ -802,10 +648,6 @@ function lurks(state: MatchState, i: number, sight: Sight, style: Style): number
   return MODE.lurk;
 }
 
-/**
- * A hunter that knows the margin the player keeps from the storm (Mind.storm) lies in wait while a phase is
- * announced: on the coming calm's rim at that margin inside, on its own side, where the player will run in.
- */
 function waylays(state: MatchState, i: number, style: Style): number {
   const ship = state.ships[i], c = ship.captain;
   if (style.stalk < 0.8 || (c.knows & KNOW.storm) === 0 || !SV.announced) return -1;
@@ -814,12 +656,6 @@ function waylays(state: MatchState, i: number, style: Style): number {
   return MODE.roam;
 }
 
-/**
- * A hunter that knows the player draws wide loops (temperaments.ts PATROL), with the player's home (which every chart
- * shows) within BRAIN.stalk of its own and little purse to bank, patrols beyond the player's border: round that home
- * where such loops' trails run, always making for a point PATROL.step farther round in the sense its own loops wheel,
- * inside the coming calm by its margin, so the player's long open trails run out into its reach (hunts).
- */
 function patrols(state: MatchState, i: number, style: Style): number {
   const ship = state.ships[i], c = ship.captain, p = state.ships[0], den = p.captain.anchor, ring = patrolOf(c, style);
   if (ring <= 0 || p.held <= 0 || !afloat(p) || ship.purse >= 0.5 * FORMS[ship.form].purse || apart(c.anchor, den) > BRAIN.stalk) return -1;
@@ -831,11 +667,6 @@ function patrols(state: MatchState, i: number, style: Style): number {
   return MODE.roam;
 }
 
-/**
- * The richest find in reach for the distance — a chest by its tier (a gold-leaf one by Style.gold, and that much
- * farther), flotsam and coins by their worth, a wreck or cache to hold beside — or −1. Sailing a loop, it leaves it
- * only for a find worth the more the less its appetite (an expander's patience).
- */
 function loots(sea: Sea, state: MatchState, i: number, style: Style, was: number): number {
   const c = state.ships[i].captain;
   let best = was === MODE.loop ? 0.25 + 0.5 * (1 - style.loot) : 0.25, mode = -1, target = -1, at: V3 | null = null;
@@ -853,17 +684,12 @@ function loots(sea: Sea, state: MatchState, i: number, style: Style, was: number
     if (s > best) [best, mode, target, at] = [s, MODE.hold, P.site, sea.geo.finds[P.site].pos];
   }
   if (at === null || (was === mode && c.target === target && c.since > BRAIN.wait)) return -1;
-  if (style.guard >= 0.5 && !guarded(state, i, at)) return -1; // a turtle takes what floats into its own waters, and sails out for none of it
+  if (style.guard >= 0.5 && !guarded(state, i, at)) return -1;
   set(c.goal, at.x, at.y, at.z);
   c.target = target;
   return mode;
 }
 
-/**
- * Loops (PROMPT.md, Territory): at home with no trail open it draws its next loop (planLoop); it sails it until the
- * purse is full, then heads home; a trail left open by anything else is closed by heading home. A ship with no waters
- * left makes for the coming calm and whatever it finds.
- */
 function loops(sea: Sea, state: MatchState, i: number, style: Style, rng: Rng, was: number): number {
   const ship = state.ships[i], c = ship.captain;
   c.target = -1;
@@ -877,26 +703,20 @@ function loops(sea: Sea, state: MatchState, i: number, style: Style, rng: Rng, w
   if (ship.laid.length > 0 || !atHome(state, i)) return MODE.home;
   if (planLoop(sea, state, i, style, rng)) {
     c.loops++;
-    c.tell = style.commit; // a gambler swings round to it first, for all to see
+    c.tell = style.commit;
     return MODE.loop;
   }
-  set(c.goal, c.anchor.x, c.anchor.y, c.anchor.z); // nowhere to draw a loop now: it keeps to its waters
+  set(c.goal, c.anchor.x, c.anchor.y, c.anchor.z);
   return MODE.roam;
 }
 
-/** A lobe of a loop by fractions of its half-width and of its reach beyond the home rim (0: back inside its waters). */
 const LOBE: readonly (readonly [number, number])[] = [[-1, 0.55], [-0.5, 1], [0.5, 1], [1, 0.55], [1.2, 0]];
 
-/**
- * Captain i's next loop into its record's plan, as the cells of a drawn course: a lobe out of its waters on a bearing
- * that wheels round its home from loop to loop (Style.wheel), its size by its Style and what it knows of the player (and smaller as the calm shrinks), every point
- * a gap apart clear of hazards and inside the coming calm by its margin; tried on six bearings, then smaller.
- */
 function planLoop(sea: Sea, state: MatchState, i: number, style: Style, rng: Rng): boolean {
   const ship = state.ships[i], c = ship.captain, calm = SV.announced ? SV.next : SV.calm, margin = stormMargin(c, style, calm);
   const inside = dcos(Math.max(0, calm.r - margin / R));
   let reach = Math.min(reachOf(c, style) * (1 + style.stretch) * (0.85 + 0.3 * rngFloat(rng)), 0.4 * (calm.r * R - margin));
-  toward(c.anchor, ship.pos, ship.head, T); // bearings from the anchor, 0 toward the ship
+  toward(c.anchor, ship.pos, ship.head, T);
   const width = 0.6 - 0.3 * style.stretch, first = c.loops * style.wheel;
   for (let round = 0; round < 2; round++, reach *= 0.6) {
     for (let k = 0; k < 6; k++) if (lobe(sea, state, ship, style, first + k * 1.05, width, reach, calm, inside)) return true;
@@ -925,7 +745,6 @@ function lobe(sea: Sea, state: MatchState, ship: Ship, style: Style, bearing: nu
   return true;
 }
 
-/** Whether a hull at p comes to harm or hindrance: aground (rocks, shoals, floes), hot water unsheathed, the vortex unless bold, kelp when in haste. */
 function hazard(sea: Sea, state: MatchState, ship: Ship, style: Style, p: V3, hasty: boolean): boolean {
   if (aground(sea, state, p)) return true;
   const z = sea.geo.zones[cellOf(TERRITORY, p)];
@@ -936,14 +755,8 @@ function hazard(sea: Sea, state: MatchState, ship: Ship, style: Style, p: V3, ha
 
 const SWERVE = [0, 0.5, -0.5, 1, -1, 1.6, -1.6];
 const ARC = v3(), BOW = v3(), CHORD = v3();
-/** Whether the clear way clearing() last found needs the reefed sail's tighter turning circle. */
 let tight = false;
 
-/**
- * The angle to starboard it bears off its heading for the goal so that the water BRAIN.probe ahead (the farther as its
- * turning circle is the wider) is clear, and the bow clears the shore on the turn round to it (swept); about, when
- * nothing is. A way whose turn only the reefed sail's tighter circle clears sets `tight`: it shortens sail for it.
- */
 function clearing(sea: Sea, state: MatchState, ship: Ship, style: Style, hasty: boolean): number {
   const c = ship.captain, pos = ship.pos, mode = c.mode, form = FORMS[ship.form];
   if (byWant(mode)) normalize(addScaled(H, c.want, pos, -dot(c.want, pos)));
@@ -965,23 +778,18 @@ function clearing(sea: Sea, state: MatchState, ship: Ship, style: Style, hasty: 
   return 2.6 * turn;
 }
 
-/**
- * Whether its bow clears the shore the whole way round from its heading to the heading u on a turning circle of
- * radius rho: a seaman's eye on the arc the hull will carve, not only the water the new heading points at.
- */
 function swept(sea: Sea, state: MatchState, ship: Ship, style: Style, u: V3, rho: number, hasty: boolean): boolean {
   const pos = ship.pos, head = ship.head, reach = FORMS[ship.form].half + BRAIN.bow;
   cross(CHORD, head, pos);
   const e = datan2(dot(u, CHORD), dot(u, head)), n = Math.max(1, Math.ceil(Math.abs(e) / BRAIN.arc));
   for (let k = 1; k <= n; k++) {
     const th = (e * k) / n;
-    along(pos, turned(head, pos, th / 2, CHORD), 2 * rho * dsin(Math.abs(th) / 2), ARC); // where the hull's middle lies, th round the circle
+    along(pos, turned(head, pos, th / 2, CHORD), 2 * rho * dsin(Math.abs(th) / 2), ARC);
     if (hazard(sea, state, ship, style, along(ARC, turned(head, pos, th, CHORD), reach, BOW), hasty)) return false;
   }
   return true;
 }
 
-/** Its intent: the heading it means to hold, toward its next mark, the chart's inked arrow. */
 function intend(ship: Ship): void {
   const c = ship.captain, pos = ship.pos;
   if (byWant(c.mode)) set(c.intent, c.want.x, c.want.y, c.want.z);

@@ -1,7 +1,3 @@
-// WP26 the title and the harbour drawn as a chart-maker's illustrations: iron-gall ink line, hatching and transparent
-// washes laid on a transparent canvas over the parchment page, which shows through every wash. Each sheet is drawn once
-// per layout at a capped pixel count; the screens then move the pieces (the ship rides the swell about her waterline,
-// the lamps breathe, the lighthouse beam turns, the planet spins under its graticule, the gull wheels).
 import * as THREE from 'three';
 import type { Rect } from '../ui/safeArea.ts';
 
@@ -9,14 +5,12 @@ type Ctx = CanvasRenderingContext2D;
 type Rnd = () => number;
 type Path = (g: Ctx) => void;
 
-/** The illustration's pen and washes (sRGB), after style/palette.ts. */
 export const INK = '#2a1e14';
 export const WASH = {
   sky: '#7d9db3', dusk: '#d9875f', rose: '#c56f78', sea: '#3c7390', deep: '#285470', verdigris: '#4f8b77', ochre: '#c99238',
   umber: '#7b4e2a', vermilion: '#b9432b', gold: '#c8a046', green: '#6f8b4b', stone: '#a08f72', lead: '#f4ecdb', ultramarine: '#3b4f9a',
   iron: '#3a332c', grey: '#8f989f',
 } as const;
-/** The tiers' pigments, iron-gall to vermilion, for the gull's plumage marks. */
 export const TIER_HEX = [WASH.iron, WASH.verdigris, WASH.ultramarine, WASH.vermilion] as const;
 const PIGMENT_HEX: Record<string, string> = {
   vermilion: WASH.vermilion, black: '#2b2622', ironGrey: '#5d5f63', ochre: WASH.ochre, verdigris: WASH.verdigris, ultramarine: WASH.ultramarine,
@@ -37,13 +31,9 @@ export function rng(seed: number): Rnd {
   };
 }
 
-// ——— sheets ———
-
 export interface Sheet { readonly canvas: HTMLCanvasElement; readonly g: Ctx; readonly w: number; readonly h: number }
-/** The UI camera has y down (CSS px from the top left), so canvas rows go on as they are. */
 export const FLIP_Y = false;
 
-/** A transparent canvas of w × h CSS px at up to `dpr`, held under `maxPixels`. */
 export function sheet(w: number, h: number, maxPixels: number, dpr: number): Sheet {
   const k = Math.max(0.5, Math.min(dpr, Math.sqrt(maxPixels / Math.max(1, w * h))));
   const canvas = document.createElement('canvas');
@@ -68,7 +58,6 @@ export function sheetMesh(s: Sheet, opacity = 1): THREE.Mesh<THREE.PlaneGeometry
   }));
 }
 
-/** Take a tree of interface meshes apart, freeing what each holds (lettering returns its rasters to the cache). */
 export function drop(o: THREE.Object3D): void {
   for (const c of [...o.children]) {
     drop(c);
@@ -82,12 +71,9 @@ export function drop(o: THREE.Object3D): void {
   } else d.dispose?.();
 }
 
-// ——— the pen ———
-
 function fill(g: Ctx, p: Path, color: string, alpha: number): void {
   g.save(); g.globalAlpha = alpha; g.fillStyle = color; p(g); g.fill(); g.restore();
 }
-/** A transparent wash: two jittered layers and a darker pooled edge. */
 function wash(g: Ctx, p: Path, color: string, alpha: number, r: Rnd, edge = true): void {
   g.save();
   g.fillStyle = color;
@@ -123,10 +109,7 @@ function stroke(g: Ctx, p: Path, width: number, alpha = 1, color: string = INK):
 }
 const seg = (x0: number, y0: number, x1: number, y1: number): Path => (q) => { q.beginPath(); q.moveTo(x0, y0); q.lineTo(x1, y1); };
 
-// ——— the ship ———
-
 export interface ShipPoints { mainTop: [number, number]; lantern: [number, number]; bow: [number, number]; stern: [number, number] }
-/** A ship of FORM `form` (pinnace … galleon) side on, bow to the right, moored with her sails furled on the yards. */
 export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: number, r: Rnd, o: { hull?: string; gull?: boolean; gullLevels?: GullMarks } = {}): ShipPoints {
   const u = len / 380, H = len * 0.15, sx = cx - len / 2, bx = cx + len / 2;
   const castle = [0, H * 0.3, H * 0.55, H * 0.7][form] ?? 0, fore = [0, 0, H * 0.4, H * 0.45][form] ?? 0;
@@ -155,7 +138,6 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
   const sternTop: [number, number] = [sx + len * 0.02, wl - H * 1.05 - castle];
   const sprit: [number, number] = fore ? [bx + len * 0.13, wl - H * 1.45 - fore] : [bx + len * 0.03, wl - H * 0.9];
 
-  // shrouds and stays behind the masts
   for (const m of rigs) {
     const x = mx(m), t = top(m), from = t + len * m.h * 0.22, foot = wl - H * 0.82;
     for (const d of [-0.07, -0.045, -0.02, 0.03]) stroke(g, seg(x, from, x + d * len, foot), 0.5 * u + 0.25, 0.75);
@@ -173,7 +155,6 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
   stroke(g, seg(mx(last), top(last) + len * 0.02, sternTop[0] + len * 0.01, sternTop[1]), 0.6 * u + 0.3, 0.85);
   if (fore) stroke(g, seg(bx - len * 0.04, wl - H * 0.95 - fore * 0.6, sprit[0], sprit[1]), 2.2 * u + 0.5);
 
-  // the hull, the sea hiding what lies below her waterline
   g.save();
   g.beginPath(); g.rect(sx - len, wl - len * 2, len * 3, len * 2 + H * 0.12); g.clip();
   wash(g, hull, o.hull ?? WASH.umber, 0.66, r);
@@ -192,12 +173,10 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
   if (castle) for (let i = 0; i < 3; i++) stroke(g, (q) => { q.beginPath(); q.rect(sx + len * (0.06 + i * 0.06), wl - H * 1.0 - castle * 0.62, 4 * u + 1, 5 * u + 1); }, 0.6 * u + 0.3, 0.8);
   stroke(g, hull, 1.6 * u + 0.5);
   g.restore();
-  // her waterline and the ripples along it
   g.save(); g.strokeStyle = INK; g.globalAlpha = 0.7; g.lineWidth = 0.9 * u + 0.3; g.beginPath();
   for (let x = sx - len * 0.06; x < bx + len * 0.08; x += 9 * u + 2) { const l = (5 + r() * 9) * u + 1; g.moveTo(x, wl + H * 0.1 + (r() - 0.5) * 2 * u); g.quadraticCurveTo(x + l / 2, wl + H * 0.06, x + l, wl + H * 0.1); }
   g.stroke(); g.restore();
 
-  // masts, yards and the furled sails
   const bundle = (x0: number, y0: number, x1: number, y1: number, fat: number): void => {
     const n = Math.max(3, Math.round(Math.hypot(x1 - x0, y1 - y0) / (9 * u + 3)));
     const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny) || 1, ox = (nx / nl) * fat, oy = (ny / nl) * fat;
@@ -229,7 +208,6 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
       bundle(ax - (ax - bxx) * 0.05, ay - (ay - by) * 0.05, bxx + (ax - bxx) * 0.06, by + (ay - by) * 0.06, 2.4 * u + 0.6);
     }
   }
-  // the pennant at the main truck and the ensign at the stern
   const [px, py] = [mx(main), top(main)];
   const pennant: Path = (q) => {
     q.beginPath(); q.moveTo(px, py + 2 * u);
@@ -242,7 +220,6 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
   stroke(g, seg(ex, ey, ex - len * 0.03, ey - len * 0.09), 1.1 * u + 0.3);
   const flag: Path = (q) => { q.beginPath(); q.moveTo(ex - len * 0.03, ey - len * 0.09); q.quadraticCurveTo(ex - len * 0.07, ey - len * 0.1, ex - len * 0.1, ey - len * 0.085); q.lineTo(ex - len * 0.095, ey - len * 0.055); q.quadraticCurveTo(ex - len * 0.06, ey - len * 0.065, ex - len * 0.03, ey - len * 0.055); q.closePath(); };
   wash(g, flag, WASH.gold, 0.75, r); stroke(g, flag, 0.6 * u + 0.3);
-  // the stern lantern
   const lantern: [number, number] = [ex + len * 0.05, ey - 9 * u];
   stroke(g, seg(lantern[0], ey, lantern[0], lantern[1] + 3 * u), 1 * u + 0.3);
   const cage: Path = (q) => { q.beginPath(); q.rect(lantern[0] - 2.5 * u, lantern[1] - 4 * u, 5 * u, 7 * u); };
@@ -251,10 +228,7 @@ export function drawShip(g: Ctx, cx: number, wl: number, len: number, form: numb
   return { mainTop: [px, py], lantern, bow: [bx - len * 0.02, wl - H * 0.9], stern: [sx + len * 0.05, wl - H * 1.0] };
 }
 
-// ——— the gull ———
-
 export interface GullMarks { marks?: readonly string[]; goldTips?: boolean }
-/** The gull perched with its feet at (x, y), facing right, `s` its length; its plumage marks along the folded wing. */
 export function drawGull(g: Ctx, x: number, y: number, s: number, r: Rnd, o: GullMarks = {}): void {
   const lw = Math.max(0.6, s * 0.035);
   stroke(g, (q) => { q.beginPath(); q.moveTo(x - s * 0.04, y - s * 0.24); q.lineTo(x - s * 0.07, y); q.moveTo(x + s * 0.07, y - s * 0.24); q.lineTo(x + s * 0.06, y); }, lw * 1.3, 1, WASH.ochre);
@@ -280,7 +254,6 @@ export function drawGull(g: Ctx, x: number, y: number, s: number, r: Rnd, o: Gul
   fill(g, (q) => { q.beginPath(); q.arc(x + s * 0.4, y - s * 0.75, s * 0.022 + 0.35, 0, Math.PI * 2); }, INK, 1);
 }
 
-/** The gull in flight, wings in a shallow M, centred on (x, y). */
 export function drawFlyingGull(g: Ctx, x: number, y: number, span: number, r: Rnd): void {
   const lw = Math.max(0.7, span * 0.025);
   const wing: Path = (q) => { q.beginPath(); q.moveTo(x, y); q.quadraticCurveTo(x - span * 0.16, y - span * 0.2, x - span * 0.32, y - span * 0.12); q.quadraticCurveTo(x - span * 0.42, y - span * 0.07, x - span * 0.5, y + span * 0.03); q.quadraticCurveTo(x - span * 0.3, y - span * 0.02, x, y + span * 0.07); q.closePath(); };
@@ -296,14 +269,11 @@ export function drawFlyingGull(g: Ctx, x: number, y: number, span: number, r: Rn
   stroke(g, (q) => { q.beginPath(); q.arc(x + span * 0.11, y + span * 0.03, span * 0.035, 0, Math.PI * 2); }, lw);
 }
 
-/** Plumage from the gull's levels: a mark in the pigment of each level reached, gold-leaf tips at the top of all. */
 export function gullMarks(levels: readonly number[], tops: readonly number[]): GullMarks {
   const marks: string[] = [];
   levels.forEach((l) => { for (let i = 0; i < l; i++) marks.push(TIER_HEX[Math.min(i, TIER_HEX.length - 1)]!); });
   return { marks, goldTips: levels.every((l, i) => l >= (tops[i] ?? 0)) };
 }
-
-// ——— small sheets: a ship for the shipwright, the gull's portrait, a captain's emblem ———
 
 export function shipSheet(w: number, h: number, form: number, dpr: number): Sheet {
   const s = sheet(w, h, 0.5e6, dpr), len = Math.min(w * 0.74, h * 1.02), r = rng(7 + form);
@@ -344,13 +314,8 @@ export function emblemSheet(w: number, h: number, pigments: readonly [string, st
   return sh;
 }
 
-// ——— the harbour ———
-
-/** The seal's centre below the top of its sheet, in seal radii (the ribbon tails hang lower). */
 export const SEAL_CY = 1.12;
 
-/** WP26b the set-sail seal: a blot of vermilion wax with a spilt, uneven rim, a raised ring of beads and an embossed
- * eight-point rose catching the dusk light from the upper left, over swallow-tailed ribbons of ultramarine and verdigris. */
 export function sealSheet(R: number, dpr: number): Sheet {
   const w = R * 3.3, h = R * 2.5, s = sheet(w, h, 0.22e6, dpr), g = s.g, r = rng(1588), cx = w / 2, cy = R * SEAL_CY;
   for (const side of [-1, 1]) {
@@ -366,7 +331,7 @@ export function sealSheet(R: number, dpr: number): Sheet {
   const disc = (k: number): Path => (q) => { q.beginPath(); q.arc(cx, cy, R * k, 0, Math.PI * 2); };
   fill(g, blob, '#9b2a1a', 0.92);
   wash(g, blob, WASH.vermilion, 0.85, r);
-  hatch(g, blob, cx - R * 0.1, cy - R * 0.1, R * 1.2, R * 1.2, 0.75, 2.2, INK, 0.55, 0.3, r); // the wax's shadowed side
+  hatch(g, blob, cx - R * 0.1, cy - R * 0.1, R * 1.2, R * 1.2, 0.75, 2.2, INK, 0.55, 0.3, r);
   wash(g, disc(0.74), WASH.vermilion, 0.5, r, false);
   stroke(g, blob, 1.6);
   stroke(g, disc(0.78), 1.3, 0.85);
@@ -377,13 +342,13 @@ export function sealSheet(R: number, dpr: number): Sheet {
     const a = -Math.PI / 2 + (i * Math.PI) / 4, l = i % 2 ? rr * 0.62 : rr, wd = rr * (i % 2 ? 0.11 : 0.16);
     const tx = cx + Math.cos(a) * l, ty = cy + Math.sin(a) * l, nx = -Math.sin(a) * wd, ny = Math.cos(a) * wd;
     const half = (sg: number): Path => (q) => { q.beginPath(); q.moveTo(cx, cy); q.lineTo(cx + Math.cos(a) * wd * 1.3 + sg * nx, cy + Math.sin(a) * wd * 1.3 + sg * ny); q.lineTo(tx, ty); q.closePath(); };
-    const lit = Math.cos(a + Math.PI * 0.75) > 0; // the face turned to the upper-left light is the paler one
+    const lit = Math.cos(a + Math.PI * 0.75) > 0;
     fill(g, half(1), lit ? '#e9a184' : '#6e1c10', 0.75);
     fill(g, half(-1), lit ? '#6e1c10' : '#e9a184', 0.6);
     stroke(g, half(1), 0.7, 0.85); stroke(g, half(-1), 0.7, 0.85);
   }
   fill(g, disc(0.07), WASH.ochre, 0.9); stroke(g, disc(0.07), 0.8);
-  stroke(g, (q) => { q.beginPath(); q.arc(cx, cy, R * 0.88, Math.PI * 1.08, Math.PI * 1.42); }, 2.2, 0.55, '#f8dcc4'); // the wax's gleam
+  stroke(g, (q) => { q.beginPath(); q.arc(cx, cy, R * 0.88, Math.PI * 1.08, Math.PI * 1.42); }, 2.2, 0.55, '#f8dcc4');
   stroke(g, (q) => { q.beginPath(); q.arc(cx, cy, R * 0.62, Math.PI * 1.12, Math.PI * 1.36); }, 1.4, 0.4, '#f8dcc4');
   return s;
 }
@@ -401,8 +366,6 @@ function glowTexture(): THREE.CanvasTexture {
   return t;
 }
 
-/** The harbour at dusk, w × h CSS px: the sky and far shore with the lighthouse, the sea, the player's ship of FORM
- * `form` at her mooring with the gull on the masthead, the quay with its lamps in front. */
 export function harbourArt(w: number, h: number, form: number, marks: GullMarks, dpr: number): HarbourArt {
   const r = rng(1525 + form), group = new THREE.Group(), sc = Math.min(w / 956, h / 440);
   const horizon = h * 0.56;
@@ -411,7 +374,6 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
     const m = sheetMesh(s); m.position.set(x, y, 0); m.renderOrder = order; parent.add(m); bytes += bytesOf(s); return m;
   };
 
-  // the sky, the far shore with its lighthouse, the sea
   const back = sheet(w, h, 2.2e6, dpr), g = back.g;
   let grad = g.createLinearGradient(0, 0, 0, horizon);
   grad.addColorStop(0, WASH.sky); grad.addColorStop(0.6, WASH.rose); grad.addColorStop(1, WASH.dusk);
@@ -480,7 +442,6 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
   }
   add(back, w / 2, h / 2, 1);
 
-  // the beam turning above the far shore
   const beamC = document.createElement('canvas');
   beamC.width = 256; beamC.height = 64;
   const bg = beamC.getContext('2d')!, bgr = bg.createLinearGradient(0, 0, 256, 0);
@@ -492,7 +453,6 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
   const beam = new THREE.Mesh(new THREE.PlaneGeometry(beamLen, h * 0.05).translate(beamLen / 2, 0, 0), new THREE.MeshBasicMaterial({ map: beamTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
   beam.position.set(lamp[0], lamp[1], 0); beam.renderOrder = 1.5; group.add(beam);
 
-  // the ship at her mooring, riding the swell about her waterline
   const len = Math.min(w * 0.36, h * 0.95), shipX = w * 0.26, wl = h * 0.835;
   const sw = len * 1.26, sh = len * 1.04, lcx = len * 0.56, lwl = len * 0.95;
   const ss = sheet(sw, sh, 1.6e6, dpr);
@@ -502,7 +462,6 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
   add(ss, sw / 2 - lcx, sh / 2 - lwl, 2, rider);
   const world = (p: [number, number]): [number, number] => [shipX + p[0] - lcx, wl + p[1] - lwl];
 
-  // the quay in front of her: stones, bollards and lines, lamps, a barrel and a crate
   const fh = h * 0.42, fw = w * 0.56, fy = h - fh, front = sheet(fw, fh, 0.9e6, dpr), f = front.g;
   f.translate(0, -fy);
   const qTop = h * 0.835, qEdge = h * 0.865;
@@ -544,7 +503,6 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
   stroke(f, (q) => { q.beginPath(); q.moveTo(w * 0.215, qTop - h * 0.02); q.lineTo(w * 0.245, qTop + h * 0.025); q.moveTo(w * 0.245, qTop - h * 0.02); q.lineTo(w * 0.215, qTop + h * 0.025); }, 0.7, 0.7);
   add(front, fw / 2, fy + fh / 2, 3);
 
-  // the lamplight
   const glowTex = glowTexture();
   const glows: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   const glow = (p: [number, number], size: number, base: number, parent: THREE.Object3D = group) => {
@@ -574,12 +532,10 @@ export function harbourArt(w: number, h: number, form: number, marks: GullMarks,
   };
 }
 
-// ——— the title ———
-
-const GLOBE_VERT = /* glsl */ `
+const GLOBE_VERT =  `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const GLOBE_FRAG = /* glsl */ `
+const GLOBE_FRAG =  `
 precision highp float;
 varying vec2 vUv;
 uniform float uTime;
@@ -597,7 +553,6 @@ void main() {
   vec2 q = vec2(vUv.x * 2.0 - 1.0, 1.0 - vUv.y * 2.0) * 1.12;
   float d = length(q), aa = fwidth(d) * 1.25;
   vec4 acc = vec4(0.0);
-  // the double rule around the sphere
   acc = over(acc, INK, (1.0 - smoothstep(0.0, aa * 1.3, abs(d - 1.0))) * 0.95);
   acc = over(acc, INK, (1.0 - smoothstep(0.0, aa, abs(d - 1.055))) * 0.6);
   acc = over(acc, vec3(0.73, 0.26, 0.17), (1.0 - smoothstep(0.0, aa, abs(d - 1.075))) * 0.45);
@@ -607,14 +562,12 @@ void main() {
     vec3 p = vec3(n.x, n.y * cos(tl) - n.z * sin(tl), n.y * sin(tl) + n.z * cos(tl));
     p = vec3(p.x * cos(sp) + p.z * sin(sp), p.y, -p.x * sin(sp) + p.z * cos(sp));
     float lambert = dot(n, normalize(vec3(-0.55, 0.5, 0.68)));
-    // the sea's wash, deeper toward the limb
     acc = over(acc, vec3(0.31, 0.5, 0.58), 0.16 + 0.16 * (1.0 - n.z));
     float land = fbm(p * 1.9 + vec3(3.1, 1.7, 0.4)), e = land - 0.53, fw = fwidth(land);
     float isLand = smoothstep(-fw, fw, e);
     acc = over(acc, mix(vec3(0.72, 0.6, 0.32), vec3(0.45, 0.55, 0.3), smoothstep(0.0, 0.08, e)), isLand * 0.42);
     acc = over(acc, vec3(0.23, 0.42, 0.52), (1.0 - smoothstep(0.0, fw * 1.1, abs(e + 0.035))) * step(e, 0.0) * 0.6);
     acc = over(acc, vec3(0.23, 0.42, 0.52), (1.0 - smoothstep(0.0, fw * 1.1, abs(e + 0.075))) * step(e, 0.0) * 0.35);
-    // the graticule every thirty degrees, the equator and the tropics in vermilion
     float lat = asin(clamp(p.y, -1.0, 1.0)), lon = atan(p.z, p.x);
     float gl = abs(fract(lat / 0.5236 + 0.5) - 0.5) * 0.5236, gm = abs(fract(lon / 0.5236 + 0.5) - 0.5) * 0.5236 * cos(lat);
     float pw = aa * 0.9;
@@ -622,11 +575,9 @@ void main() {
     acc = over(acc, INK, (1.0 - smoothstep(0.0, pw, gm)) * 0.32);
     acc = over(acc, vec3(0.73, 0.26, 0.17), (1.0 - smoothstep(0.0, pw * 1.2, abs(lat))) * 0.55);
     acc = over(acc, vec3(0.73, 0.26, 0.17), (1.0 - smoothstep(0.0, pw, abs(abs(lat) - 0.409))) * 0.35);
-    // hatching on the shadowed side
     float shade = clamp((0.25 - lambert) / 0.9, 0.0, 1.0);
     float hl = abs(fract((q.x + q.y) * 46.0) - 0.5);
     acc = over(acc, INK, (1.0 - smoothstep(0.08, 0.08 + fwidth((q.x + q.y) * 46.0), hl + 0.5 - 0.5 * shade - 0.06)) * shade * 0.5);
-    // the coastline in ink
     acc = over(acc, INK, (1.0 - smoothstep(0.0, fw * 1.4, abs(e))) * 0.9);
   }
   gl_FragColor = vec4(acc.rgb, acc.a * uOpacity);
@@ -634,8 +585,6 @@ void main() {
 
 export interface TitleArt { readonly group: THREE.Group; readonly bytes: number; readonly ribbon: { x: number; y: number; width: number; height: number }; frame(t: number, still: boolean): void }
 
-/** The title page: rhumb lines of a portolan network over the parchment, the planet turning in its double rule at
- * (cx, cy) with radius R, a ribbon cartouche for the swash-lettered name beneath it, a wind rose, the gull wheeling. */
 export function titleArt(w: number, h: number, safe: Rect, cx: number, cy: number, R: number, dpr: number): TitleArt {
   const group = new THREE.Group(), r = rng(1492);
   let bytes = 0;
@@ -651,7 +600,6 @@ export function titleArt(w: number, h: number, safe: Rect, cx: number, cy: numbe
   for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; rose(cx + Math.cos(a) * R * 2.05, cy + Math.sin(a) * R * 2.05, 16, 0.32); }
   stroke(g, (q) => { q.beginPath(); q.rect(8, 8, w - 16, h - 16); }, 1.2, 0.7);
   stroke(g, (q) => { q.beginPath(); q.rect(13, 13, w - 26, h - 26); }, 0.6, 0.6);
-  // a wind rose in the lower left of the safe area
   const rr = Math.min(safe.height * 0.13, 74), rx = safe.x + rr * 1.35, ry = safe.y + safe.height - rr * 1.35;
   stroke(g, (q) => { q.beginPath(); q.arc(rx, ry, rr * 0.42, 0, Math.PI * 2); }, 0.9, 0.8);
   stroke(g, (q) => { q.beginPath(); q.arc(rx, ry, rr * 0.48, 0, Math.PI * 2); }, 0.6, 0.6);
@@ -666,14 +614,12 @@ export function titleArt(w: number, h: number, safe: Rect, cx: number, cy: numbe
   }
   const bgMesh = sheetMesh(bg); bgMesh.position.set(w / 2, h / 2, 0); bgMesh.renderOrder = 1; group.add(bgMesh); bytes += bytesOf(bg);
 
-  // the planet
   const globe = new THREE.Mesh(new THREE.PlaneGeometry(R * 2.24, R * 2.24), new THREE.ShaderMaterial({
     vertexShader: GLOBE_VERT, fragmentShader: GLOBE_FRAG, uniforms: { uTime: { value: 0 }, uOpacity: { value: 1 } },
     transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
   }));
   globe.position.set(cx, cy, 0); globe.renderOrder = 2; group.add(globe);
 
-  // the ribbon
   const wr = Math.min(safe.width * 0.66, R * 3.6), hr = wr * 0.2, top = hr * 0.18;
   const rs = sheet(wr, hr * 1.6, 1.2e6, dpr), q0 = rs.g;
   const tail = (flip: boolean): Path => (q) => {
@@ -700,7 +646,6 @@ export function titleArt(w: number, h: number, safe: Rect, cx: number, cy: numbe
   const ribbonY = cy + R * 0.86;
   const rm = sheetMesh(rs); rm.position.set(cx, ribbonY, 0); rm.renderOrder = 3; group.add(rm); bytes += bytesOf(rs);
 
-  // the gull wheeling about the planet
   const span = R * 0.3, gs = sheet(span, span * 0.5, 0.05e6, dpr);
   drawFlyingGull(gs.g, span / 2, span * 0.2, span * 0.96, r);
   const gull = sheetMesh(gs); gull.renderOrder = 4; group.add(gull); bytes += bytesOf(gs);

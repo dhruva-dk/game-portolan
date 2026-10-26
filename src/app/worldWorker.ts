@@ -1,7 +1,3 @@
-// The world worker: builds the geography and its navigation graph off the main thread (about 1.2 s on the dev Mac)
-// while the title letters itself in, and keeps them in IndexedDB under a hash of the simulation's source
-// (__WORLD_KEY__, vite.config.ts), so later launches read them back in milliseconds and a changed simulation never
-// meets a stale world. The arrays move to the main thread without a copy.
 import type { World } from '../sim/environment.ts';
 import { buildGeography } from '../sim/world/geography.ts';
 import { buildNav } from '../sim/world/nav.ts';
@@ -11,7 +7,6 @@ declare const __WORLD_KEY__: string;
 
 export type { World };
 
-/** What the worker posts: the world, the milliseconds it took to get and whether it came from the cache. */
 export interface WorldMessage {
   readonly world: World;
   readonly ms: number;
@@ -25,7 +20,6 @@ interface Cached {
 
 async function load(): Promise<WorldMessage> {
   const t0 = performance.now();
-  // The cache is a shortcut only: when IndexedDB is unavailable the world is built every launch.
   const hit = await read<Cached>('world', 'current').catch(() => undefined);
   if (hit?.key === __WORLD_KEY__) return { world: hit.world, ms: performance.now() - t0, cached: true };
   const geo = buildGeography();

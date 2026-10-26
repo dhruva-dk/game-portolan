@@ -1,8 +1,3 @@
-// The app on each device: it boots to the title inside the startup budget (A9) with no text in the DOM, moves
-// title → harbour → match by touch alone, and pausing stops both the match and the render clock. On the iPad the
-// relaunch is also timed with the CPU throttled 4× and the world read back from the device cache. Screenshots go to
-// $SHOTS (default: a temp dir).
-//   node --test tests/app/shell.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
@@ -34,14 +29,13 @@ test('the app boots, moves through its screens by touch and pauses', async (t) =
       assert.equal(await game.hook((g) => g.screen), 'title');
       assert.equal(await page.evaluate(() => document.body.innerText.trim()), '', 'no text in the DOM');
 
-      await wait(3500); // Portolan letters itself in
+      await wait(3500);
       await game.screenshot(join(shots, `wp05-title-${name}.png`));
       await game.tap({ x: device.width / 2, y: device.height / 2 });
       await game.until((g) => g.screen === 'harbour');
       await wait(300);
       await game.screenshot(join(shots, `wp05-harbour-${name}.png`));
 
-      // The set-sail button sits in the middle of the safe area, 0.42 of the way down.
       const { top, right, bottom, left } = device.safeArea;
       await game.tap({ x: left + (device.width - left - right) / 2, y: top + (device.height - top - bottom) * 0.42 });
       await game.until((g) => g.screen === 'match' && g.tick > 15);

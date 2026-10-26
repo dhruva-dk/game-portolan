@@ -1,34 +1,22 @@
-// src/sim/math.ts: accuracy of the deterministic functions against the engine's own Math.* (V8's fdlibm port,
-// itself within 1 ulp) over the stated ranges, the generator against a reference sfc32, the quality of its
-// streams and of hash32, and speed (reported, not asserted). Ranges and measured worst errors are printed as a
-// table (copied into progress.html's log).
-//   node --test tests/sim/math.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as m from '../../src/sim/math.ts';
-
-// ---------------------------------------------------------------------------------------------------------------
-// Accuracy
 
 interface Case {
   name: string;
   range: string;
   f: (x: number, y: number) => number;
   ref: (x: number, y: number) => number;
-  /** Random arguments. */
   sample: (r: m.Rng) => [number, number];
-  /** Arguments that probe edges: zeros, quadrant boundaries, ends of the range. */
   special: [number, number][];
-  /** Error bound as a function of the true value: absolute where values are bounded, relative where not. */
   bound: (ref: number) => number;
   relative?: boolean;
 }
 
 const uni = (r: m.Rng, lo: number, hi: number) => m.rngRange(r, lo, hi);
-/** Log-uniform magnitude in [10^a, 10^b] with a random sign. */
 const logUni = (r: m.Rng, a: number, b: number) => (m.rngChance(r, 0.5) ? -1 : 1) * Math.pow(10, uni(r, a, b));
-const ABS = 4.5e-16; // 4 ulp of 1: the bound for functions with values in [−π, π]
+const ABS = 4.5e-16;
 const quarterTurns = (k: number): [number, number][] => Array.from({ length: k }, (_, i) => [(i - k / 2) * (Math.PI / 4), 0]);
 
 const CASES: Case[] = [
@@ -108,19 +96,15 @@ test('the d* functions are accurate on their stated ranges', (t) => {
 test('the d* functions handle the edges of their domains', () => {
   assert.equal(m.dexp(710), Infinity);
   assert.equal(m.dexp(-746), 0);
-  assert.equal(m.dexp(-745), Math.exp(-745)); // the smallest subnormal
+  assert.equal(m.dexp(-745), Math.exp(-745));
   assert.equal(m.dlog(0), -Infinity);
   assert.ok(Number.isNaN(m.dlog(-1)));
   assert.equal(m.dlog(Infinity), Infinity);
   assert.ok(Number.isNaN(m.dasin(1.0000001)));
   assert.ok(Number.isNaN(m.dsin(Infinity)));
   for (const f of [m.dsin, m.dcos, m.dtan, m.datan, m.dexp, m.dlog, m.dasin, m.dacos]) assert.ok(Number.isNaN(f(NaN)));
-  // Beyond TRIG_RANGE the reduction loses accuracy gracefully; it stays deterministic everywhere.
   assert.ok(Math.abs(m.dsin(1e9) - Math.sin(1e9)) < 1e-6);
 });
-
-// ---------------------------------------------------------------------------------------------------------------
-// Vectors
 
 test('vector helpers', () => {
   const a = m.v3(1, 2, 3), b = m.v3(-2, 0.5, 4), out = m.v3();
@@ -135,10 +119,6 @@ test('vector helpers', () => {
   assert.deepEqual(out, a);
 });
 
-// ---------------------------------------------------------------------------------------------------------------
-// Randomness
-
-/** sfc32 as published with PractRand (C, uint32 arithmetic), written independently of math.ts. */
 function referenceSfc32(a: number, b: number, c: number, d: number): () => number {
   return () => {
     const t = (((a + b) >>> 0) + d) >>> 0;
@@ -166,7 +146,6 @@ test('generators are reproducible and their outputs well distributed', () => {
   }
   assert.ok(differ > 990, 'neighbouring seeds give unrelated sequences');
 
-  // Chi-square over 256 buckets (255 degrees of freedom: mean 255, sd 22.6) and every output bit balanced.
   const r = m.rngFrom(1), buckets = new Float64Array(256), ones = new Float64Array(32), N = 1 << 20;
   let sum = 0;
   for (let i = 0; i < N; i++) {
@@ -196,7 +175,6 @@ test('generators are reproducible and their outputs well distributed', () => {
 });
 
 test('hash32 mixes fully, so stream seeds are independent', () => {
-  // Flipping any one input bit flips each output bit with probability ½: mean 16 of 32.
   const r = m.rngFrom(11);
   let flips = 0, trials = 0;
   for (let i = 0; i < 2000; i++) {
@@ -212,14 +190,10 @@ test('hash32 mixes fully, so stream seeds are independent', () => {
   }
   assert.ok(Math.abs(flips / trials - 16) < 0.1, `avalanche ${flips / trials}`);
 
-  // Streams of one seed, and one stream of neighbouring seeds, start uncorrelated.
   const firsts = new Set<number>();
   for (let s = 0; s < 64; s++) for (let seed = 0; seed < 64; seed++) firsts.add(m.rngU32(m.rngFrom(m.hash32(seed, s))));
   assert.ok(firsts.size > 4090, 'no repeated first outputs among 4096 streams');
 });
-
-// ---------------------------------------------------------------------------------------------------------------
-// Speed (reported only: timing assertions would be flaky)
 
 test('speed of the d* functions against Math.*', (t) => {
   const N = 2_000_000, xs = new Float64Array(N), r = m.rngFrom(5);
@@ -235,7 +209,7 @@ test('speed of the d* functions against Math.*', (t) => {
     ['asin', (x) => m.dasin(x / 10), (x) => Math.asin(x / 10)], ['exp', m.dexp, Math.exp], ['log', (x) => m.dlog(x + 10.5), (x) => Math.log(x + 10.5)],
   ];
   for (const [name, d, ref] of pairs) {
-    time(d); time(ref); // warm up
+    time(d); time(ref);
     t.diagnostic(`${name}: d* ${time(d)[0].toFixed(1)} ns, Math ${time(ref)[0].toFixed(1)} ns`);
   }
 });

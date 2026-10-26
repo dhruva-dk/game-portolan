@@ -1,7 +1,3 @@
-// WP24 part D: the compact chart, WP25's always-on round inset: your waters round the player (north up, the player at
-// the centre, COMPACT.reach u to the rim), the coasts as a wash, rivals in sight with heading ticks (hull-down hollow),
-// the storm's wall and its next shrink, the gull-marked loot. A 2D canvas overlay WP25 mounts in its HUD slot: no draw
-// call on the GPU; redrawn at most COMPACT.hz a second, its land and waters re-sampled on a COMPACT.grid² lattice.
 import type { World } from '../app/worldWorker.ts';
 import { gullMarks } from '../sim/gull.ts';
 import { cellOf, localFrame, R, TERRITORY } from '../sim/sphere.ts';
@@ -17,13 +13,11 @@ export const COMPACT = { reach: 64, px: 116, grid: 44, hz: 15 } as const;
 
 type P = { x: number; y: number; z: number };
 export interface CompactShip { i: number; x: number; y: number; hx: number; hy: number; hull: boolean }
-/** Disc coordinates: −1..1, x east, y north. Rings and loot as flat x, y pairs. */
 export interface CompactMarks { ships: CompactShip[]; shown: number; head: { x: number; y: number }; calm: number[][]; next: number[][]; finds: number[]; chests: number[] }
 
 const dot = (a: P, b: P) => a.x * b.x + a.y * b.y + a.z * b.z;
 const unit = (a: P): P => { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; };
 
-/** Where q falls on the disc round p (east e, north n): into out; false past the rim. */
 function onDisc(q: P, p: P, e: P, n: P, reach: number, out: { x: number; y: number }): boolean {
   const c = dot(q, p) / (Math.hypot(q.x, q.y, q.z) || 1), d = (Math.acos(Math.max(-1, Math.min(1, c))) * R) / reach;
   const x = dot(q, e), y = dot(q, n), l = Math.hypot(x, y);
@@ -49,7 +43,6 @@ function ring(calm: Calm, p: P, e: P, n: P, reach: number): number[][] {
 }
 
 const stormV = newStormView();
-/** What the compact chart shows (pure; the test holds its ships to the player's sight). */
 export function compactMarks(state: MatchState, world: World | null, sight: Sight | null, reach: number = COMPACT.reach): CompactMarks {
   const me = state.ships[0], p = unit(me.pos), e = { x: 0, y: 0, z: 0 }, n = { x: 0, y: 0, z: 0 };
   localFrame(p, e, n);
@@ -78,18 +71,14 @@ export function compactMarks(state: MatchState, world: World | null, sight: Sigh
   return out;
 }
 
-/** A palette entry as CSS (PIGMENTS hold THREE colours). */
 function css(c: Parameters<typeof linearVec>[0], a = 1): string {
   const [r, g, b] = linearVec(c).toArray().map((v) => Math.round(255 * Math.min(1, Math.max(0, v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055))));
   return `rgba(${r},${g},${b},${a})`;
 }
-/** The chart's parchment (chart.ts uCParch's hue). */
 const PAPER = '#efe3c6';
 
-/** The compact chart: WP25 mounts `canvas` (mount(host)), calls draw() each frame and onTap(() => rig.zoom.open()). */
 export class CompactChart {
   readonly canvas: HTMLCanvasElement;
-  /** The rivals drawn on the last draw (bits, Sight.ships order). */
   shown = 0;
   private readonly land: HTMLCanvasElement;
   private last = -Infinity;
@@ -108,7 +97,6 @@ export class CompactChart {
   onTap(open: () => void): void { this.canvas.addEventListener('pointerup', (ev) => { ev.stopPropagation(); open(); }); }
   dispose(): void { this.canvas.remove(); }
 
-  /** Land, the player's waters and rivals' waters on the lattice, into the small canvas. */
   private sample(state: MatchState, world: World | null): void {
     const G = COMPACT.grid, g = this.land.getContext('2d')!, img = g.createImageData(G, G);
     if (world && this.groundWorld !== world) { this.ground = groundOf(world); this.groundWorld = world; }
@@ -146,7 +134,6 @@ export class CompactChart {
     this.sample(state, world);
     g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
     g.drawImage(this.land, 0, 0, W, W);
-    // a light rhumb cross through the player
     g.strokeStyle = css(PIGMENTS.ironGall, 0.18); g.lineWidth = 0.6 * dpr;
     for (let a = 0; a < 4; a++) { const t = (a * Math.PI) / 4; g.beginPath(); g.moveTo(X(-Math.cos(t)), Y(-Math.sin(t))); g.lineTo(X(Math.cos(t)), Y(Math.sin(t))); g.stroke(); }
     const line = (pts: number[], w: number, col: string, dash: number[] = []) => {
@@ -180,7 +167,6 @@ export class CompactChart {
     for (const s of m.ships) mark(s.x, s.y, s.hx, s.hy, 3.6 * dpr, INK, s.hull);
     mark(0, 0, m.head.x, m.head.y, 4.4 * dpr, VERM, true);
     g.restore();
-    // the rim and its north tick
     g.strokeStyle = INK; g.lineWidth = 1.6 * dpr;
     g.beginPath(); g.arc(r, r, r - 1.2 * dpr, 0, Math.PI * 2); g.stroke();
     g.fillStyle = INK; g.beginPath(); g.moveTo(r, 1.5 * dpr); g.lineTo(r + 3.2 * dpr, 8 * dpr); g.lineTo(r - 3.2 * dpr, 8 * dpr); g.closePath(); g.fill();

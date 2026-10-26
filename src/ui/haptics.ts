@@ -1,11 +1,3 @@
-// WP25: haptics, the moments PROMPT.md names felt in the hand: closing a loop (scaled to its size), a rival touching
-// your open trail, a hit taken, a broadside fired, a ram, a chest landing, banking, the gull's return, the storm's
-// edge, crossing into your own waters, sinking; and a selection tick for a sail step. Each is a short pattern of
-// pulses with a rest before it may play again, and every pulse goes through one limiter (a gap between any two, a
-// cap per second; heavy moments wait for the gap, light ones are dropped), so a ten-ship melee never buzzes. Driven
-// by the sim's events for the player's ship the tick they happen (the audio hears the same events, WP28, and its own
-// ship's sounds carry no travel delay, so they land together; cue() pairs the few sounds with no event). Native
-// through the Capacitor Haptics plugin when the app has it, navigator.vibrate on the web where it exists, else none.
 import { EVENT, FLIGHT } from '../sim/state.ts';
 
 export type Haptic = 'loop' | 'trail' | 'hit' | 'fire' | 'ram' | 'chest' | 'bank' | 'gull' | 'storm' | 'home' | 'sink' | 'sail' | 'tap';
@@ -30,21 +22,18 @@ export const PATTERNS: Readonly<Record<Exclude<Haptic, 'loop'>, Pattern>> = {
   tap: p(60, 0, [0, 'select']),
 };
 
-/** A loop's pattern by its size 0–3: a swell of pulses rising to a success. */
 export function loopPattern(size: number): Pattern {
   const s = Math.max(0, Math.min(3, Math.round(size)));
   const steps: Pulse[] = (['light', 'medium', 'heavy', 'heavy'] as Pulse[]).slice(0, s + 1);
   return { pulses: [...steps.map((q, i) => [i * 75, q] as [number, Pulse]), [steps.length * 75 + 60, 'success']], rest: 800, weight: 4 };
 }
 
-/** A claim's size class by the u² it took: 0 a small bite … 3 a great sweep (log scale). */
 export const loopSize = (area: number): number => Math.max(0, Math.min(3, Math.floor(Math.log10(Math.max(1, area) / 60))));
 
 export const LIMIT = { gap: 45, perSecond: 10, stale: 250 } as const;
 
 interface HappeningLike { readonly kind: number; readonly ship: number; readonly by: number; readonly amount: number }
 
-/** The haptic (and its size) an event gives the player's ship `me`, or null. */
 export function eventHaptic(e: HappeningLike, me: number): [Haptic, number] | null {
   const mine = e.ship === me;
   switch (e.kind) {
@@ -60,13 +49,11 @@ export function eventHaptic(e: HappeningLike, me: number): [Haptic, number] | nu
   }
 }
 
-/** What the HUD knows each frame that has no event: the gull's flight, home waters, the storm's edge. */
 export interface Watched { gullFlight: number; inHome: boolean; stormEdge: boolean }
 
 interface Due { at: number; p: Pulse; w: number }
 
 export class Haptics {
-  /** The settings toggle (WP26). */
   enabled = true;
   private readonly backend: Backend;
   private readonly now: () => number;
@@ -81,7 +68,6 @@ export class Haptics {
     this.now = now;
   }
 
-  /** Play a haptic unless it rests from its last time; true if it will play. */
   play(h: Haptic, size = 0): boolean {
     if (!this.enabled) return false;
     const t = this.now(), pat = h === 'loop' ? loopPattern(size) : PATTERNS[h];
@@ -93,7 +79,6 @@ export class Haptics {
     return true;
   }
 
-  /** One tick's events for ship `me`. */
   events(events: readonly HappeningLike[], me: number): void {
     for (const e of events) {
       const h = eventHaptic(e, me);
@@ -101,13 +86,11 @@ export class Haptics {
     }
   }
 
-  /** WP28 cues (engine.onCue): the chest landing on deck and the ui sounds have no sim event of their own. */
   cue(c: { readonly sound: string; readonly near: boolean }): void {
     if (!c.near) return;
     if (/chest/i.test(c.sound)) this.play('chest');
   }
 
-  /** The frame's watched state: the gull back home with its chest, crossing into home waters, reaching the storm. */
   watch(w: Watched): void {
     const was = this.seen;
     this.seen = { ...w };
@@ -117,7 +100,6 @@ export class Haptics {
     if (!was.stormEdge && w.stormEdge) this.play('storm');
   }
 
-  /** Play the pulses that are due; call every frame. */
   flush(): void {
     const t = this.now();
     while (this.fired.length > 0 && this.fired[0] <= t - 1000) this.fired.shift();
@@ -149,7 +131,6 @@ interface CapacitorGlobal {
   registerPlugin?<T>(name: string): T;
 }
 
-/** The device's haptics: Capacitor's Haptics plugin when the native app carries it, else navigator.vibrate, else none. */
 export function nativeBackend(): Backend {
   const cap = (globalThis as { Capacitor?: CapacitorGlobal }).Capacitor;
   try {
@@ -164,7 +145,7 @@ export function nativeBackend(): Backend {
         },
       };
     }
-  } catch { /* no plugin: fall through */ }
+  } catch {  }
   const nav = (globalThis as { navigator?: { vibrate?: (ms: number) => boolean } }).navigator;
   if (nav && typeof nav.vibrate === 'function') return { pulse: (q) => { nav.vibrate!(VIBRATE[q]); } };
   return { pulse: () => {} };

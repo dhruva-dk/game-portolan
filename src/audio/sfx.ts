@@ -1,8 +1,3 @@
-// WP28: the sound bank. Every sound effect and ambience bed in the game, each a layered synthesis on dsp.ts (noise
-// shaping, modal resonators, FM, plucked strings, envelopes), rendered once per variant into Float32Arrays from a seed
-// derived from its name, so the same sound is bit-identical everywhere. Variants differ in their random draws; the
-// engine also jitters playback rate and level per instance. The registry SOUNDS says how each is played: bus, priority
-// (who wins when voices run out), level at the reference distance, how many may sound at once, whether it loops.
 import {
   ad, between, Biquad, brown, buf, fade, filter, fm, hash, hump, loopify, loudness, mix, modes, normalize, peak, pink, pluck, rng,
   samples, scale, scatter, shape, softclip, SR, sweep, TAU, tone, white, type Buf, type FilterType, type Rng,
@@ -14,14 +9,10 @@ export interface SoundDef {
   make: (r: Rng, v: number) => Buf | Buf[];
   variants: number;
   bus: Bus;
-  /** 0…10: who keeps a voice when they run out (louder wins among equals). */
   priority: number;
-  /** Level at the reference distance. */
   gain: number;
-  /** Voices of this sound at once. */
   max: number;
   loop: boolean;
-  /** ± fraction of playback-rate variation per instance (0 for anything tuned). */
   jitter: number;
 }
 
@@ -38,19 +29,16 @@ function burst(r: Rng, s: number, type: FilterType, f: number, q: number, a: num
   return shape(filter(white(n(s), r), type, f, q), (t) => ad(t, a, d));
 }
 
-/** A falling sine thump: f0 to f1 Hz, decaying over d s. */
 function thump(s: number, f0: number, f1: number, d: number): Buf {
   return tone(n(s), (t) => f1 + (f0 - f1) * Math.exp(-t / (d * 0.35)), (t) => ad(t, 0.002, d));
 }
 
-/** A wooden knock: a click into a plank's modes at f. */
 function knock(r: Rng, f: number, d = 0.06, s = 0.4): Buf {
   const ex = burst(r, 0.004, 'lp', 4000, 0.7, 0.0003, 0.0012);
   const ms = [1, 2.32, 3.95, 5.6, 7.9].map((k, j) => ({ f: f * k * between(r, 0.97, 1.03), d: d / (1 + j * 0.7), g: 1 / (1 + j) }));
   return normalize(modes(ex, ms, n(s)), 1);
 }
 
-/** Struck metal (a coin, a nail, a bar): free-bar partials over f. */
 function metal(r: Rng, f: number, d: number, s = d * 5): Buf {
   const ex = burst(r, 0.002, 'hp', 2000, 0.7, 0.0002, 0.0006);
   const ms = [1, 2.756, 5.404, 8.933, 13.34].map((k, j) => ({ f: f * k * between(r, 0.995, 1.005), d: d / (1 + j * 0.8), g: 1 / (1 + j * 0.5) }));
@@ -60,13 +48,11 @@ function metal(r: Rng, f: number, d: number, s = d * 5): Buf {
 const BELL_K = [0.5, 1, 1.183, 1.506, 2, 2.514, 2.662, 3.011, 4.166];
 const BELL_D = [1.6, 1, 0.8, 0.7, 0.55, 0.4, 0.35, 0.3, 0.2];
 const BELL_G = [0.6, 1, 0.7, 0.5, 0.8, 0.35, 0.3, 0.25, 0.15];
-/** A cast bell: hum, prime, tierce, quint, nominal and the upper partials. */
 function bellOf(r: Rng, f: number, d: number, s: number): Buf {
   const ex = burst(r, 0.003, 'lp', 6000, 0.7, 0.0002, 0.001);
   return normalize(modes(ex, BELL_K.map((k, j) => ({ f: f * k * between(r, 0.998, 1.002), d: d * BELL_D[j], g: BELL_G[j] })), n(s)), 1);
 }
 
-/** Stick-slip friction (a creaking timber or rope): pulses gliding from r0 to r1 a second into the given modes. */
 function stickSlip(r: Rng, len: number, r0: number, r1: number, freqs: readonly number[], d: number): Buf {
   const N = n(len), x = new Float32Array(N), wob = between(r, 2, 5);
   let ph = 0;
@@ -104,7 +90,6 @@ function crackles(into: Buf, r: Rng, from: number, to: number, perSecond: number
   });
 }
 
-/** A bowed string (viol): band-limited sawtooth-ish harmonics with vibrato through a body resonance. */
 function bowed(r: Rng, s: number, f: number, a: (t: number) => number): Buf {
   const N = n(s), x = new Float32Array(N), vib = between(r, 4.5, 5.5);
   let p = 0;
@@ -124,7 +109,6 @@ function canvasFlap(r: Rng): Buf {
   return mix(x, thump(0.12, 150, 90, 0.03), 0, 0.4);
 }
 
-/** A gull's note: a rising-falling harmonic voice with the rasp of a fast amplitude flutter. */
 function gullNote(r: Rng, s: number, f0: number, fp: number, f1: number): Buf {
   const N = n(s), x = new Float32Array(N), rasp = between(r, 28, 42), H = [1, 0.7, 0.5, 0.3, 0.2];
   let p = 0;
@@ -150,8 +134,6 @@ function stereo(L: number, xf: number, _r: Rng, ch: (c: number, N: number) => Bu
   });
   return normAll(out, to);
 }
-
-// ———————————————————————————————————————— the ship ————————————————————————————————————————
 
 function creak(r: Rng): Buf {
   const k = between(r, 0.85, 1.2), r0 = between(r, 18, 40);
@@ -189,8 +171,6 @@ function slap(r: Rng): Buf {
   return normalize(x, 0.6);
 }
 
-// ———————————————————————————————————————— combat ————————————————————————————————————————
-
 function cannon(r: Rng): Buf[] {
   const N = n(2.8), out = [new Float32Array(N), new Float32Array(N)];
   const crack = burst(r, 0.06, 'hp', 1500, 0.7, 0.0004, 0.007);
@@ -208,7 +188,6 @@ function cannon(r: Rng): Buf[] {
   return normAll(out, 0.95);
 }
 
-/** A cannon heard from afar: the crack gone to the air, the boom rolling back off the water and the land. */
 function cannonFar(r: Rng): Buf[] {
   const N = n(4.5), out = [new Float32Array(N), new Float32Array(N)], boom = thump(1.6, 70, 32, 0.5);
   out.forEach((o, c) => {
@@ -266,7 +245,6 @@ function ram(r: Rng): Buf {
   return normalize(x, 0.95);
 }
 
-/** Struck reef or rock: timber grinding over stone. */
 function scrape(r: Rng): Buf {
   const N = n(1.6), ex = white(N, r);
   let w = 0.5;
@@ -296,7 +274,6 @@ function crackle(r: Rng): Buf {
   return normalize(loopify(roar, xf), 0.6);
 }
 
-/** The long groan of a sinking: timbers giving way, the hull filling, the sea closing over. */
 function groan(r: Rng): Buf {
   const s = 5, N = n(s), x = new Float32Array(N), k = between(r, 0.85, 1.15), gr = between(r, 3, 6);
   mix(x, stickSlip(r, 3.2, 6, 20, [68, 124, 203, 331, 512].map((f) => f * k), 0.3), 0, 1);
@@ -329,8 +306,6 @@ function mortar(r: Rng): Buf {
   return normalize(x, 0.9);
 }
 
-// ———————————————————————————————————————— reward ————————————————————————————————————————
-
 function coin(r: Rng): Buf {
   const x = buf(0.8), f = between(r, 2500, 3700);
   mix(x, metal(r, f, between(r, 0.12, 0.22), 0.8), 0, 1);
@@ -349,10 +324,8 @@ function chestLand(r: Rng): Buf {
   return normalize(x, 0.9);
 }
 
-/** Notes of the chest's shimmer by pigment tier, in D. */
 const CHEST_NOTES: readonly (readonly number[])[] = [[], [880], [880, 1318.5], [587.33, 880, 1174.66], [587.33, 739.99, 880, 1174.66, 1760]];
 
-/** A chest opened: lid creak and latch, then a shimmer that grows richer with its pigment tier. */
 function chestOpen(r: Rng, tier: number): Buf {
   const s = 1.4 + tier * 0.35, x = buf(s), notes = CHEST_NOTES[tier];
   mix(x, stickSlip(r, 0.35, 30, 55, [380, 760, 1210, 1830], 0.04), 0, 0.35);
@@ -379,8 +352,6 @@ function bank(r: Rng): Buf {
   return normalize(x, 0.85);
 }
 
-/** The loop-closing chord in D (the engine transposes it to the score's key): a plucked psaltery arpeggio over a
- * swelling viol chord; the variant is the claim's size, 0…3, each a note and a breath longer. */
 function chord(r: Rng, v: number): Buf[] {
   const k = Math.min(3, v), s = 2.8 + k * 0.5, N = n(s), out = [new Float32Array(N), new Float32Array(N)];
   [1, 1.5, 2, 2.5, 3, 4].slice(0, 3 + k).forEach((m, j) => {
@@ -396,7 +367,6 @@ function chord(r: Rng, v: number): Buf[] {
   return normAll(out, 0.8);
 }
 
-/** The trail broken: a rope's snap and a sour falling dyad. */
 function broken(r: Rng): Buf {
   const x = buf(1.5);
   mix(x, burst(r, 0.02, 'hp', 2500, 0.7, 0.0002, 0.003), 0, 1);
@@ -414,8 +384,6 @@ function lead(r: Rng): Buf {
   mix(x, bellOf(r, 1174.66, 0.45, 1), 0.18, 0.45);
   return normalize(x, 0.65);
 }
-
-// ———————————————————————————————————————— life ————————————————————————————————————————
 
 function gull(r: Rng): Buf {
   const x = buf(1.8), count = 2 + Math.floor(r() * 3);
@@ -478,8 +446,6 @@ function puffin(r: Rng): Buf {
   return normalize(filter(x, 'bp', 700, 0.9), 0.5);
 }
 
-// ———————————————————————————————————————— the sea's places ————————————————————————————————————————
-
 function iceGrind(r: Rng): Buf {
   const N = n(2.5), ex = white(N, r);
   let w = 0.5;
@@ -518,8 +484,6 @@ function thunder(r: Rng): Buf[] {
 function bell(r: Rng): Buf {
   return normalize(bellOf(r, between(r, 480, 640), 1.1, 3.2), 0.7);
 }
-
-// ———————————————————————————————————————— consumables ————————————————————————————————————————
 
 function patch(r: Rng): Buf {
   const x = buf(1.5);
@@ -565,7 +529,6 @@ function flare(r: Rng): Buf {
   return normalize(x, 0.75);
 }
 
-/** The Great Current's rush as a ship breaks off or is thrown. */
 function rush(r: Rng): Buf {
   const s = 2.6, N = n(s), w = brown(N, r), p = pink(N, r);
   for (let i = 0; i < N; i++) w[i] = w[i] * 0.7 + p[i] * 0.5;
@@ -575,8 +538,6 @@ function rush(r: Rng): Buf {
   return normalize(w, 0.75);
 }
 
-// ———————————————————————————————————————— interface ————————————————————————————————————————
-
 function tap(r: Rng): Buf {
   const x = buf(0.15);
   mix(x, knock(r, between(r, 1800, 2300), 0.018, 0.15), 0, 1);
@@ -584,7 +545,6 @@ function tap(r: Rng): Buf {
   return normalize(x, 0.5);
 }
 
-/** A page of the chart or the logbook turning: parchment rustle and the soft flap of the leaf landing. */
 function page(r: Rng): Buf {
   const N = n(0.55), x = filter(white(N, r), 'bp', between(r, 2400, 3400), 0.6);
   let w = 0.5;
@@ -614,8 +574,6 @@ function twoNotes(r: Rng, a: number, b: number, to: number): Buf {
   mix(x, pluck(n(0.7), b, r, 0.7, 0.997), 0.09, 0.6);
   return normalize(x, to);
 }
-
-// ———————————————————————————————————————— ambience beds (seamless loops) ————————————————————————————————————————
 
 function sea(r: Rng): Buf[] {
   return stereo(6, 0.6, r, (c, N) => {
@@ -650,7 +608,6 @@ function wind(r: Rng): Buf[] {
   }, 0.6);
 }
 
-/** Whistling in the rigging: narrow resonances drifting in pitch; the engine pitches the bed up with the wind. */
 function rigging(r: Rng): Buf[] {
   return stereo(6, 0.6, r, (c, N) => {
     const x = new Float32Array(N), span = N / SR;
@@ -671,7 +628,6 @@ function rain(r: Rng): Buf[] {
   }, 0.55);
 }
 
-/** The storm wall's roar. */
 function storm(r: Rng): Buf[] {
   return stereo(8, 0.8, r, (c, N) => {
     const b = filter(brown(N, r), 'lp', 240), p = filter(pink(N, r), 'lp', 1100), ph = r() * TAU, span = N / SR;
@@ -693,7 +649,6 @@ function maelstrom(r: Rng): Buf[] {
   }, 0.8);
 }
 
-/** Night: crickets ashore, two of them, each at its own rate. */
 function night(r: Rng): Buf[] {
   return stereo(4, 0.4, r, (c, N) => {
     const x = new Float32Array(N), f = between(r, 4200, 4700), per = c ? 10 : 9, chirp = tone(n(0.02), () => f, (t) => hump(t / 0.02));
@@ -702,7 +657,6 @@ function night(r: Rng): Buf[] {
   }, 0.35);
 }
 
-/** A harbour: water lapping the quay, mooring lines, a knock of a moored boat, a distant bell. */
 function harbour(r: Rng): Buf[] {
   return stereo(12, 1, r, (c, N) => {
     const x = new Float32Array(N);
@@ -719,8 +673,6 @@ function steam(r: Rng): Buf {
   shape(x, (t) => 0.6 + 0.4 * Math.sin((TAU * t * 2) / L + ph));
   return normalize(fade(x, 0.002, 0.002), 0.55);
 }
-
-// ———————————————————————————————————————— the registry ————————————————————————————————————————
 
 function def(make: SoundDef['make'], variants: number, bus: Bus, priority: number, gain: number, max: number, extra: Partial<SoundDef> = {}): SoundDef {
   return { make, variants, bus, priority, gain, max, loop: false, jitter: 0.04, ...extra };
@@ -796,15 +748,13 @@ export const SOUNDS = {
 export type SoundName = keyof typeof SOUNDS;
 export const SOUND_NAMES = Object.keys(SOUNDS) as SoundName[];
 
-/** Render variant v of a sound: its channels at SR, from a seed of its name and variant. */
 export function render(name: SoundName, v = 0): Buf[] {
   const d: SoundDef = SOUNDS[name], out = d.make(rng((hash(name) ^ Math.imul(v + 1, 0x9e3779b1)) >>> 0), v);
   const chs = Array.isArray(out) ? out : [out];
-  if (!d.loop) for (const c of chs) fade(c, 0, 0.02); // never a click at the tail
+  if (!d.loop) for (const c of chs) fade(c, 0, 0.02);
   return chs;
 }
 
-/** Every rendered sound, cached; `ms` the synthesis time spent. */
 export class Bank {
   private readonly cache = new Map<string, Buf[]>();
   ms = 0;
@@ -819,17 +769,14 @@ export class Bank {
     }
     return chs;
   }
-  /** A render made elsewhere (the bank worker). */
   put(name: SoundName, v: number, chs: Buf[]): void { this.cache.set(`${name}:${v}`, chs); }
   has(name: SoundName, v: number): boolean { return this.cache.has(`${name}:${v}`); }
 }
 
-/** A bank-wide summary for tests and the progress shot: seconds, peak and loudness of each variant. */
 export function measure(chs: readonly Buf[]): { seconds: number; peak: number; loudness: number; finite: boolean } {
   let finite = true;
   for (const c of chs) for (let i = 0; i < c.length; i++) if (!Number.isFinite(c[i])) { finite = false; break; }
   return { seconds: chs[0].length / SR, peak: Math.max(...chs.map(peak)), loudness: loudness(chs), finite };
 }
 
-/** Exposed for the tests: a biquad, for checking spectra without the DOM. */
 export { Biquad };

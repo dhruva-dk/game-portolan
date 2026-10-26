@@ -1,49 +1,27 @@
-// The frame loop. The match advances in fixed TICK steps paid for out of an accumulator of real time, at most
-// MAX_CATCH_UP a frame, so after a stall the match slows instead of spiralling; the simulation never sees the
-// frame time. Once the player has sunk the match may run faster than the wall clock (rate) or be resolved as fast as
-// the frames allow (rush). Frames draw between the last two ticks at the interpolation alpha. The render clock that world
-// animations read stops while the match is paused (the chart is open) or the app is in the background, so spray
-// hangs and smoke stands still. Rendering reads the match and never feeds back into it.
 import { TICK } from '../sim/state.ts';
 
-/** Most ticks stepped in one frame: 0.2 s of match time. */
 export const MAX_CATCH_UP = 6;
-/** A longer gap between frames is a stall (a debugger, the background), not time to make up. */
 const MAX_FRAME = 0.25;
-/** Slack when holding a test frame rate, ms: a quarter of a 60 Hz display frame. */
 const FRAME_SLACK = 4;
 
-/** One frame to draw. */
 export interface Frame {
-  /** Wall seconds since the last frame drawn, capped at MAX_FRAME. */
   readonly dt: number;
-  /** The render clock, seconds: it stops while the match is paused or the app is in the background. */
   readonly clock: number;
-  /** How far the frame lies from the previous tick toward the current one, 0–1. */
   readonly alpha: number;
 }
 
-/** What the loop advances: one tick per call, false once the match goes no further. */
 export interface Stepper {
   step(): boolean;
 }
 
 export class Loop {
-  /** The chart is open: no ticks, the render clock stops. */
   paused = false;
-  /** The app is in the background: no ticks, the render clock stops. */
   private away = false;
-  /** Tests: exactly this many ticks every frame instead of real time; null for real time. */
   speed: number | null = null;
-  /** Tests: draw at most this many frames a second; null for every display frame. */
   frameRate: number | null = null;
-  /** Match seconds per wall second (WP27: the match plays out faster on the chart once the player has sunk). */
   rate = 1;
-  /** WP27: resolve the match as fast as the frames allow, stepping up to this many ms a frame (the skip to the
-   *  results); null: paced by real time. */
   rush: number | null = null;
   clock = 0;
-  /** Frames drawn, main-thread milliseconds of the last one, and the ticks of the current match and their times. */
   readonly perf = { frames: 0, frame: 0, tickMean: 0, tickMax: 0, ticks: 0 };
 
   private sim: Stepper | null = null;
@@ -51,14 +29,13 @@ export class Loop {
   private alpha = 1;
   private last: number | null = null;
   private readonly draw: (f: Frame) => void;
-  private readonly f = { dt: 0, clock: 0, alpha: 1 }; // one Frame, refilled every frame
+  private readonly f = { dt: 0, clock: 0, alpha: 1 };
 
   constructor(draw: (f: Frame) => void) {
     this.draw = draw;
     requestAnimationFrame(this.frame);
   }
 
-  /** Step this match from the next frame on (null: none), from a whole tick. */
   run(sim: Stepper | null): void {
     this.sim = sim;
     this.acc = 0;
@@ -72,7 +49,6 @@ export class Loop {
     return this.away;
   }
 
-  /** Into the background (true) or back (false). The time away is not made up. */
   set suspended(away: boolean) {
     this.away = away;
     this.last = null;
@@ -112,11 +88,10 @@ export class Loop {
       n++;
     }
     if (this.speed !== null) this.acc = TICK;
-    else if (n === budget) this.acc = Math.min(this.acc, TICK); // what could not be made up is dropped
+    else if (n === budget) this.acc = Math.min(this.acc, TICK);
     this.alpha = this.acc / TICK;
   }
 
-  /** One tick, timed; false (and the accumulator emptied) once the match goes no further. */
   private step(): boolean {
     const t0 = performance.now();
     if (!this.sim!.step()) {

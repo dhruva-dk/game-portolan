@@ -1,8 +1,3 @@
-// The scene budget page (tests/render/budget.html, outside the game build; WP30 part C): the game's own render path
-// (WorldView, every registered module) over the real headless match of territory.match.ts, posed at every standard
-// view: the zoom's stops (the rig driving), each region from the deck, low along its shore (where WP23's life is
-// captured), high over its coast and from orbit, and a ten-ship battle. window.__budget: views() names them;
-// measure(name) poses one, draws it and reports its draw calls and triangles, and the triangles by module.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { WorldView } from '../../src/render/world.ts';
@@ -39,7 +34,6 @@ while (state.tick < 600) {
   frame(TICK, false);
 }
 
-/** A point in region ri's waters `want` u off its coast (at least `deep` u deep), and the land it faces. */
 function spot(ri: number, want: number, deep: number): { at: THREE.Vector3; land: THREE.Vector3 } | null {
   const p = V(), g = V(), geo = w.geo, coast = (x: number, y: number) => coastAt(geo, toWorld(ri, x, y, g));
   for (let r = 10; r < 140; r++) {
@@ -54,7 +48,6 @@ function spot(ri: number, want: number, deep: number): { at: THREE.Vector3; land
   return null;
 }
 
-/** The camera `height` u over unit point `at`, facing unit point `toward`, pitched by `pitch` rad. */
 function pose(at: THREE.Vector3, toward: THREE.Vector3, height: number, pitch: number): void {
   const up = at.clone().normalize(), f = toward.clone().addScaledVector(up, -up.dot(toward)).normalize();
   camera.position.copy(up).multiplyScalar(R + height);
@@ -62,7 +55,6 @@ function pose(at: THREE.Vector3, toward: THREE.Vector3, height: number, pitch: n
   camera.lookAt(camera.position.clone().addScaledVector(f, Math.cos(pitch)).addScaledVector(up, Math.sin(pitch)));
 }
 
-/** Ten ships in a knot round the player (a battle), once. */
 let gathered = false;
 function gather(): THREE.Vector3 {
   const s0 = state.ships[0], c = V(s0.pos.x, s0.pos.y, s0.pos.z), len = c.length();
@@ -106,7 +98,6 @@ REGIONS.forEach((reg, ri) => {
 VIEWS.set('battle deck', manual(() => { const c = gather(); pose(c.clone().multiplyScalar(R).addScaledVector(N, -12).normalize(), c, 3.5, -0.06); }));
 VIEWS.set('battle high', manual(() => { const c = gather(); pose(c.clone().multiplyScalar(R).addScaledVector(N, -28).normalize(), c, 16, -0.5); }));
 
-// triangles by module: each drawable's share of renderer.info, booked to the module that built its top-level object
 const owner = new WeakMap<THREE.Object3D, string>(), tally = new Map<string, number>();
 let mark = 0;
 function label(o: THREE.Object3D): string {

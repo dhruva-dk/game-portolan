@@ -1,6 +1,3 @@
-// The shared procedural-geometry kit of the modules that model things in code (ships first; structures, flora and
-// fx add to it as they are built): tubes, surfaces of revolution, boxes, parametric grids and swept profiles, all
-// written through a sink, so each module keeps its own vertex format.
 import * as THREE from 'three';
 
 const TAU = Math.PI * 2;
@@ -10,16 +7,6 @@ export const smoothstep = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-/**
- * Receives generated geometry. vert gets a position and unit normal in the generator's frame, the generator's own
- * surface coordinates (s, t) and sample index i, and returns the new vertex's index; tri gets triangles wound
- * counter-clockwise seen from outside. Positions and normals are scratch vectors: copy them, don't keep them.
- *   tube   s around (0..1), t length along the path, i ring; caps: (s, t) disc coordinates in units, i = -1
- *   lathe  s around (0..1 of the arc), t length along the profile, i profile point
- *   box    (s, t) units along the face's two edges, i face (0 +x, 1 -x, 2 +y, 3 -y, 4 +z, 5 -z)
- *   grid   (s, t) the caller's surface coordinates, i = 0
- *   sweep  s length along the path, t length round the profile, i profile point
- */
 export interface Sink {
   vert(p: THREE.Vector3, n: THREE.Vector3, s: number, t: number, i: number): number;
   tri(a: number, b: number, c: number): void;
@@ -29,16 +16,10 @@ const _p = new THREE.Vector3(), _n = new THREE.Vector3(), _r = new THREE.Vector3
 const _b = new THREE.Vector3(), _du = new THREE.Vector3(), _dv = new THREE.Vector3();
 
 export interface TubeOpt {
-  /** radius multiplier around ring i at angle a (flutes, octagonal spars) */
   shape?: (a: number, i: number) => number;
-  /** end caps: null leaves an end open; a number caps it, its centre standing that far out (0 = flat) */
   caps?: readonly [number | null, number | null];
 }
 
-/**
- * A generalised cylinder through a path (closed when its ends meet) with parallel-transported frames, a radius per
- * ring, and normals that follow the taper and the shape.
- */
 export function tube(out: Sink, path: readonly THREE.Vector3[], radius: (i: number) => number, seg: number, o: TubeOpt = {}): void {
   const n = path.length, closed = path[0].distanceTo(path[n - 1]) < 1e-6, T: THREE.Vector3[] = [], N: THREE.Vector3[] = [], L = [0];
   for (let i = 0; i < n; i++) {
@@ -80,7 +61,6 @@ export function tube(out: Sink, path: readonly THREE.Vector3[], radius: (i: numb
     for (let k = 0; k < seg; k++) {
       const a = (k / seg) * TAU, sh = shape(a, i);
       ring(i, a, r * sh);
-      // a flat cap faces along the path; a pointed one leans out like the cone it is
       _n.copy(T[i]).multiplyScalar(s * r * sh).addScaledVector(_r, tip).normalize();
       out.vert(_p, _n, Math.cos(a) * r * sh, Math.sin(a) * r * sh, -1);
     }
@@ -92,10 +72,6 @@ export function tube(out: Sink, path: readonly THREE.Vector3[], radius: (i: numb
   });
 }
 
-/**
- * Surface of revolution about +Y from [r, y] points over the arc a0..a1. Walk the profile outward along the bottom,
- * up the outside and inward over the top so faces point out; repeat a point to crease there.
- */
 export function lathe(out: Sink, prof: readonly (readonly number[])[], seg: number, a0 = 0, a1 = TAU): void {
   const np = prof.length, L = [0], rows: number[] = [];
   for (let i = 1; i < np; i++) L.push(L[i - 1] + Math.hypot(prof[i][0] - prof[i - 1][0], prof[i][1] - prof[i - 1][1]));
@@ -118,10 +94,8 @@ export function lathe(out: Sink, prof: readonly (readonly number[])[], seg: numb
     }
   }
 }
-/** Every inner profile point doubled, so a lathe creases there (hard-edged mouldings). */
 export const crease = (prof: number[][]): number[][] => prof.flatMap((q, j) => (j && j < prof.length - 1 ? [q, q] : [q]));
 
-/** Box of size (sx, sy, sz) centred on the origin, flat-shaded. */
 export function box(out: Sink, sx: number, sy: number, sz: number): void {
   const h = [sx / 2, sy / 2, sz / 2], dims = [sx, sy, sz];
   for (let f = 0; f < 6; f++) {
@@ -136,10 +110,6 @@ export function box(out: Sink, sx: number, sy: number, sz: number): void {
   }
 }
 
-/**
- * A smooth parametric surface over the sample values us × vs: at(u, v, out) places a point; normals come from the
- * surface's own derivatives and face along (∂/∂u × ∂/∂v), so order the parameters for the side that should show.
- */
 export function grid(out: Sink, us: readonly number[], vs: readonly number[], at: (u: number, v: number, o: THREE.Vector3) => THREE.Vector3): void {
   const e = 1e-4, v0: number[] = [];
   for (let j = 0; j < vs.length; j++) {
@@ -162,10 +132,6 @@ export function grid(out: Sink, us: readonly number[], vs: readonly number[], at
   }
 }
 
-/**
- * A closed or open profile swept along a path: profile points are (across, up) pairs in the frame of each path
- * point's `side` vector (across) and the path's up (side × tangent); flat-shaded between profile points.
- */
 export function sweep(out: Sink, path: readonly THREE.Vector3[], side: readonly THREE.Vector3[], prof: readonly number[], closed: boolean): void {
   const np = prof.length / 2, segs = closed ? np : np - 1, L = [0];
   for (let i = 1; i < path.length; i++) L.push(L[i - 1] + path[i].distanceTo(path[i - 1]));
@@ -178,7 +144,6 @@ export function sweep(out: Sink, path: readonly THREE.Vector3[], side: readonly 
       const across = _q.crossVectors(T, U).normalize();
       a.copy(path[i]).addScaledVector(across, prof[2 * k]).addScaledVector(U, prof[2 * k + 1]);
       b.copy(path[i]).addScaledVector(across, prof[2 * k1]).addScaledVector(U, prof[2 * k1 + 1]);
-      // the face normal: perpendicular to the profile edge, in the section plane
       _n.subVectors(b, a).cross(T).normalize();
       base.push(out.vert(a, _n, L[i], k, k), out.vert(b, _n, L[i], k + 1, k1));
     }

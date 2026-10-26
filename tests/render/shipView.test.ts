@@ -1,6 +1,3 @@
-// WP19: the ships follow the sim. Where a ship floats and which way it points between ticks, heel to leeward and
-// outward in a turn, sails that show the point of sail and the sail step, damage states, levels by distance, no NaNs
-// through a battering, and ten ships within the fleet's triangle and draw budgets.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -12,11 +9,10 @@ import { FLEET_TRIANGLES, fleetLods } from '../../src/render/ships/shipwright.ts
 
 const style = createStyle();
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
-/** A glassy sea: hulls float at R, decks level. */
 const flat: Rider = { ride: (p, _f, _l, _b, _t, out) => { out.position.set(p.x, p.y, p.z).normalize().multiplyScalar(R); out.up.set(p.x, p.y, p.z).normalize(); return out; } };
 const put = (o: { x: number; y: number; z: number }, v: THREE.Vector3) => { o.x = v.x; o.y = v.y; o.z = v.z; };
 const cond = (wind = V(), strength = 1): Conditions => ({ wind, strength, rough: 1, leader: false, hit: false, battle: false });
-const P0 = V(0, 0, 1), EAST = V(1, 0, 0), PORT = V(0, 1, 0); // heading east at the pole: port is +y
+const P0 = V(0, 0, 1), EAST = V(1, 0, 0), PORT = V(0, 1, 0);
 
 function vessel(form = 1, k = 0): Vessel {
   const s = createMatch({ seed: 7 }).ships[k];
@@ -51,7 +47,7 @@ test('between ticks a ship floats where the sim puts it and points where it head
 
 test('heels to leeward under sail and outward in a turn, answering the helm within a second', () => {
   const s = vessel(), v = new ShipView(style, 0, s);
-  run(v, s, cond(PORT.clone().multiplyScalar(-6)), 3); // the wind from port, beam on
+  run(v, s, cond(PORT.clone().multiplyScalar(-6)), 3);
   assert.ok(v.heel > 0.08 && v.heel < MOTION.max, `heel ${v.heel}`);
   assert.ok(mast(v).dot(PORT) < -0.05, 'the masts lean to starboard, away from the wind');
   const t = new ShipView(style, 0, vessel());
@@ -64,7 +60,7 @@ test('heels to leeward under sail and outward in a turn, answering the helm with
 
 test('the sails show the truth: luffing head to wind, drawing on a reach, reefed when the step drops', () => {
   const s = vessel(), v = new ShipView(style, 0, s);
-  run(v, s, cond(EAST.clone().multiplyScalar(-6)), 2); // dead ahead
+  run(v, s, cond(EAST.clone().multiplyScalar(-6)), 2);
   assert.ok(v.rig.sails.every((sl) => Math.abs(sl.fill) < 0.05 && sl.shiver > 0.5), 'head to wind: no fill, shivering');
   run(v, s, cond(PORT.clone().multiplyScalar(-6)), 2);
   assert.ok(v.rig.sails.every((sl) => Math.abs(sl.fill) > 0.6 && sl.shiver < 0.2), 'beam reach: full and drawing');
@@ -136,7 +132,6 @@ test('ten ships through a battering: never a NaN, within the fleet budgets', () 
   assert.ok(draws + 1 <= 50, `${draws} draws`);
 });
 
-// ── part B: the sinking, struck colours, fittings and wounds on the hull, canvas to leeward, rigging clear of canvas ──
 import { PHASE } from '../../src/sim/state.ts';
 import { FITTING, FITTING_SLOT, SLOT } from '../../src/sim/tables.ts';
 import { dressHull, WOUND } from '../../src/render/ships/outfit.ts';
@@ -166,7 +161,6 @@ test('sinking: colours struck and a deepening list, the canvas gone, down by an 
   assert.ok(v.gone && !v.ship.visible && v.lamp.reach === 0, 'gone, the lantern drowned');
   assert.ok(plumes.live(SLICK, clock) > 0 && plumes.live(FLOTSAM, clock) > 6, 'the slick and flotsam linger');
   assert.ok(plumes.live(FOAM, clock) > 0, 'foam where the sea closed over her');
-  // S-019 (g): her ring marks the place long after, and a fleet's spray never wipes the marks out
   for (let k = 0; k < plumes.capacity * 2; k++) plumes.spawn(SPRAY, V(0, R, 0), V(0, 0, 0), 1, 0.1, 0.2, 0, clock, 0.5);
   until(SINK.gone + 30);
   assert.ok(plumes.live(RING, clock) >= 1 && plumes.live(FLOTSAM, clock) > 6, `the place stays marked: ${plumes.live(RING, clock)} rings, ${plumes.live(FLOTSAM, clock)} flotsam`);
@@ -253,7 +247,6 @@ test('the canvas always bellies to leeward, on either tack and every point of sa
 });
 
 test('rigging never cuts through the canvas across the trim, fill, reef and shiver sweep', () => {
-  // heel and pitch turn hull, rig and canvas as one body; what moves rope against cloth is trim, set, fill and shiver
   const D = V(), E1 = V(), E2 = V(), PV = V(), TV = V(), QV = V(), A = V(), B = V(), M = new THREE.Matrix4();
   const through = (p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3): boolean => {
     D.subVectors(B, A); E1.subVectors(p1, p0); E2.subVectors(p2, p0); PV.crossVectors(D, E2);

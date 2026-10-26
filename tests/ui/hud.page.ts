@@ -1,6 +1,3 @@
-// The WP25 HUD test page (tests/ui/hud.html, outside the game build): the match HUD over the game's own render of
-// the scripted match (tests/render/territory.match.ts), in three set scenes. Query: safe=top,right,bottom,left (CSS
-// px). window.__hud(scene) draws 'calm', 'fight' or 'storm' and resolves once the ink has written itself in.
 import { Lettering } from '../../src/lettering/ink.ts';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { WorldView } from '../../src/render/world.ts';

@@ -1,8 +1,3 @@
-// The effects test page (tests/render/fx.html, outside the game build): the game's own render path (WorldView, every
-// registered module) over a match at its opening, the fleet in two ranks riding the Great Current, with WP22's effects
-// driven by scripted events. window.__fx drives it from fx.shots.ts: stage(set) fires a set's events (battle | chests |
-// claim | current) and seek(t, cam) draws t s after them from a camera (deck | orbit | near | high), returning the
-// frame's draw calls and triangles and the effects' share.
 import * as THREE from 'three';
 import { effects } from '../../src/render/fx.ts';
 import { Pipeline } from '../../src/render/pipeline.ts';
@@ -26,7 +21,6 @@ type Ev = [kind: number, ship: number, by: number, at: THREE.Vector3, amount: nu
 
 const pos = (i: number) => V(state.ships[i].pos.x, state.ships[i].pos.y, state.ships[i].pos.z);
 const centre = () => state.ships.reduce((c, s) => c.add(V(s.pos.x, s.pos.y, s.pos.z)), V()).normalize();
-/** p (unit) moved e u east and n u north over the sea. */
 function off(p: THREE.Vector3, e: number, n: number): THREE.Vector3 {
   localFrame(p, E, N);
   return p.clone().multiplyScalar(R).addScaledVector(E, e).addScaledVector(N, n).normalize();

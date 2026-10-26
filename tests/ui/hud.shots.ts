@@ -1,9 +1,9 @@
-// WP25 shots: the match HUD in calm, fight and storm on the iPhone and the iPad, the fight on the smallest iPhone
-// (layout only), each saved and gathered into the contact sheet progress/shots/wp25-hud.png. node tests/ui/hud.shots.ts
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { root, serve } from '../harness.ts';
+
+mkdirSync(join(root, 'out/shots'), { recursive: true });
 
 const DEVICES = {
   iphone: { width: 956, height: 440, scale: 1.5, safe: '0,62,20,62' },
@@ -27,7 +27,7 @@ try {
       await page.evaluate((s) => (window as unknown as { __hud: (s: string) => Promise<boolean> }).__hud(s), scene);
       const png = await page.screenshot({ timeout: 240_000 });
       const name = `wp25-${dev}-${scene}`;
-      writeFileSync(join(root, 'progress/shots', `${name}.png`), png);
+      writeFileSync(join(root, 'out/shots', `${name}.png`), png);
       shots.push({ name, png });
     }
     await page.close();
@@ -35,8 +35,8 @@ try {
   const sheet = await browser.newPage({ viewport: { width: 1320, height: 400 }, deviceScaleFactor: 1 });
   const cell = (s: { name: string; png: Buffer }) => `<figure><img src="data:image/png;base64,${s.png.toString('base64')}"><figcaption>${s.name}</figcaption></figure>`;
   await sheet.setContent(`<style>body{margin:0;background:#efe0c0;font:13px Georgia;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}figure{margin:0}img{width:100%;display:block}figcaption{color:#2a211c;padding:2px 0}</style>${shots.map(cell).join('')}`);
-  writeFileSync(join(root, 'progress/shots/wp25-hud.png'), await sheet.screenshot({ fullPage: true }));
-  console.log(`wrote ${shots.length} shots and progress/shots/wp25-hud.png`);
+  writeFileSync(join(root, 'out/shots/wp25-hud.png'), await sheet.screenshot({ fullPage: true }));
+  console.log(`wrote ${shots.length} shots and out/shots/wp25-hud.png`);
 } finally {
   await browser.close();
   await (server as unknown as { close(): Promise<void> }).close();

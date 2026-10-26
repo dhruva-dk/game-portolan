@@ -1,8 +1,3 @@
-// WP26 part C shots: the 3D harbour at dusk behind the pages on the iPhone and the iPad, reached by touch through the
-// real app: wp26c-{dev}-{harbour,shipwright,gull,league,captains,settings,chosen}.png (chosen: home again after tapping
-// through the shipwright's forms), the scene alone with the pinnace and after a form, pigment and plumage change
-// (wp26c-{dev}-scene-{pinnace,galleon}.png), and the contact sheet progress/shots/wp26c-sheet.png.
-//   node tests/ui/harbour3d.shots.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
@@ -19,7 +14,7 @@ try {
     const d = DEVICES[dev];
     const view = { width: d.width, height: d.height, dpr: 2, safe: d.safeArea };
     const shoot = async (g: { screenshot(file: string): Promise<unknown> }, name: string) => {
-      const file = join(root, 'progress/shots', `wp26c-${dev}-${name}.png`);
+      const file = join(root, 'out/shots', `wp26c-${dev}-${name}.png`);
       await g.screenshot(file);
       shots.push({ name: `${dev} ${name}`, png: readFileSync(file) });
     };
@@ -56,8 +51,8 @@ try {
   const sheet = await browser.newPage({ viewport: { width: 1600, height: 400 }, deviceScaleFactor: 1 });
   const cell = (s: { name: string; png: Buffer }) => `<figure><img src="data:image/png;base64,${s.png.toString('base64')}"><figcaption>${s.name}</figcaption></figure>`;
   await sheet.setContent(`<style>body{margin:0;background:#efe0c0;font:13px Georgia;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px}figure{margin:0}img{width:100%;display:block}</style>${shots.map(cell).join('')}`);
-  writeFileSync(join(root, 'progress/shots/wp26c-sheet.png'), await sheet.screenshot({ fullPage: true }));
-  console.log(`wrote ${shots.length} shots and progress/shots/wp26c-sheet.png`);
+  writeFileSync(join(root, 'out/shots/wp26c-sheet.png'), await sheet.screenshot({ fullPage: true }));
+  console.log(`wrote ${shots.length} shots and out/shots/wp26c-sheet.png`);
 } finally {
   await browser.close();
   await server.close();

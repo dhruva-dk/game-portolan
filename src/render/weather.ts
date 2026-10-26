@@ -1,14 +1,3 @@
-// Weather (WP21): the sim's spells drawn on the page. Fog is paper left unpainted: a pale wall standing on the curved
-// sea round every bank, dense where the sim hides what lies inside (WEATHER.veil), so a ship or lantern in it is
-// hidden from outside exactly as the sight system hides it. Rain is fine diagonal pen strokes, slanted by the wind, in
-// layered curtains round the eye and hanging under the cloud base of distant squalls; squalls gust and roughen the sea
-// (the sea's squall state), calms lay it flat as a mirror (its calm state); spray is flicked lead white torn off by
-// the wind; ash is grey wash (setAsh, WP17's Fire Archipelago); lightning is a crack of gold leaf. Sight shortens in
-// fog, squall and storm by the sim's own factors, drawn as veils of paper closing in round the eye.
-//
-// Air is the one place the renderer reads the wind and weather over the eye (S-005): the sim's windAt and skyAt at the
-// camera's foot whenever a match exists, a steady fair trade wind round the planet's axis otherwise. The sea, the sky's
-// clouds, the rain, the spray and the storm all read it.
 import * as THREE from 'three';
 import type { World } from '../app/worldWorker.ts';
 import { newWind, seaFor, tideOf, windAt, type Sea as Waters } from '../sim/environment.ts';
@@ -23,29 +12,18 @@ import { hex, STORM_SLATE } from '../style/palette.ts';
 import type { RenderContext, RenderModule } from './world.ts';
 
 const AXIS = new THREE.Vector3(0, 1, 0);
-/** u over which the storm's depth eases in across its wall (outside → inside). */
 const STORM_EDGE = 14;
 
-/** The wind and weather over the eye this frame. */
 export class Air {
   readonly foot = new THREE.Vector3(0, 0, 1);
-  /** Downwind, a unit tangent at the foot. */
   readonly toward = new THREE.Vector3(1, 0, 0);
-  /** Fair = 1 (windAt's strength: gusts and squalls more, calms less). */
   strength = 1;
   gust = 0;
-  /** The sim's weather at the foot (skyAt). */
   readonly sky = newSky();
-  /** 0 outside the storm, 1 inside, eased across its wall. */
   storm = 0;
-  /** How far the eye sees, u: the sim's SIGHT.clear by the weather's and the storm's factors. */
   range = SIGHT.clear;
-  /** The eye's height over the sea, u: the veil of short sight lifts off high cameras (sight is a lookout's, on deck). */
   altitude = 0;
-  /** S-019 (g): 0–1 over the first seconds after the player sank: her lookout gone, the veil of short sight lifts off
-   *  the camera watching her go down, so the sinking reads in the storm (its rain and grey sea stay). */
   watch = 0;
-  /** The sea's state for Sea.setWeather: the weather's, heaving and grey in the storm. */
   readonly sea = { rough: 1, calm: 0, squall: 0 };
   waters: Waters | null = null;
   private readonly wind = newWind();
@@ -54,7 +32,7 @@ export class Air {
   update(world: World, state: MatchState | null, eye: THREE.Vector3): this {
     const ship = state?.ships[0]?.pos;
     if (eye.lengthSq() > 1e-9) this.foot.copy(eye).normalize();
-    else if (ship) this.foot.set(ship.x, ship.y, ship.z).normalize(); // before anything places the camera
+    else if (ship) this.foot.set(ship.x, ship.y, ship.z).normalize();
     else this.foot.set(0, 0, 1);
     this.altitude = Math.max(0, eye.length() - R);
     this.toward.crossVectors(AXIS, this.foot);
@@ -94,17 +72,12 @@ export class Air {
 
 const airs = new WeakMap<THREE.Object3D, Air>();
 
-/** The scene's air, shared by every module that draws with the wind or the weather. */
 export function airOf(scene: THREE.Object3D): Air {
   let air = airs.get(scene);
   if (!air) airs.set(scene, (air = new Air()));
   return air;
 }
 
-/**
- * The angular radius inside which a fog spell hides what lies in it — where the sim's depthIn reaches WEATHER.veil —
- * or 0 while it is too thin to hide anything.
- */
 export function fogAngle(spell: Spell): number {
   const v = vigour(spell);
   if (spell.kind !== SPELL.fog || v < WEATHER.veil) return 0;
@@ -117,14 +90,8 @@ const hash = (n: number): number => {
   return x - Math.floor(x);
 };
 
-// ---------------------------------------------------------------------------------------------------------------
-// Curtains: bands standing on the sea round a circle on the sphere (a fog bank's wall, a squall's rain under its
-// cloud base, the storm's wall, its announced front, the rain round the eye), placed in the vertex shader from one
-// instance each, so they cost no uploads but a few floats and stand on the curve: hull-down like anything else.
-
 export const CURTAIN = { fog: 0, squall: 1, storm: 2, front: 3, rain: 4 } as const;
 
-/** The uniforms every curtain shares (one set per module). */
 export function weatherUniforms() {
   return {
     uSeaR: { value: R },
@@ -143,14 +110,13 @@ export function weatherUniforms() {
 }
 export type WeatherUniforms = ReturnType<typeof weatherUniforms>;
 
-/** The veil of short sight from the air: how much paper closes in, how far off, and how grey. */
 export function setSight(u: WeatherUniforms, air: Air): void {
   u.uVeil.value = Math.min(1, Math.max(0, 1.15 * (1 - air.range / SIGHT.clear))) * (1 - THREE.MathUtils.smoothstep(air.altitude, 8, 30)) * (1 - 0.85 * air.watch);
   u.uRange.value = air.range;
   u.uGrey.value = Math.max(air.sky.squall, air.storm);
 }
 
-const NOISE_GLSL = /* glsl */ `
+const NOISE_GLSL =  `
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -162,8 +128,6 @@ float pen(float sd, float css) {
   float px = abs(sd) / max(fwidth(sd), 1e-6) / uRenderPx;
   return 1.0 - smoothstep(0.5 * css - 0.5 / uRenderPx, 0.5 * css + 0.5 / uRenderPx, px);
 }
-// fine pen strokes of rain on a sheet with coordinates st (u): columns sp apart, dashes about len long falling at
-// fall u/s, leaning by slant; thinned to an even grey where the columns crowd closer than a few CSS px
 float rain(vec2 st, float sp, float len, float fall, float slant, float css, float seed) {
   vec2 r = vec2(st.x - st.y * slant, st.y + uTime * fall);
   float col = floor(r.x / sp), hx = h21(vec2(col, seed));
@@ -176,12 +140,11 @@ float rain(vec2 st, float sp, float len, float fall, float slant, float css, flo
 }
 `;
 
-/** The rain round the eye, u: the curtain drawn (its radius), and the far one found along each ray through it (radius, top). */
 const RAIN = { near: 7, far: 22, top: 40 };
 
-const CURTAIN_VERTEX = /* glsl */ `
-in vec4 aCentre; // the circle's centre (unit) and angular radius
-in vec4 aShape;  // height (u), strength, seed, foot below the sea (u)
+const CURTAIN_VERTEX =  `
+in vec4 aCentre;
+in vec4 aShape;
 uniform float uSeaR;
 out vec3 vWorld;
 out vec3 vNormal;
@@ -203,7 +166,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }`;
 
-const CURTAIN_FRAGMENT = /* glsl */ `
+const CURTAIN_FRAGMENT =  `
 in vec3 vWorld;
 in vec3 vNormal;
 in vec2 vAt;
@@ -234,14 +197,12 @@ void main() {
   float a;
   vec3 col;
 #if KIND == 0
-  // fog: paper left unpainted, rolling at its top, with the merest cool breath where it thins
   float roll = fbm(vec2(s / 16.0 + uTime * 0.04, seed));
   float top = 0.58 + 0.3 * roll;
   float body = 1.0 - smoothstep(top - 0.25, top + 0.02, h + 0.1 * (fbm(hc / 6.0 + uTime * 0.02) - 0.5));
   a = vShape.y * body;
   col = glaze(mix(paper, paper * uSkyHorizon / uPaper, 0.2 * h), uSlate, 0.05 + 0.1 * (1.0 - body), 0.0, q);
 #elif KIND == 1
-  // a squall: grey sheets and pen strokes of rain hanging under a dark cloud base hatched beneath, inked along its top
   float roll = fbm(vec2(s / 18.0 - uTime * 0.03, seed));
   float base = 0.64 + 0.05 * (roll - 0.5), top = base + 0.12 + 0.22 * roll;
   float cloud = smoothstep(base - 0.01, base + 0.02, h) * (1.0 - smoothstep(top - 0.02, top, h));
@@ -255,8 +216,6 @@ void main() {
   col = mix(col, hatchInk(0.85), (1.0 - cloud) * strokes);
   col = mix(col, uInk, cloud * pen((top - h) * H, 1.3));
 #elif KIND == 2
-  // the storm: a wall of wet, bleeding ink under rolling masses hatched beneath, driving rain, lit by the lightning;
-  // from the calm it looms dark, from inside it is rain and slate
   bool calmSide = gl_FrontFacing;
   float roll = fbm(vec2(s / 34.0 - uTime * 0.05, seed)), roll2 = fbm(vec2(s / 11.0 + uTime * 0.08, seed + 3.0));
   float top = 0.5 + 0.34 * roll + 0.12 * roll2, billow = top - h;
@@ -275,7 +234,6 @@ void main() {
   col = mix(col, uGold, uFlash * 0.45 * (0.4 + 0.6 * wet) * step(0.0, billow));
   col = mix(col, uInk, pen(billow * H, 1.8));
 #elif KIND == 3
-  // the announced front: a low bank of wet ink on the horizon, hatched, inked along its top
   float roll = fbm(vec2(s / 22.0, seed));
   float bank = 0.42 + 0.38 * roll - h;
   a = vShape.y * smoothstep(-0.01, 0.04, bank) * smoothstep(0.0, 0.06, h);
@@ -283,8 +241,6 @@ void main() {
   col = mix(col, hatchInk(0.8), hatching(tilt * hc, tilt * hx, tilt * hy, 0.7, seed));
   col = mix(col, uInk, pen(bank * H, 1.4));
 #else
-  // rain round the eye in one pass: near, long dark strokes on this curtain; far, a finer, greyer curtain found along the
-  // same ray, so the two layers keep their parallax without a second full-screen layer; ash falls as slow grey flecks
   vec3 rd = normalize(vWorld - cameraPosition), o2 = cameraPosition - vAxis * dot(cameraPosition, vAxis), d2 = rd - vAxis * dot(rd, vAxis);
   float A = max(dot(d2, d2), 1e-6), B = dot(o2, d2), tf = (-B + sqrt(max(B * B - A * (dot(o2, o2) - ${(RAIN.far ** 2).toFixed(1)}), 0.0))) / A;
   vec3 pf = cameraPosition + rd * tf, rf = normalize(o2 + d2 * tf);
@@ -299,14 +255,12 @@ void main() {
   float kn = clamp(1.5 * rn * uRain, 0.0, 1.0), kf = clamp(1.5 * rfar * uRain, 0.0, 1.0);
   col = mix(glaze(paper, uSlate, 1.0 + uAsh, 0.0, q), mix(hatchInk(0.75), uSilver, 0.6 * uNight), (kn * an + kf * af * (1.0 - an)) / max(a, 1e-3));
 #endif
-  // what lies beyond the eye's short sight sinks into the same veil of paper as the sea there
   float veil = uVeil * smoothstep(0.3 * uRange, 1.1 * uRange, distance(vWorld, cameraPosition)) * 0.9;
   col = mix(col, glaze(paper, uSlate, 1.4 * uGrey, 0.0, q), veil);
   if (a < 0.02) discard;
   writeVeil(col, clamp(a, 0.0, 1.0));
 }`;
 
-/** One kind of curtain, up to `max` at once, `around` × `rows` cells each; one draw call. */
 export class Curtains {
   readonly mesh: THREE.Mesh;
   private readonly geometry = new THREE.InstancedBufferGeometry();
@@ -352,7 +306,6 @@ export class Curtains {
     this.n = 0;
   }
 
-  /** A curtain round `at` (unit) of angular radius rho, `height` u tall over a foot `under` u below the sea. */
   add(at: { readonly x: number; readonly y: number; readonly z: number }, rho: number, height: number, strength: number, seed: number, under = -0.6): void {
     if (this.n >= this.max) return;
     this.centre.setXYZW(this.n, at.x, at.y, at.z, rho);
@@ -372,11 +325,7 @@ export class Curtains {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The veil of short sight: two paper shells round the eye, each hiding a share of everything beyond it (the outer one
-// lays two shares in one pass).
-
-const VEIL_VERTEX = /* glsl */ `
+const VEIL_VERTEX =  `
 in float aReach;
 in float aLayers;
 uniform float uRange;
@@ -388,10 +337,10 @@ void main() {
   vK = aReach;
   vLayers = aLayers;
   gl_Position = projectionMatrix * viewMatrix * vec4(cameraPosition + position * aReach * uRange, 1.0);
-  gl_Position.z = min(gl_Position.z, 0.99999 * gl_Position.w); // beyond the far plane the shell stays whole, not cut to a ring
+  gl_Position.z = min(gl_Position.z, 0.99999 * gl_Position.w);
 }`;
 
-const VEIL_FRAGMENT = /* glsl */ `
+const VEIL_FRAGMENT =  `
 in vec3 vDir;
 in float vK;
 in float vLayers;
@@ -405,17 +354,14 @@ void main() {
   writeVeil(glaze(parchment(q), uSlate, 1.4 * uGrey, 0.0, q), 1.0 - pow(1.0 - uVeil * (0.36 + 0.3 * n), vLayers));
 }`;
 
-/** The shells' reaches (× the sight range), and the shares of veil each lays. */
 const REACHES = [0.45, 0.9];
 const LAYERS = [1, 2];
 
-// ---------------------------------------------------------------------------------------------------------------
-// Spray: lead-white flecks flicked off the crests round the eye on a world-anchored lattice, carried downwind.
 
 const SPRAY = 240;
 
-const SPRAY_VERTEX = /* glsl */ `
-in vec4 aFleck; // place in the lattice cell, share, phase
+const SPRAY_VERTEX =  `
+in vec4 aFleck;
 uniform vec3 uFoot;
 uniform vec3 uWindT;
 uniform float uSpray;
@@ -442,7 +388,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }`;
 
-const SPRAY_FRAGMENT = /* glsl */ `
+const SPRAY_FRAGMENT =  `
 in vec2 vUv;
 in float vA;
 uniform vec3 uLead;
@@ -453,10 +399,8 @@ void main() {
   writeVeil(mix(uLead, uInk, 0.5 * rim), fill * min(vA * 1.5, 1.0));
 }`;
 
-// ---------------------------------------------------------------------------------------------------------------
-// Lightning: a crack of gold leaf, a jagged bolt with a branch, struck on the render clock at a place the caller picks.
 
-const BOLT_VERTEX = /* glsl */ `
+const BOLT_VERTEX =  `
 uniform vec3 uBase;
 uniform vec3 uUp;
 uniform float uHeight;
@@ -470,7 +414,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }`;
 
-const BOLT_FRAGMENT = /* glsl */ `
+const BOLT_FRAGMENT =  `
 in vec3 vWorld;
 in vec3 vN;
 uniform vec3 uUp;
@@ -496,7 +440,7 @@ function boltGeometry(seed: number): THREE.BufferGeometry {
     }
   };
   strand(0, 1, 26, 0);
-  const at = pos.length / 3 / 2; // the branch leaves the bolt a third of the way down
+  const at = pos.length / 3 / 2;
   strand(pos[(Math.floor(at / 3) * 2) * 3], 1 - 9 / 26, 10, 0.025);
   const g = new THREE.BufferGeometry();
   g.setIndex(index);
@@ -506,7 +450,6 @@ function boltGeometry(seed: number): THREE.BufferGeometry {
 
 export class Lightning {
   readonly mesh: THREE.Mesh;
-  /** 0…1: the flash of the strike now (curtains light with it). */
   flash = 0;
   private readonly u = { uBase: { value: new THREE.Vector3() }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uHeight: { value: 30 } };
   private readonly seed: number;
@@ -524,16 +467,11 @@ export class Lightning {
     return (k + 0.1 + 0.6 * hash(k * 7.31 + this.seed)) * period;
   }
 
-  /** The render clock of the first strike at or after `clock`, striking every `period` s. */
   next(clock: number, period: number): number {
     const k = Math.floor(clock / period), s = this.start(k, period);
     return s >= clock ? s : this.start(k + 1, period);
   }
 
-  /**
-   * The bolt at render clock `clock`: one strike each `period` s, at the place `place` picks from a share 0…1 (into base
-   * and up; it returns the bolt's height, u), or none when place is null.
-   */
   update(clock: number, period: number, place: ((pick: number, base: THREE.Vector3, up: THREE.Vector3) => number) | null): void {
     const k = Math.floor(clock / period), dt = clock - this.start(k, period), on = place !== null && dt >= 0 && dt < 0.34;
     this.flash = on ? Math.exp(-dt * 8) : 0;
@@ -547,10 +485,6 @@ export class Lightning {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The weather module
-
-/** Spells drawn while their edge lies within this many u of the eye's foot (the horizon from the highest camera). */
 const REACH = 420;
 const MAX_SPELLS = 16;
 
@@ -572,7 +506,6 @@ export class Weather {
 
   constructor(style: Style) {
     const u = this.u;
-    // banks and squalls are tens of u across: 64 cells round keep each circle true to a tenth of a u (the wall needs 320)
     this.fog = new Curtains(style, CURTAIN.fog, MAX_SPELLS, 64, 6, u, THREE.FrontSide, 2);
     this.squalls = new Curtains(style, CURTAIN.squall, MAX_SPELLS, 64, 8, u, THREE.FrontSide, 2);
     this.rain = new Curtains(style, CURTAIN.rain, 1, 48, 4, u, THREE.BackSide, 5);
@@ -584,7 +517,7 @@ export class Weather {
     vg.setAttribute('aLayers', new THREE.InstancedBufferAttribute(Float32Array.from(LAYERS).reverse(), 1));
     vg.instanceCount = REACHES.length;
     this.veil = new THREE.Mesh(vg, inkMaterial(style, { vertexShader: VEIL_VERTEX, fragmentShader: VEIL_FRAGMENT, uniforms: u, veil: true, side: THREE.BackSide }));
-    this.veil.renderOrder = 1.5; // before the curtains, which veil themselves by distance
+    this.veil.renderOrder = 1.5;
     const quad = new THREE.PlaneGeometry(2, 2), sg = new THREE.InstancedBufferGeometry();
     sg.index = quad.index;
     sg.setAttribute('position', quad.getAttribute('position'));
@@ -599,12 +532,10 @@ export class Weather {
     this.group.add(this.fog.mesh, this.squalls.mesh, this.rain.mesh, this.veil, this.spray, this.lightning.mesh);
   }
 
-  /** Ash falling over the eye, 0…1 (WP17: the Fire Archipelago): grey wash and slow grey flecks. */
   setAsh(strength: number): void {
     this.ash = strength;
   }
 
-  /** Whether the player (ship 0) sees ship j this tick, by the sim's sight: WP18 draws only these, lanterns included. */
   sees(j: number): boolean {
     return j === 0 || ((this.sight[0].ships | this.sight[0].marks) & (1 << j)) !== 0;
   }
@@ -620,7 +551,6 @@ export class Weather {
     u.uWindT.value.copy(air.toward).multiplyScalar(air.strength);
     setSight(u, air);
     this.local.uFoot.value.copy(foot);
-    // fog banks and squalls standing on the sea from the horizon in
     this.fog.begin();
     this.squalls.begin();
     let boltApart = Infinity;
@@ -630,7 +560,6 @@ export class Weather {
       if ((spell.kind !== SPELL.fog && spell.kind !== SPELL.squall) || vig < 0.01) continue;
       const at = spell.at, d = Math.acos(Math.max(-1, Math.min(1, foot.x * at.x + foot.y * at.y + foot.z * at.z))) * R, apart = d - spell.r;
       if (apart > REACH) continue;
-      // a curtain is never seen from within: under it, the rain round the eye and the short sight take over
       const rho = spell.kind === SPELL.fog ? fogAngle(spell) : 0, ring = rho > 0 ? rho * R : (spell.kind === SPELL.fog ? 0.6 : 0.8) * spell.r;
       const out = THREE.MathUtils.smoothstep(d, ring, ring + 12);
       if (out <= 0) continue;
@@ -646,7 +575,6 @@ export class Weather {
     }
     this.fog.end();
     this.squalls.end();
-    // rain round the eye, short sight, spray
     const rain = Math.max(air.sky.squall, air.storm);
     u.uRain.value = rain;
     u.uAsh.value = this.ash;
@@ -659,7 +587,6 @@ export class Weather {
     const spray = (0.06 + 0.25 * Math.max(air.strength - 1, 0) + 0.5 * air.sky.squall + 0.8 * air.storm + 0.3 * air.gust) * (1 - air.sky.calm);
     this.local.uSpray.value = Math.min(1, spray);
     this.spray.visible = spray > 0.01;
-    // lightning in the nearest squall in its prime
     const bolt = this.bolt;
     this.lightning.update(clock, 4.5, bolt && ((pick, base, up) => {
       const tan = this.tan.set(bolt.at.y, -bolt.at.x, 0.3).normalize(), a = pick * Math.PI * 2, off = (0.5 * pick * bolt.r) / R;
@@ -668,7 +595,6 @@ export class Weather {
       base.copy(up).multiplyScalar(u.uSeaR.value);
       return 24;
     }));
-    // the player's sight, once a tick
     const s = this.surveyed;
     if (air.waters && (s.state !== state || s.tick !== state.tick)) {
       survey(air.waters, state, this.sight);
@@ -689,10 +615,8 @@ export class Weather {
   }
 }
 
-/** Each scene's weather (WP18 asks it which ships the player sees). */
 export const weathers = new WeakMap<THREE.Object3D, Weather>();
 
-/** The composition root's weather (MODULES). */
 export function createWeather(ctx: RenderContext): RenderModule {
   const weather = new Weather(ctx.pipeline.style);
   weathers.set(ctx.scene, weather);

@@ -1,6 +1,3 @@
-// WP26 the harbour's model, pure (no three.js, no DOM), so it can be tested in Node: the harbour's pages and how they
-// connect, where every touch target lies on each device, the league table, the nine captains' cards, the forms and the
-// gull's traits as the shipwright and the gull's page show them, and the harbour's actions on the career (WP10 API).
 import { cardLine, recordLine } from '../career/learn.ts';
 import { CAPTAINS, TEMPERAMENT, captainForm, draw, TRAITS, type Trait } from '../career/league.ts';
 import { GULL_PRICES, buyGull, chooseForm, gullPrice } from '../career/progress.ts';
@@ -8,20 +5,15 @@ import { LEAGUE, RANK, tierOf, unlockedForms, type Career } from '../career/stat
 import { FORM } from '../sim/tables.ts';
 import { safeRect, type Rect, type View } from './safeArea.ts';
 
-// ——— pages ———
-
 export type Page = 'home' | 'shipwright' | 'gull' | 'league' | 'captains' | 'chart' | 'settings' | 'credits' | 'reset';
 export const PAGES: readonly Page[] = ['home', 'shipwright', 'gull', 'league', 'captains', 'chart', 'settings', 'credits', 'reset'];
-/** Where each page leads besides back. */
 export const LINKS: Readonly<Record<Page, readonly Page[]>> = {
   home: ['shipwright', 'gull', 'league', 'captains', 'chart', 'settings'],
   shipwright: [], gull: [], league: ['captains'], captains: [], chart: [], settings: ['credits', 'reset'], credits: [], reset: [],
 };
-/** Where back goes. */
 export const PARENT: Readonly<Record<Page, Page | null>> = {
   home: null, shipwright: 'home', gull: 'home', league: 'home', captains: 'home', chart: 'home', settings: 'home', credits: 'settings', reset: 'settings',
 };
-/** The ledger's heading (swash) and the label on a link to the page. */
 export const TITLES: Readonly<Record<Page, string>> = {
   home: 'Harbour', shipwright: 'The Shipwright', gull: 'The Gull', league: 'The League', captains: 'The Nine',
   chart: 'The Career Chart', settings: 'Settings', credits: 'Credits', reset: 'Begin anew',
@@ -31,34 +23,25 @@ export const LABELS: Readonly<Record<Page, string>> = {
   chart: 'Career chart', settings: 'Settings', credits: 'Credits', reset: 'Begin anew',
 };
 
-// ——— layout ———
-
-/** The least side of a touch target, CSS px (= pt). */
 export const MIN_TARGET = 44;
 
 export type TargetKind = 'sail' | 'link' | 'back' | 'form' | 'trait' | 'level' | 'toggle' | 'confirm';
 export interface Target extends Rect {
   readonly id: string;
   readonly kind: TargetKind;
-  /** link: the page; level/toggle: the setting; trait: the trait; confirm: yes/no. */
   readonly key?: string;
-  /** form: the form; level: the step. */
   readonly value?: number;
 }
 
 export interface HarbourLayout {
   readonly page: Page;
   readonly safe: Rect;
-  /** Lettering and spacing scale: 1 on the iPhone, up to 1.5 on the iPad. */
   readonly s: number;
-  /** The unrolled ledger page (null on the harbour itself) and its body below the heading. */
   readonly ledger: Rect | null;
   readonly body: Rect | null;
   readonly heading: { x: number; y: number; size: number } | null;
-  /** The harbour: the set-sail seal and the rank line. */
   readonly seal: { x: number; y: number; r: number } | null;
   readonly status: { x: number; y: number; size: number } | null;
-  /** Card rectangles (the shipwright's forms, the nine) and row slots (gull, settings). */
   readonly cells: Rect[];
   readonly targets: Target[];
 }
@@ -70,7 +53,6 @@ export const SETTING_WORDS: Readonly<Record<(typeof SETTING_ROWS)[number], strin
 };
 export { SETTING_ROWS };
 
-/** Every touch target and frame of `page` on `view`, inside the safe area. */
 export function harbourLayout(view: View, page: Page): HarbourLayout {
   const r = safeRect(view);
   const s = Math.max(1, Math.min(1.5, r.height / 420, r.width / 832));
@@ -127,7 +109,6 @@ export function harbourLayout(view: View, page: Page): HarbourLayout {
       cells.push(rect(x0 + (i % cols) * (cw + gap), B.y + row * (ch + gap), cw, ch));
     }
   } else if (page === 'settings') {
-    // the volumes a row each, the switches two to a row (so WP25's left-handed switch fits the smallest iPhone)
     const lines = 2 + Math.ceil((SETTING_ROWS.length - 2) / 2), half = B.width / 2;
     const rh = B.height / (lines + 1), bh = Math.max(MIN_TARGET, Math.min(rh - 3, tH)), dot = Math.max(MIN_TARGET, 50 * s), x0 = B.x + B.width * 0.4;
     SETTING_ROWS.forEach((k, i) => {
@@ -143,7 +124,7 @@ export function harbourLayout(view: View, page: Page): HarbourLayout {
       }
     });
     const y = B.y + lines * rh + (rh - bh) / 2, w = 156 * s, gap = 14 * s, mid = B.x + B.width / 2;
-    targets.push({ id: 'toggle:quality', kind: 'toggle', key: 'quality', ...rect(mid - 1.5 * w - gap, y, w, bh) }); // WP26b graphics, cycled
+    targets.push({ id: 'toggle:quality', kind: 'toggle', key: 'quality', ...rect(mid - 1.5 * w - gap, y, w, bh) });
     targets.push({ id: 'link:credits', kind: 'link', key: 'credits', ...rect(mid - w / 2, y, w, bh) });
     targets.push({ id: 'link:reset', kind: 'link', key: 'reset', ...rect(mid + w / 2 + gap, y, w, bh) });
   } else if (page === 'reset') {
@@ -155,23 +136,17 @@ export function harbourLayout(view: View, page: Page): HarbourLayout {
 }
 
 export const inside = (t: Rect, x: number, y: number): boolean => x >= t.x && x <= t.x + t.width && y >= t.y && y <= t.y + t.height;
-/** The target under a finger, or null. */
 export const hit = (l: HarbourLayout, x: number, y: number): Target | null => l.targets.find((t) => inside(t, x, y)) ?? null;
-
-// ——— what the pages show ———
 
 export const FORM_NAMES = Object.keys(FORM) as (keyof typeof FORM)[];
 const TEMPERAMENT_NAMES = Object.keys(TEMPERAMENT);
 const cap = (w: string): string => w[0].toUpperCase() + w.slice(1);
 
-/** The player's wind (its highest tier, never lost), rank points and treasure, for the harbour's rank line. */
 export function statusLine(c: Career): string {
   return `${RANK.winds[c.player.tier - 1]} · ${c.player.points} points · ${c.player.treasure} treasure`;
 }
 
 export interface LeagueRow { place: number; id: number; name: string; points: number; wind: string; player: boolean; drawn: boolean }
-/** The thirty captains and the player by rank points (ties: the player first, then the lower index), the nine drawn
- * for the next voyage marked. */
 export function leagueRows(c: Career): LeagueRow[] {
   const drawn = new Set(draw(c));
   const rows = c.captains.map((k, id) => ({ id, name: CAPTAINS[id].name, points: k.points, player: false, drawn: drawn.has(id), wind: RANK.winds[tierOf(k.points) - 1] }));
@@ -188,7 +163,6 @@ export function captainCard(c: Career, id: number): Card {
     pigments: [k.pigments[0], k.pigments[1]], emblem: k.emblem, line: cardLine(c, id), record: recordLine(c, id), wind: RANK.winds[tier - 1],
   };
 }
-/** The nine captains drawn for the next voyage, nearest the player's rank first as draw() gives them. */
 export const nineCards = (c: Career): Card[] => draw(c).map((id) => captainCard(c, id));
 
 export interface FormChoice { form: number; name: string; unlocked: boolean; chosen: boolean; unlocksAt: string }
@@ -212,11 +186,8 @@ export function gullRows(c: Career): TraitRow[] {
   });
 }
 
-// ——— actions ———
-
 export type HarbourAct = { kind: 'form'; form: number } | { kind: 'gull'; trait: Trait };
 export interface ActResult { career: Career; ok: boolean; why?: 'locked' | 'chosen' | 'top' | 'short' }
-/** Choose a form or train the gull through the career API, refusing what it would refuse (the career unchanged). */
 export function harbourAct(c: Career, a: HarbourAct): ActResult {
   if (a.kind === 'form') {
     if (!unlockedForms(c.player.tier).includes(a.form)) return { career: c, ok: false, why: 'locked' };

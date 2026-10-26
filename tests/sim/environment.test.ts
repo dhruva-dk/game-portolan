@@ -1,7 +1,3 @@
-// WP6, the environment: one planetary wind shifting slowly through the match, gusts running downwind, the apparent
-// wind a ship's sails and pennants show, the lanes and the Great Current carrying ships (part A); the tide's
-// passages, the weather, the hour, the regions' moving waters and the tick budget (part B).
-//   node --test tests/sim/environment.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +23,6 @@ import { world } from './vectors.ts';
 const SEED = 20261024;
 const sea = seaFor(world(), SEED);
 
-/** n points spread evenly over the planet. */
 function spread(n: number): V3[] {
   return Array.from({ length: n }, (_, k) => {
     const z = 1 - (2 * k + 1) / n, r = Math.sqrt(1 - z * z), lon = k * 2.399963229728653;
@@ -37,7 +32,6 @@ function spread(n: number): V3[] {
 
 const angle = (a: V3, b: V3) => Math.acos(Math.max(-1, Math.min(1, dot(a, b) / (length(a) * length(b))))) * (180 / PI);
 
-/** The base wind (no gust has spawned before the first tick) everywhere at a match time. */
 function field(s: MatchState, seconds: number, points: V3[]): V3[] {
   s.tick = Math.round(seconds / TICK);
   return points.map((p) => ({ ...windAt(sea, s, p, newWind()).v }));
@@ -113,7 +107,6 @@ test('the lanes and the Great Current carry ships along them', (t) => {
   t.diagnostic(`the Great Current runs ${dot(c, ahead).toFixed(2)} u/s at its middle`);
   assert.ok(Math.abs(dot(c, ahead) - GREAT_CURRENT.speed) < 0.1, 'the Great Current at full speed');
 
-  // A reefed ship sailing down the lane's middle makes good its own way plus the lane's.
   const s = createMatch({ seed: SEED }), ship = s.ships[0], idle = idleInput();
   ship.pos = { ...mid };
   ship.head = { ...along };
@@ -124,7 +117,6 @@ test('the lanes and the Great Current carry ships along them', (t) => {
   const made = (R * Math.acos(dot(from, ship.pos))) / 2;
   assert.ok(made > ship.speed + 0.8 * lane.speed, `${made.toFixed(2)} u/s over the ground`);
 
-  // The fleet opens riding the Great Current, faster than sail alone could carry it.
   const r = createMatch({ seed: SEED }), start = { ...r.ships[0].pos };
   for (let n = 0; n < 20 / TICK; n++) step(sea, r, idle);
   const rode = (R * Math.acos(dot(start, r.ships[0].pos))) / 20;
@@ -138,15 +130,11 @@ test('the tide rises and falls on its period', () => {
   assert.ok(Math.abs(seaLevel((3 * TIDE.period) / 4) - LOW_WATER) < 1e-12, 'low water is the lowest it falls');
 });
 
-// ---------------------------------------------------------------------------------------------------------------
-// Part B: the tide's passages, the weather, the hour, and the regions' moving waters
-
 const regionNamed = (id: string) => REGIONS.findIndex((r) => r.id === id);
 const chord = (a: V3, b: V3) => R * Math.sqrt(Math.max(0, 2 - 2 * dot(a, b)));
 const pct = (x: number) => `${(100 * x).toFixed(1)} %`;
 const zoneOf = (p: V3) => sea.geo.zones[cellOf(TERRITORY, p)];
 
-/** A region's territory cells whose zone has all of `bits` and none of `without`, deep enough at low water when `wet`. */
 function cellsOf(ri: number, bits: number, without = 0, wet = true): V3[] {
   const out: V3[] = [], { region, zones, heights } = sea.geo;
   for (let c = 0; c < TERRITORY.cells; c++) {
@@ -156,27 +144,23 @@ function cellsOf(ri: number, bits: number, without = 0, wet = true): V3[] {
   return out;
 }
 
-/** A point about d u from p. */
 function offset(p: V3, d: number): V3 {
   const e = normalize(cross(v3(), p, v3(0, 0, 1)));
   return normalize(v3(p.x + (e.x * d) / R, p.y + (e.y * d) / R, p.z + (e.z * d) / R));
 }
 
-/** Whether the mangroves' roots break the wind at p. */
 function sheltered(p: V3): boolean {
   const shelter = REGIONS[regionOf(p)].mechanics.shelter;
   return shelter !== undefined && coastAt(sea.geo, p) < shelter.reach;
 }
 
-/** A match in fair weather throughout: no spell is ever sent. */
 function fairMatch(): MatchState {
   const s = createMatch({ seed: SEED });
   for (const spell of s.weather) spell.life = 1e9;
-  for (const ship of s.ships) ship.phase = PHASE.sailing; // at sea, off the Great Current
+  for (const ship of s.ships) ship.phase = PHASE.sailing;
   return s;
 }
 
-/** Ship i put at p, heading toward q under `sail` and making its way. */
 function place(s: MatchState, i: number, p: V3, q: V3, sail: number = SAIL.plain): Ship {
   const ship = s.ships[i];
   ship.pos = { ...p };
@@ -221,7 +205,7 @@ test('the tide opens and shuts the passages of the Amber Shoals and the Atolls o
 test('over 200 seeds the weather keeps each region\'s tendencies: fog in the Fjords and Stacks, calms on the Glass Sea and Shoals, squalls at sea', (t) => {
   const pts = spread(240), region = pts.map(regionOf), open = pts.map((p) => coastAt(sea.geo, p) >= WEATHER.open);
   const seas = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => seaFor(world(), seed)), sky = newSky();
-  const seen = REGIONS.map(() => [0, 0, 0, 0]), squalls = [0, 0, 0, 0]; // near land: samples, squalls; open sea: the same
+  const seen = REGIONS.map(() => [0, 0, 0, 0]), squalls = [0, 0, 0, 0];
   for (let seed = 1; seed <= 200; seed++) {
     const s = createMatch({ seed }), waters = seas[seed % seas.length];
     while (s.tick < 9000) {
@@ -318,7 +302,6 @@ test('each match starts at an hour its seed sets, and ten minutes of play cover 
 test('the Ice Crown\'s floes turn on their rings, so lanes through the pack open and close; ships slow among them and stop at them', (t) => {
   const ri = regionNamed('iceCrown'), floes = sea.geo.floes, rings = REGIONS[ri].mechanics.floes, p = v3();
   assert.ok(rings);
-  // A lane: a corridor 3 u wide straight out through the outer two rings at a bearing, clear of every floe.
   const clear = (b: number, at: number) => {
     const cb = Math.cos(b), sb = Math.sin(b);
     for (let d = 24; d <= 56; d += 0.5) {
@@ -416,7 +399,7 @@ test('the Maelstrom flings ships round its vortex and out of it at speed, at ful
       step(sea, s, idle);
       if (k === 45) gripped = length(ship.fling) / length(flow);
       if (left < 0 && inside && !vortexAt(ship.pos, flow)) left = k;
-      if (left > 0 && k === left + 1) launch = length(ship.fling); // the tick after it crossed the rim
+      if (left > 0 && k === left + 1) launch = length(ship.fling);
       if (left > 0 && k === left + 60) later = length(ship.fling);
     }
     return { gripped, launch, later };

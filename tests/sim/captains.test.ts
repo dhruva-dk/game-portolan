@@ -1,9 +1,3 @@
-// WP11 part A, the captains' brain, headless: perception (nothing beyond a captain's sight changes its decision);
-// inputs a player could give; each core skill in a scene (a loop drawn and banked, a visible trail broken with the
-// strike telegraphed, the storm outrun, a broadside brought to bear and better gunners hitting more, home when a
-// rival threatens the purse, a chest taken); rank's reaction time; the first voyage's gentleness; determinism and
-// snapshot/resume mid-thought; and nine captains' tick cost against A9.
-//   node --test tests/sim/captains.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MODE, helm, intent, think } from '../../src/sim/captains/brain.ts';
@@ -29,7 +23,6 @@ const SEED = 20261024, sea = seaFor(world(), SEED);
 const S = (seconds: number): number => Math.round(seconds / TICK);
 const IDLE = idleInput();
 
-/** The player and nine captains of a rank tier, each outfit amended by `amend`. */
 function fleet(tier = 4, amend: (i: number) => Outfit = () => ({})): Outfit[] {
   return Array.from({ length: SHIPS }, (_, i) => (i === 0 ? {} : { captain: { temperament: (i - 1) % 6, tier }, ...amend(i) }));
 }
@@ -45,7 +38,6 @@ function run(state: MatchState, ticks: number, each?: (s: MatchState) => void): 
 }
 
 const T1 = v3(), T2 = v3();
-/** The point d u from p on bearing b. */
 function at(p: V3, b: number, d: number): V3 {
   const out = v3();
   tangentAt(p, b, T1);
@@ -59,7 +51,6 @@ function clear(state: MatchState, p: V3): boolean {
     && (sea.geo.zones[cellOf(TERRITORY, p)] & (ZONE.hot | ZONE.vortex | ZONE.kelp)) === 0;
 }
 
-/** Open sea: a point with clear water `r` u every way, off the Great Current, found spiralling out from `from`. */
 function openSea(state: MatchState, from: V3, r = 40): V3 {
   for (let k = 0; k < 4000; k++) {
     const p = at(from, k * 2.39996, 6 * Math.sqrt(k));
@@ -70,7 +61,6 @@ function openSea(state: MatchState, from: V3, r = 40): V3 {
   throw new Error('no open sea');
 }
 
-/** Ship i at p, sailing on bearing b. */
 function place(state: MatchState, i: number, p: V3, b = 0): void {
   const ship = state.ships[i];
   ship.phase = PHASE.sailing;
@@ -81,14 +71,12 @@ function place(state: MatchState, i: number, p: V3, b = 0): void {
   ship.speed = 2;
 }
 
-/** Ship i's home inked where it is, as when it slows after breaking off (opening.ts coast). */
 function settle(state: MatchState, i: number): void {
   const p = state.ships[i].pos;
   set(state.ships[i].captain.anchor, p.x, p.y, p.z);
   inkHome(state, i);
 }
 
-/** A scene: only the ships kept stay in the match. */
 function scene(outfits: Outfit[], keep: number[], minds?: (Mind | null)[]): MatchState {
   const state = createMatch({ seed: SEED, fleet: outfits, minds });
   for (let j = 0; j < SHIPS; j++) {
@@ -99,7 +87,6 @@ function scene(outfits: Outfit[], keep: number[], minds?: (Mind | null)[]): Matc
   return state;
 }
 
-/** An open trail of ship j, `len` u from `from` on bearing b, laid in clear air. */
 function lay(state: MatchState, j: number, from: V3, b: number, len: number): void {
   const ship = state.ships[j];
   for (let d = 0; d <= len; d += 0.5) {
@@ -111,7 +98,6 @@ function lay(state: MatchState, j: number, from: V3, b: number, len: number): vo
   }
 }
 
-/** Captain i's decision now, through a fresh survey: its input and its record. */
 function decision(state: MatchState, i: number): { input: ShipInput; record: string } {
   const sights = survey(sea, state, Array.from({ length: SHIPS }, newSight), gullEyes(state));
   const input = helm(state, i, idleInput());
@@ -136,11 +122,11 @@ test('a captain decides from its sight alone: a ship, a trail or a chest beyond 
     place(s, 3, at(OPEN, 4, 150), 1);
   });
   const hidden = decide((s) => {
-    place(s, 2, at(OPEN, 1, 110), 3); // over the horizon
-    place(s, 3, at(OPEN, 0.6, 12), 2); // close by, under a fog flask, its trail across the bow hidden with it
+    place(s, 2, at(OPEN, 1, 110), 3);
+    place(s, 3, at(OPEN, 0.6, 12), 2);
     s.ships[3].flask = 10;
     lay(s, 3, at(OPEN, -0.4, 15), 1.2, 25);
-    s.chests.push({ at: at(OPEN, 0.1, 100), tier: 4, fitting: { kind: 0, tier: 0 }, from: -1 }); // beyond its lookout
+    s.chests.push({ at: at(OPEN, 0.1, 100), tier: 4, fitting: { kind: 0, tier: 0 }, from: -1 });
   });
   assert.equal(hidden, bare, 'nothing it could not see moved it');
   const seen = decide((s) => {
@@ -158,7 +144,7 @@ test('captains act only through inputs a player could give; they break off by ch
   run(s, S(180), (state) => {
     const inputs = lastInputs();
     for (let i = 1; i < SHIPS; i++) {
-      record(recorders[i], state.tick - 1, inputs[i]); // throws on any field a player's touch could not set
+      record(recorders[i], state.tick - 1, inputs[i]);
       if (inputs[i].flags !== 0 || inputs[i].course !== null || inputs[i].consumable >= 0 || inputs[i].chestPick >= 0) acted++;
     }
     for (const e of state.events) {
@@ -179,7 +165,7 @@ test('captains act only through inputs a player could give; they break off by ch
 test('a captain breaks an open trail it can see, telegraphing the strike', () => {
   const s = scene(fleet(6, nobody), [1, 2]);
   place(s, 1, OPEN, 0);
-  place(s, 2, at(OPEN, Math.PI, 150), Math.PI); // its owner far out of sight
+  place(s, 2, at(OPEN, Math.PI, 150), Math.PI);
   const from = at(OPEN, 0.5, 25);
   lay(s, 2, from, 2, 30);
   decision(s, 1);
@@ -194,7 +180,7 @@ test('a captain breaks an open trail it can see, telegraphing the strike', () =>
 
 test('a captain outruns the storm', () => {
   const s = scene(fleet(6, nobody), [1, 2]);
-  s.tick = S(STORM.phases[0].move + STORM.phases[0].sweep + 10); // the first phase has swept and holds
+  s.tick = S(STORM.phases[0].move + STORM.phases[0].sweep + 10);
   const calm = s.storm.calms[0];
   let p: V3 | null = null;
   for (let b = 0; b < 128 && p === null; b++) {
@@ -203,7 +189,7 @@ test('a captain outruns the storm', () => {
   }
   assert.ok(p, 'a stretch of open sea in the storm');
   place(s, 1, p, 0);
-  inkHome(s, 1); // its home in the storm's path: it must leave it
+  inkHome(s, 1);
   place(s, 2, calm.at, 0);
   const before = dot(s.ships[1].pos, calm.at);
   let fled = false;
@@ -216,7 +202,7 @@ test('a captain brings its broadside to bear, and better gunners hit more', () =
   const duel = (gunnery: number, b: number): { hits: number; fired: number } => {
     const s = scene(fleet(6, (i) => (i === 1 ? { gunnery } : { captain: undefined })), [1, 2]);
     place(s, 1, OPEN, b);
-    place(s, 2, at(OPEN, b + 0.5, 16), b + 1.2); // a rival 16 u off, sailing its own way under reefed sails
+    place(s, 2, at(OPEN, b + 0.5, 16), b + 1.2);
     s.ships[2].sail = SAIL.reefed;
     let hits = 0, fired = 0;
     run(s, S(40), (state) => {
@@ -240,7 +226,7 @@ test('a captain cuts its loop short and heads home when a rival threatens its pu
   const s = scene(fleet(8, nobody), [1, 2]);
   place(s, 1, OPEN, 0);
   inkHome(s, 1);
-  decision(s, 1); // its home's heart noted
+  decision(s, 1);
   const out = at(OPEN, 0, 26);
   lay(s, 1, at(OPEN, 0, 11), 0, 15);
   place(s, 1, out, 0);
@@ -315,7 +301,7 @@ test('captains are deterministic and resume mid-thought from a snapshot', () => 
 test('nine captains keep the tick within A9 (Node mean ≤ 0.3 ms)', (t) => {
   const cost = (outfits: Outfit[]): { mean: number; p99: number; cpu: number } => {
     const s = createMatch({ seed: SEED, fleet: outfits, rank: 6 });
-    run(s, S(120)); // past the break-offs, loops under way, the storm's first phase announced
+    run(s, S(120));
     const n = S(120), times = new Float64Array(n), cpu0 = process.cpuUsage();
     for (let k = 0; k < n; k++) {
       const t0 = performance.now();
@@ -331,24 +317,19 @@ test('nine captains keep the tick within A9 (Node mean ≤ 0.3 ms)', (t) => {
   assert.ok(crewed.cpu < 0.3, `CPU mean ${crewed.cpu.toFixed(3)} ms`);
 });
 
-// ---------------------------------------------------------------------------------------------------------------
-// Temperaments (temperaments.ts): each one's own sailing, shown in a short scene, and every captain's signature.
 
 const T = { hunter: 0, expander: 1, raider: 2, turtle: 3, opportunist: 4, gambler: 5 } as const;
-/** Captain 1 of temperament t (tier 6), its outfit amended, and the ships in `keep` without captains. */
 const lone = (t: number, keep: number[], amend: Outfit = {}): MatchState =>
   scene(fleet(6, (i) => (i === 1 ? { captain: { temperament: t, tier: 6 }, ...amend } : { captain: undefined })), [1, ...keep]);
-/** How nearly ship i's chart arrow points at p (1: dead on). */
 const bearing = (s: MatchState, i: number, p: V3): number => dot(intent(s, i, v3()), tangentToward(s.ships[i].pos, p, v3()));
 const closing = (mode: number): boolean => mode === MODE.stalk || mode === MODE.fight || mode === MODE.ram;
-/** Starting fittings of tier 6 with these FITTING kinds by SLOT. */
 function fitted(kinds: Record<number, number>): Outfit {
   return { fittings: startingFittings(6).map((f, slot) => (slot in kinds ? { kind: kinds[slot], tier: 1 } : { ...f })) };
 }
 
 test('a hunter stalks a wounded ship from beyond its guns, where an expander lets it be', () => {
   const [hunter, expander] = [T.hunter, T.expander].map((t) => {
-    const s = lone(t, [2], fitted({ [SLOT.broadside]: FITTING.none, [SLOT.bow]: FITTING.none })); // no guns, no ram: it can only stalk
+    const s = lone(t, [2], fitted({ [SLOT.broadside]: FITTING.none, [SLOT.bow]: FITTING.none }));
     place(s, 1, OPEN, 0);
     place(s, 2, at(OPEN, 0.3, 15), 2);
     s.ships[2].hull *= 0.4;
@@ -383,12 +364,12 @@ test('a raider breaks trails for the purse and runs for home with it, where a hu
   const after = (t: number, purse: number): number => {
     const s = lone(t, [2]), ship = s.ships[1];
     place(s, 1, OPEN, 0);
-    place(s, 2, at(OPEN, Math.PI, 150), Math.PI); // the trail's owner far out of sight
+    place(s, 2, at(OPEN, Math.PI, 150), Math.PI);
     lay(s, 2, at(OPEN, 0.5, 25), 2, 30);
-    decision(s, 1); // its home inks where it stands; the trail draws it
+    decision(s, 1);
     ship.held = 1000;
     ship.purse = purse * FORMS[ship.form].purse;
-    lay(s, 1, OPEN, Math.PI / 2, 6); // its own trail open
+    lay(s, 1, OPEN, Math.PI / 2, 6);
     decision(s, 1);
     return ship.captain.mode;
   };
@@ -474,7 +455,7 @@ test('a hunter that knows the player draws huge loops patrols beyond its border 
       place(s, i, p, 0);
       settle(s, i);
     }
-    place(s, 0, at(den, 1 + Math.PI, 150), 0); // the player out on a loop, far out of sight: its home is on every chart
+    place(s, 0, at(den, 1 + Math.PI, 150), 0);
     decision(s, 1);
     return s;
   };
@@ -484,7 +465,7 @@ test('a hunter that knows the player draws huge loops patrols beyond its border 
   assert.ok(apart(c.goal, knowing.ships[1].pos) > 10, 'making round it, not straight in');
   for (const s of [hunter(null), hunter(loops(12))]) assert.notEqual(s.ships[1].captain.mode, MODE.roam, 'a naive hunter, or one that knows the player\'s loops are small, draws its own loop');
   const cut = (s: MatchState): number => {
-    lay(s, 0, at(s.ships[1].pos, 0.3, 52), 1.9, 40); // a long open trail of the player's, beyond a hunter's usual reach
+    lay(s, 0, at(s.ships[1].pos, 0.3, 52), 1.9, 40);
     decision(s, 1);
     return s.ships[1].captain.mode;
   };

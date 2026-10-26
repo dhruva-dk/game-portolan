@@ -422,15 +422,6 @@ The career (rank, league, captains' memories and learned profiles, the gull, the
 
 - **Code.** Every line of code earns its place. No dead code, no duplication, no speculative features. Create a file only when it is needed, and split code by domain only when the split makes it clearer. Never write less code at the cost of a better game: carefully built procedural geometry, shaders, captains, and systems that take more code are always preferred to shortcuts that make the game worse.
 - **Tools.** Use whatever skills, tools, libraries, and techniques best achieve this result without being asked. Every library is listed in `CREDITS.md` with its source and licence.
-- **Progress.** `progress.html` at the repository root is a single self-contained page, kept current throughout the work, that opens straight from disk. It shows:
-  - the state of each section of this document: done, in progress, or not started
-  - each acceptance check with its latest result
-  - every capture, at iPhone and iPad resolution
-  - the latest review's findings, and how each was fixed
-  - a dated log of each step of the work, with before-and-after screenshots
-  - what comes next
-
-  Its screenshots live in `progress/shots/`. It is complete enough that a fresh agent with no other context can read it and carry the work on.
 
 ## Acceptance checks
 

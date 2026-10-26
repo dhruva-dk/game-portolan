@@ -1,7 +1,3 @@
-// The career, part B (WP10): captains learn the player at the stated rates and forget it, remember being sunk and
-// say what they know on their cards; the career chart inked from a headless match; the first voyage; and the career,
-// with all it has learned, still deterministic and saved bit for bit.
-//   node --test tests/career/learn.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CARD, FIGHTS, cardLine, cardLines, learn, recordLine } from '../../src/career/learn.ts';
@@ -21,7 +17,6 @@ import { FITTING } from '../../src/sim/tables.ts';
 import { REGIONS } from '../../src/sim/world/regions.ts';
 import { world } from '../sim/vectors.ts';
 
-/** A finished match as result() reports one: the player fifth, every ship's sea alike; `sinks` maps a ship to the ship that sank it. */
 function finish(sinks: Record<number, number> = {}): MatchResult {
   const order = [1, 2, 3, 4, 0, 5, 6, 7, 8, 9];
   const ships = Array.from({ length: SHIPS }, (_, ship): Finish => ({
@@ -31,7 +26,6 @@ function finish(sinks: Record<number, number> = {}): MatchResult {
   return { order, ships, timeline: [], ticks: 0 };
 }
 
-/** A voyage that showed exactly these habits. */
 function voyage(h: { breakOff?: number; loop?: number; raids?: number; run?: number; storm?: number; fittings?: number[] }): Voyage {
   const v = newVoyage();
   v.samples = 100;
@@ -136,7 +130,6 @@ test('a card says each habit learned in one line, the surest first, in letters t
   for (const line of said) for (const ch of line) assert.ok(ch in GLYPHS, `the hand has no ${JSON.stringify(ch)} for “${line}”`);
 });
 
-/** A headless first match of a new career on `seed`: the player rides idle for a minute, then the captains sink, the second by the player. */
 function sail(seed: number): { c0: Career; c1: Career; v: Voyage; drawn: number[] } {
   const c0 = newCareer(seed), { setup, drawn } = toSetup(c0, seed), sea = seaFor(world(), seed), state = createMatch(setup), v = newVoyage();
   const still = idleInput();
@@ -181,7 +174,6 @@ test('the first voyage: the nine lowest captains at their gentlest and the first
   assert.equal(s2.firstVoyage, false);
   assert.equal(createMatch(s2).charm, false);
   assert.ok(s2.minds?.slice(1).every((m) => m !== null && !m.gentle));
-  // each lesson's moment is the first time, kept
   const v = newVoyage(), sunk = { phase: PHASE.sunk };
   const at = (tick: number, kinds: number[]): void =>
     observe(v, null as unknown as Sea, { tick, ships: [sunk], events: kinds.map((kind) => ({ kind, ship: 0, by: 1, at: { x: 0, y: 0, z: 1 }, amount: 1, cells: [] })) } as unknown as MatchState);

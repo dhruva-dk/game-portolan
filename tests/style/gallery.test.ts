@@ -1,5 +1,3 @@
-// The style gallery in Chromium on both devices (tests/pages/style.html): the paper is anchored to the world, not the
-// screen; the page renders without a console error or warning; the frame stays inside its memory and draw budgets.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { launch, openGame, serve, type DeviceName, type Launched, type Server } from '../harness.ts';
@@ -31,9 +29,6 @@ for (const device of ['iphone', 'ipad'] as DeviceName[]) {
       device, hook: '__style', query: { view: 'high', hour: 12, ui: 0 },
     });
     await game.until((g) => g.ready);
-    // Grain at a few hundred points of open sea, before and after the camera turns 0.7° across and 0.7° up (the
-    // view slides some 15 CSS px each way): read at the same world points it must hold; read at the same screen
-    // pixels it must not (the control, proving the turn moved the picture past the grain).
     const r = await game.hook((g) => {
       const points = g.seaPoints(400, 70, 40);
       const before = g.probe(points), pixels = g.project(points);
@@ -47,7 +42,6 @@ for (const device of ['iphone', 'ipad'] as DeviceName[]) {
     assert.ok(pick(r.before).length >= 250);
     assert.ok(world >= 0.8, `paper slid with the camera: correlation ${world.toFixed(3)}`);
     assert.ok(screen <= 0.3, `the swing did not move the picture: control correlation ${screen.toFixed(3)}`);
-    // A9 budgets: GPU memory ≤ 150 MB with render targets, no texture over 4096², draw calls ≤ 200
     assert.ok(r.stats.textureBytes + r.stats.targetBytes <= 150 * 2 ** 20);
     assert.ok(r.stats.calls <= 200);
     game.assertClean();

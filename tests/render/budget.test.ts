@@ -1,9 +1,3 @@
-// WP30 part C: A9's budget over the standard views (tests/render/budget.html): the zoom's stops, each region from the
-// deck, low along its shore, high over its coast and from orbit, and a ten-ship battle, on both devices. Prints a
-// compact table (draws and triangles per device, the heaviest modules); every view must keep within 150 draws and
-// 420k triangles (A9 is 200 / 500k: the rest is headroom). BUDGET_OUT=<file.json> writes the table; BUDGET_SHOTS=<dir>
-// saves each deck and shore view there and, with BUDGET_BASE=<dir> from an earlier run, prints each one's pixel
-// difference (mean over the frame, over its lower 40 % where the near field is, and the share of pixels that moved).
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -44,7 +38,7 @@ async function diff(a: string, b: string): Promise<{ all: number; near: number; 
   return r;
 }
 
-test('every standard view within 150 draws and 420k triangles on both devices (WP30 part C)', async () => {
+test('every standard view within 150 draws and 420k triangles on both devices', async () => {
   const rows = new Map<string, Partial<Record<DeviceName, Row>>>(), shots = process.env.BUDGET_SHOTS, base = process.env.BUDGET_BASE;
   if (shots) await mkdir(shots, { recursive: true });
   for (const device of ['iphone', 'ipad'] as DeviceName[]) {

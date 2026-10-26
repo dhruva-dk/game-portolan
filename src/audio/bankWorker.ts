@@ -1,6 +1,3 @@
-// WP28: the sound bank rendered off the main thread. Synthesis is pure (sfx.ts), so the worker renders every variant,
-// the ambience beds and the commonest sounds first, and hands each over as transferred Float32Arrays; the engine only
-// wraps them in AudioBuffers. The whole bank takes about 3 s of a core on the dev Mac, never a frame of the main thread.
 import { SOUND_NAMES, SOUNDS, render, type SoundName } from './sfx.ts';
 
 const FIRST: readonly SoundName[] = ['sea', 'swell', 'wind', 'rigging', 'creak', 'slap', 'canvasFill', 'block', 'tap', 'page', 'cannon', 'cannonFar', 'splash', 'hit', 'whistle', 'coin', 'chord', 'surf'];

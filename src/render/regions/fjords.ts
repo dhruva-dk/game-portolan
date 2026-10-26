@@ -1,10 +1,3 @@
-// The Fjords, WP16 part A. Sheer walls streaked with falls: every cascade of the geography and a streak down each
-// tall wall leaves its lip in a free-fall curve, pushed clear of the rock (or hugging a steep face), widening as it
-// drops into the sea: lead-white strands running down a pale verdigris body, ink between them, ragged edges, a foot
-// broken into spray. The Great Falls, the landmark, is a broad curtain between two ribbons, fed by a river across the
-// plateau, under a plume of spray that reads from orbit. Mist lies in the narrow channels (paper left unpainted,
-// thickest in the morning) and curls off every foot; boulders lie fallen at the cliff feet. The terrain draws the
-// walls' strata, fissures and scree washes; flora plants the dark pines.
 import * as THREE from 'three';
 import { illustratedMaterial, inkMaterial, linearVec, transmittanceVec, type Style } from '../../style/glsl.ts';
 import { PIGMENTS } from '../../style/palette.ts';
@@ -17,28 +10,20 @@ import { chartDir, Draw, Kit, lift, pose, regionSeen, ring, seeded, vec, washOf,
 
 const RI = REGIONS.findIndex((r) => r.id === 'fjords');
 const MARK = REGIONS[RI].landmark;
-/** A fall: rows down it and columns across; how far out its lip and foot are sought (u); how far it keeps off the
- *  rock (u); how far it is thrown out per √u of drop; how much it widens to its foot. */
 const FALL = { rows: 18, cols: 5, reach: 12, clear: 0.35, throw: 0.32, spread: 0.35 } as const;
-/** Streaks down the tall walls: how many are sought, their spacing and the least wall height (u). */
 const STREAKS = { count: 44, spacing: 5, wall: 7 } as const;
-/** The Great Falls: its curtain's width, its flanking ribbons' offset and width, the river feeding it (rows, 1 u apart). */
 const GREAT = { width: 4.2, flank: 3.3, flankWidth: 1.2, river: 7 } as const;
-/** Fallen boulders: at most, how far inland the wall is looked for and how tall it stands (u). */
 const SCREE = { most: 600, inland: 2.5, wall: 5 } as const;
 
 export interface ArcPoint { readonly d: number; readonly y: number }
 export interface FallSite { readonly site: V; readonly f: V; readonly width: number; readonly river: number; readonly spray: number }
 
 const S: Surface = { height: 0, normal: vec(), up: 1, ground: 0, region: 0 };
-/** The unit direction d u out along f and l u along s from site. */
 export const toward = (site: V, f: V, s: V, d: number, l: number, o = vec()): V =>
   o.copy(site).multiplyScalar(R).addScaledVector(f, d).addScaledVector(s, l).normalize();
 export const sideOf = (site: V, f: V): V => vec().crossVectors(site, f).normalize();
 const widthAt = (w: number, i: number) => w * (1 + FALL.spread * (i / FALL.rows));
 
-/** A fall's profile out along f from its site: from its lip (where the ground first drops away) down a free-fall
- *  curve, pushed out wherever any of its width would touch the rock, to 0.8 u below mean sea over open water. */
 export function arcOf(field: TerrainField, site: V, f: V, width: number): ArcPoint[] | null {
   const s = sideOf(site, f), q = vec(), g = (d: number, l = 0) => field.surface(toward(site, f, s, d, l, q), 0, S).height;
   const hs = Array.from({ length: 61 }, (_, i) => g(-1 + 0.2 * i));
@@ -57,7 +42,6 @@ export function arcOf(field: TerrainField, site: V, f: V, width: number): ArcPoi
   return arc;
 }
 
-/** A fall's rows of points, top to bottom: `river` rows draped over the ground upstream, its lip, then its arc. */
 export function fallRows(field: TerrainField, site: V, f: V, width: number, arc: readonly ArcPoint[], river: number): V[][] {
   const s = sideOf(site, f), lip = arc[0].d, rows: V[][] = [];
   const row = (d: number, y: number | null, w: number) => Array.from({ length: FALL.cols }, (_, c) => {
@@ -69,8 +53,6 @@ export function fallRows(field: TerrainField, site: V, f: V, width: number, arc:
   return rows;
 }
 
-/** Streaks down the tall walls: sites just inland of the shore atop its cliffs, facing down the coast's slope to the
- *  water, spaced from each other and from `taken`. */
 function streaksOf(field: TerrainField, taken: readonly V[], rng: () => number): FallSite[] {
   const geo = field.geo, found: { p: V; x: number; y: number; k: number }[] = [], near = [...taken], out: FallSite[] = [];
   for (let x = -80; x <= 80; x += 1) {
@@ -91,7 +73,6 @@ function streaksOf(field: TerrainField, taken: readonly V[], rng: () => number):
   return out;
 }
 
-/** Vertices with named float attributes and triangles, merged into one geometry. */
 export class Batch {
   readonly data: Record<string, number[]> = {};
   readonly index: number[] = [];
@@ -141,7 +122,7 @@ export function addPuff(b: Batch, p: V, w: number, h: number, seed: number, spra
   b.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
-const NOISE_GLSL = /* glsl */ `
+const NOISE_GLSL =  `
 float fjHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float fjNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
@@ -150,7 +131,7 @@ float fjNoise(vec2 p) {
 float fjFbm(vec2 p) { return 0.5 * fjNoise(p) + 0.3 * fjNoise(p * 2.07 + 5.3) + 0.2 * fjNoise(p * 4.11 + 1.7); }
 `;
 
-export const FALL_VERT = /* glsl */ `
+export const FALL_VERT =  `
 in vec4 aFall;
 in float aSeed;
 out vec3 vWorld;
@@ -167,12 +148,10 @@ void main() {
 }
 `;
 
-// Falling water: strands of lead white running down a pale verdigris body, fine ink between them, ragged edges and a
-// foot broken into spray; shaded like a form, silvered by night.
-export const FALL_FRAG = NOISE_GLSL + /* glsl */ `
+export const FALL_FRAG = NOISE_GLSL +  `
 in vec3 vWorld;
 in vec3 vNormal;
-in vec4 vFall; // across 0…1, arc length down it, its whole length, its width (u)
+in vec4 vFall;
 in float vSeed;
 uniform vec3 uBody;
 uniform vec3 uFoam;
@@ -197,10 +176,10 @@ void main() {
 }
 `;
 
-export const VEIL_VERT = /* glsl */ `
+export const VEIL_VERT =  `
 uniform float uTime;
 in vec2 aCorner;
-in vec4 aPuff; // half-width, half-height (u), seed, spray (1) or mist (0)
+in vec4 aPuff;
 out vec2 vCorner;
 out vec3 vWorld;
 out vec2 vPuff;
@@ -216,8 +195,7 @@ void main() {
 }
 `;
 
-// Mist and spray: paper left unpainted (spray whiter, rising), its billows edged here and there with an inked curl.
-export const VEIL_FRAG = NOISE_GLSL + /* glsl */ `
+export const VEIL_FRAG = NOISE_GLSL +  `
 in vec2 vCorner;
 in vec3 vWorld;
 in vec2 vPuff;
@@ -237,14 +215,12 @@ void main() {
 
 const STONE = washOf(PIGMENTS.sepia, 0.55), LIT = washOf(PIGMENTS.umber, 0.42), WET = washOf(PIGMENTS.sepia, 0.85);
 
-/** A boulder 1 across, bedded 0.5 below its rest. */
 function boulderKit(): THREE.BufferGeometry {
   const rng = seeded(61), k = 7, rad = Array.from({ length: k }, () => 0.75 + 0.35 * rng());
   const at = (s: number, y: number) => ring(k, y, (j) => rad[j] * s * (0.9 + 0.2 * rng()));
   return new Kit((c, n) => (c.y < 0.05 ? WET : n.y > 0.6 ? LIT : STONE)).loft([at(0.7, -0.5), at(1, 0), at(0.85, 0.45), at(0.5, 0.72)]).build();
 }
 
-/** Boulders fallen at the cliff feet along the shore, each bedded below the lowest ground round it. */
 function screeOf(field: TerrainField): THREE.Matrix4[] {
   const geo = field.geo, rng = seeded(71), sites: V[] = [], fwd = vec(), sd = vec(), q = vec(), out: THREE.Matrix4[] = [];
   for (let x = -80; x <= 80; x += 0.8) {
@@ -335,7 +311,6 @@ export class Fjords {
     this.count = falls.index.length / 3 + puffs.index.length / 3 + scree.triangles;
   }
 
-  /** Shown when the region can be in view; the mist thickest in the morning and by night. */
   update(eye: V): void {
     this.group.visible = regionSeen(RI, eye, 90);
     const { hour, night } = this.style.palette, sm = THREE.MathUtils.smoothstep;
@@ -354,7 +329,6 @@ export class Fjords {
   }
 }
 
-/** The composition root's Fjords (MODULES). */
 export function createFjords(ctx: RenderContext): RenderModule {
   const terrain = terrains.get(ctx.scene);
   if (!terrain) throw new Error('createFjords: the terrain is built first (MODULES order)');

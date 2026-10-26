@@ -1,10 +1,3 @@
-// WP8 part B, combat, headless: hull by form and fittings; broadsides bearing only inside a side's arc and range, and
-// the carrack's castle astern; reloading, a third faster holding the Arch; a ball's damage by distance and by the angle
-// it strikes; rams scaled by closing speed, the rammer hurt a little; fire over time and the ward; rocks struck at
-// speed; hot water and copper sheathing, and embers; no fire into the Great Lagoon; fog keeping a rival from the guns;
-// aiming by tap and by drag; sinking through sink() with its bounty, twice over for the leader; determinism,
-// snapshot/resume with shot in flight, and the tick's cost with all ten ships fighting.
-//   node --test tests/sim/combat.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,7 +26,6 @@ const near = (a: number, b: number, eps = 1e-9): void => assert.ok(Math.abs(a - 
 const fitted = (slot: number, kind: number, tier = 0): { kind: number; tier: number }[] =>
   START_FITTINGS.map((k, s) => ({ kind: s === slot ? kind : k, tier }));
 
-/** Ships 0 and 1 at sea where the fleet starts, sailing but dead in the water; the rest out of the fight. */
 function duel(fleet: Outfit[] = []): MatchState {
   const s = createMatch({ seed: SEED, fleet: Array.from({ length: SHIPS }, (_, i) => fleet[i] ?? {}) });
   s.ships.forEach((ship, i) => {
@@ -43,10 +35,8 @@ function duel(fleet: Outfit[] = []): MatchState {
   return s;
 }
 
-/** Guns held: no battery fires. */
 const hold = (s: MatchState): void => s.ships.forEach((ship) => ship.reload.fill(1e9));
 
-/** Ship j `d` u from ship 0 at `angle` off its bow (positive to starboard), heading as ship 0 does turned by `facing`. */
 function place(s: MatchState, j: number, angle: number, d: number, facing = 0): void {
   const o = s.ships[0], ship = s.ships[j], star = cross(v3(), o.head, o.pos), t = v3();
   const dir = set(v3(), o.head.x * dcos(angle) + star.x * dsin(angle), o.head.y * dcos(angle) + star.y * dsin(angle), o.head.z * dcos(angle) + star.z * dsin(angle));
@@ -55,14 +45,12 @@ function place(s: MatchState, j: number, angle: number, d: number, facing = 0): 
   set(ship.head, h.x * dcos(facing) + st.x * dsin(facing), h.y * dcos(facing) + st.y * dsin(facing), h.z * dcos(facing) + st.z * dsin(facing));
 }
 
-/** Puts ship i at p, its heading kept tangent. */
 function moveTo(s: MatchState, i: number, p: V3): void {
   const ship = s.ships[i];
   set(ship.pos, p.x, p.y, p.z);
   normalize(addScaled(ship.head, ship.head, ship.pos, -dot(ship.head, ship.pos)));
 }
 
-/** One tick of combat alone: sight surveyed, then combat (the ships do not move). */
 function fight(s: MatchState): void {
   s.events.length = 0;
   survey(sea, s, SIGHT);
@@ -134,7 +122,6 @@ test('a ball strikes harder close in than at long range, and hardest raking a hu
     assert.deepEqual(s.events.filter((e) => e.kind === EVENT.hit).map((e) => [e.ship, e.by]), [[1, 0]]);
     return PINNACE - s.ships[1].hull;
   };
-  // A shot flies the chord, a hair short of the arc between the hulls.
   const at = (d: number): number => LIGHT.damage[2] * (1 - (LIGHT.falloff * 2 * R * dsin(d / (2 * R))) / LIGHT.range);
   near(hit(5, 0), at(5), 1e-6);
   near(hit(20, 0), at(20), 1e-6);
@@ -154,7 +141,7 @@ test('a ram holes the rammed hull by the closing speed, and the rammer takes a l
     return [PINNACE - s.ships[1].hull, PINNACE - s.ships[0].hull];
   };
   const [slow, slowBack] = ram(2), [fast, fastBack] = ram(4);
-  near(slow, RAM.damage * (2 - RAM.speed), 1e-4); // closing along a contact normal bent by the curve
+  near(slow, RAM.damage * (2 - RAM.speed), 1e-4);
   near(fast, RAM.damage * (4 - RAM.speed), 1e-4);
   near(slowBack, slow * RAM.recoil, 1e-6);
   near(fastBack, fast * RAM.recoil, 1e-6);
@@ -284,7 +271,6 @@ test('an aimed fitting aims itself at the nearest rival in sight with a tap, and
   near(apart(out, s.ships[0].pos), 30, 0.5);
 });
 
-/** All ten ships broken off where they ride abreast, sailing on: each within a rival's broadside. */
 function melee(): MatchState {
   const s = createMatch({ seed: SEED });
   for (const ship of s.ships) ship.phase = PHASE.sailing;

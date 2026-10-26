@@ -1,7 +1,3 @@
-// The harness itself: the game loads on each device with WebGL on the GPU, the safe areas and touch emulation
-// reach the page, gestures arrive as real multi-touch, screenshots come out at device resolution, and the console
-// stays clean. Screenshots go to $SHOTS (default: a temp dir).
-//   node --test tests/harness.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
@@ -25,7 +21,7 @@ test('the harness drives the game on every device', async (t) => {
       const game = await openGame(browser, server.url, { device: name, query: { seed: 1 } });
       const { device, page } = game;
       await page.waitForFunction(() => document.querySelector('canvas'), null, { timeout: 120_000 });
-      await page.evaluate(() => new Promise((done) => setTimeout(done, 3000))); // let a few frames render
+      await page.evaluate(() => new Promise((done) => setTimeout(done, 3000)));
 
       const env = await page.evaluate(() => {
         const probe = document.createElement('div');
@@ -46,7 +42,6 @@ test('the harness drives the game on every device', async (t) => {
       assert.deepEqual(env.size, [device.width, device.height, device.dpr], 'viewport and pixel ratio');
       assert.ok(env.touch && env.landscape, 'a landscape touch screen');
 
-      // Every gesture arrives as touch events, the pinch with two fingers down at once.
       await page.evaluate(() => {
         const seen = ((window as any).__touches = { start: 0, move: 0, end: 0, most: 0 });
         for (const type of ['touchstart', 'touchmove', 'touchend'] as const) {
@@ -59,7 +54,7 @@ test('the harness drives the game on every device', async (t) => {
       const mid = { x: device.width / 2, y: device.height / 2 };
       await game.tap(mid);
       await game.drag({ x: 120, y: mid.y }, { x: 120, y: mid.y - 80 });
-      await game.touch([{ id: 1, x: 100, y: mid.y }]); // a thumb on the stick while the other hand pinches
+      await game.touch([{ id: 1, x: 100, y: mid.y }]);
       await game.pinch(mid, 300, 120);
       await game.touch([]);
       const seen = await page.evaluate(() => (window as any).__touches);

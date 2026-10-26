@@ -1,16 +1,3 @@
-// The Weeping Isle, WP16 part E. One towering cloud-forest mountain, cascades falling into the sea all round it: the
-// largest island in the world, whose enclosure doubles a territory's income. The WP15 terrain gives a dome girt by a
-// continuous 18 u cliff (S-004: it read as a drum); this package breaks that drum. Every sim cascade and some forty
-// weeping streaks leave the rim in free-fall arcs (fjords.ts's fall kit: lead-white strands on a verdigris body,
-// rivers draped upstream of the great ones), so the wall reads as a weeping face all the way round; rock buttresses
-// stand out of the band between the falls (strata ledges stepping in and out, fissures, moss on every shelf, weed and
-// wet rock at their feet), some rising above the rim as crags, some stepping down as benches, so the skyline is
-// ragged; the summit is a spire with four shoulder peaks and pinnacles along both ridges, standing out of a cloud cap
-// over a girdle of cloud at the forest's height (veils of paper left unpainted, thickest at dawn and in rain); talus
-// fans under the cliffs, hanging gardens of moss and fern on the faces, tree ferns in the hollows and by the falls
-// (flora plants the cloud forest itself); surf lines along the cliff foot, broken foam rings at every plunge pool
-// and the guard rocks' stacks, milky fresh-water plumes fanning out from the great falls. Nothing stands where the
-// sim lets a hull pass (tested). Hooks: roosts and pools (WP23), voices (WP28), wet (WP21's weather).
 import * as THREE from 'three';
 import { illustratedMaterial, inkMaterial, linearVec, transmittanceVec, type Style } from '../../style/glsl.ts';
 import { PIGMENTS } from '../../style/palette.ts';
@@ -27,8 +14,6 @@ import { chartDir, Draw, Kit, lift, pose, regionSeen, seeded, vec, washOf, type 
 const RI = REGIONS.findIndex((r) => r.id === 'weepingIsle');
 const REGION = REGIONS[RI];
 const TAU = 2 * Math.PI;
-/** Streaks beside the sim's cascades; spire height over the summit (u); buttress slots round the rim; caps on the
- *  dressing; cloud puffs in the girdle and the summit cap. */
 export const WEEP = { near: 80, streaks: 40, spire: 22, buttresses: 32, boulders: 460, clumps: 900, ferns: 380, girdle: 56, cap: 12 } as const;
 
 const W = {
@@ -42,10 +27,8 @@ const S: Surface = { height: 0, normal: vec(), up: 1, ground: 0, region: 0 };
 const at = (x: number, y: number): V => chartDir(RI, x, y);
 const groundOf = (field: TerrainField, p: V): number => field.surface(p, -10, S).height;
 const angDiff = (a: number, b: number): number => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-/** Harbour and lights the dressing keeps clear of (chart x, y, radius). */
 const KEEP_CLEAR = [[-33, -31, 10], [41, 39, 6], [-46, -31, 6]] as const;
 const clear = (x: number, y: number, d: number): boolean => KEEP_CLEAR.every(([cx, cy, cr]) => Math.hypot(x - cx, y - cy) > cr + d);
-/** The guard rocks round the loop (regions.ts strokes). */
 const GUARDS = [[52, -28], [-54, 20], [6, 56]] as const;
 const PRINT = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]] as const;
 const T1 = vec(), T2 = vec(), T3 = vec(), FWD = vec(0, 1, 0);
@@ -56,7 +39,6 @@ const ringAt = (k: number, y: (j: number) => number, r: (j: number) => number): 
     return vec(r(j) * Math.cos(a), y(j), r(j) * Math.sin(a));
   });
 
-/** A kit-local part painted by `pick`, each facet's normal turned outward from (0, mid, 0). */
 function localKit(mid: number, pick: (n: V, c: V) => Wash): Kit {
   return new Kit((c, n) => pick(T2.copy(n).multiplyScalar(n.dot(T3.set(c.x, c.y - mid, c.z)) < 0 ? -1 : 1), c));
 }
@@ -68,7 +50,6 @@ function boulderKit(seed: number): THREE.BufferGeometry {
   return kit.build();
 }
 
-/** A hanging garden's pad of moss and fern, its top toward +y (the face's normal). */
 function clumpKit(): THREE.BufferGeometry {
   const rng = seeded(612), k = 5, j1 = Array.from({ length: 2 * k }, () => 0.7 + 0.6 * rng());
   const kit = localKit(0.15, (n) => (n.y > 0.5 ? W.moss : W.frond));
@@ -76,7 +57,6 @@ function clumpKit(): THREE.BufferGeometry {
   return kit.build();
 }
 
-/** A tree fern: a slim dark trunk under seven arching fronds. */
 function fernKit(): THREE.BufferGeometry {
   const H = 2.2, kit = new Kit((c) => (c.y < H - 0.3 ? W.trunk : c.y > H + 0.22 ? W.fern : W.frond));
   kit.loft([ringAt(3, () => -0.3, () => 0.14), ringAt(3, () => H, () => 0.09)]);
@@ -94,13 +74,11 @@ function flatKit(w: Wash, lay: (k: Kit) => void): THREE.BufferGeometry {
   lay(kit);
   return kit.build();
 }
-/** A surf dash along the shore (x along it). */
 const dashKit = () => flatKit(W.foam, (k) => {
   const a = vec(-1, 0, 0), b = vec(0, 0, -0.22), c = vec(1, 0, 0), d = vec(0.1, 0, 0.18);
   k.tri(a, b, c);
   k.tri(a, c, d);
 });
-/** A broken foam ring (radius 1). */
 const ringKit = () => flatKit(W.foam, (k) => {
   const rng = seeded(77), n = 14, o = Array.from({ length: n }, (_, j) => {
     const a = (j / n) * TAU, r = 1 + 0.2 * (rng() - 0.5);
@@ -113,7 +91,6 @@ const ringKit = () => flatKit(W.foam, (k) => {
     k.tri(b1, a2, b2);
   }
 });
-/** A milky fresh-water plume fanning out along +z. */
 const plumeKit = () => flatKit(W.plume, (k) => {
   const s = [[0, 0], [0.35, 0.8], [0.8, 2], [0.5, 3], [0, 3.3], [-0.5, 3], [-0.8, 2], [-0.35, 0.8]].map(([x, z]) => vec(x, 0, z)), c = vec(0, 0, 1.6);
   for (let i = 0; i < s.length; i++) k.tri(c, s[i], s[(i + 1) % s.length]);
@@ -131,7 +108,6 @@ export interface WeepingPlan {
 }
 interface Coast { shore: number; top: number; topH: number; sea: number }
 
-/** Along compass bearing b from the island's heart: its outer shore (r, chart u), the rim above it and the water. */
 function coastAlong(gp: (r: number, b: number) => number, b: number): Coast | null {
   let r = 76;
   for (; r > 18; r -= 0.5) {
@@ -139,7 +115,7 @@ function coastAlong(gp: (r: number, b: number) => number, b: number): Coast | nu
     let peak = 0;
     for (let d = 0; d <= 10; d++) peak = Math.max(peak, gp(r - d, b));
     if (peak >= 8) break;
-    while (r > 18 && gp(r, b) > 0.8) r -= 0.5; // an outlying rock: march past it
+    while (r > 18 && gp(r, b) > 0.8) r -= 0.5;
   }
   if (r <= 18) return null;
   let top = r, topH = gp(r, b);
@@ -168,7 +144,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
   const N = 720, coasts = Array.from({ length: N }, (_, i) => coastAlong(gp, (i / N) * TAU));
   const coastAt = (b: number) => coasts[((Math.round((b / TAU) * N) % N) + N) % N];
 
-  // the falls: the sim's cascades first, then streaks down the rest of the rim (clear of the buttresses)
   const falls: Fall[] = [];
   const lay = (site: V, f: V, width: number, seed: number, b: number, sim: boolean): boolean => {
     const arc = arcOf(field, site, f, width);
@@ -177,7 +152,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     falls.push({ lip: toward(site, f, s, arc[0].d, 0), foot: toward(site, f, s, foot.d + 0.4, 0), f, rows: fallRows(field, site, f, width, arc, sim ? 4 : 0), width, seed, bearing: b, sim });
     return true;
   };
-  /** A fall on bearing b0: at the sim's own site if it has one, else down the rim (great falls swung up to 4° or narrowed to find a drop). */
   const tryFall = (b0: number, sim: boolean, given?: { site: V; f: V }): boolean => {
     const width = sim ? 1.5 + 0.9 * rng() : 0.28 + 0.4 * rng(), seed = rng();
     if (given && lay(given.site, given.f, width, seed, b0, sim)) return true;
@@ -201,13 +175,12 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     tryFall(b, true, near && near.site.angleTo(probe) * R < 12 ? near : undefined);
   }
 
-  // the rock: one merged kit, every facet painted by its height (strata), tilt (moss shelves) and chance (fissures)
   const crags: Crag[] = [];
   let mid = vec();
   const rockKit = new Kit((c, n) => {
     const up = T1.copy(c).normalize(), h = c.length() - R, tip = (n.dot(T2.copy(c).sub(mid)) < 0 ? -1 : 1) * n.dot(up);
     if (h < 0.9) return tip > 0.4 ? W.weed : W.wet;
-    if (h > 14 && tip > 0.35) return rng() < 0.55 ? W.moss : rng() < 0.8 ? W.fern : W.rock; // the cloud forest's mossy flanks
+    if (h > 14 && tip > 0.35) return rng() < 0.55 ? W.moss : rng() < 0.8 ? W.fern : W.rock;
     if (tip > 0.6) return rng() < 0.75 ? W.moss : W.rock;
     if (rng() < 0.08) return W.fissure;
     return Math.floor(h / 1.3 + 0.4 * Math.sin(c.x * 0.7 + c.z * 0.5)) % 2 ? W.rock : W.dark;
@@ -219,7 +192,7 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     let ground = Infinity;
     for (const [u, w] of PRINT) {
       const p = foot.clone().multiplyScalar(R).addScaledVector(s, u * radius * sx).addScaledVector(f, w * radius * sz).normalize();
-      if (heightAt(geo, p) < -DRAFT + 0.1) return null; // a rock the sim does not know would stand in a hull's water
+      if (heightAt(geo, p) < -DRAFT + 0.1) return null;
       footprint.push(p);
       ground = Math.min(ground, groundOf(field, p));
     }
@@ -237,13 +210,11 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     crags.push(c);
     return c;
   };
-  // the summit: a spire over its shoulders, pinnacles along both ridges, crags on the upper slopes
   let sx0 = 0, sy0 = 0, sh = -1;
   for (let x = -14; x <= 14; x += 2) for (let y = -14; y <= 14; y += 2) {
     const h = g(x, y);
     if (h > sh) [sh, sx0, sy0] = [h, x, y];
   }
-  // the mountain itself: a cloud-forest massif heaved up off the plateau along its ridges, the spire and shoulders on it
   raise(sx0, sy0, 'peak', sh + 12, 17, { k: 14, sx: 0.85, sz: 1.2, taper: 0.78, b: Math.PI / 2 });
   raise(sx0, sy0, 'spire', sh + WEEP.spire, 7.5, { k: 9, taper: 0.86 });
   for (const [dx, dy, dh, r] of [[6, 3, 10, 4], [-5, 4, 8, 3.4], [2, -7, 11, 4.2], [-7, -4, 6, 3]]) raise(sx0 + dx, sy0 + dy, 'peak', g(sx0 + dx, sy0 + dy) + dh, r, { k: 8, taper: 0.8 });
@@ -259,7 +230,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     if (S.height < 10 || S.up > 0.88 || falls.some((f) => f.lip.angleTo(p) * R < 8)) continue;
     if (raise(x, y, 'crag', S.height + 2 + 3 * rng(), 1.2 + 1.5 * rng(), { k: 6, taper: 0.6, lean: (rng() - 0.5) * 0.3 })) n++;
   }
-  // buttresses out of the cliff band between the great falls: some crags above the rim, some benches below it
   const butt: { b: number; half: number }[] = [];
   for (let k = 0; k < WEEP.buttresses; k++) {
     const b = ((k + 0.25 + 0.5 * rng()) / WEEP.buttresses) * TAU, c = coastAt(b);
@@ -281,7 +251,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     if (simB.some((s) => Math.abs(angDiff(b, s)) < 0.08) || butt.some((x) => Math.abs(angDiff(b, x.b)) < x.half + 0.02)) continue;
     if (tryFall(b, false)) made++;
   }
-  // the guard rocks: a leaning stack and its broken teeth on each
   for (const [x, y] of GUARDS) {
     raise(x, y, 'stack', g(x, y) + 5 + 4 * rng(), 1.7, { k: 6, taper: 0.55, lean: (rng() - 0.5) * 0.25 });
     for (let i = 0; i < 3; i++) {
@@ -290,7 +259,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     }
   }
 
-  // talus under the cliffs, hanging gardens on the faces, tree ferns in the hollows and by the falls
   const spot = (p: V, h: number, up: V, yaw: number, tilt: number, sc: number, sink: number): Spot => {
     const u = up.clone().normalize();
     return { m: pose(new THREE.Matrix4(), lift(p, h - sink), u, u.dot(p) > 0.9 ? FWD : p, yaw, tilt, sc), at: lift(p, h), ground: h };
@@ -316,7 +284,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     }
   }
 
-  // the water: surf along the cliff foot, foam rings at the plunge pools and guard rocks, plumes off the great falls
   const dashes: Afloat[] = [], rings: Afloat[] = [], plumes: Afloat[] = [];
   for (let i = 0; i < N; i++) {
     const b = (i / N) * TAU, c = coasts[i];
@@ -334,7 +301,6 @@ export function planWeeping(field: TerrainField): WeepingPlan {
     plumes.push({ dir: f.foot, f: f.f, yaw: (rng() - 0.5) * 0.4, sx: 0.8 + 0.6 * f.width, sz: f.sim ? 1.6 + 1.2 * rng() : 0.6 });
   }
 
-  // veils: spray at every foot, a girdle of cloud at the forest's height, a cap the spire stands out of
   const puffs: Puff[] = [];
   for (const f of falls) {
     if (!f.sim) puffs.push({ p: lift(f.foot, 0.6), w: 0.6 + 1.2 * f.width, h: 0.6 + f.width, seed: rng(), spray: 1 });
@@ -361,13 +327,9 @@ export function planWeeping(field: TerrainField): WeepingPlan {
 export class WeepingIsle {
   readonly group = new THREE.Group();
   readonly plan: WeepingPlan;
-  /** WP23: where the island's birds roost and wheel (world points): the great falls' lips, the spire, the stacks. */
   readonly roosts: readonly V[];
-  /** WP23: the plunge pools at the great falls' feet (unit directions). */
   readonly pools: readonly V[];
-  /** WP28: every fall's roar, at its foot (world point), loudness 0–1 by width. */
   readonly voices: readonly { readonly at: V; readonly loud: number }[];
-  /** WP21: 0 dry … 1 a squall (the cloud thickens, comes down the mountain). */
   wet = 0;
   private readonly style: Style;
   private readonly swell: Swell;
@@ -375,7 +337,6 @@ export class WeepingIsle {
   private readonly materials: THREE.Material[];
   private readonly draws: Draw[];
   private readonly afloats: [Draw, Afloat[]][];
-  /** The dressing drawn only within WEEP.near of the eye (beyond it, below the ink's grain and the budget's). */
   private readonly near: [Draw, Spot[]][];
   private readonly seen = vec(1e9, 0, 0);
   private readonly fixed: number;
@@ -409,7 +370,6 @@ export class WeepingIsle {
     this.materials = [stone, water, veil];
   }
 
-  /** Shown when the region can be in view; the cloud thickest at dawn, by night and in rain; foam at the tide. */
   update(eye: V): void {
     this.group.visible = regionSeen(RI, eye, 90);
     if (!this.group.visible) return;
@@ -446,7 +406,6 @@ export class WeepingIsle {
   }
 }
 
-/** The composition root's Weeping Isle (MODULES). */
 export function createWeepingIsle(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sea || !terrain) throw new Error('createWeepingIsle: the sea and terrain are built first (MODULES order)');

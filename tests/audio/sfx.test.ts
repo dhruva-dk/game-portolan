@@ -1,6 +1,3 @@
-// WP28: the sound bank offline, in Node: every sound and variant renders finite, audible, under full scale, inside a
-// loudness band and of a sane length; renders are deterministic and variants differ; beds loop seamlessly; one-shots end
-// without a click; the chord and the chest shimmer grow with the claim and the tier; the bank's synthesis cost is bounded.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { measure, render, SOUND_NAMES, SOUNDS } from '../../src/audio/sfx.ts';

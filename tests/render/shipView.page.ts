@@ -1,13 +1,3 @@
-// The ships-alive test page (tests/render/shipView.html, outside the game build): the game's own render path (WorldView,
-// so the Fleet module draws the ships) over a real match whose ten ships are posed by hand in open water round the
-// player's start, sailing on every heading in the sim's wind and moved along it frame by frame, ?scene=
-//   deck     clear morning, the eye at deck height astern of the fleet      chart    the same from high above
-//   storm    a squall laid over the fleet, canvas reefed                       night    the same fleet at 22:30, lanterns lit
-//   damaged  hulls from whole to all but gone, three ablaze, two in chain-shot rags, the leader's gold pennant
-//   hero     WP19 part B: one galleon alone in open water, the fleet afar; __ships.pose(name) sets her up and frames her
-//            close: each point of sail (close, reach, run, irons), fittings (fit-a…e), damage (dmg-0…3, dmg-patched), the
-//            sinking (sink-0…4, in order, last)
-// window.__ships: ready, scene, stats() → draw calls and triangles of the frame and the ships' share of them.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { fleets } from '../../src/render/ships/shipView.ts';
@@ -97,7 +87,6 @@ const hook = {
     return out;
   },
 };
-// hero close-ups (WP19 part B)
 const hero = state.ships[2], wind = newWind(), waters = seaFor(W, state.seed), wv = V();
 const POINTS: Record<string, number> = { close: Math.PI - 0.85, reach: -Math.PI / 2, run: 0.15, irons: Math.PI };
 const F = FITTING, FITS: Record<string, number[]> = {
@@ -114,7 +103,6 @@ const follow = () => {
   const v = fleet.views[2];
   if (!v) return;
   const up = v.up, fwd = v.forward, port = V().crossVectors(up, fwd), H = v.ship.height, L = v.length;
-  // from leeward, to see the canvas belly; a sinking ship from her high side, clear of the rig as she lies over (heel + to starboard)
   const lee = sunkAt >= 0 ? (v.heel < 0 ? -1 : 1) : port.dot(wv) > 0 ? 1 : -1;
   const tan = Math.tan((camera.fov * Math.PI) / 360), dist = near * Math.max((0.62 * H) / tan, (0.7 * L) / (tan * camera.aspect));
   const base = v.at.clone().multiplyScalar(R);

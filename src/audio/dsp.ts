@@ -1,14 +1,7 @@
-// WP28: sample-level synthesis for the sound bank. Seeded noise, RBJ biquads, modal resonators, envelopes, FM and
-// plucked strings on Float32Arrays at the bank rate SR. Pure and deterministic: the same seed gives the same samples in
-// Node and in every browser, so the offline tests hear exactly what the game plays. Adapted from the legacy offline bank
-// (git show 6ce29f2:src/audio.ts: pink/brown noise, resonators, scatter) and extended.
-
-/** The bank's sample rate; the context resamples on playback. */
 export const SR = 32000;
 export type Buf = Float32Array;
 export type Rng = () => number;
 
-/** mulberry32: a small seeded generator, [0, 1). */
 export function rng(seed: number): Rng {
   let a = seed >>> 0 || 0x9e3779b9;
   return () => {
@@ -20,7 +13,6 @@ export function rng(seed: number): Rng {
   };
 }
 
-/** A stable 32-bit hash of a name, for per-sound seeds. */
 export function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
@@ -38,7 +30,6 @@ export function white(n: number, r: Rng): Buf {
   return x;
 }
 
-/** Pink noise (Paul Kellet's filter), about unit peak. */
 export function pink(n: number, r: Rng): Buf {
   const x = new Float32Array(n);
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
@@ -52,7 +43,6 @@ export function pink(n: number, r: Rng): Buf {
   return x;
 }
 
-/** Brown (red) noise: leaky integrated white. */
 export function brown(n: number, r: Rng): Buf {
   const x = new Float32Array(n);
   let y = 0;
@@ -65,7 +55,6 @@ export function brown(n: number, r: Rng): Buf {
 
 export type FilterType = 'lp' | 'hp' | 'bp' | 'peak' | 'notch';
 
-/** An RBJ cookbook biquad, direct form I. */
 export class Biquad {
   private b0 = 1; private b1 = 0; private b2 = 0; private a1 = 0; private a2 = 0;
   private x1 = 0; private x2 = 0; private y1 = 0; private y2 = 0;
@@ -87,14 +76,12 @@ export class Biquad {
   }
 }
 
-/** Filter x in place. */
 export function filter(x: Buf, type: FilterType, f: number, q = 0.707, db = 0): Buf {
   const b = new Biquad().set(type, f, q, db);
   for (let i = 0; i < x.length; i++) x[i] = b.tick(x[i]);
   return x;
 }
 
-/** Filter x in place with a cutoff that moves: f(t) for t the fraction 0…1 through x, re-tuned every 32 samples. */
 export function sweep(x: Buf, type: FilterType, f: (t: number) => number, q = 0.707): Buf {
   const b = new Biquad(), n = x.length;
   for (let i = 0; i < n; i++) {
@@ -104,12 +91,9 @@ export function sweep(x: Buf, type: FilterType, f: (t: number) => number, q = 0.
   return x;
 }
 
-/** Attack-decay: a linear rise over a s, then an exponential fall with time constant d s. */
 export const ad = (t: number, a: number, d: number): number => (t < 0 ? 0 : t < a ? t / a : Math.exp(-(t - a) / d));
-/** A smooth hump over 0…1. */
 export const hump = (t: number, p = 1): number => Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, t)))), p);
 
-/** Multiply x by env(t seconds) in place. */
 export function shape(x: Buf, env: (t: number) => number): Buf {
   for (let i = 0; i < x.length; i++) x[i] *= env(i / SR);
   return x;
@@ -117,7 +101,6 @@ export function shape(x: Buf, env: (t: number) => number): Buf {
 
 export interface Mode { f: number; d: number; g: number }
 
-/** A bank of two-pole resonators excited by x: each rings at f with time constant d and impulse amplitude g. */
 export function modes(x: Buf, ms: readonly Mode[], n = x.length): Buf {
   const out = new Float32Array(n);
   for (const m of ms) {
@@ -134,7 +117,6 @@ export function modes(x: Buf, ms: readonly Mode[], n = x.length): Buf {
   return out;
 }
 
-/** A sine whose frequency f(t) and amplitude a(t) follow time in seconds. */
 export function tone(n: number, f: (t: number) => number, a: (t: number) => number, phase = 0): Buf {
   const x = new Float32Array(n);
   let p = phase;
@@ -146,7 +128,6 @@ export function tone(n: number, f: (t: number) => number, a: (t: number) => numb
   return x;
 }
 
-/** Two-operator FM: carrier fc(t), modulator at ratio·fc, index k(t), amplitude a(t). */
 export function fm(n: number, fc: (t: number) => number, ratio: number, k: (t: number) => number, a: (t: number) => number): Buf {
   const x = new Float32Array(n);
   let pc = 0, pm = 0;
@@ -159,7 +140,6 @@ export function fm(n: number, fc: (t: number) => number, ratio: number, k: (t: n
   return x;
 }
 
-/** A plucked string (Karplus-Strong with a fractional delay): f Hz, brightness 0…1, loss per period. */
 export function pluck(n: number, f: number, r: Rng, bright = 0.5, loss = 0.996): Buf {
   const P = Math.max(2, SR / f - 0.5), L = Math.ceil(P) + 2, line = new Float32Array(L), x = new Float32Array(n);
   const lp = new Biquad().set('lp', 800 + bright * 9000, 0.7);
@@ -176,7 +156,6 @@ export function pluck(n: number, f: number, r: Rng, bright = 0.5, loss = 0.996):
   return x;
 }
 
-/** Add x·g into `into` starting at `at` seconds (clipped to its end). */
 export function mix(into: Buf, x: Buf, at = 0, g = 1): Buf {
   const o = Math.round(at * SR);
   for (let i = 0, n = Math.min(x.length, into.length - o); i < n; i++) if (o + i >= 0) into[o + i] += x[i] * g;
@@ -194,13 +173,11 @@ export function peak(x: Buf): number {
   return p;
 }
 
-/** Scale x so its peak is `to` (silence stays silent). */
 export function normalize(x: Buf, to: number): Buf {
   const p = peak(x);
   return p > 1e-9 ? scale(x, to / p) : x;
 }
 
-/** Fade in over a s and out over b s, in place. */
 export function fade(x: Buf, a: number, b: number): Buf {
   const na = samples(a), nb = samples(b), n = x.length;
   for (let i = 0; i < Math.min(na, n); i++) x[i] *= i / na;
@@ -214,7 +191,6 @@ export function softclip(x: Buf, drive: number): Buf {
   return x;
 }
 
-/** A seamless loop: the last xf seconds crossfaded (equal power) into the head; the result is xf shorter. */
 export function loopify(x: Buf, xf: number): Buf {
   const m = samples(xf), n = x.length - m, out = x.slice(0, n);
   for (let i = 0; i < m; i++) {
@@ -224,7 +200,6 @@ export function loopify(x: Buf, xf: number): Buf {
   return out;
 }
 
-/** Call grain(atSeconds) at a Poisson-ish rate of perSecond over [from, to) seconds. */
 export function scatter(r: Rng, from: number, to: number, perSecond: number, grain: (at: number) => void): void {
   let t = from;
   for (;;) {
@@ -234,7 +209,6 @@ export function scatter(r: Rng, from: number, to: number, perSecond: number, gra
   }
 }
 
-/** Short-term loudness proxy, dBFS: the loudest 0.4 s RMS window (0.1 s hops) of the channels. */
 export function loudness(chs: readonly Buf[]): number {
   const w = samples(0.4), hop = samples(0.1), n = chs[0].length;
   let best = 0;

@@ -1,14 +1,10 @@
-// Captures WP19's ships alive over a real match (tests/render/shipView.html) on both devices: the fleet on every heading
-// at deck and chart distance, in a squall, at night with lanterns lit, and battered (wp19-<scene>-<device>.png, contact
-// sheets wp19-sheet-<device>.png). Logs draw calls and triangles per scene and the ships' share.
-//   node tests/render/shipView.shots.ts [outDir] [--only=<scene>] [--device=ipad|iphone]     (default outDir: progress/shots)
 import { basename, join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const SCENES = ['deck', 'chart', 'storm', 'night', 'damaged'].filter((s) => !only || s === only);
 const devices = (args.find((a) => a.startsWith('--device='))?.slice(9) ?? 'ipad,iphone').split(',') as DeviceName[];

@@ -1,13 +1,9 @@
-// Captures the shipwright's sheets (tests/pages/ships.html) at both devices: the turntable of the four forms in three
-// captains' pigments at hero and far detail (and by night), the 31 emblems flat and on the fleet's mainsails, the chart
-// silhouettes, ten ships under fleetLods, the sail states, a hero view of each form and two sterns close (frames at CSS resolution).
-//   node tests/pages/ships.shots.ts [outDir] [--only=<substring>]     (default outDir: progress/shots, files wp18-*)
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const SHOTS: { name: string; query: Record<string, string> }[] = [
   { name: 'turntable', query: { view: 'turntable' } },

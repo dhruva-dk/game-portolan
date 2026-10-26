@@ -1,14 +1,10 @@
-// The shipwright's mesh builder and the frames it sets parts in, shared by the hull, the spars and the carver.
 import * as THREE from 'three';
 import type { Sink } from '../craft.ts';
 
-/** Material zones of the wood mesh. HULL is planking below the paint line and the captain's primary above it. */
 export const ZONE = { HULL: 0, PAINT: 1, TRIM: 2, TAR: 3, DECK: 4, SPAR: 5, IRON: 6, DARK: 7, GLASS: 8, GILT: 9 } as const;
 
-/** Where carved ornament goes: centre, outward normal (forward, for the stem and the beak), up, size. */
 export interface OrnamentPanel { kind: 'transom' | 'quarter' | 'taffrail' | 'beak' | 'stem'; centre: THREE.Vector3; normal: THREE.Vector3; up: THREE.Vector3; width: number; height: number }
 
-/** Accumulates the wood mesh: position, normal, uv (hatch coordinates: across, along the grain), aInfo (zone, bone). */
 export class ShipMesher implements Sink {
   zone: number = ZONE.HULL;
   bone = 0;
@@ -24,7 +20,6 @@ export class ShipMesher implements Sink {
   private readonly n = new THREE.Vector3();
 
   get count(): number { return this.pos.length / 3; }
-  /** Indices so far (three per triangle). */
   get triangles(): number { return this.idx.length; }
 
   vert(p: THREE.Vector3, n: THREE.Vector3, s: number, t: number): number {
@@ -39,7 +34,6 @@ export class ShipMesher implements Sink {
   tri(a: number, b: number, c: number): void {
     this.idx.push(a, b, c);
   }
-  /** Mirrors vertices from v0 and triangles from i0 onward to the starboard side. */
   mirror(v0: number, i0: number): void {
     const n = this.count, off = n - v0;
     for (let v = v0; v < n; v++) {
@@ -63,7 +57,6 @@ export class ShipMesher implements Sink {
 
 export const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 export const range = (n: number, a = 0, b = 1) => Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n);
-/** A frame at p whose +y is `up` and +z faces `normal` (for boxes and lathes set on the hull). */
 export const frame = (p: THREE.Vector3, normal: THREE.Vector3, up = V(0, 1, 0)) => {
   const z = normal.clone().normalize(), x = new THREE.Vector3().crossVectors(up, z).normalize(), y = new THREE.Vector3().crossVectors(z, x);
   return new THREE.Matrix4().makeBasis(x, y, z).setPosition(p);

@@ -1,14 +1,3 @@
-// The style gallery: a test page outside the game build (tests/pages/style.html), where the style module and the
-// ink pipeline are judged before any game scene exists. A stretch of the real-sized planet (R = 200) round an island
-// at the north pole, primitive solids in the illuminator's pigments on the sea before it, a row of cones running
-// over the curve to show lines fading with distance, gold leaf, and the interface primitives over it all.
-//
-//   ?hour=17.5            hour of the day (palette and sun)
-//   ?view=deck|high|orbit camera preset
-//   ?ui=0                 hide the interface
-//   ?dynamic=1            let the render scale float (default: pinned at 1 for captures)
-//
-// window.__style drives it from tests/style/gallery.test.ts and tests/pages/style.shots.ts.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { STYLE_GLSL, illustratedMaterial, inkMaterial, linearVec, transmittanceVec } from '../../src/style/glsl.ts';
@@ -26,31 +15,26 @@ if (params.get('dynamic') !== '1') pipeline.pinScale(1);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.3, 3000);
 
-/** The point on the sea at tangent-plane offset (x, z) from the island, and its up direction. */
 function surface(x: number, z: number, height = 0): { at: THREE.Vector3; up: THREE.Vector3 } {
   const up = new THREE.Vector3(x, R, z).normalize();
   return { at: up.clone().multiplyScalar(R + height), up };
 }
 
-// ---- the planet's sea: depth washes from the island's shallows to the deep, and portolan coast rings ----------
-const SEA_FRAG = /* glsl */ `
+const SEA_FRAG =  `
 in vec3 vWorld;
 uniform vec3 uIsland;
 uniform vec3 uLagoonT, uShallowT, uShelfT, uDeepT;
-uniform vec4 uDensity; // the SEA_WASHES densities, lagoon to deep
+uniform vec4 uDensity;
 void main() {
   vec3 up = normalize(vWorld);
   Paper q = paperAt(vWorld, up, 1.0);
-  float dist = acos(clamp(dot(up, uIsland), -1.0, 1.0)) * ${R.toFixed(1)}; // from the island's centre, world units
+  float dist = acos(clamp(dot(up, uIsland), -1.0, 1.0)) * ${R.toFixed(1)};
   vec3 col = parchment(q);
-  // the deep and the shelf bleed softly into one another; the shallows were laid after, with a frilled edge where
-  // their pigment dried into a darker ring
   float shelf = 1.0 - smoothstep(30.0, 70.0, dist), e = dist + (q.bloom - 0.5) * 5.0;
   float shallow = 1.0 - smoothstep(27.0, 28.2, e), dried = smoothstep(23.5, 28.0, e) * shallow;
   col = glaze(col, uDeepT, (1.0 - shelf) * uDensity.w, 0.0, q);
   col = glaze(col, uShelfT, shelf * (1.0 - shallow) * uDensity.z, 0.0, q);
   col = glaze(col, uShallowT, shallow * uDensity.y, dried * 0.9, q);
-  // coast rings: fine parallel lines spreading out from the shore, fainter as they go
   float ring = (dist - 21.0) / 1.5, px = fwidth(ring);
   float line = clamp(0.35 * uRenderPx + 0.5 - abs(fract(ring) - 0.5) / px, 0.0, 1.0) * step(0.5, ring) * (1.0 - smoothstep(0.0, 6.0, ring));
   col = mix(col, uInk, line * 0.55);
@@ -60,7 +44,7 @@ void main() {
 const sea = new THREE.Mesh(
   new THREE.SphereGeometry(R, 720, 360),
   inkMaterial(style, {
-    vertexShader: /* glsl */ `out vec3 vWorld; void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0); }`,
+    vertexShader:  `out vec3 vWorld; void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0); }`,
     fragmentShader: SEA_FRAG,
     inkWeight: 0.7,
     uniforms: {
@@ -77,13 +61,11 @@ const sea = new THREE.Mesh(
 );
 scene.add(sea);
 
-// ---- the island: a terrain-like surface with peaks, cliffs and a shelf, hatched along its contours ------------
 function islandHeight(x: number, z: number): number {
   const r = Math.hypot(x, z), s = (a: number, b: number, t: number) => {
     const u = Math.min(Math.max((t - a) / (b - a), 0), 1);
     return u * u * (3 - 2 * u);
   };
-  // ridged value noise for the rock, on a dome with a western summit and a lower eastern shoulder, falling to a shelf
   const hash = (i: number, j: number) => {
     const h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
     return h - Math.floor(h);
@@ -121,7 +103,6 @@ function islandHeight(x: number, z: number): number {
   scene.add(new THREE.Mesh(g, illustratedMaterial(style, { pigment: hex('#8c7a48'), hatch: { axis: [0, 1, 0] } })));
 }
 
-// ---- primitive solids in the illuminator's pigments -----------------------------------------------------------
 function place(mesh: THREE.Mesh, x: number, z: number, height: number, turn = 0): THREE.Mesh {
   const { at, up } = surface(x, z, height);
   mesh.position.copy(at);
@@ -133,9 +114,6 @@ function place(mesh: THREE.Mesh, x: number, z: number, height: number, turn = 0)
 const solid = (geometry: THREE.BufferGeometry, pigment: RGB, hatch?: Parameters<typeof illustratedMaterial>[1]['hatch'], density = 1) =>
   new THREE.Mesh(geometry, illustratedMaterial(style, { pigment, density, hatch, anchor: 'object' }));
 
-// The deck camera stands at FOOT; things are placed by distance and bearing from it (degrees, + to the right of
-// the view axis AXIS), so the island sits in the right third, sinking below the curve, and a row of cones runs off
-// over the horizon on the left.
 const FOOT = [-22, 46] as const, AXIS = 10.5;
 function bearing(distance: number, degrees: number): [number, number] {
   const t = THREE.MathUtils.degToRad(AXIS + degrees);
@@ -153,8 +131,7 @@ for (const [k, [d, b]] of [[26, -25], [36, -23], [48, -21.5], [62, -20.3], [78, 
   place(solid(new THREE.ConeGeometry(1.5, 4.2, 64, 1), k % 2 ? PIGMENTS.vermilion : PIGMENTS.indigo, undefined, k % 2 ? 1 : 0.6), ...bearing(d, b), 2.1);
 }
 
-// ---- the sky: a wash deepening to the zenith, giving way to bare parchment as the camera leaves the planet ------
-const SKY_FRAG = /* glsl */ `
+const SKY_FRAG =  `
 in vec3 vWorld;
 uniform vec3 uZenith, uHorizon;
 void main() {
@@ -169,15 +146,14 @@ const skyUniforms = { uZenith: { value: new THREE.Vector3() }, uHorizon: { value
 const sky = new THREE.Mesh(
   new THREE.SphereGeometry(2800, 64, 32),
   inkMaterial(style, {
-    vertexShader: /* glsl */ `out vec3 vWorld; void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0); }`,
+    vertexShader:  `out vec3 vWorld; void main() { vWorld = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0); }`,
     fragmentShader: SKY_FRAG, id: 0, side: THREE.BackSide, uniforms: skyUniforms,
   }),
 );
 sky.frustumCulled = false;
 scene.add(sky);
 
-// ---- the interface ----------------------------------------------------------------------------------------------
-const SWATCH_FRAG = /* glsl */ `
+const SWATCH_FRAG =  `
 in vec2 vLocal;
 layout(location = 0) out vec4 outColor;
 uniform vec2 uSize;
@@ -185,7 +161,6 @@ uniform vec3 uTeamLin[10];
 uniform vec3 uTeamT[10];
 uniform vec3 uSeaT;
 void main() {
-  // two rows of five cells: each the team's waters over the sea, and its trail pattern below on bare parchment
   vec2 p = vLocal + uSize * 0.5, cell = uSize / vec2(5.0, 2.0);
   ivec2 c = ivec2(p / cell);
   int k = c.y * 5 + c.x;
@@ -213,7 +188,7 @@ if (params.get('ui') !== '0') {
     new THREE.PlaneGeometry(300, 120),
     new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
-      vertexShader: /* glsl */ `out vec2 vLocal; void main() { vLocal = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      vertexShader:  `out vec2 vLocal; void main() { vLocal = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: STYLE_GLSL + SWATCH_FRAG,
       uniforms: {
         ...style.uniforms,
@@ -234,7 +209,6 @@ if (params.get('ui') !== '0') {
   vignette.set(Math.PI, 0.75);
   ui.push({
     place(w, h, inset) {
-      // the interface keeps its size on the iPad and shrinks to fit the short side of an iPhone
       const k = Math.min(1, h / 720), m = 24 * k;
       for (const o of [hull, card, swatches, ...buttons]) o.scale.setScalar(k);
       hull.position.set(inset.left + m + 115 * k, m + 29 * k, 0);
@@ -250,7 +224,6 @@ if (params.get('ui') !== '0') {
   });
 }
 
-// ---- views, hours, frames -----------------------------------------------------------------------------------------
 const VIEWS = {
   deck: { from: [-22, 46, 4.0], to: [-12.9, -3.2, 1.2], fade: [24, 110] },
   high: { from: [-36, 88, 34], to: [-16, 22, 0], fade: [40, 170] },
@@ -275,7 +248,6 @@ function setView(name: View): void {
   camera.updateMatrixWorld();
 }
 
-/** The sun's direction at an hour, rising in the east (+x) and setting in the west, and the moon by night. */
 function setHour(hour: number): void {
   style.setHour(hour);
   const day = ((hour - 6) / 12) * Math.PI, el = Math.sin(day);
@@ -309,7 +281,6 @@ function frame(): void {
   last = now;
 }
 
-/** Device-pixel position of a world point in the current view, or null when behind the camera. */
 function project(p: THREE.Vector3): [number, number] | null {
   const v = p.clone().project(camera);
   if (v.z > 1) return null;
@@ -317,11 +288,6 @@ function project(p: THREE.Vector3): [number, number] | null {
   return [((v.x + 1) / 2) * innerWidth * s, ((1 - v.y) / 2) * innerHeight * s];
 }
 
-/**
- * Render a frame, then the fine grain at each device-pixel position: the mean luminance of the 3×3 pixels there less
- * that of the 9×9 round it, so broad washes and stains drop out and paper, granulation and strokes remain. NaN where
- * the 9×9 block leaves the frame.
- */
 function probePixels(px: ([number, number] | null)[]): number[] {
   frame();
   const gl = pipeline.renderer.getContext(), block = new Uint8Array(81 * 4);
@@ -356,7 +322,6 @@ Object.assign(window, {
     stats: () => ({ ...pipeline.stats }),
     view: (name: View) => setView(name),
     hour: (h: number) => setHour(h),
-    /** Visible points of the open sea at least minDist from the island, inside the frame's margin. */
     seaPoints(count: number, minDist: number, margin: number): number[][] {
       const out: number[][] = [], ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
       const planet = new THREE.Sphere(new THREE.Vector3(), R), hit = new THREE.Vector3();
@@ -373,7 +338,6 @@ Object.assign(window, {
     probe: (points: number[][]) => probePixels(points.map((p) => project(new THREE.Vector3().fromArray(p)))),
     project: (points: number[][]) => points.map((p) => project(new THREE.Vector3().fromArray(p))),
     probePixels,
-    /** Turn the camera where it stands: yaw about its up and pitch about its right, radians. */
     turn(yaw: number, pitch: number): void {
       camera.rotateOnAxis(new THREE.Vector3(0, 1, 0), yaw);
       camera.rotateOnAxis(new THREE.Vector3(1, 0, 0), pitch);

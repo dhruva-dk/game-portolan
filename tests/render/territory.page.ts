@@ -1,9 +1,3 @@
-// The territory test page (tests/render/territory.html, outside the game build): the game's own render path (WorldView,
-// every registered module) over the real headless match of territory.match.ts. Query: scene=flood|break|storm|
-// patterns|border; at=<tick> the player's big loop closes (from a dry run when absent). window.__territory drives it
-// from territory.shots.ts and territory.test.ts: seek(s) draws s after the last tick, advance(n) plays n ticks,
-// cross() sails a rival across the player's open trail, swallow() lets the storm take a bite of its waters,
-// hour(h) sets the hour, flicker(n, du) measures border stability over a slow camera move.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { seas } from '../../src/render/sea.ts';
@@ -42,14 +36,12 @@ function draw(dt = 0): void {
   view.frame({ state, dt: 0, clock: clock + dt, alpha: 1 });
   pipeline.render(view.scene, camera, 1 / 60);
 }
-/** The camera `alt` u over c, stood back to look down on it. */
 function look(c: THREE.Vector3, alt: number, back = 0.6): void {
   localFrame(c, E, N);
   camera.position.copy(c).multiplyScalar(R + alt).addScaledVector(N, -alt * back);
   camera.up.copy(c);
   camera.lookAt(V().copy(c).multiplyScalar(R));
 }
-/** The centre and reach (u) of the player's open trail, and its middle cell. */
 function measureTrail(): void {
   const laid = state.ships[0].laid;
   centre.set(0, 0, 0);
@@ -62,7 +54,6 @@ function measureTrail(): void {
   }
   cellDir(TERRITORY, laid[laid.length >> 1] ?? 0, mid);
 }
-/** A territory tick outside the sim's step (the rival's crossing, the storm's bite), as the modules will see it. */
 function territoryTick(act: () => void): void {
   state.events.length = 0;
   act();
@@ -72,7 +63,6 @@ function territoryTick(act: () => void): void {
 }
 
 if (scene === 'patterns') {
-  // the ten teams' trails side by side, each a ship sailing straight on in open sea (positions driven, not sailed)
   const base = V(Math.cos(0.32), 0, Math.sin(0.32)).normalize();
   localFrame(base, E, N);
   for (let n = 0; n < 150; n++) {
@@ -120,7 +110,7 @@ const hook = {
   cross() {
     const laid = state.ships[0].laid, c = cellDir(TERRITORY, laid[laid.length >> 1], V());
     const j = Math.max(1, state.ships.findIndex((s, i) => i > 0 && s.phase === PHASE.sailing));
-    state.ships[j].phase = PHASE.sailing; // a rival under sail, whether or not it has broken off yet
+    state.ships[j].phase = PHASE.sailing;
     localFrame(c, E, N);
     territoryTick(() => {
       for (const s of state.ships) s.was = { ...s.pos };
@@ -148,8 +138,6 @@ const hook = {
     draw();
     return hook.stats();
   },
-  /** Pixels the territory darkens (its wash, hatching and inked border) that flip by more than 0.35 in luminance
-   * between frames of a camera sliding du u a frame: their mean and worst share, and how many there are. */
   flicker(n: number, du: number) {
     const gl = pipeline.renderer.getContext(), base = camera.position.clone();
     const grab = (): Float32Array => {

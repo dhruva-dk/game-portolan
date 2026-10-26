@@ -1,8 +1,3 @@
-// WP27 shots page: one sheet drawn full screen on a 2D canvas at the device's size and pixel ratio (results.shots.ts):
-// ?shot=chest|chest-gold|results|results-mid|results-won|chart-0|chart-23|chart-100|lesson-<k>&dev=iphone|ipad; part B:
-// next (the next voyage's nine), skip (the sinking flow's card), chart-geo-<0|23|100> (the world's coasts and sites),
-// unroll-<0|1|2|3> (the chart inking a voyage: start, the seas blooming, the names lettering, done); a `-close` suffix
-// on chest/chest-gold/results sets __wp27.clip to the icons or the tallies for a close-up.
 import { applyResult } from '../../src/career/progress.ts';
 import { toSetup } from '../../src/career/setup.ts';
 import { inkChart as inkVoyage } from '../../src/career/learn.ts';
@@ -46,7 +41,7 @@ if (shot.startsWith('chest')) {
   else ship.offer.push({ kind: FITTING.longGuns, tier: 3 }, { kind: FITTING.copperSheathing, tier: 2 }, { kind: CONSUMABLE.patchKit, tier: 1 });
   const l = chestLayout(view);
   drawChestChoice(g, chestOffers(ship), l, 3, -1, shot === 'chest-gold');
-  if (close) clip = { x: l.sheet.x - 4, y: l.sheet.y - 4, width: l.sheet.width + 8, height: l.sheet.height + 8 }; // the whole panel, its cards uncut
+  if (close) clip = { x: l.sheet.x - 4, y: l.sheet.y - 4, width: l.sheet.width + 8, height: l.sheet.height + 8 };
 } else if (shot === 'skip') {
   sea(g);
   drawSkip(g, skipLayout(view), "Sunk by Lanza's guns", 6, false, 2);
@@ -75,7 +70,6 @@ if (shot.startsWith('chest')) {
   const f = shot.endsWith('-100') ? 1 : shot.endsWith('-23') ? 2 / 3 : 0;
   drawCareerChart(g, inked(f), view.width, view.height, 1, { geo: shot.startsWith('chart-geo') ? buildGeography() : null });
 } else if (shot.startsWith('unroll-')) {
-  // a career a third inked with three seas named, home from a voyage that saw two thirds and entered two seas more
   const before = inked(1 / 3, 3), seen = inked(2 / 3, 5), voyage = newVoyage();
   voyage.seen.set(seen.chart.seen);
   seen.chart.named.forEach((n, r) => { if (n.match >= 0 && before.chart.named[r].match < 0) voyage.entered[r] = 300 + 200 * n.match; });
@@ -88,7 +82,6 @@ if (shot.startsWith('chest')) {
   sea(g);
   drawPrompt(g, promptLayout(view, Number(shot.slice(7))), 3);
 }
-/** A career whose chart is inked to `f`, with `named` regions named (all at f = 1), its rank to match. */
 function inked(f: number, named = f >= 1 ? 99 : 5): Career {
   const c = newCareer(9);
   if (f <= 0) return c;

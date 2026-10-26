@@ -1,13 +1,3 @@
-// WP24: the chart. The globe and the chart are the same world drawn two ways (A8): twelve pentagonal sheets, one per
-// region — the dodecahedron dual to the region icosahedron, so every region sits at the centre of its own sheet and
-// every cut runs through open sea halfway between regions. As z passes orbit the chart globe soaks through the
-// shaded world, each sheet flattens (sphere → gnomonic plane, so the sheets close into a dodecahedron) and the
-// sheets unfold about their hinges along a spanning tree — two flowers of 1 + 5 joined at one edge, the player's
-// region at the centre of the first — coming to rest flat on parchment like printed globe gores. Drawn on them:
-// coastlines in ink with the shore's rings of fine lines, land in an ochre wash, territory washes (WP20's cube),
-// a wind rose at each region with its 32 rhumbs (black winds, green half-winds, red quarter-winds), region names in
-// the generated cancelleresca, and the ships the player can see as small inked silhouettes with short heading
-// arrows. Five draw calls.
 import * as THREE from 'three';
 import type { World } from '../app/worldWorker.ts';
 import { layoutText, rasterizeText } from '../lettering/text.ts';
@@ -31,13 +21,10 @@ const AXIS_N = new THREE.Vector3(0, 1, 0);
 const clamp = (x: number, a: number, b: number) => (x < a ? a : x > b ? b : x);
 const ease = (x: number) => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
 
-/** The dodecahedral net: its sheets, hinges, spanning tree and per-sheet transforms (12 uniforms). */
 export class Net {
   readonly centres: THREE.Vector3[] = [];
-  /** Dodecahedron vertices on the unit sphere (the icosahedron's face centres) and scaled onto the face planes. */
   readonly corners: THREE.Vector3[] = [];
   readonly vertices: THREE.Vector3[] = [];
-  /** Each sheet's five corners, counter-clockwise seen from outside. */
   readonly faces: number[][] = [];
   readonly adj: number[][] = [];
   readonly mats: THREE.Matrix4[] = Array.from({ length: SHEETS }, () => new THREE.Matrix4());
@@ -69,7 +56,6 @@ export class Net {
     this.layout(0);
   }
 
-  /** An in-plane basis (east, north) for sheet k with north as near `hint` as the plane allows. */
   basis(k: number, hint: THREE.Vector3): [THREE.Vector3, THREE.Vector3] {
     const c = this.centres[k], n = hint.clone().addScaledVector(c, -hint.dot(c));
     if (n.lengthSq() < 1e-6) n.copy(this.centres[(k + 1) % SHEETS]).addScaledVector(c, -this.centres[(k + 1) % SHEETS].dot(c));
@@ -86,13 +72,11 @@ export class Net {
     return k;
   }
 
-  /** The two corners sheets i and j share (their hinge), or null. */
   edge(i: number, j: number): [number, number] | null {
     const s = this.faces[i].filter((a) => this.faces[j].includes(a));
     return s.length === 2 ? [s[0], s[1]] : null;
   }
 
-  /** Lays the net out with `root` at the centre of the first flower. */
   layout(root: number): void {
     if (root === this.root) return;
     this.root = root;
@@ -120,7 +104,6 @@ export class Net {
     this.fitKey = '';
   }
 
-  /** Per-sheet transforms at unfold u (0 the closed dodecahedron, 1 flat in the root's plane). */
   pose(u: number, out: THREE.Matrix4[] = this.mats): void {
     const m = new THREE.Matrix4(), t = new THREE.Matrix4();
     for (const k of this.order) {
@@ -131,7 +114,6 @@ export class Net {
     }
   }
 
-  /** Where a sphere direction lies on the net at flatten `flat` with the current pose. */
   toNet(dir: { x: number; y: number; z: number }, flat: number, out: THREE.Vector3): THREE.Vector3 {
     const k = this.sheetOf(dir), c = this.centres[k];
     out.set(dir.x, dir.y, dir.z).normalize();
@@ -139,14 +121,12 @@ export class Net {
     return out.multiplyScalar(R * (1 - flat) + (R / d) * flat).applyMatrix4(this.mats[k]);
   }
 
-  /** Where a sphere direction lies on the flat chart (unfold 1), whatever the pose now. */
   toFlat(dir: { x: number; y: number; z: number }, out: THREE.Vector3): THREE.Vector3 {
     const k = this.sheetOf(dir), c = this.centres[k];
     out.set(dir.x, dir.y, dir.z).normalize();
     return out.multiplyScalar(R / Math.max(0.2, out.dot(c))).applyMatrix4(this.final[k]);
   }
 
-  /** The sphere direction under a point of the flat chart (unfold 1), or null off the net. */
   fromNet(p: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 | null {
     const inv = new THREE.Matrix4(), q = V();
     for (let k = 0; k < SHEETS; k++) {
@@ -158,8 +138,6 @@ export class Net {
     return null;
   }
 
-  /** The framing of the flat chart for a camera and view: centre, up (north-ish, the net's long axis across), distance;
-   *  the net's extent across (right) and up, u. */
   fit(camera: THREE.PerspectiveCamera, view: RigView): { centre: THREE.Vector3; up: THREE.Vector3; right: THREE.Vector3; dist: number; width: number; height: number } {
     const key = `${this.root}:${camera.fov}:${view.width}x${view.height}:${view.safe.left},${view.safe.right},${view.safe.top},${view.safe.bottom}`;
     const o = this.fitOut;
@@ -167,7 +145,6 @@ export class Net {
     this.fitKey = key;
     const n = this.normal, [e, nn] = this.basis(this.root, AXIS_N), pts: THREE.Vector3[] = [];
     for (let k = 0; k < SHEETS; k++) for (const a of this.faces[k]) pts.push(this.vertices[a].clone().applyMatrix4(this.final[k]));
-    // the long axis by the in-plane covariance
     let mx = 0, my = 0;
     for (const p of pts) { mx += p.dot(e); my += p.dot(nn); }
     mx /= pts.length; my /= pts.length;
@@ -187,7 +164,6 @@ export class Net {
     return o;
   }
 
-  /** The sphere direction under a screen point of the open chart (course drawing, the edge tap), or null off the net. */
   unproject(x: number, y: number, camera: THREE.PerspectiveCamera, view: RigView, out: THREE.Vector3): THREE.Vector3 | null {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2((x / view.width) * 2 - 1, 1 - (y / view.height) * 2), camera);
@@ -196,8 +172,6 @@ export class Net {
     return this.fromNet(hit, out);
   }
 }
-
-// --- geometry: every layer carries a sphere direction and a sheet, so one vertex function morphs them all --------
 
 export interface Builder { dir: number[]; sheet: number[]; perp: number[]; side: number[]; colour: number[]; uv: number[] }
 export const builder = (): Builder => ({ dir: [], sheet: [], perp: [], side: [], colour: [], uv: [] });
@@ -220,7 +194,7 @@ function geometry(b: Builder): THREE.BufferGeometry {
   return g;
 }
 
-const VERT = /* glsl */ `
+const VERT =  `
 in vec3 dir;
 in float sheet;
 in vec3 perp;
@@ -246,7 +220,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * (uSheet[k] * vec4(p, 1.0));
 }`;
 
-const NOISE = /* glsl */ `
+const NOISE =  `
 in vec3 vDir;
 in vec3 vNormal;
 in vec4 vColour;
@@ -260,7 +234,7 @@ float vn(vec3 x) {
 float inkLine(float x, float px) { float w = max(fwidth(x), 1e-5); return 1.0 - smoothstep(px - 0.6, px + 0.6, abs(x) / w); }
 `;
 
-const SHEET_FRAG = NOISE + /* glsl */ `
+const SHEET_FRAG = NOISE +  `
 uniform samplerCube tGeo;
 uniform samplerCube tTerr;
 uniform float uHasTerr, uReveal;
@@ -270,9 +244,6 @@ void main() {
   vec3 n = normalize(vDir);
   vec4 g = texture(tGeo, n);
   float coast = (g.r * 255.0 - 128.0) * 0.5, height = g.g * 64.0;
-  // the swap (A8), no dissolve: the chart's ink settles first on the coasts the shaded world already shows (the same
-  // geography cube, so the lines land where the world's shores are), then its paper spreads out over the sea as one
-  // wet front by distance from shore, land and shallows first, the deep sea last
   float soak = clamp(abs(coast) / 60.0, 0.0, 1.0) * 0.86 + vn(n * 71.0) * 0.14, edge = uReveal * 1.25 - 0.05 - soak;
   if (edge < 0.0) discard;
   float front = (1.0 - smoothstep(0.0, 0.08, edge)) * step(uReveal, 0.999);
@@ -282,25 +253,16 @@ void main() {
   float land = 1.0 - smoothstep(-0.35, 0.35, coast);
   col = mix(col, col * uCLand, land);
   col = mix(col, col * uCHill, land * smoothstep(3.0, 30.0, height));
-  // land hatched along one diagonal, denser on the heights
   float hatch = inkLine(fract(dot(n, vec3(0.7, 0.5, -0.5)) * 520.0 + 0.5) - 0.5, 0.35) * land * smoothstep(1.0, 18.0, height);
-  // the shore's rings of fine lines spreading out from the coast
   float q = coast / 1.6, ring = coast > 0.8 && coast < 12.0 ? inkLine((fract(q + 0.5) - 0.5) * 1.6, 0.42) * (1.0 - coast / 12.0) : 0.0;
   float line = max(inkLine(coast, 1.05), max(ring * 0.55, hatch * 0.35));
-  // territory (WP20's wash: rgb the owner's transmittance bled outward, a the smoothed ownership whose 0.5 contour is
-  // the border): a light wash of the owner's pigment inside the border and a fine line on it, as the sea draws it, so a
-  // dark captain's claim reads as a bounded claim, never a flat grey stain (S-019 (h))
   vec4 t = texture(tTerr, n);
   float own = smoothstep(0.42, 0.58, t.a) * uHasTerr, rim = inkLine(t.a - 0.5, 0.55) * uHasTerr;
   col *= mix(vec3(1.0), t.rgb, 0.24 * own);
   col = mix(col, col * t.rgb, 0.75 * rim);
-  // the gore's border: a pooled edge and a fine sepia rule
   float e = vColour.x;
   col *= 1.0 - 0.1 * (1.0 - smoothstep(0.0, 7.0, e));
   col = mix(col, uCSepia, inkLine(e - 1.2, 0.5) * 0.7);
-  // A8's matched swap (WP24 part D): where the front has just passed, the paper still carries the shaded world's own
-  // colour fields at orbit (the sea's wash, shallow to deep by distance from shore, the land's tint) and settles to the
-  // chart's as the front moves on, so the change reads as ink settling into the same picture, not a crossfade
   vec3 world = uCParch * mix(uCSea, uCDeep, smoothstep(2.0, 50.0, coast)) * (0.96 + 0.06 * grain);
   world = mix(world, uCParch * uCLand * 0.92, land);
   col = mix(col, world, uMatch * (1.0 - smoothstep(0.0, 0.45, edge)));
@@ -309,7 +271,7 @@ void main() {
   writeInk(col, vNormal);
 }`;
 
-const LINE_FRAG = NOISE + /* glsl */ `
+const LINE_FRAG = NOISE +  `
 uniform float uAlpha;
 void main() {
   float a = vColour.a * uAlpha * (1.0 - smoothstep(0.55, 1.0, abs(vUv.y)));
@@ -317,19 +279,18 @@ void main() {
   writeVeil(vColour.rgb, a);
 }`;
 
-const TEX_FRAG = NOISE + /* glsl */ `
+const TEX_FRAG = NOISE +  `
 uniform sampler2D tMap;
 uniform float uAlpha, uMode;
 void main() {
   vec4 t = texture(tMap, vUv);
-  // labels: r coverage, g coverage bled into the paper; marks: the atlas alpha; solid ink where colour.a > 1.5
   float cov = vColour.a > 1.5 ? 1.0 : uMode < 0.5 ? max(t.r, t.g * 0.35) : t.a;
   float a = cov * uAlpha;
   if (a < 0.004) discard;
   writeVeil(vColour.rgb, a);
 }`;
 
-const BACK_FRAG = NOISE + /* glsl */ `
+const BACK_FRAG = NOISE +  `
 uniform vec3 uCParch;
 void main() {
   vec3 p = vDir;
@@ -338,7 +299,6 @@ void main() {
   writeInk(col, vec3(0.0, 0.0, 1.0));
 }`;
 
-/** The geography as a cube texture in the TERRITORY layout: r coast distance (128 + 2u), g height (u·4), b region. */
 export function geographyCube(world: World): THREE.CubeTexture {
   const N = TERRITORY.n, NN = N * N, geo = world.geo, faces: Uint8Array[] = [];
   for (let f = 0; f < 6; f++) {
@@ -355,8 +315,6 @@ export function geographyCube(world: World): THREE.CubeTexture {
   return cubeTexture(faces, THREE.UnsignedByteType);
 }
 
-/** The ships the player's chart shows: those in its sight or marked, never the sunk; its own always. Once the player
- *  has gone down the match plays out on the chart (WP27, PROMPT.md, Sinking and the end): every ship still afloat. */
 export function chartShips(state: MatchState, sight: Sight | null): number {
   let mask = 1 << PLAYER;
   if (state.ships[PLAYER]?.phase === PHASE.sunk) mask = (1 << Math.min(SHIPS, state.ships.length)) - 1;
@@ -367,11 +325,8 @@ export function chartShips(state: MatchState, sight: Sight | null): number {
 
 export interface ChartFrame { z: number; flat: number; unfold: number; reveal: number }
 
-/** The chart's meshes and their per-frame state (layer 1: the camera shows it only once the zoom is under way). */
 export class Chart {
   readonly net: Net;
-  /** Where the chart is rooted when it next unrolls (re-rooted only on the deck): the player's ship, or this when set
-   *  (S-019: once she is gone, the storm's calm, so its circle lies whole on the root and its ring of sheets). */
   rootAt: { x: number; y: number; z: number } | null = null;
   readonly group = new THREE.Group();
   readonly uniforms = {
@@ -385,18 +340,14 @@ export class Chart {
   readonly labels: THREE.Mesh;
   readonly marks: THREE.Mesh;
   readonly back: THREE.Mesh;
-  /** The ships drawn on the chart last frame (bits by ship). */
   drawn = 0;
-  /** WP24 part D: the captains' emblems flown over the ship marks (one draw, the sails' emblem atlas). */
   readonly emblems: THREE.Mesh;
-  /** WP24 part D: the stroke a finger is drawing (sphere directions; course.ts CourseDrawing.points), inked live. */
   draft: readonly { x: number; y: number; z: number }[] = [];
   private readonly world: World | null;
   private readonly emblemGeo: THREE.BufferGeometry;
   private readonly geo: THREE.CubeTexture | null;
   private readonly markGeo: THREE.BufferGeometry;
   private labelRoot = -1;
-  /** WP24 part C: the smallest name's capitals on the open chart, CSS px (the browser test holds it ≥ 11). */
   capPx = 0;
   private labelPx = 0;
   private readonly labelForm: number[][] = [];
@@ -414,7 +365,6 @@ export class Chart {
       vertexShader: VERT, fragmentShader: frag, veil, id, inkWeight: 0.8,
       uniforms: { ...common, uLayer: { value: layer }, ...extra },
     });
-    // the sheets: each pentagon a fan of five subdivided triangles in its gnomonic plane
     const sb = builder(), M = 28;
     for (let k = 0; k < SHEETS; k++) {
       const c = net.centres[k].clone().multiplyScalar(R), f = net.faces[k], vs = f.map((a) => net.vertices[a]);
@@ -442,7 +392,6 @@ export class Chart {
       uCHill: { value: new THREE.Vector3(0.82, 0.7, 0.55) }, uCParch: { value: parch },
     }, 0, false));
     this.sheets.renderOrder = 10;
-    // wind roses and rhumbs, oriented to each sheet's north (toward the Ice Crown)
     const lb = builder(), ink = [...lin('ironGall').toArray(), 0.85], green = [...lin('verdigris').toArray(), 0.75], red = [...lin('vermilion').toArray(), 0.7];
     const gold = [...lin('ochre').toArray(), 0.95], paper = [...parch.toArray(), 0.95];
     for (let k = 0; k < SHEETS; k++) {
@@ -450,7 +399,6 @@ export class Chart {
       const at = (ang: number, r: number) => c.clone().addScaledVector(nn, Math.cos(ang) * r).addScaledVector(e, Math.sin(ang) * r);
       for (let w = 0; w < 32; w++) {
         const ang = (w / 32) * Math.PI * 2, dir = at(ang, 1).sub(c);
-        // out to the sheet's edge
         let reach = 400;
         for (let i = 0; i < 5; i++) {
           const a = vs[i].clone().sub(c), b = vs[(i + 1) % 5].clone().sub(c), ab = b.clone().sub(a);
@@ -462,7 +410,6 @@ export class Chart {
         const perp = new THREE.Vector3().crossVectors(net.centres[k], dir).normalize(), p0 = at(ang, 6), p1 = at(ang, reach - 0.5);
         for (const [p, s] of [[p0, -1], [p1, -1], [p1, 1], [p0, -1], [p1, 1], [p0, 1]] as const) vert(lb, p, k, perp, s * px, col, 0, s);
       }
-      // the rose: sixteen points, two-tone (dark and light halves), on a gold ring
       for (let w = 0; w < 16; w++) {
         const ang = (w / 16) * Math.PI * 2, len = w % 4 === 0 ? 24 : w % 2 === 0 ? 16 : 10, half = (w % 4 === 0 ? 0.13 : 0.16) * Math.PI;
         const tip = at(ang, len), l = at(ang - half, len * 0.24), r = at(ang + half, len * 0.24);
@@ -477,8 +424,6 @@ export class Chart {
     }
     this.lines = new THREE.Mesh(geometry(lb), mat(LINE_FRAG, { uAlpha: { value: 0 } }, 0.5, true));
     this.lines.renderOrder = 11;
-    // region names: one atlas, quads laid out per root so they read upright on the open chart
-    // WP24 part C: a name with a space also has a two-line form, for a sheet too narrow for it on one
     const opts = { size: 44, align: 'center', valign: 'middle', swash: true } as const;
     const forms = REGIONS.slice(0, SHEETS).map((r) => {
       const one = rasterizeText(layoutText(r.name, opts), 2);
@@ -502,7 +447,6 @@ export class Chart {
     this.labels = new THREE.Mesh(new THREE.BufferGeometry(), mat(TEX_FRAG, { tMap: { value: tex }, uAlpha: { value: 0 }, uMode: { value: 0 } }, 0.9, true));
     this.labels.userData.aspect = aspect;
     this.labels.renderOrder = 12;
-    // ships in sight: rebuilt each frame (≤ 10 marks and arrows)
     this.markGeo = geometry(builder());
     this.marks = new THREE.Mesh(this.markGeo, mat(TEX_FRAG, { tMap: { value: silhouetteTexture() }, uAlpha: { value: 0 }, uMode: { value: 1 } }, 1.3, true));
     this.marks.renderOrder = 13;
@@ -510,7 +454,6 @@ export class Chart {
     this.emblemGeo = geometry(builder());
     this.emblems = new THREE.Mesh(this.emblemGeo, mat(TEX_FRAG, { tMap: { value: emblemTexture() }, uAlpha: { value: 0 }, uMode: { value: 1 } }, 1.3, true));
     this.emblems.renderOrder = 14;
-    // the parchment the net comes to rest on, far beneath the closed globe
     this.back = new THREE.Mesh(new THREE.BufferGeometry(), mat(BACK_FRAG, { uCParch: { value: parch.clone().multiplyScalar(0.97) } }, 0, false, 254));
     for (const m of [this.back, this.sheets, this.lines, this.labels, this.marks, this.emblems]) {
       m.frustumCulled = false;
@@ -520,17 +463,12 @@ export class Chart {
     this.group.layers.set(LAYER_CHART);
   }
 
-  /** Re-lays the names and the parchment for the current root (on the chart they read upright). */
   private relabel(camera: THREE.PerspectiveCamera, view: RigView, pxU: number): void {
     const net = this.net, fit = net.fit(camera, view), b = builder(), ink = [...linearVec(PIGMENTS.ironGall).toArray(), 1];
     const inv = new THREE.Matrix3();
-    // WP24 part C: names sized in screen px on the open chart (capitals 12–18 CSS px by the sheet's size on screen) and
-    // fitted to their sheet: the band clear of the wind rose where the sheet is widest, on one line or two, centred on
-    // that band's chord; shrunk to fit, never under 11 px (capPx records the smallest)
     const capPx = Math.min(18, Math.max(12, (0.095 * 247) / pxU)), ku = (capPx * pxU) / LABEL_CAP_RPX, floor = 11 / capPx;
     let least = Infinity;
     for (let k = 0; k < SHEETS; k++) {
-      // the chart's up carried back into sheet k's folded plane
       const m = inv.setFromMatrix4(net.final[k]).invert(), up = fit.up.clone().applyMatrix3(m), c = net.centres[k];
       up.addScaledVector(c, -up.dot(c)).normalize();
       const right = new THREE.Vector3().crossVectors(up, c).normalize();
@@ -558,7 +496,6 @@ export class Chart {
     this.labelPx = pxU;
     this.labels.geometry.dispose();
     this.labels.geometry = geometry(b);
-    // the parchment: a wide sheet 2.4 R beneath the root's plane, its own grain coordinates in vDir
     const g = new THREE.BufferGeometry(), n = net.normal, s = Math.max(fit.dist * 3, 4000);
     const base = fit.centre.clone().addScaledVector(n, -2.4 * R), pos: number[] = [], dir: number[] = [];
     for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
@@ -580,22 +517,19 @@ export class Chart {
     this.labelRoot = net.root;
   }
 
-  /** Lays the ships in sight on the net: a silhouette and a short inked heading arrow each, sized in screen px. */
   private ships(state: MatchState, mask: number, camera: THREE.PerspectiveCamera, view: RigView): void {
     const net = this.net, fit = net.fit(camera, view), b = builder(), pxU = this.uniforms.uPxU.value;
     const ink = [...linearVec(PIGMENTS.ironGall).toArray(), 2], mine = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
     const inv = new THREE.Matrix3(), p = V();
-    // WP27 (S-019): once the player has gone down the chart is the match playing out: its hulls drawn twice as large
     const big = state.ships[PLAYER]?.phase === PHASE.sunk ? 2 : 1;
     this.drawn = 0;
-    // WP24 part D: under the ships, the current, the player's waters, trails, landmarks, loot and the course
     chartContent(b, net, state, this.world, mask, pxU, fit.up, this.draft);
     const eb = builder();
     for (let i = 0; i < SHIPS && i < state.ships.length; i++) {
       if (!(mask & (1 << i))) continue;
       const ship = state.ships[i], k = net.sheetOf(ship.pos), c = net.centres[k];
       this.drawn |= 1 << i;
-      if (ship.phase === PHASE.sunk) continue; // the player gone down: chartmarks.ts marks the place
+      if (ship.phase === PHASE.sunk) continue;
       const up = fit.up.clone().applyMatrix3(inv.setFromMatrix4(net.final[k]).invert());
       up.addScaledVector(c, -up.dot(c)).normalize();
       const right = new THREE.Vector3().crossVectors(up, c).normalize();
@@ -606,8 +540,6 @@ export class Chart {
       if (hd.lengthSq() < 1e-10) hd.copy(up); else hd.normalize();
       const s = 9 * big * pxU, flip = hd.dot(right) < 0 ? -1 : 1, rect = silhouetteRect(FORM_NAMES[ship.form] ?? 'caravel', 'profile');
       const col = i === PLAYER ? mine : ink;
-      // WP27d (S-019): the hull in her captain's pigment (TEAMS, as her sails and trail), over the same silhouette in
-      // iron gall a little larger, so each reads as a ship and whose against parchment, sea and storm alike
       const pig = [...linearVec(TEAMS[ship.pigment % TEAMS.length].primary).toArray(), 1];
       for (const [grow, sil] of [[1.16, [...ink.slice(0, 3), 1]], [1, pig]] as const) {
         const Q = (x: number, y: number) => o.clone().addScaledVector(right, x * s * grow).addScaledVector(up, y * s * grow + s * 0.6);
@@ -615,10 +547,8 @@ export class Chart {
           [Q(-flip, 1), rect.x, rect.y + rect.w], [Q(flip, 1), rect.x + rect.z, rect.y + rect.w],
           [Q(flip, -1), rect.x + rect.z, rect.y], [Q(-flip, -1), rect.x, rect.y],
         ];
-        // S-019: a hull heading left is the quad mirrored, so its triangles wind the other way (the marks cull back faces)
         for (const j of flip > 0 ? [0, 3, 1, 1, 3, 2] : [0, 1, 3, 1, 2, 3]) vert(b, q[j][0], k, null, 0, sil, q[j][1], q[j][2]);
       }
-      // WP24 part D: the captain's emblem flown over the hull (the player's gull), from the sails' atlas
       const em = i === PLAYER ? PLAYER_EMBLEM : ship.pattern > 0 ? EMBLEMS[(ship.pattern - 1) % EMBLEMS.length] : null;
       if (em) {
         const er = emblemRect(em), es = 4.4 * pxU, ec = [...col.slice(0, 3), 1];
@@ -626,8 +556,6 @@ export class Chart {
         const eq: [THREE.Vector3, number, number][] = [[E(-1, 1), er.x, er.y + er.w], [E(1, 1), er.x + er.z, er.y + er.w], [E(1, -1), er.x + er.z, er.y], [E(-1, -1), er.x, er.y]];
         for (const j of [0, 3, 1, 1, 3, 2]) vert(eb, eq[j][0], k, null, 0, ec, eq[j][1], eq[j][2]);
       }
-      // the arrow: a shaft and a head from the hull along where it is heading
-      // (in the play-out the hull grows twice and the arrow less, so the ship, not its arrow, is what reads)
       const ab = big > 1 ? 1.3 : 1, side = new THREE.Vector3().crossVectors(c, hd).normalize(), L = 22 * ab * pxU, wS = 0.9 * ab * pxU, wH = 3.6 * ab * pxU;
       const a0 = o.clone().addScaledVector(hd, 4 * big * pxU), a1 = o.clone().addScaledVector(hd, Math.max(L - 6 * ab * pxU, 4 * big * pxU + 2 * pxU)), tip = o.clone().addScaledVector(hd, Math.max(L, 4 * big * pxU + 8 * pxU));
       const sh = [a0.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, -wS), a1.clone().addScaledVector(side, wS), a0.clone().addScaledVector(side, wS)];
@@ -642,8 +570,6 @@ export class Chart {
     for (const name of ['position', 'dir', 'sheet', 'perp', 'sideW', 'colour', 'uv']) this.emblemGeo.setAttribute(name, eg.getAttribute(name));
     this.emblemGeo.setDrawRange(0, eb.sheet.length);
   }
-  /** WP24 part C: the storm on the chart, screen-sized like the ships: the wall (the calm's edge) inked with hatching
-   *  toward the storm, and the next shrink, once announced, as a dashed vermilion ring. */
   private stormMarks(b: Builder, state: MatchState, pxU: number): void {
     const v = stormView(state, this.stormV);
     const wall = [...linearVec(PIGMENTS.ironGall).toArray(), 2], next = [...linearVec(PIGMENTS.vermilion).toArray(), 2];
@@ -668,7 +594,6 @@ export class Chart {
         const q = [prev.clone().sub(side), cur.clone().sub(side), cur.clone().add(side), prev.clone().add(side)];
         for (const j of [0, 1, 2, 0, 2, 3]) vert(b, q[j], k, null, 0, col, 0, 0);
         if (tick > 0 && i % 3 === 0) {
-          // a hatch toward the storm along the cap's outward tangent, raked a little along the wall
           out.copy(a).multiplyScalar(-sr).addScaledVector(e1, ct * cr).addScaledVector(e2, st * cr);
           out.addScaledVector(c, -out.dot(c)).normalize();
           const tip = cur.clone().addScaledVector(out, tick).addScaledVector(t, (0.35 * tick) / len), w = t.clone().multiplyScalar((half * 0.6) / len);
@@ -681,8 +606,6 @@ export class Chart {
     }
   }
 
-
-  /** One frame of the chart at zoom z (camera.ts zoomPhases), for the player's sight. */
   frame(state: MatchState, f: ChartFrame, camera: THREE.PerspectiveCamera, view: RigView, sight: Sight | null, territory: THREE.CubeTexture | null): void {
     const net = this.net, u = this.uniforms;
     if (f.z <= 0) net.layout(net.sheetOf(this.rootAt ?? state.ships[PLAYER].pos));
@@ -697,7 +620,6 @@ export class Chart {
     sm.uniforms.uMatch.value = ease((0.5 - f.z) / 0.1);
     sm.uniforms.tTerr.value = territory ?? this.geo;
     sm.uniforms.uHasTerr.value = territory ? 1 : 0;
-    // over the world the soaking globe is laid on top; once the world is gone the sheets test depth among themselves
     sm.depthFunc = f.z < 0.5 ? THREE.AlwaysDepth : THREE.LessEqualDepth;
     (this.lines.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.z - 0.42) / 0.14);
     (this.labels.material as THREE.ShaderMaterial).uniforms.uAlpha.value = ease((f.unfold - 0.55) / 0.4);
@@ -715,7 +637,7 @@ export class Chart {
   }
 }
 
-const BACK_VERT = /* glsl */ `
+const BACK_VERT =  `
 in vec3 dir;
 out vec3 vDir;
 out vec3 vNormal;
@@ -726,7 +648,6 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
 }`;
 
-/** The x extent of a convex polygon's chord at height y, or null off it. */
 function chordAt(poly: readonly [number, number][], y: number): [number, number] | null {
   let lo = Infinity, hi = -Infinity;
   for (let i = 0; i < poly.length; i++) {
@@ -738,16 +659,13 @@ function chordAt(poly: readonly [number, number][], y: number): [number, number]
   }
   return hi > lo ? [lo, hi] : null;
 }
-/** A name's capitals in its raster (0.6 em at 44 px, pixel ratio 2), and the wind rose's clear radius on a sheet, u. */
 const LABEL_CAP_RPX = 0.6 * 44 * 2, LABEL_ROSE = 40;
 
 export const CHART_LAYER = LAYER_CHART;
-/** A multiplicative tint: white toward a pigment by k (linear). */
 function tint(c: Parameters<typeof linearVec>[0], k: number): THREE.Vector3 {
   const [r, g, b] = linearVec(c).toArray();
   return new THREE.Vector3(1 + (r - 1) * k, 1 + (g - 1) * k, 1 + (b - 1) * k);
 }
-/** Height of the ground under a unit direction, u above mean sea level (the camera's collision). */
 export function groundOf(world: World): (dir: { x: number; y: number; z: number }) => number {
   return (dir) => world.geo.heights[cellOf(TERRITORY, dir)];
 }

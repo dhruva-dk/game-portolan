@@ -1,10 +1,3 @@
-// The light over the world (WP14). The sun and the moon of the match hour stand in the eye's own sky (A8: lighting
-// is computed in the player's local frame from the global hour), and Lights.set lays the style's light uniforms that
-// every material reads: the hour's palette (style.setHour, sky washes included), the direction everything is lit from
-// (uSun: the sun by day, the moon by night, never from below the horizon) and the lamps. The lamp registry holds every
-// light the night shows — the lighthouses' lamps (Beams registers them) and ships' lanterns (their package adds them)
-// — and feeds the nearest to uGlows, whose warm pools every material lays through candle() (style/glsl.ts), and to the
-// painted glow washes round each lamp. Beams: the lighthouse beams, hatched cones of lamplight that turn by night.
 import * as THREE from 'three';
 import { inkMaterial, MAX_GLOWS, type Style } from '../style/glsl.ts';
 import { hex, toLinear, type RGB } from '../style/palette.ts';
@@ -14,29 +7,20 @@ import { heightAt, type Geography } from '../sim/world/geography.ts';
 
 const { smoothstep } = THREE.MathUtils;
 
-/** A GLSL literal of an sRGB colour in linear light. */
 export function glslLinear(c: RGB): string {
   return `vec3(${toLinear(c).map((x) => x.toFixed(4)).join(', ')})`;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The sky's light
 
-/** The sky's light at an hour over a point, as skyLight fills it. Directions are world unit vectors. */
 export interface SkyLight {
   readonly up: THREE.Vector3;
   readonly east: THREE.Vector3;
   readonly north: THREE.Vector3;
-  /** Where the sun and the moon stand, below the horizon when set. The moon is full, opposite the sun. */
   readonly sun: THREE.Vector3;
   readonly moon: THREE.Vector3;
-  /** What everything is lit from (uSun): the sun by day, the moon by night, never lower than LIGHT_MIN. */
   readonly light: THREE.Vector3;
-  /** Sine of the sun's elevation. */
   sunHeight: number;
-  /** 0 by night … 1 by day: how far the light has gone over from the moon to the sun. */
   day: number;
-  /** 0 … 1: how far the lamps are lit. They come on at dusk and go out after dawn. */
   lit: number;
 }
 
@@ -45,11 +29,9 @@ export function newSkyLight(): SkyLight {
   return { up: v(), east: v(), north: v(), sun: v(), moon: v(), light: v(), sunHeight: 0, day: 1, lit: 0 };
 }
 
-/** Sines of the lowest elevations things are lit from, by the sun and by the moon: shadows never run off the page. */
 export const LIGHT_MIN = { sun: 0.2, moon: 0.5 };
 const local = new THREE.Vector3(), sunLift = new THREE.Vector3(), moonLift = new THREE.Vector3();
 
-/** d raised to at least `min` (sine of elevation) above the horizon of `up`, into out. */
 function lift(d: THREE.Vector3, up: THREE.Vector3, min: number, out: THREE.Vector3): THREE.Vector3 {
   const h = d.dot(up);
   if (h >= min) return out.copy(d);
@@ -58,7 +40,6 @@ function lift(d: THREE.Vector3, up: THREE.Vector3, min: number, out: THREE.Vecto
   return l < 1e-6 ? out.copy(up) : out.multiplyScalar(Math.sqrt(1 - min * min) / l).addScaledVector(up, min);
 }
 
-/** The sky's light at `hour` over `foot` (any length), into out. */
 export function skyLight(hour: number, foot: THREE.Vector3, out: SkyLight): SkyLight {
   out.up.copy(foot).normalize();
   localFrame(out.up, out.east, out.north);
@@ -74,31 +55,21 @@ export function skyLight(hour: number, foot: THREE.Vector3, out: SkyLight): SkyL
   return out;
 }
 
-/**
- * How low the sun stands, 0–1 (uLow): 0 from mid-morning to mid-afternoon and by night, rising as the sun sinks below
- * about 37° (16 h) to 1 near 12° (17 h), and gone again soon after it sets. The light rakes, the lit side warms, the shade
- * cools and deepens, things cast long shade and the sea glazes gold toward the sun.
- */
 export function lowSun(sunHeight: number): number {
   return (1 - smoothstep(sunHeight, 0.2, 0.62)) * smoothstep(sunHeight, -0.2, 0.02);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Lamps
-
-/** A light the night shows — a lighthouse lamp, a ship's lantern — and how far (u) its warm pool reaches. */
 export interface Lamp {
   readonly pos: THREE.Vector3;
   reach: number;
 }
 
-/** How many lamps get a painted glow wash at once (the nearest to the eye), and its radius as a share of the reach. */
 export const MAX_HALOS = 64;
 const HALO = 0.3;
 const CANDLE = glslLinear(hex('#ffc46a')), FLAME = glslLinear(hex('#fff2cc'));
 
-const HALO_VERTEX = /* glsl */ `
-in vec4 aLamp; // world position, radius (0 = unlit)
+const HALO_VERTEX =  `
+in vec4 aLamp;
 out vec2 vUv;
 void main() {
   vUv = position.xy;
@@ -107,8 +78,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(aLamp.xyz + (right * position.x + up * position.y) * aLamp.w, 1.0);
 }`;
 
-// a glow wash: a soft pool of candle colour with the frilled, darker ring where the wash dried, and the flame
-const HALO_FRAGMENT = /* glsl */ `
+const HALO_FRAGMENT =  `
 in vec2 vUv;
 void main() {
   float r = length(vUv);
@@ -119,10 +89,8 @@ void main() {
   writeVeil(mix(${CANDLE}, ${FLAME}, max(flame, body * body)), clamp(body * 0.55 + rim * 0.2 + flame, 0.0, 1.0));
 }`;
 
-/** The registry of lamps and the light uniforms; one per sky. */
 export class Lights {
   readonly sky = newSkyLight();
-  /** The painted glow washes round the nearest lamps by night: one draw call. */
   readonly halos: THREE.Mesh;
   private readonly style: Style;
   private readonly lamps: Lamp[] = [];
@@ -153,7 +121,6 @@ export class Lights {
     if (i >= 0) this.lamps.splice(i, 1);
   }
 
-  /** The hour over the eye: the style's palette and light, and the lamps nearest the eye, lit as far as the hour says. */
   set(hour: number, eye: THREE.Vector3): void {
     const s = skyLight(hour, eye, this.sky), u = this.style.uniforms, n = this.lamps.length;
     this.style.setHour(hour);
@@ -193,17 +160,13 @@ export class Lights {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Lighthouse beams
-
-/** A beam's length and end radius (u), its cone's rings and segments; lamps stand `tower` u above the ground. */
 export const BEAM = { length: 48, radius: 4.5, rings: 4, segments: 12, tower: 6, reach: 18 };
 
-const BEAM_VERTEX = /* glsl */ `
+const BEAM_VERTEX =  `
 uniform float uTime;
 in vec3 aLamp;
 in vec3 aFacing;
-in vec2 aTurn; // seconds a turn, phase
+in vec2 aTurn;
 out vec2 vBeam;
 void main() {
   vec3 up = normalize(aLamp), f = normalize(aFacing - dot(aFacing, up) * up), s = cross(up, f);
@@ -216,8 +179,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
 }`;
 
-// lamplight laid as a thin veil, hatched along the cone, fading as it reaches out
-const BEAM_FRAGMENT = /* glsl */ `
+const BEAM_FRAGMENT =  `
 in vec2 vBeam;
 uniform float uLit;
 void main() {
@@ -228,7 +190,6 @@ void main() {
   writeVeil(mix(${CANDLE}, ${FLAME}, strokes), uLit * body * (0.2 + 0.45 * strokes));
 }`;
 
-/** Every lighthouse's beam, turning with its period: one draw call, shown by night only. */
 export class Beams {
   readonly mesh: THREE.Mesh;
   private readonly uLit = { value: 0 };
@@ -273,7 +234,6 @@ export class Beams {
     this.mesh.frustumCulled = false;
   }
 
-  /** Moves light i's lamp and beam to `pos`: its lighthouse (structures.ts) seats the lantern there. */
   seat(i: number, pos: THREE.Vector3): void {
     this.lamps[i].pos.copy(pos);
     const a = this.mesh.geometry.getAttribute('aLamp') as THREE.BufferAttribute, per = 2 * (BEAM.rings + 1) * (BEAM.segments + 1);
@@ -281,7 +241,6 @@ export class Beams {
     a.needsUpdate = true;
   }
 
-  /** How far the lamps are lit (Lights.sky.lit): the beams show and fade with them. */
   setLit(lit: number): void {
     this.uLit.value = lit;
     this.mesh.visible = lit > 0.01;
@@ -297,14 +256,7 @@ export class Beams {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Hooks for the regions' night lights
-
-/**
- * The aurora (GLSL; the sky dome calls it, WP16 sets its strength through Sky.setAurora): ribbons of verdigris
- * fringed with rose madder hung in the high sky, folding slowly, their lower hems inked. Needs the style uniforms.
- */
-export const AURORA_GLSL = /* glsl */ `
+export const AURORA_GLSL =  `
 vec3 aurora(vec3 col, vec3 d, vec3 up, float strength) {
   if (strength <= 0.0) return col;
   vec3 e = normalize(cross(up, abs(up.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
@@ -322,11 +274,7 @@ vec3 aurora(vec3 col, vec3 d, vec3 up, float strength) {
 }
 `;
 
-/**
- * Bioluminescence (GLSL, for WP17's wakes and whales on the Glass Sea): glowing blue-green ink laid over col along a
- * trace (0…1 coverage), shining as night falls. Needs the style uniforms.
- */
-export const BIOLUMINESCENCE_GLSL = /* glsl */ `
+export const BIOLUMINESCENCE_GLSL =  `
 vec3 bioluminescence(vec3 col, float trace) {
   return mix(col, ${glslLinear(hex('#5ee0c8'))}, clamp(trace, 0.0, 1.0) * (0.25 + 0.75 * uNight));
 }

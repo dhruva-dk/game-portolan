@@ -1,51 +1,41 @@
-// The rig of each form: masts, yards and sails laid out on the hull, the state the ships-alive package animates
-// (bracing, canvas set and reefed, fill, shiver, slack, tears), the cloth's shape under that state, and every rope's
-// ends. Pure geometry (no materials), shared by the renderer and the clipping test. The sail shape is written once
-// here in TypeScript and once in SAIL_GLSL for the vertex shader; keep the two line for line.
 import * as THREE from 'three';
 import { HullForm, type FormName, type LateenMastSpec, type MastSpec, type SquareMastSpec } from './forms.ts';
 
-/** One sail's state: set 0 (furled) to 1; reef bands taken in; fill 0 flat, ~0.6 drawing, 1 billowing; shiver, slack, torn 0–1. */
 export interface SailState { set: number; reef: number; fill: number; slack: number; shiver: number; torn: number }
-/** brace per mast, radians, positive with the wind on the starboard side (sails lie to port); see trim(). */
 export interface RigState { brace: number[]; sails: SailState[] }
-/** How much canvas is spread: everything, plain sail (topgallants and spritsail in), or reefed down. */
 export type Canvas = 'full' | 'plain' | 'reefed';
 
 export interface MastSection { from: number; to: number; r0: number; r1: number; zOff: number }
 export interface MastLayout {
   spec: MastSpec;
-  foot: THREE.Vector3; // on the mast's axis at the deck
-  axis: THREE.Vector3; // up the mast
-  fwd: THREE.Vector3; // across the mast, forward
-  sections: MastSection[]; // lower mast, topmast, topgallant mast: heights y, radii, forward offset of the axis
-  sail: number; // forward offset of every square yard (and so every square sail's plane) from the lower axis
-  braceMin: number; braceMax: number; // magnitude range of the brace
-  top: number; // radius of the top (square masts)
+  foot: THREE.Vector3;
+  axis: THREE.Vector3;
+  fwd: THREE.Vector3;
+  sections: MastSection[];
+  sail: number;
+  braceMin: number; braceMax: number;
+  top: number;
 }
 export interface YardLayout { mast: number; kind: 'square' | 'lateen' | 'sprit'; h: number; a: number; b: number; r: number }
 export interface SailLayout {
   mast: number; yard: number; kind: 'square' | 'lateen';
   h0: readonly [number, number]; h1: readonly [number, number]; f0: readonly [number, number]; f1: readonly [number, number];
-  roach: number; belly: number; band: number; reefs: number; lowers: boolean; light: boolean; // topgallants and the spritsail, taken in first
-  cloths: number; // cloths across, for the seams
-  emblem: boolean; // the mainsail, which carries the captain's emblem
+  roach: number; belly: number; band: number; reefs: number; lowers: boolean; light: boolean;
+  cloths: number;
+  emblem: boolean;
 }
-/** A rope end: fixed to the hull, riding a yard (yard frame), or a point of a sail's cloth. */
 export type Anchor = { hull: THREE.Vector3 } | { yard: number; p: THREE.Vector3 } | { sail: number; u: number; v: number };
 export interface RopeLayout { a: Anchor; b: Anchor; r: number; tar: boolean; standing: boolean; weather?: { mast: number; side: number } }
-/** A spar as a capsule, for the clipping test: owner is its yard index, or -1 for masts, tops and the bowsprit. */
 export interface Spar { a: THREE.Vector3; b: THREE.Vector3; r: number; owner: number }
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const LATEEN_BRACE: readonly [number, number] = [0.18, 0.95];
 const SQUARE_BRACE_MARGIN = 0.9;
-const SHROUD_AFT = 0.3, SHROUD_STEP = 0.12; // first lower shroud's deadeye abaft the mast, spacing
+const SHROUD_AFT = 0.3, SHROUD_STEP = 0.12;
 const RATLINE_STEP = 0.13;
 
 const _m = new THREE.Matrix4(), _r = new THREE.Matrix4(), _y = new THREE.Matrix4(), _v = V(), _w = V(), _ax = V();
 
-/** The cloth's shape in its yard's frame (x along the yard, y up the mast or away from the yard, z the belly). */
 export function sailLocal(s: SailLayout, st: SailState, u: number, v: number, time: number, o: THREE.Vector3): THREE.Vector3 {
   const PI = Math.PI, su = Math.sin(PI * u);
   const hx = s.h0[0] + (s.h1[0] - s.h0[0]) * u, hy = s.h0[1] + (s.h1[1] - s.h0[1]) * u;
@@ -59,16 +49,15 @@ export function sailLocal(s: SailLayout, st: SailState, u: number, v: number, ti
   const bel = st.fill * (1 - st.slack) * s.belly * d * Math.sin(0.75 * PI * vv);
   z += bel + st.slack * 0.02 * d * vv * (1 + Math.sin(PI * 7 * u)) + st.shiver * 0.03 * d * Math.sin(PI * vv) * (0.5 + 0.5 * Math.sin(time * 38 + u * 11 - vv * 7));
   y += 0.6 * bel * vv * vv - st.slack * 0.07 * d * vv;
-  const g = vr > 0 ? Math.min(Math.max((vr - v) / 0.04, 0), 1) : 0; // the reefed band bunched on the yard
+  const g = vr > 0 ? Math.min(Math.max((vr - v) / 0.04, 0), 1) : 0;
   y += 0.035 * g;
   z += 0.045 * g;
-  const k = Math.min(Math.max(set / 0.25, 0), 1), f = k * k * (3 - 2 * k); // furled: rolled up on the yard
+  const k = Math.min(Math.max(set / 0.25, 0), 1), f = k * k * (3 - 2 * k);
   return o.set(hx * 0.97 + (x - hx * 0.97) * f, hy + 0.04 + 0.02 * Math.sin(PI * v) + (y - hy - 0.04 - 0.02 * Math.sin(PI * v)) * f,
     0.05 + 0.025 * Math.cos(PI * v) + (z - 0.05 - 0.025 * Math.cos(PI * v)) * f);
 }
 
-/** The same shape for the vertex shader: per sail uniforms A (h0, h1), B (f0, f1), C (roach, belly, band, reefs), D (lowers). */
-export const SAIL_GLSL = /* glsl */ `
+export const SAIL_GLSL =  `
 vec3 sailLocal(vec4 A, vec4 B, vec4 C, float lowers, vec4 st, vec2 fx, float u, float v, float time) {
   const float PI = 3.14159265;
   float su = sin(PI * u);
@@ -91,8 +80,6 @@ vec3 sailLocal(vec4 A, vec4 B, vec4 C, float lowers, vec4 st, vec2 fx, float u, 
 }
 `;
 
-/** Yard angles for the apparent wind from windFrom radians off the bow (positive from starboard): square yards
- * bisect the wind and the keel up to their stops; lateens swing out from fore-and-aft as the wind comes aft. */
 export function trim(rig: Rig, state: RigState, windFrom: number): RigState {
   const side = windFrom >= 0 ? 1 : -1, a = Math.min(Math.abs(windFrom), Math.PI);
   rig.masts.forEach((m, i) => {
@@ -109,7 +96,6 @@ export class Rig {
   readonly sails: SailLayout[] = [];
   readonly ropes: RopeLayout[] = [];
   readonly sprit: { heel: THREE.Vector3; dir: THREE.Vector3; r: number; len: number } | null = null;
-  /** Lower deadeyes on the channels and the chainplates' feet (hull fittings, built with the hull). */
   readonly deadeyes: { at: THREE.Vector3; up: THREE.Vector3; foot: THREE.Vector3; normal: THREE.Vector3 }[] = [];
   readonly channels: { a: THREE.Vector3; b: THREE.Vector3 }[] = [];
   private readonly stays: [THREE.Vector3, THREE.Vector3][][] = [];
@@ -123,7 +109,6 @@ export class Rig {
     s.masts.forEach((spec) => this.masts.push(this.layMast(spec)));
     this.masts.forEach((m, i) => (m.spec.kind === 'square' ? this.raiseSquare(i) : this.raiseLateen(i)));
     if (this.sprit && s.sprit) this.raiseSprit(s.sprit.yard);
-    // the mainsail: the largest course, or on an all-lateen rig the largest lateen
     const courses = this.sails.filter((sl) => sl.kind === 'square' && sl.reefs === 1 && !sl.lowers);
     const area = (sl: SailLayout) => Math.abs((sl.h1[0] - sl.h0[0]) * (sl.f1[1] - sl.h0[1]));
     (courses.length ? courses : this.sails).reduce((a, b) => (area(b) > area(a) ? b : a)).emblem = true;
@@ -154,20 +139,16 @@ export class Rig {
     return { spec, foot, axis, fwd, sections, sail: 0, braceMin: 0, braceMax: 0, top: spec.kind === 'square' ? 0.1 + spec.r * 2.3 : 0 };
   }
 
-  /** A square-rigged mast: course, topsail (and topgallant) yards and sails, shrouds and ratlines, stays, running rigging. */
   private raiseSquare(mi: number): void {
     const m = this.masts[mi], spec = m.spec as SquareMastSpec, f = this.hull;
-    // the highest yard hoists well below its masthead, so the stay above it clears the sail furled on it
     const hs = [spec.top - 0.3, ...spec.heads.map((h, k) => h - (k === spec.heads.length - 1 ? 0.4 : 0.24))];
     const yr = spec.yards.map((half) => 0.022 + half * 0.026);
     m.sail = Math.max(...hs.map((h, k) => { const q = this.radius(m, h); return q.zOff + q.r + yr[k] + 0.008; }));
-    // yards and sails: each sail's clews are sheeted to the yardarms below (the course's to the rail)
     const footY = f.rail(spec.u) + 0.28;
     hs.forEach((h, k) => {
       const yi = this.yards.push({ mast: mi, kind: 'square', h, a: -spec.yards[k], b: spec.yards[k], r: yr[k] }) - 1;
       const head = spec.yards[k] * 0.96, below = k ? spec.yards[k - 1] * 0.94 : spec.yards[0] * 1.02;
       const depth = (h - (k ? hs[k - 1] : footY)) / m.axis.y;
-      // the foot roaches up over the top (or crosstrees) below, clearing it by a hand
       const clear = k ? m.top * (k === 1 ? 1 : 0.6) + 0.06 : 0, over = k === 1 ? 0.28 : 0.3, uEdge = 0.5 + clear / (2 * below);
       const lift = k ? (((k === 1 ? spec.top : spec.heads[0]) + over - hs[k - 1]) / m.axis.y) / Math.sin(Math.PI * Math.min(uEdge, 0.95)) : 0;
       this.sails.push({
@@ -176,7 +157,6 @@ export class Rig {
         light: k === 2, cloths: Math.max(4, Math.round((2 * below) / 0.2)), emblem: false,
       });
     });
-    // shrouds on each side: a fan from the hounds to deadeyes on a straight channel, so the fan is one plane
     const ych = f.sheer(spec.u) - 0.05, n = spec.shrouds;
     const z0 = m.foot.z - SHROUD_AFT, z1 = z0 - (n - 1) * SHROUD_STEP;
     const xch = Math.max(f.half(f.uAt(z0, ych), ych), f.half(f.uAt(z1, ych), ych)) + 0.1;
@@ -192,7 +172,6 @@ export class Rig {
       }
       this.channels.push({ a: V(side * (xch - 0.06), ych, z0 + 0.1), b: V(side * (xch - 0.06), ych, z1 - 0.1) });
       this.ratlines(ups, hound, 0.11);
-      // topmast and topgallant shrouds from the rim of the top and the crosstrees, with futtock shrouds under the top
       spec.heads.forEach((head, k) => {
         const q = this.radius(m, head - 0.12), th = this.axisPoint(m, head - 0.12, q.zOff).add(V(side * (q.r + 0.008), 0, -q.r * 0.4));
         const base = k ? this.axisPoint(m, spec.heads[0], this.radius(m, spec.heads[0]).zOff) : this.axisPoint(m, spec.top + 0.05);
@@ -209,10 +188,7 @@ export class Rig {
       });
     }
     m.braceMax = Math.atan((m.sail + SHROUD_AFT - 0.06) / xch) * SQUARE_BRACE_MARGIN;
-    // stays forward, set up round each masthead above its yard: to the next mast's foot, top and topmast head, or
-    // out along the bowsprit
     const next = this.hull.s.masts.length > mi + 1 ? this.masts[mi + 1] : null, sp = this.sprit;
-    // (between the yard below and the roached foot of the sail above, where the stay crosses no cloth)
     const heads = [spec.top + 0.14, ...spec.heads.map((h, k) => h + (k < spec.heads.length - 1 ? 0.2 : 0.03))];
     const stays: [THREE.Vector3, THREE.Vector3][] = (this.stays[mi] = []);
     heads.forEach((h, k) => {
@@ -224,14 +200,12 @@ export class Rig {
       } else if (sp) to = sp.heel.clone().addScaledVector(sp.dir, sp.len * (k ? 0.97 : 0.33));
       if (to) { this.rope({ hull: from }, { hull: to }, k ? 0.011 : 0.016, true, true); stays[k] = [from, to]; }
     });
-    // running rigging: ties and lifts from the masthead above each yard, sheets and tacks at the course's clews, braces
     hs.forEach((_, k) => {
       const yi = this.yards.length - hs.length + k, cap = k ? spec.heads[k - 1] : spec.top + 0.3;
       const capP = this.axisPoint(m, cap, this.radius(m, cap).zOff);
       this.rope({ hull: capP }, { yard: yi, p: V(0, 0.03, 0) }, 0.009, false, false);
       for (const side of [1, -1]) {
-        this.rope({ hull: capP }, { yard: yi, p: V(side * spec.yards[k] * 0.97, 0.01, -yr[k]) }, 0.006, false, false); // lifts, to the yardarm's after side
-        // the aftmost square mast braces to the quarters, the masts ahead of it to the stays of the mast aft
+        this.rope({ hull: capP }, { yard: yi, p: V(side * spec.yards[k] * 0.97, 0.01, -yr[k]) }, 0.006, false, false);
         this.rope({ yard: yi, p: V(side * spec.yards[k], 0, 0) }, { hull: this.braceLead(mi, k, side) }, 0.006, false, false);
       }
     });
@@ -245,8 +219,6 @@ export class Rig {
     }
   }
 
-  /** Where a square yard's braces lead: along the stay of the same rank from the mast aft; to a lateen mast aft,
-   * above its yard's sling where its sail never swings; or with no mast aft, to the quarter rail. */
   private braceLead(mi: number, k: number, side: number): THREE.Vector3 {
     const stays = this.stays[mi - 1], aft = this.masts[mi - 1], f = this.hull;
     if (stays?.[k]) return stays[k][0].clone().lerp(stays[k][1], 0.3);
@@ -265,14 +237,12 @@ export class Rig {
     m.braceMax = LATEEN_BRACE[1];
     const a = -spec.fore * spec.len, b = (1 - spec.fore) * spec.len;
     const yi = this.yards.push({ mast: mi, kind: 'lateen', h: spec.sling, a, b, r }) - 1;
-    // the clew in the yard frame: clew distance aft and height above the deck, measured from the sling
     const dz = spec.clew, dy = m.foot.y + spec.clewY - spec.sling, c = Math.cos(spec.tilt), s = Math.sin(spec.tilt);
     const cx = dz * c + dy * s, cy = -dz * s + dy * c;
     this.sails.push({
       mast: mi, yard: yi, kind: 'lateen', h0: [a * 0.98, -r], h1: [b * 0.98, -r], f0: [a * 0.98, -r], f1: [cx, cy],
       roach: 0, belly: 0.14, band: 0.16, reefs: 1, lowers: false, light: false, cloths: Math.max(5, Math.round(spec.len / 0.22)), emblem: false,
     });
-    // runner tackles to windward, with ratlines; the lee runners are cast off and hauled to the weather side
     for (const side of [1, -1]) {
       const hound = this.axisPoint(m, spec.top - 0.08).add(V(side * (spec.r * 0.75 + 0.01), 0, -spec.r * 0.4)), ups: THREE.Vector3[] = [];
       for (let j = 0; j < spec.shrouds; j++) {
@@ -284,7 +254,6 @@ export class Rig {
       }
       if (ups.length > 1) this.ratlines(ups, hound, 0.11, { mast: mi, side });
     }
-    // halyard from the masthead to the sling, the sheet aft from the clew, the tack down from the yard's fore end
     const head = this.axisPoint(m, spec.top - 0.02);
     this.rope({ hull: head }, { yard: yi, p: V(0, r, 0) }, 0.01, false, false);
     const zs = m.foot.z - spec.clew - 0.35, us = f.uAt(zs, f.railAft), ys = f.rail(us);
@@ -310,7 +279,6 @@ export class Rig {
   private rope(a: Anchor, b: Anchor, r: number, tar: boolean, standing: boolean, weather?: { mast: number; side: number }): void {
     this.ropes.push({ a, b, r, tar, standing, weather });
   }
-  /** Ratlines: rungs across neighbouring shrouds every RATLINE_STEP up, until the fan grows too narrow to climb. */
   private ratlines(ups: THREE.Vector3[], hound: THREE.Vector3, minGap: number, weather?: { mast: number; side: number }): void {
     const sorted = [...ups].sort((p, q) => q.z - p.z);
     const len = sorted[0].distanceTo(hound);
@@ -321,12 +289,10 @@ export class Rig {
     }
   }
 
-  /** Is this rope set up in this state? Lateen runners are only to windward. */
   ropeShown(rope: RopeLayout, st: RigState): boolean {
     return !rope.weather || rope.weather.side === (st.brace[rope.weather.mast] >= 0 ? -1 : 1);
   }
 
-  /** A yard's frame in the ship frame under the state: braced about the lower mast's axis, lowered as it reefs. */
   yardMatrix(st: RigState, k: number, o: THREE.Matrix4): THREE.Matrix4 {
     const y = this.yards[k], m = this.masts[y.mast], b = st.brace[y.mast] ?? 0;
     if (y.kind === 'sprit') {
@@ -344,11 +310,9 @@ export class Rig {
     if (y.kind === 'square') return o.multiply(_r.makeRotationY(sign * mag)).multiply(_m.makeTranslation(0, 0, m.sail));
     const t = (m.spec as LateenMastSpec).tilt, c = Math.cos(t), s = Math.sin(t);
     o.multiply(_r.makeRotationY(-sign * mag)).multiply(_m.makeTranslation(sign * m.sail, 0, 0));
-    // the lateen yard's own frame: x up the yard toward the peak, y across it, z to leeward (mirrored on the port tack)
     return o.multiply(_m.set(0, 0, sign, 0, s, c, 0, 0, -c, s, 0, 0, 0, 0, 0, 1));
   }
 
-  /** A point of a sail's cloth in the ship frame. */
   sailPoint(st: RigState, i: number, u: number, v: number, time: number, o: THREE.Vector3, yard?: THREE.Matrix4): THREE.Vector3 {
     const s = this.sails[i];
     return sailLocal(s, st.sails[i], u, v, time, o).applyMatrix4(yard ?? this.yardMatrix(st, s.yard, _y));
@@ -360,7 +324,6 @@ export class Rig {
     return this.sailPoint(st, a.sail, a.u, a.v, time, o);
   }
 
-  /** Every rope's ends under the state: 6 floats per rope (a, b); a rope not set up has both ends at a. */
   ropeEnds(st: RigState, time: number, out: Float32Array, standing: boolean | null = null): void {
     this.ropes.forEach((rp, i) => {
       if (standing !== null && rp.standing !== standing) return;
@@ -372,7 +335,6 @@ export class Rig {
     });
   }
 
-  /** Masts, tops, crosstrees, yards and bowsprit as capsules, for the clipping test. */
   spars(st: RigState): Spar[] {
     const out: Spar[] = [];
     this.masts.forEach((m) => {
@@ -395,7 +357,6 @@ export class Rig {
     return out;
   }
 
-  /** A state with the given canvas spread and the yards trimmed for the wind (radians off the bow, + from starboard). */
   state(canvas: Canvas = 'plain', windFrom = 2.2, fill = 0.7): RigState {
     const st: RigState = {
       brace: this.masts.map(() => 0),

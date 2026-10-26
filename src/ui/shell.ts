@@ -1,8 +1,3 @@
-// The shell: the screens of the game and the one that is up. Screens are registered by name in SCREENS
-// (append-only, A6) and move the game along: title → harbour → match → results → harbour. A screen is built each
-// time it comes up and disposed when it goes; it owns its interface (a group of meshes in CSS px in the pipeline's
-// ui scene) and the world scene drawn beneath it. The shell fits the canvas to the view and its safe area, hands
-// each finger to the screen that is up, and draws that screen's frames.
 import type { ShipInput } from '../sim/input.ts';
 import type { Entry, MatchState } from '../sim/state.ts';
 import type * as THREE from 'three';
@@ -16,43 +11,32 @@ import type { Career } from '../career/state.ts';
 import type { Voyage } from '../career/voyage.ts';
 import type { MatchResult } from '../sim/end.ts';
 import { readView, type View } from './safeArea.ts';
-import { harbour } from './harbour.ts'; // WP26
+import { harbour } from './harbour.ts';
 import { match, results } from './screens.ts';
-import { title } from './title.ts'; // WP26
+import { title } from './title.ts';
 
 export type ScreenName = 'title' | 'harbour' | 'match' | 'results';
 
-/** What screens ask of the game. */
 export interface Runtime {
   readonly world: World | null;
   readonly session: Session | null;
-  /** Start a new match from the harbour. */
   setSail(): void;
-  /** Leave for a screen other than the match, ending any match. */
   show(name: Exclude<ScreenName, 'match'>): void;
-  /** WP25: the player's input for the next tick, set by the match screen's controls (idle when unset). */
   input?: (() => ShipInput) | undefined;
-  /** WP25: hears every tick's state after it steps (the haptics feel each tick's events). */
   onTick?: ((s: MatchState) => void) | null;
-  /** WP27: the career, the sound (null until it wakes), the player's voyage in the match being sailed (watched after
-   *  every tick; null for a replay) and the match it last sailed as it came home (null before one). */
   readonly career: Career | null;
   readonly audio: GameAudio | null;
   readonly voyage: Voyage | null;
   readonly outcome: Outcome | null;
-  /** WP27: the player has sunk: the rest of the match is resolved as fast as the frames allow. */
   skip(): void;
 }
 
-/** WP27: a match the player sailed, come home: the career before and after it, its result, the nine league captains
- *  drawn for ships 1–9 and the voyage; `charted` once the career chart has inked what it brought (or it brought nothing). */
 export interface Outcome {
   readonly before: Career;
   readonly after: Career;
   readonly result: MatchResult;
   readonly drawn: readonly number[];
   readonly voyage: Voyage;
-  /** S-019: the gull's moments as the match was heard (results.ts GULL_MOMENTS), for the timeline. */
   readonly gull: readonly Entry[];
   charted: boolean;
 }
@@ -63,7 +47,6 @@ export interface ScreenContext {
   readonly runtime: Runtime;
 }
 
-/** A finger (or the mouse) on the screen, CSS px from the top left. */
 export interface Touch {
   readonly phase: 'down' | 'move' | 'up' | 'cancel';
   readonly id: number;
@@ -72,17 +55,13 @@ export interface Touch {
 }
 
 export interface Screen {
-  /** The interface: meshes in CSS px, origin at the top left. */
   readonly ui: THREE.Group;
-  /** The world drawn beneath the interface. */
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   layout(view: View): void;
   frame(f: Frame): void;
   touch(t: Touch): void;
-  /** WP24: true while the screen holds the match still (the open chart): the loop stops the ticks and the render clock. */
   paused?(): boolean;
-  /** WP27: match seconds per wall second (the sinking's play-out on the chart); 1 when absent. */
   rate?(): number;
   dispose(): void;
 }
@@ -112,7 +91,6 @@ export class Shell {
     }
   }
 
-  /** The screen that is up. */
   get name(): ScreenName | null {
     return this.current;
   }
@@ -129,13 +107,10 @@ export class Shell {
     ui.add(this.screen.ui);
   }
 
-  /** The current screen holds the match still (WP24: the chart is open). */
   get paused(): boolean { return this.screen?.paused?.() ?? false; }
 
-  /** The current screen's camera (WP28: the match's is where the listener rides). */
   get camera(): THREE.PerspectiveCamera | null { return this.screen?.camera ?? null; }
 
-  /** The current screen's pace for the match (WP27). */
   get rate(): number { return this.screen?.rate?.() ?? 1; }
 
   frame(f: Frame): void {

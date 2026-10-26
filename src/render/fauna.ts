@@ -1,14 +1,3 @@
-// WP23: life. The animals of every region, placed from its habitats (REGIONS[].fauna) and seated on the geography:
-// puffins on the stack tops and rafting below them, seals hauled out on rock and ice or bottling in the swell, otters
-// on their backs in the kelp, curlews probing the Amber Shoals' flats, herons stalking the mangrove edges, turtles in
-// the atolls' clear water (the shell below the surface seen through it), whales rolling and blowing in the Glass Sea,
-// sounding with their flukes up and now and then breaching, dolphins leaping. No humans anywhere. Each is drawn as the
-// engraver would: a silhouette in wash with an inked rim and contour hatching on an upright card facing the eye, its
-// motion (wingbeats, probing, blows, leaps, ripples) in the shader. They react to ships: birds lift and fly off as a
-// ship comes near and settle after it passes, seals rear and slip under, otters and turtles dive, dolphins come to ride
-// the bow, whales sound when the guns start; by night puffins go to their burrows and waders roost, and the Glass
-// Sea's blows and rings glow. Beyond LIFE.far, or too small to read, nothing is drawn. One draw for all of it, one for
-// every gull (gull.ts).
 import * as THREE from 'three';
 import { cellOf, localFrame, R, TERRITORY } from '../sim/sphere.ts';
 import { afloat, EVENT } from '../sim/state.ts';
@@ -24,14 +13,11 @@ import type { MatchFrame, RenderContext, RenderModule } from './world.ts';
 export const SPECIES = ['puffin', 'seal', 'otter', 'wader', 'heron', 'turtle', 'whale', 'dolphin'] as const;
 export type Animal = (typeof SPECIES)[number];
 export const KIND = Object.fromEntries(SPECIES.map((s, k) => [s, k])) as Record<Animal, number>;
-/** What a creature is doing: at ease; alarmed (aloft, rearing, diving, sounding); roosting. */
 export const ACT = { idle: 0, alarm: 1, rest: 2 } as const;
-/** Each species' drawn size (half its height, u), how near a ship may come before it shies (u; a pod comes to the bow within it), where it lives. */
 const LIFE_OF: readonly { size: number; shy: number; at: 'any' | 'sea' | 'deep' | 'edge' }[] = [
   { size: 0.38, shy: 10, at: 'any' }, { size: 0.85, shy: 9, at: 'any' }, { size: 0.6, shy: 8, at: 'sea' }, { size: 0.5, shy: 12, at: 'edge' },
   { size: 0.95, shy: 9, at: 'edge' }, { size: 0.6, shy: 7, at: 'sea' }, { size: 4.2, shy: 0, at: 'deep' }, { size: 1, shy: 30, at: 'sea' },
 ];
-/** Drawn within `far` u of the eye while size/distance ≥ `cull`, never smaller than `min` × distance; at most `cap`; whales sound at gunfire within `fire` u for `sound` s; dolphins ride `bow` u ahead. */
 export const LIFE = { far: 170, cull: 0.0016, min: 0.0035, cap: 320, fire: 90, sound: 40, bow: 7 } as const;
 const GLASS = REGIONS.findIndex((r) => /glass/i.test(r.name));
 const BIRDS = new Set([KIND.puffin, KIND.wader, KIND.heron]);
@@ -41,13 +27,11 @@ const TAU = 2 * Math.PI;
 export interface Creature {
   readonly kind: number;
   readonly ri: number;
-  /** Its place (unit), the ground's height there (u; ≤ 0 at sea), the height it is drawn at, whether it stands on land. */
   readonly home: THREE.Vector3;
   readonly ground: number;
   readonly seat: number;
   readonly land: boolean;
   readonly seed: number;
-  /** Live: where it is (unit), its heading, what it is doing (ACT) and for how long, how far aloft a bird has risen (0…1). */
   readonly at: THREE.Vector3;
   readonly head: THREE.Vector3;
   act: number;
@@ -60,7 +44,6 @@ const suits = (k: number, g: number): boolean => {
   return at === 'any' || (at === 'sea' && g < -0.3) || (at === 'deep' && g < -3) || (at === 'edge' && g > -1.5 && g < 1.5);
 };
 
-/** Every region's animals (not its gulls: gull.ts), the same every time: each habitat's count sampled over its disc, re-drawn where the species cannot live. */
 export function placeLife(height: (dir: THREE.Vector3) => number): Creature[] {
   const out: Creature[] = [], e = new THREE.Vector3(), n = new THREE.Vector3();
   REGIONS.forEach((region, ri) => region.fauna.forEach((h, hi) => {
@@ -90,7 +73,6 @@ export class Fauna implements RenderModule {
   readonly creatures: Creature[];
   readonly gulls: GullFlock;
   readonly mesh: THREE.Mesh;
-  /** 0 by day … 1 by night, over the eye. */
   night = 0;
   private readonly geo = new THREE.InstancedBufferGeometry();
   private readonly data: Float32Array[];
@@ -132,12 +114,10 @@ export class Fauna implements RenderModule {
     faunas.set(ctx.scene, this);
   }
 
-  /** Cards drawn this frame. */
   get cards(): number {
     return this.geo.instanceCount;
   }
 
-  /** Life's share of the frame (A9). */
   get triangles(): number {
     return 2 * this.cards + this.gulls.triangles;
   }
@@ -166,7 +146,7 @@ export class Fauna implements RenderModule {
       if (d > LIFE.far) continue;
       this.live(c, dt, f.clock);
       if (size / d < LIFE.cull || n >= LIFE.cap) continue;
-      if (c.kind === KIND.puffin && this.night > 0.5 && c.seed < 0.66) continue; // in their burrows
+      if (c.kind === KIND.puffin && this.night > 0.5 && c.seed < 0.66) continue;
       const bird = BIRDS.has(c.kind), flying = bird && c.lift > 0.15;
       W.copy(c.at).multiplyScalar(R + c.seat + c.lift * (4 + 5 * c.seed));
       const j = 4 * n++;
@@ -189,7 +169,6 @@ export class Fauna implements RenderModule {
     this.gulls.dispose();
   }
 
-  /** A creature's reactions this frame: to the nearest ship, to gunfire, to the night. */
   private live(c: Creature, dt: number, clock: number): void {
     const k = c.kind, shy = LIFE_OF[k].shy;
     let near = Infinity, j = -1;
@@ -200,7 +179,7 @@ export class Fauna implements RenderModule {
       else if (c.act === ACT.alarm && c.time > LIFE.sound) { c.act = ACT.idle; c.time = 0; }
       return;
     }
-    if (k === KIND.dolphin) { // to the bow of a ship within reach, or roaming its waters
+    if (k === KIND.dolphin) {
       if (near < shy) {
         const p = this.ships[j], h = this.heads[j];
         T.copy(p).addScaledVector(h, LIFE.bow / R).addScaledVector(N.crossVectors(p, h), ((c.seed - 0.5) * 4) / R);
@@ -221,7 +200,7 @@ export class Fauna implements RenderModule {
         c.act = ACT.alarm;
         T.subVectors(c.at, this.ships[j]);
         T.addScaledVector(c.at, -T.dot(c.at));
-        if (bird && T.lengthSq() > 1e-12) c.head.copy(T).normalize(); // off, away from the ship
+        if (bird && T.lengthSq() > 1e-12) c.head.copy(T).normalize();
       }
       c.time = Math.min(c.time, 1);
     } else if (c.act === ACT.alarm && c.time > 5 && near > shy * 1.5) c.act = ACT.idle;
@@ -236,11 +215,11 @@ export class Fauna implements RenderModule {
 
 export const createFauna = (ctx: RenderContext): RenderModule => new Fauna(ctx);
 
-const VERT = /* glsl */ `
+const VERT =  `
 uniform float uLifeMin;
-attribute vec4 aP; // seat (world), size
-attribute vec4 aF; // heading, species (+10 on land)
-attribute vec4 aA; // act, its time, seed, glow
+attribute vec4 aP;
+attribute vec4 aF;
+attribute vec4 aA;
 varying vec2 vQ;
 varying vec4 vA;
 varying float vKind;
@@ -260,9 +239,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(aP.xyz + (X * q.x + up * q.y) * s, 1.0);
 }`;
 
-// Each creature in card units (facing +x, the ground or waterline at y = 0, its size = 1): signed distances to its
-// body (d) and inked details (m), masks for its pale parts, bill and markings, rings on the water (rip).
-const FRAG = /* glsl */ `
+const FRAG =  `
 uniform float uLifeClock;
 uniform vec3 uLInk, uLSea, uLFoam, uLGlow, uLBill;
 uniform vec3 uLCol[8];
@@ -281,7 +258,6 @@ float sdE(vec2 p, vec2 c, vec2 r) { vec2 d = (p - c) / r; return (length(d) - 1.
 float sdS(vec2 p, vec2 a, vec2 b, float w) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h) - w; }
 float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
 vec2 rot(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
-// two rings spreading on the water round a swimmer, seen low (flattened)
 float ripple(vec2 q, float t, float r0, float fw) {
   float a = 0.0;
   for (int k = 0; k < 2; k++) {
@@ -297,7 +273,7 @@ void main() {
   float act = vA.x, at = vA.y, seed = vA.z, glow = vA.w, t = uLifeClock + seed * 29.0, fw = fwidth(q.y) + 1e-5;
   float d = 1e3, m = 1e3, rip = 0.0, pale = 0.0, bill = 0.0, dark = 0.0, clip = -1e3, seen = 0.0;
   bool flying = act > 0.5 && act < 1.5;
-  if (kind == 0) { // puffin: black back, white face and front, the striped bill, orange feet
+  if (kind == 0) {
     if (flying) {
       float body = sdE(q, vec2(0.0, 0.6), vec2(0.42, 0.17)), b = sdE(q, vec2(0.6, 0.64), vec2(0.1, 0.07));
       d = min(min(smin(body, sdE(q, vec2(0.4, 0.67), vec2(0.17, 0.15)), 0.06), sdS(q, vec2(-0.02, 0.66), vec2(-0.14, 0.66 + 0.55 * sin(t * 30.0)), 0.07)), b);
@@ -316,7 +292,7 @@ void main() {
       m = length(q - hc - vec2(0.09, 0.04)) - 0.035;
       if (!land) { clip = 0.0; rip = ripple(q, t, 0.4, fw); }
     }
-  } else if (kind == 1) { // seal: mottled, hauled out (rearing when alarmed) or a head in the swell (slipping under)
+  } else if (kind == 1) {
     dark = step(0.62, lNoise(q * 9.0 + seed * 20.0));
     if (land) {
       float alert = act > 0.5 ? 1.0 : 0.0;
@@ -332,7 +308,7 @@ void main() {
       m = min(length(q - hc - vec2(0.08, 0.1)) - 0.03, sdS(q, hc + vec2(0.3, 0.04), hc + vec2(0.44, 0.08), 0.004));
       clip = 0.0; rip = ripple(q, t, 0.3, fw);
     }
-  } else if (kind == 2) { // otter on its back, paws busy at its chest; dives when alarmed
+  } else if (kind == 2) {
     float y0 = 0.06 - 0.5 * (act > 0.5 ? clamp(at * 0.7, 0.0, 1.0) : 0.0);
     vec2 hc = vec2(0.66, y0 + 0.13);
     d = smin(smin(sdE(q, vec2(0.0, y0), vec2(0.6, 0.14)), sdE(q, hc, vec2(0.16, 0.14)), 0.08), sdE(q, vec2(0.3, y0 + 0.18 + 0.05 * sin(t * 7.0)), vec2(0.08, 0.06)), 0.04);
@@ -340,7 +316,7 @@ void main() {
     pale = step(sdE(q, hc + vec2(0.04, 0.0), vec2(0.11, 0.1)), 0.0);
     m = length(q - hc - vec2(0.06, 0.05)) - 0.025;
     clip = 0.0; rip = ripple(q, t, 0.55, fw);
-  } else if (kind == 3) { // curlew: streaked, long-legged, the down-curved bill probing; aloft, legs trailing; roosting on one leg
+  } else if (kind == 3) {
     if (flying) {
       d = smin(sdE(q, vec2(0.0, 0.6), vec2(0.36, 0.11)), sdE(q, vec2(0.36, 0.64), vec2(0.09, 0.08)), 0.05);
       d = min(d, sdS(q, vec2(0.02, 0.63), vec2(-0.12, 0.63 + 0.7 * sin(t * 13.0)), 0.06));
@@ -359,7 +335,7 @@ void main() {
       m = length(q - hc - vec2(0.04, 0.03)) - 0.018;
       if (!land) rip = ripple(q, t, 0.2, fw);
     }
-  } else if (kind == 4) { // grey heron: the S of the neck, the black plume, a sudden stab; aloft, neck tucked and legs trailing
+  } else if (kind == 4) {
     if (flying) {
       d = smin(sdE(q, vec2(0.0, 0.8), vec2(0.42, 0.15)), sdS(q, vec2(0.3, 0.82), vec2(0.38, 0.86), 0.08), 0.05);
       d = min(d, min(sdS(q, vec2(0.44, 0.86), vec2(0.72, 0.82), 0.02), sdS(q, vec2(-0.35, 0.78), vec2(-0.98, 0.74), 0.02)));
@@ -379,7 +355,7 @@ void main() {
       dark = step(0.5, fract((q.x + q.y) * 12.0)) * step(body, 0.0) * step(q.y, 0.95);
       if (!land) rip = ripple(q, t, 0.25, fw);
     }
-  } else if (kind == 5) { // sea turtle: the scuted shell awash, the head up to breathe, flippers rowing, the rest seen through the water
+  } else if (kind == 5) {
     float y0 = -0.02 - 0.45 * (act > 0.5 ? clamp(at * 0.6, 0.0, 1.0) : 0.0), sw = sin(t * 2.2);
     vec2 hc = vec2(0.68, y0 + 0.02 + 0.12 * smoothstep(0.75, 0.95, fract(t / 9.0)));
     float shell = sdE(q, vec2(0.0, y0), vec2(0.55, 0.17));
@@ -387,7 +363,7 @@ void main() {
     m = length(q - hc - vec2(0.05, 0.03)) - 0.02;
     dark = step(abs(fract(q.x * 6.0 + 0.5 * step(0.5, fract((q.y - y0) * 9.0))) - 0.5), 0.07) * step(shell, 0.0);
     clip = 0.0; seen = 1.0; rip = ripple(q, t, 0.6, fw);
-  } else if (kind == 6) { // humpback: three rolls and blows, sounding with the flukes up, a breach some cycles, then down
+  } else if (kind == 6) {
     float tau = mod(t, 26.0), breach = step(lHash(vec2(floor(t / 26.0), seed * 7.0)), 0.3), spout = 0.0;
     if (act > 0.5) tau = at < 4.0 ? 10.0 + at : 30.0;
     vec2 sp = vec2(0.0);
@@ -409,13 +385,13 @@ void main() {
       d = min(sdE(rot(q - c, a), vec2(0.0), vec2(0.8, 0.24)), sdS(q, c + rot(vec2(0.1, -0.2), a), c + rot(vec2(-0.2, -0.75), a), 0.06));
       spout = 1.4 * smoothstep(0.7, 1.0, u);
     }
-    if (spout > 0.0) { // the blow: a bushy column of mist
+    if (spout > 0.0) {
       float h = 0.6 * spout + 0.3, blow = sdE(q, sp + vec2(0.0, h), vec2(0.12 + 0.2 * spout, h)) + 0.07 * (lNoise(q * 7.0 + vec2(0.0, -t * 2.0)) - 0.5);
       if (blow < d) { d = blow; pale = 2.0; }
     }
     rip = tau < 20.0 ? ripple(q * vec2(0.5, 1.0), t, 0.5, fw) : 0.0;
     dark = step(0.8, lHash(floor(q * 40.0))) * step(pale, 1.5);
-  } else { // dolphin: leaping in arcs, pale below; rings where it goes in and comes out
+  } else {
     float u = fract((t + seed * 7.0) / 1.7);
     if (u < 0.5) {
       float v = u / 0.5, ang = atan(0.85 * 3.1416 * cos(3.1416 * v), 1.2);
@@ -434,9 +410,9 @@ void main() {
   col = mix(col, uLBill, clamp(bill, 0.0, 1.0));
   col = mix(col, uLInk, 0.35 * dark) * (0.9 + 0.14 * lNoise(q * 8.0 + seed * 13.0));
   float hatch = step(0.6, fract((gl_FragCoord.x - gl_FragCoord.y) * 0.25));
-  col = mix(col, uLInk, 0.22 * hatch * smoothstep(-0.12, 0.0, d)); // contour hatching inside the rim
+  col = mix(col, uLInk, 0.22 * hatch * smoothstep(-0.12, 0.0, d));
   if (q.y < clip) {
-    if (seen > 0.5 && inside > 0.5) { // seen through the clear shallows
+    if (seen > 0.5 && inside > 0.5) {
       col = mix(mix(uLSea, col, 0.45), uLInk, 0.3 * step(0.5, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.25)));
       writeInk(col, vN);
       return;

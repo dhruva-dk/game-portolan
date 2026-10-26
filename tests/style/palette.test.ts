@@ -1,6 +1,3 @@
-// The palette's promises (PROMPT.md, The look › Readability): every team's colour stays distinct from every other
-// and from the sea and parchment beneath it at every hour and in the storm; trail patterns tell teams apart without
-// colour at the narrowest a trail is drawn; the hour palette is continuous; pigments are reproduced as authored.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,8 +5,6 @@ import {
   toDisplay, toLinear, trailColour, trailCoverage, transmittance, wash, watersColour, type RGB,
 } from '../../src/style/palette.ts';
 
-// CIELAB (D65) and the CIEDE2000 difference (Sharma, Wu & Dalal 2005). ΔE00 ≈ 1 is just noticeable side by side;
-// 10 and more reads as a different colour at a glance.
 function lab(c: RGB): RGB {
   const [r, g, b] = toLinear(c);
   const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
@@ -42,7 +37,6 @@ function deltaELab([L1, a1, b1]: RGB, [L2, a2, b2]: RGB): number {
 }
 
 test('CIEDE2000 matches the published reference pairs', () => {
-  // Sharma, Wu & Dalal 2005, table 1: pairs 1, 7, 17 and 25
   const cases: [RGB, RGB, number][] = [
     [[50, 2.6772, -79.7751], [50, 0, -82.7485], 2.0425],
     [[50, 0, 0], [50, -1, 2], 2.3669],
@@ -52,11 +46,9 @@ test('CIEDE2000 matches the published reference pairs', () => {
   for (const [a, b, d] of cases) assert.ok(Math.abs(deltaELab(a, b) - d) < 1e-4, `${deltaELab(a, b)} ≠ ${d}`);
 });
 
-// every half hour of the day, clear and half and full storm
 const CONDITIONS = Array.from({ length: 48 }, (_, i) => i / 2).flatMap((hour) => [0, 0.5, 1].map((storm) => ({ hour, storm })));
 const GROUNDS = Object.keys(SEA_WASHES) as (keyof typeof SEA_WASHES)[];
 
-/** The smallest ΔE00 found by `measure` over every condition, and where. */
 function worst(measure: (hour: number, storm: number) => { d: number; at: string }[]): { d: number; at: string } {
   let w = { d: Infinity, at: '' };
   for (const { hour, storm } of CONDITIONS) {
@@ -86,7 +78,6 @@ test('team waters stay distinct from one another over every sea, at every hour a
 });
 
 test('team waters stand out from the sea they are laid over', () => {
-  // ≥ 6 for the wash alone; the inked border in the team pigment and its hatched band carry the edge besides
   const w = worst((hour, storm) => GROUNDS.flatMap((g) => {
     const h = hourPalette(hour), ground = seaColour(g, h), bg = stormGrade(ground, storm);
     return TEAMS.map((t) => ({ d: deltaE(stormGrade(watersColour(ground, t, h), storm), bg), at: `${t.name} over ${g}` }));
@@ -110,8 +101,6 @@ test('team trails stay distinct from one another and from the sea and parchment 
 });
 
 test('trail patterns tell every team apart without colour, at the narrowest trail', () => {
-  // Coverage of each pattern sampled at the narrowest trail on the lowest-density screen (TRAIL_MIN_CSS CSS px at
-  // 2 px per CSS px), compared with every other at its best alignment along the trail and in either direction.
   const px = TRAIL_MIN_CSS * 2, window = 20 * px, slide = 6 * px;
   const strip = (p: (typeof TRAIL_PATTERNS)[number], n: number) => Array.from({ length: n }, (_, i) =>
     Array.from({ length: px }, (_, j) => trailCoverage(p, i / px, (j + 0.5) / px - 0.5, 1 / px)));
@@ -146,7 +135,7 @@ test('the hour palette passes through each named hour, wraps at midnight, and ne
 
 test('washes reproduce each pigment on parchment as authored', () => {
   for (const [name, p] of Object.entries(PIGMENTS)) {
-    if (name === 'leadWhite' || name === 'goldLeaf') continue; // body colours, never washes
+    if (name === 'leadWhite' || name === 'goldLeaf') continue;
     const got = toDisplay(wash(toLinear(PARCHMENT), transmittance(p), 1));
     assert.ok(deltaE(got, p) < 1, `${name}: ΔE00 ${deltaE(got, p).toFixed(2)}`);
   }

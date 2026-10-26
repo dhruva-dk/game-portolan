@@ -1,8 +1,3 @@
-// Captures WP19 part B's hero close-ups (tests/render/shipView.html?scene=hero) on both devices: each point of sail,
-// the fittings line-up, each damage stage and the sinking frame by frame, one galleon framed close by __ships.pose.
-// Contact sheets wp19b-<group>-<device>.png go to outDir; the single poses to --poses (default: the OS temp dir).
-// Logs draw calls and triangles per pose and the ships' share.
-//   node tests/render/shipView.hero.ts [outDir] [--device=ipad|iphone] [--poses=<dir>]
 import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -10,10 +5,9 @@ import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const poseDir = args.find((a) => a.startsWith('--poses='))?.slice(8) ?? join(tmpdir(), 'wp19b');
 const devices = (args.find((a) => a.startsWith('--device='))?.slice(9) ?? 'ipad,iphone').split(',') as DeviceName[];
-// in this order: the sinking last, for she does not come back
 const GROUPS: [string, string[]][] = [
   ['sail', ['close', 'reach', 'run', 'irons']],
   ['fit', ['fit-a', 'fit-b', 'fit-c', 'fit-d', 'fit-e']],

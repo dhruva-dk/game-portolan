@@ -1,7 +1,3 @@
-// The smoke tournament (WP11's definition of done): twenty matches of nine captains of rank, every temperament
-// taking every berth in turn under a league captain's identity (its signature), the player's ship left idle. Each
-// temperament's profile — sea claimed, trails broken, ships sunk, loot taken, finishing place — must stand apart from
-// every other's. The 200-match runner and check 3's stated margins are WP12's (tests/tools/tournament.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { seaFor } from '../../src/sim/environment.ts';
@@ -54,7 +50,6 @@ test('the smoke tournament: twenty matches, six distinct temperament profiles', 
     const p = mean[k];
     t.diagnostic(`${NAMES[k].padEnd(12)} ${String(n[k]).padStart(5)} ${p.sea.toFixed(0).padStart(7)} ${p.broken.toFixed(2).padStart(7)} ${p.sunk.toFixed(2).padStart(5)} ${p.loot.toFixed(0).padStart(5)} ${p.place.toFixed(1).padStart(6)}`);
   }
-  // Distinct: every pair of profiles, each stat over its spread across the temperaments, lies apart.
   const scale = STATS.map((f) => Math.max(1e-9, Math.max(...mean.map((p) => p[f])) - Math.min(...mean.map((p) => p[f]))));
   let nearest = Infinity, pair = '';
   for (let a = 0; a < NAMES.length; a++) for (let b = a + 1; b < NAMES.length; b++) {

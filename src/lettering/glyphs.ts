@@ -1,31 +1,13 @@
-// The cancelleresca: a sixteenth-century Italian chancery hand after Arrighi's La Operina (1522), Tagliente and
-// Palatino, written as pen strokes (the ductus). Every glyph is a list of strokes in the order the scribe makes them;
-// each stroke is a path the centre of a broad-edged nib follows, so thick and thin come from its direction alone
-// (src/lettering/nib.ts). The paths are written upright; the hand's forward slant is applied when they are placed.
-//
-// Units: the x-height is 10 (four and a half nib widths), baseline at 0, y up. Ascenders club at 19, capitals stand 15 tall,
-// figures 12, descenders reach -9. Path syntax is a subset of SVG's: absolute M, L, Q and C.
-//
-// Stroke roles drive the layout's joins and writing order (src/lettering/text.ts):
-//   entry  the hairline lead-in to a stem at the x-height; dropped where the previous letter joins into the stem
-//   exit   the foot and hairline flick at the baseline; where the next letter has an entry, it becomes the join
-//   late   the i and j dots and the t's bar, which the scribe adds once the word is written
-
-/** Proportions of the hand, in design units (x-height 10). */
 export const METRICS = {
   xHeight: 10,
   ascender: 19,
   capHeight: 15,
   figureHeight: 12,
   descender: -9,
-  /** Nib width and its thickness edge-on (the finest hairline). */
   nib: 2.2,
   hairline: 0.22,
-  /** Pen angle: the nib's edge rises this many degrees from the horizontal. */
   penAngle: 38,
-  /** Forward slant of the hand, degrees from the vertical. */
   slant: 8,
-  /** Word space. */
   space: 5.5,
 } as const;
 
@@ -34,61 +16,37 @@ export type StrokeRole = 'entry' | 'exit' | 'late';
 export interface Stroke {
   readonly d: string;
   readonly role?: StrokeRole;
-  /** Nib width factor at the start and end of the stroke (a swash lifted onto the nib's corner). */
   readonly taper?: readonly [number, number];
-  /** The stroke's swash form, written instead where the layout asks for display lettering. */
   readonly swash?: Stroke;
 }
 
 export interface Glyph {
-  /** Advance: where the next glyph's origin goes. */
   readonly adv: number;
   readonly strokes: readonly Stroke[];
 }
 
-// ---- the shared forms of the hand ------------------------------------------------------------------------------
-// Chancery minuscules grow from two movements: the branching arch, which springs from the stem two thirds of the way
-// up and rises thin before it turns (n m h r b p k), and the pointed oval of the a, made anticlockwise from the top
-// right with a hairline return (a d g q, and the c e o family). Building every letter from the same few moves keeps
-// the hand consistent, as a scribe's is.
-
 const s = (d: string, role?: StrokeRole, taper?: readonly [number, number], swash?: Stroke): Stroke => ({ d, role, taper, swash });
 
-/** Hairline lead-in to the top of a stem at x. */
 const entry = (x: number) => s(`M ${x - 1.5} 8.6 L ${x} 10`, 'entry');
-/** The foot of a stem at x turning right along the baseline, and the hairline flick that carries into the next letter. */
 const exit = (x: number, y = 1.8) => s(`M ${x} ${y} C ${x} 0.6 ${x + 0.5} 0 ${x + 1.3} 0.15 L ${x + 2.5} 1.4`, 'exit');
-/** The rounded letters' exit: from the bottom of the bowl at x, up through the flick. */
 const roundExit = (x: number) => s(`M ${x} 0 C ${x + 0.8} 0 ${x + 1.5} 0.35 ${x + 2.1} 0.95 L ${x + 2.8} 1.7`, 'exit');
-/** An x-height stem at x down to y. */
 const stem = (x: number, y: number) => `M ${x} 10 L ${x} ${y}`;
-/** An ascender at x down to y, opening with the chancery club: a hairline rising into a turned-over head. */
 const ascender = (x: number, y: number, t: number = METRICS.ascender) =>
   `M ${x - 1.7} ${t - 1.9} C ${x - 1.1} ${t - 0.9} ${x - 0.4} ${t} ${x + 0.5} ${t} C ${x + 0.2} ${t - 0.5} ${x} ${t - 1.2} ${x} ${t - 2.4} L ${x} ${y}`;
-/** The branching arch from a stem at x0 to a right leg at x1, down to y. */
 const arch = (x0: number, x1: number, y: number) =>
   `M ${x0} 5.6 C ${x0 + 0.7} 8.4 ${x0 + 1.8} 10.1 ${x0 + 3.1} 10.1 C ${x1 - 0.8} 10.1 ${x1} 9 ${x1} 7.4 L ${x1} ${y}`;
-/** The b and p bowl: an arch that comes round and closes into the foot of its stem. */
 const bowlRight = (x0: number, x1: number) =>
   `M ${x0} 5.6 C ${x0 + 0.7} 8.4 ${x0 + 1.8} 10.1 ${x0 + 3.1} 10.1 C ${x1 - 0.8} 10.1 ${x1} 8.8 ${x1} 6.4 ` +
   `C ${x1} 2.8 ${x1 - 2.2} 0 ${x0 + 1.8} 0 C ${x0 + 1} 0 ${x0 + 0.4} 0.3 ${x0} 0.9`;
-/** The pointed oval of the a, from the top right (x1) round the left (x0) and back up in a hairline. */
 const bowlLeft = (x0: number, x1: number) =>
   `M ${x1} 9 C ${x1 - 0.7} 9.9 ${x1 - 1.8} 10.2 ${x1 - 2.8} 10.1 C ${x0 + 0.8} 9.8 ${x0} 6.4 ${x0} 3.6 ` +
   `C ${x0} 1.2 ${x0 + 0.9} 0 ${x0 + 1.9} 0 C ${x0 + 3.2} 0 ${x1 - 1} 3 ${x1} 8.4`;
-/** The c, e and o's left side: from the top round to the bottom of the bowl at x = 3.8. */
 const roundLeft = `C 2.1 10.1 1 7 1 4.3 C 1 1.6 2.2 0 3.8 0`;
-/** A descender at x curling left into a tail. */
 const tail = (x: number) => `L ${x} -4.6 C ${x} -7.6 ${x - 1.4} -9 ${x - 3.4} -9 C ${x - 4.6} -9 ${x - 5.6} -8.5 ${x - 6.2} -7.6`;
-/** A diamond dot (the nib drawn a short way across its edge), centred at x, y. */
 const dot = (x: number, y: number, role?: StrokeRole) => s(`M ${x - 0.25} ${y + 0.35} L ${x + 0.25} ${y - 0.35}`, role);
-/** A capital's stem at x opening with a hairline that sweeps in from the left; its swash form swings a heavy hood out
- * to the left and over into the stem, starting on the nib's corner. */
 const capStem = (x: number, y = 0): Stroke => s(`M ${x - 2.4} 12.8 C ${x - 1.6} 14.6 ${x - 0.6} 15.3 ${x} 15 L ${x} ${y}`, undefined, undefined,
   s(`M ${x - 4.6} 9.6 C ${x - 5.6} 12.6 ${x - 3.8} 15.8 ${x - 0.6} 15.6 C ${x + 0.2} 15.5 ${x} 15.2 ${x} 14.4 L ${x} ${y}`, undefined, [0.35, 1]));
-/** A comma's head and tail at x, y (also the apostrophe and the quotes). */
 const comma = (x: number, y: number) => s(`M ${x - 0.3} ${y + 0.35} L ${x + 0.3} ${y - 0.35} C ${x + 0.3} ${y - 1.5} ${x - 0.3} ${y - 2.6} ${x - 1.5} ${y - 3.4}`);
-/** The opening quote: a comma turned over. */
 const turned = (x: number, y: number) => s(`M ${x + 0.3} ${y - 0.35} L ${x - 0.3} ${y + 0.35} C ${x - 0.3} ${y + 1.5} ${x + 0.3} ${y + 2.6} ${x + 1.5} ${y + 3.4}`);
 const oval = (x0: number, x1: number, h: number) => {
   const m = (x0 + x1) / 2;
@@ -289,13 +247,11 @@ const MARKS: Record<string, Glyph> = {
   },
 };
 
-/** A path moved by dx, dy. */
 function shift(d: string, dx: number, dy: number): string {
   let i = 0;
   return d.replace(/-?\d*\.?\d+/g, (n) => String(+(Number(n) + (i++ % 2 === 0 ? dx : dy)).toFixed(3)));
 }
 
-// The straight apostrophe and quote are written as the curly ones, as a scribe would.
 export const GLYPHS: Readonly<Record<string, Glyph>> = {
   ...LOWER, ...UPPER, ...FIGURES, ...MARKS, "'": MARKS['’'], '"': MARKS['”'],
 };

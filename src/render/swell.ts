@@ -1,10 +1,3 @@
-// The render swell: a sum of great-circle Gerstner waves (adapted from the legacy ocean) whose weights follow the
-// wind over the waters in view, so the sea runs with the wind and is seamless everywhere on the sphere, poles
-// included. One function in two languages: SWELL_GLSL moves the sea surface (and anything drawn on it) on the GPU,
-// and Swell.displace, sample and ride are its TypeScript twin, so ships and floating things ride the surface drawn.
-// The sea fields (height, coast distance, lagoon and reef) go to the GPU as one half-float cube texture whose texels
-// sit on the sim's equal-angle cells, so hardware filtering is seamless across the cube's edges; the sea's floors go
-// beside it as a byte cube on the same cells (seaFloorFaces).
 import * as THREE from 'three';
 import type { V3 } from '../sim/math.ts';
 import { R, TERRITORY } from '../sim/sphere.ts';
@@ -12,27 +5,18 @@ import { heightAt, ZONE, type Geography } from '../sim/world/geography.ts';
 import { FLOOR } from '../sim/world/regions.ts';
 
 const WAVES = 16;
-/** World units per s²: how fast each wavelength runs (deep-water dispersion, ω² = g·k). */
 export const GRAVITY = 14;
-const waveA: THREE.Vector4[] = []; // axis xyz (each wave runs toward it along great circles), wavenumber k
-const waveB: THREE.Vector4[] = []; // amplitude, angular frequency, phase, steepness
+const waveA: THREE.Vector4[] = [];
+const waveB: THREE.Vector4[] = [];
 for (let i = 0; i < WAVES; i++) {
-  const y = 1 - (2 * (i + 0.5)) / WAVES, r = Math.sqrt(1 - y * y), th = i * 2.39996323; // golden-angle spiral
-  const lambda = 4 * Math.pow(8, ((i * 7) % WAVES) / (WAVES - 1)); // 4–32 u
+  const y = 1 - (2 * (i + 0.5)) / WAVES, r = Math.sqrt(1 - y * y), th = i * 2.39996323;
+  const lambda = 4 * Math.pow(8, ((i * 7) % WAVES) / (WAVES - 1));
   const k = (2 * Math.PI) / lambda;
   waveA.push(new THREE.Vector4(r * Math.cos(th), y, r * Math.sin(th), k));
   waveB.push(new THREE.Vector4(lambda * 0.03, Math.sqrt(GRAVITY * k), (i * 1.618) % (2 * Math.PI), 0.6));
 }
 
-/**
- * GLSL (vertex or fragment). vec4 cubeAt(cube, dir): a texel of a cube texture on the TERRITORY cells (cubeTexture).
- * vec4 seaField(dir): x height above mean sea level, y signed coast distance (u, > 0 in
- * navigable water), z lagoon, w reef. float beachAt(dir): the shore water's gate (sea.ts beachAt), packed under the
- * reef flag as its negative (a cell is one floor: a reef is never a sand beach). float swellAmp(depth). vec3 swell(dir, t, amp, out normal, out lift): the
- * displacement of the surface point at rest direction dir (add it to dir·(SEA_R + uSeaLevel)); lift is its height
- * in units of amp (crests > 0).
- */
-export const SWELL_GLSL = /* glsl */ `
+export const SWELL_GLSL =  `
 #define SEA_R ${R.toFixed(1)}
 #define WAVES ${WAVES}
 uniform samplerCube tSeaField;
@@ -43,7 +27,7 @@ uniform vec3 uWindAxis;
 uniform float uWind;
 uniform float uSeaLevel;
 vec4 cubeAt(samplerCube t, vec3 p) {
-  vec3 q = p / max(max(abs(p.x), abs(p.y)), abs(p.z)); // the texels hold equal-angle cells: warp the lookup to match
+  vec3 q = p / max(max(abs(p.x), abs(p.y)), abs(p.z));
   return textureLod(t, atan(q) * 1.2732395, 0.0);
 }
 vec4 seaField(vec3 p) { vec4 f = cubeAt(tSeaField, p); return vec4(f.xyz, max(f.w, 0.0)); }
@@ -86,10 +70,6 @@ vec3 swell(vec3 p, float t, float amp, out vec3 normal, out float lift) {
 
 const HALF_ONE = THREE.DataUtils.toHalfFloat(1);
 
-/**
- * The six faces of a cube texture over the TERRITORY cells, RGBA, in the GL cube-map order and orientation: face f is
- * the sim's face f (+x −x +y −y +z −z), s runs with the sim's u and t against v. put fills texel o from cell c.
- */
 function cubeFaces<A extends Uint8Array | Uint16Array>(make: (n: number) => A, put: (out: A, o: number, c: number) => void): A[] {
   const N = TERRITORY.n, NN = N * N, faces: A[] = [];
   for (let f = 0; f < 6; f++) {
@@ -100,8 +80,6 @@ function cubeFaces<A extends Uint8Array | Uint16Array>(make: (n: number) => A, p
   return faces;
 }
 
-/** The sea-field cube's faces (RGBA half floats: height, coast distance, lagoon, reef 1 or else −`beach`, the shore
- *  water's gate per cell, sea.ts beachGates). */
 export function seaFieldFaces(geo: Geography, beach: Float32Array): Uint16Array[] {
   const half = THREE.DataUtils.toHalfFloat;
   return cubeFaces((n) => new Uint16Array(n), (out, o, c) => {
@@ -112,10 +90,6 @@ export function seaFieldFaces(geo: Geography, beach: Float32Array): Uint16Array[
   });
 }
 
-/**
- * The sea-floor cube's faces, on the field cube's texels (RGBA bytes, a mask each: rock (and ice), kelp, mud, black
- * sand; sand where none is set and the field's reef is clear).
- */
 export function seaFloorFaces(geo: Geography): Uint8Array[] {
   return cubeFaces((n) => new Uint8Array(n), (out, o, c) => {
     const fl = geo.floor[c];
@@ -126,11 +100,9 @@ export function seaFloorFaces(geo: Geography): Uint8Array[] {
   });
 }
 
-/** Bytes of GPU memory the sea-field and sea-floor cubes take. */
 export const SEA_FIELD_BYTES = 6 * TERRITORY.n * TERRITORY.n * 8;
 export const SEA_FLOOR_BYTES = 6 * TERRITORY.n * TERRITORY.n * 4;
 
-/** A linearly filtered cube texture of six RGBA faces in cubeFaces' layout (read it with cubeAt). */
 export function cubeTexture(faces: (Uint8Array | Uint16Array)[], type: THREE.TextureDataType): THREE.CubeTexture {
   const N = TERRITORY.n;
   const cube = new THREE.CubeTexture(faces.map((d) => new THREE.DataTexture(d, N, N, THREE.RGBAFormat, type)) as unknown as HTMLImageElement[]);
@@ -148,31 +120,24 @@ const smoothstep = (a: number, b: number, x: number): number => {
 };
 
 export interface SwellSample {
-  /** Height of the surface above mean sea level, the tide included, u. */
   height: number;
   readonly normal: THREE.Vector3;
 }
 
 export interface Riding {
-  /** Where the hull's centre floats. */
   readonly position: THREE.Vector3;
-  /** The deck's up: the plane through its bow, stern, port and starboard waterline points. */
   readonly up: THREE.Vector3;
 }
 
 export class Swell {
   readonly field: THREE.CubeTexture;
-  /** Shared by every material that rides the swell (spread them in; members are shared by reference). */
   readonly uniforms = {
     tSeaField: { value: null as unknown as THREE.CubeTexture },
     uWaveA: { value: waveA },
     uWaveB: { value: waveB },
-    /** Master amplitude: 1 in fair weather (calm and squall scale it). */
     uSwellAmp: { value: 1 },
-    /** The wind over the waters in view, as the axis it turns round (see setWind), and its strength 0–1.4. */
     uWindAxis: { value: new THREE.Vector3(0, 1, 0) },
     uWind: { value: 0.8 },
-    /** The tide: sea level above mean, u. */
     uSeaLevel: { value: 0 },
   };
   private readonly wgt = new Float64Array(WAVES);
@@ -187,20 +152,17 @@ export class Swell {
 
   private readonly geo: Geography;
 
-  /** `beach`: the shore water's gate per cell (sea.ts beachGates), packed into the field. */
   constructor(geo: Geography, beach: Float32Array) {
     this.geo = geo;
     this.field = cubeTexture(seaFieldFaces(geo, beach), THREE.HalfFloatType);
     this.uniforms.tSeaField.value = this.field;
   }
 
-  /** The wind at p blows toward the tangent `toward` with `strength`; it turns round one axis over the waters in view. */
   setWind(p: V3, toward: V3, strength: number): void {
     this.uniforms.uWindAxis.value.set(p.y * toward.z - p.z * toward.y, p.z * toward.x - p.x * toward.z, p.x * toward.y - p.y * toward.x).normalize();
     this.uniforms.uWind.value = strength;
   }
 
-  /** The rest-direction displacement sums at unit q (the GLSL swell, less the normalisation). */
   private sums(q: THREE.Vector3, t: number): void {
     const u = this.uniforms, level = u.uSeaLevel.value, depth = level - heightAt(this.geo, q);
     const amp = u.uSwellAmp.value * (0.55 + 0.45 * Math.min(u.uWind.value, 1.4)) * (0.15 + 0.85 * smoothstep(0.3, 10, depth));
@@ -229,14 +191,12 @@ export class Swell {
     }
   }
 
-  /** Where the sea surface point at rest direction `rest` lies at time t (the sea mesh's vertex, exactly). */
   displace(rest: V3, t: number, out: THREE.Vector3): THREE.Vector3 {
     const q = this.q.set(rest.x, rest.y, rest.z).normalize();
     this.sums(q, t);
     return out.copy(q).multiplyScalar(R + this.uniforms.uSeaLevel.value + this.d.h).add(this.d.hv);
   }
 
-  /** The surface straight above unit direction p at time t: finds the rest point the swell carried over p. */
   sample(p: V3, t: number, out: SwellSample): SwellSample {
     const q = this.q.set(p.x, p.y, p.z).normalize(), d = this.d;
     for (let it = 0; ; it++) {
@@ -249,11 +209,10 @@ export class Swell {
     return out;
   }
 
-  /** A hull of `length` and `beam` at p heading along the tangent `forward`, floating on the swell at time t. */
   ride(p: V3, forward: V3, length: number, beam: number, t: number, out: Riding): Riding {
     const up = this.t2.set(p.x, p.y, p.z).normalize();
     const fwd = this.t3.set(forward.x, forward.y, forward.z).addScaledVector(up, -up.dot(forward)).normalize();
-    const side = this.t4.crossVectors(up, fwd); // port
+    const side = this.t4.crossVectors(up, fwd);
     const offs = [[length / 2, 0], [-length / 2, 0], [0, beam / 2], [0, -beam / 2]];
     let mean = 0;
     for (let i = 0; i < 4; i++) {

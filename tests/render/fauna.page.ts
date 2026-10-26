@@ -1,7 +1,3 @@
-// The life test page (tests/render/fauna.html, outside the game build): the game's own render path (WorldView, every
-// registered module) over a match at its opening, for WP23's captures. window.__fauna.seek(step) poses and draws one
-// shot: plumage:<ship> (ships 0–6: no training, each trait at its top in turn, every trait at the top), flight:<FLIGHT
-// name> (ship 0's gull) or life:<species>; it returns the frame's draw calls and triangles and life's share.
 import * as THREE from 'three';
 import { faunas, KIND, type Animal } from '../../src/render/fauna.ts';
 import { GULL_FLY } from '../../src/render/gull.ts';

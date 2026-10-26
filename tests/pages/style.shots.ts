@@ -1,13 +1,9 @@
-// Captures the style gallery (tests/pages/style.html) at both devices: the deck view at four hours, the high and
-// orbit views in the afternoon (frames at CSS resolution, to keep progress/ light), and a detail of lines, hatching
-// and washes at full device resolution.
-//   node tests/pages/style.shots.ts [outDir] [--only=<substring>]     (default outDir: progress/shots, files wp02-*)
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 
 const SHOTS: { name: string; view: string; hour: number; ui?: boolean; detail?: boolean }[] = [

@@ -1,8 +1,3 @@
-// WP9 part A, items, headless: every fitting and every consumable at the first and the last pigment tier; chests taken
-// by sailing over them, their three offers and the choice; the loot pool by tier, rank and region richness; chests
-// dropped by a swap and by a sinking; stacking; the gull's seam (deliver); the starting fittings by rank; the Arch and
-// the Great Lagoon; determinism, snapshot/resume with chests, kegs and shells afloat, and the tick's cost.
-//   node --test tests/sim/items.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,12 +34,10 @@ const fitted = (slot: number, kind: number, tier = 0): { kind: number; tier: num
   START_FITTINGS.map((k, s) => (s === slot ? { kind, tier } : { kind: k, tier: 0 }));
 const unarmed = (o: Outfit = {}): Outfit => ({ ...o, fittings: fitted(SLOT.broadside, FITTING.none) });
 
-/** Every ship's input: idle but for the player's and ship 1's changes. */
 const inputs = (player: Partial<ShipInput> = {}, rival: Partial<ShipInput> = {}): ShipInput[] =>
   Array.from({ length: SHIPS }, (_, i) => ({ ...idleInput(), ...(i === 0 ? player : i === 1 ? rival : {}) }));
 const IDLE = inputs();
 
-/** Ships 0 and 1 at sea where the fleet starts, sailing but dead in the water, ship 1 unarmed unless outfitted; the rest out of the match. */
 function duel(fleet: Outfit[] = [], rank = 1): MatchState {
   const s = createMatch({ seed: SEED, fleet: Array.from({ length: SHIPS }, (_, i) => fleet[i] ?? (i === 1 ? unarmed() : {})), rank });
   s.ships.forEach((ship, i) => {
@@ -54,7 +47,6 @@ function duel(fleet: Outfit[] = [], rank = 1): MatchState {
   return s;
 }
 
-/** Ship j `ahead` u before ship `ref`'s bow and `abeam` u to its starboard, heading as it heads. */
 function place(s: MatchState, j: number, ahead: number, abeam: number, ref = 0): void {
   const a = s.ships[ref], b = s.ships[j], star = cross(v3(), a.head, a.pos);
   normalize(addScaled(b.pos, addScaled(b.pos, a.pos, a.head, ahead / R), star, abeam / R));
@@ -63,7 +55,6 @@ function place(s: MatchState, j: number, ahead: number, abeam: number, ref = 0):
   b.wasHead = { ...b.head };
 }
 
-/** One tick of what items touch, as the step runs it: sight, combat, items. */
 function tick(s: MatchState, ins: ShipInput[] = IDLE): void {
   s.events.length = 0;
   survey(sea, s, SIGHTS);
@@ -72,7 +63,6 @@ function tick(s: MatchState, ins: ShipInput[] = IDLE): void {
   s.tick++;
 }
 
-/** `seconds` of ticks; the events they raised. */
 function run(s: MatchState, seconds: number, ins: ShipInput[] = IDLE): Happening[] {
   const seen: Happening[] = [];
   for (let n = 0; n < S(seconds); n++) {
@@ -84,11 +74,7 @@ function run(s: MatchState, seconds: number, ins: ShipInput[] = IDLE): Happening
 const once = (s: MatchState, ins: ShipInput[] = IDLE): Happening[] => run(s, TICK, ins);
 const count = (ev: Happening[], kind: number, ship = 0): number => ev.filter((e) => e.kind === kind && e.ship === ship).length;
 
-/** A landmark's index by its perk, and its marker cell. */
 const landmark = (perk: string): number => sea.geo.landmarks.findIndex((l) => l.perk === perk);
-
-// ---------------------------------------------------------------------------------------------------------------
-// Fittings, slot by slot.
 
 test('the bow: the iron ram strikes hardest, the cutwater cuts the trail and stops a new one, each stronger by tier', () => {
   const rammed = (kind: number, tier: number) => {
@@ -116,7 +102,6 @@ test('the bow: the iron ram strikes hardest, the cutwater cuts the trail and sto
   assert.ok(rammed(FITTING.ironRam, LAST).hurt > rammed(FITTING.ironRam, FIRST).hurt);
   assert.ok(rammed(FITTING.cutwater, LAST).cut > rammed(FITTING.cutwater, FIRST).cut);
 
-  // Cut, it lays no trail leaving its waters until the cut has passed.
   const s = duel(), b = s.ships[1], c0 = cellOf(TERRITORY, b.pos), c1 = neighbor(TERRITORY, c0, 0);
   s.owner[c0] = 2;
   cellDir(TERRITORY, c0, b.was);
@@ -177,7 +162,6 @@ test('the stern: chasers fire astern only, kegs drop under pursuers and burst, t
     assert.ok(astern.s.shots.every((sh) => sh.kind === FITTING.sternChasers));
     assert.equal(chased(12).s.shots.length, 0, 'nothing astern, the chasers hold fire');
 
-    // Powder kegs: dropped while a rival follows close astern; it bursts under the rival's hull, sparing the dropper.
     const s = duel([{ fittings: fitted(SLOT.stern, FITTING.powderKegs, tier) }, unarmed()]);
     place(s, 1, -6, 0);
     assert.equal(count(once(s), EVENT.keg), 1);
@@ -189,7 +173,6 @@ test('the stern: chasers fire astern only, kegs drop under pursuers and burst, t
     near(hull - s.ships[1].hull, KEGS.damage[tier], 1e-6);
     near(s.ships[0].hull, mine, 1e-9);
     assert.equal(s.kegs.length, 0);
-    // A keg nobody sails over bursts where it floats when its fuse burns out.
     const lone = duel([{ fittings: fitted(SLOT.stern, FITTING.powderKegs, tier) }, unarmed()]);
     place(lone, 1, -6, 0);
     once(lone);
@@ -197,7 +180,6 @@ test('the stern: chasers fire astern only, kegs drop under pursuers and burst, t
     const out = run(lone, KEGS.fuse + 0.2).find((e) => e.kind === EVENT.kegBurst);
     assert.ok(out && out.by === -1 && out.amount === 0 && lone.kegs.length === 0);
 
-    // The mortar: a tap aims itself at the rival and the shell bursts on it; a drag lobs it at a point.
     const m = duel([{ gunnery: 0, fittings: fitted(SLOT.stern, FITTING.mortar, tier) }, unarmed()]);
     place(m, 1, 30, 0);
     const tap = inputs({ flags: FLAG.useAimed, aim: -1 }), before = m.ships[1].hull;
@@ -285,9 +267,6 @@ test('the lookout: the stern glass reaches astern, the crow\'s nest raises the e
   assert.equal(lookout(s, 0, SIGHTS[0]), 2);
 });
 
-// ---------------------------------------------------------------------------------------------------------------
-// Consumables.
-
 test('consumables come by the chest\'s tier and stack by kind in three slots; a fourth kind waits on deck', () => {
   for (const kind of [CONSUMABLE.patchKit, CONSUMABLE.ward, CONSUMABLE.gust, CONSUMABLE.fogFlask, CONSUMABLE.flare]) {
     for (const tier of TIERS_TESTED) {
@@ -320,7 +299,6 @@ test('each consumable at work: patch kit mends, ward absorbs and holds the trail
   };
   const use = inputs({ consumable: 0 });
 
-  // Patch kit: CONSUMABLES.patch of the full hull over its three seconds; the slot empties.
   const p = stocked(CONSUMABLE.patchKit), q = duel(), full = fullHull(p.ships[0].form, p.ships[0].fittings);
   p.ships[0].hull = q.ships[0].hull = full / 2;
   assert.equal(count(once(p, use), EVENT.used), 1);
@@ -330,7 +308,6 @@ test('each consumable at work: patch kit mends, ward absorbs and holds the trail
   near(p.ships[0].hull - q.ships[0].hull, CONSUMABLES.patch * full, 1e-6);
   assert.deepEqual(p.ships[0].consumables[0], { kind: 0, count: 0 });
 
-  // Ward: every blow absorbed, the open trail unbreakable, a second ward refused while the first holds; then neither.
   const w = stocked(CONSUMABLE.ward, 2), ship = w.ships[0], c = cellOf(TERRITORY, ship.pos), hull = ship.hull;
   ship.laid = [c];
   w.trail[c] = 1;
@@ -347,14 +324,12 @@ test('each consumable at work: patch kit mends, ward absorbs and holds the trail
   near(ship.hull, hull - 10);
   assert.equal(ship.laid.length, 0);
 
-  // Gust: CONSUMABLES.gust faster while it blows.
   const g = stocked(CONSUMABLE.gust), calm = trim(sea, g, 0, newTrim()).speed;
   once(g, use);
   near(trim(sea, g, 0, newTrim()).speed / calm, 1 + CONSUMABLES.gust);
   run(g, CONSUMABLES.time[2] + 0.1);
   near(trim(sea, g, 0, newTrim()).speed, calm);
 
-  // Fog flask: hidden from the rival's lookout while it lasts.
   const f = stocked(CONSUMABLE.fogFlask);
   place(f, 1, 10, 0);
   once(f);
@@ -365,7 +340,6 @@ test('each consumable at work: patch kit mends, ward absorbs and holds the trail
   run(f, CONSUMABLES.time[3] + 0.1);
   assert.ok((SIGHTS[1].ships & 1) !== 0);
 
-  // Flare: every ship within SIGHT.flare marked for its ship alone while it burns.
   const l = stocked(CONSUMABLE.flare);
   place(l, 1, SIGHT.flare - 10, 0);
   once(l);
@@ -376,9 +350,6 @@ test('each consumable at work: patch kit mends, ward absorbs and holds the trail
   run(l, CONSUMABLES.time[4] + 0.1);
   assert.equal(SIGHTS[0].marks & 2, 0);
 });
-
-// ---------------------------------------------------------------------------------------------------------------
-// Chests and loot.
 
 test('the loot pool: brighter pigments enter as the rank rises, and richer regions bring brighter chests', () => {
   for (let rank = 1; rank <= 8; rank++) {
@@ -420,7 +391,6 @@ test('a chest opens under the ship sailing over it, offering three items; a seco
   assert.equal(s.chests.length, 0);
   assert.ok(s.timeline.some((e) => e.kind === EVENT.chosen && e.ship === 1));
 
-  // A held fitting is offered first, the rest no brighter than the pool at the player's rank.
   const low = duel([], 1);
   place(low, 1, 10, 0);
   afloatChest(low, low.ships[1].pos, 4, { kind: FITTING.longGuns, tier: 4 }, -1);
@@ -515,10 +485,6 @@ test('landmarks: the Arch reloads the stern a third faster; nothing aims into th
   assert.equal(aimed(true), 0);
 });
 
-// ---------------------------------------------------------------------------------------------------------------
-// Determinism, snapshots and cost.
-
-/** All ten ships sailing from the start, every stern fitting and gun among them, consumables stocked, chests on deck and afloat. */
 function brawl(): MatchState {
   const guns = [FITTING.longGuns, FITTING.swivelGuns, FITTING.chainShot, FITTING.heatedShot, FITTING.lightGuns];
   const sterns = [FITTING.mortar, FITTING.powderKegs, FITTING.sternChasers];

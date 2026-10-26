@@ -1,10 +1,3 @@
-// WP27 pass f (S-019 (g)): the sinking as a moment, staged on the game's own render path (WorldView with the WP24 rig
-// driving the camera, every registered module) over the real headless match of territory.match.ts. Query: weather=
-// clear|storm, safe=top,right,bottom,left (CSS px). The match plays on from 30 s to the first second she has open water round her
-// (no ground within 30 u); for the storm the clock is set on to the
-// first phase's hold and its calm moved so the player lies 16 u inside the storm, its wall ahead; then she sinks
-// where she is. window.__sink: at(s) runs the frames to s seconds after she sank (real time, 60 a second) and draws
-// the last; it reports the camera's lift, its distance to the wreck, and the plumes alive.
 import * as THREE from 'three';
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { fleets, RING, FLOTSAM, SLICK, FOAM } from '../../src/render/ships/shipView.ts';
@@ -35,7 +28,6 @@ const frame = (dt: number, render: boolean): void => {
 };
 
 rig.zoom.set(0.35);
-// on to open water: from 30 s, the first second she has no ground within 30 u (the moment, not a coast, in frame)
 const me = state.ships[0], at = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), p = new THREE.Vector3();
 const open = (): boolean => {
   at.set(me.pos.x, me.pos.y, me.pos.z).normalize();
@@ -52,28 +44,24 @@ while (state.tick < Math.round(30 / TICK) || (state.tick < Math.round(150 / TICK
 at.set(me.pos.x, me.pos.y, me.pos.z).normalize();
 const where = { s: Math.round(state.tick * TICK), open: open() };
 if (storm) {
-  // the first phase's calm held, its edge 16 u behind the bow and a little to port: she lies in the storm, its wall ahead
   state.tick = Math.round(225 / TICK);
   const calm = state.storm.calms[0], hd = new THREE.Vector3(me.head.x, me.head.y, me.head.z).addScaledVector(at, -at.dot(me.head as THREE.Vector3Like)).normalize();
   const port = new THREE.Vector3().crossVectors(at, hd), toward = hd.clone().addScaledVector(port, 0.35).normalize(), ang = calm.r + 16 / R;
   const c = at.clone().multiplyScalar(Math.cos(ang)).addScaledVector(toward, Math.sin(ang)).normalize();
   calm.at.x = c.x; calm.at.y = c.y; calm.at.z = c.z;
-  for (let k = 0; k < 240; k++) frame(1 / 60, false); // the rain and the sea's grey come in
+  for (let k = 0; k < 240; k++) frame(1 / 60, false);
 }
-// she sinks where she is
 me.phase = PHASE.sunk;
 me.hull = 0;
 me.speed = 0;
 const sankAt = state.tick;
 state.sunk.push({ ship: 0, by: -1, cause: CAUSE.storm, tick: sankAt });
 let since = 0;
-// the match's clock runs on as it does in the game while the camera watches (the sim itself is not stepped)
 const on = (dt: number, render: boolean): void => { since += dt; state.tick = sankAt + Math.floor(since / TICK); frame(dt, render); };
 
 const hook = {
   ready: true,
   storm,
-  /** The match time she sank at, s, and whether the water round her was open. */
   where,
   at(s: number) {
     while (since + 1 / 60 <= s) on(1 / 60, false);

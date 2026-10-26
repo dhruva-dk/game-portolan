@@ -1,10 +1,3 @@
-// WP27: the first voyage (PROMPT.md, The first voyage): a new career's first match, against the nine lowest captains at
-// their gentlest (career/setup.ts; the first loop always succeeds, sim), teaches through play. Never a wall of text: at
-// the right moment a scrap of parchment letters a few words, an inked hand's arrow runs to the control that does it and
-// a ring pulses about it, and the scrap folds away as soon as the player has done it (WP10's Voyage records each LESSON
-// as it happens). Seven moments, each shown at most once: leave the current, steer, close a loop, call the gull, choose
-// from the chest, fire a broadside, run from the storm. The urgent three (storm, a rival in range, a chest on deck)
-// hurry a calm one along; a tap folds the scrap early. The state is plain integers (ticks), saved with the match.
 import * as THREE from 'three';
 import type { Career } from '../career/state.ts';
 import { LESSON, LESSONS, type Voyage } from '../career/voyage.ts';
@@ -19,31 +12,25 @@ import { MIN_LETTER, MIN_TARGET, SEPIA, VERMILION, clamp01, ease, inkRect, inset
 import type { Rect, View } from './safeArea.ts';
 import type { Touch } from './shell.ts';
 
-/** Seconds: the first prompt waits `open`; a prompt stays at least `hold`, at most `wait` (`hurry` with an urgent one due); `gap` between calm ones; a rival within `near` u is in range. */
 export const TUTORIAL = { open: 4, hold: 3, wait: 16, hurry: 7, gap: 2, near: 30 } as const;
 
 export type Anchor = 'stick' | 'home' | 'gull' | 'deck' | 'guns' | 'storm';
-// 'deck': the chest's panel, at the middle of its inner edge (part B: the match gives it; else the top left)
-/** By LESSON, the words and the control they point at. */
 export const PROMPTS: readonly { readonly words: string; readonly sub: string; readonly anchor: Anchor }[] = [
   { words: 'Leave the current', sub: 'steer out of the stream', anchor: 'stick' },
   { words: 'Steer with your thumb', sub: 'the sails set your speed', anchor: 'stick' },
   { words: 'Close a loop', sub: 'sail home to claim the sea', anchor: 'home' },
   { words: 'Call the gull', sub: 'it brings a chest', anchor: 'gull' },
-  { words: 'Touch the one you want', sub: '', anchor: 'deck' }, // the sheet itself is headed "Choose one"
+  { words: 'Touch the one you want', sub: '', anchor: 'deck' },
   { words: 'Fire a broadside', sub: 'turn your side to them', anchor: 'guns' },
   { words: 'Run from the storm', sub: 'keep inside the calm', anchor: 'storm' },
 ];
 
-/** What the tutorial reads of a tick. */
 export interface Moment {
   tick: number;
   breakOff: boolean;
   offer: boolean;
   rivalNear: boolean;
   stormNear: boolean;
-  /** Head home would close a loop now: the ship is out of its waters with an open trail behind it (S-019: never prompt
-   *  a press that does nothing, as it would inside her home). */
   homeward: boolean;
   lessons: readonly number[];
 }
@@ -59,7 +46,6 @@ export function sense(state: MatchState, v: Voyage): Moment {
   return { tick: state.tick, breakOff: v.breakOff >= 0, offer: me.offer.length > 0, rivalNear: near && afloat(me), stormNear: v.storm > 0, homeward, lessons: v.lessons };
 }
 
-/** The tutorial's state: the lesson showing (−1 none) and since when; by LESSON the tick it was shown and folded (−1 not yet). */
 export interface Tutorial {
   active: number;
   since: number;
@@ -67,7 +53,6 @@ export interface Tutorial {
   closed: number[];
 }
 export const newTutorial = (): Tutorial => ({ active: -1, since: 0, shown: new Array<number>(LESSONS).fill(-1), closed: new Array<number>(LESSONS).fill(-1) });
-/** Only the career's first match teaches. */
 export const isFirstVoyage = (career: Career): boolean => career.match === 0;
 
 const ORDER = [LESSON.storm, LESSON.broadside, LESSON.chest, LESSON.gull, LESSON.loop, LESSON.steer, LESSON.breakOff];
@@ -94,7 +79,6 @@ function close(t: Tutorial, tick: number): void {
   t.since = tick;
 }
 
-/** One tick of the tutorial: the lesson to show now (−1 none). Each lesson is shown at most once. */
 export function tutorialStep(t: Tutorial, m: Moment): number {
   if (t.active >= 0) {
     const k = t.active, held = (m.tick - t.since) * TICK;
@@ -115,31 +99,23 @@ export function tutorialStep(t: Tutorial, m: Moment): number {
   return -1;
 }
 
-/** A tap folds the scrap showing. */
 export function dismiss(t: Tutorial, tick: number): void { if (t.active >= 0) close(t, tick); }
-/** Every lesson learned or taught. */
 export const tutorialOver = (t: Tutorial, lessons: readonly number[]): boolean => t.active < 0 && lessons.every((l, k) => l >= 0 || t.closed[k] >= 0);
 
 export interface PromptLayout {
   lesson: number;
-  /** The control pointed at. */
   at: { x: number; y: number };
   card: Rect;
-  /** The sheet's bounds: the card, the arrow and the ring. */
   bounds: Rect;
   k: number;
-  /** The words and the line under them, as letter() draws them (the fit test measures them). */
   words: Words[];
 }
 
-/** Where the controls are on screen (the match screen gives the HUD's own layout, part B). */
 export type Anchors = Partial<Record<Anchor, { x: number; y: number }>>;
 
-/** Where each prompt points in the HUD `L`: the stick's thumb, head home, the gull, the broadside's fitting, the
- *  storm's dial, the chest's panel. */
 export function anchorsOf(L: HudLayout): Anchors {
   const at = (kind: string) => { const b = L.buttons.find((q) => q.kind === kind); return b && { x: b.x, y: b.y }; };
-  const guns = L.fittings[1], c = chestLayout(L.view, 3, L), p = c.panel; // a chest offers three (items.ts OFFERS)
+  const guns = L.fittings[1], c = chestLayout(L.view, 3, L), p = c.panel;
   return {
     stick: { x: L.stick.x + L.stick.width * (L.left ? 0.74 : 0.26), y: L.stick.y + L.stick.height * 0.72 },
     home: at('home'), gull: at('gull'), guns: guns && { x: guns.x, y: guns.y },
@@ -148,21 +124,16 @@ export function anchorsOf(L: HudLayout): Anchors {
   };
 }
 
-/** What a prompt's scrap must leave clear in the HUD `L` (S-019): the frame's centre (the ship and the sea ahead),
- *  every scrap and control (the hull rope, the top centre, the compact chart, the stern glass, the wind rose, the sail,
- *  the purse, the fittings, every button of the fan), where the stick comes up (the lower half of its half), and the chest's panel. */
 export function keepClear(L: HudLayout, lesson = -1): Rect[] {
   const disc = (d: { x: number; y: number; r: number }): Rect => ({ x: d.x - d.r, y: d.y - d.r, width: 2 * d.r, height: 2 * d.r });
   const hit = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : disc({ x: b.x, y: b.y, r: b.hit }));
-  const st = L.stick, rest = { x: st.x, y: st.y + st.height / 2, width: st.width, height: st.height / 2 }; // where the stick comes up
+  const st = L.stick, rest = { x: st.x, y: st.y + st.height / 2, width: st.width, height: st.height / 2 };
   const out = [centreOf(L.safe), L.hull, L.share, L.top, L.chart, L.sail, L.purse, disc(L.compass), disc(L.sternGlass),
     ...L.fittings.map(disc), ...L.buttons.map(hit), rest];
   if (lesson < 0 || PROMPTS[lesson].anchor === 'deck') out.push(chestLayout(L.view, 3, L).sheet);
   return out;
 }
 
-/** The scrap's lettering, the card at (0, 0): the words and the line under them, sized to the screen (never under
- *  MIN_LETTER), and the card's size around them. */
 function promptFace(lesson: number, kk: number): { words: Words[]; width: number; height: number } {
   const P = PROMPTS[lesson], pad = 7 * kk, side = 16 * kk;
   const wo: TextOptions = { size: Math.max(MIN_LETTER, 20 * kk), align: 'center', valign: 'top', swash: true };
@@ -172,12 +143,10 @@ function promptFace(lesson: number, kk: number): { words: Words[]; width: number
   const words: Words[] = [{ text: P.words, x: width / 2, y: pad, o: wo, colour: INK }];
   let tall = wb.bottom - wb.top;
   if (P.sub && sb) { words.push({ text: P.sub, x: width / 2, y: pad + tall, o: so, colour: SEPIA }); tall += sb.bottom - sb.top - 1 * kk; }
-  const height = Math.max(MIN_TARGET, tall + 2 * pad), dy = (height - tall - 2 * pad) / 2; // a tap folds it: a 44 pt target at least
+  const height = Math.max(MIN_TARGET, tall + 2 * pad), dy = (height - tall - 2 * pad) / 2;
   return { words: words.map((q) => ({ ...q, y: q.y + dy })), width, height };
 }
 
-/** Where the scrap and its arrow go for a lesson in the HUD `hud`: the nearest place to its control that leaves the
- *  centre and every control clear (keepClear), found in the right-handed layout and mirrored for the left hand. */
 export function promptLayout(view: View, lesson: number, leftHanded = false, hud: HudLayout = hudLayout(view, leftHanded)): PromptLayout {
   const L = hud, R = L.left ? mirrorLayout(L) : L, s = R.safe, kk = Math.min(1.45, s.height / 420), k = Math.max(1, kk), a = PROMPTS[lesson].anchor;
   const at = anchorsOf(L)[a] ?? { x: s.x + s.width / 2, y: s.y + s.height / 2 }, aim = anchorsOf(R)[a] ?? at;
@@ -189,7 +158,6 @@ export function promptLayout(view: View, lesson: number, leftHanded = false, hud
     const dx = Math.max(x - aim.x, 0, aim.x - x - w), dy = Math.max(y - aim.y, 0, aim.y - y - h), d = Math.hypot(dx, dy);
     if (d < score - 1e-6) { score = d; best = r; }
   }
-  // (nowhere clear, never seen on a supported device: the top-left corner of the safe area, as small as it is)
   let card = best ?? { x: room.x, y: room.y, width: w, height: h };
   if (L.left) card = { ...card, x: view.width - card.x - card.width };
   const words = f.words.map((q) => ({ ...q, x: q.x + card.x, y: q.y + card.y }));
@@ -207,13 +175,12 @@ function toward(r: Rect, p: { x: number; y: number }): Pt {
   return [cx + dx * f, cy + dy * f];
 }
 
-/** A prompt `t` s after it appeared: the scrap, its words written in, the arrow drawn to the control, the ring pulsing. */
 export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
   const { card: r, k, at, lesson } = pl, P = PROMPTS[lesson], a = ease(t / 0.35);
   if (a <= 0) return;
   g.save();
   g.globalAlpha *= a;
-  { // an arrow to the control (to the chest's panel: no ring)
+  {
     const from = toward(r, at), dx = at.x - from[0], dy = at.y - from[1], len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
     const end: Pt = [at.x - ux * 34 * k, at.y - uy * 34 * k], mid: Pt = [(from[0] + end[0]) / 2 - uy * len * 0.16, (from[1] + end[1]) / 2 + ux * len * 0.16];
     const pa = clamp01((t - 0.25) / 0.6), curve = quad(from, mid, end, 20);
@@ -231,7 +198,6 @@ export function drawPrompt(g: G, pl: PromptLayout, t: number): void {
   g.restore();
 }
 
-/** The first voyage in the match: feed it each tick's state and Voyage; it shows and folds the prompts. */
 export class TutorialOverlay {
   readonly group = new THREE.Group();
   private sheet: Sheet | null = null;
@@ -243,7 +209,7 @@ export class TutorialOverlay {
   private acc = 0;
   private tick = 0;
   private hud: HudLayout | null = null;
-  private finger = -1; // the finger that landed on the scrap
+  private finger = -1;
 
   readonly state: Tutorial;
   private readonly leftHanded: boolean;
@@ -255,7 +221,6 @@ export class TutorialOverlay {
     this.cue = cue;
   }
 
-  /** Folds the prompt showing, as a tap on it would (the chest's, once "Later" has stowed the chest). */
   fold(): void {
     if (this.shown < 0) return;
     dismiss(this.state, this.tick);
@@ -263,7 +228,6 @@ export class TutorialOverlay {
     this.rebuild();
   }
 
-  /** The lesson whose prompt is up (−1 none) and its scrap, which a tap folds. */
   get showing(): number { return this.shown; }
   get card(): Rect | null { return this.pl?.card ?? null; }
 
@@ -279,14 +243,12 @@ export class TutorialOverlay {
     return k;
   }
 
-  /** The view, and where its controls are (the HUD's layout). */
   layout(view: View, hud: HudLayout | null = null): void {
     this.view = view;
     this.hud = hud;
     this.rebuild();
   }
 
-  /** True when the prompt took the touch: a finger that landed on its scrap, to its end; a tap there folds it. */
   touch(t: Touch): boolean {
     if (t.phase === 'down') {
       if (this.finger >= 0 || this.pl === null || !inside(this.pl.card, t.x, t.y)) return false;

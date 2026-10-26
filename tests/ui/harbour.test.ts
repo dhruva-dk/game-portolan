@@ -1,8 +1,3 @@
-// WP26: the harbour's model in Node — every page reachable from the harbour and back, every touch target inside the
-// safe area, at least 44 pt and clear of the others on the iPhone, the iPad and the smallest iPhone, the league and
-// the nine captains' cards, the shipwright and the gull acting through the career API only as it allows, and the
-// settings kept on the device, read back and applied.
-//   node --test tests/ui/harbour.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TRAITS } from '../../src/career/league.ts';
@@ -54,7 +49,6 @@ test('every touch target fits the safe area, is at least 44 pt and clear of the 
       for (const c of l.cells) assert.ok(within(c), `${name} ${p}: every card and row inside the safe area`);
       if (l.ledger) assert.ok(within(l.ledger), `${name} ${p}: the ledger inside the safe area`);
     }
-    // the app test (tests/app/shell.test.ts) taps set sail in the middle of the safe area, 0.42 of the way down
     assert.equal(hit(harbourLayout(v, 'home'), r.x + r.width / 2, r.y + r.height * 0.42)?.id, 'sail', name);
   }
 });
@@ -132,7 +126,6 @@ test('settings are kept on the device, read back and applied', async () => {
   forgetSettings();
 });
 
-// WP26b the graphics quality: a setting kept with the others and applied to the pipeline's dynamic resolution
 import { QUALITY } from '../../src/render/pipeline.ts';
 
 test('the graphics quality is a setting, kept, sanitized and applied to the pipeline', () => {

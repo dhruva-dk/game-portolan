@@ -1,14 +1,3 @@
-// WP27: the chest choice (PROMPT.md, Chests and loot): a chest opened on deck offers three items and the player
-// chooses one. The offers come up as three inked cards on a compact parchment panel (S-019: never over the ship, the sea
-// ahead or a control, since the match runs on; see chestLayout), each the item's icon in its tier's
-// pigment (iron gall, verdigris, ultramarine, vermilion; the top tier framed in burnished gold leaf) glowing as the
-// chest did, its name lettered in the hand, what it does, and what it means for this ship: the fitting it would replace
-// in its slot, or the stack a consumable joins. A touch on a card chooses it as ShipInput.chestPick, the very index a
-// captain's bestPick() would give for that card; an offer the ship cannot take (its three stores full of other kinds) is
-// struck through and will not take a touch. The match never stops for the choice (the offers wait on deck until one is
-// chosen, items.ts), so "Later" folds the sheet away and the chest stays on deck until the player opens it again from
-// a chip beside the compact chart: the chest in its tier's pigment, glowing (part B). The panel takes only the touches
-// that land on it or "Later"; a thumb on the stick steers on, the other thumb's fan stays in reach.
 import * as THREE from 'three';
 import { drop, sheet, sheetMesh, type Sheet } from '../render/harbourScene.ts';
 import { OFFERS, bestPick, canTake, isConsumable, worth, type Item } from '../sim/items.ts';
@@ -37,40 +26,32 @@ const KEY_OF: string[] = [];
 for (const [k, v] of Object.entries(FITTING)) KEY_OF[v] = k;
 for (const [k, v] of Object.entries(CONSUMABLE)) KEY_OF[v] = k;
 
-/** An item's name as lettered (FITTING or CONSUMABLE kind). */
 export const itemName = (kind: number): string => NAME_OF[KEY_OF[kind] ?? '']?.[0] ?? 'Nothing';
 export const itemDoes = (kind: number): string => NAME_OF[KEY_OF[kind] ?? '']?.[1] ?? '';
 export const SLOT_WORDS = ['Bow', 'Broadside', 'Stern', 'Rig', 'Hull', 'Lookout'] as const;
-/** By pigment tier (tables.ts), the illuminator's pigment. */
 export const TIER_WORDS = ['Iron gall', 'Verdigris', 'Ultramarine', 'Vermilion', 'Gold leaf'] as const;
 export const chestWords = (tier: number): string => {
   const w = TIER_WORDS[Math.max(0, Math.min(TIERS - 1, tier))];
   return `${/^[AEIOU]/.test(w) ? 'An' : 'A'} ${w.toLowerCase()} chest`;
 };
 
-/** One offer as the card shows it. */
 export interface Offer {
   index: number;
   item: Item;
   name: string;
   does: string;
   consumable: boolean;
-  /** SLOT for a fitting, −1 for a consumable. */
   slot: number;
   pigment: string;
   tierWord: string;
   gold: boolean;
   takeable: boolean;
-  /** The fitting it would displace (dropped astern in a chest), null for an empty slot or a consumable. */
   replaces: Item | null;
-  /** Consumables it brings (LOOT.count), 0 for a fitting. */
   count: number;
   worth: number;
-  /** The offer a captain would take (bestPick): the first voyage marks it. */
   best: boolean;
 }
 
-/** The ship's deck offers as cards (empty when no chest is open). */
 export function chestOffers(ship: Ship): Offer[] {
   const best = bestPick(ship);
   return ship.offer.map((item, index) => {
@@ -84,52 +65,36 @@ export function chestOffers(ship: Ship): Offer[] {
   });
 }
 
-/** "1 use", "3 uses". */
 export const uses = (n: number): string => (n === 1 ? '1 use' : `${n} uses`);
 
-/** What taking it means for this ship, in a few words. */
 export function consequence(o: Offer): string {
   if (!o.takeable) return 'Your stores are full';
   if (o.consumable) return `${o.count} to your stores`;
   return o.replaces ? `In place of ${itemName(o.replaces.kind)}` : `Fills the ${SLOT_WORDS[o.slot].toLowerCase()}`;
 }
 
-/** The touch on card k as ShipInput.chestPick: k when the ship can take it, else −1 (no choice). */
 export const chestPick = (offers: readonly Offer[], k: number): number => (offers[k]?.takeable ? k : -1);
 
 export interface ChestLayout {
   view: View;
-  /** Everything the choice draws: the panel and its "Later". */
   sheet: Rect;
-  /** The parchment behind the cards (a touch on it is the choice's, never the controls' beneath). */
   panel: Rect;
   cards: Rect[];
   later: Rect;
-  /** Scale of the lettering and rules, 1 on the iPhone. */
   k: number;
-  /** The cards stacked down the thumb's edge (room enough between the compact chart and the thumb's fan: the iPad),
-   *  else side by side across the top corner on the thumb's side, over the compact chart's slot (the iPhone). */
   column: boolean;
-  /** Mirrored for the left hand: on the left, where its thumb's fan is. */
   left: boolean;
 }
 
-/** The frame's centre, which nothing of the interface may cover (PROMPT.md, The match screen; WP25's 40 % box). */
 export const centreOf = (s: Rect): Rect => ({ x: s.x + s.width * 0.3, y: s.y + s.height * 0.3, width: s.width * 0.4, height: s.height * 0.4 });
 const hitBox = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : { x: b.x - b.hit, y: b.y - b.hit, width: 2 * b.hit, height: 2 * b.hit });
 const meets = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-/** A compact choice that never hides the match (it never pauses): clear of the frame's centre (the ship and the sea
- *  ahead), of the stick's half and of every control, on the side of the thumb that is free to choose (mirrored for the
- *  left hand). Where there is room between the compact chart and the thumb's fan (the iPad) the cards stack down the
- *  thumb's edge under a header with "Later"; else (the iPhone) they sit side by side in the top corner, over the compact
- *  chart's slot, with "Later" a tab beneath the outer card, clear of the fan. `hud` is the match's own layout. */
 export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hudLayout(view, false)): ChestLayout {
   const s = safeOf(view), left = hud.left === true, k = Math.max(1, Math.min(1.45, hud.u)), c = centreOf(s), m = 6 * k, gap = 8 * k;
   const fan = hud.buttons.filter((b) => b.kind !== 'chart').map(hitBox);
   const fanTop = Math.min(s.y + s.height, ...fan.map((b) => b.y));
   const edge = left ? s.x + m : s.x + s.width - m, inner = left ? c.x - gap : c.x + c.width + gap;
-  // the column: from under the compact chart to over the fan, down the thumb's edge
   const top = hud.chart.y + hud.chart.height + gap, bottom = fanTop - gap, head = Math.max(MIN_TARGET, 44 * k), cardMin = 90 * k;
   if (bottom - top >= head + gap + n * cardMin + (n - 1) * gap + 2 * m) {
     const w = Math.min(Math.abs(edge - inner), 310 * k), x = left ? edge : edge - w, h = bottom - top;
@@ -139,12 +104,9 @@ export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hud
     const sheet = { x, y: top, width: w, height: h };
     return { view, sheet, panel: sheet, cards, later, k, column: true, left };
   }
-  // the row: across the top corner on the thumb's side, from the top centre's scrap to the edge, down to the centre's box
   const from = left ? hud.top.x - gap : hud.top.x + hud.top.width + gap, w = Math.abs(edge - from), x = left ? edge : from;
-  // (the cards close-set, 4 pt in and 5 apart, so their words fit down to the smallest iPhone)
   const y = s.y + m, h = Math.min(c.y, fanTop) - gap - y, mc = 4 * k, gc = 5 * k, cw = (w - 2 * mc - (n - 1) * gc) / n;
   const cards = Array.from({ length: n }, (_, i) => ({ x: x + mc + i * (cw + gc), y: y + mc, width: cw, height: h - 2 * mc }));
-  // "Later": a tab under the outer card, as wide as the fan's discs leave it (never under 44 pt)
   const ty = y + h + 2 * k, th = MIN_TARGET;
   let later = { x: left ? x : x + w - MIN_TARGET, y: ty, width: MIN_TARGET, height: th };
   for (const tw of [72 * k, 60 * k, 52 * k]) {
@@ -155,19 +117,14 @@ export function chestLayout(view: View, n: number = OFFERS, hud: HudLayout = hud
   return { view, sheet: { x, y, width: w, height: ty + th - y }, panel, cards, later, k, column: false, left };
 }
 
-/** "Later"'s lettering, em CSS px (inkButton letters at 21 × its scale): as large as its tab holds, never under MIN_LETTER. */
 export const laterSize = (l: ChestLayout): number => Math.max(MIN_LETTER, 21 * (l.column ? l.k * 0.85 : Math.min(l.k * 0.72, l.later.width / 64)));
-/** The column's header ("A vermilion chest"), em CSS px, and the width it may take. */
 export const headerOf = (l: ChestLayout): { size: number; w: number } => ({ size: 17 * l.k, w: l.panel.width - l.later.width - 30 * l.k });
 
-/** What a touch at (x, y) lands on: a card's index, −2 "Later", −1 nothing. */
 export function pickAt(l: ChestLayout, x: number, y: number): number {
   if (inside(l.later, x, y)) return -2;
   return l.cards.findIndex((c) => inside(c, x, y));
 }
 
-/** The whole choice as it stands `t` s after the chest opened: the panel unfolds, the cards ink in one by one. The
- *  tier is in the cards' pigments; the column's header letters it too ("A vermilion chest"). */
 export function drawChestChoice(g: G, offers: readonly Offer[], l: ChestLayout, t: number, chosen = -1, hint = false): void {
   const { panel: s, k } = l, top = offers.reduce((m, o) => Math.max(m, o.item.tier), 0);
   const open = ease(t / 0.3);
@@ -184,21 +141,16 @@ export function drawChestChoice(g: G, offers: readonly Offer[], l: ChestLayout, 
   inkButton(g, l.later, 'Later', laterSize(l) / 21, chosen >= 0 ? 0 : clamp01((t - 0.6) / 0.4));
 }
 
-/** One line (or wrapped block) of a card's lettering, as letter() draws it at (x, y); the fit test measures it. */
 export interface Words { text: string; x: number; y: number; o: TextOptions; colour: string }
-/** A card's face, `c` the card: its roundel and every string on it, each fitted inside the card's frame (S-019): a
- *  string shrinks to fit its line, never under MIN_LETTER, then wraps; the words sit from the card's foot up and the
- *  roundel takes what they leave. A wide card (the iPad's column) has the roundel at its left and four lines beside it. */
 export function cardFace(o: Offer, c: Rect, k: number): { icon: { x: number; y: number; r: number }; words: Words[]; wide: boolean } {
   const wide = c.width > c.height * 1.6, pad = 7 * k, cons = consequence(o), consInk = o.takeable ? INK : VERMILION;
   const tall = (text: string, w: TextOptions): number => { const b = layoutOf(text, w).box; return b.bottom - b.top; };
-  if (wide) { // name, tier and slot, what it does, and what taking it means, beside the icon
+  if (wide) {
     const r = c.height * 0.384, x = c.x + 12 * k + r, tx = x + r + 14 * k, wmax = c.x + c.width - 10 * k - tx, lh = c.height / 4.6, y0 = c.y + c.height / 2 - 1.5 * lh;
     const tierLine = o.consumable ? `${o.tierWord}, ${uses(o.count)}` : `${o.tierWord}, the ${SLOT_WORDS[o.slot].toLowerCase()}`;
     const line = (text: string, size: number, i: number, colour: string): Words => ({ text, x: tx, y: y0 + i * lh, o: { size: fitSize(text, size, wmax), valign: 'middle', maxWidth: wmax }, colour });
     return { icon: { x, y: c.y + c.height / 2, r }, wide, words: [line(o.name, 19 * k, 0, INK), line(tierLine, 12.5 * k, 1, o.gold ? GOLD_DARK : o.item.tier === 0 ? SEPIA : o.pigment), line(o.does, 12.5 * k, 2, SEPIA), line(cons, 12.5 * k, 3, consInk)] };
   }
-  // a narrow card (the iPhone's row): the name and what taking it means under the roundel (the tier is its pigment)
   const w = c.width - 2 * pad, x = c.x + c.width / 2;
   const no: TextOptions = { size: fitSize(o.name, 14 * k, w), align: 'center', valign: 'top', maxWidth: w, lineHeight: 1.08 };
   const co: TextOptions = { size: fitSize(cons, 12.5 * k, w), align: 'center', valign: 'top', maxWidth: w, lineHeight: 1.08 };
@@ -225,14 +177,14 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   wash(g, o.pigment, 0.16, (gg) => { gg.beginPath(); gg.arc(cx, iy, rr, 0, Math.PI * 2); });
   nib(g, ring(cx, iy, rr, 31 + o.item.kind), 1.2 * k, clamp01((t - 0.1) / 0.6), o.gold ? GOLD_DARK : o.pigment);
   const pi = clamp01((t - 0.15) / 0.6);
-  if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, rr * 0.68, pi); // icons.ts sizes are half-extents
+  if (o.consumable) consumableIcon(g, o.item.kind, cx, iy, rr * 0.68, pi);
   else cardIcon(g, o.item.kind, o.item.tier, cx, iy, rr * 0.68, pi);
   const pt = clamp01((t - 0.3) / 0.8);
   for (const w of f.words) letter(g, w.text, w.x, w.y, w.o, w.colour, pt);
   const nm = f.words[0], nb = layoutOf(nm.text, nm.o).box, ny = nm.y + (nb.top + nb.bottom) / 2, nx0 = nm.x + nb.left - 3 * k, nx1 = nm.x + nb.right + 3 * k;
   if (!o.takeable) nib(g, [[nx0, ny + 2 * k], [(nx0 + nx1) / 2, ny - 3 * k], [nx1, ny + 1 * k]], 2 * k, pt, VERMILION);
   if (hint && o.best && chosen < 0) {
-    const fx = c.x + c.width - 12 * k, fy = c.y + 12 * k; // the gull's mark: a small eight-point star in gold
+    const fx = c.x + c.width - 12 * k, fy = c.y + 12 * k;
     for (let i = 0; i < 4; i++) {
       const an = (i * Math.PI) / 4;
       nib(g, [[fx - Math.cos(an) * 9 * k, fy - Math.sin(an) * 9 * k], [fx + Math.cos(an) * 9 * k, fy + Math.sin(an) * 9 * k]], 1.6 * k, pt, GOLD_DARK);
@@ -241,13 +193,11 @@ function drawCard(g: G, o: Offer, r: Rect, t: number, chosen: number, k: number,
   g.restore();
 }
 
-/** A fitting as the card engraves it, `h` its half-extent: the slot's thing drawn in fine line over a light wash of the
- *  tier's pigment, its shade hatched (the HUD's small glyphs, icons.ts, would read as flat signs at this size). */
 function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: number, p: number): void {
   if (p <= 0) return;
   const slot = FITTING_SLOT[kind] ?? -1;
   const w = 0.07 * h, P = (u: number, v: number): Pt => [x + u * h, y + v * h], line = (pts: Pt[], k = 1): void => nib(g, pts, w * k, p);
-  const shade = (path: (q: G) => void, n = 7): void => { // diagonal hatching inside a shape
+  const shade = (path: (q: G) => void, n = 7): void => {
     g.save();
     g.beginPath();
     path(g);
@@ -258,9 +208,8 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
   wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.28 * p, (q) => q.arc(x, y, 0.95 * h, 0, Math.PI * 2));
   const fill = (pts: Pt[]) => (q: G): void => { q.moveTo(...pts[0]); for (const pt of pts) q.lineTo(...pt); q.closePath(); };
   const ring2 = (u: number, v: number, r: number, seed: number, k = 1): void => line(ring(x + u * h, y + v * h, r * h, seed), k);
-  // S-019: each fitting its own engraving (two of a slot never share one): the slot's drawing below is one kind's
   switch (kind) {
-    case FITTING.stemPost: { // an oak stem post, raked, bolted
+    case FITTING.stemPost: {
       const post = [P(-0.3, -0.85), P(0.1, -0.85), P(0.4, 0.85), P(0, 0.85)];
       wash(g, OCHRE, 0.5 * p, fill(post));
       shade(fill([P(-0.1, -0.85), P(0.1, -0.85), P(0.4, 0.85), P(0.2, 0.85)]), 6);
@@ -269,7 +218,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       line([P(-0.75, 0.85), P(0.75, 0.85)], 0.8);
       return;
     }
-    case FITTING.cutwater: { // a keen blade parting a trail's dashes
+    case FITTING.cutwater: {
       const blade = [...quad(P(-0.85, 0.15), P(0, -0.85), P(0.9, -0.35), 10), ...quad(P(0.9, -0.35), P(0.05, -0.35), P(-0.85, 0.15), 10)];
       wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.5 * p, fill(blade));
       line(blade, 1.2);
@@ -277,7 +226,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       line([P(-0.05, 0.3), P(0.12, 0.75)], 0.6);
       return;
     }
-    case FITTING.lightGuns: case FITTING.swivelGuns: { // a short gun on a low carriage; a swivel gun on its fork and post
+    case FITTING.lightGuns: case FITTING.swivelGuns: {
       const swivel = kind === FITTING.swivelGuns, L0 = swivel ? -0.55 : -0.6, L1 = swivel ? 0.6 : 0.45, b0 = swivel ? -0.25 : -0.05;
       const barrel = [P(L0, b0), P(L1, b0 - 0.16), P(L1 + 0.02, b0 - 0.02), P(L0 + 0.02, b0 + 0.2)];
       wash(g, INK, 0.25 * p, fill(barrel));
@@ -288,18 +237,18 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       else { line([P(-0.55, 0.18), P(-0.5, 0.45), P(0.35, 0.45), P(0.3, 0.05)], 1); for (const u of [-0.35, 0.18]) ring2(u, 0.52, 0.16, 5, 1.1); }
       return;
     }
-    case FITTING.chainShot: { // two balls and the chain between
+    case FITTING.chainShot: {
       for (const u of [-0.55, 0.55]) { wash(g, INK, 0.45 * p, (q) => q.arc(x + u * h, y, 0.28 * h, 0, Math.PI * 2)); ring2(u, 0, 0.28, 7 + u * 10, 1.2); }
       for (let i = 0; i < 4; i++) { const u = -0.3 + i * 0.2; line(ring(x + (u + 0.05) * h, y + (i % 2 ? 0.06 : -0.06) * h, 0.08 * h, 11 + i), 0.8); }
       return;
     }
-    case FITTING.heatedShot: { // a ball glowing, flames licking up from it
+    case FITTING.heatedShot: {
       wash(g, VERMILION, 0.4 * p, (q) => q.arc(x, y + 0.3 * h, 0.4 * h, 0, Math.PI * 2));
       ring2(0, 0.3, 0.4, 13, 1.2);
       for (const [u, t] of [[-0.25, -0.55], [0.05, -0.85], [0.3, -0.5]]) line(quad(P(u - 0.1, -0.05), P(u + 0.15, (t - 0.05) / 2), P(u, t), 6), 1);
       return;
     }
-    case FITTING.sternChasers: { // a gun run out astern over the taffrail, pointing back
+    case FITTING.sternChasers: {
       const barrel = [P(0.7, -0.2), P(-0.85, -0.42), P(-0.86, -0.25), P(0.68, 0.05)];
       wash(g, INK, 0.25 * p, fill(barrel));
       shade(fill(barrel), 5);
@@ -309,7 +258,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       for (const u of [-0.1, 0.25, 0.6]) line([P(u, 0.1), P(u, 0.3)], 0.7);
       return;
     }
-    case FITTING.powderKegs: { // a keg, hooped, its fuse lit
+    case FITTING.powderKegs: {
       const keg = [...quad(P(-0.45, -0.6), P(-0.65, 0), P(-0.45, 0.6), 8), ...quad(P(0.45, 0.6), P(0.65, 0), P(0.45, -0.6), 8)];
       wash(g, OCHRE, 0.5 * p, fill(keg));
       shade(fill(keg), 6);
@@ -319,7 +268,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       wash(g, VERMILION, 0.8 * p, (q) => q.arc(x + 0.62 * h, y - 0.76 * h, 0.07 * h, 0, Math.PI * 2));
       return;
     }
-    case FITTING.lateenMizzen: case FITTING.stormSails: { // a lateen on its long raked yard; a small storm course, reefed
+    case FITTING.lateenMizzen: case FITTING.stormSails: {
       if (kind === FITTING.lateenMizzen) {
         const sail = [P(-0.7, 0.55), ...quad(P(-0.7, 0.55), P(0.35, 0.2), P(0.75, -0.85), 8).slice(1), P(-0.7, 0.55)];
         wash(g, PAPER, 0.85 * p, fill(sail));
@@ -339,7 +288,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       }
       return;
     }
-    case FITTING.doubledPlanking: { // two courses of planks, the outer laid over the inner's seams, nailed
+    case FITTING.doubledPlanking: {
       for (const [v, off] of [[-0.45, 0], [-0.1, 0.25], [0.25, 0], [0.6, 0.25]] as const) {
         const r = [P(-0.85 + off * 0.3, v), P(0.85, v), P(0.85, v + 0.3), P(-0.85 + off * 0.3, v + 0.3)];
         wash(g, OCHRE, (off ? 0.55 : 0.35) * p, fill(r));
@@ -349,7 +298,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       }
       return;
     }
-    case FITTING.pumps: { // the chain pump's barrel and brake, water running from its spout
+    case FITTING.pumps: {
       const barrel = [P(-0.2, -0.7), P(0.2, -0.7), P(0.2, 0.85), P(-0.2, 0.85)];
       wash(g, OCHRE, 0.5 * p, fill(barrel));
       shade(fill(barrel), 5);
@@ -359,7 +308,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       for (const [u, v] of [[0.62, 0.1], [0.66, 0.35], [0.7, 0.6]]) wash(g, TIER[2], 0.7 * p, (q) => q.arc(x + u * h, y + v * h, 0.06 * h, 0, Math.PI * 2));
       return;
     }
-    case FITTING.sternGlass: { // the stern's lights: an arched window of leaded panes
+    case FITTING.sternGlass: {
       const arch = [P(-0.6, 0.75), P(-0.6, -0.2), ...quad(P(-0.6, -0.2), P(0, -0.95), P(0.6, -0.2), 10).slice(1), P(0.6, 0.75)];
       wash(g, TIER[2], 0.25 * p, fill(arch));
       line([...arch, arch[0]], 1.3);
@@ -368,7 +317,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       line([P(-0.8, 0.85), P(0.8, 0.85)], 1.3);
       return;
     }
-    case FITTING.crowsNest: { // the topmast and its nest, a lookout's pennant above
+    case FITTING.crowsNest: {
       line([P(0, -0.95), P(0, 0.95)], 1.5);
       const nest = [P(-0.42, -0.35), P(0.42, -0.35), P(0.32, 0.05), P(-0.32, 0.05)];
       wash(g, OCHRE, 0.55 * p, fill(nest));
@@ -382,7 +331,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
     }
   }
   switch (slot) {
-    case SLOT.hull: { // copper sheathing: the hull in profile, planked, plated below the waterline (no rig: not "a ship")
+    case SLOT.hull: {
       const keel = [...quad(P(0.85, -0.32), P(0.6, 0.5), P(0.05, 0.48), 10), ...quad(P(0.05, 0.48), P(-0.55, 0.48), P(-0.82, -0.18), 10)];
       wash(g, OCHRE, 0.5 * p, fill(keel));
       shade(fill([P(-0.75, 0.08), P(0.8, 0.02), ...keel.slice(4, 18)]), 8);
@@ -394,7 +343,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       for (const v of [0.22, 0.34]) line(quad(P(-0.6, v), P(0.1, v + 0.06), P(0.68, v - 0.08), 8), 0.45);
       break;
     }
-    case SLOT.broadside: { // a long gun on its carriage
+    case SLOT.broadside: {
       const barrel = [P(-0.75, -0.05), P(0.82, -0.3), P(0.84, -0.12), P(-0.72, 0.2)];
       wash(g, INK, 0.25 * p, fill(barrel));
       shade(fill([P(-0.73, 0.08), P(0.83, -0.21), P(0.84, -0.12), P(-0.72, 0.2)]), 6);
@@ -405,7 +354,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       for (const u of [-0.42, 0.24]) { line(ring(x + u * h, y + 0.55 * h, 0.2 * h, 5), 1.1); line([P(u - 0.2, 0.55), P(u + 0.2, 0.55)], 0.5); }
       break;
     }
-    case SLOT.bow: { // a ram's beak, banded
+    case SLOT.bow: {
       const beak = [P(-0.8, -0.42), P(0.88, 0.02), P(-0.8, 0.44)];
       wash(g, tier === 0 ? '#8a8178' : TIER[tier], 0.45 * p, fill(beak));
       shade(fill([P(-0.8, 0.02), P(0.88, 0.02), P(-0.8, 0.44)]), 6);
@@ -416,7 +365,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       break;
     }
     case SLOT.stern: mortarIcon(g, x, y, h * 0.8, p, tier); break;
-    case SLOT.rig: { // a mast and its course, bellied by the wind
+    case SLOT.rig: {
       const sail = [...quad(P(-0.55, -0.55), P(-0.2, -0.15), P(-0.5, 0.3), 8), ...quad(P(0.5, 0.3), P(0.85, -0.15), P(0.55, -0.55), 8)];
       wash(g, PAPER, 0.85 * p, fill(sail));
       shade(fill([P(0.15, -0.55), ...quad(P(0.55, -0.55), P(0.85, -0.15), P(0.5, 0.3), 8), P(0.15, 0.3)]), 6);
@@ -427,7 +376,7 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
       wash(g, VERMILION, 0.8 * p, fill([P(0, -0.9), P(0.42, -0.8), P(0, -0.72)]));
       break;
     }
-    default: { // the lookout's glass, drawn out
+    default: {
       const tube = (a: number, b: number, r0: number, r1: number): Pt[] => [P(a, 0.4 - (a + 0.8) * 0.5 - r0), P(b, 0.4 - (b + 0.8) * 0.5 - r1), P(b, 0.4 - (b + 0.8) * 0.5 + r1), P(a, 0.4 - (a + 0.8) * 0.5 + r0)];
       for (const [a, b, r0, r1] of [[-0.8, -0.25, 0.1, 0.12], [-0.25, 0.25, 0.14, 0.16], [0.25, 0.8, 0.19, 0.24]] as const) {
         const t = tube(a, b, r0, r1);
@@ -440,12 +389,8 @@ function cardIcon(g: G, kind: number, tier: number, x: number, y: number, h: num
   }
 }
 
-/** What the choice sounds: the sheet unfolding, a refused touch, the pick, "Later", and a stowed chest opened again
- *  (the chest's own sound, engine.chestOpen(tier)). */
 export type ChestCue = 'page' | 'tap' | 'confirm' | 'back' | 'open';
 
-/** The stowed chest's chip: a small scrap with a drawn chest (oak washed in ochre, planked and hatched, its iron bands
- *  and the scrap's rule in the tier's pigment) in a glow, lettered "Chest". */
 export function drawChestChip(g: G, r: Rect, tier: number): void {
   const k = r.height / 52, cx = r.x + r.width / 2, cy = r.y + r.height * 0.4, s = 15 * k, pig = TIER[Math.max(0, Math.min(TIERS - 1, tier))], top = tier >= TIERS - 1;
   const band = top ? GOLD_DARK : pig;
@@ -460,22 +405,18 @@ export function drawChestChip(g: G, r: Rect, tier: number): void {
   const y0 = cy - 0.1 * s, y1 = y0 + 0.85 * s, dome = ring(cx, y0, s, 7, -Math.PI, Math.PI, 16).map(([x, y]): [number, number] => [x, y0 + (y - y0) * 0.55]);
   wash(g, OCHRE, 0.62, (q) => { q.rect(cx - s, y0, 2 * s, 0.85 * s); });
   wash(g, OCHRE, 0.38, (q) => { q.moveTo(...dome[0]); for (const pt of dome) q.lineTo(...pt); q.closePath(); });
-  for (let i = 0; i < 5; i++) { const x = cx + s * (0.32 + i * 0.15); nib(g, [[x, y0 + 0.12 * s], [x - 0.18 * s, y1 - 0.08 * s]], 0.7 * k, 1, SEPIA, 0.55); } // the shade
-  nib(g, [[cx - s, y0 + 0.42 * s], [cx + s, y0 + 0.42 * s]], 0.8 * k, 1, SEPIA, 0.7); // a plank's seam
+  for (let i = 0; i < 5; i++) { const x = cx + s * (0.32 + i * 0.15); nib(g, [[x, y0 + 0.12 * s], [x - 0.18 * s, y1 - 0.08 * s]], 0.7 * k, 1, SEPIA, 0.55); }
+  nib(g, [[cx - s, y0 + 0.42 * s], [cx + s, y0 + 0.42 * s]], 0.8 * k, 1, SEPIA, 0.7);
   nib(g, [[cx - s, y0], [cx + s, y0], [cx + s, y1], [cx - s, y1], [cx - s, y0]], 1.5 * k);
   nib(g, dome, 1.5 * k);
-  for (const f of [-0.62, 0.62]) nib(g, [[cx + f * s, y0 - 0.43 * s], [cx + f * s, y1]], 2.2 * k, 1, band, 0.95); // the iron bands
-  nib(g, [[cx - 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 - 0.05 * s]], 1.3 * k, 1, top ? GOLD_DARK : INK); // the hasp
+  for (const f of [-0.62, 0.62]) nib(g, [[cx + f * s, y0 - 0.43 * s], [cx + f * s, y1]], 2.2 * k, 1, band, 0.95);
+  nib(g, [[cx - 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 - 0.05 * s], [cx + 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 + 0.32 * s], [cx - 0.17 * s, y0 - 0.05 * s]], 1.3 * k, 1, top ? GOLD_DARK : INK);
   letter(g, 'Chest', cx, r.y + r.height - 9 * k, { size: 12 * k, align: 'center', valign: 'middle' }, top ? GOLD_DARK : INK);
 }
 
-/**
- * The choice in the match: watches the player's ship each tick and unfolds the sheet when a chest opens on its deck;
- * the chosen offer goes out once through take() as ShipInput.chestPick. Never pauses the match.
- */
 export class ChestChoice {
   readonly group = new THREE.Group();
-  private readonly paper = new THREE.Group(); // the sheet, when it is up
+  private readonly paper = new THREE.Group();
   private sheet: Sheet | null = null;
   private mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
   private offers: Offer[] = [];
@@ -488,7 +429,7 @@ export class ChestChoice {
   private pick = -1;
   private shown = false;
   private stowed = false;
-  private finger = -1; // the finger that landed on a card, "Later" or the chip
+  private finger = -1;
   private chip: Rect | null = null;
   private chipMesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial> | null = null;
   private clock = 0;
@@ -503,12 +444,9 @@ export class ChestChoice {
   }
 
   get open(): boolean { return this.shown; }
-  /** A chest waits on deck, folded away by "Later" (the HUD shows it; reopen() unfolds it). */
   get waiting(): boolean { return this.stowed; }
-  /** The sheet's layout while it is up, and the chip's place while a chest is stowed (null otherwise). */
   get sheetLayout(): ChestLayout | null { return this.shown ? this.l : null; }
   get chipRect(): Rect | null { return this.stowed ? this.chip : null; }
-  /** The chest's tier: its richest offer's. */
   get tier(): number { return this.offers.reduce((m, o) => Math.max(m, o.item.tier), 0); }
 
   watch(ship: Ship): void {
@@ -532,8 +470,6 @@ export class ChestChoice {
     this.rebuild();
   }
 
-  /** The view, where the chip for a stowed chest goes (beside the compact chart; null: none) and the match's HUD, whose
-   *  controls the choice stays clear of (its thumb's side mirrored for the left hand; default the right-handed one). */
   layout(view: View, chip: Rect | null = null, hud: HudLayout | null = null): void {
     this.view = view;
     this.chip = chip;
@@ -542,12 +478,10 @@ export class ChestChoice {
     this.stow();
   }
 
-  /** True when the choice took the touch: one that landed on a card, "Later" or the chip, to its end. */
   touch(t: Touch): boolean {
     if (t.phase === 'down') {
       if (this.finger >= 0) return false;
       const onChip = this.stowed && this.chip !== null && inside(this.chip, t.x, t.y);
-      // the panel's parchment takes a touch too (a near miss between cards never reaches a control beneath it)
       if (!onChip && !(this.shown && this.l !== null && (pickAt(this.l, t.x, t.y) !== -1 || inside(this.l.panel, t.x, t.y)))) return false;
       this.finger = t.id;
       return true;
@@ -578,7 +512,6 @@ export class ChestChoice {
     return true;
   }
 
-  /** The chosen offer as ShipInput.chestPick, once; −1 when none waits. */
   take(): number {
     const p = this.pick;
     this.pick = -1;
@@ -587,7 +520,7 @@ export class ChestChoice {
 
   frame(dt: number): void {
     this.clock += dt;
-    if (this.chipMesh) this.chipMesh.scale.setScalar(1 + 0.05 * Math.sin(this.clock * 4)); // the stowed chest breathes
+    if (this.chipMesh) this.chipMesh.scale.setScalar(1 + 0.05 * Math.sin(this.clock * 4));
     if (!this.shown) return;
     this.t += dt;
     this.since += dt;
@@ -601,7 +534,6 @@ export class ChestChoice {
     this.stow();
   }
 
-  /** The chip, up while a chest is stowed. */
   private stow(): void {
     if (this.chipMesh) {
       drop(this.chipMesh);

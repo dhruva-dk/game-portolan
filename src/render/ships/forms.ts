@@ -1,62 +1,57 @@
-// The four ship forms as naval architecture: each one's hull lines, castles, gun deck and sail plan, and the hull
-// form as a function. Ship frame: +z the bow, +y up from the waterline, +x to port; world units (u). Hull
-// positions along the length are given by u, the fraction from the stern (0) to the bow (1).
 import * as THREE from 'three';
 import { smoothstep } from '../craft.ts';
 
 export type FormName = 'pinnace' | 'caravel' | 'carrack' | 'galleon';
 export const FORM_NAMES: readonly FormName[] = ['pinnace', 'caravel', 'carrack', 'galleon'];
 
-/** A raised deck over u ∈ [from, to], rise above the main deck: quarterdeck, poop, forecastle. */
 export interface DeckSpec { from: number; to: number; rise: number }
 
 export interface SquareMastSpec {
   kind: 'square';
   u: number;
-  rake: number; // radians; positive leans aft
-  r: number; // lower-mast radius at the deck
-  top: number; // height of the lower masthead, where the top sits
-  heads: readonly number[]; // topmast (and topgallant) head heights
-  yards: readonly number[]; // yard half-lengths: course, topsail, topgallant
-  shrouds: number; // per side
+  rake: number;
+  r: number;
+  top: number;
+  heads: readonly number[];
+  yards: readonly number[];
+  shrouds: number;
 }
 export interface LateenMastSpec {
   kind: 'lateen';
   u: number;
   rake: number;
   r: number;
-  top: number; // masthead
-  sling: number; // where the yard crosses the mast
-  len: number; // yard length
-  tilt: number; // yard angle above the horizontal, peak aft
-  fore: number; // share of the yard forward of the mast
-  clew: number; // clew distance aft of the mast
-  clewY: number; // clew height above the deck
-  shrouds: number; // runner tackles per side, set up to windward
+  top: number;
+  sling: number;
+  len: number;
+  tilt: number;
+  fore: number;
+  clew: number;
+  clewY: number;
+  shrouds: number;
 }
 export type MastSpec = SquareMastSpec | LateenMastSpec;
 
 export interface FormSpec {
   length: number; beam: number; draft: number;
-  rail: number; sheerAft: number; sheerFwd: number; bulwark: number; // main rail height amidships, sheer rises, bulwark
-  maxY: number; tumble: number; // height of greatest breadth; tumblehome above it
-  stemRake: number; forefoot: number; sternRake: number; // rake of the stem above water, forefoot cut-up, sternpost rake
-  tuck: number; transom: number; bowStart: number; sternStart: number; // stern tuck height, transom breadth, run lengths
-  overhang: number; // the forecastle's projection beyond the stem (the carrack's beaked castle)
+  rail: number; sheerAft: number; sheerFwd: number; bulwark: number;
+  maxY: number; tumble: number;
+  stemRake: number; forefoot: number; sternRake: number;
+  tuck: number; transom: number; bowStart: number; sternStart: number;
+  overhang: number;
   decks: readonly DeckSpec[];
-  strakes: number; // strakes from the keel to the main rail
-  wales: readonly number[]; // strake positions of the wales
-  paintFrom: number; // strake above which the upper works are painted
-  guns: number; // guns per side
-  gunStrake: number; gunSpan: readonly [number, number]; // the gun deck's strake and the u span of its ports
-  beak: number; // length of the beakhead
-  lanterns: number; // stern lanterns
-  masts: readonly MastSpec[]; // stern to bow
+  strakes: number;
+  wales: readonly number[];
+  paintFrom: number;
+  guns: number;
+  gunStrake: number; gunSpan: readonly [number, number];
+  beak: number;
+  lanterns: number;
+  masts: readonly MastSpec[];
   sprit: { len: number; angle: number; yard: number } | null;
 }
 
 export const FORMS: Record<FormName, FormSpec> = {
-  // Small, low and flush, a sliver of quarterdeck; one square main with a topsail, a lateen mizzen and a spritsail.
   pinnace: {
     length: 3.8, beam: 1.06, draft: 0.42, rail: 0.46, sheerAft: 0.2, sheerFwd: 0.24, bulwark: 0.17, maxY: 0.1, tumble: 0.22,
     stemRake: 0.38, forefoot: 0.32, sternRake: 0.26, tuck: 0.22, transom: 0.62, bowStart: 0.6, sternStart: 0.36, overhang: 0,
@@ -69,7 +64,6 @@ export const FORMS: Record<FormName, FormSpec> = {
     ],
     sprit: { len: 1.5, angle: 0.46, yard: 0.5 },
   },
-  // Long, low and fine, the sheer sweeping up to a raised stern; three raked lateens and no bowsprit.
   caravel: {
     length: 4.4, beam: 1.28, draft: 0.5, rail: 0.46, sheerAft: 0.38, sheerFwd: 0.3, bulwark: 0.17, maxY: 0.12, tumble: 0.18,
     stemRake: 0.46, forefoot: 0.4, sternRake: 0.3, tuck: 0.3, transom: 0.6, bowStart: 0.56, sternStart: 0.36, overhang: 0,
@@ -83,7 +77,6 @@ export const FORMS: Record<FormName, FormSpec> = {
     ],
     sprit: null,
   },
-  // Round, deep and tall: a towering stern castle in three tiers and a beaked forecastle jutting past the stem.
   carrack: {
     length: 5.2, beam: 1.76, draft: 0.6, rail: 0.62, sheerAft: 0.3, sheerFwd: 0.42, bulwark: 0.2, maxY: 0.16, tumble: 0.3,
     stemRake: 0.66, forefoot: 0.45, sternRake: 0.36, tuck: 0.36, transom: 0.58, bowStart: 0.55, sternStart: 0.35, overhang: 0.55,
@@ -97,8 +90,6 @@ export const FORMS: Record<FormName, FormSpec> = {
     ],
     sprit: { len: 2.2, angle: 0.58, yard: 0.66 },
   },
-  // Long and lean for her size: a low forecastle set back from the stem over a projecting beakhead, a tall flat
-  // stern, four masts — topgallants on fore and main, lateen mizzen and bonaventure.
   galleon: {
     length: 5.8, beam: 1.6, draft: 0.62, rail: 0.66, sheerAft: 0.24, sheerFwd: 0.3, bulwark: 0.2, maxY: 0.14, tumble: 0.3,
     stemRake: 0.55, forefoot: 0.5, sternRake: 0.42, tuck: 0.3, transom: 0.66, bowStart: 0.58, sternStart: 0.36, overhang: 0,
@@ -117,12 +108,11 @@ export const FORMS: Record<FormName, FormSpec> = {
 
 const _fa = new THREE.Vector3(), _fb = new THREE.Vector3(), _fc = new THREE.Vector3(), _fd = new THREE.Vector3();
 
-/** The port half of the outer skin as a function of (u, y), with the sheer, castles and decks. */
 export class HullForm {
   readonly s: FormSpec;
   readonly name: FormName;
   readonly L: number;
-  readonly yk: number; // keel line
+  readonly yk: number;
   readonly railAft: number;
   readonly railFwd: number;
   constructor(name: FormName) {
@@ -134,18 +124,15 @@ export class HullForm {
     this.railFwd = this.rail(1);
   }
 
-  /** Height of the main rail (the sheer line, without castles). */
   sheer(u: number): number {
     const s = this.s;
     return s.rail + (u < 0.45 ? s.sheerAft * ((0.45 - u) / 0.45) ** 2 : s.sheerFwd * ((u - 0.45) / 0.55) ** 2);
   }
-  /** Rise of the uppermost deck over u above the main deck. */
   level(u: number): number {
     let r = 0;
     for (const d of this.s.decks) if (u >= d.from - 1e-6 && u <= d.to + 1e-6) r = Math.max(r, d.rise);
     return r;
   }
-  /** Castle rails stand at full height over the castle and sweep down just outside it. */
   rail(u: number): number {
     let r = 0;
     for (const d of this.s.decks) {
@@ -161,7 +148,6 @@ export class HullForm {
   zFwd(y: number): number {
     const s = this.s, h = this.L / 2, main = this.sheer(1);
     if (y < 0) return h - s.forefoot * (y / s.draft) ** 2;
-    // the stem rakes forward; a beaked forecastle carries on past it above the main rail
     return h + s.stemRake * Math.pow(Math.min(y, main) / main, 1.25) + s.overhang * smoothstep(main - 0.05, main + 0.4, y);
   }
   zAft(y: number): number {
@@ -175,7 +161,6 @@ export class HullForm {
     const a = this.zAft(y);
     return (z - a) / (this.zFwd(y) - a);
   }
-  /** Half-breadth of the skin: plan shape along the hull times the section shape at height y. */
   half(u: number, y: number): number {
     const s = this.s;
     const above = smoothstep(s.tuck - 0.28, s.tuck + 0.04, y);
@@ -197,32 +182,27 @@ export class HullForm {
     } else sec = 1 - s.tumble * (1 - Math.exp(-(y - s.maxY) * 1.5));
     return 0.5 * s.beam * plan * sec;
   }
-  /** Planking coordinate: strakes counted from the keel, following the sheer. */
   strake(u: number, y: number): number {
     return ((y - this.yk) / (this.sheer(u) - this.yk)) * this.s.strakes;
   }
   strakeY(u: number, k: number): number {
     return this.yk + (k / this.s.strakes) * (this.sheer(u) - this.yk);
   }
-  /** Height of one strake amidships. */
   get strakeH(): number {
     return (this.s.rail - this.yk) / this.s.strakes;
   }
   at(u: number, y: number, o: THREE.Vector3): THREE.Vector3 {
     return o.set(this.half(u, y), y, this.z(u, y));
   }
-  /** Outward normal of the port skin. */
   normal(u: number, y: number, o: THREE.Vector3): THREE.Vector3 {
     this.at(u + 1e-3, y, _fa).sub(this.at(u - 1e-3, y, _fb));
     this.at(u, y + 1e-3, _fc).sub(this.at(u, y - 1e-3, _fd));
     return o.crossVectors(_fc, _fa).normalize();
   }
-  /** Port skin point at hull station z and height y, pushed out by `off`. */
   side(z: number, y: number, off: number, o = new THREE.Vector3()): THREE.Vector3 {
     const u = this.uAt(z, y);
     return this.at(u, y, o).addScaledVector(this.normal(u, y, _fd), off);
   }
-  /** Gunport centres on the port side (mirror x for starboard): `guns` evenly over the gun span. */
   gunports(): THREE.Vector3[] {
     const s = this.s, n = s.guns, [a, b] = s.gunSpan, out: THREE.Vector3[] = [];
     for (let k = 0; k < n; k++) {

@@ -1,16 +1,9 @@
-// WP27 pass h (S-019) shots: the sinking itself, a second apart from 5 to 12 s, in clear weather and in the storm, on the
-// iPhone and the iPad (tests/render/sinking.page.ts): progress/shots/wp27h-<device>-sink-<weather>-<k>.png at the
-// seconds after she sank in AT (1: rolled over, down by the stern, the sea over her rail; 2–4: her masts going under
-// one by one; 5: the masthead pennant last; 6: the sea closed over her, ripples, wreckage and her chest riding the
-// swell), and the sheet wp27h-sheet.png.
-//   node tests/render/sinking.shots.ts        (SINK_OUT=<dir> writes there instead of progress/shots; SINK_AT=5,6.5,…
-//   shoots those seconds instead; SINK_ONLY=iphone-clear shoots one device and weather)
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DEVICES, launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
 const AT: [string, number][] = (process.env.SINK_AT?.split(',').map(Number) ?? [5, 6, 7, 8, 9, 10, 11, 12]).map((t, i) => [`${i + 1}`, t]);
-const out = process.env.SINK_OUT ?? join(root, 'progress/shots'), only = process.env.SINK_ONLY;
+const out = process.env.SINK_OUT ?? join(root, 'out/shots'), only = process.env.SINK_ONLY;
 const server = await serve();
 const { browser, gpu, renderer } = await launch();
 if (!gpu) { console.error(`sinking.shots: no GPU WebGL (${renderer})`); await browser.close(); await server.close(); process.exit(2); }

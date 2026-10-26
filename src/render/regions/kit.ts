@@ -1,5 +1,3 @@
-// Shared by the region modules (WP16, WP17; see index.ts): repeatable randoms, faceted kits washed facet by facet for
-// illustratedMaterial({ painted: true }), instanced draws, parts posed on the planet, and whether a region is in view.
 import * as THREE from 'three';
 import { belowHorizon } from '../terrain.ts';
 import { transmittanceVec } from '../../style/glsl.ts';
@@ -10,7 +8,6 @@ import { CHARTS, toWorld } from '../../sim/world/geography.ts';
 export type V = THREE.Vector3;
 export const vec = (x = 0, y = 0, z = 0): V => new THREE.Vector3(x, y, z);
 
-/** A repeatable stream of randoms in [0, 1). */
 export function seeded(seed: number): () => number {
   let a = seed * 0x9e3779b1;
   return () => {
@@ -21,28 +18,23 @@ export function seeded(seed: number): () => number {
   };
 }
 
-/** The unit direction of chart point (x, y) of region ri. */
 export function chartDir(ri: number, x: number, y: number): V {
   const p = vec();
   toWorld(ri, x, y, p);
   return p;
 }
 
-/** Unit direction p lifted h u over mean sea level. */
 export const lift = (p: V, h: number, out = vec()): V => out.copy(p).normalize().multiplyScalar(R + h);
 
-/** Whether any of region ri within `radius` u of its centre can lie inside the eye's horizon. */
 export function regionSeen(ri: number, eye: V, radius: number): boolean {
   const d = eye.length(), h = Math.max(d - R, 0), c = CHARTS[ri].c;
   const arc = R * Math.acos(Math.min(1, (eye.x * c.x + eye.y * c.y + eye.z * c.z) / d));
   return arc < radius + Math.sqrt(2 * R * h + h * h) + 10;
 }
 
-/** A facet's wash: pigment transmittance and density. */
 export interface Wash { readonly t: V; readonly d: number }
 export const washOf = (pigment: RGB, d: number): Wash => ({ t: transmittanceVec(pigment), d });
 
-/** k points round a kit's y axis, clockwise seen from above: radius r(j), at height y or y(j, x, z). */
 export function ring(k: number, y: number | ((j: number, x: number, z: number) => number), r: (j: number) => number): V[] {
   return Array.from({ length: k }, (_, j) => {
     const a = (j / k) * 2 * Math.PI, rr = r(j), x = Math.cos(a) * rr, z = Math.sin(a) * rr;
@@ -50,7 +42,6 @@ export function ring(k: number, y: number | ((j: number, x: number, z: number) =
   });
 }
 
-/** A faceted solid in its own frame (y up), each facet washed by `paint` from its centre and outward normal. */
 export class Kit {
   private readonly paint: (centre: V, normal: V) => Wash;
   private readonly pos: number[] = [];
@@ -73,7 +64,6 @@ export class Kit {
     }
   }
 
-  /** Rings of equal length (see ring) joined from the first to the last, both ends capped. */
   loft(rings: readonly (readonly V[])[]): this {
     const k = rings[0].length, first = rings[0], last = rings[rings.length - 1];
     for (let i = 0; i + 1 < rings.length; i++) {
@@ -92,7 +82,6 @@ export class Kit {
     return this;
   }
 
-  /** The kit as flat-shaded geometry with the painted material's attributes (no stone or accent tint). */
   build(): THREE.BufferGeometry {
     const g = new THREE.BufferGeometry(), n = this.pos.length / 3;
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
@@ -105,8 +94,6 @@ export class Kit {
   }
 }
 
-/** WP30 part C: the eye the region heroes' instances are culled for (world.ts sets it each frame); a new epoch once the
- *  eye has moved or turned far enough (the frustum test is widened to cover the turn allowed between epochs). */
 export class CullView {
   readonly frustum = new THREE.Frustum();
   readonly eye = vec();
@@ -135,21 +122,16 @@ export class CullView {
   }
 }
 
-/** Cull every visible Draw under `root` for the eye (Draw.cull). */
 export function cullDraws(root: THREE.Object3D, view: CullView): void {
   root.traverseVisible((o) => (o.userData.draw as Draw | undefined)?.cull(view));
 }
 
-/** An instance whose bounding radius spans fewer render px than this (× 0.6–1.4 by instance, so they go one by one) is
- *  a speck the ink pass cannot resolve: left out. */
 const SPECK_PX = 1.5;
 const CM = new THREE.Matrix4(), CC = vec(), CD = vec(), CS = new THREE.Sphere();
 
-/** One instanced draw call of a kit, refilled whenever its parts move. */
 export class Draw {
   readonly mesh: THREE.InstancedMesh;
   private n = 0;
-  /** WP30 part C: the instances as last filled (matrices, per-instance attributes) while cull() draws those in view. */
   private snap: { n: number; m: Float32Array; attrs: [THREE.InstancedBufferAttribute, Float32Array][] } | null = null;
   private dirty = false;
   private epoch = -1;
@@ -162,8 +144,6 @@ export class Draw {
     this.mesh.userData.draw = this;
   }
 
-  /** WP30 part C: draw only the instances above the horizon, in the frustum and wider than a speck (from the fill
-   *  kept aside), once per new eye epoch or fill; culled instances cannot be seen, specks are below the ink's grain. */
   cull(v: CullView): void {
     const mesh = this.mesh, im = mesh.instanceMatrix, g = mesh.geometry;
     if (this.dirty) {
@@ -220,8 +200,6 @@ export class Draw {
 }
 
 const X = vec(), Y = vec(), Z = vec(), TIP = new THREE.Matrix4();
-/** A part at `origin`, its y along `up`, its z along `fwd` (made tangent) turned `yaw` toward its x, tipped `tilt`
- *  about its x (its top toward its z), and scaled. */
 export function pose(out: THREE.Matrix4, origin: V, up: V, fwd: V, yaw: number, tilt: number, sx: number, sy = sx, sz = sx): THREE.Matrix4 {
   Y.copy(up).normalize();
   Z.copy(fwd).addScaledVector(Y, -fwd.dot(Y)).normalize();
@@ -233,7 +211,6 @@ export function pose(out: THREE.Matrix4, origin: V, up: V, fwd: V, yaw: number, 
   return out.scale(Y.set(sx, sy, sz));
 }
 
-/** Each facet of a built kit: its first vertex index, centre, outward normal and corners (valid during the call). */
 function eachFacet(g: THREE.BufferGeometry, fn: (i: number, centre: V, normal: V, corners: readonly V[]) => void): void {
   const pos = g.getAttribute('position'), a = vec(), b = vec(), c = vec(), n = vec(), m = vec(), corners = [a, b, c];
   for (let i = 0; i + 2 < pos.count; i += 3) {
@@ -245,8 +222,6 @@ function eachFacet(g: THREE.BufferGeometry, fn: (i: number, centre: V, normal: V
   }
 }
 
-/** Sets each facet's aTint (0 the kit's own wash, 1 the instance's stone, 2 its accent; see perInstance) from its
- *  centre and outward normal. */
 export function tintFacets(g: THREE.BufferGeometry, pick: (centre: V, normal: V) => number): THREE.BufferGeometry {
   const tint = g.getAttribute('aTint') as THREE.BufferAttribute;
   eachFacet(g, (i, c, n) => {
@@ -256,8 +231,6 @@ export function tintFacets(g: THREE.BufferGeometry, pick: (centre: V, normal: V)
   return g;
 }
 
-/** Hatching uvs facet by facet, for illustratedMaterial({ hatch: { mode: 'uv', scale } }): each facet's strokes run
- *  its own way, along(centre, normal, out) laid into the facet; u along the strokes, v across, in kit units / `per`. */
 export function facetUV(g: THREE.BufferGeometry, along: (centre: V, normal: V, out: V) => V, per: readonly [number, number] = [1, 1]): THREE.BufferGeometry {
   const uv = new Float32Array(2 * g.getAttribute('position').count), d = vec(), e = vec();
   eachFacet(g, (i, c, n, corners) => {
@@ -277,7 +250,6 @@ export function facetUV(g: THREE.BufferGeometry, along: (centre: V, normal: V, o
   return g;
 }
 
-/** Per-instance stone and accent transmittances (aStone, aAccent) for a painted kit drawn up to `capacity` times. */
 export function perInstance(g: THREE.BufferGeometry, capacity: number): { stone: THREE.InstancedBufferAttribute; accent: THREE.InstancedBufferAttribute } {
   const make = () => new THREE.InstancedBufferAttribute(new Float32Array(3 * Math.max(capacity, 1)), 3);
   const stone = make(), accent = make();

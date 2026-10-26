@@ -1,9 +1,3 @@
-// src/sim/world: the twelve regions sit on the icosahedron with their landmarks, sheltered harbours and lights on
-// headlands; every cut edge of the chart net lies in open sea; the whole world is navigable from the open sea at any
-// tide, the Great Lagoon only through its channel, the Fjords' Sound end to end; the tide opens and shuts passages
-// on the Amber Shoals and in the Atolls; the Weeping Isle is the largest land in the world and the Glass Sea has no
-// cover; the Great Current and the fixed lanes run clear of land; finds stand where they can be taken.
-//   node --test tests/sim/world.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PI, dot, normalize, v3, type V3 } from '../../src/sim/math.ts';
@@ -14,7 +8,6 @@ import {
 } from '../../src/sim/world/geography.ts';
 import { NAV, buildNav, findRoute, navCellOf, type Nav } from '../../src/sim/world/nav.ts';
 
-// CPU time, not wall time: the browser tests running beside this one must not make the build look slow.
 const cpuMs = (): number => {
   const u = process.cpuUsage();
   return (u.user + u.system) / 1000;
@@ -32,7 +25,6 @@ const idx = (id: string) => REGIONS.findIndex((r) => r.id === id);
 const at = (ri: number, x: number, y: number) => toWorld(ri, x, y, v3());
 const deg = (b: number) => b * (PI / 180);
 
-/** Cells reachable over open edges at sea level `tide` from nav cell `from`, skipping `blocked` cells. */
 function flood(n: Nav, from: number, tide: number, blocked?: (c: number) => boolean): Uint8Array {
   const seen = new Uint8Array(NAV.cells), stack = [from];
   seen[from] = 1;
@@ -47,7 +39,6 @@ function flood(n: Nav, from: number, tide: number, blocked?: (c: number) => bool
   }
   return seen;
 }
-/** A point of open ocean: the dodecahedron vertex between the Ice Crown, Fjords and Basalt Stacks. */
 const ocean = normalize(v3(CHARTS[0].c.x + CHARTS[1].c.x + CHARTS[2].c.x, CHARTS[0].c.y + CHARTS[1].c.y + CHARTS[2].c.y,
   CHARTS[0].c.z + CHARTS[1].c.z + CHARTS[2].c.z));
 
@@ -58,7 +49,7 @@ test('generation is fast enough for the world worker', () => {
 
 test('the twelve regions sit at the vertices of an icosahedron, each with five equidistant neighbours', () => {
   assert.equal(REGIONS.length, 12);
-  const edge = Math.atan(2); // 63.43°
+  const edge = Math.atan(2);
   CHARTS.forEach((a, i) => {
     assert.equal(NEIGHBOURS[i].length, 5);
     for (const j of NEIGHBOURS[i]) assert.ok(Math.abs(Math.acos(dot(a.c, CHARTS[j].c)) - edge) < 1e-9, `${i}–${j}`);
@@ -108,7 +99,6 @@ test('lighthouses stand on headlands, looking out to sea', () => {
 });
 
 test('every cut edge of the chart net runs through open sea, at least 40 u from land', () => {
-  // dodecahedron vertices: the centres of the icosahedron's faces; its edges join the faces either side of an edge
   let worst = Infinity;
   for (let i = 0; i < 12; i++) {
     for (const j of NEIGHBOURS[i]) {
@@ -147,7 +137,6 @@ test('the Great Lagoon can be entered only through its channel', () => {
     const shut = flood(nav, navCellOf(ocean), tide, (c) => R * Math.acos(Math.min(1, dot(cellDir(NAV, c, v3()), mouth))) < 14);
     assert.ok(!shut[navCellOf(lagoon)], `lagoon reachable with its channel shut at tide ${tide}`);
   }
-  // and its zone covers the lagoon, not the open sea
   assert.ok(geo.zones[cellOf(TERRITORY, lagoon)] & ZONE.lagoon);
   assert.ok(!(geo.zones[cellOf(TERRITORY, at(ri, 8, 40))] & ZONE.lagoon));
 });
@@ -170,7 +159,6 @@ test('every atoll lagoon can be entered only through its own passes', () => {
 test('the Sound runs through the Fjords end to end, narrow but navigable at every tide', () => {
   const ri = idx('fjords'), sound = REGIONS[ri].strokes.filter((s) => s.k === 'carve')[0];
   assert.ok(sound && sound.k === 'carve');
-  // keep to a corridor 10 u either side of the Sound's centreline, so no route can go round the massif
   const line: V3[] = [];
   for (let i = 0; i < sound.pts.length; i += 3) line.push(at(ri, sound.pts[i], sound.pts[i + 1]));
   const off = (c: number) => {
@@ -198,7 +186,6 @@ test('the tide opens and shuts passages on the Amber Shoals and in the Coral Ato
     }
     assert.ok(tidal >= 8, `${id}: ${tidal} tidal edges`);
   }
-  // across the shoals from the west, the inlets save a long way round at high tide
   const ri = idx('amberShoals'), from = navCellOf(at(ri, -60, 0)), harbour = geo.harbours.find((h) => h.region === ri)!;
   const route: number[] = [], goal = (c: number) => c === navCellOf(harbour.pos);
   const low = findRoute(nav, from, LOW, goal, harbour.pos, route), high = findRoute(nav, from, HIGH, goal, harbour.pos, route);
@@ -283,7 +270,6 @@ test('finds stand where they can be taken; the Spice Isles have most, the Fire A
   });
 });
 
-/** Distance along the surface from p to the great-circle arc a–b, u. */
 function distToArc(p: V3, a: V3, b: V3): number {
   const n = normalize(v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)), s = dot(p, n);
   const q = normalize(v3(p.x - n.x * s, p.y - n.y * s, p.z - n.z * s)), ab = Math.acos(Math.min(1, dot(a, b)));
@@ -291,7 +277,6 @@ function distToArc(p: V3, a: V3, b: V3): number {
   return R * Math.min(Math.acos(Math.min(1, dot(p, a))), Math.acos(Math.min(1, dot(p, b))));
 }
 
-/** The point `d` u from p along unit tangent t (on the great circle). */
 function step(p: V3, t: V3, d: number, out: V3): V3 {
   const a = d / R, c = Math.cos(a), s = Math.sin(a);
   return normalize(Object.assign(out, { x: p.x * c + t.x * s, y: p.y * c + t.y * s, z: p.z * c + t.z * s }));

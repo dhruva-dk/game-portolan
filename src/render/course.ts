@@ -1,20 +1,13 @@
-// WP24 part D: drawing a course on the open chart with a finger, and the edge tap (PROMPT, The chart: "Drawing a
-// course on the chart with a finger sets the ship's route. Tapping the chart's edge zooms back down to the deck, the
-// match resumes, and the ship sails the drawn course until the player touches the stick again"). The stroke is
-// unprojected onto the globe (Net.unproject), resampled every COURSE.spacing u along it and turned into territory
-// cells: the same ShipInput.course a captain's helm draws (route.ts sails it until the stick is touched).
 import * as THREE from 'three';
 import { idleInput, type ShipInput } from '../sim/input.ts';
 import { cellOf, R, TERRITORY } from '../sim/sphere.ts';
 import type { RigView } from './camera.ts';
 import type { Net } from './chart.ts';
 
-/** u between the course's points; the most and least points; CSS px of the edge band; a tap's most travel and time. */
 export const COURSE = { spacing: 6, most: 64, least: 2, edge: 30, tapMove: 12, tapTime: 0.4 } as const;
 
 type XYZ = { x: number; y: number; z: number };
 
-/** A stroke on the globe (directions in order) → course cells, every `spacing` u along it, at most `most`. */
 export function courseCells(dirs: readonly XYZ[], spacing: number = COURSE.spacing, most: number = COURSE.most): number[] {
   let out: number[] = [];
   if (!dirs.length) return out;
@@ -40,12 +33,10 @@ export function courseCells(dirs: readonly XYZ[], spacing: number = COURSE.spaci
   return out.length >= COURSE.least ? out : [];
 }
 
-/** The input that sets a drawn course (the field a captain's helm fills). */
 export function courseInput(cells: readonly number[]): ShipInput {
   return { ...idleInput(), course: cells.slice() };
 }
 
-/** In the edge band of the view, inside its safe area. */
 export function atEdge(x: number, y: number, view: RigView, band: number = COURSE.edge): boolean {
   const s = view.safe;
   return x < s.left + band || x > view.width - s.right - band || y < s.top + band || y > view.height - s.bottom - band;
@@ -53,11 +44,6 @@ export function atEdge(x: number, y: number, view: RigView, band: number = COURS
 
 export type ChartGesture = { kind: 'course'; cells: number[]; input: ShipInput } | { kind: 'close' } | { kind: 'none' };
 
-/**
- * One finger on the open chart (WP25 forwards it while rig.chartOpen and the pinch has not taken it): a stroke draws
- * a course (its points inked live through Chart.draft = points), a tap on the edge band or off the net closes the
- * chart (WP25: rig.zoom.close()). up() returns what the gesture was.
- */
 export class CourseDrawing {
   readonly points: THREE.Vector3[] = [];
   private x0 = 0; private y0 = 0; private t0 = 0; private moved = 0; private active = false;

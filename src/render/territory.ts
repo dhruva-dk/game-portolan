@@ -1,15 +1,3 @@
-// Territory as the sea draws it (WP20), composited inside the sea shader (sea.ts) from two byte cube maps on the
-// TERRITORY cells in seaFieldFaces' layout (cubeTexture):
-// - the wash: rgb the owner's transmittance (bled a kernel outward, so the border inks in the owner's pigment; white
-//   where nobody is near), a a smoothed ownership whose 0.5 contour is the border — a 5×5 binomial of "held by this
-//   cell's owner" less "held by a rival" — so the border is a clean curve, not the cells' staircase, rival waters show
-//   two borders with sea between, and the contour is fixed to the world: it never crawls under a moving eye;
-// - the moments: r the cell's place in its moment, g its slot·32, b 255 inside one (r and g scale with b at the edge,
-//   so g/b reads the slot true), timed by the slot's uniform: a claim floods in from the trail that closed it (the home
-//   disc out from the ship) as a wet wash behind a wavering front, then dries flat; sea the storm swallows or a sunk
-//   ship frees runs and washes out before it shows as nobody's.
-// Cells change by partial uploads of the rectangles that changed. onClaim tells the camera's pull-back (WP24), the coin
-// burst (WP22), the chord (WP28) and the haptic (WP25) when a claim lands, how big it is and how long its wash takes.
 import * as THREE from 'three';
 import { seas } from './sea.ts';
 import { cubeTexture } from './swell.ts';
@@ -22,35 +10,25 @@ import { EVENT, SHIPS, type MatchState } from '../sim/state.ts';
 import { calmNow } from '../sim/storm.ts';
 
 const N = TERRITORY.n, NN = N * N, CELLS = 6 * NN;
-/** Moment slots: the sea's uFlood[8]; slot 0 is none. */
 export const MOMENT_SLOTS = 8;
-/** s a claim's wash takes to reach `reach` u in from its trail; s it takes to dry after; s lost sea takes to wash out. */
 export const floodTime = (reach: number): number => 1.3 + 0.55 * Math.sqrt(reach / 8);
 export const DRY_TIME = 2.2, WASH_OUT_TIME = 3.4;
 const KERNEL = [1, 4, 6, 4, 1].map((w) => w / 16);
 const MOMENT = { flood: 1, washOut: 2 } as const;
 const smooth01 = (x: number): number => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
-/** A claim landing (onClaim): what the camera, the coins, the chord and the haptic answer. */
 export interface Claim {
   readonly ship: number;
-  /** A closed loop, or the home disc inked after break-off. */
   readonly kind: 'loop' | 'home';
-  /** u² claimed. */
   readonly area: number;
-  /** u the wash travels in from the trail (out from the ship for the home disc). */
   readonly reach: number;
-  /** s until the wash fills the claim. */
   readonly duration: number;
-  /** Where the ship was. */
   readonly at: V3;
-  /** The render clock when the wash starts. */
   readonly clock: number;
 }
 
 interface Moment { readonly kind: number; readonly start: number; readonly duration: number; readonly reach: number; readonly cells: Int32Array }
 
-/** Cell c's face and its texel's x and y there (seaFieldFaces' layout: texel rows run down the cell rows). */
 function texelOf(c: number, out: number[]): void {
   const f = (c / NN) | 0, rem = c - f * NN, row = (rem / N) | 0;
   out[0] = f;
@@ -61,15 +39,13 @@ function texelOf(c: number, out: number[]): void {
 export class Territory {
   readonly wash: THREE.CubeTexture;
   readonly moments: THREE.CubeTexture;
-  /** Per moment slot (uFlood): x kind (1 flood, 2 wash-out), y the flood's front u or the wash-out's progress, z reach u, w dryness. */
   readonly slots = Array.from({ length: MOMENT_SLOTS }, () => new THREE.Vector4());
-  /** Bytes the partial uploads have sent (A9: what a claim costs). */
   uploaded = 0;
   private readonly washFaces: Uint8Array[] = [];
   private readonly momentFaces: Uint8Array[] = [];
-  private readonly known = new Uint8Array(CELLS); // the owners last read from the sim
-  private readonly drawn = new Uint8Array(CELLS); // the owners the wash shows (sea washing out keeps its old one)
-  private readonly mark = new Int32Array(CELLS); // scratch: a cell's index in the flood being laid, + 1
+  private readonly known = new Uint8Array(CELLS);
+  private readonly drawn = new Uint8Array(CELLS);
+  private readonly mark = new Int32Array(CELLS);
   private readonly live: (Moment | null)[] = new Array<Moment | null>(MOMENT_SLOTS).fill(null);
   private readonly dirty = Array.from({ length: 6 }, () => [N, N, -1, -1]);
   private readonly tints = new Uint8Array((SHIPS + 1) * 3).fill(255);
@@ -82,12 +58,11 @@ export class Territory {
   private state: MatchState | null = null;
   private tick = -1;
 
-  /** Without a renderer (tests) the faces are kept but nothing is sent. */
   constructor(renderer: THREE.WebGLRenderer | null) {
     this.renderer = renderer;
     for (let f = 0; f < 6; f++) {
       const wash = new Uint8Array(NN * 4);
-      new Uint32Array(wash.buffer).fill(0x00ffffff); // white, nobody's
+      new Uint32Array(wash.buffer).fill(0x00ffffff);
       this.washFaces.push(wash);
       this.momentFaces.push(new Uint8Array(NN * 4));
     }
@@ -99,18 +74,16 @@ export class Territory {
     });
   }
 
-  /** Call `listener` as each claim lands; returns its removal. */
   onClaim(listener: (c: Claim) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  /** Read the match after its last tick: claims flood in, lost sea washes out. */
   sync(state: MatchState, clock: number): void {
     if (state !== this.state) this.reset(state);
     if (state.tick === this.tick) return;
     this.tick = state.tick;
-    let moved = false; // every change of hands changes some ship's holding, so the cells are compared only then
+    let moved = false;
     for (let i = 0; i < SHIPS; i++) {
       if (state.ships[i].held === this.held[i]) continue;
       this.held[i] = state.ships[i].held;
@@ -119,7 +92,6 @@ export class Territory {
     if (moved) this.diff(state, clock);
   }
 
-  /** Time the moments at the render clock and send what changed. */
   frame(clock: number): void {
     for (let k = 1; k < MOMENT_SLOTS; k++) {
       const m = this.live[k], u = this.slots[k];
@@ -167,7 +139,6 @@ export class Territory {
     this.wash.needsUpdate = this.moments.needsUpdate = true;
   }
 
-  /** The cells that changed hands this tick: each new holder's claim floods in, sea fallen to nobody washes out. */
   private diff(state: MatchState, clock: number): void {
     const owner = state.owner, known = this.known, gained = new Map<number, number[]>(), lost: number[] = [];
     for (let c = 0; c < CELLS; c++) {
@@ -185,7 +156,6 @@ export class Territory {
     }
     for (const [o, cells] of gained) {
       const i = o - 1, ev = state.events.find((e) => (e.kind === EVENT.loop || e.kind === EVENT.home) && e.ship === i);
-      // a loop floods in from the trail that closed it; the home disc (or a claim whose event a skipped tick hid) from the ship
       const reach = this.flood(cells, ev?.kind === EVENT.loop ? ev.cells : [cellOf(TERRITORY, ev?.at ?? state.ships[i].pos)], clock);
       this.touch(cells);
       if (!ev) continue;
@@ -193,7 +163,6 @@ export class Territory {
       for (const listener of this.listeners) listener(claim);
     }
     if (lost.length === 0) return;
-    // the storm washes the deepest sea out first; a wreck's sea washes out from the wreck
     const storm = state.events.some((e) => e.kind === EVENT.swallow), wreck = state.events.find((e) => e.kind === EVENT.freed);
     const from = storm ? calmNow(state).at : wreck?.at ?? state.ships[0].pos, order = new Float32Array(lost.length), p = this.p;
     let lo = Infinity, hi = -Infinity;
@@ -210,11 +179,6 @@ export class Territory {
     this.touch(lost);
   }
 
-  /**
-   * Lay a flood over `cells` from `seeds`: each cell's distance (u, along the surface) to its nearest seed, found by a
-   * breadth-first sweep that carries each cell's nearest seed (so the front is round, not the grid's diamond). Returns
-   * the farthest.
-   */
   private flood(cells: number[], seeds: ArrayLike<number>, clock: number): number {
     const n = cells.length, mark = this.mark, near = new Int32Array(n), dist = new Float32Array(n).fill(Infinity), queue = new Int32Array(n);
     for (let k = 0; k < n; k++) mark[cells[k]] = k + 1;
@@ -256,7 +220,6 @@ export class Territory {
     return reach;
   }
 
-  /** A free moment slot; when none is, the oldest moment ends at once. */
   private slot(): number {
     let k = this.live.indexOf(null, 1);
     if (k < 0) {
@@ -267,7 +230,6 @@ export class Territory {
     return k;
   }
 
-  /** Moment k is over: its cells leave it (unless a later moment holds them) and washed-out sea shows as nobody's. */
   private finish(k: number): void {
     const m = this.live[k]!, t = this.t;
     this.live[k] = null;
@@ -289,7 +251,6 @@ export class Territory {
     out[o + 2] = out[o + 3] = 255;
   }
 
-  /** Mark the texels round `cells` (the wash kernel's reach) to bake and send. */
   private touch(cells: ArrayLike<number>): void {
     const t = this.t;
     for (let k = 0; k < cells.length; k++) {
@@ -302,7 +263,6 @@ export class Territory {
     }
   }
 
-  /** The wash over face f's texels x0–x1, y0–y1 from the drawn owners (the kernel stops at the face's edge). */
   private bake(f: number, x0: number, y0: number, x1: number, y1: number): void {
     const drawn = this.drawn, out = this.washFaces[f], tints = this.tints, base = f * NN + (N - 1) * N;
     for (let y = y0; y <= y1; y++) {
@@ -332,7 +292,6 @@ export class Territory {
     }
   }
 
-  /** Send face f's texels x0–x1, y0–y1 (unless a full upload is still to come, which carries them). */
   private upload(tex: THREE.CubeTexture, faces: Uint8Array[], f: number, x0: number, y0: number, x1: number, y1: number): void {
     const w = x1 - x0 + 1, h = y1 - y0 + 1;
     this.uploaded += w * h * 4;
@@ -350,10 +309,8 @@ export class Territory {
   }
 }
 
-/** Each scene's territory: the camera, coins, audio and haptics subscribe to its claims (onClaim). */
 export const territories = new WeakMap<THREE.Object3D, Territory>();
 
-/** The composition root's territory (MODULES): laid into the scene's sea. */
 export function createTerritory(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene);
   if (!sea) throw new Error('createTerritory: the scene has no sea (createSea comes first in MODULES)');

@@ -1,9 +1,3 @@
-// WP9 part B, the companion gull in a match, headless: the call's price at sea, at home and holding Spice Harbour, and
-// what it charges; the chest's flight by Wings and the Sandbar Light; its tier by Talons and the rank's pool; its loss
-// to the sea when its ship sinks first, for another to take; the gull aloft in rivals' sight; the Eye's range for ships
-// and loot; Beak at a break; Dive's reveal, check and cooldown by level, by tap and by hand; the perch and danger;
-// determinism, snapshot/resume with a gull in flight, and the tick's cost.
-//   node --test tests/sim/gull.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,13 +24,11 @@ const S = (seconds: number): number => Math.round(seconds / TICK);
 const near = (a: number, b: number, eps = 1e-9): void => assert.ok(Math.abs(a - b) <= eps, `${a} is not ${b}`);
 const perk = (name: string): number => sea.marks[sea.geo.landmarks.findIndex((l) => l.perk === name)];
 
-/** Every ship's input: idle but for the player's and ship 1's. */
 const inputs = (player: Partial<ShipInput> = {}, rival: Partial<ShipInput> = {}): ShipInput[] =>
   Array.from({ length: SHIPS }, (_, i) => ({ ...idleInput(), ...(i === 0 ? player : i === 1 ? rival : {}) }));
 const IDLE = inputs(), CALL = inputs({ flags: FLAG.callGull });
 const DIVE = (aim = -1): ShipInput[] => inputs({ flags: FLAG.dive, aim });
 
-/** Ships 0 and 1 at sea where the fleet starts, dead in the water, ship 0's gull trained as given and its bank full; the rest out. */
 function duel(gull: Outfit['gull'] = {}, rank = 1): MatchState {
   const s = createMatch({ seed: SEED, fleet: Array.from({ length: SHIPS }, (_, i) => (i === 0 ? { gull } : {})), rank });
   s.ships.forEach((ship, i) => {
@@ -47,14 +39,12 @@ function duel(gull: Outfit['gull'] = {}, rank = 1): MatchState {
   return s;
 }
 
-/** Ship j `ahead` u before ship 0's bow and `abeam` u to its starboard, heading as it heads. */
 function place(s: MatchState, j: number, ahead: number, abeam = 0): void {
   const a = s.ships[0], b = s.ships[j], star = cross(v3(), a.head, a.pos);
   normalize(addScaled(b.pos, addScaled(b.pos, a.pos, a.head, ahead / R), star, abeam / R));
   normalize(addScaled(b.head, a.head, b.pos, -dot(a.head, b.pos)));
 }
 
-/** One tick of what the gull touches, in the step's order: sight with the gulls aloft, items, the gulls. */
 function tick(s: MatchState, ins: ShipInput[] = IDLE): void {
   s.events.length = 0;
   survey(sea, s, SIGHTS, gullEyes(s));
@@ -63,7 +53,6 @@ function tick(s: MatchState, ins: ShipInput[] = IDLE): void {
   s.tick++;
 }
 
-/** `seconds` of ticks; the events they raised. */
 function run(s: MatchState, seconds: number, ins: ShipInput[] = IDLE): Happening[] {
   const seen: Happening[] = [];
   for (let k = 0; k < S(seconds); k++) {
@@ -73,7 +62,6 @@ function run(s: MatchState, seconds: number, ins: ShipInput[] = IDLE): Happening
   return seen;
 }
 
-/** Ticks until an event of a kind (−1: not within `most`). */
 function until(s: MatchState, kind: number, ins: ShipInput[] = IDLE, most = S(60)): number {
   for (let k = 1; k <= most; k++) {
     tick(s, ins);
@@ -84,7 +72,6 @@ function until(s: MatchState, kind: number, ins: ShipInput[] = IDLE, most = S(60
 
 const FLIGHT_EVENTS: number[] = [EVENT.departed, EVENT.returning, EVENT.landed, EVENT.chestLost];
 
-/** Ticks from now until ship 0's chest lands or is lost, and its gull's events on the way. */
 function fetch(s: MatchState): { ticks: number; kinds: number[] } {
   const kinds: number[] = [];
   for (let k = 1; k <= S(60); k++) {

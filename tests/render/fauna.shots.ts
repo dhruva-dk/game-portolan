@@ -1,15 +1,9 @@
-// Captures WP23's life (tests/render/fauna.html) on iPhone and iPad: the companion gull's plumage on its truck with no
-// training, each trait at its top and every trait at the top (wp23-plumage-*), ship 0's gull wheeling, out along the
-// bow, home with a gold-leaf chest, circling and stooping (wp23-flight-*), and each species in its region
-// (wp23-life-*); each set on a contact sheet (wp23-<set>-sheet.png). Logs the frame's draw calls and triangles and
-// life's share (A9).
-//   node tests/render/fauna.shots.ts [outDir]
 import { join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
+const outDir = process.argv[2] ?? join(root, 'out/shots');
 type Hook = { seek(step: string): Record<string, number> };
 const SETS: { set: string; steps: [name: string, step: string][] }[] = [
   { set: 'plumage', steps: ['0-plain', '1-talons', '2-wings', '3-eye', '4-beak', '5-dive', '6-gilt'].map((n, k) => [n, `plumage:${k}`]) },

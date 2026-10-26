@@ -1,7 +1,3 @@
-// WP27 part A: the chest choice gives the very pick a captain would and passes the input validator; the results tell
-// the match as it was; the career chart reads the career; the first voyage prompts each lesson once, scripted and on
-// the real sim; every sheet fits the safe area of the iPhone and the iPad with targets of 44 pt or more.
-//   node --test tests/ui/results.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyResult } from '../../src/career/progress.ts';
@@ -34,7 +30,6 @@ import { inkChart, madeMatch } from './results.fixtures.ts';
 const IPHONE = { width: 956, height: 440, dpr: 3, safe: { top: 0, right: 62, bottom: 20, left: 62 } };
 const IPAD = { width: 1376, height: 1032, dpr: 2, safe: { top: 24, right: 0, bottom: 20, left: 0 } };
 const VIEWS = [IPHONE, IPAD];
-/** The smallest supported iPhone (tests/ui/hud.test.ts's mini), for what must fit there. */
 const MINI = { width: 812, height: 375, dpr: 3, safe: { top: 0, right: 50, bottom: 21, left: 50 } };
 const overlaps = (a: Rect, b: Rect): boolean => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -140,7 +135,7 @@ test('the first voyage, scripted: each lesson prompted once, in its moment, in o
   };
   run(0, 300, { homeward: false }, LESSON.breakOff, 260);
   run(300, 700, { homeward: false }, LESSON.steer, 600);
-  run(700, 900, { homeward: false }); // S-019: still inside her waters, head home would do nothing: no loop prompt yet
+  run(700, 900, { homeward: false });
   assert.equal(t.shown[LESSON.loop], -1, 'the loop prompt waits until head home can close one');
   run(900, 1400, {}, LESSON.loop, 1200);
   assert.ok(t.shown[LESSON.loop] >= 900);
@@ -152,7 +147,6 @@ test('the first voyage, scripted: each lesson prompted once, in its moment, in o
   assert.deepEqual(seen, [LESSON.breakOff, LESSON.steer, LESSON.loop, LESSON.gull, LESSON.chest, LESSON.broadside, LESSON.storm]);
   assert.ok(t.shown.every((s, k) => s >= 0 && s < lessons[k]), `${t.shown} ${lessons}`);
   assert.ok(tutorialOver(t, lessons));
-  // a lesson learned before its moment is never prompted; an urgent moment hurries a calm prompt along
   const u = newTutorial(), early = new Array<number>(LESSONS).fill(-1);
   early[LESSON.breakOff] = 10;
   let shown = -1;
@@ -196,7 +190,6 @@ test('every sheet fits the safe area of the iPhone and the iPad, with targets of
       assert.ok(within(p.card, s), `lesson ${k}`);
       assert.ok(p.card.height >= MIN_TARGET);
     }
-    // part B: the next voyage's page, the skip card, the stowed chest's chip beside the compact chart
     const n = nextLayout(view);
     assert.ok(within(n.page, s) && within(n.cont, n.page) && n.cont.width >= MIN_TARGET && n.cont.height >= MIN_TARGET);
     assert.equal(n.cells.length, 9);
@@ -206,7 +199,7 @@ test('every sheet fits the safe area of the iPhone and the iPad, with targets of
   }
 });
 
-test('S-019: the chest choice leaves the match in sight and in hand: clear of the centre, the stick and every control, on the free thumb’s side', () => {
+test('the chest choice leaves the match in sight and in hand: clear of the centre, the stick and every control, on the free thumb’s side', () => {
   const box = (b: HudButton): Rect => (b.w !== undefined && b.h !== undefined ? { x: b.x - b.w / 2, y: b.y - b.h / 2, width: b.w, height: b.h } : { x: b.x - b.hit, y: b.y - b.hit, width: 2 * b.hit, height: 2 * b.hit });
   for (const view of VIEWS) for (const left of [false, true]) {
     const L = hudLayout(view, left), c = chestLayout(view, 3, L), s = safeOf(view), name = `${view.width} ${left ? 'left' : 'right'}-handed`;
@@ -219,7 +212,6 @@ test('S-019: the chest choice leaves the match in sight and in hand: clear of th
       for (const f of L.fittings) assert.ok(!overlaps(r, { x: f.x - f.r, y: f.y - f.r, width: 2 * f.r, height: 2 * f.r }), `${name}: clear of the fittings`);
       for (const b of L.buttons) if (b.kind !== 'chart' || c.column) assert.ok(!overlaps(r, box(b)), `${name}: clear of ${b.kind}`);
     }
-    // the free thumb's side; the iPad's column clear of the compact chart too, the iPhone's row over its slot only
     assert.ok(c.cards.every((q) => (left ? q.x + q.width <= s.x + s.width / 2 : q.x >= s.x + s.width / 2)), `${name}: on the thumb's side`);
     assert.equal(c.column, view === IPAD, `${name}: ${c.column ? 'column' : 'row'}`);
     if (c.column) assert.ok(!overlaps(c.panel, L.chart));
@@ -227,8 +219,6 @@ test('S-019: the chest choice leaves the match in sight and in hand: clear of th
     assert.ok(c.panel.height <= s.height * 0.5, `${name}: a compact panel, ${c.panel.height.toFixed(0)} of ${s.height} tall`);
     assert.ok(c.cards.every((q) => within(q, c.panel)), `${name}: the cards inside the panel`);
   }
-  // WP27d: every first-voyage prompt sits clear of the frame's centre and of every control, mirrored for the left hand,
-  // its words inside its scrap at a readable size, down to the smallest iPhone (the chest's beside the panel)
   const disc = (d: { x: number; y: number; r: number }): Rect => ({ x: d.x - d.r, y: d.y - d.r, width: 2 * d.r, height: 2 * d.r });
   for (const view of [IPHONE, MINI, IPAD]) {
     const cards: Rect[][] = [];
@@ -255,9 +245,6 @@ test('S-019: the chest choice leaves the match in sight and in hand: clear of th
     }
     cards[0].forEach((r, k) => { const m = cards[1][k]; assert.ok(Math.abs(view.width - r.x - r.width - m.x) < 1 && Math.abs(r.y - m.y) < 1, `${view.width}: prompt ${k} mirrored for the left hand`); });
   }
-  // WP27d: every string on every card fits inside its card's frame, at a readable size, down to the smallest iPhone:
-  // each item at the iron-gall and gold tiers, with each consequence it can have (an empty slot, in place of the longest
-  // name in that slot, stores full, a stack)
   const offerOf = (kind: number, tier: number, replaces: number, takeable = true): Offer => {
     const consumable = kind >= CONSUMABLE.patchKit, slot = consumable ? -1 : FITTING_SLOT[kind];
     return { index: 0, item: { kind, tier }, name: itemName(kind), does: itemDoes(kind), consumable, slot, pigment: '#4566b0', tierWord: TIER_WORDS[tier], gold: tier === TIERS - 1,
@@ -304,18 +291,16 @@ test('part B: the results end with the next voyage’s nine, and the chart inks 
   assert.ok(mean(4) < mean(7) && mean(7) < mean(1), `${mean(4).toFixed(2)} < ${mean(7).toFixed(2)} < ${mean(1).toFixed(2)}`);
 });
 
-/** A chart cell's bin on the 360 × 180 plate (careerChart.ts). */
 function cellBin(cell: number): { x: number; y: number } {
   const d = cellDir(CHART_GRID, cell, v3()), len = Math.hypot(d.x, d.y, d.z);
   return { x: Math.min(359, Math.floor(((Math.atan2(d.z, d.x) + Math.PI) / (2 * Math.PI)) * 360)), y: Math.min(179, Math.floor(((Math.PI / 2 - Math.asin(d.y / len)) / Math.PI) * 180)) };
 }
 
-test('S-019: the timeline tells the gull and the chests, leaves no bare gap when short of room, and its figures read on an iPhone', () => {
+test('the timeline tells the gull and the chests, leaves no bare gap when short of room, and its figures read on an iPhone', () => {
   const before = newCareer(21), { drawn } = toSetup(before, 99), result = madeMatch(4), voyage = newVoyage(), after = applyResult(before, result, voyage);
   const t0 = result.timeline[0].tick, at = (s: number) => t0 + Math.round(s / TICK);
   const gull = [{ tick: at(20), kind: EVENT.called, ship: 0, by: -1, amount: 12 }, { tick: at(50), kind: EVENT.landed, ship: 0, by: -1, amount: 1 },
     { tick: at(60), kind: EVENT.called, ship: 3, by: -1, amount: 12 }, { tick: result.ships[0].tick + 99, kind: EVENT.dive, ship: 0, by: 2, amount: 4 }];
-  // a long voyage: twelve more loops on the sim's timeline, in a run while she was afloat
   const span = result.ships[0].tick - t0, loops = Array.from({ length: 12 }, (_, i) => ({ tick: t0 + Math.round(span * (0.55 + i * 0.02)), kind: EVENT.loop, ship: 0, by: -1, amount: 100 + i }));
   const long = { ...result, timeline: [...result.timeline, ...loops].sort((a, b) => a.tick - b.tick) };
   const m = resultsModel(before, after, long, drawn, voyage, gull), text = m.timeline.map((l) => l.text).join(' | ');
@@ -328,10 +313,9 @@ test('S-019: the timeline tells the gull and the chests, leaves no bare gap when
     assert.ok(fit.every((x) => !/^\.+$|…/.test(x.text)), `no bare gap: ${shown}`);
     assert.ok(fit.every((x, i) => i === 0 || x.tick >= fit[i - 1].tick), 'in order');
     for (const want of [/^Broke off into/, /^Chose the Long Guns/, /^Closed \d+ loops, \d+ of sea/, /^Sunk by /]) assert.ok(fit.some((x) => want.test(x.text)), `${want} in ${shown}`);
-    const short = resultsModel(before, after, result, drawn, voyage, gull).timeline; // eleven moments
+    const short = resultsModel(before, after, result, drawn, voyage, gull).timeline;
     assert.ok(timelineFit(short, 10).some((x) => /^The gull fetched a chest, 12 doubloons/.test(x.text)), 'a call and its landing told as one');
     assert.ok(fit[fit.length - 1].kind === 'end' || /^Sunk by /.test(fit[fit.length - 1].text), 'the ending last');
-    // the times and the league's figures at FIGURE × k (≥ 14 em px, well above MIN_LETTER), "10:00" inside its column
     assert.ok(FIGURE * l.k >= MIN_LETTER + 3, `figures at ${(FIGURE * l.k).toFixed(1)}`);
     assert.ok(timeColumn(l.k) - 8 * l.k >= widthOf('10:00', { size: FIGURE * l.k }) && timeColumn(l.k) < l.mid.width * 0.3, 'the time column holds the widest time');
   }

@@ -1,9 +1,3 @@
-// Top-down debug charts of the geography, for reviewing each region's design: depth washes, land shaded by height,
-// coast rings, zones (kelp dots, tidal hatching, hot water, the Great Lagoon, harbour waters, pack ice, the vortex),
-// sites (lights ■, harbours ○, the landmark's ring, wrecks ×, caches •, falls, stacks), floes at t = 0, the designed
-// Great Current passes (dashed) and the fixed lanes. Writes progress/shots/wp03-<region>.png (±90 u, 3 px/u),
-// progress/shots/wp03-world.png (equirectangular) and, with --sheet <path>, a contact sheet of all twelve.
-//   node tests/tools/geodump.ts [--sheet out.png] [--only <regionId>]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { dirname } from 'node:path';
@@ -17,7 +11,6 @@ import {
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
-// --- PNG -------------------------------------------------------------------------------------------------------
 const CRC = new Int32Array(256).map((_, n) => {
   let c = n;
   for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
@@ -48,7 +41,6 @@ export function png(w: number, h: number, rgb: Uint8Array): Uint8Array {
   return out;
 }
 
-// --- Colours ---------------------------------------------------------------------------------------------------
 type C = [number, number, number];
 const lerp = (a: C, b: C, t: number): C => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 const PARCH: C = [239, 224, 192], INK: C = [42, 33, 28], INDIGO: C = [38, 53, 87], ULTRA: C = [52, 86, 160];
@@ -61,7 +53,6 @@ function seaColour(h: number): C {
   return lerp(ULTRA, INDIGO, Math.min(1, (-8 - h) / 30));
 }
 
-// --- Region charts ---------------------------------------------------------------------------------------------
 const SPAN = 90, PX = 3, W = 2 * SPAN * PX;
 
 function regionImage(geo: Geography, ri: number): Uint8Array {
@@ -79,7 +70,6 @@ function regionImage(geo: Geography, ri: number): Uint8Array {
       const h = heightAt(geo, p), cd = coastAt(geo, p), cell = cellOf(TERRITORY, p), z = geo.zones[cell];
       let c: C;
       if (h >= -DRAFT) {
-        // land: parchment to umber by height, shaded from the north-west
         const hx = heightAt(geo, toWorld(ri, x + e, y, q)) - heightAt(geo, toWorld(ri, x - e, y, q));
         const hy = heightAt(geo, toWorld(ri, x, y + e, q)) - heightAt(geo, toWorld(ri, x, y - e, q));
         const shade = Math.max(-0.5, Math.min(0.5, (-hx + hy) * 0.35));
@@ -87,7 +77,6 @@ function regionImage(geo: Geography, ri: number): Uint8Array {
         c = shade > 0 ? lerp(c, WHITE, shade) : lerp(c, INK, -shade * 0.8);
       } else {
         c = seaColour(h);
-        // coast rings, as on the old charts
         for (const ring of [1.5, 3.5, 6, 9.5]) if (Math.abs(cd - ring) < 0.18 + ring * 0.01) c = lerp(c, INK, 0.45 - ring * 0.03);
         if (z & ZONE.lagoon) c = lerp(c, WHITE, 0.25);
         if (z & ZONE.harbour) c = lerp(c, ULTRA, 0.3);
@@ -162,7 +151,6 @@ function worldImage(geo: Geography): Uint8Array {
       img.set(col.map(Math.round), (y * w + x) * 3);
     }
   }
-  // region borders
   for (let y = 1; y < h; y++) {
     for (let x = 1; x < w; x++) {
       const a = (y * w + x), lat = Math.PI / 2 - ((y + 0.5) / h) * Math.PI, lon = ((x + 0.5) / w) * 2 * Math.PI - Math.PI;
@@ -191,12 +179,11 @@ function downsample(img: Uint8Array, w: number, f: number): Uint8Array {
   return out;
 }
 
-// --- Main ------------------------------------------------------------------------------------------------------
 const args = process.argv.slice(2), opt = (k: string) => (args.includes(k) ? args[args.indexOf(k) + 1] : undefined);
 const t0 = performance.now();
 const geo = buildGeography();
 console.log(`buildGeography: ${(performance.now() - t0).toFixed(0)} ms`);
-const shots = `${ROOT}progress/shots/`;
+const shots = `${ROOT}out/shots/`;
 mkdirSync(shots, { recursive: true });
 const only = opt('--only'), sheetPath = opt('--sheet'), tiles: Uint8Array[] = [];
 REGIONS.forEach((reg, ri) => {

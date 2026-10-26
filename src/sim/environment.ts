@@ -1,7 +1,3 @@
-// The sea a match is sailed on and what moves over it: the one planetary wind, shifting slowly through the match,
-// with gusts running downwind across it and the weather's spells drifting with it (brew; weather.ts reads them);
-// the fixed current lanes, the seed's Great Current and the Maelstrom's vortex; the tide's rise and fall; and what is
-// solid at each moment: the ground at the tide's level and the Ice Crown's turning floes.
 import {
   PI, addScaled, cross, dasin, dcos, dot, dsin, hash32, length, normalize, rngDir, rngFrom, rngInt, rngRange, set, v3, type Rng, type V3,
 } from './math.ts';
@@ -15,35 +11,21 @@ import {
 import { NAV, type Nav } from './world/nav.ts';
 import { REGIONS, TIDE, type Region } from './world/regions.ts';
 
-/** The fixed world: the geography and its navigation graph, the same every match. */
 export interface World {
   readonly geo: Geography;
   readonly nav: Nav;
 }
 
-/** One swirl of the planetary wind: flow round `axis`, which itself turns slowly round `spin`. */
 interface Swirl { readonly axis: V3; readonly spin: V3; readonly drift: number; readonly amp: number; readonly freq: number; readonly phase: number }
 
-/** A fixed lane as a great-circle arc from a to b about the pole n, flowing a → b. */
 interface LaneArc { readonly a: V3; readonly b: V3; readonly n: V3; readonly half: number; readonly speed: number }
 
-/**
- * The waters of one match: the world, the seed's Great Current and its wind. It follows from the world and the
- * seed alone, so it is built once per match (seaFor) and never saved.
- */
 export interface Sea extends World {
   readonly current: CurrentRoute;
   readonly swirls: readonly Swirl[];
   readonly lanes: readonly LaneArc[];
-  /** The swirls' mean strength over the planet, which windAt divides out so fair wind has strength 1. */
   readonly mean: number;
-  /** The territory cell of each landmark (geo.landmarks order): the landmark lies in the waters that hold it. */
   readonly marks: Int32Array;
-  /**
-   * The navigation graph with this match's currents in its step costs, which become times at the reference speed:
-   * a step down a current costs less, one against it more, so the route home rides the currents it can and never
-   * stems one it cannot.
-   */
   readonly voyage: Nav;
 }
 
@@ -58,7 +40,6 @@ export function seaFor(world: World, seed: number): Sea {
   const lanes = world.geo.lanes.map(({ a, b, width, speed }) => ({ a, b, n: normalize(cross(v3(), a, b)), half: width / 2, speed }));
   const marks = Int32Array.from(world.geo.landmarks, (l) => cellOf(TERRITORY, l.pos));
   const sea: Sea = { ...world, current: greatCurrent(seed), swirls, lanes, mean: 1, marks, voyage: world.nav };
-  // The mean over 642 evenly spread points (a Fibonacci sphere) at the start of the match.
   const N = 642, p = v3(), w = v3();
   let sum = 0;
   for (let k = 0; k < N; k++) {
@@ -68,7 +49,6 @@ export function seaFor(world: World, seed: number): Sea {
   return { ...sea, mean: sum / N, voyage: { ...world.nav, cost: voyageCosts(sea) } };
 }
 
-/** The nav graph's step costs reckoned as times against this sea's currents and the vortex, at each cell's centre. */
 function voyageCosts(sea: Sea): Float32Array {
   const cells = NAV.cells, centre = new Float64Array(3 * cells), flow = new Float64Array(3 * cells), c = v3(), f = v3(), w = v3();
   for (let k = 0; k < cells; k++) {
@@ -98,10 +78,6 @@ function voyageCosts(sea: Sea): Float32Array {
 
 export const timeOf = (state: MatchState): number => state.tick * TICK;
 
-// ---------------------------------------------------------------------------------------------------------------
-// Wind
-
-/** The swirls' axes at the time they were last turned to, shared by every call in a tick. */
 const AXES = Array.from({ length: WIND.terms }, () => v3());
 let axesSea: Sea | null = null, axesTime = Number.NaN;
 
@@ -111,17 +87,11 @@ function turnAxes(sea: Sea, t: number): void {
   axesTime = t;
   for (let k = 0; k < WIND.terms; k++) {
     const { axis: d, spin: s, drift } = sea.swirls[k], a = drift * t, c = dcos(a), sn = dsin(a), sd = dot(s, d) * (1 - c);
-    // Rodrigues: d·cos a + (s × d)·sin a + s·(s·d)(1 − cos a)
     set(AXES[k], d.x * c + (s.y * d.z - s.z * d.y) * sn + s.x * sd, d.y * c + (s.z * d.x - s.x * d.z) * sn + s.y * sd,
       d.z * c + (s.x * d.y - s.y * d.x) * sn + s.z * sd);
   }
 }
 
-/**
- * The swirling field at p and time t, in units of its planetary mean: the flow of a stream function
- * Σ amp·sin(freq·(p·axis) + phase), so p × its gradient — tangent, without sources or sinks, in broad wheeling
- * systems. Returns its magnitude.
- */
 function swirl(sea: Sea, t: number, p: V3, out: V3): number {
   turnAxes(sea, t);
   set(out, 0, 0, 0);
@@ -134,15 +104,10 @@ function swirl(sea: Sea, t: number, p: V3, out: V3): number {
   return length(out);
 }
 
-/** The wind at a point: what windAt fills. */
 export interface Wind {
-  /** The true wind's velocity, u/s, tangent. */
   readonly v: V3;
-  /** Fair = 1: more in a gust or a squall, less in a calm or among the mangroves' roots. */
   strength: number;
-  /** How settled its direction is: 0 in the dead eye of a swirl, 1 in a steady breeze. */
   steady: number;
-  /** 0…1: how deep in a gust the point lies. */
   gust: number;
 }
 
@@ -150,10 +115,6 @@ export const newWind = (): Wind => ({ v: v3(), strength: 0, steady: 0, gust: 0 }
 
 const SKY = newSky();
 
-/**
- * The true wind at p now: what drives the sails and the swell, and what flags, smoke and foliage stream in. Gusts and
- * squalls strengthen it, a calm drops it, and among the mangroves' roots it is broken: lighter and unsettled.
- */
 export function windAt(sea: Sea, state: MatchState, p: V3, out: Wind): Wind {
   const m = swirl(sea, timeOf(state), p, out.v), lee = shelterAt(sea, p);
   out.gust = gustAt(state, p);
@@ -164,7 +125,6 @@ export function windAt(sea: Sea, state: MatchState, p: V3, out: Wind): Wind {
   return out;
 }
 
-/** The share of the wind that reaches p through the mangroves' roots (shaded channels, still water); 1 elsewhere. */
 function shelterAt(sea: Sea, p: V3): number {
   const shelter = REGIONS[sea.geo.region[cellOf(TERRITORY, p)]].mechanics.shelter;
   if (!shelter) return 1;
@@ -172,7 +132,6 @@ function shelterAt(sea: Sea, p: V3): number {
   return d >= shelter.reach ? 1 : shelter.still + ((1 - shelter.still) * d) / shelter.reach;
 }
 
-/** How deep in a gust p lies: its envelope over its life times its fall-off from the heart, the deepest gust's. */
 export function gustAt(state: MatchState, p: V3): number {
   let g = 0;
   for (const gust of state.gusts) {
@@ -185,7 +144,6 @@ export function gustAt(state: MatchState, p: V3): number {
 
 const DRIFT = v3();
 
-/** The environment's tick: gusts age and run downwind, and are born again elsewhere when they die. */
 export function stir(sea: Sea, state: MatchState): void {
   const rng = state.rng[STREAM.wind], t = timeOf(state);
   for (const gust of state.gusts) {
@@ -198,10 +156,6 @@ export function stir(sea: Sea, state: MatchState): void {
   }
 }
 
-/**
- * A gust anywhere on the planet, or, when the spell it draws is a squall in its prime, inside that squall's core: so
- * squalls blow in gusts. One never yet spawned starts part-way through its life, so they never pulse together.
- */
 function spawn(rng: Rng, gust: Gust, weather: readonly Spell[]): void {
   const first = gust.life === 0, squall = weather[rngInt(rng, weather.length)];
   if (squall.kind === SPELL.squall && vigour(squall) > 0.5) {
@@ -214,17 +168,8 @@ function spawn(rng: Rng, gust: Gust, weather: readonly Spell[]): void {
   gust.age = first ? rngRange(rng, 0, gust.life) : 0;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Weather
-
-/** The share of a spell's radius over which its depth is full. */
 const CORE = Math.sqrt(1 - 1 / WEATHER.core), AWAY = v3();
 
-/**
- * The weather's tick: each spell rises, drifts downwind and fades over its life; when one ends the seed sends the
- * next to a random place, its kind drawn by that place's odds (its region's tendencies, squalls likelier on the open
- * sea), or a fair spell: a rest before the next.
- */
 export function brew(sea: Sea, state: MatchState): void {
   const rng = state.rng[STREAM.weather], t = timeOf(state);
   for (let k = 0; k < state.weather.length; k++) {
@@ -238,7 +183,6 @@ export function brew(sea: Sea, state: MatchState): void {
   }
 }
 
-/** The spell after one that has ended; the first in its slot starts part-way through its life, as gusts do. */
 function forecast(sea: Sea, rng: Rng, spell: Spell, t: number): void {
   const first = spell.life === 0;
   rngDir(rng, spell.at);
@@ -254,39 +198,28 @@ function forecast(sea: Sea, rng: Rng, spell: Spell, t: number): void {
   drift(sea, t, spell);
 }
 
-/** A spell's drift: downwind at its centre, at WEATHER.drift of the wind, u/s. */
 function drift(sea: Sea, t: number, spell: Spell): void {
   const m = swirl(sea, t, spell.at, spell.v), s = m > 0 ? (WIND.speed * WEATHER.drift) / m : 0;
   set(spell.v, spell.v.x * s, spell.v.y * s, spell.v.z * s);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Currents
-
 const ALONG = v3(), OFF = v3();
 
-/** Strongest on the centreline, nothing at the edge: x is the offset over the half-width. */
 const profile = (x: number): number => (1 - x * x) * (1 - x * x);
-/** The chord between two unit vectors, in u. */
 const apart = (a: V3, b: V3): number => R * Math.sqrt(Math.max(0, 2 - 2 * dot(a, b)));
 
-/** The current's velocity at p, u/s, tangent: the fixed lanes and the Great Current carry any ship in them. */
 export function currentAt(sea: Sea, p: V3, out: V3): V3 {
   set(out, 0, 0, 0);
   for (const l of sea.lanes) {
     const x = (R * dot(p, l.n)) / l.half;
     if (x <= -1 || x >= 1) continue;
-    if (dot(cross(OFF, l.a, p), l.n) < 0 || dot(cross(OFF, p, l.b), l.n) < 0) continue; // beyond an end
+    if (dot(cross(OFF, l.a, p), l.n) < 0 || dot(cross(OFF, p, l.b), l.n) < 0) continue;
     const ends = Math.min(apart(p, l.a), apart(p, l.b));
     addScaled(out, out, normalize(cross(ALONG, l.n, p)), l.speed * profile(x) * Math.min(1, ends / LANE_TAPER));
   }
   return greatCurrentAt(sea, p, out);
 }
 
-/**
- * Adds the Great Current at p to `out` (the opening asks it whether a ship is clear of the current). Its centreline is
- * a point every ~2 u: a coarse pass, then a fine one.
- */
 export function greatCurrentAt(sea: Sea, p: V3, out: V3): V3 {
   const pts = sea.current.points, n = pts.length / 3, half = GREAT_CURRENT.width / 2, COARSE = 8;
   let best = 0, near = Infinity;
@@ -294,7 +227,7 @@ export function greatCurrentAt(sea: Sea, p: V3, out: V3): V3 {
     const d = 2 - 2 * (p.x * pts[3 * k] + p.y * pts[3 * k + 1] + p.z * pts[3 * k + 2]);
     if (d < near) { near = d; best = k; }
   }
-  const reach = (half + COARSE) / R; // the nearest coarse point lies within COARSE u along of the nearest point
+  const reach = (half + COARSE) / R;
   if (near > reach * reach) return out;
   for (let k = Math.max(0, best - COARSE); k <= Math.min(n - 1, best + COARSE); k++) {
     const d = 2 - 2 * (p.x * pts[3 * k] + p.y * pts[3 * k + 1] + p.z * pts[3 * k + 2]);
@@ -310,46 +243,29 @@ export function greatCurrentAt(sea: Sea, p: V3, out: V3): V3 {
   return addScaled(out, out, ALONG, GREAT_CURRENT.speed * profile(x) * Math.min(1, ends / GREAT_CURRENT.taper));
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The tide and what is solid
-
-/** Sea level above mean, u, at match time t: the planetary tide, rising and falling on its period. */
 export const seaLevel = (t: number): number => TIDE.amp * dsin((2 * PI * t) / TIDE.period);
 
-/** The sea level now: what the renderer floods the flats to, and what opens and shuts the tidal passages. */
 export const tideOf = (state: MatchState): number => seaLevel(timeOf(state));
 
-/** The lowest the tide falls: a route planned for it stays open whatever the hour. */
 export const LOW_WATER = -TIDE.amp;
 
-/**
- * Seconds from match time t until the tide next crosses `level`: when a passage that opens above it (a nav cell's or
- * edge's level) next opens or shuts — Infinity for one always open or never. It stands open while seaLevel > level.
- */
 export function untilTide(level: number, t: number): number {
   if (!(level > -TIDE.amp && level < TIDE.amp)) return Infinity;
   const turn = 2 * PI, now = ((turn * t) / TIDE.period) % turn, rise = dasin(level / TIDE.amp);
-  // The tide climbs through `level` at phase `rise` and falls back through it at π − rise.
   return (Math.min(ahead(rise - now, turn), ahead(PI - rise - now, turn)) * TIDE.period) / turn;
 }
 
-/** An angle brought into (0, turn]. */
 function ahead(a: number, turn: number): number {
   const x = a % turn;
   return x <= 0 ? x + turn : x;
 }
 
-/** Whether a hull at p is aground now: on ground the tide leaves too shallow, or on an Ice Crown floe. */
 export function aground(sea: Sea, state: MatchState, p: V3): boolean {
   const t = timeOf(state);
   return !navigable(sea.geo, p, seaLevel(t))
     || ((sea.geo.zones[cellOf(TERRITORY, p)] & ZONE.pack) !== 0 && floeAt(sea, t, p) >= 0);
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// The regions' moving waters: the Ice Crown's floes and the Maelstrom's vortex
-
-/** The one region with a mechanic, and the mechanic. */
 function only<K extends keyof Region['mechanics']>(key: K): { ri: number; m: NonNullable<Region['mechanics'][K]> } {
   const ri = REGIONS.findIndex((r) => r.mechanics[key] !== undefined), m = REGIONS[ri]?.mechanics[key];
   if (m === undefined) throw new Error(`no region has ${key}`);
@@ -360,11 +276,6 @@ const CROWN = only('floes'), MAELSTROM = only('vortex');
 const FLOE_AT: V3[] = [];
 let floeSea: Sea | null = null, floeTime = Number.NaN;
 
-/**
- * Where each Ice Crown floe (geo.floes order) lies at match time t: from chart (r·cos angle, r·sin angle) at time 0
- * its ring turns about the pole at the ring's rate (anticlockwise seen from above when positive), so the lanes
- * between the rings open and close. A floe's size is its radius in u. The points are shared, valid until the next call.
- */
 export function floesAt(sea: Sea, t: number): readonly V3[] {
   if (sea === floeSea && t === floeTime) return FLOE_AT;
   floeSea = sea;
@@ -378,7 +289,6 @@ export function floesAt(sea: Sea, t: number): readonly V3[] {
   return FLOE_AT;
 }
 
-/** The floe p lies on at match time t (geo.floes index), or −1. */
 export function floeAt(sea: Sea, t: number, p: V3): number {
   const at = floesAt(sea, t), floes = sea.geo.floes;
   for (let k = 0; k < floes.length; k++) {
@@ -388,7 +298,6 @@ export function floeAt(sea: Sea, t: number, p: V3): number {
   return -1;
 }
 
-/** The unit tangent at p pointing off the floe it lies on at match time t, into `out`; false when on none. */
 export function offFloe(sea: Sea, t: number, p: V3, out: V3): boolean {
   const k = floeAt(sea, t, p);
   if (k < 0) return false;
@@ -400,12 +309,6 @@ export function offFloe(sea: Sea, t: number, p: V3, out: V3): boolean {
 
 const EYE_AT = CHARTS[MAELSTROM.ri].c, RIM = dcos(MAELSTROM.m.r / R), SPIN = v3(), INWARD = v3();
 
-/**
- * The Maelstrom's flow at p, u/s tangent, into `out` (zero outside it); returns whether p lies within its rim. It
- * turns clockwise seen from above, strongest at the eye wall and falling by VORTEX.fall to the rim, and draws in
- * toward the eye, which turns as one. Ships feel it through the grip of its water (sailing.ts), so currentAt leaves
- * it out; the voyage costs and the renderer add it.
- */
 export function vortexAt(p: V3, out: V3): boolean {
   set(out, 0, 0, 0);
   if (dot(p, EYE_AT) <= RIM) return false;

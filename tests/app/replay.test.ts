@@ -1,8 +1,3 @@
-// The browser half of acceptance check 2 on the app runtime: a recording replayed in Chromium with full rendering,
-// at 60 and at 20 frames a second and time-accelerated, sent to the background mid-match and brought back (by a
-// reload, as a relaunched app, or in place), resumes on the tick it stopped and ends on the hash the same recording
-// gives headless in Node.
-//   node --test tests/app/replay.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { seaFor } from '../../src/sim/environment.ts';
@@ -51,7 +46,6 @@ test('a replay ends on the headless hash at any frame rate across background and
         await new Promise((done) => setTimeout(done, 1000));
         return g.perf.frames - f0;
       });
-      // the pace holds to its cap; a loaded machine drops frames below it (the hash must not care), never to half
       assert.ok(frames <= run.fps * 1.2 && frames >= run.fps * 0.5, `${frames} frames a second at ${run.fps} fps`);
       await game.until((g, at) => g.tick >= at, run.at);
       const stopped = await game.hook(async (g): Promise<number> => {
@@ -75,7 +69,6 @@ test('a replay ends on the headless hash at any frame rate across background and
       const hash = await game.hook((g): string => g.matchHash());
       t.diagnostic(`${run.name}: background at tick ${stopped}, ${hash}`);
       assert.equal(hash, expected, 'the same hash as headless in Node');
-      // Held at stopAt the loop still draws every frame: drawing only reads the match, so the hash cannot move.
       const redrawn = await game.hook(async (g): Promise<[number, number, string | null]> => {
         const f0 = g.perf.frames;
         while (g.perf.frames - f0 < 10) await new Promise((done) => setTimeout(done, 50));

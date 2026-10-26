@@ -1,7 +1,3 @@
-// src/sim/codec.ts and the match state: random values of every kind round-trip bit for bit, encoding is
-// canonical, bad values and bad bytes are refused, the hash sees every bit, and a realistic match snapshot is
-// small.
-//   node --test tests/sim/codec.test.ts
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +6,6 @@ import { dot, rngChance, rngFloat, rngFrom, rngInt, rngRange, rngU32, v3, type R
 import { R, TERRITORY, cellDir } from '../../src/sim/sphere.ts';
 import { MATCH_FORMAT, SHIPS, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState } from '../../src/sim/state.ts';
 
-/** A random value of a kind, reaching the corners: −0, subnormals, extremes, long runs and noise. */
 function randomValue(kind: Kind, r: Rng): unknown {
   switch (kind.t) {
     case 'f64': {
@@ -19,7 +14,7 @@ function randomValue(kind: Kind, r: Rng): unknown {
     }
     case 'int': {
       const special = [0, -1, 1, 127, 128, -129, 2 ** 31, -(2 ** 52) + 1, 2 ** 52 - 1];
-      return rngChance(r, 0.3) ? special[rngInt(r, special.length)] : Math.round((rngFloat(r) - 0.5) * 2 ** rngInt(r, 52)) + 0; // + 0: no −0
+      return rngChance(r, 0.3) ? special[rngInt(r, special.length)] : Math.round((rngFloat(r) - 0.5) * 2 ** rngInt(r, 52)) + 0;
     }
     case 'bool':
       return rngChance(r, 0.5);
@@ -63,7 +58,7 @@ test('random values of every kind round-trip bit for bit, and encoding is canoni
     const v = randomValue(SAMPLE, r) as Parameters<typeof encode<typeof SAMPLE>>[1];
     const b = encode(SAMPLE_FORMAT, v);
     const back = decode(SAMPLE_FORMAT, b);
-    assert.deepStrictEqual(back, v); // Object.is on numbers: −0 stays −0
+    assert.deepStrictEqual(back, v);
     assert.deepEqual(encode(SAMPLE_FORMAT, back), b);
   }
 });
@@ -86,7 +81,6 @@ test('values that do not fit the schema are refused, naming the field', () => {
   bad((o) => (o.seeds = [new Uint32Array(3)]), /seeds\.0 is not a Uint32Array\(4\)/);
   bad((o) => delete o.pos, /pos is not a record/);
 
-  // Integers have no sign of zero: −0 (from Math.round(−0.2), say) is stored as 0.
   const o = structuredClone(v);
   o.n = -0;
   assert.ok(Object.is(decode(SAMPLE_FORMAT, encode(SAMPLE_FORMAT, o as never)).n, 0));
@@ -106,13 +100,11 @@ test('bytes that are not an intact encoding are refused', () => {
   assert.throws(() => decode(fmt, Uint8Array.of(...good, 0)), /trailing bytes/);
   assert.throws(() => decode(fmt, corrupt(0, 0x58)), /not this format/);
   assert.throws(() => decode({ ...fmt, version: 2 }, good), /version 1, expected 2/);
-  // Layout: 4 magic, 1 version, 2 varint a, 1 bool, then runs (3×1, 2×2, 4×0, 1×9).
   assert.throws(() => decode(fmt, corrupt(7, 2)), /bad boolean/);
-  assert.throws(() => decode(fmt, corrupt(8, 0)), /bad run/); // a run of zero
-  assert.throws(() => decode(fmt, corrupt(8, 11)), /bad run/); // past the end of the array
+  assert.throws(() => decode(fmt, corrupt(8, 0)), /bad run/);
+  assert.throws(() => decode(fmt, corrupt(8, 11)), /bad run/);
   const longVarint = Uint8Array.of(...good.subarray(0, 5), ...new Array(9).fill(0x80), 1);
   assert.throws(() => decode(fmt, longVarint), /bad varint/);
-  // A real that is not finite cannot come from encode.
   const nan = good.slice();
   new DataView(nan.buffer).setFloat64(nan.length - 16, NaN, true);
   assert.throws(() => decode(fmt, nan), /non-finite real/);
@@ -140,11 +132,10 @@ test('hash64 sees every bit', () => {
   assert.notEqual(hash64(new Uint8Array(0)), hash64(new Uint8Array(1)), 'length counts');
 });
 
-/** A match state as it might look late in a match: ten ships' waters as caps around scattered homes, open trails. */
 function lateMatch(seed: number): MatchState {
   const s = createMatch({ seed }), r = rngFrom(seed), p = v3();
   const homes = Array.from({ length: SHIPS }, () => cellDir(TERRITORY, rngInt(r, TERRITORY.cells), v3()));
-  const within = homes.map(() => Math.cos(rngRange(r, 15, 60) / R)); // waters 15–60 u in radius
+  const within = homes.map(() => Math.cos(rngRange(r, 15, 60) / R));
   for (let c = 0; c < TERRITORY.cells; c++) {
     cellDir(TERRITORY, c, p);
     for (let i = 0; i < SHIPS; i++) if (dot(p, homes[i]) > within[i]) s.owner[c] = i + 1;
@@ -166,14 +157,13 @@ test('match states round-trip, and a late-match snapshot is small', (t) => {
   t.diagnostic(`late-match snapshot ${(b.length / 1024).toFixed(1)} KB (target ≤ 300 KB)`);
   assert.ok(b.length <= 300 * 1024);
   const time = (f: () => unknown) => {
-    for (let i = 0; i < 3; i++) f(); // warm up
+    for (let i = 0; i < 3; i++) f();
     const t0 = cpuNow();
     for (let i = 0; i < 10; i++) f();
     return ((cpuNow() - t0) / 10).toFixed(1);
   };
   t.diagnostic(`encode ${time(() => encodeMatch(late))} ms, decode ${time(() => decodeMatch(b))} ms, hash ${time(() => matchHash(late))} ms`);
 
-  // Random states of the match schema too, run-heavy territory and all.
   const r = rngFrom(3);
   for (let i = 0; i < 5; i++) {
     const v = randomValue(MATCH_FORMAT.schema, r) as MatchState;

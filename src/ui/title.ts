@@ -1,6 +1,3 @@
-// WP26 the title: the planet turning slowly over a parchment laced with a portolan's rhumb lines while Portolan
-// letters itself stroke by stroke in swash capitals on a ribbon cartouche, the gull wheeling overhead; a touch anywhere
-// goes on to the harbour. Built in one layout pass of a few canvas sheets and one shader quad, inside the boot budget.
 import * as THREE from 'three';
 import type { InkText } from '../lettering/ink.ts';
 import { drop, titleArt, type TitleArt } from '../render/harbourScene.ts';
@@ -10,7 +7,6 @@ import { applySettings, loadSettings, settings, uiSound } from './settings.ts';
 import type { Screen, ScreenContext } from './shell.ts';
 
 const BARE = { scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera() };
-/** Seconds before the pen touches the page. */
 const PEN_DOWN = 0.35;
 let settingsRead = false;
 
@@ -47,7 +43,7 @@ export function title(ctx: ScreenContext): Screen {
       const t = f.clock - start, still = settings().reducedMotion;
       art?.frame(f.clock, still);
       if (!word || !hint) return;
-      const writing = Math.min(word.duration, 2.4); // the whole name within the first seconds
+      const writing = Math.min(word.duration, 2.4);
       word.progress = still ? 1 : (t - PEN_DOWN) / writing;
       const done = still || t > PEN_DOWN + writing;
       hint.opacity = done ? (still ? 0.85 : 0.6 + 0.3 * Math.sin((t - PEN_DOWN - writing) * 2.1)) : 0;

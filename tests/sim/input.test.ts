@@ -1,7 +1,3 @@
-// src/sim/input.ts and the runner in src/sim/match.ts: a recording replays exactly the inputs of every tick, from
-// any tick, after a trip through JSON; untrusted recordings are checked; the same seed and inputs give the same
-// match every time; and a match resumed from a snapshot at any tick ends identical to one never interrupted.
-//   node --test tests/sim/input.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -26,7 +22,6 @@ test('a recording replays the exact input of every tick, from any tick, through 
     const r = replay(rec);
     inputs.forEach((want, t) => assert.deepEqual(inputAt(r, t), want, `tick ${t}`));
   }
-  // A replay can start anywhere: the input at tick t is every event up to t.
   for (const start of [0, 1, 777, 12_345, 19_999]) {
     const r = replay(recording);
     for (let t = start; t < Math.min(start + 500, inputs.length); t++) assert.deepEqual(inputAt(r, t), inputs[t]);
@@ -58,7 +53,6 @@ test('recording refuses invalid input, and parsing refuses invalid recordings', 
     { format: 1, events: [[0, 'course', 'home']] },
   ];
   for (const data of bad) assert.throws(() => parseRecording(data), TypeError, JSON.stringify(data));
-  // Parsing copies: later changes to the source do not reach the recording.
   const src = { format: 1, events: [[0, 'course', [4, 5]]] };
   const parsed = parseRecording(src);
   (src.events[0][2] as number[])[0] = 9;
@@ -114,7 +108,6 @@ test('a match resumed from a snapshot at any tick ends identical to one never in
     runMatch(sea, resumed, recording, end);
     assert.equal(matchHash(resumed), matchHash(whole), `snapshot at tick ${k}`);
   }
-  // The runner is the step: stepping by hand with the replayed inputs gives the same state.
   const byHand = createMatch({ seed: 9 }), inputs = replay(recording);
   while (byHand.tick < end) step(sea, byHand, inputAt(inputs, byHand.tick));
   assert.equal(matchHash(byHand), matchHash(whole));

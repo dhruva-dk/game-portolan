@@ -1,19 +1,3 @@
-// The Fire Archipelago (WP17 part C): the Caldera's volcano with its two lava deltas steaming into the sea, satellite
-// cones, and Cinder Isle with its black-sand harbour. The terrain draws the land and its black sand and the shared flora
-// its scrub; this module dresses it, every piece placed from the region's own strokes and the sim's heights. The fresh
-// flows: from the crater's breach down each delta that ends in hot water (the region's `land` strokes reaching a `hot`
-// stroke), a draped crust of iron-gall ropes and plates, cracked with incandescent vermilion and gold, its channel
-// running bright down the flank while the Caldera erupts, and breaking open where it meets the sea; aa clinker heaped on
-// its levees and its front. Basalt and tuff: blocks and banded tuff ledges on the older ground. Sparse scorched growth:
-// charred snags where the flows burnt the scrub, palms with scorched fronds on the old shores, nothing on a fresh flow
-// (tested). The air: the volcano's plume drawn as an engraver draws smoke, rolling inked masses hatched on their shaded
-// side, leaning downwind and thinning to a broken dry brush; white steam boiling up where the lava meets the sea, from the
-// fumaroles and off the hot water; ash falling as fine grey strokes. The hot water (the sim's `hot` zone, which damages
-// hulls): a jade, sulphur and rust bloom riding the swell, its edge a broken rust line. The Caldera erupts on the sim's
-// rhythm (calderaTime: economy.ts eruption and untilEruption, never a clock of its own): lava fountains of gold and
-// vermilion strokes, the plume surging dark and lit from beneath, the crater's glow on the slopes and smoke (a lamp).
-// Hooks: `gold` (WP22: where the Caldera's doubloons are flung from, how far they fall and how hard it is erupting),
-// `voices` (WP28: the crater, the ocean entries and the fumaroles by place and loudness).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { illustratedMaterial, inkMaterial, linearVec, transmittanceVec, type Style } from '../../style/glsl.ts';
@@ -37,39 +21,28 @@ import { chartDir, Draw, Kit, lift, pose, regionSeen, seeded, vec, type V, washO
 const RI = REGIONS.findIndex((r) => r.id === 'fireArchipelago');
 const REGION = REGIONS[RI];
 const TAU = 2 * Math.PI;
-/** Sim heights (u): at or above BLOCK no hull floats at any tide; above LAND dry at high water. */
 export const BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
-/** The Caldera's cycle (s), from the sim's region. */
 export const PERIOD = REGION.mechanics.eruption!;
 
 type Cone = Extract<Stroke, { k: 'cone' }>;
 type Hot = Extract<Stroke, { k: 'hot' }>;
 type Land = Extract<Stroke, { k: 'land' }>;
 const CONES = REGION.strokes.filter((s): s is Cone => s.k === 'cone');
-/** The Caldera's volcano: the region's tallest cone (its landmark stands on it). */
 export const VOLCANO = CONES.reduce((a, b) => (b.top > a.top ? b : a));
 export const HOTS = REGION.strokes.filter((s): s is Hot => s.k === 'hot');
 
-/** Seconds into the Caldera's cycle from the sim (economy.ts): 0 as it erupts, CALDERA.burst as the rain ends. */
 export function calderaTime(state: MatchState): number {
   const e = eruption(state);
   return e >= 0 ? e * CALDERA.burst : PERIOD - untilEruption(state);
 }
 
-/** The Caldera's fire 0…1 at `t` s into its cycle: kindling over 0.8 s as it erupts and full while it rains, then dying
- *  away (the afterglow) over the next quarter minute; asleep, a low glow at the vent. */
 export function fireOf(t: number): number {
   return t < CALDERA.burst ? Math.min(1, t / 0.8) : 0.6 * Math.exp(-(t - CALDERA.burst) / 5);
 }
 
-/**
- * A fresh flow: from the crater's breach over the flank and down a delta into the hot water at its toe. Chart points
- * resampled every `STEP` u: x, y, half-width, distance from the rim; `entry` the distance where it meets the sea.
- */
 export interface Flow { x: number[]; y: number[]; half: number[]; s: number[]; entry: number; hot: Hot }
 const STEP = 0.35;
 
-/** The region's fresh flows: each `land` stroke rising out of the volcano's flank that ends in hot water. */
 export function flowsOf(sim: (x: number, y: number) => number): Flow[] {
   const flows: Flow[] = [];
   for (const st of REGION.strokes) {
@@ -78,12 +51,10 @@ export function flowsOf(sim: (x: number, y: number) => number): Flow[] {
     const hot = HOTS.find((h) => Math.hypot(ex - h.x, ey - h.y) < h.r);
     if (!hot || Math.hypot(p[0] - VOLCANO.x, p[1] - VOLCANO.y) > VOLCANO.r) continue;
     const ux = p[0] - VOLCANO.x, uy = p[1] - VOLCANO.y, ul = Math.hypot(ux, uy), rim = VOLCANO.crater + 0.6;
-    // knots: the breach in the crater's rim, the stroke's own points, and on into the hot water past its end
     const mid = (rim + ul) / 2, kx = [VOLCANO.x + (ux / ul) * rim, VOLCANO.x + (ux / ul) * mid], ky = [VOLCANO.y + (uy / ul) * rim, VOLCANO.y + (uy / ul) * mid], kh = [0.6, 0.95];
     for (let i = 0; i < n; i++) kx.push(p[3 * i]), ky.push(p[3 * i + 1]), kh.push(p[3 * i + 2] * (i === 0 ? 0.62 : 0.68));
     kx.push(hot.x), ky.push(hot.y), kh.push(kh[kh.length - 1] * 0.85);
     const f: Flow = { x: [], y: [], half: [], s: [], entry: 0, hot };
-    // Catmull-Rom through the knots, resampled by arc length
     const at = (i: number, t: number, k: number[]): number => {
       const a = k[Math.max(i - 1, 0)], b = k[i], c = k[i + 1], d = k[Math.min(i + 2, k.length - 1)];
       return 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
@@ -97,7 +68,6 @@ export function flowsOf(sim: (x: number, y: number) => number): Flow[] {
         f.x.push(x), f.y.push(y), f.half.push(at(i, t, kh)), f.s.push(s);
       }
     }
-    // a flow winds down the flank and spreads on the delta: its line swings across the fall line, widest on the flank
     for (let i = 1; i + 1 < f.x.length; i++) {
       const tx = f.x[i + 1] - f.x[i - 1], ty = f.y[i + 1] - f.y[i - 1], tl = Math.hypot(tx, ty), m = (0.3 + 0.6 * (1 - Math.min(1, f.s[i] / 16))) * Math.sin(f.s[i] * 0.38 + p[0]);
       f.x[i] += (-ty / tl) * m;
@@ -110,8 +80,6 @@ export function flowsOf(sim: (x: number, y: number) => number): Flow[] {
   return flows;
 }
 
-/** Where chart point (x, y) lies against the flows: its distance from the nearest centre line in half-widths (`d`), how
- *  far down that flow (`s`), and that flow. */
 export function flowNear(flows: readonly Flow[], x: number, y: number): { d: number; s: number; flow: Flow | null } {
   let best = { d: Infinity, s: 0, flow: null as Flow | null };
   for (const f of flows) {
@@ -131,7 +99,6 @@ const W = {
   char: washOf(PIGMENTS.ironGall, 0.9), charLit: washOf(mix(PIGMENTS.sepia, PIGMENTS.ironGall, 0.4), 0.7), ash: washOf(mix(PIGMENTS.sepia, PIGMENTS.indigo, 0.2), 0.7),
 };
 
-/** A clinker block (aa, basalt): an angular lump, its top lit grey, its sides dark, a facet or two rusted. */
 function clinkerKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), k = new Kit((_, n) => (n.y > 0.55 ? W.basaltLit : rnd() < 0.18 ? W.rust : W.basalt));
   const j = Array.from({ length: 6 }, () => 0.75 + 0.5 * rnd());
@@ -142,7 +109,6 @@ function clinkerKit(seed: number): THREE.BufferGeometry {
   ]).build();
 }
 
-/** A tuff ledge: pale ash beds stepped back course by course, every other bed darker, its top dusted. */
 function tuffKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), beds = [0, 0.22, 0.4, 0.62, 0.78, 0.95];
   const k = new Kit((c, n) => (n.y > 0.7 ? W.tuffTop : Math.floor((c.y + 0.12) / 0.2) % 2 ? W.tuffBand : W.tuff));
@@ -153,7 +119,6 @@ function tuffKit(seed: number): THREE.BufferGeometry {
   }))).build();
 }
 
-/** A charred snag: a dead trunk burnt black at its foot, two or three stubs of limbs, the bark peeled grey above. */
 function snagKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), k = new Kit((c, n) => (c.y < 0.35 ? W.char : n.y > 0.4 ? W.charLit : W.ash));
   const limb = (from: V, dir: V, len: number, r0: number, r1: number, segs: number): void => {
@@ -176,8 +141,6 @@ export interface Part { m: THREE.Matrix4; at: V; dir: V; base: number; ground: n
 export interface FirePlan {
   flows: Flow[];
   clinker: Part[]; tuff: Part[]; snags: Part[]; palms: Part[];
-  /** The crater's mouth (unit direction, its floor's and rim's drawn heights over mean sea), the ocean entries and the
-   *  fumaroles. */
   crater: { dir: V; h: number; rim: number }; entries: { dir: V; half: number }[]; vents: { dir: V; r: number; sea: boolean }[];
   voices: { at: V; loud: number; kind: 'crater' | 'entry' | 'fumarole' }[];
 }
@@ -211,27 +174,23 @@ export function planFire(field: TerrainField): FirePlan {
   for (let y = -70; y <= 70; y += 0.7) {
     for (let x = -70; x <= 70; x += 0.7) {
       const px = x + 0.6 * (rnd() - 0.5), py = y + 0.6 * (rnd() - 0.5), h = sim(px, py), r1 = rnd(), r2 = rnd(), r3 = rnd();
-      if (h < BLOCK) continue; // nothing in a hull's water
+      if (h < BLOCK) continue;
       const near = flowNear(flows, px, py), rho = Math.hypot(px - VOLCANO.x, py - VOLCANO.y);
-      // aa clinker on the levees and heaped at the front where the flow breaks into the sea
       if (near.flow && ((near.d > 0.78 && near.d < 1.25 && near.s > 3 && r1 < 0.42) || (near.d < 1.15 && near.s > near.flow.entry - 6 && h > -0.5 && r1 < 0.5))) {
         place(plan.clinker, px, py, { sink: 0.08, yaw: r2 * TAU, tilt: 0.25 * (r3 - 0.5), s: near.s > near.flow.entry - 6 ? 0.3 + 0.45 * r2 : 0.18 + 0.3 * r2, sy: 0.18 + 0.3 * r3, kitH: 1, reach: 0.7 });
         continue;
       }
-      if (h < LAND || near.d < 1.05) continue; // nothing grows or stands on a fresh flow
+      if (h < LAND || near.d < 1.05) continue;
       const S2 = field.surface(chartDir(RI, px, py), -10, S), up = S2.up, sat = satellites.find((c) => Math.hypot(px - c.x, py - c.y) < c.r);
-      // banded tuff ledges on the satellite cones' flanks and the old island's slopes
       const old = rho > VOLCANO.r + 1.5;
       if (((sat && Math.hypot(px - sat.x, py - sat.y) > 0.3 * sat.r) || (old && up < 0.93)) && r1 < (sat ? 0.045 : 0.03) && S2.ground !== GROUND.beach) {
         place(plan.tuff, px, py, { sink: 0.25, yaw: r2 * TAU, s: 0.5 + 0.9 * r3, sy: 0.35 + 0.5 * r2, kitH: 0.95, reach: 1.6 });
         continue;
       }
-      // the scrub the flows overran: charred snags along their margins, a few on the volcano's lower apron
       if (S2.height < 6 && ((near.d < 2.2 && r1 < 0.07) || (!old && rho > 0.72 * VOLCANO.r && r1 < 0.008))) {
         place(plan.snags, px, py, { sink: 0.05, yaw: r2 * TAU, tilt: 0.16 * (r3 - 0.5), s: 0.55 + 0.55 * r3, kitH: 1, reach: 0.4 });
         continue;
       }
-      // palms with scorched fronds on the old shores, back from the sand's edge
       if (old && up > 0.82 && S2.height < 3.5 && S2.ground !== GROUND.beach && r1 < 0.05) {
         place(plan.palms, px, py, { sink: 0.1, yaw: r2 * TAU, tilt: 0.12 + 0.2 * r3, s: 2.4 + 1.2 * r2, kitH: 0.95, reach: 0.6 });
       }
@@ -245,9 +204,7 @@ export function planFire(field: TerrainField): FirePlan {
   return plan;
 }
 
-// ---- GLSL ---------------------------------------------------------------------------------------------------------
-
-const NOISE_GLSL = /* glsl */ `
+const NOISE_GLSL =  `
 float fzHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float fzNoise(vec3 x) {
   vec3 i = floor(x), f = fract(x);
@@ -255,7 +212,6 @@ float fzNoise(vec3 x) {
   return mix(mix(mix(fzHash(i), fzHash(i + vec3(1, 0, 0)), f.x), mix(fzHash(i + vec3(0, 1, 0)), fzHash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(fzHash(i + vec3(0, 0, 1)), fzHash(i + vec3(1, 0, 1)), f.x), mix(fzHash(i + vec3(0, 1, 1)), fzHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
-// cells of a cracked crust: the distance to the nearest plate's seed and how far inside the plate (F2 − F1)
 vec2 fzCell(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   float d1 = 8.0, d2 = 8.0;
@@ -269,8 +225,8 @@ vec2 fzCell(vec2 p) {
 }
 `;
 
-const FLOW_VERT = /* glsl */ `
-in vec4 aFlow; // distance from the rim (u), across (−1 … 1), half-width (u), distance past the sea entry (u)
+const FLOW_VERT =  `
+in vec4 aFlow;
 out vec3 vWorld;
 out vec3 vNormal;
 out vec4 vFlow;
@@ -282,7 +238,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
-const FLOW_FRAG = /* glsl */ `
+const FLOW_FRAG =  `
 ${NOISE_GLSL}
 in vec3 vWorld;
 in vec3 vNormal;
@@ -294,22 +250,16 @@ void main() {
   Paper q = paperAt(vWorld, n, 1.0);
   float s = vFlow.x, x = vFlow.y * vFlow.z, edge = abs(vFlow.y), far = distance(cameraPosition, vWorld);
   vec2 fp = vec2(s, x);
-  // the crust: iron-gall laid dark, rusted in patches, its margins broken into clinker
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v)));
   float rust = smoothstep(0.5, 0.85, fzNoise(vec3(fp * 0.3, 3.0)));
   vec3 col = glaze(parchment(q), mix(uCrustT, uRustT, 0.3 * rust), 1.45 + 0.2 * smoothstep(0.7, 1.0, edge), washPool(n, v, q), q);
   col = sunGlaze(shadeGlaze(col, tone, q), ndl, tone);
-  // fresh crust is near black (a dark pigment glazes thin in the style, so it is laid toward the ink), its glassy skin
-  // its glassy skin catching the light where it faces the sky
   col = mix(col, mix(uInk, vec3(0.04, 0.05, 0.08), 0.5), 0.62 - 0.2 * rust - 0.2 * smoothstep(0.3, 0.9, ndl) * fzNoise(vec3(fp * 1.7, 4.0)));
-  // pahoehoe ropes: arcs bowed downstream across the run, inked fine and fading with distance
   float rope = s * 1.6 - 0.5 * x * x / max(vFlow.z, 0.6) + 0.35 * fzNoise(vec3(fp * 0.7, 1.0));
   float rl = abs(fract(rope) - 0.5) / max(fwidth(rope), 1e-4);
   col = mix(col, uInk, 0.7 * (1.0 - smoothstep(0.5, 1.5, rl)) * (1.0 - smoothstep(25.0, 60.0, far)) * (1.0 - smoothstep(0.75, 0.95, edge)));
   vec2 hc = vec2(rope * 0.7, x * 1.4);
   col = mix(col, hatchInk(tone), hatching(hc, dFdx(hc), dFdy(hc), tone, 3.0));
-  // incandescence: the crust's cracks glowing where the flow is live (its channel and its front), the channel running
-  // bright from the breach while the Caldera erupts, and the front breaking open into the sea
   vec2 cell = fzCell(fp * vec2(1.5, 1.9));
   float crack = 1.0 - smoothstep(0.0, 0.05 + 1.2 * fwidth(cell.y), cell.y);
   float channel = 1.0 - smoothstep(0.08, 0.3, edge);
@@ -322,8 +272,7 @@ void main() {
   writeInk(col, n, 0.8);
 }`;
 
-// the hot water: a bloom riding the swell, read per pixel from the sim's zone (aHot, smoothed: the zone's edge at 0.5)
-const HOT_VERT = /* glsl */ `
+const HOT_VERT =  `
 ${SWELL_GLSL}
 uniform float uTime;
 in float aHot;
@@ -341,7 +290,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
 }`;
 
-const HOT_FRAG = /* glsl */ `
+const HOT_FRAG =  `
 ${NOISE_GLSL}
 in float vHot;
 in vec3 vRest;
@@ -352,22 +301,18 @@ void main() {
   Paper q = paperAt(p, vRest, 1.0);
   float n1 = fzNoise(p * 0.2 + vec3(0.0, uTime * 0.04, 0.0)), n2 = fzNoise(p * 0.55 - uTime * 0.06);
   float h = clamp(vHot + 0.3 * (n1 - 0.5), 0.0, 1.0);
-  // rust at the margin, sulphur within, milky jade over the vent, slowly turning over
   vec3 t = mix(uRustT, uSulphurT, smoothstep(0.35, 0.6, h));
   t = mix(t, uJadeT, smoothstep(0.62, 0.9, h + 0.2 * (n2 - 0.5)));
   vec3 col = glaze(parchment(q), t, 0.85, 0.35 + 0.3 * n2, q);
   float a = smoothstep(0.35, 0.7, h) * (0.45 + 0.25 * n2);
-  // the zone's edge, where a hull starts to scald: a broken rust line
   float rl = abs(vHot - 0.5) / max(fwidth(vHot), 1e-4);
   float rim = (1.0 - smoothstep(0.5, 1.6, rl)) * step(0.45, fzNoise(p * 1.9)) * (1.0 - smoothstep(60.0, 140.0, distance(cameraPosition, vWorld)));
   col = mix(col, glaze(parchment(q), uRimT, 1.1, 0.5, q), rim);
   writeVeil(col, max(a, 0.6 * rim));
 }`;
 
-// smoke and steam: rolling masses, each on its own sheet (paper and hatching ride the mass), inked at its silhouette,
-// hatched round its form on the side from the light, lit from beneath by the fire, breaking up as it thins
-const SMOKE_VERT = /* glsl */ `
-in vec4 aLobe; // ash (0) … steam (1), thinning 0 … 1, the fire's light on it 0 … 1, seed
+const SMOKE_VERT =  `
+in vec4 aLobe;
 out vec3 vWorld;
 out vec3 vNormal;
 out vec3 vAnchor;
@@ -378,13 +323,13 @@ void main() {
   vec4 w = M * vec4(position, 1.0);
   vWorld = w.xyz;
   vNormal = normalize(mat3(M) * normal);
-  vAnchor = normalize(position) * length(instanceMatrix[0].xyz) + aLobe.w * 41.0; // the billow's sphere, not its knobs: strokes never ring a knob
+  vAnchor = normalize(position) * length(instanceMatrix[0].xyz) + aLobe.w * 41.0;
   vUp = normalize(instanceMatrix[3].xyz);
   vLobe = aLobe;
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
-const SMOKE_FRAG = /* glsl */ `
+const SMOKE_FRAG =  `
 ${NOISE_GLSL}
 in vec3 vWorld;
 in vec3 vNormal;
@@ -395,17 +340,14 @@ uniform vec3 uAshT, uSteamT, uFireC, uGoldC;
 void main() {
   float grain = 0.6 * fzNoise(vAnchor * 0.9) + 0.4 * fzNoise(vAnchor * 3.3);
   vec3 n = normalize(vNormal) * (gl_FrontFacing ? 1.0 : -1.0), v = normalize(cameraPosition - vWorld);
-  // a dry brush: the mass breaks up as it thins, and its rim is ragged where the brush runs off the form
   float rimEdge = 1.0 - abs(dot(n, v));
   if (grain < vLobe.y * 1.1 - 0.08 + 0.6 * pow(rimEdge, 1.5)) discard;
   Paper q = paperAt(vAnchor, n, 0.3);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v)));
   vec3 col = glaze(parchment(q), mix(uAshT, uSteamT, vLobe.x), mix(1.1, 0.18, vLobe.x), washPool(n, v, q), q);
-  col = mix(col, mix(uInk, uPaper, 0.6), (0.1 + 0.3 * smoothstep(0.2, 0.9, tone) + 0.12 * smoothstep(-0.2, 0.8, -dot(n, vUp))) * (1.0 - 0.75 * vLobe.x)); // grey, deepening softly into the shade and under each billow
-  col = sunGlaze(col, ndl, tone); // (no hard-edged shade glaze: smoke's shade rolls softly round the billow)
-  // the fire's light on the underside of the column (and the lava's on the steam over the entries)
+  col = mix(col, mix(uInk, uPaper, 0.6), (0.1 + 0.3 * smoothstep(0.2, 0.9, tone) + 0.12 * smoothstep(-0.2, 0.8, -dot(n, vUp))) * (1.0 - 0.75 * vLobe.x));
+  col = sunGlaze(col, ndl, tone);
   float glow = vLobe.z * (0.35 + 0.65 * smoothstep(-0.3, 0.7, -dot(n, vUp)));
-  // strokes along the billow's level lines (as the sky's clouds are hatched), bowing round its form
   vec2 hc = vec2(vAnchor.y, vAnchor.x + 0.7 * vAnchor.z);
   float ink = hatching(hc, dFdx(hc), dFdy(hc), tone * mix(0.45, 0.25, vLobe.x), vLobe.w * 7.0);
   col = mix(col, hatchInk(tone), ink * (1.0 - glow));
@@ -413,12 +355,11 @@ void main() {
   writeInk(candle(col, vWorld), n, mix(0.75, 0.5, vLobe.x));
 }`;
 
-// fountains, bombs and ash: strokes laid along their flight, placed in the shader from their seeds and the clock
-const STREAK_VERT = /* glsl */ `
+const STREAK_VERT =  `
 uniform float uTime, uErupt, uAsh, uBox;
 uniform vec3 uCrater, uUp, uDrift, uEye;
 in vec4 aSeed;
-in float aKind; // 0 a lava bomb, 1 ash
+in float aKind;
 out vec2 vQ;
 out float vHeat;
 out float vKind;
@@ -429,7 +370,7 @@ void main() {
   if (aKind < 0.5) {
     float L = 1.6 + 1.6 * aSeed.y, ph = fract(uTime / L + aSeed.x), t = ph * L;
     vec3 e = normalize(cross(uUp, vec3(0.31, 0.83, 0.47))), f = cross(uUp, e);
-    float ang = aSeed.z * 6.2831853, out_ = aSeed.x < 0.4 ? 0.3 + 1.2 * aSeed.w : 1.0 + 5.0 * aSeed.w * aSeed.w; // a jetting core and a spray of bombs
+    float ang = aSeed.z * 6.2831853, out_ = aSeed.x < 0.4 ? 0.3 + 1.2 * aSeed.w : 1.0 + 5.0 * aSeed.w * aSeed.w;
     vec3 v0 = uUp * (13.0 + 13.0 * aSeed.y) + (cos(ang) * e + sin(ang) * f) * out_;
     p = uCrater + v0 * t - 7.0 * t * t * uUp;
     vel = v0 - 14.0 * t * uUp;
@@ -456,7 +397,7 @@ void main() {
   gl_Position = alpha > 0.0 ? projectionMatrix * viewMatrix * vec4(at, 1.0) : vec4(2.0, 2.0, 2.0, 1.0);
 }`;
 
-const STREAK_FRAG = /* glsl */ `
+const STREAK_FRAG =  `
 in vec2 vQ;
 in float vHeat;
 in float vKind;
@@ -472,7 +413,6 @@ void main() {
   }
 }`;
 
-/** A rolling mass of smoke: a sphere puffed out in cauliflower knobs, its normals smooth (inked only where masses meet). */
 function lobeGeometry(detail: number, seed: number): THREE.BufferGeometry {
   const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail).deleteAttribute('normal').deleteAttribute('uv'));
   const rnd = seeded(seed), knobs = Array.from({ length: 9 }, () => [vec(rnd() - 0.5, rnd() - 0.3, rnd() - 0.5).normalize(), 0.12 + 0.16 * rnd(), 0.5 + 0.2 * rnd()] as const);
@@ -503,10 +443,7 @@ interface Emitter {
 export class FireArchipelago {
   readonly group = new THREE.Group();
   readonly plan: FirePlan;
-  /** WP22: the Caldera's gold rain: the crater's mouth the doubloons are flung from (world), how far from the Caldera
-   *  they fall (CALDERA.spread, u) and the eruption's progress (0 … 1 while it rains, −1 asleep: economy.ts eruption). */
   readonly gold = { from: vec(), reach: CALDERA.spread, rain: -1 };
-  /** WP28: the crater's roar, the ocean entries' hiss and the fumaroles, by place and loudness. */
   readonly voices: FirePlan['voices'];
   private readonly kits: Draw[];
   private readonly flow: THREE.Mesh;
@@ -532,7 +469,6 @@ export class FireArchipelago {
     this.lights = lights;
     const T = (c: RGB): THREE.Vector3 => transmittanceVec(c), L = (c: RGB): THREE.Vector3 => linearVec(c);
     const fireC = L(mix(PIGMENTS.vermilion, PIGMENTS.ochre, 0.2)), goldC = L(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.4));
-    // the kits: clinker, tuff, snags (illustrated, painted facet by facet)
     const painted = illustratedMaterial(style, { pigment: PIGMENTS.sepia, painted: true, side: THREE.DoubleSide });
     const kit = (g: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(g, painted, parts.length).fill(parts.map((p) => p.m));
     const split = (parts: Part[], k: number, of: number): Part[] => parts.filter((_, i) => i % of === k);
@@ -541,7 +477,6 @@ export class FireArchipelago {
       ...[0, 1].map((k) => kit(tuffKit(47 + k), split(plan.tuff, k, 2))),
       ...[0, 1].map((k) => kit(snagKit(59 + k), split(plan.snags, k, 2))),
     ];
-    // the palms: the shared flora's kit in its material, whole near the eye and sketched further off, fronds scorched
     const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, 60, 70), sway: 0.05, hand: true });
     const far = floraMaterial(style, swell, { band: new THREE.Vector4(60, 70, 240, 300), sway: 0.05, far: true, hand: true, id: near.uniforms.uInkId.value as number });
     this.palms = [[0, 0, 70], [1, 60, 300]].map(([lod, from, to]) => {
@@ -556,7 +491,6 @@ export class FireArchipelago {
       g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(sd, 2));
       return [new Draw(g, lod ? far : near, plan.palms.length), from, to];
     });
-    // the fresh flows: a crust draped on the drawn ground, raised along its middle, its front into the sea
     const flowMat = inkMaterial(style, { vertexShader: FLOW_VERT, fragmentShader: FLOW_FRAG, inkWeight: 0.8, side: THREE.DoubleSide, uniforms: {
       uCrustT: { value: T(mix(PIGMENTS.ironGall, PIGMENTS.indigo, 0.4)) }, uRustT: { value: T(mix(PIGMENTS.umber, PIGMENTS.vermilion, 0.3)) },
       uFireC: { value: fireC }, uGoldC: { value: goldC }, uFire: { value: 0 }, uFront: { value: 0 } } });
@@ -564,12 +498,10 @@ export class FireArchipelago {
     flowMat.polygonOffsetFactor = -1;
     flowMat.polygonOffsetUnits = -2;
     this.flow = new THREE.Mesh(flowGeometry(field, plan.flows), flowMat);
-    // the hot water
     const hotMat = inkMaterial(style, { vertexShader: HOT_VERT, fragmentShader: HOT_FRAG, veil: true, uniforms: {
       ...swell.uniforms, uJadeT: { value: T(mix(PIGMENTS.verdigris, PIGMENTS.leadWhite, 0.45)) }, uSulphurT: { value: T(mix(PIGMENTS.ochre, PIGMENTS.verdigris, 0.25)) },
       uRustT: { value: T(mix(PIGMENTS.umber, PIGMENTS.vermilion, 0.35)) }, uRimT: { value: T(mix(PIGMENTS.vermilion, PIGMENTS.umber, 0.5)) } } });
     this.hot = new THREE.Mesh(hotGeometry(field), hotMat);
-    // smoke and steam
     const smoke = (detail: number, seed: number, n: number): Draw => {
       const g = lobeGeometry(detail, seed);
       g.setAttribute('aLobe', new THREE.InstancedBufferAttribute(new Float32Array(4 * n), 4));
@@ -582,7 +514,6 @@ export class FireArchipelago {
     const count = (plume: boolean): number => this.emitters.filter((e) => e.surge === plume).reduce((s, e) => s + e.n, 0);
     this.plume = smoke(3, 5, count(true));
     this.steam = smoke(2, 9, count(false));
-    // lava bombs over the crater and ash in the air round the eye
     const BOMBS = 360, ASH = 4200, sg = new THREE.InstancedBufferGeometry(), rnd = seeded(77);
     sg.setAttribute('position', new THREE.Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0], 3));
     sg.setIndex([0, 1, 2, 0, 2, 3]);
@@ -595,14 +526,11 @@ export class FireArchipelago {
     this.streaks = new THREE.Mesh(sg, streakMat);
     for (const o of [this.flow, this.hot, this.streaks]) o.frustumCulled = false;
     this.materials = [painted, near, far, flowMat, hotMat, smokeMat, streakMat];
-    // the crater's glow (by the fire) and the lava's at each ocean entry
     lift(plan.crater.dir, plan.crater.rim + 2, this.gold.from);
     this.lamps = [lights.add({ pos: this.gold.from.clone(), reach: 0 }), ...plan.entries.map((e) => lights.add({ pos: lift(e.dir, 1.2), reach: 7 }))];
     this.group.add(...this.kits.map((d) => d.mesh), ...this.palms.map(([d]) => d.mesh), this.flow, this.hot, this.plume.mesh, this.steam.mesh, this.streaks);
   }
 
-  /** Each frame: `clock` the frame's (smoke rolls, bombs fly), `caldera` the sim's time into its cycle (calderaTime),
-   *  `wind` the wind over the region (world, its length its strength). */
   update(eye: V, clock: number, caldera: number, rain: number, wind: V): void {
     this.group.visible = regionSeen(RI, eye, 200);
     this.gold.rain = rain;
@@ -613,7 +541,6 @@ export class FireArchipelago {
     const up = this.plan.crater.dir, fu = (this.flow.material as THREE.ShaderMaterial).uniforms;
     fu.uFire.value = fire;
     fu.uFront.value = caldera < CALDERA.burst ? 2 + 6 * caldera : 1e3;
-    // the wind along the sea at the volcano (a still air leans the column a little east all the same)
     const wt = this.w.copy(wind).addScaledVector(up, -wind.dot(up));
     if (wt.lengthSq() < 1e-4) wt.copy(chartDir(RI, VOLCANO.x + 1, VOLCANO.y)).sub(up).normalize().multiplyScalar(0.2);
     this.lobes(clock, caldera, wt);
@@ -623,7 +550,6 @@ export class FireArchipelago {
     su.uUp.value.copy(up);
     su.uDrift.value.copy(wt).multiplyScalar(1.6);
     su.uEye.value.copy(eye);
-    // ash in the air near the volcano, thickest downwind and while it erupts
     const arc = R * Math.acos(Math.min(1, eye.dot(up) / eye.length())), down = Math.max(0, this.e.copy(eye).normalize().sub(up).normalize().dot(this.f.copy(wt).normalize()));
     su.uAsh.value = (1 - THREE.MathUtils.smoothstep(h, 25, 60)) * (1 - THREE.MathUtils.smoothstep(arc, 60, 110)) * (0.45 + 0.3 * down + 0.25 * fire);
     if (eye.distanceToSquared(this.seen) < 2.25) return;
@@ -638,9 +564,6 @@ export class FireArchipelago {
     }
   }
 
-  /** The masses of smoke and steam at `clock`: each born at its emitter on a cycle of its own, rising and slowing,
-   *  swelling, drifting downwind, turning over as it rolls, thinning to nothing; the plume's born while the Caldera
-   *  erupted are bigger, darker and lift higher. */
   private lobes(clock: number, caldera: number, wind: V): void {
     const fire = fireOf(caldera), wl = wind.length();
     for (const [d, plume] of [[this.plume, true], [this.steam, false]] as const) {
@@ -687,8 +610,6 @@ export class FireArchipelago {
 
 const fract = (x: number): number => x - Math.floor(x);
 
-/** The smoke's and steam's sources: the plume out of the crater, steam boiling up where each flow meets the sea, the
- *  fumaroles on the crater's rim and at the vents, and wisps off the hot water. */
 function emittersOf(plan: FirePlan): Emitter[] {
   const up = plan.crater.dir, rnd = seeded(13);
   const at = (dir: V, h: number): V => lift(dir, h);
@@ -711,8 +632,6 @@ function emittersOf(plan: FirePlan): Emitter[] {
   return out;
 }
 
-/** The flows' drape: rows across each flow every STEP u, seated on the drawn ground and raised along the middle (the
- *  crust thin on the cone's flank, thick on the delta), its margins lobed. */
 function flowGeometry(field: TerrainField, flows: readonly Flow[]): THREE.BufferGeometry {
   const pos: number[] = [], attr: number[] = [], idx: number[] = [], ACROSS = 14, S = surfaceOut(), p = vec();
   for (const f of flows) {
@@ -745,7 +664,6 @@ function flowGeometry(field: TerrainField, flows: readonly Flow[]): THREE.Buffer
   return g;
 }
 
-/** The hot water's discs: a polar grid round each hot stroke, each vertex the share of the sim's hot zone about it. */
 function hotGeometry(field: TerrainField): THREE.BufferGeometry {
   const geo = field.geo, pos: number[] = [], hot: number[] = [], idx: number[] = [], RINGS = 22, SECT = 64;
   const zone = (x: number, y: number): number => (geo.zones[cellOf(TERRITORY, chartDir(RI, x, y))] & ZONE.hot ? 1 : 0);
@@ -774,8 +692,6 @@ function hotGeometry(field: TerrainField): THREE.BufferGeometry {
   return g;
 }
 
-/** The composition root's Fire Archipelago (MODULES): the flows, rock and growth, smoke, steam, ash and the hot water,
- *  the Caldera erupting on the sim's rhythm. */
 export function createFireArchipelago(ctx: RenderContext): RenderModule {
   const terrain = terrains.get(ctx.scene), sea = seas.get(ctx.scene), sky = skies.get(ctx.scene);
   if (!terrain || !sea || !sky) throw new Error('createFireArchipelago: the sea, sky and terrain are built first (MODULES order)');

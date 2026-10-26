@@ -1,8 +1,3 @@
-// WP28: the match heard. Soundscape keeps the ambience beds (sea, swell, surf, wind, rigging, rain, the storm wall,
-// night, harbour, the Maelstrom, steam) at levels the sim's state sets, and the player's own ship alive between events
-// (hull creak with sea and heel, bow slaps, canvas filling and flogging, blocks on a sail change, thunder in squalls, gulls
-// along the coast). MatchAudio turns every tick's events into sounds placed where they happen. GameAudio is what the app
-// holds: one engine, unlocked on the first touch, suspended with the app, a match's audio while one runs.
 import { AFLOAT, EVENT, type MatchState } from '../sim/state.ts';
 import { aground, newWind, vortexAt, windAt, type Sea } from '../sim/environment.ts';
 import { hourOf, newSky, skyAt } from '../sim/weather.ts';
@@ -14,19 +9,19 @@ import { AudioEngine, HEAR, type Point } from './engine.ts';
 import type { SoundName } from './sfx.ts';
 
 export interface Scene {
-  wind: number; // the wind's strength over the listener, fair = 1
-  gust: number; // 0…1
-  speed: number; // the own ship's speed, u/s
-  turn: number; // its turn rate, rad/s (heel follows it)
-  rough: number; // the sea's roughness, fair = 1
-  rain: number; // 0…1: squall depth
-  storm: number; // 0…1: nearness of the storm wall, 1 inside
-  coast: number; // 0…1: land near (surf)
-  night: number; // 0…1
-  harbour: number; // 0…1
-  maelstrom: number; // 0…1
-  steam: number; // 0…1
-  high: number; // 0…1: the ear risen off the water (the camera toward orbit and the chart): the sea's beds thin
+  wind: number;
+  gust: number;
+  speed: number;
+  turn: number;
+  rough: number;
+  rain: number;
+  storm: number;
+  coast: number;
+  night: number;
+  harbour: number;
+  maelstrom: number;
+  steam: number;
+  high: number;
   afloat: boolean;
 }
 
@@ -40,12 +35,9 @@ type Bed = (typeof BEDS)[number];
 const clamp = (x: number, a: number, b: number): number => Math.min(b, Math.max(a, x));
 const smooth = (a: number, b: number, x: number): number => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const len = (p: Point): number => Math.hypot(p.x, p.y, p.z);
-/** The sim's unit vectors to the world's units (the engine's): × R. */
 const world = (p: Point): Point => ({ x: p.x * R, y: p.y * R, z: p.z * R });
 const unit = (p: Point): Point => { const l = len(p) || 1; return { x: p.x / l, y: p.y / l, z: p.z / l }; };
 
-/** A point `d` u from p across the water toward bearing a (radians from fwd toward the right), on p's sphere (p and d
- * in world units). */
 function offset(p: Point, fwd: Point, a: number, d: number): Point {
   const l = len(p) || 1, ux = p.x / l, uy = p.y / l, uz = p.z / l;
   const rx = fwd.y * uz - fwd.z * uy, ry = fwd.z * ux - fwd.x * uz, rz = fwd.x * uy - fwd.y * ux;
@@ -63,10 +55,9 @@ export class Soundscape {
   private readonly engine: AudioEngine;
   constructor(engine: AudioEngine) { this.engine = engine; }
 
-  /** The beds' levels, pitch and brightness from the scene; a bed starts when first heard and stops after 4 s silent. */
   beds(s: Scene, dt: number): void {
     const w = Math.min(1.6, s.wind), wg = Math.min(1.6, s.wind + s.gust * 0.5), ashore = Math.max(s.coast, s.harbour);
-    const low = 1 - 0.85 * s.high, air = 1 - 0.4 * s.high; // risen off the water: the sea thins to a hush, the wind less
+    const low = 1 - 0.85 * s.high, air = 1 - 0.4 * s.high;
     const want: Record<Bed, [number, number, number]> = {
       sea: [0.3 + 0.35 * Math.min(1.5, s.rough) + 0.15 * Math.min(1, s.speed / 6), 1, 900 + 3000 * Math.min(1, s.rough)],
       swell: [0.25 + 0.3 * Math.min(1.5, s.rough), 1, 20000],
@@ -90,7 +81,6 @@ export class Soundscape {
         this.ids.set(b, id);
         this.sent.delete(b);
       }
-      // steer it only when the scene has moved it audibly: every automation event keeps the audio thread busy
       const was = this.sent.get(b);
       if (!was || Math.abs(g - was[0]) > 0.01 + 0.03 * was[0] || Math.abs(rate / was[1] - 1) > 0.004 || Math.abs(cutoff / was[2] - 1) > 0.04) {
         this.engine.setVoice(id, { gain: g, rate, cutoff: cutoff < 20000 ? cutoff : undefined }, 0.6);
@@ -102,7 +92,6 @@ export class Soundscape {
     }
   }
 
-  /** The own ship (at `me`, world units) and the air between events: chance per frame of each, by the scene. */
   life(s: Scene, dt: number, sail: number, me: Point, fwd: Point, windAhead: number): void {
     const e = this.engine, r = this.r, chance = (perSecond: number): boolean => r() < perSecond * dt;
     if (s.afloat) {
@@ -127,17 +116,14 @@ export class Soundscape {
   }
 }
 
-/** What a match event sounds like, placed where it happens. */
 export interface Happening { kind: number; ship: number; by: number; at: Point; amount: number }
 
 const CONSUMABLE_SOUND: Record<number, SoundName> = {
   [CONSUMABLE.patchKit]: 'patch', [CONSUMABLE.ward]: 'ward', [CONSUMABLE.gust]: 'gust', [CONSUMABLE.fogFlask]: 'fogFlask', [CONSUMABLE.flare]: 'flare',
 };
 
-/** A claim's size class for the chord and its coins, from its area in u². */
 const sizeOf = (u2: number): number => (u2 < 150 ? 0 : u2 < 600 ? 1 : u2 < 2000 ? 2 : 3);
 
-/** The camera the listener rides (WP24's rig): its world matrix, column-major (three.js `matrixWorld.elements`). */
 export interface Eye { matrixWorld: { elements: ArrayLike<number> } }
 
 export class MatchAudio {
@@ -149,7 +135,6 @@ export class MatchAudio {
   private readonly fires = new Map<number, { id: number; until: number }>();
   private readonly vort: Point = { x: 0, y: 0, z: 0 };
   private fwd: Point = { x: 0, y: 1, z: 0 };
-  /** The own ship and the ear's sea point (under the camera), world units. */
   private own: Point = { x: 0, y: 0, z: R };
   private ear: Point = { x: 0, y: 0, z: R };
   private earFwd: Point = { x: 0, y: 1, z: 0 };
@@ -174,13 +159,10 @@ export class MatchAudio {
     return s ? world(s.pos) : null;
   }
 
-  /** After every tick: its events. */
   tick(state: MatchState): void {
     for (const e of state.events) this.event(e, (i) => this.posOf(state, i));
   }
 
-  /** One event (the sim's: `at` a unit vector); `pos` gives a ship's position in world units. Exposed for the tests.
-   * The own ship's sounds are placed on her, the camera hearing them from its stand-off; rewards stay on the ear. */
   event(e: Happening, pos: (ship: number) => Point | null): void {
     const a = this.engine, mine = e.ship === this.me, at = world(e.at), shipAt = pos(e.ship) ?? at;
     const own = pos(this.me) ?? this.own, here = mine ? own : shipAt;
@@ -257,8 +239,6 @@ export class MatchAudio {
     if (f) { this.engine.stopVoice(f.id, 1.2); this.fires.delete(ship); }
   }
 
-  /** The scene from the sim at 10 Hz: the ship's own (speed, heel, wind on her) and the sea under the ear (coast and
-   * Maelstrom sampled round it at 2 Hz). `ship` is her unit vector; the ear's sea point is world units. */
   private sense(state: MatchState, ship: Point): void {
     const sea = this.sea, s = this.scene, me = state.ships[this.me];
     s.afloat = !!me && me.hull > 0;
@@ -291,8 +271,6 @@ export class MatchAudio {
     }
   }
 
-  /** Every frame: the listener on the camera (`eye`, WP24's rig; on the own ship without one), the scene, beds, life
-   * and fires. */
   frame(state: MatchState, dt: number, eye: Eye | null = null): void {
     this.time += dt;
     this.sceneAge += dt;
@@ -306,7 +284,6 @@ export class MatchAudio {
     let height = 0;
     if (eye) {
       const m = eye.matrixWorld.elements, pos = { x: m[12], y: m[13], z: m[14] }, pl = len(pos) || 1, pu = unit(pos);
-      // facing: the view's direction along the sea (straight down, the top of the frame)
       const along = (x: number, y: number, z: number): Point | null => {
         const k = x * pu.x + y * pu.y + z * pu.z, tx = x - k * pu.x, ty = y - k * pu.y, tz = z - k * pu.z, tl = Math.hypot(tx, ty, tz);
         return tl > 0.2 ? { x: tx / tl, y: ty / tl, z: tz / tl } : null;
@@ -334,21 +311,19 @@ export class MatchAudio {
   }
 }
 
-/** The app's audio: the engine, unlocked on the first touch, its bank rendered by a worker, and a match's audio while one runs. */
 export class GameAudio {
   private match: MatchAudio | null = null;
   readonly engine: AudioEngine;
   constructor(engine: AudioEngine) { this.engine = engine; }
 
-  /** null where Web Audio is unavailable. */
   static create(target?: EventTarget): GameAudio | null {
     try {
       const g = new GameAudio(new AudioEngine());
       g.engine.unlockOn(target ?? window);
-      try { // the bank renders in a worker, beds and the commonest sounds first; anything asked for sooner renders inline
+      try {
         const w = new Worker(new URL('./bankWorker.ts', import.meta.url), { type: 'module' });
         w.onmessage = (e: MessageEvent<{ name: SoundName; v: number; chs: Float32Array[] }>) => g.engine.bank.put(e.data.name, e.data.v, e.data.chs);
-      } catch { /* no workers */ }
+      } catch {  }
       return g;
     } catch {
       return null;
@@ -360,10 +335,8 @@ export class GameAudio {
     this.match = new MatchAudio(this.engine, sea);
   }
 
-  /** After every tick of the running match. */
   tick(state: MatchState): void { this.match?.tick(state); }
 
-  /** Every frame; `eye` the match's camera (the listener rides it). */
   frame(dt: number, state: MatchState | null, eye: Eye | null = null): void {
     if (this.match && state) this.match.frame(state, dt, eye);
   }

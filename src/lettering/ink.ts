@@ -1,34 +1,14 @@
-// The lettering on screen: text rasters (src/lettering/text.ts) as textures, inked on the parchment with the style's
-// iron-gall ink, a pigment or gold leaf, bleeding a little into the paper's fibres and revealed stroke by stroke.
-//
-//   const lettering = new Lettering(pipeline.style, devicePixelRatio, (b) => pipeline.registerTexture('lettering', b));
-//   const name = lettering.text('Saetta', { size: 18, align: 'center', valign: 'middle' });
-//   pipeline.ui.add(name); name.position.set(x, y, 0);
-//   name.text = 'Lanza';            // re-set only when it changes; repeated texts come from the cache
-//   title.progress = t / title.duration;   // the stroke-by-stroke lettering-in
-//
-// Each distinct text (with its layout options, at the current pixel ratio) is written once and kept while any mesh
-// shows it; unused rasters stay cached up to CACHE_BYTES, so counters that cycle through values never rewrite them.
 import * as THREE from 'three';
 import { linearVec, type Style } from '../style/glsl.ts';
 import { PIGMENTS, type PigmentName } from '../style/palette.ts';
 import { uiMaterial } from '../ui/parchment.ts';
 import { layoutText, rasterizeText, type TextLayout, type TextOptions, type TextRaster } from './text.ts';
 
-/** Bytes of unused text rasters kept for reuse. */
 export const CACHE_BYTES = 6 * 1024 * 1024;
 
 const vec3 = (v: THREE.Vector3) => `vec3(${v.x.toFixed(5)}, ${v.y.toFixed(5)}, ${v.z.toFixed(5)})`;
 
-/**
- * Iron-gall lettering on parchment, for any material that samples a text raster (the interface below, the chart's
- * names). t: the raster texel (r coverage, g coverage bled into the paper, b writing time 0–1, a ink load); fibre: the
- * parchment there (tPaper: r fibre, g grain, b mottle, a bloom); progress: how much is written, 0–1; wetSpan: how
- * long ink stays wet, as a fraction of the writing time; detail: 0 for small interface text (solid and clean) to 1 at
- * display sizes (bleed along the fibres, pooling at the edges, the grain showing through thin ink).
- * letterInk returns the ink's cover and wetness; letterInkColour the ink's linear colour.
- */
-export const LETTERING_GLSL = /* glsl */ `
+export const LETTERING_GLSL =  `
 const vec3 THIN_INK = ${vec3(linearVec(PIGMENTS.sepia))};
 vec2 letterInk(vec4 t, vec4 fibre, float progress, float wetSpan, float detail) {
   const float FRONT = 1.5 / 255.0;
@@ -48,15 +28,15 @@ vec3 letterInkColour(vec4 t, float wet) {
 }
 `;
 
-const TEXT_FRAG = /* glsl */ `
+const TEXT_FRAG =  `
 uniform sampler2D tText;
-uniform vec4 uRect;       // the raster's left, top, width and height, CSS px
+uniform vec4 uRect;
 uniform float uProgress;
 uniform float uWetSpan;
 uniform float uDetail;
 uniform float uOpacity;
-uniform float uMode;      // 0 ink, 1 a pigment, 2 gold leaf
-uniform vec3 uColour;     // linear, the pigment
+uniform float uMode;
+uniform vec3 uColour;
 ${LETTERING_GLSL}
 void main() {
   vec4 t = texture(tText, (vLocal - uRect.xy) / uRect.zw);
@@ -69,9 +49,7 @@ void main() {
 `;
 
 export interface InkTextOptions extends TextOptions {
-  /** The style's ink (default), a pigment laid as body colour, or burnished gold leaf. */
   pigment?: 'ink' | PigmentName;
-  /** How much has been written, 0–1. */
   progress?: number;
   opacity?: number;
 }
@@ -86,7 +64,6 @@ interface Entry {
   used: number;
 }
 
-/** The lettering of every screen: writes texts once and shares them between meshes. */
 export class Lettering {
   readonly style: Style;
   private ratio: number;
@@ -95,7 +72,6 @@ export class Lettering {
   private readonly live = new Set<InkText>();
   private clock = 0;
 
-  /** `onBytes` hears the GPU bytes held by text rasters whenever they change (the texture budget). */
   constructor(style: Style, pixelRatio: number, onBytes: (bytes: number) => void = () => {}) {
     this.style = style;
     this.ratio = pixelRatio;
@@ -104,26 +80,22 @@ export class Lettering {
 
   get pixelRatio(): number { return this.ratio; }
 
-  /** Bytes of text rasters held, in use and cached. */
   get bytes(): number {
     let b = 0;
     for (const e of this.entries.values()) b += e.raster.data.byteLength;
     return b;
   }
 
-  /** A mesh for the `ui` scene lettering `content`; its position is the anchor (see TextOptions align and valign). */
   text(content: string, options: InkTextOptions): InkText {
     return new InkText(this, content, options);
   }
 
-  /** Rewrites every live text for a new device pixel ratio. */
   setPixelRatio(ratio: number): void {
     if (ratio === this.ratio) return;
     this.ratio = ratio;
     for (const t of this.live) t.rewrite();
   }
 
-  /** The written text for content and options (InkText's use). */
   acquire(content: string, o: TextOptions, user: InkText): Entry {
     this.live.add(user);
     const key = JSON.stringify([content, o.size, o.align, o.valign, o.maxWidth, o.lineHeight, o.swash, this.ratio]);
@@ -145,7 +117,6 @@ export class Lettering {
     return e;
   }
 
-  /** Lets go of a written text (InkText's use); `dead` when the mesh is disposed. */
   release(e: Entry, user: InkText, dead: boolean): void {
     e.users--;
     if (dead) this.live.delete(user);
@@ -168,7 +139,6 @@ export class Lettering {
   }
 }
 
-/** Lettering in the `ui` scene (CSS px). Set `text`, `progress` and `opacity` freely; only new texts are written. */
 export class InkText extends THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> {
   private readonly lettering: Lettering;
   private readonly options: TextOptions;
@@ -201,9 +171,7 @@ export class InkText extends THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMateria
     this.rewrite();
   }
 
-  /** Lines, advance box and stroke timing of what is shown, CSS px. */
   get layout(): TextLayout { return this.entry.layout; }
-  /** Seconds to write it at the pen's pace. */
   get duration(): number { return this.entry.layout.duration; }
 
   get progress(): number { return this.material.uniforms.uProgress.value; }
@@ -212,14 +180,12 @@ export class InkText extends THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMateria
   get opacity(): number { return this.material.uniforms.uOpacity.value; }
   set opacity(a: number) { this.material.uniforms.uOpacity.value = a; }
 
-  /** Writes the current text at the lettering's pixel ratio (after a text or pixel-ratio change). */
   rewrite(): void {
     const next = this.lettering.acquire(this.content, this.options, this);
     this.lettering.release(this.entry, this, false);
     this.entry = this.show(next);
   }
 
-  /** Releases the text and the material; the mesh must already be out of the scene. */
   dispose(): void {
     this.lettering.release(this.entry, this, true);
     this.material.dispose();

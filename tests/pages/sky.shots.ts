@@ -1,14 +1,9 @@
-// Captures the WP14 sky on the sea test page (tests/pages/sea.html?view=light, offshore of a lighthouse, looking back
-// toward it over three ships): the 24-hour strip at that fixed view as one contact sheet of iPad frames
-// (wp14-hours.png) and the night readability shot, nearer the coast, at both devices (wp14-<device>-night.png), with draw calls and
-// triangles for A9.
-//   node tests/pages/sky.shots.ts [outDir]     (default outDir: progress/shots)
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { launch, openGame, root, serve } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
-const W = 344, H = 258; // a quarter of the iPad frame
+const outDir = process.argv[2] ?? join(root, 'out/shots');
+const W = 344, H = 258;
 await mkdir(outDir, { recursive: true });
 const server = await serve();
 const { browser, renderer } = await launch();

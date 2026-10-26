@@ -1,11 +1,3 @@
-// The Kelp Shallows (WP16 part C): golden-green kelp under clear water. The flora (flora.ts) roots kelp across the
-// kelp floors and the sea (sea.ts) paints those floors through the clear water; this module floats the canopies over
-// them: rosettes of blades buoyed by gas bladders, riding the swell near the eye and swaying in the current, broken by
-// leads of open water, so a ship inside a bed sits half-hidden among the fronds as the sim hides it (environment.ts,
-// visibility.ts). The Kelp Cathedral: a horseshoe of compound piers of towering kelp round a clear nave, its door to
-// the south, each pier crowned by a great floating rosette (the mark read from orbit), the nave crossed by hatched
-// shafts of sunlight refracted down to the floor. On the rocky islets: boulders at the waterline, tide pools on the
-// benches, wrack along the strand line. Hook: rafts (WP23's otters).
 import * as THREE from 'three';
 import { illustratedMaterial, inkMaterial, linearVec, transmittanceVec, type Style } from '../../style/glsl.ts';
 import { PIGMENTS, type RGB } from '../../style/palette.ts';
@@ -21,15 +13,10 @@ import { chartDir, Draw, facetUV, Kit, lift, pose, regionSeen, ring, seeded, vec
 const RI = REGIONS.findIndex((r) => r.id === 'kelpShallows');
 const REGION = REGIONS[RI], MARK = REGION.landmark;
 const BEDS = REGION.strokes.flatMap((s) => (s.k === 'kelp' ? [s] : []));
-/** The Cathedral round its mark, chart u: `piers` places on a ring of radius `ring`, the `door` places to the south
- *  left open; each pier a cluster of `stipes` towering stipes; ordinary canopy kept beyond `clear`. */
 const NAVE = { ring: 10.2, piers: 18, door: 3, stipes: 5, clear: 12.8 };
-/** Light shafts down the nave (a Latin cross of them), chart offsets from the mark. */
 const SHAFTS = [[0, -6.5], [0, -3.2], [0, 0], [0, 3.2], [0, 6.5], [-6.2, 1], [-3, 1], [3, 1], [6.2, 1]] as const;
-/** Canopy: grid step (u), the distance within which it rides the swell, its lift over the water, how many. */
 const CANOPY = { step: 2.3, near: 60, lift: 0.04, cap: 1100 };
 const SHORE = { step: 0.6, wrack: 520, pools: 170, boulders: 420 };
-/** Water's refractive index, inverted. */
 const ETA = 1 / 1.33;
 
 const smooth = (a: number, b: number, x: number) => {
@@ -53,15 +40,11 @@ const INK = {
 };
 const radial = (c: V, _n: V, out: V) => out.set(c.x, 0, c.z);
 
-/** A small float on a kit: a four-sided cone at o (its base on the surface beneath), radius r. */
 function bead(kit: Kit, o: V, r: number): void {
   const e = ring(4, o.y + 0.004, () => r).map((p) => p.add(vec(o.x, 0, o.z))), apex = vec(o.x, o.y + 1.5 * r, o.z);
   for (let j = 0; j < 4; j++) kit.tri(e[j], apex, e[(j + 1) % 4]);
 }
 
-/** A floating canopy in its own frame (y up, radius about 1): `blades` blades streaming out from the knot where the
- *  stipes reach the surface, each buoyed by a gas bladder at its base, ruffled and twisted as it lies on the water;
- *  washed golden at the tips through green to olive, banded as the blades overlap. */
 function rosetteKit(blades: number, segs: number, bladder: number, seed: number): THREE.BufferGeometry {
   const rng = seeded(seed);
   let as: Wash | null = null;
@@ -98,8 +81,6 @@ function rosetteKit(blades: number, segs: number, bladder: number, seed: number)
   return facetUV(kit.build(), radial);
 }
 
-/** A tangle of cast-up kelp on the strand line (y up, about 1 u long): three stranded stipes, dried near black,
- *  bronze and olive, with their bladders. */
 function wrackKit(): THREE.BufferGeometry {
   const rng = seeded(71);
   let as = wash(INK.wrack, 1.1);
@@ -124,8 +105,6 @@ function wrackKit(): THREE.BufferGeometry {
   return facetUV(kit.build(), (_c, _n, out) => out.set(0, 0, 1));
 }
 
-/** A tide pool in a rock bench (y up, radius about 1): pale still water holding the sky inside a lip of weed and
- *  barnacles, its skirt sunk into the rock. */
 function poolKit(seed: number): THREE.BufferGeometry {
   const rng = seeded(seed), jit = Array.from({ length: 9 }, () => 0.75 + 0.25 * rng());
   const kit = new Kit((c, n) => {
@@ -136,7 +115,6 @@ function poolKit(seed: number): THREE.BufferGeometry {
   return facetUV(kit.build(), (_c, _n, out) => out.set(1, 0, 0.3));
 }
 
-/** A waterline boulder (y up, radius about 1, 0.75 high): weed-dark and wet below the tide mark, sepia above. */
 function boulderKit(seed: number): THREE.BufferGeometry {
   const rng = seeded(seed), rad = [0.92, 1, 0.78, 0.36], hs = [0, 0.3, 0.6, 0.74];
   const kit = new Kit((c, n) => (c.y < 0.28
@@ -146,13 +124,11 @@ function boulderKit(seed: number): THREE.BufferGeometry {
   return facetUV(kit.build(), (_c, n, out) => out.set(0, 1, 0).addScaledVector(n, -n.y));
 }
 
-/** One floating canopy: chart position, unit direction, its world point at sea level, its north, size, kit. */
 export interface Float { x: number; y: number; dir: V; at: V; north: V; scale: number; yaw: number; phase: number; kit: 0 | 1 }
 export interface Stipe { m: THREE.Matrix4; foliage: V; phase: number }
 export interface Shaft { dir: V; east: V; depth: number; w: number; phase: number }
 export interface KelpPlan {
   floats: Float[];
-  /** The Cathedral's towering kelp, each rooted on the floor and reaching the surface (flora kelp kit). */
   stipes: Stipe[];
   shafts: Shaft[];
   wrack: THREE.Matrix4[];
@@ -161,7 +137,6 @@ export interface KelpPlan {
   rafts: V[];
 }
 
-/** Lay out the region: the Cathedral, the canopy over every bed, and the islets' shores. */
 export function planKelp(field: TerrainField): KelpPlan {
   const geo = field.geo, rng = seeded(144), TAU = 2 * Math.PI;
   const deep = (d: V) => -heightAt(geo, d);
@@ -170,7 +145,6 @@ export function planKelp(field: TerrainField): KelpPlan {
   const float = (x: number, y: number, dir: V, scale: number, kit: 0 | 1) =>
     floats.push({ x, y, dir, at: lift(dir, 0), north: north(x, y, dir), scale, yaw: rng() * TAU, phase: rng() * TAU, kit });
 
-  // the Cathedral: compound piers on a horseshoe round the nave, crowned by great rosettes
   for (let k = 0; k < NAVE.piers; k++) {
     if (Math.min(k, NAVE.piers - k) <= (NAVE.door - 1) / 2) continue;
     const a = -Math.PI / 2 + (k / NAVE.piers) * TAU;
@@ -194,7 +168,6 @@ export function planKelp(field: TerrainField): KelpPlan {
     shafts.push({ dir, east: chartDir(RI, x + 1, y).sub(dir).normalize(), depth: Math.max(deep(dir), 1), w: 0.9 + 0.6 * rng(), phase: rng() * TAU });
   }
 
-  // the canopy over every other bed, thinning to its edge and parted by leads of open water
   for (let y = -80; y <= 80; y += CANOPY.step) {
     for (let x = -80; x <= 80; x += CANOPY.step) {
       const px = x + 0.8 * CANOPY.step * (rng() - 0.5), py = y + 0.8 * CANOPY.step * (rng() - 0.5);
@@ -211,7 +184,6 @@ export function planKelp(field: TerrainField): KelpPlan {
   const rafts = REGION.fauna.filter((o) => o.species === 'otter').flatMap((o) =>
     floats.filter((f) => Math.hypot(f.x - o.x, f.y - o.y) < o.r).slice(0, Math.ceil(o.count / 2)).map((f) => f.dir));
 
-  // the islets' shores: wrack on the strand line, pools on the rock benches, boulders at the waterline
   const S: Surface = { height: 0, normal: vec(), up: 1, ground: 0, region: 0 };
   const keep = [...REGION.harbours.map((h) => [h.x, h.y, h.r + 2.5]), ...REGION.lighthouses.map((l) => [l.x, l.y, 4.5])];
   const taken = new Set<number>(), wrack: THREE.Matrix4[] = [], pools: THREE.Matrix4[] = [], boulders: THREE.Matrix4[] = [];
@@ -241,8 +213,7 @@ export function planKelp(field: TerrainField): KelpPlan {
   return { floats, stipes, shafts, wrack, pools, boulders, rafts };
 }
 
-// The light shafts: hatched rays laid as a veil through the water, refracted from the sun down to the floor.
-const SHAFT_VERT = /* glsl */ `
+const SHAFT_VERT =  `
 uniform float uTime;
 in vec3 aShaft;
 out vec3 vShaftWorld;
@@ -250,17 +221,15 @@ out vec3 vShaft;
 void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
   vShaftWorld = w.xyz;
-  // the rays waver as the swell's lenses pass overhead
   vShaft = vec3(aShaft.xy, 0.6 * sin(uTime * 0.35 + aShaft.z) + 0.25 * sin(uTime * 0.9 + 2.0 * aShaft.z));
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
-const SHAFT_FRAG = /* glsl */ `
+const SHAFT_FRAG =  `
 uniform float uShaftLight;
 uniform vec3 uShaftColour;
 in vec3 vShaftWorld;
-in vec3 vShaft; // across (-1 to 1), down (0 at the surface, 1 at the floor), waver
+in vec3 vShaft;
 void main() {
-  // fine strokes running down the ray, spaced across it, broken where the pen lifted
   float sx = (vShaft.x * 0.5 + 0.5) * 6.0 + vShaft.z, si = floor(sx), sd = abs(fract(sx) - 0.5), sw = fwidth(sx);
   float sh = fract(sin(si * 12.9898 + 4.1) * 43758.5453);
   float strokeA = 1.0 - smoothstep(0.13 - sw, 0.13 + sw, sd);
@@ -268,17 +237,14 @@ void main() {
   float sideA = 1.0 - smoothstep(0.55, 1.0, abs(vShaft.x));
   float fallA = smoothstep(0.0, 0.06, vShaft.y) * pow(1.0 - vShaft.y, 1.4);
   float a = strokeA * gapA * (0.6 + 0.3 * sh);
-  // and a faint wash between the strokes: the water lit along the ray
   a = clamp(max(a, 0.18) * sideA * fallA * uShaftLight, 0.0, 1.0);
   writeVeil(candle(uShaftColour, vShaftWorld), a);
 }`;
-/** Each shaft's two crossed quads: corners (across, down), two triangles each. */
 const CORNERS = [[-1, 0], [1, 1], [1, 0], [-1, 0], [-1, 1], [1, 1]] as const;
 const RAY = vec(), TOP = vec(), BOT = vec(), A1 = vec(), A2 = vec(), P = vec();
 
 export class KelpShallows {
   readonly group = new THREE.Group();
-  /** Where WP23's otters raft, wrapped in the canopy: unit directions over the beds they haunt. */
   readonly rafts: readonly V[];
   private readonly plan: KelpPlan;
   private readonly material: THREE.ShaderMaterial;
@@ -303,7 +269,6 @@ export class KelpShallows {
     const counts = [0, 1].map((k) => plan.floats.filter((f) => f.kit === k).length);
     this.floats = [rosetteKit(7, 4, 0.05, 5), rosetteKit(12, 5, 0.075, 13)].map((g, k) => new Draw(g, this.material, counts[k]));
 
-    // the Cathedral's towering kelp: the flora's kelp, seen through the water as a veil, far beyond the flora's reach
     const kelp = kitGeometry('kelp', 0).clone(), n = plan.stipes.length, foliage = new Float32Array(3 * n), seed = new Float32Array(2 * n);
     plan.stipes.forEach((s, i) => {
       foliage.set([s.foliage.x, s.foliage.y, s.foliage.z], 3 * i);
@@ -336,7 +301,6 @@ export class KelpShallows {
     this.group.add(...this.floats.map((d) => d.mesh), ...this.fixed.map((d) => d.mesh), this.shafts);
   }
 
-  /** Lays each shaft along the sun's ray refracted into the water, from the surface down to the floor. */
   private shape(sun: V): void {
     const pos = this.shafts.geometry.getAttribute('position') as THREE.BufferAttribute;
     let o = 0;
@@ -357,7 +321,6 @@ export class KelpShallows {
     pos.needsUpdate = true;
   }
 
-  /** The canopies at render clock `clock`: riding the swell within reach of the eye, at the tide's level beyond. */
   update(eye: V, clock: number): void {
     this.group.visible = regionSeen(RI, eye, 85);
     if (!this.group.visible) return;
@@ -388,7 +351,6 @@ export class KelpShallows {
   }
 }
 
-/** The composition root's Kelp Shallows (MODULES): the canopies, the Kelp Cathedral and the islets' shores. */
 export function createKelpShallows(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sea || !terrain) throw new Error('createKelpShallows: the sea and terrain are built first (MODULES order)');

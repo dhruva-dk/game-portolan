@@ -1,8 +1,3 @@
-// The chart test page (tests/render/chart.html, outside the game build): the game's own render path (WorldView with
-// the WP24 rig driving the camera, every registered module) over the real headless match of territory.match.ts.
-// Query: at=<tick> to play to; safe=top,right,bottom,left (CSS px). window.__chart: stop(lift) settles the camera at a
-// lift (0..1 deck pinch, 1..2 the chart zoom), renders and reports draw calls, triangles and the chart's ships against
-// the player's sight; sequence() plays the open move and reports z every 6th frame.
 import { Pipeline } from '../../src/render/pipeline.ts';
 import { chartShips } from '../../src/render/chart.ts';
 import { WorldView } from '../../src/render/world.ts';
@@ -27,7 +22,6 @@ const { sea, state } = scripted();
 const info = pipeline.renderer.info;
 info.autoReset = false;
 let clock = 0, ticks = 0;
-// WP24 part D: the compact chart as WP25 would mount it, in the safe area's top-left corner (shown by d('compact'))
 const compactChart = new CompactChart(innerHeight < 500 ? 96 : 132), compact = compactChart.canvas;
 Object.assign(compact.style, { position: 'fixed', left: `${left + 12}px`, top: `${top + 12}px`, display: 'none', zIndex: '5' });
 document.body.appendChild(compact);
@@ -48,7 +42,6 @@ while (state.tick < at) {
 
 const hook = {
   ready: true,
-  /** WP24 part C (diagnosis): each top-level scene object's triangles at a lift, by drawing the frame without it. */
   breakdown(lift: number) {
     const base = this.stop(lift).tris, out: [string, number][] = [];
     for (const o of view.scene.children) {
@@ -70,9 +63,6 @@ const hook = {
     const z = rig.z, alt = z < 0.5 ? camera.position.length() - R : camera.position.dot(view.chart.net.normal) - R;
     return { calls: info.render.calls, tris: info.render.triangles, z, drawn: view.chart.drawn, expected: chartShips(state, view.sight(state)), alt, cap: view.chart.capPx };
   },
-  /** WP24 part D shots: a named view with the stats of stop(): 'opening' (the page at the opening), a camera move held
-   *  at a weight ('open:0.5', 'pull:0.8', 'sink:1', 'crow:1'), 'swap:<lift>', 'chart', or 'compact' (the deck with the
-   *  compact chart mounted; reports its ships against the sight). */
   d(name: string) {
     const c = rig.cine, [kind, arg] = name.split(':'), w = Number(arg ?? 1);
     Object.assign(c, { hold: false, open: 0, sink: 0, pull: 0, want: 0, crow: 0 });
@@ -86,8 +76,6 @@ const hook = {
     if (kind !== 'opening') Object.assign(c, { hold: true, [kind]: kind === 'crow' ? 9 * w : w });
     return this.stop(0.35);
   },
-  /** WP24 part D: the open chart looked at closer (f times), over the player ('near'), the Great Current's middle or the
-   *  landmark nearest the player: the same frame magnified, for judging the drawings. */
   closeup(target: string, f = 2.6) {
     this.d('chart');
     const net = view.chart.net, me = state.ships[0].pos, dir = new THREE.Vector3(me.x, me.y, me.z).normalize();
@@ -109,7 +97,6 @@ const hook = {
     pipeline.render(view.scene, camera, 0);
     return { calls: info.render.calls, tris: info.render.triangles, z: rig.z };
   },
-  /** WP24 part D (A8): the mean colour of the globe's middle just before the swap, in it and late in it. */
   swapMatch() {
     const read = () => {
       const c = document.createElement('canvas'), g = c.getContext('2d')!;

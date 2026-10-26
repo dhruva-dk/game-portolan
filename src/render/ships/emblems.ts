@@ -1,8 +1,3 @@
-// The emblems: the thirty captains' (PROMPT.md, "The captains") and the player's gull, drawn in code as heraldic
-// charges on a roundel (a field in the captain's first pigment, the charge and a bordure in the second, an ink line
-// round both) and rasterised once from signed distances into one atlas, crisp at every mip. Ship.setEmblem paints a
-// cell onto the mainsail, where it deforms with the cloth; the chart, the lookout and the results can reuse the atlas.
-// Channels: r = field, g = charge, b = ink, a = coverage. Row 0 of the atlas is its top row of cells.
 import * as THREE from 'three';
 
 export const EMBLEMS = [
@@ -12,22 +7,17 @@ export const EMBLEMS = [
   'gull',
 ] as const;
 export type EmblemName = (typeof EMBLEMS)[number];
-/** The player's own emblem: the companion gull under a star. */
 export const PLAYER_EMBLEM: EmblemName = 'gull';
 export const EMBLEM_CELL = 128;
 const COLS = 8, ROWS = 4;
 
-/** A signed distance in the plane, negative inside. */
 export type SDF = (x: number, y: number) => number;
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
-/** Coverage of a pixel of size px by the inside of d. */
 export const cover = (d: number, px: number) => clamp(0.5 - d / px, 0, 1);
-/** Coverage of a pixel by a line of half-width hw along d = 0. */
 export const edge = (d: number, px: number, hw: number) => clamp((hw - Math.abs(d)) / px + 0.5, 0, 1);
 export const circle = (cx: number, cy: number, r: number): SDF => (x, y) => Math.hypot(x - cx, y - cy) - r;
 const ring = (cx: number, cy: number, r: number, w: number): SDF => (x, y) => Math.abs(Math.hypot(x - cx, y - cy) - r) - w;
 const ellipse = (cx: number, cy: number, rx: number, ry: number): SDF => (x, y) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
-/** A capsule from a to b, its radius running from ra to rb. */
 export const seg = (ax: number, ay: number, bx: number, by: number, ra: number, rb = ra): SDF => {
   const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9;
   return (x, y) => {
@@ -40,12 +30,10 @@ export const union = (...fs: SDF[]): SDF => (x, y) => {
   for (const f of fs) d = Math.min(d, f(x, y));
   return d;
 };
-/** A polyline of capsules through flat [x, y, ...] points, its radius tapering from ra to rb. */
 export const path = (p: readonly number[], ra: number, rb = ra): SDF => {
   const n = p.length / 2 - 1;
   return union(...Array.from({ length: n }, (_, i) => seg(p[2 * i], p[2 * i + 1], p[2 * i + 2], p[2 * i + 3], ra + ((rb - ra) * i) / n, ra + ((rb - ra) * (i + 1)) / n)));
 };
-/** A polygon through flat [x, y, ...] points (even-odd); beyond `cull` outside its bounds only the bounds are measured. */
 export const poly = (p: readonly number[], cull = 0.1): SDF => {
   const n = p.length / 2, xs = p.filter((_, i) => i % 2 === 0), ys = p.filter((_, i) => i % 2 === 1);
   const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -68,7 +56,6 @@ const inter = (a: SDF, b: SDF): SDF => (x, y) => Math.max(a(x, y), b(x, y));
 const rot = (f: SDF, a: number): SDF => { const c = Math.cos(a), s = Math.sin(a); return (x, y) => f(c * x + s * y, -s * x + c * y); };
 const move = (f: SDF, dx: number, dy: number): SDF => (x, y) => f(x - dx, y - dy);
 const mirrorX = (f: SDF): SDF => (x, y) => f(Math.abs(x), y);
-/** n copies of f (drawn about the +x axis) around the origin, the first at angle a0. */
 const around = (f: SDF, n: number, a0 = 0): SDF => {
   const k = (2 * Math.PI) / n;
   return (x, y) => { const a = Math.atan2(y, x) - a0, r = Math.hypot(x, y), b = a - k * Math.round(a / k); return f(r * Math.cos(b), r * Math.sin(b)); };
@@ -111,7 +98,6 @@ const vane = cut(ellipse(0, 0.12, 0.24, 0.6), seg(0, -0.5, 0, 0.7, 0.014), seg(0
 const bolt = union(path([-0.56, -0.06, -0.28, 0.08, 0, -0.08, 0.28, 0.08, 0.52, -0.02], 0.05), poly([0.74, 0, 0.48, 0.14, 0.52, -0.14]), poly([-0.74, 0, -0.5, 0.13, -0.54, -0.15]));
 const ray = (k: number, n: number, cy: number, r0: number, r1: number) => { const a = (Math.PI * k) / n; return seg(r0 * Math.cos(a), cy + r0 * Math.sin(a), r1 * Math.cos(a), cy + r1 * Math.sin(a), 0.05, 0.012); };
 
-/** The charges, drawn within radius 0.8 of the cell (−1…1, y up). */
 const CHARGES: Record<EmblemName, SDF> = {
   arrowhead: poly([0, 0.76, 0.44, -0.1, 0.15, 0.06, 0.08, 0, 0.08, -0.72, -0.08, -0.72, -0.08, 0, -0.15, 0.06, -0.44, -0.1]),
   crossedLances: union(rot(lance, 0.6), rot(lance, -0.6)),
@@ -156,7 +142,6 @@ const CHARGES: Record<EmblemName, SDF> = {
 };
 const FIELD = circle(0, 0, 0.94), BORDURE = ring(0, 0, 0.86, 0.028), INK = 0.016;
 
-/** The atlas: COLS × ROWS cells of `cell` px, RGBA (field, charge, ink, coverage), bottom row first in memory. */
 export function emblemAtlas(cell = EMBLEM_CELL): Uint8Array {
   const W = COLS * cell, out = new Uint8Array(4 * W * ROWS * cell), px = 2 / cell;
   EMBLEMS.forEach((name, k) => {
@@ -172,13 +157,11 @@ export function emblemAtlas(cell = EMBLEM_CELL): Uint8Array {
   });
   return out;
 }
-/** An emblem's cell in the atlas texture: (u0, v0, du, dv). */
 export function emblemRect(name: EmblemName): THREE.Vector4 {
   const k = EMBLEMS.indexOf(name);
   return new THREE.Vector4((k % COLS) / COLS, (ROWS - 1 - Math.floor(k / COLS)) / ROWS, 1 / COLS, 1 / ROWS);
 }
 let texture: THREE.DataTexture | null = null;
-/** The atlas as one mipmapped texture, made on first use. */
 export function emblemTexture(): THREE.DataTexture {
   if (!texture) texture = atlasTexture(emblemAtlas(), COLS * EMBLEM_CELL, ROWS * EMBLEM_CELL);
   return texture;

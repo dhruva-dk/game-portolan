@@ -1,7 +1,3 @@
-// The sea's geometry and its swell: the field cube is laid out the way a GL cube map reads it (so hardware filtering
-// is seamless across the cube's edges), the TypeScript swell matches the surface the GPU draws and is continuous
-// everywhere, and the camera-centred disc always reaches past the horizon; and in the browser the Coral Atolls' reef floor
-// is painted with coral heads (the flora draws none, WP17 S-021) where the open sea's floor as shallow is not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -21,7 +17,6 @@ test('the sea-field cube holds each sim cell where a GL cube map looks it up', (
   const faces = seaFieldFaces(geo, beach), n = TERRITORY.n, d = new THREE.Vector3();
   for (let k = 0; k < 4000; k++) {
     randomDir(d);
-    // OpenGL ES 3.0 §8.13: the face and (sc, tc) a direction selects, then the shader's equal-angle warp
     const ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z);
     let f: number, sc: number, tc: number, ma: number;
     if (ax >= ay && ax >= az) [f, ma, sc, tc] = [d.x > 0 ? 0 : 1, ax, d.x > 0 ? -d.z : d.z, -d.y];
@@ -31,30 +26,24 @@ test('the sea-field cube holds each sim cell where a GL cube map looks it up', (
     const got = THREE.DataUtils.fromHalfFloat(faces[f][(texel(tc) * n + texel(sc)) * 4]);
     const want = geo.heights[cellOf(TERRITORY, d)];
     assert.ok(Math.abs(got - want) <= Math.abs(want) * 1e-3 + 1e-3, `direction ${d.toArray()}: texel ${got}, cell ${want}`);
-    // (the reef flag, else the shore water's gate below 0: one floor to a cell)
     const c = cellOf(TERRITORY, d), w = THREE.DataUtils.fromHalfFloat(faces[f][(texel(tc) * n + texel(sc)) * 4 + 3]);
     assert.ok(Math.abs(w - (geo.floor[c] === FLOOR.coral ? 1 : -beach[c])) < 2e-3, `direction ${d.toArray()}: w ${w}`);
   }
 });
 
-test('the shore water is gated by the shore itself: a sheltered sandy beach, never an exposed point, a mud shore or a flat (S-029)', () => {
+test('the shore water is gated by the shore itself: a sheltered sandy beach, never an exposed point, a mud shore or a flat', () => {
   const at = (id: string, x: number, y: number) => {
     const ri = REGIONS.findIndex((r) => r.id === id), c = cellOf(TERRITORY, toWorld(ri, x, y, new THREE.Vector3()));
     return { gate: beachAt(geo, c), floor: geo.floor[c], coast: geo.coast[c], ex: exposureAt(geo, cellDir(TERRITORY, c, new THREE.Vector3())) };
   };
-  // the Spice Isles' sound: a beach's shallows, sand, in the lee of its islands
   const cove = at('spiceIsles', 20.9, -50.5);
   assert.ok(cove.floor === FLOOR.sand && cove.ex <= 0 && cove.gate > 0.9, `sheltered Spice beach ${JSON.stringify(cove)}`);
-  // the same coast's open point a few u along: sand, but the swell meets it
   const point = at('spiceIsles', 38.0, -44.4);
   assert.ok(point.floor === FLOOR.sand && point.ex > 0.5 && point.gate === 0, `exposed Spice point ${JSON.stringify(point)}`);
-  // the mangroves' shore, sheltered but mud
   const mud = at('mangroveLabyrinth', 2.6, -48.2);
   assert.ok(mud.floor === FLOOR.mud && mud.ex < 0 && mud.gate === 0, `mangrove mud ${JSON.stringify(mud)}`);
-  // an Amber Shoals flat: sand in a sheltered bight, but shoal far out (the foam band's shore)
   const flat = at('amberShoals', -5.9, 40.6);
   assert.ok(flat.floor === FLOOR.sand && flat.ex < 0 && flat.gate === 0, `Amber flat ${JSON.stringify(flat)}`);
-  // and no Amber shore anywhere, nor any rock, mud or reef floor
   for (let c = 0; c < beach.length; c++) {
     if (beach[c] === 0) continue;
     assert.ok(REGIONS[geo.region[c]].id !== 'amberShoals' && geo.floor[c] === FLOOR.sand, `cell ${c} gated`);
@@ -82,8 +71,8 @@ test('sample finds the surface the sea mesh draws over a point, and a hull rides
 test('the swell is continuous across a cube edge and over the pole, and calm over land', () => {
   const a = new THREE.Vector3(), p = new THREE.Vector3();
   const paths: [THREE.Vector3, THREE.Vector3][] = [
-    [new THREE.Vector3(1, -0.2, 0.9).normalize(), new THREE.Vector3(0.9, -0.2, 1).normalize()], // across x = z
-    [new THREE.Vector3(0.03, 1, 0).normalize(), new THREE.Vector3(-0.03, 1, 0).normalize()], // over the north pole
+    [new THREE.Vector3(1, -0.2, 0.9).normalize(), new THREE.Vector3(0.9, -0.2, 1).normalize()],
+    [new THREE.Vector3(0.03, 1, 0).normalize(), new THREE.Vector3(-0.03, 1, 0).normalize()],
   ];
   for (const [from, to] of paths) {
     const steps = Math.ceil((from.angleTo(to) * R) / 0.02);
@@ -156,7 +145,6 @@ test('a wake lays the stern\'s track every WAKE_STEP u, stays where its ship pas
   assert.ok(wakes.ships[0].w > 0, 'a new ship takes the freed slot');
 });
 
-/** A point of region `ri`'s sea, well off its coast, whose floor is `floor` and lies `depth` ± 0.1 u down at mean tide. */
 function shallows(ri: number, floor: number, depth: number): THREE.Vector3 | null {
   const p = new THREE.Vector3();
   for (let r = 4; r < 120; r += 0.5) {

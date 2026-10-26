@@ -1,7 +1,3 @@
-// WP24 part D in Node: a course drawn on the open chart becomes the ShipInput drawn course (valid, recorded, sailed);
-// the edge tap closes; reduced motion makes no large camera move (cuts under a veil: no flight, no opening swing, no
-// sinking rise, no pull-back) while the full moves exist; the compact chart shows only the rivals in sight; the chart
-// content (the waters' edge, the known loot, a vignette for every landmark).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -43,12 +39,10 @@ test('a course drawn on the chart is the ShipInput drawn course: valid, recorded
   assert.ok(g.cells.length >= 4 && g.cells.every((c) => Number.isInteger(c) && c >= 0 && c < TERRITORY.cells));
   const first = cellDir(TERRITORY, g.cells[0], new THREE.Vector3());
   assert.ok(surfaceDistance(first, state.ships[0].pos) < 12, 'the course starts at the ship, where the finger went down');
-  // the validator: recorded (record throws on a bad field) and read back from untrusted JSON
   const r = recorder();
   record(r, 1, g.input);
   const back = parseRecording(JSON.parse(JSON.stringify(r.recording)));
   assert.deepEqual(back.events.find((e) => e[1] === 'course')?.[2], g.cells);
-  // sailed: the ship takes the course and works along it
   step(sea, state, g.input);
   assert.deepEqual(state.ships[0].course, g.cells);
   const end = cellDir(TERRITORY, g.cells[g.cells.length - 1], new THREE.Vector3()), d0 = surfaceDistance(state.ships[0].pos, end);
@@ -56,14 +50,12 @@ test('a course drawn on the chart is the ShipInput drawn course: valid, recorded
   const d1 = surfaceDistance(state.ships[0].pos, end);
   console.log(`course sailed: ${d0.toFixed(1)} u → ${d1.toFixed(1)} u from its end, leg ${state.ships[0].leg}`);
   assert.ok(d1 < d0 || state.ships[0].course.length === 0, 'the ship sails toward the course end');
-  // taps: the edge band closes the chart, the middle of the net does nothing
   draw.down(8, 200, 2, camera, VIEW);
   assert.equal(draw.up(8, 200, 2.1, camera, VIEW).kind, 'close');
   draw.down(x0, y0, 3, camera, VIEW);
   assert.equal(draw.up(x0 + 2, y0, 3.1, camera, VIEW).kind, 'none');
 });
 
-/** Runs the moves (the opening, a loop closing, the chart open and closed, the sinking) and measures the camera. */
 function moves(rm: boolean) {
   const { sea, state } = scripted(), camera = cam(), rig = new CameraRig(camera, ground, new Net());
   rig.layout(VIEW);
@@ -75,7 +67,6 @@ function moves(rm: boolean) {
       if (sim) step(sea, state, helm(state));
       clock += 1 / 60;
       rig.frame(state, 1, clock, 1 / 60, 1 / 60);
-      // the camera's own motion: its place relative to the ship (the ship's sailing is not a camera move)
       const at = state.ships[0].pos, alt = camera.position.length() - R;
       rel.subVectors(camera.position, ship.set(at.x, at.y, at.z).normalize().multiplyScalar(R));
       const j = rel.distanceTo(prev) / Math.max(4, alt);
@@ -91,7 +82,7 @@ function moves(rm: boolean) {
   assert.equal(state.ships[0].phase, PHASE.riding, 'the match opens riding the Great Current');
   run(90, true);
   state.events.push({ ...state.events[0], kind: EVENT.loop, ship: 0, amount: 9000 } as MatchState['events'][number]);
-  state.tick++; // a new tick carrying the closed loop (the camera reads each tick's events once)
+  state.tick++;
   run(90);
   rig.zoom.open(); run(120);
   rig.zoom.close(); run(120);
@@ -149,18 +140,16 @@ test('chart content: the edge of the player\'s waters, the known loot, a vignett
   for (const l of sea.geo.landmarks) assert.ok(VIGNETTES[l.perk], `a vignette for ${l.perk}`);
 });
 
-test('S-019: the play-out swings from the wreck to the storm\'s calm and frames it whole with the ships afloat, without a cut', () => {
+test('the play-out swings from the wreck to the storm\'s calm and frames it whole with the ships afloat, without a cut', () => {
   const { state } = scripted(), camera = cam(), net = new Net(), rig = new CameraRig(camera, ground, net);
   rig.layout(VIEW);
   const at = state.ships[0].pos, wreck = new THREE.Vector3(at.x, at.y, at.z).normalize();
-  // the calm a quarter of the way round the world (the farthest swing a sinking needs), 44 u across its radius
   const e = new THREE.Vector3(0, 1, 0).addScaledVector(wreck, -wreck.y).normalize(), toward = wreck.clone().multiplyScalar(Math.cos(1.6)).addScaledVector(e, Math.sin(1.6));
   const f = new THREE.Vector3().crossVectors(toward, e).normalize(), g = new THREE.Vector3().crossVectors(toward, f), r = 44 / R;
   const ring = Array.from({ length: 32 }, (_, i) => toward.clone().multiplyScalar(Math.cos(r)).addScaledVector(f, Math.cos(i / 5.09) * Math.sin(r)).addScaledVector(g, Math.sin(i / 5.09) * Math.sin(r)));
   const ships = [0.5, 1.9, 3.3].map((a) => toward.clone().multiplyScalar(Math.cos(r * 0.7)).addScaledVector(f, Math.cos(a) * Math.sin(r * 0.7)).addScaledVector(g, Math.sin(a) * Math.sin(r * 0.7)));
   state.ships[0].phase = PHASE.sunk;
-  net.layout(net.sheetOf(toward)); // Chart.rootAt: the chart rooted on the calm while on the deck
-  // and a straggler far off in the storm, across the net from the calm: left out of the frame
+  net.layout(net.sheetOf(toward));
   const far = wreck.clone().negate();
   rig.playOut = { toward, ring, ships: [...ships, far] };
   let worst = 0, frames = 0, clock = 0;
@@ -174,7 +163,6 @@ test('S-019: the play-out swings from the wreck to the storm\'s calm and frames 
     prev.copy(p);
   }
   assert.ok(rig.z >= 1, 'the chart opens on the play-out');
-  // every ring point and ship inside the safe rect; the calm at least 40 % of the safe height across
   const px = (d: THREE.Vector3) => { const q = net.toFlat(d, new THREE.Vector3()).project(camera); return [(q.x + 1) / 2 * VIEW.width, (1 - q.y) / 2 * VIEW.height]; };
   const s = VIEW.safe, pts = [...ring, ...ships].map(px), ys = ring.map((d) => px(d)[1]);
   for (const [x, y] of pts) assert.ok(x >= s.left - 1 && x <= VIEW.width - s.right + 1 && y >= s.top - 1 && y <= VIEW.height - s.bottom + 1, `in the safe rect: ${x.toFixed(0)}, ${y.toFixed(0)}`);

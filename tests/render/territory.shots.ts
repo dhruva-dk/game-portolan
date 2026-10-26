@@ -1,9 +1,3 @@
-// Captures WP20's territory and trails over the real headless match (tests/render/territory.html): a big loop closing
-// and flooding (wp20-flood-*), a rival breaking the player's trail and the trail washing away (wp20-break-*), the storm
-// taking a bite of the player's waters (wp20-storm-*), and the ten team patterns side by side at four hours
-// (wp20-patterns-*); each set also on a contact sheet (wp20-<set>-sheet.png), and the sheets on one (wp20-sheet.png). Logs draw calls, triangles, texture
-// memory and the claim's partial-upload bytes.
-//   node tests/render/territory.shots.ts [outDir] [--only=<set>]     (default outDir: progress/shots)
 import { basename, join } from 'node:path';
 import { mkdir, readFile } from 'node:fs/promises';
 import type { Browser } from 'playwright';
@@ -11,7 +5,7 @@ import { launch, openGame, root, serve, type DeviceName } from '../harness.ts';
 import { bigLoop } from './territory.match.ts';
 
 const args = process.argv.slice(2);
-const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'progress/shots');
+const outDir = args.find((a) => !a.startsWith('--')) ?? join(root, 'out/shots');
 const only = args.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const loop = bigLoop();
 console.log(`the player's big loop: tick ${loop.tick}, ${loop.area.toFixed(0)} u²`);

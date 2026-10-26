@@ -1,5 +1,3 @@
-// The cancelleresca: every character the game needs is in the hand, the writing is deterministic, the layout's
-// metrics hold, the nib's geometry is exact, and nothing vanishes at the smallest interface size.
 import { cpuNow } from '../cpu.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +13,6 @@ const hash = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 test('every character the game needs is in the hand', () => {
   for (const ch of LETTERS + MARKS) assert.ok(GLYPHS[ch], `missing ${ch}`);
-  // the spec's names (bold) and the captain's card line, as the interface will letter them
   const spec = readFileSync(new URL('../../PROMPT.md', import.meta.url), 'utf8');
   const strings = [...spec.matchAll(/\*\*([^*]+)\*\*/g), ...spec.matchAll(/\*"([^"]+)"\*/g)].map((m) => m[1]);
   assert.ok(strings.length > 150, 'names found in PROMPT.md');
@@ -28,7 +25,7 @@ test('every character the game needs is in the hand', () => {
 test('the writing is deterministic', () => {
   const text = 'Saetta 1,250 — Portolan', o = { size: 17, align: 'center' as const, swash: true };
   const first = rasterizeText(layoutText(text, o), 3);
-  rasterizeText(layoutText('Rosa dei Venti', { size: 30 }), 2); // other work in between
+  rasterizeText(layoutText('Rosa dei Venti', { size: 30 }), 2);
   const again = rasterizeText(layoutText(text, o), 3);
   assert.equal(JSON.stringify(layoutText(text, o)), JSON.stringify(layoutText(text, o)));
   assert.deepEqual([again.width, again.height, again.left, again.top], [first.width, first.height, first.left, first.top]);
@@ -39,7 +36,6 @@ test('layout metrics: scale, joins, alignment, wrapping, anchors, writing order'
   const w = (l: TextLayout) => l.box.right - l.box.left;
   assert.ok(Math.abs(w(layoutText('Meridiana', { size: 24 })) - 2 * w(layoutText('Meridiana', { size: 12 }))) < 1e-9);
 
-  // n joins n: the second n's lead-in is not made, and the pair advances by the n's own width
   const k = (12 * X_HEIGHT_EM) / METRICS.xHeight, nn = layoutText('nn', { size: 12 });
   assert.equal(nn.strokes.length, GLYPHS.n.strokes.length * 2 - 1);
   assert.ok(Math.abs(nn.lines[0].width - 2 * GLYPHS.n.adv * k) < 1e-9);
@@ -60,7 +56,6 @@ test('layout metrics: scale, joins, alignment, wrapping, anchors, writing order'
   const mid = layoutText('Ostro', { size, valign: 'middle' });
   assert.ok(Math.abs(mid.lines[0].baseline - METRICS.capHeight * u / 2) < 1e-9);
 
-  // the i's dot and the t's bar come once the word is written; the pen never runs backwards in time
   const it = layoutText('it', { size: 12 });
   assert.ok(it.strokes.at(-2)!.t0 > it.strokes.at(-3)!.t1 && it.strokes.at(-1)!.t1 === it.duration);
   for (let i = 1; i < it.strokes.length; i++) assert.ok(it.strokes[i].t0 >= it.strokes[i - 1].t1);
@@ -74,7 +69,6 @@ test('optical spacing: no two letters collide', () => {
       if (!joined) assert.ok(letterGap(a, b) >= MIN_GAP - 1e-9, `${a}${b}: ${letterGap(a, b)}`);
     }
   }
-  // open pairs are drawn in: T o sits closer than the two advances
   const k = (12 * X_HEIGHT_EM) / METRICS.xHeight;
   assert.ok(layoutText('To', { size: 12 }).lines[0].width < (GLYPHS.T.adv + GLYPHS.o.adv) * k - 0.1);
 });
@@ -83,13 +77,11 @@ test('the nib: exact coverage, union without seams, thick and thin from directio
   const r = new Raster(32, 32);
   const square = (x: number, y: number, s: number) => [x, y, x, y + s, x + s, y + s, x + s, y];
   r.fill(square(2.3, 3.7, 10));
-  r.fill(square(6, 6, 9)); // overlapping, on whole pixels so the union's area is exact
+  r.fill(square(6, 6, 9));
   const cov = r.coverage();
   assert.ok(Math.abs(cov.reduce((a, b) => a + b, 0) - (100 + 81 - 6.3 * 7.7)) < 1e-3);
   assert.ok(Math.max(...cov) <= 1);
 
-  // a horizontal stroke is as thick as the nib's edge projected across it, w sin θ + t cos θ, to a fiftieth of a pixel
-  // (consecutive segments share the nib's footprint at their joint, counted twice where it touches the edge)
   const angle = (METRICS.penAngle * Math.PI) / 180, nib = { width: 12, thickness: 1, angle };
   const line = flatten([{ op: 'M', p: [10, 40] }, { op: 'L', p: [90, 40] }], 0.1, 3), page = new Raster(100, 80);
   sweep(line, nib, () => 1, (poly) => page.fill(poly));

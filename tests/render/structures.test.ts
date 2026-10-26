@@ -1,5 +1,3 @@
-// Lighthouses and harbours (WP15 part B): sited on the geography's lights and anchorages, seated on the terrain,
-// lanterns where the WP14 beams turn, a harbour with a lamp and moorings in every region.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';

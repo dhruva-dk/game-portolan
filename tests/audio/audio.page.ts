@@ -1,6 +1,3 @@
-// WP28 test page module, imported into a blank page on the Vite dev server by tests/audio/engine.test.ts (outside the
-// game build). Renders the engine's full graph in OfflineAudioContexts: each sound alone, a ten-ship broadside storm over
-// every bed, every match event, and for the progress shot a demo reel (WAV) and a waveform / spectrogram / loudness sheet.
 import { SR } from '../../src/audio/dsp.ts';
 import { AudioEngine, CEILING, VOICES, type Point } from '../../src/audio/engine.ts';
 import { Bank, measure, render, SOUND_NAMES, SOUNDS, type SoundName } from '../../src/audio/sfx.ts';
@@ -24,7 +21,6 @@ function scan(b: AudioBuffer): { peak: number; finite: boolean; rms: number } {
   return { peak, finite, rms: 20 * Math.log10(Math.sqrt(e / Math.max(1, n)) + 1e-12) };
 }
 
-/** A point d u across the water from the default listener (the north pole), toward bearing a (0: its right). */
 const near = (a: number, d: number): Point => {
   const R = 200, t = d / R;
   return { x: R * Math.sin(t) * Math.cos(a), y: R * Math.sin(t) * Math.sin(a), z: R * Math.cos(t) };
@@ -45,7 +41,6 @@ export async function each(): Promise<{ name: string; seconds: number; peak: num
 export async function storm() {
   const seconds = 8, ctx = new OfflineAudioContext(2, seconds * RATE, RATE), e = new AudioEngine(ctx);
   const used: SoundName[] = ['cannon', 'cannonFar', 'hit', 'splash', 'explosion', 'groan', 'coin'];
-  // the bank as the game's worker leaves it: these and every bed rendered before the fight (voice starts are timed, not synthesis)
   for (const n of [...used, ...SOUND_NAMES.filter((x) => SOUNDS[x].loop)]) for (let v = 0; v < SOUNDS[n].variants; v++) e.prepare(n, v);
   const scape = new Soundscape(e), s = calmScene();
   Object.assign(s, { wind: 1.6, gust: 1, rough: 1.5, rain: 1, storm: 0.9, coast: 0.8, harbour: 0.5, maelstrom: 0.6, steam: 0.5, night: 1, speed: 6 });
@@ -74,8 +69,6 @@ export async function storm() {
   return { ...scan(b), ceiling: CEILING, maxSfx, cap: VOICES.sfx, maxAll, nodesPeak: maxAll * 4 + 17, ...e.stats, renderMsPerSecond: renderMs / seconds, seconds, playUs, calls };
 }
 
-/** A sound asked for 1.3 s ahead: no nodes until just before it sounds, then heard on time; one stopped before it was
- * built never sounds. */
 export async function ahead(): Promise<{ nodesBefore: number; onset: number; stoppedPeak: number }> {
   const heard = async (delay: number): Promise<[number, number]> => {
     const ctx = new OfflineAudioContext(2, 3 * RATE, RATE), e = new AudioEngine(ctx);
@@ -85,14 +78,13 @@ export async function ahead(): Promise<{ nodesBefore: number; onset: number; sto
     for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > 1e-3) return [nodes, i / RATE];
     return [nodes, -1];
   };
-  const [nodesBefore, late] = await heard(1.3), [, now] = await heard(0), onset = late - now; // the delay as heard
+  const [nodesBefore, late] = await heard(1.3), [, now] = await heard(0), onset = late - now;
   const ctx2 = new OfflineAudioContext(2, 2 * RATE, RATE), e2 = new AudioEngine(ctx2);
   e2.prepare('bell', 0);
   e2.stopVoice(e2.play('bell', { variant: 0, delay: 0.8 }), 0.1);
   return { nodesBefore, onset, stoppedPeak: scan(await ctx2.startRendering()).peak };
 }
 
-/** The listener on the camera (WP24's rig): a deck camera behind and above the ship, then one risen to orbit. */
 export function listener(): { ear: number[]; near: number; own: number; rival: number; rivalDeck: number; highOwn: number; high: number; bare: number[] } {
   const e = new AudioEngine(new OfflineAudioContext(2, RATE, RATE)), m = new MatchAudio(e, null, 0), state = createMatch({ seed: 7 });
   const ship = state.ships[0], R = 200, u = ship.pos, h = ship.head;
@@ -121,7 +113,7 @@ export function events(): { kinds: number; started: number; errors: string[] } {
   const kinds = Object.values(EVENT);
   for (const kind of kinds) for (const ship of [0, 3]) {
     try {
-      const p = near(1, ship === 0 ? 0.5 : 12); // the sim's events are unit vectors; ships' positions world units
+      const p = near(1, ship === 0 ? 0.5 : 12);
       m.event({ kind, ship, by: kind === EVENT.used ? 21 + (kind % 5) : ship === 0 ? 3 : 0, at: { x: p.x / 200, y: p.y / 200, z: p.z / 200 }, amount: 2 }, (i) => near(1, i * 3));
     } catch (err) {
       errors.push(`${kind}: ${String(err)}`);
@@ -151,7 +143,6 @@ function fft(re: Float64Array, im: Float64Array): void {
   }
 }
 
-/** The sheet: every sound's waveform, log-frequency spectrogram (50 Hz–16 kHz), length, peak and loudness. */
 function sheet(bank: Bank): string {
   const ROW = 60, LABEL = 230, WAVE = 460, SPEC = 640, W = LABEL + WAVE + SPEC + 30, top = 40, cv = document.createElement('canvas');
   cv.width = W; cv.height = top + ROW * SOUND_NAMES.length + 10;
@@ -192,7 +183,6 @@ function sheet(bank: Bank): string {
   return cv.toDataURL('image/png');
 }
 
-/** A demo reel: every one-shot in turn over a light sea, wind and rigging, as a 16-bit WAV (base64), and the sheet. */
 export async function reel(): Promise<{ wav: string; png: string; seconds: number }> {
   const bank = new Bank(), RATE2 = 32000, oneShots = SOUND_NAMES.filter((n) => !SOUNDS[n].loop), plan: [SoundName, number][] = [];
   let t = 0.8;

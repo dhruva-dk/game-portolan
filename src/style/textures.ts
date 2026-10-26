@@ -1,18 +1,3 @@
-// The style's generated textures, made once at startup on the CPU (about 50 ms) and shared by every material, the
-// ink composite and the interface. All tile seamlessly and are sampled in world, object or scrap coordinates (never
-// across the screen, except the frame's deckle). Their GPU sizes are reported for the texture-memory budget.
-//
-//   tPaper  512², read at a screen-stable octave of the anchor frame (style/glsl.ts, paperAt):
-//           R  fibre: parchment's grain of short fibres, light and dark, over a fine tooth
-//           G  granulation: clumped pigment particles that settle in the paper's valleys in deeper washes
-//           B  mottle: smooth noise, four cells a tile (the cloudy formation of the skin; also line wobble)
-//           A  bloom: domain-warped noise whose level sets have the frilled edge a wet wash leaves where it backs
-//              into a drying one (soft bleed at glaze edges); also smooth noise for stroke wobble and crinkle
-//   tMarks  256², read at fixed world scales (stains and foxing are the same on the globe and the chart):
-//           R  foxing: sparse rust-brown spots with soft halos
-//           G  stains: broad tide-marked water stains, darker at their drying edge
-//           B  dry brush: bristle streaks broken by the paper's tooth, along x (foam, lead-white flicks)
-//           A  unused (opaque)
 import * as THREE from 'three';
 
 export interface StyleTextures {
@@ -20,7 +5,6 @@ export interface StyleTextures {
   marks: THREE.DataTexture;
 }
 
-/** Bytes a mipmapped RGBA8 square texture of this size occupies on the GPU. */
 export function textureBytes(t: THREE.DataTexture): number {
   const { width, height } = t.image;
   return Math.round(width * height * 4 * (t.generateMipmaps ? 4 / 3 : 1));
@@ -30,9 +14,6 @@ export function createStyleTextures(): StyleTextures {
   return { paper: paperTexture(512), marks: marksTexture(256) };
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-
-/** A small, fast seeded generator (mulberry32). Rendering only: the simulation has its own. */
 function rng(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -44,10 +25,6 @@ function rng(seed: number): () => number {
   };
 }
 
-/**
- * Add tileable value noise to `out` (size², row-major): `period` lattice cells across the tile, quintic
- * interpolation, scaled by `amp`. Successive calls at doubling periods build fractal noise.
- */
 function addNoise(out: Float32Array, size: number, period: number, seed: number, amp: number): void {
   const r = rng(seed), lattice = new Float32Array(period * period);
   for (let i = 0; i < lattice.length; i++) lattice[i] = r() * 2 - 1;
@@ -66,7 +43,6 @@ function addNoise(out: Float32Array, size: number, period: number, seed: number,
   }
 }
 
-/** Fractal tileable noise in roughly [-1, 1]: octaves from `period` upward, each half the amplitude. */
 function fbm(size: number, period: number, octaves: number, seed: number): Float32Array {
   const out = new Float32Array(size * size);
   let amp = 1, norm = 0;
@@ -78,7 +54,6 @@ function fbm(size: number, period: number, octaves: number, seed: number): Float
   return out;
 }
 
-/** Splat a value at a fractional position with bilinear weights, wrapping round the tile. */
 function splat(out: Float32Array, size: number, x: number, y: number, v: number): void {
   const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
   const m = size - 1;
@@ -89,7 +64,6 @@ function splat(out: Float32Array, size: number, x: number, y: number, v: number)
   out[i10 + c1] += v * fx * fy;
 }
 
-/** Rescale a field so its mean maps to 0.5 and `spread` standard deviations reach 0 and 1. */
 function normalise(f: Float32Array, spread: number): Float32Array {
   let mean = 0;
   for (const v of f) mean += v;
@@ -117,11 +91,7 @@ function pack(size: number, channels: [Float32Array, Float32Array, Float32Array,
   return t;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-
 function paperTexture(size: number): THREE.DataTexture {
-  // Fibre: a fine tooth, then thousands of short, slightly curved fibres, some darker and some lighter than the
-  // ground, laid in every direction (parchment is skin, with no machine direction).
   const fibre = fbm(size, 64, 3, 11);
   for (let i = 0; i < fibre.length; i++) fibre[i] *= 0.35;
   const r = rng(12);
@@ -138,7 +108,6 @@ function paperTexture(size: number): THREE.DataTexture {
   }
   normalise(fibre, 2.2);
 
-  // Granulation: pigment particles clump into specks four to eight texels across, more where the paper's tooth dips.
   const grain = new Float32Array(size * size);
   addNoise(grain, size, 128, 21, 1);
   addNoise(grain, size, 64, 22, 0.9);
@@ -150,7 +119,6 @@ function paperTexture(size: number): THREE.DataTexture {
 
   const mottle = normalise(fbm(size, 4, 5, 31), 2.0);
 
-  // Bloom: a field warped by two others, so its level sets have the frilled, cauliflower edge of a backrun.
   const warpX = fbm(size, 8, 3, 81), warpY = fbm(size, 8, 3, 82), base = fbm(size, 8, 5, 83);
   const bloom = new Float32Array(size * size);
   const reach = size / 24;
@@ -168,8 +136,6 @@ function paperTexture(size: number): THREE.DataTexture {
 function marksTexture(size: number): THREE.DataTexture {
   const r = rng(51);
 
-  // Foxing: rust spots, most of them tiny and faint, a few darker, some gathered in loose clusters; each a dense core
-  // in a soft irregular halo.
   const fox = new Float32Array(size * size);
   const ring = fbm(size, 16, 3, 52);
   const spot = (cx: number, cy: number, rad: number, strength: number) => {
@@ -192,8 +158,6 @@ function marksTexture(size: number): THREE.DataTexture {
     }
   }
 
-  // Stains: a few places where water once stood and dried, each of its own size and strength: a faint, uneven body
-  // and a darker tide line along its frilled edge. Most of the sheet is clean.
   const stain = new Float32Array(size * size), frill = fbm(size, 12, 4, 61), body = fbm(size, 6, 3, 62);
   for (let n = 0; n < 5; n++) {
     const cx = r() * size, cy = r() * size, rad = size * (0.06 + r() ** 2 * 0.14);
@@ -208,7 +172,6 @@ function marksTexture(size: number): THREE.DataTexture {
     }
   }
 
-  // Dry brush: bristle tracks along x, each its own darkness, broken where the loaded brush skipped the tooth.
   const bristle = new Float32Array(size * size), skip = fbm(size, 8, 4, 71);
   const tracks = new Float32Array(size);
   for (let y = 0; y < size; y++) tracks[y] = r();

@@ -1,11 +1,8 @@
-// Retakes the WP15 part-B shots at both devices: a lighthouse at dusk and at night with its beam, a harbour at dusk
-// with a ship at its mooring, and a far lighthouse over the curve (hull-down: only the lantern clears the horizon).
-// node tests/pages/structures.shots.ts [outDir]
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { launch, openGame, root, serve } from '../harness.ts';
 
-const outDir = process.argv[2] ?? join(root, 'progress/shots');
+const outDir = process.argv[2] ?? join(root, 'out/shots');
 const SHOTS: [string, Record<string, string>, number][] = [
   ['lighthouse-dusk', { view: 'light', off: '40', height: '4', pitch: 'lamp' }, 19.4],
   ['lighthouse-night', { view: 'light', off: '40', height: '4', pitch: 'lamp' }, 22.5],

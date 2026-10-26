@@ -1,6 +1,3 @@
-// The match step: every system of the simulation, in order, once per tick. It is the only code that writes the
-// match state, and ShipInput is the only way in: the player's input comes from outside, the captains' from
-// inside. Each system appends its call here, in the order the rules need.
 import { helm, piloted, think } from './captains/brain.ts';
 import { watch } from './captains/learning.ts';
 import { combat } from './combat.ts';
@@ -17,16 +14,12 @@ import { storm } from './storm.ts';
 import { chart } from './territory.ts';
 import { newSight, noteFog, survey } from './visibility.ts';
 
-/** Each ship's input this tick: the player's as given, the captains' from their brains (captains/brain.ts helm, then think). */
 const INPUTS: ShipInput[] = Array.from({ length: SHIPS }, idleInput);
 
-/** The inputs of the last step, by ship: the player's as given, the captains' as their brains gave them. */
 export const lastInputs = (): readonly ShipInput[] => INPUTS;
 
-/** What every ship sees this tick, surveyed once the hulls have moved: whom its guns may engage, and all its captain knows of its rivals. */
 const SIGHT = Array.from({ length: SHIPS }, newSight);
 
-/** Advance the match on its sea by one tick of TICK seconds, with the player's input for this tick. Once over, it stands still. */
 export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   if (over(state)) return;
   state.events.length = 0;
@@ -57,19 +50,14 @@ export function step(sea: Sea, state: MatchState, player: ShipInput): void {
   forage(sea, state);
   scoop(state);
   state.tick++;
-  for (let i = 1; i < SHIPS; i++) watch(state, i, SIGHT[i]); // what each captain saw the player do this tick (captains/learning.ts)
+  for (let i = 1; i < SHIPS; i++) watch(state, i, SIGHT[i]);
 }
 
-/** Step a match headless with recorded player inputs until it reaches `tick` or is over. */
 export function runMatch(sea: Sea, state: MatchState, recording: Recording, tick: number): void {
   const inputs = replay(recording);
   while (state.tick < tick && !over(state)) step(sea, state, inputAt(inputs, state.tick));
 }
 
-/**
- * The rest of the match at once, headless, once the player has sunk (PROMPT.md, Sinking and the end): the very steps
- * it would have taken, to its end, which the storm's last phase guarantees (storm.ts).
- */
 export function resolve(sea: Sea, state: MatchState): void {
   const still = idleInput();
   while (!over(state)) step(sea, state, still);

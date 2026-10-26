@@ -1,14 +1,3 @@
-// WP25: the match HUD drawn as ink on parchment scraps (PROMPT.md, The match screen; hud.ts places it). Every
-// indicator that can be graphic is graphic and drawn with a broad nib at 40° (nib(): width by stroke direction, a
-// touch of pressure mid-stroke, a seeded wobble so no two rings are true): the hull as a rope fraying as it empties
-// with the ward's gold glow, the storm's next move as a dial, a portolan wind rose turned to the bow with the wind's
-// feathered arrow, the sail setting as three sails, the purse a pouch that swells with unbanked doubloons beside the
-// bank's strongbox, a reload arc round the aimed fitting, the gull and its call price, consumables and the six
-// fittings as small inked icons in their tier pigments, chevrons on the frame toward every rival in sight with a
-// darkening vignette on the nearest's side. Numbers are lettered in the generated hand (Lettering). Elements write
-// themselves in on appearance, staggered (the ink-draw transition). The sheet is one canvas redrawn only when what
-// it shows changes (≤ 11 Hz, every frame while writing in); the stick and the aiming reticle are small sprites drawn
-// every frame they move, so a touch shows the frame it lands.
 import * as THREE from 'three';
 import type { InkText, InkTextOptions, Lettering } from '../lettering/ink.ts';
 import { FLIGHT } from '../sim/state.ts';
@@ -20,14 +9,12 @@ import { edgePoint, type ButtonKind, type HudLayout, type HudModel } from './hud
 import { ButtonBase, Scrap, ThreatVignette } from './parchment.ts';
 
 export const INK = '#2a211c';
-/** Pigment tiers, dullest first (tables.ts PIGMENT_TIER): iron gall, verdigris, ultramarine, vermilion, gold leaf. */
 export const TIER = ['#2a211c', '#5aa394', '#4566b0', '#d9472b', '#d4a64a'] as const;
 const PIG = { sepia: '#6b4f36', ochre: '#d4a656', ultramarine: '#4566b0', indigo: '#3e4d72', vermilion: '#d9472b', gold: '#d4a64a', verdigris: '#5aa394', grey: '#8a8178' } as const;
 
 type G = CanvasRenderingContext2D;
 type Pt = [number, number];
 
-/** A broad-nib stroke along `pts`, written up to `p` (0–1) of its length. */
 export function nib(g: G, pts: readonly Pt[], w: number, p = 1, colour: string = INK, alpha = 0.9): void {
   if (pts.length < 2 || p <= 0) return;
   const seg: number[] = [];
@@ -50,7 +37,6 @@ export function nib(g: G, pts: readonly Pt[], w: number, p = 1, colour: string =
   g.restore();
 }
 
-/** A hand-drawn ring (or arc from a0 through `sweep`), never quite true. */
 export function ring(cx: number, cy: number, r: number, seed: number, a0 = -Math.PI / 2, sweep = Math.PI * 2, n = 44): Pt[] {
   const pts: Pt[] = [];
   for (let i = 0; i <= n; i++) {
@@ -60,7 +46,6 @@ export function ring(cx: number, cy: number, r: number, seed: number, a0 = -Math
   return pts;
 }
 
-/** A watercolour wash: a pale fill with the darker dried edge. */
 export function wash(g: G, colour: string, alpha: number, path: (g: G) => void): void {
   g.save();
   g.fillStyle = colour; g.strokeStyle = colour;
@@ -70,8 +55,6 @@ export function wash(g: G, colour: string, alpha: number, path: (g: G) => void):
 }
 
 const poly = (pts: readonly Pt[]) => (g: G): void => { g.moveTo(pts[0][0], pts[0][1]); for (const q of pts) g.lineTo(q[0], q[1]); };
-
-// ---- icons: (g, x, y, s = half size, p = written 0–1)
 
 export function gullIcon(g: G, x: number, y: number, s: number, p = 1, colour: string = INK): void {
   nib(g, [[x - s, y - 0.05 * s], [x - 0.6 * s, y - 0.42 * s], [x - 0.25 * s, y - 0.3 * s], [x, y + 0.08 * s]], s * 0.2, p, colour);
@@ -127,12 +110,11 @@ export function consumableIcon(g: G, kind: number, x: number, y: number, s: numb
         nib(g, [[x + Math.cos(a) * r0, y + Math.sin(a) * r0], [x + Math.cos(a) * r1, y + Math.sin(a) * r1]], s * 0.12, p, PIG.vermilion);
       }
       break;
-    default: // an empty slot: a dotted ring
+    default:
       for (let i = 0; i < 10; i += 2) nib(g, ring(x, y, 0.55 * s, i, (i / 10) * Math.PI * 2, Math.PI / 6, 4), s * 0.07, p, INK, 0.4);
   }
 }
 
-/** A fitting by its slot, washed in its tier's pigment (gold leaf at the top tier). */
 export function fittingIcon(g: G, slot: number, kind: number, tier: number, x: number, y: number, s: number, p = 1): void {
   if (kind === 0) { nib(g, [[x - 0.12 * s, y], [x + 0.12 * s, y]], s * 0.25, p, INK, 0.3); return; }
   const c = TIER[Math.max(0, Math.min(4, tier))];
@@ -161,7 +143,6 @@ export function pennant(g: G, x: number, y: number, s: number, gold: boolean, p 
   nib(g, flag, s * 0.1, p);
 }
 
-/** The purse: a drawstring pouch, radius by the doubloons it holds (√, so it swells fast then fills slowly). */
 export function pouch(g: G, x: number, y: number, s: number, purse: number, p = 1): void {
   const r = s * (0.45 + 0.55 * Math.min(1, Math.sqrt(purse / 400)));
   wash(g, PIG.ochre, 0.45 * p, (q) => q.ellipse(x, y + 0.25 * s, r, r * 0.85, 0, 0, Math.PI * 2));
@@ -177,7 +158,6 @@ export function strongbox(g: G, x: number, y: number, s: number, p = 1): void {
   nib(g, [[x, y - 0.05 * s], [x, y + 0.25 * s]], s * 0.16, p, PIG.gold);
 }
 
-/** Sail settings reefed, plain, full as three sails; the one set inked, the others ghosted; torn sails ragged. */
 export function sails(g: G, x: number, y: number, w: number, h: number, setting: number, torn: boolean, p = 1): void {
   for (let k = 0; k < 3; k++) {
     const cx = x + w * (k + 0.5) / 3, on = k === setting, a = on ? 0.95 : 0.28, s = h * 0.45;
@@ -191,7 +171,6 @@ export function sails(g: G, x: number, y: number, w: number, h: number, setting:
   }
 }
 
-/** The hull as a rope: twisted strands to the hull left, frayed loose strands beyond, the ward's gold behind. */
 export function rope(g: G, x: number, y: number, w: number, h: number, f: number, ward: boolean, fire: boolean, p = 1): void {
   const cy = y + h / 2, end = x + w * f * p, th = h * 0.32;
   if (ward) wash(g, PIG.gold, 0.35, (q) => q.roundRect(x - 4, cy - th - 5, w * f + 8, th * 2 + 10, th + 5));
@@ -201,13 +180,12 @@ export function rope(g: G, x: number, y: number, w: number, h: number, f: number
     for (let sx = x + th * 0.6; sx < end - th * 0.4; sx += th * 0.9) nib(g, [[sx - th * 0.5, cy + th * 0.85], [sx + th * 0.5, cy - th * 0.85]], 2.2, 1, f < 0.3 ? PIG.vermilion : INK);
   }
   if (fire) for (let i = 0; i < 4; i++) nib(g, [[x + w * f * (0.2 + 0.2 * i), cy - th], [x + w * f * (0.25 + 0.2 * i), cy - th * 2.2]], 1.8, p, PIG.vermilion);
-  if (f < 0.995) { // the fray: three loose strands curling off the empty end, then the faint line of what was
+  if (f < 0.995) {
     for (let k = -1; k <= 1; k++) nib(g, [[end, cy + k * th * 0.6], [end + th * 1.1, cy + k * th * 1.1 + th * 0.2], [end + th * 1.9, cy + k * th * 1.6 - th * 0.3]], 1.3, p, INK, 0.75);
     nib(g, [[end + th * 2.2, cy], [x + w, cy]], 0.7, p, INK, 0.25);
   }
 }
 
-/** The storm dial: a ring of phases, the moved ones washed indigo, the announced one sweeping vermilion as its time runs. */
 export function stormDial(g: G, x: number, y: number, r: number, m: HudModel['storm'], p = 1): void {
   const phases = Math.max(5, m.phase + 1);
   for (let i = 0; i < phases; i++) {
@@ -220,11 +198,9 @@ export function stormDial(g: G, x: number, y: number, r: number, m: HudModel['st
     wash(g, PIG.vermilion, 0.6 * p, (q) => { q.moveTo(x, y); q.arc(x, y, r * 0.86, a0, a0 + span); q.closePath(); });
   }
   nib(g, ring(x, y, r, 9), 1.8, p);
-  // a cloud at the hub
   nib(g, [...ring(x - r * 0.18, y, r * 0.22, 1, Math.PI * 0.9, Math.PI * 1.1, 8), ...ring(x + r * 0.15, y - r * 0.05, r * 0.26, 2, Math.PI * 1.1, Math.PI * 1.1, 8)], 1.3, p);
 }
 
-/** A portolan wind rose turned so the bow is up (north swings with the helm), the wind as a feathered arrow. */
 export function rose(g: G, x: number, y: number, r: number, heading: number, wind: number, strength: number, p = 1): void {
   nib(g, ring(x, y, r, 4), 1.4, p, INK, 0.7);
   for (let i = 0; i < 8; i++) {
@@ -235,7 +211,7 @@ export function rose(g: G, x: number, y: number, r: number, heading: number, win
     wash(g, i === 0 ? PIG.vermilion : PIG.sepia, (i === 0 ? 0.75 : long ? 0.35 : 0.15) * p, poly([[x, y], sideL, tip]));
     nib(g, [sideL, tip, sideR], 1.1, p);
   }
-  nib(g, [[x, y - r - 5], [x, y - r + 3]], 2.4, p); // the lubber's mark: the bow
+  nib(g, [[x, y - r - 5], [x, y - r + 3]], 2.4, p);
   const a = wind - Math.PI / 2, l = r * (0.55 + 0.35 * Math.min(1.5, strength) / 1.5);
   const tail: Pt = [x - Math.cos(a) * l, y - Math.sin(a) * l], head: Pt = [x + Math.cos(a) * l, y + Math.sin(a) * l];
   nib(g, [tail, head], 2, p, PIG.ultramarine);
@@ -248,10 +224,7 @@ export function rose(g: G, x: number, y: number, r: number, heading: number, win
   }
 }
 
-/** A chevron on the frame toward a rival, heavier and redder the nearer. */
 export function chevron(g: G, x: number, y: number, bearing: number, near: number, s: number, p = 1, pig: string = PIG.vermilion): void {
-  // WP25 part B: more weight: a notched arrowhead washed in the captain's pigment, its ink thickening as it nears, and
-  // the distance as dots trailing behind it (three far off, two closing, one upon you)
   const a = bearing - Math.PI / 2, w = s * (0.85 + 0.75 * near), ca = Math.cos(a), sa = Math.sin(a);
   const tip: Pt = [x + ca * w * 0.75, y + sa * w * 0.75], notch: Pt = [x + ca * w * 0.08, y + sa * w * 0.08];
   const l: Pt = [x + Math.cos(a + 2.45) * w, y + Math.sin(a + 2.45) * w], r: Pt = [x + Math.cos(a - 2.45) * w, y + Math.sin(a - 2.45) * w];
@@ -265,8 +238,6 @@ export function chevron(g: G, x: number, y: number, bearing: number, near: numbe
   }
 }
 
-// ---- the view
-
 const fmt = (n: number): string => (n < 1000 ? String(Math.floor(n)) : n < 1e5 ? `${(n / 1000).toFixed(1)}k` : `${Math.floor(n / 1000)}k`);
 const ordinal = (n: number): string => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
@@ -277,7 +248,7 @@ function sheet(width: number, height: number, ratio: number): Sprite {
   canvas.width = Math.ceil(width * ratio); canvas.height = Math.ceil(height * ratio);
   const g = canvas.getContext('2d')!;
   const tex = new THREE.CanvasTexture(canvas);
-  tex.flipY = false; // the ui camera looks with y down
+  tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
@@ -301,7 +272,6 @@ export class HudView {
   private drawn = -1;
   private sig = '';
   private stickSig = '';
-  /** WP25 part B: the captain's pigment for ship j (the match sets it; the rival arrows wash in it). */
   pigment: (ship: number) => string = () => PIG.vermilion;
 
   constructor(style: Style, lettering: Lettering) {
@@ -323,7 +293,6 @@ export class HudView {
     scrap(L.top.x, L.top.y, L.top.width, L.top.height, 1);
     scrap(L.chart.x, L.chart.y, L.chart.width, L.chart.height, 2);
     scrap(L.purse.x, L.purse.y, L.purse.width, L.purse.height, 3);
-    // WP25 part B: the wind rose and the sail setting on a scrap of their own so they read over a busy sea
     const lo = Math.min(L.compass.x - L.compass.r, L.sail.x), hi = Math.max(L.compass.x + L.compass.r, L.sail.x + L.sail.width);
     scrap(lo - 7 * u, L.compass.y - L.compass.r - 6 * u, hi - lo + 14 * u, 2 * L.compass.r + 12 * u, 4);
     for (const b of L.buttons) {
@@ -351,7 +320,6 @@ export class HudView {
     this.sig = '';
   }
 
-  /** Draw the frame's HUD; `dt` s since the last. */
   frame(m: HudModel, c: ControlsView, dt: number): void {
     this.clock += dt;
     const L = this.L;
@@ -420,17 +388,17 @@ export class HudView {
         if (s && s.kind !== 0 && s.count > 1) this.say(`n${b.kind}`, String(s.count), sz * 0.7, b.x + b.r * 0.75, b.y + b.r * 0.7);
       }
     }
-    this.say('chart', 'chart', sz * 0.9, L.chart.x + L.chart.width / 2, L.chart.y + L.chart.height / 2, { opacity: 0.45 }); // until WP24 part D
+    this.say('chart', 'chart', sz * 0.9, L.chart.x + L.chart.width / 2, L.chart.y + L.chart.height / 2, { opacity: 0.45 });
   }
 
   private draw(m: HudModel, L: HudLayout, age: number): void {
     const { g, tex, ratio } = this.base!, { width, height } = L.view, u = L.u;
-    const ink = (i: number): number => Math.min(1, Math.max(0, (age - i * 0.07) / 0.45)); // staggered write-in
+    const ink = (i: number): number => Math.min(1, Math.max(0, (age - i * 0.07) / 0.45));
     g.setTransform(ratio, 0, 0, ratio, 0, 0);
     g.clearRect(0, 0, width, height);
     const H = L.hull;
     rope(g, H.x, H.y, H.width, H.height, m.hull, m.ward, m.fire, ink(0));
-    const S = L.share; // share of the claimed sea: a wash filling a ruled bar
+    const S = L.share;
     wash(g, PIG.ultramarine, 0.5 * ink(1), (q) => q.rect(S.x, S.y + S.height * 0.3, S.width * m.share, S.height * 0.4));
     nib(g, [[S.x, S.y + S.height * 0.3], [S.x + S.width, S.y + S.height * 0.3], [S.x + S.width, S.y + S.height * 0.7], [S.x, S.y + S.height * 0.7], [S.x, S.y + S.height * 0.3]], 1, ink(1), INK, 0.6);
     if (m.sternGlass) { const d = L.sternGlass; wash(g, '#cfd8d4', 0.5, (q) => q.arc(d.x, d.y, d.r, 0, Math.PI * 2)); nib(g, ring(d.x, d.y, d.r, 3), 2.2, ink(2)); nib(g, ring(d.x, d.y, d.r * 0.8, 5), 0.8, ink(2)); }
@@ -438,7 +406,7 @@ export class HudView {
     shipGlyph(g, T.x + T.width * 0.1, T.y + T.height * 0.5, 9 * u, ink(2));
     stormDial(g, T.x + T.width / 2, T.y + T.height / 2, 19 * u, m.storm, ink(3));
     pennant(g, T.x + T.width * 0.64, T.y + T.height * 0.5, 9 * u, m.leader, ink(4));
-    const C = L.chart; // the compact chart's slot (WP24 part D draws into it)
+    const C = L.chart;
     nib(g, ring(C.x + C.width - 16 * u, C.y + 16 * u, 9 * u, 8), 1, ink(5), INK, 0.5);
     nib(g, [[C.x + C.width - 16 * u, C.y + 5 * u], [C.x + C.width - 16 * u, C.y + 27 * u]], 1, ink(5), INK, 0.5);
     rose(g, L.compass.x, L.compass.y, L.compass.r, m.heading, m.wind, m.windStrength, ink(6));
@@ -451,7 +419,6 @@ export class HudView {
       if (b.kind === 'aimed') {
         if (m.aimed) mortarIcon(g, b.x, b.y - b.r * 0.05, b.r * 0.55, p, m.aimed.tier);
         else nib(g, ring(b.x, b.y, b.r * 0.4, 2), 1, p, INK, 0.3);
-        // the batteries' reloads as arcs round the aimed fitting: port left, starboard right, castle top, stern bottom
         for (const bt of m.batteries) {
           const mid = [Math.PI, 0, -Math.PI / 2, Math.PI / 2][bt.battery], span = 0.75;
           nib(g, ring(b.x, b.y, b.r + 5 * u, bt.battery, mid - span / 2, span, 10), 2, p, INK, 0.25);
@@ -493,7 +460,7 @@ export class HudView {
     const a = c.aiming;
     rt.mesh.visible = !!a;
     if (a) {
-      rt.mesh.position.set(a.x, a.y - 40 * L.u, 0); // drawn above the finger, where it can be seen
+      rt.mesh.position.set(a.x, a.y - 40 * L.u, 0);
       const { g, ratio, size, tex } = rt, o = size / 2, live = !a.cancel && a.cell >= 0;
       g.setTransform(ratio, 0, 0, ratio, 0, 0);
       g.clearRect(0, 0, size, size);

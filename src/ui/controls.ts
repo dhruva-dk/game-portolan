@@ -1,26 +1,16 @@
-// WP25: the match controls, touch → ShipInput, the only way the player acts on a match (sim/input.ts; the
-// validator stays the arbiter). Landscape, a thumb each side (PROMPT.md, Controls). The left thumb lands anywhere on
-// the left half and a floating stick appears beneath it: left/right is the helm (dead zone with hysteresis, an expo
-// curve: fine near the centre, hard over at the rim, the origin trailing a thumb that overshoots), a flick up or down
-// steps the sails (reefed/plain/full; while riding the Great Current a flick up breaks off). The right thumb has the
-// aimed fitting (tap auto-aims, drag aims by hand, drag back onto it to cancel), the gull (tap calls it for its
-// price, drag from it onto a rival dives), three consumables, head home (held), a swipe up on open sea to break off,
-// and the compact chart (tap opens it, WP24 part D). Two fingers on open sea are the camera's pinch: touch() hands
-// back every touch the camera should see, and a second finger that lands within STICK.pinchMs of the stick's turns
-// both into the pinch, so the gestures never fight. Hit targets are forgiving (hud.ts layout: ≥ 44 pt, nearest wins).
 import { FLAG, STEER_MAX, idleInput, type ShipInput } from '../sim/input.ts';
 import type { ButtonKind, HudButton, HudLayout } from './hud.ts';
 import type { Touch } from './shell.ts';
 
 export const STICK = {
-  dead: 7, // px of thumb travel before the helm answers…
-  release: 4, // …and back inside which it centres again (hysteresis)
-  full: 54, // px for hard over; beyond it the origin trails the thumb, so reversing is instant
-  expo: 1.55, // response: n^expo
-  flick: 30, // px of vertical travel…
-  flickMs: 160, // …within this, mostly vertical, is a flick
-  flickRest: 220, // ms before another flick counts
-  pinchMs: 150, // a second finger this soon after the stick's makes both the camera's pinch
+  dead: 7,
+  release: 4,
+  full: 54,
+  expo: 1.55,
+  flick: 30,
+  flickMs: 160,
+  flickRest: 220,
+  pinchMs: 150,
 } as const;
 export const SWIPE = { up: 64, ms: 380, slope: 1.8 } as const;
 export const PRESS = { slop: 14, homeArm: 160, queue: 4 } as const;
@@ -33,16 +23,13 @@ interface Act { flags: number; consumable: number; aim: number }
 
 export type ControlAct = ButtonKind | 'sail' | 'breakOff' | 'dive' | 'aim';
 
-/** What the HUD draws of the controls this frame. */
 export interface ControlsView {
   stick: { ox: number; oy: number; x: number; y: number; steer: number } | null;
   pressed: ReadonlySet<ButtonKind>;
   aiming: { kind: 'aimed' | 'gull'; x: number; y: number; cell: number; cancel: boolean } | null;
-  /** Head home's arming, 0–1 (held once 1). */
   home: number;
 }
 
-/** The helm for a thumb `dx` px off the stick's origin: integer −STEER_MAX…STEER_MAX, continuous from the dead zone. */
 export function steerOf(dx: number): number {
   const n = Math.min(1, Math.max(0, (Math.abs(dx) - STICK.release) / (STICK.full - STICK.release)));
   return Math.sign(dx) * Math.max(1, Math.min(STEER_MAX, Math.round(STEER_MAX * n ** STICK.expo)));
@@ -53,7 +40,6 @@ const inside = (b: HudButton, x: number, y: number, slop: number): boolean =>
     ? Math.abs(x - b.x) <= b.w / 2 + slop && Math.abs(y - b.y) <= b.h / 2 + slop
     : Math.hypot(x - b.x, y - b.y) <= b.hit + slop;
 
-/** The control under a touch: the nearest whose forgiving hit area holds it, or null. */
 export function hitButton(layout: HudLayout, x: number, y: number): HudButton | null {
   let best: HudButton | null = null, bestD = Infinity;
   for (const b of layout.buttons) {
@@ -66,12 +52,9 @@ export function hitButton(layout: HudLayout, x: number, y: number): HudButton | 
 
 export class Controls {
   layout: HudLayout | null = null;
-  /** The territory cell under a screen point (the camera's ray onto the sea), or −1. */
   pick: (x: number, y: number) => number = () => -1;
-  /** The ship rides the Great Current: a flick up on the stick breaks off too. */
   riding: () => boolean = () => false;
   onChart: () => void = () => {};
-  /** Heard on every act, the frame it happens (the ui sound and a selection tick). */
   onAct: (what: ControlAct) => void = () => {};
   private readonly now: () => number;
   private stick: Stick | null = null;
@@ -85,7 +68,6 @@ export class Controls {
     this.now = now;
   }
 
-  /** Feed a touch; returns the touches the camera's pinch should see (WP24), synthesised downs included. */
   touch(t: Touch): Touch[] {
     const L = this.layout;
     if (!L) return [t];
@@ -120,7 +102,6 @@ export class Controls {
 
   private down(t: Touch, now: number, L: HudLayout): Touch[] {
     const s = this.stick;
-    // a second finger right after the stick's: both were a pinch all along
     if (s && !s.engaged && now - s.t0 <= STICK.pinchMs && !hitButton(L, t.x, t.y)) {
       this.stick = null;
       this.steer = 0;
@@ -196,7 +177,6 @@ export class Controls {
     return 0;
   }
 
-  /** The player's input for the next tick: the helm held, one queued sail step and one queued act, head home held. */
   input(): ShipInput {
     const out = idleInput();
     out.steer = this.steer;
@@ -224,7 +204,6 @@ export class Controls {
     };
   }
 
-  /** Drop every finger and anything queued (a relayout, the chart opening, the match pausing). */
   reset(): void {
     this.stick = null;
     this.presses.clear();

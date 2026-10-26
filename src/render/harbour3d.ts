@@ -1,12 +1,3 @@
-// WP26 part C: the harbour in 3D, drawn through the ink pipeline behind the harbour's pages: a coursed stone quay with
-// its coping, bollards, steps and mooring lines, warehouses and the chandlery with lit windows, a cargo crane, crates,
-// barrels, rope coils and nets drying on poles, lamps breathing in their glow, the lighthouse on the rough-stone mole
-// turning its beam, calm water rocking the lamplight, the dusk sky over a far shore and its town, a caravel at the next
-// berth and a galleon in the roads, rowing boats, wheeling gulls — and the player's own ship of her form and pigments
-// (WP18 Ship) riding the swell at her mooring with her sails furled, her gull perched on the dolphin beside her with
-// the plumage of its training. Built only once the harbour is entered (harbour.ts imports it lazily), never on the
-// boot path. setCareer rebuilds the ship or the gull when the shipwright or the gull's training change them; setDetail
-// takes the graphics quality's detail (Pipeline.quality.detail) and thins the props, the birds and the roads.
 import * as THREE from 'three';
 import { inkMaterial } from '../style/glsl.ts';
 import { PIGMENTS, type RGB } from '../style/palette.ts';
@@ -17,27 +8,22 @@ import { Ship } from './ships/shipwright.ts';
 type Style = Parameters<typeof inkMaterial>[0];
 type T3 = readonly [number, number, number];
 
-/** What the harbour shows of the career: the ship's form (0 pinnace … 3 galleon), her pigments, the gull's plumage. */
 export interface HarbourLook { readonly form: number; readonly pigments: readonly [RGB, RGB] | null; readonly marks: GullMarks }
-/** The harbour's budget, as every standard view's (WP30 part C): draw calls and triangles on both devices. */
 export const HARBOUR_BUDGET = { calls: 150, triangles: 420_000 } as const;
-/** The berth: the quay's face (z) and top (y), the player's ship's centre along it, the next berth, the quay lamps. */
 export const BERTH = { quayZ: -2.1, quayY: 0.42, shipX: 0.4, nextX: -5.9, lampX: [-8.2, -4.4, -0.9, 3.2] } as const;
 const LIGHTHOUSE = new THREE.Vector3(10.4, 0.45, -8.6);
 
 const PIG = PIGMENTS as unknown as Record<string, RGB | undefined>;
 const pig = (name: string, fallback: RGB): RGB => PIG[name] ?? fallback;
-/** The player's pigments while the career names none. */
 export const PLAYER_PIGMENTS: readonly [RGB, RGB] = [pig('ultramarine', [0.22, 0.32, 0.62]), pig('vermilion', [0.78, 0.26, 0.16])];
 const NEIGHBOUR: readonly [RGB, RGB] = [pig('verdigris', [0.3, 0.55, 0.45]), pig('ochre', [0.8, 0.6, 0.3])];
 const ROADS: readonly [RGB, RGB] = [pig('iron', [0.3, 0.27, 0.25]), pig('madder', [0.6, 0.25, 0.3])];
 
-/** The harbour's calm swell (u above rest); the water's vertex shader carries the same sum. */
 export function swellAt(x: number, z: number, t: number): number {
   return 0.035 * Math.sin(0.33 * x + 0.9 * t) + 0.022 * Math.sin(0.52 * z - 0.7 * t + 0.27 * x) + 0.01 * Math.sin(1.3 * x + 1.1 * z + 1.7 * t);
 }
 
-const SOLID_VERT = /* glsl */ `
+const SOLID_VERT =  `
 attribute vec3 tint;
 varying vec3 vN;
 varying vec3 vC;
@@ -49,7 +35,7 @@ void main() {
   vN = normalize(mat3(modelMatrix) * normal);
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
-const FLY_VERT = /* glsl */ `
+const FLY_VERT =  `
 attribute vec3 tint;
 uniform float uFlap;
 varying vec3 vN;
@@ -66,7 +52,7 @@ void main() {
   vN = normalize(mat3(modelMatrix) * normal);
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
-const SOLID_FRAG = /* glsl */ `
+const SOLID_FRAG =  `
 uniform vec3 uKey;
 varying vec3 vN;
 varying vec3 vC;
@@ -77,7 +63,7 @@ void main() {
   float haze = smoothstep(18.0, 130.0, length(vW - cameraPosition));
   writeInk(mix(vC * lit, vec3(0.66, 0.55, 0.56), haze * 0.6), n);
 }`;
-const WATER_VERT = /* glsl */ `
+const WATER_VERT =  `
 uniform float uClock;
 varying vec3 vN;
 varying vec3 vW;
@@ -93,7 +79,7 @@ void main() {
   vW = w.xyz;
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
-const WATER_FRAG = /* glsl */ `
+const WATER_FRAG =  `
 uniform float uClock;
 uniform float uQuay;
 uniform vec3 uDeep;
@@ -115,14 +101,14 @@ void main() {
   }
   writeInk(c + uWarm * glint * near * 0.45, n);
 }`;
-const SKY_VERT = /* glsl */ `
+const SKY_VERT =  `
 varying vec3 vW;
 void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
   vW = w.xyz;
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
-const SKY_FRAG = /* glsl */ `
+const SKY_FRAG =  `
 uniform vec3 uLow;
 uniform vec3 uMid;
 uniform vec3 uHigh;
@@ -136,7 +122,7 @@ void main() {
   c += vec3(0.42, 0.2, 0.06) * pow(max(dot(d, uGlowDir), 0.0), 10.0);
   writeInk(c, -d);
 }`;
-const GLOW_VERT = /* glsl */ `
+const GLOW_VERT =  `
 attribute vec3 centre;
 attribute vec2 corner;
 attribute vec2 sizePhase;
@@ -150,20 +136,20 @@ void main() {
   vUv = corner;
   gl_Position = projectionMatrix * viewMatrix * vec4(centre + (r * corner.x + u * corner.y) * s, 1.0);
 }`;
-const GLOW_FRAG = /* glsl */ `
+const GLOW_FRAG =  `
 uniform vec3 uColour;
 varying vec2 vUv;
 void main() {
   float d = length(vUv);
   writeVeil(uColour, exp(-d * d * 4.5) * (1.0 - smoothstep(0.75, 1.0, d)) * 0.6);
 }`;
-const BEAM_VERT = /* glsl */ `
+const BEAM_VERT =  `
 varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
 }`;
-const BEAM_FRAG = /* glsl */ `
+const BEAM_FRAG =  `
 uniform vec3 uColour;
 varying vec2 vUv;
 void main() {
@@ -182,7 +168,6 @@ function rand(seed: number): () => number {
     return s / 4294967296;
   };
 }
-/** Quads (each four corners, counter-clockwise from the front) as flat-shaded triangles. */
 function quads(q: readonly (readonly [T3, T3, T3, T3])[]): THREE.BufferGeometry {
   const p: number[] = [];
   for (const [a, b, c, d] of q) p.push(...a, ...b, ...c, ...a, ...c, ...d);
@@ -191,14 +176,12 @@ function quads(q: readonly (readonly [T3, T3, T3, T3])[]): THREE.BufferGeometry 
   g.computeVertexNormals();
   return g;
 }
-/** A gable roof w along x by d deep, h high, its ridge along x, its eaves at y 0. */
 function roof(w: number, d: number, h: number): THREE.BufferGeometry {
   const x = w / 2, z = d / 2;
   const A: T3 = [-x, 0, z], B: T3 = [x, 0, z], C: T3 = [x, h, 0], D: T3 = [-x, h, 0], E: T3 = [x, 0, -z], F: T3 = [-x, 0, -z];
   return quads([[A, B, C, D], [E, F, D, C], [B, E, C, C], [F, A, D, D]]);
 }
 
-/** Pieces of one material merged into one mesh: positions, normals and a watercolour tint per vertex. */
 class Kit {
   private readonly pos: number[] = [];
   private readonly nor: number[] = [];
@@ -231,7 +214,6 @@ class Kit {
     const m = new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(UP, d.normalize()), V(1, 1, 1));
     return this.add(new THREE.CylinderGeometry(r, r, len, seg, 1, true), m, hex);
   }
-  /** A line hanging from a to b, sagging by `sag` at its middle. */
   rope(a: THREE.Vector3, b: THREE.Vector3, sag: number, r: number, hex: string, n = 6): this {
     let prev = a;
     for (let i = 1; i <= n; i++) {
@@ -262,7 +244,6 @@ function free(o: THREE.Object3D, keep: ReadonlySet<THREE.Material>): void {
   });
 }
 
-/** A ship of `form` moored with her sails furled, her long axis along x; her length and beam. */
 function mooredShip(style: Style, form: FormName, pigments: readonly [RGB, RGB], lod: 'hero' | 'mid' | 'far'): { ship: Ship; len: number; beam: number } {
   const ship = new Ship(style, { form, pigments, lods: [lod] });
   const st = ship.rig.state('reefed', 2.2, 0);
@@ -278,7 +259,6 @@ function mooredShip(style: Style, form: FormName, pigments: readonly [RGB, RGB],
 export class Harbour3D {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(40, 1, 0.1, 900);
-  /** The player's ship as built for the career's form and pigments (setCareer rebuilds her). */
   ship: Ship | null = null;
   shipForm: FormName = 'pinnace';
   shipPigments = '';
@@ -328,7 +308,6 @@ export class Harbour3D {
     this.camera.updateProjectionMatrix();
   }
 
-  /** The career's ship and gull: rebuilt only when the form, the pigments or the plumage change. */
   setCareer(look: HarbourLook): void {
     const form = FORM_NAMES[Math.max(0, Math.min(FORM_NAMES.length - 1, Math.round(look.form)))]!;
     const pigments = look.pigments ?? PLAYER_PIGMENTS;
@@ -345,7 +324,6 @@ export class Harbour3D {
     }
   }
 
-  /** The graphics quality's detail (0.6 Swift, 0.8 Fine, 1 Finest): the props, the birds and the roads thin with it. */
   setDetail(detail: number): void {
     if (Math.abs(detail - this.detail) < 0.01) return;
     this.detail = detail;
@@ -356,7 +334,6 @@ export class Harbour3D {
     this.time.value = t;
     this.open = still ? open : this.open + (open - this.open) * Math.min(1, dt * 2.4);
     const o = this.open, m = still ? 0 : 1, wide = this.aspect > 1.6;
-    // a slow drift, and the camera eases aside as a page unrolls over the harbour (still under reduced motion)
     this.camera.position.set(
       0.9 + 1.3 * o + 0.4 * m * Math.sin(t * 0.071),
       1.62 + 0.2 * o + 0.12 * m * Math.sin(t * 0.053 + 1.3),
@@ -365,7 +342,7 @@ export class Harbour3D {
     this.target.set(0.3 + 1.9 * o + 0.25 * m * Math.sin(t * 0.062 + 2.1), 1.25, -1.8);
     this.camera.lookAt(this.target);
     const k = still ? 0.5 : 1;
-    if (this.ship) { // she rides the swell at her lines
+    if (this.ship) {
       const x0 = BERTH.shipX, z0 = this.berth.position.z, L = this.shipLen * 0.45, B = this.shipBeam * 0.5;
       const hb = swellAt(x0 + L, z0, t), hs = swellAt(x0 - L, z0, t), hp = swellAt(x0, z0 + B, t), hq = swellAt(x0, z0 - B, t);
       this.berth.position.y = k * 0.85 * (hb + hs + hp + hq) / 4;
@@ -382,7 +359,6 @@ export class Harbour3D {
     this.boats.position.y = k * 0.7 * swellAt(0, 1, t);
     this.boats.rotation.z = k * 0.004 * Math.sin(t * 0.9);
     this.beam.rotation.y = still ? 0.6 : t * 0.42;
-    // the gull idles on its perch: looks about, now and then stretches its wings
     if (this.head) {
       this.head.rotation.y = still ? 0.3 : 0.75 * Math.sin(t * 0.5) * Math.max(0, Math.sin(t * 0.23 + 1));
       this.head.rotation.z = still ? 0 : 0.08 * Math.sin(t * 1.3);
@@ -462,7 +438,6 @@ export class Harbour3D {
     return mesh;
   }
 
-  /** The harbour itself, everything but the player's ship and gull: rebuilt when the detail changes. */
   private buildWorld(): void {
     free(this.world, this.keep);
     this.world.clear();
@@ -474,7 +449,6 @@ export class Harbour3D {
     const pick = <T>(a: readonly T[]): T => a[Math.floor(r() * a.length)]!;
     const stone = new Kit(), wood = new Kit(), build = new Kit(), rope = new Kit(), far = new Kit(), boat = new Kit();
     const glow: [THREE.Vector3, number, number][] = [];
-    // the quay: its body, the coursed face with the wet band at the waterline, the coping, steps down to the water
     stone.box(-4.5, (QY - 0.3) / 2, Q - 3, 21, QY + 0.3, 6, '#a39a8c');
     for (let row = 0; row < 3; row++) {
       for (let x = -15 + (row % 2) * 0.27; x < 6; ) {
@@ -486,14 +460,12 @@ export class Harbour3D {
     stone.box(-4.5, -0.13, Q + 0.07, 21, 0.12, 0.03, '#5b5850');
     for (let x = -14.6; x < 6; x += 0.9) stone.box(x, QY + 0.03, Q - 0.12, 0.87, 0.07, 0.3, '#bab1a1');
     for (let i = 0; i < 4; i++) { const h = QY - 0.11 * (i + 1); stone.box(4.75, (h - 0.3) / 2, Q + 0.14 * i + 0.07, 0.8, h + 0.3, 0.14, '#a59c8e'); }
-    // the mole of rough stones out to the lighthouse
     const m0 = V(5.9, 0, Q - 0.3), m1 = V(LIGHTHOUSE.x, 0, LIGHTHOUSE.z);
     for (let i = 0, n = Math.round(70 * (0.5 + 0.5 * d)); i < n; i++) {
       const p = m0.clone().lerp(m1, r()), s = 0.35 + r() * 0.5, side = (r() - 0.5) * 1.8;
       stone.box(p.x + side * 0.7, 0.05 + r() * 0.35, p.z + side * 0.5, s, s * 0.7, s * 0.9, pick(['#8f877b', '#9d968a', '#7e786e']), r() * 3, (r() - 0.5) * 0.4, (r() - 0.5) * 0.4);
     }
     for (let i = 0; i < 6; i++) { const p = m0.clone().lerp(m1, (i + 0.5) / 6); stone.box(p.x, 0.38, p.z, 1.3, 0.16, 1.25, '#b3aa9a', Math.atan2(m1.x - m0.x, m1.z - m0.z)); }
-    // the lighthouse: banded tower, gallery and rail, the lamp room, the cap
     const L = LIGHTHOUSE;
     stone.box(L.x, L.y + 0.2, L.z, 1.3, 0.4, 1.3, '#a29a8b');
     for (let i = 0; i < 5; i++) {
@@ -509,7 +481,6 @@ export class Harbour3D {
     stone.cyl(L.x, top + 0.62, L.z, 0.04, 0.32, 0.26, 12, '#3f3a36');
     stone.ball(L.x, top + 0.78, L.z, 0.05, 0.05, 0.05, '#3f3a36', 6);
     glow.push([V(L.x, top + 0.3, L.z), 1.7, 0]);
-    // the warehouses and the chandlery along the back of the quay, with lit windows, hoists and chimneys
     const F = Q - 2.5;
     let idx = 0;
     for (let x = -15; x < 4.6; idx++) {
@@ -528,12 +499,12 @@ export class Harbour3D {
           if (lit && r() < 0.5) glow.push([V(wx, y, F + 0.1), 0.32, r() * 6]);
         }
       }
-      if (r() < 0.5) { // a loft hoist
+      if (r() < 0.5) {
         wood.box(cx + w * 0.2, QY + h - 0.12, F + 0.25, 0.07, 0.07, 0.5, '#4a3626');
         rope.rope(V(cx + w * 0.2, QY + h - 0.12, F + 0.48), V(cx + w * 0.2, QY + 0.5, F + 0.5), 0, 0.008, '#6b5a40', 2);
       }
       if (r() < 0.6) build.box(cx + (r() - 0.5) * w * 0.6, QY + h + rh * 0.7, F - 1.1 - 0.4, 0.22, 0.6, 0.22, '#8a5a44');
-      if (idx === 3) { // the chandlery's hanging sign: a gilt anchor on oxblood
+      if (idx === 3) {
         wood.rod(V(cx + w / 2 - 0.25, QY + 1.35, F), V(cx + w / 2 - 0.25, QY + 1.35, F + 0.5), 0.015, '#2e2a27');
         build.box(cx + w / 2 - 0.25, QY + 1.13, F + 0.45, 0.5, 0.32, 0.03, '#8b3b2c');
         build.box(cx + w / 2 - 0.25, QY + 1.13, F + 0.47, 0.06, 0.2, 0.01, '#d7b45c');
@@ -541,7 +512,6 @@ export class Harbour3D {
       }
       x += w;
     }
-    // quay furniture: iron bollards, lamps, the crane, crates, barrels, rope coils, nets drying on poles
     for (let x = -14.5; x < 5.6; x += 1.45) { stone.cyl(x, QY + 0.08, Q - 0.2, 0.05, 0.065, 0.16, 8, '#3a3633'); stone.ball(x, QY + 0.17, Q - 0.2, 0.06, 0.035, 0.06, '#3a3633', 8); }
     BERTH.lampX.forEach((x, i) => {
       const z = Q - 0.4;
@@ -577,14 +547,13 @@ export class Harbour3D {
       const x = -13 + r() * 17, z = Q - 0.45 - r() * 0.5;
       for (let k = 0; k < 2; k++) rope.add(new THREE.TorusGeometry(0.11 - k * 0.02, 0.022, 5, 14), M(x, QY + 0.022 + k * 0.04, z, Math.PI / 2), '#b39a6a');
     }
-    for (const nx of [-12.6, 2.5]) { // a net hung to dry between two poles, and a heap of net below
+    for (const nx of [-12.6, 2.5]) {
       const z = Q - 1.6, a = V(nx, QY + 1.0, z), b = V(nx + 1.4, QY + 1.0, z);
       wood.rod(V(nx, QY, z), a, 0.03, '#5a4230').rod(V(nx + 1.4, QY, z), b, 0.03, '#5a4230').rod(a, b, 0.02, '#5a4230');
       for (let i = 1; i < 12; i++) { const x = nx + (i / 12) * 1.4; rope.rope(V(x, QY + 1.0, z), V(x, QY + 0.25 + 0.1 * Math.sin(i), z + 0.02), 0.04, 0.006, '#4e5a44', 3); }
       for (let j = 1; j < 5; j++) rope.rope(V(nx, QY + 1.0 - j * 0.16, z + 0.01), V(nx + 1.4, QY + 1.0 - j * 0.16, z + 0.01), 0.1, 0.006, '#4e5a44', 4);
       rope.ball(nx + 0.7, QY + 0.06, z + 0.45, 0.4, 0.09, 0.26, '#4e5a44', 8);
     }
-    // rowing boats at the steps and a skiff at its buoy before the berth
     const hull = (x: number, z: number, len: number, ry: number, tint: string): void => {
       boat.add(new THREE.CylinderGeometry(0.28, 0.28, len, 8, 1, true, Math.PI / 2, Math.PI), M(x, 0.08, z, -Math.PI / 2, ry, Math.PI / 2, 1, 1, 1), tint);
       for (const t of [-0.25, 0, 0.25]) boat.box(x + Math.cos(ry) * t * len, 0.03, z - Math.sin(ry) * t * len, 0.07, 0.025, 0.5, '#8a6a44', ry);
@@ -594,7 +563,6 @@ export class Harbour3D {
     hull(-2.7, 2.3, 1.0, -0.5, '#b8473a');
     boat.ball(-2.1, 0.02, 2.6, 0.1, 0.12, 0.1, '#c04a36', 8);
     rope.rope(V(-2.25, 0.06, 2.45), V(-2.1, 0.1, 2.6), 0.02, 0.006, '#6b5a40', 2);
-    // the far shore: two ridges and a town with its church in the dusk haze
     const ridge = (z: number, base: number, amp: number, seed: number, tint: string): void => {
       const q: [T3, T3, T3, T3][] = [];
       const hgt = (x: number) => base + amp * (0.5 + 0.3 * Math.sin(x * 0.07 + seed) + 0.2 * Math.sin(x * 0.19 + seed * 2) + 0.1 * Math.sin(x * 0.41 + seed * 3));
@@ -613,7 +581,6 @@ export class Harbour3D {
     for (const [kit, mat] of [[stone, this.mats.stone], [wood, this.mats.wood], [build, this.mats.build], [rope, this.mats.rope], [far, this.mats.far]] as const) if (!kit.empty) this.world.add(kit.mesh(mat));
     this.boats.add(boat.mesh(this.mats.wood));
     this.world.add(this.boats, this.glows(glow));
-    // the next berth's caravel, and a galleon riding in the roads beyond the mole at the finer qualities
     const next = mooredShip(this.style, 'caravel', NEIGHBOUR, 'mid');
     next.ship.position.set(BERTH.nextX, 0, Q + next.beam / 2 + 0.14);
     this.world.add(next.ship);
@@ -625,7 +592,6 @@ export class Harbour3D {
       this.world.add(roads.ship);
       this.fleet.push({ ship: roads.ship, x: 17, z: -22 });
     }
-    // gulls wheeling over the harbour
     const fly = new Kit();
     fly.ball(0, 0, 0, 0.14, 0.04, 0.045, '#ece6da', 8).ball(0.13, 0.02, 0, 0.035, 0.032, 0.032, '#ece6da', 6).box(-0.15, 0, 0, 0.08, 0.012, 0.06, '#9ea4aa');
     for (const s of [1, -1]) fly.box(0, 0.005, s * 0.21, 0.12, 0.012, 0.36, '#d8d6d0').box(-0.03, 0.005, s * 0.53, 0.09, 0.01, 0.3, '#34302c');
@@ -640,7 +606,6 @@ export class Harbour3D {
     }
   }
 
-  /** The player's ship at her berth, her mooring lines and fenders, and the dolphin her gull perches on. */
   private buildShip(form: FormName, pigments: readonly [RGB, RGB]): void {
     if (this.ship) { this.berth.remove(this.ship); free(this.ship, this.keep); }
     free(this.lines, this.keep);
@@ -653,7 +618,7 @@ export class Harbour3D {
     this.berth.position.set(x0, 0, z0);
     this.berth.add(ship);
     const wood = new Kit(), rope = new Kit();
-    for (const s of [1, -1]) { // head and stern lines to the bollards, springs, fenders
+    for (const s of [1, -1]) {
       const onShip = V(x0 + s * len * 0.42, rail, z0 - beam * 0.32), bollard = V(Math.round((x0 + s * len * 0.66 + 14.5) / 1.45) * 1.45 - 14.5, QY + 0.14, Q - 0.2);
       rope.rope(onShip, bollard, 0.12, 0.014, '#b39a6a', 8);
       rope.rope(V(x0 + s * len * 0.12, rail, z0 - beam * 0.4), V(x0 - s * len * 0.25, QY + 0.1, Q - 0.25), 0.08, 0.012, '#a08a5e', 6);
@@ -668,7 +633,6 @@ export class Harbour3D {
     this.gull.position.copy(this.perch);
   }
 
-  /** The companion gull perched, its plumage marks in the pigments of the levels its training reached. */
   private buildGull(marks: GullMarks): void {
     free(this.gull, this.keep);
     this.gull.clear();

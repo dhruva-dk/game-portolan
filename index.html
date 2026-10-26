@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>&#8203;</title>
     <style>
-      /* touch belongs to the game: no browser zoom, scroll bounce, text selection, or long-press callouts */
       html, body {
         margin: 0; height: 100%; overflow: hidden; background: #c9ae80;
         touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -17,13 +16,10 @@
     <canvas id="ink"></canvas>
     <script type="module" src="/src/main.ts"></script>
     <script>
-      // WP26 the GPU wakes while the modules load: the game's WebGL2 context is made here with the renderer's own
-      // attributes (three.js takes it over) and washed with the parchment, so the first sync GL call in the pipeline
-      // finds the GPU process already up (a cold start spent ~0.27 s waiting in it) and the screen is never black.
       try {
         const gl = document.getElementById('ink').getContext('webgl2', { alpha: false, antialias: false, depth: true, stencil: false, premultipliedAlpha: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
         if (gl) { gl.clearColor(0.79, 0.68, 0.5, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
-      } catch (e) { /* the pipeline makes its own */ }
+      } catch {}
     </script>
   </body>
 </html>

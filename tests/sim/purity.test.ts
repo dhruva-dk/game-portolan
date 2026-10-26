@@ -1,11 +1,3 @@
-// The purity rules of src/sim and src/career (progress.html, Architecture A2): they import nothing outside the
-// pure code, reach no global but an allowlist of exactly specified ones, call no transcendental Math function, and
-// use none of the constructs that differ between engines or runs (the ** operator, clocks, timers, async, Intl and
-// locale methods, for…in, Map/Set, Object.keys/values/entries, sorts without a comparator, string-formatted
-// floats). The TypeScript checker resolves every identifier, so a local named `location` or a field `.window` is
-// no violation, while the global `window` is. (Whether a sort comparator is a total order, ties broken by id, is
-// for review: no lint can see it.)
-//   node --test tests/sim/purity.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,24 +8,20 @@ import ts from 'typescript';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
-/** The pure areas, and the areas each may import from. */
 const AREAS = [
   { dir: 'src/sim', mayImport: ['src/sim'] },
   { dir: 'src/career', mayImport: ['src/sim', 'src/career'] },
 ];
 
-/** Globals whose every operation is exactly specified: same bits on every engine. */
 const GLOBALS = new Set([
   'Math', 'Number', 'Array', 'ArrayBuffer', 'DataView', 'Uint8Array', 'Int8Array', 'Uint16Array', 'Int16Array',
   'Uint32Array', 'Int32Array', 'Float32Array', 'Float64Array', 'Error', 'RangeError', 'TypeError', 'Infinity', 'NaN',
   'undefined',
 ]);
-/** Math members that IEEE 754 rounds exactly, and its constants. */
 const MATH = new Set([
   'sqrt', 'abs', 'floor', 'ceil', 'round', 'trunc', 'sign', 'min', 'max', 'imul', 'clz32', 'fround',
   'PI', 'E', 'LN2', 'LN10', 'LOG2E', 'LOG10E', 'SQRT2', 'SQRT1_2',
 ]);
-/** Methods that depend on the locale or format floats as strings, on any receiver. */
 const BANNED_MEMBERS = new Set([
   'localeCompare', 'toLocaleString', 'toLocaleLowerCase', 'toLocaleUpperCase', 'toLocaleDateString',
   'toLocaleTimeString', 'toFixed', 'toPrecision', 'toExponential', 'parseFloat',
@@ -46,8 +34,8 @@ const OPTIONS: ts.CompilerOptions = {
   allowImportingTsExtensions: true,
   noEmit: true,
   strict: true,
-  lib: ['lib.es2023.d.ts', 'lib.dom.d.ts'], // DOM globals resolve, so they can be caught
-  types: [], // and Node's do not: `process` is an unknown identifier
+  lib: ['lib.es2023.d.ts', 'lib.dom.d.ts'],
+  types: [],
 };
 
 function tsFiles(dir: string): string[] {
@@ -58,7 +46,6 @@ function tsFiles(dir: string): string[] {
   });
 }
 
-/** Every purity violation under `root`, as "file:line: what". */
 function purityViolations(root: string): string[] {
   const areas = AREAS.map((a) => ({ dir: join(root, a.dir) + sep, mayImport: a.mayImport.map((d) => join(root, d) + sep) }));
   const files = areas.flatMap((a) => tsFiles(a.dir));
@@ -139,7 +126,6 @@ test('the purity lint catches every banned construct, and only those', (t) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), lines.join('\n') + '\n');
   };
-  // Each seeded violation on its own line, with what the lint must say about it.
   const seeded: [string, string][] = [
     ["import * as THREE from 'three';", 'imports three'],
     ["import { view } from '../render/view.ts';", 'imports ../render/view.ts'],
@@ -176,7 +162,6 @@ test('the purity lint catches every banned construct, and only those', (t) => {
     ['export const ad = crypto.getRandomValues(new Uint8Array(1));', 'global crypto'],
   ];
   write('src/sim/bad.ts', seeded.map(([line]) => line));
-  // Allowed constructs that look like violations.
   write('src/sim/ok.ts', [
     "import { helper } from './helper.ts';",
     'interface Pose { location: number; window: number; sort: number[] }',
@@ -194,7 +179,7 @@ test('the purity lint catches every banned construct, and only those', (t) => {
   write('src/sim/helper.ts', ['export const helper = (x: number): number => Math.abs(x);']);
   write('src/career/ok.ts', ["import { helper } from '../sim/helper.ts';", 'export const career = helper(2);']);
   write('src/career/bad.ts', ["import { ui } from '../ui/hud.ts';", 'export const b = ui;']);
-  write('src/render/view.ts', ['export const view = Math.sin(1);']); // not pure code: never checked
+  write('src/render/view.ts', ['export const view = Math.sin(1);']);
 
   const found = purityViolations(root);
   const pow = seeded.findIndex(([line]) => line.includes('Math.pow')) + 1;

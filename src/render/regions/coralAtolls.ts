@@ -1,21 +1,3 @@
-// The Coral Atolls (WP17 part A): ring reefs round turquoise lagoons in tropical light, the Great Lagoon at their heart.
-// The terrain draws the reef flats, motus and white beaches and the sea paints the floor; this module lays the
-// clear turquoise water, the surf and the lace (sea.ts: one rule, SURF, for its shader and this plan) and this module
-// draws what lives on the reefs, every piece placed from the sim's own heights so the drawn reef is exactly the reef a
-// hull meets. On the reef flat (dry at low water, never passable):
-// a pink algal ridge of mottled pavement on the seaward edge, a rampart of storm-thrown bleached coral boulders on the
-// windward reefs, massive, branching and table corals across the flat, beachrock slabs tilted seaward along the motus'
-// shores. On the reef front (awash at low
-// water, crossed at high) corals whose tops stay under a keel at high water. On the motus: coconut groves broken by
-// clearings (three kits, sketched beyond 45 u; the crowns swept to the lee of the trade wind, those on the beach crest
-// leaning out over the sand), pandanus on stilt roots, beach scrub, bleached driftwood on the strandline. The channels
-// are found by walking each reef's crest in the sim: no reef part lies within 1.6 u of one's centre line and the surf's
-// own rule leaves it unbroken (tested across its width); every channel is staked on both sides with bare withies (the
-// Great Lagoon's all through), and a hulk
-// that missed the Great Lagoon's lies heeled on the reef flat beside its mouth.
-// Hooks: `turtles` (WP23: lagoon water and nesting beaches), `fish` (WP23: over the reef-front corals), `seabirds`
-// (WP23: palm crowns and the hulk), `voices` (WP28: the surf's places and loudness), `plan.channels`/`plan.sills`
-// (the passes, for cameras and captures).
 import * as THREE from 'three';
 import { illustratedMaterial, inkMaterial, linearVec, type Style } from '../../style/glsl.ts';
 import { mix, PIGMENTS } from '../../style/palette.ts';
@@ -31,17 +13,10 @@ import { chartDir, Draw, Kit, lift, pose, regionSeen, ring, seeded, vec, type V,
 const RI = REGIONS.findIndex((r) => r.id === 'coralAtolls');
 const REGION = REGIONS[RI];
 const TAU = 2 * Math.PI, DEG = Math.PI / 180;
-/** Sim heights (u above mean sea): below LOW a hull floats at every tide, at or above BLOCK at none, above LAND dry at
- *  high water. */
 export const LOW = -TIDE.amp - DRAFT, BLOCK = TIDE.amp - DRAFT, LAND = TIDE.amp + 0.15;
-/** Grid step (u); reef corals and pavement drawn within `near` u of the eye (in full within `drawn`, the pandanus too),
- *  palms leaflet by leaflet within `leaflets`, in full within `palms`, sketched beyond; the trade wind's lee (chart). */
 export const CORAL = { step: 1, near: 55, palms: 45, drawn: 24, leaflets: 14, lee: [-0.95, -0.3] as const } as const;
-/** Clearance (u) of reef, surf and foam from a channel's centre line. */
 export const CLEAR = 1.6;
-/** Every reef-front coral's top lies at least this far under the lowest water (u). */
 export const UNDER = -TIDE.amp - 0.12;
-/** The motus' dressing grid (u). */
 const MOTU = 0.6;
 
 const W = {
@@ -60,11 +35,9 @@ const W = {
   pole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.55), 0.4), poleFoot: washOf(mix(PIGMENTS.verdigris, PIGMENTS.leadWhite, 0.4), 0.4),
   crownLit: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.45), 0.5), crownSun: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.6),
   crownShade: washOf(mix(PIGMENTS.malachite, PIGMENTS.indigo, 0.25), 0.8),
-  // a grove seen from the sea at noon: silver-grey boles, the crowns sunlit through and their hanging fronds a cool green
   bole: washOf(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.45), 0.45), boleRing: washOf(PIGMENTS.sepia, 0.5),
   crownHang: washOf(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3), 0.55), crownNoon: washOf(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.62), 0.4),
   frondDry: washOf(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.25), 0.55),
-  // the hulk's timber, weathered silver-grey by sun and salt (lighter than the palms), a few boards warmer or greyer
   hulk: washOf(mix(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.42), PIGMENTS.ultramarine, 0.06), 0.5),
   hulkGrey: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.55), 0.5), hulkWarm: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.umber, 0.45), 0.5),
   hulkUnder: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.2), 0.55),
@@ -75,7 +48,6 @@ const hash = (x: number, y: number): number => {
   return s - Math.floor(s);
 };
 
-/** A kit in the making: facets take `wash`, or `pick` from their centre and normal when set. */
 class Brush {
   wash: Wash;
   pick: ((c: V, n: V) => Wash) | null = null;
@@ -106,31 +78,24 @@ function tube(b: Brush, path: readonly V[], radii: readonly number[], sides: num
   b.kit.loft(rings);
 }
 
-/** A three-sided spike from `a` (r wide) to `tip`. */
 function spike(b: Brush, a: V, tip: V, r: number, turn = 0): void {
   const [u, w] = frame(vec().subVectors(tip, a).normalize());
   const f = [0, 1, 2].map((j) => a.clone().addScaledVector(u, r * Math.cos(turn + (j / 3) * TAU)).addScaledVector(w, r * Math.sin(turn + (j / 3) * TAU)));
   for (let j = 0; j < 3; j++) b.tri(f[j], f[(j + 1) % 3], tip);
 }
 
-/** The triangles laid so far by a brush. */
 const laid = (b: Brush): number => (b.kit as unknown as { pos: number[] }).pos.length / 9;
-/** A crown's normals: frond facets above its heart (y > topY) turned up, lit as the arching upper face; those hanging below
- *  turned down by `hang` < 0, so the crown's underside falls into shade (or out and up by `hang` ≥ 0, lit through). */
 function crownNormals(g: THREE.BufferGeometry, [a0, a1]: [number, number], topY: number, hang = -0.6): THREE.BufferGeometry {
   const nrm = g.getAttribute('normal') as THREE.BufferAttribute, pos = g.getAttribute('position') as THREE.BufferAttribute, f = vec();
   for (let t = a0; t < a1; t++) {
     const cy = (pos.getY(3 * t) + pos.getY(3 * t + 1) + pos.getY(3 * t + 2)) / 3, up = cy > topY - 0.03;
     f.fromBufferAttribute(nrm, 3 * t);
-    if (f.y < 0 === (up || hang >= 0)) f.negate(); // (a crown lit through at noon: its hanging fronds face out and up)
+    if (f.y < 0 === (up || hang >= 0)) f.negate();
     f.multiplyScalar(up ? 0.45 : 0.7).add(vec(0, up ? 1 : hang, 0)).normalize();
     for (let v = 0; v < 3; v++) nrm.setXYZ(3 * t + v, f.x, f.y, f.z);
   }
   return g;
 }
-/** A crown's normals as a dome's round `c`, each facet's own turned to the dome's side and leaning on it by `own`, so a
- *  crown is lit and shaded as one mass of foliage (its sunward side near paper, its far side and underside a middle
- *  green) and its leaflets are not each inked as a crease (S-029). */
 function domeNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][], c: V, own = 0.3): THREE.BufferGeometry {
   const nrm = g.getAttribute('normal') as THREE.BufferAttribute, pos = g.getAttribute('position') as THREE.BufferAttribute, f = vec(), m = vec();
   for (const [a0, a1] of ranges) {
@@ -146,7 +111,6 @@ function domeNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][
   }
   return g;
 }
-/** Turn the normals of triangles [from, to) up toward the kit's +y, so foliage hangs lit as its upper face. */
 function liftNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][]): THREE.BufferGeometry {
   const nrm = g.getAttribute('normal') as THREE.BufferAttribute, f = vec();
   for (const [a0, a1] of ranges) {
@@ -160,7 +124,6 @@ function liftNormals(g: THREE.BufferGeometry, ranges: readonly [number, number][
   return g;
 }
 
-/** An open three-sided stick from `a` (r0) to `b` (r1), closed in a blunt point when `cap`. */
 function stick(br: Brush, a: V, b: V, r0: number, r1: number, cap: boolean): void {
   const [u, w] = frame(vec().subVectors(b, a).normalize());
   const at = (p: V, r: number, j: number): V => p.clone().addScaledVector(u, r * Math.cos((j / 3) * TAU)).addScaledVector(w, r * Math.sin((j / 3) * TAU));
@@ -177,26 +140,20 @@ function blob(b: Brush, c: V, r: number): void {
   for (const [i, j, k] of [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]]) b.tri(p[i], p[j], p[k]);
 }
 
-/** A coconut palm 1 tall: a ringed trunk with a swollen bole curving to +z, a crown of pinnate fronds swept to the lee
- *  (+z), fresh ones pale and upright, old ones yellowed and drooping, a dead one hanging, a cluster of nuts. */
 function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.bole), n = far ? 2 : young ? 4 : 7, bend = young ? 0.12 : 0.26 + 0.14 * rnd();
   const path: V[] = [], radii: number[] = [];
   for (let i = 0; i <= n; i++) {
     const t = i / n;
     path.push(vec(0.015 * Math.sin(t * 4 + seed), t, bend * t * t + 0.05 * t * Math.sin(t * 3 + seed)));
-    // (far off the bole drawn a little stouter, as an engraver keeps a far trunk to one firm line: S-024, a far grove read
-    // as a trunkless mop)
     radii.push((i === 0 ? 0.058 : 0.036 - 0.012 * t) * (young ? 1.5 : 1) * (far ? 1.15 : 1));
   }
-  b.pick = far ? null : (c) => (Math.floor(c.y * 26) % 3 ? W.bole : W.boleRing); // (far off no rings: they banded it)
+  b.pick = far ? null : (c) => (Math.floor(c.y * 26) % 3 ? W.bole : W.boleRing);
   tube(b, path, radii, far ? 3 : 6);
   b.pick = null;
   const top = path[n], Y = vec(0, 1, 0), count = far ? 8 : young ? 9 : 12, L = young ? 0.62 : 0.5, SEG = far ? 2 : 5, fronds = laid(b);
   for (let k = 0; k < count; k++) {
     const phi = (k / count) * TAU + 0.3 * rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi) + 0.6).normalize(), age = k % 4;
-    // (far off the fronds arch out flatter, so from height a crown is a star of fronds, from the sea a fountain, never a
-    // hanging mop)
     const droop = young ? 0.35 + 0.25 * age : far ? 0.32 + 0.16 * age : 0.45 + 0.28 * age, rise = young ? 0.55 : far ? 0.5 - 0.05 * age : 0.45 - 0.06 * age;
     const len = L * (0.85 + 0.3 * rnd()) * (age === 0 ? 0.8 : 1), side = vec().crossVectors(d, Y).normalize();
     b.wash = age === 3 && !young && k % 8 === 3 ? W.frondDry : age === 3 && k % 8 === 7 ? W.frondOld : age === 0 ? W.frondPale : W.frond;
@@ -205,9 +162,7 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
     for (let i = 1; i <= SEG; i++) {
       const s = i / SEG, p = top.clone().addScaledVector(d, len * s).addScaledVector(Y, len * (rise * s - droop * s * s));
       const w = len * (far ? 0.27 : 0.2) * (1 - 0.55 * s) * (i === 1 ? 0.6 : 1), mid = prev.clone().lerp(p, 0.5);
-      // the crown lit where it arches above its heart, shadowed where it hangs below
       if (!kept) b.wash = mid.y > top.y - 0.03 ? (far ? W.crownSun : age === 0 ? W.crownNoon : W.crownLit) : W.crownHang;
-      // (far off the blades lie flatter, lit as a crown is seen from afar, not a dark fringe)
       const hang = vec(0, far ? -len * 0.02 : -len * 0.09, 0).addScaledVector(d, len * 0.05), low = vec(0, -len * 0.03, 0).add(hang);
       b.tri(prev, p, mid.clone().addScaledVector(side, w).add(hang));
       b.tri(p, prev, mid.clone().addScaledVector(side, -w).add(hang));
@@ -222,17 +177,9 @@ function palmKit(seed: number, young: boolean, far = false): THREE.BufferGeometr
   return crownNormals(b.kit.build(), lit, top.y, 0.35);
 }
 
-/** A coconut palm 1 tall drawn as an engraver draws one from life (S-029: the near crowns read as mops of hanging needle
- *  strips under spiky cones): a slender trunk swollen at the bole, ringed with leaf scars, curving and leaning to +z; a
- *  crown of pinnate fronds radiating from its top, the youngest erect, the middle arching out, the oldest drooping past
- *  the crown, each a midrib curving out and down with a comb of leaflets on both sides, apart so the sky shows between
- *  them and shorter toward the tip; a cluster of green and golden nuts under the crown; a dead frond or two hanging
- *  brown against the trunk. `fine` near the eye (more leaflets, each tapered at both ends), plainer from 14 u. The
- *  crown's normals are a dome's, so it is lit and shaded as one mass of foliage, not as a heap of facets. */
 function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.bole), Y = vec(0, 1, 0), bend = young ? 0.1 : 0.22 + 0.14 * rnd();
   const at = (t: number): V => vec(0.015 * Math.sin(t * 4 + seed), t, bend * t * t + 0.05 * t * Math.sin(t * 3 + seed));
-  // the trunk: a ring of leaf scars, a little proud and darker, every 1/R of its height; swollen at the bole
   const R = fine ? 16 : 8, scar = 0.22, path: V[] = [], radii: number[] = [];
   const girth = (t: number): number => (0.031 - 0.008 * t + 0.03 * Math.exp(-t * 22)) * (young ? 1.35 : 1);
   for (let j = 0; j <= R; j++) {
@@ -250,7 +197,6 @@ function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeo
   const top = at(1), crown: [number, number][] = [], from0 = laid(b);
   const count = fine ? (young ? 16 : 22) : young ? 11 : 15, L = young ? 0.6 : 0.46, per = fine ? 16 : 10, SEG = fine ? 8 : 5;
   const frond = (d: V, len: number, el0: number, arc: number, fold: number, sag: number, tone: (h: number) => Wash, dead: boolean): void => {
-    // the midrib, a thin rod curving out and down
     const side = vec().crossVectors(d, Y).normalize(), pts: V[] = [top.clone()], tans: V[] = [];
     for (let i = 0; i <= SEG; i++) {
       const el = el0 - arc * Math.pow(i / SEG, 1.4);
@@ -259,7 +205,6 @@ function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeo
     }
     b.wash = dead ? W.frondDead : W.rachis;
     for (let i = 0; i < SEG; i++) stick(b, pts[i], pts[i + 1], 0.0075 * (1 - 0.6 * (i / SEG)), 0.0075 * (1 - 0.6 * ((i + 1) / SEG)), false);
-    // the leaflets, a comb on both sides, angled toward the tip, folded down off the frond's face and sagging at the tip
     for (let j = 0; j < per; j++) {
       const s = 0.1 + (0.88 * (j + 0.5)) / per, f = s * SEG, i = Math.min(SEG - 1, Math.floor(f)), u = f - i;
       const base = pts[i].clone().lerp(pts[i + 1], u), t = tans[i].clone().lerp(tans[i + 1], u).normalize();
@@ -281,8 +226,6 @@ function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeo
     }
   };
   for (let k = 0; k < count; k++) {
-    // 0 the youngest, standing up from the heart, to 1 the oldest, drooping past the crown; round a golden-angle spiral
-    // swept a little to the lee, so the crown is open and uneven, never a cone or a mop
     const a = k / (count - 1), phi = k * 2.39996 + 0.35 * rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi) + 0.35).normalize();
     const len = L * (0.82 + 0.3 * rnd()) * (a < 0.08 ? 0.7 : 1), el0 = (young ? 72 : 66) * DEG - a * (young ? 66 : 76) * DEG;
     const arc = (18 + 72 * a) * DEG * (0.85 + 0.3 * rnd()), fold = (a < 0.1 ? 8 : -(18 + 34 * a)) * DEG, sag = 0.1 + 0.3 * a;
@@ -290,13 +233,11 @@ function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeo
     frond(d, len, el0, arc, fold, sag, (h) => (dry ? W.frondDry : a < 0.12 ? W.crownNoon : h > 0.02 ? (k % 3 ? W.crownLit : W.crownNoon) : h > -0.3 ? (k % 2 ? W.crownSun : W.crownLit) : W.crownHang), false);
   }
   for (let k = 0; k < (young ? 0 : 2); k++) {
-    // a dead frond or two, hanging brown down the trunk, its leaflets folded close
     const phi = 1.3 + 3.1 * k + rnd(), d = vec(Math.sin(phi), 0, Math.cos(phi)).normalize();
     frond(d, L * (0.6 + 0.2 * rnd()), -60 * DEG, 25 * DEG, -70 * DEG, 0.1, () => W.frondDead, true);
   }
   crown.push([from0, laid(b)]);
   for (let k = 0; k < (young ? 2 : 7); k++) {
-    // the nuts, a cluster of green and golden under the crown
     const q = k * 2.4 + 0.4, r = (k < 4 ? 0.045 : 0.07) * (young ? 0.8 : 1), c = top.clone().add(vec(r * Math.cos(q), -0.045 - 0.02 * (k % 3), r * Math.sin(q)));
     b.wash = k % 3 === 1 ? W.nut : W.nutGreen;
     b.kit.loft([-0.8, -0.35, 0.3, 0.8].map((y, i) => ring(6, 0.032 * y, () => 0.032 * [0.35, 0.95, 0.95, 0.35][i]).map((p) => p.add(c))));
@@ -304,9 +245,6 @@ function palmNearKit(seed: number, young: boolean, fine = true): THREE.BufferGeo
   return domeNormals(b.kit.build(), crown, top.clone().add(vec(0, 0.03, 0)));
 }
 
-/** A pandanus ~0.9 tall drawn close: a leaning trunk ringed with scars on a cone of curved stilt roots, three limbs
- *  each crowned by a spiral tuft of long keeled strap leaves arching and drooping, one hung with its great segmented
- *  fruit, orange-red. */
 function pandanusNearKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.trunk), Y = vec(0, 1, 0), foot = vec(0, 0.24, 0.04), fork = vec(0.02, 0.58, 0.12);
   b.pick = (c) => (Math.floor(c.y * 40) % 3 === 0 ? W.scar : W.trunk);
@@ -349,8 +287,6 @@ function pandanusNearKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A pandanus ~0.85 tall: a leaning trunk on splayed stilt roots, three limbs each crowned by a spiral tuft of strap
- *  leaves, one bearing its orange fruit. */
 function pandanusKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.trunk), Y = vec(0, 1, 0), foot = vec(0, 0.2, 0.04), fork = vec(0.02, 0.55, 0.12);
   tube(b, [foot, vec(0.01, 0.38, 0.08), fork], [0.04, 0.034, 0.03], 5);
@@ -379,9 +315,6 @@ function pandanusKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** Beach scrub (naupaka, beach heliotrope) ~1 across: a cloud of leafy lobes, each rounded and lumpy, its surface
- *  bristling with fleshy leaves fanned out in rosettes so its outline is ragged foliage, never a faceted mound; lit on
- *  top, dark at its skirt. */
 function shrubKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), k = 11, b = new Brush(W.shrub);
   b.pick = (c, n) => (n.y > 0.6 ? W.shrubLit : c.y < 0.1 ? W.shade : W.shrub);
@@ -391,7 +324,6 @@ function shrubKit(seed: number): THREE.BufferGeometry {
     b.kit.loft([0, 0.3, 0.6, 0.85, 1].map((y, i) => ring(k, y * h, (j) => [1, 1.02, 0.86, 0.56, 0.16][i] * r * jit[i * k + j]).map((p) => p.add(vec(cx, 0, cz)))));
   }
   const lobed = laid(b);
-  // the leaves: rosettes of short fleshy blades over every lobe, pointing out and up from its surface
   for (const [cx, cz, r, h] of lobes) {
     for (let i = 0; i < 12; i++) {
       const a = rnd() * TAU, e = 0.15 + 0.8 * rnd(), out = vec(Math.cos(a) * Math.cos(e * 1.4), Math.sin(e * 1.4), Math.sin(a) * Math.cos(e * 1.4));
@@ -403,8 +335,6 @@ function shrubKit(seed: number): THREE.BufferGeometry {
   return liftNormals(smooth(b.kit.build()), [[lobed, end]]);
 }
 
-/** Smooth a kit's normals where facets meet at a point, so a rounded form reads round: no facet steps, no polygon
- *  outline inked across it. */
 function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const pos = g.getAttribute('position') as THREE.BufferAttribute, nrm = g.getAttribute('normal') as THREE.BufferAttribute;
   const acc = new Map<string, V>(), f = vec(), key = (i: number): string => `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
@@ -421,14 +351,11 @@ function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return g;
 }
 
-/** The reef flat's dead stone: bleached rubble, cream and grey, weathered grey limestone, a cool shade beneath. */
 const C = {
   shade: washOf(mix(PIGMENTS.sepia, PIGMENTS.ultramarine, 0.3), 0.45),
   rubble: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.15), 0.62), grey: washOf(mix(PIGMENTS.leadWhite, PIGMENTS.sepia, 0.3), 0.5),
 };
 
-/** A reef-flat paving slab or beachrock slab 1 across: a thin worn limestone plate bedded in the sand, its ragged edge
- *  barely proud of it, pale and smooth on top with grey pits and a weathered grey rim. */
 function slabKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), k = 12, jit = Array.from({ length: k }, (_, j) => 0.72 + 0.16 * Math.sin(j * 2.3 + seed) + 0.16 * rnd()), b = new Brush(C.rubble);
   b.pick = (c, n) => (n.y < 0.35 ? C.shade : Math.hypot(c.x, c.z) > 0.38 || hash(Math.floor(c.x * 9) + seed, Math.floor(c.z * 9)) > 0.86 ? C.grey : C.rubble);
@@ -436,8 +363,6 @@ function slabKit(seed: number): THREE.BufferGeometry {
   return smooth(b.kit.build());
 }
 
-/** Storm-thrown coral rubble 1 across: a heap of bleached stones and broken branch, cream where lit, grey where
- *  weathered, cool beneath. */
 function boulderKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(C.rubble), k = 8;
   b.pick = (c, n) => (n.y < 0.05 ? C.shade : n.y < 0.5 && hash(Math.floor(c.x * 12) + seed, Math.floor(c.z * 12)) > 0.5 ? C.grey : C.rubble);
@@ -449,7 +374,6 @@ function boulderKit(seed: number): THREE.BufferGeometry {
   return smooth(b.kit.build());
 }
 
-/** A bleached driftwood log 1 long on x with its root stubs. */
 function driftKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.drift);
   b.pick = (_c, n) => (n.y > 0.3 ? W.drift : W.driftDark);
@@ -458,9 +382,6 @@ function driftKit(seed: number): THREE.BufferGeometry {
   return b.kit.build();
 }
 
-/** A channel withy 2 tall: a slender driven pole weathered silver-grey, its foot green where the tide washes it, under
- *  a small broom topmark (a bundle of twigs bound on and fanning a little upward), drawn in fine light ink so it reads
- *  as a mark yet never outweighs the lighthouse or the palms (S-024: splayed burnt tips read as pitchforks). */
 function stakeKit(): THREE.BufferGeometry {
   const b = new Brush(W.pole);
   b.pick = (c) => (c.y < 0.3 ? W.poleFoot : W.pole);
@@ -470,14 +391,11 @@ function stakeKit(): THREE.BufferGeometry {
     const a = k * 2.4, r = 0.035 + 0.035 * (((k * 7) % 3) / 2);
     spike(b, vec(0.02, 1.4, 0), vec(0.02 + r * Math.cos(a), 1.78 + 0.1 * (((k * 5) % 3) / 2), r * Math.sin(a)), 0.012, k);
   }
-  blob(b, vec(0.02, 1.43, 0), 0.022); // the binding
+  blob(b, vec(0.02, 1.43, 0), 0.022);
   return b.kit.build();
 }
 
-/** The hulk's waterline, from the height above the water (hw) and above mean sea (hm): stained a little below the
- *  neaps' high water, a dark wet band above the water, weed hanging at it and green below, and a broken lace of foam
- *  where the water works at the timbers. */
-const WRECK = /* glsl */ `
+const WRECK =  `
   float hm = length(vWorld) - ${R.toFixed(1)}, hw = hm - uSeaLevel;
   float rag = 0.035 * sin(dot(vAnchor, vec3(9.1, 3.7, 6.3))) + 0.025 * sin(dot(vAnchor, vec3(23.0, 11.0, 17.0)));
   float lump = sin(dot(vAnchor, vec3(5.3, 2.1, 4.7))) * sin(dot(vAnchor, vec3(-3.1, 6.7, 8.9)));
@@ -489,12 +407,7 @@ const WRECK = /* glsl */ `
   tone = min(tone, 0.55) * (1.0 - lace);
 `;
 
-/** A timber's grain for its hatching: the triangles it laid [from, to) and, per ring, its centre, its frame (along,
- *  across, depth) and its length so far. */
 interface Grain { from: number; to: number; c: V[]; t: V[]; s: V[]; d: V[]; arc: number[] }
-/** A squared timber along `path`, its half-width `sw` along `side` (kept square to the path; per point, or one for all)
- *  and its half-depth `sd` across, tapering by `taper` toward its end; `snap` breaks its end off on a slant with one
- *  corner splintered proud (`snap0` its start). Its grain is pushed to `grains`. */
 function timber(b: Brush, grains: Grain[], path: readonly V[], side: V | readonly V[], sw: number | readonly number[], sd: number, taper: number, snap: number, snap0 = 0): void {
   const n = path.length, rings: V[][] = [], g: Grain = { from: laid(b), to: 0, c: [], t: [], s: [], d: [], arc: [] };
   for (let i = 0; i < n; i++) {
@@ -510,7 +423,6 @@ function timber(b: Brush, grains: Grain[], path: readonly V[], side: V | readonl
   g.to = laid(b);
   grains.push(g);
 }
-/** A built kit's uv from its timbers' grain: u along each timber, v across it (skewed, so it varies on every face). */
 function grained(g: THREE.BufferGeometry, grains: readonly Grain[]): THREE.BufferGeometry {
   const pos = g.getAttribute('position') as THREE.BufferAttribute, uv = new Float32Array(2 * pos.count), p = vec(), o = vec();
   for (const gr of grains) {
@@ -527,19 +439,11 @@ function grained(g: THREE.BufferGeometry, grains: readonly Grain[]): THREE.Buffe
   return g;
 }
 
-/** A hulk 1 long on x (bow +x), broken on the reef and drawn from life: a canted keel, the stem post curving up at the bow
- *  and the sternpost raked at the stern, both standing; frames in pairs, squared and tapering, curving up from the keel
- *  and broken off at ragged heights; the low side (+z, heeled down by its placement toward a ship in the lagoon) keeping
- *  a few ragged strakes, the high side open to its ribs. Silver-grey timber, a cooler grey beneath; its wet band, weed
- *  and lace of foam are the wreck material's, from the water's height. Every timber carries its grain as uv, so its
- *  hatching runs along it (S-027: flat ribbons hatched across read as a crate or a picket fence). */
 function hulkKit(seed: number): THREE.BufferGeometry {
   const rnd = seeded(seed), b = new Brush(W.hulk), grains: Grain[] = [], ST = 10, DEPTH = 0.34;
   let tint = W.hulk;
   b.pick = (_c, n) => (n.y < -0.55 ? W.hulkUnder : tint);
   const tints = [W.hulk, W.hulk, W.hulkGrey, W.hulkWarm];
-  // the hull's surface: x along it, u from the keel (0) to the gunwale (1), sd the side; the keel rises toward the bow,
-  // the gunwale sheers up at both ends and the stern half sags where the back broke
   const beam = (x: number): number => 0.165 * Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(x) / 0.5, 2.4)));
   const at = (x: number, u: number, sd: number): V => {
     const z = sd * beam(x) * Math.sin(Math.min(1.2 * u, 1) * Math.PI * 0.5) * (1 - 0.06 * Math.max(0, u - 0.8) / 0.2);
@@ -551,15 +455,12 @@ function hulkKit(seed: number): THREE.BufferGeometry {
     const n = vec().crossVectors(a, c).normalize();
     return n.dot(vec(0, -0.6, sd)) < 0 ? n.negate() : n;
   };
-  // the keel, a little below the garboards, and the posts standing from its ends
   const keel = [-0.5, -0.33, -0.16, 0, 0.16, 0.33, 0.49].map((x) => at(x, 0, 1).setZ(0).add(vec(0, -0.02, 0)));
   timber(b, grains, keel, vec(0, 0, 1), 0.016, 0.024, 0, 0);
   const bow = keel[keel.length - 1], stern = keel[0];
   tint = W.hulkGrey;
   timber(b, grains, [0, 0.09, 0.22, 0.36, 0.47].map((y, i) => bow.clone().add(vec([0, 0.05, 0.088, 0.105, 0.11][i], y, 0))), vec(0, 0, 1), 0.01, 0.014, 0.3, 0.02);
   timber(b, grains, [0, 0.11, 0.21, 0.28].map((y, i) => stern.clone().add(vec([0, -0.03, -0.062, -0.08][i], y, 0))), vec(0, 0, 1), 0.01, 0.014, 0.25, 0.018);
-  // frames in pairs from the keel, broken off: the high side's (−z) standing tall and open, every third broken low; the
-  // low side's (+z) behind its strakes; shorter toward the ends where the hull narrows; one of each pair the shorter
   for (let i = 0; i < ST; i++) {
     const x = -0.42 + (0.84 * i) / (ST - 1), end = Math.abs(x) > 0.3 ? 0.8 : 1;
     for (const sd of [-1, 1]) {
@@ -572,8 +473,6 @@ function hulkKit(seed: number): THREE.BufferGeometry {
       }
     }
   }
-  // strakes: boards on the frames' outer faces, ragged where they broke; the low side keeps its garboards and a few
-  // above, gapped; the high side only a garboard and a stub
   const plank = (sd: number, u0: number, u1: number, x0: number, x1: number): void => {
     tint = tints[Math.floor(rnd() * tints.length)];
     const segs = Math.max(2, Math.ceil((x1 - x0) / 0.045)), path: V[] = [], side: V[] = [], sw: number[] = [];
@@ -600,14 +499,6 @@ function hulkKit(seed: number): THREE.BufferGeometry {
   return grained(b.kit.build(), grains);
 }
 
-/** A placed part: its matrix, foot point and direction, foot and drawn-ground heights, the sim's height there, and its
- *  top's height. */
-/** The break's white water standing off the reef, 1 long (x −½…½) and 1 high, faced seaward (+z): a sheet bellied
- *  toward the sea and its top falling back over the reef. */
-// The white water as a low bore lying along the reef: a grid along it (x) and across it (aU: 0 its front foot under
-// the water, 0.3 the crest, 1 its spent tail on the reef; past 1 the spray flung off the crest). The vertex shader lays
-// its section (BORE) as each set rears, spills and slumps; the rest shape here keeps the bounds. All within the kit's
-// unit box (x and z in ±0.5), so a part's footprint is its scale. `spray` adds the spray's rows (near the eye only).
 function spillKit(nx: number, nu: number, spray: boolean): THREE.BufferGeometry {
   const pos: number[] = [], us: number[] = [], rows = nu + (spray ? 2 : 0);
   const at = (i: number, j: number): void => {
@@ -617,7 +508,7 @@ function spillKit(nx: number, nu: number, spray: boolean): THREE.BufferGeometry 
     us.push(u);
   };
   for (let j = 0; j < rows; j++) {
-    if (spray && j === nu) continue; // the spray stands free of the tail
+    if (spray && j === nu) continue;
     for (let i = 0; i < nx; i++) for (const [a, b] of [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]) at(a, b);
   }
   const g = new THREE.BufferGeometry();
@@ -626,7 +517,7 @@ function spillKit(nx: number, nu: number, spray: boolean): THREE.BufferGeometry 
   return g;
 }
 
-const BORE = /* glsl */ `
+const BORE =  `
 float h3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float n3(vec3 p) {
   vec3 i = floor(p), f = fract(p);
@@ -635,16 +526,13 @@ float n3(vec3 p) {
              mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }`;
 
-const SPILL_VERT = /* glsl */ `
+const SPILL_VERT =  `
 uniform float uSeaLevel, uTime;
 in float aU;
 varying vec3 vWorld, vN;
-varying vec2 vAt; // u along the bore (offset per part) and up from the water
+varying vec2 vAt;
 varying float vU, vPhase, vDist, vSeed, vEnd, vH;
 ${BORE}
-// the bore's section at u, the crest at zc and its height h (kit units: z seaward, y up): a rounded front rolling down
-// to its foot under the water, the white water behind it sloping away over the reef to a thin spent tail; past u = 1
-// the spray, flung up and back off the crest
 vec2 section(float u, float zc, float h) {
   if (u < 0.3) { float a = u / 0.3 * 1.5707963; return vec2(zc + 0.17 * cos(a), h * (-0.25 + 1.25 * sin(a))); }
   if (u > 1.0) { float s = u - 1.0; return vec2(zc - 0.12 - 0.5 * s, h * (1.0 + 1.6 * s)); }
@@ -653,8 +541,6 @@ vec2 section(float u, float zc, float h) {
 }
 vec3 shape(float x, float u, vec3 o, mat3 B, float ph, float set) {
   float rise = smoothstep(0.0, 0.14, ph), slump = smoothstep(0.16, 0.8, ph);
-  // the crest rolls in over the reef as it spills; the line is lumpy along its length (the rolls of foam, the same
-  // across neighbouring parts), its ends sink into the neighbours'
   float zc = mix(0.3, 0.02, slump);
   float lumps = n3((o + B * vec3(x, 0.0, 0.0)) * 2.2 + vec3(set * 3.1));
   float h = mix(0.6, 1.0, rise) * mix(1.0, 0.5, slump) * (0.75 + 0.5 * lumps) * sqrt(1.0 - smoothstep(0.28, 0.5, abs(x)));
@@ -667,7 +553,6 @@ void main() {
   mat4 M = modelMatrix * instanceMatrix;
   vec3 o = (M * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   vSeed = fract(sin(dot(floor(o * 4.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-  // the sets peel along the reef (a slow drift of phase with place), each part a little apart from its neighbours
   vPhase = uTime / 7.5 + dot(o, vec3(0.031, 0.047, 0.023)) + 0.06 * vSeed;
   float ph = fract(vPhase), set = floor(vPhase);
   mat3 B = mat3(M);
@@ -684,15 +569,13 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;
 
-const SPILL_FRAG = /* glsl */ `
+const SPILL_FRAG =  `
 uniform vec3 uFoam, uFace;
 varying vec3 vWorld, vN;
 varying vec2 vAt;
 varying float vU, vPhase, vDist, vSeed, vEnd, vH;
 ${BORE}
 void main() {
-  // a set: the crest rears green and spills (phase 0–0.14), the white water tumbles in over the reef and slumps (to
-  // 0.8), then lies low and lacy until the next
   float ph = fract(vPhase), set = floor(vPhase), rise = smoothstep(0.0, 0.14, ph), slump = smoothstep(0.16, 0.8, ph);
   float u = vU, y = vAt.y, x = vAt.x;
   vec3 n = normalize(vN), v = normalize(cameraPosition - vWorld);
@@ -701,15 +584,10 @@ void main() {
   vec3 col;
   Paper q = paperPlain(vWorld, n);
   if (u > 1.0) {
-    // spray: flecks flung off the spilling crest and carried back over it by the wind, gone as it slumps
     float s = (u - 1.0) / 0.5, fl = n3(vWorld * vec3(13.0, 6.0, 13.0) + vec3(0.0, -2.5 * uTime, set));
     a = smoothstep(0.74, 0.8, fl) * (1.0 - s) * rise * (1.0 - smoothstep(0.1, 0.45, ph)) * 0.85;
     col = mix(parchment(q), uFoam, 0.7);
   } else {
-    // the break as an engraver draws it: a pen line along the roll's top, curling over at the lip, broken along its
-    // length; the paper left white for the foam under it, opening behind into lace (threads and holes, thinner as it
-    // slumps); ahead of it the face's thin green glaze hatched along its fall. Never a body of paint: the white is the
-    // paper's, laid thin, and the water shows through every part of it
     float along = vAt.x, lumpy = n3(vWorld * 9.0 + vec3(set));
     float streak = n3(vec3(along * 1.1, u * 7.0 + y * 5.0, set * 5.3 + vSeed)) + 0.45 * n3(vec3(along * 3.7, u * 19.0 + y * 13.0, set));
     float lace = n3(vWorld * 6.0 + vec3(0.3 * uTime, set, 0.0)) + 0.35 * n3(vWorld * 15.0 + vec3(set));
@@ -719,7 +597,6 @@ void main() {
     float white = smoothstep(1.32 - dense - 0.05, 1.32 - dense + 0.05, 0.55 * streak + 0.45 * lace + 0.2 * crest);
     float face = (1.0 - rise * 0.7) * (1.0 - slump) * (1.0 - smoothstep(0.12, 0.3, u)) * smoothstep(-0.1, 0.05, y);
     float ragged = smoothstep(0.0, 0.3, nv + 0.35 * (lumpy - 0.5)) * (1.0 - smoothstep(0.3, 0.5, abs(vEnd) + 0.12 * (lumpy - 0.5)));
-    // the pen: the crest line along the roll's top and the lip's curl under it, each broken now and then
     float fu = max(fwidth(u), 1e-4);
     float top = (1.0 - smoothstep(0.5, 1.3, abs(u - 0.3 - 0.04 * (lumpy - 0.5)) / fu)) * step(0.3, n3(vec3(along * 1.6, set * 2.3, vSeed * 5.0)));
     float lip = (1.0 - smoothstep(0.4, 1.1, abs(u - 0.13 - 0.05 * lumpy) / fu)) * step(0.48, n3(vec3(along * 3.1 + 4.0, set, vSeed * 3.0)));
@@ -739,24 +616,17 @@ void main() {
 }`;
 
 export interface Part { m: THREE.Matrix4; at: V; dir: V; base: number; ground: number; sim: number; top: number }
-/** A pass through a reef ring (bearing in degrees from chart east, width u at the crest) and its centre line (outside
- *  in, 1 u apart). */
 export interface Channel { reef: number; great: boolean; bearing: number; width: number; crest: { x: number; y: number }; centre: { x: number; y: number }; line: V[] }
 export interface CoralPlan {
   palms: Part[][]; pandanus: Part[]; shrubs: Part[]; heads: Part[]; branches: Part[]; tables: Part[]; slabs: Part[];
   boulders: Part[]; drift: Part[]; stakes: Part[]; hulks: Part[];
-  /** Where the surf breaks at mean tide (SURF's rule, 1 u apart). */
   surf: V[];
-  /** The break standing up off the water near the eye: spilling white water along each exposed reef front (SURF's rule,
-   *  ~0.9 u apart, faced seaward). */
   spill: Part[];
-  /** Passes open at every tide; sills a hull clears only at high water. */
   channels: Channel[]; sills: Channel[];
   turtles: { swim: V[]; nest: V[] }; fish: V[]; seabirds: V[]; voices: { at: V; loud: number }[];
 }
 
 const surfaceOut = (): Surface => ({ height: 0, normal: vec(), up: 1, ground: GROUND.beach as Ground, region: RI });
-/** The drawn ground's height at `dir` (what every part is seated on). */
 export const groundAt = (field: TerrainField, dir: V): number => field.surface(dir, -10, surfaceOut()).height;
 
 export function planCoral(field: TerrainField): CoralPlan {
@@ -776,13 +646,10 @@ export function planCoral(field: TerrainField): CoralPlan {
     list.push(p);
     return p;
   };
-  // the passes: walk each ring's crest in the sim; a run of bearings a hull clears at low water is a channel, one it
-  // clears only at high water a sill
   REGION.strokes.forEach((s, si) => {
     if (s.k !== 'reef') return;
     const crest: number[] = [], rad: number[] = [];
     for (let b = 0; b < 360; b++) {
-      // only the ring's own band (its rim ± its flat's width), so a patch reef beyond the mouth is not taken for its crest
       const c = Math.cos(b * DEG), sn = Math.sin(b * DEG), rim = rimAt(s.rim, 90 - b), r0 = rim.r - rim.w - 3, r1 = rim.r + rim.w + 3;
       let best = -Infinity, br = r0;
       for (let rr = r0; rr <= r1; rr += 0.5) {
@@ -790,7 +657,6 @@ export function planCoral(field: TerrainField): CoralPlan {
         if (h > best) { best = h; br = rr; }
       }
       crest.push(best);
-      // in a deep pass the band's highest point is the lagoon floor or the sea beyond: its crest lies on the rim
       rad.push(best < LOW ? rim.r : br);
     }
     const kinds: [(h: number) => boolean, Channel[], number][] = [[(h) => h < LOW, plan.channels, 2], [(h) => h >= LOW && h < BLOCK, plan.sills, 3]];
@@ -813,7 +679,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       }
     }
   });
-  // nothing of the reef within `CLEAR` u of a channel's centre line
   const lines = plan.channels.map((c) => {
     const rc = Math.hypot(c.crest.x - c.centre.x, c.crest.y - c.centre.y), ux = (c.crest.x - c.centre.x) / rc, uy = (c.crest.y - c.centre.y) / rc;
     const inner = Math.min(8, 0.45 * rc);
@@ -836,18 +701,14 @@ export function planCoral(field: TerrainField): CoralPlan {
       const ox = gl > 1e-4 ? -gx / gl : 1, oy = gl > 1e-4 ? -gy / gl : 0;
       const seaward = sim(px + 6 * ox, py + 6 * oy) < -6, out = tan(px, py, ox, oy), east = tan(px, py, 1, 0);
       const windward = -(ox * lee[0] + oy * lee[1]) > 0.3, yaw = rnd() * TAU;
-      if (h > LAND) continue; // the motus are dressed below, on a finer grid
-      // the reef: a hull grounds here at low water at least (and no part reaching within CLEAR of a channel's line)
+      if (h > LAND) continue;
       if (open(px, py, CLEAR + 0.9)) continue;
       if (h >= BLOCK) {
         if (Math.abs(coastAt(geo, dir)) < 1.2 && h > 0.1 && r > 0.8) place(plan.slabs, px, py, { sink: 0.03, fwd: out, tilt: 0.1, s: 0.4 + 0.35 * rnd(), hug: true, kitH: 0.06 });
         else if (seaward && r < 0.35) place(plan.slabs, px, py, { sink: 0.03, fwd: east, yaw, s: 0.3 + 0.3 * rnd(), hug: true, kitH: 0.06 });
         else if (seaward && windward && r < 0.6) place(plan.boulders, px, py, { sink: 0.1, fwd: east, yaw, tilt: 0.3 * (rnd() - 0.5), s: 0.22 + 0.2 * rnd(), kitH: 0.42 });
-        // no living coral on the flat: it would stand at the waterline; dead rubble, bedded, a hand to a forearm across
         else if (r < 0.78) place(plan.boulders, px, py, { sink: 0.06, fwd: east, yaw, tilt: 0.2 * (rnd() - 0.5), s: 0.14 + 0.16 * rnd(), sy: 0.6 * (0.14 + 0.16 * rnd()), kitH: 0.42 });
       } else if (r < 0.5) {
-        // the reef front: corals whose tops stay under the lowest water, so the sea paints them on its floor, seen through
-        // the water and tinted by its depth (sea.ts); never drawn standing at or above the waterline
         const k = rnd(), kind: [Part[], number, number] = k < 0.4 ? [plan.heads, 0.46, 0.08] : k < 0.75 ? [plan.branches, 0.45, 0.05] : [plan.tables, 0.36, 0.04];
         const s = Math.min(0.7 + 0.9 * rnd(), (UNDER - (ground - kind[2])) / kind[1]);
         if (s >= 0.2) {
@@ -857,8 +718,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       }
     }
   }
-  // the motus, dressed on a finer grid: coconut groves broken by clearings (those on the beach crest leaning out over the
-  // sand), pandanus inland, scrub beneath, drift and turtles' nests along the strand
   const lr = seeded(718);
   for (let y = -66; y <= 66; y += MOTU) {
     for (let x = -66; x <= 66; x += MOTU) {
@@ -870,8 +729,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       const ox = gl > 1e-4 ? -gx / gl : 1, oy = gl > 1e-4 ? -gy / gl : 0;
       const inland = -coastAt(geo, dir), leeFwd = tan(px, py, lee[0], lee[1]);
       const grove = 0.5 + 0.5 * Math.sin(0.8 * px + 2 * Math.sin(0.5 * py)) * Math.cos(0.6 * py - 1.7 * Math.sin(0.4 * px));
-      // (a motu only a few paces across is still palm-capped: its palms stand on its crest, leaning out over the water,
-      // so a far motu is never a bare sand sliver, S-021)
       if (inland < 0.5 && !(inland >= 0.18 && sim(px, py) > LAND + 0.12 && r < 0.55)) {
         if (r < 0.1) place(plan.drift, px, py, { sink: 0.02, fwd: tan(px, py, -oy, ox), yaw: 0.6 * (lr() - 0.5), s: 0.8 + lr(), hug: true, kitH: 0.08 });
         else if (r > 0.93) plan.turtles.nest.push(dir);
@@ -888,10 +745,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       else if (q < 0.5) place(plan.shrubs, px, py, { sink: 0.06, fwd: leeFwd, yaw: lr() * TAU, s: 0.7 + 0.8 * lr(), sy: 0.6 + 0.5 * lr(), kitH: 0.46 });
     }
   }
-  // withies on the reef edge both sides of every channel (the Great Lagoon's staked all through), and the hulk that
-  // missed the Great Lagoon's, heeled on the reef flat beside its mouth: each found by walking across the channel from
-  // its centre line, round the ring at the same distance from its centre (so the walk follows the arms as they curve
-  // away), until the reef stops a keel at any tide
   for (const c of plan.channels) {
     const rc = Math.hypot(c.crest.x - c.centre.x, c.crest.y - c.centre.y), ux = (c.crest.x - c.centre.x) / rc, uy = (c.crest.y - c.centre.y) / rc;
     const across = (d: number, sd: number, beyond: number, edge: number): { x: number; y: number } | null => {
@@ -907,8 +760,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       }
       return null;
     };
-    // the withies stand where a keel strikes at mean tide, through the mouth (outside the crest) and in, both sides,
-    // tall enough to stand well clear of high water
     for (const d of c.great ? [7, 3, -1, -5].filter((d) => d >= -Math.min(8, 0.45 * rc)) : [1.5, -1]) {
       for (const sd of [-1, 1]) {
         const e = across(d, sd, 0.4, -DRAFT);
@@ -917,17 +768,12 @@ export function planCoral(field: TerrainField): CoralPlan {
         place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.08 * (rnd() - 0.5), s: sc, sy, kitH: 2 });
       }
     }
-    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, its quarter to a ship coming in
-    // (S-027: seen broadside its frames stood edge-on as a picket fence; from the quarter they curve), sunk to its bilge:
-    // on the arm clockwise of the mouth (seen from inside, the right hand looking out), so a ship in the lagoon before
-    // the pass sees it whole beside the channel (S-024: on the other arm it stood cut at the iPad hero's edge)
     const e = c.great ? across(0, -1, 0.5, BLOCK) : null;
     if (e && !open(e.x, e.y, 2.5)) {
       const p = place(plan.hulks, e.x, e.y, { sink: 0.17, fwd: tan(e.x, e.y, -uy, ux), yaw: 0.2, tilt: 0.32, s: 3.4, kitH: 0.62 });
       plan.seabirds.push(lift(p.dir, p.top));
     }
   }
-  // the break's white water standing off the reef front, on a fine grid thinned to ~0.9 u (none over a pass)
   const taken = new Set<string>(), sr = seeded(719);
   for (let y = -66; y <= 66; y += 0.45) {
     for (let x = -66; x <= 66; x += 0.45) {
@@ -942,9 +788,7 @@ export function planCoral(field: TerrainField): CoralPlan {
       const gx = coastAt(geo, chartDir(RI, px + 0.5, py)) - coastAt(geo, chartDir(RI, px - 0.5, py));
       const gy = coastAt(geo, chartDir(RI, px, py + 0.5)) - coastAt(geo, chartDir(RI, px, py - 0.5)), gl = Math.hypot(gx, gy);
       if (gl < 1e-4) continue;
-      // (none on a pass's sides: the swell meets the reef's outer front, not the water running in across the channel)
       if ([2, 4, 6].some((k) => open(px + (k * gx) / gl, py + (k * gy) / gl))) continue;
-      // the break, a low curl, and the spent white water rolling on over the reef behind it (lower, where the reef is awash)
       for (const [back, tall] of [[0, 0.24 + 0.12 * sr()], [1.1, 0.08 + 0.05 * sr()]]) {
         const bx = px - (back * gx) / gl, by = py - (back * gy) / gl, d = chartDir(RI, bx, by), ground = heightAt(geo, d);
         if (back > 0 && ground > TIDE.amp * 0.5) continue;
@@ -953,7 +797,6 @@ export function planCoral(field: TerrainField): CoralPlan {
       }
     }
   }
-  // the surf's voices: its breakers binned 10 u apart, loudest where most break
   const bins = new Map<string, { at: V; n: number }>();
   for (const d of plan.surf) {
     const k = [d.x, d.y, d.z].map((v) => Math.round((v * R) / 10)).join(','), b = bins.get(k);
@@ -967,22 +810,18 @@ export function planCoral(field: TerrainField): CoralPlan {
 export class CoralAtolls {
   readonly group = new THREE.Group();
   readonly plan: CoralPlan;
-  /** WP23: turtles' lagoon water and nesting beaches, reef fish over the reef-front corals, seabirds' perches. */
   readonly turtles: { swim: readonly V[]; nest: readonly V[] };
   readonly fish: readonly V[];
   readonly seabirds: readonly V[];
-  /** WP28: where the surf breaks and how loud (0–1). */
   readonly voices: readonly { at: V; loud: number }[];
   private readonly material: THREE.ShaderMaterial;
-  private readonly fine: THREE.ShaderMaterial; // (the withies' light ink)
-  private readonly grove: THREE.ShaderMaterial; // (the palms sketched far off)
-  private readonly palm: THREE.ShaderMaterial; // (the palms drawn near: light ink, light hatching)
-  private readonly wreck: THREE.ShaderMaterial; // (the hulk's, hatched along each timber's grain)
+  private readonly fine: THREE.ShaderMaterial;
+  private readonly grove: THREE.ShaderMaterial;
+  private readonly palm: THREE.ShaderMaterial;
+  private readonly wreck: THREE.ShaderMaterial;
   private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
-  /** [draw, parts, from, to (u from the eye), drawn only while dry, the share of the parts drawn] */
   private readonly near: [Draw, Part[], number, number, boolean, number][];
-  /** The break's draws (near, far): white water only where the reef under it is awash. */
   private readonly spills: Draw[];
   private drawn = NaN;
   private readonly swell: Swell;
@@ -1004,27 +843,16 @@ export class CoralAtolls {
     this.material.polygonOffset = true;
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
-    // (hatched along the pole, never round it: on the object's frame, its strokes the level lines of x, so a pole a few
-    // px wide takes one continuous stroke down its shaded side and never the cross family, S-024: hatching run round
-    // the thin poles banded them like candy sticks)
     this.fine = illustratedMaterial(style, {
       pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45, anchor: 'object', hatch: { axis: [1, 0, 0] }, surface: 'tone = min(tone, 0.6);',
     });
-    // (the palms sketched far off: each crown lit as one dome of fronds whichever face of a frond the eye meets, so it
-    // reads from height as a pale green-gold star; S-024: the double-sided fronds' back faces, flipped into shade, were
-    // hatched dense and inked all round, and a grove from high read near-black; its ink light, heavier on the shaded
-    // side, and its hatching only the underside's)
     this.grove = illustratedMaterial(style, {
       pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.55,
       surface: `n = normalize(vNormal); ndl = dot(n, uSun); tone = lightTone(ndl, abs(dot(n, v)));
         col = sunGlaze(shadeGlaze(glaze(parchment(q), vPaint.rgb, vPaint.w, washPool(n, v, q), q), tone, q), ndl, tone);
         tone = min(tone, 0.5);`,
     });
-    // (the palms drawn near, leaflet by leaflet: a leaflet a few px wide inked at full weight on both edges is all ink,
-    // and a crown of them a near-black mass, S-029; so their ink light and their hatching held to the middle tones)
     this.palm = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45, surface: 'tone = min(tone, 0.6);' });
-    // (the hulk hatched along each timber's grain (its uv), so a stroke follows a rib or a strake whole and never bands it
-    // across, S-024/S-027; its ink light, hatched only in shade; from the water's height its wet band, weed and foam)
     const wreck = (this.wreck = illustratedMaterial(style, {
       pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.6, anchor: 'object', hatch: { mode: 'uv', scale: [3.4, 3.4] }, surface: WRECK,
     }));
@@ -1035,18 +863,13 @@ export class CoralAtolls {
       fixed(shrubKit(9), plan.shrubs),
       fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes, this.fine), fixed(hulkKit(8), plan.hulks, wreck),
     ];
-    // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it; the
-    // reef-front corals are the sea's, painted on its floor under the water); palms in full near the eye, sketched beyond
     const near: [THREE.BufferGeometry, Part[], number, number, boolean, THREE.ShaderMaterial?, number?][] = [
       [slabKit(12), plan.slabs, 0, CORAL.near, true], [boulderKit(13), plan.boulders, 0, CORAL.near, false],
       ...[11, 29, 23].flatMap((seed, k): [THREE.BufferGeometry, Part[], number, number, boolean, THREE.ShaderMaterial?, number?][] => [
         [palmNearKit(seed, k === 2), plan.palms[k], 0, CORAL.leaflets, false, this.palm], [palmNearKit(seed, k === 2, false), plan.palms[k], CORAL.leaflets, CORAL.palms, false, this.palm],
-        // (far off a grove thinned, its young palms most, so its crowns stand apart with sand and shade between: S-024,
-        // the motus' 0.6 u grid packs a dozen crowns into each crown's span, one solid mass from height)
         [palmKit(seed, k === 2, true), plan.palms[k], CORAL.palms, 1e4, false, this.grove, k === 2 ? 0.35 : 0.6]]),
       [pandanusNearKit(5), plan.pandanus, 0, CORAL.drawn, false], [pandanusKit(5), plan.pandanus, CORAL.drawn, 1e4, false]];
     this.near = near.map(([kit, parts, from, to, dry, m, keep]) => [new Draw(kit, m ?? this.material, parts.length), parts, from, to, dry, keep ?? 1]);
-    // the break standing off the reef near the eye (past ~60 u the sea's own ribbon of white is the surf)
     this.spillMaterial = inkMaterial(style, { vertexShader: SPILL_VERT, fragmentShader: SPILL_FRAG, veil: true, side: THREE.DoubleSide,
       uniforms: { uSeaLevel: swell.uniforms.uSeaLevel, uFoam: { value: linearVec(PIGMENTS.leadWhite) }, uFace: { value: linearVec(PIGMENTS.verdigris) } } });
     this.spills = [new Draw(spillKit(10, 7, true), this.spillMaterial, plan.spill.length), new Draw(spillKit(5, 4, false), this.spillMaterial, plan.spill.length)];
@@ -1058,8 +881,6 @@ export class CoralAtolls {
     return [...this.fixed, ...this.near.map(([d]) => d)];
   }
 
-  /** The reef's corals near the eye, the pavement only while the tide leaves it dry; with the camera, only the parts in
-   *  its view (the frustum widened for the turn allowed between refills), so nothing behind the eye is drawn. */
   update(eye: V, camera?: THREE.Camera): void {
     this.group.visible = regionSeen(RI, eye, 90);
     if (!this.group.visible) return;
@@ -1106,7 +927,6 @@ export class CoralAtolls {
   }
 }
 
-/** The composition root's Coral Atolls (MODULES): the reefs' surf, corals and foam, the motus' palms, the channels. */
 export function createCoralAtolls(ctx: RenderContext): RenderModule {
   const sea = seas.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sea || !terrain) throw new Error('createCoralAtolls: the sea and terrain are built first (MODULES order)');

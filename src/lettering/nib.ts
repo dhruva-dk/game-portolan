@@ -1,36 +1,19 @@
-// The broad-edged nib and the paper it writes on. Pure arithmetic, so the lettering is identical every run.
-//
-// A broad nib is a small flat rectangle held at a fixed angle. The mark it leaves along a path is the path swept by
-// that rectangle (the Minkowski sum), so a stroke is thick where it moves across the nib's edge and a hairline where
-// it moves along it — the whole contrast of the chancery hand, from direction alone. Each flattened segment of a path
-// sweeps a convex polygon (the hull of the rectangle at both ends); the union of a stroke's polygons is its mark.
-//
-// The raster accumulates exact anti-aliased area coverage (signed-area accumulation, as font-rs does): every polygon is
-// oriented the same way and the winding is clamped to 1, so the union needs no clipping, the shared edges of
-// consecutive segments cancel exactly (no seams), and the result is crisp at any size. A second pass records, per
-// pixel, when the nib first passed over it (for the stroke-by-stroke reveal) and how loaded with ink it was.
-
-/** Path operation, absolute coordinates: M x y | L x y | Q x1 y1 x y | C x1 y1 x2 y2 x y. */
 export interface PathOp {
   readonly op: 'M' | 'L' | 'Q' | 'C';
   readonly p: readonly number[];
 }
 
 export interface Nib {
-  /** Width of the nib's edge and its thickness, px. */
   readonly width: number;
   readonly thickness: number;
-  /** Angle of the edge, radians, rising to the right on a y-down page. */
   readonly angle: number;
 }
 
-/** A path flattened to a polyline: points (x, y pairs) and the arc length at each point. */
 export interface Polyline {
   readonly pts: number[];
   readonly len: number[];
 }
 
-/** Flattens path operations into a polyline within `tolerance` px of the curves, with no segment longer than `maxStep`. */
 export function flatten(ops: readonly PathOp[], tolerance: number, maxStep: number): Polyline {
   const pts: number[] = [], len: number[] = [];
   let x = 0, y = 0;
@@ -71,24 +54,17 @@ export function flatten(ops: readonly PathOp[], tolerance: number, maxStep: numb
   return { pts, len };
 }
 
-/** Uniform subdivisions keeping a curve with second-difference bound `bound` within tolerance, and steps short. */
 function segments(bound: number, tolerance: number, chord: number, maxStep: number): number {
   return Math.min(512, Math.max(1, Math.ceil(Math.sqrt(bound / tolerance)), Math.ceil(chord / maxStep)));
 }
 
-/**
- * The nib swept along a polyline: calls `out` with one convex polygon (x, y pairs, positively oriented) per segment,
- * the segment's index, and its end points. `widthAt(i)` scales the nib's width at point i (a swash lifted onto the
- * nib's corner); the thickness never drops below the nib's own.
- */
 export function sweep(line: Polyline, nib: Nib, widthAt: (i: number) => number, out: (poly: number[], i: number) => void): void {
   const { pts } = line;
-  const ux = Math.cos(nib.angle) * 0.5, uy = -Math.sin(nib.angle) * 0.5;                // half the edge, per unit width
-  const vx = Math.sin(nib.angle) * nib.thickness * 0.5, vy = Math.cos(nib.angle) * nib.thickness * 0.5; // half the thickness
+  const ux = Math.cos(nib.angle) * 0.5, uy = -Math.sin(nib.angle) * 0.5;
+  const vx = Math.sin(nib.angle) * nib.thickness * 0.5, vy = Math.cos(nib.angle) * nib.thickness * 0.5;
   const corners = new Array<number>(16);
   const n = pts.length / 2;
   if (n === 1) {
-    // a touch of the pen: the nib's own rectangle
     const w = nib.width * widthAt(0);
     out(hull(rect(corners, 0, pts[0], pts[1], ux * w, uy * w, vx, vy), 8), 0);
     return;
@@ -109,7 +85,6 @@ function rect(c: number[], at: number, x: number, y: number, ux: number, uy: num
   return c;
 }
 
-/** Convex hull (monotone chain) of the first `count` / 2 points, anticlockwise in x-right, y-up terms. */
 function hull(c: readonly number[], count: number): number[] {
   const idx: number[] = [];
   for (let i = 0; i < count; i += 2) idx.push(i);
@@ -129,12 +104,10 @@ function hull(c: readonly number[], count: number): number[] {
   return poly;
 }
 
-/** Coverage, writing time and ink load of strokes on a page of `width` × `height` px. */
 export class Raster {
   readonly width: number;
   readonly height: number;
   private readonly acc: Float32Array;
-  /** When the nib first passed over each pixel (Infinity: never) and the ink load it carried then. */
   readonly when: Float32Array;
   readonly load: Float32Array;
 
@@ -146,7 +119,6 @@ export class Raster {
     this.load = new Float32Array(width * height);
   }
 
-  /** Adds a convex polygon's area coverage. All polygons must lie inside the page. */
   fill(poly: readonly number[]): void {
     const n = poly.length;
     for (let i = 0; i < n; i += 2) {
@@ -155,10 +127,6 @@ export class Raster {
     }
   }
 
-  /**
-   * Marks the pixels within `grow` px of a convex polygon with the time and ink load of the nib there, keeping the
-   * earliest pass. Time and load run linearly from (t0, l0) at point (x0, y0) to (t1, l1) at (x1, y1).
-   */
   paint(poly: readonly number[], grow: number, x0: number, y0: number, x1: number, y1: number, t0: number, t1: number, l0: number, l1: number): void {
     const n = poly.length, w = this.width;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -170,7 +138,6 @@ export class Raster {
     const ex: number[] = [], ey: number[] = [], ec: number[] = [];
     for (let i = 0; i < n; i += 2) {
       const j = (i + 2) % n, lx = poly[j] - poly[i], ly = poly[j + 1] - poly[i + 1], l = Math.hypot(lx, ly) || 1;
-      // inward normal of an anticlockwise edge, and the offset so that dot(n, p) + c is the distance inside
       ex.push(-ly / l); ey.push(lx / l); ec.push((ly * poly[i] - lx * poly[i + 1]) / l + grow);
     }
     const xa = Math.max(0, Math.floor(minX - grow)), xb = Math.min(w - 1, Math.ceil(maxX + grow));
@@ -192,7 +159,6 @@ export class Raster {
     }
   }
 
-  /** The coverage of everything filled, 0–1 per pixel. */
   coverage(): Float32Array {
     const out = new Float32Array(this.width * this.height);
     let a = 0;
@@ -203,8 +169,6 @@ export class Raster {
     return out;
   }
 
-  // Signed-area accumulation of one edge (after Raph Levien's font-rs): each pixel cell receives the area the edge
-  // sweeps across it, signed by direction; a running sum along each row then yields the winding coverage.
   private line(ax: number, ay: number, bx: number, by: number): void {
     if (ay === by) return;
     const dir = ay < by ? 1 : -1;
@@ -241,7 +205,6 @@ export class Raster {
   }
 }
 
-/** Blurs a field in place with `passes` box blurs of radius r (≈ a gaussian), returning it. */
 export function blur(f: Float32Array, width: number, height: number, r: number, passes = 2): Float32Array {
   const tmp = new Float32Array(Math.max(width, height));
   const run = (start: number, stride: number, n: number) => {

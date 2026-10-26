@@ -1,7 +1,3 @@
-// WP27: the hand shared by the chest choice, the results, the career chart and the first voyage's prompts (PROMPT.md,
-// Lettering; The look): the generated cancelleresca written onto a 2D sheet from text.ts's rasters (the coverage and
-// the ink bled into the fibres, revealed in the pen's own order as it writes), parchment scraps with deckled edges and
-// foxing, nib-ruled frames, burnished gold leaf with punched tooling, and buttons of at least 44 pt.
 import { layoutText, rasterizeText, type TextLayout, type TextOptions, type TextRaster } from '../lettering/text.ts';
 import { INK, nib } from './icons.ts';
 import type { Rect, View } from './safeArea.ts';
@@ -12,10 +8,7 @@ export type Pt = [number, number];
 export const PAPER = '#f1e4c6', PAPER_DEEP = '#dcc79c', SEPIA = '#6b4f36', VERMILION = '#d9472b', VERDIGRIS = '#5aa394';
 export const OCHRE = '#d4a656', ULTRAMARINE = '#4566b0';
 export const GOLD = '#d4a64a', GOLD_DARK = '#93691c', GOLD_LIGHT = '#f6e3a2';
-/** Touch targets: at least 44 pt (Apple HIG). */
 export const MIN_TARGET = 44;
-/** The least lettering on an iPhone, em CSS px: the smallest interface size the hand is tested legible at
- *  (tests/lettering: no stroke fades at 11 px). S-019: nothing in the match flow is set smaller. */
 export const MIN_LETTER = 11;
 export const ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
 
@@ -25,15 +18,12 @@ export const inset = (r: Rect, d: number): Rect => ({ x: r.x + d, y: r.y + d, wi
 export const inside = (r: Rect, x: number, y: number): boolean => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height;
 export const within = (r: Rect, outer: Rect): boolean =>
   r.x >= outer.x - 0.5 && r.y >= outer.y - 0.5 && r.x + r.width <= outer.x + outer.width + 0.5 && r.y + r.height <= outer.y + outer.height + 0.5;
-/** The view's safe area as a rect, CSS px. */
 export const safeOf = (v: View): Rect => ({ x: v.safe.left, y: v.safe.top, width: v.width - v.safe.left - v.safe.right, height: v.height - v.safe.top - v.safe.bottom });
-/** `r` moved (not resized) to lie inside `outer`. */
 export function clampRect(r: Rect, outer: Rect): Rect {
   const x = Math.min(Math.max(r.x, outer.x), outer.x + outer.width - r.width), y = Math.min(Math.max(r.y, outer.y), outer.y + outer.height - r.height);
   return { x, y, width: r.width, height: r.height };
 }
 
-/** A seeded generator (mulberry32): every rule and deckle jitters the same way each time a sheet is drawn. */
 export function rand(seed: number): () => number {
   let t = seed >>> 0;
   return () => {
@@ -50,7 +40,6 @@ export function rgb(hex: string): [number, number, number] {
 }
 export const rgba = (hex: string, a: number): string => { const [r, g, b] = rgb(hex); return `rgba(${r},${g},${b},${a.toFixed(3)})`; };
 
-// ——— lettering on a sheet ———
 
 interface Written { readonly r: TextRaster; readonly rgb: [number, number, number]; readonly steps: Map<number, HTMLCanvasElement> }
 const written = new Map<string, Written>();
@@ -59,7 +48,6 @@ const STEPS = 20;
 const keyOf = (text: string, o: TextOptions): string =>
   `${text}\u0001${o.size.toFixed(2)}|${o.align ?? ''}|${o.valign ?? ''}|${o.maxWidth === undefined ? '' : o.maxWidth.toFixed(1)}|${o.lineHeight ?? ''}|${o.swash ? 1 : 0}`;
 
-/** The text's layout (text.ts), kept. */
 export function layoutOf(text: string, o: TextOptions): TextLayout {
   const key = keyOf(text, o);
   let l = layouts.get(key);
@@ -71,17 +59,12 @@ export function layoutOf(text: string, o: TextOptions): TextLayout {
   return l;
 }
 export const widthOf = (text: string, o: TextOptions): number => { const b = layoutOf(text, o).box; return b.right - b.left; };
-/** The largest size from `size` down to `min` (never under MIN_LETTER) at which `text` fits `w` on one line, else that least. */
 export function fitSize(text: string, size: number, w: number, min = MIN_LETTER): number {
   const least = Math.max(MIN_LETTER, Math.min(size, min));
   for (let s = size; s > least; s -= 0.25) if (widthOf(text, { size: s }) <= w) return s;
   return least;
 }
 
-/**
- * Letter `text` at (x, y) (the anchor text.ts places by `align`/`valign`) in `colour`, written up to `p` (0–1) of the
- * pen's time: the strokes appear in the order the scribe made them, not left to right.
- */
 export function letter(g: G, text: string, x: number, y: number, o: TextOptions, colour: string = INK, p = 1, alpha = 1): void {
   if (text === '' || p <= 0 || alpha <= 0) return;
   const m = g.getTransform(), ratio = Math.max(1, Math.min(3, Math.round(Math.hypot(m.a, m.b) * 4) / 4));
@@ -123,8 +106,6 @@ function paint(w: Written, step: number): HTMLCanvasElement {
   return c;
 }
 
-// ——— parchment, rules, gold ———
-
 function trace(g: G, pts: readonly Pt[]): void {
   g.beginPath();
   pts.forEach(([x, y], i) => (i === 0 ? g.moveTo(x, y) : g.lineTo(x, y)));
@@ -140,7 +121,6 @@ function deckle(r: Rect, rnd: () => number, amp = 2.2, step = 8): Pt[] {
   return pts;
 }
 
-/** A scrap of parchment: deckled edge, a soft shadow, the skin's warm middle and darker edges, foxing. */
 export function scrap(g: G, r: Rect, seed: number, o: { tint?: string; deep?: string; alpha?: number; shadow?: boolean } = {}): void {
   const rnd = rand(seed), pts = deckle(r, rnd);
   g.save();
@@ -171,7 +151,6 @@ export function scrap(g: G, r: Rect, seed: number, o: { tint?: string; deep?: st
   g.restore();
 }
 
-/** A frame ruled by hand with the broad nib, side by side as the pen goes round, up to `p`. */
 export function inkRect(g: G, r: Rect, seed: number, p = 1, colour: string = INK, w = 1.4): void {
   if (p <= 0) return;
   const rnd = rand(seed), j = () => (rnd() - 0.5) * 1.6, { x, y, width: W, height: H } = r;
@@ -193,7 +172,6 @@ function around(x: number, y: number, w: number, h: number, s: number): Pt {
   return [x, y + h - (s - 2 * w - h)];
 }
 
-/** A gilded frame for the top tier: leaf laid on raised gesso, burnished glints, a punched line of tooling. */
 export function goldLeaf(g: G, r: Rect, seed: number, p = 1, band = Math.max(6, Math.min(r.width, r.height) * 0.045)): void {
   if (p <= 0) return;
   const rnd = rand(seed), { x, y, width: w, height: h } = r;
@@ -230,7 +208,6 @@ export function goldLeaf(g: G, r: Rect, seed: number, p = 1, band = Math.max(6, 
   g.restore();
 }
 
-/** A button: a scrap ruled round with its word lettered in the middle. */
 export function inkButton(g: G, r: Rect, label: string, k: number, p = 1, colour: string = INK, seed = 4242): void {
   if (p <= 0) return;
   g.save();
@@ -241,7 +218,6 @@ export function inkButton(g: G, r: Rect, label: string, k: number, p = 1, colour
   g.restore();
 }
 
-/** Points along a quadratic curve. */
 export function quad(a: Pt, c: Pt, b: Pt, n = 16): Pt[] {
   const out: Pt[] = [];
   for (let i = 0; i <= n; i++) {
@@ -251,7 +227,6 @@ export function quad(a: Pt, c: Pt, b: Pt, n = 16): Pt[] {
   return out;
 }
 
-/** A compass point: a kite from the centre, one half dark and one light, as the rose painters shaded them. */
 export function kite(g: G, cx: number, cy: number, an: number, len: number, wid: number, dark: string, light: string, k: number): void {
   const tip: [number, number] = [cx + Math.sin(an) * len, cy - Math.cos(an) * len];
   const l: [number, number] = [cx + Math.sin(an - Math.PI / 2) * wid, cy - Math.cos(an - Math.PI / 2) * wid];

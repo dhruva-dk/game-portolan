@@ -1,8 +1,3 @@
-// npm test (S-007). Two phases so the tests that time themselves or drive a browser never contend with the rest of the
-// suite for the CPU: first every other file in parallel (node's default concurrency), then those files one at a time
-// (cost budgets read CPU time, tests/cpu.ts; the browser tests boot Chromium and WebKit, which want the whole machine).
-// A file joins the serial phase by what it contains: the harness or playwright, or a clock. Both phases always run;
-// the exit code is non-zero if either failed. Arguments go straight to node --test: npm test -- tests/sim/x.test.ts
 import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';

@@ -1,15 +1,4 @@
-// Schema-driven binary codec and state hash for plain-data state (the match, and the career).
-//
-// A schema declares a state's shape once; its TypeScript type, its encoding, its decoding and its hash all follow
-// from that one declaration, so no field can be saved but not hashed, or hashed but not restored. Encoding is
-// versioned and little-endian: reals as their exact Float64 bits, integers as zigzag varints, byte arrays
-// run-length encoded, records field by field in schema order. Because a snapshot is exactly the hashed bytes, a
-// match resumed from decode(encode(state)) continues identically, and the tests prove it.
-
 import { fmix32 } from './math.ts';
-
-// ---------------------------------------------------------------------------------------------------------------
-// Schemas
 
 export interface Real { readonly t: 'f64' }
 export interface Int { readonly t: 'int' }
@@ -21,21 +10,14 @@ export interface Rec<F extends readonly Field[] = readonly Field[]> { readonly t
 export type Field = readonly [name: string, kind: Kind];
 export type Kind = Real | Int | Bool | Bytes | Words | List | Rec;
 
-/** A finite double, stored bit-exactly. */
 export const f64: Real = { t: 'f64' };
-/** An integer, |v| < 2^52 (−0 is stored as 0). */
 export const int: Int = { t: 'int' };
 export const bool: Bool = { t: 'bool' };
-/** A Uint8Array of a fixed length, run-length encoded (territory maps). */
 export const bytes = (length: number): Bytes => ({ t: 'bytes', length });
-/** A Uint32Array of a fixed length (random generator states). */
 export const words = (length: number): Words => ({ t: 'words', length });
-/** An array of values of one kind; a fixed length is checked on decode. */
 export const list = <K extends Kind>(of: K, length: number | null = null): List<K> => ({ t: 'list', of, length });
-/** A record: named fields in a fixed order. */
 export const rec = <const F extends readonly Field[]>(...fields: F): Rec<F> => ({ t: 'rec', fields });
 
-/** The plain-data value a schema describes. */
 export type Value<K> = K extends Real | Int ? number
   : K extends Bool ? boolean
   : K extends Bytes ? Uint8Array
@@ -44,23 +26,18 @@ export type Value<K> = K extends Real | Int ? number
   : K extends Rec<infer F> ? { -readonly [P in F[number] as P[0]]: Value<P[1]> }
   : never;
 
-/** A versioned encoding: a four-letter magic tag, a format version (bump it on every schema change), a schema. */
 export interface Format<K extends Kind> {
   readonly magic: string;
   readonly version: number;
   readonly schema: K;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Encoding
-
-const INT_LIMIT = 4503599627370496; // 2^52: zigzag values stay below 2^53, exact in a double
+const INT_LIMIT = 4503599627370496;
 
 class Writer {
   buf = new Uint8Array(1 << 16);
   view = new DataView(this.buf.buffer);
   n = 0;
-  /** Where in the value the writer is, for error messages. */
   readonly path: (string | number)[] = [];
 
   reserve(k: number): void {
@@ -78,7 +55,6 @@ class Writer {
     this.buf[this.n++] = b;
   }
 
-  /** An unsigned integer < 2^53, seven bits per byte, low bits first. */
   varint(v: number): void {
     this.reserve(8);
     while (v >= 128) {
@@ -89,7 +65,6 @@ class Writer {
     this.buf[this.n++] = v;
   }
 
-  /** Runs of equal bytes as (run length, value) pairs. */
   runs(a: Uint8Array): void {
     for (let i = 0; i < a.length; ) {
       const b = a[i];
@@ -158,7 +133,6 @@ class Writer {
   }
 }
 
-/** The bytes of a value: magic, version, then the value. Throws if the value does not fit its schema. */
 export function encode<K extends Kind>(format: Format<K>, value: Value<K>): Uint8Array {
   const w = new Writer();
   for (let i = 0; i < 4; i++) w.byte(format.magic.charCodeAt(i));
@@ -167,9 +141,6 @@ export function encode<K extends Kind>(format: Format<K>, value: Value<K>): Uint
   w.value(format.schema, value);
   return w.buf.slice(0, w.n);
 }
-
-// ---------------------------------------------------------------------------------------------------------------
-// Decoding. Corrupt, truncated, foreign or outdated bytes throw; nothing is ever half-decoded.
 
 class Reader {
   readonly buf: Uint8Array;
@@ -240,7 +211,7 @@ class Reader {
       case 'list': {
         const length = this.varint();
         if (kind.length !== null && length !== kind.length) throw new RangeError('decode: wrong list length');
-        if (length > this.buf.length - this.n) throw new RangeError('decode: truncated data'); // items take ≥ 1 byte
+        if (length > this.buf.length - this.n) throw new RangeError('decode: truncated data');
         const a: unknown[] = [];
         for (let i = 0; i < length; i++) a.push(this.value(kind.of));
         return a;
@@ -254,7 +225,6 @@ class Reader {
   }
 }
 
-/** The value encoded in `bytes`. Throws on another magic or version, corruption, truncation or trailing bytes. */
 export function decode<K extends Kind>(format: Format<K>, bytes: Uint8Array): Value<K> {
   const r = new Reader(bytes);
   for (let i = 0; i < 4; i++) if (r.byte() !== format.magic.charCodeAt(i)) throw new RangeError('decode: not this format');
@@ -265,14 +235,6 @@ export function decode<K extends Kind>(format: Format<K>, bytes: Uint8Array): Va
   return value as Value<K>;
 }
 
-// ---------------------------------------------------------------------------------------------------------------
-// Hashing
-
-/**
- * A 64-bit hash of bytes as 16 hex digits: two MurmurHash3-style 32-bit lanes with different seeds and
- * multipliers, cross-mixed at the end. Not cryptographic; any divergence between two states shows with
- * probability 1 − 2^-64.
- */
 export function hash64(b: Uint8Array): string {
   let h1 = 0x2545f491 ^ b.length, h2 = 0x9e3779b9 ^ b.length;
   const end = b.length & ~3;

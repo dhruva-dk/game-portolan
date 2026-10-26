@@ -1,4 +1,3 @@
-// WP16 region placements: the Fjords' falls leave the rock and land in open water; the Crown Light's seracs are bedded.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -24,10 +23,6 @@ import { CALDERA } from '../../src/sim/tables.ts';
 import { TICK, type MatchState } from '../../src/sim/state.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
-/** The Coral Atolls' rings by their rims (S-029), at every degree of bearing about each ring's centre: how far the rim
- *  faces off the trades' swell (deg, by the rim curve's outward normal), the most surf across its reef flat and 3 u past
- *  its seaward edge at mean tide, the crest's arc there (u), whether a pass opens there, and how open the water off its
- *  seaward edge lies to the swell along that normal (the surf rule's own shelter, openAt: under 1 off a shallower shelf). */
 const RIMS = (() => {
   const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), rad = Math.PI / 180, off = (a: number): number => Math.abs(((a + 540) % 360) - 180);
   return REGIONS[ri].strokes.flatMap((s) => s.k !== 'reef' ? [] : [{ s, at: Array.from({ length: 360 }, (_, b) => {
@@ -81,7 +76,7 @@ test("the Basalt Stacks' columns cover the sim's stacks and stand over the rock"
     }
   }
   for (const p of upright) {
-    if (p.u.angleTo(plan.arch.at) * R < 10) continue; // the Arch's piers end inside its entablature
+    if (p.u.angleTo(plan.arch.at) * R < 10) continue;
     assert.ok(BASE + p.len >= field.surface(p.u, 0, S).height + 0.25, 'a column top under the rock');
   }
   assert.ok(plan.crest >= 18.4 && plan.colonies.length > 20, `crest ${plan.crest}, ${plan.colonies.length} colonies`);
@@ -158,12 +153,11 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   assert.ok(plan.sills.length >= 1, "the north-west atoll's back door is a sill");
   const reef = [...plan.heads, ...plan.branches, ...plan.tables, ...plan.slabs, ...plan.boulders];
   const solids = [...reef, ...plan.stakes, ...plan.hulks];
-  // the channel's centre line as segments (u), and across it at every 0.5 u of its length within CLEAR either side
   const toLine = (c: (typeof plan.channels)[number], p: THREE.Vector3): number => Math.min(...c.line.slice(1).map((b, i) => {
     const a = c.line[i], ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq()));
     return a.clone().addScaledVector(ab, t).distanceTo(p) * R;
   }));
-  const reach = ({ m: { elements: e } }: { m: THREE.Matrix4 }): number => 0.5 * Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10])); // half its kit's span
+  const reach = ({ m: { elements: e } }: { m: THREE.Matrix4 }): number => 0.5 * Math.max(Math.hypot(e[0], e[1], e[2]), Math.hypot(e[8], e[9], e[10]));
   for (const c of plan.channels) {
     for (const p of solids) assert.ok(toLine(c, p.dir) - (plan.stakes.includes(p) ? 0.05 : reach(p)) >= CLEAR, `no reef part within ${CLEAR} u of channel ${c.bearing}°: ${toLine(c, p.dir).toFixed(2)}`);
     for (const p of plan.spill) assert.ok(toLine(c, p.dir) - reach(p) >= CLEAR, `no breaking white water within ${CLEAR} u of channel ${c.bearing}°: ${toLine(c, p.dir).toFixed(2)}`);
@@ -181,7 +175,6 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
         }
       }
     }
-    // and the reef either side of its crest, where a keel would strike at low water, is laced: the pass reads by its gap
     for (const side of [-1, 1]) {
       const most = Math.max(...c.line.slice(0, -1).flatMap((at, k) => {
         const across = at.clone().cross(c.line[k + 1]).normalize();
@@ -202,14 +195,11 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   const n = { palms: plan.palms.flat().length, pandanus: plan.pandanus.length, shrubs: plan.shrubs.length, reef: reef.length, surf: plan.surf.length, spill: plan.spill.length, stakes: plan.stakes.length, hulks: plan.hulks.length, channels: plan.channels.map((c) => `${c.bearing}°/${c.width.toFixed(1)}`) };
   console.log('coral plan', JSON.stringify(n));
   assert.ok(n.palms >= 100 && n.reef >= 1600 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
-  // the surf's sheets only where its rule breaks (S-029), each at its break or on the spent water rolling in 1.1 u behind it
   const near = (d: THREE.Vector3): number => Math.max(...Array.from({ length: 33 }, (_, k) => {
     const p = toChart(ri, d), a = (k * Math.PI) / 16, o = k === 32 ? 0 : 1.1;
     return surfAt(geo, chartDir(ri, p.x + o * Math.cos(a), p.y + o * Math.sin(a)), 0);
   }));
   for (const p of plan.spill) assert.ok(near(p.dir) >= 0.3, `white water where the surf does not break (${JSON.stringify(toChart(ri, p.dir))})`);
-  // and enough to draw the windward break unbroken: a sheet at least every 1.5 u along each breaking exposed windward
-  // crest (a sheet is 1.5–2.1 u long), and the breakers' 1 u grid filling a band at least 1 u deep off it
   const crest = RIMS.reduce((L, { at }) => L + at.reduce((l, a) => l + (a.off <= 60 && !a.pass && a.open > 0.5 && a.most > 0.8 ? a.arc : 0), 0), 0);
   assert.ok(n.spill >= crest / 1.5 && n.surf >= crest, `${n.spill} sheets and ${n.surf} breakers along ${crest.toFixed(0)} u of breaking windward crest`);
 });
@@ -217,7 +207,6 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
 test('the Spice Isles (S-025 (6c)): the gardens and scrub keep out of every house, and the slope east of the harbour is planted', () => {
   const plan = planSpice(field), ri = REGIONS.findIndex((r) => r.id === 'spiceIsles'), hb = REGIONS[ri].harbours[0];
   const sown = [...plan.garden.flat(), ...plan.scrub];
-  // a plant's foot never inside a house's walls (the godown kit: 1.4 long and 0.9 deep each way, scaled)
   for (const g of plan.godowns) {
     const e = g.m.elements, x = new THREE.Vector3(e[0], e[1], e[2]), z = new THREE.Vector3(e[8], e[9], e[10]), sx = x.length(), sz = z.length();
     x.normalize(); z.normalize();
@@ -226,7 +215,6 @@ test('the Spice Isles (S-025 (6c)): the gardens and scrub keep out of every hous
       assert.ok(Math.abs(d.dot(x)) > 1.4 * sx + 0.1 || Math.abs(d.dot(z)) > 0.9 * sz + 0.1, `a plant inside a house: ${d.dot(x).toFixed(2)}, ${d.dot(z).toFixed(2)}`);
     }
   }
-  // the terraced slope 11–20 u east and 6–14 u north of the harbour (capture 24's right slope) planted, not lawn
   const box = [[11, 6], [20, 6], [20, 14], [11, 14]].map(([x, y]) => chartDir(ri, hb.x + x, hb.y + y));
   const inside = (p: { dir: THREE.Vector3 }): boolean => {
     for (let i = 0; i < 4; i++) if (box[i].clone().cross(box[(i + 1) % 4]).dot(p.dir) * Math.sign(box[0].clone().cross(box[1]).dot(box[2])) < 0) return false;
@@ -241,7 +229,6 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   const plan = planSpice(field), hb = REGIONS.findIndex((r) => r.id === 'spiceIsles');
   const trees = [...plan.emergents, ...plan.flowers.flat(), ...plan.edge, ...plan.palms, ...plan.garden.flat()], works = [...plan.godowns, ...plan.quays, ...plan.heaps, ...plan.walls, ...plan.stairs];
   for (const p of [...trees, ...works]) assert.ok(p.sim >= SPICE_BLOCK, `no part in a hull's water: sim ${p.sim.toFixed(2)}`);
-  // the quay's face, where it meets the water, and a godown's or heap's whole footprint stand on ground no hull floats over
   for (const p of plan.quays) {
     const e = p.m.elements, face = new THREE.Vector3(e[12], e[13], e[14]).addScaledVector(new THREE.Vector3(e[8], e[9], e[10]).normalize(), 0.56).normalize();
     assert.ok(heightAt(geo, face) >= SPICE_BLOCK, `the quay's face stands where a hull grounds: ${heightAt(geo, face).toFixed(2)}`);
@@ -262,11 +249,9 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   for (const p of plan.quays) assert.ok(spiceGround(field, p.dir) <= p.base + 0.5 && spiceGround(field, p.dir) >= p.base - 1.6, 'the quay bedded');
   const n = { emergents: plan.emergents.length, palms: plan.palms.length, garden: plan.garden.map((g) => g.length), flowers: plan.flowers.map((f) => f.length), edge: plan.edge.length, godowns: plan.godowns.length, quays: plan.quays.length, heaps: plan.heaps.length, berths: plan.berths.length, birds: plan.birds.length, voices: plan.voices.length, region: hb };
   console.log('spice plan', JSON.stringify(n));
-  // the mole stands outside the sim's harbour (the disc a hull may lie in), on two short arms that leave the mouth open
   const hbr = REGIONS[hb].harbours[0], anchor = chartDir(hb, hbr.x, hbr.y);
   assert.ok(plan.mole.length >= 10, 'the mole is built');
   for (const p of plan.mole) assert.ok(p.dir.angleTo(anchor) * R >= hbr.r + 1, `the mole clear of the harbour's water: ${(p.dir.angleTo(anchor) * R).toFixed(2)} u`);
-  // capture 24's ships float along their whole length at low water
   for (const [x, y, tx, ty] of SPICE_SHIPS) {
     const l = Math.hypot(tx - x, ty - y), ux = (tx - x) / l, uy = (ty - y) / l;
     for (const d of [-2.9, 0, 2.9]) for (const b of [-0.5, 0.5]) {
@@ -281,15 +266,12 @@ test('the Coral Atolls (S-027 (7), S-029): every ring breaks along its exposed w
   const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), mean = (xs: { most: number }[]): number => xs.reduce((m, a) => m + a.most, 0) / Math.max(xs.length, 1);
   assert.equal(RIMS.length, 5, 'five rings');
   for (const { s, at } of RIMS) {
-    // (the falloff with the bearing off the swell along the rim the swell reaches, open water off it)
     const ring = `the ring at (${s.x}, ${s.y})`, rim = at.filter((a) => !a.pass && a.open > 0.5), exposed = rim.filter((a) => a.off <= 60);
     const sheltered = at.filter((a) => !a.pass && a.open <= 0.5 && a.off <= 60), breaks = exposed.filter((a) => a.most > 0.8);
     const beam = rim.filter((a) => a.off > 75 && a.off < 105), lee = rim.filter((a) => a.off >= 120);
     assert.ok(breaks.length > exposed.length / 2, `${ring}: its exposed windward crest breaks along ${breaks.length} of ${exposed.length}°`);
     assert.ok(Math.max(...exposed.map((a) => a.most)) > 0.95, `${ring}: full where the swell strikes square`);
     if (sheltered.length > 0) assert.ok(mean(sheltered) < mean(exposed), `${ring}: weaker where a shelf shelters its windward crest (${mean(sheltered).toFixed(2)} against ${mean(exposed).toFixed(2)})`);
-    // (beam-on and on the lee, over the bearings the ring's rim has there: the north-west ring's beam is all passes and
-    // sheltered drowned rim; S-029 leaves the south-east ring's lee breaking more than its beam, an open fault of the rule)
     for (const [side, xs] of [['beam-on', beam], ['on its lee', lee]] as const) {
       if (xs.length > 0) assert.ok(mean(xs) < mean(exposed), `${ring}: less ${side} (${mean(xs).toFixed(2)}) than to windward (${mean(exposed).toFixed(2)})`);
     }
@@ -302,11 +284,9 @@ test('the Coral Atolls (S-027 (7), S-029): every ring breaks along its exposed w
   for (const [x, y] of [[60, -60], [-10, -60], [-70, 0], [0, 60]]) assert.equal(surfAt(geo, chartDir(ri, x, y), 0), 0, `no surf in open sea at (${x}, ${y})`);
 });
 
-
 test('the Fire Archipelago: the volcano stands; each fresh flow runs from the crater into hot water; nothing grows or stands on a fresh flow; nothing in a hull\'s water', () => {
   const plan = planFire(field), ri = REGIONS.findIndex((r) => r.id === 'fireArchipelago'), m = REGIONS[ri].landmark;
   const sim = (x: number, y: number): number => heightAt(geo, chartDir(ri, x, y));
-  // the Caldera's crater at its landmark, drawn as a cone with a crater (not melted into a dome)
   const at = toChart(ri, plan.crater.dir);
   assert.ok(Math.hypot(at.x - m.x, at.y - m.y) < 1e-6 && plan.crater.rim > 15 && plan.crater.rim - plan.crater.h > 3, `crater at the landmark, rim ${plan.crater.rim.toFixed(1)} over floor ${plan.crater.h.toFixed(1)}`);
   assert.equal(plan.flows.length, 2, 'two lava deltas');

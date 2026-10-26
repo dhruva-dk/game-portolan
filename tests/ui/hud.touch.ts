@@ -1,22 +1,19 @@
-// WP25 part B: touch tests through the real app (headless Chromium, touch emulation through CDP
-// Input.dispatchTouchEvent; the match screen's window.__wp25 probe logs each touch and each tick's ShipInput): steer,
-// sail step, fire, gull call and dive, consumable, head home, chart open / course / close, pinch never steers; the
-// touch → ShipInput latency; then the HUD shots progress/shots/wp25b-*.png. node tests/ui/hud.touch.ts
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { CDPSession, Page } from 'playwright';
 import { DEVICES, launch, root, serve } from '../harness.ts';
+
+mkdirSync(join(root, 'out/shots'), { recursive: true });
 
 type P = [number, number];
 interface Tick { at: number; steer: number; sail: number; flags: number; consumable: number; aim: number; course: number }
 interface Touch { at: number; phase: string; x: number; y: number }
 interface Btn { kind: string; x: number; y: number }
 interface Lay { buttons: Btn[]; stick: { x: number; y: number; width: number; height: number }; view: { width: number; height: number } }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Win = any;
 
 const server = await serve();
-const { browser, gpu, renderer } = await launch(); // the GPU first (ANGLE on Metal): the timings need real frames
+const { browser, gpu, renderer } = await launch();
 if (!gpu) { console.error(`hud.touch: FAIL: no GPU WebGL (${renderer}); refusing to time touches under software rendering`); await browser.close(); await server.close(); process.exit(2); }
 console.log(`renderer: ${renderer}`);
 const lines: string[] = [];
@@ -29,7 +26,6 @@ async function open(dev: 'iphone' | 'ipad', dpr: number): Promise<{ page: Page; 
   const d = DEVICES[dev], s = d.safeArea;
   const context = await browser.newContext({ viewport: { width: d.width, height: d.height }, screen: { width: d.width, height: d.height }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true });
   await context.addInitScript(() => {
-    // the probe, plus each raw touch event's own timeStamp (performance.now's clock) for the latency
     const p = { touches: [], ticks: [], raw: [] as { at: number; x: number; type: string }[] };
     (window as Win).__wp25 = p;
     for (const type of ['touchstart', 'touchmove', 'touchend']) {
@@ -42,14 +38,12 @@ async function open(dev: 'iphone' | 'ipad', dpr: number): Promise<{ page: Page; 
   await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: s.top, topMax: s.top, right: s.right, rightMax: s.right, bottom: s.bottom, bottomMax: s.bottom, left: s.left, leftMax: s.left } });
   await page.goto(`${server.url}/`);
   await page.waitForFunction(() => !!(window as Win).__portolan, null, { timeout: 180_000 });
-  // the world arrives from its worker: start the match as soon as it has
   await page.waitForFunction(() => { try { (window as Win).__portolan.startMatch({ seed: 7 }); return true; } catch { return false; } }, null, { timeout: 300_000, polling: 1000 });
   await page.waitForFunction(() => { const p = (window as Win).__wp25; return !!p.layout && p.ticks.length > 30; }, null, { timeout: 300_000 });
   return { page, cdp };
 }
 
 const send = (cdp: CDPSession, type: 'touchStart' | 'touchMove' | 'touchEnd', ps: P[]) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts(ps) });
-/** Await n animation frames in the page: every gesture step is paced by frames, never by the wall clock. */
 const frames = (page: Page, n: number): Promise<unknown> => page.evaluate((k) => new Promise((r) => { let i = 0; const f = (): void => { if (++i >= k) r(0); else requestAnimationFrame(f); }; requestAnimationFrame(f); }), Math.max(1, Math.round(n)));
 async function stroke(page: Page, cdp: CDPSession, path: P[], ms: number): Promise<void> {
   const per = Math.max(1, Math.round(ms / 16.7 / path.length));
@@ -61,7 +55,6 @@ async function stroke(page: Page, cdp: CDPSession, path: P[], ms: number): Promi
 }
 const tap = (page: Page, cdp: CDPSession, p: P, ms = 60) => stroke(page, cdp, [p, p], ms);
 const isOpen = (page: Page): Promise<boolean> => page.evaluate(() => (window as Win).__wp25.chartOpen());
-/** Close the chart (a tap on the edge band) and wait until it is closed and the camera is back on deck. */
 async function closeChart(page: Page, cdp: CDPSession, W: number): Promise<void> {
   for (let k = 0; k < 3 && (await isOpen(page)); k++) {
     await tap(page, cdp, [W * 0.5, 10], 40);
@@ -79,7 +72,6 @@ async function suite(page: Page, cdp: CDPSession, tag: string): Promise<void> {
   const btn = (k: string): P => { const q = L.buttons.find((b) => b.kind === k)!; return [q.x, q.y]; };
   await closeChart(page, cdp, W);
   check(`${tag} compact chart mounted in its slot`, await page.evaluate(() => { const c = document.querySelector('canvas.compact-chart') as HTMLElement | null; return !!c && c.style.display !== 'none' && c.getBoundingClientRect().width > 40; }));
-  // steer, eight times, alternating: the latency from the touch that leaves the dead zone to the tick that carries it
   const lat: number[] = [];
   for (let i = 0; i < 8; i++) {
     const dir = i % 2 ? -1 : 1;
@@ -101,7 +93,7 @@ async function suite(page: Page, cdp: CDPSession, tag: string): Promise<void> {
   check(`${tag} steer (stick on the ${S.x > W / 3 ? 'right' : 'left'} half)`, lat.length >= 6, `${lat.length}/8`);
   say(`     latency touch→ShipInput: median ${med.toFixed(1)} ms, max ${max.toFixed(1)} ms; frame here ${gap.toFixed(1)} ms = ${(med / gap).toFixed(2)} frames; ${(med / (1000 / 60)).toFixed(2)} frames at 60 fps`);
   let t0 = await now(page);
-  await stroke(page, cdp, [s0, [s0[0], s0[1] - 15], [s0[0], s0[1] - 35], [s0[0], s0[1] - 55]], 80); // flick up: break off the current (or a sail step)
+  await stroke(page, cdp, [s0, [s0[0], s0[1] - 15], [s0[0], s0[1] - 35], [s0[0], s0[1] - 55]], 80);
   await frames(page, 24);
   check(`${tag} flick up (break off / sail up)`, (await since(page, t0)).some((k) => k.sail !== 0 || k.flags !== 0));
   await frames(page, 72);
@@ -114,14 +106,13 @@ async function suite(page: Page, cdp: CDPSession, tag: string): Promise<void> {
   t0 = await now(page); await tap(page, cdp, btn('gull')); await frames(page, 21);
   check(`${tag} gull call (tap)`, (await since(page, t0)).some((k) => k.flags !== 0));
   const g = btn('gull');
-  t0 = await now(page); await stroke(page, cdp, [g, [g[0] + (W / 2 - g[0]) * 0.3, g[1] - 40], [W * 0.5, H * 0.6], [W * 0.5, H * 0.64]], 320); // onto the sea ahead (below the horizon on every aspect) await frames(page, 21);
+  t0 = await now(page); await stroke(page, cdp, [g, [g[0] + (W / 2 - g[0]) * 0.3, g[1] - 40], [W * 0.5, H * 0.6], [W * 0.5, H * 0.64]], 320);
   check(`${tag} gull dive (drag onto the sea)`, (await since(page, t0)).some((k) => k.aim >= 0));
   t0 = await now(page); await tap(page, cdp, btn('c0')); await frames(page, 21);
   check(`${tag} consumable`, (await since(page, t0)).some((k) => k.consumable === 0));
   t0 = await now(page); await send(cdp, 'touchStart', [btn('home')]); await frames(page, 36);
   const held = await since(page, t0); await send(cdp, 'touchEnd', []); await frames(page, 12);
   check(`${tag} head home (held)`, held.some((k) => k.flags !== 0));
-  // pinch on the stick's half: two fingers, the second 40 ms after the first, spread: the camera's, never the helm's
   const a: P = [S.x + S.width * 0.35, S.y + S.height * 0.5], b: P = [S.x + S.width * 0.6, S.y + S.height * 0.5];
   t0 = await now(page);
   await send(cdp, 'touchStart', [a]); await frames(page, 3); await send(cdp, 'touchStart', [a, b]);
@@ -129,12 +120,11 @@ async function suite(page: Page, cdp: CDPSession, tag: string): Promise<void> {
   await send(cdp, 'touchEnd', []); await frames(page, 18);
   check(`${tag} pinch never steers`, (await since(page, t0)).every((k) => k.steer === 0));
   await closeChart(page, cdp, W);
-  // the chart: open from the compact chart, draw a course, close on the edge band; the course reaches the ship
   t0 = await now(page);
   await tap(page, cdp, btn('chart'));
   await page.waitForFunction(() => (window as Win).__wp25.chartOpen(), null, { timeout: 8000 }).catch(() => {});
   check(`${tag} chart opens (tap the compact chart)`, await isOpen(page));
-  await frames(page, 150); // the lift settles before the stroke
+  await frames(page, 150);
   await stroke(page, cdp, [[W * 0.5, H * 0.5], [W * 0.54, H * 0.46], [W * 0.58, H * 0.42], [W * 0.62, H * 0.4], [W * 0.66, H * 0.37], [W * 0.7, H * 0.35]], 420);
   await frames(page, 9);
   await tap(page, cdp, [W * 0.5, 10]);
@@ -150,7 +140,7 @@ async function suite(page: Page, cdp: CDPSession, tag: string): Promise<void> {
 async function shot(page: Page, name: string): Promise<Buffer> {
   await frames(page, 90);
   const png = await page.screenshot({ timeout: 240_000 });
-  writeFileSync(join(root, 'progress/shots', `${name}.png`), png);
+  writeFileSync(join(root, 'out/shots', `${name}.png`), png);
   return png;
 }
 const left = (page: Page, on: boolean) => page.evaluate(async (v) => { const m = await import('/src/ui/settings.ts' as string); await m.setSettings({ leftHanded: v }); }, on);
@@ -167,17 +157,16 @@ try {
     shots.push({ name: `wp25b-${dev}-left`, png: await shot(page, `wp25b-${dev}-left`) });
     await left(page, false);
     shots.push({ name: `wp25b-${dev}-hud`, png: await shot(page, `wp25b-${dev}-hud`) });
-    // the wind rose and the sail setting on their scrap over the sea, close up
     const Lr = await page.evaluate(() => (window as Win).__wp25.layout), c = Lr.compass, sl = Lr.sail;
     const x0 = Math.max(0, c.x - c.r - 24), y0 = Math.max(0, c.y - c.r - 24);
     const rose = await page.screenshot({ clip: { x: x0, y: y0, width: sl.x + sl.width + 24 - x0, height: 2 * c.r + 48 } });
-    writeFileSync(join(root, 'progress/shots', `wp25b-${dev}-rose.png`), rose);
+    writeFileSync(join(root, 'out/shots', `wp25b-${dev}-rose.png`), rose);
     await page.context().close();
   }
   const sheet = await browser.newPage({ viewport: { width: 1400, height: 400 }, deviceScaleFactor: 1 });
   const cell = (s: { name: string; png: Buffer }) => `<figure><img src="data:image/png;base64,${s.png.toString('base64')}"><figcaption>${s.name}</figcaption></figure>`;
   await sheet.setContent(`<style>body{margin:0;background:#efe0c0;font:13px Georgia;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}figure{margin:0}img{width:100%;display:block}</style>${shots.map(cell).join('')}`);
-  writeFileSync(join(root, 'progress/shots/wp25b-sheet.png'), await sheet.screenshot({ fullPage: true }));
+  writeFileSync(join(root, 'out/shots/wp25b-sheet.png'), await sheet.screenshot({ fullPage: true }));
 } finally {
   console.log(failed ? `${failed} FAILED` : 'all touch tests passed');
   await browser.close();

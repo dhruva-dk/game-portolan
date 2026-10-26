@@ -1,4 +1,3 @@
-// WP27: the results page's lines as plain text (what the page letters), for tests and the progress log.
 import type { ResultsModel } from '../../src/ui/results.ts';
 
 export const cardLines = (m: ResultsModel): string[] => [

@@ -1,6 +1,3 @@
-// WP20's territory: a big loop from a real headless match floods in from the trail that closed it and dries flat, its
-// claim announced once and sent as one bounded partial upload; the border is a smoothed contour, doubled where rival
-// waters meet; and in the browser the inked borders hold still under a slow camera move, console clean.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type * as THREE from 'three';
@@ -42,7 +39,6 @@ test('a big loop floods in from its trail, then dries; its claim is announced on
   assert.ok(cost < 3 * 2 ** 20, `a claim's partial upload stays under 3 MiB (${cost} B)`);
   const slot = t.slots.findIndex((s) => s.x === 1);
   assert.ok(slot > 0 && slot < MOMENT_SLOTS, 'the flood holds a moment slot');
-  // the trail's own cells are the wet start; the sea farthest from it is the last reached
   let trail = 0, n = 0, all = 0, m = 0;
   for (const c of ev.cells) {
     const [f, o] = texel(c), mo = face(t.moments, f);
@@ -66,12 +62,12 @@ test('a big loop floods in from its trail, then dries; its claim is announced on
 test('the border is a smooth contour between cells, and rival waters meeting show two borders', () => {
   const s = createMatch({ seed: 7 }), t = new Territory(null);
   t.sync(s, 0);
-  const cell = (x: number, y: number) => (N - 1 - y) * N + x; // face 0, texel (x, y)
-  for (let y = 100; y < 200; y++) for (let x = 100; x < 300; x++) s.owner[cell(x, y)] = x < 200 ? 1 : 2; // two waters side by side
+  const cell = (x: number, y: number) => (N - 1 - y) * N + x;
+  for (let y = 100; y < 200; y++) for (let x = 100; x < 300; x++) s.owner[cell(x, y)] = x < 200 ? 1 : 2;
   s.ships[0].held = s.ships[1].held = 1;
   s.tick++;
   t.sync(s, 0);
-  t.frame(100); // past every moment
+  t.frame(100);
   const a = (x: number, y: number) => face(t.wash, 0)[(y * N + x) * 4 + 3] / 255;
   assert.ok(a(99, 150) < 0.5 && a(100, 150) > 0.5, 'nobody | waters: the contour falls between the cells');
   assert.ok(a(199, 150) < 0.5 && a(200, 150) < 0.5 && a(198, 150) > 0.5 && a(201, 150) > 0.5, 'rival | rival: a border each side');
