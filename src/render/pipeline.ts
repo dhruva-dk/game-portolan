@@ -20,12 +20,15 @@
 // No MSAA: lines carry their own coverage. 8-bit colour targets (iOS has no float32 colour buffers; nothing here
 // needs more than 8 bits).
 import * as THREE from 'three';
-import { createStyle, COLOUR_GLSL, type Style } from '../style/glsl.ts';
+import { createStyle, STYLE_GLSL, type Style } from '../style/glsl.ts';
 import { textureBytes } from '../style/textures.ts';
 import { PIGMENTS, STORM_DIM, STORM_GREY, STORM_SLATE, toLinear, transmittance } from '../style/palette.ts';
 
 /** Pixels around each pixel the composite searches for line elements; line half-widths are clamped to fit. */
 const INK_REACH = 3;
+/** Cast shade at a low sun: steps of the march toward the sun, and how far it reaches (world units, a hill's shade). */
+const CAST_STEPS = 24;
+const CAST_REACH = 160;
 
 const FULLSCREEN_VERT = /* glsl */ `
 void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }
@@ -141,16 +144,94 @@ uniform sampler2D tMask;
 uniform vec3 uInkLin;
 uniform vec3 uDeckle;
 uniform vec2 uCss;       // frame size, CSS px
-uniform float uRenderPx;
 uniform float uStorm;
+uniform float uPxAngle;  // world units per render px at unit distance
 layout(location = 0) out vec4 outColor;
-${COLOUR_GLSL}
+${STYLE_GLSL}
+uniform sampler2D tDepth;
+uniform sampler2D tAux;
+uniform mat4 uProj;
+uniform mat4 uProjInv;
+uniform mat4 uViewInv;
+uniform vec2 uNearFar;
+uniform vec3 uLightView; // toward the sun (the moon by night), view space
+
+float viewZ(float d) { return uNearFar.x * uNearFar.y / (uNearFar.y - d * (uNearFar.y - uNearFar.x)); }
+vec3 viewPos(vec2 uv, float d) { vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return v.xyz / v.w; }
+vec3 octDecode(vec2 e) {
+  e = e * 2.0 - 1.0;
+  vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y));
+  float t = max(-n.z, 0.0);
+  n.xy += vec2(n.x >= 0.0 ? -t : t, n.y >= 0.0 ? -t : t);
+  return normalize(n);
+}
+
+// Cast shade at a low sun, 0 lit … 1 in shade: a march from the surface toward the sun through the depth buffer, in
+// steps growing from a fraction of a unit (a rope, a gunwale) to CAST_REACH (a hill). Wherever the scene stands in front
+// of the ray, and not so far in front that it is only something nearer the eye, the ray is blocked.
+float castShade(vec3 P, vec3 N, vec2 size) {
+  float z0 = -P.z, t = 0.15 + 0.003 * z0;
+  float grow = exp(log(${CAST_REACH.toFixed(1)} / t) / ${CAST_STEPS.toFixed(1)});
+  vec3 O = P + N * (0.06 + 0.004 * z0);
+  float occ = 0.0;
+  for (int i = 0; i < ${CAST_STEPS}; i++) {
+    vec3 Q = O + uLightView * t;
+    if (-Q.z < uNearFar.x) break;
+    vec4 c = uProj * vec4(Q, 1.0);
+    vec2 uv = c.xy / c.w * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) break;
+    float zq = -Q.z, zs = viewZ(texelFetch(tDepth, ivec2(uv * size), 0).r);
+    float dz = zq - zs, bias = 0.06 + 0.004 * zq, thick = 1.5 + 0.6 * t;
+    occ = max(occ, smoothstep(bias, 2.5 * bias, dz) * (1.0 - smoothstep(thick, 1.5 * thick, dz)));
+    if (occ > 0.99) break;
+    t *= grow;
+  }
+  return occ;
+}
+
+// Smooth noise fixed to the world at about \`size\` world units, octave-blended so it never slides or swims.
+vec4 anchored(vec3 p, float size) {
+  float k = log2(size), lo = floor(k), f = k - lo, s = exp2(lo);
+  vec2 q = vec2(p.x + 0.43 * p.z, p.y - 0.29 * p.z);
+  return mix(textureLod(tPaper, q / s, 0.0), textureLod(tPaper, q / (2.0 * s) + 0.5, 0.0), f);
+}
 const vec3 SLATE = vec3(${SLATE.map((x) => x.toFixed(5)).join(', ')});
 
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy), last = textureSize(tColor, 0) - 1;
   vec4 c = texelFetch(tColor, px, 0);
   vec3 col = toLinear(c.rgb);
+
+  // Cast shade at a low sun (uLow): hills, trees, buildings and ships throw long shade over the ground and the sea,
+  // laid as a cool wash with a frilled, world-fixed edge and hatched along its length (strokes running away from the
+  // sun, anchored to the world), as an engraver draws it. Surfaces turned from the sun keep their own shading.
+  if (uLow > 0.001) {
+    vec2 size = vec2(textureSize(tDepth, 0));
+    vec4 a = texelFetch(tAux, px, 0);
+    vec3 P = viewPos(gl_FragCoord.xy / size, texelFetch(tDepth, px, 0).r);
+    vec3 W = (uViewInv * vec4(P, 1.0)).xyz, up = normalize(W);
+    vec3 sG = normalize(uSun - up * dot(uSun, up) + 1e-5), pG = cross(up, sG);
+    vec2 hc = vec2(dot(W, pG), dot(W, sG));
+    float z = -P.z, cssWorld = z * uPxAngle * uRenderPx;
+    float blot = anchored(W, cssWorld * 90.0).g;
+    if (a.b > 0.5 / 255.0) { // not the sky
+      vec3 N = octDecode(a.rg);
+      float facing = smoothstep(-0.15, 0.15, dot(N, uLightView));
+      float s = facing > 0.0 ? castShade(P, N, size) * facing : 0.0;
+      s = smoothstep(0.25, 0.75, s + (blot - 0.5) * 0.6);
+      float rim = s * (1.0 - s) * 4.0;               // pigment pooled where the wash dried at its edge
+      s *= uLow * c.a * (1.0 - smoothstep(350.0, 800.0, z));
+      if (s > 0.0) {
+        col = wash(col, uShade, s * 0.5 + rim * uLow * c.a * 0.25);
+        float hpx = max(z * uPxAngle / max(abs(dot(N, normalize(-P))), 0.25), 1e-5); // world units per render px
+        float k = log2(hpx * uRenderPx * HATCH_SPACING), S = exp2(floor(k)), i = floor(hc.x / S + 0.5);
+        float brk = step(0.1, fract(hc.y / (S * 11.0) + hash11(i * 0.7317 + 11.7)));    // strokes lifted now and then
+        float h = clamp(0.17 * S / hpx - abs(hc.x - i * S) / hpx + 0.5, 0.0, 1.0) * brk
+                * (mod(i, 2.0) > 0.5 ? 1.0 - fract(k) : 1.0);                         // every second fades out as the spacing doubles
+        col = mix(col, wash(hatchInk(0.7), uShade, 0.8), h * s * 0.85);
+      }
+    }
+  }
 
   float cover = 0.0;
   if (texelFetch(tMask, px / ${MASK_BLOCK}, 0).r > 0.0) { // a line element lies near (the mask pass)
@@ -302,10 +383,13 @@ export class Pipeline {
       uPxAngle: { value: 0 }, uRenderPx: s.uRenderPx,
     });
     this.maskPass = pass(MASK_FRAG, { tEdge: { value: this.edges.texture } });
+    const e = this.edgePass.uniforms;
     this.compositePass = pass(COMPOSITE_FRAG, {
-      tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture }, tMask: { value: this.mask.texture },
+      ...s, tColor: { value: this.scene.textures[0] }, tEdge: { value: this.edges.texture }, tMask: { value: this.mask.texture },
       uInkLin: s.uInk, uDeckle: { value: new THREE.Vector3().fromArray(transmittance(PIGMENTS.umber)) },
-      uCss: { value: this.css }, uRenderPx: s.uRenderPx, uStorm: { value: 0 },
+      uCss: { value: this.css }, uStorm: { value: 0 },
+      tDepth: e.tDepth, tAux: e.tAux, uNearFar: e.uNearFar, uProjInv: e.uProjInv, uViewInv: e.uViewInv,
+      uLightView: e.uLightView, uPxAngle: e.uPxAngle, uProj: { value: new THREE.Matrix4() },
     });
     this.presentPass = pass(PRESENT_FRAG, { tSrc: { value: this.inked.texture }, uCanvasPx: { value: new THREE.Vector2() } });
   }
@@ -373,6 +457,7 @@ export class Pipeline {
 
     // 3. composite, 4. present
     this.compositePass.uniforms.uStorm.value = this.storm;
+    this.compositePass.uniforms.uProj.value.copy(camera.projectionMatrix);
     if (this.renderScale === 1) this.draw(this.compositePass, null);
     else {
       this.draw(this.compositePass, this.inked);
