@@ -44,7 +44,7 @@ const SHOTS: readonly (readonly [string, Record<string, string>])[] = ([
   ['coral-hero', { view: 'coral', hour: '12', tide: '0.1', off: '-14', aim: '-14' }], // 14 u in from the rim's crest: the lagoon before the pass, turned a little toward the lighthouse motu's palms (on the iPad too)
   ['coral-shore', { view: 'coralshore', hour: '15', tide: '-0.2' }],
   ['coral-high', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1' }],
-  ['coral-orbit', { view: 'orbit', region: 'Coral', hour: '12', tide: '0.1' }],
+  ['coral-orbit', { view: 'mark', region: 'Coral', hour: '12', tide: '0.1', height: '135', pitch: '-1.4', back: '26', 'iphone:height': '110', 'iphone:back': '30', 'iphone:pitch': '-1.43' }], // steeper than coral-high: the Great Lagoon among its neighbours, the horizon high (S-021); lower on the wider iPhone
   ['spice-hero', { view: 'spice', hour: '17.2' }],
   ['spice-sun', { view: 'spice', hour: '17.6', turn: 'sun', ox: '22', oy: '14', pitch: '-0.2' }], // across the harbour into the low sun: the water gives back the glowing sky, the glitter path
   ['spice-shore', { view: 'spiceshore', hour: '16' }],
@@ -71,7 +71,9 @@ try {
   for (const device of ['ipad', 'iphone'] as const) {
     const frames: string[] = [];
     for (const [name, query] of SHOTS) {
-      const game = await openGame(browser, url, { device, hook: '__sea', query: { ...query, clock: '12' } });
+      // a key `<device>:<key>` overrides `<key>` on that device only (a view framed to each device's aspect)
+      const own = Object.entries(query).filter(([k]) => !k.includes(':')).concat(Object.entries(query).filter(([k]) => k.startsWith(`${device}:`)).map(([k, v]) => [k.slice(device.length + 1), v]));
+      const game = await openGame(browser, url, { device, hook: '__sea', query: { ...Object.fromEntries(own), clock: '12' } });
       await game.until((g) => g.ready, undefined, 30000);
       await game.page.waitForTimeout(250);
       const png = await game.page.screenshot({ path: join(outDir, `wp16-${device}-${name}.png`), scale: 'css' });

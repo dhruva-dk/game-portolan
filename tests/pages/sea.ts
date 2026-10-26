@@ -287,7 +287,7 @@ if (view === 'deck') {
   const m = REGIONS[ri].landmark, from = V(), to = V();
   if (view === 'fjord') { toWorld(ri, -52, 5.5, from); toWorld(ri, -24, 17, to); } // up the Falls Fjord to the Great Falls
   else if (view === 'crown') { toWorld(ri, m.x + 5, m.y - 25, from); toWorld(ri, m.x + 2, m.y, to); } // from the pack
-  else { toWorld(ri, m.x, m.y - 60, from); toWorld(ri, m.x, m.y, to); } // high above
+  else { toWorld(ri, m.x, m.y - Number(q.get('back') ?? 60), from); toWorld(ri, m.x, m.y, to); } // high above (back=<u> south of it)
   const [height, pitch] = view === 'mark' ? [110, -1.1] : view === 'crown' ? [6, 0.02] : [3.4, 0.04];
   look(from, to, Number(q.get('height') ?? height), Number(q.get('pitch') ?? pitch));
   if (view === 'fjord') launch(15, 1.3, 0.1);
