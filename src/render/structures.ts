@@ -14,12 +14,13 @@
 // dropped below the eye's horizon (hull-down by real geometry before that: the plinth goes first, the lantern last).
 import * as THREE from 'three';
 import { illustratedMaterial, transmittanceVec, type Style } from '../style/glsl.ts';
-import { PIGMENTS, type RGB } from '../style/palette.ts';
+import { mix, PIGMENTS, type RGB } from '../style/palette.ts';
 import type { V3 } from '../sim/math.ts';
 import { R } from '../sim/sphere.ts';
 import { heightAt, regionOf, type Geography } from '../sim/world/geography.ts';
 import { REGIONS, TIDE } from '../sim/world/regions.ts';
 import type { Beams, Lamp, Lights } from './light.ts';
+import { seas } from './sea.ts';
 import { skies } from './sky.ts';
 import { terrains, type Surface, type TerrainField } from './terrain.ts';
 import type { RenderContext, RenderModule } from './world.ts';
@@ -34,6 +35,9 @@ export const TOWER = { lamp: 6, plinth: 2.7, foot: 1.3, setBack: 4, near: 80 } a
  *  harbour's radius, its wall `half` u either side of its line, its coping over mean sea (u). */
 export const MOLE = { land: 1.55, mouth: 1.08, r: 1.3, half: 0.95, coping: TIDE.amp + 0.4 } as const;
 export const HARBOUR = { rays: 32, mole: 0.85, spacing: 1.25, arm: 2.2, lamp: 1.91, reach: 10 } as const;
+/** A lagoon harbour's jetty: from the nearest shore `long` u out (no nearer the anchorage than `reach` of its radius),
+ *  `half` u either side of its line, in runs of about `run` u. */
+export const JETTY = { long: 4.5, reach: 0.45, half: 0.75, run: 0.9, coping: TIDE.amp + 1.1 } as const;
 
 type Paint = readonly [RGB | 'stone' | 'accent' | 'gold', number];
 const IRON: Paint = [PIGMENTS.ironGall, 0.85], GLASS: Paint = [PIGMENTS.ochre, 0.3], COPPER: Paint = [PIGMENTS.verdigris, 0.75];
@@ -225,6 +229,32 @@ function bollardKit(): THREE.BufferGeometry {
   return new Kit().add(g, ['stone', 0.7], true).build();
 }
 
+/** A run of a lagoon jetty 1 long on z: coral rag dressed in courses (masonrySurface), the coping overhanging both
+ *  faces (one long stone across, plain: the courses' world-squared joints read as a lattice on a flat top), a footing
+ *  course set out at the foot; y from the footing (−1.6) to the coping (0). */
+const COPING: RGB = mix(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.3), PIGMENTS.sepia, 0.1);
+function jettyKit(): THREE.BufferGeometry {
+  const h = JETTY.half;
+  return new Kit()
+    .add(box(2 * h - 0.12, 1.5, 1, 0, -0.83, 0), ['stone', 0.55], true)
+    .add(box(2 * h + 0.06, 0.12, 1.02, 0, -0.06, 0), [COPING, 0.5], true)
+    .add(box(2 * h + 0.14, 0.2, 1, 0, -1.5, 0), ['stone', 0.6], true)
+    .build();
+}
+
+/** The foam round a jetty's run at the waterline, 1 long on z: a broken ribbon of lead white either side, lapping
+ *  out from the face. */
+function lapKit(): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry(), pos: number[] = [], h = JETTY.half - 0.06, n = 6;
+  for (const side of [-1, 1]) for (let i = 0; i < n; i++) {
+    const z0 = -0.5 + i / n, z1 = z0 + 1 / n, w0 = 0.12 + 0.22 * hash(side, i, 1), w1 = 0.12 + 0.22 * hash(side, i + 1, 1);
+    const a = [side * h, 0, z0], b = [side * h, 0, z1], c = [side * (h + w1), 0, z1], d = [side * (h + w0), 0, z0];
+    pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+  }
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return new Kit().add(g, [PIGMENTS.leadWhite, 0.15], true).build();
+}
+
 /** A driftwood post, bleached and bent. */
 function postKit(): THREE.BufferGeometry {
   const g = new THREE.CylinderGeometry(0.08, 0.13, 2.4, 6, 4).translate(0, 0.4, 0), p = g.getAttribute('position');
@@ -263,6 +293,9 @@ export interface Mooring {
   readonly rocks: THREE.Matrix4[];
   readonly bollards: THREE.Matrix4[];
   readonly posts: THREE.Matrix4[];
+  /** A lagoon harbour's jetty: its runs of dressed coral rag, and the foam lapping their faces. */
+  readonly jetty: THREE.Matrix4[];
+  readonly lap: THREE.Matrix4[];
 }
 
 const unit = (p: V3) => new THREE.Vector3(p.x, p.y, p.z).normalize();
@@ -338,11 +371,12 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
   const S = newSurface(), n = HARBOUR.rays, step = (2 * Math.PI) / n;
   return geo.harbours.map((hb, index) => {
     const rng = seeded(index + 1), up = unit(hb.pos), [f, s] = tangents(up, hb.facing), r = hb.r, mole = r * HARBOUR.mole;
-    // in a coral lagoon the mole is a causeway of coral blocks a man can heave, not a ring of crags as wide as the reef
+    // a coral lagoon is its own breakwater (S-021: a ring of boulders inside it read as a necklace of nuggets): no mole,
+    // a jetty of dressed coral rag out from the nearest shore instead, the lamp on its head
     // Spice Harbour's mole is built (spiceIsles.ts lays its dressed stone): here only its rubble toe, stones a man can
     // heave, along two short arms from the flanks that leave the mouth wide open (MOLE: angles off the mouth, radius)
     const built = REGIONS[regionOf(hb.pos)]?.id === 'spiceIsles';
-    const k = REGIONS[regionOf(hb.pos)]?.flora.includes('coral') ? 0.4 : built ? 0.3 : 1;
+    const coral = REGIONS[regionOf(hb.pos)]?.flora.includes('coral') ?? false, k = coral ? 0.4 : built ? 0.3 : 1;
     const ground = (p: THREE.Vector3) => field.surface(p, -TIDE.amp, S).height;
     const shore = Array.from({ length: n }, (_, a) => {
       for (let t = 0.6; t <= 1.6 * r; t += 0.4) if (heightAt(geo, along(up, f, s, a * step, t)) > 0) return t;
@@ -364,13 +398,37 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
     const mouthA = allOpen ? 0 : (start + (len - 1) / 2) * step, half = allOpen ? 0.4 : Math.min(0.4, len * step * 0.2);
     const arms: [number, number, number][] = []; // land end angle, mouth end angle, land end radius
     if (built) arms.push([-MOLE.land, -MOLE.mouth, shoreAt(-MOLE.land)], [MOLE.land, MOLE.mouth, shoreAt(MOLE.land)]);
+    else if (coral) { /* the jetty, below */ }
     else if (allOpen) arms.push([mouthA - half - HARBOUR.arm, mouthA - half, mole], [mouthA + half + HARBOUR.arm, mouthA + half, mole]);
     else if (len > 0) {
       arms.push([(start - 0.5) * step, mouthA - half, Math.min(shore[(start + n - 1) % n] + 0.6, 1.2 * r)]);
       arms.push([(start + len - 0.5) * step, mouthA + half, Math.min(shore[(start + len) % n] + 0.6, 1.2 * r)]);
     }
-    const rocks: THREE.Matrix4[] = [], bollards: THREE.Matrix4[] = [], posts: THREE.Matrix4[] = [];
+    const rocks: THREE.Matrix4[] = [], bollards: THREE.Matrix4[] = [], posts: THREE.Matrix4[] = [], jetty: THREE.Matrix4[] = [], lap: THREE.Matrix4[] = [];
     let head: { p: THREE.Vector3; top: number; span: number } | null = null;
+    const nearest = shore.reduce((b, t, a) => (t < shore[b] ? a : b), 0);
+    if (coral && shore[nearest] < Infinity) {
+      // from half a pace up the shore out over the water, its runs standing on the floor (their footing bedded), the
+      // coping clear of high water; rubble at the foot of each face, a bollard every other run, the lamp on the head
+      const a = nearest * step, from = shore[nearest] + 0.5, to = Math.max(JETTY.reach * r, shore[nearest] - JETTY.long);
+      const n = Math.max(2, Math.round((from - to) / JETTY.run)), len = (from - to) / n;
+      const dir = f.clone().multiplyScalar(Math.cos(a)).addScaledVector(s, Math.sin(a));
+      for (let i = 0; i < n; i++) {
+        const t = from - (i + 0.5) * len, p = along(up, f, s, a, t), g = ground(p);
+        jetty.push(stand(p, dir, JETTY.coping, new THREE.Vector3(1, Math.max(0.4, (JETTY.coping - g + 0.3) / 1.6), len * 1.04)));
+        if (g < -TIDE.amp) lap.push(stand(p, dir, 0, new THREE.Vector3(1, 1, len)));
+        for (const side of [-1, 1]) {
+          const q = along(up, f, s, a + side * (JETTY.half + 0.15 + 0.2 * rng()) / t, t + (rng() - 0.5) * len);
+          rocks.push(boulder(q, f, (0.6 + 0.5 * rng()) * k, rng, ground(q), -Infinity));
+        }
+        if (i % 2 === 1) bollards.push(stand(along(up, f, s, a + ((i % 4 === 1 ? 1 : -1) * (JETTY.half - 0.25)) / t, t), f, JETTY.coping, new THREE.Vector3(0.7, 0.7, 0.7), rng() * 6.283));
+      }
+      // the head: a last run across the line, wider, the lamp on it
+      const p = along(up, f, s, a, to + 0.1);
+      jetty.push(stand(p, dir, JETTY.coping, new THREE.Vector3(1.5, Math.max(0.4, (JETTY.coping - ground(p) + 0.3) / 1.6), 1.25)));
+      lap.push(stand(p, dir, 0, new THREE.Vector3(1.5, 1, 1.25)));
+      head = { p, top: JETTY.coping, span: 0 };
+    }
     for (const [landA, mouthEnd, landR] of arms) {
       let from = landA, rFrom = landR;
       if (Math.abs(mouthEnd - from) > HARBOUR.arm) [from, rFrom] = [mouthEnd - Math.sign(mouthEnd - from) * HARBOUR.arm, mole];
@@ -422,7 +480,7 @@ export function layHarbours(geo: Geography, field: TerrainField): Mooring[] {
       lampH = ground(lampP);
     }
     return {
-      region: hb.region, pos: up, r, rocks, bollards, posts,
+      region: hb.region, pos: up, r, rocks, bollards, posts, jetty, lap,
       mouth: f.clone().multiplyScalar(Math.cos(mouthA)).addScaledVector(s, Math.sin(mouthA)),
       lamp: lampP.clone().multiplyScalar(R + lampH + HARBOUR.lamp),
       lampMatrix: stand(lampP, f, lampH, new THREE.Vector3(1, 1, 1)),
@@ -478,9 +536,11 @@ export class Structures {
   readonly harbours: Mooring[];
   private readonly material: THREE.ShaderMaterial;
   private readonly masonry: THREE.ShaderMaterial;
-  /** Near and far lighthouses, rocks, bollards, posts, harbour lamps: six draw calls. */
+  private readonly lapping: THREE.ShaderMaterial;
+  /** Near and far lighthouses, rocks, bollards, posts, harbour lamps, lagoon jetties and their foam: eight draw calls. */
   private readonly draws: Instances[];
   private readonly stone: THREE.Vector3[];
+  private readonly rag: THREE.Vector3;
   private readonly accent: THREE.Vector3[];
   /** Per lighthouse 0 dropped, 1 near, 2 far; then per harbour 0 dropped, 1 seen. */
   private readonly state: Int8Array;
@@ -489,7 +549,8 @@ export class Structures {
   private readonly eye = new THREE.Vector3();
   private horizon = 0;
 
-  constructor(style: Style, geo: Geography, field: TerrainField, lights: Lights, beams: Beams) {
+  /** `level`: the sea's level uniform (the tide), shared so a jetty's foam laps its faces at every tide. */
+  constructor(style: Style, geo: Geography, field: TerrainField, lights: Lights, beams: Beams, level: { value: number } = { value: 0 }) {
     this.towers = layLighthouses(geo, field);
     this.towers.forEach((t, i) => beams.seat(i, t.lamp));
     this.harbours = layHarbours(geo, field);
@@ -497,8 +558,16 @@ export class Structures {
     this.material = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide });
     // the harbour lamps' pillars in coursed masonry (their stone-tinted parts), the boulders and bollards natural stone
     this.masonry = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide, surface: masonrySurface(false) });
+    // the foam round a jetty floats on the tide: its parts raised by the sea's level along their up (scaled 1 there)
+    this.lapping = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, anchor: 'object', side: THREE.DoubleSide });
+    const vs = this.lapping.vertexShader, at = 'vec4 w = model * vec4(position, 1.0);';
+    if (!vs.includes(at) || !vs.includes('void main() {')) throw new Error('Structures: the illustrated vertex shader changed; the jetty foam cannot ride the tide');
+    this.lapping.vertexShader = vs.replace('void main() {', 'uniform float uLevel;\nvoid main() {').replace(at, 'vec4 w = model * vec4(position + vec3(0.0, uLevel + 0.03, 0.0), 1.0);');
+    this.lapping.uniforms.uLevel = level;
     // the region's land pigment lightened toward a warm limestone, and its accent for the band
     this.stone = REGIONS.map((r) => transmittanceVec(PIGMENTS[r.pigments.land]).lerp(transmittanceVec(PIGMENTS.ochre), 0.45));
+    // a lagoon harbour's stone is the reef's own: coral rag, bleached cream-grey (never the land's golden limestone)
+    this.rag = transmittanceVec(mix(mix(PIGMENTS.leadWhite, PIGMENTS.ochre, 0.32), PIGMENTS.sepia, 0.14));
     this.accent = REGIONS.map((r) => transmittanceVec(PIGMENTS[r.pigments.accent]));
     const t = this.towers.length, hs = this.harbours, sum = <T>(xs: T[], k: (x: T) => number) => xs.reduce((a, x) => a + k(x), 0);
     this.draws = [
@@ -508,6 +577,8 @@ export class Structures {
       new Instances(bollardKit(), this.material, sum(hs, (m) => m.bollards.length)),
       new Instances(postKit(), this.material, sum(hs, (m) => m.posts.length)),
       new Instances(lampKit(), this.masonry, hs.length),
+      new Instances(jettyKit(), this.masonry, sum(hs, (m) => m.jetty.length)),
+      new Instances(lapKit(), this.lapping, sum(hs, (m) => m.lap.length)),
     ];
     this.lamps = hs.map((h) => lights.add({ pos: h.lamp, reach: HARBOUR.reach }));
     this.state = new Int8Array(t + hs.length).fill(-1);
@@ -541,7 +612,7 @@ export class Structures {
   }
 
   private refill(): void {
-    const [near, far, rocks, bollards, posts, lamps] = this.draws, c = [0, 0, 0, 0, 0, 0], t = this.towers.length;
+    const [near, far, rocks, bollards, posts, lamps, jetty, lap] = this.draws, c = [0, 0, 0, 0, 0, 0, 0, 0], t = this.towers.length;
     this.towers.forEach((tw, i) => {
       const v = this.state[i], st = this.stone[tw.region], ac = this.accent[tw.region];
       if (!v) return;
@@ -549,12 +620,14 @@ export class Structures {
       for (const m of tw.rocks) rocks.set(c[2]++, m, st, ac);
     });
     this.harbours.forEach((h, k) => {
-      const st = this.stone[h.region], ac = this.accent[h.region];
+      const st = REGIONS[h.region].flora.includes('coral') ? this.rag : this.stone[h.region], ac = this.accent[h.region];
       if (!this.state[t + k]) return;
       for (const m of h.rocks) rocks.set(c[2]++, m, st, ac);
       for (const m of h.bollards) bollards.set(c[3]++, m, st, ac);
       for (const m of h.posts) posts.set(c[4]++, m, st, ac);
       lamps.set(c[5]++, h.lampMatrix, st, ac);
+      for (const m of h.jetty) jetty.set(c[6]++, m, st, ac);
+      for (const m of h.lap) lap.set(c[7]++, m, st, ac);
     });
     this.draws.forEach((d, j) => d.commit(c[j]));
   }
@@ -569,6 +642,7 @@ export class Structures {
     for (const d of this.draws) d.dispose();
     this.material.dispose();
     this.masonry.dispose();
+    this.lapping.dispose();
   }
 }
 
@@ -576,7 +650,7 @@ export class Structures {
 export function createStructures(ctx: RenderContext): RenderModule {
   const sky = skies.get(ctx.scene), terrain = terrains.get(ctx.scene);
   if (!sky || !terrain) throw new Error('createStructures: the sky and the terrain are built first (MODULES order)');
-  const structures = new Structures(ctx.pipeline.style, ctx.world.geo, terrain.field, sky.lights, sky.beams);
+  const structures = new Structures(ctx.pipeline.style, ctx.world.geo, terrain.field, sky.lights, sky.beams, seas.get(ctx.scene)?.swell.uniforms.uSeaLevel);
   ctx.scene.add(structures.group);
   return {
     frame() {

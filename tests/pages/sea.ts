@@ -55,7 +55,7 @@ const sky = new Sky(style, geo);
 scene.add(sky.group);
 
 // lighthouses on their headlands and the harbours' moorings, stood on the terrain, their lamps in the sky's registry
-const structures = new Structures(style, geo, terrain.field, sky.lights, sky.beams);
+const structures = new Structures(style, geo, terrain.field, sky.lights, sky.beams, sea.swell.uniforms.uSeaLevel);
 const flora = new Flora(pipeline.style, geo, terrain.field, sea.swell);
 scene.add(flora.group);
 scene.add(structures.group);
