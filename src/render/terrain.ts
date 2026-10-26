@@ -822,6 +822,38 @@ void main() {
     col *= 1.0 - 0.3 * has * smoothstep(0.0, 0.3, so.y);
   }
 
+  // a sand beach's foreshore near the eye (not mud, coral, shingle or black sand): the shore break's foam at the water's
+  // edge; above it the swash runs up the wet sand in a thin glassy film, its edge a broken line of foam scalloped between
+  // the beach's cusps (the horns pointing to the sea, the bays running furthest up), pulsing as the swash runs and
+  // falls; above that the last swash's mark, a darker wavering line on the wet sand; so the waterline is never one
+  // ruled line under a strip of paper (S-022)
+  float sandy = step(abs(shore.w), 0.5) * (1.0 - rel.y) * (1.0 - rel.z) * step(shore.z, 0.5) * (1.0 - reef) * beach
+              * (1.0 - smoothstep(0.03, 0.09, upx)) * (1.0 - smoothstep(4.0, 7.0, length(cameraPosition) - SEA_R - uSeaLevel)); // (at deck level, as the sea's)
+  float swEdge = 0.0, swMark = 0.0;
+  if (sandy > 0.01 && above < 0.5) {
+    // (u up the beach from the water: the sea's field's height over the slope of that field across a pace, as the sea
+    // paints the waterline from it; never by the pixel's derivatives, which step from texel to texel and speckle)
+    vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
+    const float E = 0.7 / SEA_R;
+    vec2 rise = vec2(seaField(normalize(dir + t1 * E)).x - seaField(normalize(dir - t1 * E)).x, seaField(normalize(dir + t2 * E)).x - seaField(normalize(dir - t2 * E)).x);
+    float wd = above / clamp(length(rise) / 1.4, 0.08, 0.8), fw = max(fwidth(wd), 1e-4);
+    float cn = noise3(vec3(pl / 2.1, 0.0) + 3.3), bay = min(1.0, abs(cn) * 2.4);    // 0 at a cusp's horn, 1 in its bay
+    float run = 0.82 + 0.18 * sin(uTime * 0.95 + 5.0 * cn);
+    float reach = max((0.12 + 0.3 * bay) * run, 6.0 * fw), foamW = max(0.025 + 0.04 * bay * run, 2.0 * fw);
+    float film = 1.0 - smoothstep(reach - fw, reach + fw, wd);
+    float grain = noise3(vec3(pl / max(0.3, 6.0 * fw), uTime * 0.2) + 1.7);
+    float rimW = max(0.04 + 0.03 * bay, 2.5 * fw);
+    float rim = (1.0 - smoothstep(0.0, rimW, reach - wd)) * film * smoothstep(-0.45, 0.1, grain);          // the swash's foam edge, broken
+    float bt = foamW * (0.6 + 0.6 * smoothstep(-0.5, 0.5, grain)), brk = (1.0 - smoothstep(bt - fw, bt + fw, wd)) * smoothstep(0.0, 0.3, grain); // the shore break's foam, in scraps
+    float mk = reach / run + max(0.12, 4.0 * fw) + 0.08 * noise3(vec3(pl / 0.9, 2.0)), mkW = max(0.02, 1.2 * fw);
+    swMark = (1.0 - smoothstep(mkW, mkW + fw, abs(wd - mk))) * smoothstep(-0.4, 0.0, noise3(vec3(pl / 0.6, 5.0))) * sandy;
+    // the film: the sand darker and cooler under it
+    col = glaze(glaze(col, VERD_T, 0.16 * film * sandy, 0.0, q), SEPIA_T, 0.14 * film * sandy, 0.0, q);
+    col = glaze(col, SEPIA_T, 0.12 * (1.0 - film) * (1.0 - smoothstep(mk - fw, mk + fw, wd)) * sandy + 0.3 * swMark, 0.0, q); // wet below the mark
+    col = mix(col, ground * LEAD / PARCH * 1.04, 0.9 * max(rim, brk) * sandy);
+    swEdge = (1.0 - smoothstep(0.4, 1.1, abs(wd - reach) / fw / uRenderPx)) * smoothstep(-0.1, 0.25, noise3(vec3(pl / 0.8, 7.0))) * sandy;
+  }
+
   float lines = 0.0;
   vec2 across = normalize(vec2(-dot(n0, NC), dot(n0, E)) + 1e-4);
   float jc = dot(pl, across) / JOINT; // along the face
@@ -881,6 +913,7 @@ void main() {
   // and the beach's foot, where its sand meets the awash flat (the islet's waterline at high water), so each motu is
   // drawn round on the reef rather than the reef's lip inked as one ring (the sea's waterline ink lightens there)
   lines += inkLine(beachD, fwidth(beachD), LINE_CSS * 0.8) * step(beachD, 1.0) * f.w * 0.75;
+  lines += 0.45 * swEdge; // the swash's edge, a fine broken pen line along its scallops
   // the brow and foot of every cliff, heavier near the eye
   // (broken into lengths, so a rounded crag's brow never draws a ring round it)
   lines += inkLine(up0 - CLIFF_UP, fwidth(up0), LINE_CSS * mix(1.5, 0.8, smoothstep(0.0, uFade.x, dist))) * 0.8 * (1.0 - 0.5 * low)
@@ -918,8 +951,9 @@ void main() {
   // the inner half of the sea's waterline, and nothing past it (a wall's foot meets the sea's own coast rings)
   float cw = COAST_CSS * uRenderPx;
   // (a reef's lip light and broken, as the sea draws it, and so the composite's line where the two meet)
-  float wl = (wall ? 0.0 : 0.9) * (1.0 - smoothstep(cw - 0.5, cw + 0.5, above / max(fwidth(above), 1e-4)));
+  float wl = (wall ? 0.0 : 0.9) * (1.0 - smoothstep(cw - 0.5, cw + 0.5, above / max(fwidth(above), 1e-4))) * (1.0 - sandy);
   col = mix(col, uInk, wl * lip);
+  lip *= 1.0 - 0.85 * sandy * (1.0 - smoothstep(0.3, 0.6, above)); // (and the composite's line there, light: the swash draws a beach's edge)
   if (above < 0.0 && !wall) discard;
   writeInk(candle(col, vWorld), n0, lip);
 }

@@ -770,10 +770,49 @@ void main() {
       swellInk *= exposed * detail * near;
     }
   }
+  // off a beach (a gentle shore near the eye, not a cliff's foot nor a reef's lip): the shore break's foam lies in
+  // scallops along the water's edge between the beach's cusps, its seaward edge the waterline's pen, wavering and broken,
+  // never ruled; broken lace drifts off it; the swell's last ripples come in as short pen strokes along the shore,
+  // closing up as the water shoals, broken along their length (S-022)
+  // (the shore's distance and slope from the floor's rise over a pace or so, never from the pixel's own derivatives,
+  // which step from texel to texel and speckle at a low eye)
+  float gentle = 0.0, ripple = 0.0, shoreLace = 1.0 - smoothstep(0.3, 1.1, shore);
+  // (a deck-level eye's detail: from higher the chart's coast rings and the foam band draw the shore, as in the Amber
+  // Shoals' flats)
+  float deckEye = 1.0 - smoothstep(4.0, 7.0, length(cameraPosition) - SEA_R - uSeaLevel);
+  if (depth < 3.5 && f.w < 0.2 && upx < 0.09 && water > 0.01 && deckEye > 0.01) {
+    vec3 t1 = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(dir, t1);
+    const float E = 0.7 / SEA_R;
+    vec2 rise = vec2(seaField(normalize(dir + t1 * E)).x - seaField(normalize(dir - t1 * E)).x, seaField(normalize(dir + t2 * E)).x - seaField(normalize(dir - t2 * E)).x);
+    float slopeS = length(rise) / 1.4, sd = depth / max(slopeS, 0.04);
+    gentle = (1.0 - smoothstep(0.9, 1.4, slopeS)) * (1.0 - smoothstep(0.02, 0.2, f.w)) * (1.0 - smoothstep(0.03, 0.09, upx)) * deckEye;
+    if (gentle > 0.01) {
+      float fs = max(fwidth(sd), 1e-4);
+      float bayS = min(1.0, abs(vnoise(xs / 1.9 + 3.3) - 0.5) * 4.4), pulse = 0.85 + 0.15 * sin(uTime * 0.95 + 9.0 * wob);
+      float sw = max((0.06 + 0.22 * bayS) * pulse + 0.03 * fine, 2.0 * fs), edgeD = sd - sw;
+      // (solid at the water's edge, broken into foam and bubbles out to its scalloped edge)
+      float lens = (1.0 - smoothstep(-fs, fs, edgeD - max(0.05, 3.0 * fs) * (vnoise(xs / 0.5) - 0.5)))
+                 * max(1.0 - smoothstep(0.2 * sw, 0.45 * sw, sd), smoothstep(0.42, 0.58, vnoise(xs / 0.28 + vec2(0.0, uTime * 0.1)) + 0.25 * fine));
+      foam = mix(foam, max(lens, 0.75 * bore) * water, gentle);
+      float edgeInk = (1.0 - smoothstep(cw - 0.5, cw + 0.5, abs(edgeD) / fs)) * smoothstep(0.25, 0.45, vnoise(xs / 1.1 + 5.0));
+      coast = mix(coast, 0.8 * edgeInk, gentle);
+      shoreLace = mix(shoreLace, (1.0 - smoothstep(sw + 0.1, sw + 0.6, sd)) * smoothstep(0.4, 0.6, vnoise(xs / 1.4 + wp * uTime * 0.05 + 2.0))
+                  * (1.0 - smoothstep(0.05, 0.1, fs)), gentle);
+      // the ripples: crests at whole phases, closer as the water shoals, running in with the swell, each drawn as short
+      // strokes swelling and thinning along it, a second set between them lighter and sparser
+      float ph = sqrt(max(edgeD, 0.0) + 0.3) * 4.2 + uTime / 3.4 + 0.5 * wob, wph = max(fwidth(ph), 1e-5);
+      for (int k = 0; k < 2; k++) {
+        float pk = ph + 0.5 * float(k), ci = floor(pk + 0.5);
+        float env = smoothstep(0.42 + 0.08 * float(k), 0.62, vnoise(xs / 0.32 + vec2(ci * 7.3 + float(k) * 19.0, ci * 3.1)));
+        ripple = max(ripple, (1.0 - smoothstep(0.6 * env, 0.6 * env + 0.9, abs(pk - ci) / wph / uRenderPx)) * step(0.02, env) * (1.0 - 0.4 * float(k)));
+      }
+      ripple *= gentle * smoothstep(0.15, 0.6, edgeD) * (1.0 - smoothstep(4.5, 8.0, sd)) * near * (1.0 - smoothstep(0.2, 0.4, wph));
+    }
+  }
   // lace over every reach of reef a keel would strike at this tide, drifting and pulsing with the swell; far off, a pale
   // stipple of it; in the shore's wash only a narrow band off the fringe, thinning out from it (no threads lie loose on
   // the still water beyond)
-  float laceZone = max(f.w * (1.0 - smoothstep(SURF_LACE.x, SURF_LACE.y, depth)) * mix(near, 1.0, clear), (1.0 - smoothstep(0.3, 1.1, shore)) * near) * water * mix(diag, 1.0, clear);
+  float laceZone = max(f.w * (1.0 - smoothstep(SURF_LACE.x, SURF_LACE.y, depth)) * mix(near, 1.0, clear), shoreLace * near) * water * mix(diag, 1.0, clear);
   if (laceZone > 0.02) {
     // the net's threads are the walls between bubbles: bent (the cells looked up through a slow warp, never the straight
     // bisectors of a Voronoi net, which read as cracked glass, S-020), swelling and thinning along their length and
@@ -829,6 +868,7 @@ void main() {
   col = mix(col, pen, laneInk * 0.8);
   col = mix(col, white, laneFoam * 0.85);
   col = mix(col, pen, waves * 0.95);
+  col = mix(col, pen, ripple * (1.0 - lead) * 0.75);
   col = mix(col, white, max(caps * 0.95, spin * 0.6));
   col = mix(col, uInk, coast * 0.9);
   // the far sea goes into the sky's horizon wash (render/sky.ts lays the same), so sea and sky meet at every hour
@@ -854,7 +894,7 @@ void main() {
 #ifdef HEADS_PROBE
   outColor = vec4(heads, 0.0, 0.0, 1.0); outAux = vec4(0.0); return; // tests: how much of each point a coral head covers
 #endif
-  writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)), off > 0.0 ? lipInk(dir, off) : 1.0); // (the composite's line where sea meets reef as light)
+  writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)), (off > 0.0 ? lipInk(dir, off) : 1.0) * (1.0 - 0.85 * gentle)); // (the composite's line where sea meets reef as light)
 }
 `;
 
