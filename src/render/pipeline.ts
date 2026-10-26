@@ -195,6 +195,20 @@ vec4 anchored(vec3 p, float size) {
   vec2 q = vec2(p.x + 0.43 * p.z, p.y - 0.29 * p.z);
   return mix(textureLod(tPaper, q / s, 0.0), textureLod(tPaper, q / (2.0 * s) + 0.5, 0.0), f);
 }
+// One family of the cast shade's hatching over frame coordinates xw (world units, fixed to the world), its strokes
+// along angle ang: spaced from the frame's change across them per render px (dxw, dyw), so ground or water seen at a
+// glance keeps its strokes spaced, never filled in; p, the world units per render px at this depth, bounds that change
+// where the depth breaks. w: stroke width as a share of the spacing; spacing: a multiple of the style's.
+float castHatch(vec2 xw, vec2 dxw, vec2 dyw, float ang, float p, float w, float spacing) {
+  vec2 d = vec2(cos(ang), sin(ang)), n = vec2(-d.y, d.x);
+  float x = dot(xw, n), y = dot(xw, d);
+  float hpx = clamp(length(vec2(dot(dxw, n), dot(dyw, n))), p, 40.0 * p);
+  float k = log2(hpx * uRenderPx * HATCH_SPACING * spacing), S = exp2(floor(k)), i = floor(x / S + 0.5);
+  float brk = step(0.1, fract(y / (S * 11.0) + hash11(i * 0.7317 + 11.7)));        // strokes lifted now and then
+  return clamp(0.5 * w * S / hpx - abs(x - i * S) / hpx + 0.5, 0.0, 1.0) * brk
+       * (mod(i, 2.0) > 0.5 ? 1.0 - fract(k) : 1.0);                                // every second fades out as the spacing doubles
+}
+const float CAST_TURN = 0.2617994; // the hatching's steps as the sun swings round, rad (15°)
 const vec3 SLATE = vec3(${SLATE.map((x) => x.toFixed(5)).join(', ')});
 
 void main() {
@@ -210,8 +224,15 @@ void main() {
     vec4 a = texelFetch(tAux, px, 0);
     vec3 P = viewPos(gl_FragCoord.xy / size, texelFetch(tDepth, px, 0).r);
     vec3 W = (uViewInv * vec4(P, 1.0)).xyz, up = normalize(W);
-    vec3 sG = normalize(uSun - up * dot(uSun, up) + 1e-5), pG = cross(up, sG);
-    vec2 hc = vec2(dot(W, pG), dot(W, sG));
+    vec3 sG = normalize(uSun - up * dot(uSun, up) + 1e-5);
+    // the hatching's frame: the face of the planet's cube that the ground looks to (fixed to the world; a frame built on
+    // the ground's own up would be degenerate, since W is that up times the radius, and fill every stroke in), its strokes
+    // along the sun's bearing turned in steps of 15° and eased from one step to the next as the sun swings round
+    vec3 au = abs(up);
+    int pl = au.x > au.y && au.x > au.z ? 0 : au.y > au.z ? 1 : 2;
+    vec2 xw = pl == 0 ? W.yz : pl == 1 ? W.zx : W.xy, dxw = dFdx(xw), dyw = dFdy(xw);
+    vec2 sw = pl == 0 ? sG.yz : pl == 1 ? sG.zx : sG.xy;
+    float turn = atan(sw.y, sw.x) / CAST_TURN, turn0 = floor(turn), ease = smoothstep(0.3, 0.7, turn - turn0);
     float z = -P.z, cssWorld = z * uPxAngle * uRenderPx;
     float blot = anchored(W, cssWorld * 90.0).g;
     if (a.b > 0.5 / 255.0) { // not the sky
@@ -222,13 +243,15 @@ void main() {
       float rim = s * (1.0 - s) * 4.0;               // pigment pooled where the wash dried at its edge
       s *= uLow * c.a * (1.0 - smoothstep(350.0, 800.0, z));
       if (s > 0.0) {
-        col = wash(col, uShade, s * 0.5 + rim * uLow * c.a * 0.25);
-        float hpx = max(z * uPxAngle / max(abs(dot(N, normalize(-P))), 0.25), 1e-5); // world units per render px
-        float k = log2(hpx * uRenderPx * HATCH_SPACING), S = exp2(floor(k)), i = floor(hc.x / S + 0.5);
-        float brk = step(0.1, fract(hc.y / (S * 11.0) + hash11(i * 0.7317 + 11.7)));    // strokes lifted now and then
-        float h = clamp(0.17 * S / hpx - abs(hc.x - i * S) / hpx + 0.5, 0.0, 1.0) * brk
-                * (mod(i, 2.0) > 0.5 ? 1.0 - fract(k) : 1.0);                         // every second fades out as the spacing doubles
-        col = mix(col, wash(hatchInk(0.7), uShade, 0.8), h * s * 0.85);
+        // water and level ground seen at a glance take only a light cool wash with spaced, finer strokes: there the
+        // shade lies foreshortened into a band, and a full wash and hatching read as a slab of slate
+        float nv = abs(dot(N, normalize(-P))), level = smoothstep(0.8, 0.95, dot(mat3(uViewInv) * N, up));
+        float light = level * smoothstep(0.75, 0.25, nv);
+        col = wash(col, uShade, (s * 0.5 + rim * uLow * c.a * 0.25) * mix(1.0, 0.6, light));
+        float p = max(z * uPxAngle, 1e-5), w = mix(0.34, 0.18, light), sp = mix(1.0, 2.0, light), h = 0.0;
+        if (ease < 1.0) h = castHatch(xw, dxw, dyw, turn0 * CAST_TURN, p, w, sp) * (1.0 - ease);
+        if (ease > 0.0) h += castHatch(xw, dxw, dyw, (turn0 + 1.0) * CAST_TURN, p, w, sp) * ease;
+        col = mix(col, wash(hatchInk(mix(0.7, 0.35, light)), uShade, mix(0.8, 1.2, light)), h * s * mix(0.85, 0.6, light));
       }
     }
   }
