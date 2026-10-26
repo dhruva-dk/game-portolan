@@ -354,10 +354,12 @@ vec3 laneFlow(vec3 d, out float edge) {
 void main() {
   vec3 dir = normalize(vRest);
   vec3 P = dir * SEA_R; // the paper and every mark ride the water
-  Paper q = paperAt(P, dir, 1.0);
+  vec4 f = seaField(dir);
+  // (the paper's foxing kept faint over a lagoon: on its pale water a foxing spot read as a brown stain on the reef
+  // from height, S-024)
+  Paper q = paperAt(P, dir, 1.0 - 0.8 * smoothstep(0.3, 0.7, f.z));
   vec3 tw = triWeights(dir, 4.0);
   float upx = max(length(dFdx(P)), length(dFdy(P)));
-  vec4 f = seaField(dir);
   float wob = tri(tPaper, P / 23.0, tw).b - 0.5; // a broad, world-fixed waver for every drawn edge
   float fine = tri(tPaper, P / 4.1, tw).g - 0.5;  // the nib's own tremor
   float depth = uSeaLevel - f.x, fwD = fwidth(depth);
@@ -729,6 +731,9 @@ void main() {
              * pow(0.8, max(kr, 0.0)) * (0.75 + 0.6 * fine) * smoothstep(2.5, 5.0, 1.0 / max(fx, 1e-5)) * water * (1.0 - far);
   // (chart notation: over clear water a low eye sees through, depth grades in the washes, never in beaded rings)
   ring *= mix(1.0, smoothstep(10.0, 24.0, length(cameraPosition) - SEA_R - uSeaLevel), clear);
+  // (nor inside a lagoon from any height: its shallows and heads are drawn in its washes, and the rings round each
+  // bommie closed into survey targets, S-024)
+  ring *= 1.0 - smoothstep(0.3, 0.7, f.z);
   float cw = COAST_CSS * uRenderPx;
   float coast = 1.0 - smoothstep(cw - 0.5, cw + 0.5, abs(depth) / max(fwD, 1e-4));
   // foam: a fringe at the waterline, bores running in to it, the reef crests breaking as the swell lifts, and lace —
