@@ -243,15 +243,15 @@ void main() {
       float rim = s * (1.0 - s) * 4.0;               // pigment pooled where the wash dried at its edge
       s *= uLow * c.a * (1.0 - smoothstep(350.0, 800.0, z));
       if (s > 0.0) {
-        // water and level ground seen at a glance take only a light cool wash with spaced, finer strokes: there the
-        // shade lies foreshortened into a band, and a full wash and hatching read as a slab of slate
+        // water and level ground seen at a glance take only a light, soft cool wash, the strokes fading out: there the
+        // shade lies foreshortened into a band, a full wash reads as a slab of slate and ruled strokes as planks (S-025)
         float nv = abs(dot(N, normalize(-P))), level = smoothstep(0.8, 0.95, dot(mat3(uViewInv) * N, up));
         float light = level * smoothstep(0.75, 0.25, nv);
         col = wash(col, uShade, (s * 0.5 + rim * uLow * c.a * 0.25) * mix(1.0, 0.6, light));
         float p = max(z * uPxAngle, 1e-5), w = mix(0.34, 0.18, light), sp = mix(1.0, 2.0, light), h = 0.0;
         if (ease < 1.0) h = castHatch(xw, dxw, dyw, turn0 * CAST_TURN, p, w, sp) * (1.0 - ease);
         if (ease > 0.0) h += castHatch(xw, dxw, dyw, (turn0 + 1.0) * CAST_TURN, p, w, sp) * ease;
-        col = mix(col, wash(hatchInk(mix(0.7, 0.35, light)), uShade, mix(0.8, 1.2, light)), h * s * mix(0.85, 0.6, light));
+        col = mix(col, wash(hatchInk(mix(0.7, 0.35, light)), uShade, mix(0.8, 1.2, light)), h * s * mix(0.85, 0.0, light));
       }
     }
   }
