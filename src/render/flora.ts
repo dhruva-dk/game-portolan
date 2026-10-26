@@ -106,11 +106,25 @@ class Kit {
     }
   }
 
+  /** A limb from `a` to `b` bowing up by `arch` on the way (a quadratic curve, never a straight plank), tapering
+   *  from `r0` to `r1`; returns its path. */
+  limb(a: THREE.Vector3, b: THREE.Vector3, r0: number, r1: number, arch: number, sides: number, pt: Paint): THREE.Vector3[] {
+    const m = a.clone().lerp(b, 0.5).addScaledVector(UP, arch), path: THREE.Vector3[] = [];
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      path.push(a.clone().multiplyScalar((1 - t) * (1 - t)).addScaledVector(m, 2 * t * (1 - t)).addScaledVector(b, t * t));
+    }
+    this.tube(path, path.map((_, i) => r0 + (r1 - r0) * Math.pow(i / 4, 0.8)), sides, pt);
+    return path;
+  }
+
   /** A clustered leaf mass: an icosphere lobed into clumps, its underside drawn up by `under`, lit as a soft dome and
    *  darker beneath (`open` < 1: deeper in the crown's shade); vertices on its upper side whose pattern exceeds `bloom`
    *  carry the blossom whole, or (dab) a blossom weight the material breaks into soft dabs, thick on the sunward top. */
   mass(c: THREE.Vector3, r: number, squash: number, detail: number, seed: number, bloom = 2, dab = 0, under = 0.6, open = 1): void {
     const ico = new THREE.IcosahedronGeometry(1, detail), pos = ico.getAttribute('position'), q = V(), p = V(), n = V();
+    // each clump its own warmth (the material's greens, cool to warm: aPaint.r below 1; the rest is the instance's)
+    const leaf: Paint = [0.98 * (((Math.sin(seed * 12.9898 + 4.1) * 43758.5453) % 1 + 1) % 1), 1, 1, LEAF[3]];
     for (let k = 0; k < pos.count; k += 3) {
       const ids = [0, 1, 2].map((m) => {
         q.fromBufferAttribute(pos, k + m);
@@ -121,7 +135,7 @@ class Kit {
         // aTint 1 + w: w the blossom (1 whole, as the pattern lays it; below 1 a weight for the material's dabs)
         const w = dab ? Math.min(0.95, dab * smooth(-1, 0.1, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
           : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom ? 1 : 0;
-        return this.vert(p, n, LEAF, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
+        return this.vert(p, n, leaf, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
       });
       this.tri(ids[0], ids[1], ids[2]);
     }
@@ -270,7 +284,7 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
   }
   // the crown: billowing clumps, the largest high in the middle, the rest round it at stepped heights, wider and lower
   // toward the rim (an emergent's in two tiers), each on a limb from the fork
-  const spread = em ? 0.46 : fl ? 0.42 : 0.4, top = em ? 0.93 : 0.86, C = far ? (em ? 3 : 2) : em ? 7 : 5;
+  const spread = em ? 0.46 : fl ? 0.42 : 0.4, top = em ? 0.93 : 0.86, C = far ? (em ? 5 : 2) : em ? 7 : 5;
   const rims: THREE.Vector3[] = [];
   for (let i = 0; i < C; i++) {
     const a = i * 2.39996 + rnd() * 0.8, d = i === 0 && !em ? 0.02 : spread * (far ? (em ? 0.62 : 0.5) : 0.4 + 0.6 * Math.sqrt(rnd()));
@@ -279,16 +293,22 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
     const c = V(Math.cos(a) * d, top - r * 0.6 - tier - (em ? 0.18 : 0.3) * (d / spread) ** 2 + 0.05 * rnd(), Math.sin(a) * d).add(lean);
     // far, an emergent's bole runs on up into a crown massed over it, its limbs into the clumps round it (S-020: a bare
     // pale bole with its clumps off to the sides read as a pole on the skyline)
-    if (em && far) c.set(Math.cos(a) * d * (i ? 0.62 : 0.15), forkY + (i ? 0.2 : 0.3) - tier * 0.5, Math.sin(a) * d * (i ? 0.62 : 0.15)).add(lean);
-    if (em && far) k.tube([fork, c.clone().setY(c.y - r * 0.2)], [0.022, 0.012], 3, bark);
-    else if (em && !far) {
-      // near, a limb rises steeply from the fork and arches out, tapering, and forks under its clump: never a straight
-      // stick (S-020); dark under the crown, the twigs ending in the leaf
-      const end = c.clone().setY(c.y - r * 0.25), elbow = fork.clone().lerp(end, 0.45).setY(fork.y + (end.y - fork.y) * 0.75);
-      k.tube([fork, elbow, end], [0.026, 0.016, 0.008], 4, BARK);
-      const side = V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(r * 0.7 * (rnd() < 0.5 ? -1 : 1));
-      k.tube([elbow, end.clone().add(side).setY(end.y + r * 0.15)], [0.011, 0.005], 3, BARK);
-    } else if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark);
+    // far, S-022: no column stacked over a pole; one clump over the fork, four round it in two tiers far out on spreading
+    // limbs, so the crown is a broad, flat-topped spread the limbs show under
+    if (em && far) {
+      const dd = i ? (i % 2 ? 0.3 : 0.37) + 0.05 * rnd() : 0.03;
+      c.set(Math.cos(a) * dd, forkY + (i === 0 ? 0.27 : i % 2 ? 0.3 : 0.15), Math.sin(a) * dd).add(lean);
+      if (i) k.limb(fork, c.clone().setY(c.y - r * 0.35), 0.022, 0.008, 0.08, 3, bark);
+    } else if (em && !far) {
+      // near, a limb rises steeply from the fork and arches out, tapering, and forks under its clump into two boughs and
+      // a twig: never a straight plank (S-020, S-022); dark under the crown, the twigs ending in the leaf
+      const end = c.clone().setY(c.y - r * 0.3), split = fork.clone().lerp(end, 0.6).setY(fork.y + (end.y - fork.y) * 0.8);
+      const main = k.limb(fork, split, 0.028, 0.017, 0.06, 6, BARK), sw = V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(r * 0.65);
+      const turn = rnd() < 0.5 ? -1 : 1;
+      k.limb(main[4], end.clone().addScaledVector(sw, 0.35 * turn), 0.016, 0.006, 0.04, 5, BARK);
+      k.limb(main[4], end.clone().addScaledVector(sw, -0.9 * turn).setY(end.y + r * 0.1), 0.012, 0.004, 0.05, 4, BARK);
+      k.limb(main[2], main[2].clone().lerp(end, 0.7).addScaledVector(sw, 1.2 * turn).setY(end.y - r * 0.1), 0.009, 0.003, 0.03, 3, BARK);
+    } else if (!far && d > 0.05) k.tube([fork, c.clone().setY(c.y - r * 0.3)], [0.02, 0.008], 3, bark); // (hidden in the canopy)
     k.billow(c, r, em ? 0.66 : 0.74, far ? (i ? (em ? 1 : 0) : em ? 1 : 2) : i ? 2 : 3, 0, seed * 3.1 + i * 2.37, dab, tier ? 0.8 : 1);
     if (d > spread * 0.6) rims.push(c);
   }
@@ -765,6 +785,8 @@ uniform float uTime;
 uniform vec4 uBand; // fade in over x → y u from the eye, out over z → w (or the plant's own thinning distance)
 uniform vec2 uCut; // WP30 part C: the plant's thinning distance × x, at least y (the reach governor)
 uniform float uSway;
+uniform float uHand; // 1: this level hands over to (or from) the other kit plant by plant
+uniform float uFar;
 in vec4 aPaint;
 in float aTint;
 in vec3 aPart;
@@ -782,6 +804,7 @@ out float vEdge;
 out float vBlossom;
 out vec3 vBloom;
 out vec3 vSil;
+out vec2 vLeaf;
 void main() {
   mat4 model = modelMatrix * instanceMatrix;
   vec3 root = model[3].xyz, up = normalize(root);
@@ -829,7 +852,18 @@ void main() {
   vBlossom = aTint > 0.5 ? aTint - 1.0 : 0.0;
   vBloom = aBloom;
   float dist = distance(cameraPosition, root), o1 = min(uBand.w, max(aSeed.y * uCut.x, uCut.y)), o0 = min(uBand.z, o1 * 0.8);
-  vFade = smoothstep(uBand.x, uBand.y, dist) * (1.0 - smoothstep(o0, o1, dist)) * seen;
+  float fin = smoothstep(uBand.x, uBand.y, dist), fout = 1.0 - smoothstep(o0, o1, dist);
+  if (uHand > 0.5) {
+    // the hand-over between the near and far kits: each plant at its own distance across the band, dissolving quickly
+    // (both levels the same plant's same distance, so the far fills exactly what the near leaves): at any moment only
+    // the odd plant is between its kits, never a whole band of stippled crowns (S-022)
+    float j = 0.1 + 0.8 * fract(aSeed.x * 7.13 + 0.37);
+    if (uFar > 0.5) fin = smoothstep(-0.35, 0.35, dist - mix(uBand.x, uBand.y, j));
+    else fout = (1.0 - smoothstep(-0.35, 0.35, dist - mix(uBand.z, uBand.w, j))) * (1.0 - smoothstep(0.8 * o1, o1, dist) * step(o1, uBand.w - 0.01));
+  }
+  vFade = fin * fout * seen;
+  // a leaf mass's leaf (the instance's: broad, pinnate or palmate) and its clump's warmth (aPaint.r below 1: cool → warm)
+  vLeaf = vec2(fract(aSeed.x * 3.71 + 0.13), aTint > 0.5 && aPaint.r < 0.99 ? aPaint.r : 0.5);
   gl_Position = projectionMatrix * viewMatrix * w;
 #ifdef VEIL
   vec4 sc = projectionMatrix * viewMatrix * vec4(surf, 1.0);
@@ -850,6 +884,7 @@ in float vEdge;
 in float vBlossom;
 in vec3 vBloom;
 in vec3 vSil;
+in vec2 vLeaf;
 uniform float uFar;
 uniform vec3 uOchre;
 uniform vec3 uRose;
@@ -898,6 +933,24 @@ float blossomAt(vec3 p, float w, float rim, out float other, out float deep, out
   }
   return max(b, 0.1 * w);
 }
+// a leaf in its own frame (x from its stalk at 0 to its tip at 1, y across), as an engraver draws it: 0 a broad leaf,
+// a pointed oval outlined on its shaded side with its midrib; 1 pinnate, a rib with leaflets swept to the tip in pairs;
+// 2 palmate, five fingers fanned from the stalk. Its body (for the silhouette) and its ink, px its pixel in leaf units
+float leafBody(vec2 f) {
+  float x = clamp(f.x, 0.0, 1.0);
+  return step(0.0, f.x) * step(f.x, 1.0) * smoothstep(0.0, 0.04, 0.22 * sin(3.1416 * x) * (1.0 - 0.3 * x) - abs(f.y));
+}
+float leafInk(vec2 f, float kind, float px) {
+  float lw = 0.045 + 0.7 * px, x = clamp(f.x, 0.0, 1.0), ay = abs(f.y), on = step(0.0, f.x) * step(f.x, 1.0);
+  float w = 0.22 * sin(3.1416 * x) * (1.0 - 0.3 * x);
+  if (kind < 0.5) return on * max(max(smoothstep(lw, 0.0, abs(f.y + w)), 0.45 * smoothstep(lw, 0.0, abs(f.y - w))), 0.8 * smoothstep(0.7 * lw, 0.0, ay) * step(f.x, 0.8));
+  if (kind < 1.5) {
+    float s = fract(f.x * 5.0 - ay * 3.2), d = min(s, 1.0 - s) / 5.9;
+    return on * max(smoothstep(0.7 * lw, 0.0, ay), smoothstep(lw, 0.0, d) * step(ay, 0.9 * w + 0.03) * step(0.12, f.x));
+  }
+  float th = atan(f.y, max(f.x, 1e-3)), r = length(f), k = clamp(floor(th / 0.48 + 0.5), -2.0, 2.0);
+  return smoothstep(lw, 0.0, abs(th - k * 0.48) * r) * step(r, 0.95 - 0.12 * abs(k)) * step(0.05, r) * step(-0.05, f.x);
+}
 void main() {
   vec3 v = normalize(cameraPosition - vWorld), n = normalize(vNormal);
   if (vPart.y > 1.5 && dot(n, v) < 0.0) n = -n; // a thin sheet is lit from the side it is seen
@@ -916,28 +969,69 @@ void main() {
     // a leaf mass's outline breaks into rounded clumps of leaf where it turns from the eye (never a polygon's edge),
     // the clumps world-anchored and gone before they shrink below a few pixels
     // (its sphere's normal's turn from the eye traces a rounded outline inside the facets', bitten by the clumps)
-    vec3 lc = vWorld * 3.4;
-    float nv = dot(normalize(vSil), v), rim = sqrt(max(0.0, 1.0 - nv * nv)), nz = 0.6 * vnoise(lc) + 0.4 * vnoise(lc * 2.7 + 7.0), lpx = length(fwidth(lc));
-    if (rim > mix(0.56 + 0.42 * nz, 1.1, smoothstep(0.35, 0.9, lpx))) discard;
+    // S-022: toward the rim only leaves stand out, each a pointed leaf turned outward from its clump (drawn in the
+    // plane facing the eye), so the edge breaks into leaf tips, never rounded cushions or square chips
+    vec3 lc = vWorld * 3.4, sil = normalize(vSil);
+    float nv = dot(sil, v), rim = sqrt(max(0.0, 1.0 - nv * nv)), nz = 0.6 * vnoise(lc) + 0.4 * vnoise(lc * 2.7 + 7.0), lpx = length(fwidth(lc));
+    vec3 e1 = normalize(cross(v, vUp)), e2 = cross(e1, v);
+    vec2 sp = vec2(dot(vWorld, e1), dot(vWorld, e2)) * 4.2, sa = vec2(dot(sil, e1), dot(sil, e2)), sc = floor(sp);
+    sa = length(sa) > 1e-3 ? normalize(sa) : vec2(0.0, 1.0);
+    float st = 0.9 * (fhash(vec3(sc, 31.0)) - 0.5);
+    sa = rot2(st) * sa;
+    vec2 sf = fract(sp) - 0.5 - 0.3 * (vec2(fhash(vec3(sc, 32.0)), fhash(vec3(sc, 33.0))) - 0.5);
+    float lf = leafBody(vec2(dot(sf, sa) + 0.45, dot(sf, vec2(-sa.y, sa.x))) / 0.9) * step(0.25, fhash(vec3(sc, 34.0)));
+    float big = 1.0 - smoothstep(0.07, 0.14, length(fwidth(sp))); // the leaves at least ~8 px, else the rounded clumps
+    if (rim > mix(mix(0.56 + 0.42 * nz, 0.5 + 0.28 * nz + 0.26 * lf, big), 1.1, smoothstep(0.35, 0.9, lpx))) discard;
   }
   // (a crown in flower thins to its leaf where it turns from the eye: its outline's turn)
   float nvB = dot(normalize(vSil), v), other = 0.0, deep = 0.0, bink = 0.0;
   float bloom = vBlossom > 0.01 ? blossomAt(vWorld, vBlossom, sqrt(max(0.0, 1.0 - nvB * nvB)), other, deep, bink) : 0.0;
-  vec3 bpig = mix(vBloom, uOchre, other * 0.8), pig = mix(vPaint.rgb, bpig, bloom);
+  vec3 bpig = mix(vBloom, uOchre, other * 0.8), leafPig = vPaint.rgb;
+  if (vPart.y > 0.5 && vPart.y < 1.5) { // S-022: several greens, each clump warmer or cooler, mottled across the crown
+    float wc = 2.0 * vLeaf.y - 1.0 + 1.1 * (vnoise(vWorld * 0.8 + 3.0) - 0.5);
+    leafPig = mix(leafPig, wc > 0.0 ? uOchre : uWater, min(0.42, 0.34 * abs(wc)));
+  }
+  vec3 pig = mix(leafPig, bpig, bloom);
   vec3 side = normalize(cross(vUp, abs(vUp.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec2 hc = vec2(dot(vWorld, vUp), dot(vWorld, side) + 0.7 * dot(vWorld, cross(vUp, side)));
   vec2 hdx = dFdx(hc), hdy = dFdy(hc);
   float ndl = dot(n, uSun), tone = lightTone(ndl, abs(dot(n, v))) * mix(0.45, 1.0, vPart.z);
-  vec3 col = glaze(parchment(q), pig, vPaint.w, washPool(n, v, q), q);
+  // S-022: a leaf mass drawn as leaves, the instance's own (broad, pinnate or palmate), each hanging outward and down
+  // from its clump's crown, each its own wash, inked most heavily on the clump's shaded underside (cross-hatched there);
+  // gone before they shrink to noise
+  float under = 0.0, lInk = 0.0, lBody = 0.0, lHue = 0.5, lpxL = 1.0, density = vPaint.w;
+  if (vPart.y > 0.5 && vPart.y < 1.5) {
+    vec3 an = abs(n), c = vWorld * 4.6, g = n - 0.9 * vUp;
+    under = smoothstep(0.5, -0.25, dot(n, vUp)) * (1.0 - bloom);
+    vec2 lp = an.x > an.y && an.x > an.z ? c.yz : an.y > an.z ? c.xz : c.xy, ga = an.x > an.y && an.x > an.z ? g.yz : an.y > an.z ? g.xz : g.xy;
+    ga = length(ga) > 1e-3 ? normalize(ga) : vec2(0.0, -1.0);
+    vec2 cell = floor(lp), o = vec2(fhash(vec3(cell, 1.0)), fhash(vec3(cell, 2.0))) - 0.5, f = fract(lp) - 0.5 - 0.3 * o;
+    float g3 = fhash(vec3(cell, 3.0)), sz = 0.85 * (0.75 + 0.45 * fhash(vec3(cell, 4.0)));
+    lpxL = length(fwidth(lp));
+    vec2 ax = rot2(1.1 * (g3 - 0.5)) * ga;
+    vec2 lf = vec2(dot(f, ax) + 0.42 * sz, dot(f, vec2(-ax.y, ax.x))) / sz;
+    float kind = floor(vLeaf.x * 3.0), keep = step(0.18, g3) * (1.0 - smoothstep(0.2, 0.55, lpxL));
+    lInk = leafInk(lf, kind, lpxL / sz) * keep;
+    lBody = (kind > 1.5 ? smoothstep(0.95, 0.6, length(lf)) * step(-0.05, lf.x) : leafBody(lf * vec2(1.0, 0.75))) * keep;
+    lHue = fhash(vec3(cell, 5.0));
+    density *= 1.0 + lBody * (0.4 * lHue - 0.12) * (1.0 - bloom);
+    pig = mix(pig, lHue > 0.5 ? uOchre : uWater, 0.12 * lBody * abs(2.0 * lHue - 1.0) * (1.0 - bloom));
+  }
+  vec3 col = glaze(parchment(q), pig, density, washPool(n, v, q), q);
   col = glaze(col, bpig, (0.3 * bloom + 0.6 * deep) * vPaint.w, 0.3, q); // the bloom laid twice, deepest in its clusters
   // a crown in flower holds its colour further round into the shade, and there deepens to a cooler red (rose madder
   // over the vermilion, a warm madder over the ochre), never browning under the cool glaze
   col = sunGlaze(shadeGlaze(col, tone - 0.15 * bloom, q), ndl, tone);
   col = glaze(col, uRose, 0.45 * bloom * smoothstep(0.4, 0.75, tone), 0.2, q);
-  col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed));
+  // (a leaf mass's shaded underside is not ruled across like a shelf, S-022: it is a deeper glaze its leaves are inked into)
+  col = glaze(col, hatchInk(0.0), 0.28 * under * (1.0 - 0.5 * tone), 0.0, q);
+  col = mix(col, hatchInk(tone), hatching(hc, hdx, hdy, tone, uSeed) * (1.0 - 0.85 * under) * (vPart.y > 0.5 && vPart.y < 1.5 ? 0.6 : 1.0));
   col = mix(col, hatchInk(0.6), 0.75 * bink); // near the eye each truss's shaded side inked
-  if (vPart.y > 0.5) {
-    // crescent leaf marks scalloping the masses, densest in shade, gone before they shrink to noise
+  if (vPart.y > 0.5 && vPart.y < 1.5) {
+    float strength = clamp(0.9 - 0.6 * tone + 0.45 * under, 0.3, 0.95) * (1.0 - 0.4 * bloom);
+    col = mix(col, hatchInk(tone), lInk * strength);
+  } else if (vPart.y > 0.5) {
+    // crescent leaf marks scalloping the sheets, densest in shade, gone before they shrink to noise
     vec3 an = abs(n), c = vWorld * 5.5;
     vec2 lp = an.x > an.y && an.x > an.z ? c.yz : an.y > an.z ? c.xz : c.xy;
     // each cell's mark its own: turned, sized, and some cells left bare, so no one glyph repeats down a crown
@@ -964,6 +1058,8 @@ export interface FloraMaterialOptions {
   sway: number;
   /** The far level (fills the stipples the near level leaves). */
   far?: boolean;
+  /** Hand over between the near and far kits plant by plant (the near level of a species with a far one, and the far). */
+  hand?: boolean;
   veil?: boolean;
   id?: number;
 }
@@ -972,7 +1068,7 @@ export interface FloraMaterialOptions {
 export function floraMaterial(style: Style, swell: Swell, o: FloraMaterialOptions): THREE.ShaderMaterial {
   return inkMaterial(style, {
     vertexShader: VERT, fragmentShader: FRAG, defines: o.veil ? { VEIL: true } : {}, id: o.id, veil: o.veil, side: THREE.DoubleSide,
-    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 },
+    uniforms: { ...swell.uniforms, uBand: { value: o.band }, uCut: { value: new THREE.Vector2(1, 0) }, uSway: { value: o.sway }, uFar: { value: o.far ? 1 : 0 }, uHand: { value: o.hand ? 1 : 0 },
       uSeed: { value: 3.7 }, uWater: { value: T('verdigris') }, uOchre: { value: T('ochre') }, uRose: { value: T('roseMadder') } },
   });
 }
@@ -1064,7 +1160,7 @@ export class Flora {
       if (!totals[k] || (lod && !sp.far)) return null;
       const band = lod ? new THREE.Vector4(sp.near * 0.85, sp.near, sp.far * 0.8, sp.far)
         : new THREE.Vector4(-1, 0, sp.near * (sp.far ? 0.85 : 0.75), sp.near);
-      const material = floraMaterial(style, swell, { band, sway: sp.sway, far: lod === 1, veil: sp.veil, id });
+      const material = floraMaterial(style, swell, { band, sway: sp.sway, far: lod === 1, hand: !!sp.far, veil: sp.veil, id });
       id ??= material.uniforms.uInkId.value as number;
       const d = new Draw(kitGeometry(kind, lod), material, Math.min(totals[k], lod ? CAP.far : CAP.near));
       this.group.add(d.mesh);

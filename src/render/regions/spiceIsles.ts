@@ -429,9 +429,9 @@ export class SpiceIsles {
     const rubble = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.rubble, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [fixed(godownKit(3), plan.godowns), dressed(quayKit(), [...plan.quays, ...plan.mole]), rubble(wallKit(), plan.walls), fixed(heapKit(5), plan.heaps), rubble(stairKit(), plan.stairs)];
     // the trees are the shared flora's rainforest kits in its material (bending in the wind, blossom in soft dabs,
-    // leaf outlines broken into clumps), whole near the eye and sketched further off, dissolving between by its stipple
-    const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04 });
-    const far = floraMaterial(style, swell, { band: new THREE.Vector4(SPICE.near * 0.85, SPICE.near, SPICE.far * 0.8, SPICE.far), sway: 0.04, far: true,
+    // leaf outlines broken into clumps), whole near the eye and sketched further off, handing over between plant by plant
+    const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04, hand: true });
+    const far = floraMaterial(style, swell, { band: new THREE.Vector4(SPICE.near * 0.85, SPICE.near, SPICE.far * 0.8, SPICE.far), sway: 0.04, far: true, hand: true,
       id: near.uniforms.uInkId.value as number });
     this.trees = [near, far];
     const T = (c: RGB): THREE.Vector3 => transmittanceVec(c), tint = (parts: Part[], k: number): Float32Array => {
