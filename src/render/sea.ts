@@ -851,6 +851,9 @@ void main() {
       col = mix(col, mix(mix(LEAF_LO, LEAF_HI, smoothstep(0.05, 0.3, path)), LEAF_GLINT, clamp(path + fine, 0.0, 1.0)), gold * smoothstep(0.08, 0.3, path));
     }
   }
+#ifdef HEADS_PROBE
+  outColor = vec4(heads, 0.0, 0.0, 1.0); outAux = vec4(0.0); return; // tests: how much of each point a coral head covers
+#endif
   writeInk(candle(col, vWorld), normalize(dir + 0.3 * (vNormal - dir)), off > 0.0 ? lipInk(dir, off) : 1.0); // (the composite's line where sea meets reef as light)
 }
 `;

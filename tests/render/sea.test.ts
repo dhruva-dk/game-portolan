@@ -1,14 +1,16 @@
 // The sea's geometry and its swell: the field cube is laid out the way a GL cube map reads it (so hardware filtering
 // is seamless across the cube's edges), the TypeScript swell matches the surface the GPU draws and is continuous
-// everywhere, and the camera-centred disc always reaches past the horizon.
+// everywhere, and the camera-centred disc always reaches past the horizon; and in the browser the Coral Atolls' reef floor
+// is painted with coral heads (the flora draws none, WP17 S-021) where the open sea's floor as shallow is not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { DISC_RINGS, discShape, WAKE_SHIPS, WAKE_STEP, Wakes } from '../../src/render/sea.ts';
 import { seaFieldFaces, seaFloorFaces, Swell, type SwellSample } from '../../src/render/swell.ts';
 import { advance, cellOf, horizonDistance, R, TERRITORY } from '../../src/sim/sphere.ts';
-import { buildGeography, heightAt } from '../../src/sim/world/geography.ts';
-import { FLOOR } from '../../src/sim/world/regions.ts';
+import { buildGeography, coastAt, heightAt, toWorld } from '../../src/sim/world/geography.ts';
+import { FLOOR, REGIONS } from '../../src/sim/world/regions.ts';
+import { launch, openGame, serve } from '../harness.ts';
 
 const geo = buildGeography();
 let seed = 7;
@@ -125,4 +127,42 @@ test('a wake lays the stern\'s track every WAKE_STEP u, stays where its ship pas
   assert.equal(wakes.ships[0].w, 0);
   wakes.feed(9, p, f, 2, t);
   assert.ok(wakes.ships[0].w > 0, 'a new ship takes the freed slot');
+});
+
+/** A point of region `ri`'s sea, well off its coast, whose floor is `floor` and lies `depth` ± 0.1 u down at mean tide. */
+function shallows(ri: number, floor: number, depth: number): THREE.Vector3 | null {
+  const p = new THREE.Vector3();
+  for (let r = 4; r < 120; r += 0.5) {
+    for (let k = 0; k < 64; k++) {
+      const a = (k / 64) * Math.PI * 2 + r * 0.37;
+      toWorld(ri, r * Math.cos(a), r * Math.sin(a), p as never);
+      if (geo.floor[cellOf(TERRITORY, p)] === floor && Math.abs(-heightAt(geo, p) - depth) < 0.1 && coastAt(geo, p) > 3) return p.clone();
+    }
+  }
+  return null;
+}
+
+test("the Coral Atolls' shallows are painted with coral heads, the open sea's as shallow with none", async () => {
+  const coral = REGIONS.findIndex((r) => r.flora.includes('coral')), amber = REGIONS.findIndex((r) => r.name.includes('Amber'));
+  const reef = shallows(coral, FLOOR.coral, 1.5), sand = shallows(amber, FLOOR.sand, 1.5);
+  assert.ok(reef && sand, 'a coral and a sand floor 1.5 u down');
+  const server = await serve(), { browser } = await launch();
+  try {
+    const share: number[] = [];
+    for (const at of [reef, sand]) {
+      const game = await openGame(browser, `${server.url}tests/pages/sea.html`, {
+        device: 'iphone', hook: '__sea', query: { view: 'floor', at: at.toArray().join(','), probe: 'heads', hour: 12, tide: 0, clock: 0 },
+      });
+      await game.until((h) => h.ready);
+      share.push(await game.page.evaluate(() => (window as unknown as { __seaProbe: { heads(): number } }).__seaProbe.heads()));
+      assert.deepEqual(game.problems(), []);
+      await game.close();
+    }
+    console.log(`heads cover ${(100 * share[0]).toFixed(1)}% of the coral floor, ${(100 * share[1]).toFixed(1)}% of the sand`);
+    assert.ok(share[0] > 0.03, `coral heads on the Coral Atolls' reef floor (${(100 * share[0]).toFixed(1)}% of the view)`);
+    assert.ok(share[1] < 0.002, `no coral heads on the open sea's sand floor (${(100 * share[1]).toFixed(1)}% of the view)`);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
 });

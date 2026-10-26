@@ -212,8 +212,9 @@ if (view === 'deck') {
   look(s.at, headingToward(s.at.clone().normalize(), s.land) + Math.PI, 2.5, 0.0);
   [[14, 5], [30, -10], [48, 7], [66, -10], [84, 5]].forEach(([d, x], i) => launch(d, x, 1.6 + i, d > 40 ? 0.35 : 1));
 } else if (view === 'floor') {
-  const s = floorSpot((q.get('kind') ?? 'sand') as keyof typeof FLOOR);
-  look(s.at, s.land, Number(q.get('height') ?? 7), Number(q.get('pitch') ?? -0.95));
+  const at = q.get('at')?.split(',').map(Number); // (or straight down over the point at=x,y,z)
+  const s = at ? { at: V(at[0], at[1], at[2]).normalize().multiplyScalar(R), land: 0 } : floorSpot((q.get('kind') ?? 'sand') as keyof typeof FLOOR);
+  look(s.at, s.land, Number(q.get('height') ?? 7), Number(q.get('pitch') ?? (at ? -1.5 : -0.95)));
 } else if (view === 'lane') {
   const l = geo.lanes[Number(q.get('lane') ?? 0)];
   look(V(l.a.x + l.b.x, l.a.y + l.b.y, l.a.z + l.b.z), V(l.b.x, l.b.y, l.b.z), Number(q.get('height') ?? 16), Number(q.get('pitch') ?? -0.6));
@@ -339,6 +340,23 @@ let frames = 0, last = performance.now(), clock = hold ?? 0;
 const hook = { ready: false, calls: 0, triangles: 0, seaTriangles: sea.triangles, skyTriangles: sky.triangles, geoMs, seaMs, terrainMs,
   terrainTriangles: 0, structureTriangles: 0, regionTriangles: 0, flora: flora.stats, chunks: terrain.chunks.length, terrainMB: terrain.bytes / 2 ** 20, textureMB: 0, targetMB: 0, setHour: (h: number) => (hour = h) };
 (window as unknown as { __sea: typeof hook }).__sea = hook;
+// probe=heads (tests/render/sea.test.ts): the sea draws in red how much of each point a coral head covers, and
+// __seaProbe.heads() renders a frame and gives the share of the view the heads cover
+if (q.get('probe') === 'heads') {
+  const m = sea.mesh.material as THREE.ShaderMaterial;
+  m.defines = { ...m.defines, HEADS_PROBE: '' };
+  m.needsUpdate = true;
+}
+(window as unknown as { __seaProbe: unknown }).__seaProbe = {
+  heads(): number {
+    pipeline.render(scene, camera, 0);
+    const gl = pipeline.renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let n = 0;
+    for (let k = 0; k < w * h; k++) if (px[4 * k] > 128 && px[4 * k] > 2 * px[4 * k + 1]) n++;
+    return n / (w * h);
+  },
+};
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
