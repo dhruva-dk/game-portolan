@@ -32,7 +32,8 @@ import type { RenderContext, RenderModule } from './world.ts';
 
 /** Every species: the regions' flora, plus reeds in the mud of grassy and mangrove shores and pandanus at the edge of
  *  the rainforest's beaches. */
-export type FloraKind = RegionFlora | 'reed' | 'pandanus';
+/** `broadleaf` and `nutmeg` are the jungle's other crowns (planted wherever it grows, S-022: never one repeated tree). */
+export type FloraKind = RegionFlora | 'reed' | 'pandanus' | 'broadleaf' | 'nutmeg';
 
 const TAU = Math.PI * 2;
 const V = (x = 0, y = 0, z = 0): THREE.Vector3 => new THREE.Vector3(x, y, z);
@@ -118,7 +119,7 @@ class Kit {
         p.set(q.x * r * lobe, q.y * r * lobe * squash * (q.y < 0 ? under : 1), q.z * r * lobe).add(c);
         n.copy(q); // its sphere's normal: the outline's, through the squash (the material lifts it toward the light)
         // aTint 1 + w: w the blossom (1 whole, as the pattern lays it; below 1 a weight for the material's dabs)
-        const w = dab ? Math.min(0.95, dab * smooth(-0.45, 0.75, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
+        const w = dab ? Math.min(0.95, dab * smooth(-0.8, 0.3, q.y) * (0.75 + 0.25 * Math.sin(q.x * 5 + q.z * 4 + seed)))
           : q.y > 0.05 && Math.sin(q.x * 7 + seed * 3) * Math.sin(q.z * 6 + seed) + 0.3 * q.y > bloom ? 1 : 0;
         return this.vert(p, n, LEAF, 1 + w, p.y, MASS, (0.35 + 0.65 * smooth(-0.8, 0.6, q.y)) * open);
       });
@@ -252,14 +253,15 @@ function crownKit(lod: number, crown: Crown): Kit {
  *  a lower, rounder crown whose clumps carry a blossom weight (soft dabs, thick on the sunward tops). `emergent`: a
  *  pale buttressed bole standing clear of the canopy under a broad, irregular, two-tiered crown of clumps on long
  *  fanning limbs, lianas hanging from it (never a lollipop). Far: the bole and a few billows. */
-export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge';
+export type RainForm = 'canopy' | 'flowering' | 'emergent' | 'edge' | 'broad' | 'cone';
 function rainKit(lod: number, form: RainForm, seed: number): Kit {
   if (form === 'edge') return edgeKit(lod, seed);
+  if (form === 'broad' || form === 'cone') return crownedKit(lod, form, seed);
   const k = new Kit(), far = lod > 0, em = form === 'emergent', fl = form === 'flowering';
   let z = seed * 9301 + 49297;
   const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
   const lean = V((rnd() - 0.5) * 0.12, 0, (rnd() - 0.5) * 0.12), forkY = (em ? 0.46 : fl ? 0.34 : 0.4) + 0.05 * rnd();
-  const fork = V(0, forkY, 0).add(lean), bark = em ? PALE_BARK : BARK, dab = fl ? 0.85 : 0;
+  const fork = V(0, forkY, 0).add(lean), bark = em ? PALE_BARK : BARK, dab = fl ? 1.15 : 0; // a tree in flower is a mass of colour (S-022)
   k.tube([V(0, -0.06, 0), V(lean.x * 0.3 + 0.015, forkY * 0.5, lean.z * 0.3), fork], em ? [0.05, 0.032, 0.026] : [0.045, 0.03, 0.024], far ? 3 : 5, bark);
   if (em && !far) for (let i = 0; i < 4; i++) { // buttresses: thin flanges flaring from the bole's foot
     const a = (i / 4) * TAU + rnd(), o = V(Math.cos(a), 0, Math.sin(a)), nn = V(-o.z, 0, o.x);
@@ -272,7 +274,7 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
   for (let i = 0; i < C; i++) {
     const a = i * 2.39996 + rnd() * 0.8, d = i === 0 && !em ? 0.02 : spread * (far ? (em ? 0.62 : 0.5) : 0.4 + 0.6 * Math.sqrt(rnd()));
     // far: a broad crown in two or three billows, the lower one slung low over the bole (never a tuft on a pole)
-    const tier = (em && i >= 5) || (far && i === 1) ? 0.16 : 0, r = far ? (em ? (i ? 0.2 : 0.22) : i ? 0.21 : fl ? 0.25 : 0.27) : (i === 0 ? 0.2 : 0.11 + 0.08 * rnd()) * (em ? 0.85 : 1);
+    const tier = (em && i >= 5) || (far && i === 1) ? (far && !em ? 0.26 : 0.16) : 0, r = far ? (em ? (i ? 0.2 : 0.22) : i ? 0.21 : fl ? 0.25 : 0.27) : (i === 0 ? 0.2 : 0.11 + 0.08 * rnd()) * (em ? 0.85 : 1);
     const c = V(Math.cos(a) * d, top - r * 0.6 - tier - (em ? 0.18 : 0.3) * (d / spread) ** 2 + 0.05 * rnd(), Math.sin(a) * d).add(lean);
     // far, an emergent's bole runs on up into a crown massed over it, its limbs into the clumps round it (S-020: a bare
     // pale bole with its clumps off to the sides read as a pole on the skyline)
@@ -327,6 +329,44 @@ function rainKit(lod: number, form: RainForm, seed: number): Kit {
     const a = rnd() * TAU, h = V(Math.cos(a), 0, Math.sin(a)), base = h.clone().multiplyScalar(0.06 + 0.12 * rnd()), broad = f % 2 === 1;
     k.sheet(base, h.clone().multiplyScalar(broad ? 0.12 : 0.17).addScaledVector(UP, broad ? 0.16 : 0.12), V(0, -0.1, 0), broad ? 0.05 : 0.035, 3, broad ? 0 : 0.55, 0.3, LEAF, 1);
   }
+  return k;
+}
+
+/** The jungle's other crowns, 1 tall (S-022: never one repeated umbrella). `broad`: a low-forking tree under a wide
+ *  dome of billows skirting down to its feet, wider than tall (a fig or a rain tree). `cone`: a nutmeg's or a clove's
+ *  dense crown tapering in stacked tiers of clumps from near the ground to a point. Far: the same outline in a few
+ *  masses, no bole (the crown hides it). */
+function crownedKit(lod: number, form: 'broad' | 'cone', seed: number): Kit {
+  const k = new Kit(), far = lod > 0;
+  let z = seed * 9301 + 49297;
+  const rnd = (): number => ((z = (z * 9301 + 49297) % 233280) / 233280);
+  if (form === 'broad') {
+    if (!far) k.tube([V(0, -0.06, 0), V(0.02, 0.16, 0), V(0, 0.3, 0.01)], [0.05, 0.034, 0.026], 5, BARK);
+    k.billow(V(0, 0.72, 0), 0.25, 0.62, far ? 2 : 3, 0, seed * 1.3, 0, 1);
+    const n = far ? 2 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + 0.6 * rnd(), d = far ? 0.36 : 0.3 + 0.16 * rnd(), r = far ? 0.24 : 0.15 + 0.06 * rnd();
+      const c = V(Math.cos(a) * d, (far ? 0.5 : 0.48 + 0.16 * rnd()), Math.sin(a) * d);
+      if (!far) k.tube([V(0, 0.3, 0), c.clone().setY(c.y - r * 0.4)], [0.022, 0.009], 3, BARK);
+      if (far) k.mass(c, r, 0.62, 0, seed + i * 3.3, 2, 0, 0.75, 0.85);
+      else k.billow(c, r, 0.66, 1, 0, seed + i * 3.3, 0, i % 2 ? 0.85 : 1);
+    }
+    if (!far) for (let i = 0; i < 3; i++) { // the skirt: lower billows under the rim, down to the understory
+      const a = rnd() * TAU, d = 0.22 + 0.15 * rnd();
+      k.billow(V(Math.cos(a) * d, 0.24 + 0.08 * rnd(), Math.sin(a) * d), 0.15 + 0.04 * rnd(), 0.9, 1, 0, seed + 30 + i, 0, 0.7);
+    }
+    return k;
+  }
+  if (!far) k.tube([V(0, -0.06, 0), V(0.01, 0.5, 0)], [0.035, 0.02], 5, BARK);
+  const tiers = far ? [[0.3, 0.22, 1], [0.52, 0.18, 1], [0.72, 0.13, 1], [0.88, 0.085, 1]] : [[0.24, 0.17, 4], [0.44, 0.15, 3], [0.62, 0.13, 3], [0.79, 0.12, 1], [0.93, 0.07, 1]];
+  tiers.forEach(([y, r, n], t) => {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + t * 1.3 + 0.5 * rnd(), d = n > 1 ? r * (0.9 + 0.3 * rnd()) : 0;
+      const c = V(Math.cos(a) * d, y + 0.04 * (rnd() - 0.5), Math.sin(a) * d);
+      if (far || t === 4) k.mass(c, n > 1 ? r : r * 1.3, 0.85, 0, seed + t * 7 + i, 2, 0, 0.7, 0.75 + 0.25 * (t / 4));
+      else k.billow(c, r, 0.8, t === 3 ? 2 : 1, 0, seed + t * 7 + i, 0, 0.7 + 0.3 * (t / 4));
+    }
+  });
   return k;
 }
 
@@ -481,7 +521,7 @@ export interface Species {
 export const FLORA: Record<FloraKind, Species> = {
   pine: { kit: pineKit, size: [2.0, 3.4], near: 55, far: 300, sway: 0.05 },
   jungle: { kit: (l) => rainKit(l, 'canopy', 7), size: [2.6, 4.0], near: 42, far: 300, sway: 0.045 },
-  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [1.9, 2.8], near: 42, far: 280, sway: 0.05 },
+  floweringTree: { kit: (l) => rainKit(l, 'flowering', 11), size: [2.9, 4.2], near: 42, far: 300, sway: 0.05 },
   cloudForest: { kit: (l) => crownKit(l, 'cloud'), size: [2.8, 4.2], near: 42, far: 300, sway: 0.045 },
   mangrove: { kit: (l) => crownKit(l, 'mangrove'), size: [1.4, 2.2], near: 42, far: 240, sway: 0.04 },
   palm: { kit: (l) => palmKit(l, false), size: [1.8, 2.8], near: 55, far: 260, sway: 0.08 },
@@ -494,6 +534,8 @@ export const FLORA: Record<FloraKind, Species> = {
   pandanus: { kit: pandanusKit, size: [1.5, 2.4], near: 45, far: 160, sway: 0.06 },
   kelp: { kit: kelpKit, size: [1.6, 2.4], near: 70, far: 0, sway: 0.22, veil: true },
   coral: { kit: coralKit, size: [0.35, 0.6], near: 120, far: 0, sway: 0, veil: true },
+  broadleaf: { kit: (l) => rainKit(l, 'broad', 13), size: [2.4, 3.6], near: 42, far: 300, sway: 0.045 },
+  nutmeg: { kit: (l) => rainKit(l, 'cone', 19), size: [1.8, 3.0], near: 42, far: 300, sway: 0.05 },
 };
 export const KINDS = Object.keys(FLORA) as FloraKind[];
 
@@ -538,10 +580,10 @@ function noise(x: number, y: number, z: number): number {
 
 /** What a cell offers a plant: its ground, height, slope, distance inland, shelter (u its ring stands above it),
  *  altitude (fraction of its region's peak), grove (0 clearing … 1 grove), water depth and floor. */
-interface Cell { ground: Ground; height: number; up: number; inland: number; shelter: number; alt: number; grove: number; depth: number; floor: number }
+interface Cell { ground: Ground; height: number; up: number; inland: number; shelter: number; alt: number; grove: number; depth: number; floor: number; mix: number }
 
 /** The trees (palms apart: they fringe the beach crest): never on beach, mud, cliff, basalt or ice. */
-export const TREES: readonly FloraKind[] = ['pine', 'jungle', 'floweringTree', 'cloudForest', 'treeFern'];
+export const TREES: readonly FloraKind[] = ['pine', 'jungle', 'floweringTree', 'cloudForest', 'treeFern', 'broadleaf', 'nutmeg'];
 /** Whether a land species takes the exact surface's ground: dune grass and palms the beach crest, reeds the mud, every other
  *  species open ground, rock and scree (mangroves stand in the tide, kelp and coral under it). */
 const grows = (kind: FloraKind, g: Ground): boolean => (kind === 'duneGrass' || kind === 'palm' || kind === 'pandanus' ? g === GROUND.meadow || g === GROUND.beach
@@ -554,8 +596,11 @@ function density(kind: FloraKind, c: Cell): number {
   const land = c.depth < 0, grove = (a: number, b: number): number => smooth(a, b, c.grove), g = c.ground;
   switch (kind) {
     case 'pine': return 0.3 * wooded(c) * grove(0.3, 0.55);
-    case 'jungle': return 0.32 * wooded(c) * grove(0.12, 0.35);
-    case 'floweringTree': return 0.08 * wooded(c) * grove(0.12, 0.35);
+    // the canopy mixed of three crowns, each massing where a slow field favours it, flowering trees through them all
+    case 'jungle': return 0.14 * wooded(c) * grove(0.12, 0.35) * (0.6 + 0.8 * c.mix);
+    case 'broadleaf': return 0.11 * wooded(c) * grove(0.12, 0.35) * (1.4 - 0.8 * c.mix);
+    case 'nutmeg': return 0.08 * wooded(c) * grove(0.12, 0.35) * (0.5 + c.mix * (1 - c.mix) * 2.4);
+    case 'floweringTree': return 0.15 * wooded(c) * grove(0.12, 0.35);
     case 'cloudForest': return 0.3 * wooded(c) * grove(0.15, 0.4) * (0.6 + c.alt);
     case 'treeFern': return 0.12 * wooded(c) * (1.2 - c.alt);
     case 'palm': return land && (g === GROUND.meadow || (g === GROUND.beach && c.height > 0.65)) && c.inland > 0.3 && c.up > 0.75 ? 0.35 * (1 - smooth(1, 9, c.inland)) : 0;
@@ -583,7 +628,9 @@ function tones(kind: FloraKind, r: Region, u: number, w: number): [THREE.Vector3
   switch (kind) {
     case 'pine': return [to(fol, 'indigo', 0.4 + 0.2 * u), fol];
     case 'jungle': return [to(fol, u < 0.5 ? 'verdigris' : 'ochre', 0.12 + 0.28 * w), fol];
-    case 'floweringTree': return [to(fol, 'verdigris', 0.25 * u), to(T(w < 0.55 ? r.pigments.accent : 'ochre'), 'roseMadder', 0.2 * u)];
+    case 'floweringTree': return [to(fol, 'verdigris', 0.25 * u), to(T(w < 0.55 ? r.pigments.accent : 'ochre'), 'roseMadder', 0.12 * u)];
+    case 'broadleaf': return [to(fol, 'ochre', 0.3 + 0.25 * w), fol]; // a light yellow-green dome
+    case 'nutmeg': return [to(fol, 'indigo', 0.22 + 0.18 * u), fol]; // dark glossy cones
     case 'cloudForest': return [to(fol, 'ultramarine', 0.18 + 0.15 * u), fol];
     case 'treeFern': return [to(fol, 'verdigris', 0.3 + 0.2 * u), fol];
     case 'palm': return [to(fol, 'verdigris', 0.2 + 0.25 * u), fol];
@@ -619,7 +666,7 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
   const H = field.relief, peak = new Float32Array(REGIONS.length).fill(1);
   for (let c = 0; c < H.length; c++) peak[geo.region[c]] = Math.max(peak[geo.region[c]], H[c]);
   const kinds = REGIONS.map((r) => [...r.flora, ...(r.flora.includes('grass') || r.flora.includes('mangrove') ? ['reed' as const] : []),
-    ...(r.flora.includes('jungle') ? ['pandanus' as const] : [])]
+    ...(r.flora.includes('jungle') ? ['pandanus' as const, 'broadleaf' as const, 'nutmeg' as const] : [])]
     .map((k) => KINDS.indexOf(k)));
   const keys: number[] = [], kindOf: number[] = [], mats: number[] = [], cols: number[] = [], seeds: number[] = [];
   const dir = v3(), surf: Surface = { height: 0, normal: V(), up: 1, ground: GROUND.meadow, region: 0 }, towns = townsOf(geo);
@@ -639,7 +686,8 @@ export function plantBed(geo: Geography, field: TerrainField): Bed {
         gnomonicDir(f, Math.tan(angle(i + 0.5)), Math.tan(angle(j + 0.5)), dir);
         const s = R / 9, grove = 0.7 * noise(dir.x * s, dir.y * s, dir.z * s) + 0.3 * noise(dir.x * s * 3.1, dir.y * s * 3.1, dir.z * s * 3.1);
         const cell: Cell = { ground: groundAt(ri, Math.max(h, 0.03), up), height: h, up, inland: -geo.coast[c], shelter: ring / 8 - h,
-          alt: Math.max(0, h) / peak[ri], grove: smooth(0.3, 0.7, grove), depth: -h, floor };
+          alt: Math.max(0, h) / peak[ri], grove: smooth(0.3, 0.7, grove), depth: -h, floor,
+          mix: noise(dir.x * s * 2.3 + 17.1, dir.y * s * 2.3 - 5.3, dir.z * s * 2.3 + 9.7) }; // which of the jungle's crowns masses here
         for (const k of ks) {
           const kind = KINDS[k], sp = FLORA[kind], n = Math.floor(density(kind, cell) + hash(c, k, 1)), tree = TREES.includes(kind);
           for (let m = 0; m < n; m++) {
@@ -827,7 +875,7 @@ float blossomAt(vec3 p, float w, out float other) {
     vec3 j = vec3(fhash(cell + 3.1), fhash(cell + 5.7), fhash(cell + 8.3)) - 0.5;
     float r = length(fract(c) - 0.5 - 0.35 * j), rr = 0.24 + 0.2 * fhash(cell + 11.9), px = length(fwidth(c));
     float d = smoothstep(rr + 0.5 * px + 0.06, rr - 0.08, r) * step(fhash(cell + 13.3), w * (o == 0 ? 0.7 : o == 1 ? 0.95 : 0.8));
-    d = mix(d, w * 0.55, smoothstep(0.7, 1.4, px));
+    d = mix(d, w * 0.85, smoothstep(0.7, 1.4, px)); // from afar a crown in flower reads as its colour (S-022)
     other = max(other, d * step(0.72, fhash(cell + 17.7)));
     b = max(b, d);
   }

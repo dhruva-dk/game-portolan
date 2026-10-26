@@ -26,7 +26,7 @@ test('the planet is planted densely with every region its own flora, the same ev
     // (coral is the sea's: painted on the reef floor under the water, never planted as a mesh, S-021)
     for (const f of r.flora) if (f !== 'coral') assert.ok(seen[ri].has(f), `${r.name}: no ${f}`);
     assert.ok(!seen[ri].has('coral'), `${r.name}: coral planted as a mesh`);
-    for (const k of seen[ri]) assert.ok(r.flora.includes(k as never) || k === 'reed' || (k === 'pandanus' && r.flora.includes('jungle')), `${r.name}: ${k} does not grow there`);
+    for (const k of seen[ri]) assert.ok(r.flora.includes(k as never) || k === 'reed' || ((k === 'pandanus' || k === 'broadleaf' || k === 'nutmeg') && r.flora.includes('jungle')), `${r.name}: ${k} does not grow there`);
   });
 });
 

@@ -189,6 +189,17 @@ function quayKit(): THREE.BufferGeometry {
   return b.build();
 }
 
+/** A terrace's retaining wall 1 long, as the quay's run but battered (its face leaning back to the coping) and capped
+ *  by a coping that projects over it, its shadow line under the lip (S-022: never a slatted crate). */
+function wallKit(): THREE.BufferGeometry {
+  const b = new Brush(W.stone), F = 0.36, B = 0.24; // the face's foot and head (z)
+  b.quad(vec(-0.5, -1.6, F), vec(0.5, -1.6, F), vec(0.5, -0.08, B), vec(-0.5, -0.08, B));
+  b.box(vec(0, -1.5, F + 0.03), 0.5, 0.12, 0.04); // the footing course
+  b.box(vec(0, -0.03, 0.2), 0.52, 0.06, 0.13); // the coping, its lip 0.09 over the head of the face
+  b.box(vec(0, -0.9, -0.12), 0.5, 0.82, 0.36); // the hearting
+  return b.build();
+}
+
 /** A flight of steps up a terrace's riser, 1 wide: treads from the lower terrace (y = −1.6, z = +0.5) to the coping
  *  (y = 0, z = −0.5), between stone cheeks. */
 function stairKit(): THREE.BufferGeometry {
@@ -337,8 +348,8 @@ export function planSpice(field: TerrainField): SpicePlan {
       // the town's terraces: garden trees in blossom between the houses
       const town = Math.hypot(px - hb.x, py - hb.y);
       if (town < hb.r + 15) {
-        if (S.up > 0.7 && town > hb.r + 5 && r < 0.3 && clear(px, py, 1.4)) {
-          place(plan.flowers[r < 0.12 ? 1 : 0], px, py, { sink: 0.1, fwd: tan(px, py, 1, 0), yaw: fr() * TAU, s: 1.9 + 0.7 * fr(), kitH: 0.95, reach: 0.8 });
+        if (S.up > 0.7 && town > hb.r + 5 && r < 0.45 && clear(px, py, 1.4)) {
+          place(plan.flowers[r < 0.18 ? 1 : 0], px, py, { sink: 0.1, fwd: tan(px, py, 1, 0), yaw: fr() * TAU, s: 2.6 + 1.0 * fr(), kitH: 0.95, reach: 0.8 });
           taken.push({ x: px, y: py, r: 1 });
         }
         continue;
@@ -359,9 +370,9 @@ export function planSpice(field: TerrainField): SpicePlan {
       if (r < 0.07) {
         const p = place(plan.emergents, px, py, { sink: 0.15, fwd, yaw: fr() * TAU, tilt: 0.04 * (fr() - 0.5), s: 4.6 + 1.6 * fr(), kitH: 0.95, reach: 1.8 });
         if (plan.birds.length < 80 && fr() < 0.5) plan.birds.push(lift(dir, p.top));
-      } else if (r < 0.07 + 0.32 * grove * grove) {
+      } else if (r < 0.07 + 0.45 * grove) {
         const gold = Math.sin(0.33 * px + 0.7) * Math.cos(0.29 * py - 0.4) > 0.1;
-        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: fr() * TAU, s: 2.7 + 1.1 * fr(), kitH: 0.95, reach: 1.1 });
+        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: fr() * TAU, s: 3.4 + 1.4 * fr(), kitH: 0.95, reach: 1.3 });
         if (plan.birds.length < 80 && fr() < 0.15) plan.birds.push(lift(dir, p.top));
       }
     }
@@ -386,6 +397,7 @@ export class SpiceIsles {
   readonly voices: readonly { at: V; loud: number; kind: 'jungle' | 'harbour' }[];
   private readonly material: THREE.ShaderMaterial;
   private readonly masonry: THREE.ShaderMaterial;
+  private readonly rubble: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), each part's foliage, blossom and seed (the flora material's)] */
   private readonly lod: [Draw, Part[], number, number, Float32Array][];
@@ -409,7 +421,13 @@ export class SpiceIsles {
     // the quay, terrace walls, mole and stairs in coursed masonry (structures.ts), never the timber's level hatch
     this.masonry = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, surface: masonrySurface(true) });
     const dressed = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.masonry, parts.length).fill(parts.map((p) => p.m));
-    this.fixed = [fixed(godownKit(3), plan.godowns), dressed(quayKit(), [...plan.quays, ...plan.walls, ...plan.mole]), fixed(heapKit(5), plan.heaps), dressed(stairKit(), plan.stairs)];
+    // the terrace walls in coursed rubble, the shade hatched on the slant (upright strokes over the courses read as the
+    // slats of a crate, S-022): each stone's foot in shadow, its joints inked
+    this.rubble = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, surface: masonrySurface(true)
+      .replace('vec2 mc = vec2(s + 0.3 * hgt, hgt)', 'vec2 mc = vec2(0.72 * (s + 1.1 * hgt), hgt)')
+      .replace('0.16 * vert * (1.0 - smoothstep(0.0, 0.22, fy))', '0.3 * vert * (1.0 - smoothstep(0.0, 0.3, fy))') });
+    const rubble = (kit: THREE.BufferGeometry, parts: Part[]): Draw => new Draw(kit, this.rubble, parts.length).fill(parts.map((p) => p.m));
+    this.fixed = [fixed(godownKit(3), plan.godowns), dressed(quayKit(), [...plan.quays, ...plan.mole]), rubble(wallKit(), plan.walls), fixed(heapKit(5), plan.heaps), rubble(stairKit(), plan.stairs)];
     // the trees are the shared flora's rainforest kits in its material (bending in the wind, blossom in soft dabs,
     // leaf outlines broken into clumps), whole near the eye and sketched further off, dissolving between by its stipple
     const near = floraMaterial(style, swell, { band: new THREE.Vector4(-1, 0, SPICE.near * 0.85, SPICE.near), sway: 0.04 });
@@ -487,6 +505,7 @@ export class SpiceIsles {
   dispose(): void {
     this.material.dispose();
     this.masonry.dispose();
+    this.rubble.dispose();
     for (const m of this.trees) m.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
