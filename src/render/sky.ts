@@ -197,6 +197,7 @@ out float vSize;
 out float vFar;
 flat out float vSeed;
 uniform vec3 uUp;
+uniform float uNight;
 void main() {
   // drawn on the sky itself, far out along its direction: every island, grove, ship and mast stands in front of it and
   // hides it, so no cloud ever sits on the action or swallows a grove; nearer (larger) clouds a little in front of farther
@@ -209,7 +210,8 @@ void main() {
   vSize = aCloud.w * 80.0; // pen and paper scale: hatching keeps one pitch on the page whatever the cloud's size
   vFar = 1.0 - smoothstep(0.025, 0.11, aCloud.w);
   vSeed = aSeed;
-  vec3 p = cameraPosition + aCloud.xyz * dist + (right * position.x + vUp * position.y) * aCloud.w * dist;
+  // by day the farthest, low on the horizon, drawn wider than tall: low, distant banks, flat along their bases
+  vec3 p = cameraPosition + aCloud.xyz * dist + (right * position.x * (1.0 + 0.8 * vFar * (1.0 - uNight)) + vUp * position.y) * aCloud.w * dist;
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 
@@ -233,6 +235,14 @@ ${PEN_GLSL}
 float along1(float t, float seed) { // smooth 0…1 noise along a contour
   float i = floor(t), f = fract(t);
   return mix(hash11(i * 1.7 + seed), hash11((i + 1.0) * 1.7 + seed), f * f * (3.0 - 2.0 * f));
+}
+// a few fine strokes flicked into a cloud's shade, along c.y: about 6 CSS px apart, each broken into short tapered
+// lengths with half of them left out (cdx, cdy: dFdx(c), dFdy(c))
+float flicks(vec2 c, vec2 cdx, vec2 cdy, float seed) {
+  float px = max(abs(cdx.x) + abs(cdy.x), 1e-6), S = 6.0 * px * uRenderPx, i = floor(c.x / S + 0.5);
+  float y = c.y / (4.0 * S) + 7.0 * hash11(i * 0.713 + seed), j = floor(y), fy = fract(y);
+  float keep = step(0.5, hash11(i * 1.37 + j * 0.53 + seed)), taper = sqrt(max(sin(3.14159265 * fy), 0.0));
+  return keep * clamp(0.32 * uRenderPx * taper - abs(c.x - i * S) / px + 0.5, 0.0, 1.0);
 }
 void main() {
   vec2 uv = vUv;
@@ -268,26 +278,52 @@ void main() {
   vec3 n = normalize(vRight * n2.x + vUp * n2.y + vToEye * nz);
   float ndl = dot(n, uSun), tone = clamp(lightTone(ndl, nz) + 0.3 * under, 0.0, 1.0);
   Paper q = paperAt(vec3(uv * vSize, vSeed * 37.0), vec3(0.0, 0.0, 1.0), 0.0);
-  vec3 col = sunGlaze(shadeGlaze(parchment(q), tone, q), ndl, tone);
-  col = mix(col, glaze(col, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.3 + 0.7 * max(under, smoothstep(0.0, 0.8, ndl))));
-  col = mix(col, glaze(col, uSlate, 0.5, 0.0, q), 0.4 * under * (1.0 - uNight));
-  col = mix(col, glaze(col, uSlate, 0.8, 0.0, q), uGrey);
   // (laid near level, as the engraver lays a cloud's shade: along the base, curving round the flank)
   vec2 hc = rot2(1.45 + 0.35 * (uv.x - head) + 0.2 * hash11(vSeed * 7.7)) * uv * vSize, hx = dFdx(hc), hy = dFdy(hc);
+  float lift = uv.y - base, inside = step(sd, 0.0);
+  float pen = penLine(sd, mix(0.8, 1.9, tone) * (1.0 - 0.4 * vFar)), fine = penLine(sd, mix(0.75, 0.45, vFar));
+  float onBase = smoothstep(base + 0.02, base + 0.09, uv.y);
+
+  // by night, as the first pass drew them: moonlit, the shade hatched, silver on the side the moon lights
+  vec3 mc = sunGlaze(shadeGlaze(parchment(q), tone, q), ndl, tone);
+  mc = mix(mc, glaze(mc, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.3 + 0.7 * max(under, smoothstep(0.0, 0.8, ndl))));
+  mc = mix(mc, glaze(mc, uSlate, 0.5, 0.0, q), 0.4 * under * (1.0 - uNight));
+  mc = mix(mc, glaze(mc, uSlate, 0.8, 0.0, q), uGrey);
   float ht = min(smoothstep(0.58, 1.0, tone), 0.6) * (1.0 - 0.6 * vFar); // one family of strokes, never crossed
-  col = mix(col, hatchInk(0.6 * ht), hatching(hc, hx, hy, ht, vSeed * 13.0) * 0.75 * (1.0 - 0.4 * vFar));
+  mc = mix(mc, hatchInk(0.6 * ht), hatching(hc, hx, hy, ht, vSeed * 13.0) * 0.75 * (1.0 - 0.4 * vFar));
   float lit = smoothstep(0.3, 0.95, ndl) * uNight;
-  col = mix(col, uSilver, 0.7 * hatching(rot2(0.6) * hc, rot2(0.6) * hx, rot2(0.6) * hy, lit * 0.3, vSeed + 11.0));
-  col = mix(col, uSilver, lit * 0.5 * (1.0 - smoothstep(0.0, 0.06, -sd)));
-  col = mix(col, uSkyHorizon * parchment(q) / uPaper, 0.4 * vFar);
+  mc = mix(mc, uSilver, 0.7 * hatching(rot2(0.6) * hc, rot2(0.6) * hx, rot2(0.6) * hy, lit * 0.3, vSeed + 11.0));
+  mc = mix(mc, uSilver, lit * 0.5 * (1.0 - smoothstep(0.0, 0.06, -sd)));
+  mc = mix(mc, uSkyHorizon * parchment(q) / uPaper, 0.4 * vFar);
   // the outline: a broken pen line, open on the lit side, closed and heavier on the shadowed; none along the hazy base
   float open = smoothstep(0.3, 0.45, along1(arc, vSeed * 3.0) + 0.4 * tone - 0.1);
-  float onBase = smoothstep(base + 0.02, base + 0.09, uv.y);
-  float ink = max(penLine(sd, mix(0.8, 1.9, tone) * (1.0 - 0.4 * vFar)) * open * onBase, 0.6 * crease * smoothstep(0.3, 0.6, tone));
-  ink *= 1.0 - 0.5 * vFar;
-  col = mix(col, uInk, ink);
-  float a = step(sd, 0.0) * (0.25 + 0.75 * smoothstep(0.0, 0.14, uv.y - base)) * (1.0 - 0.4 * vFar);
-  a = max(a, ink) * uCloudVis;
+  float nInk = max(pen * open * onBase, 0.6 * crease * smoothstep(0.3, 0.6, tone)) * (1.0 - 0.5 * vFar);
+  mc = mix(mc, uInk, nInk);
+  float na = max(inside * (0.25 + 0.75 * smoothstep(0.0, 0.14, lift)) * (1.0 - 0.4 * vFar), nInk);
+
+  // by day the quietest part of the plate (S-024, S-025): the paper left white; a little cool shade laid only in the
+  // belly and low on the flank turned from the sun, a few fine, spaced strokes in its deepest part; a fine, broken,
+  // light pen line along the sunlit head, none down the flanks or along the base; the hour's colour over all as a wash.
+  // The farther (smaller, lower) the paler, thinner-lined and less drawn, until near the horizon they are pale,
+  // flat-based banks glowing with the hour, never dark shapes on a skyline
+  float turned = 1.0 - smoothstep(-0.3, 0.35, ndl);
+  float shade = clamp(under + 0.45 * turned * smoothstep(0.36, 0.06, lift), 0.0, 1.0) * (1.0 - 0.55 * vFar);
+  float cool = shade * (1.0 - 0.6 * uGlowAmt); // at the golden hour the glow fills the shade too
+  vec3 dc = glaze(parchment(q), uSlate, 0.2 * cool, 0.0, q);
+  dc = wash(dc, uShade, 0.28 * cool);
+  dc = mix(dc, glaze(dc, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.6 + 0.4 * max(shade, smoothstep(0.0, 0.8, ndl))));
+  dc = sunGlaze(dc, ndl, shade);
+  dc = mix(dc, glaze(dc, uSlate, 0.8, 0.0, q), uGrey);
+  float hm = smoothstep(0.45, 0.85, shade) * (1.0 - vFar) * (1.0 - uGlowAmt * 0.5);
+  dc = mix(dc, hatchInk(0.0), flicks(hc, hx, hy, vSeed * 13.0) * hm * 0.45);
+  dc = mix(dc, uSkyHorizon * parchment(q) / uPaper, 0.5 * vFar);
+  float crown = smoothstep(base + 0.1, base + 0.26, uv.y) * smoothstep(0.38, 0.5, along1(arc * 1.3, vSeed * 3.0 + 1.0));
+  float dInk = max(fine * crown * 0.7, 0.22 * crease * smoothstep(base + 0.12, base + 0.2, uv.y)) * (1.0 - 0.6 * vFar);
+  dc = mix(dc, hatchInk(0.3), dInk);
+  float da = max(inside * (0.3 + 0.6 * smoothstep(0.0, 0.16 - 0.12 * vFar, lift)) * (1.0 - 0.55 * vFar), dInk);
+
+  vec3 col = mix(dc, mc, uNight);
+  float a = mix(da, na, uNight) * uCloudVis;
   if (a < 0.004) discard;
   writeVeil(col, a);
 }`;
@@ -420,7 +456,9 @@ export class Sky {
     const s = this.lights.sky, a = this.cloudAttr.array as Float32Array, er = eye.length();
     const dip = Math.acos(Math.min(R / Math.max(er, R), 1)), n = CLOUDS.count;
     this.u.uCloudVis.value = 1 - smoothstep(er - R, CLOUDS.fade[0], CLOUDS.fade[1]);
-    const cover = Math.min(Math.max(0.62 + 0.38 * w.squall - 0.45 * w.calm, 0.1), 1);
+    // few by day, a fair sky mostly clear (S-024); by night as many as the first pass drew, the moonlit sky unchanged
+    const fair = 0.34 + 0.28 * this.style.uniforms.uNight.value;
+    const cover = Math.min(Math.max(fair + (1 - fair) * w.squall - 0.45 * fair * w.calm / 0.62, 0.08), 1);
     for (let k = 0; k < n; k++) {
       const b = this.bases[k], wd = this.widths[k];
       let az = this.az[k];
