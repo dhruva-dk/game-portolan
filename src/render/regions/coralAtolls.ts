@@ -784,10 +784,12 @@ export function planCoral(field: TerrainField): CoralPlan {
         place(plan.stakes, e.x, e.y, { sink: 0.3, fwd: tan(e.x, e.y, ux, uy), yaw: rnd() * TAU, tilt: 0.08 * (rnd() - 0.5), s: sc, sy, kitH: 2 });
       }
     }
-    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, broadside to a ship coming in
-    const e = c.great ? across(0, 1, 1.4, BLOCK) : null;
+    // the hulk lies across the reef beside the mouth, its bow toward the pass it missed, broadside to a ship coming in:
+    // on the arm clockwise of the mouth (seen from inside, the right hand looking out), so a ship in the lagoon before
+    // the pass sees it whole beside the channel (S-024: on the other arm it stood cut at the iPad hero's edge)
+    const e = c.great ? across(0, -1, 0.5, BLOCK) : null;
     if (e && !open(e.x, e.y, 2.5)) {
-      const p = place(plan.hulks, e.x, e.y, { sink: 0.1, fwd: tan(e.x, e.y, uy, -ux), yaw: -0.45, tilt: 0.32, s: 3.4, kitH: 0.62 });
+      const p = place(plan.hulks, e.x, e.y, { sink: 0.1, fwd: tan(e.x, e.y, -uy, ux), yaw: 0.45, tilt: 0.32, s: 3.4, kitH: 0.62 });
       plan.seabirds.push(lift(p.dir, p.top));
     }
   }
@@ -839,6 +841,7 @@ export class CoralAtolls {
   readonly voices: readonly { at: V; loud: number }[];
   private readonly material: THREE.ShaderMaterial;
   private readonly fine: THREE.ShaderMaterial; // (the withies' light ink)
+  private readonly wreck: THREE.ShaderMaterial; // (the hulk's, hatched along its keel)
   private readonly spillMaterial: THREE.ShaderMaterial;
   private readonly fixed: Draw[];
   /** [draw, parts, from, to (u from the eye), drawn only while dry] */
@@ -865,11 +868,21 @@ export class CoralAtolls {
     this.material.polygonOffset = true;
     this.material.polygonOffsetFactor = -1;
     this.material.polygonOffsetUnits = -2;
-    this.fine = illustratedMaterial(style, { pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45 });
+    // (hatched along the pole, never round it: on the object's frame, its strokes the level lines of x, so a pole a few
+    // px wide takes one continuous stroke down its shaded side and never the cross family, S-024: hatching run round
+    // the thin poles banded them like candy sticks)
+    this.fine = illustratedMaterial(style, {
+      pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.45, anchor: 'object', hatch: { axis: [1, 0, 0] }, surface: 'tone = min(tone, 0.6);',
+    });
+    // (the hulk the same way along its length: each frame stands in a plane across the keel, so a stroke follows a rib
+    // whole and the planking takes its strokes between the frames; never banded across its ribs, S-024)
+    const wreck = (this.wreck = illustratedMaterial(style, {
+      pigment: PIGMENTS.ochre, painted: true, side: THREE.DoubleSide, inkWeight: 0.8, anchor: 'object', hatch: { axis: [1, 0, 0] }, surface: 'tone = min(tone, 0.6);',
+    }));
     const fixed = (kit: THREE.BufferGeometry, parts: Part[], m = this.material): Draw => new Draw(kit, m, parts.length).fill(parts.map((p) => p.m));
     this.fixed = [
       fixed(shrubKit(9), plan.shrubs),
-      fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes, this.fine), fixed(hulkKit(8), plan.hulks),
+      fixed(driftKit(4), plan.drift), fixed(stakeKit(), plan.stakes, this.fine), fixed(hulkKit(8), plan.hulks, wreck),
     ];
     // the reef's parts near the eye (the pavement only while dry: it goes under the drawn water, not through it; the
     // reef-front corals are the sea's, painted on its floor under the water); palms in full near the eye, sketched beyond
@@ -932,6 +945,7 @@ export class CoralAtolls {
   dispose(): void {
     this.material.dispose();
     this.fine.dispose();
+    this.wreck.dispose();
     this.spillMaterial.dispose();
     for (const d of this.draws) d.mesh.geometry.dispose();
   }
