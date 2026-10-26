@@ -645,8 +645,9 @@ void main() {
   // a sheer wall stands on the mesh's own foot (within a cell of the coast) rather than be sawn into teeth along the
   // field's waterline; never on reef, whose flank under the water is the sea's to paint, nor (on the low coral cays of
   // a white-sand region, which have no cliffs) further out than a cell, where the mesh's faces at a drowned shelf's
-  // edge stood above the sea (both showed as slivers and a smear of pigments round the atolls)
-  bool wall = up0 < 0.4 && f.w < 0.5 && (shore.w > -0.5 || f.y < CELL_U);
+  // edge stood above the sea (both showed as slivers and a smear of pigments round the atolls); and never a face the
+  // waterline laid flat on the sea (a drowned slope's, every corner lifted: S-022's flat orange plank in Spice Harbour)
+  bool wall = up0 < 0.4 && f.w < 0.5 && (shore.w > -0.5 || f.y < CELL_U) && length(vWorld) > SEA_R + uSeaLevel + ${(LIFT + 0.01).toFixed(3)};
   if (above < -0.5 && !wall) discard;
   vec3 E = uChartE[ri], NC = uChartN[ri], v = normalize(cameraPosition - vWorld);
   float h = length(vWorld) - SEA_R, dist = distance(cameraPosition, vWorld);

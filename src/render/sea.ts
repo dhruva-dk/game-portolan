@@ -346,7 +346,7 @@ void main() {
   // mirrored and pulled out into a fin (S-021)
   float shift = dd * tt;
   shift = mix(shift, shift / (1.0 + shift / 1.2), clear);
-  vec3 Pf = P - vt / max(si, 1e-4) * shift + (vNormal - dir) * mix(dd * 1.2, min(dd, 2.0) * 0.3, clear);
+  vec3 lens = (vNormal - dir) * mix(dd * 1.2, min(dd, 2.0) * 0.3, clear), Pf = P - vt / max(si, 1e-4) * shift + lens;
   vec3 dirF = normalize(Pf);
   // the floor is gone by 110 u (vis): past that, no taps (explicit LOD, safe in a branch; rip's fwidth may jump at the
   // seam, where vis is already 0 — WP30b)
@@ -357,7 +357,10 @@ void main() {
   float leadF;
   int pf = planeOf(dirF, leadF);
   vec2 x = onPlane(Pf, pf), xdx = onPlane(dFdx(Pf), pf), xdy = onPlane(dFdy(Pf), pf);
-  float rip = ff.y / 0.85 + 0.6 * wob, rw = fwidth(rip);
+  // the sand ripples' crests follow the coast under the surface point, wavering with the lens but not shifted with the
+  // depth: over a steep shelf (Spice Harbour's dredged berths) the depth's shift folded the floor's image and the
+  // crests closed into concentric target rings (S-022); the clear water's shift is already tempered (S-021)
+  float rip = mix(dist < 110.0 ? seaField(normalize(P + lens)).y : 0.0, ff.y, clear) / 0.85 + 0.6 * wob, rw = fwidth(rip);
   // the clear region's chart plane under the floor point (its coral is laid there, unstretched)
   vec2 xc = vec2(dot(Pf, uClearE), dot(Pf, uClearN)), xcx = dFdx(xc), xcy = dFdy(xc);
   float cpx = max(max(length(xcx), length(xcy)), 1e-5);
