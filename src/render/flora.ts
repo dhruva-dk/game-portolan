@@ -620,7 +620,7 @@ const DEG = Math.PI / 180;
 /** The palm's own: its trunk's rings (darker, under each a little shadow), its midribs inked, a yellowed old frond and
  *  the dead ones hanging brown, its nuts green and golden; its leaflets take the instance's foliage in a light wash. */
 const PALM_TRUNK = paint(mix(PIGMENTS.sepia, PIGMENTS.leadWhite, 0.5), 0.45), PALM_RING = paint(PIGMENTS.sepia, 0.55);
-const PALM_RIB = paint(mix(PIGMENTS.sepia, PIGMENTS.umber, 0.4), 0.7);
+const PALM_RIB = paint(mix(PIGMENTS.sepia, PIGMENTS.umber, 0.4), 0.55);
 const FROND_DRY = paint(mix(PIGMENTS.ochre, PIGMENTS.leadWhite, 0.25), 0.5), FROND_DEAD = paint(mix(PIGMENTS.umber, PIGMENTS.ochre, 0.4), 0.55);
 const NUT = paint(PIGMENTS.ochre, 0.8), NUT_GREEN = paint(mix(PIGMENTS.verdigris, PIGMENTS.ochre, 0.5), 0.65);
 const frondWash = (density: number): Paint => [1, 1, 1, density];
@@ -668,7 +668,7 @@ function palmKit(lod: number): Kit {
       if (i > 0) pts.push(pts[i - 1].clone().addScaledVector(tans[i - 1].clone().add(tans[i]).normalize(), len / segs));
     }
     for (let i = 0; i < segs; i++) {
-      const e = (m: number, s: number): THREE.Vector3 => pts[m].clone().addScaledVector(V().crossVectors(side, tans[m]).normalize(), s * 0.007 * (1 - (0.6 * m) / segs));
+      const e = (m: number, s: number): THREE.Vector3 => pts[m].clone().addScaledVector(V().crossVectors(side, tans[m]).normalize(), s * 0.005 * (1 - (0.6 * m) / segs));
       const q = [e(i, 1), e(i, -1), e(i + 1, -1), e(i + 1, 1)].map((p) => k.vert(p, side, rib, 0, sway(p), SHEET, 0.7));
       k.quad(q[0], q[1], q[2], q[3]);
     }

@@ -563,7 +563,7 @@ export class SpiceIsles {
         const fo = T(k === 3 ? mix(mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.3 + 0.2 * w), PIGMENTS.roseMadder, 0.08 + 0.1 * u)
           : k === 4 ? mix(mix(PIGMENTS.malachite, PIGMENTS.verdigris, 0.2 + 0.25 * w), PIGMENTS.indigo, 0.2 + 0.15 * u)
           : k === 5 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.2 + 0.25 * w)
-          : k === 6 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.26 + 0.2 * w) // (WP15: the strand palms a light green-gold, as flora's)
+          : k === 6 ? mix(PIGMENTS.malachite, PIGMENTS.ochre, 0.18 + 0.18 * w) // (WP15: the strand palms a light green-gold, as flora's)
           : mix(PIGMENTS.malachite, u < 0.5 ? PIGMENTS.verdigris : PIGMENTS.ochre, 0.1 + 0.3 * w));
         const bl = k === 3 ? T(mix(mix(PIGMENTS.roseMadder, PIGMENTS.vermilion, 0.3 + 0.3 * w), PIGMENTS.umber, 0.12)) : k === 0 || k > 2 ? fo : T(mix(k === 1 ? PIGMENTS.vermilion : PIGMENTS.ochre, PIGMENTS.roseMadder, 0.25 * u));
         t.set([fo.x, fo.y, fo.z, bl.x, bl.y, bl.z, w, SPICE.far], i * 8);
