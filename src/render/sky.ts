@@ -74,8 +74,8 @@ float cumulusTop(float az, float n, float flat_, float seed) {
     float c = mod(ci + float(k), n) + seed * 17.0, r = cw * (0.7 + 0.9 * hashC(c));
     float dx = az - (ci + float(k) + 0.5 + 0.5 * (hashC(c * 1.7) - 0.5)) * cw;
     // a dome raised on its own pedestal, which falls away with it (a pedestal held outside it would end in a cliff
-    // at the next cell's edge: S-021's vertical edge)
-    float dome = sqrt(max(r * r - dx * dx, 0.0));
+    // at the next cell's edge: S-021's vertical edge); its flanks ease in at the foot
+    float dome = sqrt(max(r * r - dx * dx, 0.0)) * smoothstep(1.0, 0.75, abs(dx) / r);
     top = max(top, step(0.3, hashC(c * 2.3)) * (0.5 * hashC(c * 2.9) * dome + flat_ * dome));
   }
   return top;
@@ -108,12 +108,13 @@ void main() {
   col = glaze(col, tz, dz, 0.2 * pool, qz);
   // trade-wind cloud over the horizon by day: banks of cumulus heaped along the sky's foot, the paper left white in them
   // with their bellies glazed blue-grey, softening into the haze with distance; never inked (they are far)
-  vec3 hn = normalize(d - el * uUp + 1e-5), hw = triWeights(hn, 4.0);
-  float bank = smoothstep(0.4, 0.6, tri(tPaper, hn * 1.1, hw).b);
   vec3 ax = normalize(cross(uUp, abs(uUp.z) < 0.9 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0))), ay = cross(uUp, ax);
   float caz = atan(dot(d, ay), dot(d, ax));
+  // where the banks stand round the horizon, and how they swell and dwindle away along it: slowly, so a bank never
+  // ends in a sheer side (S-021, S-027; whole turns of the horizon, so no seam where the bearing wraps)
+  float bank = smoothstep(0.42, 0.78, 0.5 + 0.24 * sin(3.0 * caz + 1.3) + 0.16 * sin(7.0 * caz + 4.1) + 0.1 * sin(12.0 * caz + 0.7));
   // heaped domes, big then small on their shoulders, as a watercolourist rounds a cumulus' head
-  float big = cumulusTop(caz, 240.0, 1.0, 1.0), small = cumulusTop(caz + 0.004, 640.0, 1.0, 7.0);
+  float big = cumulusTop(caz, 240.0, 0.7, 1.0), small = cumulusTop(caz + 0.004, 640.0, 0.8, 7.0);
   float top = bank * (big + small * smoothstep(0.002, 0.008, big)), base = 0.004 + 0.002 * wob;
   float cd = min(top - eh, eh - base), cfw = fwidth(cd);
   // (a sea-level view's: from high over the globe the banks would stand on the limb as peaks)
@@ -122,7 +123,7 @@ void main() {
   if (cloud > 0.0) {
     float belly = 1.0 - smoothstep(0.0, 0.6 * top, eh), rim = 1.0 - smoothstep(0.0, 0.004, cd);
     vec3 cc = glaze(parchment(q), uSlate / uPaper, 0.22 * belly + 0.05, 0.5 * rim, q);
-    cc = mix(cc, col, 0.2 + 0.25 * (1.0 - bank));
+    cc = mix(cc, col, 0.25 + 0.3 * belly + 0.25 * (1.0 - bank)); // into the horizon's haze toward the foot
     col = mix(col, cc, cloud);
   }
 
@@ -215,10 +216,13 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 
-// a cumulus as an engraver draws it: a heaped head on lower shoulders, each dome scalloped into small billows, outlined
-// with a broken pen line that closes and thickens on the shadowed side and opens on the lit; curls where one billow
-// turns under the next; hatching only on the flanks turned from the light; a flat, hazy belly on a level base that
-// thins into the sky; flushed by a low sun, silver by the moon; the farther (smaller, lower) the paler
+// a cumulus as an engraver draws it from life (S-027): a few towers of unequal size heaped on one flat base, each a
+// leaning stack of rounded masses, crowded by billows of many sizes (some proud of the outline, some heaped across the
+// face), so no outline is an even scallop and no part floats free as a disc; outlined with a broken pen line found on
+// the shadowed side and lost on the lit; a fine line where one billow turns under the next; strokes following each
+// billow round in its shade and laid level along the base; a flat, hazy belly on a level base that thins into the sky;
+// opaque, so a nearer cloud hides the one behind it; flushed by a low sun, silver by the moon; the farther (smaller,
+// lower) the paler
 const CLOUD_FRAGMENT = /* glsl */ `
 in vec2 vUv;
 in vec3 vRight;
@@ -244,45 +248,119 @@ float flicks(vec2 c, vec2 cdx, vec2 cdy, float seed) {
   float keep = step(0.5, hash11(i * 1.37 + j * 0.53 + seed)), taper = sqrt(max(sin(3.14159265 * fy), 0.0));
   return keep * clamp(0.32 * uRenderPx * taper - abs(c.x - i * S) / px + 0.5, 0.0, 1.0);
 }
+float sminC(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
+const int HEADS = 4, BILLOWS = 36;
 void main() {
-  vec2 uv = vUv;
-  float base = -0.32 + 0.01 * sin(uv.x * 9.0 + vSeed * 9.0);
-  float head = (hash11(vSeed * 3.1) - 0.5) * 0.6, tall = 0.7 + 0.45 * hash11(vSeed * 4.3);
-  float s[7], cy[7];
-  float body = 1e3, nr = 1.0, arc = 0.0;
-  vec2 nc = vec2(0.0);
-  for (int i = 0; i < 7; i++) {
+  vec2 uv = vUv, duvx = dFdx(uv), duvy = dFdy(uv);
+  // the condensation level: one flat base under the whole heap, only breathing a little along its length
+  float base = -0.32 + 0.014 * (along1(uv.x * 7.0, vSeed * 5.0) - 0.5);
+  // the heads: a few towers of unequal size shouldering one another along the base, one within built higher than the rest
+  float tall = hash11(vSeed * 4.3), peak = 0.6 + 1.8 * hash11(vSeed * 3.1);
+  vec3 hd[HEADS];
+  float run = 0.0, lo = 0.0, hi = 0.0, up = 0.0;
+  for (int i = 0; i < HEADS; i++) {
     float fi = float(i), h1 = hash11(vSeed * 17.0 + fi * 3.7), h2 = hash11(vSeed * 5.3 + fi * 11.1);
-    float x = -0.72 + fi * 0.24 + (h1 - 0.5) * 0.1;
-    float env = exp(-(x - head) * (x - head) / 0.16);
-    float r = (0.14 + 0.08 * h2) * (0.6 + 0.6 * env);
-    float top = base + 0.08 + 0.6 * tall * env * (0.75 + 0.35 * hash11(vSeed + fi * 1.9));
-    vec2 cc = vec2(x, max(top - r, base + 0.3 * r)), dv = uv - cc;
-    float a = atan(dv.y, dv.x);
-    s[i] = length(dv) - r * (0.93 + 0.1 * abs(sin(a * (7.0 + floor(4.0 * h2)) + h1 * 6.2831853)));
-    cy[i] = cc.y;
-    if (s[i] < body) { body = s[i]; nc = cc; nr = r; arc = a * r * 14.0 + fi * 7.0; }
+    float h3 = hash11(vSeed * 2.3 + fi * 5.9), env = exp(-(fi - peak) * (fi - peak) / 1.4);
+    float r = (0.07 + 0.14 * h2) * (0.6 + 0.6 * env);
+    if (i > 0) run += (hd[i - 1].z + r) * (0.45 + 0.4 * h1);
+    hd[i] = vec3(run, r * (0.25 + 0.55 * h3) + (0.03 + 0.3 * tall) * env, r);
+    up = max(up, hd[i].y + r);
   }
-  float sd = max(body, base - uv.y), crease = 0.0;
-  for (int i = 0; i < 7; i++) {
-    float others = 1e3;
-    for (int j = 0; j < 7; j++) if (j != i) others = min(others, s[j]);
-    crease = max(crease, penLine(s[i], 0.6) * step(others, -0.015) * step(base + 0.07, uv.y) * step(uv.y, cy[i]));
+  lo = hd[0].x - hd[0].z;
+  hi = hd[HEADS - 1].x + hd[HEADS - 1].z;
+  float sc = min(min(1.0, 1.66 / (hi - lo)), 0.7 / up), mid = 0.5 * (lo + hi) + 0.08 * (hash11(vSeed * 8.1) - 0.5);
+  // each head a rounded crown on a column standing on the base; a low shoulder along the base joins them into one heap
+  float sd = 1e3, zw = -1e3, z2 = -1e3, wr = 1.0, wy = 0.0, wi = 0.0;
+  vec2 wc = vec2(0.0);
+  for (int i = 0; i < HEADS; i++) {
+    hd[i] = vec3((hd[i].x - mid) * sc, base + hd[i].y * sc, hd[i].z * sc);
+    // a tower is a stack of rounded masses pushed a little aside, the crown the broadest, never a straight column;
+    // it is shaded as one mass (from its leaning axis), so the stack never reads as balls set one on another
+    vec2 foot = vec2(0.0);
+    for (int k = 0; k < 3; k++) {
+      float fk = float(k), t = fk * 0.5, g1 = hash11(vSeed * 9.7 + float(i) * 4.1 + fk * 1.3);
+      float r = hd[i].z * mix(0.82 + 0.2 * g1, 1.0, t);
+      vec2 a = vec2(hd[i].x + (g1 - 0.5) * 0.7 * hd[i].z * (1.0 - t), mix(base + 0.3 * r, hd[i].y, t));
+      if (k == 0) foot = a;
+      sd = sminC(sd, length(uv - a) - r, 0.07 * sc);
+    }
+    vec2 ab = hd[i].xy - foot, a = foot + ab * clamp(dot(uv - foot, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+    float r = hd[i].z, dd = length(uv - a), s = dd - r, z = sqrt(max(r * r - dd * dd, 0.0)) - 0.35 * (hd[i].y - base);
+    if (s < 0.0 && z > zw) { z2 = zw; zw = z; wc = a; wr = r; wi = float(i); }
+    else if (s < 0.0) z2 = max(z2, z);
   }
+  float shR = (0.055 + 0.04 * hash11(vSeed * 6.7)) * sc / 0.8;
+  {
+    vec2 a = vec2(clamp(uv.x, hd[0].x, hd[HEADS - 1].x), base + 0.4 * shR), dv = uv - a;
+    float dd = length(dv), s = dd - shR, z = sqrt(max(shR * shR - dd * dd, 0.0)) + 0.02;
+    sd = sminC(sd, s, 0.04 * sc);
+    if (s < 0.0 && z > zw) { z2 = zw; zw = z; wc = a; wr = shR; wy = 0.0; wi = 9.0; }
+    else if (s < 0.0) z2 = max(z2, z);
+  }
+  // the billows crowding each head's crown and shoulders, many small to a few large, some standing proud of the
+  // outline and some heaped across the face in front, never evenly spaced
+  for (int i = 0; i < BILLOWS; i++) {
+    float fi = float(i), b1 = hash11(vSeed * 13.1 + fi * 7.3), b2 = hash11(vSeed * 3.7 + fi * 2.9);
+    float b3 = hash11(vSeed * 6.1 + fi * 1.7), b4 = hash11(vSeed * 1.9 + fi * 5.3);
+    int j = b3 < 0.3 ? int(peak + 0.5) : int(mod(fi + floor(b2 * 2.0), float(HEADS)));
+    vec3 p = hd[j];
+    float side = float(j) - 1.5, th = (b1 - 0.5) * 2.9 + 0.3 * side;
+    if (b4 > 0.62) { // on the shoulder of the tower below the crown, out to one side
+      float rm = 0.9 * p.z;
+      p = vec3(p.x, mix(base + 0.3 * rm, p.y, 0.5), p.z);
+      th = sign(b1 - 0.5 + 0.2 * side) * (1.0 + 0.6 * b2);
+    }
+    float rs = p.z * (0.1 + 0.45 * b2 * b2), sink = 0.25 + 0.4 * b4;
+    vec2 c = p.xy + (p.z - sink * rs) * vec2(sin(th), cos(th));
+    rs = min(rs, min(0.96 - abs(c.x), 0.57 - c.y));
+    rs = min(rs, max((c.y - base) / 0.55, 0.0));
+    rs *= step(0.022, rs); // (none too small to draw: a speck, not a billow)
+    vec2 dv = uv - c;
+    float dd = length(dv), s = dd - rs, rr = p.z - sink * rs;
+    float z = sqrt(max(rs * rs - dd * dd, 0.0)) + 0.8 * sqrt(max(p.z * p.z - rr * rr, 0.0)) - 0.35 * (p.y - base);
+    sd = sminC(sd, s, 0.01 * sc);
+    if (s < 0.0 && z > zw) { z2 = zw; zw = z; wc = c; wr = rs; wi = 20.0 + fi; }
+    else if (s < 0.0) z2 = max(z2, z);
+  }
+  // where one billow turns under the next: the depth between the two nearest surfaces closes to nothing
+  float crease = penLine(zw - z2, 0.7) * step(-1e2, z2) * smoothstep(-0.1, -0.5, (uv.y - wc.y) / wr);
 
-  // the form: each billow rounded, the whole heap turned as one mass, the belly flat and facing down
-  vec2 n2 = 0.55 * (uv - nc) / nr + 0.45 * vec2((uv.x - head) / 0.8, (uv.y - base - 0.25) / 0.55);
-  float under = smoothstep(0.16, 0.0, uv.y - base);
-  n2 = mix(n2, vec2(0.3 * n2.x, -0.9), under);
+  // the form: each billow rounded on its own, the whole heap turned as one mass, the belly flat and facing down
+  vec2 dvw = uv - wc;
+  float dw = max(length(dvw), 1e-5);
+  vec2 dir = dvw / dw;
+  vec2 nl = zw > -1e2 ? dvw / wr : vec2(0.0);
+  vec2 n2 = 0.52 * nl + 0.48 * vec2(uv.x / 0.85, (uv.y - base - 0.22) / 0.5);
+  float lift = uv.y - base, under = smoothstep(0.13, 0.0, lift);
+  n2 = mix(n2, vec2(0.25 * n2.x, -0.9), under);
+  n2 *= min(1.0, 0.97 * inversesqrt(max(dot(n2, n2), 1e-6)));
   float nz = sqrt(max(1.0 - dot(n2, n2), 0.05));
   vec3 n = normalize(vRight * n2.x + vUp * n2.y + vToEye * nz);
-  float ndl = dot(n, uSun), tone = clamp(lightTone(ndl, nz) + 0.3 * under, 0.0, 1.0);
+  // by day lit as an illustrator sets the light: from the sun's side of the plate and from above, whether the sun stands
+  // before or behind the cloud, so the crowns are lit and the base in shade
+  vec2 s2 = vec2(dot(uSun, vRight), dot(uSun, vUp)), l2 = normalize(s2 * inversesqrt(max(dot(s2, s2), 1e-6)) + vec2(0.0, 0.8));
+  float ndl = mix(dot(n, uSun), dot(n2, l2) + 0.1 * nz - 0.05, 1.0 - uNight), tone = clamp(lightTone(ndl, nz) + 0.3 * under, 0.0, 1.0);
   Paper q = paperAt(vec3(uv * vSize, vSeed * 37.0), vec3(0.0, 0.0, 1.0), 0.0);
+  // the sun's side in the plate, and the angle round the billow measured from the side away from it (so the seam of
+  // the strokes that follow the billow round lies on its lit side, where none are laid)
+  vec2 away = -s2 * inversesqrt(max(dot(s2, s2), 1e-6));
+  if (dot(s2, s2) < 1e-4) away = vec2(0.0, -1.0);
+  float ang = atan(away.x * dir.y - away.y * dir.x, dot(away, dir));
+  // strokes following the billow's round: across them its radius, along them its arc (the column's height continues it)
+  vec2 rc = vec2(dw, ang * wr + wy) * vSize;
+  vec2 rdx = vec2(dot(dir, duvx), (dir.x * duvx.y - dir.y * duvx.x) * wr / dw + (wy != 0.0 ? duvx.y : 0.0)) * vSize;
+  vec2 rdy = vec2(dot(dir, duvy), (dir.x * duvy.y - dir.y * duvy.x) * wr / dw + (wy != 0.0 ? duvy.y : 0.0)) * vSize;
   // (laid near level, as the engraver lays a cloud's shade: along the base, curving round the flank)
-  vec2 hc = rot2(1.45 + 0.35 * (uv.x - head) + 0.2 * hash11(vSeed * 7.7)) * uv * vSize, hx = dFdx(hc), hy = dFdy(hc);
-  float lift = uv.y - base, inside = step(sd, 0.0);
-  float pen = penLine(sd, mix(0.8, 1.9, tone) * (1.0 - 0.4 * vFar)), fine = penLine(sd, mix(0.75, 0.45, vFar));
+  vec2 hc = rot2(1.45 + 0.35 * uv.x + 0.2 * hash11(vSeed * 7.7)) * uv * vSize, hx = dFdx(hc), hy = dFdy(hc);
+  float fw = fwidth(sd);
+  float pen = penLine(sd, mix(0.8, 1.9, tone) * (1.0 - 0.4 * vFar)), fine = penLine(sd, mix(1.1, 0.5, vFar));
   float onBase = smoothstep(base + 0.02, base + 0.09, uv.y);
+  float arc = ang * wr * 14.0 + wi * 7.0;
+  // the foot: the base is a level line into the haze, softly, a little ragged
+  float foot = smoothstep(base - 0.012, base + 0.03 + 0.03 * vFar, uv.y);
+  // a lost edge on the lit side, a found one on the shaded
+  float litEdge = smoothstep(-0.1, 0.5, ndl);
+  float inside = 1.0 - smoothstep(-fw * (1.0 + 2.5 * litEdge), fw, sd);
 
   // by night, as the first pass drew them: moonlit, the shade hatched, silver on the side the moon lights
   vec3 mc = sunGlaze(shadeGlaze(parchment(q), tone, q), ndl, tone);
@@ -295,32 +373,35 @@ void main() {
   mc = mix(mc, uSilver, 0.7 * hatching(rot2(0.6) * hc, rot2(0.6) * hx, rot2(0.6) * hy, lit * 0.3, vSeed + 11.0));
   mc = mix(mc, uSilver, lit * 0.5 * (1.0 - smoothstep(0.0, 0.06, -sd)));
   mc = mix(mc, uSkyHorizon * parchment(q) / uPaper, 0.4 * vFar);
-  // the outline: a broken pen line, open on the lit side, closed and heavier on the shadowed; none along the hazy base
   float open = smoothstep(0.3, 0.45, along1(arc, vSeed * 3.0) + 0.4 * tone - 0.1);
   float nInk = max(pen * open * onBase, 0.6 * crease * smoothstep(0.3, 0.6, tone)) * (1.0 - 0.5 * vFar);
   mc = mix(mc, uInk, nInk);
-  float na = max(inside * (0.25 + 0.75 * smoothstep(0.0, 0.14, lift)) * (1.0 - 0.4 * vFar), nInk);
+  float na = max(inside * foot * (0.25 + 0.75 * smoothstep(0.0, 0.14, lift)) * (1.0 - 0.4 * vFar), nInk);
 
-  // by day the quietest part of the plate (S-024, S-025): the paper left white; a little cool shade laid only in the
-  // belly and low on the flank turned from the sun, a few fine, spaced strokes in its deepest part; a fine, broken,
-  // light pen line along the sunlit head, none down the flanks or along the base; the hour's colour over all as a wash.
-  // The farther (smaller, lower) the paler, thinner-lined and less drawn, until near the horizon they are pale,
-  // flat-based banks glowing with the hour, never dark shapes on a skyline
-  float turned = 1.0 - smoothstep(-0.3, 0.35, ndl);
-  float shade = clamp(under + 0.45 * turned * smoothstep(0.36, 0.06, lift), 0.0, 1.0) * (1.0 - 0.55 * vFar);
-  float cool = shade * (1.0 - 0.6 * uGlowAmt); // at the golden hour the glow fills the shade too
-  vec3 dc = glaze(parchment(q), uSlate, 0.2 * cool, 0.0, q);
-  dc = wash(dc, uShade, 0.28 * cool);
+  // by day (S-024, S-025, S-027): the lit crowns left as paper, a pale warm breath on them; the side turned from the
+  // sun and the flat base modelled in a cool transparent wash, pooled a little darker where it dried against the paper;
+  // fine strokes following each billow round in its deepest shade and laid level along the base; a fine pen line,
+  // found on the shaded side and lost on the lit; opaque, so the nearer hides the farther. The hour's colour over all.
+  // The farther (smaller, lower) the paler and less drawn, until near the horizon they are hazy banks in the hour's
+  // glow, never dark shapes on a skyline
+  float turned = 1.0 - smoothstep(-0.3, 0.25, ndl);
+  float shade = clamp(0.8 * turned + 0.75 * under, 0.0, 1.0) * (1.0 - 0.5 * vFar);
+  float cool = shade * (1.0 - 0.55 * uGlowAmt); // at the golden hour the glow fills the shade too
+  float pool = smoothstep(0.18, 0.34, shade + 0.1 * (q.bloom - 0.5)) * (1.0 - smoothstep(0.34, 0.5, shade));
+  // (cool: the slate and the sky's own blue, reflected into the shade)
+  vec3 dc = glaze(parchment(q), mix(uSlate, uSkyHorizon / uPaper, 0.5), 0.5 * cool, 0.5 * pool, q);
+  dc = wash(dc, uShade, 0.22 * cool + 0.14 * under);
   dc = mix(dc, glaze(dc, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.6 + 0.4 * max(shade, smoothstep(0.0, 0.8, ndl))));
   dc = sunGlaze(dc, ndl, shade);
   dc = mix(dc, glaze(dc, uSlate, 0.8, 0.0, q), uGrey);
-  float hm = smoothstep(0.45, 0.85, shade) * (1.0 - vFar) * (1.0 - uGlowAmt * 0.5);
-  dc = mix(dc, hatchInk(0.0), flicks(hc, hx, hy, vSeed * 13.0) * hm * 0.45);
-  dc = mix(dc, uSkyHorizon * parchment(q) / uPaper, 0.5 * vFar);
-  float crown = smoothstep(base + 0.1, base + 0.26, uv.y) * smoothstep(0.38, 0.5, along1(arc * 1.3, vSeed * 3.0 + 1.0));
-  float dInk = max(fine * crown * 0.7, 0.22 * crease * smoothstep(base + 0.12, base + 0.2, uv.y)) * (1.0 - 0.6 * vFar);
-  dc = mix(dc, hatchInk(0.3), dInk);
-  float da = max(inside * (0.3 + 0.6 * smoothstep(0.0, 0.16 - 0.12 * vFar, lift)) * (1.0 - 0.55 * vFar), dInk);
+  float hm = smoothstep(0.42, 0.8, shade) * (1.0 - vFar) * (1.0 - uGlowAmt * 0.5);
+  float strokes = mix(flicks(rc, rdx, rdy, vSeed * 13.0 + wi), flicks(hc, hx, hy, vSeed * 13.0), max(under, step(wi, 19.5)));
+  dc = mix(dc, hatchInk(0.1), strokes * hm * 0.5);
+  dc = mix(dc, uSkyHorizon * parchment(q) / uPaper, 0.55 * vFar + 0.2 * under * vFar);
+  float found = smoothstep(0.45, 0.85, turned) * smoothstep(0.32, 0.48, along1(arc * 1.3, vSeed * 3.0 + 1.0) + 0.25 * turned);
+  float dInk = max(fine * found * onBase * 0.75, 0.4 * crease * smoothstep(0.35, 0.7, shade) * onBase) * (1.0 - 0.7 * vFar);
+  dc = mix(dc, hatchInk(0.35), dInk);
+  float da = inside * foot * (0.97 - 0.12 * vFar);
 
   vec3 col = mix(dc, mc, uNight);
   float a = mix(da, na, uNight) * uCloudVis;
