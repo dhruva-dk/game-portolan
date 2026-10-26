@@ -205,7 +205,21 @@ function swellFrom(dir: V3, out: THREE.Vector3): THREE.Vector3 {
   return out.set(out.x - k * dir.x, out.y - k * dir.y, out.z - k * dir.z).normalize();
 }
 const ramp = (a: number, b: number, x: number): number => THREE.MathUtils.smoothstep(x, a, b);
-const S1 = new THREE.Vector3(), S2 = new THREE.Vector3(), S3 = new THREE.Vector3(), S4 = new THREE.Vector3();
+const S1 = new THREE.Vector3(), S2 = new THREE.Vector3(), S3 = new THREE.Vector3(), S4 = new THREE.Vector3(), S5 = new THREE.Vector3();
+/** How open a reef front at `dir` facing `sea` (a unit tangent, seaward) lies to the swell at sea level `level` (0–1): the
+ *  swell reaches it over deep water near or farther out (`out`, `far`: deeper than `deep`), though a neighbour's shelf
+ *  lies close off it; over a shallower shelf, in a neighbour ring's lee or a maze, it is spent before it gets there (the
+ *  front's shelter). A lagoon, a lagoon's side and a pass's inner reach lie calm: no swell where the water there, near or
+ *  farther out, is a lagoon. */
+export function openAt(geo: Geography, dir: V3, sea: V3, level: number): number {
+  let zone = geo.zones[cellOf(TERRITORY, dir)], deep = -Infinity;
+  for (const k of [SURF.out, SURF.far]) {
+    const p = S5.set(sea.x, sea.y, sea.z).multiplyScalar(k / R).add(dir).normalize();
+    zone |= geo.zones[cellOf(TERRITORY, p)];
+    deep = Math.max(deep, level - heightAt(geo, p));
+  }
+  return zone & ZONE.lagoon ? 0 : ramp(SURF.deep[0], SURF.deep[1], deep);
+}
 /** How much white water the surf can lay at `dir` (0–1, its envelope: the sets break within it) at sea level `level`. */
 export function surfAt(geo: Geography, dir: V3, level: number): number {
   const y = coastAt(geo, dir), h = heightAt(geo, dir);
@@ -218,12 +232,9 @@ export function surfAt(geo: Geography, dir: V3, level: number): number {
   const lit = ramp(SURF.lit[0], SURF.lit[1], sea.dot(swellFrom(d, S4)));
   // (to windward the spent water washes on over the dry ridge, `wash` u above the sea where the swell strikes square)
   if (lit <= 0 || level - h <= -0.4 - SURF.wash * lit) return 0;
-  const far = S2.copy(sea).multiplyScalar(SURF.far / R).add(d).normalize(), out = sea.multiplyScalar(SURF.out / R).add(d).normalize();
-  if ((geo.zones[cellOf(TERRITORY, out)] | geo.zones[cellOf(TERRITORY, far)]) & ZONE.lagoon) return 0;
-  // (deep water near or farther out: a reef front facing the open swell, though a neighbour's shelf lies close off it)
-  // (and where it strikes square it is bigger and breaks farther out, in deeper water over the reef's front)
+  // (where it strikes square it is bigger and breaks farther out, in deeper water over the reef's front)
   const reach = SURF.break * lit;
-  return lit * ramp(SURF.deep[0], SURF.deep[1], level - Math.min(heightAt(geo, out), heightAt(geo, far))) * ramp(SURF.strike[0] - reach, SURF.strike[1] - reach, h);
+  return lit * openAt(geo, d, sea, level) * ramp(SURF.strike[0] - reach, SURF.strike[1] - reach, h);
 }
 /** How much lace lies at `dir` at sea level `level` (0–1): over reef that would strike a keel now. */
 export function laceAt(geo: Geography, dir: V3, level: number): number {
@@ -1041,8 +1052,8 @@ void main() {
     vec3 from = uClearE * sin(SURF_FROM) + uClearN * cos(SURF_FROM);
     float lit = smoothstep(SURF_LIT.x, SURF_LIT.y, dot(seaward, normalize(from - dir * dot(dir, from)))), reach = SURF_BREAK * lit;
     vec4 fo = seaField(normalize(dir + seaward * (SURF_OUT / SEA_R))), ff = seaField(normalize(dir + seaward * (SURF_FAR / SEA_R)));
-    // (a lagoon's side lies calm: no break where the water seaward, near or farther out, is a lagoon)
-    float open = f.w * lit * smoothstep(SURF_DEEP.x, SURF_DEEP.y, uSeaLevel - min(fo.x, ff.x)) * (1.0 - smoothstep(0.2, 0.6, max(fo.z, ff.z)));
+    // (a lagoon and a lagoon's side lie calm: no break where the water here or seaward, near or farther out, is a lagoon)
+    float open = f.w * lit * smoothstep(SURF_DEEP.x, SURF_DEEP.y, uSeaLevel - min(fo.x, ff.x)) * (1.0 - smoothstep(0.2, 0.6, max(f.z, max(fo.z, ff.z))));
     float exposed = open * smoothstep(SURF_STRIKE.x - reach, SURF_STRIKE.y - reach, f.x) * step(-0.4 - SURF_WASH * lit, depth);
     // the rollers outside the break: a few short curved pen strokes along the front, riding in toward it
     if (open > 0.0 && f.y > 1.6) {

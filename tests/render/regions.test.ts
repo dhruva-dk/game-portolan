@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { R } from '../../src/sim/sphere.ts';
-import { buildGeography, heightAt } from '../../src/sim/world/geography.ts';
-import { REGIONS, TIDE } from '../../src/sim/world/regions.ts';
+import { cellOf, R, TERRITORY } from '../../src/sim/sphere.ts';
+import { buildGeography, heightAt, toChart, ZONE } from '../../src/sim/world/geography.ts';
+import { REGIONS, rimAt, TIDE } from '../../src/sim/world/regions.ts';
 import { TerrainField, type Surface } from '../../src/render/terrain.ts';
 import { arcOf } from '../../src/render/regions/fjords.ts';
 import { crownOf } from '../../src/render/regions/iceCrown.ts';
@@ -14,12 +14,30 @@ import { open, planAmber, shoal } from '../../src/render/regions/amberShoals.ts'
 import { chartDir } from '../../src/render/regions/kit.ts';
 import { planWeeping } from '../../src/render/regions/weepingIsle.ts';
 import { BLOCK, CLEAR, groundAt, LAND, LOW, planCoral } from '../../src/render/regions/coralAtolls.ts';
-import { laceAt, surfAt } from '../../src/render/sea.ts';
+import { laceAt, openAt, SURF, surfAt } from '../../src/render/sea.ts';
 import { BLOCK as SPICE_BLOCK, groundAt as spiceGround, LAND as SPICE_LAND, planSpice, SPICE_SHIPS } from '../../src/render/regions/spiceIsles.ts';
 import { DRAFT } from '../../src/sim/world/regions.ts';
 import { navigable } from '../../src/sim/world/geography.ts';
 
 const geo = buildGeography(), field = new TerrainField(geo);
+/** The Coral Atolls' rings by their rims (S-029), at every degree of bearing about each ring's centre: how far the rim
+ *  faces off the trades' swell (deg, by the rim curve's outward normal), the most surf across its reef flat and 3 u past
+ *  its seaward edge at mean tide, the crest's arc there (u), whether a pass opens there, and how open the water off its
+ *  seaward edge lies to the swell along that normal (the surf rule's own shelter, openAt: under 1 off a shallower shelf). */
+const RIMS = (() => {
+  const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), rad = Math.PI / 180, off = (a: number): number => Math.abs(((a + 540) % 360) - 180);
+  return REGIONS[ri].strokes.flatMap((s) => s.k !== 'reef' ? [] : [{ s, at: Array.from({ length: 360 }, (_, b) => {
+    const { r, w } = rimAt(s.rim, b), n = b - Math.atan2((rimAt(s.rim, b + 0.5).r - rimAt(s.rim, b - 0.5).r) / rad, r) / rad;
+    const on = (k: number, o = 0): THREE.Vector3 => chartDir(ri, s.x + k * Math.sin(b * rad) + o * Math.sin(n * rad), s.y + k * Math.cos(b * rad) + o * Math.cos(n * rad));
+    let most = 0;
+    for (let k = r - w / 2; k <= r + w / 2 + 3; k += 0.25) most = Math.max(most, surfAt(geo, on(k), 0));
+    const edge = on(r + w / 2);
+    return {
+      b, off: off(n - SURF.from), most, arc: r * rad, pass: s.gaps.some((g) => off(b - g.bearing) * rad * r < g.half + CLEAR + 2),
+      open: openAt(geo, edge, on(r + w / 2, 1).sub(edge).normalize(), 0),
+    };
+  }) }]);
+})();
 const S: Surface = { height: 0, normal: new THREE.Vector3(), up: 1, ground: 0, region: 0 };
 const v = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
 
@@ -179,7 +197,17 @@ test('the Coral Atolls: each ring has its channels, open at every tide with no r
   }
   const n = { palms: plan.palms.flat().length, pandanus: plan.pandanus.length, shrubs: plan.shrubs.length, reef: reef.length, surf: plan.surf.length, spill: plan.spill.length, stakes: plan.stakes.length, hulks: plan.hulks.length, channels: plan.channels.map((c) => `${c.bearing}°/${c.width.toFixed(1)}`) };
   console.log('coral plan', JSON.stringify(n));
-  assert.ok(n.palms >= 100 && n.reef >= 1600 && n.surf >= 880 && n.spill >= 1000 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
+  assert.ok(n.palms >= 100 && n.reef >= 1600 && n.stakes >= 20 && n.hulks === 1, JSON.stringify(n));
+  // the surf's sheets only where its rule breaks (S-029), each at its break or on the spent water rolling in 1.1 u behind it
+  const near = (d: THREE.Vector3): number => Math.max(...Array.from({ length: 33 }, (_, k) => {
+    const p = toChart(ri, d), a = (k * Math.PI) / 16, o = k === 32 ? 0 : 1.1;
+    return surfAt(geo, chartDir(ri, p.x + o * Math.cos(a), p.y + o * Math.sin(a)), 0);
+  }));
+  for (const p of plan.spill) assert.ok(near(p.dir) >= 0.3, `white water where the surf does not break (${JSON.stringify(toChart(ri, p.dir))})`);
+  // and enough to draw the windward break unbroken: a sheet at least every 1.5 u along each breaking exposed windward
+  // crest (a sheet is 1.5–2.1 u long), and the breakers' 1 u grid filling a band at least 1 u deep off it
+  const crest = RIMS.reduce((L, { at }) => L + at.reduce((l, a) => l + (a.off <= 60 && !a.pass && a.open > 0.5 && a.most > 0.8 ? a.arc : 0), 0), 0);
+  assert.ok(n.spill >= crest / 1.5 && n.surf >= crest, `${n.spill} sheets and ${n.surf} breakers along ${crest.toFixed(0)} u of breaking windward crest`);
 });
 
 test('the Spice Isles (S-025 (6c)): the gardens and scrub keep out of every house, and the slope east of the harbour is planted', () => {
@@ -245,12 +273,28 @@ test('the Spice Isles: nothing stands in a hull\'s water; trees on land dry at h
   assert.ok(n.godowns >= 4 && n.quays >= 30 && n.heaps >= 8 && n.emergents >= 50 && plan.flowers.every((f) => f.length >= 30) && n.edge >= 40, JSON.stringify(n));
 });
 
-test('the Coral Atolls (S-027 (7)): the trades break on the windward crest, never in open sea, a lagoon or on the lee', () => {
-  const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls');
-  // along a bearing out from the Great Lagoon's centre (8, 6): the most surf over its rim at mean tide
-  const most = (b: number): number => Math.max(...Array.from({ length: 60 }, (_, i) => surfAt(geo, chartDir(ri, 8 + (18 + 0.25 * i) * Math.sin((b * Math.PI) / 180), 6 + (18 + 0.25 * i) * Math.cos((b * Math.PI) / 180)), 0)));
-  assert.ok(Math.max(most(105), most(120), most(135)) > 0.8, 'the windward (east-south-east) crest breaks');
-  for (const b of [255, 270, 285]) assert.equal(most(b), 0, `the lee rim at ${b}° lies quiet`);
-  assert.equal(surfAt(geo, chartDir(ri, 8, 6), 0), 0, 'the lagoon lies calm');
-  assert.equal(surfAt(geo, chartDir(ri, 60, -60), 0), 0, 'no surf in open sea');
+test('the Coral Atolls (S-027 (7), S-029): every ring breaks along its exposed windward crest, less where a shelf shelters it, beam-on or on its lee; never in a lagoon or open sea', () => {
+  const ri = REGIONS.findIndex((r) => r.id === 'coralAtolls'), mean = (xs: { most: number }[]): number => xs.reduce((m, a) => m + a.most, 0) / Math.max(xs.length, 1);
+  assert.equal(RIMS.length, 5, 'five rings');
+  for (const { s, at } of RIMS) {
+    // (the falloff with the bearing off the swell along the rim the swell reaches, open water off it)
+    const ring = `the ring at (${s.x}, ${s.y})`, rim = at.filter((a) => !a.pass && a.open > 0.5), exposed = rim.filter((a) => a.off <= 60);
+    const sheltered = at.filter((a) => !a.pass && a.open <= 0.5 && a.off <= 60), breaks = exposed.filter((a) => a.most > 0.8);
+    const beam = rim.filter((a) => a.off > 75 && a.off < 105), lee = rim.filter((a) => a.off >= 120);
+    assert.ok(breaks.length > exposed.length / 2, `${ring}: its exposed windward crest breaks along ${breaks.length} of ${exposed.length}°`);
+    assert.ok(Math.max(...exposed.map((a) => a.most)) > 0.95, `${ring}: full where the swell strikes square`);
+    if (sheltered.length > 0) assert.ok(mean(sheltered) < mean(exposed), `${ring}: weaker where a shelf shelters its windward crest (${mean(sheltered).toFixed(2)} against ${mean(exposed).toFixed(2)})`);
+    // (beam-on and on the lee, over the bearings the ring's rim has there: the north-west ring's beam is all passes and
+    // sheltered drowned rim; S-029 leaves the south-east ring's lee breaking more than its beam, an open fault of the rule)
+    for (const [side, xs] of [['beam-on', beam], ['on its lee', lee]] as const) {
+      if (xs.length > 0) assert.ok(mean(xs) < mean(exposed), `${ring}: less ${side} (${mean(xs).toFixed(2)}) than to windward (${mean(exposed).toFixed(2)})`);
+    }
+    assert.equal(surfAt(geo, chartDir(ri, s.x, s.y), 0), 0, `${ring}: its lagoon lies calm`);
+  }
+  for (let y = -66; y <= 66; y += 1) for (let x = -66; x <= 66; x += 1) {
+    const d = chartDir(ri, x, y);
+    if (geo.zones[cellOf(TERRITORY, d)] & ZONE.lagoon) assert.equal(surfAt(geo, d, 0), 0, `the lagoon at (${x}, ${y}) lies calm`);
+  }
+  for (const [x, y] of [[60, -60], [-10, -60], [-70, 0], [0, 60]]) assert.equal(surfAt(geo, chartDir(ri, x, y), 0), 0, `no surf in open sea at (${x}, ${y})`);
 });
+
