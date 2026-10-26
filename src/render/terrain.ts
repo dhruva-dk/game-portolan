@@ -685,6 +685,12 @@ void main() {
   vec3 E = uChartE[ri], NC = uChartN[ri], v = normalize(cameraPosition - vWorld);
   float h = length(vWorld) - SEA_R, dist = distance(cameraPosition, vWorld);
   float upx = max(length(dFdx(vWorld)), length(dFdy(vWorld)));
+  // (on a reef the footprint is judged from the eye's distance, the pixel's angle and the smooth normal, never from the
+  // facet's own derivatives, which jump from cell to cell: on the lip's sliver facets they laid the far flat's bleach
+  // in pale straight-edged wedges, S-024)
+  vec3 rdir = normalize(vWorld - cameraPosition);
+  float pang = max(length(dFdx(rdir)), length(dFdy(rdir)));
+  float upxR = mix(upx, dist * pang / max(abs(dot(normalize(vNormal), v)), 0.12), smoothstep(0.0, 0.03, f.w));
   float near = 1.0 - smoothstep(uFade.x, uFade.y, dist);
   vec2 pl = vec2(dot(vWorld, E), dot(vWorld, NC));
   Paper q = paperAt(vWorld, n0, 1.0);
@@ -781,7 +787,7 @@ void main() {
   // motus' beaches keep theirs (S-021)
   float lip = toL < 8.0 ? lipInk(dir, f.w * smoothstep(BEACH_W - 0.1, BEACH_W + 0.6, toL)) : f.w > 0.02 && above < 0.4 ? lipInk(dir, offBeach(dir, f)) : 1.0;
   float bleached = max(-shore.w, 0.0), reefInk = 0.0, reefShade = 0.0, reefSw = 0.0;
-  float afar = smoothstep(0.025, 0.06, upx * uRenderPx); // ~0.04 u to the CSS px and more: the flat seen from high
+  float afar = smoothstep(0.025, 0.06, upxR * uRenderPx); // ~0.04 u to the CSS px and more: the flat seen from high
   if (reef > 0.01) {
     // near the eye a wet reef pavement at low water, as an engraver draws it from the beach (S-024: its sepia pits read
     // as a leopard's hide, its hatched rubble as grid patches): pale cream limestone going cool grey in broad ragged
@@ -789,31 +795,37 @@ void main() {
     // broken coral heaped in drifts, each knob bleached, lit on top and drawn round on its side from the sun; shallow
     // pools of standing water giving back the pale sky inside a damp margin and a broken rim; the stone's honeycomb a
     // fine sparse stipple, never spots; its flanks broken and shaded. Every patch's outline is warped, never a round blot.
-    float fine = 1.0 - smoothstep(0.04, 0.16, upx), grain = 1.0 - smoothstep(0.012, 0.045, upx);
+    float fine = 1.0 - smoothstep(0.04, 0.16, upxR), grain = 1.0 - smoothstep(0.012, 0.045, upxR);
     float m1 = noise3(vWorld / 6.0), m2 = fine * noise3(vWorld / 1.2 + 3.0);
     float m3 = noise3(vWorld / 3.0 + 11.0);
     vec3 wv = vWorld + 0.8 * vec3(noise3(vWorld / 2.1 + 31.0), noise3(vWorld / 2.1 + 37.0), noise3(vWorld / 2.1 + 43.0));
     float edge = (1.0 - smoothstep(0.3, 1.5, -f.y + 0.6 * m1)) * smoothstep(-0.5, 0.1, m3 + 0.3 * m2);
-    float turf = smoothstep(0.2, 0.6, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
+    float turf = smoothstep(0.15, 0.55, -m1 + 0.3 * m3 + 0.45 * m2) * (1.0 - 0.6 * edge);
     float grey = smoothstep(-0.1, 0.45, noise3(wv / 3.2 + 13.0) + 0.3 * m2) * (1.0 - edge) * (1.0 - turf);
     vec3 pave = glaze(ground * 1.04, OCHRE_T, mix(0.15, 0.06, fine) + 0.04 * m1, pool * (1.0 - fine), q);
     pave = mix(pave, ground * LEAD / PARCH * 1.03, (0.1 + 0.3 * grey) * fine);
     // coralline rose: a crust along the seaward fringe, broken, and scraps of it over the flat
-    float blush = max(edge * smoothstep(-0.35, 0.15, noise3(wv / 0.8 + 19.0)), 0.4 * fine * smoothstep(0.35, 0.6, m2 - 0.35 * m1));
-    pave = glaze(pave, ROSE_T, mix(0.3, 0.34, fine) * blush, 0.0, q);
-    pave = glaze(glaze(pave, OCHRE_T, 0.14 * turf, 0.0, q), VERD_T, 0.1 * turf, 0.0, q);
+    // (and thickest as a knobbled crust on the lip itself, the water's edge and the face below it, broken in short lengths:
+    // the reef's living edge, rose against the pale stone, S-024)
+    float crust = (1.0 - smoothstep(0.0, 0.35 + 0.25 * m1, above)) * smoothstep(0.42, 0.62, noise3(wv / 0.45 + 41.0) + 0.25 * noise3(wv / 1.6 + 47.0));
+    float blush = max(max(edge * smoothstep(-0.35, 0.15, noise3(wv / 0.8 + 19.0)), 0.4 * fine * smoothstep(0.35, 0.6, m2 - 0.35 * m1)), crust);
+    pave = glaze(pave, ROSE_T, mix(0.42, 0.5, fine) * blush, 0.0, q);
+    pave = glaze(glaze(pave, OCHRE_T, 0.16 * turf, 0.0, q), VERD_T, 0.17 * turf, 0.0, q);
     // pools, a pace or two across, low on the flat: the pale sky in them, a damp margin round them
-    float pv = noise3(wv / 1.7 + 17.0) + 0.25 * m2 - 0.6 * smoothstep(0.25, 0.6, above);
-    float poolK = fine * smoothstep(0.32, 0.39, pv), damp = fine * smoothstep(0.2, 0.34, pv) * (1.0 - poolK);
-    pave = glaze(pave, SEPIA_T, 0.1 * damp, 0.0, q);
-    pave = mix(pave, glaze(ground * LEAD / PARCH * 1.07, ULTRA_T, 0.2, 0.0, q), 0.85 * poolK);
-    pave = glaze(pave, VERD_T, 0.1 * poolK * smoothstep(0.42, 0.62, pv), 0.0, q); // (the floor seen through its middle)
+    // (more of them and broader, and kept further out, so they read at the shore's distance, S-024)
+    float pf = 1.0 - smoothstep(0.07, 0.3, upxR);
+    float pv = 0.8 * noise3(wv / 1.15 + 17.0) + 0.45 * noise3(wv / 3.4 + 5.0) + 0.2 * m2 - 0.35 * smoothstep(0.35, 0.7, above);
+    pf *= smoothstep(0.02, 0.1, above) * smoothstep(0.6, 0.8, up0); // (on the flat's top, never down its lip)
+    float poolK = pf * smoothstep(0.14, 0.2, pv), damp = pf * smoothstep(0.03, 0.15, pv) * (1.0 - poolK);
+    pave = glaze(pave, SEPIA_T, 0.12 * damp, 0.0, q);
+    pave = mix(pave, glaze(ground * LEAD / PARCH * 1.08, ULTRA_T, 0.27, 0.0, q), 0.88 * poolK);
+    pave = glaze(pave, VERD_T, 0.1 * poolK * smoothstep(0.36, 0.56, pv), 0.0, q); // (the floor seen through its middle)
     // rubble: drifts heaped along the flat (banks running with the shore, ragged, a pace or two wide), a few knobs
     // strewn between them
     float bk = noise3(vec3(f.y / 0.9 + 0.7 * m3, pl / 4.5 + 3.0)) + 0.35 * noise3(wv / 0.9 + 23.0);
     float bank = fine * smoothstep(0.25, 0.5, bk) * (1.0 - poolK);
     vec2 sunR = normalize(vec2(dot(uSun, E), dot(uSun, NC)) + 1e-4);
-    vec3 k1 = knobs(pl, 0.2, mix(0.03, 0.9, bank), 51.0, sunR, upx), k2 = knobs(pl + 0.05, 0.09, mix(0.04, 0.8, bank), 57.0, sunR, upx);
+    vec3 k1 = knobs(pl, 0.2, mix(0.03, 0.9, bank), 51.0, sunR, upxR), k2 = knobs(pl + 0.05, 0.09, mix(0.04, 0.8, bank), 57.0, sunR, upxR);
     float body = max(k1.y, k2.y) * fine * (1.0 - poolK);
     pave = mix(pave, glaze(ground * 1.03, OCHRE_T, 0.05, 0.0, q), 0.35 * bank); // (coral grit between the knobs)
     pave = mix(pave, ground * LEAD / PARCH * 1.07, 0.7 * body);
@@ -821,14 +833,14 @@ void main() {
     // the honeycomb: a fine sparse stipple, thicker in ragged patches, none in the pools
     float comb = 0.24 * smoothstep(-0.3, 0.4, noise3(wv / 1.4 + 29.0)) * (1.0 - poolK) * (1.0 - body);
     reefInk = fine * (0.65 * max(k1.x, k2.x) * (1.0 - poolK)
-                      + 0.6 * inkLine(pv - 0.39, fwidth(pv), LINE_CSS * 0.7) * smoothstep(-0.2, 0.2, noise3(wv / 0.5 + 2.0))) * (1.0 - smoothstep(0.3, 0.7, -above))
-            + grain * 0.5 * stipple(pl, upx, comb, 61.0);
+                      + 0.6 * inkLine(pv - 0.2, fwidth(pv), LINE_CSS * 0.7) * smoothstep(-0.2, 0.2, noise3(wv / 0.5 + 2.0)) * pf / max(fine, 0.05)) * (1.0 - smoothstep(0.3, 0.7, -above))
+            + grain * 0.5 * stipple(pl, upxR, comb, 61.0);
     // wet below the last tide: a little darker and cooler, the sea's green in it
     pave = glaze(glaze(pave, SEPIA_T, 0.04 * wet * wet, 0.0, q), VERD_T, 0.06 * wet, 0.0, q);
     // its margin to the water near the eye (at deck level, as the sea's): the swash runs up over the flat in a thin
     // glassy film of the lagoon's water, furthest up in the bays between the pavement's spurs, its edge a broken line
     // of foam with a ripple inside it and scraps of foam at the water's edge, so the flat never ends in a hard lip
-    reefSw = (1.0 - smoothstep(0.03, 0.09, upx)) * (1.0 - smoothstep(4.0, 7.0, length(cameraPosition) - SEA_R - uSeaLevel));
+    reefSw = (1.0 - smoothstep(0.03, 0.09, upxR)) * (1.0 - smoothstep(4.0, 7.0, length(cameraPosition) - SEA_R - uSeaLevel));
     if (reefSw > 0.01 && above < 0.3) {
       // (u in from the water: up the lip by the field's slope, across the top by the coast's distance)
       float wd = min(upShore(dir, above, 0.02), max(-f.y, 0.0)), fw = max(fwidth(wd), 1e-4);
@@ -841,11 +853,14 @@ void main() {
       float rim = (1.0 - smoothstep(0.0, rimW, reach - wd)) * film * smoothstep(-0.4, 0.1, gr);
       float rp = 0.5 * reach + 0.05 * noise3(vec3(pl / 0.7, 3.0)), rpW = max(0.012, 1.2 * fw);
       float ripple = (1.0 - smoothstep(rpW, rpW + fw, abs(wd - rp))) * smoothstep(-0.1, 0.3, noise3(vec3(pl / 0.5, 9.0)));
+      // (deepening toward the water's edge to the lagoon's own tint, so the film and the sea meet without a seam, S-024)
+      float deep = 1.0 - smoothstep(0.0, 0.18 + 0.1 * bay, wd);
       float bt = max(0.03, 2.0 * fw) * (0.6 + 0.6 * smoothstep(-0.5, 0.5, gr)), brk = (1.0 - smoothstep(bt - fw, bt + fw, wd)) * smoothstep(0.0, 0.3, gr);
-      pave = glaze(glaze(pave, VERD_T, 0.38 * film * reefSw, 0.0, q), ULTRA_T, 0.05 * film * reefSw, 0.0, q);
+      pave = glaze(glaze(pave, VERD_T, (0.38 + 0.22 * deep) * film * reefSw, 0.0, q), ULTRA_T, 0.05 * film * reefSw, 0.0, q);
       pave = mix(pave, ground * LEAD / PARCH * 1.06, 0.85 * max(max(rim, brk), 0.55 * ripple * film) * reefSw);
       reefInk += reefSw * (0.6 * (1.0 - smoothstep(0.4, 1.1, abs(wd - reach) / fw / uRenderPx)) * smoothstep(-0.1, 0.25, noise3(vec3(pl / 0.8, 7.0)))
-                           + 0.3 * (1.0 - smoothstep(0.3, 0.9, abs(wd - rp - rpW) / fw / uRenderPx)) * smoothstep(0.1, 0.4, noise3(vec3(pl / 0.5, 9.0))));
+                           + 0.3 * (1.0 - smoothstep(0.3, 0.9, abs(wd - rp - rpW) / fw / uRenderPx)) * smoothstep(0.1, 0.4, noise3(vec3(pl / 0.5, 9.0)))
+                           );
       reefSw *= film;
     } else reefSw = 0.0;
     // flanks broken and shaded where they stand clear of the swash: a ragged lip, never a pale cliff
