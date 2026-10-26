@@ -16,7 +16,7 @@ import { illustratedMaterial, transmittanceVec, type Style } from '../../style/g
 import { mix, PIGMENTS, type RGB } from '../../style/palette.ts';
 import { coastAt, heightAt } from '../../sim/world/geography.ts';
 import { DRAFT, REGIONS, TIDE } from '../../sim/world/regions.ts';
-import { floraMaterial, kitGeometry, rainGeometry, type RainForm } from '../flora.ts';
+import { CANOPY, floraMaterial, kitGeometry, rainGeometry, type RainForm } from '../flora.ts';
 import { seas } from '../sea.ts';
 import { masonrySurface, MOLE } from '../structures.ts';
 import type { Swell } from '../swell.ts';
@@ -346,15 +346,17 @@ export function planSpice(field: TerrainField): SpicePlan {
   for (let y = -62; y <= 62; y += SPICE.step) {
     for (let x = -62; x <= 62; x += SPICE.step) {
       const px = x + (fr() - 0.5) * SPICE.step, py = y + (fr() - 0.5) * SPICE.step, r = fr(), q = fr();
+      const f1 = fr(), f2 = fr(), f3 = fr(), f4 = fr(); // (every point's draws taken up front: S-025 (6b), a threshold moved never reshuffles the rest)
       if (sim(px, py) <= LAND + 0.3) continue;
       const dir = chartDir(RI, px, py);
       field.surface(dir, -10, S);
       // the town's terraces: garden trees in blossom between the houses
       const town = Math.hypot(px - hb.x, py - hb.y);
       if (town < hb.r + 15) {
-        if (S.up > 0.7 && town > hb.r + 5 && r < 0.45 && clear(px, py, 1.4)) {
-          place(plan.flowers[r < 0.18 ? 1 : 0], px, py, { sink: 0.1, fwd: tan(px, py, 1, 0), yaw: fr() * TAU, s: 2.6 + 1.0 * fr(), kitH: 0.95, reach: 0.8 });
-          taken.push({ x: px, y: py, r: 1 });
+        // (S-025 (6b): fewer and taller, shade trees over the gardens, as the nutmeg is grown under them)
+        if (S.up > 0.7 && town > hb.r + 5 && r < 0.3 && clear(px, py, 1.8)) {
+          place(plan.flowers[r < 0.12 ? 1 : 0], px, py, { sink: 0.1, fwd: tan(px, py, 1, 0), yaw: f1 * TAU, s: 3.6 + 1.6 * f2, kitH: 0.95, reach: 0.8 });
+          taken.push({ x: px, y: py, r: 1.2 });
         }
         continue;
       }
@@ -385,17 +387,17 @@ export function planSpice(field: TerrainField): SpicePlan {
       const grove = 0.5 + 0.5 * Math.sin(0.21 * px + 1.3 * Math.sin(0.17 * py)) * Math.cos(0.19 * py - 1.1 * Math.sin(0.23 * px));
       if (edge && q < 0.85 && clear(px, py, 1)) {
         palm(0.3, 4.2);
-        place(plan.edge, px, py, { sink: 0.1, fwd: tan(px, py, cx / cl, cy / cl), yaw: 0.5 * (fr() - 0.5), s: 2 + 0.8 * fr(), sy: 2.2 + 0.8 * fr(), kitH: 0.95, reach: 1.5 });
+        place(plan.edge, px, py, { sink: 0.1, fwd: tan(px, py, cx / cl, cy / cl), yaw: 0.5 * (f1 - 0.5), s: 2 + 0.8 * f2, sy: 2.2 + 0.8 * f3, kitH: 0.95, reach: 1.5 });
         continue;
       }
       if (!clear(px, py, 2)) continue;
-      if (r < 0.07) {
-        const p = place(plan.emergents, px, py, { sink: 0.15, fwd, yaw: fr() * TAU, tilt: 0.04 * (fr() - 0.5), s: 7.2 + 1.8 * fr(), kitH: 0.95, reach: 1.8 }); // S-025: twice the canopy, its bole showing above it
-        if (plan.birds.length < 80 && fr() < 0.5) plan.birds.push(lift(dir, p.top));
-      } else if (r < 0.07 + 0.45 * grove) {
+      if (r < 0.11) {
+        const p = place(plan.emergents, px, py, { sink: 0.15, fwd, yaw: f1 * TAU, tilt: 0.04 * (f2 - 0.5), s: 9 + 2.4 * f3, kitH: 0.95, reach: 1.8 }); // S-025: well over the canopy, its bole showing above it
+        if (plan.birds.length < 80 && f4 < 0.5) plan.birds.push(lift(dir, p.top));
+      } else if (r < 0.11 + (0.45 / CANOPY) * grove) { // (S-025 (6b): as the bed's canopy, fewer and larger)
         const gold = Math.sin(0.33 * px + 0.7) * Math.cos(0.29 * py - 0.4) > 0.1;
-        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: fr() * TAU, s: 3.8 + 1.6 * fr(), kitH: 0.95, reach: 1.3 });
-        if (plan.birds.length < 80 && fr() < 0.15) plan.birds.push(lift(dir, p.top));
+        const p = place(plan.flowers[gold ? 1 : 0], px, py, { sink: 0.1, fwd, yaw: f1 * TAU, s: CANOPY * (3.8 + 1.6 * f2), sy: CANOPY * (3.4 + 2.2 * f3), kitH: 0.95, reach: 1.3 });
+        if (plan.birds.length < 80 && f4 < 0.15) plan.birds.push(lift(dir, p.top));
       }
     }
   }
