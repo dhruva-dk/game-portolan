@@ -22,10 +22,13 @@ const SUN_R = 0.05, MOON_R = 0.036;
 /** Star lattice cells per cube-face unit of the heavens (≈ 1.7° a cell), and the share of cells holding a star. */
 const STAR_CELLS = 26, STAR_SHARE = 0.22;
 /**
- * The clouds: how many, the cap round the eye they live in (rad), their heights and half-widths (u), and how fast a
- * fair wind carries them (u/s).
+ * The clouds, drawn on the sky behind everything: how many; the elevations (rad above the sea's horizon) of the lowest
+ * and highest bases, the farthest crowding toward the horizon; each one's half-width as a multiple of its base's
+ * elevation (the nearer, the larger: one level base seen in perspective); the height (u) of that base over the eye, so
+ * the wind (u/s at fair) turns each across the sky as its distance says; how far out (u) they are drawn; and the eye's
+ * heights (u over the sea) between which they thin away (from high the world is seen from above the weather).
  */
-export const CLOUDS = { count: 28, cap: 0.55, low: 10, high: 20, small: 6, large: 14, drift: 1.6 };
+export const CLOUDS = { count: 26, low: 0.016, high: 0.13, wide: [1.4, 2.5], widest: 0.17, base: 12, drift: 1.6, dist: 1400, fade: [45, 140] };
 
 // an anti-aliased pen line `css` CSS px wide along the zero set of sd
 const PEN_GLSL = /* glsl */ `
@@ -70,7 +73,10 @@ float cumulusTop(float az, float n, float flat_, float seed) {
   for (int k = -2; k <= 2; k++) {
     float c = mod(ci + float(k), n) + seed * 17.0, r = cw * (0.7 + 0.9 * hashC(c));
     float dx = az - (ci + float(k) + 0.5 + 0.5 * (hashC(c * 1.7) - 0.5)) * cw;
-    top = max(top, step(0.3, hashC(c * 2.3)) * (0.5 * r * hashC(c * 2.9) + flat_ * sqrt(max(r * r - dx * dx, 0.0))));
+    // a dome raised on its own pedestal, which falls away with it (a pedestal held outside it would end in a cliff
+    // at the next cell's edge: S-021's vertical edge)
+    float dome = sqrt(max(r * r - dx * dx, 0.0));
+    top = max(top, step(0.3, hashC(c * 2.3)) * (0.5 * hashC(c * 2.9) * dome + flat_ * dome));
   }
   return top;
 }
@@ -108,7 +114,7 @@ void main() {
   float caz = atan(dot(d, ay), dot(d, ax));
   // heaped domes, big then small on their shoulders, as a watercolourist rounds a cumulus' head
   float big = cumulusTop(caz, 240.0, 1.0, 1.0), small = cumulusTop(caz + 0.004, 640.0, 1.0, 7.0);
-  float top = bank * (big + small * step(0.004, big)), base = 0.004 + 0.002 * wob;
+  float top = bank * (big + small * smoothstep(0.002, 0.008, big)), base = 0.004 + 0.002 * wob;
   float cd = min(top - eh, eh - base), cfw = fwidth(cd);
   // (a sea-level view's: from high over the globe the banks would stand on the limb as peaks)
   float low = 1.0 - smoothstep(8.0, 24.0, length(cameraPosition) - ${R.toFixed(1)});
@@ -181,78 +187,81 @@ void main() {
 }`;
 
 const CLOUD_VERTEX = /* glsl */ `
-in vec4 aCloud; // centre (world), half-width (u; 0 = hidden)
+in vec4 aCloud; // the direction from the eye to the cloud's centre (world, unit), its angular half-width (rad; 0 = hidden)
 in float aSeed;
 out vec2 vUv;
 out vec3 vRight;
 out vec3 vUp;
 out vec3 vToEye;
-out vec3 vWorld;
 out float vSize;
+out float vFar;
 flat out float vSeed;
-uniform float uSeaR;
+uniform vec3 uUp;
 void main() {
-  // never between the camera and the action (S-001): a cloud near the line of sight down to the sea in view slides
-  // clear of it, so the ship and its trail always show; clouds toward the horizon, off that line, stay where they are
-  vec3 c = aCloud.xyz, fwd = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
-  float bq = dot(cameraPosition, fwd), disc = bq * bq - dot(cameraPosition, cameraPosition) + uSeaR * uSeaR;
-  float reach = disc > 0.0 ? max(-bq - sqrt(disc), 0.0) : 0.0, ahead = dot(c - cameraPosition, fwd);
-  vec3 off = c - cameraPosition - fwd * clamp(ahead, 0.0, reach);
-  float d = length(off), push = reach > 0.0 && ahead > 0.0 ? max(1.05 * aCloud.w + 0.18 * min(ahead, reach) - d, 0.0) : 0.0;
-  c += (d > 1e-3 ? off / d : normalize(c)) * push;
-  vec3 toEye = normalize(cameraPosition - c), right = cross(normalize(c), toEye);
-  right = dot(right, right) < 1e-6 ? normalize(cross(vec3(0.0, 0.0, 1.0), toEye) + vec3(1e-4, 0.0, 0.0)) : normalize(right);
+  // drawn on the sky itself, far out along its direction: every island, grove, ship and mast stands in front of it and
+  // hides it, so no cloud ever sits on the action or swallows a grove; nearer (larger) clouds a little in front of farther
+  float dist = ${CLOUDS.dist.toFixed(1)} - 400.0 * aCloud.w;
+  vec3 toEye = -aCloud.xyz, right = normalize(cross(uUp, toEye) + vec3(1e-5, 0.0, 0.0));
   vUv = position.xy;
   vRight = right;
   vUp = cross(toEye, right);
   vToEye = toEye;
-  vSize = aCloud.w;
+  vSize = aCloud.w * 80.0; // pen and paper scale: hatching keeps one pitch on the page whatever the cloud's size
+  vFar = 1.0 - smoothstep(0.025, 0.11, aCloud.w);
   vSeed = aSeed;
-  // a cloud stands in the sky: seen from below or level, or low over far water; one the eye looks down on from high
-  // above would lie flat on the sea as a paper disc, so it thins away as the eye rises over it
-  float seen = 1.0 - smoothstep(0.12, 0.3, dot(toEye, normalize(c)));
-  vWorld = c + (right * position.x + vUp * position.y) * aCloud.w * seen;
-  gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
+  vec3 p = cameraPosition + aCloud.xyz * dist + (right * position.x + vUp * position.y) * aCloud.w * dist;
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 
-// a cumulus: a row of rounded bumps over a flat, wavering base, outlined in ink (heavier on the shadowed side), curls
-// drawn where one bump turns under the next, shaded by hatching and a cool glaze, its belly flushed by a low sun,
-// picked out in silver by the moon, and fading into the horizon wash with distance
+// a cumulus as an engraver draws it: a heaped head on lower shoulders, each dome scalloped into small billows, outlined
+// with a broken pen line that closes and thickens on the shadowed side and opens on the lit; curls where one billow
+// turns under the next; hatching only on the flanks turned from the light; a flat, hazy belly on a level base that
+// thins into the sky; flushed by a low sun, silver by the moon; the farther (smaller, lower) the paler
 const CLOUD_FRAGMENT = /* glsl */ `
 in vec2 vUv;
 in vec3 vRight;
 in vec3 vUp;
 in vec3 vToEye;
-in vec3 vWorld;
 in float vSize;
+in float vFar;
 flat in float vSeed;
 uniform float uGlowAmt;
 uniform float uGrey;
 uniform vec3 uSlate;
+uniform float uCloudVis;
 ${PEN_GLSL}
+float along1(float t, float seed) { // smooth 0…1 noise along a contour
+  float i = floor(t), f = fract(t);
+  return mix(hash11(i * 1.7 + seed), hash11((i + 1.0) * 1.7 + seed), f * f * (3.0 - 2.0 * f));
+}
 void main() {
   vec2 uv = vUv;
-  float base = -0.32 + 0.025 * sin(uv.x * 7.0 + vSeed * 9.0);
-  float s[6], cy[6];
-  float body = 1e3, nr = 1.0;
+  float base = -0.32 + 0.01 * sin(uv.x * 9.0 + vSeed * 9.0);
+  float head = (hash11(vSeed * 3.1) - 0.5) * 0.6, tall = 0.7 + 0.45 * hash11(vSeed * 4.3);
+  float s[7], cy[7];
+  float body = 1e3, nr = 1.0, arc = 0.0;
   vec2 nc = vec2(0.0);
-  for (int i = 0; i < 6; i++) {
-    float fi = float(i);
-    float x = -0.66 + fi * 0.264 + (hash11(vSeed * 17.0 + fi * 3.7) - 0.5) * 0.12;
-    float r = (0.2 + 0.17 * hash11(vSeed * 5.3 + fi * 11.1)) * (1.0 - 0.55 * abs(x));
-    vec2 cc = vec2(x, base + r * (0.45 + 0.4 * hash11(vSeed + fi * 1.9)));
-    s[i] = length(uv - cc) - r;
+  for (int i = 0; i < 7; i++) {
+    float fi = float(i), h1 = hash11(vSeed * 17.0 + fi * 3.7), h2 = hash11(vSeed * 5.3 + fi * 11.1);
+    float x = -0.72 + fi * 0.24 + (h1 - 0.5) * 0.1;
+    float env = exp(-(x - head) * (x - head) / 0.16);
+    float r = (0.14 + 0.08 * h2) * (0.6 + 0.6 * env);
+    float top = base + 0.08 + 0.6 * tall * env * (0.75 + 0.35 * hash11(vSeed + fi * 1.9));
+    vec2 cc = vec2(x, max(top - r, base + 0.3 * r)), dv = uv - cc;
+    float a = atan(dv.y, dv.x);
+    s[i] = length(dv) - r * (0.93 + 0.1 * abs(sin(a * (7.0 + floor(4.0 * h2)) + h1 * 6.2831853)));
     cy[i] = cc.y;
-    if (s[i] < body) { body = s[i]; nc = cc; nr = r; }
+    if (s[i] < body) { body = s[i]; nc = cc; nr = r; arc = a * r * 14.0 + fi * 7.0; }
   }
   float sd = max(body, base - uv.y), crease = 0.0;
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 7; i++) {
     float others = 1e3;
-    for (int j = 0; j < 6; j++) if (j != i) others = min(others, s[j]);
-    crease = max(crease, penLine(s[i], 0.7) * step(others, -0.02) * step(base + 0.05, uv.y) * step(uv.y, cy[i]));
+    for (int j = 0; j < 7; j++) if (j != i) others = min(others, s[j]);
+    crease = max(crease, penLine(s[i], 0.6) * step(others, -0.015) * step(base + 0.07, uv.y) * step(uv.y, cy[i]));
   }
 
-  vec2 n2 = (uv - nc) / nr;
+  // the form: each billow rounded, the whole heap turned as one mass, the belly flat and facing down
+  vec2 n2 = 0.55 * (uv - nc) / nr + 0.45 * vec2((uv.x - head) / 0.8, (uv.y - base - 0.25) / 0.55);
   float under = smoothstep(0.16, 0.0, uv.y - base);
   n2 = mix(n2, vec2(0.3 * n2.x, -0.9), under);
   float nz = sqrt(max(1.0 - dot(n2, n2), 0.05));
@@ -260,20 +269,29 @@ void main() {
   float ndl = dot(n, uSun), tone = clamp(lightTone(ndl, nz) + 0.3 * under, 0.0, 1.0);
   Paper q = paperAt(vec3(uv * vSize, vSeed * 37.0), vec3(0.0, 0.0, 1.0), 0.0);
   vec3 col = sunGlaze(shadeGlaze(parchment(q), tone, q), ndl, tone);
-  col = mix(col, glaze(col, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.35 + 0.65 * under));
+  col = mix(col, glaze(col, uSkyGlow / uPaper, 0.9, 0.0, q), uGlowAmt * (0.3 + 0.7 * max(under, smoothstep(0.0, 0.8, ndl))));
+  col = mix(col, glaze(col, uSlate, 0.5, 0.0, q), 0.4 * under * (1.0 - uNight));
   col = mix(col, glaze(col, uSlate, 0.8, 0.0, q), uGrey);
-  vec2 hc = rot2(0.6 + vSeed) * uv * vSize, hx = dFdx(hc), hy = dFdy(hc);
-  col = mix(col, hatchInk(tone), hatching(hc, hx, hy, tone, vSeed * 13.0));
+  // (laid near level, as the engraver lays a cloud's shade: along the base, curving round the flank)
+  vec2 hc = rot2(1.45 + 0.35 * (uv.x - head) + 0.2 * hash11(vSeed * 7.7)) * uv * vSize, hx = dFdx(hc), hy = dFdy(hc);
+  float ht = min(smoothstep(0.58, 1.0, tone), 0.6) * (1.0 - 0.6 * vFar); // one family of strokes, never crossed
+  col = mix(col, hatchInk(0.6 * ht), hatching(hc, hx, hy, ht, vSeed * 13.0) * 0.75 * (1.0 - 0.4 * vFar));
   float lit = smoothstep(0.3, 0.95, ndl) * uNight;
   col = mix(col, uSilver, 0.7 * hatching(rot2(0.6) * hc, rot2(0.6) * hx, rot2(0.6) * hy, lit * 0.3, vSeed + 11.0));
   col = mix(col, uSilver, lit * 0.5 * (1.0 - smoothstep(0.0, 0.06, -sd)));
-  float far = smoothstep(70.0, 200.0, length(vWorld - cameraPosition));
-  col = mix(col, uSkyHorizon * parchment(q) / uPaper, far * 0.45);
-  float ink = max(penLine(sd, mix(1.1, 2.1, tone)), 0.6 * crease) * (1.0 - 0.6 * far);
+  col = mix(col, uSkyHorizon * parchment(q) / uPaper, 0.4 * vFar);
+  // the outline: a broken pen line, open on the lit side, closed and heavier on the shadowed; none along the hazy base
+  float open = smoothstep(0.3, 0.45, along1(arc, vSeed * 3.0) + 0.4 * tone - 0.1);
+  float onBase = smoothstep(base + 0.02, base + 0.09, uv.y);
+  float ink = max(penLine(sd, mix(0.8, 1.9, tone) * (1.0 - 0.4 * vFar)) * open * onBase, 0.6 * crease * smoothstep(0.3, 0.6, tone));
+  ink *= 1.0 - 0.5 * vFar;
   col = mix(col, uInk, ink);
-  if (sd > 0.0 && ink < 0.02) discard;
-  writeInk(col, n);
+  float a = step(sd, 0.0) * (0.25 + 0.75 * smoothstep(0.0, 0.14, uv.y - base)) * (1.0 - 0.4 * vFar);
+  a = max(a, ink) * uCloudVis;
+  if (a < 0.004) discard;
+  writeVeil(col, a);
 }`;
+
 
 /** The weather over the eye, as the sky reads it. */
 export interface SkyWeather {
@@ -304,9 +322,11 @@ export class Sky {
   private readonly dome: THREE.Mesh;
   private readonly clouds: THREE.Mesh;
   private readonly cloudAttr = new THREE.InstancedBufferAttribute(new Float32Array(CLOUDS.count * 4), 4);
-  private readonly dirs = Array.from({ length: CLOUDS.count }, () => new THREE.Vector3());
-  private readonly heights: number[] = [];
-  private readonly sizes: number[] = [];
+  private readonly az: number[] = [];
+  private readonly bases: number[] = [];
+  private readonly widths: number[] = [];
+  /** The order the clouds come in as the sky fills (a squall brings them all, a calm leaves few), near and far mixed. */
+  private readonly rank: number[] = [];
   private readonly shown: number[] = [];
   private readonly rng: () => number;
   private clock = Number.NaN;
@@ -315,7 +335,7 @@ export class Sky {
     uSunY: { value: new THREE.Vector3() }, uMoonDir: { value: new THREE.Vector3() }, uMoonX: { value: new THREE.Vector3() },
     uMoonY: { value: new THREE.Vector3() }, uCelestial: { value: new THREE.Matrix3() }, uGlowAmt: { value: 0 },
     uSunVis: { value: 0 }, uMoonVis: { value: 0 }, uStarVis: { value: 0 }, uGrey: { value: 0 }, uAurora: { value: 0 },
-    uSlate: { value: transmittanceVec(STORM_SLATE) }, uSeaR: { value: R },
+    uSlate: { value: transmittanceVec(STORM_SLATE) }, uCloudVis: { value: 1 },
   };
 
   constructor(style: Style, geo: Geography, seed = 7) {
@@ -340,14 +360,19 @@ export class Sky {
     g.setAttribute('aCloud', this.cloudAttr.setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(Float32Array.from({ length: CLOUDS.count }, () => this.rng() * 10), 1));
     g.instanceCount = CLOUDS.count;
-    for (let k = 0; k < CLOUDS.count; k++) {
-      this.heights.push(CLOUDS.low + (CLOUDS.high - CLOUDS.low) * this.rng());
-      this.sizes.push(CLOUDS.small + (CLOUDS.large - CLOUDS.small) * this.rng() ** 1.5);
+    // farthest first (drawn first, so the nearer lie over them); the farther, the more of them
+    const bases = Array.from({ length: CLOUDS.count }, () => CLOUDS.low + (CLOUDS.high - CLOUDS.low) * this.rng() ** 1.7);
+    for (const b of bases.sort((x, y) => x - y)) {
+      this.az.push(this.rng() * Math.PI * 2);
+      this.bases.push(b);
+      this.widths.push(Math.min(b * (CLOUDS.wide[0] + (CLOUDS.wide[1] - CLOUDS.wide[0]) * this.rng()), CLOUDS.widest));
       this.shown.push(0);
+      this.rank.push(this.rng());
     }
     this.clouds = new THREE.Mesh(g, inkMaterial(style, {
-      vertexShader: CLOUD_VERTEX, fragmentShader: CLOUD_FRAGMENT, uniforms: this.u, id: 0, inkWeight: 0, side: THREE.DoubleSide,
+      vertexShader: CLOUD_VERTEX, fragmentShader: CLOUD_FRAGMENT, uniforms: this.u, side: THREE.DoubleSide, veil: true,
     }));
+    this.clouds.renderOrder = 1; // over the dome
     this.clouds.frustumCulled = false;
     this.group.add(this.dome, this.clouds, this.beams.mesh, this.lights.halos);
   }
@@ -368,7 +393,7 @@ export class Sky {
     const s = this.lights.sky, u = this.u, h = s.sunHeight, first = Number.isNaN(this.clock);
     const dt = first ? 0 : Math.min(Math.max(clock - this.clock, 0), 0.1);
     this.clock = clock;
-    this.drift(dt, w, first);
+    this.drift(dt, w, first, eye);
     this.beams.setLit(s.lit);
     u.uUp.value.copy(s.up);
     u.uSunDir.value.copy(s.sun);
@@ -387,28 +412,28 @@ export class Sky {
     u.uCelestial.value.multiplyMatrices(turn3, frame3);
   }
 
-  /** Carry the clouds on the wind; those blown out of the cap come back in on its far side. */
-  private drift(dt: number, w: SkyWeather, first: boolean): void {
-    const s = this.lights.sky, foot = s.up, cap = Math.cos(CLOUDS.cap), a = this.cloudAttr.array as Float32Array;
-    const cover = Math.min(Math.max(0.62 + 0.38 * w.squall - 0.45 * w.calm, 0.1), 1) * CLOUDS.count;
-    for (let k = 0; k < CLOUDS.count; k++) {
-      const p = this.dirs[k], r = R + this.heights[k];
-      if (first || p.dot(foot) < Math.cos(CLOUDS.cap * 1.4)) {
-        const az = this.rng() * Math.PI * 2, off = CLOUDS.cap * Math.sqrt(this.rng());
-        p.copy(foot).multiplyScalar(Math.cos(off)).addScaledVector(s.east, Math.sin(off) * Math.cos(az))
-          .addScaledVector(s.north, Math.sin(off) * Math.sin(az));
-      }
-      tmp.copy(w.wind).addScaledVector(p, -w.wind.dot(p));
-      p.addScaledVector(tmp, (dt * CLOUDS.drift) / r).normalize();
-      const pf = p.dot(foot);
-      if (pf < cap) p.negate().addScaledVector(foot, 2 * pf);
-      const target = k < cover ? 1 : 0;
+  /**
+   * Turn the clouds across the sky on the wind, each as fast as its distance allows; squalls bring the near ones in,
+   * calms leave only the far. Each base stands its elevation above the sea's horizon, which dips as the eye climbs.
+   */
+  private drift(dt: number, w: SkyWeather, first: boolean, eye: THREE.Vector3): void {
+    const s = this.lights.sky, a = this.cloudAttr.array as Float32Array, er = eye.length();
+    const dip = Math.acos(Math.min(R / Math.max(er, R), 1)), n = CLOUDS.count;
+    this.u.uCloudVis.value = 1 - smoothstep(er - R, CLOUDS.fade[0], CLOUDS.fade[1]);
+    const cover = Math.min(Math.max(0.62 + 0.38 * w.squall - 0.45 * w.calm, 0.1), 1);
+    for (let k = 0; k < n; k++) {
+      const b = this.bases[k], wd = this.widths[k];
+      let az = this.az[k];
+      const across = -w.wind.dot(s.east) * Math.sin(az) + w.wind.dot(s.north) * Math.cos(az);
+      az = this.az[k] = (az + (dt * CLOUDS.drift * across * b) / CLOUDS.base) % (Math.PI * 2);
+      const target = this.rank[k] < cover ? 1 : 0;
       this.shown[k] = first ? target : this.shown[k] + Math.max(-dt * 0.2, Math.min(dt * 0.2, target - this.shown[k]));
-      const size = this.sizes[k] * this.shown[k] * smoothstep(p.dot(foot), cap, Math.cos(CLOUDS.cap * 0.85));
-      a[k * 4] = p.x * r;
-      a[k * 4 + 1] = p.y * r;
-      a[k * 4 + 2] = p.z * r;
-      a[k * 4 + 3] = size;
+      const el = b - dip + 0.32 * wd, ce = Math.cos(el);
+      tmp.copy(s.east).multiplyScalar(Math.cos(az) * ce).addScaledVector(s.north, Math.sin(az) * ce).addScaledVector(s.up, Math.sin(el));
+      a[k * 4] = tmp.x;
+      a[k * 4 + 1] = tmp.y;
+      a[k * 4 + 2] = tmp.z;
+      a[k * 4 + 3] = wd * this.shown[k];
     }
     this.cloudAttr.needsUpdate = true;
   }
