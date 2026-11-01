@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flora B: Narrows, Basalt Stacks, Kelp Shallows, Blossom Run</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #eee; font: 13px/1.3 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 6px 10px; background: rgba(0,0,0,0.55); z-index: 2; }
+  #bar label { display: flex; gap: 4px; align-items: center; }
+  #bar select, #bar input, #bar button { font: inherit; }
+  #stats { position: fixed; right: 8px; bottom: 6px; background: rgba(0,0,0,0.5); padding: 3px 7px; border-radius: 4px; z-index: 2; }
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+  #labels div { position: absolute; transform: translate(-50%, 0); white-space: nowrap; background: rgba(0,0,0,0.45); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  #title { position: fixed; left: 10px; bottom: 6px; background: rgba(0,0,0,0.5); padding: 3px 7px; border-radius: 4px; z-index: 2; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <label>Region <select id="region">
+    <option value="all">All four</option>
+    <option value="narrows">The Narrows</option>
+    <option value="basaltStacks">The Basalt Stacks</option>
+    <option value="kelpShallows">The Kelp Shallows</option>
+    <option value="blossomRun">Blossom Run</option>
+  </select></label>
+  <label>View <select id="view">
+    <option value="grid">Grid (three seeds each)</option>
+    <option value="lods">LODs side by side</option>
+    <option value="distance">One row at a distance</option>
+    <option value="forest">Forest (instanced)</option>
+  </select></label>
+  <label>Plant <select id="plant"><option value="">(all)</option></select></label>
+  <label>Distance <select id="dist"><option value="10">10 m</option><option value="50">50 m</option><option value="300">300 m</option></select></label>
+  <label>LOD <select id="lod"><option value="auto">auto</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+  <label>Light <select id="light"><option value="day">Day</option><option value="dusk">Dusk</option></select></label>
+  <label>Wind <input id="wind" type="range" min="0" max="2" step="0.05" value="0.7" /></label>
+  <label>Direction <input id="dir" type="range" min="0" max="360" step="5" value="30" /></label>
+  <label><input id="spin" type="checkbox" checked /> Turntable</label>
+  <label>Seed <input id="seed" type="number" value="1" style="width: 4em" /></label>
+</div>
+<div id="labels"></div>
+<div id="title"></div>
+<div id="stats"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { WIND, setWind, tickFlora, floraReady, floraTextures, instanced } from '../src/render/flora/kitB.ts';
+import { PLANTS as narrows } from '../src/render/flora/narrows.ts';
+import { PLANTS as basaltStacks } from '../src/render/flora/basaltStacks.ts';
+import { PLANTS as kelpShallows } from '../src/render/flora/kelpShallows.ts';
+import { PLANTS as blossomRun, createPetals } from '../src/render/flora/blossomRun.ts';
+
+// URL parameters: region, view (grid|lods|distance|forest), plant, dist (10|50|300), lod (auto|0|1|2),
+// light (day|dusk), wind (0..2), dir (degrees), spin (0|1), seed, plus az and el (camera angles, degrees) for captures.
+const REGIONS = { narrows, basaltStacks, kelpShallows, blossomRun };
+const NAMES = { narrows: 'The Narrows', basaltStacks: 'The Basalt Stacks', kelpShallows: 'The Kelp Shallows', blossomRun: 'Blossom Run' };
+const q = new URLSearchParams(location.search);
+const ui = Object.fromEntries(['region', 'view', 'plant', 'dist', 'lod', 'light', 'wind', 'dir', 'spin', 'seed'].map((k) => [k, document.getElementById(k)]));
+const state = {
+  region: q.get('region') ?? 'all', view: q.get('view') ?? 'grid', plant: q.get('plant') ?? '', dist: q.get('dist') ?? '50',
+  lod: q.get('lod') ?? 'auto', light: q.get('light') ?? 'day', wind: +(q.get('wind') ?? 0.7), dir: +(q.get('dir') ?? 30),
+  spin: q.get('spin') !== '0', seed: +(q.get('seed') ?? 1), az: q.has('az') ? +q.get('az') : null, el: q.has('el') ? +q.get('el') : null,
+};
+const allPlants = () => Object.entries(REGIONS).flatMap(([reg, list]) => list.map((p) => ({ ...p, region: reg })));
+function refreshPlantList() {
+  const sel = ui.plant;
+  sel.innerHTML = '<option value="">(all)</option>' + allPlants().filter((p) => state.region === 'all' || p.region === state.region).map((p) => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.value = state.plant;
+}
+refreshPlantList();
+for (const k of ['region', 'view', 'dist', 'lod', 'light', 'wind', 'dir', 'seed']) ui[k].value = String(state[k]);
+ui.spin.checked = state.spin;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 6000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+
+const sun = new THREE.DirectionalLight(0xffffff, 3);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+const hemi = new THREE.HemisphereLight(0xbcd4ff, 0x4a4033, 1);
+scene.add(sun, sun.target, hemi);
+
+function applyLight() {
+  const day = state.light === 'day';
+  sun.color.set(day ? 0xfff2df : 0xff8a4a);
+  sun.intensity = day ? 3.2 : 2.4;
+  hemi.color.set(day ? 0xb8d0ff : 0x6a6f9a);
+  hemi.groundColor.set(day ? 0x4f4536 : 0x2a2028);
+  hemi.intensity = day ? 1.15 : 0.7;
+  const sky = day ? 0x9ec3e8 : 0x4a4466;
+  scene.background = new THREE.Color(sky);
+  scene.fog = new THREE.Fog(day ? 0xb7cde3 : 0x6b5a6e, 400, 2600);
+  renderer.toneMappingExposure = day ? 1.0 : 1.15;
+}
+
+// ---------------------------------------------------------------- stages: just enough ground to stand plants on
+
+function bandsTexture() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 512;
+  const g = c.getContext('2d');
+  for (let y = 0; y < 512; y += 4) {
+    const t = Math.sin(y * 0.05) * 0.5 + Math.sin(y * 0.013 + 1) * 0.5;
+    g.fillStyle = `hsl(${18 + t * 10}, ${45 + t * 12}%, ${36 + t * 10}%)`;
+    g.fillRect(0, y, 64, 4);
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+const stageMat = {
+  meadow: new THREE.MeshStandardMaterial({ color: 0x5f8a3a, roughness: 1 }),
+  turf: new THREE.MeshStandardMaterial({ color: 0x4f8a2e, roughness: 1 }),
+  basalt: new THREE.MeshStandardMaterial({ color: 0x232527, roughness: 0.9 }),
+  sand: new THREE.MeshStandardMaterial({ color: 0xa89466, roughness: 1 }),
+  rock: new THREE.MeshStandardMaterial({ map: bandsTexture(), roughness: 0.95 }),
+  water: new THREE.MeshStandardMaterial({ color: 0x5d6a2c, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.45, depthWrite: false }),
+  river: new THREE.MeshStandardMaterial({ color: 0x7fa6c4, roughness: 0.1, transparent: true, opacity: 0.7 }),
+};
+
+/** Where each plant stands in a row: its anchor decides whether it needs a wall, ground or the sea. */
+function stageFor(region, spanX, spanZ) {
+  const g = new THREE.Group();
+  const W = spanX + 60, D = spanZ + 80;
+  if (region === 'narrows') {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(W, 34, 8), stageMat.rock);
+    wall.position.set(0, 11, -4);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), stageMat.rock);
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(W, 30).rotateX(-Math.PI / 2), stageMat.rock);
+    top.position.set(0, 28.01, -15);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(W, 34, 22), stageMat.rock);
+    back.position.set(0, 11, -19);
+    g.add(wall, ground, back);
+    void top;
+  } else if (region === 'basaltStacks') {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), stageMat.turf);
+    g.add(ground);
+    const hex = new THREE.CylinderGeometry(0.9, 0.9, 1, 6);
+    for (let i = 0; i < 40; i++) {
+      const h = 3 + (i % 5) * 1.3;
+      const m = new THREE.Mesh(hex, stageMat.basalt);
+      m.scale.y = h; m.position.set(-W / 2 + i * 1.6, h / 2 - 2.5, -spanZ / 2 - 14 - (i % 3) * 1.5);
+      g.add(m);
+    }
+  } else if (region === 'kelpShallows') {
+    const bed = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), stageMat.sand);
+    bed.position.y = -16;
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(W, 13, 14), stageMat.sand);
+    shelf.position.set(0, -16 + 6.5 - 3.0, spanZ / 2 + 4);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(W * 3, D * 3).rotateX(-Math.PI / 2), stageMat.water);
+    water.renderOrder = 10;
+    g.add(bed, shelf, water);
+  } else {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), stageMat.meadow);
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(W, 16).rotateX(-Math.PI / 2), stageMat.river);
+    river.position.set(0, 0.03, spanZ / 2 + 14);
+    g.add(ground, river);
+  }
+  g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; } });
+  return g;
+}
+
+/** Where a plant's origin goes on its stage. */
+function anchorPoint(p, x, z) {
+  const a = p.placement.anchor ?? 'ground';
+  if (p.region === 'narrows') return a === 'wall' ? new THREE.Vector3(x, 6 + (Math.abs(x * 7.3) % 6), 0) : new THREE.Vector3(x, 0, z + 8);
+  if (p.region === 'kelpShallows') return a === 'surface' ? new THREE.Vector3(x, 0, z) : new THREE.Vector3(x, -3, z + 12);
+  return new THREE.Vector3(x, 0, z);
+}
+
+// ---------------------------------------------------------------- views
+
+let root = new THREE.Group();
+scene.add(root);
+const labels = document.getElementById('labels');
+let tags = [];
+let petals = null;
+let lodSwitch = [];
+
+function size(p) {
+  const o = p.build(state.seed, 2);
+  const b = new THREE.Box3().setFromObject(o);
+  o.traverse((m) => m.geometry?.dispose());
+  return b;
+}
+
+function chosenLod(d) {
+  return state.lod === 'auto' ? null : +state.lod;
+}
+
+function rebuild() {
+  scene.remove(root);
+  root.traverse((o) => { if (o.isMesh && o.geometry && !o.userData.keep) o.geometry.dispose(); });
+  root = new THREE.Group();
+  scene.add(root);
+  labels.innerHTML = '';
+  tags = [];
+  lodSwitch = [];
+  petals = null;
+  const regions = state.region === 'all' ? Object.keys(REGIONS) : [state.region];
+  let list = allPlants().filter((p) => regions.includes(p.region) && (!state.plant || p.id === state.plant));
+  if (!list.length) list = allPlants().filter((p) => regions.includes(p.region));
+  document.getElementById('title').textContent = regions.map((r) => NAMES[r]).join(' · ') + ' — ' + state.view;
+
+  let focus = new THREE.Vector3(), radius = 20;
+  let zOff = 0;
+  for (const region of regions) {
+    const plants = list.filter((p) => p.region === region);
+    if (!plants.length) continue;
+    const row = new THREE.Group();
+    let x = 0;
+    const items = [];
+    const reps = state.view === 'lods' ? [0, 1, 2] : state.view === 'grid' ? [0, 1, 2] : [0];
+    let depth = 0;
+    for (const p of plants) {
+      if (state.view === 'forest') continue;
+      const box = size(p);
+      const w = Math.max(3, box.max.x - box.min.x, box.max.z - box.min.z) * 0.9 + 2;
+      depth = Math.max(depth, box.max.z - box.min.z);
+      for (const k of reps) {
+        const seed = state.view === 'lods' ? state.seed : state.seed + k * 7;
+        const lod = state.view === 'lods' ? k : chosenLod();
+        const at = anchorPoint(p, x + w / 2, 0);
+        items.push({ p, seed, lod, at, box, label: state.view === 'lods' ? `${p.name} · LOD ${k}` : `${p.name} · seed ${seed}` });
+        x += w;
+      }
+      x += 4;
+    }
+    if (state.view === 'forest') {
+      buildForest(row, plants, region);
+      x = 220;
+    }
+    for (const it of items) {
+      it.at.x -= x / 2;
+      const holder = new THREE.Group();
+      holder.position.copy(it.at);
+      row.add(holder);
+      if (it.lod === null) lodSwitch.push({ holder, p: it.p, seed: it.seed, cur: -1 });
+      else holder.add(it.p.build(it.seed, it.lod));
+      const tag = document.createElement('div');
+      tag.textContent = it.label;
+      labels.appendChild(tag);
+      tags.push({ tag, at: it.at.clone().add(new THREE.Vector3(0, -1.2, 3)), row });
+    }
+    row.position.z = zOff;
+    row.add(stageFor(region, x, depth));
+    if (region === 'blossomRun' || state.region === 'blossomRun') {
+      petals = createPetals({ count: 4000, box: [Math.max(60, x), 16, 60] });
+      row.add(petals);
+    }
+    root.add(row);
+    focus = new THREE.Vector3(0, region === 'kelpShallows' ? -2 : 4, zOff);
+    if (state.view === 'distance' && items.length) {
+      // aim at the middle of the first plant
+      const c = items[0].box.getCenter(new THREE.Vector3());
+      focus = items[0].at.clone().add(c).add(new THREE.Vector3(0, 0, zOff));
+    }
+    radius = Math.max(radius, x * 0.55);
+    zOff -= 90;
+  }
+  if (regions.length > 1 && state.view !== 'distance') focus.set(0, 3, zOff / 2 + 45);
+  placeCamera(focus, radius, regions.length);
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -Math.max(40, radius * 1.2);
+  sun.shadow.camera.right = sun.shadow.camera.top = Math.max(40, radius * 1.2);
+  sun.shadow.camera.far = 800;
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.target.position.copy(focus);
+  const sd = state.light === 'day' ? new THREE.Vector3(0.45, 0.8, 0.4) : new THREE.Vector3(-0.85, 0.16, 0.5);
+  sun.position.copy(focus).addScaledVector(sd.normalize(), 300);
+  renderer.shadowMap.needsUpdate = true;
+}
+
+function buildForest(row, plants, region) {
+  // hundreds of copies, three seeds per plant, LOD by distance from the centre
+  const R = 110;
+  for (const p of plants) {
+    const per = p.placement.density === 0 ? 1 : Math.min(400, Math.max(40, Math.round(p.placement.density * 160)));
+    const seeds = [1, 2, 3];
+    for (const seed of seeds) for (const lod of [0, 1, 2]) {
+      const inst = instanced(p.build(seed, lod), per);
+      let n = 0;
+      const m = new THREE.Matrix4(), qn = new THREE.Quaternion();
+      for (let i = 0; i < per * 3; i++) {
+        const a = (i * 2.39996 + seed) % (Math.PI * 2), d = Math.sqrt((i + 0.5) / (per * 3)) * R;
+        const want = d < p.lodDistances[0] * 0.6 ? 0 : d < p.lodDistances[1] * 0.6 ? 1 : 2;
+        if (want !== lod || (i % 3) !== seed - 1 || n >= per) continue;
+        const at = anchorPoint({ ...p, region }, Math.cos(a) * d, Math.sin(a) * d);
+        qn.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.placement.anchor === 'wall' ? 0 : i * 1.7);
+        const s = 0.85 + ((i * 0.618) % 0.3);
+        m.compose(at, qn, new THREE.Vector3(s, s, s));
+        inst.set(n++, m);
+      }
+      inst.commit(n);
+      row.add(inst.group);
+    }
+  }
+}
+
+function placeCamera(focus, radius, nRegions) {
+  controls.target.copy(focus);
+  const az = THREE.MathUtils.degToRad(state.az ?? 20), el = THREE.MathUtils.degToRad(state.el ?? 14);
+  let d;
+  if (state.view === 'distance') d = +state.dist;
+  else d = radius * (nRegions > 1 ? 1.9 : 1.6) + 8;
+  camera.position.set(focus.x + Math.sin(az) * Math.cos(el) * d, focus.y + Math.sin(el) * d, focus.z + Math.cos(az) * Math.cos(el) * d);
+  if (state.view === 'distance') camera.fov = 40;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function updateLods() {
+  const wp = new THREE.Vector3();
+  for (const s of lodSwitch) {
+    s.holder.getWorldPosition(wp);
+    const d = wp.distanceTo(camera.position);
+    const want = d < s.p.lodDistances[0] ? 0 : d < s.p.lodDistances[1] ? 1 : 2;
+    if (want === s.cur) continue;
+    s.holder.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
+    s.holder.clear();
+    s.holder.add(s.p.build(s.seed, want));
+    s.cur = want;
+    renderer.shadowMap.needsUpdate = true;
+  }
+}
+
+// ---------------------------------------------------------------- controls and loop
+
+for (const k of ['region', 'view', 'plant', 'dist', 'lod', 'light', 'seed']) ui[k].addEventListener('change', () => {
+  state[k] = k === 'seed' ? +ui[k].value : ui[k].value;
+  if (k === 'region') { state.plant = ''; refreshPlantList(); }
+  applyLight();
+  rebuild();
+});
+ui.wind.addEventListener('input', () => (state.wind = +ui.wind.value));
+ui.dir.addEventListener('input', () => (state.dir = +ui.dir.value));
+ui.spin.addEventListener('change', () => (state.spin = ui.spin.checked));
+
+applyLight();
+rebuild();
+if (q.has('tex')) {
+  // ?tex=<name> shows one painted texture flat on screen, over a checkerboard
+  const t = floraTextures().get(q.get('tex'));
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:70px 10px 30px 10px;z-index:3;background:repeating-conic-gradient(#888 0 25%,#bbb 0 50%) 0 0/24px 24px;display:flex;justify-content:center';
+  const c = document.createElement('canvas');
+  c.style.cssText = 'height:100%;width:auto;aspect-ratio:auto;object-fit:contain';
+  div.appendChild(c);
+  document.body.appendChild(div);
+  const draw = () => {
+    const img = t.image;
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d');
+    const d = new ImageData(img.width, img.height);
+    for (let y = 0; y < img.height; y++) d.data.set(img.data.subarray((img.height - 1 - y) * img.width * 4, (img.height - y) * img.width * 4), y * img.width * 4);
+    g.putImageData(d, 0, 0);
+  };
+  floraReady().then(draw);
+}
+
+const stats = document.getElementById('stats');
+let frames = 0, fps = 0, acc = 0;
+const clock = new THREE.Timer();
+function frame(now) {
+  clock.update(now);
+  const dt = clock.getDelta();
+  const t = clock.getElapsed();
+  const a = THREE.MathUtils.degToRad(state.dir);
+  setWind(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)), state.wind);
+  tickFlora(t);
+  controls.autoRotate = state.spin;
+  controls.autoRotateSpeed = 0.6;
+  controls.update(dt);
+  updateLods();
+  renderer.shadowMap.autoUpdate = true;
+  renderer.render(scene, camera);
+  const v = new THREE.Vector3();
+  for (const { tag, at, row } of tags) {
+    v.copy(at).applyMatrix4(row.matrixWorld).project(camera);
+    tag.style.display = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 ? '' : 'none';
+    tag.style.left = ((v.x + 1) / 2) * innerWidth + 'px';
+    tag.style.top = ((1 - v.y) / 2) * innerHeight + 'px';
+  }
+  frames++; acc += dt;
+  if (acc > 0.5) { fps = frames / acc; frames = 0; acc = 0; }
+  const info = renderer.info.render;
+  stats.textContent = `${fps.toFixed(0)} fps · ${info.calls} calls · ${(info.triangles / 1000).toFixed(0)}k tris · wind ${state.wind.toFixed(2)}`;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+floraReady().then(() => {
+  // let the repainted textures upload and a few frames settle before captures
+  setTimeout(() => { window.__floraReady = true; }, 600);
+});
+window.__flora = { state, rebuild, WIND };
+</script>
+</body>
+</html>
