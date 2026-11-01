@@ -9,6 +9,10 @@
 // - Below `kill`, frozen time is budgeted: at most `budget` seconds of (1 - scale) per rolling second, so a repeater
 //   or a scatter volley can't turn the game into a slideshow. Over budget, a stop is trimmed, or dropped if under a frame.
 // - No stop holds longer than 0.6 s unless it's a ceremony.
+//
+// Impact effects (sparks, shards, splinters, the flash on the hull) should not freeze with the world: step them by
+// `effectDt(realDt)`, which never drops below EFFECT_FLOOR of real time, so the burst blooms slowly over the held
+// frame, the way hit sparks keep playing through hitlag in a fighting game. Ships, water and projectiles use game time.
 import { EASE } from './ease.ts';
 import { effects } from './log.ts';
 
@@ -31,6 +35,8 @@ interface Stop extends StopSpec {
 }
 
 const FRAME = 1 / 60;
+/** The slowest impact effects run during a stop, as a fraction of real time. */
+export const EFFECT_FLOOR = 0.35;
 const MAX_HOLD = 0.6;
 
 export class TimeScale {
@@ -79,6 +85,11 @@ export class TimeScale {
     if (budgeted && scale < 1) this.spent.push({ t: this.now, frozen: (1 - scale) * realDt });
     while (this.spent.length && this.spent[0].t < this.now - this.window) this.spent.shift();
     return realDt * scale;
+  }
+
+  /** Time for impact effects this frame: game time, but never slower than EFFECT_FLOOR of real time. */
+  effectDt(realDt: number): number {
+    return realDt * Math.max(this.scale, EFFECT_FLOOR);
   }
 
   /** The scale this frame, by the stacking rules above. */

@@ -266,7 +266,7 @@ export { RECIPES, RECIPE_IDS, RARITY, PARTICLE_HOOKS, SOUND_LAYERS, pickupRecipe
 export { EASE, SPRING, Spring, springEasing } from './ease.ts';
 export { effects, format, type EffectEntry, type EffectLog } from './log.ts';
 export { ticker } from './ticker.ts';
-export { PRIORITY, TimeScale, type StopSpec } from './time.ts';
+export { EFFECT_FLOOR, PRIORITY, TimeScale, type StopSpec } from './time.ts';
 export { BANDS, CameraJuice, type CameraSpec, type KickSpec, type PulseSpec } from './camera.ts';
 export { Haptics, PATTERNS, capacitorDriver, type HapticKind, type PatternName } from './haptics.ts';
 export { LOW_HULL, ScreenFx, ScreenFxDom, type ScreenState } from './screen.ts';

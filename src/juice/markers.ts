@@ -202,6 +202,8 @@ export const NUMBERS: Record<NumberKind, { color: string; size: number; life: nu
 
 /** Numbers within this many seconds on the same target and colour merge into one, re-popping. */
 const MERGE = 0.6;
+/** Numbers start up and right of the hit (px at scale 1), and drift further right, so the crosshair's marker stays clear. */
+const OFFSET = { x: 30, y: -34, drift: [8, 26] } as const;
 
 interface Num {
   el: HTMLDivElement;
@@ -252,7 +254,8 @@ export class DamageNumbers {
       this.nums.push(n);
     }
     this.n++;
-    Object.assign(n, { kind, key: k, value, t: 0, at, live: true, dx: ((this.n * 37) % 29) - 14 });
+    const drift = OFFSET.drift[0] + ((this.n * 37) % 11) / 10 * (OFFSET.drift[1] - OFFSET.drift[0]);
+    Object.assign(n, { kind, key: k, value, t: 0, at, live: true, dx: drift });
     n.el.textContent = String(Math.round(value));
     this.style(n);
     effects.add('number', kind, { value });
@@ -288,9 +291,9 @@ export class DamageNumbers {
     // grow in over 4 frames past full size, then settle back: the pop
     const s = t < 0.065 ? 0.5 + 1.3 * (t / 0.065) : 1 + 0.8 * (1 - EASE.settle((t - 0.065) / 0.18));
     const rise = 48 * this.scale * EASE.settle(t / life);
-    const x = p.x + n.dx * this.scale * EASE.settle(t / life);
+    const x = p.x + (OFFSET.x + n.dx * EASE.settle(t / life)) * this.scale;
     const a = t < life * 0.6 ? 1 : 1 - (t - life * 0.6) / (life * 0.4);
     n.el.style.opacity = a.toFixed(3);
-    n.el.style.transform = `translate(${x.toFixed(1)}px, ${(p.y - rise).toFixed(1)}px) translate(-50%, -50%) scale(${s.toFixed(3)})`;
+    n.el.style.transform = `translate(${x.toFixed(1)}px, ${(p.y + OFFSET.y * this.scale - rise).toFixed(1)}px) translate(-50%, -50%) scale(${s.toFixed(3)})`;
   }
 }

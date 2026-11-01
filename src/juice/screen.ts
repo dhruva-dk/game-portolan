@@ -243,7 +243,8 @@ export class ScreenFxDom {
     this.tintEl = layer('normal');
     this.addEl = layer('plus-lighter');
     this.root.append(this.vigEl, this.tintEl, this.addEl);
-    parent.append(this.root);
+    // first child, so the HUD's own widgets stay readable over a flash
+    parent.prepend(this.root);
   }
 
   draw(s: ScreenState): void {

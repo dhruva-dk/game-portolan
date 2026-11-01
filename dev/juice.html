@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Juice bench</title>
+<style>
+  :root { --panel: rgba(10, 16, 26, 0.78); --line: rgba(255, 255, 255, 0.14); --ink: #eef3f8; --dim: #9fb0c2; --shield: #4fc3ff; --hull: #f4f1ea; --gold: #ffcf3a; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1520; color: var(--ink); font: 600 13px/1.25 system-ui, -apple-system, 'Helvetica Neue', sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  #hud > * { position: absolute; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; display: flex; align-items: center; gap: 8px; }
+  #crosshair { left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.7); }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; left: 50%; top: 50%; border: 1.5px solid rgba(255,255,255,0.75); border-radius: 50%; width: 26px; height: 26px; margin: -14.5px; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+  #crosshair::after { display: none; }
+  #levelbox { left: calc(16px + env(safe-area-inset-left)); top: 14px; }
+  #level { width: 34px; height: 34px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3b0, var(--gold) 55%, #9a6a00); color: #2a1a00; display: grid; place-items: center; font-weight: 800; font-size: 16px; box-shadow: 0 0 0 2px rgba(0,0,0,0.5); }
+  #xpbar { width: 120px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  #xpfill { height: 100%; width: 40%; background: linear-gradient(90deg, #ffe48a, var(--gold)); }
+  #rank { padding: 3px 9px; border-radius: 8px; background: linear-gradient(#c9d6e4, #8ea3b8); color: #172230; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 0 0 2px rgba(0,0,0,0.45); }
+  #counters { right: calc(16px + env(safe-area-inset-right)); top: 14px; display: flex; gap: 8px; }
+  .coin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8d0 0 18%, var(--gold) 40%, #8a5a00); box-shadow: 0 0 0 1.5px rgba(60,30,0,0.6); }
+  #coins, #kills { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 2ch; display: inline-block; }
+  #bars { left: calc(16px + env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 6px; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .track { width: 190px; height: 14px; border-radius: 7px; background: rgba(0,0,0,0.45); box-shadow: 0 0 0 1.5px rgba(255,255,255,0.18); overflow: hidden; }
+  .fill { height: 100%; transition: width 0.18s cubic-bezier(.2,.8,.2,1); }
+  #shieldfill { background: linear-gradient(90deg, #2a8fd8, var(--shield)); }
+  #hullfill { background: linear-gradient(90deg, #d9d2c3, var(--hull)); }
+  .val { font-size: 17px; font-weight: 800; min-width: 3ch; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+  #shieldval { color: var(--shield); }
+  #hotbar { left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); translate: -50% 0; display: flex; gap: 6px; }
+  .slot { width: 48px; height: 48px; border-radius: 10px; background: var(--panel); border: 2px solid var(--line); display: grid; place-items: center; }
+  .slot.sel { border-color: #fff; }
+  .slot i { width: 26px; height: 26px; border-radius: 6px; background: var(--c, transparent); box-shadow: 0 0 10px var(--c, transparent); }
+  #gust { right: calc(24px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 64px; height: 64px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #e6f6ff, #7cc7f2 60%, #2f79ad); box-shadow: 0 0 0 3px rgba(0,0,0,0.4); display: grid; place-items: center; color: #10304a; font-weight: 800; }
+  #enemy { left: 0; top: 0; display: flex; flex-direction: column; gap: 3px; translate: -50% -100%; }
+  #enemy .track { width: 90px; height: 7px; }
+  #enemy .name { text-align: center; font-size: 12px; text-shadow: 0 1px 3px #000; }
+  #banner { left: 50%; top: 30%; translate: -50% -50%; font-size: 64px; font-weight: 900; letter-spacing: 0.06em; color: #fff3c4; text-shadow: 0 4px 0 #8a5a00, 0 0 30px rgba(255,200,80,0.8); opacity: 0; }
+
+  /* dev panels */
+  #panel { position: fixed; right: calc(10px + env(safe-area-inset-right)); top: 64px; bottom: 96px; width: 214px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; box-sizing: border-box; -webkit-overflow-scrolling: touch; }
+  #panel h3 { margin: 8px 2px 4px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  #panel button { display: block; width: 100%; margin: 0 0 5px; padding: 8px 10px; text-align: left; border: 0; border-radius: 8px; background: rgba(255,255,255,0.08); color: var(--ink); font: inherit; cursor: pointer; }
+  #panel button:hover { background: rgba(255,255,255,0.14); }
+  #panel button.on { background: #2a6fb0; }
+  #panel .row { display: flex; gap: 5px; }
+  #panel .row button { text-align: center; padding: 7px 4px; }
+  #scope { position: fixed; left: 50%; top: 10px; translate: -50% 0; width: 300px; height: 74px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  #log { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: 100px; width: min(560px, 46vw); max-height: 34vh; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; box-sizing: border-box; font: 500 10.5px/1.35 ui-monospace, Menlo, monospace; color: #cfe0ef; white-space: pre; pointer-events: none; }
+  #log .suppressed, #log .trimmed { color: #ffb36b; }
+  body.clean #panel, body.clean #scope, body.clean #log { display: none; }
+  @media (max-height: 500px) {
+    #panel { top: 56px; bottom: 84px; width: 190px; }
+    #log { display: none; }
+    #banner { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="levelbox" class="chip"><div id="level">12</div><div><div style="font-size:11px;color:var(--dim)">XP <span id="xp">400</span> / 1,000</div><div id="xpbar"><div id="xpfill"></div></div></div><div id="rank">Silver II</div></div>
+  <div id="counters"><div class="chip"><div class="coin"></div><span id="coins">120</span></div><div class="chip"><span style="color:var(--dim)">Kills</span><span id="kills">2</span></div></div>
+  <div id="bars">
+    <div class="bar"><div class="track" id="shieldbar"><div class="fill" id="shieldfill" style="width:50%"></div></div><span class="val" id="shieldval">50</span></div>
+    <div class="bar"><div class="track" id="hullbar"><div class="fill" id="hullfill" style="width:100%"></div></div><span class="val" id="hullval">100</span></div>
+  </div>
+  <div id="hotbar"><div class="slot sel"><i style="--c:#3fa5ff"></i></div><div class="slot"><i style="--c:#5fd35a"></i></div><div class="slot" id="newslot"><i></i></div><div class="slot"><i></i></div><div class="slot"><i></i></div></div>
+  <div id="gust">Gust</div>
+  <div id="enemy"><div class="name">Marrow Gale</div><div class="track"><div class="fill" id="eshield" style="width:100%;background:var(--shield)"></div></div><div class="track"><div class="fill" id="ehull" style="width:100%;background:var(--hull)"></div></div></div>
+  <div id="banner">VICTORY</div>
+</div>
+<canvas id="scope"></canvas>
+<div id="log"></div>
+<div id="panel"></div>
+<script type="module" src="../src/juice/dev/bench.ts"></script>
+</body>
+</html>
