@@ -48,7 +48,7 @@ export async function serve({ production = false } = {}): Promise<Server> {
     await server.listen();
     return { url: server.resolvedUrls!.local[0], close: () => server.close() };
   }
-  const outDir = await mkdtemp(join(tmpdir(), 'portolan-build-'));
+  const outDir = await mkdtemp(join(tmpdir(), 'tidefall-build-'));
   await build({ root, logLevel: 'warn', build: { outDir, emptyOutDir: true } });
   const server = await preview({ root, logLevel: 'warn', build: { outDir }, preview: { port: 0 } });
   return {
@@ -129,7 +129,7 @@ export async function openGame(browser: Browser, url: string, options: OpenOptio
   });
   const target = new URL(url);
   for (const [k, v] of Object.entries(options.query ?? {})) target.searchParams.set(k, String(v));
-  const game = new Game(page, cdp, device, options.hook ?? '__portolan', target.origin);
+  const game = new Game(page, cdp, device, options.hook ?? '__tidefall', target.origin);
   await page.goto(target.href);
   return game;
 }

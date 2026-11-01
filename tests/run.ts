@@ -17,6 +17,7 @@ const files = readdirSync(join(root, 'tests'), { recursive: true, encoding: 'utf
 const serial = files.filter((f) => SERIAL.test(readFileSync(join(root, f), 'utf8')));
 const parallel = files.filter((f) => !serial.includes(f));
 console.log(`npm test: ${parallel.length} files in parallel, then ${serial.length} one at a time`);
-const first = run(parallel);
-const second = run(['--test-concurrency=1', ...serial]);
+// (node --test with no files would go looking for every test itself, so an empty list runs nothing)
+const first = parallel.length ? run(parallel) : 0;
+const second = serial.length ? run(['--test-concurrency=1', ...serial]) : 0;
 process.exit(first || second);
