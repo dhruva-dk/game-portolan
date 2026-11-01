@@ -3,11 +3,11 @@
 // its windows lit by the wisp that sails her, the great spirit lantern over the taffrail, and three lateen masts
 // (fore-and-aft sails, so they sit edge-on to the chase camera and never hide what is ahead). A swivel turret in the
 // waist wears whichever weapon is in hand; the broadside fires from the gunports. The figurehead is its own piece, so
-// it can be swapped, and the sail carries the captain's emblem from the league's atlas.
+// it can be swapped, and the sail carries the captain's emblem from the cosmetics library.
 //
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
-import { emblemRect, emblemTexture, EMBLEMS } from '../../career/emblems.ts';
+import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { patch, type ActorTextures } from './common.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
@@ -547,7 +547,7 @@ varying float vSize;
 varying vec2 vNdc;
 varying vec3 vSailW;
 const float BAYER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-// the league's emblem, from its atlas: r the roundel's field, g the charge, b the ink
+// the emblem's roundel: r the field, g the charge, b the ink
 vec3 emblemAt(vec2 p) {
   vec2 q = p / 0.3 * 0.5 + 0.5;
   if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) return vec3(0.0);
@@ -783,7 +783,7 @@ export class Kit {
   envMap: THREE.Texture | null = null;
   readonly tex: ActorTextures;
   readonly sailNoise: THREE.Texture;
-  readonly emblems = emblemTexture();
+  private readonly emblems = new Map<string, THREE.DataTexture>();
   constructor(tex: ActorTextures) {
     this.tex = tex;
     this.sailNoise = sailNoise(tex.noise);
@@ -793,6 +793,21 @@ export class Kit {
     let g = this.heads.get(kind);
     if (!g) this.heads.set(kind, (g = figureheadGeometry(kind)));
     return g;
+  }
+  /** One emblem's roundel from the cosmetics library (r the field, g the charge, b the ink), drawn when first worn. */
+  emblem(id: string): THREE.DataTexture {
+    let t = this.emblems.get(id);
+    if (!t) {
+      const N = 128;
+      t = new THREE.DataTexture(emblemRoundel(id, N), N, N, THREE.RGBAFormat);
+      t.generateMipmaps = true;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      t.anisotropy = 4;
+      t.needsUpdate = true;
+      this.emblems.set(id, t);
+    }
+    return t;
   }
   bodyMaterial(u: Uniforms): THREE.MeshStandardMaterial {
     const m = new THREE.MeshStandardMaterial({ map: this.tex.hull_d, normalMap: this.tex.hull_n, roughness: 0.7, metalness: 0, envMap: this.envMap, envMapIntensity: 1 });
@@ -895,7 +910,7 @@ export class ShipModel {
       uWisp: { value: new THREE.Color(look.wisp) }, uHit: { value: 0 }, uDamage: { value: 0 }, uNight: { value: 0 },
       uDeckMap: { value: kit.tex.deck_d }, uDeckN: { value: kit.tex.deck_n }, uDmgNoise: { value: kit.tex.noise },
       uSailA: { value: new THREE.Color(look.sail) }, uSailB: { value: new THREE.Color(look.sail2) }, uTrimC: { value: new THREE.Color(look.trim) },
-      uPattern: { value: look.pattern }, uEmblem: { value: look.emblem }, uEmblemAtlas: { value: kit.emblems }, uEmblemRect: { value: new THREE.Vector4() },
+      uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
     };
@@ -932,8 +947,8 @@ export class ShipModel {
     u.uHull.value.setHex(look.hull); u.uAccent.value.setHex(look.accent); u.uTrim.value.setHex(look.trim); u.uTrimC.value.setHex(look.trim);
     u.uWisp.value.setHex(look.wisp); u.uSailA.value.setHex(look.sail); u.uSailB.value.setHex(look.sail2);
     u.uPattern.value = look.pattern;
-    u.uEmblem.value = look.emblem;
-    if (look.emblem >= 0) u.uEmblemRect.value.copy(emblemRect(EMBLEMS[look.emblem]));
+    u.uEmblem.value = look.emblem ? 0 : -1;
+    if (look.emblem) u.uEmblemAtlas.value = this.kit.emblem(look.emblem);
     this.head.geometry = this.kit.figurehead(look.figurehead);
   }
 

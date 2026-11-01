@@ -1,8 +1,26 @@
 // The cosmetics a ship wears, from the id record the career hands over to the colours and shapes the model draws.
-// Every table here is a placeholder set: an id the table knows gets its entry, any other id gets one picked by its
-// hash, so a catalogue of about 100 cosmetics can be wired in without the renderer knowing each one.
-import { EMBLEMS } from '../../career/emblems.ts';
+// The career's catalogue (src/career/cosmetics.ts) gives each sail colour, hull paint and wake its colour, and the ids
+// below map its patterns and figureheads onto the shapes the model has so far. The tables here are placeholders: an
+// id they know gets its entry, any other id one picked by its hash, so new cosmetics never break the renderer.
+import { cosmetic } from '../../career/cosmetics.ts';
+import { EMBLEMS, LEGACY_EMBLEMS } from '../cosmetics/emblems.ts';
 import type { CosmeticIds } from './view.ts';
+
+/** The career's sail patterns and figureheads, onto the shader's six patterns and the model's seven heads. */
+const CAREER_PATTERNS: Record<string, number> = {
+  plain: 0, singleStripe: 3, twinBands: 1, quartered: 4, chevron: 5, waveCrest: 2, tideLines: 1, laurelEdge: 2, forkedLightning: 5,
+};
+const CAREER_HEADS: Record<string, Figurehead> = {
+  plainStem: 'none', heron: 'gull', stormPetrel: 'gull', narwhalTusk: 'ram', coiledEel: 'orb', ammonite: 'orb', coralAntler: 'star',
+  iceShard: 'star', kelpCrown: 'sun', whaleFluke: 'whale', leapingDolphin: 'whale', emberBloom: 'sun', sunburst: 'sun', greatWhale: 'whale',
+};
+
+const hex = (s: string | undefined): number | null => (s && /^#[0-9a-f]{6}$/i.test(s) ? parseInt(s.slice(1), 16) : null);
+const lum = (c: number) => (((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11) / 255;
+const mixHex = (a: number, b: number, t: number): number => {
+  const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t) << s;
+  return ch(16) | ch(8) | ch(0);
+};
 
 export const FIGUREHEADS = ['gull', 'whale', 'star', 'orb', 'ram', 'sun', 'none'] as const;
 export type Figurehead = (typeof FIGUREHEADS)[number];
@@ -16,7 +34,7 @@ export interface Look {
   sail: number;
   sail2: number;
   pattern: number; // 0 plain, 1 bands, 2 leech band, 3 centre stripe, 4 quarters, 5 chevrons
-  emblem: number; // index into the league's EMBLEMS, -1 for none
+  emblem: string | null; // a charge id from src/render/cosmetics/emblems.ts (sigil, emblem cosmetic or spare), null for none
   figurehead: Figurehead;
   wisp: number; // the spirit lantern's light, shared with the wake's glow
   wake: WakeLook;
@@ -65,13 +83,25 @@ export function pick<T>(table: Record<string, T>, id: string | undefined): T {
 }
 
 export function lookOf(c: CosmeticIds): Look {
-  const [sail, sail2] = pick(SAIL_COLOURS, c.sail);
-  const paint = pick(HULL_PAINTS, c.hull);
-  const wake = pick(WAKES, c.wake);
-  const emblem = c.emblem === 'none' ? -1 : c.emblem ? ((EMBLEMS as readonly string[]).indexOf(c.emblem) + EMBLEMS.length) % EMBLEMS.length : 0;
-  const fig = (FIGUREHEADS as readonly string[]).includes(c.figurehead ?? '') ? (c.figurehead as Figurehead) : FIGUREHEADS[c.figurehead ? hash(c.figurehead) % (FIGUREHEADS.length - 1) : 0];
+  let [sail, sail2] = pick(SAIL_COLOURS, c.sail);
+  const paint = { ...pick(HULL_PAINTS, c.hull) };
+  const wake = { ...pick(WAKES, c.wake) };
+  // the career's own colours, where it has them: a contrasting second colour for the sail's pattern and charge
+  const sc = hex(c.sail ? cosmetic(c.sail)?.colour : undefined);
+  if (sc !== null) { sail = sc; sail2 = lum(sc) > 0.55 ? mixHex(sc, 0x1b2233, 0.8) : mixHex(sc, 0xf3ead8, 0.85); }
+  const hc = hex(c.hull ? cosmetic(c.hull)?.colour : undefined);
+  if (hc !== null) { paint.hull = hc; paint.accent = lum(hc) > 0.5 ? 0x24324a : mixHex(hc, 0xe6dccb, 0.55); }
+  const wc = hex(c.wake ? cosmetic(c.wake)?.colour : undefined);
+  if (wc !== null) {
+    const plain = c.wake === 'foam' || c.wake === 'bubbles';
+    Object.assign(wake, { color: plain ? 0x7fe7ff : wc, glow: plain ? 0.6 : 1.3, sparkle: !plain, wisp: plain ? 0x7fe7ff : mixHex(wc, 0xffffff, 0.25) });
+  }
+  const emblem = c.emblem === 'none' ? null : !c.emblem ? 'gull' : c.emblem in EMBLEMS ? c.emblem : LEGACY_EMBLEMS[c.emblem] ?? 'gull';
+  const pattern = c.pattern && c.pattern in CAREER_PATTERNS ? CAREER_PATTERNS[c.pattern] : pick(PATTERNS, c.pattern);
+  const f = c.figurehead ?? '';
+  const fig = (FIGUREHEADS as readonly string[]).includes(f) ? (f as Figurehead) : CAREER_HEADS[f] ?? FIGUREHEADS[f ? hash(f) % (FIGUREHEADS.length - 1) : 0];
   return {
-    ...paint, sail, sail2, pattern: pick(PATTERNS, c.pattern), emblem, figurehead: fig,
+    ...paint, sail, sail2, pattern, emblem, figurehead: fig,
     wisp: wake.wisp, wake: { color: wake.color, glow: wake.glow, sparkle: wake.sparkle },
   };
 }
