@@ -282,7 +282,9 @@ export function fxLobby(): LobbyModel {
 export function fxGale(): GaleModel {
   const r = rng(7);
   return {
-    seconds: 14, total: 20, sun: { lat: 12, lon: 40 }, pick: 11, ships: 20,
+    seconds: 14, total: 35, sun: { lat: 12, lon: 40 }, pick: 11, below: 6, ships: 20,
+    at: { lat: 18, lon: -30 },
+    path: Array.from({ length: 13 }, (_, k) => ({ lat: 18 + k * 2.5, lon: -30 + k * 6 })),
     regions: REGIONS.map((_, index) => ({ index, open: index !== 0 && index !== 15, heading: index === 0 || index === 15 ? 0 : Math.floor(r() * 4) })),
   };
 }

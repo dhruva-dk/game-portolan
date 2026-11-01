@@ -13,7 +13,7 @@ import { QUALITY, U } from '../render/engine.ts';
 import { sunDirection } from '../render/sky.ts';
 import { waveHeight } from '../render/swell.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
-import { wornLook } from '../career/index.ts';
+import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SHIPS } from '../sim/match.ts';
 import type { V3 } from '../sim/math.ts';
@@ -28,7 +28,8 @@ import { cosmeticsOf, sceneActors, sceneStage } from './views.ts';
 import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { CareerHolder } from './career.ts';
-import { lobbyModel } from './models.ts';
+import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivalsModel } from './models.ts';
+import { QUALITY_PRESET, SettingsHolder } from './settings.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { titleScreen, type TitleView } from '../ui/screens/title.ts';
 import { lobbyScreen } from '../ui/screens/lobby.ts';
@@ -36,8 +37,14 @@ import { page } from '../ui/screens/frame.ts';
 import {
   deathScreen, galeScreen, hudScreen, resultsScreen, spectateScreen, victoryScreen, type GaleView, type HudView, type SpectateView,
 } from '../ui/screens/match.ts';
+import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
+import { warmChart } from '../ui/screens/chart.ts';
 import { el, esc } from '../ui/parts/index.ts';
-import type { DeathModel, GaleModel, HudModel, ResultsModel, SpectateModel, TitleModel, VictoryModel } from '../ui/model.ts';
+import type {
+  CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
+} from '../ui/model.ts';
+import type { Quality as StageQuality } from '../render/engine.ts';
+import type { AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
@@ -58,6 +65,8 @@ export interface AppStage {
   snap(): void;
   settled(): Promise<void>;
   stats(): { tris: number; calls: number; fps: number; scale: number; chunks: number; pending: number };
+  /** The renderer's quality, from the settings; the debug globe has only one. */
+  setQuality?(q: StageQuality): void;
 }
 
 const VERSION = 'Portolan · pass 1';
@@ -70,6 +79,7 @@ export class App {
   readonly loop: Loop;
   readonly shell: Shell;
   readonly career: CareerHolder;
+  readonly settings: SettingsHolder;
   stage: AppStage | null = null;
   actors: Actors | null = null;
   readonly overlay: HTMLElement;
@@ -90,6 +100,10 @@ export class App {
   private title: TitleView | null = null;
   private progress = { f: 0, what: 'Charting the seas' };
   private readonly sun = new THREE.Vector3();
+  /** Unlocks the player has not looked at yet: badges on the lobby's tiles and "new" on the cards. */
+  private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
+  /** A cosmetic the locker is trying on the lobby's ship, over what it wears. */
+  private preview: { kind: CosmeticKind; id: string } | null = null;
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
     this.canvas = canvas;
@@ -105,6 +119,7 @@ export class App {
     this.shell = new Shell(this.uiLayer);
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
     this.career = new CareerHolder(options.capture);
+    this.settings = new SettingsHolder(options.capture);
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
@@ -114,6 +129,27 @@ export class App {
     connectUiFeedback((what, sound) => this.log.add('screen', what, sound !== 'none' ? { sound } : undefined), this.juice.haptics, (n) => this.audio.play(n));
     if (options.capture) this.loop.running = false;
     addEventListener('resize', () => this.stage?.resize());
+    this.applySettings();
+  }
+
+  /** Changes some settings, saves them, and applies them everywhere at once. */
+  setSettings(s: Partial<Settings>): Settings {
+    const before = this.settings.settings.quality, next = this.settings.set(s);
+    this.applySettings(next.quality !== before);
+    return next;
+  }
+
+  /** The settings into the sound, the juice, the controls, the session and (when it changed) the renderer. */
+  private applySettings(quality = false): void {
+    const s = this.settings.settings;
+    this.audio.setVolumes({ master: s.master, effects: s.effects, ambience: s.ambience, interface: s.interface });
+    this.juice.settings({ shake: s.shake, haptics: s.haptics });
+    this.controls.sens = s.sensitivity;
+    this.controls.invert = s.invertY;
+    this.controls.lefty = s.leftHanded;
+    if (this.session) this.session.autoFire = s.autoFire;
+    this.uiLayer.dataset.hand = s.leftHanded ? 'left' : 'right';
+    if (quality) this.stage?.setQuality?.(QUALITY[QUALITY_PRESET[s.quality]]);
   }
 
   start(): void {
@@ -127,7 +163,7 @@ export class App {
       this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
       this.title?.setProgress(this.progress.f, this.progress.what);
     };
-    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas) : await Stage.create(this.canvas, QUALITY.balanced, report);
+    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas) : await Stage.create(this.canvas, QUALITY[QUALITY_PRESET[this.settings.settings.quality]], report);
     this.stage = stage;
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
@@ -135,6 +171,7 @@ export class App {
       cam.updateMatrixWorld();
     };
     this.actors = createActors(stage.scene, { radius: R, wave: waveHeight, uniforms: U });
+    warmChart();
     await this.actors.ready;
     stage.snap();
     this.progress = { f: 1, what: 'Ready' };
@@ -178,7 +215,37 @@ export class App {
         return titleScreen(m, { onStart: () => this.go('lobby') });
       }
       case 'lobby':
-        return lobbyScreen((model as never) ?? lobbyModel(career), { onPlay: () => this.play({}), onOpen: (m) => this.go(m) });
+        return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), { onPlay: () => this.play({}), onOpen: (m) => this.go(m) });
+      case 'abilities': {
+        const v: MenuView<ReturnType<typeof abilitiesModel>> = abilitiesScreen((model as never) ?? abilitiesModel(career, this.fresh.abilities), {
+          onBack: this.back,
+          onEquip: (id: AbilityId) => this.equip((c) => equipAbility(c, id), () => v.set(abilitiesModel(this.career.career, this.fresh.abilities))),
+        });
+        this.seen(this.fresh.abilities);
+        return v;
+      }
+      case 'locker': {
+        const v: MenuView<ReturnType<typeof lockerModel>> = lockerScreen((model as never) ?? lockerModel(career, this.fresh.cosmetics), {
+          onBack: this.back,
+          onEquip: (id) => {
+            this.preview = null;
+            this.equip((c) => equipCosmetic(c, id), () => v.set(lockerModel(this.career.career, this.fresh.cosmetics)));
+          },
+          onPreview: (kind, id) => { this.preview = id ? { kind, id } : null; },
+        });
+        this.seen(this.fresh.cosmetics);
+        return v;
+      }
+      case 'rivals':
+        return rivalsScreen((model as never) ?? rivalsModel(career), { onBack: this.back });
+      case 'career':
+        return careerScreen((model as never) ?? careerModel(career), { onBack: this.back });
+      case 'rank':
+        return rankScreen((model as never) ?? rankModel(career), { onBack: this.back });
+      case 'settings': {
+        const v = settingsScreen((model as Settings | undefined) ?? this.settings.settings, { onBack: this.back, onChange: (x) => this.setSettings(x) });
+        return v;
+      }
       default:
         return this.matchView(name, model) ?? this.placeholder(name);
     }
@@ -193,7 +260,7 @@ export class App {
     switch (name) {
       case 'gale': {
         if (!model && !s) return null;
-        const v = galeScreen((model as GaleModel) ?? galeModel(s!), { onDive: () => this.tap('dive') });
+        const v = galeScreen((model as GaleModel) ?? galeModel(s!), { onDive: () => this.tap('dive'), onPick: (r) => this.session?.pick(r) });
         this.galeView = v;
         return v;
       }
@@ -222,6 +289,32 @@ export class App {
       default:
         return this.placeholder(name);
     }
+  }
+
+  private readonly back = (): void => this.go('lobby');
+
+  /** Changes the career in a menu (an equip), saves, and redraws the menu; a locked item changes nothing. */
+  private equip(change: (c: Career) => Career, redraw: () => void): void {
+    try {
+      this.career.set(change(this.career.career));
+      this.log.add('flow', 'equip', {});
+    } catch (e) {
+      this.log.add('flow', 'equip-refused', { why: String(e) });
+    }
+    redraw();
+  }
+
+  /** The lobby's badges: how many unlocks wait unseen behind each menu. */
+  private news(): LobbyModel['news'] {
+    const n: LobbyModel['news'] = {};
+    if (this.fresh.abilities.size) n.abilities = this.fresh.abilities.size;
+    if (this.fresh.cosmetics.size) n.locker = this.fresh.cosmetics.size;
+    return n;
+  }
+
+  /** The menu's cards have shown their "new": once you leave, they are old. */
+  private seen(set: Set<string>): void {
+    queueMicrotask(() => set.clear());
   }
 
   /** A screen still being built: its frame, its name, and a way back. */
@@ -267,13 +360,14 @@ export class App {
     if (this.session) this.leaveMatch();
     const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
     s.onMoment = (m) => this.onMoment(m);
+    s.autoFire = this.settings.settings.autoFire;
     this.session = s;
     this.viewer.me = this.sound.me = PLAYER;
     this.log.tick = s.state.tick;
     this.log.add('flow', 'match', { seed: s.state.seed, skipGale: !!o.skipGale, autopilot: !!o.autopilot });
     this.loop.run(s);
     this.controls.on = true;
-    if (this.stage?.rig) this.stage.rig.follow = 9;
+    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 9, shoulder: 0 });
     this.stage?.snap();
     this.go(s.me.phase === PHASE.gale ? 'gale' : 'match');
   }
@@ -322,6 +416,8 @@ export class App {
     if (!s) return;
     const report = s.tally.report(s.plan.fleet.map((e) => e.captain), (i) => s.standing(i));
     const changes = this.career.apply(report), mine = report.ships[PLAYER];
+    for (const id of changes.unlocked.abilities) this.fresh.abilities.add(id);
+    for (const id of changes.unlocked.cosmetics) this.fresh.cosmetics.add(id);
     this.log.add('flow', 'finish', { place: changes.place, kills: changes.kills, xp: changes.xp.total, tick: s.state.tick });
     this.leaveMatch();
     this.go('results', resultsModel(changes, this.career.career, { damage: mine.damage, survived: mine.survived }));
@@ -466,7 +562,15 @@ export class App {
     }
     const v = this.view, sv = sceneStage(v, f.clock);
     sunDirection(sv.hour, sv.tilt, this.sun);
-    const look = cosmeticsOf(wornLook(this.career.career));
+    // in the locker the boom swings out and back, so the whole ship stands clear of the pane on the right
+    const locker = this.screen === 'locker';
+    if (stage.rig && !this.fixed) {
+      const k = Math.min(1, f.realDt * 3);
+      stage.rig.shoulder += ((locker ? 7.5 : 0) - stage.rig.shoulder) * k;
+      stage.rig.dist += ((locker ? 34 : 27) - stage.rig.dist) * k;
+    }
+    const worn = wornLook(this.career.career), p = locker ? this.preview : null;
+    const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
     actors.update(sceneActors(v, f.clock, this.sun, look, v.camera === 'chase' && this.fixed ? 14.5 : 0), f.dt, stage.camera);
     stage.frame(sv, f.dt);
   }

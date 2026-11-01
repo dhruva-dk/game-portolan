@@ -32,6 +32,8 @@ export class Controls {
   /** Look sensitivity and an inverted pitch, from the settings. */
   sens = 1;
   invert = false;
+  /** Left-handed: the stick under the right thumb and the look on the left. */
+  lefty = false;
   private readonly keys = new Set<string>();
   private readonly held = new Set<Press>();
   private readonly edges = new Set<Press>();
@@ -183,7 +185,7 @@ export class Controls {
       return;
     }
     this.layer.setPointerCapture(e.pointerId);
-    if (e.clientX < innerWidth * 0.42 && this.stickId < 0) {
+    if ((this.lefty ? e.clientX > innerWidth * 0.58 : e.clientX < innerWidth * 0.42) && this.stickId < 0) {
       this.stickId = e.pointerId;
       this.origin = { x: e.clientX, y: e.clientY };
       this.place(e.clientX, e.clientY, 0, 0);

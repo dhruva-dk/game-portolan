@@ -10,8 +10,9 @@ import {
   type MatchState, type Ship,
 } from '../sim/match.ts';
 import { GALE, GUST, LOOT } from '../sim/tables.ts';
-import { R, apart } from '../sim/sphere.ts';
-import { REGIONS, regionAt } from '../sim/world/index.ts';
+import { GALE_SPEED } from '../sim/opening.ts';
+import { R, advance, apart } from '../sim/sphere.ts';
+import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import {
   rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type GaleModel, type HudModel,
@@ -131,17 +132,30 @@ export function hudModel(session: Session): HudModel {
   };
 }
 
+/** How far a ship can glide from the Gale before it reaches the sea, m. */
+const GLIDE_REACH = (GALE.height / GALE.fall) * GALE.glide;
+const ROAD = 24, ROAD_P = v3(), ROAD_H = v3();
+
 export function galeModel(session: Session): GaleModel {
-  const s = session.state, sun = latLon(sunDir(s, SUN));
+  const s = session.state, g = s.gale, sun = latLon(sunDir(s, SUN));
   const heading = new Array<number>(REGIONS.length).fill(0);
   for (let i = 1; i < SHIPS; i++) {
     const c = s.ships[i].captain;
     if (c.on && c.region >= 0 && c.region < heading.length) heading[c.region]++;
   }
+  // the road ahead, and every region with its centre in glide reach of some point on it
+  const path: GaleModel['path'] = [], open = new Array<boolean>(REGIONS.length).fill(false);
+  for (let k = 0; k <= ROAD; k++) {
+    const t = g.t + ((GALE.time - g.t) * k) / ROAD;
+    advance(g.from, g.dir, GALE_SPEED * t, ROAD_P, ROAD_H);
+    path.push(latLon(ROAD_P));
+    for (let r = 0; r < CENTRES.length; r++) if (!open[r] && apart(ROAD_P, CENTRES[r]) < GLIDE_REACH) open[r] = true;
+  }
   return {
-    seconds: Math.max(0, Math.ceil(GALE.time - s.gale.t)), total: GALE.time, sun,
-    regions: REGIONS.map((_, index) => ({ index, open: true, heading: heading[index] })),
-    pick: regionAt(s.gale.at), ships: SHIPS,
+    seconds: Math.max(0, Math.ceil(GALE.time - g.t)), total: GALE.time, sun,
+    at: latLon(s.ships[PLAYER].pos), path,
+    regions: REGIONS.map((_, index) => ({ index, open: open[index], heading: heading[index] })),
+    pick: session.target, below: regionAt(s.ships[PLAYER].pos), ships: SHIPS,
   };
 }
 

@@ -2,7 +2,10 @@
 // fixtures as its data. Its buttons navigate the way the game will.
 import { Shell } from '../src/ui/shell.ts';
 import { el } from '../src/ui/parts/index.ts';
-import { fxLobby, fxTitle } from '../src/ui/fixtures.ts';
+import { fxAbilities, fxCareer, fxLobby, fxLocker, fxRank, fxRivals, fxTitle } from '../src/ui/fixtures.ts';
+import { DEFAULT_SETTINGS } from '../src/ui/model.ts';
+import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen } from '../src/ui/screens/menus.ts';
+import { warmChart } from '../src/ui/screens/chart.ts';
 import { lobbyScreen } from '../src/ui/screens/lobby.ts';
 import { titleScreen } from '../src/ui/screens/title.ts';
 import { partsGallery } from './ui-parts.ts';
@@ -14,7 +17,7 @@ export const DEVICES = {
 } as const;
 export type DeviceName = keyof typeof DEVICES;
 
-export const SCREENS = ['parts', 'title', 'lobby'];
+export const SCREENS = ['parts', 'title', 'lobby', 'abilities', 'locker', 'rivals', 'career', 'rank', 'settings'];
 export const STATES: Record<string, string[]> = { title: ['loading', 'ready'] };
 
 const devStyle = `
@@ -71,4 +74,17 @@ export function mountScreen(screen: string, device: DeviceName, state: string): 
     shell.show('title', t, 'fade');
   }
   if (screen === 'lobby') shell.show('lobby', lobbyScreen(fxLobby(), { onPlay: () => go('gale'), onOpen: (m) => go(m) }), 'fade');
+  const back = () => go('lobby');
+  if (screen === 'abilities') shell.show('abilities', abilitiesScreen(fxAbilities(), { onBack: back, onEquip: () => {} }), 'fade');
+  if (screen === 'locker') shell.show('locker', lockerScreen(fxLocker(), { onBack: back, onEquip: () => {}, onPreview: () => {} }), 'fade');
+  if (screen === 'rivals') shell.show('rivals', rivalsScreen(fxRivals(), { onBack: back }), 'fade');
+  if (screen === 'career') {
+    warmChart();
+    shell.show('career', careerScreen(fxCareer(), { onBack: back }), 'fade');
+  }
+  if (screen === 'rank') shell.show('rank', rankScreen(fxRank(), { onBack: back }), 'fade');
+  if (screen === 'settings') {
+    const v = settingsScreen(DEFAULT_SETTINGS, { onBack: back, onChange: (x) => v.set({ ...DEFAULT_SETTINGS, ...x }) });
+    shell.show('settings', v, 'fade');
+  }
 }

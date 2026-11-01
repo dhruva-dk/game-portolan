@@ -215,11 +215,14 @@ export interface RankModel {
 export type Quality = 'low' | 'medium' | 'high';
 
 export interface Settings {
+  /** Volumes, 0–1: everything, the guns and the world's sounds, the sea and the weather, and the interface. */
   master: number;
-  music: number;
   effects: number;
   ambience: number;
+  interface: number;
   haptics: boolean;
+  /** Screen shake, 0–1. */
+  shake: number;
   quality: Quality;
   /** Aim speed, 0.5–2. */
   sensitivity: number;
@@ -231,7 +234,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  master: 0.9, music: 0.7, effects: 0.9, ambience: 0.7, haptics: true, quality: 'high',
+  master: 0.9, effects: 0.9, ambience: 0.7, interface: 0.8, haptics: true, shake: 1, quality: 'medium',
   sensitivity: 1, invertY: false, leftHanded: false, autoFire: false,
 };
 
@@ -253,7 +256,7 @@ export const CONSUMABLE: Record<ConsumableId, { name: string; stack: number; sec
 
 export interface GaleRegion {
   index: number;
-  /** False for regions the Gale does not reach this match. */
+  /** False for regions too far off the Gale's road to glide to. */
   open: boolean;
   /** Captains heading there now. */
   heading: number;
@@ -265,9 +268,14 @@ export interface GaleModel {
   total: number;
   /** The point under the sun, in degrees: day is the half facing it. */
   sun: { lat: number; lon: number };
+  /** Where you ride, in degrees, and the Gale's road ahead from there to where it lets go. */
+  at: { lat: number; lon: number };
+  path: { lat: number; lon: number }[];
   regions: GaleRegion[];
-  /** The region you have picked, or -1. */
+  /** The region you have marked to come down in, or -1. */
   pick: number;
+  /** The region under you now. */
+  below: number;
   ships: number;
 }
 

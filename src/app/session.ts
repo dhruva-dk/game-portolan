@@ -14,9 +14,9 @@ import {
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
-import { R, along, angleTo, apart, flatten, turned } from '../sim/sphere.ts';
+import { R, along, angleTo, apart, flatten, tangentToward, turned } from '../sim/sphere.ts';
 import { vigour } from '../sim/weather.ts';
-import type { WeatherKind } from '../sim/world/index.ts';
+import { CENTRES, type WeatherKind } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { MatchTally } from './career.ts';
 import type { Intents } from './controls.ts';
@@ -57,6 +57,8 @@ export function setupFrom(plan: MatchPlan, seed = plan.seed): MatchSetup {
 }
 
 const SECOND = Math.round(1 / TICK);
+/** Riding to a picked region: leave the Gale this near its centre (m), and drop this near on the glide. */
+const PICK = { leave: 600, drop: 120 } as const;
 const AIM = { near: 40, far: 260, lock: 300, cone: 0.2, pitch: [0.06, 0.6] as const };
 const WIND = newWind(), STORM = newStormView();
 
@@ -94,6 +96,11 @@ export class Session implements Stepper {
   watch = PLAYER;
   /** The ship the guns have locked onto, or -1, and the point they aim at (a unit vector). */
   lock = -1;
+  /** Fire on its own while the guns hold a lock (a setting). */
+  autoFire = false;
+  /** The region picked on the Gale's globe, or -1: the ship leaves the Gale as it nears it, then glides in. */
+  target = -1;
+  private targetD = Infinity;
   readonly aim = v3(0, 0, 1);
   private readonly input = idleInput();
   private readonly held = idleInput();
@@ -230,11 +237,12 @@ export class Session implements Stepper {
     if (mag > 0.2) {
       turned(this.view, p, Math.atan2(st.x, st.y), this.want);
       inp.steer = angleTo(w.head, this.want, p);
-    } else inp.steer = 0;
+    } else if (this.target >= 0 && w.phase !== PHASE.sea) this.toward(w, inp);
+    else inp.steer = 0;
     inp.throttle = 1;
     if (it.fire) this.firing = true;
     if (it.dive) this.diving = true;
-    inp.fire = (it.fire || this.firing) && w.phase === PHASE.sea;
+    inp.fire = (it.fire || this.firing || (this.autoFire && this.lock >= 0)) && w.phase === PHASE.sea;
     inp.dive = it.dive || this.diving;
     if (it.gust) inp.gust = true;
     if (it.reload) inp.reload = true;
@@ -248,6 +256,26 @@ export class Session implements Stepper {
     inp.aim.y = this.aim.y;
     inp.aim.z = this.aim.z;
     inp.aimY = 0;
+  }
+
+  /** Picks a region on the Gale's globe to come down in. */
+  pick(region: number): void {
+    this.target = region;
+    this.targetD = Infinity;
+  }
+
+  /** Rides to the picked region: leaves the Gale once near it or past its closest, then glides for its centre and drops. */
+  private toward(w: Ship, inp: ShipInput): void {
+    const c = CENTRES[this.target], d = apart(w.pos, c);
+    if (w.phase === PHASE.gale) {
+      if (d < PICK.leave || d > this.targetD + 0.01) this.diving = true;
+      this.targetD = d;
+      inp.steer = 0;
+      return;
+    }
+    tangentToward(w.pos, c, this.want);
+    inp.steer = angleTo(w.head, this.want, w.pos);
+    if (d < PICK.drop) this.diving = true;
   }
 
   /** Along the look as far as its pitch reaches, or at a ship close to that line. */

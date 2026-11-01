@@ -8,6 +8,7 @@ import type {
 } from '../model.ts';
 import { CONSUMABLE, WEAPON_NAME } from '../model.ts';
 import type { ScreenView } from '../shell.ts';
+import { galeGlobe } from './chart.ts';
 import { page } from './frame.ts';
 import './match.css';
 
@@ -53,18 +54,27 @@ export interface GaleView extends ScreenView {
   set(m: GaleModel): void;
 }
 
-export function galeScreen(m: GaleModel, a: { onDive(): void }): GaleView {
+export function galeScreen(m: GaleModel, a: { onDive(): void; onPick(region: number): void }): GaleView {
   const root = el('s-mx s-gale');
   const top = box('s-gale__top p-smoke', root);
   el('s-gale__title', top, 'Riding the Gale');
   const line = el('s-gale__line', top);
+  const map = box('s-gale__map p-smoke', root);
+  const globe = galeGlobe(a.onPick);
+  map.appendChild(globe.el);
+  const hint = el('s-gale__hint', map);
   const go = box('s-gale__go', root);
   button({ label: 'Dive', icon: ICON.dive, sub: 'Leave the Gale here', kind: 'gold', size: 'lg', parent: go, what: 'gale:dive', onPress: a.onDive });
   const set = (g: GaleModel) => {
-    const r = REGIONS[g.pick];
+    const r = REGIONS[g.below];
     line.innerHTML = `Below: <b>${esc(r?.name ?? 'the open sea')}</b> · the Gale lets go in ${mmss(g.seconds)}`;
+    const p = REGIONS[g.pick];
+    hint.innerHTML = p ? `Steering for <b>${esc(p.name)}</b>: you leave the Gale over it` : 'Tap a sea in reach to steer for it';
+    globe.set(g);
   };
   set(m);
+  // the canvas has no size until it is laid out
+  requestAnimationFrame(() => globe.set(m));
   return { el: root, set };
 }
 
