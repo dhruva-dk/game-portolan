@@ -631,6 +631,167 @@ This pass gets everything to blocked out, with the core loop first.
 5. Port the interface and create every screen.
 6. Wire up the career at its simplest: the league, the skill rating, ranks, levels and abilities.
 
+### Pass 1: done when
+
+Pass 1 takes every item to **blocked out**. An item is done only when every line in its list is true.
+
+**Every region (all 16), done when:**
+1. Its terrain comes from its own module, `src/sim/world/regions/<id>.ts`. That module is the region's own code, not a shared height function with different numbers or tints.
+2. Its shapes read as the skyline in its portrait (see the table below), at blockout fidelity and at real size.
+3. Land, shallows or features spread across the whole region, from border to border. No water in it is more than about 15 seconds of sailing (about 200 m) from land, shallows, a landmark or a loot spot.
+4. It blends into every neighbour across a band. Heights and features cross smoothly, with no seam, wall or trench along the border.
+5. Its currents work. Every ring region touches the Great Current. At least one smaller current crosses from it into a neighbour.
+6. It has 6 or more loot spots, all in water a ship can reach.
+7. Its landmark exists as a simple shape at real size. It is about 50 m or taller, or it carries a light. It can be seen over the curve of the planet from the border with each neighbour.
+8. Its beacon exists as a position and a placeholder light.
+9. It renders on the sphere with placeholder materials, which may be shared at this rung.
+
+| Region | Blocked-out shapes |
+|---|---|
+| The Ice Crown | Rings of floes around a crown of ice spires at the pole, with lanes between the rings. |
+| The Fjords | Tall valley walls around narrow fjords. A cliff at the head of the main fjord carries the falls. |
+| Mistwood | Low, flat islands with rooty shores, separated by still channels. The fallen Hollow Cedar is a log you can sail through. |
+| The Spires | A cluster of sheer needles rising from the sea, with the Needle the tallest. |
+| The Narrows | Two long, continuous walls with a slot between them. The Gorge has one way in and one way out. |
+| The Basalt Stacks | Column cliffs and sea stacks, with a natural arch you can sail under. |
+| The Kelp Shallows | Low islets on wide shallows. The Kelp Cathedral's columns rise above the surface. |
+| Blossom Run | Rolling hills cut by a wide river valley. The Great Cherry stands on a hilltop. |
+| The Glass Sea | A wide, open sea with a few low isles and sand shallows. Glasswater is a ringed pool at the heart. |
+| The Jade Shoals | Sandbars and low dunes cut by channels, with one tall dune for the beacon. |
+| The Coral Atolls | Rings of low islets around lagoons. The Great Reef is the biggest ring, with gaps. |
+| The Spice Isles | Rounded hills with a sheltered cove under the tallest one. |
+| The Fire Archipelago | A volcanic cone with a caldera you can sail into, surrounded by smaller black islands. |
+| The Weeping Isle | One huge dome-shaped island with steep cliffs and a few rocks around it. |
+| The Mangrove Labyrinth | A low maze of root islands cut by narrow channels. The Root Gate is at its heart. |
+| The Maelstrom | A ring of cliffs around a wide whirlpool basin, with the Eye standing at the centre. |
+
+**Mechanics, done when each works in the simulation, with debug visuals where it can't be seen yet:**
+- **Sailing:**
+  - Ships sail great circles on the sphere at up to 14.5 m/s.
+  - Speed follows the point of sail. Sailing upwind is at most 25% slower.
+  - Ships turn, and they run aground on land and shallows.
+  - Currents carry ships.
+- **The gust:** every ship has it. It gives a burst of speed and a hop off the water, then recharges.
+- **Wind:** wind varies over the planet. It is calm in the lee of islands, and weather systems bend it.
+- **Tides:**
+  - The sea level rises and falls during a match.
+  - In every region whose portrait mentions tides, at least one passage opens and closes.
+- **Day and night:**
+  - A match starts at a random hour, and the sun moves about 4 hours during it.
+  - The tilt changes from match to match.
+  - Half the planet is always dark.
+- **Weather:**
+  - 3–5 systems drift over the planet.
+  - Each of the 6 kinds applies its one effect from the weather table.
+  - Regions tend toward their own weather.
+- **Weapons:**
+  - 6 classes × 5 rarities, all aimed.
+  - Projectiles have flight time. Ammo and reloads work.
+  - Ranges are tuned to the sightline of about 240 m.
+  - The broadside fires from both sides at once.
+- **The hotbar:** 5 slots, with select, swap and drop.
+- **Shield and hull:**
+  - Ships start with no shield, and damage takes the shield first.
+  - The Storm damages only the hull.
+  - Breaking the shield raises a break event.
+  - Damage events say how much went to the shield and how much to the hull.
+- **Consumables:**
+  - The 4 kinds use the values and use times in this file.
+  - Using one takes time, and the use can be interrupted.
+- **Loot:**
+  - Each match fills the loot spots with items, by rarity.
+  - Sinking ships drop their items.
+  - Ships pick items up.
+- **Territory:**
+  - Water a ship sails through takes its colour.
+  - Ships slowly repair in their own water.
+  - Holding a landmark gives the holder that region's perk. At least the four perks the rewrite had work: Fast Reload, Fast Repair, Cheap Deliveries and a damage perk mapped to its new region.
+- **Coins and gull deliveries:**
+  - Coins are earned in play and spent on deliveries.
+  - The gull flies each delivery to the ship.
+  - Coins reset when the match ends.
+- **The Gale:**
+  - The fleet is carried high over the planet.
+  - Each captain picks a region and dives into it.
+- **The Storm:**
+  - The first safe zone covers half the planet, and the Storm closes over 7 phases.
+  - The final circle lies inside a region.
+  - The finale lands in every region about equally often across seeds.
+- **20 ships:**
+  - 19 bot captains sail, loot, fight, use consumables and flee the Storm.
+  - A full headless match runs to a winner with no errors. This is a crash test only.
+- **Abilities:**
+  - Every ship carries one active ability (on a button with a cooldown) and one passive.
+  - The starter pair works.
+  - All 16 are defined. Each one beyond the starter pair works, or is listed in the backlog.
+- **The whale:**
+  - It surfaces and dives along its routes.
+  - The giant whale breach event can lift and flip ships.
+- **Rotating rule changes:** chosen by the date, with at least three working.
+- **Determinism:** a match replayed from its seed and inputs ends with the same state hash in Node, Chromium and WebKit.
+
+**The renderer, done when:**
+- **The planet is a real sphere on screen:**
+  - Terrain comes from `heightAt`, with placeholder materials that change by region and blend at borders.
+  - The water is a sphere with waves and a colour that changes with depth.
+  - The sky has the sun, moon and stars, placed from the hour and the tilt. The dark half of the planet is dark.
+- **The rewrite's look carries over:** high dynamic range, bloom and the colour grade.
+- **The chase camera keeps the local up.** Another ship's mast drops below the horizon at about 240 m.
+- **An orbit view shows the whole planet,** for the Gale and the lobby.
+- **The rewrite's caravel sails on the sphere,** rolling and pitching, with the shield aura as a shell around it.
+- **The rewrite's effects work on the sphere:** projectiles, splashes, impacts and wakes.
+- **The gull and the whale render.**
+- **Nights are readable,** with ship lanterns and beacons.
+- **Weather systems show** as simple cloud formations and fog.
+
+**Every screen (title, lobby, abilities, locker, rivals, career and chart, rank, settings, HUD, Gale drop, death and spectating, victory, and results with XP and rank progress), done when:**
+- It exists, can be reached and left, and shows real data.
+- It is built from the shared parts.
+- The lobby sits over the live 3D planet.
+
+**The shared interface parts, done when:**
+- **One set of tokens exists:** colours, type sizes, spacing, corner radii and shadows.
+- **The parts exist:** buttons, cards, tabs, panels, rarity frames, progress bars, toasts and pop-ups.
+- **A gallery page shows every part** at iPad and iPhone sizes.
+
+**The career, done when:**
+- **The league:**
+  - About 40 captains, each with a temperament and an emblem.
+  - Each match draws 19 of them near your skill.
+- **Skill and rank:**
+  - The hidden skill rating updates after every match.
+  - The ranks run from Iron to Legend, with tier floors.
+- **Levels:** XP earns levels, and levels unlock the abilities.
+- **The catalogue:** about 100 cosmetics are defined, and each has an unlock rule.
+- **The record:**
+  - The rivals record and the chart of sailed regions are kept.
+  - Everything is saved between sessions.
+
+**Sound, done when:**
+- Every mechanic above has a placeholder sound.
+- Every region has an ambience bed.
+- There is no music.
+
+### Who owns what in pass 1
+
+Agents build in parallel. Each owns its paths and touches nothing else, so pushes to main rarely collide. The rewrite's flat game, at `src/main.ts`, `src/*.ts` and `src/gfx/`, keeps running until the integration step replaces it. Port from it; don't break it.
+
+| Owner | Paths | Delivers |
+|---|---|---|
+| World | `src/sim/world/**`, `src/render/regions/**`, `dev/world.html` | The 16 regions on the sphere through the API in `src/sim/world/index.ts`, and their landmark meshes |
+| Simulation | `src/sim/**` except `world/`, `tests/sim/**` | Every mechanic in the list above, deterministic, on the sphere |
+| Planet renderer | `src/render/**` except `actors/` and `regions/`, `dev/planet.html` | Terrain, water, sky, light, weather, the grade and the cameras on the sphere |
+| Actors and effects | `src/render/actors/**`, `dev/actors.html` | The hero ship, the shield aura, projectiles and effects, the gull and the whale |
+| Interface | `src/ui/**`, `dev/ui.html` | The shared parts and every screen, driven by view models |
+| Career | `src/career/**`, `tests/career/**` | The league, skill, ranks, levels, abilities and cosmetics catalogue, and saving |
+| Sound | `src/audio/**`, `dev/audio.html` | Synthesised and recorded sound for every mechanic and region, with no music |
+| Integration | `src/main.ts`, `src/app/**`, `index.html`, `tests/capture/**` | Wiring it all together, and the reviewer's capture tools |
+
+Contracts between owners:
+- **`src/sim/world/index.ts` is the only way into the world.** Its exported names and signatures stay stable. Additions are fine.
+- **The renderer, the interface and the sound each define the view model or events they consume.** Integration adapts the simulation's state into them. The simulation never imports from them.
+- **Shared files** (PLAN.md, package.json, CREDITS.md and tests/run.ts) change only when needed. Rebase before pushing, and never force-push.
+
 ## Backlog
 
 Nothing yet.
