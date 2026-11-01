@@ -633,37 +633,50 @@ This pass gets everything to blocked out, with the core loop first.
 
 ### Pass 1: done when
 
-Pass 1 takes every item to **blocked out**. An item is done only when every line in its list is true.
+Pass 1 takes every item to **blocked out**. An item is done only when every line in its list is true. One thing is pulled forward from the Playable rung on purpose: screens are built from the shared parts from the start, so later passes don't have to rebuild them.
+
+**The base and the planet, done when:**
+- **The base runs:** `npm run typecheck` and `npm test` pass on the restored base at the new size.
+- **The size is right:** the radius is about 554 m, and a lap of the equator at 14.5 m/s takes about 4 minutes.
+- **The layout matches "Layout":**
+  - a cap at each pole and two staggered rings of seven, in the listed order;
+  - each ring region touches two regions in the other ring;
+  - the equator is the seam between the rings.
+- **The regions tile the sphere:** every point belongs to exactly one region. A test that samples at least 100,000 points finds none unassigned.
+- **A landmark is always in view:** from at least 95% of sampled sea points, at 8 m up, a landmark or a beacon is above the horizon, by day and by night.
 
 **Every region (all 16), done when:**
 1. Its terrain comes from its own module, `src/sim/world/regions/<id>.ts`. That module is the region's own code, not a shared height function with different numbers or tints.
-2. Its shapes read as the skyline in its portrait (see the table below), at blockout fidelity and at real size.
-3. Land, shallows or features spread across the whole region, from border to border. No water in it is more than about 15 seconds of sailing (about 200 m) from land, shallows, a landmark or a loot spot.
-4. It blends into every neighbour across a band. Heights and features cross smoothly, with no seam, wall or trench along the border.
-5. Its currents work. Every ring region touches the Great Current. At least one smaller current crosses from it into a neighbour.
+2. Its shapes read as the skyline in its portrait (see the table below), at blockout fidelity and at real size. This is judged from an orbit capture and from a capture 8 m up at each border.
+3. Land, shallows or features spread across the whole region, from border to border. Outside the current lanes, every straight course meets land, shallows, cover or loot at least every 217 m, which is 15 s at top speed. A test reports the longest gap.
+4. It blends into every neighbour across a band at least 100 m wide, where both regions' landforms appear mixed. The band is never a seam, a wall, a trench or a flat strip of open water.
+5. Its currents work:
+   - The Great Current is a closed loop around the equator, and every ring region touches it.
+   - At least one smaller current crosses from the region into a neighbour.
+   - Ships on any current go measurably faster than in still water nearby.
 6. It has 6 or more loot spots, all in water a ship can reach.
-7. Its landmark exists as a simple shape at real size. It is about 50 m or taller, or it carries a light. It can be seen over the curve of the planet from the border with each neighbour.
+7. Its landmark exists as a simple shape at real size. It is about 50 m or taller, or it carries a light. It can be seen over the curve of the planet from every point of each border it shares with a neighbour.
 8. Its beacon exists as a position and a placeholder light.
-9. It renders on the sphere with placeholder materials, which may be shared at this rung.
+9. It renders on the sphere with a placeholder material set. Sets may be shared between regions at this rung, but each region picks its own, and they blend at borders.
 
 | Region | Blocked-out shapes |
 |---|---|
 | The Ice Crown | Rings of floes around a crown of ice spires at the pole, with lanes between the rings. |
-| The Fjords | Tall valley walls around narrow fjords. A cliff at the head of the main fjord carries the falls. |
-| Mistwood | Low, flat islands with rooty shores, separated by still channels. The fallen Hollow Cedar is a log you can sail through. |
-| The Spires | A cluster of sheer needles rising from the sea, with the Needle the tallest. |
+| The Fjords | Tall U-shaped valley walls around narrow fjords. A cliff at the head of the main fjord carries the falls, with a sailable gap behind the curtain. |
+| Mistwood | Giant cedar trunks rising above a fog line, on low, flat islands with rooty shores, separated by still channels. The fallen Hollow Cedar is a log you can sail through, and it carries a light so neighbours can see it. |
+| The Spires | A cluster of sheer needles rising from the sea. The Needle is the tallest, and it can be seen from every northern ring region. |
 | The Narrows | Two long, continuous walls with a slot between them. The Gorge has one way in and one way out. |
 | The Basalt Stacks | Column cliffs and sea stacks, with a natural arch you can sail under. |
 | The Kelp Shallows | Low islets on wide shallows. The Kelp Cathedral's columns rise above the surface. |
-| Blossom Run | Rolling hills cut by a wide river valley. The Great Cherry stands on a hilltop. |
+| Blossom Run | Rolling hills cut by a wide, sailable river valley. The Great Cherry stands on a hilltop. |
 | The Glass Sea | A wide, open sea with a few low isles and sand shallows. Glasswater is a ringed pool at the heart. |
 | The Jade Shoals | Sandbars and low dunes cut by channels, with one tall dune for the beacon. |
 | The Coral Atolls | Rings of low islets around lagoons. The Great Reef is the biggest ring, with gaps. |
 | The Spice Isles | Rounded hills with a sheltered cove under the tallest one. |
 | The Fire Archipelago | A volcanic cone with a caldera you can sail into, surrounded by smaller black islands. |
-| The Weeping Isle | One huge dome-shaped island with steep cliffs and a few rocks around it. |
-| The Mangrove Labyrinth | A low maze of root islands cut by narrow channels. The Root Gate is at its heart. |
-| The Maelstrom | A ring of cliffs around a wide whirlpool basin, with the Eye standing at the centre. |
+| The Weeping Isle | One huge dome-shaped island with steep cliffs that fills most of the region, so its cliff feet come near every border, with rocks and pools between. |
+| The Mangrove Labyrinth | A low maze of root islands cut by narrow channels, under a low canopy you sail beneath. The Root Gate is an arch you sail through. |
+| The Maelstrom | A ring of cliffs around a wide whirlpool basin, with the Eye standing at the centre. The whirlpool is a working current that spirals ships toward the Eye. |
 
 **Mechanics, done when each works in the simulation, with debug visuals where it can't be seen yet:**
 - **Sailing:**
@@ -675,7 +688,11 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 - **Wind:** wind varies over the planet. It is calm in the lee of islands, and weather systems bend it.
 - **Tides:**
   - The sea level rises and falls during a match.
-  - In every region whose portrait mentions tides, at least one passage opens and closes.
+  - At least one passage opens and closes in each of four regions:
+    - the Basalt Stacks: the passage behind the arch;
+    - the Jade Shoals: bars and channels;
+    - the Coral Atolls: reef gaps;
+    - the Mangrove Labyrinth: root channels.
 - **Day and night:**
   - A match starts at a random hour, and the sun moves about 4 hours during it.
   - The tilt changes from match to match.
@@ -683,7 +700,9 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 - **Weather:**
   - 3–5 systems drift over the planet.
   - Each of the 6 kinds applies its one effect from the weather table.
-  - Regions tend toward their own weather.
+  - Regions tend toward their own weather: most systems over a region are its listed kinds.
+  - Snow appears only near the Ice Crown, and ash only downwind of the Fire Archipelago.
+- **Night:** at night, enemies beyond about 150 m are flagged as lantern-only, with no name or health bar.
 - **Weapons:**
   - 6 classes × 5 rarities, all aimed.
   - Projectiles have flight time. Ammo and reloads work.
@@ -696,7 +715,7 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
   - Breaking the shield raises a break event.
   - Damage events say how much went to the shield and how much to the hull.
 - **Consumables:**
-  - The 4 kinds use the values and use times in this file.
+  - The 4 kinds use the values, caps, use times and stack sizes in this file.
   - Using one takes time, and the use can be interrupted.
 - **Loot:**
   - Each match fills the loot spots with items, by rarity.
@@ -705,7 +724,12 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 - **Territory:**
   - Water a ship sails through takes its colour.
   - Ships slowly repair in their own water.
-  - Holding a landmark gives the holder that region's perk. At least the four perks the rewrite had work: Fast Reload, Fast Repair, Cheap Deliveries and a damage perk mapped to its new region.
+  - Holding a landmark gives the holder that region's perk.
+  - At least the four perks the rewrite had work, in their new regions:
+    - Fast Reload (the Basalt Stacks);
+    - Fast Repair (the Fjords);
+    - Cheap Deliveries (the Glass Sea);
+    - Fire Shot (the Fire Archipelago).
 - **Coins and gull deliveries:**
   - Coins are earned in play and spent on deliveries.
   - The gull flies each delivery to the ship.
@@ -715,15 +739,15 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
   - Each captain picks a region and dives into it.
 - **The Storm:**
   - The first safe zone covers half the planet, and the Storm closes over 7 phases.
-  - The final circle lies inside a region.
-  - The finale lands in every region about equally often across seeds.
+  - The final circle lies wholly within one region and contains some of its land, never only open water.
+  - Over 1,600 seeds, each region hosts within ±30% of 1/16 of the finales.
 - **20 ships:**
   - 19 bot captains sail, loot, fight, use consumables and flee the Storm.
   - A full headless match runs to a winner with no errors. This is a crash test only.
 - **Abilities:**
   - Every ship carries one active ability (on a button with a cooldown) and one passive.
-  - The starter pair works.
-  - All 16 are defined. Each one beyond the starter pair works, or is listed in the backlog.
+  - The starter pair, Repair and Salvage, works.
+  - All 16 abilities in `src/sim/abilities.ts` work in the simulation.
 - **The whale:**
   - It surfaces and dives along its routes.
   - The giant whale breach event can lift and flip ships.
@@ -732,7 +756,7 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 
 **The renderer, done when:**
 - **The planet is a real sphere on screen:**
-  - Terrain comes from `heightAt`, with placeholder materials that change by region and blend at borders.
+  - Terrain comes from `heightAt`. Each region picks a placeholder material set through the rewrite's ported material system. Sets may be shared at this rung, and they blend at borders.
   - The water is a sphere with waves and a colour that changes with depth.
   - The sky has the sun, moon and stars, placed from the hour and the tilt. The dark half of the planet is dark.
 - **The rewrite's look carries over:** high dynamic range, bloom and the colour grade.
@@ -741,13 +765,35 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 - **The rewrite's caravel sails on the sphere,** rolling and pitching, with the shield aura as a shell around it.
 - **The rewrite's effects work on the sphere:** projectiles, splashes, impacts and wakes.
 - **The gull and the whale render.**
-- **Nights are readable,** with ship lanterns and beacons.
+- **Nights are readable:** at night, every lantern within 240 m and every beacon shows in captures.
 - **Weather systems show** as simple cloud formations and fog.
 
-**Every screen (title, lobby, abilities, locker, rivals, career and chart, rank, settings, HUD, Gale drop, death and spectating, victory, and results with XP and rank progress), done when:**
-- It exists, can be reached and left, and shows real data.
-- It is built from the shared parts.
-- The lobby sits over the live 3D planet.
+**Every screen, done when it exists, can be reached and left, is built from the shared parts, and shows this real data:**
+- **Title:** the game's name, then a tap to start, after the loading progress.
+- **Lobby:**
+  - It sits over the live 3D planet, with your ship on the water and your cosmetics on.
+  - It shows your level and rank, and has the play button.
+  - It links to every menu screen.
+- **Abilities:** all 16, with locked and unlocked states and the level each unlocks at. You pick one active and one passive.
+- **Locker:** about 100 cosmetics by kind, with locked and unlocked states and their unlock rules. You equip them on your ship.
+- **Rivals:** about 40 captains with their emblems and temperaments, and your record against each one.
+- **Career and chart:**
+  - Matches played, wins, top 5s and kills.
+  - The chart of the 16 regions, with the ones you've sailed filled in.
+- **Rank:** your rank and step, progress to the next, and every rank from Iron to Legend.
+- **Settings:** sound volumes, haptics, quality and controls. Changes apply at once and are saved.
+- **The HUD:**
+  - shield and hull;
+  - the hotbar;
+  - the ability and gust buttons with their cooldowns;
+  - the map;
+  - the Storm timer;
+  - ships left and kills;
+  - hit markers, and damage numbers in blue for shield and white for hull.
+- **Gale drop:** the globe with its day and night halves, the regions you can pick, the time left to dive, and the dive itself.
+- **Death and spectating:** who sank you and how, then spectating the ship that did, with a way back to results.
+- **Victory:** a full-screen win moment.
+- **Results:** this match's placement, kills and XP gained, plus level and rank progress, with new unlocks.
 
 **The shared interface parts, done when:**
 - **One set of tokens exists:** colours, type sizes, spacing, corner radii and shadows.
@@ -757,11 +803,13 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 **The career, done when:**
 - **The league:**
   - About 40 captains, each with a temperament and an emblem.
-  - Each match draws 19 of them near your skill.
+  - Each match draws 19 of them near your skill. Rivals are drawn more often.
+  - Captains learn your habits and hold grudges.
 - **Skill and rank:**
   - The hidden skill rating updates after every match.
-  - The ranks run from Iron to Legend, with tier floors.
-- **Levels:** XP earns levels, and levels unlock the abilities.
+  - Rank comes from the rating: six tiers of three steps each, then Admiral and Legend.
+  - You never drop below a tier you've reached.
+- **Levels:** XP earns levels. The 16 abilities unlock across roughly the first 40 levels.
 - **The catalogue:** about 100 cosmetics are defined, and each has an unlock rule.
 - **The record:**
   - The rivals record and the chart of sailed regions are kept.
@@ -771,6 +819,17 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 - Every mechanic above has a placeholder sound.
 - Every region has an ambience bed.
 - There is no music.
+
+**Integration, done when:**
+- **The loop runs end to end:** title → lobby → Gale → match → death or victory → results → lobby, with the career updated after each match.
+- **It runs on devices:** `npm run ios` builds, and it runs on an iPad.
+- **The capture tools work.** From a seed, they produce:
+  - frame strips of a scripted moment, with a log of every sound and screen effect that fired;
+  - fixed scenes in each region at dawn, midday, dusk and night;
+  - blind-test shots;
+  - lap-test frames;
+  - interface transition strips at iPad and iPhone sizes.
+- **Performance is measured** on a device or the simulator, and the numbers are recorded in the backlog.
 
 ### Who owns what in pass 1
 
@@ -794,4 +853,4 @@ Contracts between owners:
 
 ## Backlog
 
-Nothing yet.
+- **Naming question for the owner:** "Quick Hands" is both the Weeping Isle's perk and a passive ability. One of them needs a new name.
