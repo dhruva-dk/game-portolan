@@ -8,6 +8,11 @@ import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { DebugStage } from './debugStage.ts';
+import { createActors, type Actors } from '../render/actors/index.ts';
+import { STARTER_LOOK } from '../career/index.ts';
+import { R } from '../sim/sphere.ts';
+import { cosmeticsOf, sceneActors } from './views.ts';
+import type { V3 } from '../sim/math.ts';
 import { sceneFrom, sunFor, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, type ScreenName } from './flow.ts';
 
@@ -23,7 +28,12 @@ export class App {
   readonly sound: MomentSound;
   readonly loop: Loop;
   readonly stage: DebugStage;
+  readonly actors: Actors;
   readonly overlay: HTMLElement;
+  /** The interface's layer, and the juice library's (markers, numbers, flashes) above it. */
+  readonly uiLayer: HTMLElement;
+  readonly juiceLayer: HTMLElement;
+  private sun: V3 = { x: 1, y: 0, z: 0 };
   readonly options: AppOptions;
   screen: ScreenName = 'boot';
   /** The fixed scene the hook jumped to, if any. */
@@ -33,8 +43,12 @@ export class App {
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
     this.options = options;
     this.overlay = overlay;
-    this.juice = new Juice({ hud: overlay, seed: 1 });
+    this.uiLayer = layer(overlay, 'app-ui');
+    this.juiceLayer = layer(overlay, 'app-juice');
+    this.juiceLayer.style.pointerEvents = 'none';
+    this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
     this.stage = new DebugStage(canvas);
+    this.actors = createActors(this.stage.scene, { radius: R });
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
@@ -56,7 +70,9 @@ export class App {
   }
 
   /** Resolves when the stage has everything it needs for the current view. */
-  async whenLoaded(): Promise<void> {}
+  async whenLoaded(): Promise<void> {
+    await this.actors.ready;
+  }
 
   go(name: ScreenName | string, _model?: unknown): void {
     if (!isScreen(name)) throw new RangeError(`go: no screen "${name}"`);
@@ -71,8 +87,9 @@ export class App {
     const s = sceneFrom(input);
     this.view = s;
     const sun = sunFor(s.pos, s.hour, s.tilt);
+    this.sun = sun;
     this.stage.setScene(s, new THREE.Vector3(sun.x, sun.y, sun.z));
-    this.overlay.replaceChildren();
+    this.uiLayer.replaceChildren();
     return s;
   }
 
@@ -133,16 +150,28 @@ export class App {
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
+    if (this.view) {
+      const look = cosmeticsOf(STARTER_LOOK);
+      this.actors.update(sceneActors(this.view, f.clock, this.sun, look, this.view.camera === 'chase' ? 14.5 : 0), f.dt, this.stage.camera);
+    }
     this.stage.render();
   }
 
   private renderOverlay(): void {
     // placeholder screens until the interface lands
-    const o = this.overlay;
+    const o = this.uiLayer;
     o.replaceChildren();
     const panel = document.createElement('div');
     panel.style.cssText = 'position:fixed;left:24px;top:24px;padding:16px 20px;background:#f3e7cc;border-radius:12px;font:600 20px system-ui;color:#2b2118';
     panel.textContent = this.screen;
     o.append(panel);
   }
+}
+
+function layer(parent: HTMLElement, cls: string): HTMLElement {
+  const d = document.createElement('div');
+  d.className = cls;
+  d.style.cssText = 'position:fixed;inset:0;';
+  parent.append(d);
+  return d;
 }

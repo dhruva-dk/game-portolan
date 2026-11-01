@@ -75,7 +75,7 @@ export class DebugStage {
     this.sun.position.copy(sunDir).multiplyScalar(5000);
     const day = Math.max(0.05, sunDir.dot(up) + 0.2);
     this.scene.background = new THREE.Color().setHSL(0.58, 0.45, Math.min(0.75, day * 0.7));
-    this.ship.visible = s.ship;
+    this.ship.visible = false;
     if (s.ship) {
       this.ship.position.copy(up).multiplyScalar(R + 1);
       this.ship.lookAt(this.ship.position.clone().add(fwd));
