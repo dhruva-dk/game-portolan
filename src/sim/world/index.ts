@@ -115,6 +115,12 @@ export function regionMix(p: V3, out: RegionMix = { a: 0, b: 0, t: 0 }): RegionM
   return out;
 }
 
+/** Tides move the sea level between -TIDE_AMPLITUDE and +TIDE_AMPLITUDE metres. The simulation owns the clock. */
+export const TIDE_AMPLITUDE = 1;
+
+/** A ship runs aground where the ground is less than DRAFT metres below the sea level. Tidal sills sit between -2.5 and -0.5 m. */
+export const DRAFT = 1.5;
+
 /** Height of the ground above mean sea level in metres: positive is land, negative is the sea floor. */
 export function heightAt(p: V3): number {
   // Placeholder: one round island at each region's centre on a 30 m deep sea.
