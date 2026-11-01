@@ -1,103 +1,132 @@
-import { spill } from './economy.ts';
-import { afloatChest } from './items.ts';
-import { rngInt, set } from './math.ts';
-import { AREA_Q } from './sphere.ts';
-import { EVENT, PHASE, STREAM, afloat, chronicle, emit, type Entry, type MatchState } from './state.ts';
-import { END, FITTING, MOMENTS, TREASURE } from './tables.ts';
-import { founder } from './territory.ts';
+// Sinking and the end of the match: a ship at zero hull sinks and spills its hold; the last ship afloat wins.
+// The result is what the career, the interface and the captains' learning read afterwards.
+import { spill } from './items.ts';
+import { hasPassive } from './perks.ts';
+import { CAUSE, EVENT, PHASE, SHIPS, TICK, emit, type Expect, type MatchState } from './state.ts';
+import { COINS, POWERS } from './tables.ts';
+import { founder, squareMetres } from './territory.ts';
 
-const PLAYER = 0;
-const RIVALRY: readonly number[] = [EVENT.broken, EVENT.lead, EVENT.sunk];
-
-export const over = (state: MatchState): boolean => state.winner >= 0;
-
+/** Sinks ship i. `by` is the ship credited with it (-1 for none). */
 export function sink(state: MatchState, i: number, by: number, cause: number): void {
   const ship = state.ships[i];
-  if (!afloat(ship) || over(state)) return;
-  const bounty = END.bounty * (state.leader === i ? 2 : 1);
-  ship.phase = PHASE.sunk;
-  ship.speed = 0;
-  ship.rate = 0;
-  ship.prize = -1;
-  ship.holding = 0;
-  set(ship.was, ship.pos.x, ship.pos.y, ship.pos.z);
-  set(ship.wasHead, ship.head.x, ship.head.y, ship.head.z);
-  if (ship.purse > 0) spill(state, ship.pos, ship.purse, i);
-  ship.purse = 0;
-  founder(state, i);
-  state.sunk.push({ ship: i, by, cause, tick: state.tick });
-  emit(state, EVENT.sunk, i, by, ship.pos, cause);
-  chronicle(state, EVENT.sunk, i, by, cause);
-  if (by >= 0 && by !== i) {
-    state.ships[by].bank += bounty;
-    emit(state, EVENT.bounty, by, i, ship.pos, bounty);
-  }
-  dropChest(state, i);
+  if (ship.phase === PHASE.sunk) return;
   let left = 0;
-  for (const s of state.ships) if (afloat(s)) left++;
-  if (left === 1) win(state);
-}
-
-function dropChest(state: MatchState, i: number): void {
-  const ship = state.ships[i];
-  let n = 0;
-  for (const f of ship.fittings) if (f.kind !== FITTING.none) n++;
-  if (n === 0) return;
-  let k = rngInt(state.rng[STREAM.loot], n);
-  for (const f of ship.fittings) {
-    if (f.kind === FITTING.none) continue;
-    if (k-- > 0) continue;
-    afloatChest(state, ship.pos, f.tier, f, i);
-    f.kind = FITTING.none;
-    f.tier = 0;
-    return;
+  for (let j = 0; j < SHIPS; j++) if (state.ships[j].phase !== PHASE.sunk) left++;
+  ship.place = left;
+  ship.hull = 0;
+  ship.shield = 0;
+  ship.by = by;
+  ship.cause = cause;
+  ship.sunk = state.tick;
+  ship.use = -1;
+  ship.burn = 0;
+  spill(state, i);
+  founder(state, i);
+  ship.phase = PHASE.sunk;
+  state.sunk.push({ ship: i, by, cause, tick: state.tick });
+  emit(state, EVENT.sink, i, by, ship.pos, { item: cause, amount: ship.place });
+  if (by >= 0 && by !== i) {
+    const k = state.ships[by];
+    k.kills++;
+    k.coins += COINS.kill;
+    emit(state, EVENT.coins, by, i, k.pos, { amount: COINS.kill, item: 4 });
+    if (hasPassive(k, 'salvage') && k.phase !== PHASE.sunk) k.shield = Math.min(100, k.shield + POWERS.salvage);
   }
 }
 
-function win(state: MatchState): void {
-  const w = state.ships.findIndex(afloat), ship = state.ships[w];
-  state.winner = w;
-  emit(state, EVENT.win, w, -1, ship.pos, ship.held / AREA_Q);
-  chronicle(state, EVENT.win, w, -1, ship.held / AREA_Q);
+/** Sinks every ship at zero hull, then sees whether the match is won. */
+export function settle(state: MatchState): void {
+  for (let i = 0; i < SHIPS; i++) {
+    const ship = state.ships[i];
+    if (ship.phase !== PHASE.sea || ship.hull > 0) continue;
+    // the Storm and the elements take the credit away from a hitter who is long gone
+    const recent = state.tick - ship.lastHit < Math.round(8 / TICK);
+    const by = ship.lastBy >= 0 && (recent || ship.cause < CAUSE.storm) ? ship.lastBy : -1;
+    sink(state, i, by, ship.cause);
+  }
+  if (state.winner >= 0) return;
+  let alive = 0, last = -1;
+  for (let i = 0; i < SHIPS; i++) {
+    if (state.ships[i].phase !== PHASE.sunk) {
+      alive++;
+      last = i;
+    }
+  }
+  if (alive <= 1) {
+    const w = last >= 0 ? last : state.sunk.length > 0 ? state.sunk[state.sunk.length - 1].ship : 0;
+    state.winner = w;
+    state.ships[w].place = 1;
+    emit(state, EVENT.win, w, -1, state.ships[w].pos, {});
+  }
 }
 
-export interface Finish {
-  ship: number;
+export interface ShipResult {
+  /** 1 is the winner. */
   place: number;
-  tick: number;
+  kills: number;
+  /** Damage dealt, shield and hull. */
+  dealt: number;
+  /** Indices of the regions sailed through, in REGIONS order. */
+  regions: number[];
+  /** Seconds afloat from the start. */
+  survived: number;
+  /** Who sank this ship (-1: the sea, the Storm, or nobody), and what with: a weapon kind or a CAUSE. */
   by: number;
   cause: number;
-  claimed: number;
-  sank: number;
-  bank: number;
-  treasure: number;
+  coins: number;
+  /** Square metres held at the end. A sunk ship's water goes free, so it holds none. */
+  held: number;
+  captain: boolean;
+}
+
+/** What a captain learnt of the player this match, carried back to the career. */
+export interface LearntMind {
+  dive: Expect;
+  loop: Expect;
+  raids: Expect;
+  run: Expect;
+  storm: Expect;
 }
 
 export interface MatchResult {
-  order: number[];
-  ships: Finish[];
-  timeline: Entry[];
+  seed: number;
+  rule: number;
   ticks: number;
+  winner: number;
+  ships: ShipResult[];
+  /** For each ship, what its captain learnt of the player (null for the player's own ship). */
+  minds: (LearntMind | null)[];
 }
 
+const bits = (mask: number): number[] => {
+  const out: number[] = [];
+  for (let r = 0; r < 16; r++) if ((mask & (1 << r)) !== 0) out.push(r);
+  return out;
+};
+
 export function result(state: MatchState): MatchResult {
-  if (!over(state)) throw new RangeError('result: the match is not over');
-  const order = [state.winner], end = state.sunk[state.sunk.length - 1].tick;
-  for (let k = state.sunk.length - 1; k >= 0; k--) order.push(state.sunk[k].ship);
-  const ships = state.ships.map((ship, i): Finish => {
-    const place = order.indexOf(i) + 1, fate = state.sunk.find((s) => s.ship === i);
-    let claimed = 0;
-    for (const e of state.timeline) if (e.ship === i && (e.kind === EVENT.home || e.kind === EVENT.loop)) claimed += e.amount;
-    return {
-      ship: i, place, tick: fate ? fate.tick : end, by: fate ? fate.by : -1, cause: fate ? fate.cause : -1, claimed,
-      sank: state.sunk.filter((s) => s.by === i).length, bank: ship.bank,
-      treasure: Math.floor(ship.bank * TREASURE.share * TREASURE.place[place - 1]),
-    };
-  });
-  const gone = state.timeline.findIndex((e) => e.kind === EVENT.sunk && e.ship === PLAYER);
-  const mine = state.timeline.filter((e, k) => (gone < 0 || k <= gone) && (e.ship === PLAYER || (RIVALRY.includes(e.kind) && e.by === PLAYER)));
-  const loops = mine.filter((e) => e.kind === EVENT.loop).sort((a, b) => b.amount - a.amount || a.tick - b.tick);
-  const kept = loops.slice(0, MOMENTS.loops);
-  const timeline = mine.filter((e) => e.kind !== EVENT.loop || kept.includes(e)).map((e) => ({ ...e }));
-  return { order, ships, timeline, ticks: end };
+  return {
+    seed: state.seed,
+    rule: state.rule,
+    ticks: state.tick,
+    winner: state.winner,
+    ships: state.ships.map((s) => ({
+      place: s.phase === PHASE.sunk ? s.place : state.winner >= 0 && state.winner !== state.ships.indexOf(s) ? s.place : 1,
+      kills: s.kills,
+      dealt: Math.round(s.dealt),
+      regions: bits(s.regions),
+      survived: (s.phase === PHASE.sunk ? s.sunk : state.tick) * TICK,
+      by: s.by,
+      cause: s.cause,
+      coins: s.coins,
+      held: squareMetres(s.held),
+      captain: s.captain.on,
+    })),
+    minds: state.ships.map((s) => (s.captain.on ? {
+      dive: { ...s.captain.dive }, loop: { ...s.captain.loop }, raids: { ...s.captain.raids }, run: { ...s.captain.run },
+      storm: { ...s.captain.storm },
+    } : null)),
+  };
 }
+
+export const over = (state: MatchState): boolean => state.winner >= 0;

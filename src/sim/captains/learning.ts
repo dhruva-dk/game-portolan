@@ -1,53 +1,50 @@
-import { EVENT, KNOW, afloat, fullHull, type MatchState, type Ship } from '../state.ts';
-import { HOME } from '../tables.ts';
-import type { Sight } from '../visibility.ts';
-import type { Style } from './temperaments.ts';
+// What captains learn of the player, match after match. Each captain watches the player and keeps an expectation
+// (a value and a confidence) of five habits: which region they dive to, how big the loops they claim, how often
+// they cut others' trails, how low their hull runs before they turn to heal or flee, and how long they linger in
+// the Storm. The career carries these from match to match (setup fleet[i].mind in, result().minds out).
+import { PHASE, PLAYER, TICK, type Expect, type MatchState } from '../state.ts';
+import { EVENT } from '../state.ts';
+import { inStorm } from '../storm.ts';
+import { seen, SEEN } from '../visibility.ts';
 
-type Captain = Ship['captain'];
+export const WATCH = { rate: 0.35, gain: 0.25, raid: 1, sighted: 0.5 } as const;
 
-export const WATCH = { rate: 0.5, raid: 5, wounded: 0.85, scrap: Math.PI * HOME.radius * HOME.radius } as const;
+/** Folds one observation into an expectation. */
+export function learn(e: Expect, x: number, rate: number = WATCH.rate): void {
+  e.value = e.confidence > 0 ? e.value + rate * (x - e.value) : x;
+  e.confidence = Math.min(1, e.confidence + WATCH.gain * (1 - e.confidence) + 0.05);
+}
 
-const know = (c: Captain, bit: number): void => {
-  c.knows |= bit;
-  c.learnt |= bit;
-};
-
-export function watch(state: MatchState, i: number, sight: Sight): void {
-  const ship = state.ships[i], c = ship.captain, p = state.ships[0];
-  if (!c.watches || !afloat(ship)) return;
-  for (const e of state.events) {
-    if (e.kind !== EVENT.loop || e.ship !== 0 || e.amount < WATCH.scrap) continue;
-    const r = Math.sqrt(e.amount / Math.PI);
-    c.loop = (c.knows & KNOW.loop) !== 0 ? c.loop + WATCH.rate * (r - c.loop) : r;
-    c.seen++;
-    know(c, KNOW.loop);
+/** A region is not a quantity: a repeat raises confidence, a change resets it. */
+function learnRegion(e: Expect, r: number): void {
+  if (e.confidence > 0 && e.value === r) e.confidence = Math.min(1, e.confidence + WATCH.gain);
+  else {
+    e.value = r;
+    e.confidence = 0.3;
   }
-  if ((sight.ships & 1) === 0) {
-    c.eyed = 0;
-    return;
-  }
+}
+
+/** Captain i watches the player through this tick's events. */
+export function watch(state: MatchState, i: number): void {
+  const c = state.ships[i].captain, p = state.ships[PLAYER];
+  if (!c.watches || p.captain.on || i === PLAYER) return;
   for (const e of state.events) {
-    if (e.kind === EVENT.breakOff && e.ship === 0) {
-      c.breakOff = e.by;
-      know(c, KNOW.breakOff);
-    } else if (e.kind === EVENT.broken && e.by === 0) {
-      c.raids = ((c.knows & KNOW.raids) !== 0 ? Math.max(0, c.raids) : 0) + WATCH.raid;
-      know(c, KNOW.raids);
+    if (e.ship !== PLAYER && e.by !== PLAYER) continue;
+    if (e.kind === EVENT.landing && e.ship === PLAYER) learnRegion(c.dive, e.item);
+    else if (e.kind === EVENT.claim && e.ship === PLAYER && e.amount > 50) learn(c.loop, Math.sqrt(e.amount / 3.14159));
+    else if (e.kind === EVENT.cut && e.by === PLAYER) learn(c.raids, c.raids.value + WATCH.raid, 1);
+    else if (e.kind === EVENT.useStart && e.ship === PLAYER && p.hull < 90) learn(c.run, p.hull);
+  }
+  // the Storm: seconds the player lingers outside the circle, noted when they come back in
+  if (p.phase === PHASE.sea && (state.tick + i) % 15 === 0) {
+    const out = inStorm(state, p.pos);
+    if (out) c.felt += 15 * TICK;
+    else if (c.felt > 0) {
+      learn(c.storm, c.felt);
+      c.felt = 0;
     }
   }
-  if ((sight.hulls & 1) === 0 || !afloat(p)) return;
-  const h = p.hull / fullHull(p.form, p.fittings), homing = p.homing ? 1 : 0;
-  if (homing && !(c.eyed & 1) && h < WATCH.wounded) {
-    const at = 100 * h;
-    c.run = (c.knows & KNOW.run) !== 0 && c.run > 0 ? c.run + WATCH.rate * (at - c.run) : at;
-    know(c, KNOW.run);
-  }
-  c.eyed = homing;
+  // being seen sharpens a grudge
+  if ((state.tick + i) % 30 === 0 && p.phase === PHASE.sea) c.eyed = (seen(state, i, PLAYER) & SEEN.visible) !== 0;
 }
 
-export function lure(c: Captain, style: Style): number {
-  if (c.gentle) return -0.5;
-  return 0.5 + 0.4 * style.fight + 0.4 * Math.min(1, style.raid) + 0.5 * style.stalk + 0.3 * Math.min(1, style.edge) - 0.8 * style.guard + 0.2 * c.grudge;
-}
-
-export const pressAt = (c: Captain): number => ((c.knows & KNOW.run) !== 0 && c.run > 0 ? Math.max(0.7, c.run / 100 + 0.1) : 0.7);

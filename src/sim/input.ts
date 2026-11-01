@@ -1,68 +1,109 @@
-import { TERRITORY } from './sphere.ts';
-import { SAIL, type Ship } from './state.ts';
-
-export const FLAG = {
-  breakOff: 1,
-  headHome: 2,
-  callGull: 4,
-  useAimed: 8,
-  dive: 16,
-} as const;
-const ALL_FLAGS = 31;
-
-export const STEER_MAX = 127;
+// What a ship's helm asks for in one tick, from the player's controls or a captain's mind, and the recorder
+// that turns a stream of inputs into a compact replay. A match replayed from its seed and its recording ends
+// with the same state hash.
+import type { V3 } from './math.ts';
 
 export interface ShipInput {
+  /** The turn wanted, in radians from the current heading: positive toward starboard. Beyond about 1.8 she slows to come round. */
   steer: number;
-  sail: number;
-  flags: number;
-  consumable: number;
-  aim: number;
-  chestPick: number;
-  course: number[] | null;
+  /** Sail set, 0 (furled) to 1 (full). */
+  throttle: number;
+  /** Fire the selected weapon, or use the selected consumable. Held fires again as soon as it can. */
+  fire: boolean;
+  /** Where to aim: a point on the sphere (unit vector) and its height above the sea. */
+  aim: V3;
+  aimY: number;
+  /** Select a hotbar slot (0–4), or -1 to keep the current one. */
+  select: number;
+  /** Swap the selected slot with this one (0–4), or -1. */
+  swap: number;
+  /** Drop the selected item. */
+  drop: boolean;
+  /** Take the nearest loot in reach even when the hotbar is full: it swaps with the selected slot. */
+  take: boolean;
+  /** Reload now. */
+  reload: boolean;
+  gust: boolean;
+  /** Use the active ability. */
+  ability: boolean;
+  /** Leave the Gale and dive; while gliding, hold to dive steeply. */
+  dive: boolean;
+  /** Call a gull delivery: parcel tier 0–2, or -1. */
+  hail: number;
 }
 
 export function idleInput(): ShipInput {
-  return { steer: 0, sail: 0, flags: 0, consumable: -1, aim: -1, chestPick: -1, course: null };
+  return {
+    steer: 0, throttle: 1, fire: false, aim: { x: 0, y: 0, z: 1 }, aimY: 0, select: -1, swap: -1, drop: false, take: false,
+    reload: false, gust: false, ability: false, dive: false, hail: -1,
+  };
 }
 
-export function applyControls(ship: Ship, input: ShipInput): void {
-  ship.sail = Math.min(SAIL.full, Math.max(SAIL.reefed, ship.sail + input.sail));
-  if (input.course !== null) ship.course = input.course.slice();
+/** Copies an input. Numbers gain + 0, which turns -0 into 0: JSON does the same, so a replay matches the live match. */
+export function copyInput(out: ShipInput, a: ShipInput): ShipInput {
+  out.steer = a.steer + 0;
+  out.throttle = a.throttle + 0;
+  out.fire = a.fire;
+  out.aim.x = a.aim.x + 0;
+  out.aim.y = a.aim.y + 0;
+  out.aim.z = a.aim.z + 0;
+  out.aimY = a.aimY + 0;
+  out.select = a.select;
+  out.swap = a.swap;
+  out.drop = a.drop;
+  out.take = a.take;
+  out.reload = a.reload;
+  out.gust = a.gust;
+  out.ability = a.ability;
+  out.dive = a.dive;
+  out.hail = a.hail;
+  return out;
 }
 
-export const INPUT_FIELDS = ['steer', 'sail', 'flags', 'consumable', 'aim', 'chestPick', 'course'] as const;
+// ---------------------------------------------------------------- recording
+
+export const INPUT_FIELDS = ['steer', 'throttle', 'fire', 'aim', 'aimY', 'select', 'swap', 'drop', 'take', 'reload', 'gust', 'ability', 'dive', 'hail'] as const;
 export type InputField = (typeof INPUT_FIELDS)[number];
-type FieldValue = number | number[] | null;
+type FieldValue = number | boolean | readonly [number, number, number];
 export type InputEvent = [tick: number, field: InputField, value: FieldValue];
 
 export interface Recording {
-  format: 1;
+  format: 2;
   events: InputEvent[];
 }
 
+const isNum = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 const isInt = (v: unknown, lo: number, hi: number): v is number => Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi;
-const isCell = (v: unknown): v is number => isInt(v, 0, TERRITORY.cells - 1);
 
-function valid(field: InputField, v: unknown): v is FieldValue {
+function valid(field: InputField, v: unknown): boolean {
   switch (field) {
-    case 'steer': return isInt(v, -STEER_MAX, STEER_MAX);
-    case 'sail': return isInt(v, -1, 1);
-    case 'flags': return isInt(v, 0, ALL_FLAGS);
-    case 'consumable': case 'chestPick': return isInt(v, -1, 2);
-    case 'aim': return v === -1 || isCell(v);
-    case 'course': return v === null || (Array.isArray(v) && v.every(isCell));
+    case 'steer': return isNum(v, -4, 4);
+    case 'throttle': return isNum(v, 0, 1);
+    case 'aim': return Array.isArray(v) && v.length === 3 && v.every((x) => isNum(x, -1.0001, 1.0001));
+    case 'aimY': return isNum(v, -50, 500);
+    case 'select': case 'swap': return isInt(v, -1, 4);
+    case 'hail': return isInt(v, -1, 2);
+    default: return typeof v === 'boolean';
   }
 }
 
-const same = (a: FieldValue, b: FieldValue): boolean =>
-  a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((c, i) => c === b[i]));
+// + 0 keeps -0 out of the recording, so it reads back the same after JSON
+const valueOf = (input: ShipInput, field: InputField): FieldValue => {
+  if (field === 'aim') return [input.aim.x + 0, input.aim.y + 0, input.aim.z + 0];
+  const v = input[field];
+  return typeof v === 'number' ? v + 0 : v;
+};
 
-const copyOf = (v: FieldValue): FieldValue => (Array.isArray(v) ? v.slice() : v);
+const same = (a: FieldValue, b: FieldValue): boolean =>
+  a === b || (Array.isArray(a) && Array.isArray(b) && a[0] === b[0] && a[1] === b[1] && a[2] === b[2]);
 
 function setField(input: ShipInput, field: InputField, v: FieldValue): void {
-  if (field === 'course') input.course = v as number[] | null;
-  else input[field] = v as number;
+  if (field === 'aim') {
+    const a = v as readonly number[];
+    input.aim.x = a[0];
+    input.aim.y = a[1];
+    input.aim.z = a[2];
+  } else (input as unknown as Record<string, FieldValue>)[field] = v;
 }
 
 export interface Recorder {
@@ -72,25 +113,26 @@ export interface Recorder {
 }
 
 export function recorder(): Recorder {
-  return { recording: { format: 1, events: [] }, held: idleInput(), lastTick: -1 };
+  return { recording: { format: 2, events: [] }, held: idleInput(), lastTick: -1 };
 }
 
+/** Notes the input for a tick: only the fields that changed are kept. */
 export function record(r: Recorder, tick: number, input: ShipInput): void {
   if (!(Number.isInteger(tick) && tick > r.lastTick)) throw new RangeError(`record: tick ${tick} after ${r.lastTick}`);
   for (const field of INPUT_FIELDS) {
-    const v = input[field];
+    const v = valueOf(input, field);
     if (!valid(field, v)) throw new RangeError(`record: bad ${field} at tick ${tick}`);
-    if (same(v, r.held[field])) continue;
-    r.recording.events.push([tick, field, copyOf(v)]);
-    setField(r.held, field, copyOf(v));
+    if (same(v, valueOf(r.held, field))) continue;
+    r.recording.events.push([tick, field, v]);
+    setField(r.held, field, v);
   }
   r.lastTick = tick;
 }
 
 export function parseRecording(data: unknown): Recording {
   const d = data as Partial<Recording> | null;
-  if (typeof d !== 'object' || d === null || d.format !== 1 || !Array.isArray(d.events)) {
-    throw new TypeError('parseRecording: not a format-1 recording');
+  if (typeof d !== 'object' || d === null || d.format !== 2 || !Array.isArray(d.events)) {
+    throw new TypeError('parseRecording: not a format-2 recording');
   }
   const events: InputEvent[] = [];
   let last = 0;
@@ -100,9 +142,9 @@ export function parseRecording(data: unknown): Recording {
       throw new TypeError(`parseRecording: bad event ${events.length}`);
     }
     last = e[0];
-    events.push([e[0], e[1], copyOf(e[2])]);
+    events.push([e[0], e[1], Array.isArray(e[2]) ? [e[2][0], e[2][1], e[2][2]] : e[2]]);
   }
-  return { format: 1, events };
+  return { format: 2, events };
 }
 
 export interface Replay {

@@ -1,156 +1,158 @@
-import {
-  aground, currentAt, newWind, offFloe, seaLevel, timeOf, vortexAt, windAt, type Sea, type Wind,
-} from './environment.ts';
+// Sailing on the sphere: ships run great circles at up to 14.5 m/s, faster off the wind than into it, turn,
+// carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other.
+import { aground, currentAt, seaLevel } from './environment.ts';
+import { hurt } from './harm.ts';
 import type { ShipInput } from './input.ts';
-import { addScaled, cross, dcos, dexp, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
-import { helmOf } from './route.ts';
-import { R, TERRITORY, advance, cellOf, localFrame } from './sphere.ts';
-import { PHASE, SHIPS, TICK, afloat, type MatchState, type Ship } from './state.ts';
-import { inStorm } from './storm.ts';
-import {
-  BUMP, CONSUMABLES, COPPER, FITTING, FORMS, HELM, LAND, LATEEN_MIZZEN, POINT, SAILS, SLOT, SPARE_CANVAS, STORM, STORM_SAILS, TRIM, VORTEX,
-} from './tables.ts';
-import { holds } from './territory.ts';
-import { ZONE, heightAt } from './world/geography.ts';
-import { DRAFT, REGIONS } from './world/regions.ts';
+import { addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
+import { hasActive, hasPassive, hasPerk } from './perks.ts';
+import { R, advance, apart, localFrame, turned } from './sphere.ts';
+import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState, type Ship } from './state.ts';
+import { COINS, GRAVITY, GROUND, GUST, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
+import { newWind, windAt, type Wind } from './wind.ts';
+import { DRAFT, heightAt, regionAt } from './world/index.ts';
 
-export const BUMPED = { nothing: -1, land: SHIPS } as const;
+const smooth = (a: number, b: number, x: number): number => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 
-const approach = (tau: number): number => 1 - dexp(-TICK / tau);
-const K = FORMS.map((f) => ({ accel: approach(f.accel), drag: approach(f.drag), helm: approach(f.helm) }));
-const K_SHOVE = approach(BUMP.shove), K_GRIP = approach(VORTEX.grip), K_CARRY = approach(VORTEX.carry);
-
-export function pointOfSail(form: number, c: number): number {
-  const f = FORMS[form];
-  return 1 + POINT * (-f.close * c - f.reach * (2 * c * c - 1));
+/**
+ * How well she sails at `a` radians off the wind's direction: 0 running dead before it, PI straight into it.
+ * Best on a reach, a little slower running, and at most 25% slower close-hauled.
+ */
+export function pointOfSail(a: number): number {
+  return POINT.run + (POINT.beam - POINT.run) * smooth(0, 1.2, a) - 0.07 * smooth(1.9, 2.5, a)
+    - (POINT.beam - 0.07 - POINT.upwind) * smooth(2.5, 3, a);
 }
 
-export interface Trim {
-  speed: number;
-  turn: number;
-  stormSails: boolean;
-  drive: number;
+/** The angle between her heading and where the wind blows to. */
+export function offWind(head: V3, wind: V3): number {
+  const w = length(wind);
+  return w > 1e-9 ? dacos(Math.max(-1, Math.min(1, dot(head, wind) / w))) : 1.5;
 }
 
-export const newTrim = (): Trim => ({ speed: 1, turn: 1, stormSails: false, drive: 0 });
-
-export function trim(sea: Sea, state: MatchState, i: number, out: Trim): Trim {
-  const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos), holder = state.owner[cell] - 1;
-  const zone = sea.geo.zones[cell], waters = REGIONS[sea.geo.region[cell]].mechanics;
-  const rig = ship.fittings[SLOT.rig], hull = ship.fittings[SLOT.hull];
-  let speed = 1, turn = 1;
-  if (holder === i) speed *= 1 + TRIM.home;
-  else if (holder >= 0) speed *= 1 - TRIM.rival * (holds(sea, state, holder, 'rootGate') ? TRIM.rootGate : 1);
-  if (holds(sea, state, i, 'whaleRoad')) speed *= 1 + TRIM.whaleRoad;
-  if (rig.kind === FITTING.spareCanvas) speed *= 1 + SPARE_CANVAS[rig.tier];
-  if (rig.kind === FITTING.lateenMizzen) turn *= 1 + LATEEN_MIZZEN[rig.tier];
-  if (hull.kind === FITTING.copperSheathing) speed *= 1 + COPPER[hull.tier];
-  if (ship.torn > 0) speed *= 1 - TRIM.torn;
-  if (ship.boost > 0) speed *= 1 + CONSUMABLES.gust;
-  if ((zone & ZONE.kelp) !== 0 && waters.kelp) speed *= waters.kelp.slow;
-  if ((zone & ZONE.pack) !== 0 && waters.packSlow) speed *= waters.packSlow;
-  if (rig.kind !== FITTING.stormSails && inStorm(state, ship.pos)) speed *= 1 - STORM.labour;
-  out.speed = speed;
-  out.turn = turn;
-  out.stormSails = rig.kind === FITTING.stormSails;
-  out.drive = out.stormSails ? STORM_SAILS[rig.tier] : 0;
-  return out;
+/** The speed she settles to with this wind and sail. */
+export function settledSpeed(ship: Ship, wind: Wind, throttle: number): number {
+  let point = pointOfSail(offWind(ship.head, wind.v));
+  point = 1 + (point - 1) * Math.min(1, wind.steady + 0.3);
+  if (hasPassive(ship, 'windReader')) point = 1 - (1 - point) * POWERS.windReader;
+  const s = wind.strength, airs = s < 1 ? WIND.airs + (1 - WIND.airs) * Math.max(0, s) : 1;
+  let top = SHIP.top * point * airs * throttle;
+  if (hasPassive(ship, 'lightHull')) top *= POWERS.lightHull.speed;
+  if (ship.use >= 0) top *= SHIP.using;
+  if (ship.slow > 0) top *= PERKS.frostShot.slow;
+  return Math.min(SHIP.top * (hasPassive(ship, 'lightHull') ? POWERS.lightHull.speed : 1), top);
 }
 
-export function scald(sea: Sea, state: MatchState, i: number): number {
-  const ship = state.ships[i], cell = cellOf(TERRITORY, ship.pos);
-  if ((sea.geo.zones[cell] & ZONE.hot) === 0 || ship.fittings[SLOT.hull].kind === FITTING.copperSheathing) return 0;
-  return REGIONS[sea.geo.region[cell]].mechanics.hotDamage ?? 0;
+/** The fastest she can turn right now, rad/s. */
+export function turnRate(ship: Ship): number {
+  let r = SHIP.turn + SHIP.turnWay * Math.min(1, Math.abs(ship.speed) / SHIP.turnFull);
+  if (hasPerk(ship, 'tightTurns')) r *= PERKS.tightTurns;
+  if (hasPassive(ship, 'lightHull')) r *= POWERS.lightHull.turn;
+  if (ship.boost > 0) r *= GUST.turn;
+  return r * (1 - WEATHER.snow.turn * ship.ice);
 }
 
-export function settledSpeed(form: number, sail: number, c: number, wind: Wind, t: Trim): number {
-  const s = wind.strength, g = TRIM.gale;
-  const airs = s < 1 ? TRIM.calm + (1 - TRIM.calm) * s : 1;
-  const gale = (t.stormSails ? -t.drive : g.loss) * Math.max(0, Math.min(1, (s - g.from) / (g.to - g.from)));
-  return FORMS[form].speed * SAILS[sail].speed * (1 + (pointOfSail(form, c) - 1) * wind.steady) * airs * (1 - gale)
-    * (1 + TRIM.gust * wind.gust) * t.speed;
-}
+const W = newWind(), FLOW = v3(), V = v3(), SB = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), WAS = v3(), N = v3(), E = v3(), NN = v3();
 
-export const turningRadius = (form: number, sail: number, t: Trim): number => (FORMS[form].radius * SAILS[sail].radius) / t.turn;
-
-const W = newWind(), T = newTrim(), V = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), WAS = v3(), N = v3(), E = v3(), NN = v3();
-
-export function sail(sea: Sea, state: MatchState, i: number, input: ShipInput): void {
-  const ship = state.ships[i], form = FORMS[ship.form], k = K[ship.form];
-  grip(sea, state, i);
-  copy(ship.was, ship.pos);
-  copy(ship.wasHead, ship.head);
-  ship.bump = 0;
-  ship.bumped = BUMPED.nothing;
-  ship.bumpOn = 0;
-  ship.torn = Math.max(0, ship.torn - TICK);
-
-  const helm = helmOf(sea, state, i, input);
-  trim(sea, state, i, T);
-  windAt(sea, state, ship.pos, W);
-  const ws = length(W.v), radius = turningRadius(ship.form, ship.sail, T);
-  const way = Math.max(ship.speed, HELM.steerage * form.speed);
-  ship.rate += ((helm * way) / radius - ship.rate) * k.helm;
-  const carve = 1 - HELM.carve * Math.min(1, (Math.abs(ship.rate) * radius) / way);
-  const grounded = aground(sea, state, ship.pos);
-  const target = settledSpeed(ship.form, ship.sail, ws > 0 ? -dot(ship.head, W.v) / ws : 0, W, T) * carve
-    * (grounded ? LAND.crawl : 1);
-  ship.speed += (target - ship.speed) * (target > ship.speed ? k.accel : k.drag);
-
-  move(sea, state, ship, grounded);
-  const a = ship.rate * TICK, c = dcos(a), s = dsin(a);
-  cross(E, ship.head, ship.pos);
-  normalize(set(ship.head, ship.head.x * c + E.x * s, ship.head.y * c + E.y * s, ship.head.z * c + E.z * s));
-  set(ship.shove, ship.shove.x * (1 - K_SHOVE), ship.shove.y * (1 - K_SHOVE), ship.shove.z * (1 - K_SHOVE));
-}
-
-const FLOW = v3();
-
-function grip(sea: Sea, state: MatchState, i: number): void {
-  const ship = state.ships[i], f = ship.fling;
-  if (vortexAt(ship.pos, FLOW)) {
-    set(f, f.x + (FLOW.x - f.x) * K_GRIP, f.y + (FLOW.y - f.y) * K_GRIP, f.z + (FLOW.z - f.z) * K_GRIP);
-    return;
-  }
-  if (f.x === 0 && f.y === 0 && f.z === 0) return;
-  const keep = vortexAt(ship.was, FLOW) && !holds(sea, state, i, 'eye') ? VORTEX.keep : 1, s = keep * (1 - K_CARRY);
-  if (dot(f, f) * s * s < VORTEX.still * VORTEX.still) set(f, 0, 0, 0);
-  else set(f, f.x * s, f.y * s, f.z * s);
-}
-
-export function velocityOf(sea: Sea, ship: Ship, out: V3): V3 {
-  currentAt(sea, ship.pos, out);
-  addScaled(out, out, ship.head, ship.speed);
-  addScaled(out, out, ship.fling, 1);
-  return addScaled(out, out, ship.shove, 1);
-}
-
-export function apparentWind(sea: Sea, state: MatchState, i: number, out: V3): number {
+/** One tick of sailing for ship i. */
+export function sail(state: MatchState, i: number, input: ShipInput): void {
   const ship = state.ships[i];
-  windAt(sea, state, ship.pos, W);
-  velocityOf(sea, ship, V);
-  return length(set(out, W.v.x - V.x, W.v.y - V.y, W.v.z - V.z));
+  copy(ship.was, ship.pos);
+  if (ship.flip > 0) {
+    ship.flip = elapse(ship.flip);
+    ship.speed *= 0.9;
+    ship.rate = 0;
+  }
+  windAt(state, ship.pos, W);
+  const steer = Math.max(-3.2, Math.min(3.2, input.steer));
+  const max = turnRate(ship);
+  const want = ship.flip > 0 ? 0 : Math.max(-1, Math.min(1, steer / 0.3)) * max;
+  ship.rate += (want - ship.rate) * Math.min(1, TICK * 5);
+  ship.turn = steer;
+
+  let target = ship.flip > 0 ? 0 : settledSpeed(ship, W, Math.max(0, Math.min(1, input.throttle)));
+  if (Math.abs(steer) > SHIP.hard) target = Math.min(target, SHIP.crawl);
+  let accel: number = target > ship.speed ? SHIP.accel : SHIP.decel;
+  if (ship.boost > 0) {
+    ship.boost = elapse(ship.boost);
+    target += GUST.speed;
+    accel = GUST.accel;
+  }
+  if (ship.power > 0 && hasActive(ship, 'ram')) {
+    target += POWERS.ram.speed;
+    accel = GUST.accel;
+  }
+  const grounded = aground(state, ship.pos, draftOf(ship));
+  if (grounded) target = Math.min(target, 2);
+  ship.speed += Math.max(-accel * TICK, Math.min(accel * TICK, target - ship.speed));
+
+  // the turn, and the slip of a carved turn
+  const a = ship.rate * TICK;
+  turned(ship.head, ship.pos, a, ship.head);
+  normalize(addScaled(ship.head, ship.head, ship.pos, -dot(ship.head, ship.pos)));
+  ship.drift = -SHIP.carve * ship.speed * (max > 0 ? ship.rate / max : 0);
+
+  // velocity: way on, slip, current and any shove
+  currentAt(ship.pos, FLOW);
+  const rider = hasPerk(ship, 'currentRider') ? PERKS.currentRider : 1;
+  set(SB, ship.head.y * ship.pos.z - ship.head.z * ship.pos.y, ship.head.z * ship.pos.x - ship.head.x * ship.pos.z,
+    ship.head.x * ship.pos.y - ship.head.y * ship.pos.x);
+  set(V, 0, 0, 0);
+  addScaled(V, V, ship.head, ship.speed);
+  addScaled(V, V, SB, ship.drift);
+  addScaled(V, V, FLOW, rider);
+  addScaled(V, V, ship.shove, 1);
+  move(state, i, grounded);
+  const k = Math.max(0, 1 - TICK * 1.5);
+  set(ship.shove, ship.shove.x * k, ship.shove.y * k, ship.shove.z * k);
+  addScaled(ship.shove, ship.shove, ship.pos, -dot(ship.shove, ship.pos));
+
+  // the hop off the water
+  if (ship.alt > 0 || ship.vy > 0) {
+    ship.alt += ship.vy * TICK - 0.5 * GRAVITY * TICK * TICK;
+    ship.vy -= GRAVITY * TICK;
+    if (ship.alt <= 0) {
+      ship.alt = 0;
+      ship.vy = 0;
+    }
+  }
+
+  // log and coins for the distance run
+  const d = apart(ship.was, ship.pos), before = Math.floor(ship.sailed / COINS.metres);
+  ship.sailed += d;
+  const coins = Math.floor(ship.sailed / COINS.metres) - before;
+  if (coins > 0) ship.coins += coins;
+  if ((state.tick + i) % 15 === 0) ship.regions |= 1 << regionAt(ship.pos);
+  if (ship.scrape > 0) ship.scrape = elapse(ship.scrape);
 }
 
-function move(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): void {
-  velocityOf(sea, ship, V);
-  const on = tryMove(sea, state, ship, grounded);
+export const draftOf = (ship: Ship): number => (hasPerk(ship, 'shallowDraft') ? DRAFT * PERKS.shallowDraft : DRAFT);
+
+function move(state: MatchState, i: number, grounded: boolean): void {
+  const ship = state.ships[i];
+  copy(ship.vel, V);
+  const on = tryMove(state, ship, grounded);
   if (on === null) return;
-  shoreNormal(sea, state, PROBE, V, N);
+  shoreNormal(PROBE, N);
   const into = -dot(V, N);
   if (into > 0) {
-    report(ship, into, BUMPED.land, on);
+    if (into > GROUND.scrape && ship.scrape === 0) {
+      emit(state, EVENT.scrape, i, -1, PROBE, { amount: into });
+      ship.scrape = 0.5;
+    }
     addScaled(V, V, N, into);
-    ship.speed *= 1 - (1 - LAND.keep) * Math.max(0, -dot(ship.head, N));
-    addScaled(ship.shove, ship.shove, N, Math.max(0, -dot(ship.shove, N)));
-    addScaled(ship.fling, ship.fling, N, Math.max(0, -dot(ship.fling, N)));
+    ship.speed *= 1 - (1 - GROUND.keep) * Math.max(0, -dot(ship.head, N));
+    const s = dot(ship.shove, N);
+    if (s < 0) addScaled(ship.shove, ship.shove, N, -s);
   }
-  tryMove(sea, state, ship, grounded);
+  copy(ship.vel, V);
+  if (tryMove(state, ship, grounded) !== null) ship.speed *= 0.5;
 }
 
 const PROBES = [1, 0, -1];
 
-function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): number | null {
+function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | null {
   const v = length(V);
   if (v === 0) return null;
   set(H1, V.x / v, V.y / v, V.z / v);
@@ -158,103 +160,115 @@ function tryMove(sea: Sea, state: MatchState, ship: Ship, grounded: boolean): nu
   set(H1, ship.head.x, ship.head.y, ship.head.z);
   normalize(addScaled(H1, H1, P1, -dot(H1, P1)));
   if (!grounded) {
-    const half = FORMS[ship.form].half / R;
+    const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship);
     for (const on of PROBES) {
-      if (aground(sea, state, normalize(addScaled(PROBE, P1, H1, on * half))) && !offShore(sea, state, ship, on * half)) return on;
+      normalize(addScaled(PROBE, P1, H1, on * half));
+      const h = heightAt(PROBE);
+      if (h <= level - draft) continue;
+      // a hull already touching the ground may still work off it: only rising ground stops her
+      normalize(addScaled(WAS, ship.pos, ship.head, on * half));
+      if (h > heightAt(WAS)) return on;
     }
   }
   copy(ship.pos, P1);
   copy(ship.head, H1);
-  addScaled(ship.shove, ship.shove, P1, -dot(ship.shove, P1));
-  addScaled(ship.fling, ship.fling, P1, -dot(ship.fling, P1));
   return null;
 }
 
-function offShore(sea: Sea, state: MatchState, ship: Ship, at: number): boolean {
-  const dry = seaLevel(timeOf(state)) - DRAFT, h = heightAt(sea.geo, PROBE);
-  if (!(h >= dry)) return false;
-  const was = heightAt(sea.geo, normalize(addScaled(WAS, ship.pos, ship.head, at)));
-  return was >= dry && h < was;
-}
-
-function shoreNormal(sea: Sea, state: MatchState, p: V3, v: V3, out: V3): V3 {
-  if (offFloe(sea, timeOf(state), p, out)) return out;
-  const d = 0.6 / R;
+/** The way off the shore at p: down the slope of the ground. */
+function shoreNormal(p: V3, out: V3): V3 {
+  const d = GROUND.probe / R;
   localFrame(p, E, NN);
-  const gx = heightAt(sea.geo, normalize(addScaled(P1, p, E, d))) - heightAt(sea.geo, normalize(addScaled(P1, p, E, -d)));
-  const gy = heightAt(sea.geo, normalize(addScaled(P1, p, NN, d))) - heightAt(sea.geo, normalize(addScaled(P1, p, NN, -d)));
+  const gx = heightAt(normalize(addScaled(P1, p, E, d))) - heightAt(normalize(addScaled(P1, p, E, -d)));
+  const gy = heightAt(normalize(addScaled(P1, p, NN, d))) - heightAt(normalize(addScaled(P1, p, NN, -d)));
   set(out, -gx * E.x - gy * NN.x, -gx * E.y - gy * NN.y, -gx * E.z - gy * NN.z);
   if (length(out) > 1e-9) return normalize(out);
-  return normalize(set(out, -v.x, -v.y, -v.z));
+  return normalize(set(out, -V.x, -V.y, -V.z));
 }
 
-function report(ship: Ship, speed: number, what: number, on: number): void {
-  if (speed <= ship.bump) return;
-  ship.bump = speed;
-  ship.bumped = what;
-  ship.bumpOn = on;
+/** Aground on a falling tide, she is pushed gently off toward deeper water. */
+export function refloat(state: MatchState, i: number): void {
+  const ship = state.ships[i];
+  if (!aground(state, ship.pos, draftOf(ship))) return;
+  shoreNormal(ship.pos, N);
+  addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 4);
 }
 
-function copy(out: V3, a: V3): void {
-  set(out, a.x, a.y, a.z);
+// ---------------------------------------------------------------- the gust
+
+/** Spends a gust charge: a burst of speed and a hop off the water. */
+export function gust(state: MatchState, i: number): boolean {
+  const ship = state.ships[i];
+  if (ship.phase !== PHASE.sea || ship.gusts <= 0 || ship.boost > 0 || ship.flip > 0) return false;
+  ship.gusts--;
+  ship.boost = GUST.time;
+  ship.vy = Math.max(ship.vy, GUST.hop);
+  if (ship.alt <= 0) ship.alt = 1e-3;
+  emit(state, EVENT.gust, i, -1, ship.pos, { amount: ship.gusts });
+  return true;
 }
 
-const D = v3(), U = v3(), UB = v3(), SEP = v3(), DV = v3();
+/** Gust charges come back one at a time. */
+export function rechargeGust(ship: Ship): void {
+  if (ship.gusts >= GUST.charges) {
+    ship.gustT = 0;
+    return;
+  }
+  ship.gustT += TICK / (hasPerk(ship, 'quickGust') ? PERKS.quickGust : 1);
+  if (ship.gustT >= GUST.recharge) {
+    ship.gusts++;
+    ship.gustT = 0;
+  }
+}
 
+// ---------------------------------------------------------------- bumping
+
+const D = v3(), DV = v3();
+
+/** Hulls that touch push apart; one closing fast enough rams the other. */
 export function collide(state: MatchState): void {
   for (let i = 0; i < SHIPS; i++) {
-    if (!afloat(state.ships[i])) continue;
-    for (let j = i + 1; j < SHIPS; j++) if (afloat(state.ships[j]) && !makesWay(state.ships[i], state.ships[j])) contact(state, i, j);
+    if (state.ships[i].phase !== PHASE.sea) continue;
+    for (let j = i + 1; j < SHIPS; j++) if (state.ships[j].phase === PHASE.sea) contact(state, i, j);
   }
 }
-
-const makesWay = (a: Ship, b: Ship): boolean =>
-  (a.phase === PHASE.riding && b.phase !== PHASE.sailing) || (b.phase === PHASE.riding && a.phase !== PHASE.sailing);
 
 function contact(state: MatchState, i: number, j: number): void {
-  const a = state.ships[i], b = state.ships[j], fa = FORMS[a.form], fb = FORMS[b.form];
-  const touch = fa.beam + fb.beam, far = fa.half + fb.half + touch;
-  if (R * R * (2 - 2 * dot(a.pos, b.pos)) >= far * far) return;
+  const a = state.ships[i], b = state.ships[j];
+  const gap = apart(a.pos, b.pos);
+  if (gap >= SHIP.touch) return;
   set(D, (b.pos.x - a.pos.x) * R, (b.pos.y - a.pos.y) * R, (b.pos.z - a.pos.z) * R);
-  set(U, a.head.x * fa.half, a.head.y * fa.half, a.head.z * fa.half);
-  set(UB, b.head.x * fb.half, b.head.y * fb.half, b.head.z * fb.half);
-  const uu = dot(U, U), uv = dot(U, UB), vv = dot(UB, UB), ud = -dot(U, D), vd = -dot(UB, D), den = uu * vv - uv * uv;
-  let s = den > 1e-9 ? clamp1((uv * vd - vv * ud) / den) : 0, t = (vd + s * uv) / vv;
-  if (t < -1 || t > 1) {
-    t = clamp1(t);
-    s = clamp1((t * uv - ud) / uu);
-  }
-  set(SEP, D.x + t * UB.x - s * U.x, D.y + t * UB.y - s * U.y, D.z + t * UB.z - s * U.z);
-  addScaled(SEP, SEP, a.pos, -dot(SEP, a.pos));
-  const gap = length(SEP);
-  if (gap >= touch) return;
-  if (gap > 1e-9) set(SEP, SEP.x / gap, SEP.y / gap, SEP.z / gap);
-  else cross(SEP, a.head, a.pos);
-  const ia = 1 / fa.mass, ib = 1 / fb.mass, share = ia / (ia + ib), pen = touch - gap;
-  shift(a, SEP, -pen * share);
-  shift(b, SEP, pen * (1 - share));
-  set(DV, a.head.x * a.speed + a.shove.x + a.fling.x - b.head.x * b.speed - b.shove.x - b.fling.x,
-    a.head.y * a.speed + a.shove.y + a.fling.y - b.head.y * b.speed - b.shove.y - b.fling.y,
-    a.head.z * a.speed + a.shove.z + a.fling.z - b.head.z * b.speed - b.shove.z - b.fling.z);
-  const closing = dot(DV, SEP);
+  addScaled(D, D, a.pos, -dot(D, a.pos));
+  const l = length(D);
+  if (l > 1e-9) set(D, D.x / l, D.y / l, D.z / l);
+  else set(D, a.head.y * a.pos.z - a.head.z * a.pos.y, a.head.z * a.pos.x - a.head.x * a.pos.z, a.head.x * a.pos.y - a.head.y * a.pos.x);
+  const pen = SHIP.touch - gap;
+  normalize(addScaled(a.pos, a.pos, D, (-pen * 0.5) / R));
+  normalize(addScaled(b.pos, b.pos, D, (pen * 0.5) / R));
+  normalize(addScaled(a.head, a.head, a.pos, -dot(a.head, a.pos)));
+  normalize(addScaled(b.head, b.head, b.pos, -dot(b.head, b.pos)));
+  set(DV, a.vel.x - b.vel.x, a.vel.y - b.vel.y, a.vel.z - b.vel.z);
+  const closing = dot(DV, D);
   if (closing <= 0) return;
-  const impulse = ((1 + BUMP.restitution) * closing) / (ia + ib);
-  strike(a, SEP, -impulse * ia);
-  strike(b, SEP, impulse * ib);
-  report(a, closing, j, s);
-  report(b, closing, i, t);
-}
-
-const clamp1 = (x: number): number => Math.max(-1, Math.min(1, x));
-
-function shift(ship: Ship, n: V3, d: number): void {
-  normalize(addScaled(ship.pos, ship.pos, n, d / R));
-  normalize(addScaled(ship.head, ship.head, ship.pos, -dot(ship.head, ship.pos)));
-}
-
-function strike(ship: Ship, n: V3, dv: number): void {
-  const along = dv * dot(n, ship.head);
-  ship.speed += along;
-  addScaled(ship.shove, ship.shove, n, dv);
-  addScaled(ship.shove, ship.shove, ship.head, -along);
+  addScaled(a.shove, a.shove, D, -closing * 0.6);
+  addScaled(b.shove, b.shove, D, closing * 0.6);
+  a.speed *= 0.7;
+  b.speed *= 0.7;
+  const aRams = a.power > 0 && hasActive(a, 'ram'), bRams = b.power > 0 && hasActive(b, 'ram');
+  if (aRams) {
+    hurt(state, j, POWERS.ram.damage, i, CAUSE.ram, b.pos, 2);
+    a.power = 0;
+  }
+  if (bRams) {
+    hurt(state, i, POWERS.ram.damage, j, CAUSE.ram, a.pos, 2);
+    b.power = 0;
+  }
+  if (closing > SHIP.ram) {
+    const dmg = (closing - 5) * SHIP.ramDamage;
+    // the faster ship drives into the slower one and takes less of the blow
+    const fa = Math.max(0, dot(a.vel, D)), fb = Math.max(0, -dot(b.vel, D)), sum = fa + fb > 1e-9 ? fa + fb : 1;
+    if (!aRams) hurt(state, i, dmg * (0.3 + 0.7 * (fb / sum)), j, CAUSE.ram, a.pos, 1);
+    if (!bRams) hurt(state, j, dmg * (0.3 + 0.7 * (fa / sum)), i, CAUSE.ram, b.pos, 1);
+    emit(state, EVENT.ram, fa >= fb ? i : j, fa >= fb ? j : i, a.pos, { amount: closing });
+  }
 }

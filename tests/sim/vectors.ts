@@ -1,17 +1,13 @@
 import { hash64 } from '../../src/sim/codec.ts';
-import { STEER_MAX, idleInput, record, recorder, type Recording, type ShipInput } from '../../src/sim/input.ts';
+import { idleInput, record, recorder, type Recording, type ShipInput } from '../../src/sim/input.ts';
 import * as m from '../../src/sim/math.ts';
-import { seaFor, type World } from '../../src/sim/environment.ts';
 import { runMatch } from '../../src/sim/match.ts';
-import { buildGeography } from '../../src/sim/world/geography.ts';
-import { buildNav } from '../../src/sim/world/nav.ts';
+import { createMatch, type FleetEntry } from '../../src/sim/setup.ts';
 import {
   TERRITORY, advance, angleBetween, bearingOf, cellDir, cellOf, faceUV, fromLatLon, horizonDistance, localFrame,
   tangentAt, tangentToward,
 } from '../../src/sim/sphere.ts';
-import { createMatch, decodeMatch, encodeMatch, matchHash } from '../../src/sim/state.ts';
-import type { MatchState } from '../../src/sim/state.ts';
-import { FITTING, SLOT } from '../../src/sim/tables.ts';
+import { decodeMatch, encodeMatch, matchHash } from '../../src/sim/state.ts';
 
 function digest(values: ArrayLike<number>): string {
   const bytes = new Uint8Array(values.length * 8), view = new DataView(bytes.buffer);
@@ -85,19 +81,28 @@ function sphereVectors(): string {
   return digest(out);
 }
 
+/** A restless helm: it steers, trims, aims, fires, juggles the hotbar, gusts, dives and hails at random. */
 export function scriptedInputs(seed: number, ticks: number): ShipInput[] {
   const r = m.rngFrom(seed), inputs: ShipInput[] = [], held = idleInput();
   for (let t = 0; t < ticks; t++) {
-    const input: ShipInput = { ...held, sail: 0, consumable: -1, chestPick: -1, course: null };
-    if (m.rngChance(r, 0.05)) held.steer = input.steer = m.rngInt(r, 2 * STEER_MAX + 1) - STEER_MAX;
-    if (m.rngChance(r, 0.01)) input.sail = m.rngChance(r, 0.5) ? 1 : -1;
-    if (m.rngChance(r, 0.01)) held.flags = input.flags = m.rngInt(r, 32);
-    if (m.rngChance(r, 0.003)) input.consumable = m.rngInt(r, 3);
-    if (m.rngChance(r, 0.003)) held.aim = input.aim = m.rngChance(r, 0.5) ? -1 : m.rngInt(r, TERRITORY.cells);
-    if (m.rngChance(r, 0.002)) input.chestPick = m.rngInt(r, 3);
-    if (m.rngChance(r, 0.002)) {
-      input.course = m.rngChance(r, 0.2) ? [] : Array.from({ length: 1 + m.rngInt(r, 40) }, () => m.rngInt(r, TERRITORY.cells));
+    const input: ShipInput = { ...held, aim: { ...held.aim }, select: -1, swap: -1, drop: false, take: false, reload: false, gust: false, ability: false, hail: -1 };
+    if (m.rngChance(r, 0.05)) held.steer = input.steer = m.rngRange(r, -2.5, 2.5);
+    if (m.rngChance(r, 0.01)) held.throttle = input.throttle = m.rngFloat(r);
+    if (m.rngChance(r, 0.02)) held.fire = input.fire = m.rngChance(r, 0.4);
+    if (m.rngChance(r, 0.02)) {
+      cellDir(TERRITORY, m.rngInt(r, TERRITORY.cells), held.aim);
+      input.aim = { ...held.aim };
+      held.aimY = input.aimY = m.rngRange(r, 0, 20);
     }
+    if (m.rngChance(r, 0.005)) input.select = m.rngInt(r, 5);
+    if (m.rngChance(r, 0.002)) input.swap = m.rngInt(r, 5);
+    if (m.rngChance(r, 0.001)) input.drop = true;
+    if (m.rngChance(r, 0.01)) input.take = true;
+    if (m.rngChance(r, 0.003)) input.reload = true;
+    if (m.rngChance(r, 0.004)) input.gust = true;
+    if (m.rngChance(r, 0.004)) input.ability = true;
+    if (t > 300 && m.rngChance(r, 0.01)) held.dive = input.dive = m.rngChance(r, 0.7);
+    if (m.rngChance(r, 0.001)) input.hail = m.rngInt(r, 3);
     inputs.push(input);
   }
   return inputs;
@@ -109,32 +114,21 @@ export function recordInputs(inputs: ShipInput[]): Recording {
   return rec.recording;
 }
 
-let built: World | null = null;
-
-export function world(): World {
-  if (!built) {
-    const geo = buildGeography();
-    built = { geo, nav: buildNav(geo) };
-  }
-  return built;
-}
+/** The player and nineteen captains of every temperament and skill. */
+export const vectorFleet = (): FleetEntry[] =>
+  Array.from({ length: 20 }, (_, i) => (i === 0 ? { captain: false } : { captain: true, temperament: (i - 1) % 6, skill: i / 20 }));
 
 function matchVectors(): { match: string; resumed: string } {
-  const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks)), seed = 20261024, sea = seaFor(world(), seed);
-  const whole = createMatch({ seed, fleet: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0].map((form, i) => ({ form, captain: i > 0 ? { temperament: (i - 1) % 6, tier: i } : undefined })) });
-  runMatch(sea, whole, recording, ticks);
-  const half = createMatch({ seed, fleet: [1, 0, 1, 2, 3, 0, 1, 2, 3, 0].map((form, i) => ({ form, captain: i > 0 ? { temperament: (i - 1) % 6, tier: i } : undefined })) });
-  runMatch(sea, half, recording, ticks / 2);
+  const ticks = 3600, recording = recordInputs(scriptedInputs(5, ticks)), seed = 20261024;
+  const whole = createMatch({ seed, date: '2026-11-01', fleet: vectorFleet() });
+  runMatch(whole, recording, ticks);
+  const half = createMatch({ seed, date: '2026-11-01', fleet: vectorFleet() });
+  runMatch(half, recording, ticks / 2);
   const resumed = decodeMatch(encodeMatch(half));
-  runMatch(sea, resumed, recording, ticks);
+  runMatch(resumed, recording, ticks);
   return { match: matchHash(whole), resumed: matchHash(resumed) };
 }
 
 export function vectors(): Record<string, string> {
   return { math: mathVectors(), rng: rngVectors(), sphere: sphereVectors(), ...matchVectors() };
-}
-
-export function unarmed(s: MatchState, from = 0): MatchState {
-  for (let i = from; i < s.ships.length; i++) s.ships[i].fittings[SLOT.broadside] = { kind: FITTING.none, tier: 0 };
-  return s;
 }

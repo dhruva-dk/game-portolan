@@ -1,238 +1,291 @@
-import { aim, burst, fights, launch, targets, touches } from './combat.ts';
-import type { Sea } from './environment.ts';
-import { FLAG, type ShipInput } from './input.ts';
-import { addScaled, dcos, dot, normalize, rngFloat, rngInt, set, v3, type V3 } from './math.ts';
-import { R, TERRITORY, cellOf } from './sphere.ts';
-import { EVENT, SHIPS, STREAM, TICK, afloat, chronicle, emit, fullHull, type MatchState, type Ship } from './state.ts';
-import {
-  BATTERY, CONSUMABLE, CONSUMABLES, EFFECT, FITTING, FITTING_SLOT, FORMS, KEGS, KITS, LOOKOUT, LOOT, MORTAR, OUTFIT, SIGHT,
-  SLOT, STERN_GLASS, TIERS,
-} from './tables.ts';
-import type { Sight } from './visibility.ts';
-import { REGIONS } from './world/regions.ts';
+// Items: the 5-slot hotbar (select, swap, drop), loot on the water (the loot spots filled by rarity at the
+// start, drops from sinking ships, parcels and the whale), picking it up, and using consumables.
+import { interrupt, mend, shore } from './harm.ts';
+import type { ShipInput } from './input.ts';
+import { addScaled, dot, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
+import { openAt, nearestOpen } from './nav.ts';
+import { hasPassive, hasPerk } from './perks.ts';
+import { RULE } from './rules.ts';
+import { apart, along, tangentAt } from './sphere.ts';
+import { EVENT, PHASE, SHIPS, STREAM, TICK, copy, emit, type Item, type Loot, type MatchState, type Ship } from './state.ts';
+import { COINS, EQUIP, ITEM, LOOT, PERKS, POWERS, RARITIES, SLOTS, USES, WEAPONS, WEAPON_KINDS, isUse, isWeapon } from './tables.ts';
+import { CENTRES, LOOT_SPOTS, REGIONS, regionAt } from './world/index.ts';
 
-export interface Item {
-  kind: number;
-  tier: number;
+export function empty(): Item {
+  return { kind: ITEM.none, rarity: 0, n: 0 };
 }
 
-export const OFFERS = 3;
+export const weaponItem = (kind: number, rarity: number): Item => ({ kind, rarity, n: WEAPONS[kind].mag });
 
-export const isConsumable = (kind: number): boolean => kind >= CONSUMABLE.patchKit;
+export const useItem = (kind: number, n = LOOT.counts[kind] ?? 1): Item => ({ kind, rarity: LOOT.rarity[kind] ?? 0, n });
 
-const LIT = ['patch', 'ward', 'boost', 'flask', 'flare'] as const;
+/** How many of a consumable fit in one slot. */
+export const stackOf = (ship: Ship, kind: number): number =>
+  (USES[kind]?.stack ?? 1) + (hasPassive(ship, 'deepHold') ? POWERS.deepHold : 0);
 
-const NONE: Item = { kind: FITTING.none, tier: 0 };
-const KEG_COS = dcos(KEGS.arc), LOOKOUT_COS = LOOKOUT.map((u) => dcos(u / R)), WEIGHT = new Array<number>(TIERS).fill(0);
-const A = v3(), D = v3(), P = v3();
-
-export function items(sea: Sea, state: MatchState, inputs: readonly ShipInput[], sights: readonly Sight[]): void {
-  const open = targets(sea, state);
-  for (let i = 0; i < SHIPS; i++) {
-    const ship = state.ships[i], input = inputs[i];
-    if (!afloat(ship)) continue;
-    burn(ship);
-    if (input.chestPick >= 0) choose(state, i, input.chestPick);
-    if (!fights(ship)) continue;
-    if (input.consumable >= 0) use(state, i, input.consumable);
-    astern(sea, state, i, input, sights[i].ships & open);
-  }
-  pickUp(state);
-  kegs(state, open);
-}
-
-export function afloatChest(state: MatchState, at: V3, tier: number, fitting: Item, from: number): void {
-  state.chests.push({ at: { x: at.x, y: at.y, z: at.z }, tier, fitting: { kind: fitting.kind, tier: fitting.tier }, from });
-  emit(state, EVENT.chest, from, fitting.kind, at, tier);
-}
-
-export function deliver(state: MatchState, i: number, tier: number): void {
-  if (state.ships[i].offer.length > 0) afloatChest(state, state.ships[i].pos, tier, NONE, -1);
-  else open(state, i, tier, NONE, -1);
-}
-
-export function poolTop(rank: number): number {
-  let top = 0;
-  while (top + 1 < TIERS && LOOT.enters[top + 1] <= rank) top++;
-  return top;
-}
-
-export function chestTier(sea: Sea, state: MatchState, at: V3, most = TIERS - 1): number {
-  const rich = REGIONS[sea.geo.region[cellOf(TERRITORY, at)]].richness, top = Math.min(most, poolTop(state.rank));
+function rollRarity(rng: Rng, boost: number): number {
+  const w = LOOT.weights;
   let total = 0;
-  for (let t = 0, r = 1; t <= top; t++, r *= rich) {
-    WEIGHT[t] = LOOT.weight[t] * (1 + LOOT.climb * (state.rank - LOOT.enters[t])) * r;
-    total += WEIGHT[t];
+  for (const x of w) total += x;
+  let r = rngFloat(rng) * total, k = 0;
+  while (k < w.length - 1 && r >= w[k]) r -= w[k++];
+  return Math.min(RARITIES - 1, k + boost);
+}
+
+/** A random item, by rarity. Under the harpoons-only rule every weapon is a harpoon. */
+export function rollItem(state: MatchState, rng: Rng, boost = 0): Item {
+  if (rngFloat(rng) < LOOT.weapon) {
+    const kind = state.rule === RULE.harpoonsOnly ? ITEM.harpoon : WEAPON_KINDS[rngInt(rng, WEAPON_KINDS.length)];
+    return weaponItem(kind, rollRarity(rng, boost));
   }
-  let x = rngFloat(state.rng[STREAM.loot]) * total, t = 0;
-  while (t < top && (x -= WEIGHT[t]) >= 0) t++;
+  const r = rngFloat(rng);
+  const kind = r < 0.36 ? ITEM.smallShield : r < 0.58 ? ITEM.repairKit : r < 0.86 ? ITEM.bigShield : ITEM.fullRepair;
+  return useItem(kind);
+}
+
+/** The weapon every ship starts with in slot 0. */
+export const starter = (state: MatchState): Item => weaponItem(state.rule === RULE.harpoonsOnly ? ITEM.harpoon : ITEM.cannon, 0);
+
+// ---------------------------------------------------------------- loot on the water
+
+const T = v3(), P = v3();
+
+export function spawnLoot(state: MatchState, at: V3, item: Item, from: number, spot = -1, kick = 0): Loot {
+  const rng = state.rng[STREAM.loot];
+  const loot: Loot = {
+    id: state.nextId++, at: { x: at.x, y: at.y, z: at.z }, v: { x: 0, y: 0, z: 0 },
+    item: { kind: item.kind, rarity: item.rarity, n: item.n }, age: 0, from, spot,
+  };
+  if (kick > 0) {
+    tangentAt(loot.at, rngRange(rng, -3.14159, 3.14159), T);
+    set(loot.v, T.x * kick, T.y * kick, T.z * kick);
+  }
+  state.loot.push(loot);
+  return loot;
+}
+
+/** The loot spots: the world's, or, until the world has placed them, six on open water around each region's landmark. */
+export function lootSpots(): readonly { pos: V3; region: number }[] {
+  if (LOOT_SPOTS.length > 0) return LOOT_SPOTS;
+  return FALLBACK;
+}
+
+const FALLBACK: { pos: V3; region: number }[] = [];
+let fellBack = false;
+
+function fallback(): void {
+  if (fellBack) return;
+  fellBack = true;
+  for (let r = 0; r < REGIONS.length; r++) {
+    for (let k = 0; k < LOOT.fallback; k++) {
+      const p = v3();
+      tangentAt(CENTRES[r], (k / LOOT.fallback) * 6.283185307179586 + r, T);
+      for (let d = 70; d < 260; d += 15) {
+        along(CENTRES[r], T, d + 20 * (k % 3), p);
+        if (openAt(p) && regionAt(p) === r) break;
+      }
+      if (!openAt(p) && !nearestOpen(p, p, 12)) continue;
+      FALLBACK.push({ pos: p, region: r });
+    }
+  }
+}
+
+/** Fills every loot spot with an item, and some with a second. */
+export function seedLoot(state: MatchState): void {
+  fallback();
+  const rng = state.rng[STREAM.loot], spots = lootSpots();
+  for (let s = 0; s < spots.length; s++) {
+    spawnLoot(state, spots[s].pos, rollItem(state, rng), -1, s);
+    if (rngFloat(rng) < LOOT.second) {
+      const l = spawnLoot(state, spots[s].pos, rollItem(state, rng), -1, s);
+      tangentAt(l.at, rngRange(rng, -3.14159, 3.14159), T);
+      along(l.at, T, 4, l.at);
+    }
+  }
+}
+
+/** Drifts and settles loot that is moving. */
+export function driftLoot(state: MatchState): void {
+  const k = Math.max(0, 1 - TICK * LOOT.drift);
+  for (const l of state.loot) {
+    l.age += TICK;
+    const v = Math.sqrt(dot(l.v, l.v));
+    if (v < 1e-3) continue;
+    set(T, l.v.x / v, l.v.y / v, l.v.z / v);
+    along(l.at, T, v * TICK, P);
+    if (openAt(P)) copy(l.at, P);
+    else set(l.v, 0, 0, 0);
+    normalize(addScaled(l.v, l.v, l.at, -dot(l.v, l.at)));
+    set(l.v, l.v.x * v * k, l.v.y * v * k, l.v.z * v * k);
+  }
+}
+
+/** Everything in a sinking ship's hold goes over the side. */
+export function spill(state: MatchState, i: number): void {
+  const ship = state.ships[i];
+  for (let s = 0; s < SLOTS; s++) {
+    const it = ship.slots[s];
+    if (it.kind === ITEM.none) continue;
+    const item = isWeapon(it.kind) ? weaponItem(it.kind, it.rarity) : it;
+    spawnLoot(state, ship.pos, item, i, -1, 3 + s);
+    ship.slots[s] = empty();
+  }
+}
+
+// ---------------------------------------------------------------- the hotbar
+
+/** Where an item would go: a stack with room, else an empty slot; -1 if neither. */
+export function roomFor(ship: Ship, item: Item): number {
+  if (isUse(item.kind)) {
+    for (let s = 0; s < SLOTS; s++) if (ship.slots[s].kind === item.kind && ship.slots[s].n < stackOf(ship, item.kind)) return s;
+  }
+  for (let s = 0; s < SLOTS; s++) if (ship.slots[s].kind === ITEM.none) return s;
+  return -1;
+}
+
+/** Puts an item in the hotbar. Returns how many of it are left over. */
+export function give(ship: Ship, item: Item): number {
+  let n = isUse(item.kind) ? item.n : 1;
+  while (n > 0) {
+    const s = roomFor(ship, item);
+    if (s < 0) break;
+    const slot = ship.slots[s];
+    if (slot.kind === ITEM.none) {
+      if (isWeapon(item.kind)) {
+        ship.slots[s] = { kind: item.kind, rarity: item.rarity, n: item.n };
+        return 0;
+      }
+      ship.slots[s] = { kind: item.kind, rarity: item.rarity, n: 0 };
+    }
+    const take = Math.min(n, stackOf(ship, item.kind) - ship.slots[s].n);
+    ship.slots[s].n += take;
+    n -= take;
+  }
+  return n;
+}
+
+export function select(state: MatchState, i: number, s: number): void {
+  const ship = state.ships[i];
+  if (s < 0 || s >= SLOTS || s === ship.sel) return;
+  interrupt(state, i);
+  ship.sel = s;
+  ship.reload = 0;
+  ship.equip = EQUIP;
+  emit(state, EVENT.select, i, -1, ship.pos, { item: ship.slots[s].kind, amount: s });
+}
+
+export function swap(state: MatchState, i: number, s: number): void {
+  const ship = state.ships[i];
+  if (s < 0 || s >= SLOTS || s === ship.sel) return;
+  interrupt(state, i);
+  const a = ship.slots[ship.sel];
+  ship.slots[ship.sel] = ship.slots[s];
+  ship.slots[s] = a;
+  ship.reload = 0;
+  ship.sel = s;
+  emit(state, EVENT.select, i, -1, ship.pos, { item: ship.slots[s].kind, amount: s, flag: 1 });
+}
+
+export function drop(state: MatchState, i: number): void {
+  const ship = state.ships[i], it = ship.slots[ship.sel];
+  if (it.kind === ITEM.none) return;
+  interrupt(state, i);
+  set(T, -ship.head.x, -ship.head.y, -ship.head.z);
+  along(ship.pos, T, 8, P);
+  const l = spawnLoot(state, P, it, i);
+  set(l.v, T.x * 1.5, T.y * 1.5, T.z * 1.5);
+  ship.slots[ship.sel] = empty();
+  ship.reload = 0;
+  emit(state, EVENT.drop, i, -1, ship.pos, { item: it.kind, amount: it.n, y: it.rarity });
+}
+
+/** Ships sweep up loot in reach that fits; `take` swaps the nearest for the selected slot when full. */
+export function pickups(state: MatchState, inputs: readonly ShipInput[]): void {
+  for (let i = 0; i < SHIPS; i++) {
+    const ship = state.ships[i];
+    if (ship.phase !== PHASE.sea || ship.flip > 0) continue;
+    let nearest = -1, nd: number = LOOT.reach;
+    for (let k = state.loot.length - 1; k >= 0; k--) {
+      const l = state.loot[k];
+      if (l.age < LOOT.settle && l.from === i) continue;
+      const d = apart(ship.pos, l.at);
+      if (d > LOOT.reach) continue;
+      if (roomFor(ship, l.item) >= 0) {
+        take(state, i, k);
+        continue;
+      }
+      if (d < nd) {
+        nd = d;
+        nearest = l.id;
+      }
+    }
+    if (nearest >= 0 && inputs[i].take) {
+      const k = state.loot.findIndex((l) => l.id === nearest);
+      const old = ship.slots[ship.sel];
+      ship.slots[ship.sel] = empty();
+      if (old.kind !== ITEM.none) {
+        const l = spawnLoot(state, ship.pos, old, i);
+        emit(state, EVENT.drop, i, -1, ship.pos, { item: old.kind, amount: old.n, y: old.rarity });
+        l.age = 0;
+      }
+      if (k >= 0) take(state, i, k);
+    }
+  }
+}
+
+function take(state: MatchState, i: number, k: number): void {
+  const ship = state.ships[i], l = state.loot[k];
+  // Better Loot: what you open at a loot spot rolls a rarity higher
+  if (l.spot >= 0 && isWeapon(l.item.kind) && hasPerk(ship, 'betterLoot')) l.item.rarity = Math.min(RARITIES - 1, l.item.rarity + 1);
+  const left = give(ship, l.item);
+  emit(state, EVENT.pickup, i, l.id, l.at, { item: l.item.kind, amount: l.item.n - left, y: l.item.rarity });
+  ship.coins += COINS.loot;
+  if (left > 0) l.item.n = left;
+  else state.loot.splice(k, 1);
+}
+
+// ---------------------------------------------------------------- consumables
+
+/** How long a consumable takes for this ship. */
+export function useTime(ship: Ship, kind: number): number {
+  let t = USES[kind].time;
+  if (hasPerk(ship, 'quickHands')) t *= PERKS.quickHands;
+  if (hasPassive(ship, 'quickHands')) t *= POWERS.quickHands;
   return t;
 }
 
-function open(state: MatchState, i: number, tier: number, held: Item, from: number): void {
-  const ship = state.ships[i], rng = state.rng[STREAM.loot], t = Math.min(tier, poolTop(state.rank));
-  if (held.kind !== FITTING.none) ship.offer.push({ kind: held.kind, tier: held.tier });
-  while (ship.offer.length < OFFERS) {
-    const kind = rngFloat(rng) < LOOT.consumable[t] ? CONSUMABLE.patchKit + rngInt(rng, LIT.length) : 1 + rngInt(rng, FITTING_SLOT.length - 1);
-    if (ship.offer.every((o) => o.kind !== kind)) ship.offer.push({ kind, tier: t });
+/** Would it do anything? A shield charge does nothing at its cap, a repair nothing at full. */
+export function useful(ship: Ship, kind: number): boolean {
+  const u = USES[kind];
+  return u.shield > 0 ? ship.shield < u.cap : ship.hull < u.cap;
+}
+
+export function startUse(state: MatchState, i: number): boolean {
+  const ship = state.ships[i], it = ship.slots[ship.sel];
+  if (!isUse(it.kind) || it.n <= 0 || ship.use >= 0 || ship.phase !== PHASE.sea) return false;
+  if (!useful(ship, it.kind)) {
+    emit(state, EVENT.blocked, i, -1, ship.pos, { item: it.kind });
+    return false;
   }
-  emit(state, EVENT.opened, i, from, ship.pos, tier);
+  ship.use = ship.sel;
+  ship.useT = useTime(ship, it.kind);
+  emit(state, EVENT.useStart, i, -1, ship.pos, { item: it.kind, amount: ship.useT });
+  return true;
 }
 
-function pickUp(state: MatchState): void {
-  const chests = state.chests;
-  let kept = 0;
-  for (let c = 0; c < chests.length; c++) {
-    const chest = chests[c];
-    let taker = -1;
-    for (let i = 0; i < SHIPS && taker < 0; i++) {
-      const ship = state.ships[i];
-      if (i !== chest.from && fights(ship) && ship.offer.length === 0 && touches(ship, chest.at, LOOT.reach)) taker = i;
-    }
-    if (taker >= 0) open(state, taker, chest.tier, chest.fitting, chest.from);
-    else chests[kept++] = chest;
-  }
-  chests.length = kept;
-}
-
-export function canTake(ship: Ship, item: Item): boolean {
-  return !isConsumable(item.kind) || ship.consumables.some((s) => s.kind === item.kind || s.count === 0);
-}
-
-function choose(state: MatchState, i: number, k: number): void {
-  const ship = state.ships[i], item = ship.offer[k];
-  if (item === undefined || !canTake(ship, item)) return;
-  if (isConsumable(item.kind)) stow(ship, item.kind, LOOT.count[item.tier]);
-  else fit(state, i, item);
-  emit(state, EVENT.chosen, i, item.kind, ship.pos, item.tier);
-  chronicle(state, EVENT.chosen, i, item.kind, item.tier);
-  ship.offer.length = 0;
-}
-
-function stow(ship: Ship, kind: number, count: number): void {
-  let k = ship.consumables.findIndex((s) => s.kind === kind);
-  if (k < 0) k = ship.consumables.findIndex((s) => s.count === 0);
-  ship.consumables[k].kind = kind;
-  ship.consumables[k].count += count;
-}
-
-function fit(state: MatchState, i: number, item: Item): void {
-  const ship = state.ships[i], slot = FITTING_SLOT[item.kind], old = ship.fittings[slot], was = fullHull(ship.form, ship.fittings);
-  if (old.kind !== FITTING.none) {
-    normalize(addScaled(A, ship.pos, ship.head, -(FORMS[ship.form].half + LOOT.astern) / R));
-    afloatChest(state, A, old.tier, old, i);
-    emit(state, EVENT.swapped, i, old.kind, ship.pos, old.tier);
-  }
-  ship.fittings[slot] = { kind: item.kind, tier: item.tier };
-  const full = fullHull(ship.form, ship.fittings);
-  ship.hull = Math.min(full, ship.hull + Math.max(0, full - was));
-}
-
-function burn(ship: Ship): void {
-  if (ship.patch > 0) {
-    const full = fullHull(ship.form, ship.fittings);
-    ship.hull = Math.min(full, ship.hull + (CONSUMABLES.patch * full * Math.min(TICK, ship.patch)) / CONSUMABLES.time[0]);
-  }
-  for (const key of LIT) ship[key] = Math.max(0, ship[key] - TICK);
-  ship.cut = Math.max(0, ship.cut - TICK);
-}
-
-function use(state: MatchState, i: number, k: number): void {
-  const ship = state.ships[i], slot = ship.consumables[k];
-  if (slot === undefined || slot.count === 0) return;
-  const c = slot.kind - CONSUMABLE.patchKit, key = LIT[c];
-  if (ship[key] > 0) return;
-  ship[key] = CONSUMABLES.time[c];
-  slot.count--;
-  emit(state, EVENT.used, i, slot.kind, ship.pos, slot.count);
-  if (slot.count === 0) slot.kind = 0;
-}
-
-function astern(sea: Sea, state: MatchState, i: number, input: ShipInput, seen: number): void {
-  const ship = state.ships[i], fitting = ship.fittings[SLOT.stern];
-  if (ship.reload[BATTERY.stern] > 0) return;
-  if (fitting.kind === FITTING.mortar && (input.flags & FLAG.useAimed) !== 0) {
-    const j = aim(sea, state, i, seen, input.aim, MORTAR.range, MORTAR.speed, P);
-    if (j < 0) return;
-    launch(state, i, FITTING.mortar, ship.pos, P, MORTAR, fitting.tier);
-    ship.reload[BATTERY.stern] = MORTAR.reload;
-    emit(state, EVENT.mortar, i, j, P, state.shots[state.shots.length - 1].time);
-  } else if (fitting.kind === FITTING.powderKegs && pursued(state, i, seen)) {
-    normalize(addScaled(A, ship.pos, ship.head, -(FORMS[ship.form].half + KEGS.trigger) / R));
-    state.kegs.push({ ship: i, at: { x: A.x, y: A.y, z: A.z }, age: 0, tier: fitting.tier });
-    ship.reload[BATTERY.stern] = KEGS.reload;
-    emit(state, EVENT.keg, i, -1, A, fitting.tier);
-  }
-}
-
-function pursued(state: MatchState, i: number, seen: number): boolean {
+export function useTick(state: MatchState, i: number): void {
   const ship = state.ships[i];
-  for (let j = 0; j < SHIPS; j++) {
-    if (j === i || (seen & (1 << j)) === 0) continue;
-    const q = state.ships[j].pos;
-    set(D, q.x - ship.pos.x, q.y - ship.pos.y, q.z - ship.pos.z);
-    const d = Math.sqrt(dot(D, D));
-    if (d * R <= KEGS.range && -dot(D, ship.head) >= KEG_COS * d) return true;
-  }
-  return false;
+  if (ship.use < 0) return;
+  ship.useT -= TICK;
+  if (ship.useT > 1e-9) return;
+  const it = ship.slots[ship.use], u = USES[it.kind];
+  const shield = u.shield > 0 ? shore(state, i, u.shield, u.cap) : 0;
+  const hull = u.hull > 0 ? mend(state, i, u.hull, u.cap) : 0;
+  it.n--;
+  emit(state, EVENT.useDone, i, -1, ship.pos, { item: it.kind, shield, hull, amount: it.n });
+  if (it.n <= 0) ship.slots[ship.use] = empty();
+  ship.use = -1;
+  ship.useT = 0;
 }
 
-function kegs(state: MatchState, open: number): void {
-  const all = state.kegs;
-  let kept = 0;
-  for (let k = 0; k < all.length; k++) {
-    const keg = all[k];
-    keg.age += TICK;
-    let by = -1;
-    for (let j = 0; j < SHIPS && by < 0 && keg.age >= KEGS.arm; j++) {
-      if (j !== keg.ship && (open & (1 << j)) !== 0 && fights(state.ships[j]) && touches(state.ships[j], keg.at, KEGS.trigger)) by = j;
-    }
-    if (by < 0 && keg.age < KEGS.fuse) {
-      all[kept++] = keg;
-      continue;
-    }
-    const struck = burst(state, keg.ship, keg.at, KEGS.blast, KEGS.damage[keg.tier], EFFECT.none, 0, open);
-    emit(state, EVENT.kegBurst, keg.ship, by, keg.at, struck);
-  }
-  all.length = kept;
-}
-
-export function worth(ship: Ship, item: Item): number {
-  if (!canTake(ship, item)) return -Infinity;
-  if (isConsumable(item.kind)) return LOOT.count[item.tier] * LOOT.worth;
-  const held = ship.fittings[FITTING_SLOT[item.kind]];
-  return item.tier + 1 - (held.kind === FITTING.none ? 0 : held.tier + 1);
-}
-
-export function bestPick(ship: Ship): number {
-  let best = -1, most = -Infinity;
-  for (let k = 0; k < ship.offer.length; k++) {
-    const w = worth(ship, ship.offer[k]) + (KITS[ship.captain.temperament]?.includes(ship.offer[k].kind) ? 0.5 : 0);
-    if (w > most) {
-      most = w;
-      best = k;
-    }
-  }
-  return best;
-}
-
-export function startingFittings(rank: number, temperament = -1): Item[] {
-  const tier = poolTop(rank - 1), kit = KITS[temperament];
-  return OUTFIT.map(({ at, kind }, s) => (rank >= at ? { kind: kit ? kit[s] : kind, tier } : { kind: FITTING.none, tier: 0 }));
-}
-
-const rated = (fitting: Item, kind: number, table: readonly number[]): number => (fitting.kind === kind ? table[fitting.tier] : 0);
-
-export const sternGlass = (ship: Ship): number => rated(ship.fittings[SLOT.lookout], FITTING.sternGlass, STERN_GLASS);
-
-export const crowsNest = (ship: Ship): number => rated(ship.fittings[SLOT.lookout], FITTING.crowsNest, SIGHT.crowsNest);
-
-export function lookout(state: MatchState, i: number, sight: Sight): number {
-  const ship = state.ships[i], look = ship.fittings[SLOT.lookout], known = sight.ships | sight.marks;
-  if (look.kind !== FITTING.lookout) return 0;
-  let mask = 0;
-  for (let j = 0; j < SHIPS; j++) {
-    if (j !== i && (known & (1 << j)) !== 0 && dot(ship.pos, state.ships[j].pos) >= LOOKOUT_COS[look.tier]) mask |= 1 << j;
-  }
-  return mask;
-}
+export { isUse, isWeapon };

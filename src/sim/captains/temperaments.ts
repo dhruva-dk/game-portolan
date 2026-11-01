@@ -1,41 +1,45 @@
+// The captains' temperaments: six ways to sail a battle royale, each with a little per-captain variation.
+// A gentle captain (a first match) keeps its distance, shoots late and wide, and heals early.
 import { hash32 } from '../math.ts';
-import { KNOW, type Ship } from '../state.ts';
-import { FITTING, HOME } from '../tables.ts';
-
-type Captain = Ship['captain'];
+import type { Ship } from '../state.ts';
 
 export interface Style {
-  loop: number;
-  stretch: number;
-  wheel: number;
+  /** Fight: how readily it engages, 0–1. */
   fight: number;
-  raid: number;
+  /** How far off it notices and chases a ship, metres. */
+  notice: number;
+  /** Hull below which it breaks off and runs. */
   run: number;
+  /** Hull below which it heals when it can. */
   mend: number;
-  margin: number;
+  /** Interest in loot, 0–1, and how far it goes for it. */
   loot: number;
-  bold: number;
+  lootReach: number;
+  /** Size of the loops it sails to claim water, metres. */
+  loop: number;
+  /** Raiding: cutting rivals' trails, 0–1. */
+  raid: number;
+  /** Metres it keeps inside the Storm's edge. */
+  margin: number;
+  /** Share of the preferred range it closes to: under 1 presses in, over 1 stands off. */
   standoff: number;
-  stalk: number;
-  edge: number;
-  guard: number;
-  commit: number;
-  bolt: boolean;
-  gold: number;
+  /** Coins it holds back before calling the gull. */
+  thrift: number;
 }
 
-const BASE = { wheel: 2.4, stalk: 0, edge: 0, guard: 0, commit: 0, bolt: false, gold: 1 };
+export const GENTLE: Style = { fight: 0.15, notice: 70, run: 55, mend: 75, loot: 0.8, lootReach: 140, loop: 40, raid: 0, margin: 40, standoff: 1.3, thrift: 20 };
 
-export const GENTLE: Style = { ...BASE, loop: 15, stretch: 0.2, fight: 0.15, raid: 0, run: 0.6, mend: 0.6, margin: 18, loot: 0.7, bold: 0, standoff: 1 };
-
+/** Hunter, Homesteader, Raider, Turtle, Scavenger, Brawler. */
 export const STYLES: readonly Style[] = [
-  { ...BASE, loop: 11, stretch: 0.75, fight: 0.6, raid: 0.65, run: 0.5, mend: 0.7, margin: 18, loot: 0.2, bold: 0.5, standoff: 0.6, stalk: 1 },
-  { ...BASE, loop: 36, stretch: 0.1, wheel: 1.0, fight: 0.05, raid: 0, run: 0.7, mend: 0.65, margin: 16, loot: 0, bold: 0.15, standoff: 0.85 },
-  { ...BASE, loop: 16, stretch: 0.45, fight: 0.25, raid: 2, run: 0.6, mend: 0.5, margin: 14, loot: 0.55, bold: 0.8, standoff: 0.95, bolt: true },
-  { ...BASE, loop: 7, stretch: 0.1, wheel: 0.6, fight: 0.2, raid: 0.1, run: 0.45, mend: 0.6, margin: 18, loot: 0.45, bold: 0.05, standoff: 0.75, guard: 0.5 },
-  { ...BASE, loop: 12, stretch: 0.35, fight: 0.1, raid: 0.25, run: 0.45, mend: 0.55, margin: 14, loot: 1, bold: 0.3, standoff: 1, stalk: 0.35, edge: 1.6 },
-  { ...BASE, loop: 56, stretch: 0.6, wheel: 2.9, fight: 0.35, raid: 0.15, run: 0.2, mend: 0.2, margin: 8, loot: 0.45, bold: 0.9, standoff: 0.6, commit: 1.4, gold: 6 },
+  { fight: 0.8, notice: 200, run: 25, mend: 50, loot: 0.4, lootReach: 120, loop: 45, raid: 0.5, margin: 25, standoff: 0.9, thrift: 0 },
+  { fight: 0.3, notice: 110, run: 45, mend: 65, loot: 0.5, lootReach: 130, loop: 90, raid: 0.1, margin: 35, standoff: 1.1, thrift: 30 },
+  { fight: 0.55, notice: 160, run: 35, mend: 55, loot: 0.5, lootReach: 120, loop: 40, raid: 1, margin: 25, standoff: 0.9, thrift: 0 },
+  { fight: 0.35, notice: 120, run: 50, mend: 70, loot: 0.6, lootReach: 110, loop: 30, raid: 0, margin: 45, standoff: 1.25, thrift: 45 },
+  { fight: 0.3, notice: 120, run: 40, mend: 60, loot: 1, lootReach: 220, loop: 35, raid: 0.2, margin: 30, standoff: 1.15, thrift: 0 },
+  { fight: 1, notice: 220, run: 15, mend: 40, loot: 0.3, lootReach: 90, loop: 30, raid: 0.3, margin: 15, standoff: 0.7, thrift: 0 },
 ];
+
+export const STYLE_NAMES = ['hunter', 'homesteader', 'raider', 'turtle', 'scavenger', 'brawler'] as const;
 
 const IDS = 64;
 const unit = (x: number): number => Math.max(0, Math.min(1, x));
@@ -44,42 +48,16 @@ function signature(t: Style, id: number): Style {
   const u = (k: number): number => (hash32(0x51a7e, id * 16 + k) & 0xffff) / 0xffff;
   return {
     ...t,
-    loop: t.loop * (0.8 + 0.4 * u(0)),
-    stretch: Math.min(0.9, unit(t.stretch + 0.24 * (u(1) - 0.5))),
-    standoff: t.standoff * (0.85 + 0.3 * u(2)),
-    edge: t.edge * (0.85 + 0.3 * u(2)),
-    run: unit(t.run + 0.14 * (u(3) - 0.5)),
-    wheel: t.wheel * (0.8 + 0.4 * u(4)) * (u(5) < 0.5 ? -1 : 1),
-    margin: t.margin * (0.8 + 0.4 * u(6)),
-    bold: unit(t.bold + 0.2 * (u(7) - 0.5)),
+    fight: unit(t.fight + 0.2 * (u(0) - 0.5)),
+    notice: t.notice * (0.85 + 0.3 * u(1)),
+    run: t.run * (0.8 + 0.4 * u(2)),
+    loop: t.loop * (0.8 + 0.4 * u(3)),
+    margin: t.margin * (0.8 + 0.4 * u(4)),
+    standoff: t.standoff * (0.9 + 0.2 * u(5)),
   };
 }
 
-const OVER: Partial<Style>[] = [];
-const signAll = (): Style[] => STYLES.flatMap((t, k) => Array.from({ length: IDS }, (_, id) => signature({ ...t, ...OVER[k] }, id)));
-let SIGNED: readonly Style[] = signAll();
-export function restyle(t: number, o: Partial<Style>): void {
-  OVER[t] = o;
-  SIGNED = signAll();
-}
+const SIGNED: readonly Style[] = STYLES.flatMap((t) => Array.from({ length: IDS }, (_, id) => signature(t, id)));
 
-export const styleOf = (ship: Ship): Style => (ship.captain.gentle ? GENTLE : SIGNED[ship.captain.temperament * IDS + (ship.pigment % IDS)]);
-
-export const wary = (c: Captain): number => ((c.knows & KNOW.raids) !== 0 ? unit(c.raids / 20) : 0);
-
-export const reachOf = (c: Captain, style: Style): number => style.loop * (1 - 0.3 * wary(c));
-
-export const PATROL = { wide: 20, beyond: 1.5, step: 0.6 } as const;
-
-export const patrolOf = (c: Captain, style: Style): number =>
-  style.stalk >= 0.8 && (c.knows & KNOW.loop) !== 0 && c.loop >= PATROL.wide ? HOME.radius + PATROL.beyond * c.loop : 0;
-
-const WARY: Readonly<Record<number, number>> = {
-  [FITTING.stemPost]: 0.15, [FITTING.ironRam]: 0.2, [FITTING.cutwater]: 0.1, [FITTING.swivelGuns]: 0.2, [FITTING.longGuns]: -0.2, [FITTING.mortar]: -0.15,
-};
-
-export function standoff(c: Captain, style: Style, j: number): number {
-  let s = style.standoff;
-  if (j === 0) for (let k = 0; k < Math.min(2, c.fittings.length); k++) s += WARY[c.fittings[k]] ?? 0;
-  return Math.max(0.35, Math.min(1.2, s));
-}
+export const styleOf = (ship: Ship): Style =>
+  (ship.captain.gentle ? GENTLE : SIGNED[(ship.captain.temperament % STYLES.length) * IDS + (ship.look % IDS)]);

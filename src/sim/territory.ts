@@ -1,18 +1,19 @@
-import { bankPurse, fill, spill } from './economy.ts';
-import { timeOf, type Sea } from './environment.ts';
-import { cross, dcos, dot, dsin, normalize, set, v3, type V3 } from './math.ts';
+// Territory, ported from the old simulation: water a ship sails through outside its own takes its trail;
+// coming home closes the loop and inks everything inside. Cutting a rival's trail costs its hull and pays the
+// cutter. Holding a region's landmark gives that region's perk. Ships mend slowly in their own water.
+import { hurt } from './harm.ts';
+import { dcos, dot, normalize, set, v3 } from './math.ts';
+import { hasPerk } from './perks.ts';
 import { AREA_Q, GRID, R, TERRITORY, cellDir, cellOf, neighbor } from './sphere.ts';
-import { EVENT, SHIPS, afloat, chronicle, emit, type MatchState } from './state.ts';
-import { HARBOUR, HOME, PERK } from './tables.ts';
-import { ZONE } from './world/geography.ts';
-import type { Perk } from './world/regions.ts';
+import { CAUSE, EVENT, PHASE, SHIPS, TICK, emit, type MatchState } from './state.ts';
+import { INK, PERKS } from './tables.ts';
+import { LANDMARKS } from './world/index.ts';
 
 const M = GRID - 1, FACE_MASK = GRID * GRID - 1, LOG = TERRITORY.log, FACE_SHIFT = 2 * LOG, AREA = TERRITORY.area;
 const STRIDE = 0.15;
 const TURN = 32;
-const HOME_COS = dcos(HOME.radius / R);
-const BEAM_REACH = dcos(PERK.crownLight.reach / R), BEAM_HALF = dcos(PERK.crownLight.half);
-const ORIGIN = v3(), P = v3(), D = v3(), RIGHT = v3(), BEAM = v3();
+const HOME_COS = dcos(INK.home / R);
+const ORIGIN = v3(), P = v3(), D = v3();
 
 const BLOG = 4, B = 1 << BLOG, BLOG2 = LOG - BLOG, BM = (GRID >> BLOG) - 1, BFACE = 2 * BLOG2, BLOCKS = 6 << BFACE;
 const CLEAN = 1, DIRTY = 2, ROW_WORDS = GRID >> 2, BLOCK_WORDS = B >> 2, ROW_EIGHTS = GRID >> 3, BLOCK_EIGHTS = B >> 3;
@@ -33,69 +34,62 @@ const parent: number[] = [], area: number[] = [], front: number[] = [], back: nu
 let me = 0, owner: Uint8Array = new Uint8Array(0), root = 0, seen = 0, bseen = 0, classed = 0;
 let words: Int32Array = new Int32Array(0), eights: Float64Array = new Float64Array(0), mine = 0;
 
+
+/** Square metres in a held area. */
+export const squareMetres = (held: number): number => held / AREA_Q;
+
 export const atHome = (state: MatchState, i: number): boolean => state.owner[cellOf(TERRITORY, state.ships[i].pos)] === i + 1;
 
-const landmarkOf = (sea: Sea, perk: Perk): number => sea.geo.landmarks.findIndex((l) => l.perk === perk);
+/** The territory cell under each landmark: whoever owns it holds that region's perk. */
+const MARKS: readonly number[] = LANDMARKS.map((l) => cellOf(TERRITORY, l.pos));
 
-export const holder = (sea: Sea, state: MatchState, perk: Perk): number => state.owner[sea.marks[landmarkOf(sea, perk)]] - 1;
+/** The ship holding region r's landmark, or -1. */
+export const holderOf = (state: MatchState, r: number): number => state.owner[MARKS[r]] - 1;
 
-export const holds = (sea: Sea, state: MatchState, i: number, perk: Perk): boolean => holder(sea, state, perk) === i;
-
-export function perksOf(sea: Sea, state: MatchState, i: number): number {
-  let mask = 0;
-  for (let k = 0; k < sea.marks.length; k++) if (state.owner[sea.marks[k]] === i + 1) mask |= 1 << k;
-  return mask;
-}
-
-export function repairRate(sea: Sea, state: MatchState, i: number): number {
-  const cell = cellOf(TERRITORY, state.ships[i].pos);
-  if ((sea.geo.zones[cell] & ZONE.harbour) !== 0 || sheltered(sea, state, i)) return HARBOUR.repair;
-  if (state.owner[cell] !== i + 1) return 0;
-  return holds(sea, state, i, 'greatFalls') ? HOME.repair * PERK.greatFalls : HOME.repair;
-}
-
-export function sheltered(sea: Sea, state: MatchState, i: number): boolean {
-  const lagoon = sea.geo.landmarks[landmarkOf(sea, 'greatLagoon')];
-  return holds(sea, state, i, 'greatLagoon') && dot(state.ships[i].pos, lagoon.pos) >= dcos(lagoon.r / R);
-}
-
-export function gullPrice(sea: Sea, state: MatchState, i: number, price: number): number {
-  const home = atHome(state, i) ? price * HOME.gull : price;
-  return holds(sea, state, i, 'spiceHarbour') ? home * PERK.spiceHarbour : home;
-}
-
-export const reloadSpeed = (sea: Sea, state: MatchState, i: number): number =>
-  (holds(sea, state, i, 'arch') ? PERK.arch : 1);
-
-export const chestSpeed = (sea: Sea, state: MatchState, i: number): number =>
-  (holds(sea, state, i, 'sandbarLight') ? PERK.sandbarLight : 1);
-
-export const unseen = (sea: Sea, state: MatchState, i: number): boolean =>
-  atHome(state, i) && holds(sea, state, i, 'kelpCathedral');
-
-export function crownBeam(sea: Sea, state: MatchState, out: V3): V3 {
-  const mark = sea.geo.landmarks[landmarkOf(sea, 'crownLight')], e = mark.facing;
-  const a = (2 * Math.PI * timeOf(state)) / PERK.crownLight.period, c = dcos(a), s = dsin(a);
-  cross(RIGHT, e, mark.pos);
-  return set(out, e.x * c + RIGHT.x * s, e.y * c + RIGHT.y * s, e.z * c + RIGHT.z * s);
-}
-
-export function beamMarks(sea: Sea, state: MatchState, i: number): number {
-  if (!holds(sea, state, i, 'crownLight')) return 0;
-  const light = sea.geo.landmarks[landmarkOf(sea, 'crownLight')].pos, beam = crownBeam(sea, state, BEAM);
-  let mask = 0;
-  for (let j = 0; j < SHIPS; j++) {
-    const p = state.ships[j].pos, near = dot(p, light);
-    if (j === i || near < BEAM_REACH || near >= 1 || !afloat(state.ships[j])) continue;
-    if (dot(p, beam) >= BEAM_HALF * Math.sqrt(1 - near * near)) mask |= 1 << j;
+/** Recomputes who holds which perk, and tells of the changes. */
+export function perks(state: MatchState): void {
+  for (let i = 0; i < SHIPS; i++) {
+    const ship = state.ships[i];
+    let mask = 0;
+    if (ship.phase !== PHASE.sunk) for (let r = 0; r < MARKS.length; r++) if (state.owner[MARKS[r]] === i + 1) mask |= 1 << r;
+    const gained = mask & ~ship.perks, lost = ship.perks & ~mask;
+    ship.perks = mask;
+    for (let r = 0; r < MARKS.length; r++) {
+      if ((gained & (1 << r)) !== 0) emit(state, EVENT.perkGained, i, -1, LANDMARKS[r].pos, { item: r });
+      if ((lost & (1 << r)) !== 0) emit(state, EVENT.perkLost, i, -1, LANDMARKS[r].pos, { item: r });
+    }
   }
-  return mask;
+}
+
+/** Mending in your own water, once nobody has hit you for a few seconds; twice as fast with Fast Repair. */
+export function mendAtHome(state: MatchState): void {
+  const quiet = Math.round(INK.quiet / TICK);
+  for (let i = 0; i < SHIPS; i++) {
+    const ship = state.ships[i];
+    if (ship.phase !== PHASE.sea || ship.hull >= 100 || state.tick - ship.lastHit < quiet || !atHome(state, i)) continue;
+    ship.hull = Math.min(100, ship.hull + INK.repair * (hasPerk(ship, 'fastRepair') ? PERKS.fastRepair : 1) * TICK);
+  }
+}
+
+/** Every so often, held water pays rent in coins. */
+export function rent(state: MatchState): void {
+  state.rentT += TICK;
+  if (state.rentT < INK.every) return;
+  state.rentT -= INK.every;
+  for (let i = 0; i < SHIPS; i++) {
+    const ship = state.ships[i];
+    if (ship.phase === PHASE.sunk || ship.held <= 0) continue;
+    const coins = Math.floor(squareMetres(ship.held) * INK.rent);
+    if (coins <= 0) continue;
+    ship.coins += coins;
+    emit(state, EVENT.coins, i, -1, ship.pos, { amount: coins, item: 1 });
+  }
 }
 
 export function intruders(state: MatchState, i: number): number {
   let mask = 0;
   for (let j = 0; j < SHIPS; j++) {
-    if (j !== i && afloat(state.ships[j]) && state.owner[cellOf(TERRITORY, state.ships[j].pos)] === i + 1) mask |= 1 << j;
+    if (j !== i && state.ships[j].phase !== PHASE.sunk && state.owner[cellOf(TERRITORY, state.ships[j].pos)] === i + 1) mask |= 1 << j;
   }
   return mask;
 }
@@ -120,7 +114,7 @@ export function inkHome(state: MatchState, i: number): number {
     }
   }
   for (let k = 0; k < n; k++) LABEL[SEEN[k]] = 0;
-  emit(state, EVENT.home, i, -1, p, inked / AREA_Q, cells);
+  emit(state, EVENT.home, i, -1, p, { amount: inked / AREA_Q, cells });
   return inked / AREA_Q;
 }
 
@@ -134,7 +128,7 @@ export function swallow(state: MatchState, cells: ArrayLike<number>): void {
     own(state, c, 0);
     lost.push(c);
   }
-  if (lost.length > 0) emit(state, EVENT.swallow, -1, -1, ORIGIN, swallowed / AREA_Q, lost);
+  if (lost.length > 0) emit(state, EVENT.swallow, -1, -1, ORIGIN, { amount: swallowed / AREA_Q, cells: lost });
 }
 
 export function founder(state: MatchState, i: number): void {
@@ -146,11 +140,11 @@ export function founder(state: MatchState, i: number): void {
     own(state, c, 0);
     freed.push(c);
   }
-  emit(state, EVENT.freed, i, -1, ship.pos, held / AREA_Q, freed);
+  emit(state, EVENT.freed, i, -1, ship.pos, { amount: held / AREA_Q, cells: freed });
 }
 
 export function chart(state: MatchState): void {
-  for (let i = 0; i < SHIPS; i++) lay(state, i);
+  for (let i = 0; i < SHIPS; i++) if (state.ships[i].phase === PHASE.sea) lay(state, i);
   pennant(state);
 }
 
@@ -170,7 +164,6 @@ function lay(state: MatchState, i: number): void {
     enter(state, i, from, c);
     from = c;
   }
-  if (ship.laid.length > 0) fill(state, i, dist);
 }
 
 function adjacent(a: number, b: number): boolean {
@@ -193,22 +186,30 @@ function enter(state: MatchState, i: number, from: number, c: number): void {
     if (ship.laid.length > 0) closeLoop(state, i);
     return;
   }
-  if (ship.laid.length === 0 && (state.owner[from] !== mark || ship.cut > 0)) return;
+  if (ship.laid.length === 0 && state.owner[from] !== mark) return;
   if (state.trail[c] !== mark) {
     ship.laid.push(c);
     state.trail[c] = mark;
   }
+  if (ship.laid.length > INK.trail) {
+    // too long a trail runs dry
+    emit(state, EVENT.cut, i, -1, ship.pos, { amount: 0, cells: ship.laid.slice(), flag: 1 });
+    wash(state, i);
+  }
 }
 
+/** Ship `by` sails across ship j's trail: j's trail is gone, it pays in hull past the shield, and the cutter is paid. */
 export function breakTrail(state: MatchState, j: number, by: number, c: number): void {
   const ship = state.ships[j];
-  if (ship.laid.length === 0 || ship.ward > 0 || (j === 0 && state.charm)) return;
-  const cells = ship.laid.slice(), lost = ship.purse, at = cellDir(TERRITORY, c, v3());
+  if (ship.laid.length === 0) return;
+  const cells = ship.laid.slice(), at = cellDir(TERRITORY, c, v3());
   wash(state, j);
-  ship.purse = 0;
-  emit(state, EVENT.broken, j, by, at, lost, cells);
-  chronicle(state, EVENT.broken, j, by, lost);
-  if (lost > 0) spill(state, at, lost, j);
+  emit(state, EVENT.cut, j, by, at, { amount: INK.cut, cells });
+  hurt(state, j, INK.cut, by, CAUSE.ink, at, 1);
+  if (by >= 0) {
+    state.ships[by].coins += INK.cutCoins;
+    emit(state, EVENT.coins, by, j, at, { amount: INK.cutCoins, item: 2 });
+  }
 }
 
 function wash(state: MatchState, i: number): void {
@@ -281,10 +282,12 @@ function closeLoop(state: MatchState, i: number): void {
   ship.held += gained;
   const cells = laid.slice();
   wash(state, i);
-  emit(state, EVENT.loop, i, -1, ship.pos, gained / AREA_Q, cells);
-  chronicle(state, EVENT.loop, i, -1, gained / AREA_Q);
-  bankPurse(state, i);
-  if (i === 0) state.charm = false;
+  emit(state, EVENT.claim, i, -1, ship.pos, { amount: gained / AREA_Q, cells });
+  const coins = Math.floor((gained / AREA_Q) * INK.claim);
+  if (coins > 0) {
+    ship.coins += coins;
+    emit(state, EVENT.coins, i, -1, ship.pos, { amount: coins, item: 3 });
+  }
 }
 
 function claim(c: number): number {
@@ -463,6 +466,5 @@ function pennant(state: MatchState): void {
   if (best === was) return;
   state.leader = best;
   const held = best >= 0 ? state.ships[best].held / AREA_Q : 0;
-  emit(state, EVENT.lead, best, was, best >= 0 ? state.ships[best].pos : ORIGIN, held);
-  chronicle(state, EVENT.lead, best, was, held);
+  emit(state, EVENT.lead, best, was, best >= 0 ? state.ships[best].pos : ORIGIN, { amount: held });
 }

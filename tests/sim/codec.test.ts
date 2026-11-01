@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { bool, bytes, decode, encode, f64, hash64, int, list, rec, words, type Format, type Kind } from '../../src/sim/codec.ts';
 import { dot, rngChance, rngFloat, rngFrom, rngInt, rngRange, rngU32, v3, type Rng } from '../../src/sim/math.ts';
 import { R, TERRITORY, cellDir } from '../../src/sim/sphere.ts';
-import { MATCH_FORMAT, SHIPS, createMatch, decodeMatch, encodeMatch, matchHash, type MatchState } from '../../src/sim/state.ts';
+import { createMatch } from '../../src/sim/setup.ts';
+import { MATCH_FORMAT, SHIPS, decodeMatch, encodeMatch, matchHash, type MatchState } from '../../src/sim/state.ts';
 
 function randomValue(kind: Kind, r: Rng): unknown {
   switch (kind.t) {
@@ -141,7 +142,7 @@ function lateMatch(seed: number): MatchState {
     for (let i = 0; i < SHIPS; i++) if (dot(p, homes[i]) > within[i]) s.owner[c] = i + 1;
   }
   for (let i = 0; i < SHIPS; i++) for (let k = 0; k < 400; k++) s.trail[rngInt(r, TERRITORY.cells)] = i + 1;
-  for (const ship of s.ships) ship.course = Array.from({ length: rngInt(r, 50) }, () => rngInt(r, TERRITORY.cells));
+  for (const ship of s.ships) ship.captain.path = Array.from({ length: rngInt(r, 50) }, () => rngInt(r, TERRITORY.cells));
   s.tick = 12_345;
   return s;
 }
@@ -177,8 +178,8 @@ test('the match hash depends on every part of the state', () => {
     (s) => s.tick++,
     (s) => (s.seed ^= 1),
     (s) => (s.rng[3][2] ^= 1 << 30),
-    (s) => (s.ships[9].sail = (s.ships[9].sail + 1) % 3),
-    (s) => s.ships[4].course.push(0),
+    (s) => (s.ships[9].shield += 1),
+    (s) => s.ships[4].captain.path.push(0),
     (s) => (s.owner[TERRITORY.cells - 1] ^= 1),
     (s) => (s.trail[0] ^= 4),
   ];

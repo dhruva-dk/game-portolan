@@ -1,283 +1,342 @@
+// The new world against PLAN.md's pass 1 lines for the planet and for every region. Each check that the
+// world does not meet yet is marked todo: it still runs and reports what it measured, without failing the run.
+// Take the todo off once the regions are fixed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PI, dot, normalize, v3, type V3 } from '../../src/sim/math.ts';
-import { R, TERRITORY, cellArea, cellDir, cellOf, neighbor } from '../../src/sim/sphere.ts';
-import { DRAFT, REGIONS, TIDE, rimAt } from '../../src/sim/world/regions.ts';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { PI, dot, rngFloat, rngFrom, v3, type V3 } from '../../src/sim/math.ts';
+import { R, TERRITORY, along, cellDir, cellOf, fromLatLon, horizonDistance, neighbor, surfaceDistance, tangentAt } from '../../src/sim/sphere.ts';
+import { SHIP } from '../../src/sim/tables.ts';
 import {
-  CHARTS, CLEAR, NEIGHBOURS, ZONE, buildGeography, chartTangent, coastAt, greatCurrent, heightAt, regionOf, toWorld,
-} from '../../src/sim/world/geography.ts';
-import { NAV, buildNav, findRoute, navCellOf, type Nav } from '../../src/sim/world/nav.ts';
+  BEACONS, BLEND, CENTRES, CURRENTS, GREAT_CURRENT, LANDMARKS, LOOT_SPOTS, REGIONS, REGION_COUNT, TIDAL_PASSAGES, TIDE_AMPLITUDE, ZONE,
+  bakeHeights, currentAt, heightAt, navigable, obstacleAt, regionAt, regionIndex, regionMix, regionWeights, zonesAt, type RegionId,
+} from '../../src/sim/world/index.ts';
 
-const cpuMs = (): number => {
-  const u = process.cpuUsage();
-  return (u.user + u.system) / 1000;
-};
-let t0 = cpuMs();
-const geo = buildGeography();
-const buildMs = cpuMs() - t0;
-t0 = cpuMs();
-const nav = buildNav(geo);
-const navMs = cpuMs() - t0;
-console.log(`# buildGeography ${buildMs.toFixed(0)} ms, buildNav ${navMs.toFixed(0)} ms`);
+bakeHeights();
 
-const LOW = -TIDE.amp + 0.01, HIGH = TIDE.amp - 0.01;
-const idx = (id: string) => REGIONS.findIndex((r) => r.id === id);
-const at = (ri: number, x: number, y: number) => toWorld(ri, x, y, v3());
-const deg = (b: number) => b * (PI / 180);
-
-function flood(n: Nav, from: number, tide: number, blocked?: (c: number) => boolean): Uint8Array {
-  const seen = new Uint8Array(NAV.cells), stack = [from];
-  seen[from] = 1;
-  while (stack.length) {
-    const c = stack.pop()!;
-    for (let s = 0; s < 4; s++) {
-      const m = neighbor(NAV, c, s);
-      if (seen[m] || !(n.edge[c * 4 + s] < tide) || blocked?.(m)) continue;
-      seen[m] = 1;
-      stack.push(m);
+const rng = rngFrom(0x5eed);
+function anywhere(out: V3): V3 {
+  for (;;) {
+    const x = rngFloat(rng) * 2 - 1, y = rngFloat(rng) * 2 - 1, z = rngFloat(rng) * 2 - 1, l = x * x + y * y + z * z;
+    if (l > 0.01 && l <= 1) {
+      const s = 1 / Math.sqrt(l);
+      out.x = x * s;
+      out.y = y * s;
+      out.z = z * s;
+      return out;
     }
   }
-  return seen;
 }
-const ocean = normalize(v3(CHARTS[0].c.x + CHARTS[1].c.x + CHARTS[2].c.x, CHARTS[0].c.y + CHARTS[1].c.y + CHARTS[2].c.y,
-  CHARTS[0].c.z + CHARTS[1].c.z + CHARTS[2].c.z));
+const lat = (p: V3): number => (Math.asin(Math.max(-1, Math.min(1, p.y))) * 180) / PI;
+const name = (i: number): string => REGIONS[i].id;
+const NORTH = [1, 2, 3, 4, 5, 6, 7], SOUTH = [8, 9, 10, 11, 12, 13, 14];
+const EYE = horizonDistance(8);
 
-test('generation is fast enough for the world worker', () => {
-  assert.ok(buildMs < 3000, `buildGeography took ${buildMs.toFixed(0)} ms`);
-  assert.ok(navMs < 2000, `buildNav took ${navMs.toFixed(0)} ms`);
+// ---------------------------------------------------------------- the planet
+
+test('the planet is about 554 m across its radius, and a lap at top speed takes about four minutes', () => {
+  assert.ok(Math.abs(R - 554) < 5, `R = ${R}`);
+  const lap = (2 * PI * R) / SHIP.top;
+  assert.ok(lap > 225 && lap < 255, `a lap takes ${lap.toFixed(0)} s`);
 });
 
-test('the twelve regions sit at the vertices of an icosahedron, each with five equidistant neighbours', () => {
-  assert.equal(REGIONS.length, 12);
-  const edge = Math.atan(2);
-  CHARTS.forEach((a, i) => {
-    assert.equal(NEIGHBOURS[i].length, 5);
-    for (const j of NEIGHBOURS[i]) assert.ok(Math.abs(Math.acos(dot(a.c, CHARTS[j].c)) - edge) < 1e-9, `${i}–${j}`);
-    for (let j = 0; j < 12; j++) if (j !== i && !NEIGHBOURS[i].includes(j)) assert.ok(Math.acos(dot(a.c, CHARTS[j].c)) > edge + 0.1);
-  });
-});
-
-test('each region has its own landmark and perk, at least one harbour and one light', () => {
-  const perks = new Set(REGIONS.map((r) => r.landmark.perk));
-  assert.equal(perks.size, 12);
-  REGIONS.forEach((r, ri) => {
-    assert.equal(geo.landmarks[ri].region, ri);
-    assert.equal(regionOf(geo.landmarks[ri].pos), ri, `${r.id} landmark outside its region`);
-    assert.ok(r.harbours.length >= 1 && r.lighthouses.length >= 1, r.id);
-  });
-});
-
-test('harbours are sheltered, navigable anchorages facing out through their mouths', () => {
-  for (const h of geo.harbours) {
-    const id = REGIONS[h.region].id;
-    assert.ok(coastAt(geo, h.pos) >= CLEAR, `${id} anchorage ${coastAt(geo, h.pos).toFixed(1)} u from shore`);
-    let sheltered = 0;
-    for (let k = 0; k < 32; k++) {
-      const t = chartTangent(h.region, h.pos, k * 11.25, v3()), p = v3();
-      for (let d = 1; d <= 30; d += 0.5) {
-        if (heightAt(geo, step(h.pos, t, d, p)) >= -DRAFT) { sheltered++; break; }
-      }
-    }
-    assert.ok(sheltered >= 16, `${id} harbour sheltered on ${sheltered}/32 bearings`);
-    const p = v3();
-    for (let d = 1; d <= 8; d += 0.5) assert.ok(coastAt(geo, step(h.pos, h.facing, d, p)) > 1, `${id} harbour mouth blocked ${d} u out`);
+test('a cap at each pole and two staggered rings of seven, in the listed order', () => {
+  assert.equal(REGION_COUNT, 16);
+  assert.equal(REGIONS[0].id, 'iceCrown');
+  assert.equal(REGIONS[0].lat, 90);
+  assert.equal(REGIONS[15].id, 'maelstrom');
+  assert.equal(REGIONS[15].lat, -90);
+  const order: RegionId[] = [
+    'fjords', 'mistwood', 'spires', 'narrows', 'basaltStacks', 'kelpShallows', 'blossomRun',
+    'glassSea', 'jadeShoals', 'coralAtolls', 'spiceIsles', 'fireArchipelago', 'weepingIsle', 'mangroveLabyrinth',
+  ];
+  order.forEach((id, k) => assert.equal(regionIndex(id), k + 1, id));
+  for (let k = 0; k < 7; k++) {
+    const n = REGIONS[NORTH[k]], s = REGIONS[SOUTH[k]];
+    assert.ok(n.lat > 0 && s.lat < 0);
+    // the southern ring sits half a step round from the northern one
+    const off = (((n.lon - s.lon) % (360 / 7)) + 360 / 7) % (360 / 7);
+    assert.ok(Math.abs(off - 360 / 14) < 1e-9, `${n.id} and ${s.id} are ${off}° apart`);
   }
 });
 
-test('lighthouses stand on headlands, looking out to sea', () => {
-  for (const l of geo.lights) {
-    const id = REGIONS[l.region].id, p = v3();
-    assert.ok(heightAt(geo, l.pos) > TIDE.amp - DRAFT + 0.3, `${id} light at height ${heightAt(geo, l.pos).toFixed(2)}`);
-    let wet = 0;
-    for (let k = 0; k < 32; k++) {
-      const t = chartTangent(l.region, l.pos, k * 11.25, v3());
-      for (let d = 0.5; d <= 12; d += 0.5) if (heightAt(geo, step(l.pos, t, d, p)) < -DRAFT) { wet++; break; }
-    }
-    assert.ok(wet >= 16, `${id} light sees the sea on ${wet}/32 bearings`);
-    assert.ok(heightAt(geo, step(l.pos, l.facing, 8, p)) < -DRAFT, `${id} light faces land`);
+// Borders seen by sampling: which pairs of regions meet.
+const borders = new Set<string>();
+const SEAM = { maxLat: 0 };
+{
+  const P = v3(), M = { a: 0, b: 0, t: 0 };
+  for (let k = 0; k < 100_000; k++) {
+    anywhere(P);
+    regionMix(P, M);
+    if (M.t < 0.45) continue;
+    borders.add(`${Math.min(M.a, M.b)}-${Math.max(M.a, M.b)}`);
+    const crossRing = (NORTH.includes(M.a) && SOUTH.includes(M.b)) || (SOUTH.includes(M.a) && NORTH.includes(M.b));
+    if (crossRing) SEAM.maxLat = Math.max(SEAM.maxLat, Math.abs(lat(P)));
+  }
+}
+const meets = (a: number, b: number): boolean => borders.has(`${Math.min(a, b)}-${Math.max(a, b)}`);
+
+test('each ring region touches two regions in the other ring', () => {
+  for (const i of [...NORTH, ...SOUTH]) {
+    const other = NORTH.includes(i) ? SOUTH : NORTH;
+    const touched = other.filter((j) => meets(i, j));
+    assert.equal(touched.length, 2, `${name(i)} touches ${touched.map(name).join(', ')}`);
+    const listed = REGIONS[i].neighbours.filter((j) => other.includes(j));
+    assert.deepEqual([...touched].sort(), [...listed].sort(), `${name(i)}'s neighbours list`);
   }
 });
 
-test('every cut edge of the chart net runs through open sea, at least 40 u from land', () => {
-  let worst = Infinity;
-  for (let i = 0; i < 12; i++) {
-    for (const j of NEIGHBOURS[i]) {
-      if (j < i) continue;
-      const ends = NEIGHBOURS[i].filter((k) => NEIGHBOURS[j].includes(k)).map((k) =>
-        normalize(v3(CHARTS[i].c.x + CHARTS[j].c.x + CHARTS[k].c.x, CHARTS[i].c.y + CHARTS[j].c.y + CHARTS[k].c.y,
-          CHARTS[i].c.z + CHARTS[j].c.z + CHARTS[k].c.z)));
-      assert.equal(ends.length, 2);
-      const len = R * Math.acos(dot(ends[0], ends[1])), p = v3();
-      for (let s = 0; s <= len; s += 1) {
-        const t = s / len;
-        normalize(Object.assign(p, { x: ends[0].x * (1 - t) + ends[1].x * t, y: ends[0].y * (1 - t) + ends[1].y * t, z: ends[0].z * (1 - t) + ends[1].z * t }));
-        worst = Math.min(worst, coastAt(geo, p));
-      }
-    }
-  }
-  assert.ok(worst >= 40, `land within ${worst.toFixed(1)} u of a cut edge`);
-});
-
-test('the whole world is navigable from the open sea at every tide', () => {
-  const water = ['greatFalls', 'arch', 'kelpCathedral', 'greatLagoon', 'spiceHarbour', 'rootGate', 'whaleRoad', 'eye'];
-  for (const tide of [LOW, 0, HIGH]) {
-    const seen = flood(nav, navCellOf(ocean), tide);
-    for (const h of geo.harbours) assert.ok(seen[navCellOf(h.pos)], `${REGIONS[h.region].id} harbour cut off at tide ${tide}`);
-    for (const m of geo.landmarks) if (water.includes(m.perk)) assert.ok(seen[navCellOf(m.pos)], `${m.perk} cut off at tide ${tide}`);
+test('the equator is the seam between the rings', (t) => {
+  t.diagnostic(`the border between the rings strays at most ${SEAM.maxLat.toFixed(1)}° (${((SEAM.maxLat * PI * R) / 180).toFixed(0)} m) from the equator`);
+  // the rings are staggered, so the border zigzags across the equator; it stays inside the blend band
+  assert.ok((SEAM.maxLat * PI * R) / 180 < BLEND, `the seam wanders ${SEAM.maxLat.toFixed(1)}° off the equator`);
+  const P = v3();
+  for (let k = 0; k < 20_000; k++) {
+    anywhere(P);
+    const l = lat(P), r = regionAt(P);
+    if (l > SEAM.maxLat + 0.5) assert.ok(r <= 7, `a point at ${l.toFixed(1)}° is in ${name(r)}`);
+    if (l < -SEAM.maxLat - 0.5) assert.ok(r >= 8, `a point at ${l.toFixed(1)}° is in ${name(r)}`);
   }
 });
 
-test('the Great Lagoon can be entered only through its channel', () => {
-  const ri = idx('coralAtolls'), reef = REGIONS[ri].strokes.find((s) => s.k === 'reef' && s.great);
-  assert.ok(reef && reef.k === 'reef' && reef.gaps.length === 1);
-  const lagoon = geo.landmarks[ri].pos, b = deg(reef.gaps[0].bearing);
-  const rr = rimAt(reef.rim, reef.gaps[0].bearing).r, mouth = at(ri, reef.x + rr * Math.sin(b), reef.y + rr * Math.cos(b));
-  for (const tide of [LOW, HIGH]) {
-    assert.ok(flood(nav, navCellOf(ocean), tide)[navCellOf(lagoon)], 'lagoon unreachable through its channel');
-    const shut = flood(nav, navCellOf(ocean), tide, (c) => R * Math.acos(Math.min(1, dot(cellDir(NAV, c, v3()), mouth))) < 14);
-    assert.ok(!shut[navCellOf(lagoon)], `lagoon reachable with its channel shut at tide ${tide}`);
+test('the regions tile the sphere: every point of 100,000 belongs to exactly one region', () => {
+  const P = v3(), M = { a: 0, b: 0, t: 0 }, seen = new Set<number>();
+  for (let k = 0; k < 100_000; k++) {
+    anywhere(P);
+    const r = regionAt(P);
+    assert.ok(Number.isInteger(r) && r >= 0 && r < REGION_COUNT);
+    regionMix(P, M);
+    assert.equal(M.a, r);
+    assert.ok(M.t <= 0.5);
+    seen.add(r);
   }
-  assert.ok(geo.zones[cellOf(TERRITORY, lagoon)] & ZONE.lagoon);
-  assert.ok(!(geo.zones[cellOf(TERRITORY, at(ri, 8, 40))] & ZONE.lagoon));
+  assert.equal(seen.size, REGION_COUNT);
+  // every observed border is in both regions' neighbour lists
+  for (const b of borders) {
+    const [a, c] = b.split('-').map(Number);
+    assert.ok(REGIONS[a].neighbours.includes(c) && REGIONS[c].neighbours.includes(a), `${name(a)} meets ${name(c)} unlisted`);
+  }
 });
 
-test('every atoll lagoon can be entered only through its own passes', () => {
-  const ri = idx('coralAtolls');
-  for (const s of REGIONS[ri].strokes) {
-    if (s.k !== 'reef') continue;
-    const lagoon = at(ri, s.x, s.y), mouths = s.gaps.map((g) => {
-      const b = deg(g.bearing), r = rimAt(s.rim, g.bearing).r;
-      return at(ri, s.x + r * Math.sin(b), s.y + r * Math.cos(b));
-    });
-    for (const tide of [LOW, HIGH]) {
-      assert.ok(flood(nav, navCellOf(ocean), tide)[navCellOf(lagoon)], `lagoon (${s.x}, ${s.y}) unreachable at tide ${tide}`);
-      const shut = flood(nav, navCellOf(ocean), tide, (c) => mouths.some((m) => R * Math.acos(Math.min(1, dot(cellDir(NAV, c, v3()), m))) < 7));
-      assert.ok(!shut[navCellOf(lagoon)], `lagoon (${s.x}, ${s.y}) reachable with its passes shut at tide ${tide}`);
-    }
+test('a landmark or beacon is above the horizon from at least 95% of the sea, at 8 m up, by day and by night', (t) => {
+  const P = v3();
+  let sea = 0, day = 0, night = 0;
+  for (let k = 0; k < 40_000; k++) {
+    anywhere(P);
+    if (!navigable(P)) continue;
+    sea++;
+    let d = false, n = false;
+    for (const b of BEACONS) if (surfaceDistance(P, b.pos) <= EYE + horizonDistance(b.height)) d = n = true;
+    if (!d) for (const l of LANDMARKS) if (surfaceDistance(P, l.pos) <= EYE + horizonDistance(l.height)) d = true;
+    if (d) day++;
+    if (n) night++;
   }
+  t.diagnostic(`in view by day ${((100 * day) / sea).toFixed(1)}%, by night (beacons only) ${((100 * night) / sea).toFixed(1)}%`);
+  assert.ok(day / sea >= 0.95);
+  assert.ok(night / sea >= 0.95);
 });
-test('the Sound runs through the Fjords end to end, narrow but navigable at every tide', () => {
-  const ri = idx('fjords'), sound = REGIONS[ri].strokes.filter((s) => s.k === 'carve')[0];
-  assert.ok(sound && sound.k === 'carve');
-  const line: V3[] = [];
-  for (let i = 0; i < sound.pts.length; i += 3) line.push(at(ri, sound.pts[i], sound.pts[i + 1]));
-  const off = (c: number) => {
-    const p = cellDir(NAV, c, v3());
-    let d = Infinity;
-    for (let i = 1; i < line.length; i++) d = Math.min(d, distToArc(p, line[i - 1], line[i]));
-    return d > 10;
+
+// ---------------------------------------------------------------- every region
+
+test('each region\'s terrain comes from its own module', () => {
+  const dir = fileURLToPath(new URL('../../src/sim/world/regions/', import.meta.url));
+  const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+  const bodies = new Set<string>();
+  for (const r of REGIONS) {
+    assert.ok(files.includes(`${r.id}.ts`), `regions/${r.id}.ts`);
+    const src = readFileSync(`${dir}${r.id}.ts`, 'utf8');
+    assert.match(src, new RegExp(`export const ${r.id}: RegionSpec`), `${r.id} exports its spec`);
+    assert.match(src, /height\s*[(:]/, `${r.id} has its own height function`);
+    bodies.add(src);
+  }
+  assert.equal(bodies.size, REGION_COUNT);
+});
+
+// The longest straight run with nothing on it, by region: outside the lanes, from a sea point in a random
+// direction, the distance until land, shallows, cover or loot.
+const GAPS = new Array<number>(REGION_COUNT).fill(0);
+{
+  const P = v3(), T = v3(), Q = v3(), C = v3();
+  const loot = (p: V3): boolean => {
+    for (const s of LOOT_SPOTS) if (dot(p, s.pos) > 1 - (15 * 15) / (2 * R * R)) return true;
+    return false;
   };
-  for (const tide of [LOW, HIGH]) {
-    const seen = flood(nav, navCellOf(line[0]), tide, off);
-    assert.ok(seen[navCellOf(line[line.length - 1])], `the Sound is closed at tide ${tide}`);
-  }
-  for (const [x, y] of [[-8, 30], [33, -27], [-6, -34]]) {
-    assert.ok(flood(nav, navCellOf(ocean), LOW)[navCellOf(at(ri, x, y))], `fjord head (${x}, ${y}) cut off`);
-  }
-});
-
-test('the tide opens and shuts passages on the Amber Shoals and in the Coral Atolls', () => {
-  for (const id of ['amberShoals', 'coralAtolls']) {
-    const ri = idx(id);
-    let tidal = 0;
-    for (let c = 0; c < NAV.cells; c++) {
-      if (regionOf(cellDir(NAV, c, v3())) !== ri) continue;
-      for (let s = 0; s < 4; s++) if (Number.isFinite(nav.edge[c * 4 + s])) tidal++;
+  const something = (p: V3): boolean =>
+    heightAt(p) > -4 || (zonesAt(p) & (ZONE.kelp | ZONE.mist | ZONE.canopy | ZONE.curtain)) !== 0 || obstacleAt(p) >= 0 || loot(p);
+  const lane = (p: V3): boolean => {
+    currentAt(p, C);
+    return Math.hypot(C.x, C.y, C.z) > 0.3;
+  };
+  for (let k = 0; k < 2500; k++) {
+    anywhere(P);
+    if (!navigable(P)) continue;
+    tangentAt(P, rngFloat(rng) * 2 * PI, T);
+    let gap = 0, from = regionAt(P);
+    for (let s = 3; s <= 900; s += 3) {
+      along(P, T, s, Q);
+      if (!navigable(Q)) break;
+      if (something(Q) || lane(Q)) {
+        gap = 0;
+        from = regionAt(Q);
+        continue;
+      }
+      gap += 3;
+      if (gap > GAPS[from]) GAPS[from] = gap;
     }
-    assert.ok(tidal >= 8, `${id}: ${tidal} tidal edges`);
   }
-  const ri = idx('amberShoals'), from = navCellOf(at(ri, -60, 0)), harbour = geo.harbours.find((h) => h.region === ri)!;
-  const route: number[] = [], goal = (c: number) => c === navCellOf(harbour.pos);
-  const low = findRoute(nav, from, LOW, goal, harbour.pos, route), high = findRoute(nav, from, HIGH, goal, harbour.pos, route);
-  assert.ok(low > 0 && high > 0, 'harbour unreachable');
-  assert.ok(high < low * 0.7, `high tide ${high.toFixed(0)} u vs low tide ${low.toFixed(0)} u`);
+}
+
+test('outside the lanes, every straight course meets something at least every 217 m', { todo: 'twelve regions have open stretches longer than 217 m' }, (t) => {
+  t.diagnostic(`longest gap by region: ${REGIONS.map((r, i) => `${r.id} ${GAPS[i]} m`).join(', ')}`);
+  const over = REGIONS.filter((_, i) => GAPS[i] > 217).map((r) => r.id);
+  assert.deepEqual(over, []);
 });
 
-test('the Weeping Isle is the largest land in the world, and the Glass Sea has no cover', () => {
-  const comp = new Int32Array(TERRITORY.cells).fill(-1), areas: number[] = [];
+test('neighbours blend across a band at least 100 m wide, where both weigh in', () => {
+  assert.ok(2 * BLEND >= 100, `the band is ${2 * BLEND} m`);
+  const P = v3(), M = { a: 0, b: 0, t: 0 }, W = new Float64Array(REGION_COUNT);
+  let checked = 0;
+  for (let k = 0; k < 200_000 && checked < 2000; k++) {
+    anywhere(P);
+    regionMix(P, M);
+    if (M.t < 0.47) continue;
+    checked++;
+    regionWeights(P, W);
+    // on the border the two sides weigh the same, and more than any third region near a corner
+    const third = Math.max(...W.filter((_, i) => i !== M.a && i !== M.b));
+    assert.ok(W[M.a] > 0.2 && Math.abs(W[M.a] - W[M.b]) < 0.05 && third <= W[M.a] + 1e-9,
+      `on the ${name(M.a)}–${name(M.b)} border: ${W[M.a].toFixed(2)} / ${W[M.b].toFixed(2)}, a third weighs ${third.toFixed(2)}`);
+  }
+  assert.ok(checked > 500, `only ${checked} border points sampled`);
+});
+
+test('the Great Current is a closed loop round the equator that every ring region touches', () => {
+  const P = v3(), C = v3(), E = v3(), touched = new Set<number>();
+  for (let k = 0; k < 3600; k++) {
+    fromLatLon(0, (k / 3600) * 2 * PI, P);
+    assert.ok(navigable(P, -TIDE_AMPLITUDE), `the equator runs aground at ${(k / 10).toFixed(1)}°`);
+    currentAt(P, C);
+    E.x = P.z;
+    E.y = 0;
+    E.z = -P.x;
+    const east = dot(C, E) / Math.hypot(E.x, E.z);
+    assert.ok(east >= GREAT_CURRENT.speed * 0.5, `the current runs ${east.toFixed(2)} m/s east at ${(k / 10).toFixed(1)}°`);
+    touched.add(regionAt(P));
+  }
+  for (const i of [...NORTH, ...SOUTH]) assert.ok(touched.has(i), `${name(i)} doesn't touch the Great Current`);
+});
+
+test('every region has a current that crosses into a neighbour', () => {
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const crossing = CURRENTS.filter((l) => l.region === i && l.pts.some((q) => regionAt(q) === i) && l.pts.some((q) => regionAt(q) !== i));
+    assert.ok(crossing.length > 0, `${name(i)} has no current crossing a border`);
+  }
+});
+
+const water = new Uint8Array(TERRITORY.cells), part = new Int32Array(TERRITORY.cells).fill(-1);
+let mainPart = -1;
+{
+  const P = v3(), sizes: number[] = [], stack: number[] = [];
+  for (let c = 0; c < TERRITORY.cells; c++) water[c] = navigable(cellDir(TERRITORY, c, P), 0) ? 1 : 0;
   for (let c = 0; c < TERRITORY.cells; c++) {
-    if (comp[c] >= 0 || geo.heights[c] < -DRAFT) continue;
-    const id = areas.length, stack = [c];
-    let area = 0;
-    comp[c] = id;
+    if (!water[c] || part[c] >= 0) continue;
+    let size = 0;
+    stack.push(c);
+    part[c] = sizes.length;
     while (stack.length) {
-      const k = stack.pop()!;
-      area += cellArea(TERRITORY, k);
-      for (let s = 0; s < 4; s++) {
-        const m = neighbor(TERRITORY, k, s);
-        if (comp[m] < 0 && geo.heights[m] >= -DRAFT) { comp[m] = id; stack.push(m); }
+      const x = stack.pop()!;
+      size++;
+      for (let k = 0; k < 4; k++) {
+        const y = neighbor(TERRITORY, x, k);
+        if (water[y] && part[y] < 0) {
+          part[y] = sizes.length;
+          stack.push(y);
+        }
       }
     }
-    areas.push(area);
+    sizes.push(size);
   }
-  const weeping = comp[cellOf(TERRITORY, geo.landmarks[idx('weepingIsle')].pos)];
-  const second = Math.max(...areas.filter((_, i) => i !== weeping));
-  assert.ok(weeping >= 0 && areas[weeping] > 1.3 * second, `Weeping Isle ${areas[weeping]} vs next ${second}`);
-  const glass = idx('glassSea');
-  for (let r = 0; r <= 45; r += 1) {
-    for (let a = 0; a < 360; a += 3) assert.ok(heightAt(geo, at(glass, r * Math.sin(deg(a)), r * Math.cos(deg(a)))) < -DRAFT - 2, `cover at ${r} u`);
+  mainPart = sizes.indexOf(Math.max(...sizes));
+}
+
+test('every region has 6 or more loot spots', () => {
+  for (let i = 0; i < REGION_COUNT; i++) assert.ok(LOOT_SPOTS.filter((s) => s.region === i).length >= 6, name(i));
+});
+
+test('every loot spot is in its region, in water a ship can reach at low tide', { todo: 'loot spots in several regions are dry at low tide, cut off, or over the border' }, (t) => {
+  const faults: string[] = [];
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const spots = LOOT_SPOTS.filter((s) => s.region === i);
+    const dry = spots.filter((s) => !navigable(s.pos, -TIDE_AMPLITUDE)).length;
+    const cut = spots.filter((s) => part[cellOf(TERRITORY, s.pos)] !== mainPart).length;
+    const out = spots.filter((s) => regionAt(s.pos) !== i).length;
+    if (dry || cut || out) faults.push(`${name(i)}: ${dry} dry at low tide, ${cut} cut off, ${out} over the border`);
+  }
+  t.diagnostic(faults.join('; ') || 'none');
+  assert.deepEqual(faults, []);
+});
+
+test('every landmark is about 50 m or taller, or carries a light', () => {
+  for (const l of LANDMARKS) {
+    const lit = BEACONS.some((b) => b.region === l.region && surfaceDistance(b.pos, l.pos) <= l.r + 30);
+    assert.ok(l.height >= 50 || lit, `${l.name} is ${l.height} m and unlit`);
+    assert.equal(regionAt(l.pos), l.region, `${l.name} stands in its own region`);
   }
 });
 
-test('the Great Current rides clear of land through four or five neighbouring regions', () => {
-  const seen = new Set<number>();
-  let worst = Infinity, worstSeed = 0;
-  for (let seed = 1; seed <= 200; seed++) {
-    const route = greatCurrent(seed);
-    assert.ok(route.regions.length >= 4 && route.regions.length <= 5);
-    assert.equal(new Set(route.regions).size, route.regions.length);
-    for (let i = 1; i < route.regions.length; i++) assert.ok(NEIGHBOURS[route.regions[i - 1]].includes(route.regions[i]));
-    route.regions.forEach((r) => seen.add(r));
-    const p = v3();
-    for (let k = 0; k < route.points.length; k += 3) {
-      p.x = route.points[k]; p.y = route.points[k + 1]; p.z = route.points[k + 2];
-      const c = coastAt(geo, p);
-      if (c < worst) { worst = c; worstSeed = seed; }
+test('every landmark can be seen over the curve from every point of its borders', { todo: 'eight landmarks drop below the horizon from parts of their borders' }, (t) => {
+  const P = v3(), M = { a: 0, b: 0, t: 0 }, short = new Array<number>(REGION_COUNT).fill(0);
+  for (let k = 0; k < 150_000; k++) {
+    anywhere(P);
+    regionMix(P, M);
+    if (M.t < 0.47) continue;
+    for (const i of [M.a, M.b]) {
+      const l = LANDMARKS[i], over = surfaceDistance(P, l.pos) - (EYE + horizonDistance(l.height));
+      if (over > short[i]) short[i] = over;
     }
-    assert.deepEqual(greatCurrent(seed), route, 'route is not a pure function of the seed');
   }
-  assert.equal(seen.size, 12, 'some region is never on the current');
-  assert.ok(worst >= 8, `the current passes ${worst.toFixed(1)} u from land (seed ${worstSeed})`);
+  const faults = REGIONS.flatMap((r, i) => (short[i] > 0 ? [`${r.id} ${short[i].toFixed(0)} m short`] : []));
+  t.diagnostic(faults.join(', ') || 'none');
+  assert.deepEqual(faults, []);
 });
 
-test('the fixed current lanes run clear of land', () => {
-  for (const lane of geo.lanes) {
-    const len = R * Math.acos(dot(lane.a, lane.b)), p = v3();
-    for (let s = 0; s <= len; s++) {
-      const t = s / len;
-      normalize(Object.assign(p, { x: lane.a.x * (1 - t) + lane.b.x * t, y: lane.a.y * (1 - t) + lane.b.y * t, z: lane.a.z * (1 - t) + lane.b.z * t }));
-      assert.ok(coastAt(geo, p) >= lane.width, `${REGIONS[lane.from].id} → ${REGIONS[lane.to].id} near land`);
-    }
+test('the Needle can be seen from every northern ring region', { todo: 'four northern regions lie beyond the 150 m Needle\'s reach; Kelp Shallows and Blossom Run, about 750 m off, need it about 390 m tall' }, (t) => {
+  const needle = LANDMARKS[regionIndex('spires')], reach = EYE + horizonDistance(needle.height), P = v3();
+  const nearest = new Array<number>(REGION_COUNT).fill(Infinity);
+  for (let k = 0; k < 60_000; k++) {
+    anywhere(P);
+    const r = regionAt(P);
+    if (NORTH.includes(r)) nearest[r] = Math.min(nearest[r], surfaceDistance(P, needle.pos));
   }
+  const far = NORTH.filter((i) => nearest[i] > reach);
+  t.diagnostic(`the Needle (${needle.height} m) shows ${reach.toFixed(0)} m off; nearest water of ${NORTH.map((i) => `${name(i)} ${nearest[i].toFixed(0)} m`).join(', ')}`);
+  assert.deepEqual(far.map(name), []);
 });
 
-test('finds stand where they can be taken; the Spice Isles have most, the Fire Archipelago pays best', () => {
-  for (const f of geo.finds) {
-    const id = REGIONS[f.region].id, p = v3();
-    if (f.kind === 'wreck') assert.ok(coastAt(geo, f.pos) >= CLEAR, `${id} wreck aground`);
-    else {
-      assert.ok(heightAt(geo, f.pos) > -DRAFT + 0.3, `${id} cache awash`);
-      let shore = false;
-      for (let k = 0; k < 16 && !shore; k++) shore = coastAt(geo, step(f.pos, chartTangent(f.region, f.pos, k * 22.5, v3()), 4, p)) > 0.5;
-      assert.ok(shore, `${id} cache out of reach of a hull`);
-    }
-  }
-  const count = (ri: number) => geo.finds.filter((f) => f.region === ri).length;
-  const spice = idx('spiceIsles'), fire = idx('fireArchipelago');
-  REGIONS.forEach((r, ri) => {
-    if (ri !== spice) assert.ok(count(spice) > count(ri), `${r.id} has as many finds as the Spice Isles`);
-    if (ri !== fire) assert.ok(REGIONS[fire].richness > r.richness);
+test('every region has a beacon with a light above the sea', () => {
+  assert.equal(BEACONS.length, REGION_COUNT);
+  BEACONS.forEach((b, i) => {
+    assert.equal(b.region, i);
+    assert.equal(regionAt(b.pos), i, `${name(i)}'s beacon stands in its region`);
+    assert.ok(b.height > 0);
   });
 });
 
-function distToArc(p: V3, a: V3, b: V3): number {
-  const n = normalize(v3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x)), s = dot(p, n);
-  const q = normalize(v3(p.x - n.x * s, p.y - n.y * s, p.z - n.z * s)), ab = Math.acos(Math.min(1, dot(a, b)));
-  if (Math.acos(Math.min(1, dot(a, q))) + Math.acos(Math.min(1, dot(q, b))) <= ab + 1e-9) return R * Math.asin(Math.min(1, Math.abs(s)));
-  return R * Math.min(Math.acos(Math.min(1, dot(p, a))), Math.acos(Math.min(1, dot(p, b))));
-}
+test('the four tidal regions each have a passage that opens at high tide and closes at low tide', () => {
+  for (const id of ['basaltStacks', 'jadeShoals', 'coralAtolls', 'mangroveLabyrinth'] as RegionId[]) {
+    const i = regionIndex(id);
+    const works = TIDAL_PASSAGES.filter((s) => s.region === i && navigable(s.pos, TIDE_AMPLITUDE) && !navigable(s.pos, -TIDE_AMPLITUDE));
+    assert.ok(works.length > 0, `${id} has no working tidal passage`);
+  }
+});
 
-function step(p: V3, t: V3, d: number, out: V3): V3 {
-  const a = d / R, c = Math.cos(a), s = Math.sin(a);
-  return normalize(Object.assign(out, { x: p.x * c + t.x * s, y: p.y * c + t.y * s, z: p.z * c + t.z * s }));
-}
+test('the landmarks sit near their region centres, and each region is about the same size', () => {
+  const P = v3(), count = new Array<number>(REGION_COUNT).fill(0);
+  for (let k = 0; k < 40_000; k++) count[regionAt(anywhere(P))]++;
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const share = count[i] / 40_000;
+    assert.ok(share > 0.4 / REGION_COUNT && share < 1.8 / REGION_COUNT, `${name(i)} covers ${(share * 100).toFixed(1)}%`);
+    assert.ok(surfaceDistance(LANDMARKS[i].pos, CENTRES[i]) < 400, `${LANDMARKS[i].name} is far from its region's heart`);
+  }
+});

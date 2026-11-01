@@ -1,99 +1,69 @@
-import type { Sea } from './environment.ts';
-import { dcos, dot, v3, type V3 } from './math.ts';
-import { R, TERRITORY, cellDir, horizonDistance } from './sphere.ts';
-import { EVENT, SHIPS, afloat, type MatchState } from './state.ts';
-import { calmNow } from './storm.ts';
-import { FITTING, FORMS, SIGHT, SLOT, STORM, TIERS } from './tables.ts';
-import { beamMarks, intruders, unseen } from './territory.ts';
-import { inFog, newSky, skyAt, veiled } from './weather.ts';
+// Who can see whom. A ship sees another within the sightline (about 240 m, less in fog), unless land stands
+// between them or it hides in smoke. At night, ships beyond about 150 m show only as a lantern: no name, no
+// health bar. Separately, a ship is on the map unless fog or Hidden Wake hides it; Reveal and Spotter show it.
+import { isNight } from './environment.ts';
+import { lineOfSight } from './nav.ts';
+import { hasPerk } from './perks.ts';
+import { inSmoke } from './powers.ts';
+import { apart } from './sphere.ts';
+import { PHASE, SHIPS, type MatchState } from './state.ts';
+import { POWERS, SIGHT } from './tables.ts';
+import { atHome } from './territory.ts';
+import { inFog, newSky, skyAt } from './weather.ts';
 
-export interface Eye {
-  at: V3;
-  height: number;
-  dive: number;
-  scouts: boolean;
+export const SEEN = {
+  /** In sight. */
+  visible: 1,
+  /** In sight but only as a lantern: no name or health bar. */
+  lantern: 2,
+  /** On this ship's map. */
+  map: 4,
+} as const;
+
+const SKY = newSky();
+
+/** How far ship i can see right now. */
+export function sightOf(state: MatchState, i: number): number {
+  const ship = state.ships[i];
+  if (hasPerk(ship, 'fogSight')) return SIGHT.range;
+  skyAt(state, ship.pos, SKY);
+  return SIGHT.range * SKY.sight;
 }
 
-export interface Sight {
-  ships: number;
-  hulls: number;
-  marks: number;
-  range: number;
-  gulls: number;
-}
-
-export const newSight = (): Sight => ({ ships: 0, hulls: 0, marks: 0, range: 0, gulls: 0 });
-
-const EYE = FORMS.map((_, f) => Array.from({ length: TIERS + 1 }, (_, k) => horizonDistance(SIGHT.eye[f] + (k > 0 ? SIGHT.crowsNest[k - 1] : 0))));
-const MAST = FORMS.map((_, f) => horizonDistance(SIGHT.mast[f]));
-const HULL = FORMS.map((_, f) => horizonDistance(SIGHT.hull[f]));
-const FLARE_COS = dcos(SIGHT.flare / R);
-
-export function eyeReach(state: MatchState, i: number): number {
-  const ship = state.ships[i], look = ship.fittings[SLOT.lookout];
-  return EYE[ship.form][look.kind === FITTING.crowsNest ? 1 + look.tier : 0];
-}
-
-const SKY = newSky(), AIR = new Float64Array(SHIPS), REACH = new Float64Array(SHIPS), WING = new Float64Array(SHIPS), CELL = v3();
-
-function spot(sea: Sea, state: MatchState, from: V3, reach: number, air: number, j: number): number {
-  const ship = state.ships[j], c = dot(from, ship.pos);
-  if (c < dcos(Math.min(air, reach + MAST[ship.form]) / R) || veiled(sea.geo, state, from, ship.pos)) return 0;
-  return c >= dcos(Math.min(air, reach + HULL[ship.form]) / R) ? 3 : 2;
-}
-
-export function survey(sea: Sea, state: MatchState, out: Sight[], gulls?: readonly (Eye | null)[]): Sight[] {
-  const calm = calmNow(state);
-  let hidden = 0;
-  for (let i = 0; i < SHIPS; i++) {
-    const ship = state.ships[i];
-    if (!afloat(ship) || ship.flask > 0 || unseen(sea, state, i)) hidden |= 1 << i;
-    AIR[i] = SIGHT.clear * skyAt(state, ship.pos, SKY).sight * (dot(ship.pos, calm.at) < calm.cos ? STORM.sight : 1);
-    REACH[i] = eyeReach(state, i);
-    const gull = gulls?.[i];
-    WING[i] = gull ? horizonDistance(gull.height) : 0;
+/** What viewer v knows of ship j, as SEEN bits. */
+export function seen(state: MatchState, v: number, j: number): number {
+  const a = state.ships[v], b = state.ships[j];
+  if (v === j) return SEEN.visible | SEEN.map;
+  if (b.phase === PHASE.sunk) return 0;
+  let out = 0;
+  if (b.phase !== PHASE.sea) {
+    // up in the Gale or gliding down: everyone can see the sky
+    return SEEN.visible | SEEN.map;
   }
-  for (let i = 0; i < SHIPS; i++) {
-    const o = out[i], ship = state.ships[i], gull = gulls?.[i] ?? null;
-    o.ships = o.hulls = o.marks = o.gulls = 0;
-    o.range = AIR[i];
-    if (!afloat(ship)) {
-      o.range = 0;
-      continue;
-    }
-    const scout = gull?.scouts ? gull : null, scoutReach = scout ? horizonDistance(scout.height) : 0;
-    for (let j = 0; j < SHIPS; j++) {
-      if (j === i || (hidden & (1 << j)) !== 0) continue;
-      const air = Math.min(AIR[i], AIR[j]);
-      const seen = spot(sea, state, ship.pos, REACH[i], air, j) | (scout ? spot(sea, state, scout.at, scoutReach, air, j) : 0);
-      if (seen !== 0) o.ships |= 1 << j;
-      if (seen === 3) o.hulls |= 1 << j;
-      if (ship.flare > 0 && dot(ship.pos, state.ships[j].pos) >= FLARE_COS) o.marks |= 1 << j;
-    }
-    for (let j = 0; j < SHIPS; j++) {
-      const g = j === i ? null : gulls?.[j];
-      if (g && dot(ship.pos, g.at) >= dcos(Math.min(AIR[i], REACH[i] + WING[j]) / R) && !veiled(sea.geo, state, ship.pos, g.at)) o.gulls |= 1 << j;
-    }
-    if (gull && gull.dive >= 0 && gull.dive !== i) o.marks |= 1 << gull.dive;
-    o.marks = (o.marks | intruders(state, i) | beamMarks(sea, state, i)) & ~hidden;
+  const d = apart(a.pos, b.pos);
+  const range = Math.min(sightOf(state, v), skyRange(state, j));
+  if (d <= range && !(inSmoke(state, j) && d > 12) && (d < 30 || lineOfSight(a.pos, b.pos))) {
+    out |= SEEN.visible;
+    if (d > SIGHT.lantern && isNight(state, b.pos) && !hasPerk(a, 'fogSight')) out |= SEEN.lantern;
   }
+  const hidden = inFog(state, b.pos) || (hasPerk(b, 'hiddenWake') && atHome(state, j)) || inSmoke(state, j);
+  if (!hidden && (out & SEEN.visible) !== 0) out |= SEEN.map;
+  if (b.spotted > 0 || (a.revealed > 0 && d <= POWERS.reveal.r)) out |= SEEN.map;
   return out;
 }
 
-export function trailSeen(sea: Sea, state: MatchState, viewer: number, owner: number, k: number): boolean {
-  if (viewer === owner) return true;
-  const ship = state.ships[owner];
-  if (ship.fogged[k] || ship.flask > 0) return false;
-  return !veiled(sea.geo, state, state.ships[viewer].pos, cellDir(TERRITORY, ship.laid[k], CELL));
+/** Fog around the target shortens the sightline to it too. */
+function skyRange(state: MatchState, j: number): number {
+  skyAt(state, state.ships[j].pos, SKY);
+  return SIGHT.range * SKY.sight;
 }
 
-export function noteFog(state: MatchState): void {
-  for (const e of state.events) if (e.kind === EVENT.loop || e.kind === EVENT.broken) state.ships[e.ship].fogged.length = 0;
-  for (const ship of state.ships) {
-    const laid = ship.laid.length, fogged = ship.fogged;
-    if (fogged.length > laid) fogged.length = 0;
-    if (fogged.length === laid) continue;
-    const fog = inFog(state, ship.pos);
-    while (fogged.length < laid) fogged.push(fog);
-  }
+/** Every ship's view of every other, as SEEN bits: out[v * SHIPS + j]. */
+export function survey(state: MatchState, out: Uint8Array): Uint8Array {
+  for (let v = 0; v < SHIPS; v++) for (let j = 0; j < SHIPS; j++) out[v * SHIPS + j] = state.ships[v].phase === PHASE.sunk ? 0 : seen(state, v, j);
+  return out;
+}
+
+export function newSurvey(): Uint8Array {
+  return new Uint8Array(SHIPS * SHIPS);
 }

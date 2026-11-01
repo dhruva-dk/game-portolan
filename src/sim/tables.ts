@@ -1,362 +1,374 @@
+// Every tuning number in the match, in metres, seconds and hit points. Ported from the rewrite's flat game
+// (src/game.ts, src/territory.ts) and the old simulation, converted to metres on the 554 m sphere.
 import { PI } from './math.ts';
 import { R } from './sphere.ts';
 
-export const REFERENCE = (2 * PI * R) / 360;
+// ---------------------------------------------------------------- the ship
 
-export const FORM = { pinnace: 0, caravel: 1, carrack: 2, galleon: 3 } as const;
-export type FormName = keyof typeof FORM;
+export const SHIP = {
+  /** Top speed under sail, m/s. */
+  top: 14.5,
+  /** Acceleration toward the target speed, m/s², speeding up and slowing down. */
+  accel: 6.5,
+  decel: 4.5,
+  /** Turning rate in rad/s: base plus a share that grows with way on, up to `full` m/s. */
+  turn: 0.55,
+  turnWay: 0.8,
+  turnFull: 8,
+  /** A turn sharper than this (rad) holds her to `crawl` m/s while she comes round. */
+  hard: 1.8,
+  crawl: 8,
+  /** Sideways slip while carving a turn, as a share of speed. */
+  carve: 0.12,
+  /** Hull length and beam, for grounding probes and collisions. */
+  half: 8.6,
+  beam: 2.6,
+  /** Two hulls closer than this push apart; closing faster than `ram` m/s is a ramming. */
+  touch: 10,
+  ram: 7,
+  ramDamage: 2.2,
+  /** Using a consumable slows her to this share of speed. */
+  using: 0.6,
+  hull: 100,
+  shield: 100,
+} as const;
 
-export interface Form {
-  readonly name: FormName;
+/** How well she sails at angle a off the wind (0 running before it, PI straight into it). At most 25% slower upwind. */
+export const POINT = { run: 0.92, beam: 1, upwind: 0.75 } as const;
+
+/** The gust: a burst of wind and a hop off the water. */
+export const GUST = { charges: 2, speed: 13, time: 1.15, recharge: 6.5, hop: 6.3, accel: 28, turn: 1.35, spread: 1.6 } as const;
+
+export const GRAVITY = 9.8;
+
+/** Grounding: how hard the shore pushes back, and the scrape worth reporting. */
+export const GROUND = { push: 1.2, keep: 0.9, scrape: 3.5, probe: 1.5 } as const;
+
+// ---------------------------------------------------------------- items
+
+export const RARITIES = 5;
+export const RARITY = {
+  names: ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'],
+  damage: [1, 1.08, 1.16, 1.24, 1.32],
+  reload: [1, 0.95, 0.9, 0.85, 0.8],
+} as const;
+
+/** Item kinds. 0 is an empty slot; 1–6 are weapons; 7–10 are consumables. */
+export const ITEM = {
+  none: 0,
+  cannon: 1, scatter: 2, harpoon: 3, mortar: 4, repeater: 5, broadside: 6,
+  smallShield: 7, bigShield: 8, repairKit: 9, fullRepair: 10,
+} as const;
+export const ITEM_NAMES = ['', 'Cannon', 'Scattergun', 'Harpoon', 'Mortar', 'Repeater', 'Broadside', 'Small Shield', 'Big Shield', 'Repair Kit', 'Full Repair'];
+export const WEAPON_KINDS: readonly number[] = [ITEM.cannon, ITEM.scatter, ITEM.harpoon, ITEM.mortar, ITEM.repeater, ITEM.broadside];
+export const isWeapon = (kind: number): boolean => kind >= ITEM.cannon && kind <= ITEM.broadside;
+export const isUse = (kind: number): boolean => kind >= ITEM.smallShield && kind <= ITEM.fullRepair;
+
+export interface Weapon {
+  readonly damage: number;
+  /** Seconds between shots. */
+  readonly interval: number;
+  readonly mag: number;
+  readonly reload: number;
+  /** Muzzle speed, m/s; lobbed weapons pick their own. */
   readonly speed: number;
-  readonly radius: number;
-  readonly accel: number;
-  readonly drag: number;
-  readonly helm: number;
-  readonly hull: number;
-  readonly guns: number;
-  readonly castle: boolean;
-  readonly purse: number;
-  readonly mass: number;
-  readonly half: number;
-  readonly beam: number;
-  readonly close: number;
-  readonly reach: number;
+  readonly gravity: number;
+  readonly spread: number;
+  readonly pellets: number;
+  /** Metres: tuned to the sightline of about 240 m. */
+  readonly range: number;
+  readonly crit: number;
+  readonly splash: number;
+  readonly auto: boolean;
+  readonly lob: boolean;
+  /** Broadside only: balls fired abeam from each side at once. */
+  readonly sides: number;
 }
 
-export const FORMS: readonly Form[] = [
-  {
-    name: 'pinnace', speed: 1.1 * REFERENCE, radius: 5, accel: 1.2, drag: 1, helm: 0.18,
-    hull: 60, guns: 1, castle: false, purse: 120, mass: 1, half: 1.9, beam: 0.53, close: 0.5, reach: 0.4,
-  },
-  {
-    name: 'caravel', speed: REFERENCE, radius: 6.5, accel: 1.6, drag: 1.3, helm: 0.25,
-    hull: 80, guns: 2, castle: false, purse: 180, mass: 1.4, half: 2.2, beam: 0.64, close: 0.3, reach: 0.45,
-  },
-  {
-    name: 'carrack', speed: 0.9 * REFERENCE, radius: 9, accel: 2.4, drag: 1.9, helm: 0.38,
-    hull: 120, guns: 3, castle: true, purse: 300, mass: 2.4, half: 2.6, beam: 0.88, close: 0.6, reach: 0.4,
-  },
-  {
-    name: 'galleon', speed: 0.82 * REFERENCE, radius: 11.5, accel: 3.2, drag: 2.5, helm: 0.5,
-    hull: 150, guns: 4, castle: false, purse: 400, mass: 3, half: 2.9, beam: 0.8, close: 0.65, reach: 0.35,
-  },
+const gun = (w: Partial<Weapon> & Pick<Weapon, 'damage' | 'interval' | 'mag' | 'reload' | 'speed' | 'gravity' | 'spread' | 'range'>): Weapon => ({
+  pellets: 1, crit: 1.5, splash: 0, auto: false, lob: false, sides: 0, ...w,
+});
+
+export const WEAPONS: Readonly<Record<number, Weapon>> = {
+  [ITEM.cannon]: gun({ damage: 20, interval: 0.42, mag: 8, reload: 1.9, speed: 165, gravity: 7, spread: 0.008, range: 200, auto: true }),
+  [ITEM.scatter]: gun({ damage: 8, interval: 1, mag: 4, reload: 2.3, speed: 135, gravity: 4, spread: 0.065, pellets: 8, range: 70 }),
+  [ITEM.harpoon]: gun({ damage: 80, interval: 1.4, mag: 1, reload: 2.1, speed: 300, gravity: 2.5, spread: 0, range: 240, crit: 1.75 }),
+  [ITEM.mortar]: gun({ damage: 60, interval: 1.3, mag: 2, reload: 2.8, speed: 0, gravity: 26, spread: 0.012, range: 220, crit: 1, splash: 11, lob: true }),
+  [ITEM.repeater]: gun({ damage: 7, interval: 0.1, mag: 30, reload: 2, speed: 185, gravity: 3, spread: 0.024, range: 150, auto: true }),
+  [ITEM.broadside]: gun({ damage: 14, interval: 1.6, mag: 3, reload: 3, speed: 110, gravity: 6, spread: 0.02, range: 110, crit: 1.25, sides: 4 }),
+};
+
+/** Lobbed shots take this long in the air: distance / `per`, held between `min` and `max` seconds. */
+export const LOB = { per: 70, min: 0.9, max: 2.8 } as const;
+
+/** Damage holds to `hold` of range, then falls to `floor` at full range; shots fly on to `beyond` of range. */
+export const FALLOFF = { hold: 0.6, floor: 0.5, beyond: 1.15 } as const;
+
+/** The muzzle: metres ahead of the mast step and above the water. */
+export const MUZZLE = { ahead: 2.6, up: 2.8 } as const;
+
+/** Swapping weapons takes a moment before the next shot. */
+export const EQUIP = 0.22;
+
+/** Hit boxes in the ship's frame: x across, y up from the waterline, z along. The head of the sail is the weak spot. */
+export const BOXES: readonly (readonly [number, number, number, number, number, number, boolean])[] = [
+  [-2.8, 2.8, -1, 2.6, -9.4, 9.2, false],
+  [-2.4, 2.4, 2.6, 5.4, -10, -3.9, false],
+  [-2, 2, 2.6, 4.4, 5.4, 9, false],
+  [-1.8, 1.8, 4.4, 11, -8.5, 9.5, false],
+  [-1.6, 1.6, 11, 20, -9, 7, true],
 ];
 
-export const POINT = 0.15;
-
-export const SAILS: readonly { readonly speed: number; readonly radius: number }[] = [
-  { speed: 0.72, radius: 0.7 },
-  { speed: 1, radius: 1 },
-  { speed: 1.22, radius: 1.4 },
-];
-
-export const HELM = {
-  soft: 0.35,
-  steerage: 0.3,
-  carve: 0.12,
+/** Consumables: PLAN.md's values, caps, use times (s) and stack sizes. */
+export interface Use { readonly shield: number; readonly hull: number; readonly cap: number; readonly time: number; readonly stack: number }
+export const USES: Readonly<Record<number, Use>> = {
+  [ITEM.smallShield]: { shield: 25, hull: 0, cap: 50, time: 1, stack: 6 },
+  [ITEM.bigShield]: { shield: 50, hull: 0, cap: 100, time: 2.6, stack: 3 },
+  [ITEM.repairKit]: { shield: 0, hull: 15, cap: 75, time: 1.8, stack: 8 },
+  [ITEM.fullRepair]: { shield: 0, hull: 100, cap: 100, time: 5, stack: 2 },
 };
 
-export const LAND = { keep: 0.12, crawl: 0.35 };
-export const BUMP = { restitution: 0.3, shove: 0.6 };
+export const SLOTS = 5;
 
-export const PILOT = {
-  full: 0.45,
-  lead: 0.35,
-  arrive: 3.5,
-  look: 7.5,
-  window: 48,
-  crab: 0.6,
-  stem: 0.25,
-  headway: 0.15,
-  replan: 90,
-  offing: 3,
-};
+/** Loot: rarity weights on the water and at loot spots, and the share that are weapons. */
+export const LOOT = {
+  weights: [42, 30, 17, 8, 3],
+  weapon: 0.62,
+  /** Consumables come in these counts, and read as this rarity. */
+  counts: { [ITEM.smallShield]: 3, [ITEM.bigShield]: 1, [ITEM.repairKit]: 4, [ITEM.fullRepair]: 1 } as Record<number, number>,
+  rarity: { [ITEM.smallShield]: 1, [ITEM.bigShield]: 2, [ITEM.repairKit]: 1, [ITEM.fullRepair]: 3 } as Record<number, number>,
+  /** A second item at a spot, with this chance. */
+  second: 0.4,
+  reach: 9.5,
+  /** Fresh loot can't be picked up for this long, so a drop isn't caught straight back. */
+  settle: 0.6,
+  drift: 2.2,
+  /** Loot spots when the world has none yet: this many per region, on open water near its centre. */
+  fallback: 6,
+} as const;
 
-export const TRIM = {
-  home: 0.1,
-  rival: 0.1,
-  rootGate: 2,
-  whaleRoad: 0.2,
-  torn: 0.3,
-  gust: 0.14,
-  gale: { from: 1.7, to: 2.4, loss: 0.3 },
-  calm: 0.4,
-};
+// ---------------------------------------------------------------- damage
+
+/** Bots spar more gently with each other, and with a player fresh off the drop. */
+export const SPAR = { bots: 0.4, player: 0.65, grace: 0.4, from: 8, over: 50 } as const;
+
+/** Burning: hit points a second, through the shield first. */
+export const BURN = { rate: 3, fireShot: 3 } as const;
+
+// ---------------------------------------------------------------- territory and coins
+
+export const INK = {
+  /** Home water inked on landing. */
+  home: 26,
+  /** Cutting a rival's trail: what it costs the hull that laid it (past the shield), and pays the cutter. */
+  cut: 28,
+  cutCoins: 10,
+  /** A trail longer than this many cells runs dry. */
+  trail: 260,
+  /** Hull mended a second in your own water, once nobody has hit you for `quiet` seconds. */
+  repair: 2.5,
+  quiet: 4,
+  /** Coins a claimed square metre pays, and a held square metre every `every` seconds. */
+  claim: 1 / 220,
+  rent: 1 / 2600,
+  every: 10,
+} as const;
+
+export const COINS = {
+  /** One coin for every this many metres sailed. */
+  metres: 40,
+  kill: 12,
+  loot: 1,
+} as const;
+
+/** Gull deliveries: what each parcel costs. */
+export const PARCELS = [
+  { name: 'Supplies', cost: 20 },
+  { name: 'Armament', cost: 45 },
+  { name: 'Treasure', cost: 80 },
+] as const;
+
+export const DELIVERY = { speed: 30, height: 40, drop: 5, ahead: 12, rest: 18, fetch: 2.5 } as const;
+
+/** Region perks: the numbers behind each. */
+export const PERKS = {
+  frostShot: { slow: 0.7, time: 1.5 },
+  fastRepair: 2,
+  longRange: 1.15,
+  fastReload: 0.7,
+  quickGust: 0.6,
+  cheapDeliveries: 0.7,
+  shallowDraft: 0.3,
+  quickHands: 0.7,
+  tightTurns: 1.5,
+  currentRider: 1.5,
+  spotter: 5,
+  fireShot: 3,
+  lootSense: 120,
+} as const;
+
+// ---------------------------------------------------------------- abilities
+
+export const POWERS = {
+  repair: { hull: 30, time: 3 },
+  smokeScreen: { r: 25, time: 8 },
+  ram: { speed: 12, time: 1.5, damage: 40 },
+  reveal: { r: 250, time: 6 },
+  hardTurn: { boost: 1 },
+  decoy: { time: 8 },
+  wave: { r: 40, push: 12, damage: 5 },
+  driftMine: { arm: 1, r: 8, splash: 10, damage: 35, life: 60 },
+  salvage: 30,
+  quickReload: 0.8,
+  quickHands: 0.75,
+  lightHull: { speed: 1.05, turn: 1.15 },
+  windReader: 0.5,
+  stormWalker: 0.6,
+  deepHold: 1,
+  steadyAim: 0.2,
+} as const;
+
+/** How much turning spreads shots, at the full turning rate. */
+export const TURN_SPREAD = 1;
+
+// ---------------------------------------------------------------- wind, weather, tides, day
 
 export const WIND = {
+  /** Mean wind speed, m/s. */
   speed: 6,
   terms: 12,
   freq: [3, 6],
   drift: [0.0005, 0.0012],
+  /** Wind weaker than this share of the mean reads as unsteady. */
   lull: 0.35,
-};
-
-export const GUSTS = {
-  count: 96,
-  radius: [10, 22],
-  life: [6, 14],
-  drift: 0.7,
-  strength: 0.6,
-};
-
-export const GREAT_CURRENT = { width: 18, speed: 5.5, taper: 30 };
-export const LANE_TAPER = 12;
-
-export const SPELL = { fair: 0, fog: 1, squall: 2, calm: 3 } as const;
-
-export const WEATHER = {
-  count: 48,
-  spells: [
-    { r: [0, 0], life: [20, 50] },
-    { r: [26, 48], life: [60, 120] },
-    { r: [22, 40], life: [50, 90] },
-    { r: [34, 60], life: [70, 140] },
-  ],
-  rise: 15,
-  core: 2.5,
-  drift: 0.15,
-  stride: 30,
-  open: 40,
-  openSquall: 3.5,
-  veil: 0.5,
-  fog: { sight: 0.3 },
-  squall: { wind: 0.5, sight: 0.55, rough: 1.8 },
-  calm: { drop: 0.75 },
-};
-
-export const DAY = {
-  rate: 3.5 / 600,
-  starts: [[4.75, 5.75], [14.25, 15.25], [18, 18.75]],
-  sunrise: 6,
-  tilt: PI / 6,
-};
-
-export const VORTEX = { fall: 0.4, grip: 1.2, carry: 4, keep: 0.5, still: 0.02 };
-
-export const SLOT = { bow: 0, broadside: 1, stern: 2, rig: 3, hull: 4, lookout: 5 } as const;
-export const SLOTS = 6;
-export const TIERS = 5;
-export const PIGMENT_TIER = { ironGall: 0, verdigris: 1, ultramarine: 2, vermilion: 3, goldLeaf: 4 } as const;
-
-export const FITTING = {
-  none: 0,
-  stemPost: 1, ironRam: 2, cutwater: 3,
-  lightGuns: 4, longGuns: 5, swivelGuns: 6, chainShot: 7, heatedShot: 8,
-  sternChasers: 9, powderKegs: 10, mortar: 11,
-  spareCanvas: 12, lateenMizzen: 13, stormSails: 14,
-  copperSheathing: 15, doubledPlanking: 16, pumps: 17,
-  sternGlass: 18, crowsNest: 19, lookout: 20,
+  /** Below full strength the sails lose way, down to `airs` in a flat calm. */
+  airs: 0.7,
+  /** The lee of an island: probes upwind, in metres, and how still it gets. */
+  lee: [12, 28, 48],
+  still: 0.25,
 } as const;
 
-export const FITTING_SLOT: readonly number[] = [-1, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5];
+/** Wind gusts: patches of stronger wind that drift over the sea. */
+export const GUSTS = { count: 48, radius: [25, 55], life: [6, 14], drift: 0.7, strength: 0.6 } as const;
 
-export const OUTFIT: readonly { readonly at: number; readonly kind: number }[] = [
-  { at: 1, kind: FITTING.stemPost }, { at: 1, kind: FITTING.lightGuns }, { at: 4, kind: FITTING.sternChasers },
-  { at: 3, kind: FITTING.spareCanvas }, { at: 2, kind: FITTING.doubledPlanking }, { at: 5, kind: FITTING.crowsNest },
-];
+export const WEATHER_KIND = { fog: 0, rain: 1, thunder: 2, calm: 3, snow: 4, ash: 5 } as const;
+export const WEATHER_NAMES = ['fog', 'rain', 'thunder', 'calm', 'snow', 'ash'] as const;
 
-export const KITS: number[][] = [
-  [FITTING.ironRam, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
-  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
-  [FITTING.cutwater, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.copperSheathing, FITTING.crowsNest],
-  [FITTING.stemPost, FITTING.lightGuns, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
-  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.doubledPlanking, FITTING.crowsNest],
-  [FITTING.stemPost, FITTING.chainShot, FITTING.sternChasers, FITTING.spareCanvas, FITTING.copperSheathing, FITTING.crowsNest],
-];
+export const WEATHER = {
+  slots: 5,
+  least: 3,
+  r: [70, 130],
+  life: [70, 150],
+  gap: [0, 30],
+  /** Seconds to grow and to fade. */
+  rise: 12,
+  /** The share of the radius at full strength. */
+  core: 0.6,
+  /** Drift speed as a share of the wind. */
+  drift: 0.15,
+  /** A system spawned over a region is one of its own kinds this often. */
+  own: 0.85,
+  fog: { sight: 0.35 },
+  rain: { wind: 1.4, rough: 1.8, spread: 1.3, swirl: 3 },
+  thunder: { every: [6, 12], warn: 1.5, reach: 12, damage: 25, open: 30, swirl: 3 },
+  calm: { wind: 0.15 },
+  /** Snow: ice builds over `build` seconds and slows turning by up to `turn`. It lives only north of `lat`. */
+  snow: { build: 20, melt: 10, turn: 0.5, lat: 50 * (PI / 180) },
+  /** Ash: after `after` seconds in it, embers burn this many points a second. */
+  ash: { after: 4, rate: 1.5 },
+} as const;
 
-export const START_FITTINGS: readonly number[] = OUTFIT.map((o) => (o.at <= 1 ? o.kind : FITTING.none));
+/** Tides: the sea level swings by the world's TIDE_AMPLITUDE over this period, in seconds. */
+export const TIDE = { period: 240 } as const;
 
-export const SPARE_CANVAS = [0.04, 0.06, 0.08, 0.1, 0.12];
-export const COPPER = [0.03, 0.045, 0.06, 0.075, 0.09];
-export const LATEEN_MIZZEN = [0.08, 0.12, 0.16, 0.2, 0.24];
-export const STORM_SAILS = [0, 0.03, 0.06, 0.09, 0.12];
-export const PUMPS = [0.15, 0.25, 0.35, 0.45, 0.55];
-export const STERN_GLASS = [25, 30, 35, 40, 45];
-export const LOOKOUT = [40, 50, 60, 70, 80];
+export const DAY = {
+  /** Hours the sun moves in a second: about 4 hours over a match. */
+  rate: 4 / 630,
+  /** The planet's tilt is drawn from ±this, in radians. */
+  tilt: 0.45,
+  /** Darker than this sun height counts as night. */
+  dusk: -0.05,
+} as const;
 
-export const CONSUMABLE = { patchKit: 21, ward: 22, gust: 23, fogFlask: 24, flare: 25 } as const;
-export const CONSUMABLE_SLOTS = 3;
-
-export const CONSUMABLES = { time: [3, 4, 4, 20, 6], patch: 0.35, gust: 0.4 };
-
-export const LOOT = {
-  enters: [1, 2, 3, 5, 7], weight: [1, 0.5, 0.25, 0.12, 0.06], climb: 0.5,
-  consumable: [0.45, 0.4, 0.35, 0.3, 0.25], count: [1, 1, 2, 2, 3], reach: 0.8, astern: 1.5, worth: 0.5,
-};
-
-export const HOME = {
-  radius: 10,
-  repair: 0.5,
-  gull: 0.75,
-};
-
-export const ECONOMY = {
-  trail: 0.6,
-  income: 1 / 60000,
-};
-
-export const COINS = {
-  count: 96,
-  each: 15,
-  most: 8,
-  scatter: 2.5,
-  reach: 1.5,
-  life: 90,
-};
-
-export const HARBOUR = {
-  repair: 4,
-};
-
-export const PERK = {
-  crownLight: { reach: 70, half: 0.15, period: 12 },
-  greatFalls: 2,
-  arch: 4 / 3,
-  sandbarLight: 2,
-  weepingIsle: 2,
-  spiceHarbour: 0.5,
-};
-
-export const CALDERA = { burst: 8, drop: 0.5, value: 90, spread: 24, tries: 8 };
-
-export const FINDS = {
-  wreck: { value: 40, reach: 4, hold: 4, refill: 180 },
-  cache: { value: 75, reach: 9, hold: 6, refill: 300 },
-  jitter: 0.25,
-  flotsam: { value: 5, pieces: 4, scatter: 3, every: 15, life: 75 },
-  bottle: { value: 35, every: 40, life: 240, tries: 16 },
-};
-
-const RIDE = 15;
-
-export const OPENING = { ride: RIDE, way: RIDE - GREAT_CURRENT.speed, peel: 0.6, settle: 3, most: 8 };
-
-export const END = { bounty: 60 };
-
-export const BATTERY = { port: 0, starboard: 1, castle: 2, stern: 3 } as const;
-export const BATTERIES = 4;
-
-export const EFFECT = { none: 0, tear: 1, burn: 2 } as const;
-
-const NIL: readonly number[] = [0, 0, 0, 0, 0];
-
-export interface Gun {
-  readonly range: number;
-  readonly arc: number;
-  readonly reload: number;
-  readonly damage: readonly number[];
-  readonly falloff: number;
-  readonly spread: number;
-  readonly speed: number;
-  readonly loft: number;
-  readonly blast: number;
-  readonly effect: number;
-  readonly lasting: readonly number[];
-}
-
-export const GUNS: Readonly<Partial<Record<number, Gun>>> = {
-  [FITTING.lightGuns]: {
-    range: 22, arc: 0.45, reload: 2.5, damage: [6, 6.6, 7.2, 7.8, 8.4], falloff: 0.4, spread: 0.05, speed: 30, loft: 0.06,
-    blast: 0, effect: EFFECT.none, lasting: NIL,
-  },
-  [FITTING.longGuns]: {
-    range: 40, arc: 0.35, reload: 5, damage: [7.5, 8.25, 9, 9.75, 10.5], falloff: 0.3, spread: 0.03, speed: 40, loft: 0.08,
-    blast: 0, effect: EFFECT.none, lasting: NIL,
-  },
-  [FITTING.swivelGuns]: {
-    range: 14, arc: 0.7, reload: 0.9, damage: [2.6, 2.9, 3.2, 3.5, 3.8], falloff: 0.5, spread: 0.07, speed: 28, loft: 0.04,
-    blast: 0, effect: EFFECT.none, lasting: NIL,
-  },
-  [FITTING.chainShot]: {
-    range: 18, arc: 0.45, reload: 3.5, damage: [3, 3.3, 3.6, 3.9, 4.2], falloff: 0.4, spread: 0.06, speed: 26, loft: 0.06,
-    blast: 0, effect: EFFECT.tear, lasting: [3, 4, 5, 6, 7],
-  },
-  [FITTING.heatedShot]: {
-    range: 18, arc: 0.45, reload: 4, damage: [3.5, 3.85, 4.2, 4.55, 4.9], falloff: 0.4, spread: 0.06, speed: 26, loft: 0.06,
-    blast: 0, effect: EFFECT.burn, lasting: [2, 2.75, 3.5, 4.25, 5],
-  },
-  [FITTING.sternChasers]: {
-    range: 24, arc: 0.4, reload: 2.5, damage: [5, 5.5, 6, 6.5, 7], falloff: 0.4, spread: 0.05, speed: 32, loft: 0.06,
-    blast: 0, effect: EFFECT.none, lasting: NIL,
-  },
-};
-
-export const CHASERS = { guns: 2 };
-
-export const MORTAR: Gun = {
-  range: 45, arc: 0, reload: 8, damage: [10, 11.5, 13, 14.5, 16], falloff: 0, spread: 0, speed: 16, loft: 0.5,
-  blast: 2.5, effect: EFFECT.none, lasting: NIL,
-};
-
-export const KEGS = { reload: 4, range: 14, arc: 0.7, arm: 0.6, trigger: 0.6, fuse: 25, blast: 2.5, damage: [9, 10.5, 12, 13.5, 15] };
-
-export const CASTLE = { guns: 2, arc: 0.5 };
-export const AFT = { reload: 3 };
-
-export const GUNNERY = { ball: 0.15, rake: 0.5, wild: 0.1, deck: 0.6, passes: 3 };
-
-export const RAM = { bow: 0.5, speed: 0.6, damage: 3.5, recoil: 0.2 };
-
-export interface Bow {
-  readonly power: readonly number[];
-  readonly recoil: number;
-  readonly cut: readonly number[];
-}
-
-export const STEM_POST: Bow = { power: [1, 1.1, 1.2, 1.3, 1.4], recoil: 1, cut: NIL };
-
-export const BOWS: Readonly<Partial<Record<number, Bow>>> = {
-  [FITTING.stemPost]: STEM_POST,
-  [FITTING.ironRam]: { power: [2, 2.3, 2.6, 2.9, 3.2], recoil: 0.5, cut: NIL },
-  [FITTING.cutwater]: { power: [1.2, 1.3, 1.4, 1.5, 1.6], recoil: 0.8, cut: [3, 4, 5, 6, 7] },
-};
-
-export const ROCKS = { speed: 1.5, damage: 4 };
-
-export const FIRE = { rate: 1.5, embers: 1 / 25, ember: 5 };
-
-export const DOUBLED_PLANKING = [0.15, 0.22, 0.3, 0.38, 0.45];
-
-export const STORM = {
-  announce: 115,
-  phases: [
-    { move: 160, sweep: 60, calm: 400, rate: 0.1 },
-    { move: 265, sweep: 60, calm: 260, rate: 0.2 },
-    { move: 370, sweep: 45, calm: 160, rate: 0.3 },
-    { move: 460, sweep: 40, calm: 90, rate: 0.4 },
-    { move: 535, sweep: 30, calm: 44, rate: 0.6 },
-    { move: 590, sweep: 20, calm: 15, rate: 3 },
-    { move: 630, sweep: 18, calm: 0, rate: 24 },
-  ],
-  labour: 0.25,
-  sight: 0.45,
-  scan: 30,
-};
+// ---------------------------------------------------------------- sight
 
 export const SIGHT = {
-  eye: [0.9, 1, 1.2, 1.4],
-  mast: [3, 3.6, 4.4, 5],
-  hull: [0.4, 0.5, 0.7, 0.8],
-  crowsNest: [1.5, 2, 2.5, 3, 3.5],
-  clear: 70,
-  flare: 90,
-};
+  /** The sightline: another ship's mast drops below the horizon at about this range. */
+  range: 240,
+  /** At night, beyond this a ship shows only as a lantern. */
+  lantern: 150,
+  /** How far captains notice a ship early on and late, before temperament. */
+  notice: [45, 180],
+} as const;
 
-export const TREASURE = { share: 0.5, place: [2, 1.6, 1.35, 1.15, 1, 0.9, 0.8, 0.7, 0.6, 0.5] };
+// ---------------------------------------------------------------- the Storm
 
-export const MOMENTS = { loops: 3 };
+/** Radii of the safe circles in metres: the first covers half the planet, the last nonzero one is the final circle. */
+export const ZONES: readonly number[] = [(PI / 2) * R, 600, 400, 260, 160, 90, 40, 0];
 
-export const GULL = {
-  levels: { talons: 4, wings: 4, eye: 4, beak: 3, dive: 3 },
-  price: 60,
-  flight: [12, 10, 8.5, 7, 6],
-  legs: { out: 0.25, away: 0.3, back: 0.3, circle: 0.15 },
-  far: 60,
-  circle: 4,
-  fly: 8,
-  eye: { ahead: [0, 20, 30, 40, 50], height: [0, 6, 9, 12, 15] },
-  beak: [0, 0.25, 0.4, 0.6],
-  dive: { cool: [0, 30, 22, 15], reach: 40, near: 10, hold: 4, check: 0.5 },
-  danger: { hull: 0.4, near: 30, storm: 15 },
-};
+/** Seven phases: each waits, then shrinks to the next circle. Damage is hull points a second, past the shield. */
+export const STORM = {
+  phases: [
+    { wait: 60, shrink: 45, damage: 1 },
+    { wait: 50, shrink: 40, damage: 2 },
+    { wait: 45, shrink: 35, damage: 3 },
+    { wait: 40, shrink: 30, damage: 5 },
+    { wait: 35, shrink: 30, damage: 7 },
+    { wait: 30, shrink: 25, damage: 9 },
+    { wait: 25, shrink: 30, damage: 12 },
+  ],
+  /** Before the first phase. */
+  first: 1,
+  /** Once closed, the Storm keeps rising by this much every `every` seconds. */
+  rise: 4,
+  every: 10,
+  /** Rows of the territory grid the Storm washes each tick. */
+  scan: 30,
+  /** Treasure glints just inside the wall when a phase starts to close. */
+  treasure: 3,
+} as const;
+
+// ---------------------------------------------------------------- the Gale
+
+export const GALE = {
+  /** Height of the Gale above the sea, and how long it carries the fleet. */
+  height: 350,
+  time: 35,
+  /** Arc it covers, in radians. */
+  arc: PI,
+  /** Gliding: horizontal speed, fall speed, and the dive. */
+  glide: 32,
+  slow: 12,
+  fall: 10,
+  dive: 35,
+  turn: 1.5,
+  /** Ships near land as they come down drift to open water below this height. */
+  steer: 40,
+  /** Speed on landing. */
+  land: 10,
+} as const;
+
+// ---------------------------------------------------------------- the whale
+
+export const WHALE = {
+  speed: 6,
+  surface: 20,
+  under: 40,
+  waypoints: 6,
+  roam: 250,
+  /** Depth of water it needs to surface. */
+  deep: 4,
+  /** The breach: warning time, reach of the lift and of the flip, the lift, and how long a flip lasts. */
+  rising: 6,
+  lift: 35,
+  flip: 18,
+  up: 12,
+  flipped: 3,
+  /** Breaches come as these Storm phases are announced. */
+  at: [1, 3],
+  loot: 6,
+} as const;
+
+// ---------------------------------------------------------------- the match
+
+export const MATCH = { ships: 20, tick: 1 / 30 } as const;

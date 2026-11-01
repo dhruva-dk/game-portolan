@@ -1,7 +1,9 @@
 import { PI, addScaled, cross, datan, datan2, dcos, dot, dsin, dtan, length, normalize, set, v3, type V3 } from './math.ts';
 
+// The planet: a sphere of radius R metres. A lap of the equator at the top speed of 14.5 m/s takes about 4 minutes.
 export const R = 554;
-export const GRID = 512;
+// Cells per cube face of the territory grid: about 3.4 m across.
+export const GRID = 256;
 export const AREA_Q = 16777216;
 
 export interface FaceUV {
@@ -172,4 +174,37 @@ export function surfaceDistance(a: V3, b: V3): number {
 
 export function horizonDistance(h: number): number {
   return R * datan2(Math.sqrt(h * (2 * R + h)), R);
+}
+
+/** Straight-line distance between two unit vectors, in metres on the surface (close to the arc for short spans). */
+export function apart(a: V3, b: V3): number {
+  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+  return R * Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/** The point d metres from p along the tangent t. */
+export function along(p: V3, t: V3, d: number, out: V3): V3 {
+  const c = dcos(d / R), s = dsin(d / R);
+  return normalize(set(out, p.x * c + t.x * s, p.y * c + t.y * s, p.z * c + t.z * s));
+}
+
+/** The tangent at p turned by angle a (positive turns toward starboard, the side cross(t, p) points to). */
+export function turned(t: V3, p: V3, a: number, out: V3): V3 {
+  const sx = t.y * p.z - t.z * p.y, sy = t.z * p.x - t.x * p.z, sz = t.x * p.y - t.y * p.x;
+  const c = dcos(a), s = dsin(a);
+  return set(out, t.x * c + sx * s, t.y * c + sy * s, t.z * c + sz * s);
+}
+
+/** The signed angle from tangent a to tangent b at p, positive toward starboard. */
+export function angleTo(a: V3, b: V3, p: V3): number {
+  const sx = a.y * p.z - a.z * p.y, sy = a.z * p.x - a.x * p.z, sz = a.x * p.y - a.y * p.x;
+  return datan2(b.x * sx + b.y * sy + b.z * sz, dot(a, b));
+}
+
+/** Projects v onto the tangent plane at p and normalizes it; falls back to fallback when v is along p. */
+export function flatten(v: V3, p: V3, fallback: V3, out: V3): V3 {
+  const d = dot(v, p);
+  set(out, v.x - p.x * d, v.y - p.y * d, v.z - p.z * d);
+  if (dot(out, out) < 1e-18) return set(out, fallback.x, fallback.y, fallback.z);
+  return normalize(out);
 }
