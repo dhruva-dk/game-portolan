@@ -1,6 +1,6 @@
 import { PI, addScaled, cross, datan, datan2, dcos, dot, dsin, dtan, length, normalize, set, v3, type V3 } from './math.ts';
 
-export const R = 200;
+export const R = 554;
 export const GRID = 512;
 export const AREA_Q = 16777216;
 

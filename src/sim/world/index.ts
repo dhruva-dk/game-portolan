@@ -7,10 +7,31 @@
 // bit-identical in Node, Chromium and WebKit.
 //
 // Pass 1 contract: these names and signatures are what the simulation and the renderer code against.
-// The internals start as placeholders (one round island per region) and get replaced by each region's
-// own terrain code.
-import { PI, dot, normalize, set, v3, type V3 } from '../math.ts';
-import { R, fromLatLon } from '../sphere.ts';
+// Each region's terrain is its own code, in ./regions/<id>.ts, written in that region's local chart. This file
+// places the charts on the sphere, blends neighbours across their borders, carves the current lanes, and bakes
+// heights into a grid for the simulation.
+import { PI, dcos, dot, dsin, normalize, set, v3, type V3 } from '../math.ts';
+import { R, faceDir, faceUV, fromLatLon, localFrame, type FaceUV } from '../sphere.ts';
+import { smax, smin, smoothstep } from './kit.ts';
+import type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
+import { iceCrown, FLOE_RINGS } from './regions/iceCrown.ts';
+import { fjords } from './regions/fjords.ts';
+import { mistwood } from './regions/mistwood.ts';
+import { spires } from './regions/spires.ts';
+import { narrows } from './regions/narrows.ts';
+import { basaltStacks } from './regions/basaltStacks.ts';
+import { kelpShallows } from './regions/kelpShallows.ts';
+import { blossomRun } from './regions/blossomRun.ts';
+import { glassSea } from './regions/glassSea.ts';
+import { jadeShoals } from './regions/jadeShoals.ts';
+import { coralAtolls } from './regions/coralAtolls.ts';
+import { spiceIsles } from './regions/spiceIsles.ts';
+import { fireArchipelago } from './regions/fireArchipelago.ts';
+import { weepingIsle } from './regions/weepingIsle.ts';
+import { mangroveLabyrinth } from './regions/mangroveLabyrinth.ts';
+import { maelstrom, VORTEX_SPEC } from './regions/maelstrom.ts';
+
+export type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
 
 export type RegionId =
   | 'iceCrown'
@@ -107,7 +128,8 @@ export function regionMix(p: V3, out: RegionMix = { a: 0, b: 0, t: 0 }): RegionM
   }
   // Distance to the bisector between the two centres, along the surface (small-angle form).
   const ca = CENTRES[a], cb = CENTRES[b];
-  const gap = Math.sqrt((ca.x - cb.x) ** 2 + (ca.y - cb.y) ** 2 + (ca.z - cb.z) ** 2);
+  const gx = ca.x - cb.x, gy = ca.y - cb.y, gz = ca.z - cb.z;
+  const gap = Math.sqrt(gx * gx + gy * gy + gz * gz);
   const toBorder = ((da - db) / gap) * R;
   out.a = a;
   out.b = b;
@@ -121,21 +143,309 @@ export const TIDE_AMPLITUDE = 1;
 /** A ship runs aground where the ground is less than DRAFT metres below the sea level. Tidal sills sit between -2.5 and -0.5 m. */
 export const DRAFT = 1.5;
 
-/** Height of the ground above mean sea level in metres: positive is land, negative is the sea floor. */
-export function heightAt(p: V3): number {
-  // Placeholder: one round island at each region's centre on a 30 m deep sea.
-  const i = regionAt(p), d = (1 - dot(p, CENTRES[i])) * R * R * 2, r2 = 45 * 45;
-  return d < r2 ? 18 * (1 - d / r2) - 2 : -30;
+// ---------------------------------------------------------------------------------------------------------
+// Charts: each region's local tangent frame. x = R (p · east), y = R (p · north), an orthographic projection.
+
+const SPECS: readonly RegionSpec[] = [
+  iceCrown, fjords, mistwood, spires, narrows, basaltStacks, kelpShallows, blossomRun,
+  glassSea, jadeShoals, coralAtolls, spiceIsles, fireArchipelago, weepingIsle, mangroveLabyrinth, maelstrom,
+];
+
+export interface Chart { readonly c: V3; readonly e: V3; readonly n: V3 }
+
+export const CHARTS: readonly Chart[] = CENTRES.map((c) => {
+  const e = v3(), n = v3();
+  localFrame(c, e, n);
+  return { c, e, n };
+});
+
+export interface ChartPoint { x: number; y: number }
+
+/** p in region ri's chart, metres east and north of its centre. */
+export function toChart(ri: number, p: V3, out: ChartPoint = { x: 0, y: 0 }): ChartPoint {
+  const k = CHARTS[ri];
+  out.x = R * dot(p, k.e);
+  out.y = R * dot(p, k.n);
+  return out;
 }
 
-/** The surface current at p, in m/s, tangent to the sphere. Placeholder: the Great Current runs east along the equator. */
-export function currentAt(p: V3, out: V3): V3 {
-  const band = Math.max(0, 1 - Math.abs(p.y) * R / 40);
-  set(out, p.z, 0, -p.x);
-  const l = Math.sqrt(out.x * out.x + out.z * out.z);
-  if (l < 1e-9 || band === 0) return set(out, 0, 0, 0);
-  return set(out, (out.x / l) * 3 * band, 0, (out.z / l) * 3 * band);
+/** The point at (x, y) in region ri's chart, as a unit vector. */
+export function fromChart(ri: number, x: number, y: number, out: V3 = v3()): V3 {
+  const k = CHARTS[ri], s = x / R, t = y / R, w = Math.sqrt(Math.max(0, 1 - s * s - t * t));
+  return normalize(set(out, k.e.x * s + k.n.x * t + k.c.x * w, k.e.y * s + k.n.y * t + k.c.y * w, k.e.z * s + k.n.z * t + k.c.z * w));
 }
+
+/** The unit tangent at p pointing along a chart bearing (degrees clockwise from the chart's north). */
+export function chartTangent(ri: number, p: V3, bearing: number, out: V3 = v3()): V3 {
+  const k = CHARTS[ri], a = bearing * (PI / 180), s = dsin(a), c = dcos(a);
+  set(out, k.e.x * s + k.n.x * c, k.e.y * s + k.n.y * c, k.e.z * s + k.n.z * c);
+  const d = dot(out, p);
+  return normalize(set(out, out.x - d * p.x, out.y - d * p.y, out.z - d * p.z));
+}
+
+/** One region's own height function at p, unblended. For debugging and the renderer's region previews. */
+export function regionHeight(ri: number, p: V3): number {
+  const k = CHARTS[ri];
+  return SPECS[ri].height(R * dot(p, k.e), R * dot(p, k.n));
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Blending. Every region whose border is within 2·BLEND of chord distance takes part. Each region's weight w
+// is 1 at its own border and inside it, falling to 0 a band's width into the neighbour; its landforms sink by
+// FADE·(1-w)³ as they cross, and the highest wins (smoothly). So both regions' shapes reach across the band
+// and mix there, and the height is continuous everywhere, including where three regions meet.
+
+const FADE = 300;
+const CHORD = new Float64Array(REGION_COUNT);
+
+/** Blend weights at p, one per region, summing to 1. For blending materials, water and sound at borders. */
+export function regionWeights(p: V3, out: Float64Array = new Float64Array(REGION_COUNT)): Float64Array {
+  let m = 9, sum = 0;
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const c = CENTRES[i], ch = Math.sqrt(Math.max(0, 2 - 2 * (p.x * c.x + p.y * c.y + p.z * c.z)));
+    CHORD[i] = ch;
+    if (ch < m) m = ch;
+  }
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const w = 1 - smoothstep(0, 2 * BLEND, R * (CHORD[i] - m));
+    out[i] = w;
+    sum += w;
+  }
+  for (let i = 0; i < REGION_COUNT; i++) out[i] /= sum;
+  return out;
+}
+
+function blended(p: V3): number {
+  let m = 9;
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const c = CENTRES[i], ch = Math.sqrt(Math.max(0, 2 - 2 * (p.x * c.x + p.y * c.y + p.z * c.z)));
+    CHORD[i] = ch;
+    if (ch < m) m = ch;
+  }
+  let h = -1e9;
+  for (let i = 0; i < REGION_COUNT; i++) {
+    const s = R * (CHORD[i] - m);
+    if (s >= 2 * BLEND) continue;
+    const u = smoothstep(0, 2 * BLEND, s), k = CHARTS[i];
+    const term = SPECS[i].height(R * dot(p, k.e), R * dot(p, k.n)) - FADE * u * u * u;
+    h = h === -1e9 ? term : smax(h, term, 3);
+  }
+  return h;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Currents. The Great Current runs east along the equator; each region adds lanes that cross into a
+// neighbour; the Maelstrom's vortex pulls toward the Eye. Lanes are carved into the ground so they stay open.
+
+/** The Great Current: core half-width and speed, and where its flow fades out. */
+export const GREAT_CURRENT = { half: 16, fade: 34, speed: 4 } as const;
+
+export interface CurrentLane {
+  name: string;
+  /** The region whose module drew it. */
+  region: number;
+  /** Points along the lane, every few metres, from source to mouth. */
+  pts: readonly V3[];
+  width: number;
+  speed: number;
+  /** A cap around the lane, for quick rejection: its centre and the cosine of its angular radius. */
+  centre: V3;
+  cos: number;
+}
+
+function laneOf(ri: number, l: LaneSpec): CurrentLane {
+  const pts: V3[] = [];
+  for (let i = 0; i + 3 < l.pts.length; i += 2) {
+    const ax = l.pts[i], ay = l.pts[i + 1], bx = l.pts[i + 2], by = l.pts[i + 3];
+    const n = Math.max(1, Math.ceil(Math.sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay)) / 6));
+    for (let k = 0; k < n; k++) pts.push(fromChart(ri, ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n));
+  }
+  pts.push(fromChart(ri, l.pts[l.pts.length - 2], l.pts[l.pts.length - 1]));
+  const centre = v3();
+  for (const q of pts) set(centre, centre.x + q.x, centre.y + q.y, centre.z + q.z);
+  normalize(centre);
+  let cos = 1;
+  for (const q of pts) cos = Math.min(cos, dot(q, centre));
+  // Widen the cap by the lane's width and the carve's banks.
+  const pad = (l.width + 40) / R;
+  cos = cos * (1 - (pad * pad) / 2) - Math.sqrt(Math.max(0, 1 - cos * cos)) * pad;
+  return { name: l.name, region: ri, pts, width: l.width, speed: l.speed, centre, cos };
+}
+
+export const CURRENTS: readonly CurrentLane[] = SPECS.flatMap((s, ri) => s.lanes.map((l) => laneOf(ri, l)));
+
+/** Distance in metres from p to a lane's centre line, and (in LANE_HIT) the segment it is nearest. */
+const LANE_HIT = { seg: 0, along: 0, d: 0 };
+function laneDistance(l: CurrentLane, p: V3): number {
+  let best = 1e9, seg = 0, along = 0;
+  const pts = l.pts;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, qx = p.x - a.x, qy = p.y - a.y, qz = p.z - a.z;
+    const l2 = dx * dx + dy * dy + dz * dz;
+    let t = l2 > 0 ? (qx * dx + qy * dy + qz * dz) / l2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = qx - dx * t, ey = qy - dy * t, ez = qz - dz * t, d2 = ex * ex + ey * ey + ez * ez;
+    if (d2 < best) { best = d2; seg = i; along = t; }
+  }
+  LANE_HIT.seg = seg;
+  LANE_HIT.along = along;
+  LANE_HIT.d = R * Math.sqrt(best);
+  return LANE_HIT.d;
+}
+
+/** Distance from the equator in metres. */
+const fromEquator = (p: V3): number => Math.abs(p.y) * R * (1 + (p.y * p.y) / 6);
+
+/** Lanes stay open: the ground is pulled down to a channel with banks at most this steep. */
+function carve(p: V3, h: number): number {
+  const de = fromEquator(p);
+  if (de < GREAT_CURRENT.fade + 40) h = smin(h, -7 + 2.4 * Math.max(0, de - GREAT_CURRENT.half), 3);
+  for (let i = 0; i < CURRENTS.length; i++) {
+    const l = CURRENTS[i];
+    if (dot(p, l.centre) < l.cos) continue;
+    const d = laneDistance(l, p), half = l.width / 2;
+    if (d < half + 40) h = smin(h, -5 + 2 * Math.max(0, d - half * 0.6), 3);
+  }
+  return h;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Heights
+
+/** The exact ground height at p, blended and carved, for the renderer's meshes at any resolution. */
+export function heightExact(p: V3): number {
+  return carve(p, blended(p));
+}
+
+// The simulation's heights come from a grid baked on the cube sphere (equal-angle faces, as sphere.ts), tile
+// by tile the first time a ship needs one, so startup costs nothing. Every node is a pure function of its
+// position, so the order tiles bake in never changes a value.
+
+/** Cells along each cube face edge; a cell is about 2.3 m across. */
+export const HEIGHT_GRID = 384;
+const GT = 16, TILES = HEIGHT_GRID / GT, NODE_ROW = HEIGHT_GRID + 1, FACE_NODES = NODE_ROW * NODE_ROW;
+let NODES: Float32Array = new Float32Array(6 * FACE_NODES);
+let BAKED = new Uint8Array(6 * TILES * TILES);
+const PROBE = v3();
+
+function bakeTile(face: number, ti: number, tj: number): void {
+  const i0 = ti * GT, j0 = tj * GT, base = face * FACE_NODES;
+  for (let j = j0; j <= j0 + GT; j++) {
+    for (let i = i0; i <= i0 + GT; i++) {
+      faceDir(face, (i / HEIGHT_GRID) * 2 - 1, (j / HEIGHT_GRID) * 2 - 1, PROBE);
+      NODES[base + j * NODE_ROW + i] = heightExact(PROBE);
+    }
+  }
+  BAKED[(face * TILES + tj) * TILES + ti] = 1;
+}
+
+const UV: FaceUV = { face: 0, u: 0, v: 0 };
+
+/** Height of the ground above mean sea level in metres: positive is land, negative is the sea floor. */
+export function heightAt(p: V3): number {
+  faceUV(p, UV);
+  const fx = (UV.u + 1) * 0.5 * HEIGHT_GRID, fy = (UV.v + 1) * 0.5 * HEIGHT_GRID;
+  const i = Math.max(0, Math.min(HEIGHT_GRID - 1, Math.floor(fx))), j = Math.max(0, Math.min(HEIGHT_GRID - 1, Math.floor(fy)));
+  const ti = Math.floor(i / GT), tj = Math.floor(j / GT), f = UV.face;
+  if (BAKED[(f * TILES + tj) * TILES + ti] === 0) bakeTile(f, ti, tj);
+  const tx = Math.max(0, Math.min(1, fx - i)), ty = Math.max(0, Math.min(1, fy - j)), b = f * FACE_NODES + j * NODE_ROW + i;
+  const h0 = NODES[b] + (NODES[b + 1] - NODES[b]) * tx, h1 = NODES[b + NODE_ROW] + (NODES[b + NODE_ROW + 1] - NODES[b + NODE_ROW]) * tx;
+  return h0 + (h1 - h0) * ty;
+}
+
+/** Bakes every tile now and returns the grid, e.g. in a worker, to hand to adoptHeights on the main thread. */
+export function bakeHeights(): Float32Array {
+  for (let f = 0; f < 6; f++) for (let tj = 0; tj < TILES; tj++) for (let ti = 0; ti < TILES; ti++) {
+    if (BAKED[(f * TILES + tj) * TILES + ti] === 0) bakeTile(f, ti, tj);
+  }
+  return NODES;
+}
+
+/** Installs a grid baked elsewhere by bakeHeights (same code, so the same values). */
+export function adoptHeights(grid: Float32Array): void {
+  if (grid.length !== NODES.length) throw new RangeError('adoptHeights: wrong grid size');
+  NODES = grid;
+  BAKED = new Uint8Array(6 * TILES * TILES).fill(1);
+}
+
+/** True where a ship can float at sea level `tide` (metres, between -TIDE_AMPLITUDE and +TIDE_AMPLITUDE). */
+export const navigable = (p: V3, tide = 0): boolean => heightAt(p) < tide - DRAFT;
+
+// ---------------------------------------------------------------------------------------------------------
+// The surface current
+
+const EAST = v3(), TAN = v3();
+
+/** The surface current at p, in m/s, tangent to the sphere: the Great Current, the region lanes and the vortex. */
+export function currentAt(p: V3, out: V3): V3 {
+  set(out, 0, 0, 0);
+  // The Great Current, east along the equator.
+  const de = fromEquator(p);
+  if (de < GREAT_CURRENT.fade) {
+    const s = GREAT_CURRENT.speed * (1 - smoothstep(GREAT_CURRENT.half, GREAT_CURRENT.fade, de));
+    set(EAST, p.z, 0, -p.x);
+    const l = Math.sqrt(EAST.x * EAST.x + EAST.z * EAST.z);
+    if (l > 1e-9) set(out, (EAST.x / l) * s, 0, (EAST.z / l) * s);
+  }
+  // The lanes.
+  for (let i = 0; i < CURRENTS.length; i++) {
+    const l = CURRENTS[i];
+    if (dot(p, l.centre) < l.cos) continue;
+    const d = laneDistance(l, p), half = l.width / 2;
+    if (d >= half) continue;
+    const n = l.pts.length - 1, at = (LANE_HIT.seg + LANE_HIT.along) / n;
+    const ends = smoothstep(0, 0.08, at) * (1 - smoothstep(0.9, 1, at));
+    const s = l.speed * (1 - smoothstep(half * 0.4, half, d)) * ends;
+    if (s <= 0) continue;
+    const a = l.pts[LANE_HIT.seg], b = l.pts[LANE_HIT.seg + 1];
+    set(TAN, b.x - a.x, b.y - a.y, b.z - a.z);
+    const k = dot(TAN, p);
+    normalize(set(TAN, TAN.x - k * p.x, TAN.y - k * p.y, TAN.z - k * p.z));
+    set(out, out.x + TAN.x * s, out.y + TAN.y * s, out.z + TAN.z * s);
+  }
+  vortexAt(p, out, 1);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The Maelstrom's vortex
+
+export interface Vortex {
+  /** Unit vector to the Eye. */
+  pos: V3;
+  /** Radius of the whirlpool basin, of the calm eye, and the peak swirl and inflow speeds (m/s). */
+  r: number;
+  eye: number;
+  swirl: number;
+  inflow: number;
+}
+
+const MAEL = 15;
+export const VORTEX: Vortex = { pos: fromChart(MAEL, VORTEX_SPEC.x, VORTEX_SPEC.y), ...VORTEX_SPEC };
+const RADIAL = v3(), SPIN = v3();
+
+/** Adds the vortex's flow at p to out, scaled by strength (1 normally; the Maelstrom's event raises it). */
+export function vortexAt(p: V3, out: V3, strength = 1): V3 {
+  const c = VORTEX.pos, d = dot(p, c), lim = 1 - (VORTEX.r * VORTEX.r) / (2 * R * R);
+  if (d < lim) return out;
+  // Toward the eye, along the surface.
+  set(RADIAL, c.x - d * p.x, c.y - d * p.y, c.z - d * p.z);
+  const len = Math.sqrt(RADIAL.x * RADIAL.x + RADIAL.y * RADIAL.y + RADIAL.z * RADIAL.z);
+  if (len < 1e-12) return out;
+  const rho = R * Math.sqrt(Math.max(0, 2 - 2 * d));
+  set(RADIAL, RADIAL.x / len, RADIAL.y / len, RADIAL.z / len);
+  // Clockwise seen from above the south pole: the spin is p × toward-eye.
+  set(SPIN, p.y * RADIAL.z - p.z * RADIAL.y, p.z * RADIAL.x - p.x * RADIAL.z, p.x * RADIAL.y - p.y * RADIAL.x);
+  const u = rho / VORTEX.r, rim = 1 - smoothstep(0.75, 1, u), calm = smoothstep(VORTEX.eye * 0.6, VORTEX.eye * 1.6, rho);
+  const swirl = strength * VORTEX.swirl * rim * calm * (0.45 + 0.55 * (1 - u));
+  const inflow = strength * VORTEX.inflow * rim * calm;
+  return set(out, out.x + SPIN.x * swirl + RADIAL.x * inflow, out.y + SPIN.y * swirl + RADIAL.y * inflow,
+    out.z + SPIN.z * swirl + RADIAL.z * inflow);
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Sites
 
 export interface Site {
   region: number;
@@ -153,16 +463,135 @@ export interface Landmark extends Site {
   height: number;
 }
 
-const tangent = (p: V3): V3 => {
-  const t = Math.abs(p.y) > 0.99 ? v3(1, 0, 0) : v3(0, 1, 0);
-  const d = dot(t, p);
-  return normalize(set(t, t.x - d * p.x, t.y - d * p.y, t.z - d * p.z));
+/** A natural beacon: where its light sits, and how high above sea level. */
+export interface Beacon extends Site {
+  height: number;
+}
+
+const site = (ri: number, x: number, y: number, bearing: number, r: number): Site => {
+  const pos = fromChart(ri, x, y);
+  return { region: ri, pos, facing: chartTangent(ri, pos, bearing), r };
 };
 
-export const LANDMARKS: readonly Landmark[] = REGIONS.map((r, i) => ({
-  region: i, pos: CENTRES[i], facing: tangent(CENTRES[i]), r: 30, name: r.landmark, height: 50,
-}));
+export const LANDMARKS: readonly Landmark[] = SPECS.map((s, i) => {
+  const m = s.landmark;
+  return { ...site(i, m.x, m.y, m.bearing, m.r), name: REGIONS[i].landmark, height: m.height };
+});
 
-export const BEACONS: readonly Site[] = LANDMARKS.map((l) => ({ region: l.region, pos: l.pos, facing: l.facing, r: 4 }));
+export const BEACONS: readonly Beacon[] = SPECS.map((s, i) => ({ ...site(i, s.beacon.x, s.beacon.y, 0, 4), height: s.beacon.height }));
 
-export const LOOT_SPOTS: readonly Site[] = [];
+/** Loot spots, 6 or more per region, all in water a ship can reach. r is the pickup radius. */
+export const LOOT_SPOTS: readonly Site[] = SPECS.flatMap((s, i) => {
+  const out: Site[] = [];
+  for (let k = 0; k + 1 < s.loot.length; k += 2) out.push(site(i, s.loot[k], s.loot[k + 1], 0, 6));
+  return out;
+});
+
+/** Tidal passages: sills that open at high tide and close at low tide. */
+export const TIDAL_PASSAGES: readonly Site[] = SPECS.flatMap((s, i) => {
+  const out: Site[] = [];
+  for (let k = 0; k + 1 < s.tidal.length; k += 2) out.push(site(i, s.tidal[k], s.tidal[k + 1], 0, 10));
+  return out;
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Obstacles the heightfield can't express, and zones
+
+export interface Obstacle extends Site {
+  kind: ObstacleKind;
+  /** Top, metres above sea level. */
+  height: number;
+  /** Length along `facing` (logs, curtains). */
+  length: number;
+  /** A log's bore radius, or the clearance under an arch. */
+  inner: number;
+}
+
+export const OBSTACLES: readonly Obstacle[] = SPECS.flatMap((s, i) => s.obstacles.map((o) => ({
+  ...site(i, o.x, o.y, o.bearing, o.r), kind: o.kind, height: o.height, length: o.length ?? 0, inner: o.inner ?? 0,
+})));
+
+const OB_REACH = OBSTACLES.map((o) => {
+  const reach = (Math.max(o.r, o.length / 2) + 2) / R;
+  return 1 - (reach * reach) / 2;
+});
+
+/**
+ * The obstacle that is solid at the waterline at p, or -1. Arches and curtains are never solid (their pillars
+ * are terrain); a log is solid in its walls and open along its bore; a trunk is solid across its radius.
+ */
+export function obstacleAt(p: V3): number {
+  for (let i = 0; i < OBSTACLES.length; i++) {
+    const o = OBSTACLES[i];
+    if (o.kind === 'arch' || o.kind === 'curtain') continue;
+    const d = dot(p, o.pos);
+    if (d < OB_REACH[i]) continue;
+    const qx = (p.x - o.pos.x) * R, qy = (p.y - o.pos.y) * R, qz = (p.z - o.pos.z) * R;
+    if (o.kind === 'trunk') {
+      if (qx * qx + qy * qy + qz * qz < o.r * o.r) return i;
+      continue;
+    }
+    const along = qx * o.facing.x + qy * o.facing.y + qz * o.facing.z;
+    if (Math.abs(along) > o.length / 2) continue;
+    const side = Math.sqrt(Math.max(0, qx * qx + qy * qy + qz * qz - along * along));
+    if (side < o.r && side > o.inner) return i;
+  }
+  return -1;
+}
+
+export const ZONE: Readonly<Record<ZoneKind, number>> = {
+  kelp: 1, hot: 2, mist: 4, canopy: 8, curtain: 16, slush: 32, lagoon: 64, petals: 128, sulphur: 256, spray: 512,
+};
+
+export interface Zone extends Site {
+  kind: ZoneKind;
+}
+
+export const ZONES: readonly Zone[] = SPECS.flatMap((s, i) => s.zones.map((z) => ({ ...site(i, z.x, z.y, 0, z.r), kind: z.kind })));
+const ZONE_COS = ZONES.map((z) => 1 - (z.r * z.r) / (2 * R * R));
+
+/** The zones covering p, as a bitmask of ZONE flags. */
+export function zonesAt(p: V3): number {
+  let m = 0;
+  for (let i = 0; i < ZONES.length; i++) if (dot(p, ZONES[i].pos) > ZONE_COS[i]) m |= ZONE[ZONES[i].kind];
+  return m;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The Ice Crown's floes: discs that ride slow rings around the pole, each ring at its own speed, so the lanes
+// between clumps open and close. Pure functions of the match time t (seconds).
+
+export interface Floe {
+  ring: number;
+  /** Ring radius from the pole, metres. */
+  orbit: number;
+  /** Angle at t = 0, radians. */
+  angle: number;
+  /** Floe radius, metres. */
+  size: number;
+  /** Radians per second; the sign is the direction. */
+  speed: number;
+}
+
+export const FLOES: readonly Floe[] = FLOE_RINGS.flatMap((ring, k) => ring.floes.map((f) => ({
+  ring: k, orbit: ring.r + f.dr, angle: f.angle, size: f.size, speed: ring.speed,
+})));
+
+/** Where floe f is at time t. */
+export function floePos(f: Floe, t: number, out: V3 = v3()): V3 {
+  const a = f.angle + f.speed * t;
+  return fromChart(0, f.orbit * dsin(a), f.orbit * dcos(a), out);
+}
+
+const FLOE_P = v3();
+/** The floe covering p at time t, or -1. */
+export function floeAt(p: V3, t: number): number {
+  if (p.y < 0.8) return -1;
+  for (let i = 0; i < FLOES.length; i++) {
+    const f = FLOES[i];
+    floePos(f, t, FLOE_P);
+    const dx = p.x - FLOE_P.x, dy = p.y - FLOE_P.y, dz = p.z - FLOE_P.z, r = f.size / R;
+    if (dx * dx + dy * dy + dz * dz < r * r) return i;
+  }
+  return -1;
+}
