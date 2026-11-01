@@ -1,0 +1,300 @@
+// The screens over a running match, blocked out: the Gale's dive, the HUD, death and spectating, victory, and the
+// results. Over the sea only small boxes in the corners take touches; everything else lets them through to the
+// controls layer underneath, where the stick and the look live.
+import { REGIONS } from '../../sim/world/index.ts';
+import { button, el, esc, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
+import type {
+  ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
+} from '../model.ts';
+import { CONSUMABLE, WEAPON_NAME } from '../model.ts';
+import type { ScreenView } from '../shell.ts';
+import { page } from './frame.ts';
+import './match.css';
+
+/** What the HUD's buttons do: hold or let go of a control, or pick a hotbar slot. */
+export type HoldWhat = 'fire' | 'gust' | 'reload' | 'ability' | 'take' | 'hail' | 'dive';
+
+export interface HudActions {
+  press(what: HoldWhat, down: boolean): void;
+  pick(slot: number): void;
+  /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
+  target?(name: string, el: HTMLElement | null): void;
+}
+
+/** A box over the sea that takes the touches landing on it. */
+const box = (cls: string, parent: Element, html?: string) => el(`s-mx__box ${cls}`, parent, html);
+
+/** A round control held while a finger is on it. */
+function holdButton(cls: string, icon: string, label: string, parent: Element, what: HoldWhat, a: HudActions): HTMLElement {
+  const b = box(`s-mx__hold ${cls}`, parent, `<i class="s-mx__holdI">${icon}</i><span class="s-mx__holdL">${esc(label)}</span><b class="s-mx__holdN"></b>`);
+  b.dataset.what = what;
+  const up = (e: PointerEvent) => {
+    if (!b.classList.contains('is-down')) return;
+    b.classList.remove('is-down');
+    a.press(what, false);
+    e.stopPropagation();
+  };
+  b.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    b.setPointerCapture?.(e.pointerId);
+    b.classList.add('is-down');
+    a.press(what, true);
+  });
+  b.addEventListener('pointerup', up);
+  b.addEventListener('pointercancel', up);
+  b.addEventListener('lostpointercapture', up);
+  return b;
+}
+
+// ── the Gale ──
+
+export interface GaleView extends ScreenView {
+  set(m: GaleModel): void;
+}
+
+export function galeScreen(m: GaleModel, a: { onDive(): void }): GaleView {
+  const root = el('s-mx s-gale');
+  const top = box('s-gale__top p-smoke', root);
+  el('s-gale__title', top, 'Riding the Gale');
+  const line = el('s-gale__line', top);
+  const go = box('s-gale__go', root);
+  button({ label: 'Dive', icon: ICON.dive, sub: 'Leave the Gale here', kind: 'gold', size: 'lg', parent: go, what: 'gale:dive', onPress: a.onDive });
+  const set = (g: GaleModel) => {
+    const r = REGIONS[g.pick];
+    line.innerHTML = `Below: <b>${esc(r?.name ?? 'the open sea')}</b> · the Gale lets go in ${mmss(g.seconds)}`;
+  };
+  set(m);
+  return { el: root, set };
+}
+
+// ── the HUD ──
+
+export interface HudView extends ScreenView {
+  set(m: HudModel): void;
+}
+
+const slotIcon = (s: Slot): string => (s.kind === 'weapon' ? ICON[s.weapon] : s.kind === 'consumable' ? ICON[s.item] : '');
+const slotName = (s: Slot): string => (s.kind === 'weapon' ? WEAPON_NAME[s.weapon as WeaponId] : s.kind === 'consumable' ? CONSUMABLE[s.item as ConsumableId].name : '');
+
+export function hudScreen(m: HudModel, a: HudActions): HudView {
+  const root = el('s-mx s-hud');
+
+  const vit = box('s-hud__vit p-smoke', root);
+  const shield = progressBar({ kind: 'shield', value: 0, label: '', parent: vit });
+  const hull = progressBar({ kind: 'hull', value: 0, label: '', parent: vit });
+
+  const info = box('s-hud__info p-smoke', root);
+  const storm = el('s-hud__storm', info);
+  const count = el('s-hud__count', info);
+  const counter = (icon: string) => el('s-hud__n', el('', count, `<i>${icon}</i>`, 'span'), '', 'b');
+  const nShips = counter(ICON.flag), nKills = counter(ICON.sink), nCoins = counter(ICON.coin);
+
+  const map = box('s-hud__map', root);
+  const canvas = el<HTMLCanvasElement>('s-hud__mapC', map, undefined, 'canvas');
+
+  const where = box('s-hud__where p-smoke', root);
+
+  const bar = box('s-hud__bar', root);
+  const slots: { el: HTMLElement; ring: HTMLElement }[] = [];
+  for (let k = 0; k < 5; k++) {
+    const s = el('s-hud__slot', bar);
+    s.dataset.slot = String(k);
+    s.addEventListener('pointerdown', (e) => { e.stopPropagation(); a.pick(k); });
+    slots.push({ el: s, ring: el('s-hud__ring', s) });
+  }
+  const using = el('s-hud__using', bar);
+  const usingBar: BarHandle = progressBar({ kind: 'plain', value: 0, parent: using });
+
+  const take = box('s-hud__take', root);
+  const takeB = button({ label: 'Take', icon: ICON.hand, kind: 'secondary', size: 'sm', parent: take, what: 'hud:take', onPress: () => { a.press('take', true); a.press('take', false); } });
+
+  const pad = box('s-hud__pad', root);
+  holdButton('s-hud__fire', ICON.cannon, 'Fire', pad, 'fire', a);
+  const gust = holdButton('s-hud__gust', ICON.gust, 'Gust', pad, 'gust', a);
+  const abil = holdButton('s-hud__abil', ICON.star, 'Ability', pad, 'ability', a);
+  const reload = holdButton('s-hud__reload', ICON.reload, 'Reload', pad, 'reload', a);
+
+  const drawMap = (mv: HudModel['map']) => {
+    // not laid out yet (the screen is still being mounted): the next refresh draws it
+    const size = Math.round(map.clientWidth * devicePixelRatio);
+    if (size < 8) return;
+    if (canvas.width !== size) canvas.width = canvas.height = size;
+    const g = canvas.getContext('2d');
+    if (!g) return;
+    const c = size / 2, k = c / mv.range;
+    g.clearRect(0, 0, size, size);
+    g.save();
+    g.beginPath();
+    g.arc(c, c, c - 1, 0, Math.PI * 2);
+    g.fillStyle = 'rgba(214, 196, 150, 0.85)';
+    g.fill();
+    g.clip();
+    // north stays up; x east, y north
+    const at = (x: number, y: number) => [c + x * k, c - y * k] as const;
+    if (mv.storm) {
+      g.fillStyle = 'rgba(70, 40, 110, 0.35)';
+      g.fillRect(0, 0, size, size);
+      const [sx, sy] = at(mv.storm.x, mv.storm.y);
+      g.globalCompositeOperation = 'destination-out';
+      g.beginPath(); g.arc(sx, sy, mv.storm.r * k, 0, Math.PI * 2); g.fill();
+      g.globalCompositeOperation = 'source-over';
+      g.fillStyle = 'rgba(214, 196, 150, 0.85)';
+      g.globalCompositeOperation = 'destination-over';
+      g.beginPath(); g.arc(c, c, c - 1, 0, Math.PI * 2); g.fill();
+      g.globalCompositeOperation = 'source-over';
+    }
+    if (mv.next) {
+      const [nx, ny] = at(mv.next.x, mv.next.y);
+      g.strokeStyle = 'rgba(255, 255, 255, 0.9)'; g.lineWidth = 1.5 * devicePixelRatio;
+      g.beginPath(); g.arc(nx, ny, mv.next.r * k, 0, Math.PI * 2); g.stroke();
+    }
+    for (const mk of mv.marks) {
+      const [x, y] = at(mk.x, mk.y);
+      g.fillStyle = mk.kind === 'loot' ? '#c99a2e' : '#fff';
+      g.fillRect(x - 2 * devicePixelRatio, y - 2 * devicePixelRatio, 4 * devicePixelRatio, 4 * devicePixelRatio);
+    }
+    for (const sh of mv.ships) {
+      const [x, y] = at(sh.x, sh.y);
+      g.fillStyle = sh.spotted ? 'rgba(178, 40, 24, 0.55)' : '#b22818';
+      g.beginPath(); g.arc(x, y, 3.2 * devicePixelRatio, 0, Math.PI * 2); g.fill();
+    }
+    g.translate(c, c);
+    g.rotate(mv.heading);
+    g.fillStyle = '#1d1208';
+    g.beginPath();
+    const u = 6 * devicePixelRatio;
+    g.moveTo(0, -u * 1.4); g.lineTo(u, u); g.lineTo(0, u * 0.5); g.lineTo(-u, u); g.closePath(); g.fill();
+    g.restore();
+  };
+
+  const set = (h: HudModel) => {
+    shield.set(h.shield / h.shieldMax, false);
+    shield.setLabel(`${h.shield}`);
+    hull.set(h.hull / h.hullMax, false);
+    hull.setLabel(`${h.hull}`);
+    hull.el.classList.toggle('is-low', h.hull < 35);
+    const st = h.storm;
+    storm.innerHTML = `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`;
+    storm.classList.toggle('is-out', st.outside);
+    nShips.textContent = `${h.ships}`;
+    nKills.textContent = `${h.kills}`;
+    nCoins.textContent = `${h.coins}`;
+    where.innerHTML = `<b>${esc(h.region)}</b>${h.perk ? `<span>${esc(h.perk)}</span>` : ''}${h.night ? `<i>${ICON.moon}</i>` : ''}`;
+    h.slots.forEach((s, k) => {
+      const v = slots[k];
+      v.el.classList.toggle('is-sel', k === h.selected);
+      v.el.classList.toggle('is-empty', s.kind === 'empty');
+      v.el.dataset.rarity = s.kind === 'weapon' ? String(s.rarity) : '';
+      const n = s.kind === 'weapon' ? `${s.ammo}/${s.mag}` : s.kind === 'consumable' ? `×${s.count}` : '';
+      const html = `<i class="s-hud__slotI">${slotIcon(s)}</i><span class="s-hud__slotN">${n}</span>`;
+      if (v.el.dataset.html !== html) {
+        v.el.dataset.html = html;
+        v.el.innerHTML = html;
+        v.el.title = slotName(s);
+        v.ring = el('s-hud__ring', v.el);
+      }
+      v.ring.style.transform = `scaleX(${s.kind === 'weapon' ? s.reload : 0})`;
+    });
+    using.classList.toggle('is-on', h.using !== null);
+    if (h.using) usingBar.set(h.using.progress, false);
+    take.classList.toggle('is-on', h.pickup !== null);
+    if (h.pickup) takeB.el.title = h.pickup;
+    gust.querySelector('.s-mx__holdN')!.textContent = `${h.gust.charges}`;
+    gust.classList.toggle('is-off', h.gust.charges === 0);
+    abil.querySelector('.s-mx__holdN')!.textContent = h.ability.ready >= 1 ? '' : `${h.ability.seconds}`;
+    abil.classList.toggle('is-off', h.ability.ready < 1);
+    reload.classList.toggle('is-off', h.slots[h.selected]?.kind !== 'weapon');
+    drawMap(h.map);
+  };
+  set(m);
+  const named: [string, HTMLElement][] = [
+    ['shield', shield.el], ['hull', hull.el], ['shieldValue', shield.el.querySelector<HTMLElement>('.p-bar__label')!],
+    ['hullValue', hull.el.querySelector<HTMLElement>('.p-bar__label')!], ['hotbar', bar], ['gust', gust], ['kills', nKills],
+  ];
+  for (const [n, e] of named) a.target?.(n, e);
+  return { el: root, set, leave: () => { for (const [n] of named) a.target?.(n, null); } };
+}
+
+// ── death, spectating and victory ──
+
+export function deathScreen(m: DeathModel, a: { onSpectate(): void; onLeave(): void }): ScreenView {
+  const root = el('s-mx s-end');
+  const card = box('s-end__card p-paper', root);
+  el('s-end__kicker', card, 'Sunk');
+  el('s-end__place', card, `${ordinal(m.place)} <span>of ${m.ships}</span>`);
+  const by = m.killer ? `by ${esc(m.killer.name)}${m.killer.weapon ? `'s ${WEAPON_NAME[m.killer.weapon].toLowerCase()}` : ''}` : m.cause === 'storm' ? 'by the Storm' : 'by the sea';
+  el('s-end__by', card, by);
+  stats(card, m.kills, m.damage, m.survived);
+  const row = el('s-end__row', card);
+  button({ label: 'Spectate', icon: ICON.eye, kind: 'secondary', parent: row, what: 'death:spectate', onPress: a.onSpectate });
+  button({ label: 'Leave', icon: ICON.leave, kind: 'primary', parent: row, what: 'death:leave', onPress: a.onLeave });
+  return { el: root };
+}
+
+export interface SpectateView extends ScreenView {
+  set(m: SpectateModel): void;
+}
+
+export function spectateScreen(m: SpectateModel, a: { onLeave(): void }): SpectateView {
+  const root = el('s-mx s-spec');
+  const top = box('s-spec__top p-smoke', root);
+  const line = el('s-spec__line', top);
+  const leave = box('s-spec__leave', root);
+  button({ label: 'Leave', icon: ICON.leave, kind: 'dark', size: 'sm', parent: leave, what: 'spectate:leave', onPress: a.onLeave });
+  const set = (s: SpectateModel) => {
+    line.innerHTML = `<i>${ICON.eye}</i>Watching <b>${esc(s.target.name)}</b> · ${s.target.kills} sunk · ${s.ships} afloat`;
+  };
+  set(m);
+  return { el: root, set };
+}
+
+export function victoryScreen(m: VictoryModel, a: { onContinue(): void }): ScreenView {
+  const root = el('s-mx s-end s-end--win');
+  const card = box('s-end__card p-paper', root);
+  el('s-end__kicker', card, `${ICON.crown} Last ship afloat`);
+  el('s-end__place', card, `1st <span>of ${m.ships}</span>`);
+  stats(card, m.kills, m.damage, m.survived);
+  const row = el('s-end__row', card);
+  button({ label: 'Continue', icon: ICON.next, kind: 'gold', parent: row, what: 'victory:continue', onPress: a.onContinue });
+  return { el: root };
+}
+
+function stats(parent: Element, kills: number, damage: number, survived: number): void {
+  const s = el('s-end__stats', parent);
+  for (const [v, l] of [[`${kills}`, 'Sunk'], [`${damage}`, 'Damage'], [mmss(survived), 'Afloat']] as const) el('s-end__stat', s, `<b>${v}</b><span>${l}</span>`);
+}
+
+// ── results ──
+
+export function resultsScreen(m: ResultsModel, a: { onDone(): void }): ScreenView {
+  const p = page({ title: 'Results', sub: `${ordinal(m.place)} of ${m.ships}`, onBack: a.onDone, className: 's-res' });
+  const left = el('s-res__col p-paper', p.body);
+  el('s-res__place', left, `${ordinal(m.place)} <span>of ${m.ships}</span>`);
+  stats(left, m.kills, m.damage, m.survived);
+  const xp = el('s-res__xp', left);
+  for (const part of m.xp.parts) el('s-res__xpRow', xp, `<span>${esc(part.label)}</span><b>+${part.amount}</b>`);
+  el('s-res__xpRow s-res__xpRow--total', xp, `<span>XP</span><b>+${m.xp.total}</b>`);
+
+  const right = el('s-res__col p-paper', p.body);
+  const lv = m.level;
+  el('s-res__line', right, `<span>Level</span><b>${lv.before.level}${lv.after.level !== lv.before.level ? ` → ${lv.after.level}` : ''}</b>`);
+  progressBar({ kind: 'xp', value: lv.after.into / lv.after.need, label: `${lv.after.into} / ${lv.after.need}`, parent: right });
+  const rk = m.rank;
+  el('s-res__line', right, `<span>Rank</span><b>${esc(rk.before.name)}${rk.change !== 'same' ? ` → ${esc(rk.after.name)}` : ''}</b>`);
+  progressBar({ kind: 'rank', value: rk.after.progress, parent: right });
+  const news: string[] = [];
+  for (const ab of m.unlocked.abilities) news.push(`Unlocked ${ab.name}`);
+  for (const c of m.unlocked.cosmetics) news.push(`Unlocked ${c.name}`);
+  for (const r of m.newRegions) news.push(`Charted ${r.name}`);
+  const WHAT = { sankYou: 'sank you', sunkByYou: 'was sunk by you', grudge: 'holds a grudge', firstMeeting: 'met you for the first time' } as const;
+  // first meetings fold into one line: the first match meets the whole fleet
+  const met = m.rivals.filter((r) => r.what === 'firstMeeting');
+  for (const r of m.rivals) if (r.what !== 'firstMeeting' || met.length <= 3) news.push(`${r.name} ${WHAT[r.what]}`);
+  if (met.length > 3) news.push(`Met ${met.length} captains for the first time`);
+  const list = el('s-res__news', right);
+  for (const n of news) el('s-res__newsRow', list, esc(n));
+  const row = el('s-end__row', right);
+  button({ label: 'Continue', icon: ICON.next, kind: 'gold', parent: row, what: 'results:continue', onPress: a.onDone });
+  return p;
+}

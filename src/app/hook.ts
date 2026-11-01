@@ -2,6 +2,7 @@
 // jump to a scene, start a seeded match with scripted player input, step the simulation, read the effect log, open
 // any screen with its live or fixture model, and read state.
 import type { App } from './app.ts';
+import type { PlayOptions } from './session.ts';
 import { lapPath, regionList, regionView, type SceneInput } from './scenes.ts';
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
@@ -42,7 +43,7 @@ export function installHook(app: App) {
 
     // ── matches ──
     /** Starts a match: { seed, skipGale, autopilot, script: [[tick, input], ...] }. */
-    play: (o: { seed?: number; skipGale?: boolean; autopilot?: boolean; script?: [number, unknown][] } = {}) => app.play(o),
+    play: (o: PlayOptions = {}) => app.play(o),
     dive: () => app.dive(),
     /** Steps n ticks now, without drawing; returns how many ran. */
     step: (n: number) => app.stepTicks(n),

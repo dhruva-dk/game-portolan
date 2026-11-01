@@ -43,6 +43,7 @@ export class MomentJuice {
         if (m.ship === me) juice.fire('fire', { strength: FIRE_STRENGTH[m.weapon], world: m.pos });
         return;
       case 'hit': {
+        if (m.steady) return;
         const size = m.shield + m.hull;
         if (m.by === me && m.ship !== me) {
           const id = m.crit ? 'crit' : m.hull > 0 ? 'cannonHit' : 'shieldHit';

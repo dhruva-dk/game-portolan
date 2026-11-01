@@ -49,6 +49,8 @@ export class Stage {
   /** The point the camera follows, in metres. */
   readonly focus = new THREE.Vector3(0, R, 0);
   readonly depth: WeatherDepth = {};
+  /** Called once the rig has placed the camera each frame, before anything is drawn: for shake laid on top. */
+  onCamera: ((cam: THREE.PerspectiveCamera) => void) | null = null;
   private readonly up = new THREE.Vector3();
 
   readonly engine: Engine;
@@ -134,6 +136,7 @@ export class Stage {
     const cam = this.camera;
     cam.aspect = this.engine.aspect;
     this.rig.update(cam, v.camera, v.target, this.sun, dt, v.time);
+    this.onCamera?.(cam);
     const eye = cam.position;
     const t = v.target.pos;
     this.focus.set(t.x, t.y, t.z).normalize().multiplyScalar(R + v.tide);

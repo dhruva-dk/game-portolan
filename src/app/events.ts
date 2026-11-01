@@ -10,7 +10,11 @@ export type ConsumableKind = 'smallShield' | 'bigShield' | 'repairKit' | 'fullRe
 export type Moment =
   | { k: 'fire'; ship: number; weapon: WeaponClass; rarity: number; pos: V3; dir: V3 }
   | { k: 'impact'; pos: V3; on: 'water' | 'land' | 'ship'; weapon: WeaponClass; ship: number }
-  | { k: 'hit'; ship: number; by: number; shield: number; hull: number; crit: boolean; pos: V3; weapon: WeaponClass | 'storm' | 'ram' | 'fire' | 'other' }
+  | {
+    k: 'hit'; ship: number; by: number; shield: number; hull: number; crit: boolean; pos: V3; weapon: WeaponClass | 'storm' | 'ram' | 'fire' | 'other';
+    /** Damage that comes tick by tick (burning, ash): counted, but too small and too often to juice. */
+    steady?: boolean;
+  }
   | { k: 'shieldBreak'; ship: number; by: number; pos: V3 }
   | { k: 'shieldUp'; ship: number; pos: V3 }
   | { k: 'sink'; ship: number; by: number; cause: string; pos: V3 }
@@ -36,6 +40,7 @@ export type Moment =
   | { k: 'perk'; ship: number; perk: string; on: boolean }
   | { k: 'lightning'; pos: V3; warning: boolean }
   | { k: 'aground'; ship: number; pos: V3 }
+  | { k: 'ram'; ship: number; by: number; pos: V3 }
   | { k: 'win'; ship: number };
 
 export type MomentKind = Moment['k'];

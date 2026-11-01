@@ -15,6 +15,8 @@ export class MomentSound {
   /** The ship the player hears from. */
   me = 0;
   private readonly uses = new Map<number, { item: ConsumableKind; use: Use }>();
+  /** When the Storm last bit the player's hull, in seconds: its sound comes once a second, not every tick. */
+  private storm = -1;
 
   constructor(audio: Audio, log: EffectLog) {
     this.audio = audio;
@@ -39,11 +41,17 @@ export class MomentSound {
         if (m.on !== 'ship') a.impact(m.on, { pos: m.pos, weapon: m.weapon });
         return;
       case 'hit':
+        if (m.steady) return;
         if (m.weapon === 'storm') { if (m.ship === me) a.play('stormDamage'); return; }
         if (m.shield > 0) a.shieldHit({ pos: this.at(m.ship, m.pos), level: 0.5 });
         if (m.hull > 0) a.impact('ship', { pos: this.at(m.ship, m.pos), weapon: m.weapon in FIRE_OK ? (m.weapon as never) : undefined, crit: m.crit });
         if (m.by === me && m.ship !== me) a.play(m.crit ? 'hitMarkerCrit' : m.hull > 0 ? 'hitMarker' : 'hitMarkerShield');
         return;
+      case 'stormHurt': {
+        const now = performance.now() / 1000;
+        if (m.ship === me && now - this.storm >= 1) { this.storm = now; a.play('stormDamage'); }
+        return;
+      }
       case 'shieldBreak':
         a.shieldBreak(m.ship === me ? null : m.pos);
         if (m.by === me) a.play('stingShieldBreak');
