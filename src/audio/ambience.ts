@@ -124,10 +124,11 @@ export class Ambience {
       if (id === undefined) {
         if (g <= 0.01) continue;
         if (!e.ready(name)) { e.want(name); continue; }
-        id = e.play(name, { gain: 0.001, cutoff: cutoff < 20000 ? cutoff : undefined });
+        // beds start at their level and glide in from silence; play() would drop a near-silent start
+        id = e.play(name, { gain: g, rate, cutoff: cutoff < 20000 ? cutoff : undefined, fadeIn: 1.5 });
         if (!id) continue;
         this.ids.set(name, id);
-        this.sent.delete(name);
+        this.sent.set(name, { gain: g, rate, cutoff });
       }
       const was = this.sent.get(name);
       if (!was || Math.abs(g - was.gain) > 0.01 + 0.03 * was.gain || Math.abs(rate / was.rate - 1) > 0.004 || Math.abs(cutoff / was.cutoff - 1) > 0.04) {

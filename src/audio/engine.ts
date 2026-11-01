@@ -31,6 +31,8 @@ export interface PlayOptions {
   priority?: number;
   /** A lowpass on this voice, in Hz. */
   cutoff?: number;
+  /** Seconds to rise from silence: the ambience beds glide in. Loops get a few milliseconds anyway. */
+  fadeIn?: number;
 }
 
 /** One line of the log of every sound that fired, for the capture tools. */
@@ -59,6 +61,7 @@ interface Voice {
   start: number;
   end: number;
   duration: number | undefined;
+  fadeIn: number;
   at: Vec3 | null;
   gain: number;
   rate: number;
@@ -410,11 +413,16 @@ export class AudioEngine {
     }
     head.connect(this.buses[v.pool]);
     const centre = !pn && mono ? Math.SQRT1_2 : 1;
-    amp.gain.value = v.gain * sp.gain * centre * (1 + (this.rand() - 0.5) * 0.12);
+    const level = v.gain * sp.gain * centre * (1 + (this.rand() - 0.5) * 0.12);
+    amp.gain.value = level;
+    if (v.fadeIn > 0 && offset === 0) {
+      amp.gain.setValueAtTime(0, begin);
+      amp.gain.linearRampToValueAtTime(level, begin + v.fadeIn);
+    }
     if (d.loop) {
       src.loop = true;
       if (v.duration !== undefined) {
-        amp.gain.setValueAtTime(amp.gain.value, v.start + v.duration);
+        amp.gain.setValueAtTime(level, v.start + v.duration);
         amp.gain.linearRampToValueAtTime(0, v.start + v.duration + 0.35);
       }
     }
@@ -480,7 +488,7 @@ export class AudioEngine {
     for (const v of [...byName, ...byPool]) { this.kill(v, when); this.stats.stolen++; }
     const v: Voice = {
       id: this.nextId++, name, pool: d.bus, buffer, score, start: when, end: until, duration: d.loop ? o.duration : undefined,
-      at, gain: d.gain * (o.gain ?? 1), rate, pan: o.pan ?? 0, cutoff: o.cutoff ?? 20000, tone: o.cutoff !== undefined || (d.loop && !!at), nodes: null,
+      at, gain: d.gain * (o.gain ?? 1), rate, fadeIn: o.fadeIn ?? (d.loop ? 0.02 : 0), pan: o.pan ?? 0, cutoff: o.cutoff ?? 20000, tone: o.cutoff !== undefined || (d.loop && !!at), nodes: null,
     };
     this.voices.push(v);
     this.byId.set(v.id, v);
