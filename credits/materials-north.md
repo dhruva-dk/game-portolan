@@ -1,11 +1,12 @@
 ## Textures: northern region ground materials (public/tex/regions, from Poly Haven and ambientCG, 2048² JPG)
 
 Each scan ships albedo, normal (OpenGL), roughness, ambient occlusion and a 1024² height map, re-encoded from the 2K
-downloads. Where the download had no AO map (Snow005, Ice003), the AO is derived from its height map. Two albedos are
-recoloured: Ice003 is gradient-mapped to blue ice, and Sparse Grass has a purple hue blended into its lighter strands
-for heather. All ambientCG materials are photogrammetry scans except Grass001, Grass007, Ice003 and Snow005, which are
+downloads. Where the download had no AO map (Snow005, Ice003), the AO is derived from its height map. Four albedos are
+recoloured: Ice003 and Rock027 are gradient-mapped to blue ice, Sparse Grass has a purple hue blended into its lighter
+strands for heather, and the jacaranda petals of Flower Scattered Dirt are shifted to pale cherry pink. All ambientCG materials are photogrammetry scans except Grass001, Grass007, Ice003 and Snow005, which are
 Substance-built (ambientCG's "procedural"); none is "Approximated".
 
+- Rock 027 — https://ambientcg.com/a/Rock027 — Lennart Demes (ambientCG) — CC0 (the Ice Crown: sculpted blue ice, cliff)
 - Snow 005 — https://ambientcg.com/a/Snow005 — Lennart Demes (ambientCG) — CC0 (the Ice Crown: snow, top)
 - Rock 046 S — https://ambientcg.com/a/Rock046S — Lennart Demes (ambientCG) — CC0 (the Ice Crown: frost lichen, slope)
 - Ice 003 — https://ambientcg.com/a/Ice003 — Lennart Demes (ambientCG) — CC0 (the Ice Crown: blue ice, cliff and wet shore)

@@ -27,9 +27,11 @@ function set(region: RegionId, layers: MaterialLayer[]): MaterialSet {
   return { region, layers: byRole };
 }
 
-// The Ice Crown: white, pale blue and steel. Snow over blue ice, frost-white lichen on the outer rocks,
-// glassy refrozen leads at the waterline, dark shingle under the slush.
+// The Ice Crown: white, pale blue and steel. Snow over blue ice, sculpted blue ice in the pressure ridges
+// and spires, frost-white lichen on the outer rocks, glassy refrozen leads at the waterline, dark shingle
+// under the slush.
 const ice = (n: string, s: string) => scan('iceCrown', n, s);
+const iceFace = ice('iceface', ACG('Rock027'));
 const iceSnow = ice('snow', ACG('Snow005'));
 const iceLichen = ice('frostlichen', ACG('Rock046S'));
 const iceBlue = ice('blueice', ACG('Ice003'));
@@ -103,7 +105,7 @@ export const REGION_MATERIALS: Record<NorthRegionId, MaterialSet> = {
   iceCrown: set('iceCrown', [
     iceSnow('top', 4, [2.55, 2.68, 2.85], 0, 0.6),
     iceLichen('slope', 3, [2.0, 2.2, 2.7]),
-    iceBlue('cliff', 9, [1.75, 1.75, 1.7]),
+    iceFace('cliff', 8, [1.05, 1.22, 1.3], 0.2),
     iceRime('beach', 3, [1.74, 1.79, 1.72]),
     iceBlue('wetShore', 5, [0.95, 0.95, 0.98], 0.7),
     iceShingle('seabed', 4, [0.68, 0.84, 1.18], 0.5),
@@ -158,7 +160,7 @@ export const REGION_MATERIALS: Record<NorthRegionId, MaterialSet> = {
   ]),
   blossomRun: set('blossomRun', [
     blMeadow('top', 3, [1.39, 1.48, 2.09]),
-    blPetals('slope', 3, [1.4, 1.12, 1.4]),
+    blPetals('slope', 3, [1.08, 1.0, 1.02]),
     blBank('cliff', 6, [0.88, 0.96, 0.92]),
     blStones('beach', 3, [1.6, 1.8, 2.1]),
     blBed('wetShore', 3, [0.97, 1.02, 1.1], 0.7),

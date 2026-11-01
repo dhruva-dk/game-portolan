@@ -34,7 +34,7 @@ const ss = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max
 function patchHeight(x: number, z: number): number {
   const u = x + 5 * Math.sin(z * 0.07) + 2.5 * Math.sin(z * 0.19 + 1.3);
   const bumps = 0.6 * Math.sin(x * 0.31 + z * 0.17) * Math.sin(z * 0.27 - x * 0.11);
-  return -7 + 6.4 * ss(-48, -14, u) + 2.6 * ss(-16, -1, u) + 8 * ss(0, 17, u) + 15 * ss(20, 26, u) + bumps * ss(-20, 0, u) + 1.2 * bumps * ss(26, 34, u);
+  return -7 + 6.4 * ss(-48, -14, u) + 2.6 * ss(-16, -1, u) + 8 * ss(0, 17, u) + 15 * ss(20, 26, u) + bumps * ss(-20, 0, u) + 0.4 * bumps * ss(26, 34, u);
 }
 
 function terrainGeometry(): THREE.BufferGeometry {
@@ -277,7 +277,7 @@ const sunUniform = { value: new THREE.Vector3() };
 
 const LIGHTS = {
   day: { elev: 42, az: 140, colour: 0xfff4e2, power: 3.2, sky: 0xa9c6e8, ground: 0x4a4236, hemi: 1.0, bg: 0x8fb3d9, exposure: 1.0 },
-  dusk: { elev: 7, az: 215, colour: 0xff9a52, power: 2.4, sky: 0x6a6f9e, ground: 0x2c2230, hemi: 0.55, bg: 0x40405e, exposure: 1.25 },
+  dusk: { elev: 7, az: 215, colour: 0xff9a52, power: 2.4, sky: 0x6a6f9e, ground: 0x2c2230, hemi: 0.75, bg: 0x4a4866, exposure: 1.2 },
 };
 let light: keyof typeof LIGHTS = params.get('light') === 'dusk' ? 'dusk' : 'day';
 function applyLight(): void {
