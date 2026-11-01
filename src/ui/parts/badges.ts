@@ -1,6 +1,7 @@
 // Small marks: the level seal, rank medallions, captains' emblem discs, chips and stat tiles.
 import { el, esc } from './dom.ts';
 import { emblem } from './icons.ts';
+import { chargeOf, maskInto } from './sigil.ts';
 
 /** The ranks' names and metals, Iron to Legend. Tiers 0–5 have three steps each; Admiral and Legend have one. */
 export const RANK_TIERS = [
@@ -83,8 +84,10 @@ export function seal(level: number, o: { cap?: string; parent?: Element } = {}):
 }
 
 /** A captain's emblem on a disc of their two colours. */
-export function emblemBadge(name: string, colours: readonly [string, string], o: { size?: 'md' | 'lg'; parent?: Element } = {}): HTMLElement {
-  const e = el(`p-emblem${o.size === 'lg' ? ' p-emblem--lg' : ''}`, o.parent, `<div class="p-emblem__glyph">${emblem(name)}</div>`);
+export function emblemBadge(name: string, colours: readonly [string, string], o: { size?: 'sm' | 'md' | 'lg'; parent?: Element } = {}): HTMLElement {
+  const c = chargeOf(name);
+  const e = el(`p-emblem${o.size === 'lg' ? ' p-emblem--lg' : o.size === 'sm' ? ' p-emblem--sm' : ''}`, o.parent, `<div class="p-emblem__glyph">${c ? '' : emblem(name)}</div>`);
+  if (c) maskInto(e.firstElementChild as HTMLElement, c);
   e.style.setProperty('--e1', colours[0]);
   e.style.setProperty('--e2', colours[1]);
   e.dataset.part = 'emblem';

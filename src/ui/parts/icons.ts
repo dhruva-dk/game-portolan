@@ -139,7 +139,7 @@ export const KIND_ICON: Record<string, string> = {
   hullPaint: svg('<path d="M1.5 12h21l-3.6 8H5.1z"/><path d="M15.5 2.5c1.5 2.4 3.2 4 3.2 5.8a3.2 3.2 0 0 1-6.4 0c0-1.8 1.7-3.4 3.2-5.8z"/>'),
   figurehead: ICON.gull,
   emblem: svg(`<path d="${SHIELD_D}"/>${star(5, 5.6, 2.3, 12, 11.6).replace('<path', '<path fill="rgba(255,250,230,.88)"')}`),
-  wakeTrail: svg(st('M2 20c4-1 6-4 9-8s5-6.6 11-8', 2.6) + dot(6, 11, 1.4) + dot(15, 18, 1.6) + dot(19.5, 12.5, 1.2) + dot(10, 5.5, 1.1)),
+  wake: svg(st('M2 20c4-1 6-4 9-8s5-6.6 11-8', 2.6) + dot(6, 11, 1.4) + dot(15, 18, 1.6) + dot(19.5, 12.5, 1.2) + dot(10, 5.5, 1.1)),
 };
 
 // ---------------------------------------------------------------- the captains' emblems

@@ -87,3 +87,30 @@ export function iconButton(o: IconButtonOptions): IconButtonHandle {
   press(b, () => o.onPress?.(), { sound: o.sound ?? 'tap', haptic: o.haptic ?? 'light', on: o.on });
   return { el: b, setBadge, setDisabled };
 }
+
+export interface TileOptions {
+  icon: string;
+  label: string;
+  badge?: number | null;
+  onPress?: () => void;
+  parent?: Element;
+  className?: string;
+}
+
+/** A menu tile: a big glyph over its name, on dark glass, with a count of new things. */
+export function tile(o: TileOptions): IconButtonHandle {
+  const b = el<HTMLButtonElement>(`p-tile${o.className ? ' ' + o.className : ''}`, o.parent, '', 'button');
+  b.type = 'button';
+  b.dataset.part = `tile:${o.label.toLowerCase()}`;
+  el('p-tile__face', b, `<div class="p-tile__icon">${o.icon}</div><div class="p-tile__label">${esc(o.label)}</div>`);
+  let badge: HTMLElement | null = null;
+  const setBadge = (v: number | '' | null) => {
+    if (v === null || v === 0) { badge?.remove(); badge = null; return; }
+    if (!badge) badge = el('p-badge', b);
+    badge.textContent = v === '' ? '' : String(v);
+  };
+  setBadge(o.badge ?? null);
+  const setDisabled = (v: boolean) => b.setAttribute('aria-disabled', v ? 'true' : 'false');
+  press(b, () => o.onPress?.(), { sound: 'open', haptic: 'light' });
+  return { el: b, setBadge, setDisabled };
+}

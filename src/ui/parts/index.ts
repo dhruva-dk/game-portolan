@@ -13,4 +13,6 @@ export * from './controls.ts';
 export * from './progress.ts';
 export * from './badges.ts';
 export * from './overlays.ts';
+export * from './sigil.ts';
+export * from './art.ts';
 export { makePaper, paperTile, grain } from './paper.ts';

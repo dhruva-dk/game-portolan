@@ -32,3 +32,49 @@
 
 /* the safe frame every screen lays out inside: clear of the notch, the corners and the home bar */
 .pui-safe { position: absolute; top: var(--st); bottom: var(--sb); left: var(--sl); right: var(--sr); }
+
+/* ---------------------------------------------------------------- the menu page frame */
+
+.s-backdrop { position: absolute; inset: 0; }
+/* the planet darkened, with a chart's rhumb lines fanning faintly from two wind roses */
+.s-backdrop--chart { background:
+    repeating-conic-gradient(from 0deg at 18% 72%, rgba(255, 214, 150, 0.07) 0deg 0.35deg, transparent 0.35deg 11.25deg),
+    repeating-conic-gradient(from 5deg at 84% 22%, rgba(255, 214, 150, 0.05) 0deg 0.35deg, transparent 0.35deg 11.25deg),
+    radial-gradient(ellipse at 50% 38%, rgba(40, 26, 12, 0.62), rgba(10, 6, 2, 0.92) 78%);
+  -webkit-backdrop-filter: blur(7px) saturate(0.8); backdrop-filter: blur(7px) saturate(0.8); animation: pui-fade-in var(--t-slow) var(--ease) both; }
+.s-backdrop--side { background: linear-gradient(90deg, transparent 0%, transparent 34%, rgba(10, 6, 2, 0.55) 52%, rgba(10, 6, 2, 0.8) 100%), linear-gradient(180deg, rgba(10, 6, 2, 0.5), transparent 22%); }
+.s-backdrop--clear { pointer-events: none; }
+.s-page__safe { display: flex; flex-direction: column; }
+.s-page__safe > .p-header { flex: none; }
+.s-page__body { position: relative; flex: 1; min-height: 0; display: flex; gap: var(--sp-5); padding: 0 var(--sp-5) var(--sp-5); }
+.pui[data-form='phone'] .s-page__body { gap: var(--sp-4); padding: 0 0 var(--sp-2); }
+.pui[data-form='phone'] .s-page__safe > .p-header { padding: 0; height: calc(var(--hit-icon) + var(--sp-3)); }
+
+/* a section label inside a page */
+.s-label { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-micro); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-goldHi); opacity: 0.9; }
+.p-paper .s-label { color: var(--c-rubric); }
+
+/* ---------------------------------------------------------------- shared bits */
+
+/* the player's plate: level seal, the two bars with their lines, the rank medallion */
+.s-plate { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); }
+.s-plate__mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(3px * var(--k)); }
+.s-plate__line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); white-space: nowrap; }
+.s-plate__line + .p-bar + .s-plate__line { margin-top: calc(4px * var(--k)); }
+.s-plate__name { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-small); letter-spacing: 0.03em; }
+.s-plate__soft { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); letter-spacing: 0.06em; opacity: 0.72; overflow: hidden; text-overflow: ellipsis; }
+.s-plate .p-bar { height: calc(12px * var(--k)); }
+.pui[data-form='phone'] .s-plate { gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); }
+
+/* an ability's glyph in a medallion: wax for actives, lapis for passives */
+.s-glyph { flex: none; display: flex; align-items: center; justify-content: center; width: var(--hit-icon); height: var(--hit-icon); border-radius: 50%; color: var(--c-cream);
+  border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.55); box-shadow: inset 0 calc(2px * var(--k)) 0 rgba(255, 255, 255, 0.25), var(--sh-1); }
+.s-glyph > svg { width: 60%; height: 60%; filter: drop-shadow(0 calc(1.5px * var(--k)) 0 rgba(0, 0, 0, 0.4)); }
+.s-glyph--active { background: radial-gradient(circle at 50% 30%, var(--c-waxHi), var(--c-wax) 55%, var(--c-waxLo)); }
+.s-glyph--passive { background: radial-gradient(circle at 50% 30%, #6fa4e8, var(--c-lapis) 55%, #183a6e); }
+
+/* a captain's emblem with a name over a soft line */
+.s-mark { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.s-mark__t { display: flex; flex-direction: column; min-width: 0; }
+.s-mark__name { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-mark__sub { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }

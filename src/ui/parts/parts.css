@@ -19,7 +19,7 @@
 }
 .pui *, .pui *::before, .pui *::after { box-sizing: border-box; }
 .pui svg { display: block; width: 100%; height: 100%; fill: currentColor; overflow: visible; }
-.pui button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; }
+:where(.pui button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; }
 .pui :focus-visible { outline: calc(3px * var(--k)) solid var(--c-goldHi); outline-offset: calc(3px * var(--k)); }
 
 /* type */
@@ -109,6 +109,17 @@
   background: radial-gradient(circle at 40% 30%, var(--c-waxHi), var(--c-wax) 70%); color: var(--c-cream); border: calc(2px * var(--k)) solid var(--c-cream); font-family: var(--f-display); font-weight: 900; font-size: calc(13px * var(--k)); line-height: 1; box-shadow: var(--sh-1); z-index: 2; animation: p-pop 420ms var(--spring) backwards; }
 .p-badge:empty { min-width: calc(16px * var(--k)); height: calc(16px * var(--k)); padding: 0; }
 @keyframes p-pop { from { transform: scale(0); } }
+
+/* a menu tile: dark glass on a lip, a big glyph over its name */
+.p-tile { --depth: calc(5px * var(--k)); position: relative; flex: none; width: calc(var(--hit-btnLg) * 1.18); height: calc(var(--hit-btnLg) * 1.18); padding: 0 0 var(--depth); border-radius: var(--r-lg); pointer-events: auto; color: var(--c-cream); transition: transform var(--t-fast) var(--ease); }
+.p-tile::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; top: var(--depth); border-radius: var(--r-lg); background: #0c0703; border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.4); }
+.p-tile__face { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(4px * var(--k)); border-radius: var(--r-lg);
+  background: radial-gradient(circle at 50% 28%, rgba(255, 220, 150, 0.22), transparent 62%), linear-gradient(180deg, rgba(64, 42, 22, 0.9), rgba(24, 14, 6, 0.92)); border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.25), var(--sh-1); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: transform var(--t-fast) var(--ease); }
+.p-tile__icon { width: 46%; height: 46%; color: var(--c-goldHi); filter: drop-shadow(0 calc(2px * var(--k)) 0 rgba(0, 0, 0, 0.5)); }
+.p-tile__label { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-micro); letter-spacing: 0.09em; text-transform: uppercase; }
+.p-tile.is-down { transform: scale(0.95); }
+.p-tile.is-down .p-tile__face { transform: translateY(calc(var(--depth) - 1px)); }
 
 /* ---------------------------------------------------------------- cards */
 
@@ -238,6 +249,19 @@
   background: radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--e1) 70%, white), var(--e1) 60%, color-mix(in srgb, var(--e1) 60%, black)); border: calc(2.4px * var(--k)) solid var(--c-ink); box-shadow: inset 0 0 0 calc(2px * var(--k)) color-mix(in srgb, var(--e2) 45%, transparent), var(--sh-1); }
 .p-emblem__glyph { width: 58%; height: 58%; filter: drop-shadow(0 calc(1.5px * var(--k)) 0 rgba(0, 0, 0, 0.35)); }
 .p-emblem--lg { width: calc(var(--hit-icon) * 2); height: calc(var(--hit-icon) * 2); border-width: calc(3.5px * var(--k)); }
+.p-emblem--sm { width: calc(var(--hit-icon) * 0.62); height: calc(var(--hit-icon) * 0.62); border-width: calc(1.8px * var(--k)); }
+.p-emblem__glyph.p-mask { width: 72%; height: 72%; }
+
+/* a charge from the cosmetics library: an alpha mask over the current colour, faded in when it is drawn */
+.p-mask { display: block; background: currentColor; -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat; opacity: 0; transition: opacity var(--t-base) var(--ease); }
+.p-mask.is-ready { opacity: 1; }
+
+/* cosmetic art inside a rarity frame or a slot */
+.p-art { width: 100%; height: 100%; display: grid; place-items: center; }
+.p-art > svg, .p-art > .p-art__charge { width: 100%; height: 100%; }
+.p-art--ink { color: #fff8e6; }
+.p-art--water { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #2c5b78, #10283a 70%); box-shadow: inset 0 0 0 calc(2px * var(--k)) rgba(0, 0, 0, 0.35); }
+.p-art--water > svg { width: 82%; height: 82%; }
 
 /* a rank: a medallion in the tier's metal with its steps as chevrons */
 .p-rank { --m1: #9aa0a6; --m2: #5b6168; --m3: #2a2e33; position: relative; flex: none; width: calc(var(--hit-icon) * 1.1); height: calc(var(--hit-icon) * 1.1); display: grid; place-items: center; }

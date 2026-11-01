@@ -1,0 +1,44 @@
+/* The lobby sits over the live planet: only its corners carry anything, and the middle stays clear for your ship. */
+.s-lobby { position: absolute; inset: 0; }
+.s-lobby__shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(8, 5, 2, 0.55), transparent 24%, transparent 70%, rgba(8, 5, 2, 0.6)); }
+.s-lobby__safe { pointer-events: none; }
+.s-lobby__safe > * { pointer-events: auto; }
+
+.s-lobby__top { position: absolute; left: var(--sp-6); right: var(--sp-6); top: var(--sp-5); display: flex; align-items: flex-start; gap: var(--sp-5); animation: pui-rise-in var(--t-slow) var(--ease) both; }
+.s-lobby__me { width: calc(460px * var(--k)); }
+.s-lobby__stats { display: flex; gap: var(--sp-2); margin-left: auto; }
+.s-lobby__stat { display: flex; flex-direction: column; align-items: center; min-width: calc(84px * var(--k)); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: rgba(18, 10, 4, 0.55); color: var(--c-cream); border: 1px solid rgba(255, 236, 196, 0.2); }
+.s-lobby__stat b { font-family: var(--f-display); font-weight: 900; font-size: var(--fs-h3); line-height: 1.1; }
+.s-lobby__stat span { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
+
+.s-lobby__menu { position: absolute; left: var(--sp-6); top: 50%; transform: translateY(-46%); display: grid; grid-template-columns: repeat(2, auto); gap: var(--sp-4); }
+.s-lobby__go { position: absolute; right: var(--sp-6); bottom: var(--sp-6); display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); width: calc(440px * var(--k)); animation: pui-rise-in var(--t-slow) 120ms var(--ease) both; }
+.s-lobby__play { height: calc(var(--hit-btnLg) * 1.25); }
+.s-lobby__play .p-btn__face { font-size: calc(var(--fs-btnLg) * 1.25); }
+.s-lobby__loadout { display: flex; gap: var(--sp-3); }
+.s-lobby__slot { flex: 1; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); cursor: pointer; transition: transform var(--t-fast) var(--ease); }
+.s-lobby__slot.is-down { transform: scale(0.96); }
+.s-lobby__slot .s-glyph { width: calc(var(--hit-min) * 0.9); height: calc(var(--hit-min) * 0.9); }
+.s-lobby__slotT { display: flex; flex-direction: column; min-width: 0; }
+.s-lobby__slotT span { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-goldHi); }
+.s-lobby__slotT b { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.s-lobby__ticker { position: absolute; left: var(--sp-6); bottom: var(--sp-6); max-width: calc(520px * var(--k)); display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4) var(--sp-6); animation: pui-rise-in var(--t-slow) 220ms var(--ease) both; }
+.s-lobby__tickI { width: calc(var(--fs-body) * 1.5); height: calc(var(--fs-body) * 1.5); flex: none; color: var(--c-rubric); }
+.s-lobby__tickT { font-family: var(--f-body); font-style: italic; font-size: var(--fs-body); line-height: 1.25; }
+.s-lobby__tickT.is-in { animation: s-tick-in var(--t-slow) var(--ease) both; }
+@keyframes s-tick-in { from { opacity: 0; transform: translateY(calc(10px * var(--k))); } }
+
+/* phone: the tiles run along the bottom, play holds the corner, and the ticker gives way */
+.pui[data-form='phone'] .s-lobby__top { left: 0; right: 0; top: var(--sp-3); }
+.pui[data-form='phone'] .s-lobby__me { width: calc(330px * var(--k)); }
+.pui[data-form='phone'] .s-lobby__stat { min-width: calc(62px * var(--k)); padding: var(--sp-1) var(--sp-2); }
+.pui[data-form='phone'] .s-lobby__menu { left: 0; top: auto; bottom: var(--sp-3); transform: none; display: flex; gap: var(--sp-3); }
+.pui[data-form='phone'] .p-tile { width: calc(var(--hit-btnLg) * 1.05); height: calc(var(--hit-btnLg) * 1.08); }
+.pui[data-form='phone'] .p-tile__label { font-size: calc(var(--fs-micro) * 0.9); letter-spacing: 0.03em; }
+.pui[data-form='phone'] .s-lobby__go { right: 0; bottom: var(--sp-3); width: calc(270px * var(--k)); gap: var(--sp-3); }
+.pui[data-form='phone'] .s-lobby__play { height: calc(var(--hit-btnLg) * 1.12); }
+.pui[data-form='phone'] .s-lobby__play .p-btn__face { font-size: var(--fs-btnLg); }
+.pui[data-form='phone'] .s-lobby__ticker { display: none; }
+.pui[data-form='phone'] .s-lobby__slot { padding: var(--sp-1) var(--sp-2); gap: var(--sp-2); }
+.pui[data-form='phone'] .s-lobby__slotT span { display: none; }
