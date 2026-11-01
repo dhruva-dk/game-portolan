@@ -2,7 +2,10 @@
 // Each part (stage, actors, interface, sound, career, simulation) is reached through an adapter in this folder.
 import * as THREE from 'three';
 import { Juice } from '../juice/index.ts';
+import { createAudio, type Audio } from '../audio/index.ts';
 import { EffectLog } from './effects.ts';
+import { MomentSound } from './sounds.ts';
+import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { DebugStage } from './debugStage.ts';
 import { sceneFrom, sunFor, type SceneInput, type SceneSpec } from './scenes.ts';
@@ -16,6 +19,8 @@ export interface AppOptions {
 export class App {
   readonly log = new EffectLog();
   readonly juice: Juice;
+  readonly audio: Audio;
+  readonly sound: MomentSound;
   readonly loop: Loop;
   readonly stage: DebugStage;
   readonly overlay: HTMLElement;
@@ -32,6 +37,10 @@ export class App {
     this.stage = new DebugStage(canvas);
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
+    this.audio = createAudio();
+    this.audio.unlock();
+    this.sound = new MomentSound(this.audio, this.log);
+    connectUiFeedback((what, sound) => this.log.add('screen', what, sound !== 'none' ? { sound } : undefined), this.juice.haptics, (n) => this.audio.play(n));
     if (options.capture) this.loop.running = false;
     addEventListener('resize', () => this.stage.resize());
   }
