@@ -1,8 +1,8 @@
 // The app: one canvas for the planet, one layer for the interface, the frame loop, and the flow between screens.
 // Each part (stage, actors, interface, sound, career, simulation) is reached through an adapter in this folder.
 import * as THREE from 'three';
-import { CameraJuice, EffectLog, Flash } from './effects.ts';
-import { createHaptics, type HapticsOut } from './haptics.ts';
+import { Juice } from '../juice/index.ts';
+import { EffectLog } from './effects.ts';
 import { Loop, type Frame } from './loop.ts';
 import { DebugStage } from './debugStage.ts';
 import { sceneFrom, sunFor, type SceneInput, type SceneSpec } from './scenes.ts';
@@ -15,9 +15,7 @@ export interface AppOptions {
 
 export class App {
   readonly log = new EffectLog();
-  readonly juice = new CameraJuice(this.log);
-  readonly flash = new Flash(this.log);
-  readonly haptics: HapticsOut;
+  readonly juice: Juice;
   readonly loop: Loop;
   readonly stage: DebugStage;
   readonly overlay: HTMLElement;
@@ -30,9 +28,10 @@ export class App {
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
     this.options = options;
     this.overlay = overlay;
-    this.haptics = createHaptics(this.log);
+    this.juice = new Juice({ hud: overlay, seed: 1 });
     this.stage = new DebugStage(canvas);
     this.loop = new Loop((f) => this.frame(f));
+    this.loop.scale = (dt) => this.juice.update(dt);
     if (options.capture) this.loop.running = false;
     addEventListener('resize', () => this.stage.resize());
   }
@@ -125,8 +124,6 @@ export class App {
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
-    this.juice.update(f.dt);
-    this.flash.update(f.realDt);
     this.stage.render();
   }
 

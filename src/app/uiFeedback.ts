@@ -2,8 +2,7 @@
 // every screen effect the interface reports goes into the effect log.
 import type { SoundName } from '../audio/bank.ts';
 import { onFeedback, setFeedbackHook, type UiHaptic, type UiSound } from '../ui/parts/feedback.ts';
-import type { EffectLog } from './effects.ts';
-import type { HapticKind, HapticsOut } from './haptics.ts';
+import type { Haptics, HapticKind } from '../juice/index.ts';
 
 const SOUND: Record<Exclude<UiSound, 'none'>, SoundName> = {
   tap: 'tap', back: 'back', tab: 'tab', toggle: 'toggle', slide: 'tick', select: 'confirm', equip: 'equip', deny: 'deny',
@@ -17,12 +16,14 @@ const HAPTIC: Record<Exclude<UiHaptic, 'none'>, HapticKind> = {
   selection: 'select', light: 'light', medium: 'medium', heavy: 'heavy', success: 'success', warning: 'warning', error: 'error',
 };
 
-export function connectUiFeedback(log: EffectLog, haptics: HapticsOut, play: (name: SoundName) => void): void {
-  setFeedbackHook((sound, haptic, what) => {
+export function connectUiFeedback(
+  log: (what: string, sound: UiSound) => void, haptics: Haptics, play: (name: SoundName) => void,
+): void {
+  setFeedbackHook((sound, haptic) => {
     if (sound !== 'none') play(SOUND[sound]);
-    if (haptic !== 'none') haptics.play(HAPTIC[haptic], what);
+    if (haptic !== 'none') haptics.play(HAPTIC[haptic]);
   });
   onFeedback((e) => {
-    if (e.type === 'effect') log.add('screen', e.what, e.sound !== 'none' ? { sound: e.sound } : undefined);
+    if (e.type === 'effect') log(e.what, e.sound);
   });
 }

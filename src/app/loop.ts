@@ -1,7 +1,7 @@
 // The frame loop: the simulation steps at a fixed 30 Hz, and every animation frame draws once, with `alpha` saying how
 // far the clock has run between the last tick and the next, so rendering can interpolate.
-// Ported from the old game's loop (2025e68:src/app/loop.ts), plus hit-stop: a short hold that freezes the
-// simulation and slows the drawn clock, for the juice of big hits.
+// Ported from the old game's loop (2025e68:src/app/loop.ts). Hit-stop comes in through `scale`: it turns each frame's
+// real time into game time (the juice library's TimeScale), so a stop slows the tick accumulator and the drawn clock.
 
 export const TICK = 1 / 30;
 export const MAX_CATCH_UP = 6;
@@ -9,7 +9,7 @@ const MAX_FRAME = 0.25;
 const FRAME_SLACK = 4;
 
 export interface Frame {
-  /** Seconds since the last frame, after hit-stop. */
+  /** Game seconds since the last frame, after hit-stop. */
   readonly dt: number;
   /** Seconds since the last frame, ignoring hit-stop (for interface motion). */
   readonly realDt: number;
@@ -43,7 +43,8 @@ export class Loop {
   private acc = 0;
   private alpha = 1;
   private last: number | null = null;
-  private stop = 0;
+  /** Turns real seconds into game seconds (hit-stop); identity by default. */
+  scale: (realDt: number) => number = (dt) => dt;
   private readonly draw: (f: Frame) => void;
   private readonly f = { dt: 0, realDt: 0, clock: 0, alpha: 1 };
 
@@ -58,7 +59,6 @@ export class Loop {
     this.alpha = 1;
     this.rate = 1;
     this.rush = null;
-    this.stop = 0;
     Object.assign(this.perf, { tickMean: 0, tickMax: 0, ticks: 0 });
   }
 
@@ -73,15 +73,6 @@ export class Loop {
   set suspended(away: boolean) {
     this.away = away;
     this.last = null;
-  }
-
-  /** Hit-stop: freeze the simulation for `seconds` (the longest asked for wins). */
-  hold(seconds: number): void {
-    this.stop = Math.max(this.stop, seconds);
-  }
-
-  get held(): number {
-    return this.stop;
   }
 
   /** Steps the simulation n ticks now, without drawing (tests and captures). */
@@ -114,13 +105,9 @@ export class Loop {
   };
 
   private pass(realDt: number): void {
-    let dt = realDt;
-    if (this.paused || this.away) dt = 0;
-    else if (this.stop > 0) {
-      // the world holds its breath: no ticks, and the drawn clock crawls
-      this.stop = Math.max(0, this.stop - realDt);
-      dt = realDt * 0.05;
-    } else {
+    let dt = 0;
+    if (!this.paused && !this.away) {
+      dt = this.scale(realDt);
       this.clock += dt;
       if (this.sim) this.advance(dt);
     }
