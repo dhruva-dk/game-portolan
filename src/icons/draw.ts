@@ -144,12 +144,20 @@ export const head = (x: number, y: number, a: number, len = 4.4, half = 3): stri
   return poly(x, y, px(bx, half, a + 90), py(by, half, a + 90), px(bx, half, a - 90), py(by, half, a - 90));
 };
 
-/** An arc with an arrowhead at its end, for reload and recharge rings. */
+/** An arc with an arrowhead at its end, for reload and recharge rings. The head's base sits on the arc's end. */
 export const arcArrow = (cx: number, cy: number, r: number, a0: number, a1: number, w: number, o: Opt = {}): Prim[] => {
-  const dir = a1 > a0 ? 1 : -1, back = ((w * 1.2) / r) * (180 / Math.PI) * dir;
-  const tipA = a1 + back * 0.6;
-  const tx = px(cx, r, tipA), ty = py(cy, r, tipA);
-  return [line(arc(cx, cy, r, a0, a1 - back * 0.4), w, o), fill(head(tx, ty, tipA + 90 * dir, w * 2.1, w * 1.55), o)];
+  const dir = a1 > a0 ? 1 : -1, hl = w * 2.1, hw = w * 1.55;
+  const bx = px(cx, r, a1), by = py(cy, r, a1);
+  const ta = a1 + (hl / r) * (180 / Math.PI) * dir, tx = px(cx, r, ta), ty = py(cy, r, ta);
+  const ang = Math.atan2(ty - by, tx - bx) / DEG;
+  const head = poly(tx, ty, px(bx, hw, ang + 90), py(by, hw, ang + 90), px(bx, hw, ang - 90), py(by, hw, ang - 90));
+  return [line(arc(cx, cy, r, a0, a1 - dir * ((w * 0.5) / r) * (180 / Math.PI)), w, o), fill(head, o)];
+};
+
+/** A leaf or blade from x,y out along angle a: len long, wid wide at its middle. */
+export const leaf = (x: number, y: number, a: number, len: number, wid: number): string => {
+  const tx = px(x, len, a), ty = py(y, len, a), mx = px(x, len * 0.5, a), my = py(y, len * 0.5, a);
+  return `M${f(x)} ${f(y)}Q${f(px(mx, wid, a + 90))} ${f(py(my, wid, a + 90))} ${f(tx)} ${f(ty)}Q${f(px(mx, wid, a - 90))} ${f(py(my, wid, a - 90))} ${f(x)} ${f(y)}Z`;
 };
 
 /** A smooth wave from x0 to x1 about y, with n crests. */
@@ -206,14 +214,18 @@ export const gear = (cx: number, cy: number, n: number, ro: number, ri: number, 
 
 // ---------------------------------------------------------------- recurring things
 
-/** The gull in flight, spanning about 21.6 units, centred on cx,cy. */
+/** The gull in flight, wings in an M, spanning about 21.6 units, centred on cx,cy. */
 export const gull = (cx: number, cy: number, s = 1): string => {
   const x = (v: number) => f(cx + v * s), y = (v: number) => f(cy + v * s);
   return (
-    `M${x(-10.8)} ${y(-3.4)}C${x(-7.2)} ${y(-5)} ${x(-4)} ${y(-3.9)} ${x(0)} ${y(0.8)}` +
-    `C${x(4)} ${y(-3.9)} ${x(7.2)} ${y(-5)} ${x(10.8)} ${y(-3.4)}` +
-    `C${x(7.8)} ${y(-3.1)} ${x(4.2)} ${y(-0.9)} ${x(0)} ${y(4.4)}` +
-    `C${x(-4.2)} ${y(-0.9)} ${x(-7.8)} ${y(-3.1)} ${x(-10.8)} ${y(-3.4)}Z`
+    `M${x(0)} ${y(-0.6)}C${x(-1.6)} ${y(-3.6)} ${x(-3.6)} ${y(-4.8)} ${x(-5.6)} ${y(-4.8)}` +
+    `C${x(-7.8)} ${y(-4.8)} ${x(-9.6)} ${y(-3)} ${x(-10.8)} ${y(-0.2)}` +
+    `C${x(-8.8)} ${y(-1.8)} ${x(-7)} ${y(-2)} ${x(-5.6)} ${y(-1.6)}` +
+    `C${x(-3.6)} ${y(-1)} ${x(-1.8)} ${y(0.8)} ${x(0)} ${y(3)}` +
+    `C${x(1.8)} ${y(0.8)} ${x(3.6)} ${y(-1)} ${x(5.6)} ${y(-1.6)}` +
+    `C${x(7)} ${y(-2)} ${x(8.8)} ${y(-1.8)} ${x(10.8)} ${y(-0.2)}` +
+    `C${x(9.6)} ${y(-3)} ${x(7.8)} ${y(-4.8)} ${x(5.6)} ${y(-4.8)}` +
+    `C${x(3.6)} ${y(-4.8)} ${x(1.6)} ${y(-3.6)} ${x(0)} ${y(-0.6)}Z`
   );
 };
 
