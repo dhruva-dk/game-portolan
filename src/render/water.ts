@@ -8,7 +8,7 @@
 // waterline is drawn first and darkened by the water above it (planet.ts underSea), which gives the depth colour,
 // the shallows and the sea floor; the surface adds the reflection and the foam on top, by its Fresnel term.
 import * as THREE from 'three';
-import { R, faceDir, faceUV, type FaceUV } from '../sim/sphere.ts';
+import { GRID, R, faceDir, faceUV, type FaceUV } from '../sim/sphere.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { REGIONS, regionMix, type RegionId, type RegionMix } from '../sim/world/index.ts';
 import { U, type Textures } from './engine.ts';
@@ -61,6 +61,7 @@ const WATER_VERT = /* glsl */ `
 uniform vec3 uNadir, uE1, uE2;
 uniform float uChop;
 varying vec3 vWP, vGrad;
+#include <planet>
 ${SWELL_GLSL}
 #include <fog_pars_vertex>
 void main() {
@@ -188,7 +189,7 @@ void main() {
   // the captains' colours: held water washed in its holder's colour with a pen line round it, trails bright
   if (uInkOn > 0.5) {
     vec3 cu = cubeUV(up);
-    vec2 cell = vec2(1.0 / 512.0);
+    vec2 cell = vec2(1.0 / ${GRID}.0);
     vec2 jit = (texture(uNoise, wxy * 0.045).rg - 0.5) * cell * 1.1;
     vec2 ids = floor(texture(uInk, vec3(cu.xy + jit, cu.z)).rg * 255.0 + 0.5);
     if (ids.x > 0.5) {
@@ -381,7 +382,7 @@ function polarGrid(segs: number): THREE.BufferGeometry {
 // ---------------------------------------------------------------- the water itself
 
 /** The territory's cells, owner in red and trail in green, as the simulation's cube grid. */
-const INK_N = 512;
+const INK_N = GRID;
 
 export class Water {
   readonly mesh: THREE.Mesh;

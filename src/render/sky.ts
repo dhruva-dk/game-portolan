@@ -236,6 +236,17 @@ export class Sky {
   private readonly mood: Mood = { ...MORNING };
   private readonly domeU: Record<string, THREE.IUniform>;
   private readonly tmp = new THREE.Vector3();
+  private readonly seen = { zenith: new THREE.Color(), horizon: new THREE.Color(), reflect: 1, chop: 1 };
+
+  /** The dome's colours where the camera is and how the water should look there: what Water.prepare() takes. */
+  get look(): { zenith: THREE.Color; horizon: THREE.Color; reflect: number; chop: number } {
+    const s = this.seen;
+    s.zenith.copy(this.domeU.uZenith.value);
+    s.horizon.copy(this.domeU.uHorizon.value);
+    s.reflect = this.water.reflect;
+    s.chop = this.water.chop;
+    return s;
+  }
 
   constructor(shadowSize: number) {
     this.domeU = {

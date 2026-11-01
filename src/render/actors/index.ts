@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, ShipModel, type Pose } from './caravel.ts';
-import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, sea, smooth, v3, type WaveFn } from './common.ts';
+import { AU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, sea, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
@@ -33,6 +33,8 @@ export interface ActorsOptions {
   wave?: WaveFn;
   /** An environment map for the hull's varnish and the sails. */
   envMap?: THREE.Texture | null;
+  /** The stage's shared uniforms (the planet's light and air), given to every actor material along with the actors' own. */
+  uniforms?: Record<string, THREE.IUniform>;
   /** Thin the player's own sail round the middle of the screen, where the crosshair is. Default true. */
   fadePlayerSail?: boolean;
   /** Camera shake, kicks, flashes, hit-stop and haptics, for the integration to route. */
@@ -99,6 +101,7 @@ interface Marker { at: THREE.Vector3; m: HitMarker }
 export function createActors(scene: THREE.Object3D, options: ActorsOptions = {}): Actors {
   SEA.radius = options.radius ?? 554;
   if (options.wave) sea.wave = options.wave;
+  Object.assign(STAGE_U, options.uniforms ?? {});
   const tex = loadTextures(options.textureBase ?? TEX_BASE);
   const kit = new Kit(tex);
   kit.envMap = options.envMap ?? null;

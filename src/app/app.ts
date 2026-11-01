@@ -8,18 +8,44 @@ import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { DebugStage } from './debugStage.ts';
+import { Stage, type StageView } from '../render/stage.ts';
+import { QUALITY, U } from '../render/engine.ts';
+import { sunDirection } from '../render/sky.ts';
+import { waveHeight } from '../render/swell.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
-import { STARTER_LOOK } from '../career/index.ts';
+import { wornLook } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
-import { cosmeticsOf, sceneActors } from './views.ts';
-import type { V3 } from '../sim/math.ts';
-import { sceneFrom, sunFor, type SceneInput, type SceneSpec } from './scenes.ts';
-import { isScreen, type ScreenName } from './flow.ts';
+import { cosmeticsOf, sceneActors, sceneStage } from './views.ts';
+import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
+import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
+import { CareerHolder } from './career.ts';
+import { lobbyModel } from './models.ts';
+import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
+import { titleScreen, type TitleView } from '../ui/screens/title.ts';
+import { lobbyScreen } from '../ui/screens/lobby.ts';
+import { page } from '../ui/screens/frame.ts';
+import { el, esc } from '../ui/parts/index.ts';
+import type { TitleModel } from '../ui/model.ts';
 
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
   capture: boolean;
+  /** Draw the plain debug globe instead of the planet's renderer. */
+  debugStage?: boolean;
 }
+
+/** What the app needs of a stage: the planet's renderer, or the debug globe standing in for it. */
+export interface AppStage {
+  readonly scene: THREE.Scene;
+  readonly camera: THREE.PerspectiveCamera;
+  frame(v: StageView, dt: number): void;
+  resize(): void;
+  snap(): void;
+  settled(): Promise<void>;
+  stats(): { tris: number; calls: number; fps: number; scale: number; chunks: number; pending: number };
+}
+
+const VERSION = 'Portolan · pass 1';
 
 export class App {
   readonly log = new EffectLog();
@@ -27,28 +53,37 @@ export class App {
   readonly audio: Audio;
   readonly sound: MomentSound;
   readonly loop: Loop;
-  readonly stage: DebugStage;
-  readonly actors: Actors;
+  readonly shell: Shell;
+  readonly career: CareerHolder;
+  stage: AppStage | null = null;
+  actors: Actors | null = null;
   readonly overlay: HTMLElement;
   /** The interface's layer, and the juice library's (markers, numbers, flashes) above it. */
   readonly uiLayer: HTMLElement;
   readonly juiceLayer: HTMLElement;
-  private sun: V3 = { x: 1, y: 0, z: 0 };
   readonly options: AppOptions;
   screen: ScreenName = 'boot';
-  /** The fixed scene the hook jumped to, if any. */
-  view: SceneSpec | null = null;
+  /** The fixed scene on the stage: the lobby's, the title's, or one the hook jumped to. */
+  view: SceneSpec = titleScene();
   ready = false;
+  /** True while the hook holds a fixed scene: the ship there sails at full speed for its wake. */
+  private fixed = false;
+  private readonly canvas: HTMLCanvasElement;
+  private loaded: Promise<void> | null = null;
+  private title: TitleView | null = null;
+  private progress = { f: 0, what: 'Charting the seas' };
+  private readonly sun = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
+    this.canvas = canvas;
     this.options = options;
     this.overlay = overlay;
     this.uiLayer = layer(overlay, 'app-ui');
     this.juiceLayer = layer(overlay, 'app-juice');
     this.juiceLayer.style.pointerEvents = 'none';
+    this.shell = new Shell(this.uiLayer);
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
-    this.stage = new DebugStage(canvas);
-    this.actors = createActors(this.stage.scene, { radius: R });
+    this.career = new CareerHolder(options.capture);
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
@@ -56,11 +91,27 @@ export class App {
     this.sound = new MomentSound(this.audio, this.log);
     connectUiFeedback((what, sound) => this.log.add('screen', what, sound !== 'none' ? { sound } : undefined), this.juice.haptics, (n) => this.audio.play(n));
     if (options.capture) this.loop.running = false;
-    addEventListener('resize', () => this.stage.resize());
+    addEventListener('resize', () => this.stage?.resize());
   }
 
   start(): void {
     this.go(this.options.capture ? 'lobby' : 'title');
+    this.loaded = this.load();
+  }
+
+  /** Builds the stage and the actors, reporting progress on the title. */
+  private async load(): Promise<void> {
+    const report = (f: number, what: string) => {
+      this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
+      this.title?.setProgress(this.progress.f, this.progress.what);
+    };
+    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas) : await Stage.create(this.canvas, QUALITY.balanced, report);
+    this.stage = stage;
+    this.actors = createActors(stage.scene, { radius: R, wave: waveHeight, uniforms: U });
+    await this.actors.ready;
+    stage.snap();
+    this.progress = { f: 1, what: 'Ready' };
+    this.title?.setProgress(1, 'Ready');
     this.ready = true;
   }
 
@@ -71,31 +122,64 @@ export class App {
 
   /** Resolves when the stage has everything it needs for the current view. */
   async whenLoaded(): Promise<void> {
-    await this.actors.ready;
+    await this.loaded;
+    await this.stage?.settled();
   }
 
-  go(name: ScreenName | string, _model?: unknown): void {
+  // ── screens ──
+
+  go(name: ScreenName | string, model?: unknown): void {
     if (!isScreen(name)) throw new RangeError(`go: no screen "${name}"`);
     const from = this.screen;
     this.screen = name;
     this.log.add('flow', 'screen', { from, to: name });
-    this.renderOverlay();
+    this.fixed = false;
+    if (name === 'title' || name === 'lobby' || (MENUS as readonly string[]).includes(name) || name === 'results') {
+      // the lobby's planet: your ship on the water, or the planet from orbit behind the title
+      this.view = name === 'title' ? titleScene() : lobbyScene();
+    }
+    const view = this.screenView(name, model);
+    this.title = name === 'title' ? (view as TitleView) : null;
+    this.shell.show(name, view, transition(from, name));
+  }
+
+  private screenView(name: ScreenName, model?: unknown): ScreenView {
+    const career = this.career.career;
+    switch (name) {
+      case 'title': {
+        const m = (model as TitleModel | undefined) ?? { progress: this.progress.f, status: this.progress.what, version: VERSION };
+        return titleScreen(m, { onStart: () => this.go('lobby') });
+      }
+      case 'lobby':
+        return lobbyScreen((model as never) ?? lobbyModel(career), { onPlay: () => this.play({}), onOpen: (m) => this.go(m) });
+      default:
+        return this.placeholder(name);
+    }
+  }
+
+  /** A screen still being built: its frame, its name, and a way back. */
+  private placeholder(name: ScreenName): ScreenView {
+    const back = (MENUS as readonly string[]).includes(name) || name === 'results' ? 'lobby' : null;
+    const p = page({ title: name[0].toUpperCase() + name.slice(1), onBack: back ? () => this.go(back) : undefined });
+    el('s-page__note', p.body, esc(`The ${name} screen is not built yet.`));
+    return p;
   }
 
   /** Jumps to a fixed scene, leaving any match. */
   scene(input: SceneInput): SceneSpec {
     const s = sceneFrom(input);
     this.view = s;
-    const sun = sunFor(s.pos, s.hour, s.tilt);
-    this.sun = sun;
-    this.stage.setScene(s, new THREE.Vector3(sun.x, sun.y, sun.z));
-    this.uiLayer.replaceChildren();
+    this.fixed = true;
+    this.stage?.snap();
+    this.shell.show('scene', { el: el('s-empty') }, 'none');
     return s;
   }
 
   // ── matches (wired when the simulation lands) ──
   session: { state: unknown } | null = null;
-  play(_o: unknown): void { throw new Error('play: no simulation yet'); }
+  play(_o: unknown): void {
+    this.shell.toasts.show({ icon: '', text: 'Matches arrive in the next step.' });
+  }
   dive(): void {}
   stepTicks(n: number): number { return this.loop.advanceTicks(n); }
   sinkPlayer(): void {}
@@ -127,11 +211,12 @@ export class App {
 
   // ── numbers ──
   perf() {
-    return { ...this.loop.perf, ...this.stage.stats() };
+    return { ...this.loop.perf, ...(this.stage?.stats() ?? {}) };
   }
 
   /** Draws `frames` frames as fast as the page allows and reports frame times, triangles and draw calls. */
   async measure(frames: number) {
+    await this.whenLoaded();
     const times: number[] = [];
     let tris = 0, calls = 0;
     for (let i = 0; i < frames; i++) {
@@ -139,7 +224,7 @@ export class App {
       this.loop.drawNow(1 / 30);
       await new Promise((r) => requestAnimationFrame(r));
       times.push(performance.now() - t0);
-      const st = this.stage.stats();
+      const st = this.stage!.stats();
       tris = Math.max(tris, st.tris);
       calls = Math.max(calls, st.calls);
     }
@@ -150,22 +235,23 @@ export class App {
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
-    if (this.view) {
-      const look = cosmeticsOf(STARTER_LOOK);
-      this.actors.update(sceneActors(this.view, f.clock, this.sun, look, this.view.camera === 'chase' ? 14.5 : 0), f.dt, this.stage.camera);
-    }
-    this.stage.render();
+    const stage = this.stage, actors = this.actors;
+    if (!stage || !actors) return;
+    const v = this.view, sv = sceneStage(v, f.clock);
+    sunDirection(sv.hour, sv.tilt, this.sun);
+    const look = cosmeticsOf(wornLook(this.career.career));
+    actors.update(sceneActors(v, f.clock, this.sun, look, v.camera === 'chase' && this.fixed ? 14.5 : 0), f.dt, stage.camera);
+    stage.frame(sv, f.dt);
   }
+}
 
-  private renderOverlay(): void {
-    // placeholder screens until the interface lands
-    const o = this.uiLayer;
-    o.replaceChildren();
-    const panel = document.createElement('div');
-    panel.style.cssText = 'position:fixed;left:24px;top:24px;padding:16px 20px;background:#f3e7cc;border-radius:12px;font:600 20px system-ui;color:#2b2118';
-    panel.textContent = this.screen;
-    o.append(panel);
-  }
+/** How one screen gives way to the next. */
+function transition(from: ScreenName, to: ScreenName): Transition {
+  if (from === 'boot') return 'fade';
+  if (from === 'title') return 'zoom';
+  if ((MENUS as readonly string[]).includes(to)) return 'push';
+  if ((MENUS as readonly MenuName[]).includes(from as MenuName) && to === 'lobby') return 'pop';
+  return 'fade';
 }
 
 function layer(parent: HTMLElement, cls: string): HTMLElement {

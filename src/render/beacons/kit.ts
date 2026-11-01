@@ -4,6 +4,7 @@
 // billboards whose motion runs entirely in the vertex shader. Units are metres, +Y is up, y = 0 is sea level.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { sharedUniforms } from '../planet.ts';
 
 // ---------------------------------------------------------------- randomness and noise (JS side)
 
@@ -149,7 +150,7 @@ export function lit(k: Kit, o: LitOptions): THREE.MeshStandardMaterial {
   });
   const uni = o.uniforms ?? {};
   const head = /* glsl */ `
-uniform float uTime; uniform float uNight;
+${sharedUniforms('float', 'uTime', 'uNight')}
 ${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
 varying vec3 vLocal; varying vec3 vLN;
 ${GLSL_NOISE}
@@ -245,7 +246,8 @@ export const SHAPE_FLAME =
 export const SHAPE_PUFF = 'shape = smoothstep(1.0, 0.0, r2) * (0.6 + 0.4 * bNoise(vec3(c * 2.3, vSeed * 37.0)));';
 
 const PARTICLE_VERT = (o: ParticleOptions, uni: Record<string, THREE.IUniform>) => /* glsl */ `
-uniform float uTime; uniform float uNight; uniform float uNearFade;
+${sharedUniforms('float', 'uTime', 'uNight')}
+uniform float uNearFade;
 ${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
 attribute vec4 aSeed; attribute vec3 aBase;
 varying vec2 vC; varying float vA; varying vec3 vCol; varying float vSeed;
@@ -270,7 +272,8 @@ void main() {
 }`;
 
 const PARTICLE_FRAG = (o: ParticleOptions, uni: Record<string, THREE.IUniform>) => /* glsl */ `
-uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
+${sharedUniforms('float', 'uTime', 'uNight')}
+uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
 ${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
 varying vec2 vC; varying float vA; varying vec3 vCol; varying float vSeed;
 #include <fog_pars_fragment>
@@ -281,7 +284,9 @@ void main() {
   { ${o.shape ?? SHAPE_SOFT} }
   float fogF = 0.0;
   #ifdef USE_FOG
-    #ifdef FOG_EXP2
+    #if defined(PLANET_CHUNK)
+      fogF = airLoss(vFogWorld);
+    #elif defined(FOG_EXP2)
       fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
     #else
       fogF = smoothstep(fogNear, fogFar, vFogDepth);
@@ -292,7 +297,9 @@ void main() {
     ? /* glsl */ `float al = clamp(shape * a, 0.0, 1.0);
   if (al < 0.003) discard;
   vec3 rgb = uMatter * mix(1.0, 0.12, uNight) * col + uColor * gain * col;
-  #ifdef USE_FOG
+  #if defined(USE_FOG) && defined(PLANET_CHUNK)
+  rgb = atmosphere(rgb, vFogWorld);
+  #elif defined(USE_FOG)
   rgb = mix(rgb, fogColor, fogF);
   #endif
   gl_FragColor = vec4(rgb, al);`
@@ -374,7 +381,7 @@ export function surface(k: Kit, geo: THREE.BufferGeometry, o: SurfaceOptions): T
   const uni = o.uniforms ?? {};
   const decl = `${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}`;
   const vert = /* glsl */ `
-uniform float uTime; uniform float uNight;
+${sharedUniforms('float', 'uTime', 'uNight')}
 ${decl}
 varying vec2 vUv; varying vec3 vLocal; varying vec3 vView; varying vec3 vNrm;
 #include <fog_pars_vertex>
@@ -395,7 +402,8 @@ void main() {
   #include <fog_vertex>
 }`;
   const frag = /* glsl */ `
-uniform float uTime; uniform float uNight; uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
+${sharedUniforms('float', 'uTime', 'uNight')}
+uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
 ${decl}
 varying vec2 vUv; varying vec3 vLocal; varying vec3 vView; varying vec3 vNrm;
 #include <fog_pars_fragment>
@@ -406,7 +414,9 @@ void main() {
   { ${o.paint} }
   float fogF = 0.0;
   #ifdef USE_FOG
-    #ifdef FOG_EXP2
+    #if defined(PLANET_CHUNK)
+      fogF = airLoss(vFogWorld);
+    #elif defined(FOG_EXP2)
       fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
     #else
       fogF = smoothstep(fogNear, fogFar, vFogDepth);
@@ -415,7 +425,9 @@ void main() {
   float gain = mix(uDay, uGain, uNight);
   ${o.blend === 'alpha'
     ? /* glsl */ `vec3 rgb = uMatter * mix(1.0, 0.12, uNight) * col + uColor * col * glow * gain;
-  #ifdef USE_FOG
+  #if defined(USE_FOG) && defined(PLANET_CHUNK)
+  rgb = atmosphere(rgb, vFogWorld);
+  #elif defined(USE_FOG)
   rgb = mix(rgb, fogColor, fogF);
   #endif
   if (alpha < 0.003) discard;

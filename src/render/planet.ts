@@ -11,19 +11,24 @@
 // - underSea(col, wp): what lies below the water, seen through it: absorbed with depth and tinted by the sea there.
 // - atmosphere(col, wp): the air between the eye and wp, plus the limb from orbit and the Storm's tint.
 //
-// Any shader that includes <planet> (or three's fog or light chunks) gets these uniforms declared; do not declare
-// uTime, uSunDir, uMoonDir, uNoise, uFogColor, uFogSun, uFogDensity, uFogFalloff, uMist, uNight, uPlanet, uKey, uStorm,
-// uStormOn or uSeaTint again. Give them values with patch() from engine.ts.
+// Any shader that includes <planet> (or three's fog or light chunks) gets these uniforms declared. A shader of its own
+// that uses one of them too (uTime, uNight, uSunDir, uNoise...) declares it with sharedUniforms(), so whichever comes
+// first declares it, with or without the planet's chunks installed. Give them values with patch() from engine.ts.
 import * as THREE from 'three';
+
+/** Declares uniforms a shader shares with the planet's chunk; each is declared by whichever shader text comes first. */
+export function sharedUniforms(type: string, ...names: string[]): string {
+  return names.map((n) => `#ifndef U_${n}\n#define U_${n}\nuniform ${type} ${n};\n#endif`).join('\n');
+}
 
 export const PLANET_GLSL = /* glsl */ `
 #ifndef PLANET_CHUNK
 #define PLANET_CHUNK
-uniform vec3 uSunDir, uMoonDir, uFogSun, uFogColor;
-uniform float uFogDensity, uFogFalloff, uTime, uNight, uStormOn;
-uniform vec4 uMist, uPlanet, uStorm;
+${sharedUniforms('vec3', 'uSunDir', 'uMoonDir', 'uFogSun', 'uFogColor')}
+${sharedUniforms('float', 'uFogDensity', 'uFogFalloff', 'uTime', 'uNight', 'uStormOn')}
+${sharedUniforms('vec4', 'uMist', 'uPlanet', 'uStorm')}
 uniform vec3 uKey[20];
-uniform sampler2D uNoise, uSeaTint;
+${sharedUniforms('sampler2D', 'uNoise', 'uSeaTint')}
 
 vec3 keyAt(int k, float e) {
   int b = k * 5;
@@ -88,13 +93,12 @@ float airDepth(float a, float b, float h0, float h1, float L) {
   return abs(b * dh) > 1e-3 ? a * L * (e0 - exp(-b * h1)) / (b * dh) : a * L * e0;
 }
 
-vec3 atmosphere(vec3 col, vec3 wp) {
-  if (uPlanet.x < 1.0) return col;
+// the share of the light from wp that the air takes on its way to the eye
+float airLoss(vec3 wp) {
+  if (uPlanet.x < 1.0) return 0.0;
   vec3 d = wp - cameraPosition;
   float dist = length(d);
-  vec3 dir = d / max(dist, 1e-3);
   float rw = length(wp);
-  vec3 up = wp / rw;
   float h0 = length(cameraPosition) - uPlanet.y, h1 = rw - uPlanet.y;
   float od = airDepth(uFogDensity, uFogFalloff, h0, h1, dist);
   float wisp = texture(uNoise, wp.xz * 0.004 + wp.y * 0.0031 + uTime * vec2(0.004, 0.0015)).r;
@@ -103,7 +107,13 @@ vec3 atmosphere(vec3 col, vec3 wp) {
   float f = 1.0 - exp(-od);
   // from orbit, a ray grazing the limb crosses a lot of air
   float space = smoothstep(150.0, 900.0, h0);
-  f = max(f, space * pow(1.0 - abs(dot(dir, up)), 4.0) * 0.85);
+  return max(f, space * pow(1.0 - abs(dot(d / max(dist, 1e-3), wp / rw)), 4.0) * 0.85);
+}
+
+vec3 atmosphere(vec3 col, vec3 wp) {
+  if (uPlanet.x < 1.0) return col;
+  vec3 dir = normalize(wp - cameraPosition), up = normalize(wp);
+  float f = airLoss(wp);
   float e = dot(up, uSunDir);
   float s = max(dot(dir, uSunDir), 0.0);
   vec3 fc = keyAt(0, e) + uFogSun * keyAt(1, e) * (pow(s, 6.0) * 0.6 + pow(s, 32.0) * 0.3) * planetShade(wp, uSunDir);

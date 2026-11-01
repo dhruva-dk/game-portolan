@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { R } from '../sim/sphere.ts';
 import { LANDMARKS, REGIONS, heightAt, regionAt } from '../sim/world/index.ts';
-import type { SceneSpec } from './scenes.ts';
+import { sunDirection } from '../render/sky.ts';
+import type { StageView } from '../render/stage.ts';
 
 export interface DebugCamera {
   pos: THREE.Vector3;
@@ -17,7 +18,6 @@ export class DebugStage {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(55, 1, 0.5, 20000);
   readonly sun = new THREE.DirectionalLight(0xffffff, 2.4);
-  readonly ship = new THREE.Group();
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -25,12 +25,6 @@ export class DebugStage {
     this.scene.background = new THREE.Color(0x8fb4d8);
     this.scene.add(this.sun, new THREE.HemisphereLight(0xbfd8ff, 0x203040, 0.8));
     this.scene.add(this.globe(), this.sea(), this.pins());
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 18), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 18), new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
-    mast.position.y = 9;
-    this.ship.add(hull, mast);
-    this.ship.visible = false;
-    this.scene.add(this.ship);
     this.resize();
   }
 
@@ -69,26 +63,30 @@ export class DebugStage {
     return g;
   }
 
-  /** Points the camera for a fixed scene. */
-  setScene(s: SceneSpec, sunDir: THREE.Vector3): void {
-    const up = new THREE.Vector3(s.pos.x, s.pos.y, s.pos.z), fwd = new THREE.Vector3(s.heading.x, s.heading.y, s.heading.z);
+  /** Points the camera for the view and draws it: the same view the real stage takes. */
+  frame(s: StageView, _dt: number): void {
+    const t = s.target;
+    const up = new THREE.Vector3(t.pos.x, t.pos.y, t.pos.z).normalize(), fwd = new THREE.Vector3(t.heading.x, t.heading.y, t.heading.z);
+    const sunDir = sunDirection(s.hour, s.tilt);
     this.sun.position.copy(sunDir).multiplyScalar(5000);
     const day = Math.max(0.05, sunDir.dot(up) + 0.2);
     this.scene.background = new THREE.Color().setHSL(0.58, 0.45, Math.min(0.75, day * 0.7));
-    this.ship.visible = false;
-    if (s.ship) {
-      this.ship.position.copy(up).multiplyScalar(R + 1);
-      this.ship.lookAt(this.ship.position.clone().add(fwd));
-      this.ship.up.copy(up);
-      this.ship.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(fwd.clone().cross(up), up, fwd));
-    }
-    if (s.camera === 'orbit') {
+    this.pose(s.camera, up, fwd);
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  snap(): void {}
+
+  async settled(): Promise<void> {}
+
+  private pose(mode: StageView['camera'], up: THREE.Vector3, fwd: THREE.Vector3): void {
+    if (mode === 'orbit') {
       this.camera.position.copy(up).multiplyScalar(R * 3.2);
       this.camera.up.copy(fwd);
       this.camera.lookAt(0, 0, 0);
       return;
     }
-    const height = s.camera === 'high' ? 60 : 8, back = s.camera === 'chase' ? 24 : 0;
+    const height = mode === 'high' ? 60 : 8, back = mode === 'chase' ? 24 : 0;
     this.camera.position.copy(up).multiplyScalar(R + height).addScaledVector(fwd, -back);
     this.camera.up.copy(up);
     this.camera.lookAt(this.camera.position.clone().addScaledVector(fwd, 100).addScaledVector(up, -3));
@@ -101,12 +99,8 @@ export class DebugStage {
     this.camera.updateProjectionMatrix();
   }
 
-  render(): void {
-    this.renderer.render(this.scene, this.camera);
-  }
-
   stats() {
     const r = this.renderer.info.render;
-    return { tris: r.triangles, calls: r.calls };
+    return { tris: r.triangles, calls: r.calls, fps: 0, scale: 1, chunks: 0, pending: 0 };
   }
 }

@@ -5,6 +5,6 @@ import { installHook } from './hook.ts';
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const overlay = document.getElementById('ui') as HTMLElement;
-const app = new App(canvas, overlay, { capture: q.has('capture') });
+const app = new App(canvas, overlay, { capture: q.has('capture'), debugStage: q.get('stage') === 'debug' });
 installHook(app);
 app.start();

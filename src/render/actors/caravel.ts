@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { patch, type ActorTextures } from './common.ts';
+import { sharedUniforms } from '../planet.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
 
@@ -489,7 +490,8 @@ const SAIL_VERT_HEAD = /* glsl */ `
 attribute float aKind;
 attribute vec2 aPlane;
 attribute vec3 aRig;
-uniform float uFill, uSide, uBoom, uTime, uLuff, uFlag;
+uniform float uFill, uSide, uBoom, uLuff, uFlag;
+${sharedUniforms('float', 'uTime')}
 varying vec2 vSailUv;
 varying vec2 vPlane;
 varying float vKind;
@@ -679,7 +681,8 @@ export function turretGeometry(kind: Weapon): { base: THREE.BufferGeometry; barr
 
 const BODY_HEAD = /* glsl */ `
 uniform vec3 uHull, uAccent, uTrim, uWisp;
-uniform float uHit, uDamage, uNight, uTime;
+uniform float uHit, uDamage;
+${sharedUniforms('float', 'uNight', 'uTime')}
 uniform sampler2D uDeckMap, uDeckN, uDmgNoise;
 varying float vPart;
 varying float vAux;
@@ -838,7 +841,7 @@ export class Kit {
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SAIL_VERT)
         .replace('#include <project_vertex>', '#include <project_vertex>\nvNdc = gl_Position.xy / gl_Position.w;\nvSailW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       s.fragmentShader = s.fragmentShader
-        .replace('#include <common>', '#include <common>\n' + SAIL_FRAG_HEAD + '\nuniform vec3 uSunColor, uSunDir;')
+        .replace('#include <common>', '#include <common>\n' + SAIL_FRAG_HEAD + '\nuniform vec3 uSunColor;\n' + sharedUniforms('vec3', 'uSunDir'))
         .replace('#include <map_fragment>', SAIL_FRAG)
         .replace('#include <opaque_fragment>', /* glsl */ `
           // light through the cloth

@@ -4,6 +4,7 @@
 // column of spray, hangs in the air rolling onto its side, and slams down in a wall of water with a shockwave.
 import * as THREE from 'three';
 import { SEA, TAU, frameAt, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { sharedUniforms } from '../planet.ts';
 import type { Effects } from './effects.ts';
 import { C, Mesher, type Ring } from './mesher.ts';
 import { SPRITE } from './particles.ts';
@@ -81,7 +82,7 @@ export class Whales {
       Object.assign(s.uniforms, this.u);
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + HEAD)
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal = position;\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + HEAD + 'uniform float uGlow, uTime, uSeaR;\nuniform sampler2D uNoise;\nuniform vec3 uSunDir;')
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + HEAD + 'uniform float uGlow, uSeaR;\n' + sharedUniforms('float', 'uTime') + '\n' + sharedUniforms('sampler2D', 'uNoise') + '\n' + sharedUniforms('vec3', 'uSunDir'))
         .replace('#include <emissivemap_fragment>', /* glsl */ `
           // bioluminescent spots and stripes along the flanks, strong at night, faint by day
           vec3 lp = vLocal / ${S.toFixed(4)};

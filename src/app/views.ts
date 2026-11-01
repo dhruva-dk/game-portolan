@@ -4,7 +4,8 @@ import type { ActorsView, CosmeticIds, ShipView } from '../render/actors/index.t
 import type { Look } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
-import type { SceneSpec } from './scenes.ts';
+import type { StageView } from '../render/stage.ts';
+import { latLonOf, type SceneSpec } from './scenes.ts';
 
 /** The career's look as the actors' cosmetic ids. */
 export const cosmeticsOf = (look: Look): CosmeticIds => ({
@@ -22,4 +23,17 @@ export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticI
   // a steady breeze from behind the ship's port quarter
   const wind = { x: s.heading.x * 6, y: s.heading.y * 6, z: s.heading.z * 6 };
   return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [] };
+}
+
+/** The planet's hour (at longitude 0) when it is `local` o'clock at p. */
+export const planetHour = (p: V3, local: number): number => (((local - latLonOf(p).lon / 15) % 24) + 24) % 24;
+
+/** A fixed scene as the stage draws it: no Storm, no territory, and the scene's weather standing over the spot. */
+export function sceneStage(s: SceneSpec, time: number): StageView {
+  return {
+    time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, wind: scale(s.heading, 6), camera: s.camera,
+    target: { pos: s.pos, heading: s.heading, height: s.ship ? 2.5 : 0 },
+    weather: s.weather === 'clear' ? [] : [{ kind: s.weather, at: s.pos, radius: 220, strength: 1 }],
+    storm: null, territory: null,
+  };
 }

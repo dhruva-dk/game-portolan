@@ -42,6 +42,7 @@ attribute vec4 aTint;   // rgb, opacity
 varying vec2 vQ;
 varying vec4 vLook, vTint;
 varying vec3 vC, vUp, vRight, vTop;
+#include <planet>
 varying float vFade;
 #include <fog_pars_vertex>
 void main() {

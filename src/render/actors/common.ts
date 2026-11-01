@@ -22,10 +22,13 @@ export const AU = {
   uNight: { value: 0 }, // at the focus, for things lit as one (lanterns, windows)
 };
 
+/** The stage's own uniforms (the planet's light and air), which every actor material shares as well; set by the actors from options. */
+export const STAGE_U: Record<string, THREE.IUniform> = {};
+
 /** Gives a material the shared uniforms; `hook` edits its shader, and `key` names the edit for the program cache. */
 export function patch<T extends THREE.Material>(m: T, key: string, hook?: (s: THREE.WebGLProgramParametersWithUniforms) => void): T {
   m.onBeforeCompile = (s) => {
-    Object.assign(s.uniforms, AU);
+    Object.assign(s.uniforms, STAGE_U, AU);
     hook?.(s);
   };
   m.customProgramCacheKey = () => key;

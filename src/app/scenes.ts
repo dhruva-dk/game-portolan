@@ -163,5 +163,12 @@ export function sceneFrom(s: SceneInput): SceneSpec {
   };
 }
 
+/** Where the lobby sits: your ship on open water off the Spice Isles' cove, in the late afternoon, with the low sun
+ * over the camera's shoulder so the hull shows its paint rather than its silhouette. */
+export const lobbyScene = (): SceneSpec => sceneFrom({ region: 'spiceIsles', hour: 16.5, tilt: 12, camera: 'chase', ship: true, heading: 120 });
+
+/** The title: the same spot seen from orbit, so tapping in flies down to the lobby. */
+export const titleScene = (): SceneSpec => ({ ...lobbyScene(), camera: 'orbit' });
+
 /** Every region with its beacon, for the hook's listings. */
 export const regionList = () => REGIONS.map((r, i) => ({ id: r.id, name: r.name, beacon: BEACONS[i]?.pos ?? null }));
