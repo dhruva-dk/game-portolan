@@ -283,7 +283,7 @@ const fern = (() => {
 })();
 
 // the elements
-const sun = sunburst;
+
 const wind = move(scale(union(
   path(curl(-0.74, 0.3, 0.18, 0.3, 0.2, 1, 1.4), 0.05, 0.03),
   path(curl(-0.52, -0.02, 0.4, -0.02, 0.16, 1, 1.4), 0.05, 0.03),
@@ -508,58 +508,63 @@ export interface EmblemDef {
 }
 const def = (name: string, charge: SDF, finish: EmblemFinish = 'ink'): EmblemDef => ({ name, charge, finish });
 
-/** The forty captains' sigils, keyed by the sigil ids in src/career/captains.ts. */
-export const SIGILS: Record<string, EmblemDef> = {
-  forkedBolt: def('a forked bolt', forkedBolt), eelCoil: def('an eel coiled to strike', eelCoil), stoopingHawk: def('a hawk in its stoop', stoopingHawk),
-  clawRake: def('three claw marks', clawRake), crabClaw: def('a claw closing', crabClaw), orcaFin: def('a tall black fin', orcaFin),
-  sharkTooth: def('a serrated tooth', sharkTooth), meridianArc: def('an arc over the world', meridianArc), tideWaves: def('three stacked waves', waves),
-  dawnRays: def('rays over the sea line', risingSun), eightStar: def('an eight-pointed star', northStar), windRose: def('a rose of the winds', windRose),
-  cragPeak: def('a jagged peak', mountain), coralFan: def('a branching coral fan', coralFan), magpieWing: def('a pied wing', wing(true)),
-  foxTail: def('a brush tail', foxTail), clutchingTalon: def('a talon clutching', clutchingTalon), splinterBurst: def('a burst of splinters', splinterBurst),
-  crescentHook: def('a hooked crescent', crescentHook), crabShell: def('a crab shell', crab), ravenWing: def('a black wing', wing(false)),
-  hexShell: def('a shell of hexagons', hexShell), stillRing: def('a single still ring', stillRing), whorlShell: def('a whorled shell', nautilus),
-  urchinSpines: def('a ball of spines', urchinSpines), reefRock: def('a rock awash', reefRock), fogBank: def('a bank of fog', fogBank),
-  firefly: def('a spark with wings', firefly), fallingDrop: def('a falling drop', fallingDrop), eclipse: def('a black sun', eclipse),
-  owlWings: def('spread owl wings', owlWings), brokenFeather: def('a broken feather', brokenFeather), tightSpiral: def('a tight spiral', tightSpiral),
-  undertow: def('a wave folding under', undertow), fourLeaf: def('a four-leaf sprig', clover), jaggedRocks: def('rocks breaking the surface', jaggedRocks),
-  thunderhead: def('a storm cloud', stormCloud), comet: def('a comet and its tail', comet), twinFlames: def('two flames', twinFlames),
-  swallowTail: def('a forked swallow tail', swift),
+/** The forty captains' charges. src/career/captains.ts names each captain's sigil by these ids. */
+export const CAPTAIN_EMBLEMS: Record<string, EmblemDef> = {
+  swift: def('Swift', swift), narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf),
+  crab: def('Crab', crab), sun: def('Noon Sun', sunburst), waves: def('Tide', waves), risingSun: def('Dawn', risingSun),
+  northStar: def('North Star', northStar), wind: def('Wind', wind), magpie: def('Magpie', magpie), fox: def('Fox', fox),
+  raven: def('Raven', raven), lightning: def('Lightning', lightning), octopus: def('Octopus', octopus), turtle: def('Turtle', turtle),
+  mountain: def('Mountain', mountain), oak: def('Oak', oak), pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus),
+  heron: def('Heron', heron), eclipse: def('Eclipse', eclipse), owl: def('Owl', owl), vulture: def('Vulture', vulture),
+  nautilus: def('Nautilus', nautilus), clover: def('Clover', clover), scorpion: def('Scorpion', scorpion), stormCloud: def('Storm', stormCloud),
+  comet: def('Comet', comet), flame: def('Flame', flame), whale: def('Whale', whale), serpent: def('Serpent', serpent),
+  stag: def('Stag', stag), bearPaw: def('Bear', bearPaw), bat: def('Bat', bat), moth: def('Moth', moth),
+  swordfish: def('Swordfish', swordfish), maple: def('Maple', maple), volcano: def('Volcano', volcano), starfish: def('Starfish', starfish),
 };
 
-/** The emblem cosmetics the player wears, keyed by the ids in src/career/cosmetics.ts. */
-export const EMBLEM_COSMETICS: Record<string, EmblemDef> = {
-  gull: def('Gull', gull), wave: def('Wave', curlingWave), crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), risingSun: def('Rising Sun', sunOnSea),
-  northStar: def('North Star', fourStar), feather: def('Feather', feather), shell: def('Shell', scallop), fern: def('Fern', fern),
-  flame: def('Flame', flame), snowflake: def('Snowflake', snowflake), lightning: def('Lightning', lightning), whirlpool: def('Whirlpool', whirlpool),
-  leapingFish: def('Leaping Fish', leapingFish), petal: def('Petal', blossom),
-  twinStars: def('Twin Stars', twinStars, 'silver'), northernCrown: def('Northern Crown', northernCrown, 'gold'),
-};
-
-/** Charges drawn for the library that nothing names yet: more spirits for later captains and emblems. */
-export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
-  narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf), sun: def('Noon Sun', sun), wind: def('Wind', wind),
-  magpie: def('Magpie', magpie), fox: def('Fox', fox), raven: def('Raven', raven), octopus: def('Octopus', octopus), oak: def('Oak', oak),
-  pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus), heron: def('Heron', heron), owl: def('Owl', owl),
-  vulture: def('Vulture', vulture), whale: def('Whale', whale), serpent: def('Serpent', serpent), stag: def('Stag', stag), bearPaw: def('Bear', bearPaw),
-  bat: def('Bat', bat), moth: def('Moth', moth), swordfish: def('Swordfish', swordfish), maple: def('Maple', maple), volcano: def('Volcano', volcano),
-  starfish: def('Starfish', starfish), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin), swan: def('Swan', swan), hare: def('Hare', hare),
-  butterfly: def('Butterfly', butterfly), turtle: def('Turtle', turtle), scorpion: def('Scorpion', scorpion),
+/**
+ * The player's emblem cosmetics, keyed by the ids in src/career/cosmetics.ts. The last three are the show-off
+ * emblems for Diamond, Admiral and Legend, laid on in crystal, gold leaf and living light.
+ */
+export const PLAYER_EMBLEMS: Record<string, EmblemDef> = {
+  gull: def('Gull', gull), scallop: def('Scallop', scallop), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin),
+  fern: def('Fern', fern), hare: def('Hare', hare), swan: def('Swan', swan), butterfly: def('Butterfly', butterfly), snowflake: def('Snowflake', snowflake),
   crystal: def('Crystal Heart', crystal, 'crystal'), leviathan: def('Leviathan', leviathan, 'gold'), phoenix: def('Phoenix', phoenix, 'spirit'),
 };
 
-/** Every charge by id: spares, sigils and emblem cosmetics. Ids are unique across the three. */
-export const EMBLEMS: Record<string, EmblemDef> = { ...SPARE_EMBLEMS, ...SIGILS, ...EMBLEM_COSMETICS };
+/** Charges drawn for the library that nothing names yet: more spirits and natural forms for later captains and emblems. */
+export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
+  forkedBolt: def('Forked Bolt', forkedBolt), eelCoil: def('Coiled Eel', eelCoil), stoopingHawk: def('Stooping Hawk', stoopingHawk),
+  clawRake: def('Claw Marks', clawRake), crabClaw: def('Crab Claw', crabClaw), orcaFin: def('Orca Fin', orcaFin), sharkTooth: def('Shark Tooth', sharkTooth),
+  meridianArc: def('Meridian', meridianArc), windRose: def('Wind Rose', windRose), coralFan: def('Sea Fan', coralFan), magpieWing: def('Pied Wing', wing(true)),
+  foxTail: def('Brush Tail', foxTail), clutchingTalon: def('Talon', clutchingTalon), splinterBurst: def('Splinters', splinterBurst),
+  crescentHook: def('Hooked Crescent', crescentHook), ravenWing: def('Black Wing', wing(false)), hexShell: def('Hex Shell', hexShell),
+  stillRing: def('Still Ring', stillRing), urchinSpines: def('Urchin', urchinSpines), reefRock: def('Rock Awash', reefRock), fogBank: def('Fog Bank', fogBank),
+  firefly: def('Firefly', firefly), fallingDrop: def('Falling Drop', fallingDrop), owlWings: def('Owl Wings', owlWings),
+  brokenFeather: def('Broken Feather', brokenFeather), tightSpiral: def('Spiral', tightSpiral), undertow: def('Undertow', undertow),
+  jaggedRocks: def('Jagged Rocks', jaggedRocks), twinFlames: def('Twin Flames', twinFlames), wave: def('Curling Wave', curlingWave),
+  crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), sunOnSea: def('Sun on the Sea', sunOnSea), fourStar: def('Four-pointed Star', fourStar),
+  feather: def('Feather', feather), whirlpool: def('Whirlpool', whirlpool), leapingFish: def('Leaping Fish', leapingFish), blossom: def('Blossom', blossom),
+  twinStars: def('Twin Stars', twinStars, 'silver'), northernCrown: def('Northern Crown', northernCrown, 'gold'),
+};
+
+/** Every charge by id: captains', the player's and spares. Ids are unique across the three. */
+export const EMBLEMS: Record<string, EmblemDef> = { ...SPARE_EMBLEMS, ...CAPTAIN_EMBLEMS, ...PLAYER_EMBLEMS };
 export type EmblemId = string;
-export const SIGIL_IDS = Object.keys(SIGILS), EMBLEM_COSMETIC_IDS = Object.keys(EMBLEM_COSMETICS), SPARE_EMBLEM_IDS = Object.keys(SPARE_EMBLEMS);
+export const CAPTAIN_EMBLEM_IDS = Object.keys(CAPTAIN_EMBLEMS), PLAYER_EMBLEM_IDS = Object.keys(PLAYER_EMBLEMS), SPARE_EMBLEM_IDS = Object.keys(SPARE_EMBLEMS);
 export const EMBLEM_IDS = Object.keys(EMBLEMS);
 
-/** The old game's emblem names (src/career/league.ts at 2025e68) mapped to charges here, for old saves. */
+/**
+ * Other names that resolve to a charge here: the old game's emblem names (src/career/league.ts at 2025e68), several
+ * of which were things made by hands and so map to a natural charge, and the sigil ids Career used for a while.
+ */
 export const LEGACY_EMBLEMS: Record<string, EmblemId> = {
-  arrowhead: 'swallowTail', crossedLances: 'narwhal', sunburst: 'sun', ironKnot: 'crabClaw', waves: 'tideWaves', risingSun: 'dawnRays',
-  eightPointStar: 'eightStar', diamond: 'magpieWing', crescent: 'crescentMoon', key: 'clutchingTalon', lightningStroke: 'lightning',
-  coin: 'stillRing', hexagon: 'hexShell', tower: 'cragPeak', anchor: 'reefRock', battlement: 'urchinSpines', circle: 'stillRing',
-  hourglass: 'fallingDrop', twoRings: 'owlWings', brokenWheel: 'brokenFeather', spiral: 'tightSpiral', wheelOfFortune: 'fourLeaf',
-  die: 'jaggedRocks', thunderbolt: 'forkedBolt',
+  arrowhead: 'swift', crossedLances: 'narwhal', sunburst: 'sun', ironKnot: 'crabClaw', eightPointStar: 'northStar', diamond: 'magpieWing',
+  crescent: 'crescentMoon', key: 'clutchingTalon', lightningStroke: 'lightning', coin: 'stillRing', hexagon: 'hexShell', tower: 'mountain',
+  anchor: 'reefRock', battlement: 'urchinSpines', circle: 'stillRing', hourglass: 'fallingDrop', twoRings: 'owlWings', brokenWheel: 'brokenFeather',
+  spiral: 'tightSpiral', wheelOfFortune: 'clover', die: 'jaggedRocks', thunderbolt: 'forkedBolt',
+  tideWaves: 'waves', dawnRays: 'risingSun', eightStar: 'northStar', cragPeak: 'mountain', crabShell: 'crab', whorlShell: 'nautilus',
+  fourLeaf: 'clover', thunderhead: 'stormCloud', swallowTail: 'swift', shell: 'scallop', petal: 'blossom',
 };
 
 export const isEmblem = (id: string): boolean => id in EMBLEMS;
