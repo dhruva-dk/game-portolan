@@ -27,13 +27,15 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { LOD_DISTANCES, instancePlant, plantLOD, rng, setTextureRoot, setWind, texturesReady, tickWind, triangles } from '../src/render/flora/kitC.ts';
 import { PLANTS as glassSea } from '../src/render/flora/glassSea.ts';
+import { PLANTS as jadeShoals } from '../src/render/flora/jadeShoals.ts';
+import { PLANTS as coralAtolls } from '../src/render/flora/coralAtolls.ts';
 
 // URL parameters:
 //   region=all|glassSea|jadeShoals|coralAtolls|spiceIsles   plant=<id>   view=grid|turntable|field
 //   lod=auto|0|1|2   light=day|dusk   wind=0..1   seed=<first seed>   seeds=<variants per plant>
 //   dist=<camera metres from the subject>   fov=<degrees>   yaw=<deg>   pitch=<deg>   t=<frozen wind clock, s>
 //   shot=1 hides the controls   labels=0 hides the labels
-const REGIONS = { glassSea };
+const REGIONS = { glassSea, jadeShoals, coralAtolls };
 const NAMES = { glassSea: 'The Glass Sea', jadeShoals: 'The Jade Shoals', coralAtolls: 'The Coral Atolls', spiceIsles: 'The Spice Isles' };
 const q = new URLSearchParams(location.search);
 const P = {
@@ -108,14 +110,17 @@ seabed.position.y = SEABED;
 seabed.receiveShadow = true;
 scene.add(seabed);
 const water = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000).rotateX(-Math.PI / 2),
-  new THREE.MeshStandardMaterial({ color: dusk ? 0x2a7f8c : 0x3fd0d0, transparent: true, opacity: 0.28, roughness: 0.08, metalness: 0.1, depthWrite: false }));
+  new THREE.MeshStandardMaterial({ color: dusk ? 0x2a7f8c : 0x3fd0d0, transparent: true, opacity: 0.2, roughness: 0.08, metalness: 0.1, depthWrite: false }));
 water.renderOrder = 2;
 scene.add(water);
 
 function island(x, z, r) {
   // a low sand isle sloping gently into the lagoon
   const prof = [[r * 1.5, SEABED - 0.1], [r * 1.15, -0.6], [r * 0.95, 0.05], [r * 0.7, 0.25], [0, 0.27]].map(([a, b]) => new THREE.Vector2(a, b));
-  const m = new THREE.Mesh(new THREE.LatheGeometry(prof, 48), sandMat);
+  const geo = new THREE.LatheGeometry(prof, 48);
+  const pos = geo.getAttribute('position'), uv = geo.getAttribute('uv');
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
+  const m = new THREE.Mesh(geo, sandMat);
   m.position.set(x, 0, z);
   m.receiveShadow = true;
   scene.add(m);

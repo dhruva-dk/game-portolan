@@ -391,13 +391,13 @@ export class Geo {
    * A strip along a spine. At point i it spans from spine[i] + side[i]·w0[i] (u0) to spine[i] + side[i]·w1[i] (u1);
    * v runs from v0 at the first point to v1 at the last.
    */
-  strip(spine: THREE.Vector3[], side: THREE.Vector3[], w0: number[], w1: number[], normals: THREE.Vector3[], uv: Rect, color: PerPoint<Col>, wind: Wind = {}): void {
+  strip(spine: THREE.Vector3[], side: THREE.Vector3[], w0: number[], w1: number[], normals: THREE.Vector3[], uv: Rect, color: PerPoint<Col>, wind: Wind = {}, edgeFlutter: [number, number] = [1, 1]): void {
     const base = this.count, n = spine.length;
     for (let i = 0; i < n; i++) {
       const t = i / (n - 1), v = uv[1] + (uv[3] - uv[1]) * t;
       const c = at(color, i, t), sw = at(wind.sway ?? 0, i, t), fl = at(wind.flutter ?? 0, i, t);
-      this.vert(_a.copy(spine[i]).addScaledVector(side[i], w0[i]), normals[i], uv[0], v, c, sw, fl);
-      this.vert(_a.copy(spine[i]).addScaledVector(side[i], w1[i]), normals[i], uv[2], v, c, sw, fl);
+      this.vert(_a.copy(spine[i]).addScaledVector(side[i], w0[i]), normals[i], uv[0], v, c, sw, fl * edgeFlutter[0]);
+      this.vert(_a.copy(spine[i]).addScaledVector(side[i], w1[i]), normals[i], uv[2], v, c, sw, fl * edgeFlutter[1]);
     }
     for (let i = 0; i < n - 1; i++) {
       const a = base + i * 2;
@@ -464,6 +464,22 @@ export class Geo {
     }
     if (g.index) for (let i = 0; i < g.index.count; i++) this.idx.push(base + g.index.getX(i));
     else for (let i = 0; i < P.count; i++) this.idx.push(base + i);
+  }
+
+  /** Copy another Geo in, moved by m, keeping its colours, uvs and wind weights. */
+  append(o: Geo, m: THREE.Matrix4): void {
+    const nm = new THREE.Matrix3().getNormalMatrix(m), base = this.count;
+    for (let i = 0; i < o.count; i++) {
+      _a.fromArray(o.pos, i * 3).applyMatrix4(m);
+      _b.fromArray(o.nor, i * 3).applyMatrix3(nm).normalize();
+      this.pos.push(_a.x, _a.y, _a.z);
+      this.nor.push(_b.x, _b.y, _b.z);
+    }
+    for (const x of o.uv) this.uv.push(x);
+    for (const x of o.col) this.col.push(x);
+    for (const x of o.sway) this.sway.push(x);
+    for (const x of o.flut) this.flut.push(x);
+    for (const i of o.idx) this.idx.push(base + i);
   }
 
   build(): THREE.BufferGeometry {
