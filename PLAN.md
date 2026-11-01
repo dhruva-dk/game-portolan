@@ -846,6 +846,21 @@ Agents build in parallel. Each owns its paths and touches nothing else, so pushe
 | Sound | `src/audio/**`, `dev/audio.html` | Synthesised and recorded sound for every mechanic and region, with no music |
 | Integration | `src/main.ts`, `src/app/**`, `index.html`, `tests/capture/**` | Wiring it all together, and the reviewer's capture tools |
 
+**Asset libraries started early at the owner's direction.** Each is self-contained with its own dev page. Regions take them up when they reach the Good rung. Credits go in `credits/<library>.md` and are merged into CREDITS.md later.
+
+| Owner | Paths |
+|---|---|
+| Flora A–D (four regions each) | `src/render/flora/**`, `public/tex/flora/<a–d>/`, `dev/flora-<a–d>.html` |
+| Rocks | `src/render/rocks/**`, `public/tex/rocks/`, `dev/rocks.html` |
+| Materials North and South | `src/render/materials/**`, `public/tex/regions/**`, `dev/materials-*.html` |
+| Cosmetics | `src/render/cosmetics/**`, `public/tex/cosmetics/`, `dev/cosmetics.html` |
+| Icons | `src/icons/**`, `dev/icons.html` |
+| Weather effects | `src/render/weather/**`, `dev/weather.html` |
+| Juice | `src/juice/**`, `dev/juice.html` |
+| Beacons | `src/render/beacons/**`, `dev/beacons.html` |
+| Landmarks North and South (queued) | `src/render/landmarks/**`, `public/tex/landmarks/`, `dev/landmarks-*.html` |
+| Water looks (queued) | `src/render/waterlooks/**`, `dev/waterlooks.html` |
+
 Contracts between owners:
 - **`src/sim/world/index.ts` is the only way into the world.** Its exported names and signatures stay stable. Additions are fine.
 - **The renderer, the interface and the sound each define the view model or events they consume.** Integration adapts the simulation's state into them. The simulation never imports from them.
