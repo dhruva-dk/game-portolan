@@ -129,6 +129,8 @@ export interface LitOptions {
   uniforms?: Record<string, THREE.IUniform>;
   /** Shared GLSL functions, placed before main() in both stages. */
   defs?: string;
+  /** Vertex-only declarations (attributes). */
+  vdefs?: string;
   /** Vertex GLSL that may move `transformed` (object space). `position`, `vLocal` (object space) and the clock are in scope. */
   vertex?: string;
   /** Fragment GLSL that may change `diffuseColor.rgb`, from `vLocal`, `vLN` (object-space normal) and the clock. */
@@ -139,15 +141,12 @@ export interface LitOptions {
   rough?: string;
 }
 
-let litKeys = 0;
-
 /** A MeshStandardMaterial with surface detail, sway and glow written in GLSL, driven by the beacon's clock. */
 export function lit(k: Kit, o: LitOptions): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({
     color: o.color, roughness: o.roughness ?? 0.8, metalness: o.metalness ?? 0, flatShading: o.flat ?? false,
     side: o.side ?? THREE.FrontSide, transparent: o.transparent ?? false, opacity: o.opacity ?? 1,
   });
-  const key = `beacon-lit-${litKeys++}`;
   const uni = o.uniforms ?? {};
   const head = /* glsl */ `
 uniform float uTime; uniform float uNight;
@@ -160,7 +159,7 @@ ${o.defs ?? ''}`;
     sh.uniforms.uNight = k.clock.uNight;
     Object.assign(sh.uniforms, uni);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', `#include <common>\n${head}`)
+      .replace('#include <common>', `#include <common>\n${head}\n${o.vdefs ?? ''}`)
       .replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
 #ifdef USE_INSTANCING
   vLocal = (instanceMatrix * vec4(position, 1.0)).xyz;
@@ -178,8 +177,16 @@ ${o.defs ?? ''}`;
 { float fres = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 3.0);
   ${o.emissive ?? ''} }`);
   };
+  // materials with the same GLSL share one program; only their uniforms differ
+  const key = `beacon-lit:${hashString(JSON.stringify([o.defs, o.vdefs, o.vertex, o.albedo, o.emissive, o.rough, Object.keys(uni)]))}`;
   m.customProgramCacheKey = () => key;
   return m;
+}
+
+function hashString(str: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
 }
 
 function glslType(v: unknown): string {
@@ -332,9 +339,9 @@ export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
 
 /** One soft glow: a halo or a far-reading sky glow. `nearFade` keeps it from swallowing the camera up close. */
 export function halo(k: Kit, at: [number, number, number], radius: number, color: THREE.ColorRepresentation,
-  day: number, night: number, breathe = '1.0', nearFade = 0): THREE.Mesh {
+  day: number, night: number, breathe = '1.0', nearFade = 0, defs = ''): THREE.Mesh {
   return particles(k, {
-    count: 1, color, day, night, nearFade, renderOrder: 12,
+    count: 1, color, day, night, nearFade, renderOrder: 12, defs,
     base: () => at,
     motion: `size = ${radius.toFixed(2)}; alpha = ${breathe};`,
     shape: 'shape = exp(-r2 * 3.2) * (1.0 - r2) * 0.85 + exp(-r2 * 14.0) * 0.4;',
@@ -459,11 +466,11 @@ export function place(g: THREE.BufferGeometry, pos: THREE.Vector3Like, rot?: THR
   return g.applyMatrix4(m);
 }
 
-/** Merges geometries into one (one draw call); they must share attributes, so normals and uvs are made uniform. */
-export function merge(gs: THREE.BufferGeometry[]): THREE.BufferGeometry {
+/** Merges geometries into one (one draw call); they must share attributes, so normals and uvs are made uniform. `keep` names extra attributes every part has. */
+export function merge(gs: THREE.BufferGeometry[], keep: string[] = []): THREE.BufferGeometry {
   const clean = gs.map((g) => {
     const n = g.index ? g.toNonIndexed() : g;
-    for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') n.deleteAttribute(k);
+    for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv' && !keep.includes(k)) n.deleteAttribute(k);
     if (!n.attributes.normal) n.computeVertexNormals();
     if (!n.attributes.uv) n.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((n.attributes.position.count) * 2), 2));
     return n;
@@ -471,6 +478,12 @@ export function merge(gs: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const m = mergeGeometries(clean, false);
   if (!m) throw new Error('beacon kit: merge failed');
   return m;
+}
+
+/** Gives every vertex of a geometry one value of a float attribute (for per-part phases in a merged mesh). */
+export function tag(g: THREE.BufferGeometry, name: string, v: number): THREE.BufferGeometry {
+  g.setAttribute(name, new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(v), 1));
+  return g;
 }
 
 /** Welds a geometry's seams and recomputes smooth normals (after displacing it). */

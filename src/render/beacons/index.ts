@@ -7,11 +7,18 @@ import type { RegionId } from '../../sim/world/index.ts';
 import type { BeaconLook } from './look.ts';
 import type { BeaconState } from './kit.ts';
 import { iceCrown } from './looks/iceCrown.ts';
+import { fjords } from './looks/fjords.ts';
+import { mistwood } from './looks/mistwood.ts';
+import { spires } from './looks/spires.ts';
+import { narrows } from './looks/narrows.ts';
+import { basaltStacks } from './looks/basaltStacks.ts';
+import { kelpShallows } from './looks/kelpShallows.ts';
+import { blossomRun } from './looks/blossomRun.ts';
 
 export type { BeaconLook } from './look.ts';
 
 export const BEACON_LOOKS: Partial<Record<RegionId, BeaconLook>> = {
-  iceCrown,
+  iceCrown, fjords, mistwood, spires, narrows, basaltStacks, kelpShallows, blossomRun,
 };
 
 /**
