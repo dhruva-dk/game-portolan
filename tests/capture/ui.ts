@@ -62,12 +62,14 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
   await shots.sheet(r.browser, 6);
 }
 
-export async function ui(r: Rig, o: { dpr: number; device?: string }): Promise<void> {
+export async function ui(r: Rig, o: { dpr: number; device?: string; only?: string }): Promise<void> {
   const devices = o.device ? [o.device] : ['ipad', 'iphone'];
+  const only = o.only?.split(',');
+  const list = only ? TRANSITIONS.filter((t) => only.includes(t.name)) : TRANSITIONS;
   for (const device of devices) {
     if (device !== 'ipad' && device !== 'iphone') throw new Error('--device must be ipad or iphone');
     const game = await openApp(r, { device, dpr: o.dpr });
-    for (const t of TRANSITIONS) {
+    for (const t of list) {
       await strip(game, r, t, device);
       log(`ui ${device}: ${t.name}`);
     }

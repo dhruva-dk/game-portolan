@@ -5,7 +5,7 @@
 //   npm run capture -- blind [--seed n]                   unlabelled shots from fixed spots, shuffled; the key is in key.json
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
-//   npm run capture -- ui [--device ipad|iphone]          transition strips for each screen change (both sizes by default)
+//   npm run capture -- ui [--device ipad|iphone] [--only a,b]  transition strips for each screen change (both sizes by default)
 //   npm run capture -- perf                               frame time, triangles and draw calls per region
 //   npm run capture -- list                               the moments and transitions there are
 //
@@ -25,6 +25,7 @@ const { values: a, positionals } = parseArgs({
     region: { type: 'string' },
     ring: { type: 'string' },
     device: { type: 'string' },
+    only: { type: 'string' },
     seed: { type: 'string', default: '7' },
     dpr: { type: 'string', default: '1' },
     every: { type: 'string', default: '4' },
@@ -51,7 +52,7 @@ try {
     case 'blind': await blind(r, opts); break;
     case 'lap': await lap(r, { ...opts, ring: a.ring }); break;
     case 'moment': await moment(r, { ...opts, name: arg ?? 'all' }); break;
-    case 'ui': await ui(r, { ...opts, device: a.device }); break;
+    case 'ui': await ui(r, { ...opts, device: a.device, only: a.only }); break;
     case 'perf': await perf(r, opts); break;
     default: throw new Error(`unknown capture command "${command}"`);
   }
