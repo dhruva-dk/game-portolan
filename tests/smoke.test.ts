@@ -1,5 +1,6 @@
-// The whole game, twice over: a match of bots sailed to its end in plain Node, then the real page booted in headless
-// Chromium, a match sailed and skipped through, the chart opened, and the results reached, with no errors on the way.
+// The rewrite's flat game, twice over: a match of bots sailed to its end in plain Node, then its page (dev/flat.html)
+// booted in headless Chromium, a match sailed and skipped through, the chart opened, and the results reached, with no
+// errors on the way.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWorld, flowAt, FLOW, PLAY_R } from '../src/world.ts';
@@ -46,7 +47,7 @@ test('the page boots, sails, charts and comes home without an error', async (t) 
   const server = await serve();
   const { browser } = await launch();
   t.after(async () => { await browser.close(); await server.close(); });
-  const game = await openGame(browser, server.url, { device: 'ipad', query: {}, hook: '__tidefall' });
+  const game = await openGame(browser, server.url, { device: 'ipad', path: 'dev/flat.html', query: {}, hook: '__tidefall' });
   await game.until((h) => h.ready, undefined, 120_000);
   await game.hook((h) => h.sail(5, true));
   await game.hook((h) => h.skip(70));

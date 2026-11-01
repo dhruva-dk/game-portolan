@@ -1,15 +1,15 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// The parchment of the page behind the game (index.html) and of the launch screen, so launch never flashes white.
-const parchment = '#c9ae80';
+// The night of the page behind the game (index.html) and of the launch screen, so launch never flashes white.
+const night = '#0d1520';
 
 const config: CapacitorConfig = {
   appId: 'com.portolan.game',
   appName: 'Portolan',
   webDir: 'dist',
-  backgroundColor: parchment,
+  backgroundColor: night,
   ios: {
-    backgroundColor: parchment,
+    backgroundColor: night,
     contentInset: 'never', // the web view runs edge to edge; the game keeps clear of env(safe-area-inset-*)
     scrollEnabled: false, // no rubber-band bounce
   },

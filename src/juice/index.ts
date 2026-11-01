@@ -191,6 +191,8 @@ export class Juice {
     this.time.clear();
     this.camera.clear();
     this.screen.clear();
+    this.markers?.clear();
+    this.numbers?.clear();
     this.haptics.cancel();
   }
 

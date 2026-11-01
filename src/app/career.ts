@@ -16,7 +16,8 @@ export class CareerHolder {
 
   constructor(capture: boolean) {
     this.store = capture ? memoryStore() : safeWebStore();
-    this.career = loadCareer(this.store, (Math.random() * 0xffffffff) >>> 0).career;
+    // a capture's career is the same every time, so its matches are too
+    this.career = loadCareer(this.store, capture ? 7 : (Math.random() * 0xffffffff) >>> 0).career;
   }
 
   plan(): MatchPlan {

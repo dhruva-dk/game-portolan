@@ -6,6 +6,7 @@
 // look for a moment the view swings back behind the ship, so the keys alone still sail her round. The guns aim along
 // the look, as far as its pitch reaches, and lock onto a ship close to that line.
 import { captainIndex, CAPTAINS, type MatchPlan, type TemperamentId } from '../career/index.ts';
+import type { AmbienceMix, RegionId } from '../audio/index.ts';
 import type { ActorsView, CosmeticIds, LootView, ProjectileView, ShipView, WhaleView } from '../render/actors/index.ts';
 import type { StageView, WeatherSystem } from '../render/stage.ts';
 import { sink, settle } from '../sim/end.ts';
@@ -14,15 +15,17 @@ import {
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
-import { R, along, angleTo, apart, flatten, tangentToward, turned } from '../sim/sphere.ts';
-import { vigour } from '../sim/weather.ts';
-import { CENTRES, type WeatherKind } from '../sim/world/index.ts';
+import { sunHeight } from '../sim/environment.ts';
+import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
+import { DAY } from '../sim/tables.ts';
+import { newSky, skyAt, vigour } from '../sim/weather.ts';
+import { CENTRES, REGION_COUNT, REGIONS, VORTEX, heightAt, regionWeights, type WeatherKind } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { MatchTally } from './career.ts';
 import type { Intents } from './controls.ts';
 import type { Moment } from './events.ts';
 import type { Stepper } from './loop.ts';
-import { gunDir, lootKind, momentsOf, weaponOf } from './moments.ts';
+import { gunDir, heldStill, lootKind, momentsOf, weaponOf } from './moments.ts';
 import { cosmeticsOf } from './views.ts';
 
 /** The career's temperaments as the simulation's styles (Hunter, Homesteader, Raider, Turtle, Scavenger, Brawler). */
@@ -61,6 +64,9 @@ const SECOND = Math.round(1 / TICK);
 const PICK = { leave: 600, drop: 120 } as const;
 const AIM = { near: 40, far: 260, lock: 300, cone: 0.2, pitch: [0.06, 0.6] as const };
 const WIND = newWind(), STORM = newStormView();
+/** What the ear reads: the region weights, the sky, and land felt for on eight bearings this far out (m). */
+const EAR = { weights: new Float64Array(REGION_COUNT), sky: newSky(), t: v3(), q: v3(), surf: 35 };
+const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
 const metres = (p: V3, h = 0, out: V3 = v3()): V3 => {
   out.x = p.x * (R + h);
@@ -104,7 +110,9 @@ export class Session implements Stepper {
   readonly aim = v3(0, 0, 1);
   private readonly input = idleInput();
   private readonly held = idleInput();
-  private readonly script: [number, Partial<ShipInput>][] | null;
+  private script: [number, Partial<ShipInput>][] | null;
+  /** The other ships' inputs while a scripted moment holds them still, or null for their captains. */
+  private still: (ShipInput | null)[] | null = null;
   private readonly autopilot: boolean;
   private readonly buf: Moment[] = [];
   private readonly ids = new WeakMap<Shot, number>();
@@ -148,11 +156,21 @@ export class Session implements Stepper {
   step(): boolean {
     const s = this.state;
     if (over(s)) return false;
-    step(s, this.autopilot ? null : this.script ? this.scripted() : this.input);
+    step(s, this.autopilot ? null : this.script ? this.scripted() : this.input, this.still);
     this.spend();
     this.read();
     if (s.tick % SECOND === 0) this.sample();
     return true;
+  }
+
+  /** Stages a scripted moment: the player's input from now on, and with `hold` every other ship held still. */
+  stage(script: [number, Partial<ShipInput>][], hold: boolean): void {
+    this.script = [...script].sort((a, b) => a[0] - b[0]);
+    this.still = hold ? heldStill() : null;
+    const w = this.state.ships[this.watch];
+    this.view.x = w.head.x;
+    this.view.y = w.head.y;
+    this.view.z = w.head.z;
   }
 
   /** Dives now and sails on until the player's ship is at sea; the moments on the way go to the tally only. */
@@ -389,6 +407,29 @@ export class Session implements Stepper {
       storm: formed ? { centre: { ...STORM.calm.at }, radius: STORM.calm.r } : null,
       territory: { owner: s.owner, trail: s.trail, version: Math.floor(s.tick / 6), me: this.watch + 1 },
       screen: { storm: outside, hurt, low },
+    };
+  }
+
+  /** The sea's beds around the watched ship: the regions it is in, the weather over it, its wind and speed, the Storm,
+   *  the night, and surf where land is near. */
+  hearing(): AmbienceMix {
+    const s = this.state, w = s.ships[this.watch], p = w.pos, sky = skyAt(s, p, EAR.sky);
+    regionWeights(p, EAR.weights);
+    const regions: Partial<Record<RegionId, number>> = {};
+    for (let i = 0; i < REGION_COUNT; i++) if (EAR.weights[i] > 0.01) regions[REGIONS[i].id] = EAR.weights[i];
+    stormView(s, STORM);
+    const formed = STORM.calm.r < ZONES[0] - 1, level = seaLevel(s);
+    let land = 0;
+    for (let k = 0; k < 8; k++) if (heightAt(along(p, tangentAt(p, (k * Math.PI) / 4, EAR.t), EAR.surf, EAR.q)) > level) land++;
+    return {
+      regions,
+      weather: { fog: sky.fog, rain: sky.rain, thunder: sky.thunder, calm: sky.calm, snow: sky.snow, ash: sky.ash },
+      nearSurf: clamp01(land / 3), wind: windAt(s, p, WIND).strength, speed: Math.abs(w.speed), rough: sky.rough,
+      altitude: Math.max(0, w.alt),
+      storm: formed ? clamp01((surfaceDistance(p, STORM.calm.at) - STORM.calm.r + 15) / 20) : 0,
+      night: clamp01((DAY.dusk + 0.1 - sunHeight(s, p)) / 0.2),
+      vortex: clamp01(1 - surfaceDistance(p, VORTEX.pos) / VORTEX.r),
+      afloat: w.phase === PHASE.sea,
     };
   }
 

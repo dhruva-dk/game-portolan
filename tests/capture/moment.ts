@@ -12,7 +12,7 @@ export interface MomentDef {
 
 // Keep in step with MOMENTS in src/app/moments.ts.
 export const MOMENTS: readonly MomentDef[] = [
-  { name: 'cannon-hit', about: 'the player fires a cannon into a ship 70 m off the bow' },
+  { name: 'cannon-hit', about: 'the player fires a cannon into a ship 55 m ahead and 24 m to starboard' },
   { name: 'shield-break', about: 'a shielded ship takes the hit that breaks its shield' },
   { name: 'sinking', about: 'a ship takes its last hull and sinks' },
   { name: 'gust', about: 'the player gusts: a burst of speed and a hop' },
@@ -54,8 +54,9 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
   await game.hook((h) => h.clearEffects());
   await game.hook((h) => h.draw(1 / 30));
   for (let f = 0; f < plan.frames; f++) {
-    const tick: number = await game.hook((h) => h.tick);
-    await shots.shot(game, `t${tick - plan.trigger >= 0 ? '+' : ''}${tick - plan.trigger}`);
+    const tick: number = await game.hook((h) => h.tick), d = tick - plan.trigger;
+    // the sign spelled out in the file name, where a slug would make t-1 and t+1 the same
+    await shots.shot(game, `t${d >= 0 ? '+' : ''}${d}`, `${String(f).padStart(3, '0')}-t-${d < 0 ? 'minus' : 'plus'}-${Math.abs(d)}.png`);
     await game.hook((h, n) => h.stepAndDraw(n), plan.every);
   }
   const effects = await game.hook((h) => h.effects());

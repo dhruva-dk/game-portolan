@@ -143,13 +143,18 @@ export class HitMarkers {
     if (!this.kind) return;
     this.t += dt;
     if (this.t >= MARKERS[this.kind].life) {
-      this.kind = null;
-      this.root.style.opacity = '0';
-      for (const sh of this.shards) sh.el.remove();
-      this.shards = [];
+      this.clear();
       return;
     }
     this.draw();
+  }
+
+  /** Hides the marker at once. */
+  clear(): void {
+    this.kind = null;
+    this.root.style.opacity = '0';
+    for (const sh of this.shards) sh.el.remove();
+    this.shards = [];
   }
 
   private draw(): void {
@@ -272,6 +277,14 @@ export class DamageNumbers {
         continue;
       }
       this.place(n);
+    }
+  }
+
+  /** Hides every number at once, so none merges into the next match's. */
+  clear(): void {
+    for (const n of this.nums) {
+      n.live = false;
+      n.el.style.opacity = '0';
     }
   }
 

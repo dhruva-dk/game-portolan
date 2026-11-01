@@ -2,7 +2,7 @@
 // hook jumps to these, and the capture tools use the region views and lap paths defined here, so every run frames
 // the same places. This is app code, not simulation code: it may use Math freely, since nothing here is replayed.
 import { R, fromLatLon } from '../sim/sphere.ts';
-import { BEACONS, LANDMARKS, REGIONS, heightAt, regionAt, type RegionId, type WeatherKind } from '../sim/world/index.ts';
+import { BEACONS, CENTRES, LANDMARKS, REGIONS, heightAt, regionAt, type RegionId, type WeatherKind } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 
 export type CameraMode = 'chase' | 'eye' | 'orbit' | 'high';
@@ -22,6 +22,8 @@ export interface SceneSpec {
   tide: number;
   /** Whether to put the player's ship there. */
   ship: boolean;
+  /** The camera's target over the sea, in metres, if not the ship's deck or the water. */
+  height?: number;
   region?: string;
   regionName?: string;
 }
@@ -38,6 +40,7 @@ export interface SceneInput {
   camera?: CameraMode;
   tide?: number;
   ship?: boolean;
+  height?: number;
 }
 
 const DEG = Math.PI / 180;
@@ -121,6 +124,68 @@ export function regionView(region: RegionId | number, k = 0): SceneSpec {
   };
 }
 
+const clampLat = (lat: number, most: number) => Math.max(-most, Math.min(most, lat));
+
+/**
+ * A region from orbit at its noon, under a low sun on its equator side: the relief casts shadows, and the sun's glint
+ * on the sea falls at the region's edge rather than over its middle.
+ */
+export function orbitView(region: RegionId | number): SceneSpec {
+  const v = regionView(region), i = REGIONS.findIndex((r) => r.id === v.region), pos = LANDMARKS[i].pos, lat = latLonOf(pos).lat;
+  return { ...v, pos, heading: bearingTangent(pos, 0), hour: 12, tilt: lat - Math.sign(lat || 1) * 67.5, camera: 'orbit' };
+}
+
+/** Water at p, and on eight bearings `r` metres round it. */
+function openWater(p: V3, r: number): boolean {
+  if (!isWater(p)) return false;
+  for (let k = 0; k < 8; k++) if (!isWater(travel(p, bearingTangent(p, (k * Math.PI) / 4), r).pos)) return false;
+  return true;
+}
+
+/** Water every 15 m from p for `far` metres towards `to`. */
+function clearTowards(p: V3, to: V3, far: number): boolean {
+  const dir = towards(p, to);
+  for (let d = 15; d <= far; d += 15) if (!isWater(travel(p, dir, d).pos)) return false;
+  return true;
+}
+
+/** The eye camera stands 0.8 m over its target: this puts it 8 m over the sea. */
+const BORDER_EYE = 7.2;
+
+/**
+ * A spot on the sea on the border between each pair of neighbours, 8 m up, once looking at the first region's landmark
+ * and once at the second's, in the mid-morning. Each view stands on the line where the two regions meet, as near the
+ * middle of their shared border as there is open water with 150 m of sea ahead, so it isn't a cliff face a few metres
+ * off; failing that, open water, then any water.
+ */
+export function borderViews(): (SceneSpec & { a: string; b: string; facing: string; facingName: string; onWater: boolean })[] {
+  const out: (SceneSpec & { a: string; b: string; facing: string; facingName: string; onWater: boolean })[] = [];
+  for (let a = 0; a < REGIONS.length; a++) {
+    for (const b of REGIONS[a].neighbours) {
+      if (b < a) continue;
+      // the middle of the two centres is on the border; walking across the a-b line keeps to it
+      const ca = CENTRES[a], cb = CENTRES[b], mid = norm(vec(ca.x + cb.x, ca.y + cb.y, ca.z + cb.z));
+      const along = norm(cross(mid, towards(mid, cb)));
+      for (const f of [a, b]) {
+        const tests = [(p: V3) => openWater(p, 25) && clearTowards(p, LANDMARKS[f].pos, 150), (p: V3) => openWater(p, 25), isWater];
+        let spot = mid, onWater = false;
+        for (const ok of tests) {
+          for (let k = 0; k <= 40 && !onWater; k++) {
+            const p = travel(mid, along, (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 12).pos, r = regionAt(p);
+            if ((r === a || r === b) && ok(p)) { spot = p; onWater = true; }
+          }
+        }
+        out.push({
+          pos: spot, heading: towards(spot, LANDMARKS[f].pos), hour: 10.5, tilt: clampLat(latLonOf(spot).lat, 40), weather: 'clear',
+          camera: 'eye', tide: 0, ship: false, height: BORDER_EYE, region: REGIONS[regionAt(spot)].id, regionName: REGIONS[regionAt(spot)].name,
+          a: REGIONS[a].id, b: REGIONS[b].id, facing: REGIONS[f].id, facingName: REGIONS[f].name, onWater,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Points every `every` seconds of sailing at top speed along a full circuit: the equator, or a ring's latitude. On a
  * latitude the path is a small circle, so the heading is due east.
@@ -160,6 +225,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     ...base,
     hour: s.hour ?? base.hour, tilt: s.tilt ?? base.tilt, weather: s.weather ?? base.weather,
     camera: s.camera ?? base.camera, tide: s.tide ?? 0, ship: s.ship ?? base.ship, region: reg.id, regionName: reg.name,
+    ...(s.height !== undefined && { height: s.height }),
   };
 }
 

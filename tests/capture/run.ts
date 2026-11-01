@@ -3,6 +3,7 @@
 //
 //   npm run capture -- regions [--region <id>]           fixed scenes in each region at dawn, midday, dusk and night
 //   npm run capture -- blind [--seed n]                   unlabelled shots from fixed spots, shuffled; the key is in key.json
+//   npm run capture -- borders                            each region from orbit, and 8 m up on the sea at every border
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
 //   npm run capture -- ui [--device ipad|iphone] [--only a,b]  transition strips for each screen change (both sizes by default)
@@ -14,6 +15,7 @@ import { parseArgs } from 'node:util';
 import { log, rig } from './common.ts';
 import { regions } from './regions.ts';
 import { blind } from './blind.ts';
+import { borders } from './borders.ts';
 import { lap } from './lap.ts';
 import { moment, MOMENTS } from './moment.ts';
 import { ui, TRANSITIONS } from './ui.ts';
@@ -37,7 +39,7 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, blind, lap, moment <name|all>, ui, perf');
+  console.log('commands: regions, blind, borders, lap, moment <name|all>, ui, perf');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
   process.exit(0);
@@ -50,6 +52,7 @@ try {
   switch (command) {
     case 'regions': await regions(r, { ...opts, region: a.region }); break;
     case 'blind': await blind(r, opts); break;
+    case 'borders': await borders(r, opts); break;
     case 'lap': await lap(r, { ...opts, ring: a.ring }); break;
     case 'moment': await moment(r, { ...opts, name: arg ?? 'all' }); break;
     case 'ui': await ui(r, { ...opts, device: a.device, only: a.only }); break;

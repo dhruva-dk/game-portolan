@@ -3,7 +3,7 @@
 // any screen with its live or fixture model, and read state.
 import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
-import { lapPath, regionList, regionView, type SceneInput } from './scenes.ts';
+import { borderViews, lapPath, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
@@ -19,10 +19,14 @@ export function installHook(app: App) {
     regions: () => regionList().map(({ id, name }) => ({ id, name })),
     regionView: (id: string | number, k = 0) => regionView(id as never, k),
     lapPath: (ring: 'equator' | 'north' | 'south', every = 4) => lapPath(ring, every),
+    orbitView: (id: string | number) => orbitView(id as never),
+    borderViews: () => borderViews(),
     /** Jumps to a fixed scene: { region | lat,lon | pos, heading, hour, tilt, weather, camera, tide, ship }. */
     scene: (s: SceneInput) => app.scene(s),
     /** Draws `frames` frames, then waits until the page has presented the last one. */
     async settle(frames = 4) {
+      // a still frame first, so the view asks for what it needs before the wait
+      if (!loop.running) loop.drawNow(0);
       await app.whenLoaded();
       for (let i = 0; i < frames; i++) {
         if (!loop.running) loop.drawNow(1 / 30);

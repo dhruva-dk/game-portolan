@@ -56,7 +56,7 @@ export class Projectiles {
     const lg = new THREE.BufferGeometry();
     lg.setAttribute('position', new THREE.BufferAttribute(this.linePos, 3).setUsage(THREE.DynamicDrawUsage));
     lg.setDrawRange(0, 0);
-    this.lines = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x8a7556, transparent: true, opacity: 0.85 }));
+    this.lines = new THREE.LineSegments(lg, patch(new THREE.LineBasicMaterial({ color: 0x8a7556, transparent: true, opacity: 0.85 }), 'actor-line'));
     this.lines.frustumCulled = false;
     this.group.add(this.lines);
   }

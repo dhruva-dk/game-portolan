@@ -1,7 +1,8 @@
 // What every capture shares: a server and a browser, the game page opened with its test hook, numbered frames written
 // to captures/<name>/, the effect log beside them, and a contact sheet that tiles the frames into one PNG.
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName, type Game, type Server } from '../harness.ts';
 
@@ -83,28 +84,31 @@ export class Shots {
 
 export const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
 
-/** Lays out frames as a grid of thumbnails with their labels, in a throwaway page, and screenshots it. */
+/** Lays out frames as a grid of thumbnails with their labels, in a throwaway page, and screenshots it. The page loads
+ *  the frames from their files: inlined, a long strip's (60 full-size PNGs, 80 MB) would take the renderer down. */
 export async function contactSheet(
   browser: Browser, frames: readonly { file: string; label: string }[], out: string, columns = 4, labels = true, thumb = 440,
 ): Promise<string> {
   const page = await browser.newPage({ deviceScaleFactor: 1, viewport: { width: columns * (thumb + 8) + 8, height: 200 } });
+  const html = join(dirname(out), `${basename(out, '.png')}.html`);
   try {
     const cells: string[] = [];
     for (const f of frames) {
-      const b64 = (await readFile(f.file)).toString('base64');
       const caption = labels ? `<figcaption>${escape(f.label)}</figcaption>` : `<figcaption>${escape(basename(f.file, '.png').slice(0, 3))}</figcaption>`;
-      cells.push(`<figure><img src="data:image/png;base64,${b64}">${caption}</figure>`);
+      cells.push(`<figure><img src="${pathToFileURL(f.file).href}">${caption}</figure>`);
     }
-    await page.setContent(`<!doctype html><style>
+    await writeFile(html, `<!doctype html><meta charset="utf-8"><style>
       body { margin: 0; padding: 8px; background: #1b1d22; font: 13px/1.3 -apple-system, system-ui, sans-serif; color: #e8e4da; }
       main { display: grid; grid-template-columns: repeat(${columns}, ${thumb}px); gap: 8px; }
       figure { margin: 0; } img { width: ${thumb}px; display: block; border-radius: 3px; }
       figcaption { padding: 3px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     </style><main>${cells.join('')}</main>`);
+    await page.goto(pathToFileURL(html).href);
     await page.waitForFunction(() => [...document.images].every((i) => i.complete));
     await page.screenshot({ path: out, fullPage: true });
   } finally {
     await page.close();
+    await rm(html, { force: true });
   }
   return out;
 }

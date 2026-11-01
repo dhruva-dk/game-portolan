@@ -2,7 +2,7 @@
 // Each part (stage, actors, interface, sound, career, simulation) is reached through an adapter in this folder.
 import * as THREE from 'three';
 import { Juice } from '../juice/index.ts';
-import { createAudio, type Audio } from '../audio/index.ts';
+import { createAudio, type AmbienceMix, type Audio } from '../audio/index.ts';
 import { EffectLog } from './effects.ts';
 import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
@@ -21,10 +21,10 @@ import type { CameraRig } from '../render/camera.ts';
 import { Controls } from './controls.ts';
 import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
-import { actorEvent } from './moments.ts';
+import { MOMENTS, actorEvent, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
 import { deathModel, galeModel, hudModel, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
-import { cosmeticsOf, sceneActors, sceneStage } from './views.ts';
+import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { CareerHolder } from './career.ts';
@@ -51,7 +51,15 @@ export interface AppOptions {
   capture: boolean;
   /** Draw the plain debug globe instead of the planet's renderer. */
   debugStage?: boolean;
+  /** Log the frame rate, the worst frame and what was drawn every few seconds (the iOS build's log, ?perflog). */
+  perfLog?: boolean;
+  /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
+   *  device, ?autoplay). */
+  autoplay?: boolean;
 }
+
+/** Seconds between perf lines. */
+const PERF_EVERY = 5;
 
 /** What the app needs of a stage: the planet's renderer, or the debug globe standing in for it. */
 export interface AppStage {
@@ -104,6 +112,9 @@ export class App {
   private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
   /** A cosmetic the locker is trying on the lobby's ship, over what it wears. */
   private preview: { kind: CosmeticKind; id: string } | null = null;
+  /** The frames since the last perf line: seconds, how many, and the longest. */
+  private readonly perfWindow = { t: 0, frames: 0, worst: 0 };
+  private readonly ear = { fwd: new THREE.Vector3(), up: new THREE.Vector3(), t: 0 };
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
     this.canvas = canvas;
@@ -118,8 +129,8 @@ export class App {
     this.juiceLayer.style.pointerEvents = 'none';
     this.shell = new Shell(this.uiLayer);
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
-    this.career = new CareerHolder(options.capture);
-    this.settings = new SettingsHolder(options.capture);
+    this.career = new CareerHolder(options.capture || !!options.autoplay);
+    this.settings = new SettingsHolder(options.capture || !!options.autoplay);
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
@@ -155,6 +166,7 @@ export class App {
   start(): void {
     this.go(this.options.capture ? 'lobby' : 'title');
     this.loaded = this.load();
+    if (this.options.autoplay) void this.loaded.then(() => this.play({ autopilot: true }));
   }
 
   /** Builds the stage and the actors, reporting progress on the title. */
@@ -187,7 +199,15 @@ export class App {
   /** Resolves when the stage has everything it needs for the current view. */
   async whenLoaded(): Promise<void> {
     await this.loaded;
-    await this.stage?.settled();
+    const settled = this.stage?.settled();
+    if (!settled || this.loop.running) return settled;
+    // the terrain builds only as frames are drawn: with the loop held (captures), draw still ones until it has
+    let done = false;
+    void settled.then(() => { done = true; });
+    for (let i = 0; i < 1800 && !done; i++) {
+      this.loop.drawNow(0);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
   }
 
   // ── screens ──
@@ -340,6 +360,8 @@ export class App {
 
   session: Session | null = null;
   private readonly momentJuice: MomentJuice;
+  /** The scripted moment the match was set up for, if any. */
+  private staged: MomentScript | null = null;
   private hud: HudView | null = null;
   private galeView: GaleView | null = null;
   private spec: SpectateView | null = null;
@@ -358,6 +380,7 @@ export class App {
   /** Starts a match from the career's plan: the Gale, or (skipGale) already at sea. */
   play(o: PlayOptions = {}): void {
     if (this.session) this.leaveMatch();
+    this.staged = null;
     const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
     s.onMoment = (m) => this.onMoment(m);
     s.autoFire = this.settings.settings.autoFire;
@@ -451,8 +474,35 @@ export class App {
     };
   }
 
-  moment(_name: string, _seed: number): void { throw new Error('moment: not built yet'); }
-  momentPlan(): unknown { return null; }
+  /** Sets up a scripted moment on a match from the seed (see MOMENTS). Arranged again, it plays the same. */
+  moment(name: string, seed: number): void {
+    const def = MOMENTS.find((m) => m.name === name);
+    if (!def) throw new Error(`no moment "${name}"; there are ${MOMENTS.map((m) => m.name).join(', ')}`);
+    this.play({ seed, skipGale: def.sea });
+    const s = this.session!;
+    const script = def.arrange(s.state);
+    daylight(s.state);
+    s.stage(script, def.sea);
+    this.staged = def;
+    this.log.add('flow', 'moment', { name, seed, tick: s.state.tick });
+    this.stage?.snap();
+  }
+
+  /** A dry run of the moment just set up: the tick its trigger fires on (or -1), and how to frame it. */
+  momentPlan(): { trigger: number; lead: number; every: number; frames: number; note: string } | null {
+    const s = this.session, def = this.staged;
+    if (!s || !def) return null;
+    let trigger = -1;
+    // only the trigger's tick is wanted: the moments on the way stay unheard and unseen, or their sounds, still
+    // ringing, would outrank the same sounds in the replay
+    const routed = s.onMoment;
+    s.onMoment = (m) => {
+      if (trigger < 0 && def.is(m)) trigger = s.state.tick;
+    };
+    for (let n = 0; n < 60 * 30 && trigger < 0 && this.stepTicks(1); n++);
+    s.onMoment = routed;
+    return { trigger, lead: def.lead, every: def.every, frames: def.frames, note: def.note };
+  }
 
   /** Where a world point lands on the interface, in CSS pixels, or null behind the camera. */
   private project(p: V3): { x: number; y: number } | null {
@@ -485,6 +535,7 @@ export class App {
     s.sun(this.sun);
     actors.update(s.actorsView(f.clock, f.alpha, this.sun), f.dt, stage.camera);
     stage.frame(s.stageView(f.clock, f.alpha), f.dt);
+    this.hear(stage, f.realDt, () => s.hearing());
     const c = stage.camera.position;
     this.eye.x = c.x;
     this.eye.y = c.y;
@@ -552,8 +603,21 @@ export class App {
     return { frameMs: +mean.toFixed(2), p95Ms: +times[Math.floor(times.length * 0.95)].toFixed(2), tris, calls };
   }
 
+  private logPerf(dt: number): void {
+    const w = this.perfWindow;
+    w.t += dt;
+    w.frames++;
+    w.worst = Math.max(w.worst, dt);
+    if (w.t < PERF_EVERY) return;
+    const st = this.stage?.stats();
+    console.info(`perf ${this.screen}: ${(w.frames / w.t).toFixed(1)} fps, worst frame ${(w.worst * 1000).toFixed(0)} ms, ` +
+      `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms`);
+    Object.assign(w, { t: 0, frames: 0, worst: 0 });
+  }
+
   private frame(f: Frame): void {
     this.log.clock = f.clock;
+    if (this.options.perfLog && f.realDt > 0) this.logPerf(f.realDt);
     const stage = this.stage, actors = this.actors;
     if (!stage || !actors) return;
     if (this.session) {
@@ -571,8 +635,22 @@ export class App {
     }
     const worn = wornLook(this.career.career), p = locker ? this.preview : null;
     const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
-    actors.update(sceneActors(v, f.clock, this.sun, look, v.camera === 'chase' && this.fixed ? 14.5 : 0), f.dt, stage.camera);
+    const speed = v.camera === 'chase' && this.fixed ? 14.5 : 0;
+    actors.update(sceneActors(v, f.clock, this.sun, look, speed), f.dt, stage.camera);
     stage.frame(sv, f.dt);
+    this.hear(stage, f.realDt, () => sceneHearing(v, speed));
+  }
+
+  /** The listener rides the camera every frame; the sea's beds follow what is around it ten times a second. */
+  private hear(stage: AppStage, dt: number, mix: () => AmbienceMix): void {
+    const cam = stage.camera, e = this.ear;
+    cam.getWorldDirection(e.fwd);
+    e.up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    this.audio.setListener(cam.position, e.fwd, e.up);
+    e.t -= dt;
+    if (e.t > 0 && this.loop.running) return;
+    e.t = 0.1;
+    this.audio.setAmbience(mix());
   }
 }
 

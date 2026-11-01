@@ -869,3 +869,58 @@ Contracts between owners:
 ## Backlog
 
 - **Naming question for the owner:** "Quick Hands" is both the Weeping Isle's perk and a passive ability. One of them needs a new name.
+
+### From pass 1 (blocked out)
+
+What pass 1 left, found while building it. The four open `todo` tests under "The world" are lines of the regions' done-when list that are not yet true. The rest each need a decision or a fix in a later pass.
+
+The root page (`index.html`) and the iOS build now run the new app. The rewrite's flat game still runs at `dev/flat.html`, and its smoke test drives it there.
+
+**Questions for the owner:**
+- **The Needle can't be seen from every northern ring region.** The Kelp Shallows and Blossom Run are about 750 m away, so over the curve of a 554 m planet the Needle would need to stand about 390 m tall. The blockout keeps it at 150 m as the tallest spire. Should it be that tall, or should the rule ask for less?
+- **Can `legacy/` be deleted?** It holds the old game's career, its tuning tools and the old simulation's tests. They no longer build against the new simulation, and nothing imports them. They stay until you decide (see `legacy/README.md`).
+
+**The match:**
+- Headless bot matches last 4.4–6.4 minutes against the 10–12 minute target. The Storm's phases, or the captains' aggression, need tuning.
+- Ram damage stacks with ram-boosting passives to about 87 in one hit. It needs a cap.
+- Landmarks aren't collidable yet. Ships sail through their shapes.
+- The throttle is always 1 on touch: there's no way to slow down.
+- The captains' storm habit is learnt in different units from the ones the simulation uses. `setupFrom` drops it for now.
+- The Gale fleet bunches up on the way across. Spread the captains' dive picks.
+- A Gale pick inside 600 m of the ship leaves the Gale at once.
+- Most of the fixture rivals are tagged Rival. Use a realistic spread.
+
+**The world** (each is a `todo` test in `tests/sim/world.test.ts`, so `npm test` passes with them open):
+- **Open stretches:** twelve regions have straight courses longer than 217 m with nothing on them. The longest: the Narrows 570 m, the Coral Atolls 423 m, the Glass Sea 372 m, the Fire Archipelago 360 m, the Ice Crown 321 m, the Jade Shoals 318 m. Only Mistwood, the Kelp Shallows, the Weeping Isle and the Mangrove Labyrinth are under.
+- **Loot spots:** some are dry at low tide, cut off from open water, or over their region's border. They need to sit deeper, or move with the tide.
+- **Landmarks over the curve:** eight landmarks drop below the horizon from parts of their borders: Blossom Run 46 m short, the Basalt Stacks 28, the Coral Atolls 31, Mistwood 25, the Jade Shoals 25, the Mangrove Labyrinth 21, the Kelp Shallows 13, the Fjords 9. Raise them, or give them lights.
+- **The Needle** (see the question above): at 150 m it shows 462 m off, so it can't be seen from the Kelp Shallows, Blossom Run, the Fjords or the Basalt Stacks.
+
+**The renderer:**
+- The ships have no environment map, so their varnish and metal look flat.
+- The shield aura's material doesn't get the planet's uniforms (sun, fog), so it doesn't darken at night.
+- The far sea turns sky-white near the horizon.
+- The lanterns' bloom is too hot at night.
+- The chart's region mask is coarse, so its borders look blocky.
+
+**The interface:**
+- Captains' rank names are empty on results, death and spectating.
+- The death screen moves the camera at once. Ease it.
+- `sinkNow` (behind the test hook's `sinkPlayer` and `winPlayer`) always sinks ships "by the Storm", so the death screen it leads to never names a killer.
+- The minimap shows the Storm, the next circle and the ships, but no land. Port the rewrite's.
+- The HUD's shield and hull bars have no icons.
+- In the locker, the camera crops the top of the sail.
+- The victory moment and spectating need polish: a ceremony, and a smoother camera hand-off.
+
+**The sound:**
+- The surf bed listens for land on eight bearings 35 m out, so a cliff over deep water sounds like a beach.
+- The title and the lobby hear a fixed mix for their spot: no surf, and a fair breeze.
+
+**The tools:**
+- The lap rings follow a line of latitude straight through land, so many frames show the ship on a hillside or inside a cliff. Route the lap round the islands, or leave out the frames over land.
+- The border views (`npm run capture -- borders`) look for open water on each border with 150 m of clear sea towards the landmark they face. Few borders have it, because land stands near most of them. Ten have no open water within 240 m of the middle at all: the Ice Crown with the Fjords, Mistwood, the Narrows and Blossom Run; the Fjords with Mistwood; the Jade Shoals with the Glass Sea, the Coral Atolls and the Maelstrom; and the Mangrove Labyrinth with the Weeping Isle and the Maelstrom. Some of those frames face a cliff a few metres off. Search the whole border, or step back from the land.
+
+**Performance** (measured at the end of pass 1):
+- **Chromium on the Mac** (M1 Pro, `npm run capture -- perf`): every region holds 60 fps (16.7 ms a frame, the worst 95th percentile 18.4 ms) with 0.43–0.87 million triangles and 165–339 draw calls. A match view is 0.99 million triangles and 396 calls.
+- **The iOS simulator** (iPad Pro 13-inch (M5), iOS 27, on the same Mac): the title holds about 47 fps at a render scale of 0.92 (0.44 million triangles, 216 calls). An autoplayed match (`VITE_AUTOPLAY=1`, 6 minutes logged) **misses the 30 fps rule there**. It holds 31–36 fps for the first minute, at a render scale of 0.84–0.92. By the third minute the scale is down at its floor of 0.60. From then on the view fills as the fleet closes in (0.76–1.52 million triangles, 276–527 calls), and the frame rate slides to 22–33 fps. 31 of the 72 five-second windows are under 30 fps. In most windows the worst frame is 40–80 ms. Nine hold a spike of 130–250 ms, four of them in the first minute, which looks like shaders compiling and terrain loading, but it has not been profiled. The simulation's tick stays under 0.35 ms, so the cost is in drawing. The simulator draws through the Mac's GPU, so these numbers don't say what an iPad does. They do say where to look first: triangles and draw calls in a busy late-match view. The boot is slow there: the title was still loading 25 seconds after launch.
+- **No real iPad or iPhone has run it yet.** The iOS build logs a `perf` line every 5 seconds to the app's console, and `VITE_AUTOPLAY=1 npm run ios` builds one that sails a match by itself (on the web, `?autoplay`).
