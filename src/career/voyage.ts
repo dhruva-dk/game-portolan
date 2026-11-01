@@ -1,3 +1,6 @@
+// LEGACY: the old game's career (commit 2025e68), kept only because tests/tools/tournament.ts and the sim tests
+// that run it still import it. Portolan's career does not use this file: see src/career/index.ts.
+// Whoever retires or rewrites the tournament may delete this file, and the other legacy career files with it.
 import type { Sea } from '../sim/environment.ts';
 import { startingFittings } from '../sim/items.ts';
 import { PI, dcos, dot, v3, type V3 } from '../sim/math.ts';
