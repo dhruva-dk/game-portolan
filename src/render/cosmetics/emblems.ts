@@ -4,7 +4,7 @@
 // geometric charges carry over where they are natural (the sun, the waves, the star, the moon's eclipse...).
 // No three.js here: the shapes render in Node as well as in the browser.
 import {
-  above, around, bez, circle, cover, cut, edge, ellipse, hexagon, inter, mirrorX, move, path, poly, rect, ring, rot, scale, seg,
+  above, around, below, bez, circle, cover, cut, edge, ellipse, hexagon, inter, mirrorX, move, path, poly, rect, ring, rot, scale, seg,
   shape, spiral, star, stroke, trace, union, type SDF,
 } from './sdf.ts';
 
@@ -335,61 +335,236 @@ const phoenix = union(
   path(curl(-0.06, -0.22, -0.3, -0.56, 0.1, -1, 1.2), 0.055, 0.016),
 );
 
+// the charges Career's captains and emblems name (src/career/captains.ts, src/career/cosmetics.ts)
+const crescent = cut(circle(0, -0.06, 0.62), circle(0, 0.2, 0.52));
+const vane = cut(ellipse(0, 0.12, 0.24, 0.6), seg(0, -0.5, 0, 0.7, 0.014), seg(0.06, 0.32, 0.3, 0.46, 0.025), seg(-0.06, -0.06, -0.3, 0.06, 0.025));
+const feather = rot(union(vane, seg(0, -0.78, 0, -0.45, 0.032, 0.02)), -0.55);
+const blade = (f: (t: number) => readonly [number, number], w: number): SDF => union(stroke((t) => f(t / 2), 0.008, w, 12), stroke((t) => f(0.5 + t / 2), w, 0.008, 12));
+const fourStar = cut(union(poly(star(4, 0.8, 0.14)), poly(star(4, 0.4, 0.1, Math.PI * 0.75))), circle(0, 0, 0.05));
+const forkedBolt = union(lightning, seg(0.0, -0.07, 0.44, -0.42, 0.05, 0.008), seg(0.22, -0.26, 0.5, -0.2, 0.03, 0.006), seg(-0.14, 0.02, -0.5, 0.3, 0.04, 0.006));
+const eelCoil = (() => {
+  const coil = trace((t) => { const a = Math.PI * (0.5 + 3.6 * t), r = 0.08 + 0.42 * t; return [r * Math.cos(a), -0.1 + r * Math.sin(a)]; }, 60);
+  const [hx, hy] = pts(coil);
+  return move(scale(cut(union(path(coil, 0.02, 0.085), stroke(cubic([hx, hy], [hx - 0.02, hy + 0.3], [hx + 0.2, hy + 0.5], [hx + 0.42, hy + 0.56]), 0.085, 0.07),
+    move(shape('M 0 0.06 Q 0.16 0.12 0.32 0.04 L 0.18 0.0 L 0.3 -0.06 Q 0.14 -0.1 0 -0.06 Z'), hx + 0.42, hy + 0.56)), circle(hx + 0.5, hy + 0.6, 0.024)), 0.8), -0.12, -0.06);
+})();
+const stoopingHawk = rot(union(
+  mirrorX(shape('M 0.03 0.3 Q 0.3 0.34 0.56 -0.12 Q 0.62 -0.36 0.66 -0.6 Q 0.4 -0.2 0.03 -0.04 Z')),
+  ellipse(0, 0.04, 0.12, 0.34), circle(0, 0.42, 0.12), shape('M 0.05 0.5 Q 0.2 0.52 0.14 0.66 L 0.08 0.56 Z'),
+  shape('M 0.07 -0.22 L 0.16 -0.7 L -0.16 -0.7 L -0.07 -0.22 Z'),
+), Math.PI + 0.35);
+const clawRake = union(...[-0.32, 0, 0.32].map((dx) => blade((t) => [dx - 0.34 + 0.6 * t + 0.08 * Math.sin(Math.PI * t), 0.64 - 1.28 * t], 0.085)));
+const crabClaw = cut(union(
+  ellipse(-0.14, -0.18, 0.32, 0.24, 0.7),
+  shape('M 0.0 -0.02 Q 0.42 0.0 0.66 0.54 Q 0.44 0.38 0.12 0.26 Z'),
+  shape('M -0.24 0.12 Q -0.14 0.64 0.5 0.72 Q 0.16 0.52 0.04 0.32 Z'),
+  path([-0.34, -0.36, -0.56, -0.62, -0.76, -0.58], 0.1, 0.07),
+), circle(-0.56, -0.6, 0.03), path([-0.36, -0.06, -0.06, -0.4], 0.014));
+const orcaFin = cut(union(
+  inter(ellipse(0, -0.26, 0.72, 0.22), above(-0.26)),
+  shape('M -0.34 -0.12 Q -0.1 0.12 -0.08 0.74 Q 0.18 0.22 0.42 -0.14 Z'),
+  water(-0.38, 0.8, 0.04, 11, 0.03), water(-0.58, 0.62, 0.035, 11, 0.026),
+), ellipse(0.36, -0.15, 0.16, 0.035, 0.1));
+const sharkTooth = (() => {
+  const right: number[] = [];
+  for (let i = 0; i <= 14; i++) { const t = i / 14, w = i % 2 ? 0.03 : 0; right.push(0.38 * t + w, 0.72 - 1.04 * t + w * 0.4); }
+  const left: number[] = [];
+  for (let i = right.length - 2; i >= 0; i -= 2) left.push(-right[i], right[i + 1]);
+  return cut(poly([...right, 0.42, -0.36, 0.3, -0.56, 0.08, -0.46, 0, -0.5, -0.08, -0.46, -0.3, -0.56, -0.42, -0.36, ...left]),
+    path(bez([-0.38, -0.3], [0, -0.16], [0.38, -0.3], 10), 0.016), path([0.02, 0.5, 0.08, 0.0, 0.04, -0.2], 0.012));
+})();
+const meridianArc = union(
+  cut(circle(0, -0.26, 0.38), (x, y) => Math.abs(ellipse(0, -0.26, 0.38, 0.12)(x, y)) - 0.016, (x, y) => Math.abs(ellipse(0, -0.26, 0.14, 0.38)(x, y)) - 0.016),
+  inter(ring(0, -0.26, 0.6, 0.05), above(-0.26)), move(poly(star(4, 0.12, 0.03)), 0, 0.48),
+);
+const windRose = cut(union(poly(star(8, [0.78, 0.48], 0.12)), ring(0, 0, 0.34, 0.03)), circle(0, 0, 0.06));
+const coralFan = (() => {
+  // a sea fan: wavy ribs spreading from one stalk into a half-disc, laced together by fine rings
+  const base: [number, number] = [0, -0.56], parts: SDF[] = [seg(0, -0.7, 0, -0.5, 0.06, 0.05)];
+  for (let k = 0; k < 9; k++) {
+    const a0 = Math.PI * (0.12 + (0.76 * k) / 8);
+    const rib = (a: number, t0: number) => (t: number): [number, number] => {
+      const tt = t0 + (1 - t0) * t, r = 0.06 + 0.66 * tt, aa = a + 0.06 * Math.sin(tt * 10 + k);
+      return [base[0] + r * Math.cos(aa), base[1] + r * Math.sin(aa) * 0.92];
+    };
+    parts.push(stroke(rib(a0, 0), 0.036, 0.014, 16));
+    if (k < 8) parts.push(stroke(rib(a0 + 0.17, 0.5), 0.022, 0.01, 10));
+  }
+  const fan = (y: number) => y > base[1] + 0.04;
+  for (const r of [0.3, 0.46, 0.6]) parts.push((x, y) => (fan(y) ? Math.abs(Math.hypot(x - base[0], (y - base[1]) / 0.92) - r) - 0.011 : 1));
+  return union(...parts, inter(ellipse(0, -0.7, 0.3, 0.1), above(-0.74)));
+})();
+const wing = (pied: boolean) => cut(
+  shape('M -0.56 -0.56 Q -0.44 0.08 0.08 0.5 L 0.66 0.74 L 0.5 0.54 L 0.74 0.52 L 0.5 0.36 L 0.72 0.28 L 0.44 0.18 L 0.62 0.04 L 0.32 0.0 L 0.42 -0.16 L 0.12 -0.14 L 0.16 -0.32 L -0.12 -0.28 Q -0.32 -0.44 -0.56 -0.56 Z'),
+  ...(pied ? [shape('M -0.24 -0.12 Q -0.02 0.22 0.3 0.38 L 0.36 0.22 Q 0.08 0.06 -0.08 -0.22 Z')] : [path([-0.4, -0.36, 0.06, 0.12], 0.014), path([-0.22, -0.3, 0.12, -0.02], 0.014)]),
+  path([0.18, 0.38, 0.52, 0.53], 0.012), path([0.2, 0.28, 0.54, 0.33], 0.012), path([0.16, 0.16, 0.48, 0.12], 0.012), path([0.08, 0.04, 0.32, -0.06], 0.012),
+);
+const foxTail = (() => {
+  // a brush swelling from a thin root to a full plume, tufted along its edge, its tip white
+  const f = cubic([-0.6, -0.62], [0.16, -0.56], [-0.12, 0.3], [0.34, 0.56]), r = (t: number) => 0.035 + 0.25 * Math.sin(Math.PI * Math.min(1, t * 1.05)) ** 0.7;
+  const body = union(...Array.from({ length: 24 }, (_, i) => { const [x0, y0] = f(i / 24), [x1, y1] = f((i + 1) / 24); return seg(x0, y0, x1, y1, r(i / 24), r((i + 1) / 24)); }));
+  const tufts = [0.3, 0.42, 0.54, 0.66, 0.78].flatMap((t) => [1, -1].map((s) => {
+    const [x, y] = f(t), [x1, y1] = f(t + 0.01), l = Math.hypot(x1 - x, y1 - y), nx = (-(y1 - y) / l) * s, ny = ((x1 - x) / l) * s, rr = r(t);
+    return poly([x + nx * rr * 0.7 - (x1 - x) / l * 0.06, y + ny * rr * 0.7 - (y1 - y) / l * 0.06, x + nx * (rr + 0.08) + (x1 - x) / l * 0.04, y + ny * (rr + 0.08) + (y1 - y) / l * 0.04,
+      x + nx * rr * 0.7 + (x1 - x) / l * 0.08, y + ny * rr * 0.7 + (y1 - y) / l * 0.08]);
+  }));
+  const tail = union(body, ...tufts), tip = circle(0.3, 0.5, 0.24), tipShape = inter(tail, tip);
+  return union(cut(tail, grow(tip, 0.03), stroke((t) => f(0.2 + 0.5 * t), 0.014), stroke((t) => { const [x, y] = f(0.25 + 0.45 * t); return [x + 0.1, y - 0.04]; }, 0.012)),
+    (x, y) => Math.abs(tipShape(x, y)) - 0.022);
+})();
+const clutchingTalon = cut(over(circle(0, -0.2, 0.25), union(
+  cut(path([0.12, 0.82, 0.06, 0.2], 0.1, 0.075), path([0.0, 0.62, 0.2, 0.6], 0.012), path([0.0, 0.46, 0.18, 0.44], 0.012), path([0.0, 0.3, 0.16, 0.28], 0.012)),
+  stroke(cubic([0.0, 0.16], [-0.42, 0.12], [-0.52, -0.3], [-0.24, -0.44]), 0.06, 0.012),
+  stroke(cubic([0.04, 0.12], [0.02, -0.1], [0.06, -0.4], [-0.04, -0.58]), 0.06, 0.012),
+  stroke(cubic([0.08, 0.16], [0.46, 0.12], [0.54, -0.3], [0.26, -0.44]), 0.06, 0.012),
+), 0.03), circle(-0.1, -0.1, 0.045));
+const splinterBurst = union(circle(0, 0, 0.1), ...Array.from({ length: 13 }, (_, k) => {
+  const a = (k / 13) * 2 * Math.PI + 0.3 * Math.sin(k * 7.1), l = 0.46 + 0.3 * (0.5 + 0.5 * Math.sin(k * 3.7)), w = 0.035 + 0.025 * (0.5 + 0.5 * Math.cos(k * 5.3));
+  const c = Math.cos(a), s = Math.sin(a);
+  return poly([0.08 * c - w * s, 0.08 * s + w * c, l * c, l * s, 0.08 * c + w * s, 0.08 * s - w * c]);
+}));
+const crescentHook = rot(union(cut(circle(0, 0, 0.6), circle(0.24, 0.08, 0.5)), poly([0.5, -0.38, 0.28, -0.14, 0.4, -0.18, 0.34, -0.4])), 0.15);
+const hexShell = cut(ellipse(0, 0, 0.6, 0.48),
+  (x, y) => Math.abs(hexagon(0.16)(x, y)) - 0.02, inter(around(seg(0.16, 0, 0.7, 0, 0.02), 6, Math.PI / 6), ellipse(0, 0, 0.48, 0.36)),
+  (x, y) => Math.abs(ellipse(0, 0, 0.48, 0.36)(x, y)) - 0.02, inter(around(seg(0.4, 0, 0.7, 0, 0.016), 16), cut(ellipse(0, 0, 0.62, 0.5), ellipse(0, 0, 0.48, 0.36))));
+const stillRing = union(ring(0, 0, 0.36, 0.08), ring(0, 0, 0.6, 0.022), circle(0, 0, 0.07));
+const urchinSpines = cut(union(circle(0, 0, 0.32), around(seg(0.26, 0, 0.76, 0, 0.034, 0.005), 22), around(seg(0.26, 0, 0.56, 0, 0.03, 0.005), 22, Math.PI / 22)),
+  ...[[0, 0], [0.14, 0.12], [-0.14, 0.12], [0.14, -0.12], [-0.14, -0.12], [0, 0.2], [0, -0.2], [0.2, 0], [-0.2, 0]].map(([x, y]) => circle(x, y, 0.03)));
+const reefRock = union(
+  over(cut(shape('M -0.64 -0.22 L -0.46 0.16 L -0.24 0.28 L -0.02 0.52 L 0.2 0.38 L 0.48 0.22 L 0.64 -0.22 Z'), path([-0.02, 0.5, 0.06, 0.2, -0.04, -0.04], 0.016), path([0.3, 0.3, 0.24, 0.06], 0.014)),
+    union(water(-0.26, 0.82, 0.05, 10, 0.035), water(-0.48, 0.7, 0.04, 11, 0.03)), 0.04),
+  circle(-0.6, 0.06, 0.035), circle(-0.7, -0.06, 0.03), circle(0.62, 0.08, 0.035), circle(0.72, -0.04, 0.03),
+);
+const jaggedRocks = union(
+  over(union(shape('M -0.7 -0.2 L -0.56 0.16 L -0.46 0.02 L -0.36 0.3 L -0.22 -0.2 Z'), shape('M -0.14 -0.2 L -0.02 0.42 L 0.06 0.2 L 0.16 0.62 L 0.34 -0.2 Z'),
+    shape('M 0.4 -0.2 L 0.5 0.1 L 0.58 -0.02 L 0.7 -0.2 Z')),
+  union(water(-0.28, 0.84, 0.045, 12, 0.032), water(-0.5, 0.7, 0.04, 12, 0.028)), 0.04),
+  circle(-0.06, 0.66, 0.03), circle(0.32, 0.6, 0.025), circle(-0.44, 0.42, 0.025),
+);
+const fogBank = union(...[[-0.62, 0.36, 0.3], [-0.3, 0.12, 0.66], [-0.72, -0.12, 0.4], [-0.42, -0.36, 0.56]].map(([x0, y0, x1], k) =>
+  path(trace((t) => [x0 + (x1 - x0) * t, y0 + 0.025 * Math.sin(t * 9 + k)], 16), 0.075)), circle(-0.28, 0.42, 0.1), circle(0.36, 0.18, 0.09), circle(-0.4, -0.06, 0.08));
+const firefly = union(
+  over(union(ellipse(0, 0.14, 0.07, 0.16), circle(0, 0.34, 0.07), mirrorX(path([0.03, 0.4, 0.1, 0.56, 0.2, 0.6], 0.014))), mirrorX(ellipse(0.2, 0.24, 0.22, 0.08, 0.45)), 0.03),
+  circle(0, -0.2, 0.15), move(around(seg(0.22, 0, 0.42, 0, 0.026, 0.005), 10), 0, -0.2),
+);
+const fallingDrop = union(
+  cut(shape('M 0 0.66 Q 0.06 0.4 0.26 0.14 Q 0.4 -0.06 0.3 -0.24 Q 0.18 -0.42 0 -0.42 Q -0.18 -0.42 -0.3 -0.24 Q -0.4 -0.06 -0.26 0.14 Q -0.06 0.4 0 0.66 Z'),
+    path(bez([-0.14, 0.02], [-0.2, -0.16], [-0.06, -0.28], 8), 0.025)),
+  (x, y) => Math.abs(ellipse(0, -0.66, 0.42, 0.09)(x, y)) - 0.025,
+);
+const owlWings = cut(union(
+  mirrorX(shape('M 0.1 0.2 Q 0.4 0.46 0.84 0.4 L 0.74 0.28 L 0.86 0.2 L 0.72 0.12 L 0.8 0.02 L 0.64 -0.02 L 0.68 -0.12 L 0.5 -0.12 Q 0.3 -0.16 0.1 -0.24 Z')),
+  ellipse(0, -0.12, 0.18, 0.36), mirrorX(shape('M 0 0.06 Q 0.22 0.06 0.24 0.24 L 0.3 0.5 L 0.15 0.38 Q 0.08 0.4 0 0.4 Z')),
+  shape('M -0.1 -0.42 L 0 -0.66 L 0.1 -0.42 Z'),
+), mirrorX(ring(0.1, 0.22, 0.065, 0.022)), mirrorX(path([0.3, 0.26, 0.62, 0.3], 0.012)), mirrorX(path([0.3, 0.12, 0.62, 0.08], 0.012)), path([-0.08, -0.2, 0, -0.26, 0.08, -0.2], 0.016));
+const brokenFeather = rot(union(inter(union(vane, seg(0, -0.78, 0, -0.45, 0.032, 0.02)), below(0.02)),
+  move(rot(move(inter(vane, above(0.1)), 0, -0.1), -0.4), 0.04, 0.12)), -0.35);
+const tightSpiral = spiral(3.2, 0.64, 0.045);
+const undertow = union(
+  path([...trace((t) => [-0.72 + 0.86 * t, -0.06 + 0.46 * Math.sin((Math.PI / 2) * t)], 12), ...trace((t) => {
+    const a = Math.PI / 2 - t * 1.7 * Math.PI, r = 0.4 * (1 - 0.6 * t); return [0.14 + r * Math.cos(a), r * Math.sin(a)];
+  }, 30).slice(2)], 0.1, 0.03),
+  water(-0.06, 0.82, 0.03, 10, 0.026), water(-0.56, 0.6, 0.03, 10, 0.024),
+);
+const curlingWave = union(
+  cut(shape('M -0.82 -0.52 Q -0.44 -0.44 -0.24 -0.04 Q -0.02 0.52 0.38 0.54 Q 0.72 0.5 0.7 0.18 Q 0.6 0.38 0.42 0.34 Q 0.22 0.28 0.26 0.06 Q 0.32 -0.12 0.52 -0.12 Q 0.3 -0.32 0.62 -0.52 Z'),
+    path(bez([-0.5, -0.42], [-0.2, -0.1], [0.04, 0.36], 10), 0.016), path(bez([-0.2, -0.46], [0.04, -0.24], [0.16, 0.04], 10), 0.016)),
+  circle(0.78, 0.32, 0.04), circle(0.74, 0.08, 0.03), circle(0.62, -0.02, 0.025), water(-0.64, 0.8, 0.03, 12, 0.026),
+);
+const twinFlames = over(move(scale(flame, 0.66), -0.24, -0.08), move(scale(flame, 0.82), 0.18, 0.04), 0.04);
+const whirlpool = union(circle(0, 0, 0.08), ...[0, 1, 2, 3].map((k) => rot(path(trace((t) => {
+  const a = 1.5 * Math.PI * t, r = 0.12 + 0.6 * t; return [r * Math.cos(a), r * Math.sin(a)];
+}, 30), 0.02, 0.08), (k * Math.PI) / 2)));
+const leapingFish = (() => {
+  const at = (deg: number, r = 0.62): [number, number] => { const a = (deg * Math.PI) / 180; return [r * Math.cos(a), -0.36 + r * Math.sin(a)]; };
+  const arc = (a0: number, a1: number) => trace((t) => at(a0 + (a1 - a0) * t), 20);
+  const tail = at(152), head = at(34);
+  return cut(union(
+    path(arc(90, 36), 0.17, 0.11), path(arc(90, 146), 0.17, 0.05), circle(head[0], head[1], 0.12),
+    move(rot(shape('M 0 0 L -0.1 0.22 L 0.04 0.06 L 0.14 0.2 L 0.06 -0.02 Z'), 1.1), tail[0], tail[1]),
+    move(shape('M 0 0 Q 0.08 0.18 -0.14 0.22 L -0.1 0 Z'), ...at(98, 0.79)),
+    move(shape('M 0 0 Q 0.04 -0.16 -0.12 -0.2 L -0.08 0 Z'), ...at(70, 0.46)),
+    water(-0.6, 0.8, 0.04, 12, 0.03),
+  ), circle(...at(40, 0.66), 0.03), path(trace((t) => at(118 - 50 * t, 0.56), 10), 0.012), path(trace((t) => at(110 - 40 * t, 0.68), 10), 0.012));
+})();
+const blossom = union(cut(around(cut(ellipse(0.36, 0, 0.32, 0.22), poly([0.6, 0, 0.74, 0.1, 0.74, -0.1])), 5, Math.PI / 2),
+  circle(0, 0, 0.12), around(seg(0.12, 0, 0.3, 0, 0.012), 10, Math.PI / 2)), circle(0, 0, 0.07), around(circle(0.2, 0, 0.03), 10, Math.PI / 2));
+const twinStars = union(move(scale(fourStar, 0.62), -0.2, 0.16), move(scale(fourStar, 0.38), 0.4, -0.34), move(scale(poly(star(4, 0.4, 0.1)), 0.28), -0.46, -0.46));
+const northernCrown = union(inter(ring(0, 0.4, 0.68, 0.018), below(0.2)),
+  ...[200, 222, 246, 270, 294, 318, 340].map((deg, k) => {
+    const a = (deg * Math.PI) / 180, r = k === 3 ? 0.24 : 0.17 - 0.016 * Math.abs(k - 3);
+    return move(poly(star(5, r, r * 0.45)), 0.68 * Math.cos(a), 0.4 + 0.68 * Math.sin(a));
+  }));
+const sunOnSea = union(inter(circle(0, -0.16, 0.5), above(-0.16)), ...[0.04, 0.035, 0.03, 0.025].map((w, k) => seg(-0.5 + 0.1 * k, -0.28 - 0.13 * k, 0.5 - 0.1 * k, -0.28 - 0.13 * k, w)));
+
 // ---------------------------------------------------------------- the catalogue
 
-export type EmblemFinish = 'ink' | 'crystal' | 'gold' | 'spirit';
+/** How a charge is laid on: plain ink for most; the show-off ones in silver, gold leaf, crystal or living light. */
+export type EmblemFinish = 'ink' | 'silver' | 'gold' | 'crystal' | 'spirit';
 export interface EmblemDef {
   readonly name: string;
   readonly charge: SDF;
-  /** How the charge is laid on: plain ink for most, the show-off ones in crystal, gold leaf or living light. */
   readonly finish: EmblemFinish;
 }
 const def = (name: string, charge: SDF, finish: EmblemFinish = 'ink'): EmblemDef => ({ name, charge, finish });
 
-/** The league's captains: one charge each, chosen from the spirit each captain is named for. */
-export const CAPTAIN_EMBLEMS = {
-  swift: def('Swift', swift), narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf),
-  crab: def('Crab', crab), sun: def('Noon Sun', sun), waves: def('Tide', waves), risingSun: def('Dawn', risingSun),
-  northStar: def('North Star', northStar), wind: def('Wind', wind), magpie: def('Magpie', magpie), fox: def('Fox', fox),
-  raven: def('Raven', raven), lightning: def('Lightning', lightning), octopus: def('Octopus', octopus), turtle: def('Turtle', turtle),
-  mountain: def('Mountain', mountain), oak: def('Oak', oak), pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus),
-  heron: def('Heron', heron), eclipse: def('Eclipse', eclipse), owl: def('Owl', owl), vulture: def('Vulture', vulture),
-  nautilus: def('Nautilus', nautilus), clover: def('Clover', clover), scorpion: def('Scorpion', scorpion), stormCloud: def('Storm', stormCloud),
-  comet: def('Comet', comet), flame: def('Flame', flame), whale: def('Whale', whale), serpent: def('Serpent', serpent),
-  stag: def('Stag', stag), bearPaw: def('Bear', bearPaw), bat: def('Bat', bat), moth: def('Moth', moth),
-  swordfish: def('Swordfish', swordfish), maple: def('Maple', maple), volcano: def('Volcano', volcano), starfish: def('Starfish', starfish),
-} as const satisfies Record<string, EmblemDef>;
-
-/** The player's choices, worn on the sail; the last three are the show-off emblems for Diamond, Admiral and Legend. */
-export const PLAYER_EMBLEMS = {
-  gull: def('Gull', gull), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin), swan: def('Swan', swan),
-  hare: def('Hare', hare), butterfly: def('Butterfly', butterfly), snowflake: def('Snowflake', snowflake), fern: def('Fern', fern),
-  scallop: def('Scallop', scallop),
-  crystal: def('Crystal Heart', crystal, 'crystal'), leviathan: def('Leviathan', leviathan, 'gold'), phoenix: def('Phoenix', phoenix, 'spirit'),
-} as const satisfies Record<string, EmblemDef>;
-
-export type CaptainEmblemId = keyof typeof CAPTAIN_EMBLEMS;
-export type PlayerEmblemId = keyof typeof PLAYER_EMBLEMS;
-export type EmblemId = CaptainEmblemId | PlayerEmblemId;
-export const EMBLEMS: Record<EmblemId, EmblemDef> = { ...CAPTAIN_EMBLEMS, ...PLAYER_EMBLEMS };
-export const CAPTAIN_EMBLEM_IDS = Object.keys(CAPTAIN_EMBLEMS) as CaptainEmblemId[];
-export const PLAYER_EMBLEM_IDS = Object.keys(PLAYER_EMBLEMS) as PlayerEmblemId[];
-export const EMBLEM_IDS = Object.keys(EMBLEMS) as EmblemId[];
-
-/**
- * The old game's emblem names (src/career/league.ts) mapped to natural charges. Several old charges were things made
- * by hands (a tower, a key, an anchor, dice), which the plan rules out, so each captain gets the spirit of their name.
- */
-export const LEGACY_EMBLEMS: Record<string, EmblemId> = {
-  arrowhead: 'swift', crossedLances: 'narwhal', feather: 'goshawk', sunburst: 'wolf', ironKnot: 'crab', meridianArc: 'sun', waves: 'waves',
-  risingSun: 'risingSun', eightPointStar: 'northStar', windRose: 'wind', diamond: 'magpie', crescent: 'fox', key: 'raven',
-  lightningStroke: 'lightning', coin: 'octopus', hexagon: 'turtle', tower: 'mountain', anchor: 'oak', battlement: 'pufferfish',
-  circle: 'lotus', hourglass: 'heron', eclipse: 'eclipse', twoRings: 'owl', brokenWheel: 'vulture', spiral: 'nautilus',
-  wheelOfFortune: 'clover', die: 'scorpion', thunderbolt: 'stormCloud', comet: 'comet', flame: 'flame', gull: 'gull',
+/** The forty captains' sigils, keyed by the sigil ids in src/career/captains.ts. */
+export const SIGILS: Record<string, EmblemDef> = {
+  forkedBolt: def('a forked bolt', forkedBolt), eelCoil: def('an eel coiled to strike', eelCoil), stoopingHawk: def('a hawk in its stoop', stoopingHawk),
+  clawRake: def('three claw marks', clawRake), crabClaw: def('a claw closing', crabClaw), orcaFin: def('a tall black fin', orcaFin),
+  sharkTooth: def('a serrated tooth', sharkTooth), meridianArc: def('an arc over the world', meridianArc), tideWaves: def('three stacked waves', waves),
+  dawnRays: def('rays over the sea line', risingSun), eightStar: def('an eight-pointed star', northStar), windRose: def('a rose of the winds', windRose),
+  cragPeak: def('a jagged peak', mountain), coralFan: def('a branching coral fan', coralFan), magpieWing: def('a pied wing', wing(true)),
+  foxTail: def('a brush tail', foxTail), clutchingTalon: def('a talon clutching', clutchingTalon), splinterBurst: def('a burst of splinters', splinterBurst),
+  crescentHook: def('a hooked crescent', crescentHook), crabShell: def('a crab shell', crab), ravenWing: def('a black wing', wing(false)),
+  hexShell: def('a shell of hexagons', hexShell), stillRing: def('a single still ring', stillRing), whorlShell: def('a whorled shell', nautilus),
+  urchinSpines: def('a ball of spines', urchinSpines), reefRock: def('a rock awash', reefRock), fogBank: def('a bank of fog', fogBank),
+  firefly: def('a spark with wings', firefly), fallingDrop: def('a falling drop', fallingDrop), eclipse: def('a black sun', eclipse),
+  owlWings: def('spread owl wings', owlWings), brokenFeather: def('a broken feather', brokenFeather), tightSpiral: def('a tight spiral', tightSpiral),
+  undertow: def('a wave folding under', undertow), fourLeaf: def('a four-leaf sprig', clover), jaggedRocks: def('rocks breaking the surface', jaggedRocks),
+  thunderhead: def('a storm cloud', stormCloud), comet: def('a comet and its tail', comet), twinFlames: def('two flames', twinFlames),
+  swallowTail: def('a forked swallow tail', swift),
 };
 
-export const isEmblem = (id: string): id is EmblemId => id in EMBLEMS;
-export const emblemCharge = (id: EmblemId): SDF => EMBLEMS[id].charge;
+/** The emblem cosmetics the player wears, keyed by the ids in src/career/cosmetics.ts. */
+export const EMBLEM_COSMETICS: Record<string, EmblemDef> = {
+  gull: def('Gull', gull), wave: def('Wave', curlingWave), crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), risingSun: def('Rising Sun', sunOnSea),
+  northStar: def('North Star', fourStar), feather: def('Feather', feather), shell: def('Shell', scallop), fern: def('Fern', fern),
+  flame: def('Flame', flame), snowflake: def('Snowflake', snowflake), lightning: def('Lightning', lightning), whirlpool: def('Whirlpool', whirlpool),
+  leapingFish: def('Leaping Fish', leapingFish), petal: def('Petal', blossom),
+  twinStars: def('Twin Stars', twinStars, 'silver'), northernCrown: def('Northern Crown', northernCrown, 'gold'),
+};
+
+/** Charges drawn for the library that nothing names yet: more spirits for later captains and emblems. */
+export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
+  narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf), sun: def('Noon Sun', sun), wind: def('Wind', wind),
+  magpie: def('Magpie', magpie), fox: def('Fox', fox), raven: def('Raven', raven), octopus: def('Octopus', octopus), oak: def('Oak', oak),
+  pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus), heron: def('Heron', heron), owl: def('Owl', owl),
+  vulture: def('Vulture', vulture), whale: def('Whale', whale), serpent: def('Serpent', serpent), stag: def('Stag', stag), bearPaw: def('Bear', bearPaw),
+  bat: def('Bat', bat), moth: def('Moth', moth), swordfish: def('Swordfish', swordfish), maple: def('Maple', maple), volcano: def('Volcano', volcano),
+  starfish: def('Starfish', starfish), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin), swan: def('Swan', swan), hare: def('Hare', hare),
+  butterfly: def('Butterfly', butterfly), turtle: def('Turtle', turtle), scorpion: def('Scorpion', scorpion),
+  crystal: def('Crystal Heart', crystal, 'crystal'), leviathan: def('Leviathan', leviathan, 'gold'), phoenix: def('Phoenix', phoenix, 'spirit'),
+};
+
+/** Every charge by id: spares, sigils and emblem cosmetics. Ids are unique across the three. */
+export const EMBLEMS: Record<string, EmblemDef> = { ...SPARE_EMBLEMS, ...SIGILS, ...EMBLEM_COSMETICS };
+export type EmblemId = string;
+export const SIGIL_IDS = Object.keys(SIGILS), EMBLEM_COSMETIC_IDS = Object.keys(EMBLEM_COSMETICS), SPARE_EMBLEM_IDS = Object.keys(SPARE_EMBLEMS);
+export const EMBLEM_IDS = Object.keys(EMBLEMS);
+
+/** The old game's emblem names (src/career/league.ts at 2025e68) mapped to charges here, for old saves. */
+export const LEGACY_EMBLEMS: Record<string, EmblemId> = {
+  arrowhead: 'swallowTail', crossedLances: 'narwhal', sunburst: 'sun', ironKnot: 'crabClaw', waves: 'tideWaves', risingSun: 'dawnRays',
+  eightPointStar: 'eightStar', diamond: 'magpieWing', crescent: 'crescentMoon', key: 'clutchingTalon', lightningStroke: 'lightning',
+  coin: 'stillRing', hexagon: 'hexShell', tower: 'cragPeak', anchor: 'reefRock', battlement: 'urchinSpines', circle: 'stillRing',
+  hourglass: 'fallingDrop', twoRings: 'owlWings', brokenWheel: 'brokenFeather', spiral: 'tightSpiral', wheelOfFortune: 'fourLeaf',
+  die: 'jaggedRocks', thunderbolt: 'forkedBolt',
+};
+
+export const isEmblem = (id: string): boolean => id in EMBLEMS;
+/** A charge by id (a sigil, an emblem cosmetic, a spare, or an old name); unknown ids fall back to the gull, so a sail is never blank. */
+export const emblemDef = (id: EmblemId): EmblemDef => EMBLEMS[id] ?? EMBLEMS[LEGACY_EMBLEMS[id]] ?? EMBLEMS.gull;
 
 // ---------------------------------------------------------------- rendering
 
@@ -401,7 +576,7 @@ const FIELD = circle(0, 0, 0.94), BORDURE = ring(0, 0, 0.86, 0.028), INK = 0.016
  * R the field, G the charge, B the ink lines, A the whole roundel.
  */
 export function emblemRoundel(id: EmblemId, size: number, out = new Uint8Array(4 * size * size), stride = size, ox = 0, oy = 0): Uint8Array {
-  const charge = union(EMBLEMS[id].charge, BORDURE), px = 2 / size;
+  const charge = union(emblemDef(id).charge, BORDURE), px = 2 / size;
   for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
     const x = (i + 0.5) * px - 1, y = (j + 0.5) * px - 1, fd = FIELD(x, y), cd = charge(x, y);
     const field = cover(fd, px), ink = Math.max(edge(fd, px, INK), edge(cd, px, INK) * field), o = 4 * ((oy + j) * stride + ox + i);
