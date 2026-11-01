@@ -1,0 +1,137 @@
+// What the actors need from the match, as plain data. The integration step adapts the simulation's state and events
+// into these each frame; nothing in src/render/actors imports the simulation.
+//
+// Positions are world metres from the planet's centre (the planet is a sphere of radius R about the origin). For
+// things that sit on the water (ships, loot, splashes, the whale) only the direction is used: they are placed on the
+// sea surface there. Headings are unit vectors tangent to the sphere.
+
+export interface Vec3 { x: number; y: number; z: number }
+
+export const WEAPONS = ['cannon', 'scatter', 'harpoon', 'mortar', 'repeater', 'broadside'] as const;
+export type Weapon = (typeof WEAPONS)[number];
+
+/** 0 common (grey), 1 uncommon (green), 2 rare (blue), 3 epic (purple), 4 legendary (gold). */
+export type Rarity = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * A ship's cosmetics, by id. Unknown ids fall back to a placeholder picked from the id's hash, so the catalogue can
+ * grow without touching the renderer. See cosmetics.ts for the ids the placeholders know.
+ */
+export interface CosmeticIds {
+  sail?: string; // sail colour
+  pattern?: string; // sail pattern
+  hull?: string; // hull paint
+  figurehead?: string;
+  emblem?: string; // one of the league's emblems (src/career/emblems.ts)
+  wake?: string; // wake trail
+}
+
+export interface ShipView {
+  id: number;
+  pos: Vec3;
+  head: Vec3;
+  /** Metres per second through the water. */
+  speed: number;
+  /** Rate of turn, radians per second, positive to port (left). Ships heel out of the turn. */
+  turn: number;
+  /** Height above the sea, for the Gale and the glide; the gust's hop is animated here from the gust event. */
+  alt?: number;
+  /** Extra roll in radians, positive to starboard: a ship tossed by the whale's breach rolling over and back. */
+  flip?: number;
+  /** 0..1 */
+  hull: number;
+  /** Shield points and their cap (the shield aura brightens as it fills). */
+  shield: number;
+  shieldMax: number;
+  weapon: Weapon;
+  /** World direction the turret aims; omitted, it trains forward. */
+  aim?: Vec3;
+  /** The wind she feels, a tangent vector in m/s; omitted, the view's wind. */
+  wind?: Vec3;
+  cosmetics: CosmeticIds;
+  /** False once sunk: the sinking animation plays out (from the sink event) and the model goes. */
+  alive: boolean;
+}
+
+export interface ProjectileView {
+  id: number;
+  weapon: Weapon;
+  rarity: Rarity;
+  pos: Vec3;
+  vel: Vec3;
+  /** The ship that fired it, for the harpoon's line. */
+  ship?: number;
+}
+
+export type LootKind = Weapon | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair' | 'coin';
+
+export interface LootView {
+  id: number;
+  pos: Vec3;
+  kind: LootKind;
+  rarity: Rarity;
+  /** Seconds since it appeared, for the pop-in. */
+  age: number;
+}
+
+/** The whale on its route: deep (unseen), rising, at the surface (blowing now and then) or diving, k 0..1 through each. */
+export interface WhaleView {
+  id: number;
+  pos: Vec3;
+  head: Vec3;
+  state: 'deep' | 'rising' | 'surface' | 'diving';
+  k: number;
+}
+
+export interface ActorsView {
+  /** Seconds, for waves and flutter. */
+  time: number;
+  /** Unit vector toward the sun, world frame. Half the planet is dark; lanterns and wakes glow there. */
+  sun: Vec3;
+  /** Sea level relative to the mean radius, metres (the tide, about -1..1). */
+  seaLevel: number;
+  /** The wind where no ship carries its own, a tangent vector in m/s at the focus. */
+  wind: Vec3;
+  /** The player's ship id: its hits raise hit markers and its events raise camera juice. -1 for none. */
+  player: number;
+  ships: readonly ShipView[];
+  projectiles: readonly ProjectileView[];
+  loot: readonly LootView[];
+  whales: readonly WhaleView[];
+}
+
+/** One-shot moments. `at` is a world point; for hits it is where the shot struck. */
+export type ActorEvent =
+  | { t: 'fire'; ship: number; weapon: Weapon; rarity?: Rarity }
+  | { t: 'hit'; ship: number; by: number; weapon: Weapon; at: Vec3; shield: number; hull: number; crit?: boolean }
+  | { t: 'impact'; weapon: Weapon; at: Vec3; on: 'water' | 'land' }
+  | { t: 'shieldBreak'; ship: number; at?: Vec3 }
+  | { t: 'shieldRefill'; ship: number }
+  | { t: 'sink'; ship: number }
+  | { t: 'gust'; ship: number }
+  | { t: 'pickup'; ship: number; rarity: Rarity }
+  | { t: 'delivery'; ship: number; rarity?: Rarity }
+  | { t: 'ram'; at: Vec3 }
+  | { t: 'scrape'; at: Vec3 }
+  | { t: 'breach'; at: Vec3; head?: Vec3 };
+
+/** What a moment should do to the camera, the screen and the hand, for the integration step to route. */
+export interface Juice {
+  shake: number; // 0..1 trauma
+  kick?: number; // field-of-view punch, degrees
+  flash?: number; // 0..1 screen flash
+  flashColor?: number;
+  hitStop?: number; // seconds of frozen time
+  haptic?: 'light' | 'medium' | 'heavy';
+}
+
+/** A hit marker for the HUD: where on screen (normalised device coordinates, -1..1, y up) and what it did. */
+export interface HitMarker {
+  ndc: { x: number; y: number };
+  onScreen: boolean;
+  ship: number;
+  shield: number;
+  hull: number;
+  crit: boolean;
+  broke: boolean;
+}
