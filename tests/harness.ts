@@ -110,6 +110,10 @@ export interface OpenOptions {
   device?: DeviceName;
   query?: Record<string, string | number | boolean>;
   hook?: string;
+  /** The page under the server's root, such as 'dev/game.html'; the root page by default. */
+  path?: string;
+  /** Overrides the device's pixel ratio (captures use 1 to keep files small). */
+  dpr?: number;
 }
 
 export async function openGame(browser: Browser, url: string, options: OpenOptions = {}): Promise<Game> {
@@ -117,7 +121,7 @@ export async function openGame(browser: Browser, url: string, options: OpenOptio
   const context = await browser.newContext({
     viewport: { width: device.width, height: device.height },
     screen: { width: device.width, height: device.height },
-    deviceScaleFactor: device.dpr,
+    deviceScaleFactor: options.dpr ?? device.dpr,
     isMobile: true,
     hasTouch: true,
   });
@@ -127,9 +131,9 @@ export async function openGame(browser: Browser, url: string, options: OpenOptio
   await cdp.send('Emulation.setSafeAreaInsetsOverride', {
     insets: { top, topMax: top, right, rightMax: right, bottom, bottomMax: bottom, left, leftMax: left },
   });
-  const target = new URL(url);
+  const target = new URL(options.path ?? '', url);
   for (const [k, v] of Object.entries(options.query ?? {})) target.searchParams.set(k, String(v));
-  const game = new Game(page, cdp, device, options.hook ?? '__tidefall', target.origin);
+  const game = new Game(page, cdp, device, options.hook ?? '__portolan', target.origin);
   await page.goto(target.href);
   return game;
 }

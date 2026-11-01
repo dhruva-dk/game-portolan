@@ -46,7 +46,7 @@ test('the page boots, sails, charts and comes home without an error', async (t) 
   const server = await serve();
   const { browser } = await launch();
   t.after(async () => { await browser.close(); await server.close(); });
-  const game = await openGame(browser, server.url, { device: 'ipad', query: {} });
+  const game = await openGame(browser, server.url, { device: 'ipad', query: {}, hook: '__tidefall' });
   await game.until((h) => h.ready, undefined, 120_000);
   await game.hook((h) => h.sail(5, true));
   await game.hook((h) => h.skip(70));

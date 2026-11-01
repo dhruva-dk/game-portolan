@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node tests/run.ts",
     "ios": "node tests/ios.ts",
+    "capture": "node tests/capture/run.ts",
     "check:assets": "vite build --logLevel warn && node tests/check-assets.ts"
   },
   "dependencies": {
