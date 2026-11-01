@@ -1,0 +1,34 @@
+/* The layers, and how screens move between each other. Each screen's own layout lives in its own CSS file. */
+
+.pui-screens, .pui-hud, .pui-overlay, .pui-fly { position: absolute; inset: 0; pointer-events: none; }
+.pui-screens { z-index: 10; }
+.pui-hud { z-index: 5; }
+.pui-overlay { z-index: 40; }
+.pui-fly { z-index: 90; }
+.pui-screen { position: absolute; inset: 0; pointer-events: none; }
+.pui-screen > * { pointer-events: auto; }
+
+/* in */
+.pui-in-fade { animation: pui-fade-in var(--t-screen) var(--ease) both; }
+.pui-in-zoom { animation: pui-zoom-in 620ms var(--ease) both; }
+.pui-in-push { animation: pui-push-in var(--t-screen) var(--ease) both; }
+.pui-in-pop { animation: pui-pop-in var(--t-screen) var(--ease) both; }
+.pui-in-rise { animation: pui-rise-in var(--t-slow) var(--ease) both; }
+@keyframes pui-fade-in { from { opacity: 0; } }
+@keyframes pui-zoom-in { from { opacity: 0; transform: scale(1.08); filter: blur(6px); } }
+@keyframes pui-push-in { from { opacity: 0; transform: translateX(calc(80px * var(--k))); } }
+@keyframes pui-pop-in { from { opacity: 0; transform: translateX(calc(-80px * var(--k))); } }
+@keyframes pui-rise-in { from { opacity: 0; transform: translateY(calc(60px * var(--k))); } }
+/* out */
+.pui-leaving { z-index: -1; }
+.pui-out-fade, .pui-out-rise, .pui-out-none { animation: pui-fade-out var(--t-base) var(--ease-out) both; }
+.pui-out-zoom { animation: pui-zoom-out 520ms var(--ease-out) both; }
+.pui-out-push { animation: pui-push-out var(--t-screen) var(--ease) both; }
+.pui-out-pop { animation: pui-pop-out var(--t-screen) var(--ease) both; }
+@keyframes pui-fade-out { to { opacity: 0; } }
+@keyframes pui-zoom-out { to { opacity: 0; transform: scale(0.94); } }
+@keyframes pui-push-out { to { opacity: 0; transform: translateX(calc(-60px * var(--k))); } }
+@keyframes pui-pop-out { to { opacity: 0; transform: translateX(calc(80px * var(--k))); } }
+
+/* the safe frame every screen lays out inside: clear of the notch, the corners and the home bar */
+.pui-safe { position: absolute; top: var(--st); bottom: var(--sb); left: var(--sl); right: var(--sr); }
