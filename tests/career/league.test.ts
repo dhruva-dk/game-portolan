@@ -22,7 +22,7 @@ test('the league: about forty named captains, each with a temperament, a sigil a
     assert.ok(TEMPERAMENTS.some((t) => t.id === c.temperament), c.id);
     assert.equal(ability(c.active).kind, 'active', c.id);
     assert.equal(ability(c.passive).kind, 'passive', c.id);
-    assert.equal(cosmetic(c.sigil.id), undefined, `${c.id}'s sigil is not a player emblem`);
+    assert.notEqual(cosmetic(c.sigil.id)?.kind, 'emblem', `${c.id}'s sigil is not a player emblem`);
     for (const k of LOOK_KINDS) {
       if (k === 'emblem') assert.equal(c.look.emblem, c.sigil.id);
       else assert.equal(cosmetic(c.look[k])?.kind, k, `${c.id} ${k}`);

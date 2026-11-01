@@ -2,7 +2,8 @@
 // Plain kinds, evocative names. Each has one unlock rule: a level, or a rank tier (the show-off ones).
 // Nothing is bought: there is no shop and no currency between matches.
 // Ids are stable: saves and captains refer to them. Add to the end of a kind; never rename or reuse an id.
-// Figureheads and emblems are natural forms and spirits: never people, never faces.
+// Figureheads and emblems are natural forms and spirits: never people, never faces. Emblem ids are the player
+// charges drawn in src/render/cosmetics/emblems.ts (PLAYER_EMBLEMS).
 import { TIER } from './ranks.ts';
 
 export type CosmeticKind = 'sailColour' | 'sailPattern' | 'hullPaint' | 'figurehead' | 'emblem' | 'wake';
@@ -118,21 +119,17 @@ export const COSMETICS: readonly Cosmetic[] = [
   ]),
   ...kind('emblem', [
     ['gull', 'Gull', 'A gull in flight.', at(1)],
-    ['wave', 'Wave', 'A single curling wave.', at(1)],
-    ['crescentMoon', 'Crescent Moon', 'A thin new moon.', at(2)],
-    ['risingSun', 'Rising Sun', 'Half a sun over the sea line.', at(4)],
-    ['northStar', 'North Star', 'A four-pointed star.', at(7)],
-    ['feather', 'Feather', 'One long feather.', at(10)],
-    ['shell', 'Shell', 'A scallop shell.', at(13)],
+    ['scallop', 'Scallop', 'A scallop shell.', at(2)],
+    ['seahorse', 'Seahorse', 'A seahorse, tail curled.', at(7)],
+    ['dolphin', 'Dolphin', 'A leaping dolphin.', at(13)],
     ['fern', 'Fern', 'An uncurling fern.', at(16)],
-    ['flame', 'Flame', 'A single flame.', at(20)],
-    ['snowflake', 'Snowflake', 'A six-armed snowflake.', at(24)],
-    ['lightning', 'Lightning', 'A forked bolt.', at(28)],
-    ['whirlpool', 'Whirlpool', 'A spiral of water.', at(32)],
-    ['leapingFish', 'Leaping Fish', 'A fish arcing out of the water.', at(39)],
-    ['petal', 'Petal', 'A cherry blossom.', at(46)],
-    ['twinStars', 'Twin Stars', 'Two bright stars. For reaching Platinum.', rank(TIER.platinum)],
-    ['northernCrown', 'Northern Crown', 'An arc of seven stars. For reaching Admiral.', rank(TIER.admiral)],
+    ['hare', 'Hare', 'A running hare.', at(20)],
+    ['swan', 'Swan', 'A swan, wings raised.', at(24)],
+    ['butterfly', 'Butterfly', 'A butterfly.', at(32)],
+    ['snowflake', 'Snowflake', 'A six-armed snowflake.', at(39)],
+    ['crystal', 'Crystal Heart', 'A heart of clear crystal. For reaching Diamond.', rank(TIER.diamond)],
+    ['leviathan', 'Leviathan', 'A great sea beast in gold. For reaching Admiral.', rank(TIER.admiral)],
+    ['phoenix', 'Phoenix', 'A firebird of living light. For reaching Legend.', rank(TIER.legend)],
   ]),
   ...kind('wake', [
     ['foam', 'Foam', 'Plain white foam.', at(1), '#ffffff'],
