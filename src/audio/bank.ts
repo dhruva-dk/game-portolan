@@ -53,6 +53,7 @@ export class Bank {
   }
   put(name: SoundName, v: number, chs: Buf[]): void { this.cache.set(`${name}:${v}`, chs); }
   has(name: SoundName, v: number): boolean { return this.cache.has(`${name}:${v}`); }
+  drop(name: SoundName, v: number): void { this.cache.delete(`${name}:${v}`); }
 }
 
 export function measure(chs: readonly Buf[]): { seconds: number; peak: number; loudness: number; finite: boolean } {

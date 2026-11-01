@@ -23,12 +23,14 @@ export interface SoundDef {
   /** Metres beyond which it is not heard. */
   range: number;
   grade: Grade;
+  /** Loops played with a duration: how far the rate climbs by the end of it (the consumables charging up). */
+  climb: number;
 }
 
 export function def(
   make: SoundDef['make'], variants: number, bus: Bus, priority: number, gain: number, max: number, extra: Partial<SoundDef> = {},
 ): SoundDef {
-  return { make, variants, bus, priority, gain, max, loop: false, jitter: 0.04, range: bus === 'fx' ? 320 : 400, grade: 'random', ...extra };
+  return { make, variants, bus, priority, gain, max, loop: false, jitter: 0.04, range: bus === 'fx' ? 320 : 400, grade: 'random', climb: 1, ...extra };
 }
 
 export const LOOP: Partial<SoundDef> = { loop: true, jitter: 0 };
