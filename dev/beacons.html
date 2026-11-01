@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Portolan: beacons</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font: 13px/1.35 -apple-system, system-ui, sans-serif; color: #e8eef6; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #labels { position: fixed; inset: 0; pointer-events: none; }
+    .label { position: absolute; box-sizing: border-box; padding: 6px 9px; text-shadow: 0 1px 3px #000, 0 0 8px #000; }
+    .label b { font-weight: 650; }
+    .label span { opacity: 0.8; max-width: 640px; display: inline-block; }
+    #bar { position: fixed; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+    #bar button, #bar a { font: inherit; color: #e8eef6; background: #0008; border: 1px solid #fff4; border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <canvas></canvas>
+  <div id="labels"></div>
+  <div id="bar">
+    <button data-time="day">Day</button>
+    <button data-time="dusk">Dusk</button>
+    <button data-time="night">Night</button>
+    <a href="?view=grid">Close</a>
+    <a href="?view=far">330 m</a>
+  </div>
+  <script type="module" src="../src/render/beacons/dev.ts"></script>
+</body>
+</html>
