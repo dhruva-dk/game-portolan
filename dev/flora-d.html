@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flora D: fire, weeping, mangrove, maelstrom</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; font: 13px/1.35 system-ui, sans-serif; color: #eee; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 8px; left: 8px; background: rgba(10, 12, 14, 0.72); padding: 8px 10px; border-radius: 8px; max-width: 360px; }
+  #panel label { display: inline-block; margin: 2px 8px 2px 0; }
+  #panel select, #panel input { font: inherit; }
+  #stats { margin-top: 6px; font: 11px/1.3 ui-monospace, monospace; white-space: pre; color: #cfd6dc; }
+  #labels div { position: fixed; transform: translate(-50%, 0); font: 12px system-ui; color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; white-space: nowrap; }
+  body.clean #panel, body.clean #labels { display: none; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <label>Region <select id="region">
+    <option value="all">all four</option><option value="fire">Fire Archipelago</option><option value="weeping">Weeping Isle</option>
+    <option value="mangrove">Mangrove Labyrinth</option><option value="maelstrom">Maelstrom</option>
+  </select></label>
+  <label>View <select id="view"><option value="grid">grid</option><option value="turntable">turntable</option><option value="field">field</option></select></label>
+  <label>Light <select id="light"><option value="day">day</option><option value="dusk">dusk</option></select></label>
+  <label>LOD <select id="lod"><option value="auto">auto</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+  <label>Wind <input id="wind" type="range" min="0" max="1" step="0.05" /></label>
+  <div id="stats"></div>
+</div>
+<div id="labels"></div>
+<script type="module">
+// Flora library D's viewer. URL parameters:
+//   region=all|fire|weeping|mangrove|maelstrom   view=grid|turntable|field   light=day|dusk   lod=auto|0|1|2
+//   wind=0..1   plant=<id> (turntable: just this plant)   dist=<m> (turntable or field camera distance)
+//   seed=<n>   t=<seconds> (freeze time there)   clean=1 (hide the panel)   yaw=<deg> pitch=<deg> (camera)
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { LOD_DISTANCES, floraReady, setWind, setSea, instance, rng } from '../src/render/flora/kitD.ts';
+import * as fire from '../src/render/flora/fireArchipelago.ts';
+import * as weeping from '../src/render/flora/weepingIsle.ts';
+import * as mangrove from '../src/render/flora/mangroveLabyrinth.ts';
+import * as maelstrom from '../src/render/flora/maelstrom.ts';
+
+const q = new URLSearchParams(location.search);
+const opt = {
+  region: q.get('region') ?? 'all', view: q.get('view') ?? 'grid', light: q.get('light') ?? 'day', lod: q.get('lod') ?? 'auto',
+  wind: Number(q.get('wind') ?? 0.4), plant: q.get('plant'), dist: Number(q.get('dist') ?? 0), seed: Number(q.get('seed') ?? 1),
+  t: q.has('t') ? Number(q.get('t')) : null, yaw: Number(q.get('yaw') ?? 35), pitch: Number(q.get('pitch') ?? 12),
+};
+if (q.get('clean')) document.body.classList.add('clean');
+for (const k of ['region', 'view', 'light', 'lod']) {
+  const el = document.getElementById(k);
+  el.value = opt[k];
+  el.onchange = () => { q.set(k, el.value); location.search = q.toString(); };
+}
+const windEl = document.getElementById('wind');
+windEl.value = String(opt.wind);
+windEl.oninput = () => { opt.wind = Number(windEl.value); };
+
+// each region's ground, so plants are judged on what they stand on
+const REGIONS = {
+  fire: { mod: fire, name: 'the Fire Archipelago', ground: 0x17161a, rough: 0.95, water: null },
+  weeping: { mod: weeping, name: 'the Weeping Isle', ground: 0x1d2a1c, rough: 0.9, water: null },
+  mangrove: { mod: mangrove, name: 'the Mangrove Labyrinth', ground: 0x3a3226, rough: 0.9, water: 0x3b2c18, floor: -0.7 },
+  maelstrom: { mod: maelstrom, name: 'the Maelstrom', ground: 0x2c3134, rough: 0.9, water: null },
+};
+const chosen = opt.region === 'all' ? Object.keys(REGIONS) : [opt.region];
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = opt.light === 'dusk' ? 1.1 : 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 4000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// ---- light: day or dusk
+const LIGHT = {
+  day: { sky: 0x9cbcd8, horizon: 0xdfe8ee, sun: 0xfff3e2, sunI: 3.2, elev: 52, hemiSky: 0xbcd6f0, hemiGround: 0x4a4038, hemiI: 1.1, fog: 0xbfd0dc },
+  dusk: { sky: 0x2a2f52, horizon: 0xe08a52, sun: 0xff9a52, sunI: 2.4, elev: 7, hemiSky: 0x5a5a8a, hemiGround: 0x3a2a24, hemiI: 0.7, fog: 0x8a6a68 },
+}[opt.light];
+scene.background = skyTexture(LIGHT.sky, LIGHT.horizon);
+scene.fog = new THREE.Fog(LIGHT.fog, 250, 2200);
+const hemi = new THREE.HemisphereLight(LIGHT.hemiSky, LIGHT.hemiGround, LIGHT.hemiI);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunI);
+const az = THREE.MathUtils.degToRad(opt.light === 'dusk' ? 200 : 140), el = THREE.MathUtils.degToRad(LIGHT.elev);
+sun.position.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)).multiplyScalar(200);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.04;
+scene.add(sun, sun.target);
+
+function skyTexture(top, bottom) {
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 256;
+  const g = c.getContext('2d'), grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#' + new THREE.Color(top).getHexString());
+  grad.addColorStop(0.75, '#' + new THREE.Color(bottom).getHexString());
+  grad.addColorStop(1, '#' + new THREE.Color(bottom).getHexString());
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+function ground(region, x, z, w, d) {
+  const R = REGIONS[region];
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: R.ground, roughness: R.rough }));
+  g.rotation.x = -Math.PI / 2;
+  g.position.set(x, R.floor ?? 0, z);
+  g.receiveShadow = true;
+  scene.add(g);
+  if (R.water != null) {
+    const wtr = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: R.water, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.82 }));
+    wtr.rotation.x = -Math.PI / 2;
+    wtr.position.set(x, 0, z);
+    wtr.receiveShadow = true;
+    scene.add(wtr);
+  }
+}
+
+const plantsOf = (region) => REGIONS[region].mod.PLANTS.filter((p) => !opt.plant || p.id === opt.plant);
+const lodFor = (dist) => opt.lod !== 'auto' ? Number(opt.lod) : dist < LOD_DISTANCES[0] ? 0 : dist < LOD_DISTANCES[1] ? 1 : 2;
+const labels = [];
+function label(text, pos) {
+  const el = document.createElement('div');
+  el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  labels.push({ el, pos });
+}
+function sizeOf(obj) { return new THREE.Box3().setFromObject(obj).getSize(new THREE.Vector3()); }
+
+const stats = [];
+function countTris(obj) {
+  let t = 0;
+  obj.traverse((o) => { if (o.isMesh && o.geometry.index) t += o.geometry.index.count / 3; });
+  return t;
+}
+
+// ---- grid: one row per plant, four seeds side by side, each a THREE.LOD (or the forced level)
+function buildGrid() {
+  let z = 0, maxX = 0;
+  for (const region of chosen) {
+    const plants = plantsOf(region);
+    if (!plants.length) continue;
+    const z0 = z;
+    for (const plant of plants) {
+      const objs = [0, 1, 2, 3].map((k) => {
+        const seed = opt.seed + k * 101;
+        if (opt.lod === 'auto') {
+          const l = new THREE.LOD();
+          [0, 1, 2].forEach((lv) => l.addLevel(plant.build(seed, lv), lv === 0 ? 0 : LOD_DISTANCES[lv - 1]));
+          return l;
+        }
+        return plant.build(seed, Number(opt.lod));
+      });
+      const w = Math.max(...objs.map((o) => { const s = sizeOf(o); return Math.max(s.x, s.z); }), 2);
+      objs.forEach((o, k) => { o.position.set(k * (w + 2), REGIONS[region].floor ?? 0, z + w / 2); scene.add(o); maxX = Math.max(maxX, k * (w + 2) + w); });
+      label(`${plant.name}`, new THREE.Vector3(-w * 0.6 - 2, 1, z + w / 2));
+      stats.push(`${plant.id.padEnd(16)} ` + [0, 1, 2].map((l) => String(countTris(plant.build(opt.seed, l))).padStart(6)).join(' '));
+      z += w + 4;
+    }
+    ground(region, maxX / 2, (z0 + z) / 2 - 2, maxX + 40, z - z0 + 6);
+    label(REGIONS[region].name, new THREE.Vector3(-8, 4, z0));
+    z += 8;
+  }
+  const c = new THREE.Vector3(maxX / 2, 2, z / 2);
+  controls.target.copy(c);
+  const d = opt.dist || Math.max(maxX, z) * 0.9;
+  placeCamera(c, d);
+  sun.target.position.copy(c);
+  fitShadow(Math.max(maxX, z) * 0.7);
+}
+
+// ---- turntable: the region's plants in a ring, the camera orbiting at `dist`
+function buildTurntable() {
+  const region = chosen[0];
+  const plants = plantsOf(region);
+  const objs = plants.map((p) => {
+    if (opt.lod === 'auto') {
+      const l = new THREE.LOD();
+      [0, 1, 2].forEach((lv) => l.addLevel(p.build(opt.seed, lv), lv === 0 ? 0 : LOD_DISTANCES[lv - 1]));
+      return l;
+    }
+    return p.build(opt.seed, Number(opt.lod));
+  });
+  const w = Math.max(...objs.map((o) => { const s = sizeOf(o); return Math.max(s.x, s.z); }), 2);
+  objs.forEach((o, i) => { o.position.set((i - (objs.length - 1) / 2) * (w + 1), REGIONS[region].floor ?? 0, 0); scene.add(o); });
+  ground(region, 0, 0, 600, 600);
+  const h = Math.max(...objs.map((o) => sizeOf(o).y));
+  const c = new THREE.Vector3(0, h * 0.45, 0);
+  controls.target.copy(c);
+  controls.autoRotate = opt.t == null;
+  placeCamera(c, opt.dist || Math.max(h, w * objs.length) * 1.4);
+  sun.target.position.copy(c);
+  fitShadow(Math.max(h, w * objs.length));
+  for (const p of plants) stats.push(`${p.id.padEnd(16)} ` + [0, 1, 2].map((l) => String(countTris(p.build(opt.seed, l))).padStart(6)).join(' '));
+}
+
+// ---- field: a patch of the region planted at each plant's density, instanced by LOD ring round the camera
+function buildField() {
+  const region = chosen[0];
+  const size = 260, half = size / 2;
+  ground(region, 0, 0, size * 4, size * 4);
+  const dist = opt.dist || 300;
+  const yaw = THREE.MathUtils.degToRad(opt.yaw), pitch = THREE.MathUtils.degToRad(opt.pitch);
+  const camPos = new THREE.Vector3(Math.cos(yaw) * Math.cos(pitch), Math.sin(pitch), Math.sin(yaw) * Math.cos(pitch)).multiplyScalar(dist);
+  const r = rng(opt.seed * 7 + 3);
+  let total = 0;
+  for (const plant of plantsOf(region)) {
+    const P = plant.placement;
+    const n = Math.round((P.density * size * size) / 100 * 0.35);
+    // clustered: plants gather round a few grove centres, the tighter the higher `cluster` is
+    const groves = Array.from({ length: Math.max(3, Math.round(n / 40)) }, () => [(r() - 0.5) * size, (r() - 0.5) * size]);
+    const buckets = new Map();
+    for (let i = 0; i < n; i++) {
+      let x = (r() - 0.5) * size, z = (r() - 0.5) * size;
+      if (r() < P.cluster) {
+        const g = groves[Math.floor(r() * groves.length)], spread = size * 0.12 * (1.2 - P.cluster);
+        x = g[0] + (r() + r() - 1) * spread; z = g[1] + (r() + r() - 1) * spread;
+      }
+      if (Math.abs(x) > half || Math.abs(z) > half) continue;
+      const y = REGIONS[region].floor != null ? REGIONS[region].floor : 0;
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plant.id === 'stormGrass' ? (r() - 0.5) * 0.5 : r() * TAU), new THREE.Vector3(1, 1, 1).multiplyScalar(0.85 + r() * 0.3));
+      const lod = lodFor(camPos.distanceTo(new THREE.Vector3(x, y, z)));
+      const key = `${i % 6}/${lod}`;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(m);
+      total++;
+    }
+    for (const [key, ms] of buckets) {
+      const [v, lod] = key.split('/').map(Number);
+      scene.add(instance(plant.build(opt.seed + v * 101, lod), ms));
+    }
+  }
+  stats.push(`instances: ${total}`);
+  controls.target.set(0, 4, 0);
+  camera.position.copy(camPos).add(new THREE.Vector3(0, 6, 0));
+  sun.target.position.set(0, 0, 0);
+  fitShadow(half * 1.2);
+}
+const TAU = Math.PI * 2;
+
+function placeCamera(c, d) {
+  const yaw = THREE.MathUtils.degToRad(opt.yaw), pitch = THREE.MathUtils.degToRad(opt.pitch);
+  camera.position.set(c.x + Math.cos(yaw) * Math.cos(pitch) * d, c.y + Math.sin(pitch) * d, c.z + Math.sin(yaw) * Math.cos(pitch) * d);
+}
+function fitShadow(r) {
+  const cam = sun.shadow.camera;
+  cam.left = cam.bottom = -r; cam.right = cam.top = r;
+  cam.near = 1; cam.far = 600;
+  cam.updateProjectionMatrix();
+  sun.position.add(sun.target.position);
+}
+
+if (opt.view === 'turntable') buildTurntable();
+else if (opt.view === 'field') buildField();
+else buildGrid();
+setSea(new THREE.Vector3(0, 0, 0), 0);
+
+const statEl = document.getElementById('stats');
+function showStats() {
+  statEl.textContent = (stats.length && opt.view !== 'field' ? 'triangles        lod0   lod1   lod2\n' : '') + stats.join('\n') + `\ndrawn: ${renderer.info.render.triangles} tris, ${renderer.info.render.calls} calls`;
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+const windDir = new THREE.Vector3(1, 0, 0.35).normalize();
+let frames = 0;
+function frame() {
+  const t = opt.t ?? clock.getElapsedTime();
+  setWind(windDir, opt.wind, t);
+  controls.update();
+  renderer.render(scene, camera);
+  for (const l of labels) {
+    const p = l.pos.clone().project(camera);
+    l.el.style.display = p.z < 1 ? '' : 'none';
+    l.el.style.left = ((p.x + 1) / 2) * innerWidth + 'px';
+    l.el.style.top = ((1 - p.y) / 2) * innerHeight + 'px';
+  }
+  if (++frames % 30 === 1) showStats();
+  requestAnimationFrame(frame);
+}
+floraReady().then(() => {
+  frame();
+  requestAnimationFrame(() => requestAnimationFrame(() => { document.body.dataset.ready = '1'; }));
+}).catch((e) => { statEl.textContent = String(e); document.body.dataset.ready = 'error'; });
+</script>
+</body>
+</html>

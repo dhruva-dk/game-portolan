@@ -1,0 +1,11 @@
+## Flora D textures (public/tex/flora/d; leaf and grass atlases cut from ambientCG sets, barks at 1024 px)
+
+- Leaf Set 024 — https://ambientcg.com/a/LeafSet024 — ambientCG (Lennart Demes) — CC0 (round leaves: leaves_round)
+- Leaf Set 022 — https://ambientcg.com/a/LeafSet022 — ambientCG (Lennart Demes) — CC0 (long leaves: leaves_long)
+- Leaf Set 018 — https://ambientcg.com/a/LeafSet018 — ambientCG (Lennart Demes) — CC0 (broad leaves: leaves_broad)
+- Foliage 008 — https://ambientcg.com/a/Foliage008 — ambientCG (Lennart Demes) — CC0 (grass blades: grass_blades)
+- Bark 007 — https://ambientcg.com/a/Bark007 — ambientCG (Lennart Demes) — CC0 (the Fire Archipelago's ash-grey bark: bark_ash_d, bark_ash_n)
+- Bark 013 — https://ambientcg.com/a/Bark013 — ambientCG (Lennart Demes) — CC0 (the Weeping Isle's mossy bark: bark_mossy_d, bark_mossy_n)
+- Moss 001 — https://ambientcg.com/a/Moss001 — ambientCG (Lennart Demes) — CC0 (moss on the Weeping Isle's trunks: moss_d, moss_n)
+- Chinese Hackberry Bark — https://polyhaven.com/a/chinese_hackberry_bark — Charlotte Baglioni — CC0 (the Mangrove Labyrinth's bark: bark_mangrove_d, bark_mangrove_n)
+- Palm Bark — https://polyhaven.com/a/palm_bark — Charlotte Baglioni — CC0 (the Weeping Isle's tree-fern trunks: bark_fern_d, bark_fern_n)
