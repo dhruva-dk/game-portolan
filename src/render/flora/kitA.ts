@@ -522,7 +522,7 @@ export type CoverName = 'snow' | 'moss';
 
 const BARK_FILES: Record<BarkName, string> = { fir: 'fir_bark', pine: 'pine_bark', cedar: 'cedar_bark', crown: 'crown_bark' };
 const COVER: Record<CoverName, { file: string; tint: THREE.Color; scale: number }> = {
-  snow: { file: 'snow', tint: new THREE.Color(1.05, 1.08, 1.15), scale: 0.6 },
+  snow: { file: 'snow', tint: new THREE.Color(1.3, 1.34, 1.42), scale: 0.6 },
   moss: { file: 'moss', tint: new THREE.Color(0.85, 1.0, 0.75), scale: 0.4 },
 };
 
