@@ -8,7 +8,7 @@ import { launch, openGame, root, serve, type DeviceName, type Game, type Server 
 export const CAPTURES = join(root, 'captures');
 
 /** The page that runs the new app. */
-export const APP_PAGE = 'index.html';
+export const APP_PAGE = 'dev/game.html';
 
 export interface Rig {
   server: Server;
