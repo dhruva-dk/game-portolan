@@ -39,6 +39,40 @@ function column(x: number, z: number, top: number, r: number, mat: THREE.Materia
   return new THREE.Mesh(g, mat);
 }
 
+/**
+ * A tower of coral at (x, z) from below the waterline up to `top`, r across at the water: knobbly all over, drawing
+ * in to a waist and swelling again into a rounded head no wider than its foot, leaning a little. Its colour deepens
+ * toward the water, with paler and violet patches.
+ */
+function coralTower(x: number, z: number, top: number, r: number, i: number, mat: THREE.Material, bottom = -10): THREE.Mesh {
+  const g = new THREE.CylinderGeometry(1, 1, 1, 14, 14), p = g.attributes.position as THREE.BufferAttribute, tall = top - bottom;
+  const lean = (jitter(i, 40) - 0.5) * 0.1 * tall, dir = jitter(i, 41) * Math.PI * 2, seed = jitter(i, 42) * 9;
+  for (let k = 0; k < p.count; k++) {
+    const u = p.getY(k) + 0.5, px = p.getX(k), pz = p.getZ(k), rr = Math.hypot(px, pz), a = Math.atan2(pz, px);
+    const knob = 0.1 * Math.sin(a * 5 + u * 9 + seed) * Math.sin(u * 17 + a * 3) + 0.06 * Math.sin(a * 11 - u * 23 + seed);
+    const waist = 1 - 0.3 * Math.sin(Math.min(1, u / 0.85) * Math.PI);
+    const w = r * waist * (1 + knob) * rr, sway = lean * u * u;
+    // the head domes over
+    const y = bottom + u * tall + (u > 0.99 ? (1 - rr * rr) * r * 0.5 : 0);
+    p.setXYZ(k, x + px * w + Math.cos(dir) * sway, y, z + pz * w + Math.sin(dir) * sway);
+  }
+  g.deleteAttribute('uv');
+  const f = g.toNonIndexed();
+  f.computeVertexNormals();
+  const pos = f.attributes.position, col = new Float32Array(pos.count * 3), c = new THREE.Color(), deep = new THREE.Color(0xb05a46);
+  const pale = new THREE.Color(0xf2b89a), bleach = new THREE.Color(0xf3dccb), violet = new THREE.Color(0xa0708f);
+  for (let v = 0; v < pos.count; v += 3) {
+    const py = pos.getY(v), u = Math.max(0, Math.min(1, (py - bottom) / tall)), patchy = Math.sin(pos.getX(v) * 0.7 + seed) * Math.sin(py * 0.45 + pos.getZ(v) * 0.6);
+    c.lerpColors(deep, pale, Math.min(1, u * 1.3));
+    if (patchy > 0.55) c.lerp(bleach, 0.6);
+    else if (patchy < -0.6) c.lerp(violet, 0.5);
+    c.multiplyScalar(0.9 + 0.2 * jitter(v, i));
+    for (let q = 0; q < 3; q++) c.toArray(col, (v + q) * 3);
+  }
+  f.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return new THREE.Mesh(f, mat);
+}
+
 /** A shape at each of the landmark's region's columns, so what a ship runs into is what she sees. */
 function columnsOf(lm: Landmark, make: (x: number, z: number, o: Obstacle, i: number) => THREE.Object3D): THREE.Group {
   const out = new THREE.Group();
@@ -237,8 +271,34 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     }
     return out;
   },
-  // the Moonbow Arch: a basalt arch over the passage
-  basaltStacks: (lm) => arch(46, lm.height, 9, rock(0x2c2e33)),
+  // the Moonbow Arch: a basalt arch over the passage, its feet in the region's two pillars, drawn as stacks of
+  // hexagonal columns 21 m across (the Arch run's channel shaves the pillars' heights into a stepped slope, which
+  // the columns stand over)
+  basaltStacks: (lm) => {
+    const out = new THREE.Group(), cols: THREE.BufferGeometry[] = [], side = new THREE.Color(), top = new THREE.Color();
+    out.add(arch(46, lm.height, 9, rock(0x2c2e33)));
+    for (const s of [-1, 1]) {
+      for (let row = -4; row <= 4; row++) {
+        for (let q = -6; q <= 6; q++) {
+          // a hex lattice whose cells the columns fill, a hair apart so their joints show
+          const x = (q + row / 2) * 2.6, z = row * 2.25, rho = Math.hypot(x, z), n = cols.length;
+          if (rho > 10.5) continue;
+          const j = (k: number) => jitter(n + (s > 0 ? 200 : 0), 60 + k), h = 58 + 6 * j(1) - (6 * Math.max(0, rho - 8)) / 2.5;
+          const g = new THREE.CylinderGeometry(1.42, 1.5, h + 12, 6, 1);
+          g.translate(s * 28 + x, (h - 12) / 2, z);
+          side.set(0x2c2e33).multiplyScalar(0.8 + 0.4 * j(2));
+          top.set(0x3d4438).multiplyScalar(0.85 + 0.3 * j(3));
+          const nm = g.attributes.normal, col = new Float32Array(nm.count * 3);
+          for (let v = 0; v < nm.count; v++) (nm.getY(v) > 0.5 ? top : side).toArray(col, v * 3);
+          g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          cols.push(g);
+        }
+      }
+    }
+    const mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true }), 'landmark-rock');
+    out.add(new THREE.Mesh(mergeGeometries(cols), mat));
+    return out;
+  },
   // the Kelp Cathedral: columns of giant kelp rising out of the shallows, one at each of the region's trunks, so what
   // a ship runs into is what she sees
   kelpShallows: (lm) => {
@@ -279,13 +339,13 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // the Great Reef: coral towers round the rim of the biggest ring, with gaps to sail in by; the tallest grow as
   // clumps of leaning branches, like antler coral, not as single columns
   coralAtolls: (lm) => {
-    const coral = rock(0xe39a7a);
+    const coral = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true }), 'landmark-rock');
     return columnsOf(lm, (x, z, o, i) => {
-      if (o.height < lm.height - 4) return column(x, z, o.height, o.r, coral);
+      if (o.height < lm.height - 4) return coralTower(x, z, o.height, o.r, i, coral);
       const clump = new THREE.Group();
       for (let b = 0; b < 5; b++) {
         const h = (lm.height - 4) * (b === 0 ? 1 : 0.45 + 0.4 * jitter(i, 10 + b)), a = b * 1.4 + jitter(i, 20 + b);
-        const branch = column(0, 0, h, b === 0 ? 4.5 : 3, coral);
+        const branch = coralTower(0, 0, h, b === 0 ? 4.5 : 3, i * 7 + b, coral);
         branch.position.set(x + Math.cos(a) * 3 * Math.min(1, b), 0, z + Math.sin(a) * 3 * Math.min(1, b));
         branch.rotation.set(Math.sin(a) * 0.08 * b, 0, -Math.cos(a) * 0.08 * b);
         clump.add(branch);

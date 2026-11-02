@@ -5,7 +5,6 @@
 // a ship whenever the sea stands high under them. Each shape stands in its spot's frame: +Y the outward normal, +Z
 // its facing, y = 0 at mean sea level.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R } from '../../sim/sphere.ts';
 import { REGION_EVENTS, REGIONS, type RegionId } from '../../sim/world/index.ts';
 import { STUMP } from '../../sim/world/regions/spires.ts';
@@ -100,29 +99,40 @@ function boulder(i: number, r: number): THREE.BufferGeometry {
   return paint(rough(g, r * 0.18, 60 + i), 0x8f5f3c, 0xb3825a);
 }
 
+/** A smooth field of lumps, about −1…1, the same at the same point every run. */
+const lumps = (x: number, y: number, z: number, seed: number) =>
+  (Math.sin(x * 0.41 + seed) * Math.sin(y * 0.37 + seed * 1.7) + Math.sin(z * 0.53 + x * 0.21 + seed * 2.3) * Math.sin(y * 0.29 - z * 0.17 + seed * 0.7)) / 2;
+
+/** The tunnel's half-width, metres: the roof's opening comes no lower than its `under` across it. */
+const TUNNEL_HALF = 6.5;
+
 /**
- * A rock roof across the tunnel along +Z: a slab of basalt from `under` metres over mean sea level up to its turf,
- * thick where it meets the plateau (−X) and thinner over the shoal (+X), on a pier of columns at each side.
+ * A rock roof across the tunnel along +Z: a natural arch of basalt springing from under the water either side and
+ * turfed on top, higher where it meets the plateau (−X) than over the shoal (+X). Its opening is a rounded arch whose
+ * crown stands 2.5 m over `under` and which comes no lower than `under` across the tunnel, as the simulation has it;
+ * the rock round it is lumpy, and its ends are broken back unevenly.
  */
 function roof(i: number, length: number, under: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
-  const slab = new THREE.BoxGeometry(26, 1, length, 6, 1, 5), p = slab.attributes.position as THREE.BufferAttribute;
+  // a box whose x runs over the arch from foot to foot, y from the opening out to the turf, and z along the tunnel
+  const g = new THREE.BoxGeometry(1, 1, 1, 36, 5, 14), p = g.attributes.position as THREE.BufferAttribute;
+  const sup = (c: number, e: number) => Math.sign(c) * Math.abs(c) ** e, seed = 3 + i * 5;
   for (let k = 0; k < p.count; k++) {
-    const x = p.getX(k) - 1, top = 23 - (9 * (x + 14)) / 26;
-    p.setXYZ(k, x, p.getY(k) > 0 ? top : under, p.getZ(k));
+    const s = p.getX(k) + 0.5, t = p.getY(k) + 0.5, w = p.getZ(k), th = Math.PI * (1 - s), c = Math.cos(th), sn = Math.abs(Math.sin(th));
+    // the opening: a rounded arch from 8 m under the sea; the outside: broader, and higher toward the plateau
+    const ia = c < 0 ? 10.5 : 9.5, ix = ia * sup(c, 2 / 3), iy = -8 + (under + 10.5) * sn ** (2 / 3);
+    const oa = c < 0 ? 15 : 13.5, ox = oa * sup(c, 0.8), oy = -8 + (27 - 3 * c) * sn ** 0.8;
+    let x = ix + (ox - ix) * t, y = iy + (oy - iy) * t, z = w * length;
+    // lumped out from the arch's middle: the opening only ever wider, the outside either way
+    const bump = lumps(x, y, z, seed), out = t * 1.4 * bump + (1 - t) * 0.8 * Math.abs(bump), d = Math.hypot(x, y + 2) || 1;
+    x += (x / d) * out;
+    y += ((y + 2) / d) * out;
+    // the ends broken back unevenly, up to 2 m in and 1 m out
+    if (Math.abs(w) > 0.49) z = Math.sign(w) * (length / 2 - 0.5 + 1.5 * lumps(x * 1.3, y * 1.3, 0, seed + 1));
+    if (t < 0.01 && Math.abs(x) <= TUNNEL_HALF + 0.5) y = Math.max(y, under);
+    p.setXYZ(k, x, y, z);
   }
-  // the underside stays where the simulation has it; only the top and the sides are broken up
-  parts.push(paint(rough(slab, 0.7, 80 + i, (_x, y) => y <= under + 0.01), 0x35353b, 0x56703c));
-  for (const s of [-1, 1]) {
-    for (let j = 0; j < 7; j++) {
-      const top = under + 1 + 2 * jitter(i * 7 + j, 20 + s), x = s * (10.5 + 1.8 * (j % 2)), z = -length / 2 + 2 + ((length - 4) * j) / 6;
-      const c = new THREE.CylinderGeometry(2.1, 2.3, top + 8, 6, 1);
-      c.rotateY(jitter(i * 7 + j, 22 + s));
-      c.translate(x, (top - 8) / 2, z);
-      parts.push(paint(c, 0x2e2e33, 0x3c3c42));
-    }
-  }
-  return mergeGeometries(parts);
+  // the opening over the tunnel stays where the simulation has it; the rest is broken up
+  return paint(rough(g, 0.45, 80 + i, (x, y) => Math.abs(x) <= TUNNEL_HALF + 1 && y < under + 3), 0x35353b, 0x56703c);
 }
 
 const easeIn = (u: number) => u * u;

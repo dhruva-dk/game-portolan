@@ -1,4 +1,4 @@
-// The Basalt Stacks: the Moonbow Blowhole. A stepped mass of black hexagonal columns under green turf, with a blowhole
+// The Basalt Stacks: the Moonbow Blowhole. A sheer stack of black hexagonal columns under green turf, with a blowhole
 // at its foot. Every few seconds the swell booms into the cave below and a column of spray bursts up out of the hole,
 // higher than the stack. The spray is phosphorescent, silver-white at night, and as its mist hangs a moonbow forms in
 // it. By day it is a plume of white spray with a rainbow. From far off: a white burst that comes and goes.
@@ -31,9 +31,12 @@ export const basaltStacks: BeaconLook = {
   build(seed) {
     const k = new Kit(seed, 'beacon:basaltStacks');
 
-    // the columns: a hex grid stepping down from a high back to a low rim round the blowhole
+    // the columns: a hex grid, a sheer-faced stack at the back over a low causeway of broken columns round the blowhole.
+    // The face and rim drop in a column or two, the top leans from one end to the other in lumps, and the columns snap
+    // off in clusters of uneven width, so the stack neither steps down in rings nor shows an even, walled top.
     const ms: THREE.Matrix4[] = [];
     const s = 1.85;
+    const lump = (x: number, z: number) => Math.sin(x * 0.45 + 1.3) * Math.sin(z * 0.38 - 0.7) + 0.5 * Math.sin(x * 0.9 - z * 0.7 + 2.1);
     for (let q = -10; q <= 10; q++) {
       for (let r = -10; r <= 10; r++) {
         const x = s * (q + r / 2), z = s * r * 0.866;
@@ -41,8 +44,13 @@ export const basaltStacks: BeaconLook = {
         if (d > 17 + k.r(-1.5, 1.5)) continue;
         const toHole = Math.hypot(x - HOLE.x, z - HOLE.z);
         if (toHole < 2.6) continue;
-        const back = THREE.MathUtils.smoothstep(-z, -6, 12);
-        let h = 2 + back * 24 * (1 - (d / 18) ** 2) + k.r(-1.2, 1.2) + (1 - THREE.MathUtils.smoothstep(d, 10, 17)) * 4;
+        const stack = THREE.MathUtils.smoothstep(-z, -1.5, 1.5) * (1 - THREE.MathUtils.smoothstep(d, 13.5, 16));
+        const top = 15 + 10 * THREE.MathUtils.smoothstep(-x, -12, 14) + 3.5 * lump(x, z) + k.r(-0.6, 0.6);
+        const low = 1.2 + 1.2 * lump(x * 1.7, z * 1.7) + k.r(0, 1.4);
+        let h = low + (top - low) * stack;
+        // clusters of columns snapped off along the face and the rim
+        const snap = lump(x * 2.1 + 4, z * 2.1 - 3);
+        if (stack < 0.97 && snap > 0.55) h = Math.max(low, h - (snap - 0.55) * 14 - k.r(0, 1.5));
         if (toHole < 5) h = Math.min(h, 2.5 + toHole * 0.6 + k.r(0, 1));
         h = Math.max(0.8, h);
         ms.push(mat4(x, -1, z, k.r(-0.03, 0.03), k.r(0, 0.2), k.r(-0.03, 0.03), [0.98, h + 1, 0.98]));

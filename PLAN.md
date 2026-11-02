@@ -1007,7 +1007,19 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 
 The banner within 240 m of a border is checked by tests/app/banner.test.ts rather than a strip: for every region, with only its event warned, the banner shows at its landmark, 120 m and 220 m past its border on up to three bearings, and not at the first point beyond with none of the region's water within 260 m.
 
-Still open from the review: the no-humans shapes and the borderline items.
+*Revision 1 of the no-humans shapes, checked in their captures:*
+- **The Basalt Stacks' tunnel roof:** each roof is now a rough natural arch, a lumpy rock vault. Its inner curve rises to the roof's 8 m clearance over the water, its outer face falls to the sea on both sides, and its ends are broken off unevenly. Turf grows over its top (src/render/regions/eventRocks.ts).
+- **The stepped stack:** this was the Moonbow Blowhole beacon, whose column heights fell away in even rings.
+  - It is now a sheer-faced stack of columns standing behind a low causeway of broken columns round the blowhole.
+  - *Revision 2:* the first reshape had a flat top with evenly snapped columns that read as battlements. Now the top leans from one end to the other in lumps, and the columns snap off in clusters of uneven width (src/render/beacons/looks/basaltStacks.ts).
+- **The Moonbow Arch's legs** stand in bundles of hexagonal columns of uneven heights, turf on their tops. The bundles also hide the shaved ground round the legs' feet.
+- **The Coral Atolls' columns** are now knobbly coral heads. Each pinches in at a waist, leans a little and domes at the top. It is painted face by face, from deep red at the foot to pale coral, with bleached and violet patches (`coralTower()` in src/render/regions/landmarks.ts).
+
+Decisions (Settled overnight in the owner's absence; the owner may change it.):
+- The ziggurat was a beacon, so it is reshaped in the beacon's own look. Its spray, blowhole and moonbow are unchanged.
+- Backlog: from 150 m the column tops still read square-cut.
+
+Still open from the review: the Blossom Run loot drum that reads as a pipe, and the borderline items.
 
 **The perks, done when each shows itself working:**
 
