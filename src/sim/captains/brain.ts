@@ -12,7 +12,7 @@ import { rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, copy, type Captain, type MatchState, type Ship } from '../state.ts';
-import { calmNow, stormView, newStormView, toEdge } from '../storm.ts';
+import { calmNow, inStorm, stormView, newStormView, toEdge } from '../storm.ts';
 import { GALE, ITEM, PARCELS, PERKS, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
@@ -34,6 +34,8 @@ export const BRAIN = {
   /** Seconds to the next look round for a new goal while roaming. */
   roam: 9,
   repath: 2,
+  /** A captain sure of this much that the player stays out in the Storm this many seconds waits for them at its edge. */
+  waits: { sure: 0.4, seconds: 3 },
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
@@ -96,7 +98,10 @@ export function think(state: MatchState, i: number): void {
   // 4. fight what it sees
   if (c.foe >= 0 && wantsFight(state, i, style, foeD)) {
     setMode(c, MODE.fight);
-    copy(c.goal, state.ships[c.foe].pos);
+    const foe = state.ships[c.foe].pos;
+    // a captain who has learnt that the player lingers out in the Storm waits at its edge for them to come back in
+    if (c.foe === PLAYER && waitsOut(c) && inStorm(state, foe)) lieInWait(foe, style.margin * 0.6, c.goal);
+    else copy(c.goal, foe);
     return;
   }
 
@@ -359,6 +364,16 @@ function roamGoal(state: MatchState, i: number, style: Style, rng: Rng): void {
 }
 
 /** A point at most `r` from the centre, along the line from p toward it. */
+const waitsOut = (c: Captain): boolean => c.storm.confidence >= BRAIN.waits.sure && c.storm.value >= BRAIN.waits.seconds;
+
+/** The water `inset` metres inside the calm's edge on the way out to p, where a ship out in the Storm comes back in. */
+function lieInWait(p: V3, inset: number, out: V3): V3 {
+  tangentToward(VIEW.calm.at, p, T);
+  along(VIEW.calm.at, T, Math.max(0, VIEW.calm.r - inset), out);
+  if (!openAt(out)) nearestOpen(out, out, 20);
+  return out;
+}
+
 function inward(p: V3, centre: V3, r: number, out: V3): V3 {
   const d = R * Math.sqrt(Math.max(0, 2 - 2 * dot(p, centre)));
   if (d <= r) return copy(out, p);

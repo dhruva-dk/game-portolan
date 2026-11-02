@@ -74,23 +74,42 @@ export class MatchTally {
   private rangeN = 0;
   private readonly byWeapon = new Map<string, number>();
   private clock = 0;
+  /** The player's stretches out in the Storm, in seconds, the one under way, and seconds afloat since it began to close. */
+  private readonly caught: number[] = [];
+  private out = 0;
+  private closed = 0;
+  /** The player's hull each time they began to mend below 90, the simulation's own measure of when they break off. */
+  private readonly mended: number[] = [];
 
   constructor(count: number) {
     this.ships = Array.from({ length: count }, () => ({ kills: 0, damage: 0, survived: 0, regions: new Set<number>(), sunkBy: -1, sunkAt: -1 }));
   }
 
-  /** Called once a second of match time with every ship's position (unit vector) and whether it floats. */
-  sample(seconds: number, ships: readonly { pos: V3; afloat: boolean }[]): void {
+  /**
+   * Called once a second of match time with every ship's position (unit vector) and whether it floats, and with the
+   * Storm as the player meets it: whether it has begun to close, and whether the player's ship is out in it.
+   */
+  sample(seconds: number, ships: readonly { pos: V3; afloat: boolean }[], storm?: { closing: boolean; outside: boolean }): void {
     this.clock = seconds;
     ships.forEach((s, i) => {
       if (!s.afloat) return;
       this.ships[i].survived = seconds;
       this.ships[i].regions.add(regionAt(s.pos));
     });
+    if (!storm || !ships[0]?.afloat) return;
+    if (storm.closing) this.closed++;
+    if (storm.outside) this.out++;
+    else if (this.out > 0) {
+      this.caught.push(this.out);
+      this.out = 0;
+    }
   }
 
-  /** Reads one moment; `posOf(i)` gives ship i's position in metres, for the range of the player's hits. */
-  observe(m: Moment, posOf: (i: number) => V3): void {
+  /**
+   * Reads one moment; `posOf(i)` gives ship i's position in metres, for the range of the player's hits, and `hullOf(i)`
+   * its hull, for when the player turns to mend.
+   */
+  observe(m: Moment, posOf: (i: number) => V3, hullOf: (i: number) => number = () => 100): void {
     switch (m.k) {
       case 'hit':
         if (m.by >= 0 && m.by !== m.ship) {
@@ -114,6 +133,9 @@ export class MatchTally {
       }
       case 'galeDive':
         if (m.ship === 0) this.drop = m.region;
+        return;
+      case 'useStart':
+        if (m.ship === 0 && hullOf(0) < 90) this.mended.push(hullOf(0));
         return;
       default:
         return;
@@ -147,9 +169,18 @@ export class MatchTally {
     let best: string | null = null, most = 0;
     for (const [w, d] of this.byWeapon) if (d > most) { most = d; best = w; }
     const weapon = best === null ? -1 : (CAREER_WEAPONS as readonly string[]).indexOf(best);
+    // the Storm, in the simulation's own measure: seconds out in it each time it caught them (a stretch that ends in
+    // sinking counts); 0 when it closed on them for a minute or more and never caught them
+    const caught = this.out > 0 ? [...this.caught, this.out] : this.caught;
+    const storm = caught.length ? Math.round(caught.reduce((a, b) => a + b, 0) / caught.length) : this.closed >= 60 ? 0 : null;
+    // breaking off: their hull when they turned to mend; 0 when a ship sank them and they never did
+    const me = this.ships[0];
+    const runAt = this.mended.length ? Math.round(this.mended.reduce((a, b) => a + b, 0) / this.mended.length) : me && me.sunkBy >= 0 ? 0 : null;
     return {
       ...NO_HABITS,
       drop: this.drop,
+      runAt,
+      storm,
       range: this.rangeN ? Math.round(this.rangeSum / this.rangeN) : null,
       weapon: weapon >= 0 ? weapon : null,
     };

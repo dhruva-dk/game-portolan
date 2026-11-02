@@ -19,7 +19,7 @@ export {
   COSMETICS, COSMETIC_KINDS, LOOK_KINDS, STARTER_LOOK, cosmetic, cosmeticsOf, isUnlocked, type Cosmetic, type CosmeticKind, type Look, type Unlock,
 } from './cosmetics.ts';
 export { FLEET_SIZE, RIVAL_AT, drawCaptains, planMatch, rivalry } from './fleet.ts';
-export { CARD, NO_HABITS, WEAPON_CLASSES, type Expect, type Knowledge, type PlayerHabits, type WeaponClass } from './habits.ts';
+export { CARD, LEARNING, NO_HABITS, WEAPON_CLASSES, type Expect, type Knowledge, type PlayerHabits, type WeaponClass } from './habits.ts';
 export { ABILITY_LEVEL, ABILITY_ORDER, MATCH_XP, levelOf, xpAt, xpToNext, type LevelProgress, type XpPart } from './levels.ts';
 export { RANKS, RANK_STEP, TIER, TIERS, rankOf, type Rank, type RankStep } from './ranks.ts';
 export { SKILL } from './rating.ts';

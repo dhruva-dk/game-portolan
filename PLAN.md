@@ -899,7 +899,7 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
   - gust, and use the ability;
   - call a gull delivery;
   - pick a region in the Gale, and dive.
-- **The captains' Storm habit is learnt in the simulation's own units,** and `setupFrom` keeps it.
+- **The captains' Storm habit is learnt in the simulation's own units,** and `setupFrom` keeps it. *Done: the career and the simulation both keep it as the seconds the player stays out in the Storm each time it catches them. `setupFrom` carries it, and the run habit, into the match on the simulation's 0–1 confidence scale (it had been passing the career's 0–1000). The app now measures the run habit too, which it never had. A captain sure the player lingers waits for them just inside the edge (tests/sim/captains.test.ts, tests/app/habits.test.ts).*
 - **The Gale spreads out:**
   - At the moment each captain leaves the Gale, no more than 3 ships are within 100 m of it.
   - No region gets more than a quarter of the captains' picks in a match.
@@ -1182,7 +1182,6 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 - Ram damage stacks with ram-boosting passives to about 87 in one hit. It needs a cap.
 - Landmarks aren't collidable yet. Ships sail through their shapes.
 - The throttle is always 1 on touch: there's no way to slow down.
-- The captains' storm habit is learnt in different units from the ones the simulation uses. `setupFrom` drops it for now.
 - The Gale fleet bunches up on the way across. Spread the captains' dive picks.
 - A Gale pick inside 600 m of the ship leaves the Gale at once.
 - Most of the fixture rivals are tagged Rival. Use a realistic spread.

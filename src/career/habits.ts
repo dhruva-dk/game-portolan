@@ -6,8 +6,8 @@ import { REGION_COUNT, REGIONS } from '../sim/world/index.ts';
 
 export const LEARNING = { learn: 40, fade: 15, known: 500, full: 1000 } as const;
 
-/** Bin edges: hull % when you break off, metres you keep from the Storm's edge, metres you fight at. */
-export const BINS = { run: [30, 60], storm: [0, 20], range: [80, 160] } as const;
+/** Bin edges: hull % when you break off, seconds you stay out in the Storm each time, metres you fight at. */
+export const BINS = { run: [30, 60], storm: [3, 10], range: [80, 160] } as const;
 
 export const WEAPON_CLASSES = ['cannon', 'harpoon', 'mortar', 'repeater', 'scatter', 'broadside'] as const;
 export type WeaponClass = (typeof WEAPON_CLASSES)[number];
@@ -21,7 +21,10 @@ export interface PlayerHabits {
   drop: number | null;
   /** Hull % when the player broke off a fight; 0 when they fought on to the end. */
   runAt: number | null;
-  /** Average metres the player kept inside the safe zone's edge while near it; negative inside the Storm. */
+  /**
+   * Average seconds the player stayed out in the Storm each time they were caught in it, the simulation's own measure
+   * (learning.ts); 0 when the Storm closed on them and they never let it catch them.
+   */
   storm: number | null;
   /** Average metres the player's hits landed at. */
   range: number | null;
@@ -96,7 +99,7 @@ export interface Knowledge {
   drop: Expect;
   /** Hull % at which the player runs; 0 means they stand and fight. */
   runAt: Expect;
-  /** Metres the player keeps from the Storm's edge. */
+  /** Seconds the player stays out in the Storm each time it catches them. */
   storm: Expect;
   /** Metres the player likes to fight at. */
   range: Expect;
@@ -135,7 +138,7 @@ const where = (r: number): string => REGIONS[r].name;
 export const CARD = {
   drop: (r: number): string => `Has learned you dive into ${where(r)}.`,
   run: ['Has learned you run only when nearly sunk.', 'Has learned you run when half wrecked.', 'Has learned you run at the first hit.', 'Has learned you stand and fight.'],
-  storm: ['Has learned you linger in the Storm.', 'Has learned you skirt the Storm’s edge.', 'Has learned you run early from the Storm.'],
+  storm: ['Has learned you run early from the Storm.', 'Has learned you skirt the Storm’s edge.', 'Has learned you linger in the Storm.'],
   range: ['Has learned you fight up close.', 'Has learned you fight at middle range.', 'Has learned you fight from long range.'],
   weapon: (k: number): string => `Has learned you favour the ${WEAPON_NAMES[k]}.`,
   grudge: ['Remembers you sank it, and hunts you.', 'Sunk by you twice running, it hunts you hard.', 'Sunk by you again and again, it hunts you hardest.'],

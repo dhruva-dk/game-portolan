@@ -5,13 +5,13 @@
 // Steering follows the camera: the player turns the look, and the stick says which way to sail relative to it. With no
 // look for a moment the view swings back behind the ship, so the keys alone still sail her round. The guns aim along
 // the look, as far as its pitch reaches, and lock onto a ship close to that line.
-import { captainIndex, CAPTAINS, type MatchPlan, type TemperamentId } from '../career/index.ts';
+import { captainIndex, CAPTAINS, LEARNING, type Expect, type MatchPlan, type TemperamentId } from '../career/index.ts';
 import type { AmbienceMix, RegionId } from '../audio/index.ts';
 import type { ActorsView, CosmeticIds, LootView, ProjectileView, ShipView, WhaleView } from '../render/actors/index.ts';
 import type { StageView, WeatherSystem } from '../render/stage.ts';
 import { sink, settle } from '../sim/end.ts';
 import {
-  CAUSE, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, matchHash, newStormView,
+  CAUSE, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
@@ -41,6 +41,9 @@ export interface PlayOptions {
   script?: [number, Partial<ShipInput>][];
 }
 
+/** The career's expectation (confidence 0 to LEARNING.full) as the simulation keeps it (confidence 0 to 1). */
+const sure = (e: Expect): Expect => ({ value: e.value, confidence: Math.min(1, e.confidence / LEARNING.full) });
+
 /** The simulation's setup for the career's plan: the player as ship 0, the plan's captains as ships 1 to 19. */
 export function setupFrom(plan: MatchPlan, seed = plan.seed): MatchSetup {
   const fleet: FleetEntry[] = [{ captain: false, name: 0, look: 0, active: plan.player.active, passive: plan.player.passive }];
@@ -49,10 +52,11 @@ export function setupFrom(plan: MatchPlan, seed = plan.seed): MatchSetup {
     fleet.push({
       captain: true, name: k + 1, look: Math.max(0, captainIndex(e.captain)), temperament: STYLE[e.temperament], skill: e.skill,
       gentle: e.gentle, active: e.active, passive: e.passive,
-      // what it learnt of the player: where they dive and when they run (its storm habit is in other units)
+      // what it learnt of the player: where they dive, when they run and how long they stay out in the Storm
       mind: {
-        ...(knows.drop.value >= 0 ? { dive: { ...knows.drop } } : {}),
-        ...(knows.runAt.value > 0 ? { run: { ...knows.runAt } } : {}),
+        ...(knows.drop.value >= 0 ? { dive: sure(knows.drop) } : {}),
+        ...(knows.runAt.value > 0 ? { run: sure(knows.runAt) } : {}),
+        ...(knows.storm.value >= 0 ? { storm: sure(knows.storm) } : {}),
       },
     });
   });
@@ -214,7 +218,7 @@ export class Session implements Stepper {
     this.buf.length = 0;
     momentsOf(s, this.buf);
     for (const m of this.buf) {
-      this.tally.observe(m, (i) => metres(s.ships[i].pos));
+      this.tally.observe(m, (i) => metres(s.ships[i].pos), (i) => s.ships[i].hull);
       if (m.k === 'hit' && m.ship === this.watch && !m.steady && m.shield + m.hull > 0) this.hurtTick = s.tick;
       // the player's own wreck stays in view until they choose to spectate
       if (m.k === 'sink' && m.ship === this.watch && m.ship !== PLAYER) this.rewatch(m.by);
@@ -223,7 +227,10 @@ export class Session implements Stepper {
   }
 
   private sample(): void {
-    this.tally.sample(this.seconds, this.state.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })));
+    const s = this.state;
+    stormView(s, STORM);
+    const storm = { closing: STORM.calm.r < ZONES[0] - 1, outside: s.ships[PLAYER].phase === PHASE.sea && inStorm(s, s.ships[PLAYER].pos) };
+    this.tally.sample(this.seconds, s.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })), storm);
   }
 
   /** Spectating once the player's ship has sunk: watch the ship that sank it, or else the one afloat with the most kills. */

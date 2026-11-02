@@ -196,4 +196,4 @@ export function loadTextures(base: string): ActorTextures {
 }
 
 /** Where the public textures live: the site root in development, beside the page in a build. */
-export const TEX_BASE = import.meta.env.DEV ? '/tex/' : 'tex/';
+export const TEX_BASE = import.meta.env?.DEV ? '/tex/' : 'tex/';

@@ -37,15 +37,15 @@ test('learning moves 40% of the way each match together and fades 15% each match
 
 test('a habit is known within five matches together and forgotten within five after the player changes it', () => {
   let c = applyMatch(newCareer(7), scriptedReport(planMatch(newCareer(7)), 10)).career;
-  const habit = habits({ drop: 2, runAt: 70, storm: -10, range: 200, weapon: 4 });
+  const habit = habits({ drop: 2, runAt: 70, storm: 20, range: 200, weapon: 4 });
   for (let k = 0; k < 5; k++) c = applyMatch(c, scriptedReport(planMatch(c), 10, {}, habit)).career;
   assert.ok(knowing(c, (f) => sure(f.knows.drop, 2) && sure(f.knows.weapon, 4)) >= 5);
-  assert.ok(knowing(c, (f) => sure(f.knows.runAt, 70) && sure(f.knows.storm, -10) && sure(f.knows.range, 200)) >= 5);
-  const changed = habits({ drop: 6, runAt: 0, storm: 30, range: 50, weapon: 0 });
+  assert.ok(knowing(c, (f) => sure(f.knows.runAt, 70) && sure(f.knows.storm, 20) && sure(f.knows.range, 200)) >= 5);
+  const changed = habits({ drop: 6, runAt: 0, storm: 0, range: 50, weapon: 0 });
   for (let k = 0; k < 5; k++) c = applyMatch(c, scriptedReport(planMatch(c), 10, {}, changed)).career;
   for (const r of c.captains) {
     const h = r.habits;
-    assert.ok(h.drop[2] < LEARNING.known && h.weapon[4] < LEARNING.known && h.run[2] < LEARNING.known && h.storm[0] < LEARNING.known && h.range[2] < LEARNING.known);
+    assert.ok(h.drop[2] < LEARNING.known && h.weapon[4] < LEARNING.known && h.run[2] < LEARNING.known && h.storm[2] < LEARNING.known && h.range[2] < LEARNING.known);
   }
   assert.ok(knowing(c, (f) => sure(f.knows.drop, 6) && sure(f.knows.runAt, 0) && sure(f.knows.weapon, 0)) >= 5);
   assert.ok(c.profile.drop[6] >= LEARNING.known && c.profile.drop[2] < LEARNING.known, 'your own profile follows you too');
