@@ -191,11 +191,19 @@ export function regionHeight(ri: number, p: V3): number {
 
 // ---------------------------------------------------------------------------------------------------------
 // Blending. Every region whose border is within 2·BLEND of chord distance takes part. Each region's weight w
-// is 1 at its own border and inside it, falling to 0 a band's width into the neighbour; its landforms sink by
-// FADE·(1-w)³ as they cross, and the highest wins (smoothly). So both regions' shapes reach across the band
-// and mix there, and the height is continuous everywhere, including where three regions meet.
+// is 1 at its own border and inside it, falling to 0 a band's width into the neighbour; its landforms sink as
+// they cross, and the highest wins (smoothly). So both regions' shapes reach across the band and mix there,
+// and the height is continuous everywhere, including where three regions meet.
 
-const FADE = 300;
+/**
+ * How far a region's landforms have sunk s chord-metres past its border (about 2 m of s to a metre of ground).
+ * They ease in over the first 20 m, then slope down at most 1.5 m a metre, like a steep shore rather than a wall
+ * along the border, and only the last 15 m drop away fast, to bury whatever is still standing.
+ */
+function sink(s: number): number {
+  const x = s / 2, u = smoothstep(0.75 * 2 * BLEND, 2 * BLEND, s);
+  return 1.5 * (x < 20 ? (x * x) / 40 : x - 10) + 300 * u * u * u;
+}
 const CHORD = new Float64Array(REGION_COUNT);
 
 /** Blend weights at p, one per region, summing to 1. For blending materials, water and sound at borders. */
@@ -226,8 +234,7 @@ function blended(p: V3): number {
   for (let i = 0; i < REGION_COUNT; i++) {
     const s = R * (CHORD[i] - m);
     if (s >= 2 * BLEND) continue;
-    const u = smoothstep(0, 2 * BLEND, s), k = CHARTS[i];
-    const term = SPECS[i].height(R * dot(p, k.e), R * dot(p, k.n)) - FADE * u * u * u;
+    const k = CHARTS[i], term = SPECS[i].height(R * dot(p, k.e), R * dot(p, k.n)) - sink(s);
     h = h === -1e9 ? term : smax(h, term, 3);
   }
   return h;

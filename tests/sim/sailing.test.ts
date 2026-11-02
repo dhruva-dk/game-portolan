@@ -13,7 +13,7 @@ import { seen, SEEN, sightOf } from '../../src/sim/visibility.ts';
 import { brew, newSky, skyAt } from '../../src/sim/weather.ts';
 import { newWind, windAt } from '../../src/sim/wind.ts';
 import {
-  CENTRES, CURRENTS, DRAFT, GREAT_CURRENT, REGIONS, TIDE_AMPLITUDE, currentAt, heightAt, navigable, regionAt,
+  CENTRES, CURRENTS, DRAFT, GREAT_CURRENT, REGIONS, TIDE_AMPLITUDE, VORTEX, currentAt, heightAt, navigable, regionAt,
 } from '../../src/sim/world/index.ts';
 import { events, openWater, place, quietMatch, run, sailOn, type Course } from './fixture.ts';
 
@@ -176,6 +176,31 @@ test('she rides the currents: a held ship drifts with a lane, and east with the 
   const east = dot(sub(v3(), eq.ships[G].pos, start), E) * R;
   t.diagnostic(`the Great Current carried her ${east.toFixed(1)} m east in 3 s`);
   assert.ok(east > 0.5 * GREAT_CURRENT.speed * 3, 'east at half its speed or better');
+});
+
+test('the Maelstrom\'s whirlpool spirals a held ship in toward the Eye', (t) => {
+  const state = quietMatch(), P = v3(), T = v3(), E = v3(), N = v3();
+  let start: V3 | null = null;
+  for (let b = 0; b < 2 * Math.PI && !start; b += 0.1) {
+    along(VORTEX.pos, tangentAt(VORTEX.pos, b, T), 0.8 * VORTEX.r, P);
+    if (deep(P) && clearOfShips(state, P, 120)) start = v3(P.x, P.y, P.z);
+  }
+  assert.ok(start, 'deep water in the basin, clear of the fleet');
+  place(state, G, { pos: start, head: tangentAt(start, 0, v3()) });
+  // How far round the Eye she goes, from her bearing as seen from it.
+  localFrame(VORTEX.pos, E, N);
+  const bearing = (p: V3): number => Math.atan2(dot(p, E), dot(p, N));
+  let swept = 0, was = bearing(start), closest = apart(start, VORTEX.pos);
+  run(state, 120, () => null, (s) => {
+    const p = s.ships[G].pos, b = bearing(p);
+    swept += Math.atan2(Math.sin(b - was), Math.cos(b - was));
+    was = b;
+    closest = Math.min(closest, apart(p, VORTEX.pos));
+  });
+  const turn = Math.abs(swept) * (180 / Math.PI);
+  t.diagnostic(`from ${apart(start, VORTEX.pos).toFixed(0)} m out she went ${turn.toFixed(0)}° round and came within ${closest.toFixed(0)} m of the Eye in 120 s`);
+  assert.ok(turn >= 180, 'round the Eye as she goes in, not straight at it');
+  assert.ok(closest < 2 * VORTEX.eye, 'in to the calm round the Eye');
 });
 
 test('the gust: two charges, a burst of speed and a hop, each charge back after 6.5 s', (t) => {

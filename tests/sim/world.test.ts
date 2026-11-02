@@ -5,20 +5,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PI, dot, rngFloat, rngFrom, v3, type V3 } from '../../src/sim/math.ts';
-import { R, TERRITORY, along, cellDir, cellOf, fromLatLon, horizonDistance, neighbor, surfaceDistance, tangentAt } from '../../src/sim/sphere.ts';
+import { PI, cross, dot, normalize, rngFloat, rngFrom, v3, type Rng, type V3 } from '../../src/sim/math.ts';
+import {
+  R, TERRITORY, along, cellDir, cellOf, fromLatLon, horizonDistance, neighbor, surfaceDistance, tangentAt, tangentToward,
+} from '../../src/sim/sphere.ts';
 import { SHIP } from '../../src/sim/tables.ts';
 import {
   BEACONS, BLEND, CENTRES, CURRENTS, GREAT_CURRENT, LANDMARKS, LOOT_SPOTS, REGIONS, REGION_COUNT, TIDAL_PASSAGES, TIDE_AMPLITUDE, ZONE,
-  bakeHeights, currentAt, heightAt, navigable, obstacleAt, regionAt, regionIndex, regionMix, regionWeights, zonesAt, type RegionId,
+  bakeHeights, currentAt, heightAt, heightExact, navigable, obstacleAt, regionAt, regionHeight, regionIndex, regionMix, regionWeights,
+  zonesAt, type RegionId,
 } from '../../src/sim/world/index.ts';
 
 bakeHeights();
 
 const rng = rngFrom(0x5eed);
-function anywhere(out: V3): V3 {
+function anywhere(out: V3, r: Rng = rng): V3 {
   for (;;) {
-    const x = rngFloat(rng) * 2 - 1, y = rngFloat(rng) * 2 - 1, z = rngFloat(rng) * 2 - 1, l = x * x + y * y + z * z;
+    const x = rngFloat(r) * 2 - 1, y = rngFloat(r) * 2 - 1, z = rngFloat(r) * 2 - 1, l = x * x + y * y + z * z;
     if (l > 0.01 && l <= 1) {
       const s = 1 / Math.sqrt(l);
       out.x = x * s;
@@ -153,21 +156,24 @@ test('each region\'s terrain comes from its own module', () => {
   assert.equal(bodies.size, REGION_COUNT);
 });
 
+// What breaks up open water: land, shallows, cover or loot. And the current lanes, which count as something.
+const loot = (p: V3): boolean => {
+  for (const s of LOOT_SPOTS) if (dot(p, s.pos) > 1 - (15 * 15) / (2 * R * R)) return true;
+  return false;
+};
+const something = (p: V3): boolean =>
+  heightAt(p) > -4 || (zonesAt(p) & (ZONE.kelp | ZONE.mist | ZONE.canopy | ZONE.curtain)) !== 0 || obstacleAt(p) >= 0 || loot(p);
+const FLOW = v3();
+const lane = (p: V3, over = 0.3): boolean => {
+  currentAt(p, FLOW);
+  return Math.hypot(FLOW.x, FLOW.y, FLOW.z) > over;
+};
+
 // The longest straight run with nothing on it, by region: outside the lanes, from a sea point in a random
 // direction, the distance until land, shallows, cover or loot.
 const GAPS = new Array<number>(REGION_COUNT).fill(0);
 {
-  const P = v3(), T = v3(), Q = v3(), C = v3();
-  const loot = (p: V3): boolean => {
-    for (const s of LOOT_SPOTS) if (dot(p, s.pos) > 1 - (15 * 15) / (2 * R * R)) return true;
-    return false;
-  };
-  const something = (p: V3): boolean =>
-    heightAt(p) > -4 || (zonesAt(p) & (ZONE.kelp | ZONE.mist | ZONE.canopy | ZONE.curtain)) !== 0 || obstacleAt(p) >= 0 || loot(p);
-  const lane = (p: V3): boolean => {
-    currentAt(p, C);
-    return Math.hypot(C.x, C.y, C.z) > 0.3;
-  };
+  const P = v3(), T = v3(), Q = v3();
   for (let k = 0; k < 2500; k++) {
     anywhere(P);
     if (!navigable(P)) continue;
@@ -209,6 +215,111 @@ test('neighbours blend across a band at least 100 m wide, where both weigh in', 
       `on the ${name(M.a)}–${name(M.b)} border: ${W[M.a].toFixed(2)} / ${W[M.b].toFixed(2)}, a third weighs ${third.toFixed(2)}`);
   }
   assert.ok(checked > 500, `only ${checked} border points sampled`);
+});
+
+// Lines across every border, away from the lanes, whose channels are carved on purpose with banks 40 m beyond the
+// current: from a point on the border, 60 m into each side along the way between the two regions' centres, a
+// metre a step. Up to 40 a border, drawn from their own seed so the other tests' draws don't move.
+interface Transect { a: number; b: number; pts: V3[] }
+const TRANSECTS: Transect[] = [];
+const carved = (p: V3): boolean => Math.abs(p.y) * R < GREAT_CURRENT.fade + 45 ||
+  CURRENTS.some((l) => dot(p, l.centre) >= l.cos && l.pts.some((q) => surfaceDistance(p, q) < l.width / 2 + 45));
+{
+  const r = rngFrom(0xb0d0), P = v3(), D = v3(), M = { a: 0, b: 0, t: 0 }, count = new Map<string, number>();
+  for (let k = 0; k < 400_000; k++) {
+    anywhere(P, r);
+    regionMix(P, M);
+    if (M.t < 0.495) continue;
+    const key = `${Math.min(M.a, M.b)}-${Math.max(M.a, M.b)}`;
+    if ((count.get(key) ?? 0) >= 40) continue;
+    tangentToward(P, CENTRES[M.b], D);
+    const pts: V3[] = [];
+    for (let x = -BLEND; x <= BLEND; x++) pts.push(along(P, D, x, v3()));
+    if (pts.some(carved)) continue;
+    count.set(key, (count.get(key) ?? 0) + 1);
+    TRANSECTS.push({ a: M.a, b: M.b, pts });
+  }
+}
+const border = (a: number, b: number): string => `${name(Math.min(a, b))}–${name(Math.max(a, b))}`;
+
+test('across every border the blend raises no ridge, digs no trench and stands no wall', (t) => {
+  const W = new Float64Array(REGION_COUNT), own = new Float64Array(REGION_COUNT), was = new Float64Array(REGION_COUNT);
+  let steepest = 0, where = '';
+  for (const { a, b, pts } of TRANSECTS) {
+    was.fill(NaN);
+    let before = 0;
+    pts.forEach((q, j) => {
+      const h = heightExact(q);
+      regionWeights(q, W);
+      let top = -Infinity, slope = 0;
+      for (let i = 0; i < REGION_COUNT; i++) {
+        own[i] = W[i] > 0 ? regionHeight(i, q) : NaN;
+        if (W[i] > 0) top = Math.max(top, own[i]);
+        if (!Number.isNaN(own[i]) && !Number.isNaN(was[i])) slope = Math.max(slope, Math.abs(own[i] - was[i]));
+      }
+      const home = own[regionAt(q)];
+      // the highest landform wins, smoothly: never more than a metre and a half over the tallest of them
+      assert.ok(h <= top + 1.5, `${border(a, b)}: ${h.toFixed(1)} m stands over every region's own ground (${top.toFixed(1)} m)`);
+      // and never under the ground of the region it is in
+      assert.ok(h >= home - 0.01, `${border(a, b)}: ${h.toFixed(1)} m sinks under ${name(regionAt(q))}'s own ${home.toFixed(1)} m`);
+      if (j > 0 && Math.abs(h - before) - slope > steepest) {
+        steepest = Math.abs(h - before) - slope;
+        where = `${border(a, b)}, ${j - BLEND} m from the border at ${h.toFixed(1)} m`;
+      }
+      before = h;
+      was.set(own);
+    });
+  }
+  t.diagnostic(`${TRANSECTS.length} lines across the borders; the blend's steepest addition: ${steepest.toFixed(2)} m a metre, on the ${where}`);
+  // a steep shore, not a wall: at most 2 m a metre steeper than the regions' own ground
+  assert.ok(steepest <= 2, `a wall on the ${where}: ${steepest.toFixed(2)} m a metre steeper than either side's own ground`);
+});
+
+test('on every border the landforms reach across and mix, rather than meet at a seam', (t) => {
+  // Ground 4–40 m into one side raised by the other side's landform: higher than its own region's ground, and near
+  // enough the surface to see. Where one side's ground already stands higher (the Mangrove's flats against the
+  // Maelstrom's deep water), only the other side's reaches over.
+  const reach = new Map<string, number>(), seen = new Map<string, number>(), ways = new Map<string, Set<string>>();
+  for (const { a, b, pts } of TRANSECTS) {
+    const key = border(a, b);
+    pts.forEach((q, j) => {
+      const x = j - BLEND;
+      if (Math.abs(x) < 4 || Math.abs(x) > 40) return;
+      const [here, there] = x < 0 ? [a, b] : [b, a], h = heightExact(q);
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+      if (h > -10 && h > regionHeight(here, q) + 1 && regionHeight(there, q) >= h - 1.5) {
+        reach.set(key, (reach.get(key) ?? 0) + 1);
+        ways.set(key, (ways.get(key) ?? new Set()).add(name(there)));
+      }
+    });
+  }
+  const share = [...seen].map(([k, n]) => [k, (reach.get(k) ?? 0) / n] as const).sort((x, y) => x[1] - y[1]);
+  const both = [...ways].filter(([, w]) => w.size === 2).length;
+  t.diagnostic(`${seen.size} borders; ${both} reach both ways; the least mixed: ${share.slice(0, 5).map(([k, f]) => `${k} ${(100 * f).toFixed(1)}%`).join(', ')}`);
+  assert.deepEqual(share.filter(([, f]) => f < 0.02).map(([k]) => k), []);
+});
+
+test('no border is a long flat strip of open water', (t) => {
+  // Along each border from the middle of every line across it, both ways until another region takes over.
+  const T = v3(), Q = v3(), M = { a: 0, b: 0, t: 0 }, longest = new Map<string, number>();
+  for (const { a, b, pts } of TRANSECTS) {
+    const P = pts[BLEND];
+    normalize(cross(T, P, pts[BLEND + 1]));
+    for (const dir of [1, -1]) {
+      let gap = 0;
+      for (let s = 3; s <= 600; s += 3) {
+        along(P, T, dir * s, Q);
+        regionMix(Q, M);
+        if (Math.min(M.a, M.b) !== Math.min(a, b) || Math.max(M.a, M.b) !== Math.max(a, b)) break;
+        gap = !navigable(Q) || something(Q) || lane(Q) ? 0 : gap + 3;
+        const k = border(a, b);
+        if (gap > (longest.get(k) ?? 0)) longest.set(k, gap);
+      }
+    }
+  }
+  const worst = [...longest].sort((x, y) => y[1] - x[1]);
+  t.diagnostic(`longest open water along a border: ${worst.slice(0, 5).map(([k, g]) => `${k} ${g} m`).join(', ')}`);
+  assert.deepEqual(worst.filter(([, g]) => g > 217).map(([k]) => k), []);
 });
 
 test('the Great Current is a closed loop round the equator that every ring region touches', () => {

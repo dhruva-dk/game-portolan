@@ -69,8 +69,9 @@ function height(x: number, y: number): number {
       return d > 34 ? -1e9 : d < 0 ? needle(d + r, r, 2 + (s.b > 0.7 ? 18 : 6) * s.c) : shore(d, 0, 1, 1.5, 6);
     }, (cx, cy) => hyp(cx, cy) < RING.r + 48 || polyDist(cx, cy, LANE) < 30);
   }
-  // Shoals across the open water, so no straight course runs empty for long.
-  return shoals(x, y, h, 140, S + 40);
+  // Shoals across the open water outside the ring, so no straight course runs empty for long. The basin stays a
+  // clean bowl, and its current is something to meet anyway.
+  return mix(h, shoals(x, y, h, 140, S + 40), smoothstep(RING.r + 10, RING.r + 40, rho));
 }
 
 export const maelstrom: RegionSpec = {
