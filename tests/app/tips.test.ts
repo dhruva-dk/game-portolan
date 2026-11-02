@@ -1,11 +1,19 @@
-// First-time tips: each shows once ever and one at a time, the saved list survives a broken save, and a real match
+// First-time tips: each shows once ever and one at a time, the saved list survives a broken save and is written and
+// read back, every tip comes up through its own trigger, and a real match
 // offers the Gale's tip on the Gale and the starter weapon's once the ship has settled at sea.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Intents } from '../../src/app/controls.ts';
 import type { Moment } from '../../src/app/events.ts';
 import { Session } from '../../src/app/session.ts';
-import { TIPS, Tips, parseSeen, type TipId } from '../../src/app/tips.ts';
+import { TIPS, TIPS_KEY, Tips, parseSeen, type TipId } from '../../src/app/tips.ts';
+import { MOMENTS } from '../../src/app/moments.ts';
+import { isNight, localHour, seaLevelAt } from '../../src/sim/environment.ts';
+import { openAt } from '../../src/sim/nav.ts';
+import { R, TERRITORY, cellOf } from '../../src/sim/sphere.ts';
+import { PLAYER, WEATHER_KIND, WEATHER_NAMES } from '../../src/sim/match.ts';
+import { TIDE, WEATHER } from '../../src/sim/tables.ts';
+import { REGIONS } from '../../src/sim/world/index.ts';
 import { newCareer } from '../../src/career/career.ts';
 import { planMatch } from '../../src/career/fleet.ts';
 import { PHASE, TICK } from '../../src/sim/state.ts';
@@ -85,4 +93,116 @@ test('the weapon tip names the weapon held, and moments offer theirs only for th
   const after = ride(s, t, 40);
   assert.ok(after.includes('storm'), 'the Storm\'s tip comes up in turn');
   assert.ok(!after.includes('shot'), 'not the shot tip for someone else\'s shot');
+});
+
+/** The browser's storage as a map, put in place of `localStorage` while `run` runs. */
+function withStorage(saved: string | null, run: (store: Map<string, string>) => void): void {
+  const store = new Map<string, string>(saved === null ? [] : [[TIPS_KEY, saved]]);
+  const fake = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, String(v)),
+    removeItem: (k: string) => void store.delete(k),
+  };
+  const before = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', { value: fake, configurable: true, writable: true });
+  try {
+    run(store);
+  } finally {
+    if (before) Object.defineProperty(globalThis, 'localStorage', before);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
+}
+
+test('the tips seen are written to storage, read back by the next visit, and cleared by forgetting them', () => {
+  withStorage(null, (store) => {
+    const s = session(11), first = new Tips(false);
+    assert.equal(first.update(s, TICK)?.id, 'gale');
+    assert.deepEqual(JSON.parse(store.get(TIPS_KEY)!), ['gale'], 'written as soon as it shows');
+    const next = new Tips(false);
+    assert.deepEqual(next.shown, ['gale'], 'read back on the next visit');
+    assert.equal(next.update(session(12), TICK), null, 'and not shown again');
+    next.forget();
+    assert.deepEqual(JSON.parse(store.get(TIPS_KEY)!), [], 'forgetting clears the save');
+    assert.equal(new Tips(false).update(session(13), TICK)?.id, 'gale', 'so it shows again');
+  });
+});
+
+/** Puts the player where the tide, falling now, will shut water near her within the tip's look ahead. */
+function onAFallingTide(s: Session): void {
+  const probe = new Tips(true) as unknown as { closing(t: number, p: { x: number; y: number; z: number }): boolean };
+  // the tide falls fastest a half period after its high water
+  const tick = Math.round(TIDE.period / 2 / TICK), p = { x: 0, y: 0, z: 0 }, n = 40000;
+  for (let i = 0; i < n; i++) {
+    // a spiral of points over the whole planet
+    const y = 1 - (2 * (i + 0.5)) / n, r = Math.sqrt(1 - y * y), a = i * 2.399963229728653;
+    p.x = Math.cos(a) * r; p.y = y; p.z = Math.sin(a) * r;
+    if (!openAt(p, seaLevelAt(tick * TICK)) || !probe.closing(tick * TICK, p)) continue;
+    s.state.tick = tick;
+    s.me.pos.x = p.x; s.me.pos.y = p.y; s.me.pos.z = p.z;
+    return;
+  }
+  throw new Error('no water anywhere the falling tide shuts');
+}
+
+/** What brings each tip up, done to the player once she has settled at sea (the Gale's needs only the Gale). */
+const TRIGGER: Record<string, (s: Session, t: Tips) => void> = {
+  gale: () => {},
+  weapon: () => {},
+  gust: () => {},
+  ability: () => {},
+  shot: (s, t) => t.moment({ k: 'fire', ship: PLAYER, weapon: 'cannon', rarity: 0, pos: s.me.pos, dir: s.me.pos } as Moment, s),
+  shieldBreak: (s, t) => t.moment({ k: 'shieldBreak', ship: PLAYER } as Moment, s),
+  loot: (s, t) => t.moment({ k: 'pickup', ship: PLAYER } as Moment, s),
+  consumable: (s, t) => t.moment({ k: 'useStart', ship: PLAYER } as Moment, s),
+  storm: (s, t) => t.moment({ k: 'stormPhase', phase: 1, seconds: 60 } as Moment, s),
+  landmark: (s, t) => t.moment({ k: 'perk', ship: PLAYER, perk: REGIONS[0].perk, on: true } as Moment, s),
+  whale: (s, t) => t.moment({ k: 'whaleBreach', pos: { x: s.me.pos.x * R, y: s.me.pos.y * R, z: s.me.pos.z * R } } as Moment, s),
+  gull: (s) => void (s.me.coins = 9999),
+  mend: (s) => {
+    s.me.hull = 40;
+    s.me.lastHit = -10000;
+    s.state.owner[cellOf(TERRITORY, s.me.pos)] = PLAYER + 1;
+  },
+  night: (s) => {
+    for (let h = 0; h < 24 && !isNight(s.state, s.me.pos); h++) s.state.hour = h;
+  },
+  event: (s) => void MOMENTS.find((m) => m.name === 'event-fireArchipelago')!.arrange(s.state),
+  tide: onAFallingTide,
+  ...Object.fromEntries(WEATHER_NAMES.map((w) => [`weather:${w}`, (s: Session) => {
+    const v = s.state.weather[0], at = s.me.pos;
+    v.kind = WEATHER_KIND[w];
+    v.at.x = at.x; v.at.y = at.y; v.at.z = at.z;
+    v.r = WEATHER.r[1];
+    v.life = WEATHER.life[1];
+    v.age = WEATHER.rise;
+  }])),
+};
+
+/** Rides `seconds` without moving, from a save holding every tip but `id`, after `arrange`; whether `id` came up. */
+function comesUp(id: TipId, arrange: (s: Session, t: Tips) => void, seconds = 20): boolean {
+  let came = false;
+  withStorage(JSON.stringify(Object.keys(TIPS).filter((x) => x !== id)), () => {
+    const s = session(11, id !== 'gale'), tp = new Tips(false), still = { ...hands, throttle: 0 };
+    // midday where she is, so night has to be brought on
+    s.state.hour = (((s.state.hour + 12 - localHour(s.state, s.me.pos)) % 24) + 24) % 24;
+    // settled at sea first, then what brings it on
+    for (let k = 0; k < 3.5 / TICK; k++) (s.control(still, TICK), s.step(), tp.update(s, TICK));
+    arrange(s, tp);
+    for (let k = 0; k < seconds / TICK && !came; k++) {
+      s.control(still, TICK);
+      s.step();
+      came = tp.update(s, TICK)?.id === id;
+    }
+  });
+  return came;
+}
+
+test('every tip comes up through its own trigger, and none but the first four without it', (t) => {
+  const ids = Object.keys(TIPS) as TipId[], always = ['gale', 'weapon', 'gust', 'ability'];
+  assert.deepEqual(Object.keys(TRIGGER).sort(), [...ids].sort(), 'a trigger for every tip');
+  for (const id of ids) {
+    assert.ok(comesUp(id, TRIGGER[id]), `${id} comes up`);
+    if (!always.includes(id)) assert.ok(!comesUp(id, () => {}), `${id} does not come up untriggered`);
+  }
+  t.diagnostic(`all ${ids.length} tips came up, ${ids.length - always.length} of them only when brought on`);
 });

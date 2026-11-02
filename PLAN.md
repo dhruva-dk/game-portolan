@@ -1005,7 +1005,9 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - The clams only show where the bed is. The pearls the simulation spills are still the loot.
 - The petals are drawn round the camera only, out to 120 m, and are not in the simulation.
 
-Still open from the review: the banner within 240 m of a border, the no-humans shapes, and the borderline items.
+The banner within 240 m of a border is checked by tests/app/banner.test.ts rather than a strip: for every region, with only its event warned, the banner shows at its landmark, 120 m and 220 m past its border on up to three bearings, and not at the first point beyond with none of the region's water within 260 m.
+
+Still open from the review: the no-humans shapes and the borderline items.
 
 **The perks, done when each shows itself working:**
 
@@ -1144,6 +1146,8 @@ Still open from the review: the banner within 240 m of a border, the no-humans s
 
 **The independent review of the screens** (at `3fee5d7`) fails "no text is clipped": on the Gale globe, the rim cuts "…ngrove Labyrinth" and "The Coral At…" at all four sizes, and the layout check misses it. "The Glass Sea" and "The Jade Shoals" also run into each other. Everything else in the layout check holds on all 64 screens. Lists cut at their scrolling edge (Rank, Settings, Abilities, the locker) are fine as long as they scroll.
 
+*Revision 1:* the globe's labels are measured and kept inside the rim, nudged up or down off one another, and a sea with no room left is not named (the sea you pick always is). In the layout capture, no label touches the rim or another at any size.
+
 **The shared parts, done when:** any part added in this pass (such as the event banner or the perk chip) comes from the same tokens and is in the gallery at every size.
 
 **The career, done when:**
@@ -1174,6 +1178,8 @@ Still open from the review: the banner within 240 m of a border, the no-humans s
   - The capture tools start with tips off, so frames show only what they arrange; the hook turns them on (`h.tips(true)`).
 
   **The independent review** (at `3fee5d7`) passed the card itself: readable, unclipped, clear of the safe areas and the fight controls, on the HUD and the Gale at all four sizes. The item still fails on its evidence: only six of the tips are ever shown, and the save is tested only as parsed, never written and read back.
+
+  *Revision 1:* tests/app/tips.test.ts now writes the save, reads it back in a new session (the tip stays hidden), and clears it (the tip shows again). It also brings on every one of the 22 tips through its own trigger at sea (a shot, the shield breaking, a pickup, a consumable, coins for a gull, mending in your own water, a landmark held, the Storm, a falling tide on open water, each weather kind, night, a region event, the whale) and checks that the 18 with a trigger stay hidden when it is not brought on.
 - **Skill shows:** over 20 headless matches, captains drawn at a higher skill finish higher on average than captains drawn lower.
 
 **Sound, done when:**

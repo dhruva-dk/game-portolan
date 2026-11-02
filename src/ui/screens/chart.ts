@@ -71,6 +71,23 @@ const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, 
   g.fillText(text, x, y);
 };
 
+interface Box { x0: number; y0: number; x1: number; y1: number }
+
+/** A label block's middle (x, y), `half` wide each way, `up` above and `down` below, moved toward the centre (cx, cy)
+ *  until all its corners lie within `limit` of it. */
+function inside(x: number, y: number, half: number, up: number, down: number, cx: number, cy: number, limit: number): { x: number; y: number } {
+  for (let i = 0; i < 8; i++) {
+    let worst = 0;
+    for (const [dx, dy] of [[-half, -up], [half, -up], [-half, down], [half, down]]) worst = Math.max(worst, Math.hypot(x + dx - cx, y + dy - cy));
+    if (worst <= limit) break;
+    // step in by the overshoot, along the line to the centre
+    const d = Math.hypot(x - cx, y - cy) || 1, k = Math.min(1, (worst - limit + 1) / d);
+    x -= (x - cx) * k;
+    y -= (y - cy) * k;
+  }
+  return { x, y };
+}
+
 // ── the career's chart ──
 
 /** The whole world on parchment: the seas you have sailed inked in with their coasts, the rest left blank. */
@@ -240,15 +257,27 @@ export function galeGlobe(onPick: (region: number) => void, className = ''): Glo
     }
     g.stroke();
     g.restore();
-    // the seas' names, and the captains heading for each
-    const size = Math.max(9, S / 24);
-    for (const r of mm.regions) {
-      const info = REGIONS[r.index], p = project(info.lat, info.lon);
-      if (p.z < 0.2) continue;
-      const sx = cx + p.x * rad, sy = cy - p.y * rad, on = r.index === mm.pick;
+    // the seas' names, and the captains heading for each: the pick first, then the nearest the middle, each kept
+    // inside the globe and clear of those already down, nudged a line up or down, or left out if no nudge clears it
+    const size = Math.max(9, S / 24), placed: Box[] = [];
+    const seas = mm.regions.map((r) => ({ r, p: project(REGIONS[r.index].lat, REGIONS[r.index].lon) })).filter((q) => q.p.z >= 0.2)
+      .sort((a, b) => Number(b.r.index === mm.pick) - Number(a.r.index === mm.pick) || b.p.z - a.p.z);
+    for (const { r, p } of seas) {
+      const info = REGIONS[r.index], on = r.index === mm.pick, fs = size * (on ? 1.15 : 1), ships = r.heading > 0 && r.open;
+      g.font = `700 ${fs}px ${FONT.display}`;
+      // the block round the name (and the ships line under it), from the name's middle
+      const half = g.measureText(info.name).width / 2 + fs * 0.2, up = fs * 0.62, down = ships ? size * 1.15 + size * 0.55 : fs * 0.62;
+      let spot: { x: number; y: number } | null = null;
+      for (const nudge of [0, -1, 1, -2, 2]) {
+        const q = inside(cx + p.x * rad, cy - p.y * rad + nudge * (up + down) * 0.6, half, up, down, cx, cy, rad * 0.97);
+        if (!placed.some((b) => q.x + half > b.x0 && q.x - half < b.x1 && q.y + down > b.y0 && q.y - up < b.y1)) { spot = q; break; }
+      }
+      if (!spot && !on) continue;
+      const { x: sx, y: sy } = spot ?? inside(cx + p.x * rad, cy - p.y * rad, half, up, down, cx, cy, rad * 0.97);
+      placed.push({ x0: sx - half, x1: sx + half, y0: sy - up, y1: sy + down });
       const ink = on ? 'rgb(255, 222, 140)' : r.open ? 'rgb(255, 246, 226)' : 'rgba(255, 246, 226, 0.45)';
-      label(g, info.name, sx, sy, size * (on ? 1.15 : 1), ink, 'rgba(26, 16, 8, 0.85)');
-      if (r.heading > 0 && r.open) label(g, `${r.heading} ${r.heading === 1 ? 'ship' : 'ships'}`, sx, sy + size * 1.15, size * 0.85, 'rgba(255, 246, 226, 0.85)', 'rgba(26, 16, 8, 0.85)');
+      label(g, info.name, sx, sy, fs, ink, 'rgba(26, 16, 8, 0.85)');
+      if (ships) label(g, `${r.heading} ${r.heading === 1 ? 'ship' : 'ships'}`, sx, sy + size * 1.15, size * 0.85, 'rgba(255, 246, 226, 0.85)', 'rgba(26, 16, 8, 0.85)');
     }
     // you, at the centre, pointing along the road
     const next = mm.path[1] ? project(mm.path[1].lat, mm.path[1].lon) : { x: 0, y: 1, z: 1 };
