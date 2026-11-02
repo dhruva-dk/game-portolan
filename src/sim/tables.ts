@@ -386,8 +386,9 @@ export const REGION_EVENT = {
   every: 27,
   late: 12,
   warn: [5, 10],
-  /** How long each runs, and how many seconds it takes to build up and to die down, by region index. */
-  run: [60, 45, 60, 4, 75, 60, 70, 50, 4, 70, 70, 60, 45, 60, 70, 45],
+  /** How long each runs, and how many seconds it takes to build up and to die down, by region index. The Glass Sea's
+   *  runs through the whale's leap until it is down and the wall of water thrown. */
+  run: [60, 45, 60, 4, 75, 60, 70, 50, 7, 70, 70, 60, 45, 60, 70, 45],
   ramp: [8, 6, 10, 0, 0, 6, 10, 6, 0, 10, 10, 0, 4, 10, 10, 8],
   /** The Ice Crown: how many times as fast the floes ride, and how close to one a captain will go. */
   ice: { speed: 4, berth: 16 },

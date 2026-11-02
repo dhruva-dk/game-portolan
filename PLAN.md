@@ -1023,10 +1023,10 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - **The grey drum at Blossom Run** was the broadside's loot token, its short gun lying alone on the water. Hiding the scene's groups one at a time found it. That token now sits on a ship's truck carriage: two cheeks on a bed, on four small wheels. Every other gun token stands on its deck mount with its barrel cocked up. The repair tokens are bellied casks with hoops, not plain cylinders (src/render/actors/loot.ts).
 - **The banner hand-over:** a second, smaller banner sits under the first. Your own region's event takes the first. Then events already running beside you come before those only warned, so a new warning never hides an event still running next door. `eventsOf` in src/app/matchModels.ts; tested in tests/app/banner.test.ts.
 - **The Basalt Stacks' warning** now reads "The cave opens: sail in for its hoard.", so it no longer says the cave is open before it is.
-
 - **The Jade Shoals' sound:** the falling tide has a sound of its own, `tideDraw`: a long hiss of water running off the sand that falls away, with gurgles as the channels empty. The tide coming back in keeps the flood surge. The events that fill a whole region play all round you while you are in that region, not from their spot 300 m off: the Mistwood fog, the Spring Flood, both tides, the cloudburst and the Mangrove flood (`WIDE` in src/app/sounds.ts). Checked as rendered buffers only, since the captures run muted.
+- **The Glass Sea's banner** went at 4 s, while the whale was still in the air: its leap takes 4.8 s to come down. That event now runs 7 s (`REGION_EVENT.run` in src/sim/tables.ts), so the banner holds through the leap and the wall of water and leaves once the sea is calm again. Checked in the event-glassSea capture.
 
-Still open from the review: the Glass Sea's banner going while the whale is in the air, and the hard-edged pale shapes.
+Still open from the review: the hard-edged pale shapes.
 
 **The perks, done when each shows itself working:**
 
