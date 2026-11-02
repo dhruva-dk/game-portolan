@@ -131,3 +131,10 @@
 [data-hand='left'] .s-hud__gust { right: auto; left: calc(146px * var(--k)); }
 [data-hand='left'] .s-hud__abil { right: auto; left: calc(140px * var(--k)); }
 [data-hand='left'] .s-hud__reload { right: auto; left: calc(16px * var(--k)); }
+
+/* a first-time tip: under the vitals and the region on the HUD, above Dive on the Gale */
+.pui-tip { position: absolute; z-index: 55; }
+.pui-tip[data-at='hud'] { left: calc(var(--sl) + var(--sp-5)); top: calc(var(--st) + var(--sp-5) + 140px * var(--k)); }
+.pui-tip[data-at='gale'] { right: calc(var(--sr) + var(--sp-6)); bottom: calc(var(--sb) + var(--sp-6) + 110px * var(--k)); }
+.pui .pui-tip[data-at=''] { display: none; }
+.pui[data-form='phone'] .pui-tip[data-at='hud'] { top: calc(var(--st) + var(--sp-5) + 106px * var(--k)); }

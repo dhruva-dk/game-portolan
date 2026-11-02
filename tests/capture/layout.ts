@@ -26,6 +26,9 @@ export const SCREENS: readonly Screen[] = [
   { name: 'hud', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90)', thumbs: true },
   // a region's event warned in the player's own region: the banner under the Storm's clock, the circle on the map
   { name: 'hud-event', setup: 'h.moment("event-fireArchipelago", 11); h.step(60)' },
+  // a first-time tip over the HUD (the starter weapon's, once the ship has settled) and over the Gale
+  { name: 'hud-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11, skipGale: true }); h.step(90); await h.run(4)' },
+  { name: 'gale-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11 }); await h.run(1)' },
   { name: 'death', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)' },
   { name: 'spectate', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")' },
   { name: 'results', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()' },

@@ -118,7 +118,7 @@ function nearRegion(p: V3, ri: number): boolean {
 }
 
 /** The region event the banner shows at p: one warned or running in the water there or near it, its own region's first. */
-function eventOf(s: MatchState, p: V3): EventView | null {
+export function eventOf(s: MatchState, p: V3): EventView | null {
   const here = regionAt(p);
   let best = -1;
   for (let ri = 0; ri < s.regionEvents.length; ri++) {

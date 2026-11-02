@@ -1124,6 +1124,12 @@ Decisions made for the events (Settled overnight in the owner's absence; the own
   - the whale rises.
 
   Each appears only once, and is saved.
+
+  *Done: src/app/tips.ts offers each of these, and the card (`tipCard`, a shared part) shows it under the vitals on the HUD and above Dive on the Gale. tests/app/tips.test.ts checks the save, the Gale's tip, and the first tips at sea; the layout capture has `hud-tip` and `gale-tip` at all four sizes.* Decisions (Settled overnight in the owner's absence; the owner may change it.):
+  - The tips seen are saved under their own key in the browser's storage (`portolan.tips`), not in the career, so clearing them never touches a career.
+  - One tip shows at a time, for 7 s, with a short pause between. The first ones at sea wait 3 s after landing.
+  - "Your first weapon" is the starter weapon, named on the card. "The tide closes a passage" fires while the tide is falling and water within 40 m that is open now will be shut 20 s on. Each weather kind fires once its depth where you are passes 0.4; the whale, once it comes up within 260 m.
+  - The capture tools start with tips off, so frames show only what they arrange; the hook turns them on (`h.tips(true)`).
 - **Skill shows:** over 20 headless matches, captains drawn at a higher skill finish higher on average than captains drawn lower.
 
 **Sound, done when:**

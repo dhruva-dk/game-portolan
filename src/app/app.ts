@@ -30,6 +30,7 @@ import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { CareerHolder } from './career.ts';
 import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivalsModel } from './models.ts';
 import { QUALITY_PRESET, SettingsHolder } from './settings.ts';
+import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { titleScreen, type TitleView } from '../ui/screens/title.ts';
 import { lobbyScreen } from '../ui/screens/lobby.ts';
@@ -39,7 +40,7 @@ import {
 } from '../ui/screens/match.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
-import { el, esc } from '../ui/parts/index.ts';
+import { el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
   CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
 } from '../ui/model.ts';
@@ -88,6 +89,9 @@ export class App {
   readonly shell: Shell;
   readonly career: CareerHolder;
   readonly settings: SettingsHolder;
+  /** First-time tips, and the card they show on over the Gale and the HUD. */
+  readonly tips: Tips;
+  private readonly tip: TipCardHandle;
   stage: AppStage | null = null;
   actors: Actors | null = null;
   readonly overlay: HTMLElement;
@@ -131,6 +135,8 @@ export class App {
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
     this.career = new CareerHolder(options.capture || !!options.autoplay);
     this.settings = new SettingsHolder(options.capture || !!options.autoplay);
+    this.tips = new Tips(options.capture || !!options.autoplay);
+    this.tip = tipCard({ parent: this.shell.root, className: 'pui-tip' });
     this.loop = new Loop((f) => this.frame(f));
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
@@ -400,6 +406,7 @@ export class App {
     this.session = s;
     this.watched = -1;
     this.pull = 0;
+    this.tips.reset();
     this.viewer.me = this.sound.me = PLAYER;
     this.viewer.spectating = false;
     this.log.tick = s.state.tick;
@@ -425,6 +432,7 @@ export class App {
     if (ev) this.actors?.fire([ev]);
     this.momentJuice.react(m);
     this.sound.react(m);
+    this.tips.moment(m, s);
   }
 
   /** Leaves the Gale now. */
@@ -470,6 +478,7 @@ export class App {
     this.sound.clear();
     this.juice.clear();
     this.hud = this.galeView = this.spec = null;
+    this.tip.set(null);
     this.log.tick = -1;
     if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0 });
     this.stage?.snap();
@@ -569,6 +578,10 @@ export class App {
     this.viewer.me = this.sound.me = s.watch;
     this.viewer.spectating = s.watch !== PLAYER;
     this.follow(s);
+    // a tip over the Gale and the HUD only: the card waits while another screen is up
+    const tipAt = this.screen === 'gale' ? 'gale' : this.screen === 'match' ? 'hud' : '';
+    this.tip.el.dataset.at = tipAt;
+    this.tip.set(tipAt ? this.tips.update(s, f.realDt) : null);
     this.hudT -= f.realDt;
     if (this.hudT <= 0 || !this.loop.running) {
       this.hudT = 1 / 12;

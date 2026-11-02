@@ -83,6 +83,14 @@ export function installHook(app: App) {
     get sim() { return app.session?.state ?? null; },
     get app() { return app; },
 
+    // ── tips ──
+    /** Turns the first-time tips on or off (off in capture mode to start); returns the ones shown so far. */
+    tips(on?: boolean) {
+      if (on !== undefined) app.tips.on = on;
+      return app.tips.shown;
+    },
+    forgetTips: () => app.tips.forget(),
+
     // ── moments ──
     moment: (name: string, seed: number) => app.moment(name, seed),
     momentPlan: () => app.momentPlan(),
