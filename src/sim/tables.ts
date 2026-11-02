@@ -43,8 +43,11 @@ export const GUST = { charges: 2, speed: 13, time: 1.15, recharge: 6.5, hop: 6.3
 
 export const GRAVITY = 9.8;
 
-/** Grounding: how hard the shore pushes back, and the scrape worth reporting. */
-export const GROUND = { push: 1.2, keep: 0.9, scrape: 3.5, probe: 1.5 } as const;
+/**
+ * Running aground: the push off a falling tide, the speed kept against a shore, the speed that scrapes, the gradient's
+ * reach (m), how many times a stopped move slides on along what stopped it, and how fast she eases off it (m/s).
+ */
+export const GROUND = { push: 1.2, keep: 0.9, scrape: 3.5, probe: 1.5, slides: 3, ease: 0.3 } as const;
 
 // ---------------------------------------------------------------- items
 

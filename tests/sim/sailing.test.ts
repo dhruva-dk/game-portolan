@@ -143,6 +143,81 @@ test('a hull with her stern on the ground can still sail off it', () => {
   assert.ok(apart(state.ships[G].pos, found.pos) > 25, `she got off: ${apart(state.ships[G].pos, found.pos).toFixed(1)} m`);
 });
 
+/** Down the slope of the ground at p, off the shore, from its height either side. */
+function offShore(p: V3, out: V3): V3 {
+  const E = v3(), N = v3(), Q = v3();
+  localFrame(p, E, N);
+  const gx = heightAt(along(p, E, 3, Q)) - heightAt(along(p, E, -3, Q)), gy = heightAt(along(p, N, 3, Q)) - heightAt(along(p, N, -3, Q));
+  return normalize(set(out, -gx * E.x - gy * N.x, -gx * E.y - gy * N.y, -gx * E.z - gy * N.z));
+}
+
+/**
+ * Courses that run onto a shore at `angle` from straight in, over still, deep water with no column within 40 m of
+ * where she meets it: up to three in each region.
+ */
+function slantingShores(angle: number): { region: number; course: Course }[] {
+  const out: { region: number; course: Course }[] = [];
+  const T = v3(), P = v3(), H = v3(), S = v3(), Nn = v3(), C = v3(), Q = v3();
+  for (let region = 0; region < REGIONS.length; region++) {
+    let found = 0;
+    for (let d = 60; d <= 400 && found < 3; d += 37) {
+      for (let b = 0; b < 2 * Math.PI && found < 3; b += 0.7) {
+        tangentAt(CENTRES[region], b, T);
+        along(CENTRES[region], T, d, P);
+        if (regionAt(P) !== region || !deep(P, 1.5)) continue;
+        for (let hb = 0; hb < 2 * Math.PI && found < 3; hb += 0.5) {
+          tangentAt(P, hb, H);
+          let hit = -1;
+          for (let k = 2; k < 80 && hit < 0; k++) if (!deep(along(P, H, k, S), 0.5)) hit = k;
+          if (hit < 30) continue;
+          along(P, H, hit + 2, S);
+          if (OBSTACLES.some((o) => apart(o.pos, S) < o.r + 40)) continue;
+          offShore(S, Nn);
+          const side = normalize(cross(v3(), Nn, S));
+          const head = normalize(set(v3(), -Nn.x * Math.cos(angle) + side.x * Math.sin(angle), -Nn.y * Math.cos(angle) + side.y * Math.sin(angle), -Nn.z * Math.cos(angle) + side.z * Math.sin(angle)));
+          const start = along(S, head, -(hit + 2), v3());
+          let clear = deep(start, 1);
+          for (let k = 0; k < hit - 6 && clear; k += 3) {
+            currentAt(along(start, head, k, Q), C);
+            clear = deep(Q, 0.5) && length(C) <= 0.05;
+          }
+          if (!clear) continue;
+          const h0 = normalize(set(head, head.x - start.x * dot(head, start), head.y - start.y * dot(head, start), head.z - start.z * dot(head, start)));
+          out.push({ region, course: { pos: start, head: h0 } });
+          found++;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+test('a ship pressed against a slanting shore slides along it instead of freezing', (t) => {
+  let met = 0, slid = 0;
+  const stuck: string[] = [];
+  for (const { region, course } of slantingShores((50 * Math.PI) / 180)) {
+    const state = quietMatch(), at = v3();
+    place(state, G, course);
+    let contact = -1, dry = 0;
+    run(state, 25, only(G, sailOn()), (s) => {
+      if (contact < 0 && events(s, EVENT.scrape).some((e) => e.ship === G)) {
+        contact = s.tick;
+        set(at, s.ships[G].pos.x, s.ships[G].pos.y, s.ships[G].pos.z);
+      }
+      if (heightAt(s.ships[G].pos) >= seaLevel(s)) dry++;
+    });
+    if (contact < 0) continue;
+    met++;
+    assert.equal(dry, 0, `${REGIONS[region].id}: her keel never stood on dry land`);
+    const moved = apart(state.ships[G].pos, at);
+    if (moved >= 10) slid++;
+    else stuck.push(`${REGIONS[region].id} ${moved.toFixed(1)} m`);
+  }
+  t.diagnostic(`${slid} of ${met} ships run onto a shore 50° from straight in slid 10 m or more along it; stuck: ${stuck.join(', ')}`);
+  assert.ok(met >= 30, 'shores met all over the planet');
+  assert.ok(slid >= met * 0.9, 'nearly all slide along them');
+});
+
 test('she rides the currents: a held ship drifts with a lane, and east with the Great Current', (t) => {
   const state = quietMatch(), C = v3();
   let lane: V3 | null = null;

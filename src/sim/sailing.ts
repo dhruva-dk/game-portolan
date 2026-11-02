@@ -132,22 +132,27 @@ export const draftOf = (ship: Ship): number => (hasPerk(ship, 'shallowDraft') ? 
 function move(state: MatchState, i: number, grounded: boolean): void {
   const ship = state.ships[i];
   copy(ship.vel, V);
-  const on = tryMove(state, ship, grounded);
+  let on = tryMove(state, ship, grounded);
   if (on === null) return;
-  if (!hitSolid || !solidNormal(state, PROBE, N)) shoreNormal(PROBE, N);
-  const into = -dot(V, N);
-  if (into > 0) {
-    if (into > GROUND.scrape && ship.scrape === 0) {
-      emit(state, EVENT.scrape, i, -1, PROBE, { amount: into });
-      ship.scrape = 0.5;
+  // she slides along whatever stopped her, easing off it; a bank that bends into her slide stops the next try too, so
+  // she slides along that in turn
+  for (let k = 0; k < GROUND.slides && on !== null; k++) {
+    if (!hitSolid || !solidNormal(state, PROBE, N)) shoreNormal(PROBE, N);
+    const into = -dot(V, N);
+    if (into > 0) {
+      if (k === 0 && into > GROUND.scrape && ship.scrape === 0) {
+        emit(state, EVENT.scrape, i, -1, PROBE, { amount: into });
+        ship.scrape = 0.5;
+      }
+      addScaled(V, V, N, into + GROUND.ease);
+      if (k === 0) ship.speed *= 1 - (1 - GROUND.keep) * Math.max(0, -dot(ship.head, N));
+      const s = dot(ship.shove, N);
+      if (s < 0) addScaled(ship.shove, ship.shove, N, -s);
     }
-    addScaled(V, V, N, into);
-    ship.speed *= 1 - (1 - GROUND.keep) * Math.max(0, -dot(ship.head, N));
-    const s = dot(ship.shove, N);
-    if (s < 0) addScaled(ship.shove, ship.shove, N, -s);
+    copy(ship.vel, V);
+    on = tryMove(state, ship, grounded);
   }
-  copy(ship.vel, V);
-  if (tryMove(state, ship, grounded) !== null) ship.speed *= 0.5;
+  if (on !== null) ship.speed *= 0.5;
 }
 
 const PROBES = [1, 0, -1];

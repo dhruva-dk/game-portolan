@@ -909,7 +909,7 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
   *Done: a captain takes the least-picked region, starting with the first circle, once its own pick is full. Once it is bound to leave, it holds on while 3 ships that have left are still close. Captains whose drop lies past the Gale's end start taking turns 2.5 s apiece before it blows out. Ships still riding don't count toward the 3. They sit in the Gale's own 36 × 27 m block, so they are always within 100 m. Over 12 seeds of an all-captain fleet the worst is 2 ships near a leaver, and 59 of 60 captains still land in the region they picked (tests/sim/match.test.ts). Over 80 seeds of a measuring script, one captain in one match is still held when the Gale blows out, and lands beside 3 others and an idle player.*
 - **A pick near the Gale works:** a pick within 600 m of the ship glides down to that pick instead of leaving the Gale at once. *Done: a ship can only glide once it has left the Gale, so leaving at once is right for a pick inside glide reach (1,120 m). What matters is that it then glides for the pick's centre and dives once within 120 m of it, and it does. Four near picks come down 9–51 m from the centre. A pick further along rides on, leaves near it, and comes down inside it (tests/app/pick.test.ts).*
 - **The rivals are realistic:** in the fixtures, at most a third of the captains are tagged Rival. *Done: the fixture measures rivalry as the career does, from grudges and sinkings either way, and tags at the career's 0.3. It plays a mid-career record, which tags 12 of the 40 (tests/app/fixtures.test.ts).*
-- **Grounded ships slide:** a ship pressed against a slanting shore slides along it instead of freezing.
+- **Grounded ships slide:** a ship pressed against a slanting shore slides along it instead of freezing. *Done: a stopped move now slides along whatever stopped it, easing 0.3 m/s off it. If the bank bends into her slide, she slides along that in turn, up to three times a tick. Run at shores 50° from straight in all over the planet, 44 of 46 slide 10 m or more along them, up from 38 (tests/sim/sailing.test.ts). Without columns near, the misses are a hull pointing straight into a nook, and she has to turn out of it. At 35° and 65° the freezes fall from 21 of 45 to 11, and from 15 of 48 to 3. Most of what's left is wedged between a column and the bank.*
 - **Bots don't get stuck:** over 20 headless matches, no bot stays aground for more than 10 s.
 
 **Every region (all 16), done when:**
@@ -1183,7 +1183,6 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 
 **The match:**
 - Headless bot matches last 4.4–6.4 minutes against the 10–12 minute target. The Storm's phases, or the captains' aggression, need tuning.
-- A grounded ship can freeze on a slanting shore. `tryMove` refuses the whole step when any touching probe (bow, middle or stern) would climb, so a hull that drifts sideways along an oblique bank can't move forward or back until something turns her. Let her slide along the bank instead.
 
 **The renderer:**
 - The ships have no environment map, so their varnish and metal look flat.
