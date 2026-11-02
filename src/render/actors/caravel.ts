@@ -682,6 +682,7 @@ export function turretGeometry(kind: Weapon): { base: THREE.BufferGeometry; barr
 const BODY_HEAD = /* glsl */ `
 uniform vec3 uHull, uAccent, uTrim, uWisp;
 uniform float uHit, uDamage;
+uniform vec3 uHitAt;
 ${sharedUniforms('float', 'uNight', 'uTime')}
 uniform sampler2D uDeckMap, uDeckN, uDmgNoise;
 varying float vPart;
@@ -746,7 +747,10 @@ if (uDamage > 0.0 && bPart != 11.0) {
   bRough = mix(bRough, 0.95, ch);
   emit += vec3(1.0, 0.32, 0.06) * pow(ch, 6.0) * uDamage * (1.5 + sin(uTime * 5.0 + dn * 20.0));
 }
-emit += vec3(1.0, 0.9, 0.8) * uHit * 0.8;
+// struck: a hot glow where the shot went in, and the rest of her lit a moment in her own colours. A flat white
+// over the whole ship washed her out against the haze, as if she had gone see-through
+float struck = smoothstep(4.5, 0.0, distance(vLP, uHitAt));
+emit += (col * 0.5 + vec3(1.0, 0.45, 0.15) * 1.8 * struck * struck) * uHit;
 diffuseColor.rgb = col;
 totalEmissiveRadiance += emit;
 `;
@@ -912,7 +916,7 @@ export class ShipModel {
     this.look = look;
     this.u = {
       uHull: { value: new THREE.Color(look.hull) }, uAccent: { value: new THREE.Color(look.accent) }, uTrim: { value: new THREE.Color(look.trim) },
-      uWisp: { value: new THREE.Color(look.wisp) }, uHit: { value: 0 }, uDamage: { value: 0 }, uNight: { value: 0 },
+      uWisp: { value: new THREE.Color(look.wisp) }, uHit: { value: 0 }, uHitAt: { value: new THREE.Vector3(0, -99, 0) }, uDamage: { value: 0 }, uNight: { value: 0 },
       uDeckMap: { value: kit.tex.deck_d }, uDeckN: { value: kit.tex.deck_n }, uDmgNoise: { value: kit.tex.noise },
       uSailA: { value: new THREE.Color(look.sail) }, uSailB: { value: new THREE.Color(look.sail2) }, uTrimC: { value: new THREE.Color(look.trim) },
       uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
@@ -955,6 +959,12 @@ export class ShipModel {
     u.uEmblem.value = look.emblem ? 0 : -1;
     if (look.emblem) u.uEmblemAtlas.value = this.kit.emblem(look.emblem);
     this.head.geometry = this.kit.figurehead(look.figurehead);
+  }
+
+  /** Where a shot went into her, given in world space, for the hit's glow. */
+  struck(world: THREE.Vector3): void {
+    this.hull.updateWorldMatrix(true, false);
+    this.hull.worldToLocal((this.u.uHitAt.value as THREE.Vector3).copy(world));
   }
 
   /** Far from the camera, the lighter cut of the hull. */

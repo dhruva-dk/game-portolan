@@ -361,7 +361,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           }
           if (e.hull > 0) {
             fx.hitShip(at, !!e.crit, big);
-            if (f) f.hit = 1;
+            if (f) { f.hit = 1; f.model.struck(at); }
             if (counted) numbers.add(at.clone().addScaledVector(at.clone().normalize(), e.shield > 0 ? 1.4 : 0), e.hull, false, e.crit);
           }
           if (f) { f.lastHitBy = e.by; f.lastHitAt = clock; }
