@@ -34,6 +34,10 @@ export const MOMENTS: readonly MomentDef[] = [
   ].map(([id, about]) => ({ name: `event-${id}`, about: `${about}: the banner, the map and the sea` })),
 ];
 
+/** Ticks before each frame drawn one by one at 30 a second, so what plays on over time (foam on a race, smoke, sparks)
+ *  is in the picture as it would be in play, not drawn once a beat. */
+const WARM = 24;
+
 interface Plan {
   /** The tick the trigger fired on in the dry run, or -1 if it never did. */
   trigger: number;
@@ -60,14 +64,16 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
   // replay from the seed, and stop short of the trigger
   await arrange(game, def.name, seed);
   const start = Math.max(0, plan.trigger - plan.lead);
-  await game.hook((h, n) => h.step(n), start - (await game.hook((h) => h.tick)));
+  await game.hook((h, n) => h.step(n), Math.max(0, start - WARM - (await game.hook((h) => h.tick))));
   await game.hook((h) => h.clearEffects());
-  await game.hook((h) => h.draw(1 / 30));
   for (let f = 0; f < plan.frames; f++) {
+    // stepped to the frame's tick, the last of the way drawn at 30 frames a second
+    const now: number = await game.hook((h) => h.tick), to = start + f * plan.every - now, w = Math.max(1, Math.min(WARM, to));
+    await game.hook((h, n) => h.step(n), to - w);
+    await game.hook((h, s) => h.run(s), w / 30);
     const tick: number = await game.hook((h) => h.tick), d = tick - plan.trigger;
     // the sign spelled out in the file name, where a slug would make t-1 and t+1 the same
     await shots.shot(game, `t${d >= 0 ? '+' : ''}${d}`, `${String(f).padStart(3, '0')}-t-${d < 0 ? 'minus' : 'plus'}-${Math.abs(d)}.png`);
-    await game.hook((h, n) => h.stepAndDraw(n), plan.every);
   }
   const effects = await game.hook((h) => h.effects());
   await shots.json('effects.json', effects);

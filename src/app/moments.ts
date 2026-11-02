@@ -283,8 +283,10 @@ function eventMoment(id: string): MomentScript {
         e.state = EVENT_STATE.waiting;
         e.at = j === ri ? now + ev.warn + 1 : 1e6;
       });
-      // (Cinder Peak stands tall: far enough off to see its plume and where its bombs come down)
-      const r = eventMark(s, ri, spot), off = REGIONS[ri].id === 'fireArchipelago' ? r + 150 : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
+      // (Cinder Peak stands tall: far enough off to see its plume and where its bombs come down; the kelp lies flat on
+      // the water, so the ship waits inside its reach and the bloom spreads up to her and round her)
+      const r = eventMark(s, ri, spot), id = REGIONS[ri].id;
+      const off = id === 'fireArchipelago' ? r + 150 : id === 'kelpShallows' ? r * 0.25 : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
       // the match's spot when the region's own water looks on it, else the first of its others that does; then
       // the same from any water
       let c: Course | null = null;

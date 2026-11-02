@@ -14,6 +14,8 @@ import { Landmarks } from './regions/landmarks.ts';
 import { Beacons } from './regions/beacons.ts';
 import { Floes } from './regions/floes.ts';
 import { EventRocks, type EventPhase } from './regions/eventRocks.ts';
+import { EventKelp } from './regions/eventKelp.ts';
+import { FastWater } from './fastWater.ts';
 import { setLifts } from './lift.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
@@ -38,8 +40,12 @@ export interface StageView {
   floes?: number;
   /** How far the regions' events move the sea now, metres at the middle of each of the world's LIFTS; none when absent. */
   lift?: readonly number[];
-  /** Where the regions' events have got to, for the rock they move (the Spires' fall, the Narrows' rockfall); none under way when absent. */
+  /** Where the regions' events have got to, for what they move on the stage (the Spires' fall, the Narrows' rockfall,
+   *  the kelp bloom); none under way when absent. */
   events?: Partial<Record<RegionId, EventPhase>>;
+  /** How hard the regions' events drive the currents: each lane's speed scale (by its index in CURRENTS) and the
+   *  vortex's; the currents stay unmarked when absent. */
+  currents?: { lanes: readonly number[]; vortex: number };
   /** The wind where the camera looks, a tangent in metres per second. */
   wind: V3;
   camera: CameraMode;
@@ -77,6 +83,8 @@ export class Stage {
   readonly beacons: Beacons;
   readonly floes = new Floes();
   readonly rocks = new EventRocks();
+  readonly kelp = new EventKelp();
+  private readonly fast = new FastWater();
 
   private constructor(engine: Engine, tex: Textures, sky: Sky, terrain: Terrain, water: Water, weather: Weather, landmarks: Landmarks, beacons: Beacons) {
     this.engine = engine;
@@ -89,7 +97,7 @@ export class Stage {
     this.beacons = beacons;
     // the atmosphere rides on three's fog chunks, so a fog must exist for them to compile in
     this.scene.fog = new THREE.Fog(0xffffff, 1, 2);
-    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group, this.rocks.group);
+    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group, this.rocks.group, this.kelp.group);
     terrain.detail = engine.quality.detail;
     this.resize();
   }
@@ -170,6 +178,8 @@ export class Stage {
     this.beacons.update(v.time, this.sky.night);
     this.floes.update(v.floes ?? v.time, v.tide);
     this.rocks.update(v.events, v.time);
+    this.kelp.update(v.events, v.time, v.tide);
+    this.fast.update(this.focus, v.currents, v.tide, dt, this.water);
     this.engine.render(this.scene, cam, this.sky.grade, dt, () => {
       this.water.prepare(this.engine.renderer, this.scene, cam, this.focus, this.sky.look, this.engine.width, this.engine.height, dt);
     });

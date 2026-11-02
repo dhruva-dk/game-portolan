@@ -149,10 +149,16 @@ export function solidNormal(state: MatchState, p: V3, out: V3): boolean {
 const LANE_SCALE = new Float64Array(CURRENTS.length).fill(1);
 const SURGING = CURRENTS.map((l, i) => (l.region === EVENT_REGION.fjords || l.region === EVENT_REGION.blossom ? i : -1)).filter((i) => i >= 0);
 
+/** How hard the regions' events drive the currents now: each surging lane's speed scale into `lanes` (by its index in
+ *  CURRENTS; the rest are left alone, at 1), and the vortex's returned. */
+export function currentScales(state: MatchState, lanes: { [i: number]: number }): number {
+  for (const i of SURGING) lanes[i] = 1 + (REGION_EVENT.surge - 1) * eventStrength(state, CURRENTS[i].region);
+  return 1 + (REGION_EVENT.vortex - 1) * eventStrength(state, EVENT_REGION.maelstrom);
+}
+
 /** The surface current at p, m/s, tangent to the sphere, with the lanes in spate and the vortex wound up by their regions' events. */
 export function currentAt(state: MatchState, p: V3, out: V3): V3 {
-  for (const i of SURGING) LANE_SCALE[i] = 1 + (REGION_EVENT.surge - 1) * eventStrength(state, CURRENTS[i].region);
-  return worldCurrent(p, out, LANE_SCALE, 1 + (REGION_EVENT.vortex - 1) * eventStrength(state, EVENT_REGION.maelstrom));
+  return worldCurrent(p, out, LANE_SCALE, currentScales(state, LANE_SCALE));
 }
 
 /** How deep p sits in a bank of radius r round `at`: 1 in its core, falling to 0 at its edge. */

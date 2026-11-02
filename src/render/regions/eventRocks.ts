@@ -12,12 +12,14 @@ import { STUMP } from '../../sim/world/regions/spires.ts';
 import type { V3 } from '../../sim/math.ts';
 import { patch } from '../engine.ts';
 
-/** Where a region's event has got to: the spot it happens at, and seconds into its phase and left until the next. */
+/** Where a region's event has got to: the spot it happens at, seconds into its phase and left until the next, and how
+ *  hard it runs now (0…1, ramping up and down at its ends, as the simulation has it; 1 while running when absent). */
 export interface EventPhase {
   phase: 'waiting' | 'warning' | 'running' | 'over';
   k: number;
   since: number;
   left: number;
+  strength?: number;
 }
 
 /** Seconds a spire takes to fall and the Narrows' rocks to come down; both land as the event starts. */
