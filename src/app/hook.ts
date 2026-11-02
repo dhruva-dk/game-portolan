@@ -34,6 +34,11 @@ export function installHook(app: App) {
       }
       await nextFrame();
     },
+    /** Draws `seconds` of 30 fps frames back to back, so whatever the frames drive (juice, cameras) plays out. */
+    async run(seconds: number) {
+      for (let i = 0; i < Math.round(seconds * 30); i++) loop.drawNow(1 / 30);
+      await nextFrame();
+    },
     /** Draws one frame of dt seconds now (stepping the match in real time). */
     async draw(dt = 1 / 30) {
       loop.drawNow(dt);
@@ -60,7 +65,8 @@ export function installHook(app: App) {
     setSpeed: (n: number | null) => { loop.speed = n; },
     setPaused: (p: boolean) => { loop.paused = p; },
     setRunning: (r: boolean) => { loop.running = r; },
-    sinkPlayer: () => app.sinkPlayer(),
+    /** Sinks the player's ship: by ship `by` (none by default) with `how` ('cannon', 'ram', 'storm'...). */
+    sinkPlayer: (by?: number, how?: string) => app.sinkPlayer(by, how),
     winPlayer: () => app.winPlayer(),
     finish: () => app.finishMatch(),
     matchHash: () => app.matchHash(),

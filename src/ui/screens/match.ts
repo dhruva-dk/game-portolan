@@ -2,7 +2,7 @@
 // results. Over the sea only small boxes in the corners take touches; everything else lets them through to the
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
-import { button, el, esc, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
+import { button, ceremony, el, emblemBadge, esc, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
 import type {
   ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
 } from '../model.ts';
@@ -233,13 +233,32 @@ export function deathScreen(m: DeathModel, a: { onSpectate(): void; onLeave(): v
   const card = box('s-end__card p-paper', root);
   el('s-end__kicker', card, 'Sunk');
   el('s-end__place', card, `${ordinal(m.place)} <span>of ${m.ships}</span>`);
-  const by = m.killer ? `by ${esc(m.killer.name)}${m.killer.weapon ? `'s ${WEAPON_NAME[m.killer.weapon].toLowerCase()}` : ''}` : m.cause === 'storm' ? 'by the Storm' : 'by the sea';
-  el('s-end__by', card, by);
+  if (m.killer) {
+    const k = m.killer, who = el('s-end__who', card);
+    emblemBadge(k.emblem, k.colours, { parent: who });
+    const grudge = k.grudge > 0 ? ' · holds a grudge' : '';
+    el('s-end__whoT', who, `<b>${esc(k.name)}</b><span>${esc([k.rank, k.temperament].filter(Boolean).join(' · ') + grudge)}</span>`);
+  }
+  el('s-end__by', card, sunkBy(m));
   stats(card, m.kills, m.damage, m.survived);
   const row = el('s-end__row', card);
   button({ label: 'Spectate', icon: ICON.eye, kind: 'secondary', parent: row, what: 'death:spectate', onPress: a.onSpectate });
   button({ label: 'Leave', icon: ICON.leave, kind: 'primary', parent: row, what: 'death:leave', onPress: a.onLeave });
   return { el: root };
+}
+
+/** How the player's ship went down, in a line: "rammed by Sirocchia", "by Sirocchia, in the Storm", "by the sea". */
+const HOW: Record<string, [string, string]> = {
+  ram: ['rammed by %', 'rammed'], burn: ['burned out by %', 'burned out'], ink: ['by %, in the ink', 'in the ink'],
+  mine: ["by %'s mine", 'by a mine'], wave: ["by %'s wave", 'by a wave'], storm: ['by %, in the Storm', 'by the Storm'],
+  lightning: ['by %, under lightning', 'by lightning'], ash: ['by %, in the ash', 'by the ash'], whale: ['by %, and the whale', 'by the whale'],
+};
+
+function sunkBy(m: DeathModel): string {
+  const who = m.killer ? `<b>${esc(m.killer.name)}</b>` : '', weapon = (WEAPON_NAME as Record<string, string>)[m.how];
+  if (weapon) return who ? `by ${who}'s ${weapon.toLowerCase()}` : `by a stray ${weapon.toLowerCase()}`;
+  const h = HOW[m.how];
+  return h ? (who ? h[0].replace('%', who) : h[1]) : who ? `by ${who}` : 'by the sea';
 }
 
 export interface SpectateView extends ScreenView {
@@ -253,15 +272,21 @@ export function spectateScreen(m: SpectateModel, a: { onLeave(): void }): Specta
   const leave = box('s-spec__leave', root);
   button({ label: 'Leave', icon: ICON.leave, kind: 'dark', size: 'sm', parent: leave, what: 'spectate:leave', onPress: a.onLeave });
   const set = (s: SpectateModel) => {
-    line.innerHTML = `<i>${ICON.eye}</i>Watching <b>${esc(s.target.name)}</b> · ${s.target.kills} sunk · ${s.ships} afloat`;
+    const rank = s.target.rank ? ` <span>${esc(s.target.rank)}</span>` : '';
+    line.innerHTML = `<i>${ICON.eye}</i>Watching <b>${esc(s.target.name)}</b>${rank} · ${s.target.kills} sunk · ${s.ships} afloat`;
   };
   set(m);
   return { el: root, set };
 }
 
+/** The win: a full-screen ceremony first, then the card with the match's numbers once it is dismissed or done. */
 export function victoryScreen(m: VictoryModel, a: { onContinue(): void }): ScreenView {
   const root = el('s-mx s-end s-end--win');
-  const card = box('s-end__card p-paper', root);
+  const card = box('s-end__card p-paper is-waiting', root);
+  void ceremony({
+    kind: 'victory', kicker: 'Last ship afloat', art: ICON.crown, title: 'Victory', parent: root, ms: 6000,
+    sub: `1st of ${m.ships} · ${m.kills} sunk`,
+  }).then(() => card.classList.remove('is-waiting'));
   el('s-end__kicker', card, `${ICON.crown} Last ship afloat`);
   el('s-end__place', card, `1st <span>of ${m.ships}</span>`);
   stats(card, m.kills, m.damage, m.survived);

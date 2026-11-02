@@ -53,6 +53,8 @@ export interface Actors {
   muzzle(id: number, pos: THREE.Vector3, dir?: THREE.Vector3): boolean;
   /** Ship `id`'s hull as drawn (riding the swell, heeling, sinking), for cameras that follow it; null if not shown. */
   ship(id: number): THREE.Object3D | null;
+  /** Drops the effects still playing (fire, smoke, flotsam, queued broadsides), for a new match. */
+  clear(): void;
   dispose(): void;
 }
 
@@ -447,6 +449,10 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     ship(id) {
       const f = fleet.get(id);
       return f && f.shown ? f.model.body : null;
+    },
+    clear() {
+      fx.clear();
+      pending.length = 0;
     },
     dispose() {
       for (const f of [...fleet.values()]) remove(f);

@@ -57,6 +57,14 @@ export class Effects {
     this.group.add(this.plankMesh);
   }
 
+  /** Drops everything still in the air or afloat, for a new match. */
+  clear(): void {
+    this.glow.clear();
+    this.smoke.clear();
+    this.planks.length = 0;
+    this.wisps.length = 0;
+  }
+
   /** Emits at a point plus an offset in the local frame. */
   private at(base: THREE.Vector3, off: THREE.Vector3): THREE.Vector3 {
     return this.p.copy(base).add(off);

@@ -22,12 +22,13 @@ export const TRANSITIONS: readonly Transition[] = [
   ]),
   { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })' },
   { name: 'gale-match', from: 'h.play({ seed: 11 })', to: 'h.dive()' },
-  { name: 'match-death', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer()' },
-  { name: 'death-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(); h.step(60)', to: 'h.go("spectate")' },
-  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(); h.step(60); h.go("spectate")', to: 'h.go("results")' },
-  { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer()' },
-  { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.go("results")' },
-  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.go("results")', to: 'h.go("lobby")' },
+  // the match's own screens follow the sim, which only moves here when a frame is drawn
+  { name: 'match-death', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
+  { name: 'death-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)', to: 'h.go("spectate")' },
+  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")', to: 'h.finish()' },
+  { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer(); await h.draw()' },
+  { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()' },
+  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()', to: 'h.go("lobby")' },
 ];
 
 /** Milliseconds into the transition for each frame of the strip. */
@@ -56,6 +57,8 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
   }
   await game.hook((h) => h.freezeUi(false));
   await game.page.waitForTimeout(1200);
+  // the screen flashes and vignettes run on drawn frames, which nothing draws here unless asked
+  await game.hook((h) => h.run(3));
   await game.hook((h) => h.settle(2));
   await shots.shot(game, 'settled');
   await shots.json('effects.json', await game.hook((h) => h.effects()));

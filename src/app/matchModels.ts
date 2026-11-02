@@ -1,7 +1,7 @@
 // The interface's view models from the match: what the Gale, the HUD, death, spectating, victory and the results show,
 // read from the session and the career's changes. Like models.ts, the screens never see the simulation itself.
 import {
-  ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, wornLook, type Career, type Look, type MatchChanges, type Rank,
+  ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, temperament, wornLook, type Career, type Look, type MatchChanges, type Rank,
 } from '../career/index.ts';
 import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
@@ -163,7 +163,7 @@ export function galeModel(session: Session): GaleModel {
 function killerOf(session: Session, i: number, weapon: number): Killer {
   const e = session.plan.fleet[i - 1], cap = CAPTAINS[captainIndex(e.captain)];
   return {
-    ...markOf(cap?.look ?? e.look), name: session.names[i], rank: '', temperament: cap?.temperament ?? '',
+    ...markOf(cap?.look ?? e.look), name: session.names[i], rank: e.rank, temperament: cap ? temperament(cap.temperament).name : '',
     weapon: weapon >= 1 && weapon <= 6 ? (weaponOf(weapon) as WeaponId) : null, grudge: session.state.ships[i].captain.grudge,
   };
 }
@@ -173,15 +173,16 @@ export function deathModel(session: Session): DeathModel {
   const by = me.by >= 1 && me.by < SHIPS ? me.by : -1, cause = causeName(me.cause);
   return {
     place: me.place || afloat(s) + 1, ships: SHIPS, killer: by > 0 ? killerOf(session, by, me.cause) : null,
-    cause: by > 0 ? 'ship' : cause === 'storm' ? 'storm' : 'sea',
+    cause: by > 0 ? 'ship' : cause === 'storm' ? 'storm' : 'sea', how: cause,
     kills: me.kills, damage: Math.round(t.damage), survived: Math.round(t.sunkAt >= 0 ? t.sunkAt : session.seconds),
   };
 }
 
 export function spectateModel(session: Session, look: Look): SpectateModel {
   const s = session.state, i = session.watch, sh = s.ships[i];
-  const mark = i === PLAYER ? markOf(look) : markOf(CAPTAINS[captainIndex(session.plan.fleet[i - 1].captain)]?.look ?? session.plan.fleet[i - 1].look);
-  return { target: { ...mark, name: session.names[i], rank: '', kills: sh.kills, shield: Math.round(sh.shield), hull: Math.round(sh.hull) }, ships: afloat(s) };
+  const e = session.plan.fleet[i - 1], mark = i === PLAYER ? markOf(look) : markOf(CAPTAINS[captainIndex(e.captain)]?.look ?? e.look);
+  const rank = i === PLAYER ? session.plan.player.rank : e.rank;
+  return { target: { ...mark, name: session.names[i], rank, kills: sh.kills, shield: Math.round(sh.shield), hull: Math.round(sh.hull) }, ships: afloat(s) };
 }
 
 export function victoryModel(session: Session): VictoryModel {

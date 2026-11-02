@@ -357,6 +357,8 @@ export interface DeathModel {
   /** Who sank you, or null when the Storm or the sea did. */
   killer: Killer | null;
   cause: 'ship' | 'storm' | 'sea';
+  /** How: the weapon class, or ram, burn, ink, mine, wave, storm, lightning, ash, whale or sea. */
+  how: string;
   kills: number;
   damage: number;
   survived: number;

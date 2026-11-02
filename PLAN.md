@@ -904,13 +904,10 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - The chart's region mask is coarse, so its borders look blocky.
 
 **The interface:**
-- Captains' rank names are empty on results, death and spectating.
-- The death screen moves the camera at once. Ease it.
-- `sinkNow` (behind the test hook's `sinkPlayer` and `winPlayer`) always sinks ships "by the Storm", so the death screen it leads to never names a killer.
 - The minimap shows the Storm, the next circle and the ships, but no land. Port the rewrite's.
 - The HUD's shield and hull bars have no icons.
 - In the locker, the camera crops the top of the sail.
-- The victory moment and spectating need polish: a ceremony, and a smoother camera hand-off.
+- The win's lens flash lands over the victory ceremony's own flash, so the ceremony's first second is washed out twice.
 
 **The sound:**
 - The surf bed listens for land on eight bearings 35 m out, so a cliff over deep water sounds like a beach.

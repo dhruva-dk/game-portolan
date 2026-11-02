@@ -37,6 +37,14 @@ const CAUSES: Record<number, string> = {
 /** What sank or hurt a ship, by name: a weapon class or one of the causes. */
 export const causeName = (cause: number): string => (isWeapon(cause) ? weaponOf(cause) : CAUSES[cause] ?? 'sea');
 
+/** A cause by name, as causeName gives it, back to the sim's number; anything else is the Storm. */
+export function causeOf(name: string): number {
+  const w = WEAPON_CLASSES.indexOf(name as WeaponClass);
+  if (w >= 0) return ITEM.cannon + w;
+  const k = Object.keys(CAUSES).find((n) => CAUSES[+n] === name);
+  return k ? +k : CAUSE.storm;
+}
+
 function hurtBy(kind: number): Extract<Moment, { k: 'hit' }>['weapon'] {
   if (isWeapon(kind)) return weaponOf(kind);
   if (kind === CAUSE.storm) return 'storm';

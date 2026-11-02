@@ -174,6 +174,9 @@ export class Particles {
 
   get count(): number { return this.n; }
 
+  /** Drops every live particle. */
+  clear(): void { this.n = 0; }
+
   emit(e: Emit): void {
     if (this.n >= this.cap) return;
     const o = this.n++ * S, f = this.f;

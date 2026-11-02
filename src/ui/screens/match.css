@@ -65,11 +65,18 @@
 
 /* death, victory and spectating */
 .s-end__card { left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: calc(440px * var(--k)); padding: var(--sp-5) var(--sp-6); text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--sp-3); }
+.s-end--win .s-end__card { animation: p-cer-up 500ms var(--ease) both; }
+.s-end__card.is-waiting { display: none; }
 .s-end__kicker { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-rubric); }
 .s-end__kicker svg { width: 1.2em; height: 1.2em; vertical-align: -0.2em; }
 .s-end__place { font-family: var(--f-display); font-weight: 900; font-size: calc(var(--fs-h1) * 1.2); line-height: 1; }
 .s-end__place span { font-size: var(--fs-h3); opacity: 0.6; }
 .s-end__by { font-family: var(--f-body); font-style: italic; font-size: var(--fs-body); }
+.s-end__by b { font-style: normal; font-weight: 700; }
+.s-end__who { display: flex; align-items: center; gap: var(--sp-3); text-align: left; }
+.s-end__whoT { display: flex; flex-direction: column; }
+.s-end__whoT b { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-h3); line-height: 1.1; }
+.s-end__whoT span { font-family: var(--f-display); font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
 .s-end__stats { display: flex; gap: var(--sp-5); }
 .s-end__stat { display: flex; flex-direction: column; align-items: center; }
 .s-end__stat b { font-family: var(--f-display); font-weight: 900; font-size: var(--fs-h3); }
@@ -77,6 +84,7 @@
 .s-end__row { display: flex; gap: var(--sp-3); margin-top: var(--sp-2); }
 .s-spec__top { left: 50%; top: var(--sp-5); transform: translateX(-50%); padding: var(--sp-2) var(--sp-5); font-family: var(--f-display); font-size: var(--fs-small); }
 .s-spec__top i { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.2em; margin-right: 0.4em; }
+.s-spec__top span { font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
 .s-spec__leave { right: var(--sp-5); top: var(--sp-5); }
 
 /* results */

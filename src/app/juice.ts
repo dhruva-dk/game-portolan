@@ -13,6 +13,8 @@ const dist = (a: V3, b: V3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 export interface Viewer {
   /** The ship the player sees from: their own, or the one they spectate. */
   me: number;
+  /** Watching another captain's ship: its hits, coins and haptics are not the player's, so they stay quiet. */
+  spectating: boolean;
   /** The camera's position in metres from the planet's centre. */
   eye: V3;
   /** Where a world point lands in the HUD, or null when it is behind the camera. */
@@ -37,7 +39,8 @@ export class MomentJuice {
   }
 
   react(m: Moment): void {
-    const { juice } = this, me = this.view.me;
+    // spectating, no ship is the player's: only the world's rumbles reach them
+    const { juice } = this, me = this.view.spectating ? -1 : this.view.me;
     switch (m.k) {
       case 'fire':
         if (m.ship === me) juice.fire('fire', { strength: FIRE_STRENGTH[m.weapon], world: m.pos });

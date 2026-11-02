@@ -130,7 +130,7 @@ export class MomentSound {
         a.play('aground', { pos: this.at(m.ship, m.pos) });
         return;
       case 'win':
-        if (m.ship === me) a.play('stingVictory');
+        // the victory screen's ceremony plays the sting
         return;
       default:
         return;

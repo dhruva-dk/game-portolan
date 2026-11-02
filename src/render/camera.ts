@@ -33,6 +33,9 @@ export class CameraRig {
   fov = 58;
   /** Seconds a switch between modes takes. */
   flight = 2.2;
+  /** Seconds the flight under way takes: a mode switch's, or a glide's. */
+  private span = 2.2;
+  private gliding = 0;
   trauma = 0;
   private kickFov = 0;
   private kickPitch = 0;
@@ -70,6 +73,11 @@ export class CameraRig {
     this.blend = 1;
   }
 
+  /** Flies from where the camera is now to its next pose over `seconds`, as when the camera moves to another ship. */
+  glide(seconds = 1.6): void {
+    this.gliding = seconds;
+  }
+
   /** The ground's height at a point in metres, never below the sea. */
   private ground(x: THREE.Vector3): number {
     const l = x.length();
@@ -84,8 +92,16 @@ export class CameraRig {
       this.fromQuat.copy(cam.quaternion);
       this.fromFov = cam.fov;
       this.blend = this.seeded ? 0 : 1;
+      this.span = this.flight;
       this.lastMode = mode;
+    } else if (this.gliding > 0 && this.seeded) {
+      this.fromPos.copy(cam.position);
+      this.fromQuat.copy(cam.quaternion);
+      this.fromFov = cam.fov;
+      this.blend = 0;
+      this.span = this.gliding;
     }
+    this.gliding = 0;
     this.mode = mode;
     const up = this.a.set(target.pos.x, target.pos.y, target.pos.z).normalize();
     const pivot = this.b.copy(up).multiplyScalar(R + (target.height ?? 2.5));
@@ -106,7 +122,7 @@ export class CameraRig {
     // the flight between modes: round the planet, not through it
     let pos = this.pos, quat = this.quat, fov = mode === 'orbit' ? 40 : this.fov;
     if (this.blend < 1) {
-      this.blend = Math.min(1, this.blend + dt / this.flight);
+      this.blend = Math.min(1, this.blend + dt / this.span);
       const s = smoother(this.blend);
       const r0 = this.fromPos.length(), r1 = this.pos.length();
       const d0 = this.a.copy(this.fromPos).divideScalar(r0), d1 = this.c.copy(this.pos).divideScalar(r1);

@@ -324,7 +324,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
 export function fxDeath(cause: 'ship' | 'storm' = 'ship'): DeathModel {
   const [, name, , t, emblem, , , , sail, hull] = CAPTAIN_ROWS[0];
   return {
-    place: 7, ships: 20, cause, kills: 3, damage: 1840, survived: 612,
+    place: 7, ships: 20, cause, how: cause === 'ship' ? 'harpoon' : 'storm', kills: 3, damage: 1840, survived: 612,
     killer: cause === 'ship' ? { name, emblem, colours: [sail, hull], rank: 'Gold III', temperament: TEMPERAMENTS.find((x) => x.id === t)!.name, weapon: 'harpoon', grudge: 2 } : null,
   };
 }

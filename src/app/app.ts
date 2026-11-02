@@ -21,7 +21,7 @@ import type { CameraRig } from '../render/camera.ts';
 import { Controls } from './controls.ts';
 import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
-import { MOMENTS, actorEvent, daylight, type MomentScript } from './moments.ts';
+import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
 import { deathModel, galeModel, hudModel, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
@@ -277,6 +277,11 @@ export class App {
     this.hud = null;
     this.galeView = null;
     this.spec = null;
+    if (name === 'death' || name === 'spectate' || name === 'victory') {
+      // the match's markers and numbers don't stay over the end of it
+      this.juice.markers?.clear();
+      this.juice.numbers?.clear();
+    }
     switch (name) {
       case 'gale': {
         if (!model && !s) return null;
@@ -297,6 +302,7 @@ export class App {
         return deathScreen((model as DeathModel) ?? deathModel(s!), { onSpectate: () => this.go('spectate'), onLeave: () => this.finishMatch() });
       case 'spectate': {
         if (!model && !s) return null;
+        s?.spectate();
         const v = spectateScreen((model as SpectateModel) ?? spectateModel(s!, wornLook(this.career.career)), { onLeave: () => this.finishMatch() });
         this.spec = v;
         return v;
@@ -363,6 +369,10 @@ export class App {
   /** The scripted moment the match was set up for, if any. */
   private staged: MomentScript | null = null;
   private hud: HudView | null = null;
+  /** The ship the camera followed last frame (-1: none yet). */
+  private watched = -1;
+  /** How far the camera has drawn back for the win, 0 to 1. */
+  private pull = 0;
   private galeView: GaleView | null = null;
   private spec: SpectateView | null = null;
   /** Seconds until the HUD's next refresh: it redraws a few times a second, not every frame. */
@@ -372,6 +382,7 @@ export class App {
   /** Where the juice sees from: the camera, and the ship the player watches. */
   private readonly viewer: Viewer = {
     me: PLAYER,
+    spectating: false,
     eye: this.eye,
     project: (p) => this.project(p),
     bearing: (p) => this.bearing(p),
@@ -380,17 +391,21 @@ export class App {
   /** Starts a match from the career's plan: the Gale, or (skipGale) already at sea. */
   play(o: PlayOptions = {}): void {
     if (this.session) this.leaveMatch();
+    this.actors?.clear();
     this.staged = null;
     const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
     s.onMoment = (m) => this.onMoment(m);
     s.autoFire = this.settings.settings.autoFire;
     this.session = s;
+    this.watched = -1;
+    this.pull = 0;
     this.viewer.me = this.sound.me = PLAYER;
+    this.viewer.spectating = false;
     this.log.tick = s.state.tick;
     this.log.add('flow', 'match', { seed: s.state.seed, skipGale: !!o.skipGale, autopilot: !!o.autopilot });
     this.loop.run(s);
     this.controls.on = true;
-    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 9, shoulder: 0 });
+    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 9, shoulder: 0, yaw: 0 });
     this.stage?.snap();
     this.go(s.me.phase === PHASE.gale ? 'gale' : 'match');
   }
@@ -420,8 +435,9 @@ export class App {
     return this.loop.advanceTicks(n);
   }
 
-  sinkPlayer(): void {
-    this.session?.sinkNow([PLAYER]);
+  /** Sinks the player's ship now: by ship `by` (-1: nobody) with `how`, a cause as causeName names it. */
+  sinkPlayer(by = -1, how = 'storm'): void {
+    this.session?.sinkNow([PLAYER], by, causeOf(how));
   }
 
   /** Sinks every other ship: the player wins. */
@@ -454,7 +470,7 @@ export class App {
     this.juice.clear();
     this.hud = this.galeView = this.spec = null;
     this.log.tick = -1;
-    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27 });
+    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0 });
     this.stage?.snap();
   }
 
@@ -531,6 +547,15 @@ export class App {
       const alt = Math.max(0, s.state.ships[s.watch].alt), dip = Math.acos(R / (R + alt));
       stage.rig.pitch = Math.max(s.pitch, Math.min(1.05, dip * 0.9 + 0.1));
       stage.rig.dist = 27 + alt * 0.08;
+      // the win: the camera draws back and circles the last ship afloat
+      this.pull += ((this.screen === 'victory' ? 1 : 0) - this.pull) * (1 - Math.exp(-f.realDt * 1.5));
+      stage.rig.yaw += f.realDt * 0.22 * this.pull;
+      stage.rig.dist += 9 * this.pull;
+    }
+    if (s.watch !== this.watched) {
+      // the camera moves to another ship: it flies there rather than jumping
+      if (this.watched >= 0) stage.rig?.glide();
+      this.watched = s.watch;
     }
     s.sun(this.sun);
     actors.update(s.actorsView(f.clock, f.alpha, this.sun), f.dt, stage.camera);
@@ -541,6 +566,7 @@ export class App {
     this.eye.y = c.y;
     this.eye.z = c.z;
     this.viewer.me = this.sound.me = s.watch;
+    this.viewer.spectating = s.watch !== PLAYER;
     this.follow(s);
     this.hudT -= f.realDt;
     if (this.hudT <= 0 || !this.loop.running) {
@@ -558,6 +584,8 @@ export class App {
     else if (me.phase === PHASE.sunk && (at === 'match' || at === 'gale')) this.go('death');
     else if (at === 'gale' && me.phase !== PHASE.gale) this.go('match');
     else if (s.over && at === 'spectate') this.finishMatch();
+    // a match that sails itself watches on after its sinking, so a long run keeps the sea busy
+    else if (this.options.autoplay && at === 'death' && s.seconds - s.tally.ships[PLAYER].sunkAt > 4) this.go('spectate');
   }
 
   // ── interface capture: pause every running animation and scrub them together ──
@@ -567,7 +595,12 @@ export class App {
       this.frozen = document.getAnimations();
       for (const a of this.frozen) a.pause();
     } else {
-      for (const a of this.frozen) a.play();
+      // play() would rewind one scrubbed past its end and run it again
+      for (const a of this.frozen) {
+        const end = Number(a.effect?.getComputedTiming().endTime ?? Infinity);
+        if (Number(a.currentTime ?? 0) >= end) a.finish();
+        else a.play();
+      }
       this.frozen = [];
     }
   }

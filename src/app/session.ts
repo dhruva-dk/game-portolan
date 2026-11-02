@@ -212,13 +212,19 @@ export class Session implements Stepper {
     for (const m of this.buf) {
       this.tally.observe(m, (i) => metres(s.ships[i].pos));
       if (m.k === 'hit' && m.ship === this.watch && !m.steady && m.shield + m.hull > 0) this.hurtTick = s.tick;
-      if (m.k === 'sink' && m.ship === this.watch) this.rewatch(m.by);
+      // the player's own wreck stays in view until they choose to spectate
+      if (m.k === 'sink' && m.ship === this.watch && m.ship !== PLAYER) this.rewatch(m.by);
       this.onMoment(m);
     }
   }
 
   private sample(): void {
     this.tally.sample(this.seconds, this.state.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })));
+  }
+
+  /** Spectating once the player's ship has sunk: watch the ship that sank it, or else the one afloat with the most kills. */
+  spectate(): void {
+    if (this.watch === PLAYER && this.me.phase === PHASE.sunk) this.rewatch(this.me.by);
   }
 
   /** After the ship followed sinks: watch the one that sank it, or else the ship afloat with the most kills. */
@@ -393,8 +399,10 @@ export class Session implements Stepper {
     const formed = STORM.calm.r < ZONES[0] - 1;
     const dist = formed ? R * Math.acos(Math.max(-1, Math.min(1, at.x * STORM.calm.at.x + at.y * STORM.calm.at.y + at.z * STORM.calm.at.z))) : 0;
     const outside = formed && dist > STORM.calm.r ? Math.min(1, 0.45 + (dist - STORM.calm.r) / 60) : 0;
-    const hurt = Math.max(0, 1 - ((s.tick - this.hurtTick) * TICK) / 0.5);
-    const low = w.phase === PHASE.sunk ? 0 : Math.max(0, (35 - w.hull) / 35) * 0.8;
+    // the screen's hurt and low-hull edges are the player's own; spectating, the Storm's tint is half as strong
+    const own = this.watch === PLAYER;
+    const hurt = own ? Math.max(0, 1 - ((s.tick - this.hurtTick) * TICK) / 0.5) : 0;
+    const low = !own || w.phase === PHASE.sunk ? 0 : Math.max(0, (35 - w.hull) / 35) * 0.8;
     const weather: WeatherSystem[] = [];
     for (const sys of s.weather) {
       if (sys.kind < 0) continue;
@@ -406,7 +414,7 @@ export class Session implements Stepper {
       weather,
       storm: formed ? { centre: { ...STORM.calm.at }, radius: STORM.calm.r } : null,
       territory: { owner: s.owner, trail: s.trail, version: Math.floor(s.tick / 6), me: this.watch + 1 },
-      screen: { storm: outside, hurt, low },
+      screen: { storm: own ? outside : outside * 0.5, hurt, low },
     };
   }
 
@@ -445,11 +453,11 @@ export class Session implements Stepper {
     this.input.dive = true;
   }
 
-  /** Sinks ships now (the Storm takes them), then lets the match see whether it is won. */
-  sinkNow(ships: readonly number[]): void {
+  /** Sinks ships now, by ship `by` (-1: none) with `cause` (the Storm unless named), then lets the match see whether it is won. */
+  sinkNow(ships: readonly number[], by = -1, cause: number = CAUSE.storm): void {
     const s = this.state;
     s.events.length = 0;
-    for (const i of ships) sink(s, i, -1, CAUSE.storm);
+    for (const i of ships) sink(s, i, i === by ? -1 : by, cause);
     settle(s);
     this.read();
   }
