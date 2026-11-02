@@ -4,7 +4,7 @@
 // sky's mood (sky.ts) and the sea's chop.
 import * as THREE from 'three';
 import { R } from '../sim/sphere.ts';
-import type { WeatherKind } from '../sim/world/index.ts';
+import { heightAt, type WeatherKind } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 import { U } from './engine.ts';
 
@@ -103,6 +103,8 @@ void main() {
     col = vTint.rgb * (sun * mix(vLook.z, vLook.y, lit) * 1.6 + sky * mix(0.35, 0.8, under) * mix(vLook.z, 1.0, 0.5));
     col += vec3(0.75, 0.8, 1.0) * uFlashSys * 2.0 * (0.4 + nz);
     a = smoothstep(1.0, 0.35, r2 + (nz - 0.5) * 0.7) * vTint.w;
+    // thinning into the water, so a low puff meets the sea without the hard line where it goes under
+    a *= smoothstep(0.0, 5.0, length(wp) - uPlanet.y - seaLift(normalize(wp)));
   } else {
     // a rain curtain: streaks falling, thinning toward its edges and the sea
     float x = vQ.x, y = vQ.y * 0.5 + 0.5;
@@ -260,9 +262,12 @@ export class Weather {
         // more puffs toward the middle, the tall ones there too
         const r = Math.sqrt(rnd()) * rad, a = rnd() * Math.PI * 2, mid = 1 - r / rad;
         const tall = look.tower * mid * mid * rnd();
-        const h = look.base + tall + rnd() * 18;
+        let h = look.base + tall + rnd() * 18;
         const size = look.size * (0.6 + rnd() * 0.7) * (0.7 + mid * 0.5);
         p.copy(up).multiplyScalar(R + h).addScaledVector(e1, Math.cos(a) * r).addScaledVector(e2, Math.sin(a) * r);
+        // a fog bank lies on the water, and where land comes up through a puff it cuts it with a hard edge: the puffs
+        // over the shore rise clear of it and cap the hills instead
+        if (sys.kind === 'fog') h = Math.max(h, landUnder(p.normalize(), e1, e2, size) + 0.4 * size + 1);
         p.normalize().multiplyScalar(R + h);
         C.set([p.x, p.y, p.z, size], n * 4);
         const dark = sys.kind === 'thunder' || sys.kind === 'rain' ? 1 - 0.4 * (h - look.base) / Math.max(1, look.tower + 18) : 1;
@@ -323,6 +328,21 @@ export class Weather {
     else if (snow === most) { vel.set(0.9, -1.6, 0.5); u.uLen.value = 0.05; (u.uFallColor.value as THREE.Color).setRGB(1, 1, 1); u.uGlow.value = 0.2; }
     else { vel.set(0.4, 0.9, 0.3); u.uLen.value = 0.08; (u.uFallColor.value as THREE.Color).setRGB(2.4, 0.9, 0.25); u.uGlow.value = 1; }
   }
+}
+
+const probe = new THREE.Vector3();
+
+/** The highest ground under a puff of this size centred over `at` (a unit vector), on two rings round it. */
+function landUnder(at: THREE.Vector3, e1: THREE.Vector3, e2: THREE.Vector3, size: number): number {
+  let top = heightAt(at);
+  for (const k of [0.45, 0.85]) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i + k) * (Math.PI / 3), d = (k * size) / R;
+      probe.copy(at).addScaledVector(e1, Math.cos(a) * d).addScaledVector(e2, Math.sin(a) * d).normalize();
+      top = Math.max(top, heightAt(probe));
+    }
+  }
+  return top;
 }
 
 function smooth(a: number, b: number, x: number): number {

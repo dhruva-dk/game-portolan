@@ -8,7 +8,8 @@
 // - keyAt(k, e): the air's colours by the sun's height e (the sine of its elevation where the fragment is):
 //   k = 0 the horizon fog, 1 the sun's colour after the air, 2 the sky's light from above, 3 the light off the ground.
 // - planetAmbient(wp, n): the sky light a surface gets, by its local sun height and how it faces.
-// - underSea(col, wp): what lies below the water, seen through it: absorbed with depth and tinted by the sea there.
+// - underSea(col, wp): what lies below the water, seen through it: absorbed with depth and tinted by the sea there;
+//   land past the horizon seen through a dip of the eye's line through the sea sinks into it.
 // - atmosphere(col, wp): the air between the eye and wp, plus the limb from orbit and the Storm's tint.
 //
 // Any shader that includes <planet> (or three's fog or light chunks) gets these uniforms declared. A shader of its own
@@ -90,8 +91,13 @@ vec3 seaLight(vec3 wp) {
 
 vec3 underSea(vec3 col, vec3 wp) {
   if (uPlanet.x < 1.0) return col;
-  float rw = length(wp);
-  vec3 up = wp / rw, dir = normalize(wp - cameraPosition);
+  // the eye's line at its lowest: wp itself for a floor the line runs down to. A line that dips through the sea short
+  // of the horizon and out again to land beyond it passes over a floor at least that deep, and that floor is what
+  // shows through the water there, as the sky draws it (sky.ts), not the land the planet's curve hides
+  vec3 v = wp - cameraPosition;
+  vec3 lo = cameraPosition + v * clamp(-dot(cameraPosition, v) / max(dot(v, v), 1e-6), 0.0, 1.0);
+  float rw = length(lo);
+  vec3 up = lo / rw, dir = normalize(v);
   float depth = uPlanet.y + seaLift(up) - rw;
   if (depth <= 0.0 || length(cameraPosition) < uPlanet.y) return col;
   // the path through the water, bent toward the vertical as it enters
@@ -101,7 +107,7 @@ vec3 underSea(vec3 col, vec3 wp) {
   vec3 k = mix(vec3(0.45, 0.14, 0.11), vec3(0.2, 0.055, 0.045), tint.a);
   vec3 T = exp(-k * path);
   float s = 1.0 - exp(-path * mix(0.4, 0.12, tint.a));
-  return col * T + tint.rgb * seaLight(wp) * s;
+  return col * T + tint.rgb * seaLight(lo) * s;
 }
 
 float airDepth(float a, float b, float h0, float h1, float L) {
@@ -127,12 +133,14 @@ float airLoss(vec3 wp) {
   return max(f, space * pow(1.0 - abs(dot(d / max(dist, 1e-3), wp / rw)), 4.0) * 0.85);
 }
 
-// where the eye's line to wp enters the sea, for a point under it seen from above: the air ends there
+// where the eye's line to wp enters the sea, seen from above, for a point under it or past the horizon beyond a dip
+// through it: the air ends there
 vec3 seaEntry(vec3 wp) {
   vec3 o = cameraPosition, v = wp - o;
   float a = dot(v, v), b = dot(o, v), c = dot(o, o) - uPlanet.y * uPlanet.y;
-  if (c <= 0.0 || dot(wp, wp) >= uPlanet.y * uPlanet.y || a < 1e-6) return wp;
-  return o + v * clamp((-b - sqrt(max(b * b - a * c, 0.0))) / a, 0.0, 1.0);
+  if (c <= 0.0 || b >= 0.0 || a < 1e-6 || b * b <= a * c) return wp;
+  float t = (-b - sqrt(b * b - a * c)) / a;
+  return t < 1.0 ? o + v * t : wp;
 }
 
 vec3 atmosphere(vec3 col, vec3 wp) {

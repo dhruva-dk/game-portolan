@@ -71,6 +71,9 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
     const now: number = await game.hook((h) => h.tick), to = start + f * plan.every - now, w = Math.max(1, Math.min(WARM, to));
     await game.hook((h, n) => h.step(n), to - w);
     await game.hook((h, s) => h.run(s), w / 30);
+    // run() draws its frames back to back, so the terrain round a ship that has moved is still the coarse chunks
+    // until the workers catch up: wait for them, on still frames that move nothing on
+    await game.hook((h) => h.settle(0));
     const tick: number = await game.hook((h) => h.tick), d = tick - plan.trigger;
     // the sign spelled out in the file name, where a slug would make t-1 and t+1 the same
     await shots.shot(game, `t${d >= 0 ? '+' : ''}${d}`, `${String(f).padStart(3, '0')}-t-${d < 0 ? 'minus' : 'plus'}-${Math.abs(d)}.png`);

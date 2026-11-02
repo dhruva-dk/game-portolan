@@ -1026,7 +1026,23 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - **The Jade Shoals' sound:** the falling tide has a sound of its own, `tideDraw`: a long hiss of water running off the sand that falls away, with gurgles as the channels empty. The tide coming back in keeps the flood surge. The events that fill a whole region play all round you while you are in that region, not from their spot 300 m off: the Mistwood fog, the Spring Flood, both tides, the cloudburst and the Mangrove flood (`WIDE` in src/app/sounds.ts). Checked as rendered buffers only, since the captures run muted.
 - **The Glass Sea's banner** went at 4 s, while the whale was still in the air: its leap takes 4.8 s to come down. That event now runs 7 s (`REGION_EVENT.run` in src/sim/tables.ts), so the banner holds through the leap and the wall of water and leaves once the sea is calm again. Checked in the event-glassSea capture.
 
-Still open from the review: the hard-edged pale shapes.
+*Revisions of the hard-edged pale shapes, checked in their captures and in the regions and borders captures:*
+- **The Maelstrom's pink sheet, and the pale slabs over the water in general:**
+  - The planet is small, so an eye 8 m up looks down through the sea short of the horizon and out of it again, to land beyond that the curve should hide. The water is see-through, so that land showed through it as pale ghosts with a hard edge where it met the waterline.
+  - That was the Maelstrom's sheet: its far ring wall, 220 m off. The same ghosts stood under the horizon elsewhere: the lower halves of the coral columns and the spires, the Spice Isles' hill below its own waterline, and the slabs in the Maelstrom's and the Basalt Stacks' dusk frames.
+  - Now the sea takes such a line as it does a floor at the line's lowest point, as the sky already did where no floor is drawn, and the air ends where the line enters the sea (`underSea` and `seaEntry` in src/render/planet.ts).
+  - Seabed seen down through the water is unchanged. Against the last commit, the shallows' frames move under 0.03% of their pixels (the Glass Sea's 0.4%, round the whale), and the orbit views barely at all.
+  - *Revision 1 was dropped:* it lengthened the path through the water at glancing looks. That muddied the clear shallows, and once the captures waited for the terrain it did not remove the sheet. This is revision 2.
+- **The Weeping Isle's white wall of mist:**
+  - The cloudburst's fog puffs lay low on the water. Where the isle's cliffs came up through a puff, the land cut it with a hard edge, and a puff low on the sea met the water along a hard line.
+  - Now the puffs thin out over their last 5 m above the water. The ones over the shore rise clear of the land under them and cap the hills instead (`landUnder` in src/render/weather.ts).
+- **The Mangrove Labyrinth's slab** did not show in this pass's capture of its flood.
+- **Mistwood's tan band** is the territory ink: the pen line of the ship that holds that water, drawn at the fog's edge.
+- **The moment captures** now wait for the terrain round the camera to load before each frame is shot, on still frames that move nothing on (tests/capture/moment.ts). Before, a ship that had moved was shot over the coarse chunks still standing in for the fine ones.
+
+Decisions (Settled overnight in the owner's absence; the owner may change it.):
+- Mistwood's band stays as it is. It is the territory ink doing its job, not a slab of mist.
+- Backlog: a cliff face turned from the sun at close range reads as a flat, near-black slab (the Weeping Isle's cloudburst frames from t+30, lower left). It is the rock's own colour under the sky's light alone, crushed by the grade's ACES toe, and the cloudburst doesn't soften the light the way an overcast sky would. That is a lighting and grade change for every region, so it waits for its own pass.
 
 **The perks, done when each shows itself working:**
 
@@ -1262,7 +1278,7 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - **Mistwood:** no giant cedar trunks over a fog line (the flora and mist libraries, below).
 - **The Spires:** the Needle. Settled since by the owner's decision above, so it passes the new rule.
 - **The Mangrove Labyrinth:** no low canopy over the channels (the flora library, below).
-- **The renderer:** pale slabs still stand over the water (below).
+- **The renderer:** pale slabs still stand over the water. Fixed since: they were land past the horizon seen through the sea (the review's revisions, above). Not yet re-judged.
 - **Integration:** no real iPad has run it yet (Performance, below).
 
 Its no-humans check passed the Eye, the Kelp Cathedral and the Root Gate. It failed the Hollow Cedar's stump, whose four even pinnacles read as a steeple. The stump is now a ragged, slanting break with uneven splinters; that change came after the review, so it is not yet re-judged. It called three shapes borderline: the Eye's blue light on its tip at night (a little like a lighthouse), the Hollow Cedar's log seen end-on (a pipe; its bark and ends are now rough), and the Coral Atolls' flat-topped columns.
@@ -1273,7 +1289,8 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 - The ships have no environment map, so their varnish and metal look flat.
 - The shield aura's material doesn't get the planet's uniforms (sun, fog), so it doesn't darken at night.
 - The far sea turns sky-white near the horizon.
-- Pale slabs still stand over the water in some frames, such as the bottom right of the Maelstrom's dusk frame.
+- ~~Pale slabs still stand over the water in some frames, such as the bottom right of the Maelstrom's dusk frame.~~ They were land past the horizon seen through the sea, and are gone (the review's revisions, above).
+- A cliff face turned from the sun at close range reads as a flat, near-black slab. The sky's light alone leaves the rock too dark, the grade's ACES toe crushes it, and a cloudburst doesn't soften the light as an overcast sky would.
 - A polar night glows red over the horizon unless the sun is far under it. On a planet this small the sunset is only a few hundred metres off, and the sky still catches it with the sun 45° under. A match draws its tilt from ±26°, so the poles' nights always glow. The regions capture tilts the planet so the sun stands 70° under at every midnight, as at the equator (`nightTilt` in `src/app/scenes.ts`). Find what catches the sunset and let it go dark.
 - The lanterns' bloom is too hot at night. It's worst in the spectate view, which it washes out.
 - "Nights are readable" passes in the captures, but only just. Past about 180 m a ship's stern lantern drops under the curve, and only her masthead light shows; it reaches about 238 m. The captures place a ship only where her masthead is in sight, so they can't show a failure. The Fire Archipelago's night and beacon frames find nowhere to put a ship at all.
@@ -1287,6 +1304,8 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 - The Moonbow Arch's beacon is an overexposed white blob under the arch, with no spray column and no moonbow.
 - Blossom Run's beacon shows as two pink smudges. There's no firefly spiral, and the blossom isn't lit.
 - The Coral Atolls' pipes and Mistwood's rings only just read.
+- The Maelstrom's foam round the vortex has a small brownish stain on one side, seen in the event's frames.
+- The gun tokens on their deck mounts were checked by their sizes only, not seen up close in a capture. The broadside's carriage was seen.
 - The simulation's beacon heights don't match the looks. The Fjords' says 140 m, but its look glows about 12 m up. The captures frame each beacon from its look's height instead (`beaconView` in `src/app/hook.ts`). Set the specs' heights from the looks. The landmark-in-view test uses the specs' heights and passes 98.5% of spots by night. At the looks' heights it's 80.0% for the core light alone, 92.7% at 0.6 of the height, and 98.7% for the full glow.
 
 **The interface:**
