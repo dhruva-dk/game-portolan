@@ -2,9 +2,10 @@
 // coming home closes the loop and inks everything inside. Cutting a rival's trail costs its hull and pays the
 // cutter. Holding a region's landmark gives that region's perk. Ships mend slowly in their own water.
 import { hurt } from './harm.ts';
-import { dcos, dot, normalize, set, v3 } from './math.ts';
+import { PI, dcos, dot, normalize, set, v3, type V3 } from './math.ts';
+import { openAt } from './nav.ts';
 import { hasPerk } from './perks.ts';
-import { AREA_Q, GRID, R, TERRITORY, cellDir, cellOf, neighbor } from './sphere.ts';
+import { AREA_Q, GRID, R, TERRITORY, along, cellDir, cellOf, neighbor, tangentAt } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, emit, type MatchState } from './state.ts';
 import { INK, PERKS } from './tables.ts';
 import { LANDMARKS } from './world/index.ts';
@@ -38,23 +39,77 @@ let words: Int32Array = new Int32Array(0), eights: Float64Array = new Float64Arr
 /** Square metres in a held area. */
 export const squareMetres = (held: number): number => held / AREA_Q;
 
-export const atHome = (state: MatchState, i: number): boolean => state.owner[cellOf(TERRITORY, state.ships[i].pos)] === i + 1;
+export const holdsAt = (state: MatchState, i: number, p: V3): boolean => state.owner[cellOf(TERRITORY, p)] === i + 1;
+export const atHome = (state: MatchState, i: number): boolean => holdsAt(state, i, state.ships[i].pos);
 
-/** The territory cell under each landmark: whoever owns it holds that region's perk. */
-const MARKS: readonly number[] = LANDMARKS.map((l) => cellOf(TERRITORY, l.pos));
+/** Metres of open water a landmark's hold has all round it at mean tide: room to sail a loop round it. */
+const ROOM = 16;
+/** The longest loop round a landmark that fits in a trail before it runs dry, with the way out to it and back. */
+const ROUND = 340;
+const AROUND = v3(), OUT = v3(), LAST = v3();
+
+function roomy(p: V3): boolean {
+  if (!openAt(p)) return false;
+  for (let k = 0; k < 12; k++) if (!openAt(along(p, tangentAt(p, (k * PI) / 6, AROUND), ROOM, OUT))) return false;
+  return true;
+}
+
+/** Whether a loop round `at` through the first water out from it on each bearing is short enough to sail. */
+function loopable(at: V3): boolean {
+  let length = 0;
+  for (let k = 0; k <= 12; k++) {
+    tangentAt(at, (k * PI) / 6, AROUND);
+    let r = 12;
+    while (r <= 150 && !openAt(along(at, AROUND, r, OUT))) r += 6;
+    if (r > 150) return false;
+    const dx = OUT.x - LAST.x, dy = OUT.y - LAST.y, dz = OUT.z - LAST.z;
+    if (k > 0) length += R * Math.sqrt(dx * dx + dy * dy + dz * dz);
+    set(LAST, OUT.x, OUT.y, OUT.z);
+  }
+  return length <= ROUND;
+}
+
+/** The landmark's own spot where a loop round it fits in a trail, else the nearest water with room round it. */
+function holdNear(at: V3): V3 {
+  const out = v3(), t = v3();
+  if (loopable(at)) return set(out, at.x, at.y, at.z);
+  for (let r = 4; r <= 400; r += 4) {
+    for (let k = 0; k < 32; k++) if (roomy(along(at, tangentAt(at, (k * PI) / 16, t), r, out))) return out;
+  }
+  return set(out, at.x, at.y, at.z);
+}
+
+/**
+ * Where each landmark is held: whoever owns the territory cell under its hold holds that region's perk. It is the
+ * landmark's own spot when a loop round it is short enough to sail before the trail runs dry; otherwise it is the
+ * nearest water with room to sail round, so a small loop there holds it, as does a loop round the whole landmark.
+ * (Settled overnight in the owner's absence; the owner may change it. Held at their own spots, Thunder Falls, the Great
+ * Cherry, the Sandbar Light and the Weeping Isle could only be held by a loop round more land than a trail gets round,
+ * and the Gorge by a loop round both its walls.)
+ */
+let holds: readonly V3[] | null = null, marks: readonly number[] = [];
+export function landmarkHold(r: number): V3 {
+  if (!holds) {
+    holds = LANDMARKS.map((l) => holdNear(l.pos));
+    marks = holds.map((h) => cellOf(TERRITORY, h));
+  }
+  return holds[r];
+}
+const MARKS = (): readonly number[] => (landmarkHold(0), marks);
 
 /** The ship holding region r's landmark, or -1. */
-export const holderOf = (state: MatchState, r: number): number => state.owner[MARKS[r]] - 1;
+export const holderOf = (state: MatchState, r: number): number => state.owner[MARKS()[r]] - 1;
 
 /** Recomputes who holds which perk, and tells of the changes. */
 export function perks(state: MatchState): void {
   for (let i = 0; i < SHIPS; i++) {
     const ship = state.ships[i];
     let mask = 0;
-    if (ship.phase !== PHASE.sunk) for (let r = 0; r < MARKS.length; r++) if (state.owner[MARKS[r]] === i + 1) mask |= 1 << r;
+    const at = MARKS();
+    if (ship.phase !== PHASE.sunk) for (let r = 0; r < at.length; r++) if (state.owner[at[r]] === i + 1) mask |= 1 << r;
     const gained = mask & ~ship.perks, lost = ship.perks & ~mask;
     ship.perks = mask;
-    for (let r = 0; r < MARKS.length; r++) {
+    for (let r = 0; r < LANDMARKS.length; r++) {
       if ((gained & (1 << r)) !== 0) emit(state, EVENT.perkGained, i, -1, LANDMARKS[r].pos, { item: r });
       if ((lost & (1 << r)) !== 0) emit(state, EVENT.perkLost, i, -1, LANDMARKS[r].pos, { item: r });
     }

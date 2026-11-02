@@ -105,6 +105,8 @@ export function land(state: MatchState, i: number): void {
   ship.regions |= 1 << regionAt(ship.pos);
   emit(state, EVENT.landing, i, regionAt(ship.pos), ship.pos, { item: regionAt(ship.pos) });
   inkHome(state, i);
+  // a captain keeps the spot it landed on, the middle of its home water, to set out from
+  copy(ship.captain.drop, ship.pos);
 }
 
 /** True once every ship has left the Gale. */

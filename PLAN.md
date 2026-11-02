@@ -1141,6 +1141,12 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - **Rotating rule changes:** the rule of the day shows in the lobby and when the match starts.
 - **Determinism:** a match replayed from its seed and inputs ends with the same state hash in Node, Chromium and WebKit, with the region events in.
 
+  *Done for the bots: tests/tools/bots.ts counts each behaviour named here over 20 seeded matches of league captains, and tests/sim/bots.test.ts checks that every count is above zero, that the Homesteaders (the territory holders) hold landmarks longer than the other captains on average, and that captains drawn at a skill of 0.6 or more finish higher on average than those drawn at 0.4 or less. From seed 1: each of the 16 landmarks is held 1 to 11 times; captains get out of thunder 261 times and out of ash 30 times; the Homesteaders hold a landmark 37 s a match against 25 s for the others (the Turtles hold longest, 56 s); and the higher-skilled finish 10.4th on average against 10.6th.* Decisions (Settled overnight in the owner's absence; the owner may change it.):
+  - A landmark is held at its own spot only when a loop round it, through the first water out from it on each bearing, is 340 m or less. Otherwise it is held at the nearest water with 16 m open all round it. That moves the hold off Thunder Falls, the Great Cherry, the Sandbar Light, the Weeping Isle and the Gorge, which a trail could only get round by looping more land than it lasts for. Nothing on the map shows a player where a moved hold is yet (backlog).
+  - Each captain has a liking for landmarks (`marks` in src/sim/captains/temperaments.ts: the Homesteader 0.9, the Turtle 0.5, the others 0.1 to 0.3). One that goes for them lands 50 to 110 m from the hold of its region's landmark, and keeps the spot it landed on as home.
+  - Its loop goes round the hold of the nearest landmark it doesn't hold, within 260 m: eight points at the first water out from it on each bearing, then home. It sets out from its own water, or from the spot it landed on while it still holds that and is within 360 m of it. The whole trip has to come to 560 m or less. It doesn't break off the loop for loot or a raid.
+  - Half the weather systems after the first form over the calm (within 0.85 of its radius), so the circle sees thunder and ash late in a match, not only the open sea.
+
 **The renderer, done when:**
 - **No pale slabs stand over the water** in any region capture.
 - **Polar nights are dark:** with the sun 18° or more under the horizon, no part of the sky glows red. The regions capture shows each pole's night at the strongest tilt a match can draw, not with `nightTilt`.
@@ -1313,10 +1319,15 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 - The HUD's shield and hull bars have no icons.
 - In the locker, the camera crops the top of the sail.
 - The win's lens flash lands over the victory ceremony's own flash, so the ceremony's first second is washed out twice.
+- A landmark held off its own spot (Thunder Falls, the Great Cherry, the Sandbar Light, the Weeping Isle and the Gorge) gives no sign of where the hold is. Mark it on the map, or on the water.
 
 **The sound:**
 - The surf bed listens for land on eight bearings 35 m out, so a cliff over deep water sounds like a beach.
 - The title and the lobby hear a fixed mix for their spot: no surf, and a fair breeze.
+
+**The bots:**
+- Skill shows only just: over seed 1's 20 matches the higher-skilled finish 10.4th on average and the lower 10.6th. Draw skill wider, or let it weigh more in a fight.
+- The bot report takes about a minute, so tests/sim/bots.test.ts is the slowest test.
 
 **The tools:**
 - The lap rings follow a line of latitude straight through land, so many frames show the ship on a hillside or inside a cliff. Route the lap round the islands, or leave out the frames over land.

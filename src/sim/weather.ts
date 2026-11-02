@@ -4,10 +4,11 @@
 // the Fire Archipelago) burns ships that stay in it. Systems form over a region mostly as that region's own kinds.
 import { eventSky } from './environment.ts';
 import { hurt } from './harm.ts';
-import { addScaled, dot, dsin, normalize, rngDir, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
+import { PI, addScaled, dot, dsin, normalize, rngDir, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
 import { nav, navCell } from './nav.ts';
-import { apart, along } from './sphere.ts';
+import { apart, along, tangentAt } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, emit, elapse, type MatchState, type WeatherSystem } from './state.ts';
+import { calmNow } from './storm.ts';
 import { WEATHER, WEATHER_KIND, WEATHER_NAMES } from './tables.ts';
 import { breeze, spinAround } from './wind.ts';
 import { CENTRES, REGIONS, regionAt, type WeatherKind } from './world/index.ts';
@@ -158,6 +159,13 @@ const snowLine = (): number => SNOW_LINE;
 function form(state: MatchState, rng: Rng, s: WeatherSystem): void {
   const first = state.tick === 0;
   rngDir(rng, s.at);
+  // later ones form over the calm this often, where the fleet is, so weather comes to the ships and doesn't only pass
+  // over empty sea (with them all over the planet, a ship spent under 5% of a match in any)
+  if (!first && rngFloat(rng) < WEATHER.gather) {
+    const calm = calmNow(state);
+    tangentAt(calm.at, rngRange(rng, -PI, PI), T);
+    along(calm.at, T, 0.85 * calm.r * Math.sqrt(rngFloat(rng)), s.at);
+  }
   const region = regionAt(s.at), own = OWN[region];
   let kind: number;
   if (own.length > 0 && rngFloat(rng) < WEATHER.own) kind = own[rngInt(rng, own.length)];

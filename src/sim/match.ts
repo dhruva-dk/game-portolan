@@ -177,5 +177,5 @@ export { seen, SEEN, sightOf } from './visibility.ts';
 export { seaLevel, sunDir, sunUp, isNight, localHour, hourOf } from './environment.ts';
 export { windAt, newWind, type Wind } from './wind.ts';
 export { skyAt, newSky, type Sky } from './weather.ts';
-export { squareMetres, holderOf } from './territory.ts';
+export { squareMetres, holderOf, landmarkHold } from './territory.ts';
 export { priceOf, canCall } from './economy.ts';
