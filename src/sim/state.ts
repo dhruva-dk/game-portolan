@@ -84,6 +84,8 @@ const CAPTAIN = rec(
   // seconds it holds a turn off land ahead, signed by its side: negative to port
   ['avoid', f64],
   ['felt', f64],
+  // radians off the straight course to its goal it sails, to ride a current or sail a better point of the wind
+  ['lean', f64],
   // its drop has come past in the Gale: it leaves at the first gap in the crowd
   ['bound', bool],
 );

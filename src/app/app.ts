@@ -16,9 +16,9 @@ import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
 import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
-import { PHASE, PLAYER, SHIPS, WEATHER_KIND } from '../sim/match.ts';
+import { PHASE, PLAYER, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
 import { WEATHER } from '../sim/tables.ts';
-import { LANDMARKS, REGIONS } from '../sim/world/index.ts';
+import { REGIONS } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 import type { CameraRig } from '../render/camera.ts';
 import { Controls } from './controls.ts';
@@ -476,7 +476,7 @@ export class App {
     const st = s.state, at = st.ships[PLAYER].pos;
     for (const id of o.perks ?? []) {
       const r = REGIONS.findIndex((x) => x.perk === id);
-      if (r >= 0) st.owner[cellOf(TERRITORY, LANDMARKS[r].pos)] = PLAYER + 1;
+      if (r >= 0) st.owner[cellOf(TERRITORY, landmarkHold(r))] = PLAYER + 1;
     }
     const kind = o.weather ? WEATHER_KIND[o.weather as keyof typeof WEATHER_KIND] : undefined;
     if (kind === undefined) return;

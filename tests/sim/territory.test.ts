@@ -12,7 +12,7 @@ import { createMatch } from '../../src/sim/setup.ts';
 import { TERRITORY, advance, along, angleTo, apart, cellOf, tangentToward } from '../../src/sim/sphere.ts';
 import { EVENT, GULL, PHASE, TICK, type MatchState } from '../../src/sim/state.ts';
 import { COINS, DELIVERY, INK, ITEM, PARCELS, PERKS, SLOTS, WEAPONS } from '../../src/sim/tables.ts';
-import { atHome, inkHome, squareMetres } from '../../src/sim/territory.ts';
+import { atHome, inkHome, landmarkHold, squareMetres } from '../../src/sim/territory.ts';
 import { LANDMARKS, REGIONS, REGION_COUNT } from '../../src/sim/world/index.ts';
 import { events, openWater, place, quietMatch, run, sailOn, type Course } from './fixture.ts';
 
@@ -51,7 +51,7 @@ function pilot(state: MatchState, i: number, points: V3[], near = 12) {
 
 /** Holds region r's landmark for ship i, or lets it go. */
 const hold = (state: MatchState, r: number, i: number) => {
-  state.owner[cellOf(TERRITORY, LANDMARKS[r].pos)] = i + 1;
+  state.owner[cellOf(TERRITORY, landmarkHold(r))] = i + 1;
 };
 
 // ---------------------------------------------------------------- territory

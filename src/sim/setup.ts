@@ -63,7 +63,7 @@ function newCaptain(e: FleetEntry, i: number, seed: number, gentle: boolean): Ca
     watches: e.captain, eyed: false,
     mode: 0, think: rngInt(rng, 6), since: 0, react: 0, foe: -1, seen: -1e9, last: xyz(), goal: xyz(), want: xyz(), target: -1,
     region: -1, drop: xyz(), path: [], leg: 0, pathTo: xyz(), repath: 0, strafe: rngFloat(rng) < 0.5 ? -1 : 1, strafeT: 0,
-    err: xyz(), errTo: xyz(), errT: 0, burst: 0, swapT: 0, stuckT: 0, backT: 0, claimT: 0, ring: [], li: 0, avoid: 0, felt: 0, bound: false,
+    err: xyz(), errTo: xyz(), errT: 0, burst: 0, swapT: 0, stuckT: 0, backT: 0, claimT: 0, ring: [], li: 0, avoid: 0, felt: 0, lean: 0, bound: false,
   };
 }
 

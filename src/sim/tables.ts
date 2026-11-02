@@ -274,6 +274,9 @@ export const WEATHER = {
   drift: 0.15,
   /** A system spawned over a region is one of its own kinds this often. */
   own: 0.85,
+  /** A system formed after the start is formed over the calm this often. (Settled overnight in the owner's absence;
+   *  the owner may change it.) */
+  gather: 0.5,
   fog: { sight: 0.35 },
   rain: { wind: 1.4, rough: 1.8, spread: 1.3, swirl: 3 },
   thunder: { every: [6, 12], warn: 1.5, reach: 12, damage: 25, open: 30, swirl: 3 },
