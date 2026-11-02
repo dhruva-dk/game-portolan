@@ -48,10 +48,10 @@ for (const s of scatterPoints(-300, -340, 300, 320, CELL / 2, S + 7, 0.9)) {
 
 export const mistwood: RegionSpec = {
   height,
-  // The landmark is seen by its stump's light, 62 m up.
-  landmark: { x: LOG.x, y: LOG.y, r: 50, height: 62, bearing: LOG.bearing },
-  beacon: { x: SNAG.x, y: SNAG.y, height: 62 },
-  loot: snapWet(height, [-150, -110, 120, 160, -60, 190, 160, -90, -10, -170, 90, 90, -180, 60, 40, -40], 4),
+  // The landmark is seen by its stump's light, 81 m up.
+  landmark: { x: LOG.x, y: LOG.y, r: 50, height: 84, bearing: LOG.bearing },
+  beacon: { x: SNAG.x, y: SNAG.y, height: 81 },
+  loot: snapWet(height, [-150, -110, 120, 160, -60, 190, 160, -90, -10, -170, 90, 90, -144, 51, 40, -40], 4),
   lanes: [
     // A slow drain out of the south-east channels and across the Great Current into the Coral Atolls.
     { name: 'the Cedar drain', pts: [110, -140, 160, -220, 200, -280, 236, -340], width: 22, speed: 2.6 },

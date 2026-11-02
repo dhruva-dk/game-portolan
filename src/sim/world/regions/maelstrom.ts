@@ -79,7 +79,7 @@ export const maelstrom: RegionSpec = {
   beacon: { x: EYE.x, y: EYE.y, height: EYE.top + 6 },
   loot: snapWet(height, [
     40, 40, -60, 70, 90, -60, -100, -110, 0, -140, 130, 90,
-    -230, 60, 240, -50, 60, 250, -120, -240, 170, -210,
+    -230, 60, 240, -50, 80, 240, -120, -240, 170, -210,
   ], 4),
   lanes: [{ name: 'the Spill', pts: LANE, width: 24, speed: 3 }],
   obstacles: [],

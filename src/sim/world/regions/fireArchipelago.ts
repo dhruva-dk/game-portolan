@@ -52,7 +52,7 @@ export const fireArchipelago: RegionSpec = {
   landmark: { x: PEAK.x, y: PEAK.y, r: PEAK.rim, height: PEAK.top, bearing: 200 },
   // The lava's glow in the caldera, lighting the plume from below.
   beacon: { x: PEAK.x, y: PEAK.y, height: PEAK.top + 10 },
-  loot: snapWet(height, [PEAK.x, PEAK.y, -60, -150, -200, 120, 190, 120, 200, -120, -190, -60, 70, 230, -90, 230], 3),
+  loot: snapWet(height, [PEAK.x, PEAK.y, -60, -150, -200, 120, 190, 120, 162, -102, -190, -60, 70, 230, -90, 230], 3),
   lanes: [
     // A hot current round the cone's southern foot and east into the Weeping Isle's water.
     { name: 'the Ash current', pts: LANE, width: 22, speed: 2.8 },

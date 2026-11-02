@@ -1,6 +1,6 @@
 // The Kelp Shallows. Wide olive shallows three or four metres deep, cut by deeper winding channels, with low
 // grassy islets and rock flats awash at low tide. The drama is under water: kelp beds everywhere, and at the
-// heart the Kelp Cathedral, a deep round nave where giant kelp grows in columns 50–70 m above the surface.
+// heart the Kelp Cathedral, a deep round nave where giant kelp grows in columns 50–90 m above the surface.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
@@ -56,10 +56,10 @@ for (const [x, y, r] of [[-150, 170, 55], [120, 160, 60], [150, -60, 50], [-170,
 
 export const kelpShallows: RegionSpec = {
   height,
-  landmark: { x: NAVE.x, y: NAVE.y, r: NAVE.r, height: 72, bearing: 0 },
+  landmark: { x: NAVE.x, y: NAVE.y, r: NAVE.r, height: 88, bearing: 0 },
   // The kelp glows at the heart of the nave.
   beacon: { x: NAVE.x, y: NAVE.y, height: 40 },
-  loot: snapWet(height, [NAVE.x + 30, NAVE.y - 10, -150, 170, 120, 160, 150, -60, -170, -60, -20, -170, 190, 60, -60, 230], 3),
+  loot: snapWet(height, [NAVE.x + 30, NAVE.y - 10, -132, 181, 120, 160, 150, -60, -170, -60, -20, -170, 190, 60, -60, 230], 3),
   lanes: [
     // A cold stream off the Crown runs down the western channels and away south-east to the mangroves.
     { name: 'the Kelp stream', pts: LANE, width: 24, speed: 2.8 },

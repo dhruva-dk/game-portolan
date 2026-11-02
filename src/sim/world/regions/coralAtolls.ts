@@ -77,9 +77,9 @@ for (const a of ATOLLS) for (const [b, floor] of a.gaps) if (floor > -2.5) TIDAL
 export const coralAtolls: RegionSpec = {
   height,
   // The Great Reef is low; a glow of bioluminescence rising from its lagoon is what neighbours see.
-  landmark: { x: GREAT.x, y: GREAT.y, r: GREAT.r, height: 62, bearing: 0 },
-  beacon: { x: GREAT.x, y: GREAT.y, height: 62 },
-  loot: snapWet(height, [GREAT.x, GREAT.y, GREAT.x + 50, GREAT.y + 40, -165, 170, -175, -165, 60, 215, 110, -200, 190, 40, -100, 140, 40, -150], 3),
+  landmark: { x: GREAT.x, y: GREAT.y, r: GREAT.r, height: 88, bearing: 0 },
+  beacon: { x: GREAT.x, y: GREAT.y, height: 88 },
+  loot: snapWet(height, [GREAT.x, GREAT.y, GREAT.x + 50, GREAT.y + 40, -165, 170, -146, -149, 60, 215, 110, -200, 190, 40, -100, 140, 40, -150], 3),
   lanes: [
     // Up the eastern side from the Maelstrom's edge and across the Great Current to the Spires.
     { name: 'the Reef current', pts: LANE, width: 24, speed: 3 },

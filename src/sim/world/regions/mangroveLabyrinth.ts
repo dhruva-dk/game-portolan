@@ -9,7 +9,7 @@ import { cells, fromEquator, hyp, needle, noise, plant, polyDist, smax, smin, sm
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x3a46;
-const GATE = { x: 0, y: 0, half: 17, top: 50, clear: 24 };
+const GATE = { x: 0, y: 0, half: 17, top: 68, clear: 24 };
 const RING = 62;
 // The main channels: always open.
 const SPOKES: number[][] = [

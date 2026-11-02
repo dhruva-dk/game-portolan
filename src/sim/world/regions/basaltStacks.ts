@@ -1,5 +1,5 @@
 // The Basalt Stacks. Black columnar basalt: plateau islands with flat green turf tops and cliffs that step down
-// into the sea in hexagonal columns, sea stacks standing off them, and Moonbow Arch, a span of rock 64 m high
+// into the sea in hexagonal columns, sea stacks standing off them, and Moonbow Arch, a span of rock 86 m high
 // between two pillars, that you sail under. Behind the arch a narrow cut through the arch-head is floored by a
 // sill: it opens at high tide and closes at low.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
@@ -22,7 +22,7 @@ const PLATEAUS: number[][] = [
 const SINCOS = PLATEAUS.map((p) => [dsin(p[4] * DEG), dcos(p[4] * DEG)]);
 
 // Moonbow Arch: two pillars either side of a channel, the span running east–west.
-const ARCH = { x: 60, y: -40, half: 28, top: 64, clear: 40 };
+const ARCH = { x: 60, y: -40, half: 28, top: 86, clear: 40 };
 // The hidden passage: a cut north through the arch-head plateau, floored by a sill at -1.5 m.
 const PASSAGE = [112, -40, 112, 40];
 const LANE = [-10, 300, -8, 140, 12, 50, 48, 0, 60, -40, 82, -100, 130, -200, 196, -340];
@@ -78,7 +78,7 @@ export const basaltStacks: RegionSpec = {
   landmark: { x: ARCH.x, y: ARCH.y, r: 36, height: ARCH.top, bearing: 0 },
   // The moonbow's glow in the spray under the arch.
   beacon: { x: ARCH.x, y: ARCH.y, height: 30 },
-  loot: snapWet(height, [ARCH.x, ARCH.y - 30, 112, 55, -20, 60, -160, 150, 160, 60, -130, -110, 40, -230, -200, 190, 30, 220], 4),
+  loot: snapWet(height, [ARCH.x, ARCH.y - 30, 112, 55, -20, 60, -160, 150, 160, 60, -130, -110, 40, -230, -129, 176, 30, 220], 4),
   lanes: [
     // Down from the north, under Moonbow Arch, and away south-east across the Great Current.
     { name: 'the Arch run', pts: LANE, width: 22, speed: 3 },

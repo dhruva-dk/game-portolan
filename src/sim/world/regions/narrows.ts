@@ -57,7 +57,7 @@ export const narrows: RegionSpec = {
   height,
   landmark: { x: axis(15), y: 15, r: 30, height: 82, bearing: 180 },
   beacon: { x: axis(NORTH) + SLOT + WALL / 2, y: NORTH, height: 70 },
-  loot: snapWet(height, [axis(120), 120, axis(-90), -90, -150, 60, 150, -40, -120, -170, 140, 180, -170, 210, 160, -190], 4),
+  loot: snapWet(height, [axis(120), 120, axis(-90), -90, -150, 60, 150, -40, -120, -170, 140, 180, -134, 188, 160, -190], 4),
   lanes: [
     // The cold stream from the Crown runs on through the Gorge and out to the south-east.
     { name: 'the Gorge race', pts: LANE, width: 14, speed: 3.2 },

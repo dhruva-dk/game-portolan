@@ -1,5 +1,5 @@
 // The Fjords. Four granite massifs, their tops 60–100 m up, split by narrow fjords with U-shaped walls: the main
-// fjord runs north from the open sea to Thunder Falls, which drops 130 m off the head wall with a sailable gap
+// fjord runs north from the open sea to Thunder Falls, which drops 146 m off the head wall with a sailable gap
 // behind its curtain; a sound crosses east–west; two arms branch off. Skerries litter the outer water.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { fbm, hyp, noise, plant, ridged, scatter, segDist, smax, smin, smoothstep, snapWet, strokeDist } from '../kit.ts';
@@ -41,8 +41,8 @@ function height(x: number, y: number): number {
     const sd = smax(outer, -water, 6);
     // U-shaped walls: sheer for the first 20 m in from the water, then shoulders rounding over to the plateau.
     const top = 62 + 22 * fbm(x * 0.006, y * 0.006, S + 5, 3) + 12 * ridged(x * 0.012, y * 0.012, S + 6);
-    // The head wall is the highest ground, so the falls drop the full 130 m.
-    const head = 130 * (1 - smoothstep(30, 90, hyp(x, y - FALLS_Y - 30)));
+    // The head wall is the highest ground, so the falls drop the full 146 m.
+    const head = 146 * (1 - smoothstep(30, 90, hyp(x, y - FALLS_Y - 30)));
     const plateau = Math.max(top, head);
     let g: number;
     if (sd < 0) {
@@ -68,16 +68,16 @@ function height(x: number, y: number): number {
 
 export const fjords: RegionSpec = {
   height,
-  landmark: { x: 0, y: FALLS_Y, r: 22, height: 130, bearing: 180 },
-  beacon: { x: 0, y: FALLS_Y + 16, height: 124 },
-  loot: snapWet(height, [0, -110, -2, 40, -150, -20, 150, -8, -90, 115, 110, -150, -60, -230, 120, -235, 205, 120], 4),
+  landmark: { x: 0, y: FALLS_Y, r: 22, height: 146, bearing: 180 },
+  beacon: { x: 0, y: FALLS_Y + 16, height: 140 },
+  loot: snapWet(height, [0, -110, -2, 40, -150, -20, 150, -8, -90, 115, 110, -150, -60, -230, 120, -235, 186, 8], 4),
   lanes: [
     // The falls' outflow, down the main fjord and out across the Great Current.
     { name: 'the Fjord race', pts: [0, 80, 4, -40, -6, -170, 4, -260, 30, -340], width: 22, speed: 3 },
   ],
   obstacles: [
     // Thunder Falls: a curtain of water across the head of the fjord, with the slot of water behind it.
-    { kind: 'curtain', x: 0, y: FALLS_Y, bearing: 90, r: 4, height: 130, length: 30 },
+    { kind: 'curtain', x: 0, y: FALLS_Y, bearing: 90, r: 4, height: 146, length: 30 },
   ],
   zones: [
     { kind: 'spray', x: 0, y: FALLS_Y - 10, r: 40 },

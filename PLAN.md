@@ -892,8 +892,6 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 
 **The world** (each is a `todo` test in `tests/sim/world.test.ts`, so `npm test` passes with them open):
 - **Open stretches:** twelve regions have straight courses longer than 217 m with nothing on them. The longest: the Narrows 570 m, the Coral Atolls 423 m, the Glass Sea 372 m, the Fire Archipelago 360 m, the Ice Crown 321 m, the Jade Shoals 318 m. Only Mistwood, the Kelp Shallows, the Weeping Isle and the Mangrove Labyrinth are under.
-- **Loot spots:** some are dry at low tide, cut off from open water, or over their region's border. They need to sit deeper, or move with the tide.
-- **Landmarks over the curve:** eight landmarks drop below the horizon from parts of their borders: Blossom Run 46 m short, the Basalt Stacks 28, the Coral Atolls 31, Mistwood 25, the Jade Shoals 25, the Mangrove Labyrinth 21, the Kelp Shallows 13, the Fjords 9. Raise them, or give them lights.
 - **The Needle** (see the question above): at 150 m it shows 462 m off, so it can't be seen from the Kelp Shallows, Blossom Run, the Fjords or the Basalt Stacks.
 
 **The renderer:**

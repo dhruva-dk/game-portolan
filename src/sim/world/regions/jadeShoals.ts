@@ -1,6 +1,6 @@
 // The Jade Shoals. Long amber sandbars running north-east, a metre or two above the water with dunes on the
 // wider ones, rippled flats either side and channels of darker blue between. The bars are broken by gaps,
-// some deep and some floored by sills that the tide covers and uncovers. One great dune, 50 m high, carries
+// some deep and some floored by sills that the tide covers and uncovers. One great dune, 72 m high, carries
 // the Sandbar Light, a natural beacon of glowing glass sand.
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { R } from '../../sphere.ts';
@@ -11,7 +11,7 @@ const S = 0x7ade;
 // The bars run along bearing 60: u along them, v across (positive to the south-east).
 const SU = 0.8660254037844387, CU = 0.5;
 const SP = 52, GAP = 95;
-const DUNE = { x: 10, y: -10, along: 75, across: 42, h: 50 };
+const DUNE = { x: 10, y: -10, along: 75, across: 42, h: 72 };
 const LANE_V = 1.5 * SP;
 
 const offset = (u: number) => 8 * noise(u * 0.01, 0.5, S);
@@ -68,7 +68,7 @@ export const jadeShoals: RegionSpec = {
   height,
   landmark: { x: DUNE.x, y: DUNE.y, r: 40, height: DUNE.h + 6, bearing: 60 },
   beacon: { x: DUNE.x, y: DUNE.y, height: DUNE.h + 6 },
-  loot: snapWet(height, [-150, 60, 120, -120, -60, 170, 160, 130, 60, -200, -180, -150, 90, 60, -90, -60], 3),
+  loot: snapWet(height, [-150, 60, 120, -120, -60, 170, 160, 130, 60, -200, -93, -149, 90, 60, -90, -60], 3),
   lanes: [
     // A tidal stream along the channel south of the great dune, running out north-east into the Coral Atolls.
     { name: 'the Shoal stream', pts: LANE, width: 22, speed: 2.8 },

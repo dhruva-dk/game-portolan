@@ -264,7 +264,7 @@ test('every region has 6 or more loot spots', () => {
   for (let i = 0; i < REGION_COUNT; i++) assert.ok(LOOT_SPOTS.filter((s) => s.region === i).length >= 6, name(i));
 });
 
-test('every loot spot is in its region, in water a ship can reach at low tide', { todo: 'loot spots in several regions are dry at low tide, cut off, or over the border' }, (t) => {
+test('every loot spot is in its region, in water a ship can reach at low tide', (t) => {
   const faults: string[] = [];
   for (let i = 0; i < REGION_COUNT; i++) {
     const spots = LOOT_SPOTS.filter((s) => s.region === i);
@@ -285,7 +285,7 @@ test('every landmark is about 50 m or taller, or carries a light', () => {
   }
 });
 
-test('every landmark can be seen over the curve from every point of its borders', { todo: 'eight landmarks drop below the horizon from parts of their borders' }, (t) => {
+test('every landmark can be seen over the curve from every point of its borders', (t) => {
   const P = v3(), M = { a: 0, b: 0, t: 0 }, short = new Array<number>(REGION_COUNT).fill(0);
   for (let k = 0; k < 150_000; k++) {
     anywhere(P);

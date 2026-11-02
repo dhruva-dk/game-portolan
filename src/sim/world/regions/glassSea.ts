@@ -48,7 +48,7 @@ export const glassSea: RegionSpec = {
   // Glasswater is low; its light pillar is what neighbours see.
   landmark: { x: POOL.x, y: POOL.y, r: POOL.r, height: 70, bearing: 0 },
   beacon: { x: POOL.x, y: POOL.y, height: 70 },
-  loot: snapWet(height, [POOL.x, POOL.y, -150, 120, 165, 130, -170, -90, 150, -120, 55, 195, -60, -185, -215, 60], 3),
+  loot: snapWet(height, [POOL.x, POOL.y, -150, 120, 165, 130, -170, -90, 150, -120, 55, 195, -60, -185, -197, 66], 3),
   lanes: [
     // The whale road: from the Maelstrom's edge north past Glasswater and across the Great Current.
     { name: 'the Whale road', pts: LANE, width: 26, speed: 2.6 },
