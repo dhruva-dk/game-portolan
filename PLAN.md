@@ -866,6 +866,160 @@ Contracts between owners:
 - **The renderer, the interface and the sound each define the view model or events they consume.** Integration adapts the simulation's state into them. The simulation never imports from them.
 - **Shared files** (PLAN.md, package.json, CREDITS.md and tests/run.ts) change only when needed. Rebase before pushing, and never force-push.
 
+### Pass 2: done when
+
+Pass 2 takes every item to **playable**: it plays as intended, with rough visuals. The core loop comes first, starting with what pass 1 left in the match. An item is done only when every line in its list is true. The owner hasn't played pass 1 on an iPad yet. That playtest is still owed, and so is one for this pass.
+
+**The match, done when:**
+- **Matches last 10–12 minutes:** over 20 headless bot matches, the median is 10–12 minutes, and none is under 8 or over 14.
+- **Ram damage is capped:** one ram does at most 45 damage, whatever passives and perks stack on it.
+- **Landmarks are solid:** ships run into every landmark's shape. The ones you sail through or under (the Hollow Cedar, Moonbow Arch, the Root Gate, the Fjords' curtain) are solid only at their sides.
+- **You can slow down on touch:** the touch controls have a throttle that goes from full sail down to a stop.
+- **The captains' Storm habit is learnt in the simulation's own units,** and `setupFrom` keeps it.
+- **The Gale spreads out:** the fleet doesn't sail across in a bunch, and no region gets more than a quarter of the captains' picks in a match.
+- **A pick near the Gale works:** a pick within 600 m of the ship glides down to that pick instead of leaving the Gale at once.
+- **The rivals are realistic:** in the fixtures, at most a third of the captains are tagged Rival.
+- **Grounded ships slide:** a ship pressed against a slanting shore slides along it instead of freezing.
+
+**Every region (all 16), done when:**
+1. **Its event works in the simulation.** It happens at least once in every match, at a time drawn from the seed. It gives a warning a few seconds before it starts, runs, and then ends. The table below says what each one does.
+2. **You see and hear its event:**
+   - a basic visual in the world that you can see from inside the region;
+   - a sound;
+   - a banner with the event's name when you're in or near the region;
+   - a marker on the map while it runs.
+3. **Bots react to its event:** they avoid its danger, or go for its reward, as the table says.
+4. **Its perk works, and you can see it working.** Holding the landmark gives the perk. The HUD shows the perks you hold, and gaining or losing one gets a banner. Where a perk changes what you see (Spotter, Loot Sense, Hidden Wake and Fog Sight), the change shows on the map or in the world.
+5. **Its beacon works:** it is lit at night and dim by day, in its own colour, and it shows at night from every border the region shares.
+6. **Its mechanics work, and bots use them:** its currents, passages, sail-through landmarks and shallows, as its portrait and pass 1 describe.
+7. **Weather and light apply:**
+   - The region's weather kinds form over it and show as their own clouds, fog, rain, snow or ash.
+   - Their effects work there.
+   - Dawn, midday, dusk and night each light it differently.
+   - Placeholder materials are fine.
+
+| Region | Event in the simulation | What you see and hear | What bots do |
+|---|---|---|---|
+| The Ice Crown | The floe rings turn faster, so lanes open and close. | Floes on the move; cracking ice. | Steer round the floes. |
+| The Fjords | A flood surge: a strong current runs out of the main fjord. | The falls swell, with foam on the outflow; a rising roar. | Ride the surge out, and don't fight their way up it. |
+| Mistwood | A fog surge: a fog system rolls out over the region. | A fog bank moves in; the sound goes muffled. | Use the fog to hide or to get away. |
+| The Spires | A spire topples into a channel and blocks it for the rest of the match. | The spire falls and lies across the channel, with a crash and a splash. | Route round it. |
+| The Narrows | A rockfall blocks one end of the Gorge for a while. | A pile of rock in the gorge mouth; a rumble and a crash. | Route round it while it's there. |
+| The Basalt Stacks | A low tide opens the hidden passage behind the arch. | The sea level drops at the arch; surf booms. | Use the passage while it's open. |
+| The Kelp Shallows | A bloom: kelp spreads over the water and slows every ship in it. | Kelp mats on the surface; kelp brushing the hull. | Steer round the bloom. |
+| Blossom Run | A spring flood: the river's current runs much faster. | Fast water and petals streaming down the river; the river's rush. | Ride it downstream. |
+| The Glass Sea | The giant whale breaches. | The whale rises and breaches, lifting and flipping ships (pass 1). | Get clear of the rising whale. |
+| The Jade Shoals | The tide falls: bars rise and channels close. | The bars show above the water; gentle surf. | Keep to the channels. |
+| The Coral Atolls | The tide closes some reef gaps and opens others. | Reef flats show or drown at the gaps; surf on the reef. | Use the gaps that are open. |
+| The Spice Isles | A pearl bloom: a clam bed opens with rare loot. | Glowing clams on the water; a chime. | Go for it, and fight over it. |
+| The Fire Archipelago | An eruption: lava bombs fall round the cone, and an ash cloud forms downwind. | The plume flares; bombs fall with trails and burst; a rumble and booms. | Get away from the cone and out of the ash. |
+| The Weeping Isle | A cloudburst: rain sets in over the region, and mist rolls out to sea. | Rain and mist around the isle; heavier falling water. | Use the mist to hide or to get away. |
+| The Mangrove Labyrinth | The tide rises and floods new channels through the roots. | The water rises among the roots; frogs and drips. | Use the new channels. |
+| The Maelstrom | The vortex strengthens and pulls harder toward the Eye. | The spiral foam turns faster; the roar rises. | Keep clear of the eye. |
+
+**Mechanics, done when each has basic visuals and sound, and bots use it:**
+- **Sailing:**
+  - The sails fill with the wind. Ships leave a wake. The hull has a sound that follows its speed.
+  - Bots sail with the wind and route round land.
+- **The gust:** a burst on the water and a whoosh. Bots gust to close in, to run and to reach the circle.
+- **Wind:** it shows on the water and the sails, and it has a sound. Weather systems bend it.
+- **Tides:**
+  - The sea visibly rises and falls.
+  - The HUD shows the tide and which way it's going.
+  - Bots don't steer into a passage the tide has closed.
+- **Day and night:** the light follows the hour, and every ship's lantern shows at night.
+- **Weather:**
+  - Each of the 6 kinds shows in the world and has its own sound.
+  - Thunder warns with a glow before it strikes.
+  - The HUD names the weather you're in.
+  - Bots get out of thunder and ash.
+- **Night:** enemies beyond about 150 m show only as a lantern glow, with no name or health bar, both in the world and on the map.
+- **Weapons:**
+  - Each of the 6 classes has its own projectile, muzzle flash, fire sound and impact.
+  - Bots fire all six.
+- **The hotbar:** select, swap and drop each animate and have a sound. Bots swap and drop.
+- **Shield and hull:**
+  - The aura fills, ripples where it's hit, and shatters when it breaks, with a sound for each.
+  - Bots heal when they're hurt.
+- **Consumables:**
+  - Using one shows its progress and has a sound. Being interrupted shows and sounds different.
+  - Bots use all four.
+- **Loot:** crates float with their rarity's colour, and picking one up has a sound. Bots loot.
+- **Territory:**
+  - Water you hold shows your colour.
+  - Repairing at home shows.
+  - Claims, cuts and taking the lead each get a banner and a sound.
+  - Bots claim water.
+- **Coins and gull deliveries:**
+  - Coins count up on the HUD. The gull flies the delivery in, and the drop has a sound.
+  - Bots call deliveries.
+- **The Gale:**
+  - You pick a region on the globe and dive into it, with a sound for the dive.
+  - Bots spread their picks (see the match list).
+- **The Storm:**
+  - Its wall shows on the water and on the map. Being inside it tints the screen and has a sound.
+  - Bots get out of it.
+- **20 ships:** a full headless match runs to a winner with no errors. This is a crash test only.
+- **Abilities:**
+  - All 16 have a visual and a sound when they fire, or, for passives, when they act.
+  - Bots use all 8 actives.
+- **The whale:**
+  - It blows when it surfaces, and its rising shows a warning.
+  - Bots get clear of a rising whale.
+- **Region events:** see the regions above.
+- **Rotating rule changes:** the rule of the day shows in the lobby and when the match starts.
+- **Determinism:** a match replayed from its seed and inputs ends with the same state hash in Node, Chromium and WebKit, with the region events in.
+
+**The renderer, done when:**
+- **Ships reflect their surroundings:** they have an environment map, so varnish and metal aren't flat.
+- **The shield aura takes the planet's light:** it gets the sun and fog uniforms, and it darkens at night.
+- **The far sea keeps its colour** up to the horizon, instead of turning sky-white.
+- **No pale slabs stand over the water** in any region capture.
+- **Polar nights are dark:** a pole's night doesn't glow red when the sun is well under the horizon.
+- **Lantern bloom doesn't wash out the view,** including when spectating.
+- **The chart's region borders are smooth,** not blocky.
+- **Each weather kind has a placeholder look:** fog, rain, a thunder flash, calm glassy water, snow and ash.
+
+**Every screen, done when it is built only from the shared parts, and works on iPad and iPhone:**
+- **On both sizes:**
+  - No text is clipped.
+  - Nothing sits under the safe areas.
+  - Every button is at least 44 points and within thumb reach in a match.
+  - This is checked in the interface captures, which are taken at the iPad and the iPhone size.
+- **Title, lobby, abilities, rank and settings:** as in pass 1, at both sizes.
+- **Locker:** the camera shows the whole sail.
+- **Rivals:** as in pass 1, with the realistic spread of tags.
+- **Career and chart:** as in pass 1. The chart's region borders are smooth.
+- **The HUD:**
+  - The shield and hull bars have icons.
+  - The map shows the land.
+  - The HUD shows the perks you hold.
+  - It shows the weather you're in and the tide.
+  - It shows the throttle on touch.
+  - Region events get a banner, and a marker on the map.
+- **Gale drop:** as in pass 1, and a pick near the Gale glides there.
+- **Death and spectating:** as in pass 1, with the lantern bloom held back.
+- **Victory:** the ceremony's first second has one flash, not two.
+- **Results:** as in pass 1.
+
+**The shared parts, done when:** any part added in this pass (such as the event banner or the perk chip) comes from the same tokens and is in the gallery at both sizes.
+
+**The career, done when:**
+- **The first match is gentle:** every captain in it is gentle.
+- **Short tips** appear the first time each of these happens: the shield breaks, you pick up loot, you use a consumable, the Storm closes in, you hold a landmark, a region event starts, and night falls. Each appears only once, and is saved.
+
+**Sound, done when:**
+- Every mechanic and every region event has a sound.
+- The surf bed hears only real shores: a cliff over deep water doesn't sound like a beach.
+- The title and the lobby hear the sea, the wind and the weather at the spot they show.
+- There is still no music.
+
+**Integration, done when:**
+- The loop runs end to end, as in pass 1.
+- The capture tools also show the region events: `npm run capture -- events` frames each region's event, with a log of every sound and screen effect that fired.
+- Performance is measured again and recorded in the backlog.
+- The owner's iPad playtest is noted as owed.
+
 ## Backlog
 
 ### The owner's decisions after pass 1
