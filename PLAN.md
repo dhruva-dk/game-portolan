@@ -907,7 +907,7 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
   - No region gets more than a quarter of the captains' picks in a match.
 
   *Done: a captain takes the least-picked region, starting with the first circle, once its own pick is full. Once it is bound to leave, it holds on while 3 ships that have left are still close. Captains whose drop lies past the Gale's end start taking turns 2.5 s apiece before it blows out. Ships still riding don't count toward the 3. They sit in the Gale's own 36 × 27 m block, so they are always within 100 m. Over 12 seeds of an all-captain fleet the worst is 2 ships near a leaver, and 59 of 60 captains still land in the region they picked (tests/sim/match.test.ts). Over 80 seeds of a measuring script, one captain in one match is still held when the Gale blows out, and lands beside 3 others and an idle player.*
-- **A pick near the Gale works:** a pick within 600 m of the ship glides down to that pick instead of leaving the Gale at once.
+- **A pick near the Gale works:** a pick within 600 m of the ship glides down to that pick instead of leaving the Gale at once. *Done: a ship can only glide once it has left the Gale, so leaving at once is right for a pick inside glide reach (1,120 m). What matters is that it then glides for the pick's centre and dives once within 120 m of it, and it does. Four near picks come down 9–51 m from the centre. A pick further along rides on, leaves near it, and comes down inside it (tests/app/pick.test.ts).*
 - **The rivals are realistic:** in the fixtures, at most a third of the captains are tagged Rival.
 - **Grounded ships slide:** a ship pressed against a slanting shore slides along it instead of freezing.
 - **Bots don't get stuck:** over 20 headless matches, no bot stays aground for more than 10 s.
@@ -1183,7 +1183,6 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 
 **The match:**
 - Headless bot matches last 4.4–6.4 minutes against the 10–12 minute target. The Storm's phases, or the captains' aggression, need tuning.
-- A Gale pick inside 600 m of the ship leaves the Gale at once.
 - Most of the fixture rivals are tagged Rival. Use a realistic spread.
 - A grounded ship can freeze on a slanting shore. `tryMove` refuses the whole step when any touching probe (bow, middle or stern) would climb, so a hull that drifts sideways along an oblique bank can't move forward or back until something turns her. Let her slide along the bank instead.
 
