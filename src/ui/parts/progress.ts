@@ -15,8 +15,12 @@ export interface BarHandle {
   value(): number;
 }
 
-export function progressBar(o: { kind?: BarKind; value?: number; label?: string; segments?: number; parent?: Element; className?: string }): BarHandle {
-  const b = el(`p-bar p-bar--${o.kind ?? 'xp'}${o.className ? ' ' + o.className : ''}`, o.parent, '<i class="p-bar__ghost"></i><i class="p-bar__fill"></i>');
+export function progressBar(o: { kind?: BarKind; value?: number; label?: string; segments?: number; icon?: string; parent?: Element; className?: string }): BarHandle {
+  // with a glyph, the bar sits in a row behind it; the handle is still the bar's
+  const row = o.icon ? el('p-barRow', o.parent, `<i class="p-barRow__icon">${o.icon}</i>`) : null;
+  if (row) row.dataset.kind = o.kind ?? 'xp';
+  const parent = row ?? o.parent;
+  const b = el(`p-bar p-bar--${o.kind ?? 'xp'}${o.className ? ' ' + o.className : ''}`, parent, '<i class="p-bar__ghost"></i><i class="p-bar__fill"></i>');
   b.dataset.part = `bar:${o.kind ?? 'xp'}`;
   const ghost = b.querySelector<HTMLElement>('.p-bar__ghost')!, fill = b.querySelector<HTMLElement>('.p-bar__fill')!;
   if (o.segments && o.segments > 1) {

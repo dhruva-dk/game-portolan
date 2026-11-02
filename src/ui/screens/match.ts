@@ -2,13 +2,15 @@
 // results. Over the sea only small boxes in the corners take touches; everything else lets them through to the
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
-import { button, ceremony, el, emblemBadge, esc, eventBanner, EVENT_ICON, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
+import {
+  button, ceremony, chip, el, EMBLEM, emblemBadge, esc, eventBanner, EVENT_ICON, ICON, mmss, ordinal, PERK_ICON, progressBar, WEATHER_ICON, type BarHandle,
+} from '../parts/index.ts';
 import type {
   ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
 } from '../model.ts';
 import { CONSUMABLE, WEAPON_NAME } from '../model.ts';
 import type { ScreenView } from '../shell.ts';
-import { galeGlobe } from './chart.ts';
+import { galeGlobe, LandLayer } from './chart.ts';
 import { page } from './frame.ts';
 import './match.css';
 
@@ -30,6 +32,10 @@ export interface HudActions {
 
 /** The minimap's ink for a region event, by what it is to you. */
 const EVENT_INK = { danger: '#c8341c', prize: '#b8800f', sea: '#1e6e78' } as const;
+
+/** The weather as the HUD names it. */
+const WEATHER_WORD = { fog: 'Fog', rain: 'Rain', thunder: 'Thunder', calm: 'Calm', snow: 'Snow', ash: 'Ash' } as const;
+const PERK_NAME = new Map(REGIONS.map((r) => [r.perk as string, r.perkName]));
 
 /** A box over the sea that takes the touches landing on it. */
 const box = (cls: string, parent: Element, html?: string) => el(`s-mx__box ${cls}`, parent, html);
@@ -100,8 +106,8 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const root = el('s-mx s-hud');
 
   const vit = box('s-hud__vit p-smoke', root);
-  const shield = progressBar({ kind: 'shield', value: 0, label: '', parent: vit });
-  const hull = progressBar({ kind: 'hull', value: 0, label: '', parent: vit });
+  const shield = progressBar({ kind: 'shield', value: 0, label: '', icon: ICON.shield, parent: vit });
+  const hull = progressBar({ kind: 'hull', value: 0, label: '', icon: ICON.hull, parent: vit });
 
   const info = box('s-hud__info p-smoke', root);
   const storm = el('s-hud__storm', info);
@@ -116,6 +122,10 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const canvas = el<HTMLCanvasElement>('s-hud__mapC', map, undefined, 'canvas');
 
   const where = box('s-hud__where p-smoke', root);
+  // under it, what the sea is doing round you and the perks you hold; they take no touches
+  const state = el('s-hud__state', root);
+  let stateKey = '';
+  const land = new LandLayer();
 
   const bar = box('s-hud__bar', root);
   // the gull: a tap opens the parcels, priced in coins; a parcel you can't call yet is greyed
@@ -192,7 +202,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const abil = holdButton('s-hud__abil', ICON.star, 'Ability', pad, 'ability', a);
   const reload = holdButton('s-hud__reload', ICON.reload, 'Reload', pad, 'reload', a);
 
-  const drawMap = (mv: HudModel['map']) => {
+  const drawMap = (mv: HudModel['map'], tide: number) => {
     // not laid out yet (the screen is still being mounted): the next refresh draws it
     const size = Math.round(map.clientWidth * devicePixelRatio);
     if (size < 8) return;
@@ -204,22 +214,19 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     g.save();
     g.beginPath();
     g.arc(c, c, c - 1, 0, Math.PI * 2);
-    g.fillStyle = 'rgba(214, 196, 150, 0.85)';
-    g.fill();
     g.clip();
+    // the land and the sea, against the tide
+    land.draw(g, c, mv.lat, mv.lon, mv.range, tide);
     // north stays up; x east, y north
     const at = (x: number, y: number) => [c + x * k, c - y * k] as const;
     if (mv.storm) {
-      g.fillStyle = 'rgba(70, 40, 110, 0.35)';
-      g.fillRect(0, 0, size, size);
+      // everything outside the safe circle under the Storm's wash
       const [sx, sy] = at(mv.storm.x, mv.storm.y);
-      g.globalCompositeOperation = 'destination-out';
-      g.beginPath(); g.arc(sx, sy, mv.storm.r * k, 0, Math.PI * 2); g.fill();
-      g.globalCompositeOperation = 'source-over';
-      g.fillStyle = 'rgba(214, 196, 150, 0.85)';
-      g.globalCompositeOperation = 'destination-over';
-      g.beginPath(); g.arc(c, c, c - 1, 0, Math.PI * 2); g.fill();
-      g.globalCompositeOperation = 'source-over';
+      g.beginPath();
+      g.rect(0, 0, size, size);
+      g.arc(sx, sy, mv.storm.r * k, 0, Math.PI * 2, true);
+      g.fillStyle = 'rgba(70, 40, 110, 0.42)';
+      g.fill('evenodd');
     }
     if (mv.next) {
       const [nx, ny] = at(mv.next.x, mv.next.y);
@@ -305,7 +312,24 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     abil.querySelector('.s-mx__holdN')!.textContent = h.ability.ready >= 1 ? '' : `${h.ability.seconds}`;
     abil.classList.toggle('is-off', h.ability.ready < 1);
     reload.classList.toggle('is-off', h.slots[h.selected]?.kind !== 'weapon');
-    drawMap(h.map);
+    // the weather you are in, the tide's level and way, then the perks you hold
+    const level = Math.round(((h.tide.level + 1) / 2) * 10);
+    const key = `${h.weather}|${level}|${h.tide.rising}|${h.perks.join()}`;
+    if (key !== stateKey) {
+      stateKey = key;
+      state.replaceChildren();
+      if (h.weather) chip(WEATHER_ICON[h.weather], WEATHER_WORD[h.weather], { small: true, parent: state, className: 's-hud__wx' });
+      const tide = chip(EMBLEM.waves, 'Tide', { small: true, parent: state, className: 's-hud__tide' });
+      tide.dataset.way = h.tide.rising ? 'up' : 'down';
+      tide.title = h.tide.rising ? 'The tide is rising' : 'The tide is falling';
+      el('s-hud__tideA', tide, ICON.up, 'i');
+      el('s-hud__gauge', tide, '', 'b').style.setProperty('--level', `${level * 10}%`);
+      for (const id of h.perks) chip(PERK_ICON[id] ?? ICON.star, '', { small: true, gold: true, title: PERK_NAME.get(id) ?? id, parent: state });
+      // a first-time tip sits under the row, however many lines it wraps to
+      const pui = root.closest<HTMLElement>('.pui');
+      if (pui && state.offsetHeight) pui.style.setProperty('--hud-state', `${state.offsetHeight}px`);
+    }
+    drawMap(h.map, h.tide.level);
   };
   set(m);
   const named: [string, HTMLElement][] = [

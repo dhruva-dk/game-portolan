@@ -208,6 +208,21 @@ export const EVENT_ICON: Record<string, string> = {
   weepingIsle: EMBLEM.drop, mangroveLabyrinth: EMBLEM.moonPhases, maelstrom: EMBLEM.spiral,
 };
 
+// ---------------------------------------------------------------- the landmarks' perks and the weather
+
+/** Each landmark's perk as a glyph on the HUD's chips, by perk id. */
+export const PERK_ICON: Record<string, string> = {
+  frostShot: EMBLEM.snowflake, fastRepair: ICON.repairKit, fogSight: ICON.eye, spotter: ICON.target, longRange: EMBLEM.arrowhead,
+  fastReload: ICON.reload, hiddenWake: EMBLEM.eclipse, quickGust: ICON.gust, cheapDeliveries: ICON.gull, shallowDraft: EMBLEM.waves,
+  lootSense: ICON.map, betterLoot: EMBLEM.diamond, fireShot: EMBLEM.flame, fastRefill: ICON.hourglass, tightTurns: ABILITY_ICON.hardTurn,
+  currentRider: EMBLEM.spiral,
+};
+
+/** Each kind of weather as a glyph, by name. */
+export const WEATHER_ICON: Record<string, string> = {
+  fog: ICON.eye, rain: ICON.wind, thunder: EMBLEM.thunderbolt, calm: ICON.sail, snow: EMBLEM.snowflake, ash: ICON.fire,
+};
+
 // ---------------------------------------------------------------- weapons and consumables by name
 
 export const WEAPON_ICON: Record<string, string> = {

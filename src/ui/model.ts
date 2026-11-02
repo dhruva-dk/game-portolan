@@ -3,6 +3,8 @@
 // nothing here reads the simulation's state or the career's internals. The abilities and the regions are read
 // straight from src/sim, which is allowed: they are fixed tables.
 import type { AbilityId, ActiveId, PassiveId } from '../sim/abilities.ts';
+import type { WEATHER_NAMES } from '../sim/tables.ts';
+import type { PerkId } from '../sim/world/index.ts';
 import type { Rarity } from './parts/tokens.ts';
 
 // ---------------------------------------------------------------- shared
@@ -299,6 +301,8 @@ export interface EventView {
   seconds: number;
 }
 
+export type WeatherName = (typeof WEATHER_NAMES)[number];
+
 export interface MapView {
   /** Where you are, in degrees, to centre the chart. */
   lat: number;
@@ -341,6 +345,12 @@ export interface HudModel {
   region: string;
   /** The region's perk, when you are in your drop region's water. */
   perk: string | null;
+  /** Every perk you hold, in the regions' order. */
+  perks: PerkId[];
+  /** The weather you are well inside, if any. */
+  weather: WeatherName | null;
+  /** The sea level in metres, from −1 at low water to +1 at high, and whether it is rising. */
+  tide: { level: number; rising: boolean };
   night: boolean;
   /** What a pickup button would take, if anything is in reach. */
   pickup: string | null;

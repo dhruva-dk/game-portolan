@@ -217,6 +217,12 @@
 .p-bar--rank { --fill: linear-gradient(180deg, #a6d0ff, #4a8fe0 50%, #23589e); }
 .p-bar--shield { --fill: linear-gradient(180deg, var(--c-shieldHi), var(--c-shield) 55%, #1d63c0); }
 .p-bar--hull { --fill: linear-gradient(180deg, #ffffff, var(--c-hull) 55%, #c9c2b2); }
+/* a bar with its glyph in front: shield blue, hull white */
+.p-barRow { display: flex; align-items: center; gap: var(--sp-2); }
+.p-barRow > .p-bar { flex: 1; min-width: 0; }
+.p-barRow__icon { width: calc(22px * var(--k)); height: calc(22px * var(--k)); flex: none; color: var(--c-cream); filter: drop-shadow(0 calc(1px * var(--k)) calc(2px * var(--k)) rgba(0, 0, 0, 0.7)); }
+.p-barRow__icon svg { width: 100%; height: 100%; display: block; }
+.p-barRow[data-kind='shield'] .p-barRow__icon { color: var(--c-shieldHi); }
 .p-bar--hull.is-low { --fill: linear-gradient(180deg, #ff9f86, var(--c-hullLow) 55%, #b02a10); animation: p-low 0.8s ease-in-out infinite alternate; }
 @keyframes p-low { to { filter: brightness(1.3); } }
 .p-bar--plain { --fill: linear-gradient(180deg, #5a4430, var(--c-ink)); background: rgba(42, 26, 13, 0.15); }
@@ -231,6 +237,11 @@
 .p-chip { display: inline-flex; align-items: center; gap: 0.4em; height: calc(var(--hit-min) * 0.7); padding: 0 0.85em 0 0.6em; border-radius: 999px; background: rgba(26, 16, 8, 0.72); color: var(--c-cream); border: calc(1.5px * var(--k)) solid rgba(255, 236, 196, 0.35); font-family: var(--f-display); font-weight: 800; font-size: var(--fs-small); white-space: nowrap; box-shadow: var(--sh-1); }
 .p-chip__icon { width: 1.25em; height: 1.25em; flex: none; }
 .p-chip--paper { background: var(--paper-bg); color: var(--c-ink); border: calc(2px * var(--k)) solid var(--c-ink); }
+.p-chip--sm { height: calc(var(--hit-min) * 0.56); padding: 0 0.7em 0 0.5em; font-size: var(--fs-micro); gap: 0.3em; }
+.p-chip--gold { border-color: var(--c-goldHi); box-shadow: 0 0 0 calc(1px * var(--k)) rgba(168, 112, 15, 0.8), var(--sh-1); }
+.p-chip--gold .p-chip__icon { color: var(--c-goldHi); }
+.p-chip--icon { padding: 0; aspect-ratio: 1; justify-content: center; }
+.p-chip__icon svg { width: 100%; height: 100%; display: block; }
 
 .p-stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(2px * var(--k)); padding: var(--sp-4) var(--sp-3); border-radius: var(--r-md); background: rgba(42, 26, 13, 0.07); border: calc(1.5px * var(--k)) solid var(--c-inkFaint); min-width: 0; }
 .p-stat__icon { width: calc(var(--fs-num) * 0.95); height: calc(var(--fs-num) * 0.95); color: var(--c-wax); }

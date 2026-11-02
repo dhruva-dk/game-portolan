@@ -94,9 +94,12 @@ export function emblemBadge(name: string, colours: readonly [string, string], o:
   return e;
 }
 
-/** A small rounded label with a glyph. */
-export function chip(icon: string, label: string, o: { paper?: boolean; parent?: Element; className?: string } = {}): HTMLElement {
-  const c = el(`p-chip${o.paper ? ' p-chip--paper' : ''}${o.className ? ' ' + o.className : ''}`, o.parent, `${icon ? `<span class="p-chip__icon">${icon}</span>` : ''}<span class="p-chip__t">${esc(label)}</span>`);
+/** A small rounded label with a glyph. Small ones sit on the HUD; gold ones mark what you hold, like a perk, and with no
+ *  label show the glyph alone, named in a title. */
+export function chip(icon: string, label: string, o: { paper?: boolean; small?: boolean; gold?: boolean; title?: string; parent?: Element; className?: string } = {}): HTMLElement {
+  const cls = `p-chip${o.paper ? ' p-chip--paper' : ''}${o.small ? ' p-chip--sm' : ''}${o.gold ? ' p-chip--gold' : ''}${label ? '' : ' p-chip--icon'}`;
+  const c = el(`${cls}${o.className ? ' ' + o.className : ''}`, o.parent, `${icon ? `<span class="p-chip__icon">${icon}</span>` : ''}${label ? `<span class="p-chip__t">${esc(label)}</span>` : ''}`);
+  if (o.title) c.title = o.title;
   c.dataset.part = 'chip';
   return c;
 }

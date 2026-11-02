@@ -43,6 +43,13 @@
 .s-hud__where { left: var(--sp-5); top: calc(var(--sp-5) + 96px * var(--k)); padding: var(--sp-1) var(--sp-3); display: flex; gap: var(--sp-2); align-items: center; font-family: var(--f-display); font-size: var(--fs-micro); }
 .s-hud__where span { color: var(--c-goldHi); }
 .s-hud__where i { width: 1.1em; height: 1.1em; display: inline-block; }
+/* under the region: the weather you are in, the tide (its level in the gauge, its way in the arrow), the perks you hold */
+.s-hud__state { position: absolute; left: var(--sp-5); top: calc(var(--sp-5) + 130px * var(--k)); max-width: calc(300px * var(--k)); display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.s-hud__tideA { width: 0.9em; height: 0.9em; display: block; margin-left: -0.15em; }
+.s-hud__tideA svg { width: 100%; height: 100%; display: block; }
+.s-hud__tide[data-way='down'] .s-hud__tideA { transform: rotate(180deg); }
+.s-hud__gauge { position: relative; width: calc(5px * var(--k)); height: 1.1em; border-radius: 999px; background: rgba(255, 236, 196, 0.2); overflow: hidden; }
+.s-hud__gauge::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--level); background: var(--c-shieldHi); }
 /* the hotbar ends just short of the guns, so the right thumb reaches it without leaving them for long */
 .s-hud__bar { right: calc(var(--sp-5) + 270px * var(--k) + var(--sp-4)); bottom: var(--sp-5); display: flex; gap: var(--sp-2); }
 .s-hud__slot { position: relative; width: var(--hit-btn); height: var(--hit-btn); border-radius: var(--r-md); background: rgba(18, 10, 4, 0.72); border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.3); color: var(--c-cream); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
@@ -121,6 +128,7 @@
 .pui[data-form='phone'] .s-hud__map { width: calc(120px * var(--k)); height: calc(120px * var(--k)); }
 .pui[data-form='phone'] .s-hud__vit { width: calc(220px * var(--k)); }
 .pui[data-form='phone'] .s-hud__where { top: calc(var(--sp-5) + 70px * var(--k)); }
+.pui[data-form='phone'] .s-hud__state { top: calc(var(--sp-5) + 100px * var(--k)); max-width: calc(220px * var(--k)); }
 .pui[data-form='phone'] .s-hud__event { top: calc(var(--sp-5) + 62px * var(--k)); max-width: calc(100% - 2 * (var(--sp-5) + 150px * var(--k))); }
 
 /* left-handed: the guns go to the left thumb, and the stick (on the controls layer) to the right */
@@ -132,9 +140,9 @@
 [data-hand='left'] .s-hud__abil { right: auto; left: calc(140px * var(--k)); }
 [data-hand='left'] .s-hud__reload { right: auto; left: calc(16px * var(--k)); }
 
-/* a first-time tip: under the vitals and the region on the HUD, above Dive on the Gale */
+/* a first-time tip: under the vitals, the region and the sea's state on the HUD, above Dive on the Gale */
 .pui-tip { position: absolute; z-index: 55; }
-.pui-tip[data-at='hud'] { left: calc(var(--sl) + var(--sp-5)); top: calc(var(--st) + var(--sp-5) + 140px * var(--k)); }
+.pui-tip[data-at='hud'] { left: calc(var(--sl) + var(--sp-5)); top: calc(var(--st) + var(--sp-5) + 140px * var(--k) + var(--hud-state, 26px * var(--k))); }
 .pui-tip[data-at='gale'] { right: calc(var(--sr) + var(--sp-6)); bottom: calc(var(--sb) + var(--sp-6) + 110px * var(--k)); }
 .pui .pui-tip[data-at=''] { display: none; }
-.pui[data-form='phone'] .pui-tip[data-at='hud'] { top: calc(var(--st) + var(--sp-5) + 106px * var(--k)); }
+.pui[data-form='phone'] .pui-tip[data-at='hud'] { top: calc(var(--st) + var(--sp-5) + 106px * var(--k) + var(--hud-state, 26px * var(--k))); }

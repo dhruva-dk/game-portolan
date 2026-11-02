@@ -14,8 +14,10 @@ import { sunDirection } from '../render/sky.ts';
 import { waveHeight } from '../render/swell.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
-import { R } from '../sim/sphere.ts';
-import { PHASE, PLAYER, SHIPS } from '../sim/match.ts';
+import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
+import { PHASE, PLAYER, SHIPS, WEATHER_KIND } from '../sim/match.ts';
+import { WEATHER } from '../sim/tables.ts';
+import { LANDMARKS, REGIONS } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 import type { CameraRig } from '../render/camera.ts';
 import { Controls } from './controls.ts';
@@ -456,6 +458,26 @@ export class App {
     const rest: number[] = [];
     for (let i = 0; i < SHIPS; i++) if (i !== PLAYER && s.state.ships[i].phase !== PHASE.sunk) rest.push(i);
     s.sinkNow(rest);
+  }
+
+  /** Hands the player the landmarks whose perks are named, so the next tick gives them those perks, and sets weather
+   *  of `weather`'s kind at full strength over the ship. */
+  stagePlayer(o: { perks?: readonly string[]; weather?: string } = {}): void {
+    const s = this.session;
+    if (!s) return;
+    const st = s.state, at = st.ships[PLAYER].pos;
+    for (const id of o.perks ?? []) {
+      const r = REGIONS.findIndex((x) => x.perk === id);
+      if (r >= 0) st.owner[cellOf(TERRITORY, LANDMARKS[r].pos)] = PLAYER + 1;
+    }
+    const kind = o.weather ? WEATHER_KIND[o.weather as keyof typeof WEATHER_KIND] : undefined;
+    if (kind === undefined) return;
+    const w = st.weather[0];
+    w.kind = kind;
+    w.at.x = at.x; w.at.y = at.y; w.at.z = at.z;
+    w.r = WEATHER.r[1];
+    w.life = WEATHER.life[1];
+    w.age = WEATHER.rise;
   }
 
   /** Ends the match where it stands: the career takes the report, and the results show what changed. */

@@ -13,7 +13,7 @@ import { PHASE, PLAYER, TICK, WEATHER_NAMES, canCall, isNight, newSky, skyAt } f
 import { REGIONS } from '../sim/world/index.ts';
 import { v3 } from '../sim/math.ts';
 // straight from the icons, not the parts kit's index, so the tips load without its stylesheet (and under node)
-import { ABILITY_ICON, EMBLEM, EVENT_ICON, ICON } from '../ui/parts/icons.ts';
+import { ABILITY_ICON, EVENT_ICON, ICON, WEATHER_ICON } from '../ui/parts/icons.ts';
 import type { TipView } from '../ui/parts/overlays.ts';
 import { WEAPON_NAME, type WeaponId } from '../ui/model.ts';
 import type { Moment } from './events.ts';
@@ -41,12 +41,12 @@ export const TIPS = {
   night: { icon: ICON.moon, title: 'Night', text: 'Far ships show only as lanterns, with no name or health bar.' },
   event: { icon: ICON.storm, title: 'A region\'s event', text: 'Each sea has its own, once a match. The banner says what to do; the map rings where.' },
   whale: { icon: ICON.whale, title: 'The whale', text: 'When it breaches it lifts the ships near it, flips any right over it, and scatters loot.' },
-  'weather:fog': { icon: ICON.eye, title: 'Fog', text: 'You see less far, and ships deep in it drop off the map.' },
-  'weather:rain': { icon: ICON.wind, title: 'Rain', text: 'The wind gusts and swirls, and the sea runs rough.' },
-  'weather:thunder': { icon: EMBLEM.thunderbolt, title: 'Thunder', text: 'Lightning strikes ships in open water. Keep close to land.' },
-  'weather:calm': { icon: ICON.sail, title: 'Calm', text: 'The wind dies away. Gust to get out of it.' },
-  'weather:snow': { icon: EMBLEM.snowflake, title: 'Snow', text: 'Ice builds in your rigging and slows your turns. It melts once you are out.' },
-  'weather:ash': { icon: ICON.fire, title: 'Ash', text: 'Embers burn ships that stay in it. Sail out.' },
+  'weather:fog': { icon: WEATHER_ICON.fog, title: 'Fog', text: 'You see less far, and ships deep in it drop off the map.' },
+  'weather:rain': { icon: WEATHER_ICON.rain, title: 'Rain', text: 'The wind gusts and swirls, and the sea runs rough.' },
+  'weather:thunder': { icon: WEATHER_ICON.thunder, title: 'Thunder', text: 'Lightning strikes ships in open water. Keep close to land.' },
+  'weather:calm': { icon: WEATHER_ICON.calm, title: 'Calm', text: 'The wind dies away. Gust to get out of it.' },
+  'weather:snow': { icon: WEATHER_ICON.snow, title: 'Snow', text: 'Ice builds in your rigging and slows your turns. It melts once you are out.' },
+  'weather:ash': { icon: WEATHER_ICON.ash, title: 'Ash', text: 'Embers burn ships that stay in it. Sail out.' },
 } as const satisfies Record<string, { icon: string; title: string; text: string }>;
 
 export type TipId = keyof typeof TIPS;

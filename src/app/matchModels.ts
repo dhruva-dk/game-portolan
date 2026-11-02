@@ -6,9 +6,10 @@ import {
 import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
 import {
-  ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, inStorm, isNight, newStormView, seen, SEEN, stormView, sunDir,
-  type MatchState, type Ship,
+  ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, WEATHER_NAMES, inStorm, isNight, newSky, newStormView, seen, SEEN, skyAt,
+  stormView, sunDir, type MatchState, type Ship,
 } from '../sim/match.ts';
+import { seaLevelAt } from '../sim/environment.ts';
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE } from '../sim/state.ts';
 import { GALE, GUST, LOOT, PARCELS } from '../sim/tables.ts';
@@ -19,7 +20,7 @@ import { PI, v3, type V3 } from '../sim/math.ts';
 import {
   rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type EventView, type GaleModel, type HudModel,
   type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type SpectateModel, type VictoryModel,
-  type WeaponId,
+  type WeaponId, type WeatherName,
 } from '../ui/model.ts';
 import type { Rarity } from '../ui/parts/tokens.ts';
 import { causeName, consumableOf, itemKey, weaponOf } from './moments.ts';
@@ -29,6 +30,9 @@ const DEG = 180 / Math.PI;
 const SV = newStormView();
 const SUN = v3();
 const MAP_RANGE = 320;
+const SKY = newSky();
+/** How deep into a weather system before the HUD names it, as the tips do. */
+const WEATHER_DEEP = 0.4;
 
 const rarityOf = (n: number): Rarity => Math.max(0, Math.min(4, Math.round(n))) as Rarity;
 const colourOf = (id: string, fallback: string): string => cosmetic(id)?.colour ?? fallback;
@@ -143,11 +147,19 @@ function pickupOf(s: MatchState, sh: Ship): string | null {
   return best;
 }
 
+/** The weather the HUD names at p: the deepest kind you are well inside, or null. */
+function weatherAt(s: MatchState, p: V3): WeatherName | null {
+  skyAt(s, p, SKY);
+  let best: WeatherName | null = null;
+  for (const w of WEATHER_NAMES) if (SKY[w] > WEATHER_DEEP && (!best || SKY[w] > SKY[best])) best = w;
+  return best;
+}
+
 export function hudModel(session: Session): HudModel {
   const s = session.state, sh = s.ships[session.watch];
   const id = ACTIVES[sh.active] as ActiveId, cool = ability(id).cooldown;
   stormView(s, SV);
-  const use = sh.use >= 0 ? sh.slots[sh.use] : null, r = regionAt(sh.pos);
+  const use = sh.use >= 0 ? sh.slots[sh.use] : null, r = regionAt(sh.pos), now = s.tick * TICK, level = seaLevelAt(now);
   return {
     shield: Math.round(sh.shield), shieldMax: 100, hull: Math.round(sh.hull), hullMax: 100,
     slots: sh.slots.map((_, k) => slotOf(sh, k)),
@@ -167,6 +179,9 @@ export function hudModel(session: Session): HudModel {
     using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     region: REGIONS[r]?.name ?? 'the open sea',
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,
+    perks: REGIONS.filter((_, k) => sh.perks & (1 << k)).map((x) => x.perk),
+    weather: weatherAt(s, sh.pos),
+    tide: { level, rising: seaLevelAt(now + 1) > level },
     night: isNight(s, sh.pos),
     pickup: pickupOf(s, sh),
     event: eventOf(s, sh.pos),

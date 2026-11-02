@@ -320,6 +320,9 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     throttle: fight ? 1 : storm ? 0.5 : 1,
     using: storm ? { item: 'repairKit', progress: 0.55 } : null,
     region: storm ? 'the Coral Atolls' : 'the Spice Isles', perk: storm ? null : 'Better Loot', night: state === 'night',
+    perks: storm ? [] : fight ? ['betterLoot', 'fastReload', 'spotter'] : ['betterLoot'],
+    weather: storm ? 'rain' : state === 'night' ? 'fog' : null,
+    tide: { level: fight ? -0.6 : 0.4, rising: !fight },
     pickup: state === 'calm' ? 'Rare Harpoon' : null,
     // the Spice Isles' pearls in a fight, the Coral Atolls' tide in the Storm, and Cinder Peak warned next door at night
     event: fight ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: false, seconds: 22 }

@@ -973,6 +973,23 @@ Decisions made for the events (Settled overnight in the owner's absence; the own
 - A danger event whose spot the Storm's calm would have closed round by its end (leaving less than 60 m of calm clear of it) swaps slots with the latest earlier event that fits. Without this, a finale at Cinder Peak trapped ships between the eruption and the Storm.
 - The spire that falls stands on a low stump (3 m, 40 m from the run's middle along its fall) all match, and the stump stays when it breaks. The fallen spire, the Narrows' scree and the tunnel roof are meshes drawn by the stage (src/render/regions/eventRocks.ts), not terrain, so the planet's height field stays the same all match.
 - The event strips look on the event from open water in its own region with nothing standing between, and use one of the region's other spots when the match's own can't be seen. The Narrows' north mouth has almost no open water round it.
+
+**The independent review of part 2** (at `3fee5d7`, from `npm run capture -- moment events` and the layout capture):
+- **10 regions pass:** the Ice Crown, Mistwood, the Spires, the Narrows, the Basalt Stacks, the Kelp Shallows, the Glass Sea, the Coral Atolls, the Weeping Isle and the Mangrove Labyrinth.
+- **6 fail:**
+  - **The Fjords:** no falls in view, and the outflow foam looks the same before and during the surge.
+  - **Blossom Run:** foam streaks, but no petals.
+  - **The Jade Shoals and the Fire Archipelago:** the strip is filmed from the next region (the region tag reads the Glass Sea and the Basalt Stacks).
+  - **The Spice Isles:** no glowing clams on the water.
+  - **The Maelstrom:** no spiral foam turning faster, and the strip looks away from the Eye.
+- **No strip shows the banner from outside a region,** so "within 240 m of its border" is unproven for all 16.
+- **No-humans:** the Basalt Stacks' tunnel roof reads as a flat block with a square, door-like opening, and a stepped stack beside it as a ziggurat. The Coral Atolls' square columns read as pillars again. A grey drum of loot floating at Blossom Run reads as a pipe.
+- **Borderline:**
+  - A neighbouring event's banner fades out under a new warning, and then stays gone while its event still runs.
+  - The Glass Sea's banner goes while the whale is still in the air.
+  - The Basalt Stacks' warning says the cave is open before it opens.
+  - Hard-edged pale shapes on the water: a tan band at Mistwood's fog edge, a flat white wall of mist at the Weeping Isle, a pale slab with a hard top over the Mangrove Labyrinth's risen water, and a pink sheet in the Maelstrom.
+  - The Jade Shoals' surf plays at a gain of 0.02, barely heard, and it and the Coral Atolls share one sound.
 - Foam marks fast water only where it runs faster than the Great Current (4.4 m/s), full white from 8 m/s. Tracers ride the current within 115 m of the camera's focus and write foam into the water's wake map, so the streaks follow the real flow.
 - The kelp rafts are one instanced mesh laid where the simulation slows ships, and the Kelp Shallows' strip looks on from inside the bloom.
 
@@ -1100,9 +1117,18 @@ Decisions made for the events (Settled overnight in the owner's absence; the own
   - It shows the weather you're in and the tide.
   - It shows the throttle on touch.
   - Region events get a banner, and a marker on the map.
+
+  *Done for the icons, the land, the perks, the weather and the tide: the bars carry a shield and a hull. The minimap samples the planet's height round the ship and paints the land, its inked coast, the shallows and the deeps at the tide of the moment (`LandLayer` in src/ui/screens/chart.ts); it resamples a few rows a frame once the ship has sailed an eighth of the map's reach. A row under the region tag holds a chip for the weather you're in, a tide chip with its level and its way, and a gold chip for each perk held, named on hover. The layout capture's `hud-perks` shot shows them with rain and three perks, and a tip under the row.* Decisions (Settled overnight in the owner's absence; the owner may change it.):
+  - The perk chips show only the perk's icon, in gold, so a long hold fits; the landmark tip and the hover name them.
+  - The weather chip shows once you are 0.4 deep in a system, as the tips do.
+  - The tide chip shows the sea's level from low to high water as a small gauge, and an arrow for rising or falling.
+  - The minimap samples 144 by 144 points over 1.25 times its reach.
+  - A first-time tip on the HUD sits under the row however many lines it wraps to.
 - **Gale drop:** as in pass 1. The globe shows the weather systems as clouds, and a pick near the Gale glides there.
 - **Death and spectating:** as in pass 1, with the lantern bloom held back.
 - **Results:** as in pass 1.
+
+**The independent review of the screens** (at `3fee5d7`) fails "no text is clipped": on the Gale globe, the rim cuts "…ngrove Labyrinth" and "The Coral At…" at all four sizes, and the layout check misses it. "The Glass Sea" and "The Jade Shoals" also run into each other. Everything else in the layout check holds on all 64 screens. Lists cut at their scrolling edge (Rank, Settings, Abilities, the locker) are fine as long as they scroll.
 
 **The shared parts, done when:** any part added in this pass (such as the event banner or the perk chip) comes from the same tokens and is in the gallery at every size.
 
@@ -1132,6 +1158,8 @@ Decisions made for the events (Settled overnight in the owner's absence; the own
   - One tip shows at a time, for 7 s, with a short pause between. The first ones at sea wait 3 s after landing.
   - "Your first weapon" is the starter weapon, named on the card. "The tide closes a passage" fires while the tide is falling and water within 40 m that is open now will be shut 20 s on. Each weather kind fires once its depth where you are passes 0.4; the whale, once it comes up within 260 m.
   - The capture tools start with tips off, so frames show only what they arrange; the hook turns them on (`h.tips(true)`).
+
+  **The independent review** (at `3fee5d7`) passed the card itself: readable, unclipped, clear of the safe areas and the fight controls, on the HUD and the Gale at all four sizes. The item still fails on its evidence: only six of the tips are ever shown, and the save is tested only as parsed, never written and read back.
 - **Skill shows:** over 20 headless matches, captains drawn at a higher skill finish higher on average than captains drawn lower.
 
 **Sound, done when:**

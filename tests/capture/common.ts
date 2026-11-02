@@ -1,12 +1,13 @@
 // What every capture shares: a server and a browser, the game page opened with its test hook, numbered frames written
-// to captures/<name>/, the effect log beside them, and a contact sheet that tiles the frames into one PNG.
+// to captures/<name>/, the effect log beside them, and a contact sheet that tiles the frames into one PNG. CAPTURES_DIR
+// sends them somewhere else, so a run can go on while another reads the last one's.
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Browser } from 'playwright';
 import { launch, openGame, root, serve, type DeviceName, type Game, type Server } from '../harness.ts';
 
-export const CAPTURES = join(root, 'captures');
+export const CAPTURES = process.env.CAPTURES_DIR || join(root, 'captures');
 
 /** The page that runs the new app. */
 export const APP_PAGE = 'dev/game.html';
