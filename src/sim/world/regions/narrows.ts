@@ -57,7 +57,8 @@ function height(x: number, y: number): number {
 export const narrows: RegionSpec = {
   height,
   landmark: { x: axis(15), y: 15, r: 30, height: 82, bearing: 180 },
-  beacon: { x: axis(NORTH) + SLOT + WALL / 2, y: NORTH, height: 70 },
+  // the Sapphire Seam's hoodoo stands in the deep water off the east wall's outer face, by the gorge's north mouth
+  beacon: { x: axis(NORTH) + SLOT + WALL + 10, y: NORTH + 12, height: 70 },
   loot: snapWet(height, [axis(120), 120, axis(-90), -90, -150, 60, 150, -40, -120, -170, 140, 180, -134, 188, 160, -190], 4),
   lanes: [
     // The cold stream from the Crown runs on through the Gorge and out to the south-east.

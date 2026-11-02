@@ -3,7 +3,9 @@
 // any screen with its live or fixture model, and read state.
 import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
-import { borderViews, lapPath, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
+import { BEACON_LOOKS } from '../render/beacons/index.ts';
+import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
+import { beaconView, borderViews, lapPath, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
@@ -20,8 +22,14 @@ export function installHook(app: App) {
     regionView: (id: string | number, k = 0) => regionView(id as never, k),
     lapPath: (ring: 'equator' | 'north' | 'south', every = 4) => lapPath(ring, every),
     orbitView: (id: string | number) => orbitView(id as never),
+    /** The beacon at midnight, framed on how high its look's light shows over the sea where it stands. */
+    beaconView: (id: string | number) => {
+      const i = typeof id === 'number' ? id : REGIONS.findIndex((r) => r.id === id), look = BEACON_LOOKS[REGIONS[i].id];
+      const base = look.ground === 'shore' ? Math.max(0, heightAt(BEACONS[i].pos)) : 0;
+      return beaconView(i, base + Math.max(look.lightHeight, 0.6 * look.height));
+    },
     borderViews: () => borderViews(),
-    /** Jumps to a fixed scene: { region | lat,lon | pos, heading, hour, tilt, weather, camera, tide, ship }. */
+    /** Jumps to a fixed scene: { region | lat,lon | pos, heading, hour, tilt, weather, camera, tide, ship, fleet }. */
     scene: (s: SceneInput) => app.scene(s),
     /** Draws `frames` frames, then waits until the page has presented the last one. */
     async settle(frames = 4) {

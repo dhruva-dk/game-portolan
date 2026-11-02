@@ -485,7 +485,7 @@ export const LANDMARKS: readonly Landmark[] = SPECS.map((s, i) => {
   return { ...site(i, m.x, m.y, m.bearing, m.r), name: REGIONS[i].landmark, height: m.height };
 });
 
-export const BEACONS: readonly Beacon[] = SPECS.map((s, i) => ({ ...site(i, s.beacon.x, s.beacon.y, 0, 4), height: s.beacon.height }));
+export const BEACONS: readonly Beacon[] = SPECS.map((s, i) => ({ ...site(i, s.beacon.x, s.beacon.y, s.beacon.bearing ?? 0, 4), height: s.beacon.height }));
 
 /** Loot spots, 6 or more per region, all in water a ship can reach. r is the pickup radius. */
 export const LOOT_SPOTS: readonly Site[] = SPECS.flatMap((s, i) => {

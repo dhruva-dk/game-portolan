@@ -81,7 +81,8 @@ const at = (r: number, b: number): [number, number] => [r * dsin(b * DEG), r * d
 export const iceCrown: RegionSpec = {
   height,
   landmark: { x: 0, y: 0, r: 40, height: 96, bearing: 0 },
-  beacon: { x: 0, y: 0, height: 34 },
+  // the Heart-light stands on a floe in the open water off the Crown's flank, not up on the ice
+  beacon: { x: 34, y: -42, height: 34 },
   loot: snapWet(height, [...at(100, 75), ...at(102, 250), ...at(160, 15), ...at(165, 140), ...at(170, 300), ...at(232, 95), ...at(228, 205), ...at(240, 330)], 4),
   lanes: [
     // Meltwater pours off the shelf and out between the rings, into the head of the Narrows.

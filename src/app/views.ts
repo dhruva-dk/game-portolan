@@ -4,10 +4,10 @@ import type { AmbienceMix, RegionId } from '../audio/index.ts';
 import type { ActorsView, CosmeticIds, ShipView } from '../render/actors/index.ts';
 import type { Look } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
-import { REGION_COUNT, REGIONS, regionWeights } from '../sim/world/index.ts';
+import { REGION_COUNT, REGIONS, heightAt, regionWeights } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 import type { StageView } from '../render/stage.ts';
-import { latLonOf, type SceneSpec } from './scenes.ts';
+import { latLonOf, travel, type SceneSpec } from './scenes.ts';
 
 /** The career's look as the actors' cosmetic ids. */
 export const cosmeticsOf = (look: Look): CosmeticIds => ({
@@ -15,6 +15,30 @@ export const cosmeticsOf = (look: Look): CosmeticIds => ({
 });
 
 const scale = (v: V3, k: number): V3 => ({ x: v.x * k, y: v.y * k, z: v.z * k });
+const across = (p: V3, t: V3): V3 => ({ x: p.y * t.z - p.z * t.y, y: p.z * t.x - p.x * t.z, z: p.x * t.y - p.y * t.x });
+
+/**
+ * Where a scene's fleet sails: n ships spread from 60 to 220 m ahead, each off to one side or the other so the middle of
+ * the view stays clear, on water deep enough to float, sailing across the view so their hulls show. Spots on land are
+ * left empty.
+ */
+function fleetOf(s: SceneSpec, look: CosmeticIds): ShipView[] {
+  const out: ShipView[] = [], n = s.fleet ?? 0;
+  for (let k = 0; k < n; k++) {
+    const ahead = travel(s.pos, s.heading, 60 + (160 * k) / Math.max(1, n - 1));
+    for (const side of k % 2 ? [-1, 1] : [1, -1]) {
+      const at = travel(ahead.pos, across(ahead.pos, ahead.heading), side * (26 + 12 * k));
+      if (heightAt(at.pos) > -3) continue;
+      const head = travel(at.pos, across(at.pos, ahead.heading), 1).heading;
+      out.push({
+        id: 1 + k, pos: scale(at.pos, R), head: k % 2 ? scale(head, -1) : head, speed: 8, turn: 0, hull: 1, shield: 0, shieldMax: 100,
+        weapon: 'cannon', cosmetics: look, alive: true,
+      });
+      break;
+    }
+  }
+  return out;
+}
 
 /** A lone ship (or none) at a scene's spot. */
 export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticIds, speed = 0): ActorsView {
@@ -22,6 +46,7 @@ export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticI
     id: 0, pos: scale(s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
     cosmetics: look, alive: true,
   }] : [];
+  ships.push(...fleetOf(s, look));
   // a steady breeze from behind the ship's port quarter
   const wind = { x: s.heading.x * 6, y: s.heading.y * 6, z: s.heading.z * 6 };
   return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [] };

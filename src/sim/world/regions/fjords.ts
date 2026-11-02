@@ -70,7 +70,8 @@ function height(x: number, y: number): number {
 export const fjords: RegionSpec = {
   height,
   landmark: { x: 0, y: FALLS_Y, r: 22, height: 146, bearing: 180 },
-  beacon: { x: 0, y: FALLS_Y + 16, height: 140 },
+  // the meltwater slab stands on a low shore clear of the falls, its ribbon and plunge pool facing the open water
+  beacon: { x: -21, y: FALLS_Y - 35, height: 140, bearing: 135 },
   loot: snapWet(height, [0, -110, -2, 40, -150, -20, 150, -8, -90, 115, 110, -150, -60, -230, 120, -235, 186, 8], 4),
   lanes: [
     // The falls' outflow, down the main fjord and out across the Great Current.

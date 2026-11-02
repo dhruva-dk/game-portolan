@@ -14,11 +14,20 @@ import { narrows } from './looks/narrows.ts';
 import { basaltStacks } from './looks/basaltStacks.ts';
 import { kelpShallows } from './looks/kelpShallows.ts';
 import { blossomRun } from './looks/blossomRun.ts';
+import { glassSea } from './looks/glassSea.ts';
+import { jadeShoals } from './looks/jadeShoals.ts';
+import { coralAtolls } from './looks/coralAtolls.ts';
+import { spiceIsles } from './looks/spiceIsles.ts';
+import { fireArchipelago } from './looks/fireArchipelago.ts';
+import { weepingIsle } from './looks/weepingIsle.ts';
+import { mangroveLabyrinth } from './looks/mangroveLabyrinth.ts';
+import { maelstrom } from './looks/maelstrom.ts';
 
 export type { BeaconLook } from './look.ts';
 
-export const BEACON_LOOKS: Partial<Record<RegionId, BeaconLook>> = {
+export const BEACON_LOOKS: Record<RegionId, BeaconLook> = {
   iceCrown, fjords, mistwood, spires, narrows, basaltStacks, kelpShallows, blossomRun,
+  glassSea, jadeShoals, coralAtolls, spiceIsles, fireArchipelago, weepingIsle, mangroveLabyrinth, maelstrom,
 };
 
 /**

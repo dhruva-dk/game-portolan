@@ -67,8 +67,8 @@ export interface RegionSpec {
   height(x: number, y: number): number;
   /** The landmark: its centre, footprint radius and the height it is seen at (its top, or its light). */
   landmark: { x: number; y: number; r: number; height: number; bearing: number };
-  /** The natural beacon: where its light sits and how high. */
-  beacon: { x: number; y: number; height: number };
+  /** The natural beacon: where its light sits and how high, and which way its face turns if it has one (chart degrees). */
+  beacon: { x: number; y: number; height: number; bearing?: number };
   /** Loot spots, flat x, y pairs, all in water a ship can reach. */
   loot: readonly number[];
   lanes: readonly LaneSpec[];

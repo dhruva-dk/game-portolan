@@ -242,7 +242,7 @@ sea.receiveShadow = true;
 scene.add(sea);
 
 const seed = Number(q.get('seed') ?? 1);
-const looks = ORDER.filter((id) => BEACON_LOOKS[id]).map((id) => ({ id, look: BEACON_LOOKS[id] as BeaconLook }));
+const looks = ORDER.map((id) => ({ id, look: BEACON_LOOKS[id] }));
 const built = looks.map(({ id, look }) => {
   const obj = look.build(seed);
   obj.visible = false;

@@ -63,8 +63,8 @@ crown(NEEDLE.x, NEEDLE.y, NEEDLE.r, NEEDLE.h, 5, 0.5);
 export const spires: RegionSpec = {
   height,
   landmark: { x: NEEDLE.x, y: NEEDLE.y, r: 26, height: NEEDLE.h, bearing: 0 },
-  // A vein of glowing calcite near the Needle's crown.
-  beacon: { x: NEEDLE.x, y: NEEDLE.y - 10, height: 140 },
+  // Four lesser needles standing in the sea at the Needle's foot, their crowns burning with corona fire.
+  beacon: { x: NEEDLE.x + 8, y: NEEDLE.y - 30, height: 66 },
   loot: snapWet(height, [-60, 60, 70, 80, 140, -60, -150, 20, 30, -120, -40, 200, 120, 190, -170, -170], 4),
   lanes: [
     // A slalom stream down through the towers and out across the Great Current to the Coral Atolls.

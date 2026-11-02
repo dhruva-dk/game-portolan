@@ -80,14 +80,29 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     out.add(curtain, spray);
     return out;
   },
-  // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall with a fungus light on top
+  // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall, splintered at the top, with
+  // fungus shelves glowing down its side
   mistwood: (lm) => {
     const out = new THREE.Group(), bark = rock(0x5a3b28);
     const log = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 80, 16, 1, true), patch(new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true }), 'landmark-rock'));
     log.rotation.x = Math.PI / 2;
     log.position.y = 4;
-    const stump = column(18, -44, lm.height - 6, 9, bark, -6);
-    out.add(log, stump, glow(0x9dffb0, 3.2, 6).translateX(18).translateY(lm.height - 3).translateZ(-44));
+    const top = lm.height - 14;
+    out.add(log, column(18, -44, top, 9, bark, -6));
+    // splinters left standing where the trunk snapped
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + jitter(i, 7), h = 5 + 9 * jitter(i, 8);
+      const g = new THREE.ConeGeometry(1.6 + jitter(i, 9), h, 4);
+      g.translate(18 + Math.cos(a) * 4.5, top + h / 2 - 0.5, -44 + Math.sin(a) * 4.5);
+      out.add(new THREE.Mesh(g, bark));
+    }
+    for (let i = 0; i < 4; i++) {
+      const f = 0.3 + 0.15 * i, a = 1.3 * i, r = 9 - 2.7 * f + 0.6;
+      const shelf = glow(0x9dffb0, 2.2, 4);
+      shelf.scale.set(1.2, 0.3, 1.2);
+      shelf.position.set(18 + Math.cos(a) * r, -6 + f * (top + 6), -44 + Math.sin(a) * r);
+      out.add(shelf);
+    }
     return out;
   },
   // the Moonbow Arch: a basalt arch over the passage
@@ -95,9 +110,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // the Kelp Cathedral: a ring of kelp-draped columns rising out of the shallows
   kelpShallows: (lm) => {
     const kelp = rock(0x4a5a2c);
-    const out = around(10, 34, 0, (x, z, i) => column(x, z, lm.height * (0.6 + 0.4 * jitter(i, 1)), 4.5, kelp));
-    out.add(glow(0xb8ff9a, 2.4, 4).translateY(lm.height + 2));
-    return out;
+    return around(10, 34, 0, (x, z, i) => column(x, z, lm.height * (0.6 + 0.4 * jitter(i, 1)), 4.5, kelp));
   },
   // the Great Cherry: a broad tree on the hilltop
   blossomRun: (lm) => {
@@ -121,12 +134,22 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       return m;
     });
   },
-  // the Great Reef: coral towers round the rim of the biggest ring, with gaps to sail in by
+  // the Great Reef: coral towers round the rim of the biggest ring, with gaps to sail in by; the tallest grow as
+  // clumps of leaning branches, like antler coral, not as single columns
   coralAtolls: (lm) => {
     const coral = rock(0xe39a7a);
-    const out = around(18, 88, 4, (x, z, i) => column(x, z, 6 + (i % 5 === 2 ? lm.height - 6 : 18 * jitter(i, 6)), 5, coral));
-    out.add(glow(0xffd0a0, 2.4, 4).translateY(lm.height + 2).translateX(Math.sin((2 / 18) * Math.PI * 2) * 88).translateZ(Math.cos((2 / 18) * Math.PI * 2) * 88));
-    return out;
+    return around(18, 88, 4, (x, z, i) => {
+      if (i % 5 !== 2) return column(x, z, 6 + 18 * jitter(i, 6), 5, coral);
+      const clump = new THREE.Group();
+      for (let b = 0; b < 5; b++) {
+        const h = (lm.height - 4) * (b === 0 ? 1 : 0.45 + 0.4 * jitter(i, 10 + b)), a = b * 1.4 + jitter(i, 20 + b);
+        const branch = column(0, 0, h, b === 0 ? 4.5 : 3, coral);
+        branch.position.set(x + Math.cos(a) * 3 * Math.min(1, b), 0, z + Math.sin(a) * 3 * Math.min(1, b));
+        branch.rotation.set(Math.sin(a) * 0.08 * b, 0, -Math.cos(a) * 0.08 * b);
+        clump.add(branch);
+      }
+      return clump;
+    });
   },
   // the Root Gate: an arch of roots over the channel
   mangroveLabyrinth: (lm) => {
@@ -135,7 +158,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     const twin = arch(30, lm.height - 8, 3, roots);
     twin.position.z = 5;
     twin.rotation.y = 0.15;
-    out.add(twin, glow(0xc8ff70, 2, 4).translateY(lm.height - 1));
+    out.add(twin);
     return out;
   },
 };

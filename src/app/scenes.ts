@@ -22,6 +22,8 @@ export interface SceneSpec {
   tide: number;
   /** Whether to put the player's ship there. */
   ship: boolean;
+  /** Other ships sailing on open water ahead, spread from 60 to 220 m out: their lanterns show at night. */
+  fleet?: number;
   /** The camera's target over the sea, in metres, if not the ship's deck or the water. */
   height?: number;
   region?: string;
@@ -40,6 +42,7 @@ export interface SceneInput {
   camera?: CameraMode;
   tide?: number;
   ship?: boolean;
+  fleet?: number;
   height?: number;
 }
 
@@ -135,6 +138,41 @@ export function orbitView(region: RegionId | number): SceneSpec {
   return { ...v, pos, heading: bearingTangent(pos, 0), hour: 12, tilt: lat - Math.sign(lat || 1) * 67.5, camera: 'orbit' };
 }
 
+/**
+ * A region's beacon from the sea, 8 m up, at midnight: about as far off as puts its light 17° up the frame once the sea
+ * has fallen away over the curve, from the spot where the least land stands in the line of sight to it: bearings are
+ * tried round from straight off the beacon's face.
+ * `top` is how high over the sea the light shows, if not the height the simulation gives the beacon.
+ */
+export function beaconView(region: RegionId | number, top?: number): SceneSpec {
+  const v = regionView(region), i = REGIONS.findIndex((r) => r.id === v.region), b = BEACONS[i], h = (top ?? b.height) - EYE;
+  // the light, h over the eye and d out, stands (h - d² / 2R) / d up: 0.3 is about 17°
+  const best = Math.max(110, R * (Math.sqrt(0.09 + (2 * h) / R) - 0.3));
+  const { east, north } = frameAt(b.pos), face = Math.atan2(dot(b.facing, east), dot(b.facing, north));
+  let pick = { pos: v.pos, miss: Infinity };
+  for (let k = 0; k < 24; k++) {
+    const out = bearingTangent(b.pos, face + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 12));
+    for (let d = best - 60; d < best + 160; d += 10) {
+      const p = travel(b.pos, out, d).pos;
+      if (d < 90 || (h - (d * d) / (2 * R)) / d > 0.45 || !isWater(p)) continue;
+      // metres of land over the line of sight, then a little for straying from the best distance
+      const miss = hidden(p, b.pos, d, h) + Math.abs(d - best) * 0.01;
+      if (miss < pick.miss) pick = { pos: p, miss };
+    }
+  }
+  return { ...v, pos: pick.pos, heading: towards(pick.pos, b.pos), hour: 23.5, height: BORDER_EYE };
+}
+
+/** How far the land stands over the line of sight from an eye at p to a light `h` m over it at q, `d` m off: 0 if clear. */
+function hidden(p: V3, q: V3, d: number, h: number): number {
+  const dir = towards(p, q);
+  let most = 0;
+  for (let x = 10; x < d - 20; x += 10) {
+    most = Math.max(most, heightAt(travel(p, dir, x).pos) - (EYE + (h * x) / d - (x * (d - x)) / (2 * R) - 2));
+  }
+  return most;
+}
+
 /** Water at p, and on eight bearings `r` metres round it. */
 function openWater(p: V3, r: number): boolean {
   if (!isWater(p)) return false;
@@ -151,6 +189,7 @@ function clearTowards(p: V3, to: V3, far: number): boolean {
 
 /** The eye camera stands 0.8 m over its target: this puts it 8 m over the sea. */
 const BORDER_EYE = 7.2;
+const EYE = BORDER_EYE + 0.8;
 
 /**
  * A spot on the sea on the border between each pair of neighbours, 8 m up, once looking at the first region's landmark
@@ -226,6 +265,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     hour: s.hour ?? base.hour, tilt: s.tilt ?? base.tilt, weather: s.weather ?? base.weather,
     camera: s.camera ?? base.camera, tide: s.tide ?? 0, ship: s.ship ?? base.ship, region: reg.id, regionName: reg.name,
     ...(s.height !== undefined && { height: s.height }),
+    ...(s.fleet !== undefined && { fleet: s.fleet }),
   };
 }
 
