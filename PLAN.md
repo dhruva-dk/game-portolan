@@ -1121,6 +1121,39 @@ Backlog from this revision:
 - In a match the chase camera has no shoulder offset, so a target straight ahead hides behind your own sails.
 - Up close the whale's pectoral fins show as flat dark planes edge-on, and at the top of its leap it rises out of the top of the frame for about half a second.
 
+**The independent review of revision 1 and the bots** (at `77de384`, from the 16 event strips, the regions capture, the whale-breach, broadside and cannon-hit moments, and `node --test tests/sim/bots.test.ts`): **none of its 5 items pass.** Two are borderline and three fail.
+- **The region events are borderline, on one region of 16.**
+  - All 16 strips show the banner with the table's name, the start sound, the warning haptic and a map marker while the event runs, and 15 show their event from inside the region.
+  - The Narrows now passes, only just. The rock tumbles into the gap at t+0 and raises a plume at t+30, but it is never seen falling from the wall tops, and the heap it leaves is low and faint.
+  - The Mangrove Labyrinth fails the line. Its strip shows only open water: no water rises among the roots, and the Root Gate never changes.
+- **No humans fails.** The Fjords' Glowfall crag now reads as natural. Three shapes still read as built:
+  - the Moonbow Blowhole's stack, still rectangular columns at stepped heights on a block causeway, like a city skyline. Its turf brow doesn't show;
+  - the Moonbow Arch, a smooth semicircle on a fluted pier, like an aqueduct;
+  - the Coral Atolls' flat-topped, faceted columns, like cut posts or stumps.
+- **Pale slabs over the water fail.** The review found three:
+  - the blowhole's spray, a bright, soft-edged white block inside the arch in every Basalt Stacks capture, brightest at night and in the beacon frame;
+  - a hard-edged pale oval across the Weeping Isle's cliff and sky from t+210;
+  - the cyan surf-glow smudges above the water in the Basalt Stacks' dusk frame.
+- **The juice checklist is borderline.**
+  - **The whale breach passes.** It has a rumble, a haptic and its sound at the trigger, the leap shows from t+42 to t+120, and the slam at t+121 has its own flash, a 55 ms hit-stop, a heavy shake, a 4.6° widening of the view and a heavy haptic, with spray after.
+  - **The cannon hit is mixed.** Its marker sits on the target's hull and one "23" shows. But for three ticks after the hit the target turns pale and see-through, with the horizon showing through its hull.
+  - **The broadside is weak.** At t+10 the "64" sits over the player's own stern, and the target is lost in the white glare of the sun on the sea. Fire shows on the target only from t+16, and nothing winds up before the shot.
+- **The bots fail.** The test passes and every count is above zero. All 16 landmarks are held, from once (the Hollow Cedar) to 11 times (the Weeping Isle). But four counts measure something easier than the plan's line:
+  - **"Lets a hidden ship be"** only looks at ships within 150 m, never checks that a hidden ship goes untargeted, and skips a hidden ship that is still the captain's foe. About 10% of the hidden ships it sees are just that, because a captain keeps a lost foe for 4 s.
+  - **"Spreads its Gale picks"** counts a match whose picks cover 6 or more regions. The plan's rule is that no region gets more than a quarter of the picks.
+  - **"Gets clear of a rising whale"** measures the distance to the whale as it swims, not to where it breaches, so the whale swimming off counts.
+  - **"Gets out of thunder and ash"** also counts weather that moves off the ship, about 11% of the thunder exits.
+  - The Turtles hold landmarks longer (56 s) than the Homesteaders, the territory holders (37 s). The test checks the Homesteaders only against the average, so this passes.
+
+New problems it found, to the backlog unless a revision below takes them:
+- The ambient beds are crossed: the Fire Archipelago's strip plays the Maelstrom's bed, quietly, and never its own, and the Narrows' strip plays the Fire Archipelago's.
+- At Cinder Peak the eruption still plays at a gain of 0.045 and the bombs at 0.03 to 0.04, too quiet to carry the event.
+- A thin arc floats with nothing under it above the Jade Shoals' grey dome in every frame.
+- The Glass Sea's flat, untextured coloured triangles read as a regatta of sails at dawn.
+- The Fjords' walls are ochre and red-brown, not granite, and no pines show in any frame.
+- A dark, creature-like silhouette sits on the Kelp Shallows' hill.
+- Still there: the Ice Crown's spires read salmon and rust, with crimson pillars; the lantern's bloom washes out the stern at night; the ship hangs in the sky in Mistwood's first frame; and five region events share the flood-surge sound.
+
 **The perks, done when each shows itself working:**
 
 | Perk | How you see it working |
