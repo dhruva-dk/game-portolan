@@ -30,11 +30,11 @@ export const BRAIN = {
   /** Think every this many ticks. */
   every: 6,
   /** Seconds before a green / a sharp captain first fires on a ship it has just seen. */
-  react: [1.4, 0.35],
+  react: [2.2, 0.3],
   /** Preferred range for each weapon, metres. */
   pref: { [ITEM.cannon]: 95, [ITEM.scatter]: 28, [ITEM.harpoon]: 170, [ITEM.mortar]: 140, [ITEM.repeater]: 65, [ITEM.broadside]: 45 } as Record<number, number>,
-  /** Aim error, as a share of distance, for a green captain; a sharp one has a fifth of it. */
-  error: 0.12,
+  /** Aim error, as a share of distance, for a green captain; a sharp one has a sixth of it. */
+  error: 0.2,
   /** Seconds to the next look round for a new goal while roaming. */
   roam: 9,
   repath: 2,
@@ -64,6 +64,10 @@ export const BRAIN = {
   letGo: 90,
   /** With this many ships or fewer afloat, a captain holds back this much more, and leaves the Storm to bring on the end. */
   lastFew: { ships: 3, more: 0.4 },
+  /** Radians a sharp captain swings either side of her course as she weaves away under fire. */
+  weave: 0.55,
+  /** Metres within which a sharp captain counts the other ships it sees before it picks a fight. */
+  crowd: 150,
   /** A captain on the run makes for an event's fog bank this far off. */
   cover: 150,
 } as const;
@@ -144,13 +148,14 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   }
 
   // 2. heal when it is safe to
-  const foeD = c.foe >= 0 ? apart(ship.pos, state.ships[c.foe].pos) : 1e9;
+  const foeD = c.foe >= 0 ? apart(ship.pos, foeAt(state, c)) : 1e9;
   // (not with a foe close by: lying still to mend under its guns only gets it sunk, so it runs first)
-  if ((ship.hull < style.mend || ship.shield < 25) && healSlot(ship) >= 0 && foeD > 70) {
+  // (a sharp captain tops up sooner, between fights)
+  if ((ship.hull < style.mend + 20 * c.skill || ship.shield < 25 + 25 * c.skill) && healSlot(ship) >= 0 && foeD > 70) {
     setMode(c, MODE.heal);
     // where it is, unless the tide is leaving it there
     if (!openAt(ship.pos, tide) || !nearestOpen(ship.pos, c.goal, 10, tide)) copy(c.goal, ship.pos);
-    if (c.foe >= 0) away(ship.pos, state.ships[c.foe].pos, 60, c.goal);
+    if (c.foe >= 0) away(ship.pos, foeAt(state, c), 60, c.goal);
     return;
   }
 
@@ -161,7 +166,7 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
     if (coverNear(state, ship.pos, BRAIN.cover, U) && toEdge(state, U) > style.margin) {
       copy(c.goal, U);
       if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 20, tide);
-    } else away(ship.pos, state.ships[c.foe].pos, 120, c.goal);
+    } else away(ship.pos, foeAt(state, c), 120, c.goal);
     keepInside(state, c.goal, style);
     return;
   }
@@ -169,10 +174,18 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   // 4. fight what it sees
   if (c.foe >= 0 && wantsFight(state, i, style, foeD)) {
     setMode(c, MODE.fight);
-    const foe = state.ships[c.foe].pos;
+    const foe = foeAt(state, c);
     // a captain who has learnt that the player lingers out in the Storm waits at its edge for them to come back in
     if (c.foe === PLAYER && waitsOut(c) && inStorm(state, foe)) lieInWait(foe, style.margin * 0.6, c.goal);
     else copy(c.goal, foe);
+    return;
+  }
+
+  // 4b. shot at by a ship it won't fight, a sharp captain gets out of her guns' reach; a green one sails on under them
+  if (c.foe >= 0 && foeD < 140 && shotBy(state, ship, c.foe, 90) && (c.mode === MODE.flee || rngFloat(rng) < c.skill)) {
+    setMode(c, MODE.flee);
+    away(ship.pos, foeAt(state, c), 120, c.goal);
+    keepInside(state, c.goal, style);
     return;
   }
 
@@ -256,6 +269,13 @@ function setMode(c: Captain, mode: number): void {
 
 const seenNow = (state: MatchState, c: Captain): boolean => state.tick * TICK - c.seen < 2;
 
+/** Whether the captain saw its foe (or the foe's decoy) when it last looked. It looks every BRAIN.every ticks. */
+export const inSight = (state: MatchState, c: Captain): boolean => state.tick * TICK - c.seen < (BRAIN.every - 0.5) * TICK;
+
+/** Where the captain takes its foe to be: where it sees it, or else where it last saw it. A ship it can't see it
+ *  doesn't follow, aim at or fire on; it makes for the spot it lost it at, and lets it go after 4 s. */
+const foeAt = (state: MatchState, c: Captain): V3 => (inSight(state, c) ? state.ships[c.foe].pos : c.last);
+
 /** Chooses the region to dive to: its own pick, or the player's, if it has learnt where the player goes. */
 const inFirst = (state: MatchState, r: number): boolean => apart(CENTRES[r], state.storm.centres[0]) <= ZONES[0] - 120;
 
@@ -298,7 +318,8 @@ function chooseRegion(state: MatchState, i: number, rng: Rng): void {
 /** Notes the nearest ship it can see, and keeps a grudge against whoever hits it. */
 function perceive(state: MatchState, i: number, style: Style): void {
   const ship = state.ships[i], c = ship.captain, now = state.tick * TICK;
-  let best = -1, bd = style.notice * (c.gentle ? 0.7 : 1);
+  // a sharp captain keeps a better lookout, and sees a ship before it sees her
+  let best = -1, bd = style.notice * (0.8 + 0.4 * c.skill) * (c.gentle ? 0.7 : 1);
   for (let j = 0; j < SHIPS; j++) {
     const o = state.ships[j];
     if (j === i || o.phase !== PHASE.sea) continue;
@@ -335,7 +356,8 @@ function perceive(state: MatchState, i: number, style: Style): void {
   } else if (c.foe >= 0 && (now - c.seen > 4 || state.ships[c.foe].phase !== PHASE.sea)) c.foe = -1;
 }
 
-const SIGHT_MAX = 240;
+/** The farthest a captain looks for a ship to fight. */
+export const SIGHT_MAX = 240;
 
 const reactTime = (c: Captain): number => BRAIN.react[0] + (BRAIN.react[1] - BRAIN.react[0]) * c.skill + (c.gentle ? 1.5 : 0);
 
@@ -343,8 +365,14 @@ function wantsFight(state: MatchState, i: number, style: Style, d: number): bool
   const ship = state.ships[i], c = ship.captain, foe = state.ships[c.foe];
   if (!hasWeapon(ship)) return false;
   let will = style.fight * (0.6 + 0.4 * c.aggro);
-  will += 0.25 * ((ship.hull + ship.shield) - (foe.hull + foe.shield)) / 100;
+  // a sharp captain reads the odds: it takes the fights it is winning and leaves the ones it isn't
+  will += (0.1 + 0.5 * c.skill) * ((ship.hull + ship.shield) - (foe.hull + foe.shield)) / 100;
   if (shotBy(state, ship, c.foe, 120)) will += 0.4;
+  // and keeps out of a crowd, where a third ship finishes whoever wins
+  for (let j = 0; j < SHIPS; j++) {
+    const o = state.ships[j];
+    if (j !== i && j !== c.foe && o.phase === PHASE.sea && apart(ship.pos, o.pos) < BRAIN.crowd && (seen(state, i, j) & SEEN.visible) !== 0) will -= 0.25 * c.skill;
+  }
   // a captain who has learnt where the player's hull breaks presses the attack below it
   if (c.foe === PLAYER && c.run.confidence > 0.3 && foe.hull < c.run.value + 10) will += 0.3;
   if (c.foe === PLAYER && c.gentle) will -= 0.3;
@@ -745,7 +773,7 @@ const levelFor = (state: MatchState): number => Math.min(seaLevel(state), seaLev
 
 function steerFor(state: MatchState, i: number, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain, level = tide;
-  if (c.mode === MODE.fight && c.foe >= 0) {
+  if (c.mode === MODE.fight && c.foe >= 0 && inSight(state, c)) {
     fightCourse(state, i, WANT);
   } else copy(WANT, c.goal);
   // land in the way: follow a route. A line from shallows isn't to be trusted, for it starts past the ground the ship is
@@ -770,6 +798,15 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
   } else c.path.length = 0;
   tangentToward(ship.pos, to, T);
   if (c.lean !== 0 && c.path.length === 0 && c.mode !== MODE.fight) rotateTangent(ship.pos, T, c.lean, T);
+  // under fire on the run, a sharp captain weaves, so the ship behind her can't lead her
+  if (c.mode === MODE.flee && c.path.length === 0 && c.foe >= 0 && shotBy(state, ship, c.foe, 150)) {
+    c.strafeT -= TICK;
+    if (c.strafeT <= 0) {
+      c.strafe = -c.strafe;
+      c.strafeT = rngRange(rngOf(state, i), 1, 2.2);
+    }
+    rotateTangent(ship.pos, T, c.strafe * BRAIN.weave * c.skill, T);
+  }
   let steer = angleTo(ship.head, T, ship.pos);
   course = steer;
   // feel ahead along its course for land, and for floes and columns standing in the water; not along its heading, for
@@ -829,7 +866,8 @@ function fightCourse(state: MatchState, i: number, out: V3): void {
   c.strafeT -= TICK;
   if (c.strafeT <= 0) {
     c.strafe = -c.strafe;
-    c.strafeT = rngRange(rngOf(state, i), 4, 9);
+    // a sharp captain weaves, turning back more often, so she is hard to lead
+    c.strafeT = rngRange(rngOf(state, i), 4, 9) * (1 - 0.6 * c.skill);
   }
   tangentToward(foe.pos, ship.pos, T);
   // a point on the ring of radius pref round the foe, a little round from where it is now
@@ -845,7 +883,7 @@ const LEAD = v3();
 function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain, now = state.tick * TICK;
   void style;
-  if (c.foe < 0 || ship.use >= 0) {
+  if (c.foe < 0 || ship.use >= 0 || !inSight(state, c)) {
     copy(out.aim, ship.head);
     along(ship.pos, ship.head, 60, out.aim);
     out.aimY = 2;
@@ -884,7 +922,7 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   }
   const blend = Math.min(1, TICK * 2);
   set(c.err, c.err.x + (c.errTo.x - c.err.x) * blend, c.err.y + (c.errTo.y - c.err.y) * blend, c.err.z + (c.errTo.z - c.err.z) * blend);
-  const miss = BRAIN.error * (1 - 0.8 * c.skill) * (c.gentle ? 2 : 1) * d;
+  const miss = BRAIN.error * (1 - 0.85 * c.skill) * (c.gentle ? 2 : 1) * d;
   addScaled(out.aim, LEAD, c.err, miss / R);
   normalize(out.aim);
   out.aimY = c.skill > 0.7 && it.kind === ITEM.harpoon ? 13 : 2.5;
@@ -940,7 +978,7 @@ function useWhatItCarries(state: MatchState, i: number, style: Style, out: ShipI
     }
   }
   if (c.mode !== MODE.heal && ship.use < 0 && isUse(ship.slots[ship.sel].kind) && c.swapT <= 0) {
-    const s = bestWeapon(ship, c.foe >= 0 ? apart(ship.pos, state.ships[c.foe].pos) : 100);
+    const s = bestWeapon(ship, c.foe >= 0 ? apart(ship.pos, foeAt(state, c)) : 100);
     if (s >= 0) out.select = s;
   }
   // a full hotbar: drop the worst weapon for better loot in reach
@@ -976,7 +1014,7 @@ function useWhatItCarries(state: MatchState, i: number, style: Style, out: ShipI
 
 function abilityNow(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain;
-  const foe = c.foe >= 0 ? state.ships[c.foe] : null, d = foe ? apart(ship.pos, foe.pos) : 1e9;
+  const foe = c.foe >= 0 && inSight(state, c) ? state.ships[c.foe] : null, d = c.foe >= 0 ? apart(ship.pos, foeAt(state, c)) : 1e9;
   switch (activeOf(ship)) {
     case 'repair': return ship.hull < 70;
     case 'smokeScreen': return c.mode === MODE.flee && d < 110;

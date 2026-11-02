@@ -85,7 +85,7 @@ export function fire(state: MatchState, i: number): void {
   const turning = Math.min(1, Math.abs(ship.rate) / 1.2) * TURN_SPREAD * (hasPassive(ship, 'steadyAim') ? POWERS.steadyAim : 1);
   spread *= 1 + turning;
   // captains' hands are less steady than they think
-  if (ship.captain.on) spread *= 1 + (1 - ship.captain.skill) * 1.5 + (ship.captain.gentle ? 1 : 0);
+  if (ship.captain.on) spread *= 1 + (1 - ship.captain.skill) * 2.5 + (ship.captain.gentle ? 1 : 0);
   const damage = w.damage * RARITY.damage[it.rarity];
   set(RIGHT, ship.head.y * ship.pos.z - ship.head.z * ship.pos.y, ship.head.z * ship.pos.x - ship.head.x * ship.pos.z,
     ship.head.x * ship.pos.y - ship.head.y * ship.pos.x);
