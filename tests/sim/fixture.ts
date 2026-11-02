@@ -5,6 +5,7 @@ import { idleInput, type ShipInput } from '../../src/sim/input.ts';
 import { step } from '../../src/sim/match.ts';
 import { PI, v3, type V3 } from '../../src/sim/math.ts';
 import { RULE } from '../../src/sim/rules.ts';
+import { nav, navCell } from '../../src/sim/nav.ts';
 import { createMatch } from '../../src/sim/setup.ts';
 import { along, apart, tangentAt } from '../../src/sim/sphere.ts';
 import { PHASE, SHIPS, TICK, copy, type MatchState } from '../../src/sim/state.ts';
@@ -43,7 +44,8 @@ export function openWater(region: number, run = 160, side = 50, bearing = 0, mar
     for (let k = 0; k < 24; k++) {
       tangentAt(c, bearing + (k * PI) / 12, T);
       along(c, T, d, P);
-      if (regionAt(P) !== region || !deep(P, margin)) continue;
+      // in the open: nothing shut on the nav grid within a few cells, as the lightning's own test has it
+      if (regionAt(P) !== region || !deep(P, margin) || nav().clear[navCell(P)] < 4) continue;
       for (let h = 0; h < 8; h++) {
         tangentAt(P, (h * PI) / 4, H);
         let ok = true;
