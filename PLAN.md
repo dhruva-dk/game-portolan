@@ -1044,6 +1044,37 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - Mistwood's band stays as it is. It is the territory ink doing its job, not a slab of mist.
 - Backlog: a cliff face turned from the sun at close range reads as a flat, near-black slab (the Weeping Isle's cloudburst frames from t+30, lower left). It is the rock's own colour under the sky's light alone, crushed by the grade's ACES toe, and the cloudburst doesn't soften the light the way an overcast sky would. That is a lighting and grade change for every region, so it waits for its own pass.
 
+**The independent review of the revisions** (at `e2d8532`, from the 16 event strips, the regions capture, the Gale's layout capture, and the whale-breach and broadside moments): **3 of its 7 items pass.** They are the Gale globe's names (inside the rim and clear of one another at all four sizes), the event banners (the hand-over next door, and the Glass Sea's held through the leap and the splash), and the career tips (all 22 come up through their own triggers, once each, and the save is written, read back and cleared).
+- **The region events fail, on one region of 16.** The Narrows' strip looks at a rock wall a few metres off in all 16 frames, so the rock heaping in the Gorge mouth never shows. Only the shake, the sound and the banner do. The other 15 show their event from inside the region.
+- **No humans is borderline.** The Basalt Stacks' tunnel roofs now read as natural arches. Three shapes still read as built:
+  - the Moonbow Blowhole's stack, whose square-cut column tops stand at stepped heights like a ruined, crenellated wall;
+  - thin, flat-topped grey cylinders behind a coral head, which read as pilings;
+  - the smooth pale block the Fjords' Glowfall pours off, which reads as a concrete dam.
+- **Pale slabs over the water fail.** The review found five:
+  - a flat, untextured light-grey plane over the bottom of the Ice Crown's midday frame;
+  - the Fjords' pale block;
+  - a grey, stair-stepped band beside the Jade Shoals' bars and the Coral Atolls' reef flat as their tides fall;
+  - the broadside's loot gun at Blossom Run, drawn flat grey with no shading;
+  - a white dome with a hard outline on the Mangrove Labyrinth's horizon in every frame.
+- **The juice checklist is borderline.**
+  - **The broadside:** its effect log has every layer, on firing and on each hit, but the screen doesn't show them. The target is hidden behind your own stern, so the hit marker sits on your own ship and reads as if you were hit. No damage number shows, the splinters can't be seen, the flashes are faint, and nothing winds up before the shot.
+  - **The whale breach:** it has its wind-up, a rumble, the spray, a rainbow, a haptic and its sound. It has no flash, no hit-stop and no interface response, and only one sound layer. The whale stays mostly off the edge of the frame, and the strip ends 0.4 s after the trigger, so the leap is never seen.
+
+New problems it found, to the backlog unless a revision below takes them:
+- The Ice Crown's spires render as rust-red rock, not ice.
+- Mistwood's water is bright turquoise, with no fog and no cedar trunks, and the Hollow Cedar shows at dusk as a pale grey spire with a jagged top.
+- The Great Cherry is grey at midday.
+- The Maelstrom's water is calm in the regions capture, with no spiral foam.
+- Cyan surf-glow smudges float above the water in the Basalt Stacks' midday and dusk frames. The far sea stack there is a flat, unshaded tan at dusk, and the blowhole's spray is one large, flat white oval.
+- Close sails show a dot-grid dither.
+- At Cinder Peak the eruption plays at a gain of 0.045 and the bombs at about 0.03, and the shake is skipped as out of range though the camera is in the region.
+- Five events share the flood-surge sound: the Fjords, the Basalt Stacks, Blossom Run, the Coral Atolls and the Mangrove Labyrinth.
+- The own ship's lantern glow washes out her hull on the Ice Crown's nights.
+- A ship hangs in the sky in two frames (Mistwood's t−30 and the whale's t+6).
+- A dark, hard-edged square patch sits on the water in the Maelstrom's event frames, and a lighter hard-edged wedge in the Jade Shoals' first frame.
+- The Glass Sea's banner is gone while the splash's spray still hangs.
+- The Gale globe drops the names of the Mangrove Labyrinth and the Coral Atolls, which sit near its rim.
+
 **The perks, done when each shows itself working:**
 
 | Perk | How you see it working |
