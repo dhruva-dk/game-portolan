@@ -98,6 +98,63 @@ function kelpColumn(x: number, z: number, top: number, r: number, i: number, sti
   }
 }
 
+/** The Hollow Cedar's fallen log along +Z, 80 m long: out of round, its bark fluted, its ends broken off ragged. */
+function cedarLog(): THREE.BufferGeometry {
+  const segs = 20, rows = 6, g = new THREE.CylinderGeometry(1, 1, 80, segs, rows, true), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const row = Math.floor(i / (segs + 1)), col = i % (segs + 1), a = (col / segs) * Math.PI * 2;
+    const r = (11 + row / rows) * (1 + 0.06 * Math.cos(7 * a + 0.5) ** 2 + 0.04 * Math.cos(3 * a + 1));
+    // each end broken off a few metres short in places
+    const short = row === 0 ? -6 * jitter(col % segs, 60) : row === rows ? 6 * jitter(col % segs, 61) : 0;
+    p.setXYZ(i, r * Math.sin(a), p.getY(i) + short, r * Math.cos(a));
+  }
+  g.rotateX(Math.PI / 2);
+  g.translate(0, 4, 0);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * The Hollow Cedar's broken stump at (x, z), from `bottom` to about `top` and r across: hollow, out of round and
+ * fluted, flaring into its roots at the foot, leaning a little, and torn off in a ragged slant that stands highest on
+ * the side it tore from (bearing `torn` round the trunk, 0 along +Z), with splinters left standing there. `bark(t, a,
+ * out)` is the point `out` m off its bark at the share t of its height and bearing a, for hanging things on it.
+ */
+function cedarStump(x: number, z: number, bottom: number, top: number, r: number, torn: number) {
+  const segs = 22, rows = 14, tall = top - bottom;
+  const radius = (t: number, a: number) => {
+    const foot = Math.max(0, 1 - (t * tall) / 14);
+    return r * (1 - 0.3 * t) * (1 + 0.07 * Math.cos(9 * a + 0.8) + 0.05 * Math.cos(4 * a + 2.1) + 0.08 * Math.cos(2 * a))
+      * (1 + 0.5 * foot * foot * (1 + 0.5 * Math.cos(5 * a + 1)));
+  };
+  const bark = (t: number, a: number, out = 0) => {
+    // the break comes down 12 m on the far side from the tear
+    const rr = radius(t, a) + out, y = bottom + t * tall - 12 * (0.5 - 0.5 * Math.cos(a - torn)) * t;
+    return new THREE.Vector3(x + 0.03 * (y - bottom) + rr * Math.sin(a), y, z + rr * Math.cos(a));
+  };
+  const g = new THREE.CylinderGeometry(1, 1, 1, segs, rows, true), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const row = Math.floor(i / (segs + 1)), col = i % (segs + 1), v = bark(1 - row / rows, (col / segs) * Math.PI * 2);
+    // the rim splintered, each stave standing up a little or a lot
+    if (row === 0) v.y += 7 * jitter(col % segs, 50) ** 2;
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  const parts: THREE.BufferGeometry[] = [g];
+  // a few long splinters left standing on the torn side, thin and leaning out
+  for (let i = 0; i < 3; i++) {
+    const a = torn + (jitter(i, 51) - 0.5) * 1.6, h = 8 + 10 * jitter(i, 52), s = new THREE.ConeGeometry(1.2 + jitter(i, 53), h, 3);
+    s.scale(1, 1, 0.45);
+    s.translate(0, h / 2, 0);
+    s.rotateX(0.12 + 0.25 * jitter(i, 54));
+    s.rotateY(a);
+    const at = bark(1, a, -0.4);
+    s.translate(at.x, at.y - 1.5, at.z);
+    parts.push(s);
+  }
+  return { geometry: mergeGeometries(parts), bark };
+}
+
 /** The tangent at the landmark toward its highest ground at distance d. */
 function highest(lm: Landmark, d: number): THREE.Vector3Like {
   const dir = v3(), p = v3();
@@ -126,27 +183,16 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     out.add(curtain, spray);
     return out;
   },
-  // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall, splintered at the top, with
-  // fungus shelves glowing down its side
+  // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall beside it, with fungus shelves
+  // glowing down its side
   mistwood: (lm) => {
-    const out = new THREE.Group(), bark = rock(0x5a3b28);
-    const log = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 80, 16, 1, true), patch(new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true }), 'landmark-rock'));
-    log.rotation.x = Math.PI / 2;
-    log.position.y = 4;
-    const top = lm.height - 14;
-    out.add(log, column(18, -44, top, 9, bark, -6));
-    // splinters left standing where the trunk snapped
+    const out = new THREE.Group(), wood = patch(new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true }), 'landmark-rock');
+    const stump = cedarStump(18, -44, -6, lm.height - 14, 9, 2.4);
+    out.add(new THREE.Mesh(cedarLog(), wood), new THREE.Mesh(stump.geometry, wood));
     for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + jitter(i, 7), h = 5 + 9 * jitter(i, 8);
-      const g = new THREE.ConeGeometry(1.6 + jitter(i, 9), h, 4);
-      g.translate(18 + Math.cos(a) * 4.5, top + h / 2 - 0.5, -44 + Math.sin(a) * 4.5);
-      out.add(new THREE.Mesh(g, bark));
-    }
-    for (let i = 0; i < 4; i++) {
-      const f = 0.3 + 0.15 * i, a = 1.3 * i, r = 9 - 2.7 * f + 0.6;
       const shelf = glow(0x9dffb0, 2.2, 4);
       shelf.scale.set(1.2, 0.3, 1.2);
-      shelf.position.set(18 + Math.cos(a) * r, -6 + f * (top + 6), -44 + Math.sin(a) * r);
+      shelf.position.copy(stump.bark(0.3 + 0.15 * i, 1.3 * i, 0.6));
       out.add(shelf);
     }
     return out;

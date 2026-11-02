@@ -876,6 +876,17 @@ What pass 1 left, found while building it. The one open `todo` test under "The w
 
 The root page (`index.html`) and the iOS build now run the new app. The rewrite's flat game still runs at `dev/flat.html`, and its smoke test drives it there.
 
+**The independent review** (at `bdfefa7`): **31 of the 36 items pass**, up from 16 at the first review. The ones that came through since are 13 regions, Death and spectating, and Victory. These five still fail:
+- **Mistwood:** no giant cedar trunks over a fog line (the flora and mist libraries, below).
+- **The Spires:** the Needle (the question below).
+- **The Mangrove Labyrinth:** no low canopy over the channels (the flora library, below).
+- **The renderer:** pale slabs still stand over the water (below).
+- **Integration:** no real iPad has run it yet (Performance, below).
+
+Its no-humans check passed the Eye, the Kelp Cathedral and the Root Gate. It failed the Hollow Cedar's stump, whose four even pinnacles read as a steeple. The stump is now a ragged, slanting break with uneven splinters; that change came after the review, so it is not yet re-judged. It called three shapes borderline: the Eye's blue light on its tip at night (a little like a lighthouse), the Hollow Cedar's log seen end-on (a pipe; its bark and ends are now rough), and the Coral Atolls' flat-topped columns.
+
+The last blind test named 33 of the 48 frames. The Glass Sea got none of its three, taken for the Ice Crown or the Jade Shoals. The Ice Crown, the Coral Atolls and the Weeping Isle got one each, and the Ice Crown and the Coral Atolls were both taken for the Spires. The blind test is a Good-rung check, so this is where to start at that rung.
+
 **Questions for the owner:**
 - **The Needle can't be seen from every northern ring region.** The Kelp Shallows and Blossom Run are about 750 m away, so over the curve of a 554 m planet the Needle would need to stand about 390 m tall. The blockout keeps it at 150 m as the tallest spire. Should it be that tall, or should the rule ask for less?
 - **Can `legacy/` be deleted?** It holds the old game's career, its tuning tools and the old simulation's tests. They no longer build against the new simulation, and nothing imports them. They stay until you decide (see `legacy/README.md`).
@@ -900,7 +911,8 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - The far sea turns sky-white near the horizon.
 - Pale slabs still stand over the water in some frames, such as the bottom right of the Maelstrom's dusk frame.
 - A polar night glows red over the horizon unless the sun is far under it. On a planet this small the sunset is only a few hundred metres off, and the sky still catches it with the sun 45° under. A match draws its tilt from ±26°, so the poles' nights always glow. The regions capture tilts the planet so the sun stands 70° under at every midnight, as at the equator (`nightTilt` in `src/app/scenes.ts`). Find what catches the sunset and let it go dark.
-- The lanterns' bloom is too hot at night.
+- The lanterns' bloom is too hot at night. It's worst in the spectate view, which it washes out.
+- "Nights are readable" passes in the captures, but only just. Past about 180 m a ship's stern lantern drops under the curve, and only her masthead light shows; it reaches about 238 m. The captures place a ship only where her masthead is in sight, so they can't show a failure. The Fire Archipelago's night and beacon frames find nowhere to put a ship at all.
 - The chart's region mask is coarse, so its borders look blocky.
 
 **The regions' looks:**
@@ -908,7 +920,10 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - The Weeping Isle's Moss Spring barely shows from the sea. It sits on the crown's plateau, and the rim hides all but the glow of its cloud cap. Both of this pass's revisions are used.
 - The Fire Archipelago's steam shows as a red smear behind the caldera rim, not a column lit from below. Both of this pass's revisions are used.
 - The Spice Isles' Ember Swarm reads as an orange blur, and from the sea a hill hides most of it.
-- The simulation's beacon heights don't match the looks. The Fjords' says 140 m, but its look glows about 12 m up. The captures frame each beacon from its look's height instead (`beaconView` in `src/app/hook.ts`). Set the specs' heights from the looks.
+- The Moonbow Arch's beacon is an overexposed white blob under the arch, with no spray column and no moonbow.
+- Blossom Run's beacon shows as two pink smudges. There's no firefly spiral, and the blossom isn't lit.
+- The Coral Atolls' pipes and Mistwood's rings only just read.
+- The simulation's beacon heights don't match the looks. The Fjords' says 140 m, but its look glows about 12 m up. The captures frame each beacon from its look's height instead (`beaconView` in `src/app/hook.ts`). Set the specs' heights from the looks. The landmark-in-view test uses the specs' heights and passes 98.5% of spots by night. At the looks' heights it's 80.0% for the core light alone, 92.7% at 0.6 of the height, and 98.7% for the full glow.
 
 **The interface:**
 - The minimap shows the Storm, the next circle and the ships, but no land. Port the rewrite's.
@@ -923,6 +938,7 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 **The tools:**
 - The lap rings follow a line of latitude straight through land, so many frames show the ship on a hillside or inside a cliff. Route the lap round the islands, or leave out the frames over land.
 - The border views (`npm run capture -- borders`) look for open water on each border with 150 m of clear sea towards the landmark they face. Few borders have it, because land stands near most of them. Ten have no open water within 240 m of the middle at all: the Ice Crown with the Fjords, Mistwood, the Narrows and Blossom Run; the Fjords with Mistwood; the Jade Shoals with the Glass Sea, the Coral Atolls and the Maelstrom; and the Mangrove Labyrinth with the Weeping Isle and the Maelstrom. Some of those frames face a cliff a few metres off. Search the whole border, or step back from the land.
+- The blend tests cover only 24 of the 42 borders, because their transects skip the current lanes. Their mix threshold of 2% is weak; the least mixed border tested is at 5.8%.
 
 **Performance** (measured at the end of pass 1):
 - **Chromium on the Mac** (M1 Pro, `npm run capture -- perf`): every region holds 60 fps (16.7 ms a frame, the worst 95th percentile 18.4 ms) with 0.43–0.87 million triangles and 165–339 draw calls. A match view is 0.99 million triangles and 396 calls.
