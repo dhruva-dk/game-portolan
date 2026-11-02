@@ -34,7 +34,8 @@ export const SCREENS: readonly Screen[] = [
   { name: 'results', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()' },
 ];
 
-interface Target { what: string; x: number; y: number; w: number; h: number; fight: boolean }
+/** A target where it can be touched (the part its scrollers show), and its own full size. */
+interface Target { what: string; x: number; y: number; w: number; h: number; fw: number; fh: number; fight: boolean }
 interface Measured { targets: Target[]; clipped: string[]; safe: { top: number; right: number; bottom: number; left: number }; vw: number; vh: number }
 
 const MIN = 44;
@@ -59,19 +60,36 @@ async function measure(game: Game): Promise<Measured> {
       }
       return true;
     };
+    // a list scrolls its cards out of sight: only the part every scroller round a card shows can be touched
+    const showing = (e: Element) => {
+      const r = e.getBoundingClientRect();
+      let x0 = r.left, y0 = r.top, x1 = r.right, y1 = r.bottom;
+      for (let n = e.parentElement; n && n !== document.body; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+        const c = n.getBoundingClientRect(), l = c.left + n.clientLeft, t = c.top + n.clientTop;
+        x0 = Math.max(x0, l);
+        y0 = Math.max(y0, t);
+        x1 = Math.min(x1, l + n.clientWidth);
+        y1 = Math.min(y1, t + n.clientHeight);
+      }
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    };
     const SEL = 'button, [role="button"], .p-tile, .p-row[data-part], .s-mx__hold, .s-hud__slot, .s-hud__sail, .s-globe, [data-what]';
     const seen = new Set<Element>();
     const targets = [...ui.querySelectorAll(SEL)].filter((e) => {
       // the innermost target counts once: a button's own face or label is not another target
       if ([...seen].some((s) => s.contains(e))) return false;
       if (!shown(e) || getComputedStyle(e).pointerEvents === 'none') return false;
+      const v = showing(e);
+      if (v.w < 1 || v.h < 1) return false;
       seen.add(e);
       return true;
     }).map((e) => {
-      const r = e.getBoundingClientRect(), h = e as HTMLElement;
+      const r = e.getBoundingClientRect(), v = showing(e), h = e as HTMLElement;
       return {
         what: h.dataset.what ?? h.dataset.part ?? h.dataset.slot ?? (h.getAttribute('aria-label') || h.className.toString().split(' ')[0]),
-        x: r.left, y: r.top, w: r.width, h: r.height,
+        ...v, fw: r.width, fh: r.height,
         fight: h.classList.contains('s-mx__hold') || h.classList.contains('s-hud__sail'),
       };
     });
@@ -93,7 +111,7 @@ function judge(m: Measured, thumbs: boolean): string[] {
   const bad: string[] = [];
   for (const t of m.targets) {
     const name = `${t.what} (${t.w.toFixed(0)}×${t.h.toFixed(0)} at ${t.x.toFixed(0)},${t.y.toFixed(0)})`;
-    if (t.w < MIN - 0.5 || t.h < MIN - 0.5) bad.push(`under 44 points: ${name}`);
+    if (t.fw < MIN - 0.5 || t.fh < MIN - 0.5) bad.push(`under 44 points: ${name}`);
     const s = m.safe;
     if (t.x < s.left - 0.5 || t.y < s.top - 0.5 || t.x + t.w > m.vw - s.right + 0.5 || t.y + t.h > m.vh - s.bottom + 0.5) bad.push(`under a safe area: ${name}`);
     if (thumbs && t.fight) {
