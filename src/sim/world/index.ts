@@ -41,7 +41,7 @@ export type RegionId =
 
 export type PerkId =
   | 'frostShot' | 'fastRepair' | 'fogSight' | 'spotter' | 'longRange' | 'fastReload' | 'hiddenWake' | 'quickGust'
-  | 'cheapDeliveries' | 'shallowDraft' | 'lootSense' | 'betterLoot' | 'fireShot' | 'quickHands' | 'tightTurns' | 'currentRider';
+  | 'cheapDeliveries' | 'shallowDraft' | 'lootSense' | 'betterLoot' | 'fireShot' | 'fastRefill' | 'tightTurns' | 'currentRider';
 
 export type WeatherKind = 'clear' | 'fog' | 'rain' | 'thunder' | 'calm' | 'snow' | 'ash';
 
@@ -86,7 +86,7 @@ const INFO: Omit<RegionInfo, 'neighbours'>[] = [
   { id: 'coralAtolls', name: 'the Coral Atolls', ...south(2), landmark: 'the Great Reef', perk: 'lootSense', perkName: 'Loot Sense', perkText: 'Nearby loot shows on your map.', weather: ['clear', 'rain'] },
   { id: 'spiceIsles', name: 'the Spice Isles', ...south(3), landmark: 'Spice Cove', perk: 'betterLoot', perkName: 'Better Loot', perkText: 'Loot you open rolls one rarity higher.', weather: ['rain', 'thunder'] },
   { id: 'fireArchipelago', name: 'the Fire Archipelago', ...south(4), landmark: 'Cinder Peak', perk: 'fireShot', perkName: 'Fire Shot', perkText: 'Your hits set ships burning.', weather: ['ash'] },
-  { id: 'weepingIsle', name: 'the Weeping Isle', ...south(5), landmark: 'the Weeping Isle', perk: 'quickHands', perkName: 'Quick Hands', perkText: 'You use consumables about 30% faster.', weather: ['rain', 'fog'] },
+  { id: 'weepingIsle', name: 'the Weeping Isle', ...south(5), landmark: 'the Weeping Isle', perk: 'fastRefill', perkName: 'Fast Refill', perkText: 'You use shields and repairs about 30% faster.', weather: ['rain', 'fog'] },
   { id: 'mangroveLabyrinth', name: 'the Mangrove Labyrinth', ...south(6), landmark: 'the Root Gate', perk: 'tightTurns', perkName: 'Tight Turns', perkText: 'You turn much more sharply.', weather: ['rain', 'fog'] },
   { id: 'maelstrom', name: 'the Maelstrom', ring: 'pole', lat: -90, lon: 0, landmark: 'the Eye', perk: 'currentRider', perkName: 'Current Rider', perkText: 'Currents push you about 50% harder.', weather: ['rain', 'thunder'] },
 ];

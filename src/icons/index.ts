@@ -79,7 +79,7 @@ export const TINTS: Partial<Record<IconName, string>> = {
   'perk.fireShot': '#ff7a2e',
   'perk.cheapDeliveries': '#f4c24a',
   'perk.shallowDraft': '#f0c97a',
-  'perk.quickHands': '#7fd0ff',
+  'perk.fastRefill': '#7fd0ff',
   'gull.supplies': '#e2c08a',
   'gull.armament': '#d79a5a',
   'gull.treasure': '#f4c24a',

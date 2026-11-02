@@ -318,7 +318,7 @@ Each portrait describes what the region must feel like, without dictating number
 - **Plants:** cloud forest and tree ferns.
 - **Landmark:** the Isle itself, ringed by its weeping cliffs.
 - **Event:** a cloudburst. Every fall doubles and mist rolls out to sea.
-- **Perk:** Quick Hands. You use consumables about 30% faster.
+- **Perk:** Fast Refill. You use shields and repairs about 30% faster.
 - **Sound:** endless falling water at every distance.
 - **Weather:** rain, fog.
 - **Remembered for:** circling a weeping green giant.
@@ -664,7 +664,7 @@ Pass 1 takes every item to **blocked out**. An item is done only when every line
 | The Ice Crown | Rings of floes around a crown of ice spires at the pole, with lanes between the rings. |
 | The Fjords | Tall U-shaped valley walls around narrow fjords. A cliff at the head of the main fjord carries the falls, with a sailable gap behind the curtain. |
 | Mistwood | Giant cedar trunks rising above a fog line, on low, flat islands with rooty shores, separated by still channels. The fallen Hollow Cedar is a log you can sail through, and it carries a light so neighbours can see it. |
-| The Spires | A cluster of sheer needles rising from the sea. The Needle is the tallest, and it can be seen from every northern ring region. |
+| The Spires | A cluster of sheer needles rising from the sea. The Needle is the tallest landmark in the north, and it can be seen from every region that borders the Spires. |
 | The Narrows | Two long, continuous walls with a slot between them. The Gorge has one way in and one way out. |
 | The Basalt Stacks | Column cliffs and sea stacks, with a natural arch you can sail under. |
 | The Kelp Shallows | Low islets on wide shallows. The Kelp Cathedral's columns rise above the surface. |
@@ -846,7 +846,7 @@ Agents build in parallel. Each owns its paths and touches nothing else, so pushe
 | Sound | `src/audio/**`, `dev/audio.html` | Synthesised and recorded sound for every mechanic and region, with no music |
 | Integration | `src/main.ts`, `src/app/**`, `index.html`, `tests/capture/**` | Wiring it all together, and the reviewer's capture tools |
 
-**Asset libraries started early at the owner's direction.** Each is self-contained with its own dev page. Regions take them up when they reach the Good rung. Each library kept its credits in `credits/<library>.md`; they are merged into CREDITS.md, and new credits go straight there.
+**Asset libraries started early at the owner's direction.** Each is self-contained with its own dev page. Regions take them up when they reach the Good rung. Their credits are all in CREDITS.md, and new credits go straight there.
 
 | Owner | Paths |
 |---|---|
@@ -868,17 +868,23 @@ Contracts between owners:
 
 ## Backlog
 
-- **Naming question for the owner:** "Quick Hands" is both the Weeping Isle's perk and a passive ability. One of them needs a new name.
+### The owner's decisions after pass 1
+
+The owner asked the agent to go with its recommendations on the open questions:
+- **The Needle:** it stays 150 m, the tallest landmark in the north. A Needle seen from every northern ring region would have to stand about 390 m, most of the planet's radius, so the rule now asks for every region that borders the Spires (the Ice Crown, Mistwood, the Narrows, the Spice Isles and the Coral Atolls).
+- **`legacy/` is deleted.** Nothing built against it. Its files are still in git at `9db96ab` (`git show 9db96ab:legacy/<path>`), and the old game itself at `2025e68`.
+- **`credits/` is deleted.** Every line was already in CREDITS.md.
+- **The Weeping Isle's perk is now Fast Refill** (shields and repairs about 30% faster). The passive ability keeps the name Quick Hands. The two still stack.
 
 ### From pass 1 (blocked out)
 
-What pass 1 left, found while building it. The one open `todo` test under "The world" is a line of the regions' done-when list that is not yet true. The rest each need a decision or a fix in a later pass.
+What pass 1 left, found while building it. Each needs a fix in a later pass.
 
 The root page (`index.html`) and the iOS build now run the new app. The rewrite's flat game still runs at `dev/flat.html`, and its smoke test drives it there.
 
 **The independent review** (at `bdfefa7`): **31 of the 36 items pass**, up from 16 at the first review. The ones that came through since are 13 regions, Death and spectating, and Victory. These five still fail:
 - **Mistwood:** no giant cedar trunks over a fog line (the flora and mist libraries, below).
-- **The Spires:** the Needle (the question below).
+- **The Spires:** the Needle. Settled since by the owner's decision above, so it passes the new rule.
 - **The Mangrove Labyrinth:** no low canopy over the channels (the flora library, below).
 - **The renderer:** pale slabs still stand over the water (below).
 - **Integration:** no real iPad has run it yet (Performance, below).
@@ -886,10 +892,6 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 Its no-humans check passed the Eye, the Kelp Cathedral and the Root Gate. It failed the Hollow Cedar's stump, whose four even pinnacles read as a steeple. The stump is now a ragged, slanting break with uneven splinters; that change came after the review, so it is not yet re-judged. It called three shapes borderline: the Eye's blue light on its tip at night (a little like a lighthouse), the Hollow Cedar's log seen end-on (a pipe; its bark and ends are now rough), and the Coral Atolls' flat-topped columns.
 
 The last blind test named 33 of the 48 frames. The Glass Sea got none of its three, taken for the Ice Crown or the Jade Shoals. The Ice Crown, the Coral Atolls and the Weeping Isle got one each, and the Ice Crown and the Coral Atolls were both taken for the Spires. The blind test is a Good-rung check, so this is where to start at that rung.
-
-**Questions for the owner:**
-- **The Needle can't be seen from every northern ring region.** The Kelp Shallows and Blossom Run are about 750 m away, so over the curve of a 554 m planet the Needle would need to stand about 390 m tall. The blockout keeps it at 150 m as the tallest spire. Should it be that tall, or should the rule ask for less?
-- **Can `legacy/` be deleted?** It holds the old game's career, its tuning tools and the old simulation's tests. They no longer build against the new simulation, and nothing imports them. They stay until you decide (see `legacy/README.md`).
 
 **The match:**
 - Headless bot matches last 4.4–6.4 minutes against the 10–12 minute target. The Storm's phases, or the captains' aggression, need tuning.
@@ -901,9 +903,6 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 - A Gale pick inside 600 m of the ship leaves the Gale at once.
 - Most of the fixture rivals are tagged Rival. Use a realistic spread.
 - A grounded ship can freeze on a slanting shore. `tryMove` refuses the whole step when any touching probe (bow, middle or stern) would climb, so a hull that drifts sideways along an oblique bank can't move forward or back until something turns her. Let her slide along the bank instead.
-
-**The world** (each is a `todo` test in `tests/sim/world.test.ts`, so `npm test` passes with them open):
-- **The Needle** (see the question above): at 150 m it shows 462 m off, so it can't be seen from the Kelp Shallows, Blossom Run, the Fjords or the Basalt Stacks.
 
 **The renderer:**
 - The ships have no environment map, so their varnish and metal look flat.

@@ -249,7 +249,7 @@ function take(state: MatchState, i: number, k: number): void {
 /** How long a consumable takes for this ship. */
 export function useTime(ship: Ship, kind: number): number {
   let t = USES[kind].time;
-  if (hasPerk(ship, 'quickHands')) t *= PERKS.quickHands;
+  if (hasPerk(ship, 'fastRefill')) t *= PERKS.fastRefill;
   if (hasPassive(ship, 'quickHands')) t *= POWERS.quickHands;
   return t;
 }

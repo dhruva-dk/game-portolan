@@ -199,7 +199,7 @@ export const PERKS = {
   quickGust: 0.6,
   cheapDeliveries: 0.7,
   shallowDraft: 0.3,
-  quickHands: 0.7,
+  fastRefill: 0.7,
   tightTurns: 1.5,
   currentRider: 1.5,
   spotter: 5,

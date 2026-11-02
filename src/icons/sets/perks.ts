@@ -122,7 +122,7 @@ export const PERK_ICONS: Record<PerkId, Prim[]> = {
     cutLine(circle(15.2, 15.2, 6.6), 1.4),
     ...ball(15.2, 15.2, 5.6, { top: true }),
   ],
-  quickHands: [
+  fastRefill: [
     // a flask, used fast
     fill('M10.8 2.6H16.2V8.4L21 18.2C21.8 19.8 20.8 21.4 19 21.4H8C6.2 21.4 5.2 19.8 6 18.2L10.8 8.4Z', { tint: true }),
     cutLine('M10.6 4.6H16.4', 1),

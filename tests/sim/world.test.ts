@@ -412,17 +412,21 @@ test('every landmark can be seen over the curve from every point of its borders'
   assert.deepEqual(faults, []);
 });
 
-test('the Needle can be seen from every northern ring region', { todo: 'four northern regions lie beyond the 150 m Needle\'s reach; Kelp Shallows and Blossom Run, about 750 m off, need it about 390 m tall' }, (t) => {
-  const needle = LANDMARKS[regionIndex('spires')], reach = EYE + horizonDistance(needle.height), P = v3();
-  const nearest = new Array<number>(REGION_COUNT).fill(Infinity);
-  for (let k = 0; k < 60_000; k++) {
+test('the Needle is the north\'s tallest landmark, and shows from every region that borders the Spires', (t) => {
+  const s = regionIndex('spires'), needle = LANDMARKS[s], reach = EYE + horizonDistance(needle.height), P = v3(), M = { a: 0, b: 0, t: 0 };
+  for (const i of [0, ...NORTH]) if (i !== s) assert.ok(LANDMARKS[i].height < needle.height, `${name(i)}'s landmark stands taller than the Needle`);
+  const nearest = new Map<number, number>();
+  for (let k = 0; k < 150_000; k++) {
     anywhere(P);
-    const r = regionAt(P);
-    if (NORTH.includes(r)) nearest[r] = Math.min(nearest[r], surfaceDistance(P, needle.pos));
+    regionMix(P, M);
+    if (M.t < 0.47 || (M.a !== s && M.b !== s)) continue;
+    const r = M.a === s ? M.b : M.a;
+    nearest.set(r, Math.min(nearest.get(r) ?? Infinity, surfaceDistance(P, needle.pos)));
   }
-  const far = NORTH.filter((i) => nearest[i] > reach);
-  t.diagnostic(`the Needle (${needle.height} m) shows ${reach.toFixed(0)} m off; nearest water of ${NORTH.map((i) => `${name(i)} ${nearest[i].toFixed(0)} m`).join(', ')}`);
-  assert.deepEqual(far.map(name), []);
+  const far = [...nearest].filter(([, d]) => d > reach).map(([i]) => name(i));
+  t.diagnostic(`the Needle (${needle.height} m) shows ${reach.toFixed(0)} m off; its neighbours' nearest border points: ${[...nearest].map(([i, d]) => `${name(i)} ${d.toFixed(0)} m`).join(', ')}`);
+  assert.ok(nearest.size >= 4, 'the Spires has at least four neighbours');
+  assert.deepEqual(far, []);
 });
 
 test('every region has a beacon with a light above the sea', () => {
