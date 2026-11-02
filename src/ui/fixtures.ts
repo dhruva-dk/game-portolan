@@ -324,11 +324,13 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     weather: storm ? 'rain' : state === 'night' ? 'fog' : null,
     tide: { level: fight ? -0.6 : 0.4, rising: !fight },
     pickup: state === 'calm' ? 'Rare Harpoon' : null,
-    // the Spice Isles' pearls in a fight, the Coral Atolls' tide in the Storm, and Cinder Peak warned next door at night
+    // the Spice Isles' pearls in a fight, the Coral Atolls' tide in the Storm, and Cinder Peak warned next door at night;
+    // in the Storm the Atolls' tide runs on a second banner while the Spice Isles' bloom is warned at home
     event: fight ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: false, seconds: 22 }
-      : storm ? { region: 'coralAtolls', name: 'Reef Tide', tip: 'One reef gap shuts, another opens.', tone: 'sea', warning: false, seconds: 41 }
+      : storm ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: true, seconds: 6 }
       : state === 'night' ? { region: 'fireArchipelago', name: 'Eruption', tip: 'Get away from the cone and the ash.', tone: 'danger', warning: true, seconds: 7 }
       : null,
+    also: storm ? { region: 'coralAtolls', name: 'Reef Tide', tip: 'One reef gap shuts, another opens.', tone: 'sea', warning: false, seconds: 41 } : null,
     map: {
       lat: -31, lon: 167, heading: 0.6, range: 260,
       storm: { x: storm ? -210 : -60, y: storm ? 140 : 80, r: storm ? 180 : 420 }, next: { x: -40, y: 120, r: storm ? 110 : 260 },

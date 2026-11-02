@@ -5,6 +5,7 @@ import type { ConsumableKind, Moment } from './events.ts';
 import type { EffectLog } from './effects.ts';
 import type { V3 } from '../sim/math.ts';
 import { EVENT_REGION as R } from '../sim/environment.ts';
+import { regionAt } from '../sim/world/index.ts';
 
 const ABILITY: Record<string, SoundName> = {
   smokeScreen: 'abilitySmoke', ram: 'abilityRam', repair: 'abilityRepair', reveal: 'abilityReveal', hardTurn: 'abilityHardTurn',
@@ -24,7 +25,7 @@ const EVENT_SOUND: Record<number, readonly [Cue, Cue, Cue]> = {
   [R.kelp]: [null, ['kelpBloom', 1], null],
   [R.blossom]: [null, ['floodSurge', 1], null],
   [R.glass]: [['whaleSong', 0.8], ['whaleBreach', 1], null],
-  [R.jade]: [null, ['floodSurge', 0.5], ['floodSurge', 0.5]],
+  [R.jade]: [null, ['tideDraw', 0.9], ['floodSurge', 0.5]],
   [R.coral]: [null, ['floodSurge', 0.7], null],
   [R.spice]: [null, ['clamOpen', 1], null],
   [R.fire]: [['thunder', 0.5], ['eruption', 1], null],
@@ -32,11 +33,15 @@ const EVENT_SOUND: Record<number, readonly [Cue, Cue, Cue]> = {
   [R.mangrove]: [null, ['floodSurge', 0.7], null],
   [R.maelstrom]: [['vortexSurge', 0.4], ['vortexSurge', 1], null],
 };
+/** The events that fill their whole region, heard all round you while you are in it rather than from their spot. */
+const WIDE = new Set<number>([R.mist, R.blossom, R.jade, R.coral, R.weeping, R.mangrove]);
 
 export class MomentSound {
   readonly audio: Audio;
   /** The ship the player hears from. */
   me = 0;
+  /** Where that ship is, for the events that fill a region. */
+  ear: () => V3 | null = () => null;
   private readonly uses = new Map<number, { item: ConsumableKind; use: Use }>();
   /** When the Storm last bit the player's hull, in seconds: its sound comes once a second, not every tick. */
   private storm = -1;
@@ -151,7 +156,8 @@ export class MomentSound {
         return;
       case 'regionEvent': {
         const cue = EVENT_SOUND[m.region]?.[m.phase === 'warn' ? 0 : m.phase === 'start' ? 1 : 2];
-        if (cue) a.play(cue[0], { pos: m.pos, gain: cue[1] });
+        const ear = WIDE.has(m.region) ? this.ear() : null, pos = ear && regionAt(ear) === m.region ? null : m.pos;
+        if (cue) a.play(cue[0], { pos, gain: cue[1] });
         if (m.phase === 'start' && m.region === R.weeping) a.play('thunder', { pos: m.pos, delay: 0.8 });
         return;
       }

@@ -1019,7 +1019,14 @@ Decisions (Settled overnight in the owner's absence; the owner may change it.):
 - The ziggurat was a beacon, so it is reshaped in the beacon's own look. Its spray, blowhole and moonbow are unchanged.
 - Backlog: from 150 m the column tops still read square-cut.
 
-Still open from the review: the Blossom Run loot drum that reads as a pipe, and the borderline items.
+*Revision 1 of the loot "pipe" and three borderline items:*
+- **The grey drum at Blossom Run** was the broadside's loot token, its short gun lying alone on the water. Hiding the scene's groups one at a time found it. That token now sits on a ship's truck carriage: two cheeks on a bed, on four small wheels. Every other gun token stands on its deck mount with its barrel cocked up. The repair tokens are bellied casks with hoops, not plain cylinders (src/render/actors/loot.ts).
+- **The banner hand-over:** a second, smaller banner sits under the first. Your own region's event takes the first. Then events already running beside you come before those only warned, so a new warning never hides an event still running next door. `eventsOf` in src/app/matchModels.ts; tested in tests/app/banner.test.ts.
+- **The Basalt Stacks' warning** now reads "The cave opens: sail in for its hoard.", so it no longer says the cave is open before it is.
+
+- **The Jade Shoals' sound:** the falling tide has a sound of its own, `tideDraw`: a long hiss of water running off the sand that falls away, with gurgles as the channels empty. The tide coming back in keeps the flood surge. The events that fill a whole region play all round you while you are in that region, not from their spot 300 m off: the Mistwood fog, the Spring Flood, both tides, the cloudburst and the Mangrove flood (`WIDE` in src/app/sounds.ts). Checked as rendered buffers only, since the captures run muted.
+
+Still open from the review: the Glass Sea's banner going while the whale is in the air, and the hard-edged pale shapes.
 
 **The perks, done when each shows itself working:**
 

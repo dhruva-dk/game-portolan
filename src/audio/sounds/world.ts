@@ -275,6 +275,20 @@ function floodSurge(r: Rng): Buf[] {
   return normAll(out, 0.8);
 }
 
+/** The tide drawing off the Jade Shoals: a long hiss of water running off the sand that falls away as it goes, with
+ *  gurgles in the channels as they empty. */
+function tideDraw(r: Rng): Buf[] {
+  const s = 6, out = pair(s);
+  out.forEach((o) => {
+    const w = pink(o.length, r);
+    sweep(w, 'lp', (u) => 2800 - 2300 * u, 0.7);
+    mix(o, shape(w, (t) => hump(t / s, 0.4)), 0, 0.9);
+    mix(o, shape(filter(brown(o.length, r), 'lp', 220), (t) => hump(t / s, 0.6)), 0, 0.6);
+    bubbles(o, r, 1, s - 0.5, 40, 0.08, 200, 900);
+  });
+  return normAll(out, 0.75);
+}
+
 /** Mistwood's fog surge: a cold breath rolling out of the trees. */
 function fogSurge(r: Rng): Buf[] {
   const s = 5, out = pair(s);
@@ -522,6 +536,7 @@ export const WORLD_SOUNDS = {
   floesGrind: def(floesGrind, 2, 'fx', 4, 0.6, 2, { range: 300 }),
   rockfall: def(rockfall, 2, 'fx', 7, 0.9, 1, { range: 900 }),
   floodSurge: def(floodSurge, 1, 'fx', 6, 0.8, 1, { range: 900 }),
+  tideDraw: def(tideDraw, 1, 'fx', 6, 0.75, 1, { range: 900 }),
   fogSurge: def(fogSurge, 1, 'amb', 6, 0.6, 1),
   eruption: def(eruption, 1, 'fx', 9, 1, 1, { range: 1500 }),
   lavaBomb: def(lavaBomb, 3, 'fx', 7, 0.85, 4, { range: 600 }),

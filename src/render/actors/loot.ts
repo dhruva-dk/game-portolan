@@ -2,6 +2,7 @@
 // turning slowly and bobbing on the swell, glowing in its rarity's colour (grey, green, blue, purple, gold) over a
 // halo on the water and under a column of light that rises higher the rarer it is.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { onSea, patch, tangents } from './common.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { SPRITE } from './particles.ts';
@@ -10,20 +11,61 @@ import { WEAPONS, type LootKind, type LootView, type Weapon } from './view.ts';
 const KINDS: readonly LootKind[] = [...WEAPONS, 'smallShield', 'bigShield', 'repairKit', 'fullRepair', 'coin'];
 const CAP = 200;
 
-function tokenGeometry(kind: LootKind, barrels: Map<Weapon, THREE.BufferGeometry>): THREE.BufferGeometry {
+/** A cask on its side: bellied staves, a hoop near each end and one round each side of the belly. */
+function cask(r: number, len: number): THREE.BufferGeometry {
+  // u runs from the belly (0) to an end (1)
+  const us = [0, 0.2, 0.4, 0.44, 0.56, 0.6, 0.82, 0.86, 0.96, 1];
+  const rad = (u: number) => r * (0.84 + 0.16 * Math.cos((u * Math.PI) / 2)) * ((u >= 0.44 && u <= 0.56) || (u >= 0.86 && u <= 0.96) ? 1.05 : 1);
+  const pts = [new THREE.Vector2(0, -len / 2)];
+  for (const u of [...us].reverse()) pts.push(new THREE.Vector2(rad(u), (-u * len) / 2));
+  for (const u of us.slice(1)) pts.push(new THREE.Vector2(rad(u), (u * len) / 2));
+  pts.push(new THREE.Vector2(0, len / 2));
+  return new THREE.LatheGeometry(pts, 14).rotateZ(Math.PI / 2);
+}
+
+/** A ship's gun as it stands on deck: its mount, and its barrel on the pivot. */
+export interface GunShape { base: THREE.BufferGeometry; barrel: THREE.BufferGeometry; pivot: number }
+
+function tokenGeometry(kind: LootKind, guns: Map<Weapon, GunShape>): THREE.BufferGeometry {
   switch (kind) {
     case 'smallShield': return new THREE.OctahedronGeometry(0.6, 0).scale(0.8, 1.3, 0.8);
     case 'bigShield': return new THREE.OctahedronGeometry(0.85, 0).scale(0.85, 1.45, 0.85);
-    case 'repairKit': return new THREE.CylinderGeometry(0.42, 0.42, 1.0, 12).rotateZ(Math.PI / 2);
-    case 'fullRepair': return new THREE.CylinderGeometry(0.6, 0.6, 1.3, 14).rotateZ(Math.PI / 2);
+    case 'repairKit': return cask(0.46, 1.0);
+    case 'fullRepair': return cask(0.64, 1.3);
     case 'coin': return new THREE.CylinderGeometry(0.55, 0.55, 0.12, 20).rotateX(Math.PI / 2);
     default: {
-      const g = barrels.get(kind)!.clone();
-      g.computeBoundingBox();
-      const c = g.boundingBox!.getCenter(new THREE.Vector3());
-      return g.translate(-c.x, -c.y, -c.z).scale(1.15, 1.15, 1.15);
+      // the gun on its mount with the barrel cocked up, so it reads as a gun and not a length of pipe on the water;
+      // the broadside's mount is only a sighting post, so its short gun sits on a truck carriage of its own
+      const gun = guns.get(kind)!;
+      if (kind === 'broadside') return centred(mergeGeometries([...truck(), plain(gun.barrel.clone().rotateX(-0.15).translate(0, 0.62, -0.1))]));
+      const barrel = gun.barrel.clone().rotateX(-0.4).translate(0, gun.pivot, 0);
+      return centred(mergeGeometries([gun.base.clone(), barrel]));
     }
   }
+}
+
+/** A ship's gun carriage: two cheeks on a bed, on four small wheels, in the barrel's frame (along +z). */
+function truck(): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = [new THREE.BoxGeometry(0.6, 0.1, 1.0).translate(0, 0.24, 0)];
+  for (const x of [-0.3, 0.3]) parts.push(new THREE.BoxGeometry(0.12, 0.4, 1.05).translate(x, 0.44, 0));
+  for (const z of [-0.36, 0.38]) {
+    parts.push(new THREE.CylinderGeometry(0.05, 0.05, 0.84, 6).rotateZ(Math.PI / 2).translate(0, 0.17, z));
+    for (const x of [-0.4, 0.4]) parts.push(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 12).rotateZ(Math.PI / 2).translate(x, 0.17, z));
+  }
+  return parts;
+}
+
+/** The ship builder's extra attributes dropped, so its parts merge with plain shapes. */
+function plain(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+  return g;
+}
+
+/** Centred on its bounding box and scaled up a little to read on the water. */
+function centred(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  g.computeBoundingBox();
+  const c = g.boundingBox!.getCenter(new THREE.Vector3());
+  return g.translate(-c.x, -c.y, -c.z).scale(1.15, 1.15, 1.15);
 }
 
 const BEAM_VERT = /* glsl */ `
@@ -75,7 +117,7 @@ export class Loot {
   private readonly p = new THREE.Vector3();
   private readonly beamU = { uTime: { value: 0 } };
 
-  constructor(fx: Effects, barrels: Map<Weapon, THREE.BufferGeometry>) {
+  constructor(fx: Effects, guns: Map<Weapon, GunShape>) {
     this.fx = fx;
     for (const k of KINDS) {
       const shieldy = k === 'smallShield' || k === 'bigShield';
@@ -88,7 +130,7 @@ export class Loot {
           .replace('#include <color_fragment>', '')
           .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\ntotalEmissiveRadiance *= vColor;\n#endif');
       });
-      const mesh = new THREE.InstancedMesh(tokenGeometry(k, barrels), m, CAP);
+      const mesh = new THREE.InstancedMesh(tokenGeometry(k, guns), m, CAP);
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
       mesh.count = 0;
       mesh.frustumCulled = false;

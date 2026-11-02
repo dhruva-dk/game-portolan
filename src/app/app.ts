@@ -144,6 +144,7 @@ export class App {
     this.audio = createAudio();
     this.audio.unlock();
     this.sound = new MomentSound(this.audio, this.log);
+    this.sound.ear = () => this.session?.state.ships[this.sound.me]?.pos ?? null;
     this.momentJuice = new MomentJuice(this.juice, this.viewer);
     connectUiFeedback((what, sound) => this.log.add('screen', what, sound !== 'none' ? { sound } : undefined), this.juice.haptics, (n) => this.audio.play(n));
     if (options.capture) this.loop.running = false;

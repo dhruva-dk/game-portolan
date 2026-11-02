@@ -121,21 +121,30 @@ function nearRegion(p: V3, ri: number): boolean {
   return false;
 }
 
-/** The region event the banner shows at p: one warned or running in the water there or near it, its own region's first. */
-export function eventOf(s: MatchState, p: V3): EventView | null {
-  const here = regionAt(p);
-  let best = -1;
-  for (let ri = 0; ri < s.regionEvents.length; ri++) {
-    const st = s.regionEvents[ri].state;
-    if (st !== EVENT_STATE.warning && st !== EVENT_STATE.running) continue;
-    if (ri === here) { best = ri; break; }
-    if (best < 0 && nearRegion(p, ri)) best = ri;
-  }
-  if (best < 0) return null;
-  const ev = s.regionEvents[best], info = REGIONS[best], warning = ev.state === EVENT_STATE.warning;
+function eventView(s: MatchState, ri: number): EventView {
+  const ev = s.regionEvents[ri], info = REGIONS[ri], warning = ev.state === EVENT_STATE.warning;
   const left = warning ? ev.at - s.tick * TICK : ev.run - ev.t;
-  return { region: info.id, name: info.event, tip: info.eventTip, tone: eventTone(best), warning, seconds: Math.max(0, Math.ceil(left)) };
+  return { region: info.id, name: info.event, tip: info.eventTip, tone: eventTone(ri), warning, seconds: Math.max(0, Math.ceil(left)) };
 }
+
+/**
+ * The region events the banners show at p, warned or running in the water there or near it: its own region's first,
+ * then those running before those warned, so a warning never hides an event already running beside you. At most two.
+ */
+export function eventsOf(s: MatchState, p: V3): { event: EventView | null; also: EventView | null } {
+  const here = regionAt(p), shown: number[] = [];
+  const live = (ri: number) => s.regionEvents[ri].state === EVENT_STATE.warning || s.regionEvents[ri].state === EVENT_STATE.running;
+  if (here >= 0 && here < s.regionEvents.length && live(here)) shown.push(here);
+  for (const st of [EVENT_STATE.running, EVENT_STATE.warning]) {
+    for (let ri = 0; ri < s.regionEvents.length && shown.length < 2; ri++) {
+      if (ri !== here && s.regionEvents[ri].state === st && nearRegion(p, ri)) shown.push(ri);
+    }
+  }
+  return { event: shown.length ? eventView(s, shown[0]) : null, also: shown.length > 1 ? eventView(s, shown[1]) : null };
+}
+
+/** The region event the first banner shows at p. */
+export const eventOf = (s: MatchState, p: V3): EventView | null => eventsOf(s, p).event;
 
 /** What a take would pick up: the nearest loot in reach. */
 function pickupOf(s: MatchState, sh: Ship): string | null {
@@ -184,7 +193,7 @@ export function hudModel(session: Session): HudModel {
     tide: { level, rising: seaLevelAt(now + 1) > level },
     night: isNight(s, sh.pos),
     pickup: pickupOf(s, sh),
-    event: eventOf(s, sh.pos),
+    ...eventsOf(s, sh.pos),
     map: mapOf(s, session.watch),
   };
 }

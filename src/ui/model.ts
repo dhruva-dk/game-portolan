@@ -356,6 +356,8 @@ export interface HudModel {
   pickup: string | null;
   /** A region's event, warned or running, in the water you are in or within 240 m of it. */
   event: EventView | null;
+  /** A second such event while the first shows, in a smaller banner under it. */
+  also?: EventView | null;
   map: MapView;
 }
 

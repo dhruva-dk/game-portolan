@@ -120,8 +120,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   const wakes = new Wakes();
   const numbers = new Numbers();
   const projectiles = new Projectiles(fx);
-  const barrels = new Map<Weapon, THREE.BufferGeometry>([...kit.turrets].map(([k, t]) => [k, t.barrel] as [Weapon, THREE.BufferGeometry]));
-  const loot = new Loot(fx, barrels);
+  const loot = new Loot(fx, kit.turrets);
   const gulls = new Gulls(fx);
   const whales = new Whales(fx);
   const ships = new THREE.Group();

@@ -115,8 +115,9 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const counter = (icon: string) => el('s-hud__n', el('', count, `<i>${icon}</i>`, 'span'), '', 'b');
   const nShips = counter(ICON.flag), nKills = counter(ICON.sink), nCoins = counter(ICON.coin);
 
-  // a region's event, under the Storm's line; it takes no touches
-  const banner = eventBanner({ parent: root, className: 's-hud__event' });
+  // a region's event, under the Storm's line, and a second one smaller under it; they take no touches
+  const events = el('s-hud__event', root);
+  const banner = eventBanner({ parent: events }), also = eventBanner({ parent: events, className: 's-hud__also' });
 
   const map = box('s-hud__map', root);
   const canvas = el<HTMLCanvasElement>('s-hud__mapC', map, undefined, 'canvas');
@@ -274,6 +275,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     nKills.textContent = `${h.kills}`;
     nCoins.textContent = `${h.coins}`;
     banner.set(h.event ? { ...h.event, icon: EVENT_ICON[h.event.region] ?? ICON.storm } : null);
+    also.set(h.also ? { ...h.also, icon: EVENT_ICON[h.also.region] ?? ICON.storm } : null);
     where.innerHTML = `<b>${esc(h.region)}</b>${h.perk ? `<span>${esc(h.perk)}</span>` : ''}${h.night ? `<i>${ICON.moon}</i>` : ''}`;
     h.slots.forEach((s, k) => {
       const v = slots[k];
