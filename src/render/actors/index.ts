@@ -351,15 +351,18 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
         case 'hit': {
           const f = fleet.get(e.ship), at = v3(e.at);
           const big = BIG[e.weapon] * (e.crit ? 1.4 : 1);
+          // the hits the player lands get the interface's number over the target, a broadside's balls added into
+          // one: the world's numbers are for every other hit, or each would show twice
+          const counted = e.by !== player || e.ship === player;
           if (e.shield > 0) {
             f?.aura.hit(at);
             fx.shieldSparks(at);
-            numbers.add(at, e.shield, true, e.crit && e.hull <= 0);
+            if (counted) numbers.add(at, e.shield, true, e.crit && e.hull <= 0);
           }
           if (e.hull > 0) {
             fx.hitShip(at, !!e.crit, big);
             if (f) f.hit = 1;
-            numbers.add(at.clone().addScaledVector(at.clone().normalize(), e.shield > 0 ? 1.4 : 0), e.hull, false, e.crit);
+            if (counted) numbers.add(at.clone().addScaledVector(at.clone().normalize(), e.shield > 0 ? 1.4 : 0), e.hull, false, e.crit);
           }
           if (f) { f.lastHitBy = e.by; f.lastHitAt = clock; }
           if (e.by === player && e.ship !== player) {

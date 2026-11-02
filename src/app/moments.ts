@@ -255,9 +255,10 @@ export function daylight(state: MatchState, hour = 15): void {
 }
 
 /** Open water `d` metres or more from a spot, on a course facing it, with room astern and to either side. With
- *  `sight`, only where nothing stands between the ship and the spot, so the camera behind her sees it, and well inside
- *  region `own` when one is given, so the current doesn't carry her out of it: null when there's no such water. */
-function facing(spot: V3, d: number, sight = false, own = -1): Course | null {
+ *  `sight`, only where nothing stands between the ship and the spot short of its last `bare` metres, so the camera
+ *  behind her sees it, and well inside region `own` when one is given, so the current doesn't carry her out of it: null
+ *  when there's no such water. */
+function facing(spot: V3, d: number, sight = false, own = -1, bare = 50): Course | null {
   const t = v3(), q = v3();
   for (let r = d; r <= d + (sight ? 260 : 400); r += 20) {
     for (let k = 0, n = sight ? 64 : 32; k < n; k++) {
@@ -265,7 +266,7 @@ function facing(spot: V3, d: number, sight = false, own = -1): Course | null {
       let ok = own < 0 || regionShare(own, pos) > 0.8;
       for (let s = -40; s <= 10 && ok; s += 10) for (const x of [-12, 0, 12]) if (ok && !open(off(c, s, x).pos)) ok = false;
       // (the spot's own ground, a dune or a peak, is what she looks at: only what stands short of it hides it)
-      for (let s = 10; sight && ok && s < r - 50; s += 10) if (heightAt(along(pos, c.head, s, q)) > 4) ok = false;
+      for (let s = 10; sight && ok && s < r - bare; s += 10) if (heightAt(along(pos, c.head, s, q)) > 4) ok = false;
       if (ok) return c;
     }
   }
@@ -286,10 +287,13 @@ function eventMoment(id: string): MomentScript {
       });
       // (Cinder Peak stands tall: far enough off to see its plume and where its bombs come down; the kelp lies flat on
       // the water, so the ship waits inside its reach and the bloom spreads up to her and round her; the Maelstrom's
-      // whirl races fastest well inside its reach, so she waits in it, where the water foams)
+      // whirl races fastest well inside its reach, so she waits in it, where the water foams; the Narrows' rock comes
+      // down into the slot of water between the Gorge's walls, so she waits off the mouth, back far enough to see the
+      // wall tops it falls from, looking straight in with nothing at all in the way)
       const r = eventMark(s, ri, spot), id = REGIONS[ri].id;
       const off = id === 'fireArchipelago' ? r + 120 : id === 'kelpShallows' ? r * 0.25 : id === 'maelstrom' ? 80
-        : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
+        : id === 'narrows' ? r + 90 : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
+      const bare = id === 'narrows' ? 10 : 50;
       // the match's spot when the region's own water looks on it, else the first of its others that does; then
       // the same from any water
       // (the Fjords' surge is seen at its source: the ship lies on the outflow, looking up the fjord at the falls)
@@ -297,7 +301,7 @@ function eventMoment(id: string): MomentScript {
       for (const own of [ri, -1]) {
         for (let j = 0; j < spots.length && !c; j++) {
           const k = (ev.k + j) % spots.length;
-          c = facing(k === ev.k ? spot : spots[k], off, true, own);
+          c = facing(k === ev.k ? spot : spots[k], off, true, own, bare);
           if (c && k !== ev.k) (ev.k = k), copy(ev.spot, spots[k]);
         }
       }
@@ -376,16 +380,19 @@ export const MOMENTS: readonly MomentScript[] = [
     is: (m) => m.k === 'stormPhase',
   },
   {
-    name: 'whale-breach', note: 'the giant whale breaching', sea: true, lead: 45, every: 3, frames: 20,
+    // on past the trigger through the leap (a second of boiling sea, then nearly four in the air) to the slam
+    name: 'whale-breach', note: 'the giant whale breaching', sea: true, lead: 36, every: 6, frames: 30,
     arrange: (s) => {
       const c = openCourse(s, 60, 50);
       place(s, PLAYER, c);
       callBreach(s);
-      // it rises 24 m to starboard: inside the lift's reach, outside the flip's
-      const w = s.whale, spot = off(c, 10, 24).pos;
+      // it rises ahead to starboard, inside the lift's reach and outside the flip's, far enough off for the view to
+      // take in a leap twice its length, and swims across the view to port. Aimed at, the view turns to it
+      const w = s.whale, spot = off(c, 22, 24).pos;
       Object.assign(w.spot, spot);
       Object.assign(w.at, spot);
-      return [[s.tick, { throttle: 0, steer: 0 }]];
+      tangentToward(spot, off(c, 60, -10).pos, w.head);
+      return [[s.tick, { throttle: 0, steer: 0, aim: spot }]];
     },
     is: (m) => m.k === 'whaleBreach',
   },

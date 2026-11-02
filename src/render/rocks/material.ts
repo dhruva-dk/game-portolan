@@ -6,6 +6,7 @@
 // The sea is described once for every rock by ROCK_UNIFORMS.uSea: (centre, radius) of the sea sphere, or, with a
 // radius of 0, a flat sea at y = centre.y. The integration step points it at the planet and adds the tide.
 import * as THREE from 'three';
+import { sharedUniforms } from '../planet.ts';
 import { SKINS, type Skin, type SkinId, type TexId } from './skins.ts';
 
 /** Uniforms every rock material shares by reference. */
@@ -27,6 +28,9 @@ export function setRockTextureBase(url: string): void {
 
 const loader = new THREE.TextureLoader();
 const textures = new Map<string, THREE.Texture>();
+const loading: Promise<void>[] = [];
+/** Settles once every rock texture asked for so far has loaded (or failed), so a still is never shot of black rock. */
+export const rockTexturesReady = (): Promise<void[]> => Promise.all(loading);
 let anisotropy = 8;
 /** Caps the anisotropic filtering of every rock texture loaded from now on. */
 export function setRockAnisotropy(n: number): void {
@@ -37,7 +41,9 @@ function texture(id: TexId, kind: 'd' | 'n'): THREE.Texture {
   const key = `${id}_${kind}`;
   let t = textures.get(key);
   if (!t) {
-    t = loader.load(`${base}${key}.jpg`);
+    let done!: () => void;
+    loading.push(new Promise<void>((ok) => (done = ok)));
+    t = loader.load(`${base}${key}.jpg`, done, undefined, done);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = kind === 'd' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.anisotropy = anisotropy;
@@ -80,7 +86,8 @@ const VERT_MAIN = /* glsl */ `
 const FRAG_PARS = /* glsl */ `
 uniform sampler2D uAlb, uNrm, uOvAlb, uOvNrm;
 uniform vec4 uSea;
-uniform float uTime, uDaylight;
+${sharedUniforms('float', 'uTime')}
+uniform float uDaylight;
 uniform vec2 uDetailFade;
 uniform vec2 uScale;        // texture repeats per metre, u and v
 uniform vec3 uTint;
@@ -328,7 +335,8 @@ function buildMaterial(id: SkinId, s: Skin): THREE.MeshStandardMaterial {
     uPieceD: { value: vec3(s.pieces?.[3] ?? [1, 1, 1]) },
   };
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, uniforms);
+    // on the planet, its own clock (given by engine.ts's patchAll before this runs) is the one the rock keeps
+    for (const [k, v] of Object.entries(uniforms)) if (!(k in sh.uniforms)) sh.uniforms[k] = v;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\n' + VERT_PARS)
       .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + VERT_MAIN);

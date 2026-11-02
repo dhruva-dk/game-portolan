@@ -32,12 +32,12 @@ const LOOKS: Partial<Record<WeatherKind, Look>> = {
   thunder: { base: 100, tower: 210, size: 58, flat: 0.85, lit: 0.7, shade: 0.16, tint: [0.88, 0.9, 1.0], curtains: 9, share: 1.2 },
   snow: { base: 95, tower: 60, size: 50, flat: 0.7, lit: 1.0, shade: 0.5, tint: [0.95, 0.97, 1.0], curtains: 5, share: 0.9 },
   ash: { base: 80, tower: 260, size: 52, flat: 1.0, lit: 0.5, shade: 0.16, tint: [0.78, 0.68, 0.6], curtains: 0, share: 1 },
-  fog: { base: 6, tower: 14, size: 70, flat: 0.32, lit: 1.0, shade: 0.72, tint: [0.92, 0.94, 0.96], curtains: 0, share: 0.9 },
+  fog: { base: 4, tower: 8, size: 70, flat: 0.26, lit: 1.0, shade: 0.72, tint: [0.92, 0.94, 0.96], curtains: 0, share: 0.9 },
 };
 
 const PUFF_VERT = /* glsl */ `
 attribute vec4 aPuff;   // centre (m), size (m)
-attribute vec4 aLook;   // flatness, lit, shade, kind (0 puff, 1 curtain)
+attribute vec4 aLook;   // flatness, lit, shade, kind (0 puff, 1 curtain, 2 a fog bank's puff)
 attribute vec4 aTint;   // rgb, opacity
 varying vec2 vQ;
 varying vec4 vLook, vTint;
@@ -52,7 +52,8 @@ void main() {
   float d = length(toCam);
   vec3 f = toCam / d;
   vec3 right, top;
-  if (aLook.w < 0.5) {
+  bool curtain = abs(aLook.w - 1.0) < 0.5;
+  if (!curtain) {
     // a puff faces the camera, squashed toward the ground
     right = normalize(cross(up, f));
     if (abs(dot(up, f)) > 0.999) right = normalize(cross(vec3(0.0, 0.0, 1.0), f));
@@ -63,9 +64,8 @@ void main() {
     top = up;
   }
   float s = aPuff.w;
-  vec3 wp = c + right * position.x * s + top * position.y * s * (aLook.w < 0.5 ? mix(1.0, aLook.x, abs(dot(top, up))) : 1.0);
-  if (aLook.w > 0.5) wp = c + right * position.x * s * 0.45 + up * (position.y * 0.5 - 0.5) * c.y * 0.0 + up * (position.y - 1.0) * aTint.w * 0.0;
-  if (aLook.w > 0.5) wp = c + right * position.x * s * 0.45 + up * (position.y + 1.0) * 0.5 * (length(c) - uPlanet.y) * -1.0;
+  vec3 wp = c + right * position.x * s + top * position.y * s * (curtain ? 1.0 : mix(1.0, aLook.x, abs(dot(top, up))));
+  if (curtain) wp = c + right * position.x * s * 0.45 + up * (position.y + 1.0) * 0.5 * (length(c) - uPlanet.y) * -1.0;
   vQ = position.xy;
   vLook = aLook;
   vTint = aTint;
@@ -92,7 +92,7 @@ void main() {
   float shade = planetShade(wp, uSunDir);
   vec3 sun = keyAt(1, e) * shade * smoothstep(-0.05, 0.05, e);
   vec3 sky = keyAt(2, e) + vec3(0.02, 0.025, 0.04);
-  if (vLook.w < 0.5) {
+  if (abs(vLook.w - 1.0) > 0.5) {
     float r2 = dot(vQ, vQ);
     if (r2 > 1.0) discard;
     // a soft ball: its normal from where on the disc the fragment is, lit by the sun from its side
@@ -102,9 +102,13 @@ void main() {
     float under = clamp(dot(n, vUp) * 0.5 + 0.5, 0.0, 1.0);
     col = vTint.rgb * (sun * mix(vLook.z, vLook.y, lit) * 1.6 + sky * mix(0.35, 0.8, under) * mix(vLook.z, 1.0, 0.5));
     col += vec3(0.75, 0.8, 1.0) * uFlashSys * 2.0 * (0.4 + nz);
-    a = smoothstep(1.0, 0.35, r2 + (nz - 0.5) * 0.7) * vTint.w;
+    // a fog bank's puffs fade from their middles out, so where the bank ends it frays instead of stopping at an outline
+    a = (vLook.w > 1.5 ? smoothstep(1.0, 0.0, r2 + (nz - 0.5) * 1.1) * 0.8 : smoothstep(1.0, 0.35, r2 + (nz - 0.5) * 0.7)) * vTint.w;
     // thinning into the water, so a low puff meets the sea without the hard line where it goes under
     a *= smoothstep(0.0, 5.0, length(wp) - uPlanet.y - seaLift(normalize(wp)));
+    // a fog bank is thickest on the water and thins upward into wisps, so seen from afar its top fades into the air
+    // instead of standing as a hard white dome
+    if (vLook.w > 1.5) a *= smoothstep(0.85, -0.45, vQ.y + (texture(uNoise, vQ * 1.3 + vC.xz * 0.01).g - 0.5) * 0.7);
   } else {
     // a rain curtain: streaks falling, thinning toward its edges and the sea
     float x = vQ.x, y = vQ.y * 0.5 + 0.5;
@@ -262,7 +266,7 @@ export class Weather {
         // more puffs toward the middle, the tall ones there too
         const r = Math.sqrt(rnd()) * rad, a = rnd() * Math.PI * 2, mid = 1 - r / rad;
         const tall = look.tower * mid * mid * rnd();
-        let h = look.base + tall + rnd() * 18;
+        let h = look.base + tall + rnd() * (sys.kind === 'fog' ? 6 : 18);
         const size = look.size * (0.6 + rnd() * 0.7) * (0.7 + mid * 0.5);
         p.copy(up).multiplyScalar(R + h).addScaledVector(e1, Math.cos(a) * r).addScaledVector(e2, Math.sin(a) * r);
         // a fog bank lies on the water, and where land comes up through a puff it cuts it with a hard edge: the puffs
@@ -271,7 +275,7 @@ export class Weather {
         p.normalize().multiplyScalar(R + h);
         C.set([p.x, p.y, p.z, size], n * 4);
         const dark = sys.kind === 'thunder' || sys.kind === 'rain' ? 1 - 0.4 * (h - look.base) / Math.max(1, look.tower + 18) : 1;
-        L.set([look.flat, look.lit * (2 - dark), look.shade * dark, 0], n * 4);
+        L.set([look.flat, look.lit * (2 - dark), look.shade * dark, sys.kind === 'fog' ? 2 : 0], n * 4);
         T.set([look.tint[0], look.tint[1], look.tint[2], 0.92 * fade], n * 4);
         n++;
       }

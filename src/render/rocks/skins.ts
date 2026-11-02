@@ -52,6 +52,13 @@ export const SKINS = {
     ice: { deep: [0.2, 0.48, 0.72], inner: 0.08 },
     cover: { tex: 'snow', tile: 3, tint: [1.0, 1.02, 1.06], amount: 1, up: 0.55, soft: 0.18 },
   },
+  // sea ice riding low, wet nearly all over: paler in the body than a berg's glacier ice, and a rougher wet sheen,
+  // since with nothing for it to mirror a dark glassy top reads black against the sea once the sun is low
+  floe: {
+    tex: 'ice', tile: 3.2, tint: [1, 1, 1], rough: [0.2, 0.3], spray: 0.5, normal: 0.8,
+    ice: { deep: [0.4, 0.66, 0.86], inner: 0.12 },
+    cover: { tex: 'snow', tile: 3, tint: [1.0, 1.02, 1.06], amount: 1, up: 0.55, soft: 0.18 },
+  },
   // dark rock poking through snow, for the Ice Crown's generic boulders
   snowrock: {
     tex: 'granite', tile: 3, tint: [0.55, 0.58, 0.64], grade: [0.5, 1.2, 1], rough: [0.75, 0.2], spray: 0.8,

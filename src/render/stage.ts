@@ -180,7 +180,7 @@ export class Stage {
     this.terrain.update(eye);
     this.landmarks.update(this.sky.night, v.time, v.events);
     this.beacons.update(v.time, this.sky.night);
-    this.floes.update(v.floes ?? v.time, v.tide);
+    this.floes.update(v.floes ?? v.time, v.tide, this.sky.night);
     this.rocks.update(v.events, v.time);
     this.kelp.update(v.events, v.time, v.tide);
     this.clams.update(v.events, v.time, v.tide);

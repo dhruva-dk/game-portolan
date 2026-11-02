@@ -4,29 +4,18 @@ import * as THREE from 'three';
 import { R } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
 import { FLOES, floePos } from '../../sim/world/index.ts';
-import { patch } from '../engine.ts';
+import { ROCK_UNIFORMS, rockById, rockMaterial, setRockTextureBase } from '../rocks/index.ts';
+import { TEX_BASE, patchAll } from '../engine.ts';
 
-/** Top and bottom of a slab against the sea, metres. */
-const TOP = 0.7, BOTTOM = -1.6;
-
-/** A slab of unit radius with a ragged rim, its top at TOP. */
-function slab(): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(1, 1.08, TOP - BOTTOM, 11, 1);
-  const p = g.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), z = p.getZ(i), a = Math.atan2(z, x);
-    // the same ragged rim top and bottom, so the sides stay closed
-    const k = 0.95 + 0.06 * Math.sin(a * 3 + 0.7) + 0.04 * Math.sin(a * 7 + 2.1);
-    p.setXYZ(i, x * k, p.getY(i), z * k);
-  }
-  g.translate(0, (TOP + BOTTOM) / 2, 0);
-  g.computeVertexNormals();
-  return g;
-}
+/** How many shapes of floe there are, each shared by every fourth floe; and the radius they are built at, metres. */
+const SHAPES = 4, MID = 9.5;
+/** A built floe's outline runs 0.72–1.05 of its radius: built this much wider, it covers the water the simulation's
+ *  floe does. */
+const COVER = 1.08;
 
 export class Floes {
   readonly group = new THREE.Group();
-  private readonly mesh: THREE.InstancedMesh;
+  private readonly meshes: THREE.InstancedMesh[] = [];
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly up = new THREE.Vector3();
@@ -38,26 +27,41 @@ export class Floes {
 
   constructor() {
     this.group.name = 'floes';
-    const ice = patch(new THREE.MeshStandardMaterial({ color: 0xe6f0f5, roughness: 0.55, flatShading: true }), 'landmark-rock');
-    this.mesh = new THREE.InstancedMesh(slab(), ice, FLOES.length);
-    this.mesh.castShadow = this.mesh.receiveShadow = true;
-    this.mesh.frustumCulled = false;
-    this.group.add(this.mesh);
+    // the rock library's broken floes in its blue-white sea ice: a ragged rim, a snow-crusted top, rafted slabs
+    // pushed up onto it
+    setRockTextureBase(`${TEX_BASE}rocks/`);
+    const form = rockById('iceFloe')!;
+    for (let k = 0; k < SHAPES; k++) {
+      const n = FLOES.filter((_, i) => i % SHAPES === k).length;
+      for (const part of form.parts(0x1ce0 + 17 * k, 2 * MID * COVER, 0)) {
+        const mesh = new THREE.InstancedMesh(part.geo, rockMaterial(part.skin ?? 'floe'), n);
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        mesh.userData.shape = k;
+        this.meshes.push(mesh);
+        this.group.add(mesh);
+      }
+    }
+    patchAll(this.group);
   }
 
-  /** t: how far round their rings the floes have ridden, in seconds; tide: sea level against the mean. */
-  update(t: number, tide: number): void {
+  /** t: how far round their rings the floes have ridden, in seconds; tide: sea level against the mean; night: 0 by
+   *  day to 1 at night. */
+  update(t: number, tide: number, night: number): void {
     const Y = Floes.Y, turn = this.turn;
+    // the rocks' sea is the planet's, at the tide of the moment; the ice holds less light as the day goes
+    ROCK_UNIFORMS.uSea.value.set(0, 0, 0, R + tide);
+    ROCK_UNIFORMS.uDaylight.value = 1 - night;
     FLOES.forEach((f, i) => {
       const p = floePos(f, t, this.p);
       this.up.set(p.x, p.y, p.z);
       this.q.setFromUnitVectors(Y, this.up);
       turn.setFromAxisAngle(Y, -(f.angle + f.speed * t) + i * 1.7);
       this.q.multiply(turn);
-      this.s.set(f.size, 1, f.size);
+      this.s.setScalar(f.size / MID);
       this.m.compose(this.at.copy(this.up).multiplyScalar(R + tide), this.q, this.s);
-      this.mesh.setMatrixAt(i, this.m);
+      for (const mesh of this.meshes) if (mesh.userData.shape === i % SHAPES) mesh.setMatrixAt(Math.floor(i / SHAPES), this.m);
     });
-    this.mesh.instanceMatrix.needsUpdate = true;
+    for (const mesh of this.meshes) mesh.instanceMatrix.needsUpdate = true;
   }
 }

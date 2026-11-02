@@ -4,6 +4,7 @@
 import { Juice, pickupRecipe, type FireContext } from '../juice/index.ts';
 import type { Point } from '../juice/anim.ts';
 import type { Moment, WeaponClass } from './events.ts';
+import type { ActorEvent, Juice as ActorJuice } from '../render/actors/index.ts';
 import type { V3 } from '../sim/math.ts';
 import { EVENT_REGION as R } from '../sim/environment.ts';
 
@@ -28,6 +29,8 @@ export interface Viewer {
   eye: V3;
   /** Where a world point lands in the HUD, or null when it is behind the camera. */
   project(p: V3): Point | null;
+  /** Where a world point shows on the screen, kept clear of its edges, or null when the screen doesn't show it. */
+  onScreen(p: V3): Point | null;
   /** Screen direction from the view's centre to a world point, radians clockwise from straight ahead. */
   bearing(p: V3): number;
 }
@@ -43,8 +46,10 @@ export class MomentJuice {
 
   private ctx(pos: V3 | null, extra: FireContext = {}): FireContext {
     if (!pos) return extra;
-    const v = this.view;
-    return { world: pos, distance: dist(pos, v.eye), dir: v.bearing(pos), anchor: () => v.project(pos), ...extra };
+    // the marker goes on the hit where the screen shows it, not on the crosshair (over your own ship, it reads as
+    // a hit on you); off the screen it keeps to the crosshair
+    const v = this.view, at = v.onScreen(pos);
+    return { world: pos, distance: dist(pos, v.eye), dir: v.bearing(pos), anchor: () => v.project(pos), ...(at ? { at } : {}), ...extra };
   }
 
   react(m: Moment): void {
@@ -150,6 +155,18 @@ export class MomentJuice {
       default:
         return;
     }
+  }
+
+  /** The renderer's own beats, timed by what it draws: the whale bursting out of the sea and slamming back down
+   *  seconds after the breach that starts it, and a gull dropping your crate. It reports hits and shots too, with
+   *  their cause, but their moments have recipes already. */
+  world(j: ActorJuice, cause: ActorEvent | null): void {
+    if (cause) return;
+    const { juice } = this;
+    juice.camera.play({ shake: j.shake, band: 'rumble', ...(j.kick ? { fov: { deg: j.kick, attack: 0.08, hold: 0.2, release: 0.9 } } : {}) });
+    if (j.hitStop) juice.time.request({ scale: 0.1, hold: j.hitStop, release: 0.2, priority: 'hit' });
+    if (j.flash) juice.screen.flash({ color: `#${(j.flashColor ?? 0xffffff).toString(16).padStart(6, '0')}`, alpha: j.flash, blend: 'add', attack: 0.03, hold: 0.06, decay: 0.5 });
+    if (j.haptic) juice.haptics.play(j.haptic);
   }
 
   /** A rumble that falls off with distance from the camera. */

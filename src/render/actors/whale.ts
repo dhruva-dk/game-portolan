@@ -323,7 +323,7 @@ export class Whales {
         const p = this.v.copy(ground).addScaledVector(ca, rand(-30, 30)).addScaledVector(cb, rand(-30, 30)).addScaledVector(cu, rand(2, 14));
         fx.smoke.emit({ x: p.x, y: p.y, z: p.z, vx: cu.x * rand(0.5, 2), vy: cu.y * rand(0.5, 2), vz: cu.z * rand(0.5, 2), life: rand(4, 6.5), size: rand(6, 11), grow: 2.2, r: 1.2, g: 1.24, b: 1.3, a: 0.3, frame: SPRITE.smoke, drag: 0.5, fadeIn: 0.15 });
       }
-      juice = { shake: 0.95 * near, kick: 5 * near, flash: 0.22 * near, flashColor: 0xdff4ff, hitStop: 0.06, haptic: 'heavy' };
+      juice = { shake: 0.95 * near, kick: 5 * near, flash: 0.22 * near, flashColor: 0xdff4ff, hitStop: 0.06 * near, haptic: 'heavy' };
     }
     if (k >= 1 && Math.random() < dt * 3) {
       // the foam it leaves

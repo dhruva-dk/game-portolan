@@ -124,11 +124,14 @@ export class Loot {
       const base = shieldy ? { color: 0x9fe8ff, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.88 }
         : k === 'coin' ? { color: 0xffc843, roughness: 0.25, metalness: 0.95 }
           : k === 'repairKit' || k === 'fullRepair' ? { color: 0x8b6a48, roughness: 0.75 }
-            : { color: 0x3c3a3a, roughness: 0.35, metalness: 0.85 };
+            // iron with enough of a matt skin for the sun to model it: fully metal, with no sky in the scene for it to
+            // mirror, it showed only its glow, a flat grey cutout on the water
+            : { color: 0x58534c, roughness: 0.5, metalness: 0.45 };
       const m = patch(new THREE.MeshStandardMaterial({ ...base, emissive: 0xffffff, emissiveIntensity: shieldy ? 0.6 : k === 'coin' ? 0.35 : 0.28 }), 'actor-token', (s) => {
         s.fragmentShader = s.fragmentShader
           .replace('#include <color_fragment>', '')
-          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\ntotalEmissiveRadiance *= vColor;\n#endif');
+          // the rarity's glow gathers at the edges, so it rims the token's shape instead of filling it in flat
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\ntotalEmissiveRadiance *= vColor;\n#endif\ntotalEmissiveRadiance *= 0.3 + 1.4 * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0);');
       });
       const mesh = new THREE.InstancedMesh(tokenGeometry(k, guns), m, CAP);
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);

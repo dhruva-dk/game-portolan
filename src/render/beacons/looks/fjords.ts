@@ -1,11 +1,12 @@
-// The Fjords: the Glowfall. A granite slab with a ribbon of glacial meltwater pouring off its lip. By day it is white
+// The Fjords: the Glowfall. A granite crag with a ribbon of glacial meltwater pouring off its lip. By day it is white
 // water on grey rock; at night the water carries a cold turquoise light, as if the glacier's melt were alive, and the
 // plunge pool and its mist glow at the foot. From far off it is a thin turquoise thread standing on a bright foot.
 import * as THREE from 'three';
-import { Kit, column, disc, halo, lit, particles, strip, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
+import { Kit, column, disc, fbm3, halo, lit, merge, noise3, particles, place, strip, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 
 const TOP = 57, LIP_Z = 7, FOOT_Z = 13.5;
+const smoothstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export const fjords: BeaconLook = {
   name: 'the Glowfall',
@@ -19,28 +20,53 @@ export const fjords: BeaconLook = {
   build(seed) {
     const k = new Kit(seed, 'beacon:fjords');
 
-    // the slab: a wide block of granite with a notch at the lip where the water leaves
+    // the slab: a wide crag of granite, its sides broken into strata that undercut and step back to mossy shelves and
+    // split by vertical joints, a talus apron running down under the water at its back and sides, and a notch at the
+    // lip where the water leaves
     const slab = column({
-      height: 60, radial: 22, rings: 30, seed: seed + 3, bump: 1.6, bumpScale: 0.07, sx: 1.5, sz: 0.75,
-      radius: (f) => 13.5 - 3 * f + (f > 0.96 ? -2.5 * (f - 0.96) * 25 : 0),
-      shape: (x, y, _z, _f, a) => {
-        const front = Math.max(0, Math.sin(a));
-        const notch = y > 50 ? -2 * Math.exp(-(x * x) / 10) * front * Math.min(1, (y - 50) / 4) : 0;
-        const joints = -0.6 * Math.abs(Math.sin(x * 0.55 + Math.sin(y * 0.05) * 1.5)) * front;
-        return notch + joints;
+      height: 66, radial: 64, rings: 80, seed: seed + 3, bump: 2.4, bumpScale: 0.06, sx: 1.5, sz: 0.75,
+      radius: (f) => 13.2 - 2.2 * f + (f > 0.95 ? -2.5 * (f - 0.95) * 20 : 0),
+      shape: (x, y, z, _f, a) => {
+        const h = y - 6, front = Math.max(0, Math.sin(a));
+        const notch = h > 50 ? -2 * Math.exp(-(x * x) / 10) * front * Math.min(1, (h - 50) / 4) : 0;
+        // vertical joints split the crag into blocks; in each block the strata sit at their own heights and depths,
+        // each band leaning out as it climbs and stepping back at its top, so its top is a shelf
+        const ja = a * 4 + Math.sin(h * 0.06) * 0.8 + seed, block = Math.floor(ja / Math.PI);
+        const band = (h + 4 * noise3(block * 1.7, 0, 0, seed) + 2.2 * Math.sin(a * 2 + seed)) / (6 + 1.5 * noise3(block * 2.3, 1, 0, seed));
+        const amp = 1.7 * (0.65 + 0.35 * noise3(block * 0.9, Math.floor(band) * 0.7, 0, seed + 3));
+        const strata = -amp * (1 - (band - Math.floor(band))) ** 2.5 * (1 - 0.6 * front);
+        const joint = -2 * (1 - smoothstep(0, 0.3, Math.abs(Math.sin(ja))));
+        const apron = 5 * Math.exp(-Math.max(0, h + 4) / 4.5) * (1 - 0.9 * front);
+        return notch + strata + joint * (1 - 0.5 * front) + apron + fbm3(x * 0.25, h * 0.25, z * 0.25, seed + 9) * 0.6;
       },
     });
-    const granite = lit(k, {
-      color: 0x8a8a86, roughness: 0.85,
-      albedo: /* glsl */ `float n = bFbm(vLocal * 0.09);
+    slab.translate(0, -6, 0);
+    // a broken crown: the top rises and falls instead of standing flat
+    const sp = slab.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < sp.count; i++) {
+      const y = sp.getY(i);
+      if (y > 52) sp.setY(i, y + fbm3(sp.getX(i) * 0.12, 0, sp.getZ(i) * 0.12, seed + 5) * 4 * smoothstep(52, 60, y));
+    }
+    slab.computeVertexNormals();
+    const albedo = /* glsl */ `float n = bFbm(vLocal * 0.09), n2 = bFbm(vLocal * vec3(0.5, 0.18, 0.5));
         float speck = smoothstep(0.62, 0.7, bNoise(vLocal * 2.3));
-        vec3 g = mix(vec3(0.32, 0.32, 0.31), vec3(0.55, 0.55, 0.53), n);
-        g = mix(g, vec3(0.2, 0.2, 0.2), speck * 0.25);
-        // wet and dark where the fall runs, heather and pine-dark on the top
+        vec3 g = mix(vec3(0.19, 0.195, 0.2), vec3(0.42, 0.42, 0.4), clamp(n * 0.75 + n2 * 0.45 - 0.1, 0.0, 1.0));
+        g = mix(g, vec3(0.1), speck * 0.3);
+        // dark streaks where water has run down the faces from the shelves
+        float stain = smoothstep(0.5, 0.8, bNoise(vec3(vLocal.x * 0.7, vLocal.y * 0.035, vLocal.z * 0.7)));
+        g *= 1.0 - stain * 0.45 * (1.0 - smoothstep(0.3, 0.6, vLN.y));
+        // wet and dark where the fall runs, and along the waterline
         float wet = exp(-vLocal.x * vLocal.x / 40.0) * smoothstep(4.0, 9.0, vLocal.z);
         g = mix(g, g * 0.35, wet);
-        g = mix(g, vec3(0.16, 0.2, 0.13), smoothstep(0.7, 0.9, vLN.y) * smoothstep(40.0, 55.0, vLocal.y));
-        diffuseColor.rgb = g;`,
+        g *= mix(1.0, 0.5, smoothstep(1.5, -0.5, vLocal.y));
+        // yellow-grey lichen on the dry faces, moss and heather on every shelf and over the top
+        float lichen = smoothstep(0.58, 0.75, bNoise(vLocal * 0.32 + 7.0)) * (1.0 - wet) * step(1.5, vLocal.y);
+        g = mix(g, vec3(0.5, 0.48, 0.3), lichen * 0.45);
+        float shelf = smoothstep(0.45, 0.8, vLN.y) * step(0.8, vLocal.y);
+        g = mix(g, mix(vec3(0.11, 0.15, 0.08), vec3(0.2, 0.18, 0.11), n2), shelf * (0.7 + 0.3 * smoothstep(20.0, 55.0, vLocal.y)));
+        diffuseColor.rgb = g;`;
+    const granite = lit(k, {
+      color: 0x8a8a86, roughness: 0.9, albedo,
       rough: `roughnessFactor = mix(roughnessFactor, 0.25, exp(-vLocal.x * vLocal.x / 40.0) * smoothstep(4.0, 9.0, vLocal.z));`,
       emissive: /* glsl */ `// glowing algae streaks in the wet rock beside the fall
         float wet = exp(-vLocal.x * vLocal.x / 60.0) * smoothstep(5.0, 9.0, vLocal.z);
@@ -51,6 +77,25 @@ export const fjords: BeaconLook = {
     const rock = new THREE.Mesh(slab, granite);
     rock.castShadow = rock.receiveShadow = true;
     k.add(rock);
+
+    // boulders fallen from the crag, half sunk round its foot, none in the plunge pool
+    const stones: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 16; i++) {
+      const a = Math.PI * 0.5 + 0.75 + (i / 16) * (Math.PI * 2 - 1.5) + k.r(-0.08, 0.08);
+      const r = k.r(1.4, 4.2), d = k.r(0.95, 1.2);
+      // faceted, not rounded: granite splits along its joints
+      const g = new THREE.IcosahedronGeometry(1, 1);
+      const gp = g.attributes.position as THREE.BufferAttribute;
+      for (let j = 0; j < gp.count; j++) {
+        const f = 1 + fbm3(gp.getX(j) * 1.3, gp.getY(j) * 1.3, gp.getZ(j) * 1.3, seed + 40 + i) * 0.45;
+        gp.setXYZ(j, gp.getX(j) * f * k.r(0.95, 1.05), gp.getY(j) * f * 0.6, gp.getZ(j) * f);
+      }
+      g.computeVertexNormals();
+      stones.push(place(g, { x: Math.cos(a) * 19.5 * d, y: r * k.r(-0.1, 0.3), z: Math.sin(a) * 10.5 * d }, new THREE.Euler(k.r(-0.3, 0.3), k.r(0, 6.28), k.r(-0.3, 0.3)), { x: r, y: r, z: r }));
+    }
+    const boulders = new THREE.Mesh(merge(stones), lit(k, { color: 0x8a8a86, roughness: 0.9, albedo }));
+    boulders.castShadow = boulders.receiveShadow = true;
+    k.add(boulders);
 
     // the ribbon: a parabola from the lip to the pool, widening as it falls
     const pts: THREE.Vector3[] = [], widths: number[] = [];

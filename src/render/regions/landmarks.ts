@@ -44,16 +44,17 @@ function column(x: number, z: number, top: number, r: number, mat: THREE.Materia
  * in to a waist and swelling again into a rounded head no wider than its foot, leaning a little. Its colour deepens
  * toward the water, with paler and violet patches.
  */
-function coralTower(x: number, z: number, top: number, r: number, i: number, mat: THREE.Material, bottom = -10): THREE.Mesh {
+function coralTower(x: number, z: number, top: number, r: number, i: number, mat: THREE.Material, bottom = -10, taper = 0): THREE.Mesh {
   const g = new THREE.CylinderGeometry(1, 1, 1, 14, 14), p = g.attributes.position as THREE.BufferAttribute, tall = top - bottom;
   const lean = (jitter(i, 40) - 0.5) * 0.1 * tall, dir = jitter(i, 41) * Math.PI * 2, seed = jitter(i, 42) * 9;
   for (let k = 0; k < p.count; k++) {
     const u = p.getY(k) + 0.5, px = p.getX(k), pz = p.getZ(k), rr = Math.hypot(px, pz), a = Math.atan2(pz, px);
-    const knob = 0.1 * Math.sin(a * 5 + u * 9 + seed) * Math.sin(u * 17 + a * 3) + 0.06 * Math.sin(a * 11 - u * 23 + seed);
-    const waist = 1 - 0.3 * Math.sin(Math.min(1, u / 0.85) * Math.PI);
+    const knob = (0.1 * Math.sin(a * 5 + u * 9 + seed) * Math.sin(u * 17 + a * 3) + 0.06 * Math.sin(a * 11 - u * 23 + seed)) * (1 + taper * 1.5);
+    // a branch narrows steadily to a blunt tip; a tower draws in to a waist and swells again
+    const waist = taper > 0 ? 1 - taper * u : 1 - 0.3 * Math.sin(Math.min(1, u / 0.85) * Math.PI);
     const w = r * waist * (1 + knob) * rr, sway = lean * u * u;
     // the head domes over
-    const y = bottom + u * tall + (u > 0.99 ? (1 - rr * rr) * r * 0.5 : 0);
+    const y = bottom + u * tall + (u > 0.99 ? (1 - rr * rr) * r * waist * 0.5 : 0);
     p.setXYZ(k, x + px * w + Math.cos(dir) * sway, y, z + pz * w + Math.sin(dir) * sway);
   }
   g.deleteAttribute('uv');
@@ -337,7 +338,8 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     });
   },
   // the Great Reef: coral towers round the rim of the biggest ring, with gaps to sail in by; the tallest grow as
-  // clumps of leaning branches, like antler coral, not as single columns
+  // clumps of leaning branches, like antler coral, not as single columns. Each branch thins to a blunt tip and forks
+  // into tines near its top, so none stands as a straight, even pole with a cut end.
   coralAtolls: (lm) => {
     const coral = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true }), 'landmark-rock');
     return columnsOf(lm, (x, z, o, i) => {
@@ -345,9 +347,19 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       const clump = new THREE.Group();
       for (let b = 0; b < 5; b++) {
         const h = (lm.height - 4) * (b === 0 ? 1 : 0.45 + 0.4 * jitter(i, 10 + b)), a = b * 1.4 + jitter(i, 20 + b);
-        const branch = coralTower(0, 0, h, b === 0 ? 4.5 : 3, i * 7 + b, coral);
+        const r = b === 0 ? 4.5 : 3.6, branch = coralTower(0, 0, h, r, i * 7 + b, coral, -10, b === 0 ? 0.3 : 0.5);
         branch.position.set(x + Math.cos(a) * 3 * Math.min(1, b), 0, z + Math.sin(a) * 3 * Math.min(1, b));
-        branch.rotation.set(Math.sin(a) * 0.08 * b, 0, -Math.cos(a) * 0.08 * b);
+        const tilt = b === 0 ? 0 : 0.1 + 0.05 * b;
+        branch.rotation.set(Math.sin(a) * tilt, 0, -Math.cos(a) * tilt);
+        // tines forking off the upper branch, splayed further out, each its own blunt-tipped spur
+        for (let t = 0; t < (b === 0 ? 3 : 2); t++) {
+          const at = 0.5 + 0.3 * jitter(i * 7 + b, 30 + t), ta = a + (t - 0.5) * 1.9 + jitter(i, 40 + b + t) - 0.5, splay = 0.45 + 0.25 * jitter(i, 50 + b + t);
+          const reach = (h + 10) * (0.22 + 0.12 * jitter(i, 60 + b + t)), wide = r * (1 - (b === 0 ? 0.3 : 0.5) * at);
+          const tine = coralTower(0, 0, reach, wide * 0.55, i * 31 + b * 5 + t, coral, 0, 0.55);
+          tine.position.set(Math.cos(ta) * wide * 0.4, -10 + at * (h + 10), Math.sin(ta) * wide * 0.4);
+          tine.rotation.set(Math.sin(ta) * splay, 0, -Math.cos(ta) * splay);
+          branch.add(tine);
+        }
         clump.add(branch);
       }
       return clump;

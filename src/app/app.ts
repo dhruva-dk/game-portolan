@@ -13,6 +13,7 @@ import { QUALITY, U } from '../render/engine.ts';
 import { sunDirection } from '../render/sky.ts';
 import { waveHeight } from '../render/swell.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
+import { rockTexturesReady } from '../render/rocks/index.ts';
 import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SHIPS, WEATHER_KIND } from '../sim/match.ts';
@@ -191,9 +192,10 @@ export class App {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    this.actors = createActors(stage.scene, { radius: R, wave: waveHeight, uniforms: U });
+    this.actors = createActors(stage.scene, { radius: R, wave: waveHeight, uniforms: U, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;
+    await rockTexturesReady();
     stage.snap();
     this.progress = { f: 1, what: 'Ready' };
     this.title?.setProgress(1, 'Ready');
@@ -395,6 +397,11 @@ export class App {
     spectating: false,
     eye: this.eye,
     project: (p) => this.project(p),
+    onScreen: (p) => {
+      const at = this.project(p);
+      if (!at || at.x < 0 || at.x > innerWidth || at.y < 0 || at.y > innerHeight) return null;
+      return { x: Math.min(innerWidth * 0.92, Math.max(innerWidth * 0.08, at.x)), y: Math.min(innerHeight * 0.85, Math.max(innerHeight * 0.1, at.y)) };
+    },
     bearing: (p) => this.bearing(p),
   };
 

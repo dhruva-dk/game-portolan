@@ -114,9 +114,14 @@ export class ScreenFx {
     let alpha = Math.min(1, spec.alpha * strength * this.intensity);
     this.bigStarts = this.bigStarts.filter((t) => t > this.now - 1);
     let outcome: 'played' | 'trimmed' = 'played';
-    if (alpha >= BIG) {
+    // the flashes of a blend already showing stack with this one, and the stack is what the eye sees: a broadside's
+    // hits landing together count as one big flash
+    let keep = 1;
+    for (const f of this.flashes) if (f.blend === spec.blend) keep *= 1 - f.alpha * env(f);
+    const live = 1 - keep;
+    if (live < BIG && 1 - keep * (1 - alpha) >= BIG) {
       if (this.bigStarts.length >= 3) {
-        alpha = SAFE;
+        alpha = Math.min(alpha, SAFE, Math.max(0, (SAFE - live) / keep));
         outcome = 'trimmed';
       } else this.bigStarts.push(this.now);
     }

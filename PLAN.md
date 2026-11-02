@@ -1075,6 +1075,52 @@ New problems it found, to the backlog unless a revision below takes them:
 - The Glass Sea's banner is gone while the splash's spray still hangs.
 - The Gale globe drops the names of the Mangrove Labyrinth and the Coral Atolls, which sit near its rim.
 
+*Revision 1 of the four items that failed or were borderline, checked in their captures:*
+- **The Narrows:** the strip waits off the Gorge mouth, 90 m back from where the rock comes down, looking straight in. Nothing may stand in the way short of the last 10 m (`facing()`'s `bare` in src/app/moments.ts), so the wall tops the rock falls from and the heap in the slot of water are in frame.
+- **No humans:**
+  - **The Moonbow Blowhole's stack** (its second reshape): the columns meet with no sky between them. Each breaks off on its own slant with a corner chipped away, and the high top is under a mantle of turf that follows its lean and lumps, so the skyline is a rounded green brow (src/render/beacons/looks/basaltStacks.ts).
+  - **The "pilings" behind the coral head** are clumps of leaning antler coral. Each branch thins to a blunt tip and forks into tines near its top (src/render/regions/landmarks.ts).
+  - **The Fjords' "dam":** the Glowfall's slab is a granite crag. Its sides break into strata that undercut and step back to mossy shelves, vertical joints split it into blocks, a talus apron runs down under the water, and the water leaves through a notch in the lip (src/render/beacons/looks/fjords.ts).
+- **Pale slabs over the water:**
+  - **The Ice Crown's flat plane** was its floes. They are now the rock library's broken floes in blue-white sea ice: a ragged rim, a snow-crusted top and rafted slabs pushed up onto it, built a little wider to cover the water the simulation's floe does. They hold less light as the day goes (src/render/regions/floes.ts, src/render/rocks/skins.ts). The captures now wait for every rock texture to load (`rockTexturesReady` in src/render/rocks/material.ts), so a still is never shot of untextured rock.
+  - **The Fjords' block** is the crag above.
+  - **The stair-stepped band at the Jade Shoals and the Coral Atolls** was the sky's drawn floor where the eye's line only grazes the sea. It stood at the mean sea level, so when the tide fell it showed as a band above the water. It now sits at the sea's top as the events have moved it (src/render/sky.ts).
+  - **The broadside's loot gun** is iron with enough of a matt skin for the sun to model it, and the rarity's glow rims its edges instead of filling it in flat (src/render/actors/loot.ts).
+  - **The Mangrove Labyrinth's white dome** was a fog bank. Its puffs now fade from their middles out, so where the bank ends it frays, and thin upward into wisps, so from afar its top fades into the air (src/render/weather.ts).
+  - **The Ice Crown's rust-red spires** (from the new problems): the region's cliffs are snow-dusted ice, tinted blue (src/render/ground.ts).
+- **The broadside's juice:**
+  - In a scripted moment that aims (the duels), the view turns toward the aim only until the aim is 0.7 rad off the view (`scriptLook` in src/app/session.ts). The target then sits beside the ship. Looked at straight, it was behind her own sails.
+  - The hit marker goes on the hit where the screen shows it, kept inside the screen's margins. It falls back to the crosshair only when the hit is off the screen (`onScreen` in src/app/app.ts, `ctx` in src/app/juice.ts).
+  - The interface's number over the target adds a broadside's four balls into one. The world's numbers no longer also show the hits the player lands, which drew each ball's 16 again (src/render/actors/index.ts).
+  - The muzzle and hit flashes are brighter and hold two frames. The flash limiter adds the flashes already showing in the same blend to a new one, so a broadside's hits landing together count as one big flash, as the eye sees them (src/juice/screen.ts, src/juice/recipes.ts).
+  - Checked: in the broadside strip the target stands to the right of the ship, the four markers sit on it, one "64" floats over it, and splinters and fire show on its hull. The cannon-hit strip keeps its framing, with its marker on the target.
+- **The whale breach's juice:**
+  - The renderer times the breach's beats from what it draws: the whale bursts out a second after the trigger and slams down four seconds after it. It handed those beats out as juice that the app never took. The app now plays them (`world()` in src/app/juice.ts). The eruption gives a rumble and a 1.8° widening of the view. The slam gives a heavy shake, a 4.6° widening, a cold white flash, a 55 ms hit-stop and a heavy haptic, all scaled by distance. A gull dropping your crate gives its small shake too. Juice that the renderer reports with a cause (hits and shots) is left to the moments' recipes.
+  - The whale rises 33 m off, ahead to starboard, inside the 35 m lift. It leaps across the view to port, and the script aims at it, so the view turns to it. Before, it rose 26 m off at the frame's edge, too close for a leap of 62 m.
+  - The strip runs from 1.2 s before the trigger to 4.6 s after, a frame every 0.2 s, through the leap, the slam and the wall of spray.
+  - Its sound is one sound of six layers: the water rushing up, sheets of water off its back, a thump, a blast, a splash and a scatter of droplets. The log names it once. The dive sound follows at the slam.
+
+Decisions (Settled overnight in the owner's absence; the owner may change it.):
+- A scripted moment's view turns partway to what it aims at, not all the way.
+- Hit markers go on the hit's point on the screen.
+- The world's damage numbers skip the hits the player lands, since the interface's number covers those.
+- Flashes of one blend that show together count as one flash for the limiter.
+- The whale's beats play as direct camera, flash, hit-stop and haptic calls with the renderer's numbers. The `whaleBreach` recipe stays unused.
+- The breach gets no interface response beyond the whale tip and, in the Glass Sea, the banner. It happens to the sea, not to your ship.
+
+Backlog from this revision:
+- The floes go dark at dusk and dawn, and the Ice Crown's pillars still read pink in low light.
+- The Glowfall's granite should come from the rock library.
+- src/render/weather/ is not used by the stage.
+- A distant cloud deck ends in a firm edge (the Mangrove Labyrinth's first frame).
+- The blowhole's spray is a flat white column.
+- The juice library's particle and sound hooks are not wired (`hooked: false` in every log).
+- Nothing winds up before the broadside. Making it wait for its gunports to open, or delaying the shot in the simulation, is the owner's call.
+- The render ripples the broadside's muzzle flashes along the aimed side only, while the simulation fires both sides.
+- The sun's glint on the sea blows out to a large white blob, sown with sparkles, when the view faces the sun (the broadside strip).
+- In a match the chase camera has no shoulder offset, so a target straight ahead hides behind your own sails.
+- Up close the whale's pectoral fins show as flat dark planes edge-on, and at the top of its leap it rises out of the top of the frame for about half a second.
+
 **The perks, done when each shows itself working:**
 
 | Perk | How you see it working |

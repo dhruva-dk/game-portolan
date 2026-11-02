@@ -218,11 +218,13 @@ void main() {
   // into the sea: where no sea floor is drawn behind the see-through water (a line that passes over the floor and out
   // of the sea again, chunks past the ones kept round the camera, the far plane), the floor is at least as deep as the
   // line's lowest point, so it is drawn as plain rock just under there, seen through that much sea, which is also what
-  // a drawn floor the line only grazes gives
-  float qb = dot(o, d), qc = dot(o, o) - uPlanet.y * uPlanet.y;
-  if (qc > 0.0 && qb < 0.0 && qb * qb > qc) {
-    vec3 m = o - d * qb;
-    sky = atmosphere(underSea(vec3(0.15) * seaLight(m), m), m);
+  // a drawn floor the line only grazes gives. The sea's top there is where the events have moved it (lift.ts), so a
+  // drawn-down sea doesn't leave a band of floor standing above its own horizon
+  float qb = dot(o, d);
+  vec3 lo = o - d * qb;
+  float top = uPlanet.y + seaLift(normalize(lo));
+  if (qb < 0.0 && dot(o, o) > top * top && dot(lo, lo) < top * top) {
+    sky = atmosphere(underSea(vec3(0.15) * seaLight(lo), lo), lo);
   }
   gl_FragColor = vec4(sky, 1.0);
 }`;

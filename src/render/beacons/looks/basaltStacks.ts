@@ -3,7 +3,7 @@
 // higher than the stack. The spray is phosphorescent, silver-white at night, and as its mist hangs a moonbow forms in
 // it. By day it is a plume of white spray with a rainbow. From far off: a white burst that comes and goes.
 import * as THREE from 'three';
-import { Kit, disc, halo, instances, lit, mat4, particles, strip, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
+import { Kit, disc, halo, lit, particles, strip, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 
 const HOLE = new THREE.Vector3(0, 0, 7);
@@ -33,10 +33,21 @@ export const basaltStacks: BeaconLook = {
 
     // the columns: a hex grid, a sheer-faced stack at the back over a low causeway of broken columns round the blowhole.
     // The face and rim drop in a column or two, the top leans from one end to the other in lumps, and the columns snap
-    // off in clusters of uneven width, so the stack neither steps down in rings nor shows an even, walled top.
-    const ms: THREE.Matrix4[] = [];
-    const s = 1.85;
+    // off in clusters of uneven width, so the stack neither steps down in rings nor shows an even, walled top. Each
+    // column breaks off on its own slant with a corner chipped away, never square across, and the high top is under
+    // a mantle of turf, so nothing along the skyline reads as a cut block.
+    // the columns just meet, so no sky shows through the seams between them
+    const s = 1.85, R0 = 1.07;
     const lump = (x: number, z: number) => Math.sin(x * 0.45 + 1.3) * Math.sin(z * 0.38 - 0.7) + 0.5 * Math.sin(x * 0.9 - z * 0.7 + 2.1);
+    const stackAt = (x: number, z: number) =>
+      THREE.MathUtils.smoothstep(-z, -1.5, 1.5) * (1 - THREE.MathUtils.smoothstep(Math.hypot(x * 0.9, z * 1.1), 13.5, 16));
+    const topAt = (x: number, z: number) => 15 + 10 * THREE.MathUtils.smoothstep(-x, -12, 14) + 3.5 * lump(x, z);
+    const verts: number[] = [];
+    const ring = (x: number, z: number, y: (cx: number, cz: number, i: number) => number) =>
+      Array.from({ length: 6 }, (_, i) => {
+        const cx = R0 * Math.sin(i * Math.PI / 3), cz = R0 * Math.cos(i * Math.PI / 3);
+        return [x + cx, y(cx, cz, i), z + cz];
+      });
     for (let q = -10; q <= 10; q++) {
       for (let r = -10; r <= 10; r++) {
         const x = s * (q + r / 2), z = s * r * 0.866;
@@ -44,20 +55,31 @@ export const basaltStacks: BeaconLook = {
         if (d > 17 + k.r(-1.5, 1.5)) continue;
         const toHole = Math.hypot(x - HOLE.x, z - HOLE.z);
         if (toHole < 2.6) continue;
-        const stack = THREE.MathUtils.smoothstep(-z, -1.5, 1.5) * (1 - THREE.MathUtils.smoothstep(d, 13.5, 16));
-        const top = 15 + 10 * THREE.MathUtils.smoothstep(-x, -12, 14) + 3.5 * lump(x, z) + k.r(-0.6, 0.6);
+        const stack = stackAt(x, z);
+        const top = topAt(x, z) + k.r(-0.6, 0.6);
         const low = 1.2 + 1.2 * lump(x * 1.7, z * 1.7) + k.r(0, 1.4);
         let h = low + (top - low) * stack;
         // clusters of columns snapped off along the face and the rim
         const snap = lump(x * 2.1 + 4, z * 2.1 - 3);
-        if (stack < 0.97 && snap > 0.55) h = Math.max(low, h - (snap - 0.55) * 14 - k.r(0, 1.5));
+        if (stack < 0.9 && snap > 0.55) h = Math.max(low, h - (snap - 0.55) * 14 - k.r(0, 1.5));
         if (toHole < 5) h = Math.min(h, 2.5 + toHole * 0.6 + k.r(0, 1));
         h = Math.max(0.8, h);
-        ms.push(mat4(x, -1, z, k.r(-0.03, 0.03), k.r(0, 0.2), k.r(-0.03, 0.03), [0.98, h + 1, 0.98]));
+        // the break: a slant across the column, one corner chipped lower, the middle a little proud
+        const lean = k.r(0.08, 0.42), dir = k.r(0, Math.PI * 2), chip = Math.floor(k.r(0, 6)), chipBy = k.r(0.15, 0.55);
+        const slant = (cx: number, cz: number) => lean * (cx * Math.cos(dir) + cz * Math.sin(dir));
+        const bot = ring(x, z, () => -1);
+        const rim = ring(x, z, (cx, cz, i) => h + slant(cx, cz) - (i === chip ? chipBy : 0));
+        const mid = [x, h + k.r(0.04, 0.18), z];
+        for (let i = 0; i < 6; i++) {
+          const j = (i + 1) % 6;
+          verts.push(...bot[i], ...rim[j], ...rim[i], ...bot[i], ...bot[j], ...rim[j]);
+          verts.push(...mid, ...rim[i], ...rim[j]);
+        }
       }
     }
-    const hex = new THREE.CylinderGeometry(1.07, 1.07, 1, 6);
-    hex.translate(0, 0.5, 0);
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    colGeo.computeVertexNormals();
     const basalt = lit(k, {
       color: 0x1d1e20, roughness: 0.72, flat: true,
       albedo: /* glsl */ `vec3 c = mix(vec3(0.06, 0.065, 0.07), vec3(0.15, 0.15, 0.16), bNoise(vLocal * 1.4));
@@ -72,9 +94,43 @@ export const basaltStacks: BeaconLook = {
         totalEmissiveRadiance += vec3(0.7, 0.85, 1.0) * exp(-d / 6.0) * (0.15 + 1.4 * burstEnv(uTime)) * uNight;`,
       defs: BURST,
     });
-    const cols = instances(hex, basalt, ms);
+    const cols = new THREE.Mesh(colGeo, basalt);
     cols.castShadow = cols.receiveShadow = true;
     k.add(cols);
+
+    // the turf: soil and grass draped over the stack's high top, following its lean and lumps, so from off the water
+    // the skyline is a rounded green brow. At its edge it tucks down among the column ends of the rim.
+    const STEP = 0.8, NX = Math.round(34 / STEP), NZ = Math.round(18 / STEP);
+    const tp: number[] = [], ti: number[] = [];
+    const cover: number[] = [];
+    for (let iz = 0; iz <= NZ; iz++) {
+      for (let ix = 0; ix <= NX; ix++) {
+        const x = -17 + ix * STEP, z = -17 + iz * STEP;
+        const c = THREE.MathUtils.smoothstep(stackAt(x, z), 0.97, 0.995);
+        cover.push(c);
+        tp.push(x, topAt(x, z) + 0.75 + 0.25 * Math.sin(x * 1.7 + z * 0.9) * Math.sin(z * 2.3 - x) - (1 - c) * 2.6, z);
+      }
+    }
+    for (let iz = 0; iz < NZ; iz++) {
+      for (let ix = 0; ix < NX; ix++) {
+        const a = iz * (NX + 1) + ix, b = a + 1, c = a + NX + 1, d = c + 1;
+        if (Math.max(cover[a], cover[b], cover[c], cover[d]) <= 0) continue;
+        ti.push(a, c, b, b, c, d);
+      }
+    }
+    const turfGeo = new THREE.BufferGeometry();
+    turfGeo.setAttribute('position', new THREE.Float32BufferAttribute(tp, 3));
+    turfGeo.setIndex(ti);
+    turfGeo.computeVertexNormals();
+    const turf = k.add(new THREE.Mesh(turfGeo, lit(k, {
+      color: 0x2e4a18, roughness: 0.95,
+      albedo: /* glsl */ `vec3 c = mix(vec3(0.12, 0.24, 0.06), vec3(0.24, 0.36, 0.1), bNoise(vLocal * 0.6));
+        c *= 0.75 + 0.35 * bNoise(vLocal * 3.1);
+        // bare peat where the brow rolls over
+        c = mix(vec3(0.05, 0.055, 0.035), c, smoothstep(0.55, 0.85, vLN.y));
+        diffuseColor.rgb = c;`,
+    })));
+    turf.castShadow = turf.receiveShadow = true;
 
     // the blowhole's water and the pools caught in the columns, glowing
     const pool = surface(k, disc(4, 0.3), {

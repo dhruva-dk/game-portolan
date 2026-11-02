@@ -126,6 +126,9 @@ export class Session implements Stepper {
     return this.input.throttle;
   }
   private script: [number, Partial<ShipInput>][] | null;
+  /** Where a scripted moment aims, for the view to turn to as a player's look would, or null. */
+  private scriptAim: V3 | null = null;
+  private readonly look = v3();
   /** The other ships' inputs while a scripted moment holds them still, or null for their captains. */
   private still: (ShipInput | null)[] | null = null;
   private readonly autopilot: boolean;
@@ -187,10 +190,14 @@ export class Session implements Stepper {
   stage(script: [number, Partial<ShipInput>][], hold: boolean): void {
     this.script = [...script].sort((a, b) => a[0] - b[0]);
     this.still = hold ? heldStill() : null;
-    const w = this.state.ships[this.watch];
-    this.view.x = w.head.x;
-    this.view.y = w.head.y;
-    this.view.z = w.head.z;
+    const w = this.state.ships[this.watch], aim = this.script.find(([, inp]) => inp.aim)?.[1].aim;
+    this.scriptAim = aim && this.watch === PLAYER ? { ...aim } : null;
+    if (this.scriptAim) this.scriptLook(w.pos, w.head, this.view);
+    else {
+      this.view.x = w.head.x;
+      this.view.y = w.head.y;
+      this.view.z = w.head.z;
+    }
   }
 
   /** Dives now and sails on until the player's ship is at sea; the moments on the way go to the tally only. */
@@ -206,6 +213,13 @@ export class Session implements Stepper {
     this.view.x = this.me.head.x;
     this.view.y = this.me.head.y;
     this.view.z = this.me.head.z;
+  }
+
+  /** A scripted moment's look: from astern, turned toward where it aims only until that is in sight beside the ship,
+   *  clear of her sails (looked at straight, the aim is behind them). */
+  private scriptLook(p: V3, head: V3, out: V3): V3 {
+    const a = angleTo(head, tangentToward(p, this.scriptAim!, out), p);
+    return turned(head, p, Math.sign(a) * Math.max(0, Math.abs(a) - 0.7), out);
   }
 
   private scripted(): ShipInput {
@@ -268,8 +282,10 @@ export class Session implements Stepper {
     flatten(this.view, p, head, this.view);
     const mine = this.watch === PLAYER && w.phase !== PHASE.sunk;
     if (!mine || this.autopilot || this.script) {
-      // spectating, or watching the helm sail itself: the view rides behind the ship
-      turned(this.view, p, angleTo(this.view, head, p) * (1 - Math.exp(-dt * 3)), this.view);
+      // spectating, or watching the helm sail itself: the view rides behind the ship, turned in a scripted moment to
+      // bring what it aims at into sight
+      const to = mine && this.script && this.scriptAim ? this.scriptLook(p, head, this.look) : head;
+      turned(this.view, p, angleTo(this.view, to, p) * (1 - Math.exp(-dt * 3)), this.view);
       if (!mine) return;
     } else {
       if (it.look.x) turned(this.view, p, it.look.x, this.view);

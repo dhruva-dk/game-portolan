@@ -31,7 +31,7 @@ import type { Lod } from './mesh.ts';
 import { REGION_SKIN, type SkinId } from './skins.ts';
 import type { BuildOpts, Generator, Part } from './types.ts';
 
-export { ROCK_UNIFORMS, rockMaterial, poolMaterial, setRockTextureBase, setRockAnisotropy } from './material.ts';
+export { ROCK_UNIFORMS, rockMaterial, poolMaterial, rockTexturesReady, setRockTextureBase, setRockAnisotropy } from './material.ts';
 export { REGION_SKIN, SKINS, type SkinId } from './skins.ts';
 export type { BuildOpts, Part } from './types.ts';
 export type { Lod } from './mesh.ts';

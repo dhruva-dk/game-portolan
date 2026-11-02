@@ -26,7 +26,7 @@ export interface MaterialSet {
 
 /** Placeholder sets, one per region, from the textures in public/tex. Their own scanned materials come later. */
 export const MATERIAL_SETS: Record<RegionId, MaterialSet> = {
-  iceCrown: { flat: 'snow', alt: 'snow', cliff: 'cliff', ledge: 'snow', shore: 'snow', high: 'snow', tints: { flat: [1.05, 1.08, 1.15], alt: [0.82, 0.9, 1.05], cliff: [0.8, 0.92, 1.15], shore: [0.85, 0.92, 1.05] }, snowline: -60, cliffBias: 0.06 },
+  iceCrown: { flat: 'snow', alt: 'snow', cliff: 'snow', ledge: 'snow', shore: 'snow', high: 'snow', tints: { flat: [1.05, 1.08, 1.15], alt: [0.82, 0.9, 1.05], cliff: [0.6, 0.8, 1.05], shore: [0.85, 0.92, 1.05] }, snowline: -60, cliffBias: 0.06 },
   fjords: { flat: 'grass', alt: 'forest', cliff: 'cliff', ledge: 'moss', shore: 'pebbles', high: 'snow', tints: { flat: [0.75, 0.78, 0.7], alt: [0.55, 0.65, 0.5], cliff: [0.85, 0.87, 0.9], shore: [0.8, 0.82, 0.85] }, snowline: 140, cliffBias: -0.04 },
   mistwood: { flat: 'moss', alt: 'forest', cliff: 'lichen', ledge: 'moss', shore: 'moss', high: 'moss', tints: { flat: [0.55, 0.7, 0.6], alt: [0.45, 0.55, 0.45], cliff: [0.6, 0.68, 0.62], shore: [0.4, 0.45, 0.38] }, snowline: 999, cliffBias: 0 },
   spires: { flat: 'grass', alt: 'forest', cliff: 'cliff', ledge: 'moss', shore: 'sand', high: 'cliff', tints: { flat: [0.8, 0.95, 0.65], alt: [0.5, 0.6, 0.48], cliff: [1.35, 1.3, 1.2], shore: [1.15, 1.12, 1.05] }, snowline: 999, cliffBias: -0.06 },
