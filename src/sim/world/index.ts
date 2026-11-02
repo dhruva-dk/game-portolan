@@ -11,7 +11,7 @@
 // places the charts on the sphere, blends neighbours across their borders, carves the current lanes, and bakes
 // heights into a grid for the simulation.
 import { PI, dcos, dot, dsin, normalize, set, v3, type V3 } from '../math.ts';
-import { R, faceDir, faceUV, fromLatLon, localFrame, type FaceUV } from '../sphere.ts';
+import { R, along, faceDir, faceUV, fromLatLon, localFrame, tangentAt, type FaceUV } from '../sphere.ts';
 import { smax, smin, smoothstep } from './kit.ts';
 import type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
 import { iceCrown, FLOE_RINGS } from './regions/iceCrown.ts';
@@ -56,6 +56,9 @@ export interface RegionInfo {
   perk: PerkId;
   perkName: string;
   perkText: string;
+  /** Its event's banner name, and what to do about it in a line. */
+  event: string;
+  eventTip: string;
   weather: readonly WeatherKind[];
   /** Indices of the regions that share a border with this one. */
   neighbours: readonly number[];
@@ -73,22 +76,22 @@ const ringNeighbours = (i: number): number[] =>
   i <= 7 ? [N(i - 2), N(i), 0, S(i - 1), S(i)] : [S(i - 9), S(i - 7), 15, N(i - 9), N(i - 8)];
 
 const INFO: Omit<RegionInfo, 'neighbours'>[] = [
-  { id: 'iceCrown', name: 'the Ice Crown', ring: 'pole', lat: 90, lon: 0, landmark: 'the Crown', perk: 'frostShot', perkName: 'Frost Shot', perkText: 'Your hits slow ships for a moment.', weather: ['snow', 'fog'] },
-  { id: 'fjords', name: 'the Fjords', ...north(0), landmark: 'Thunder Falls', perk: 'fastRepair', perkName: 'Fast Repair', perkText: 'You repair twice as fast in your own water.', weather: ['fog', 'rain'] },
-  { id: 'mistwood', name: 'Mistwood', ...north(1), landmark: 'the Hollow Cedar', perk: 'fogSight', perkName: 'Fog Sight', perkText: 'You see at full range through fog and at night.', weather: ['fog'] },
-  { id: 'spires', name: 'the Spires', ...north(2), landmark: 'the Needle', perk: 'spotter', perkName: 'Spotter', perkText: 'Ships you hit show on the map for a few seconds.', weather: ['rain', 'thunder'] },
-  { id: 'narrows', name: 'the Narrows', ...north(3), landmark: 'the Gorge', perk: 'longRange', perkName: 'Long Range', perkText: 'Your weapons reach about 15% further.', weather: ['calm', 'rain'] },
-  { id: 'basaltStacks', name: 'the Basalt Stacks', ...north(4), landmark: 'Moonbow Arch', perk: 'fastReload', perkName: 'Fast Reload', perkText: 'You reload about 30% faster.', weather: ['fog', 'rain'] },
-  { id: 'kelpShallows', name: 'the Kelp Shallows', ...north(5), landmark: 'the Kelp Cathedral', perk: 'hiddenWake', perkName: 'Hidden Wake', perkText: 'Your wake does not show, and you drop off the map.', weather: ['clear', 'calm'] },
-  { id: 'blossomRun', name: 'Blossom Run', ...north(6), landmark: 'the Great Cherry', perk: 'quickGust', perkName: 'Quick Gust', perkText: 'Your gust recharges faster.', weather: ['clear', 'rain'] },
-  { id: 'glassSea', name: 'the Glass Sea', ...south(0), landmark: 'Glasswater', perk: 'cheapDeliveries', perkName: 'Cheap Deliveries', perkText: 'Gull deliveries cost about 30% less.', weather: ['calm', 'clear'] },
-  { id: 'jadeShoals', name: 'the Jade Shoals', ...south(1), landmark: 'the Sandbar Light', perk: 'shallowDraft', perkName: 'Shallow Draft', perkText: 'You can cross sandbars without running aground.', weather: ['clear', 'calm'] },
-  { id: 'coralAtolls', name: 'the Coral Atolls', ...south(2), landmark: 'the Great Reef', perk: 'lootSense', perkName: 'Loot Sense', perkText: 'Nearby loot shows on your map.', weather: ['clear', 'rain'] },
-  { id: 'spiceIsles', name: 'the Spice Isles', ...south(3), landmark: 'Spice Cove', perk: 'betterLoot', perkName: 'Better Loot', perkText: 'Loot you open rolls one rarity higher.', weather: ['rain', 'thunder'] },
-  { id: 'fireArchipelago', name: 'the Fire Archipelago', ...south(4), landmark: 'Cinder Peak', perk: 'fireShot', perkName: 'Fire Shot', perkText: 'Your hits set ships burning.', weather: ['ash'] },
-  { id: 'weepingIsle', name: 'the Weeping Isle', ...south(5), landmark: 'the Weeping Isle', perk: 'fastRefill', perkName: 'Fast Refill', perkText: 'You use shields and repairs about 30% faster.', weather: ['rain', 'fog'] },
-  { id: 'mangroveLabyrinth', name: 'the Mangrove Labyrinth', ...south(6), landmark: 'the Root Gate', perk: 'tightTurns', perkName: 'Tight Turns', perkText: 'You turn much more sharply.', weather: ['rain', 'fog'] },
-  { id: 'maelstrom', name: 'the Maelstrom', ring: 'pole', lat: -90, lon: 0, landmark: 'the Eye', perk: 'currentRider', perkName: 'Current Rider', perkText: 'Currents push you about 50% harder.', weather: ['rain', 'thunder'] },
+  { id: 'iceCrown', name: 'the Ice Crown', ring: 'pole', lat: 90, lon: 0, landmark: 'the Crown', perk: 'frostShot', perkName: 'Frost Shot', perkText: 'Your hits slow ships for a moment.', event: 'Floes Turning', eventTip: 'Steer round the floes.', weather: ['snow', 'fog'] },
+  { id: 'fjords', name: 'the Fjords', ...north(0), landmark: 'Thunder Falls', perk: 'fastRepair', perkName: 'Fast Repair', perkText: 'You repair twice as fast in your own water.', event: 'Flood Surge', eventTip: 'Ride the surge out of the fjord.', weather: ['fog', 'rain'] },
+  { id: 'mistwood', name: 'Mistwood', ...north(1), landmark: 'the Hollow Cedar', perk: 'fogSight', perkName: 'Fog Sight', perkText: 'You see at full range through fog and at night.', event: 'Fog Surge', eventTip: 'Hide or slip away in the fog.', weather: ['fog'] },
+  { id: 'spires', name: 'the Spires', ...north(2), landmark: 'the Needle', perk: 'spotter', perkName: 'Spotter', perkText: 'Ships you hit show on the map for a few seconds.', event: 'Spire Falling', eventTip: 'Keep clear of the falling spire.', weather: ['rain', 'thunder'] },
+  { id: 'narrows', name: 'the Narrows', ...north(3), landmark: 'the Gorge', perk: 'longRange', perkName: 'Long Range', perkText: 'Your weapons reach about 15% further.', event: 'Rockfall', eventTip: 'Keep clear of the Gorge mouth.', weather: ['calm', 'rain'] },
+  { id: 'basaltStacks', name: 'the Basalt Stacks', ...north(4), landmark: 'Moonbow Arch', perk: 'fastReload', perkName: 'Fast Reload', perkText: 'You reload about 30% faster.', event: 'Low Tide at the Arch', eventTip: 'The cave under the arch is open.', weather: ['fog', 'rain'] },
+  { id: 'kelpShallows', name: 'the Kelp Shallows', ...north(5), landmark: 'the Kelp Cathedral', perk: 'hiddenWake', perkName: 'Hidden Wake', perkText: 'Your wake does not show, and you drop off the map.', event: 'Kelp Bloom', eventTip: 'Steer round the kelp: it holds you.', weather: ['clear', 'calm'] },
+  { id: 'blossomRun', name: 'Blossom Run', ...north(6), landmark: 'the Great Cherry', perk: 'quickGust', perkName: 'Quick Gust', perkText: 'Your gust recharges faster.', event: 'Spring Flood', eventTip: 'Ride the river downstream.', weather: ['clear', 'rain'] },
+  { id: 'glassSea', name: 'the Glass Sea', ...south(0), landmark: 'Glasswater', perk: 'cheapDeliveries', perkName: 'Cheap Deliveries', perkText: 'Gull deliveries cost about 30% less.', event: 'Whale Rising', eventTip: 'Get clear of the rising whale.', weather: ['calm', 'clear'] },
+  { id: 'jadeShoals', name: 'the Jade Shoals', ...south(1), landmark: 'the Sandbar Light', perk: 'shallowDraft', perkName: 'Shallow Draft', perkText: 'You can cross sandbars without running aground.', event: 'Falling Tide', eventTip: 'Keep to the channels.', weather: ['clear', 'calm'] },
+  { id: 'coralAtolls', name: 'the Coral Atolls', ...south(2), landmark: 'the Great Reef', perk: 'lootSense', perkName: 'Loot Sense', perkText: 'Nearby loot shows on your map.', event: 'Reef Tide', eventTip: 'One reef gap shuts, another opens.', weather: ['clear', 'rain'] },
+  { id: 'spiceIsles', name: 'the Spice Isles', ...south(3), landmark: 'Spice Cove', perk: 'betterLoot', perkName: 'Better Loot', perkText: 'Loot you open rolls one rarity higher.', event: 'Pearl Bloom', eventTip: 'Pearls in the cove: race for them.', weather: ['rain', 'thunder'] },
+  { id: 'fireArchipelago', name: 'the Fire Archipelago', ...south(4), landmark: 'Cinder Peak', perk: 'fireShot', perkName: 'Fire Shot', perkText: 'Your hits set ships burning.', event: 'Eruption', eventTip: 'Get away from the cone and the ash.', weather: ['ash'] },
+  { id: 'weepingIsle', name: 'the Weeping Isle', ...south(5), landmark: 'the Weeping Isle', perk: 'fastRefill', perkName: 'Fast Refill', perkText: 'You use shields and repairs about 30% faster.', event: 'Cloudburst', eventTip: 'Hide or slip away in the mist.', weather: ['rain', 'fog'] },
+  { id: 'mangroveLabyrinth', name: 'the Mangrove Labyrinth', ...south(6), landmark: 'the Root Gate', perk: 'tightTurns', perkName: 'Tight Turns', perkText: 'You turn much more sharply.', event: 'Flood Tide', eventTip: 'New channels open through the roots.', weather: ['rain', 'fog'] },
+  { id: 'maelstrom', name: 'the Maelstrom', ring: 'pole', lat: -90, lon: 0, landmark: 'the Eye', perk: 'currentRider', perkName: 'Current Rider', perkText: 'Currents push you about 50% harder.', event: 'Vortex Rising', eventTip: 'Keep clear of the Eye.', weather: ['rain', 'thunder'] },
 ];
 
 export const REGION_COUNT = 16;
@@ -661,9 +664,26 @@ export const REGION_EVENTS: readonly RegionEventSite[] = SPECS.map((s, ri) => {
   };
 });
 
+/** Every disc of water the regions' events move, each with its region: what the renderer draws them from. */
+export const LIFTS: readonly (EventLift & { region: number })[] = REGION_EVENTS.flatMap((e) => e.lift.map((l) => ({ ...l, region: e.region })));
+
 const SHARE: RegionMix = { a: 0, b: 0, t: 0 };
 
 /** How much of the water at p is region ri's: 1 inside it, a half on its border, none once past its neighbour's blend. */
+/** The highest ground within `within` metres of p (a unit vector): where it is, and how high. Cinder Peak's crater over its eruption's spot. */
+export function summitNear(p: V3, within: number): { at: V3; h: number } {
+  const t = v3(), q = v3(), at = { x: p.x, y: p.y, z: p.z };
+  let h = heightAt(p);
+  for (let d = 5; d <= within; d += 5) {
+    for (let b = 0; b < 48; b++) {
+      along(p, tangentAt(p, (b / 48) * 2 * PI, t), d, q);
+      const k = heightAt(q);
+      if (k > h) (h = k), set(at, q.x, q.y, q.z);
+    }
+  }
+  return { at, h };
+}
+
 export function regionShare(ri: number, p: V3): number {
   regionMix(p, SHARE);
   return SHARE.a === ri ? 1 - SHARE.t : SHARE.b === ri ? SHARE.t : 0;

@@ -41,6 +41,10 @@ export type Moment =
   | { k: 'lightning'; pos: V3; warning: boolean }
   | { k: 'aground'; ship: number; pos: V3 }
   | { k: 'ram'; ship: number; by: number; pos: V3 }
+  /** A region's own event warned, started or ended: seconds of warning, or how long it runs. */
+  | { k: 'regionEvent'; region: number; phase: 'warn' | 'start' | 'end'; seconds: number; pos: V3 }
+  /** Cinder Peak threw a bomb (pos where it will land, seconds in the air), or it landed. */
+  | { k: 'lavaBomb'; pos: V3; landed: boolean; seconds: number }
   | { k: 'win'; ship: number };
 
 export type MomentKind = Moment['k'];

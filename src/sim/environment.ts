@@ -5,7 +5,7 @@ import { RULE } from './rules.ts';
 import { EVENT_STATE, TICK, type MatchState } from './state.ts';
 import { DAY, REGION_EVENT, TIDE, WEATHER } from './tables.ts';
 import {
-  CURRENTS, DRAFT, FLOES, OBSTACLES, REGION_EVENTS, TIDE_AMPLITUDE, blockAt, currentAt as worldCurrent, floeAt, floePos, heightAt, liftOf,
+  CURRENTS, DRAFT, FLOES, LIFTS, OBSTACLES, REGION_EVENTS, TIDE_AMPLITUDE, blockAt, currentAt as worldCurrent, floeAt, floePos, heightAt, liftOf,
   obstacleAt, regionIndex, roofAt,
 } from './world/index.ts';
 
@@ -57,6 +57,16 @@ export function liftAt(state: MatchState, p: V3): number {
     if (s > 0) h += s * liftOf(ri, state.regionEvents[ri].k, p);
   }
   return h;
+}
+
+/** How far each of LIFTS moves the sea now at its middle, metres, in LIFTS' order: for the renderer. */
+export function liftsNow(state: MatchState, out: number[]): number[] {
+  out.length = LIFTS.length;
+  for (let i = 0; i < LIFTS.length; i++) {
+    const l = LIFTS[i], s = eventStrength(state, l.region);
+    out[i] = s * (l.flip && state.regionEvents[l.region].k % 2 === 1 ? -l.by : l.by);
+  }
+  return out;
 }
 
 /** The sea level at p: the tide, and whatever the regions' events have done to the water there. */

@@ -1,6 +1,7 @@
 // The planet on screen: the engine (HDR, bloom and the grade), the sky and its light, the terrain, the water, the
-// weather's formations, the landmarks the terrain can't make, the beacons and the floes, seen through the camera rig. The app
-// hands it a StageView every frame, made from the match or from a fixed scene; nothing here reads the simulation.
+// weather's formations, the landmarks the terrain can't make, the beacons, the floes and the rock the regions' events
+// move, seen through the camera rig. The app hands it a StageView every frame, made from the match or from a fixed
+// scene; nothing here reads the simulation.
 import * as THREE from 'three';
 import { Engine, QUALITY, U, loadTextures, type Quality, type Textures } from './engine.ts';
 import { Sky, moonDirection, sunDirection } from './sky.ts';
@@ -12,11 +13,17 @@ import { CameraRig, type CameraMode, type CameraTarget } from './camera.ts';
 import { Landmarks } from './regions/landmarks.ts';
 import { Beacons } from './regions/beacons.ts';
 import { Floes } from './regions/floes.ts';
+import { EventRocks, type EventPhase } from './regions/eventRocks.ts';
+import { setLifts } from './lift.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
+import type { RegionId } from '../sim/world/index.ts';
 
 export type { CameraMode, CameraTarget } from './camera.ts';
 export type { WeatherSystem } from './weather.ts';
+export type { EventPhase } from './regions/eventRocks.ts';
+
+const NO_LIFT: readonly number[] = [];
 
 export interface StageView {
   /** Seconds on the clock every animated thing shares: the swell, ripples and beacons. Give the actors the same. */
@@ -29,6 +36,10 @@ export interface StageView {
   tide: number;
   /** How far round their rings the Ice Crown's floes have ridden, in seconds; `time` when absent. */
   floes?: number;
+  /** How far the regions' events move the sea now, metres at the middle of each of the world's LIFTS; none when absent. */
+  lift?: readonly number[];
+  /** Where the regions' events have got to, for the rock they move (the Spires' fall, the Narrows' rockfall); none under way when absent. */
+  events?: Partial<Record<RegionId, EventPhase>>;
   /** The wind where the camera looks, a tangent in metres per second. */
   wind: V3;
   camera: CameraMode;
@@ -65,6 +76,7 @@ export class Stage {
   readonly landmarks: Landmarks;
   readonly beacons: Beacons;
   readonly floes = new Floes();
+  readonly rocks = new EventRocks();
 
   private constructor(engine: Engine, tex: Textures, sky: Sky, terrain: Terrain, water: Water, weather: Weather, landmarks: Landmarks, beacons: Beacons) {
     this.engine = engine;
@@ -77,7 +89,7 @@ export class Stage {
     this.beacons = beacons;
     // the atmosphere rides on three's fog chunks, so a fog must exist for them to compile in
     this.scene.fog = new THREE.Fog(0xffffff, 1, 2);
-    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group);
+    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group, this.rocks.group);
     terrain.detail = engine.quality.detail;
     this.resize();
   }
@@ -124,6 +136,7 @@ export class Stage {
     sunDirection(v.hour, v.tilt, this.sun);
     moonDirection(v.hour, v.tilt, this.moon);
     U.uPlanet.value.set(R, R + v.tide, v.tide, 0);
+    setLifts(v.lift ?? NO_LIFT);
     // ripples and trees: about 1 in a fresh breeze
     U.uWind.value.set(v.wind.x, v.wind.y, v.wind.z).multiplyScalar(0.09);
     U.uDrift.value.addScaledVector(U.uWind.value, dt);
@@ -156,6 +169,7 @@ export class Stage {
     this.landmarks.update(this.sky.night);
     this.beacons.update(v.time, this.sky.night);
     this.floes.update(v.floes ?? v.time, v.tide);
+    this.rocks.update(v.events, v.time);
     this.engine.render(this.scene, cam, this.sky.grade, dt, () => {
       this.water.prepare(this.engine.renderer, this.scene, cam, this.focus, this.sky.look, this.engine.width, this.engine.height, dt);
     });

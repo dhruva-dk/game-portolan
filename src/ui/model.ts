@@ -285,6 +285,20 @@ export type Slot =
   | { kind: 'consumable'; item: ConsumableId; count: number };
 
 /** The minimap, in metres on the sea round you: x east, y north, you at the centre. */
+/** What a region's event is to you: something to keep clear of, something to go for, or a change in the sea. */
+export type EventTone = 'danger' | 'prize' | 'sea';
+
+export interface EventView {
+  /** The region's id, for its glyph. */
+  region: string;
+  name: string;
+  tip: string;
+  tone: EventTone;
+  /** Warned and not started yet; then seconds until it starts, or else until it ends. */
+  warning: boolean;
+  seconds: number;
+}
+
 export interface MapView {
   /** Where you are, in degrees, to centre the chart. */
   lat: number;
@@ -300,6 +314,8 @@ export interface MapView {
   ships: { x: number; y: number; spotted?: boolean }[];
   /** Things worth sailing to: loot, a gull drop, the region's beacon. */
   marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' }[];
+  /** Region events warned or running in range: where each stands, how far it reaches, and what it is to you. */
+  events: { x: number; y: number; r: number; tone: EventTone; warning: boolean }[];
 }
 
 export interface HudModel {
@@ -328,6 +344,8 @@ export interface HudModel {
   night: boolean;
   /** What a pickup button would take, if anything is in reach. */
   pickup: string | null;
+  /** A region's event, warned or running, in the water you are in or within 240 m of it. */
+  event: EventView | null;
   map: MapView;
 }
 

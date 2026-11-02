@@ -267,6 +267,20 @@ function dangerReach(ri: number): number {
   return ri === EVENT_REGION.kelp ? REGION_EVENT.bloom.r : REGION_EVENTS[ri].r;
 }
 
+/**
+ * Where region ri's event shows on the map, and how far it reaches: Cinder Peak's cone, the kelp bloom where it has
+ * drifted, and every other at its spot.
+ */
+export function eventMark(state: MatchState, ri: number, out: V3): number {
+  const ev = state.regionEvents[ri];
+  copy(out, ri === EVENT_REGION.fire ? REGION_EVENTS[ri].spots[ev.k] : ev.spot);
+  return ri === EVENT_REGION.kelp ? REGION_EVENT.bloom.r : REGION_EVENTS[ri].r;
+}
+
+/** What region ri's event is to a captain: something to keep clear of, something to go for, or neither. */
+export const eventTone = (ri: number): 'danger' | 'prize' | 'sea' =>
+  dangerReach(ri) > 0 ? 'danger' : PRIZES.some((p) => p.ri === ri) ? 'prize' : 'sea';
+
 /** The event danger over p, or within `pad` metres of it: where to get away from, and how far. */
 export function dangerAt(state: MatchState, p: V3, pad: number, out: Danger): boolean {
   for (const { ri, live, ash } of DANGERS) {

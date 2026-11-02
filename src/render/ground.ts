@@ -125,7 +125,7 @@ void terrainSurface(out vec3 alb, out vec3 nW, out float rough, out vec3 glow) {
     n = normalize(mix(n, n2, tb));
   }
   // the water's edge: a wet band above it, surf washing up and back, caustics below
-  float lvl = uPlanet.y - uPlanet.x;
+  float lvl = uPlanet.y - uPlanet.x + seaLift(up);
   float above = alt - lvl;
   float fn = texture(uNoise, q * 0.11 + vec2(uTime * 0.01, 0.0)).b;
   float wet = smoothstep(1.3, 0.0, above + (fn - 0.5) * 0.4);

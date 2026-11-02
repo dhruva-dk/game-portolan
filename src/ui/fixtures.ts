@@ -321,11 +321,20 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     using: storm ? { item: 'repairKit', progress: 0.55 } : null,
     region: storm ? 'the Coral Atolls' : 'the Spice Isles', perk: storm ? null : 'Better Loot', night: state === 'night',
     pickup: state === 'calm' ? 'Rare Harpoon' : null,
+    // the Spice Isles' pearls in a fight, the Coral Atolls' tide in the Storm, and Cinder Peak warned next door at night
+    event: fight ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: false, seconds: 22 }
+      : storm ? { region: 'coralAtolls', name: 'Reef Tide', tip: 'One reef gap shuts, another opens.', tone: 'sea', warning: false, seconds: 41 }
+      : state === 'night' ? { region: 'fireArchipelago', name: 'Eruption', tip: 'Get away from the cone and the ash.', tone: 'danger', warning: true, seconds: 7 }
+      : null,
     map: {
       lat: -31, lon: 167, heading: 0.6, range: 260,
       storm: { x: storm ? -210 : -60, y: storm ? 140 : 80, r: storm ? 180 : 420 }, next: { x: -40, y: 120, r: storm ? 110 : 260 },
       ships: fight ? [{ x: 60, y: 40 }, { x: -90, y: 110, spotted: true }, { x: 150, y: -60 }] : [{ x: 160, y: 120 }],
       marks: [{ x: -40, y: -70, kind: 'loot' }, { x: 120, y: 30, kind: 'gull' }, { x: -150, y: -30, kind: 'beacon' }],
+      events: fight ? [{ x: 70, y: -90, r: 60, tone: 'prize', warning: false }]
+        : storm ? [{ x: -120, y: -40, r: 90, tone: 'sea', warning: false }]
+        : state === 'night' ? [{ x: 230, y: 160, r: 140, tone: 'danger', warning: true }]
+        : [],
     },
   };
 }

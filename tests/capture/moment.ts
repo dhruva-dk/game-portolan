@@ -22,6 +22,16 @@ export const MOMENTS: readonly MomentDef[] = [
   { name: 'whale-breach', about: 'the giant whale breaches beside the player' },
   { name: 'broadside', about: 'the player fires a broadside, both sides at once' },
   { name: 'delivery', about: 'the player calls a gull delivery and it arrives' },
+  ...[
+    ['iceCrown', 'the Ice Crown\'s floes turn round the pole'], ['fjords', 'a flood surge pours out of the fjords'],
+    ['mistwood', 'a fog bank rolls out of Mistwood over the sea'], ['spires', 'a spire topples into the sea'],
+    ['narrows', 'rock falls into the Gorge mouth'], ['basaltStacks', 'the tide falls and the cave under the arch opens'],
+    ['kelpShallows', 'the kelp blooms over the shallows'], ['blossomRun', 'the spring flood runs down the river'],
+    ['glassSea', 'the whale rises through the Glass Sea'], ['jadeShoals', 'the tide falls and the shoals show their channels'],
+    ['coralAtolls', 'the reef tide shuts one gap and opens another'], ['spiceIsles', 'the clam bed opens and pearls spill into the cove'],
+    ['fireArchipelago', 'Cinder Peak erupts and throws lava bombs'], ['weepingIsle', 'a cloudburst closes round the isle'],
+    ['mangroveLabyrinth', 'the flood tide opens channels through the roots'], ['maelstrom', 'the vortex rises round the Eye'],
+  ].map(([id, about]) => ({ name: `event-${id}`, about: `${about}: the banner, the map and the sea` })),
 ];
 
 interface Plan {
@@ -71,7 +81,8 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
 }
 
 export async function moment(r: Rig, o: { dpr: number; seed: number; name: string }): Promise<void> {
-  const list = o.name === 'all' ? MOMENTS : MOMENTS.filter((m) => m.name === o.name);
+  const names = o.name.split(',');
+  const list = o.name === 'all' ? MOMENTS : o.name === 'events' ? MOMENTS.filter((m) => m.name.startsWith('event-')) : MOMENTS.filter((m) => names.includes(m.name));
   if (!list.length) throw new Error(`no moment "${o.name}"; there are ${MOMENTS.map((m) => m.name).join(', ')}`);
   const game = await openApp(r, { dpr: o.dpr });
   const missed: string[] = [];

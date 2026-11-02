@@ -122,6 +122,7 @@ attribute float aEnd;
 uniform vec3 uE1, uUp, uE2, uVel;
 uniform float uSpan, uLen, uAmount;
 varying float vEnd, vA;
+#include <planet>
 #include <fog_pars_vertex>
 void main() {
   // drops in a box round the camera that wraps as they fall and as the camera moves

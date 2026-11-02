@@ -198,6 +198,16 @@ export function emblem(name: string): string {
   return svg(star(n, 10.5, 4 + (Math.abs(h >> 4) % 4)));
 }
 
+// ---------------------------------------------------------------- the regions' events
+
+/** Each region's event as a glyph on its banner, by region id. */
+export const EVENT_ICON: Record<string, string> = {
+  iceCrown: EMBLEM.snowflake, fjords: EMBLEM.waves, mistwood: ICON.wind, spires: EMBLEM.peak, narrows: EMBLEM.zigzag,
+  basaltStacks: EMBLEM.hexagon, kelpShallows: EMBLEM.fern, blossomRun: EMBLEM.leaf, glassSea: EMBLEM.whaleTail,
+  jadeShoals: EMBLEM.crescent, coralAtolls: EMBLEM.shell, spiceIsles: EMBLEM.circle, fireArchipelago: EMBLEM.flame,
+  weepingIsle: EMBLEM.drop, mangroveLabyrinth: EMBLEM.moonPhases, maelstrom: EMBLEM.spiral,
+};
+
 // ---------------------------------------------------------------- weapons and consumables by name
 
 export const WEAPON_ICON: Record<string, string> = {

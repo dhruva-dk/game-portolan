@@ -2,7 +2,7 @@
 // results. Over the sea only small boxes in the corners take touches; everything else lets them through to the
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
-import { button, ceremony, el, emblemBadge, esc, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
+import { button, ceremony, el, emblemBadge, esc, eventBanner, EVENT_ICON, ICON, mmss, ordinal, progressBar, type BarHandle } from '../parts/index.ts';
 import type {
   ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
 } from '../model.ts';
@@ -27,6 +27,9 @@ export interface HudActions {
   /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
   target?(name: string, el: HTMLElement | null): void;
 }
+
+/** The minimap's ink for a region event, by what it is to you. */
+const EVENT_INK = { danger: '#c8341c', prize: '#b8800f', sea: '#1e6e78' } as const;
 
 /** A box over the sea that takes the touches landing on it. */
 const box = (cls: string, parent: Element, html?: string) => el(`s-mx__box ${cls}`, parent, html);
@@ -105,6 +108,9 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const count = el('s-hud__count', info);
   const counter = (icon: string) => el('s-hud__n', el('', count, `<i>${icon}</i>`, 'span'), '', 'b');
   const nShips = counter(ICON.flag), nKills = counter(ICON.sink), nCoins = counter(ICON.coin);
+
+  // a region's event, under the Storm's line; it takes no touches
+  const banner = eventBanner({ parent: root, className: 's-hud__event' });
 
   const map = box('s-hud__map', root);
   const canvas = el<HTMLCanvasElement>('s-hud__mapC', map, undefined, 'canvas');
@@ -220,6 +226,15 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
       g.strokeStyle = 'rgba(255, 255, 255, 0.9)'; g.lineWidth = 1.5 * devicePixelRatio;
       g.beginPath(); g.arc(nx, ny, mv.next.r * k, 0, Math.PI * 2); g.stroke();
     }
+    // region events: a wash of their colour over their reach, the rim dashed while they are only warned
+    for (const ev of mv.events) {
+      const [x, y] = at(ev.x, ev.y), ink = EVENT_INK[ev.tone];
+      g.beginPath(); g.arc(x, y, Math.max(5 * devicePixelRatio, ev.r * k), 0, Math.PI * 2);
+      g.fillStyle = `${ink}38`; g.fill();
+      g.setLineDash(ev.warning ? [5 * devicePixelRatio, 4 * devicePixelRatio] : []);
+      g.strokeStyle = ink; g.lineWidth = 2 * devicePixelRatio; g.stroke();
+      g.setLineDash([]);
+    }
     for (const mk of mv.marks) {
       const [x, y] = at(mk.x, mk.y);
       g.fillStyle = mk.kind === 'loot' ? '#c99a2e' : '#fff';
@@ -251,6 +266,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     nShips.textContent = `${h.ships}`;
     nKills.textContent = `${h.kills}`;
     nCoins.textContent = `${h.coins}`;
+    banner.set(h.event ? { ...h.event, icon: EVENT_ICON[h.event.region] ?? ICON.storm } : null);
     where.innerHTML = `<b>${esc(h.region)}</b>${h.perk ? `<span>${esc(h.perk)}</span>` : ''}${h.night ? `<i>${ICON.moon}</i>` : ''}`;
     h.slots.forEach((s, k) => {
       const v = slots[k];
@@ -326,6 +342,7 @@ const HOW: Record<string, [string, string]> = {
   ram: ['rammed by %', 'rammed'], burn: ['burned out by %', 'burned out'], ink: ['by %, in the ink', 'in the ink'],
   mine: ["by %'s mine", 'by a mine'], wave: ["by %'s wave", 'by a wave'], storm: ['by %, in the Storm', 'by the Storm'],
   lightning: ['by %, under lightning', 'by lightning'], ash: ['by %, in the ash', 'by the ash'], whale: ['by %, and the whale', 'by the whale'],
+  rock: ['by %, under falling rock', 'by falling rock'],
 };
 
 function sunkBy(m: DeathModel): string {

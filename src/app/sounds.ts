@@ -4,10 +4,33 @@ import type { Audio, SoundName, Use } from '../audio/index.ts';
 import type { ConsumableKind, Moment } from './events.ts';
 import type { EffectLog } from './effects.ts';
 import type { V3 } from '../sim/math.ts';
+import { EVENT_REGION as R } from '../sim/environment.ts';
 
 const ABILITY: Record<string, SoundName> = {
   smokeScreen: 'abilitySmoke', ram: 'abilityRam', repair: 'abilityRepair', reveal: 'abilityReveal', hardTurn: 'abilityHardTurn',
   decoy: 'abilityDecoy', wave: 'abilityWave', driftMine: 'mineDrop',
+};
+
+type Cue = readonly [SoundName, number] | null;
+
+/** Each region's event as heard, by region index: its warning, its start and its end, each a sound and its gain. */
+const EVENT_SOUND: Record<number, readonly [Cue, Cue, Cue]> = {
+  [R.ice]: [['iceBoom', 0.6], ['floesGrind', 1], null],
+  [R.fjords]: [null, ['floodSurge', 1], null],
+  [R.mist]: [null, ['fogSurge', 1], null],
+  [R.spires]: [['rockfall', 0.35], ['rockfall', 1], null],
+  [R.narrows]: [['rockfall', 0.3], ['rockfall', 1], null],
+  [R.basalt]: [null, ['floodSurge', 0.6], ['floodSurge', 0.5]],
+  [R.kelp]: [null, ['kelpBloom', 1], null],
+  [R.blossom]: [null, ['floodSurge', 1], null],
+  [R.glass]: [['whaleSong', 0.8], ['whaleBreach', 1], null],
+  [R.jade]: [null, ['floodSurge', 0.5], ['floodSurge', 0.5]],
+  [R.coral]: [null, ['floodSurge', 0.7], null],
+  [R.spice]: [null, ['clamOpen', 1], null],
+  [R.fire]: [['thunder', 0.5], ['eruption', 1], null],
+  [R.weeping]: [['thunderWarn', 0.8], ['cloudburst', 1], null],
+  [R.mangrove]: [null, ['floodSurge', 0.7], null],
+  [R.maelstrom]: [['vortexSurge', 0.4], ['vortexSurge', 1], null],
 };
 
 export class MomentSound {
@@ -125,6 +148,16 @@ export class MomentSound {
       case 'lightning':
         if (m.warning) a.play('thunderWarn', { pos: m.pos });
         else { a.play('lightning', { pos: m.pos }); a.play('thunder', { pos: m.pos, delay: 0.3 }); }
+        return;
+      case 'regionEvent': {
+        const cue = EVENT_SOUND[m.region]?.[m.phase === 'warn' ? 0 : m.phase === 'start' ? 1 : 2];
+        if (cue) a.play(cue[0], { pos: m.pos, gain: cue[1] });
+        if (m.phase === 'start' && m.region === R.weeping) a.play('thunder', { pos: m.pos, delay: 0.8 });
+        return;
+      }
+      case 'lavaBomb':
+        if (m.landed) a.play('lavaBomb', { pos: m.pos });
+        else a.whistle(m.pos, m.seconds);
         return;
       case 'aground':
         a.play('aground', { pos: this.at(m.ship, m.pos) });

@@ -6,16 +6,18 @@ import {
 import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
 import {
-  ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, USES, WEAPONS, inStorm, isNight, newStormView, seen, SEEN, stormView, sunDir,
+  ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, inStorm, isNight, newStormView, seen, SEEN, stormView, sunDir,
   type MatchState, type Ship,
 } from '../sim/match.ts';
+import { eventMark, eventTone } from '../sim/regionEvents.ts';
+import { EVENT_STATE } from '../sim/state.ts';
 import { GALE, GUST, LOOT, PARCELS } from '../sim/tables.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
-import { R, advance, apart } from '../sim/sphere.ts';
+import { R, advance, along, apart, tangentAt } from '../sim/sphere.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
-import { v3, type V3 } from '../sim/math.ts';
+import { PI, v3, type V3 } from '../sim/math.ts';
 import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type GaleModel, type HudModel,
+  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type EventView, type GaleModel, type HudModel,
   type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type SpectateModel, type VictoryModel,
   type WeaponId,
 } from '../ui/model.ts';
@@ -90,10 +92,45 @@ function mapOf(s: MatchState, i: number): MapView {
   const marks: MapView['marks'] = [];
   for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push({ ...rel(l.at), kind: 'loot' });
   if (sh.gull.state !== 0) marks.push({ ...rel(sh.gull.at), kind: 'gull' });
+  const events: MapView['events'] = [];
+  for (let ri = 0; ri < s.regionEvents.length; ri++) {
+    const st = s.regionEvents[ri].state;
+    if (st !== EVENT_STATE.warning && st !== EVENT_STATE.running) continue;
+    const r = eventMark(s, ri, MARK);
+    if (r > 0 && apart(p, MARK) < MAP_RANGE * 1.5 + r) events.push({ ...rel(MARK), r, tone: eventTone(ri), warning: st === EVENT_STATE.warning });
+  }
   return {
     lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: MAP_RANGE,
-    storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
+    storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks, events,
   };
+}
+
+const MARK = v3(), NEAR_P = v3(), NEAR_T = v3();
+/** How far past a region's border its event's banner still shows, m. */
+const EVENT_NEAR = 240;
+
+/** Whether region ri's water lies within EVENT_NEAR metres of p: rings of points round p, 16 bearings each. */
+function nearRegion(p: V3, ri: number): boolean {
+  for (let d = EVENT_NEAR / 3; d <= EVENT_NEAR; d += EVENT_NEAR / 3) {
+    for (let k = 0; k < 16; k++) if (regionAt(along(p, tangentAt(p, (k * PI) / 8, NEAR_T), d, NEAR_P)) === ri) return true;
+  }
+  return false;
+}
+
+/** The region event the banner shows at p: one warned or running in the water there or near it, its own region's first. */
+function eventOf(s: MatchState, p: V3): EventView | null {
+  const here = regionAt(p);
+  let best = -1;
+  for (let ri = 0; ri < s.regionEvents.length; ri++) {
+    const st = s.regionEvents[ri].state;
+    if (st !== EVENT_STATE.warning && st !== EVENT_STATE.running) continue;
+    if (ri === here) { best = ri; break; }
+    if (best < 0 && nearRegion(p, ri)) best = ri;
+  }
+  if (best < 0) return null;
+  const ev = s.regionEvents[best], info = REGIONS[best], warning = ev.state === EVENT_STATE.warning;
+  const left = warning ? ev.at - s.tick * TICK : ev.run - ev.t;
+  return { region: info.id, name: info.event, tip: info.eventTip, tone: eventTone(best), warning, seconds: Math.max(0, Math.ceil(left)) };
 }
 
 /** What a take would pick up: the nearest loot in reach. */
@@ -132,6 +169,7 @@ export function hudModel(session: Session): HudModel {
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,
     night: isNight(s, sh.pos),
     pickup: pickupOf(s, sh),
+    event: eventOf(s, sh.pos),
     map: mapOf(s, session.watch),
   };
 }

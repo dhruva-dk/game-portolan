@@ -98,6 +98,16 @@ export interface ActorsView {
   projectiles: readonly ProjectileView[];
   loot: readonly LootView[];
   whales: readonly WhaleView[];
+  /** Cinder Peak while it erupts, or is about to; none when it is quiet. */
+  eruption?: EruptionView | null;
+}
+
+/** Cinder Peak erupting: its crater, how hard it erupts (0…1, a thread of smoke while it is warned), and the bombs it
+ *  has thrown, each with where it comes down and how far through its flight it is (0…1). */
+export interface EruptionView {
+  crater: Vec3;
+  strength: number;
+  bombs: readonly { to: Vec3; k: number }[];
 }
 
 /** One-shot moments. `at` is a world point; for hits it is where the shot struck. */
@@ -113,7 +123,10 @@ export type ActorEvent =
   | { t: 'delivery'; ship: number; rarity?: Rarity }
   | { t: 'ram'; at: Vec3 }
   | { t: 'scrape'; at: Vec3 }
-  | { t: 'breach'; at: Vec3; head?: Vec3 };
+  | { t: 'breach'; at: Vec3; head?: Vec3 }
+  | { t: 'lavaBomb'; at: Vec3; on: 'water' | 'land' }
+  /** A region's event brings rock down into the water (the Spires' spire, the Narrows' rockfall): `at` is its spot. */
+  | { t: 'rockfall'; region: number; at: Vec3 };
 
 /** What a moment should do to the camera, the screen and the hand, for the integration step to route. */
 export interface Juice {

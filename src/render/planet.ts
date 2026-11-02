@@ -25,10 +25,11 @@ export const PLANET_GLSL = /* glsl */ `
 #ifndef PLANET_CHUNK
 #define PLANET_CHUNK
 ${sharedUniforms('vec3', 'uSunDir', 'uMoonDir', 'uFogSun', 'uFogColor')}
-${sharedUniforms('float', 'uFogDensity', 'uFogFalloff', 'uTime', 'uNight', 'uStormOn')}
+${sharedUniforms('float', 'uFogDensity', 'uFogFalloff', 'uTime', 'uNight', 'uStormOn', 'uLiftOn')}
 ${sharedUniforms('vec4', 'uMist', 'uPlanet', 'uStorm')}
 uniform vec3 uKey[20];
-${sharedUniforms('sampler2D', 'uNoise', 'uSeaTint')}
+uniform vec4 uLiftAt[5], uLiftR[5];
+${sharedUniforms('sampler2D', 'uNoise', 'uSeaTint', 'uSeaShare')}
 
 vec3 keyAt(int k, float e) {
   int b = k * 5;
@@ -64,6 +65,22 @@ vec4 seaTint(vec3 up) {
   return texture(uSeaTint, uv);
 }
 
+// how far the regions' events have raised the sea over a direction from the planet's centre, metres (lift.ts)
+float seaLift(vec3 up) {
+  if (uLiftOn == 0.0) return 0.0;
+  float h = 0.0;
+  vec4 share = vec4(-1.0);
+  for (int i = 0; i < 5; i++) {
+    if (uLiftAt[i].w == 0.0) continue;
+    float d = uPlanet.x * sqrt(max(0.0, 2.0 - 2.0 * dot(up, uLiftAt[i].xyz)));
+    float f = 1.0 - smoothstep(uLiftR[i].x, uLiftR[i].x + uLiftR[i].y, d);
+    if (f <= 0.0) continue;
+    if (share.x < 0.0) share = texture(uSeaShare, vec2(atan(-up.z, up.x) * 0.15915494 + 0.5, asin(clamp(up.y, -1.0, 1.0)) * 0.31830989 + 0.5));
+    h += uLiftAt[i].w * f * share[int(uLiftR[i].z)];
+  }
+  return h;
+}
+
 // the light the water itself carries at a point: sun through the surface and the sky's
 vec3 seaLight(vec3 wp) {
   vec3 up = normalize(wp);
@@ -74,9 +91,9 @@ vec3 seaLight(vec3 wp) {
 vec3 underSea(vec3 col, vec3 wp) {
   if (uPlanet.x < 1.0) return col;
   float rw = length(wp);
-  float depth = uPlanet.y - rw;
-  if (depth <= 0.0 || length(cameraPosition) < uPlanet.y) return col;
   vec3 up = wp / rw, dir = normalize(wp - cameraPosition);
+  float depth = uPlanet.y + seaLift(up) - rw;
+  if (depth <= 0.0 || length(cameraPosition) < uPlanet.y) return col;
   // the path through the water, bent toward the vertical as it enters
   float c = abs(dot(dir, up));
   float path = depth / max(sqrt(1.0 - (1.0 - c * c) * 0.565), 0.3);

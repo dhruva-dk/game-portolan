@@ -12,6 +12,7 @@ import { GRID, R, faceDir, faceUV, type FaceUV } from '../sim/sphere.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { REGIONS, regionMix, type RegionId, type RegionMix } from '../sim/world/index.ts';
 import { U, type Textures } from './engine.ts';
+import { liftShareTexture } from './lift.ts';
 import { SWELL_GLSL, swell } from './swell.ts';
 
 // ---------------------------------------------------------------- each region's water
@@ -68,7 +69,7 @@ void main() {
   // position: x is the distance from the point under the camera along the sea, z the bearing round it
   float th = position.x / uPlanet.x, ph = position.z;
   vec3 up = cos(th) * uNadir + sin(th) * (cos(ph) * uE1 + sin(ph) * uE2);
-  vec3 p = up * uPlanet.y;
+  vec3 p = up * (uPlanet.y + seaLift(up));
   vec4 sw = swellAt(p, up, uTime, uChop, length(p - cameraPosition));
   vec3 wp = p + up * sw.x;
   vWP = wp;
@@ -405,6 +406,7 @@ export class Water {
     this.reflScale = reflectScale;
     fillSeaTint(this.tint);
     U.uSeaTint.value = this.tint;
+    U.uSeaShare.value = liftShareTexture();
     this.refl = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType, depthBuffer: true });
     this.ink = new THREE.DataArrayTexture(new Uint8Array(INK_N * INK_N * 6 * 2), INK_N, INK_N, 6);
     this.ink.format = THREE.RGFormat;

@@ -42,6 +42,12 @@ export const U = {
   uStormOn: { value: 0 },
   /** The sea's body colour (rgb) and clarity (a) over the planet, by latitude and longitude. */
   uSeaTint: { value: null as THREE.Texture | null },
+  /** The water the regions' events move (lift.ts): each disc's middle and how far it moves the sea now; its radius,
+   *  fade and region channel in uSeaShare; and whether any moves it at all. */
+  uLiftAt: { value: Array.from({ length: 5 }, () => new THREE.Vector4()) },
+  uLiftR: { value: Array.from({ length: 5 }, () => new THREE.Vector4(1, 1, 0, 0)) },
+  uLiftOn: { value: 0 },
+  uSeaShare: { value: null as THREE.Texture | null },
   // three refreshes these on every fogged material; the atmosphere replaces what they would do
   fogColor: { value: new THREE.Color() },
   fogNear: { value: 1 },

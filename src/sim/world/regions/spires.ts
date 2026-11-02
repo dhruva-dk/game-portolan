@@ -2,7 +2,7 @@
 // Needle and thinning toward the borders, each with a ledge of white-washed rubble at its foot and a crown of
 // dark pines. The Needle itself is 150 m, seen from far across the north.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
-import { PI, datan2 } from '../../math.ts';
+import { PI, datan2, dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
 import { fbm, fromEquator, hyp, needle, over, polyDist, scatter, scatterPoints, shoals, smoothstep, snapWet, type Scattered } from '../kit.ts';
 import type { PropSpec, RegionSpec } from '../spec.ts';
@@ -16,6 +16,9 @@ const FALLS = [1, 2, 3].map((k) => {
   const ax = LANE[2 * k], ay = LANE[2 * k + 1], bx = LANE[2 * k + 2], by = LANE[2 * k + 3];
   return { x: (ax + bx) / 2, y: (ay + by) / 2, bearing: (datan2(bx - ax, by - ay) * 180) / PI + 90 };
 });
+// The spire that falls stands on a low stump just past one end of its fall, all match; the stump stays when it breaks.
+export const STUMP = { at: 40, r: 8, top: 3 };
+const STUMPS = FALLS.map((f) => ({ x: f.x + STUMP.at * dsin((f.bearing * PI) / 180), y: f.y + STUMP.at * dcos((f.bearing * PI) / 180) }));
 
 // Where needles may not stand: too near the Needle, the Great Current or the lane.
 function clear(cx: number, cy: number, pad: number): boolean {
@@ -48,6 +51,10 @@ function height(x: number, y: number): number {
   h = scatter(x, y, 26, S + 20, 0.3, h, small, (cx, cy) => clear(cx, cy, 0));
   const dn = hyp(x - NEEDLE.x, y - NEEDLE.y);
   if (dn < 50) h = over(h, over(needle(dn, NEEDLE.r, NEEDLE.h), dn < NEEDLE.r + 6 ? -1.4 : -1.4 - 58.6 * smoothstep(0, 12, dn - NEEDLE.r - 6), 1), 1);
+  for (const s of STUMPS) {
+    const d = hyp(x - s.x, y - s.y);
+    if (d < STUMP.r + 12) h = over(h, needle(d, STUMP.r, STUMP.top), 1);
+  }
   // Shoals across the open water, so no straight course runs empty for long.
   return shoals(x, y, h, 140, S + 40);
 }

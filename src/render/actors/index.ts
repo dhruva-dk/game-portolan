@@ -4,17 +4,19 @@
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
-import { AU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, sea, smooth, v3, type WaveFn } from './common.ts';
+import { AU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
+import { seaLift } from '../lift.ts';
+import { rockfallAt } from '../regions/eventRocks.ts';
 import { Loot } from './loot.ts';
 import { Numbers } from './numbers.ts';
 import { SPRITE } from './particles.ts';
 import { Projectiles } from './projectiles.ts';
 import { Wakes } from './wakes.ts';
 import { Whales } from './whale.ts';
-import type { ActorEvent, ActorsView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
+import type { ActorEvent, ActorsView, EruptionView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
 
 export * from './view.ts';
 export { lookOf, SAIL_COLOURS, PATTERNS, HULL_PAINTS, WAKES, FIGUREHEADS } from './cosmetics.ts';
@@ -102,7 +104,9 @@ interface Marker { at: THREE.Vector3; m: HitMarker }
 
 export function createActors(scene: THREE.Object3D, options: ActorsOptions = {}): Actors {
   SEA.radius = options.radius ?? 554;
-  if (options.wave) sea.wave = options.wave;
+  // the swell, on the water the regions' events have raised or drawn down
+  const wave = options.wave ?? sea.wave;
+  sea.wave = (p, t) => wave(p, t) + seaLift(p);
   Object.assign(STAGE_U, options.uniforms ?? {});
   const tex = loadTextures(options.textureBase ?? TEX_BASE);
   const kit = new Kit(tex);
@@ -231,6 +235,19 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     if (f.hop >= 0 && f.hop < 0.9) fx.windAround(f.pos, f.fwd.clone().multiplyScalar(v.speed + 14), 40, dt);
   }
 
+  // Cinder Peak: its plume, and each bomb on its arc from the crater, highest midway
+  const crater = new THREE.Vector3(), bombAt = new THREE.Vector3(), bombTo = new THREE.Vector3();
+  function erupt(e: EruptionView, dt: number): void {
+    crater.set(e.crater.x, e.crater.y, e.crater.z);
+    fx.plume(crater, e.strength, dt);
+    for (const b of e.bombs) {
+      bombTo.set(b.to.x, b.to.y, b.to.z);
+      const k = b.k, r0 = crater.length(), r1 = seaRadius(bombTo), apex = 18 + crater.distanceTo(bombTo) * 0.35;
+      bombAt.lerpVectors(crater, bombTo, k).setLength(r0 + (r1 - r0) * k + apex * 4 * k * (1 - k));
+      fx.bomb(bombAt, dt);
+    }
+  }
+
   function update(view: ActorsView, dt: number, camera: THREE.Camera): void {
     frame++;
     clock += dt;
@@ -289,6 +306,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     for (const f of fleet.values()) refs.set(f.id, { pos: f.pos, fwd: f.fwd, speed: f.view.speed, alive: f.view.alive && f.sink < 0 });
     juice(gulls.update(refs, eye, dt, t, player), null);
     juice(whales.update(view.whales, dt, t, eye), null);
+    if (view.eruption) erupt(view.eruption, dt);
     shards.update(dt);
     fx.update(dt);
     wakes.update(t);
@@ -433,6 +451,12 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
         }
         case 'breach':
           whales.breach(e.at, e.head);
+          break;
+        case 'lavaBomb':
+          fx.lavaLand(v3(e.at), e.on === 'water');
+          break;
+        case 'rockfall':
+          for (const p of rockfallAt(e.region, v3(e.at).normalize())) fx.rockfall(onSea(v3(p), 0, new THREE.Vector3()));
           break;
       }
     }
