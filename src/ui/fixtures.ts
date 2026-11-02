@@ -237,21 +237,26 @@ const HABITS = [
   'Has learned you fight at middle range.', 'Has learned you favour the cannon.',
 ];
 
+/** As the career's: the rivalry at which a captain is called a rival. */
+const RIVAL_AT = 0.3;
+
 export function fxRivals(): RivalsModel {
   const r = rng(40);
   const rivals: RivalView[] = CAPTAIN_ROWS.map(([id, name, meaning, t, emblem, sigil, active, passive, sail, hull], i) => {
-    const met = i % 7 === 6 ? 0 : Math.floor(r() * 26);
-    const sankYou = Math.floor(r() * Math.min(met, 6) * 0.6), sunkByYou = Math.floor(r() * Math.min(met, 6) * 0.6);
+    // a mid-career player: most captains met a few times, a handful often, and only those often sunk either way are rivals
+    const met = i % 7 === 6 ? 0 : Math.floor(r() * r() * 26);
+    const sankYou = Math.floor(r() * Math.min(met, 8) * 0.4), sunkByYou = Math.floor(r() * Math.min(met, 8) * 0.4);
     const ahead = Math.floor(met * (0.3 + r() * 0.5)), behind = met - ahead;
-    const grudge = sunkByYou > 2 ? Math.min(3, sunkByYou - 2) : 0;
-    const rivalry = met === 0 ? 0 : Math.min(1, (sankYou + sunkByYou) / 7 + grudge * 0.2 + met / 60);
+    const grudge = sunkByYou > 1 ? Math.min(3, sunkByYou - 1) : 0;
+    // the career's own measure: a grudge out of 3, and sinkings either way out of 6
+    const rivalry = Math.min(1, grudge / 3 + (sankYou + sunkByYou) / 6);
     const habits = met > 8 ? HABITS.filter((_, k) => (i + k) % 3 === 0) : [];
     const lines = [...(grudge ? [GRUDGE[grudge - 1]] : []), ...habits,
       met === 0 ? 'Has never met you.' : `Sank you ${sankYou}, sunk by you ${sunkByYou}, in ${met} ${met === 1 ? 'match' : 'matches'} together.`];
     const rank = RANK_LADDER[Math.min(19, Math.max(0, Math.round(4 + r() * 13 + (i % 9 === 0 ? 3 : 0))))].name;
     return {
       id, name, meaning, sigil, emblem, colours: [sail, hull], temperament: TEMPERAMENTS.find((x) => x.id === t)!, rank, active, passive,
-      met, ahead, behind, sankYou, sunkByYou, grudge, rivalry, isRival: rivalry >= 0.5, lines,
+      met, ahead, behind, sankYou, sunkByYou, grudge, rivalry, isRival: rivalry >= RIVAL_AT, lines,
     };
   });
   rivals.sort((a, b) => b.rivalry - a.rivalry || b.met - a.met || a.name.localeCompare(b.name));
