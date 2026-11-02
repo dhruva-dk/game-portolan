@@ -15,6 +15,8 @@ import { Beacons } from './regions/beacons.ts';
 import { Floes } from './regions/floes.ts';
 import { EventRocks, type EventPhase } from './regions/eventRocks.ts';
 import { EventKelp } from './regions/eventKelp.ts';
+import { EventClams } from './regions/eventClams.ts';
+import { EventPetals } from './regions/eventPetals.ts';
 import { FastWater } from './fastWater.ts';
 import { setLifts } from './lift.ts';
 import { R } from '../sim/sphere.ts';
@@ -84,6 +86,8 @@ export class Stage {
   readonly floes = new Floes();
   readonly rocks = new EventRocks();
   readonly kelp = new EventKelp();
+  readonly clams = new EventClams();
+  readonly petals = new EventPetals();
   private readonly fast = new FastWater();
 
   private constructor(engine: Engine, tex: Textures, sky: Sky, terrain: Terrain, water: Water, weather: Weather, landmarks: Landmarks, beacons: Beacons) {
@@ -97,7 +101,7 @@ export class Stage {
     this.beacons = beacons;
     // the atmosphere rides on three's fog chunks, so a fog must exist for them to compile in
     this.scene.fog = new THREE.Fog(0xffffff, 1, 2);
-    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group, this.rocks.group, this.kelp.group);
+    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group);
     terrain.detail = engine.quality.detail;
     this.resize();
   }
@@ -174,12 +178,14 @@ export class Stage {
     const terr = v.territory;
     this.water.setTerritory(terr?.owner ?? null, terr?.trail ?? null, terr?.version ?? 0, terr?.me ?? 0);
     this.terrain.update(eye);
-    this.landmarks.update(this.sky.night);
+    this.landmarks.update(this.sky.night, v.time, v.events);
     this.beacons.update(v.time, this.sky.night);
     this.floes.update(v.floes ?? v.time, v.tide);
     this.rocks.update(v.events, v.time);
     this.kelp.update(v.events, v.time, v.tide);
+    this.clams.update(v.events, v.time, v.tide);
     this.fast.update(this.focus, v.currents, v.tide, dt, this.water);
+    this.petals.update(this.focus, v.events, v.currents, v.time, v.tide, dt);
     this.engine.render(this.scene, cam, this.sky.grade, dt, () => {
       this.water.prepare(this.engine.renderer, this.scene, cam, this.focus, this.sky.look, this.engine.width, this.engine.height, dt);
     });

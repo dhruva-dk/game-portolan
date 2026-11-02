@@ -12,7 +12,7 @@ import { R, advance, along, tangentAt, tangentToward, turned } from '../sim/sphe
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE, copy } from '../sim/state.ts';
 import { callBreach } from '../sim/whale.ts';
-import { REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable, regionShare } from '../sim/world/index.ts';
+import { LANDMARKS, REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable, regionShare } from '../sim/world/index.ts';
 import { PI, v3, type V3 } from '../sim/math.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
 
@@ -255,16 +255,17 @@ export function daylight(state: MatchState, hour = 15): void {
 }
 
 /** Open water `d` metres or more from a spot, on a course facing it, with room astern and to either side. With
- *  `sight`, only where nothing stands between the ship and the spot, so the camera behind her sees it, and in
- *  region `own` when one is given: null when there's no such water. */
+ *  `sight`, only where nothing stands between the ship and the spot, so the camera behind her sees it, and well inside
+ *  region `own` when one is given, so the current doesn't carry her out of it: null when there's no such water. */
 function facing(spot: V3, d: number, sight = false, own = -1): Course | null {
   const t = v3(), q = v3();
-  for (let r = d; r <= d + (sight ? 100 : 400); r += 20) {
+  for (let r = d; r <= d + (sight ? 260 : 400); r += 20) {
     for (let k = 0, n = sight ? 64 : 32; k < n; k++) {
       const pos = along(spot, tangentAt(spot, (k * 2 * PI) / n, t), r, v3()), c = { pos, head: tangentToward(pos, spot, v3()) };
-      let ok = own < 0 || regionShare(own, pos) > 0.5;
+      let ok = own < 0 || regionShare(own, pos) > 0.8;
       for (let s = -40; s <= 10 && ok; s += 10) for (const x of [-12, 0, 12]) if (ok && !open(off(c, s, x).pos)) ok = false;
-      for (let s = 10; sight && ok && s < r; s += 10) if (heightAt(along(pos, c.head, s, q)) > 4) ok = false;
+      // (the spot's own ground, a dune or a peak, is what she looks at: only what stands short of it hides it)
+      for (let s = 10; sight && ok && s < r - 50; s += 10) if (heightAt(along(pos, c.head, s, q)) > 4) ok = false;
       if (ok) return c;
     }
   }
@@ -284,12 +285,15 @@ function eventMoment(id: string): MomentScript {
         e.at = j === ri ? now + ev.warn + 1 : 1e6;
       });
       // (Cinder Peak stands tall: far enough off to see its plume and where its bombs come down; the kelp lies flat on
-      // the water, so the ship waits inside its reach and the bloom spreads up to her and round her)
+      // the water, so the ship waits inside its reach and the bloom spreads up to her and round her; the Maelstrom's
+      // whirl races fastest well inside its reach, so she waits in it, where the water foams)
       const r = eventMark(s, ri, spot), id = REGIONS[ri].id;
-      const off = id === 'fireArchipelago' ? r + 150 : id === 'kelpShallows' ? r * 0.25 : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
+      const off = id === 'fireArchipelago' ? r + 120 : id === 'kelpShallows' ? r * 0.25 : id === 'maelstrom' ? 80
+        : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
       // the match's spot when the region's own water looks on it, else the first of its others that does; then
       // the same from any water
-      let c: Course | null = null;
+      // (the Fjords' surge is seen at its source: the ship lies on the outflow, looking up the fjord at the falls)
+      let c: Course | null = id === 'fjords' ? facing(LANDMARKS[ri].pos, 140, true, ri) : null;
       for (const own of [ri, -1]) {
         for (let j = 0; j < spots.length && !c; j++) {
           const k = (ev.k + j) % spots.length;

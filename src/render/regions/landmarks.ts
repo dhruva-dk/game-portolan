@@ -10,6 +10,8 @@ import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
 import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type Obstacle, type RegionId } from '../../sim/world/index.ts';
 import { patch } from '../engine.ts';
+import type { EventPhase } from './eventRocks.ts';
+import { Kit, particles, strip, surface, tick, SHAPE_PUFF } from '../beacons/kit.ts';
 
 const rock = (color: number, rough = 0.9) => patch(new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), 'landmark-rock');
 
@@ -169,19 +171,56 @@ function highest(lm: Landmark, d: number): THREE.Vector3Like {
 type Build = (lm: Landmark) => THREE.Object3D;
 
 const SHAPES: Partial<Record<RegionId, Build>> = {
-  // the falls: a pale curtain hung from the cliff top at the head of the fjord, its foot in spray; it faces the cliff
+  // the falls: a sheet of white water poured off the cliff top at the head of the fjord, arching out as it drops and
+  // streaming down in ragged strands, its foot lost in mist; it faces the cliff. In the Flood Surge it widens, runs
+  // whiter and thicker, and its mist billows up
   fjords: (lm) => {
-    const out = new THREE.Group();
-    out.userData.facing = highest(lm, 40);
-    const water = new THREE.MeshStandardMaterial({ color: 0xe8f2f6, roughness: 0.3, transparent: true, opacity: 0.85, emissive: 0x30404a, side: THREE.DoubleSide });
-    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(26, lm.height, 1, 8), patch(water, 'landmark-falls'));
-    curtain.position.set(0, lm.height / 2 - 4, 0);
-    const spray = new THREE.Mesh(new THREE.SphereGeometry(16, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), patch(water.clone(), 'landmark-falls'));
-    spray.scale.set(1, 0.5, 0.6);
-    // 26 m on toward the cliff, so the sailable gap is behind the curtain
-    curtain.position.z = spray.position.z = 26;
-    out.add(curtain, spray);
-    return out;
+    const k = new Kit(lm.region * 977 + 5, 'landmark:falls'), swell = { value: 0 }, facing = highest(lm, 40);
+    k.root.userData.facing = facing;
+    k.root.userData.swell = swell;
+    // the cliff as it stands toward the head of the fjord: the lip is where the face has climbed most of the way to
+    // the top, the foot the last of the water short of it
+    const ground = (d: number) => heightAt(along(lm.pos, facing, d, v3()));
+    let peak = 0, lip = 30, foot = 12;
+    for (let d = 0; d <= 60; d++) peak = Math.max(peak, ground(d));
+    for (let d = 0; d <= 60; d++) if (ground(d) >= 0.8 * peak) { lip = d; break; }
+    for (let d = lip; d > 0; d--) if (ground(d) < -1) { foot = d - 1; break; }
+    const top = ground(lip) + 0.5;
+    // poured off the lip and arching out from the face as it drops, to its foot in the water
+    const pts: THREE.Vector3[] = [], widths: number[] = [];
+    for (let i = 0; i <= 48; i++) {
+      const f = i / 48;
+      pts.push(new THREE.Vector3(Math.sin(i * 0.5) * 0.3, top - f * (top + 1), lip - (lip - foot) * Math.sqrt(f)));
+      widths.push(22 + 9 * f);
+    }
+    const length = pts.reduce((s, p, i) => s + (i ? p.distanceTo(pts[i - 1]) : 0), 0);
+    k.add(surface(k, strip(pts, widths), {
+      color: 0xbfe4ee, day: 0, night: 0.25, blend: 'alpha', matter: 0xd8e6ea, uniforms: { uSwell: swell },
+      vertex: /* glsl */ `p.x *= 1.0 + 0.75 * uSwell;`,
+      paint: /* glsl */ `float x = vUv.x, v = vUv.y;
+        float edge = smoothstep(0.0, 0.16, x) * smoothstep(1.0, 0.84, x);
+        float n1 = bNoise(vec3(x * 7.0, v * 0.05 - uTime * 0.9, 0.0));
+        float n2 = bNoise(vec3(x * 19.0, v * 0.14 - uTime * 1.7, 3.0));
+        float n3 = bNoise(vec3(x * 42.0, v * 0.4 - uTime * 3.1, 9.0));
+        float streak = smoothstep(0.3, 0.95, n1 * 0.55 + n2 * 0.35 + n3 * 0.25);
+        // ragged at the edges, thin at the lip, dissolving into the mist at the foot
+        float lip = smoothstep(0.0, 3.0, v), foot = 1.0 - smoothstep(${(length - 15).toFixed(1)}, ${length.toFixed(1)}, v);
+        float body = edge * mix(0.35, 0.6, uSwell) + edge * (0.4 + 0.25 * uSwell) * streak;
+        alpha = body * lip * foot * (0.55 + 0.45 * n2);
+        col = mix(vec3(0.72, 0.82, 0.86), vec3(1.12), streak * (0.55 + 0.4 * uSwell));
+        glow = body * streak;`,
+    }));
+    // mist rolling off the plunge, up the lower face and out over the water
+    k.add(particles(k, {
+      count: 180, color: 0xbfe4ee, day: 0, night: 0.05, blend: 'alpha', matter: 0xe2eaec, shape: SHAPE_PUFF, uniforms: { uSwell: swell },
+      motion: /* glsl */ `float life = fract(s.x + t * (0.05 + s.y * 0.05));
+        float a = s.z * 6.2831, grow = 1.0 + 1.3 * uSwell;
+        float rr = (4.0 + life * (9.0 + s.w * 12.0)) * grow;
+        pos = vec3(cos(a) * rr, 1.0 + life * (10.0 + s.y * 20.0) * grow, ${(foot + 1).toFixed(1)} - abs(sin(a)) * rr * 0.7);
+        size = (3.5 + life * 7.0) * (0.8 + 0.5 * uSwell);
+        alpha = sin(life * 3.14159) * (0.14 + 0.14 * uSwell);`,
+    }));
+    return k.root;
   },
   // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall beside it, with fungus shelves
   // glowing down its side
@@ -291,10 +330,24 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   },
 };
 
+/** How far the Fjords' Flood Surge has the falls swollen, 0…1: rising through the warning, with the event's strength
+ *  while it runs, and settling back once it's over. */
+export function swollen(e: EventPhase | undefined): number {
+  if (!e) return 0;
+  if (e.phase === 'warning') return 0.35 * Math.min(1, e.since / 8);
+  if (e.phase === 'running') return Math.max(0.35, e.strength ?? 1);
+  if (e.phase === 'over') return Math.max(0, 0.35 * (1 - e.since / 6));
+  return 0;
+}
+
 export class Landmarks {
   readonly group = new THREE.Group();
   /** The glows, dimmed by day. */
   private readonly glows: THREE.Mesh[] = [];
+  /** The shapes drawn with the beacons' kit, whose clocks run with the frame. */
+  private readonly kits: THREE.Object3D[] = [];
+  /** How swollen the falls are, as their shaders read it. */
+  private falls: { value: number } | null = null;
 
   constructor() {
     this.group.name = 'landmarks';
@@ -304,20 +357,26 @@ export class Landmarks {
       const shape = build(lm);
       shape.name = lm.name;
       stand(shape, lm.pos, shape.userData.facing ?? lm.facing, R);
+      if (shape.userData.beacon) this.kits.push(shape);
+      if (shape.userData.swell) this.falls = shape.userData.swell;
       shape.traverse((o) => {
         if ((o as THREE.Mesh).isMesh && o.userData.glow) this.glows.push(o as THREE.Mesh);
-        else if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
+        // (the kit's sheets and mist are see-through: they cast no shadow)
+        else if ((o as THREE.Mesh).isMesh && !((o as THREE.Mesh).material as THREE.ShaderMaterial).isShaderMaterial) { o.castShadow = true; o.receiveShadow = true; }
       });
       this.group.add(shape);
     }
   }
 
-  /** night: 0 day to 1 night where the camera is. */
-  update(night: number): void {
+  /** night: 0 day to 1 night where the camera is; `time` the clock the swell and beacons share; the regions'
+   *  events, for the falls' swell. */
+  update(night: number, time: number, events?: Partial<Record<RegionId, EventPhase>>): void {
     for (const g of this.glows) {
       const { color, power } = g.userData.glow as { color: THREE.Color; power: number };
       (g.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(0.25 + night * power);
     }
+    for (const k of this.kits) tick(k, time, night);
+    if (this.falls) this.falls.value = swollen(events?.fjords);
   }
 }
 

@@ -993,6 +993,20 @@ Decisions made for the events (Settled overnight in the owner's absence; the own
 - Foam marks fast water only where it runs faster than the Great Current (4.4 m/s), full white from 8 m/s. Tracers ride the current within 115 m of the camera's focus and write foam into the water's wake map, so the streaks follow the real flow.
 - The kelp rafts are one instanced mesh laid where the simulation slows ships, and the Kelp Shallows' strip looks on from inside the bloom.
 
+*Revision 1 of the six failed strips, checked in their captures:*
+- **The Fjords:** the strip lies on the outflow 200 m from the falls, looking up the fjord at them. The falls are rebuilt as a streaming sheet poured off the cliff's own lip (found by sampling the ground toward the head wall) and arching out to the water, with mist rolling off the plunge. Through the surge the sheet widens by up to three quarters, runs whiter and thicker, and its mist billows (`swollen()` in src/render/regions/landmarks.ts). Foam streaks the outflow while the surge runs.
+- **Blossom Run:** drifts of cupped pink petals ride the river's current wherever it runs over 1.2 m/s, a scatter at any time and thick through the Spring Flood (src/render/regions/eventPetals.ts).
+- **The Jade Shoals and the Fire Archipelago:** filmed from inside their own region. The strip's spot must be over 0.8 inside the region, and the dune or cone being looked at no longer counts as standing in the way. The Jade Shoals are filmed 290 m from the dune and Cinder Peak 260 m from its cone, so the plume and bombs are in frame.
+- **The Spice Isles:** a bed of nine giant clams comes up round the spot while it is warned, gapes open as the bloom starts with a glowing pearl in each, and closes and sinks once it is over (src/render/regions/eventClams.ts).
+- **The Maelstrom:** filmed 80 m from the Eye, looking at it, so the spiral foam builds round the ship as she is drawn in.
+
+Decisions (Settled overnight in the owner's absence; the owner may change it.):
+- The falls drop from where the cliff stands, about 105 m, not the 146 m the head wall reaches further back.
+- The clams only show where the bed is. The pearls the simulation spills are still the loot.
+- The petals are drawn round the camera only, out to 120 m, and are not in the simulation.
+
+Still open from the review: the banner within 240 m of a border, the no-humans shapes, and the borderline items.
+
 **The perks, done when each shows itself working:**
 
 | Perk | How you see it working |
