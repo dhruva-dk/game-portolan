@@ -1,12 +1,14 @@
-// The landmarks the terrain can't make, as simple shapes at real size: arches and a hollow log to sail through,
-// columns, shards and coral towers standing out of the water, a tree on a hill and a waterfall's curtain. Where the
-// region's heights already carry the landmark (the Crown, the Needle, Cinder Peak, the Eye...), nothing is added.
-// Each shape stands in the landmark's own frame: +Y the outward normal, +Z its facing, y = 0 at sea level. These are
-// for the eye only: the simulation sails through them.
+// The landmarks the terrain can't make, as simple shapes at real size: an arch and a hollow log to sail through, a
+// mangrove standing astride a channel on its roots, columns of kelp, shards and coral towers standing out of the
+// water, a tree on a hill and a waterfall's curtain. Where the region's heights already carry the landmark (the Crown,
+// the Needle, Cinder Peak, the Eye...), nothing is added. Each shape stands in the landmark's own frame: +Y the
+// outward normal, +Z its facing, y = 0 at sea level. Most are for the eye only and the simulation sails through them;
+// the kelp columns stand on the region's trunks, which it runs into.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
-import { LANDMARKS, REGIONS, heightAt, type Landmark, type RegionId } from '../../sim/world/index.ts';
+import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type RegionId } from '../../sim/world/index.ts';
 import { patch } from '../engine.ts';
 
 const rock = (color: number, rough = 0.9) => patch(new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), 'landmark-rock');
@@ -51,6 +53,50 @@ const jitter = (i: number, k: number) => {
   const s = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
   return s - Math.floor(s);
 };
+
+/** Where the unit vector p lies in a landmark's frame: x to its right, z along its facing, metres over the surface. */
+function local(lm: Landmark, p: THREE.Vector3Like): { x: number; z: number } {
+  const up = new THREE.Vector3(lm.pos.x, lm.pos.y, lm.pos.z), fwd = new THREE.Vector3(lm.facing.x, lm.facing.y, lm.facing.z);
+  fwd.addScaledVector(up, -fwd.dot(up)).normalize();
+  const right = new THREE.Vector3().crossVectors(up, fwd), q = new THREE.Vector3(p.x, p.y, p.z).sub(up).multiplyScalar(R);
+  return { x: q.dot(right), z: q.dot(fwd) };
+}
+
+/** A smooth tube through `pts`, `r` thick. */
+const tube = (pts: THREE.Vector3[], r: number, segs = 24): THREE.BufferGeometry =>
+  new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segs, r, 6, false);
+
+/**
+ * A column of giant kelp rising out of the water at (x, z) to `top`, about r across: a bundle of stipes twisting
+ * round each other, each ending at its own height and drooping over, with blades hanging off them. Adds to `stipes`
+ * and `blades`.
+ */
+function kelpColumn(x: number, z: number, top: number, r: number, i: number, stipes: THREE.BufferGeometry[], blades: THREE.BufferGeometry[]): void {
+  const n = 5 + Math.floor(3 * jitter(i, 30)), twist = (0.05 + 0.04 * jitter(i, 31)) * (i % 2 ? 1 : -1);
+  const lx = (jitter(i, 32) - 0.5) * 0.12, lz = (jitter(i, 33) - 0.5) * 0.12;
+  for (let s = 0; s < n; s++) {
+    const j = (k: number) => jitter(i * 17 + s, k);
+    const a0 = (s / n) * Math.PI * 2 + j(34), ring = r * (0.3 + 0.4 * j(35)), h = s === 0 ? top : top * (0.7 + 0.28 * j(36));
+    const at = (y: number) => new THREE.Vector3(
+      x + lx * y + ring * Math.cos(a0 + twist * y), y, z + lz * y + ring * Math.sin(a0 + twist * y));
+    const pts: THREE.Vector3[] = [];
+    for (let k = 0; k <= 10; k++) pts.push(at(-8 + ((h + 8) * k) / 10));
+    // the top bends out and over under its own weight
+    const out = a0 + j(37) * 1.5, ox = Math.cos(out), oz = Math.sin(out), t = pts[10];
+    for (const [d, dy] of [[3, 1.2], [6, 0], [8, -4]]) pts.push(new THREE.Vector3(t.x + ox * d, t.y + dy, t.z + oz * d));
+    stipes.push(tube(pts, 0.3 + 0.25 * j(38), 30));
+    // blades every few metres up the stipe, hanging out and down round it
+    for (let y = 1 + 3 * j(39), b = 0; y < h - 2; y += 4 + 2 * jitter(b, s + i), b++) {
+      const len = 3 + 3 * jitter(b, 40 + s), g = new THREE.PlaneGeometry(0.7 + 0.5 * jitter(b, 41 + s), len, 1, 2);
+      g.translate(0, -len / 2, 0);
+      g.rotateX(-0.5 - 0.6 * jitter(b, 42 + s));
+      g.rotateY(Math.PI * 2 * jitter(b, 43 + s));
+      const p = at(y);
+      g.translate(p.x, p.y, p.z);
+      blades.push(g);
+    }
+  }
+}
 
 /** The tangent at the landmark toward its highest ground at distance d. */
 function highest(lm: Landmark, d: number): THREE.Vector3Like {
@@ -107,10 +153,19 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   },
   // the Moonbow Arch: a basalt arch over the passage
   basaltStacks: (lm) => arch(46, lm.height, 9, rock(0x2c2e33)),
-  // the Kelp Cathedral: a ring of kelp-draped columns rising out of the shallows
+  // the Kelp Cathedral: columns of giant kelp rising out of the shallows, one at each of the region's trunks, so what
+  // a ship runs into is what she sees
   kelpShallows: (lm) => {
-    const kelp = rock(0x4a5a2c);
-    return around(10, 34, 0, (x, z, i) => column(x, z, lm.height * (0.6 + 0.4 * jitter(i, 1)), 4.5, kelp));
+    const stipes: THREE.BufferGeometry[] = [], blades: THREE.BufferGeometry[] = [];
+    OBSTACLES.forEach((o, i) => {
+      if (o.region !== lm.region || o.kind !== 'trunk') return;
+      const { x, z } = local(lm, o.pos);
+      kelpColumn(x, z, o.height, o.r, i, stipes, blades);
+    });
+    const out = new THREE.Group(), wet = { roughness: 0.55, metalness: 0 };
+    out.add(new THREE.Mesh(mergeGeometries(stipes), patch(new THREE.MeshStandardMaterial({ color: 0x6a5c22, ...wet }), 'landmark-kelp')));
+    out.add(new THREE.Mesh(mergeGeometries(blades), patch(new THREE.MeshStandardMaterial({ color: 0x938531, side: THREE.DoubleSide, ...wet }), 'landmark-kelp')));
+    return out;
   },
   // the Great Cherry: a broad tree on the hilltop
   blossomRun: (lm) => {
@@ -151,14 +206,39 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       return clump;
     });
   },
-  // the Root Gate: an arch of roots over the channel
+  // the Root Gate: a great mangrove standing astride the channel on its roots, which spring from the mounds either
+  // side, tangle up into its trunk and cross over the top, with thin roots hanging from its crown into the water
+  // outside the channel. The passage under it stays clear to 40 m.
   mangroveLabyrinth: (lm) => {
-    const out = new THREE.Group(), roots = rock(0x3d3324);
-    out.add(arch(26, lm.height, 4, roots));
-    const twin = arch(30, lm.height - 8, 3, roots);
-    twin.position.z = 5;
-    twin.rotation.y = 0.15;
-    out.add(twin);
+    const roots: THREE.BufferGeometry[] = [], P = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+    for (let i = 0; i < 22; i++) {
+      const j = (k: number) => jitter(i, 50 + k), s = i % 2 ? 1 : -1, z = (j(0) - 0.5) * 22, wide = j(1);
+      const pts = [
+        P(s * (14 + 20 * wide), -3, z),
+        P(s * (15 + 12 * wide + 3 * j(2)), 16 + 10 * j(3), z * 0.75),
+        P(s * (10 + 5 * j(4)), 40 + 6 * j(5), z * 0.4),
+        P(s * (1 + 3 * j(6)), 50 + 4 * j(7), (j(8) - 0.5) * 6),
+      ];
+      // one in three crosses over the top and runs down the far shoulder
+      if (i % 3 === 0) pts.push(P(-s * (8 + 4 * j(9)), 46 + 4 * j(10), (j(11) - 0.5) * 8), P(-s * (12 + 4 * j(12)), 38 + 4 * j(13), z * 0.3));
+      roots.push(tube(pts, 0.6 + 1.1 * j(14) * (1 - 0.5 * wide), 40));
+    }
+    // the trunk the roots gather into, short and thick under the crown
+    roots.push(tube([P(0, 46, 0), P(0.8, 52, 0.5), P(0, 60, 0)], 3.8, 8));
+    for (let i = 0; i < 12; i++) {
+      const j = (k: number) => jitter(i, 70 + k), s = i % 2 ? 1 : -1, x = s * (14 + 18 * j(0)), z = (j(1) - 0.5) * 30;
+      roots.push(tube([P(x, 54, z), P(x + (j(2) - 0.5) * 3, 26, z), P(x + (j(3) - 0.5) * 2, -2, z + (j(4) - 0.5) * 2)], 0.2 + 0.2 * j(5), 12));
+    }
+    const out = new THREE.Group();
+    out.add(new THREE.Mesh(mergeGeometries(roots), patch(new THREE.MeshStandardMaterial({ color: 0x4a3d2c, roughness: 0.95 }), 'landmark-roots')));
+    const leaves = rock(0x34502a, 0.85);
+    for (let i = 0; i < 8; i++) {
+      const j = (k: number) => jitter(i, 90 + k), r = 10 + 5 * j(0);
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leaves);
+      crown.scale.set(1.25, 0.5, 1.25);
+      crown.position.set((j(1) - 0.5) * 44, lm.height - 0.5 * r - 2 * j(2) - (i % 3) * 3, (j(3) - 0.5) * 30);
+      out.add(crown);
+    }
     return out;
   },
 };

@@ -10,7 +10,7 @@ export const mangroveLabyrinth: BeaconLook = {
   name: 'the Firefly Gate',
   what: 'A swarm of fireflies round the Root Gate flashing together in sweeping waves, over water that sparks green beneath it.',
   color: 0xd4ff5a,
-  lightHeight: 22,
+  lightHeight: TOP - 8,
   height: TOP,
   radius: 18,
   ground: 'sea',
@@ -27,12 +27,13 @@ export const mangroveLabyrinth: BeaconLook = {
         glow = (0.1 + spark + ripple) * smoothstep(22.0, 10.0, r);`,
     }));
 
-    // the swarm: a broad cloud in and over the canopy, flashing in waves that sweep across it
+    // the swarm: a broad cloud in and under the canopy the Gate's tree holds over the channel, flashing in waves that
+    // sweep across it; a few stray down round the roots
     k.add(particles(k, {
       count: 700, color: 0xd8ff60, day: 0, night: 3.0, shape: SHAPE_SPARK,
-      base: (_i, r) => {
-        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 24, y = 6 + Math.pow(r(), 0.7) * (TOP - 10);
-        return [Math.cos(a) * d * (1.1 - (y / TOP) * 0.5), y, Math.sin(a) * d * (1.1 - (y / TOP) * 0.5)];
+      base: (i, r) => {
+        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 30, y = i % 6 ? TOP - 26 + Math.pow(r(), 0.7) * 34 : 4 + r() * (TOP - 30);
+        return [Math.cos(a) * d, y, Math.sin(a) * d * 0.75];
       },
       motion: /* glsl */ `pos += vec3(sin(t * 0.6 + s.x * 30.0), sin(t * 0.8 + s.y * 30.0) * 0.6, cos(t * 0.5 + s.z * 30.0)) * 1.4;
         // waves of light sweeping through, every firefly flashing as one passes
@@ -42,8 +43,9 @@ export const mangroveLabyrinth: BeaconLook = {
         size = 0.09 + 0.16 * flash; alpha = 0.06 + 1.8 * flash + own;`,
     }));
 
-    k.add(halo(k, [0, 20, 0], 26, 0xc8ff5a, 0, 0.32, '0.8 + 0.35 * exp(-pow((fract(uTime / 4.5) - 0.5) / 0.08, 2.0))', 24));
-    k.add(halo(k, [0, TOP * 0.6, 0], 36, 0xc0ff50, 0, 0.12, '1.0', 36));
+    // a soft glow in the canopy where the swarm is thickest, not a lamp filling the arch
+    k.add(halo(k, [0, TOP - 6, 0], 24, 0xc8ff5a, 0, 0.14, '0.8 + 0.35 * exp(-pow((fract(uTime / 4.5) - 0.5) / 0.08, 2.0))', 24));
+    k.add(halo(k, [0, TOP - 14, 0], 40, 0xc0ff50, 0, 0.05, '1.0', 36));
     k.setPulse((t) => 0.8 + 0.35 * Math.exp(-((((t / 4.5) % 1) - 0.5) ** 2) / 0.0064));
     return k.root;
   },

@@ -5,7 +5,7 @@ import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
 import { BEACON_LOOKS } from '../render/beacons/index.ts';
 import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
-import { beaconView, borderViews, lapPath, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
+import { beaconView, borderViews, lapPath, nightView, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
@@ -20,6 +20,7 @@ export function installHook(app: App) {
     // ── scenes ──
     regions: () => regionList().map(({ id, name }) => ({ id, name })),
     regionView: (id: string | number, k = 0) => regionView(id as never, k),
+    nightView: (id: string | number) => nightView(id as never),
     lapPath: (ring: 'equator' | 'north' | 'south', every = 4) => lapPath(ring, every),
     orbitView: (id: string | number) => orbitView(id as never),
     /** The beacon at midnight, framed on how high its look's light shows over the sea where it stands. */

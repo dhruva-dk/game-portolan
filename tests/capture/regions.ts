@@ -1,6 +1,7 @@
 // Fixed scenes in each region at dawn, midday, dusk and night, at iPad size, then the region's beacon at midnight from
-// where its light stands well up in the frame: one row per region in the contact sheet. The night scenes have three
-// ships sailing 60 to 220 m out, so the captures show whether their lanterns read.
+// where its light stands well up in the frame: one row per region in the contact sheet. The night scenes look from 8 m
+// up and have three ships sailing 60 to 220 m out where the eye can see their mastheads, so the captures show whether
+// their lights read.
 import { log, openApp, Shots, type Rig } from './common.ts';
 
 export const HOURS = [
@@ -19,14 +20,16 @@ export async function regions(r: Rig, o: { dpr: number; region?: string }): Prom
   const key: unknown[] = [];
   for (const reg of list) {
     for (const { name, hour } of HOURS) {
-      const spec = await game.hook((h, a) => ({ ...h.regionView(a.id, 0), hour: a.hour, weather: 'clear', tilt: 0, fleet: a.fleet }),
-        { id: reg.id, hour, fleet: name === 'night' ? 3 : 0 });
+      // the night looks from a captain's eye, with the poles tilted into the dark, so the fleet's lights show as in play
+      const spec = await game.hook((h, a) => ({
+        ...(a.night ? h.nightView(a.id) : { ...h.regionView(a.id, 0), hour: a.hour, tilt: 0 }), weather: 'clear', fleet: a.night ? 3 : 0,
+      }), { id: reg.id, hour, night: name === 'night' });
       await game.hook((h, s) => h.scene(s), spec);
       await game.hook((h) => h.settle(6));
       await shots.shot(game, `${reg.name}, ${name}`, `${reg.id}-${name}.png`);
       key.push({ region: reg.id, time: name, ...spec });
     }
-    const spec = await game.hook((h, a) => ({ ...h.beaconView(a.id), weather: 'clear', tilt: 0, fleet: 3 }), { id: reg.id });
+    const spec = await game.hook((h, a) => ({ ...h.beaconView(a.id), weather: 'clear', fleet: 3 }), { id: reg.id });
     await game.hook((h, s) => h.scene(s), spec);
     await game.hook((h) => h.settle(6));
     await shots.shot(game, `${reg.name}, its beacon`, `${reg.id}-beacon.png`);

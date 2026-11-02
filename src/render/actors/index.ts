@@ -3,7 +3,7 @@
 // here imports the simulation; the integration adapts its state into an ActorsView (see view.ts).
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
-import { GUNPORTS, Kit, LANTERN, ShipModel, type Pose } from './caravel.ts';
+import { GUNPORTS, Kit, LANTERN, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
 import { AU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, sea, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
@@ -224,6 +224,9 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       fx.light(at, Math.max(1.1, d * 0.013), f.lantern, (1.4 + 2.2 * n) * n * flick);
       fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick);
       if (v.id === player) { lamp.position.copy(at); lamp.intensity = 260 * n * flick; lamp.color.copy(f.lantern); }
+      // the wisp at the main truck: past about 180 m the stern lantern has gone under the curve, but this shows to 240 m
+      // (not on your own ship, where it would hang at the top of the view)
+      if (v.id !== player) fx.light(m.toWorld(MASTHEAD, tmp), Math.max(0.4, d * 0.009), f.lantern, (0.9 + 1.6 * n) * n * flick);
     }
     if (f.hop >= 0 && f.hop < 0.9) fx.windAround(f.pos, f.fwd.clone().multiplyScalar(v.speed + 14), 40, dt);
   }

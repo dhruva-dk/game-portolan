@@ -3,7 +3,7 @@
 Each scan ships albedo, normal (OpenGL), roughness, ambient occlusion and a 1024² height map, re-encoded from the 2K
 downloads. Where the download had no AO map (Snow005, Ice003), the AO is derived from its height map. Four albedos are
 recoloured: Ice003 and Rock027 are gradient-mapped to blue ice, Sparse Grass has a purple hue blended into its lighter
-strands for heather, and the jacaranda petals of Flower Scattered Dirt are shifted to pale cherry pink. All ambientCG materials are photogrammetry scans except Grass001, Grass007, Ice003 and Snow005, which are
+strands for heather, and the jacaranda petals of Flower Scattered Dirt are shifted to pale cherry pink. All ambientCG materials are photogrammetry scans except Grass001, Grass007 and Ice003, which are
 Substance-built (ambientCG's "procedural"); none is "Approximated".
 
 - Rock 027 — https://ambientcg.com/a/Rock027 — Lennart Demes (ambientCG) — CC0 (the Ice Crown: sculpted blue ice, cliff)

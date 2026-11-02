@@ -1,17 +1,27 @@
 // The Maelstrom, the south pole cap. A ring of dark, storm-beaten slate cliffs 30–45 m tall, 360 m across,
 // broken by five gaps, around a wide whirlpool basin that drops to 60 m. At its calm centre stands the Eye, a
-// spire of rock 100 m tall. Outside the ring, boulder shelves at the cliff feet and skerries out to the border.
+// crag of storm-fluted spires grown together, the tallest 100 m. Outside the ring, boulder shelves at the cliff feet and skerries out to the border.
 // The whirlpool itself is a current (VORTEX_SPEC, read by index.ts), not terrain.
 // Chart: the pole at the origin; the Glass Sea lies at bearing 334, and the south ring runs clockwise from it,
 // one region every 51.4 degrees.
-import { dcos, dsin } from '../../math.ts';
-import { fbm, hyp, mix, needle, noise, over, polyDist, ridged, scatter, shoals, shore, smoothstep, snapWet } from '../kit.ts';
+import { datan2, dcos, dsin } from '../../math.ts';
+import { DEEP, fbm, hyp, mix, needle, noise, over, polyDist, ridged, scatter, shoals, shore, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x3a1e;
 const DEG = 3.141592653589793 / 180;
 const RING = { r: 178, w: 24, top: 42 };
 const EYE = { x: 0, y: 0, r: 14, top: 100 };
+// The Eye's spires, grown together: a broad shoulder, the tallest spire on it with its top broken off flat for the
+// storm-light to cling to, a second horn beside it across a notch, and two lower spires on the flanks. `cap` is the
+// share of the taper at which a top breaks off.
+const SPIRES = [
+  { x: EYE.x - 5, y: EYE.y - 3, r: 18, top: 56, cap: 0.92 },
+  { x: EYE.x, y: EYE.y, r: 11, top: EYE.top, cap: 0.85 },
+  { x: EYE.x + 9, y: EYE.y + 5, r: 8, top: 82, cap: 0.9 },
+  { x: EYE.x + 17, y: EYE.y - 11, r: 9, top: 58, cap: 0.95 },
+  { x: EYE.x - 15, y: EYE.y + 12, r: 8, top: 40, cap: 0.95 },
+];
 // The gaps in the ring, by bearing: one toward the Glass Sea, the rest every 72 degrees.
 const GAPS = [340, 52, 124, 196, 268];
 const GAP_HALF = 20;
@@ -36,6 +46,19 @@ function gapDist(x: number, y: number, rho: number): number {
   return d;
 }
 
+/**
+ * One of the Eye's spires at (x, y): out of round, fluted by the storms, steep at the foot and tapering to its top,
+ * and stepped every 9 m where harder beds of rock stand out as ledges.
+ */
+function spire(x: number, y: number, s: (typeof SPIRES)[number], k: number): number {
+  const dx = x - s.x, dy = y - s.y, d = hyp(dx, dy), a = datan2(dy, dx);
+  const r = s.r * (1 + 0.2 * dcos(2 * a + 1.7 * k) + 0.14 * dcos(5 * a + 2 * k) + 0.12 * noise(x * 0.15, y * 0.15, S + 4 + k));
+  if (d >= r) return -DEEP * smoothstep(0, 5 + 0.3 * r, d - r);
+  const t = 1 - d / r, z = s.top * Math.min(1, (t * (1.6 - 0.6 * t)) / s.cap) * (1 - 0.04 * ridged(x * 0.2, y * 0.2, S + 7 + k));
+  const q = z / 9, ledged = (Math.floor(q) + smoothstep(0.25, 0.75, q - Math.floor(q))) * 9;
+  return z + 0.55 * (ledged - z);
+}
+
 function height(x: number, y: number): number {
   const rho = hyp(x, y);
   // Dark navy water outside the ring, 25–35 m down; the basin inside bowls down toward the Eye.
@@ -57,9 +80,9 @@ function height(x: number, y: number): number {
     wall = mix(wall, Math.min(wall, -14), open);
     h = sd < 0 ? wall : over(h, wall, 3);
   }
-  // The Eye: a spire of rock on a low skirt of boulders, standing in the calm centre.
+  // The Eye: its spires on a low skirt of boulders, standing in the calm centre.
   if (rho < 60) {
-    h = over(h, needle(rho, EYE.r * (1 + 0.12 * noise(x * 0.15, y * 0.15, S + 4)), EYE.top), 2);
+    for (let k = 0; k < SPIRES.length; k++) h = over(h, spire(x, y, SPIRES[k], k), 3);
     h = over(h, shore(rho - EYE.r - 9, 3, 6, 6, 10), 2);
   }
   // Skerries and boulder heaps out to the border, clear of the spill and the gaps.

@@ -874,6 +874,8 @@ export interface Pose {
 
 /** The great spirit lantern over the taffrail, in ship space: where its glow is drawn. */
 export const LANTERN = new V3(0, STERN_Y + 0.6 + 0.85, STERN_Z - 0.05 - 0.35);
+/** The wisp that rides the main truck at night, in ship space: high enough to show as far off as her masts do. */
+export const MASTHEAD = new V3(0, mastTop(MASTS[1]) + 0.3, mastZ(MASTS[1]));
 
 /** The broadside's gun muzzles in ship space, four a side (x > 0 port, x < 0 starboard), and the way each points. */
 export const GUNPORTS: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];

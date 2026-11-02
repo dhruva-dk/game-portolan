@@ -129,6 +129,14 @@ export function regionView(region: RegionId | number, k = 0): SceneSpec {
 
 const clampLat = (lat: number, most: number) => Math.max(-most, Math.min(most, lat));
 
+/** A tilt that keeps midnight dark at p: none in the tropics, and toward the poles the sun far enough over the other
+ *  hemisphere to stand 70° under the horizon at midnight, as at the equator. On a planet this small anything less
+ *  leaves the sunset a few hundred metres off and clouds high enough to catch it, glowing red over the horizon. */
+export const nightTilt = (p: V3): number => {
+  const { lat } = latLonOf(p);
+  return -Math.sign(lat) * Math.max(0, Math.abs(lat) - 20);
+};
+
 /**
  * A region from orbit at its noon, under a low sun on its equator side: the relief casts shadows, and the sun's glint
  * on the sea falls at the region's edge rather than over its middle.
@@ -160,7 +168,13 @@ export function beaconView(region: RegionId | number, top?: number): SceneSpec {
       if (miss < pick.miss) pick = { pos: p, miss };
     }
   }
-  return { ...v, pos: pick.pos, heading: towards(pick.pos, b.pos), hour: 23.5, height: BORDER_EYE };
+  return { ...v, pos: pick.pos, heading: towards(pick.pos, b.pos), hour: 23.5, tilt: nightTilt(pick.pos), height: BORDER_EYE };
+}
+
+/** A region's view at midnight from 8 m up, where a captain's eye is, with the poles tilted into the dark. */
+export function nightView(region: RegionId | number): SceneSpec {
+  const v = regionView(region);
+  return { ...v, hour: 23.5, tilt: nightTilt(v.pos), height: BORDER_EYE };
 }
 
 /** How far the land stands over the line of sight from an eye at p to a light `h` m over it at q, `d` m off: 0 if clear. */

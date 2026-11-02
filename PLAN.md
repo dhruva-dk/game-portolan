@@ -846,7 +846,7 @@ Agents build in parallel. Each owns its paths and touches nothing else, so pushe
 | Sound | `src/audio/**`, `dev/audio.html` | Synthesised and recorded sound for every mechanic and region, with no music |
 | Integration | `src/main.ts`, `src/app/**`, `index.html`, `tests/capture/**` | Wiring it all together, and the reviewer's capture tools |
 
-**Asset libraries started early at the owner's direction.** Each is self-contained with its own dev page. Regions take them up when they reach the Good rung. Credits go in `credits/<library>.md` and are merged into CREDITS.md later.
+**Asset libraries started early at the owner's direction.** Each is self-contained with its own dev page. Regions take them up when they reach the Good rung. Each library kept its credits in `credits/<library>.md`; they are merged into CREDITS.md, and new credits go straight there.
 
 | Owner | Paths |
 |---|---|
@@ -898,8 +898,17 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - The ships have no environment map, so their varnish and metal look flat.
 - The shield aura's material doesn't get the planet's uniforms (sun, fog), so it doesn't darken at night.
 - The far sea turns sky-white near the horizon.
+- Pale slabs still stand over the water in some frames, such as the bottom right of the Maelstrom's dusk frame.
+- A polar night glows red over the horizon unless the sun is far under it. On a planet this small the sunset is only a few hundred metres off, and the sky still catches it with the sun 45° under. A match draws its tilt from ±26°, so the poles' nights always glow. The regions capture tilts the planet so the sun stands 70° under at every midnight, as at the equator (`nightTilt` in `src/app/scenes.ts`). Find what catches the sunset and let it go dark.
 - The lanterns' bloom is too hot at night.
 - The chart's region mask is coarse, so its borders look blocky.
+
+**The regions' looks:**
+- The flora and mist libraries aren't on the stage yet; regions take them up at the Good rung. Until then the Mangrove Labyrinth has no canopy but the Root Gate's own tree, and Mistwood has no cedar trunks rising over a fog line, so neither skyline matches its portrait.
+- The Weeping Isle's Moss Spring barely shows from the sea. It sits on the crown's plateau, and the rim hides all but the glow of its cloud cap. Both of this pass's revisions are used.
+- The Fire Archipelago's steam shows as a red smear behind the caldera rim, not a column lit from below. Both of this pass's revisions are used.
+- The Spice Isles' Ember Swarm reads as an orange blur, and from the sea a hill hides most of it.
+- The simulation's beacon heights don't match the looks. The Fjords' says 140 m, but its look glows about 12 m up. The captures frame each beacon from its look's height instead (`beaconView` in `src/app/hook.ts`). Set the specs' heights from the looks.
 
 **The interface:**
 - The minimap shows the Storm, the next circle and the ships, but no land. Port the rewrite's.
