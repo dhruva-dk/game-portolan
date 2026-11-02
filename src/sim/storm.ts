@@ -130,6 +130,9 @@ export function phaseAt(state: MatchState, t: number): { k: number; closing: boo
   return { k: LAST, closing: false, f: 1, left: 0 };
 }
 
+/** The phase running now: 0 for the first, up to LAST once the Storm has closed. */
+export const stormPhase = (state: MatchState): number => phaseAt(state, clock(state)).k;
+
 /** The safe circle at storm time t. */
 export function calmAt(state: MatchState, t: number, out: Calm): Calm {
   const ph = phaseAt(state, t), c = state.storm.centres;

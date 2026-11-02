@@ -13,11 +13,11 @@ import { roomFor, useful } from '../items.ts';
 import { draftOf } from '../sailing.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, copy, type Captain, type MatchState, type Ship } from '../state.ts';
-import { calmNow, inStorm, stormView, newStormView, toEdge } from '../storm.ts';
+import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
 import { GALE, ITEM, LOOT, PARCELS, PERKS, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
-import { CENTRES, REGIONS } from '../world/index.ts';
+import { CENTRES, REGIONS, heightAt } from '../world/index.ts';
 import { styleOf, type Style } from './temperaments.ts';
 
 export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9 } as const;
@@ -45,11 +45,22 @@ export const BRAIN = {
   /**
    * Backing off a bank: a ship making less than `crawl` m/s is stuck. It turns hard toward the open side at about `rate`
    * radians a second, for at least `least` seconds and at most `most`, and holds the turn until its course lies within
-   * `slack` of half a turn ahead of it.
+   * `slack` of half a turn ahead of it. One aground and dragging slower than `drag` m/s for `wade` seconds, or crawling
+   * with shoal water `bow` metres ahead, makes instead for the deepest water `sound` metres round it, for up to `most`
+   * seconds more.
    */
-  backOff: { crawl: 1, rate: 0.65, least: 1, most: 4.5, slack: 0.6 },
+  backOff: { crawl: 1, rate: 0.65, least: 1, most: 4.5, slack: 0.6, drag: 2.5, wade: 1, bow: 4, sound: 14 },
   /** Seconds it holds a turn off land ahead once the way clears. */
   avoid: 0.8,
+  /**
+   * Early in a match a captain would sooner loot than fight: its will to fight falls by this much in each Storm phase, and
+   * while it does, it holds its fire outside a fight it chose.
+   */
+  restraint: [0.5, 0.5, 0.45, 0.35, 0.25, 0.1, 0, 0],
+  /** While it holds back, metres off at which it lets a ship sailing away from it go. */
+  letGo: 90,
+  /** With this many ships or fewer afloat, a captain holds back this much more, and leaves the Storm to bring on the end. */
+  lastFew: { ships: 3, more: 0.4 },
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
@@ -100,7 +111,8 @@ export function think(state: MatchState, i: number): void {
 
   // 2. heal when it is safe to
   const foeD = c.foe >= 0 ? apart(ship.pos, state.ships[c.foe].pos) : 1e9;
-  if ((ship.hull < style.mend || ship.shield < 25) && healSlot(ship) >= 0 && (foeD > 70 || ship.hull < style.run)) {
+  // (not with a foe close by: lying still to mend under its guns only gets it sunk, so it runs first)
+  if ((ship.hull < style.mend || ship.shield < 25) && healSlot(ship) >= 0 && foeD > 70) {
     setMode(c, MODE.heal);
     // where it is, unless the tide is leaving it there
     if (!openAt(ship.pos, tide) || !nearestOpen(ship.pos, c.goal, 10, tide)) copy(c.goal, ship.pos);
@@ -272,11 +284,27 @@ function wantsFight(state: MatchState, i: number, style: Style, d: number): bool
   if (!hasWeapon(ship)) return false;
   let will = style.fight * (0.6 + 0.4 * c.aggro);
   will += 0.25 * ((ship.hull + ship.shield) - (foe.hull + foe.shield)) / 100;
-  if (ship.lastBy === c.foe && state.tick - ship.lastHit < 120) will += 0.4;
+  if (shotBy(state, ship, c.foe, 120)) will += 0.4;
   // a captain who has learnt where the player's hull breaks presses the attack below it
   if (c.foe === PLAYER && c.run.confidence > 0.3 && foe.hull < c.run.value + 10) will += 0.3;
   if (c.foe === PLAYER && c.gentle) will -= 0.3;
-  return will > 0.35 || d < 35;
+  // early on it would sooner loot than fight, and lets a ship running from it go once she is past its guns' best range
+  const restraint = holdBack(state);
+  if (restraint > 0 && d > BRAIN.letGo && dot(foe.head, addScaled(P, foe.pos, ship.pos, -1)) > 0) return false;
+  will -= restraint;
+  return will > 0.35 || d < 35 - 50 * restraint;
+}
+
+/** Whether ship j has shot this one in the last `ticks`: a bump from a ship sailing into it is no attack. */
+const shotBy = (state: MatchState, ship: Ship, j: number, ticks: number): boolean => ship.lastBy === j && state.tick - ship.lastHit < ticks && isWeapon(ship.cause);
+
+/** How much a captain holds back from a fight now: by the Storm's phase, and more among the last few afloat. */
+function holdBack(state: MatchState): number {
+  const by = BRAIN.restraint[stormPhase(state)];
+  if (by <= 0) return 0;
+  let afloat = 0;
+  for (let j = 0; j < SHIPS; j++) if (state.ships[j].phase !== PHASE.sunk) afloat++;
+  return afloat <= BRAIN.lastFew.ships ? by + BRAIN.lastFew.more : by;
 }
 
 const hasWeapon = (ship: Ship): boolean => {
@@ -582,6 +610,23 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
 
 const clearAt = (state: MatchState, p: V3, level: number): boolean => openAt(p, level) && !solidAt(state, p);
 
+/**
+ * The way off the ground for a ship aground, as a turn from her heading: radians, to starboard positive. It goes by the
+ * highest ground she would cross in the first `sound` metres each way, then by how deep the water is at the end of it,
+ * so she never makes for deep water over a spit of land.
+ */
+function deepest(ship: Ship): number {
+  let best = 0, low = Infinity;
+  for (let k = -7; k <= 8; k++) {
+    rotateTangent(ship.pos, ship.head, (k * PI) / 8, T);
+    let top = -Infinity, end = 0;
+    for (let m = 2; m <= BRAIN.backOff.sound; m += 3) top = Math.max(top, end = heightAt(along(ship.pos, T, m, Q)));
+    const score = top + 0.25 * end;
+    if (score < low) [low, best] = [score, (k * PI) / 8];
+  }
+  return best;
+}
+
 function probeSide(state: MatchState, ship: Ship, a: number, level: number): boolean {
   rotateTangent(ship.pos, ship.head, a, T);
   along(ship.pos, T, 16 + ship.speed, Q);
@@ -657,6 +702,9 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   // fire when in range, past the first moment's surprise, and not in a pause between bursts
   const range = rangeOf(ship, w);
   if (now < c.react || d > range * 0.95 || c.mode === MODE.loot && d > range * 0.6) return;
+  // while it holds back it fires only in a fight it chose, or back at a ship close by that has just shot it; not at one
+  // that only bumped it, nor after one that has broken off, or the two would trade shots all the way to the bottom
+  if (c.mode !== MODE.fight && holdBack(state) > 0 && !(shotBy(state, ship, c.foe, 150) && d < BRAIN.letGo)) return;
   if (c.burst > 0) {
     c.burst -= TICK;
     if (c.burst <= 0) c.burst = -rngRange(rng, 0.8, 2.2) * (c.gentle ? 2.5 : 1);
@@ -773,7 +821,26 @@ function stuck(state: MatchState, i: number, rng: Rng, out: ShipInput): void {
     out.throttle = 0.6;
     return;
   }
-  if (apart(ship.was, ship.pos) < BRAIN.backOff.crawl * TICK && ship.flip <= 0 && ship.use < 0) c.stuckT += TICK;
+  const crawling = apart(ship.was, ship.pos) < BRAIN.backOff.crawl * TICK, free = ship.flip <= 0 && ship.use < 0;
+  // aground and dragging at a grounded ship's pace, or held up by shoal water off her bow (as in a pool a falling tide
+  // has closed round her), it stops making for its mark across the bar and works off it the way the water deepens,
+  // mending or not; the back-off clock runs below zero for the time it spends so
+  const { drag, wade, most, bow } = BRAIN.backOff, draft = draftOf(ship);
+  const held = (aground(state, ship.pos, draft) && ship.speed < drag) || (crawling && aground(state, along(ship.pos, ship.head, bow, Q), draft));
+  if (held && ship.flip <= 0 && c.backT > -(wade + most)) {
+    c.backT -= TICK;
+    if (c.backT > -wade) return;
+    if (c.backT + TICK > -wade) c.path.length = 0;
+    // (with the way off astern it holds the turn it is in, or it would swing from one side to the other)
+    const deep = deepest(ship);
+    out.steer = Math.abs(deep) > PI / 2 && ship.rate * deep < 0 ? Math.sign(ship.rate) * 2.4 : Math.max(-2.4, Math.min(2.4, 2 * deep));
+    out.throttle = 0.6;
+    return;
+  }
+  // and if that doesn't float it, it backs off as from a bank
+  const gaveUp = c.backT <= -(wade + most);
+  c.backT = 0;
+  if ((crawling || gaveUp) && free) c.stuckT += gaveUp ? 2.5 : TICK;
   else c.stuckT = Math.max(0, c.stuckT - TICK * 2);
   if (c.stuckT > 2.5) {
     c.stuckT = 0;
@@ -781,12 +848,10 @@ function stuck(state: MatchState, i: number, rng: Rng, out: ShipInput): void {
     // it turns off toward whichever side lies open, or on the way to its course when both do
     const left = probeSide(state, ship, -1.2, tide), right = probeSide(state, ship, 1.2, tide);
     c.strafe = left !== right ? (left ? -1 : 1) : course >= 0 ? 1 : -1;
-    // and keeps turning until its course lies less than half a turn on, so it doesn't swing back across the bank; one
-    // already aground only turns off it, for it would only plough round in a circle
-    const { rate, least, most, slack } = BRAIN.backOff;
+    // and keeps turning until its course lies less than half a turn on, so it doesn't swing back across the bank
+    const { rate, least, slack } = BRAIN.backOff;
     const round = c.strafe * course >= 0 ? Math.abs(course) : 2 * PI - Math.abs(course);
-    const hold = aground(state, ship.pos, draftOf(ship)) ? 0 : (round - PI + slack) / rate;
-    c.backT = Math.min(most, Math.max(rngRange(rng, least, least * 2.2), hold));
+    c.backT = Math.min(most, Math.max(rngRange(rng, least, least * 2.2), (round - PI + slack) / rate));
   }
 }
 

@@ -315,13 +315,13 @@ export const ZONES: readonly number[] = [(PI / 2) * R, 600, 400, 260, 160, 90, 4
 /** Seven phases: each waits, then shrinks to the next circle. Damage is hull points a second, past the shield. */
 export const STORM = {
   phases: [
-    { wait: 60, shrink: 45, damage: 1 },
-    { wait: 50, shrink: 40, damage: 2 },
-    { wait: 45, shrink: 35, damage: 3 },
-    { wait: 40, shrink: 30, damage: 5 },
-    { wait: 35, shrink: 30, damage: 7 },
-    { wait: 30, shrink: 25, damage: 9 },
-    { wait: 25, shrink: 30, damage: 12 },
+    { wait: 95, shrink: 65, damage: 1 },
+    { wait: 85, shrink: 60, damage: 2 },
+    { wait: 80, shrink: 55, damage: 3 },
+    { wait: 65, shrink: 50, damage: 5 },
+    { wait: 45, shrink: 40, damage: 7 },
+    { wait: 35, shrink: 35, damage: 9 },
+    { wait: 30, shrink: 30, damage: 12 },
   ],
   /** Before the first phase. */
   first: 1,

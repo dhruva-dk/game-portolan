@@ -193,13 +193,20 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
 
 /** The way off the shore at p: down the slope of the ground, measured `across` metres either side. */
 function shoreNormal(p: V3, out: V3, across: number = GROUND.probe): V3 {
+  if (downhill(p, out, across)) return out;
+  return normalize(set(out, -V.x, -V.y, -V.z));
+}
+
+/** The way down the slope of the ground at p, measured `across` metres either side, or false where it lies flat. */
+function downhill(p: V3, out: V3, across: number): boolean {
   const d = across / R;
   localFrame(p, E, NN);
   const gx = heightAt(normalize(addScaled(P1, p, E, d))) - heightAt(normalize(addScaled(P1, p, E, -d)));
   const gy = heightAt(normalize(addScaled(P1, p, NN, d))) - heightAt(normalize(addScaled(P1, p, NN, -d)));
   set(out, -gx * E.x - gy * NN.x, -gx * E.y - gy * NN.y, -gx * E.z - gy * NN.z);
-  if (length(out) > 1e-9) return normalize(out);
-  return normalize(set(out, -V.x, -V.y, -V.z));
+  if (length(out) <= 1e-9) return false;
+  normalize(out);
+  return true;
 }
 
 /**
@@ -210,8 +217,8 @@ export function refloat(state: MatchState, i: number): void {
   const ship = state.ships[i];
   // a floe riding into her, or a hull caught inside a column, is shouldered out of it
   if (solidNormal(state, ship.pos, N)) addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 6);
-  if (!aground(state, ship.pos, draftOf(ship))) return;
-  shoreNormal(ship.pos, N);
+  // (on a bar lying flat there is no way down to push her, and she works off it under her own way)
+  if (!aground(state, ship.pos, draftOf(ship)) || !downhill(ship.pos, N, GROUND.probe)) return;
   addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 4 * (ship.speed > 1 ? GROUND.under : 1));
 }
 

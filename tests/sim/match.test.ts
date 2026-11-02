@@ -247,7 +247,7 @@ test('the Storm waits, then closes, phase by phase, announcing each change; the 
   for (const rule of [RULE.none, RULE.doubleStorm]) {
     const state = quietMatch({ rule }), sc = rule === RULE.doubleStorm ? 0.5 : 1;
     assert.equal(state.storm.scale, sc);
-    const { said, radii } = stormOnly(state, STORM.first + 600 * sc);
+    const { said, radii } = stormOnly(state, STORM.first + (STORM.phases.reduce((t, p) => t + p.wait + p.shrink, 0) + 10) * sc);
     assert.equal(said.length, 14, 'a wait and a closing for each of seven phases');
     let at = STORM.first;
     for (let k = 0; k < 7; k++) {
@@ -264,8 +264,9 @@ test('the Storm waits, then closes, phase by phase, announcing each change; the 
     for (let k = 1; k < radii.length; k++) assert.ok(radii[k] <= radii[k - 1] + 1e-9, 'the safe circle only ever shrinks');
     assert.equal(radii[radii.length - 1], 0, 'down to nothing');
   }
-  const ph = phaseAt(plan(1, RULE.doubleStorm), 60);
-  assert.equal(ph.k, 1, 'at 60 s the doubled Storm is in its second phase');
+  // the first phase runs 160 s; doubled, it is over in 80
+  const ph = phaseAt(plan(1, RULE.doubleStorm), 90);
+  assert.equal(ph.k, 1, 'at 90 s the doubled Storm is in its second phase');
 });
 
 test('the Storm wears at the hull alone, only once the first circle starts to close, and Storm Walker takes less of it', (t) => {
