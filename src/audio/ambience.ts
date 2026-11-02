@@ -75,6 +75,11 @@ export class Ambience {
     this.sent.clear();
   }
 
+  /** The region beds playing now and the gain each was last set to, loudest first. */
+  playing(): [SoundName, number][] {
+    return [...this.ids.keys()].filter((n) => n.startsWith('bed')).map((n): [SoundName, number] => [n, this.sent.get(n)?.gain ?? 0]).sort((a, b) => b[1] - a[1]);
+  }
+
   /** Region weights normalised to sum to 1. */
   weights(): [RegionId, number][] {
     const ws = REGION_IDS.map((id) => [id, Math.max(0, this.mix.regions[id] ?? 0)] as [RegionId, number]).filter(([, w]) => w > 0);

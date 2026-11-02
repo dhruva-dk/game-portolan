@@ -22,6 +22,8 @@ export interface SoundDef {
   jitter: number;
   /** Metres beyond which it is not heard. */
   range: number;
+  /** Metres within which it is heard at full strength; beyond, it falls off with distance. Great sounds carry. */
+  near: number;
   grade: Grade;
   /** Loops played with a duration: how far the rate climbs by the end of it (the consumables charging up). */
   climb: number;
@@ -30,7 +32,7 @@ export interface SoundDef {
 export function def(
   make: SoundDef['make'], variants: number, bus: Bus, priority: number, gain: number, max: number, extra: Partial<SoundDef> = {},
 ): SoundDef {
-  return { make, variants, bus, priority, gain, max, loop: false, jitter: 0.04, range: bus === 'fx' ? 320 : 400, grade: 'random', climb: 1, ...extra };
+  return { make, variants, bus, priority, gain, max, loop: false, jitter: 0.04, range: bus === 'fx' ? 320 : 400, near: 20, grade: 'random', climb: 1, ...extra };
 }
 
 export const LOOP: Partial<SoundDef> = { loop: true, jitter: 0 };

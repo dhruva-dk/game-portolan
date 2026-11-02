@@ -287,7 +287,7 @@ export class AudioEngine {
   }
 
   /** How a sound at a point is heard from the listener. */
-  spatial(at: Vec3 | null | undefined, range = 400): { gain: number; pan: number; cutoff: number; delay: number; d: number } {
+  spatial(at: Vec3 | null | undefined, range = 400, near = NEAR): { gain: number; pan: number; cutoff: number; delay: number; d: number } {
     if (!at) return { gain: 1, pan: 0, cutoff: 20000, delay: 0, d: 0 };
     const L = this.listener.pos, F = this.listener.fwd, U = this.listener.up;
     const dx = at.x - L.x, dy = at.y - L.y, dz = at.z - L.z, d = Math.hypot(dx, dy, dz);
@@ -299,8 +299,8 @@ export class AudioEngine {
     // the curve of the planet hides what is beyond both horizons
     const R = this.radius, hl = Math.max(1, Math.hypot(L.x, L.y, L.z) - R), hs = Math.max(1, Math.hypot(at.x, at.y, at.z) - R);
     const reach = Math.sqrt(2 * R * hl) + Math.sqrt(2 * R * hs), occl = smooth(reach * 0.9, reach * 1.4, d);
-    const beyond = Math.max(0, d - NEAR);
-    let gain = NEAR / (NEAR + beyond * 0.6);
+    const beyond = Math.max(0, d - near);
+    let gain = near / (near + beyond * 0.6);
     gain *= (1 - smooth(range * 0.7, range, d)) * (1 - 0.6 * occl);
     let cutoff = 20000 / (1 + beyond / 60);
     if (ahead < 0) cutoff *= 1 + 0.3 * ahead;
@@ -385,7 +385,7 @@ export class AudioEngine {
   }
 
   private build(v: Voice): void {
-    const c = this.ctx, t = this.now, d = SOUNDS[v.name], sp = this.spatial(v.at, d.range);
+    const c = this.ctx, t = this.now, d = SOUNDS[v.name], sp = this.spatial(v.at, d.range, d.near);
     const begin = Math.max(v.start, t), offset = d.loop ? 0 : (begin - v.start) * v.rate;
     if (!d.loop && offset >= v.buffer.duration) return;
     const src = c.createBufferSource();
@@ -454,7 +454,7 @@ export class AudioEngine {
     const d: SoundDef = SOUNDS[name];
     if (!d || this.ctx.state === 'closed') return 0;
     const at = d.bus === 'ui' ? null : o.pos ?? null;
-    const sp = this.spatial(at, d.range), gain = d.gain * (o.gain ?? 1) * sp.gain;
+    const sp = this.spatial(at, d.range, d.near), gain = d.gain * (o.gain ?? 1) * sp.gain;
     if (gain < 0.003) { this.stats.dropped++; return 0; }
     this.prune();
     const when = this.now + (o.delay ?? 0) + sp.delay, score = (o.priority ?? d.priority) * (0.25 + Math.min(1, gain));
@@ -510,7 +510,7 @@ export class AudioEngine {
     if (s.rate !== undefined) v.rate = s.rate;
     const nd = v.nodes;
     if (!nd) return;
-    const t = this.now, sp = this.spatial(v.at, d.range), centre = !nd.pan && v.buffer.numberOfChannels === 1 ? Math.SQRT1_2 : 1;
+    const t = this.now, sp = this.spatial(v.at, d.range, d.near), centre = !nd.pan && v.buffer.numberOfChannels === 1 ? Math.SQRT1_2 : 1;
     if (s.gain !== undefined || s.pos !== undefined) nd.amp.gain.setTargetAtTime(v.gain * sp.gain * centre, t, tau);
     if (s.pos !== undefined && nd.pan) nd.pan.pan.setTargetAtTime(clamp(sp.pan + v.pan, -1, 1), t, tau);
     if ((s.cutoff !== undefined || s.pos !== undefined) && nd.lp) nd.lp.frequency.setTargetAtTime(Math.min(v.cutoff, sp.cutoff), t, tau);

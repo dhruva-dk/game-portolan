@@ -100,6 +100,8 @@ export function installHook(app: App) {
     // ── effects and numbers ──
     effects: (since = 0) => log.since(since),
     clearEffects: () => log.clear(),
+    /** The region beds playing now, with their gains: the log has a bed only when it starts. */
+    beds: () => app.audio.ambience.playing(),
     perf: () => app.perf(),
     measure: (frames: number) => app.measure(frames),
   };

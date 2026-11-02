@@ -66,6 +66,7 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
   const start = Math.max(0, plan.trigger - plan.lead);
   await game.hook((h, n) => h.step(n), Math.max(0, start - WARM - (await game.hook((h) => h.tick))));
   await game.hook((h) => h.clearEffects());
+  let bedsBefore: [string, number][] = [];
   for (let f = 0; f < plan.frames; f++) {
     // stepped to the frame's tick, the last of the way drawn at 30 frames a second
     const now: number = await game.hook((h) => h.tick), to = start + f * plan.every - now, w = Math.max(1, Math.min(WARM, to));
@@ -77,13 +78,16 @@ async function one(game: Game, r: Rig, def: MomentDef, seed: number): Promise<bo
     const tick: number = await game.hook((h) => h.tick), d = tick - plan.trigger;
     // the sign spelled out in the file name, where a slug would make t-1 and t+1 the same
     await shots.shot(game, `t${d >= 0 ? '+' : ''}${d}`, `${String(f).padStart(3, '0')}-t-${d < 0 ? 'minus' : 'plus'}-${Math.abs(d)}.png`);
+    if (f === 0) bedsBefore = await game.hook((h) => h.beds());
   }
-  const effects = await game.hook((h) => h.effects());
+  const effects = await game.hook((h) => h.effects()), bedsAfter: [string, number][] = await game.hook((h) => h.beds());
   await shots.json('effects.json', effects);
   await shots.json('plan.json', { ...def, seed, ...plan });
-  await shots.text('effects.txt', (effects as { t: number; tick: number; kind: string; name: string; data?: unknown }[])
-    .map((e) => `${e.t.toFixed(3).padStart(8)} s  tick ${String(e.tick).padStart(5)}  ${e.kind.padEnd(7)} ${e.name}${e.data ? '  ' + JSON.stringify(e.data) : ''}`)
-    .join('\n') + '\n');
+  // a bed shows in the log only when it starts, so the ones already playing are listed first
+  const beds = (when: string, b: [string, number][]) => `beds playing ${when}: ${b.map(([n, g]) => `${n} ${g.toFixed(2)}`).join(', ') || 'none'}`;
+  await shots.text('effects.txt', [beds('at the first frame', bedsBefore), ...(effects as { t: number; tick: number; kind: string; name: string; data?: unknown }[])
+    .map((e) => `${e.t.toFixed(3).padStart(8)} s  tick ${String(e.tick).padStart(5)}  ${e.kind.padEnd(7)} ${e.name}${e.data ? '  ' + JSON.stringify(e.data) : ''}`),
+  beds('at the last frame', bedsAfter)].join('\n') + '\n');
   await shots.sheet(r.browser, 4);
   log(`moment ${def.name}: ${plan.frames} frames around tick ${plan.trigger}, ${(effects as unknown[]).length} effects, in ${shots.dir}`);
   return true;
