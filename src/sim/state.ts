@@ -83,6 +83,8 @@ const CAPTAIN = rec(
   ['li', int],
   ['avoid', f64],
   ['felt', f64],
+  // its drop has come past in the Gale: it leaves at the first gap in the crowd
+  ['bound', bool],
 );
 
 const DELIVERY = rec(['state', int], ['t', f64], ['tier', int], ['at', XYZ], ['alt', f64]);

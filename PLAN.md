@@ -885,12 +885,14 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
 
 **The match, done when:**
 - **Matches last 10–12 minutes:** over 20 headless bot matches, the median is 10–12 minutes, and none is under 8 or over 14.
-- **Ram damage is capped:** one collision takes at most 45 off a ship, whatever passives, perks and abilities stack on it.
+- **Ram damage is capped:** one collision takes at most 45 off a ship, whatever passives, perks and abilities stack on it. *Done: tests/sim/match.test.ts drives a gusting Ram on a light hull into a ship sailing at her.*
 - **Landmarks are solid:**
   - Ships run into every landmark's shape. That includes the Kelp Cathedral's columns: you sneak through the kelp between them, not through them.
   - The ones you sail through or under are solid only at their sides: the Hollow Cedar, Moonbow Arch, the Root Gate and the Fjords' curtain.
   - The ones you sail into keep their mouths open: Cinder Peak's caldera, the Gorge, Glasswater's pool and Spice Cove.
   - The Ice Crown's floes are solid, and one riding into a ship shoulders her aside.
+
+  *Done: tests/sim/sailing.test.ts sails a ship at a column in every region that has them, at the Hollow Cedar's log from abeam, and parks one in a floe's path. Arches and curtains are never solid, and the open mouths are terrain the solid shapes leave alone.*
 - **Everything you can do, you can do on touch.** Each action has a HUD control of at least 44 points at every supported size, and no action needs a keyboard. The actions are:
   - steer, and set the throttle from full sail down to a stop;
   - aim, fire and reload;
@@ -903,6 +905,8 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
 - **The Gale spreads out:**
   - At the moment each captain leaves the Gale, no more than 3 ships are within 100 m of it.
   - No region gets more than a quarter of the captains' picks in a match.
+
+  *Done: a captain takes the least-picked region, starting with the first circle, once its own pick is full. Once it is bound to leave, it holds on while 3 ships that have left are still close. Captains whose drop lies past the Gale's end start taking turns 2.5 s apiece before it blows out. Ships still riding don't count toward the 3. They sit in the Gale's own 36 × 27 m block, so they are always within 100 m. Over 12 seeds of an all-captain fleet the worst is 2 ships near a leaver, and 59 of 60 captains still land in the region they picked (tests/sim/match.test.ts). Over 80 seeds of a measuring script, one captain in one match is still held when the Gale blows out, and lands beside 3 others and an idle player.*
 - **A pick near the Gale works:** a pick within 600 m of the ship glides down to that pick instead of leaving the Gale at once.
 - **The rivals are realistic:** in the fixtures, at most a third of the captains are tagged Rival.
 - **Grounded ships slide:** a ship pressed against a slanting shore slides along it instead of freezing.
@@ -1179,10 +1183,6 @@ The last blind test named 33 of the 48 frames. The Glass Sea got none of its thr
 
 **The match:**
 - Headless bot matches last 4.4–6.4 minutes against the 10–12 minute target. The Storm's phases, or the captains' aggression, need tuning.
-- Ram damage stacks with ram-boosting passives to about 87 in one hit. It needs a cap.
-- Landmarks aren't collidable yet. Ships sail through their shapes.
-- The throttle is always 1 on touch: there's no way to slow down.
-- The Gale fleet bunches up on the way across. Spread the captains' dive picks.
 - A Gale pick inside 600 m of the ship leaves the Gale at once.
 - Most of the fixture rivals are tagged Rival. Use a realistic spread.
 - A grounded ship can freeze on a slanting shore. `tryMove` refuses the whole step when any touching probe (bow, middle or stern) would climb, so a hull that drifts sideways along an oblique bank can't move forward or back until something turns her. Let her slide along the bank instead.

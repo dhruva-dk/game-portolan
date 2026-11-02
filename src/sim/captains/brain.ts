@@ -36,9 +36,15 @@ export const BRAIN = {
   repath: 2,
   /** A captain sure of this much that the player stays out in the Storm this many seconds waits for them at its edge. */
   waits: { sure: 0.4, seconds: 3 },
+  /**
+   * Leaving the Gale: hold on while this many ships that have already left are within `near` metres; everyone still
+   * aboard starts leaving this many seconds before it blows out.
+   */
+  spread: { most: 3, near: 100, gap: 2.5 },
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
+const PICKS = new Int32Array(REGIONS.length);
 const P = v3(), Q = v3(), T = v3(), U = v3(), VIEW = newStormView();
 
 // ---------------------------------------------------------------- thinking
@@ -165,14 +171,35 @@ function setMode(c: Captain, mode: number): void {
 const seenNow = (state: MatchState, c: Captain): boolean => state.tick * TICK - c.seen < 2;
 
 /** Chooses the region to dive to: its own pick, or the player's, if it has learnt where the player goes. */
+const inFirst = (state: MatchState, r: number): boolean => apart(CENTRES[r], state.storm.centres[0]) <= ZONES[0] - 120;
+
 function chooseRegion(state: MatchState, i: number, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, style = styleOf(ship);
   // a region whose heart is inside the first safe circle
   let r = rngInt(rng, REGIONS.length);
-  for (let k = 0; k < 4 && apart(CENTRES[r], state.storm.centres[0]) > ZONES[0] - 120; k++) r = rngInt(rng, REGIONS.length);
+  for (let k = 0; k < 4 && !inFirst(state, r); k++) r = rngInt(rng, REGIONS.length);
   const knows = c.dive.confidence >= 0.4 && !state.ships[PLAYER].captain.on;
   if (knows && !c.gentle && style.fight >= 0.55 && rngFloat(rng) < 0.6 + 0.4 * c.dive.confidence) r = c.dive.value;
   else if (knows && (c.gentle || style.fight < 0.35) && r === c.dive.value) r = (r + 1 + rngInt(rng, REGIONS.length - 1)) % REGIONS.length;
+  // the fleet spreads out: no region takes more than a quarter of the captains' picks, so a full one sends this
+  // captain to the least picked region in the first circle instead
+  let captains = 0;
+  const picks = PICKS.fill(0);
+  for (let j = 0; j < SHIPS; j++) {
+    const o = state.ships[j].captain;
+    if (!o.on) continue;
+    captains++;
+    if (j !== i && o.region >= 0) picks[o.region]++;
+  }
+  if (picks[r] >= Math.max(1, Math.floor(captains / 4))) {
+    const from = rngInt(rng, REGIONS.length);
+    let best = -1;
+    for (let k = 0; k < REGIONS.length; k++) {
+      const q = (from + k) % REGIONS.length;
+      if (best < 0 || (inFirst(state, q) && !inFirst(state, best)) || (inFirst(state, q) === inFirst(state, best) && picks[q] < picks[best])) best = q;
+    }
+    r = best;
+  }
   c.region = r;
   tangentAt(CENTRES[r], rngRange(rng, -PI, PI), T);
   along(CENTRES[r], T, rngRange(rng, 60, 180), c.drop);
@@ -431,14 +458,49 @@ export function helm(state: MatchState, i: number, out: ShipInput): void {
   stuck(state, i, rng, out);
 }
 
-/** Leaves the Gale when it passes closest to the drop point it chose. */
+/**
+ * Leaves the Gale when it passes closest to the drop point it chose, or as the Gale is about to blow out. The fleet
+ * spreads out: once bound to leave, it holds on while ships that have just left crowd round it.
+ */
 function galeHelm(state: MatchState, i: number, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain;
   if (c.region < 0) return;
   const now = apart(ship.pos, c.drop);
   galeSeat(state, i, state.gale.t + 1, P, T);
   const soon = apart(P, c.drop), reach = (GALE.glide * GALE.height) / GALE.fall;
-  out.dive = (soon > now && now < reach * 0.9) || now < GALE_SPEED * 2;
+  if ((soon > now && now < reach * 0.9) || now < GALE_SPEED * 2 || state.gale.t > GALE.time - BRAIN.spread.gap * lateRiders(state)) c.bound = true;
+  out.dive = c.bound && crowd(state, i) < BRAIN.spread.most;
+  // the captains after it this tick count it as gone
+  if (out.dive) c.mode = MODE.glide;
+}
+
+const END = v3(), BEFORE = v3(), EH = v3();
+
+/**
+ * Captains still riding whose drop the Gale is still closing on as it blows out. Each needs about BRAIN.spread.gap
+ * seconds to itself to leave without a crowd, so they start taking turns that long before the end.
+ */
+function lateRiders(state: MatchState): number {
+  let n = 0;
+  for (let j = 0; j < SHIPS; j++) {
+    const c = state.ships[j].captain;
+    if (state.ships[j].phase !== PHASE.gale || !c.on || c.region < 0 || c.mode === MODE.glide) continue;
+    galeSeat(state, j, GALE.time, END, EH);
+    galeSeat(state, j, GALE.time - 1, BEFORE, EH);
+    if (apart(END, c.drop) < apart(BEFORE, c.drop)) n++;
+  }
+  return n;
+}
+
+/** Ships that have left the Gale, or are leaving it this tick, within BRAIN.spread.near metres of ship i. */
+function crowd(state: MatchState, i: number): number {
+  let n = 0;
+  for (let j = 0; j < SHIPS; j++) {
+    const o = state.ships[j];
+    const gone = o.phase === PHASE.glide || o.phase === PHASE.sea || (o.phase === PHASE.gale && o.captain.on && o.captain.mode === MODE.glide);
+    if (j !== i && gone && apart(o.pos, state.ships[i].pos) < BRAIN.spread.near) n++;
+  }
+  return n;
 }
 
 const WANT = v3();

@@ -155,6 +155,29 @@ test('each captain picks a region and dives into it', (t) => {
   assert.ok(picked.size >= 6, 'and spread over the planet');
 });
 
+test('the Gale fleet spreads out: no captain leaves it into a crowd, and no region takes more than a quarter of the picks', (t) => {
+  let worst = 0, most = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const state = createMatch({ seed, fleet: [{ captain: true }] });
+    while (!state.gale.done) {
+      step(state);
+      for (const e of events(state, EVENT.galeDive)) {
+        const me = state.ships[e.ship];
+        // ships still riding sit in the Gale's own block, 36 by 27 m: only those that have left count as a crowd
+        let near = 0;
+        state.ships.forEach((o, j) => { if (j !== e.ship && o.phase !== PHASE.gale && apart(o.pos, me.pos) < 100) near++; });
+        worst = Math.max(worst, near);
+        assert.ok(near <= 3, `seed ${seed}: captain ${e.ship} leaves the Gale with ${near} ships within 100 m, at ${state.gale.t.toFixed(1)} s`);
+      }
+    }
+    const picks = new Array<number>(REGION_COUNT).fill(0);
+    for (const s of state.ships) picks[s.captain.region]++;
+    most = Math.max(most, ...picks);
+    assert.ok(Math.max(...picks) <= SHIPS / 4, `seed ${seed}: picks ${picks.join(',')}`);
+  }
+  t.diagnostic(`at most ${worst} ships within 100 m of a captain leaving; at most ${most} picks a region`);
+});
+
 // ---------------------------------------------------------------- the Storm
 
 /** The storm plan createMatch makes for a seed, without the rest of the match. */
