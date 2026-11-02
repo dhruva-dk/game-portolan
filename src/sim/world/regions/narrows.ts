@@ -68,4 +68,6 @@ export const narrows: RegionSpec = {
   zones: [],
   tidal: [],
   props: [],
+  // Rockfall: the walls shed into one mouth of the Gorge and choke it until the scree settles.
+  event: { spots: [axis(NORTH - 8), NORTH - 8, axis(SOUTH + 8), SOUTH + 8], r: 40, block: { length: 0, width: 34 } },
 };

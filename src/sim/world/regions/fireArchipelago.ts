@@ -66,4 +66,6 @@ export const fireArchipelago: RegionSpec = {
   ],
   tidal: [],
   props: [],
+  // Cinder Peak erupts: lava bombs rain round the cone and an ash cloud drifts off downwind.
+  event: { spots: [PEAK.x, PEAK.y], r: 140 },
 };

@@ -1,7 +1,8 @@
 // The Basalt Stacks. Black columnar basalt: plateau islands with flat green turf tops and cliffs that step down
 // into the sea in hexagonal columns, sea stacks standing off them, and Moonbow Arch, a span of rock 86 m high
 // between two pillars, that you sail under. Behind the arch a narrow cut through the arch-head is floored by a
-// sill: it opens at high tide and closes at low.
+// sill: it opens at high tide and closes at low. Across the cut, east to west, runs a tunnel under the turf that only
+// the Stacks' event, drawing the sea down below its rock roofs, lets a ship through.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
@@ -26,6 +27,9 @@ const ARCH = { x: 60, y: -40, half: 28, top: 86, clear: 40 };
 // The hidden passage: a cut north through the arch-head plateau, floored by a sill at -1.5 m.
 const PASSAGE = [112, -40, 112, 40];
 const LANE = [-10, 300, -8, 140, 12, 50, 48, 0, 60, -40, 82, -100, 130, -200, 196, -340];
+// The hidden tunnel, floored 7 m down, and the middles of its two rock roofs, either side of the cut.
+const TUNNEL = { x0: 66, x1: 158, y: 14, half: 6.5 };
+const ROOFS = [96, 128];
 
 /** Columns: quantises the ground into hexagonal basalt columns, each with its own height jitter. */
 function columns(x: number, y: number, f: (x: number, y: number) => number): number {
@@ -71,7 +75,10 @@ function height(x: number, y: number): number {
     return d > 10 ? -1e9 : d < 0 ? 1.2 * smoothstep(0, 3, -d) : -60 * smoothstep(0, 10, d);
   }, (cx, cy) => fromEquator(cx, cy, R, false) < 30 || polyDist(cx, cy, LANE) < 16);
   // Shoals across the open water, so no straight course runs empty for long.
-  return shoals(x, y, h, 140, S + 40);
+  h = shoals(x, y, h, 140, S + 40);
+  // The tunnel, cut last so nothing stands in it.
+  const dt = segDist(x, y, TUNNEL.x0, TUNNEL.y, TUNNEL.x1, TUNNEL.y);
+  return dt < TUNNEL.half + 3 ? Math.min(h, -7 + 45 * smoothstep(TUNNEL.half, TUNNEL.half + 3, dt)) : h;
 }
 
 export const basaltStacks: RegionSpec = {
@@ -90,4 +97,10 @@ export const basaltStacks: RegionSpec = {
   zones: [{ kind: 'spray', x: ARCH.x, y: ARCH.y, r: 30 }],
   tidal: [PASSAGE[0], (PASSAGE[1] + PASSAGE[3]) / 2],
   props: [],
+  // The sea draws back from the arch-head and opens the hidden tunnel under it, east to west.
+  event: {
+    spots: [112, TUNNEL.y], r: 50,
+    lift: [{ x: 112, y: TUNNEL.y, r: 45, fade: 30, by: -3 }],
+    roofs: ROOFS.map((x) => ({ x, y: TUNNEL.y, bearing: 90, length: 22, width: 16, under: 8 })),
+  },
 };

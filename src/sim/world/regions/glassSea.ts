@@ -68,4 +68,6 @@ export const glassSea: RegionSpec = {
   zones: [{ kind: 'lagoon', x: POOL.x, y: POOL.y, r: POOL.r - 4 }],
   tidal: [],
   props: plant(height, 'palm', [-260, -260, 260, 300], 7, S + 20, 0.6, 0.8, 4, 0.3, 9),
+  // The whale comes up under the open water and breaches.
+  event: { spots: snapWet(height, [-90, 70, 70, 60, -30, -120], 5), r: 43 },
 };

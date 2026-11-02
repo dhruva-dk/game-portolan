@@ -5,13 +5,15 @@ import { empty, seedLoot, starter } from './items.ts';
 import { hash32, rngFrom, rngFloat, rngInt, rngRange } from './math.ts';
 import { galeSeat, planGale } from './opening.ts';
 import { activeIndex, passiveIndex } from './perks.ts';
+import { chartEvents, planEvents } from './regionEvents.ts';
 import { RULE, ruleFor } from './rules.ts';
 import { TERRITORY } from './sphere.ts';
-import { GULL, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
+import { EVENT_STATE, GULL, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
 import { planStorm } from './storm.ts';
 import { DAY, GALE, GUST, SLOTS } from './tables.ts';
 import { newWeather } from './weather.ts';
 import { planWhale } from './whale.ts';
+import { REGION_COUNT } from './world/index.ts';
 import { newGusts } from './wind.ts';
 
 /** One ship in the fleet. Leave `captain` false for the player's ship. */
@@ -105,12 +107,17 @@ export function createMatch(setup: MatchSetup): MatchState {
     trail: new Uint8Array(TERRITORY.cells),
     loot: [], nextId: 1, shots: [], clouds: [], decoys: [], mines: [],
     whale: { at: xyz(), head: { x: 1, y: 0, z: 0 }, route: [], leg: 0, state: WHALE_STATE.under, t: 0, breaches: 0, spot: xyz() },
+    regionEvents: Array.from({ length: REGION_COUNT }, () => ({ state: EVENT_STATE.waiting, at: 0, warn: 0, run: 0, t: 0, k: 0, spot: xyz(), n: 0, marks: [] })),
+    floeT: 0,
     leader: -1, rentT: 0, events: [], sunk: [], winner: -1,
   };
+  // the captains' chart starts from a quiet sea, whatever the last match left on it
+  chartEvents(state);
   planGale(state);
   const fleet = setup.fleet ?? [{ captain: false }];
   for (let i = 0; i < SHIPS; i++) state.ships.push(newShip(state, fleet[i] ?? { captain: true }, i, setup.gentle ?? false));
   planStorm(state);
+  planEvents(state);
   planWhale(state);
   seedLoot(state);
   return state;

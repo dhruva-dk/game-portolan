@@ -20,6 +20,8 @@ export interface Quiet {
   loot?: boolean;
   /** Keep the weather the match brewed. */
   weather?: boolean;
+  /** Keep the regions' events on their programme. */
+  events?: boolean;
 }
 
 export interface Course {
@@ -111,7 +113,13 @@ export function quietMatch(q: Quiet = {}): MatchState {
   for (let i = 0; i < SHIPS; i++) place(state, i, spot(i));
   if (!q.loot) state.loot.length = 0;
   if (!q.weather) clearSkies(state);
+  if (!q.events) holdEvents(state);
   return state;
+}
+
+/** Puts every region's event off past the end of any match. */
+export function holdEvents(state: MatchState): void {
+  for (const ev of state.regionEvents) ev.at = 1e9;
 }
 
 /** Furled sails, helm amidships. */
@@ -123,17 +131,17 @@ export const sailOn = (over: Partial<ShipInput> = {}): ShipInput => ({ ...idleIn
 const HELD: ShipInput[] = Array.from({ length: SHIPS }, hold);
 
 /**
- * Runs the match for `seconds`. `drive` gives a ship's input each tick, or null to hold it still; `each` is
- * called after every tick and stops the run when it returns true.
+ * Runs the match for `seconds`. `drive` gives a ship's input each tick, or null to hold it still (or, for a ship a
+ * captain sails, to leave her to it); `each` is called after every tick and stops the run when it returns true.
  */
 export function run(
   state: MatchState, seconds: number, drive: (i: number, tick: number) => ShipInput | null = () => null,
   each?: (state: MatchState) => boolean | void,
 ): void {
-  const inputs: ShipInput[] = new Array(SHIPS);
+  const inputs: (ShipInput | null)[] = new Array(SHIPS);
   const end = state.tick + Math.round(seconds / TICK);
   while (state.tick < end) {
-    for (let i = 0; i < SHIPS; i++) inputs[i] = drive(i, state.tick) ?? HELD[i];
+    for (let i = 0; i < SHIPS; i++) inputs[i] = drive(i, state.tick) ?? (state.ships[i].captain.on ? null : HELD[i]);
     step(state, null, inputs);
     if (each?.(state)) return;
   }

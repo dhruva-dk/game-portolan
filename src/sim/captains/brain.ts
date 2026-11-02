@@ -10,18 +10,19 @@ import { GALE_SPEED, galeSeat } from '../opening.ts';
 import { activeOf, hasPerk } from '../perks.ts';
 import { rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
+import { coverNear, dangerAt, escapeFrom, newDanger, rewardNear } from '../regionEvents.ts';
 import { draftOf } from '../sailing.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
-import { GALE, ITEM, LOOT, PARCELS, PERKS, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
+import { GALE, ITEM, LOOT, PARCELS, PERKS, REGION_EVENT, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
 import { CENTRES, REGIONS, heightAt } from '../world/index.ts';
 import { styleOf, type Style } from './temperaments.ts';
 
-export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9 } as const;
-export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid'] as const;
+export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9, event: 10 } as const;
+export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid', 'event'] as const;
 
 export const BRAIN = {
   /** Think every this many ticks. */
@@ -61,6 +62,8 @@ export const BRAIN = {
   letGo: 90,
   /** With this many ships or fewer afloat, a captain holds back this much more, and leaves the Storm to bring on the end. */
   lastFew: { ships: 3, more: 0.4 },
+  /** A captain on the run makes for an event's fog bank this far off. */
+  cover: 150,
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
@@ -95,6 +98,18 @@ export function think(state: MatchState, i: number): void {
 
   // what it can see
   perceive(state, i, style);
+  decide(state, i, style, rng);
+  // whatever it settled on, it keeps out of what a region's event is bringing down
+  if (c.mode !== MODE.storm && c.mode !== MODE.event && dangerAt(state, c.goal, 0, DANGER)) {
+    escapeFrom(DANGER, c.goal, REGION_EVENT.berth, c.goal);
+    if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 20, tide);
+  }
+}
+
+const DANGER = newDanger();
+
+function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
+  const ship = state.ships[i], c = ship.captain;
 
   // 1. the Storm comes first
   stormView(state, VIEW);
@@ -106,6 +121,14 @@ export function think(state: MatchState, i: number): void {
     const target = edge < style.margin * 0.4 || !late ? VIEW.calm : VIEW.next;
     inward(ship.pos, target.at, Math.max(0, target.r - style.margin), c.goal);
     if (c.foe >= 0 && seenNow(state, c)) c.mode = MODE.storm;
+    return;
+  }
+
+  // then out from under whatever a region's event is about to bring down on it: a falling spire, the rockfall, the
+  // whale, Cinder Peak's bombs, the bloom, the Maelstrom wound up
+  if (dangerAt(state, ship.pos, REGION_EVENT.berth * 0.5, DANGER)) {
+    setMode(c, MODE.event);
+    wayOut(state, ship.pos, style, c.goal);
     return;
   }
 
@@ -123,7 +146,11 @@ export function think(state: MatchState, i: number): void {
   // 3. run from a fight it is losing
   if (c.foe >= 0 && ship.hull < style.run * (c.gentle ? 1.3 : 1) && foeD < 140) {
     setMode(c, MODE.flee);
-    away(ship.pos, state.ships[c.foe].pos, 120, c.goal);
+    // into a fog bank an event has thrown over the sea, when there is one near, else just away
+    if (coverNear(state, ship.pos, BRAIN.cover, U) && toEdge(state, U) > style.margin) {
+      copy(c.goal, U);
+      if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 20, tide);
+    } else away(ship.pos, state.ships[c.foe].pos, 120, c.goal);
     keepInside(state, c.goal, style);
     return;
   }
@@ -149,6 +176,14 @@ export function think(state: MatchState, i: number): void {
     copy(c.goal, state.loot[loot].at);
     // loot lying in the shallows it takes from the edge of the water deep enough to reach it by
     if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 1, tide);
+    return;
+  }
+
+  // 6b. what a region's event offers: a lane in spate to ride, the clam bed's pearls, the sea caves' hoard (inside the calm)
+  if (rewardNear(state, ship.pos, REGION_EVENT.reach, U) >= 0 && toEdge(state, U) > style.margin) {
+    setMode(c, MODE.event);
+    copy(c.goal, U);
+    if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 6, tide);
     return;
   }
 
@@ -463,6 +498,22 @@ function away(p: V3, from: V3, d: number, out: V3): V3 {
   along(p, T, d, out);
   if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
   return out;
+}
+
+/**
+ * Out of DANGER from p to open water inside the calm: straight out if that is inside, else swung round the danger a
+ * little further each way until it is (pulling it in toward the calm's centre only would lead back into the danger).
+ * Where the edge of the danger is dry land, as Cinder Peak's flanks are, it looks on out to the water beyond.
+ */
+function wayOut(state: MatchState, p: V3, style: Style, out: V3): void {
+  for (let k = 0; k <= 12; k++) {
+    const swing = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (PI / 12);
+    for (let m = 0; m <= 60 && (m === 0 || !openAt(out, tide)); m += 10) escapeFrom(DANGER, p, REGION_EVENT.berth + m, out, swing);
+    if (toEdge(state, out) >= style.margin && openAt(out, tide)) return;
+  }
+  escapeFrom(DANGER, p, REGION_EVENT.berth, out);
+  keepInside(state, out, style);
+  if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
 }
 
 function keepInside(state: MatchState, p: V3, style: Style): void {

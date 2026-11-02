@@ -59,6 +59,11 @@
 //   scrape      ship scraped the ground; ram: ship rammed by; coins: ship earned amount (item: 1 rent, 2 cut,
 //               3 claim, 4 kill)
 //   weatherForms / weatherEnds   item WEATHER_KIND, amount radius; win: ship won
+//   regionWarn / regionStart / regionEnd   a region's own event (regionEvents.ts): item region index, at its spot,
+//               y its reach; amount warning seconds (warn) or how long it runs (start). state.regionEvents[r] has its
+//               state (EVENT_STATE), start time, run, spot k and where its effect stands now
+//   lavaBomb    Cinder Peak threw a bomb: at where it will land, amount seconds in the air, y its reach; FLAG.done
+//               when it lands
 import { helm, think } from './captains/brain.ts';
 import { watch } from './captains/learning.ts';
 import { arm, burnTick, fly } from './combat.ts';
@@ -69,6 +74,7 @@ import { copyInput, idleInput, inputAt, replay, type Recording, type ShipInput }
 import { drop, driftLoot, pickups, select, swap, useTick } from './items.ts';
 import { blow, glide, ride } from './opening.ts';
 import { powers, useAbility } from './powers.ts';
+import { tickEvents } from './regionEvents.ts';
 import { collide, gust, rechargeGust, refloat, sail } from './sailing.ts';
 import { PHASE, PLAYER, SHIPS, type MatchState } from './state.ts';
 import { storm } from './storm.ts';
@@ -88,6 +94,7 @@ export const lastInputs = (): readonly ShipInput[] => INPUTS;
 export function step(state: MatchState, input: ShipInput | null = null, inputs: readonly (ShipInput | null)[] | null = null): void {
   if (over(state)) return;
   state.events.length = 0;
+  tickEvents(state);
   brew(state);
   stir(state);
   blow(state);

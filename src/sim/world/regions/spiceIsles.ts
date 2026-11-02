@@ -69,4 +69,6 @@ export const spiceIsles: RegionSpec = {
     ...plant(height, 'flameTree', [-60, -80, 70, 60], 9, S + 20, 0.7, 20, 90, 1, 18).filter((p) => hyp(p.x - COVE.x, p.y - COVE.y) < 60),
     ...plant(height, 'flameTree', [-260, -260, 260, 300], 26, S + 21, 0.5, 6, 90, 0.8, 14),
   ],
+  // A pearl bloom: a clam bed in the shallows opens, and its pearls float up.
+  event: { spots: snapWet(height, [COVE.x, COVE.y, 140, -20, 60, -150], 3), r: 40 },
 };

@@ -93,4 +93,6 @@ export const iceCrown: RegionSpec = {
   tidal: [],
   // Snow firs on the rock isles at the rim.
   props: plant(height, 'fir', [-320, -320, 320, 320], 9, S + 40, 0.7, 2.5, 30, 1.2, 12).filter((p) => hyp(p.x, p.y) > 215),
+  // The floes break loose: every ring turns four times as fast, and the lanes between the clumps open and shut in seconds.
+  event: { spots: [0, 0], r: 210 },
 };

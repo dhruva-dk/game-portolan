@@ -100,4 +100,12 @@ export const coralAtolls: RegionSpec = {
   zones: ATOLLS.map((a) => ({ kind: 'lagoon' as const, x: a.x, y: a.y, r: a.r - a.w })),
   tidal: TIDAL,
   props: plant(height, 'palm', [-260, -260, 260, 300], 7, S + 20, 0.65, 0.8, 4, 0.3, 11),
+  // The reef tide: one half of the Great Atoll floods while the other drains, east or west by the match.
+  event: {
+    spots: [GREAT.x, GREAT.y, GREAT.x, GREAT.y], r: 140,
+    lift: [
+      { x: GREAT.x + 110, y: GREAT.y, r: 110, fade: 50, by: 2.4, flip: true },
+      { x: GREAT.x - 110, y: GREAT.y, r: 110, fade: 50, by: -2.4, flip: true },
+    ],
+  },
 };

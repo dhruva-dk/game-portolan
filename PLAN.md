@@ -961,6 +961,15 @@ The owner hasn't played pass 1 on an iPad yet, and the plan asks for that before
 
 A ship pulled into the Maelstrom's Eye runs aground on its rocks, and the pull holds her there until she sails out against it. (Settled overnight in the owner's absence; the owner may change it.)
 
+*Simulation side done (parts 1 and 3); the visuals, sounds, banners and map markers come next. src/sim/regionEvents.ts runs the programme: each region's event once a match, the far side of the planet from where the Storm closes first, 27 s apart from 45 s in, warned 5–10 s ahead (the whale's own 6 s rising for the Glass Sea), and all over by about 540 s. What each one does to the sea lives in environment.ts, so sailing, the weather and the captains' chart all see it. The four tide events lift or drop the region's own water by 2.4–3 m round their spots, more than the planet's 1 m tide, so their passages open or close at either tide. tests/sim/events.test.ts checks each event's effect, the programme over six seeds, and determinism with the events in. In the scripted moments a captain clears a falling spire and the erupting cone well within 20 s, and one 300 m off reaches the pearls. Over 20 all-captain matches (tests/tools/events.ts), ship-seconds in each danger from warning to end against the same span before it: Spires 1 against 4, Narrows 0 against 35, the whale 1 against 6, Cinder Peak 31 against 55, the kelp bloom 53 against 212, the Maelstrom 3 against 34. No ship is hit by a falling rock, and 23 of 1,260 lava bombs hit someone.*
+
+Decisions made for the events (Settled overnight in the owner's absence; the owner may change it.):
+- The Basalt Stacks' hidden passage is a sea-cave tunnel under the arch: its roof stands below 8 m and the water under it is shut at any tide, until the event drops the sea there by 3 m. Its cave hoard of 3 items spills out as it opens.
+- The Spice Isles' clam bed spills 5 pearls rolled three rarities richer than usual. Captains go for them for the first 30 s.
+- The Jade Shoals ebb 2.5 m, the Mangrove Labyrinth floods 2.5 m, and the Coral Atolls' tide runs 2.4 m up at one gap and down at the other.
+- Captains keep clear of Cinder Peak's drifting ash cloud as well as its cone. Leaving the cone, they look past its dry flanks to the water beyond, and swing round the danger rather than out of the Storm's calm.
+- A danger event whose spot the Storm's calm would have closed round by its end (leaving less than 60 m of calm clear of it) swaps slots with the latest earlier event that fits. Without this, a finale at Cinder Peak trapped ships between the eruption and the Storm.
+
 **The perks, done when each shows itself working:**
 
 | Perk | How you see it working |

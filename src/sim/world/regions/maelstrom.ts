@@ -112,4 +112,6 @@ export const maelstrom: RegionSpec = {
   tidal: [],
   // Storm-flattened grass and sea kale only: nothing tree-sized.
   props: [],
+  // The whirlpool wakes: the vortex spins up to more than twice its strength.
+  event: { spots: [EYE.x, EYE.y], r: 120 },
 };

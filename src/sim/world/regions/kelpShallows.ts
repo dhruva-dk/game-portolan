@@ -69,4 +69,6 @@ export const kelpShallows: RegionSpec = {
   zones: BEDS,
   tidal: [],
   props: [],
+  // The kelp blooms: a bed spreads across the water and drags at every hull in it.
+  event: { spots: [NAVE.x, NAVE.y, -150, 170, 120, 160], r: 110 },
 };

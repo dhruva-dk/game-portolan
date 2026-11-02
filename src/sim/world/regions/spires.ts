@@ -2,6 +2,7 @@
 // Needle and thinning toward the borders, each with a ledge of white-washed rubble at its foot and a crown of
 // dark pines. The Needle itself is 150 m, seen from far across the north.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
+import { PI, datan2 } from '../../math.ts';
 import { R } from '../../sphere.ts';
 import { fbm, fromEquator, hyp, needle, over, polyDist, scatter, scatterPoints, shoals, smoothstep, snapWet, type Scattered } from '../kit.ts';
 import type { PropSpec, RegionSpec } from '../spec.ts';
@@ -10,6 +11,11 @@ const S = 0x5b1e;
 const NEEDLE = { x: 0, y: 50, r: 15, h: 150 };
 // The race swings east round the Needle, clear of the carve's reach (about 50 m), then back west to the Great Current.
 const LANE = [40, 290, 70, 150, 85, 50, 30, -60, -80, -110, -150, -230, -200, -340];
+// Where a spire can fall across the run: the middle of each of its three central reaches, lying square to it.
+const FALLS = [1, 2, 3].map((k) => {
+  const ax = LANE[2 * k], ay = LANE[2 * k + 1], bx = LANE[2 * k + 2], by = LANE[2 * k + 3];
+  return { x: (ax + bx) / 2, y: (ay + by) / 2, bearing: (datan2(bx - ax, by - ay) * 180) / PI + 90 };
+});
 
 // Where needles may not stand: too near the Needle, the Great Current or the lane.
 function clear(cx: number, cy: number, pad: number): boolean {
@@ -74,4 +80,6 @@ export const spires: RegionSpec = {
   zones: [],
   tidal: [],
   props: PINES,
+  // A spire breaks and falls across the run, at the middle of one of its three central reaches, and lies there.
+  event: { spots: FALLS.flatMap((f) => [f.x, f.y]), bearings: FALLS.map((f) => f.bearing), r: 44, block: { length: 64, width: 14, stays: true } },
 };

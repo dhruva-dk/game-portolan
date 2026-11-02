@@ -70,4 +70,6 @@ export const mistwood: RegionSpec = {
     ...CEDARS,
     { kind: 'snag', x: SNAG.x, y: SNAG.y, r: 9, height: 62 },
   ],
+  // The mist rolls out from the heart of the wood until no one can see a ship's length.
+  event: { spots: [0, 0], r: 290 },
 };

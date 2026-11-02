@@ -31,7 +31,7 @@ import { weepingIsle } from './regions/weepingIsle.ts';
 import { mangroveLabyrinth } from './regions/mangroveLabyrinth.ts';
 import { maelstrom, VORTEX_SPEC } from './regions/maelstrom.ts';
 
-export type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
+export type { EventSpec, LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
 
 export type RegionId =
   | 'iceCrown'
@@ -384,8 +384,11 @@ export const navigable = (p: V3, tide = 0): boolean => heightAt(p) < tide - DRAF
 
 const EAST = v3(), TAN = v3();
 
-/** The surface current at p, in m/s, tangent to the sphere: the Great Current, the region lanes and the vortex. */
-export function currentAt(p: V3, out: V3): V3 {
+/**
+ * The surface current at p, in m/s, tangent to the sphere: the Great Current, the region lanes and the vortex. `lanes`
+ * scales each lane's speed (by its index in CURRENTS) and `vortex` the vortex's, for the regions' events.
+ */
+export function currentAt(p: V3, out: V3, lanes: ArrayLike<number> | null = null, vortex = 1): V3 {
   set(out, 0, 0, 0);
   // The Great Current, east along the equator.
   const de = fromEquator(p);
@@ -403,7 +406,7 @@ export function currentAt(p: V3, out: V3): V3 {
     if (d >= half) continue;
     const n = l.pts.length - 1, at = (LANE_HIT.seg + LANE_HIT.along) / n;
     const ends = smoothstep(0, 0.08, at) * (1 - smoothstep(0.9, 1, at));
-    const s = l.speed * (1 - smoothstep(half * 0.4, half, d)) * ends;
+    const s = l.speed * (1 - smoothstep(half * 0.4, half, d)) * ends * (lanes ? lanes[i] : 1);
     if (s <= 0) continue;
     const a = l.pts[LANE_HIT.seg], b = l.pts[LANE_HIT.seg + 1];
     set(TAN, b.x - a.x, b.y - a.y, b.z - a.z);
@@ -411,7 +414,7 @@ export function currentAt(p: V3, out: V3): V3 {
     normalize(set(TAN, TAN.x - k * p.x, TAN.y - k * p.y, TAN.z - k * p.z));
     set(out, out.x + TAN.x * s, out.y + TAN.y * s, out.z + TAN.z * s);
   }
-  vortexAt(p, out, 1);
+  vortexAt(p, out, vortex);
   return out;
 }
 
@@ -599,6 +602,106 @@ export function floeAt(p: V3, t: number): number {
     floePos(f, t, FLOE_P);
     const dx = p.x - FLOE_P.x, dy = p.y - FLOE_P.y, dz = p.z - FLOE_P.z, r = f.size / R;
     if (dx * dx + dy * dy + dz * dz < r * r) return i;
+  }
+  return -1;
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The regions' events: where each can happen, and the geometry its effect needs (sim/regionEvents.ts runs them).
+
+export interface EventLift {
+  pos: V3;
+  r: number;
+  fade: number;
+  by: number;
+  flip: boolean;
+  /** The cosine of the disc's whole reach, for quick rejection. */
+  cos: number;
+}
+
+export interface EventRoof extends Site {
+  length: number;
+  width: number;
+  under: number;
+  cos: number;
+}
+
+export interface RegionEventSite {
+  region: number;
+  /** Where it can happen; each match picks one, k. */
+  spots: readonly V3[];
+  /** Unit tangents along each spot's bearing. */
+  facings: readonly V3[];
+  r: number;
+  lift: readonly EventLift[];
+  block: { length: number; width: number; stays: boolean } | null;
+  /** The cosine of the block's reach round its spot. */
+  blockCos: number;
+  roofs: readonly EventRoof[];
+}
+
+const capOf = (reach: number): number => 1 - (reach * reach) / (2 * R * R);
+
+export const REGION_EVENTS: readonly RegionEventSite[] = SPECS.map((s, ri) => {
+  const e = s.event, spots: V3[] = [], facings: V3[] = [];
+  for (let k = 0; k + 1 < e.spots.length; k += 2) {
+    const p = fromChart(ri, e.spots[k], e.spots[k + 1]);
+    spots.push(p);
+    facings.push(chartTangent(ri, p, e.bearings?.[k / 2] ?? 0));
+  }
+  const b = e.block;
+  return {
+    region: ri, spots, facings, r: e.r,
+    lift: (e.lift ?? []).map((l) => ({ pos: fromChart(ri, l.x, l.y), r: l.r, fade: l.fade, by: l.by, flip: l.flip ?? false, cos: capOf(l.r + l.fade) })),
+    block: b ? { length: b.length, width: b.width, stays: b.stays ?? false } : null,
+    blockCos: b ? capOf(b.length / 2 + b.width / 2 + 20) : 1,
+    roofs: (e.roofs ?? []).map((o) => ({
+      ...site(ri, o.x, o.y, o.bearing, o.width / 2), length: o.length, width: o.width, under: o.under, cos: capOf(o.length / 2 + o.width / 2 + 10),
+    })),
+  };
+});
+
+const SHARE: RegionMix = { a: 0, b: 0, t: 0 };
+
+/** How much of the water at p is region ri's: 1 inside it, a half on its border, none once past its neighbour's blend. */
+export function regionShare(ri: number, p: V3): number {
+  regionMix(p, SHARE);
+  return SHARE.a === ri ? 1 - SHARE.t : SHARE.b === ri ? SHARE.t : 0;
+}
+
+/** The sea's rise at p, metres, from region ri's event at full strength with spot k; negative where it draws the sea down. It stays in its own water. */
+export function liftOf(ri: number, k: number, p: V3): number {
+  let h = 0;
+  for (const l of REGION_EVENTS[ri].lift) {
+    const d = dot(p, l.pos);
+    if (d < l.cos) continue;
+    h += (l.flip && k % 2 === 1 ? -l.by : l.by) * (1 - smoothstep(l.r, l.r + l.fade, R * Math.sqrt(Math.max(0, 2 - 2 * d))));
+  }
+  return h === 0 ? 0 : h * regionShare(ri, p);
+}
+
+/** Whether p lies within `pad` metres of what region ri's event drops across the water at spot k. */
+export function blockAt(ri: number, k: number, p: V3, pad = 0): boolean {
+  const e = REGION_EVENTS[ri], b = e.block;
+  if (!b || k < 0 || k >= e.spots.length) return false;
+  const c = e.spots[k];
+  if (dot(p, c) < e.blockCos) return false;
+  const f = e.facings[k], qx = (p.x - c.x) * R, qy = (p.y - c.y) * R, qz = (p.z - c.z) * R;
+  const half = b.length / 2, t = qx * f.x + qy * f.y + qz * f.z, a = t < -half ? -half : t > half ? half : t;
+  const ex = qx - f.x * a, ey = qy - f.y * a, ez = qz - f.z * a, r = b.width / 2 + pad;
+  return ex * ex + ey * ey + ez * ez < r * r;
+}
+
+/** The roof of region ri's event over p (within `pad` metres of its edge), or -1. */
+export function roofAt(ri: number, p: V3, pad = 0): number {
+  const roofs = REGION_EVENTS[ri].roofs;
+  for (let i = 0; i < roofs.length; i++) {
+    const o = roofs[i];
+    if (dot(p, o.pos) < o.cos) continue;
+    const qx = (p.x - o.pos.x) * R, qy = (p.y - o.pos.y) * R, qz = (p.z - o.pos.z) * R;
+    const t = qx * o.facing.x + qy * o.facing.y + qz * o.facing.z;
+    if (Math.abs(t) > o.length / 2 + pad) continue;
+    if (Math.sqrt(Math.max(0, qx * qx + qy * qy + qz * qz - t * t)) < o.width / 2 + pad) return i;
   }
   return -1;
 }

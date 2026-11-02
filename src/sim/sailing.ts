@@ -1,6 +1,6 @@
 // Sailing on the sphere: ships run great circles at up to 14.5 m/s, faster off the wind than into it, turn,
 // carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other.
-import { aground, currentAt, seaLevel, solidAt, solidNormal } from './environment.ts';
+import { aground, bloomAt, currentAt, levelAt, solidAt, solidNormal } from './environment.ts';
 import { hurt } from './harm.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
@@ -72,6 +72,7 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   ship.turn = steer;
 
   let target = ship.flip > 0 ? 0 : settledSpeed(ship, W, Math.max(0, Math.min(1, input.throttle)));
+  target *= bloomAt(state, ship.pos);
   if (Math.abs(steer) > SHIP.hard) target = Math.min(target, SHIP.crawl);
   let accel: number = target > ship.speed ? SHIP.accel : SHIP.decel;
   if (ship.boost > 0) {
@@ -94,7 +95,7 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   ship.drift = -SHIP.carve * ship.speed * (max > 0 ? ship.rate / max : 0);
 
   // velocity: way on, slip, current and any shove
-  currentAt(ship.pos, FLOW);
+  currentAt(state, ship.pos, FLOW);
   const rider = hasPerk(ship, 'currentRider') ? PERKS.currentRider : 1;
   set(SB, ship.head.y * ship.pos.z - ship.head.z * ship.pos.y, ship.head.z * ship.pos.x - ship.head.x * ship.pos.z,
     ship.head.x * ship.pos.y - ship.head.y * ship.pos.x);
@@ -168,14 +169,14 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
   advance(ship.pos, H1, v * TICK, P1, H1);
   set(H1, ship.head.x, ship.head.y, ship.head.z);
   normalize(addScaled(H1, H1, P1, -dot(H1, P1)));
-  const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship), fore = dot(V, ship.head);
+  const half = (SHIP.half * 0.8) / R, draft = draftOf(ship), fore = dot(V, ship.head);
   for (const on of PROBES) {
     // the hull follows where her bow has been: ground under her stern never stops a ship going ahead, nor under her bow
     // one going astern
     if (on * fore < 0) continue;
     normalize(addScaled(PROBE, P1, H1, on * half));
     // a hull already touching the ground may still work across the shallows, but not up onto dry land
-    const h = heightAt(PROBE);
+    const h = heightAt(PROBE), level = levelAt(state, PROBE);
     if (h > (grounded ? level : level - draft) && h > heightAt(normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
       hitSolid = false;
       return on;

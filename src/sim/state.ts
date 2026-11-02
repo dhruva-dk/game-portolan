@@ -22,7 +22,7 @@ export const STREAMS = STREAM.captains + SHIPS;
 export const PHASE = { gale: 0, glide: 1, sea: 2, sunk: 3 } as const;
 
 /** What sank a ship, or hurt it. Weapons use their item kind (1–6). */
-export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28 } as const;
+export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28, rock: 29 } as const;
 
 /** The gull's delivery run. */
 export const GULL = { home: 0, flying: 1, rest: 2 } as const;
@@ -172,6 +172,21 @@ const GALE = rec(['from', XYZ], ['dir', XYZ], ['at', XYZ], ['head', XYZ], ['t', 
 
 const WHALE = rec(['at', XYZ], ['head', XYZ], ['route', list(XYZ)], ['leg', int], ['state', int], ['t', f64], ['breaches', int], ['spot', XYZ]);
 
+/** A region's own event: one each, by region index (regionEvents.ts). */
+export const EVENT_STATE = { waiting: 0, warning: 1, running: 2, over: 3 } as const;
+
+const MARK = rec(['at', XYZ], ['t', f64]);
+
+const REGION_EVENT = rec(
+  ['state', int],
+  // when it starts (match seconds), how long its warning is, how long it runs, and how far into the run it is
+  ['at', f64], ['warn', f64], ['run', f64], ['t', f64],
+  // which of the region's spots it happens at, and where its effect stands now
+  ['k', int], ['spot', XYZ],
+  // a counter and things in flight (the eruption's bombs: where each lands and seconds until it does)
+  ['n', int], ['marks', list(MARK)],
+);
+
 const CLOUD = rec(['owner', int], ['at', XYZ], ['t', f64]);
 const DECOY = rec(['owner', int], ['pos', XYZ], ['head', XYZ], ['t', f64]);
 const MINE = rec(['owner', int], ['at', XYZ], ['t', f64]);
@@ -205,6 +220,9 @@ const MATCH_SCHEMA = rec(
   ['decoys', list(DECOY)],
   ['mines', list(MINE)],
   ['whale', WHALE],
+  ['regionEvents', list(REGION_EVENT, 16)],
+  // seconds the Ice Crown's floes have ridden ahead of the clock, when its event drives them on
+  ['floeT', f64],
   ['leader', int],
   ['rentT', f64],
   ['events', list(HAPPENING)],
@@ -221,10 +239,11 @@ export type WindGust = Value<typeof WIND_GUST>;
 export type WeatherSystem = Value<typeof SYSTEM>;
 export type Happening = Value<typeof HAPPENING>;
 export type Sinking = Value<typeof SINKING>;
+export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 1, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 2, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {
@@ -275,11 +294,16 @@ export const EVENT = {
   weatherEnds: 44,
   blocked: 45,
   splash: 46,
+  regionWarn: 47,
+  regionStart: 48,
+  regionEnd: 49,
+  lavaBomb: 50,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
   'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
+  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb',
 ];
 
 /** Event flag bits. */
