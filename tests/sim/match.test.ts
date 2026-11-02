@@ -340,6 +340,26 @@ test('Ram surges forward and smashes into the ship ahead', (t) => {
   assert.ok(!said.some((s) => s.tick === blow!.tick && s.e.kind === EVENT.hit && s.e.ship === G), 'the rammer takes nothing from the blow');
 });
 
+test('no collision takes off more than the cap, even a gusting Ram on a light hull into a ship sailing at her', (t) => {
+  const state = at('ram', 'lightHull');
+  place(state, G, COURSE, SHIP.top);
+  const T0 = spot(40);
+  place(state, T, { pos: T0.pos, head: v3(-T0.head.x, -T0.head.y, -T0.head.z) }, SHIP.top);
+  let took = 0, tick = -1, worst = 0;
+  run(state, 3, (i) => (i === G ? sailOn({ ability: true, gust: true }) : i === T ? sailOn({ gust: true }) : null), (s) => {
+    for (const e of s.events) {
+      if (e.kind !== EVENT.hit || e.item !== CAUSE.ram) continue;
+      if (s.tick !== tick) took = 0;
+      tick = s.tick;
+      took += e.amount;
+      worst = Math.max(worst, took);
+    }
+  });
+  t.diagnostic(`the worst collision took ${worst.toFixed(1)} off one ship`);
+  assert.ok(worst > 0, 'they collide');
+  assert.ok(worst <= SHIP.ramCap + 1e-9, `at most ${SHIP.ramCap}`);
+});
+
 test('Reveal shows every ship near you on the map, even one hidden', () => {
   const state = at('reveal');
   place(state, T, spot(150));

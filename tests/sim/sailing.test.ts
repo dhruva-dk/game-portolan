@@ -2,10 +2,10 @@
 // grounding, currents, the gust, the wind, tides, day and night, weather, and lanterns at night.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hourOf, isNight, localHour, seaLevel, seaLevelAt, sunDir } from '../../src/sim/environment.ts';
+import { floeTime, hourOf, isNight, localHour, seaLevel, seaLevelAt, solidAt, sunDir } from '../../src/sim/environment.ts';
 import { cross, dot, length, normalize, rngFloat, rngFrom, set, v3, type V3 } from '../../src/sim/math.ts';
 import { pointOfSail, settledSpeed, turnRate } from '../../src/sim/sailing.ts';
-import { R, along, apart, fromLatLon, localFrame, tangentAt } from '../../src/sim/sphere.ts';
+import { R, along, apart, fromLatLon, localFrame, tangentAt, tangentToward } from '../../src/sim/sphere.ts';
 import { CAUSE, EVENT, TICK, type MatchState } from '../../src/sim/state.ts';
 import { DAY, GUST, SHIP, TIDE, WEATHER, WEATHER_KIND, WIND } from '../../src/sim/tables.ts';
 import { RULE } from '../../src/sim/rules.ts';
@@ -13,7 +13,8 @@ import { seen, SEEN, sightOf } from '../../src/sim/visibility.ts';
 import { brew, newSky, skyAt } from '../../src/sim/weather.ts';
 import { newWind, windAt } from '../../src/sim/wind.ts';
 import {
-  CENTRES, CURRENTS, DRAFT, GREAT_CURRENT, REGIONS, TIDE_AMPLITUDE, VORTEX, currentAt, heightAt, navigable, regionAt,
+  CENTRES, CURRENTS, DRAFT, FLOES, GREAT_CURRENT, OBSTACLES, REGIONS, TIDE_AMPLITUDE, VORTEX, currentAt, floePos, heightAt,
+  navigable, obstacleAt, regionAt, type Obstacle,
 } from '../../src/sim/world/index.ts';
 import { events, openWater, place, quietMatch, run, sailOn, type Course } from './fixture.ts';
 
@@ -404,4 +405,95 @@ test('at night a ship beyond 150 m shows only as a lantern', () => {
       assert.equal((v & SEEN.lantern) !== 0, dark && far, `${dark ? 'night' : 'day'}, ${d} m: ${v}`);
     }
   }
+});
+
+/** A clear run of `run` metres at obstacle o, ending `stop` metres from its centre, or null. */
+function runAt(state: MatchState, o: Obstacle, stop: number, run = 40): Course | null {
+  const T = v3(), P = v3(), Q = v3();
+  for (let b = 0; b < 2 * Math.PI; b += Math.PI / 36) {
+    tangentAt(o.pos, b, T);
+    along(o.pos, T, stop + run, P);
+    let ok = true;
+    for (let d = stop; d <= stop + run + SHIP.half && ok; d += 1) {
+      along(o.pos, T, d, Q);
+      ok = deep(Q, 0.5) && !solidAt(state, Q);
+    }
+    if (!ok) continue;
+    // heading back along T, at the obstacle
+    tangentToward(P, o.pos, Q);
+    return { pos: v3(P.x, P.y, P.z), head: v3(Q.x, Q.y, Q.z) };
+  }
+  return null;
+}
+
+test('columns standing in the water are solid: she stops at kelp, coral, glass, the cedar\'s stump and the Root Gate\'s roots', (t) => {
+  const tried = new Set<string>();
+  for (const o of OBSTACLES) {
+    const id = REGIONS[o.region].id;
+    if (o.kind !== 'trunk' || tried.has(id)) continue;
+    const state = quietMatch(), course = runAt(state, o, o.r + 2);
+    if (!course) continue;
+    tried.add(id);
+    const i = o.region;
+    place(state, i, course, SHIP.top);
+    let inside = 0, closest = 1e9;
+    run(state, 8, only(i, sailOn()), (s) => {
+      const ship = s.ships[i];
+      if (obstacleAt(ship.pos) >= 0) inside++;
+      closest = Math.min(closest, apart(ship.pos, o.pos));
+    });
+    t.diagnostic(`${id}: a column ${o.r.toFixed(1)} m round; her middle came within ${closest.toFixed(1)} m of its heart`);
+    assert.equal(inside, 0, `${id}: she never sailed into it`);
+    assert.ok(closest < o.r + SHIP.half + 4, `${id}: she sailed right up to it`);
+  }
+  for (const id of ['kelpShallows', 'coralAtolls', 'glassSea', 'mistwood', 'mangroveLabyrinth']) assert.ok(tried.has(id), `${id} was tried`);
+});
+
+test('the Hollow Cedar\'s log is solid in its walls', (t) => {
+  const log = OBSTACLES.find((o) => o.kind === 'log');
+  assert.ok(log);
+  const state = quietMatch(), i = log.region, side = cross(v3(), log.pos, log.facing), P = v3(), H = v3();
+  // abeam of the log somewhere along it, heading straight at its side over clear water
+  const A = v3(), Q = v3();
+  let found: Course | null = null;
+  for (let a = -40; a <= 40 && !found; a += 5) {
+    along(log.pos, log.facing, a, A);
+    for (const k of [1, -1]) {
+      set(H, side.x * k, side.y * k, side.z * k);
+      let ok = true;
+      for (let d = log.r + 1; d <= log.r + 40 && ok; d += 1) ok = deep(along(A, H, d, Q), 0.5);
+      if (!ok) continue;
+      along(A, H, log.r + 36, P);
+      tangentToward(P, A, H);
+      found = { pos: v3(P.x, P.y, P.z), head: v3(H.x, H.y, H.z) };
+      break;
+    }
+  }
+  assert.ok(found, 'clear water abeam of the log');
+  place(state, i, found, SHIP.top);
+  let inside = 0, closest = 1e9;
+  run(state, 8, only(i, sailOn()), (s) => {
+    if (obstacleAt(s.ships[i].pos) >= 0) inside++;
+    closest = Math.min(closest, apart(s.ships[i].pos, A));
+  });
+  t.diagnostic(`her middle came within ${closest.toFixed(1)} m of the log's axis`);
+  assert.equal(inside, 0, 'she never sailed into its wall');
+  assert.ok(closest < log.r + SHIP.half + 4, 'she sailed right up to it');
+});
+
+test('a floe riding into a ship that lies still shoulders her out of its way', (t) => {
+  const state = quietMatch(), i = 0, f = FLOES[0], P = v3(), Q = v3(), H = v3(), C = v3();
+  // where the floe will be in 12 s, heading on round its ring
+  floePos(f, floeTime(state) + 12, P);
+  floePos(f, floeTime(state) + 13, Q);
+  tangentToward(P, Q, H);
+  place(state, i, { pos: P, head: H });
+  let deepest = 0;
+  run(state, 40, () => null, (s) => {
+    floePos(f, floeTime(s), C);
+    deepest = Math.max(deepest, f.size - apart(s.ships[i].pos, C));
+  });
+  t.diagnostic(`the floe ran at most ${deepest.toFixed(2)} m into her; she was carried ${apart(state.ships[i].pos, P).toFixed(1)} m`);
+  assert.ok(deepest < 1, 'it never ran into her');
+  assert.ok(apart(state.ships[i].pos, P) > 5, 'it pushed her along');
 });

@@ -79,6 +79,8 @@ export const mangroveLabyrinth: RegionSpec = {
   ],
   obstacles: [
     { kind: 'arch', x: GATE.x, y: GATE.y, bearing: 90, r: GATE.half, height: GATE.top, inner: GATE.clear },
+    // the Gate's root fans, springing from the mounds out into the water either side of the channel
+    ...[-1, 1].flatMap((s) => [-5.5, 5.5].map((y) => ({ kind: 'trunk' as const, x: GATE.x + s * 27.5, y: GATE.y + y, bearing: 0, r: 6.5, height: 20 }))),
   ],
   zones: [{ kind: 'canopy', x: 0, y: 0, r: 240 }],
   tidal: SILLS,

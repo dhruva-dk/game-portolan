@@ -2,6 +2,7 @@
 // its hull, the ships in sight, loot, the gull and its own water, and settle on a mode and a goal. Every tick
 // it steers for the goal (by A* over the nav grid when land is in the way), aims, fires and uses what it carries.
 import { canCall } from '../economy.ts';
+import { solidAt } from '../environment.ts';
 import type { ShipInput } from '../input.ts';
 import { PI, addScaled, dcos, dot, dsin, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
 import { cellCentre, clearLine, findPath, nearestOpen, openAt } from '../nav.ts';
@@ -453,11 +454,11 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
   } else c.path.length = 0;
   tangentToward(ship.pos, to, T);
   let steer = angleTo(ship.head, T, ship.pos);
-  // feel ahead for land
+  // feel ahead for land, and for floes and columns standing in the water
   along(ship.pos, ship.head, 14 + ship.speed, Q);
-  if (!openAt(Q)) {
+  if (!clearAt(state, Q)) {
     tangentAt(ship.pos, 0, U);
-    const left = probeSide(ship, -0.6), right = probeSide(ship, 0.6);
+    const left = probeSide(state, ship, -0.6), right = probeSide(state, ship, 0.6);
     if (left !== right) steer = left ? -0.9 : 0.9;
     else if (!left) steer = steer >= 0 ? 1.2 : -1.2;
   }
@@ -467,10 +468,12 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
   if (c.mode === MODE.heal && d < 15) out.throttle = 0.3;
 }
 
-function probeSide(ship: Ship, a: number): boolean {
+const clearAt = (state: MatchState, p: V3): boolean => openAt(p) && !solidAt(state, p);
+
+function probeSide(state: MatchState, ship: Ship, a: number): boolean {
   rotateTangent(ship.pos, ship.head, a, T);
   along(ship.pos, T, 16 + ship.speed, Q);
-  return openAt(Q);
+  return clearAt(state, Q);
 }
 
 /** In a fight: hold the selected weapon's preferred range, circling the foe. */

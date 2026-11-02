@@ -3,6 +3,7 @@
 // a straight reach through the middle holds the Hollow Cedar, a fallen giant lying in the water that you can
 // sail through, its broken stump standing beside it with foxfire at its top.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
+import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
 import { cells, fbm, fromEquator, hyp, noise, scatterPoints, segDist, shore, smax, smoothstep, snapWet } from '../kit.ts';
 import type { PropSpec, RegionSpec } from '../spec.ts';
@@ -14,6 +15,9 @@ const CELL = 82;
 const REACH_A = [-140, 52], REACH_B = [140, -2];
 const LOG = { x: 0, y: 25, bearing: 100.9, length: 96, r: 9, inner: 6.5 };
 const SNAG = { x: -72, y: 70 };
+// The cedar's broken stump, standing in the water beside the log: 18 m to the log's left and 44 m back.
+const LB = LOG.bearing * (3.141592653589793 / 180);
+const STUMP = { x: LOG.x - 18 * dcos(LB) - 44 * dsin(LB), y: LOG.y + 18 * dsin(LB) - 44 * dcos(LB), r: 9 };
 
 function islandDist(x: number, y: number): number {
   const wx = x + 7 * noise(x * 0.03, y * 0.03, S), wy = y + 7 * noise(x * 0.03 + 4.4, y * 0.03, S + 1);
@@ -58,6 +62,7 @@ export const mistwood: RegionSpec = {
   ],
   obstacles: [
     { kind: 'log', x: LOG.x, y: LOG.y, bearing: LOG.bearing, r: LOG.r, inner: LOG.inner, length: LOG.length, height: 14 },
+    { kind: 'trunk', x: STUMP.x, y: STUMP.y, bearing: 0, r: STUMP.r, height: 70 },
   ],
   zones: [{ kind: 'mist', x: 0, y: 0, r: 330 }],
   tidal: [],

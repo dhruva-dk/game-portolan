@@ -5,8 +5,8 @@
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, plant, polyDist, scatter, shoals, smax, smin, smoothstep, snapWet } from '../kit.ts';
-import type { RegionSpec } from '../spec.ts';
+import { fbm, fromEquator, hash01, hyp, noise, plant, polyDist, scatter, shoals, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import type { ObstacleSpec, RegionSpec } from '../spec.ts';
 
 const S = 0xc0a1;
 const DEG = 3.141592653589793 / 180;
@@ -75,6 +75,17 @@ function height(x: number, y: number): number {
 const TIDAL: number[] = [];
 for (const a of ATOLLS) for (const [b, floor] of a.gaps) if (floor > -2.5) TIDAL.push(a.x + a.r * dsin(b * DEG), a.y + a.r * dcos(b * DEG));
 
+// The Great Reef's coral towers: a ring inside the rim, standing clear of the gaps so a ship coming in by one has
+// open water ahead. Every fifth is a tall clump of branches, the rest squat columns.
+const TOWERS: ObstacleSpec[] = [];
+for (let i = 0; i < 18; i++) {
+  const b = i * 20;
+  if (GREAT.gaps.some(([g]) => Math.abs(((b - g + 540) % 360) - 180) < 12)) continue;
+  const clump = TOWERS.length % 5 === 2;
+  TOWERS.push({ kind: 'trunk', x: GREAT.x + 88 * dsin(b * DEG), y: GREAT.y + 88 * dcos(b * DEG), bearing: 0, r: clump ? 7 : 5,
+    height: clump ? 84 : 6 + 18 * hash01(i, 6, S) });
+}
+
 export const coralAtolls: RegionSpec = {
   height,
   // The Great Reef is low; a glow of bioluminescence rising from its lagoon is what neighbours see.
@@ -85,7 +96,7 @@ export const coralAtolls: RegionSpec = {
     // Up the eastern side from the Maelstrom's edge and across the Great Current to the Spires.
     { name: 'the Reef current', pts: LANE, width: 24, speed: 3 },
   ],
-  obstacles: [],
+  obstacles: TOWERS,
   zones: ATOLLS.map((a) => ({ kind: 'lagoon' as const, x: a.x, y: a.y, r: a.r - a.w })),
   tidal: TIDAL,
   props: plant(height, 'palm', [-260, -260, 260, 300], 7, S + 20, 0.65, 0.8, 4, 0.3, 11),

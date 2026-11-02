@@ -2,13 +2,13 @@
 // mangrove standing astride a channel on its roots, columns of kelp, shards and coral towers standing out of the
 // water, a tree on a hill and a waterfall's curtain. Where the region's heights already carry the landmark (the Crown,
 // the Needle, Cinder Peak, the Eye...), nothing is added. Each shape stands in the landmark's own frame: +Y the
-// outward normal, +Z its facing, y = 0 at sea level. Most are for the eye only and the simulation sails through them;
-// the kelp columns stand on the region's trunks, which it runs into.
+// outward normal, +Z its facing, y = 0 at sea level. The columns of kelp, glass and coral and the cedar's stump stand
+// on the region's trunks, which the simulation runs into, and the Root Gate's roots over trunks of their own.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
-import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type RegionId } from '../../sim/world/index.ts';
+import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type Obstacle, type RegionId } from '../../sim/world/index.ts';
 import { patch } from '../engine.ts';
 
 const rock = (color: number, rough = 0.9) => patch(new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), 'landmark-rock');
@@ -37,14 +37,14 @@ function column(x: number, z: number, top: number, r: number, mat: THREE.Materia
   return new THREE.Mesh(g, mat);
 }
 
-/** Things set round a circle of radius `ring`, with every `gap`th left out for a way in. */
-function around(n: number, ring: number, gap: number, make: (x: number, z: number, i: number) => THREE.Object3D): THREE.Group {
+/** A shape at each of the landmark's region's columns, so what a ship runs into is what she sees. */
+function columnsOf(lm: Landmark, make: (x: number, z: number, o: Obstacle, i: number) => THREE.Object3D): THREE.Group {
   const out = new THREE.Group();
-  for (let i = 0; i < n; i++) {
-    if (gap && i % gap === 0) continue;
-    const a = (i / n) * Math.PI * 2;
-    out.add(make(Math.sin(a) * ring, Math.cos(a) * ring, i));
-  }
+  OBSTACLES.forEach((o, i) => {
+    if (o.region !== lm.region || o.kind !== 'trunk') return;
+    const { x, z } = local(lm, o.pos);
+    out.add(make(x, z, o, i));
+  });
   return out;
 }
 
@@ -187,7 +187,8 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // glowing down its side
   mistwood: (lm) => {
     const out = new THREE.Group(), wood = patch(new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true }), 'landmark-rock');
-    const stump = cedarStump(18, -44, -6, lm.height - 14, 9, 2.4);
+    const at = OBSTACLES.find((o) => o.region === lm.region && o.kind === 'trunk'), foot = at ? local(lm, at.pos) : { x: 18, z: -44 };
+    const stump = cedarStump(foot.x, foot.z, -6, lm.height - 14, at?.r ?? 9, 2.4);
     out.add(new THREE.Mesh(cedarLog(), wood), new THREE.Mesh(stump.geometry, wood));
     for (let i = 0; i < 4; i++) {
       const shelf = glow(0x9dffb0, 2.2, 4);
@@ -223,15 +224,16 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     out.add(trunk, crown);
     return out;
   },
-  // Glasswater: shards of natural glass round the rim of the pool
+  // Glasswater: shards of natural glass round the rim of the pool, one at each of the region's columns, which are
+  // their girth at the waterline
   glassSea: (lm) => {
     const glass = patch(new THREE.MeshStandardMaterial({ color: 0x9fe6e0, roughness: 0.1, metalness: 0.2, flatShading: true }), 'landmark-glass');
-    return around(14, 42, 7, (x, z, i) => {
-      const h = 14 + (lm.height - 14) * jitter(i, 2) * (i % 3 === 1 ? 1 : 0.5);
-      const g = new THREE.ConeGeometry(3 + 3 * jitter(i, 3), h + 4, 5);
-      g.translate(x, h / 2 - 2, z);
+    return columnsOf(lm, (x, z, o, i) => {
+      const g = new THREE.ConeGeometry(o.r / 0.8, o.height + 4, 5);
+      g.translate(0, o.height / 2 - 2, 0);
       const m = new THREE.Mesh(g, glass);
-      m.rotation.set((jitter(i, 4) - 0.5) * 0.2, 0, (jitter(i, 5) - 0.5) * 0.2);
+      m.position.set(x, 0, z);
+      m.rotation.set((jitter(i, 4) - 0.5) * 0.1, 0, (jitter(i, 5) - 0.5) * 0.1);
       return m;
     });
   },
@@ -239,8 +241,8 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // clumps of leaning branches, like antler coral, not as single columns
   coralAtolls: (lm) => {
     const coral = rock(0xe39a7a);
-    return around(18, 88, 4, (x, z, i) => {
-      if (i % 5 !== 2) return column(x, z, 6 + 18 * jitter(i, 6), 5, coral);
+    return columnsOf(lm, (x, z, o, i) => {
+      if (o.height < lm.height - 4) return column(x, z, o.height, o.r, coral);
       const clump = new THREE.Group();
       for (let b = 0; b < 5; b++) {
         const h = (lm.height - 4) * (b === 0 ? 1 : 0.45 + 0.4 * jitter(i, 10 + b)), a = b * 1.4 + jitter(i, 20 + b);

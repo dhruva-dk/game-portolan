@@ -4,8 +4,8 @@
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, plant, ridged, ringBand, shoals, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
-import type { RegionSpec } from '../spec.ts';
+import { fbm, fromEquator, hash01, hyp, noise, plant, ridged, ringBand, shoals, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import type { ObstacleSpec, RegionSpec } from '../spec.ts';
 
 const S = 0x6a55;
 const POOL = { x: 0, y: -10, r: 40 };
@@ -44,6 +44,16 @@ function height(x: number, y: number): number {
   return shoals(x, y, h, 140, S + 40);
 }
 
+// The shards of natural glass round the rim of the pool, every seventh left out for a way in. Each is a solid
+// column at the waterline, so what a ship runs into is what she sees; r is its girth there.
+const SHARDS: ObstacleSpec[] = [];
+for (let i = 0; i < 14; i++) {
+  if (i % 7 === 0) continue;
+  const a = (i / 14) * 6.283185307179586;
+  SHARDS.push({ kind: 'trunk', x: POOL.x - 42 * dsin(a), y: POOL.y + 42 * dcos(a), bearing: 0, r: 0.8 * (3 + 3 * hash01(i, 3, S)),
+    height: 14 + 56 * hash01(i, 2, S) * (i % 3 === 1 ? 1 : 0.5) });
+}
+
 export const glassSea: RegionSpec = {
   height,
   // Glasswater is low; its light pillar is what neighbours see.
@@ -54,7 +64,7 @@ export const glassSea: RegionSpec = {
     // The whale road: from the Maelstrom's edge north past Glasswater and across the Great Current.
     { name: 'the Whale road', pts: LANE, width: 26, speed: 2.6 },
   ],
-  obstacles: [],
+  obstacles: SHARDS,
   zones: [{ kind: 'lagoon', x: POOL.x, y: POOL.y, r: POOL.r - 4 }],
   tidal: [],
   props: plant(height, 'palm', [-260, -260, 260, 300], 7, S + 20, 0.6, 0.8, 4, 0.3, 9),

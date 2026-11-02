@@ -1,6 +1,6 @@
 // Sailing on the sphere: ships run great circles at up to 14.5 m/s, faster off the wind than into it, turn,
 // carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other.
-import { aground, currentAt, seaLevel } from './environment.ts';
+import { aground, currentAt, seaLevel, solidAt, solidNormal } from './environment.ts';
 import { hurt } from './harm.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
@@ -134,7 +134,7 @@ function move(state: MatchState, i: number, grounded: boolean): void {
   copy(ship.vel, V);
   const on = tryMove(state, ship, grounded);
   if (on === null) return;
-  shoreNormal(PROBE, N);
+  if (!hitSolid || !solidNormal(state, PROBE, N)) shoreNormal(PROBE, N);
   const into = -dot(V, N);
   if (into > 0) {
     if (into > GROUND.scrape && ship.scrape === 0) {
@@ -151,6 +151,8 @@ function move(state: MatchState, i: number, grounded: boolean): void {
 }
 
 const PROBES = [1, 0, -1];
+/** Whether the last move that was stopped ran into something standing out of the water rather than the ground. */
+let hitSolid = false;
 
 function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | null {
   const v = length(V);
@@ -159,15 +161,19 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
   advance(ship.pos, H1, v * TICK, P1, H1);
   set(H1, ship.head.x, ship.head.y, ship.head.z);
   normalize(addScaled(H1, H1, P1, -dot(H1, P1)));
-  if (!grounded) {
-    const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship);
-    for (const on of PROBES) {
-      normalize(addScaled(PROBE, P1, H1, on * half));
-      const h = heightAt(PROBE);
-      if (h <= level - draft) continue;
-      // a hull already touching the ground may still work off it: only rising ground stops her
-      normalize(addScaled(WAS, ship.pos, ship.head, on * half));
-      if (h > heightAt(WAS)) return on;
+  const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship);
+  for (const on of PROBES) {
+    normalize(addScaled(PROBE, P1, H1, on * half));
+    // a hull already touching the ground may still work off it: only rising ground stops her
+    const h = grounded ? -Infinity : heightAt(PROBE);
+    if (h > level - draft && h > heightAt(normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
+      hitSolid = false;
+      return on;
+    }
+    // and one caught inside a column or a floe may still get out of it
+    if (solidAt(state, PROBE) && !solidAt(state, normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
+      hitSolid = true;
+      return on;
     }
   }
   copy(ship.pos, P1);
@@ -186,9 +192,11 @@ function shoreNormal(p: V3, out: V3): V3 {
   return normalize(set(out, -V.x, -V.y, -V.z));
 }
 
-/** Aground on a falling tide, she is pushed gently off toward deeper water. */
+/** Aground on a falling tide, she is pushed gently off toward deeper water; inside something solid, out of it. */
 export function refloat(state: MatchState, i: number): void {
   const ship = state.ships[i];
+  // a floe riding into her, or a hull caught inside a column, is shouldered out of it
+  if (solidNormal(state, ship.pos, N)) addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 6);
   if (!aground(state, ship.pos, draftOf(ship))) return;
   shoreNormal(ship.pos, N);
   addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 4);
@@ -265,10 +273,11 @@ function contact(state: MatchState, i: number, j: number): void {
   }
   if (closing > SHIP.ram) {
     const dmg = (closing - 5) * SHIP.ramDamage;
-    // the faster ship drives into the slower one and takes less of the blow
+    // the faster ship drives into the slower one and takes less of the blow; no collision takes off more than the cap
     const fa = Math.max(0, dot(a.vel, D)), fb = Math.max(0, -dot(b.vel, D)), sum = fa + fb > 1e-9 ? fa + fb : 1;
-    if (!aRams) hurt(state, i, dmg * (0.3 + 0.7 * (fb / sum)), j, CAUSE.ram, a.pos, 1);
-    if (!bRams) hurt(state, j, dmg * (0.3 + 0.7 * (fa / sum)), i, CAUSE.ram, b.pos, 1);
+    const capA = SHIP.ramCap - (bRams ? POWERS.ram.damage : 0), capB = SHIP.ramCap - (aRams ? POWERS.ram.damage : 0);
+    if (!aRams) hurt(state, i, Math.min(capA, dmg * (0.3 + 0.7 * (fb / sum))), j, CAUSE.ram, a.pos, 1);
+    if (!bRams) hurt(state, j, Math.min(capB, dmg * (0.3 + 0.7 * (fa / sum))), i, CAUSE.ram, b.pos, 1);
     emit(state, EVENT.ram, fa >= fb ? i : j, fa >= fb ? j : i, a.pos, { amount: closing });
   }
 }

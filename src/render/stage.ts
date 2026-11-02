@@ -1,5 +1,5 @@
 // The planet on screen: the engine (HDR, bloom and the grade), the sky and its light, the terrain, the water, the
-// weather's formations, the landmarks the terrain can't make and the beacons, seen through the camera rig. The app
+// weather's formations, the landmarks the terrain can't make, the beacons and the floes, seen through the camera rig. The app
 // hands it a StageView every frame, made from the match or from a fixed scene; nothing here reads the simulation.
 import * as THREE from 'three';
 import { Engine, QUALITY, U, loadTextures, type Quality, type Textures } from './engine.ts';
@@ -11,6 +11,7 @@ import { Weather, type WeatherDepth, type WeatherSystem } from './weather.ts';
 import { CameraRig, type CameraMode, type CameraTarget } from './camera.ts';
 import { Landmarks } from './regions/landmarks.ts';
 import { Beacons } from './regions/beacons.ts';
+import { Floes } from './regions/floes.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
 
@@ -26,6 +27,8 @@ export interface StageView {
   tilt: number;
   /** Sea level against the mean, in metres. */
   tide: number;
+  /** How far round their rings the Ice Crown's floes have ridden, in seconds; `time` when absent. */
+  floes?: number;
   /** The wind where the camera looks, a tangent in metres per second. */
   wind: V3;
   camera: CameraMode;
@@ -61,6 +64,7 @@ export class Stage {
   readonly weather: Weather;
   readonly landmarks: Landmarks;
   readonly beacons: Beacons;
+  readonly floes = new Floes();
 
   private constructor(engine: Engine, tex: Textures, sky: Sky, terrain: Terrain, water: Water, weather: Weather, landmarks: Landmarks, beacons: Beacons) {
     this.engine = engine;
@@ -73,7 +77,7 @@ export class Stage {
     this.beacons = beacons;
     // the atmosphere rides on three's fog chunks, so a fog must exist for them to compile in
     this.scene.fog = new THREE.Fog(0xffffff, 1, 2);
-    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group);
+    this.scene.add(sky.group, terrain.group, water.mesh, weather.group, landmarks.group, beacons.group, this.floes.group);
     terrain.detail = engine.quality.detail;
     this.resize();
   }
@@ -151,6 +155,7 @@ export class Stage {
     this.terrain.update(eye);
     this.landmarks.update(this.sky.night);
     this.beacons.update(v.time, this.sky.night);
+    this.floes.update(v.floes ?? v.time, v.tide);
     this.engine.render(this.scene, cam, this.sky.grade, dt, () => {
       this.water.prepare(this.engine.renderer, this.scene, cam, this.focus, this.sky.look, this.engine.width, this.engine.height, dt);
     });

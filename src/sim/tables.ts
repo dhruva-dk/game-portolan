@@ -27,6 +27,8 @@ export const SHIP = {
   touch: 10,
   ram: 7,
   ramDamage: 2.2,
+  /** The most one collision takes off a ship, the Ram ability's blow included. */
+  ramCap: 45,
   /** Using a consumable slows her to this share of speed. */
   using: 0.6,
   hull: 100,

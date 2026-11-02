@@ -1,8 +1,8 @@
 // The captains' chart: a coarse grid of open water over the sphere, baked once from the world's heights,
 // with routes found by A*. Built lazily on first use; the world is fixed, so it is the same for every match.
-import { dot, normalize, set, v3, type V3 } from './math.ts';
+import { addScaled, cross, dot, normalize, set, v3, type V3 } from './math.ts';
 import { R, cellDir, cellOf, cubeGrid, neighbor, type CubeGrid } from './sphere.ts';
-import { DRAFT, heightAt } from './world/index.ts';
+import { DRAFT, OBSTACLES, heightAt } from './world/index.ts';
 
 /** About 6.8 m cells. */
 export const NAV: CubeGrid = cubeGrid(128);
@@ -28,6 +28,7 @@ export function nav(): Nav {
     height[c] = heightAt(cellDir(NAV, c, p));
     open[c] = height[c] < OPEN ? 1 : 0;
   }
+  shutObstacles(open);
   // distance to shore, by a few rounds of erosion
   for (let c = 0; c < cells; c++) clear[c] = open[c] ? 4 : 0;
   for (let round = 0; round < 4; round++) {
@@ -38,6 +39,29 @@ export function nav(): Nav {
   }
   built = { height, open, clear };
   return built;
+}
+
+/** Margin kept off a column or a log's wall, metres. */
+const BERTH = 1.5;
+
+/** Shuts every cell a column or a log's wall stands in, with a little to spare; a log's bore stays open. */
+function shutObstacles(open: Uint8Array): void {
+  const p = v3(), side = v3();
+  for (const o of OBSTACLES) {
+    if (o.kind !== 'trunk' && o.kind !== 'log') continue;
+    cross(side, o.pos, o.facing);
+    const reach = Math.max(o.r, o.length / 2) + BERTH;
+    for (let a = -reach; a <= reach; a += 1) {
+      for (let b = -reach; b <= reach; b += 1) {
+        const out = Math.abs(b);
+        const hit = o.kind === 'trunk' ? Math.sqrt(a * a + b * b) < o.r + BERTH : Math.abs(a) < o.length / 2 + BERTH && out > o.inner && out < o.r + BERTH;
+        if (!hit) continue;
+        set(p, o.pos.x, o.pos.y, o.pos.z);
+        addScaled(p, p, o.facing, a / R);
+        open[cellOf(NAV, normalize(addScaled(p, p, side, b / R)))] = 0;
+      }
+    }
+  }
 }
 
 export const navCell = (p: V3): number => cellOf(NAV, p);

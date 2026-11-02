@@ -1,10 +1,10 @@
 // The planet's moving parts that aren't weather: the tide, the ground under the keel, the currents, and the sun.
-import { PI, datan2, dot, dsin, type V3 } from './math.ts';
-import { fromLatLon } from './sphere.ts';
+import { PI, addScaled, datan2, dot, dsin, length, normalize, set, v3, type V3 } from './math.ts';
+import { R, fromLatLon } from './sphere.ts';
 import { RULE } from './rules.ts';
 import { TICK, type MatchState } from './state.ts';
 import { DAY, TIDE } from './tables.ts';
-import { DRAFT, TIDE_AMPLITUDE, currentAt as worldCurrent, heightAt } from './world/index.ts';
+import { DRAFT, FLOES, OBSTACLES, TIDE_AMPLITUDE, currentAt as worldCurrent, floeAt, floePos, heightAt, obstacleAt } from './world/index.ts';
 
 /** The sea level in metres above mean, t seconds into the match. */
 export const seaLevelAt = (t: number): number => TIDE_AMPLITUDE * dsin((2 * PI * t) / TIDE.period);
@@ -15,6 +15,39 @@ export const seaLevel = (state: MatchState): number => seaLevelAt(state.tick * T
 export const shoal = (p: V3, level: number, draft = DRAFT): boolean => heightAt(p) > level - draft;
 
 export const aground = (state: MatchState, p: V3, draft = DRAFT): boolean => shoal(p, seaLevel(state), draft);
+
+// ---------------------------------------------------------------- what stands out of the water
+
+/** How far round their rings the Ice Crown's floes have ridden, in seconds of their ordinary drift. */
+export const floeTime = (state: MatchState): number => state.tick * TICK;
+
+/** Something standing out of the water at p that no hull passes through: a column, a log's wall, a floe. */
+export const solidAt = (state: MatchState, p: V3): boolean => obstacleAt(p) >= 0 || floeAt(p, floeTime(state)) >= 0;
+
+const C = v3();
+
+/** The way out of whatever solid stands at p, tangent to the sphere, or false if nothing does. */
+export function solidNormal(state: MatchState, p: V3, out: V3): boolean {
+  const o = obstacleAt(p);
+  if (o >= 0) {
+    const ob = OBSTACLES[o];
+    set(out, p.x - ob.pos.x, p.y - ob.pos.y, p.z - ob.pos.z);
+    if (ob.kind === 'log') {
+      // off the wall: out of the side of the log, or back into the bore from inside it
+      addScaled(out, out, ob.facing, -dot(out, ob.facing));
+      if (length(out) * R < (ob.inner + ob.r) / 2) set(out, -out.x, -out.y, -out.z);
+    }
+  } else {
+    const f = floeAt(p, floeTime(state));
+    if (f < 0) return false;
+    floePos(FLOES[f], floeTime(state), C);
+    set(out, p.x - C.x, p.y - C.y, p.z - C.z);
+  }
+  addScaled(out, out, p, -dot(out, p));
+  if (length(out) < 1e-12) return false;
+  normalize(out);
+  return true;
+}
 
 /** The surface current at p, m/s, tangent to the sphere. */
 export const currentAt = (p: V3, out: V3): V3 => worldCurrent(p, out);
