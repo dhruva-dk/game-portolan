@@ -81,6 +81,7 @@ const CAPTAIN = rec(
   ['claimT', f64],
   ['ring', list(XYZ)],
   ['li', int],
+  // seconds it holds a turn off land ahead, signed by its side: negative to port
   ['avoid', f64],
   ['felt', f64],
   // its drop has come past in the Gale: it leaves at the first gap in the crowd

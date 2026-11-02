@@ -40,27 +40,30 @@ const still = (p: V3, c: V3): boolean => {
  */
 export function openWater(region: number, run = 160, side = 50, bearing = 0, margin = 2): Course {
   const c = CENTRES[region], T = v3(), P = v3(), Q = v3(), H = v3(), S = v3(), F = v3();
-  for (let d = 40; d <= 320; d += 10) {
-    for (let k = 0; k < 24; k++) {
-      tangentAt(c, bearing + (k * PI) / 12, T);
-      along(c, T, d, P);
-      // in the open: nothing shut on the nav grid within a few cells, as the lightning's own test has it
-      if (regionAt(P) !== region || !deep(P, margin) || nav().clear[navCell(P)] < 4) continue;
-      for (let h = 0; h < 8; h++) {
-        tangentAt(P, (h * PI) / 4, H);
-        let ok = true;
-        for (let s = -16; s <= run && ok; s += 8) {
-          along(P, H, s, Q);
-          // the run may cross a shoal's bank, which leaves 0.7 m under the keel at low tide
-          if (!deep(Q, Math.min(margin, 0.5)) || !still(Q, F)) ok = false;
-          for (const off of [-side, side]) {
-            if (!ok) break;
-            tangentAt(Q, (h * PI) / 4 + PI / 2, S);
-            along(Q, S, off, S);
-            if (heightAt(S) > -DRAFT) ok = false;
+  // in the open: nothing shut on the nav grid within a few cells, as the lightning's own test has it, or as few as the
+  // region has (the Jade Shoals' bars lie close together)
+  for (let clear = 4; clear >= 2; clear--) {
+    for (let d = 40; d <= 320; d += 10) {
+      for (let k = 0; k < 24; k++) {
+        tangentAt(c, bearing + (k * PI) / 12, T);
+        along(c, T, d, P);
+        if (regionAt(P) !== region || !deep(P, margin) || nav().clear[navCell(P)] < clear) continue;
+        for (let h = 0; h < 8; h++) {
+          tangentAt(P, (h * PI) / 4, H);
+          let ok = true;
+          for (let s = -16; s <= run && ok; s += 8) {
+            along(P, H, s, Q);
+            // the run may cross a shoal's bank, which leaves 0.7 m under the keel at low tide
+            if (!deep(Q, Math.min(margin, 0.5)) || !still(Q, F)) ok = false;
+            for (const off of [-side, side]) {
+              if (!ok) break;
+              tangentAt(Q, (h * PI) / 4 + PI / 2, S);
+              along(Q, S, off, S);
+              if (heightAt(S) > -DRAFT) ok = false;
+            }
           }
+          if (ok) return { pos: v3(P.x, P.y, P.z), head: v3(H.x, H.y, H.z) };
         }
-        if (ok) return { pos: v3(P.x, P.y, P.z), head: v3(H.x, H.y, H.z) };
       }
     }
   }

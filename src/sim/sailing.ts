@@ -138,7 +138,9 @@ function move(state: MatchState, i: number, grounded: boolean): void {
   // she slides along that in turn
   for (let k = 0; k < GROUND.slides && on !== null; k++) {
     if (!hitSolid || !solidNormal(state, PROBE, N)) shoreNormal(PROBE, N);
-    const into = -dot(V, N);
+    let into = -dot(V, N);
+    // where the broad lie of the shore says she isn't going into it, the ground right under her says which way it rises
+    if (into <= 0 && !hitSolid) into = -dot(V, shoreNormal(PROBE, N, GROUND.probe * GROUND.fine));
     if (into > 0) {
       if (k === 0 && into > GROUND.scrape && ship.scrape === 0) {
         emit(state, EVENT.scrape, i, -1, PROBE, { amount: into });
@@ -166,12 +168,15 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
   advance(ship.pos, H1, v * TICK, P1, H1);
   set(H1, ship.head.x, ship.head.y, ship.head.z);
   normalize(addScaled(H1, H1, P1, -dot(H1, P1)));
-  const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship);
+  const half = (SHIP.half * 0.8) / R, level = seaLevel(state), draft = draftOf(ship), fore = dot(V, ship.head);
   for (const on of PROBES) {
+    // the hull follows where her bow has been: ground under her stern never stops a ship going ahead, nor under her bow
+    // one going astern
+    if (on * fore < 0) continue;
     normalize(addScaled(PROBE, P1, H1, on * half));
-    // a hull already touching the ground may still work off it: only rising ground stops her
-    const h = grounded ? -Infinity : heightAt(PROBE);
-    if (h > level - draft && h > heightAt(normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
+    // a hull already touching the ground may still work across the shallows, but not up onto dry land
+    const h = heightAt(PROBE);
+    if (h > (grounded ? level : level - draft) && h > heightAt(normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
       hitSolid = false;
       return on;
     }
@@ -186,9 +191,9 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
   return null;
 }
 
-/** The way off the shore at p: down the slope of the ground. */
-function shoreNormal(p: V3, out: V3): V3 {
-  const d = GROUND.probe / R;
+/** The way off the shore at p: down the slope of the ground, measured `across` metres either side. */
+function shoreNormal(p: V3, out: V3, across: number = GROUND.probe): V3 {
+  const d = across / R;
   localFrame(p, E, NN);
   const gx = heightAt(normalize(addScaled(P1, p, E, d))) - heightAt(normalize(addScaled(P1, p, E, -d)));
   const gy = heightAt(normalize(addScaled(P1, p, NN, d))) - heightAt(normalize(addScaled(P1, p, NN, -d)));
@@ -197,14 +202,17 @@ function shoreNormal(p: V3, out: V3): V3 {
   return normalize(set(out, -V.x, -V.y, -V.z));
 }
 
-/** Aground on a falling tide, she is pushed gently off toward deeper water; inside something solid, out of it. */
+/**
+ * Aground on a falling tide, she is pushed gently off toward deeper water; inside something solid, out of it. A ship
+ * working off under her own way is pushed less, so the push never holds her where she is.
+ */
 export function refloat(state: MatchState, i: number): void {
   const ship = state.ships[i];
   // a floe riding into her, or a hull caught inside a column, is shouldered out of it
   if (solidNormal(state, ship.pos, N)) addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 6);
   if (!aground(state, ship.pos, draftOf(ship))) return;
   shoreNormal(ship.pos, N);
-  addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 4);
+  addScaled(ship.shove, ship.shove, N, GROUND.push * TICK * 4 * (ship.speed > 1 ? GROUND.under : 1));
 }
 
 // ---------------------------------------------------------------- the gust

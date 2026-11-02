@@ -44,10 +44,11 @@ export const GUST = { charges: 2, speed: 13, time: 1.15, recharge: 6.5, hop: 6.3
 export const GRAVITY = 9.8;
 
 /**
- * Running aground: the push off a falling tide, the speed kept against a shore, the speed that scrapes, the gradient's
- * reach (m), how many times a stopped move slides on along what stopped it, and how fast she eases off it (m/s).
+ * Running aground: the push off a falling tide, and the share of it a ship under way still gets; the speed kept against
+ * a shore, the speed that scrapes, the gradient's reach (m) and the share of it for the ground right under her, how
+ * many times a stopped move slides on along what stopped it, and how fast she eases off it (m/s).
  */
-export const GROUND = { push: 1.2, keep: 0.9, scrape: 3.5, probe: 1.5, slides: 3, ease: 0.3 } as const;
+export const GROUND = { push: 1.2, under: 0.25, keep: 0.9, scrape: 3.5, probe: 1.5, fine: 0.12, slides: 3, ease: 0.3 } as const;
 
 // ---------------------------------------------------------------- items
 

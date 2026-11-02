@@ -2,7 +2,7 @@
 // its hull, the ships in sight, loot, the gull and its own water, and settle on a mode and a goal. Every tick
 // it steers for the goal (by A* over the nav grid when land is in the way), aims, fires and uses what it carries.
 import { canCall } from '../economy.ts';
-import { solidAt } from '../environment.ts';
+import { aground, seaLevel, seaLevelAt, solidAt } from '../environment.ts';
 import type { ShipInput } from '../input.ts';
 import { PI, addScaled, dcos, dot, dsin, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
 import { cellCentre, clearLine, findPath, nearestOpen, openAt } from '../nav.ts';
@@ -10,10 +10,11 @@ import { GALE_SPEED, galeSeat } from '../opening.ts';
 import { activeOf, hasPerk } from '../perks.ts';
 import { rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
+import { draftOf } from '../sailing.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormView, newStormView, toEdge } from '../storm.ts';
-import { GALE, ITEM, PARCELS, PERKS, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
+import { GALE, ITEM, LOOT, PARCELS, PERKS, SLOTS, WEAPONS, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
 import { CENTRES, REGIONS } from '../world/index.ts';
@@ -41,9 +42,21 @@ export const BRAIN = {
    * aboard starts leaving this many seconds before it blows out.
    */
   spread: { most: 3, near: 100, gap: 2.5 },
+  /**
+   * Backing off a bank: a ship making less than `crawl` m/s is stuck. It turns hard toward the open side at about `rate`
+   * radians a second, for at least `least` seconds and at most `most`, and holds the turn until its course lies within
+   * `slack` of half a turn ahead of it.
+   */
+  backOff: { crawl: 1, rate: 0.65, least: 1, most: 4.5, slack: 0.6 },
+  /** Seconds it holds a turn off land ahead once the way clears. */
+  avoid: 0.8,
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
+/** The sea level the captain thinking now plans by (see levelFor): goals it picks lie in water deep enough at it. */
+let tide = 0;
+/** The turn, in radians, the ship steering now would make to face its course, before it feels for land ahead. */
+let course = 0;
 const PICKS = new Int32Array(REGIONS.length);
 const P = v3(), Q = v3(), T = v3(), U = v3(), VIEW = newStormView();
 
@@ -55,6 +68,7 @@ export function think(state: MatchState, i: number): void {
   c.think--;
   if (c.think > 0) return;
   c.think = BRAIN.every;
+  tide = levelFor(state);
   const style = styleOf(ship), rng = rngOf(state, i);
   if (ship.phase === PHASE.gale) {
     if (c.region < 0) chooseRegion(state, i, rng);
@@ -88,7 +102,8 @@ export function think(state: MatchState, i: number): void {
   const foeD = c.foe >= 0 ? apart(ship.pos, state.ships[c.foe].pos) : 1e9;
   if ((ship.hull < style.mend || ship.shield < 25) && healSlot(ship) >= 0 && (foeD > 70 || ship.hull < style.run)) {
     setMode(c, MODE.heal);
-    copy(c.goal, ship.pos);
+    // where it is, unless the tide is leaving it there
+    if (!openAt(ship.pos, tide) || !nearestOpen(ship.pos, c.goal, 10, tide)) copy(c.goal, ship.pos);
     if (c.foe >= 0) away(ship.pos, state.ships[c.foe].pos, 60, c.goal);
     return;
   }
@@ -120,6 +135,8 @@ export function think(state: MatchState, i: number): void {
     setMode(c, MODE.loot);
     c.target = state.loot[loot].id;
     copy(c.goal, state.loot[loot].at);
+    // loot lying in the shallows it takes from the edge of the water deep enough to reach it by
+    if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 1, tide);
     return;
   }
 
@@ -203,7 +220,7 @@ function chooseRegion(state: MatchState, i: number, rng: Rng): void {
   c.region = r;
   tangentAt(CENTRES[r], rngRange(rng, -PI, PI), T);
   along(CENTRES[r], T, rngRange(rng, 60, 180), c.drop);
-  if (!openAt(c.drop)) nearestOpen(c.drop, c.drop, 30);
+  if (!openAt(c.drop, tide)) nearestOpen(c.drop, c.drop, 30, tide);
 }
 
 /** Notes the nearest ship it can see, and keeps a grudge against whoever hits it. */
@@ -293,6 +310,8 @@ function bestLoot(state: MatchState, i: number, style: Style): number {
   for (let k = 0; k < state.loot.length; k++) {
     const l = state.loot[k], d = apart(ship.pos, l.at);
     if (d > reach || toEdge(state, l.at) < 10) continue;
+    // nor loot in water too shallow to come within reach of it
+    if (!openAt(l.at, tide) && !(nearestOpen(l.at, P, 1, tide) && apart(P, l.at) < LOOT.reach - 1.5)) continue;
     let worth = 0;
     if (isWeapon(l.item.kind)) worth = weaponWorth(ship, l.item.kind, l.item.rarity);
     else if (roomFor(ship, l.item) >= 0) worth = 0.5;
@@ -353,7 +372,7 @@ function planLoop(state: MatchState, i: number, style: Style, rng: Rng): void {
   const a0 = rngRange(rng, -PI, PI);
   tangentAt(ship.pos, a0, T);
   along(ship.pos, T, r, Q);
-  if (!openAt(Q) || toEdge(state, Q) < r + 20) return;
+  if (!openAt(Q, tide) || toEdge(state, Q) < r + 20) return;
   const spin = rngFloat(rng) < 0.5 ? -1 : 1, n = 6;
   tangentToward(Q, ship.pos, U);
   for (let k = 1; k <= n; k++) {
@@ -361,7 +380,7 @@ function planLoop(state: MatchState, i: number, style: Style, rng: Rng): void {
     const p = v3();
     rotateTangent(Q, U, a, T);
     along(Q, T, r, p);
-    if (!openAt(p) && !nearestOpen(p, p, 6)) continue;
+    if (!openAt(p, tide) && !nearestOpen(p, p, 6, tide)) continue;
     c.ring.push(p);
   }
 }
@@ -382,7 +401,7 @@ function roamGoal(state: MatchState, i: number, style: Style, rng: Rng): void {
       const k = 0.4;
       normalize(set(P, P.x + (calm.at.x - P.x) * k, P.y + (calm.at.y - P.y) * k, P.z + (calm.at.z - P.z) * k));
     }
-    if (openAt(P) && toEdge(state, P) > style.margin) {
+    if (openAt(P, tide) && toEdge(state, P) > style.margin) {
       copy(c.goal, P);
       return;
     }
@@ -397,7 +416,7 @@ const waitsOut = (c: Captain): boolean => c.storm.confidence >= BRAIN.waits.sure
 function lieInWait(p: V3, inset: number, out: V3): V3 {
   tangentToward(VIEW.calm.at, p, T);
   along(VIEW.calm.at, T, Math.max(0, VIEW.calm.r - inset), out);
-  if (!openAt(out)) nearestOpen(out, out, 20);
+  if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
   return out;
 }
 
@@ -406,7 +425,7 @@ function inward(p: V3, centre: V3, r: number, out: V3): V3 {
   if (d <= r) return copy(out, p);
   tangentToward(centre, p, T);
   along(centre, T, r * 0.6, out);
-  if (!openAt(out)) nearestOpen(out, out, 20);
+  if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
   return out;
 }
 
@@ -414,7 +433,7 @@ function away(p: V3, from: V3, d: number, out: V3): V3 {
   tangentToward(p, from, T);
   set(T, -T.x, -T.y, -T.z);
   along(p, T, d, out);
-  if (!openAt(out)) nearestOpen(out, out, 20);
+  if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
   return out;
 }
 
@@ -427,6 +446,7 @@ function keepInside(state: MatchState, p: V3, style: Style): void {
 
 export function helm(state: MatchState, i: number, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain, style = styleOf(ship), rng = rngOf(state, i);
+  tide = levelFor(state);
   out.fire = false;
   out.select = -1;
   out.swap = -1;
@@ -505,18 +525,23 @@ function crowd(state: MatchState, i: number): number {
 
 const WANT = v3();
 
+/** Seconds of tide a captain looks ahead: it routes through water deep enough now and still deep enough then. */
+const TIDE_AHEAD = 15;
+const levelFor = (state: MatchState): number => Math.min(seaLevel(state), seaLevelAt(state.tick * TICK + TIDE_AHEAD));
+
 function steerFor(state: MatchState, i: number, out: ShipInput): void {
-  const ship = state.ships[i], c = ship.captain;
+  const ship = state.ships[i], c = ship.captain, level = tide;
   if (c.mode === MODE.fight && c.foe >= 0) {
     fightCourse(state, i, WANT);
   } else copy(WANT, c.goal);
-  // land in the way: follow a route
-  const d = apart(ship.pos, WANT);
+  // land in the way: follow a route. A line from shallows isn't to be trusted, for it starts past the ground the ship is
+  // on: a bar there may lie between it and the water beyond, so it works out to open water by the route first.
+  const d = apart(ship.pos, WANT), shoaled = !openAt(ship.pos, level);
   let to: V3 = WANT;
-  if (d > 12 && !clearLine(ship.pos, WANT, 6)) {
+  if (d > 12 && (shoaled || !clearLine(ship.pos, WANT, 6, level))) {
     c.repath -= TICK;
     if (c.path.length === 0 || c.repath <= 0 || apart(c.pathTo, WANT) > 30) {
-      findPath(ship.pos, WANT, c.path, 4000);
+      findPath(ship.pos, WANT, c.path, 4000, level);
       copy(c.pathTo, WANT);
       c.leg = Math.min(1, c.path.length - 1);
       c.repath = BRAIN.repath;
@@ -525,19 +550,29 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
     if (c.leg < c.path.length) {
       // look ahead along the route as far as the water is clear
       let k = c.leg;
-      while (k + 1 < c.path.length && k < c.leg + 6 && clearLine(ship.pos, cellCentre(c.path[k + 1], Q), 6)) k++;
+      while (!shoaled && k + 1 < c.path.length && k < c.leg + 6 && clearLine(ship.pos, cellCentre(c.path[k + 1], Q), 6, level)) k++;
       to = cellCentre(c.path[k], P);
     }
   } else c.path.length = 0;
   tangentToward(ship.pos, to, T);
   let steer = angleTo(ship.head, T, ship.pos);
-  // feel ahead for land, and for floes and columns standing in the water
-  along(ship.pos, ship.head, 14 + ship.speed, Q);
-  if (!clearAt(state, Q)) {
-    tangentAt(ship.pos, 0, U);
-    const left = probeSide(state, ship, -0.6), right = probeSide(state, ship, 0.6);
-    if (left !== right) steer = left ? -0.9 : 0.9;
-    else if (!left) steer = steer >= 0 ? 1.2 : -1.2;
+  course = steer;
+  // feel ahead along its course for land, and for floes and columns standing in the water; not along its heading, for
+  // a ship coming round in a narrow channel would only ever feel the bank
+  along(ship.pos, T, Math.min(14 + ship.speed, apart(ship.pos, to)), Q);
+  if (!clearAt(state, Q, level)) {
+    const left = probeSide(state, ship, -0.6, level), right = probeSide(state, ship, 0.6, level);
+    // it keeps turning off the way it began to, unless only the other side lies open
+    let way = Math.sign(c.avoid);
+    if (way === 0 || (way < 0 ? !left && right : !right && left)) way = left !== right ? (left ? -1 : 1) : left ? 0 : steer >= 0 ? 1 : -1;
+    if (way !== 0) {
+      steer = way * (left !== right ? 0.9 : 1.2);
+      c.avoid = way * BRAIN.avoid;
+    }
+  } else if (c.avoid !== 0) {
+    // and holds the turn a moment once the way ahead clears, rather than swing straight back at what it turned from
+    if (Math.sign(steer) !== Math.sign(c.avoid)) steer = Math.sign(c.avoid) * 0.9;
+    c.avoid = c.avoid > 0 ? Math.max(0, c.avoid - TICK) : Math.min(0, c.avoid + TICK);
   }
   out.steer = steer;
   // ease off to pick loot up, or to hold a position
@@ -545,12 +580,12 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
   if (c.mode === MODE.heal && d < 15) out.throttle = 0.3;
 }
 
-const clearAt = (state: MatchState, p: V3): boolean => openAt(p) && !solidAt(state, p);
+const clearAt = (state: MatchState, p: V3, level: number): boolean => openAt(p, level) && !solidAt(state, p);
 
-function probeSide(state: MatchState, ship: Ship, a: number): boolean {
+function probeSide(state: MatchState, ship: Ship, a: number, level: number): boolean {
   rotateTangent(ship.pos, ship.head, a, T);
   along(ship.pos, T, 16 + ship.speed, Q);
-  return clearAt(state, Q);
+  return clearAt(state, Q, level);
 }
 
 /** In a fight: hold the selected weapon's preferred range, circling the foe. */
@@ -570,7 +605,7 @@ function fightCourse(state: MatchState, i: number, out: V3): void {
   rotateTangent(foe.pos, T, c.strafe * swing, U);
   along(foe.pos, U, d < pref * 0.6 ? pref * 1.2 : pref, out);
   if (activeOf(ship) === 'ram' && ship.cooldown <= 0 && d < 45 && ship.hull > foe.hull) copy(out, foe.pos);
-  if (!openAt(out)) nearestOpen(out, out, 10);
+  if (!openAt(out, tide)) nearestOpen(out, out, 10, tide);
 }
 
 const LEAD = v3();
@@ -726,7 +761,10 @@ function abilityNow(state: MatchState, i: number, style: Style): boolean {
   }
 }
 
-/** Backs off land it is stuck against. */
+/**
+ * Backs off land it is stuck against. It goes by how far it really sailed last tick, not by its speed: a hull pressed
+ * into a bank or a floe keeps its way on while hardly moving.
+ */
 function stuck(state: MatchState, i: number, rng: Rng, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain;
   if (c.backT > 0) {
@@ -735,12 +773,20 @@ function stuck(state: MatchState, i: number, rng: Rng, out: ShipInput): void {
     out.throttle = 0.6;
     return;
   }
-  if (ship.speed < 1.5 && ship.flip <= 0 && ship.use < 0) c.stuckT += TICK;
+  if (apart(ship.was, ship.pos) < BRAIN.backOff.crawl * TICK && ship.flip <= 0 && ship.use < 0) c.stuckT += TICK;
   else c.stuckT = Math.max(0, c.stuckT - TICK * 2);
   if (c.stuckT > 2.5) {
-    c.backT = rngRange(rng, 1, 2.2);
     c.stuckT = 0;
     c.path.length = 0;
+    // it turns off toward whichever side lies open, or on the way to its course when both do
+    const left = probeSide(state, ship, -1.2, tide), right = probeSide(state, ship, 1.2, tide);
+    c.strafe = left !== right ? (left ? -1 : 1) : course >= 0 ? 1 : -1;
+    // and keeps turning until its course lies less than half a turn on, so it doesn't swing back across the bank; one
+    // already aground only turns off it, for it would only plough round in a circle
+    const { rate, least, most, slack } = BRAIN.backOff;
+    const round = c.strafe * course >= 0 ? Math.abs(course) : 2 * PI - Math.abs(course);
+    const hold = aground(state, ship.pos, draftOf(ship)) ? 0 : (round - PI + slack) / rate;
+    c.backT = Math.min(most, Math.max(rngRange(rng, least, least * 2.2), hold));
   }
 }
 

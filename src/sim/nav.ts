@@ -1,7 +1,7 @@
 // The captains' chart: a coarse grid of open water over the sphere, baked once from the world's heights,
 // with routes found by A*. Built lazily on first use; the world is fixed, so it is the same for every match.
 import { addScaled, cross, dot, normalize, set, v3, type V3 } from './math.ts';
-import { R, cellDir, cellOf, cubeGrid, neighbor, type CubeGrid } from './sphere.ts';
+import { R, cellDir, cellOf, cubeGrid, localFrame, neighbor, type CubeGrid } from './sphere.ts';
 import { DRAFT, OBSTACLES, heightAt } from './world/index.ts';
 
 /** About 6.8 m cells. */
@@ -11,10 +11,17 @@ export const NAV: CubeGrid = cubeGrid(128);
 const OPEN = -(DRAFT + 0.3);
 /** Line of sight is blocked by ground higher than this. */
 const SIGHT_LINE = 2.5;
+/** Soundings across a cell besides its centre, metres east and north of it. */
+const SOUNDINGS = [[2.3, 0], [-2.3, 0], [0, 2.3], [0, -2.3], [2.3, 2.3], [-2.3, 2.3], [2.3, -2.3], [-2.3, -2.3]];
 
 export interface Nav {
   readonly height: Float32Array;
+  /** The shallowest of a few soundings across the cell: a bar thinner than a cell still shows. */
+  readonly crest: Float32Array;
+  /** Open at mean tide. */
   readonly open: Uint8Array;
+  /** Shut whatever the tide: a column or a log's wall stands there. */
+  readonly shut: Uint8Array;
   /** Cells of open water to the nearest shore, up to 4. */
   readonly clear: Uint8Array;
 }
@@ -23,12 +30,17 @@ let built: Nav | null = null;
 
 export function nav(): Nav {
   if (built) return built;
-  const cells = NAV.cells, height = new Float32Array(cells), open = new Uint8Array(cells), clear = new Uint8Array(cells), p = v3();
+  const cells = NAV.cells, height = new Float32Array(cells), crest = new Float32Array(cells), open = new Uint8Array(cells), shut = new Uint8Array(cells), clear = new Uint8Array(cells);
+  const p = v3(), q = v3(), e = v3(), nn = v3();
+  shutObstacles(shut);
   for (let c = 0; c < cells; c++) {
     height[c] = heightAt(cellDir(NAV, c, p));
-    open[c] = height[c] < OPEN ? 1 : 0;
+    localFrame(p, e, nn);
+    let top = height[c];
+    for (const [a, b] of SOUNDINGS) top = Math.max(top, heightAt(normalize(addScaled(q, addScaled(q, p, e, a / R), nn, b / R))));
+    crest[c] = top;
+    open[c] = top < OPEN && !shut[c] ? 1 : 0;
   }
-  shutObstacles(open);
   // distance to shore, by a few rounds of erosion
   for (let c = 0; c < cells; c++) clear[c] = open[c] ? 4 : 0;
   for (let round = 0; round < 4; round++) {
@@ -37,15 +49,18 @@ export function nav(): Nav {
       for (let k = 0; k < 4; k++) if (clear[neighbor(NAV, c, k)] === round) { clear[c] = round + 1; break; }
     }
   }
-  built = { height, open, clear };
+  built = { height, crest, open, shut, clear };
   return built;
 }
+
+/** Whether cell c is open water with the sea at `level`: a falling tide closes the shallows, a rising one opens them. */
+const openCell = (n: Nav, c: number, level: number): boolean => n.shut[c] === 0 && n.crest[c] < level + OPEN;
 
 /** Margin kept off a column or a log's wall, metres. */
 const BERTH = 1.5;
 
 /** Shuts every cell a column or a log's wall stands in, with a little to spare; a log's bore stays open. */
-function shutObstacles(open: Uint8Array): void {
+function shutObstacles(shut: Uint8Array): void {
   const p = v3(), side = v3();
   for (const o of OBSTACLES) {
     if (o.kind !== 'trunk' && o.kind !== 'log') continue;
@@ -58,7 +73,7 @@ function shutObstacles(open: Uint8Array): void {
         if (!hit) continue;
         set(p, o.pos.x, o.pos.y, o.pos.z);
         addScaled(p, p, o.facing, a / R);
-        open[cellOf(NAV, normalize(addScaled(p, p, side, b / R)))] = 0;
+        shut[cellOf(NAV, normalize(addScaled(p, p, side, b / R)))] = 1;
       }
     }
   }
@@ -66,17 +81,17 @@ function shutObstacles(open: Uint8Array): void {
 
 export const navCell = (p: V3): number => cellOf(NAV, p);
 
-export const openAt = (p: V3): boolean => nav().open[navCell(p)] === 1;
+export const openAt = (p: V3, level = 0): boolean => openCell(nav(), navCell(p), level);
 
 const S = v3();
 
-/** Open water all along the chord from a to b. */
-export function clearLine(a: V3, b: V3, step = 4): boolean {
+/** Open water all along the chord from a to b, with the sea at `level`. */
+export function clearLine(a: V3, b: V3, step = 4, level = 0): boolean {
   const n = nav(), d = R * Math.sqrt(Math.max(0, 2 - 2 * dot(a, b))), k = Math.max(1, Math.ceil(d / step));
   for (let s = 1; s <= k; s++) {
     const f = s / k;
     normalize(set(S, a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f));
-    if (n.open[navCell(S)] === 0) return false;
+    if (!openCell(n, navCell(S), level)) return false;
   }
   return true;
 }
@@ -95,10 +110,10 @@ export function lineOfSight(a: V3, b: V3): boolean {
 const QUEUE: number[] = [], MARKS = new Int32Array(NAV.cells);
 let mark = 0;
 
-/** The centre of the nearest open cell to p, within `reach` cells. Returns false if there is none. */
-export function nearestOpen(p: V3, out: V3, reach = 40): boolean {
+/** The centre of the nearest open cell to p, within `reach` cells, with the sea at `level`. Returns false if there is none. */
+export function nearestOpen(p: V3, out: V3, reach = 40, level = 0): boolean {
   const n = nav(), start = navCell(p);
-  if (n.open[start]) {
+  if (openCell(n, start, level)) {
     set(out, p.x, p.y, p.z);
     return true;
   }
@@ -113,7 +128,7 @@ export function nearestOpen(p: V3, out: V3, reach = 40): boolean {
       end = QUEUE.length;
     }
     const c = QUEUE[q];
-    if (n.open[c]) {
+    if (openCell(n, c, level)) {
       const d = dot(cellDir(NAV, c, S), p);
       if (d > near) {
         near = d;
@@ -197,17 +212,17 @@ const gap = (a: number, b: number): number => {
 };
 
 /**
- * A route of nav cells from p to q over open water, keeping off the shore where it can. Gives up after `work` cells.
- * Returns false when there is no route; `out` then holds the route to the closest cell it reached.
+ * A route of nav cells from p to q over open water with the sea at `level`, keeping off the shore where it can. Gives up
+ * after `work` cells. Returns false when there is no route; `out` then holds the route to the closest cell it reached.
  */
-export function findPath(p: V3, q: V3, out: number[], work = 6000): boolean {
+export function findPath(p: V3, q: V3, out: number[], work = 6000, level = 0): boolean {
   const n = nav();
   centres();
   out.length = 0;
   const to = navCell(q);
   let from = navCell(p);
-  if (!n.open[from]) {
-    if (!nearestOpen(p, S, 6)) return false;
+  if (!openCell(n, from, level)) {
+    if (!nearestOpen(p, S, 6, level)) return false;
     from = navCell(S);
   }
   stamp++;
@@ -231,7 +246,7 @@ export function findPath(p: V3, q: V3, out: number[], work = 6000): boolean {
     }
     for (let k = 0; k < 4; k++) {
       const m = neighbor(NAV, c, k);
-      if (!n.open[m] && m !== to) continue;
+      if (!openCell(n, m, level) && m !== to) continue;
       const hug = n.clear[m] >= 2 ? 1 : 2.5;
       const gm = gc + gap(c, m) * hug;
       if (SEEN[m] === stamp && gm >= G[m]) continue;
