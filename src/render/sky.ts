@@ -215,6 +215,15 @@ void main() {
     sp += vec3(1.0, 0.97, 0.92) * (disc * 40.0 + pow(s, 200.0) * 0.6) + moon;
     sky = mix(sky, sp + rim, uSpace);
   }
+  // into the sea: where no sea floor is drawn behind the see-through water (a line that passes over the floor and out
+  // of the sea again, chunks past the ones kept round the camera, the far plane), the floor is at least as deep as the
+  // line's lowest point, so it is drawn as plain rock just under there, seen through that much sea, which is also what
+  // a drawn floor the line only grazes gives
+  float qb = dot(o, d), qc = dot(o, o) - uPlanet.y * uPlanet.y;
+  if (qc > 0.0 && qb < 0.0 && qb * qb > qc) {
+    vec3 m = o - d * qb;
+    sky = atmosphere(underSea(vec3(0.15) * seaLight(m), m), m);
+  }
   gl_FragColor = vec4(sky, 1.0);
 }`;
 

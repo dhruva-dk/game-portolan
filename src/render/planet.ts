@@ -110,8 +110,17 @@ float airLoss(vec3 wp) {
   return max(f, space * pow(1.0 - abs(dot(d / max(dist, 1e-3), wp / rw)), 4.0) * 0.85);
 }
 
+// where the eye's line to wp enters the sea, for a point under it seen from above: the air ends there
+vec3 seaEntry(vec3 wp) {
+  vec3 o = cameraPosition, v = wp - o;
+  float a = dot(v, v), b = dot(o, v), c = dot(o, o) - uPlanet.y * uPlanet.y;
+  if (c <= 0.0 || dot(wp, wp) >= uPlanet.y * uPlanet.y || a < 1e-6) return wp;
+  return o + v * clamp((-b - sqrt(max(b * b - a * c, 0.0))) / a, 0.0, 1.0);
+}
+
 vec3 atmosphere(vec3 col, vec3 wp) {
   if (uPlanet.x < 1.0) return col;
+  wp = seaEntry(wp);
   vec3 dir = normalize(wp - cameraPosition), up = normalize(wp);
   float f = airLoss(wp);
   float e = dot(up, uSunDir);

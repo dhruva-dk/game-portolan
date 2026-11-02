@@ -62,7 +62,7 @@ export async function serve({ production = false } = {}): Promise<Server> {
 
 const GPU_ARGS = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
 const SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
-const COMMON_ARGS = ['--autoplay-policy=no-user-gesture-required'];
+const COMMON_ARGS = ['--autoplay-policy=no-user-gesture-required', '--mute-audio'];
 
 export interface Launched {
   browser: Browser;
