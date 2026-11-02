@@ -87,15 +87,18 @@ test('she turns at up to her turning rate, and crawls through a hard turn', (t) 
   assert.ok(hard.ships[G].speed <= SHIP.crawl + 1e-9, `a hard turn holds her to ${SHIP.crawl} m/s, not ${hard.ships[G].speed.toFixed(2)}`);
 });
 
-/** From the open course, the first bearing that meets land between 40 and 140 m off over still, deep water. */
+/**
+ * From the open course, the first bearing that meets a shore between 40 and 200 m off over still, deep water:
+ * land that goes on for 12 m, not a thin rim like Glasswater's.
+ */
 function towardLand(): { course: Course; land: number } {
   const T = v3(), P = v3(), C = v3();
   for (let b = 0; b < 2 * Math.PI; b += Math.PI / 90) {
     tangentAt(COURSE.pos, b, T);
-    for (let d = 2; d <= 140; d += 1) {
+    for (let d = 2; d <= 200; d += 1) {
       along(COURSE.pos, T, d, P);
       if (heightAt(P) > 0) {
-        if (d >= 40) return { course: { pos: v3(COURSE.pos.x, COURSE.pos.y, COURSE.pos.z), head: v3(T.x, T.y, T.z) }, land: d };
+        if (d >= 40 && heightAt(along(COURSE.pos, T, d + 12, P)) > 0) return { course: { pos: v3(COURSE.pos.x, COURSE.pos.y, COURSE.pos.z), head: v3(T.x, T.y, T.z) }, land: d };
         break;
       }
       currentAt(P, C);
@@ -109,7 +112,7 @@ test('she stops at the shore and never sails onto land', (t) => {
   const { course, land } = towardLand(), state = quietMatch(), shore = along(course.pos, course.head, land, v3());
   place(state, G, course);
   let dry = 0, scrapes = 0, closest = 1e9;
-  run(state, 12, only(G, sailOn()), (s) => {
+  run(state, 18, only(G, sailOn()), (s) => {
     const ship = s.ships[G];
     if (heightAt(ship.pos) >= seaLevel(s)) dry++;
     scrapes += events(s, EVENT.scrape).filter((e) => e.ship === G).length;

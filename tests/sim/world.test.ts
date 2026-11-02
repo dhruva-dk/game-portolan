@@ -187,7 +187,7 @@ const GAPS = new Array<number>(REGION_COUNT).fill(0);
   }
 }
 
-test('outside the lanes, every straight course meets something at least every 217 m', { todo: 'twelve regions have open stretches longer than 217 m' }, (t) => {
+test('outside the lanes, every straight course meets something at least every 217 m', (t) => {
   t.diagnostic(`longest gap by region: ${REGIONS.map((r, i) => `${r.id} ${GAPS[i]} m`).join(', ')}`);
   const over = REGIONS.filter((_, i) => GAPS[i] > 217).map((r) => r.id);
   assert.deepEqual(over, []);

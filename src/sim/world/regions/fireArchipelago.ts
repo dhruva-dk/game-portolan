@@ -3,7 +3,7 @@
 // reach the sea in hot water. Around it, smaller black cones and lava skerries on near-black water.
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, polyDist, ridged, scatter, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, noise, polyDist, ridged, scatter, shoals, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0xf12e;
@@ -44,7 +44,8 @@ function height(x: number, y: number): number {
     const top = 6 + 26 * s.b * s.b, v = Math.max(0, 1 - rho / r);
     return d < 0 ? Math.max(shore(d, 1.5, 4, 0, 1), top * v * v * (0.4 + 0.6 * v) + 1.5 * smoothstep(0, 4, -d)) : shore(d, 0, 1, 2, 6);
   }, (cx, cy) => hyp(cx - PEAK.x, cy - PEAK.y) < PEAK.base + 55 || polyDist(cx, cy, LANE) < 40 || fromEquator(cx, cy, R, true) < 54);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const fireArchipelago: RegionSpec = {

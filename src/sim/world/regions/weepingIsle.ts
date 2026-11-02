@@ -4,7 +4,7 @@
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, needle, noise, polyDist, ridged, scatter, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, needle, noise, polyDist, ridged, scatter, shoals, smax, smin, smoothstep, snapWet } from '../kit.ts';
 import type { ObstacleSpec, RegionSpec } from '../spec.ts';
 
 const S = 0x3ee9;
@@ -38,7 +38,8 @@ function height(x: number, y: number): number {
     const r = 3 + 7 * s.a, rho2 = hyp(s.dx, s.dy);
     return rho2 > r + 10 ? -1e9 : needle(rho2, r, 2 + (s.b > 0.75 ? 20 : 7) * s.c);
   }, (cx, cy) => hyp(cx - ISLE.x, cy - ISLE.y) < ISLE.r + 30 || polyDist(cx, cy, LANE) < 26 || fromEquator(cx, cy, R, true) < 40);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 // The falls: curtains down the cliff all round, in the clefts.

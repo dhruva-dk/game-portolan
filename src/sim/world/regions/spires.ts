@@ -3,7 +3,7 @@
 // dark pines. The Needle itself is 150 m, seen from far across the north.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, needle, over, polyDist, scatter, scatterPoints, smoothstep, snapWet, type Scattered } from '../kit.ts';
+import { fbm, fromEquator, hyp, needle, over, polyDist, scatter, scatterPoints, shoals, smoothstep, snapWet, type Scattered } from '../kit.ts';
 import type { PropSpec, RegionSpec } from '../spec.ts';
 
 const S = 0x5b1e;
@@ -42,7 +42,8 @@ function height(x: number, y: number): number {
   h = scatter(x, y, 26, S + 20, 0.3, h, small, (cx, cy) => clear(cx, cy, 0));
   const dn = hyp(x - NEEDLE.x, y - NEEDLE.y);
   if (dn < 50) h = over(h, over(needle(dn, NEEDLE.r, NEEDLE.h), dn < NEEDLE.r + 6 ? -1.4 : -1.4 - 58.6 * smoothstep(0, 12, dn - NEEDLE.r - 6), 1), 1);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 // Pines crowning every big needle (the small ones are bare).

@@ -872,7 +872,7 @@ Contracts between owners:
 
 ### From pass 1 (blocked out)
 
-What pass 1 left, found while building it. The four open `todo` tests under "The world" are lines of the regions' done-when list that are not yet true. The rest each need a decision or a fix in a later pass.
+What pass 1 left, found while building it. The one open `todo` test under "The world" is a line of the regions' done-when list that is not yet true. The rest each need a decision or a fix in a later pass.
 
 The root page (`index.html`) and the iOS build now run the new app. The rewrite's flat game still runs at `dev/flat.html`, and its smoke test drives it there.
 
@@ -889,9 +889,9 @@ The root page (`index.html`) and the iOS build now run the new app. The rewrite'
 - The Gale fleet bunches up on the way across. Spread the captains' dive picks.
 - A Gale pick inside 600 m of the ship leaves the Gale at once.
 - Most of the fixture rivals are tagged Rival. Use a realistic spread.
+- A grounded ship can freeze on a slanting shore. `tryMove` refuses the whole step when any touching probe (bow, middle or stern) would climb, so a hull that drifts sideways along an oblique bank can't move forward or back until something turns her. Let her slide along the bank instead.
 
 **The world** (each is a `todo` test in `tests/sim/world.test.ts`, so `npm test` passes with them open):
-- **Open stretches:** twelve regions have straight courses longer than 217 m with nothing on them. The longest: the Narrows 570 m, the Coral Atolls 423 m, the Glass Sea 372 m, the Fire Archipelago 360 m, the Ice Crown 321 m, the Jade Shoals 318 m. Only Mistwood, the Kelp Shallows, the Weeping Isle and the Mangrove Labyrinth are under.
 - **The Needle** (see the question above): at 150 m it shows 462 m off, so it can't be seen from the Kelp Shallows, Blossom Run, the Fjords or the Basalt Stacks.
 
 **The renderer:**

@@ -5,7 +5,7 @@
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, plant, polyDist, scatter, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, noise, plant, polyDist, scatter, shoals, smax, smin, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0xc0a1;
@@ -67,7 +67,8 @@ function height(x: number, y: number): number {
     for (const a of ATOLLS) if (hyp(cx - a.x, cy - a.y) < a.r + a.w + 26) return true;
     return polyDist(cx, cy, LANE) < 30 || fromEquator(cx, cy, R, true) < 46;
   });
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 // The tidal gaps: on the rim at each sill's bearing.

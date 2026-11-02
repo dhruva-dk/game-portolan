@@ -2,7 +2,7 @@
 // fjord runs north from the open sea to Thunder Falls, which drops 146 m off the head wall with a sailable gap
 // behind its curtain; a sound crosses east–west; two arms branch off. Skerries litter the outer water.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
-import { fbm, hyp, noise, plant, ridged, scatter, segDist, smax, smin, smoothstep, snapWet, strokeDist } from '../kit.ts';
+import { fbm, hyp, noise, plant, ridged, scatter, segDist, shoals, smax, smin, smoothstep, snapWet, strokeDist } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0xf10d;
@@ -63,7 +63,8 @@ function height(x: number, y: number): number {
       return d < 0 ? top * smoothstep(0, r * 0.7, -d) : -60 * smoothstep(0, 14, d);
     }, (cx, cy) => massif(cx, cy) < 40);
   }
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const fjords: RegionSpec = {

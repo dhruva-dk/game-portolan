@@ -49,7 +49,8 @@ export function openWater(region: number, run = 160, side = 50, bearing = 0, mar
         let ok = true;
         for (let s = -16; s <= run && ok; s += 8) {
           along(P, H, s, Q);
-          if (!deep(Q, margin) || !still(Q, F)) ok = false;
+          // the run may cross a shoal's bank, which leaves 0.7 m under the keel at low tide
+          if (!deep(Q, Math.min(margin, 0.5)) || !still(Q, F)) ok = false;
           for (const off of [-side, side]) {
             if (!ok) break;
             tangentAt(Q, (h * PI) / 4 + PI / 2, S);

@@ -3,7 +3,7 @@
 // a round, sheltered bay under the tallest flame trees, open to the sea by one mouth.
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, needle, noise, plant, scatter, shore, smax, smin, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, needle, noise, plant, scatter, shoals, shore, smax, smin, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x591c;
@@ -48,7 +48,8 @@ function height(x: number, y: number): number {
     }
     return true;
   });
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const spiceIsles: RegionSpec = {

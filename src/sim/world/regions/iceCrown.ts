@@ -2,7 +2,7 @@
 // the floes ride three rings (they move, so they live in FLOE_RINGS, not the heightfield), with static pressure
 // ridges between the rings and bergs adrift everywhere; snow-fir rocks stand at the outer edge.
 // Chart: the pole at the origin; the Fjords lie toward -y, the Narrows toward +y.
-import { arcPts, fbm, hash01, hyp, needle, noise, over, plant, scatter, shore, smoothstep, snapWet, strokeDist } from '../kit.ts';
+import { arcPts, fbm, hash01, hyp, needle, noise, over, plant, scatter, shoals, shore, smoothstep, snapWet, strokeDist } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 import { dcos, dsin } from '../../math.ts';
 
@@ -57,7 +57,8 @@ function height(x: number, y: number): number {
       return d > 36 ? -1e9 : shore(d, 7 + 12 * s.b, 10, 14, 16);
     }, (cx, cy) => hyp(cx, cy) < 250);
   }
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 /** The floe rings: radius, angular speed (rad/s; alternate rings turn opposite ways), and each floe's place. */

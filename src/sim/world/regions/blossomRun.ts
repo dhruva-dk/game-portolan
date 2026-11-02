@@ -3,7 +3,7 @@
 // round hill beside the river, its pink crown 116 m up. River stones and meadow islets dot the outer water.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, plant, scatter, shore, smax, smin, smoothstep, snapWet, strokeDist } from '../kit.ts';
+import { fbm, fromEquator, hyp, noise, plant, scatter, shoals, shore, smax, smin, smoothstep, snapWet, strokeDist } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0xb105;
@@ -41,7 +41,8 @@ function height(x: number, y: number): number {
     const r = 4 + 10 * s.a, d = hyp(s.dx, s.dy) - r * (1 + 0.3 * noise(s.dx * 0.1, s.dy * 0.1, S + 5));
     return d > 30 ? -1e9 : shore(d, 1 + 5 * s.b, 8, 2.2, 10);
   }, (cx, cy) => country(cx, cy) < 30 || fromEquator(cx, cy, R, false) < 48);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const blossomRun: RegionSpec = {

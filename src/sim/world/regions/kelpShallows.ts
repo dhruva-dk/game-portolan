@@ -4,7 +4,7 @@
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hash01, hyp, noise, polyDist, ridged, scatter, shore, smin, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hash01, hyp, noise, polyDist, ridged, scatter, shoals, shore, smin, smoothstep, snapWet } from '../kit.ts';
 import type { ObstacleSpec, RegionSpec, ZoneSpec } from '../spec.ts';
 
 const S = 0x4e19;
@@ -32,7 +32,8 @@ function height(x: number, y: number): number {
     const r = 3 + 6 * s.a, d = hyp(s.dx, s.dy) - r;
     return d > 22 ? -1e9 : d < 0 ? -0.7 + 1.1 * s.b * smoothstep(0, 3, -d) : -0.7 - 59.3 * smoothstep(0, 22, d);
   }, (cx, cy) => hyp(cx - NAVE.x, cy - NAVE.y) < NAVE.r + 15 || polyDist(cx, cy, LANE) < 26);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 // The Cathedral's columns: a ring of eighteen, an inner ring of seven, and one at the heart.

@@ -5,7 +5,7 @@
 // Chart: the pole at the origin; the Glass Sea lies at bearing 334, and the south ring runs clockwise from it,
 // one region every 51.4 degrees.
 import { dcos, dsin } from '../../math.ts';
-import { fbm, hyp, mix, needle, noise, over, polyDist, ridged, scatter, shore, smoothstep, snapWet } from '../kit.ts';
+import { fbm, hyp, mix, needle, noise, over, polyDist, ridged, scatter, shoals, shore, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x3a1e;
@@ -69,7 +69,8 @@ function height(x: number, y: number): number {
       return d > 34 ? -1e9 : d < 0 ? needle(d + r, r, 2 + (s.b > 0.7 ? 18 : 6) * s.c) : shore(d, 0, 1, 1.5, 6);
     }, (cx, cy) => hyp(cx, cy) < RING.r + 48 || polyDist(cx, cy, LANE) < 30);
   }
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const maelstrom: RegionSpec = {

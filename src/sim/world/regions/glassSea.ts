@@ -4,7 +4,7 @@
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, plant, ridged, ringBand, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, noise, plant, ridged, ringBand, shoals, shore, smax, smin, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x6a55;
@@ -40,7 +40,8 @@ function height(x: number, y: number): number {
     const d = hyp(x - ix, y - iy) - r * (1 + 0.25 * noise(x * 0.06, y * 0.06, S + 3));
     if (d < 60) h = smax(h, shore(d, 2.4, 12, 3, 22), 2);
   }
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const glassSea: RegionSpec = {

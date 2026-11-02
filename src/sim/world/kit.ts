@@ -268,6 +268,23 @@ export function cells(x: number, y: number, cell: number, seed: number, jitter =
   return CELLS;
 }
 
+/**
+ * Shoals: a net of narrow banks along the edges of Voronoi cells `cell` metres apart, cresting 3.2 m down: shallow
+ * enough to show pale and to count as shallows, deep enough to sail over at low tide. A straight course through
+ * open water crosses one within about a cell. The edges are warped so the banks wander like sand ribbons and
+ * reef lines rather than drawing a net. Banks are `half` metres either side of the edge, give or take half
+ * that, and only raise water that is deeper.
+ */
+export function shoals(x: number, y: number, h: number, cell: number, seed: number, half = 7): number {
+  const crest = -3.2;
+  if (h >= crest) return h;
+  const f = 1.3 / cell, wx = x + 0.22 * cell * noise(x * f, y * f, seed + 2), wy = y + 0.22 * cell * noise(x * f + 5.3, y * f, seed + 3);
+  const c = cells(wx, wy, cell, seed), edge = (c.f2 - c.f1) / 2;
+  const w = half * (1 + 0.5 * noise(x * 0.025, y * 0.025, seed + 1));
+  if (edge >= 2.5 * w) return h;
+  return crest + (h - crest) * smoothstep(w, 2.5 * w, edge);
+}
+
 // Ring regions sit at latitude ±31°. In a ring region's chart, how far a point is from the equator, in metres
 // (positive inside the region's own hemisphere). `R` is the planet radius; `south` is true for the southern ring.
 const SIN31 = 0.5150380749100542, COS31 = 0.8571673007021123;

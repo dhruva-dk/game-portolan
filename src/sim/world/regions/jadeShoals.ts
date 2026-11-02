@@ -4,7 +4,7 @@
 // the Sandbar Light, a natural beacon of glowing glass sand.
 // Chart: x east, y north (toward the equator); the Maelstrom lies south.
 import { R } from '../../sphere.ts';
-import { blobDist, fbm, fromEquator, hash01, noise, over, plant, smin, smoothstep, snapWet } from '../kit.ts';
+import { blobDist, fbm, fromEquator, hash01, noise, over, plant, shoals, smin, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x7ade;
@@ -43,7 +43,8 @@ function height(x: number, y: number): number {
     const q = Math.min(1, dd), dune = DUNE.h * (1 - q * q) * (1 - q * q) - 60 * smoothstep(1, 1.6, dd);
     h = over(h, dune, 3);
   }
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 // The tidal gaps inside the region, for the simulation and the tests.

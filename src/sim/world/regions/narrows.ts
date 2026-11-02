@@ -4,7 +4,7 @@
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { fbm, fromEquator, hyp, noise, over, polyDist, scatter, shore, smoothstep, snapWet } from '../kit.ts';
+import { fbm, fromEquator, hyp, noise, over, polyDist, scatter, shoals, shore, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0x7a77;
@@ -50,7 +50,8 @@ function height(x: number, y: number): number {
     return d < 0 ? top * smoothstep(0, 3, -d) : shore(d, 0, 1, 1.8, 6);
   }, (cx, cy) => Math.abs(cx - axis(cy)) < SLOT + WALL + 40 && cy < NORTH + 40 && cy > SOUTH - 40
     || polyDist(cx, cy, LANE) < 40 || fromEquator(cx, cy, R, false) < 62);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const narrows: RegionSpec = {

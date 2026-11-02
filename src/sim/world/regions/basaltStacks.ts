@@ -5,7 +5,7 @@
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
-import { blobDist, fbm, fromEquator, hexCell, hyp, needle, noise, over, polyDist, scatter, segDist, smax, smoothstep, snapWet } from '../kit.ts';
+import { blobDist, fbm, fromEquator, hexCell, hyp, needle, noise, over, polyDist, scatter, segDist, shoals, smax, smoothstep, snapWet } from '../kit.ts';
 import type { RegionSpec } from '../spec.ts';
 
 const S = 0xba5a;
@@ -70,7 +70,8 @@ function height(x: number, y: number): number {
     const d = hyp(s.dx, s.dy) - 3 - 4 * s.a;
     return d > 10 ? -1e9 : d < 0 ? 1.2 * smoothstep(0, 3, -d) : -60 * smoothstep(0, 10, d);
   }, (cx, cy) => fromEquator(cx, cy, R, false) < 30 || polyDist(cx, cy, LANE) < 16);
-  return h;
+  // Shoals across the open water, so no straight course runs empty for long.
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const basaltStacks: RegionSpec = {
