@@ -6,7 +6,8 @@
 //   npm run capture -- borders                            each region from orbit, and 8 m up on the sea at every border
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
-//   npm run capture -- ui [--device ipad|iphone] [--only a,b]  transition strips for each screen change (both sizes by default)
+//   npm run capture -- ui [--device ipad,ipadSmall,iphone,iphoneSmall] [--only a,b]  transition strips for each screen change (all four by default)
+//   npm run capture -- layout [--device …] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
 //   npm run capture -- perf                               frame time, triangles and draw calls per region
 //   npm run capture -- list                               the moments and transitions there are
 //
@@ -20,6 +21,7 @@ import { lap } from './lap.ts';
 import { moment, MOMENTS } from './moment.ts';
 import { ui, TRANSITIONS } from './ui.ts';
 import { perf } from './perf.ts';
+import { layout, SCREENS } from './layout.ts';
 
 const { values: a, positionals } = parseArgs({
   allowPositionals: true,
@@ -39,9 +41,10 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, blind, borders, lap, moment <name|all>, ui, perf');
+  console.log('commands: regions, blind, borders, lap, moment <name|all>, ui, layout, perf');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
+  console.log(`layout screens: ${SCREENS.map((s) => s.name).join(', ')}`);
   process.exit(0);
 }
 
@@ -56,6 +59,7 @@ try {
     case 'lap': await lap(r, { ...opts, ring: a.ring }); break;
     case 'moment': await moment(r, { ...opts, name: arg ?? 'all' }); break;
     case 'ui': await ui(r, { ...opts, device: a.device, only: a.only }); break;
+    case 'layout': await layout(r, { ...opts, device: a.device, only: a.only }); break;
     case 'perf': await perf(r, opts); break;
     default: throw new Error(`unknown capture command "${command}"`);
   }

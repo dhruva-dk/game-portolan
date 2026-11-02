@@ -25,6 +25,22 @@ export const DEVICES = {
     safeArea: { top: 0, right: 62, bottom: 20, left: 62 },
     simulator: 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max',
   },
+  iphoneSmall: {
+    label: 'iPhone 15 Pro',
+    width: 852,
+    height: 393,
+    dpr: 3,
+    safeArea: { top: 0, right: 59, bottom: 21, left: 59 },
+    simulator: 'com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro',
+  },
+  ipadSmall: {
+    label: 'iPad Pro 11-inch (M1)',
+    width: 1180,
+    height: 820,
+    dpr: 2,
+    safeArea: { top: 0, right: 0, bottom: 20, left: 0 },
+    simulator: 'com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-3rd-generation',
+  },
   ipad: {
     label: 'iPad Pro 13-inch (M5)',
     width: 1376,
@@ -59,6 +75,9 @@ export async function serve({ production = false } = {}): Promise<Server> {
     },
   };
 }
+
+/** Chromium's report that the machine's audio device failed, which a muted capture never hears anyway. */
+const HOST_AUDIO = /^The AudioContext encountered an error from the audio device or the WebAudio renderer/;
 
 const GPU_ARGS = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
 const SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
@@ -155,6 +174,8 @@ export class Game {
     this.hookName = hookName;
     page.on('console', (m) => {
       const where = m.location().url ? ` (${m.location().url}:${m.location().lineNumber})` : '';
+      // the host's own sound device failing under a muted headless browser is not the page's problem
+      if (HOST_AUDIO.test(m.text())) return void console.warn(`harness: ${m.text()}`);
       if (m.type() === 'error') this.errors.push(m.text() + where);
       else if (m.type() === 'warning') this.warnings.push(m.text() + where);
     });

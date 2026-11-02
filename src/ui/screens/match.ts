@@ -12,12 +12,18 @@ import { galeGlobe } from './chart.ts';
 import { page } from './frame.ts';
 import './match.css';
 
-/** What the HUD's buttons do: hold or let go of a control, or pick a hotbar slot. */
-export type HoldWhat = 'fire' | 'gust' | 'reload' | 'ability' | 'take' | 'hail' | 'dive';
+/** What the HUD's buttons do: hold or let go of a control, pick or trade hotbar slots, set the sails, or call a gull. */
+export type HoldWhat = 'fire' | 'gust' | 'reload' | 'ability' | 'take' | 'hail' | 'dive' | 'drop';
 
 export interface HudActions {
   press(what: HoldWhat, down: boolean): void;
   pick(slot: number): void;
+  /** A slot dragged onto another: the two trade places. */
+  trade(from: number, to: number): void;
+  /** The sails set: 1 full, 0.5 half, 0 furled. */
+  sails(v: number): void;
+  /** A gull called for a parcel tier. */
+  call(tier: number): void;
   /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
   target?(name: string, el: HTMLElement | null): void;
 }
@@ -106,15 +112,70 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const where = box('s-hud__where p-smoke', root);
 
   const bar = box('s-hud__bar', root);
+  // the gull: a tap opens the parcels, priced in coins; a parcel you can't call yet is greyed
+  const gull = el('s-hud__slot s-hud__act s-hud__gull', bar, `<i class="s-hud__slotI">${ICON.gull}</i><span class="s-hud__slotN"></span>`);
+  gull.dataset.what = 'hud:gull';
+  const tray = el('s-hud__tray p-smoke', bar);
+  const parcels = m.gull.parcels.map((pc, t) => button({
+    label: pc.name, sub: `${pc.price}`, icon: ICON.coin, kind: 'secondary', size: 'sm', parent: tray, what: `hud:parcel${t}`,
+    onPress: () => {
+      if (!lastGull[t]) return;
+      a.call(t);
+      tray.classList.remove('is-on');
+    },
+  }));
+  let lastGull: boolean[] = m.gull.parcels.map((pc) => pc.ready);
+  gull.addEventListener('pointerdown', (e) => { e.stopPropagation(); tray.classList.toggle('is-on'); });
+
+  // a slot tapped is selected; dragged onto another, the two trade places
   const slots: { el: HTMLElement; ring: HTMLElement }[] = [];
+  let drag: { from: number; id: number; x: number; moved: boolean } | null = null;
+  const slotAt = (x: number, y: number): number => {
+    const t = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('.s-hud__slot[data-slot]');
+    return t ? Number(t.dataset.slot) : -1;
+  };
+  const endDrag = (e: PointerEvent, drop: boolean) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    const to = drop && drag.moved ? slotAt(e.clientX, e.clientY) : -1;
+    if (to >= 0 && to !== drag.from) a.trade(drag.from, to);
+    for (const v of slots) v.el.classList.remove('is-lift', 'is-over');
+    drag = null;
+  };
   for (let k = 0; k < 5; k++) {
     const s = el('s-hud__slot', bar);
     s.dataset.slot = String(k);
-    s.addEventListener('pointerdown', (e) => { e.stopPropagation(); a.pick(k); });
+    s.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      a.pick(k);
+      s.setPointerCapture?.(e.pointerId);
+      drag = { from: k, id: e.pointerId, x: e.clientX, moved: false };
+    });
+    s.addEventListener('pointermove', (e) => {
+      if (!drag || drag.id !== e.pointerId) return;
+      if (!drag.moved && Math.abs(e.clientX - drag.x) < 12) return;
+      drag.moved = true;
+      const over = slotAt(e.clientX, e.clientY);
+      slots.forEach((v, j) => { v.el.classList.toggle('is-lift', j === drag!.from); v.el.classList.toggle('is-over', j === over && j !== drag!.from); });
+    });
+    s.addEventListener('pointerup', (e) => endDrag(e, true));
+    s.addEventListener('pointercancel', (e) => endDrag(e, false));
     slots.push({ el: s, ring: el('s-hud__ring', s) });
   }
+  const dropB = el('s-hud__slot s-hud__act s-hud__drop', bar, `<i class="s-hud__slotI">${ICON.drop}</i><span class="s-hud__slotN">Drop</span>`);
+  dropB.dataset.what = 'hud:drop';
+  dropB.addEventListener('pointerdown', (e) => { e.stopPropagation(); a.press('drop', true); a.press('drop', false); });
   const using = el('s-hud__using', bar);
   const usingBar: BarHandle = progressBar({ kind: 'plain', value: 0, parent: using });
+
+  // the sails, under the stick's thumb: full, half, or furled to a stop
+  const sails = box('s-hud__sails p-smoke', root);
+  const sailSteps = ([[1, 'Full'], [0.5, 'Half'], [0, 'Stop']] as const).map(([v, label]) => {
+    const b = el('s-hud__sail', sails, `<i>${v ? ICON.sail : ICON.anchor}</i><span>${label}</span>`);
+    b.dataset.what = `hud:sails${label.toLowerCase()}`;
+    b.dataset.v = String(v);
+    b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); a.sails(v); });
+    return b;
+  });
 
   const take = box('s-hud__take', root);
   const takeB = button({ label: 'Take', icon: ICON.hand, kind: 'secondary', size: 'sm', parent: take, what: 'hud:take', onPress: () => { a.press('take', true); a.press('take', false); } });
@@ -208,6 +269,19 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     });
     using.classList.toggle('is-on', h.using !== null);
     if (h.using) usingBar.set(h.using.progress, false);
+    const sel = h.slots[h.selected];
+    dropB.classList.toggle('is-off', !sel || sel.kind === 'empty');
+    for (const b of sailSteps) b.classList.toggle('is-sel', Number(b.dataset.v) === h.throttle);
+    lastGull = h.gull.parcels.map((pc) => pc.ready);
+    h.gull.parcels.forEach((pc, t) => {
+      const b = parcels[t];
+      if (!b) return;
+      b.setDisabled(!pc.ready);
+      const sub = b.el.querySelector('.p-btn__sub');
+      if (sub && sub.textContent !== `${pc.price}`) sub.textContent = `${pc.price}`;
+    });
+    gull.querySelector('.s-hud__slotN')!.textContent = `${h.gull.price}`;
+    gull.classList.toggle('is-off', !h.gull.ready);
     take.classList.toggle('is-on', h.pickup !== null);
     if (h.pickup) takeB.el.title = h.pickup;
     gust.querySelector('.s-mx__holdN')!.textContent = `${h.gust.charges}`;

@@ -110,6 +110,10 @@ export class Session implements Stepper {
   readonly aim = v3(0, 0, 1);
   private readonly input = idleInput();
   private readonly held = idleInput();
+  /** How much sail the player has set. */
+  get throttle(): number {
+    return this.input.throttle;
+  }
   private script: [number, Partial<ShipInput>][] | null;
   /** The other ships' inputs while a scripted moment holds them still, or null for their captains. */
   private still: (ShipInput | null)[] | null = null;
@@ -263,7 +267,7 @@ export class Session implements Stepper {
       inp.steer = angleTo(w.head, this.want, p);
     } else if (this.target >= 0 && w.phase !== PHASE.sea) this.toward(w, inp);
     else inp.steer = 0;
-    inp.throttle = 1;
+    inp.throttle = it.throttle;
     if (it.fire) this.firing = true;
     if (it.dive) this.diving = true;
     inp.fire = (it.fire || this.firing || (this.autoFire && this.lock >= 0)) && w.phase === PHASE.sea;
@@ -274,6 +278,7 @@ export class Session implements Stepper {
     if (it.drop) inp.drop = true;
     if (it.take) inp.take = true;
     if (it.select >= 0) inp.select = it.select;
+    if (it.swap >= 0) inp.swap = it.swap;
     if (it.hail >= 0) inp.hail = it.hail;
     this.aimAt(w);
     inp.aim.x = this.aim.x;

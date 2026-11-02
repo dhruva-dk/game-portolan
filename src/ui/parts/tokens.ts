@@ -120,7 +120,8 @@ export function applyTokens(root: HTMLElement, w: number, h: number, force?: For
   for (const [n, v] of Object.entries(TYPE[form])) s.setProperty(`--fs-${n}`, px(v));
   SPACE[form].forEach((v, i) => s.setProperty(`--sp-${i}`, px(v)));
   for (const [n, v] of Object.entries(RADIUS[form])) s.setProperty(`--r-${n}`, px(v));
-  for (const [n, v] of Object.entries(HIT[form])) s.setProperty(`--hit-${n}`, px(v));
+  // a target never shrinks under 44 points, however small the window
+  for (const [n, v] of Object.entries(HIT[form])) s.setProperty(`--hit-${n}`, `${Math.max(44, v * k).toFixed(2)}px`);
   for (const [n, v] of Object.entries(SHADOW)) s.setProperty(`--sh-${n}`, v);
   s.setProperty('--t-fast', `${MOTION.fast}ms`);
   s.setProperty('--t-base', `${MOTION.base}ms`);

@@ -293,6 +293,7 @@ export class App {
         if (!model && !s) return null;
         const v = hudScreen((model as HudModel) ?? hudModel(s!), {
           press: (w, d) => this.controls.press(w, d), pick: (k) => this.controls.pick(k), target: (n, e) => this.juice.target(n, e),
+          trade: (f, t) => this.controls.trade(f, t), sails: (v) => { this.controls.throttle = v; }, call: (t) => this.controls.call(t),
         });
         this.hud = v;
         return v;

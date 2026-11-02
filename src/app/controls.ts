@@ -19,13 +19,20 @@ export interface Intents {
   drop: boolean;
   take: boolean;
   select: number;
+  /** A slot to swap the selected item into, or -1. */
+  swap: number;
+  /** A parcel to call a gull for, or -1. */
   hail: number;
+  /** How much sail is set: 1 full, 0.5 half, 0 furled. */
+  throttle: number;
 }
 
 export type Press = 'fire' | 'dive' | 'gust' | 'reload' | 'ability' | 'drop' | 'take' | 'hail';
 
 const STICK_RADIUS = 62;
 const KEYS_SELECT = ['1', '2', '3', '4', '5'];
+/** The sails' settings, furled to full. */
+export const SAILS = [0, 0.5, 1] as const;
 
 export class Controls {
   enabled = false;
@@ -38,6 +45,9 @@ export class Controls {
   private readonly held = new Set<Press>();
   private readonly edges = new Set<Press>();
   private select = -1;
+  private swapTo = -1;
+  private hail = -1;
+  private sails = 1;
   private readonly stick = { x: 0, y: 0 };
   private readonly look = { x: 0, y: 0 };
   private lastLook = -99;
@@ -51,7 +61,7 @@ export class Controls {
   private readonly knob: HTMLElement;
   private readonly out: Intents = {
     stick: { x: 0, y: 0 }, look: { x: 0, y: 0 }, idle: 99, fire: false, dive: false, gust: false, reload: false, ability: false,
-    drop: false, take: false, select: -1, hail: -1,
+    drop: false, take: false, select: -1, swap: -1, hail: -1, throttle: 1,
   };
 
   /** `layer` sits under the interface and takes the touches the interface lets through. */
@@ -82,6 +92,8 @@ export class Controls {
   set on(v: boolean) {
     this.enabled = v;
     this.layer.style.pointerEvents = v ? 'auto' : 'none';
+    // every match sets out under full sail
+    if (v) this.sails = 1;
     if (!v) {
       this.release();
       if (document.pointerLockElement === this.layer) document.exitPointerLock();
@@ -99,6 +111,27 @@ export class Controls {
   /** A hotbar slot tapped. */
   pick(slot: number): void {
     this.select = slot;
+  }
+
+  /** A hotbar slot dragged onto another: the two trade places. */
+  trade(from: number, to: number): void {
+    if (from === to) return;
+    this.select = from;
+    this.swapTo = to;
+  }
+
+  /** A gull called for a parcel. */
+  call(tier: number): void {
+    this.hail = tier;
+  }
+
+  /** The sails set to one of SAILS. */
+  set throttle(v: number) {
+    this.sails = v;
+  }
+
+  get throttle(): number {
+    return this.sails;
   }
 
   release(): void {
@@ -135,11 +168,19 @@ export class Controls {
     o.ability = e.has('ability');
     o.drop = e.has('drop');
     o.take = e.has('take');
-    o.hail = e.has('hail') ? 0 : -1;
+    o.hail = e.has('hail') ? 0 : this.hail;
     o.select = this.select;
-    this.select = -1;
+    o.swap = this.swapTo;
+    o.throttle = this.sails;
+    this.select = this.swapTo = this.hail = -1;
     e.clear();
     return o;
+  }
+
+  /** Sails up or down a setting. */
+  private step(by: number): void {
+    const i = SAILS.indexOf(this.sails as (typeof SAILS)[number]);
+    this.sails = SAILS[Math.max(0, Math.min(SAILS.length - 1, (i < 0 ? SAILS.length - 1 : i) + by))];
   }
 
   private turn(dx: number, dy: number): void {
@@ -166,6 +207,7 @@ export class Controls {
     else if (k === 'g') this.edges.add('drop');
     else if (k === 't') this.edges.add('take');
     else if (k === 'h') this.edges.add('hail');
+    else if (k === 'z' || k === 'x') this.step(k === 'z' ? -1 : 1);
     else if (k === ' ') this.edges.add('dive');
   }
 

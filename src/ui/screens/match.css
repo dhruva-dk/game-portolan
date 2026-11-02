@@ -2,6 +2,8 @@
 .pui-screen.s-mx { pointer-events: none; }
 .pui-screen.s-mx > * { pointer-events: none; }
 .pui-screen.s-mx > .s-mx__box { pointer-events: auto; }
+/* the boxes over the sea keep out of the notch, the rounded corners and the home bar */
+.pui-screen.s-hud, .pui-screen.s-gale, .pui-screen.s-spec { inset: var(--st) var(--sr) var(--sb) var(--sl); }
 .s-mx__box { position: absolute; }
 
 /* held controls */
@@ -40,7 +42,8 @@
 .s-hud__where { left: var(--sp-5); top: calc(var(--sp-5) + 96px * var(--k)); padding: var(--sp-1) var(--sp-3); display: flex; gap: var(--sp-2); align-items: center; font-family: var(--f-display); font-size: var(--fs-micro); }
 .s-hud__where span { color: var(--c-goldHi); }
 .s-hud__where i { width: 1.1em; height: 1.1em; display: inline-block; }
-.s-hud__bar { left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; gap: var(--sp-2); }
+/* the hotbar ends just short of the guns, so the right thumb reaches it without leaving them for long */
+.s-hud__bar { right: calc(var(--sp-5) + 270px * var(--k) + var(--sp-4)); bottom: var(--sp-5); display: flex; gap: var(--sp-2); }
 .s-hud__slot { position: relative; width: var(--hit-btn); height: var(--hit-btn); border-radius: var(--r-md); background: rgba(18, 10, 4, 0.72); border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.3); color: var(--c-cream); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
 .s-hud__slot.is-sel { border-color: var(--c-goldHi); box-shadow: 0 0 0 calc(2px * var(--k)) var(--c-gold); }
 .s-hud__slot.is-empty { opacity: 0.55; }
@@ -52,6 +55,21 @@
 .s-hud__slotI svg { width: 100%; height: 100%; }
 .s-hud__slotN { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); line-height: 1; }
 .s-hud__ring { position: absolute; left: 0; right: 0; bottom: 0; height: calc(4px * var(--k)); background: var(--c-goldHi); transform-origin: left; transform: scaleX(0); }
+/* the gull and drop sit either end of the hotbar; the gull's parcels open above it */
+.s-hud__act { cursor: pointer; }
+.s-hud__act.is-off { opacity: 0.45; }
+.s-hud__slot.is-lift { transform: translateY(calc(-8px * var(--k))) scale(1.06); box-shadow: var(--sh-2); }
+.s-hud__slot.is-over { border-color: var(--c-goldHi); border-style: dashed; }
+.s-hud__tray { position: absolute; left: 0; bottom: calc(100% + var(--sp-3)); padding: var(--sp-2); display: none; flex-direction: column; gap: var(--sp-2); }
+.s-hud__tray.is-on { display: flex; }
+.s-hud__tray .p-btn { width: calc(190px * var(--k)); }
+/* the sails: three steps stacked at the stick's edge, full at the top */
+.s-hud__sails { left: var(--sp-5); bottom: var(--sp-5); padding: var(--sp-1); display: flex; flex-direction: column; gap: var(--sp-1); }
+.s-hud__sail { width: calc(var(--hit-btn) * 1.2); height: var(--hit-btn); border-radius: var(--r-md); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--c-cream); background: rgba(18, 10, 4, 0.55); border: calc(2px * var(--k)) solid rgba(255, 236, 196, 0.25); touch-action: none; user-select: none; -webkit-user-select: none; }
+.s-hud__sail i { width: 42%; height: 42%; display: block; }
+.s-hud__sail i svg { width: 100%; height: 100%; }
+.s-hud__sail span { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-micro); letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; }
+.s-hud__sail.is-sel { border-color: var(--c-goldHi); background: rgba(120, 52, 22, 0.8); box-shadow: 0 0 0 calc(2px * var(--k)) var(--c-gold); }
 .s-hud__using { position: absolute; left: 0; right: 0; top: calc(-18px * var(--k)); display: none; }
 .s-hud__using.is-on { display: block; }
 .s-hud__take { left: 50%; bottom: calc(var(--sp-5) + var(--hit-btn) + 28px * var(--k)); transform: translateX(-50%); display: none; }
@@ -60,7 +78,7 @@
 .s-hud__pad .s-mx__hold { position: absolute; }
 .s-hud__fire { right: 0; bottom: 0; width: calc(132px * var(--k)); height: calc(132px * var(--k)); }
 .s-hud__gust { right: calc(146px * var(--k)); bottom: 0; width: calc(84px * var(--k)); height: calc(84px * var(--k)); }
-.s-hud__abil { right: calc(130px * var(--k)); bottom: calc(104px * var(--k)); width: calc(84px * var(--k)); height: calc(84px * var(--k)); }
+.s-hud__abil { right: calc(140px * var(--k)); bottom: calc(104px * var(--k)); width: calc(84px * var(--k)); height: calc(84px * var(--k)); }
 .s-hud__reload { right: calc(16px * var(--k)); bottom: calc(150px * var(--k)); width: calc(72px * var(--k)); height: calc(72px * var(--k)); }
 
 /* death, victory and spectating */
@@ -105,7 +123,9 @@
 
 /* left-handed: the guns go to the left thumb, and the stick (on the controls layer) to the right */
 [data-hand='left'] .s-hud__pad { right: auto; left: var(--sp-5); }
+[data-hand='left'] .s-hud__sails { left: auto; right: var(--sp-5); }
+[data-hand='left'] .s-hud__bar { right: auto; left: calc(var(--sp-5) + 270px * var(--k) + var(--sp-4)); }
 [data-hand='left'] .s-hud__fire { right: auto; left: 0; }
 [data-hand='left'] .s-hud__gust { right: auto; left: calc(146px * var(--k)); }
-[data-hand='left'] .s-hud__abil { right: auto; left: calc(130px * var(--k)); }
+[data-hand='left'] .s-hud__abil { right: auto; left: calc(140px * var(--k)); }
 [data-hand='left'] .s-hud__reload { right: auto; left: calc(16px * var(--k)); }

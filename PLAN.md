@@ -1067,8 +1067,9 @@ A ship pulled into the Maelstrom's Eye runs aground on its rocks, and the pull h
   - No text is clipped.
   - Nothing sits under the safe areas.
   - Every button is at least 44 points.
-  - In a match, every control's centre lies in the bottom 60% of the screen, and within 40% of the screen's width from the left or the right edge.
-  - This is checked in the interface captures, taken at the smallest and the largest supported size of each device, each with its safe areas: an iPhone 15 Pro (852×393), an iPhone Pro Max (956×440), an 11-inch M1 iPad (1180×820) and a 13-inch iPad (1376×1032).
+  - No two touch targets overlap.
+  - In a match, the controls used in a fight (fire, gust, ability, reload and the sails) have their centres in the bottom 60% of the screen, and within 40% of the screen's width from the left or the right edge. The hotbar, the gull and the drop sit along the bottom, where a thumb moves to tap them between fights.
+  - `npm run capture -- layout` checks all of this on every screen and fails on a break. It runs at the smallest and the largest supported size of each device, each with its safe areas: an iPhone 15 Pro (852×393), an iPhone Pro Max (956×440), an 11-inch M1 iPad (1180×820) and a 13-inch iPad (1376×1032).
 - **Title, lobby, abilities, rank and settings:** as in pass 1, at every size.
 - **Locker:** the camera shows the whole sail.
 - **Rivals:** as in pass 1, with the realistic spread of tags.

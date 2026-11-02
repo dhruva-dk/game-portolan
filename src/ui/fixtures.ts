@@ -308,7 +308,11 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     gust: { charges: fight ? 0 : storm ? 1 : 2, max: 2, recharge: fight ? 0.7 : 0.4 },
     storm: { phase: storm ? 4 : 2, phases: 7, seconds: storm ? 38 : 72, shrinking: storm, outside: storm },
     ships: fight ? 9 : storm ? 6 : 17, kills: fight ? 3 : storm ? 4 : 1, coins: fight ? 140 : 85,
-    gull: { price: 120, ready: fight },
+    gull: {
+      price: 20, ready: fight,
+      parcels: [{ name: 'Supplies', price: 20, ready: true }, { name: 'Armament', price: 45, ready: fight }, { name: 'Treasure', price: 80, ready: fight }],
+    },
+    throttle: fight ? 1 : storm ? 0.5 : 1,
     using: storm ? { item: 'repairKit', progress: 0.55 } : null,
     region: storm ? 'the Coral Atolls' : 'the Spice Isles', perk: storm ? null : 'Better Loot', night: state === 'night',
     pickup: state === 'calm' ? 'Rare Harpoon' : null,

@@ -316,8 +316,10 @@ export interface HudModel {
   ships: number;
   kills: number;
   coins: number;
-  /** A gull delivery's price, and whether you can afford one here. */
-  gull: { price: number; ready: boolean };
+  /** The cheapest gull delivery's price, and whether you can call one here; and each parcel's. */
+  gull: { price: number; ready: boolean; parcels: { name: string; price: number; ready: boolean }[] };
+  /** How much sail is set: 1 full, 0.5 half, 0 furled. */
+  throttle: number;
   /** A consumable in use, with its progress. */
   using: { item: ConsumableId; progress: number } | null;
   region: string;

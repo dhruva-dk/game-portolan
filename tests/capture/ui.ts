@@ -1,8 +1,8 @@
-// Interface transition strips, at iPad (1376×1032) and iPhone (956×440) sizes. Each transition is driven through the
+// Interface transition strips, at the smallest and largest iPad (1180×820, 1376×1032) and iPhone (852×393, 956×440). Each transition is driven through the
 // app's real flow, then every running animation on the page is paused and scrubbed through fixed times, so each strip
 // shows the same instants on every run. A last frame shows the screen after everything has settled.
 import { log, openApp, Shots, type Rig } from './common.ts';
-import type { Game } from '../harness.ts';
+import { DEVICES, type DeviceName, type Game } from '../harness.ts';
 
 export interface Transition {
   name: string;
@@ -66,12 +66,12 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
 }
 
 export async function ui(r: Rig, o: { dpr: number; device?: string; only?: string }): Promise<void> {
-  const devices = o.device ? [o.device] : ['ipad', 'iphone'];
+  const devices = o.device ? o.device.split(',') : ['ipad', 'ipadSmall', 'iphone', 'iphoneSmall'];
   const only = o.only?.split(',');
   const list = only ? TRANSITIONS.filter((t) => only.includes(t.name)) : TRANSITIONS;
   for (const device of devices) {
-    if (device !== 'ipad' && device !== 'iphone') throw new Error('--device must be ipad or iphone');
-    const game = await openApp(r, { device, dpr: o.dpr });
+    if (!(device in DEVICES)) throw new Error(`--device must be among ${Object.keys(DEVICES).join(', ')}`);
+    const game = await openApp(r, { device: device as DeviceName, dpr: o.dpr });
     for (const t of list) {
       await strip(game, r, t, device);
       log(`ui ${device}: ${t.name}`);

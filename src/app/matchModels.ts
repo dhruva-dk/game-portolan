@@ -9,7 +9,7 @@ import {
   ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, USES, WEAPONS, inStorm, isNight, newStormView, seen, SEEN, stormView, sunDir,
   type MatchState, type Ship,
 } from '../sim/match.ts';
-import { GALE, GUST, LOOT } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARCELS } from '../sim/tables.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
 import { R, advance, apart } from '../sim/sphere.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
@@ -122,7 +122,11 @@ export function hudModel(session: Session): HudModel {
     ships: afloat(s),
     kills: sh.kills,
     coins: Math.floor(sh.coins),
-    gull: { price: priceOf(sh, 0), ready: canCall(sh, 0) },
+    gull: {
+      price: priceOf(sh, 0), ready: canCall(sh, 0),
+      parcels: PARCELS.map((p, t) => ({ name: p.name, price: priceOf(sh, t), ready: canCall(sh, t) })),
+    },
+    throttle: session.watch === PLAYER ? session.throttle : 1,
     using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     region: REGIONS[r]?.name ?? 'the open sea',
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,
