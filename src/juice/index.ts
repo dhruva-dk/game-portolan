@@ -10,7 +10,7 @@
 //   on events:
 //     juice.fire('shieldBreak', { at, world, value: e.shield, key: e.target });
 //
-// Everything that fires is written to `juice.log` (see log.ts), which the reviewer reads next to a frame strip.
+// Everything that fires is written to `juice.log` (see log.ts), to read next to a frame strip.
 import type * as THREE from 'three';
 import { countUp, FlyCanvas, flyTo, pop, squash, type Point } from './anim.ts';
 import { CameraJuice } from './camera.ts';

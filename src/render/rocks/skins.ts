@@ -2,7 +2,7 @@
 // grows on it. Every region's rock gets its own skin, so no two regions share a rock colour.
 import type { RegionId } from '../../sim/world/index.ts';
 
-/** The photographs in public/tex/rocks (credited in credits/rocks.md). Each has <id>_d.jpg and <id>_n.jpg. */
+/** The photographs in public/tex/rocks (credited in CREDITS.md). Each has <id>_d.jpg and <id>_n.jpg. */
 export type TexId =
   | 'ice' | 'snow' | 'granite' | 'limestone' | 'sandstone' | 'basalt' | 'coral' | 'scoria' | 'pahoehoe'
   | 'wetblack' | 'moss' | 'slate' | 'seaside' | 'shore';

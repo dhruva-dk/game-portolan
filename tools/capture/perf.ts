@@ -18,7 +18,7 @@ export async function perf(r: Rig, o: { dpr: number }): Promise<void> {
   await game.hook((h) => h.play({ seed: 5, skipGale: true, autopilot: true }));
   await game.hook((h) => h.settle(10));
   rows.push({ region: 'match', ...(await game.hook((h) => h.measure(150))) });
-  await shots.json('perf.json', { renderer: r.renderer, gpu: r.gpu, dpr: o.dpr, rows });
+  await shots.json('perf.json', { renderer: r.renderer, dpr: o.dpr, rows });
   console.table(rows);
   game.assertClean();
   log(`perf: ${shots.dir}/perf.json`);

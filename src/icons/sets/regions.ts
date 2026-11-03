@@ -1,5 +1,5 @@
-// The 16 region glyphs of src/sim/world/index.ts, each drawn from its portrait's skyline or landmark, and each
-// region's own colour (its dominant colour from PLAN.md) for the chart roundel.
+// The 16 region glyphs of src/sim/world/index.ts, each drawn from its skyline or landmark, and each
+// region's dominant colour for the chart roundel.
 import type { RegionId } from '../../sim/world/index.ts';
 import { circle, cut, cutLine, ellipse, fill, line, path, poly, px, py, sparkle, wave, type Prim } from '../draw.ts';
 

@@ -1,4 +1,4 @@
-// First-time tips: a short card the first time each thing in PLAN.md's list happens to the player, from riding the
+// First-time tips: a short card the first time each of the game's key moments happens to the player, from riding the
 // Gale to the whale rising. Moments and a look over the player's ship each frame offer tips; each shows once ever, one
 // at a time, and the ones shown are kept in the browser's storage beside the settings. Capture mode keeps them in
 // memory and starts with them off, so the capture tools' frames show only what they arrange.

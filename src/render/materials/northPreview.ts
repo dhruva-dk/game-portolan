@@ -20,7 +20,7 @@ const regions = (only ? [only] : Object.keys(REGION_MATERIALS)) as NorthRegionId
 const RES = Number(params.get('res') ?? (only ? 2048 : 512));
 const PATCH = 100; // metres on a side
 
-// Water colours from the portraits, only to judge the seabed role through the water.
+// Each region's water colour, only to judge the seabed role through the water.
 const WATER: Record<NorthRegionId, number> = {
   iceCrown: 0x5d7486, fjords: 0x5fb3b0, mistwood: 0x14231d, spires: 0x2f9a98,
   narrows: 0x1f4b33, basaltStacks: 0x4c6460, kelpShallows: 0x6f7a3a, blossomRun: 0x7fb0d8,

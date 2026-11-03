@@ -198,7 +198,7 @@ export class HitMarkers {
 
 export type NumberKind = 'hull' | 'shield' | 'crit';
 
-/** Blue for shield and white for hull, as PLAN.md asks; gold and bigger for a crit. */
+/** Blue for shield and white for hull; gold and bigger for a crit. */
 export const NUMBERS: Record<NumberKind, { color: string; size: number; life: number }> = {
   hull: { color: '#ffffff', size: 26, life: 0.95 },
   shield: { color: '#4fc3ff', size: 26, life: 0.95 },

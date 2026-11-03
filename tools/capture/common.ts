@@ -15,16 +15,15 @@ export const APP_PAGE = 'dev/game.html';
 export interface Rig {
   server: Server;
   browser: Browser;
-  gpu: boolean;
   renderer: string;
   close(): Promise<void>;
 }
 
 export async function rig(headed = false): Promise<Rig> {
   const server = await serve();
-  const { browser, gpu, renderer } = await launch({ headed });
+  const { browser, renderer } = await launch({ headed });
   return {
-    server, browser, gpu, renderer,
+    server, browser, renderer,
     close: async () => { await browser.close(); await server.close(); },
   };
 }
@@ -115,17 +114,5 @@ export async function contactSheet(
 }
 
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-
-/** Deterministic shuffle for the blind test, so a seed gives the same order every time. */
-export function shuffle<T>(items: readonly T[], seed: number): T[] {
-  const a = items.slice();
-  let s = seed >>> 0 || 1;
-  const next = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 0x100000000);
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(next() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
 export const log = (msg: string): void => console.log(`capture: ${msg}`);

@@ -6,7 +6,7 @@ import type { Game } from '../harness.ts';
 
 export interface MomentDef {
   name: string;
-  /** What the reviewer should look for. */
+  /** What happens in the moment. */
   about: string;
 }
 

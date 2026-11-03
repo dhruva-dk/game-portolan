@@ -1,7 +1,7 @@
 // The shared kit behind flora library D: the Fire Archipelago, the Weeping Isle, the Mangrove Labyrinth and the
 // Maelstrom. Every plant is generated here in code: tubes for wood and roots, cards for leaves, ribbons for blades
 // and strands, and surfaces for broad leaves. Textures are scans from ambientCG and Poly Haven (see
-// credits/flora-d.md); the leaf atlases are composed from the scanned leaves at load time, in code.
+// CREDITS.md); the leaf atlases are composed from the scanned leaves at load time, in code.
 //
 // Wind: every material sways in its vertex shader from the uniforms in `floraUniforms` (set them with `setWind`).
 // Each vertex carries `aWind` = (bend, flutter, phase): bend is how far it leans at full gale in the plant's own

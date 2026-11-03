@@ -1,5 +1,5 @@
 // The effect log. Every sound played, every haptic, every screen, camera and actor effect, and every screen change
-// goes in here with the loop's clock and the simulation tick, so the reviewer's capture tools can read exactly what a
+// goes in here with the loop's clock and the simulation tick, so the capture tools can read exactly what a
 // moment did and when. The juice library keeps its own log (src/juice/log.ts); the app copies each of its entries in
 // as it happens, so this one log holds everything on one clock.
 import { effects as juiceLog } from '../juice/index.ts';

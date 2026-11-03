@@ -26,7 +26,7 @@ export type { WeatherLocal, WeatherOptions, WeatherSpot, WeatherSystem, WeatherV
 export { addIcing, addWetness, type Amount } from './hooks.ts';
 export { formation } from './clouds.ts';
 
-/** At most this many systems are drawn at once; the plan has 3–5. */
+/** At most this many systems are drawn at once. */
 export const MAX_SYSTEMS = 6;
 
 export interface Weather {

@@ -80,40 +80,46 @@ export async function serve({ production = false } = {}): Promise<Server> {
 const HOST_AUDIO = /^The AudioContext encountered an error from the audio device or the WebAudio renderer/;
 
 const GPU_ARGS = ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
-const SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
 const COMMON_ARGS = ['--autoplay-policy=no-user-gesture-required', '--mute-audio'];
+const SOFTWARE = /SwiftShader|llvmpipe|Software/i;
 
 export interface Launched {
   browser: Browser;
+  /** The GPU that WebGPU and WebGL draw on, as each reports it. */
   renderer: string;
-  gpu: boolean;
 }
 
+/** Starts Chromium on the Mac's GPU. There's no software fallback: without a GPU WebGPU adapter it stops. */
 export async function launch({ headed = false } = {}): Promise<Launched> {
-  for (const args of [GPU_ARGS, SOFTWARE_ARGS]) {
-    const browser = await chromium.launch({ headless: !headed, args: [...args, ...COMMON_ARGS] });
-    const page = await browser.newPage();
-    const renderer = await webglRenderer(page);
-    await page.close();
-    const gpu = !!renderer && !/SwiftShader|llvmpipe|Software/i.test(renderer);
-    if (gpu || (renderer && args === SOFTWARE_ARGS)) {
-      if (!gpu) console.warn(`harness: no GPU WebGL, falling back to ${renderer}`);
-      return { browser, renderer: renderer!, gpu };
-    }
+  const browser = await chromium.launch({ headless: !headed, args: [...GPU_ARGS, ...COMMON_ARGS] });
+  const { webgpu, webgl } = await gpuInfo(browser);
+  if (!webgpu || SOFTWARE.test(webgpu)) {
     await browser.close();
+    throw new Error(`harness: Chromium has no GPU WebGPU adapter (it reports ${webgpu ?? 'none'})`);
   }
-  throw new Error('harness: Chromium has no WebGL 2, not even SwiftShader');
+  return { browser, renderer: `WebGPU ${webgpu}; WebGL ${webgl ?? 'none'}` };
 }
 
-export function webglRenderer(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const gl = document.createElement('canvas').getContext('webgl2');
-    if (!gl) return null;
-    const info = gl.getExtension('WEBGL_debug_renderer_info');
-    const renderer = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
-    return renderer;
-  });
+/** What WebGPU and WebGL 2 run on. WebGPU needs a secure context, so the probe page is served as localhost. */
+async function gpuInfo(browser: Browser): Promise<{ webgpu: string | null; webgl: string | null }> {
+  const page = await browser.newPage();
+  try {
+    await page.route('http://localhost/**', (r) => r.fulfill({ body: '<!doctype html>', contentType: 'text/html' }));
+    await page.goto('http://localhost/');
+    return await page.evaluate(async () => {
+      type Adapter = { info: { vendor: string; architecture: string } };
+      const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<Adapter | null> } }).gpu;
+      const adapter = await gpu?.requestAdapter();
+      const webgpu = adapter ? `${adapter.info.vendor}/${adapter.info.architecture}` : null;
+      const gl = document.createElement('canvas').getContext('webgl2');
+      const info = gl?.getExtension('WEBGL_debug_renderer_info');
+      const webgl = gl ? String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : null;
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      return { webgpu, webgl };
+    });
+  } finally {
+    await page.close();
+  }
 }
 
 export interface Point {

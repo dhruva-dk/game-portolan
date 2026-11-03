@@ -1,8 +1,7 @@
-// The reviewer's capture tools. Each command writes PNG frames, a contact sheet (contact.png) and any logs to
+// Capture tools for looking at the game headless. Each command writes PNG frames, a contact sheet (contact.png) and any logs to
 // captures/<name>/ (gitignored).
 //
 //   npm run capture -- regions [--region <id>]           fixed scenes in each region at dawn, midday, dusk and night
-//   npm run capture -- blind [--seed n]                   unlabelled shots from fixed spots, shuffled; the key is in key.json
 //   npm run capture -- borders                            each region from orbit, and 8 m up on the sea at every border
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
@@ -15,7 +14,6 @@
 import { parseArgs } from 'node:util';
 import { log, rig } from './common.ts';
 import { regions } from './regions.ts';
-import { blind } from './blind.ts';
 import { borders } from './borders.ts';
 import { lap } from './lap.ts';
 import { moment, MOMENTS } from './moment.ts';
@@ -41,7 +39,7 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, blind, borders, lap, moment <name|all>, ui, layout, perf');
+  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
   console.log(`layout screens: ${SCREENS.map((s) => s.name).join(', ')}`);
@@ -49,12 +47,11 @@ if (!command || command === 'list' || command === 'help') {
 }
 
 const r = await rig(a.headed);
-log(`Chromium WebGL: ${r.renderer}${r.gpu ? '' : ' (software)'}`);
+log(`Chromium: ${r.renderer}`);
 const t0 = Date.now();
 try {
   switch (command) {
     case 'regions': await regions(r, { ...opts, region: a.region }); break;
-    case 'blind': await blind(r, opts); break;
     case 'borders': await borders(r, opts); break;
     case 'lap': await lap(r, { ...opts, ring: a.ring }); break;
     case 'moment': await moment(r, { ...opts, name: arg ?? 'all' }); break;

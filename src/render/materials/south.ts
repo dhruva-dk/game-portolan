@@ -1,9 +1,9 @@
 // The ground materials of the southern ring and the Maelstrom: four or five scans of each region's own,
 // painted into the six roles every region fills. Scans come from Poly Haven and ambientCG (credits in
-// credits/materials-south.md); the files live in public/tex/regions/<region>/.
+// CREDITS.md); the files live in public/tex/regions/<region>/.
 //
 // Scales are metres per texture repeat. Tints are linear multipliers that pull each scan toward its
-// region's portrait colours (PLAN.md, "The 16 regions"); wet darkens and smooths a layer.
+// region's own colours; wet darkens and smooths a layer.
 import type { RegionId } from '../../sim/world/index.ts';
 import { scanMaps, type MaterialLayer, type MaterialRole, type MaterialSet, type SouthRegionId } from './types.ts';
 

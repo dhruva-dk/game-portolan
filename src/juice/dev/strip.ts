@@ -1,4 +1,4 @@
-// Frame strips of the juice bench, for tuning and for the reviewer: a contact sheet of frames across a moment, a
+// Frame strips of the juice bench, for tuning: a contact sheet of frames across a moment, a
 // timing chart of every channel at 60 Hz, and the effect log.
 //
 //   node src/juice/dev/strip.ts <recipe or sequence>... [--device ipad|iphone] [--frames 24] [--every 2] [--pre 2]

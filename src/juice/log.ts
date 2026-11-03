@@ -1,5 +1,5 @@
 // The effect log: every camera move, hit-stop, haptic, flash, marker, animation, particle hook and sound hook that
-// fires, with what it resolved to. The reviewer reads it next to a frame strip, so it says what actually played,
+// fires, with what it resolved to. It's read next to a frame strip, so it says what actually played,
 // what was trimmed by a budget and what was suppressed, and why.
 
 export type Channel =

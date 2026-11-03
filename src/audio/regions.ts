@@ -1,6 +1,6 @@
 // How each of the 16 regions sounds: its bed, the life the mixer scatters over it, the acoustic space it lends to
 // gunfire (the Narrows' walls throw every shot back), and how loud the open sea, the wind and the night insects are
-// there. Each one follows its portrait's "Sound" line in PLAN.md.
+// there.
 import type { RegionId } from '../sim/world/index.ts';
 import type { SoundName } from './bank.ts';
 

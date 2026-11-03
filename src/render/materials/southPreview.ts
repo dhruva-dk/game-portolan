@@ -19,7 +19,7 @@ const regions = (only ? [only] : Object.keys(REGION_MATERIALS)) as SouthRegionId
 const RES = Number(params.get('res') ?? (only ? 2048 : 512));
 const PATCH = 100; // metres on a side
 
-/** Water from the portraits: colour, and how fast light dies with depth (per metre), only to judge the seabed. */
+/** Each region's water: colour, and how fast light dies with depth (per metre), only to judge the seabed. */
 const WATER: Record<SouthRegionId, { colour: number; murk: number }> = {
   glassSea: { colour: 0x9ccbd4, murk: 0.06 },
   jadeShoals: { colour: 0x6cc9a6, murk: 0.16 },

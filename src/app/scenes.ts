@@ -105,7 +105,7 @@ const isWater = (p: V3): boolean => heightAt(p) < -2;
 
 /**
  * A fixed spot on open water near a region's landmark, looking at it. Spot 0 stands off the landmark's face; spots 1
- * and 2 come in from a third of the way round on either side, further out, for the blind test.
+ * and 2 come in from a third of the way round on either side, further out.
  */
 export function regionView(region: RegionId | number, k = 0): SceneSpec {
   const i = typeof region === 'number' ? region : REGIONS.findIndex((r) => r.id === region);

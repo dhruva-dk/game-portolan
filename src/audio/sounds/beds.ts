@@ -1,6 +1,6 @@
 // The ambience beds: seamless stereo loops that the mixer crossfades as you sail. The shared beds are the sea, the
-// wind and the ship moving through water; the weather beds sit on top; and each of the 16 regions has its own bed,
-// built from its portrait's "Sound" line. Every bed changes slowly over its loop so it never sounds like a loop.
+// wind and the ship moving through water; the weather beds sit on top; and each of the 16 regions has its own bed.
+// Every bed changes slowly over its loop so it never sounds like a loop.
 import { type Buf, type Rng } from '../dsp.ts';
 import { def, LOOP } from '../def.ts';
 import {

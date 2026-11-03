@@ -125,7 +125,7 @@ export const BOXES: readonly (readonly [number, number, number, number, number, 
   [-1.6, 1.6, 11, 20, -9, 7, true],
 ];
 
-/** Consumables: PLAN.md's values, caps, use times (s) and stack sizes. */
+/** Consumables: values, caps, use times (s) and stack sizes. */
 export interface Use { readonly shield: number; readonly hull: number; readonly cap: number; readonly time: number; readonly stack: number }
 export const USES: Readonly<Record<number, Use>> = {
   [ITEM.smallShield]: { shield: 25, hull: 0, cap: 50, time: 1, stack: 6 },

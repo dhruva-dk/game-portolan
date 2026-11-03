@@ -15,7 +15,9 @@ This is the only design document for Portolan. It's the owner's, and agents neve
 ## How to work
 
 - **Spend the effort on implementation:** shaders, generated models, systems and content. Not on tests, tooling or documents. Expect the game to grow to several hundred thousand lines. You decide what complete means.
-- **The owner works on this Mac while agents build. Develop and look at the game only in headless browsers, preferably Playwright's WebKit, which is the iPad's own engine. Never open a visible window: no headed browser, no `vite --open`, no iOS Simulator.**
+- **The owner works on this Mac while agents build. Develop and look at the game only in headless browsers. `tools/harness.ts` drives headless Chromium, and Playwright's WebKit, the iPad's own engine, is for checking that it draws the same. Never open a visible window: no headed browser, no `vite --open`, no iOS Simulator.**
+- **Look at the game to build it, not to prove it.** When a capture shows something wrong, fix it and move on.
+- **Look in the repo before building something.** It already has a library of scanned materials, plant kits, weather effects and a rock kit, and capture tools in `tools/capture/`.
 
 ## The game
 
@@ -334,18 +336,3 @@ Controls answer on the next frame. A ship's weight comes from its motion and the
 - **Later:** a free voyage mode on the same planet, with no Storm and no timer; and secrets to find, some of which pay off in matches.
 - **Parked:** other ship types.
 - **Out:** trading, music and online play.
-
-## Where things live
-
-- `index.html` loads `src/app/main.ts`.
-- `src/app/`: the app: the frame loop, the flow between screens, and the adapters that connect the simulation, the stage, the interface, sound and the career.
-- `src/sim/`: a match on the sphere: sailing, wind, weather, the Storm, combat, items, abilities, perks, territory, the whale, and the bot captains (`captains/`). `src/sim/world/` holds the planet's places and terrain.
-- `src/render/`: the planet on screen: the engine, sky, water, terrain and its materials, landmarks, beacons and events (`regions/`), and the ships, gull, whale, projectiles, particles and wakes (`actors/`).
-- `src/ui/`: the interface: shared parts and tokens (`parts/`) and screens (`screens/`).
-- `src/career/`: the league, captains, rating, ranks, levels, cosmetics and saving.
-- `src/audio/`: the sound engine and every sound. `src/juice/`: camera kicks, hit-stop, haptics and easing. `src/icons/`: icons drawn in code.
-- `dev/`: pages that show one part on its own.
-- `public/`: textures and fonts.
-- `tools/`: `harness.ts` serves the game and opens it in a headless browser, `capture/` takes screenshots and frame strips, `check-assets.ts` checks the build's assets, and `ios.ts` builds the iOS app.
-- `ios/`: the Capacitor shell.
-- **Built but not in the game yet:** the scanned material library (`src/render/materials/`), the plant kits (`src/render/flora/`) and the weather effects (`src/render/weather/`). The rock kit (`src/render/rocks/`) is used only for ice floes.
