@@ -1,4 +1,4 @@
-// window.__portolan: the test hook. Playwright (tests/smoke.test.ts and tests/capture/) drives the game through it:
+// window.__portolan: the test hook. Playwright (tools/capture/) drives the game through it:
 // jump to a scene, start a seeded match with scripted player input, step the simulation, read the effect log, open
 // any screen with its live or fixture model, and read state.
 import type { App } from './app.ts';

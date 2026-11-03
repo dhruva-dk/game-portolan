@@ -6,7 +6,7 @@
 // few matches, so a new player's rating finds their level within about 10 matches, then settles.
 //
 // The bots are drawn SKILL.edge below your rating. That is the tuning: it puts you in the top 5 about half
-// the time and gives you a win about 1 match in 6 (tests/career/rating.test.ts plays it with a synthetic player).
+// the time and gives you a win about 1 match in 6.
 import { dexp } from '../sim/math.ts';
 
 export const SKILL = {

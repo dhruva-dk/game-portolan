@@ -79,7 +79,7 @@ export async function serve({ production = false } = {}): Promise<Server> {
 /** Chromium's report that the machine's audio device failed, which a muted capture never hears anyway. */
 const HOST_AUDIO = /^The AudioContext encountered an error from the audio device or the WebAudio renderer/;
 
-const GPU_ARGS = ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
+const GPU_ARGS = ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'];
 const SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
 const COMMON_ARGS = ['--autoplay-policy=no-user-gesture-required', '--mute-audio'];
 

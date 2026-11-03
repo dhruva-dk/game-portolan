@@ -9,7 +9,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DEVICES, launch, serve, type DeviceName } from '../../../tests/harness.ts';
+import { DEVICES, launch, serve, type DeviceName } from '../../../tools/harness.ts';
 
 const argv = process.argv.slice(2);
 const opts: Record<string, string> = {};

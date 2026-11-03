@@ -10,7 +10,7 @@ import { lobbyScreen } from '../src/ui/screens/lobby.ts';
 import { titleScreen } from '../src/ui/screens/title.ts';
 import { partsGallery } from './ui-parts.ts';
 
-/** The two designed devices, as tests/harness.ts has them: CSS size and safe areas. */
+/** The two designed devices, as tools/harness.ts has them: CSS size and safe areas. */
 export const DEVICES = {
   ipad: { label: 'iPad 13"', width: 1376, height: 1032, safe: { top: 0, right: 0, bottom: 25, left: 0 } },
   iphone: { label: 'iPhone Pro Max', width: 956, height: 440, safe: { top: 0, right: 62, bottom: 20, left: 62 } },

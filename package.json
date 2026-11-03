@@ -8,10 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/run.ts",
-    "ios": "node tests/ios.ts",
-    "capture": "node tests/capture/run.ts",
-    "check:assets": "vite build --logLevel warn && node tests/check-assets.ts"
+    "ios": "node tools/ios.ts",
+    "capture": "node tools/capture/run.ts",
+    "check:assets": "vite build --logLevel warn && node tools/check-assets.ts"
   },
   "dependencies": {
     "@capacitor/app": "8.1.2",

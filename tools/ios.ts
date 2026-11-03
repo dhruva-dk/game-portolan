@@ -69,7 +69,7 @@ export function boot(udid: string): void {
 }
 
 export function rotate(udid: string, orientation: number): void {
-  const source = join(root, 'tests/sim-orientation.swift'), tool = join(LOGS, 'sim-orientation');
+  const source = join(root, 'tools/sim-orientation.swift'), tool = join(LOGS, 'sim-orientation');
   if (!existsSync(tool) || statSync(tool).mtimeMs < statSync(source).mtimeMs) {
     mkdirSync(LOGS, { recursive: true });
     step('sim-orientation-build', 'xcrun', ['swiftc', '-O', source, '-o', tool]);

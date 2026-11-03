@@ -156,7 +156,7 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
 
 // ---------------------------------------------------------------- scripted moments
 //
-// The capture tools' moments (tests/capture/moment.ts keeps the same list). Each sets a moment up on a seeded match
+// The capture tools' moments (tools/capture/moment.ts keeps the same list). Each sets a moment up on a seeded match
 // that has just begun, gives the player's input from then on, and names the moment its strip is about. At sea, the
 // player is moved to open water and every other ship is held still with furled sails, so nothing else steps in.
 
