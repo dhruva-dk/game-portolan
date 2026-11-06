@@ -4,6 +4,7 @@
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
+import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
@@ -64,6 +65,8 @@ export class GpuStage {
   readonly scans: ScanCache;
   readonly post: Post;
   readonly clouds = new Clouds();
+  /** The grade for the hour and the weather where the eye is. */
+  readonly colour = new ColourScript();
   readonly fall = new Fall();
   readonly beacons = new Beacons(1);
   readonly landmarks = new Landmarks();
@@ -180,6 +183,7 @@ export class GpuStage {
     this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt, FAIR_WEATHER);
     const d = this.clouds.depth;
     P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
+    this.colour.update({ elevation: up.dot(this.sun), rising: rising(up, this.sun), weather: d }, dt);
     P.snow.value = d.snow ?? 0;
     P.flash.value = this.clouds.flash;
     this.fall.update(eye, wind, { rain: P.rain.value, snow: P.snow.value, ash: d.ash ?? 0 });

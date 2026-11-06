@@ -12,8 +12,8 @@
 // - light: a bloom blurs a few percent of everything (a lens's scatter, not a glow on chosen things), and the
 //   brightest of it throws ghosts across the lens (after Chapman's pseudo lens flare) and lights the dust and smears
 //   on it;
-// - exposure and tone: the eye's adaptation exposes it, AgX and the grade map it to the screen, and a fine grain lies
-//   over it all.
+// - exposure and tone: the eye's adaptation exposes it, AgX and the grade map it to the screen (the colour script's
+//   table for the hour and the weather, grade.ts), and a fine grain lies over it all.
 import { RenderPipeline, Vector4, CanvasTexture, LinearFilter, SRGBColorSpace, UnsignedByteType, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { Node, TextureNode } from 'three/webgpu';
 import {
@@ -26,6 +26,7 @@ import GTAONode from 'three/addons/tsl/display/GTAONode.js';
 import { gaussianBlur } from 'three/addons/tsl/display/GaussianBlurNode.js';
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { agx, GRADE } from './tonemap.ts';
+import { graded } from './grade.ts';
 import { Exposure, exposure } from './exposure.ts';
 import { HAZE_MAX, hazeSpots } from './haze.ts';
 import { P } from './uniforms.ts';
@@ -258,7 +259,7 @@ export class Post {
       // outside the safe circle the world drains toward a bruised violet, before the tone curve so its light holds
       const lum = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
       hdr = mix(hdr, vec3(lum).mul(vec3(0.55, 0.42, 0.95)).add(hdr.mul(vec3(0.25, 0.15, 0.45))), SCREEN.storm.mul(0.75));
-      let ldr = agx(hdr);
+      let ldr = graded(agx(hdr));
       // low on hull the colour drains a little
       ldr = mix(vec3(dot(ldr, vec3(0.2126, 0.7152, 0.0722))), ldr, float(1).sub(SCREEN.low.mul(0.35)));
       // the corners darken a little, as through any lens
