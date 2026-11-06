@@ -65,19 +65,21 @@ export function signingTeam(): string {
   return paid.teamID;
 }
 
-/** Builds the app for real devices, signed by `team`. */
-export async function buildDeviceApp(team: string): Promise<string> {
+/** Builds the app for real devices, signed by `team`. Built for one device, that device is registered with the team
+ *  first if it is not yet, so the build's provisioning profile lets it install there. */
+export async function buildDeviceApp(team: string, device?: RealDevice): Promise<string> {
   await build({ root, logLevel: 'warn' });
   step('cap-sync', 'npx', ['cap', 'sync', 'ios']);
   step('xcodebuild-device', 'xcodebuild', [
     '-project', 'ios/App/App.xcodeproj', '-scheme', 'App', '-configuration', 'Debug',
-    '-destination', 'generic/platform=iOS', '-derivedDataPath', DERIVED, '-allowProvisioningUpdates',
+    '-destination', device ? `platform=iOS,id=${device.udid}` : 'generic/platform=iOS', '-derivedDataPath', DERIVED,
+    '-allowProvisioningUpdates', ...(device ? ['-allowProvisioningDeviceRegistration'] : []),
     `DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic', '-quiet', 'build',
   ]);
   return DEVICE_APP;
 }
 
-export interface RealDevice { id: string; name: string; type: string; paired: boolean; developerMode: boolean; connected: boolean }
+export interface RealDevice { id: string; udid: string; name: string; type: string; paired: boolean; developerMode: boolean; connected: boolean }
 
 /** The real iPads and iPhones this Mac knows, paired or not. */
 export function realDevices(): RealDevice[] {
@@ -88,12 +90,12 @@ export function realDevices(): RealDevice[] {
     result: { devices: {
       identifier: string;
       deviceProperties: { name: string; developerModeStatus?: string };
-      hardwareProperties: { reality: string; deviceType: string };
+      hardwareProperties: { reality: string; deviceType: string; udid: string };
       connectionProperties: { pairingState: string; tunnelState?: string; transportType?: string };
     }[] };
   };
   return result.devices.filter((d) => d.hardwareProperties.reality === 'physical').map((d) => ({
-    id: d.identifier, name: d.deviceProperties.name, type: d.hardwareProperties.deviceType,
+    id: d.identifier, udid: d.hardwareProperties.udid, name: d.deviceProperties.name, type: d.hardwareProperties.deviceType,
     paired: d.connectionProperties.pairingState === 'paired',
     developerMode: d.deviceProperties.developerModeStatus === 'enabled',
     connected: d.connectionProperties.tunnelState === 'connected' || !!d.connectionProperties.transportType,
@@ -221,7 +223,7 @@ if (import.meta.main) {
     const target = realDevice(device === 'ipad' ? 'iPad' : 'iPhone');
     const team = signingTeam();
     done(`installing on ${target.name}, signed by team ${team}`);
-    if (!a['no-build']) done(`built ${await buildDeviceApp(team)}`);
+    if (!a['no-build']) done(`built ${await buildDeviceApp(team, target)}`);
     installOnDevice(target);
     done(`installed and launched ${APP_ID} on ${target.name}`);
     process.exit(0);
