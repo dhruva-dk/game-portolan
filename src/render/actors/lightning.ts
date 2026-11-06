@@ -9,7 +9,7 @@
 // out in the air. Each frame it is laid out as ribbons facing the eye, at least a few pixels wide so a far bolt holds
 // its line, with a bright core and a soft halo across them.
 import * as THREE from 'three';
-import { GPU, onSea, rand } from './common.ts';
+import { onSea, rand } from './common.ts';
 import { boltNodeMaterial } from './tsl/lightning.ts';
 import { STRIKE } from '../gpu/uniforms.ts';
 import type { Effects } from './effects.ts';
@@ -84,9 +84,7 @@ export class Lightning {
     g.setAttribute('color', new THREE.BufferAttribute(this.#col, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('uv', new THREE.BufferAttribute(this.#uv, 2).setUsage(THREE.DynamicDrawUsage));
     g.setDrawRange(0, 0);
-    const m = GPU.on ? boltNodeMaterial() : new THREE.MeshBasicMaterial({
-      vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
-    });
+    const m = boltNodeMaterial();
     this.mesh = new THREE.Mesh(g, m);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 4;

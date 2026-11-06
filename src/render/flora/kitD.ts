@@ -3,12 +3,11 @@
 // and strands, and surfaces for broad leaves. Textures are scans from ambientCG and Poly Haven (see
 // CREDITS.md); the leaf atlases are composed from the scanned leaves at load time, in code.
 //
-// Wind: every material sways in its vertex shader from the uniforms in `floraUniforms` (set them with `setWind`).
-// Each vertex carries `aWind` = (bend, flutter, phase): bend is how far it leans at full gale in the plant's own
-// metres, flutter is how much it shivers, and phase de-syncs neighbours. The same shader runs on plain meshes and
-// on InstancedMesh, so a plant built once can be drawn hundreds of times.
+// Wind: each vertex carries `aWind` = (bend, flutter, phase): bend is how far it leans at full gale in the plant's
+// own metres, flutter is how much it shivers, and phase de-syncs neighbours. The materials are tagged (tag.ts) and
+// the planet's flora (nodes.ts) sways them on the GPU, every copy from its own place.
 //
-// Up is the plant's local +Y. On the sphere, place each plant with +Y along the planet's radius; the wind is
+// Up is the plant's local +Y. On the sphere, each plant stands with +Y along the planet's radius; the wind is
 // projected onto each plant's own horizontal plane, so one world-space wind vector works everywhere.
 import * as THREE from 'three';
 import { tag } from './tag.ts';
@@ -39,35 +38,6 @@ export interface Plant {
 
 /** Distances in metres at which a plant switches to LOD 1 and to LOD 2. */
 export const LOD_DISTANCES: readonly [number, number] = [40, 150];
-
-/** Builds all three levels into a THREE.LOD that switches at LOD_DISTANCES. */
-export function buildLOD(plant: Plant, seed: number, scale = 1): THREE.LOD {
-  const lod = new THREE.LOD();
-  ([0, 1, 2] as const).forEach((l) => lod.addLevel(plant.build(seed, l), l === 0 ? 0 : LOD_DISTANCES[l - 1] * scale));
-  lod.name = plant.id;
-  return lod;
-}
-
-/** Turns a built plant into InstancedMeshes, one per part, sharing its geometry and materials. */
-export function instance(template: THREE.Object3D, matrices: readonly THREE.Matrix4[]): THREE.Group {
-  const group = new THREE.Group();
-  template.updateMatrixWorld(true);
-  const m = new THREE.Matrix4();
-  template.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const im = new THREE.InstancedMesh(mesh.geometry, mesh.material, matrices.length);
-    matrices.forEach((mx, i) => im.setMatrixAt(i, m.multiplyMatrices(mx, mesh.matrixWorld)));
-    im.instanceMatrix.needsUpdate = true;
-    im.customDepthMaterial = mesh.customDepthMaterial;
-    im.castShadow = mesh.castShadow;
-    im.receiveShadow = mesh.receiveShadow;
-    im.renderOrder = mesh.renderOrder;
-    im.computeBoundingSphere();
-    group.add(im);
-  });
-  return group;
-}
 
 // ---------------------------------------------------------------- small helpers
 
@@ -126,32 +96,6 @@ export function detail(lod: Lod): Detail {
 
 /** Count of n scaled for the level of detail, never below `min`. */
 export const many = (n: number, d: Detail, min = 1): number => Math.max(min, Math.round(n * d.cards));
-
-// ---------------------------------------------------------------- wind and sea uniforms
-
-/** Shared by every material in the kit. */
-export const floraUniforms = {
-  uTime: { value: 0 },
-  /** World-space wind direction (unit). */
-  uWindDir: { value: new THREE.Vector3(1, 0, 0) },
-  /** 0 is calm, 1 is a full gale. */
-  uWindStrength: { value: 0.35 },
-  /** The sea: a sphere around uSeaCentre of radius uSeaRadius, or with radius 0 a flat sea at uSeaCentre.y. */
-  uSeaCentre: { value: new THREE.Vector3(0, 0, 0) },
-  uSeaRadius: { value: 0 },
-};
-
-export function setWind(dir: THREE.Vector3, strength: number, time: number): void {
-  floraUniforms.uWindDir.value.copy(dir).normalize();
-  floraUniforms.uWindStrength.value = strength;
-  floraUniforms.uTime.value = time;
-}
-
-/** Where the sea surface is, so roots darken, shine and carry a tide line where they meet it. */
-export function setSea(centre: THREE.Vector3, radius: number): void {
-  floraUniforms.uSeaCentre.value.copy(centre);
-  floraUniforms.uSeaRadius.value = radius;
-}
 
 // ---------------------------------------------------------------- textures
 
@@ -595,61 +539,6 @@ export function clump(geo: Geo, r: () => number, c: THREE.Vector3, rad: readonly
 
 // ---------------------------------------------------------------- materials
 
-const VERT_HEAD = /* glsl */ `
-attribute vec3 aWind;
-uniform float uTime;
-uniform vec3 uWindDir;
-uniform float uWindStrength;
-uniform vec3 uSeaCentre;
-uniform float uSeaRadius;
-varying float vSeaH;
-varying float vUpL;
-#ifdef FLORA_MOSS
-attribute float aMoss;
-varying float vMoss;
-#endif
-`;
-
-// Bend toward the wind (lean plus a slow sway and a sideways wobble), then a fast shiver for leaves and tips.
-// Gusts travel downwind as a wave, so a field of plants ripples.
-const VERT_BODY = /* glsl */ `
-#ifdef USE_INSTANCING
-mat4 floraM = modelMatrix * instanceMatrix;
-#else
-mat4 floraM = modelMatrix;
-#endif
-vec3 floraO = floraM[3].xyz;
-vec3 wl = transpose(mat3(floraM)) * uWindDir;
-vec2 wd = dot(wl.xz, wl.xz) > 1e-8 ? normalize(wl.xz) : vec2(1.0, 0.0);
-float ph = dot(floraO, vec3(0.071, 0.053, 0.089));
-float wave = dot(floraO, uWindDir) * 0.05 - uTime * 1.1;
-float gust = 0.5 + 0.5 * sin(wave) * sin(wave * 0.43 + ph * 2.0);
-float st = uWindStrength;
-float lean = st * (0.45 + 0.75 * gust);
-float osc = (0.08 + 0.35 * st) * sin(uTime * (1.1 + 0.6 * fract(ph * 7.31)) + ph * 6.2831 + aWind.z * 0.8);
-float wob = (0.04 + 0.2 * st) * sin(uTime * 0.83 + ph * 3.7);
-vec2 off = (wd * (lean + osc) + vec2(-wd.y, wd.x) * wob) * aWind.x;
-transformed.xz += off;
-transformed.y -= 0.4 * dot(off, off) / max(abs(position.y), 0.4);
-float fl = aWind.y * (0.15 + 1.1 * st) * (0.5 + 0.7 * gust);
-float shiver = sin(uTime * 6.1 + aWind.z * 6.2831 + ph * 3.0) + 0.6 * sin(uTime * 9.7 + aWind.z * 15.0);
-transformed += normal * (shiver * 0.045 * fl);
-transformed.xz += wd * (shiver * 0.02 * fl);
-vec4 floraW = floraM * vec4(transformed, 1.0);
-vSeaH = uSeaRadius > 0.0 ? length(floraW.xyz - uSeaCentre) - uSeaRadius : floraW.y - uSeaCentre.y;
-vUpL = normal.y;
-#ifdef FLORA_MOSS
-vMoss = aMoss;
-#endif
-`;
-
-function windVertex(s: THREE.WebGLProgramParametersWithUniforms): void {
-  Object.assign(s.uniforms, floraUniforms);
-  s.vertexShader = s.vertexShader
-    .replace('#include <common>', '#include <common>\n' + VERT_HEAD)
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + VERT_BODY);
-}
-
 export interface BarkOpts {
   map: string;
   normal: string;
@@ -681,46 +570,6 @@ export function barkMaterial(key: string, o: BarkOpts): THREE.MeshStandardMateri
   });
   const mossMap = o.moss ? texture(o.moss.map, true) : null;
   const mossTint = new THREE.Color(o.moss?.tint ?? 0xffffff);
-  m.onBeforeCompile = (s) => {
-    windVertex(s);
-    s.uniforms.uMossMap = { value: mossMap };
-    s.uniforms.uMossTint = { value: mossTint };
-    s.uniforms.uMossAmount = { value: o.moss?.amount ?? 0 };
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', /* glsl */ `#include <common>
-        varying float vSeaH;
-        varying float vUpL;
-        uniform sampler2D uMossMap;
-        uniform vec3 uMossTint;
-        uniform float uMossAmount;
-        #ifdef FLORA_MOSS
-        varying float vMoss;
-        #endif
-        float floraWet = 0.0;`)
-      .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
-        #ifdef FLORA_MOSS
-        {
-          vec3 moss = texture2D(uMossMap, vMapUv * 1.3 + 0.37).rgb;
-          float lump = moss.g * 1.6 - 0.45;
-          float m = clamp(smoothstep(0.05, 0.5, vUpL * uMossAmount + vMoss * 0.9 + lump * 0.45 - 0.2), 0.0, 1.0);
-          diffuseColor.rgb = mix(diffuseColor.rgb, moss * uMossTint, m);
-        }
-        #endif
-        #ifdef FLORA_TIDE
-        {
-          // under water: dark and slick; the band the tide covers: a green-brown stain; above: dry
-          float under = 1.0 - smoothstep(-0.15, 0.1, vSeaH);
-          float band = smoothstep(-0.2, 0.05, vSeaH) * (1.0 - smoothstep(0.55, 1.1, vSeaH));
-          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.55, 0.6, 0.42), band * 0.8);
-          diffuseColor.rgb *= mix(1.0, 0.45, under);
-          floraWet = max(under, band * 0.7);
-        }
-        #endif`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, floraWet);');
-    if (o.moss) s.defines = { ...s.defines, FLORA_MOSS: '' };
-    if (o.tide) s.defines = { ...s.defines, FLORA_TIDE: '' };
-  };
-  m.customProgramCacheKey = () => 'flora-d-bark-' + (o.moss ? 'm' : '') + (o.tide ? 't' : '');
   tag(m, { kit: 'D', moss: o.moss && mossMap ? { map: mossMap, tint: mossTint, amount: o.moss.amount } : undefined, tide: !!o.tide });
   materials.set(key, m);
   return m;
@@ -746,63 +595,10 @@ export function leafMaterial(key: string, o: LeafOpts): THREE.MeshStandardMateri
     side: THREE.DoubleSide, alphaTest: o.solid ? 0 : o.alphaTest ?? 0.45, vertexColors: true,
   });
   const translucency = o.translucency ?? 0.6, size = o.atlas.texture.image.width as number;
-  m.onBeforeCompile = (s) => {
-    windVertex(s);
-    s.uniforms.uTranslucency = { value: translucency };
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uTranslucency;')
-      .replace('#include <map_fragment>', mipAlpha(size))
-      .replace('#include <opaque_fragment>', /* glsl */ `
-        #if NUM_DIR_LIGHTS > 0
-        {
-          float back = pow(max(dot(normalize(-vViewPosition), directionalLights[0].direction), 0.0), 3.0);
-          outgoingLight += diffuseColor.rgb * directionalLights[0].color * back * uTranslucency;
-        }
-        #endif
-        #include <opaque_fragment>`);
-  };
-  m.customProgramCacheKey = () => 'flora-d-leaf';
   tag(m, { kit: 'D', cutout: o.solid ? undefined : size, translucency });
   materials.set(key, m);
   return m;
 }
-
-// mipmaps average the leaves' alpha away; this restores coverage so far crowns stay full
-const mipAlpha = (size: number) => /* glsl */ `
-#ifdef USE_MAP
-  vec4 sampledDiffuseColor = texture2D(map, vMapUv);
-  vec2 fdx = dFdx(vMapUv * ${size.toFixed(1)}), fdy = dFdy(vMapUv * ${size.toFixed(1)});
-  sampledDiffuseColor.a *= 1.0 + max(0.0, 0.5 * log2(max(dot(fdx, fdx), dot(fdy, fdy)))) * 0.28;
-  diffuseColor *= sampledDiffuseColor;
-#endif
-`;
-
-const depths = new Map<THREE.Material, THREE.MeshDepthMaterial>();
-
-/** The shadow-casting twin of a leaf material: same alpha cut-out, same sway. */
-export function depthMaterial(leaf: THREE.MeshStandardMaterial): THREE.MeshDepthMaterial {
-  let d = depths.get(leaf);
-  if (!d) {
-    d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: leaf.map, alphaTest: leaf.alphaTest || 0, side: THREE.DoubleSide });
-    d.onBeforeCompile = windVertex;
-    d.customProgramCacheKey = () => 'flora-d-depth';
-    depths.set(leaf, d);
-  }
-  return d;
-}
-
-/** Bark's shadow twin: the same sway so shadows move with the wood. */
-export function barkDepth(): THREE.MeshDepthMaterial {
-  let d = depths.get(barkDepthKey);
-  if (!d) {
-    d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-    d.onBeforeCompile = windVertex;
-    d.customProgramCacheKey = () => 'flora-d-depth-bark';
-    depths.set(barkDepthKey, d);
-  }
-  return d;
-}
-const barkDepthKey = new THREE.MeshBasicMaterial();
 
 /** Puts a plant's parts together as one group of meshes, each part one draw call. Empty parts are skipped. */
 export function assemble(name: string, lod: Lod, parts: readonly (readonly [Geo, THREE.Material])[]): THREE.Group {
@@ -813,8 +609,6 @@ export function assemble(name: string, lod: Lod, parts: readonly (readonly [Geo,
     const mesh = new THREE.Mesh(geo.build(), mat);
     mesh.castShadow = lod < 2;
     mesh.receiveShadow = lod < 2;
-    if (mat instanceof THREE.MeshStandardMaterial) mesh.customDepthMaterial = mat.map && mat.alphaTest > 0 ? depthMaterial(mat) : barkDepth();
-    if (mat instanceof THREE.ShaderMaterial) { mesh.castShadow = false; mesh.renderOrder = 2; }
     group.add(mesh);
   }
   return group;
@@ -822,46 +616,13 @@ export function assemble(name: string, lod: Lod, parts: readonly (readonly [Geo,
 
 // ---------------------------------------------------------------- falling drips
 
-const DRIP_VERT = /* glsl */ `
-attribute vec3 aDrip; // corner across, corner along, phase
-attribute float aFall;
-uniform float uTime;
-varying float vA;
-void main() {
-  float period = 2.6 + aFall * 0.25;
-  float t = fract(uTime / period + aDrip.z) * period;
-  float y = 4.9 * t * t;
-  float v = 9.8 * t;
-  vA = (1.0 - smoothstep(aFall * 0.8, aFall, y)) * step(0.05, t);
-  vec3 p = position;
-  p.y -= min(y, aFall);
-  p.y += aDrip.y * (0.03 + v * 0.018);
-  mat4 m = modelMatrix;
-#ifdef USE_INSTANCING
-  m = modelMatrix * instanceMatrix;
-#endif
-  vec4 wp = m * vec4(p, 1.0);
-  // turn the streak's width to face the camera
-  vec3 toCam = normalize(cameraPosition - wp.xyz);
-  wp.xyz += normalize(cross(vec3(0.0, 1.0, 0.0), toCam)) * aDrip.x * 0.007;
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}`;
+let dripMat: THREE.MeshBasicMaterial | null = null;
 
-const DRIP_FRAG = /* glsl */ `
-varying float vA;
-void main() {
-  if (vA < 0.01) discard;
-  gl_FragColor = vec4(0.82, 0.9, 0.95, 0.55 * vA);
-}`;
-
-let dripMat: THREE.ShaderMaterial | null = null;
-
-/** Drops that fall from the given points over and over, `fall` metres each, as thin streaks. */
+/** Drops that fall from the given points over and over, `fall` metres each, as thin streaks: each quad's corners
+ *  carry aDrip (across, along, phase) and aFall, and the planet's flora (nodes.ts) lets them fall. The material is
+ *  untagged, which is what marks them as drips there. */
 export function drips(r: () => number, from: readonly THREE.Vector3[], fall: readonly number[]): THREE.Mesh {
-  dripMat ??= new THREE.ShaderMaterial({
-    vertexShader: DRIP_VERT, fragmentShader: DRIP_FRAG, uniforms: { uTime: floraUniforms.uTime },
-    transparent: true, depthWrite: false,
-  });
+  dripMat ??= new THREE.MeshBasicMaterial({ name: 'drips', color: 0xd1e6f2, transparent: true, opacity: 0.55, depthWrite: false });
   const pos: number[] = [], drip: number[] = [], fl: number[] = [], idx: number[] = [];
   from.forEach((p, i) => {
     const ph = r(), b = pos.length / 3;

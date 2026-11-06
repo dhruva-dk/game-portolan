@@ -12,7 +12,7 @@ export type V3 = Node<'vec3'>;
 export type V4 = Node<'vec4'>;
 export type B = Node<'bool'>;
 
-/** An actor's uniforms: the same `{ value }` records its WebGL shaders are given. */
+/** An actor's uniforms: `{ value }` records the actor sets each frame and its nodes read. */
 export type Uniforms = Record<string, { value: unknown }>;
 
 /** Reads one of an actor's uniforms each time the object is drawn. */

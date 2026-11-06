@@ -2,7 +2,7 @@
 // night the storm-charged air burns on the pine tips as violet corona fire that crackles and leaps, and now and then
 // an arc jumps between two crowns. From far off: four violet sparks hung high over the sea, flickering.
 import * as THREE from 'three';
-import { Kit, column, noise3, halo, instances, lit, mat4, merge, particles, strip, surface, tick, SHAPE_FLAME, SHAPE_SPARK } from '../kit.ts';
+import { Kit, column, noise3, halo, instances, lit, mat4, merge, particles, strip, surface, tick } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { abs, clamp, cos, exp, float, floor, fract, mix, mod, sin, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import { bFbm, bHash1, bNoise, shapeFlame, shapeSpark, type F } from '../nodes.ts';
@@ -45,16 +45,6 @@ export const spires: BeaconLook = {
     });
     const lime = lit(k, {
       color: 0xd8d2c2, roughness: 0.9,
-      albedo: /* glsl */ `float bed = 0.5 + 0.5 * sin(vLocal.y * 1.25 + bNoise(vLocal * 0.3) * 2.0);
-        float n = bFbm(vLocal * vec3(0.4, 0.05, 0.4));
-        vec3 c = mix(vec3(0.62, 0.6, 0.55), vec3(0.85, 0.83, 0.77), bed * 0.4 + n * 0.6);
-        c = mix(c, vec3(0.35, 0.34, 0.32), smoothstep(0.6, 0.8, bNoise(vec3(vLocal.x * 0.9, vLocal.y * 0.04, vLocal.z * 0.9))) * 0.5);
-        c = mix(c, vec3(0.1, 0.13, 0.1), smoothstep(3.0, 0.5, vLocal.y));
-        diffuseColor.rgb = c;`,
-      emissive: /* glsl */ `// the corona's light falling on the upper rock
-        float top = smoothstep(24.0, 60.0, vLocal.y);
-        float fl = 0.7 + 0.3 * bNoise(vec3(uTime * 9.0, vLocal.y * 0.1, 0.0));
-        totalEmissiveRadiance += vec3(0.4, 0.28, 1.0) * top * top * 0.22 * fl * uNight;`,
       albedoNode: ({ local: L }) => {
         const bed = sin(L.y.mul(1.25).add(bNoise(L.mul(0.3)).mul(2))).mul(0.5).add(0.5);
         const n = bFbm(L.mul(vec3(0.4, 0.05, 0.4)));
@@ -79,23 +69,14 @@ export const spires: BeaconLook = {
     ]);
     k.add(instances(pineGeo, lit(k, {
       color: 0x1d2a1e, roughness: 0.9,
-      emissive: /* glsl */ `totalEmissiveRadiance += vec3(0.5, 0.35, 1.0) * fres * 0.6 * (0.6 + 0.4 * sin(uTime * 23.0 + vLocal.x)) * uNight;`,
       emissiveNode: ({ local: L, t, night, fres }) => vec3(0.5, 0.35, 1).mul(fres).mul(0.6).mul(sin(t.mul(23).add(L.x)).mul(0.4).add(0.6)).mul(night),
     }), pines));
 
     // the corona: tongues of violet fire licking up from every pine tip
     const tipArr = tips.map((v) => [v.x, v.y, v.z] as [number, number, number]);
     k.add(particles(k, {
-      count: 4 * 34, color: 0x9a78ff, day: 0.0, night: 5.0, shape: SHAPE_FLAME,
+      count: 4 * 34, color: 0x9a78ff, day: 0.0, night: 5.0,
       base: (i, r) => { const t = tipArr[i % 4], a = r() * Math.PI * 2, d = Math.sqrt(r()) * 1.8; return [t[0] + Math.cos(a) * d, t[1] - r() * 2.5, t[2] + Math.sin(a) * d]; },
-      motion: /* glsl */ `float f = bNoise(vec3(t * 11.0 + s.x * 40.0, s.y * 9.0, 0.0));
-        float g = bNoise(vec3(t * 3.0 + s.z * 20.0, 1.0, 0.0));
-        size = 0.25 + 0.5 * f * f + 0.25 * s.w;
-        stretch = 1.5 + 2.5 * f;
-        pos.y += size * stretch * 0.7;
-        pos.xz += vec2(sin(t * 7.0 + s.x * 30.0), cos(t * 6.0 + s.y * 30.0)) * 0.15;
-        alpha = smoothstep(0.25, 0.7, f * 0.7 + g * 0.5);
-        col = mix(vec3(0.7, 0.45, 1.0), vec3(0.85, 0.9, 1.4), f * f);`,
       shapeNode: shapeFlame,
       motionNode: ({ s, pos, t }) => {
         const f = bNoise(vec3(t.mul(11).add(s.x.mul(40)), s.y.mul(9), 0)), g = bNoise(vec3(t.mul(3).add(s.z.mul(20)), 1, 0));
@@ -109,12 +90,8 @@ export const spires: BeaconLook = {
     }));
     // sparks spitting off the crowns
     k.add(particles(k, {
-      count: 4 * 14, color: 0xd6c8ff, day: 0.0, night: 4.0, shape: SHAPE_SPARK,
+      count: 4 * 14, color: 0xd6c8ff, day: 0.0, night: 4.0,
       base: (i) => tipArr[i % 4],
-      motion: /* glsl */ `float T = 0.7 + s.y * 0.8; float tt = mod(t + s.x * 9.0, T);
-        float a = s.z * 6.2831;
-        pos += vec3(cos(a) * tt * 3.0, tt * 4.0 - 3.0 * tt * tt, sin(a) * tt * 3.0);
-        size = 0.08; alpha = (1.0 - tt / T) * step(0.6, bNoise(vec3(floor((t + s.x * 9.0) / T), s.w * 10.0, 0.0)) + 0.35);`,
       shapeNode: shapeSpark,
       motionNode: ({ s, pos, t }) => {
         const T = s.y.mul(0.8).add(0.7), tt = mod(t.add(s.x.mul(9)), T), a = s.z.mul(6.2831);
@@ -125,10 +102,10 @@ export const spires: BeaconLook = {
       },
     }));
     for (const tip of tips) {
-      k.add(halo(k, [tip.x, tip.y + 0.5, tip.z], 7, 0x8a66ff, 0.0, 1.1, '0.7 + 0.3 * bNoise(vec3(uTime * 8.0, s.x * 10.0, 0.0))', 0, '',
+      k.add(halo(k, [tip.x, tip.y + 0.5, tip.z], 7, 0x8a66ff, 0.0, 1.1, 0,
         ({ t, s }) => bNoise(vec3(t.mul(8), s.x.mul(10), 0)).mul(0.3).add(0.7)));
     }
-    k.add(halo(k, [0, 54, 0], 36, 0x7a5cff, 0, 0.11, '1.0', 36));
+    k.add(halo(k, [0, 54, 0], 36, 0x7a5cff, 0, 0.11, 36));
 
     // arcs: now and then a jagged line of light jumps between two crowns
     const pairs: [number, number][] = [[0, 1], [0, 2], [0, 3], [1, 3]];
@@ -152,17 +129,6 @@ export const spires: BeaconLook = {
       };
       k.add(surface(k, geo, {
         color: 0xc8b8ff, day: 0, night: 9.0,
-        defs: /* glsl */ `float arcOn(float t) { float ph = t / ${period.toFixed(2)} + ${(i * 0.37).toFixed(2)};
-          float f = fract(ph); float n = floor(ph);
-          return step(f, 0.05) * step(0.45, bHash1(n * 1.7 + ${i.toFixed(1)})) * (0.6 + 0.4 * step(0.5, fract(f * 60.0))); }`,
-        vertex: /* glsl */ `float n = floor(uTime * 18.0);
-          float L = ${len.toFixed(2)};
-          float j = sin(uv.y * 0.9 + n * 1.3) * 1.2 + (bNoise(vec3(uv.y * 0.6, n, 0.0)) - 0.5) * 2.6;
-          float env = sin(clamp(uv.y / max(L, 1.0), 0.0, 1.0) * 3.14159);
-          p += vec3(j, (bNoise(vec3(uv.y * 0.8, n, 5.0)) - 0.5) * 2.0, -j) * env;`,
-        paint: /* glsl */ `float x = abs(vUv.x - 0.5) * 2.0;
-          glow = arcOn(uTime) * (exp(-x * x * 10.0) + 0.3);
-          col = mix(vec3(0.75, 0.65, 1.0), vec3(1.2), exp(-x * x * 30.0));`,
         vertexNode: ({ p, uv: f, t }) => {
           const n = floor(t.mul(18));
           const j = sin(f.y.mul(0.9).add(n.mul(1.3))).mul(1.2).add(bNoise(vec3(f.y.mul(0.6), n, 0)).sub(0.5).mul(2.6));

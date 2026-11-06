@@ -1,12 +1,12 @@
-// The wakes' foam as a node material, for the WebGPU planet: the same V of foam as the GLSL in wakes.ts, read from the
-// same vertex data (along, across, strength, age; the trail's glow), but lit as a surface on the sea by the sun, the
+// The wakes' foam as a node material: the V of foam wakes.ts lays out, read from its vertex data (along, across,
+// strength, age; the trail's glow), lit as a surface on the sea by the sun, the
 // moon and the sky, so it takes the ship's shadow and goes grey under cloud and blue at dusk on its own. At night
 // the spirit's light in the water glows in the trail's colour.
 //
 // Lit foam in the planet's light is many times brighter than the sea round it, so a thin veil of it over the whole
 // ribbon reads as a sheet of white. Foam is not a veil: it lies in patches with water between, and how much of the
 // sea it covers is how white the sea looks from afar. So the V's foam here is a lace, cut from noise at the share of
-// the water the GLSL's foam stands for, and seen from far enough that the lace is finer than a pixel, that share.
+// the water the trail's strength asks for, and seen from far enough that the lace is finer than a pixel, that share.
 import { DoubleSide, MeshStandardNodeMaterial, type Texture } from 'three/webgpu';
 import { abs, attribute, clamp, float, fwidth, max, mix, pow, smoothstep, texture, vec2, vec3 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';

@@ -1,4 +1,4 @@
-// The moonbow under Moonbow Arch, on the WebGPU planet. The swell breaks on the arch's feet and throws spray up into
+// The moonbow under Moonbow Arch. The swell breaks on the arch's feet and throws spray up into
 // the passage, where it hangs and drifts on the wind. The spray is a thin cloud of drops, lit by the sun, the moon and
 // the sky as mist is. Where the eye looks about 42 degrees from the point opposite the light, the drops send the light
 // back as a bow: violet inside, red outside, a fainter reversed bow near 51 degrees, the dark band between, and the

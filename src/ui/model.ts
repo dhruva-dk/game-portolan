@@ -214,8 +214,6 @@ export interface RankModel {
 
 // ---------------------------------------------------------------- settings
 
-export type Quality = 'low' | 'medium' | 'high';
-
 export interface Settings {
   /** Volumes, 0–1: everything, the guns and the world's sounds, the sea and the weather, and the interface. */
   master: number;
@@ -225,7 +223,6 @@ export interface Settings {
   haptics: boolean;
   /** Screen shake, 0–1. */
   shake: number;
-  quality: Quality;
   /** Aim speed, 0.5–2. */
   sensitivity: number;
   invertY: boolean;
@@ -236,7 +233,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  master: 0.9, effects: 0.9, ambience: 0.7, interface: 0.8, haptics: true, shake: 1, quality: 'medium',
+  master: 0.9, effects: 0.9, ambience: 0.7, interface: 0.8, haptics: true, shake: 1,
   sensitivity: 1, invertY: false, leftHanded: false, autoFire: false,
 };
 

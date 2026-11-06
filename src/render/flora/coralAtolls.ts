@@ -161,57 +161,9 @@ function buildCoconut(seed: number, lod: Lod): THREE.Object3D {
 
 // ---------------------------------------------------------------- coral materials
 
-// Value noise in the coral's own frame; brain coral draws meandering grooves from its iso-lines, the others
-// a skin of corallite cups. Both shade the normal from the pattern's screen-space slope.
-const CORAL_HEAD = /* glsl */ `
-varying vec3 vCoralP;
-float cHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float cNoise(vec3 x) {
-  vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(cHash(i), cHash(i + vec3(1, 0, 0)), f.x), mix(cHash(i + vec3(0, 1, 0)), cHash(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(cHash(i + vec3(0, 0, 1)), cHash(i + vec3(1, 0, 1)), f.x), mix(cHash(i + vec3(0, 1, 1)), cHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}
-// -1 (deep groove or pore) to 1 (ridge or cup rim); flattened where the pattern is finer than a pixel
-float coralHeight(vec3 p) {
-#ifdef CORAL_BRAIN
-  float n = cNoise(p * CORAL_FREQ) * 0.62 + cNoise(p * CORAL_FREQ * 2.1 + 7.0) * 0.28 + cNoise(p * CORAL_FREQ * 4.3) * 0.1;
-  float f = n * 10.0;
-  float h = cos(6.2832 * f);
-  return h * (1.0 - smoothstep(0.2, 0.55, fwidth(f)));
-#else
-  float c = cNoise(p * CORAL_FREQ) * 0.75 + cNoise(p * CORAL_FREQ * 2.3 + 3.0) * 0.25;
-  float h = smoothstep(0.5, 0.68, c) * 2.0 - 1.0 - 0.8 * smoothstep(0.72, 0.8, c);
-  return h * (1.0 - smoothstep(0.08, 0.25, fwidth(c)));
-#endif
-}
-vec3 coralBump(vec3 surf, vec3 n, float h, float k) {
-  vec3 sx = dFdx(surf), sy = dFdy(surf);
-  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
-  float det = dot(sx, r1);
-  vec3 grad = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2) * k;
-  return normalize(abs(det) * n - grad);
-}
-`;
-
-function coralPatch(kind: 'brain' | 'polyp', freq: number, bump: number) {
-  return (s: THREE.WebGLProgramParametersWithUniforms) => {
-    s.defines = s.defines ?? {};
-    s.defines.CORAL_FREQ = freq.toFixed(2);
-    if (kind === 'brain') s.defines.CORAL_BRAIN = '';
-    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vCoralP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCoralP = position;');
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + CORAL_HEAD)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        float cH = coralHeight(vCoralP);
-        diffuseColor.rgb *= ${kind === 'brain' ? '0.78 + cH * 0.22' : '0.85 + cH * 0.15'};`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        normal = coralBump(-vViewPosition, normal, cH, ${bump.toFixed(3)});`);
-  };
-}
-
-const branchMat = () => plantMaterial('coralAtolls-branch', () => ({ roughness: 0.75, patch: coralPatch('polyp', 70, 0.004), coral: { kind: 'polyp', freq: 70, bump: 0.004 } }));
-const brainMat = () => plantMaterial('coralAtolls-brain', () => ({ roughness: 0.7, patch: coralPatch('brain', 7, 0.012), coral: { kind: 'brain', freq: 7, bump: 0.012 } }));
-const plateMat = () => plantMaterial('coralAtolls-plate', () => ({ roughness: 0.75, doubleSide: true, patch: coralPatch('polyp', 55, 0.004), coral: { kind: 'polyp', freq: 55, bump: 0.004 } }));
+const branchMat = () => plantMaterial('coralAtolls-branch', () => ({ roughness: 0.75, coral: { kind: 'polyp', freq: 70, bump: 0.004 } }));
+const brainMat = () => plantMaterial('coralAtolls-brain', () => ({ roughness: 0.7, coral: { kind: 'brain', freq: 7, bump: 0.012 } }));
+const plateMat = () => plantMaterial('coralAtolls-plate', () => ({ roughness: 0.75, doubleSide: true, coral: { kind: 'polyp', freq: 55, bump: 0.004 } }));
 const rubbleMat = () => plantMaterial('coralAtolls-rubble', () => {
   const map = scanTexture('coral_rubble_d.jpg', true), normalMap = scanTexture('coral_rubble_n.jpg', false);
   return { map, normalMap, roughness: 0.95 };

@@ -1,5 +1,4 @@
-// The particles as node materials, for the WebGPU planet: the same sprites as the GLSL in particles.ts, from the same
-// instance data (place and size, colour and alpha, velocity and stretch, spin, atlas frame and mode).
+// The particles as node materials: the sprites particles.ts lays out, from its instance data (place and size, colour and alpha, velocity and stretch, spin, atlas frame and mode).
 //
 // Each sprite's corners are placed in world space in the vertex stage (the mesh sits at the origin), whether it
 // faces the eye, streaks along its velocity on screen or lies flat on the water, so the haze and the light at the

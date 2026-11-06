@@ -1,11 +1,8 @@
 // The player's settings: kept in the browser's storage beside the career (never in capture mode), and applied at
-// once to the sound, the juice, the stage's quality and the controls whenever they change.
-import { DEFAULT_SETTINGS, type Quality, type Settings } from '../ui/model.ts';
+// once to the sound, the juice and the controls whenever they change.
+import { DEFAULT_SETTINGS, type Settings } from '../ui/model.ts';
 
 export const SETTINGS_KEY = 'portolan.settings';
-
-/** The interface's three qualities as the renderer's presets. */
-export const QUALITY_PRESET: Record<Quality, 'battery' | 'balanced' | 'cinematic'> = { low: 'battery', medium: 'balanced', high: 'cinematic' };
 
 const clamp01 = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : d);
 const bool = (v: unknown, d: boolean): boolean => (typeof v === 'boolean' ? v : d);
@@ -20,12 +17,11 @@ export function parseSettings(raw: string | null): Settings {
   } catch {
     // a broken save starts from the defaults
   }
-  const q = o.quality;
   const sens = typeof o.sensitivity === 'number' && Number.isFinite(o.sensitivity) ? Math.max(0.5, Math.min(2, o.sensitivity)) : d.sensitivity;
   return {
     master: clamp01(o.master, d.master), effects: clamp01(o.effects, d.effects), ambience: clamp01(o.ambience, d.ambience),
     interface: clamp01(o.interface, d.interface), haptics: bool(o.haptics, d.haptics), shake: clamp01(o.shake, d.shake),
-    quality: q === 'low' || q === 'medium' || q === 'high' ? q : d.quality, sensitivity: sens,
+    sensitivity: sens,
     invertY: bool(o.invertY, d.invertY), leftHanded: bool(o.leftHanded, d.leftHanded), autoFire: bool(o.autoFire, d.autoFire),
   };
 }

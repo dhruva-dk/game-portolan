@@ -1,5 +1,4 @@
-// The shield aura as a node material, for the WebGPU planet: the same shell of hexes as the GLSL in aura.ts, from the
-// same uniforms. It brightens as the shield fills, ripples from each hit, cracks as it weakens, flashes when it
+// The shield aura as a node material: a shell of hexes round the hull, driven by aura.ts's uniforms. It brightens as the shield fills, ripples from each hit, cracks as it weakens, flashes when it
 // breaks and knits up from the waterline when it is refilled. Added light, at the lamps' scale, and not hazed.
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, type Vector4 } from 'three/webgpu';
 import {

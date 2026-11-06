@@ -5,9 +5,7 @@ import * as THREE from 'three';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { REGION_EVENTS, REGIONS, heightAt, type RegionId } from '../../sim/world/index.ts';
 import { v3 } from '../../sim/math.ts';
-import { patch } from '../engine.ts';
 import { seaAt } from '../swell.ts';
-import { GPU } from '../actors/common.ts';
 import { addedGlowNode, faintGlowNode, glowNode } from '../beacons/nodes.ts';
 import type { EventPhase } from './eventRocks.ts';
 
@@ -63,18 +61,16 @@ export class EventClams {
     this.group.name = 'eventClams';
     const dome = shell(), cup = shell().scale(1, -1, 1);
     cup.computeVertexNormals();
-    const outside = patch(new THREE.MeshStandardMaterial({ color: 0x6d7e86, roughness: 0.55, flatShading: true, side: THREE.DoubleSide }), 'event-clams');
+    const outside = new THREE.MeshStandardMaterial({ color: 0x6d7e86, roughness: 0.55, flatShading: true, side: THREE.DoubleSide });
     // the cup's nacre, seen when they gape
     const shine = { color: 0xe7d3e6, roughness: 0.25, metalness: 0.2, emissive: 0x3a2a48, side: THREE.DoubleSide };
-    const nacre = GPU.on ? (faintGlowNode(shine) as unknown as THREE.MeshStandardMaterial) : patch(new THREE.MeshStandardMaterial(shine), 'event-clams');
+    const nacre = (faintGlowNode(shine) as unknown as THREE.MeshStandardMaterial);
     this.lower = new THREE.InstancedMesh(cup, nacre, CLAMS);
     this.upper = new THREE.InstancedMesh(dome, outside, CLAMS);
-    // the pearls glow past white, so they bloom; on the GPU planet at the lamps' scale
-    const pearl = GPU.on ? glowNode(0xffe9c2, { value: 3 }) : new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe9c2).multiplyScalar(3), fog: false, toneMapped: false });
+    // the pearls glow past white, so they bloom, at the lamps' scale
+    const pearl = glowNode(0xffe9c2, { value: 3 });
     this.pearls = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 2), pearl as THREE.Material, CLAMS);
-    const halo = GPU.on
-      ? addedGlowNode(0xffd9a0, 0.13)
-      : new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
+    const halo = addedGlowNode(0xffd9a0, 0.13);
     this.halos = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.6, 2), halo as THREE.Material, CLAMS);
     for (const mesh of [this.lower, this.upper, this.pearls, this.halos]) {
       mesh.count = 0;

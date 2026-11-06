@@ -23,22 +23,10 @@ export const AU = {
   uNight: { value: 0 }, // at the focus, for things lit as one (lanterns, windows)
 };
 
-/** Whether the actors are drawn by the WebGPU planet, which takes their node materials (tsl/) in place of the GLSL. */
-export const GPU = { on: false };
-
-/** The stage's own uniforms (the planet's light and air), which every actor material shares as well; set by the actors from options. */
-export const STAGE_U: Record<string, THREE.IUniform> = {};
-
-/** Gives a material the shared uniforms; `hook` edits its shader, and `key` names the edit for the program cache. */
-export function patch<T extends THREE.Material>(m: T, key: string, hook?: (s: THREE.WebGLProgramParametersWithUniforms) => void): T {
-  // on the WebGPU planet, where the material is made a node material (its properties copied over), the glow is
-  // set at the lamps' scale; the hook is GL's alone, and a material with one gets its own node material instead
-  if (GPU.on && 'emissive' in m) (m as { emissiveNode?: unknown }).emissiveNode = lampEmissive();
-  m.onBeforeCompile = (s) => {
-    Object.assign(s.uniforms, STAGE_U, AU);
-    hook?.(s);
-  };
-  m.customProgramCacheKey = () => key;
+/** Gives a material the lamps' glow: the planet makes it a node material (its properties copied over) and sets
+ *  what it gives off at the lamps' scale. */
+export function patch<T extends THREE.Material>(m: T): T {
+  if ('emissive' in m) (m as { emissiveNode?: unknown }).emissiveNode = lampEmissive();
   return m;
 }
 

@@ -1,5 +1,4 @@
-// The caravel's hull and sails as node materials, for the WebGPU planet: the same paint, cloth and wear as the GLSL in
-// caravel.ts, read from the same uniforms, lit by the atmosphere's lights and shadowed by the sun's cascades.
+// The caravel's hull and sails as node materials: paint, cloth and wear read from caravel.ts's uniforms, lit by the atmosphere's lights and shadowed by the sun's cascades.
 //
 // The hull is one mesh coloured by part (aPart): lacquered planks with the gun deck's band, the castles' gilt lattice
 // and the copper below the water; gilt, the deck, dark wood, rope, iron, bronze, the stern's windows and the wisp.

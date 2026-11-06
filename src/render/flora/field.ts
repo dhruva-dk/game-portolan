@@ -1,4 +1,4 @@
-// The plants on the WebGPU planet: every region's kinds grown over its ground, built at three levels of detail in a
+// The plants on the planet: every region's kinds grown over its ground, built at three levels of detail in a
 // few variants each, and drawn instanced, with the choosing done on the GPU.
 //
 // Where they grow is worked out off the main thread (scatter-worker.ts) from each kind's rules. Every copy is then a

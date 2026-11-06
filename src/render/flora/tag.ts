@@ -1,4 +1,4 @@
-// What a plant material is, written on it by the kit that made it, so the WebGPU planet can make its node twin
+// What a plant material is, written on it by the kit that made it, so the planet can make its node material
 // (flora/nodes.ts): which kit's wind moves it, and what its surface does beyond a plain lit texture.
 import type { Color, Material, Texture } from 'three';
 

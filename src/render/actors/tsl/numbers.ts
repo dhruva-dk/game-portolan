@@ -1,4 +1,4 @@
-// The damage numbers as a node material, for the WebGPU planet. They are drawn over the finished frame (the stage's
+// The damage numbers as a node material. They are drawn over the finished frame (the stage's
 // overlay), after the temporal upscaler, the exposure and the tone curve, which would smear them as they rise, dim
 // them by day and blow them out at night: a number is something written on the screen, not light in the world.
 import { MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';

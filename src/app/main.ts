@@ -8,7 +8,7 @@ const canvas = document.getElementById('view') as HTMLCanvasElement;
 const overlay = document.getElementById('ui') as HTMLElement;
 // the native app has no query: VITE_AUTOPLAY=1 at build time stands in for ?autoplay
 const app = new App(canvas, overlay, {
-  capture: q.has('capture'), debugStage: q.get('stage') === 'debug', gpu: q.has('gpu'), perfLog: q.has('perflog') || Capacitor.isNativePlatform(),
+  capture: q.has('capture'), perfLog: q.has('perflog') || Capacitor.isNativePlatform(),
   autoplay: q.has('autoplay') || import.meta.env.VITE_AUTOPLAY === '1',
 });
 installHook(app);

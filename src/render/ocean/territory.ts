@@ -11,7 +11,7 @@ type F = Node<'float'>;
 type V2 = Node<'vec2'>;
 type V3 = Node<'vec3'>;
 
-/** The colours there are, by ship index + 1 (the WebGL water's). */
+/** The colours there are, by ship index + 1. */
 const COLOURS = 32;
 
 export class Territory {

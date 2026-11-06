@@ -1,10 +1,7 @@
 // Blossom Run's plants: cherry trees in full bloom, the ancient Great Cherry on its hilltop, red maples,
 // and the petals drifting off them onto the river.
 import * as THREE from 'three';
-import {
-  Geo, STILL, V, assemble, atlasCells, emitTree, grow, hsl, lerp, material, painted, range, rng, scan, stamp, topOf, WIND,
-  type GrowParams, type Lod, type PlantSpec, type Rgb,
-} from './kitB.ts';
+import { Geo, STILL, V, assemble, atlasCells, emitTree, grow, hsl, lerp, material, painted, range, rng, scan, stamp, topOf, type GrowParams, type Lod, type PlantSpec, type Rgb } from './kitB.ts';
 
 // ---------------------------------------------------------------- textures
 
@@ -98,24 +95,6 @@ function blossomTexture(): THREE.Texture {
       g.beginPath(); g.ellipse(tx + (r() - 0.5) * 60, ty + (r() - 0.5) * 60, 5, 7, r() * 3, 0, Math.PI * 2); g.fill();
     }
     void h;
-  });
-}
-
-/** One fallen petal, notched at the tip. */
-function petalTexture(): THREE.Texture {
-  return painted('petal', 64, 64, ({ g }) => {
-    const grd = g.createLinearGradient(32, 60, 32, 4);
-    grd.addColorStop(0, hsl(338, 70, 74));
-    grd.addColorStop(0.5, hsl(345, 75, 88));
-    grd.addColorStop(1, hsl(350, 60, 94));
-    g.fillStyle = grd;
-    g.beginPath();
-    g.moveTo(32, 62);
-    g.bezierCurveTo(6, 44, 6, 10, 24, 4);
-    g.lineTo(32, 12);
-    g.lineTo(40, 4);
-    g.bezierCurveTo(58, 10, 58, 44, 32, 62);
-    g.fill();
   });
 }
 
@@ -326,94 +305,6 @@ function redMaple(seed: number, lod: Lod): THREE.Object3D {
 }
 
 // ---------------------------------------------------------------- drifting petals
-
-export interface PetalOptions {
-  /** How many petals in the box. */
-  count?: number;
-  /** The box they fall through, in metres: width, height, depth. Its floor is the object's origin. */
-  box?: [number, number, number];
-  /** Metres per second they fall. */
-  fall?: number;
-  /** Seconds a petal floats on the water after it lands before it fades. */
-  float?: number;
-}
-
-/**
- * Cherry petals falling through a box and drifting on the water at its floor, carried by the shared wind.
- * One draw call. Place it round the camera or under the cherries; its floor (local y = 0) is the water or ground.
- */
-export function createPetals(o: PetalOptions = {}): THREE.Mesh {
-  const count = o.count ?? 3000;
-  const [bw, bh, bd] = o.box ?? [60, 18, 60];
-  const r = rng(1234);
-  const quad = new THREE.PlaneGeometry(0.045, 0.06, 1, 2);
-  // cup the petal a little
-  const qp = quad.getAttribute('position') as THREE.BufferAttribute;
-  for (let i = 0; i < qp.count; i++) qp.setZ(i, Math.abs(qp.getX(i)) * 0.25);
-  quad.computeVertexNormals();
-  const geo = new THREE.InstancedBufferGeometry();
-  geo.index = quad.index;
-  for (const k of ['position', 'normal', 'uv'] as const) geo.setAttribute(k, quad.getAttribute(k));
-  const seeds = new Float32Array(count * 4);
-  for (let i = 0; i < count * 4; i++) seeds[i] = r();
-  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
-  geo.instanceCount = count;
-  geo.boundingSphere = new THREE.Sphere(V(0, bh / 2, 0), Math.hypot(bw, bh, bd) / 2);
-
-  const box = { value: V(bw, bh, bd) };
-  const fall = { value: o.fall ?? 0.9 };
-  const floatS = { value: o.float ?? 25 };
-  const m = new THREE.MeshStandardMaterial({ map: petalTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.7, color: 0xffffff });
-  m.onBeforeCompile = (s) => {
-    Object.assign(s.uniforms, { uTime: WIND.uTime, uWindDir: WIND.uWindDir, uWindStrength: WIND.uWindStrength, uBox: box, uFall: fall, uFloat: floatS });
-    s.vertexShader = s.vertexShader
-      .replace('#include <common>', /* glsl */ `#include <common>
-        attribute vec4 aSeed;
-        uniform float uTime, uWindStrength, uFall, uFloat;
-        uniform vec3 uWindDir, uBox;
-        mat3 rotAxis(vec3 a, float t) {
-          float c = cos(t), s = sin(t), k = 1.0 - c;
-          return mat3(c + a.x*a.x*k, a.y*a.x*k + a.z*s, a.z*a.x*k - a.y*s,
-                      a.x*a.y*k - a.z*s, c + a.y*a.y*k, a.z*a.y*k + a.x*s,
-                      a.x*a.z*k + a.y*s, a.y*a.z*k - a.x*s, c + a.z*a.z*k);
-        }`)
-      .replace('#include <beginnormal_vertex>', /* glsl */ `
-        vec3 wl = transpose(mat3(modelMatrix)) * uWindDir; wl.y = 0.0;
-        wl = length(wl) > 1e-5 ? normalize(wl) : vec3(1.0, 0.0, 0.0);
-        float y0 = aSeed.y * uBox.y;
-        float tLand = y0 / uFall;
-        float life = tLand + uFloat * (0.6 + 0.8 * aSeed.w);
-        float t = mod(uTime + aSeed.w * 517.0, life);
-        float landed = step(tLand, t);
-        float tf = min(t, tLand), tw = max(t - tLand, 0.0);
-        float speed = 0.6 + 2.2 * uWindStrength;
-        // drift: fast in the air, slow on the water
-        vec2 drift = wl.xz * (tf * speed + tw * speed * 0.12);
-        drift += vec2(sin(t * 1.3 + aSeed.x * 40.0), cos(t * 1.1 + aSeed.z * 40.0)) * 0.35 * (1.0 - landed);
-        vec2 xz = (aSeed.xz - 0.5) * uBox.xz + drift;
-        xz = mod(xz + 0.5 * uBox.xz, uBox.xz) - 0.5 * uBox.xz;
-        float y = mix(y0 - tf * uFall, 0.02 + 0.03 * sin(uTime * 1.4 + aSeed.x * 30.0), landed);
-        vec3 pc = vec3(xz.x, y, xz.y);
-        // shrink at the box's sides, at birth and as a floating petal sinks
-        vec2 e = abs(xz / uBox.xz) * 2.0;
-        float sc = (1.0 - smoothstep(0.82, 1.0, max(e.x, e.y))) * smoothstep(0.0, 0.6, t) * (1.0 - smoothstep(life - 3.0, life, t));
-        sc *= 0.75 + 0.5 * fract(aSeed.w * 13.0);
-        vec3 ax = normalize(vec3(aSeed.x - 0.5, aSeed.z - 0.5 + 0.2, aSeed.w - 0.5) + 1e-3);
-        mat3 tumble = rotAxis(ax, t * (2.0 + 3.0 * aSeed.y) + aSeed.x * 6.0);
-        mat3 lie = rotAxis(vec3(1.0, 0.0, 0.0), -1.5708) * rotAxis(vec3(0.0, 0.0, 1.0), aSeed.z * 6.2832);
-        mat3 pR = landed > 0.5 ? lie : tumble;
-        vec3 objectNormal = pR * normal;
-        #ifdef USE_TANGENT
-          vec3 objectTangent = vec3( tangent.xyz );
-        #endif`)
-      .replace('#include <begin_vertex>', 'vec3 transformed = pR * position * sc + pc;');
-  };
-  m.customProgramCacheKey = () => 'floraB-petals';
-  const petals = new THREE.Mesh(geo, m);
-  petals.frustumCulled = false;
-  petals.name = 'petals';
-  return petals;
-}
 
 // ---------------------------------------------------------------- the region's list
 

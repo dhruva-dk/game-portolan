@@ -3,7 +3,7 @@
 // the summit, and luminous droplets spill away from it toward the cliffs: the cloud cap glows like a lamp-lit fog
 // from far off. By day it is a ring of mossy boulders round a clear spring in the mist.
 import * as THREE from 'three';
-import { Kit, disc, halo, lit, merge, mound, particles, place, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
+import { Kit, disc, halo, lit, merge, mound, particles, place, surface, tick } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { cos, exp, fract, length, mix, pow, sin, smoothstep, vec3 } from 'three/tsl';
 import { bFbm, bNoise, shapePuff, shapeSpark, type F, type V3 } from '../nodes.ts';
@@ -31,12 +31,6 @@ export const weepingIsle: BeaconLook = {
     }
     const moss = lit(k, {
       color: 0x3f7a3a, roughness: 0.95,
-      albedo: /* glsl */ `float m = smoothstep(0.35, 0.6, bFbm(vLocal * 0.6) + vLN.y * 0.4);
-        diffuseColor.rgb = mix(vec3(0.24, 0.25, 0.22), mix(vec3(0.16, 0.38, 0.12), vec3(0.3, 0.55, 0.2), bNoise(vLocal * 2.0)), m);`,
-      emissive: /* glsl */ `float m = smoothstep(0.35, 0.6, bFbm(vLocal * 0.6) + vLN.y * 0.4);
-        float spot = pow(bNoise(vLocal * 3.0 + vec3(0.0, uTime * 0.05, 0.0)), 2.0);
-        float breathe = 0.75 + 0.25 * sin(uTime * 0.5 + length(vLocal.xz) * 0.4);
-        totalEmissiveRadiance += vec3(0.55, 1.0, 0.7) * m * (0.4 + spot * 2.2) * breathe * uNight;`,
       albedoNode: ({ local: L, ln }) =>
         mix(vec3(0.24, 0.25, 0.22), mix(vec3(0.16, 0.38, 0.12), vec3(0.3, 0.55, 0.2), bNoise(L.mul(2))), mossy(L, ln)),
       emissiveNode: ({ local: L, ln, t, night }) => {
@@ -50,9 +44,6 @@ export const weepingIsle: BeaconLook = {
     // the spring, shining up from below
     k.add(surface(k, disc(5.5, 0.15, 40), {
       color: 0xb8ffe0, day: 0.06, night: 0.9,
-      paint: /* glsl */ `float r = length(vLocal.xz);
-        float well = 0.6 + 0.4 * sin(r * 3.0 - uTime * 1.6);
-        glow = (exp(-r / 2.0) * 1.8 + well * 0.3) * smoothstep(5.5, 4.0, r);`,
       paintNode: ({ local, t }) => {
         const r = length(local.xz), well = sin(r.mul(3).sub(t.mul(1.6))).mul(0.4).add(0.6);
         return { glow: exp(r.div(-2)).mul(1.8).add(well.mul(0.3)).mul(smoothstep(5.5, 4, r)) };
@@ -61,12 +52,7 @@ export const weepingIsle: BeaconLook = {
 
     // luminous droplets spilling away over the summit toward the cliffs
     k.add(particles(k, {
-      count: 180, color: 0xc0ffe0, day: 0, night: 2.2, shape: SHAPE_SPARK,
-      motion: /* glsl */ `float f = fract(s.y + t * (0.05 + s.z * 0.05));
-        float a = s.x * 6.2831, r = 4.0 + f * 16.0;
-        pos = vec3(cos(a) * r, 0.4 - f * f * 6.0 + sin(f * 9.0 + s.w * 6.0) * 0.2, sin(a) * r);
-        float tw = pow(0.5 + 0.5 * sin(t * (1.5 + s.z * 2.5) + s.w * 50.0), 3.0);
-        size = 0.07 + 0.08 * tw; alpha = (0.3 + 0.8 * tw) * (1.0 - f);`,
+      count: 180, color: 0xc0ffe0, day: 0, night: 2.2,
       shapeNode: shapeSpark,
       motionNode: ({ s, t }) => {
         const f = fract(s.y.add(t.mul(s.z.mul(0.05).add(0.05)))), a = s.x.mul(6.2831), r = f.mul(16).add(4);
@@ -80,10 +66,8 @@ export const weepingIsle: BeaconLook = {
 
     // the cloud on the summit, lit from inside at night
     k.add(particles(k, {
-      count: 30, color: 0x8affc0, day: 0, night: 0.45, blend: 'alpha', matter: 0xd4dbd8, shape: SHAPE_PUFF,
+      count: 30, color: 0x8affc0, day: 0, night: 0.45, blend: 'alpha', matter: 0xd4dbd8,
       base: (i, r) => { const a = r() * Math.PI * 2, d = r() * 16; return [Math.cos(a) * d, 6 + (i % 10) * 4.6, Math.sin(a) * d]; },
-      motion: /* glsl */ `pos.x += sin(t * 0.05 + s.x * 6.28) * 5.0; pos.z += cos(t * 0.04 + s.y * 6.28) * 5.0;
-        size = 9.0 + s.z * 9.0; alpha = 0.3 * (1.0 - pos.y / 58.0);`,
       shapeNode: shapePuff,
       motionNode: ({ s, pos, t }) => ({
         pos: vec3(pos.x.add(sin(t.mul(0.05).add(s.x.mul(6.28))).mul(5)), pos.y, pos.z.add(cos(t.mul(0.04).add(s.y.mul(6.28))).mul(5))),
@@ -92,9 +76,9 @@ export const weepingIsle: BeaconLook = {
       renderOrder: 9,
     }));
 
-    k.add(halo(k, [0, 3, 0], 16, 0xa8ffd0, 0, 0.5, '0.85 + 0.15 * sin(uTime * 0.5)', 14, '', ({ t }) => sin(t.mul(0.5)).mul(0.15).add(0.85)));
+    k.add(halo(k, [0, 3, 0], 16, 0xa8ffd0, 0, 0.5, 14, ({ t }) => sin(t.mul(0.5)).mul(0.15).add(0.85)));
     // the cloud cap's glow stands well over the summit, so it shows from the sea below the crown's rim
-    k.add(halo(k, [0, 40, 0], 56, 0x90ffc0, 0, 0.32, '1.0', 52));
+    k.add(halo(k, [0, 40, 0], 56, 0x90ffc0, 0, 0.32, 52));
     k.setPulse((t) => 0.85 + 0.15 * Math.sin(t * 0.5));
     return k.root;
   },

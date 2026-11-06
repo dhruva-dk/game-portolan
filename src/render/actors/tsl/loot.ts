@@ -1,5 +1,4 @@
-// The loot as node materials, for the WebGPU planet: the beams that mark loot from afar and the tokens' rarity glow,
-// as the GLSL in loot.ts does them. Each token's rarity colour (its instance colour) lights only its glow, which
+// The loot as node materials: the beams that mark loot from afar and the tokens' rarity glow. Each token's rarity colour (its instance colour) lights only its glow, which
 // gathers at the edges, so the token's own colour is left alone and the glow rims its shape.
 import {
   AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, type MeshStandardMaterialParameters, type NodeBuilder,

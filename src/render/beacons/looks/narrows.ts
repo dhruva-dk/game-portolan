@@ -3,7 +3,7 @@
 // glow deep blue from within, light sweeping along their facets, and glints spin round the fan: the one cold light in
 // a warm-rocked region. By day they are blue glass catching the sun.
 import * as THREE from 'three';
-import { Kit, column, crystal, halo, lit, merge, particles, place, tick, SHAPE_SPARK } from '../kit.ts';
+import { Kit, column, crystal, halo, lit, merge, particles, place, tick } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { abs, cos, dot, exp, length, max, mix, pow, select, sin, smoothstep, vec3 } from 'three/tsl';
 import { bFbm, bNoise, shapeSpark, type V3 } from '../nodes.ts';
@@ -22,7 +22,6 @@ export const narrows: BeaconLook = {
   update: tick,
   build(seed) {
     const k = new Kit(seed, 'beacon:narrows');
-    const core = `vec3(${CORE.x.toFixed(1)}, ${CORE.y.toFixed(1)}, ${CORE.z.toFixed(1)})`;
     const coreN = vec3(CORE.x, CORE.y, CORE.z);
 
     // the hoodoo: wide foot, waisted middle, a cap-rock lip, split at the top
@@ -33,17 +32,6 @@ export const narrows: BeaconLook = {
     });
     const sandstone = lit(k, {
       color: 0xc88a4a, roughness: 0.95,
-      albedo: /* glsl */ `float band = sin(vLocal.y * 0.95 + bNoise(vLocal * 0.2) * 2.5);
-        vec3 ochre = vec3(0.62, 0.4, 0.2), rust = vec3(0.45, 0.19, 0.1), cream = vec3(0.72, 0.56, 0.38);
-        vec3 c = mix(ochre, rust, smoothstep(-0.3, 0.6, band));
-        c = mix(c, cream, smoothstep(0.75, 0.95, band) * 0.7);
-        c *= 0.8 + 0.3 * bFbm(vLocal * 0.6);
-        c = mix(c, c * 0.45, smoothstep(2.5, 0.0, vLocal.y));
-        diffuseColor.rgb = c;`,
-      emissive: /* glsl */ `// blue light spilling from the geode onto the rock
-        float d = length(vLocal - ${core});
-        float seam = exp(-abs(vLocal.x) / 2.5) * smoothstep(0.0, 6.0, vLocal.z) * smoothstep(8.0, 30.0, vLocal.y);
-        totalEmissiveRadiance += vec3(0.12, 0.3, 1.0) * (exp(-d / 9.0) * 1.2 + seam * 0.25) * uNight;`,
       albedoNode: ({ local: L }) => {
         const band = sin(L.y.mul(0.95).add(bNoise(L.mul(0.2)).mul(2.5)));
         let c: V3 = mix(vec3(0.62, 0.4, 0.2), vec3(0.45, 0.19, 0.1), smoothstep(-0.3, 0.6, band));
@@ -90,15 +78,6 @@ export const narrows: BeaconLook = {
     }
     const sapphire = lit(k, {
       color: 0x1d3fa8, roughness: 0.06, metalness: 0.2, flat: true,
-      albedo: `diffuseColor.rgb = mix(vec3(0.03, 0.08, 0.35), vec3(0.15, 0.3, 0.8), bNoise(vLocal * 0.7));`,
-      emissive: /* glsl */ `float d = length(vLocal - ${core});
-        float inner = exp(-d / 8.0) * 2.2 + 0.35;
-        float bands = smoothstep(0.55, 0.9, bNoise(vLocal * vec3(0.9, 0.3, 0.9) + vec3(0.0, uTime * 0.3, 0.0)));
-        // light sweeping along the facets
-        float sweep = pow(max(0.0, sin(dot(vLocal, vec3(0.31, 0.53, 0.22)) * 0.8 - uTime * 1.4)), 24.0);
-        vec3 blue = vec3(0.08, 0.28, 1.0);
-        vec3 e = blue * (inner * (0.8 + 0.2 * sin(uTime * 0.7)) + bands * 0.9) + vec3(0.5, 0.75, 1.0) * (fres * 1.4 + sweep * 2.5);
-        totalEmissiveRadiance += e * mix(0.03, 1.0, uNight);`,
       albedoNode: ({ local: L }) => mix(vec3(0.03, 0.08, 0.35), vec3(0.15, 0.3, 0.8), bNoise(L.mul(0.7))),
       emissiveNode: ({ local: L, t, night, fres }) => {
         const d = length(L.sub(coreN)), inner = exp(d.div(-8)).mul(2.2).add(0.35);
@@ -116,12 +95,7 @@ export const narrows: BeaconLook = {
 
     // glints wheeling slowly round the fan
     k.add(particles(k, {
-      count: 120, color: 0x9cc4ff, day: 0.4, night: 3.0, shape: SHAPE_SPARK,
-      motion: /* glsl */ `float a = s.x * 6.2831 + t * (0.1 + s.y * 0.15) * (s.z > 0.5 ? 1.0 : -1.0);
-        float r = 3.0 + s.w * 15.0;
-        pos = ${core} + vec3(cos(a) * r, (s.y - 0.35) * 22.0 + sin(t * 0.4 + s.x * 9.0) * 1.5, sin(a) * r);
-        float tw = pow(max(0.0, sin(t * (1.0 + s.z * 3.0) + s.w * 50.0)), 10.0);
-        size = 0.12 + 0.28 * tw; alpha = 0.2 + 2.0 * tw;`,
+      count: 120, color: 0x9cc4ff, day: 0.4, night: 3.0,
       shapeNode: shapeSpark,
       motionNode: ({ s, t }) => {
         const a = s.x.mul(6.2831).add(t.mul(s.y.mul(0.15).add(0.1)).mul(select(s.z.greaterThan(0.5), 1, -1)));
@@ -133,8 +107,8 @@ export const narrows: BeaconLook = {
         };
       },
     }));
-    k.add(halo(k, [CORE.x, CORE.y + 2, CORE.z], 15, 0x3c78ff, 0, 0.7, '0.9 + 0.1 * sin(uTime * 0.7)', 14, '', ({ t }) => sin(t.mul(0.7)).mul(0.1).add(0.9)));
-    k.add(halo(k, [0, 46, 0], 34, 0x2f62ff, 0, 0.12, '1.0', 34));
+    k.add(halo(k, [CORE.x, CORE.y + 2, CORE.z], 15, 0x3c78ff, 0, 0.7, 14, ({ t }) => sin(t.mul(0.7)).mul(0.1).add(0.9)));
+    k.add(halo(k, [0, 46, 0], 34, 0x2f62ff, 0, 0.12, 34));
     k.setPulse((t) => 0.9 + 0.1 * Math.sin(t * 0.7));
     return k.root;
   },

@@ -70,26 +70,6 @@ export const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 // ---------------------------------------------------------------- wind
 
 /**
- * The uniforms every plant reads. Set them once per frame; all of Flora B moves together.
- * uWindDir is a world-space direction (any length; it is projected onto each plant's ground plane).
- * uWindStrength is 0 for calm, 1 for a fresh breeze, 2 for a gale.
- */
-export const WIND = {
-  uTime: { value: 0 },
-  uWindDir: { value: new THREE.Vector3(1, 0, 0) },
-  uWindStrength: { value: 0.6 },
-};
-
-export function setWind(dir: THREE.Vector3, strength: number): void {
-  WIND.uWindDir.value.copy(dir).normalize();
-  WIND.uWindStrength.value = strength;
-}
-
-export function tickFlora(seconds: number): void {
-  WIND.uTime.value = seconds;
-}
-
-/**
  * Per-vertex wind weights, the `aWind` attribute:
  * - bend: metres the whole plant leans at this vertex in a breeze (0 at the anchor, growing up the plant);
  * - branch: metres this branch sways on its own;
@@ -102,120 +82,6 @@ export const STILL: Wind = { bend: 0, branch: 0, phase: 0, flutter: 0, hz: 0.5 }
 
 /** How the wind moves a material: in the air, under the water (swell), or at the surface (both, by height). */
 export type WindMode = 'air' | 'submerged' | 'surface';
-
-const WIND_HEAD = /* glsl */ `
-attribute vec4 aWind;
-uniform float uTime;
-uniform vec3 uWindDir;
-uniform float uWindStrength;
-
-// The displacement of a vertex at local p (normal n), in local units.
-vec3 floraWind(vec3 p, vec3 n) {
-  #ifdef USE_INSTANCING
-    mat4 fM = modelMatrix * instanceMatrix;
-  #else
-    mat4 fM = modelMatrix;
-  #endif
-  vec3 org = fM[3].xyz;
-  mat3 R = mat3(fM);
-  vec3 w = transpose(R) * uWindDir;
-  w.y = 0.0;
-  float wl = length(w);
-  vec3 wd = wl > 1e-5 ? w / wl : vec3(1.0, 0.0, 0.0);
-  vec3 side = vec3(-wd.z, 0.0, wd.x);
-  float hz = floor(aWind.z) * 0.01;
-  float ph = fract(aWind.z) * 6.2832 + dot(org, vec3(0.071, 0.053, 0.067));
-  float str = uWindStrength;
-  float t = uTime;
-  // gusts roll across the land downwind
-  float along = dot(org, uWindDir);
-  float gust = 0.62 + 0.38 * sin(along * 0.045 - t * 0.9) * sin(t * 0.23 + dot(org, vec3(0.011, 0.017, 0.013)));
-  vec3 d = vec3(0.0);
-  float air = 1.0;
-  #if defined(FLORA_SUBMERGED)
-    air = 0.0;
-  #elif defined(FLORA_SURFACE)
-    air = smoothstep(-0.3, 0.6, p.y);
-  #endif
-  if (air > 0.0) {
-    float lean = str * (0.7 + 0.45 * gust);
-    float osc = sin(t * hz * 6.2832 + ph * 0.25) * (0.12 + 0.3 * str) * gust;
-    vec3 a = wd * aWind.x * (lean + osc);
-    a += side * aWind.x * sin(t * hz * 4.7 + ph * 0.5) * (0.04 + 0.12 * str);
-    float bs = sin(t * hz * 13.0 + ph) * (0.25 + 0.6 * str * gust);
-    a += (wd * (0.35 + 0.4 * str) + side * 0.6) * aWind.y * bs;
-    a += n * aWind.w * sin(t * (7.0 + hz * 9.0) + ph * 3.0 + dot(p, vec3(2.1, 1.7, 2.3))) * (0.2 + 0.8 * str);
-    d += a * air;
-  }
-  if (air < 1.0) {
-    // the swell: a slow to-and-fro along the waves, which run with the wind, plus ribbons rippling
-    float sw = sin(t * 0.8 - along * 0.07 + p.y * 0.12 + ph * 0.15);
-    vec3 s = wd * aWind.x * sw * (0.35 + 0.65 * str);
-    s += side * aWind.x * 0.35 * sin(t * 0.55 + ph * 0.3);
-    s += (side * 0.7 + wd * 0.3) * aWind.y * sin(t * 1.3 + ph + p.y * 0.9);
-    s += n * aWind.w * sin(t * 2.2 + ph * 2.0 + p.y * 2.6 + p.x * 1.3);
-    #ifdef FLORA_SURFACE
-      // things floating at the surface ride the waves up and down
-      float atTop = 1.0 - smoothstep(0.25, 1.2, abs(p.y));
-      vec3 wp = org + R * p;
-      s.y += atTop * 0.09 * sin(t * 1.1 + dot(wp, vec3(0.31, 0.27, 0.23))) * (0.4 + 0.6 * str);
-    #endif
-    d += s * (1.0 - air);
-  }
-  // a bent stem drops toward its anchor rather than stretching
-  float h = max(abs(p.y), 0.4);
-  float dd = dot(d.xz, d.xz);
-  d.y -= sign(p.y + 1e-4) * min(dd / (2.0 * h), h * 0.5);
-  return d;
-}
-`;
-
-// Mipmapping averages a card's alpha away at a distance; this restores coverage so far crowns stay full.
-const ALPHA_KEEP = /* glsl */ `
-#ifdef USE_MAP
-  vec2 fdx = dFdx(vMapUv * 1024.0), fdy = dFdy(vMapUv * 1024.0);
-  diffuseColor.a *= 1.0 + max(0.0, 0.5 * log2(max(dot(fdx, fdx), dot(fdy, fdy)))) * 0.28;
-#endif
-`;
-
-// A card seen edge-on is a hard streak; fade it out as it turns away (true face normal from screen derivatives).
-const EDGE_FADE = /* glsl */ `
-{
-  vec3 fFace = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
-  float fEdge = abs(dot(fFace, normalize(vViewPosition)));
-  diffuseColor.a *= smoothstep(0.12, 0.42, fEdge);
-}
-`;
-
-// Thin leaves let the sun through: light from behind a card glows through it.
-const TRANSLUCENT = /* glsl */ `
-#if NUM_DIR_LIGHTS > 0
-{
-  vec3 fV = normalize(-vViewPosition);
-  vec3 fL = directionalLights[0].direction;
-  float fBack = pow(max(dot(-fV, fL), 0.0), 4.0) * 0.7 + max(dot(-normal, fL), 0.0) * 0.45;
-  outgoingLight += diffuseColor.rgb * directionalLights[0].color * fBack * FLORA_TRANSLUCENT;
-}
-#endif
-`;
-
-const BLEACH = /* glsl */ `
-#ifdef FLORA_BLEACH
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11))) * 2.2, FLORA_BLEACH);
-#endif
-`;
-
-function hookShader(s: THREE.WebGLProgramParametersWithUniforms, depth: boolean, alpha: boolean, translucent: boolean): void {
-  s.uniforms.uTime = WIND.uTime;
-  s.uniforms.uWindDir = WIND.uWindDir;
-  s.uniforms.uWindStrength = WIND.uWindStrength;
-  s.vertexShader = s.vertexShader
-    .replace('#include <common>', '#include <common>\n' + WIND_HEAD)
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += floraWind(transformed, normal);');
-  if (alpha) s.fragmentShader = s.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n' + ALPHA_KEEP + (depth ? '' : EDGE_FADE));
-  if (!depth) s.fragmentShader = s.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n' + BLEACH);
-  if (!depth && translucent) s.fragmentShader = s.fragmentShader.replace('#include <opaque_fragment>', TRANSLUCENT + '\n#include <opaque_fragment>');
-}
 
 // ---------------------------------------------------------------- materials
 
@@ -239,14 +105,13 @@ export interface MaterialOptions {
 }
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
-const depthMaterials = new Map<string, THREE.MeshDepthMaterial>();
 
-/** A cached plant material with the wind built in. The same key always returns the same material. */
+/** A cached plant material, tagged with how the wind moves it and what its surface does (nodes.ts makes it so). The
+ *  same key always returns the same material. */
 export function material(key: string, o: MaterialOptions): THREE.MeshStandardMaterial {
   const hit = materials.get(key);
   if (hit) return hit;
   const alpha = o.alphaTest !== undefined;
-  const translucent = (o.translucency ?? 0) > 0;
   const m = new THREE.MeshStandardMaterial({
     map: o.map ?? null,
     normalMap: o.normalMap ?? null,
@@ -259,27 +124,14 @@ export function material(key: string, o: MaterialOptions): THREE.MeshStandardMat
     emissive: o.emissive ?? 0x000000,
   });
   if (o.normalMap) m.normalScale.setScalar(o.normalScale ?? 1);
-  m.defines = { ...(m.defines ?? {}) };
-  if (o.mode === 'submerged') m.defines.FLORA_SUBMERGED = '';
-  if (o.mode === 'surface') m.defines.FLORA_SURFACE = '';
-  if (translucent) m.defines.FLORA_TRANSLUCENT = (o.translucency ?? 0).toFixed(3);
-  if (o.bleach) m.defines.FLORA_BLEACH = o.bleach.toFixed(3);
-  m.onBeforeCompile = (s) => hookShader(s, false, alpha, translucent);
-  m.customProgramCacheKey = () => `floraB:${o.mode ?? 'air'}:${alpha}:${translucent}:${!!o.bleach}`;
   tag(m, { kit: 'B', mode: o.mode ?? 'air', cutout: alpha ? 1024 : undefined, edgeFade: alpha, translucency: o.translucency ?? 0, bleach: o.bleach ?? 0 });
-  const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: alpha ? (o.map ?? null) : null, alphaTest: o.alphaTest ?? 0, side: m.side });
-  d.defines = { ...m.defines };
-  d.onBeforeCompile = (s) => hookShader(s, true, alpha, false);
-  d.customProgramCacheKey = () => `floraB-depth:${o.mode ?? 'air'}:${alpha}`;
   materials.set(key, m);
-  depthMaterials.set(key, d);
   return m;
 }
 
-/** A mesh with its shadow material set, so its shadow sways and is cut out like the plant. */
+/** A mesh casting (if asked) and receiving shadows. */
 export function mesh(geo: THREE.BufferGeometry, mat: THREE.MeshStandardMaterial, shadows = true): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
-  for (const [k, v] of materials) if (v === mat) m.customDepthMaterial = depthMaterials.get(k);
   m.castShadow = shadows;
   m.receiveShadow = true;
   return m;
@@ -881,39 +733,6 @@ export function isDescendant(all: Branch[], b: Branch, ancestor: Branch): boolea
   if (j <= i) return false;
   for (let k = i + 1; k <= j; k++) if (all[k].level <= ancestor.level) return false;
   return true;
-}
-
-// ---------------------------------------------------------------- instancing
-
-/**
- * Turns a built plant into instanced meshes sharing its geometry and materials, one per part, `count` copies.
- * Set each copy with `set(i, matrix)`. The wind works per copy, from each copy's own position and frame.
- */
-export function instanced(plant: THREE.Object3D, count: number): { group: THREE.Group; set(i: number, m: THREE.Matrix4): void; commit(n?: number): void } {
-  const group = new THREE.Group();
-  const parts: THREE.InstancedMesh[] = [];
-  plant.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
-    const im = new THREE.InstancedMesh(o.geometry, o.material, count);
-    im.customDepthMaterial = o.customDepthMaterial;
-    im.castShadow = o.castShadow;
-    im.receiveShadow = o.receiveShadow;
-    im.frustumCulled = false;
-    parts.push(im);
-    group.add(im);
-  });
-  return {
-    group,
-    set(i, m) {
-      for (const p of parts) p.setMatrixAt(i, m);
-    },
-    commit(n = count) {
-      for (const p of parts) {
-        p.count = n;
-        p.instanceMatrix.needsUpdate = true;
-      }
-    },
-  };
 }
 
 /** The highest point of a grown tree. */

@@ -1,4 +1,4 @@
-// The gulls and the whales as node materials, for the WebGPU planet.
+// The gulls and the whales as node materials.
 //
 // A gull's wings beat in its own space before its instance's matrix places it, as skinning does: the arm turns at
 // the shoulder and the hand at the wrist, a beat behind, with the normals turned alike. A whale's flanks glow with

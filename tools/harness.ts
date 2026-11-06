@@ -85,23 +85,23 @@ const SOFTWARE = /SwiftShader|llvmpipe|Software/i;
 
 export interface Launched {
   browser: Browser;
-  /** The GPU that WebGPU and WebGL draw on, as each reports it. */
+  /** The GPU that WebGPU draws on, as its adapter reports it. */
   renderer: string;
 }
 
 /** Starts Chromium on the Mac's GPU. There's no software fallback: without a GPU WebGPU adapter it stops. */
 export async function launch({ headed = false } = {}): Promise<Launched> {
   const browser = await chromium.launch({ headless: !headed, args: [...GPU_ARGS, ...COMMON_ARGS] });
-  const { webgpu, webgl } = await gpuInfo(browser);
+  const webgpu = await gpuInfo(browser);
   if (!webgpu || SOFTWARE.test(webgpu)) {
     await browser.close();
     throw new Error(`harness: Chromium has no GPU WebGPU adapter (it reports ${webgpu ?? 'none'})`);
   }
-  return { browser, renderer: `WebGPU ${webgpu}; WebGL ${webgl ?? 'none'}` };
+  return { browser, renderer: `WebGPU ${webgpu}` };
 }
 
-/** What WebGPU and WebGL 2 run on. WebGPU needs a secure context, so the probe page is served as localhost. */
-async function gpuInfo(browser: Browser): Promise<{ webgpu: string | null; webgl: string | null }> {
+/** What WebGPU runs on. It needs a secure context, so the probe page is served as localhost. */
+async function gpuInfo(browser: Browser): Promise<string | null> {
   const page = await browser.newPage();
   try {
     await page.route('http://localhost/**', (r) => r.fulfill({ body: '<!doctype html>', contentType: 'text/html' }));
@@ -110,12 +110,7 @@ async function gpuInfo(browser: Browser): Promise<{ webgpu: string | null; webgl
       type Adapter = { info: { vendor: string; architecture: string } };
       const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<Adapter | null> } }).gpu;
       const adapter = await gpu?.requestAdapter();
-      const webgpu = adapter ? `${adapter.info.vendor}/${adapter.info.architecture}` : null;
-      const gl = document.createElement('canvas').getContext('webgl2');
-      const info = gl?.getExtension('WEBGL_debug_renderer_info');
-      const webgl = gl ? String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : null;
-      gl?.getExtension('WEBGL_lose_context')?.loseContext();
-      return { webgpu, webgl };
+      return adapter ? `${adapter.info.vendor}/${adapter.info.architecture}` : null;
     });
   } finally {
     await page.close();

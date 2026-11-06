@@ -9,22 +9,20 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
 import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type Obstacle, type RegionId } from '../../sim/world/index.ts';
-import { patch } from '../engine.ts';
 import type { EventPhase } from './eventRocks.ts';
-import { Kit, particles, strip, surface, tick, SHAPE_PUFF } from '../beacons/kit.ts';
+import { Kit, particles, strip, surface, tick } from '../beacons/kit.ts';
 import { abs, cos, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
 import { bNoise, glowNode, num, shapePuff } from '../beacons/nodes.ts';
-import { GPU } from '../actors/common.ts';
 
-const rock = (color: number, rough = 0.9) => patch(new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), 'landmark-rock');
+const rock = (color: number, rough = 0.9) => new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true });
 
-/** A glow that reads from far off at night: an unlit sphere bright enough to bloom. On the GPU planet it shines at the
- *  beacons' lamp scale, by a level update() sets. */
+/** A glow that reads from far off at night: an unlit sphere bright enough to bloom. It shines at the beacons' lamp
+ *  scale, by a level update() sets. */
 function glow(color: number, radius: number, power: number): THREE.Mesh {
   const level = { value: 1 };
-  const m = GPU.on ? glowNode(color, level) : new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(power), fog: false, toneMapped: false });
+  const m = glowNode(color, level);
   const g = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 2), m as THREE.Material);
-  g.userData.glow = { color: new THREE.Color(color), power, level };
+  g.userData.glow = { power, level };
   return g;
 }
 
@@ -235,8 +233,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     }
     const length = pts.reduce((s, p, i) => s + (i ? p.distanceTo(pts[i - 1]) : 0), 0);
     k.add(surface(k, strip(pts, widths), {
-      color: 0xbfe4ee, day: 0, night: 0.25, blend: 'alpha', matter: 0xd8e6ea, uniforms: { uSwell: swell },
-      vertex: /* glsl */ `p.x *= 1.0 + 0.75 * uSwell;`,
+      color: 0xbfe4ee, day: 0, night: 0.25, blend: 'alpha', matter: 0xd8e6ea,
       vertexNode: ({ p }) => vec3(p.x.mul(num(swell).mul(0.75).add(1)), p.y, p.z),
       paintNode: ({ uv: f, t }) => {
         const x = f.x, v = f.y, sw = num(swell);
@@ -254,28 +251,10 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
           glow: body.mul(streak),
         };
       },
-      paint: /* glsl */ `float x = vUv.x, v = vUv.y;
-        float edge = smoothstep(0.0, 0.16, x) * smoothstep(1.0, 0.84, x);
-        float n1 = bNoise(vec3(x * 7.0, v * 0.05 - uTime * 0.9, 0.0));
-        float n2 = bNoise(vec3(x * 19.0, v * 0.14 - uTime * 1.7, 3.0));
-        float n3 = bNoise(vec3(x * 42.0, v * 0.4 - uTime * 3.1, 9.0));
-        float streak = smoothstep(0.3, 0.95, n1 * 0.55 + n2 * 0.35 + n3 * 0.25);
-        // ragged at the edges, thin at the lip, dissolving into the mist at the foot
-        float lip = smoothstep(0.0, 3.0, v), foot = 1.0 - smoothstep(${(length - 15).toFixed(1)}, ${length.toFixed(1)}, v);
-        float body = edge * mix(0.35, 0.6, uSwell) + edge * (0.4 + 0.25 * uSwell) * streak;
-        alpha = body * lip * foot * (0.55 + 0.45 * n2);
-        col = mix(vec3(0.72, 0.82, 0.86), vec3(1.12), streak * (0.55 + 0.4 * uSwell));
-        glow = body * streak;`,
     }));
     // mist rolling off the plunge, up the lower face and out over the water
     k.add(particles(k, {
-      count: 180, color: 0xbfe4ee, day: 0, night: 0.05, blend: 'alpha', matter: 0xe2eaec, shape: SHAPE_PUFF, uniforms: { uSwell: swell },
-      motion: /* glsl */ `float life = fract(s.x + t * (0.05 + s.y * 0.05));
-        float a = s.z * 6.2831, grow = 1.0 + 1.3 * uSwell;
-        float rr = (4.0 + life * (9.0 + s.w * 12.0)) * grow;
-        pos = vec3(cos(a) * rr, 1.0 + life * (10.0 + s.y * 20.0) * grow, ${(foot + 1).toFixed(1)} - abs(sin(a)) * rr * 0.7);
-        size = (3.5 + life * 7.0) * (0.8 + 0.5 * uSwell);
-        alpha = sin(life * 3.14159) * (0.14 + 0.14 * uSwell);`,
+      count: 180, color: 0xbfe4ee, day: 0, night: 0.05, blend: 'alpha', matter: 0xe2eaec,
       shapeNode: shapePuff,
       motionNode: ({ s, t }) => {
         const sw = num(swell), life = fract(s.x.add(t.mul(s.y.mul(0.05).add(0.05))));
@@ -292,7 +271,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // the fallen Hollow Cedar: a log to sail through, its broken stump standing tall beside it, with fungus shelves
   // glowing down its side
   mistwood: (lm) => {
-    const out = new THREE.Group(), wood = patch(new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true }), 'landmark-rock');
+    const out = new THREE.Group(), wood = new THREE.MeshStandardMaterial({ color: 0x5a3b28, roughness: 0.95, side: THREE.DoubleSide, flatShading: true });
     const at = OBSTACLES.find((o) => o.region === lm.region && o.kind === 'trunk'), foot = at ? local(lm, at.pos) : { x: 18, z: -44 };
     const stump = cedarStump(foot.x, foot.z, -6, lm.height - 14, at?.r ?? 9, 2.4);
     out.add(new THREE.Mesh(cedarLog(), wood), new THREE.Mesh(stump.geometry, wood));
@@ -328,7 +307,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
         }
       }
     }
-    const mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true }), 'landmark-rock');
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true });
     out.add(new THREE.Mesh(mergeGeometries(cols), mat));
     return out;
   },
@@ -342,8 +321,8 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       kelpColumn(x, z, o.height, o.r, i, stipes, blades);
     });
     const out = new THREE.Group(), wet = { roughness: 0.55, metalness: 0 };
-    out.add(new THREE.Mesh(mergeGeometries(stipes), patch(new THREE.MeshStandardMaterial({ color: 0x6a5c22, ...wet }), 'landmark-kelp')));
-    out.add(new THREE.Mesh(mergeGeometries(blades), patch(new THREE.MeshStandardMaterial({ color: 0x938531, side: THREE.DoubleSide, ...wet }), 'landmark-kelp')));
+    out.add(new THREE.Mesh(mergeGeometries(stipes), new THREE.MeshStandardMaterial({ color: 0x6a5c22, ...wet })));
+    out.add(new THREE.Mesh(mergeGeometries(blades), new THREE.MeshStandardMaterial({ color: 0x938531, side: THREE.DoubleSide, ...wet })));
     return out;
   },
   // the Great Cherry: a broad tree on the hilltop
@@ -359,7 +338,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // Glasswater: shards of natural glass round the rim of the pool, one at each of the region's columns, which are
   // their girth at the waterline
   glassSea: (lm) => {
-    const glass = patch(new THREE.MeshStandardMaterial({ color: 0x9fe6e0, roughness: 0.1, metalness: 0.2, flatShading: true }), 'landmark-glass');
+    const glass = new THREE.MeshStandardMaterial({ color: 0x9fe6e0, roughness: 0.1, metalness: 0.2, flatShading: true });
     return columnsOf(lm, (x, z, o, i) => {
       const g = new THREE.ConeGeometry(o.r / 0.8, o.height + 4, 5);
       g.translate(0, o.height / 2 - 2, 0);
@@ -373,7 +352,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   // clumps of leaning branches, like antler coral, not as single columns. Each branch thins to a blunt tip and forks
   // into tines near its top, so none stands as a straight, even pole with a cut end.
   coralAtolls: (lm) => {
-    const coral = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true }), 'landmark-rock');
+    const coral = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
     return columnsOf(lm, (x, z, o, i) => {
       if (o.height < lm.height - 4) return coralTower(x, z, o.height, o.r, i, coral);
       const clump = new THREE.Group();
@@ -421,7 +400,7 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       roots.push(tube([P(x, 54, z), P(x + (j(2) - 0.5) * 3, 26, z), P(x + (j(3) - 0.5) * 2, -2, z + (j(4) - 0.5) * 2)], 0.2 + 0.2 * j(5), 12));
     }
     const out = new THREE.Group();
-    out.add(new THREE.Mesh(mergeGeometries(roots), patch(new THREE.MeshStandardMaterial({ color: 0x4a3d2c, roughness: 0.95 }), 'landmark-roots')));
+    out.add(new THREE.Mesh(mergeGeometries(roots), new THREE.MeshStandardMaterial({ color: 0x4a3d2c, roughness: 0.95 })));
     const leaves = rock(0x34502a, 0.85);
     for (let i = 0; i < 8; i++) {
       const j = (k: number) => jitter(i, 90 + k), r = 10 + 5 * j(0);
@@ -479,9 +458,8 @@ export class Landmarks {
   update(night: number, time: number, events?: Partial<Record<RegionId, EventPhase>>, sun?: THREE.Vector3): void {
     const here = (up: THREE.Vector3) => (sun ? Math.min(1, Math.max(0, (0.08 - up.dot(sun)) / 0.16)) : night);
     for (const { mesh, up } of this.glows) {
-      const { color, power, level } = mesh.userData.glow as { color: THREE.Color; power: number; level: { value: number } };
+      const { power, level } = mesh.userData.glow as { power: number; level: { value: number } };
       level.value = 0.25 + here(up) * power;
-      if (!GPU.on) (mesh.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(level.value);
     }
     for (const { obj, up } of this.kits) tick(obj, time, here(up));
     if (this.falls) this.falls.value = swollen(events?.fjords);

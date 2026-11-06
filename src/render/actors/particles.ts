@@ -2,7 +2,7 @@
 // planet's centre, spray that lands rides the sea surface, and the flat kind (rings, halos) lies in the water's
 // tangent plane. Two pools: glow (added, for fire, sparks and light) and smoke (blended, lit by the sun where it is).
 import * as THREE from 'three';
-import { AU, GPU, TAU, seaRadius } from './common.ts';
+import { TAU, seaRadius } from './common.ts';
 import { particleNodeMaterial } from './tsl/particles.ts';
 
 /** Eight soft white shapes on a 4×2 sheet: puff, smoke, spark, ring, spray, star, shard, flame. */
@@ -63,69 +63,6 @@ function makeAtlas(): THREE.CanvasTexture {
   return t;
 }
 
-const PART_VERT = /* glsl */ `
-attribute vec4 iPos, iCol, iVel;
-attribute vec3 iMisc;
-uniform vec3 uSunDir, uSunColor;
-varying vec4 vCol;
-varying vec2 vUv;
-varying float vFrame;
-varying float vNear;
-varying vec3 vLight;
-void main() {
-  vec3 wp = iPos.xyz;
-  float size = iPos.w;
-  vec2 q = position.xy;
-  vec4 mv;
-  vec3 up = normalize(wp);
-  if (iMisc.z > 1.5) {
-    // lying flat on the water
-    vec3 t1 = normalize(cross(up, abs(up.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0))), t2 = cross(up, t1);
-    float c = cos(iMisc.x), s = sin(iMisc.x);
-    mv = viewMatrix * vec4(wp + (t1 * (c * q.x - s * q.y) + t2 * (s * q.x + c * q.y)) * size, 1.0);
-  } else if (iMisc.z > 0.5) {
-    // a streak trailing behind along the velocity, as seen on screen
-    mv = viewMatrix * vec4(wp, 1.0);
-    vec2 d = (mat3(viewMatrix) * iVel.xyz).xy;
-    float L = length(d);
-    vec2 dir = L > 1e-4 ? d / L : vec2(0.0, 1.0);
-    float len = max(size, L * iVel.w);
-    mv.xy += vec2(-dir.y, dir.x) * size * q.x + dir * len * (q.y - 1.0) * 0.5;
-  } else {
-    mv = viewMatrix * vec4(wp, 1.0);
-    float c = cos(iMisc.x), s = sin(iMisc.x);
-    mv.xy += vec2(c * q.x - s * q.y, s * q.x + c * q.y) * size;
-  }
-  gl_Position = projectionMatrix * mv;
-  // anything brushing the lens thins out instead of filling the screen
-  vNear = smoothstep(1.5, 8.0, -mv.z);
-  vUv = q * 0.5 + 0.5;
-  vCol = iCol;
-  vFrame = iMisc.y;
-  // smoke and spray are lit by the sun where they are, and the moon at night
-  float day = smoothstep(-0.14, 0.15, dot(up, uSunDir));
-  vLight = mix(vec3(0.07, 0.09, 0.15), uSunColor * 0.9 + vec3(0.18, 0.2, 0.24), day);
-}`;
-
-const PART_FRAG = /* glsl */ `
-uniform sampler2D uAtlas;
-varying vec4 vCol;
-varying vec2 vUv;
-varying float vFrame;
-varying float vNear;
-varying vec3 vLight;
-void main() {
-  vec2 cell = vec2(mod(vFrame, 4.0), floor(vFrame / 4.0 + 0.01));
-  vec4 t = texture2D(uAtlas, (cell + 0.02 + vUv * 0.96) / vec2(4.0, 2.0));
-  float a = t.a * vCol.a * vNear;
-  if (a < 0.002) discard;
-#ifdef GLOW
-  gl_FragColor = vec4(vCol.rgb * a, 0.0);
-#else
-  gl_FragColor = vec4(vCol.rgb * vLight * a, a);
-#endif
-}`;
-
 export interface Emit {
   x: number; y: number; z: number; vx?: number; vy?: number; vz?: number;
   life: number; size: number; grow?: number; // size at birth, and the factor it reaches at death (life 0: one frame)
@@ -160,14 +97,7 @@ export class Particles {
     geo.setAttribute('iVel', (this.vel = attr(4)));
     geo.setAttribute('iMisc', (this.misc = attr(3)));
     geo.instanceCount = 0;
-    this.mat = GPU.on ? particleNodeMaterial(atlas, glow) : new THREE.ShaderMaterial({
-      vertexShader: PART_VERT, fragmentShader: PART_FRAG,
-      uniforms: { uAtlas: { value: atlas }, uSunDir: AU.uSunDir, uSunColor: AU.uSunColor },
-      defines: glow ? { GLOW: 1 } : {},
-      transparent: true, depthWrite: false,
-      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
-      blendSrc: THREE.OneFactor, blendDst: glow ? THREE.OneFactor : THREE.OneMinusSrcAlphaFactor,
-    });
+    this.mat = particleNodeMaterial(atlas, glow);
     this.mesh = new THREE.Mesh(geo, this.mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = glow ? 8 : 7;

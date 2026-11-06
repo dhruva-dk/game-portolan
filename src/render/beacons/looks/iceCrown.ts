@@ -2,7 +2,7 @@
 // of cold light that beats slowly. Diamond dust hangs in the air around it, and the dust stands the light up into a
 // pillar far above the crown: the thin white-blue column that marks the pole from anywhere in the north.
 import * as THREE from 'three';
-import { Kit, column, halo, heartbeat, instances, lit, mat4, merge, mound, particles, pillar, place, tick, SHAPE_SPARK } from '../kit.ts';
+import { Kit, column, halo, heartbeat, instances, lit, mat4, merge, mound, particles, pillar, place, tick } from '../kit.ts';
 import { abs, cos, exp, float, length, max, mix, mod, pow, sin, smoothstep, vec3 } from 'three/tsl';
 import { bBeat, bFbm, bNoise, shapeSpark, type Clocked } from '../nodes.ts';
 import type { BeaconLook } from '../look.ts';
@@ -21,18 +21,11 @@ export const iceCrown: BeaconLook = {
   update: tick,
   build(seed) {
     const k = new Kit(seed, 'beacon:iceCrown');
-    const heart = `vec3(${HEART.x.toFixed(1)}, ${HEART.y.toFixed(1)}, ${HEART.z.toFixed(1)})`;
-    const beat = 'bBeat(uTime, 3.2)';
     const heartN = vec3(HEART.x, HEART.y, HEART.z), beatN = (c: Clocked) => bBeat(c.t, 3.2);
 
     // the floe: snow over blue ice, lit from the heart
     const floe = new THREE.Mesh(mound(26, 2.4, { seed: seed + 1, bump: 0.5, bumpScale: 0.12, segs: 72 }), lit(k, {
       color: 0xeef5fb, roughness: 0.85,
-      albedo: /* glsl */ `float edge = smoothstep(18.0, 25.0, length(vLocal.xz));
-        float n = bFbm(vLocal * 0.35);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.55, 0.78, 0.95), edge * 0.7 + n * 0.12);`,
-      emissive: /* glsl */ `float d = length(vLocal - ${heart});
-        totalEmissiveRadiance += vec3(0.45, 0.75, 1.0) * exp(-d / 9.0) * (0.7 + 0.5 * ${beat}) * mix(0.03, 1.0, uNight);`,
       albedoNode: (c) => {
         const edge = smoothstep(18, 25, length(c.local.xz)), n = bFbm(c.local.mul(0.35));
         return mix(c.colour, vec3(0.55, 0.78, 0.95), edge.mul(0.7).add(n.mul(0.12)));
@@ -63,18 +56,6 @@ export const iceCrown: BeaconLook = {
     }
     const ice = lit(k, {
       color: 0x8fc8ee, roughness: 0.08, metalness: 0.05, flat: true,
-      albedo: /* glsl */ `float n = bFbm(vLocal * vec3(0.25, 0.06, 0.25));
-        diffuseColor.rgb = mix(vec3(0.42, 0.72, 0.93), vec3(0.86, 0.95, 1.0), n * 0.8 + smoothstep(20.0, 50.0, vLocal.y) * 0.3);`,
-      emissive: /* glsl */ `float d = length(vLocal - ${heart});
-        float pulse = 0.65 + 0.55 * ${beat};
-        float inner = exp(-d / 7.0) * 2.0 + exp(-d / 22.0) * 0.3;
-        // light runs up the shards like glass fibres to the tips of the crown
-        float tip = smoothstep(26.0, 50.0, vLocal.y) * 0.9;
-        float vein = smoothstep(0.6, 0.75, bNoise(vLocal * vec3(0.5, 0.07, 0.5) + vec3(0.0, -uTime * 0.25, 0.0)));
-        vec3 cold = vec3(0.16, 0.5, 1.0);
-        vec3 e = cold * (inner * pulse + tip * (0.6 + 0.4 * pulse) + vein * 0.8 * exp(-d / 26.0)) + vec3(0.7, 0.9, 1.0) * fres * inner * 0.5;
-        // by day: a faint inner blue, the look of thick ice in sun
-        totalEmissiveRadiance += e * mix(0.035, 1.0, uNight) + cold * fres * 0.12 * (1.0 - uNight);`,
       albedoNode: (c) => {
         const n = bFbm(c.local.mul(vec3(0.25, 0.06, 0.25)));
         return mix(vec3(0.42, 0.72, 0.93), vec3(0.86, 0.95, 1), n.mul(0.8).add(smoothstep(20, 50, c.local.y).mul(0.3)));
@@ -99,8 +80,6 @@ export const iceCrown: BeaconLook = {
     // the heart: a faceted crystal turning slowly in the cage, with a ring of smaller facets round it
     const heartMat = lit(k, {
       color: 0xdff2ff, roughness: 0.05, flat: true,
-      emissive: /* glsl */ `float b = ${beat};
-        totalEmissiveRadiance += mix(vec3(0.55, 0.8, 1.0), vec3(1.0), fres) * (4.0 + 6.0 * b) * mix(0.06, 1.0, uNight);`,
       emissiveNode: (c) => mix(vec3(0.55, 0.8, 1), vec3(1), c.fres).mul(beatN(c).mul(6).add(4)).mul(mix(0.06, 1, c.night)),
     });
     const core = new THREE.Mesh(new THREE.IcosahedronGeometry(2.3, 0), heartMat);
@@ -123,18 +102,13 @@ export const iceCrown: BeaconLook = {
     });
 
     // glow: the heart's halo, the cage's glow and a wide sky glow for distance
-    k.add(halo(k, [HEART.x, HEART.y, HEART.z], 8, 0xd8eeff, 0.04, 1.0, `0.7 + 0.5 * ${beat}`, 0, '', (c) => beatN(c).mul(0.5).add(0.7)));
-    k.add(halo(k, [0, 24, 0], 30, 0x9fd0ff, 0.0, 0.18, `0.85 + 0.2 * ${beat}`, 30, '', (c) => beatN(c).mul(0.2).add(0.85)));
-    k.add(halo(k, [0, 60, 0], 26, 0xa8d4ff, 0.0, 0.12, '1.0', 40));
+    k.add(halo(k, [HEART.x, HEART.y, HEART.z], 8, 0xd8eeff, 0.04, 1.0, 0, (c) => beatN(c).mul(0.5).add(0.7)));
+    k.add(halo(k, [0, 24, 0], 30, 0x9fd0ff, 0.0, 0.18, 30, (c) => beatN(c).mul(0.2).add(0.85)));
+    k.add(halo(k, [0, 60, 0], 26, 0xa8d4ff, 0.0, 0.12, 40));
 
     // the light pillar: diamond dust standing the heart's light up into a column
     k.add(pillar(k, 6, 150, 6, {
       color: 0xd6ecff, day: 0, night: 1.6,
-      paint: /* glsl */ `float x = abs(vUv.x - 0.5) * 2.0, h = vUv.y;
-        float core = exp(-x * x * 26.0) + 0.25 * exp(-x * x * 4.0);
-        float fade = smoothstep(0.0, 0.08, h) * pow(1.0 - h, 1.4);
-        float shimmer = 0.7 + 0.3 * bNoise(vec3(x * 4.0, h * 40.0 - uTime * 1.2, uTime * 0.2));
-        glow = core * fade * shimmer * (0.75 + 0.35 * ${beat});`,
       paintNode: (c) => {
         const x = abs(c.uv.x.sub(0.5)).mul(2), h = c.uv.y, x2 = x.mul(x);
         const core = exp(x2.mul(-26)).add(exp(x2.mul(-4)).mul(0.25));
@@ -146,15 +120,8 @@ export const iceCrown: BeaconLook = {
 
     // diamond dust: glints falling slowly through the light
     k.add(particles(k, {
-      count: 220, color: 0xe6f4ff, day: 0.9, night: 3.0, shape: SHAPE_SPARK,
+      count: 220, color: 0xe6f4ff, day: 0.9, night: 3.0,
       base: (_i, r) => { const a = r() * Math.PI * 2, d = 3 + r() * 24; return [Math.cos(a) * d, 0, Math.sin(a) * d]; },
-      motion: /* glsl */ `float H = 72.0;
-        float y = mod(s.y * H - t * (0.5 + s.z * 0.7), H);
-        pos = vec3(pos.x + sin(t * 0.3 + s.w * 6.28) * 1.6, y + 1.0, pos.z + cos(t * 0.27 + s.x * 6.28) * 1.6);
-        float tw = pow(max(0.0, sin(t * (1.5 + s.z * 3.5) + s.w * 40.0)), 14.0);
-        size = 0.16 + 0.3 * tw;
-        float near = exp(-length(pos - ${heart}) / 16.0);
-        alpha = (0.15 + 2.5 * tw) * (0.3 + 1.7 * near) * smoothstep(0.0, 4.0, y) * smoothstep(H, H - 8.0, y);`,
       shapeNode: shapeSpark,
       motionNode: ({ s, pos, t }) => {
         const H = 72, y = mod(s.y.mul(H).sub(t.mul(s.z.mul(0.7).add(0.5))), H);

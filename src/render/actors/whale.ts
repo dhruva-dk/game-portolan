@@ -3,9 +3,8 @@
 // is the leviathan's event made huge: the sea churns, a whale more than twice the size bursts out nose first in a
 // column of spray, hangs in the air rolling onto its side, and slams down in a wall of water with a shockwave.
 import * as THREE from 'three';
-import { AU, GPU, SEA, TAU, frameAt, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { AU, SEA, TAU, frameAt, rand, seaRadius, smooth, tangents } from './common.ts';
 import { whaleNodeMaterial } from './tsl/fauna.ts';
-import { sharedUniforms } from '../planet.ts';
 import type { Effects } from './effects.ts';
 import { C, Mesher, type Ring } from './mesher.ts';
 import { SPRITE } from './particles.ts';
@@ -15,14 +14,7 @@ import type { Juice, Vec3, WhaleView } from './view.ts';
 export const WHALE_LENGTH = 28;
 export const BREACH = 2.2;
 const HALF = WHALE_LENGTH / 2;
-const S = WHALE_LENGTH / 40; // the rewrite's leviathan was 40 m
-
-const HEAD = /* glsl */ `
-varying vec3 vLocal;
-varying vec3 vWP;
-`;
-
-function whaleGeometry(): { body: THREE.BufferGeometry; flukes: THREE.BufferGeometry } {
+const S = WHALE_LENGTH / 40; function whaleGeometry(): { body: THREE.BufferGeometry; flukes: THREE.BufferGeometry } {
   const m = new Mesher();
   const back = C(0x26354f), belly = C(0xc9d4e2), pale = C(0xbfd0e8);
   // nose at +z; s runs 0 tail .. 1 nose
@@ -80,23 +72,7 @@ export class Whales {
     this.body = g.body;
     this.flukes = g.flukes;
     const base = { vertexColors: true, roughness: 0.42, metalness: 0.05, emissive: 0x6fe6ff, emissiveIntensity: 1 };
-    this.mat = GPU.on ? whaleNodeMaterial(base, this.u, AU.uNoise.value!, S) : patch(new THREE.MeshStandardMaterial(base), 'actor-whale', (s) => {
-      Object.assign(s.uniforms, this.u);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + HEAD)
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal = position;\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + HEAD + 'uniform float uGlow, uSeaR;\n' + sharedUniforms('float', 'uTime') + '\n' + sharedUniforms('sampler2D', 'uNoise') + '\n' + sharedUniforms('vec3', 'uSunDir'))
-        .replace('#include <emissivemap_fragment>', /* glsl */ `
-          // bioluminescent spots and stripes along the flanks, strong at night, faint by day
-          vec3 lp = vLocal / ${S.toFixed(4)};
-          float spots = smoothstep(0.62, 0.7, texture2D(uNoise, lp.xz * 0.06 + lp.y * 0.02).r);
-          float stripe = smoothstep(0.92, 1.0, sin(lp.z * 0.9) * 0.5 + 0.5) * smoothstep(0.5, 2.5, abs(lp.x)) * step(lp.y, 0.5);
-          float night = 1.0 - smoothstep(-0.14, 0.12, dot(normalize(vWP), uSunDir));
-          totalEmissiveRadiance *= (spots * 1.5 + stripe * 0.8) * uGlow * (0.12 + 0.88 * night) * (0.7 + 0.3 * sin(uTime * 2.0 + lp.z * 0.3));`)
-        .replace('#include <dithering_fragment>', /* glsl */ `#include <dithering_fragment>
-          // under the surface it fades into the water's blue
-          float depth = uSeaR - length(vWP);
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.03, 0.12, 0.17), smoothstep(0.0, 9.0, depth) * 0.85);`);
-    });
+    this.mat = whaleNodeMaterial(base, this.u, AU.uNoise.value!, S);
   }
 
   private rig(): Rig {

@@ -1,5 +1,6 @@
-// The sea's swell, shared by the water's shader and anything that floats: hulls ride waveHeight and tilt with
-// waveSlope, the water mesh draws the same waves. This is render code (the simulation's ships stay level).
+// The sea's swell for anything that floats: hulls ride seaAt and tilt with its slope. Once the stage draws its ocean
+// it hands its own sea over (rideOn), and everything rides the waves on screen; until then, and where no stage is
+// drawn, they ride these long waves. This is render code (the simulation's ships stay level).
 //
 // The rewrite's swell was plane waves over a flat sea. On the sphere each wave runs along a fixed direction in the
 // planet's frame; wherever that direction lies along the ground the wave travels across the sea like before, and
@@ -56,7 +57,7 @@ export function waveSlope(p: V3, t: number, out: V3): V3 {
   return out;
 }
 
-/** The sea anything floating rides when the stage draws another than this swell: the GPU planet's ocean, which gives
+/** The sea anything floating rides when the stage draws another than this swell: the planet's ocean, which gives
  *  its height and slope at a point the same way. */
 let ridden: ((p: V3, slope?: V3) => number) | null = null;
 export function rideOn(sea: ((p: V3, slope?: V3) => number) | null): void {
@@ -69,27 +70,3 @@ export function seaAt(p: V3, t: number, slope?: V3): number {
   if (slope) waveSlope(p, t, slope);
   return waveHeight(p, t);
 }
-
-const f = (n: number) => n.toFixed(5);
-
-/**
- * GLSL for the same swell: swellAt(p, up, t, chop, dist) returns the height and the slope (as in waveSlope). Short
- * waves fade with distance before the mesh grows too coarse to hold them.
- */
-export const SWELL_GLSL = /* glsl */ `
-const vec4 WAVE_D[${WAVES.length}] = vec4[${WAVES.length}](${WAVES.map((v) => `vec4(${f(v.x)}, ${f(v.y)}, ${f(v.z)}, ${f(v.k)})`).join(', ')});
-const vec2 WAVE_A[${WAVES.length}] = vec2[${WAVES.length}](${WAVES.map((v) => `vec2(${f(v.A)}, ${f(v.w)})`).join(', ')});
-vec4 swellAt(vec3 p, vec3 up, float t, float chop, float dist) {
-  float h = 0.0; vec3 g = vec3(0.0);
-  for (int i = 0; i < ${WAVES.length}; i++) {
-    vec3 d = WAVE_D[i].xyz;
-    float k = WAVE_D[i].w, L = 6.2832 / k;
-    float c = dot(d, up);
-    float a = WAVE_A[i].x * smoothstep(0.35, 0.75, sqrt(max(0.0, 1.0 - c * c))) * smoothstep(L * 16.0, L * 6.0, dist);
-    float ph = dot(d, p) * k - WAVE_A[i].y * t;
-    h += sin(ph) * a;
-    g += d * cos(ph) * a * k;
-  }
-  g -= up * dot(g, up);
-  return vec4(h, g) * chop;
-}`;

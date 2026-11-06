@@ -1,7 +1,6 @@
 // The planet on screen, on WebGPU: the atmosphere and its light, the sun's shadows, the FFT ocean, the land painted
-// with its regions' scans, and the frame's finish, seen through the same camera rig and driven by the same StageView
-// as the WebGL stage. The app takes it with ?gpu while the rest of the planet moves across; nothing here reads the
-// simulation.
+// with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
+// camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
@@ -32,8 +31,7 @@ import { Flora } from '../flora/field.ts';
 import { rideOn } from '../swell.ts';
 import { seaLift, setLifts } from '../lift.ts';
 import { seaDeepAt } from '../seaTint.ts';
-import { GPU } from '../actors/common.ts';
-import { moonDirection, sunDirection } from '../sky.ts';
+import { moonDirection, sunDirection } from '../sun.ts';
 import { R } from '../../sim/sphere.ts';
 import type { V3 } from '../../sim/math.ts';
 import type { StageView } from '../stage.ts';
@@ -65,7 +63,7 @@ export class GpuStage {
   readonly post: Post;
   readonly clouds = new Clouds();
   readonly fall = new Fall();
-  readonly beacons = new Beacons(1, true);
+  readonly beacons = new Beacons(1);
   readonly landmarks = new Landmarks();
   readonly floes = new Floes();
   readonly rocks = new EventRocks();
@@ -109,8 +107,6 @@ export class GpuStage {
 
   static async create(canvas: HTMLCanvasElement, progress: (f: number, what: string) => void = () => {}): Promise<GpuStage> {
     progress(0.02, 'Charting the seas');
-    // whatever the stage builds from here takes its node materials
-    GPU.on = true;
     const { renderer, info } = await createRenderer(canvas);
     progress(0.5, 'Raising the islands');
     const stage = new GpuStage(canvas, renderer, info.phone);

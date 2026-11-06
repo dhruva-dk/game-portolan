@@ -2,7 +2,7 @@
 // in a spiral to the broken top. At night the fungi burn with cold green foxfire in a slow wave that climbs the trunk,
 // spores drift up through the light, and the fog around the snag glows green: a tall soft lantern in the murk.
 import * as THREE from 'three';
-import { Kit, column, halo, instances, lit, mat4, merge, mound, particles, place, tick, tube, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
+import { Kit, column, halo, instances, lit, mat4, merge, mound, particles, place, tick, tube } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { atan, cos, length, mix, mod, sin, smoothstep, vec3 } from 'three/tsl';
 import { bFbm, bNoise, shapePuff, shapeSpark, type Clocked, type F, type V3 } from '../nodes.ts';
@@ -10,7 +10,6 @@ import { bFbm, bNoise, shapePuff, shapeSpark, type Clocked, type F, type V3 } fr
 const H = 62;
 // the trunk's radius at height fraction f, shared by the bark and the fungi placed on it
 const trunkR = (f: number) => 3.3 * (1 - f) ** 0.85 + 0.75 + 2.4 * Math.exp(-f * 16);
-const WAVE = '(0.5 + 0.5 * sin(vLocal.y * 0.16 - uTime * 0.85))';
 /** The foxfire's wave climbing the trunk, at a point. */
 const wave = (c: Clocked & { local: V3 }): F => sin(c.local.y.mul(0.16).sub(c.t.mul(0.85))).mul(0.5).add(0.5);
 
@@ -29,7 +28,6 @@ export const mistwood: BeaconLook = {
     // the islet and the roots
     const islet = new THREE.Mesh(mound(15, 1.6, { seed: seed + 2, bump: 0.6, bumpScale: 0.2 }), lit(k, {
       color: 0x2f3a24, roughness: 0.95,
-      albedo: `diffuseColor.rgb = mix(vec3(0.09, 0.08, 0.06), vec3(0.16, 0.22, 0.09), bFbm(vLocal * 0.4));`,
       albedoNode: (c) => mix(vec3(0.09, 0.08, 0.06), vec3(0.16, 0.22, 0.09), bFbm(c.local.mul(0.4))),
     }));
     islet.receiveShadow = true;
@@ -58,15 +56,6 @@ export const mistwood: BeaconLook = {
     }
     const bark = lit(k, {
       color: 0x3a332c, roughness: 0.92,
-      albedo: /* glsl */ `float grain = bNoise(vec3(atan(vLocal.z, vLocal.x) * 6.0, vLocal.y * 0.12, 0.0));
-        vec3 c = mix(vec3(0.11, 0.095, 0.085), vec3(0.24, 0.21, 0.18), grain);
-        // silver weathered wood high up, moss low down
-        c = mix(c, vec3(0.36, 0.35, 0.33), smoothstep(35.0, 60.0, vLocal.y) * 0.6);
-        float moss = smoothstep(0.5, 0.7, bFbm(vLocal * 0.3)) * smoothstep(18.0, 2.0, vLocal.y);
-        diffuseColor.rgb = mix(c, vec3(0.1, 0.17, 0.05), moss);`,
-      emissive: /* glsl */ `// faint foxfire in the cracks of the bark
-        float crack = smoothstep(0.72, 0.8, bNoise(vec3(atan(vLocal.z, vLocal.x) * 9.0, vLocal.y * 0.35, 1.0)));
-        totalEmissiveRadiance += vec3(0.45, 1.0, 0.12) * crack * (0.25 + 0.6 * ${WAVE}) * uNight;`,
       albedoNode: ({ local: L }) => {
         const grain = bNoise(vec3(atan(L.z, L.x).mul(6), L.y.mul(0.12), 0));
         let c: V3 = mix(vec3(0.11, 0.095, 0.085), vec3(0.24, 0.21, 0.18), grain);
@@ -101,11 +90,6 @@ export const mistwood: BeaconLook = {
     }
     const fungus = lit(k, {
       color: 0xb8b098, roughness: 0.7,
-      albedo: `diffuseColor.rgb = mix(vec3(0.42, 0.38, 0.3), vec3(0.72, 0.68, 0.55), bNoise(vLocal * 3.0));`,
-      emissive: /* glsl */ `float under = smoothstep(0.1, -0.6, vLN.y);
-        float gills = 0.75 + 0.25 * sin(length(vLocal.xz) * 30.0);
-        vec3 fox = vec3(0.5, 1.0, 0.12);
-        totalEmissiveRadiance += fox * (under * gills * 3.2 + 0.35 + fres * 0.6) * (0.35 + 0.9 * ${WAVE}) * mix(0.0, 1.0, uNight);`,
       albedoNode: (c) => mix(vec3(0.42, 0.38, 0.3), vec3(0.72, 0.68, 0.55), bNoise(c.local.mul(3))),
       emissiveNode: (c) => {
         const under = smoothstep(0.1, -0.6, c.ln.y), gills = sin(length(c.local.xz).mul(30)).mul(0.25).add(0.75);
@@ -116,15 +100,8 @@ export const mistwood: BeaconLook = {
 
     // spores drifting up through the light
     k.add(particles(k, {
-      count: 260, color: 0xb6ff5a, day: 0, night: 2.6, shape: SHAPE_SPARK,
+      count: 260, color: 0xb6ff5a, day: 0, night: 2.6,
       base: (_i, r) => { const a = r() * Math.PI * 2, d = 2 + r() * 9; return [Math.cos(a) * d, 0, Math.sin(a) * d]; },
-      motion: /* glsl */ `float Hh = 64.0; float y = mod(s.y * Hh + t * (0.35 + s.z * 0.5), Hh);
-        pos.x += sin(t * 0.21 + s.w * 6.28 + y * 0.1) * 2.0 + 2.2 * (y / 62.0) * (y / 62.0);
-        pos.z += cos(t * 0.17 + s.x * 6.28 + y * 0.1) * 2.0;
-        pos.y = y;
-        float tw = 0.5 + 0.5 * sin(t * (1.0 + s.z * 2.0) + s.w * 30.0);
-        size = 0.09 + 0.1 * tw;
-        alpha = (0.3 + 0.7 * tw) * smoothstep(0.0, 3.0, y) * smoothstep(Hh, Hh - 10.0, y);`,
       shapeNode: shapeSpark,
       motionNode: ({ s, pos, t }) => {
         const Hh = 64, y = mod(s.y.mul(Hh).add(t.mul(s.z.mul(0.5).add(0.35))), Hh), f = y.div(62);
@@ -136,11 +113,8 @@ export const mistwood: BeaconLook = {
     }));
     // the fog: white by day, glowing green round the snag at night
     k.add(particles(k, {
-      count: 26, color: 0x7cff40, day: 0, night: 0.16, blend: 'alpha', matter: 0xbfc9c6, shape: SHAPE_PUFF,
+      count: 26, color: 0x7cff40, day: 0, night: 0.16, blend: 'alpha', matter: 0xbfc9c6,
       base: (i, r) => { const a = r() * Math.PI * 2, d = 6 + r() * 12; return [Math.cos(a) * d, 2 + (i % 13) * 3.2, Math.sin(a) * d]; },
-      motion: /* glsl */ `pos.x += sin(t * 0.05 + s.x * 6.28) * 4.0; pos.z += cos(t * 0.04 + s.y * 6.28) * 4.0;
-        size = 9.0 + s.z * 8.0;
-        alpha = 0.22 * (1.0 - pos.y / 50.0);`,
       shapeNode: shapePuff,
       motionNode: ({ s, pos, t }) => ({
         pos: vec3(pos.x.add(sin(t.mul(0.05).add(s.x.mul(6.28))).mul(4)), pos.y, pos.z.add(cos(t.mul(0.04).add(s.y.mul(6.28))).mul(4))),
@@ -149,8 +123,8 @@ export const mistwood: BeaconLook = {
       renderOrder: 9,
     }));
 
-    k.add(halo(k, [1, 28, 0], 30, 0x8cff36, 0, 0.13, '0.85 + 0.15 * sin(uTime * 0.85)', 26, '', (c) => sin(c.t.mul(0.85)).mul(0.15).add(0.85)));
-    k.add(halo(k, [0, 12, 0], 16, 0x9cff3a, 0, 0.3, '1.0', 14));
+    k.add(halo(k, [1, 28, 0], 30, 0x8cff36, 0, 0.13, 26, (c) => sin(c.t.mul(0.85)).mul(0.15).add(0.85)));
+    k.add(halo(k, [0, 12, 0], 16, 0x9cff3a, 0, 0.3, 14));
     k.setPulse((t) => 0.8 + 0.2 * Math.sin(t * 0.85));
     return k.root;
   },

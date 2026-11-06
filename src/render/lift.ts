@@ -1,25 +1,23 @@
 // The sea the regions' events move: the Jade Shoals' falling tide, the Mangrove's flood, the reef tide running to one
 // side of the Great Atoll, the low tide under Moonbow Arch. Each disc of LIFTS raises or draws down the water, in its
-// own region only. The shaders read it through planet.ts seaLift (uLiftAt, uLiftR, uSeaShare), the GPU planet's
-// through seaLiftNode; the hulls, the loot and the splashes ride it through seaLift here, which works it out the same
-// way.
+// own region only. The planet's shaders read it through seaLiftNode; the hulls, the loot and the splashes ride it
+// through seaLift here, which works it out the same way.
 import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
 import { Fn, If, asin, atan, clamp, dot, float, floor, fract, ivec2, max, mix, mod, smoothstep, sqrt, texture, vec2, vec3 } from 'three/tsl';
 import { R } from '../sim/sphere.ts';
 import { LIFTS, regionMix, type RegionMix } from '../sim/world/index.ts';
-import { U } from './engine.ts';
 import { P } from './gpu/uniforms.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
 type V4 = Node<'vec4'>;
 
-/** The most discs planet.ts's arrays hold. */
+/** The most discs the uniforms hold. */
 export const MAX_LIFTS = 5;
 /** The regions whose water moves, each a channel of the share texture. */
 const LIFTERS = [...new Set(LIFTS.map((l) => l.region))];
-if (LIFTS.length > MAX_LIFTS || LIFTERS.length > 4) throw new Error(`the sea's lifts outgrow planet.ts: ${LIFTS.length} discs in ${LIFTERS.length} regions`);
+if (LIFTS.length > MAX_LIFTS || LIFTERS.length > 4) throw new Error(`the sea's lifts outgrow the uniforms: ${LIFTS.length} discs in ${LIFTERS.length} regions`);
 
 const W = 512, H = 256;
 let share: Uint8Array | null = null;
@@ -27,8 +25,8 @@ let shareTex: THREE.DataTexture | null = null, shareTexels: THREE.DataTexture | 
 const now = new Float32Array(LIFTS.length);
 let on = false;
 
-/** Each lifting region's share of the water over the planet, by latitude and longitude as uSeaTint: one channel a region. */
-export function liftShareTexture(): THREE.DataTexture {
+/** Each lifting region's share of the water over the planet, by latitude and longitude: one channel a region. */
+function liftShareTexture(): THREE.DataTexture {
   if (shareTex) return shareTex;
   const d = new Uint8Array(W * H * 4), p = { x: 0, y: 0, z: 0 }, mix: RegionMix = { a: 0, b: 0, t: 0 };
   for (let y = 0; y < H; y++) {
@@ -50,8 +48,6 @@ export function liftShareTexture(): THREE.DataTexture {
   tex.colorSpace = THREE.NoColorSpace;
   tex.needsUpdate = true;
   LIFTS.forEach((l, i) => {
-    U.uLiftAt.value[i].set(l.pos.x, l.pos.y, l.pos.z, 0);
-    U.uLiftR.value[i].set(l.r, l.fade, LIFTERS.indexOf(l.region), 0);
     (P.liftAt.array[i] as THREE.Vector4).set(l.pos.x, l.pos.y, l.pos.z, 0);
     (P.liftR.array[i] as THREE.Vector4).set(l.r, l.fade, LIFTERS.indexOf(l.region), 0);
   });
@@ -64,16 +60,14 @@ export function setLifts(by: readonly number[]): void {
   on = false;
   for (let i = 0; i < LIFTS.length; i++) {
     now[i] = share ? by[i] ?? 0 : 0;
-    U.uLiftAt.value[i].w = now[i];
     (P.liftAt.array[i] as THREE.Vector4).w = now[i];
     if (now[i] !== 0) on = true;
   }
-  U.uLiftOn.value = on ? 1 : 0;
   P.liftOn.value = on ? 1 : 0;
 }
 
 /**
- * On the GPU planet, how far the events have raised the sea over `up`, a direction from the planet's centre, metres:
+ * How far the events have raised the sea over `up`, a direction from the planet's centre, metres:
  * seaLift's sum as nodes. The discs, their reach and their regions never change, so only how far each moves the sea
  * now is read from the uniforms. The share table is read filtered; with `loads`, for a material out of samplers, it
  * is filtered by hand from four texel loads of a copy WebGPU reads without one.
@@ -104,7 +98,7 @@ export function seaLiftNode(up: V3, loads = false): F {
   return h;
 }
 
-/** The sea's surface over `up` on the GPU planet, metres from the centre: the tide's level and the events' lift,
+/** The sea's surface over `up`, metres from the centre: the tide's level and the events' lift,
  *  which is only worked out while some event moves the water. */
 export const seaLevelNode = (up: V3, loads = false): F =>
   Fn(() => {

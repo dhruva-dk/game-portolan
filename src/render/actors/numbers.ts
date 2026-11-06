@@ -1,7 +1,7 @@
 // Damage numbers: blue for what the shield took, white for the hull, popping out of the hit and rising. Drawn as
 // screen-sized glyphs anchored in the world, so they read the same at phone size near or far. One draw call.
 import * as THREE from 'three';
-import { GPU, rand } from './common.ts';
+import { rand } from './common.ts';
 import { numberNodeMaterial } from './tsl/numbers.ts';
 
 const GLYPHS = '0123456789+!';
@@ -30,42 +30,6 @@ function makeDigits(): THREE.CanvasTexture {
   return t;
 }
 
-const VERT = /* glsl */ `
-attribute vec3 iAnchor;
-attribute vec3 iGlyph; // x offset in glyph widths, glyph index, size (fraction of screen height)
-attribute vec4 iCol;
-varying vec2 vUv;
-varying vec4 vCol;
-void main() {
-  vec4 c = projectionMatrix * viewMatrix * vec4(iAnchor, 1.0);
-  vUv = vec2(0.0);
-  vCol = vec4(0.0);
-  if (c.w <= 0.0) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
-  float aspect = projectionMatrix[1][1] / projectionMatrix[0][0];
-  vec2 q = position.xy;
-  vec2 off = vec2((q.x * 0.5 + iGlyph.x * 0.62) / aspect, q.y * 0.5) * iGlyph.z * 2.0;
-  c.xy += off * c.w;
-  // never hidden behind the hull it struck
-  c.z = min(c.z, c.w * 0.999);
-  gl_Position = c;
-  float g = iGlyph.y;
-  vUv = (vec2(mod(g, 4.0), 3.0 - floor(g / 4.0)) + q * 0.5 + 0.5) / 4.0;
-  vCol = iCol;
-}`;
-
-const FRAG = /* glsl */ `
-uniform sampler2D uDigits;
-varying vec2 vUv;
-varying vec4 vCol;
-void main() {
-  vec4 t = texture2D(uDigits, vUv);
-  // white fill takes the colour; the black outline stays dark
-  vec3 c = mix(vec3(0.0), vCol.rgb, t.r);
-  float a = t.a * vCol.a;
-  if (a < 0.01) discard;
-  gl_FragColor = vec4(c * a, a);
-}`;
-
 interface Num { at: THREE.Vector3; up: THREE.Vector3; text: string; col: THREE.Color; age: number; size: number; jx: number }
 
 export const SHIELD_BLUE = new THREE.Color(0.35, 0.72, 1.6);
@@ -88,11 +52,7 @@ export class Numbers {
     geo.setAttribute('iGlyph', (this.glyph = attr(3)));
     geo.setAttribute('iCol', (this.col = attr(4)));
     geo.instanceCount = 0;
-    const m = GPU.on ? numberNodeMaterial(makeDigits()) : new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG, uniforms: { uDigits: { value: makeDigits() } },
-      transparent: true, depthWrite: false, depthTest: false,
-      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-    });
+    const m = numberNodeMaterial(makeDigits());
     this.mesh = new THREE.Mesh(geo, m);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 20;

@@ -1,4 +1,4 @@
-// The bolt as a node material, for the WebGPU planet: its ribbons added over the scene at the lamps' scale times many,
+// The bolt as a node material: its ribbons added over the scene at the lamps' scale times many,
 // a white-hot core down the middle of each and a halo spreading out across it. The core's share of the ribbon comes
 // with it (uv.y), as the ribbon is widened to hold a few pixels where the bolt is far.
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';

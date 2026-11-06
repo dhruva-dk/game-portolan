@@ -3,22 +3,10 @@
 // light climb the stipes, the canopy mat on the surface glimmers and plankton sparks drift up through it all. By day it
 // is olive-gold kelp swaying over the shallows. From far off: a cluster of swaying cyan columns beaded with light.
 import * as THREE from 'three';
-import { Kit, halo, lit, merge, particles, strip, surface, tag, tick, tube, disc, SHAPE_SPARK } from '../kit.ts';
+import { Kit, halo, lit, merge, particles, strip, surface, tag, tick, tube, disc } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { abs, attribute, clamp, cos, length, max, mix, mod, pow, sin, smoothstep, uv, varying, vec2, vec3 } from 'three/tsl';
 import { bFbm, bNoise, shapeSpark, type Clocked, type F, type V3 } from '../nodes.ts';
-
-// the sway every part of a column shares, so stipes, blades and floats move as one
-const SWAY = /* glsl */ `
-varying float vPhase;
-vec3 kelpSway(vec3 p, float ph) {
-  float h = clamp((p.y + 3.0) / 58.0, 0.0, 1.0); h *= h;
-  return vec3(sin(uTime * 0.5 + ph * 6.0) * 3.2 + sin(uTime * 1.25 + ph * 9.0 + p.y * 0.14) * 0.7, 0.0,
-              cos(uTime * 0.43 + ph * 7.0) * 2.4 + cos(uTime * 1.05 + p.y * 0.11 + ph * 5.0) * 0.6) * h;
-}
-float kelpPulse(float y, float ph) { return pow(max(0.0, sin(y * 0.2 - uTime * 2.1 + ph * 11.0)), 14.0); }`;
-const MOVE = /* glsl */ `vPhase = aPhase; transformed += kelpSway(vLocal, aPhase);`;
-const MOVE_INST = /* glsl */ `vPhase = aPhase; transformed += inverse(mat3(instanceMatrix)) * kelpSway(vLocal, aPhase);`;
 
 /** The same sway and pulse as nodes, and each part's phase as the vertex and the fragment have it. */
 const phase = (): F => attribute<'float'>('aPhase') as unknown as F;
@@ -78,10 +66,7 @@ export const kelpShallows: BeaconLook = {
     }
 
     const stipeMat = lit(k, {
-      color: 0x4c4518, roughness: 0.55, defs: SWAY, vdefs: 'attribute float aPhase;', vertex: MOVE,
-      albedo: `diffuseColor.rgb = mix(vec3(0.16, 0.13, 0.04), vec3(0.32, 0.26, 0.08), bNoise(vLocal * vec3(2.0, 0.3, 2.0)));`,
-      emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
-        totalEmissiveRadiance += vec3(0.1, 0.8, 1.0) * (0.25 + 4.0 * p) * smoothstep(-1.0, 1.0, vLocal.y) * uNight;`,
+      color: 0x4c4518, roughness: 0.55,
       vertexNode: moveNode,
       albedoNode: ({ local: L }) => mix(vec3(0.16, 0.13, 0.04), vec3(0.32, 0.26, 0.08), bNoise(L.mul(vec3(2, 0.3, 2)))),
       emissiveNode: ({ local: L, t, night }) =>
@@ -92,12 +77,7 @@ export const kelpShallows: BeaconLook = {
     k.add(stand);
 
     const bladeMat = lit(k, {
-      color: 0x8a7424, roughness: 0.5, side: THREE.DoubleSide, defs: SWAY, vdefs: 'attribute float aPhase;', vertex: MOVE,
-      albedo: /* glsl */ `float vein = smoothstep(0.08, 0.0, abs(vUv.x - 0.5)) * 0.25;
-        diffuseColor.rgb = mix(vec3(0.42, 0.33, 0.08), vec3(0.62, 0.5, 0.14), bNoise(vec3(vUv * vec2(3.0, 1.2), vPhase * 9.0))) * (1.0 - vein);`,
-      emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
-        totalEmissiveRadiance += vec3(0.08, 0.6, 0.8) * (0.06 + 0.9 * p + fres * 0.25) * uNight
-          + vec3(0.25, 0.2, 0.04) * fres * 0.25 * (1.0 - uNight);`,
+      color: 0x8a7424, roughness: 0.5, side: THREE.DoubleSide,
       vertexNode: moveNode,
       albedoNode: () => {
         const f = uv(), vein = smoothstep(0.08, 0, abs(f.x.sub(0.5))).mul(0.25);
@@ -116,10 +96,7 @@ export const kelpShallows: BeaconLook = {
     const fg = new THREE.SphereGeometry(1, 10, 8);
     fg.scale(1, 1.3, 1);
     const fl = new THREE.InstancedMesh(fg, lit(k, {
-      color: 0xb8a050, roughness: 0.3, defs: SWAY, vdefs: 'attribute float aPhase;', vertex: MOVE_INST,
-      emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
-        float lamp = 0.6 + 0.4 * sin(uTime * 1.7 + vPhase * 40.0 + vLocal.y);
-        totalEmissiveRadiance += mix(vec3(0.2, 0.85, 1.0), vec3(0.85, 1.0, 1.0), p) * (1.6 * lamp + 7.0 * p) * mix(0.02, 1.0, uNight);`,
+      color: 0xb8a050, roughness: 0.3,
       vertexNode: moveNode,
       emissiveNode: ({ local: L, t, night }) => {
         const ph = vPhase(), p = pulse(L.y, ph, t), lamp = sin(t.mul(1.7).add(ph.mul(40)).add(L.y)).mul(0.4).add(0.6);
@@ -138,12 +115,6 @@ export const kelpShallows: BeaconLook = {
     // the canopy: a mat of kelp lying on the surface, glimmering at night
     k.add(surface(k, disc(26, 0.12, 64), {
       color: 0x1fd6ff, day: 0, night: 0.9, blend: 'alpha', matter: 0x5a4a14,
-      paint: /* glsl */ `vec2 p = vLocal.xz;
-        float mat = smoothstep(0.48, 0.62, bFbm(vec3(p * 0.16, 1.0)) + 0.25 * (1.0 - length(p) / 26.0));
-        float edge = smoothstep(26.0, 18.0, length(p));
-        float spark = pow(bNoise(vec3(p * 1.6, uTime * 0.8)), 6.0) * 3.0;
-        alpha = mat * edge * 0.85;
-        glow = mat * edge * (0.12 + spark + 0.4 * pow(max(0.0, sin(length(p) * 0.5 - uTime * 1.2)), 8.0));`,
       paintNode: ({ local, t }) => {
         const p = local.xz, d = length(p);
         const mat = smoothstep(0.48, 0.62, bFbm(vec3(p.mul(0.16), 1)).add(d.div(26).oneMinus().mul(0.25)));
@@ -157,12 +128,8 @@ export const kelpShallows: BeaconLook = {
 
     // plankton sparks drifting up the stand
     k.add(particles(k, {
-      count: 280, color: 0x5fe8ff, day: 0, night: 2.6, shape: SHAPE_SPARK,
+      count: 280, color: 0x5fe8ff, day: 0, night: 2.6,
       base: (_i, r) => { const a = r() * Math.PI * 2, d = r() * 17; return [Math.cos(a) * d, 0, Math.sin(a) * d]; },
-      motion: /* glsl */ `float Hh = 56.0; float y = mod(s.y * Hh + t * (0.6 + s.z * 0.8), Hh);
-        pos += vec3(sin(t * 0.3 + s.w * 6.28 + y * 0.12) * 1.5, y, cos(t * 0.26 + s.x * 6.28) * 1.5);
-        float tw = pow(0.5 + 0.5 * sin(t * (1.5 + s.z * 3.0) + s.w * 40.0), 4.0);
-        size = 0.08 + 0.12 * tw; alpha = (0.2 + 0.9 * tw) * smoothstep(0.0, 2.0, y) * smoothstep(Hh, Hh - 12.0, y);`,
       shapeNode: shapeSpark,
       motionNode: ({ s, pos, t }) => {
         const Hh = 56, y = mod(s.y.mul(Hh).add(t.mul(s.z.mul(0.8).add(0.6))), Hh);
@@ -174,8 +141,8 @@ export const kelpShallows: BeaconLook = {
       },
     }));
 
-    k.add(halo(k, [0, 4, 0], 20, 0x1fd6ff, 0, 0.35, '1.0', 18));
-    k.add(halo(k, [0, 34, 0], 32, 0x18c4f0, 0, 0.12, '1.0', 32));
+    k.add(halo(k, [0, 4, 0], 20, 0x1fd6ff, 0, 0.35, 18));
+    k.add(halo(k, [0, 34, 0], 32, 0x18c4f0, 0, 0.12, 32));
     k.setPulse((t) => 0.85 + 0.15 * Math.sin(t * 1.7));
     return k.root;
   },

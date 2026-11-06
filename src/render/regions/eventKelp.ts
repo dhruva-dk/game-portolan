@@ -8,7 +8,6 @@ import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { REGION_EVENT } from '../../sim/tables.ts';
 import { REGION_EVENTS, REGIONS, heightAt, type RegionId } from '../../sim/world/index.ts';
 import { v3 } from '../../sim/math.ts';
-import { patch } from '../engine.ts';
 import { seaAt } from '../swell.ts';
 import type { EventPhase } from './eventRocks.ts';
 
@@ -71,7 +70,7 @@ export class EventKelp {
 
   constructor() {
     this.group.name = 'eventKelp';
-    const mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0, side: THREE.DoubleSide }), 'event-kelp');
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0, side: THREE.DoubleSide });
     this.mesh = new THREE.InstancedMesh(raft(), mat, RAFTS);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;

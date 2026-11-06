@@ -3,20 +3,12 @@
 // synchronous fireflies do, and the blossom glows pink in their light while petals drift down. By day it is a cherry
 // in bloom shedding petals. From far off: a pink glow under a tall spiral of yellow-green sparks.
 import * as THREE from 'three';
-import { Kit, halo, lit, mat4, merge, mound, noise3, particles, smooth, tick, tube, SHAPE_SPARK } from '../kit.ts';
+import { Kit, halo, lit, mat4, merge, mound, noise3, particles, smooth, tick, tube } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
 import { abs, cos, exp, fract, length, max, mix, mod, pow, sin, smoothstep, step, vec3 } from 'three/tsl';
 import { bFbm, bNoise, shapeSpark, type Clocked, type F, type ShapeCtx, type V3 } from '../nodes.ts';
 
 const KNOLL = 4;
-const SWAY = /* glsl */ `vec3 treeSway(vec3 p) { float h = max(0.0, p.y - 6.0) / 14.0;
-  return vec3(sin(uTime * 0.9 + p.y * 0.2) * 0.25, 0.0, cos(uTime * 0.7 + p.x * 0.2) * 0.2) * h * h; }`;
-// the synchronised flash: a wave that rolls out from the tree and up the spiral
-const BLINK = /* glsl */ `float flyBlink(vec3 p, float t, float jitter) {
-  float ph = t * 0.55 - length(p.xz) * 0.035 - p.y * 0.02 + jitter * 0.12;
-  float burst = smoothstep(0.35, 0.0, abs(fract(ph * 0.25) - 0.25));
-  return pow(max(0.0, sin(ph * 6.2831 * 1.6)), 10.0) * (0.25 + 0.75 * burst); }`;
-
 /** The same sway and flash as nodes. */
 const swayNode = ({ p, t }: Clocked & { p: V3 }): V3 => {
   const h = max(0, p.y.sub(6)).div(14);
@@ -43,11 +35,6 @@ export const blossomRun: BeaconLook = {
 
     k.add(new THREE.Mesh(mound(18, KNOLL, { seed: seed + 1, bump: 0.35, bumpScale: 0.15 }), lit(k, {
       color: 0x4f7a2c, roughness: 0.95,
-      albedo: /* glsl */ `vec3 c = mix(vec3(0.16, 0.3, 0.07), vec3(0.32, 0.45, 0.12), bFbm(vLocal * 0.5));
-        c = mix(c, vec3(0.9, 0.62, 0.72), smoothstep(0.62, 0.72, bNoise(vLocal * 1.7)) * 0.6);
-        c = mix(c, vec3(0.3, 0.27, 0.22), smoothstep(1.0, 0.0, vLocal.y));
-        diffuseColor.rgb = c;`,
-      emissive: `totalEmissiveRadiance += vec3(0.6, 0.9, 0.2) * exp(-length(vLocal.xz) / 6.0) * 0.08 * uNight;`,
       albedoNode: ({ local: L }) => {
         let c: V3 = mix(vec3(0.16, 0.3, 0.07), vec3(0.32, 0.45, 0.12), bFbm(L.mul(0.5)));
         c = mix(c, vec3(0.9, 0.62, 0.72), smoothstep(0.62, 0.72, bNoise(L.mul(1.7))).mul(0.6));
@@ -75,9 +62,7 @@ export const blossomRun: BeaconLook = {
     };
     grow(new THREE.Vector3(0, KNOLL - 0.8, 0), new THREE.Vector3(0.1, 1, 0).normalize(), 5.2, 0.95, 4);
     const bark = lit(k, {
-      color: 0x3a2a26, roughness: 0.9, defs: SWAY, vertex: 'transformed += treeSway(vLocal);',
-      albedo: `diffuseColor.rgb = mix(vec3(0.09, 0.06, 0.055), vec3(0.22, 0.15, 0.13), bNoise(vec3(vLocal.x * 3.0, vLocal.y * 0.6, vLocal.z * 3.0)));`,
-      emissive: `totalEmissiveRadiance += vec3(0.7, 0.9, 0.25) * fres * 0.08 * uNight;`,
+      color: 0x3a2a26, roughness: 0.9,
       vertexNode: swayNode,
       albedoNode: ({ local: L }) => mix(vec3(0.09, 0.06, 0.055), vec3(0.22, 0.15, 0.13), bNoise(vec3(L.x.mul(3), L.y.mul(0.6), L.z.mul(3)))),
       emissiveNode: ({ fres, night }) => vec3(0.7, 0.9, 0.25).mul(fres).mul(0.08).mul(night),
@@ -104,13 +89,7 @@ export const blossomRun: BeaconLook = {
       }
     }
     const bloom = new THREE.InstancedMesh(puffGeo, lit(k, {
-      color: 0xf2a7c3, roughness: 0.85, defs: SWAY, vertex: 'transformed += inverse(mat3(instanceMatrix)) * treeSway(vLocal);',
-      albedo: /* glsl */ `float n = bNoise(vLocal * 3.5);
-        diffuseColor.rgb = mix(vec3(0.85, 0.42, 0.58), vec3(1.0, 0.86, 0.92), n);
-        diffuseColor.rgb *= 0.75 + 0.25 * smoothstep(0.4, 0.7, bNoise(vLocal * 9.0));`,
-      emissive: /* glsl */ `// the fireflies' light on the petals, flaring with their waves
-        float wave = 0.5 + 0.5 * sin(uTime * 0.55 * 6.2831 * 0.4 - length(vLocal.xz) * 0.1);
-        totalEmissiveRadiance += vec3(1.0, 0.45, 0.65) * (0.22 + 0.25 * wave + fres * 0.3) * uNight;`,
+      color: 0xf2a7c3, roughness: 0.85,
       vertexNode: swayNode,
       albedoNode: ({ local: L }) =>
         mix(vec3(0.85, 0.42, 0.58), vec3(1, 0.86, 0.92), bNoise(L.mul(3.5))).mul(smoothstep(0.4, 0.7, bNoise(L.mul(9))).mul(0.25).add(0.75)),
@@ -128,15 +107,11 @@ export const blossomRun: BeaconLook = {
     // the swarm in and round the crown
     const crownTop = Math.max(...tips.map((t) => t.y));
     k.add(particles(k, {
-      count: 420, color: 0xd8ff50, day: 0, night: 6.0, shape: SHAPE_SPARK, defs: BLINK,
+      count: 420, color: 0xd8ff50, day: 0, night: 6.0,
       base: (_i, r) => {
         const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 13;
         return [Math.cos(a) * d, KNOLL + 1 + r() * (crownTop - KNOLL + 4), Math.sin(a) * d];
       },
-      motion: /* glsl */ `pos += vec3(sin(t * (0.3 + s.x * 0.4) + s.y * 20.0), sin(t * (0.25 + s.z * 0.3) + s.w * 20.0) * 0.6,
-          cos(t * (0.28 + s.w * 0.35) + s.x * 20.0)) * (0.8 + s.z * 1.6);
-        float b = flyBlink(pos, t, s.w);
-        size = 0.1 + 0.16 * b; alpha = 0.05 + b;`,
       shapeNode: shapeSpark,
       motionNode: ({ s, pos, t }) => {
         const p = pos.add(vec3(
@@ -150,14 +125,7 @@ export const blossomRun: BeaconLook = {
     }));
     // the spiral: fireflies climbing in a loose helix above the tree
     k.add(particles(k, {
-      count: 300, color: 0xd8ff50, day: 0, night: 6.0, shape: SHAPE_SPARK, defs: BLINK,
-      motion: /* glsl */ `float Hh = 60.0 - ${crownTop.toFixed(1)};
-        float y = mod(s.y * Hh + t * (0.5 + s.z * 0.4), Hh);
-        float a = s.x * 6.2831 + y * 0.16 + t * 0.12;
-        float r = 3.0 + 6.0 * (1.0 - y / Hh) + s.w * 3.5;
-        pos = vec3(cos(a) * r, ${crownTop.toFixed(1)} + y, sin(a) * r) + vec3(sin(t + s.w * 30.0), 0.0, cos(t * 1.1 + s.z * 30.0)) * 0.7;
-        float b = flyBlink(pos, t, s.w);
-        size = 0.12 + 0.16 * b; alpha = (0.05 + b) * smoothstep(Hh, Hh - 15.0, y);`,
+      count: 300, color: 0xd8ff50, day: 0, night: 6.0,
       shapeNode: shapeSpark,
       motionNode: ({ s, t }) => {
         const Hh = 60 - crownTop, y = mod(s.y.mul(Hh).add(t.mul(s.z.mul(0.4).add(0.5))), Hh);
@@ -170,13 +138,7 @@ export const blossomRun: BeaconLook = {
     // petals drifting down
     k.add(particles(k, {
       count: 170, color: 0xff9ac8, day: 0, night: 0.5, blend: 'alpha', matter: 0xf6c4d6,
-      shape: 'shape = smoothstep(1.0, 0.6, r2 + abs(c.x * c.y) * 0.8);',
       base: (_i, r) => { const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 11; return [Math.cos(a) * d, 0, Math.sin(a) * d]; },
-      motion: /* glsl */ `float T = 9.0 + s.y * 6.0; float tt = mod(t + s.x * T, T);
-        float y = ${(crownTop + 1).toFixed(1)} - tt * 1.4;
-        pos += vec3(sin(tt * 1.3 + s.z * 9.0) * 1.2 + tt * 0.6, y, cos(tt * 1.1 + s.w * 9.0) * 1.0);
-        size = 0.13; alpha = step(${KNOLL.toFixed(1)}, pos.y - length(pos.xz) * 0.12) * 0.95;
-        dir = vec3(sin(tt * 4.0 + s.z * 9.0), 0.4, cos(tt * 3.0)); stretch = 0.6;`,
       shapeNode: petal,
       motionNode: ({ s, pos, t }) => {
         const T = s.y.mul(6).add(9), tt = mod(t.add(s.x.mul(T)), T), y = tt.mul(-1.4).add(crownTop + 1);
@@ -188,8 +150,8 @@ export const blossomRun: BeaconLook = {
       },
     }));
 
-    k.add(halo(k, [0, crownTop - 2, 0], 17, 0xffa0c8, 0, 0.32, '0.85 + 0.15 * sin(uTime * 1.2)', 14, '', ({ t }) => sin(t.mul(1.2)).mul(0.15).add(0.85)));
-    k.add(halo(k, [0, 38, 0], 30, 0xc8f050, 0, 0.11, '1.0', 30));
+    k.add(halo(k, [0, crownTop - 2, 0], 17, 0xffa0c8, 0, 0.32, 14, ({ t }) => sin(t.mul(1.2)).mul(0.15).add(0.85)));
+    k.add(halo(k, [0, 38, 0], 30, 0xc8f050, 0, 0.11, 30));
     k.setPulse((t) => 0.75 + 0.25 * Math.max(0, Math.sin(t * 0.55 * Math.PI * 2 * 1.6)) ** 4);
     return k.root;
   },

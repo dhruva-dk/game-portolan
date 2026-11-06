@@ -1,11 +1,9 @@
 // The beacon kit: what every regional beacon is built from. A beacon is one THREE.Group whose materials all read
-// one shared clock (time and how dark it is), so animating it is two uniform writes. Lit parts are standard
-// materials with glow and surface detail added in GLSL; glows, halos, sparks, mist and flames are instanced
-// billboards whose motion runs entirely in the vertex shader. Units are metres, +Y is up, y = 0 is sea level.
+// one shared clock (time and how dark it is), so animating it is two uniform writes. Lit parts are node materials
+// with glow and surface detail written in TSL (nodes.ts); glows, halos, sparks, mist and flames are instanced
+// billboards whose motion runs entirely on the GPU. Units are metres, +Y is up, y = 0 is sea level.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { sharedUniforms } from '../planet.ts';
-import { GPU } from '../actors/common.ts';
 import {
   litNode, particlesNode, shapeHalo, surfaceNode, type Clocked, type F, type LitNodes, type ParticleNodes, type SurfaceNodes, type V4,
 } from './nodes.ts';
@@ -49,22 +47,6 @@ export function fbm3(x: number, y: number, z: number, seed = 0, oct = 4): number
   for (let i = 0; i < oct; i++) { s += a * noise3(x * f, y * f, z * f, seed + i * 17); n += a; a *= 0.5; f *= 2.03; }
   return s / n;
 }
-
-// ---------------------------------------------------------------- GLSL shared by every beacon material
-
-export const GLSL_NOISE = /* glsl */ `
-float bHash(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
-float bHash1(float n) { return fract(sin(n) * 43758.5453123); }
-float bNoise(vec3 x) {
-  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(bHash(i), bHash(i + vec3(1,0,0)), f.x), mix(bHash(i + vec3(0,1,0)), bHash(i + vec3(1,1,0)), f.x), f.y),
-             mix(mix(bHash(i + vec3(0,0,1)), bHash(i + vec3(1,0,1)), f.x), mix(bHash(i + vec3(0,1,1)), bHash(i + vec3(1,1,1)), f.x), f.y), f.z);
-}
-float bFbm(vec3 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * bNoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }
-// two quick beats then a rest, period p: the same rhythm as heartbeat() below
-float bBeat(float t, float p) { float x = fract(t / p); return min(1.0, exp(-pow((x - 0.08) / 0.035, 2.0)) + 0.7 * exp(-pow((x - 0.2) / 0.04, 2.0))); }
-vec3 bHue(float h) { return clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0); }
-`;
 
 // ---------------------------------------------------------------- the clock and the beacon root
 
@@ -130,91 +112,18 @@ export interface LitOptions extends LitNodes {
   side?: THREE.Side;
   transparent?: boolean;
   opacity?: number;
-  /** Extra uniforms the GLSL below can read. */
-  uniforms?: Record<string, THREE.IUniform>;
-  /** Shared GLSL functions, placed before main() in both stages. */
-  defs?: string;
-  /** Vertex-only declarations (attributes). */
-  vdefs?: string;
-  /** Vertex GLSL that may move `transformed` (object space). `position`, `vLocal` (object space) and the clock are in scope. */
-  vertex?: string;
-  /** Fragment GLSL that may change `diffuseColor.rgb`, from `vLocal`, `vLN` (object-space normal) and the clock. */
-  albedo?: string;
-  /** Fragment GLSL that adds to `totalEmissiveRadiance` (HDR: above ~1.1 blooms). `normal`, `vViewPosition`, `vLocal`, `vLN`, `fres` are in scope. */
-  emissive?: string;
-  /** Fragment GLSL that may change `roughnessFactor`. */
-  rough?: string;
 }
 
-/** A MeshStandardMaterial with surface detail, sway and glow written in GLSL, driven by the beacon's clock; on the
- *  WebGPU planet, a node material from the look's TSL. */
+/** A standard node material with surface detail, sway and glow from the look's nodes, driven by the beacon's clock. */
 export function lit(k: Kit, o: LitOptions): THREE.MeshStandardMaterial {
-  if (GPU.on) return litNode(k.clock, o) as unknown as THREE.MeshStandardMaterial;
-  const m = new THREE.MeshStandardMaterial({
-    color: o.color, roughness: o.roughness ?? 0.8, metalness: o.metalness ?? 0, flatShading: o.flat ?? false,
-    side: o.side ?? THREE.FrontSide, transparent: o.transparent ?? false, opacity: o.opacity ?? 1,
-  });
-  const uni = o.uniforms ?? {};
-  const head = /* glsl */ `
-${sharedUniforms('float', 'uTime', 'uNight')}
-${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
-varying vec3 vLocal; varying vec3 vLN;
-${GLSL_NOISE}
-${o.defs ?? ''}`;
-  m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = k.clock.uTime;
-    sh.uniforms.uNight = k.clock.uNight;
-    Object.assign(sh.uniforms, uni);
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', `#include <common>\n${head}\n${o.vdefs ?? ''}`)
-      .replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
-#ifdef USE_INSTANCING
-  vLocal = (instanceMatrix * vec4(position, 1.0)).xyz;
-  vLN = normalize(mat3(instanceMatrix) * objectNormal);
-#else
-  vLocal = position;
-  vLN = objectNormal;
-#endif
-{ ${o.vertex ?? ''} }`);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\n${head}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n{ ${o.albedo ?? ''} }`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n{ ${o.rough ?? ''} }`)
-      .replace('#include <emissivemap_fragment>', /* glsl */ `#include <emissivemap_fragment>
-{ float fres = pow(1.0 - clamp(abs(dot(normalize(normal), normalize(vViewPosition))), 0.0, 1.0), 3.0);
-  ${o.emissive ?? ''} }`);
-  };
-  // materials with the same GLSL share one program; only their uniforms differ
-  const key = `beacon-lit:${hashString(JSON.stringify([o.defs, o.vdefs, o.vertex, o.albedo, o.emissive, o.rough, Object.keys(uni)]))}`;
-  m.customProgramCacheKey = () => key;
-  return m;
-}
-
-function hashString(str: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
-  return (h >>> 0).toString(36);
-}
-
-function glslType(v: unknown): string {
-  if (typeof v === 'number') return 'float';
-  if (v instanceof THREE.Color || v instanceof THREE.Vector3) return 'vec3';
-  if (v instanceof THREE.Vector2) return 'vec2';
-  if (v instanceof THREE.Vector4) return 'vec4';
-  throw new Error('beacon kit: unsupported uniform type');
-}
-
-/** A colour as a GLSL vec3 literal (linear). */
-export function vec3(c: THREE.ColorRepresentation, scale = 1): string {
-  const col = new THREE.Color(c);
-  return `vec3(${(col.r * scale).toFixed(4)}, ${(col.g * scale).toFixed(4)}, ${(col.b * scale).toFixed(4)})`;
+  return litNode(k.clock, o) as unknown as THREE.MeshStandardMaterial;
 }
 
 // ---------------------------------------------------------------- billboard particles
 
 export interface ParticleOptions extends Partial<ParticleNodes> {
   count: number;
-  /** Base colour (linear), multiplied by `col` from the motion GLSL. */
+  /** Base colour (linear), multiplied by the colour the motion gives. */
   color: THREE.ColorRepresentation;
   /** Brightness by day and at night: HDR, so above ~1.1 blooms. */
   day: number;
@@ -223,96 +132,12 @@ export interface ParticleOptions extends Partial<ParticleNodes> {
   blend?: 'add' | 'alpha';
   /** Per-particle base position. Defaults to the origin. */
   base?: (i: number, r: () => number) => [number, number, number];
-  /** Shared GLSL functions. */
-  defs?: string;
-  /**
-   * Vertex GLSL run per particle. In scope: `vec4 s` (four random numbers fixed per particle), `vec3 pos` (starts at the
-   * base), `float t` (seconds), `uNight`. It may set `pos`, `size` (half-width in metres), `alpha`, `col`, `stretch`
-   * (how much longer than wide along `dir`), and `dir` (object space, default up).
-   */
-  motion: string;
-  /** Fragment GLSL from `vec2 c` (-1..1 across the quad), `float r2`, `vec3 col`, `float a`: sets `float shape`. */
-  shape?: string;
   /** For 'alpha' blending: the matter's own colour by day (linear), lit a little by the glow at night. */
   matter?: THREE.ColorRepresentation;
-  uniforms?: Record<string, THREE.IUniform>;
   renderOrder?: number;
   /** Fades nearer than this many metres to the camera (keeps big halos from filling the screen). */
   nearFade?: number;
 }
-
-/** Soft round glow: a hot core in a wide falloff. */
-export const SHAPE_SOFT = 'shape = exp(-r2 * 4.5) * (1.0 - r2);';
-/** A tight spark with a faint halo. */
-export const SHAPE_SPARK = 'shape = exp(-r2 * 28.0) + 0.18 * exp(-r2 * 5.0) * (1.0 - r2);';
-/** A flame tongue: pointed at the top, round at the bottom. */
-export const SHAPE_FLAME =
-  'float w = 1.0 - smoothstep(-1.0, 1.0, c.y) * 0.85; shape = exp(-(c.x * c.x) / max(0.02, w * w * 0.32) - (c.y + 0.25) * (c.y + 0.25) * 1.6) * (1.0 - r2 * 0.5);';
-/** A cloud puff for smoke and mist. */
-export const SHAPE_PUFF = 'shape = smoothstep(1.0, 0.0, r2) * (0.6 + 0.4 * bNoise(vec3(c * 2.3, vSeed * 37.0)));';
-
-const PARTICLE_VERT = (o: ParticleOptions, uni: Record<string, THREE.IUniform>) => /* glsl */ `
-${sharedUniforms('float', 'uTime', 'uNight')}
-uniform float uNearFade;
-${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
-attribute vec4 aSeed; attribute vec3 aBase;
-varying vec2 vC; varying float vA; varying vec3 vCol; varying float vSeed;
-#include <fog_pars_vertex>
-${GLSL_NOISE}
-${o.defs ?? ''}
-void main() {
-  vec4 s = aSeed; vec3 pos = aBase; float t = uTime;
-  float size = 1.0, alpha = 1.0, stretch = 0.0; vec3 col = vec3(1.0); vec3 dir = vec3(0.0, 1.0, 0.0);
-  { ${o.motion} }
-  vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-  vec3 dv = (modelViewMatrix * vec4(dir, 0.0)).xyz;
-  vec2 up = length(dv.xy) > 1e-4 ? normalize(dv.xy) : vec2(0.0, 1.0);
-  vec2 rt = vec2(up.y, -up.x);
-  // a stretched quad only grows along dir as far as dir faces across the view
-  float along = 1.0 + stretch * clamp(length(dv.xy) / max(length(dv), 1e-4), 0.0, 1.0);
-  mvPosition.xy += (rt * position.x + up * position.y * along) * size;
-  if (uNearFade > 0.0) alpha *= smoothstep(uNearFade * 0.4, uNearFade, -mvPosition.z);
-  gl_Position = projectionMatrix * mvPosition;
-  vC = position.xy; vA = alpha; vCol = col; vSeed = s.x;
-  #include <fog_vertex>
-}`;
-
-const PARTICLE_FRAG = (o: ParticleOptions, uni: Record<string, THREE.IUniform>) => /* glsl */ `
-${sharedUniforms('float', 'uTime', 'uNight')}
-uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
-${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}
-varying vec2 vC; varying float vA; varying vec3 vCol; varying float vSeed;
-#include <fog_pars_fragment>
-${GLSL_NOISE}
-void main() {
-  vec2 c = vC; float r2 = dot(c, c); vec3 col = vCol; float a = vA; float shape = 0.0;
-  if (r2 > 1.0) discard;
-  { ${o.shape ?? SHAPE_SOFT} }
-  float fogF = 0.0;
-  #ifdef USE_FOG
-    #if defined(PLANET_CHUNK)
-      fogF = airLoss(vFogWorld);
-    #elif defined(FOG_EXP2)
-      fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
-    #else
-      fogF = smoothstep(fogNear, fogFar, vFogDepth);
-    #endif
-  #endif
-  float gain = mix(uDay, uGain, uNight);
-  ${o.blend === 'alpha'
-    ? /* glsl */ `float al = clamp(shape * a, 0.0, 1.0);
-  if (al < 0.003) discard;
-  vec3 rgb = uMatter * mix(1.0, 0.12, uNight) * col + uColor * gain * col;
-  #if defined(USE_FOG) && defined(PLANET_CHUNK)
-  rgb = atmosphere(rgb, vFogWorld);
-  #elif defined(USE_FOG)
-  rgb = mix(rgb, fogColor, fogF);
-  #endif
-  gl_FragColor = vec4(rgb, al);`
-    : /* glsl */ `vec3 rgb = uColor * col * shape * a * gain * (1.0 - fogF);
-  if (max(rgb.r, max(rgb.g, rgb.b)) < 0.0005) discard;
-  gl_FragColor = vec4(rgb, 1.0);`}
-}`;
 
 /** A cloud of camera-facing quads, all moved on the GPU. One draw call. */
 export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
@@ -328,22 +153,7 @@ export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
   g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
   g.setAttribute('aBase', new THREE.InstancedBufferAttribute(bases, 3));
   g.instanceCount = o.count;
-  const uni = o.uniforms ?? {};
-  const mat = GPU.on ? particlesNode(k.clock, { ...o, motionNode: o.motionNode ?? (() => ({})) }) : new THREE.ShaderMaterial({
-    vertexShader: PARTICLE_VERT(o, uni),
-    fragmentShader: PARTICLE_FRAG(o, uni),
-    uniforms: {
-      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
-      uTime: k.clock.uTime, uNight: k.clock.uNight,
-      uColor: { value: new THREE.Color(o.color) },
-      uMatter: { value: new THREE.Color(o.matter ?? 0x000000) },
-      uDay: { value: o.day }, uGain: { value: o.night },
-      uNearFade: { value: o.nearFade ?? 0 },
-      ...uni,
-    },
-    transparent: true, depthWrite: false, fog: true, side: THREE.DoubleSide,
-    blending: o.blend === 'alpha' ? THREE.NormalBlending : THREE.AdditiveBlending,
-  });
+  const mat = particlesNode(k.clock, { ...o, motionNode: o.motionNode ?? (() => ({})) });
   const mesh = new THREE.Mesh(g, mat);
   mesh.frustumCulled = false; // positions are made in the shader; the beacon is one place, so cull it as a whole
   mesh.renderOrder = o.renderOrder ?? 10;
@@ -351,15 +161,13 @@ export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
 }
 
 /** One soft glow: a halo or a far-reading sky glow. `nearFade` keeps it from swallowing the camera up close; `breathe`
- *  is its alpha, in GLSL, and `breatheNode` the same in TSL. */
+ *  is its alpha over time. */
 export function halo(k: Kit, at: [number, number, number], radius: number, color: THREE.ColorRepresentation,
-  day: number, night: number, breathe = '1.0', nearFade = 0, defs = '', breatheNode?: (c: Clocked & { s: V4 }) => F): THREE.Mesh {
+  day: number, night: number, nearFade = 0, breathe?: (c: Clocked & { s: V4 }) => F): THREE.Mesh {
   return particles(k, {
-    count: 1, color, day, night, nearFade, renderOrder: 12, defs,
+    count: 1, color, day, night, nearFade, renderOrder: 12,
     base: () => at,
-    motion: `size = ${radius.toFixed(2)}; alpha = ${breathe};`,
-    shape: 'shape = exp(-r2 * 3.2) * (1.0 - r2) * 0.85 + exp(-r2 * 14.0) * 0.4;',
-    motionNode: (c) => ({ size: radius, alpha: breatheNode ? breatheNode(c) : 1 }),
+    motionNode: (c) => ({ size: radius, alpha: breathe ? breathe(c) : 1 }),
     shapeNode: shapeHalo,
   });
 }
@@ -370,15 +178,9 @@ export interface SurfaceOptions extends Partial<SurfaceNodes> {
   color: THREE.ColorRepresentation;
   day: number;
   night: number;
-  /** Fragment GLSL from `vUv`, `vLocal`, the clock: sets `float glow` and may set `vec3 col` (multiplies color). */
-  paint: string;
-  /** Vertex GLSL that may move `p` (object space) from `uv`. */
-  vertex?: string;
-  defs?: string;
   blend?: 'add' | 'alpha';
-  /** For alpha blending: the surface's own colour (linear), and `float alpha` may be set by paint. */
+  /** For alpha blending: the surface's own colour (linear); the paint may give an alpha. */
   matter?: THREE.ColorRepresentation;
-  uniforms?: Record<string, THREE.IUniform>;
   /** Turn the quad about local Y so it always faces the camera (pillars, falls of light). */
   faceY?: boolean;
   renderOrder?: number;
@@ -387,77 +189,10 @@ export interface SurfaceOptions extends Partial<SurfaceNodes> {
 
 /** A custom-shaded surface: light ribbons, glowing pools, light pillars. */
 export function surface(k: Kit, geo: THREE.BufferGeometry, o: SurfaceOptions): THREE.Mesh {
-  const uni = o.uniforms ?? {};
-  const decl = `${Object.entries(uni).map(([n, u]) => `uniform ${glslType(u.value)} ${n};`).join('\n')}`;
-  const vert = /* glsl */ `
-${sharedUniforms('float', 'uTime', 'uNight')}
-${decl}
-varying vec2 vUv; varying vec3 vLocal; varying vec3 vView; varying vec3 vNrm;
-#include <fog_pars_vertex>
-${GLSL_NOISE}
-${o.defs ?? ''}
-void main() {
-  vec3 p = position; vUv = uv;
-  { ${o.vertex ?? ''} }
-  ${o.faceY ? /* glsl */ `
-  vec3 camL = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz;
-  vec2 to = camL.xz - vec2(0.0); to = length(to) > 1e-3 ? normalize(to) : vec2(0.0, 1.0);
-  p = vec3(to.y * p.x, p.y, -to.x * p.x) + vec3(to.x, 0.0, to.y) * p.z;` : ''}
-  vLocal = p;
-  vNrm = normalize(normalMatrix * normal);
-  vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-  vView = -mvPosition.xyz;
-  gl_Position = projectionMatrix * mvPosition;
-  #include <fog_vertex>
-}`;
-  const frag = /* glsl */ `
-${sharedUniforms('float', 'uTime', 'uNight')}
-uniform vec3 uColor; uniform vec3 uMatter; uniform float uDay; uniform float uGain;
-${decl}
-varying vec2 vUv; varying vec3 vLocal; varying vec3 vView; varying vec3 vNrm;
-#include <fog_pars_fragment>
-${GLSL_NOISE}
-${o.defs ?? ''}
-void main() {
-  float glow = 1.0, alpha = 1.0; vec3 col = vec3(1.0);
-  { ${o.paint} }
-  float fogF = 0.0;
-  #ifdef USE_FOG
-    #if defined(PLANET_CHUNK)
-      fogF = airLoss(vFogWorld);
-    #elif defined(FOG_EXP2)
-      fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
-    #else
-      fogF = smoothstep(fogNear, fogFar, vFogDepth);
-    #endif
-  #endif
-  float gain = mix(uDay, uGain, uNight);
-  ${o.blend === 'alpha'
-    ? /* glsl */ `vec3 rgb = uMatter * mix(1.0, 0.12, uNight) * col + uColor * col * glow * gain;
-  #if defined(USE_FOG) && defined(PLANET_CHUNK)
-  rgb = atmosphere(rgb, vFogWorld);
-  #elif defined(USE_FOG)
-  rgb = mix(rgb, fogColor, fogF);
-  #endif
-  if (alpha < 0.003) discard;
-  gl_FragColor = vec4(rgb, clamp(alpha, 0.0, 1.0));`
-    : /* glsl */ `vec3 rgb = uColor * col * glow * gain * (1.0 - fogF);
-  gl_FragColor = vec4(max(rgb, 0.0), 1.0);`}
-}`;
-  const mat = GPU.on ? surfaceNode(k.clock, { ...o, paintNode: o.paintNode ?? (() => ({})) }) : new THREE.ShaderMaterial({
-    vertexShader: vert, fragmentShader: frag,
-    uniforms: {
-      ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
-      uTime: k.clock.uTime, uNight: k.clock.uNight,
-      uColor: { value: new THREE.Color(o.color) }, uMatter: { value: new THREE.Color(o.matter ?? 0x000000) },
-      uDay: { value: o.day }, uGain: { value: o.night }, ...uni,
-    },
-    transparent: true, depthWrite: false, fog: true, side: o.side ?? THREE.DoubleSide,
-    blending: o.blend === 'alpha' ? THREE.NormalBlending : THREE.AdditiveBlending,
-  });
+  const mat = surfaceNode(k.clock, { ...o, paintNode: o.paintNode ?? (() => ({})) });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = o.renderOrder ?? 11;
-  if (o.faceY || o.vertex) mesh.frustumCulled = false;
+  if (o.faceY || o.vertexNode) mesh.frustumCulled = false;
   return mesh;
 }
 

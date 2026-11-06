@@ -4,11 +4,11 @@
 import { ability, type AbilityId } from '../../sim/abilities.ts';
 import {
   button, card, clear, cosmeticArt, el, emblemBadge, esc, hydrate, ICON, KIND_ICON, mmss, panel, progressBar, rankBadge, rarityFrame,
-  rarityLabel, segmented, slider, stagger, tabs, thousands, toggle,
+  rarityLabel, slider, stagger, tabs, thousands, toggle,
 } from '../parts/index.ts';
 import {
   KINDS, RANK_LADDER, TIER_NAMES, rankByName, unlockText, type AbilitiesModel, type AbilityView, type CareerModel, type CosmeticKind,
-  type LockerModel, type Quality, type RankModel, type RivalView, type RivalsModel, type Settings,
+  type LockerModel, type RankModel, type RivalView, type RivalsModel, type Settings,
 } from '../model.ts';
 import type { ScreenView } from '../shell.ts';
 import { abilityGlyph, playerPlate } from './bits.ts';
@@ -321,12 +321,6 @@ export function settingsScreen(s0: Settings, a: { onBack(): void; onChange(s: Pa
   const lefty = toggle({ value: s0.leftHanded, label: 'Left-handed', parent: row(ctl, 'Left-handed', 'Stick on the right, guns on the left'), onChange: (v) => a.onChange({ leftHanded: v }) });
   const auto = toggle({ value: s0.autoFire, label: 'Auto-fire', parent: row(ctl, 'Auto-fire', 'Fire while the guns hold a ship'), onChange: (v) => a.onChange({ autoFire: v }) });
 
-  const gfx = box('Graphics', ICON.quality);
-  const quality = segmented({
-    items: [{ id: 'low', label: 'Battery' }, { id: 'medium', label: 'Balanced' }, { id: 'high', label: 'Best' }], value: s0.quality, label: 'Quality',
-    parent: row(gfx, 'Quality', 'Battery saves power; Best wants a recent device'), onChange: (id) => a.onChange({ quality: id as Quality }),
-  });
-
   stagger(cols);
   return {
     ...p,
@@ -338,7 +332,6 @@ export function settingsScreen(s0: Settings, a: { onBack(): void; onChange(s: Pa
       invert.set(s.invertY);
       lefty.set(s.leftHanded);
       auto.set(s.autoFire);
-      quality.set(s.quality);
     },
   };
 }

@@ -1,4 +1,4 @@
-// The plants' materials as nodes, for the WebGPU planet. Each kit's material is remade from what the kit wrote on it
+// The plants' materials as nodes. Each kit's material is remade from what the kit wrote on it
 // (tag.ts): the same photographs and painted atlases, the same per-vertex wind weights read by the same motion, and
 // the same surface touches (snow and moss on the upper faces, the tide's stain, bleached driftwood, coral's grooves).
 //

@@ -3,7 +3,7 @@
 // halo on the water and under a column of light that rises higher the rarer it is.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GPU, onSea, patch, tangents } from './common.ts';
+import { onSea, tangents } from './common.ts';
 import { beamNodeMaterial, tokenNodeMaterial } from './tsl/loot.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { SPRITE } from './particles.ts';
@@ -69,41 +69,6 @@ function centred(g: THREE.BufferGeometry): THREE.BufferGeometry {
   return g.translate(-c.x, -c.y, -c.z).scale(1.15, 1.15, 1.15);
 }
 
-const BEAM_VERT = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vC;
-varying vec3 vWp;
-varying vec3 vN;
-varying vec3 vAxis;
-void main() {
-  vUv = uv;
-  vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
-  vWp = wp.xyz;
-  vN = normalize(mat3(instanceMatrix) * vec3(position.x, 0.0, position.z));
-  vAxis = normalize(mat3(instanceMatrix) * vec3(0.0, 1.0, 0.0));
-  vC = instanceColor;
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}`;
-const BEAM_FRAG = /* glsl */ `
-uniform float uTime;
-varying vec2 vUv;
-varying vec3 vC;
-varying vec3 vWp;
-varying vec3 vN;
-varying vec3 vAxis;
-void main() {
-  float a = pow(clamp(1.0 - vUv.y, 0.0, 1.0), 2.2);
-  a *= 0.75 + 0.25 * sin(vUv.y * 40.0 - uTime * 6.0);
-  // a soft column: bright down the core, nothing at the rim
-  vec3 vd = normalize(cameraPosition - vWp);
-  vd = normalize(vd - vAxis * dot(vd, vAxis));
-  float core = abs(dot(normalize(vN), vd));
-  a *= core * core * 1.6;
-  // a marker for the distance; up close the token itself speaks
-  a *= smoothstep(10.0, 55.0, distance(cameraPosition, vWp));
-  gl_FragColor = vec4(vC * a, 0.0);
-}`;
-
 export class Loot {
   readonly group = new THREE.Group();
   private readonly tokens = new Map<LootKind, THREE.InstancedMesh>();
@@ -129,12 +94,7 @@ export class Loot {
             // mirror, it showed only its glow, a flat grey cutout on the water
             : { color: 0x58534c, roughness: 0.5, metalness: 0.45 };
       const glow = shieldy ? 0.6 : k === 'coin' ? 0.35 : 0.28;
-      const m = GPU.on ? tokenNodeMaterial(base, glow) : patch(new THREE.MeshStandardMaterial({ ...base, emissive: 0xffffff, emissiveIntensity: glow }), 'actor-token', (s) => {
-        s.fragmentShader = s.fragmentShader
-          .replace('#include <color_fragment>', '')
-          // the rarity's glow gathers at the edges, so it rims the token's shape instead of filling it in flat
-          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\ntotalEmissiveRadiance *= vColor;\n#endif\ntotalEmissiveRadiance *= 0.3 + 1.4 * pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0);');
-      });
+      const m = tokenNodeMaterial(base, glow);
       const mesh = new THREE.InstancedMesh(tokenGeometry(k, guns), m, CAP);
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
       mesh.count = 0;
@@ -143,10 +103,7 @@ export class Loot {
       this.group.add(mesh);
     }
     const bc = new THREE.CylinderGeometry(0.5, 0.8, 1, 12, 1, true).translate(0, 0.5, 0);
-    const bm = GPU.on ? beamNodeMaterial() : new THREE.ShaderMaterial({
-      vertexShader: BEAM_VERT, fragmentShader: BEAM_FRAG, uniforms: this.beamU, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
-    });
+    const bm = beamNodeMaterial();
     this.beams = new THREE.InstancedMesh(bc, bm, CAP);
     this.beams.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
     this.beams.count = 0;

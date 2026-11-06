@@ -41,14 +41,14 @@ export class Projectiles {
 
   constructor(fx: Effects) {
     this.fx = fx;
-    const metal = patch(new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 0.8, roughness: 0.35 }), 'actor-shot');
+    const metal = patch(new THREE.MeshStandardMaterial({ color: 0x2a2a2e, metalness: 0.8, roughness: 0.35 }));
     const bolt = new THREE.CylinderGeometry(0.09, 0.09, 4.2, 6).rotateX(Math.PI / 2);
     const tip = new THREE.ConeGeometry(0.28, 0.9, 6).rotateX(Math.PI / 2).translate(0, 0, 2.5);
     const barb = new THREE.ConeGeometry(0.2, 0.5, 4).rotateX(-Math.PI / 2).translate(0, 0, 1.9);
     this.bolts = new THREE.InstancedMesh(mergeGeos([bolt, tip, barb]), metal, CAP);
-    const hot = patch(new THREE.MeshStandardMaterial({ color: 0x1a1414, roughness: 0.5, emissive: 0xff5a10, emissiveIntensity: 2.5 }), 'actor-shell');
+    const hot = patch(new THREE.MeshStandardMaterial({ color: 0x1a1414, roughness: 0.5, emissive: 0xff5a10, emissiveIntensity: 2.5 }));
     this.shells = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 1), hot, CAP);
-    const iron = patch(new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.45, metalness: 0.6, emissive: 0xff7a30, emissiveIntensity: 0.6 }), 'actor-ball');
+    const iron = patch(new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.45, metalness: 0.6, emissive: 0xff7a30, emissiveIntensity: 0.6 }));
     this.balls = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.32, 1), iron, CAP * 2);
     for (const m of [this.bolts, this.shells, this.balls]) { m.count = 0; m.frustumCulled = false; this.group.add(m); }
     // the harpoon's line, paid out behind the bolt
@@ -56,7 +56,7 @@ export class Projectiles {
     const lg = new THREE.BufferGeometry();
     lg.setAttribute('position', new THREE.BufferAttribute(this.linePos, 3).setUsage(THREE.DynamicDrawUsage));
     lg.setDrawRange(0, 0);
-    this.lines = new THREE.LineSegments(lg, patch(new THREE.LineBasicMaterial({ color: 0x8a7556, transparent: true, opacity: 0.85 }), 'actor-line'));
+    this.lines = new THREE.LineSegments(lg, patch(new THREE.LineBasicMaterial({ color: 0x8a7556, transparent: true, opacity: 0.85 })));
     this.lines.frustumCulled = false;
     this.group.add(this.lines);
   }

@@ -15,7 +15,7 @@ import { CURRENTS, GREAT_CURRENT, REGION_COUNT, VORTEX } from '../../sim/world/i
 import { R } from '../../sim/sphere.ts';
 import { cubeFace } from '../gpu/cube.ts';
 import { FLOW_NODES } from './flowField.ts';
-import type { WeatherSystem } from '../weather.ts';
+import type { WeatherSystem } from '../stage.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;

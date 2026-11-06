@@ -12,7 +12,8 @@
 //   dir=<rad>      the direction hits on you come from (clockwise from ahead); default cycles
 //   clean=1        hide the dev panels (for captures)
 //   strip=1        manual clock for frame-strip capture: window.__juice.step(dt) advances one frame
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { abs, cameraPosition, color, dot, float, max, mix, normalWorld, normalize, positionLocal, positionWorld, pow, uniform } from 'three/tsl';
 import { Juice, RECIPES, RECIPE_IDS, effects, format, pressable, type FireContext, type RecipeId } from '../index.ts';
 import type { ParticleCall } from '../index.ts';
 import { ticker } from '../ticker.ts';
@@ -32,7 +33,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 // ------------------------------------------------------------------ the scene
 
 const canvas = $<HTMLCanvasElement>('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: STRIP });
+const renderer = new THREE.WebGPURenderer({ canvas, antialias: true });
+await renderer.init();
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -45,24 +47,14 @@ const LIGHTS = {
   dusk: { zenith: 0x1d2350, horizon: 0xff9560, sun: 0xffa060, dir: [-0.25, 0.1, -0.95], sky: 0x8a7aa8, ground: 0x2a1a20, sunI: 2.4, hemiI: 0.7, sea: 0x1a2740, exposure: 0.95 },
 };
 
-const skyU = { uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uSun: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3() } };
-const sky = new THREE.Mesh(
-  new THREE.SphereGeometry(6000, 32, 16),
-  new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: skyU,
-    vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform vec3 uZenith, uHorizon, uSun, uSunDir; varying vec3 vDir;
-      void main(){ vec3 d = normalize(vDir); float h = max(d.y, 0.0);
-        vec3 c = mix(uHorizon, uZenith, pow(h, 0.5)); float s = max(dot(d, normalize(uSunDir)), 0.0);
-        c += uSun * (pow(s, 900.0) * 30.0 + pow(s, 8.0) * 0.35);
-        gl_FragColor = vec4(c, 1.0);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`,
-  }),
-);
+const skyU = { uZenith: uniform(new THREE.Color()), uHorizon: uniform(new THREE.Color()), uSun: uniform(new THREE.Color()), uSunDir: uniform(new THREE.Vector3()) };
+const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+skyMat.colorNode = (() => {
+  const d = normalize(positionLocal), h = max(d.y, 0);
+  const s = max(dot(d, normalize(skyU.uSunDir)), 0);
+  return mix(skyU.uHorizon, skyU.uZenith, pow(h, 0.5)).add(skyU.uSun.mul(pow(s, 900).mul(30).add(pow(s, 8).mul(0.35))));
+})();
+const sky = new THREE.Mesh(new THREE.SphereGeometry(6000, 32, 16), skyMat);
 scene.add(sky);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
 const sun = new THREE.DirectionalLight(0xffffff, 2);
@@ -110,10 +102,13 @@ for (const [x, z, r, h] of [[-220, -420, 40, 1.4], [260, -560, 60, 0.7], [-520, 
   scene.add(rock, cap);
 }
 
-const auraVert = `varying vec3 vN; varying vec3 vV;
-  void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`;
-const auraFrag = `uniform vec3 uColor; uniform float uOn; varying vec3 vN; varying vec3 vV;
-  void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.2); gl_FragColor = vec4(uColor * (0.1 + f * 1.3) * uOn, 1.0); }`;
+/** A fresnel shell of light round a ship, as the game's shield draws it. */
+function auraMaterial(on: THREE.UniformNode<'float', number>): THREE.MeshBasicNodeMaterial {
+  const m = new THREE.MeshBasicNodeMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  const f = pow(float(1).sub(abs(dot(normalWorld, normalize(cameraPosition.sub(positionWorld))))), 2.2);
+  m.colorNode = color(0.25, 0.65, 1).mul(f.mul(1.3).add(0.1)).mul(on);
+  return m;
+}
 
 interface ShipRig {
   root: THREE.Group;
@@ -153,18 +148,8 @@ function makeShip(sail: number): ShipRig {
   const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.4, 1.2) }));
   lantern.position.set(0, 3.6, 7.4);
   body.add(lantern);
-  const aura = { value: 1 };
-  const shell = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 40, 20),
-    new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0.25, 0.65, 1) }, uOn: aura },
-      vertexShader: auraVert,
-      fragmentShader: auraFrag,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
+  const aura = uniform(1);
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 20), auraMaterial(aura));
   shell.scale.set(6.5, 8, 12.5);
   shell.position.y = 4;
   body.add(shell);

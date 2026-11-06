@@ -1,6 +1,7 @@
 // The beacons' dev page: all 16 by day, dusk or night, close up on a turntable or from 330 m away over the curve
-// of a 554 m planet at 8 m eye height (the chase camera's view). The HDR, bloom and ACES grade are a copy of the
-// rewrite's engine post, so glow levels tuned here carry over.
+// of a 554 m planet at 8 m eye height (the chase camera's view). On WebGPU like the planet: the cells are drawn into
+// one HDR target, then bloomed and graded (ACES) as one picture. The lamps shine at their daylight scale under every
+// light here, since nothing on this page adapts to the dark as the planet's exposure does.
 //
 // URL parameters:
 //   time=night|dusk|day   the light (default night); keys 1, 2, 3 switch it
@@ -8,7 +9,10 @@
 //   region=<RegionId>      one beacon full screen with orbit controls (view=far puts the camera 330 m off)
 //   t=<seconds>            freeze the clock (for screenshots); spin=0 stops the turntable
 //   seed=<n>               the build seed (default 1)
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { Fn, dot, floor, fract, luminance, max, mix, normalize, positionLocal, pow, select, smoothstep, step, texture, uniform, vec3, vec4 } from 'three/tsl';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import type { Node } from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { BEACON_LOOKS, beaconLight } from './index.ts';
 import type { BeaconLook } from './look.ts';
@@ -27,140 +31,52 @@ const NAMES: Record<RegionId, string> = {
   weepingIsle: 'the Weeping Isle', mangroveLabyrinth: 'the Mangrove Labyrinth', maelstrom: 'the Maelstrom',
 };
 
-// ---------------------------------------------------------------- the post: HDR target, bloom, ACES (from src/gfx/engine.ts)
-
-const FS_VERT = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
-const fs = (frag: string, uniforms: Record<string, THREE.IUniform>, additive = false) => new THREE.ShaderMaterial({
-  vertexShader: FS_VERT, fragmentShader: frag, uniforms, depthTest: false, depthWrite: false,
-  ...(additive ? { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendEquation: THREE.AddEquation } : { blending: THREE.NoBlending }),
-});
-const PREFILTER = /* glsl */ `uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uThreshold; varying vec2 vUv;
-void main() {
-  vec3 c = (texture(tSrc, vUv + uTexel * vec2(-1.0, -1.0)).rgb + texture(tSrc, vUv + uTexel * vec2(1.0, -1.0)).rgb
-          + texture(tSrc, vUv + uTexel * vec2(-1.0, 1.0)).rgb + texture(tSrc, vUv + uTexel * vec2(1.0, 1.0)).rgb) * 0.25;
-  if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0);
-  float br = max(c.r, max(c.g, c.b));
-  float soft = clamp(br - uThreshold + 0.5, 0.0, 1.0); soft = soft * soft * 0.5;
-  gl_FragColor = vec4(min(c * max(soft, br - uThreshold) / max(br, 1e-4), vec3(40.0)), 1.0);
-}`;
-const DOWN = /* glsl */ `uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
-void main() {
-  vec2 t = uTexel;
-  vec3 a = texture(tSrc, vUv + t * vec2(-2, -2)).rgb, b = texture(tSrc, vUv + t * vec2(0, -2)).rgb, c = texture(tSrc, vUv + t * vec2(2, -2)).rgb;
-  vec3 d = texture(tSrc, vUv + t * vec2(-2, 0)).rgb, e = texture(tSrc, vUv).rgb, f = texture(tSrc, vUv + t * vec2(2, 0)).rgb;
-  vec3 g = texture(tSrc, vUv + t * vec2(-2, 2)).rgb, h = texture(tSrc, vUv + t * vec2(0, 2)).rgb, i = texture(tSrc, vUv + t * vec2(2, 2)).rgb;
-  vec3 j = texture(tSrc, vUv + t * vec2(-1, -1)).rgb, k = texture(tSrc, vUv + t * vec2(1, -1)).rgb;
-  vec3 l = texture(tSrc, vUv + t * vec2(-1, 1)).rgb, m = texture(tSrc, vUv + t * vec2(1, 1)).rgb;
-  gl_FragColor = vec4(e * 0.125 + (a + c + g + i) * 0.03125 + (b + d + f + h) * 0.0625 + (j + k + l + m) * 0.125, 1.0);
-}`;
-const UP = /* glsl */ `uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uScatter; varying vec2 vUv;
-void main() {
-  vec2 t = uTexel;
-  vec3 s = texture(tSrc, vUv + t * vec2(-1, -1)).rgb + texture(tSrc, vUv + t * vec2(1, -1)).rgb
-         + texture(tSrc, vUv + t * vec2(-1, 1)).rgb + texture(tSrc, vUv + t * vec2(1, 1)).rgb;
-  s += (texture(tSrc, vUv + t * vec2(0, -1)).rgb + texture(tSrc, vUv + t * vec2(0, 1)).rgb
-      + texture(tSrc, vUv + t * vec2(-1, 0)).rgb + texture(tSrc, vUv + t * vec2(1, 0)).rgb) * 2.0;
-  s += texture(tSrc, vUv).rgb * 4.0;
-  gl_FragColor = vec4(s / 16.0 * uScatter, 1.0);
-}`;
-const COMPOSITE = /* glsl */ `uniform sampler2D tScene, tBloom; uniform float uExposure, uBloom, uSat, uContrast, uVignette; varying vec2 vUv;
-vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
-vec3 aces(vec3 c) {
-  const mat3 I = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
-  const mat3 O = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
-  return clamp(O * RRTAndODTFit(I * (c / 0.6)), 0.0, 1.0);
-}
-vec3 srgb(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
-void main() {
-  vec2 q = vUv - 0.5;
-  vec3 c = (texture(tScene, vUv).rgb + texture(tBloom, vUv).rgb * uBloom) * uExposure;
-  c = aces(c);
-  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  c = mix(vec3(l), c, uSat);
-  c = clamp((c - 0.5) * uContrast + 0.5, 0.0, 1.0);
-  c *= 1.0 - dot(q * vec2(1.25, 1.0), q * vec2(1.25, 1.0)) * uVignette;
-  gl_FragColor = vec4(srgb(clamp(c, 0.0, 1.0)), 1.0);
-}`;
+// ---------------------------------------------------------------- the post: one HDR target for every cell, bloom, ACES
 
 class Post {
-  private target!: THREE.WebGLRenderTarget;
-  private mips: THREE.WebGLRenderTarget[] = [];
-  private w = 0;
-  private h = 0;
-  private readonly quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
-  private readonly cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  private readonly fsScene = new THREE.Scene();
-  private readonly pre = fs(PREFILTER, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uThreshold: { value: 1.1 } });
-  private readonly down = fs(DOWN, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() } });
-  private readonly up = fs(UP, { tSrc: { value: null }, uTexel: { value: new THREE.Vector2() }, uScatter: { value: 0.85 } }, true);
-  readonly comp = fs(COMPOSITE, {
-    tScene: { value: null }, tBloom: { value: null }, uExposure: { value: 1 }, uBloom: { value: 0.6 }, uSat: { value: 1 },
-    uContrast: { value: 1.05 }, uVignette: { value: 0.45 },
-  });
+  readonly target = new THREE.RenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  readonly pipeline: THREE.RenderPipeline;
+  private readonly gain = uniform(0.6);
+  private readonly sat = uniform(1);
+  private readonly glow: ReturnType<typeof bloom>;
+  private readonly r: THREE.WebGPURenderer;
 
-  private readonly r: THREE.WebGLRenderer;
-
-  constructor(r: THREE.WebGLRenderer) {
+  constructor(r: THREE.WebGPURenderer) {
     this.r = r;
-    this.quad.frustumCulled = false;
-    this.fsScene.add(this.quad);
+    const scene = texture(this.target.texture) as unknown as Node<'vec4'>;
+    this.glow = bloom(scene, 1, 0.85, 1.1);
+    const c = scene.rgb.add((this.glow as unknown as Node<'vec4'>).rgb.mul(this.gain));
+    this.pipeline = new THREE.RenderPipeline(r);
+    // the grade's saturation, before the renderer's own exposure and ACES curve
+    this.pipeline.outputNode = vec4(mix(vec3(luminance(c)), c, this.sat), 1);
   }
 
-  private size(w: number, h: number): void {
-    if (w === this.w && h === this.h) return;
-    this.w = w; this.h = h;
-    this.target?.dispose();
-    this.target = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4, depthBuffer: true });
-    for (const m of this.mips) m.dispose();
-    this.mips = [];
-    let mw = w >> 1, mh = h >> 1;
-    for (let i = 0; i < 6 && mw > 4 && mh > 4; i++, mw >>= 1, mh >>= 1) this.mips.push(new THREE.WebGLRenderTarget(mw, mh, { type: THREE.HalfFloatType, depthBuffer: false }));
+  /** Readies the target for a frame of `w` × `h` drawing-buffer pixels, cleared. */
+  begin(w: number, h: number): void {
+    if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
+    this.target.scissorTest = false;
+    this.target.viewport.set(0, 0, w, h);
+    this.r.setRenderTarget(this.target);
+    this.r.setClearColor(0x000000, 1);
+    this.r.clear();
   }
 
-  private pass(m: THREE.ShaderMaterial, t: THREE.WebGLRenderTarget | null, clear = true): void {
-    this.quad.material = m;
-    this.r.setRenderTarget(t);
-    if (clear) this.r.clear(true, false, false);
-    this.r.render(this.fsScene, this.cam);
+  /** Draws one cell, (x, y, w, h) from the top left. */
+  cell(scene: THREE.Scene, camera: THREE.Camera, x: number, y: number, w: number, h: number): void {
+    this.target.viewport.set(x, y, w, h);
+    this.target.scissor.set(x, y, w, h);
+    this.target.scissorTest = true;
+    this.r.render(scene, camera);
   }
 
-  /** Renders the scene through bloom and the grade into the canvas rectangle (x, y, w, h) in drawing-buffer pixels. */
-  render(scene: THREE.Scene, camera: THREE.Camera, g: Grade, x: number, y: number, w: number, h: number): void {
-    const r = this.r;
-    this.size(w, h);
-    r.setScissorTest(false);
-    r.setRenderTarget(this.target);
-    r.setClearColor(0x000000, 1);
-    r.clear(true, true, false);
-    r.render(scene, camera);
-    const m = this.mips;
-    this.pre.uniforms.tSrc.value = this.target.texture;
-    this.pre.uniforms.uTexel.value.set(1 / w, 1 / h);
-    this.pre.uniforms.uThreshold.value = g.threshold;
-    this.pass(this.pre, m[0]);
-    for (let i = 1; i < m.length; i++) {
-      this.down.uniforms.tSrc.value = m[i - 1].texture;
-      this.down.uniforms.uTexel.value.set(1 / m[i - 1].width, 1 / m[i - 1].height);
-      this.pass(this.down, m[i]);
-    }
-    for (let i = m.length - 2; i >= 0; i--) {
-      this.up.uniforms.tSrc.value = m[i + 1].texture;
-      this.up.uniforms.uTexel.value.set(1 / m[i + 1].width, 1 / m[i + 1].height);
-      this.pass(this.up, m[i], false);
-    }
-    const u = this.comp.uniforms;
-    u.tScene.value = this.target.texture;
-    u.tBloom.value = m[0].texture;
-    u.uExposure.value = g.exposure;
-    u.uBloom.value = g.bloom;
-    u.uSat.value = g.sat;
-    this.quad.material = this.comp;
-    r.setRenderTarget(null);
-    r.setViewport(x, y, w, h);
-    r.setScissor(x, y, w, h);
-    r.setScissorTest(true);
-    r.render(this.fsScene, this.cam);
-    r.setScissorTest(false);
+  /** Blooms and grades the whole grid onto the canvas. */
+  end(g: Grade): void {
+    this.r.setRenderTarget(null);
+    this.r.toneMappingExposure = g.exposure;
+    this.gain.value = g.bloom;
+    this.sat.value = g.sat;
+    (this.glow as unknown as { threshold: { value: number } }).threshold.value = g.threshold;
+    this.pipeline.render();
   }
 }
 
@@ -186,30 +102,34 @@ const MOODS: Record<string, Mood> = {
   },
 };
 
-const SKY_VERT = /* glsl */ `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const SKY_FRAG = /* glsl */ `uniform vec3 uZenith, uHorizon, uSunDir, uSun; uniform float uStars, uNight; varying vec3 vDir;
-float h(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.x + p.y) * p.z); }
-void main() {
-  vec3 d = normalize(vDir);
-  float up = max(d.y, 0.0);
-  vec3 c = mix(uHorizon, uZenith, pow(up, 0.45));
-  if (d.y < 0.0) c = uHorizon * 0.6;
-  float s = max(dot(d, uSunDir), 0.0);
-  c += uSun * (pow(s, mix(1200.0, 4000.0, uNight)) * mix(30.0, 1.5, uNight) + pow(s, 12.0) * 0.25 * (1.0 - uNight * 0.8));
-  vec3 cell = floor(d * 380.0);
-  float st = step(0.9965, h(cell)) * h(cell + 7.0);
-  c += vec3(0.85, 0.9, 1.0) * st * uStars * 1.4 * smoothstep(0.0, 0.15, d.y);
-  gl_FragColor = vec4(c, 1.0);
-}`;
+const skyU = {
+  uZenith: uniform(new THREE.Color()), uHorizon: uniform(new THREE.Color()), uSunDir: uniform(new THREE.Vector3()),
+  uSun: uniform(new THREE.Color()), uStars: uniform(0), uNight: uniform(0),
+};
+const hash = (p: Node<'vec3'>): Node<'float'> => {
+  const a = fract(p.mul(vec3(0.1031, 0.103, 0.0973))).toVar();
+  a.addAssign(dot(a, a.yxz.add(33.33)));
+  return fract(a.x.add(a.y).mul(a.z));
+};
+/** A gradient from the horizon to the zenith, the sun's disc and glow, and stars by night. */
+const skyColour = Fn(() => {
+  const d = normalize(positionLocal), up = max(d.y, 0);
+  let c = select(d.y.lessThan(0), skyU.uHorizon.mul(0.6), mix(skyU.uHorizon, skyU.uZenith, pow(up, 0.45)));
+  const s = max(dot(d, skyU.uSunDir), 0), n = skyU.uNight;
+  c = c.add(skyU.uSun.mul(pow(s, mix(1200, 4000, n)).mul(mix(30, 1.5, n)).add(pow(s, 12).mul(0.25).mul(n.mul(-0.8).add(1)))));
+  const cell = floor(d.mul(380));
+  const star = step(0.9965, hash(cell)).mul(hash(cell.add(7)));
+  return c.add(vec3(0.85, 0.9, 1).mul(star).mul(skyU.uStars).mul(1.4).mul(smoothstep(0, 0.15, d.y)));
+});
 
 // ---------------------------------------------------------------- the scene
 
 const canvas = document.querySelector('canvas')!;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+await renderer.init();
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.autoClear = false;
-renderer.toneMapping = THREE.NoToneMapping;
-renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 const post = new Post(renderer);
@@ -225,12 +145,9 @@ const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
 const glowLight = new THREE.PointLight(0xffffff, 0, 160, 1.6);
 scene.add(sun, sun.target, hemi, glowLight);
 
-const skyU = {
-  uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3() },
-  uSun: { value: new THREE.Color() }, uStars: { value: 0 }, uNight: { value: 0 },
-};
-const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 24),
-  new THREE.ShaderMaterial({ vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, uniforms: skyU, side: THREE.BackSide, depthWrite: false, fog: false }));
+const skyMat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+skyMat.colorNode = skyColour();
+const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 24), skyMat);
 sky.renderOrder = -10;
 scene.add(sky);
 
@@ -261,10 +178,10 @@ function setMood(m: Mood): void {
   hemi.color.setHex(m.hemiSky);
   hemi.groundColor.setHex(m.hemiGround);
   hemi.intensity = m.hemiI;
-  skyU.uZenith.value.setHex(m.zenith);
-  skyU.uHorizon.value.setHex(m.horizon);
-  skyU.uSunDir.value.copy(dir);
-  skyU.uSun.value.setHex(m.sun);
+  (skyU.uZenith.value as THREE.Color).setHex(m.zenith);
+  (skyU.uHorizon.value as THREE.Color).setHex(m.horizon);
+  (skyU.uSunDir.value as THREE.Vector3).copy(dir);
+  (skyU.uSun.value as THREE.Color).setHex(m.sun);
   skyU.uStars.value = m.stars;
   skyU.uNight.value = m.night;
   seaMat.color.setHex(m.sea);
@@ -352,18 +269,14 @@ function frame(): void {
   const t = frozen ?? (performance.now() - start) / 1000;
   controls?.update();
   const W = renderer.domElement.width, H = renderer.domElement.height;
-  renderer.setScissorTest(false);
-  renderer.setRenderTarget(null);
-  renderer.setViewport(0, 0, W, H);
-  renderer.setClearColor(0x000000, 1);
-  renderer.clear();
+  post.begin(W, H);
   const cells = single ? [single] : built;
   const cols = single ? 1 : 4, rows = single ? 1 : 4;
   const cw = Math.floor(W / cols), ch = Math.floor(H / rows);
   for (const b of built) b.look.update(b.obj, t, mood.night);
   cells.forEach((b, i) => {
     for (const o of built) o.obj.visible = o === b;
-    const cx = (i % cols) * cw, cy = H - (Math.floor(i / cols) + 1) * ch;
+    const cx = (i % cols) * cw, cy = Math.floor(i / cols) * ch; // from the top left, as WebGPU counts
     camera.aspect = cw / ch;
     if (!single || view === 'far') {
       const turn = spin && frozen === null ? t * 0.12 : 0.5;
@@ -376,8 +289,9 @@ function frame(): void {
     glowLight.position.set(0, b.look.lightHeight, 0);
     glowLight.intensity = beaconLight(b.obj) * 600;
     sun.target.position.set(0, 0, 0);
-    post.render(scene, camera, mood.grade, cx, cy, cw, ch);
+    post.cell(scene, camera, cx, cy, cw, ch);
   });
+  post.end(mood.grade);
   hook.frames++;
   if (hook.frames > 3) hook.ready = true;
   requestAnimationFrame(frame);

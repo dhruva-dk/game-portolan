@@ -50,7 +50,7 @@ export class Effects {
     this.smoke = smoke;
     this.group.add(smoke.mesh, glow.mesh);
     // flotsam from sunk ships
-    const m = patch(new THREE.MeshStandardMaterial({ map: wood, color: 0x9a7b5a, roughness: 0.85 }), 'actor-plank');
+    const m = patch(new THREE.MeshStandardMaterial({ map: wood, color: 0x9a7b5a, roughness: 0.85 }));
     this.plankMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.18, 2.4), m, 220);
     this.plankMesh.count = 0;
     this.plankMesh.frustumCulled = false;

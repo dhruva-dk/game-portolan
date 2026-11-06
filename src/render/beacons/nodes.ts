@@ -1,10 +1,10 @@
-// The beacon kit's shaders as nodes, for the WebGPU planet: its noise, its rhythms, and the three kinds of material a
-// beacon is made of (lit surfaces with glow, billboard particles and painted surfaces), each taking a look's TSL in
-// place of its GLSL. A look hands each a function of what its GLSL had in scope (the clock, the point in the beacon's
-// own frame, the seeds) and gets back what the GLSL set.
+// The beacon kit's shaders as nodes: its noise, its rhythms, and the three kinds of material a beacon is made of (lit
+// surfaces with glow, billboard particles and painted surfaces), each taking a look's TSL. A look hands each a
+// function of what is in scope (the clock, the point in the beacon's own frame, the seeds) and gets back the colour,
+// the glow, the motion or the shape.
 //
-// What differs from GL is the light. A glow is given as it reads against a lit deck and set at the lamps' scale, so an
-// eye adapted to noon or to moonlight sees it as GL's fixed exposure did; additive light is dimmed by the air between
+// A glow is given as it reads against a lit deck and set at the lamps' scale, so an eye adapted to noon or to
+// moonlight sees it the same; additive light is dimmed by the air between
 // it and the eye but has no haze added over it; and the matter of smoke, mist and falling water is lit as a thin cloud
 // by the sun and moon through the air and by the sky round it, instead of by a flat day colour.
 import {
@@ -109,7 +109,7 @@ function airLoss(): V3 {
 // ---------------------------------------------------------------- lit surfaces
 
 /** What a lit surface's fragment TSL has to hand: the point and its normal in the beacon's frame (after any instance's
- *  matrix), the clock, the fresnel term the GLSL's emissive had, and the colour so far. */
+ *  matrix), the clock, a fresnel term, and the colour so far. */
 export interface LitCtx extends Clocked { local: V3; ln: V3; fres: F; colour: V3 }
 
 export interface LitNodes {
@@ -117,7 +117,7 @@ export interface LitNodes {
   vertexNode?: (c: Clocked & { p: V3 }) => V3;
   /** The surface's colour. */
   albedoNode?: (c: LitCtx) => V3;
-  /** The light it gives off, as the GLSL's emissive was (it is set at the lamps' scale here). */
+  /** The light it gives off (set at the lamps' scale). */
   emissiveNode?: (c: LitCtx) => V3;
   /** Its roughness, from the material's. */
   roughNode?: (c: LitCtx & { rough: F }) => F;

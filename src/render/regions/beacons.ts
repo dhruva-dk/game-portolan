@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { R } from '../../sim/sphere.ts';
 import { BEACONS, REGIONS, heightAt } from '../../sim/world/index.ts';
 import { BEACON_LOOKS, placeBeacon, type BeaconLook } from '../beacons/index.ts';
-import { patchAll } from '../engine.ts';
 
 interface Placed {
   obj: THREE.Object3D;
@@ -16,8 +15,7 @@ export class Beacons {
   readonly group = new THREE.Group();
   private readonly placed: Placed[] = [];
 
-  /** `gpu`: built for the WebGPU planet, whose materials take the planet's light and air as they are. */
-  constructor(seed = 1, gpu = false) {
+  constructor(seed = 1) {
     this.group.name = 'beacons';
     BEACONS.forEach((b, i) => {
       const look = BEACON_LOOKS[REGIONS[b.region].id], ground = Math.max(0, heightAt(b.pos));
@@ -26,8 +24,6 @@ export class Beacons {
       this.group.add(obj);
       this.placed.push({ obj, look, up: new THREE.Vector3(b.pos.x, b.pos.y, b.pos.z).normalize() });
     });
-    // the beacon library's own materials get the planet's light and air too
-    if (!gpu) patchAll(this.group);
   }
 
   /** t: seconds; night: 0 day to 1 night where the camera is. Given the sun, each beacon is lit by the night where

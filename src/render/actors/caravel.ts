@@ -8,9 +8,8 @@
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
-import { GPU, patch, type ActorTextures } from './common.ts';
+import { type ActorTextures } from './common.ts';
 import { hullNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
-import { sharedUniforms } from '../planet.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
 
@@ -490,126 +489,6 @@ function sailGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-const SAIL_VERT_HEAD = /* glsl */ `
-attribute float aKind;
-attribute vec2 aPlane;
-attribute vec3 aRig;
-uniform float uFill, uSide, uBoom, uLuff, uFlag;
-${sharedUniforms('float', 'uTime')}
-varying vec2 vSailUv;
-varying vec2 vPlane;
-varying float vKind;
-varying float vSize;
-varying vec2 vNdc;
-varying vec3 vSailW;
-`;
-const SAIL_VERT = /* glsl */ `
-vSailUv = uv;
-vPlane = aPlane;
-vKind = aKind;
-vSize = aRig.y;
-float u = uv.x, v = uv.y;
-if (aKind < 1.5) {
-  // a lateen (0) or its yard (1): hung on the lee side of the mast, the cloth bellying out between yard and foot and
-  // flogging when she is slow, the whole swinging round the mast with the sheet
-  float belly = aKind < 0.5 ? sin(3.14159 * v) * (0.3 + 0.7 * sin(3.14159 * pow(u, 0.75))) * aRig.y * 0.13 : 0.0;
-  float flog = aKind < 0.5 ? sin(uTime * 9.0 + u * 9.0 + v * 4.0) * 0.16 * u * (1.0 - v) * uLuff : 0.0;
-  transformed.x += uSide * (0.38 + belly * uFill) + flog;
-  float a = uBoom * aRig.z, c = cos(a), s = sin(a);
-  vec2 rz = vec2(transformed.x, transformed.z - aRig.x);
-  transformed.x = rz.x * c + rz.y * s;
-  transformed.z = -rz.x * s + rz.y * c + aRig.x;
-} else {
-  // the pennants (2) and the ensign (3) stream down the wind that she feels, swung round their staffs
-  float w = aKind < 2.5
-    ? sin(uTime * 7.0 - u * 7.0) * 0.35 * u + sin(uTime * 11.0 - u * 13.0) * 0.12 * u
-    : sin(uTime * 5.5 - u * 5.0) * 0.3 * u + sin(uTime * 9.0 - u * 9.0 + v * 2.0) * 0.08 * u;
-  transformed.x += w;
-  transformed.y -= u * u * (aKind < 2.5 ? 0.4 : 0.25);
-  float c = cos(uFlag), s = sin(uFlag);
-  vec2 rz = vec2(transformed.x, transformed.z - aRig.x);
-  transformed.x = rz.x * c + rz.y * s;
-  transformed.z = -rz.x * s + rz.y * c + aRig.x;
-}
-`;
-
-/** The cloth's normals turned with it: the lateens round their masts, the flags round their staffs. */
-const SAIL_NORMAL = /* glsl */ `
-{
-  float a = aKind < 1.5 ? uBoom * aRig.z : uFlag, c = cos(a), s = sin(a);
-  objectNormal = vec3(objectNormal.x * c + objectNormal.z * s, objectNormal.y, -objectNormal.x * s + objectNormal.z * c);
-}
-`;
-
-const SAIL_FRAG_HEAD = /* glsl */ `
-uniform sampler2D uLinen, uSailNoise, uEmblemAtlas;
-uniform vec3 uSailA, uSailB, uTrimC;
-uniform vec4 uEmblemRect;
-uniform float uPattern, uEmblem, uDamage, uFade;
-varying vec2 vSailUv;
-varying vec2 vPlane;
-varying float vKind;
-varying float vSize;
-varying vec2 vNdc;
-varying vec3 vSailW;
-const float BAYER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
-// the emblem's roundel: r the field, g the charge, b the ink
-vec3 emblemAt(vec2 p) {
-  vec2 q = p / 0.3 * 0.5 + 0.5;
-  if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) return vec3(0.0);
-  return texture2D(uEmblemAtlas, uEmblemRect.xy + q * uEmblemRect.zw).rgb;
-}
-`;
-const SAIL_FRAG = /* glsl */ `
-vec2 su = vSailUv, sp = vPlane;
-float k = vKind;
-vec3 sc;
-if (k > 0.5 && k < 1.5) {
-  // the yards: oiled spars
-  sc = vec3(0.13, 0.085, 0.05) * (0.8 + 0.4 * texture2D(uLinen, su * vec2(6.0, 1.0)).r);
-} else {
-  vec3 lin = texture2D(uLinen, sp * vSize * 0.3).rgb;
-  vec3 base = k > 1.5 ? uSailB : uSailA;
-  float m = sp.y * vSize;
-  if (k < 0.5) {
-    if (uPattern > 0.5 && uPattern < 1.5) base = mod(floor(m / 2.4 + 0.5), 2.0) < 0.5 ? uSailA : uSailB;
-    else if (uPattern > 1.5 && uPattern < 2.5) base = su.x > 0.8 || su.y < 0.1 ? uSailB : uSailA;
-    else if (uPattern > 2.5 && uPattern < 3.5) base = abs(sp.x) < 0.14 ? uSailB : uSailA;
-    else if (uPattern > 3.5 && uPattern < 4.5) base = (sp.x > 0.0) == (sp.y > 0.0) ? uSailB : uSailA;
-    else if (uPattern > 4.5) base = mod(floor((sp.y - abs(sp.x) * 0.8) * vSize / 2.2), 2.0) < 0.5 ? uSailA : uSailB;
-  }
-  sc = base * (0.62 + 0.55 * lin);
-  // the emblem, on the lateens and the ensign: its roundel in the trim, the charge in the second colour, inked
-  if ((k < 0.5 || k > 2.5) && uEmblem > -0.5) {
-    vec2 ep = (sp - vec2(0.0, k < 0.5 ? 0.12 : 0.0)) * (k < 0.5 ? 1.0 : 0.62);
-    vec3 e = emblemAt(ep);
-    vec3 field = mix(uTrimC, base, 0.35) * (0.7 + 0.4 * lin);
-    vec3 charge = (k < 0.5 ? uSailB : uSailA) * (0.7 + 0.4 * lin);
-    if (dot(charge - field, charge - field) < 0.02) charge = vec3(0.08);
-    sc = mix(sc, field, e.r * 0.92);
-    sc = mix(sc, charge, e.g);
-    sc = mix(sc, vec3(0.05, 0.04, 0.035), e.b * 0.85);
-  }
-  // the cloths' seams run down the sail; bolt-ropes round the edges
-  if (k < 0.5) sc *= 1.0 - 0.13 * smoothstep(0.05, 0.0, abs(fract(sp.x * vSize / 0.95) - 0.5) - 0.44);
-  float hem = k < 0.5 ? min(min(su.y, 1.0 - su.y) * 6.0, 1.0 - su.x) : min(min(su.x, 1.0 - su.x), min(su.y, 1.0 - su.y));
-  sc *= mix(0.68, 1.0, smoothstep(0.0, 0.03, hem));
-}
-// shot through: holes grow with damage, their edges scorched
-float hn = texture2D(uSailNoise, sp * vec2(0.7, 1.1) + vKind * 0.37).r;
-float cut = (k > 0.5 && k < 1.5) ? -1.0 : uDamage * 0.62 - 0.05;
-if (hn < cut) discard;
-sc *= mix(1.0, 0.25, smoothstep(cut + 0.06, cut, hn) * step(0.0, cut));
-// the player's own sail thins where it would hide the way ahead
-// (round the crosshair only, so the rest of the rig stays solid)
-if (uFade > 0.0) {
-  ivec2 fc = ivec2(mod(gl_FragCoord.xy, 4.0));
-  float f = uFade * (1.0 - smoothstep(0.16, 0.5, length(vNdc * vec2(1.0, 0.75))));
-  if ((BAYER[fc.x + fc.y * 4] + 0.5) / 16.0 < f) discard;
-}
-diffuseColor.rgb = sc;
-`;
-
 // ---------------------------------------------------------------- turrets
 
 /** Each turret: a swivel base and a barrel that pitches; `muzzle` is the barrel's tip in barrel space. */
@@ -681,85 +560,6 @@ export function turretGeometry(kind: Weapon): { base: THREE.BufferGeometry; barr
   return { base: base.build(), barrel: barrel.build(), pivot, muzzle };
 }
 
-// ---------------------------------------------------------------- materials
-
-const BODY_HEAD = /* glsl */ `
-uniform vec3 uHull, uAccent, uTrim, uWisp;
-uniform float uHit, uDamage;
-uniform vec3 uHitAt;
-${sharedUniforms('float', 'uNight', 'uTime')}
-uniform sampler2D uDeckMap, uDeckN, uDmgNoise;
-varying float vPart;
-varying float vAux;
-varying vec3 vLP;
-float bPart; float bRough; float bMetal; float bNs;
-`;
-const BODY_MAP = /* glsl */ `
-bPart = floor(vPart + 0.5);
-vec3 wood = texture2D(map, vMapUv).rgb;
-float lum = dot(wood, vec3(0.3, 0.55, 0.15));
-vec3 col = wood; bRough = 0.75; bMetal = 0.0; bNs = 1.0;
-vec3 emit = vec3(0.0);
-if (bPart < 0.5 || bPart == 2.0 || bPart == 6.0) {
-  // lacquer over planks: the grain shows through the gloss
-  vec3 lac = bPart == 6.0 ? uAccent : uHull;
-  col = lac * (0.55 + 1.3 * lum);
-  bRough = 0.32 + lum * 0.3;
-  if (bPart == 2.0) { col *= 0.7; bRough = 0.6; }
-  if (bPart < 0.5) {
-    // vAux is the height over the main deck's line, so the paint follows the sheer
-    float h = vAux, wl = vLP.y;
-    // the gun deck's band between the wales, in the accent
-    float band = smoothstep(-0.36, -0.33, h) * (1.0 - smoothstep(0.86, 0.89, h));
-    col = mix(col, uAccent * (0.55 + 1.3 * lum), band);
-    // the castles' sides: a gilt lattice over the lacquer
-    float q = vLP.z + vLP.x;
-    vec2 dl = fract(vec2(q + h * 1.3, q - h * 1.3) * 0.5) - 0.5;
-    float gold = smoothstep(0.98, 1.04, h) * smoothstep(0.035, 0.0, min(abs(dl.x), abs(dl.y))) * 0.85;
-    // gilt mouldings: one under the band, one at the water
-    gold += smoothstep(0.035, 0.0, abs(h + 0.5)) + smoothstep(0.045, 0.0, abs(wl - ${(WL + 0.05).toFixed(2)}));
-    col = mix(col, uTrim, clamp(gold, 0.0, 1.0));
-    bMetal = clamp(gold, 0.0, 1.0) * 0.9;
-    // below the water: dark copper sheathing
-    float bottom = smoothstep(${(WL - 0.02).toFixed(2)}, ${(WL - 0.06).toFixed(2)}, wl);
-    col = mix(col, vec3(0.13, 0.17, 0.15) * (0.5 + lum), bottom);
-    bRough = mix(bRough, 0.55, bottom);
-  }
-} else if (bPart == 1.0) { col = uTrim; bMetal = 0.95; bRough = 0.28; bNs = 0.0; }
-else if (bPart == 3.0) { col = texture2D(uDeckMap, vMapUv).rgb * vec3(1.05, 0.95, 0.85); bRough = 0.7; }
-else if (bPart == 7.0) { col = wood * vec3(0.55, 0.45, 0.38); bRough = 0.8; }
-else if (bPart == 8.0) { col = vec3(0.16, 0.12, 0.09); bRough = 0.95; bNs = 0.0; }
-else if (bPart == 9.0) { col = vec3(0.045, 0.035, 0.03) * (0.6 + lum); bRough = 0.45; }
-else if (bPart == 14.0) {
-  // windows, lit by the wisp and a warmer lamp behind
-  col = vec3(0.02); bRough = 0.15; bNs = 0.0;
-  float flick = 0.9 + 0.1 * sin(uTime * 5.0 + vLP.x * 4.0 + vLP.z);
-  emit += (uWisp * (0.45 + 2.2 * uNight) + vec3(1.0, 0.55, 0.22) * (0.2 + 0.9 * uNight)) * flick;
-}
-else if (bPart == 11.0) {
-  col = uWisp * 0.4; bRough = 0.6; bNs = 0.0;
-  float flick = 0.85 + 0.15 * sin(uTime * 7.0 + vLP.y * 3.0) * sin(uTime * 3.1);
-  emit += uWisp * (1.6 + 3.0 * uNight) * flick;
-}
-else if (bPart == 12.0) { col = vec3(0.62, 0.42, 0.22) * (0.8 + 0.4 * lum); bMetal = 1.0; bRough = 0.32; bNs = 0.3; }
-else if (bPart == 13.0) { col = vec3(0.08, 0.085, 0.09); bMetal = 0.7; bRough = 0.45; bNs = 0.3; }
-// scorched where she has been hurt, embers in the worst of it
-if (uDamage > 0.0 && bPart != 11.0) {
-  float dn = texture2D(uDmgNoise, vLP.xz * 0.11 + vLP.y * 0.07).r * 0.7 + texture2D(uDmgNoise, vLP.zy * 0.3).g * 0.3;
-  float ch = smoothstep(1.02 - uDamage * 0.75, 1.1 - uDamage * 0.75, dn);
-  col *= 1.0 - ch * 0.82;
-  bRough = mix(bRough, 0.95, ch);
-  emit += vec3(1.0, 0.32, 0.06) * pow(ch, 6.0) * uDamage * (1.5 + sin(uTime * 5.0 + dn * 20.0));
-}
-// struck: a hot glow where the shot went in, and the rest of her lit a moment in her own colours. A flat white
-// over the whole ship washed her out against the haze, as if she had gone see-through
-float struck = smoothstep(4.5, 0.0, distance(vLP, uHitAt));
-emit += (col * 0.5 + vec3(1.0, 0.45, 0.15) * 1.8 * struck * struck) * uHit;
-diffuseColor.rgb = col;
-totalEmissiveRadiance += emit;
-`;
-
-
 interface Uniforms { [k: string]: THREE.IUniform }
 
 /** Ragged holes for shot-through sails, from the shared noise. */
@@ -819,44 +619,6 @@ export class Kit {
       this.emblems.set(id, t);
     }
     return t;
-  }
-  bodyMaterial(u: Uniforms): THREE.MeshStandardMaterial {
-    const m = new THREE.MeshStandardMaterial({ map: this.tex.hull_d, normalMap: this.tex.hull_n, roughness: 0.7, metalness: 0, envMap: this.envMap, envMapIntensity: 1 });
-    m.normalScale.set(0.8, 0.8);
-    return patch(m, 'actor-ship-body', (s) => {
-      Object.assign(s.uniforms, u);
-      s.vertexShader = s.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aPart;\nattribute float aAux;\nvarying float vPart;\nvarying float vAux;\nvarying vec3 vLP;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPart = aPart;\nvAux = aAux;\nvLP = position;');
-      s.fragmentShader = s.fragmentShader
-        .replace('#include <common>', '#include <common>\n' + BODY_HEAD)
-        .replace('#include <map_fragment>', BODY_MAP)
-        .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = bRough;')
-        .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = bMetal;')
-        .replace('#include <normal_fragment_maps>', /* glsl */ `
-          vec3 mapN = (bPart == 3.0 ? texture2D(uDeckN, vNormalMapUv).xyz : texture2D(normalMap, vNormalMapUv).xyz) * 2.0 - 1.0;
-          mapN.xy *= normalScale * bNs;
-          normal = normalize(tbn * mapN);`);
-    });
-  }
-  sailMaterial(u: Uniforms): THREE.MeshStandardMaterial {
-    const m = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, side: THREE.DoubleSide, envMap: this.envMap, envMapIntensity: 0.4 });
-    return patch(m, 'actor-ship-sail', (s) => {
-      Object.assign(s.uniforms, u);
-      s.vertexShader = s.vertexShader
-        .replace('#include <common>', '#include <common>\n' + SAIL_VERT_HEAD)
-        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n' + SAIL_NORMAL)
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SAIL_VERT)
-        .replace('#include <project_vertex>', '#include <project_vertex>\nvNdc = gl_Position.xy / gl_Position.w;\nvSailW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-      s.fragmentShader = s.fragmentShader
-        .replace('#include <common>', '#include <common>\n' + SAIL_FRAG_HEAD + '\nuniform vec3 uSunColor;\n' + sharedUniforms('vec3', 'uSunDir'))
-        .replace('#include <map_fragment>', SAIL_FRAG)
-        .replace('#include <opaque_fragment>', /* glsl */ `
-          // light through the cloth
-          vec3 vd = normalize(vSailW - cameraPosition);
-          outgoingLight += diffuseColor.rgb * uSunColor * pow(max(dot(vd, uSunDir), 0.0), 2.0) * 0.55;
-          #include <opaque_fragment>`);
-    });
   }
 }
 
@@ -927,8 +689,8 @@ export class ShipModel {
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
     };
-    const body = GPU.on ? hullNodeMaterial(this.u, kit.tex) : kit.bodyMaterial(this.u);
-    const sail = GPU.on ? sailNodeMaterial(this.u, kit.tex, kit.sailNoise) : kit.sailMaterial(this.u);
+    const body = hullNodeMaterial(this.u, kit.tex);
+    const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise);
     const hull = this.hull = new THREE.Mesh(kit.hull, body);
     hull.castShadow = hull.receiveShadow = true;
     this.head = new THREE.Mesh(kit.figurehead(look.figurehead), body);
@@ -937,15 +699,7 @@ export class ShipModel {
     sails.castShadow = true;
     sails.receiveShadow = true;
     this.mats = [body, sail];
-    // the node material's own motion and holes are used for its shadow; the GLSL needs a depth material of its own
-    if (!GPU.on) {
-      const depth = patch(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide }), 'actor-ship-sail-depth', (s) => {
-        Object.assign(s.uniforms, this.u);
-        s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + SAIL_VERT_HEAD).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SAIL_VERT);
-      });
-      sails.customDepthMaterial = depth;
-      this.mats.push(depth);
-    }
+    // the node material's own motion and holes are used for its shadow
     this.turretBase = new THREE.Mesh(undefined, body);
     this.barrelMesh = new THREE.Mesh(undefined, body);
     this.turretBase.castShadow = this.barrelMesh.castShadow = true;

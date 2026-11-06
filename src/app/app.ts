@@ -7,12 +7,8 @@ import { EffectLog } from './effects.ts';
 import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
-import { DebugStage } from './debugStage.ts';
-import { Stage, type StageView } from '../render/stage.ts';
 import { GpuStage } from '../render/gpu/stage.ts';
-import { QUALITY, U } from '../render/engine.ts';
-import { sunDirection } from '../render/sky.ts';
-import { waveHeight } from '../render/swell.ts';
+import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
 import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
@@ -21,7 +17,6 @@ import { PHASE, PLAYER, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.t
 import { WEATHER } from '../sim/tables.ts';
 import { REGIONS } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
-import type { CameraRig } from '../render/camera.ts';
 import { Controls } from './controls.ts';
 import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
@@ -33,7 +28,7 @@ import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } fr
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { CareerHolder } from './career.ts';
 import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivalsModel } from './models.ts';
-import { QUALITY_PRESET, SettingsHolder } from './settings.ts';
+import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { titleScreen, type TitleView } from '../ui/screens/title.ts';
@@ -48,16 +43,11 @@ import { el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
   CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
 } from '../ui/model.ts';
-import type { Quality as StageQuality } from '../render/engine.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
   capture: boolean;
-  /** Draw the plain debug globe instead of the planet's renderer. */
-  debugStage?: boolean;
-  /** Draw the planet on WebGPU (?gpu), while it moves across from WebGL. */
-  gpu?: boolean;
   /** Log the frame rate, the worst frame and what was drawn every few seconds (the iOS build's log, ?perflog). */
   perfLog?: boolean;
   /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
@@ -67,24 +57,6 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
-
-/** What the app needs of a stage: the planet's renderer, or the debug globe standing in for it. */
-export interface AppStage {
-  readonly scene: THREE.Scene;
-  readonly camera: THREE.PerspectiveCamera;
-  /** The planet's camera rig and its after-placement hook; the debug globe has neither. */
-  readonly rig?: CameraRig;
-  onCamera?: ((cam: THREE.PerspectiveCamera) => void) | null;
-  frame(v: StageView, dt: number): void;
-  resize(): void;
-  snap(): void;
-  settled(): Promise<void>;
-  stats(): { tris: number; calls: number; fps: number; scale: number; chunks: number; pending: number };
-  /** The renderer's quality, from the settings; the debug globe has only one. */
-  setQuality?(q: StageQuality): void;
-  /** The swell the stage draws, for the hulls to ride: metres over sea level at p. The WebGL swell when absent. */
-  wave?: (p: V3, t: number) => number;
-}
 
 const VERSION = 'Portolan · pass 1';
 
@@ -100,7 +72,7 @@ export class App {
   /** First-time tips, and the card they show on over the Gale and the HUD. */
   readonly tips: Tips;
   private readonly tip: TipCardHandle;
-  stage: AppStage | null = null;
+  stage: GpuStage | null = null;
   actors: Actors | null = null;
   readonly overlay: HTMLElement;
   /** Thumbs, mouse and keys in a match, on a layer under the interface. */
@@ -160,13 +132,13 @@ export class App {
 
   /** Changes some settings, saves them, and applies them everywhere at once. */
   setSettings(s: Partial<Settings>): Settings {
-    const before = this.settings.settings.quality, next = this.settings.set(s);
-    this.applySettings(next.quality !== before);
+    const next = this.settings.set(s);
+    this.applySettings();
     return next;
   }
 
-  /** The settings into the sound, the juice, the controls, the session and (when it changed) the renderer. */
-  private applySettings(quality = false): void {
+  /** The settings into the sound, the juice, the controls and the session. */
+  private applySettings(): void {
     const s = this.settings.settings;
     this.audio.setVolumes({ master: s.master, effects: s.effects, ambience: s.ambience, interface: s.interface });
     this.juice.settings({ shake: s.shake, haptics: s.haptics });
@@ -175,7 +147,6 @@ export class App {
     this.controls.lefty = s.leftHanded;
     if (this.session) this.session.autoFire = s.autoFire;
     this.uiLayer.dataset.hand = s.leftHanded ? 'left' : 'right';
-    if (quality) this.stage?.setQuality?.(QUALITY[QUALITY_PRESET[s.quality]]);
   }
 
   start(): void {
@@ -190,16 +161,14 @@ export class App {
       this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
       this.title?.setProgress(this.progress.f, this.progress.what);
     };
-    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas)
-      : this.options.gpu ? await GpuStage.create(this.canvas, report)
-      : await Stage.create(this.canvas, QUALITY[QUALITY_PRESET[this.settings.settings.quality]], report);
+    const stage = await GpuStage.create(this.canvas, report);
     this.stage = stage;
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave ?? waveHeight, uniforms: U, gpu: stage instanceof GpuStage, overlay: stage instanceof GpuStage ? stage.overlay : undefined, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
+    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;
     await rockTexturesReady();
@@ -586,7 +555,7 @@ export class App {
   }
 
   /** One frame of a match: the controls into the session, the actors and the planet drawn, the screens kept in step. */
-  private matchFrame(s: Session, f: Frame, stage: AppStage, actors: Actors): void {
+  private matchFrame(s: Session, f: Frame, stage: GpuStage, actors: Actors): void {
     this.log.tick = s.state.tick;
     s.control(this.controls.read(), f.realDt);
     if (stage.rig) {
@@ -726,7 +695,7 @@ export class App {
   }
 
   /** The listener rides the camera every frame; the sea's beds follow what is around it ten times a second. */
-  private hear(stage: AppStage, dt: number, mix: () => AmbienceMix): void {
+  private hear(stage: GpuStage, dt: number, mix: () => AmbienceMix): void {
     const cam = stage.camera, e = this.ear;
     cam.getWorldDirection(e.fwd);
     e.up.set(0, 1, 0).applyQuaternion(cam.quaternion);

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
-import { AU, GPU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
+import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
@@ -37,10 +37,6 @@ export interface ActorsOptions {
   wave?: WaveFn;
   /** An environment map for the hull's varnish and the sails. */
   envMap?: THREE.Texture | null;
-  /** The stage's shared uniforms (the planet's light and air), given to every actor material along with the actors' own. */
-  uniforms?: Record<string, THREE.IUniform>;
-  /** Drawn by the WebGPU planet: the actors take their node materials. */
-  gpu?: boolean;
   /** Where things written on the screen (the damage numbers) go, if the stage draws them over the finished frame;
    *  with the rest of the actors when absent. */
   overlay?: THREE.Object3D;
@@ -111,11 +107,9 @@ interface Marker { at: THREE.Vector3; m: HitMarker }
 
 export function createActors(scene: THREE.Object3D, options: ActorsOptions = {}): Actors {
   SEA.radius = options.radius ?? 554;
-  GPU.on = options.gpu ?? false;
   // the swell, on the water the regions' events have raised or drawn down
   const wave = options.wave ?? sea.wave;
   sea.wave = (p, t) => wave(p, t) + seaLift(p);
-  Object.assign(STAGE_U, options.uniforms ?? {});
   const tex = loadTextures(options.textureBase ?? TEX_BASE);
   const kit = new Kit(tex);
   kit.envMap = options.envMap ?? null;

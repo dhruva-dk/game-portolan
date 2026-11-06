@@ -1,9 +1,9 @@
 // Flora C's kit: what the Glass Sea, Jade Shoals, Coral Atolls and Spice Isles plants are built from.
-// A seeded random stream, a geometry builder (tubes, strips, leaf cards), wind-swayed materials over scanned
-// or painted textures, and helpers to wrap a plant in LODs or instance it hundreds of times.
+// A seeded random stream, a geometry builder (tubes, strips, leaf cards) and materials over scanned or painted
+// textures, tagged with how the wind or the swell moves them (flora/nodes.ts moves them so on the GPU).
 //
 // Every plant is built in its own frame: metres, +Y up from the ground at the origin. The integration step
-// turns +Y to the sphere's local up. Wind is three shared uniforms (WIND), set once a frame for every plant.
+// turns +Y to the sphere's local up.
 import * as THREE from 'three';
 import { tag, type FloraTag } from './tag.ts';
 
@@ -62,84 +62,6 @@ export function hsl(h: number, s: number, l: number): THREE.Color {
 }
 export const mix = (a: THREE.Color, b: THREE.Color, t: number): THREE.Color => a.clone().lerp(b, t);
 
-// ---------------------------------------------------------------- wind
-
-/** Shared by every plant material. Direction is in world space; strength is 0 (calm) to 1 (a gale). */
-export const WIND = {
-  uWindDir: { value: V(1, 0, 0) },
-  uWindStrength: { value: 0.35 },
-  uTime: { value: 0 },
-};
-
-export function setWind(dir: THREE.Vector3, strength: number): void {
-  WIND.uWindDir.value.copy(dir).normalize();
-  WIND.uWindStrength.value = strength;
-}
-export function tickWind(seconds: number): void {
-  WIND.uTime.value = seconds;
-}
-
-// aSway: metres a point leans at full strength (the whole plant bends). aFlutter: metres a leaf flaps along its normal.
-const WIND_HEAD = /* glsl */ `
-attribute float aSway;
-attribute float aFlutter;
-uniform vec3 uWindDir;
-uniform float uWindStrength;
-uniform float uTime;
-`;
-const WIND_BODY = /* glsl */ `
-{
-  mat4 wm = modelMatrix;
-  #ifdef USE_INSTANCING
-  wm = wm * instanceMatrix;
-  #endif
-  vec3 wo = wm[3].xyz;
-  float ph = dot(wo, vec3(0.137, 0.091, 0.113));
-  // the world wind turned into the plant's own frame, flattened onto its ground
-  vec3 wl = transpose(mat3(wm)) * uWindDir;
-  wl.y = 0.0;
-  wl = dot(wl, wl) > 1e-8 ? normalize(wl) : vec3(1.0, 0.0, 0.0);
-  vec3 ws = vec3(-wl.z, 0.0, wl.x);
-  float s = uWindStrength;
-  #ifdef FLORA_SURGE
-  // under water the swell rocks soft corals to and fro, with no steady lean
-  float surge = sin(uTime * 0.9 + ph) + 0.35 * sin(uTime * 2.3 + ph * 1.7);
-  transformed += (wl * surge + ws * 0.3 * sin(uTime * 0.7 + ph * 2.1)) * aSway * (0.3 + 0.7 * s);
-  #else
-  float gust = 0.6 + 0.4 * sin(uTime * 0.63 + ph) * sin(uTime * 0.21 + ph * 0.7);
-  float lean = s * s * gust;
-  float swing = (0.15 + s) * (sin(uTime * 1.7 + ph * 3.1) * 0.22 + sin(uTime * 2.9 + ph * 1.3) * 0.08);
-  float side = (0.15 + s) * sin(uTime * 1.3 + ph * 2.3) * 0.1;
-  transformed += (wl * (lean + swing) + ws * side) * aSway;
-  transformed.y -= aSway * lean * lean * 0.3;
-  #endif
-  transformed += normal * aFlutter * (0.2 + s) * sin(uTime * (6.0 + 3.0 * s) + dot(position, vec3(1.9, 2.3, 1.7)) + ph * 5.0);
-}
-`;
-
-// Leaves let the sun through from behind, and keep their coverage in the distance where mipmaps thin the alpha.
-const LEAF_ALPHA = /* glsl */ `
-#include <alphamap_fragment>
-#ifdef USE_MAP
-{
-  vec2 tsz = vec2(textureSize(map, 0));
-  vec2 ddx = dFdx(vMapUv * tsz), ddy = dFdy(vMapUv * tsz);
-  diffuseColor.a *= 1.0 + max(0.0, 0.5 * log2(max(dot(ddx, ddx), dot(ddy, ddy)))) * 0.22;
-}
-#endif
-`;
-const LEAF_LIGHT = /* glsl */ `
-#include <lights_fragment_end>
-#if NUM_DIR_LIGHTS > 0
-{
-  vec3 tL = directionalLights[ 0 ].direction;
-  float tBack = pow(clamp(dot(-geometryViewDir, tL), 0.0, 1.0), 3.0);
-  float tThru = clamp(dot(-normal, tL), 0.0, 1.0);
-  reflectedLight.directDiffuse += diffuseColor.rgb * directionalLights[ 0 ].color * (tBack * 0.55 + tThru * 0.3) * FLORA_TRANSLUCENT;
-}
-#endif
-`;
-
 export interface MaterialOptions {
   map?: THREE.Texture;
   normalMap?: THREE.Texture;
@@ -153,17 +75,12 @@ export interface MaterialOptions {
   doubleSide?: boolean;
   /** Sway with the under-water swell instead of the wind. */
   surge?: boolean;
-  /** Extra shader edits, run after the wind and leaf edits. */
-  patch?: (s: THREE.WebGLProgramParametersWithUniforms) => void;
-  /** Extra uniforms the patch reads. */
-  uniforms?: Record<string, THREE.IUniform>;
-  /** What the patch draws, for the WebGPU planet, which makes its own. */
+  /** Coral's skin, grooves or cups, as bumps. */
   coral?: FloraTag['coral'];
 }
 
 export interface PlantMaterial {
   mat: THREE.MeshStandardMaterial;
-  depth: THREE.MeshDepthMaterial;
 }
 
 const materials = new Map<string, PlantMaterial>();
@@ -188,42 +105,8 @@ export function plantMaterial(key: string, make: () => MaterialOptions): PlantMa
     alphaToCoverage: leaf,
   });
   if (o.normalMap) mat.normalScale.setScalar(o.normalScale ?? 1);
-  const defines = (s: THREE.WebGLProgramParametersWithUniforms) => {
-    s.defines = s.defines ?? {};
-    if (o.surge) s.defines.FLORA_SURGE = '';
-  };
-  mat.onBeforeCompile = (s) => {
-    Object.assign(s.uniforms, WIND, o.uniforms ?? {});
-    defines(s);
-    s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\n' + WIND_HEAD)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + WIND_BODY);
-    if (leaf) {
-      s.fragmentShader = s.fragmentShader
-        .replace('#include <common>', `#include <common>\n#define FLORA_TRANSLUCENT ${(o.leaf ?? 0).toFixed(3)}`)
-        .replace('#include <alphamap_fragment>', LEAF_ALPHA)
-        .replace('#include <lights_fragment_end>', LEAF_LIGHT);
-    }
-    o.patch?.(s);
-  };
-  mat.customProgramCacheKey = () => 'floraC:' + key;
   tag(mat, { kit: 'C', surge: !!o.surge, cutout: leaf ? 0 : undefined, translucency: leaf ? o.leaf : 0, coral: o.coral });
-  const depth = new THREE.MeshDepthMaterial({
-    depthPacking: THREE.RGBADepthPacking,
-    map: leaf ? (o.map ?? null) : null,
-    alphaMap: leaf ? (o.alphaMap ?? null) : null,
-    alphaTest,
-    side,
-  });
-  depth.onBeforeCompile = (s) => {
-    Object.assign(s.uniforms, WIND);
-    defines(s);
-    s.vertexShader = s.vertexShader
-      .replace('#include <common>', '#include <common>\n' + WIND_HEAD)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + WIND_BODY);
-  };
-  depth.customProgramCacheKey = () => 'floraC-depth:' + key;
-  const out = { mat, depth };
+  const out = { mat };
   materials.set(key, out);
   return out;
 }
@@ -545,7 +428,7 @@ export interface Part {
   mat: PlantMaterial;
 }
 
-/** Wrap a plant's parts into one group: a mesh per material, with shadows and its wind-aware depth material. */
+/** Wrap a plant's parts into one group: a mesh per material, with shadows. */
 export function assemble(name: string, lod: Lod, parts: Part[]): THREE.Group {
   const group = new THREE.Group();
   group.name = name;
@@ -554,7 +437,6 @@ export function assemble(name: string, lod: Lod, parts: Part[]): THREE.Group {
     if (p.geo.empty) continue;
     const geo = p.geo.build();
     const mesh = new THREE.Mesh(geo, p.mat.mat);
-    mesh.customDepthMaterial = p.mat.depth;
     mesh.castShadow = lod < 2;
     mesh.receiveShadow = true;
     triangles += geo.index!.count / 3;
@@ -562,34 +444,6 @@ export function assemble(name: string, lod: Lod, parts: Part[]): THREE.Group {
   }
   group.userData = { lod, triangles };
   return group;
-}
-
-/** A plant at all three LODs, switching at LOD_DISTANCES. */
-export function plantLOD(plant: Plant, seed: number): THREE.LOD {
-  const lod = new THREE.LOD();
-  for (const l of LODS) lod.addLevel(plant.build(seed, l), LOD_DISTANCES[l]);
-  return lod;
-}
-
-/**
- * Many copies of one built plant as instanced meshes (one draw call per material). Each matrix places a copy
- * in its parent's frame; an optional colour per copy multiplies its vertex colours for variety.
- */
-export function instancePlant(built: THREE.Object3D, matrices: readonly THREE.Matrix4[], colors?: readonly THREE.Color[]): THREE.Group {
-  const out = new THREE.Group();
-  out.name = built.name + ' ×' + matrices.length;
-  built.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
-    const im = new THREE.InstancedMesh(o.geometry, o.material, matrices.length);
-    matrices.forEach((m, i) => im.setMatrixAt(i, m));
-    colors?.forEach((c, i) => im.setColorAt(i, c));
-    im.customDepthMaterial = o.customDepthMaterial;
-    im.castShadow = o.castShadow;
-    im.receiveShadow = o.receiveShadow;
-    im.computeBoundingSphere();
-    out.add(im);
-  });
-  return out;
 }
 
 /** Triangles in a built plant. */

@@ -1,7 +1,6 @@
 // Each region's water: its colour in deep water and how clear it is, blended over the planet across the regions'
-// borders like the land, as a table by latitude and longitude. The WebGL water reads it through planet.ts seaTint;
-// the GPU planet reads it through waterAt, as the deep water's own reflectance and the extinction along a path
-// through it.
+// borders like the land, as a table by latitude and longitude. The planet reads it through waterAt, as the deep
+// water's own reflectance and the extinction along a path through it.
 import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
 import { asin, atan, clamp, float, floor, fract, ivec2, mix, mod, texture, vec2, vec3, vec4 } from 'three/tsl';
@@ -22,7 +21,7 @@ export const REGION_WATER: Record<RegionId, [number, number]> = {
 const TINT_W = 512, TINT_H = 256;
 
 /** The sea's colour and clarity over the planet, blended across region borders like the land. */
-export function seaTintTexture(): THREE.DataTexture {
+function seaTintTexture(): THREE.DataTexture {
   const tex = new THREE.DataTexture(new Uint8Array(TINT_W * TINT_H * 4), TINT_W, TINT_H, THREE.RGBAFormat, THREE.UnsignedByteType);
   tex.magFilter = tex.minFilter = THREE.LinearFilter;
   tex.wrapS = THREE.RepeatWrapping;
@@ -30,7 +29,7 @@ export function seaTintTexture(): THREE.DataTexture {
   return tex;
 }
 
-export function fillSeaTint(tex: THREE.DataTexture): void {
+function fillSeaTint(tex: THREE.DataTexture): void {
   const d = tex.image.data as Uint8Array, p = v3(), mix: RegionMix = { a: 0, b: 0, t: 0 }, c = new THREE.Color(), c2 = new THREE.Color();
   // linear colours in [0, 0.25] stored ×4 so dark seas keep their precision
   const cols = REGIONS.map((r) => new THREE.Color().setHex(REGION_WATER[r.id][0]));
@@ -50,7 +49,7 @@ export function fillSeaTint(tex: THREE.DataTexture): void {
   tex.needsUpdate = true;
 }
 
-// ---------------------------------------------------------------- the GPU planet's
+// ---------------------------------------------------------------- on the GPU
 
 /** The deep water's diffuse reflectance, as a share of its colour as the regions give it. */
 const DEEP = 0.5;
@@ -90,7 +89,7 @@ function tintAt(up: V3, loads: boolean): V4 {
   return vec4(t.rgb.mul(0.25), t.a);
 }
 
-/** The water over `up` on the GPU planet: the deep water's own diffuse reflectance, and its extinction per metre. */
+/** The water over `up`: the deep water's own diffuse reflectance, and its extinction per metre. */
 export function waterAt(up: V3, loads = false): { deep: V3; extinction: V3 } {
   const t = tintAt(up, loads);
   return { deep: t.rgb.mul(DEEP), extinction: mix(vec3(...MURKY), vec3(...CLEAR), t.a) };

@@ -2,7 +2,7 @@
 // into a V as it ages and fading out. By day it is white foam lit by the sun; at night it glows in the colour of the
 // ship's wake trail (a cosmetic), so ships stay readable in the dark. All ships draw in one call.
 import * as THREE from 'three';
-import { AU, GPU, SEA, sea } from './common.ts';
+import { AU, SEA, sea } from './common.ts';
 import { wakeNodeMaterial } from './tsl/wakes.ts';
 import type { WakeLook } from './cosmetics.ts';
 
@@ -20,48 +20,6 @@ class Trail {
   lastT = -1;
   seen = 0;
 }
-
-const VERT = /* glsl */ `
-attribute vec4 aData; // along (metres from the stern), across (-1..1), strength, age (0..1)
-attribute vec4 aColor; // glow colour, glow amount
-uniform vec3 uSunDir, uSunColor;
-varying vec4 vData;
-varying vec4 vColor;
-varying vec3 vLight;
-varying float vNight;
-varying vec3 vW;
-void main() {
-  vData = aData;
-  vColor = aColor;
-  vW = position;
-  float sunUp = dot(normalize(position), uSunDir);
-  vNight = 1.0 - smoothstep(-0.14, 0.12, sunUp);
-  vLight = mix(vec3(0.05, 0.07, 0.11), uSunColor * 0.85 + vec3(0.2, 0.22, 0.26), 1.0 - vNight);
-  gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
-}`;
-
-const FRAG = /* glsl */ `
-uniform sampler2D uNoise;
-uniform float uTime;
-varying vec4 vData;
-varying vec4 vColor;
-varying vec3 vLight;
-varying float vNight;
-void main() {
-  float along = vData.x, across = vData.y, s = vData.z, age = vData.w;
-  float n = texture2D(uNoise, vec2(along * 0.09, across * 0.35 + along * 0.02) + vec2(0.0, uTime * 0.02)).g;
-  float n2 = texture2D(uNoise, vec2(along * 0.23 - uTime * 0.05, across * 0.9)).b;
-  // the arms of the V bright at the edges, churned water down the middle, all breaking up as it ages
-  float edge = smoothstep(0.55, 0.95, abs(across)) * (1.0 - smoothstep(0.95, 1.0, abs(across)));
-  float churn = (1.0 - smoothstep(0.0, 0.6, abs(across))) * (1.0 - age * 0.7);
-  float foam = (edge * 0.9 + churn * 0.8) * smoothstep(0.25 + age * 0.4, 0.75, n * 0.7 + n2 * 0.5);
-  float a = foam * s * pow(1.0 - age, 1.5) * smoothstep(0.0, 2.5, along);
-  if (a < 0.003) discard;
-  vec3 col = vec3(0.92, 0.96, 1.0) * vLight;
-  // at night, the spirit's own light in the water
-  col += vColor.rgb * vColor.a * (0.25 + 2.2 * vNight);
-  gl_FragColor = vec4(col * a, a * (1.0 - vNight * 0.6));
-}`;
 
 export class Wakes {
   readonly mesh: THREE.Mesh;
@@ -94,22 +52,14 @@ export class Wakes {
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aData', new THREE.BufferAttribute(this.data, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aColor', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
-    if (GPU.on) {
-      g.setAttribute('normal', new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage));
-      g.setAttribute('aAcross', new THREE.BufferAttribute(this.across, 1).setUsage(THREE.DynamicDrawUsage));
-    }
+    g.setAttribute('normal', new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aAcross', new THREE.BufferAttribute(this.across, 1).setUsage(THREE.DynamicDrawUsage));
     g.setIndex(idx);
-    const m = GPU.on ? wakeNodeMaterial(AU.uNoise.value!) : new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG,
-      uniforms: { uSunDir: AU.uSunDir, uSunColor: AU.uSunColor, uNoise: AU.uNoise, uTime: AU.uTime },
-      transparent: true, depthWrite: false, side: THREE.DoubleSide,
-      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-    });
+    const m = wakeNodeMaterial(AU.uNoise.value!);
     this.mesh = new THREE.Mesh(g, m);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 5;
-    this.mesh.receiveShadow = GPU.on;
+    this.mesh.receiveShadow = true;
   }
 
   /** Lays the wake for ship `id` this frame: its stern on the sea, the way it heads, its speed and the trail's look. */

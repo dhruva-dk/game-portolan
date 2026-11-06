@@ -9,7 +9,6 @@ import { R } from '../../sim/sphere.ts';
 import { REGION_EVENTS, REGIONS, type RegionId } from '../../sim/world/index.ts';
 import { STUMP } from '../../sim/world/regions/spires.ts';
 import type { V3 } from '../../sim/math.ts';
-import { patch } from '../engine.ts';
 
 /** Where a region's event has got to: the spot it happens at, seconds into its phase and left until the next, and how
  *  hard it runs now (0…1, ramping up and down at its ends, as the simulation has it; 1 while running when absent). */
@@ -149,7 +148,7 @@ export class EventRocks {
 
   constructor() {
     this.group.name = 'eventRocks';
-    const mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true }), 'landmark-rock');
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true });
     const add = (o: THREE.Object3D, pos: V3, facing: V3) => {
       o.matrixAutoUpdate = false;
       o.matrix.copy(frame(pos, facing));

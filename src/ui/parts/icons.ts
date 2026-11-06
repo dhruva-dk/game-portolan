@@ -97,7 +97,6 @@ export const ICON = {
   rank: svg('<path d="M4 2.5h16v7.8L12 15l-8-4.7z"/><path d="M4 13.2l8 4.7 8-4.7v3.4L12 21.3l-8-4.7z"/>'),
   sound: svg('<path d="M3 9h4l5.5-4.5v15L7 15H3z"/>' + st('M15.5 8.5a5 5 0 0 1 0 7M18.3 5.6a9 9 0 0 1 0 12.8', 2.2)),
   haptic: svg('<rect x="7" y="3" width="10" height="18" rx="2.2"/>' + st('M3 8v8M21 8v8', 2.2)),
-  quality: svg(star(4, 10.5, 3) + star(4, 4, 1.2, 19, 5)),
   controls: svg('<path fill-rule="evenodd" d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zm0 4.6a3.9 3.9 0 1 0 0 7.8 3.9 3.9 0 0 0 0-7.8z"/>' + dot(12, 12, 2)),
   chart: svg(st('M3 19.5h18M5.5 16l4.5-5 3.5 3 5.5-7.5', 2.6) + dot(19, 6.5, 2)),
   calendar: svg('<path fill-rule="evenodd" d="M4 4.5h16a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V6A1.5 1.5 0 0 1 4 4.5zm1 5.5v9.5h14V10z"/><path d="M7 2.5h2.4v4H7zM14.6 2.5H17v4h-2.4z"/>'),

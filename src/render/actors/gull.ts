@@ -2,7 +2,7 @@
 // wrist in the shader, so every bird flaps on its own beat in a single draw call. Small flocks wheel over the ships
 // nearest the camera; a delivery gull flies in from far off with a parcel, drops it on the ship's deck, and goes.
 import * as THREE from 'three';
-import { GPU, TAU, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { TAU, patch, rand, seaRadius, smooth, tangents } from './common.ts';
 import { gullNodeMaterial } from './tsl/fauna.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { C, Mesher } from './mesher.ts';
@@ -37,27 +37,6 @@ function gullGeometry(): THREE.BufferGeometry {
   b.part = 0;
   return b.build();
 }
-
-const FLAP = /* glsl */ `
-float gSide = sign(aPart), gJoint = abs(aPart);
-float gArm = sin(aFlap.x) * aFlap.y, gHand = sin(aFlap.x - 0.8) * aFlap.y * 0.8;
-vec3 gP = position, gN = normal;
-if (gJoint > 1.5) {
-  float a = gSide * gHand, c = cos(a), s = sin(a);
-  vec2 o = vec2(gSide * 0.74, 0.1), q = gP.xy - o;
-  gP.xy = o + vec2(c * q.x - s * q.y, s * q.x + c * q.y);
-  gN.xy = vec2(c * gN.x - s * gN.y, s * gN.x + c * gN.y);
-}
-if (gJoint > 0.5) {
-  float a = gSide * gArm, c = cos(a), s = sin(a);
-  vec2 o = vec2(gSide * 0.14, 0.1), q = gP.xy - o;
-  gP.xy = o + vec2(c * q.x - s * q.y, s * q.x + c * q.y);
-  gN.xy = vec2(c * gN.x - s * gN.y, s * gN.x + c * gN.y);
-}
-vec3 objectNormal = gN;
-#ifdef USE_TANGENT
-vec3 objectTangent = vec3(tangent.xyz);
-#endif`;
 
 interface Bird { pos: THREE.Vector3; fwd: THREE.Vector3; climb: number; bank: number; scale: number; phase: number; amp: number }
 
@@ -95,12 +74,7 @@ export class Gulls {
     const geo = gullGeometry();
     this.flap = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aFlap', this.flap);
-    const mat = GPU.on ? gullNodeMaterial({ vertexColors: true, roughness: 0.75 }) : patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }), 'actor-gull', (s) => {
-      s.vertexShader = s.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aPart;\nattribute vec2 aFlap;')
-        .replace('#include <beginnormal_vertex>', FLAP)
-        .replace('#include <begin_vertex>', 'vec3 transformed = gP;');
-    });
+    const mat = gullNodeMaterial({ vertexColors: true, roughness: 0.75 });
     this.mesh = new THREE.InstancedMesh(geo, mat, CAP);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
@@ -123,7 +97,7 @@ export class Gulls {
     this.x.crossVectors(up, away);
     const out = away.multiplyScalar(Math.cos(ang)).addScaledVector(this.x, Math.sin(ang)).normalize().clone();
     const pos = ref.pos.clone().addScaledVector(out, 210).normalize().multiplyScalar(seaRadius(ref.pos) + 48);
-    const parcel = this.parcels.pop() ?? new THREE.Mesh(this.parcelGeo, patch(new THREE.MeshStandardMaterial({ color: 0x4b6b3a, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0.9 }), 'actor-parcel'));
+    const parcel = this.parcels.pop() ?? new THREE.Mesh(this.parcelGeo, patch(new THREE.MeshStandardMaterial({ color: 0x4b6b3a, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0.9 })));
     (parcel.material as THREE.MeshStandardMaterial).emissive.copy(RARITY_GLOW[rarity]).multiplyScalar(0.8);
     parcel.visible = true;
     parcel.position.copy(pos);

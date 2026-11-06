@@ -3,13 +3,11 @@
 //
 // URL parameters: view=grid|one|field  form=<id>  seed=<n>  size=<m>  lod=0|1|2|auto  dist=10|50|300
 //                 light=day|dusk|night  spin=0|1  sea=<m>  wire=1  region=<RegionId> (grid of one region's forms)
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { pass } from 'three/tsl';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { Sky } from 'three/addons/objects/Sky.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import type { RegionId } from '../../sim/world/index.ts';
 import { ROCKS, ROCK_UNIFORMS, buildLOD, instanceRocks, rockById, setRockTextureBase, skinFor, type RockForm, type Scatter } from './index.ts';
 import type { Lod } from './mesh.ts';
@@ -34,7 +32,8 @@ const state = {
 
 // ---------------------------------------------------------------- renderer, sky, light
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGPURenderer({ antialias: true });
+await renderer.init();
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -49,7 +48,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.autoRotateSpeed = 0.6;
 
-const sky = new Sky();
+const sky = new SkyMesh();
 sky.scale.setScalar(5000);
 const skyScene = new THREE.Scene();
 skyScene.add(sky);
@@ -62,7 +61,7 @@ scene.add(sun, sun.target);
 const hemi = new THREE.HemisphereLight(0xbcd4ff, 0x3a3428, 0.4);
 scene.add(hemi);
 const pmrem = new THREE.PMREMGenerator(renderer);
-let envRT: THREE.WebGLRenderTarget | null = null;
+let envRT: THREE.RenderTarget | null = null;
 
 const LIGHTS: Record<string, { elev: number; az: number; sun: number; colour: number; hemi: number; turbidity: number; exposure: number; fog: number; daylight: number }> = {
   day: { elev: 38, az: 140, sun: 3.0, colour: 0xfff4e6, hemi: 0.5, turbidity: 4, exposure: 0.95, fog: 0xa9bccf, daylight: 1 },
@@ -74,12 +73,11 @@ function applyLight(): void {
   const L = LIGHTS[state.light] ?? LIGHTS.day;
   const phi = THREE.MathUtils.degToRad(90 - L.elev), th = THREE.MathUtils.degToRad(L.az);
   const dir = new THREE.Vector3().setFromSphericalCoords(1, phi, th);
-  const u = sky.material.uniforms;
-  u.sunPosition.value.copy(dir);
-  u.turbidity.value = L.turbidity;
-  u.rayleigh.value = state.light === 'dusk' ? 2.5 : 1.2;
-  u.mieCoefficient.value = 0.005;
-  u.mieDirectionalG.value = 0.85;
+  (sky.sunPosition.value as THREE.Vector3).copy(dir);
+  sky.turbidity.value = L.turbidity;
+  sky.rayleigh.value = state.light === 'dusk' ? 2.5 : 1.2;
+  sky.mieCoefficient.value = 0.005;
+  sky.mieDirectionalG.value = 0.85;
   // at night the light is the moon: put it above the horizon opposite the sun
   const lightDir = state.light === 'night' ? new THREE.Vector3(-dir.x, 0.55, -dir.z).normalize() : dir;
   sun.position.copy(lightDir).multiplyScalar(400);
@@ -298,16 +296,14 @@ seaIn.oninput = () => { state.sea = Number(seaIn.value); applySea(); syncUrl(); 
 
 // ---------------------------------------------------------------- loop
 
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.25, 0.4, 3));
-composer.addPass(new OutputPass());
+const pipeline = new THREE.RenderPipeline(renderer);
+const scenePass = pass(scene, camera);
+pipeline.outputNode = scenePass.add(bloom(scenePass, 0.25, 0.4, 3));
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
 });
 
 applyLight();
@@ -324,7 +320,7 @@ function frame(): void {
   controls.update();
   content.updateMatrixWorld();
   renderer.info.reset();
-  composer.render();
+  pipeline.render();
   for (const l of labels) {
     v.copy(l.at).applyMatrix4(content.matrixWorld).project(camera);
     const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;

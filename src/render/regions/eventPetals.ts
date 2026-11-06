@@ -6,9 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { REGIONS, currentAt, heightAt, regionShare, type RegionId } from '../../sim/world/index.ts';
 import { v3, type V3 } from '../../sim/math.ts';
-import { patch } from '../engine.ts';
 import { seaAt } from '../swell.ts';
-import { GPU } from '../actors/common.ts';
 import { faintGlowNode } from '../beacons/nodes.ts';
 import type { EventPhase } from './eventRocks.ts';
 
@@ -73,7 +71,7 @@ export class EventPetals {
   constructor() {
     this.group.name = 'eventPetals';
     const petal = { color: 0xffffff, roughness: 0.6, emissive: 0x3a1a26, side: THREE.DoubleSide };
-    const mat = GPU.on ? (faintGlowNode(petal) as unknown as THREE.MeshStandardMaterial) : patch(new THREE.MeshStandardMaterial(petal), 'event-petals');
+    const mat = (faintGlowNode(petal) as unknown as THREE.MeshStandardMaterial);
     this.mesh = new THREE.InstancedMesh(drift(), mat, N);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;

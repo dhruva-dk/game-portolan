@@ -1,4 +1,4 @@
-// The rock material as nodes, for the WebGPU planet: the same scanned photographs projected three ways in the rock's
+// The rock material as nodes: the same scanned photographs projected three ways in the rock's
 // own space, graded toward the region's rock, wetted and grown over toward the waterline, banded, iced or glowing as
 // its skin says, with the cover layer on faces that look up. It follows material.ts line for line; what differs is
 // where the rock's own space comes from and the scale of the light it gives off.
@@ -6,7 +6,7 @@
 // The rock's space is its geometry's, scaled to metres: for an instanced rock the instance's matrix is read here from
 // the same buffer three's instancing reads, so the photograph rides a turning floe instead of swimming over it, and
 // each copy is offset into a different patch of it. Light the rock gives off (hot cracks, the light ice seems to hold)
-// is set at the lamps' scale, as every glow on the GPU planet is, so it reads the same against noon and moonlight.
+// is set at the lamps' scale, as every glow on the planet is, so it reads the same against noon and moonlight.
 import { MeshStandardNodeMaterial, type InstancedMesh, type Node, type NodeBuilder, type Texture } from 'three/webgpu';
 import {
   Fn, abs, attribute, buffer, cameraPosition, cameraViewMatrix, clamp, dot, float, floor, fract, instanceIndex, length, max, mix,

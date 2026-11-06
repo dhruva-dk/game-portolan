@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node -e \"require('fs').existsSync('node_modules/.package-lock.json')||require('child_process').execSync('npm install',{stdio:'inherit'})\" && vite --open",
+    "start": "node -e \"require('fs').existsSync('node_modules/.package-lock.json')||require('child_process').execSync('npm install',{stdio:'inherit'})\" && vite",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

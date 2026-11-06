@@ -311,84 +311,6 @@ export function cardAlong(g: Geo, o: THREE.Vector3, dir: THREE.Vector3, roll: nu
   g.card(o, right, up, w, len, cell, { anchor: [0.5, 0], ...c });
 }
 
-// ---------------------------------------------------------------- wind
-
-/**
- * The wind every Flora A material reads. Set it once a frame: time in seconds, the wind's direction in world space
- * (each plant bends along it, flattened into its own ground plane) and its strength (0 calm, 1 a fresh breeze, 2 a gale).
- */
-export const wind = {
-  uTime: { value: 0 },
-  uWindDir: { value: new THREE.Vector3(1, 0, 0) },
-  uWindStrength: { value: 0.6 },
-};
-
-export function setWind(time: number, dir: THREE.Vector3, strength: number): void {
-  wind.uTime.value = time;
-  wind.uWindDir.value.copy(dir).normalize();
-  wind.uWindStrength.value = strength;
-}
-
-const WIND_HEAD = /* glsl */ `
-attribute vec4 aWind;
-attribute float aCover;
-uniform float uTime;
-uniform vec3 uWindDir;
-uniform float uWindStrength;
-#ifdef FLORA_COVER
-varying float vCover;
-varying float vUp;
-#endif
-`;
-
-// aWind: x the main bend in metres, y a phase, z the branch bob in metres, w the flutter in metres (all at strength 1)
-const WIND_BODY = /* glsl */ `
-#ifdef USE_INSTANCING
-  mat3 fwM = mat3(modelMatrix) * mat3(instanceMatrix);
-  vec3 fwO = (modelMatrix * instanceMatrix[3]).xyz;
-#else
-  mat3 fwM = mat3(modelMatrix);
-  vec3 fwO = modelMatrix[3].xyz;
-#endif
-  vec3 fwL = transpose(fwM) * uWindDir; // the wind in the plant's own frame, flattened onto its ground
-  fwL.y = 0.0;
-  fwL = length(fwL) > 1e-5 ? normalize(fwL) : vec3(1.0, 0.0, 0.0);
-  vec3 fwS = vec3(-fwL.z, 0.0, fwL.x);
-  float fwSeed = dot(fwO, vec3(0.131, 0.173, 0.117));
-  float fwG = dot(fwO, uWindDir) * 0.045 - uTime * 1.1; // gusts roll across the land along the wind
-  float fwGust = 0.62 + 0.38 * sin(fwG) * sin(fwG * 0.43 + fwSeed);
-  float fwK = uWindStrength;
-  float fwSway = sin(uTime * 0.7 + fwSeed) * 0.3 + sin(uTime * 1.73 + fwSeed * 2.3) * 0.12;
-  vec3 fwOff = (fwL * (fwGust + fwSway) + fwS * 0.22 * sin(uTime * 0.53 + fwSeed * 1.9)) * aWind.x * fwK;
-  fwOff.y -= aWind.x * aWind.x * fwK * fwK * 0.02; // bending shortens a little
-  float fwP = uTime * 2.3 + aWind.y + fwSeed;
-  fwOff += (vec3(0.0, 1.0, 0.0) * sin(fwP) + fwL * 0.6 * sin(fwP * 0.8 + 1.0)) * aWind.z * fwK * (0.4 + fwGust);
-  fwOff += normal * sin(uTime * 8.0 + aWind.y * 3.0 + dot(position, vec3(2.1, 1.7, 2.9))) * aWind.w * fwK * fwGust;
-  transformed += fwOff;
-#ifdef FLORA_COVER
-  vCover = aCover;
-  vUp = dot(normalize(fwM * normal), normalize(fwM[1])) * 0.5 + 0.5;
-#endif
-`;
-
-type Shader = THREE.WebGLProgramParametersWithUniforms;
-
-function windHook(s: Shader): void {
-  s.uniforms.uTime = wind.uTime;
-  s.uniforms.uWindDir = wind.uWindDir;
-  s.uniforms.uWindStrength = wind.uWindStrength;
-  s.vertexShader = s.vertexShader
-    .replace('#include <common>', '#include <common>\n' + WIND_HEAD)
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + WIND_BODY);
-}
-
-// mipmaps average thin needles' alpha away; restore coverage so far crowns stay full
-const ALPHA_KEEP = /* glsl */ `
-#include <map_fragment>
-vec2 faDx = dFdx(vMapUv * 1024.0), faDy = dFdy(vMapUv * 1024.0);
-diffuseColor.a *= 1.0 + min(2.0, max(0.0, 0.5 * log2(max(dot(faDx, faDx), dot(faDy, faDy))))) * 0.22;
-`;
-
 // ---------------------------------------------------------------- textures
 
 let texBase = `${import.meta.env?.BASE_URL ?? './'}tex/flora/a/`;
@@ -527,19 +449,12 @@ const COVER: Record<CoverName, { file: string; tint: THREE.Color; scale: number 
   moss: { file: 'moss', tint: new THREE.Color(0.85, 1.0, 0.75), scale: 0.4 },
 };
 
-const matCache = new Map<string, { mat: THREE.Material; depth: THREE.Material }>();
-
-function depthFor(key: string, opts: { map?: THREE.Texture; alphaTest?: number }): THREE.MeshDepthMaterial {
-  const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, ...opts, side: opts.map ? THREE.DoubleSide : THREE.FrontSide });
-  d.onBeforeCompile = windHook;
-  d.customProgramCacheKey = () => 'floraA-depth-' + key;
-  return d;
-}
+const matCache = new Map<string, THREE.Material>();
 
 /** Scanned bark, optionally with snow or moss lying on its upper faces and wherever aCover asks for it. */
-export function barkMaterial(bark: BarkName, cover?: CoverName): { mat: THREE.Material; depth: THREE.Material } {
+export function barkMaterial(bark: BarkName, cover?: CoverName): THREE.Material {
   const key = `bark-${bark}-${cover ?? 'bare'}`;
-  let m = matCache.get(key);
+  const m = matCache.get(key);
   if (m) return m;
   const mat = new THREE.MeshStandardMaterial({
     map: loadTex(`${BARK_FILES[bark]}_d.jpg`, true),
@@ -550,54 +465,26 @@ export function barkMaterial(bark: BarkName, cover?: CoverName): { mat: THREE.Ma
     vertexColors: true,
   });
   const cv = cover ? COVER[cover] : null;
-  mat.onBeforeCompile = (s) => {
-    windHook(s);
-    if (!cv) return;
-    s.defines = { ...s.defines, FLORA_COVER: '' };
-    s.uniforms.uCoverMap = { value: loadTex(`${cv.file}_d.jpg`, true) };
-    s.uniforms.uCoverTint = { value: cv.tint };
-    s.uniforms.uCoverScale = { value: cv.scale };
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uCoverMap;\nuniform vec3 uCoverTint;\nuniform float uCoverScale;\nvarying float vCover;\nvarying float vUp;')
-      .replace('#include <map_fragment>', /* glsl */ `
-        #include <map_fragment>
-        vec4 fcTex = texture2D(uCoverMap, vMapUv * uCoverScale);
-        float fcLow = texture2D(uCoverMap, vMapUv * uCoverScale * 0.13 + 0.37).g; // big patches, so the edge wanders
-        float fc = vCover * mix(0.45, 1.0, smoothstep(0.5, 0.9, vUp)) + step(0.999, vCover);
-        fc = smoothstep(0.32, 0.55, clamp(fc + (fcTex.g - 0.5) * 0.5 + (fcLow - 0.5) * 0.9, 0.0, 1.0));
-        diffuseColor.rgb = mix(diffuseColor.rgb, fcTex.rgb * uCoverTint, fc);`);
-  };
-  mat.customProgramCacheKey = () => 'floraA-' + key;
   tag(mat, { kit: 'A', cover: cv ? { map: loadTex(`${cv.file}_d.jpg`, true), tint: cv.tint, scale: cv.scale } : undefined });
-  m = { mat, depth: depthFor(key, {}) };
-  matCache.set(key, m);
-  return m;
+  matCache.set(key, mat);
+  return mat;
 }
 
 /** Alpha-tested cards from a painted atlas: needles, fronds, strands. Normals are not flipped on back faces. */
-export function cardMaterial(atlas: Atlas<string>): { mat: THREE.Material; depth: THREE.Material } {
+export function cardMaterial(atlas: Atlas<string>): THREE.Material {
   const key = 'cards-' + atlas.key;
-  let m = matCache.get(key);
+  const m = matCache.get(key);
   if (m) return m;
   const map = atlas.texture();
   const mat = new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.82, metalness: 0, vertexColors: true });
-  mat.onBeforeCompile = (s) => {
-    windHook(s);
-    s.fragmentShader = s.fragmentShader
-      .replace('#include <map_fragment>', ALPHA_KEEP)
-      .replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
-  };
-  mat.customProgramCacheKey = () => 'floraA-' + key;
   tag(mat, { kit: 'A', cutout: 1024, crownNormals: true });
-  const depth = depthFor(key, { map, alphaTest: 0.5 });
-  m = { mat, depth };
-  matCache.set(key, m);
-  return m;
+  matCache.set(key, mat);
+  return mat;
 }
 
 // ---------------------------------------------------------------- assembling plants
 
-export interface Part { geo: Geo; mat: { mat: THREE.Material; depth: THREE.Material } }
+export interface Part { geo: Geo; mat: THREE.Material }
 
 /** Turns a plant's parts into one object: a mesh per material, casting and receiving shadows. */
 export function assemble(name: string, lod: number, parts: Part[]): THREE.Group {
@@ -606,8 +493,7 @@ export function assemble(name: string, lod: number, parts: Part[]): THREE.Group 
   let tris = 0;
   for (const p of parts) {
     if (!p.geo.triangles) continue;
-    const mesh = new THREE.Mesh(p.geo.build(), p.mat.mat);
-    mesh.customDepthMaterial = p.mat.depth;
+    const mesh = new THREE.Mesh(p.geo.build(), p.mat);
     mesh.castShadow = lod < 2;
     mesh.receiveShadow = lod < 2;
     tris += p.geo.triangles;
@@ -615,86 +501,4 @@ export function assemble(name: string, lod: number, parts: Part[]): THREE.Group 
   }
   group.userData.triangles = tris;
   return group;
-}
-
-/** One copy of a plant as a THREE.LOD, switching at its lodDistances. */
-export function plantLOD(p: Plant, seed: number): THREE.LOD {
-  const lod = new THREE.LOD();
-  lod.name = p.id;
-  lod.addLevel(p.build(seed, 0), 0);
-  lod.addLevel(p.build(seed, 1), p.lodDistances[0]);
-  lod.addLevel(p.build(seed, 2), p.lodDistances[1]);
-  lod.addLevel(new THREE.Object3D(), p.lodDistances[2]);
-  return lod;
-}
-
-export interface PlantField {
-  group: THREE.Group;
-  /** Re-sorts copies into levels of detail for an eye position (cheap; skips work if the eye barely moved). */
-  update(eye: THREE.Vector3, force?: boolean): void;
-  /** Triangles drawn after the last update. */
-  triangles(): number;
-}
-
-/**
- * Many copies of a plant, instanced. Each copy gets one of a few seeded variants, and each variant is built at the
- * three levels of detail; every update moves each copy into the level its distance from the eye asks for.
- */
-export function plantField(p: Plant, transforms: THREE.Matrix4[], variants = 4, seed = 1): PlantField {
-  const group = new THREE.Group();
-  group.name = p.id + '-field';
-  const pick = transforms.map((_, i) => (i * 2654435761 + seed) % variants >>> 0);
-  type Slot = { meshes: THREE.InstancedMesh[]; tris: number; count: number };
-  const slots: Slot[][] = []; // [variant][lod]
-  for (let v = 0; v < variants; v++) {
-    const cap = pick.filter((k) => k === v).length;
-    slots.push(
-      [0, 1, 2].map((lod) => {
-        const obj = p.build(seed * 1000 + v, lod);
-        const meshes: THREE.InstancedMesh[] = [];
-        obj.traverse((o) => {
-          if (!(o as THREE.Mesh).isMesh) return;
-          const src = o as THREE.Mesh;
-          const im = new THREE.InstancedMesh(src.geometry, src.material, Math.max(1, cap));
-          im.customDepthMaterial = src.customDepthMaterial;
-          im.castShadow = src.castShadow;
-          im.receiveShadow = src.receiveShadow;
-          im.count = 0;
-          group.add(im);
-          meshes.push(im);
-        });
-        return { meshes, tris: obj.userData.triangles ?? 0, count: 0 };
-      }),
-    );
-  }
-  const centres = transforms.map((m) => V().setFromMatrixPosition(m));
-  const last = V(1e9, 1e9, 1e9);
-  const [d1, d2, d3] = p.lodDistances;
-  return {
-    group,
-    update(eye, force = false) {
-      if (!force && last.distanceToSquared(eye) < 4) return;
-      last.copy(eye);
-      for (const lods of slots) for (const s of lods) s.count = 0;
-      transforms.forEach((m, i) => {
-        const d = centres[i].distanceTo(eye);
-        if (d > d3) return;
-        const s = slots[pick[i]][d < d1 ? 0 : d < d2 ? 1 : 2];
-        for (const im of s.meshes) im.setMatrixAt(s.count, m);
-        s.count++;
-      });
-      for (const lods of slots)
-        for (const s of lods)
-          for (const im of s.meshes) {
-            im.count = s.count;
-            im.instanceMatrix.needsUpdate = true;
-            if (s.count) im.computeBoundingSphere();
-          }
-    },
-    triangles() {
-      let t = 0;
-      for (const lods of slots) for (const s of lods) t += s.tris * s.count;
-      return t;
-    },
-  };
 }
