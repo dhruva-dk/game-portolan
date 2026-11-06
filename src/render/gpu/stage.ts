@@ -4,6 +4,7 @@
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
+import { ClusteredLighting } from './clusters.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
@@ -102,6 +103,8 @@ export class GpuStage {
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
     this.#scale = phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop;
+    // every point light without a shadow is clustered, over the frame as the scene pass draws it
+    renderer.lighting = new ClusteredLighting(this.#scale);
     this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
     this.resize();
   }

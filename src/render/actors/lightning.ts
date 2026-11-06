@@ -65,8 +65,9 @@ function crooked(a: THREE.Vector3, b: THREE.Vector3, levels: number, rough: numb
 
 export class Lightning {
   readonly mesh: THREE.Mesh;
-  /** What the strokes throw on the sea and the ships round them. */
-  readonly light = new THREE.PointLight(BOLT_COLOUR, 0, 0, 2);
+  /** What the strokes throw on the sea and the ships round them: out to 600 m, where it has fallen to a few
+   *  thousandths of a lux (a light of unbounded reach would be culled from every cluster but its own). */
+  readonly light = new THREE.PointLight(BOLT_COLOUR, 0, 600, 2);
   readonly #bolts: Bolt[] = [];
   readonly #fx: Effects;
   readonly #pos = new Float32Array(MAX_QUADS * 6 * 3);

@@ -7,6 +7,7 @@ import { AU, TAU, onSea, rand, tangents } from './common.ts';
 import { makeParticles, SPRITE, type Particles } from './particles.ts';
 import { Ribbons } from './ribbons.ts';
 import { Debris } from './debris.ts';
+import { Lights } from './lights.ts';
 import type { Weapon } from './view.ts';
 import { heat } from '../gpu/haze.ts';
 
@@ -44,6 +45,8 @@ export class Effects {
   private readonly L2 = new Local();
   /** Wreckage afloat: what shot knocks out of hulls and what the sunk leave behind. */
   readonly debris: Debris;
+  /** The light the fight throws: lanterns, fires, gun flashes, hits and bursts (clustered point lights). */
+  readonly lights = new Lights();
   private readonly wisps: Wisp[] = [];
   private readonly p = new THREE.Vector3();
   private flick = 0;
@@ -57,7 +60,7 @@ export class Effects {
     this.group.add(smoke.mesh, glow.mesh, this.trails.mesh, this.heatTrails.mesh);
     this.debris = new Debris(wood);
     this.debris.onSplash = (at, big) => this.plop(at, big);
-    this.group.add(this.debris.group);
+    this.group.add(this.debris.group, this.lights.group);
   }
 
   /** Drops everything still in the air or afloat, for a new match. */
@@ -67,6 +70,7 @@ export class Effects {
     this.trails.clear();
     this.heatTrails.clear();
     this.debris.clear();
+    this.lights.clear();
     this.wisps.length = 0;
   }
 
@@ -80,6 +84,8 @@ export class Effects {
   muzzle(kind: Weapon, pos: THREE.Vector3, dir: THREE.Vector3, scale = 1): void {
     const big = kind === 'mortar' ? 1.8 : kind === 'harpoon' ? 1.2 : kind === 'repeater' ? 0.45 : kind === 'scatter' ? 1.3 : kind === 'broadside' ? 1.1 : kind === 'chain' ? 1.15 : kind === 'heated' ? 1.05 : 1;
     const s = big * scale, { x, y, z } = pos, L = this.L.at(pos);
+    // the flash lights the gun's own smoke, her side and the water under the muzzle
+    this.lights.flash(this.p.copy(pos).addScaledVector(dir, 0.8 * s), kind === 'repeater' ? 0xffc070 : 0xffa458, 340 * s * s, 9 + 12 * s, 0.09 + 0.05 * s);
     // the blast's heat bends the air in front of the muzzle for a moment
     heat(this.p.copy(pos).addScaledVector(dir, 1.5 * s), 2.2 * s, 0.9, 0.45);
     this.glow.emit({ x, y, z, life: 0.09, size: 1.6 * s, grow: 1.6, r: 6, g: 3.6, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
@@ -132,6 +138,7 @@ export class Effects {
   hitShip(at: THREE.Vector3, crit: boolean, big: number, out?: THREE.Vector3, paint?: THREE.Color): void {
     const s = 0.7 + big * 0.8, { x, y, z } = at, L = this.L.at(at);
     if (out && paint) this.debris.shatter(at, out, paint, big * (crit ? 1.4 : 1));
+    this.lights.flash(at, crit ? 0xffd27a : 0xff9a4a, 160 * s * s, 12 * s, 0.16);
     this.glow.emit({ x, y, z, life: 0.12, size: 2.2 * s, grow: 1.5, r: crit ? 6 : 5, g: crit ? 5 : 2.6, b: crit ? 1.2 : 1, frame: SPRITE.puff, fadeIn: 0 });
     for (let i = 0; i < 9 * s; i++) {
       const v = L.vec(Math.random() * TAU, rand(8, 22), rand(2, 14));
@@ -166,6 +173,7 @@ export class Effects {
   explode(at: THREE.Vector3, size: number, onWater: boolean): void {
     const L = this.L.at(at), c = this.p.copy(at).addScaledVector(L.up, 1), { x, y, z } = c;
     this.glow.emit({ x, y, z, life: 0.14, size: 4.5 * size, grow: 1.5, r: 5, g: 3, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
+    this.lights.flash(c, 0xff8a3a, 1400 * size * size, 34 * size, 0.55);
     // tongues of flame licking out of it, brief
     for (let i = 0; i < 5 * size; i++) {
       const v = L.vec(Math.random() * TAU, rand(2, 8) * size, rand(2, 9) * size);
@@ -413,6 +421,7 @@ export class Effects {
 
   update(dt: number): void {
     this.debris.update(dt);
+    this.lights.update(dt);
     const up = this.L.up, v = new THREE.Vector3();
     // wisps of the lost, rising
     for (let i = this.wisps.length - 1; i >= 0; i--) {

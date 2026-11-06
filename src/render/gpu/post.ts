@@ -10,19 +10,19 @@
 //   or a shot's flight streaks;
 // - focus: in the lobby and the ceremonies the frame takes a lens's depth of field;
 // - light: a bloom blurs a few percent of everything (a lens's scatter, not a glow on chosen things), and the
-//   brightest of it throws ghosts across the lens (Chapman's pseudo lens flare) and lights the dust and smears on it;
+//   brightest of it throws ghosts across the lens (after Chapman's pseudo lens flare) and lights the dust and smears
+//   on it;
 // - exposure and tone: the eye's adaptation exposes it, AgX and the grade map it to the screen, and a fine grain lies
 //   over it all.
 import { RenderPipeline, Vector4, CanvasTexture, LinearFilter, SRGBColorSpace, UnsignedByteType, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { Node, TextureNode } from 'three/webgpu';
 import {
   Fn, float, ivec2, min, mix, mrt, output, pass, screenUV, smoothstep, uniform, uniformArray, vec2, vec4, velocity, clamp, dot, vec3,
-  fract, sin, cos, rtt, texture, max, length, select, screenSize, uv,
+  fract, sin, cos, rtt, texture, max, length, select, screenSize, uv, distance, pow,
 } from 'three/tsl';
 import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import GTAONode from 'three/addons/tsl/display/GTAONode.js';
-import { lensflare } from 'three/addons/tsl/display/LensflareNode.js';
 import { gaussianBlur } from 'three/addons/tsl/display/GaussianBlurNode.js';
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -32,6 +32,41 @@ import { P } from './uniforms.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 export const BLOOM = uniform(0.05);
+
+/** Ghosts across the lens, their spacing toward the centre, and how the lens's edge fades them. */
+const GHOSTS = 5;
+const SPACING = 0.22;
+const EDGE = 22;
+/** Exposed light beyond which a thing throws ghosts, and the most any one place throws. */
+const GHOST_FROM = 20;
+const GHOST_MOST = 60;
+
+/**
+ * The ghosts the lens throws of what is brightest in the frame (Chapman's pseudo lens flare, made to keep its light).
+ * Each ghost is the frame turned about its centre and drawn smaller or larger toward it; the pseudo flare draws each
+ * as bright as what threw it, so a ghost magnified eight times paints a lamp-lit rail across half the screen. Here a
+ * ghost spreads its light over the area it is magnified to (its weight goes as the square of its scale), so a small
+ * hot source still throws a bright ghost and a wide lit surface throws faint ones. The threshold is taken off the
+ * light's luminance, not off each channel, so an orange lamp throws orange ghosts, not red; and the excess is eased
+ * toward a ceiling, so a source a thousand times too bright throws no more than a few times too bright.
+ */
+function lensGhosts(bright: TextureNode): Node<'vec4'> {
+  return Fn(() => {
+    const t = uv().oneMinus();
+    const sum = vec3(0).toVar();
+    for (let i = 0; i < GHOSTS; i++) {
+      const scale = 1 - SPACING * i;
+      const at = t.mul(scale).add(0.5 * SPACING * i);
+      const c = bright.sample(at).rgb;
+      const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      const over = max(lum.sub(GHOST_FROM), 0);
+      const eased = over.div(over.div(GHOST_MOST).add(1));
+      const weight = pow(float(1).sub(distance(at, vec2(0.5))), EDGE).mul(scale * scale);
+      sum.addAssign(c.mul(eased.div(max(lum, 1e-4))).mul(weight));
+    }
+    return vec4(sum.mul(vec3(1, 0.86, 0.66)), 1);
+  })() as unknown as Node<'vec4'>;
+}
 
 /** What the match lays over the whole frame, 0…1: outside the safe circle, just hurt, and low on hull. */
 export const SCREEN = { storm: uniform(0), hurt: uniform(0), low: uniform(0) };
@@ -214,10 +249,7 @@ export class Post {
       const glow = bloom(hdrIn, 1, 0.55, 0) as unknown as Node<'vec4'> & { getTextureNode(): TextureNode };
       // the brightest of the scatter, exposed, throws ghosts across the lens and lights its dust
       const bright = rtt(glow.rgb.mul(exposure), null, null, { resolutionScale: 0.25 });
-      const ghosts = gaussianBlur(
-        lensflare(bright, { ghostTint: vec3(1, 0.86, 0.66), threshold: float(20), ghostSamples: float(5), ghostSpacing: float(0.22), ghostAttenuationFactor: float(22), downSampleRatio: 2 }),
-        null, 6,
-      ) as unknown as Node<'vec4'>;
+      const ghosts = gaussianBlur(rtt(lensGhosts(bright), null, null, { resolutionScale: 0.125 }), null, 6) as unknown as Node<'vec4'>;
       const dust = texture(lensDirt(), screenUV).rgb;
       const lit = max(glow.rgb.mul(exposure).sub(1.6), vec3(0));
       let hdr = hdrIn.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM)).mul(exposure)

@@ -133,9 +133,6 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh, lightning.mesh, lightning.light);
   (options.overlay ?? group).add(numbers.mesh);
   const auraGeo = new THREE.SphereGeometry(1, 48, 32);
-  // the player's lantern lights the deck and the water round her at night
-  const lamp = new THREE.PointLight(0xffa04a, 0, 34, 1.6);
-  group.add(lamp);
 
   const fleet = new Map<number, Fleet>();
   const pending: Pending[] = [];
@@ -237,7 +234,11 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     // on fire: flames along her deck and up the canvas, and a pall of smoke down the wind
     if (parts && parts.burn > 0 && d < 400 && f.sink < 0) {
       const sailAt = parts.mast === 'down' ? null : m.toWorld(tmp.set(0, MAIN_FOOT.y + MAIN_HEIGHT * (parts.mast === 'jury' ? 0.3 : 0.45), MAIN_FOOT.z), new THREE.Vector3());
-      fx.burning(m.toWorld(DECK, new THREE.Vector3()), f.fwd, sailAt, dt);
+      const deck = m.toWorld(DECK, new THREE.Vector3());
+      fx.burning(deck, f.fwd, sailAt, dt);
+      // the fire lights her canvas from below and the sea round her, guttering
+      const gutter = 0.75 + 0.15 * Math.sin(t * 11 + v.id) + 0.1 * Math.sin(t * 27.3 + v.id * 5);
+      fx.lights.hold(`fire${v.id}`, tmp.copy(deck).addScaledVector(deck.clone().normalize(), 2.5), 0xff7428, 420 * Math.min(1, parts.burn) * gutter, 32);
     }
     m.far = d > 140;
     m.fade = v.id === player && options.fadePlayerSail !== false ? 1 : 0;
@@ -254,7 +255,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       const flick = 0.9 + Math.sin(t * 9 + v.id) * 0.05 + Math.sin(t * 23 + v.id * 3) * 0.05;
       fx.light(at, Math.max(1.1, d * 0.013), f.lantern, (1.4 + 2.2 * n) * n * flick);
       fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick);
-      if (v.id === player) { lamp.position.copy(at); lamp.intensity = 260 * n * flick; lamp.color.copy(f.lantern); }
+      // and it lights her deck, her sails and the water round her
+      if (d < 260) fx.lights.hold(`lantern${v.id}`, at, f.lantern, 260 * n * flick, 34, 1.6);
       // and the light it throws into the air round her
       LANTERNS.add(at, f.lantern, n * flick);
       // the wisp at the main truck: past about 180 m the stern lantern has gone under the curve, but this shows to 240 m
@@ -294,7 +296,6 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     const elev = focus.dot(AU.uSunDir.value);
     AU.uSunColor.value.copy(HIGH_SUN).lerp(LOW_SUN, 1 - smooth(-0.05, 0.35, elev));
     AU.uNight.value = nightAt(focus);
-    lamp.intensity = 0;
     LANTERNS.clear();
     // ships
     const hEye = Math.max(1, eye.length() - SEA.radius), R = SEA.radius;
