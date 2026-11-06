@@ -1,8 +1,13 @@
 // The frame after the scene. It is drawn below the screen's resolution with motion vectors, and each step builds on
 // the last:
-// - occlusion: ground-truth ambient occlusion (GTAO, Jimenez et al. 2016) from the depth buffer, at half the scene's
-//   resolution with its noise turned each frame, darkens the creases where light can't reach: under a gunwale, where
-//   a hull meets the water, between rocks;
+// - occlusion and bounce: screen-space global illumination (visibility bitmasks, Therrien et al. 2023, after GTAO's
+//   horizons) from the depth buffer, at half the scene's resolution with its noise turned each frame, darkens the
+//   creases where light can't reach (under a gunwale, where a hull meets the water, between rocks) and gathers the
+//   light the frame's own lit surfaces throw on each other: a sunlit sail warming the deck under it, a cliff's glow
+//   on the sea below, the sea's blue on a hull's side;
+// - contact: screen-space shadows (Bend Studio's, marched toward the sun through the depth buffer) put the small
+//   shadows the shadow maps are too coarse to hold where things touch: a gun on its deck, the rigging's lines, a
+//   pebble on a beach;
 // - upscaling: the occluded frame is reconstructed to the screen by temporal upscaling (jittered frames accumulated
 //   with a Blackman-Harris resolve, Karis 2014), which also gathers the occlusion's noise away;
 // - heat haze: the air over what burns or fires shimmers, bending what lies behind it;
@@ -14,15 +19,19 @@
 //   on it;
 // - exposure and tone: the eye's adaptation exposes it, AgX and the grade map it to the screen (the colour script's
 //   table for the hour and the weather, grade.ts), and a fine grain lies over it all.
-import { RenderPipeline, Vector4, CanvasTexture, LinearFilter, SRGBColorSpace, UnsignedByteType, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
+import {
+  RenderPipeline, Vector4, CanvasTexture, LinearFilter, SRGBColorSpace, UnsignedByteType, type DirectionalLight, type PassNode, type PerspectiveCamera,
+  type Scene, type Texture, type WebGPURenderer,
+} from 'three/webgpu';
 import type { Node, TextureNode } from 'three/webgpu';
 import {
   Fn, float, ivec2, min, mix, mrt, output, pass, screenUV, smoothstep, uniform, uniformArray, vec2, vec4, velocity, clamp, dot, vec3,
-  fract, sin, cos, rtt, texture, max, length, select, screenSize, uv, distance, pow,
+  fract, sin, cos, rtt, texture, max, length, select, screenSize, uv, distance, pow, diffuseColor,
 } from 'three/tsl';
 import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import GTAONode from 'three/addons/tsl/display/GTAONode.js';
+import SSGINode from 'three/addons/tsl/display/SSGINode.js';
+import SSSNode from 'three/addons/tsl/display/SSSNode.js';
 import { gaussianBlur } from 'three/addons/tsl/display/GaussianBlurNode.js';
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -76,6 +85,10 @@ export const SCREEN = { storm: uniform(0), hurt: uniform(0), low: uniform(0) };
  *  the lens flare's ghosts and the dust they light, the film grain, and how far heat bends the light. */
 export const LENS = {
   occlusion: uniform(0.8),
+  /** How much of the light gathered off the frame's lit surfaces each surface throws back, and how dark the contact
+   *  shadows lie (by day: the night's moon is left to the shadow maps). */
+  bounce: uniform(1),
+  contact: uniform(0.6),
   shutter: uniform(0.5),
   flare: uniform(0.35),
   dirt: uniform(0.1),
@@ -97,19 +110,39 @@ function clampedLoads(node: TextureNode): TextureNode {
   return node;
 }
 
-/** The scene as the upscaler loads it, clamped as clampedLoads does, occluded by `ao` (sampled at the texel's centre)
- *  and capped. */
-function occludedLoads(node: TextureNode, ao: TextureNode): TextureNode {
+/** What the frame's surfaces throw on each other, as the upscaler composites it: the occlusion, the light gathered,
+ *  the surface's own colour that takes it, the contact shadows, and the sea's mask (1 off the water). */
+interface Light { ao: TextureNode; gi: TextureNode; albedo: TextureNode; contact: TextureNode | null; dry: TextureNode }
+
+/** The scene as the upscaler loads it, clamped as clampedLoads does, occluded and lit by what the frame's surfaces
+ *  throw on each other (sampled at the texel's centre), and capped. */
+function occludedLoads(node: TextureNode, l: Light): TextureNode {
   const load = node.load.bind(node) as (at: Node) => TextureNode;
   const size = (node as unknown as { size(level?: number): Node<'ivec2'> }).size(0);
   const last = size.sub(ivec2(1, 1));
   (node as unknown as { load(at: Node<'ivec2'>): Node }).load = (at) => {
     const c = load(clamp(at as unknown as Node<'vec2'>, ivec2(0, 0) as unknown as Node<'vec2'>, last as unknown as Node<'vec2'>)) as unknown as Node<'vec4'>;
     const st = vec2(at as unknown as Node<'vec2'>).add(0.5).div(vec2(size as unknown as Node<'vec2'>));
-    const o = mix(float(1), (ao.sample(st) as unknown as Node<'vec4'>).r, LENS.occlusion);
-    return min(vec4(c.rgb.mul(o), c.a), vec4(30000));
+    // the contact shadows lie on what is dry: the sea's own crests would shadow its troughs in a moving speckle
+    const dry = (l.dry.sample(st) as unknown as Node<'vec4'>).r;
+    const shade = l.contact ? (l.contact.sample(st) as unknown as Node<'vec4'>).r : float(1);
+    const touch = mix(float(1), shade, LENS.contact.mul(dry));
+    const o = mix(float(1), (l.ao.sample(st) as unknown as Node<'vec4'>).r.mul(touch), LENS.occlusion);
+    const bounce = (l.gi.sample(st) as unknown as Node<'vec4'>).rgb.mul((l.albedo.sample(st) as unknown as Node<'vec4'>).rgb).mul(LENS.bounce);
+    return min(vec4(c.rgb.mul(o).add(bounce), c.a), vec4(30000));
   };
   return node;
+}
+
+/** Screen-space global illumination drawn at a share of the scene pass's pixels: three's node draws at the whole
+ *  drawing buffer, which at the screen's own resolution would cost many times what the rest of the frame does. */
+class Bounce extends SSGINode {
+  scale = 0.5;
+  // (three's typings leave setSize out)
+  setSize(width: number, height: number): void {
+    const base = SSGINode.prototype as unknown as { setSize(this: SSGINode, w: number, h: number): void };
+    base.setSize.call(this, Math.max(1, Math.round(width * this.scale)), Math.max(1, Math.round(height * this.scale)));
+  }
 }
 
 /** The dust and smears on the front of the lens, drawn once: soft specks, a few out-of-focus rings, and wipes. */
@@ -171,7 +204,8 @@ export class Post {
   readonly pipeline: RenderPipeline;
   readonly scenePass: PassNode;
   readonly exposure: Exposure;
-  readonly occlusion: GTAONode;
+  readonly occlusion: SSGINode;
+  readonly contact: SSSNode | null;
   readonly #renderer: WebGPURenderer;
   readonly #camera: PerspectiveCamera;
   readonly #plain: Node;
@@ -182,33 +216,58 @@ export class Post {
 
   /** `overlay` is drawn over the finished frame at the screen's own resolution, untouched by the upscaler, the
    *  exposure and the tone curve: what is written on the screen rather than lit in the world. */
-  constructor(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera, scale: number, overlay?: Scene) {
+  constructor(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera, scale: number, overlay?: Scene, sun?: DirectionalLight) {
     this.#renderer = renderer;
     this.#camera = camera;
     const scenePass = pass(scene, camera);
     // `smear`: how much of its motion a pixel is blurred by, 1 but where a material says otherwise (the sea)
-    scenePass.setMRT(mrt({ output, velocity, smear: float(1) }));
+    // `albedo`: the surface's own colour, which takes the light bounced onto it
+    scenePass.setMRT(mrt({ output, velocity, smear: float(1), albedo: diffuseColor }));
     scenePass.setResolutionScale(scale);
     (scenePass.getTexture('smear') as Texture).type = UnsignedByteType;
+    (scenePass.getTexture('albedo') as Texture).type = UnsignedByteType;
     this.scenePass = scenePass;
     const smear = scenePass.getTextureNode('smear');
     const beauty = scenePass.getTextureNode('output');
     const depth = clampedLoads(scenePass.getTextureNode('depth'));
     const motion = clampedLoads(scenePass.getTextureNode('velocity'));
 
-    // occlusion, from depth alone: normals rebuilt from it, so the smoke and spray drawn over a hull never muddy it
-    const occlusion = new GTAONode(depth, null as unknown as Node, camera);
-    occlusion.resolutionScale = 0.5;
-    occlusion.radius.value = 1.6;
-    occlusion.thickness.value = 1.5;
-    occlusion.distanceExponent.value = 1.4;
-    occlusion.samples.value = 12;
+    // occlusion and bounce, from depth alone: normals rebuilt from it, so the smoke and spray drawn over a hull never
+    // muddy it. Two slices of eight steps a pixel, its noise turned each frame for the upscaler to gather; the radius
+    // reaches a few metres, about a hull's beam, so a sail lights the deck beneath it but a cliff doesn't light a ship
+    // a cable off
+    const occlusion = new Bounce(beauty, depth, null as unknown as TextureNode, camera);
+    occlusion.scale = scale * 0.5;
+    occlusion.sliceCount.value = 2;
+    occlusion.stepCount.value = 8;
+    occlusion.radius.value = 4;
+    occlusion.thickness.value = 1.2;
+    occlusion.expFactor.value = 1.6;
+    occlusion.aoIntensity.value = 1;
+    occlusion.giIntensity.value = 1;
     occlusion.useTemporalFiltering = true;
     this.occlusion = occlusion;
-    const ao = occlusion.getTextureNode();
-    // the upscaler reads the scene through its loads: occluded there, and capped, since a glint past half-float's range
-    // is stored as infinity, which the upscaler's blend turns into a NaN that spreads as black through its history
-    const resolved = taau(occludedLoads(beauty, ao), depth, motion, camera) as unknown as { getTextureNode(): TextureNode };
+    // contact shadows, by day, from the sun
+    let contact: TextureNode | null = null;
+    this.contact = null;
+    if (sun) {
+      const c = new SSSNode(depth, camera, sun);
+      c.resolutionScale = scale * 0.75;
+      c.maxDistance.value = 0.7;
+      c.thickness.value = 0.12;
+      c.quality.value = 0.5;
+      c.useTemporalFiltering = true;
+      this.contact = c;
+      contact = c.getTextureNode() as unknown as TextureNode;
+    }
+    const light: Light = {
+      ao: occlusion.getAONode() as unknown as TextureNode, gi: occlusion.getGINode() as unknown as TextureNode,
+      albedo: scenePass.getTextureNode('albedo'), contact, dry: smear,
+    };
+    // the upscaler reads the scene through its loads: occluded and lit there, and capped, since a glint past
+    // half-float's range is stored as infinity, which the upscaler's blend turns into a NaN that spreads as black
+    // through its history
+    const resolved = taau(occludedLoads(beauty, light), depth, motion, camera) as unknown as { getTextureNode(): TextureNode };
     const sharp = resolved.getTextureNode();
 
     // heat haze, then motion blur, at the screen's resolution
@@ -323,6 +382,8 @@ export class Post {
       a[k].set(s.x, s.y, s.r, s.strength);
       b[k].set(s.depth, 0, 0, 0);
     }
+    // the contact shadows fade with the sun: at night the moon's are left to the shadow maps
+    if (this.contact) this.contact.shadowIntensity.value = Math.max(0, 1 - (P.night.value as number) * 1.4);
     this.pipeline.render();
     this.#renderer.compute(this.exposure.passes);
   }

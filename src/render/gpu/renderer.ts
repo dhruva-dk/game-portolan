@@ -35,6 +35,8 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   if (!adapter) throw new Error('Portolan needs WebGPU, and this device offered no adapter');
   const renderer = new WebGPURenderer({
     canvas, antialias: false, alpha: false, depth: true, stencil: false, powerPreference: 'high-performance',
+    // the bounce light's buffer is packed floats (post.ts)
+    requiredFeatures: ['rg11b10ufloat-renderable'].filter((f) => adapter.features.has(f)),
     requiredLimits: {
       maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
       maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,

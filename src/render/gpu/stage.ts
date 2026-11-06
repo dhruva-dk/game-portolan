@@ -108,7 +108,7 @@ export class GpuStage {
     this.#scale = phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop;
     // every point light without a shadow is clustered, over the frame as the scene pass draws it
     renderer.lighting = new ClusteredLighting(this.#scale);
-    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
+    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay, this.atmosphere.sun);
     this.resize();
   }
 
