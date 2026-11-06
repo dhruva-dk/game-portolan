@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "ios": "node tools/ios.ts",
+    "ios:ipad": "node tools/ios.ts --real",
     "capture": "node tools/capture/run.ts",
     "check:assets": "vite build --logLevel warn && node tools/check-assets.ts"
   },

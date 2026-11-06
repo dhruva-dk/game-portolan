@@ -42,6 +42,82 @@ export async function buildApp(): Promise<string> {
   return APP;
 }
 
+// ---------------------------------------------------------------- a real device
+
+/** The app built for real devices (Debug, so Safari's Web Inspector can attach to its web view). */
+export const DEVICE_APP = join(DERIVED, 'Build/Products/Debug-iphoneos/App.app');
+
+/** The team that signs a build for a real device: PORTOLAN_TEAM, else the paid team Xcode is signed in to. */
+export function signingTeam(): string {
+  if (process.env.PORTOLAN_TEAM) return process.env.PORTOLAN_TEAM;
+  const plist = join(LOGS, 'xcode-defaults.plist');
+  mkdirSync(LOGS, { recursive: true });
+  execFileSync('defaults', ['export', 'com.apple.dt.Xcode', plist]);
+  let teams: { teamID: string; isFreeProvisioningTeam: boolean }[] = [];
+  try {
+    const byAccount = JSON.parse(execFileSync('plutil', ['-extract', 'IDEProvisioningTeamByIdentifier', 'json', '-o', '-', plist], { encoding: 'utf8' }));
+    teams = Object.values(byAccount).flat() as typeof teams;
+  } catch {
+    // (no account signed in)
+  }
+  const paid = teams.find((t) => !t.isFreeProvisioningTeam) ?? teams[0];
+  if (!paid) throw new Error('no signing team: sign in to Xcode (Settings › Accounts) with your Apple Developer account, or set PORTOLAN_TEAM');
+  return paid.teamID;
+}
+
+/** Builds the app for real devices, signed by `team`. */
+export async function buildDeviceApp(team: string): Promise<string> {
+  await build({ root, logLevel: 'warn' });
+  step('cap-sync', 'npx', ['cap', 'sync', 'ios']);
+  step('xcodebuild-device', 'xcodebuild', [
+    '-project', 'ios/App/App.xcodeproj', '-scheme', 'App', '-configuration', 'Debug',
+    '-destination', 'generic/platform=iOS', '-derivedDataPath', DERIVED, '-allowProvisioningUpdates',
+    `DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic', '-quiet', 'build',
+  ]);
+  return DEVICE_APP;
+}
+
+export interface RealDevice { id: string; name: string; type: string; paired: boolean; developerMode: boolean; connected: boolean }
+
+/** The real iPads and iPhones this Mac knows, paired or not. */
+export function realDevices(): RealDevice[] {
+  const out = join(LOGS, 'devices.json');
+  mkdirSync(LOGS, { recursive: true });
+  execFileSync('xcrun', ['devicectl', 'list', 'devices', '--json-output', out], { stdio: 'ignore' });
+  const { result } = JSON.parse(readFileSync(out, 'utf8')) as {
+    result: { devices: {
+      identifier: string;
+      deviceProperties: { name: string; developerModeStatus?: string };
+      hardwareProperties: { reality: string; deviceType: string };
+      connectionProperties: { pairingState: string; tunnelState?: string; transportType?: string };
+    }[] };
+  };
+  return result.devices.filter((d) => d.hardwareProperties.reality === 'physical').map((d) => ({
+    id: d.identifier, name: d.deviceProperties.name, type: d.hardwareProperties.deviceType,
+    paired: d.connectionProperties.pairingState === 'paired',
+    developerMode: d.deviceProperties.developerModeStatus === 'enabled',
+    connected: d.connectionProperties.tunnelState === 'connected' || !!d.connectionProperties.transportType,
+  }));
+}
+
+/** The real device of a kind ('iPad' or 'iPhone') to install on, or why there is none ready. */
+export function realDevice(type: 'iPad' | 'iPhone'): RealDevice {
+  const all = realDevices().filter((d) => d.type === type);
+  const ready = all.find((d) => d.paired && d.developerMode);
+  if (ready) return ready;
+  if (!all.length) throw new Error(`no ${type} known to this Mac: connect it by USB, unlock it and tap Trust`);
+  const d = all[0];
+  if (!d.paired) throw new Error(`${d.name} is not paired: connect it by USB, unlock it and tap Trust`);
+  throw new Error(`${d.name} has Developer Mode off: Settings › Privacy & Security › Developer Mode, then restart it`);
+}
+
+/** Installs the device build on a real device and starts it. */
+export function installOnDevice(device: RealDevice, app = DEVICE_APP): void {
+  step('devicectl-install', 'xcrun', ['devicectl', 'device', 'install', 'app', '--device', device.id, app]);
+  step('devicectl-launch', 'xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device.id, '--terminate-existing', APP_ID]);
+}
+
+
 export function simulator(device: DeviceName = 'ipad'): string {
   const { label, simulator: type } = DEVICES[device];
   const name = `Portolan ${label}`;
@@ -134,11 +210,22 @@ if (import.meta.main) {
       shot: { type: 'string' },
       wait: { type: 'string', default: '10' },
       'no-build': { type: 'boolean', default: false },
+      // install on the real iPad (or iPhone, with --device iphone) instead of the Simulator
+      real: { type: 'boolean', default: false },
     },
   });
   const device = a.device as DeviceName;
   if (!(device in DEVICES)) throw new Error(`--device must be one of ${Object.keys(DEVICES).join(', ')}`);
   const t0 = Date.now(), done = (what: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(0).padStart(4)} s  ${what}`);
+  if (a.real) {
+    const target = realDevice(device === 'ipad' ? 'iPad' : 'iPhone');
+    const team = signingTeam();
+    done(`installing on ${target.name}, signed by team ${team}`);
+    if (!a['no-build']) done(`built ${await buildDeviceApp(team)}`);
+    installOnDevice(target);
+    done(`installed and launched ${APP_ID} on ${target.name}`);
+    process.exit(0);
+  }
   if (!a['no-build']) done(`built ${await buildApp()}`);
   const udid = simulator(device);
   boot(udid);
