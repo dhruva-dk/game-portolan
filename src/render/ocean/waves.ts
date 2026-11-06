@@ -11,6 +11,9 @@
 //                 pixel's footprint, which turns detail too fine to draw into roughness (Bruneton, Neyret and
 //                 Holzschuch, "Real-time Realistic Ocean Lighting", 2010), so the sun's glitter widens into a road
 //                 toward the horizon and the sea never sparkles in noise.
+//   curvature     (∂²h/∂x², ∂²h/∂z², ∂²h/∂x∂z), central differences of the slopes: how the surface focuses the light
+//                 under it into caustics. Its mips are the curvature blurred over the sun's disc at a depth, so the
+//                 caustics of the shortest ripples fade a little way down and only the long waves' reach the deep.
 // Foam is the surface folding over (the Jacobian of its displacement dropping toward zero) and stays, fading, after
 // the crest has passed.
 import { RepeatWrapping, LinearMipmapLinearFilter, HalfFloatType, StorageArrayTexture, type ComputeNode, type Node } from 'three/webgpu';
@@ -18,8 +21,8 @@ import {
   Fn, clamp, cos, cosh, exp, float, instanceIndex, instancedArray, localId, log, max, pow, select, sin, sqrt, tanh,
   storageTexture, int, uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId, atan,
 } from 'three/tsl';
-import { Vector2 } from 'three/webgpu';
-import { CASCADES, CUTS, G, N, SIZES, SWELL_SPREAD, type SpectrumParams } from './spectrum.ts';
+import { Vector2, Vector3 } from 'three/webgpu';
+import { CASCADES, CUTS, G, N, SIZES, SWELL_SPREAD, curvatureRms, type SpectrumParams } from './spectrum.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -41,6 +44,8 @@ export const SEA = {
   foamFold: uniform(0.55),
   foamGain: uniform(2.5),
   foamLife: uniform(2.8),
+  /** Each cascade's RMS curvature, 1/m (spectrum.ts curvatureRms): how hard its waves focus light into caustics. */
+  curvature: uniform(new Vector3(0.05, 0.5, 5)),
 };
 
 export function setSpectrum(p: SpectrumParams, seed: number): void {
@@ -51,6 +56,7 @@ export function setSpectrum(p: SpectrumParams, seed: number): void {
   SEA.swellPeak.value = p.swellPeak;
   (SEA.swellDir.value as Vector2).set(...p.swellDir);
   SEA.seed.value = seed;
+  (SEA.curvature.value as Vector3).fromArray(curvatureRms(p));
 }
 
 const NN = N * N;
@@ -118,10 +124,10 @@ const modeOf = (i: U): F => select(i.lessThan(uint(HALF)), float(i), float(i).su
 const cmul = (a: V2, b: V2): V2 => vec2(a.x.mul(b.x).sub(a.y.mul(b.y)), a.x.mul(b.y).add(a.y.mul(b.x)));
 
 /** The layers of the waves' texture: each kind's first cascade; the cascades follow it. */
-export const LAYER = { displacement: 0, slope: CASCADES, moments: 2 * CASCADES } as const;
+export const LAYER = { displacement: 0, slope: CASCADES, moments: 2 * CASCADES, curvature: 3 * CASCADES } as const;
 
 function waveField(): StorageArrayTexture {
-  const t = new StorageArrayTexture(N, N, 3 * CASCADES);
+  const t = new StorageArrayTexture(N, N, 4 * CASCADES);
   t.type = HalfFloatType;
   t.wrapS = t.wrapT = RepeatWrapping;
   t.minFilter = LinearMipmapLinearFilter;
@@ -132,8 +138,8 @@ function waveField(): StorageArrayTexture {
 }
 
 export class Waves {
-  /** Displacement, slope and moments for every cascade (see the top of this file), one texture so the water's
-   *  shader samples all nine through one sampler: Metal allows sixteen to a stage. */
+  /** Displacement, slope, moments and curvature for every cascade (see the top of this file), one texture so the
+   *  water's shader samples all twelve through one sampler: Metal allows sixteen to a stage. */
   readonly field = waveField();
   /** Builds the starting amplitudes: run when the sea state changes. */
   readonly build: ComputeNode;
@@ -240,6 +246,14 @@ export class Waves {
       store.depth(layer.add(LAYER.displacement)).store(at, vec4(dx, dy, dz, f));
       store.depth(layer.add(LAYER.slope)).store(at, vec4(dyx, dyz, dxx, dzz));
       store.depth(layer.add(LAYER.moments)).store(at, vec4(dyx.mul(dyx), dyz.mul(dyz), dyx.mul(dyz), dxz));
+      // the slopes either side, the tile wrapping round
+      const slopes = (u: U, v: U) => work.element(c.add(uint(CASCADES)).mul(uint(NN)).add(v.mul(uint(N))).add(u)).xy;
+      const east = slopes(x.add(uint(1)).mod(uint(N)), y), west = slopes(x.add(uint(N - 1)).mod(uint(N)), y);
+      const north = slopes(x, y.add(uint(1)).mod(uint(N))), south = slopes(x, y.add(uint(N - 1)).mod(uint(N)));
+      const twice = cascadeSize(c).mul(2 / N);
+      const hxx = east.x.sub(west.x).div(twice), hzz = north.y.sub(south.y).div(twice);
+      const hxz = north.x.sub(south.x).add(east.y.sub(west.y)).div(twice.mul(2));
+      store.depth(layer.add(LAYER.curvature)).store(at, vec4(hxx, hzz, hxz, 0));
     })().compute(CASCADES * NN, [64]);
 
     this.frame = [evolve, fft(false), fft(true), resolve];

@@ -1,0 +1,124 @@
+// What reaches a surface under the sea: the sun's light and the sky's, after the water above has taken its share on
+// the way down (Beer–Lambert, along the sun's refracted path and along a diffuse one for the sky), the sun's gathered
+// into caustics by the waves overhead.
+//
+// It is applied to the whole of a fragment's light, before the haze, so everything under the surface stands in it
+// alike: the seabed, the foot of a cliff, a reef, the bottom of a hull, a whale. The sea's own surface takes no part.
+//
+// The caustics are the waves' focusing worked out in the small-slope limit: light falling through a surface h(x) is
+// bent by (1 − 1/n)∇h, so after a path d it lands at x + d(1 − 1/n)∇h(x), and the light that crossed a patch of
+// surface is spread over that patch's image, I = 1 / |det(I + d(1 − 1/n)H)| with H the Hessian of h. The Hessian
+// comes from the waves' curvature layers, read at the mip whose texels are as wide as the sun's disc blurs a caustic
+// at that depth, or as a pixel there, whichever is wider.
+//
+// One pre-image is all the formula sees. Past a wave's focal depth, 1/(d(1 − 1/n)|H|), the map folds and several
+// patches of surface light the same spot; summing one of them loses light, and the floor goes dark in a speckle. So
+// each cascade's curvature is weighed down once the path passes its waves' focal depth (from their RMS curvature,
+// worked out from the spectrum): a cascade that has overfocused has spread into the even light it averages to, and
+// the caustics left are those of the waves whose focus lies about this deep: the ripples' fine bright net in a hand's
+// depth of water, only the long waves' broad one in the deep.
+import { type Node, type NodeBuilder, type Texture } from 'three/webgpu';
+import {
+  Fn, If, abs, clamp, dot, exp, float, fwidth, int, length, log2, max, min, mix, smoothstep, sqrt, texture, vec2, vec3,
+} from 'three/tsl';
+import { CASCADES, N, SIZES } from './spectrum.ts';
+import { LAYER, SEA } from './waves.ts';
+import { FRAME, FRAMES, WATER, inFrame, type Frame } from './surface.ts';
+import { skyLight, sunlight } from '../atmosphere/light.ts';
+import { P } from '../gpu/uniforms.ts';
+
+type F = Node<'float'>;
+type V2 = Node<'vec2'>;
+type V3 = Node<'vec3'>;
+
+/** How far light falling through the surface is turned per unit of slope: 1 − 1/n for water. */
+const BEND = 1 - 1 / 1.333;
+/** The sun's angular radius, which blurs a caustic by this much per metre of depth. */
+const SUN_BLUR = 0.0047;
+/** The bend times RMS curvature at which a cascade's waves have reached their focus, past which they are weighed
+ *  down: a little under one, so the brightest lines still come through. */
+const FOCUS = 0.7;
+/** The brightest a caustic gets, times the light that fell on the surface. */
+const BRIGHTEST = 7;
+/** How far the crests can stand above the mean sea, metres: nothing higher than this is ever under water. */
+const CRESTS = 4;
+
+const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));
+
+/** A filter that takes a fragment's light at p to what it is under the waves of `field`. */
+export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
+  const waves = texture(field);
+  const sample = (uv: V2, layer: number) => waves.sample(uv).depth(int(layer));
+
+  /** The waves' height over up, in one frame. */
+  const rise = (up: V3, f: Frame): F => {
+    const { q } = inFrame(up, f);
+    const h = float(0).toVar();
+    for (let c = 0; c < CASCADES; c++) h.addAssign(sample(q.div(SIZES[c]), LAYER.displacement + c).level(float(2)).y);
+    return h;
+  };
+
+  /** The Hessian of the surface (xx, zz, xz) the light came through, in one frame's axes: at the point up, the light
+   *  having run `run` from where it fell, blurred over `blur` metres, each cascade weighed by `focus` once its waves
+   *  have overfocused over a bend of `k` (path × (1 − 1/n)). */
+  const curvature = (up: V3, run: V3, f: Frame, blur: F, k: F): V3 => {
+    const { q, e1, e2 } = inFrame(up, f);
+    const from = q.sub(vec2(dot(run, e1), dot(run, e2)));
+    const H = vec3(0).toVar();
+    const rms = [SEA.curvature.x, SEA.curvature.y, SEA.curvature.z];
+    for (let c = 0; c < CASCADES; c++) {
+      const texel = SIZES[c] / N;
+      const lod = max(log2(blur.div(texel)), 0);
+      const weight = min(float(1), float(FOCUS).div(max(k.mul(rms[c]), 1e-4)));
+      H.addAssign(sample(from.div(SIZES[c]), LAYER.curvature + c).level(lod).xyz.mul(weight));
+    }
+    return H;
+  };
+
+  return (colour: V3, p: V3): V3 =>
+    Fn((builder: NodeBuilder) => {
+      const material = (builder as unknown as { material?: { userData?: { seaSurface?: boolean } } }).material;
+      if (material?.userData?.seaSurface) return colour;
+      const out = vec3(colour).toVar();
+      const r = p.length();
+      const sea = P.planet.y;
+      If(r.lessThan(sea.add(CRESTS)), () => {
+        const up = p.div(r);
+        const w = FRAME.weight;
+        const surface = rise(up, FRAMES[0]).mul(w.x).toVar();
+        If(w.y.greaterThan(0), () => {
+          surface.addAssign(rise(up, FRAMES[1]).mul(w.y));
+        });
+        const depth = sea.add(surface).sub(r);
+        If(depth.greaterThan(0), () => {
+          // the sun's way down, bent toward the vertical as it enters
+          const mu = dot(up, P.sunDir);
+          const cosT = sqrt(max(float(1).sub(float(1).sub(mu.mul(mu)).div(1.333 * 1.333)), 0));
+          const path = depth.div(max(cosT, 0.2));
+          const down = exp(WATER.extinction.mul(path).negate());
+          // the sky's light comes down from every side: on average along a path a third longer than the depth
+          const diffuse = exp(WATER.extinction.mul(depth.mul(1.33)).negate());
+          // where the sun's ray through p entered: back along its run under the surface
+          const flat = P.sunDir.sub(up.mul(mu));
+          const run = flat.div(1.333).mul(path).negate();
+          const pixel = length(fwidth(p));
+          const blur = max(max(path.mul(SUN_BLUR), pixel.mul(1.5)), 0.01);
+          const k = path.mul(BEND);
+          const H = curvature(up, run, FRAMES[0], blur, k).mul(w.x).toVar();
+          If(w.y.greaterThan(0), () => {
+            H.addAssign(curvature(up, run, FRAMES[1], blur, k).mul(w.y));
+          });
+          const det = float(1).add(k.mul(H.x)).mul(float(1).add(k.mul(H.y))).sub(k.mul(k).mul(H.z).mul(H.z));
+          const focus = clamp(float(1).div(max(abs(det), 1 / BRIGHTEST)), 0, BRIGHTEST);
+          // a hand's depth of water is too thin to focus anything yet
+          const caustic = mix(float(1), focus, smoothstep(0, 0.25, depth));
+          // the sun's share of the light on a level patch here, which is the share the caustics move
+          const sun = luma(sunlight).mul(max(mu, 0));
+          const sky = luma(skyLight(p, up));
+          const share = sun.div(max(sun.add(sky), 1e-6));
+          out.assign(colour.mul(down.mul(caustic).mul(share).add(diffuse.mul(float(1).sub(share)))));
+        });
+      });
+      return out;
+    })();
+}

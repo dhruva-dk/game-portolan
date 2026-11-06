@@ -1,11 +1,12 @@
 // The ocean: the waves, the surface drawn from them, and the swell the hulls ride, kept in step. The stage owns one,
 // sets its sea state from the weather and calls update() once a frame before drawing.
-import { Quaternion, Vector2, Vector3, type Mesh, type WebGPURenderer } from 'three/webgpu';
+import { Quaternion, Vector2, Vector3, type Mesh, type Node, type WebGPURenderer } from 'three/webgpu';
 import type { V3 } from '../../sim/math.ts';
 import { R } from '../../sim/sphere.ts';
 import { CALM_SEA, LongWaves, spectrumParams, type SeaState } from './spectrum.ts';
 import { SEA, Waves, setSpectrum } from './waves.ts';
 import { FRAME, WATER, oceanSurface } from './surface.ts';
+import { beneath } from './beneath.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
  *  where the map stretches the sea 4% across. */
@@ -31,9 +32,13 @@ export class Ocean {
   #fade = 0;
   #time = 0;
 
+  /** What the sea does to the light of anything under it: give it to the atmosphere's haze. */
+  readonly beneath: (colour: Node<'vec3'>, p: Node<'vec3'>) => Node<'vec3'>;
+
   constructor(seed = 1) {
     this.#seed = seed;
     this.mesh = oceanSurface(this.waves);
+    this.beneath = beneath(this.waves.field);
   }
 
   /** The sea now: the spectrum is rebuilt before the next frame when it has changed. */

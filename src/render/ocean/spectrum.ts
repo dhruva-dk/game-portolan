@@ -98,6 +98,25 @@ export function spectrum(kx: number, kz: number, p: SpectrumParams): number {
   return ((wind + swell) * dwdk) / k * Math.exp(-k * k * 1e-4);
 }
 
+/** Each cascade's RMS curvature of the surface, 1/m: sqrt(∫ E(k) k⁴ d²k) over its band of wavenumbers, up to the
+ *  finest its grid holds. How strongly that cascade's waves focus light, and so how deep before they overfocus. */
+export function curvatureRms(p: SpectrumParams): number[] {
+  return SIZES.map((L, c) => {
+    const lo = Math.max(CUTS[c], (2 * Math.PI) / L), hi = Math.min(CUTS[c + 1], (Math.PI * N) / L);
+    const RADII = 96, ANGLES = 64;
+    let sum = 0;
+    for (let i = 0; i < RADII; i++) {
+      // log-spaced in k, which is where the spectrum's shape lives
+      const k0 = lo * Math.pow(hi / lo, i / RADII), k1 = lo * Math.pow(hi / lo, (i + 1) / RADII), k = Math.sqrt(k0 * k1);
+      for (let j = 0; j < ANGLES; j++) {
+        const a = ((j + 0.5) / ANGLES) * 2 * Math.PI;
+        sum += spectrum(k * Math.cos(a), k * Math.sin(a), p) * k ** 4 * k * (k1 - k0) * ((2 * Math.PI) / ANGLES);
+      }
+    }
+    return Math.sqrt(sum);
+  });
+}
+
 /** PCG's hash (Jarzynski and Olano, "Hash Functions for GPU Rendering", JCGT 2020), the GPU's to the bit. */
 export function pcg(v: number): number {
   const state = (Math.imul(v >>> 0, 747796405) + 2891336453) >>> 0;

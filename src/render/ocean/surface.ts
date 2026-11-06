@@ -86,11 +86,11 @@ export const WATER = {
   ripples: uniform(0.0012),
 };
 
-interface Frame { anchor: Node<'vec3'>; axis: Node<'vec3'> }
-const FRAMES: Frame[] = [{ anchor: FRAME.anchor0, axis: FRAME.axis0 }, { anchor: FRAME.anchor1, axis: FRAME.axis1 }];
+export interface Frame { anchor: Node<'vec3'>; axis: Node<'vec3'> }
+export const FRAMES: Frame[] = [{ anchor: FRAME.anchor0, axis: FRAME.axis0 }, { anchor: FRAME.anchor1, axis: FRAME.axis1 }];
 
 /** Where up lies in a frame, metres in its plane, and the plane's axes carried to up (for displacement and slope). */
-function inFrame(up: V3, f: Frame): { q: V2; e1: V3; e2: V3 } {
+export function inFrame(up: V3, f: Frame): { q: V2; e1: V3; e2: V3 } {
   const A = f.anchor, a1 = f.axis;
   const a2 = A.cross(a1);
   const c = dot(up, A);
@@ -109,6 +109,8 @@ function inFrame(up: V3, f: Frame): { q: V2; e1: V3; e2: V3 } {
 export function oceanSurface(waves: Waves): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   mat.fog = true;
+  // the surface is what the light under it passes through, not something beneath it
+  mat.userData.seaSurface = true;
 
   // ----- vertex: the grid on the sphere, moved by the waves
   const along = positionGeometry.x, bearing = positionGeometry.z;

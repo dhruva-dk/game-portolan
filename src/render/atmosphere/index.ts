@@ -1,7 +1,7 @@
 // The atmosphere: the tables, the sky behind everything, the haze in front of everything, and the three lights the air
 // casts. The stage owns one and calls update() once a frame before drawing.
 import {
-  DirectionalLight, Matrix4, PMREMGenerator, Scene, Vector3, type PerspectiveCamera, type RenderTarget, type WebGPURenderer,
+  DirectionalLight, Matrix4, PMREMGenerator, Scene, Vector3, type Node, type PerspectiveCamera, type RenderTarget, type WebGPURenderer,
 } from 'three/webgpu';
 import { Fn, output, positionWorld, vec4 } from 'three/tsl';
 import { AIR, CLEAR_AIR, setAir, type Air } from './model.ts';
@@ -10,12 +10,21 @@ import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
 import { SkyLight, SkyLightNode, bodyLight, moonlight, sunlight } from './light.ts';
 import { P } from '../gpu/uniforms.ts';
 
+type V3 = Node<'vec3'>;
+
+/** What stands between the light and a surface, worked on the surface's light at p: the sea over it, say. */
+export type LightFilter = (colour: V3, p: V3) => V3;
+
 /** Everything the scene's surfaces take on with distance: the light lost on the way to the eye and the light
- *  scattered in along it. Every material with fog on reads it. */
-export const aerialFog = Fn(() => {
-  const { light, loss } = aerialAt(positionWorld);
-  return vec4(output.rgb.mul(loss).add(light), output.a);
-})();
+ *  scattered in along it, after the filter has worked on the light the surface had. Every material with fog on
+ *  reads it. */
+export function haze(filter?: LightFilter): Node<'vec4'> {
+  return Fn(() => {
+    const colour = filter ? filter(output.rgb, positionWorld) : output.rgb;
+    const { light, loss } = aerialAt(positionWorld);
+    return vec4(colour.mul(loss).add(light), output.a);
+  })();
+}
 
 /** How often the probe of the sky round the eye is retaken, seconds, unless the light or the eye moves a lot. */
 const PROBE_EVERY = 0.75;
@@ -48,10 +57,10 @@ export class Atmosphere {
     this.#generator = new PMREMGenerator(renderer);
   }
 
-  /** Puts the sky, the haze and the lights into a scene. */
-  install(scene: Scene): void {
+  /** Puts the sky, the haze and the lights into a scene; the filter works on every surface's light first. */
+  install(scene: Scene, filter?: LightFilter): void {
     scene.backgroundNode = skyBackground;
-    scene.fogNode = aerialFog;
+    scene.fogNode = haze(filter);
     scene.add(this.sun, this.sun.target, this.moon, this.moon.target, this.sky);
   }
 
