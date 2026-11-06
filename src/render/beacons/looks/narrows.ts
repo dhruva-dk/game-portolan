@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { Kit, column, crystal, halo, lit, merge, particles, place, tick, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
+import { abs, cos, dot, exp, length, max, mix, pow, select, sin, smoothstep, vec3 } from 'three/tsl';
+import { bFbm, bNoise, shapeSpark, type V3 } from '../nodes.ts';
 
 const HOOD = 34;
 const CORE = new THREE.Vector3(0, HOOD + 5, 0);
@@ -21,6 +23,7 @@ export const narrows: BeaconLook = {
   build(seed) {
     const k = new Kit(seed, 'beacon:narrows');
     const core = `vec3(${CORE.x.toFixed(1)}, ${CORE.y.toFixed(1)}, ${CORE.z.toFixed(1)})`;
+    const coreN = vec3(CORE.x, CORE.y, CORE.z);
 
     // the hoodoo: wide foot, waisted middle, a cap-rock lip, split at the top
     const hood = column({
@@ -41,6 +44,19 @@ export const narrows: BeaconLook = {
         float d = length(vLocal - ${core});
         float seam = exp(-abs(vLocal.x) / 2.5) * smoothstep(0.0, 6.0, vLocal.z) * smoothstep(8.0, 30.0, vLocal.y);
         totalEmissiveRadiance += vec3(0.12, 0.3, 1.0) * (exp(-d / 9.0) * 1.2 + seam * 0.25) * uNight;`,
+      albedoNode: ({ local: L }) => {
+        const band = sin(L.y.mul(0.95).add(bNoise(L.mul(0.2)).mul(2.5)));
+        let c: V3 = mix(vec3(0.62, 0.4, 0.2), vec3(0.45, 0.19, 0.1), smoothstep(-0.3, 0.6, band));
+        c = mix(c, vec3(0.72, 0.56, 0.38), smoothstep(0.75, 0.95, band).mul(0.7));
+        c = c.mul(bFbm(L.mul(0.6)).mul(0.3).add(0.8));
+        return mix(c, c.mul(0.45), smoothstep(2.5, 0, L.y));
+      },
+      emissiveNode: ({ local: L, night }) => {
+        // blue light spilling from the geode onto the rock
+        const d = length(L.sub(coreN));
+        const seam = exp(abs(L.x).div(-2.5)).mul(smoothstep(0, 6, L.z)).mul(smoothstep(8, 30, L.y));
+        return vec3(0.12, 0.3, 1).mul(exp(d.div(-9)).mul(1.2).add(seam.mul(0.25))).mul(night);
+      },
     });
     const rock = new THREE.Mesh(hood, sandstone);
     rock.castShadow = rock.receiveShadow = true;
@@ -83,6 +99,16 @@ export const narrows: BeaconLook = {
         vec3 blue = vec3(0.08, 0.28, 1.0);
         vec3 e = blue * (inner * (0.8 + 0.2 * sin(uTime * 0.7)) + bands * 0.9) + vec3(0.5, 0.75, 1.0) * (fres * 1.4 + sweep * 2.5);
         totalEmissiveRadiance += e * mix(0.03, 1.0, uNight);`,
+      albedoNode: ({ local: L }) => mix(vec3(0.03, 0.08, 0.35), vec3(0.15, 0.3, 0.8), bNoise(L.mul(0.7))),
+      emissiveNode: ({ local: L, t, night, fres }) => {
+        const d = length(L.sub(coreN)), inner = exp(d.div(-8)).mul(2.2).add(0.35);
+        const bands = smoothstep(0.55, 0.9, bNoise(L.mul(vec3(0.9, 0.3, 0.9)).add(vec3(0, t.mul(0.3), 0))));
+        // light sweeping along the facets
+        const sweep = pow(max(0, sin(dot(L, vec3(0.31, 0.53, 0.22)).mul(0.8).sub(t.mul(1.4)))), 24);
+        const e = vec3(0.08, 0.28, 1).mul(inner.mul(sin(t.mul(0.7)).mul(0.2).add(0.8)).add(bands.mul(0.9)))
+          .add(vec3(0.5, 0.75, 1).mul(fres.mul(1.4).add(sweep.mul(2.5))));
+        return e.mul(mix(0.03, 1, night));
+      },
     });
     const gems = new THREE.Mesh(merge(cs), sapphire);
     gems.castShadow = true;
@@ -96,8 +122,18 @@ export const narrows: BeaconLook = {
         pos = ${core} + vec3(cos(a) * r, (s.y - 0.35) * 22.0 + sin(t * 0.4 + s.x * 9.0) * 1.5, sin(a) * r);
         float tw = pow(max(0.0, sin(t * (1.0 + s.z * 3.0) + s.w * 50.0)), 10.0);
         size = 0.12 + 0.28 * tw; alpha = 0.2 + 2.0 * tw;`,
+      shapeNode: shapeSpark,
+      motionNode: ({ s, t }) => {
+        const a = s.x.mul(6.2831).add(t.mul(s.y.mul(0.15).add(0.1)).mul(select(s.z.greaterThan(0.5), 1, -1)));
+        const r = s.w.mul(15).add(3);
+        const tw = pow(max(0, sin(t.mul(s.z.mul(3).add(1)).add(s.w.mul(50)))), 10);
+        return {
+          pos: coreN.add(vec3(cos(a).mul(r), s.y.sub(0.35).mul(22).add(sin(t.mul(0.4).add(s.x.mul(9))).mul(1.5)), sin(a).mul(r))),
+          size: tw.mul(0.28).add(0.12), alpha: tw.mul(2).add(0.2),
+        };
+      },
     }));
-    k.add(halo(k, [CORE.x, CORE.y + 2, CORE.z], 15, 0x3c78ff, 0, 0.7, '0.9 + 0.1 * sin(uTime * 0.7)', 14));
+    k.add(halo(k, [CORE.x, CORE.y + 2, CORE.z], 15, 0x3c78ff, 0, 0.7, '0.9 + 0.1 * sin(uTime * 0.7)', 14, '', ({ t }) => sin(t.mul(0.7)).mul(0.1).add(0.9)));
     k.add(halo(k, [0, 46, 0], 34, 0x2f62ff, 0, 0.12, '1.0', 34));
     k.setPulse((t) => 0.9 + 0.1 * Math.sin(t * 0.7));
     return k.root;

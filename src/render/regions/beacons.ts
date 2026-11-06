@@ -8,27 +8,34 @@ import { patchAll } from '../engine.ts';
 interface Placed {
   obj: THREE.Object3D;
   look: BeaconLook;
+  /** The outward normal where it stands. */
+  up: THREE.Vector3;
 }
 
 export class Beacons {
   readonly group = new THREE.Group();
   private readonly placed: Placed[] = [];
 
-  constructor(seed = 1) {
+  /** `gpu`: built for the WebGPU planet, whose materials take the planet's light and air as they are. */
+  constructor(seed = 1, gpu = false) {
     this.group.name = 'beacons';
     BEACONS.forEach((b, i) => {
       const look = BEACON_LOOKS[REGIONS[b.region].id], ground = Math.max(0, heightAt(b.pos));
       const obj = look.build(seed + i);
       placeBeacon(obj, b.pos, b.facing, R, look.ground === 'shore' ? ground : 0);
       this.group.add(obj);
-      this.placed.push({ obj, look });
+      this.placed.push({ obj, look, up: new THREE.Vector3(b.pos.x, b.pos.y, b.pos.z).normalize() });
     });
     // the beacon library's own materials get the planet's light and air too
-    patchAll(this.group);
+    if (!gpu) patchAll(this.group);
   }
 
-  /** t: seconds; night: 0 day to 1 night where the camera is. */
-  update(t: number, night: number): void {
-    for (const p of this.placed) p.look.update(p.obj, t, night);
+  /** t: seconds; night: 0 day to 1 night where the camera is. Given the sun, each beacon is lit by the night where
+   *  it stands instead, so from high over the planet those on its dark side shine and those in the day are quiet. */
+  update(t: number, night: number, sun?: THREE.Vector3): void {
+    for (const p of this.placed) {
+      const n = sun ? Math.min(1, Math.max(0, (0.08 - p.up.dot(sun)) / 0.16)) : night;
+      p.look.update(p.obj, t, n);
+    }
   }
 }

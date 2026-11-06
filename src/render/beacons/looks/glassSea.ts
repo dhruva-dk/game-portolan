@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { Kit, crystal, disc, halo, lit, merge, particles, pillar, place, surface, tick, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
+import { abs, cos, exp, length, max, mix, mod, pow, sin, smoothstep, vec3 } from 'three/tsl';
+import { bNoise, shapeSpark } from '../nodes.ts';
 
 const TOP = 70;
 
@@ -38,6 +40,11 @@ export const glassSea: BeaconLook = {
       emissive: /* glsl */ `float inner = exp(-max(0.0, vLocal.y + 2.0) / 9.0);
         float sweep = pow(max(0.0, sin(vLocal.y * 0.5 - uTime * 0.9)), 16.0);
         totalEmissiveRadiance += vec3(0.55, 0.95, 1.0) * (inner * 1.6 + sweep * 2.0 + fres * 1.2) * mix(0.02, 1.0, uNight);`,
+      albedoNode: ({ local: L }) => mix(vec3(0.7, 0.9, 0.92), vec3(0.95, 1, 1), bNoise(L.mul(0.8))),
+      emissiveNode: ({ local: L, t, fres, night }) => {
+        const inner = exp(max(0, L.y.add(2)).div(-9)), sweep = pow(max(0, sin(L.y.mul(0.5).sub(t.mul(0.9)))), 16);
+        return vec3(0.55, 0.95, 1).mul(inner.mul(1.6).add(sweep.mul(2)).add(fres.mul(1.2))).mul(mix(0.02, 1, night));
+      },
     });
     k.add(new THREE.Mesh(merge(cs), quartz));
 
@@ -48,6 +55,12 @@ export const glassSea: BeaconLook = {
         float c = bNoise(vec3(p * 0.35, uTime * 0.3)) + bNoise(vec3(p * 0.7 + 9.0, -uTime * 0.25));
         float caustic = pow(1.0 - abs(c - 1.0), 6.0);
         glow = (0.25 + caustic * 1.4) * smoothstep(36.0, 20.0, r) + 1.5 * exp(-r / 6.0);`,
+      paintNode: ({ local, t }) => {
+        const p = local.xz, r = length(p);
+        const c = bNoise(vec3(p.mul(0.35), t.mul(0.3))).add(bNoise(vec3(p.mul(0.7).add(9), t.mul(-0.25))));
+        const caustic = pow(abs(c.sub(1)).oneMinus(), 6);
+        return { glow: caustic.mul(1.4).add(0.25).mul(smoothstep(36, 20, r)).add(exp(r.div(-6)).mul(1.5)) };
+      },
     }));
 
     // the pillar: pale, soft-edged, breathing slowly, fading as it climbs
@@ -57,6 +70,14 @@ export const glassSea: BeaconLook = {
         float core = exp(-x * x * 9.0) + 0.35 * exp(-x * x * 2.0);
         float rise = bNoise(vec3(vUv.x * 3.0, vUv.y * 4.0 - uTime * 0.35, 2.0));
         glow = core * (0.75 + 0.35 * rise) * smoothstep(0.0, 0.06, vUv.y) * pow(1.0 - vUv.y, 1.4) * (0.9 + 0.1 * sin(uTime * 0.6));`,
+      paintNode: ({ uv: f, t }) => {
+        const x = abs(f.x.sub(0.5)).mul(2), x2 = x.mul(x);
+        const core = exp(x2.mul(-9)).add(exp(x2.mul(-2)).mul(0.35));
+        const rise = bNoise(vec3(f.x.mul(3), f.y.mul(4).sub(t.mul(0.35)), 2));
+        return {
+          glow: core.mul(rise.mul(0.35).add(0.75)).mul(smoothstep(0, 0.06, f.y)).mul(pow(f.y.oneMinus(), 1.4)).mul(sin(t.mul(0.6)).mul(0.1).add(0.9)),
+        };
+      },
     }));
 
     // motes drifting up the pillar
@@ -67,9 +88,16 @@ export const glassSea: BeaconLook = {
         pos = vec3(cos(a) * r, y, sin(a) * r);
         float tw = pow(0.5 + 0.5 * sin(t * (1.0 + s.z * 2.5) + s.w * 40.0), 3.0);
         size = 0.1 + 0.14 * tw; alpha = (0.3 + 0.8 * tw) * smoothstep(${TOP.toFixed(1)}, ${(TOP * 0.6).toFixed(1)}, y);`,
+      shapeNode: shapeSpark,
+      motionNode: ({ s, t }) => {
+        const y = mod(s.y.mul(TOP).add(t.mul(s.z.mul(1.4).add(0.8))), TOP);
+        const a = s.x.mul(6.2831).add(t.mul(0.2)), r = s.w.mul(3.5).add(0.5);
+        const tw = pow(sin(t.mul(s.z.mul(2.5).add(1)).add(s.w.mul(40))).mul(0.5).add(0.5), 3);
+        return { pos: vec3(cos(a).mul(r), y, sin(a).mul(r)), size: tw.mul(0.14).add(0.1), alpha: tw.mul(0.8).add(0.3).mul(smoothstep(TOP, TOP * 0.6, y)) };
+      },
     }));
 
-    k.add(halo(k, [0, 4, 0], 18, 0xa8f6ff, 0, 0.45, '0.9 + 0.1 * sin(uTime * 0.6)', 16));
+    k.add(halo(k, [0, 4, 0], 18, 0xa8f6ff, 0, 0.45, '0.9 + 0.1 * sin(uTime * 0.6)', 16, '', ({ t }) => sin(t.mul(0.6)).mul(0.1).add(0.9)));
     k.add(halo(k, [0, TOP * 0.55, 0], 34, 0x9aeeff, 0, 0.12, '1.0', 34));
     k.setPulse((t) => 0.9 + 0.1 * Math.sin(t * 0.6));
     return k.root;

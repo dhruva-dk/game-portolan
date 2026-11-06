@@ -9,7 +9,7 @@
 //    turned to each fragment's own horizon and coloured by its own sky).
 import { AnalyticLightNode, DirectionalLight, Light, type Node, type NodeBuilder, type Texture } from 'three/webgpu';
 import {
-  Fn, cameraWorldMatrix, clamp, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
+  Fn, cameraWorldMatrix, clamp, float, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
   int, pow, roughness, texture, vec2, vec3,
 } from 'three/tsl';
 import { AIR } from './model.ts';
@@ -129,3 +129,16 @@ export function bodyLight(colour: V3): DirectionalLight {
   (light as DirectionalLight & { colorNode: V3 }).colorNode = colour;
   return light;
 }
+
+/**
+ * The light a thin cloud at p sends to the eye per unit of its albedo: the sun and the moon through the air and after
+ * the clouds over it, and the sky's light from above and below, scattered about evenly so a quarter of what falls on
+ * it from each side comes back. For smoke, mist, spray and falling water.
+ */
+export const thinCloudLight = (p: V3): V3 => {
+  const r = p.length(), up = p.div(r);
+  const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(sunShade(p));
+  const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(p));
+  const sky = skyLight(p, up).add(skyLight(p, up.negate())).mul(0.5);
+  return sun.add(moon).mul(0.25).add(sky.div(Math.PI));
+};

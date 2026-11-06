@@ -15,6 +15,8 @@ import { Terrain } from '../terrain.ts';
 import { ScanCache } from '../land/scans.ts';
 import { landMaterial } from '../land/material.ts';
 import { CameraRig } from '../camera.ts';
+import { Beacons } from '../regions/beacons.ts';
+import { GPU } from '../actors/common.ts';
 import { moonDirection, sunDirection } from '../sky.ts';
 import { R } from '../../sim/sphere.ts';
 import type { V3 } from '../../sim/math.ts';
@@ -44,6 +46,7 @@ export class GpuStage {
   readonly post: Post;
   readonly clouds = new Clouds();
   readonly fall = new Fall();
+  readonly beacons = new Beacons(1, true);
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -60,13 +63,15 @@ export class GpuStage {
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
-    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group);
+    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group);
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
 
   static async create(canvas: HTMLCanvasElement, progress: (f: number, what: string) => void = () => {}): Promise<GpuStage> {
     progress(0.02, 'Charting the seas');
+    // whatever the stage builds from here takes its node materials
+    GPU.on = true;
     const { renderer, info } = await createRenderer(canvas);
     progress(0.5, 'Raising the islands');
     const stage = new GpuStage(canvas, renderer, info.phone);
@@ -136,6 +141,7 @@ export class GpuStage {
     this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);
+    this.beacons.update(v.time, P.night.value as number, this.sun);
     this.post.render();
 
     const now = performance.now();

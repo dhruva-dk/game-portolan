@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { Kit, disc, halo, lit, particles, strip, surface, tick, SHAPE_PUFF, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
+import { abs, clamp, cos, exp, float, floor, length, mix, mod, select, sin, smoothstep, step, vec3 } from 'three/tsl';
+import { bHue, bNoise, shapePuff, shapeSpark, type F, type V3 } from '../nodes.ts';
 
 const HOLE = new THREE.Vector3(0, 0, 7);
 const PERIOD = 8;
@@ -13,6 +15,11 @@ const BURST = /* glsl */ `
 float burstAge(float t) { return mod(t, ${(PERIOD / 2).toFixed(1)}); }
 float burstSize(float t) { return mod(floor(t / ${(PERIOD / 2).toFixed(1)}), 2.0) < 0.5 ? 1.0 : 0.55; }
 float burstEnv(float t) { float a = burstAge(t); return burstSize(t) * smoothstep(0.0, 0.25, a) * exp(-a * 0.7); }`;
+
+/** The same envelope as nodes. */
+const age = (t: F): F => mod(t, PERIOD / 2);
+const size = (t: F): F => select(mod(floor(t.div(PERIOD / 2)), 2).lessThan(0.5), float(1), float(0.55));
+const env = (t: F): F => size(t).mul(smoothstep(0, 0.25, age(t))).mul(exp(age(t).mul(-0.7)));
 
 function burstEnv(t: number): number {
   const h = PERIOD / 2, a = t % h, big = Math.floor(t / h) % 2 === 0 ? 1 : 0.55;
@@ -93,6 +100,19 @@ export const basaltStacks: BeaconLook = {
         float d = length(vLocal - vec3(${HOLE.x.toFixed(1)}, 6.0, ${HOLE.z.toFixed(1)}));
         totalEmissiveRadiance += vec3(0.7, 0.85, 1.0) * exp(-d / 6.0) * (0.15 + 1.4 * burstEnv(uTime)) * uNight;`,
       defs: BURST,
+      albedoNode: ({ local: L, ln }) => {
+        let c: V3 = mix(vec3(0.06, 0.065, 0.07), vec3(0.15, 0.15, 0.16), bNoise(L.mul(1.4)));
+        // turf on the high tops, wet weed low down
+        const top = smoothstep(0.85, 0.95, ln.y).mul(smoothstep(9, 13, L.y));
+        c = mix(c, vec3(0.16, 0.32, 0.08).mul(bNoise(L.mul(3)).mul(0.4).add(0.8)), top);
+        return mix(c, vec3(0.05, 0.08, 0.04), smoothstep(1.5, 0, L.y).mul(0.8));
+      },
+      roughNode: ({ local: L, rough }) => mix(0.25, rough, smoothstep(0, 2.5, L.y)),
+      emissiveNode: ({ local: L, t, night }) => {
+        // the burst lights the columns round the hole, and the wet rock keeps a faint shine
+        const d = length(L.sub(vec3(HOLE.x, 6, HOLE.z)));
+        return vec3(0.7, 0.85, 1).mul(exp(d.div(-6))).mul(env(t).mul(1.4).add(0.15)).mul(night);
+      },
     });
     const cols = new THREE.Mesh(colGeo, basalt);
     cols.castShadow = cols.receiveShadow = true;
@@ -129,6 +149,11 @@ export const basaltStacks: BeaconLook = {
         // bare peat where the brow rolls over
         c = mix(vec3(0.05, 0.055, 0.035), c, smoothstep(0.55, 0.85, vLN.y));
         diffuseColor.rgb = c;`,
+      albedoNode: ({ local: L, ln }) => {
+        const c = mix(vec3(0.12, 0.24, 0.06), vec3(0.24, 0.36, 0.1), bNoise(L.mul(0.6))).mul(bNoise(L.mul(3.1)).mul(0.35).add(0.75));
+        // bare peat where the brow rolls over
+        return mix(vec3(0.05, 0.055, 0.035), c, smoothstep(0.55, 0.85, ln.y));
+      },
     })));
     turf.castShadow = turf.receiveShadow = true;
 
@@ -137,12 +162,17 @@ export const basaltStacks: BeaconLook = {
       color: 0xbfe4ff, day: 0, night: 1.6, defs: BURST,
       paint: /* glsl */ `vec2 p = (vUv - 0.5) * 2.0; float r = length(p);
         glow = (0.4 + 2.5 * burstEnv(uTime)) * (0.6 + 0.4 * bNoise(vec3(p * 4.0, uTime * 2.0))) * smoothstep(1.0, 0.4, r);`,
+      paintNode: ({ uv: f, t }) => {
+        const p = f.sub(0.5).mul(2), r = length(p);
+        return { glow: env(t).mul(2.5).add(0.4).mul(bNoise(vec3(p.mul(4), t.mul(2))).mul(0.4).add(0.6)).mul(smoothstep(1, 0.4, r)) };
+      },
     });
     pool.position.copy(HOLE);
     k.add(pool);
 
     // the burst: droplets flung high, then a mist that hangs and drifts
     const spray = `vec3(${HOLE.x.toFixed(1)}, 1.0, ${HOLE.z.toFixed(1)})`;
+    const sprayN = vec3(HOLE.x, 1, HOLE.z);
     k.add(particles(k, {
       count: 360, color: 0xe8f4ff, day: 0.55, night: 3.2, shape: SHAPE_SPARK, defs: BURST,
       motion: /* glsl */ `float tt = burstAge(t) - s.x * 0.5;
@@ -153,6 +183,17 @@ export const basaltStacks: BeaconLook = {
         dir = vec3(cos(a) * sp, v - 9.8 * tt, sin(a) * sp);
         alpha = step(0.0, tt) * step(0.0, pos.y) * smoothstep(4.0, 1.0, tt);
         col = mix(vec3(1.0), bHue(s.w + t * 0.05) * 1.2, 0.18);`,
+      shapeNode: shapeSpark,
+      motionNode: ({ s, t }) => {
+        const tt = age(t).sub(s.x.mul(0.5)), v = s.y.mul(15).add(20).mul(size(t));
+        const a = s.z.mul(6.2831), sp = s.w.mul(s.w).mul(3.2);
+        const pos = sprayN.add(vec3(cos(a).mul(sp).mul(tt), v.mul(tt).sub(tt.mul(tt).mul(4.9)), sin(a).mul(sp).mul(tt)));
+        const up = v.sub(tt.mul(9.8));
+        return {
+          pos, size: s.w.mul(0.25).add(0.18), stretch: clamp(abs(up).div(20), 0, 1).mul(2.5), dir: vec3(cos(a).mul(sp), up, sin(a).mul(sp)),
+          alpha: step(0, tt).mul(step(0, pos.y)).mul(smoothstep(4, 1, tt)), col: mix(vec3(1), bHue(s.w.add(t.mul(0.05))).mul(1.2), 0.18),
+        };
+      },
     }));
     k.add(particles(k, {
       count: 120, color: 0xd6eaff, day: 0, night: 0.55, blend: 'alpha', matter: 0xeef3f6, shape: SHAPE_PUFF, defs: BURST,
@@ -163,6 +204,15 @@ export const basaltStacks: BeaconLook = {
         pos = ${spray} + vec3(cos(a) * (1.0 + tt * 1.6) + tt * 1.2, top * rise - tt * tt * 0.35, sin(a) * (1.0 + tt * 1.6));
         size = 2.0 + tt * 2.4;
         alpha = step(0.0, tt) * smoothstep(3.9, 1.0, tt) * 0.3 * burstSize(t);`,
+      shapeNode: shapePuff,
+      motionNode: ({ s, t }) => {
+        const tt = age(t).sub(0.2).sub(s.x.mul(0.6)), top = s.y.mul(30).add(24).mul(size(t));
+        const rise = float(1).sub(exp(tt.mul(-1.6))), a = s.z.mul(6.2831), out = tt.mul(1.6).add(1);
+        return {
+          pos: sprayN.add(vec3(cos(a).mul(out).add(tt.mul(1.2)), top.mul(rise).sub(tt.mul(tt).mul(0.35)), sin(a).mul(out))),
+          size: tt.mul(2.4).add(2), alpha: step(0, tt).mul(smoothstep(3.9, 1, tt)).mul(0.3).mul(size(t)),
+        };
+      },
     }));
     // the moonbow: a spectral arc in the hanging mist, after each big burst
     const arcPts: THREE.Vector3[] = [], arcW: number[] = [];
@@ -180,10 +230,19 @@ export const basaltStacks: BeaconLook = {
         float show = burstSize(uTime) > 0.9 ? smoothstep(0.8, 1.8, age) * smoothstep(3.95, 2.6, age) : 0.0;
         col = mix(vec3(0.85), spec, mix(0.85, 0.45, uNight));
         glow = edge * show * (0.6 + 0.4 * bNoise(vec3(vUv.y * 0.2, uTime * 0.5, 0.0)));`,
+      paintNode: ({ uv: f, t, night }) => {
+        const x = f.x, a = age(t);
+        const edge = smoothstep(0, 0.25, x).mul(smoothstep(1, 0.75, x));
+        const show = select(size(t).greaterThan(0.9), smoothstep(0.8, 1.8, a).mul(smoothstep(3.95, 2.6, a)), float(0));
+        return {
+          col: mix(vec3(0.85), bHue(x.mul(0.72).add(0.02)), mix(0.85, 0.45, night)),
+          glow: edge.mul(show).mul(bNoise(vec3(f.y.mul(0.2), t.mul(0.5), 0)).mul(0.4).add(0.6)),
+        };
+      },
     }));
 
-    k.add(halo(k, [HOLE.x, 26, HOLE.z], 30, 0xdfeeff, 0, 0.22, 'burstEnv(uTime) * 1.4 + 0.08', 30, BURST));
-    k.add(halo(k, [HOLE.x, 3, HOLE.z], 9, 0xcfe6ff, 0, 0.5, '0.3 + burstEnv(uTime)', 8, BURST));
+    k.add(halo(k, [HOLE.x, 26, HOLE.z], 30, 0xdfeeff, 0, 0.22, 'burstEnv(uTime) * 1.4 + 0.08', 30, BURST, ({ t }) => env(t).mul(1.4).add(0.08)));
+    k.add(halo(k, [HOLE.x, 3, HOLE.z], 9, 0xcfe6ff, 0, 0.5, '0.3 + burstEnv(uTime)', 8, BURST, ({ t }) => env(t).add(0.3)));
     k.setPulse((t) => 0.25 + burstEnv(t));
     return k.root;
   },

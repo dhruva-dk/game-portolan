@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { Kit, halo, lit, merge, particles, strip, surface, tag, tick, tube, disc, SHAPE_SPARK } from '../kit.ts';
 import type { BeaconLook } from '../look.ts';
+import { abs, attribute, clamp, cos, length, max, mix, mod, pow, sin, smoothstep, uv, varying, vec2, vec3 } from 'three/tsl';
+import { bFbm, bNoise, shapeSpark, type Clocked, type F, type V3 } from '../nodes.ts';
 
 // the sway every part of a column shares, so stipes, blades and floats move as one
 const SWAY = /* glsl */ `
@@ -17,6 +19,19 @@ vec3 kelpSway(vec3 p, float ph) {
 float kelpPulse(float y, float ph) { return pow(max(0.0, sin(y * 0.2 - uTime * 2.1 + ph * 11.0)), 14.0); }`;
 const MOVE = /* glsl */ `vPhase = aPhase; transformed += kelpSway(vLocal, aPhase);`;
 const MOVE_INST = /* glsl */ `vPhase = aPhase; transformed += inverse(mat3(instanceMatrix)) * kelpSway(vLocal, aPhase);`;
+
+/** The same sway and pulse as nodes, and each part's phase as the vertex and the fragment have it. */
+const phase = (): F => attribute<'float'>('aPhase') as unknown as F;
+const vPhase = (): F => varying(phase(), 'vKelpPhase') as unknown as F;
+const sway = (p: V3, ph: F, t: F): V3 => {
+  const h0 = clamp(p.y.add(3).div(58), 0, 1), h = h0.mul(h0);
+  return vec3(
+    sin(t.mul(0.5).add(ph.mul(6))).mul(3.2).add(sin(t.mul(1.25).add(ph.mul(9)).add(p.y.mul(0.14))).mul(0.7)), 0,
+    cos(t.mul(0.43).add(ph.mul(7))).mul(2.4).add(cos(t.mul(1.05).add(p.y.mul(0.11)).add(ph.mul(5))).mul(0.6)),
+  ).mul(h);
+};
+const pulse = (y: F, ph: F, t: F): F => pow(max(0, sin(y.mul(0.2).sub(t.mul(2.1)).add(ph.mul(11)))), 14);
+const moveNode = ({ p, t }: Clocked & { p: V3 }): V3 => p.add(sway(p, phase(), t));
 
 export const kelpShallows: BeaconLook = {
   name: 'the Lantern Kelp',
@@ -67,6 +82,10 @@ export const kelpShallows: BeaconLook = {
       albedo: `diffuseColor.rgb = mix(vec3(0.16, 0.13, 0.04), vec3(0.32, 0.26, 0.08), bNoise(vLocal * vec3(2.0, 0.3, 2.0)));`,
       emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
         totalEmissiveRadiance += vec3(0.1, 0.8, 1.0) * (0.25 + 4.0 * p) * smoothstep(-1.0, 1.0, vLocal.y) * uNight;`,
+      vertexNode: moveNode,
+      albedoNode: ({ local: L }) => mix(vec3(0.16, 0.13, 0.04), vec3(0.32, 0.26, 0.08), bNoise(L.mul(vec3(2, 0.3, 2)))),
+      emissiveNode: ({ local: L, t, night }) =>
+        vec3(0.1, 0.8, 1).mul(pulse(L.y, vPhase(), t).mul(4).add(0.25)).mul(smoothstep(-1, 1, L.y)).mul(night),
     });
     const stand = new THREE.Mesh(merge(stipes, ['aPhase']), stipeMat);
     stand.frustumCulled = false;
@@ -79,6 +98,14 @@ export const kelpShallows: BeaconLook = {
       emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
         totalEmissiveRadiance += vec3(0.08, 0.6, 0.8) * (0.06 + 0.9 * p + fres * 0.25) * uNight
           + vec3(0.25, 0.2, 0.04) * fres * 0.25 * (1.0 - uNight);`,
+      vertexNode: moveNode,
+      albedoNode: () => {
+        const f = uv(), vein = smoothstep(0.08, 0, abs(f.x.sub(0.5))).mul(0.25);
+        return mix(vec3(0.42, 0.33, 0.08), vec3(0.62, 0.5, 0.14), bNoise(vec3(f.mul(vec2(3, 1.2)), vPhase().mul(9)))).mul(vein.oneMinus());
+      },
+      emissiveNode: ({ local: L, t, night, fres }) =>
+        vec3(0.08, 0.6, 0.8).mul(pulse(L.y, vPhase(), t).mul(0.9).add(0.06).add(fres.mul(0.25))).mul(night)
+          .add(vec3(0.25, 0.2, 0.04).mul(fres).mul(0.25).mul(night.oneMinus())),
     });
     bladeMat.defines = { USE_UV: '' };
     const leaves = new THREE.Mesh(merge(blades, ['aPhase']), bladeMat);
@@ -93,6 +120,11 @@ export const kelpShallows: BeaconLook = {
       emissive: /* glsl */ `float p = kelpPulse(vLocal.y, vPhase);
         float lamp = 0.6 + 0.4 * sin(uTime * 1.7 + vPhase * 40.0 + vLocal.y);
         totalEmissiveRadiance += mix(vec3(0.2, 0.85, 1.0), vec3(0.85, 1.0, 1.0), p) * (1.6 * lamp + 7.0 * p) * mix(0.02, 1.0, uNight);`,
+      vertexNode: moveNode,
+      emissiveNode: ({ local: L, t, night }) => {
+        const ph = vPhase(), p = pulse(L.y, ph, t), lamp = sin(t.mul(1.7).add(ph.mul(40)).add(L.y)).mul(0.4).add(0.6);
+        return mix(vec3(0.2, 0.85, 1), vec3(0.85, 1, 1), p).mul(lamp.mul(1.6).add(p.mul(7))).mul(mix(0.02, 1, night));
+      },
     }), floats.length);
     const phases = new Float32Array(floats.length);
     floats.forEach((f, i) => {
@@ -112,6 +144,15 @@ export const kelpShallows: BeaconLook = {
         float spark = pow(bNoise(vec3(p * 1.6, uTime * 0.8)), 6.0) * 3.0;
         alpha = mat * edge * 0.85;
         glow = mat * edge * (0.12 + spark + 0.4 * pow(max(0.0, sin(length(p) * 0.5 - uTime * 1.2)), 8.0));`,
+      paintNode: ({ local, t }) => {
+        const p = local.xz, d = length(p);
+        const mat = smoothstep(0.48, 0.62, bFbm(vec3(p.mul(0.16), 1)).add(d.div(26).oneMinus().mul(0.25)));
+        const edge = smoothstep(26, 18, d), spark = pow(bNoise(vec3(p.mul(1.6), t.mul(0.8))), 6).mul(3);
+        return {
+          alpha: mat.mul(edge).mul(0.85),
+          glow: mat.mul(edge).mul(spark.add(0.12).add(pow(max(0, sin(d.mul(0.5).sub(t.mul(1.2)))), 8).mul(0.4))),
+        };
+      },
     }));
 
     // plankton sparks drifting up the stand
@@ -122,6 +163,15 @@ export const kelpShallows: BeaconLook = {
         pos += vec3(sin(t * 0.3 + s.w * 6.28 + y * 0.12) * 1.5, y, cos(t * 0.26 + s.x * 6.28) * 1.5);
         float tw = pow(0.5 + 0.5 * sin(t * (1.5 + s.z * 3.0) + s.w * 40.0), 4.0);
         size = 0.08 + 0.12 * tw; alpha = (0.2 + 0.9 * tw) * smoothstep(0.0, 2.0, y) * smoothstep(Hh, Hh - 12.0, y);`,
+      shapeNode: shapeSpark,
+      motionNode: ({ s, pos, t }) => {
+        const Hh = 56, y = mod(s.y.mul(Hh).add(t.mul(s.z.mul(0.8).add(0.6))), Hh);
+        const tw = pow(sin(t.mul(s.z.mul(3).add(1.5)).add(s.w.mul(40))).mul(0.5).add(0.5), 4);
+        return {
+          pos: pos.add(vec3(sin(t.mul(0.3).add(s.w.mul(6.28)).add(y.mul(0.12))).mul(1.5), y, cos(t.mul(0.26).add(s.x.mul(6.28))).mul(1.5))),
+          size: tw.mul(0.12).add(0.08), alpha: tw.mul(0.9).add(0.2).mul(smoothstep(0, 2, y)).mul(smoothstep(Hh, Hh - 12, y)),
+        };
+      },
     }));
 
     k.add(halo(k, [0, 4, 0], 20, 0x1fd6ff, 0, 0.35, '1.0', 18));

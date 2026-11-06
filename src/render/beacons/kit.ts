@@ -5,6 +5,10 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { sharedUniforms } from '../planet.ts';
+import { GPU } from '../actors/common.ts';
+import {
+  litNode, particlesNode, shapeHalo, surfaceNode, type Clocked, type F, type LitNodes, type ParticleNodes, type SurfaceNodes, type V4,
+} from './nodes.ts';
 
 // ---------------------------------------------------------------- randomness and noise (JS side)
 
@@ -118,7 +122,7 @@ export function tick(obj: THREE.Object3D, t: number, night: number): void {
 
 // ---------------------------------------------------------------- lit materials with glow
 
-export interface LitOptions {
+export interface LitOptions extends LitNodes {
   color: THREE.ColorRepresentation;
   roughness?: number;
   metalness?: number;
@@ -142,8 +146,10 @@ export interface LitOptions {
   rough?: string;
 }
 
-/** A MeshStandardMaterial with surface detail, sway and glow written in GLSL, driven by the beacon's clock. */
+/** A MeshStandardMaterial with surface detail, sway and glow written in GLSL, driven by the beacon's clock; on the
+ *  WebGPU planet, a node material from the look's TSL. */
 export function lit(k: Kit, o: LitOptions): THREE.MeshStandardMaterial {
+  if (GPU.on) return litNode(k.clock, o) as unknown as THREE.MeshStandardMaterial;
   const m = new THREE.MeshStandardMaterial({
     color: o.color, roughness: o.roughness ?? 0.8, metalness: o.metalness ?? 0, flatShading: o.flat ?? false,
     side: o.side ?? THREE.FrontSide, transparent: o.transparent ?? false, opacity: o.opacity ?? 1,
@@ -206,7 +212,7 @@ export function vec3(c: THREE.ColorRepresentation, scale = 1): string {
 
 // ---------------------------------------------------------------- billboard particles
 
-export interface ParticleOptions {
+export interface ParticleOptions extends Partial<ParticleNodes> {
   count: number;
   /** Base colour (linear), multiplied by `col` from the motion GLSL. */
   color: THREE.ColorRepresentation;
@@ -323,7 +329,7 @@ export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
   g.setAttribute('aBase', new THREE.InstancedBufferAttribute(bases, 3));
   g.instanceCount = o.count;
   const uni = o.uniforms ?? {};
-  const mat = new THREE.ShaderMaterial({
+  const mat = GPU.on ? particlesNode(k.clock, { ...o, motionNode: o.motionNode ?? (() => ({})) }) : new THREE.ShaderMaterial({
     vertexShader: PARTICLE_VERT(o, uni),
     fragmentShader: PARTICLE_FRAG(o, uni),
     uniforms: {
@@ -344,20 +350,23 @@ export function particles(k: Kit, o: ParticleOptions): THREE.Mesh {
   return mesh;
 }
 
-/** One soft glow: a halo or a far-reading sky glow. `nearFade` keeps it from swallowing the camera up close. */
+/** One soft glow: a halo or a far-reading sky glow. `nearFade` keeps it from swallowing the camera up close; `breathe`
+ *  is its alpha, in GLSL, and `breatheNode` the same in TSL. */
 export function halo(k: Kit, at: [number, number, number], radius: number, color: THREE.ColorRepresentation,
-  day: number, night: number, breathe = '1.0', nearFade = 0, defs = ''): THREE.Mesh {
+  day: number, night: number, breathe = '1.0', nearFade = 0, defs = '', breatheNode?: (c: Clocked & { s: V4 }) => F): THREE.Mesh {
   return particles(k, {
     count: 1, color, day, night, nearFade, renderOrder: 12, defs,
     base: () => at,
     motion: `size = ${radius.toFixed(2)}; alpha = ${breathe};`,
     shape: 'shape = exp(-r2 * 3.2) * (1.0 - r2) * 0.85 + exp(-r2 * 14.0) * 0.4;',
+    motionNode: (c) => ({ size: radius, alpha: breatheNode ? breatheNode(c) : 1 }),
+    shapeNode: shapeHalo,
   });
 }
 
 // ---------------------------------------------------------------- shaped emissive surfaces (ribbons, pillars, discs)
 
-export interface SurfaceOptions {
+export interface SurfaceOptions extends Partial<SurfaceNodes> {
   color: THREE.ColorRepresentation;
   day: number;
   night: number;
@@ -435,7 +444,7 @@ void main() {
     : /* glsl */ `vec3 rgb = uColor * col * glow * gain * (1.0 - fogF);
   gl_FragColor = vec4(max(rgb, 0.0), 1.0);`}
 }`;
-  const mat = new THREE.ShaderMaterial({
+  const mat = GPU.on ? surfaceNode(k.clock, { ...o, paintNode: o.paintNode ?? (() => ({})) }) : new THREE.ShaderMaterial({
     vertexShader: vert, fragmentShader: frag,
     uniforms: {
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
