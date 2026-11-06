@@ -18,6 +18,7 @@ import {
 } from 'three/tsl';
 import { REGIONS } from '../../sim/world/index.ts';
 import { P } from '../gpu/uniforms.ts';
+import { refractedShadowPosition } from '../ocean/beneath.ts';
 import { MOSS, ROLE, ROLE_COUNT } from './library.ts';
 import type { ScanCache } from './scans.ts';
 
@@ -110,6 +111,8 @@ const element = (array: { element(i: I): unknown }, at: I): Node<'vec4'> => arra
 export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
   mat.fog = true;
+  // under the sea the sun's shadow is read along its bent path
+  (mat as unknown as { receivedShadowPositionNode: Node }).receivedShadowPositionNode = refractedShadowPosition(positionWorld);
   const surfaceMap = texture(scans.surface);
   const detailMap = texture(scans.detail);
   const noiseMap = texture(noise);

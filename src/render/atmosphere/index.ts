@@ -8,6 +8,7 @@ import { AIR, CLEAR_AIR, setAir, type Air } from './model.ts';
 import { EYE, aerialAt, passes } from './luts.ts';
 import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
 import { SkyLight, SkyLightNode, bodyLight, moonlight, sunlight } from './light.ts';
+import { SunShadows } from './shadows.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type V3 = Node<'vec3'>;
@@ -36,6 +37,7 @@ export class Atmosphere {
   readonly sun: DirectionalLight;
   readonly moon: DirectionalLight;
   readonly sky = new SkyLight();
+  readonly shadows: SunShadows;
   #renderer: WebGPURenderer;
   #air: Air = { ...CLEAR_AIR };
   #dirty = true;
@@ -53,6 +55,7 @@ export class Atmosphere {
     this.moon = bodyLight(moonlight);
     this.sun.name = 'sun';
     this.moon.name = 'moon';
+    this.shadows = new SunShadows(renderer, this.sun);
     this.#probeScene.backgroundNode = probeBackground;
     this.#generator = new PMREMGenerator(renderer);
   }
@@ -112,6 +115,7 @@ export class Atmosphere {
     this.moon.position.copy(ground).addScaledVector(P.moonDir.value as Vector3, 400);
     this.sun.target.updateMatrixWorld();
     this.moon.target.updateMatrixWorld();
+    this.shadows.update(camera);
 
     this.#probeAge += dt;
     const sun = P.sunDir.value as Vector3;

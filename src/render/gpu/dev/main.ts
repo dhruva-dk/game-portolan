@@ -107,6 +107,7 @@ async function main(): Promise<void> {
     h.position.y = 0.3;
     const sl = new Mesh(new BoxGeometry(0.2, 8, 6), sail);
     sl.position.y = 5.7;
+    h.castShadow = h.receiveShadow = sl.castShadow = sl.receiveShadow = true;
     group.add(h, sl);
     scene.add(group);
     ships.push({ at: new Vector3(), heading: i * 2.5, group });
@@ -176,7 +177,7 @@ async function main(): Promise<void> {
     info,
     ready: false,
     frames: 0,
-    set(o: { land?: number; view?: string; at?: [number, number, number]; height?: number; pitch?: number; hour?: number; tilt?: number; exposure?: number; bearing?: number; fog?: boolean; sky?: boolean; sun?: boolean; sea?: string; water?: boolean }) {
+    set(o: { land?: number; view?: string; at?: [number, number, number]; height?: number; pitch?: number; hour?: number; tilt?: number; exposure?: number; bearing?: number; fog?: boolean; sky?: boolean; sun?: boolean; shadows?: boolean; sea?: string; water?: boolean }) {
       if (o.water !== undefined) ocean.mesh.visible = o.water;
       if (o.land !== undefined) LAND.debug.value = o.land;
       if (o.sea) ocean.sea = SEAS[o.sea];
@@ -194,6 +195,7 @@ async function main(): Promise<void> {
       if (o.fog !== undefined) scene.fogNode = o.fog ? fog : null;
       if (o.sky !== undefined) atmosphere.sky.visible = o.sky;
       if (o.sun !== undefined) atmosphere.sun.visible = o.sun;
+      if (o.shadows !== undefined) atmosphere.sun.castShadow = o.shadows;
       if (o.hour !== undefined) hour = o.hour;
       if (o.tilt !== undefined) tilt = o.tilt;
       if (o.exposure !== undefined) METER.bias.value = Math.log2(o.exposure);

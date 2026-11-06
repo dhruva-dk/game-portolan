@@ -21,6 +21,7 @@ import { R } from '../../sim/sphere.ts';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, type Waves } from './waves.ts';
 import { skyLight, sunlight, moonlight } from '../atmosphere/light.ts';
+import { sunShadow } from '../atmosphere/shadows.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
@@ -202,9 +203,11 @@ export function oceanSurface(waves: Waves): Mesh {
     const v = normalize(cameraPosition.sub(p));
     const nv = max(dot(world, v), 0);
     const fresnel = float(0.02).add(pow(float(1).sub(nv), 5).mul(0.98));
-    // what reaches into the water from above: the sky, and the sun and moon by their height
+    // what reaches into the water from above: the sky, and the sun and moon by their height, the sun's taken away
+    // where something stands between it and the water
+    const sun = sunlight.mul(sunShadow()).toVar();
     const down = skyLight(p, u)
-      .add(sunlight.mul(max(dot(u, P.sunDir), 0)))
+      .add(sun.mul(max(dot(u, P.sunDir), 0)))
       .add(moonlight.mul(max(dot(u, P.moonDir), 0)));
     const body = down.mul(WATER.deep).div(Math.PI);
     // the floor through the surface, bent by its slope, and the path through the water to it
@@ -222,7 +225,7 @@ export function oceanSurface(waves: Waves): Mesh {
     const toward = pow(clamp(dot(v, P.sunDir.negate()), 0, 1), 4);
     const thin = pow(clamp(float(0.5).sub(dot(P.sunDir, world).mul(0.5)), 0, 1), 3);
     const crest = clamp(vRise.mul(1.6).add(0.25), 0, 2);
-    const through = sunlight.mul(WATER.crest).mul(toward.mul(thin).mul(crest).mul(0.09));
+    const through = sun.mul(WATER.crest).mul(toward.mul(thin).mul(crest).mul(0.09));
     // looking down into the water a little more of its own light comes back
     const sss = body.mul(mix(float(0.6), float(1.2), nv));
     return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel));

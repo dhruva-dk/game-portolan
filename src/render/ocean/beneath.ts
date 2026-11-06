@@ -25,6 +25,7 @@ import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, SEA } from './waves.ts';
 import { FRAME, FRAMES, WATER, inFrame, type Frame } from './surface.ts';
 import { skyLight, sunlight } from '../atmosphere/light.ts';
+import { sunShadow } from '../atmosphere/shadows.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
@@ -44,6 +45,25 @@ const BRIGHTEST = 7;
 const CRESTS = 4;
 
 const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));
+
+/**
+ * Where the shadow map is read for a point under the sea. The sun's light reaches p bent toward the vertical where it
+ * entered the water, so what shades p is whatever stands on the straight line from the sun to that entry point: the
+ * shadow map answers for the point at p's depth on that straight line, a little further from the sun than p. A hull's
+ * shadow on the seabed lies as close under it as it does in the sea, not as far as it would on dry land.
+ */
+export const refractedShadowPosition = (p: V3): V3 => {
+  const r = p.length();
+  const up = p.div(r);
+  const depth = max(P.planet.y.sub(r), 0);
+  const mu = max(dot(up, P.sunDir), 0.1);
+  const sinI = sqrt(max(float(1).sub(mu.mul(mu)), 1e-6));
+  const sinT = sinI.div(1.333);
+  const cosT = sqrt(max(float(1).sub(sinT.mul(sinT)), 1e-6));
+  const toward = P.sunDir.sub(up.mul(dot(up, P.sunDir))).div(sinI);
+  const entry = p.add(up.mul(depth)).add(toward.mul(depth.mul(sinT).div(cosT)));
+  return entry.sub(P.sunDir.mul(depth.div(mu)));
+};
 
 /** A filter that takes a fragment's light at p to what it is under the waves of `field`. */
 export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
@@ -112,8 +132,9 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
           const focus = clamp(float(1).div(max(abs(det), 1 / BRIGHTEST)), 0, BRIGHTEST);
           // a hand's depth of water is too thin to focus anything yet
           const caustic = mix(float(1), focus, smoothstep(0, 0.25, depth));
-          // the sun's share of the light on a level patch here, which is the share the caustics move
-          const sun = luma(sunlight).mul(max(mu, 0));
+          // the sun's share of the light on a level patch here, which is the share the caustics move: none in the
+          // shadow of a hull or a cliff
+          const sun = luma(sunlight).mul(max(mu, 0)).mul(sunShadow());
           const sky = luma(skyLight(p, up));
           const share = sun.div(max(sun.add(sky), 1e-6));
           out.assign(colour.mul(down.mul(caustic).mul(share).add(diffuse.mul(float(1).sub(share)))));

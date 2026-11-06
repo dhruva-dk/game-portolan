@@ -10,10 +10,10 @@
 import { AnalyticLightNode, DirectionalLight, Light, type Node, type NodeBuilder, type Texture } from 'three/webgpu';
 import {
   Fn, cameraWorldMatrix, clamp, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
-  pow, roughness, texture, vec2, vec3,
+  int, pow, roughness, texture, vec2, vec3,
 } from 'three/tsl';
 import { AIR } from './model.ts';
-import { IRRADIANCE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyIrradiance, tables } from './luts.ts';
+import { IRRADIANCE, IRRADIANCE_FACE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyIrradiance, tables } from './luts.ts';
 import { P } from '../gpu/uniforms.ts';
 import { probeEye } from './sky.ts';
 
@@ -49,8 +49,9 @@ const zenithLight = (p: V3): V3 => {
   const up = p.div(r);
   const y = clamp(r.sub(AIR.bottom).div(AIR.top.sub(AIR.bottom)), 0, 1).mul(1 - 1 / IRRADIANCE.y).add(0.5 / IRRADIANCE.y);
   const at = (l: V3) => vec2(clamp(up.dot(l).mul(0.5).add(0.5), 0, 1).mul(1 - 1 / IRRADIANCE.x).add(0.5 / IRRADIANCE.x), y);
-  return texture(tables.irradianceUp, at(P.sunDir)).rgb.mul(P.sunIlluminance)
-    .add(texture(tables.irradianceUp, at(P.moonDir)).rgb.mul(P.moonIlluminance).mul(P.moonPhase))
+  const upward = (l: V3) => texture(tables.irradiance, at(l)).depth(int(IRRADIANCE_FACE.up)).rgb;
+  return upward(P.sunDir).mul(P.sunIlluminance)
+    .add(upward(P.moonDir).mul(P.moonIlluminance).mul(P.moonPhase))
     .add(NIGHT_FLOOR);
 };
 

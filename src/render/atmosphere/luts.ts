@@ -15,9 +15,9 @@
 // The first three depend on the air alone and are redone when the air changes. The last two follow the eye, the sun
 // and the moon. The moon lights the sky by the same physics at its own (far smaller) illuminance, so a moonlit night
 // has a real, dim blue sky with a glow round the moon.
-import { HalfFloatType, Matrix4, Storage3DTexture, StorageTexture, Vector2, Vector3, type ComputeNode, type Node } from 'three/webgpu';
+import { HalfFloatType, Matrix4, Storage3DTexture, StorageArrayTexture, StorageTexture, Vector2, Vector3, type ComputeNode, type Node } from 'three/webgpu';
 import {
-  Fn, If, abs, acos, clamp, exp, float, globalId, max, mix, select, smoothstep, sqrt, texture, texture3D,
+  Fn, If, abs, acos, clamp, exp, float, globalId, int, max, mix, select, smoothstep, sqrt, storageTexture, texture, texture3D,
   textureStore, uint, uniform, uvec3, vec2, vec3, vec4, cos, sin,
 } from 'three/tsl';
 import { AIR, densities, distanceToTop, miePhase, raySphere, rayleighPhase, transmittanceParams, transmittanceUV } from './model.ts';
@@ -46,6 +46,13 @@ function table(w: number, h: number): StorageTexture {
   return t;
 }
 
+function layers(w: number, h: number, n: number): StorageArrayTexture {
+  const t = new StorageArrayTexture(w, h, n);
+  t.type = HalfFloatType;
+  t.generateMipmaps = false;
+  return t;
+}
+
 function volume(w: number, h: number, d: number): Storage3DTexture {
   const t = new Storage3DTexture(w, h, d);
   t.type = HalfFloatType;
@@ -53,15 +60,15 @@ function volume(w: number, h: number, d: number): Storage3DTexture {
   return t;
 }
 
+/** The layers of the irradiance table. */
+export const IRRADIANCE_FACE = { up: 0, down: 1, toward: 2, away: 3, aside: 4 } as const;
+
 export const tables = {
   transmittance: table(TRANSMITTANCE.x, TRANSMITTANCE.y),
   multi: table(MULTI.x, MULTI.y),
-  /** The sky's irradiance on faces turned up, down, toward the light's azimuth, away from it, and aside. */
-  irradianceUp: table(IRRADIANCE.x, IRRADIANCE.y),
-  irradianceDown: table(IRRADIANCE.x, IRRADIANCE.y),
-  irradianceToward: table(IRRADIANCE.x, IRRADIANCE.y),
-  irradianceAway: table(IRRADIANCE.x, IRRADIANCE.y),
-  irradianceAside: table(IRRADIANCE.x, IRRADIANCE.y),
+  /** The sky's irradiance on faces turned up, down, toward the light's azimuth, away from it, and aside (the layers
+   *  of IRRADIANCE_FACE): one array, so the surfaces that read it hold one sampler for it rather than five. */
+  irradiance: layers(IRRADIANCE.x, IRRADIANCE.y, 5),
   sky: table(SKY.x, SKY.y),
   moonSky: table(MOON_SKY.x, MOON_SKY.y),
   aerialLight: volume(AERIAL.x, AERIAL.y, AERIAL.z),
@@ -133,9 +140,10 @@ export const skyIrradiance = Fn(([p, n, l]: [V3, V3, V3]) => {
   const uv = irradianceUV(r, muS);
   const ny = n.dot(up), nt = n.dot(toward);
   const ns2 = max(float(1).sub(ny.mul(ny)).sub(nt.mul(nt)), 0);
-  const vertical = select(ny.greaterThan(0), texture(tables.irradianceUp, uv).rgb, texture(tables.irradianceDown, uv).rgb);
-  const along = select(nt.greaterThan(0), texture(tables.irradianceToward, uv).rgb, texture(tables.irradianceAway, uv).rgb);
-  return vertical.mul(ny.mul(ny)).add(along.mul(nt.mul(nt))).add(texture(tables.irradianceAside, uv).rgb.mul(ns2));
+  const face = (k: number) => texture(tables.irradiance, uv).depth(int(k)).rgb;
+  const vertical = select(ny.greaterThan(0), face(IRRADIANCE_FACE.up), face(IRRADIANCE_FACE.down));
+  const along = select(nt.greaterThan(0), face(IRRADIANCE_FACE.toward), face(IRRADIANCE_FACE.away));
+  return vertical.mul(ny.mul(ny)).add(along.mul(nt.mul(nt))).add(face(IRRADIANCE_FACE.aside).mul(ns2));
 });
 
 // ---------------------------------------------------------------- the sky view's mapping (Hillaire)
@@ -328,12 +336,13 @@ const irradianceKernel = Fn(() => {
       eAside.addAssign(Lw.mul(abs(d.z)));
     });
   });
-  textureStore(tables.irradianceUp, id, vec4(eUp, 1));
-  textureStore(tables.irradianceDown, id, vec4(eDown, 1));
-  textureStore(tables.irradianceToward, id, vec4(eToward, 1));
-  textureStore(tables.irradianceAway, id, vec4(eAway, 1));
+  const store = storageTexture(tables.irradiance);
+  store.depth(int(IRRADIANCE_FACE.up)).store(id, vec4(eUp, 1));
+  store.depth(int(IRRADIANCE_FACE.down)).store(id, vec4(eDown, 1));
+  store.depth(int(IRRADIANCE_FACE.toward)).store(id, vec4(eToward, 1));
+  store.depth(int(IRRADIANCE_FACE.away)).store(id, vec4(eAway, 1));
   // aside is the same on either side: the sky is symmetric about the light's vertical plane
-  textureStore(tables.irradianceAside, id, vec4(eAside.mul(0.5), 1));
+  store.depth(int(IRRADIANCE_FACE.aside)).store(id, vec4(eAside.mul(0.5), 1));
 });
 
 /** The sky round the eye, lit by one light. Its rows pack the zenith-to-nadir circle tighter at the horizon, its
