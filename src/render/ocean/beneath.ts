@@ -27,6 +27,7 @@ import { FRAME, FRAMES, WATER, inFrame, type Frame } from './surface.ts';
 import { skyLight, sunlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
 import { P } from '../gpu/uniforms.ts';
+import { seaLevelNode } from '../lift.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -55,7 +56,7 @@ const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));
 export const refractedShadowPosition = (p: V3): V3 => {
   const r = p.length();
   const up = p.div(r);
-  const depth = max(P.planet.y.sub(r), 0);
+  const depth = max(seaLevelNode(up, true).sub(r), 0);
   const mu = max(dot(up, P.sunDir), 0.1);
   const sinI = sqrt(max(float(1).sub(mu.mul(mu)), 1e-6));
   const sinT = sinI.div(1.333);
@@ -101,9 +102,10 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
       if (material?.userData?.seaSurface) return colour;
       const out = vec3(colour).toVar();
       const r = p.length();
-      const sea = P.planet.y;
+      const up = p.div(r).toVar();
+      // (by texel loads: this runs in every material's fragment, the land's among them, which is out of samplers)
+      const sea = seaLevelNode(up, true).toVar();
       If(r.lessThan(sea.add(CRESTS)), () => {
-        const up = p.div(r);
         const w = FRAME.weight;
         const surface = rise(up, FRAMES[0]).mul(w.x).toVar();
         If(w.y.greaterThan(0), () => {

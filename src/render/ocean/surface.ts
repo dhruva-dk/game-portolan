@@ -23,6 +23,7 @@ import { LAYER, type Waves } from './waves.ts';
 import { skyLight, sunlight, moonlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
 import { P } from '../gpu/uniforms.ts';
+import { seaLevelNode } from '../lift.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -182,7 +183,8 @@ export function oceanSurface(waves: Waves): Mesh {
     vq.assign(q);
     vRise.assign(rise);
     vUp.assign(up);
-    return up.mul(R).add(lift);
+    // on the sea's level: the tide's, raised or drawn down where the regions' events move the water
+    return up.mul(seaLevelNode(up)).add(lift);
   })();
 
   // ----- fragment: the surface's slope, its unresolved roughness and its foam, worked out once at the top of the

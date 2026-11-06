@@ -31,6 +31,15 @@ export interface SceneSpec {
   /** Weather standing off the spot rather than over it: its kind, how far ahead along the heading and to starboard
    *  it stands (metres along the surface), its radius and strength. */
   systems?: readonly SceneSystem[];
+  /** The region's event, at its height: which turn of it (k), and seconds since it began. */
+  event?: SceneEvent;
+}
+
+export interface SceneEvent {
+  /** The region whose event runs, by default the scene's own. */
+  region?: RegionId | number;
+  k?: number;
+  since?: number;
 }
 
 export interface SceneSystem {
@@ -56,6 +65,7 @@ export interface SceneInput {
   fleet?: number;
   height?: number;
   systems?: readonly SceneSystem[];
+  event?: SceneEvent;
 }
 
 const DEG = Math.PI / 180;
@@ -293,6 +303,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     ...(s.height !== undefined && { height: s.height }),
     ...(s.fleet !== undefined && { fleet: s.fleet }),
     ...(s.systems && { systems: s.systems }),
+    ...(s.event && { event: s.event }),
   };
 }
 

@@ -4,7 +4,9 @@ import type { AmbienceMix, RegionId } from '../audio/index.ts';
 import type { ActorsView, CosmeticIds, ShipView } from '../render/actors/index.ts';
 import type { Look } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
-import { REGION_COUNT, REGIONS, heightAt, regionWeights } from '../sim/world/index.ts';
+import { CURRENTS, LIFTS, REGION_COUNT, REGIONS, heightAt, regionAt, regionWeights } from '../sim/world/index.ts';
+import { REGION_EVENT } from '../sim/tables.ts';
+import { EVENT_REGION } from '../sim/environment.ts';
 import type { V3 } from '../sim/math.ts';
 import type { StageView } from '../render/stage.ts';
 import { MASTHEAD } from '../render/actors/caravel.ts';
@@ -92,6 +94,21 @@ export function sceneStage(s: SceneSpec, time: number): StageView {
       ...(s.systems ?? []).map((w, i) => ({ kind: w.kind, at: standing(s, w.ahead, w.side ?? 0), radius: w.radius ?? 110, strength: w.strength ?? 1, id: 1 + i })),
     ],
     storm: null, territory: null,
+    ...(s.event && sceneEvent(s)),
+  };
+}
+
+/** A scene's region event at its height, as a match would hand it to the stage: its phase, the sea it lifts and the
+ *  lanes it sets in spate. */
+function sceneEvent(s: SceneSpec): Pick<StageView, 'events' | 'lift' | 'currents'> {
+  const e = s.event!, r = e.region ?? regionAt(s.pos), ri = typeof r === 'number' ? r : REGIONS.findIndex((g) => g.id === r), k = e.k ?? 0;
+  return {
+    events: { [REGIONS[ri].id]: { phase: 'running', k, since: e.since ?? 20, left: 60, strength: 1 } },
+    lift: LIFTS.map((l) => (l.region !== ri ? 0 : l.flip && k % 2 === 1 ? -l.by : l.by)),
+    currents: {
+      lanes: CURRENTS.map((l) => (l.region === ri && (ri === EVENT_REGION.fjords || ri === EVENT_REGION.blossom) ? REGION_EVENT.surge : 1)),
+      vortex: ri === EVENT_REGION.maelstrom ? REGION_EVENT.vortex : 1,
+    },
   };
 }
 

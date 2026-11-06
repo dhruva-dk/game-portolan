@@ -23,6 +23,7 @@ import { EventKelp } from '../regions/eventKelp.ts';
 import { EventClams } from '../regions/eventClams.ts';
 import { EventPetals } from '../regions/eventPetals.ts';
 import { rideOn } from '../swell.ts';
+import { seaLift, setLifts } from '../lift.ts';
 import { GPU } from '../actors/common.ts';
 import { moonDirection, sunDirection } from '../sky.ts';
 import { R } from '../../sim/sphere.ts';
@@ -30,6 +31,7 @@ import type { V3 } from '../../sim/math.ts';
 import type { StageView } from '../stage.ts';
 
 const DEG = Math.PI / 180;
+const NO_LIFT: readonly number[] = [];
 /** The wind sea is rebuilt only when the wind has changed by this much, m/s and radians: a rebuild is a pop. */
 const WIND_STEP = 0.75;
 const HEADING_STEP = 8 * DEG;
@@ -79,7 +81,7 @@ export class GpuStage {
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
     this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group);
     // what floats rides the sea this stage draws
-    rideOn((p, slope) => this.ocean.heightAt(p, slope));
+    rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -121,6 +123,7 @@ export class GpuStage {
     P.moonPhase.value = 0.5 - 0.5 * this.sun.dot(this.moon);
     this.atmosphere.turn = -(v.hour - 12) * 15 * DEG;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
+    setLifts(v.lift ?? NO_LIFT);
     const wind = this.#wind.set(v.wind.x, v.wind.y, v.wind.z);
     (P.wind.value as Vector3).copy(wind);
     (P.drift.value as Vector3).addScaledVector(wind, dt);
