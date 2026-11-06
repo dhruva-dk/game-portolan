@@ -8,7 +8,8 @@
 // independent seas keeps the variance of one: the waves change their pattern without growing or calming.
 //
 // The shading is water's: the sky and the sun reflected by Fresnel (three's GGX, with the slopes' unresolved
-// variance as roughness), and under it the light that went into the water, the sea floor seen through the
+// variance as roughness), with whatever stands over the water (hulls, shores, lanterns) found in the frame and put
+// in for the sky it hides (reflect.ts), and under it the light that went into the water, the sea floor seen through the
 // refracting surface and dimmed by Beer–Lambert over the path through the water, the water's own colour where the
 // path is long, light through the thin crests where the sun is behind them, and the foam on top.
 //
@@ -35,6 +36,7 @@ import type { Territory } from './territory.ts';
 import { REACH } from './coastField.ts';
 import { waterAt } from '../seaTint.ts';
 import type { Flow } from './flow.ts';
+import { SeaLight, seaReflection } from './reflect.ts';
 
 /** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
  *  phase grows as √distance, so a line's spacing is 2√(d + 1) / SHOAL metres: two at the water's edge, ten 24 m out). */
@@ -418,6 +420,15 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const sigma2 = variance.mul(0.5).add(WATER.ripples).add(P.rain.mul(0.004));
   const alpha = clamp(sigma2.mul(2).sqrt(), 0.02, 1);
   mat.roughnessNode = mix(alpha.sqrt(), float(0.9), whiteness);
+
+  // ----- what it mirrors of the frame, in place of the sky behind it (reflect.ts), where the water reflects enough
+  // for it to show and no foam lies
+  const facing = float(1).sub(max(dot(world, normalize(cameraPosition.sub(positionWorld))), 0));
+  const reflectance = float(0.02).add(pow(facing, 5).mul(0.98)).mul(float(1).sub(whiteness));
+  mat.setupLightingModel = () => new SeaLight(
+    () => seaReflection(world, alpha, reflectance),
+    [mat.useClearcoat, mat.useSheen, mat.useIridescence, mat.useAnisotropy, mat.useTransmission, mat.useDispersion],
+  );
 
   // ----- under the surface
   mat.backdropNode = Fn(() => {
