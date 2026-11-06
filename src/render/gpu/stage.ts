@@ -2,7 +2,7 @@
 // with its regions' scans, and the frame's finish, seen through the same camera rig and driven by the same StageView
 // as the WebGL stage. The app takes it with ?gpu while the rest of the planet moves across; nothing here reads the
 // simulation.
-import { PerspectiveCamera, Scene, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
+import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { P } from './uniforms.ts';
@@ -77,6 +77,9 @@ export class GpuStage {
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
   readonly #forward = new Vector3();
+  readonly #buffer = new Vector2();
+  /** The scene's resolution as a share of the screen's. */
+  readonly #scale: number;
   readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
@@ -97,7 +100,8 @@ export class GpuStage {
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
+    this.#scale = phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop;
+    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
     this.resize();
   }
 
@@ -186,6 +190,8 @@ export class GpuStage {
     const calm = 1 - Math.min(1, Math.max(0, (wind.length() - 6) / 6));
     this.fog.update(this.renderer, eye, cam.getWorldDirection(this.#forward), EYE.viewProjection.value as Matrix4, v.weather,
       (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
+    const size = this.renderer.getDrawingBufferSize(this.#buffer);
+    this.clouds.march(this.renderer, size.x * this.#scale, size.y * this.#scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
     this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);

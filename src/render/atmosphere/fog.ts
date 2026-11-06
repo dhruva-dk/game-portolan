@@ -57,8 +57,8 @@ const HAZE = 0.0013, HAZE_HEIGHT = 32, NIGHT_DAMP = 1.5;
 const G_MIST = 0.72, G_ASH = 0.45;
 /** The weather systems the fog takes its haze from at once, and the lanterns it lights. */
 const DISCS = 8, LAMPS = 12;
-/** A lantern's intensity per unit of its strength: the deck's own lamp, so the halo and the light on the deck agree. */
-const LANTERN = 260;
+/** A lantern's intensity in the air per unit of its strength: half the deck lamp's, as its glass and housing shade the flame from most of the air round it. */
+const LANTERN = 130;
 
 function volume(): Storage3DTexture {
   const t = new Storage3DTexture(FROXELS.x, FROXELS.y, FROXELS.z);
