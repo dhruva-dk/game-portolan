@@ -12,6 +12,7 @@ import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
 import { Studio } from '../render/studio.ts';
+import { Parchment } from '../render/paper/parchment.ts';
 import type { Weapon } from '../render/actors/view.ts';
 import { setStudio } from '../ui/parts/art.ts';
 import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Career } from '../career/index.ts';
@@ -42,7 +43,7 @@ import {
 } from '../ui/screens/match.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
-import { ICON, ceremony, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
+import { ICON, applyParchment, ceremony, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
   CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
 } from '../ui/model.ts';
@@ -171,6 +172,10 @@ export class App {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
+    // the interface's parchment, rendered on the stage's own GPU, and the chart painted the same way
+    const parchment = await Parchment.create(stage.renderer);
+    applyParchment(await parchment.sheets());
+    setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
     this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;

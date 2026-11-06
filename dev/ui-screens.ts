@@ -1,7 +1,8 @@
 // Mounts one screen (or the parts gallery) at the window's size, over a stand-in for the live planet, with the
 // fixtures as its data. Its buttons navigate the way the game will.
 import { Shell } from '../src/ui/shell.ts';
-import { el } from '../src/ui/parts/index.ts';
+import { applyParchment, el, setChartPainter } from '../src/ui/parts/index.ts';
+import { Parchment } from '../src/render/paper/parchment.ts';
 import { fxAbilities, fxCareer, fxLobby, fxLocker, fxRank, fxRivals, fxTitle } from '../src/ui/fixtures.ts';
 import { DEFAULT_SETTINGS } from '../src/ui/model.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen } from '../src/ui/screens/menus.ts';
@@ -54,7 +55,14 @@ const devStyle = `
   .dev-play { min-width: calc(320px * var(--k)); }
 `;
 
+/** The parchment, on a renderer of the gallery's own (it has no stage). */
+const parchment = Parchment.create().then(async (p) => {
+  applyParchment(await p.sheets());
+  setChartPainter((w, h, mask, sailed) => p.chart(w, h, mask, sailed));
+});
+
 export function mountScreen(screen: string, device: DeviceName, state: string): void {
+  void parchment;
   const st = document.createElement('style');
   st.textContent = devStyle;
   document.head.appendChild(st);

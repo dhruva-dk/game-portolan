@@ -15,4 +15,4 @@ export * from './badges.ts';
 export * from './overlays.ts';
 export * from './sigil.ts';
 export * from './art.ts';
-export { makePaper, paperTile, grain } from './paper.ts';
+export { applyParchment, chartPainter, paperTile, setChartPainter, type ChartMask, type ChartPainter, type ParchmentSheets } from './paper.ts';

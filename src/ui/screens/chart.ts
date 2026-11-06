@@ -7,6 +7,7 @@ import { R, fromLatLon, localFrame } from '../../sim/sphere.ts';
 import { v3, type V3 } from '../../sim/math.ts';
 import { FONT } from '../parts/tokens.ts';
 import type { ChartRegionView, GaleModel } from '../model.ts';
+import { chartPainter } from '../parts/paper.ts';
 
 const DEG = Math.PI / 180;
 /** The mask: an equirectangular grid, west to east and north to south. */
@@ -43,7 +44,7 @@ const cell = (lat: number, lon: number): number => {
 type RGB = readonly [number, number, number];
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-const PAPER: RGB = [233, 217, 180], INK: RGB = [58, 36, 20], SEA: RGB = [150, 182, 164], DEEP: RGB = [96, 138, 136];
+const INK: RGB = [58, 36, 20], SEA: RGB = [150, 182, 164], DEEP: RGB = [96, 138, 136];
 const LAND: RGB = [201, 167, 106], HIGH: RGB = [164, 124, 72];
 
 /** A ground height as chart colour: washed sea deepening offshore, ochre land browning with height. */
@@ -90,71 +91,44 @@ function inside(x: number, y: number, half: number, up: number, down: number, cx
 
 // ── the career's chart ──
 
-/** The whole world on parchment: the seas you have sailed inked in with their coasts, the rest left blank. */
+/** Which painting each chart canvas is waiting on, so a stale one never lands over a newer. */
+const PAINTING = new WeakMap<HTMLCanvasElement, number>();
+
+/**
+ * The whole world on parchment: the seas you have sailed washed in watercolour with their coasts inked, the rest bare
+ * paper with their borders in pencil. The GPU paints it (src/render/paper); the names go on over it here.
+ */
 export function drawChart(c: HTMLCanvasElement, chart: readonly ChartRegionView[]): void {
   if (!fit(c)) return;
   const m = mask(), sailed = new Uint8Array(REGION_COUNT);
   for (const r of chart) sailed[r.index] = r.sailed > 0 ? 1 : 0;
-  const img = new ImageData(MW, MH), d = img.data;
-  for (let k = 0; k < MW * MH; k++) {
-    const r = m.region[k], i = k % MW, j = (k / MW) | 0, h = m.height[k];
-    const east = m.region[j * MW + ((i + 1) % MW)], south = j + 1 < MH ? m.region[k + MW] : r;
-    let col: RGB = PAPER;
-    if (sailed[r]) {
-      col = ground(h);
-      const he = m.height[j * MW + ((i + 1) % MW)], hs = j + 1 < MH ? m.height[k + MW] : h;
-      if ((h >= 0) !== (he >= 0) || (h >= 0) !== (hs >= 0)) col = mix(col, INK, 0.75);
-    }
-    if (r !== east || r !== south) col = mix(col, INK, sailed[r] || sailed[east] || sailed[south] ? 0.5 : 0.22);
-    // the paper's grain
-    const n = ((i * 73856093) ^ (j * 19349663)) & 15;
-    d[k * 4] = col[0] - n * 0.6;
-    d[k * 4 + 1] = col[1] - n * 0.6;
-    d[k * 4 + 2] = col[2] - n * 0.6;
-    d[k * 4 + 3] = 255;
-  }
-  const off = document.createElement('canvas');
-  off.width = MW;
-  off.height = MH;
-  off.getContext('2d')!.putImageData(img, 0, 0);
-  // the chart keeps its 2:1 in whatever box it gets, centred
-  const g = c.getContext('2d')!, W = Math.min(c.width, c.height * 2), H = W / 2;
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, c.width, c.height);
-  g.translate((c.width - W) / 2, (c.height - H) / 2);
-  g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = 'high';
-  g.drawImage(off, 0, 0, W, H);
-  g.save();
-  g.beginPath();
-  g.rect(0, 0, W, H);
-  g.clip();
-  // rhumb lines from two wind roses, as old charts have them
-  g.save();
-  g.strokeStyle = 'rgba(120, 60, 30, 0.22)';
-  g.lineWidth = Math.max(1, W / 900);
-  for (const [cx, cy] of [[0.27, 0.62], [0.74, 0.36]]) {
-    for (let k = 0; k < 16; k++) {
-      const a = (k / 16) * Math.PI * 2;
-      g.beginPath();
-      g.moveTo(cx * W, cy * H);
-      g.lineTo(cx * W + Math.cos(a) * W, cy * H + Math.sin(a) * W);
-      g.stroke();
-    }
-  }
-  g.restore();
-  g.restore();
-  // names: the seas you know in ink, the rest faint
-  const size = Math.max(9, W / 64);
-  for (let ri = 0; ri < REGIONS.length; ri++) {
-    const r = REGIONS[ri], known = sailed[ri];
-    const x = ((r.lon + 180) / 360) * W, y = ((90 - r.lat) / 180) * H;
-    label(g, r.name, x, y, size, known ? 'rgb(58, 36, 20)' : 'rgba(58, 36, 20, 0.38)', known ? 'rgba(240, 226, 192, 0.85)' : 'rgba(240, 226, 192, 0.4)');
-  }
-  g.strokeStyle = 'rgba(58, 36, 20, 0.8)';
-  g.lineWidth = Math.max(1.5, W / 420);
-  g.strokeRect(g.lineWidth / 2, g.lineWidth / 2, W - g.lineWidth, H - g.lineWidth);
-  g.setTransform(1, 0, 0, 1, 0, 0);
+  // the chart keeps its 2:1 in whatever box it gets, centred (its width a multiple of 64, as the GPU's rows are read
+  // back whole)
+  const W = Math.floor(Math.min(c.width, c.height * 2) / 64) * 64, H = W / 2;
+  if (W < 64) return;
+  const ticket = (PAINTING.get(c) ?? 0) + 1;
+  PAINTING.set(c, ticket);
+  void chartPainter()
+    .then((paint) => paint(W, H, { width: MW, height: MH, region: m.region, ground: m.height }, sailed))
+    .then((px) => {
+      if (PAINTING.get(c) !== ticket || c.width < W) return;
+      const g = c.getContext('2d')!, x0 = Math.round((c.width - W) / 2), y0 = Math.round((c.height - H) / 2);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, c.width, c.height);
+      const img = new ImageData(W, H);
+      img.data.set(px.subarray(0, W * H * 4));
+      g.putImageData(img, x0, y0);
+      // names: the seas you know in ink, the rest faint
+      g.translate(x0, y0);
+      const size = Math.max(9, W / 64);
+      for (let ri = 0; ri < REGIONS.length; ri++) {
+        const r = REGIONS[ri], known = sailed[ri];
+        const x = ((r.lon + 180) / 360) * W, y = ((90 - r.lat) / 180) * H;
+        label(g, r.name, x, y, size, known ? 'rgb(58, 36, 20)' : 'rgba(58, 36, 20, 0.38)', known ? 'rgba(240, 226, 192, 0.85)' : 'rgba(240, 226, 192, 0.4)');
+      }
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      c.classList.add('is-painted');
+    });
 }
 
 // ── the Gale's globe ──
