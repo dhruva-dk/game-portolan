@@ -16,11 +16,11 @@
 // its foot, scales it about the foot (a jury mast is a short spar; gone is nothing), and lets it sink and drag astern
 // where it lies in the water. Shot-torn canvas (uTorn) opens holes in the lateens as hull damage does.
 import {
-  DoubleSide, MeshStandardNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture, type Vector4,
+  DoubleSide, MeshPhysicalNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture, type Vector4,
 } from 'three/webgpu';
 import {
   Fn, abs, atan, attribute, cameraPosition, clamp, cos, cross, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
-  int, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
+  int, normalGeometry, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
   uv, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
@@ -46,12 +46,12 @@ function mainmast(u: Uniforms, p: V3): V3 {
 }
 
 /** The hull, figurehead and turret: one material a ship, coloured by part. */
-export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardNodeMaterial {
-  const m = new MeshStandardNodeMaterial();
+export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalNodeMaterial {
+  const m = new MeshPhysicalNodeMaterial();
   const hull = read(u, 'uHull', 'color'), accent = read(u, 'uAccent', 'color'), trim = read(u, 'uTrim', 'color');
   const wisp = read(u, 'uWisp', 'color');
   const damage = read(u, 'uDamage', 'float'), hit = read(u, 'uHit', 'float'), hitAt = read(u, 'uHitAt', 'vec3');
-  const night = read(u, 'uNight', 'float');
+  const night = read(u, 'uNight', 'float'), reach = read(u, 'uWet', 'float');
   m.positionNode = Fn(() => moved(mainmast(u, positionLocal)))();
 
   const part = floor(attribute<'float'>('aPart').add(0.5)).toVar('shipPart');
@@ -148,9 +148,27 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardN
   const struck = smoothstep(4.5, 0, lp.distance(hitAt));
   const flash = charred.mul(0.5).add(vec3(1, 0.45, 0.15).mul(1.8).mul(struck).mul(struck)).mul(hit);
 
-  m.colorNode = holed;
-  m.roughnessNode = mix(rough, 0.95, max(scorch, max(soot, pierced).mul(mark)));
-  m.metalnessNode = metal;
+  // her sides wet as high as the sea and her bow wave throw it (higher forward, and in runs down the planking), the
+  // whole of her in rain, the deck most; above the wet, the salt the sea has left dried white in the grain. Water
+  // darkens bare wood more than lacquer, and lies on both as a second, glassy coat.
+  const lacquered = is(0).and(bottom.lessThan(0.5)).or(is(2)).or(is(6));
+  const runs = texture(tex.noise, vec2(lp.z.mul(0.7), lp.y.mul(0.12))).g;
+  const top = float(WL + 0.3).add(reach.mul(smoothstep(1, 8, lp.z).mul(1.2).add(0.4)));
+  const sides = smoothstep(top.add(0.12), top.sub(0.12), lp.y.sub(runs.sub(0.5).mul(0.6)));
+  const rained = P.rain.mul(mix(float(0.55), float(1), smoothstep(0.4, 0.9, normalGeometry.y)));
+  const wet = clamp(max(sides.mul(select(is(0).or(is(2)).or(is(6)).or(is(9)), float(1), float(0))), rained), 0, 1).mul(float(1).sub(scorch)).toVar('shipWet');
+  // (a tide-line just over the wet, frayed into drips where the spray ran down and dried)
+  const drips = texture(tex.noise, vec2(lp.z.mul(3.1), lp.y.mul(0.35))).r;
+  const fine = texture(tex.noise, lp.zy.mul(vec2(2.7, 5.5))).b;
+  const line = smoothstep(top.sub(0.02), top.add(0.06), lp.y).mul(smoothstep(top.add(drips.mul(0.5)).add(0.12), top.add(0.08), lp.y));
+  const crust = line.mul(smoothstep(0.35, 0.7, fine.mul(0.6).add(drips.mul(0.5))))
+    .mul(select(is(0), float(1), float(0))).mul(float(1).sub(gold)).mul(float(1).sub(wet)).mul(float(1).sub(scorch)).mul(0.45).toVar('shipSalt');
+  const soaked = holed.mul(mix(float(1), select(lacquered, float(0.82), float(0.55)), wet));
+  m.colorNode = mix(soaked, vec3(0.74, 0.73, 0.69).mul(lum.mul(0.25).add(0.85)), crust);
+  m.roughnessNode = mix(mix(rough, 0.95, max(scorch, max(soot, pierced).mul(mark))), 0.9, crust);
+  m.metalnessNode = metal.mul(float(1).sub(crust));
+  m.clearcoatNode = max(select(lacquered, float(0.75), float(0)).mul(float(1).sub(max(scorch, soot.mul(mark)))), wet).mul(float(1).sub(crust));
+  m.clearcoatRoughnessNode = mix(lum.mul(0.08).add(0.08), float(0.03), wet);
   m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(0.8).mul(bumps));
   m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP);
   return m;
@@ -174,8 +192,8 @@ class ClothLight extends PhysicalLightingModel {
 }
 
 /** The running rigging: tarred hemp, a tube built round each rope's particles in the vertex stage. */
-export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshStandardNodeMaterial {
-  const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
+export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshPhysicalNodeMaterial {
+  const m = new MeshPhysicalNodeMaterial({ roughness: 0.9, metalness: 0 });
   const slot = read(u, 'uClothSlot', 'float');
   const rope = attribute<'vec4'>('aRope'), radius = attribute<'float'>('aRopeR');
   m.positionNode = Fn(() => {
@@ -191,14 +209,17 @@ export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshStandardNodeMater
   })();
   // laid strands, twisting round the rope
   const strand = sin(rope.w.mul(3).add(positionLocal.length().mul(40))).mul(0.5).add(0.5);
-  m.colorNode = vec3(0.16, 0.12, 0.09).mul(strand.mul(0.35).add(0.75));
+  m.colorNode = vec3(0.16, 0.12, 0.09).mul(strand.mul(0.35).add(0.75)).mul(float(1).sub(P.rain.mul(0.3)));
+  // the fibres' soft sheen along the lay
+  m.sheenNode = vec3(0.22, 0.19, 0.15).mul(strand.mul(0.5).add(0.5));
+  m.sheenRoughnessNode = float(0.45);
   m.receivedShadowPositionNode = positionWorld.add(P.sunDir.mul(0.1));
   return m;
 }
 
 /** The lateens, their yards, the pennants and the ensign: one material a ship, double-sided cloth. */
-export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, sim: Cloth): MeshStandardNodeMaterial {
-  const m = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.85, metalness: 0 });
+export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, sim: Cloth): MeshPhysicalNodeMaterial {
+  const m = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.85, metalness: 0 });
   const side = read(u, 'uSide', 'float'), boom = read(u, 'uBoom', 'float'), slot = read(u, 'uClothSlot', 'float');
   const sailA = read(u, 'uSailA', 'color'), sailB = read(u, 'uSailB', 'color'), trimC = read(u, 'uTrimC', 'color');
   const pattern = read(u, 'uPattern', 'float'), emblem = read(u, 'uEmblem', 'float'), rect = read(u, 'uEmblemRect', 'vec4');
@@ -270,7 +291,10 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   const rags = torn.mul(float(0.7).add(float(1).sub(su.y).mul(0.25)).add(su.x.mul(0.15))).sub(0.04);
   const cut = select(yard, float(-1), max(damage.mul(0.62).sub(0.05), select(kind.lessThan(0.5), rags, float(-1))));
   const whole = hn.greaterThanEqual(cut);
-  m.colorNode = colour.mul(mix(1, 0.25, smoothstep(cut.add(0.06), cut, hn).mul(step(0, cut))));
+  // canvas darkens when it is rained on; the weave's sheen, the cloth's own colour at grazing light
+  m.colorNode = colour.mul(mix(1, 0.25, smoothstep(cut.add(0.06), cut, hn).mul(step(0, cut)))).mul(float(1).sub(P.rain.mul(select(yard, float(0.1), float(0.25)))));
+  m.sheenNode = select(yard, vec3(0), cloth.mul(0.45).add(0.08));
+  m.sheenRoughnessNode = float(0.55);
   // the player's own sail thins where it would hide the way ahead (round the crosshair only, so the rest of the rig
   // stays solid)
   const ndc = screenUV.mul(2).sub(1);
@@ -284,6 +308,6 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   // grow coarse
   const away = positionWorld.distance(cameraPosition);
   m.receivedShadowPositionNode = positionWorld.add(P.sunDir.mul(away.mul(0.01).add(0.15)));
-  m.setupLightingModel = () => new ClothLight();
+  m.setupLightingModel = () => new ClothLight(false, true);
   return m;
 }

@@ -777,7 +777,7 @@ export class ShipModel {
       uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFade: { value: 0 },
-      uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 }, uClothSlot: { value: 0 },
+      uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 }, uClothSlot: { value: 0 }, uWet: { value: 0.2 },
       // where she has been shot through and burnt, in hull space: centre, and radius (negative for a burn)
       uHoles: { value: Array.from({ length: HOLES }, () => new THREE.Vector4(0, -99, 0, 0)) },
     };
@@ -982,6 +982,9 @@ export class ShipModel {
     // the flags: the true wind less her own way through the water
     const ax = Math.sin(p.wind) * p.windSpeed, az = Math.cos(p.wind) * p.windSpeed - (aloft ? 20 : p.speed);
     u.uDamage.value = THREE.MathUtils.clamp((1 - p.hp) * 1.15 - 0.1, 0, 1) + s * 0.3;
+    // how high the sea and her bow wave wet her sides: up quickly as she drives into it, drying slowly
+    const reach = aloft ? 0 : THREE.MathUtils.clamp(p.speed / 16, 0, 1) * 0.8 + Math.max(0, -b.pitch) * 3 + Math.abs(b.roll) * 1.5;
+    u.uWet.value += (reach - u.uWet.value) * Math.min(1, dt * (reach > u.uWet.value ? 3 : 0.15));
     this.cloth(p, ax, az, dt);
     u.uHit.value = p.hit;
     u.uNight.value = p.night;
