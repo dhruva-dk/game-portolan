@@ -7,6 +7,8 @@ import { BEACON_LOOKS } from '../render/beacons/index.ts';
 import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
 import { beaconView, borderViews, lapPath, nightView, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
 import { BLOOM, FOCUS, LENS } from '../render/gpu/post.ts';
+import { MODE_NAMES, OPTION_NAMES, SCORES } from '../sim/captains/brain.ts';
+import { LEAF } from '../sim/captains/tree.ts';
 
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
@@ -84,6 +86,16 @@ export function installHook(app: App) {
     matchHash: () => app.matchHash(),
     state: () => app.summary(),
     get sim() { return app.session?.state ?? null; },
+    /** How each captain is thinking: its mode, the leaf of its behaviour tree that last acted, and its options' last
+     *  weighted scores, best first. */
+    minds: () => {
+      const st = app.session?.state;
+      if (!st) return [];
+      return st.ships.map((sh, i) => ({
+        ship: i, mode: MODE_NAMES[sh.captain.mode], leaf: LEAF[i] ?? '',
+        scores: OPTION_NAMES.map((n, k) => [n, +SCORES[i][k].toFixed(3)] as const).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]),
+      }));
+    },
     get app() { return app; },
 
     // ── tips ──
