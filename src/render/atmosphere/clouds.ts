@@ -77,6 +77,8 @@ interface Kind {
   /** 1 for a fog bank's shape, 1 for a thunderhead's anvil. */
   fog: number; anvil: number;
   tint: [number, number, number];
+  /** 1 for the fair-weather layer over the whole planet, whose cover comes from a broad weather map of its own. */
+  fair?: number;
 }
 
 const NONE: Kind = { base: 0, tower: 0, sigma: 0, albedo: 0, shaft: 0, fall: 0, fog: 0, anvil: 0, tint: [0, 0, 0] };
@@ -92,7 +94,10 @@ const KINDS: Kind[] = [
   { base: 50, tower: 45, sigma: 0.08, albedo: 0.99, shaft: 0.009, fall: 1.3, fog: 0, anvil: 0, tint: [0.97, 0.98, 1] },
   // ash: a sooty plume, high and dark, ash settling out of it
   { base: 40, tower: 190, sigma: 0.11, albedo: 0.5, shaft: 0.01, fall: 0.9, fog: 0, anvil: 0, tint: [0.5, 0.45, 0.41] },
+  // fair weather: cumulus over the whole planet, well above the weather's decks, heaped where the air is wetter
+  { base: 125, tower: 95, sigma: 0.07, albedo: 0.975, shaft: 0, fall: 0, fog: 0, anvil: 0, tint: [1, 1, 1], fair: 1 },
 ];
+const FAIR = KINDS.length - 1;
 const KIND_INDEX: Partial<Record<WeatherKind, number>> = { fog: 1, rain: 2, thunder: 3, snow: 4, ash: 5 };
 
 /** The lowest and highest a kind's cloud and its fall reach, metres over the sea. */
@@ -102,7 +107,7 @@ function reach(k: Kind): [number, number] {
 
 const SHAPE_K = uniformArray(KINDS.map((k) => new Vector4(k.base, k.tower, k.sigma, k.albedo)), 'vec4');
 const FALL_K = uniformArray(KINDS.map((k) => new Vector4(k.shaft, k.fall, k.fog, k.anvil)), 'vec4');
-const TINT_K = uniformArray(KINDS.map((k) => new Vector4(...k.tint, 0)), 'vec4');
+const TINT_K = uniformArray(KINDS.map((k) => new Vector4(...k.tint, k.fair ?? 0)), 'vec4');
 
 // ---------------------------------------------------------------- the systems
 
@@ -199,12 +204,16 @@ const detailKernel = Fn(() => {
 const cloudAt = (p: V3, i: I, fine: F): V2 => Fn(() => {
   const place = el(SYS.place, i), look = el(SYS.look, i);
   const kind = int(look.x);
-  const shape = el(SHAPE_K, kind), fall = el(FALL_K, kind);
+  const shape = el(SHAPE_K, kind), fall = el(FALL_K, kind), fair = el(TINT_K, kind).w;
   const centre = place.xyz, radius = place.w, strength = look.y, seed = look.z;
   const r = p.length(), up = p.div(r), h = r.sub(P.planet.y);
-  const rho = up.sub(centre.mul(up.dot(centre))).length().mul(P.planet.x).div(radius);
   // the noise rides with the system, each system its own part of it
   const q = p.sub(centre.mul(P.planet.x)).add(vec3(seed.mul(37.3), seed.mul(-21.1), seed.mul(13.7)));
+  // how far out from the system's middle p lies, a share of its radius; the fair-weather layer has no middle, and
+  // takes it from a broad map of its own instead, clear over some seas and heaped over others
+  const broad = texture3D(shapeTex, q.mul(1 / 1500)).level(float(0)).r;
+  const rho = select(fair.greaterThan(0.5), float(0.72).add(float(0.5).sub(broad).mul(1.5)),
+    up.sub(centre.mul(up.dot(centre))).length().mul(P.planet.x).div(radius));
   const out = vec2(0, 0).toVar();
   // the weather map: the cloud in patches over the system, frayed at its edge
   const wm = texture3D(shapeTex, q.mul(1 / 380)).level(float(0));
@@ -311,8 +320,9 @@ function cloudMaterial(): MeshBasicNodeMaterial {
       Discard();
     });
 
+    // the fair-weather layer is a thin shell, and is crossed in fewer steps than a system's towers
     const STEPS = 40;
-    const dt = t1.sub(t0).div(STEPS);
+    const dt = t1.sub(t0).div(select(el(TINT_K, kind).w.greaterThan(0.5), float(24), float(STEPS)));
     const t = t0.add(dt.mul(interleavedGradientNoise(screenCoordinate.xy.add(P.frame.mul(5.588238))))).toVar();
     const T = float(1).toVar();
     const L = vec3(0).toVar();
@@ -441,7 +451,7 @@ export class Clouds {
   }
 
   /** Lays out the systems' clouds for a frame, and the shade they throw. */
-  update(renderer: WebGPURenderer, systems: readonly CloudSystem[], eye: Vector3, sun: Vector3, moon: Vector3, dt: number): void {
+  update(renderer: WebGPURenderer, systems: readonly CloudSystem[], eye: Vector3, sun: Vector3, moon: Vector3, dt: number, fair = 0): void {
     if (!this.#made) {
       renderer.compute([shapeKernel, detailKernel] as ComputeNode[]);
       this.#made = true;
@@ -496,6 +506,20 @@ export class Clouds {
         if (STRIKE.light * 1.6 > fl.w) fl.set(into.x, into.y, into.z, STRIKE.light * 1.6);
       }
     });
+    // the fair-weather layer: a shell round the whole planet, its noise carried along by the wind
+    if (fair > 0.01 && n < MAX_CLOUDS) {
+      const i = n++, [, hi] = reach(KINDS[FAIR]);
+      const drift = (P.drift.value as Vector3);
+      (SYS.place.array[i] as Vector4).set(drift.x * 0.6 / R, drift.y * 0.6 / R, drift.z * 0.6 / R, 1e5);
+      (SYS.look.array[i] as Vector4).set(FAIR, fair, 7.3, 0);
+      (SYS.bound.array[i] as Vector4).set(0, 0, 0, (sea + hi) * 1.001);
+      (SYS.flash.array[i] as Vector4).w = 0;
+      const mesh = this.#meshes[i];
+      mesh.visible = true;
+      mesh.position.set(0, 0, 0);
+      mesh.scale.setScalar((sea + hi) * 1.04);
+      mesh.updateMatrixWorld();
+    }
     if (STRIKE.light > 0.01) flash = Math.max(flash, STRIKE.light * smooth(900, 150, STRIKE.foot.distanceTo(eye)));
     for (const id of this.#flickers.keys()) if (!seen.has(id)) this.#flickers.delete(id);
     for (let i = n; i < MAX_CLOUDS; i++) this.#meshes[i].visible = false;

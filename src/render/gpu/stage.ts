@@ -32,6 +32,8 @@ import type { StageView } from '../stage.ts';
 
 const DEG = Math.PI / 180;
 const NO_LIFT: readonly number[] = [];
+/** How built up the fair-weather cumulus is over the planet, where its own map heaps it most. */
+const FAIR_WEATHER = 0.62;
 /** The wind sea is rebuilt only when the wind has changed by this much, m/s and radians: a rebuild is a pop. */
 const WIND_STEP = 0.75;
 const HEADING_STEP = 8 * DEG;
@@ -148,7 +150,7 @@ export class GpuStage {
     P.night.value = Math.min(1, Math.max(0, (0.08 - up.dot(this.sun)) / 0.16));
     P.space.value = Math.min(1, Math.max(0, (eye.length() - R - 150) / 900));
 
-    this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt);
+    this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt, FAIR_WEATHER);
     const d = this.clouds.depth;
     P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
     P.snow.value = d.snow ?? 0;
