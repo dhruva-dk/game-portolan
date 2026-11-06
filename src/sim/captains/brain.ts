@@ -1,11 +1,12 @@
 // A captain's mind. Every few ticks it thinks: pick a region and dive into it, then at sea weigh the Storm,
-// its hull, the ships in sight, loot, the gull and its own water, and settle on a mode and a goal. Every tick
-// it steers for the goal (by A* over the nav grid when land is in the way), aims, fires and uses what it carries.
+// its hull, the ships in sight, the guns it hears, loot, the gull and its own water, and settle on a mode and a goal.
+// With nowhere it has to be, it weighs the water round it on the influence map (influence.ts). Every tick it steers
+// for the goal (by A* over the nav grid when land is in the way), aims, fires and uses what it carries.
 import { canCall } from '../economy.ts';
 import { aground, currentAt, seaLevel, seaLevelAt, solidAt } from '../environment.ts';
 import type { ShipInput } from '../input.ts';
 import { PI, addScaled, dcos, dot, dsin, length, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
-import { cellCentre, clearLine, findPath, nearestOpen, openAt } from '../nav.ts';
+import { cellCentre, clearLine, findPath, lineOfSight, nearestOpen, openAt } from '../nav.ts';
 import { GALE_SPEED, galeSeat } from '../opening.ts';
 import { activeOf, hasPerk } from '../perks.ts';
 import { rangeOf } from '../combat.ts';
@@ -23,9 +24,12 @@ import { wet } from '../parts.ts';
 import { newWind, windAt } from '../wind.ts';
 import { CENTRES, LANDMARKS, REGIONS, heightAt } from '../world/index.ts';
 import { styleOf, type Style } from './temperaments.ts';
+import { hears } from './hearing.ts';
+import { scout } from './influence.ts';
+import { keptClear } from './director.ts';
 
-export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9, event: 10, shelter: 11, landmark: 12 } as const;
-export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid', 'event', 'shelter', 'landmark'] as const;
+export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9, event: 10, shelter: 11, landmark: 12, hunt: 13 } as const;
+export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid', 'event', 'shelter', 'landmark', 'hunt'] as const;
 
 export const BRAIN = {
   /** Think every this many ticks. */
@@ -75,8 +79,19 @@ export const BRAIN = {
   weave: 0.55,
   /** Metres within which a sharp captain counts the other ships it sees before it picks a fight. */
   crowd: 150,
-  /** A captain on the run makes for an event's fog bank this far off. */
+  /** A captain on the run makes for an event's fog bank this far off; failing one, a sharp captain looks this far
+   *  round for water behind land, out of its pursuer's sight. */
   cover: 150,
+  hide: [70, 140],
+  /**
+   * Going to the sound of the guns: a noise (or the director's hunch) is worth going to for `memory` seconds, and gone
+   * to once within `arrive` metres. A captain goes with nerve past `nerve` (a hunch adds `hunch`; the director keeping
+   * the player's water clear takes `kept`), to `standoff` metres short of it, on the upwind side when it is sharp
+   * enough to take the weather gage. The last `endgame` ships afloat all go.
+   */
+  hunt: { memory: 22, arrive: 30, nerve: 0.42, hunch: 0.3, kept: 0.7, standoff: 85, gage: 0.45, endgame: 6, more: 0.3 },
+  /** Less will to start on the player while the director keeps their water clear, unless they shot first. */
+  relaxed: 0.35,
 } as const;
 
 const rngOf = (state: MatchState, i: number): Rng => state.rng[STREAM.captains + i];
@@ -173,7 +188,7 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
     if (coverNear(state, ship.pos, BRAIN.cover, U) && toEdge(state, U) > style.margin) {
       copy(c.goal, U);
       if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 20, tide);
-    } else away(ship.pos, foeAt(state, c), 120, c.goal);
+    } else if (!(c.skill > 0.35 && behindLand(state, i, style, c.goal))) away(ship.pos, foeAt(state, c), 120, c.goal);
     keepInside(state, c.goal, style);
     return;
   }
@@ -193,6 +208,19 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
     setMode(c, MODE.flee);
     away(ship.pos, foeAt(state, c), 120, c.goal);
     keepInside(state, c.goal, style);
+    return;
+  }
+
+  // 4c. guns heard out of sight (or the director's hunch): a captain with the nerve for it goes to see
+  if (goesToGuns(state, i, style)) {
+    setMode(c, MODE.hunt);
+    approach(state, i, style, c.goal);
+    // got there and found nothing: it lets that noise go
+    if (apart(ship.pos, c.goal) < BRAIN.hunt.arrive) {
+      c.heardT = state.tick * TICK;
+      copy(c.heard, ship.pos);
+      c.hunch = false;
+    }
     return;
   }
 
@@ -361,6 +389,16 @@ function perceive(state: MatchState, i: number, style: Style): void {
     copy(c.last, state.ships[best].pos);
     if (best === PLAYER && ship.lastBy === PLAYER) c.grudge = 1;
   } else if (c.foe >= 0 && (now - c.seen > 4 || state.ships[c.foe].phase !== PHASE.sea)) c.foe = -1;
+  // and it listens, for what it can't see: a noise newer than the one it last went by takes over from it (and from a
+  // hunch)
+  {
+    const k = hears(state, i, Q, best);
+    if (k >= 0 && state.noise[k].t > c.heardT) {
+      copy(c.heard, Q);
+      c.heardT = state.noise[k].t;
+      c.hunch = false;
+    }
+  }
 }
 
 /** The farthest a captain looks for a ship to fight. */
@@ -383,6 +421,8 @@ function wantsFight(state: MatchState, i: number, style: Style, d: number): bool
   // a captain who has learnt where the player's hull breaks presses the attack below it
   if (c.foe === PLAYER && c.run.confidence > 0.3 && foe.hull < c.run.value + 10) will += 0.3;
   if (c.foe === PLAYER && c.gentle) will -= 0.3;
+  // the director keeps the player's water clear after a fight: a fresh captain is in less of a hurry to start another
+  if (c.foe === PLAYER && keptClear(state, i) > 0 && !shotBy(state, ship, PLAYER, 300)) will -= BRAIN.relaxed;
   // early on it would sooner loot than fight, and lets a ship running from it go once she is past its guns' best range
   const restraint = holdBack(state);
   if (restraint > 0 && d > BRAIN.letGo && dot(foe.head, addScaled(P, foe.pos, ship.pos, -1)) > 0) return false;
@@ -400,6 +440,82 @@ function holdBack(state: MatchState): number {
   let afloat = 0;
   for (let j = 0; j < SHIPS; j++) if (state.ships[j].phase !== PHASE.sunk) afloat++;
   return afloat <= BRAIN.lastFew.ships ? by + BRAIN.lastFew.more : by;
+}
+
+/** A captain's nerve now, 0..1 or so: its will to go looking for a fight, by temperament, its own state, the Storm's
+ *  phase and how few are left. */
+function nerveOf(state: MatchState, i: number, style: Style): number {
+  const ship = state.ships[i], c = ship.captain;
+  // (the early restraint counts for half: going to look is not yet starting a fight)
+  let n = style.fight * (0.6 + 0.4 * c.aggro) - 0.5 * holdBack(state) + (ship.hull + ship.shield - 100) / 400;
+  let afloat = 0;
+  for (let j = 0; j < SHIPS; j++) if (state.ships[j].phase !== PHASE.sunk) afloat++;
+  if (afloat <= BRAIN.hunt.endgame) n += BRAIN.hunt.more;
+  return c.gentle ? n - 0.4 : n;
+}
+
+/** Whether a captain with nothing in sight goes to see the noise it last heard. */
+function goesToGuns(state: MatchState, i: number, style: Style): boolean {
+  const ship = state.ships[i], c = ship.captain, h = BRAIN.hunt;
+  if (state.tick * TICK - c.heardT > h.memory || apart(ship.pos, c.heard) < h.arrive) return false;
+  if (!hasWeapon(ship) || crippled(ship) || ship.hull < style.run + 20) return false;
+  if (toEdge(state, c.heard) < style.margin * 0.5) return false;
+  let n = nerveOf(state, i, style) + (c.hunch ? h.hunch : 0);
+  const clear = keptClear(state, i);
+  if (clear > 0 && apart(c.heard, state.ships[PLAYER].pos) < clear) n -= h.kept;
+  return n > h.nerve;
+}
+
+/**
+ * Where to make for to come on what it heard: `standoff` short of it, so it sights the ships there before it is among
+ * them. A sharp captain comes at it from upwind, to hold the weather gage when the fight starts: from upwind she
+ * chooses when it starts and when it ends.
+ */
+function approach(state: MatchState, i: number, style: Style, out: V3): void {
+  const ship = state.ships[i], c = ship.captain, h = BRAIN.hunt;
+  const off = h.standoff * style.standoff;
+  if (c.skill > h.gage && apart(ship.pos, c.heard) > off * 1.3) {
+    windAt(state, c.heard, WIND);
+    const m = length(WIND.v);
+    if (m > 0.5) {
+      // the tangent toward where the wind comes from
+      set(T, -WIND.v.x / m, -WIND.v.y / m, -WIND.v.z / m);
+      // swung toward its own side of the noise, so it doesn't sail through the fight to get upwind of it
+      tangentToward(c.heard, ship.pos, U);
+      normalize(set(T, T.x + U.x * 0.6, T.y + U.y * 0.6, T.z + U.z * 0.6));
+      along(c.heard, T, off, out);
+      if (openAt(out, tide) || nearestOpen(out, out, 20, tide)) {
+        keepInside(state, out, style);
+        return;
+      }
+    }
+  }
+  tangentToward(c.heard, ship.pos, T);
+  along(c.heard, T, off, out);
+  if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
+  keepInside(state, out, style);
+}
+
+/** Water out of its pursuer's sight behind land, in `out`, the nearest of a ring round it away from the foe. */
+function behindLand(state: MatchState, i: number, style: Style, out: V3): boolean {
+  const ship = state.ships[i], c = ship.captain, foe = foeAt(state, c);
+  tangentToward(ship.pos, foe, U);
+  let bd = 1e9;
+  for (const r of BRAIN.hide) {
+    for (let k = -3; k <= 3; k++) {
+      // the half of the ring facing away from the foe
+      rotateTangent(ship.pos, U, PI + (k * PI) / 7, T);
+      along(ship.pos, T, r, P);
+      if (!openAt(P, tide) || toEdge(state, P) < style.margin || lineOfSight(foe, P)) continue;
+      const d = r + Math.abs(k) * 10;
+      if (d < bd && clearLine(ship.pos, P, 6, tide)) {
+        bd = d;
+        copy(out, P);
+      }
+    }
+    if (bd < 1e9) return true;
+  }
+  return false;
 }
 
 const hasWeapon = (ship: Ship): boolean => {
@@ -521,6 +637,7 @@ function rotateTangent(p: V3, t: V3, a: number, out: V3): V3 {
 
 function roamGoal(state: MatchState, i: number, style: Style, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, calm = calmNow(state);
+  if (scout(state, i, style, nerveOf(state, i, style), rng, tide, c.goal)) return;
   for (let tries = 0; tries < 8; tries++) {
     tangentAt(ship.pos, rngRange(rng, -PI, PI), T);
     along(ship.pos, T, rngRange(rng, 60, 160), P);
@@ -877,9 +994,19 @@ function fightCourse(state: MatchState, i: number, out: V3): void {
   const d = apart(ship.pos, foe.pos);
   c.strafeT -= TICK;
   if (c.strafeT <= 0) {
+    const rng = rngOf(state, i);
     c.strafe = -c.strafe;
     // a sharp captain weaves, turning back more often, so she is hard to lead
-    c.strafeT = rngRange(rngOf(state, i), 4, 9) * (1 - 0.6 * c.skill);
+    c.strafeT = rngRange(rng, 4, 9) * (1 - 0.6 * c.skill);
+    // and more often than not works round to windward of her foe, to keep the weather gage
+    if (rngFloat(rng) < c.skill * 0.7) {
+      windAt(state, foe.pos, WIND);
+      tangentToward(foe.pos, ship.pos, T);
+      rotateTangent(foe.pos, T, 0.5, U);
+      const port = -dot(U, WIND.v);
+      rotateTangent(foe.pos, T, -0.5, U);
+      c.strafe = port > -dot(U, WIND.v) ? 1 : -1;
+    }
   }
   tangentToward(foe.pos, ship.pos, T);
   // a point on the ring of radius pref round the foe, a little round from where it is now

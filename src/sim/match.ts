@@ -71,8 +71,13 @@
 //               state (EVENT_STATE), start time, run, spot k and where its effect stands now
 //   lavaBomb    Cinder Peak threw a bomb: at where it will land, amount seconds in the air, y its reach; FLAG.done
 //               when it lands
+//
+// state.noise: what the captains can hear or see from afar (captains/hearing.ts); state.director: the pacing
+// director's phase and the player's heat (captains/director.ts).
 import { helm, think } from './captains/brain.ts';
 import { watch } from './captains/learning.ts';
+import { listen } from './captains/hearing.ts';
+import { direct } from './captains/director.ts';
 import { arm, burnTick, fly } from './combat.ts';
 import { partsTick } from './parts.ts';
 import { gulls } from './economy.ts';
@@ -154,6 +159,9 @@ export function step(state: MatchState, input: ShipInput | null = null, inputs: 
   for (const e of state.events) if (e.kind === EVENT.stormWait && (WHALE.at as readonly number[]).includes(e.item)) callBreach(state);
   swim(state);
   settle(state);
+  // what the captains will hear of this tick, and the director's read of it
+  listen(state);
+  direct(state);
   state.tick++;
   for (let i = 0; i < SHIPS; i++) if (state.ships[i].captain.on) watch(state, i);
 }

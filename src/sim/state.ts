@@ -88,6 +88,10 @@ const CAPTAIN = rec(
   ['lean', f64],
   // its drop has come past in the Gale: it leaves at the first gap in the crowd
   ['bound', bool],
+  // the last noise it heard and went by (hearing.ts): where, and when; a hunch is the director's (director.ts)
+  ['heard', XYZ],
+  ['heardT', f64],
+  ['hunch', bool],
 );
 
 const DELIVERY = rec(['state', int], ['t', f64], ['tier', int], ['at', XYZ], ['alt', f64]);
@@ -204,6 +208,13 @@ const MINE = rec(['owner', int], ['at', XYZ], ['t', f64]);
 
 const SINKING = rec(['ship', int], ['by', int], ['cause', int], ['tick', int]);
 
+/** Something the captains can hear or see from afar (hearing.ts): its kind (SOUND), where, when, how loud, whose. */
+const NOISE = rec(['kind', int], ['at', XYZ], ['t', f64], ['loud', f64], ['by', int]);
+
+/** The pacing director (director.ts): its phase (PACE), the player's heat, seconds into the phase, seconds of quiet,
+ *  and how many hunches it has handed out. */
+const DIRECTOR = rec(['phase', int], ['heat', f64], ['t', f64], ['quiet', f64], ['hunches', int]);
+
 /** One thing that happened this tick. Which fields mean what is listed per kind in match.ts. */
 const HAPPENING = rec(
   ['kind', int], ['ship', int], ['by', int], ['at', XYZ], ['y', f64], ['amount', f64], ['shield', f64], ['hull', f64],
@@ -237,6 +248,8 @@ const MATCH_SCHEMA = rec(
   ['leader', int],
   ['rentT', f64],
   ['events', list(HAPPENING)],
+  ['noise', list(NOISE)],
+  ['director', DIRECTOR],
   ['sunk', list(SINKING)],
   ['winner', int],
 );
@@ -250,11 +263,13 @@ export type WindGust = Value<typeof WIND_GUST>;
 export type WeatherSystem = Value<typeof SYSTEM>;
 export type Happening = Value<typeof HAPPENING>;
 export type Sinking = Value<typeof SINKING>;
+export type Noise = Value<typeof NOISE>;
+export type Director = Value<typeof DIRECTOR>;
 export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 2, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 3, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {

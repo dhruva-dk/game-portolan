@@ -64,6 +64,7 @@ function newCaptain(e: FleetEntry, i: number, seed: number, gentle: boolean): Ca
     mode: 0, think: rngInt(rng, 6), since: 0, react: 0, foe: -1, seen: -1e9, last: xyz(), goal: xyz(), want: xyz(), target: -1,
     region: -1, drop: xyz(), path: [], leg: 0, pathTo: xyz(), repath: 0, strafe: rngFloat(rng) < 0.5 ? -1 : 1, strafeT: 0,
     err: xyz(), errTo: xyz(), errT: 0, burst: 0, swapT: 0, stuckT: 0, backT: 0, claimT: 0, ring: [], li: 0, avoid: 0, felt: 0, lean: 0, bound: false,
+    heard: xyz(), heardT: -1e9, hunch: false,
   };
 }
 
@@ -110,7 +111,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     whale: { at: xyz(), head: { x: 1, y: 0, z: 0 }, route: [], leg: 0, state: WHALE_STATE.under, t: 0, breaches: 0, spot: xyz() },
     regionEvents: Array.from({ length: REGION_COUNT }, () => ({ state: EVENT_STATE.waiting, at: 0, warn: 0, run: 0, t: 0, k: 0, spot: xyz(), n: 0, marks: [] })),
     floeT: 0,
-    leader: -1, rentT: 0, events: [], sunk: [], winner: -1,
+    leader: -1, rentT: 0, events: [], noise: [], director: { phase: 0, heat: 0, t: 0, quiet: 0, hunches: 0 }, sunk: [], winner: -1,
   };
   // the captains' chart starts from a quiet sea, whatever the last match left on it
   chartEvents(state);
