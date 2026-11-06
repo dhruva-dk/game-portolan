@@ -14,16 +14,16 @@
 // its foot, scales it about the foot (a jury mast is a short spar; gone is nothing), and lets it sink and drag astern
 // where it lies in the water. Shot-torn canvas (uTorn) opens holes in the lateens as hull damage does.
 import {
-  DoubleSide, MeshStandardNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type NodeBuilder, type Texture,
+  DoubleSide, MeshStandardNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture, type Vector4,
 } from 'three/webgpu';
 import {
-  Fn, PI, abs, attribute, cameraPosition, clamp, cos, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
-  normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uv, vec2,
-  vec3,
+  Fn, PI, abs, atan, attribute, cameraPosition, clamp, cos, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
+  normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
+  uv, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
-import { MAIN_FOOT, WL } from '../caravel.ts';
+import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
 import { dither, moved, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /**
@@ -117,12 +117,36 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardN
   const embers = vec3(1, 0.32, 0.06).mul(pow(scorch, 6)).mul(damage).mul(sin(P.time.mul(5).add(dn.mul(20))).add(1.5));
   const charred = colour.mul(float(1).sub(scorch.mul(0.82)));
 
+  // shot holes that stay: a dark hole torn ragged, a ring of fresh splintered wood round it, soot beyond; a burn is a
+  // broad black scorch. Each is a point on her skin (caravel.ts struck), so they sit where the shots went in.
+  const holes = uniformArray(u.uHoles.value as Vector4[], 'vec4');
+  // the grain of the planking: what a hole's edge splits along, and the long splinters it leaves
+  const grainJag = texture(tex.noise, vec2(lp.z.mul(0.35), lp.y.mul(3.1))).r.toVar('shipJag');
+  let pierced: F = float(0), splinters: F = float(0), soot: F = float(0);
+  for (let i = 0; i < HOLES; i++) {
+    const c = holes.element(i) as unknown as Node<'vec4'>, r = abs(c.w), off = lp.sub(c.xyz), d = length(off);
+    // ragged all round, differently for each hole: a few sines of the angle about it, and the planking's grain
+    const a = atan(off.y, off.z.add(off.x.mul(0.5)));
+    const edge = sin(a.mul(3).add(i * 1.7)).mul(0.22).add(sin(a.mul(7).add(i * 2.9)).mul(0.14)).add(sin(a.mul(13).add(i * 4.3)).mul(0.08));
+    const reach = d.div(max(r, 1e-3)).sub(edge).sub(grainJag.sub(0.5).mul(0.5));
+    const shot = step(0, c.w);
+    pierced = max(pierced, smoothstep(0.62, 0.5, reach).mul(shot));
+    splinters = max(splinters, smoothstep(1.05, 0.8, reach).mul(shot));
+    soot = max(soot, smoothstep(mix(float(1.1), float(2.6), shot), float(0.45), reach).mul(mix(float(0.94), float(0.85), shot)));
+  }
+  pierced = pierced.toVar('shipPierced');
+  splinters = splinters.toVar('shipSplinters');
+  soot = soot.toVar('shipSoot');
+  const mark = select(is(11).or(is(14)).or(is(1)).or(is(12)), float(0), float(1));
+  const fresh = vec3(0.24, 0.15, 0.075).mul(lum.mul(0.5).add(0.75));
+  const holed = mix(mix(charred.mul(float(1).sub(soot.mul(mark).mul(0.85))), fresh, splinters.mul(mark)), vec3(0.008, 0.006, 0.005), pierced.mul(mark));
+
   // struck: a hot glow where the shot went in, and the rest of her lit a moment in her own colours
   const struck = smoothstep(4.5, 0, lp.distance(hitAt));
   const flash = charred.mul(0.5).add(vec3(1, 0.45, 0.15).mul(1.8).mul(struck).mul(struck)).mul(hit);
 
-  m.colorNode = charred;
-  m.roughnessNode = mix(rough, 0.95, scorch);
+  m.colorNode = holed;
+  m.roughnessNode = mix(rough, 0.95, max(scorch, max(soot, pierced).mul(mark)));
   m.metalnessNode = metal;
   m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(0.8).mul(bumps));
   m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP);

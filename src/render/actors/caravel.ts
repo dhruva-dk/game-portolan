@@ -679,6 +679,9 @@ export interface Pose {
   listTo: number; // the side she lists to, +1 starboard
 }
 
+/** Shot holes and burns a hull keeps, the oldest giving way to the newest. */
+export const HOLES = 16;
+
 /** The great spirit lantern over the taffrail, in ship space: where its glow is drawn. */
 export const LANTERN = new V3(0, STERN_Y + 0.6 + 0.85, STERN_Z - 0.05 - 0.35);
 /** The wisp that rides the main truck at night, in ship space: high enough to show as far off as her masts do. */
@@ -724,6 +727,9 @@ export class ShipModel {
   private jury = 0;
   private mastState: Pose['mast'] = 'up';
   private flood = 0;
+  /** Holes laid so far (the next goes in this slot of the ring), and her hull at the last frame. */
+  private holes = 0;
+  private lastHp = 1;
   /** Set for the frame the fallen mast strikes the water, with where its head hit in ship space. */
   landed = false;
   readonly landedAt = new V3();
@@ -740,6 +746,8 @@ export class ShipModel {
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
       uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 },
+      // where she has been shot through and burnt, in hull space: centre, and radius (negative for a burn)
+      uHoles: { value: Array.from({ length: HOLES }, () => new THREE.Vector4(0, -99, 0, 0)) },
     };
     const body = hullNodeMaterial(this.u, kit.tex);
     const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise);
@@ -776,10 +784,34 @@ export class ShipModel {
     this.head.geometry = this.kit.figurehead(look.figurehead);
   }
 
-  /** Where a shot went into her, given in world space, for the hit's glow. */
-  struck(world: THREE.Vector3): void {
+  /**
+   * Where a shot went into her, given in world space: the hit's glow, and a hole that stays (a burn, for heated
+   * shot), laid on her skin where the shot struck. Returns her side's outward normal there, in world space, for
+   * what is knocked out of it.
+   */
+  struck(world: THREE.Vector3, burn = false, big = 1): THREE.Vector3 {
     this.hull.updateWorldMatrix(true, false);
-    this.hull.worldToLocal((this.u.uHitAt.value as THREE.Vector3).copy(world));
+    const local = this.hull.worldToLocal((this.u.uHitAt.value as THREE.Vector3).copy(world)).clone();
+    // onto her side: the station along her and the side it came in, its height held between keel and rail; a shot
+    // that came down over the rail lands on the deck where it struck
+    const s = sAt(local.z), side = local.x >= 0 ? 1 : -1;
+    const onSide = local.y < rail(s) + 0.2;
+    const y = clamp(local.y, keel(s) + 0.4, rail(s) - 0.15);
+    const at = onSide ? onSkin(s, y, side) : local;
+    const n = onSide ? hullNormal(s, y, side) : new V3(0, 1, 0);
+    const holes = this.u.uHoles.value as THREE.Vector4[];
+    holes[this.holes++ % HOLES].set(at.x, at.y, at.z, (burn ? -1.5 : 0.45) * (0.75 + big * 0.35));
+    return n.transformDirection(this.hull.matrixWorld);
+  }
+
+  /** Holes patched as she is repaired: the oldest go first, as many as the share of her hull mended. */
+  private patchHoles(mended: number): void {
+    const holes = this.u.uHoles.value as THREE.Vector4[];
+    let n = Math.round(mended * HOLES * 1.2);
+    for (let k = 0; k < HOLES && n > 0; k++) {
+      const h = holes[(this.holes + k) % HOLES];
+      if (h.w !== 0) { h.set(0, -99, 0, 0); n--; }
+    }
   }
 
   /** Far from the camera, the lighter cut of the hull. */
@@ -892,6 +924,8 @@ export class ShipModel {
     this.body.rotation.set(b.pitch - s * 0.32 - this.flood * 0.03, 0, b.roll + b.heel + s * 0.55 + p.flip + list, 'YXZ');
     this.rig(p.mast, dt);
     this.u.uTorn.value = p.torn;
+    if (p.hp > this.lastHp + 0.01) this.patchHoles(p.hp - this.lastHp);
+    this.lastHp = p.hp;
     // the yards hang on the lee side and are sheeted to the wind: eased right out running before it, hauled in close
     // as she points up, until head to wind the cloth lifts and shakes. Bringing the wind across the stern gybes them.
     const off = Math.abs(p.wind), aloft = p.alt > 3;

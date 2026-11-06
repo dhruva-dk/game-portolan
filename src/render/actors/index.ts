@@ -393,8 +393,9 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
             if (counted) numbers.add(at, e.shield, true, e.crit && e.hull <= 0);
           }
           if (e.hull > 0) {
-            fx.hitShip(at, !!e.crit, big);
-            if (f) { f.hit = 1; f.model.struck(at); }
+            const out = f ? f.model.struck(at, e.weapon === 'heated', big) : undefined;
+            fx.hitShip(at, !!e.crit, big, out, f ? new THREE.Color(f.model.look.hull) : undefined);
+            if (f) f.hit = 1;
             if (counted) numbers.add(at.clone().addScaledVector(at.clone().normalize(), e.shield > 0 ? 1.4 : 0), e.hull, false, e.crit);
           }
           if (f) { f.lastHitBy = e.by; f.lastHitAt = clock; }
@@ -444,7 +445,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           const f = fleet.get(e.ship);
           if (!f) break;
           if (f.sink < 0) f.sink = 0;
-          fx.sink(f.pos, f.fwd, new THREE.Color(f.model.look.wisp));
+          fx.sink(f.pos, f.fwd, new THREE.Color(f.model.look.wisp), new THREE.Color(f.model.look.hull));
           const near = e.ship === player ? 1 : nearPlayer(f.pos, 120);
           if (near > 0) juice({ shake: 0.65 * near, kick: 2 * near, haptic: 'heavy' }, e);
           break;

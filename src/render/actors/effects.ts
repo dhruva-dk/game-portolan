@@ -3,9 +3,10 @@
 // sunk and the wisp of a lost ship's lantern rising free. Every direction is worked out in the local frame (up away
 // from the planet's centre), so nothing here assumes a flat sea.
 import * as THREE from 'three';
-import { AU, TAU, onSea, patch, rand, seaRadius, tangents } from './common.ts';
+import { AU, TAU, onSea, rand, tangents } from './common.ts';
 import { makeParticles, SPRITE, type Particles } from './particles.ts';
 import { Ribbons } from './ribbons.ts';
+import { Debris } from './debris.ts';
 import type { Weapon } from './view.ts';
 import { heat } from '../gpu/haze.ts';
 
@@ -28,7 +29,6 @@ class Local {
   }
 }
 
-interface Plank { p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; life: number; s: number }
 interface Wisp { p: THREE.Vector3; c: THREE.Color; t: number }
 
 const GRAV = 16;
@@ -42,10 +42,9 @@ export class Effects {
   readonly heatTrails: Ribbons;
   private readonly L = new Local();
   private readonly L2 = new Local();
-  private readonly planks: Plank[] = [];
-  private readonly plankMesh: THREE.InstancedMesh;
+  /** Wreckage afloat: what shot knocks out of hulls and what the sunk leave behind. */
+  readonly debris: Debris;
   private readonly wisps: Wisp[] = [];
-  private readonly tmp = new THREE.Object3D();
   private readonly p = new THREE.Vector3();
   private flick = 0;
 
@@ -56,13 +55,9 @@ export class Effects {
     this.trails = new Ribbons(72, 64, false, AU.uNoise.value!);
     this.heatTrails = new Ribbons(32, 24, true, AU.uNoise.value!);
     this.group.add(smoke.mesh, glow.mesh, this.trails.mesh, this.heatTrails.mesh);
-    // flotsam from sunk ships
-    const m = patch(new THREE.MeshStandardMaterial({ map: wood, color: 0x9a7b5a, roughness: 0.85 }));
-    this.plankMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.18, 2.4), m, 220);
-    this.plankMesh.count = 0;
-    this.plankMesh.frustumCulled = false;
-    this.plankMesh.castShadow = true;
-    this.group.add(this.plankMesh);
+    this.debris = new Debris(wood);
+    this.debris.onSplash = (at, big) => this.plop(at, big);
+    this.group.add(this.debris.group);
   }
 
   /** Drops everything still in the air or afloat, for a new match. */
@@ -71,7 +66,7 @@ export class Effects {
     this.smoke.clear();
     this.trails.clear();
     this.heatTrails.clear();
-    this.planks.length = 0;
+    this.debris.clear();
     this.wisps.length = 0;
   }
 
@@ -120,18 +115,32 @@ export class Effects {
     this.smoke.emit({ x: r.x, y: r.y, z: r.z, life: 1.4, size: 1 + big * 2, grow: 5, r: 1.3, g: 1.35, b: 1.4, a: 0.7, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
   }
 
-  /** Shot striking a hull: splinters, sparks, a flash; crits burst gold. */
-  hitShip(at: THREE.Vector3, crit: boolean, big: number): void {
+  /** Something small (a plank, a cask) dropping into the sea: a few drops thrown up and a ring of foam. */
+  plop(where: THREE.Vector3, big: number): void {
+    const L = this.L.at(where), c = onSea(where, 0.1, new THREE.Vector3());
+    for (let i = 0; i < 3 + big * 6; i++) {
+      const v = L.vec(Math.random() * TAU, rand(0.5, 1.5), rand(2, 4) * (0.6 + big));
+      this.smoke.emit({ x: c.x, y: c.y, z: c.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.5, 0.8), size: rand(0.15, 0.3) * (0.7 + big), grow: 1.8, r: 1.25, g: 1.32, b: 1.4, a: 0.7, frame: SPRITE.spray, grav: GRAV, float: true });
+    }
+    this.smoke.emit({ x: c.x, y: c.y, z: c.z, life: 0.8, size: 0.25 + big * 0.5, grow: 2.4, r: 1.3, g: 1.35, b: 1.4, a: 0.16, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
+  }
+
+  /**
+   * Shot striking a hull: splinters, sparks, a flash, and planks of her side knocked out (`out` her side's outward
+   * normal, `paint` her hull's colour) to float; crits burst gold.
+   */
+  hitShip(at: THREE.Vector3, crit: boolean, big: number, out?: THREE.Vector3, paint?: THREE.Color): void {
     const s = 0.7 + big * 0.8, { x, y, z } = at, L = this.L.at(at);
+    if (out && paint) this.debris.shatter(at, out, paint, big * (crit ? 1.4 : 1));
     this.glow.emit({ x, y, z, life: 0.12, size: 2.2 * s, grow: 1.5, r: crit ? 6 : 5, g: crit ? 5 : 2.6, b: crit ? 1.2 : 1, frame: SPRITE.puff, fadeIn: 0 });
     for (let i = 0; i < 9 * s; i++) {
       const v = L.vec(Math.random() * TAU, rand(8, 22), rand(2, 14));
       this.glow.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.25, 0.6), size: 0.07, r: crit ? 7 : 6, g: crit ? 6 : 3, b: crit ? 1.5 : 0.8, frame: SPRITE.spark, mode: 1, stretch: 0.045, grav: 18, drag: 1.5, fadeIn: 0 });
     }
-    // splinters: dark wood shards tumbling, landing on the water
+    // splinters too small to keep: dark slivers tumbling out and gone in the water (the planks are debris.ts's)
     for (let i = 0; i < 8 * s; i++) {
       const v = L.vec(Math.random() * TAU, rand(3, 10), rand(3, 9));
-      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.6), size: rand(0.25, 0.5), r: 0.55, g: 0.4, b: 0.28, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-12, 12), float: true, fadeIn: 0 });
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.6, 1.1), size: rand(0.12, 0.26), r: 0.16, g: 0.1, b: 0.06, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-12, 12), fadeIn: 0 });
     }
     const v = L.vec(0, 0, 1.2);
     this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 1.6, size: 1.2 * s, grow: 3, r: 0.45, g: 0.42, b: 0.4, a: 0.55, frame: SPRITE.billow, drag: 1, spin: rand(-0.4, 0.4) });
@@ -262,16 +271,10 @@ export class Effects {
 
   // ---------------------------------------------------------------- ships
 
-  /** A ship lost: the fire, the flotsam, and her wisp lantern rising free into the sky. */
-  sink(at: THREE.Vector3, fwd: THREE.Vector3, wisp: THREE.Color): void {
-    const L = this.L.at(at);
+  /** A ship lost: the fire, her wreckage, and her wisp lantern rising free into the sky. */
+  sink(at: THREE.Vector3, fwd: THREE.Vector3, wisp: THREE.Color, paint: THREE.Color): void {
     this.explode(onSea(at, 2, new THREE.Vector3()), 1.4, true);
-    for (let i = 0; i < 18; i++) {
-      if (this.planks.length >= 220) this.planks.shift();
-      const p = onSea(at, rand(1, 4), new THREE.Vector3()).addScaledVector(fwd, rand(-6, 6));
-      const v = L.vec(Math.random() * TAU, rand(3, 12), rand(5, 14)).clone();
-      this.planks.push({ p, v, q: new THREE.Quaternion().random(), w: new THREE.Vector3(rand(-6, 6), rand(-4, 4), rand(-6, 6)), life: rand(14, 22), s: rand(0.6, 1.4) });
-    }
+    this.debris.wreck(onSea(at, 0, new THREE.Vector3()), fwd, paint);
     this.wisps.push({ p: onSea(at, 3, new THREE.Vector3()), c: wisp.clone(), t: 0 });
   }
 
@@ -282,8 +285,10 @@ export class Effects {
     for (let i = 0; i < 26; i++) {
       const k = Math.random(), x = foot.x + (top.x - foot.x) * k, y = foot.y + (top.y - foot.y) * k, z = foot.z + (top.z - foot.z) * k;
       const v = L.vec(Math.random() * TAU, rand(1, 5), rand(1, 4));
-      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.6, 1.4), size: rand(0.15, 0.4), r: 0.5, g: 0.38, b: 0.26, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-10, 10), float: true, fadeIn: 0 });
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.6, 1.4), size: rand(0.15, 0.4), r: 0.16, g: 0.1, b: 0.06, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-10, 10), fadeIn: 0 });
     }
+    // what the break tears out of the step and the partners round it, thrown clear over the side to float
+    this.debris.splinter(foot, top);
     for (let i = 0; i < 6; i++) {
       const v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(0.5, 2));
       this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.5), size: 1.4, grow: 3, r: 0.6, g: 0.55, b: 0.5, a: 0.45, frame: SPRITE.billow, drag: 1 });
@@ -407,33 +412,8 @@ export class Effects {
   // ---------------------------------------------------------------- per frame
 
   update(dt: number): void {
-    // flotsam bobs, drifts and sinks
-    let np = 0;
-    const up = this.L.up, v = new THREE.Vector3(), q = new THREE.Quaternion();
-    for (let i = this.planks.length - 1; i >= 0; i--) {
-      const p = this.planks[i];
-      p.life -= dt;
-      if (p.life <= 0) { this.planks.splice(i, 1); continue; }
-      up.copy(p.p).normalize();
-      const r = p.p.length(), h = seaRadius(p.p) - (p.life < 3 ? (3 - p.life) * 0.6 : 0);
-      const vr = p.v.dot(up);
-      if (r > h + 0.1) p.v.addScaledVector(up, -22 * dt);
-      else {
-        p.v.addScaledVector(up, (h - r) * 6 - vr);
-        p.v.multiplyScalar(1 - dt * 1.5);
-        p.w.multiplyScalar(1 - dt * 3);
-      }
-      p.p.addScaledVector(p.v, dt);
-      q.setFromEuler(new THREE.Euler(p.w.x * dt, p.w.y * dt, p.w.z * dt));
-      p.q.multiply(q);
-      this.tmp.position.copy(p.p);
-      this.tmp.quaternion.copy(p.q);
-      this.tmp.scale.set(p.s, 1, p.s);
-      this.tmp.updateMatrix();
-      this.plankMesh.setMatrixAt(np++, this.tmp.matrix);
-    }
-    this.plankMesh.count = np;
-    this.plankMesh.instanceMatrix.needsUpdate = true;
+    this.debris.update(dt);
+    const up = this.L.up, v = new THREE.Vector3();
     // wisps of the lost, rising
     for (let i = this.wisps.length - 1; i >= 0; i--) {
       const w = this.wisps[i];
