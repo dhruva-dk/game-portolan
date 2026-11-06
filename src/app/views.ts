@@ -87,7 +87,22 @@ export function sceneStage(s: SceneSpec, time: number): StageView {
   return {
     time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, wind: scale(s.heading, 6), camera: s.camera,
     target: { pos: s.pos, heading: s.heading, height: s.height ?? (s.ship ? 2.5 : 0) },
-    weather: s.weather === 'clear' ? [] : [{ kind: s.weather, at: s.pos, radius: 220, strength: 1 }],
+    weather: [
+      ...(s.weather === 'clear' ? [] : [{ kind: s.weather, at: s.pos, radius: 220, strength: 1, id: 0 }]),
+      ...(s.systems ?? []).map((w, i) => ({ kind: w.kind, at: standing(s, w.ahead, w.side ?? 0), radius: w.radius ?? 110, strength: w.strength ?? 1, id: 1 + i })),
+    ],
     storm: null, territory: null,
   };
+}
+
+/** The point `ahead` metres along the scene's heading and `side` to starboard of its spot, on the unit sphere. */
+function standing(s: SceneSpec, ahead: number, side: number): V3 {
+  const p = s.pos, h = s.heading;
+  // starboard: the heading crossed with up
+  const sx = h.y * p.z - h.z * p.y, sy = h.z * p.x - h.x * p.z, sz = h.x * p.y - h.y * p.x;
+  const dx = h.x * ahead + sx * side, dy = h.y * ahead + sy * side, dz = h.z * ahead + sz * side;
+  const d = Math.hypot(dx, dy, dz), a = d / R;
+  if (d < 1e-6) return { ...p };
+  const c = Math.cos(a), k = Math.sin(a) / d;
+  return { x: p.x * c + dx * k, y: p.y * c + dy * k, z: p.z * c + dz * k };
 }

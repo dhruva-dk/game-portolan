@@ -461,10 +461,11 @@ export class Session implements Stepper {
     const hurt = own ? Math.max(0, 1 - ((s.tick - this.hurtTick) * TICK) / 0.5) : 0;
     const low = !own || w.phase === PHASE.sunk ? 0 : Math.max(0, (35 - w.hull) / 35) * 0.8;
     const weather = eventWeather(s, []);
-    for (const sys of s.weather) {
-      if (sys.kind < 0) continue;
-      weather.push({ kind: WEATHER_NAMES[sys.kind] as WeatherKind, at: sys.at, radius: sys.r, strength: vigour(sys) });
-    }
+    // the events' own weather first, then the simulation's slots, each with an id of its own
+    weather.forEach((w, i) => (w.id = 100 + i));
+    s.weather.forEach((sys, slot) => {
+      if (sys.kind >= 0) weather.push({ kind: WEATHER_NAMES[sys.kind] as WeatherKind, at: sys.at, radius: sys.r, strength: vigour(sys), id: slot });
+    });
     return {
       time, hour: hourOf(s), tilt: (s.tilt * 180) / Math.PI, tide: seaLevel(s), floes: floeTime(s), lift: liftsNow(s, this.lifts), events: this.eventPhases(alpha),
       currents: ((this.currents.vortex = currentScales(s, this.currents.lanes)), this.currents), wind: { ...windAt(s, at, WIND).v }, camera: 'chase',

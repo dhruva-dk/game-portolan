@@ -8,6 +8,7 @@ import { Post, SCREEN } from './post.ts';
 import { P } from './uniforms.ts';
 import { makeNoiseTexture } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
+import { Clouds } from '../atmosphere/clouds.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
 import { Terrain } from '../terrain.ts';
 import { ScanCache } from '../land/scans.ts';
@@ -40,6 +41,7 @@ export class GpuStage {
   readonly terrain: Terrain;
   readonly scans: ScanCache;
   readonly post: Post;
+  readonly clouds = new Clouds();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -56,7 +58,7 @@ export class GpuStage {
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
-    this.scene.add(this.terrain.group);
+    this.scene.add(this.terrain.group, this.clouds.group);
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -123,6 +125,11 @@ export class GpuStage {
     this.#seaFromWind(eye, wind);
     this.atmosphere.update(cam, dt);
     this.ocean.update(this.renderer, eye, v.time, dt);
+    this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt);
+    const d = this.clouds.depth;
+    P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
+    P.snow.value = d.snow ?? 0;
+    P.flash.value = this.clouds.flash;
     this.terrain.update(eye);
     this.scans.update(eye, dt);
     this.post.render();

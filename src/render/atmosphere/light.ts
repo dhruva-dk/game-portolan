@@ -2,7 +2,7 @@
 //
 //  - the sun: a directional light whose colour is the sun's light after the air between it and that fragment, faded
 //    over the sun's disc as it sinks behind the limb, so dawn is red on the eastern capes while the sea behind is
-//    still in night, and the terminator is a soft band across the globe;
+//    still in night, and the terminator is a soft band across the globe; and after the clouds over it (shade.ts);
 //  - the moon: the same, at the moon's illuminance and phase;
 //  - the sky: the light of the whole sky and the sea under it on a surface facing its normal (an ambient cube from the
 //    irradiance tables), and the sky's reflection in glossy surfaces (a filtered probe of the sky round the eye,
@@ -16,6 +16,7 @@ import { AIR } from './model.ts';
 import { IRRADIANCE, IRRADIANCE_FACE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyIrradiance, tables } from './luts.ts';
 import { P } from '../gpu/uniforms.ts';
 import { probeEye } from './sky.ts';
+import { moonShade, sunShade } from './shade.ts';
 
 type V3 = Node<'vec3'>;
 
@@ -23,14 +24,14 @@ type V3 = Node<'vec3'>;
 export const sunlight = Fn(() => {
   const p = positionWorld;
   const r = p.length();
-  return lightTransmittance(r, p.div(r).dot(P.sunDir), SUN_RADIUS).mul(P.sunIlluminance);
+  return lightTransmittance(r, p.div(r).dot(P.sunDir), SUN_RADIUS).mul(P.sunIlluminance).mul(sunShade(p));
 })();
 
 /** The moon's light as it arrives at the fragment being shaded. */
 export const moonlight = Fn(() => {
   const p = positionWorld;
   const r = p.length();
-  return lightTransmittance(r, p.div(r).dot(P.moonDir), MOON_RADIUS).mul(P.moonIlluminance).mul(P.moonPhase);
+  return lightTransmittance(r, p.div(r).dot(P.moonDir), MOON_RADIUS).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(p));
 })();
 
 /** The faint light left when neither sun nor moon is up: the stars and the glow of the high air. */

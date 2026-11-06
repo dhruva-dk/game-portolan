@@ -14,6 +14,8 @@ export interface WeatherSystem {
   at: V3;
   radius: number;
   strength: number;
+  /** Stable while the system lasts: what keeps a system's clouds its own as it drifts. */
+  id?: number;
 }
 
 /** How deep the camera is in each kind of weather, 0..1. */

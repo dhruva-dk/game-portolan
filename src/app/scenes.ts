@@ -28,6 +28,17 @@ export interface SceneSpec {
   height?: number;
   region?: string;
   regionName?: string;
+  /** Weather standing off the spot rather than over it: its kind, how far ahead along the heading and to starboard
+   *  it stands (metres along the surface), its radius and strength. */
+  systems?: readonly SceneSystem[];
+}
+
+export interface SceneSystem {
+  kind: WeatherKind;
+  ahead: number;
+  side?: number;
+  radius?: number;
+  strength?: number;
 }
 
 export interface SceneInput {
@@ -44,6 +55,7 @@ export interface SceneInput {
   ship?: boolean;
   fleet?: number;
   height?: number;
+  systems?: readonly SceneSystem[];
 }
 
 const DEG = Math.PI / 180;
@@ -280,6 +292,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     camera: s.camera ?? base.camera, tide: s.tide ?? 0, ship: s.ship ?? base.ship, region: reg.id, regionName: reg.name,
     ...(s.height !== undefined && { height: s.height }),
     ...(s.fleet !== undefined && { fleet: s.fleet }),
+    ...(s.systems && { systems: s.systems }),
   };
 }
 
