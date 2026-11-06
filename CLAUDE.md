@@ -8,6 +8,8 @@ in commit messages. This file and CREDITS.md are the only documents in the repo.
 
 ## Working
 
+- **Never deploy to Vercel.** The Vercel project serves the first Portolan from the `legacy-territory` branch and
+  nothing else. Don't run `vercel` deploy commands from main, even when a change looks ready to show.
 - **Work comes from issues** on dhruva-dk/game-portolan. An issue is a title and a list of user stories. It is done
   when every story is true on the iPad, and the commit that makes it true closes it.
 - **The owner decides what gets built.** Build only what an issue asks for. File bugs you find as issues; propose
