@@ -9,6 +9,7 @@ import { FRAME, WATER, oceanSurface } from './surface.ts';
 import { beneath } from './beneath.ts';
 import { Coast } from './coast.ts';
 import { Territory } from './territory.ts';
+import { Flow } from './flow.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
@@ -31,6 +32,8 @@ export class Ocean {
   readonly coast = new Coast();
   /** The captains' water and trails, inked on the sea. */
   readonly territory = new Territory();
+  /** The currents the surface streams along, and the calms that still it. */
+  readonly flow = new Flow();
   readonly #seed: number;
   #state: SeaState = { ...CALM_SEA };
   #built = '';
@@ -44,7 +47,7 @@ export class Ocean {
 
   constructor(seed = 1) {
     this.#seed = seed;
-    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory);
+    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory, this.flow);
     this.beneath = beneath(this.waves.field);
   }
 

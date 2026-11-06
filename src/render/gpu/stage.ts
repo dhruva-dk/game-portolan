@@ -195,6 +195,8 @@ export class GpuStage {
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
     this.clouds.march(this.renderer, size.x * this.#scale, size.y * this.#scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
     this.flora.update(this.renderer, cam);
+    this.ocean.flow.set(v.currents);
+    this.ocean.flow.calms(v.weather, eye);
     this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);
@@ -241,6 +243,7 @@ export class GpuStage {
     await this.flora.settled();
     await this.scans.settled(this.camera.position);
     await this.ocean.coast.ready;
+    await this.ocean.flow.ready;
   }
 
   stats() {

@@ -33,10 +33,17 @@ import type { Coast } from './coast.ts';
 import type { Territory } from './territory.ts';
 import { REACH } from './coastField.ts';
 import { waterAt } from '../seaTint.ts';
+import type { Flow } from './flow.ts';
 
 /** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
  *  phase grows as √distance, so a line's spacing is 2√(d + 1) / SHOAL metres: two at the water's edge, ten 24 m out). */
 const SURF_PERIOD = 7, SHOAL = 1;
+/** The flow map's period, seconds: each of its two reads is carried down the current for this long before it jumps
+ *  back. Long enough that the jump is rare, short enough that nothing is stretched past recognition. */
+const FLOW_PERIOD = 2.4;
+/** Water slower than this carries no foam of its own, m/s; faster than FAST it runs white: the Great Current's pace
+ *  and below is quiet, a race in spate is not. */
+const SLOW = 4.4, FAST = 8;
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -151,7 +158,7 @@ function rainRings(q: V2): V2 {
 
 // ---------------------------------------------------------------- the material
 
-export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory): Mesh {
+export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   mat.fog = true;
   // the surface is what the light under it passes through, not something beneath it
@@ -190,13 +197,15 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       lift.addAssign(b.world.mul(FRAME.weight.y));
       rise.addAssign(b.height.mul(FRAME.weight.y));
     });
+    // a calm stills the waves toward its middle
+    const still = float(1).sub(flow.calmAt(up).mul(0.85));
     vq.assign(q);
-    vRise.assign(rise);
+    vRise.assign(rise.mul(still));
     vUp.assign(up);
     // on the sea's level: the tide's, raised or drawn down where the regions' events move the water
     const level = seaLevelNode(up).toVar();
     vLevel.assign(level.sub(R));
-    return up.mul(level).add(lift);
+    return up.mul(level).add(lift.mul(still));
   })();
 
   // ----- fragment: the surface's slope, its unresolved roughness and its foam, worked out once at the top of the
@@ -205,16 +214,43 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const variance = float(0).toVar('oceanVariance');
   const foam = float(0).toVar('oceanFoam');
   const fold = float(1).toVar('oceanFold');
+  const race = float(0).toVar('oceanRace');
   const surface = () => {
     const u = normalize(vUp);
+    // the flow map's two reads: how far down the current each has been carried, seconds, and how much each counts;
+    // worked out here, before any branch, so every branch that reads them finds them set
+    const cycle = P.time.div(FLOW_PERIOD);
+    const phase = vec2(fract(cycle), fract(cycle.add(0.5))).mul(FLOW_PERIOD).toVar('oceanFlowPhase');
+    const w0 = float(1).sub(abs(fract(cycle).mul(2).sub(1)));
+    const weights = vec2(w0, float(1).sub(w0)).toVar('oceanFlowWeights');
+    const current = flow.at(u).toVar('oceanCurrent');
+    const calm = flow.calmAt(u).toVar('oceanCalm');
     const shade = (q: V2, f: Frame, w: F) => {
       const { e1, e2 } = inFrame(u, f);
       const s = vec4(0).toVar();
       const dxz = float(0).toVar(), v = float(0).toVar(), white = float(0).toVar();
+      // the current in this frame's plane: the shortest waves ride it, so they stream past whatever stands still
+      const along = vec2(dot(current, e1), dot(current, e2));
+      const moving = length(along).greaterThan(0.15);
       for (let c = 0; c < CASCADES; c++) {
         const uv = q.div(SIZES[c]);
-        const sl = sample(uv, LAYER.slope + c);
-        const mo = sample(uv, LAYER.moments + c);
+        let sl: Node<'vec4'>, mo: Node<'vec4'>;
+        if (c === CASCADES - 1) {
+          const slv = vec4(0).toVar(), mov = vec4(0).toVar();
+          If(moving, () => {
+            const a = q.sub(along.mul(phase.x)).div(SIZES[c]), b = q.sub(along.mul(phase.y)).div(SIZES[c]);
+            slv.assign(sample(a, LAYER.slope + c).mul(weights.x).add(sample(b, LAYER.slope + c).mul(weights.y)));
+            mov.assign(sample(a, LAYER.moments + c).mul(weights.x).add(sample(b, LAYER.moments + c).mul(weights.y)));
+          }).Else(() => {
+            slv.assign(sample(uv, LAYER.slope + c));
+            mov.assign(sample(uv, LAYER.moments + c));
+          });
+          sl = slv;
+          mo = mov;
+        } else {
+          sl = sample(uv, LAYER.slope + c);
+          mo = sample(uv, LAYER.moments + c);
+        }
         s.addAssign(sl);
         dxz.addAssign(mo.w);
         v.addAssign(max(mo.x.sub(sl.x.mul(sl.x)), 0).add(max(mo.y.sub(sl.y.mul(sl.y)), 0)));
@@ -229,6 +265,34 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     shade(vq.xy, FRAMES[0], FRAME.weight.x);
     If(FRAME.weight.y.greaterThan(0), () => {
       shade(vq.zw, FRAMES[1], FRAME.weight.y);
+    });
+    // a calm: the slopes, their unresolved spread and the breaking all stilled toward its middle
+    const still = float(1).sub(calm.mul(0.85));
+    world.mulAssign(still);
+    variance.mulAssign(still.mul(still));
+    foam.mulAssign(still);
+    // fast water runs white: foam carried down the flow and drawn out along it, a short line integral of the noise
+    // down the current (Cabral and Leedom, SIGGRAPH 1993) read at both of the flow map's phases
+    const speed = length(current);
+    const fast = smoothstep(SLOW, FAST, speed).toVar();
+    If(fast.greaterThan(0.01), () => {
+      const { e1, e2 } = inFrame(u, FRAMES[0]);
+      const along = vec2(dot(current, e1), dot(current, e2));
+      const dir = along.div(max(speed, 1e-3));
+      const streak = (carried: F) => {
+        const base = vq.xy.sub(along.mul(carried));
+        let n: F = float(0);
+        for (let k = -2; k <= 2; k++) n = n.add(noiseMap.sample(base.add(dir.mul(k * 0.9)).mul(0.11)).g.mul(k === 0 ? 0.28 : k * k === 1 ? 0.2 : 0.16));
+        return n;
+      };
+      const n = streak(phase.x).mul(weights.x).add(streak(phase.y).mul(weights.y));
+      // and a finer grain carried with it, so the streaks' edges fray
+      const fine = noiseMap.sample(vq.xy.sub(along.mul(phase.x)).mul(0.37)).a.mul(weights.x)
+        .add(noiseMap.sample(vq.xy.sub(along.mul(phase.y)).mul(0.37)).a.mul(weights.y));
+      const m = n.mul(0.75).add(fine.mul(0.25));
+      const lace = smoothstep(float(0.66).sub(fast.mul(0.1)), float(0.76).sub(fast.mul(0.1)), m);
+      const far = smoothstep(140, 420, length(positionWorld.sub(cameraPosition)));
+      race.assign(mix(lace, fast.mul(0.22), far).mul(fast));
     });
     // rain ringing the water near the eye, where the rings can be seen
     const near = smoothstep(45, 6, positionWorld.distance(cameraPosition)).mul(P.rain);
@@ -316,7 +380,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     });
   };
   // the foam, over the ink, and how much of the water the two cover between them: the rest is the water itself
-  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore), 0, 1);
+  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore).add(race), 0, 1);
   const covered = whiteness.add(inkShare.mul(float(1).sub(whiteness)));
   mat.colorNode = Fn(() => {
     surface();
