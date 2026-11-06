@@ -204,7 +204,8 @@ export class GpuStage {
     this.clams.update(v.events, v.time, v.tide);
     this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
     this.moonbow.update(eye, wind.length());
-    this.post.render();
+    this.post.focus(v.focus ?? null);
+    this.post.render(dt);
 
     const now = performance.now();
     if (this.#last) this.#fps += (1000 / Math.max(now - this.#last, 1) - this.#fps) * 0.05;

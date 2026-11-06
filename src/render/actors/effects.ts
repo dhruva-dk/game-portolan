@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { TAU, onSea, patch, rand, seaRadius, tangents } from './common.ts';
 import { makeParticles, SPRITE, type Particles } from './particles.ts';
 import type { Weapon } from './view.ts';
+import { heat } from '../gpu/haze.ts';
 
 export const RARITY_GLOW = [0xc9d1da, 0x55e05a, 0x3aa0ff, 0xb85cff, 0xffa21f].map((h) => new THREE.Color(h));
 
@@ -76,6 +77,8 @@ export class Effects {
   muzzle(kind: Weapon, pos: THREE.Vector3, dir: THREE.Vector3, scale = 1): void {
     const big = kind === 'mortar' ? 1.8 : kind === 'harpoon' ? 1.2 : kind === 'repeater' ? 0.45 : kind === 'scatter' ? 1.3 : kind === 'broadside' ? 1.1 : kind === 'chain' ? 1.15 : kind === 'heated' ? 1.05 : 1;
     const s = big * scale, { x, y, z } = pos, L = this.L.at(pos);
+    // the blast's heat bends the air in front of the muzzle for a moment
+    heat(this.p.copy(pos).addScaledVector(dir, 1.5 * s), 2.2 * s, 0.9, 0.45);
     this.glow.emit({ x, y, z, life: 0.09, size: 1.6 * s, grow: 1.6, r: 6, g: 3.6, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
     this.glow.emit({ x: x + dir.x * 1.2 * s, y: y + dir.y * 1.2 * s, z: z + dir.z * 1.2 * s, vx: dir.x * 8, vy: dir.y * 8, vz: dir.z * 8, life: 0.08, size: 0.9 * s, grow: 2, r: 8, g: 4.5, b: 1.5, frame: SPRITE.flame, mode: 1, stretch: 0.25, fadeIn: 0 });
     const sparks = kind === 'repeater' ? 1 : 5;
@@ -287,6 +290,9 @@ export class Effects {
    */
   burning(deck: THREE.Vector3, fwd: THREE.Vector3, sail: THREE.Vector3 | null, dt: number): void {
     const L = this.L.at(deck);
+    // the air over her shimmers in the heat, up through the burning canvas
+    heat(deck, 7, 1);
+    if (sail) heat(sail, 6, 0.8);
     for (let i = 0; i < 40 * dt || Math.random() < 40 * dt - i; i++) {
       const o = this.p.copy(deck).addScaledVector(fwd, rand(-6, 6)).add(L.vec(Math.random() * TAU, rand(0, 1.4), rand(-0.3, 0.4)));
       const v = L.vec(Math.random() * TAU, rand(0, 0.6), rand(1.5, 3.5));

@@ -19,6 +19,7 @@ import { Projectiles } from './projectiles.ts';
 import { Wakes } from './wakes.ts';
 import { Whales } from './whale.ts';
 import type { ActorEvent, ActorsView, EruptionView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
+import { heat } from '../gpu/haze.ts';
 
 export * from './view.ts';
 export { lookOf, SAIL_COLOURS, PATTERNS, HULL_PAINTS, WAKES, FIGUREHEADS } from './cosmetics.ts';
@@ -268,6 +269,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   function erupt(e: EruptionView, dt: number): void {
     crater.set(e.crater.x, e.crater.y, e.crater.z);
     fx.plume(crater, e.strength, dt);
+    heat(crater, 26, 0.6 + 0.4 * e.strength);
     for (const b of e.bombs) {
       bombTo.set(b.to.x, b.to.y, b.to.z);
       const k = b.k, r0 = crater.length(), r1 = seaRadius(bombTo), apex = 18 + crater.distanceTo(bombTo) * 0.35;

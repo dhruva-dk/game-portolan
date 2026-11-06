@@ -575,7 +575,10 @@ export class App {
     }
     s.sun(this.sun);
     actors.update(s.actorsView(f.clock, f.alpha, this.sun), f.dt, stage.camera);
-    stage.frame(s.stageView(f.clock, f.alpha), f.dt);
+    const sv = s.stageView(f.clock, f.alpha);
+    // the win is a ceremony: the lens draws focus onto the last ship afloat
+    if (this.screen === 'victory' && stage.rig) sv.focus = stage.rig.dist;
+    stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => s.hearing());
     const c = stage.camera.position;
     this.eye.x = c.x;
@@ -690,6 +693,8 @@ export class App {
     const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
     const speed = v.camera === 'chase' && this.fixed ? 14.5 : 0;
     actors.update(sceneActors(v, f.clock, this.sun, look, speed), f.dt, stage.camera);
+    // over the lobby and the menus the lens draws focus onto the ship, and the sea and islands behind fall soft
+    if (v.camera === 'chase' && v.ship && stage.rig) sv.focus = stage.rig.dist;
     stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => sceneHearing(v, speed));
   }

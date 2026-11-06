@@ -16,6 +16,7 @@ import {
   Fn, acos, attribute, cameraFar, cameraNear, cameraPosition, cameraWorldMatrix, clamp, dot, exp, float, fract, max, mix,
   modelViewMatrix, modelWorldMatrixInverse, perspectiveDepthToViewZ, positionGeometry, positionView, positionWorld, screenUV,
   select, sin, smoothstep, texture, uniform, varying, vec2, vec3, vec4, viewportDepthTexture, cos,
+  positionPrevious,
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import { LANDMARKS, REGIONS } from '../../sim/world/index.ts';
@@ -119,7 +120,11 @@ export class Moonbow {
     const mv = modelViewMatrix.mul(vec4(centre, 1));
     const q = positionGeometry.xy;
     const world = cameraWorldMatrix.mul(vec4(mv.xy.add(q.mul(size)), mv.z, 1));
-    m.positionNode = Fn(() => modelWorldMatrixInverse.mul(world).xyz)();
+    m.positionNode = Fn(() => {
+      const at = modelWorldMatrixInverse.mul(world).xyz.toVar();
+      positionPrevious.assign(at);
+      return at;
+    })();
 
     const vq = varying(q, 'vSprayQ') as unknown as V2;
     const va = varying(alpha, 'vSprayA') as unknown as F;

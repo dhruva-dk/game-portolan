@@ -26,6 +26,7 @@ import {
   interleavedGradientNoise, length, log2, materialColor, materialRoughness, max, min, mix, normalGeometry, normalLocal,
   normalView, normalViewGeometry, normalize, positionGeometry, positionView, positionViewDirection, positionWorld, screenCoordinate,
   int, select, sign, sin, smoothstep, step, texture, textureSize, uint, uv, varying, vec2, vec3, vec4, cameraPosition,
+  positionPrevious,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
 import { thinCloudLight } from '../atmosphere/light.ts';
@@ -313,7 +314,10 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
     const ws = vec3(wl.z.negate(), 0, wl.x);
     const w: WindIn = { p, n, o: c.at, wl, ws, wd, t: P.time, speed, q: c.q, size: c.size };
     const off = t.kit === 'A' ? windA(w) : t.kit === 'B' ? windB(w, t.mode ?? 'air') : t.kit === 'C' ? windC(w, !!t.surge) : windD(w);
-    return c.at.add(turn(c.q, p.add(off).mul(c.size)));
+    // (each copy is placed by this node, not by a matrix: its place is where it was, for the motion vectors)
+    const at = c.at.add(turn(c.q, p.add(off).mul(c.size))).toVar();
+    positionPrevious.assign(at);
+    return at;
   })();
 
   // ---- the surface
@@ -417,7 +421,9 @@ function drips(f: FieldNodes): Material {
     const world = c.at.add(turn(c.q, local.mul(c.size)));
     const toEye = normalize(cameraPosition.sub(world));
     const across = normalize(cross(turn(c.q, vec3(0, 1, 0)), toEye));
-    return world.add(across.mul(drip.x.mul(0.007)));
+    const at = world.add(across.mul(drip.x.mul(0.007))).toVar();
+    positionPrevious.assign(at);
+    return at;
   })();
   const va = varying(alpha.mul(c.shown), 'vDripA') as unknown as F;
   m.colorNode = Fn(() => thinCloudLight(positionWorld).mul(0.9).add(vec3(0.02, 0.025, 0.03).mul(P.night.oneMinus())))();
