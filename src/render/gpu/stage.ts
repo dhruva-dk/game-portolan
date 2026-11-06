@@ -23,6 +23,7 @@ import { EventRocks } from '../regions/eventRocks.ts';
 import { EventKelp } from '../regions/eventKelp.ts';
 import { EventClams } from '../regions/eventClams.ts';
 import { EventPetals } from '../regions/eventPetals.ts';
+import { Moonbow } from '../regions/moonbow.ts';
 import { rideOn } from '../swell.ts';
 import { seaLift, setLifts } from '../lift.ts';
 import { seaDeepAt } from '../seaTint.ts';
@@ -66,6 +67,7 @@ export class GpuStage {
   readonly kelp = new EventKelp();
   readonly clams = new EventClams();
   readonly petals = new EventPetals();
+  readonly moonbow = new Moonbow();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -83,7 +85,7 @@ export class GpuStage {
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
-    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group);
+    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group);
     // what floats rides the sea this stage draws
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
@@ -179,6 +181,7 @@ export class GpuStage {
     this.kelp.update(v.events, v.time, v.tide);
     this.clams.update(v.events, v.time, v.tide);
     this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
+    this.moonbow.update(eye, wind.length());
     this.post.render();
 
     const now = performance.now();
