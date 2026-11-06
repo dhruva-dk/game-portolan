@@ -6,7 +6,7 @@ import { PerspectiveCamera, Scene, Vector3, type WebGPURenderer } from 'three/we
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { P } from './uniforms.ts';
-import { makeNoiseTexture } from './noise.ts';
+import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
 import { Clouds } from '../atmosphere/clouds.ts';
 import { Fall } from '../atmosphere/fall.ts';
@@ -77,7 +77,7 @@ export class GpuStage {
     this.atmosphere.install(this.scene, this.ocean.beneath);
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
-    this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
+    this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
     this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group);
     // what floats rides the sea this stage draws
@@ -192,6 +192,7 @@ export class GpuStage {
   async settled(): Promise<void> {
     await this.terrain.settled();
     await this.scans.settled(this.camera.position);
+    await this.ocean.coast.ready;
   }
 
   stats() {

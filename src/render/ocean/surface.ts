@@ -11,19 +11,30 @@
 // variance as roughness), and under it the light that went into the water, the sea floor seen through the
 // refracting surface and dimmed by Beer–Lambert over the path through the water, the water's own colour where the
 // path is long, light through the thin crests where the sun is behind them, and the foam on top.
-import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector3, type Node } from 'three/webgpu';
+//
+// Where the sea meets the land it surfs, as Sea of Thieves' shore does (Ang et al., SIGGRAPH 2018), from the
+// coastline's signed distance field (coast.ts): the swell's lines come in over the shallows, closing up as the water
+// shoals and breaking where it is shallow, and foam clings where the water runs out against whatever stands in it,
+// found from the depth under the surface. At night the surf glows.
+import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector3, type Node, type Texture } from 'three/webgpu';
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
-  smoothstep, texture, uniform, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  smoothstep, sqrt, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, type Waves } from './waves.ts';
 import { skyLight, sunlight, moonlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
-import { P } from '../gpu/uniforms.ts';
+import { LAMP, P } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
+import type { Coast } from './coast.ts';
+import { REACH } from './coastField.ts';
+
+/** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
+ *  phase grows as √distance, so a line's spacing is 2√(d + 1) / SHOAL metres: two at the water's edge, ten 24 m out). */
+const SURF_PERIOD = 7, SHOAL = 1;
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -142,7 +153,7 @@ function rainRings(q: V2): V2 {
 
 // ---------------------------------------------------------------- the material
 
-export function oceanSurface(waves: Waves): Mesh {
+export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   mat.fog = true;
   // the surface is what the light under it passes through, not something beneath it
@@ -169,6 +180,7 @@ export function oceanSurface(waves: Waves): Mesh {
   const vq = varyingProperty('vec4', 'vOceanQ');
   const vRise = varyingProperty('float', 'vOceanRise');
   const vUp = varyingProperty('vec3', 'vOceanUp');
+  const vLevel = varyingProperty('float', 'vOceanLevel');
   mat.positionNode = Fn(() => {
     const a = displaced(FRAMES[0]);
     const q = vec4(a.q, 0, 0).toVar();
@@ -184,7 +196,9 @@ export function oceanSurface(waves: Waves): Mesh {
     vRise.assign(rise);
     vUp.assign(up);
     // on the sea's level: the tide's, raised or drawn down where the regions' events move the water
-    return up.mul(seaLevelNode(up)).add(lift);
+    const level = seaLevelNode(up).toVar();
+    vLevel.assign(level.sub(R));
+    return up.mul(level).add(lift);
   })();
 
   // ----- fragment: the surface's slope, its unresolved roughness and its foam, worked out once at the top of the
@@ -226,6 +240,56 @@ export function oceanSurface(waves: Waves): Mesh {
       world.addAssign(e1.mul(g.x).add(e2.mul(g.y)));
     });
     world.assign(normalize(u.sub(world)));
+    surf(u);
+  };
+
+  // ----- the surf
+  const shore = float(0).toVar('oceanShore');
+  const shoreGlow = float(0).toVar('oceanShoreGlow');
+  const noiseMap = texture(noise);
+  const surf = (u: V3) => {
+    const p = positionWorld;
+    const t = P.time;
+    // the land's seamless projection of the world, and noise drifting on it at three scales
+    const q = p.xz.add(vec2(0.71, -0.53).mul(p.y)).toVar();
+    const n1 = noiseMap.sample(q.mul(0.045).add(vec2(t.mul(0.011), t.mul(-0.007)))).g.toVar();
+    // the water straight down from here to whatever the eye sees through it: the ground, a rock, a hull. A line
+    // that dips under the surface and finds nothing (the sky past the curve of the sea, ground not built yet) comes
+    // out over the surface again, and the water there is deep
+    const zHere = positionView.z;
+    const zFloor = perspectiveDepthToViewZ(viewportDepthTexture(screenUV).x, cameraNear, cameraFar);
+    const floorAt = cameraPosition.add(p.sub(cameraPosition).mul(zFloor.div(zHere)));
+    const drop = length(p).sub(length(floorAt));
+    const under = select(drop.lessThan(0), float(1e3), drop).toVar();
+    const c = coast.at(u);
+    const d = c.y.toVar();
+    If(under.lessThan(1.2).or(coast.on.greaterThan(0).and(d.lessThan(REACH - 4))), () => {
+      const n2 = noiseMap.sample(q.mul(0.13).sub(vec2(t.mul(0.017), t.mul(0.009)))).b;
+      const n3 = noiseMap.sample(q.mul(0.47).add(vec2(t.mul(0.023), t.mul(0.004)))).a;
+      // the depth by the grid, the field off where it has not arrived
+      const depth = select(coast.on.greaterThan(0), vLevel.sub(c.x), float(50));
+      const out = select(coast.on.greaterThan(0), max(d, 0), float(REACH));
+      // the swell's lines, every SURF_PERIOD seconds, closing up as the water shoals and bent by the noise so no two
+      // run alike; each a sharp front on its shoreward side and a tail behind
+      const phase = sqrt(out.add(1)).mul(SHOAL).add(t.div(SURF_PERIOD)).add(n1.mul(1.4));
+      const g = fract(phase);
+      // a line thinner than a pixel is drawn as its average over the lines, so far off they do not break into dashes
+      const line = mix(max(pow(float(1).sub(g), 7), smoothstep(0.955, 1, g)), float(0.15), smoothstep(0.08, 0.4, fwidth(phase)));
+      // they break where the water is shallow, most in the last few metres, and break up along their length
+      const shoal = smoothstep(2.8, 0.45, depth).mul(smoothstep(REACH - 4, 10, out));
+      const broken = line.mul(shoal).mul(smoothstep(0.32, 0.62, n2.add(float(1).sub(g).mul(0.3))));
+      // the water's edge, running up and back with each line's arrival
+      const surge = sin(t.mul((2 * Math.PI) / SURF_PERIOD).add(n1.mul(6))).mul(0.5).add(0.5);
+      const contact = smoothstep(mix(float(0.22), float(0.85), surge), 0.02, under);
+      // and what the broken lines leave on the water as they spread out
+      const left = smoothstep(16, 1.5, out).mul(smoothstep(0.35, 0.8, n1)).mul(0.5).mul(smoothstep(4, 1, depth));
+      const density = clamp(broken.mul(0.95).add(contact).add(left), 0, 1);
+      // foam is bubbles: a lace that thins as it spreads, eroded out of the noise; far off, only how much there is
+      const lace = smoothstep(float(1).sub(density), float(1.14).sub(density), n3.mul(0.55).add(n2.mul(0.45)));
+      const far = smoothstep(120, 420, length(p.sub(cameraPosition)));
+      shore.assign(mix(lace.mul(density.sqrt()), density.mul(0.55), far));
+      shoreGlow.assign(shore.mul(n1.add(0.6)));
+    });
   };
   mat.colorNode = Fn(() => {
     surface();
@@ -234,7 +298,7 @@ export function oceanSurface(waves: Waves): Mesh {
   mat.normalNode = cameraViewMatrix.mul(vec4(world, 0)).xyz.normalize();
 
   // roughness from the slopes' variance (Beckmann's α² = 2σ²), and rough where foam lies
-  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)), 0, 1);
+  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore), 0, 1);
   const sigma2 = variance.mul(0.5).add(WATER.ripples).add(P.rain.mul(0.004));
   const alpha = clamp(sigma2.mul(2).sqrt(), 0.02, 1);
   mat.roughnessNode = mix(alpha.sqrt(), float(0.9), whiteness);
@@ -274,6 +338,8 @@ export function oceanSurface(waves: Waves): Mesh {
     return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel));
   })();
   mat.backdropAlphaNode = float(1).sub(whiteness);
+  // the surf's glow at night, the sea's own light (actors' scale)
+  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
 
   const mesh = new Mesh(polarGrid(), mat);
   mesh.frustumCulled = false;

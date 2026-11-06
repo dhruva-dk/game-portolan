@@ -17,7 +17,7 @@ import {
   normalWorldGeometry, normalize, positionWorld, pow, select, sin, smoothstep, sqrt, step, texture, uniform, uniformArray, vec2, vec3, vec4,
 } from 'three/tsl';
 import { REGIONS } from '../../sim/world/index.ts';
-import { P } from '../gpu/uniforms.ts';
+import { LAMP, P } from '../gpu/uniforms.ts';
 import { refractedShadowPosition } from '../ocean/beneath.ts';
 import { seaLevelNode } from '../lift.ts';
 import { MOSS, ROLE, ROLE_COUNT } from './library.ts';
@@ -40,6 +40,8 @@ const PAINTED = 3;
 const SNOW = vec3(0.82, 0.86, 0.93);
 const MOSS_COLOUR = vec3(0.045, 0.075, 0.022);
 const SALT = vec3(0.42, 0.42, 0.39);
+/** Foam on the sand. */
+const SURF = vec3(0.9, 0.93, 0.95);
 
 /** How far a hex on a wall may turn, as a share of a full turn: a little, so strata stay roughly level. */
 const WALL_SPIN = 0.08;
@@ -124,6 +126,7 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
   const normal = vec3(0, 1, 0).toVar('landNormal');
   const rough = float(0.9).toVar('landRough');
   const occlusion = float(1).toVar('landOcclusion');
+  const glow = float(0).toVar('landGlow');
 
   const weightsOf = (): F[] => {
     const out: F[] = [];
@@ -363,6 +366,18 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     nb.assign(normalize(mix(nb, gn, snowy.mul(0.7))));
     ao.assign(mix(ao, float(1), snowy));
 
+    // the surf on the sand: the swash running up the shore and back with the waves, and a band of foam in the wash
+    // just under the water's edge, where the sea's own surf (ocean/surface.ts) meets the land; at night it glows
+    const fn = noiseMap.sample(q.mul(0.11).add(vec2(P.time.mul(0.01), 0))).b;
+    const surge = sin(P.time.mul(1.1).add(fn.mul(5))).mul(0.25).sub(0.05);
+    const swash = smoothstep(0.35, 0, abs(above.sub(surge))).mul(smoothstep(0.35, 0.65, fn.add(0.15))).mul(smoothstep(-2, 0, above));
+    const wash = smoothstep(0.8, 1, sin(above.mul(-4).sub(P.time.mul(1.6)).add(fn.mul(4))))
+      .mul(smoothstep(-1.6, -0.2, above)).mul(step(above, 0)).mul(smoothstep(0.35, 0.7, fn));
+    const surf = clamp(swash.mul(0.9).add(wash.mul(0.4)), 0, 1).mul(float(1).sub(snowy));
+    a.assign(mix(a, SURF, surf));
+    rg.assign(mix(rg, float(0.6), surf));
+    glow.assign(surf.mul(fn.add(0.6)));
+
     albedo.assign(a);
     // the lab's looks inside: 1 the roles, 2 the nearer region, 3 the strongest candidate's scan untinted, 4 its slot,
     // 5 the axis the ground is projected along (red x, green y, blue z, grey between)
@@ -390,5 +405,7 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
   mat.normalNode = cameraViewMatrix.mul(vec4(normal, 0)).xyz.normalize();
   mat.roughnessNode = rough;
   mat.aoNode = occlusion;
+  // the surf's glow at night, the sea's own light (actors' scale)
+  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(glow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
   return mat;
 }

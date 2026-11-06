@@ -7,6 +7,8 @@ import { CALM_SEA, LongWaves, spectrumParams, type SeaState } from './spectrum.t
 import { SEA, Waves, setSpectrum } from './waves.ts';
 import { FRAME, WATER, oceanSurface } from './surface.ts';
 import { beneath } from './beneath.ts';
+import { Coast } from './coast.ts';
+import { sharedNoise } from '../gpu/noise.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
  *  where the map stretches the sea 4% across. */
@@ -24,6 +26,8 @@ export class Ocean {
   readonly waves = new Waves();
   readonly long = new LongWaves();
   readonly mesh: Mesh;
+  /** The coastline's distance field, which the surf is drawn from: built in a worker as the game starts. */
+  readonly coast = new Coast();
   readonly #seed: number;
   #state: SeaState = { ...CALM_SEA };
   #built = '';
@@ -37,7 +41,7 @@ export class Ocean {
 
   constructor(seed = 1) {
     this.#seed = seed;
-    this.mesh = oceanSurface(this.waves);
+    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise());
     this.beneath = beneath(this.waves.field);
   }
 

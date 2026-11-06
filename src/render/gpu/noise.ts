@@ -38,6 +38,11 @@ function normalise(a: Float32Array): Float32Array {
   return a;
 }
 
+let shared: THREE.DataTexture | null = null;
+
+/** One noise texture for every GPU material that reads it, so a material reading it twice binds it once. */
+export const sharedNoise = (): THREE.DataTexture => (shared ??= makeNoiseTexture());
+
 /** Four channels of tileable fbm noise at different scales. */
 export function makeNoiseTexture(): THREE.DataTexture {
   const N = 256, chans = [fbmTile(N, 4, 1), fbmTile(N, 8, 2), fbmTile(N, 16, 3, 4), fbmTile(N, 32, 4, 3)].map(normalise);
