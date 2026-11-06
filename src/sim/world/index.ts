@@ -12,7 +12,7 @@
 // heights into a grid for the simulation.
 import { PI, dcos, dot, dsin, normalize, set, v3, type V3 } from '../math.ts';
 import { R, along, faceDir, faceUV, fromLatLon, localFrame, tangentAt, type FaceUV } from '../sphere.ts';
-import { smax, smin, smoothstep } from './kit.ts';
+import { noise, noise3, smax, smin, smoothstep } from './kit.ts';
 import type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
 import { iceCrown, FLOE_RINGS } from './regions/iceCrown.ts';
 import { fjords } from './regions/fjords.ts';
@@ -307,15 +307,43 @@ function laneDistance(l: CurrentLane, p: V3): number {
 /** Distance from the equator in metres. */
 const fromEquator = (p: V3): number => Math.abs(p.y) * R * (1 + (p.y * p.y) / 6);
 
-/** Lanes stay open: the ground is pulled down to a channel with banks at most this steep. */
+/**
+ * A channel the current has scoured, x metres across its flow from its centre line and `run` metres along it: the
+ * floor `floor` metres down at the middle, wandering up and down by a metre or so and ribbed with sand waves across
+ * the flow, its banks shelving gently for the first few metres and then steepening toward the shore. The centre line
+ * wanders a little either side and the channel widens and narrows, but the middle `core` metres either side of the
+ * lane's own line are always on the floor.
+ */
+function channel(x: number, run: number, half: number, floor: number, seed: number): number {
+  const wander = 0.15 * half * noise(run / 70, 0.5, seed);
+  const wide = 0.6 * half * (1 + 0.22 * noise(run / 45, 3.5, seed + 1));
+  const d = Math.abs(x - wander);
+  const out = Math.max(0, d - wide);
+  // 0.7 m a metre at first, 1.6 once past the shoulder, joined smoothly
+  const shoulder = out - 3.5, k = 1.5;
+  const steep = shoulder < -k ? 0 : shoulder > k ? shoulder : ((shoulder + k) * (shoulder + k)) / (4 * k);
+  const bed = floor - 1.1 * (0.5 + 0.5 * noise(run / 28, 7.5, seed + 2)) + 0.3 * Math.sin(run * 0.72 + 2.2 * noise(run / 19, x / 23, seed + 3));
+  return bed + 0.7 * out + 0.9 * steep;
+}
+
+/** Lanes stay open: the ground is pulled down to a channel the current has scoured. */
 function carve(p: V3, h: number): number {
   const de = fromEquator(p);
-  if (de < GREAT_CURRENT.fade + 40) h = smin(h, -7 + 2.4 * Math.max(0, de - GREAT_CURRENT.half), 3);
+  if (de < GREAT_CURRENT.fade + 40) {
+    const across = p.y < 0 ? -de : de, run = Math.atan2(p.z, p.x) * R;
+    h = smin(h, channel(across, run, GREAT_CURRENT.half / 0.6, -6.5, 41), 3);
+  }
   for (let i = 0; i < CURRENTS.length; i++) {
     const l = CURRENTS[i];
     if (dot(p, l.centre) < l.cos) continue;
     const d = laneDistance(l, p), half = l.width / 2;
-    if (d < half + 40) h = smin(h, -5 + 2 * Math.max(0, d - half * 0.6), 3);
+    if (d >= half + 40) continue;
+    // which side of the lane p lies, and how far along it
+    const a = l.pts[LANE_HIT.seg], b = l.pts[LANE_HIT.seg + 1];
+    const tx = b.x - a.x, ty = b.y - a.y, tz = b.z - a.z, qx = p.x - a.x, qy = p.y - a.y, qz = p.z - a.z;
+    const side = (ty * qz - tz * qy) * p.x + (tz * qx - tx * qz) * p.y + (tx * qy - ty * qx) * p.z < 0 ? -1 : 1;
+    const run = (LANE_HIT.seg + LANE_HIT.along) * R * Math.sqrt(tx * tx + ty * ty + tz * tz);
+    h = smin(h, channel(side * d, run, half, -4.5, 97 + i * 13), 3);
   }
   return h;
 }
@@ -323,9 +351,44 @@ function carve(p: V3, h: number): number {
 // ---------------------------------------------------------------------------------------------------------
 // Heights
 
+/** Below this the floor is free to take any shape: no keel reaches it, at any tide. */
+const FREE = -(DRAFT + TIDE_AMPLITUDE + 0.1);
+/** How far the deep floor's outlines are pushed about, and over what distance the push turns, metres: a broad push
+ *  and a finer one on it. */
+const WARP = [24, 8];
+const WARP_SCALE = [110, 35];
+const WARPED = v3();
+
+/**
+ * The regions draw their seabeds as their charts lay them out: shelves and basins with polygon edges, floors as flat
+ * as a table. None of it matters to a ship once it is deeper than a keel and the tide can reach, so there the floor
+ * is taken from a point pushed a few metres about by noise, which bends every straight edge into a contour the sea
+ * could have worn, and the deep floors are given relief that grows with their depth. Anything shallower than that is
+ * exactly as the region drew it, and nothing deeper is ever raised to where a keel could touch it.
+ */
+function seabed(p: V3, h: number): number {
+  if (h > FREE) return h;
+  // far down no outline can be seen through the water, and the open deep is most of the planet: the push fades out
+  const reach = smoothstep(-40, -30, h);
+  let out = h;
+  if (reach > 0) {
+    set(WARPED, p.x, p.y, p.z);
+    for (let o = 0; o < WARP.length; o++) {
+      const k = R / WARP_SCALE[o], w = WARP[o] / R, x = p.x * k, y = p.y * k, z = p.z * k;
+      set(WARPED, WARPED.x + noise3(x, y, z, 11 + o) * w, WARPED.y + noise3(x, y, z, 23 + o) * w, WARPED.z + noise3(x, y, z, 37 + o) * w);
+    }
+    const hw = blended(normalize(WARPED));
+    out = h + (hw - h) * reach * smoothstep(FREE, FREE - 0.4, Math.max(h, hw));
+  }
+  // at most 15% of the depth past three metres, so nothing comes up past FREE
+  const amp = Math.min(Math.max(-out - 3, 0) * 0.15, 2.5);
+  const k = R / 75, x = p.x * k, y = p.y * k, z = p.z * k;
+  return out + amp * (0.7 * noise3(x * 2.9, y * 2.9, z * 2.9, 51) + 0.3 * noise3(x * 8.3, y * 8.3, z * 8.3, 53));
+}
+
 /** The exact ground height at p, blended and carved, for the renderer's meshes at any resolution. */
 export function heightExact(p: V3): number {
-  return carve(p, blended(p));
+  return carve(p, seabed(p, blended(p)));
 }
 
 // The simulation's heights come from a grid baked on the cube sphere (equal-angle faces, as sphere.ts), tile

@@ -52,6 +52,21 @@ export function noise(x: number, y: number, s: number): number {
   return 1.4 * (a + (b - a) * ux + (c - a + (a - b - c + d) * ux) * uy);
 }
 
+/** Value noise in three dimensions, in [-1, 1], with features about one unit across: for shapes that must not care
+ *  which region's chart they are in. */
+export function noise3(x: number, y: number, z: number, s: number): number {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz;
+  const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
+  const uz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
+  const layer = (k: number): number => {
+    const t = s + Math.imul(iz + k, 0x5bd1e995);
+    const a = hash01(ix, iy, t), b = hash01(ix + 1, iy, t), c = hash01(ix, iy + 1, t), d = hash01(ix + 1, iy + 1, t);
+    return a + (b - a) * ux + (c - a + (a - b - c + d) * ux) * uy;
+  };
+  const lo = layer(0);
+  return 2 * (lo + (layer(1) - lo) * uz) - 1;
+}
+
 export function fbm(x: number, y: number, s: number, octaves: number): number {
   let sum = 0, amp = 0.6;
   for (let o = 0; o < octaves; o++) {
@@ -278,11 +293,17 @@ export function cells(x: number, y: number, cell: number, seed: number, jitter =
 export function shoals(x: number, y: number, h: number, cell: number, seed: number, half = 7): number {
   const crest = -3.2;
   if (h >= crest) return h;
-  const f = 1.3 / cell, wx = x + 0.22 * cell * noise(x * f, y * f, seed + 2), wy = y + 0.22 * cell * noise(x * f + 5.3, y * f, seed + 3);
+  // the cells' edges, pushed about at two scales so no bar runs straight for long
+  const f = 1.3 / cell, g = 4.3 / cell;
+  const wx = x + 0.3 * cell * noise(x * f, y * f, seed + 2) + 0.07 * cell * noise(x * g, y * g, seed + 4);
+  const wy = y + 0.3 * cell * noise(x * f + 5.3, y * f, seed + 3) + 0.07 * cell * noise(x * g + 2.1, y * g, seed + 5);
   const c = cells(wx, wy, cell, seed), edge = (c.f2 - c.f1) / 2;
   const w = half * (1 + 0.5 * noise(x * 0.025, y * 0.025, seed + 1));
-  if (edge >= 2.5 * w) return h;
-  return crest + (h - crest) * smoothstep(w, 2.5 * w, edge);
+  if (edge >= 3.5 * w) return h;
+  // the bar's back rises and falls along it, and in places sinks away, so it comes and goes
+  const top = crest - 0.15 - 4.5 * smoothstep(0.05, 0.55, noise(x * 0.011, y * 0.011, seed + 6));
+  if (h >= top) return h;
+  return top + (h - top) * smoothstep(w * 0.6, 3.5 * w, edge);
 }
 
 // Ring regions sit at latitude ±31°. In a ring region's chart, how far a point is from the equator, in metres
