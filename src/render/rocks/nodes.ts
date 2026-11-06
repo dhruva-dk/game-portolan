@@ -13,6 +13,7 @@ import {
   modelWorldMatrix, normalGeometry, normalize, positionGeometry, positionLocal, positionWorld, pow, reference, select, sin, smoothstep,
   step, texture, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
+import { marksAt, scorch } from '../gpu/marks.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
 import type { Skin, SkinId, TexId } from './skins.ts';
 
@@ -183,10 +184,14 @@ export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd'
     const cA = (texture(tex(C.tex, 'd'), cuv) as unknown as V4).rgb.mul(rgb(C.tint));
     rA = mix(rA, cA.mul(mix(1, 0.7, rWet.mul(0.5))), rCover);
   }
+  // the scars of the match, where shot and fire struck it (gpu/marks.ts)
+  const scar = vec4(marksAt(wp, macro));
+  const scarred = scorch(rA, float(0), scar, macro);
+  rA = scarred.albedo;
   m.colorNode = vec4(rA, 1);
 
   const rough = mix(rLumRough(s, rAlb), s.rough[1], rWet.mul(rCover.mul(-0.6).add(1)));
-  m.roughnessNode = clamp(mix(rough, 0.85, rCover.mul(0.8)), 0.04, 1);
+  m.roughnessNode = clamp(mix(mix(rough, 0.85, rCover.mul(0.8)), 0.95, max(scar.x, scar.y)), 0.04, 1);
 
   let nR: V3 = rNO;
   if (s.cover) nR = normalize(mix(nR, normalize(rN.add(vec3(rCovN.x, 0, rCovN.y).mul(0.6))), rCover.mul(0.7)));
@@ -204,7 +209,8 @@ export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd'
     glow = glow.add(rgb(s.ice.deep).mul(s.ice.inner).mul(daylight).mul(rCav.oneMinus())
       .mul(abs(rFacing).oneMinus().mul(0.6).add(0.4)).mul(rCover.oneMinus()));
   }
-  if (s.glow || s.ice) m.emissiveNode = glow.mul(LAMP).mul(2.5);
+  glow = glow.add(scarred.glow.mul(1.6));
+  m.emissiveNode = glow.mul(LAMP).mul(2.5);
   // the cavities keep the sky's light out
   m.aoNode = rCav.mul(-0.75).add(1);
   return m;

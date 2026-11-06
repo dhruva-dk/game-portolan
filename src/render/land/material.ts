@@ -18,6 +18,7 @@ import {
 } from 'three/tsl';
 import { REGIONS } from '../../sim/world/index.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
+import { marksAt, scorch } from '../gpu/marks.ts';
 import { refractedShadowPosition } from '../ocean/beneath.ts';
 import { seaLevelNode } from '../lift.ts';
 import { MOSS, ROLE, ROLE_COUNT } from './library.ts';
@@ -127,6 +128,7 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
   const rough = float(0.9).toVar('landRough');
   const occlusion = float(1).toVar('landOcclusion');
   const glow = float(0).toVar('landGlow');
+  const heat = vec3(0).toVar('landHeat');
 
   const weightsOf = (): F[] => {
     const out: F[] = [];
@@ -366,6 +368,13 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     nb.assign(normalize(mix(nb, gn, snowy.mul(0.7))));
     ao.assign(mix(ao, float(1), snowy));
 
+    // the scars of the match: where shot and fire struck, the ground is charred for the rest of it (gpu/marks.ts)
+    const scar = vec4(marksAt(p, n.z)).toVar('landScar');
+    const scarred = scorch(a, rg, scar, n.z);
+    a.assign(scarred.albedo);
+    rg.assign(scarred.rough);
+    heat.assign(scarred.glow.mul(smoothstep(-0.3, 0.2, above)));
+
     // the surf on the sand: the swash running up the shore and back with the waves, and a band of foam in the wash
     // just under the water's edge, where the sea's own surf (ocean/surface.ts) meets the land; at night it glows
     const fn = noiseMap.sample(q.mul(0.11).add(vec2(P.time.mul(0.01), 0))).b;
@@ -406,6 +415,6 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
   mat.roughnessNode = rough;
   mat.aoNode = occlusion;
   // the surf's glow at night, the sea's own light (actors' scale)
-  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(glow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
+  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(glow.mul(P.night).mul(0.35)).add(heat.mul(1.6)).mul(LAMP.mul(2.5));
   return mat;
 }

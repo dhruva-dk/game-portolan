@@ -21,6 +21,8 @@ import { Wakes } from './wakes.ts';
 import { Whales } from './whale.ts';
 import type { ActorEvent, ActorsView, EruptionView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
 import { heat } from '../gpu/haze.ts';
+import { MARK_KIND, addMark, clearMarks } from '../gpu/marks.ts';
+import { heightAt } from '../../sim/world/index.ts';
 
 export * from './view.ts';
 export { lookOf, SAIL_COLOURS, PATTERNS, HULL_PAINTS, WAKES, FIGUREHEADS } from './cosmetics.ts';
@@ -418,6 +420,11 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           if (e.weapon === 'mortar') fx.explode(at, 1, e.on === 'water');
           else if (e.on === 'water') fx.splash(at, big);
           else fx.hitLand(at, big);
+          // shot that strikes the land leaves its mark there for the rest of the match
+          if (e.on === 'land') {
+            const size = e.weapon === 'mortar' ? 1.9 : e.weapon === 'broadside' ? 1.2 : e.weapon === 'scatter' || e.weapon === 'repeater' ? 0.5 : 1;
+            addMark(at, e.weapon === 'heated' ? MARK_KIND.heated : MARK_KIND.shot, size);
+          }
           const near = nearPlayer(at, e.weapon === 'mortar' ? 60 : 25);
           if (near > 0) juice({ shake: near * (e.weapon === 'mortar' ? 0.35 : 0.08) }, e);
           break;
@@ -512,13 +519,19 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           break;
         case 'lavaBomb':
           fx.lavaLand(v3(e.at), e.on === 'water');
+          if (e.on === 'land') addMark(v3(e.at), MARK_KIND.lava);
           break;
         case 'rockfall':
           for (const p of rockfallAt(e.region, v3(e.at).normalize())) fx.rockfall(onSea(v3(p), 0, new THREE.Vector3()));
           break;
         case 'lightning':
           if (e.warning) lightning.warn(v3(e.at));
-          else lightning.strike(v3(e.at));
+          else {
+            lightning.strike(v3(e.at));
+            // a bolt that finds the land burns it where it lands
+            const p = v3(e.at);
+            if (heightAt({ x: p.x / p.length(), y: p.y / p.length(), z: p.z / p.length() }) > 0.5) addMark(p, MARK_KIND.heated, 0.8);
+          }
           break;
       }
     }
@@ -542,6 +555,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     clear() {
       fx.clear();
       lightning.clear();
+      clearMarks();
       pending.length = 0;
     },
     dispose() {
