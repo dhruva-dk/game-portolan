@@ -11,16 +11,18 @@
 // meet they are cross-faded over a tenth of the distance either side, with weights that sum to one, and each slice's
 // map is read once, in its own branch, only where it has any weight.
 //
-// Each map is read with a fixed disc of sixteen hardware-compared taps, whose spread keeps the penumbra at least as
-// wide on the ground as the sun's disc makes it a couple of metres behind an edge, and never under a texel and a half
-// in any slice, so the near slices are not razor-cut and the far ones are not blocky. The disc is not turned per pixel:
-// with no temporal filter yet, a turned disc would show as grain.
+// Each map is read with a disc of sixteen hardware-compared taps, whose spread keeps the penumbra at least as wide on
+// the ground as the sun's disc makes it a couple of metres behind an edge, and never under a texel and a half in any
+// slice, so the near slices are not razor-cut and the far ones are not blocky. The disc is turned per pixel and per
+// frame by interleaved gradient noise (Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare",
+// SIGGRAPH 2014): the temporal upscaler gathers the turns into a penumbra far smoother than sixteen fixed taps make.
 //
 // Light a material works out for itself, rather than through three's lights (the sea's body, the sun's share of the
 // light the caustics move), reads the same cascades through sunShadow.
 import type { DirectionalLight, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, cameraNear, cameraViewMatrix, clamp, float, nodeObject, reference, renderGroup, shadowPositionWorld, smoothstep, texture, vec2, vec4,
+  Fn, If, cameraNear, cameraViewMatrix, clamp, cos, float, interleavedGradientNoise, nodeObject, reference, renderGroup, screenCoordinate,
+  shadowPositionWorld, sin, smoothstep, texture, uniform, vec2, vec4,
 } from 'three/tsl';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 
@@ -40,6 +42,9 @@ const PENUMBRA_AT = 2.5;
 const SPREAD_MIN = 1.5;
 const SPREAD_MAX = 5;
 
+/** Counts the frames, so each turns the disc anew. */
+const FRAME = uniform(0);
+
 /** Sixteen points on the unit disc (Vogel's spiral), weighted toward the middle so the penumbra falls off softly. */
 const DISC = Array.from({ length: 16 }, (_, i) => {
   const r = Math.sqrt((i + 0.5) / 16), a = i * 2.399963229728653;
@@ -57,9 +62,12 @@ const discFilter = ({ depthTexture, shadowCoord, shadow, depthLayer }: FilterInp
   const size = perRender(reference('mapSize', 'vec2', shadow));
   const spread = perRender(reference('radius', 'float', shadow));
   const step = vec2(spread).div(size);
+  const turn = interleavedGradientNoise(screenCoordinate.xy.add(FRAME.mul(5.588238))).mul(2 * Math.PI);
+  const c = cos(turn), s = sin(turn);
   let sum: F = float(0);
   for (const [x, y, w] of DISC) {
-    let tap = texture(depthTexture, shadowCoord.xy.add(vec2(x, y).mul(step)));
+    const at = vec2(c.mul(x).sub(s.mul(y)), s.mul(x).add(c.mul(y)));
+    let tap = texture(depthTexture, shadowCoord.xy.add(at.mul(step)));
     if (depthTexture.isArrayTexture) tap = tap.depth(depthLayer);
     sum = sum.add((tap.compare(shadowCoord.z) as unknown as F).mul(w / DISC_WEIGHT));
   }
@@ -104,6 +112,7 @@ class Cascades extends CSMShadowNode {
 
   override updateBefore(frame: NodeFrame): boolean | undefined {
     super.updateBefore(frame);
+    FRAME.value = (FRAME.value + 1) % 64;
     for (const l of this.lights) {
       const shadow = l.shadow!, cam = shadow.camera;
       const texel = (cam.right - cam.left) / MAP_SIZE;
