@@ -56,10 +56,14 @@ export const turn = (q: V4, v: V3): V3 => {
   return v.add(t.mul(q.w)).add(cross(q.xyz, t));
 };
 /** v turned back by q. */
-const unturn = (q: V4, v: V3): V3 => turn(vec4(q.xyz.negate(), q.w), v);
+export const unturn = (q: V4, v: V3): V3 => turn(vec4(q.xyz.negate(), q.w), v);
+
+/** Levels of detail: three built from the plant, then its impostor (impostor.ts). A bucket is a variant's level,
+ *  variant × LEVELS + level. */
+export const LEVELS = 4;
 
 /** The copy this vertex belongs to: its place, size and turn, its bucket and how much of it this level shows. */
-interface Copy {
+export interface Copy {
   at: V3;
   size: F;
   q: V4;
@@ -69,14 +73,15 @@ interface Copy {
   odd: F;
 }
 
-function copyOf(f: FieldNodes): Copy {
+export function copyOf(f: FieldNodes): Copy {
   const bucket = uint(attribute<'float'>('aBucket') as unknown as F);
   const id = f.shown.element(f.base.element(bucket).add(instanceIndex));
   const a = f.copies.element(id.mul(2)), q = f.copies.element(id.mul(2).add(1));
   const fade = f.fade.element(bucket);
   const d = length(a.xyz.sub(f.eye));
   const shown = min(d.sub(fade.x).div(fade.y), fade.z.sub(d).div(fade.w)).clamp(0, 1);
-  const odd = float(bucket.mod(3).mod(2));
+  // (neighbouring levels' screen-doors run opposite ways, so where both draw they never cover the same pixel)
+  const odd = float(bucket.mod(LEVELS).mod(2));
   return { at: a.xyz, size: a.w, q, id, shown, odd };
 }
 
@@ -235,7 +240,7 @@ function bump(n: V3, h: F, k: number): V3 {
 }
 
 /** Leaves: each light's direct term gains what comes through the blade from behind. */
-class LeafLight extends PhysicalLightingModel {
+export class LeafLight extends PhysicalLightingModel {
   readonly #through: F;
   constructor(through: F) {
     super();
@@ -252,7 +257,7 @@ class LeafLight extends PhysicalLightingModel {
   }
 }
 
-class FloraNodeMaterial extends MeshStandardNodeMaterial {
+export class FloraNodeMaterial extends MeshStandardNodeMaterial {
   through: F | null = null;
   turnNormal: (() => void) | null = null;
   override setupLightingModel(): PhysicalLightingModel {
@@ -265,7 +270,7 @@ class FloraNodeMaterial extends MeshStandardNodeMaterial {
 }
 
 /** The screen-door noise for the level-of-detail cross-fade, turned every frame. */
-const door = (): F => interleavedGradientNoise(screenCoordinate.xy.add(vec2(float(P.frame).mul(5.588238), float(P.frame).mul(3.1415))));
+export const door = (): F => interleavedGradientNoise(screenCoordinate.xy.add(vec2(float(P.frame).mul(5.588238), float(P.frame).mul(3.1415))));
 
 const made = new Map<Material, Material>();
 

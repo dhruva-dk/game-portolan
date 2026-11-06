@@ -11,7 +11,11 @@
 //
 // A kind's variants and levels of detail are merged into one geometry per material, each piece tagged with its list,
 // and drawn as one object with an indirect draw per piece: one object and one pipeline for every copy of a kind's
-// bark, another for its leaves. The pieces of levels 0 and 1 cast shadows; the last does not.
+// bark, another for its leaves. The pieces of levels 0 and 1 cast shadows; the others do not.
+//
+// The tall plants have a fourth level past the third: an octahedral impostor (impostor.ts), one quad a copy, which
+// takes over where the plant stands small enough on screen for its views' texels to hold it. Their variants are baked
+// into the atlas on the first frame the field is drawn.
 import {
   BufferGeometry, Float32BufferAttribute, Frustum, Group, IndirectStorageBufferAttribute, Matrix4, Mesh, Sphere,
   StorageBufferAttribute, Uint32BufferAttribute, Vector3, Vector4,
@@ -21,7 +25,8 @@ import { Fn, If, atomicAdd, atomicLoad, atomicStore, bool, dot, instanceIndex, l
 import type { Node } from 'three/webgpu';
 import { BEACONS, LANDMARKS } from '../../sim/world/index.ts';
 import { P } from '../gpu/uniforms.ts';
-import { floraMaterial, turn, type FieldNodes } from './nodes.ts';
+import { ImpostorAtlas, SHARP, impostorMaterial, type ImpostorSource } from './impostor.ts';
+import { LEVELS, floraMaterial, turn, type FieldNodes } from './nodes.ts';
 import { SPECIES, type Lod, type Species } from './species.ts';
 import { STRIDE, type Clearing, type ScatterSpec, type Scattered } from './scatter.ts';
 
@@ -29,12 +34,17 @@ type V3 = Node<'vec3'>;
 type V4 = Node<'vec4'>;
 type U = Node<'uint'>;
 
-/** Levels of detail. */
-const LEVELS = 3;
 /** The share of a boundary's distance over which neighbouring levels cross-fade, either side of it. */
 const BAND = 0.08;
 /** Kinds sparser than this per 100 m² have a crown that needs room, and more variants to tell them apart. */
 const SPARSE = 3;
+/** The view's focal length in pixels (its height over twice the tangent of half its field of view), for judging how
+ *  big a plant stands on screen. */
+const FOCAL = 1450;
+/** Plants shorter than this, metres, are not worth an impostor: they are gone before one would take over. */
+const TALL = 3;
+/** The levels built from the plant itself; the impostor is the one past them. */
+const BUILT = 3;
 
 interface Piece {
   bucket: number;
@@ -55,6 +65,15 @@ interface Drawn {
   sphere: Sphere;
   near: number;
   far: number;
+  /** The impostors' atlas, for their draw: not drawn until it is baked. */
+  atlas?: ImpostorAtlas;
+}
+
+/** Whether a material's colour map, if it has one, has its picture. */
+function loaded(m: Material): boolean {
+  const map = (m as { map?: { image?: { width?: number; data?: unknown } } | null }).map;
+  const img = map?.image;
+  return !map || !!img && (!!img.data || (img.width ?? 0) > 0);
 }
 
 const breathe = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
@@ -168,14 +187,23 @@ export class Flora {
   readonly #ready: Promise<void>;
   /** Copies grown, for the record. */
   copies = 0;
-  /** Each kind grown: its copies, and the size of its biggest variant's nearest build. */
-  readonly kinds: { id: string; region: number; copies: number; height: number; radius: number; far: number }[] = [];
+  /** Each kind grown: its copies, the size of its biggest variant's nearest build, where it is last drawn, and where
+   *  its impostor takes over (null, none). */
+  readonly kinds: { id: string; region: number; copies: number; height: number; radius: number; far: number; impostor: number | null; reach: number }[] = [];
+  /** The tall plants' impostors, and the bake that fills their atlas on the first frame drawn. */
+  #atlas: ImpostorAtlas | null = null;
+  #bake: ImpostorSource[] | null = null;
 
   constructor() {
     this.group.name = 'flora';
     this.#ready = this.#start().catch((e: unknown) => {
       console.warn('flora:', e);
     });
+  }
+
+  /** The tall plants' impostor atlas, once there is one. */
+  get atlas(): ImpostorAtlas | null {
+    return this.#atlas;
   }
 
   /** Resolves once every plant is grown, built and ready to draw. */
@@ -230,6 +258,7 @@ export class Flora {
     }
 
     // build each kind's variants at each level, merged per material
+    const impostors: (ImpostorSource & { sv: number })[] = [];
     const fade = new Float32Array(buckets * 4);
     const shape = new Float32Array(svs * 4);
     const commands: Command[] = [];
@@ -237,8 +266,11 @@ export class Flora {
     for (const k of kinds) {
       const groups = new Map<string, { material: Material; shadow: boolean; pieces: Piece[]; levels: Set<number> }>();
       let height = 0, radius = 0, centre = 0;
+      // each variant's nearest build, kept for its impostor's bake
+      const nearest: { material: Material; geometry: BufferGeometry }[][] = [];
       for (let v = 0; v < k.spec.variants; v++) {
-        for (let l = 0 as Lod; l < LEVELS; l = (l + 1) as Lod) {
+        nearest.push([]);
+        for (let l = 0 as Lod; l < BUILT; l = (l + 1) as Lod) {
           const root = k.s.build(k.spec.seed * 31 + v * 104729 + 7, l);
           for (const part of meshesOf(root)) {
             const g = part.geometry;
@@ -249,6 +281,7 @@ export class Flora {
               height = Math.max(height, b.max.y);
               radius = Math.max(radius, Math.hypot(Math.max(-b.min.x, b.max.x), Math.max(-b.min.z, b.max.z)));
               centre = Math.max(centre, (b.max.y + Math.max(0, b.min.y)) / 2);
+              nearest[v].push({ material: part.material, geometry: g });
             }
             const shadow = part.shadow && l < 2;
             const id = `${part.material.uuid}:${shadow}`;
@@ -260,17 +293,40 @@ export class Flora {
       }
       const [d1, d2, cull] = k.s.lods;
       const far = Math.max(d2 * 1.2, cull ?? Math.max(80, Math.min(1000, height * 200)));
-      this.kinds.push({ id: k.s.id, region: k.s.region, copies: k.plants.variant.length, height, radius, far });
-      const ends = [d1, Math.max(d2, d1 * 1.3), far];
+      // the sphere round each variant's nearest build, about the centre up its axis: what its impostor's views hold
+      const reach = nearest.map((parts) => {
+        let r = 0.3;
+        for (const { geometry } of parts) {
+          const pos = geometry.getAttribute('position');
+          for (let i = 0; i < pos.count; i++) r = Math.max(r, Math.hypot(pos.getX(i), pos.getY(i) - centre, pos.getZ(i)));
+        }
+        return r * 1.02;
+      });
+      // a tall plant above the water gets an impostor where its sphere stands SHARP pixels across, if that is short
+      // of where it stops being drawn
+      const second = Math.max(d2, d1 * 1.3);
+      const takeover = Math.max(second * 1.3, (2 * Math.max(...reach) * FOCAL) / SHARP);
+      const impostor = height >= TALL && k.s.maxHeight >= 0 && takeover < far * 0.85 ? takeover : null;
+      this.kinds.push({ id: k.s.id, region: k.s.region, copies: k.plants.variant.length, height, radius, far, impostor, reach: Math.max(...reach) });
+      const ends = impostor === null ? [d1, second, far] : [d1, second, impostor, far];
       for (let v = 0; v < k.spec.variants; v++) {
         const sv = k.sv + v;
         shape.set([centre, Math.max(radius, (height - centre) * 1.1, 0.3), Math.min(40, height * 2.5), 0], sv * 4);
         for (let l = 0; l < LEVELS; l++) {
           const b = sv * LEVELS + l;
+          if (l >= ends.length) {
+            // (a level this kind has not got: no distance lists it)
+            fade.set([1e9, 1, 1e9, 1], b * 4);
+            continue;
+          }
+          const last = l === ends.length - 1;
           const start = l === 0 ? 0 : ends[l - 1], end = ends[l];
           const inX = l === 0 ? -1e9 : start * (1 - BAND), inW = l === 0 ? 1 : 2 * start * BAND;
-          const outZ = l === LEVELS - 1 ? end : end * (1 + BAND), outW = l === LEVELS - 1 ? end * BAND * 1.5 : 2 * end * BAND;
+          const outZ = last ? end : end * (1 + BAND), outW = last ? end * BAND * 1.5 : 2 * end * BAND;
           fade.set([inX, inW, outZ, outW], b * 4);
+        }
+        if (impostor !== null) {
+          impostors.push({ slot: impostors.length, parts: nearest[v], centre, radius: reach[v], sv });
         }
       }
       for (const grp of groups.values()) {
@@ -289,6 +345,21 @@ export class Flora {
     const shownAttr = new StorageBufferAttribute(new Uint32Array(Math.max(listed, 1)), 1);
     const countAttr = new StorageBufferAttribute(new Uint32Array(buckets), 1);
     for (const o of objects) for (const c of o.commands) commands.push(c);
+    // the impostors: a quad for each variant that has one, carrying its slot in the atlas and its sphere
+    const atlas = impostors.length ? new ImpostorAtlas(impostors.length) : null;
+    let quads: { geometry: BufferGeometry; commands: Command[] } | null = null;
+    if (atlas) {
+      quads = merge(impostors.map((m) => {
+        const g = new BufferGeometry();
+        const [sx, sy] = atlas.slotAt(m.slot);
+        g.setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
+        g.setAttribute('normal', new Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+        g.setAttribute('aImp', new Float32BufferAttribute(Array.from({ length: 4 }, () => [sx, sy, m.radius, m.centre]).flat(), 4));
+        g.setIndex([0, 1, 2, 0, 2, 3]);
+        return { bucket: m.sv * LEVELS + BUILT, geometry: g };
+      }));
+      for (const c of quads.commands) commands.push(c);
+    }
     const args = new Uint32Array(commands.length * 5);
     const which = new Uint32Array(commands.length);
     commands.forEach((c, i) => {
@@ -384,6 +455,23 @@ export class Flora {
       this.group.add(mesh);
       this.#drawn.push({ mesh, sphere, near, far });
     }
+    if (atlas && quads) {
+      quads.geometry.setIndirect(argsAttr, quads.commands.map((_, j) => (ci + j) * 20));
+      ci += quads.commands.length;
+      // (the copies are everywhere on the planet: the lists decide which draw)
+      const sphere = new Sphere(new Vector3(), 1e5);
+      quads.geometry.boundingSphere = sphere.clone();
+      const mesh = new Mesh(quads.geometry, impostorMaterial(nodes, atlas));
+      mesh.name = 'flora:impostors';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.visible = false;
+      this.group.add(mesh);
+      this.#drawn.push({ mesh, sphere, near: 0, far: 1e9, atlas });
+      this.#atlas = atlas;
+      this.#bake = impostors;
+    }
     this.group.matrixAutoUpdate = false;
     this.#live = true;
   }
@@ -397,10 +485,15 @@ export class Flora {
     this.#frustum.setFromProjectionMatrix(this.#m, camera.coordinateSystem, (camera as { reversedDepth?: boolean }).reversedDepth ?? false);
     const planes = this.#planes.array as Vector4[];
     this.#frustum.planes.forEach((p, i) => planes[i].set(p.normal.x, p.normal.y, p.normal.z, p.constant));
+    // the impostors' views, drawn the first time the field is drawn with every photograph they need loaded
+    if (this.#bake && this.#atlas && this.#bake.every((b) => b.parts.every((p) => loaded(p.material)))) {
+      this.#atlas.bake(renderer, this.#bake);
+      this.#bake = null;
+    }
     // whole kinds out of reach are not drawn at all
     for (const d of this.#drawn) {
       const away = d.sphere.center.distanceTo(eye);
-      d.mesh.visible = away - d.sphere.radius < d.far && away + d.sphere.radius > d.near;
+      d.mesh.visible = away - d.sphere.radius < d.far && away + d.sphere.radius > d.near && (!d.atlas || d.atlas.baked);
     }
     renderer.compute(this.#passes);
   }
