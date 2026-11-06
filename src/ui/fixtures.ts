@@ -172,7 +172,7 @@ const COSMETIC_ROWS: readonly CosmeticRow[] = [
   ['wakeOfLegends', 'wake', 'Wake of Legends', 'A blazing trail of fire. For reaching Legend.', -7, '#ff5a1a'],
 ];
 
-const ABILITY_LEVEL: Record<AbilityId, number> = {"repair":1,"salvage":1,"smokeScreen":3,"quickReload":5,"hardTurn":8,"quickHands":10,"ram":13,"lightHull":16,"reveal":19,"windReader":22,"decoy":25,"stormWalker":28,"wave":31,"deepHold":34,"driftMine":37,"steadyAim":40}
+const ABILITY_LEVEL: Record<AbilityId, number> = {"repair":1,"salvage":1,"smokeScreen":3,"quickReload":5,"hardTurn":8,"quickHands":10,"ram":13,"lightHull":16,"reveal":19,"windReader":22,"decoy":25,"stormWalker":28,"wave":31,"deepHold":34,"driftMine":37,"steadyAim":40,"whaleCall":Infinity,"darkLantern":Infinity}
 
 // ---------------------------------------------------------------- helpers
 
@@ -224,7 +224,7 @@ export const fxAbilities = (): AbilitiesModel => ({ level: FX_LEVEL, abilities: 
 export function fxCosmetics(level = FX_LEVEL, tier = FX_TIER): CosmeticView[] {
   return COSMETIC_ROWS.map(([id, kind, name, hint, n, colour]) => {
     const unlock = unlockOf(n);
-    const unlocked = unlock.by === 'level' ? level >= unlock.level : tier >= unlock.tier;
+    const unlocked = unlock.by === 'level' ? level >= unlock.level : unlock.by === 'rank' && tier >= unlock.tier;
     return { id, kind, name, hint, ...(colour ? { colour } : {}), rarity: rarityOf(unlock), unlock, unlocked, isNew: NEW_COSMETICS.has(id) };
   });
 }
@@ -270,6 +270,12 @@ export function fxCareer(): CareerModel {
     stats: { matches: 37, wins: 4, top5: 15, kills: 61, damage: 48210, survived: 37 * 640, bestPlace: 1 },
     chart: REGIONS.map((reg, index) => ({ index, name: reg.name, sailed: sailed[index] })),
     habits: ['You dive into the Spice Isles.', 'You fight at middle range.', 'You favour the cannon.'],
+    secrets: [
+      { id: 'moonbow', region: 'Basalt Stacks', found: true, name: 'The Moonbow', text: 'You sailed under Moonbow Arch by night and saw its pale bow.', gives: 'Emblem: Crescent Moon' },
+      { id: 'thunderFalls', region: 'Fjords', found: true, name: 'Behind the Falls', text: 'Behind Thunder Falls is a slot of still water no one can see into.', gives: 'A cache in every match' },
+      { id: 'cedarHeart', region: 'Mistwood', found: false, name: '?', text: 'The fallen giant is hollow. Few stop to listen inside it.', gives: 'A cache in every match' },
+      { id: 'greatCurrent', region: null, found: false, name: '?', text: 'The Great Current never ends. Neither should you.', gives: 'Emblem: Meridian' },
+    ],
   };
 }
 
@@ -281,6 +287,7 @@ export function fxLobby(): LobbyModel {
     news: { locker: 3, abilities: 1 },
     ticker: ['Saetta remembers you sank it, and hunts you.', 'Orca has learned you dive into the Spice Isles.'],
     stats: { matches: 37, wins: 4, top5: 15 },
+    secrets: { found: 3, of: 21 },
   };
 }
 

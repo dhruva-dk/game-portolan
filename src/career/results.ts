@@ -118,7 +118,10 @@ export function applyMatch(career: Career, report: MatchReport): { career: Caree
   const rankAfter = careerRank(next);
   const levelUp = (l: number): boolean => l > levelBefore.level && l <= levelAfter.level;
   const abilities = ABILITIES.filter((a) => levelUp(ABILITY_LEVEL[a.id])).map((a) => a.id);
-  const cosmetics = COSMETICS.filter((c) => (c.unlock.by === 'level' ? levelUp(c.unlock.level) : c.unlock.tier > career.bestTier && c.unlock.tier <= next.bestTier)).map((c) => c.id);
+  // (a secret's unlocks come with it, the moment it is found: see findSecrets)
+  const cosmetics = COSMETICS.filter((c) =>
+    c.unlock.by === 'level' ? levelUp(c.unlock.level) : c.unlock.by === 'rank' && c.unlock.tier > career.bestTier && c.unlock.tier <= next.bestTier,
+  ).map((c) => c.id);
   const change = rankAfter.step.index > rankBefore.step.index ? 'up' : rankAfter.step.index < rankBefore.step.index ? 'down' : 'same';
 
   return {

@@ -1188,6 +1188,8 @@ function abilityNow(state: MatchState, i: number, style: Style): boolean {
       tangentToward(ship.pos, foe.pos, T);
       return Math.abs(angleTo(ship.head, T, ship.pos)) > 2.2;
     }
+    // under a foe that can't turn away in time: slow, or close and in the fight
+    case 'whaleCall': return !!foe && c.mode === MODE.fight && d > 45 && d < 105 && foe.speed < 6;
     default: return false;
   }
 }

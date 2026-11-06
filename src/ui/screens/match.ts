@@ -28,6 +28,8 @@ export interface HudActions {
   call(tier: number): void;
   /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
   target?(name: string, el: HTMLElement | null): void;
+  /** On a voyage: make port, ending it. */
+  port?(): void;
 }
 
 /** The minimap's ink for a region event, by what it is to you. */
@@ -129,6 +131,11 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const count = el('s-hud__count', info);
   const counter = (icon: string) => el('s-hud__n', el('', count, `<i>${icon}</i>`, 'span'), '', 'b');
   const nShips = counter(ICON.flag), nKills = counter(ICON.sink), nCoins = counter(ICON.coin);
+  // a voyage has no Storm and no count of ships left: the line shows the secrets found instead, and a way home
+  if (m.voyage) {
+    nShips.parentElement!.style.display = 'none';
+    button({ label: 'Make port', icon: ICON.port, kind: 'secondary', size: 'sm', parent: info, what: 'hud:port', onPress: () => a.port?.() });
+  }
 
   // a region's event, under the Storm's line, and a second one smaller under it; they take no touches
   const events = el('s-hud__event', root);
@@ -260,6 +267,14 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     }
     for (const mk of mv.marks) {
       const [x, y] = at(mk.x, mk.y);
+      if (mk.kind === 'cache') {
+        // a cache you know of: a gold diamond, ringed in ink
+        const u = 4.5 * devicePixelRatio;
+        g.beginPath(); g.moveTo(x, y - u); g.lineTo(x + u, y); g.lineTo(x, y + u); g.lineTo(x - u, y); g.closePath();
+        g.fillStyle = '#f2c14e'; g.fill();
+        g.strokeStyle = '#1d1208'; g.lineWidth = 1.4 * devicePixelRatio; g.stroke();
+        continue;
+      }
       g.fillStyle = mk.kind === 'loot' ? '#c99a2e' : '#fff';
       g.fillRect(x - 2 * devicePixelRatio, y - 2 * devicePixelRatio, 4 * devicePixelRatio, 4 * devicePixelRatio);
     }
@@ -305,9 +320,14 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     pFire.el.classList.toggle('is-on', p.burning);
     pFire.el.title = 'On fire: canvas burning';
     partsRow.classList.toggle('is-on', partsRow.querySelector('.is-on') !== null);
-    const st = h.storm;
-    storm.innerHTML = `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`;
-    storm.classList.toggle('is-out', st.outside);
+    const st = h.storm, vy = h.voyage;
+    const line = !vy
+      ? `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`
+      : vy.refit > 0
+        ? `<i>${ICON.hull}</i><span>Refitting · ${vy.refit}s</span>`
+        : `<i>${ICON.secret}</i><span>Voyage · ${vy.found}/${vy.of} secrets</span>`;
+    if (storm.dataset.html !== line) storm.innerHTML = storm.dataset.html = line;
+    storm.classList.toggle('is-out', !vy && st.outside);
     nShips.textContent = `${h.ships}`;
     nKills.textContent = `${h.kills}`;
     nCoins.textContent = `${h.coins}`;

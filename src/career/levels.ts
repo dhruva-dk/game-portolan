@@ -1,7 +1,8 @@
 // Levels: XP from each match earns levels. The curve climbs to level 40 over roughly 90 matches, then every
-// level after costs the same. Levels unlock the 16 abilities (the starter pair at level 1, the rest spread
-// to level 40) and most cosmetics (see cosmetics.ts).
+// level after costs the same. Levels unlock sixteen of the abilities (the starter pair at level 1, the rest spread
+// to level 40) and most cosmetics (see cosmetics.ts). The other two are found as secrets on the planet.
 import { ABILITIES, STARTER_ACTIVE, STARTER_PASSIVE, type AbilityId } from '../sim/abilities.ts';
+import { ABILITY_SECRET } from '../sim/secrets.ts';
 
 export const XP = {
   /** XP to go from level 1 to 2; each level up to LEVEL_CURVE_END costs `rise` more than the last. */
@@ -34,7 +35,8 @@ export function levelOf(xp: number): LevelProgress {
   return { level, into: rest, need: xpToNext(level) };
 }
 
-/** The level each ability unlocks at. Actives and passives alternate so every few levels bring a new one. */
+/** The level each ability unlocks at. Actives and passives alternate so every few levels bring a new one. A secret's
+ *  ability has no level: finding the secret unlocks it. */
 export const ABILITY_LEVEL: Readonly<Record<AbilityId, number>> = {
   repair: 1,
   salvage: 1,
@@ -52,9 +54,15 @@ export const ABILITY_LEVEL: Readonly<Record<AbilityId, number>> = {
   deepHold: 34,
   driftMine: 37,
   steadyAim: 40,
+  whaleCall: Infinity,
+  darkLantern: Infinity,
 };
 
-export const abilityUnlocked = (id: AbilityId, level: number): boolean => ABILITY_LEVEL[id] <= level;
+/** Whether an ability is open to a career at `level` that has found `secrets` (their ids). */
+export const abilityUnlocked = (id: AbilityId, level: number, secrets: readonly string[] = []): boolean => {
+  const by = ABILITY_SECRET[id];
+  return by !== undefined ? secrets.includes(by) : ABILITY_LEVEL[id] <= level;
+};
 
 /** The abilities in unlock order. */
 export const ABILITY_ORDER: readonly AbilityId[] = ABILITIES.map((a) => a.id).sort(

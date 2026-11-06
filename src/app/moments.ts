@@ -115,6 +115,8 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.scrape: return { k: 'aground', ship, pos };
     case EVENT.ram: return { k: 'ram', ship, by: e.by, pos };
     case EVENT.win: return { k: 'win', ship };
+    case EVENT.secret: return { k: 'secret', ship, secret: e.item, pos };
+    case EVENT.refit: return { k: 'refit', ship, pos };
     case EVENT.regionWarn: return { k: 'regionEvent', region: e.item, phase: 'warn', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionStart: return { k: 'regionEvent', region: e.item, phase: 'start', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionEnd: return { k: 'regionEvent', region: e.item, phase: 'end', seconds: 0, pos: metres(e.at) };

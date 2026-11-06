@@ -40,6 +40,10 @@ export interface PlayOptions {
   autopilot?: boolean;
   /** The player's input from a tick on, merged into what was held: [[tick, input], ...]. */
   script?: [number, Partial<ShipInput>][];
+  /** A free voyage instead of a match (sim/voyage.ts). */
+  voyage?: boolean;
+  /** The secrets the player has found, as indices into SECRETS. */
+  found?: readonly number[];
 }
 
 /** The career's expectation (confidence 0 to LEARNING.full) as the simulation keeps it (confidence 0 to 1). */
@@ -151,7 +155,8 @@ export class Session implements Stepper {
 
   constructor(plan: MatchPlan, look: CosmeticIds, o: PlayOptions = {}) {
     this.plan = plan;
-    this.state = createMatch(setupFrom(plan, o.seed ?? plan.seed));
+    this.state = createMatch({ ...setupFrom(plan, o.seed ?? plan.seed), voyage: o.voyage ?? false, found: o.found ?? [] });
+    this.voyage = o.voyage ?? false;
     this.tally = new MatchTally(SHIPS);
     this.names = ['You', ...plan.fleet.map((e) => e.name)];
     this.looks = [look, ...plan.fleet.map((e) => cosmeticsOf(CAPTAINS[captainIndex(e.captain)]?.look ?? e.look))];
@@ -166,6 +171,9 @@ export class Session implements Stepper {
   get me(): Ship {
     return this.state.ships[PLAYER];
   }
+
+  /** A free voyage: no Storm, no end, and wrecks refit. */
+  readonly voyage: boolean;
 
   get over(): boolean {
     return over(this.state);
@@ -248,6 +256,8 @@ export class Session implements Stepper {
       if (m.k === 'hit' && m.ship === this.watch && !m.steady && m.shield + m.hull > 0) this.hurtTick = s.tick;
       // the player's own wreck stays in view until they choose to spectate
       if (m.k === 'sink' && m.ship === this.watch && m.ship !== PLAYER) this.rewatch(m.by);
+      // refitted, the player's ship has the view back
+      if (m.k === 'refit' && m.ship === PLAYER) this.back();
       this.onMoment(m);
     }
   }
@@ -257,6 +267,14 @@ export class Session implements Stepper {
     stormView(s, STORM);
     const storm = { closing: STORM.calm.r < ZONES[0] - 1, outside: s.ships[PLAYER].phase === PHASE.sea && inStorm(s, s.ships[PLAYER].pos) };
     this.tally.sample(this.seconds, s.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })), storm);
+  }
+
+  /** The view back on the player's own ship, behind her. */
+  private back(): void {
+    this.watch = PLAYER;
+    this.view.x = this.me.head.x;
+    this.view.y = this.me.head.y;
+    this.view.z = this.me.head.z;
   }
 
   /** Spectating once the player's ship has sunk: watch the ship that sank it, or else the one afloat with the most kills. */
@@ -378,8 +396,10 @@ export class Session implements Stepper {
     ships.length = 0;
     for (let i = 0; i < SHIPS; i++) {
       const sh = s.ships[i], alive = sh.phase !== PHASE.sunk;
-      // ships in fog or past sight stay hidden; the sunk stay listed so they finish sinking
+      // ships in fog or past sight stay hidden; the sunk stay listed so they finish sinking; a voyage's empty berths
+      // never put to sea
       if (alive && i !== this.watch && !(seen(s, this.watch, i) & (SEEN.visible | SEEN.lantern))) continue;
+      if (!alive && sh.sunk < 0) continue;
       ships.push(this.shipView(i, sh, alive, alpha));
     }
     const shots = this.shots;

@@ -290,6 +290,8 @@ export const POWERS = {
   stormWalker: 0.6,
   deepHold: 1,
   steadyAim: 0.2,
+  /** Whale Call: how far ahead along the aim the whale is called to, at the nearest and furthest. */
+  whaleCall: { near: 45, far: 110 },
 } as const;
 
 /** How much turning spreads shots, at the full turning rate. */
@@ -487,3 +489,25 @@ export const REGION_EVENT = {
 // ---------------------------------------------------------------- the match
 
 export const MATCH = { ships: 20, tick: 1 / 30 } as const;
+
+/** The free voyage (voyage.ts). */
+export const VOYAGE = {
+  /** Captains who sail the voyage with you; the rest of the fleet stays ashore. */
+  captains: 7,
+  /** Seconds a wreck waits before it refits and sails again: yours, and a captain's. */
+  refit: 8,
+  refitCaptain: 30,
+  /** Metres a refitted ship comes back clear of every other ship, and a captain's clear of you. */
+  clear: 160,
+  clearYou: 320,
+  /** Seconds between loot laid again on an empty spot. */
+  loot: 6,
+  /** Seconds what a wreck spilled floats before it goes down. */
+  spill: 240,
+  /** Seconds a region's event rests before it comes round again, at the least and the most. */
+  rest: [150, 330],
+  /** Seconds between the whale's breaches, at the least and the most. */
+  whale: [150, 260],
+  /** Seconds before a hidden cache taken is filled again. */
+  cache: 120,
+} as const;

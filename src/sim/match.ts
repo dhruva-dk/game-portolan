@@ -61,6 +61,8 @@
 //   mastFall    ship's mainmast went over the side (by who brought it down); amount the side, +1 starboard
 //   juryRig     ship has a jury mast up in its place;  quench: ship's fire put out by the weather (flag 1: a heated
 //               shot quenched as it struck)
+//   secret      the player found a secret (secrets.ts): item its index into SECRETS, at where
+//   refit       on a voyage, a wrecked ship sails again: at where she comes back
 //   impact      also carries the parts a ship hit struck, as FLAG.sail / waterline / rudder, and FLAG.rake for a
 //               shot down her length; hull the hull points it took
 //   scrape      ship scraped the ground; ram: ship rammed by; coins: ship earned amount (item: 1 rent, 2 cut,
@@ -95,6 +97,8 @@ import { chart, mendAtHome, perks, rent } from './territory.ts';
 import { brew, weatherOnShips } from './weather.ts';
 import { swim, callBreach } from './whale.ts';
 import { stir } from './wind.ts';
+import { seek } from './secrets.ts';
+import { isVoyage, voyageTick } from './voyage.ts';
 import { EVENT } from './state.ts';
 import { WHALE } from './tables.ts';
 
@@ -159,9 +163,11 @@ export function step(state: MatchState, input: ShipInput | null = null, inputs: 
   for (const e of state.events) if (e.kind === EVENT.stormWait && (WHALE.at as readonly number[]).includes(e.item)) callBreach(state);
   swim(state);
   settle(state);
-  // what the captains will hear of this tick, and the director's read of it
+  if (isVoyage(state)) voyageTick(state);
+  seek(state);
+  // what the captains will hear of this tick, and the director's read of it (a voyage is left to itself)
   listen(state);
-  direct(state);
+  if (!isVoyage(state)) direct(state);
   state.tick++;
   for (let i = 0; i < SHIPS; i++) if (state.ships[i].captain.on) watch(state, i);
 }
@@ -180,10 +186,12 @@ export function resolve(state: MatchState, limit = 60 * 60 * 30): void {
 }
 
 export { createMatch, type FleetEntry, type MatchSetup } from './setup.ts';
+export { SECRETS, SECRET_COUNT, CACHE_PLACES, SECRET_PLACES, secret, secretIndex, type SecretDef, type SecretId } from './secrets.ts';
+export { isVoyage, ashore } from './voyage.ts';
 export { idleInput, recorder, record, replay, inputAt, parseRecording, type ShipInput, type Recording } from './input.ts';
 export { over, result, type MatchResult, type ShipResult, type LearntMind } from './end.ts';
 export {
-  EVENT, EVENT_NAMES, FLAG, PHASE, CAUSE, GULL, WHALE_STATE, PLAYER, SHIPS, TICK, encodeMatch, decodeMatch, matchHash,
+  EVENT, EVENT_NAMES, FLAG, MODE, PHASE, CAUSE, GULL, WHALE_STATE, PLAYER, SHIPS, TICK, encodeMatch, decodeMatch, matchHash,
   type MatchState, type Ship, type Happening, type Item, type Loot, type Shot,
 } from './state.ts';
 export { ITEM, ITEM_NAMES, RARITY, WEAPONS, USES, SLOTS, WEATHER_KIND, WEATHER_NAMES, ZONES, STORM } from './tables.ts';

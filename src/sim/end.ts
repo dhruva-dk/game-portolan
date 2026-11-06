@@ -2,7 +2,7 @@
 // The result is what the career, the interface and the captains' learning read afterwards.
 import { spill } from './items.ts';
 import { hasPassive } from './perks.ts';
-import { CAUSE, EVENT, PHASE, SHIPS, TICK, emit, type Expect, type MatchState } from './state.ts';
+import { CAUSE, EVENT, MODE, PHASE, SHIPS, TICK, emit, type Expect, type MatchState } from './state.ts';
 import { COINS, POWERS } from './tables.ts';
 import { founder, squareMetres } from './territory.ts';
 
@@ -44,7 +44,8 @@ export function settle(state: MatchState): void {
     const by = ship.lastBy >= 0 && (recent || ship.cause < CAUSE.storm) ? ship.lastBy : -1;
     sink(state, i, by, ship.cause);
   }
-  if (state.winner >= 0) return;
+  // a voyage has no winner: its wrecks refit (voyage.ts)
+  if (state.winner >= 0 || state.mode === MODE.voyage) return;
   let alive = 0, last = -1;
   for (let i = 0; i < SHIPS; i++) {
     if (state.ships[i].phase !== PHASE.sunk) {

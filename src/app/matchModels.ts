@@ -12,7 +12,8 @@ import {
 import { seaLevelAt } from '../sim/environment.ts';
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE } from '../sim/state.ts';
-import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS, VOYAGE, isWeapon } from '../sim/tables.ts';
+import { CACHE_PLACES, SECRET_COUNT, secretIndex } from '../sim/secrets.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
 import { R, advance, along, apart, tangentAt } from '../sim/sphere.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
@@ -95,6 +96,8 @@ function mapOf(s: MatchState, i: number): MapView {
   }
   const marks: MapView['marks'] = [];
   for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push({ ...rel(l.at), kind: 'loot' });
+  // the hidden caches of the secrets you know, wherever they are within reach of the chart
+  for (const c of CACHE_PLACES) if (s.found.includes(secretIndex(c.secret)) && apart(p, c.at) < MAP_RANGE * 1.5) marks.push({ ...rel(c.at), kind: 'cache' });
   if (sh.gull.state !== 0) marks.push({ ...rel(sh.gull.at), kind: 'gull' });
   const events: MapView['events'] = [];
   for (let ri = 0; ri < s.regionEvents.length; ri++) {
@@ -199,7 +202,14 @@ export function hudModel(session: Session): HudModel {
     pickup: pickupOf(s, sh),
     ...eventsOf(s, sh.pos),
     map: mapOf(s, session.watch),
+    voyage: session.voyage ? { found: s.found.length, of: SECRET_COUNT, refit: refitIn(s) } : null,
   };
+}
+
+/** Seconds until the player's wreck refits on a voyage, or 0 while she is afloat. */
+function refitIn(s: MatchState): number {
+  const me = s.ships[PLAYER];
+  return me.phase === PHASE.sunk && me.sunk >= 0 ? Math.max(0, Math.ceil(VOYAGE.refit - (s.tick - me.sunk) * TICK)) : 0;
 }
 
 /** How far a ship can glide from the Gale before it reaches the sea, m. */

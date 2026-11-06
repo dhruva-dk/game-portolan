@@ -43,15 +43,16 @@ export function planWhale(state: MatchState): void {
 /** Whether the whale is free to be called: not already rising or breaching. */
 export const whaleFree = (state: MatchState): boolean => state.whale.state !== WHALE_STATE.rising && state.whale.state !== WHALE_STATE.breach;
 
-/** Calls the breach: the whale rises under the busiest water within reach, or under `at` when the Glass Sea calls it there. */
-export function callBreach(state: MatchState, at: V3 | null = null): void {
+/** Calls the breach: the whale rises under the busiest water within reach, or under `at` when the Glass Sea calls it
+ *  there or a ship calls it (`by`, with Whale Call). */
+export function callBreach(state: MatchState, at: V3 | null = null, by = -1): void {
   const w = state.whale;
   if (!whaleFree(state)) return;
   if (at !== null) {
     copy(w.spot, at);
     w.state = WHALE_STATE.rising;
     w.t = WHALE.rising;
-    emit(state, EVENT.whaleRising, -1, -1, w.spot, { amount: WHALE.rising, y: WHALE.lift });
+    emit(state, EVENT.whaleRising, -1, by, w.spot, { amount: WHALE.rising, y: WHALE.lift });
     return;
   }
   let best = -1, bestN = 0;

@@ -51,7 +51,7 @@ export function abilitiesScreen(m0: AbilitiesModel, a: { onBack(): void; onEquip
         const grid = el('s-abil__grid', sec);
         for (const v of m.abilities.filter((x) => x.kind === kind)) {
           const c = card({
-            className: 's-abil__card', selected: v.id === sel, locked: !v.unlocked, lockText: `Level ${v.level}`,
+            className: 's-abil__card', selected: v.id === sel, locked: !v.unlocked, lockText: v.secret !== undefined ? 'Secret' : `Level ${v.level}`,
             equipped: v.id === m.active || v.id === m.passive, isNew: v.isNew, parent: grid,
             onPress: () => { sel = v.id; render(); },
           }).el;
@@ -81,7 +81,7 @@ export function abilitiesScreen(m0: AbilitiesModel, a: { onBack(): void; onEquip
     el('s-abil__text', b, esc(v.text));
     const foot = el('s-abil__foot', b);
     const worn = v.id === m.active || v.id === m.passive;
-    if (!v.unlocked) el('s-abil__why', foot, `${ICON.lock}<span>Reach level ${v.level} to unlock</span>`);
+    if (!v.unlocked) el('s-abil__why', foot, `${ICON.lock}<span>${v.secret !== undefined ? `A secret of the planet. ${esc(v.secret)}` : `Reach level ${v.level} to unlock`}</span>`);
     else if (worn) el('s-abil__why is-on', foot, `${ICON.check}<span>Sailing with it</span>`);
     else button({ label: `Equip ${v.kind === 'active' ? 'active' : 'passive'}`, kind: 'primary', parent: foot, what: `abilities:equip:${v.id}`, onPress: () => a.onEquip(v.id) });
   };
@@ -229,6 +229,17 @@ export function careerScreen(m: CareerModel, a: { onBack(): void }): MenuView<Ca
     const hab = section('How the captains read you', left, 's-car__habits p-smoke');
     if (!model.habits.length) el('s-car__habit', hab, 'They have not seen enough of you yet.');
     for (const h of model.habits) el('s-car__habit', hab, esc(h));
+    // the secrets of the planet: what you found, and riddles for the rest
+    const got = model.secrets.filter((x) => x.found).length;
+    const sec = section(`Secrets · ${got} of ${model.secrets.length}`, left, 's-car__secrets p-smoke');
+    for (const x of model.secrets) {
+      const row = el(`s-car__secret${x.found ? ' is-found' : ''}`, sec);
+      el('s-car__secretI', row, x.found ? ICON.secret : ICON.lock);
+      const t = el('s-car__secretT', row);
+      el('s-car__secretN', t, `<b>${esc(x.name)}</b>${x.region ? `<span>${esc(x.region)}</span>` : ''}`);
+      el('s-car__secretX', t, esc(x.text));
+      if (x.found) el('s-car__secretG', t, esc(x.gives));
+    }
     const known = model.chart.filter((r) => r.sailed > 0).length;
     cap.innerHTML = `<b class="t-h3">The chart</b><span class="t-micro t-soft">${known} of ${model.chart.length} seas charted</span>`;
     requestAnimationFrame(() => drawChart(canvas, model.chart));

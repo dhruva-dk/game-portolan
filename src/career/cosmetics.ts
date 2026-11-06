@@ -1,5 +1,6 @@
 // The cosmetics catalogue: sail colours, sail patterns, hull paints, figureheads, emblems and wake trails.
-// Plain kinds, evocative names. Each has one unlock rule: a level, or a rank tier (the show-off ones).
+// Plain kinds, evocative names. Each has one unlock rule: a level, a rank tier (the show-off ones), or a secret found on
+// the planet (sim/secrets.ts: the emblems at the end of their kind).
 // Nothing is bought: there is no shop and no currency between matches.
 // Ids are stable: saves and captains refer to them. Add to the end of a kind; never rename or reuse an id.
 // Figureheads and emblems are natural forms and spirits: never people, never faces. Emblem ids are the player
@@ -17,7 +18,7 @@ export const COSMETIC_KINDS: readonly { kind: CosmeticKind; name: string }[] = [
   { kind: 'wake', name: 'Wake trails' },
 ];
 
-export type Unlock = { by: 'level'; level: number } | { by: 'rank'; tier: number };
+export type Unlock = { by: 'level'; level: number } | { by: 'rank'; tier: number } | { by: 'secret'; secret: string };
 
 export interface Cosmetic {
   id: string;
@@ -32,6 +33,7 @@ export interface Cosmetic {
 
 const at = (level: number): Unlock => ({ by: 'level', level });
 const rank = (tier: number): Unlock => ({ by: 'rank', tier });
+const found = (secret: string): Unlock => ({ by: 'secret', secret });
 
 const kind = (k: CosmeticKind, items: readonly (readonly [id: string, name: string, hint: string, unlock: Unlock, colour?: string])[]): Cosmetic[] =>
   items.map(([id, name, hint, unlock, colour]) => (colour === undefined ? { id, kind: k, name, hint, unlock } : { id, kind: k, name, hint, unlock, colour }));
@@ -130,6 +132,22 @@ export const COSMETICS: readonly Cosmetic[] = [
     ['crystal', 'Crystal Heart', 'A heart of clear crystal. For reaching Diamond.', rank(TIER.diamond)],
     ['leviathan', 'Leviathan', 'A great sea beast in gold. For reaching Admiral.', rank(TIER.admiral)],
     ['phoenix', 'Phoenix', 'A firebird of living light. For reaching Legend.', rank(TIER.legend)],
+    // found, not earned: each for a secret of the planet
+    ['crescentMoon', 'Crescent Moon', 'The moon over Moonbow Arch. For finding the Moonbow.', found('moonbow')],
+    ['sunOnSea', 'Sun on the Sea', 'A sun that never sets. For the Midnight Sun.', found('midnightSun')],
+    ['whirlpool', 'Whirlpool', 'The Maelstrom turning. For the Eye of the Vortex.', found('eyeOfVortex')],
+    ['twinStars', 'Twin Stars', 'A star and its reflection, in silver. For Starlit Glasswater.', found('starlitGlass')],
+    ['coralFan', 'Sea Fan', 'A fan of kelp and coral. For Noon in the Cathedral.', found('naveAtNoon')],
+    ['jaggedRocks', 'Jagged Rocks', 'The walls of the Gorge. For the Gorge Answers.', found('gorgeEcho')],
+    ['firefly', 'Firefly', 'A spark at first light. For Dawn in Spice Cove.', found('coveAtDawn')],
+    ['blossom', 'Blossom', 'A falling cherry blossom. For the Spring Flood.', found('springFlood')],
+    ['twinFlames', 'Twin Flames', 'Fire on the water. For the Heart of Fire.', found('calderaFire')],
+    ['fallingDrop', 'Falling Drop', 'One drop of a hundred falls. For the Hundred Falls.', found('weepingRound')],
+    ['forkedBolt', 'Forked Bolt', 'A bolt from a thunderhead. For Thunder on the Needle.', found('needleThunder')],
+    ['meridianArc', 'Meridian', 'The world\'s line, all the way round. For Round the World.', found('greatCurrent')],
+    ['windRose', 'Wind Rose', 'Every bearing, end to end. For Pole to Pole.', found('poleToPole')],
+    ['northernCrown', 'Northern Crown', 'The aurora\'s crown, in gold. For Under the Lights.', found('northernLights')],
+    ['splinterBurst', 'Splinters', 'A mast that took the lightning. For Lightning\'s Mark.', found('struck')],
   ]),
   ...kind('wake', [
     ['foam', 'Foam', 'Plain white foam.', at(1), '#ffffff'],
@@ -153,8 +171,8 @@ export const cosmetic = (id: string): Cosmetic | undefined => COSMETICS.find((c)
 
 export const cosmeticsOf = (k: CosmeticKind): Cosmetic[] => COSMETICS.filter((c) => c.kind === k);
 
-export const isUnlocked = (c: Cosmetic, level: number, bestTier: number): boolean =>
-  c.unlock.by === 'level' ? level >= c.unlock.level : bestTier >= c.unlock.tier;
+export const isUnlocked = (c: Cosmetic, level: number, bestTier: number, secrets: readonly string[] = []): boolean =>
+  c.unlock.by === 'level' ? level >= c.unlock.level : c.unlock.by === 'rank' ? bestTier >= c.unlock.tier : secrets.includes(c.unlock.secret);
 
 /** What a ship looks like: one cosmetic id per kind. A captain's emblem is its own sigil (see captains.ts). */
 export interface Look {

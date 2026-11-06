@@ -530,22 +530,25 @@ export const PLAYER_EMBLEMS: Record<string, EmblemDef> = {
   gull: def('Gull', gull), scallop: def('Scallop', scallop), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin),
   fern: def('Fern', fern), hare: def('Hare', hare), swan: def('Swan', swan), butterfly: def('Butterfly', butterfly), snowflake: def('Snowflake', snowflake),
   crystal: def('Crystal Heart', crystal, 'crystal'), leviathan: def('Leviathan', leviathan, 'gold'), phoenix: def('Phoenix', phoenix, 'spirit'),
+  // the emblems found as secrets of the planet (sim/secrets.ts)
+  crescentMoon: def('Crescent Moon', rot(crescent, 0.6), 'silver'), sunOnSea: def('Sun on the Sea', sunOnSea, 'gold'), whirlpool: def('Whirlpool', whirlpool),
+  twinStars: def('Twin Stars', twinStars, 'silver'), coralFan: def('Sea Fan', coralFan), jaggedRocks: def('Jagged Rocks', jaggedRocks),
+  firefly: def('Firefly', firefly, 'spirit'), blossom: def('Blossom', blossom), twinFlames: def('Twin Flames', twinFlames, 'gold'),
+  fallingDrop: def('Falling Drop', fallingDrop, 'crystal'), forkedBolt: def('Forked Bolt', forkedBolt, 'silver'), meridianArc: def('Meridian', meridianArc, 'gold'),
+  windRose: def('Wind Rose', windRose, 'gold'), northernCrown: def('Northern Crown', northernCrown, 'gold'), splinterBurst: def('Splinters', splinterBurst),
 };
 
 /** Charges drawn for the library that nothing names yet: more spirits and natural forms for later captains and emblems. */
 export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
-  forkedBolt: def('Forked Bolt', forkedBolt), eelCoil: def('Coiled Eel', eelCoil), stoopingHawk: def('Stooping Hawk', stoopingHawk),
+  eelCoil: def('Coiled Eel', eelCoil), stoopingHawk: def('Stooping Hawk', stoopingHawk),
   clawRake: def('Claw Marks', clawRake), crabClaw: def('Crab Claw', crabClaw), orcaFin: def('Orca Fin', orcaFin), sharkTooth: def('Shark Tooth', sharkTooth),
-  meridianArc: def('Meridian', meridianArc), windRose: def('Wind Rose', windRose), coralFan: def('Sea Fan', coralFan), magpieWing: def('Pied Wing', wing(true)),
-  foxTail: def('Brush Tail', foxTail), clutchingTalon: def('Talon', clutchingTalon), splinterBurst: def('Splinters', splinterBurst),
+  magpieWing: def('Pied Wing', wing(true)), foxTail: def('Brush Tail', foxTail), clutchingTalon: def('Talon', clutchingTalon),
   crescentHook: def('Hooked Crescent', crescentHook), ravenWing: def('Black Wing', wing(false)), hexShell: def('Hex Shell', hexShell),
   stillRing: def('Still Ring', stillRing), urchinSpines: def('Urchin', urchinSpines), reefRock: def('Rock Awash', reefRock), fogBank: def('Fog Bank', fogBank),
-  firefly: def('Firefly', firefly), fallingDrop: def('Falling Drop', fallingDrop), owlWings: def('Owl Wings', owlWings),
+  owlWings: def('Owl Wings', owlWings),
   brokenFeather: def('Broken Feather', brokenFeather), tightSpiral: def('Spiral', tightSpiral), undertow: def('Undertow', undertow),
-  jaggedRocks: def('Jagged Rocks', jaggedRocks), twinFlames: def('Twin Flames', twinFlames), wave: def('Curling Wave', curlingWave),
-  crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), sunOnSea: def('Sun on the Sea', sunOnSea), fourStar: def('Four-pointed Star', fourStar),
-  feather: def('Feather', feather), whirlpool: def('Whirlpool', whirlpool), leapingFish: def('Leaping Fish', leapingFish), blossom: def('Blossom', blossom),
-  twinStars: def('Twin Stars', twinStars, 'silver'), northernCrown: def('Northern Crown', northernCrown, 'gold'),
+  wave: def('Curling Wave', curlingWave), fourStar: def('Four-pointed Star', fourStar), feather: def('Feather', feather),
+  leapingFish: def('Leaping Fish', leapingFish),
 };
 
 /** Every charge by id: captains', the player's and spares. Ids are unique across the three. */

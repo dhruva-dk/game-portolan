@@ -18,6 +18,10 @@ export const PLAYER = 0;
 export const STREAM = { world: 0, weather: 1, wind: 2, loot: 3, storm: 4, combat: 5, whale: 6, captains: 7 } as const;
 export const STREAMS = STREAM.captains + SHIPS;
 
+/** What is being sailed: a match (the Storm closes and the last ship afloat wins), or a free voyage on the same planet,
+ *  with no Storm and no end, where a wreck refits and sails on (voyage.ts). */
+export const MODE = { match: 0, voyage: 1 } as const;
+
 /** Where a ship is in the match: riding the Gale, gliding down, at sea, or sunk. */
 export const PHASE = { gale: 0, glide: 1, sea: 2, sunk: 3 } as const;
 
@@ -221,10 +225,15 @@ const HAPPENING = rec(
   ['item', int], ['flag', int], ['cells', list(int)],
 );
 
+/** The voyage's own clocks (voyage.ts): seconds until loot is laid again, until the whale is called, and until a hidden
+ *  cache taken is filled again, by cache. */
+const VOYAGE = rec(['lootT', f64], ['whaleT', f64], ['caches', list(f64)]);
+
 const MATCH_SCHEMA = rec(
   ['seed', int],
   ['tick', int],
   ['rule', int],
+  ['mode', int],
   ['hour', f64],
   ['tilt', f64],
   ['rng', list(words(4), STREAMS)],
@@ -252,6 +261,11 @@ const MATCH_SCHEMA = rec(
   ['director', DIRECTOR],
   ['sunk', list(SINKING)],
   ['winner', int],
+  // the secrets the player has found (secrets.ts), carried in from the career and added to as they are found, and
+  // how far along each feat is (a stay counted up, a circle sailed round, the poles reached)
+  ['found', list(int)],
+  ['quest', list(f64)],
+  ['voyage', VOYAGE],
 );
 
 export type Ship = Value<typeof SHIP>;
@@ -269,7 +283,7 @@ export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 3, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 4, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {
@@ -327,12 +341,14 @@ export const EVENT = {
   mastFall: 51,
   juryRig: 52,
   quench: 53,
+  secret: 54,
+  refit: 55,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
   'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
-  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench',
+  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit',
 ];
 
 /** Event flag bits. */

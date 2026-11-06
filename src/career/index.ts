@@ -12,7 +12,7 @@
 export type { FleetEntry, MatchChanges, MatchPlan, MatchReport, PlayerEntry, RivalNews, ShipReport } from './contract.ts';
 export { CAPTAINS, LEAGUE_SIZE, TEMPERAMENTS, captainIndex, temperament, type Captain, type Temperament, type TemperamentId } from './captains.ts';
 export {
-  careerHash, careerLevel, careerRank, copyCareer, equipAbility, equipCosmetic, newCareer, unlockedAbilities, unlockedCosmetics, wornLook,
+  careerHash, careerLevel, careerRank, copyCareer, equipAbility, equipCosmetic, findSecrets, newCareer, unlockedAbilities, unlockedCosmetics, wornLook,
   type CaptainRecord, type Career,
 } from './career.ts';
 export {

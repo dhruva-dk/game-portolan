@@ -58,6 +58,10 @@ export type Moment =
   | { k: 'ablaze'; ship: number; by: number; spread: boolean; pos: V3 }
   /** The weather put a ship's fire out, or (`shot`) quenched a heated shot as it struck. */
   | { k: 'quench'; ship: number; shot: boolean; pos: V3 }
-  | { k: 'win'; ship: number };
+  | { k: 'win'; ship: number }
+  /** The player found a secret of the planet: its index into SECRETS. */
+  | { k: 'secret'; ship: number; secret: number; pos: V3 }
+  /** On a voyage, a wreck sails again. */
+  | { k: 'refit'; ship: number; pos: V3 };
 
 export type MomentKind = Moment['k'];

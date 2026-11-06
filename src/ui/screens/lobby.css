@@ -15,6 +15,7 @@
 .s-lobby__go { position: absolute; right: var(--sp-6); bottom: var(--sp-6); display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-4); width: calc(440px * var(--k)); animation: pui-rise-in var(--t-slow) 120ms var(--ease) both; }
 .s-lobby__play { height: calc(var(--hit-btnLg) * 1.25); }
 .s-lobby__play .p-btn__face { font-size: calc(var(--fs-btnLg) * 1.25); }
+.s-lobby__voyage { order: 3; }
 .s-lobby__loadout { display: flex; gap: var(--sp-3); }
 .s-lobby__slot { flex: 1; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); cursor: pointer; transition: transform var(--t-fast) var(--ease); }
 .s-lobby__slot.is-down { transform: scale(0.96); }

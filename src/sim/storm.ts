@@ -7,7 +7,7 @@ import { HALF_PI, PI, addScaled, dacos, dcos, dot, dsin, dtan, fmix32, normalize
 import { openAt } from './nav.ts';
 import { RULE } from './rules.ts';
 import { R, TERRITORY, along, tangentAt } from './sphere.ts';
-import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, emit, type MatchState } from './state.ts';
+import { CAUSE, EVENT, MODE, PHASE, SHIPS, STREAM, TICK, emit, type MatchState } from './state.ts';
 import { STORM, ZONES } from './tables.ts';
 import { swallow } from './territory.ts';
 import { BLEND, CENTRES, REGIONS, heightAt, regionMix } from './world/index.ts';
@@ -136,6 +136,13 @@ export const stormPhase = (state: MatchState): number => phaseAt(state, clock(st
 /** The safe circle at storm time t. */
 export function calmAt(state: MatchState, t: number, out: Calm): Calm {
   const ph = phaseAt(state, t), c = state.storm.centres;
+  if (state.mode === MODE.voyage) {
+    // no Storm on a voyage: the whole planet is calm
+    set(out.at, c[0].x, c[0].y, c[0].z);
+    out.r = PI * R;
+    out.cos = -1;
+    return out;
+  }
   if (!ph.closing) {
     const z = Math.min(ph.k, ZONES.length - 1);
     set(out.at, c[z].x, c[z].y, c[z].z);
@@ -243,6 +250,7 @@ function scan(state: MatchState, calm: Calm): void {
 }
 
 export function storm(state: MatchState): void {
+  if (state.mode === MODE.voyage) return;
   const s = state.storm, t = clock(state), ph = phaseAt(state, t);
   if (state.tick === s.start || ph.k !== s.phase || ph.closing !== s.shrinking) {
     if (ph.k < LAST) {

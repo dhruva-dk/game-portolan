@@ -8,9 +8,11 @@ import { activeIndex, passiveIndex } from './perks.ts';
 import { chartEvents, planEvents } from './regionEvents.ts';
 import { RULE, ruleFor } from './rules.ts';
 import { TERRITORY } from './sphere.ts';
-import { EVENT_STATE, GULL, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
+import { SECRET_COUNT, seedCaches } from './secrets.ts';
+import { EVENT_STATE, GULL, MODE, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
 import { planStorm } from './storm.ts';
-import { DAY, GALE, GUST, SLOTS } from './tables.ts';
+import { DAY, GALE, GUST, SLOTS, VOYAGE } from './tables.ts';
+import { planVoyage } from './voyage.ts';
 import { newWeather } from './weather.ts';
 import { planWhale } from './whale.ts';
 import { REGION_COUNT } from './world/index.ts';
@@ -48,6 +50,10 @@ export interface MatchSetup {
   fleet?: readonly FleetEntry[];
   /** Every captain is gentle: a first match. */
   gentle?: boolean;
+  /** A free voyage (voyage.ts) instead of a match: no Storm, no end, and only the first VOYAGE.captains captains. */
+  voyage?: boolean;
+  /** The secrets the player has already found, as indices into SECRETS (secrets.ts). */
+  found?: readonly number[];
 }
 
 const xyz = () => ({ x: 0, y: 0, z: 1 });
@@ -94,9 +100,10 @@ export function createMatch(setup: MatchSetup): MatchState {
   const seed = setup.seed >>> 0;
   const rng = Array.from({ length: STREAMS }, (_, k) => rngFrom(hash32(seed, k)));
   const w = rng[STREAM.world];
-  const rule = setup.rule ?? ruleFor(setup.date);
+  // the day's rule is for matches: a voyage sails under the usual rules
+  const rule = setup.rule ?? (setup.voyage ? RULE.none : ruleFor(setup.date));
   const state: MatchState = {
-    seed, tick: 0, rule,
+    seed, tick: 0, rule, mode: setup.voyage ? MODE.voyage : MODE.match,
     hour: setup.hour ?? rngRange(w, 0, 24),
     tilt: setup.tilt ?? rngRange(w, -DAY.tilt, DAY.tilt),
     rng,
@@ -112,6 +119,9 @@ export function createMatch(setup: MatchSetup): MatchState {
     regionEvents: Array.from({ length: REGION_COUNT }, () => ({ state: EVENT_STATE.waiting, at: 0, warn: 0, run: 0, t: 0, k: 0, spot: xyz(), n: 0, marks: [] })),
     floeT: 0,
     leader: -1, rentT: 0, events: [], noise: [], director: { phase: 0, heat: 0, t: 0, quiet: 0, hunches: 0 }, sunk: [], winner: -1,
+    found: [...new Set(setup.found ?? [])].filter((k) => k >= 0 && k < SECRET_COUNT).sort((a, b) => a - b),
+    quest: new Array<number>(SECRET_COUNT).fill(0),
+    voyage: { lootT: 0, whaleT: 0, caches: [] },
   };
   // the captains' chart starts from a quiet sea, whatever the last match left on it
   chartEvents(state);
@@ -122,6 +132,8 @@ export function createMatch(setup: MatchSetup): MatchState {
   planEvents(state);
   planWhale(state);
   seedLoot(state);
+  seedCaches(state);
+  if (setup.voyage) planVoyage(state, VOYAGE.captains);
   return state;
 }
 

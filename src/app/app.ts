@@ -11,9 +11,9 @@ import { GpuStage } from '../render/gpu/stage.ts';
 import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
-import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
+import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
-import { PHASE, PLAYER, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
+import { PHASE, PLAYER, SECRETS, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
 import { WEATHER } from '../sim/tables.ts';
 import { REGIONS } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
@@ -39,11 +39,11 @@ import {
 } from '../ui/screens/match.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
-import { el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
+import { ICON, ceremony, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
   CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
 } from '../ui/model.ts';
-import type { AbilityId } from '../sim/abilities.ts';
+import { ability, type AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
@@ -222,7 +222,9 @@ export class App {
         return titleScreen(m, { onStart: () => this.go('lobby') });
       }
       case 'lobby':
-        return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), { onPlay: () => this.play({}), onOpen: (m) => this.go(m) });
+        return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), {
+          onPlay: () => this.play({}), onVoyage: () => this.play({ voyage: true }), onOpen: (m) => this.go(m),
+        });
       case 'abilities': {
         const v: MenuView<ReturnType<typeof abilitiesModel>> = abilitiesScreen((model as never) ?? abilitiesModel(career, this.fresh.abilities), {
           onBack: this.back,
@@ -281,6 +283,7 @@ export class App {
         const v = hudScreen((model as HudModel) ?? hudModel(s!), {
           press: (w, d) => this.controls.press(w, d), pick: (k) => this.controls.pick(k), target: (n, e) => this.juice.target(n, e),
           trade: (f, t) => this.controls.trade(f, t), sails: (v) => { this.controls.throttle = v; }, call: (t) => this.controls.call(t),
+          port: () => this.makePort(),
         });
         this.hud = v;
         return v;
@@ -386,7 +389,9 @@ export class App {
     if (this.session) this.leaveMatch();
     this.actors?.clear();
     this.staged = null;
-    const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
+    // the secrets already found ride along, so none is announced twice
+    const found = this.career.career.secrets.map((id) => SECRETS.findIndex((x) => x.id === id)).filter((k) => k >= 0);
+    const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), { found, ...o });
     s.onMoment = (m) => this.onMoment(m);
     s.autoFire = this.settings.settings.autoFire;
     this.session = s;
@@ -396,7 +401,7 @@ export class App {
     this.viewer.me = this.sound.me = PLAYER;
     this.viewer.spectating = false;
     this.log.tick = s.state.tick;
-    this.log.add('flow', 'match', { seed: s.state.seed, skipGale: !!o.skipGale, autopilot: !!o.autopilot });
+    this.log.add('flow', 'match', { seed: s.state.seed, skipGale: !!o.skipGale, autopilot: !!o.autopilot, voyage: !!o.voyage });
     this.loop.run(s);
     this.controls.on = true;
     if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 9, shoulder: 0, yaw: 0 });
@@ -419,6 +424,40 @@ export class App {
     this.momentJuice.react(m);
     this.sound.react(m);
     this.tips.moment(m, s);
+    if (m.k === 'secret' && m.ship === PLAYER) this.foundSecret(m.secret);
+  }
+
+  /** A secret found at sea: kept at once (a match left early still keeps it), what it gives marked new, and the
+   *  moment shown. Not in capture runs, whose career is never saved. */
+  private foundSecret(k: number): void {
+    const def = SECRETS[k];
+    if (!def) return;
+    const before = this.career.career, after = findSecrets(before, [def.id]);
+    if (after === before) return;
+    this.career.set(after);
+    let gives = '';
+    if (def.reward.kind === 'ability') {
+      this.fresh.abilities.add(def.reward.id);
+      gives = `New ability: ${ability(def.reward.id).name}`;
+    } else if (def.reward.kind === 'emblem') {
+      const c = cosmetic(def.reward.id);
+      if (c) this.fresh.cosmetics.add(c.id);
+      gives = `New emblem: ${c?.name ?? def.reward.id}`;
+    } else gives = 'A cache lies here now in every match, marked on your chart';
+    this.log.add('flow', 'secret', { id: def.id, found: after.secrets.length });
+    void ceremony({
+      kind: 'unlock', kicker: `Secret found · ${after.secrets.length} of ${SECRETS.length}`, title: def.name, sub: `${def.found} ${gives}.`,
+      art: ICON.secret, color: '#9fe3ff', colorDeep: '#2a6f8f', parent: this.shell.root, ms: 4200,
+    });
+  }
+
+  /** Ends a voyage: back to port (the lobby). Nothing is scored; the secrets found are already kept. */
+  makePort(): void {
+    const s = this.session;
+    if (!s || !s.voyage) return;
+    this.log.add('flow', 'port', { tick: s.state.tick, found: s.state.found.length });
+    this.leaveMatch();
+    this.go('lobby');
   }
 
   /** Leaves the Gale now. */
@@ -603,6 +642,11 @@ export class App {
   /** Moves between the match's screens as the player's ship leaves the Gale, sinks, or wins. */
   private follow(s: Session): void {
     const me = s.me, at = this.screen;
+    // a voyage never ends: its wreck refits, and the HUD counts down to it
+    if (s.voyage) {
+      if (at === 'gale' && me.phase !== PHASE.gale) this.go('match');
+      return;
+    }
     if (s.over && s.state.winner === PLAYER && (at === 'match' || at === 'gale')) this.go('victory');
     else if (me.phase === PHASE.sunk && (at === 'match' || at === 'gale')) this.go('death');
     else if (at === 'gale' && me.phase !== PHASE.gale) this.go('match');

@@ -1,4 +1,4 @@
-// The 16 abilities of src/sim/abilities.ts: eight actives and eight passives.
+// The abilities of src/sim/abilities.ts: nine actives and nine passives (the last of each found as a secret).
 import type { AbilityId } from '../../sim/abilities.ts';
 import {
   all, arc, arcArrow, ball, circle, cut, cutLine, fill, line, path, plus, poly, px, py, rect, shield, ship, star, wave,
@@ -77,6 +77,14 @@ export const ABILITY_ICONS: Record<AbilityId, Prim[]> = {
     line(wave(1.6, 22.4, 19.2, 0.9, 3), 1.8),
     cut(circle(10, 8.4, 1.3), { fine: true }),
   ],
+  whaleCall: [
+    // the whale's flukes thrown up out of the sea, and the rings of the call spreading under them
+    fill('M10.8 12.6C10.8 10.2 10.6 8.8 9.6 7.6C8 5.8 4.6 6.2 1.8 1.8C1.8 5.8 4.8 8.6 8.4 8.8C9.2 9.4 9.6 10.8 9.4 12.6ZM13.2 12.6C13.2 10.2 13.4 8.8 14.4 7.6C16 5.8 19.4 6.2 22.2 1.8C22.2 5.8 19.2 8.6 15.6 8.8C14.8 9.4 14.4 10.8 14.6 12.6Z'),
+    fill('M9.2 12.8C9.8 10.4 10.8 8.6 12 7.2C13.2 8.6 14.2 10.4 14.8 12.8Z'),
+    line('M1.4 14.6C4.6 13.4 7.4 13.4 12 14.6S19.4 15.8 22.6 14.6', 1.8),
+    line('M4.6 18.4C8 17.6 16 17.6 19.4 18.4', 1.4),
+    line('M8 21.8C10.4 21.4 13.6 21.4 16 21.8', 1.2, { fine: true }),
+  ],
   // ---------------------------------------------------------------- passives
   salvage: [
     // a shield raised from wreckage
@@ -133,5 +141,14 @@ export const ABILITY_ICONS: Record<AbilityId, Prim[]> = {
     fill(circle(12, 12, 2)),
     line(arc(12, 12, 10.2, 200, 250), 1.3, { fine: true }),
     line(arc(12, 12, 10.2, 20, 70), 1.3, { fine: true }),
+  ],
+  darkLantern: [
+    // a lantern with its shutter drawn, under a crescent moon
+    line(circle(10.4, 4.4, 1.7), 1.4),
+    fill('M5.6 8.8L7.4 6.2H13.4L15.2 8.8Z'),
+    fill(rect(5.8, 8.6, 9.2, 10.6, 1.6)),
+    fill(rect(4.8, 19, 11.2, 3, 1.1)),
+    cutLine('M8.2 11.2V16.8M10.4 11.2V16.8M12.6 11.2V16.8', 1.1),
+    fill('M20.4 2.2A5 5 0 1 0 22.6 10.6A4 4 0 1 1 20.4 2.2Z'),
   ],
 };
