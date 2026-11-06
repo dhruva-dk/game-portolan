@@ -1,7 +1,8 @@
 // Damage numbers: blue for what the shield took, white for the hull, popping out of the hit and rising. Drawn as
 // screen-sized glyphs anchored in the world, so they read the same at phone size near or far. One draw call.
 import * as THREE from 'three';
-import { rand } from './common.ts';
+import { GPU, rand } from './common.ts';
+import { numberNodeMaterial } from './tsl/numbers.ts';
 
 const GLYPHS = '0123456789+!';
 const CAP = 256;
@@ -87,7 +88,7 @@ export class Numbers {
     geo.setAttribute('iGlyph', (this.glyph = attr(3)));
     geo.setAttribute('iCol', (this.col = attr(4)));
     geo.instanceCount = 0;
-    const m = new THREE.ShaderMaterial({
+    const m = GPU.on ? numberNodeMaterial(makeDigits()) : new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, uniforms: { uDigits: { value: makeDigits() } },
       transparent: true, depthWrite: false, depthTest: false,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,

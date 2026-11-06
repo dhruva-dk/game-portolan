@@ -25,6 +25,8 @@ const HEADING_STEP = 8 * DEG;
 
 export class GpuStage {
   readonly scene = new Scene();
+  /** What is written on the screen rather than lit in the world (the damage numbers), drawn over the finished frame. */
+  readonly overlay = new Scene();
   readonly camera = new PerspectiveCamera(58, 1, 0.25, 4000);
   readonly rig = new CameraRig();
   onCamera: ((cam: PerspectiveCamera) => void) | null = null;
@@ -55,7 +57,7 @@ export class GpuStage {
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
     this.scene.add(this.terrain.group);
-    this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop);
+    this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
 

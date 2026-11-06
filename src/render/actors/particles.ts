@@ -2,7 +2,8 @@
 // planet's centre, spray that lands rides the sea surface, and the flat kind (rings, halos) lies in the water's
 // tangent plane. Two pools: glow (added, for fire, sparks and light) and smoke (blended, lit by the sun where it is).
 import * as THREE from 'three';
-import { AU, TAU, seaRadius } from './common.ts';
+import { AU, GPU, TAU, seaRadius } from './common.ts';
+import { particleNodeMaterial } from './tsl/particles.ts';
 
 /** Eight soft white shapes on a 4×2 sheet: puff, smoke, spark, ring, spray, star, shard, flame. */
 export const SPRITE = { puff: 0, smoke: 1, spark: 2, ring: 3, spray: 4, star: 5, shard: 6, flame: 7 } as const;
@@ -145,7 +146,7 @@ export class Particles {
   private readonly vel: THREE.InstancedBufferAttribute;
   private readonly misc: THREE.InstancedBufferAttribute;
   private readonly geo: THREE.InstancedBufferGeometry;
-  readonly mat: THREE.ShaderMaterial;
+  readonly mat: THREE.Material;
 
   constructor(cap: number, glow: boolean, atlas: THREE.Texture) {
     this.cap = cap;
@@ -159,7 +160,7 @@ export class Particles {
     geo.setAttribute('iVel', (this.vel = attr(4)));
     geo.setAttribute('iMisc', (this.misc = attr(3)));
     geo.instanceCount = 0;
-    this.mat = new THREE.ShaderMaterial({
+    this.mat = GPU.on ? particleNodeMaterial(atlas, glow) : new THREE.ShaderMaterial({
       vertexShader: PART_VERT, fragmentShader: PART_FRAG,
       uniforms: { uAtlas: { value: atlas }, uSunDir: AU.uSunDir, uSunColor: AU.uSunColor },
       defines: glow ? { GLOW: 1 } : {},

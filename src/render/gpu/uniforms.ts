@@ -5,7 +5,7 @@
 // it is on the sphere, which is how one sun leaves half the planet dark and how the same shaders hold from the deck
 // and from orbit.
 import { Vector3, Vector4 } from 'three/webgpu';
-import { uniform, uniformArray } from 'three/tsl';
+import { mix, uniform, uniformArray } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 
 export const MAX_LIFTS = 5;
@@ -15,6 +15,8 @@ export const P = {
   time: uniform(0),
   /** Seconds since the last frame. */
   dt: uniform(1 / 60),
+  /** Counts the frames drawn, wrapping at 64: what turns the noise that the temporal upscaler gathers. */
+  frame: uniform(0),
   /** Unit vector toward the sun, in the planet's frame. */
   sunDir: uniform(new Vector3(0.3, 0.5, 0.2).normalize()),
   /** Unit vector toward the moon. */
@@ -62,3 +64,11 @@ export const values = {
   get moon(): Vector3 { return P.moonDir.value as Vector3; },
   get planet(): Vector4 { return P.planet.value as Vector4; },
 };
+
+/**
+ * What a lamp's light is scaled by: the lanterns, the wisps, embers and glowing loot. The eye adapts across a range of
+ * light the lamps don't (the day is some thousand times brighter than the night), so a lamp kept at one luminance is
+ * lost by day and blinding at night. Each glow is given as it should read against a lit deck, and this scales it from
+ * a lamp that still shows in daylight to one that holds its own against the night once the eye has adapted.
+ */
+export const LAMP = mix(0.4, 0.005, P.night);

@@ -33,7 +33,9 @@ export class Post {
   readonly exposure: Exposure;
   readonly #renderer: WebGPURenderer;
 
-  constructor(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera, scale: number) {
+  /** `overlay` is drawn over the finished frame at the screen's own resolution, untouched by the upscaler, the
+   *  exposure and the tone curve: what is written on the screen rather than lit in the world. */
+  constructor(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera, scale: number, overlay?: Scene) {
     this.#renderer = renderer;
     const scenePass = pass(scene, camera);
     scenePass.setMRT(mrt({ output, velocity }));
@@ -61,6 +63,12 @@ export class Post {
     // and a grain finer than a pixel breaks the banding in the sky's long gradients
     const n = fract(sin(dot(screenUV.mul(vec3(1931.7, 1279.3, 0).xy).add(fract(P.time.mul(7.13))), vec3(12.9898, 78.233, 0).xy)).mul(43758.5453));
     ldr = clamp(ldr.add(n.sub(0.5).mul(1 / 255)), 0, 1);
+    if (overlay) {
+      // cleared to nothing and blended over, the overlay's colour comes premultiplied by its coverage
+      renderer.setClearColor(0x000000, 0);
+      const over = pass(overlay, camera).getTextureNode('output');
+      ldr = ldr.mul(float(1).sub(over.a)).add(over.rgb);
+    }
     this.pipeline = new RenderPipeline(renderer);
     this.pipeline.outputNode = vec4(ldr, 1);
     this.exposure = new Exposure(scenePass.getTexture('output') as Texture);
@@ -68,6 +76,7 @@ export class Post {
 
   /** Draws the frame, then meters it for the next. */
   render(): void {
+    P.frame.value = (P.frame.value + 1) % 64;
     this.pipeline.render();
     this.#renderer.compute(this.exposure.passes);
   }

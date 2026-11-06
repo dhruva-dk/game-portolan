@@ -2,7 +2,8 @@
 // each hit, cracks as it weakens, shatters into shards with a flash when it breaks, and shimmers back into place,
 // knitting up from the waterline, when it is refilled. Each state can be triggered on its own from the dev page.
 import * as THREE from 'three';
-import { TAU, rand } from './common.ts';
+import { GPU, TAU, rand } from './common.ts';
+import { auraNodeMaterial } from './tsl/aura.ts';
 
 /** The shell's size round the ship (half-axes in metres) and its centre over the hull's origin. */
 export const SHELL = { x: 6.4, y: 8.2, z: 12.6, cy: 4.2 };
@@ -100,7 +101,7 @@ export class Aura {
   private readonly v = new THREE.Vector3();
 
   constructor(geo: THREE.BufferGeometry) {
-    const m = new THREE.ShaderMaterial({
+    const m = GPU.on ? auraNodeMaterial(this.u, this.u.uHits.value) : new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG, uniforms: this.u, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
     });

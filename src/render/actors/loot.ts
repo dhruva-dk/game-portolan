@@ -3,7 +3,8 @@
 // halo on the water and under a column of light that rises higher the rarer it is.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { onSea, patch, tangents } from './common.ts';
+import { GPU, onSea, patch, tangents } from './common.ts';
+import { beamNodeMaterial, tokenNodeMaterial } from './tsl/loot.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { SPRITE } from './particles.ts';
 import { WEAPONS, type LootKind, type LootView, type Weapon } from './view.ts';
@@ -127,7 +128,8 @@ export class Loot {
             // iron with enough of a matt skin for the sun to model it: fully metal, with no sky in the scene for it to
             // mirror, it showed only its glow, a flat grey cutout on the water
             : { color: 0x58534c, roughness: 0.5, metalness: 0.45 };
-      const m = patch(new THREE.MeshStandardMaterial({ ...base, emissive: 0xffffff, emissiveIntensity: shieldy ? 0.6 : k === 'coin' ? 0.35 : 0.28 }), 'actor-token', (s) => {
+      const glow = shieldy ? 0.6 : k === 'coin' ? 0.35 : 0.28;
+      const m = GPU.on ? tokenNodeMaterial(base, glow) : patch(new THREE.MeshStandardMaterial({ ...base, emissive: 0xffffff, emissiveIntensity: glow }), 'actor-token', (s) => {
         s.fragmentShader = s.fragmentShader
           .replace('#include <color_fragment>', '')
           // the rarity's glow gathers at the edges, so it rims the token's shape instead of filling it in flat
@@ -141,7 +143,7 @@ export class Loot {
       this.group.add(mesh);
     }
     const bc = new THREE.CylinderGeometry(0.5, 0.8, 1, 12, 1, true).translate(0, 0.5, 0);
-    const bm = new THREE.ShaderMaterial({
+    const bm = GPU.on ? beamNodeMaterial() : new THREE.ShaderMaterial({
       vertexShader: BEAM_VERT, fragmentShader: BEAM_FRAG, uniforms: this.beamU, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
     });

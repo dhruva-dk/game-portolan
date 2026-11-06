@@ -22,8 +22,9 @@
 import type { DirectionalLight, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, cameraNear, cameraViewMatrix, clamp, cos, float, interleavedGradientNoise, nodeObject, reference, renderGroup, screenCoordinate,
-  shadowPositionWorld, sin, smoothstep, texture, uniform, vec2, vec4,
+  shadowPositionWorld, sin, smoothstep, texture, vec2, vec4,
 } from 'three/tsl';
+import { P } from '../gpu/uniforms.ts';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 
 /** The shadows reach this far from the eye, metres. */
@@ -42,9 +43,6 @@ const PENUMBRA_AT = 2.5;
 const SPREAD_MIN = 1.5;
 const SPREAD_MAX = 5;
 
-/** Counts the frames, so each turns the disc anew. */
-const FRAME = uniform(0);
-
 /** Sixteen points on the unit disc (Vogel's spiral), weighted toward the middle so the penumbra falls off softly. */
 const DISC = Array.from({ length: 16 }, (_, i) => {
   const r = Math.sqrt((i + 0.5) / 16), a = i * 2.399963229728653;
@@ -62,7 +60,7 @@ const discFilter = ({ depthTexture, shadowCoord, shadow, depthLayer }: FilterInp
   const size = perRender(reference('mapSize', 'vec2', shadow));
   const spread = perRender(reference('radius', 'float', shadow));
   const step = vec2(spread).div(size);
-  const turn = interleavedGradientNoise(screenCoordinate.xy.add(FRAME.mul(5.588238))).mul(2 * Math.PI);
+  const turn = interleavedGradientNoise(screenCoordinate.xy.add(P.frame.mul(5.588238))).mul(2 * Math.PI);
   const c = cos(turn), s = sin(turn);
   let sum: F = float(0);
   for (const [x, y, w] of DISC) {
@@ -112,7 +110,6 @@ class Cascades extends CSMShadowNode {
 
   override updateBefore(frame: NodeFrame): boolean | undefined {
     super.updateBefore(frame);
-    FRAME.value = (FRAME.value + 1) % 64;
     for (const l of this.lights) {
       const shadow = l.shadow!, cam = shadow.camera;
       const texel = (cam.right - cam.left) / MAP_SIZE;

@@ -22,6 +22,9 @@ export const AU = {
   uNight: { value: 0 }, // at the focus, for things lit as one (lanterns, windows)
 };
 
+/** Whether the actors are drawn by the WebGPU planet, which takes their node materials (tsl/) in place of the GLSL. */
+export const GPU = { on: false };
+
 /** The stage's own uniforms (the planet's light and air), which every actor material shares as well; set by the actors from options. */
 export const STAGE_U: Record<string, THREE.IUniform> = {};
 

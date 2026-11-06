@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
-import { AU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
+import { AU, GPU, SEA, STAGE_U, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
@@ -37,6 +37,11 @@ export interface ActorsOptions {
   envMap?: THREE.Texture | null;
   /** The stage's shared uniforms (the planet's light and air), given to every actor material along with the actors' own. */
   uniforms?: Record<string, THREE.IUniform>;
+  /** Drawn by the WebGPU planet: the actors take their node materials. */
+  gpu?: boolean;
+  /** Where things written on the screen (the damage numbers) go, if the stage draws them over the finished frame;
+   *  with the rest of the actors when absent. */
+  overlay?: THREE.Object3D;
   /** Thin the player's own sail round the middle of the screen, where the crosshair is. Default true. */
   fadePlayerSail?: boolean;
   /** Camera shake, kicks, flashes, hit-stop and haptics, for the integration to route. */
@@ -104,6 +109,7 @@ interface Marker { at: THREE.Vector3; m: HitMarker }
 
 export function createActors(scene: THREE.Object3D, options: ActorsOptions = {}): Actors {
   SEA.radius = options.radius ?? 554;
+  GPU.on = options.gpu ?? false;
   // the swell, on the water the regions' events have raised or drawn down
   const wave = options.wave ?? sea.wave;
   sea.wave = (p, t) => wave(p, t) + seaLift(p);
@@ -124,7 +130,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   const gulls = new Gulls(fx);
   const whales = new Whales(fx);
   const ships = new THREE.Group();
-  group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh, numbers.mesh);
+  group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh);
+  (options.overlay ?? group).add(numbers.mesh);
   const auraGeo = new THREE.SphereGeometry(1, 48, 32);
   // the player's lantern lights the deck and the water round her at night
   const lamp = new THREE.PointLight(0xffa04a, 0, 34, 1.6);

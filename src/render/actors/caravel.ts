@@ -8,7 +8,8 @@
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
-import { patch, type ActorTextures } from './common.ts';
+import { GPU, patch, type ActorTextures } from './common.ts';
+import { hullNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
 import { sharedUniforms } from '../planet.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
@@ -16,8 +17,11 @@ import { WEAPONS, type Weapon } from './view.ts';
 // ---------------------------------------------------------------- the hull's lines
 
 /** s runs from the stern (0) to the bow (1); heights are over the hull's origin, the waterline a little above it. */
+/** The waterline over the keel, in ship space. */
+export const WL = 0.3;
+
 export const SHIP = { length: 18, beam: 5.4, radius: 5.2, turretZ: 2.6, perch: new THREE.Vector3() };
-const L = SHIP.length, B = SHIP.beam, WL = 0.3, YB = WL + 0.9;
+const L = SHIP.length, B = SHIP.beam, YB = WL + 0.9;
 const V3 = THREE.Vector3;
 const sm = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -923,7 +927,8 @@ export class ShipModel {
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
     };
-    const body = kit.bodyMaterial(this.u), sail = kit.sailMaterial(this.u);
+    const body = GPU.on ? hullNodeMaterial(this.u, kit.tex) : kit.bodyMaterial(this.u);
+    const sail = GPU.on ? sailNodeMaterial(this.u, kit.tex, kit.sailNoise) : kit.sailMaterial(this.u);
     const hull = this.hull = new THREE.Mesh(kit.hull, body);
     hull.castShadow = hull.receiveShadow = true;
     this.head = new THREE.Mesh(kit.figurehead(look.figurehead), body);
@@ -931,12 +936,16 @@ export class ShipModel {
     const sails = new THREE.Mesh(kit.sails, sail);
     sails.castShadow = true;
     sails.receiveShadow = true;
-    const depth = patch(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide }), 'actor-ship-sail-depth', (s) => {
-      Object.assign(s.uniforms, this.u);
-      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + SAIL_VERT_HEAD).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SAIL_VERT);
-    });
-    sails.customDepthMaterial = depth;
-    this.mats = [body, sail, depth];
+    this.mats = [body, sail];
+    // the node material's own motion and holes are used for its shadow; the GLSL needs a depth material of its own
+    if (!GPU.on) {
+      const depth = patch(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide }), 'actor-ship-sail-depth', (s) => {
+        Object.assign(s.uniforms, this.u);
+        s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + SAIL_VERT_HEAD).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SAIL_VERT);
+      });
+      sails.customDepthMaterial = depth;
+      this.mats.push(depth);
+    }
     this.turretBase = new THREE.Mesh(undefined, body);
     this.barrelMesh = new THREE.Mesh(undefined, body);
     this.turretBase.castShadow = this.barrelMesh.castShadow = true;

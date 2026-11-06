@@ -199,7 +199,7 @@ export class App {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave ?? waveHeight, uniforms: U, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
+    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave ?? waveHeight, uniforms: U, gpu: stage instanceof GpuStage, overlay: stage instanceof GpuStage ? stage.overlay : undefined, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;
     await rockTexturesReady();
