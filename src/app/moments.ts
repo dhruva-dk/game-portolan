@@ -12,6 +12,7 @@ import { R, advance, along, tangentAt, tangentToward, turned } from '../sim/sphe
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE, copy } from '../sim/state.ts';
 import { callBreach } from '../sim/whale.ts';
+import { WEATHER, WEATHER_KIND } from '../sim/tables.ts';
 import { LANDMARKS, REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable, regionShare } from '../sim/world/index.ts';
 import { PI, v3, type V3 } from '../sim/math.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
@@ -150,6 +151,7 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'whaleBreach': return { t: 'breach', at: m.pos, head: whaleHead };
     case 'lavaBomb': return m.landed ? { t: 'lavaBomb', at: m.pos, on: heightAt(m.pos) > 0.5 ? 'land' : 'water' } : null;
     case 'regionEvent': return m.phase === 'start' && REGION_EVENTS[m.region].block ? { t: 'rockfall', region: m.region, at: m.pos } : null;
+    case 'lightning': return { t: 'lightning', at: m.pos, warning: m.warning };
     default: return null;
   }
 }
@@ -378,6 +380,25 @@ export const MOMENTS: readonly MomentScript[] = [
       return [[s.tick, { throttle: 0, steer: 0 }]];
     },
     is: (m) => m.k === 'stormPhase',
+  },
+  {
+    // a thunderhead standing over the player on open water, fully grown, with its next strike due: the leader comes
+    // down over the ship for the warning's second and a half, then the strokes
+    name: 'lightning', note: 'lightning striking the player\'s ship', sea: true, lead: 52, every: 2, frames: 30,
+    arrange: (s) => {
+      const c = openCourse(s, 60, 40);
+      place(s, PLAYER, c);
+      const w = s.weather[0];
+      w.kind = WEATHER_KIND.thunder;
+      Object.assign(w.at, off(c, 30).pos);
+      w.r = 110;
+      w.life = 600;
+      w.age = WEATHER.rise + 1;
+      w.target = -1;
+      w.strike = 0.3;
+      return [[s.tick, { throttle: 0, steer: 0 }]];
+    },
+    is: (m) => m.k === 'lightning' && !m.warning,
   },
   {
     // on past the trigger through the leap (a second of boiling sea, then nearly four in the air) to the slam

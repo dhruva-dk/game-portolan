@@ -58,6 +58,10 @@ export const P = {
   liftOn: uniform(0),
 };
 
+/** Lightning striking now, as the bolts set it (actors/lightning.ts): where its channel enters the cloud, and how
+ *  bright its stroke is, 0…1. The clouds light up round it, and the whole sky flashes by how near it is. */
+export const STRIKE = { top: new Vector3(), foot: new Vector3(), light: 0 };
+
 /** The values behind P, for code on the CPU that needs them. */
 export const values = {
   get sun(): Vector3 { return P.sunDir.value as Vector3; },

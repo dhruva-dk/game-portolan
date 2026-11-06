@@ -13,7 +13,7 @@
 // path is long, light through the thin crests where the sun is behind them, and the foam on top.
 import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector3, type Node } from 'three/webgpu';
 import {
-  Fn, If, abs, atan, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
+  Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
   smoothstep, texture, uniform, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
@@ -105,6 +105,40 @@ export function inFrame(up: V3, f: Frame): { q: V2; e1: V3; e2: V3 } {
   return { q: vec2(cp, sp).mul(theta.mul(R)), e1: g.mul(cp).sub(t.mul(sp)), e2: g.mul(sp).add(t.mul(cp)) };
 }
 
+// ---------------------------------------------------------------- rain on the water
+
+/** Three layers of drops, each landing once in each cell of a grid at its own rate and laying a ring that spreads and
+ *  dies: their slope in the frame's plane, in metres per metre. */
+const RAIN_LAYERS = [
+  { cell: 0.45, rate: 1.7, offset: [0, 0] },
+  { cell: 0.6, rate: 1.3, offset: [0.37, 0.71] },
+  { cell: 0.8, rate: 1.05, offset: [0.83, 0.19] },
+];
+
+const hash2 = (p: V2): V2 => fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))).mul(43758.5453));
+
+function rainRings(q: V2): V2 {
+  const slope = vec2(0).toVar();
+  RAIN_LAYERS.forEach((l, k) => {
+    const p = q.div(l.cell).add(vec2(l.offset[0], l.offset[1]));
+    const cell = floor(p), f = fract(p);
+    const start = hash2(cell.add(k * 17.3)).x;
+    const clock = P.time.mul(l.rate).add(start);
+    const age = fract(clock);
+    // each time it lands somewhere new in the cell, kept off its sides so the ring stays inside it
+    const at = hash2(cell.add(floor(clock).mul(vec2(3.1, 7.7))).add(k * 5.1)).mul(0.5).add(0.25);
+    const d = f.sub(at).mul(l.cell);
+    const r = length(d);
+    // a crest and trough running out at 0.3 m/s, its wavelength about 4 cm, dying as it spreads
+    const x = r.sub(age.mul(l.cell * 0.42));
+    const k2 = 2 * Math.PI / 0.045, s2 = 0.0004;
+    const env = exp(x.mul(x).div(-s2)).mul(float(1).sub(age).pow(2));
+    const dh = cos(x.mul(k2)).mul(k2).sub(sin(x.mul(k2)).mul(x).mul(2 / s2)).mul(env).mul(0.0009);
+    slope.addAssign(d.div(max(r, 1e-4)).mul(dh));
+  });
+  return slope;
+}
+
 // ---------------------------------------------------------------- the material
 
 export function oceanSurface(waves: Waves): Mesh {
@@ -182,6 +216,13 @@ export function oceanSurface(waves: Waves): Mesh {
     If(FRAME.weight.y.greaterThan(0), () => {
       shade(vq.zw, FRAMES[1], FRAME.weight.y);
     });
+    // rain ringing the water near the eye, where the rings can be seen
+    const near = smoothstep(45, 6, positionWorld.distance(cameraPosition)).mul(P.rain);
+    If(near.greaterThan(0.01), () => {
+      const { e1, e2 } = inFrame(u, FRAMES[0]);
+      const g = rainRings(vq.xy).mul(near);
+      world.addAssign(e1.mul(g.x).add(e2.mul(g.y)));
+    });
     world.assign(normalize(u.sub(world)));
   };
   mat.colorNode = Fn(() => {
@@ -192,7 +233,7 @@ export function oceanSurface(waves: Waves): Mesh {
 
   // roughness from the slopes' variance (Beckmann's α² = 2σ²), and rough where foam lies
   const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)), 0, 1);
-  const sigma2 = variance.mul(0.5).add(WATER.ripples);
+  const sigma2 = variance.mul(0.5).add(WATER.ripples).add(P.rain.mul(0.004));
   const alpha = clamp(sigma2.mul(2).sqrt(), 0.02, 1);
   mat.roughnessNode = mix(alpha.sqrt(), float(0.9), whiteness);
 

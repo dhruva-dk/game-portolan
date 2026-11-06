@@ -126,7 +126,9 @@ export type ActorEvent =
   | { t: 'breach'; at: Vec3; head?: Vec3 }
   | { t: 'lavaBomb'; at: Vec3; on: 'water' | 'land' }
   /** A region's event brings rock down into the water (the Spires' spire, the Narrows' rockfall): `at` is its spot. */
-  | { t: 'rockfall'; region: number; at: Vec3 };
+  | { t: 'rockfall'; region: number; at: Vec3 }
+  /** Lightning over a spot: its warning (the leader coming down), then its strike. */
+  | { t: 'lightning'; at: Vec3; warning: boolean };
 
 /** What a moment should do to the camera, the screen and the hand, for the integration step to route. */
 export interface Juice {

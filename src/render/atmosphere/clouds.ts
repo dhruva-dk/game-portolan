@@ -32,7 +32,7 @@ import {
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import type { WeatherKind } from '../../sim/world/index.ts';
-import { P } from '../gpu/uniforms.ts';
+import { P, STRIKE } from '../gpu/uniforms.ts';
 import { loop } from '../gpu/tsl.ts';
 import { raySphere } from './model.ts';
 import { MOON_RADIUS, SUN_RADIUS, aerialAt, lightTransmittance } from './luts.ts';
@@ -82,8 +82,8 @@ interface Kind {
 const NONE: Kind = { base: 0, tower: 0, sigma: 0, albedo: 0, shaft: 0, fall: 0, fog: 0, anvil: 0, tint: [0, 0, 0] };
 const KINDS: Kind[] = [
   NONE,
-  // fog: thick on the water, thinning upward through twenty metres into wisps
-  { base: 0, tower: 22, sigma: 0.07, albedo: 0.98, shaft: 0, fall: 0, fog: 1, anvil: 0, tint: [0.96, 0.97, 0.98] },
+  // fog: thick on the water, thinning upward through thirty metres into wisps
+  { base: 0, tower: 32, sigma: 0.065, albedo: 0.98, shaft: 0, fall: 0, fog: 1, anvil: 0, tint: [0.96, 0.97, 0.98] },
   // rain: a low grey deck with rounded towers, rain in shafts under it
   { base: 58, tower: 60, sigma: 0.1, albedo: 0.96, shaft: 0.012, fall: 9, fog: 0, anvil: 0, tint: [0.93, 0.95, 0.98] },
   // thunder: a dark base and a column up into an anvil, the heaviest rain
@@ -209,7 +209,7 @@ const cloudAt = (p: V3, i: I, fine: F): V2 => Fn(() => {
   // the weather map: the cloud in patches over the system, frayed at its edge
   const wm = texture3D(shapeTex, q.mul(1 / 380)).level(float(0));
   // never whole even in the middle, so the billows stand apart as towers rather than fill the system
-  const cover = strength.mul(smoothstep(1.05, 0.35, rho.add(wm.r.sub(0.5).mul(0.8)))).mul(0.82);
+  const cover = strength.mul(smoothstep(1.05, 0.35, rho.add(wm.r.sub(0.5).mul(0.8)))).mul(mix(float(0.82), float(1), fall.z));
   const anvilCover = fall.w.mul(strength).mul(smoothstep(1.4, 0.8, rho.add(wm.b.sub(0.5).mul(0.5))));
   If(max(cover, anvilCover).greaterThan(0.002), () => {
     const base = shape.x, tower = shape.y;
@@ -217,7 +217,10 @@ const cloudAt = (p: V3, i: I, fine: F): V2 => Fn(() => {
     const cells = texture3D(shapeTex, q.mul(1 / 210)).level(float(0));
     const column = smoothstep(0.42, 0.85, cells.b.mul(0.8).add(cells.g.mul(0.2)));
     const core = smoothstep(1, 0.1, rho);
-    const top = base.add(tower.mul(clamp(column.mul(core.mul(0.7).add(0.3)).add(wm.g.sub(0.5).mul(0.2)), 0.14, 1)));
+    // a fog bank instead lies level, a little higher here and there
+    const lift = select(fall.z.greaterThan(0.5), wm.g.mul(0.3).add(0.75),
+      clamp(column.mul(core.mul(0.7).add(0.3)).add(wm.g.sub(0.5).mul(0.2)), 0.14, 1));
+    const top = base.add(tower.mul(lift));
     const hf = h.sub(base).div(max(top.sub(base), 1));
     const s = texture3D(shapeTex, q.mul(1 / 140).add(vec3(0, P.time.mul(0.0015), 0))).level(float(0));
     const fbm = s.g.mul(0.625).add(s.b.mul(0.25)).add(s.a.mul(0.125));
@@ -409,6 +412,7 @@ const _up = new Vector3();
 const _e1 = new Vector3();
 const _e2 = new Vector3();
 const _v = new Vector3();
+const _w = new Vector3();
 
 export class Clouds {
   readonly group = new Group();
@@ -482,10 +486,17 @@ export class Clouds {
         const lit = this.#flicker(id, c, s.radius, k, sea, dt);
         if (lit) {
           fl.set(lit.at.x, lit.at.y, lit.at.z, lit.amount);
-          flash = Math.max(flash, lit.amount * smooth(700, 120, lit.at.distanceTo(eye)));
+          // a flash inside the cloud lights the world less than a stroke down to the sea
+          flash = Math.max(flash, lit.amount * 0.45 * smooth(700, 120, lit.at.distanceTo(eye)));
         }
       }
+      // a bolt striking out of this system lights it from where its channel goes up into the cloud
+      if (STRIKE.light > 0.01 && _w.copy(STRIKE.top).normalize().angleTo(c) * R < s.radius * 1.2) {
+        const into = _w.copy(STRIKE.top).setLength(sea + k.base + k.tower * 0.12);
+        if (STRIKE.light * 1.6 > fl.w) fl.set(into.x, into.y, into.z, STRIKE.light * 1.6);
+      }
     });
+    if (STRIKE.light > 0.01) flash = Math.max(flash, STRIKE.light * smooth(900, 150, STRIKE.foot.distanceTo(eye)));
     for (const id of this.#flickers.keys()) if (!seen.has(id)) this.#flickers.delete(id);
     for (let i = n; i < MAX_CLOUDS; i++) this.#meshes[i].visible = false;
     SYS.count.value = n;

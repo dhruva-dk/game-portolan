@@ -37,11 +37,17 @@ export const moonlight = Fn(() => {
 /** The faint light left when neither sun nor moon is up: the stars and the glow of the high air. */
 const NIGHT_FLOOR = vec3(0.0009, 0.0012, 0.0022);
 
-/** The sky's irradiance on a surface at p facing n, from the sun and the moon. */
+/** Lightning's light thrown down from the clouds it flashes through, at a flash of 1: a sheet of it over everything,
+ *  coming from above, a little round the sides and hardly from below. */
+const FLASH_LIGHT = vec3(0.72, 0.78, 1).mul(5);
+
+/** The sky's irradiance on a surface at p facing n, from the sun and the moon, and lightning's flash. */
 export const skyLight = Fn(([p, n]: [V3, V3]) => {
+  const flash = FLASH_LIGHT.mul(P.flash).mul(n.dot(p.normalize()).mul(0.45).add(0.55));
   return skyIrradiance(p, n, P.sunDir).mul(P.sunIlluminance)
     .add(skyIrradiance(p, n, P.moonDir).mul(P.moonIlluminance).mul(P.moonPhase))
-    .add(NIGHT_FLOOR);
+    .add(NIGHT_FLOOR)
+    .add(flash);
 });
 
 /** The sky's overall brightness straight up at p: what the probe of the eye's sky is scaled by elsewhere. */

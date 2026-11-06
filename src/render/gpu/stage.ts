@@ -9,6 +9,7 @@ import { P } from './uniforms.ts';
 import { makeNoiseTexture } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
 import { Clouds } from '../atmosphere/clouds.ts';
+import { Fall } from '../atmosphere/fall.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
 import { Terrain } from '../terrain.ts';
 import { ScanCache } from '../land/scans.ts';
@@ -42,6 +43,7 @@ export class GpuStage {
   readonly scans: ScanCache;
   readonly post: Post;
   readonly clouds = new Clouds();
+  readonly fall = new Fall();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -58,7 +60,7 @@ export class GpuStage {
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
-    this.scene.add(this.terrain.group, this.clouds.group);
+    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group);
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -122,14 +124,16 @@ export class GpuStage {
     P.night.value = Math.min(1, Math.max(0, (0.08 - up.dot(this.sun)) / 0.16));
     P.space.value = Math.min(1, Math.max(0, (eye.length() - R - 150) / 900));
 
-    this.#seaFromWind(eye, wind);
-    this.atmosphere.update(cam, dt);
-    this.ocean.update(this.renderer, eye, v.time, dt);
     this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt);
     const d = this.clouds.depth;
     P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
     P.snow.value = d.snow ?? 0;
     P.flash.value = this.clouds.flash;
+    this.fall.update(eye, wind, { rain: P.rain.value, snow: P.snow.value, ash: d.ash ?? 0 });
+    // a squall raises the sea, a thunderhead most
+    this.#seaFromWind(eye, wind, Math.max((d.rain ?? 0) * 0.55, d.thunder ?? 0));
+    this.atmosphere.update(cam, dt);
+    this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);
     this.post.render();
@@ -139,9 +143,10 @@ export class GpuStage {
     this.#last = now;
   }
 
-  /** The wind sea from the wind where the camera looks: rebuilt only when it has moved by a step. */
-  #seaFromWind(eye: Vector3, wind: Vector3): void {
-    const speed = Math.min(Math.max(wind.length(), 2), 20);
+  /** The wind sea from the wind where the camera looks, and the gusts of the weather over it: rebuilt only when it
+   *  has moved by a step. */
+  #seaFromWind(eye: Vector3, wind: Vector3, storm: number): void {
+    const speed = Math.min(Math.max(wind.length(), 2) + storm * 9, 20);
     const s = this.#sea;
     const before = s.heading;
     this.ocean.sea = s;

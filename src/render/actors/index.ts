@@ -10,6 +10,7 @@ import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
 import { seaLift } from '../lift.ts';
 import { rockfallAt } from '../regions/eventRocks.ts';
+import { Lightning } from './lightning.ts';
 import { Loot } from './loot.ts';
 import { Numbers } from './numbers.ts';
 import { SPRITE } from './particles.ts';
@@ -129,8 +130,9 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   const loot = new Loot(fx, kit.turrets);
   const gulls = new Gulls(fx);
   const whales = new Whales(fx);
+  const lightning = new Lightning(fx);
   const ships = new THREE.Group();
-  group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh);
+  group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh, lightning.mesh, lightning.light);
   (options.overlay ?? group).add(numbers.mesh);
   const auraGeo = new THREE.SphereGeometry(1, 48, 32);
   // the player's lantern lights the deck and the water round her at night
@@ -314,6 +316,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     juice(whales.update(view.whales, dt, t, eye), null);
     if (view.eruption) erupt(view.eruption, dt);
     shards.update(dt);
+    lightning.update(dt, camera);
     fx.update(dt);
     wakes.update(t);
     numbers.update(dt);
@@ -467,6 +470,10 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
         case 'rockfall':
           for (const p of rockfallAt(e.region, v3(e.at).normalize())) fx.rockfall(onSea(v3(p), 0, new THREE.Vector3()));
           break;
+        case 'lightning':
+          if (e.warning) lightning.warn(v3(e.at));
+          else lightning.strike(v3(e.at));
+          break;
       }
     }
   }
@@ -488,6 +495,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     },
     clear() {
       fx.clear();
+      lightning.clear();
       pending.length = 0;
     },
     dispose() {

@@ -4,7 +4,7 @@
 // adaptation, and mapped to the screen through AgX and the grade.
 import { RenderPipeline, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { Node, TextureNode } from 'three/webgpu';
-import { float, ivec2, mix, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
+import { float, ivec2, min, mix, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
 import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -18,12 +18,17 @@ export const BLOOM = uniform(0.05);
 export const SCREEN = { storm: uniform(0), hurt: uniform(0), low: uniform(0) };
 
 /** The temporal upscaler reads each output pixel's 3×3 neighbourhood with textureLoad and no clamp; out of range,
- *  Metal hands back the texel from the opposite edge, which lit the top row with the sea. Its loads are clamped here. */
-function clampedLoads(node: TextureNode): TextureNode {
+ *  Metal hands back the texel from the opposite edge, which lit the top row with the sea. Its loads are clamped here.
+ *  With `cap`, what is loaded is capped too: a glint past half-float's range is stored as infinity, which the
+ *  upscaler's blend turns into a NaN that spreads as black through its history. */
+function clampedLoads(node: TextureNode, cap?: number): TextureNode {
   const load = node.load.bind(node) as (at: Node) => TextureNode;
   const size = (node as unknown as { size(level?: number): Node<'ivec2'> }).size(0);
   const last = size.sub(ivec2(1, 1));
-  (node as unknown as { load(at: Node<'ivec2'>): TextureNode }).load = (at) => load(clamp(at as unknown as Node<'vec2'>, ivec2(0, 0) as unknown as Node<'vec2'>, last as unknown as Node<'vec2'>));
+  (node as unknown as { load(at: Node<'ivec2'>): Node }).load = (at) => {
+    const v = load(clamp(at as unknown as Node<'vec2'>, ivec2(0, 0) as unknown as Node<'vec2'>, last as unknown as Node<'vec2'>));
+    return cap === undefined ? v : min(v as unknown as Node<'vec4'>, vec4(cap));
+  };
   return node;
 }
 
@@ -41,7 +46,7 @@ export class Post {
     scenePass.setMRT(mrt({ output, velocity }));
     scenePass.setResolutionScale(scale);
     this.scenePass = scenePass;
-    const beauty = clampedLoads(scenePass.getTextureNode('output'));
+    const beauty = clampedLoads(scenePass.getTextureNode('output'), 30000);
     const depth = clampedLoads(scenePass.getTextureNode('depth'));
     const motion = clampedLoads(scenePass.getTextureNode('velocity'));
     const resolved = taau(beauty, depth, motion, camera) as unknown as Node<'vec4'>;

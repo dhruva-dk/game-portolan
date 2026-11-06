@@ -19,6 +19,7 @@ export const MOMENTS: readonly MomentDef[] = [
   { name: 'consumable', about: 'the player drinks a Big Shield through its use time' },
   { name: 'gale-dive', about: 'the Gale carries the fleet and the player dives' },
   { name: 'storm-phase', about: 'the Storm starts its next phase and closes in' },
+  { name: 'lightning', about: 'a thunderhead\'s leader creeps down over the player, then strikes' },
   { name: 'whale-breach', about: 'the giant whale breaches beside the player' },
   { name: 'broadside', about: 'the player fires a broadside, both sides at once' },
   { name: 'delivery', about: 'the player calls a gull delivery and it arrives' },
