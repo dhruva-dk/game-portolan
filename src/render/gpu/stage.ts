@@ -16,6 +16,7 @@ import { ScanCache } from '../land/scans.ts';
 import { landMaterial } from '../land/material.ts';
 import { CameraRig } from '../camera.ts';
 import { Beacons } from '../regions/beacons.ts';
+import { Landmarks } from '../regions/landmarks.ts';
 import { GPU } from '../actors/common.ts';
 import { moonDirection, sunDirection } from '../sky.ts';
 import { R } from '../../sim/sphere.ts';
@@ -47,6 +48,7 @@ export class GpuStage {
   readonly clouds = new Clouds();
   readonly fall = new Fall();
   readonly beacons = new Beacons(1, true);
+  readonly landmarks = new Landmarks();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -63,7 +65,7 @@ export class GpuStage {
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
-    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group);
+    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -142,6 +144,7 @@ export class GpuStage {
     this.terrain.update(eye);
     this.scans.update(eye, dt);
     this.beacons.update(v.time, P.night.value as number, this.sun);
+    this.landmarks.update(P.night.value as number, v.time, v.events, this.sun);
     this.post.render();
 
     const now = performance.now();

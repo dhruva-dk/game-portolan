@@ -12,14 +12,19 @@ import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type Obstacle, 
 import { patch } from '../engine.ts';
 import type { EventPhase } from './eventRocks.ts';
 import { Kit, particles, strip, surface, tick, SHAPE_PUFF } from '../beacons/kit.ts';
+import { abs, cos, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
+import { bNoise, glowNode, num, shapePuff } from '../beacons/nodes.ts';
+import { GPU } from '../actors/common.ts';
 
 const rock = (color: number, rough = 0.9) => patch(new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true }), 'landmark-rock');
 
-/** A glow that reads from far off at night: an unlit sphere bright enough to bloom. */
+/** A glow that reads from far off at night: an unlit sphere bright enough to bloom. On the GPU planet it shines at the
+ *  beacons' lamp scale, by a level update() sets. */
 function glow(color: number, radius: number, power: number): THREE.Mesh {
-  const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(power), fog: false, toneMapped: false });
-  const g = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 2), m);
-  g.userData.glow = { color: new THREE.Color(color), power };
+  const level = { value: 1 };
+  const m = GPU.on ? glowNode(color, level) : new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(power), fog: false, toneMapped: false });
+  const g = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 2), m as THREE.Material);
+  g.userData.glow = { color: new THREE.Color(color), power, level };
   return g;
 }
 
@@ -232,6 +237,23 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     k.add(surface(k, strip(pts, widths), {
       color: 0xbfe4ee, day: 0, night: 0.25, blend: 'alpha', matter: 0xd8e6ea, uniforms: { uSwell: swell },
       vertex: /* glsl */ `p.x *= 1.0 + 0.75 * uSwell;`,
+      vertexNode: ({ p }) => vec3(p.x.mul(num(swell).mul(0.75).add(1)), p.y, p.z),
+      paintNode: ({ uv: f, t }) => {
+        const x = f.x, v = f.y, sw = num(swell);
+        const edge = smoothstep(0, 0.16, x).mul(smoothstep(1, 0.84, x));
+        const n1 = bNoise(vec3(x.mul(7), v.mul(0.05).sub(t.mul(0.9)), 0));
+        const n2 = bNoise(vec3(x.mul(19), v.mul(0.14).sub(t.mul(1.7)), 3));
+        const n3 = bNoise(vec3(x.mul(42), v.mul(0.4).sub(t.mul(3.1)), 9));
+        const streak = smoothstep(0.3, 0.95, n1.mul(0.55).add(n2.mul(0.35)).add(n3.mul(0.25)));
+        // ragged at the edges, thin at the lip, dissolving into the mist at the foot
+        const lipF = smoothstep(0, 3, v), footF = smoothstep(length - 15, length, v).oneMinus();
+        const body = edge.mul(mix(0.35, 0.6, sw)).add(edge.mul(sw.mul(0.25).add(0.4)).mul(streak));
+        return {
+          alpha: body.mul(lipF).mul(footF).mul(n2.mul(0.45).add(0.55)),
+          col: mix(vec3(0.72, 0.82, 0.86), vec3(1.12), streak.mul(sw.mul(0.4).add(0.55))),
+          glow: body.mul(streak),
+        };
+      },
       paint: /* glsl */ `float x = vUv.x, v = vUv.y;
         float edge = smoothstep(0.0, 0.16, x) * smoothstep(1.0, 0.84, x);
         float n1 = bNoise(vec3(x * 7.0, v * 0.05 - uTime * 0.9, 0.0));
@@ -254,6 +276,16 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
         pos = vec3(cos(a) * rr, 1.0 + life * (10.0 + s.y * 20.0) * grow, ${(foot + 1).toFixed(1)} - abs(sin(a)) * rr * 0.7);
         size = (3.5 + life * 7.0) * (0.8 + 0.5 * uSwell);
         alpha = sin(life * 3.14159) * (0.14 + 0.14 * uSwell);`,
+      shapeNode: shapePuff,
+      motionNode: ({ s, t }) => {
+        const sw = num(swell), life = fract(s.x.add(t.mul(s.y.mul(0.05).add(0.05))));
+        const a = s.z.mul(6.2831), grow = sw.mul(1.3).add(1);
+        const rr = life.mul(s.w.mul(12).add(9)).add(4).mul(grow);
+        return {
+          pos: vec3(cos(a).mul(rr), life.mul(s.y.mul(20).add(10)).mul(grow).add(1), abs(sin(a)).mul(rr).mul(-0.7).add(foot + 1)),
+          size: life.mul(7).add(3.5).mul(sw.mul(0.5).add(0.8)), alpha: sin(life.mul(Math.PI)).mul(sw.mul(0.14).add(0.14)),
+        };
+      },
     }));
     return k.root;
   },
@@ -414,10 +446,10 @@ export function swollen(e: EventPhase | undefined): number {
 
 export class Landmarks {
   readonly group = new THREE.Group();
-  /** The glows, dimmed by day. */
-  private readonly glows: THREE.Mesh[] = [];
+  /** The glows, dimmed by day, with the outward normal where each stands. */
+  private readonly glows: { mesh: THREE.Mesh; up: THREE.Vector3 }[] = [];
   /** The shapes drawn with the beacons' kit, whose clocks run with the frame. */
-  private readonly kits: THREE.Object3D[] = [];
+  private readonly kits: { obj: THREE.Object3D; up: THREE.Vector3 }[] = [];
   /** How swollen the falls are, as their shaders read it. */
   private falls: { value: number } | null = null;
 
@@ -429,25 +461,29 @@ export class Landmarks {
       const shape = build(lm);
       shape.name = lm.name;
       stand(shape, lm.pos, shape.userData.facing ?? lm.facing, R);
-      if (shape.userData.beacon) this.kits.push(shape);
+      const up = new THREE.Vector3(lm.pos.x, lm.pos.y, lm.pos.z).normalize();
+      if (shape.userData.beacon) this.kits.push({ obj: shape, up });
       if (shape.userData.swell) this.falls = shape.userData.swell;
       shape.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh && o.userData.glow) this.glows.push(o as THREE.Mesh);
+        if ((o as THREE.Mesh).isMesh && o.userData.glow) this.glows.push({ mesh: o as THREE.Mesh, up });
         // (the kit's sheets and mist are see-through: they cast no shadow)
-        else if ((o as THREE.Mesh).isMesh && !((o as THREE.Mesh).material as THREE.ShaderMaterial).isShaderMaterial) { o.castShadow = true; o.receiveShadow = true; }
+        else if ((o as THREE.Mesh).isMesh && !((o as THREE.Mesh).material as THREE.Material).transparent) { o.castShadow = true; o.receiveShadow = true; }
       });
       this.group.add(shape);
     }
   }
 
   /** night: 0 day to 1 night where the camera is; `time` the clock the swell and beacons share; the regions'
-   *  events, for the falls' swell. */
-  update(night: number, time: number, events?: Partial<Record<RegionId, EventPhase>>): void {
-    for (const g of this.glows) {
-      const { color, power } = g.userData.glow as { color: THREE.Color; power: number };
-      (g.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(0.25 + night * power);
+   *  events, for the falls' swell. Given the sun's direction, each landmark takes its own night from the sun's height
+   *  over it instead. */
+  update(night: number, time: number, events?: Partial<Record<RegionId, EventPhase>>, sun?: THREE.Vector3): void {
+    const here = (up: THREE.Vector3) => (sun ? Math.min(1, Math.max(0, (0.08 - up.dot(sun)) / 0.16)) : night);
+    for (const { mesh, up } of this.glows) {
+      const { color, power, level } = mesh.userData.glow as { color: THREE.Color; power: number; level: { value: number } };
+      level.value = 0.25 + here(up) * power;
+      if (!GPU.on) (mesh.material as THREE.MeshBasicMaterial).color.copy(color).multiplyScalar(level.value);
     }
-    for (const k of this.kits) tick(k, time, night);
+    for (const { obj, up } of this.kits) tick(obj, time, here(up));
     if (this.falls) this.falls.value = swollen(events?.fjords);
   }
 }
