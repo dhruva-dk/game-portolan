@@ -19,6 +19,10 @@
 // Where shot has gone through (the same holes the shader cuts), the wind goes through too and the canvas there holds
 // nothing together: the rags round a hole flog loose.
 //
+// The running rigging hangs from the cloth: each lateen's sheet from its clew to the lee rail, and its vangs from the
+// peak to either quarter. A rope is a chain of particles that holds against stretching and gives to any push, eased
+// a little longer than the span between its ends, so it sags, swings with her roll and is blown out by the wind.
+//
 // Nothing is read back. The sail material reads the particles straight from the buffer in the vertex stage, and
 // takes its normals from the neighbours' positions.
 import * as THREE from 'three';
@@ -66,6 +70,54 @@ const RAGGED = 2e-4;
  *  radius of the mast it hangs from. */
 export interface ClothGrid { kind: number; base: number; nu: number; nv: number; mastR: number }
 
+/**
+ * A rope of the running rigging, in the ship's frame: made fast at a corner of a lateen (given where it is drawn before
+ * the yard swings, with the mast it swings round and its share of the swing), and at a point on her rail, on the lee
+ * side if `lee` (x is then its distance out from the centreline). Eased `slack` times the span; on the mainmast or not.
+ */
+export interface ClothRope { from: THREE.Vector3; to: THREE.Vector3; lee: boolean; mastZ: number; swing: number; slack: number; radius: number; main: number }
+/** Particles a rope. */
+export const ROPE_POINTS = 12;
+/** Sides of a rope's tube. */
+const ROPE_SIDES = 4;
+
+/**
+ * The ropes as tubes the vertex stage builds round the particles: aRope is (particle, the one before, the one after,
+ * angle round the rope), aRopeR its radius, aMain whether it is on the mainmast.
+ */
+export function ropeGeometry(ropes: ClothRope[]): THREE.BufferGeometry {
+  const pos: number[] = [], rope: number[] = [], main: number[] = [], thick: number[] = [], idx: number[] = [];
+  ropes.forEach((r, k) => {
+    const first = k * ROPE_POINTS, base = pos.length / 3;
+    const to = r.to.clone();
+    for (let i = 0; i < ROPE_POINTS; i++) {
+      const at = r.from.clone().lerp(to, i / (ROPE_POINTS - 1));
+      for (let a = 0; a < ROPE_SIDES; a++) {
+        pos.push(at.x, at.y, at.z);
+        rope.push(first + i, first + Math.max(0, i - 1), first + Math.min(ROPE_POINTS - 1, i + 1), (a / ROPE_SIDES) * Math.PI * 2);
+        main.push(r.main);
+        thick.push(r.radius);
+      }
+    }
+    for (let i = 0; i + 1 < ROPE_POINTS; i++) for (let a = 0; a < ROPE_SIDES; a++) {
+      const p = base + i * ROPE_SIDES + a, q = base + i * ROPE_SIDES + ((a + 1) % ROPE_SIDES);
+      idx.push(p, q, p + ROPE_SIDES, q, q + ROPE_SIDES, p + ROPE_SIDES);
+    }
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(pos.length), 3));
+  g.setAttribute('aRope', new THREE.Float32BufferAttribute(rope, 4));
+  g.setAttribute('aMain', new THREE.Float32BufferAttribute(main, 1));
+  g.setAttribute('aRopeR', new THREE.Float32BufferAttribute(thick, 1));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  // the yards swing the ropes' upper ends across her, either side
+  g.boundingSphere!.radius += 8;
+  g.userData.ropes = ropes;
+  return g;
+}
+
 type Buffer = { element(i: unknown): V4 };
 
 export class Cloth {
@@ -73,6 +125,11 @@ export class Cloth {
   readonly count: number;
   /** The particles' positions in each ship's frame, for the sail material's vertex stage. */
   readonly positions: Buffer;
+  /** Rope particles a ship, and theirs, for the rigging's. */
+  readonly ropeCount: number;
+  readonly ropePositions: Buffer;
+  readonly #rope: StorageBufferAttribute[];
+  readonly #ropeTemplate: StorageBufferAttribute[];
   readonly #x: StorageBufferAttribute;
   readonly #v: StorageBufferAttribute;
   readonly #p: StorageBufferAttribute;
@@ -84,10 +141,12 @@ export class Cloth {
   readonly #free: number[] = [];
   #predict: ComputeNode | null = null;
   #solve: ComputeNode | null = null;
+  #ropePredict: ComputeNode | null = null;
+  #ropeSolve: ComputeNode | null = null;
   #dt = 0;
   #any = false;
 
-  constructor(geo: THREE.BufferGeometry, noise: THREE.Texture) {
+  constructor(geo: THREE.BufferGeometry, rigging: THREE.BufferGeometry, noise: THREE.Texture) {
     this.#noise = noise;
     const grids = (geo.userData.grids as ClothGrid[]).filter((g) => g.kind !== 1);
     const pos = geo.getAttribute('position'), plane = geo.getAttribute('aPlane'), rig = geo.getAttribute('aRig');
@@ -151,6 +210,20 @@ export class Cloth {
     this.#p = new StorageBufferAttribute(new Float32Array(total * 4), 4);
     this.#paramsAttr = new StorageBufferAttribute(this.#params, 4);
     this.positions = storage(this.#x, 'vec4', total).toReadOnly() as unknown as Buffer;
+
+    // the ropes: each one's ends, and how far it is eased
+    const ropes = rigging.userData.ropes as ClothRope[];
+    const RA = new Float32Array(ropes.length * 4), RB = new Float32Array(ropes.length * 4), RC = new Float32Array(ropes.length * 4);
+    ropes.forEach((r, k) => {
+      RA.set([r.from.x, r.from.y, r.from.z, r.mastZ], k * 4);
+      RB.set([r.to.x, r.to.y, r.to.z, r.lee ? 1 : 0], k * 4);
+      RC.set([r.swing, r.slack, 0, 0], k * 4);
+    });
+    this.#ropeTemplate = [RA, RB, RC].map((a) => new StorageBufferAttribute(a, 4));
+    this.ropeCount = ropes.length * ROPE_POINTS;
+    const ropeTotal = CLOTH_SLOTS * this.ropeCount;
+    this.#rope = [0, 1, 2].map(() => new StorageBufferAttribute(new Float32Array(ropeTotal * 4), 4));
+    this.ropePositions = storage(this.#rope[0], 'vec4', ropeTotal).toReadOnly() as unknown as Buffer;
     for (let s = CLOTH_SLOTS - 1; s >= 0; s--) this.#free.push(s);
     everyFrame((renderer) => this.#run(renderer));
   }
@@ -197,7 +270,7 @@ export class Cloth {
     const a = this.#paramsAttr;
     a.needsUpdate = true;
     const steps: ComputeNode[] = [];
-    for (let k = 0; k < SUBSTEPS; k++) steps.push(this.#predict!, this.#solve!);
+    for (let k = 0; k < SUBSTEPS; k++) steps.push(this.#predict!, this.#ropePredict!, this.#solve!, this.#ropeSolve!);
     renderer.compute(steps);
     // a slot that is not asked for next frame rests; one laid out has been
     const f = this.#params;
@@ -346,5 +419,72 @@ export class Cloth {
       V.element(id).assign(vec4(x.sub(before).div(h), 0));
       X.element(id).assign(vec4(x, self.w));
     })().compute(CLOTH_SLOTS * n, [64]);
+
+    // the ropes: a chain between two ends, one on the cloth's lashings, the other on her rail
+    const m = this.ropeCount, ropeTotal = CLOTH_SLOTS * m;
+    const [RX, RV, RP] = this.#rope.map((b) => storage(b, 'vec4', ropeTotal) as unknown as Buffer);
+    const lines = this.#ropeTemplate[0].count;
+    const [rA, rB, rC] = this.#ropeTemplate.map((b) => ro(b, lines));
+    const along = () => {
+      const id = int(instanceIndex);
+      const slot = id.div(m);
+      const t = id.sub(slot.mul(m));
+      const r = t.div(ROPE_POINTS);
+      const i = t.sub(r.mul(ROPE_POINTS));
+      const p0 = params.element(slot.mul(PARAMS));
+      const a = rA.element(r), b = rB.element(r), c = rC.element(r);
+      const head = lashed(a.xyz, float(0), p0.x, p0.y, a.w, c.x);
+      const foot = vec3(select(b.w.greaterThan(0.5), b.x.mul(select(p0.y.greaterThanEqual(0), float(1), float(-1))), b.x), b.y, b.z);
+      const ends = i.equal(0).or(i.equal(ROPE_POINTS - 1));
+      const end = select(i.equal(0), head, foot);
+      return { id, slot, i, p0, c, head, foot, ends, end };
+    };
+
+    this.#ropePredict = Fn(() => {
+      const { id, slot, i, p0, head, foot, ends, end } = along();
+      If(p0.z.lessThan(0.5), () => { Return(); });
+      If(p0.w.greaterThan(0.5), () => {
+        const at = head.add(foot.sub(head).mul(float(i).div(ROPE_POINTS - 1)));
+        RX.element(id).assign(vec4(at, 1));
+        RV.element(id).assign(vec4(0));
+        RP.element(id).assign(vec4(at, 1));
+        Return();
+      });
+      If(ends, () => {
+        RP.element(id).assign(vec4(end, 1));
+        Return();
+      });
+      const p2 = params.element(slot.mul(PARAMS).add(2)), p4 = params.element(slot.mul(PARAMS).add(4));
+      const v = RV.element(id).xyz, x = RX.element(id).xyz;
+      // a rope's weight, and the wind dragging it as it goes past
+      const air = p4.xyz.sub(v);
+      const v1 = v.add(p2.xyz.add(air.mul(length(air)).mul(0.035)).mul(h)).mul(float(1).sub(h.mul(0.8)));
+      RP.element(id).assign(vec4(x.add(v1.mul(h)), 1));
+    })().compute(ropeTotal, [64]);
+
+    this.#ropeSolve = Fn(() => {
+      const { id, i, p0, c, head, foot, ends } = along();
+      If(p0.z.lessThan(0.5).or(p0.w.greaterThan(0.5)), () => { Return(); });
+      const p = RP.element(id).xyz;
+      const before = RX.element(id).xyz;
+      If(ends, () => {
+        RV.element(id).assign(vec4(p.sub(before).div(h), 0));
+        RX.element(id).assign(vec4(p, 1));
+        Return();
+      });
+      // eased off the span between its ends: it holds against stretching and gives to a push
+      const rest = length(foot.sub(head)).mul(c.y).div(ROPE_POINTS - 1);
+      const sum = vec3(0).toVar();
+      for (const dj of [-1, 1]) {
+        const j = i.add(dj);
+        const q = RP.element(id.add(dj)).xyz;
+        const w = select(j.equal(0).or(j.equal(ROPE_POINTS - 1)), float(0), float(1));
+        const dv = p.sub(q), len = max(length(dv), 1e-6), C = len.sub(rest);
+        If(C.greaterThan(0), () => { sum.addAssign(dv.div(len).mul(C.negate().div(float(1).add(w)))); });
+      }
+      const x = p.add(sum.mul(OMEGA * 0.5));
+      RV.element(id).assign(vec4(x.sub(before).div(h), 0));
+      RX.element(id).assign(vec4(x, 1));
+    })().compute(ropeTotal, [64]);
   }
 }

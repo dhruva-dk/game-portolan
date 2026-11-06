@@ -173,6 +173,29 @@ class ClothLight extends PhysicalLightingModel {
   }
 }
 
+/** The running rigging: tarred hemp, a tube built round each rope's particles in the vertex stage. */
+export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshStandardNodeMaterial {
+  const m = new MeshStandardNodeMaterial({ roughness: 0.9, metalness: 0 });
+  const slot = read(u, 'uClothSlot', 'float');
+  const rope = attribute<'vec4'>('aRope'), radius = attribute<'float'>('aRopeR');
+  m.positionNode = Fn(() => {
+    const first = int(slot).mul(sim.ropeCount);
+    const at = (k: F): V3 => sim.ropePositions.element(first.add(int(k))).xyz;
+    const p = at(rope.x), run = at(rope.z).sub(at(rope.y));
+    const t = run.div(max(length(run), 1e-5));
+    const across = select(abs(t.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
+    const n = cross(t, across).normalize(), b = cross(t, n);
+    const out = n.mul(cos(rope.w)).add(b.mul(sin(rope.w)));
+    normalLocal.assign(out);
+    return moved(mainmast(u, p.add(out.mul(radius))));
+  })();
+  // laid strands, twisting round the rope
+  const strand = sin(rope.w.mul(3).add(positionLocal.length().mul(40))).mul(0.5).add(0.5);
+  m.colorNode = vec3(0.16, 0.12, 0.09).mul(strand.mul(0.35).add(0.75));
+  m.receivedShadowPositionNode = positionWorld.add(P.sunDir.mul(0.1));
+  return m;
+}
+
 /** The lateens, their yards, the pennants and the ensign: one material a ship, double-sided cloth. */
 export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, sim: Cloth): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.85, metalness: 0 });

@@ -9,8 +9,8 @@
 import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { type ActorTextures } from './common.ts';
-import { hullNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
-import { Cloth, type ClothGrid } from './cloth.ts';
+import { hullNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
+import { Cloth, ropeGeometry, type ClothGrid, type ClothRope } from './cloth.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
 
@@ -504,6 +504,26 @@ function sailGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * The running rigging, as ropes the cloth hangs (cloth.ts): each lateen's sheet, from its clew to the lee rail a little
+ * aft of it, and its two vangs, from the peak down to her rail on either quarter, which hold the yard's upper end.
+ */
+function riggingGeometry(): THREE.BufferGeometry {
+  const ropes: ClothRope[] = [];
+  const railAt = (z: number, side: number) => {
+    const s = clamp(sAt(z), 0.03, 0.97), y = rail(s);
+    return new V3(side * (Math.abs(onSkin(s, y, 1).x) + 0.04), y + 0.12, zAt(s));
+  };
+  for (const m of MASTS) {
+    const { P: Pk, C } = lateen(m), main = m === MASTS[1] ? 1 : 0, mz = mastZ(m);
+    ropes.push({ from: new V3(0, C.y, C.x), to: railAt(C.x - 1.8, 1), lee: true, mastZ: mz, swing: m.swing, slack: 1.04, radius: 0.032, main });
+    for (const side of [-1, 1]) {
+      ropes.push({ from: new V3(0, Pk.y, Pk.x), to: railAt(Pk.x + 1.5, side), lee: false, mastZ: mz, swing: m.swing, slack: 1.06, radius: 0.024, main });
+    }
+  }
+  return ropeGeometry(ropes);
+}
+
 // ---------------------------------------------------------------- turrets
 
 /** Each turret: a swivel base and a barrel that pitches; `muzzle` is the barrel's tip in barrel space. */
@@ -627,6 +647,7 @@ export class Kit {
   readonly hull = hullGeometry(true);
   readonly hullFar = hullGeometry(false);
   readonly sails = sailGeometry();
+  readonly rigging = riggingGeometry();
   readonly turrets = new Map<Weapon, ReturnType<typeof turretGeometry>>();
   private readonly heads = new Map<Figurehead, THREE.BufferGeometry>();
   envMap: THREE.Texture | null = null;
@@ -638,7 +659,7 @@ export class Kit {
   constructor(tex: ActorTextures) {
     this.tex = tex;
     this.sailNoise = sailNoise(tex.noise);
-    this.cloth = new Cloth(this.sails, this.sailNoise);
+    this.cloth = new Cloth(this.sails, this.rigging, this.sailNoise);
     for (const k of WEAPONS) this.turrets.set(k, turretGeometry(k));
   }
   figurehead(kind: Figurehead): THREE.BufferGeometry {
@@ -770,7 +791,10 @@ export class ShipModel {
     const sails = new THREE.Mesh(kit.sails, sail);
     sails.castShadow = true;
     sails.receiveShadow = true;
-    this.mats = [body, sail];
+    const rope = ropeNodeMaterial(this.u, kit.cloth);
+    const rigging = new THREE.Mesh(kit.rigging, rope);
+    rigging.castShadow = true;
+    this.mats = [body, sail, rope];
     // the node material's own motion and holes are used for its shadow
     this.turretBase = new THREE.Mesh(undefined, body);
     this.barrelMesh = new THREE.Mesh(undefined, body);
@@ -778,7 +802,7 @@ export class ShipModel {
     this.turret.add(this.turretBase, this.barrel);
     this.barrel.add(this.barrelMesh);
     this.turret.position.set(0, deckHeight(SHIP.turretZ), SHIP.turretZ);
-    this.body.add(hull, this.head, sails, this.turret);
+    this.body.add(hull, this.head, sails, rigging, this.turret);
     this.root.add(this.body);
     this.root.matrixAutoUpdate = false;
     this.setLook(look);
