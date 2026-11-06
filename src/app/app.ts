@@ -11,6 +11,8 @@ import { GpuStage } from '../render/gpu/stage.ts';
 import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
+import { Studio } from '../render/studio.ts';
+import { setStudio } from '../ui/parts/art.ts';
 import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SECRETS, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
@@ -171,6 +173,9 @@ export class App {
     this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;
+    // the locker's cards and the rewards are drawn from the ship itself
+    const studio = new Studio(stage.renderer, this.actors.kit);
+    setStudio((kind, id) => studio.cosmetic(kind, id));
     await rockTexturesReady();
     stage.snap();
     this.progress = { f: 1, what: 'Ready' };

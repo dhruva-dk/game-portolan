@@ -135,6 +135,12 @@
 .s-res__xpRow, .s-res__line { display: flex; justify-content: space-between; font-family: var(--f-body); font-size: var(--fs-body); }
 .s-res__xpRow--total { border-top: 1px solid rgba(42, 26, 13, 0.4); padding-top: var(--sp-1); font-weight: 700; }
 .s-res__line b, .s-res__xpRow b { font-family: var(--f-display); }
+.s-res__kicker { font-family: var(--f-display); font-size: var(--fs-micro); letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.7; }
+.s-res__got { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.s-res__reward { width: calc(92px * var(--k)); display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); animation: s-res-in 520ms var(--ease-out) both; animation-delay: calc(240ms + var(--i) * 110ms); }
+.s-res__art { width: calc(92px * var(--k)); height: calc(92px * var(--k)); }
+.s-res__rewardName { font-family: var(--f-display); font-size: var(--fs-micro); text-align: center; line-height: 1.1; }
+@keyframes s-res-in { from { opacity: 0; transform: translateY(calc(14px * var(--k))) scale(0.86); } to { opacity: 1; transform: none; } }
 .s-res__news { display: flex; flex-direction: column; gap: var(--sp-1); font-family: var(--f-body); font-style: italic; }
 
 /* phone */

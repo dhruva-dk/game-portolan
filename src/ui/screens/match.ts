@@ -3,7 +3,8 @@
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
 import {
-  button, ceremony, chip, el, EMBLEM, emblemBadge, esc, eventBanner, EVENT_ICON, ICON, mmss, ordinal, PERK_ICON, progressBar, WEATHER_ICON, type BarHandle,
+  ABILITY_ICON, button, ceremony, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, eventBanner, EVENT_ICON, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
+  rarityFrame, WEATHER_ICON, type BarHandle,
 } from '../parts/index.ts';
 import type {
   ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
@@ -492,9 +493,26 @@ export function resultsScreen(m: ResultsModel, a: { onDone(): void }): ScreenVie
   const rk = m.rank;
   el('s-res__line', right, `<span>Rank</span><b>${esc(rk.before.name)}${rk.change !== 'same' ? ` → ${esc(rk.after.name)}` : ''}</b>`);
   progressBar({ kind: 'rank', value: rk.after.progress, parent: right });
+  // what the match unlocked, as the cards themselves: each cosmetic worn by the ship, each ability by its mark
+  if (m.unlocked.abilities.length || m.unlocked.cosmetics.length) {
+    el('s-res__kicker', right, 'Unlocked');
+    const got = el('s-res__got', right);
+    let k = 0;
+    for (const ab of m.unlocked.abilities) {
+      const c = el('s-res__reward', got);
+      c.style.setProperty('--i', String(k++));
+      rarityFrame(3, `<div class="p-art p-art--ink">${ABILITY_ICON[ab.id] ?? ICON.star}</div>`, { parent: c, className: 's-res__art' });
+      el('s-res__rewardName', c, esc(ab.name));
+    }
+    for (const v of m.unlocked.cosmetics) {
+      const c = el('s-res__reward', got);
+      c.style.setProperty('--i', String(k++));
+      rarityFrame(v.rarity, cosmeticArt(v), { parent: c, className: 's-res__art' });
+      el('s-res__rewardName', c, esc(v.name));
+    }
+    hydrate(got);
+  }
   const news: string[] = [];
-  for (const ab of m.unlocked.abilities) news.push(`Unlocked ${ab.name}`);
-  for (const c of m.unlocked.cosmetics) news.push(`Unlocked ${c.name}`);
   for (const r of m.newRegions) news.push(`Charted ${r.name}`);
   const WHAT = { sankYou: 'sank you', sunkByYou: 'was sunk by you', grudge: 'holds a grudge', firstMeeting: 'met you for the first time' } as const;
   // first meetings fold into one line: the first match meets the whole fleet

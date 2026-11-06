@@ -271,6 +271,12 @@
 .p-art { width: 100%; height: 100%; display: grid; place-items: center; }
 .p-art > svg, .p-art > .p-art__charge { width: 100%; height: 100%; }
 .p-art--ink { color: #fff8e6; }
+/* the studio's render of the cosmetic on the ship, over the drawing it replaces */
+.p-art[data-studio] { position: relative; }
+.p-art[data-studio] > :not(.p-art__shot) { transition: opacity 260ms var(--ease-out, ease-out); }
+.p-art.is-rendered > :not(.p-art__shot) { opacity: 0; }
+.p-art__shot { position: absolute; inset: -31%; width: 162%; height: 162%; object-fit: contain; opacity: 0; transform: scale(0.94); transition: opacity 320ms var(--ease-out, ease-out), transform 420ms var(--ease-out, ease-out); pointer-events: none; }
+.p-art.is-rendered > .p-art__shot { opacity: 1; transform: none; }
 .p-art--water { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #2c5b78, #10283a 70%); box-shadow: inset 0 0 0 calc(2px * var(--k)) rgba(0, 0, 0, 0.35); }
 .p-art--water > svg { width: 82%; height: 82%; }
 

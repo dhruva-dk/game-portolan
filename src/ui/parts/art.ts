@@ -64,8 +64,24 @@ const charge = (id: EmblemId, colour = 'currentColor') => `<i class="p-art__char
 
 export interface ArtItem { id: string; kind: string; colour?: string }
 
+/** Draws a cosmetic as worn by the ship, in 3D, and gives back the image's URL (null for a kind it cannot show). */
+export type Studio = (kind: string, id: string) => Promise<string | null>;
+let studio: Studio | null = null;
+/** The app hands over the renderer's studio once the stage is up. */
+export function setStudio(s: Studio | null): void {
+  studio = s;
+}
+
+/** The kinds the studio draws: the drawn art stands in until its render arrives, then gives way to it. */
+const RENDERED = new Set(['sailColour', 'sailPattern', 'hullPaint', 'figurehead', 'emblem']);
+
 /** Card art for a cosmetic, as markup. Call hydrate on the container once it is in the page. */
 export function cosmeticArt(c: ArtItem): string {
+  const art = drawnArt(c);
+  return RENDERED.has(c.kind) ? art.replace('<div class="p-art', `<div data-studio="${c.kind}:${c.id}" class="p-art`) : art;
+}
+
+function drawnArt(c: ArtItem): string {
   switch (c.kind) {
     case 'sailColour': return `<div class="p-art">${sailSvg(c.colour ?? '#e8dcc0', 'transparent', '')}</div>`;
     case 'sailPattern': return `<div class="p-art">${sailSvg('#efe2c2', '#a12a17', pattern(c.id))}</div>`;
@@ -83,7 +99,26 @@ export function cosmeticArt(c: ArtItem): string {
   }
 }
 
-/** Fills in every charge mask under root. */
+/** Fills in every charge mask under root, and asks the studio for every render. */
 export function hydrate(root: Element): void {
   root.querySelectorAll<HTMLElement>('[data-charge]:not(.p-mask)').forEach((e) => maskInto(e, e.dataset.charge as EmblemId));
+  if (!studio) return;
+  const draw = studio;
+  root.querySelectorAll<HTMLElement>('[data-studio]:not(.is-shot)').forEach((e) => {
+    e.classList.add('is-shot');
+    const [kind, id] = e.dataset.studio!.split(':');
+    void draw(kind, id).then((url) => {
+      if (!url) return;
+      const img = new Image();
+      img.className = 'p-art__shot';
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = url;
+      // the render fades in over the drawing it replaces once it has decoded, so nothing pops
+      void img.decode().then(() => {
+        e.appendChild(img);
+        requestAnimationFrame(() => e.classList.add('is-rendered'));
+      }, () => {});
+    });
+  });
 }

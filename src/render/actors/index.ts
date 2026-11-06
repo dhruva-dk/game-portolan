@@ -54,6 +54,8 @@ export interface ActorsOptions {
 
 export interface Actors {
   readonly group: THREE.Group;
+  /** The ships' shared geometry, textures and cloth, which the studio draws its ship from. */
+  readonly kit: Kit;
   /** Resolves when the textures are in. */
   readonly ready: Promise<void>;
   update(view: ActorsView, dt: number, camera: THREE.Camera): void;
@@ -539,6 +541,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
 
   return {
     group,
+    kit,
     ready: tex.ready,
     update,
     fire,
