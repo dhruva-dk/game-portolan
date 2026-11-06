@@ -45,8 +45,9 @@ in commit messages. This file and CREDITS.md are the only documents in the repo.
   version on ambientCG or Poly Haven, never ambientCG's "Approximated". Every one is credited in CREDITS.md. The
   build can be up to 2 GB.
 - **One ship.** Every ship is the same ship; captains differ by colour, emblem and cosmetics.
-- **The bar is a current AAA console release,** in motion and up close: physically based and art-directed. The
-  painterly feel comes from light, atmosphere and composition, never from outlines or flat colour. Each hour and
+- **The bar is a current AAA console game as it ships on an iPad,** in motion and up close: physically based and
+  art-directed, at a steady 30 fps on an M1 iPad Air. When an effect costs more than it shows, the cheaper one wins.
+  The painterly feel comes from light, atmosphere and composition, never from outlines or flat colour. Each hour and
   each weather has its own palette.
 - **Readability first.** Every captain reads at a glance by colour and emblem. Ships separate from the sea in value
   and silhouette. Enemies, shots, the Storm's edge and loot read before anything else. Nothing shimmers, crawls,
