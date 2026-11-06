@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { type ActorTextures } from './common.ts';
 import { hullNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
+import { Cloth, type ClothGrid } from './cloth.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
 
@@ -448,13 +449,15 @@ function figureheadGeometry(kind: Figurehead): THREE.BufferGeometry {
 /**
  * The cloth: three lateens and their yards (which swing round their masts), the masthead pennants and the ensign.
  * uv runs tack (0) to leech (1) and foot (0) to yard (1); aPlane is the flat sail about its middle, in sail widths;
- * aRig is the mast it swings round, its size, and its share of the swing.
+ * aRig is the mast it swings round, its size, and its share of the swing (cloth.ts adds the cloth particle to it).
  */
 function sailGeometry(): THREE.BufferGeometry {
   const pos: number[] = [], uv: number[] = [], kind: number[] = [], plane: number[] = [], rig: number[] = [], main: number[] = [], idx: number[] = [];
-  let onMain = 0;
+  const grids: ClothGrid[] = [];
+  let onMain = 0, mastR = 0;
   const grid = (k: number, at: (u: number, v: number) => THREE.Vector3, nu: number, nv: number, r: [number, number, number], flat: (p: THREE.Vector3, u: number, v: number) => [number, number]) => {
     const base = pos.length / 3;
+    grids.push({ kind: k, base, nu, nv, mastR });
     for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
       const u = i / nu, v = j / nv, p = at(u, v);
       pos.push(p.x, p.y, p.z); uv.push(u, v); kind.push(k); plane.push(...flat(p, u, v)); rig.push(...r); main.push(onMain);
@@ -467,6 +470,7 @@ function sailGeometry(): THREE.BufferGeometry {
   for (const m of MASTS) {
     const { T, P: Pk, C } = lateen(m), z = mastZ(m), size = m.yard * 0.5;
     onMain = m === MASTS[1] ? 1 : 0;
+    mastR = m.r;
     const cz = (T.x + Pk.x + C.x) / 3, cy = (T.y + Pk.y + C.y) / 3;
     const at = (a: THREE.Vector2) => new V3(0, a.y, a.x);
     // the sail: hung from the yard, its foot from the tack to the clew
@@ -496,6 +500,7 @@ function sailGeometry(): THREE.BufferGeometry {
   g.setIndex(idx);
   g.computeVertexNormals();
   g.computeBoundingSphere();
+  g.userData.grids = grids;
   return g;
 }
 
@@ -627,10 +632,13 @@ export class Kit {
   envMap: THREE.Texture | null = null;
   readonly tex: ActorTextures;
   readonly sailNoise: THREE.Texture;
+  /** Every ship's sails and flags, simulated together. */
+  readonly cloth: Cloth;
   private readonly emblems = new Map<string, THREE.DataTexture>();
   constructor(tex: ActorTextures) {
     this.tex = tex;
     this.sailNoise = sailNoise(tex.noise);
+    this.cloth = new Cloth(this.sails, this.sailNoise);
     for (const k of WEAPONS) this.turrets.set(k, turretGeometry(k));
   }
   figurehead(kind: Figurehead): THREE.BufferGeometry {
@@ -733,6 +741,9 @@ export class ShipModel {
   /** Set for the frame the fallen mast strikes the water, with where its head hit in ship space. */
   landed = false;
   readonly landedAt = new V3();
+  /** Her slot in the fleet's cloth, and where her hull was and how fast it went last frame (to feel her motion). */
+  private readonly slot: number;
+  private readonly was = { at: new V3(), v: new V3(), felt: new V3(), seen: false };
 
   constructor(kit: Kit, look: Look) {
     this.kit = kit;
@@ -744,13 +755,14 @@ export class ShipModel {
       uSailA: { value: new THREE.Color(look.sail) }, uSailB: { value: new THREE.Color(look.sail2) }, uTrimC: { value: new THREE.Color(look.trim) },
       uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
-      uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
-      uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 },
+      uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFade: { value: 0 },
+      uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 }, uClothSlot: { value: 0 },
       // where she has been shot through and burnt, in hull space: centre, and radius (negative for a burn)
       uHoles: { value: Array.from({ length: HOLES }, () => new THREE.Vector4(0, -99, 0, 0)) },
     };
+    this.slot = this.u.uClothSlot.value = kit.cloth.acquire();
     const body = hullNodeMaterial(this.u, kit.tex);
-    const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise);
+    const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise, kit.cloth);
     const hull = this.hull = new THREE.Mesh(kit.hull, body);
     hull.castShadow = hull.receiveShadow = true;
     this.head = new THREE.Mesh(kit.figurehead(look.figurehead), body);
@@ -945,9 +957,8 @@ export class ShipModel {
     u.uLuff.value = aloft ? 0 : Math.max(THREE.MathUtils.clamp(1 - p.windSpeed / 3, 0, 1) * 0.8, irons * 0.8, THREE.MathUtils.clamp(1 - p.speed / 4, 0, 1) * 0.4);
     // the flags: the true wind less her own way through the water
     const ax = Math.sin(p.wind) * p.windSpeed, az = Math.cos(p.wind) * p.windSpeed - (aloft ? 20 : p.speed);
-    const flag = Math.atan2(ax, az) - Math.PI;
-    u.uFlag.value += Math.atan2(Math.sin(flag - u.uFlag.value), Math.cos(flag - u.uFlag.value)) * Math.min(1, dt * 3);
     u.uDamage.value = THREE.MathUtils.clamp((1 - p.hp) * 1.15 - 0.1, 0, 1) + s * 0.3;
+    this.cloth(p, ax, az, dt);
     u.uHit.value = p.hit;
     u.uNight.value = p.night;
     u.uFade.value = this.fade;
@@ -964,7 +975,53 @@ export class ShipModel {
     } else this.barrelMesh.rotation.z = 0;
   }
 
+  /**
+   * Her cloth this frame, all in her own heeled and pitching frame. The lateens are given a wind that fills them to
+   * the lee as full as she is sailing (the game's ships go faster than any wind would drive them, so the wind the
+   * sails feel is the one that would), with the apparent wind running along the cloth from luff to leech; when she
+   * is in irons or becalmed it runs along them gusting and they lift and shake. The flags fly in the apparent wind
+   * itself. What the cloth feels besides is gravity less her own acceleration: the swell's heave, the turn, the
+   * jolt of a hit or a landing.
+   */
+  private cloth(p: Pose, ax: number, az: number, dt: number): void {
+    const u = this.u, w = this.was;
+    const local = CLOTH_Q.copy(this.body.quaternion).invert();
+    const a = this.boom, n = CLOTH_N.set(Math.cos(a), 0, -Math.sin(a)), along = CLOTH_T.set(Math.sin(a), 0, Math.cos(a));
+    const side = u.uSide.value as number, fill = u.uFill.value as number, luff = u.uLuff.value as number;
+    const strength = fill * 8 * (1 - luff * 0.85);
+    const run = Math.min(-3 - luff * p.windSpeed * 0.6, ax * along.x + az * along.z);
+    const sail = CLOTH_S.copy(n).multiplyScalar(side * strength).addScaledVector(along, run).applyQuaternion(local);
+    const flag = CLOTH_F.set(ax, 0, az).applyQuaternion(local);
+    // her hull's acceleration, from where it has been the last frames, lagged a little so the swell's noise is felt
+    // as a sway and not as a buzz; a jump (she has been moved) lays the cloth out afresh
+    this.body.updateWorldMatrix(true, false);
+    const at = CLOTH_A.setFromMatrixPosition(this.body.matrixWorld);
+    const up = CLOTH_U.setFromMatrixColumn(this.root.matrixWorld, 1).normalize();
+    if (dt > 0) {
+      const v = CLOTH_V.copy(at).sub(w.at).divideScalar(dt);
+      if (!w.seen || v.length() > 80) {
+        this.kit.cloth.reset(this.slot);
+        w.felt.set(0, 0, 0);
+        v.set(0, 0, 0);
+      } else {
+        const acc = CLOTH_W.copy(v).sub(w.v).divideScalar(dt).clampLength(0, 14);
+        w.felt.lerp(acc, Math.min(1, dt * 6));
+      }
+      w.v.copy(v);
+      w.at.copy(at);
+      w.seen = true;
+    }
+    const q = CLOTH_Q2.setFromRotationMatrix(this.body.matrixWorld).invert();
+    const g = CLOTH_G.copy(up).multiplyScalar(-9.81).sub(w.felt).applyQuaternion(q);
+    this.kit.cloth.set(this.slot, a, side, sail, 0.1 + luff * 0.55, flag, g, p.torn, u.uDamage.value as number, dt);
+  }
+
   dispose(): void {
     for (const m of this.mats) m.dispose();
+    this.kit.cloth.release(this.slot);
   }
 }
+
+const CLOTH_Q = new THREE.Quaternion(), CLOTH_Q2 = new THREE.Quaternion();
+const CLOTH_N = new V3(), CLOTH_T = new V3(), CLOTH_S = new V3(), CLOTH_F = new V3(), CLOTH_A = new V3(), CLOTH_U = new V3();
+const CLOTH_V = new V3(), CLOTH_W = new V3(), CLOTH_G = new V3();

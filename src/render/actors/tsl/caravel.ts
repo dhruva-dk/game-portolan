@@ -5,10 +5,12 @@
 // Every part's colour, roughness, metalness and normal strength is worked out as a chain of selects rather than
 // branches, so the four outputs share one evaluation of the planks.
 //
-// The sails move in the vertex stage (bellying, flogging when she is slow, swung round the mast with the sheet; the
-// flags streaming down her wind) and their normals are turned with them. The same motion is used when the sun's shadow
-// maps are drawn, and the holes shot through the cloth are cut from those as well, so the shadow on the deck is torn
-// where the sail is. The sails let the light through from behind (ClothLight), so a sail against the sun glows.
+// The lateens and the flags are cloth simulated on the GPU (cloth.ts): the vertex stage reads each vertex's particle
+// from the fleet's buffer by the ship's slot, and takes its normal across its neighbours in the grid. The yards are
+// spars, hung on the lee side of the mast and swung round it with the sheet, as the cloth's lashings are. The same
+// motion is used when the sun's shadow maps are drawn, and the holes shot through the cloth are cut from those as
+// well, so the shadow on the deck is torn where the sail is. The sails let the light through from behind
+// (ClothLight), so a sail against the sun glows.
 //
 // The mainmast and everything on it (aMain) can be shot away: uMast turns it over the side about her length through
 // its foot, scales it about the foot (a jury mast is a short spar; gone is nothing), and lets it sink and drag astern
@@ -17,13 +19,14 @@ import {
   DoubleSide, MeshStandardNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture, type Vector4,
 } from 'three/webgpu';
 import {
-  Fn, PI, abs, atan, attribute, cameraPosition, clamp, cos, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
-  normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
+  Fn, abs, atan, attribute, cameraPosition, clamp, cos, cross, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
+  int, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
   uv, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
+import { HUNG, type Cloth } from '../cloth.ts';
 import { dither, moved, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /**
@@ -171,40 +174,34 @@ class ClothLight extends PhysicalLightingModel {
 }
 
 /** The lateens, their yards, the pennants and the ensign: one material a ship, double-sided cloth. */
-export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture): MeshStandardNodeMaterial {
+export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, sim: Cloth): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: 0.85, metalness: 0 });
-  const fill = read(u, 'uFill', 'float'), side = read(u, 'uSide', 'float'), boom = read(u, 'uBoom', 'float');
-  const luff = read(u, 'uLuff', 'float'), flag = read(u, 'uFlag', 'float');
+  const side = read(u, 'uSide', 'float'), boom = read(u, 'uBoom', 'float'), slot = read(u, 'uClothSlot', 'float');
   const sailA = read(u, 'uSailA', 'color'), sailB = read(u, 'uSailB', 'color'), trimC = read(u, 'uTrimC', 'color');
   const pattern = read(u, 'uPattern', 'float'), emblem = read(u, 'uEmblem', 'float'), rect = read(u, 'uEmblemRect', 'vec4');
   const damage = read(u, 'uDamage', 'float'), fade = read(u, 'uFade', 'float'), torn = read(u, 'uTorn', 'float');
 
   const kind = attribute<'float'>('aKind');
-  const rig = attribute<'vec3'>('aRig');
+  const rig = attribute<'vec4'>('aRig');
   const plane = attribute<'vec2'>('aPlane');
+  const particle = rig.w, across = attribute<'vec4'>('aClothN');
 
   m.positionNode = Fn(() => {
-    const t = P.time, su = uv().x, sv = uv().y;
-    const lateen = kind.lessThan(1.5), cloth = kind.lessThan(0.5), pennant = kind.lessThan(2.5);
-    // a lateen (0) or its yard (1): hung on the lee side of the mast, the cloth bellying out between yard and foot
-    // and flogging when she is slow, the whole swinging round the mast with the sheet
-    const belly = select(cloth, sin(sv.mul(PI)).mul(sin(pow(su, 0.75).mul(PI)).mul(0.7).add(0.3)).mul(rig.y).mul(0.13), float(0));
-    const flog = select(cloth, sin(t.mul(9).add(su.mul(9)).add(sv.mul(4))).mul(0.16).mul(su).mul(float(1).sub(sv)).mul(luff), float(0));
-    const hung = side.mul(belly.mul(fill).add(0.38)).add(flog);
-    // the pennants (2) and the ensign (3) stream down the wind that she feels, swung round their staffs
-    const stream = select(pennant,
-      sin(t.mul(7).sub(su.mul(7))).mul(0.35).mul(su).add(sin(t.mul(11).sub(su.mul(13))).mul(0.12).mul(su)),
-      sin(t.mul(5.5).sub(su.mul(5))).mul(0.3).mul(su).add(sin(t.mul(9).sub(su.mul(9)).add(sv.mul(2))).mul(0.08).mul(su)));
-    const droop = select(lateen, float(0), su.mul(su).mul(select(pennant, float(0.4), float(0.25))));
+    // the cloth, where the simulation has it, its normal across its neighbours
+    const first = int(slot).mul(sim.count);
+    const at = (k: F): V3 => sim.positions.element(first.add(int(k))).xyz;
+    const cloth = particle.greaterThanEqual(0);
+    const tangent = at(across.y).sub(at(across.x)), bitangent = at(across.w).sub(at(across.z));
+    const normal = cross(tangent, bitangent);
+    // a yard: hung on the lee side of the mast and swung round it with the sheet
     const p = positionLocal;
-    const x = p.x.add(select(lateen, hung, stream));
-    const a = select(lateen, boom.mul(rig.z), flag);
-    const c = cos(a), s = sin(a);
-    const z = p.z.sub(rig.x);
-    // the cloth's normals turn with it
+    const a = boom.mul(rig.z), c = cos(a), s = sin(a);
+    const x = p.x.add(side.mul(HUNG)), z = p.z.sub(rig.x);
+    const spar = vec3(x.mul(c).add(z.mul(s)), p.y, x.negate().mul(s).add(z.mul(c)).add(rig.x));
     const n = normalLocal;
-    normalLocal.assign(vec3(n.x.mul(c).add(n.z.mul(s)), n.y, n.x.negate().mul(s).add(n.z.mul(c))));
-    return moved(mainmast(u, vec3(x.mul(c).add(z.mul(s)), p.y.sub(droop), x.negate().mul(s).add(z.mul(c)).add(rig.x))));
+    const sparNormal = vec3(n.x.mul(c).add(n.z.mul(s)), n.y, n.x.negate().mul(s).add(n.z.mul(c)));
+    normalLocal.assign(select(cloth, normal.div(max(length(normal), 1e-6)), sparNormal));
+    return moved(mainmast(u, select(cloth, at(particle), spar)));
   })();
 
   const su = uv(), sp = plane, size = rig.y;
