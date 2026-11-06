@@ -9,6 +9,7 @@ import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { DebugStage } from './debugStage.ts';
 import { Stage, type StageView } from '../render/stage.ts';
+import { GpuStage } from '../render/gpu/stage.ts';
 import { QUALITY, U } from '../render/engine.ts';
 import { sunDirection } from '../render/sky.ts';
 import { waveHeight } from '../render/swell.ts';
@@ -55,6 +56,8 @@ export interface AppOptions {
   capture: boolean;
   /** Draw the plain debug globe instead of the planet's renderer. */
   debugStage?: boolean;
+  /** Draw the planet on WebGPU (?gpu), while it moves across from WebGL. */
+  gpu?: boolean;
   /** Log the frame rate, the worst frame and what was drawn every few seconds (the iOS build's log, ?perflog). */
   perfLog?: boolean;
   /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
@@ -79,6 +82,8 @@ export interface AppStage {
   stats(): { tris: number; calls: number; fps: number; scale: number; chunks: number; pending: number };
   /** The renderer's quality, from the settings; the debug globe has only one. */
   setQuality?(q: StageQuality): void;
+  /** The swell the stage draws, for the hulls to ride: metres over sea level at p. The WebGL swell when absent. */
+  wave?: (p: V3, t: number) => number;
 }
 
 const VERSION = 'Portolan · pass 1';
@@ -185,14 +190,16 @@ export class App {
       this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
       this.title?.setProgress(this.progress.f, this.progress.what);
     };
-    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas) : await Stage.create(this.canvas, QUALITY[QUALITY_PRESET[this.settings.settings.quality]], report);
+    const stage: AppStage = this.options.debugStage ? new DebugStage(this.canvas)
+      : this.options.gpu ? await GpuStage.create(this.canvas, report)
+      : await Stage.create(this.canvas, QUALITY[QUALITY_PRESET[this.settings.settings.quality]], report);
     this.stage = stage;
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    this.actors = createActors(stage.scene, { radius: R, wave: waveHeight, uniforms: U, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
+    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave ?? waveHeight, uniforms: U, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
     await this.actors.ready;
     await rockTexturesReady();

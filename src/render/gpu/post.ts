@@ -4,7 +4,7 @@
 // adaptation, and mapped to the screen through AgX and the grade.
 import { RenderPipeline, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
 import type { Node, TextureNode } from 'three/webgpu';
-import { float, ivec2, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
+import { float, ivec2, mix, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
 import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -13,6 +13,9 @@ import { P } from './uniforms.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 export const BLOOM = uniform(0.05);
+
+/** What the match lays over the whole frame, 0…1: outside the safe circle, just hurt, and low on hull. */
+export const SCREEN = { storm: uniform(0), hurt: uniform(0), low: uniform(0) };
 
 /** The temporal upscaler reads each output pixel's 3×3 neighbourhood with textureLoad and no clamp; out of range,
  *  Metal hands back the texel from the opposite edge, which lit the top row with the sea. Its loads are clamped here. */
@@ -41,11 +44,20 @@ export class Post {
     const motion = clampedLoads(scenePass.getTextureNode('velocity'));
     const resolved = taau(beauty, depth, motion, camera) as unknown as Node<'vec4'>;
     const glow = bloom(resolved, 1, 0.55, 0) as unknown as Node<'vec4'>;
-    const hdr = resolved.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM));
-    let ldr = agx(hdr.mul(exposure));
+    let hdr = resolved.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM)).mul(exposure);
+    // outside the safe circle the world drains toward a bruised violet, before the tone curve so its light holds
+    const lum = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
+    hdr = mix(hdr, vec3(lum).mul(vec3(0.55, 0.42, 0.95)).add(hdr.mul(vec3(0.25, 0.15, 0.45))), SCREEN.storm.mul(0.75));
+    let ldr = agx(hdr);
+    // low on hull the colour drains a little
+    ldr = mix(vec3(dot(ldr, vec3(0.2126, 0.7152, 0.0722))), ldr, float(1).sub(SCREEN.low.mul(0.35)));
     // the corners darken a little, as through any lens
     const d = screenUV.sub(0.5).mul(vec3(1.25, 1, 0).xy);
     ldr = ldr.mul(float(1).sub(GRADE.vignette.mul(smoothstep(0.25, 0.85, d.length()))));
+    // a hit reddens the edges of the frame, and a failing hull pulses them dark
+    const edge = smoothstep(0.12, 0.42, d.dot(d));
+    ldr = mix(ldr, vec3(0.75, 0.05, 0.02), edge.mul(SCREEN.hurt.clamp(0, 1)).mul(0.65));
+    ldr = mix(ldr, vec3(0.25, 0, 0.02), edge.mul(SCREEN.low).mul(sin(P.time.mul(5)).mul(0.15).add(0.35)));
     // and a grain finer than a pixel breaks the banding in the sky's long gradients
     const n = fract(sin(dot(screenUV.mul(vec3(1931.7, 1279.3, 0).xy).add(fract(P.time.mul(7.13))), vec3(12.9898, 78.233, 0).xy)).mul(43758.5453));
     ldr = clamp(ldr.add(n.sub(0.5).mul(1 / 255)), 0, 1);
