@@ -8,6 +8,7 @@ import { makeParticles, SPRITE, type Particles } from './particles.ts';
 import { Ribbons } from './ribbons.ts';
 import { Debris } from './debris.ts';
 import { Lights } from './lights.ts';
+import { RIPPLES } from '../ocean/ripples.ts';
 import type { Weapon } from './view.ts';
 import { heat } from '../gpu/haze.ts';
 
@@ -71,6 +72,7 @@ export class Effects {
     this.heatTrails.clear();
     this.debris.clear();
     this.lights.clear();
+    RIPPLES.clear();
     this.wisps.length = 0;
   }
 
@@ -107,6 +109,8 @@ export class Effects {
 
   splash(where: THREE.Vector3, big: number): void {
     const L = this.L.at(where), c = onSea(where, 0.3, new THREE.Vector3());
+    // a ring of waves runs out from it across the sea
+    RIPPLES.ring(where, Math.min(0.9, 0.12 + big * 0.14), 0.8 + big * 0.55);
     const n = Math.round(10 + big * 22);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU, out = rand(0.5, 3) * (0.6 + big * 0.4), up = rand(5, 13) * (0.5 + big * 0.7);
@@ -124,6 +128,7 @@ export class Effects {
   /** Something small (a plank, a cask) dropping into the sea: a few drops thrown up and a ring of foam. */
   plop(where: THREE.Vector3, big: number): void {
     const L = this.L.at(where), c = onSea(where, 0.1, new THREE.Vector3());
+    RIPPLES.ring(where, 0.04 + big * 0.12, 0.5 + big * 0.5, 8);
     for (let i = 0; i < 3 + big * 6; i++) {
       const v = L.vec(Math.random() * TAU, rand(0.5, 1.5), rand(2, 4) * (0.6 + big));
       this.smoke.emit({ x: c.x, y: c.y, z: c.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.5, 0.8), size: rand(0.15, 0.3) * (0.7 + big), grow: 1.8, r: 1.25, g: 1.32, b: 1.4, a: 0.7, frame: SPRITE.spray, grav: GRAV, float: true });

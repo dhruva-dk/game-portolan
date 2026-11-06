@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MAIN_FOOT, MAIN_HEIGHT, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
+import { RIPPLES } from '../ocean/ripples.ts';
 import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
@@ -248,6 +249,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     const sinking = f.sink >= 0;
     wakes.track(v.id, m.toWorld(STERN, tmp), f.fwd, v.speed, m.look.wake, t, pose.alt < 0.6 && !sinking);
     if (d < 170 && pose.alt < 0.6 && !sinking) fx.bowSpray(m.toWorld(BOW, tmp), f.fwd, v.speed, dt);
+    // and the waves she pushes aside, which the sea is drawn with and other hulls ride over
+    if (d < 320 && pose.alt < 0.6 && !sinking) RIPPLES.sail(v.id, onSea(m.toWorld(BOW, tmp), 0, tmp), f.fwd, v.speed, 2.6);
     if (d < 220 && !sinking) fx.wounded(m.toWorld(DECK, tmp), v.hull, dt);
     // the spirit lantern, sized so it still reads as a point of light at the edge of sight
     if (pose.night > 0.02 && (!sinking || f.sink < 1)) {

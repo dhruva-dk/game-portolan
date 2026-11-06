@@ -13,6 +13,9 @@
 // refracting surface and dimmed by Beer–Lambert over the path through the water, the water's own colour where the
 // path is long, light through the thin crests where the sun is behind them, and the foam on top.
 //
+// Wakes, bow waves and splashes are wave particles (ripples.ts) drawn into a field round the point under the eye: the
+// grid rises and falls with it, its slopes tilt the surface, and where its crests stand high they break white.
+//
 // Where the sea meets the land it surfs, as Sea of Thieves' shore does (Ang et al., SIGGRAPH 2018), from the
 // coastline's signed distance field (coast.ts): the swell's lines come in over the shallows, closing up as the water
 // shoals and breaking where it is shallow, and foam clings where the water runs out against whatever stands in it,
@@ -37,6 +40,7 @@ import { REACH } from './coastField.ts';
 import { waterAt } from '../seaTint.ts';
 import type { Flow } from './flow.ts';
 import { SeaLight, seaReflection } from './reflect.ts';
+import { RIPPLES, RIPPLE_SPAN } from './ripples.ts';
 
 /** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
  *  phase grows as √distance, so a line's spacing is 2√(d + 1) / SHOAL metres: two at the water's edge, ten 24 m out). */
@@ -214,6 +218,12 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const vRise = varyingProperty('float', 'vOceanRise');
   const vUp = varyingProperty('vec3', 'vOceanUp');
   const vLevel = varyingProperty('float', 'vOceanLevel');
+  // the wakes' field: where this lies in it (and how far in from its edge), and the field's axes carried here
+  const ripples = texture(RIPPLES.field);
+  const vRipple = varyingProperty('vec3', 'vOceanRipple');
+  const vRippleE1 = varyingProperty('vec3', 'vOceanRippleE1');
+  const vRippleE2 = varyingProperty('vec3', 'vOceanRippleE2');
+  const near: Frame = { anchor: FRAME.nadir, axis: FRAME.gridE1 };
   mat.positionNode = Fn(() => {
     const a = displaced(FRAMES[0]);
     const q = vec4(a.q, 0, 0).toVar();
@@ -225,6 +235,16 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       lift.addAssign(b.world.mul(FRAME.weight.y));
       rise.addAssign(b.height.mul(FRAME.weight.y));
     });
+    // the wakes and splashes: the field is drawn in the grid's own map (its first row is the map's far side)
+    const r = inFrame(up, near);
+    const at = vec3(r.q.x.div(2 * RIPPLE_SPAN).add(0.5), float(0.5).sub(r.q.y.div(2 * RIPPLE_SPAN)),
+      smoothstep(RIPPLE_SPAN, RIPPLE_SPAN * 0.8, max(abs(r.q.x), abs(r.q.y))));
+    vRipple.assign(at);
+    vRippleE1.assign(r.e1);
+    vRippleE2.assign(r.e2);
+    const wake = ripples.sample(at.xy).level(float(0)).x.mul(at.z);
+    lift.addAssign(up.mul(wake));
+    rise.addAssign(wake);
     // a calm stills the waves toward its middle
     const still = float(1).sub(flow.calmAt(up).mul(0.85));
     vq.assign(q);
@@ -243,6 +263,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const foam = float(0).toVar('oceanFoam');
   const fold = float(1).toVar('oceanFold');
   const race = float(0).toVar('oceanRace');
+  const wakeFoam = float(0).toVar('oceanWakeFoam');
   const surface = () => {
     const u = normalize(vUp);
     // the flow map's two reads: how far down the current each has been carried, seconds, and how much each counts;
@@ -321,6 +342,13 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       const lace = smoothstep(float(0.66).sub(fast.mul(0.1)), float(0.76).sub(fast.mul(0.1)), m);
       const far = smoothstep(140, 420, length(positionWorld.sub(cameraPosition)));
       race.assign(mix(lace, fast.mul(0.22), far).mul(fast));
+    });
+    // the wakes' slopes, and white where their crests stand high
+    If(vRipple.z.greaterThan(0), () => {
+      const w = ripples.sample(vRipple.xy).level(float(0)).mul(vRipple.z);
+      world.addAssign(vRippleE1.mul(w.y).add(vRippleE2.mul(w.z)).mul(still));
+      const lace = noiseMap.sample(vq.xy.mul(0.31)).a.add(w.w.mul(0.6));
+      wakeFoam.assign(smoothstep(0.1, 0.32, w.x).mul(smoothstep(0.5, 0.72, lace)).mul(0.85));
     });
     // rain ringing the water near the eye, where the rings can be seen
     const near = smoothstep(45, 6, positionWorld.distance(cameraPosition)).mul(P.rain);
@@ -408,7 +436,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     });
   };
   // the foam, over the ink, and how much of the water the two cover between them: the rest is the water itself
-  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore).add(race), 0, 1);
+  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore).add(race).add(wakeFoam), 0, 1);
   const covered = whiteness.add(inkShare.mul(float(1).sub(whiteness)));
   mat.colorNode = Fn(() => {
     surface();

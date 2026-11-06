@@ -11,6 +11,7 @@ import { Coast } from './coast.ts';
 import { Territory } from './territory.ts';
 import { Flow } from './flow.ts';
 import { sharedNoise } from '../gpu/noise.ts';
+import { RIPPLES } from './ripples.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
  *  where the map stretches the sea 4% across. */
@@ -90,6 +91,10 @@ export class Ocean {
     SEA.time.value = time;
     SEA.dt.value = Math.min(dt, 0.1);
     renderer.compute(this.waves.frame);
+    // the wakes and splashes move on and are drawn into their field round the point under the eye
+    RIPPLES.step(Math.min(dt, 0.1));
+    _w.crossVectors(nadir, FRAME.gridE1.value as Vector3);
+    RIPPLES.draw(renderer, nadir, FRAME.gridE1.value as Vector3, _w);
   }
 
   #follow(nadir: Vector3, dt: number): void {
@@ -120,8 +125,9 @@ export class Ocean {
     (FRAME.weight.value as Vector2).set(Math.cos(t), this.#to ? Math.sin(t) : 0);
   }
 
-  /** The swell's height (m) over sea level at p, a point in the planet's frame, and if asked its slope: a vector
-   *  along the ground pointing uphill whose length is the rise per metre (a hull's up is normalize(up - slope)). */
+  /** The sea's height (m) over its level at p, a point in the planet's frame (the swell, and the wakes and splashes
+   *  on it), and if asked its slope: a vector along the ground pointing uphill whose length is the rise per metre (a
+   *  hull's up is normalize(up - slope)). */
   heightAt(p: V3, slope?: V3): number {
     const w = FRAME.weight.value as Vector2;
     const up = _v.set(p.x, p.y, p.z).normalize();
@@ -138,7 +144,7 @@ export class Ocean {
         slope.z += (e1.z * _s[0] + e2.z * _s[1]) * weight;
       }
     }
-    return h;
+    return h + RIPPLES.heightAt(p, slope);
   }
 }
 
