@@ -11,6 +11,7 @@
 // Up is the plant's local +Y. On the sphere, place each plant with +Y along the planet's radius; the wind is
 // projected onto each plant's own horizontal plane, so one world-space wind vector works everywhere.
 import * as THREE from 'three';
+import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the API every region file exports
 
@@ -720,6 +721,7 @@ export function barkMaterial(key: string, o: BarkOpts): THREE.MeshStandardMateri
     if (o.tide) s.defines = { ...s.defines, FLORA_TIDE: '' };
   };
   m.customProgramCacheKey = () => 'flora-d-bark-' + (o.moss ? 'm' : '') + (o.tide ? 't' : '');
+  tag(m, { kit: 'D', moss: o.moss && mossMap ? { map: mossMap, tint: mossTint, amount: o.moss.amount } : undefined, tide: !!o.tide });
   materials.set(key, m);
   return m;
 }
@@ -760,6 +762,7 @@ export function leafMaterial(key: string, o: LeafOpts): THREE.MeshStandardMateri
         #include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => 'flora-d-leaf';
+  tag(m, { kit: 'D', cutout: o.solid ? undefined : size, translucency });
   materials.set(key, m);
   return m;
 }

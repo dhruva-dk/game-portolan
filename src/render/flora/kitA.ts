@@ -5,6 +5,7 @@
 //
 // Units are metres. A plant's local +Y is up from the ground, and its root sits at the origin.
 import * as THREE from 'three';
+import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the contract
 
@@ -567,6 +568,7 @@ export function barkMaterial(bark: BarkName, cover?: CoverName): { mat: THREE.Ma
         diffuseColor.rgb = mix(diffuseColor.rgb, fcTex.rgb * uCoverTint, fc);`);
   };
   mat.customProgramCacheKey = () => 'floraA-' + key;
+  tag(mat, { kit: 'A', cover: cv ? { map: loadTex(`${cv.file}_d.jpg`, true), tint: cv.tint, scale: cv.scale } : undefined });
   m = { mat, depth: depthFor(key, {}) };
   matCache.set(key, m);
   return m;
@@ -586,6 +588,7 @@ export function cardMaterial(atlas: Atlas<string>): { mat: THREE.Material; depth
       .replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
   };
   mat.customProgramCacheKey = () => 'floraA-' + key;
+  tag(mat, { kit: 'A', cutout: 1024, crownNormals: true });
   const depth = depthFor(key, { map, alphaTest: 0.5 });
   m = { mat, depth };
   matCache.set(key, m);

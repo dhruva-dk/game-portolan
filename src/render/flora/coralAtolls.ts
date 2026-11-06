@@ -209,9 +209,9 @@ function coralPatch(kind: 'brain' | 'polyp', freq: number, bump: number) {
   };
 }
 
-const branchMat = () => plantMaterial('coralAtolls-branch', () => ({ roughness: 0.75, patch: coralPatch('polyp', 70, 0.004) }));
-const brainMat = () => plantMaterial('coralAtolls-brain', () => ({ roughness: 0.7, patch: coralPatch('brain', 7, 0.012) }));
-const plateMat = () => plantMaterial('coralAtolls-plate', () => ({ roughness: 0.75, doubleSide: true, patch: coralPatch('polyp', 55, 0.004) }));
+const branchMat = () => plantMaterial('coralAtolls-branch', () => ({ roughness: 0.75, patch: coralPatch('polyp', 70, 0.004), coral: { kind: 'polyp', freq: 70, bump: 0.004 } }));
+const brainMat = () => plantMaterial('coralAtolls-brain', () => ({ roughness: 0.7, patch: coralPatch('brain', 7, 0.012), coral: { kind: 'brain', freq: 7, bump: 0.012 } }));
+const plateMat = () => plantMaterial('coralAtolls-plate', () => ({ roughness: 0.75, doubleSide: true, patch: coralPatch('polyp', 55, 0.004), coral: { kind: 'polyp', freq: 55, bump: 0.004 } }));
 const rubbleMat = () => plantMaterial('coralAtolls-rubble', () => {
   const map = scanTexture('coral_rubble_d.jpg', true), normalMap = scanTexture('coral_rubble_n.jpg', false);
   return { map, normalMap, roughness: 0.95 };

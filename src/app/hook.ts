@@ -103,6 +103,7 @@ export function installHook(app: App) {
     /** The region beds playing now, with their gains: the log has a bed only when it starts. */
     beds: () => app.audio.ambience.playing(),
     perf: () => app.perf(),
+    flora: () => (app.stage as { flora?: { kinds: unknown } } | null)?.flora?.kinds ?? null,
     measure: (frames: number) => app.measure(frames),
   };
   Object.defineProperty(window, '__portolan', { value: hook, configurable: true });

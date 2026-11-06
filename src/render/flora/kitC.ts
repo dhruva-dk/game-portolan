@@ -5,6 +5,7 @@
 // Every plant is built in its own frame: metres, +Y up from the ground at the origin. The integration step
 // turns +Y to the sphere's local up. Wind is three shared uniforms (WIND), set once a frame for every plant.
 import * as THREE from 'three';
+import { tag, type FloraTag } from './tag.ts';
 
 // ---------------------------------------------------------------- the API every region file exports
 
@@ -156,6 +157,8 @@ export interface MaterialOptions {
   patch?: (s: THREE.WebGLProgramParametersWithUniforms) => void;
   /** Extra uniforms the patch reads. */
   uniforms?: Record<string, THREE.IUniform>;
+  /** What the patch draws, for the WebGPU planet, which makes its own. */
+  coral?: FloraTag['coral'];
 }
 
 export interface PlantMaterial {
@@ -204,6 +207,7 @@ export function plantMaterial(key: string, make: () => MaterialOptions): PlantMa
     o.patch?.(s);
   };
   mat.customProgramCacheKey = () => 'floraC:' + key;
+  tag(mat, { kit: 'C', surge: !!o.surge, cutout: leaf ? 0 : undefined, translucency: leaf ? o.leaf : 0, coral: o.coral });
   const depth = new THREE.MeshDepthMaterial({
     depthPacking: THREE.RGBADepthPacking,
     map: leaf ? (o.map ?? null) : null,
@@ -226,7 +230,7 @@ export function plantMaterial(key: string, make: () => MaterialOptions): PlantMa
 
 // ---------------------------------------------------------------- textures
 
-let ROOT = '';
+let ROOT = import.meta.env?.BASE_URL ?? '';
 const textures = new Map<string, THREE.Texture>();
 const pending: Promise<unknown>[] = [];
 

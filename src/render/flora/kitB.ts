@@ -6,6 +6,7 @@
 // Frames: every plant is built in metres with +Y up (the planet's up where it stands) and its origin at its anchor.
 // See `Anchor` for where that is. Render code, not simulation, so Math.sin and friends are fine here.
 import * as THREE from 'three';
+import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the plant contract
 
@@ -265,6 +266,7 @@ export function material(key: string, o: MaterialOptions): THREE.MeshStandardMat
   if (o.bleach) m.defines.FLORA_BLEACH = o.bleach.toFixed(3);
   m.onBeforeCompile = (s) => hookShader(s, false, alpha, translucent);
   m.customProgramCacheKey = () => `floraB:${o.mode ?? 'air'}:${alpha}:${translucent}:${!!o.bleach}`;
+  tag(m, { kit: 'B', mode: o.mode ?? 'air', cutout: alpha ? 1024 : undefined, edgeFade: alpha, translucency: o.translucency ?? 0, bleach: o.bleach ?? 0 });
   const d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: alpha ? (o.map ?? null) : null, alphaTest: o.alphaTest ?? 0, side: m.side });
   d.defines = { ...m.defines };
   d.onBeforeCompile = (s) => hookShader(s, true, alpha, false);

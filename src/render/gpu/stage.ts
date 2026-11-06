@@ -28,6 +28,7 @@ import { EventKelp } from '../regions/eventKelp.ts';
 import { EventClams } from '../regions/eventClams.ts';
 import { EventPetals } from '../regions/eventPetals.ts';
 import { Moonbow } from '../regions/moonbow.ts';
+import { Flora } from '../flora/field.ts';
 import { rideOn } from '../swell.ts';
 import { seaLift, setLifts } from '../lift.ts';
 import { seaDeepAt } from '../seaTint.ts';
@@ -73,6 +74,7 @@ export class GpuStage {
   readonly petals = new EventPetals();
   readonly moonbow = new Moonbow();
   readonly fog = new Fog();
+  readonly flora = new Flora();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -95,7 +97,7 @@ export class GpuStage {
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
-    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group);
+    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group, this.flora.group);
     // what floats rides the sea this stage draws
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
@@ -192,6 +194,7 @@ export class GpuStage {
       (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
     this.clouds.march(this.renderer, size.x * this.#scale, size.y * this.#scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
+    this.flora.update(this.renderer, cam);
     this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);
@@ -235,12 +238,13 @@ export class GpuStage {
   /** Resolves when the land round the camera has been built and painted. */
   async settled(): Promise<void> {
     await this.terrain.settled();
+    await this.flora.settled();
     await this.scans.settled(this.camera.position);
     await this.ocean.coast.ready;
   }
 
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
-    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: RENDER_SCALE.desktop, chunks: tr.drawn, pending: tr.pending + tr.queued };
+    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: RENDER_SCALE.desktop, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
   }
 }
