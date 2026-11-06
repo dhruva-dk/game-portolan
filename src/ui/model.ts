@@ -353,6 +353,8 @@ export interface PartsModel {
   flood: number;
   sinks: number;
   burning: boolean;
+  /** Ice built on her by falling snow, 0–1: she turns slower the more she carries. */
+  ice: number;
 }
 
 export interface HudModel {

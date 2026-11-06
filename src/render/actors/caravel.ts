@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { type ActorTextures } from './common.ts';
-import { hullNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
+import { hullNodeMaterial, iceNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
 import { Cloth, ropeGeometry, type ClothGrid, type ClothRope } from './cloth.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
@@ -524,6 +524,66 @@ function riggingGeometry(): THREE.BufferGeometry {
   return ropeGeometry(ropes);
 }
 
+// ---------------------------------------------------------------- ice
+
+/**
+ * The icicles that grow where spray and snow freeze and drip: down both sides from under the rail's cap, under the
+ * bowsprit, and along the stern gallery's edge. Each is a thin five-sided cone hung from its root. Every vertex sits at
+ * the root; aIce holds its offset from the root at full growth (xyz) and the share of ice at which that icicle starts
+ * to grow (w), so they come one by one as the ice builds, the bow's first and longest, where the spray flies.
+ */
+function icicleGeometry(): THREE.BufferGeometry {
+  const pos: number[] = [], nor: number[] = [], grow: number[] = [], idx: number[] = [];
+  let seed = 90731;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const SIDES = 5;
+  const hang = (root: THREE.Vector3, len: number, r: number, start: number) => {
+    const base = pos.length / 3, lean = (rnd() - 0.5) * 0.06, leanZ = (rnd() - 0.5) * 0.06;
+    for (let k = 0; k < SIDES; k++) {
+      const a = (k / SIDES) * Math.PI * 2;
+      pos.push(root.x, root.y, root.z);
+      nor.push(Math.cos(a) * 0.97, 0.24, Math.sin(a) * 0.97);
+      grow.push(Math.cos(a) * r, 0, Math.sin(a) * r, start);
+    }
+    // a tip for each face, so each face keeps its own normal down to the point
+    for (let k = 0; k < SIDES; k++) {
+      const a = ((k + 0.5) / SIDES) * Math.PI * 2;
+      pos.push(root.x, root.y, root.z);
+      nor.push(Math.cos(a) * 0.9, -0.44, Math.sin(a) * 0.9);
+      grow.push(lean * len, -len, leanZ * len, start);
+      idx.push(base + k, base + ((k + 1) % SIDES), base + SIDES + k);
+    }
+  };
+  // under the rail's cap, both sides, bow to stern: longer and sooner forward
+  for (const side of [-1, 1]) {
+    for (let s = 0.02; s < 0.985; s += 0.009 + rnd() * 0.008) {
+      if (rnd() < 0.25) continue;
+      const root = skin(s, 1, side).add(new V3(side * 0.025, -0.005, 0));
+      const fwd = sm(0.2, 1, s);
+      hang(root, (0.08 + rnd() * rnd() * 0.6) * (0.6 + 0.8 * fwd), 0.02 + rnd() * 0.025, clamp(0.12 + rnd() * 0.62 - fwd * 0.18, 0.02, 0.85));
+    }
+  }
+  // under the bowsprit
+  const foot = new V3(0, deckAt(0.95) + 0.25, zOf(0.95, deckAt(0.95)));
+  for (let t = 0.04; t < 0.94; t += 0.04 + rnd() * 0.04) {
+    const at = foot.clone().lerp(BOWSPRIT, t), r = 0.2 + (0.09 - 0.2) * t;
+    hang(at.add(new V3((rnd() - 0.5) * r, -r * 0.92, 0)), 0.1 + rnd() * rnd() * 0.7, 0.02 + rnd() * 0.02, clamp(0.08 + rnd() * 0.5, 0.02, 0.8));
+  }
+  // along the stern gallery's aft edge
+  const yg = 3.12, zg = zOf(0, yg) - 0.3, wg = halfAt(0, yg) * 0.92;
+  for (let x = -wg + 0.05; x < wg - 0.05; x += 0.1 + rnd() * 0.12) {
+    hang(new V3(x, yg - 0.1, zg + 0.04 - 0.3), 0.06 + rnd() * rnd() * 0.4, 0.015 + rnd() * 0.015, clamp(0.2 + rnd() * 0.65, 0.02, 0.9));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('aIce', new THREE.Float32BufferAttribute(grow, 4));
+  g.setIndex(idx);
+  // (the vertices all sit at their roots: the bounds are the hull's, so the icicles are culled with her)
+  g.boundingSphere = new THREE.Sphere(new V3(0, 2, 1), 13);
+  return g;
+}
+
 // ---------------------------------------------------------------- turrets
 
 /** Each turret: a swivel base and a barrel that pitches; `muzzle` is the barrel's tip in barrel space. */
@@ -648,6 +708,7 @@ export class Kit {
   readonly hullFar = hullGeometry(false);
   readonly sails = sailGeometry();
   readonly rigging = riggingGeometry();
+  readonly icicles = icicleGeometry();
   readonly turrets = new Map<Weapon, ReturnType<typeof turretGeometry>>();
   private readonly heads = new Map<Figurehead, THREE.BufferGeometry>();
   envMap: THREE.Texture | null = null;
@@ -709,6 +770,7 @@ export interface Pose {
   irons: number; // 1 in irons, the canvas shaking
   lurch: number; // 1 as a thrown gybe slams the yards across, falling to 0
   roll: number; // the seaway's roll the gunners feel, radians, positive with her starboard side down
+  ice: number; // 0 clear .. 1 iced up: the ice falling snow has built on her, which slows her turning
 }
 
 /** Shot holes and burns a hull keeps, the oldest giving way to the newest. */
@@ -743,6 +805,7 @@ export class ShipModel {
   private readonly head: THREE.Mesh;
   private readonly turretBase: THREE.Mesh;
   private readonly barrelMesh: THREE.Mesh;
+  private readonly icicles: THREE.Mesh;
   private readonly mats: THREE.Material[];
   private muzzleZ = 3;
   private readonly kit: Kit;
@@ -781,6 +844,7 @@ export class ShipModel {
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFade: { value: 0 },
       uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 }, uClothSlot: { value: 0 }, uWet: { value: 0.2 },
+      uIce: { value: 0 },
       // where she has been shot through and burnt, in hull space: centre, and radius (negative for a burn)
       uHoles: { value: Array.from({ length: HOLES }, () => new THREE.Vector4(0, -99, 0, 0)) },
     };
@@ -797,7 +861,10 @@ export class ShipModel {
     const rope = ropeNodeMaterial(this.u, kit.cloth);
     const rigging = new THREE.Mesh(kit.rigging, rope);
     rigging.castShadow = true;
-    this.mats = [body, sail, rope];
+    const ice = iceNodeMaterial(this.u);
+    this.icicles = new THREE.Mesh(kit.icicles, ice);
+    this.icicles.visible = false;
+    this.mats = [body, sail, rope, ice];
     // the node material's own motion and holes are used for its shadow
     this.turretBase = new THREE.Mesh(undefined, body);
     this.barrelMesh = new THREE.Mesh(undefined, body);
@@ -805,7 +872,7 @@ export class ShipModel {
     this.turret.add(this.turretBase, this.barrel);
     this.barrel.add(this.barrelMesh);
     this.turret.position.set(0, deckHeight(SHIP.turretZ), SHIP.turretZ);
-    this.body.add(hull, this.head, sails, rigging, this.turret);
+    this.body.add(hull, this.head, sails, rigging, this.turret, this.icicles);
     this.root.add(this.body);
     this.root.matrixAutoUpdate = false;
     this.setLook(look);
@@ -984,7 +1051,8 @@ export class ShipModel {
     const strength = THREE.MathUtils.clamp(p.windSpeed / 10, 0.2, 1.3);
     const fill = aloft ? 1.25 : THREE.MathUtils.clamp(0.15 + p.speed / 20 + strength * 0.55, 0.2, 1.25) * (1 - irons * 0.6) + p.boost * 0.35;
     u.uFill.value += (fill - u.uFill.value) * Math.min(1, dt * 2);
-    u.uLuff.value = aloft ? 0 : Math.max(THREE.MathUtils.clamp(1 - p.windSpeed / 3, 0, 1) * 0.8, irons * 0.8, THREE.MathUtils.clamp(1 - p.speed / 4, 0, 1) * 0.4);
+    // (iced canvas is stiff: it lifts and shakes less)
+    u.uLuff.value = (aloft ? 0 : Math.max(THREE.MathUtils.clamp(1 - p.windSpeed / 3, 0, 1) * 0.8, irons * 0.8, THREE.MathUtils.clamp(1 - p.speed / 4, 0, 1) * 0.4)) * (1 - 0.6 * p.ice);
     // the flags: the true wind less her own way through the water
     const ax = Math.sin(p.wind) * p.windSpeed, az = Math.cos(p.wind) * p.windSpeed - (aloft ? 20 : p.speed);
     u.uDamage.value = THREE.MathUtils.clamp((1 - p.hp) * 1.15 - 0.1, 0, 1) + s * 0.3;
@@ -994,6 +1062,8 @@ export class ShipModel {
     this.cloth(p, ax, az, dt);
     u.uHit.value = p.hit;
     u.uNight.value = p.night;
+    u.uIce.value = p.ice;
+    this.icicles.visible = p.ice > 0.02;
     u.uFade.value = this.fade;
     // the turret: yaw relative to the hull, then elevation; the repeater's barrels spin
     let dy = p.aimYaw - this.turret.rotation.y;

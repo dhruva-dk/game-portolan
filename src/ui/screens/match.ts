@@ -119,7 +119,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     return { el: e, label: e.querySelector('b')! };
   };
   const pSail = partMark('sail', ICON.sail), pMast = partMark('mast', ICON.mast), pRudder = partMark('rudder', ICON.rudder);
-  const pFlood = partMark('flood', ICON.leak), pFire = partMark('fire', ICON.fire);
+  const pFlood = partMark('flood', ICON.leak), pFire = partMark('fire', ICON.fire), pIce = partMark('ice', EMBLEM.snowflake);
   const grade = (m: { el: HTMLElement }, k: number, bad: number, title: string) => {
     const lvl = k >= bad ? 'bad' : k >= 0.15 ? 'hurt' : '';
     m.el.dataset.lvl = lvl;
@@ -329,6 +329,9 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     pFire.el.dataset.lvl = p.burning ? 'bad' : '';
     pFire.el.classList.toggle('is-on', p.burning);
     pFire.el.title = 'On fire: canvas burning';
+    // ice: amber as it starts to tell on her turning, red when she is iced up
+    grade(pIce, p.ice, 0.7, 'Iced up: slow to turn');
+    pIce.label.textContent = p.ice >= 0.15 ? `${Math.round(p.ice * 100)}%` : '';
     partsRow.classList.toggle('is-on', partsRow.querySelector('.is-on') !== null);
     const st = h.storm, vy = h.voyage;
     const line = !vy

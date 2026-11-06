@@ -51,8 +51,14 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   const hull = read(u, 'uHull', 'color'), accent = read(u, 'uAccent', 'color'), trim = read(u, 'uTrim', 'color');
   const wisp = read(u, 'uWisp', 'color');
   const damage = read(u, 'uDamage', 'float'), hit = read(u, 'uHit', 'float'), hitAt = read(u, 'uHitAt', 'vec3');
-  const night = read(u, 'uNight', 'float'), reach = read(u, 'uWet', 'float');
-  m.positionNode = Fn(() => moved(mainmast(u, positionLocal)))();
+  const night = read(u, 'uNight', 'float'), reach = read(u, 'uWet', 'float'), ice = read(u, 'uIce', 'float');
+  // the standing rigging grows a coat of ice as it builds, hanging heavier under the rope than over it
+  m.positionNode = Fn(() => {
+    const rope = select(floor(attribute<'float'>('aPart').add(0.5)).equal(8), float(1), float(0));
+    const n = normalGeometry, coat = ice.mul(rope);
+    const p = positionLocal.add(n.mul(coat.mul(0.022))).add(vec3(0, min(n.y, 0).mul(coat).mul(0.03), 0));
+    return moved(mainmast(u, p));
+  })();
 
   const part = floor(attribute<'float'>('aPart').add(0.5)).toVar('shipPart');
   const is = (k: number): B => part.equal(k);
@@ -152,11 +158,37 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   // whole of her in rain, the deck most; above the wet, the salt the sea has left dried white in the grain. Water
   // darkens bare wood more than lacquer, and lies on both as a second, glassy coat.
   const lacquered = is(0).and(bottom.lessThan(0.5)).or(is(2)).or(is(6));
+
+  // ice, as the sim builds it in falling snow north of the snow line (uIce, 0…1). Snow settles first on whatever faces
+  // up (the decks, the rail's cap, the castles' tops, the tops of the casks and the capstan), deeper where it drifts;
+  // then the spray freezes on her as glaze, thickest forward where it flies and on the faces that stand up to it. Where
+  // either lies the water on her is ice, not wet. Nothing settles on the lit windows or the wisp.
+  const lamp = select(is(11).or(is(14)), float(0), float(1));
+  const drift = texture(tex.noise, lp.xz.mul(0.37)).g.mul(0.6).add(texture(tex.noise, lp.xz.mul(1.9).add(lp.y)).r.mul(0.4)).toVar('shipDrift');
+  const up = normalGeometry.y;
+  const snow = smoothstep(0.35, 0.75, up.add(drift.sub(0.5).mul(0.7)))
+    .mul(smoothstep(drift.mul(0.4), drift.mul(0.4).add(0.22), ice))
+    .mul(smoothstep(WL + 0.4, WL + 0.9, lp.y)).mul(lamp).toVar('shipSnow');
+  const forward = smoothstep(-7, 9, lp.z);
+  // (the spray freezes in streaks laid aft along her, as it flies)
+  // (from the noise's smoother channels: its finest octaves are only a couple of texels across)
+  const feather = texture(tex.noise, vec2(lp.z.mul(0.9).add(lp.x.mul(0.5)), lp.y.mul(6.5))).r.mul(0.55)
+    .add(texture(tex.noise, vec2(lp.z.mul(2.3), lp.y.mul(11)).add(lp.x)).r.mul(0.25)).add(drift.mul(0.2)).toVar('shipFeather');
+  // glaze: a clear coat over everything above the water, the wood showing through it
+  const glaze = smoothstep(0.05, 0.35, ice.mul(mix(0.6, 1.2, forward)).sub(feather.mul(0.3)))
+    .mul(smoothstep(WL + 0.12, WL + 0.4, lp.y)).mul(lamp).mul(float(1).sub(snow)).toVar('shipGlaze');
+  // rime: white and feathered, in patches where the spray flies, the bow most, the faces standing up to it
+  const rime = smoothstep(0.6, 0.8, feather.add(ice.mul(forward.mul(0.13).add(0.08))).sub(abs(up).mul(0.2)))
+    .mul(step(0.02, ice)).mul(smoothstep(WL + 0.15, WL + 0.5, lp.y)).mul(lamp).mul(float(1).sub(snow)).mul(select(is(7), float(0.4), float(1))).toVar('shipRime');
+  const frozen = max(snow, max(glaze, rime));
+  // (snow glints where a flake's face catches the light)
+  const glint = step(0.93, texture(tex.noise, lp.xz.mul(11).add(lp.y.mul(3))).r);
+
   const runs = texture(tex.noise, vec2(lp.z.mul(0.7), lp.y.mul(0.12))).g;
   const top = float(WL + 0.3).add(reach.mul(smoothstep(1, 8, lp.z).mul(1.2).add(0.4)));
   const sides = smoothstep(top.add(0.12), top.sub(0.12), lp.y.sub(runs.sub(0.5).mul(0.6)));
   const rained = P.rain.mul(mix(float(0.55), float(1), smoothstep(0.4, 0.9, normalGeometry.y)));
-  const wet = clamp(max(sides.mul(select(is(0).or(is(2)).or(is(6)).or(is(9)), float(1), float(0))), rained), 0, 1).mul(float(1).sub(scorch)).toVar('shipWet');
+  const wet = clamp(max(sides.mul(select(is(0).or(is(2)).or(is(6)).or(is(9)), float(1), float(0))), rained), 0, 1).mul(float(1).sub(scorch)).mul(float(1).sub(frozen)).toVar('shipWet');
   // (a tide-line just over the wet, frayed into drips where the spray ran down and dried)
   const drips = texture(tex.noise, vec2(lp.z.mul(3.1), lp.y.mul(0.35))).r;
   const fine = texture(tex.noise, lp.zy.mul(vec2(2.7, 5.5))).b;
@@ -164,12 +196,16 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   const crust = line.mul(smoothstep(0.35, 0.7, fine.mul(0.6).add(drips.mul(0.5))))
     .mul(select(is(0), float(1), float(0))).mul(float(1).sub(gold)).mul(float(1).sub(wet)).mul(float(1).sub(scorch)).mul(0.45).toVar('shipSalt');
   const soaked = holed.mul(mix(float(1), select(lacquered, float(0.82), float(0.55)), wet));
-  m.colorNode = mix(soaked, vec3(0.74, 0.73, 0.69).mul(lum.mul(0.25).add(0.85)), crust);
-  m.roughnessNode = mix(mix(rough, 0.95, max(scorch, max(soot, pierced).mul(mark))), 0.9, crust);
-  m.metalnessNode = metal.mul(float(1).sub(crust));
-  m.clearcoatNode = max(select(lacquered, float(0.75), float(0)).mul(float(1).sub(max(scorch, soot.mul(mark)))), wet).mul(float(1).sub(crust));
-  m.clearcoatRoughnessNode = mix(lum.mul(0.08).add(0.08), float(0.03), wet);
-  m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(0.8).mul(bumps));
+  const salted = mix(soaked, vec3(0.74, 0.73, 0.69).mul(lum.mul(0.25).add(0.85)), crust);
+  // glaze is clear ice: what is under it shows through, a little cooled; rime and snow cover it
+  const glazed = mix(salted, salted.mul(vec3(0.86, 0.92, 0.98)).add(vec3(0.012, 0.018, 0.024)), glaze);
+  const rimed = mix(glazed, vec3(0.78, 0.83, 0.88).mul(feather.mul(0.2).add(0.85)), rime);
+  m.colorNode = mix(rimed, vec3(0.86, 0.9, 0.95).mul(drift.mul(0.12).add(0.9)), snow);
+  m.roughnessNode = mix(mix(mix(mix(mix(rough, 0.95, max(scorch, max(soot, pierced).mul(mark))), 0.9, crust), 0.18, glaze), 0.6, rime), mix(float(0.72), float(0.18), glint), snow);
+  m.metalnessNode = metal.mul(float(1).sub(crust)).mul(float(1).sub(frozen));
+  m.clearcoatNode = max(max(select(lacquered, float(0.75), float(0)).mul(float(1).sub(max(scorch, soot.mul(mark)))), wet).mul(float(1).sub(crust)), glaze).mul(float(1).sub(max(snow, rime)));
+  m.clearcoatRoughnessNode = mix(mix(lum.mul(0.08).add(0.08), float(0.03), wet), float(0.05), glaze);
+  m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(0.8).mul(bumps).mul(float(1).sub(max(snow, rime).mul(0.85))).mul(float(1).sub(glaze.mul(0.4))));
   m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP);
   return m;
 }
@@ -181,14 +217,53 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
  * come through, and neither through a sail in the lee of an island.
  */
 class ClothLight extends PhysicalLightingModel {
+  /** How much of that light gets through: less through canvas stiff with frost. */
+  through: F = float(1);
   override direct(input: LightingModelDirectInput, builder: NodeBuilder): void {
     super.direct(input, builder);
     const l = input.lightDirection as V3, lightColor = input.lightColor as V3;
     const reflectedLight = input.reflectedLight as unknown as { directDiffuse: V3 };
     const back = max(dot(normalView, l).negate(), 0).mul(0.35);
     const straight = pow(max(dot(positionViewDirection, l).negate(), 0), 4).mul(0.4);
-    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseColor.rgb).mul(back.add(straight)).mul(1 / Math.PI));
+    reflectedLight.directDiffuse.addAssign(lightColor.mul(diffuseColor.rgb).mul(back.add(straight)).mul(this.through).mul(1 / Math.PI));
   }
+}
+
+/**
+ * Ice's light: the standard model, and what comes through it. An icicle is clear, so light from behind it comes
+ * through nearly whole, bent and scattered inside into a glow tinted by the ice's own faint blue, and brightest looking
+ * straight into the light along it.
+ */
+class IceLight extends PhysicalLightingModel {
+  override direct(input: LightingModelDirectInput, builder: NodeBuilder): void {
+    super.direct(input, builder);
+    const l = input.lightDirection as V3, lightColor = input.lightColor as V3;
+    const reflectedLight = input.reflectedLight as unknown as { directDiffuse: V3 };
+    const back = max(dot(normalView, l).negate(), 0).mul(0.5);
+    const straight = pow(max(dot(positionViewDirection, l).negate(), 0), 6).mul(1.6);
+    reflectedLight.directDiffuse.addAssign(lightColor.mul(vec3(0.75, 0.9, 1)).mul(back.add(straight)).mul(1 / Math.PI));
+  }
+}
+
+/**
+ * The icicles (caravel.ts icicleGeometry): each grows from its root once the ice passes its own share, its girth
+ * first and then its length, so the bow's come first and the stern's last. Clear ice, faintly blue, with a glassy coat;
+ * light comes through it from behind (IceLight).
+ */
+export function iceNodeMaterial(u: Uniforms): MeshPhysicalNodeMaterial {
+  const m = new MeshPhysicalNodeMaterial({ roughness: 0.1, metalness: 0 });
+  const ice = read(u, 'uIce', 'float'), grow = attribute<'vec4'>('aIce');
+  m.positionNode = Fn(() => {
+    const k = smoothstep(grow.w, grow.w.add(0.28), ice), girth = min(k.mul(2.2), 1);
+    return moved(positionLocal.add(vec3(grow.x.mul(girth), grow.y.mul(k), grow.z.mul(girth))));
+  })();
+  // (thicker at the root, clearer toward the tip)
+  const tip = smoothstep(0, -0.3, grow.y);
+  m.colorNode = mix(vec3(0.74, 0.82, 0.88), vec3(0.5, 0.64, 0.74), tip);
+  m.clearcoatNode = float(1);
+  m.clearcoatRoughnessNode = float(0.04);
+  m.setupLightingModel = () => new IceLight(true);
+  return m;
 }
 
 /** The running rigging: tarred hemp, a tube built round each rope's particles in the vertex stage. */
@@ -196,6 +271,9 @@ export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshPhysicalNodeMater
   const m = new MeshPhysicalNodeMaterial({ roughness: 0.9, metalness: 0 });
   const slot = read(u, 'uClothSlot', 'float');
   const rope = attribute<'vec4'>('aRope'), radius = attribute<'float'>('aRopeR');
+  const ice = read(u, 'uIce', 'float');
+  // (each particle along a rope a bead of ice of its own size, and a hanging drip under some)
+  const bead = fract(sin(rope.x.mul(12.9898)).mul(43758.5453));
   m.positionNode = Fn(() => {
     const first = int(slot).mul(sim.ropeCount);
     const at = (k: F): V3 => sim.ropePositions.element(first.add(int(k))).xyz;
@@ -205,13 +283,18 @@ export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshPhysicalNodeMater
     const n = cross(t, across).normalize(), b = cross(t, n);
     const out = n.mul(cos(rope.w)).add(b.mul(sin(rope.w)));
     normalLocal.assign(out);
-    return moved(mainmast(u, p.add(out.mul(radius))));
+    // iced: thicker, beaded, and the ice hanging under it
+    const coat = ice.mul(bead.mul(0.6).add(0.7));
+    const hang = vec3(0, min(out.y, 0).mul(coat).mul(bead.mul(bead).mul(0.07).add(0.012)), 0);
+    return moved(mainmast(u, p.add(out.mul(radius.mul(coat.mul(1.5).add(1)))).add(hang)));
   })();
   // laid strands, twisting round the rope
   const strand = sin(rope.w.mul(3).add(positionLocal.length().mul(40))).mul(0.5).add(0.5);
-  m.colorNode = vec3(0.16, 0.12, 0.09).mul(strand.mul(0.35).add(0.75)).mul(float(1).sub(P.rain.mul(0.3)));
+  const iced = smoothstep(0.08, 0.45, ice);
+  m.colorNode = mix(vec3(0.16, 0.12, 0.09).mul(strand.mul(0.35).add(0.75)).mul(float(1).sub(P.rain.mul(0.3))), vec3(0.55, 0.62, 0.68), iced.mul(0.65));
+  m.roughnessNode = mix(float(0.9), float(0.25), iced);
   // the fibres' soft sheen along the lay
-  m.sheenNode = vec3(0.22, 0.19, 0.15).mul(strand.mul(0.5).add(0.5));
+  m.sheenNode = vec3(0.22, 0.19, 0.15).mul(strand.mul(0.5).add(0.5)).mul(float(1).sub(iced));
   m.sheenRoughnessNode = float(0.45);
   m.receivedShadowPositionNode = positionWorld.add(P.sunDir.mul(0.1));
   return m;
@@ -291,9 +374,17 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   const rags = torn.mul(float(0.7).add(float(1).sub(su.y).mul(0.25)).add(su.x.mul(0.15))).sub(0.04);
   const cut = select(yard, float(-1), max(damage.mul(0.62).sub(0.05), select(kind.lessThan(0.5), rags, float(-1))));
   const whole = hn.greaterThanEqual(cut);
+  // frost: as the ice builds the canvas pales and stiffens with rime, patchily at first, and lets less light through;
+  // snow lies along the tops of the yards
+  const ice = read(u, 'uIce', 'float');
+  const fn = texture(sailNoise, sp.mul(vec2(2.3, 3.1)).add(kind.mul(0.71))).g;
+  const frost = smoothstep(0.1, 0.5, ice.mul(1.1).sub(fn.mul(0.6))).mul(select(yard, float(0.4), float(1))).toVar('sailFrost');
+  const yardSnow = select(yard, smoothstep(0.45, 0.8, normalGeometry.y).mul(smoothstep(0.05, 0.3, ice)), float(0));
+  const rimed = mix(mix(colour, vec3(0.84, 0.87, 0.91).mul(lin.mul(0.2).add(0.85)), frost.mul(0.36)), vec3(0.88, 0.91, 0.95), yardSnow);
   // canvas darkens when it is rained on; the weave's sheen, the cloth's own colour at grazing light
-  m.colorNode = colour.mul(mix(1, 0.25, smoothstep(cut.add(0.06), cut, hn).mul(step(0, cut)))).mul(float(1).sub(P.rain.mul(select(yard, float(0.1), float(0.25)))));
-  m.sheenNode = select(yard, vec3(0), cloth.mul(0.45).add(0.08));
+  m.colorNode = rimed.mul(mix(1, 0.25, smoothstep(cut.add(0.06), cut, hn).mul(step(0, cut)))).mul(float(1).sub(P.rain.mul(select(yard, float(0.1), float(0.25))).mul(float(1).sub(frost))));
+  m.sheenNode = select(yard, vec3(0), cloth.mul(0.45).add(0.08)).mul(float(1).sub(frost.mul(0.7)));
+  m.roughnessNode = mix(float(0.85), float(0.62), frost);
   m.sheenRoughnessNode = float(0.55);
   // the player's own sail thins where it would hide the way ahead (round the crosshair only, so the rest of the rig
   // stays solid)
@@ -308,6 +399,10 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   // grow coarse
   const away = positionWorld.distance(cameraPosition);
   m.receivedShadowPositionNode = positionWorld.add(P.sunDir.mul(away.mul(0.01).add(0.15)));
-  m.setupLightingModel = () => new ClothLight(false, true);
+  m.setupLightingModel = () => {
+    const light = new ClothLight(false, true);
+    light.through = float(1).sub(frost.mul(0.55));
+    return light;
+  };
   return m;
 }

@@ -461,7 +461,7 @@ export class Session implements Stepper {
     return {
       id: i, pos: metres(at), head: { ...sh.head }, speed: sh.speed, turn: -sh.rate, alt: sh.alt, flip, hull: sh.hull / 100,
       shield: sh.shield, shieldMax: 100, weapon, aim: gunDir(sh), cosmetics: this.looks[i] ?? this.looks[0], alive,
-      parts: { torn: sh.torn, mast: sh.fallen > 0 ? 'down' : sh.jury ? 'jury' : 'up', flood: sh.flood, listTo: sh.listTo, burn: sh.burn },
+      parts: { torn: sh.torn, mast: sh.fallen > 0 ? 'down' : sh.jury ? 'jury' : 'up', flood: sh.flood, listTo: sh.listTo, burn: sh.burn, ice: sh.ice },
       irons: sh.irons > 0, lurch: sh.lurch / ABOUT.lurch, roll: deckAt(this.state, i, DECK).roll,
       windup: sh.windup > 0 && WEAPONS[slot.kind] ? Math.min(1, 1 - (sh.windup - (alpha - 1) * TICK) / WEAPONS[slot.kind].windup) : 0,
     };

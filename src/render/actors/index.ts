@@ -176,7 +176,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
 
   const pose: Pose = {
     speed: 0, turn: 0, aimYaw: 0, aimPitch: 0, hp: 1, sink: 0, boost: 0, hit: 0, alt: 0, dive: 0, wind: 0, windSpeed: 0, night: 0, flip: 0,
-    torn: 0, mast: 'up', flood: 0, listTo: 1, irons: 0, lurch: 0, roll: 0,
+    torn: 0, mast: 'up', flood: 0, listTo: 1, irons: 0, lurch: 0, roll: 0, ice: 0,
   };
 
   function sail(f: Fleet, v: ShipView, view: ActorsView, dt: number, t: number, limit: number): void {
@@ -229,6 +229,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     pose.mast = parts?.mast ?? 'up';
     pose.flood = parts?.flood ?? 0;
     pose.listTo = parts?.listTo ?? 1;
+    pose.ice = parts?.ice ?? 0;
     const M = m.root.matrix;
     m.update(pose, t, dt, (lx, lz) => sea.wave(hp.set(lx, 0, lz).applyMatrix4(M), sea.time));
     // the fallen mainmast striking the water alongside

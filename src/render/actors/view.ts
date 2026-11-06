@@ -74,6 +74,8 @@ export interface PartsView {
   listTo: number;
   /** Seconds left burning; 0 not. */
   burn: number;
+  /** The ice falling snow has built on her, 0 clear .. 1 iced up (it slows her turning); omitted, none. */
+  ice?: number;
 }
 
 export interface ProjectileView {

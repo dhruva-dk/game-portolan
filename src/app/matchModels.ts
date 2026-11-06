@@ -203,7 +203,7 @@ export function hudModel(session: Session): HudModel {
     shield: Math.round(sh.shield), shieldMax: 100, hull: Math.round(sh.hull), hullMax: 100,
     parts: {
       sail: sh.torn, mast: sh.fallen > 0 ? 1 : sh.mast, down: Math.max(0, sh.fallen), jury: sh.jury, rudder: sh.rudder,
-      flood: sh.flood, sinks: PARTS.sinks, burning: sh.burn > 0,
+      flood: sh.flood, sinks: PARTS.sinks, burning: sh.burn > 0, ice: sh.ice,
     },
     slots: sh.slots.map((_, k) => slotOf(sh, k)),
     selected: sh.sel,
