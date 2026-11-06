@@ -2,7 +2,7 @@
 // with its regions' scans, and the frame's finish, seen through the same camera rig and driven by the same StageView
 // as the WebGL stage. The app takes it with ?gpu while the rest of the planet moves across; nothing here reads the
 // simulation.
-import { PerspectiveCamera, Scene, Vector3, type WebGPURenderer } from 'three/webgpu';
+import { PerspectiveCamera, Scene, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { P } from './uniforms.ts';
@@ -10,6 +10,10 @@ import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
 import { Clouds } from '../atmosphere/clouds.ts';
 import { AURORA, OVAL } from '../atmosphere/aurora.ts';
+import { Fog } from '../atmosphere/fog.ts';
+import { EYE } from '../atmosphere/luts.ts';
+import { LANTERNS } from '../lanterns.ts';
+import { LANDMARKS, REGIONS } from '../../sim/world/index.ts';
 import { Fall } from '../atmosphere/fall.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
 import { Terrain } from '../terrain.ts';
@@ -68,9 +72,12 @@ export class GpuStage {
   readonly clams = new EventClams();
   readonly petals = new EventPetals();
   readonly moonbow = new Moonbow();
+  readonly fog = new Fog();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
+  readonly #forward = new Vector3();
+  readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
   #last = 0;
@@ -88,6 +95,8 @@ export class GpuStage {
     this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group);
     // what floats rides the sea this stage draws
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
+    const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
+    if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -171,6 +180,12 @@ export class GpuStage {
     // a squall raises the sea, a thunderhead most
     this.#seaFromWind(eye, wind, Math.max((d.rain ?? 0) * 0.55, d.thunder ?? 0));
     this.atmosphere.update(cam, dt);
+    this.#mistFrom(v);
+    // sea smoke off the cold water round the pole, thickest in the polar night and blown away by a wind
+    const poleNight = Math.min(1, Math.max(0, (0.08 - this.sun.y) / 0.16));
+    const calm = 1 - Math.min(1, Math.max(0, (wind.length() - 6) / 6));
+    this.fog.update(this.renderer, eye, cam.getWorldDirection(this.#forward), EYE.viewProjection.value as Matrix4, v.weather,
+      (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
     this.ocean.update(this.renderer, eye, v.time, dt);
     this.terrain.update(eye);
     this.scans.update(eye, dt);
@@ -187,6 +202,14 @@ export class GpuStage {
     const now = performance.now();
     if (this.#last) this.#fps += (1000 / Math.max(now - this.#last, 1) - this.#fps) * 0.05;
     this.#last = now;
+  }
+
+  /** Mistwood's mist: always some rolling out of the wood, and thick in its Fog Surge. */
+  #mistFrom(v: StageView): void {
+    const m = this.#mist;
+    const e = v.events?.mistwood;
+    const surge = e?.phase === 'running' ? Math.min(1, e.since / 5, e.left / 5) : 0;
+    m.amount = 0.35 + 0.65 * surge;
   }
 
   /** The wind sea from the wind where the camera looks, and the gusts of the weather over it: rebuilt only when it

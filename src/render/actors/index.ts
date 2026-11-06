@@ -9,6 +9,7 @@ import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
 import { seaLift } from '../lift.ts';
+import { LANTERNS } from '../lanterns.ts';
 import { rockfallAt } from '../regions/eventRocks.ts';
 import { Lightning } from './lightning.ts';
 import { Loot } from './loot.ts';
@@ -236,6 +237,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       fx.light(at, Math.max(1.1, d * 0.013), f.lantern, (1.4 + 2.2 * n) * n * flick);
       fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick);
       if (v.id === player) { lamp.position.copy(at); lamp.intensity = 260 * n * flick; lamp.color.copy(f.lantern); }
+      // and the light it throws into the air round her
+      LANTERNS.add(at, f.lantern, n * flick);
       // the wisp at the main truck: past about 180 m the stern lantern has gone under the curve, but this shows to 240 m
       // (not on your own ship, where it would hang at the top of the view)
       if (v.id !== player) fx.light(m.toWorld(MASTHEAD, tmp), Math.max(0.4, d * 0.009), f.lantern, (0.9 + 1.6 * n) * n * flick);
@@ -273,6 +276,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     AU.uSunColor.value.copy(HIGH_SUN).lerp(LOW_SUN, 1 - smooth(-0.05, 0.35, elev));
     AU.uNight.value = nightAt(focus);
     lamp.intensity = 0;
+    LANTERNS.clear();
     // ships
     const hEye = Math.max(1, eye.length() - SEA.radius), R = SEA.radius;
     const limit = Math.sqrt(2 * R * hEye + hEye * hEye) + Math.sqrt(2 * R * 25) + 30;

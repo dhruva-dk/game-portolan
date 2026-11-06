@@ -71,8 +71,9 @@ export const tables = {
   irradiance: layers(IRRADIANCE.x, IRRADIANCE.y, 5),
   sky: table(SKY.x, SKY.y),
   moonSky: table(MOON_SKY.x, MOON_SKY.y),
-  aerialLight: volume(AERIAL.x, AERIAL.y, AERIAL.z),
-  aerialLoss: volume(AERIAL.x, AERIAL.y, AERIAL.z),
+  /** The aerial perspective: the light gathered in the first AERIAL.z slices and the light kept in the next as many,
+   *  one volume so that every surface reading it holds one sampler for it rather than two. */
+  aerial: volume(AERIAL.x, AERIAL.y, AERIAL.z * 2),
 };
 
 /** Where the eye is, and what the aerial perspective volume is laid over. Set by the atmosphere each frame. */
@@ -426,8 +427,8 @@ const aerialKernel = Fn(() => {
       });
       prev.assign(t1);
     });
-    textureStore(tables.aerialLight, uvec3(id.x, id.y, uint(i)), vec4(L, 1));
-    textureStore(tables.aerialLoss, uvec3(id.x, id.y, uint(i)), vec4(T, 1));
+    textureStore(tables.aerial, uvec3(id.x, id.y, uint(i)), vec4(L, 1));
+    textureStore(tables.aerial, uvec3(id.x, id.y, uint(i).add(AERIAL.z)), vec4(T, 1));
   });
 });
 
@@ -519,12 +520,14 @@ export function aerialAt(p: V3): { light: V3; loss: V3 } {
   const start = max(shell.x, 0);
   const w = sqrt(clamp(dist.sub(start).div(EYE.range), 0, 1));
   const half = 0.5 / AERIAL.z;
-  const z = max(w.sub(half), half);
-  const uvw = vec3(clamp(uv.x, 0, 1), clamp(uv.y, 0, 1), z);
+  // the slice, as a share of the light's half of the volume, kept off the half's edges so the filter never mixes in
+  // the other half
+  const z = clamp(w.sub(half), half, 1 - half).mul(0.5);
+  const xy = vec2(clamp(uv.x, 0, 1), clamp(uv.y, 0, 1));
   // closer than the first slice's middle, fade the first slice's effect toward none
   const near = clamp(w.mul(AERIAL.z).mul(2), 0, 1);
-  const light = texture3D(tables.aerialLight, uvw).rgb.mul(near);
-  const loss = mix(vec3(1), texture3D(tables.aerialLoss, uvw).rgb, near);
+  const light = texture3D(tables.aerial, vec3(xy, z)).rgb.mul(near);
+  const loss = mix(vec3(1), texture3D(tables.aerial, vec3(xy, z.add(0.5))).rgb, near);
   const outside = shell.y.lessThan(0);
   return { light: select(outside, vec3(0), light), loss: select(outside, vec3(1), loss) };
 }

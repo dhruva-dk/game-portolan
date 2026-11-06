@@ -3,12 +3,13 @@
 import {
   DirectionalLight, Matrix4, PMREMGenerator, Scene, Vector3, type Node, type PerspectiveCamera, type RenderTarget, type WebGPURenderer,
 } from 'three/webgpu';
-import { Fn, output, positionWorld, vec4 } from 'three/tsl';
+import { Fn, output, positionWorld, positionWorldDirection, vec4 } from 'three/tsl';
 import { AIR, CLEAR_AIR, setAir, type Air } from './model.ts';
 import { EYE, aerialAt, passes } from './luts.ts';
 import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
 import { SkyLight, SkyLightNode, bodyLight, moonlight, sunlight } from './light.ts';
 import { SunShadows } from './shadows.ts';
+import { fogAt } from './fog.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type V3 = Node<'vec3'>;
@@ -17,15 +18,22 @@ type V3 = Node<'vec3'>;
 export type LightFilter = (colour: V3, p: V3) => V3;
 
 /** Everything the scene's surfaces take on with distance: the light lost on the way to the eye and the light
- *  scattered in along it, after the filter has worked on the light the surface had. Every material with fog on
- *  reads it. */
+ *  scattered in along it, by the air and then by the mist close round the eye, after the filter has worked on the
+ *  light the surface had. Every material with fog on reads it. */
 export function haze(filter?: LightFilter): Node<'vec4'> {
   return Fn(() => {
     const colour = filter ? filter(output.rgb, positionWorld) : output.rgb;
     const { light, loss } = aerialAt(positionWorld);
-    return vec4(colour.mul(loss).add(light), output.a);
+    const mist = fogAt(positionWorld);
+    return vec4(colour.mul(loss).add(light).mul(mist.loss).add(mist.light), output.a);
   })();
 }
+
+/** The sky behind everything, through the mist close round the eye. */
+const skyThroughMist = Fn(() => {
+  const mist = fogAt(EYE.position.add(positionWorldDirection.mul(4000)));
+  return vec4(skyBackground.rgb.mul(mist.loss).add(mist.light), 1);
+})();
 
 /** How often the probe of the sky round the eye is retaken, seconds, unless the light or the eye moves a lot. */
 const PROBE_EVERY = 0.75;
@@ -62,7 +70,7 @@ export class Atmosphere {
 
   /** Puts the sky, the haze and the lights into a scene; the filter works on every surface's light first. */
   install(scene: Scene, filter?: LightFilter): void {
-    scene.backgroundNode = skyBackground;
+    scene.backgroundNode = skyThroughMist;
     scene.fogNode = haze(filter);
     scene.add(this.sun, this.sun.target, this.moon, this.moon.target, this.sky);
   }

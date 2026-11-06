@@ -19,7 +19,7 @@
 //
 // Light a material works out for itself, rather than through three's lights (the sea's body, the sun's share of the
 // light the caustics move), reads the same cascades through sunShadow.
-import type { DirectionalLight, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
+import type { DepthTexture, DirectionalLight, Matrix4, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, cameraNear, cameraViewMatrix, clamp, cos, float, interleavedGradientNoise, nodeObject, reference, renderGroup, screenCoordinate,
   shadowPositionWorld, sin, smoothstep, texture, vec2, vec4,
@@ -30,8 +30,8 @@ import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 /** The shadows reach this far from the eye, metres. */
 export const SHADOW_REACH = 360;
 /** Where each slice ends, as a share of the reach. */
-const SPLITS = [0.034, 0.12, 0.36, 1];
-const MAP_SIZE = 2048;
+export const SPLITS = [0.034, 0.12, 0.36, 1];
+export const MAP_SIZE = 2048;
 /** The share of a boundary's distance the slices are cross-faded over, either side of it, and the share of the reach
  *  over which the last slice's shadows thin out. */
 const FADE = 0.1;
@@ -148,6 +148,20 @@ export class SunShadows {
     this.node.fade = true;
     (shadow as unknown as { shadowNode: unknown }).shadowNode = this.node;
     installed = this;
+  }
+
+  /** Each slice's map and the matrix that takes a world point into it, once the first frame has made them; for what
+   *  works the sun's shadow out away from a surface (the fog). */
+  get slices(): { matrix: Matrix4; depth: DepthTexture }[] | null {
+    const lights = this.node.lights;
+    if (lights.length !== SPLITS.length) return null;
+    const out: { matrix: Matrix4; depth: DepthTexture }[] = [];
+    for (const l of lights) {
+      const map = l.shadow?.map as { depthTexture?: DepthTexture } | null | undefined;
+      if (!map?.depthTexture) return null;
+      out.push({ matrix: l.shadow!.matrix, depth: map.depthTexture });
+    }
+    return out;
   }
 
   /** Refits the slices when the eye's projection changes. */

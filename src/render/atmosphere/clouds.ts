@@ -37,6 +37,7 @@ import { loop } from '../gpu/tsl.ts';
 import { raySphere } from './model.ts';
 import { MOON_RADIUS, SUN_RADIUS, aerialAt, lightTransmittance } from './luts.ts';
 import { skyLight } from './light.ts';
+import { fogAt } from './fog.ts';
 import { SHADE, SHADE_SIZE } from './shade.ts';
 
 type F = Node<'float'>;
@@ -377,9 +378,11 @@ function cloudMaterial(): MeshBasicNodeMaterial {
     If(alpha.lessThan(0.002), () => {
       Discard();
     });
-    // the haze between the eye and the cloud, at its mean depth
-    const { light, loss } = aerialAt(eye.add(d.mul(at.div(max(weight, 1e-5)))));
-    return vec4(L.mul(loss).add(light.mul(alpha)), alpha);
+    // the haze between the eye and the cloud, and the mist closer in, at its mean depth
+    const mean = eye.add(d.mul(at.div(max(weight, 1e-5))));
+    const { light, loss } = aerialAt(mean);
+    const mist = fogAt(mean);
+    return vec4(L.mul(loss).add(light.mul(alpha)).mul(mist.loss).add(mist.light.mul(alpha)), alpha);
   })();
   return m;
 }
