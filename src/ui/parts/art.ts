@@ -72,6 +72,9 @@ export function setStudio(s: Studio | null): void {
   studio = s;
 }
 
+/** The studio's render of kind:id (a weapon's is kind 'weapon'), or null with no studio yet. */
+export const studioShot = (kind: string, id: string): Promise<string | null> => (studio ? studio(kind, id) : Promise.resolve(null));
+
 /** The kinds the studio draws: the drawn art stands in until its render arrives, then gives way to it. */
 const RENDERED = new Set(['sailColour', 'sailPattern', 'hullPaint', 'figurehead', 'emblem']);
 

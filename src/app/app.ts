@@ -12,11 +12,12 @@ import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
 import { Studio } from '../render/studio.ts';
+import type { Weapon } from '../render/actors/view.ts';
 import { setStudio } from '../ui/parts/art.ts';
 import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SECRETS, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
-import { WEATHER } from '../sim/tables.ts';
+import { ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
 import { REGIONS } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
 import { Controls } from './controls.ts';
@@ -175,7 +176,8 @@ export class App {
     await this.actors.ready;
     // the locker's cards and the rewards are drawn from the ship itself
     const studio = new Studio(stage.renderer, this.actors.kit);
-    setStudio((kind, id) => studio.cosmetic(kind, id));
+    // a weapon's art is its mount on her deck; anything else is a cosmetic as worn
+    setStudio((kind, id) => (kind === 'weapon' ? studio.weapon(id as Weapon) : studio.cosmetic(kind, id)));
     await rockTexturesReady();
     stage.snap();
     this.progress = { f: 1, what: 'Ready' };
@@ -490,10 +492,16 @@ export class App {
 
   /** Hands the player the landmarks whose perks are named, so the next tick gives them those perks, and sets weather
    *  of `weather`'s kind at full strength over the ship. */
-  stagePlayer(o: { perks?: readonly string[]; weather?: string } = {}): void {
+  stagePlayer(o: { perks?: readonly string[]; weather?: string; weapons?: readonly string[] } = {}): void {
     const s = this.session;
     if (!s) return;
     const st = s.state, at = st.ships[PLAYER].pos;
+    // and fills the hotbar from its first slot with the weapons named, rare and loaded
+    (o.weapons ?? []).forEach((name, k) => {
+      const kind = ITEM[name as keyof typeof ITEM], slot = st.ships[PLAYER].slots[k];
+      if (kind === undefined || !slot) return;
+      slot.kind = kind; slot.rarity = 2; slot.n = WEAPONS[kind].mag;
+    });
     for (const id of o.perks ?? []) {
       const r = REGIONS.findIndex((x) => x.perk === id);
       if (r >= 0) st.owner[cellOf(TERRITORY, landmarkHold(r))] = PLAYER + 1;

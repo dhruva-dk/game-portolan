@@ -168,7 +168,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   gull.addEventListener('pointerdown', (e) => { e.stopPropagation(); tray.classList.toggle('is-on'); });
 
   // a slot tapped is selected; dragged onto another, the two trade places
-  const slots: { el: HTMLElement; ring: HTMLElement }[] = [];
+  const slots: { el: HTMLElement; ring: HTMLElement; count: HTMLElement }[] = [];
   let drag: { from: number; id: number; x: number; moved: boolean } | null = null;
   const slotAt = (x: number, y: number): number => {
     const t = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('.s-hud__slot[data-slot]');
@@ -199,7 +199,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     });
     s.addEventListener('pointerup', (e) => endDrag(e, true));
     s.addEventListener('pointercancel', (e) => endDrag(e, false));
-    slots.push({ el: s, ring: el('s-hud__ring', s) });
+    slots.push({ el: s, ring: el('s-hud__ring', s), count: el('s-hud__slotN', s) });
   }
   const dropB = el('s-hud__slot s-hud__act s-hud__drop', bar, `<i class="s-hud__slotI">${ICON.drop}</i><span class="s-hud__slotN">Drop</span>`);
   dropB.dataset.what = 'hud:drop';
@@ -342,14 +342,20 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
       v.el.classList.toggle('is-sel', k === h.selected);
       v.el.classList.toggle('is-empty', s.kind === 'empty');
       v.el.dataset.rarity = s.kind === 'weapon' ? String(s.rarity) : '';
-      const n = s.kind === 'weapon' ? `${s.ammo}/${s.mag}` : s.kind === 'consumable' ? `×${s.count}` : '';
-      const html = `<i class="s-hud__slotI">${slotIcon(s)}</i><span class="s-hud__slotN">${n}</span>`;
-      if (v.el.dataset.html !== html) {
-        v.el.dataset.html = html;
-        v.el.innerHTML = html;
+      // what is in the slot is rebuilt only when it changes, so a weapon's render isn't asked for again each shot
+      const what = s.kind === 'weapon' ? `w:${s.weapon}` : s.kind === 'consumable' ? `c:${s.item}` : '';
+      if (v.el.dataset.what !== what) {
+        v.el.dataset.what = what;
+        // a weapon is shown as the studio draws it on its mount, its glyph standing in until the render arrives
+        const studio = s.kind === 'weapon' ? ` data-studio="weapon:${s.weapon}"` : '';
+        v.el.innerHTML = `<i class="s-hud__slotI"${studio}>${slotIcon(s)}</i><span class="s-hud__slotN"></span>`;
         v.el.title = slotName(s);
+        v.count = v.el.querySelector('.s-hud__slotN')!;
         v.ring = el('s-hud__ring', v.el);
+        if (studio) hydrate(v.el);
       }
+      const n = s.kind === 'weapon' ? `${s.ammo}/${s.mag}` : s.kind === 'consumable' ? `×${s.count}` : '';
+      if (v.count.textContent !== n) v.count.textContent = n;
       v.ring.style.transform = `scaleX(${s.kind === 'weapon' ? s.reload : 0})`;
     });
     using.classList.toggle('is-on', h.using !== null);

@@ -13,14 +13,15 @@ import { HalfFloatType, NodeMaterial, PMREMGenerator, QuadMesh, RenderTarget, ty
 import { agxToneMapping, float, max, sRGBTransferOETF, texture, uniform, uv, vec4 } from 'three/tsl';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { R } from '../sim/sphere.ts';
-import { ShipModel, type Kit, type Pose } from './actors/caravel.ts';
+import { GUNPORTS, ShipModel, type Kit, type Pose } from './actors/caravel.ts';
 import { lookOf } from './actors/cosmetics.ts';
 import type { CosmeticIds, Weapon } from './actors/view.ts';
 import { P } from './gpu/uniforms.ts';
 import { everyFrame } from './gpu/work.ts';
 
-/** What a shot frames: the sails, the hull's side, the bow, the mainsail's face, or the gun on its mount. */
-export type Framing = 'sails' | 'hull' | 'bow' | 'emblem' | 'gun';
+/** What a shot frames: the sails, the hull's side, the bow, the mainsail's face, the gun on its mount, or the guns
+ *  run out of her ports. */
+export type Framing = 'sails' | 'hull' | 'bow' | 'emblem' | 'gun' | 'ports';
 
 /** Pixels on a side of each shot. */
 const SIZE = 256;
@@ -31,19 +32,23 @@ const TILES = 4;
 const PER_FRAME = 4;
 /** Where she stands: on the pole, so whatever her shaders work out from the planet's centre comes out right. */
 const BASE = new THREE.Vector3(0, R + 0.2, 0);
-const BOX = new THREE.Box3(), CENTRE = new THREE.Vector3(), SIZE3 = new THREE.Vector3();
+const BOX = new THREE.Box3(), CENTRE = new THREE.Vector3(), SIZE3 = new THREE.Vector3(), PORT = new THREE.Vector3();
 
 /**
  * How each framing looks at her: which of her parts it fits in the frame (the body's children in the order the model
  * adds them: hull, figurehead, sails, rigging, turret), the way the camera looks from (her own space, bow toward +z,
  * port toward +x), its field, and how much room it leaves round the part.
  */
-const FRAMES: Record<Framing, { part: 0 | 1 | 2 | 4; from: THREE.Vector3; fov: number; room: number; min?: number }> = {
+const FRAMES: Record<Framing, { part: 0 | 1 | 2 | 4; from: THREE.Vector3; fov: number; room: number; min?: number; alone?: boolean; ports?: boolean }> = {
   sails: { part: 2, from: new THREE.Vector3(-0.78, 0.16, 0.6), fov: 36, room: 0.84 },
   hull: { part: 0, from: new THREE.Vector3(-0.8, 0.18, 0.56), fov: 32, room: 0.7 },
   bow: { part: 1, from: new THREE.Vector3(-0.8, 0.2, 0.56), fov: 30, room: 1.2, min: 1.1 },
   emblem: { part: 2, from: new THREE.Vector3(-0.95, 0.12, 0.28), fov: 32, room: 0.8 },
-  gun: { part: 4, from: new THREE.Vector3(-0.62, 0.48, 0.62), fov: 30, room: 1.1, min: 1.2 },
+  // the gun alone, as an icon: three-quarters from ahead and a little above, so the barrel reads in profile and
+  // the mount's round shows beneath it
+  gun: { part: 4, from: new THREE.Vector3(-0.9, 0.42, 0.45), fov: 26, room: 0.95, alone: true },
+  // a broadside has no gun on the mount: its guns are run out of the ports along her side, seen from the beam, close
+  ports: { part: 0, from: new THREE.Vector3(-1, 0.3, 0.2), fov: 24, room: 0.95, alone: true, ports: true },
 };
 
 /** A ship at rest on a flat calm, her sails drawing in a steady breeze off the quarter. */
@@ -124,7 +129,7 @@ export class Studio {
 
   /** The art for a weapon: its mount on her deck. */
   weapon(kind: Weapon): Promise<string | null> {
-    return this.#shoot(`weapon:${kind}`, {}, 'gun', kind);
+    return this.#shoot(`weapon:${kind}`, {}, kind === 'broadside' ? 'ports' : 'gun', kind);
   }
 
   dispose(): void {
@@ -191,9 +196,23 @@ export class Studio {
     if (job.weapon !== this.#ship.weapon) this.#ship.setWeapon(job.weapon);
     // fit the part's bounding sphere in the field, from the framing's side
     const body = this.#ship.body;
+    // a framing that shows its part alone hides the rest of her for the shot
+    const hidden = f.alone ? body.children.filter((c, n) => n !== f.part && c.visible) : [];
+    for (const c of hidden) c.visible = false;
     this.#ship.root.updateMatrixWorld(true);
-    const box = BOX.setFromObject(body.children[f.part]);
-    const centre = box.getCenter(CENTRE), radius = Math.max(box.getSize(SIZE3).length() / 2, f.min ?? 0);
+    let centre: THREE.Vector3, radius: number;
+    if (f.ports) {
+      // the run of ports on the side the camera looks at
+      const side = GUNPORTS.filter((g) => Math.sign(g.pos.x) === Math.sign(f.from.x));
+      BOX.makeEmpty();
+      for (const g of side) BOX.expandByPoint(this.#ship.toWorld(g.pos, PORT));
+      centre = BOX.getCenter(CENTRE);
+      radius = BOX.getSize(SIZE3).length() / 2 + 0.9;
+    } else {
+      const box = BOX.setFromObject(body.children[f.part]);
+      centre = box.getCenter(CENTRE);
+      radius = Math.max(box.getSize(SIZE3).length() / 2, f.min ?? 0);
+    }
     const away = (radius * f.room) / Math.sin((f.fov * Math.PI) / 360);
     cam.fov = f.fov;
     cam.position.copy(f.from).normalize().multiplyScalar(away).add(centre);
@@ -203,6 +222,7 @@ export class Studio {
     r.autoClear = true;
     r.setRenderTarget(this.#hdr);
     r.render(this.#scene, cam);
+    for (const c of hidden) c.visible = true;
     // into its tile, leaving the others be
     this.#atlas.viewport.set((k % TILES) * SIZE, Math.floor(k / TILES) * SIZE, SIZE, SIZE);
     r.setRenderTarget(this.#atlas);

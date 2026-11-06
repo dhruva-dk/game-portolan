@@ -79,7 +79,7 @@ export function installHook(app: App) {
     sinkPlayer: (by?: number, how?: string) => app.sinkPlayer(by, how),
     winPlayer: () => app.winPlayer(),
     /** Gives the player perks by name and weather by kind ('fog', 'rain'...) over the ship. */
-    stagePlayer: (o: { perks?: string[]; weather?: string }) => app.stagePlayer(o),
+    stagePlayer: (o: { perks?: string[]; weather?: string; weapons?: string[] }) => app.stagePlayer(o),
     finish: () => app.finishMatch(),
     matchHash: () => app.matchHash(),
     state: () => app.summary(),

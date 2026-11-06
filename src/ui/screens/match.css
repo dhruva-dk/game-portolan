@@ -74,6 +74,12 @@
 .s-hud__slot[data-rarity='4'] { background: linear-gradient(180deg, rgba(18, 10, 4, 0.72), var(--rar4-lo)); }
 .s-hud__slotI { width: 55%; height: 55%; display: block; }
 .s-hud__slotI svg { width: 100%; height: 100%; }
+/* a weapon's studio render: larger than the glyph it replaces, since the gun sits small on its mount */
+.s-hud__slotI[data-studio] { position: relative; }
+.s-hud__slotI[data-studio] > svg { transition: opacity 220ms var(--ease-out, ease-out); }
+.s-hud__slotI.is-rendered > svg { opacity: 0; }
+.s-hud__slotI .p-art__shot { position: absolute; inset: -38%; width: 176%; height: 176%; object-fit: contain; opacity: 0; transition: opacity 260ms var(--ease-out, ease-out); pointer-events: none; filter: drop-shadow(0 calc(1px * var(--k)) calc(1.5px * var(--k)) rgba(0, 0, 0, 0.6)); }
+.s-hud__slotI.is-rendered > .p-art__shot { opacity: 1; }
 .s-hud__slotN { font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); line-height: 1; }
 .s-hud__ring { position: absolute; left: 0; right: 0; bottom: 0; height: calc(4px * var(--k)); background: var(--c-goldHi); transform-origin: left; transform: scaleX(0); }
 /* the gull and drop sit either end of the hotbar; the gull's parcels open above it */
