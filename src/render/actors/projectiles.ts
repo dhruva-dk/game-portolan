@@ -91,12 +91,12 @@ export class Projectiles {
       switch (p.weapon) {
         case 'cannon':
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.32, r: 6, g: 3.4, b: 1.2, frame: SPRITE.spark, mode: 1, stretch: 0.035 });
-          trail(2.2, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.5, 0.8), size: 0.25, grow: 4, r: 0.9, g: 0.88, b: 0.86, a: 0.3, frame: SPRITE.smoke, drag: 1.5 }));
+          trail(2.2, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.5, 0.8), size: 0.25, grow: 4, r: 0.9, g: 0.88, b: 0.86, a: 0.3, frame: SPRITE.billow, drag: 1.5 }));
           break;
         case 'broadside':
           if (nr < CAP * 2) this.place(this.balls, nr++, p.pos, t * 9 + p.id);
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.4, r: 5, g: 2.6, b: 0.9, frame: SPRITE.spark, mode: 1, stretch: 0.025 });
-          trail(1.6, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1.0), size: 0.35, grow: 4, r: 0.8, g: 0.78, b: 0.76, a: 0.32, frame: SPRITE.smoke, drag: 1.5 }));
+          trail(1.6, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1.0), size: 0.35, grow: 4, r: 0.8, g: 0.78, b: 0.76, a: 0.32, frame: SPRITE.billow, drag: 1.5 }));
           break;
         case 'repeater':
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.12, r: 6 * (0.6 + rc.r * 0.4), g: 4.6 * (0.6 + rc.g * 0.4), b: 1.6 + rc.b, frame: SPRITE.spark, mode: 1, stretch: 0.05 });
@@ -144,7 +144,7 @@ export class Projectiles {
             this.chains.setMatrixAt(nc++, this.tmp.matrix);
           }
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.22, r: 3.2, g: 2.4, b: 1.6, a: 0.6, frame: SPRITE.spark, mode: 1, stretch: 0.03 });
-          trail(1.8, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.4, 0.7), size: 0.3, grow: 3.5, r: 0.85, g: 0.84, b: 0.82, a: 0.22, frame: SPRITE.smoke, drag: 1.5 }));
+          trail(1.8, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.4, 0.7), size: 0.3, grow: 3.5, r: 0.85, g: 0.84, b: 0.82, a: 0.22, frame: SPRITE.billow, drag: 1.5 }));
           break;
         }
         case 'heated': {
@@ -153,7 +153,7 @@ export class Projectiles {
           // embers shed from the ball, and a thin brown smoke where it singes the air
           trail(1.2, (x, y, z) => {
             if (Math.random() < 0.6) glow.emit({ x, y, z, vx: ux * 2 + rand(-1, 1), vy: uy * 2 + rand(-1, 1), vz: uz * 2 + rand(-1, 1), life: rand(0.3, 0.6), size: 0.07, r: 7, g: 2.2, b: 0.4, frame: SPRITE.spark, drag: 2, fadeIn: 0 });
-            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1), size: 0.28, grow: 4, r: 0.55, g: 0.45, b: 0.38, a: 0.28, frame: SPRITE.smoke, drag: 1.5 });
+            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1), size: 0.28, grow: 4, r: 0.55, g: 0.45, b: 0.38, a: 0.28, frame: SPRITE.billow, drag: 1.5 });
           });
           break;
         }
@@ -161,7 +161,7 @@ export class Projectiles {
           if (ns < CAP) this.place(this.shells, ns++, p.pos, t * 7 + p.id);
           trail(0.9, (x, y, z) => {
             glow.emit({ x, y, z, life: rand(0.15, 0.3), size: 0.9, grow: 0.3, r: 5, g: 2.2, b: 0.5, frame: SPRITE.flame, fadeIn: 0 });
-            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(1.2, 2), size: 0.6, grow: 4, r: 0.35, g: 0.33, b: 0.32, a: 0.45, frame: SPRITE.smoke, drag: 1, spin: rand(-0.5, 0.5) });
+            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(1.2, 2), size: 0.6, grow: 4, r: 0.35, g: 0.33, b: 0.32, a: 0.45, frame: SPRITE.billow, drag: 1, spin: rand(-0.5, 0.5) });
           });
           break;
         }

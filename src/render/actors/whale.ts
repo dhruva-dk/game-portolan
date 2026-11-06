@@ -208,7 +208,7 @@ export class Whales {
     }
     for (let i = 0; i < 8 * big; i++) {
       const h = rand(6, 10) * big, p = this.w.copy(at).addScaledVector(up, h);
-      this.fx.smoke.emit({ x: p.x, y: p.y, z: p.z, vx: up.x * 0.6 + a.x * rand(-1, 1), vy: up.y * 0.6 + a.y * rand(-1, 1), vz: up.z * 0.6 + a.z * rand(-1, 1), life: rand(2.5, 4), size: rand(1.5, 2.5) * big, grow: 2.5, r: 1.2, g: 1.25, b: 1.3, a: 0.22, frame: SPRITE.smoke, drag: 0.6, fadeIn: 0.25 });
+      this.fx.smoke.emit({ x: p.x, y: p.y, z: p.z, vx: up.x * 0.6 + a.x * rand(-1, 1), vy: up.y * 0.6 + a.y * rand(-1, 1), vz: up.z * 0.6 + a.z * rand(-1, 1), life: rand(2.5, 4), size: rand(1.5, 2.5) * big, grow: 2.5, r: 1.2, g: 1.25, b: 1.3, a: 0.22, frame: SPRITE.billow, drag: 0.6, fadeIn: 0.25 });
     }
   }
 
@@ -299,7 +299,7 @@ export class Whales {
       fx.glow.emit({ x: g.x, y: g.y, z: g.z, life: 1.4, size: 12, grow: 12, r: 0.5, g: 1.4, b: 1.8, a: 1, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
       for (let i = 0; i < 36; i++) {
         const p = this.v.copy(ground).addScaledVector(ca, rand(-30, 30)).addScaledVector(cb, rand(-30, 30)).addScaledVector(cu, rand(2, 14));
-        fx.smoke.emit({ x: p.x, y: p.y, z: p.z, vx: cu.x * rand(0.5, 2), vy: cu.y * rand(0.5, 2), vz: cu.z * rand(0.5, 2), life: rand(4, 6.5), size: rand(6, 11), grow: 2.2, r: 1.2, g: 1.24, b: 1.3, a: 0.3, frame: SPRITE.smoke, drag: 0.5, fadeIn: 0.15 });
+        fx.smoke.emit({ x: p.x, y: p.y, z: p.z, vx: cu.x * rand(0.5, 2), vy: cu.y * rand(0.5, 2), vz: cu.z * rand(0.5, 2), life: rand(4, 6.5), size: rand(6, 11), grow: 2.2, r: 1.2, g: 1.24, b: 1.3, a: 0.3, frame: SPRITE.billow, drag: 0.5, fadeIn: 0.15 });
       }
       juice = { shake: 0.95 * near, kick: 5 * near, flash: 0.22 * near, flashColor: 0xdff4ff, hitStop: 0.06 * near, haptic: 'heavy' };
     }

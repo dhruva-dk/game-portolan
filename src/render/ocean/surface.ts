@@ -123,6 +123,28 @@ export function inFrame(up: V3, f: Frame): { q: V2; e1: V3; e2: V3 } {
   return { q: vec2(cp, sp).mul(theta.mul(R)), e1: g.mul(cp).sub(t.mul(sp)), e2: g.mul(sp).add(t.mul(cp)) };
 }
 
+/** The wave field the sea is drawn from, once the ocean is built: what seaHeightNode reads. */
+export const SEA_FIELD: { texture: Texture | null } = { texture: null };
+
+/**
+ * The sea's surface over `up` in metres from the planet's centre, as near as anything riding it needs: the level of
+ * the tide and the events, and the height of the waves of every cascade at their finest mip, in both frames. For
+ * compute work (particles landing on the water); null until the ocean is built.
+ */
+export function seaHeightNode(up: V3): F | null {
+  const tex = SEA_FIELD.texture;
+  if (!tex) return null;
+  const field = texture(tex);
+  let h: F = float(0);
+  FRAMES.forEach((f, k) => {
+    const { q } = inFrame(up, f);
+    let d: F = float(0);
+    for (let c = 0; c < CASCADES; c++) d = d.add(field.sample(q.div(SIZES[c])).depth(int(LAYER.displacement + c)).level(float(0)).y);
+    h = h.add(d.mul(k === 0 ? FRAME.weight.x : FRAME.weight.y));
+  });
+  return seaLevelNode(up).add(h);
+}
+
 // ---------------------------------------------------------------- rain on the water
 
 /** Three layers of drops, each landing once in each cell of a grid at its own rate and laying a ring that spreads and

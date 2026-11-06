@@ -4,6 +4,7 @@
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
+import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
@@ -204,6 +205,7 @@ export class GpuStage {
     this.clams.update(v.events, v.time, v.tide);
     this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
     this.moonbow.update(eye, wind.length());
+    runFrameWork(this.renderer);
     this.post.focus(v.focus ?? null);
     this.post.render(dt);
 

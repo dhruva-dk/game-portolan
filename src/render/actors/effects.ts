@@ -89,7 +89,8 @@ export class Effects {
     const puffs = kind === 'repeater' ? (Math.random() < 0.3 ? 1 : 0) : 3;
     for (let i = 0; i < puffs; i++) {
       const sp = rand(2, 7) * s, j = L.vec(rand(0, TAU), rand(0, 0.5), rand(0.3, 1.2));
-      this.smoke.emit({ x, y, z, vx: dir.x * sp + j.x, vy: dir.y * sp + j.y, vz: dir.z * sp + j.z, life: rand(1.2, 2.2), size: 0.8 * s, grow: 4, r: 0.85, g: 0.84, b: 0.82, a: 0.45, frame: SPRITE.smoke, drag: 1.4, spin: rand(-0.5, 0.5) });
+      // the first of it is lit from inside by the flash, and burns out as it billows
+      this.smoke.emit({ x, y, z, vx: dir.x * sp + j.x, vy: dir.y * sp + j.y, vz: dir.z * sp + j.z, life: rand(1.2, 2.2), size: 0.8 * s, grow: 4, r: 0.85, g: 0.84, b: 0.82, a: 0.45, frame: i === 0 ? SPRITE.blast : SPRITE.billow, heat: 0.9, drag: 1.4, spin: rand(-0.5, 0.5) });
     }
   }
 
@@ -105,7 +106,7 @@ export class Effects {
     }
     for (let i = 0; i < 4 + big * 4; i++) {
       const v = L.vec(Math.random() * TAU, 3, rand(1, 3));
-      this.smoke.emit({ x: c.x, y: c.y, z: c.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.4, 2.4), size: 1.2 + big, grow: 3, r: 1.2, g: 1.25, b: 1.3, a: 0.35, frame: SPRITE.smoke, drag: 1.2 });
+      this.smoke.emit({ x: c.x, y: c.y, z: c.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.4, 2.4), size: 1.2 + big, grow: 3, r: 1.2, g: 1.25, b: 1.3, a: 0.35, frame: SPRITE.billow, drag: 1.2 });
     }
     const r = onSea(where, 0.1, new THREE.Vector3());
     this.smoke.emit({ x: r.x, y: r.y, z: r.z, life: 1.4, size: 1 + big * 2, grow: 5, r: 1.3, g: 1.35, b: 1.4, a: 0.7, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
@@ -125,14 +126,14 @@ export class Effects {
       this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.6), size: rand(0.25, 0.5), r: 0.55, g: 0.4, b: 0.28, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-12, 12), float: true, fadeIn: 0 });
     }
     const v = L.vec(0, 0, 1.2);
-    this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 1.6, size: 1.2 * s, grow: 3, r: 0.45, g: 0.42, b: 0.4, a: 0.55, frame: SPRITE.smoke, drag: 1, spin: rand(-0.4, 0.4) });
+    this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: 1.6, size: 1.2 * s, grow: 3, r: 0.45, g: 0.42, b: 0.4, a: 0.55, frame: SPRITE.billow, drag: 1, spin: rand(-0.4, 0.4) });
   }
 
   hitLand(at: THREE.Vector3, big: number): void {
     const { x, y, z } = at, L = this.L.at(at);
     for (let i = 0; i < 4 + big * 6; i++) {
       const v = L.vec(Math.random() * TAU, rand(1, 4) * (1 + big), rand(1, 4) * (1 + big));
-      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.2, 2.4), size: 1 + big * 1.5, grow: 2.5, r: 0.62, g: 0.55, b: 0.46, a: 0.6, frame: SPRITE.smoke, drag: 1.3, grav: 1 });
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.2, 2.4), size: 1 + big * 1.5, grow: 2.5, r: 0.62, g: 0.55, b: 0.46, a: 0.6, frame: SPRITE.billow, drag: 1.3, grav: 1 });
     }
     for (let i = 0; i < 8 + big * 10; i++) {
       const v = L.vec(Math.random() * TAU, rand(4, 12), rand(4, 12));
@@ -147,18 +148,24 @@ export class Effects {
   /** A mortar landing, or a ship going down: fireball, smoke column, shockwave, spray. */
   explode(at: THREE.Vector3, size: number, onWater: boolean): void {
     const L = this.L.at(at), c = this.p.copy(at).addScaledVector(L.up, 1), { x, y, z } = c;
-    this.glow.emit({ x, y, z, life: 0.22, size: 9 * size, grow: 1.4, r: 5, g: 3, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
-    for (let i = 0; i < 10 * size; i++) {
+    this.glow.emit({ x, y, z, life: 0.14, size: 4.5 * size, grow: 1.5, r: 5, g: 3, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
+    // tongues of flame licking out of it, brief
+    for (let i = 0; i < 5 * size; i++) {
       const v = L.vec(Math.random() * TAU, rand(2, 8) * size, rand(2, 9) * size);
-      this.glow.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.35, 0.7), size: rand(1.4, 2.6) * size, grow: 1.8, r: 5, g: rand(1.8, 2.8), b: 0.6, frame: SPRITE.flame, drag: 2.5, spin: rand(-2, 2) });
+      this.glow.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.25, 0.5), size: rand(0.9, 1.6) * size, grow: 1.6, r: 5, g: rand(1.8, 2.8), b: 0.6, frame: SPRITE.flame, drag: 2.5, spin: rand(-2, 2) });
     }
     for (let i = 0; i < 24 * size; i++) {
       const v = L.vec(Math.random() * TAU, rand(12, 34), rand(4, 26));
       this.glow.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.5, 1.2), size: 0.1, r: 7, g: 3.6, b: 1, frame: SPRITE.spark, mode: 1, stretch: 0.04, grav: 20, drag: 0.8, fadeIn: 0 });
     }
+    // the fireball: billows burning from inside, their hearts cooling from yellow to red to smoke as they swell
+    for (let i = 0; i < 3 + 4 * size; i++) {
+      const v = L.vec(Math.random() * TAU, rand(1, 6) * size, rand(2, 7) * size), d = rand(0.18, 0.28);
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.4, 2.2), size: rand(2.2, 3.2) * size, grow: 2.2, r: d, g: d * 0.9, b: d * 0.85, a: 0.95, frame: SPRITE.blast, heat: rand(1.1, 1.5), drag: 1.8, grav: -2, spin: rand(-0.6, 0.6), fadeIn: 0.04 });
+    }
     for (let i = 0; i < 12 * size; i++) {
       const v = L.vec(Math.random() * TAU, rand(1, 5) * size, rand(3, 9) * size), dark = rand(0.16, 0.3);
-      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(2.5, 4.5), size: rand(2, 3.5) * size, grow: 2.6, r: dark, g: dark * 0.95, b: dark * 0.9, a: 0.75, frame: SPRITE.smoke, drag: 1.1, grav: -1.2, spin: rand(-0.3, 0.3), fadeIn: 0.12 });
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(2.5, 4.5), size: rand(2, 3.5) * size, grow: 2.6, r: dark, g: dark * 0.95, b: dark * 0.9, a: 0.75, frame: SPRITE.billow, drag: 1.1, grav: -1.2, spin: rand(-0.3, 0.3), fadeIn: 0.12 });
     }
     if (onWater) {
       this.splash(at, 1.6 * size);
@@ -187,7 +194,7 @@ export class Effects {
     for (let i = 0; i < n || Math.random() < n - i; i++) {
       const o = this.at(crater, L.vec(Math.random() * TAU, rand(0, 6), rand(-2, 2))), v = L.vec(Math.random() * TAU, rand(0.3, 2.5), rand(16, 34) * (0.3 + strength));
       const d = rand(0.04, 0.1);
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(7, 11), size: rand(6, 11) * (0.5 + strength * 0.8), grow: 5, r: d, g: d * 0.92, b: d * 0.88, a: 0.6 + strength * 0.35, frame: SPRITE.smoke, drag: 0.25, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(7, 11), size: rand(6, 11) * (0.5 + strength * 0.8), grow: 5, r: d, g: d * 0.92, b: d * 0.88, a: 0.6 + strength * 0.35, frame: SPRITE.billow, drag: 0.25, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
       if (i > 20) break;
     }
     if (strength < 0.05) return;
@@ -209,7 +216,7 @@ export class Effects {
     this.glow.emit({ x, y, z, life: 0.35, size: 2.6, grow: -0.6, r: 6, g: 2.2, b: 0.5, frame: SPRITE.flame, fadeIn: 0 });
     if (Math.random() < 40 * dt) {
       const d = rand(0.08, 0.16);
-      this.smoke.emit({ x, y, z, life: rand(1.6, 2.6), size: rand(1.6, 2.6), grow: 2.4, r: d, g: d * 0.95, b: d * 0.9, a: 0.65, frame: SPRITE.smoke, drag: 0.6, grav: -0.6, spin: rand(-0.4, 0.4), fadeIn: 0.05 });
+      this.smoke.emit({ x, y, z, life: rand(1.6, 2.6), size: rand(1.6, 2.6), grow: 2.4, r: d, g: d * 0.95, b: d * 0.9, a: 0.65, frame: SPRITE.blast, heat: 0.7, drag: 0.6, grav: -0.6, spin: rand(-0.4, 0.4), fadeIn: 0.05 });
     }
   }
 
@@ -221,7 +228,7 @@ export class Effects {
       const c = onSea(at, 0.3, new THREE.Vector3());
       for (let i = 0; i < 10; i++) {
         const o = this.at(c, L.vec(Math.random() * TAU, rand(0, 2), 0)), v = L.vec(Math.random() * TAU, rand(0.3, 1.5), rand(3, 7));
-        this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(2.5, 4), size: rand(1.5, 2.5), grow: 3.5, r: 1.15, g: 1.15, b: 1.18, a: 0.5, frame: SPRITE.smoke, drag: 0.8, spin: rand(-0.4, 0.4), fadeIn: 0.1 });
+        this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(2.5, 4), size: rand(1.5, 2.5), grow: 3.5, r: 1.15, g: 1.15, b: 1.18, a: 0.5, frame: SPRITE.billow, drag: 0.8, spin: rand(-0.4, 0.4), fadeIn: 0.1 });
       }
       return;
     }
@@ -241,7 +248,7 @@ export class Effects {
     }
     for (let i = 0; i < 6; i++) {
       const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 6), 2)), v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(1, 3)), d = rand(0.5, 0.65);
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: rand(4, 7), grow: 4, r: d, g: d * 0.93, b: d * 0.85, a: 0.45, frame: SPRITE.smoke, drag: 0.7, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: rand(4, 7), grow: 4, r: d, g: d * 0.93, b: d * 0.85, a: 0.45, frame: SPRITE.billow, drag: 0.7, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
     }
   }
 
@@ -271,7 +278,7 @@ export class Effects {
     }
     for (let i = 0; i < 6; i++) {
       const v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(0.5, 2));
-      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.5), size: 1.4, grow: 3, r: 0.6, g: 0.55, b: 0.5, a: 0.45, frame: SPRITE.smoke, drag: 1 });
+      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.5), size: 1.4, grow: 3, r: 0.6, g: 0.55, b: 0.5, a: 0.45, frame: SPRITE.billow, drag: 1 });
     }
   }
 
@@ -280,7 +287,7 @@ export class Effects {
     const L = this.L.at(foot);
     for (let i = 0; i < 10; i++) {
       const v = L.vec(Math.random() * TAU, rand(1, 3), rand(1, 3));
-      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.4), size: 0.6, grow: 2.5, r: 0.75, g: 0.68, b: 0.58, a: 0.4, frame: SPRITE.smoke, drag: 1.5 });
+      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.4), size: 0.6, grow: 2.5, r: 0.75, g: 0.68, b: 0.58, a: 0.4, frame: SPRITE.billow, drag: 1.5 });
     }
   }
 
@@ -311,7 +318,8 @@ export class Effects {
     }
     if (Math.random() < 9 * dt) {
       const o = this.p.copy(sail ?? deck).addScaledVector(fwd, rand(-3, 3)), v = L.vec(Math.random() * TAU, rand(0.5, 1.5), rand(2.5, 4.5));
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: 1.6, grow: 5, r: 0.16, g: 0.15, b: 0.14, a: 0.6, frame: SPRITE.smoke, drag: 0.3, spin: rand(-0.4, 0.4) });
+      // the pall, lit from under by the fire it rises off
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: 1.6, grow: 5, r: 0.16, g: 0.15, b: 0.14, a: 0.6, frame: SPRITE.blast, heat: 0.55, drag: 0.3, spin: rand(-0.4, 0.4) });
     }
   }
 
@@ -320,7 +328,7 @@ export class Effects {
     const L = this.L.at(at);
     for (let i = 0; i < 10 * big; i++) {
       const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 2) * big, 0)), v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(2, 5));
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.6), size: rand(0.8, 1.4) * big, grow: 4, r: 1.25, g: 1.27, b: 1.3, a: 0.5, frame: SPRITE.smoke, drag: 0.8, spin: rand(-0.5, 0.5) });
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.6), size: rand(0.8, 1.4) * big, grow: 4, r: 1.25, g: 1.27, b: 1.3, a: 0.5, frame: SPRITE.billow, drag: 0.8, spin: rand(-0.5, 0.5) });
     }
   }
 
@@ -356,7 +364,7 @@ export class Effects {
     const L = this.L.at(at);
     if (Math.random() < (0.6 - hp) * 14 * dt) {
       const d = 0.22 + hp * 0.4, o = this.at(at, L.vec(Math.random() * TAU, rand(0, 1), 0)), v = L.vec(Math.random() * TAU, rand(0, 0.5), rand(2, 4));
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(2, 3.5), size: 0.8, grow: 4, r: d, g: d * 0.95, b: d * 0.92, a: 0.6, frame: SPRITE.smoke, drag: 0.4, spin: rand(-0.5, 0.5) });
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(2, 3.5), size: 0.8, grow: 4, r: d, g: d * 0.95, b: d * 0.92, a: 0.6, frame: SPRITE.billow, drag: 0.4, spin: rand(-0.5, 0.5) });
     }
     if (hp < 0.3 && Math.random() < (0.3 - hp) * 50 * dt) {
       const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 1.2), -0.5)), v = L.vec(0, 0, rand(2, 4));

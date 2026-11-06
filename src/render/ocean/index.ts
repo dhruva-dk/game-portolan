@@ -5,7 +5,7 @@ import type { V3 } from '../../sim/math.ts';
 import { R } from '../../sim/sphere.ts';
 import { CALM_SEA, LongWaves, spectrumParams, type SeaState } from './spectrum.ts';
 import { SEA, Waves, setSpectrum } from './waves.ts';
-import { FRAME, WATER, oceanSurface } from './surface.ts';
+import { FRAME, SEA_FIELD, WATER, oceanSurface } from './surface.ts';
 import { beneath } from './beneath.ts';
 import { Coast } from './coast.ts';
 import { Territory } from './territory.ts';
@@ -48,6 +48,7 @@ export class Ocean {
   constructor(seed = 1) {
     this.#seed = seed;
     this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory, this.flow);
+    SEA_FIELD.texture = this.waves.field;
     this.beneath = beneath(this.waves.field);
   }
 

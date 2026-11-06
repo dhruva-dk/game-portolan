@@ -42,7 +42,7 @@ export const LENS = {
   occlusion: uniform(0.8),
   shutter: uniform(0.5),
   flare: uniform(0.35),
-  dirt: uniform(0.5),
+  dirt: uniform(0.1),
   grain: uniform(0.022),
   haze: uniform(0.0045),
 };
@@ -215,11 +215,11 @@ export class Post {
       // the brightest of the scatter, exposed, throws ghosts across the lens and lights its dust
       const bright = rtt(glow.rgb.mul(exposure), null, null, { resolutionScale: 0.25 });
       const ghosts = gaussianBlur(
-        lensflare(bright, { ghostTint: vec3(1, 0.86, 0.66), threshold: float(8), ghostSamples: float(5), ghostSpacing: float(0.22), ghostAttenuationFactor: float(22), downSampleRatio: 2 }),
+        lensflare(bright, { ghostTint: vec3(1, 0.86, 0.66), threshold: float(20), ghostSamples: float(5), ghostSpacing: float(0.22), ghostAttenuationFactor: float(22), downSampleRatio: 2 }),
         null, 6,
       ) as unknown as Node<'vec4'>;
       const dust = texture(lensDirt(), screenUV).rgb;
-      const lit = max(glow.rgb.mul(exposure).sub(0.9), vec3(0));
+      const lit = max(glow.rgb.mul(exposure).sub(1.6), vec3(0));
       let hdr = hdrIn.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM)).mul(exposure)
         .add(ghosts.rgb.mul(LENS.flare))
         .add(lit.mul(dust).mul(LENS.dirt));
@@ -253,7 +253,18 @@ export class Post {
     };
     if (overlay) renderer.setClearColor(0x000000, 0);
     this.#plain = finish(moved as unknown as Node<'vec4'>);
-    this.#focused = finish(dof(moved, viewZ, FOCUS.distance, FOCUS.range, FOCUS.bokeh) as unknown as Node<'vec4'>);
+    // out of focus a lens spreads each point of light into a disc; the light is tone-weighted before it spreads
+    // (Karis's 1/(1+luma)) and given back after, so a spark or a lantern behind the focus blooms into a soft glow
+    // instead of a hard-edged coin brighter than everything round it
+    const weighed = rtt(Fn(() => {
+      const c = moved.sample(screenUV).rgb.toVar();
+      return vec4(c.div(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure).add(1)), 1);
+    })());
+    const spread = dof(weighed, viewZ, FOCUS.distance, FOCUS.range, FOCUS.bokeh) as unknown as Node<'vec4'>;
+    this.#focused = finish(Fn(() => {
+      const c = spread.rgb.toVar();
+      return vec4(c.div(max(float(1).sub(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure)), 0.02)), 1);
+    })() as unknown as Node<'vec4'>);
     this.pipeline = new RenderPipeline(renderer);
     this.pipeline.outputNode = this.#plain;
     this.exposure = new Exposure(scenePass.getTexture('output') as Texture);
