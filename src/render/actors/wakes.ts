@@ -70,6 +70,8 @@ export class Wakes {
   private readonly pos: Float32Array;
   /** Up from the planet's centre at each vertex, for the node material's light. */
   private readonly nrm: Float32Array;
+  /** Metres across the ribbon from its middle, signed, for the node material's lace of foam. */
+  private readonly across: Float32Array;
   private readonly data: Float32Array;
   private readonly col: Float32Array;
   private readonly geo: THREE.BufferGeometry;
@@ -80,6 +82,7 @@ export class Wakes {
     const verts = MAX * (N + 1) * 2;
     this.pos = new Float32Array(verts * 3);
     this.nrm = new Float32Array(verts * 3);
+    this.across = new Float32Array(verts);
     this.data = new Float32Array(verts * 4);
     this.col = new Float32Array(verts * 4);
     const idx: number[] = [];
@@ -91,7 +94,10 @@ export class Wakes {
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aData', new THREE.BufferAttribute(this.data, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aColor', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
-    if (GPU.on) g.setAttribute('normal', new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage));
+    if (GPU.on) {
+      g.setAttribute('normal', new THREE.BufferAttribute(this.nrm, 3).setUsage(THREE.DynamicDrawUsage));
+      g.setAttribute('aAcross', new THREE.BufferAttribute(this.across, 1).setUsage(THREE.DynamicDrawUsage));
+    }
     g.setIndex(idx);
     const m = GPU.on ? wakeNodeMaterial(AU.uNoise.value!) : new THREE.ShaderMaterial({
       vertexShader: VERT, fragmentShader: FRAG,
@@ -130,7 +136,7 @@ export class Wakes {
   }
 
   update(t: number): void {
-    const P = this.pos, N3 = this.nrm, D = this.data, C = this.col, R = SEA.radius + SEA.level, p = new THREE.Vector3(), c = new THREE.Vector3();
+    const P = this.pos, N3 = this.nrm, A = this.across, D = this.data, C = this.col, R = SEA.radius + SEA.level, p = new THREE.Vector3(), c = new THREE.Vector3();
     for (let s = 0; s < MAX; s++) {
       const tr = this.slots[s];
       const base = s * (N + 1) * 2;
@@ -154,6 +160,7 @@ export class Wakes {
           p.normalize().multiplyScalar(h);
           P[v * 3] = p.x; P[v * 3 + 1] = p.y; P[v * 3 + 2] = p.z;
           N3[v * 3] = p.x / h; N3[v * 3 + 1] = p.y / h; N3[v * 3 + 2] = p.z / h;
+          A[v] = side ? hw : -hw;
           D[v * 4] = along; D[v * 4 + 1] = side ? 1 : -1; D[v * 4 + 2] = i < list.length ? sm.s : 0; D[v * 4 + 3] = age;
           const tc = this.slots[s]!;
           C[v * 4] = tc.color.r; C[v * 4 + 1] = tc.color.g; C[v * 4 + 2] = tc.color.b; C[v * 4 + 3] = tc.glow;
@@ -161,7 +168,7 @@ export class Wakes {
         if (i + 1 < list.length) along += list[i].dir.distanceTo(list[i + 1].dir) * R;
       }
     }
-    for (const k of ['position', 'normal', 'aData', 'aColor']) {
+    for (const k of ['position', 'normal', 'aAcross', 'aData', 'aColor']) {
       const a = this.geo.getAttribute(k) as THREE.BufferAttribute | undefined;
       if (a) a.needsUpdate = true;
     }

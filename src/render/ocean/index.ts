@@ -8,6 +8,7 @@ import { SEA, Waves, setSpectrum } from './waves.ts';
 import { FRAME, WATER, oceanSurface } from './surface.ts';
 import { beneath } from './beneath.ts';
 import { Coast } from './coast.ts';
+import { Territory } from './territory.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
@@ -28,6 +29,8 @@ export class Ocean {
   readonly mesh: Mesh;
   /** The coastline's distance field, which the surf is drawn from: built in a worker as the game starts. */
   readonly coast = new Coast();
+  /** The captains' water and trails, inked on the sea. */
+  readonly territory = new Territory();
   readonly #seed: number;
   #state: SeaState = { ...CALM_SEA };
   #built = '';
@@ -41,7 +44,7 @@ export class Ocean {
 
   constructor(seed = 1) {
     this.#seed = seed;
-    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise());
+    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory);
     this.beneath = beneath(this.waves.field);
   }
 

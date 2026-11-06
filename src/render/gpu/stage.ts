@@ -24,6 +24,7 @@ import { EventClams } from '../regions/eventClams.ts';
 import { EventPetals } from '../regions/eventPetals.ts';
 import { rideOn } from '../swell.ts';
 import { seaLift, setLifts } from '../lift.ts';
+import { seaDeepAt } from '../seaTint.ts';
 import { GPU } from '../actors/common.ts';
 import { moonDirection, sunDirection } from '../sky.ts';
 import { R } from '../../sim/sphere.ts';
@@ -126,6 +127,10 @@ export class GpuStage {
     this.atmosphere.turn = -(v.hour - 12) * 15 * DEG;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
     setLifts(v.lift ?? NO_LIFT);
+    const terr = v.territory;
+    this.ocean.territory.set(terr?.owner ?? null, terr?.trail ?? null, terr?.version ?? 0, terr?.me ?? 0);
+    // the deep water's colour under the eye, for the sea the sky draws past the horizon
+    seaDeepAt(v.target.pos, P.seaDeep.value as Vector3);
     const wind = this.#wind.set(v.wind.x, v.wind.y, v.wind.z);
     (P.wind.value as Vector3).copy(wind);
     (P.drift.value as Vector3).addScaledVector(wind, dt);

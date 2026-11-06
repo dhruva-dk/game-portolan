@@ -23,11 +23,12 @@ import {
 } from 'three/tsl';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, SEA } from './waves.ts';
-import { FRAME, FRAMES, WATER, inFrame, type Frame } from './surface.ts';
+import { FRAME, FRAMES, inFrame, type Frame } from './surface.ts';
 import { skyLight, sunlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
 import { P } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
+import { waterAt } from '../seaTint.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -113,13 +114,15 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
         });
         const depth = sea.add(surface).sub(r);
         If(depth.greaterThan(0), () => {
+          // this region's water (by texel loads too)
+          const extinction = waterAt(up, true).extinction.toVar();
           // the sun's way down, bent toward the vertical as it enters
           const mu = dot(up, P.sunDir);
           const cosT = sqrt(max(float(1).sub(float(1).sub(mu.mul(mu)).div(1.333 * 1.333)), 0));
           const path = depth.div(max(cosT, 0.2));
-          const down = exp(WATER.extinction.mul(path).negate());
+          const down = exp(extinction.mul(path).negate());
           // the sky's light comes down from every side: on average along a path a third longer than the depth
-          const diffuse = exp(WATER.extinction.mul(depth.mul(1.33)).negate());
+          const diffuse = exp(extinction.mul(depth.mul(1.33)).negate());
           // where the sun's ray through p entered: back along its run under the surface
           const flat = P.sunDir.sub(up.mul(mu));
           const run = flat.div(1.333).mul(path).negate();

@@ -20,7 +20,7 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial,
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
-  smoothstep, sqrt, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import { CASCADES, N, SIZES } from './spectrum.ts';
@@ -30,7 +30,9 @@ import { sunShadow } from '../atmosphere/shadows.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
 import type { Coast } from './coast.ts';
+import type { Territory } from './territory.ts';
 import { REACH } from './coastField.ts';
+import { waterAt } from '../seaTint.ts';
 
 /** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
  *  phase grows as √distance, so a line's spacing is 2√(d + 1) / SHOAL metres: two at the water's edge, ten 24 m out). */
@@ -86,12 +88,8 @@ export const FRAME = {
   weight: uniform(new Vector2(1, 0)),
 };
 
-/** The water's colour and clarity where the eye is. */
+/** The water's light (its colour and clarity are each region's: seaTint.ts waterAt). */
 export const WATER = {
-  /** The deep water's own diffuse reflectance: the light that goes in and is scattered back out. */
-  deep: P.seaDeep,
-  /** Extinction per metre of path through the water. */
-  extinction: uniform(new Vector3(0.42, 0.085, 0.055)),
   /** The colour light takes through a thin crest. */
   crest: uniform(new Vector3(0.1, 0.55, 0.42)),
   foam: uniform(new Vector3(0.82, 0.86, 0.88)),
@@ -153,7 +151,7 @@ function rainRings(q: V2): V2 {
 
 // ---------------------------------------------------------------- the material
 
-export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
+export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   mat.fog = true;
   // the surface is what the light under it passes through, not something beneath it
@@ -241,11 +239,37 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
     });
     world.assign(normalize(u.sub(world)));
     surf(u);
+    ink(u);
   };
 
   // ----- the surf
   const shore = float(0).toVar('oceanShore');
   const shoreGlow = float(0).toVar('oceanShoreGlow');
+  // ----- the captains' ink: their colour laid on the water they hold, deepest on its coast, and the trail each is
+  // laying, pulsing along its length and glowing at night. The ink is a dye in the water rather than a paint on it:
+  // its reflectance is near the sea's own, so the held water is the sea tinted, and the pen line round it darker.
+  const inkColour = vec3(0).toVar('oceanInk');
+  const inkShare = float(0).toVar('oceanInkShare');
+  const inkGlow = vec3(0).toVar('oceanInkGlow');
+  const ink = (u: V3) => {
+    If(territory.on.greaterThan(0.5), () => {
+      const p = positionWorld;
+      const q = p.xz.add(vec2(0.71, -0.53).mul(p.y));
+      const t = territory.at(u, noiseMap.sample(q.mul(0.045)).rg.sub(0.5));
+      If(t.owner.greaterThan(0.5), () => {
+        const mine = float(1).sub(step(0.5, abs(t.owner.sub(territory.me))));
+        inkColour.assign(territory.colour(t.owner).mul(0.16));
+        inkShare.assign(float(0.32).add(mine.mul(0.08)).add(t.edge.mul(0.4)));
+      });
+      If(t.trail.greaterThan(0.5), () => {
+        const pulse = sin(P.time.mul(5).sub(dot(q, vec2(0.35)))).mul(0.25).add(0.75);
+        const tc = territory.colour(t.trail);
+        inkColour.assign(mix(inkColour, tc.mul(pulse).mul(0.3), float(0.6).div(max(inkShare.add(0.6), 0.6))));
+        inkShare.assign(inkShare.add(float(0.6).mul(float(1).sub(inkShare))));
+        inkGlow.assign(tc.mul(pulse).mul(0.6));
+      });
+    });
+  };
   const noiseMap = texture(noise);
   const surf = (u: V3) => {
     const p = positionWorld;
@@ -291,14 +315,16 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
       shoreGlow.assign(shore.mul(n1.add(0.6)));
     });
   };
+  // the foam, over the ink, and how much of the water the two cover between them: the rest is the water itself
+  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore), 0, 1);
+  const covered = whiteness.add(inkShare.mul(float(1).sub(whiteness)));
   mat.colorNode = Fn(() => {
     surface();
-    return WATER.foam;
+    return mix(inkColour, WATER.foam, whiteness.div(max(covered, 1e-4)));
   })();
   mat.normalNode = cameraViewMatrix.mul(vec4(world, 0)).xyz.normalize();
 
   // roughness from the slopes' variance (Beckmann's α² = 2σ²), and rough where foam lies
-  const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore), 0, 1);
   const sigma2 = variance.mul(0.5).add(WATER.ripples).add(P.rain.mul(0.004));
   const alpha = clamp(sigma2.mul(2).sqrt(), 0.02, 1);
   mat.roughnessNode = mix(alpha.sqrt(), float(0.9), whiteness);
@@ -316,7 +342,9 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
     const down = skyLight(p, u)
       .add(sun.mul(max(dot(u, P.sunDir), 0)))
       .add(moonlight.mul(max(dot(u, P.moonDir), 0)));
-    const body = down.mul(WATER.deep).div(Math.PI);
+    // this region's water: its own colour, and how far the eye sees into it
+    const water = waterAt(u);
+    const body = down.mul(water.deep).div(Math.PI);
     // the floor through the surface, bent by its slope, and the path through the water to it
     const nViewXY = cameraViewMatrix.mul(vec4(world.sub(u), 0)).xy;
     const zHere = positionView.z;
@@ -326,7 +354,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
     const uv = select(behind(bent).lessThan(zHere), bent, screenUV);
     const depthZ = max(zHere.sub(behind(uv)), 0);
     const path = depthZ.mul(length(positionView)).div(max(abs(zHere), 1e-3));
-    const T = exp(WATER.extinction.mul(path).negate());
+    const T = exp(water.extinction.mul(path).negate());
     const floor = viewportSharedTexture(uv).rgb;
     // the sun through a crest standing between it and the eye (after Atlas's water, GDC 2019)
     const toward = pow(clamp(dot(v, P.sunDir.negate()), 0, 1), 4);
@@ -337,9 +365,9 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture): Mesh {
     const sss = body.mul(mix(float(0.6), float(1.2), nv));
     return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel));
   })();
-  mat.backdropAlphaNode = float(1).sub(whiteness);
+  mat.backdropAlphaNode = float(1).sub(covered);
   // the surf's glow at night, the sea's own light (actors' scale)
-  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
+  mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).add(inkGlow.mul(P.night)).mul(LAMP.mul(2.5));
 
   const mesh = new Mesh(polarGrid(), mat);
   mesh.frustumCulled = false;
