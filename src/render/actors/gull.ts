@@ -2,7 +2,8 @@
 // wrist in the shader, so every bird flaps on its own beat in a single draw call. Small flocks wheel over the ships
 // nearest the camera; a delivery gull flies in from far off with a parcel, drops it on the ship's deck, and goes.
 import * as THREE from 'three';
-import { TAU, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { GPU, TAU, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { gullNodeMaterial } from './tsl/fauna.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { C, Mesher } from './mesher.ts';
 import { SPRITE } from './particles.ts';
@@ -94,7 +95,7 @@ export class Gulls {
     const geo = gullGeometry();
     this.flap = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 2), 2).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aFlap', this.flap);
-    const mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }), 'actor-gull', (s) => {
+    const mat = GPU.on ? gullNodeMaterial({ vertexColors: true, roughness: 0.75 }) : patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }), 'actor-gull', (s) => {
       s.vertexShader = s.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float aPart;\nattribute vec2 aFlap;')
         .replace('#include <beginnormal_vertex>', FLAP)

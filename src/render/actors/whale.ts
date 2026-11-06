@@ -3,7 +3,8 @@
 // is the leviathan's event made huge: the sea churns, a whale more than twice the size bursts out nose first in a
 // column of spray, hangs in the air rolling onto its side, and slams down in a wall of water with a shockwave.
 import * as THREE from 'three';
-import { SEA, TAU, frameAt, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { AU, GPU, SEA, TAU, frameAt, patch, rand, seaRadius, smooth, tangents } from './common.ts';
+import { whaleNodeMaterial } from './tsl/fauna.ts';
 import { sharedUniforms } from '../planet.ts';
 import type { Effects } from './effects.ts';
 import { C, Mesher, type Ring } from './mesher.ts';
@@ -62,7 +63,7 @@ export class Whales {
   readonly group = new THREE.Group();
   private readonly body: THREE.BufferGeometry;
   private readonly flukes: THREE.BufferGeometry;
-  private readonly mat: THREE.MeshStandardMaterial;
+  private readonly mat: THREE.Material;
   private readonly u = { uGlow: { value: 1 }, uSeaR: { value: 554 } };
   private readonly fx: Effects;
   private readonly swimmers = new Map<number, Swimmer>();
@@ -78,7 +79,8 @@ export class Whales {
     const g = whaleGeometry();
     this.body = g.body;
     this.flukes = g.flukes;
-    this.mat = patch(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.05, emissive: 0x6fe6ff, emissiveIntensity: 1 }), 'actor-whale', (s) => {
+    const base = { vertexColors: true, roughness: 0.42, metalness: 0.05, emissive: 0x6fe6ff, emissiveIntensity: 1 };
+    this.mat = GPU.on ? whaleNodeMaterial(base, this.u, AU.uNoise.value!, S) : patch(new THREE.MeshStandardMaterial(base), 'actor-whale', (s) => {
       Object.assign(s.uniforms, this.u);
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\n' + HEAD)
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal = position;\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');

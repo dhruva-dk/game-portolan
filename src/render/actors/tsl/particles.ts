@@ -8,13 +8,13 @@
 // scale, and is not hazed, as bright lights show through the haze.
 import { AdditiveBlending, MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import {
-  abs, attribute, cameraViewMatrix, cameraWorldMatrix, cos, cross, float, floor, length, max, mod, normalize, positionGeometry,
+  Fn, abs, attribute, cameraViewMatrix, cameraWorldMatrix, cos, cross, float, floor, length, max, mod, normalize, positionGeometry,
   select, sin, smoothstep, texture, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from '../../atmosphere/luts.ts';
 import { skyLight } from '../../atmosphere/light.ts';
-import type { F, V3, V4 } from './kit.ts';
+import { moved, type F, type V3, type V4 } from './kit.ts';
 
 export function particleNodeMaterial(atlas: Texture, glow: boolean): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: glow ? AdditiveBlending : NormalBlending });
@@ -38,7 +38,7 @@ export function particleNodeMaterial(atlas: Texture, glow: boolean): MeshBasicNo
   const streak = vec2(dir.y.negate(), dir.x).mul(size).mul(q.x).add(dir.mul(max(size, len.mul(vel.w))).mul(q.y.sub(1)).mul(0.5));
   const offset = select(misc.z.greaterThan(0.5), streak, turned.mul(size));
   const facing = cameraWorldMatrix.mul(vec4(centre.xy.add(offset), centre.z, 1)).xyz;
-  m.positionNode = select(misc.z.greaterThan(1.5), flat, facing);
+  m.positionNode = Fn(() => moved(select(misc.z.greaterThan(1.5), flat, facing) as V3))();
 
   // anything brushing the lens thins out instead of filling the screen
   const near = varying(smoothstep(1.5, 8, centre.z.negate()) as F);

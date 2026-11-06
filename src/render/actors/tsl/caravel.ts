@@ -21,7 +21,7 @@ import {
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { WL } from '../caravel.ts';
-import { dither, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
+import { dither, moved, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /** The hull, figurehead and turret: one material a ship, coloured by part. */
 export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardNodeMaterial {
@@ -160,7 +160,7 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
     // the cloth's normals turn with it
     const n = normalLocal;
     normalLocal.assign(vec3(n.x.mul(c).add(n.z.mul(s)), n.y, n.x.negate().mul(s).add(n.z.mul(c))));
-    return vec3(x.mul(c).add(z.mul(s)), p.y.sub(droop), x.negate().mul(s).add(z.mul(c)).add(rig.x));
+    return moved(vec3(x.mul(c).add(z.mul(s)), p.y.sub(droop), x.negate().mul(s).add(z.mul(c)).add(rig.x)));
   })();
 
   const su = uv(), sp = plane, size = rig.y;

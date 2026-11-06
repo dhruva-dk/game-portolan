@@ -1,6 +1,7 @@
 // Shared by every actor: the planet's frame (up, forward and right at any point on the sphere), the sea surface with
 // its swell and tide, the uniforms all actor materials read, a tileable noise texture, and the scanned textures.
 import * as THREE from 'three';
+import { lampEmissive } from './tsl/kit.ts';
 import type { Vec3 } from './view.ts';
 
 export const TAU = Math.PI * 2;
@@ -30,6 +31,9 @@ export const STAGE_U: Record<string, THREE.IUniform> = {};
 
 /** Gives a material the shared uniforms; `hook` edits its shader, and `key` names the edit for the program cache. */
 export function patch<T extends THREE.Material>(m: T, key: string, hook?: (s: THREE.WebGLProgramParametersWithUniforms) => void): T {
+  // on the WebGPU planet, where the material is made a node material (its properties copied over), the glow is
+  // set at the lamps' scale; the hook is GL's alone, and a material with one gets its own node material instead
+  if (GPU.on && 'emissive' in m) (m as { emissiveNode?: unknown }).emissiveNode = lampEmissive();
   m.onBeforeCompile = (s) => {
     Object.assign(s.uniforms, STAGE_U, AU);
     hook?.(s);

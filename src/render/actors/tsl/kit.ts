@@ -2,7 +2,8 @@
 // ship's colours, damage and hit flash are set once and both renderers see them), a chain of cases for shaders that
 // colour by part, and a dither for fading a surface out without blending it.
 import type { Node, Texture } from 'three/webgpu';
-import { interleavedGradientNoise, reference, screenCoordinate, select, texture } from 'three/tsl';
+import { interleavedGradientNoise, materialEmissive, positionPrevious, reference, screenCoordinate, select, texture } from 'three/tsl';
+import { LAMP } from '../../gpu/uniforms.ts';
 import { P } from '../../gpu/uniforms.ts';
 
 export type F = Node<'float'>;
@@ -47,4 +48,24 @@ export function pick<T extends Node>(cases: readonly (readonly [B, T])[], fallba
  */
 export function dither(): F {
   return interleavedGradientNoise(screenCoordinate.xy.add(P.frame.mul(5.588238)));
+}
+
+/**
+ * Moves a vertex to `p` in its object's own space as of the frame before as well, and returns `p`. Called inside a
+ * position node's Fn, before an instance's matrix if there is one. The motion vectors are worked out from the
+ * previous position, and left alone that is the raw geometry: they would carry the whole of a sail's belly or a
+ * sprite's corner as motion, and the upscaler would draw the history from the wrong place. A shape's own motion
+ * between two frames is a few centimetres at most, so only the object's motion is counted.
+ */
+export function moved(p: V3): V3 {
+  positionPrevious.assign(p);
+  return p;
+}
+
+/**
+ * The glow of a plain lit material (its emissive colour, intensity and map) at the lamps' scale, for an eye that
+ * adapts from noon to moonlight: GL's fixed exposure took an emissive as it was.
+ */
+export function lampEmissive(): V3 {
+  return (materialEmissive as unknown as V3).mul(LAMP).mul(2.5);
 }
