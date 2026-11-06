@@ -40,6 +40,9 @@ export const P = {
   stormOn: uniform(0),
   /** How rough the sea is where the camera is, 0 glass to 1 a gale, from the wind and the weather. */
   seaState: uniform(0.4),
+  /** The deep sea's own diffuse reflectance where the camera is: the light that goes into the water and is scattered
+   *  back out of it, which is the sea's colour wherever the floor is too deep to see. */
+  seaDeep: uniform(new Vector3(0.0045, 0.022, 0.034)),
   /** Rain falling where the camera is, 0…1: wet surfaces, rings on the sea. */
   rain: uniform(0),
   /** Snow settling where the camera is, 0…1. */

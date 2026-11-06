@@ -1,13 +1,16 @@
 // The WebGPU lab: the new renderer on a bare planet, driven from the capture tools through window.__lab. It shows
 // what the GPU path draws before the stage is moved onto it.
 import {
-  IcosahedronGeometry, Mesh, MeshStandardNodeMaterial, PerspectiveCamera, Scene, SphereGeometry, Vector3,
+  Group, IcosahedronGeometry, Mesh, MeshStandardNodeMaterial, PerspectiveCamera, Scene, SphereGeometry, Vector3,
   BoxGeometry, Color, DataUtils,
 } from 'three/webgpu';
 import { normalWorld, positionWorld, vec3 } from 'three/tsl';
 import { RENDER_SCALE, createRenderer } from '../renderer.ts';
 import { Post } from '../post.ts';
 import { METER } from '../exposure.ts';
+import { Waves, SEA, setSpectrum } from '../../ocean/waves.ts';
+import { Ocean } from '../../ocean/index.ts';
+import { CALM_SEA, LongWaves, N, SIZES, spectrumParams, type SeaState } from '../../ocean/spectrum.ts';
 import { skyLight } from '../../atmosphere/light.ts';
 import { passes, tables } from '../../atmosphere/luts.ts';
 import { Atmosphere } from '../../atmosphere/index.ts';
@@ -44,6 +47,13 @@ function moonAt(hour: number, tilt: number, out: Vector3): Vector3 {
   return out.set(c * Math.cos(l), Math.sin(lat), -c * Math.sin(l));
 }
 
+/** Sea states to look at: a calm, a fresh breeze, and a gale. */
+const SEAS: Record<string, SeaState> = {
+  calm: { ...CALM_SEA },
+  fresh: { wind: 10, heading: 0.3, fetch: 12000, swell: 0.8, swellLength: 40, swellHeading: 0.9, chop: 1 },
+  gale: { wind: 17, heading: 0.3, fetch: 30000, swell: 1.4, swellLength: 55, swellHeading: 0.7, chop: 1.1 },
+};
+
 async function main(): Promise<void> {
   const canvas = document.getElementById('view') as HTMLCanvasElement;
   const { renderer, info } = await createRenderer(canvas);
@@ -54,8 +64,11 @@ async function main(): Promise<void> {
   const post = new Post(renderer, scene, camera, info.phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop);
   const fog = scene.fogNode;
 
-  const sea = new Mesh(new SphereGeometry(R, 512, 256), new MeshStandardNodeMaterial({ color: new Color(0.02, 0.05, 0.07), roughness: 0.18, metalness: 0 }));
-  scene.add(sea);
+  // the sea floor, deep sand (the islands make the shallows), and the sea over it
+  const floor = new Mesh(new SphereGeometry(R - 60, 512, 256), new MeshStandardNodeMaterial({ color: new Color(0.62, 0.55, 0.4), roughness: 0.95, metalness: 0 }));
+  scene.add(floor);
+  const ocean = new Ocean(3);
+  scene.add(ocean.mesh);
   // a few islands, a few ships' worth of boxes
   const rock = new MeshStandardNodeMaterial({ color: new Color(0.32, 0.3, 0.26), roughness: 0.9 });
   const grass = new MeshStandardNodeMaterial({ color: new Color(0.16, 0.26, 0.08), roughness: 0.85 });
@@ -79,12 +92,31 @@ async function main(): Promise<void> {
   const home = new Vector3(1, 0.25, 0.1).normalize();
   const side = new Vector3(0, 1, 0).cross(home).normalize();
   const fore = new Vector3().crossVectors(home, side);
+  // ships' worth of boxes, riding the swell
+  const ships: { at: Vector3; heading: number; group: Group }[] = [];
   for (let i = 0; i < 6; i++) {
     const a = i * 1.1;
-    const dir = home.clone().addScaledVector(side, 0.12 * Math.cos(a)).addScaledVector(fore, 0.12 * Math.sin(a));
-    place(new Mesh(new BoxGeometry(1, 1, 1), hull), dir, 0.8, new Vector3(3, 1.6, 9));
-    place(new Mesh(new BoxGeometry(1, 1, 1), sail), dir, 6.5, new Vector3(0.2, 8, 6));
+    const dir = home.clone().addScaledVector(side, 0.12 * Math.cos(a)).addScaledVector(fore, 0.12 * Math.sin(a)).normalize();
+    const group = new Group();
+    const h = new Mesh(new BoxGeometry(3, 1.6, 9), hull);
+    h.position.y = 0.3;
+    const sl = new Mesh(new BoxGeometry(0.2, 8, 6), sail);
+    sl.position.y = 5.7;
+    group.add(h, sl);
+    scene.add(group);
+    ships.push({ at: dir.multiplyScalar(R), heading: a * 2.3, group });
   }
+  const slope = { x: 0, y: 0, z: 0 };
+  const ride = () => {
+    for (const s of ships) {
+      const up = s.at.clone().normalize();
+      const h = ocean.heightAt(s.at, slope);
+      s.group.position.copy(up).multiplyScalar(R + h);
+      const tilted = up.clone().sub(new Vector3(slope.x, slope.y, slope.z)).normalize();
+      s.group.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), tilted);
+      s.group.rotateY(s.heading);
+    }
+  };
 
   // ?debug=irradiance shows the sky's irradiance on every surface as its colour
   if (new URLSearchParams(location.search).get('debug') === 'irradiance') {
@@ -124,6 +156,8 @@ async function main(): Promise<void> {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
     atmosphere.update(camera, dt);
+    ocean.update(renderer, camera.position, time, dt);
+    ride();
     post.render();
   };
 
@@ -131,7 +165,8 @@ async function main(): Promise<void> {
     info,
     ready: false,
     frames: 0,
-    set(o: { view?: string; hour?: number; tilt?: number; exposure?: number; bearing?: number; fog?: boolean; sky?: boolean; sun?: boolean }) {
+    set(o: { view?: string; hour?: number; tilt?: number; exposure?: number; bearing?: number; fog?: boolean; sky?: boolean; sun?: boolean; sea?: string }) {
+      if (o.sea) ocean.sea = SEAS[o.sea];
       if (o.view) view = { ...VIEWS[o.view] };
       if (o.bearing !== undefined) view.bearing = o.bearing;
       if (o.fog !== undefined) scene.fogNode = o.fog ? fog : null;
@@ -155,6 +190,30 @@ async function main(): Promise<void> {
       return nodes.getForCompute(passes[name]).computeShader;
     },
     /** Steps n frames; with settle, the eye adapts at once, as it would have long before a still is taken. */
+    /** Cascade 0's heights at a few texels against the CPU's direct sum of the same modes. */
+    async checkWaves(t = 3.7) {
+      const waves = new Waves();
+      const p = spectrumParams(CALM_SEA);
+      setSpectrum(p, 7);
+      SEA.time.value = t;
+      SEA.chop.value = 0;
+      renderer.compute(waves.build);
+      renderer.compute(waves.frame);
+      const backend = renderer.backend as unknown as { copyTextureToBuffer(t: unknown, x: number, y: number, w: number, h: number, face: number): Promise<Uint16Array> };
+      const raw = await backend.copyTextureToBuffer(waves.field, 0, 0, N, N, 0);
+      const long = new LongWaves();
+      long.update(p, 7, N / 2 - 1, 1e6);
+      const out: number[][] = [];
+      let rms = 0, gpuRms = 0;
+      for (const [x, y] of [[0, 0], [17, 3], [100, 200], [255, 128], [64, 64], [31, 222]]) {
+        const gpu = DataUtils.fromHalfFloat(raw[(y * N + x) * 4 + 1]);
+        const cpu = long.at((x * SIZES[0]) / N, (y * SIZES[0]) / N, t);
+        out.push([x, y, gpu, cpu]);
+      }
+      for (let i = 0; i < N * N; i++) gpuRms += DataUtils.fromHalfFloat(raw[i * 4 + 1]) ** 2;
+      for (let i = 0; i < 400; i++) rms += long.at(Math.random() * 250, Math.random() * 250, t) ** 2;
+      return { out, modes: long.count, gpuRms: Math.sqrt(gpuRms / (N * N)), cpuRms: Math.sqrt(rms / 400) };
+    },
     async step(n = 1, settle = false) {
       const up = METER.up.value, down = METER.down.value;
       if (settle) METER.up.value = METER.down.value = 200;

@@ -3,8 +3,8 @@
 // that blurs a few percent of everything (a lens's scatter, not a glow on chosen things), exposed by the eye's
 // adaptation, and mapped to the screen through AgX and the grade.
 import { RenderPipeline, type PassNode, type PerspectiveCamera, type Scene, type Texture, type WebGPURenderer } from 'three/webgpu';
-import type { Node } from 'three/webgpu';
-import { float, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
+import type { Node, TextureNode } from 'three/webgpu';
+import { float, ivec2, mrt, output, pass, screenUV, smoothstep, uniform, vec4, velocity, clamp, dot, vec3, fract, sin } from 'three/tsl';
 import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -13,6 +13,16 @@ import { P } from './uniforms.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 export const BLOOM = uniform(0.05);
+
+/** The temporal upscaler reads each output pixel's 3×3 neighbourhood with textureLoad and no clamp; out of range,
+ *  Metal hands back the texel from the opposite edge, which lit the top row with the sea. Its loads are clamped here. */
+function clampedLoads(node: TextureNode): TextureNode {
+  const load = node.load.bind(node) as (at: Node) => TextureNode;
+  const size = (node as unknown as { size(level?: number): Node<'ivec2'> }).size(0);
+  const last = size.sub(ivec2(1, 1));
+  (node as unknown as { load(at: Node<'ivec2'>): TextureNode }).load = (at) => load(clamp(at as unknown as Node<'vec2'>, ivec2(0, 0) as unknown as Node<'vec2'>, last as unknown as Node<'vec2'>));
+  return node;
+}
 
 export class Post {
   readonly pipeline: RenderPipeline;
@@ -26,9 +36,9 @@ export class Post {
     scenePass.setMRT(mrt({ output, velocity }));
     scenePass.setResolutionScale(scale);
     this.scenePass = scenePass;
-    const beauty = scenePass.getTextureNode('output');
-    const depth = scenePass.getTextureNode('depth');
-    const motion = scenePass.getTextureNode('velocity');
+    const beauty = clampedLoads(scenePass.getTextureNode('output'));
+    const depth = clampedLoads(scenePass.getTextureNode('depth'));
+    const motion = clampedLoads(scenePass.getTextureNode('velocity'));
     const resolved = taau(beauty, depth, motion, camera) as unknown as Node<'vec4'>;
     const glow = bloom(resolved, 1, 0.55, 0) as unknown as Node<'vec4'>;
     const hdr = resolved.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM));

@@ -8,8 +8,8 @@ import {
   Fn, If, abs, clamp, cos, dot, exp, float, floor, fract, max, mix, mx_fractal_noise_float, positionWorldDirection, pow,
   select, sin, smoothstep, sqrt, vec2, vec3, vec4, cross, normalize, length, uniform,
 } from 'three/tsl';
-import { AIR } from './model.ts';
-import { EYE, MOON_RADIUS, SUN_RADIUS, skyFromTables, skyMarched, viewTransmittance } from './luts.ts';
+import { AIR, raySphere } from './model.ts';
+import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyFromTables, skyIrradiance, skyMarched, viewTransmittance } from './luts.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
@@ -145,11 +145,32 @@ export const skyRadiance = Fn(([d]: [V3]) => {
 export const skyBackground = vec4(skyRadiance(positionWorldDirection), 1);
 
 /** The sky the reflection probe is taken of, marched from the probe's own place. It leaves the sun's disc out: the
- *  sun's own light draws its highlight, sharp, and a disc blurred into the probe would only smear a second one. */
+ *  sun's own light draws its highlight, sharp, and a disc blurred into the probe would only smear a second one. Below
+ *  the horizon is the sea, as the sea looks from there: the sky mirrored in it by Fresnel's share, over the light the
+ *  water scatters back up. (Left as the planet's dark ground, it put black flecks on every wave whose reflection
+ *  dipped below the horizon.) */
 export const probeBackground = Fn(() => {
   const d = positionWorldDirection;
-  const marched = skyMarched(probeEye, d);
-  const moon = moonDisc(d);
-  const starry = stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(marched.rgb));
-  return vec4(marched.rgb.add(moon.rgb.add(starry).mul(marched.a)), 1);
+  const eye = probeEye;
+  const marched = skyMarched(eye, d);
+  const ground = raySphere(eye, d, AIR.bottom);
+  const beyond = vec3(0).toVar();
+  If(ground.x.greaterThan(0), () => {
+    const p = eye.add(d.mul(ground.x));
+    const n = p.normalize();
+    const cosI = max(d.dot(n).negate(), 0);
+    const mirrored = d.add(n.mul(cosI.mul(2)));
+    const fresnel = float(0.02).add(pow(float(1).sub(cosI), 5).mul(0.98));
+    const sky = skyMarched(p.add(n.mul(0.05)), mirrored).rgb;
+    const r = p.length();
+    const body = (l: V3, illuminance: V3, size: number) =>
+      skyIrradiance(p, n, l).add(lightTransmittance(r, n.dot(l), float(size)).mul(max(n.dot(l), 0))).mul(illuminance);
+    const down = body(P.sunDir, P.sunIlluminance, SUN_RADIUS).add(body(P.moonDir, P.moonIlluminance.mul(P.moonPhase), MOON_RADIUS));
+    beyond.assign(sky.mul(fresnel).add(down.mul(P.seaDeep).div(Math.PI).mul(float(1).sub(fresnel))));
+  }).Else(() => {
+    const moon = moonDisc(d);
+    const starry = stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(marched.rgb));
+    beyond.assign(moon.rgb.add(starry));
+  });
+  return vec4(marched.rgb.add(beyond.mul(marched.a)), 1);
 })();
