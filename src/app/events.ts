@@ -67,6 +67,11 @@ export type Moment =
    * A ship going about: a clean tack or a gybe filling her canvas on the new board (`surge`, m/s more for a moment), a
    * gybe thrown so hard her yards slam across, or caught head to wind in irons.
    */
-  | { k: 'about'; ship: number; how: 'tack' | 'gybe' | 'slam' | 'irons'; surge: number; pos: V3 };
+  | { k: 'about'; ship: number; how: 'tack' | 'gybe' | 'slam' | 'irons'; surge: number; pos: V3 }
+  /**
+   * A heavy gun winding up (WINDUP): the harpoon's winch, the mortar's fuse, the broadside run out, `seconds` before it
+   * fires, at `at` (or -1, nothing in its sights); or, with `seconds` 0, stood down without firing.
+   */
+  | { k: 'windup'; ship: number; weapon: WeaponClass; at: number; seconds: number; pos: V3 };
 
 export type MomentKind = Moment['k'];

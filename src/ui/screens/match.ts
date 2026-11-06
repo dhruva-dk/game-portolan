@@ -217,6 +217,13 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     return b;
   });
 
+  // a heavy gun winding up on you: a marker round the middle of the screen, the way it lies from your aim, filling as
+  // it nears firing, with the gun's name under the crosshair
+  const aimed = el('s-hud__aimed', root);
+  const aimedArc = el('s-hud__aimedArc', aimed);
+  el('s-hud__aimedTip', aimedArc, ICON.target, 'i');
+  const aimedName = el('s-hud__aimedName', aimed);
+
   const take = box('s-hud__take', root);
   const takeB = button({ label: 'Take', icon: ICON.hand, kind: 'secondary', size: 'sm', parent: take, what: 'hud:take', onPress: () => { a.press('take', true); a.press('take', false); } });
 
@@ -380,6 +387,12 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     abil.querySelector('.s-mx__holdN')!.textContent = h.ability.ready >= 1 ? '' : `${h.ability.seconds}`;
     abil.classList.toggle('is-off', h.ability.ready < 1);
     reload.classList.toggle('is-off', h.slots[h.selected]?.kind !== 'weapon');
+    aimed.classList.toggle('is-on', h.aimed !== null);
+    if (h.aimed) {
+      aimedArc.style.setProperty('--b', `${h.aimed.bearing.toFixed(3)}rad`);
+      aimedArc.style.setProperty('--w', h.aimed.wound.toFixed(2));
+      if (aimedName.textContent !== h.aimed.weapon) aimedName.textContent = h.aimed.weapon;
+    }
     fireB.classList.toggle('is-rolling', h.steady !== null);
     if (h.steady !== null) steadyRing.style.setProperty('--steady', h.steady.toFixed(2));
     // the weather you are in, the tide's level and way, then the perks you hold

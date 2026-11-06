@@ -18,7 +18,8 @@ import {
 } from '../sim/match.ts';
 import { EVENT_REGION, currentScales, eventStrength, floeTime, liftsNow, strengthAt, sunHeight } from '../sim/environment.ts';
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
-import { ABOUT, DAY, REGION_EVENT, isWeapon } from '../sim/tables.ts';
+import { ABOUT, DAY, REGION_EVENT, WEAPONS, isWeapon } from '../sim/tables.ts';
+import { landing } from '../sim/combat.ts';
 import { newSky, skyAt, vigour } from '../sim/weather.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
 import { CENTRES, CURRENTS, REGION_COUNT, REGION_EVENTS, REGIONS, VORTEX, heightAt, regionWeights, summitNear, type WeatherKind } from '../sim/world/index.ts';
@@ -78,6 +79,8 @@ const WIND = newWind(), STORM = newStormView(), DECK = newDeck();
 const EAR = { weights: new Float64Array(REGION_COUNT), sky: newSky(), t: v3(), q: v3(), surf: 35 };
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
+/** Where a falling shell will come down. */
+const LAND = v3();
 const metres = (p: V3, h = 0, out: V3 = v3()): V3 => {
   out.x = p.x * (R + h);
   out.y = p.y * (R + h);
@@ -414,7 +417,13 @@ export class Session implements Stepper {
       pos.x -= vel.x * back;
       pos.y -= vel.y * back;
       pos.z -= vel.z * back;
-      shots.push({ id, weapon: weaponOf(sh.kind), rarity: Math.max(0, Math.min(4, sh.rarity)) as 0, pos, vel, ship: sh.owner });
+      const view: ProjectileView = { id, weapon: weaponOf(sh.kind), rarity: Math.max(0, Math.min(4, sh.rarity)) as 0, pos, vel, ship: sh.owner };
+      // a shell that bursts: where it will come down, for the ring on the water there
+      if (sh.splash > 0 && sh.g > 0) {
+        const seconds = landing(sh, LAND) + (1 - alpha) * TICK;
+        view.land = { at: metres(LAND, seaLevel(s) + 1), reach: sh.splash, seconds };
+      }
+      shots.push(view);
     }
     const loot = this.loot;
     loot.length = 0;
@@ -454,6 +463,7 @@ export class Session implements Stepper {
       shield: sh.shield, shieldMax: 100, weapon, aim: gunDir(sh), cosmetics: this.looks[i] ?? this.looks[0], alive,
       parts: { torn: sh.torn, mast: sh.fallen > 0 ? 'down' : sh.jury ? 'jury' : 'up', flood: sh.flood, listTo: sh.listTo, burn: sh.burn },
       irons: sh.irons > 0, lurch: sh.lurch / ABOUT.lurch, roll: deckAt(this.state, i, DECK).roll,
+      windup: sh.windup > 0 && WEAPONS[slot.kind] ? Math.min(1, 1 - (sh.windup - (alpha - 1) * TICK) / WEAPONS[slot.kind].windup) : 0,
     };
   }
 

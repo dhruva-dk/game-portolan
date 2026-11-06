@@ -2,18 +2,18 @@
 // with flight time and drop; magazines empty and reload; the head of the sail is the weak spot. The broadside
 // fires from both sides at once. Hits land where they land (parts.ts): a shot down a ship's length rakes her, and
 // what reaches the hull tears canvas, weakens the mast, floods her or shoots the rudder about by where it struck.
-import { hurt } from './harm.ts';
+import { hurt, standDown } from './harm.ts';
 import { ignite, raking, wound } from './parts.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dot, rngFloat, set, v3, type V3 } from './math.ts';
 import { hasPassive, hasPerk } from './perks.ts';
 import { startUse } from './items.ts';
-import { R, advance, apart, along, turned } from './sphere.ts';
+import { R, advance, apart, along, tangentToward, turned } from './sphere.ts';
 import { CAUSE, EVENT, FLAG, PHASE, SHIPS, STREAM, TICK, copy, emit, elapse, type MatchState, type Ship, type Shot } from './state.ts';
 import { deckOf, newDeck, seaState } from './seaway.ts';
 import {
   ABOUT, SEAWAY,
-  BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RAKE, RARITY, TURN_SPREAD, WEAPONS, WEATHER, isUse, isWeapon,
+  BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RAKE, RARITY, TURN_SPREAD, WEAPONS, WEATHER, WINDUP, isUse, isWeapon,
   type Weapon,
 } from './tables.ts';
 import { newSky, skyAt } from './weather.ts';
@@ -47,6 +47,21 @@ export function arm(state: MatchState, i: number, input: ShipInput): void {
   }
   if (!isWeapon(it.kind)) return;
   const w = WEAPONS[it.kind];
+  // a heavy gun winding up fires when it is wound, wherever she is aiming by then; capsized, it is stood down
+  if (ship.windup > 0) {
+    if (ship.flip > 0) {
+      standDown(state, i);
+      return;
+    }
+    ship.windup = elapse(ship.windup);
+    if (ship.windup > 0) return;
+    fire(state, i);
+    if (it.n <= 0) {
+      emit(state, EVENT.empty, i, -1, ship.pos, { item: it.kind });
+      startReload(state, i);
+    }
+    return;
+  }
   if (ship.reload > 0) {
     ship.reload -= TICK;
     if (ship.reload <= 0) {
@@ -61,11 +76,46 @@ export function arm(state: MatchState, i: number, input: ShipInput): void {
     return;
   }
   if (!input.fire || ship.cool > 0 || ship.equip > 0 || it.n <= 0 || ship.flip > 0 || ship.use >= 0) return;
+  if (w.windup > 0) {
+    ship.windup = w.windup;
+    emit(state, EVENT.windup, i, aimedAt(state, i, w), ship.pos, { item: it.kind, amount: w.windup });
+    return;
+  }
   fire(state, i);
   if (it.n <= 0) {
     emit(state, EVENT.empty, i, -1, ship.pos, { item: it.kind });
     startReload(state, i);
   }
+}
+
+/**
+ * The ship a gun is aimed at: the nearest at sea within WINDUP.aimed of the aim point, or for a broadside the nearest
+ * abeam within its reach. -1 for none.
+ */
+export function aimedAt(state: MatchState, i: number, w: Weapon): number {
+  const ship = state.ships[i];
+  const range = rangeOf(ship, w);
+  let best = -1, bd = w.sides > 0 ? range : WINDUP.aimed + w.splash;
+  for (let j = 0; j < state.ships.length; j++) {
+    const o = state.ships[j];
+    if (j === i || o.phase !== PHASE.sea) continue;
+    if (w.sides > 0) {
+      const d = apart(ship.pos, o.pos);
+      tangentToward(ship.pos, o.pos, T);
+      if (d < bd && Math.abs(dot(T, ship.head)) < 0.5) [best, bd] = [j, d];
+    } else {
+      const d = apart(ship.aim, o.pos);
+      if (d < bd) [best, bd] = [j, d];
+    }
+  }
+  return best;
+}
+
+/** Where a lobbed shot comes down on the water, into `out`, and in how many seconds. */
+export function landing(shot: Shot, out: V3): number {
+  const t = (shot.vy + Math.sqrt(Math.max(0, shot.vy * shot.vy + 2 * shot.g * shot.y))) / Math.max(1e-6, shot.g);
+  along(shot.pos, shot.dir, shot.v * t, out);
+  return t;
 }
 
 function startReload(state: MatchState, i: number): void {
@@ -307,7 +357,8 @@ function burst(state: MatchState, s: Shot, p: V3, y: number): void {
   for (let j = 0; j < SHIPS; j++) {
     const t = state.ships[j];
     if (j === s.owner || t.phase !== PHASE.sea) continue;
-    const h = apart(t.pos, p), v = (2 - y) * 0.5, d = Math.sqrt(h * h + v * v) - 3;
+    // (a ship hopping on the gust is that much further from a burst on the water)
+    const h = apart(t.pos, p), v = (2 + t.alt - y) * 0.5, d = Math.sqrt(h * h + v * v) - 3;
     if (d > s.splash) continue;
     const before = t.hull;
     hurt(state, j, s.damage * (1 - (Math.max(0, d) / s.splash) * 0.6), s.owner, s.kind, t.pos, 3, FLAG.ship);

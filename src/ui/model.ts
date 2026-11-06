@@ -377,6 +377,9 @@ export interface HudModel {
   /** In a seaway, how steady your deck is for a shot (1 at the top of a roll, 0 swinging through upright); null when
    *  the sea is too slight to roll her. */
   steady: number | null;
+  /** A heavy gun winding up on you (the nearest to firing): its plain name, where it is (radians round from where you
+   *  aim, positive to the right), and how far through its wind-up it is, 0..1. */
+  aimed: { weapon: string; bearing: number; wound: number } | null;
   /** A consumable in use, with its progress. */
   using: { item: ConsumableId; progress: number } | null;
   region: string;

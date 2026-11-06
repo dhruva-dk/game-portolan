@@ -33,6 +33,8 @@
 // state.events: what happened this tick (cleared at the start of each step). Each Happening has kind (EVENT),
 // ship, by, at (unit vector), y (height), amount, shield, hull, item, flag (FLAG bits), cells. Per kind:
 //   fire        ship fired; item weapon kind, amount rarity, at muzzle, y height; flag 3 for a broadside
+//   windup      a heavy gun winding up to fire (WINDUP): item weapon kind, amount seconds (0: stood down), by the
+//               ship it is aimed at (-1 none). combat.landing() gives where a lobbed shot in flight comes down
 //   impact      a shot landed; ship hit (-1 none), by shooter, item kind; flag FLAG.ship/land/crit; 8 a decoy
 //   splash      a mortar burst; amount radius
 //   hit         ship took damage from by; amount total, shield and hull the split, item weapon kind or CAUSE;

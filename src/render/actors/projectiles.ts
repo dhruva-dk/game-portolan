@@ -6,12 +6,15 @@
 // What a shot leaves behind it in the air is a ribbon (ribbons.ts): a cord of powder smoke that spreads, drifts down
 // the wind and frays over a second or two, so a broadside's flight hangs over the water as a sheaf of arcs. Heated
 // shot and the mortar's fuse also shed a short ribbon of heat that cools from yellow to red behind them.
+//
+// A mortar shell's landing is ringed on the water from the moment it's fired (tsl/landing.ts), as wide as its burst.
 import * as THREE from 'three';
 import { patch, rand } from './common.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { SPRITE } from './particles.ts';
 import type { RibbonLook } from './ribbons.ts';
 import type { ProjectileView } from './view.ts';
+import { landingNodeMaterial } from './tsl/landing.ts';
 
 /** The trails each kind of shot draws: width and spread, life, colour and opacity, and for heat how hot. */
 const TRAIL: Record<string, RibbonLook> = {
@@ -53,6 +56,12 @@ export class Projectiles {
   private readonly chains: THREE.InstancedMesh;
   private readonly redHot: THREE.InstancedMesh;
   private readonly lines: THREE.LineSegments;
+  /** The rings where shells will land, and each one's fall (0 fired .. 1 landing). */
+  private readonly rings: THREE.InstancedMesh;
+  private readonly fall: THREE.InstancedBufferAttribute;
+  /** How long each shell's flight was when first seen, by id, so its ring's sweep runs from rim to middle. */
+  private readonly flights = new Map<number, number>();
+  private readonly n = new THREE.Vector3();
   private readonly linePos: Float32Array;
   private readonly trails = new Map<number, THREE.Vector3>();
   private readonly tmp = new THREE.Object3D();
@@ -80,6 +89,15 @@ export class Projectiles {
     const glowing = patch(new THREE.MeshStandardMaterial({ color: 0x3a1006, roughness: 0.6, emissive: 0xff3a08, emissiveIntensity: 6 }));
     this.redHot = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.34, 1), glowing, CAP);
     for (const m of [this.bolts, this.shells, this.balls, this.chains, this.redHot]) { m.count = 0; m.frustumCulled = false; this.group.add(m); }
+    // where the shells come down: a flat disc, a metre across before its scale, laid on the sea
+    const disc = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+    this.fall = new THREE.InstancedBufferAttribute(new Float32Array(CAP), 1).setUsage(THREE.DynamicDrawUsage);
+    disc.setAttribute('aFall', this.fall);
+    this.rings = new THREE.InstancedMesh(disc, landingNodeMaterial(), CAP);
+    this.rings.count = 0;
+    this.rings.frustumCulled = false;
+    this.rings.renderOrder = 20;
+    this.group.add(this.rings);
     // the harpoon's line, paid out behind the bolt
     this.linePos = new Float32Array(CAP * 2 * 3 * 8);
     const lg = new THREE.BufferGeometry();
@@ -93,7 +111,7 @@ export class Projectiles {
 
   /** One frame of shots; `muzzle(ship)` gives where a ship's gun is, for the harpoon's line. */
   update(list: readonly ProjectileView[], t: number, muzzle: (ship: number) => THREE.Vector3 | null): void {
-    let nb = 0, ns = 0, nr = 0, nl = 0, nc = 0, nh = 0;
+    let nb = 0, ns = 0, nr = 0, nl = 0, nc = 0, nh = 0, ng = 0;
     const seen = new Set<number>(), fx = this.fx, glow = fx.glow, smoke = fx.smoke;
     for (const p of list) {
       seen.add(p.id);
@@ -186,10 +204,24 @@ export class Projectiles {
           break;
         }
       }
+      if (p.land && ng < CAP) {
+        const flight = this.flights.get(p.id) ?? (this.flights.set(p.id, Math.max(0.5, p.land.seconds)), Math.max(0.5, p.land.seconds));
+        const a = p.land.at;
+        this.tmp.position.set(a.x, a.y, a.z);
+        this.tmp.quaternion.setFromUnitVectors(this.n.set(0, 1, 0), this.up.set(a.x, a.y, a.z).normalize());
+        this.tmp.scale.setScalar(p.land.reach);
+        this.tmp.updateMatrix();
+        this.rings.setMatrixAt(ng, this.tmp.matrix);
+        this.fall.setX(ng++, Math.min(1, Math.max(0, 1 - p.land.seconds / flight)));
+      }
       const keep = this.trails.get(p.id);
       if (keep) keep.set(x, y, z); else this.trails.set(p.id, new THREE.Vector3(x, y, z));
     }
     for (const id of this.trails.keys()) if (!seen.has(id)) this.trails.delete(id);
+    for (const id of this.flights.keys()) if (!seen.has(id)) this.flights.delete(id);
+    this.rings.count = ng;
+    this.rings.visible = ng > 0;
+    if (ng > 0) { this.rings.instanceMatrix.needsUpdate = true; this.fall.needsUpdate = true; }
     this.bolts.count = nb;
     this.shells.count = ns;
     this.balls.count = nr;

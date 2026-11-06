@@ -7,6 +7,7 @@ import {
   ad, between, blast, brown, burst, crackles, crunch, filter, glass, grit, hump, knock, metal, mix, n, normalize, normAll, pair, pink,
   scatter, shape, shards, splashOf, splinters, SR, sweep, thump, tone, white, whoosh, stickSlip,
 } from '../kit.ts';
+import { TAU as TAU_ } from '../dsp.ts';
 
 /** The weight a rarity adds to a fire sound, mixed into every channel. */
 function weight(chs: Buf[], r: Rng, v: number): void {
@@ -322,6 +323,60 @@ function reloadBroadside(r: Rng): Buf[] {
   return normAll(out, 0.6);
 }
 
+// ---------------------------------------------------------------- wind-ups (WINDUP): heard by whoever they're aimed at
+
+/** The harpoon's winch ratcheting back, faster and higher as the bow-spring loads, and the line creaking taut. */
+function windHarpoon(r: Rng): Buf {
+  const s = 0.8, x = new Float32Array(n(s + 0.15));
+  let at = 0.02;
+  for (let k = 0; at < s; k++) {
+    const u = at / s;
+    mix(x, knock(r, between(r, 1700, 1900) * (1 + 0.35 * u), 0.01, 0.06), at, 0.45 + 0.4 * u);
+    mix(x, metal(r, between(r, 3100, 3400), 0.012, 0.05), at + 0.003, 0.12 + 0.2 * u);
+    at += 0.11 - 0.075 * u;
+  }
+  mix(x, stickSlip(r, s, 22, 70, [380, 760, 1150], 0.05), 0, 0.35); // the line drawn bar-taut
+  mix(x, shape(filter(brown(n(s), r), 'lp', 220), (t) => Math.pow(t / s, 2)), 0, 0.3); // the spring's groan building
+  return normalize(x, 0.6);
+}
+
+/** The mortar's fuse struck and caught: a rasp, the flare, and the sizzle running down to the charge. */
+function windMortar(r: Rng): Buf {
+  const s = 0.7, x = new Float32Array(n(s + 0.1));
+  mix(x, burst(r, 0.07, 'bp', 2400, 1.4, 0.002, 0.04), 0, 0.6); // the slow match struck
+  mix(x, whoosh(r, 0.22, 900, 3200, 1.1, 1.4), 0.03, 0.5); // catching
+  const hiss = shape(filter(white(n(s), r), 'hp', 3800), (t) => 0.55 + 0.45 * Math.sin(TAU_ * 31 * t) * Math.sin(TAU_ * 7 * t));
+  mix(x, shape(hiss, (t) => ad(t, 0.06, 0.6)), 0.05, 0.55);
+  crackles(x, r, 0.08, s, 38, 0.25);
+  mix(x, knock(r, between(r, 150, 180), 0.08, 0.4), 0.02, 0.35); // the bed settling
+  return normalize(x, 0.6);
+}
+
+/** The broadside's guns run out: the trucks rumbling across the deck and the port lids banging up, down both sides. */
+function windBroadside(r: Rng): Buf[] {
+  const s = 0.75, out = pair(s + 0.2);
+  out.forEach((o, c) => {
+    mix(o, shape(filter(brown(n(s), r), 'lp', 160), (t) => hump(t / s, 0.8)), 0, 0.9); // the trucks rolling
+    mix(o, stickSlip(r, s * 0.8, 40, 75, [180, 390, 620], 0.03), 0.04 + c * 0.02, 0.3);
+    for (let k = 0; k < 4; k++) {
+      const at = 0.12 + k * between(r, 0.1, 0.15) + c * 0.03;
+      mix(o, knock(r, between(r, 260, 330), 0.06, 0.35), at, 0.7); // a lid banging up
+      mix(o, thump(0.25, 140, 80, 0.05), at, 0.45);
+    }
+  });
+  return normAll(out, 0.7);
+}
+
+/** Aimed at: a heavy gun winding up on your ship. A taut double knock under a rising whine, cut short when it fires. */
+function aimedAt(r: Rng): Buf {
+  const s = 0.6, x = new Float32Array(n(s));
+  mix(x, tone(n(s), (t) => 980 + 520 * (t / s), (t) => 0.05 * hump(t / s, 0.7)), 0, 1);
+  mix(x, tone(n(s), (t) => 1470 + 780 * (t / s), (t) => 0.025 * hump(t / s, 0.7)), 0, 1);
+  mix(x, knock(r, 1250, 0.02, 0.1), 0, 0.5);
+  mix(x, knock(r, 1250, 0.02, 0.1), 0.11, 0.5);
+  return normalize(x, 0.55);
+}
+
 /** The gun is ready: a crisp latch. */
 function reloadDone(r: Rng): Buf {
   const x = new Float32Array(n(0.25));
@@ -383,6 +438,10 @@ export const WEAPON_SOUNDS = {
   reloadBroadside: def(reloadBroadside, 1, 'fx', 4, 0.6, 2, { range: 60 }),
   reloadChain: def(reloadChain, 2, 'fx', 4, 0.55, 2, { range: 60 }),
   reloadHeated: def(reloadHeated, 2, 'fx', 4, 0.55, 2, { range: 60 }),
+  windHarpoon: def(windHarpoon, 3, 'fx', 7, 0.8, 4, { range: 260 }),
+  windMortar: def(windMortar, 3, 'fx', 7, 0.75, 4, { range: 240 }),
+  windBroadside: def(windBroadside, 2, 'fx', 7, 0.85, 4, { range: 260 }),
+  aimedAt: def(aimedAt, 1, 'ui', 9, 0.55, 2, { jitter: 0 }),
   reloadDone: def(reloadDone, 2, 'ui', 6, 0.5, 2),
   empty: def(empty, 2, 'ui', 6, 0.55, 2),
   select: def(select, 2, 'ui', 7, 0.5, 2),

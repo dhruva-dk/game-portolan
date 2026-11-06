@@ -1,6 +1,6 @@
 // Items: the 5-slot hotbar (select, swap, drop), loot on the water (the loot spots filled by rarity at the
 // start, drops from sinking ships, parcels and the whale), picking it up, and using consumables.
-import { interrupt, mend, shore } from './harm.ts';
+import { interrupt, mend, shore, standDown } from './harm.ts';
 import { damaged, mendParts } from './parts.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dot, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
@@ -169,6 +169,7 @@ export function select(state: MatchState, i: number, s: number): void {
   const ship = state.ships[i];
   if (s < 0 || s >= SLOTS || s === ship.sel) return;
   interrupt(state, i);
+  standDown(state, i);
   ship.sel = s;
   ship.reload = 0;
   ship.equip = EQUIP;
@@ -179,6 +180,7 @@ export function swap(state: MatchState, i: number, s: number): void {
   const ship = state.ships[i];
   if (s < 0 || s >= SLOTS || s === ship.sel) return;
   interrupt(state, i);
+  standDown(state, i);
   const a = ship.slots[ship.sel];
   ship.slots[ship.sel] = ship.slots[s];
   ship.slots[s] = a;
@@ -191,6 +193,7 @@ export function drop(state: MatchState, i: number): void {
   const ship = state.ships[i], it = ship.slots[ship.sel];
   if (it.kind === ITEM.none) return;
   interrupt(state, i);
+  standDown(state, i);
   set(T, -ship.head.x, -ship.head.y, -ship.head.z);
   along(ship.pos, T, 8, P);
   const l = spawnLoot(state, P, it, i);

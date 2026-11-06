@@ -177,3 +177,21 @@
 .pui-tip[data-at='gale'] { right: calc(var(--sr) + var(--sp-6)); bottom: calc(var(--sb) + var(--sp-6) + 110px * var(--k)); }
 .pui .pui-tip[data-at=''] { display: none; }
 .pui[data-form='phone'] .pui-tip[data-at='hud'] { top: calc(var(--st) + var(--sp-5) + 106px * var(--k) + var(--hud-state, 26px * var(--k))); }
+
+/* a heavy gun winding up on you: a marker on a ring round the middle, turned to where it lies, filling as it nears
+   firing; ahead is the top of the screen */
+.s-hud__aimed { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0;
+  transition: opacity 120ms ease-out; }
+.s-hud__aimed.is-on { opacity: 1; }
+.s-hud__aimedArc { position: absolute; left: 0; top: 0; width: 0; height: 0; transform: rotate(var(--b, 0rad)); }
+.s-hud__aimedTip { position: absolute; left: calc(-17px * var(--k)); top: calc(-150px * var(--k)); width: calc(34px * var(--k));
+  height: calc(34px * var(--k)); display: grid; place-items: center; border-radius: 50%;
+  color: #2a1a00; background: conic-gradient(#ffd23a calc(var(--w, 0) * 360deg), rgba(255, 210, 58, 0.35) 0);
+  box-shadow: 0 0 calc(14px * var(--k)) rgba(255, 190, 40, calc(0.3 + var(--w, 0) * 0.6));
+  animation: s-hud-aimed 0.32s ease-in-out infinite alternate; }
+.s-hud__aimedTip svg { width: 62%; height: 62%; transform: rotate(calc(-1 * var(--b, 0rad))); }
+.s-hud__aimedName { position: absolute; left: 0; top: calc(44px * var(--k)); transform: translateX(-50%); white-space: nowrap;
+  font-family: var(--f-display); font-weight: 800; font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase;
+  color: #ffd23a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
+@keyframes s-hud-aimed { from { scale: 1; } to { scale: 1.12; } }
+@media (prefers-reduced-motion: reduce) { .s-hud__aimedTip { animation: none; } }

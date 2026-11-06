@@ -79,7 +79,7 @@ function newShip(state: MatchState, e: FleetEntry, i: number, gentle: boolean): 
     name: e.name ?? i, look: e.look ?? i, phase: PHASE.gale, pos: xyz(), head: { x: 1, y: 0, z: 0 }, was: xyz(), alt: GALE.height, vy: 0,
     speed: 0, drift: 0, rate: 0, turn: 0, shove: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 },
     hull: 100, shield: state.rule === RULE.fullShields ? 100 : 0,
-    slots: Array.from({ length: SLOTS }, empty), sel: 0, cool: 0, reload: 0, equip: 0, use: -1, useT: 0,
+    slots: Array.from({ length: SLOTS }, empty), sel: 0, cool: 0, reload: 0, equip: 0, windup: 0, use: -1, useT: 0,
     gusts: GUST.charges, gustT: 0, boost: 0, aim: xyz(), aimY: 0,
     active: Math.max(0, activeIndex(e.active ?? STARTER_ACTIVE)), passive: Math.max(0, passiveIndex(e.passive ?? STARTER_PASSIVE)),
     cooldown: 0, power: 0, burn: 0, burnBy: -1, slow: 0, spotted: 0, revealed: 0, ice: 0, ash: 0, flip: 0, scrape: 0,

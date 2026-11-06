@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MAIN_FOOT, MAIN_HEIGHT, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
 import { RIPPLES } from '../ocean/ripples.ts';
-import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
+import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, rand, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
@@ -248,6 +248,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       const gutter = 0.75 + 0.15 * Math.sin(t * 11 + v.id) + 0.1 * Math.sin(t * 27.3 + v.id * 5);
       fx.lights.hold(`fire${v.id}`, tmp.copy(deck).addScaledVector(deck.clone().normalize(), 2.5), 0xff7428, 420 * Math.min(1, parts.burn) * gutter, 32);
     }
+    if (v.windup && v.windup > 0 && d < 420 && f.sink < 0) windUp(f, v, v.windup, t, dt);
     m.far = d > 140;
     m.fade = v.id === player && options.fadePlayerSail !== false ? 1 : 0;
     // the shield's shell
@@ -274,6 +275,57 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       if (v.id !== player) fx.light(m.toWorld(MASTHEAD, tmp), Math.max(0.4, d * 0.009), f.lantern, (0.9 + 1.6 * n) * n * flick);
     }
     if (f.hop >= 0 && f.hop < 0.9) fx.windAround(f.pos, f.fwd.clone().multiplyScalar(v.speed + 14), 40, dt);
+  }
+
+  // A heavy gun winding up, where its mark can see it (WINDUP): `k` runs 0..1 to the shot.
+  // - the harpoon: a cold glint gathering at the bolt's head as the bow-spring creaks back, and the odd spark of iron
+  //   on iron from the winch;
+  // - the mortar: the fuse lit at the mouth, fizzing and spitting sparks up into the air, the faster the nearer;
+  // - the broadside: her slow matches glowing at the open ports down the side she will fire, and a haze of their
+  //   smoke, brightening down the line as the guns run out.
+  const wu = new THREE.Vector3(), wd = new THREE.Vector3(), port = new THREE.Vector3();
+  function windUp(f: Fleet, v: ShipView, k: number, t: number, dt: number): void {
+    const m = f.model, glow = fx.glow, swell = 0.35 + 0.65 * k;
+    if (v.weapon === 'broadside') {
+      // the side she fires is the side her aim is on (x > 0 is port)
+      const side = v.aim ? Math.sign(v.aim.x * right.x + v.aim.y * right.y + v.aim.z * right.z) || 1 : 1;
+      let lit = 0;
+      for (let i = 0; i < GUNPORTS.length; i++) {
+        const g = GUNPORTS[i];
+        if (Math.sign(g.pos.x) !== side) continue;
+        // down the line from the bow, each gun a little after the one before
+        const own = clamp((k - lit * 0.12) / 0.5, 0, 1);
+        lit++;
+        if (own <= 0) continue;
+        m.toWorld(g.pos, port);
+        m.dirToWorld(g.dir, wd);
+        const flick = 0.8 + 0.2 * Math.sin(t * 19 + i * 2.3);
+        glow.emit({ x: port.x, y: port.y, z: port.z, life: 0, size: 0.5 + 0.5 * own, r: 7 * flick * own, g: 3 * flick * own, b: 0.8 * own, frame: SPRITE.spark });
+        if (Math.random() < dt * 6 * own) {
+          fx.smoke.emit({ x: port.x + wd.x * 0.5, y: port.y + wd.y * 0.5, z: port.z + wd.z * 0.5, vx: wd.x * 0.6 + f.up.x, vy: wd.y * 0.6 + f.up.y, vz: wd.z * 0.6 + f.up.z, life: rand(0.8, 1.4), size: 0.4, grow: 4, r: 0.5, g: 0.48, b: 0.46, a: 0.22, frame: SPRITE.billow, drag: 1.2 });
+        }
+      }
+      fx.lights.hold(`windup${v.id}`, m.toWorld(DECK, wu), 0xff8a3a, 140 * k, 16);
+      return;
+    }
+    m.muzzle(wu, wd);
+    if (v.weapon === 'harpoon') {
+      const pulse = 0.7 + 0.3 * Math.sin(t * (10 + 26 * k));
+      glow.emit({ x: wu.x, y: wu.y, z: wu.z, life: 0, size: 0.35 + 0.9 * k * k, r: 2.6 * pulse * swell, g: 3.4 * pulse * swell, b: 5 * pulse * swell, frame: SPRITE.spark });
+      if (Math.random() < dt * (4 + 14 * k)) {
+        glow.emit({ x: wu.x - wd.x * 1.2, y: wu.y - wd.y * 1.2, z: wu.z - wd.z * 1.2, vx: rand(-2, 2) + f.up.x * 2, vy: rand(-2, 2) + f.up.y * 2, vz: rand(-2, 2) + f.up.z * 2, life: rand(0.15, 0.3), size: 0.06, r: 6, g: 5, b: 3.6, frame: SPRITE.spark, mode: 1, stretch: 0.03, drag: 2, fadeIn: 0 });
+      }
+      return;
+    }
+    // the mortar's fuse
+    const flick = 0.75 + 0.25 * Math.sin(t * 37 + v.id);
+    glow.emit({ x: wu.x, y: wu.y, z: wu.z, life: 0, size: 0.5 + 0.6 * k, r: 8 * flick * swell, g: 3.4 * flick * swell, b: 0.7 * swell, frame: SPRITE.spark });
+    const n = Math.floor(dt * (25 + 70 * k) + Math.random());
+    for (let i = 0; i < n; i++) {
+      glow.emit({ x: wu.x, y: wu.y, z: wu.z, vx: rand(-2.5, 2.5) + f.up.x * rand(2, 5), vy: rand(-2.5, 2.5) + f.up.y * rand(2, 5), vz: rand(-2.5, 2.5) + f.up.z * rand(2, 5), life: rand(0.2, 0.5), size: 0.07, r: 7, g: 3, b: 0.6, frame: SPRITE.spark, mode: 1, stretch: 0.03, drag: 1.5, grav: 6, fadeIn: 0 });
+    }
+    if (Math.random() < dt * 8) fx.smoke.emit({ x: wu.x, y: wu.y, z: wu.z, vx: f.up.x * 1.5, vy: f.up.y * 1.5, vz: f.up.z * 1.5, life: rand(0.8, 1.3), size: 0.25, grow: 5, r: 0.55, g: 0.53, b: 0.5, a: 0.3, frame: SPRITE.billow, drag: 1 });
+    fx.lights.hold(`windup${v.id}`, wu, 0xff7a2a, 90 * k * flick, 12);
   }
 
   // Cinder Peak: its plume, and each bomb on its arc from the crater, highest midway

@@ -145,7 +145,7 @@ export function refit(state: MatchState, i: number): void {
   s.slots = Array.from({ length: SLOTS }, empty);
   s.slots[0] = starter(state);
   s.sel = 0;
-  s.cool = s.reload = s.equip = s.useT = 0;
+  s.cool = s.reload = s.equip = s.windup = s.useT = 0;
   s.use = -1;
   s.gusts = GUST.charges;
   s.gustT = s.boost = s.cooldown = s.power = 0;

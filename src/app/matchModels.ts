@@ -16,13 +16,14 @@ import { EVENT_STATE } from '../sim/state.ts';
 import { GALE, GUST, LOOT, PARCELS, PARTS, VOYAGE, isWeapon } from '../sim/tables.ts';
 import { CACHE_PLACES, SECRET_COUNT, secretIndex } from '../sim/secrets.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
-import { R, advance, along, apart, tangentAt } from '../sim/sphere.ts';
+import { R, advance, along, angleTo, apart, tangentAt, tangentToward } from '../sim/sphere.ts';
+import { aimedAt } from '../sim/combat.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
 import { PI, v3, type V3 } from '../sim/math.ts';
 import {
   rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type EventView, type GaleModel, type HudModel,
   type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type SpectateModel, type VictoryModel,
-  type WeaponId, type WeatherName,
+  type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
 import type { Rarity } from '../ui/parts/tokens.ts';
 import { causeName, consumableOf, itemKey, weaponOf } from './moments.ts';
@@ -175,6 +176,24 @@ function steadyOf(s: MatchState, i: number): number | null {
   return d.sea < 0.2 ? null : 1 - d.unsteady;
 }
 
+/** The heavy gun winding up on ship i soonest to fire, as the HUD warns of it: only one it can see. */
+function aimedOf(s: MatchState, i: number, aim: V3): HudModel['aimed'] {
+  const me = s.ships[i];
+  let best: HudModel['aimed'] = null, left = Infinity;
+  for (let j = 0; j < s.ships.length; j++) {
+    const o = s.ships[j];
+    if (j === i || o.windup <= 0 || o.windup >= left || o.phase !== PHASE.sea || !(seen(s, i, j) & SEEN.visible)) continue;
+    const w = WEAPONS[o.slots[o.sel].kind];
+    if (!w || aimedAt(s, j, w) !== i) continue;
+    left = o.windup;
+    tangentToward(me.pos, aim, AIM_T);
+    tangentToward(me.pos, o.pos, TO_T);
+    best = { weapon: WEAPON_NAME[weaponOf(o.slots[o.sel].kind) as WeaponId], bearing: angleTo(AIM_T, TO_T, me.pos), wound: 1 - o.windup / w.windup };
+  }
+  return best;
+}
+const AIM_T = v3(), TO_T = v3();
+
 export function hudModel(session: Session): HudModel {
   const s = session.state, sh = s.ships[session.watch];
   const id = ACTIVES[sh.active] as ActiveId, cool = ability(id).cooldown;
@@ -201,6 +220,7 @@ export function hudModel(session: Session): HudModel {
     },
     throttle: session.watch === PLAYER ? session.throttle : 1,
     steady: steadyOf(s, session.watch),
+    aimed: aimedOf(s, session.watch, session.aim),
     using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     region: REGIONS[r]?.name ?? 'the open sea',
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,

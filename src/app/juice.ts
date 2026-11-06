@@ -169,6 +169,12 @@ export class MomentJuice {
       case 'quench':
         if (m.ship === me) juice.haptics.play('light');
         return;
+      case 'windup':
+        // a heavy gun laid on you: a cold edge to the view and a buzz, held for as long as the wind-up runs
+        if (m.at !== me || m.seconds <= 0) return;
+        juice.screen.vignette({ color: '#ffd23a', alpha: 0.28, reach: 0.42, attack: 0.08, hold: m.seconds * 0.8, decay: 0.3 });
+        juice.haptics.play('warning');
+        return;
       case 'about':
         if (m.ship !== me) return;
         // a clean tack leans the view forward a touch as she surges; a thrown gybe jars it; irons is felt, not seen

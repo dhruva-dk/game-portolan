@@ -120,6 +120,7 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.win: return { k: 'win', ship };
     case EVENT.secret: return { k: 'secret', ship, secret: e.item, pos };
     case EVENT.refit: return { k: 'refit', ship, pos };
+    case EVENT.windup: return { k: 'windup', ship, weapon: weaponOf(e.item), at: e.by, seconds: e.amount, pos: metres(state.ships[ship].pos, 3) };
     case EVENT.about: return { k: 'about', ship, how: ABOUT_HOW[e.item] ?? 'tack', surge: e.amount, pos: metres(state.ships[ship].pos, 6) };
     case EVENT.regionWarn: return { k: 'regionEvent', region: e.item, phase: 'warn', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionStart: return { k: 'regionEvent', region: e.item, phase: 'start', seconds: e.amount, pos: metres(e.at) };

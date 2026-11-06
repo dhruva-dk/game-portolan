@@ -69,6 +69,14 @@ export function interrupt(state: MatchState, i: number): void {
   ship.useT = 0;
 }
 
+/** Stands a heavy gun's wind-up down: she changed slot, dropped the gun, or capsized. */
+export function standDown(state: MatchState, i: number): void {
+  const ship = state.ships[i];
+  if (ship.windup <= 0) return;
+  ship.windup = 0;
+  emit(state, EVENT.windup, i, -1, ship.pos, { item: ship.slots[ship.sel].kind, amount: 0 });
+}
+
 /** Mends the hull, up to `cap`. Returns what it mended. */
 export function mend(state: MatchState, i: number, amount: number, cap = 100): number {
   const ship = state.ships[i];

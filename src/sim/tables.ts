@@ -121,22 +121,33 @@ export interface Weapon {
   readonly parts: PartsBias;
   /** Seconds a hit that reaches the hull sets her burning for; 0 none. */
   readonly ignite: number;
+  /** Seconds a heavy gun winds up between the trigger and the shot, seen and heard by whoever it is aimed at; 0 for
+   *  the rest, which fire on the trigger. */
+  readonly windup: number;
 }
+
+/**
+ * Telegraphs. Every heavy attack winds up where it can be seen and heard, and every one has an answer. The harpoon's
+ * winch ratchets back, the mortar's fuse is lit, and the broadside's guns are run out. Long enough to read and answer
+ * with the gust hop or a hard turn bow-on, short enough that it is still a gun. The ship it is aimed at is the one
+ * within `aimed` metres of the aim point (any ship abeam within reach, for a broadside).
+ */
+export const WINDUP = { aimed: 30 } as const;
 
 export interface PartsBias { readonly sail: number; readonly mast: number; readonly flood: number; readonly rudder: number }
 const EVEN: PartsBias = { sail: 1, mast: 1, flood: 1, rudder: 1 };
 
 const gun = (w: Partial<Weapon> & Pick<Weapon, 'damage' | 'interval' | 'mag' | 'reload' | 'speed' | 'gravity' | 'spread' | 'range'>): Weapon => ({
-  pellets: 1, crit: 1.5, splash: 0, auto: false, lob: false, sides: 0, parts: EVEN, ignite: 0, ...w,
+  pellets: 1, crit: 1.5, splash: 0, auto: false, lob: false, sides: 0, parts: EVEN, ignite: 0, windup: 0, ...w,
 });
 
 export const WEAPONS: Readonly<Record<number, Weapon>> = {
   [ITEM.cannon]: gun({ damage: 20, interval: 0.42, mag: 8, reload: 1.9, speed: 165, gravity: 7, spread: 0.008, range: 200, auto: true }),
   [ITEM.scatter]: gun({ damage: 8, interval: 1, mag: 4, reload: 2.3, speed: 135, gravity: 4, spread: 0.065, pellets: 8, range: 70 }),
-  [ITEM.harpoon]: gun({ damage: 80, interval: 1.4, mag: 1, reload: 2.1, speed: 300, gravity: 2.5, spread: 0, range: 240, crit: 1.75 }),
-  [ITEM.mortar]: gun({ damage: 60, interval: 1.3, mag: 2, reload: 2.8, speed: 0, gravity: 26, spread: 0.012, range: 220, crit: 1, splash: 11, lob: true }),
+  [ITEM.harpoon]: gun({ damage: 80, interval: 1.4, mag: 1, reload: 2.1, speed: 300, gravity: 2.5, spread: 0, range: 240, crit: 1.75, windup: 0.75 }),
+  [ITEM.mortar]: gun({ damage: 60, interval: 1.3, mag: 2, reload: 2.8, speed: 0, gravity: 26, spread: 0.012, range: 220, crit: 1, splash: 11, lob: true, windup: 0.6 }),
   [ITEM.repeater]: gun({ damage: 7, interval: 0.1, mag: 30, reload: 2, speed: 185, gravity: 3, spread: 0.024, range: 150, auto: true }),
-  [ITEM.broadside]: gun({ damage: 14, interval: 1.6, mag: 3, reload: 3, speed: 110, gravity: 6, spread: 0.02, range: 110, crit: 1.25, sides: 4 }),
+  [ITEM.broadside]: gun({ damage: 14, interval: 1.6, mag: 3, reload: 3, speed: 110, gravity: 6, spread: 0.02, range: 110, crit: 1.25, sides: 4, windup: 0.55 }),
   // two half-balls on a chain, whirling: little against a hull, ruin to canvas and spars; slow and short-ranged, so
   // it is the weapon for stopping a ship that runs, aimed high
   [ITEM.chain]: gun({

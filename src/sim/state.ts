@@ -124,6 +124,8 @@ const SHIP = rec(
   ['cool', f64],
   ['reload', f64],
   ['equip', f64],
+  // seconds left winding up a heavy gun before it fires (WINDUP)
+  ['windup', f64],
   ['use', int],
   ['useT', f64],
   ['gusts', int],
@@ -293,7 +295,7 @@ export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 5, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 6, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {
@@ -355,12 +357,14 @@ export const EVENT = {
   refit: 55,
   /** A ship going about: item 0 a clean tack, 1 a gybe, 2 a gybe thrown so the yards slam, 3 caught in irons. */
   about: 56,
+  /** A heavy gun winding up: item weapon kind, amount seconds (0 when it was stood down), by the ship it is aimed at. */
+  windup: 57,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
   'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
-  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit', 'about',
+  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit', 'about', 'windup',
 ];
 
 /** Event flag bits. */

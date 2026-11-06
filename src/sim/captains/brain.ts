@@ -7,11 +7,11 @@
 import { canCall } from '../economy.ts';
 import { aground, currentAt, seaLevel, seaLevelAt, solidAt } from '../environment.ts';
 import type { ShipInput } from '../input.ts';
-import { PI, addScaled, dcos, dot, dsin, length, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
+import { PI, addScaled, dcos, dot, dsin, hash32, length, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
 import { cellCentre, clearLine, findPath, lineOfSight, nearestOpen, openAt } from '../nav.ts';
 import { GALE_SPEED, galeSeat } from '../opening.ts';
 import { activeOf, hasPerk } from '../perks.ts';
-import { rangeOf } from '../combat.ts';
+import { aimedAt, landing, rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
 import { coverNear, dangerAt, escapeFrom, newDanger, rewardNear } from '../regionEvents.ts';
 import { draftOf, offWind, pointOfSail, turnRate } from '../sailing.ts';
@@ -1008,6 +1008,7 @@ export function helm(state: MatchState, i: number, out: ShipInput): void {
   steerFor(state, i, out);
   aimAndFire(state, i, style, rng, out);
   useWhatItCarries(state, i, style, out);
+  answer(state, i, out);
   stuck(state, i, rng, out);
 }
 
@@ -1245,7 +1246,7 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   const foe = state.ships[c.foe], target = c.target === -2 ? c.last : foe.pos;
   const d = apart(ship.pos, target);
   // the right weapon for the range, and for the foe
-  if (c.swapT <= 0 && c.mode === MODE.fight) {
+  if (c.swapT <= 0 && c.mode === MODE.fight && ship.windup <= 0) {
     const s = bestWeapon(ship, d, state, c.foe);
     if (s >= 0 && s !== ship.sel) {
       out.select = s;
@@ -1263,7 +1264,8 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   }
   const w = WEAPONS[it.kind];
   // lead the target by its velocity over the flight time, with a wandering error
-  const flight = w.lob ? Math.max(0.9, Math.min(2.8, d / 70)) : d / w.speed;
+  // (a heavy gun's wind-up adds to the flight: the able gunner lays her lead for where the foe will be when it fires)
+  const flight = (w.lob ? Math.max(0.9, Math.min(2.8, d / 70)) : d / w.speed) + (ship.windup > 0 ? ship.windup : w.windup) * (0.3 + 0.7 * c.skill);
   set(LEAD, target.x + (foe.vel.x * flight) / R, target.y + (foe.vel.y * flight) / R, target.z + (foe.vel.z * flight) / R);
   normalize(LEAD);
   c.errT -= TICK;
@@ -1384,6 +1386,67 @@ function useWhatItCarries(state: MatchState, i: number, style: Style, out: ShipI
   // the active ability
   if (ship.cooldown <= 0 && ship.phase === PHASE.sea) out.ability = abilityNow(state, i, style);
 }
+
+// ---------------------------------------------------------------- answering what's coming
+
+/**
+ * Every heavy attack is telegraphed and every one has an answer (WINDUP). A captain that sees a heavy gun winding up on
+ * it, or a mortar shell coming down near it, answers. A sharp one notices sooner and nearly always; a green one is
+ * often too slow, or never sees it:
+ * - the shell: it sails out from under where it's coming down, and gusts clear, the gust's burst of speed taking it
+ *   out of the splash, once the shell is close;
+ * - the harpoon and the broadside: it turns her bow or her stern to the gun, whichever is nearer, so she is a narrow
+ *   mark and the balls go by either side; a sharp captain with far to turn gusts for the gust's quicker turn.
+ */
+function answer(state: MatchState, i: number, out: ShipInput): void {
+  const ship = state.ships[i], c = ship.captain;
+  if (ship.phase !== PHASE.sea || c.gentle) return;
+  const notice = 0.2 + 0.75 * c.skill, canGust = ship.gusts > 0 && ship.boost <= 0 && ship.use < 0;
+  // shells coming down
+  for (const sh of state.shots) {
+    if (sh.owner === i || sh.splash <= 0 || sh.g <= 0) continue;
+    const t = landing(sh, P);
+    // where she'll be by then, as she's going
+    set(Q, ship.pos.x + (ship.vel.x * t) / R, ship.pos.y + (ship.vel.y * t) / R, ship.pos.z + (ship.vel.z * t) / R);
+    normalize(Q);
+    const d = apart(Q, P);
+    if (d > sh.splash + 5 || apart(ship.pos, P) > 140) continue;
+    // whether this captain sees it in time: once per shell, by the shell and the ship
+    // (a shell's speed is set once, with a little chance in it, when it's fired: a key that holds for its flight)
+    if (unitHash(i, Math.round(sh.v * 4096) + sh.owner * 131) > notice) continue;
+    tangentToward(ship.pos, P, T);
+    set(T, -T.x, -T.y, -T.z);
+    out.steer = angleTo(ship.head, T, ship.pos);
+    out.throttle = 1;
+    if (canGust && t < 0.9 + 0.4 * c.skill && d < sh.splash + 2) out.gust = true;
+    ANSWERED.shell++;
+    return;
+  }
+  // guns winding up on it
+  for (let j = 0; j < SHIPS; j++) {
+    const o = state.ships[j];
+    if (j === i || o.windup <= 0 || o.phase !== PHASE.sea) continue;
+    const w = WEAPONS[o.slots[o.sel].kind];
+    if (!w || aimedAt(state, j, w) !== i || (seen(state, i, j) & SEEN.visible) === 0) continue;
+    // it notices once the wind-up has gone on long enough for it to (sooner when sharp), or not at all
+    const gone = w.windup - o.windup;
+    if (gone < (1 - c.skill) * 0.3 || unitHash(i, j * 7919 + Math.floor((state.tick * TICK - gone) * 10)) > notice) continue;
+    tangentToward(ship.pos, o.pos, T);
+    // bow or stern to her, whichever is the smaller turn: end on, she is a fifth the mark she is broadside on
+    const bearing = angleTo(ship.head, T, ship.pos);
+    out.steer = Math.abs(bearing) < PI / 2 ? bearing : bearing - Math.sign(bearing) * PI;
+    // and a sharp captain with a long way to turn gusts, for the gust's quicker turn
+    if (canGust && c.skill > 0.45 && Math.abs(out.steer) > 0.6) out.gust = true;
+    ANSWERED.gun++;
+    return;
+  }
+}
+
+/** Ticks spent answering shells and guns, for watching; never read by the sim. */
+export const ANSWERED = { shell: 0, gun: 0 };
+
+/** A number in 0..1 fixed by its two keys, for a choice made once and kept (whether a captain notices a threat). */
+const unitHash = (a: number, b: number): number => (hash32(a * 2654435761, b) >>> 0) / 4294967296;
 
 function abilityNow(state: MatchState, i: number, style: Style): boolean {
   const ship = state.ships[i], c = ship.captain;

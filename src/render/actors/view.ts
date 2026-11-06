@@ -52,6 +52,9 @@ export interface ShipView {
   weapon: Weapon;
   /** World direction the turret aims; omitted, it trains forward. */
   aim?: Vec3;
+  /** A heavy gun winding up, 0 at the start to 1 as it fires; omitted or 0, none: the harpoon's bow-spring creaking
+   *  back, the mortar's fuse fizzing, the broadside's matches glowing at her open ports on the side she fires. */
+  windup?: number;
   /** The wind she feels, a tangent vector in m/s; omitted, the view's wind. */
   wind?: Vec3;
   cosmetics: CosmeticIds;
@@ -81,6 +84,9 @@ export interface ProjectileView {
   vel: Vec3;
   /** The ship that fired it, for the harpoon's line. */
   ship?: number;
+  /** A shell that bursts where it comes down: where on the water that is, the burst's reach in metres, and the seconds
+   *  until it lands, for the ring drawn there. */
+  land?: { at: Vec3; reach: number; seconds: number };
 }
 
 export type LootKind = Weapon | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair' | 'coin';

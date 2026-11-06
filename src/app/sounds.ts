@@ -195,6 +195,14 @@ export class MomentSound {
       case 'quench':
         a.play('quench', { pos: this.at(m.ship, m.pos) });
         return;
+      case 'windup': {
+        // heard round about it, and by its mark as a warning over everything else
+        if (m.seconds <= 0) return;
+        const id = m.weapon === 'harpoon' ? 'windHarpoon' : m.weapon === 'mortar' ? 'windMortar' : 'windBroadside';
+        a.play(id, { pos: this.at(m.ship, m.pos) });
+        if (m.at === me) a.play('aimedAt');
+        return;
+      }
       case 'about': {
         // canvas filling on the new board, louder for the way she carried; the yards slamming; or the canvas shaking
         const pos = this.at(m.ship, m.pos);
