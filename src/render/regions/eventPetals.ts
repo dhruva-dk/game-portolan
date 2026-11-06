@@ -7,7 +7,9 @@ import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { REGIONS, currentAt, heightAt, regionShare, type RegionId } from '../../sim/world/index.ts';
 import { v3, type V3 } from '../../sim/math.ts';
 import { patch } from '../engine.ts';
-import { waveHeight, waveSlope } from '../swell.ts';
+import { seaAt } from '../swell.ts';
+import { GPU } from '../actors/common.ts';
+import { faintGlowNode } from '../beacons/nodes.ts';
 import type { EventPhase } from './eventRocks.ts';
 
 const BLOSSOM = REGIONS.findIndex((r) => r.id === 'blossomRun');
@@ -70,7 +72,8 @@ export class EventPetals {
 
   constructor() {
     this.group.name = 'eventPetals';
-    const mat = patch(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, emissive: 0x3a1a26, side: THREE.DoubleSide }), 'event-petals');
+    const petal = { color: 0xffffff, roughness: 0.6, emissive: 0x3a1a26, side: THREE.DoubleSide };
+    const mat = GPU.on ? (faintGlowNode(petal) as unknown as THREE.MeshStandardMaterial) : patch(new THREE.MeshStandardMaterial(petal), 'event-petals');
     this.mesh = new THREE.InstancedMesh(drift(), mat, N);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
@@ -115,8 +118,7 @@ export class EventPetals {
       // grown in as it's set loose and shrunk away at its end, so none pops
       const s = Math.min(1, age[i] / 0.8, (life[i] - age[i]) / 1.2);
       up.set(p.x, p.y, p.z).multiplyScalar(R + tide);
-      const h = waveHeight(up, time);
-      waveSlope(up, time, slope);
+      const h = seaAt(up, time, slope);
       up.set(p.x - slope.x, p.y - slope.y, p.z - slope.z).normalize();
       tangentAt(p, yaw[i] + spin[i] * age[i], this.t);
       z.set(this.t.x, this.t.y, this.t.z).addScaledVector(up, -(this.t.x * up.x + this.t.y * up.y + this.t.z * up.z)).normalize();

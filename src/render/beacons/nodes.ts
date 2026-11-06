@@ -12,7 +12,7 @@ import {
   type ColorRepresentation, type Node, type Side,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cameraPosition, cameraWorldMatrix, clamp, dot, exp, float, floor, fract, length, materialColor, materialRoughness, max, min,
+  Fn, abs, attribute, cameraPosition, materialEmissive, cameraWorldMatrix, clamp, dot, exp, float, floor, fract, length, materialColor, materialRoughness, max, min,
   mix, modelViewMatrix, modelWorldMatrixInverse, normalLocal, normalView, normalize, positionGeometry, positionLocal, positionViewDirection,
   positionWorld, pow, reference, select, sin, smoothstep, uv, varying, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
@@ -279,5 +279,21 @@ export function surfaceNode(clock: Clock, o: SurfaceBase & SurfaceNodes): MeshBa
 export function glowNode(colour: ColorRepresentation, level: { value: number }): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial();
   m.colorNode = lamp(rgb(colour).mul(num(level)));
+  return m;
+}
+
+/** A see-through glow added over what lies behind it: `colour` times `level` at the lamps' scale, dimmed by the air
+ *  between it and the eye. */
+export function addedGlowNode(colour: ColorRepresentation, level: number): MeshBasicNodeMaterial {
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, fog: false });
+  m.colorNode = lamp(rgb(colour).mul(level)).mul(airLoss());
+  return m;
+}
+
+/** A standard surface whose emissive colour is a faint glow of its own, set at the actors' scale for glows so it reads
+ *  at night as it does by day instead of blazing once the eye has adapted to moonlight. */
+export function faintGlowNode(params: ConstructorParameters<typeof MeshStandardNodeMaterial>[0]): MeshStandardNodeMaterial {
+  const m = new MeshStandardNodeMaterial(params);
+  m.emissiveNode = materialEmissive.mul(LAMP).mul(2.5);
   return m;
 }

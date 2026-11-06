@@ -8,6 +8,8 @@
 import * as THREE from 'three';
 import { sharedUniforms } from '../planet.ts';
 import { SKINS, type Skin, type SkinId, type TexId } from './skins.ts';
+import { rockNodeMaterial } from './nodes.ts';
+import { GPU } from '../actors/common.ts';
 
 /** Uniforms every rock material shares by reference. */
 export const ROCK_UNIFORMS = {
@@ -292,7 +294,8 @@ const vec3 = (c: readonly number[]) => new THREE.Vector3(c[0], c[1], c[2]);
 export function rockMaterial(id: SkinId): THREE.MeshStandardMaterial {
   let m = materials.get(id);
   if (m) return m;
-  m = buildMaterial(id, SKINS[id]);
+  // on the GPU planet the same rock as nodes
+  m = GPU.on ? (rockNodeMaterial(id, SKINS[id], texture, ROCK_UNIFORMS) as unknown as THREE.MeshStandardMaterial) : buildMaterial(id, SKINS[id]);
   materials.set(id, m);
   return m;
 }

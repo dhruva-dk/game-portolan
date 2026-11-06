@@ -9,7 +9,7 @@ import { REGION_EVENT } from '../../sim/tables.ts';
 import { REGION_EVENTS, REGIONS, heightAt, type RegionId } from '../../sim/world/index.ts';
 import { v3 } from '../../sim/math.ts';
 import { patch } from '../engine.ts';
-import { waveHeight, waveSlope } from '../swell.ts';
+import { seaAt } from '../swell.ts';
 import type { EventPhase } from './eventRocks.ts';
 
 const KELP = REGIONS.findIndex((r) => r.id === 'kelpShallows');
@@ -100,8 +100,7 @@ export class EventKelp {
       if (f.d > r) break;
       const grow = Math.min(1, (r - f.d) / EDGE) * f.s;
       at.copy(f.up).multiplyScalar(R + tide);
-      const h = waveHeight(at, time);
-      waveSlope(at, time, slope);
+      const h = seaAt(at, time, slope);
       // tilted with the swell, its heading kept along the water
       up.set(f.up.x - slope.x, f.up.y - slope.y, f.up.z - slope.z).normalize();
       z.copy(f.fwd).addScaledVector(up, -f.fwd.dot(up)).normalize();

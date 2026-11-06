@@ -56,6 +56,20 @@ export function waveSlope(p: V3, t: number, out: V3): V3 {
   return out;
 }
 
+/** The sea anything floating rides when the stage draws another than this swell: the GPU planet's ocean, which gives
+ *  its height and slope at a point the same way. */
+let ridden: ((p: V3, slope?: V3) => number) | null = null;
+export function rideOn(sea: ((p: V3, slope?: V3) => number) | null): void {
+  ridden = sea;
+}
+
+/** The height (m) of the sea being drawn over its level at p, at t, and if asked its slope as waveSlope gives it. */
+export function seaAt(p: V3, t: number, slope?: V3): number {
+  if (ridden) return ridden(p, slope);
+  if (slope) waveSlope(p, t, slope);
+  return waveHeight(p, t);
+}
+
 const f = (n: number) => n.toFixed(5);
 
 /**

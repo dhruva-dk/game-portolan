@@ -6,6 +6,7 @@ import { v3 } from '../../sim/math.ts';
 import { FLOES, floePos } from '../../sim/world/index.ts';
 import { ROCK_UNIFORMS, rockById, rockMaterial, setRockTextureBase } from '../rocks/index.ts';
 import { TEX_BASE, patchAll } from '../engine.ts';
+import { GPU } from '../actors/common.ts';
 
 /** How many shapes of floe there are, each shared by every fourth floe; and the radius they are built at, metres. */
 const SHAPES = 4, MID = 9.5;
@@ -42,7 +43,7 @@ export class Floes {
         this.group.add(mesh);
       }
     }
-    patchAll(this.group);
+    if (!GPU.on) patchAll(this.group);
   }
 
   /** t: how far round their rings the floes have ridden, in seconds; tide: sea level against the mean; night: 0 by

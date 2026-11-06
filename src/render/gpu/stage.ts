@@ -17,6 +17,12 @@ import { landMaterial } from '../land/material.ts';
 import { CameraRig } from '../camera.ts';
 import { Beacons } from '../regions/beacons.ts';
 import { Landmarks } from '../regions/landmarks.ts';
+import { Floes } from '../regions/floes.ts';
+import { EventRocks } from '../regions/eventRocks.ts';
+import { EventKelp } from '../regions/eventKelp.ts';
+import { EventClams } from '../regions/eventClams.ts';
+import { EventPetals } from '../regions/eventPetals.ts';
+import { rideOn } from '../swell.ts';
 import { GPU } from '../actors/common.ts';
 import { moonDirection, sunDirection } from '../sky.ts';
 import { R } from '../../sim/sphere.ts';
@@ -49,6 +55,11 @@ export class GpuStage {
   readonly fall = new Fall();
   readonly beacons = new Beacons(1, true);
   readonly landmarks = new Landmarks();
+  readonly floes = new Floes();
+  readonly rocks = new EventRocks();
+  readonly kelp = new EventKelp();
+  readonly clams = new EventClams();
+  readonly petals = new EventPetals();
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
@@ -66,6 +77,9 @@ export class GpuStage {
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, makeNoiseTexture()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
+    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group);
+    // what floats rides the sea this stage draws
+    rideOn((p, slope) => this.ocean.heightAt(p, slope));
     this.post = new Post(renderer, this.scene, this.camera, phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop, this.overlay);
     this.resize();
   }
@@ -145,6 +159,11 @@ export class GpuStage {
     this.scans.update(eye, dt);
     this.beacons.update(v.time, P.night.value as number, this.sun);
     this.landmarks.update(P.night.value as number, v.time, v.events, this.sun);
+    this.floes.update(v.floes ?? v.time, v.tide, P.night.value as number);
+    this.rocks.update(v.events, v.time);
+    this.kelp.update(v.events, v.time, v.tide);
+    this.clams.update(v.events, v.time, v.tide);
+    this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
     this.post.render();
 
     const now = performance.now();
