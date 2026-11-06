@@ -90,6 +90,8 @@ const CAPTAIN = rec(
   ['felt', f64],
   // radians off the straight course to its goal it sails, to ride a current or sail a better point of the wind
   ['lean', f64],
+  // the board it beats to windward on when its course lies in the eye of the wind (+1, -1)
+  ['beat', int],
   // its drop has come past in the Gale: it leaves at the first gap in the crowd
   ['bound', bool],
   // the last noise it heard and went by (hearing.ts): where, and when; a hunch is the director's (director.ts)
@@ -142,6 +144,14 @@ const SHIP = rec(
   ['ash', f64],
   ['flip', f64],
   ['scrape', f64],
+  // going about (sailing.ts about): the board the wind is on (+1 over her starboard side, 0 not yet known), seconds
+  // pinching in the no-go zone, seconds left in irons, the surge of a clean tack still in her canvas (m/s), and
+  // seconds left of a thrown gybe's lurch
+  ['board', int],
+  ['nogo', f64],
+  ['irons', f64],
+  ['fill', f64],
+  ['lurch', f64],
   // her parts (PARTS): canvas torn, the mainmast's damage, seconds until a jury mast stands in a fallen one's place
   // and whether one does, the rudder's damage, water in her and the side she lists to (+1 to starboard)
   ['torn', f64],
@@ -283,7 +293,7 @@ export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 4, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 5, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {
@@ -343,12 +353,14 @@ export const EVENT = {
   quench: 53,
   secret: 54,
   refit: 55,
+  /** A ship going about: item 0 a clean tack, 1 a gybe, 2 a gybe thrown so the yards slam, 3 caught in irons. */
+  about: 56,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
   'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
-  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit',
+  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit', 'about',
 ];
 
 /** Event flag bits. */

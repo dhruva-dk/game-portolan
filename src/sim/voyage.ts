@@ -152,6 +152,8 @@ export function refit(state: MatchState, i: number): void {
   s.burn = 0;
   s.burnBy = -1;
   s.slow = s.spotted = s.revealed = s.ice = s.ash = s.flip = s.scrape = 0;
+  s.board = 0;
+  s.nogo = s.irons = s.fill = s.lurch = 0;
   s.torn = s.mast = s.fallen = s.rudder = s.flood = 0;
   s.jury = false;
   s.listTo = 1;

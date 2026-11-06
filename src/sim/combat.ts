@@ -11,6 +11,7 @@ import { startUse } from './items.ts';
 import { R, advance, apart, along, turned } from './sphere.ts';
 import { CAUSE, EVENT, FLAG, PHASE, SHIPS, STREAM, TICK, copy, emit, elapse, type MatchState, type Ship, type Shot } from './state.ts';
 import {
+  ABOUT,
   BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RAKE, RARITY, TURN_SPREAD, WEAPONS, WEATHER, isUse, isWeapon,
   type Weapon,
 } from './tables.ts';
@@ -86,6 +87,8 @@ export function fire(state: MatchState, i: number): void {
   if (SKY.rain > 0.3 || SKY.thunder > 0.3) spread *= WEATHER.rain.spread;
   const turning = Math.min(1, Math.abs(ship.rate) / 1.2) * TURN_SPREAD * (hasPassive(ship, 'steadyAim') ? POWERS.steadyAim : 1);
   spread *= 1 + turning;
+  // a gybe thrown in a blow lurches her deck under the gun
+  if (ship.lurch > 0) spread *= 1 + ABOUT.lurchSpread * (ship.lurch / ABOUT.lurch);
   // captains' hands are less steady than they think
   if (ship.captain.on) spread *= 1 + (1 - ship.captain.skill) * 2.5 + (ship.captain.gentle ? 1 : 0);
   const damage = w.damage * RARITY.damage[it.rarity];

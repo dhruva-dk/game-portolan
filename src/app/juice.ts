@@ -169,6 +169,13 @@ export class MomentJuice {
       case 'quench':
         if (m.ship === me) juice.haptics.play('light');
         return;
+      case 'about':
+        if (m.ship !== me) return;
+        // a clean tack leans the view forward a touch as she surges; a thrown gybe jars it; irons is felt, not seen
+        if (m.how === 'slam') { juice.camera.play({ shake: 0.35, kick: { back: 0.25, pitch: -0.8 } }); juice.haptics.play('heavy'); }
+        else if (m.how === 'irons') juice.haptics.play('warning');
+        else if (m.surge > 0.8) { juice.camera.play({ fov: { deg: 1.5 + m.surge, attack: 0.25, hold: 0.4, release: 1 } }); juice.haptics.play('light'); }
+        return;
       default:
         return;
     }

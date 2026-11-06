@@ -195,6 +195,14 @@ export class MomentSound {
       case 'quench':
         a.play('quench', { pos: this.at(m.ship, m.pos) });
         return;
+      case 'about': {
+        // canvas filling on the new board, louder for the way she carried; the yards slamming; or the canvas shaking
+        const pos = this.at(m.ship, m.pos);
+        if (m.how === 'slam') { a.play('yardSlam', { pos }); a.play('creak', { pos, delay: 0.25 }); }
+        else if (m.how === 'irons') a.play('sailLuff', { pos });
+        else a.play('sailFill', { pos, gain: 0.45 + 0.25 * Math.min(1, m.surge / 2) });
+        return;
+      }
       default:
         return;
     }

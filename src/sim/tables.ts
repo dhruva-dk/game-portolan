@@ -38,6 +38,23 @@ export const SHIP = {
 /** How well she sails at angle a off the wind (0 running before it, PI straight into it). At most 25% slower upwind. */
 export const POINT = { run: 0.92, beam: 1, upwind: 0.75 } as const;
 
+/**
+ * Going about. Pointing higher than `nogo` radians off the wind's run (into the eye of it), she pinches, the canvas
+ * shaking; held there past `linger` seconds in any real wind (`breeze` of a fair one) she loses her way and hangs in
+ * irons for `irons` s, turning at `ironsTurn` of her rate and making `ironsSpeed` m/s, until she pays off or the gust
+ * breaks her out. Carried through the wind briskly (no more than `brisk` s pinching), a tack fills her canvas on the
+ * new board: up to `surge` m/s more, by as much way as she carried in (full at `carry` m/s), fading over `fill` s. A
+ * gybe is the same for `gybe` of that, unless it is thrown: turning faster than `crash` rad/s with more than `hard`
+ * of a fair wind behind her, the yards slam across, `slam` of her way is gone and her aim is thrown off for `lurch` s
+ * (her shots spread `lurchSpread` more at its worst). A board counts once the wind is `clear` (the sine of the angle)
+ * to one side, and a change of board only while she is turning faster than `turning`, so the wind veering about a
+ * ship running dead before it never throws her.
+ */
+export const ABOUT = {
+  nogo: 2.72, linger: 2.6, breeze: 0.45, irons: 2.2, ironsTurn: 0.35, ironsSpeed: 1.2, brisk: 1.2, surge: 2.4, carry: 9, fill: 1.6, gybe: 0.45,
+  crash: 0.9, hard: 0.65, slam: 0.3, lurch: 1.3, lurchSpread: 1.4, clear: 0.17, turning: 0.08,
+} as const;
+
 /** The gust: a burst of wind and a hop off the water. */
 export const GUST = { charges: 2, speed: 13, time: 1.15, recharge: 6.5, hop: 6.3, accel: 28, turn: 1.35, spread: 1.6 } as const;
 

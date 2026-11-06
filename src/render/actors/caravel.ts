@@ -706,6 +706,8 @@ export interface Pose {
   mast: 'up' | 'down' | 'jury';
   flood: number; // 0 dry .. 1 full
   listTo: number; // the side she lists to, +1 starboard
+  irons: number; // 1 in irons, the canvas shaking
+  lurch: number; // 1 as a thrown gybe slams the yards across, falling to 0
 }
 
 /** Shot holes and burns a hull keeps, the oldest giving way to the newest. */
@@ -950,6 +952,8 @@ export class ShipModel {
       b.pitch += (-Math.atan2(hb - hs, 12) * 0.9 - p.speed * 0.004 - (p.alt > 0.2 ? 0.12 : 0) - b.pitch) * k;
       b.roll += (Math.atan2(hp - hst, 4.4) * 0.8 - b.roll) * k;
       b.heel += (p.turn * Math.min(1, p.speed / 14) * 0.35 - b.heel) * Math.min(1, dt * 2.5);
+      // a thrown gybe: the yards' weight coming across throws her over toward the new lee, and she rocks back
+      if (p.lurch > 0) b.roll += Math.sin(p.lurch * Math.PI * 3) * p.lurch * -this.lee * 0.11 * Math.min(1, dt * 30);
     }
     // water in her: she settles and lists to the side it came in
     this.flood += (p.flood - this.flood) * Math.min(1, dt * 0.8);
@@ -969,12 +973,13 @@ export class ShipModel {
     // (your own, seen from the chase camera, is kept sheeted closer so the cloth stays edge-on and out of the view)
     const sheet = (0.6 - 0.42 * THREE.MathUtils.smoothstep(off, 0.5, 2.7)) * (this.fade > 0 ? 0.45 : 1);
     const want = aloft ? 0.15 * this.lee : -this.lee * sheet - p.turn * 0.15 + Math.sin(t * 0.3) * 0.04;
-    this.boom += (want - this.boom) * Math.min(1, dt * 1.4);
+    // (thrown across in a gybe, they come all at once)
+    this.boom += (want - this.boom) * Math.min(1, dt * (1.4 + p.lurch * 9));
     const u = this.u;
     u.uBoom.value = this.boom;
     u.uSide.value += ((this.boom >= 0 ? -1 : 1) - u.uSide.value) * Math.min(1, dt * 3);
     // the cloth fills with the wind's strength and her way, and slats in irons or a calm
-    const irons = aloft ? 0 : THREE.MathUtils.smoothstep(off, 2.55, 3.0);
+    const irons = aloft ? 0 : Math.max(THREE.MathUtils.smoothstep(off, 2.55, 3.0), p.irons);
     const strength = THREE.MathUtils.clamp(p.windSpeed / 10, 0.2, 1.3);
     const fill = aloft ? 1.25 : THREE.MathUtils.clamp(0.15 + p.speed / 20 + strength * 0.55, 0.2, 1.25) * (1 - irons * 0.6) + p.boost * 0.35;
     u.uFill.value += (fill - u.uFill.value) * Math.min(1, dt * 2);

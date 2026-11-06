@@ -5,11 +5,11 @@ import { aground, bloomAt, currentAt, levelAt, solidAt, solidNormal } from './en
 import { hurt } from './harm.ts';
 import { blanket, drive, steering } from './parts.ts';
 import type { ShipInput } from './input.ts';
-import { addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
+import { PI, addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
 import { hasActive, hasPassive, hasPerk } from './perks.ts';
 import { R, advance, apart, localFrame, turned } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState, type Ship } from './state.ts';
-import { COINS, GRAVITY, GROUND, GUST, PARTS, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
+import { ABOUT, COINS, GRAVITY, GROUND, GUST, PARTS, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
 import { newWind, windAt, type Wind } from './wind.ts';
 import { DRAFT, heightAt, regionAt } from './world/index.ts';
 
@@ -52,7 +52,65 @@ export function turnRate(ship: Ship): number {
   if (hasPerk(ship, 'tightTurns')) r *= PERKS.tightTurns;
   if (hasPassive(ship, 'lightHull')) r *= POWERS.lightHull.turn;
   if (ship.boost > 0) r *= GUST.turn;
+  if (ship.irons > 0) r *= ABOUT.ironsTurn;
   return r * (1 - WEATHER.snow.turn * ship.ice) * steering(ship);
+}
+
+/**
+ * Going about (ABOUT): which board the wind is on, how long she has pinched in the eye of it, irons, and what a tack
+ * or a gybe does as the wind crosses her bow or her stern. A captain who tacks briskly gets a surge out of it, one who
+ * pinches loses her way, one who throws a gybe in a blow loses way and her aim for a moment: the skill has its cost
+ * and its payoff, and the gust is the way out of irons.
+ */
+function about(state: MatchState, i: number, wind: Wind): void {
+  const ship = state.ships[i];
+  if (ship.fill > 0) ship.fill = Math.max(0, ship.fill - (ABOUT.surge / ABOUT.fill) * TICK);
+  if (ship.lurch > 0) ship.lurch = elapse(ship.lurch);
+  if (ship.irons > 0) ship.irons = ship.boost > 0 ? 0 : elapse(ship.irons);
+  // aloft, flipped or on the Gale she is out of the water's rules
+  if (ship.phase !== PHASE.sea || ship.alt > 0.5 || ship.flip > 0) {
+    ship.nogo = 0;
+    ship.board = 0;
+    return;
+  }
+  const w = length(wind.v);
+  if (w < 1e-6) return;
+  const off = offWind(ship.head, wind.v);
+  // pinching: the eye of a real wind held too long stops her
+  if (off > ABOUT.nogo && ship.irons <= 0 && wind.strength > ABOUT.breeze && ship.boost <= 0) {
+    ship.nogo += TICK;
+    if (ship.nogo > ABOUT.linger) {
+      ship.irons = ABOUT.irons;
+      ship.nogo = 0;
+      ship.fill = 0;
+      emit(state, EVENT.about, i, -1, ship.pos, { item: 3 });
+    }
+  } else if (off <= ABOUT.nogo) ship.nogo = Math.max(0, ship.nogo - TICK * 2);
+  // the side the wind comes over: + over her starboard side (her right is head x up)
+  set(SB, ship.head.y * ship.pos.z - ship.head.z * ship.pos.y, ship.head.z * ship.pos.x - ship.head.x * ship.pos.z,
+    ship.head.x * ship.pos.y - ship.head.y * ship.pos.x);
+  const side = -dot(wind.v, SB) / w;
+  const board = side > ABOUT.clear ? 1 : side < -ABOUT.clear ? -1 : 0;
+  if (board === 0) return;
+  const was = ship.board;
+  ship.board = board;
+  if (was === 0 || was === board || Math.abs(ship.rate) < ABOUT.turning) return;
+  const carried = Math.min(1, ship.speed / ABOUT.carry);
+  if (off > PI / 2) {
+    // a tack: her bow came through the wind; briskly done, the canvas fills on the new board
+    if (ship.irons > 0 || ship.nogo > ABOUT.brisk) return;
+    ship.fill = Math.max(ship.fill, ABOUT.surge * carried);
+    emit(state, EVENT.about, i, -1, ship.pos, { item: 0, amount: ship.fill });
+  } else if (Math.abs(ship.rate) > ABOUT.crash && wind.strength > ABOUT.hard) {
+    // a gybe thrown in a blow: the yards slam across
+    ship.speed *= 1 - ABOUT.slam;
+    ship.lurch = ABOUT.lurch;
+    ship.fill = 0;
+    emit(state, EVENT.about, i, -1, ship.pos, { item: 2 });
+  } else {
+    ship.fill = Math.max(ship.fill, ABOUT.surge * ABOUT.gybe * carried);
+    emit(state, EVENT.about, i, -1, ship.pos, { item: 1, amount: ship.fill });
+  }
 }
 
 const W = newWind(), FLOW = v3(), V = v3(), SB = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), WAS = v3(), N = v3(), E = v3(), NN = v3();
@@ -67,6 +125,7 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
     ship.rate = 0;
   }
   windAt(state, ship.pos, W);
+  about(state, i, W);
   const steer = Math.max(-3.2, Math.min(3.2, input.steer));
   const max = turnRate(ship);
   const want = ship.flip > 0 ? 0 : Math.max(-1, Math.min(1, steer / 0.3)) * max;
@@ -76,6 +135,9 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   let target = ship.flip > 0 ? 0 : settledSpeed(ship, W, Math.max(0, Math.min(1, input.throttle)));
   target *= bloomAt(state, ship.pos) * blanket(state, i, W);
   if (Math.abs(steer) > SHIP.hard) target = Math.min(target, SHIP.crawl);
+  // in irons she barely makes way; a clean tack's canvas fills with a surge
+  if (ship.irons > 0) target = Math.min(target, ABOUT.ironsSpeed);
+  target += ship.fill;
   let accel: number = target > ship.speed ? SHIP.accel : SHIP.decel;
   if (ship.boost > 0) {
     ship.boost = elapse(ship.boost);

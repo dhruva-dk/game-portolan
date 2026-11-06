@@ -69,7 +69,7 @@ function newCaptain(e: FleetEntry, i: number, seed: number, gentle: boolean): Ca
     watches: e.captain, eyed: false,
     mode: 0, think: rngInt(rng, 6), since: 0, react: 0, foe: -1, seen: -1e9, last: xyz(), goal: xyz(), want: xyz(), target: -1,
     region: -1, drop: xyz(), path: [], leg: 0, pathTo: xyz(), repath: 0, strafe: rngFloat(rng) < 0.5 ? -1 : 1, strafeT: 0,
-    err: xyz(), errTo: xyz(), errT: 0, burst: 0, swapT: 0, stuckT: 0, backT: 0, claimT: 0, ring: [], li: 0, avoid: 0, felt: 0, lean: 0, bound: false,
+    err: xyz(), errTo: xyz(), errT: 0, burst: 0, swapT: 0, stuckT: 0, backT: 0, claimT: 0, ring: [], li: 0, avoid: 0, felt: 0, lean: 0, beat: 1, bound: false,
     heard: xyz(), heardT: -1e9, hunch: false,
   };
 }
@@ -83,6 +83,7 @@ function newShip(state: MatchState, e: FleetEntry, i: number, gentle: boolean): 
     gusts: GUST.charges, gustT: 0, boost: 0, aim: xyz(), aimY: 0,
     active: Math.max(0, activeIndex(e.active ?? STARTER_ACTIVE)), passive: Math.max(0, passiveIndex(e.passive ?? STARTER_PASSIVE)),
     cooldown: 0, power: 0, burn: 0, burnBy: -1, slow: 0, spotted: 0, revealed: 0, ice: 0, ash: 0, flip: 0, scrape: 0,
+    board: 0, nogo: 0, irons: 0, fill: 0, lurch: 0,
     torn: 0, mast: 0, fallen: 0, jury: false, rudder: 0, flood: 0, listTo: 1,
     kills: 0, dealt: 0, place: 0, by: -1, cause: -1, lastBy: -1, lastHit: -100000, landed: -1, sunk: -1, coins: 0, sailed: 0,
     regions: 0, laid: [], held: 0, perks: 0,

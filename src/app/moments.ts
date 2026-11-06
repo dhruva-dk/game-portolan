@@ -17,6 +17,9 @@ import { LANDMARKS, REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable,
 import { PI, v3, type V3 } from '../sim/math.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
 
+/** The sim's going-about events by item, as the moment names them. */
+const ABOUT_HOW = ['tack', 'gybe', 'slam', 'irons'] as const;
+
 /** A weapon's item kind as its weapon class; anything else reads as the cannon. */
 export const weaponOf = (kind: number): WeaponClass => WEAPON_CLASSES[Math.max(0, WEAPON_KINDS.indexOf(kind))];
 
@@ -117,6 +120,7 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.win: return { k: 'win', ship };
     case EVENT.secret: return { k: 'secret', ship, secret: e.item, pos };
     case EVENT.refit: return { k: 'refit', ship, pos };
+    case EVENT.about: return { k: 'about', ship, how: ABOUT_HOW[e.item] ?? 'tack', surge: e.amount, pos: metres(state.ships[ship].pos, 6) };
     case EVENT.regionWarn: return { k: 'regionEvent', region: e.item, phase: 'warn', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionStart: return { k: 'regionEvent', region: e.item, phase: 'start', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionEnd: return { k: 'regionEvent', region: e.item, phase: 'end', seconds: 0, pos: metres(e.at) };

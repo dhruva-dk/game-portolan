@@ -38,6 +38,10 @@ export interface ShipView {
   alt?: number;
   /** Extra roll in radians, positive to starboard: a ship tossed by the whale's breach rolling over and back. */
   flip?: number;
+  /** Head to wind and stopped in irons: her canvas shakes and slats. */
+  irons?: boolean;
+  /** 1 as a thrown gybe slams her yards across, falling to 0: the yards swing fast and the hull jolts. */
+  lurch?: number;
   /** 0..1 */
   hull: number;
   /** Shield points and their cap (the shield aura brightens as it fills). */

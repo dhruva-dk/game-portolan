@@ -49,7 +49,7 @@ const FRAMES: Record<Framing, { part: 0 | 1 | 2 | 4; from: THREE.Vector3; fov: n
 /** A ship at rest on a flat calm, her sails drawing in a steady breeze off the quarter. */
 const STILL: Pose = {
   speed: 3, turn: 0, aimYaw: 0.35, aimPitch: 0.08, hp: 1, sink: 0, boost: 0, hit: 0, alt: 0, dive: 0, wind: 0.9, windSpeed: 7,
-  night: 0, flip: 0, torn: 0, mast: 'up', flood: 0, listTo: 1,
+  night: 0, flip: 0, torn: 0, mast: 'up', flood: 0, listTo: 1, irons: 0, lurch: 0,
 };
 
 interface Job { key: string; ids: CosmeticIds; framing: Framing; weapon: Weapon; done: (url: string | null) => void }

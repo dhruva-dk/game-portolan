@@ -62,6 +62,11 @@ export type Moment =
   /** The player found a secret of the planet: its index into SECRETS. */
   | { k: 'secret'; ship: number; secret: number; pos: V3 }
   /** On a voyage, a wreck sails again. */
-  | { k: 'refit'; ship: number; pos: V3 };
+  | { k: 'refit'; ship: number; pos: V3 }
+  /**
+   * A ship going about: a clean tack or a gybe filling her canvas on the new board (`surge`, m/s more for a moment), a
+   * gybe thrown so hard her yards slam across, or caught head to wind in irons.
+   */
+  | { k: 'about'; ship: number; how: 'tack' | 'gybe' | 'slam' | 'irons'; surge: number; pos: V3 };
 
 export type MomentKind = Moment['k'];

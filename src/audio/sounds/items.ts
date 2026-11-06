@@ -58,6 +58,25 @@ function sailLuff(r: Rng): Buf {
   return normalize(x, 0.65);
 }
 
+/**
+ * A gybe thrown in a blow: the canvas backs with a crack, the yards come across and fetch up against the shrouds with a
+ * heavy wooden blow that rings down the mast, and the sheets snatch taut.
+ */
+function yardSlam(r: Rng): Buf {
+  const x = new Float32Array(n(1.4));
+  mix(x, canvasFlap(r), 0, 0.8);
+  mix(x, canvasFlap(r), 0.05, 0.6);
+  mix(x, whoosh(r, 0.32, 600, 1800, 1.2, 1.6), 0.02, 0.35);
+  const hit = 0.3;
+  mix(x, thump(0.7, between(r, 95, 115), 52, 0.22), hit, 1);
+  mix(x, knock(r, between(r, 210, 250), 0.18, 0.6), hit, 0.85);
+  mix(x, knock(r, between(r, 480, 560), 0.08, 0.3), hit + 0.012, 0.4);
+  // the sheets and braces snatching taut
+  for (let k = 0; k < 3; k++) mix(x, burst(r, 0.08, 'bp', between(r, 1800, 2600), 4, 0.001, 0.025), hit + 0.04 + k * between(r, 0.03, 0.06), 0.3);
+  mix(x, shape(filter(brown(n(0.6), r), 'lp', 300), (t) => ad(t, 0.01, 0.3)), hit, 0.5);
+  return normalize(x, 0.85);
+}
+
 /** Riding into a fast current. */
 function currentRush(r: Rng): Buf {
   const s = 2.6, N = n(s), w = brown(N, r), p = pink(N, r);
@@ -200,6 +219,7 @@ export const ITEM_SOUNDS = {
   slap: def(slap, 4, 'fx', 2, 0.4, 3, { range: 60 }),
   sailFill: def(sailFill, 3, 'fx', 3, 0.55, 2, { range: 80 }),
   sailLuff: def(sailLuff, 2, 'fx', 3, 0.5, 2, { range: 80 }),
+  yardSlam: def(yardSlam, 3, 'fx', 5, 0.7, 2, { range: 140 }),
   currentRush: def(currentRush, 2, 'fx', 5, 0.7, 2, { range: 120 }),
   tideTurn: def(tideTurn, 1, 'amb', 5, 0.6, 1),
   pickup: def(pickup, 5, 'fx', 8, 0.8, 3, { ...RARITY, range: 80, jitter: 0 }),

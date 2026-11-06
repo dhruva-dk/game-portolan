@@ -176,7 +176,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
 
   const pose: Pose = {
     speed: 0, turn: 0, aimYaw: 0, aimPitch: 0, hp: 1, sink: 0, boost: 0, hit: 0, alt: 0, dive: 0, wind: 0, windSpeed: 0, night: 0, flip: 0,
-    torn: 0, mast: 'up', flood: 0, listTo: 1,
+    torn: 0, mast: 'up', flood: 0, listTo: 1, irons: 0, lurch: 0,
   };
 
   function sail(f: Fleet, v: ShipView, view: ActorsView, dt: number, t: number, limit: number): void {
@@ -221,6 +221,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     pose.windSpeed = Math.hypot(wx, wz);
     pose.night = nightAt(f.pos);
     pose.flip = v.flip ?? 0;
+    pose.irons = v.irons ? 1 : 0;
+    pose.lurch = v.lurch ?? 0;
     const parts = v.parts;
     pose.torn = parts?.torn ?? 0;
     pose.mast = parts?.mast ?? 'up';

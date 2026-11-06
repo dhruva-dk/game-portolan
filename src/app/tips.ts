@@ -46,6 +46,9 @@ export const TIPS = {
   fire: { icon: ICON.fire, title: 'On fire', text: 'The flames eat your canvas and leap to ships close downwind. Rain puts them out.' },
   rake: { icon: ICON.target, title: 'Raking fire', text: 'A shot down a ship\'s length from bow or stern does more harm. Cross her bow, or her stern, to rake her.' },
   whale: { icon: ICON.whale, title: 'The whale', text: 'When it breaches it lifts the ships near it, flips any right over it, and scatters loot.' },
+  irons: { icon: ICON.wind, title: 'In irons', text: 'Head to wind your canvas shakes and she stops. Turn off the wind, or Gust to break free.' },
+  tack: { icon: ICON.sail, title: 'Going about', text: 'Turn your bow through the wind briskly and the canvas fills on the new side with a burst of speed.' },
+  gybe: { icon: ICON.sail, title: 'Gybe', text: 'Swing your stern through a strong wind too fast and the yards slam across: you lose speed and aim. Ease the turn.' },
   'weather:fog': { icon: WEATHER_ICON.fog, title: 'Fog', text: 'You see less far, and ships deep in it drop off the map.' },
   'weather:rain': { icon: WEATHER_ICON.rain, title: 'Rain', text: 'The wind gusts and swirls, and the sea runs rough.' },
   'weather:thunder': { icon: WEATHER_ICON.thunder, title: 'Thunder', text: 'Lightning strikes ships in open water. Keep close to land.' },
@@ -147,6 +150,7 @@ export class Tips {
       case 'stormPhase': this.offer('storm'); break;
       case 'mastFall': if (mine) this.offer('mast'); break;
       case 'ablaze': if (mine) this.offer('fire'); break;
+      case 'about': if (mine) this.offer(m.how === 'irons' ? 'irons' : m.how === 'slam' ? 'gybe' : m.how === 'tack' && m.surge > 1 ? 'tack' : 'gybe'); break;
       case 'hit': if (m.rake && m.by === PLAYER) this.offer('rake'); break;
       case 'perk': {
         const r = REGIONS.find((x) => x.perk === m.perk);

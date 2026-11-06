@@ -12,11 +12,11 @@ import { activeOf, hasPerk } from '../perks.ts';
 import { rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
 import { coverNear, dangerAt, escapeFrom, newDanger, rewardNear } from '../regionEvents.ts';
-import { draftOf, offWind, pointOfSail } from '../sailing.ts';
+import { draftOf, offWind, pointOfSail, turnRate } from '../sailing.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, WHALE_STATE, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
-import { GALE, ITEM, LOOT, PARCELS, PERKS, REGION_EVENT, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
+import { ABOUT, GALE, ITEM, LOOT, PARCELS, PERKS, REGION_EVENT, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome, holderOf, holdsAt, landmarkHold } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
 import { newSky, skyAt, vigour } from '../weather.ts';
@@ -900,6 +900,54 @@ const WANT = v3();
 const TIDE_AHEAD = 15;
 const levelFor = (state: MatchState): number => Math.min(seaLevel(state), seaLevelAt(state.tick * TICK + TIDE_AHEAD));
 
+const HERE = newWind(), ON = v3(), OFF = v3(), RUN = v3();
+/** How close to the wind a captain beats: `close` radians off the wind's run at its best, and `pinch` higher with
+ *  no skill (close to the no-go zone, so the least able pinch into irons now and then); how much nearer the mark must
+ *  lie to the other board before it goes about. */
+const BEAT = { close: 2.42, pinch: 0.45, layline: 0.3 } as const;
+
+/**
+ * To windward it beats: a course in the eye of the wind is sailed close-hauled on one board and then the other,
+ * going about once the mark lies nearer the other board's heading by a margin (its layline), so it zigzags up to a
+ * mark straight upwind rather than pinching at it.
+ */
+function beat(state: MatchState, i: number, t: V3): void {
+  const ship = state.ships[i], c = ship.captain;
+  windAt(state, ship.pos, HERE);
+  const w = length(HERE.v);
+  if (w < 1e-6 || HERE.strength <= ABOUT.breeze) return;
+  const close = BEAT.close + (1 - c.skill) * BEAT.pinch;
+  if (offWind(t, HERE.v) <= close) return;
+  // the two close-hauled headings: the wind's run turned either way by as close as it sails
+  normalize(addScaled(RUN, HERE.v, ship.pos, -dot(HERE.v, ship.pos)));
+  rotateTangent(ship.pos, RUN, c.beat * close, ON);
+  rotateTangent(ship.pos, RUN, -c.beat * close, OFF);
+  if (Math.abs(angleTo(OFF, t, ship.pos)) + BEAT.layline < Math.abs(angleTo(ON, t, ship.pos))) {
+    c.beat = -c.beat;
+    copy(t, OFF);
+  } else copy(t, ON);
+}
+
+/**
+ * Through a gybe in a blow an able captain eases the helm, so her yards come across under control rather than slam:
+ * the turn it wants is cut, by its skill, toward the most she can turn at without throwing them (HERE is the wind
+ * beat read this tick).
+ */
+function easeGybe(ship: Ship, steer: number): number {
+  if (HERE.strength <= ABOUT.hard || Math.abs(steer) < 0.05 || length(HERE.v) < 1e-6) return steer;
+  normalize(addScaled(RUN, HERE.v, ship.pos, -dot(HERE.v, ship.pos)));
+  const a = angleTo(ship.head, RUN, ship.pos);
+  // the turn carries her stern through the wind if the wind's run lies between her heading and where she turns to, and
+  // the yards are not across until the wind is clear on her other quarter
+  const ahead = a * Math.sign(steer);
+  if (ahead < -0.32 || ahead > Math.abs(steer)) return steer;
+  // in the rate she turns at, which the helm reaches at a third of a radian (sailing.ts sail)
+  const max = Math.max(1e-3, turnRate(ship)), want = Math.min(1, Math.abs(steer) / 0.3) * max, safe = ABOUT.crash * 0.8;
+  if (want <= safe) return steer;
+  const rate = want + (safe - want) * Math.min(1, ship.captain.skill * 1.5);
+  return (Math.sign(steer) * 0.3 * rate) / max;
+}
+
 function steerFor(state: MatchState, i: number, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain, level = tide;
   if (c.mode === MODE.fight && c.foe >= 0 && inSight(state, c)) {
@@ -936,6 +984,7 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
     }
     rotateTangent(ship.pos, T, c.strafe * BRAIN.weave * c.skill, T);
   }
+  beat(state, i, T);
   let steer = angleTo(ship.head, T, ship.pos);
   course = steer;
   // feel ahead along its course for land, and for floes and columns standing in the water; not along its heading, for
@@ -955,7 +1004,7 @@ function steerFor(state: MatchState, i: number, out: ShipInput): void {
     if (Math.sign(steer) !== Math.sign(c.avoid)) steer = Math.sign(c.avoid) * 0.9;
     c.avoid = c.avoid > 0 ? Math.max(0, c.avoid - TICK) : Math.min(0, c.avoid + TICK);
   }
-  out.steer = steer;
+  out.steer = easeGybe(ship, steer);
   // ease off to pick loot up, or to hold a position
   if ((c.mode === MODE.loot || c.mode === MODE.heal) && d < 25) out.throttle = 0.55;
   if (c.mode === MODE.heal && d < 15) out.throttle = 0.3;
@@ -1153,6 +1202,8 @@ function useWhatItCarries(state: MatchState, i: number, style: Style, out: ShipI
   // the gust: to close in, to run, or to get back inside the circle
   const fleeing = c.mode === MODE.flee || c.mode === MODE.storm;
   if (ship.gusts > 0 && ship.boost <= 0 && ship.use < 0) {
+    // caught in irons, an able captain gusts out of it; the rest wait for her to pay off
+    if (ship.irons > 0 && c.skill > 0.4 && ABOUT.irons - ship.irons > 0.3 + (1 - c.skill) * 0.8) out.gust = true;
     if ((fleeing && (ship.gusts === 2 || ship.hull < 40)) || (c.mode === MODE.fight && apart(ship.pos, c.goal) > 120)) out.gust = true;
   }
   // the gull, when it has coins to spare and nothing on
