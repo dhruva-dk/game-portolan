@@ -3,8 +3,9 @@
 // sunk and the wisp of a lost ship's lantern rising free. Every direction is worked out in the local frame (up away
 // from the planet's centre), so nothing here assumes a flat sea.
 import * as THREE from 'three';
-import { TAU, onSea, patch, rand, seaRadius, tangents } from './common.ts';
+import { AU, TAU, onSea, patch, rand, seaRadius, tangents } from './common.ts';
 import { makeParticles, SPRITE, type Particles } from './particles.ts';
+import { Ribbons } from './ribbons.ts';
 import type { Weapon } from './view.ts';
 import { heat } from '../gpu/haze.ts';
 
@@ -36,6 +37,9 @@ export class Effects {
   readonly group = new THREE.Group();
   readonly glow: Particles;
   readonly smoke: Particles;
+  /** The smoke shots draw behind them, and the heat they shed, as unbroken ribbons. */
+  readonly trails: Ribbons;
+  readonly heatTrails: Ribbons;
   private readonly L = new Local();
   private readonly L2 = new Local();
   private readonly planks: Plank[] = [];
@@ -49,7 +53,9 @@ export class Effects {
     const { glow, smoke } = makeParticles();
     this.glow = glow;
     this.smoke = smoke;
-    this.group.add(smoke.mesh, glow.mesh);
+    this.trails = new Ribbons(72, 64, false, AU.uNoise.value!);
+    this.heatTrails = new Ribbons(32, 24, true, AU.uNoise.value!);
+    this.group.add(smoke.mesh, glow.mesh, this.trails.mesh, this.heatTrails.mesh);
     // flotsam from sunk ships
     const m = patch(new THREE.MeshStandardMaterial({ map: wood, color: 0x9a7b5a, roughness: 0.85 }));
     this.plankMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.18, 2.4), m, 220);
@@ -63,6 +69,8 @@ export class Effects {
   clear(): void {
     this.glow.clear();
     this.smoke.clear();
+    this.trails.clear();
+    this.heatTrails.clear();
     this.planks.length = 0;
     this.wisps.length = 0;
   }
@@ -446,5 +454,7 @@ export class Effects {
     }
     this.glow.update(dt);
     this.smoke.update(dt);
+    this.trails.update(dt);
+    this.heatTrails.update(dt);
   }
 }

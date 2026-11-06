@@ -314,7 +314,7 @@ export class Particles {
 
 /** Curl noise: the curl of a smooth vector potential, so it stirs without gathering or spreading anything; two
  *  scales, the larger drifting with time. Metres per second squared, about ±1. */
-const curl = Fn(([p, t]: [V3, F]) => {
+export const curl = Fn(([p, t]: [V3, F]) => {
   const out = vec3(0).toVar();
   for (const [k, s, w] of [[0.13, 0.21, 1], [0.37, 0.5, 0.5]] as const) {
     const q = p.mul(k).add(vec3(t.mul(s), t.mul(s * 0.7), t.mul(s * -0.6)));

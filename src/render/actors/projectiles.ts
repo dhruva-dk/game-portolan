@@ -2,11 +2,28 @@
 // scatter's spray of hot pellets, the harpoon's iron bolt trailing its line back to the ship, the mortar's tumbling
 // shell with a fuse of fire, the repeater's tracers tinted by rarity, and the broadside's heavy round shot; chain
 // shot's two half-balls whirling on their bar, and heated shot glowing red and shedding embers.
+//
+// What a shot leaves behind it in the air is a ribbon (ribbons.ts): a cord of powder smoke that spreads, drifts down
+// the wind and frays over a second or two, so a broadside's flight hangs over the water as a sheaf of arcs. Heated
+// shot and the mortar's fuse also shed a short ribbon of heat that cools from yellow to red behind them.
 import * as THREE from 'three';
 import { patch, rand } from './common.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { SPRITE } from './particles.ts';
+import type { RibbonLook } from './ribbons.ts';
 import type { ProjectileView } from './view.ts';
+
+/** The trails each kind of shot draws: width and spread, life, colour and opacity, and for heat how hot. */
+const TRAIL: Record<string, RibbonLook> = {
+  cannon: { width: 0.3, grow: 7, life: 1.6, r: 0.78, g: 0.77, b: 0.75, a: 0.26, form: 0.05 },
+  broadside: { width: 0.4, grow: 8, life: 2.2, r: 0.74, g: 0.72, b: 0.7, a: 0.3, form: 0.05 },
+  chain: { width: 0.36, grow: 6, life: 1.3, r: 0.78, g: 0.77, b: 0.75, a: 0.22, form: 0.06 },
+  harpoon: { width: 0.14, grow: 5, life: 1, r: 0.9, g: 0.9, b: 0.9, a: 0.2, form: 0.08 },
+  heated: { width: 0.3, grow: 6, life: 1.4, r: 0.5, g: 0.42, b: 0.35, a: 0.28, form: 0.04 },
+  heatedGlow: { width: 0.55, grow: 1.4, life: 0.3, r: 1, g: 1, b: 1, a: 1, heat: 1.3, rise: 0.2, step: 1.5, form: 0 },
+  mortar: { width: 0.7, grow: 6, life: 3, r: 0.32, g: 0.3, b: 0.29, a: 0.62, rise: 0.8, step: 2, form: 0.02 },
+  mortarGlow: { width: 1, grow: 0.5, life: 0.25, r: 1, g: 1, b: 1, a: 1, heat: 1.4, rise: 0.3, step: 1.2, form: 0 },
+};
 
 function mergeGeos(gs: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const pos: number[] = [], nor: number[] = [], idx: number[] = [];
@@ -41,6 +58,7 @@ export class Projectiles {
   private readonly tmp = new THREE.Object3D();
   private readonly a = new THREE.Vector3();
   private readonly up = new THREE.Vector3();
+  private readonly here = new THREE.Vector3();
 
   constructor(fx: Effects) {
     this.fx = fx;
@@ -51,7 +69,7 @@ export class Projectiles {
     this.bolts = new THREE.InstancedMesh(mergeGeos([bolt, tip, barb]), metal, CAP);
     const hot = patch(new THREE.MeshStandardMaterial({ color: 0x1a1414, roughness: 0.5, emissive: 0xff5a10, emissiveIntensity: 2.5 }));
     this.shells = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 1), hot, CAP);
-    const iron = patch(new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.45, metalness: 0.6, emissive: 0xff7a30, emissiveIntensity: 0.6 }));
+    const iron = patch(new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.45, metalness: 0.6, emissive: 0xff7a30, emissiveIntensity: 0.06 }));
     this.balls = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.32, 1), iron, CAP * 2);
     // chain shot: two hemispheres on a short iron bar, spinning end over end round the way it flies
     const halves = [-1, 1].map((x) => new THREE.SphereGeometry(0.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(x * Math.PI / 2).translate(x * 0.85, 0, 0));
@@ -87,16 +105,17 @@ export class Projectiles {
         for (let i = 1; i <= n; i++) { const k = i / n; f(prev.x + (x - prev.x) * k, prev.y + (y - prev.y) * k, prev.z + (z - prev.z) * k); }
       };
       this.up.set(x, y, z).normalize();
+      const here = this.here.set(x, y, z);
       const ux = this.up.x * 0.4, uy = this.up.y * 0.4, uz = this.up.z * 0.4;
       switch (p.weapon) {
         case 'cannon':
-          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.32, r: 6, g: 3.4, b: 1.2, frame: SPRITE.spark, mode: 1, stretch: 0.035 });
-          trail(2.2, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.5, 0.8), size: 0.25, grow: 4, r: 0.9, g: 0.88, b: 0.86, a: 0.3, frame: SPRITE.billow, drag: 1.5 }));
+          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.16, r: 4, g: 2.3, b: 0.8, frame: SPRITE.spark, mode: 1, stretch: 0.035 });
+          fx.trails.push(p.id, here, TRAIL.cannon);
           break;
         case 'broadside':
           if (nr < CAP * 2) this.place(this.balls, nr++, p.pos, t * 9 + p.id);
-          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.4, r: 5, g: 2.6, b: 0.9, frame: SPRITE.spark, mode: 1, stretch: 0.025 });
-          trail(1.6, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1.0), size: 0.35, grow: 4, r: 0.8, g: 0.78, b: 0.76, a: 0.32, frame: SPRITE.billow, drag: 1.5 }));
+          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.16, r: 3, g: 1.6, b: 0.6, frame: SPRITE.spark, mode: 1, stretch: 0.025 });
+          fx.trails.push(p.id, here, TRAIL.broadside);
           break;
         case 'repeater':
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.12, r: 6 * (0.6 + rc.r * 0.4), g: 4.6 * (0.6 + rc.g * 0.4), b: 1.6 + rc.b, frame: SPRITE.spark, mode: 1, stretch: 0.05 });
@@ -115,7 +134,7 @@ export class Projectiles {
             this.bolts.setMatrixAt(nb++, this.tmp.matrix);
           }
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.1, r: 2.4, g: 2.8, b: 3.4, a: 0.7, frame: SPRITE.spark, mode: 1, stretch: 0.06 });
-          trail(3, (x, y, z) => smoke.emit({ x, y, z, life: 0.5, size: 0.15, grow: 3, r: 1.2, g: 1.25, b: 1.3, a: 0.35, frame: SPRITE.puff }));
+          fx.trails.push(p.id, here, TRAIL.harpoon);
           // the line: a sagging run from the gun to the bolt's tail
           const from = p.ship !== undefined ? muzzle(p.ship) : null;
           if (from && nl < CAP) {
@@ -144,25 +163,26 @@ export class Projectiles {
             this.chains.setMatrixAt(nc++, this.tmp.matrix);
           }
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.22, r: 3.2, g: 2.4, b: 1.6, a: 0.6, frame: SPRITE.spark, mode: 1, stretch: 0.03 });
-          trail(1.8, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.4, 0.7), size: 0.3, grow: 3.5, r: 0.85, g: 0.84, b: 0.82, a: 0.22, frame: SPRITE.billow, drag: 1.5 }));
+          fx.trails.push(p.id, here, TRAIL.chain);
           break;
         }
         case 'heated': {
           if (nh < CAP) this.place(this.redHot, nh++, p.pos, t * 5 + p.id);
           glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.55, r: 9, g: 2.6, b: 0.5, frame: SPRITE.spark, mode: 1, stretch: 0.03 });
-          // embers shed from the ball, and a thin brown smoke where it singes the air
+          // embers shed from the ball, its heat cooling behind it, and a thin brown smoke where it singes the air
           trail(1.2, (x, y, z) => {
             if (Math.random() < 0.6) glow.emit({ x, y, z, vx: ux * 2 + rand(-1, 1), vy: uy * 2 + rand(-1, 1), vz: uz * 2 + rand(-1, 1), life: rand(0.3, 0.6), size: 0.07, r: 7, g: 2.2, b: 0.4, frame: SPRITE.spark, drag: 2, fadeIn: 0 });
-            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1), size: 0.28, grow: 4, r: 0.55, g: 0.45, b: 0.38, a: 0.28, frame: SPRITE.billow, drag: 1.5 });
           });
+          fx.heatTrails.push(p.id, here, TRAIL.heatedGlow);
+          fx.trails.push(p.id, here, TRAIL.heated);
           break;
         }
         case 'mortar': {
           if (ns < CAP) this.place(this.shells, ns++, p.pos, t * 7 + p.id);
-          trail(0.9, (x, y, z) => {
-            glow.emit({ x, y, z, life: rand(0.15, 0.3), size: 0.9, grow: 0.3, r: 5, g: 2.2, b: 0.5, frame: SPRITE.flame, fadeIn: 0 });
-            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(1.2, 2), size: 0.6, grow: 4, r: 0.35, g: 0.33, b: 0.32, a: 0.45, frame: SPRITE.billow, drag: 1, spin: rand(-0.5, 0.5) });
-          });
+          // the fuse burning, and a dark rope of smoke; a few gouts of it billow off the shell as it tumbles
+          fx.heatTrails.push(p.id, here, TRAIL.mortarGlow);
+          fx.trails.push(p.id, here, TRAIL.mortar);
+          trail(4, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(1.2, 2), size: 0.6, grow: 4, r: 0.35, g: 0.33, b: 0.32, a: 0.35, frame: SPRITE.billow, drag: 1, spin: rand(-0.5, 0.5) }));
           break;
         }
       }
