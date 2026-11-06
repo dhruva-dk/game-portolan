@@ -1,5 +1,5 @@
 // What the eye sees where nothing stands in front of it: the air's own light, and, through it, the sun's disc, the
-// moon with its phase and its seas, and the stars and the band of the galaxy turning with the hour.
+// moon with its phase and its seas, the stars and the band of the galaxy turning with the hour, and the aurora.
 //
 // Inside the air the sky comes from the sky view tables; from orbit it is marched per pixel, which is only ever the
 // thin rim round the globe and the black beyond.
@@ -11,6 +11,7 @@ import {
 import { AIR, raySphere } from './model.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyFromTables, skyIrradiance, skyMarched, viewTransmittance } from './luts.ts';
 import { P } from '../gpu/uniforms.ts';
+import { auroraAlong } from './aurora.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
@@ -138,7 +139,7 @@ export const skyRadiance = Fn(([d]: [V3]) => {
   });
   const moon = moonDisc(d);
   const beyond = sunDisc(d).add(moon.rgb).add(stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(L)));
-  return L.add(viewTransmittance(d).mul(beyond));
+  return L.add(viewTransmittance(d).mul(beyond.add(auroraAlong(eye, d))));
 });
 
 /** The scene's background: the sky in every direction no surface covers. */
@@ -170,7 +171,8 @@ export const probeBackground = Fn(() => {
   }).Else(() => {
     const moon = moonDisc(d);
     const starry = stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(marched.rgb));
-    beyond.assign(moon.rgb.add(starry));
+    // the aurora too, which the sea under it mirrors
+    beyond.assign(moon.rgb.add(starry).add(auroraAlong(eye, d)));
   });
   return vec4(marched.rgb.add(beyond.mul(marched.a)), 1);
 })();

@@ -9,6 +9,7 @@ import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
 import { Clouds } from '../atmosphere/clouds.ts';
+import { AURORA, OVAL } from '../atmosphere/aurora.ts';
 import { Fall } from '../atmosphere/fall.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
 import { Terrain } from '../terrain.ts';
@@ -125,6 +126,10 @@ export class GpuStage {
     (P.moonDir.value as Vector3).copy(this.moon);
     P.moonPhase.value = 0.5 - 0.5 * this.sun.dot(this.moon);
     this.atmosphere.turn = -(v.hour - 12) * 15 * DEG;
+    // the aurora is always there over the pole where it is dark, waxing and waning over the minutes; when the sun
+    // stands over all of the oval, it is not worked out at all
+    const dark = Math.cos(Math.min(Math.PI, Math.acos(Math.max(-1, Math.min(1, this.sun.y))) + OVAL)) < 0.08;
+    AURORA.strength.value = dark ? 0.7 + 0.3 * Math.sin(v.time * 0.013) * Math.sin(v.time * 0.031 + 1.3) : 0;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
     setLifts(v.lift ?? NO_LIFT);
     const terr = v.territory;
