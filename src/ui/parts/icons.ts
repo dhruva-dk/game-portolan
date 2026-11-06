@@ -44,6 +44,8 @@ export const ICON = {
   harpoon: svg('<path d="M1 11.1h15v1.8H1z"/><path d="M14.5 7.2l8.5 4.8-8.5 4.8 2.4-4.8z"/><path d="M2.6 8.4l2.4 3.6-2.4 3.6H.8l2.4-3.6L.8 8.4z"/>'),
   mortar: svg('<path d="M6 15.2l6.4-10.6 5.4 3.3-6.4 10.6z"/><path d="M3 18.4h11.5V22H3z"/><ellipse cx="15.2" cy="6.2" rx="3.2" ry="1.5" transform="rotate(31 15.2 6.2)"/>'),
   repeater: svg('<rect x="3" y="5.6" width="18" height="2.8" rx="1.2"/><rect x="3" y="10.6" width="18" height="2.8" rx="1.2"/><rect x="3" y="15.6" width="18" height="2.8" rx="1.2"/><rect x="6" y="4" width="4" height="16" rx="1.2"/>'),
+  chain: svg('<circle cx="4.6" cy="12" r="3.6"/><circle cx="19.4" cy="12" r="3.6"/><path d="M7.6 11.1h1.6a1.6 1.6 0 0 1 0 1.8H7.6zM10.4 10.6h3.2v2.8h-3.2zM14.8 11.1h1.6v1.8h-1.6a1.6 1.6 0 0 1 0-1.8z"/>'),
+  heated: svg('<circle cx="12" cy="9" r="5.4"/><path d="M5 22c0-3 1.6-4.4 2.6-6 .5 1.3 1.4 2 2.4 2.2-.4-1.6 0-3 1.2-4 .2 1.8 1.4 2.7 2.6 3 .4-.9.5-1.8.3-2.8 1.8 1.2 4.9 3.3 4.9 7.6z"/>'),
   broadside: svg('<path d="M12 2.5c2.6 2.4 3.6 5.6 3.6 9.5s-1 7.1-3.6 9.5C9.4 19.1 8.4 15.9 8.4 12s1-7.1 3.6-9.5z"/><path d="M.8 8.4h6.4v2.4H.8zM.8 13.2h6.4v2.4H.8zM16.8 8.4h6.4v2.4h-6.4zM16.8 13.2h6.4v2.4h-6.4z"/>'),
   // consumables
   smallShield: svg(`<path d="M12 4.5l6 2.2v4.4c0 3.7-2.5 6.5-6 7.7-3.5-1.2-6-4-6-7.7V6.7z"/><path d="M11 8.5h2v2.4h2.4v2H13v2.4h-2v-2.4H8.6v-2H11z" fill="rgba(255,255,255,.85)"/>`),
@@ -51,6 +53,9 @@ export const ICON = {
   repairKit: svg('<path fill-rule="evenodd" d="M5.5 5h13A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5v-9A2.5 2.5 0 0 1 5.5 5zm5.2 3v2.7H8v2.6h2.7V16h2.6v-2.7H16v-2.6h-2.7V8z"/><path d="M9 3h6v2.4H9z"/>'),
   fullRepair: svg('<path fill-rule="evenodd" d="M12 1.5l2.6 3.4 4.2-.7-.7 4.2 3.4 2.6-3.4 2.6.7 4.2-4.2-.7L12 20.5l-2.6-3.4-4.2.7.7-4.2L2.5 11l3.4-2.6-.7-4.2 4.2.7zm-1.3 5.7v2.5H8.2v2.6h2.5v2.5h2.6v-2.5h2.5V9.7h-2.5V7.2z"/>'),
   // vitals and counters
+  mast: svg('<path d="M11 1.5h2v20h-2z"/><path d="M4.5 5h15v1.8h-15zM6 12h12v1.8H6z"/><path d="M5.8 7.2h12.4c-.6 1.6-.6 3.2 0 4.4H5.8c.6-1.2.6-2.8 0-4.4z" opacity=".55"/><path d="M8 20.5h8v2H8z"/>'),
+  rudder: svg('<path d="M9.6 1.5h2.2v6.2h6.6c.9 4.7-.4 9.9-4 14.8H11.8V22H9.6z"/><path d="M3.5 3.5h8.3v1.8H3.5z"/><circle cx="3.5" cy="4.4" r="1.6"/>'),
+  leak: svg('<path d="M12 1.8c3 4.4 5 7.4 5 10a5 5 0 0 1-10 0c0-2.6 2-5.6 5-10z"/>' + st('M1.5 19c2.6-1.8 4.6-1.8 7 0s4.4 1.8 7 0 4.4-1.8 7 0', 2)),
   shield: svg(`<path d="${SHIELD_D}"/>`),
   hull: svg('<path d="M1.5 10.5h21l-3.6 8H5.1z"/><path d="M11 2.5h2v7h-2z"/><path d="M13 3.2l6 5.3h-6z"/>'),
   coin: svg('<circle cx="12" cy="12" r="9.6"/><circle cx="12" cy="12" r="6.8" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="1.3"/>' + star(4, 4.6, 1.5).replace('<path', '<path fill="rgba(255,250,220,.85)"')),
@@ -226,6 +231,7 @@ export const WEATHER_ICON: Record<string, string> = {
 
 export const WEAPON_ICON: Record<string, string> = {
   cannon: ICON.cannon, harpoon: ICON.harpoon, mortar: ICON.mortar, repeater: ICON.repeater, scatter: ICON.scatter, broadside: ICON.broadside,
+  chain: ICON.chain, heated: ICON.heated,
 };
 export const CONSUMABLE_ICON: Record<string, string> = {
   smallShield: ICON.smallShield, bigShield: ICON.bigShield, repairKit: ICON.repairKit, fullRepair: ICON.fullRepair,

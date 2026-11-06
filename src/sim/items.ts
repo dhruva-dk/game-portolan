@@ -1,6 +1,7 @@
 // Items: the 5-slot hotbar (select, swap, drop), loot on the water (the loot spots filled by rarity at the
 // start, drops from sinking ships, parcels and the whale), picking it up, and using consumables.
 import { interrupt, mend, shore } from './harm.ts';
+import { damaged, mendParts } from './parts.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dot, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
 import { openAt, nearestOpen } from './nav.ts';
@@ -8,7 +9,7 @@ import { hasPassive, hasPerk } from './perks.ts';
 import { RULE } from './rules.ts';
 import { apart, along, tangentAt } from './sphere.ts';
 import { EVENT, PHASE, SHIPS, STREAM, TICK, copy, emit, type Item, type Loot, type MatchState, type Ship } from './state.ts';
-import { COINS, EQUIP, ITEM, LOOT, PERKS, POWERS, RARITIES, SLOTS, USES, WEAPONS, WEAPON_KINDS, isUse, isWeapon } from './tables.ts';
+import { COINS, EQUIP, ITEM, LOOT, PARTS, PERKS, POWERS, RARITIES, SLOTS, USES, WEAPONS, WEAPON_KINDS, isUse, isWeapon } from './tables.ts';
 import { CENTRES, LOOT_SPOTS, REGIONS, regionAt } from './world/index.ts';
 
 export function empty(): Item {
@@ -254,10 +255,10 @@ export function useTime(ship: Ship, kind: number): number {
   return t;
 }
 
-/** Would it do anything? A shield charge does nothing at its cap, a repair nothing at full. */
+/** Would it do anything? A shield charge does nothing at its cap, a repair nothing to a whole ship at full. */
 export function useful(ship: Ship, kind: number): boolean {
   const u = USES[kind];
-  return u.shield > 0 ? ship.shield < u.cap : ship.hull < u.cap;
+  return u.shield > 0 ? ship.shield < u.cap : ship.hull < u.cap || damaged(ship);
 }
 
 export function startUse(state: MatchState, i: number): boolean {
@@ -281,6 +282,7 @@ export function useTick(state: MatchState, i: number): void {
   const it = ship.slots[ship.use], u = USES[it.kind];
   const shield = u.shield > 0 ? shore(state, i, u.shield, u.cap) : 0;
   const hull = u.hull > 0 ? mend(state, i, u.hull, u.cap) : 0;
+  if (u.hull > 0) mendParts(state, i, PARTS.kit, it.kind === ITEM.fullRepair);
   it.n--;
   emit(state, EVENT.useDone, i, -1, ship.pos, { item: it.kind, shield, hull, amount: it.n });
   if (it.n <= 0) ship.slots[ship.use] = empty();

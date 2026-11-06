@@ -700,6 +700,8 @@ export class App {
     cam.getWorldDirection(e.fwd);
     e.up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.audio.setListener(cam.position, e.fwd, e.up);
+    const s = this.session;
+    if (s) this.sound.fires(s.state.ships, PHASE.sunk, (p) => ({ x: p.x * R, y: p.y * R, z: p.z * R }));
     e.t -= dt;
     if (e.t > 0 && this.loop.running) return;
     e.t = 0.1;

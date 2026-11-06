@@ -89,6 +89,8 @@ export class Lightning {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 4;
     this.mesh.name = 'lightning';
+    // (an empty draw range is still drawn, and WebGPU warns of a draw of no vertices: hidden instead)
+    this.mesh.visible = false;
     this.light.name = 'lightning-light';
   }
 
@@ -117,6 +119,7 @@ export class Lightning {
     STRIKE.light = 0;
     this.light.intensity = 0;
     this.#geo.setDrawRange(0, 0);
+    this.mesh.visible = false;
   }
 
   #make(at: THREE.Vector3, warn: number): Bolt {
@@ -254,6 +257,7 @@ export class Lightning {
     this.light.intensity = light * 2500;
     if (light > 0) this.light.position.copy(lit);
     this.#geo.setDrawRange(0, quads * 6);
+    this.mesh.visible = quads > 0;
     if (quads === 0) return;
     for (const k of ['position', 'color', 'uv']) {
       const a = this.#geo.getAttribute(k) as THREE.BufferAttribute;

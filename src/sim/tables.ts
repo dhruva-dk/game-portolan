@@ -59,15 +59,18 @@ export const RARITY = {
   reload: [1, 0.95, 0.9, 0.85, 0.8],
 } as const;
 
-/** Item kinds. 0 is an empty slot; 1–6 are weapons; 7–10 are consumables. */
+/** Item kinds. 0 is an empty slot; 1–6 and 11–12 are weapons; 7–10 are consumables. Shot made for a purpose came
+ *  later than the rest, so its numbers follow the consumables'. */
 export const ITEM = {
   none: 0,
   cannon: 1, scatter: 2, harpoon: 3, mortar: 4, repeater: 5, broadside: 6,
   smallShield: 7, bigShield: 8, repairKit: 9, fullRepair: 10,
+  chain: 11, heated: 12,
 } as const;
-export const ITEM_NAMES = ['', 'Cannon', 'Scattergun', 'Harpoon', 'Mortar', 'Repeater', 'Broadside', 'Small Shield', 'Big Shield', 'Repair Kit', 'Full Repair'];
-export const WEAPON_KINDS: readonly number[] = [ITEM.cannon, ITEM.scatter, ITEM.harpoon, ITEM.mortar, ITEM.repeater, ITEM.broadside];
-export const isWeapon = (kind: number): boolean => kind >= ITEM.cannon && kind <= ITEM.broadside;
+export const ITEM_NAMES = ['', 'Cannon', 'Scattergun', 'Harpoon', 'Mortar', 'Repeater', 'Broadside', 'Small Shield', 'Big Shield', 'Repair Kit', 'Full Repair', 'Chain Shot', 'Heated Shot'];
+/** The weapons, in the order of their classes everywhere outside the simulation. */
+export const WEAPON_KINDS: readonly number[] = [ITEM.cannon, ITEM.scatter, ITEM.harpoon, ITEM.mortar, ITEM.repeater, ITEM.broadside, ITEM.chain, ITEM.heated];
+export const isWeapon = (kind: number): boolean => (kind >= ITEM.cannon && kind <= ITEM.broadside) || kind === ITEM.chain || kind === ITEM.heated;
 export const isUse = (kind: number): boolean => kind >= ITEM.smallShield && kind <= ITEM.fullRepair;
 
 export interface Weapon {
@@ -89,10 +92,17 @@ export interface Weapon {
   readonly lob: boolean;
   /** Broadside only: balls fired abeam from each side at once. */
   readonly sides: number;
+  /** How hard it goes at each part of a ship, as a multiple of what any shot does there (see PARTS). */
+  readonly parts: PartsBias;
+  /** Seconds a hit that reaches the hull sets her burning for; 0 none. */
+  readonly ignite: number;
 }
 
+export interface PartsBias { readonly sail: number; readonly mast: number; readonly flood: number; readonly rudder: number }
+const EVEN: PartsBias = { sail: 1, mast: 1, flood: 1, rudder: 1 };
+
 const gun = (w: Partial<Weapon> & Pick<Weapon, 'damage' | 'interval' | 'mag' | 'reload' | 'speed' | 'gravity' | 'spread' | 'range'>): Weapon => ({
-  pellets: 1, crit: 1.5, splash: 0, auto: false, lob: false, sides: 0, ...w,
+  pellets: 1, crit: 1.5, splash: 0, auto: false, lob: false, sides: 0, parts: EVEN, ignite: 0, ...w,
 });
 
 export const WEAPONS: Readonly<Record<number, Weapon>> = {
@@ -102,6 +112,14 @@ export const WEAPONS: Readonly<Record<number, Weapon>> = {
   [ITEM.mortar]: gun({ damage: 60, interval: 1.3, mag: 2, reload: 2.8, speed: 0, gravity: 26, spread: 0.012, range: 220, crit: 1, splash: 11, lob: true }),
   [ITEM.repeater]: gun({ damage: 7, interval: 0.1, mag: 30, reload: 2, speed: 185, gravity: 3, spread: 0.024, range: 150, auto: true }),
   [ITEM.broadside]: gun({ damage: 14, interval: 1.6, mag: 3, reload: 3, speed: 110, gravity: 6, spread: 0.02, range: 110, crit: 1.25, sides: 4 }),
+  // two half-balls on a chain, whirling: little against a hull, ruin to canvas and spars; slow and short-ranged, so
+  // it is the weapon for stopping a ship that runs, aimed high
+  [ITEM.chain]: gun({
+    damage: 11, interval: 0.85, mag: 3, reload: 2.4, speed: 115, gravity: 7.5, spread: 0.03, range: 130, crit: 1.25,
+    parts: { sail: 3.5, mast: 5, flood: 0.3, rudder: 0.6 },
+  }),
+  // a ball heated red in the galley's furnace: sets whatever it holes burning, unless the rain has it first
+  [ITEM.heated]: gun({ damage: 15, interval: 0.7, mag: 4, reload: 2.6, speed: 140, gravity: 8, spread: 0.012, range: 170, ignite: 5 }),
 };
 
 /** Lobbed shots take this long in the air: distance / `per`, held between `min` and `max` seconds. */
@@ -160,6 +178,46 @@ export const SPAR = { bots: 0.4, player: 0.65, grace: 0.4, from: 8, over: 50 } a
 
 /** Burning: hit points a second, through the shield first. */
 export const BURN = { rate: 3, fireShot: 3 } as const;
+
+/**
+ * Damage to a ship's parts, from the hull points a hit takes where it lands (the shield, an aura round her, keeps
+ * every part whole while it holds). Per hull point: the canvas torn (a share, 1 all of it), the mainmast weakened (1
+ * and it falls), water let in at the waterline (1 full) and the rudder shot about (1 shot away). Hits within `mid`
+ * metres of her centreline aloft strike the mast itself, `spar` times as hard.
+ */
+export const PARTS = {
+  sail: 0.01, mast: 0.0068, flood: 0.0095, rudder: 0.008, mid: 0.9, spar: 1.6,
+  /** Aloft is above `aloft` metres; the waterline below `waterline`; the rudder aft of `stern` metres along her. */
+  aloft: 4.4, waterline: 1.1, stern: -6.8,
+  /** Drive lost with all her canvas torn; the share she keeps with the mainmast down, and under a jury rig. */
+  drive: 0.42, bare: 0.5, jury: 0.82,
+  /** Drag of a hull full of water, and how much heavier she steers; steering lost with the rudder shot away. */
+  drag: 0.32, heavy: 0.25, steer: 0.58,
+  /** Seconds to rig a jury mast once the mainmast falls, and how weak it stands. */
+  rig: 14, rigged: 0.55,
+  /** Past `sinks` the water takes hull, `rate` points a second when she is full; it is past the shield. */
+  sinks: 0.6, rate: 5,
+  /** Quiet for `quiet` seconds, the pumps clear `pump` a second and the crew mends `mend` of canvas and rudder;
+   *  twice as fast in her own water. */
+  quiet: 3, pump: 0.022, mend: 0.012,
+  /** A repair kit mends this share of each part's damage; a full repair mends every part and rigs a jury mast. */
+  kit: 0.5,
+  /** Lightning down the mast: how much it weakens it; a breaching whale's wave: how much water it ships. */
+  bolt: 0.45, swamp: 0.35,
+} as const;
+
+/** Raking fire: a shot within `cos` of a ship's length, landing more than `ends` metres from her middle, does `mult`. */
+export const RAKE = { cos: 0.92, ends: 6, mult: 1.35 } as const;
+
+/** Blanketing: a ship within `reach` metres upwind (within `cone` of dead upwind) takes up to `most` of the wind. */
+export const BLANKET = { reach: 48, cone: 0.82, most: 0.38 } as const;
+
+/**
+ * Fire aboard: the canvas it burns away a second; a burning ship sets one within `spread` metres downwind of her
+ * (within `cone` of the wind) burning for `catch` seconds, and stronger wind (per m/s) feeds it; rain, thunder and snow
+ * put it out `quench` times as fast and quench heated shot before it catches.
+ */
+export const FIRE = { sail: 0.025, spread: 12, cone: 0.5, catch: 4, wind: 0.06, quench: 5 } as const;
 
 // ---------------------------------------------------------------- territory and coins
 

@@ -9,9 +9,9 @@ export const LEARNING = { learn: 40, fade: 15, known: 500, full: 1000 } as const
 /** Bin edges: hull % when you break off, seconds you stay out in the Storm each time, metres you fight at. */
 export const BINS = { run: [30, 60], storm: [3, 10], range: [80, 160] } as const;
 
-export const WEAPON_CLASSES = ['cannon', 'harpoon', 'mortar', 'repeater', 'scatter', 'broadside'] as const;
+export const WEAPON_CLASSES = ['cannon', 'harpoon', 'mortar', 'repeater', 'scatter', 'broadside', 'chain', 'heated'] as const;
 export type WeaponClass = (typeof WEAPON_CLASSES)[number];
-const WEAPON_NAMES = ['cannon', 'harpoon', 'mortar', 'repeater', 'scatter gun', 'broadside'];
+const WEAPON_NAMES = ['cannon', 'harpoon', 'mortar', 'repeater', 'scatter gun', 'broadside', 'chain shot', 'heated shot'];
 
 export const GRUDGE = { max: 3 } as const;
 

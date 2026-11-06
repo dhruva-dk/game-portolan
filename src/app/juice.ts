@@ -8,7 +8,7 @@ import type { ActorEvent, Juice as ActorJuice } from '../render/actors/index.ts'
 import type { V3 } from '../sim/math.ts';
 import { EVENT_REGION as R } from '../sim/environment.ts';
 
-const FIRE_STRENGTH: Record<WeaponClass, number> = { cannon: 1, scatter: 1.1, harpoon: 0.9, mortar: 1.2, repeater: 0.35, broadside: 1.5 };
+const FIRE_STRENGTH: Record<WeaponClass, number> = { cannon: 1, scatter: 1.1, harpoon: 0.9, mortar: 1.2, repeater: 0.35, broadside: 1.5, chain: 1.05, heated: 1 };
 
 /** The regions whose event shakes the camera as it starts: how hard, and the distances over which it fades. */
 const EVENT_RUMBLE: Record<number, readonly [number, number, number]> = {
@@ -63,7 +63,7 @@ export class MomentJuice {
         if (m.steady) return;
         const size = m.shield + m.hull;
         if (m.by === me && m.ship !== me) {
-          const id = m.crit ? 'crit' : m.hull > 0 ? 'cannonHit' : 'shieldHit';
+          const id = m.crit ? 'crit' : m.rake && m.hull > 0 ? 'rake' : m.hull > 0 ? 'cannonHit' : 'shieldHit';
           juice.fire(id, this.ctx(m.pos, { value: Math.round(size), key: m.ship, strength: Math.min(1.3, 0.6 + size / 40) }));
         } else if (m.ship === me && size > 0) {
           juice.fire('hurt', this.ctx(m.pos, { value: Math.round(size), strength: Math.min(1.3, 0.4 + size / 40), anchor: undefined }));
@@ -151,6 +151,23 @@ export class MomentJuice {
         return;
       case 'win':
         if (m.ship === me) juice.fire('win');
+        return;
+      case 'mastFall':
+        if (m.by === me && m.ship !== me) juice.fire('mastDown', this.ctx(m.pos, { key: m.ship }));
+        else if (m.ship === me) juice.fire('mastLost', this.ctx(m.pos, { anchor: undefined }));
+        else this.near(m.pos, 0.25, [40, 260]);
+        return;
+      case 'juryRig':
+        if (m.ship === me) juice.haptics.play('success');
+        return;
+      case 'ablaze':
+        if (m.ship === me) {
+          juice.screen.vignette({ color: '#ff5a10', alpha: 0.4, reach: 0.5, attack: 0.05, hold: 0.2, decay: 1.2 });
+          juice.haptics.play('warning');
+        }
+        return;
+      case 'quench':
+        if (m.ship === me) juice.haptics.play('light');
         return;
       default:
         return;

@@ -18,7 +18,7 @@ import {
 } from '../sim/match.ts';
 import { EVENT_REGION, currentScales, eventStrength, floeTime, liftsNow, strengthAt, sunHeight } from '../sim/environment.ts';
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
-import { DAY, REGION_EVENT } from '../sim/tables.ts';
+import { DAY, REGION_EVENT, isWeapon } from '../sim/tables.ts';
 import { newSky, skyAt, vigour } from '../sim/weather.ts';
 import { CENTRES, CURRENTS, REGION_COUNT, REGION_EVENTS, REGIONS, VORTEX, heightAt, regionWeights, summitNear, type WeatherKind } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
@@ -425,12 +425,13 @@ export class Session implements Stepper {
 
   private shipView(i: number, sh: Ship, alive: boolean, alpha: number): ShipView {
     const at = between(sh.was, sh.pos, alpha, this.p);
-    const slot = sh.slots[sh.sel], weapon = slot.kind >= 1 && slot.kind <= 6 ? weaponOf(slot.kind) : weaponOf(sh.slots.find((x) => x.kind >= 1 && x.kind <= 6)?.kind ?? 1);
+    const slot = sh.slots[sh.sel], weapon = isWeapon(slot.kind) ? weaponOf(slot.kind) : weaponOf(sh.slots.find((x) => isWeapon(x.kind))?.kind ?? 1);
     // the whale's toss: over and back while the flip runs
     const flip = sh.flip > 0 ? Math.PI * 0.9 * Math.sin(Math.PI * (1 - sh.flip / 3)) : 0;
     return {
       id: i, pos: metres(at), head: { ...sh.head }, speed: sh.speed, turn: -sh.rate, alt: sh.alt, flip, hull: sh.hull / 100,
       shield: sh.shield, shieldMax: 100, weapon, aim: gunDir(sh), cosmetics: this.looks[i] ?? this.looks[0], alive,
+      parts: { torn: sh.torn, mast: sh.fallen > 0 ? 'down' : sh.jury ? 'jury' : 'up', flood: sh.flood, listTo: sh.listTo, burn: sh.burn },
     };
   }
 

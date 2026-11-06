@@ -1,9 +1,9 @@
-// The six weapon classes, in profile with the muzzle to the right, and the four consumables.
+// The eight weapon classes, in profile with the muzzle to the right, and the four consumables.
 import {
   all, ball, circle, cut, cutLine, fill, line, plus, poly, rect, shield, star, wave, type Prim,
 } from '../draw.ts';
 
-export type WeaponClass = 'cannon' | 'scatter' | 'harpoon' | 'mortar' | 'repeater' | 'broadside';
+export type WeaponClass = 'cannon' | 'scatter' | 'harpoon' | 'mortar' | 'repeater' | 'broadside' | 'chain' | 'heated';
 export type ConsumableId = 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
 const barrel = 'rotate(-9 12 10)';
@@ -86,6 +86,26 @@ export const WEAPON_ICONS: Record<WeaponClass, Prim[]> = {
     fill(star(2.2, 12.5, 7, 2.6, 1.1, 0)),
     fill(star(21.8, 12.5, 7, 2.6, 1.1, 180)),
     line(wave(2, 22, 21.6, 0.9, 3), 1.6),
+  ],
+  chain: [
+    // two half-balls flying apart on the chain between them, spinning
+    fill('M2.2 9.4A4.6 4.6 0 0 1 6.8 4.8V14Z', { tr: 'rotate(-24 6.8 9.4)' }),
+    fill('M21.8 14.6A4.6 4.6 0 0 1 17.2 19.2V10Z', { tr: 'rotate(-24 17.2 14.6)' }),
+    ...[0, 1, 2, 3].map((k) => cutLine(circle(8.6 + k * 2.3, 10.4 + k * 1.1, 1.15), 1.1)),
+    ...[0, 1, 2, 3].map((k) => line(circle(8.6 + k * 2.3, 10.4 + k * 1.1, 1.15), 0.9, { fine: true })),
+    // the arcs of its spin
+    line('M3.4 17.6Q2 21 5.6 21.8', 1.2, { fine: true }),
+    line('M20.6 6.4Q22 3 18.4 2.2', 1.2, { fine: true }),
+  ],
+  heated: [
+    // a ball glowing in the tongs, over the coals
+    fill(circle(12, 9.4, 5.2), { tint: true }),
+    cut(circle(10.2, 7.6, 1.4), { fine: true }),
+    line('M3.2 2.6L9.2 6.4', 1.8),
+    line('M3.2 7.8L8.2 9.6', 1.8),
+    fill(rect(3.4, 17.4, 17.2, 4.4, 1.4)),
+    fill('M5.6 17.4C5.6 15.6 7 15 7.8 13.8 8 15 8.8 15.6 9.6 15.8 9.6 14.6 10.4 13.8 11.2 13.4 11.4 14.8 12.4 15.6 13.4 15.8 13.8 15 14 14.2 13.8 13.4 15.4 14.4 18.2 15.6 18.4 17.4Z', { tint: true }),
+    cutLine('M3.8 19.6H20.2', 0.9, { fine: true }),
   ],
 };
 

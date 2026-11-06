@@ -76,6 +76,7 @@ function newShip(state: MatchState, e: FleetEntry, i: number, gentle: boolean): 
     gusts: GUST.charges, gustT: 0, boost: 0, aim: xyz(), aimY: 0,
     active: Math.max(0, activeIndex(e.active ?? STARTER_ACTIVE)), passive: Math.max(0, passiveIndex(e.passive ?? STARTER_PASSIVE)),
     cooldown: 0, power: 0, burn: 0, burnBy: -1, slow: 0, spotted: 0, revealed: 0, ice: 0, ash: 0, flip: 0, scrape: 0,
+    torn: 0, mast: 0, fallen: 0, jury: false, rudder: 0, flood: 0, listTo: 1,
     kills: 0, dealt: 0, place: 0, by: -1, cause: -1, lastBy: -1, lastHit: -100000, landed: -1, sunk: -1, coins: 0, sailed: 0,
     regions: 0, laid: [], held: 0, perks: 0,
     gull: { state: GULL.home, t: 0, tier: 0, at: xyz(), alt: 0 },

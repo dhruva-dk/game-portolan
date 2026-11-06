@@ -300,6 +300,9 @@ export function fxHud(state: HudState = 'calm'): HudModel {
   const fight = state === 'fight', storm = state === 'storm';
   return {
     shield: fight ? 18 : storm ? 0 : 75, shieldMax: 100, hull: fight ? 31 : storm ? 52 : 100, hullMax: 100,
+    parts: fight
+      ? { sail: 0.45, mast: 1, down: 9, jury: false, rudder: 0.3, flood: 0.42, sinks: 0.6, burning: true }
+      : { sail: 0, mast: 0, down: 0, jury: false, rudder: 0, flood: 0, sinks: 0.6, burning: false },
     slots: [
       { kind: 'weapon', weapon: 'cannon', rarity: 2, ammo: fight ? 0 : 4, mag: 4, reload: fight ? 0.45 : 0 },
       { kind: 'weapon', weapon: 'scatter', rarity: 3, ammo: 6, mag: 8, reload: 0 },

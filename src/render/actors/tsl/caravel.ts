@@ -9,6 +9,10 @@
 // flags streaming down her wind) and their normals are turned with them. The same motion is used when the sun's shadow
 // maps are drawn, and the holes shot through the cloth are cut from those as well, so the shadow on the deck is torn
 // where the sail is. The sails let the light through from behind (ClothLight), so a sail against the sun glows.
+//
+// The mainmast and everything on it (aMain) can be shot away: uMast turns it over the side about her length through
+// its foot, scales it about the foot (a jury mast is a short spar; gone is nothing), and lets it sink and drag astern
+// where it lies in the water. Shot-torn canvas (uTorn) opens holes in the lateens as hull damage does.
 import {
   DoubleSide, MeshStandardNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type NodeBuilder, type Texture,
 } from 'three/webgpu';
@@ -19,8 +23,24 @@ import {
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
-import { WL } from '../caravel.ts';
+import { MAIN_FOOT, WL } from '../caravel.ts';
 import { dither, moved, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
+
+/**
+ * A point in ship space, and normalLocal with it, as the mainmast stands this frame: uMast is the angle it has gone
+ * over through (about her length, positive to starboard, which is toward -x), its scale about the foot, how far it
+ * has sunk and how far it has dragged astern. Points off the mainmast stay where they are.
+ */
+function mainmast(u: Uniforms, p: V3): V3 {
+  const mast = read(u, 'uMast', 'vec4'), on = attribute<'float'>('aMain');
+  const foot = vec3(MAIN_FOOT.x, MAIN_FOOT.y, MAIN_FOOT.z);
+  const a = mast.x.mul(on), k = mix(float(1), mast.y, on);
+  const c = cos(a), s = sin(a);
+  const q = p.sub(foot).mul(k);
+  const n = normalLocal;
+  normalLocal.assign(vec3(n.x.mul(c).sub(n.y.mul(s)), n.x.mul(s).add(n.y.mul(c)), n.z));
+  return vec3(q.x.mul(c).sub(q.y.mul(s)), q.x.mul(s).add(q.y.mul(c)), q.z).add(foot).sub(vec3(0, mast.z, mast.w).mul(on));
+}
 
 /** The hull, figurehead and turret: one material a ship, coloured by part. */
 export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardNodeMaterial {
@@ -29,6 +49,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshStandardN
   const wisp = read(u, 'uWisp', 'color');
   const damage = read(u, 'uDamage', 'float'), hit = read(u, 'uHit', 'float'), hitAt = read(u, 'uHitAt', 'vec3');
   const night = read(u, 'uNight', 'float');
+  m.positionNode = Fn(() => moved(mainmast(u, positionLocal)))();
 
   const part = floor(attribute<'float'>('aPart').add(0.5)).toVar('shipPart');
   const is = (k: number): B => part.equal(k);
@@ -132,7 +153,7 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   const luff = read(u, 'uLuff', 'float'), flag = read(u, 'uFlag', 'float');
   const sailA = read(u, 'uSailA', 'color'), sailB = read(u, 'uSailB', 'color'), trimC = read(u, 'uTrimC', 'color');
   const pattern = read(u, 'uPattern', 'float'), emblem = read(u, 'uEmblem', 'float'), rect = read(u, 'uEmblemRect', 'vec4');
-  const damage = read(u, 'uDamage', 'float'), fade = read(u, 'uFade', 'float');
+  const damage = read(u, 'uDamage', 'float'), fade = read(u, 'uFade', 'float'), torn = read(u, 'uTorn', 'float');
 
   const kind = attribute<'float'>('aKind');
   const rig = attribute<'vec3'>('aRig');
@@ -159,7 +180,7 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
     // the cloth's normals turn with it
     const n = normalLocal;
     normalLocal.assign(vec3(n.x.mul(c).add(n.z.mul(s)), n.y, n.x.negate().mul(s).add(n.z.mul(c))));
-    return moved(vec3(x.mul(c).add(z.mul(s)), p.y.sub(droop), x.negate().mul(s).add(z.mul(c)).add(rig.x)));
+    return moved(mainmast(u, vec3(x.mul(c).add(z.mul(s)), p.y.sub(droop), x.negate().mul(s).add(z.mul(c)).add(rig.x))));
   })();
 
   const su = uv(), sp = plane, size = rig.y;
@@ -199,9 +220,11 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   cloth = cloth.mul(mix(0.68, 1, smoothstep(0, 0.03, hem)));
   const colour = select(yard, spar, cloth);
 
-  // shot through: holes grow with damage, their edges scorched
+  // shot through: holes grow with damage and with the canvas torn by shot aloft, their edges scorched; torn canvas
+  // goes in rags from the foot and the leech, where it flogs loose, before the head
   const hn = texture(sailNoise, sp.mul(vec2(0.7, 1.1)).add(kind.mul(0.37))).r;
-  const cut = select(yard, float(-1), damage.mul(0.62).sub(0.05));
+  const rags = torn.mul(float(0.7).add(float(1).sub(su.y).mul(0.25)).add(su.x.mul(0.15))).sub(0.04);
+  const cut = select(yard, float(-1), max(damage.mul(0.62).sub(0.05), select(kind.lessThan(0.5), rags, float(-1))));
   const whole = hn.greaterThanEqual(cut);
   m.colorNode = colour.mul(mix(1, 0.25, smoothstep(cut.add(0.06), cut, hn).mul(step(0, cut))));
   // the player's own sail thins where it would hide the way ahead (round the crosshair only, so the rest of the rig

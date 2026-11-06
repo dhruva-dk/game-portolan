@@ -32,6 +32,16 @@
 
 /* the HUD */
 .s-hud__vit { left: var(--sp-5); top: var(--sp-5); width: calc(300px * var(--k)); padding: var(--sp-2) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
+.s-hud__parts { display: none; gap: var(--sp-2); align-items: center; font-family: var(--f-display); font-weight: 700; font-size: var(--fs-micro); line-height: 1; }
+.s-hud__parts.is-on { display: flex; }
+.s-hud__part { display: none; align-items: center; gap: 0.25em; padding: 0.2em 0.45em; border-radius: 999px; background: rgba(0, 0, 0, 0.28); color: #f3e2b8; }
+.s-hud__part.is-on { display: inline-flex; }
+.s-hud__part i { display: inline-block; width: 1.25em; height: 1.25em; }
+.s-hud__part svg { width: 100%; height: 100%; fill: currentColor; }
+.s-hud__part[data-lvl='hurt'] { color: #ffc65a; }
+.s-hud__part[data-lvl='bad'] { color: #ff7a5c; background: rgba(120, 20, 8, 0.45); }
+.s-hud__part[data-lvl='jury'] { color: #d8c7a0; }
+.s-hud__part.is-sinking, .s-hud__part[data-part='fire'].is-on { animation: p-low 0.6s ease-in-out infinite alternate; }
 .s-hud__info { left: 50%; top: var(--sp-5); transform: translateX(-50%); padding: var(--sp-2) var(--sp-4); display: flex; flex-direction: column; align-items: center; gap: var(--sp-1); font-family: var(--f-display); font-weight: 700; font-size: var(--fs-small); }
 .s-hud__info i { display: inline-block; width: 1.1em; height: 1.1em; vertical-align: -0.18em; margin-right: 0.3em; }
 .s-hud__info svg { width: 100%; height: 100%; }

@@ -4,8 +4,8 @@
 import { softclip, type Buf, type Rng } from '../dsp.ts';
 import { def, LEVEL, LOOP } from '../def.ts';
 import {
-  ad, between, brown, bubbles, burst, crackles, creak, crunch, filter, glass, hump, knock, mix, modes, n, normalize, normAll,
-  pair, pink, scatter, shape, shards, splinters, SR, stickSlip, stereoLoop, sweep, thump, tone, white, whoosh,
+  ad, between, brown, bubbles, burst, canvasFlap, crackles, creak, crunch, filter, glass, hump, knock, mix, modes, n, normalize,
+  normAll, pair, pink, scatter, shape, shards, splashOf, splinters, SR, stickSlip, stereoLoop, sweep, thump, tone, white, whoosh,
 } from '../kit.ts';
 import { fade, loopify, TAU } from '../dsp.ts';
 
@@ -164,6 +164,66 @@ function emberBurn(r: Rng): Buf {
   return normalize(x, 0.5);
 }
 
+/** The mainmast going: a long groan of the step working loose, a crack like a gun as it parts, the rigging snapping
+ *  one line after another, then the top hitting the sea alongside. */
+function mastFall(r: Rng): Buf[] {
+  const out = pair(4.2);
+  const groan = stickSlip(r, 1.1, 14, 30, [110, 240, 390, 610, 900], 0.08);
+  const part = burst(r, 0.08, 'hp', 900, 0.7, 0.0005, 0.02);
+  const boom = thump(1.2, 90, 40, 0.3);
+  const splash = splashOf(r, 1.4, 2.2);
+  out.forEach((o, c) => {
+    mix(o, groan, 0, 0.8);
+    mix(o, creak(r, 0.75), 0.35, 0.5);
+    mix(o, part, 1.05 + c * 0.0008, 1); mix(o, boom, 1.05, 0.9);
+    splinters(o, r, 1.05, 1.6, 90, 0.7);
+    crunch(o, r, 1.05, 1.5, 10, 0.6);
+    // the shrouds and stays parting, each a whip-crack
+    scatter(r, 1.2, 2.2, 5, (at) => mix(o, burst(r, 0.04, 'bp', between(r, 1400, 2600), 1.5, 0.0003, 0.008), at + c * 0.004, between(r, 0.3, 0.6)));
+    mix(o, whoosh(r, 0.8, 200, 900, 1.2), 1.3, 0.45);
+    mix(o, splash, 2.05 + c * 0.003, 1);
+    mix(o, shape(filter(brown(o.length, r), 'lp', 160), (t) => ad(t, 1.1, 1.6)), 0, 0.6);
+  });
+  return normAll(out, 0.95);
+}
+
+/** Canvas ripping under shot: a tearing rasp that runs and stops. */
+function sailTear(r: Rng): Buf {
+  const s = between(r, 0.35, 0.6), x = stickSlip(r, s, between(r, 160, 240), between(r, 380, 520), [700, 1300, 2100, 3300], 0.006);
+  const rasp = shape(filter(white(n(s), r), 'bp', between(r, 1400, 2200)), (t) => hump(t / s, 0.4));
+  mix(x, rasp, 0, 0.5);
+  mix(x, canvasFlap(r), s * 0.9, 0.5);
+  return normalize(x, 0.7);
+}
+
+/** The sea coming in through a hole at the waterline: a slap and a gulping gurgle. */
+function floodGush(r: Rng): Buf {
+  const x = new Float32Array(n(1.6));
+  mix(x, splashOf(r, 0.4, 0.6), 0, 0.6);
+  const gush = shape(filter(brown(n(1.4), r), 'lp', 520), (t) => ad(t, 0.05, 0.6) * (0.7 + 0.3 * Math.sin(TAU * 7 * t)));
+  mix(x, gush, 0.05, 0.8);
+  bubbles(x, r, 0.1, 1.4, 22, 0.35, 250, 900);
+  return normalize(x, 0.7);
+}
+
+/** Fire put out by rain, or a red-hot ball meeting it: a burst of steam. */
+function quench(r: Rng): Buf {
+  const x = shape(filter(white(n(1.3), r), 'hp', 2200), (t) => ad(t, 0.01, 0.55));
+  sweep(x, 'lp', (u) => 9000 - 5500 * u, 0.7);
+  crackles(x, r, 0, 0.4, 30, 0.3);
+  return normalize(x, 0.6);
+}
+
+/** A jury mast swayed up: rope through blocks, a heave, a spar knocked home. */
+function juryRig(r: Rng): Buf {
+  const x = new Float32Array(n(1.8));
+  for (let k = 0; k < 3; k++) mix(x, stickSlip(r, 0.3, 60, 120, [520, 980, 1600], 0.02), k * 0.35, 0.45);
+  mix(x, creak(r, 1.2), 0.5, 0.35);
+  mix(x, knock(r, between(r, 260, 340), 0.07, 0.4), 1.15, 0.9);
+  mix(x, knock(r, between(r, 400, 520), 0.05, 0.3), 1.35, 0.6);
+  return normalize(x, 0.6);
+}
+
 /** Your own ship repairing slowly in your own water: soft timbers knitting, as a loop. */
 function mending(r: Rng): Buf[] {
   return stereoLoop(4, 0.4, (c, N) => {
@@ -189,5 +249,10 @@ export const COMBAT_SOUNDS = {
   burning: def(burning, 1, 'fx', 5, 0.5, 4, { ...LOOP, range: 200 }),
   emberBurn: def(emberBurn, 3, 'fx', 5, 0.5, 2, { range: 60 }),
   mending: def(mending, 1, 'fx', 3, 0.35, 1, { ...LOOP, range: 60 }),
+  mastFall: def(mastFall, 2, 'fx', 10, 1, 2, { range: 650, jitter: 0.02 }),
+  sailTear: def(sailTear, 4, 'fx', 6, 0.7, 3, { range: 260 }),
+  floodGush: def(floodGush, 3, 'fx', 6, 0.75, 3, { range: 220 }),
+  quench: def(quench, 2, 'fx', 6, 0.65, 3, { range: 260 }),
+  juryRig: def(juryRig, 2, 'fx', 6, 0.7, 2, { range: 160 }),
 };
 

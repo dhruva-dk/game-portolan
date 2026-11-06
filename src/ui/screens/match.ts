@@ -108,6 +108,21 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const vit = box('s-hud__vit p-smoke', root);
   const shield = progressBar({ kind: 'shield', value: 0, label: '', icon: ICON.shield, parent: vit });
   const hull = progressBar({ kind: 'hull', value: 0, label: '', icon: ICON.hull, parent: vit });
+  // her parts, under the bars: a mark for each that is hurt, amber then red, and the fallen mast's countdown
+  const partsRow = el('s-hud__parts', vit);
+  const partMark = (name: string, icon: string) => {
+    const e = el('s-hud__part', partsRow, `<i>${icon}</i><b></b>`);
+    e.dataset.part = name;
+    return { el: e, label: e.querySelector('b')! };
+  };
+  const pSail = partMark('sail', ICON.sail), pMast = partMark('mast', ICON.mast), pRudder = partMark('rudder', ICON.rudder);
+  const pFlood = partMark('flood', ICON.leak), pFire = partMark('fire', ICON.fire);
+  const grade = (m: { el: HTMLElement }, k: number, bad: number, title: string) => {
+    const lvl = k >= bad ? 'bad' : k >= 0.15 ? 'hurt' : '';
+    m.el.dataset.lvl = lvl;
+    m.el.classList.toggle('is-on', lvl !== '');
+    m.el.title = title;
+  };
 
   const info = box('s-hud__info p-smoke', root);
   const storm = el('s-hud__storm', info);
@@ -268,6 +283,28 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     hull.set(h.hull / h.hullMax, false);
     hull.setLabel(`${h.hull}`);
     hull.el.classList.toggle('is-low', h.hull < 35);
+    const p = h.parts;
+    grade(pSail, p.sail, 0.6, 'Canvas torn: less drive');
+    pSail.label.textContent = p.sail >= 0.15 ? `${Math.round(p.sail * 100)}%` : '';
+    if (p.down > 0) {
+      pMast.el.dataset.lvl = 'bad';
+      pMast.el.classList.add('is-on');
+      pMast.el.title = 'Mainmast down: rigging a jury mast';
+      pMast.label.textContent = `${Math.ceil(p.down)}s`;
+    } else {
+      grade(pMast, p.mast, 0.7, p.jury ? 'Jury mast: less sail than she had' : 'Mainmast sprung');
+      if (p.jury) { pMast.el.dataset.lvl = pMast.el.dataset.lvl || 'jury'; pMast.el.classList.add('is-on'); }
+      pMast.label.textContent = p.jury ? 'jury' : '';
+    }
+    grade(pRudder, p.rudder, 0.5, 'Rudder shot about: slow to turn');
+    pRudder.label.textContent = '';
+    grade(pFlood, p.flood / p.sinks, 0.75, p.flood > p.sinks ? 'Foundering: get her pumped or mended' : 'Taking water: heavy and listing');
+    pFlood.label.textContent = p.flood >= 0.08 ? `${Math.round(p.flood * 100)}%` : '';
+    pFlood.el.classList.toggle('is-sinking', p.flood > p.sinks);
+    pFire.el.dataset.lvl = p.burning ? 'bad' : '';
+    pFire.el.classList.toggle('is-on', p.burning);
+    pFire.el.title = 'On fire: canvas burning';
+    partsRow.classList.toggle('is-on', partsRow.querySelector('.is-on') !== null);
     const st = h.storm;
     storm.innerHTML = `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`;
     storm.classList.toggle('is-out', st.outside);
@@ -368,7 +405,7 @@ const HOW: Record<string, [string, string]> = {
   ram: ['rammed by %', 'rammed'], burn: ['burned out by %', 'burned out'], ink: ['by %, in the ink', 'in the ink'],
   mine: ["by %'s mine", 'by a mine'], wave: ["by %'s wave", 'by a wave'], storm: ['by %, in the Storm', 'by the Storm'],
   lightning: ['by %, under lightning', 'by lightning'], ash: ['by %, in the ash', 'by the ash'], whale: ['by %, and the whale', 'by the whale'],
-  rock: ['by %, under falling rock', 'by falling rock'],
+  rock: ['by %, under falling rock', 'by falling rock'], flood: ['holed below the waterline by %', 'swamped and foundered'],
 };
 
 function sunkBy(m: DeathModel): string {

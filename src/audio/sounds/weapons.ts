@@ -1,10 +1,10 @@
-// The guns. Each of the six classes has its own layered fire sound (a crack, a body, a blast and a tail), and the
+// The guns. Each of the eight classes has its own layered fire sound (a crack, a body, a blast and a tail), and the
 // variant is the rarity: every step up adds a deeper sub, a longer tail, then a ringing barrel and a spirit
 // sparkle. Then the projectiles' impacts, the mortar's falling whistle, reloads and the dry click.
 import { pluck, softclip, type Buf, type Rng } from '../dsp.ts';
 import { def, RARITY } from '../def.ts';
 import {
-  ad, between, blast, brown, burst, crunch, filter, glass, grit, hump, knock, metal, mix, n, normalize, normAll, pair, pink,
+  ad, between, blast, brown, burst, crackles, crunch, filter, glass, grit, hump, knock, metal, mix, n, normalize, normAll, pair, pink,
   scatter, shape, shards, splashOf, splinters, SR, sweep, thump, tone, white, whoosh, stickSlip,
 } from '../kit.ts';
 
@@ -108,6 +108,43 @@ function repeater(r: Rng, v: number): Buf[] {
     mix(o, shape(filter(pink(o.length, r), 'lp', 600), (t) => ad(t, 0.01, 0.16)), 0.005, 0.35);
   });
   return finish(out, r, Math.min(v, 3), 1.5);
+}
+
+/** Chain shot: a short gun's flat bark, then the two halves whirring away on their chain, a whup-whup that falls. */
+function chainShot(r: Rng, v: number): Buf[] {
+  const out = pair(2.4);
+  const crack = burst(r, 0.05, 'hp', 1300, 0.7, 0.0004, 0.006);
+  const boom = thump(1.2, between(r, 105, 130), 40, between(r, 0.3, 0.38));
+  const bl = blast(r, 1.4, 3600, 10, 0.26);
+  const rattle = new Float32Array(n(0.12));
+  for (let k = 0; k < 6; k++) mix(rattle, metal(r, between(r, 1200, 2200), 0.015, 0.06), between(r, 0, 0.08), between(r, 0.2, 0.5));
+  // the whirr: noise through a band that pulses at the bar's spin, slowing and falling as it goes
+  const s = 1.3, whirr = white(n(s), r);
+  sweep(whirr, 'bp', (u) => 900 - 450 * u, 3.5);
+  shape(whirr, (t) => hump(t / s, 0.5) * (0.5 + 0.5 * Math.sin(2 * Math.PI * (26 - 9 * t) * t)) ** 2);
+  out.forEach((o, c) => {
+    mix(o, crack, c * 0.0006, 0.9); mix(o, boom, 0, 1); mix(o, bl, 0.001 * c, 0.8); mix(o, rattle, 0.004, 0.5);
+    mix(o, whirr, 0.05 + c * 0.012, 0.42);
+    mix(o, shape(filter(pink(o.length, r), 'lp', 320), (t) => ad(t, 0.05, 0.7)), 0.01, 0.45);
+  });
+  return finish(out, r, v, 1.6);
+}
+
+/** Heated shot: the cannon's report with a hiss of steam off the wet swab and the ball's own crackle as it leaves. */
+function heatedShot(r: Rng, v: number): Buf[] {
+  const out = pair(2.8);
+  const crack = burst(r, 0.06, 'hp', 1600, 0.7, 0.0004, 0.007);
+  const boom = thump(1.4, between(r, 100, 125), 36, between(r, 0.36, 0.46));
+  const bl = blast(r, 1.6, 4400, 9, 0.3);
+  const hiss = shape(filter(white(n(1.2), r), 'hp', 2600), (t) => ad(t, 0.01, 0.5));
+  const sizzle = new Float32Array(n(1.4));
+  crackles(sizzle, r, 0.02, 1.2, 45, 0.5);
+  out.forEach((o, c) => {
+    mix(o, crack, c * 0.0006, 0.9); mix(o, boom, 0, 1.05); mix(o, bl, 0.001 * c, 0.85);
+    mix(o, hiss, 0.01 + c * 0.004, 0.35); mix(o, sizzle, 0.03 + c * 0.007, 0.35);
+    mix(o, shape(filter(pink(o.length, r), 'lp', 300), (t) => ad(t, 0.06, 0.8)), 0.01, 0.5);
+  });
+  return finish(out, r, v, 1.6);
 }
 
 /** Both batteries at once: guns ripple down each side, port and starboard a beat apart, over one long rumble. */
@@ -220,6 +257,26 @@ function reloadCannon(r: Rng): Buf {
   return normalize(x, 0.6);
 }
 
+function reloadChain(r: Rng): Buf {
+  const x = new Float32Array(n(1.2));
+  for (let k = 0; k < 9; k++) mix(x, metal(r, between(r, 1100, 2300), 0.02, 0.09), 0.05 + k * 0.035 + between(r, 0, 0.02), between(r, 0.2, 0.45)); // the chain paid in
+  mix(x, knock(r, between(r, 170, 210), 0.08, 0.4), 0.45, 0.8); // the halves seated
+  mix(x, knock(r, between(r, 850, 1000), 0.03, 0.2), 0.8, 0.6);
+  mix(x, thump(0.3, 120, 70, 0.06), 0.8, 0.5);
+  return normalize(x, 0.6);
+}
+
+function reloadHeated(r: Rng): Buf {
+  const x = new Float32Array(n(1.3));
+  mix(x, metal(r, between(r, 700, 850), 0.06, 0.3), 0, 0.5); // the tongs off the furnace
+  mix(x, shape(filter(white(n(0.7), r), 'hp', 3200), (t) => ad(t, 0.01, 0.3)), 0.2, 0.35); // hissing on the wet wad
+  crackles(x, r, 0.2, 0.8, 30, 0.3);
+  mix(x, knock(r, between(r, 180, 220), 0.07, 0.4), 0.45, 0.8);
+  mix(x, knock(r, between(r, 900, 1100), 0.03, 0.2), 0.85, 0.6);
+  mix(x, thump(0.3, 120, 70, 0.06), 0.85, 0.5);
+  return normalize(x, 0.6);
+}
+
 function reloadScatter(r: Rng): Buf {
   const x = new Float32Array(n(1));
   for (let k = 0; k < 10; k++) mix(x, metal(r, between(r, 2200, 4200), 0.02, 0.1), 0.1 + between(r, 0, 0.25), between(r, 0.1, 0.3)); // shot poured in
@@ -308,6 +365,8 @@ export const WEAPON_SOUNDS = {
   fireMortar: def(mortar, 5, 'fx', 7, 1, 6, { ...RARITY, range: 620 }),
   fireRepeater: def(repeater, 5, 'fx', 6, 0.85, 12, { ...RARITY, range: 450 }),
   fireBroadside: def(broadside, 5, 'fx', 8, 1, 6, { ...RARITY, range: 700 }),
+  fireChain: def(chainShot, 5, 'fx', 7, 0.95, 6, { ...RARITY, range: 520 }),
+  fireHeated: def(heatedShot, 5, 'fx', 7, 1, 8, { ...RARITY, range: 600 }),
   mortarWhistle: def(whistle, 3, 'fx', 5, 0.6, 6, { range: 220 }),
   flyby: def(flyby, 3, 'fx', 4, 0.6, 4, { range: 40 }),
   impactWater: def(impactWater, 4, 'fx', 5, 0.75, 8, { range: 420 }),
@@ -322,6 +381,8 @@ export const WEAPON_SOUNDS = {
   reloadMortar: def(reloadMortar, 2, 'fx', 4, 0.55, 2, { range: 60 }),
   reloadRepeater: def(reloadRepeater, 2, 'fx', 4, 0.55, 2, { range: 60 }),
   reloadBroadside: def(reloadBroadside, 1, 'fx', 4, 0.6, 2, { range: 60 }),
+  reloadChain: def(reloadChain, 2, 'fx', 4, 0.55, 2, { range: 60 }),
+  reloadHeated: def(reloadHeated, 2, 'fx', 4, 0.55, 2, { range: 60 }),
   reloadDone: def(reloadDone, 2, 'ui', 6, 0.5, 2),
   empty: def(empty, 2, 'ui', 6, 0.55, 2),
   select: def(select, 2, 'ui', 7, 0.5, 2),
@@ -332,11 +393,13 @@ export const WEAPON_SOUNDS = {
 /** The fire sound for each weapon class. */
 export const FIRE = {
   cannon: 'fireCannon', scatter: 'fireScatter', harpoon: 'fireHarpoon', mortar: 'fireMortar', repeater: 'fireRepeater', broadside: 'fireBroadside',
+  chain: 'fireChain', heated: 'fireHeated',
 } as const;
 
 /** The reload sound for each weapon class. */
 export const RELOAD = {
   cannon: 'reloadCannon', scatter: 'reloadScatter', harpoon: 'reloadHarpoon', mortar: 'reloadMortar', repeater: 'reloadRepeater', broadside: 'reloadBroadside',
+  chain: 'reloadChain', heated: 'reloadHeated',
 } as const;
 
 export const IMPACT = { water: 'impactWater', land: 'impactLand', ship: 'impactShip' } as const;

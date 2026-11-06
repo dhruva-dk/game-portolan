@@ -86,7 +86,9 @@ const STERN_Y = rail(0), STERN_Z = zOf(0, STERN_Y), BOWSPRIT = new V3(0, rail(1)
 const P = { hull: 0, gold: 1, bulwark: 2, deck: 3, accent: 6, wood: 7, rope: 8, tar: 9, wisp: 11, bronze: 12, iron: 13, glass: 14 } as const;
 
 class Builder {
-  pos: number[] = []; nor: number[] = []; uv: number[] = []; part: number[] = []; aux: number[] = []; idx: number[] = [];
+  pos: number[] = []; nor: number[] = []; uv: number[] = []; part: number[] = []; aux: number[] = []; main: number[] = []; idx: number[] = [];
+  /** 1 while the mainmast and its rigging are added: the part that falls when it is shot away. */
+  mainmast = 0;
   add(g: THREE.BufferGeometry, part: number, m?: THREE.Matrix4, uvm?: (u: number, v: number) => [number, number], aux = 0): this {
     if (!g.getAttribute('normal')) g.computeVertexNormals();
     const p = g.getAttribute('position'), n = g.getAttribute('normal'), t = g.getAttribute('uv'), ax = g.getAttribute('aAux');
@@ -103,6 +105,7 @@ class Builder {
       this.uv.push(u, w);
       this.part.push(part);
       this.aux.push(ax ? ax.getX(i) : aux);
+      this.main.push(this.mainmast);
     }
     if (g.index) for (let i = 0; i < g.index.count; i++) this.idx.push(base + g.index.getX(i));
     else for (let i = 0; i < p.count; i++) this.idx.push(base + i);
@@ -115,6 +118,7 @@ class Builder {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('aPart', new THREE.Float32BufferAttribute(this.part, 1));
     g.setAttribute('aAux', new THREE.Float32BufferAttribute(this.aux, 1));
+    g.setAttribute('aMain', new THREE.Float32BufferAttribute(this.main, 1));
     g.setIndex(this.idx);
     g.computeBoundingSphere();
     return g;
@@ -324,6 +328,7 @@ function hullGeometry(hi: boolean): THREE.BufferGeometry {
   // the masts: fighting tops on fore and main, shrouds with ratlines down to the chains
   for (const m of MASTS) {
     const z = mastZ(m), d = deckAt(m.s), top = mastTop(m);
+    b.mainmast = m === MASTS[1] ? 1 : 0;
     rod(b, new V3(0, d - 0.2, z), new V3(0, top, z), m.r, m.r * 0.45, P.wood, hi ? 10 : 5);
     b.add(new THREE.SphereGeometry(m.r * 0.8, 8, 6), P.gold, M(0, top + 0.05, z));
     const yt = m.top ? d + m.h * m.top : d + m.h * 0.78, rt = m.top ? 0.95 : 0.3;
@@ -350,6 +355,7 @@ function hullGeometry(hi: boolean): THREE.BufferGeometry {
       }
     }
   }
+  b.mainmast = 0;
   // the forestay, from the fore's head out to the bowsprit
   rod(b, new V3(0, mastTop(MASTS[0]) - 0.5, mastZ(MASTS[0])), BOWSPRIT.clone().add(new V3(0, 0.1, -0.3)), 0.035, 0.035, P.rope, 4);
   // small things on deck: a hatch grating, a capstan on the quarterdeck, casks by the mainmast, the turret's ring
@@ -445,12 +451,13 @@ function figureheadGeometry(kind: Figurehead): THREE.BufferGeometry {
  * aRig is the mast it swings round, its size, and its share of the swing.
  */
 function sailGeometry(): THREE.BufferGeometry {
-  const pos: number[] = [], uv: number[] = [], kind: number[] = [], plane: number[] = [], rig: number[] = [], idx: number[] = [];
+  const pos: number[] = [], uv: number[] = [], kind: number[] = [], plane: number[] = [], rig: number[] = [], main: number[] = [], idx: number[] = [];
+  let onMain = 0;
   const grid = (k: number, at: (u: number, v: number) => THREE.Vector3, nu: number, nv: number, r: [number, number, number], flat: (p: THREE.Vector3, u: number, v: number) => [number, number]) => {
     const base = pos.length / 3;
     for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
       const u = i / nu, v = j / nv, p = at(u, v);
-      pos.push(p.x, p.y, p.z); uv.push(u, v); kind.push(k); plane.push(...flat(p, u, v)); rig.push(...r);
+      pos.push(p.x, p.y, p.z); uv.push(u, v); kind.push(k); plane.push(...flat(p, u, v)); rig.push(...r); main.push(onMain);
     }
     for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
       const a = base + j * (nu + 1) + i, b = a + 1, c = a + nu + 1, e = c + 1;
@@ -459,6 +466,7 @@ function sailGeometry(): THREE.BufferGeometry {
   };
   for (const m of MASTS) {
     const { T, P: Pk, C } = lateen(m), z = mastZ(m), size = m.yard * 0.5;
+    onMain = m === MASTS[1] ? 1 : 0;
     const cz = (T.x + Pk.x + C.x) / 3, cy = (T.y + Pk.y + C.y) / 3;
     const at = (a: THREE.Vector2) => new V3(0, a.y, a.x);
     // the sail: hung from the yard, its foot from the tack to the clew
@@ -474,6 +482,7 @@ function sailGeometry(): THREE.BufferGeometry {
     const top = mastTop(m), len = m.h > 15 ? 6.5 : 4.2, w = m.h > 15 ? 0.6 : 0.45;
     grid(2, (u, v) => new V3(0, top - 0.25 - v * w * (1 - u * 0.85), z - 0.1 - u * len), 16, 2, [z, 1, 0], (_, u, v) => [u * 2 - 1, v - 0.5]);
   }
+  onMain = 0;
   // the ensign, flown from the staff over the stern
   const fy = STERN_Y + 2.75, fz = STERN_Z - 0.4;
   grid(3, (u, v) => new V3(0, fy - v * 1.5, fz - u * 2.4), 14, 6, [fz, 0.8, 0], (_, u, v) => [(u - 0.5) * 3, (0.5 - v) * 1.875]);
@@ -483,6 +492,7 @@ function sailGeometry(): THREE.BufferGeometry {
   g.setAttribute('aKind', new THREE.Float32BufferAttribute(kind, 1));
   g.setAttribute('aPlane', new THREE.Float32BufferAttribute(plane, 2));
   g.setAttribute('aRig', new THREE.Float32BufferAttribute(rig, 3));
+  g.setAttribute('aMain', new THREE.Float32BufferAttribute(main, 1));
   g.setIndex(idx);
   g.computeVertexNormals();
   g.computeBoundingSphere();
@@ -546,6 +556,29 @@ export function turretGeometry(kind: Weapon): { base: THREE.BufferGeometry; barr
       for (const z of [0.1, 1.2, 2.1]) barrel.add(new THREE.TorusGeometry(0.3, 0.05, 6, 16), P.gold, M(0, 0, z));
       barrel.add(new THREE.CylinderGeometry(0.34, 0.34, 0.6, 12), P.iron, M(0, 0, -0.6, Math.PI / 2));
       pivot = 1.05; muzzle = 2.3;
+      break;
+    }
+    case 'chain': {
+      // a short, wide-mouthed gun on a heavy carriage, its bore oval to take the two halves; chain coiled by the trunnions
+      base.add(new THREE.BoxGeometry(0.26, 0.9, 1.3), P.wood, M(-0.55, 0.8, 0));
+      base.add(new THREE.BoxGeometry(0.26, 0.9, 1.3), P.wood, M(0.55, 0.8, 0));
+      base.add(new THREE.TorusGeometry(0.28, 0.06, 5, 12), P.iron, M(-0.55, 1.3, -0.45, Math.PI / 2));
+      base.add(new THREE.TorusGeometry(0.22, 0.06, 5, 12), P.iron, M(-0.55, 1.38, -0.45, Math.PI / 2));
+      lathe([[0.001, -0.85], [0.24, -0.85], [0.34, -0.7], [0.38, -0.4], [0.34, 0.4], [0.33, 1.4], [0.44, 1.55], [0.46, 1.75], [0.3, 1.75], [0.26, 1.5]], P.iron, MS(0, 0, 0, Math.PI / 2, 0, 0, 1.25, 1, 0.85));
+      for (const z of [-0.4, 0.6]) barrel.add(new THREE.TorusGeometry(0.4, 0.05, 6, 16), P.gold, MS(0, 0, z, 0, 0, 0, 1.2, 0.85, 1));
+      pivot = 1.1; muzzle = 1.75;
+      break;
+    }
+    case 'heated': {
+      // a long gun beside the furnace its shot is heated in: an iron brazier on legs, its coals aglow
+      base.add(new THREE.BoxGeometry(0.24, 1.0, 1.2), P.wood, M(-0.5, 0.85, 0));
+      base.add(new THREE.BoxGeometry(0.24, 1.0, 1.2), P.wood, M(0.5, 0.85, 0));
+      base.add(new THREE.CylinderGeometry(0.42, 0.3, 0.45, 10, 1, true), P.iron, M(1.15, 1.05, -0.55));
+      base.add(new THREE.CylinderGeometry(0.38, 0.38, 0.08, 10), P.wisp, M(1.15, 1.2, -0.55));
+      for (const a of [0, 2.1, 4.2]) base.add(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 4), P.iron, M(1.15 + Math.cos(a) * 0.28, 0.5, -0.55 + Math.sin(a) * 0.28));
+      lathe([[0.001, -0.95], [0.2, -0.95], [0.3, -0.8], [0.33, -0.5], [0.29, 0.3], [0.24, 1.9], [0.22, 2.75], [0.3, 2.85], [0.32, 3.05], [0.2, 3.1], [0.16, 2.8]], P.iron, along);
+      for (const z of [-0.6, 0.5, 1.8]) barrel.add(new THREE.TorusGeometry(0.3, 0.05, 6, 16), P.bronze, M(0, 0, z));
+      pivot = 1.05; muzzle = 3.1;
       break;
     }
     case 'broadside': {
@@ -640,12 +673,21 @@ export interface Pose {
   windSpeed: number; // m/s
   night: number; // 0 day .. 1 night, where she is
   flip: number; // extra roll, radians: tossed over by the breach
+  torn: number; // 0 whole canvas .. 1 in rags
+  mast: 'up' | 'down' | 'jury';
+  flood: number; // 0 dry .. 1 full
+  listTo: number; // the side she lists to, +1 starboard
 }
 
 /** The great spirit lantern over the taffrail, in ship space: where its glow is drawn. */
 export const LANTERN = new V3(0, STERN_Y + 0.6 + 0.85, STERN_Z - 0.05 - 0.35);
 /** The wisp that rides the main truck at night, in ship space: high enough to show as far off as her masts do. */
 export const MASTHEAD = new V3(0, mastTop(MASTS[1]) + 0.3, mastZ(MASTS[1]));
+/** The mainmast's foot on the deck, which it falls about, and its height over it. */
+export const MAIN_FOOT = new V3(0, deckAt(MASTS[1].s), mastZ(MASTS[1]));
+export const MAIN_HEIGHT = MASTS[1].h;
+/** The mainmast's fall, in seconds: tipping slowly, then all at once to the water. */
+const FALL = { time: 1.5, lie: 2.6, sink: 5, gone: 8, angle: Math.PI / 2 + 0.16, jury: 0.58, sway: 1.2 } as const;
 
 /** The broadside's gun muzzles in ship space, four a side (x > 0 port, x < 0 starboard), and the way each points. */
 export const GUNPORTS: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
@@ -676,6 +718,15 @@ export class ShipModel {
   private lee = 1;
   /** The player's own sail thins round the crosshair, 0..1. */
   fade = 0;
+  /** The mainmast: seconds since it began to fall (-1 standing), the side it went (+1 starboard), and the jury mast. */
+  private fell = -1;
+  private fellTo = 1;
+  private jury = 0;
+  private mastState: Pose['mast'] = 'up';
+  private flood = 0;
+  /** Set for the frame the fallen mast strikes the water, with where its head hit in ship space. */
+  landed = false;
+  readonly landedAt = new V3();
 
   constructor(kit: Kit, look: Look) {
     this.kit = kit;
@@ -688,6 +739,7 @@ export class ShipModel {
       uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFlag: { value: 0 }, uFade: { value: 0 },
+      uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 },
     };
     const body = hullNodeMaterial(this.u, kit.tex);
     const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise);
@@ -745,6 +797,51 @@ export class ShipModel {
     this.muzzleZ = t.muzzle;
   }
 
+  /** The mainmast goes over the side, toward `side` (+1 starboard). */
+  mastFall(side: number): void {
+    this.fell = 0;
+    this.fellTo = side >= 0 ? 1 : -1;
+    this.jury = 0;
+    this.mastState = 'down';
+  }
+
+  /**
+   * The mainmast this frame, into uMast: (angle it has fallen through about her length, positive to starboard; its
+   * scale about the foot, under a jury rig or gone; how far it has sunk; how far it has drifted aft).
+   */
+  private rig(state: Pose['mast'], dt: number): void {
+    const u = this.u.uMast.value as THREE.Vector4;
+    this.landed = false;
+    if (state === 'down' && this.mastState !== 'down') {
+      // seen down without seeing it go (a ship come into sight that way): it is already gone
+      this.fell = FALL.gone;
+      this.mastState = 'down';
+    }
+    if (state !== 'down') {
+      if (state === 'jury' && this.mastState !== 'jury') this.jury = 0;
+      this.mastState = state;
+      this.fell = -1;
+      this.jury = state === 'jury' ? Math.min(FALL.sway, this.jury + dt) : 0;
+      const k = THREE.MathUtils.smoothstep(this.jury, 0, FALL.sway);
+      u.set(0, state === 'jury' ? FALL.jury * k : 1, 0, 0);
+      return;
+    }
+    const was = this.fell;
+    this.fell += dt;
+    const t = this.fell;
+    // it tips like a felled tree, slowly and then all at once, and comes to lie a little past level on the water
+    const tip = Math.min(1, t / FALL.time);
+    const angle = FALL.angle * tip * tip * (1 + 0.04 * Math.sin(Math.min(1, Math.max(0, t - FALL.time)) * 9) * Math.exp(-(t - FALL.time) * 2));
+    if (was < FALL.time && t >= FALL.time) {
+      this.landed = true;
+      this.landedAt.set(-this.fellTo * MAIN_HEIGHT * 0.85, 0, MAIN_FOOT.z);
+    }
+    // lying in the water, it drags astern of her and settles; then it is gone
+    const lie = Math.max(0, t - FALL.time);
+    const sink = lie > FALL.lie ? (lie - FALL.lie) * 0.9 : 0;
+    u.set(angle * this.fellTo, t > FALL.gone ? 0 : 1, sink, Math.min(lie * 3.5, 30));
+  }
+
   /** The muzzle in world space, and the direction it points. */
   muzzle(pos: THREE.Vector3, dir?: THREE.Vector3): THREE.Vector3 {
     this.barrel.updateWorldMatrix(true, false);
@@ -786,10 +883,15 @@ export class ShipModel {
       b.roll += (Math.atan2(hp - hst, 4.4) * 0.8 - b.roll) * k;
       b.heel += (p.turn * Math.min(1, p.speed / 14) * 0.35 - b.heel) * Math.min(1, dt * 2.5);
     }
+    // water in her: she settles and lists to the side it came in
+    this.flood += (p.flood - this.flood) * Math.min(1, dt * 0.8);
+    const settle = this.flood * 0.85, list = p.listTo * this.flood * 0.24;
     // sinking: down by the stern, rolling over
     const s = p.sink;
-    this.body.position.y = b.y - s * s * 9 - s * 0.6;
-    this.body.rotation.set(b.pitch - s * 0.32, 0, b.roll + b.heel + s * 0.55 + p.flip, 'YXZ');
+    this.body.position.y = b.y - s * s * 9 - s * 0.6 - settle;
+    this.body.rotation.set(b.pitch - s * 0.32 - this.flood * 0.03, 0, b.roll + b.heel + s * 0.55 + p.flip + list, 'YXZ');
+    this.rig(p.mast, dt);
+    this.u.uTorn.value = p.torn;
     // the yards hang on the lee side and are sheeted to the wind: eased right out running before it, hauled in close
     // as she points up, until head to wind the cloth lifts and shakes. Bringing the wind across the stern gybes them.
     const off = Math.abs(p.wind), aloft = p.alt > 3;

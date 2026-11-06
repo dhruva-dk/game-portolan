@@ -1,7 +1,9 @@
-// Weapons: six classes in five rarities, all aimed at a point. Shots fly great circles at a height over the sea,
+// Weapons: eight classes in five rarities, all aimed at a point. Shots fly great circles at a height over the sea,
 // with flight time and drop; magazines empty and reload; the head of the sail is the weak spot. The broadside
-// fires from both sides at once.
+// fires from both sides at once. Hits land where they land (parts.ts): a shot down a ship's length rakes her, and
+// what reaches the hull tears canvas, weakens the mast, floods her or shoots the rudder about by where it struck.
 import { hurt } from './harm.ts';
+import { ignite, raking, wound } from './parts.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dot, rngFloat, set, v3, type V3 } from './math.ts';
 import { hasPassive, hasPerk } from './perks.ts';
@@ -9,7 +11,7 @@ import { startUse } from './items.ts';
 import { R, advance, apart, along, turned } from './sphere.ts';
 import { CAUSE, EVENT, FLAG, PHASE, SHIPS, STREAM, TICK, copy, emit, elapse, type MatchState, type Ship, type Shot } from './state.ts';
 import {
-  BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RARITY, TURN_SPREAD, WEAPONS, WEATHER, isUse, isWeapon,
+  BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RAKE, RARITY, TURN_SPREAD, WEAPONS, WEATHER, isUse, isWeapon,
   type Weapon,
 } from './tables.ts';
 import { newSky, skyAt } from './weather.ts';
@@ -143,8 +145,10 @@ function launch(
 
 const A = v3(), B = v3(), FWD = v3(), SIDE = v3();
 
-interface Hit { t: number; crit: boolean }
-const HIT: Hit = { t: 2, crit: false };
+/** Where along the segment it struck, whether on the weak spot, and where on her, in her own frame (x to starboard,
+ *  y up from the waterline, z toward the bow), metres. */
+interface Hit { t: number; crit: boolean; x: number; y: number; z: number }
+const HIT: Hit = { t: 2, crit: false, x: 0, y: 0, z: 0 };
 
 /** Where the segment a→b (unit vectors with heights ya, yb) first meets a hull at pos/head lifted by lift. */
 function segmentShip(pos: V3, head: V3, lift: number, a: V3, ya: number, b: V3, yb: number, out: Hit): boolean {
@@ -177,6 +181,9 @@ function segmentShip(pos: V3, head: V3, lift: number, a: V3, ya: number, b: V3, 
     if (ok && (!found || t0 < out.t)) {
       out.t = t0;
       out.crit = crit;
+      out.x = ax + dx * t0;
+      out.y = ay + dy * t0;
+      out.z = az + dz * t0;
       found = true;
     }
   }
@@ -200,7 +207,7 @@ export function fly(state: MatchState): void {
     s.vy -= s.g * TICK;
     s.travelled += step;
     copy(B, s.pos);
-    let best = -1, bt = 2, crit = false;
+    let best = -1, bt = 2, crit = false, hx = 0, hy = 0, hz = 0;
     for (let j = 0; j < SHIPS; j++) {
       const t = state.ships[j];
       if (j === s.owner || t.phase !== PHASE.sea || apart(t.pos, B) > 30) continue;
@@ -208,6 +215,9 @@ export function fly(state: MatchState): void {
         bt = HIT.t;
         best = j;
         crit = HIT.crit;
+        hx = HIT.x;
+        hy = HIT.y;
+        hz = HIT.z;
       }
     }
     let decoy = -1;
@@ -224,7 +234,7 @@ export function fly(state: MatchState): void {
       at(A, B, bt, FWD);
       const y = ya + (s.y - ya) * bt;
       if (s.splash > 0) burst(state, s, FWD, y);
-      else if (best >= 0) strike(state, s, best, FWD, y, crit);
+      else if (best >= 0) strike(state, s, best, FWD, y, crit, hx, hy, hz);
       else {
         state.decoys[decoy].t = 0;
         emit(state, EVENT.impact, -1, s.owner, FWD, { y, item: s.kind, flag: 8 });
@@ -258,11 +268,17 @@ function at(a: V3, b: V3, t: number, out: V3): V3 {
   return set(out, out.x / l, out.y / l, out.z / l);
 }
 
-function strike(state: MatchState, s: Shot, j: number, p: V3, y: number, crit: boolean): void {
-  const isCrit = crit && s.crit > 1;
-  const amount = s.damage * falloff(s) * (isCrit ? s.crit : 1);
-  hurt(state, j, amount, s.owner, s.kind, p, y, isCrit ? FLAG.crit | FLAG.ship : FLAG.ship);
-  emit(state, EVENT.impact, j, s.owner, p, { y, item: s.kind, flag: FLAG.ship | (isCrit ? FLAG.crit : 0) });
+/** A shot strikes ship j at p, y metres up, at (x, y, z) in her own frame. */
+function strike(state: MatchState, s: Shot, j: number, p: V3, y: number, crit: boolean, x: number, ly: number, z: number): void {
+  const t = state.ships[j];
+  const isCrit = crit && s.crit > 1, rake = raking(t, s.dir, z);
+  const amount = s.damage * falloff(s) * (isCrit ? s.crit : 1) * (rake ? RAKE.mult : 1);
+  const flag = FLAG.ship | (isCrit ? FLAG.crit : 0) | (rake ? FLAG.rake : 0);
+  const before = t.hull;
+  hurt(state, j, amount, s.owner, s.kind, p, y, flag);
+  const hull = before - t.hull, parts = wound(state, j, s.owner, s.kind, hull, x, ly, z);
+  emit(state, EVENT.impact, j, s.owner, p, { y, item: s.kind, flag: flag | parts, hull });
+  if (hull > 0 && WEAPONS[s.kind].ignite > 0) ignite(state, j, s.owner, WEAPONS[s.kind].ignite);
   onHit(state, s.owner, j);
 }
 
@@ -270,11 +286,7 @@ function strike(state: MatchState, s: Shot, j: number, p: V3, y: number, crit: b
 export function onHit(state: MatchState, owner: number, j: number): void {
   if (owner < 0) return;
   const o = state.ships[owner], t = state.ships[j];
-  if (hasPerk(o, 'fireShot')) {
-    if (t.burn <= 0) emit(state, EVENT.ablaze, j, owner, t.pos, { amount: PERKS.fireShot });
-    t.burn = PERKS.fireShot;
-    t.burnBy = owner;
-  }
+  if (hasPerk(o, 'fireShot') && t.phase === PHASE.sea) ignite(state, j, owner, PERKS.fireShot);
   if (hasPerk(o, 'frostShot')) t.slow = PERKS.frostShot.time;
   if (hasPerk(o, 'spotter')) t.spotted = PERKS.spotter;
 }
@@ -287,7 +299,13 @@ function burst(state: MatchState, s: Shot, p: V3, y: number): void {
     if (j === s.owner || t.phase !== PHASE.sea) continue;
     const h = apart(t.pos, p), v = (2 - y) * 0.5, d = Math.sqrt(h * h + v * v) - 3;
     if (d > s.splash) continue;
+    const before = t.hull;
     hurt(state, j, s.damage * (1 - (Math.max(0, d) / s.splash) * 0.6), s.owner, s.kind, t.pos, 3, FLAG.ship);
+    // a shell bursting over her deck tears her canvas; one bursting in the sea alongside opens her seams
+    set(SIDE, t.head.y * t.pos.z - t.head.z * t.pos.y, t.head.z * t.pos.x - t.head.x * t.pos.z, t.head.x * t.pos.y - t.head.y * t.pos.x);
+    const x = R * ((p.x - t.pos.x) * SIDE.x + (p.y - t.pos.y) * SIDE.y + (p.z - t.pos.z) * SIDE.z);
+    const z = R * ((p.x - t.pos.x) * t.head.x + (p.y - t.pos.y) * t.head.y + (p.z - t.pos.z) * t.head.z);
+    wound(state, j, s.owner, s.kind, before - t.hull, x, y > 3 ? 6 : 0, z);
     onHit(state, s.owner, j);
   }
 }
@@ -299,7 +317,7 @@ export function smoked(state: MatchState, p: V3, y: number): boolean {
   return false;
 }
 
-/** Fire Shot burns: points a second, shield first. */
+/** Fire burns: points a second, shield first. What it does to the canvas, and the rain, are in parts.ts. */
 export function burnTick(state: MatchState): void {
   for (let i = 0; i < SHIPS; i++) {
     const ship = state.ships[i];

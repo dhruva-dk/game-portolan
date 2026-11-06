@@ -22,6 +22,8 @@ export const MOMENTS: readonly MomentDef[] = [
   { name: 'lightning', about: 'a thunderhead\'s leader creeps down over the player, then strikes' },
   { name: 'whale-breach', about: 'the giant whale breaches beside the player' },
   { name: 'broadside', about: 'the player fires a broadside, both sides at once' },
+  { name: 'mast-fall', about: 'chain shot brings the target\'s mainmast down over the side' },
+  { name: 'heated-shot', about: 'a heated shot sets the target burning' },
   { name: 'delivery', about: 'the player calls a gull delivery and it arrives' },
   ...[
     ['iceCrown', 'the Ice Crown\'s floes turn round the pole'], ['fjords', 'a flood surge pours out of the fjords'],

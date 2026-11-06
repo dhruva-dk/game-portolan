@@ -18,7 +18,8 @@ import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '.
 import { GALE, ITEM, LOOT, PARCELS, PERKS, REGION_EVENT, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome, holderOf, holdsAt, landmarkHold } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
-import { vigour } from '../weather.ts';
+import { newSky, skyAt, vigour } from '../weather.ts';
+import { wet } from '../parts.ts';
 import { newWind, windAt } from '../wind.ts';
 import { CENTRES, LANDMARKS, REGIONS, heightAt } from '../world/index.ts';
 import { styleOf, type Style } from './temperaments.ts';
@@ -32,7 +33,13 @@ export const BRAIN = {
   /** Seconds before a green / a sharp captain first fires on a ship it has just seen. */
   react: [2.2, 0.3],
   /** Preferred range for each weapon, metres. */
-  pref: { [ITEM.cannon]: 95, [ITEM.scatter]: 28, [ITEM.harpoon]: 170, [ITEM.mortar]: 140, [ITEM.repeater]: 65, [ITEM.broadside]: 45 } as Record<number, number>,
+  pref: {
+    [ITEM.cannon]: 95, [ITEM.scatter]: 28, [ITEM.harpoon]: 170, [ITEM.mortar]: 140, [ITEM.repeater]: 65, [ITEM.broadside]: 45,
+    [ITEM.chain]: 75, [ITEM.heated]: 110,
+  } as Record<number, number>,
+  /** A crippled ship mends as soon as it is safe to: water in her past `flood`, her rudder past `rudder`, her canvas
+   *  past `torn`, or her mainmast down. */
+  cripple: { flood: 0.35, rudder: 0.5, torn: 0.55 },
   /** Aim error, as a share of distance, for a green captain; a sharp one has a sixth of it. */
   error: 0.2,
   /** Seconds to the next look round for a new goal while roaming. */
@@ -151,7 +158,7 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   const foeD = c.foe >= 0 ? apart(ship.pos, foeAt(state, c)) : 1e9;
   // (not with a foe close by: lying still to mend under its guns only gets it sunk, so it runs first)
   // (a sharp captain tops up sooner, between fights)
-  if ((ship.hull < style.mend + 20 * c.skill || ship.shield < 25 + 25 * c.skill) && healSlot(ship) >= 0 && foeD > 70) {
+  if ((ship.hull < style.mend + 20 * c.skill || ship.shield < 25 + 25 * c.skill || crippled(ship)) && healSlot(ship) >= 0 && foeD > 70) {
     setMode(c, MODE.heal);
     // where it is, unless the tide is leaving it there
     if (!openAt(ship.pos, tide) || !nearestOpen(ship.pos, c.goal, 10, tide)) copy(c.goal, ship.pos);
@@ -400,6 +407,10 @@ const hasWeapon = (ship: Ship): boolean => {
   return false;
 };
 
+/** Hurt in her parts badly enough that mending them comes before anything but a fight close by. */
+const crippled = (ship: Ship): boolean =>
+  ship.flood > BRAIN.cripple.flood || ship.rudder > BRAIN.cripple.rudder || ship.torn > BRAIN.cripple.torn || ship.fallen > 0;
+
 /** The slot holding the consumable it should use now, or -1. */
 function healSlot(ship: Ship): number {
   let best = -1, bv = 0;
@@ -407,8 +418,9 @@ function healSlot(ship: Ship): number {
     const it = ship.slots[s];
     if (!isUse(it.kind) || it.n <= 0 || !useful(ship, it.kind)) continue;
     let v = 0;
-    if (it.kind === ITEM.fullRepair) v = ship.hull < 45 ? 4 : 0;
-    else if (it.kind === ITEM.repairKit) v = ship.hull < 75 ? 3 : 0;
+    // a full repair is worth spending on a fallen mast; a kit on any part badly hurt
+    if (it.kind === ITEM.fullRepair) v = ship.hull < 45 || ship.fallen > 0 ? 4 : 0;
+    else if (it.kind === ITEM.repairKit) v = ship.hull < 75 || crippled(ship) ? 3 : 0;
     else if (it.kind === ITEM.bigShield) v = ship.shield < 50 ? 2.5 : 0;
     else v = ship.shield < 50 ? 2 : 0;
     if (v > bv) {
@@ -874,11 +886,14 @@ function fightCourse(state: MatchState, i: number, out: V3): void {
   const swing = kind === ITEM.broadside ? 0.9 : 0.5;
   rotateTangent(foe.pos, T, c.strafe * swing, U);
   along(foe.pos, U, d < pref * 0.6 ? pref * 1.2 : pref, out);
+  // crossing the T: a sharp captain with a broadside lays herself across the bow of a foe coming at her, where every
+  // gun bears and the foe's shot can only rake back down her length
+  if (kind === ITEM.broadside && c.skill > 0.45 && dot(foe.head, T) > 0.6) along(foe.pos, foe.head, pref, out);
   if (activeOf(ship) === 'ram' && ship.cooldown <= 0 && d < 45 && ship.hull > foe.hull) copy(out, foe.pos);
   if (!openAt(out, tide)) nearestOpen(out, out, 10, tide);
 }
 
-const LEAD = v3();
+const LEAD = v3(), SKY = newSky();
 
 function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: ShipInput): void {
   const ship = state.ships[i], c = ship.captain, now = state.tick * TICK;
@@ -891,9 +906,9 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   }
   const foe = state.ships[c.foe], target = c.target === -2 ? c.last : foe.pos;
   const d = apart(ship.pos, target);
-  // the right weapon for the range
+  // the right weapon for the range, and for the foe
   if (c.swapT <= 0 && c.mode === MODE.fight) {
-    const s = bestWeapon(ship, d);
+    const s = bestWeapon(ship, d, state, c.foe);
     if (s >= 0 && s !== ship.sel) {
       out.select = s;
       c.swapT = 1.5;
@@ -925,7 +940,8 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   const miss = BRAIN.error * (1 - 0.85 * c.skill) * (c.gentle ? 2 : 1) * d;
   addScaled(out.aim, LEAD, c.err, miss / R);
   normalize(out.aim);
-  out.aimY = c.skill > 0.7 && it.kind === ITEM.harpoon ? 13 : 2.5;
+  // a sharp captain puts the harpoon into the head of the sail; anyone with chain shot aims it at the rigging
+  out.aimY = (c.skill > 0.7 && it.kind === ITEM.harpoon) || it.kind === ITEM.chain ? 12 : 2.5;
   // fire when in range, past the first moment's surprise, and not in a pause between bursts
   const range = rangeOf(ship, w);
   if (now < c.react || d > range * 0.95 || c.mode === MODE.loot && d > range * 0.6) return;
@@ -948,14 +964,27 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
   out.fire = it.n > 0 || ship.reload <= 0;
 }
 
-/** The weapon slot that suits this range best, preferring one that's loaded. */
-function bestWeapon(ship: Ship, d: number): number {
+/**
+ * The weapon slot that suits this range best, preferring one that's loaded. Given the foe: chain shot for one running
+ * away with her canvas whole (or one that sails faster), and not heated shot into rain that would quench it.
+ */
+function bestWeapon(ship: Ship, d: number, state?: MatchState, foe = -1): number {
   let best = -1, bs = -1e9;
+  const f = state && foe >= 0 ? state.ships[foe] : null;
   for (let s = 0; s < SLOTS; s++) {
     const it = ship.slots[s];
     if (!isWeapon(it.kind)) continue;
     const w = WEAPONS[it.kind], pref = BRAIN.pref[it.kind] ?? 80;
     let score = it.rarity * 0.15 - Math.abs(d - pref) / Math.max(pref, 40);
+    if (f && it.kind === ITEM.chain) {
+      tangentToward(ship.pos, f.pos, T);
+      const running = dot(f.head, T) > 0.5 || f.speed > ship.speed + 1.5;
+      score += running && f.fallen <= 0 && f.torn < 0.6 ? 0.5 : -0.25;
+    }
+    if (f && state && it.kind === ITEM.heated) {
+      skyAt(state, f.pos, SKY);
+      score += wet(SKY) ? -0.8 : f.burn > 0 ? -0.1 : 0.2;
+    }
     if (d > rangeOf(ship, w)) score -= 2;
     if (it.n <= 0) score -= 0.6;
     if (s === ship.sel) score += 0.2;

@@ -1,6 +1,7 @@
 // Shots in flight, one look per weapon class, ported from the rewrite: the cannon's glowing ball and smoke trail, the
 // scatter's spray of hot pellets, the harpoon's iron bolt trailing its line back to the ship, the mortar's tumbling
-// shell with a fuse of fire, the repeater's tracers tinted by rarity, and the broadside's heavy round shot.
+// shell with a fuse of fire, the repeater's tracers tinted by rarity, and the broadside's heavy round shot; chain
+// shot's two half-balls whirling on their bar, and heated shot glowing red and shedding embers.
 import * as THREE from 'three';
 import { patch, rand } from './common.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
@@ -32,6 +33,8 @@ export class Projectiles {
   private readonly bolts: THREE.InstancedMesh;
   private readonly shells: THREE.InstancedMesh;
   private readonly balls: THREE.InstancedMesh;
+  private readonly chains: THREE.InstancedMesh;
+  private readonly redHot: THREE.InstancedMesh;
   private readonly lines: THREE.LineSegments;
   private readonly linePos: Float32Array;
   private readonly trails = new Map<number, THREE.Vector3>();
@@ -50,7 +53,15 @@ export class Projectiles {
     this.shells = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 1), hot, CAP);
     const iron = patch(new THREE.MeshStandardMaterial({ color: 0x18181a, roughness: 0.45, metalness: 0.6, emissive: 0xff7a30, emissiveIntensity: 0.6 }));
     this.balls = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.32, 1), iron, CAP * 2);
-    for (const m of [this.bolts, this.shells, this.balls]) { m.count = 0; m.frustumCulled = false; this.group.add(m); }
+    // chain shot: two hemispheres on a short iron bar, spinning end over end round the way it flies
+    const halves = [-1, 1].map((x) => new THREE.SphereGeometry(0.3, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(x * Math.PI / 2).translate(x * 0.85, 0, 0));
+    const bar = new THREE.CylinderGeometry(0.05, 0.05, 1.7, 5).rotateZ(Math.PI / 2);
+    const links = [-0.5, 0, 0.5].map((x) => new THREE.TorusGeometry(0.11, 0.035, 4, 8).rotateY(Math.PI / 2).translate(x, 0, 0));
+    this.chains = new THREE.InstancedMesh(mergeGeos([...halves, bar, ...links]), metal, CAP);
+    // heated shot: iron that glows from within, red going to yellow at its heart
+    const glowing = patch(new THREE.MeshStandardMaterial({ color: 0x3a1006, roughness: 0.6, emissive: 0xff3a08, emissiveIntensity: 6 }));
+    this.redHot = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.34, 1), glowing, CAP);
+    for (const m of [this.bolts, this.shells, this.balls, this.chains, this.redHot]) { m.count = 0; m.frustumCulled = false; this.group.add(m); }
     // the harpoon's line, paid out behind the bolt
     this.linePos = new Float32Array(CAP * 2 * 3 * 8);
     const lg = new THREE.BufferGeometry();
@@ -58,12 +69,13 @@ export class Projectiles {
     lg.setDrawRange(0, 0);
     this.lines = new THREE.LineSegments(lg, patch(new THREE.LineBasicMaterial({ color: 0x8a7556, transparent: true, opacity: 0.85 })));
     this.lines.frustumCulled = false;
+    this.lines.visible = false;
     this.group.add(this.lines);
   }
 
   /** One frame of shots; `muzzle(ship)` gives where a ship's gun is, for the harpoon's line. */
   update(list: readonly ProjectileView[], t: number, muzzle: (ship: number) => THREE.Vector3 | null): void {
-    let nb = 0, ns = 0, nr = 0, nl = 0;
+    let nb = 0, ns = 0, nr = 0, nl = 0, nc = 0, nh = 0;
     const seen = new Set<number>(), fx = this.fx, glow = fx.glow, smoke = fx.smoke;
     for (const p of list) {
       seen.add(p.id);
@@ -120,6 +132,31 @@ export class Projectiles {
           }
           break;
         }
+        case 'chain': {
+          if (nc < CAP) {
+            // the bar turns round the line of flight, a full turn every fifth of a second
+            this.tmp.position.set(x, y, z);
+            this.tmp.up.copy(this.up);
+            this.tmp.lookAt(x + vx, y + vy, z + vz);
+            this.tmp.rotateZ(t * 31 + p.id * 1.7);
+            this.tmp.scale.setScalar(1);
+            this.tmp.updateMatrix();
+            this.chains.setMatrixAt(nc++, this.tmp.matrix);
+          }
+          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.22, r: 3.2, g: 2.4, b: 1.6, a: 0.6, frame: SPRITE.spark, mode: 1, stretch: 0.03 });
+          trail(1.8, (x, y, z) => smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.4, 0.7), size: 0.3, grow: 3.5, r: 0.85, g: 0.84, b: 0.82, a: 0.22, frame: SPRITE.smoke, drag: 1.5 }));
+          break;
+        }
+        case 'heated': {
+          if (nh < CAP) this.place(this.redHot, nh++, p.pos, t * 5 + p.id);
+          glow.emit({ x, y, z, vx, vy, vz, life: 0, size: 0.55, r: 9, g: 2.6, b: 0.5, frame: SPRITE.spark, mode: 1, stretch: 0.03 });
+          // embers shed from the ball, and a thin brown smoke where it singes the air
+          trail(1.2, (x, y, z) => {
+            if (Math.random() < 0.6) glow.emit({ x, y, z, vx: ux * 2 + rand(-1, 1), vy: uy * 2 + rand(-1, 1), vz: uz * 2 + rand(-1, 1), life: rand(0.3, 0.6), size: 0.07, r: 7, g: 2.2, b: 0.4, frame: SPRITE.spark, drag: 2, fadeIn: 0 });
+            smoke.emit({ x, y, z, vx: ux, vy: uy, vz: uz, life: rand(0.6, 1), size: 0.28, grow: 4, r: 0.55, g: 0.45, b: 0.38, a: 0.28, frame: SPRITE.smoke, drag: 1.5 });
+          });
+          break;
+        }
         case 'mortar': {
           if (ns < CAP) this.place(this.shells, ns++, p.pos, t * 7 + p.id);
           trail(0.9, (x, y, z) => {
@@ -136,9 +173,13 @@ export class Projectiles {
     this.bolts.count = nb;
     this.shells.count = ns;
     this.balls.count = nr;
-    for (const m of [this.bolts, this.shells, this.balls]) m.instanceMatrix.needsUpdate = true;
+    this.chains.count = nc;
+    this.redHot.count = nh;
+    for (const m of [this.bolts, this.shells, this.balls, this.chains, this.redHot]) m.instanceMatrix.needsUpdate = true;
     const lg = this.lines.geometry;
     lg.setDrawRange(0, nl * 8 * 2);
+    // (an empty draw range is still drawn, and WebGPU warns of a draw of no vertices)
+    this.lines.visible = nl > 0;
     (lg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 

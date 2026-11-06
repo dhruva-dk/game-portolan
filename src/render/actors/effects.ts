@@ -74,7 +74,7 @@ export class Effects {
   // ---------------------------------------------------------------- firing
 
   muzzle(kind: Weapon, pos: THREE.Vector3, dir: THREE.Vector3, scale = 1): void {
-    const big = kind === 'mortar' ? 1.8 : kind === 'harpoon' ? 1.2 : kind === 'repeater' ? 0.45 : kind === 'scatter' ? 1.3 : kind === 'broadside' ? 1.1 : 1;
+    const big = kind === 'mortar' ? 1.8 : kind === 'harpoon' ? 1.2 : kind === 'repeater' ? 0.45 : kind === 'scatter' ? 1.3 : kind === 'broadside' ? 1.1 : kind === 'chain' ? 1.15 : kind === 'heated' ? 1.05 : 1;
     const s = big * scale, { x, y, z } = pos, L = this.L.at(pos);
     this.glow.emit({ x, y, z, life: 0.09, size: 1.6 * s, grow: 1.6, r: 6, g: 3.6, b: 1.4, frame: SPRITE.puff, fadeIn: 0 });
     this.glow.emit({ x: x + dir.x * 1.2 * s, y: y + dir.y * 1.2 * s, z: z + dir.z * 1.2 * s, vx: dir.x * 8, vy: dir.y * 8, vz: dir.z * 8, life: 0.08, size: 0.9 * s, grow: 2, r: 8, g: 4.5, b: 1.5, frame: SPRITE.flame, mode: 1, stretch: 0.25, fadeIn: 0 });
@@ -255,6 +255,67 @@ export class Effects {
       this.planks.push({ p, v, q: new THREE.Quaternion().random(), w: new THREE.Vector3(rand(-6, 6), rand(-4, 4), rand(-6, 6)), life: rand(14, 22), s: rand(0.6, 1.4) });
     }
     this.wisps.push({ p: onSea(at, 3, new THREE.Vector3()), c: wisp.clone(), t: 0 });
+  }
+
+  /** The mainmast going: splinters and dust burst from its foot, and the rigging's tar-smoke. */
+  mastBreak(foot: THREE.Vector3, top: THREE.Vector3): void {
+    this.hitShip(foot, false, 1.8);
+    const L = this.L.at(foot);
+    for (let i = 0; i < 26; i++) {
+      const k = Math.random(), x = foot.x + (top.x - foot.x) * k, y = foot.y + (top.y - foot.y) * k, z = foot.z + (top.z - foot.z) * k;
+      const v = L.vec(Math.random() * TAU, rand(1, 5), rand(1, 4));
+      this.smoke.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.6, 1.4), size: rand(0.15, 0.4), r: 0.5, g: 0.38, b: 0.26, a: 1, frame: SPRITE.shard, grav: GRAV, spin: rand(-10, 10), float: true, fadeIn: 0 });
+    }
+    for (let i = 0; i < 6; i++) {
+      const v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(0.5, 2));
+      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.5), size: 1.4, grow: 3, r: 0.6, g: 0.55, b: 0.5, a: 0.45, frame: SPRITE.smoke, drag: 1 });
+    }
+  }
+
+  /** A jury mast swayed up: a little dust and chips off the step. */
+  juryRig(foot: THREE.Vector3): void {
+    const L = this.L.at(foot);
+    for (let i = 0; i < 10; i++) {
+      const v = L.vec(Math.random() * TAU, rand(1, 3), rand(1, 3));
+      this.smoke.emit({ x: foot.x, y: foot.y, z: foot.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.4), size: 0.6, grow: 2.5, r: 0.75, g: 0.68, b: 0.58, a: 0.4, frame: SPRITE.smoke, drag: 1.5 });
+    }
+  }
+
+  /**
+   * A ship on fire, per frame: flames licking along her deck between bow and stern, more of them up the canvas while
+   * the mainmast stands (`sail`, its middle), embers lifting, and a dark pall of smoke.
+   */
+  burning(deck: THREE.Vector3, fwd: THREE.Vector3, sail: THREE.Vector3 | null, dt: number): void {
+    const L = this.L.at(deck);
+    for (let i = 0; i < 40 * dt || Math.random() < 40 * dt - i; i++) {
+      const o = this.p.copy(deck).addScaledVector(fwd, rand(-6, 6)).add(L.vec(Math.random() * TAU, rand(0, 1.4), rand(-0.3, 0.4)));
+      const v = L.vec(Math.random() * TAU, rand(0, 0.6), rand(1.5, 3.5));
+      this.glow.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.35, 0.7), size: rand(0.7, 1.4), grow: 0.5, r: 6, g: 2.6, b: 0.6, frame: SPRITE.flame, fadeIn: 0.1, spin: rand(-1, 1) });
+      if (i > 8) break;
+    }
+    if (sail) for (let i = 0; i < 24 * dt || Math.random() < 24 * dt - i; i++) {
+      const o = this.p.copy(sail).add(L.vec(Math.random() * TAU, rand(0, 2.5), rand(-3, 4)));
+      const v = L.vec(Math.random() * TAU, rand(0, 0.8), rand(2, 4));
+      this.glow.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.3, 0.6), size: rand(0.6, 1.1), grow: 0.4, r: 6.5, g: 2.4, b: 0.5, frame: SPRITE.flame, fadeIn: 0.1 });
+      if (i > 6) break;
+    }
+    if (Math.random() < 30 * dt) {
+      const o = this.p.copy(deck).addScaledVector(fwd, rand(-5, 5)), v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(3, 7));
+      this.glow.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.6), size: 0.06, r: 7, g: 2.6, b: 0.4, frame: SPRITE.spark, drag: 0.8, fadeIn: 0 });
+    }
+    if (Math.random() < 9 * dt) {
+      const o = this.p.copy(sail ?? deck).addScaledVector(fwd, rand(-3, 3)), v = L.vec(Math.random() * TAU, rand(0.5, 1.5), rand(2.5, 4.5));
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: 1.6, grow: 5, r: 0.16, g: 0.15, b: 0.14, a: 0.6, frame: SPRITE.smoke, drag: 0.3, spin: rand(-0.4, 0.4) });
+    }
+  }
+
+  /** Fire put out, or a red-hot ball doused: a white burst of steam. */
+  steam(at: THREE.Vector3, big = 1): void {
+    const L = this.L.at(at);
+    for (let i = 0; i < 10 * big; i++) {
+      const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 2) * big, 0)), v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(2, 5));
+      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.5, 2.6), size: rand(0.8, 1.4) * big, grow: 4, r: 1.25, g: 1.27, b: 1.3, a: 0.5, frame: SPRITE.smoke, drag: 0.8, spin: rand(-0.5, 0.5) });
+    }
   }
 
   /** The gust: a ring of wind round the hull, streaks blowing aft and a sheet of spray off the bow. */

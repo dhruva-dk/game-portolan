@@ -3,7 +3,7 @@
 // here imports the simulation; the integration adapts its state into an ActorsView (see view.ts).
 import * as THREE from 'three';
 import { Aura, SHELL, Shards } from './aura.ts';
-import { GUNPORTS, Kit, LANTERN, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
+import { GUNPORTS, Kit, LANTERN, MAIN_FOOT, MAIN_HEIGHT, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
 import { AU, SEA, TEX_BASE, clamp, frameAt, loadTextures, nightAt, onSea, sea, seaRadius, smooth, v3, type WaveFn } from './common.ts';
 import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
@@ -64,7 +64,7 @@ export interface Actors {
 }
 
 /** How hard each weapon lands, for splashes, splinters and the numbers. */
-const BIG: Record<Weapon, number> = { cannon: 0.7, scatter: 0.4, harpoon: 0.8, mortar: 1.4, repeater: 0.25, broadside: 1 };
+const BIG: Record<Weapon, number> = { cannon: 0.7, scatter: 0.4, harpoon: 0.8, mortar: 1.4, repeater: 0.25, broadside: 1, chain: 0.85, heated: 0.75 };
 /** What firing each weapon does to your own camera. */
 const RECOIL: Record<Weapon, Juice> = {
   cannon: { shake: 0.12, kick: 0.8, haptic: 'light' },
@@ -73,6 +73,8 @@ const RECOIL: Record<Weapon, Juice> = {
   mortar: { shake: 0.26, kick: 1.6, haptic: 'medium' },
   repeater: { shake: 0.03, haptic: 'light' },
   broadside: { shake: 0.38, kick: 2.2, haptic: 'heavy' },
+  chain: { shake: 0.18, kick: 1.1, haptic: 'medium' },
+  heated: { shake: 0.13, kick: 0.85, haptic: 'light' },
 };
 const SINK_TIME = 6.5;
 const STERN = new THREE.Vector3(0, 0.6, -8.6);
@@ -169,7 +171,10 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     fleet.delete(f.id);
   };
 
-  const pose: Pose = { speed: 0, turn: 0, aimYaw: 0, aimPitch: 0, hp: 1, sink: 0, boost: 0, hit: 0, alt: 0, dive: 0, wind: 0, windSpeed: 0, night: 0, flip: 0 };
+  const pose: Pose = {
+    speed: 0, turn: 0, aimYaw: 0, aimPitch: 0, hp: 1, sink: 0, boost: 0, hit: 0, alt: 0, dive: 0, wind: 0, windSpeed: 0, night: 0, flip: 0,
+    torn: 0, mast: 'up', flood: 0, listTo: 1,
+  };
 
   function sail(f: Fleet, v: ShipView, view: ActorsView, dt: number, t: number, limit: number): void {
     const m = f.model, base = SEA.radius + SEA.level;
@@ -213,8 +218,26 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     pose.windSpeed = Math.hypot(wx, wz);
     pose.night = nightAt(f.pos);
     pose.flip = v.flip ?? 0;
+    const parts = v.parts;
+    pose.torn = parts?.torn ?? 0;
+    pose.mast = parts?.mast ?? 'up';
+    pose.flood = parts?.flood ?? 0;
+    pose.listTo = parts?.listTo ?? 1;
     const M = m.root.matrix;
     m.update(pose, t, dt, (lx, lz) => sea.wave(hp.set(lx, 0, lz).applyMatrix4(M), sea.time));
+    // the fallen mainmast striking the water alongside
+    if (m.landed && d < 300) {
+      const at = m.toWorld(m.landedAt, new THREE.Vector3());
+      fx.splash(at, 2.6);
+      fx.splash(m.toWorld(tmp.copy(m.landedAt).multiplyScalar(0.55).setZ(m.landedAt.z), new THREE.Vector3()), 1.4);
+      const near = v.id === player ? 1 : nearPlayer(at, 90);
+      if (near > 0) juice({ shake: 0.3 * near, haptic: 'medium' }, { t: 'mastFall', ship: v.id, side: 0 });
+    }
+    // on fire: flames along her deck and up the canvas, and a pall of smoke down the wind
+    if (parts && parts.burn > 0 && d < 400 && f.sink < 0) {
+      const sailAt = parts.mast === 'down' ? null : m.toWorld(tmp.set(0, MAIN_FOOT.y + MAIN_HEIGHT * (parts.mast === 'jury' ? 0.3 : 0.45), MAIN_FOOT.z), new THREE.Vector3());
+      fx.burning(m.toWorld(DECK, new THREE.Vector3()), f.fwd, sailAt, dt);
+    }
     m.far = d > 140;
     m.fade = v.id === player && options.fadePlayerSail !== false ? 1 : 0;
     // the shield's shell
@@ -461,6 +484,24 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
         }
         case 'breach':
           whales.breach(e.at, e.head);
+          break;
+        case 'mastFall': {
+          const f = fleet.get(e.ship);
+          if (!f || !f.shown) { f?.model.mastFall(e.side); break; }
+          f.model.mastFall(e.side);
+          fx.mastBreak(f.model.toWorld(tmp.set(0, MAIN_FOOT.y + 1.5, MAIN_FOOT.z), new THREE.Vector3()), f.model.toWorld(tmp.set(0, MAIN_FOOT.y + MAIN_HEIGHT, MAIN_FOOT.z), new THREE.Vector3()));
+          const near = e.ship === player ? 1 : nearPlayer(f.pos, 140);
+          if (near > 0) juice({ shake: 0.4 * near, kick: 1.2 * near, hitStop: e.ship === player ? 0.06 : 0, haptic: 'heavy' }, e);
+          break;
+        }
+        case 'juryRig': {
+          const f = fleet.get(e.ship);
+          if (f?.shown) fx.juryRig(f.model.toWorld(tmp.set(0, MAIN_FOOT.y + 0.5, MAIN_FOOT.z), new THREE.Vector3()));
+          if (e.ship === player) juice({ shake: 0.06, haptic: 'light' }, e);
+          break;
+        }
+        case 'quench':
+          fx.steam(v3(e.at), 1.3);
           break;
         case 'lavaBomb':
           fx.lavaLand(v3(e.at), e.on === 'water');

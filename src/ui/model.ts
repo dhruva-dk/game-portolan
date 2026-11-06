@@ -239,11 +239,12 @@ export const DEFAULT_SETTINGS: Settings = {
 
 // ---------------------------------------------------------------- the match
 
-export type WeaponId = 'cannon' | 'harpoon' | 'mortar' | 'repeater' | 'scatter' | 'broadside';
+export type WeaponId = 'cannon' | 'harpoon' | 'mortar' | 'repeater' | 'scatter' | 'broadside' | 'chain' | 'heated';
 export type ConsumableId = 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
 export const WEAPON_NAME: Record<WeaponId, string> = {
   cannon: 'Cannon', harpoon: 'Harpoon', mortar: 'Mortar', repeater: 'Repeater', scatter: 'Scatter Gun', broadside: 'Broadside',
+  chain: 'Chain Shot', heated: 'Heated Shot',
 };
 
 export const CONSUMABLE: Record<ConsumableId, { name: string; stack: number; seconds: number; text: string }> = {
@@ -319,11 +320,26 @@ export interface MapView {
   events: { x: number; y: number; r: number; tone: EventTone; warning: boolean }[];
 }
 
+/** A ship's parts as the HUD shows them: how hurt each is, 0 whole to 1 shot away. */
+export interface PartsModel {
+  sail: number;
+  /** The mainmast: weakened 0–1 while it stands; `down` seconds until a jury mast is up once it falls. */
+  mast: number;
+  down: number;
+  jury: boolean;
+  rudder: number;
+  /** Water in her: past `sinks` it drags her under. */
+  flood: number;
+  sinks: number;
+  burning: boolean;
+}
+
 export interface HudModel {
   shield: number;
   shieldMax: number;
   hull: number;
   hullMax: number;
+  parts: PartsModel;
   slots: Slot[];
   selected: number;
   ability: { id: ActiveId; /** 0–1, 1 ready. */ ready: number; /** Seconds left, while cooling down. */ seconds: number };
@@ -386,7 +402,7 @@ export interface DeathModel {
   /** Who sank you, or null when the Storm or the sea did. */
   killer: Killer | null;
   cause: 'ship' | 'storm' | 'sea';
-  /** How: the weapon class, or ram, burn, ink, mine, wave, storm, lightning, ash, whale or sea. */
+  /** How: the weapon class, or ram, burn, ink, mine, wave, storm, lightning, ash, whale, rock, flood or sea. */
   how: string;
   kills: number;
   damage: number;

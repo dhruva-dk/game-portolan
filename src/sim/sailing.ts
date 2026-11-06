@@ -1,13 +1,15 @@
 // Sailing on the sphere: ships run great circles at up to 14.5 m/s, faster off the wind than into it, turn,
-// carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other.
+// carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other. A ship upwind
+// steals her wind, and her parts (parts.ts) set what drive and steering she has left.
 import { aground, bloomAt, currentAt, levelAt, solidAt, solidNormal } from './environment.ts';
 import { hurt } from './harm.ts';
+import { blanket, drive, steering } from './parts.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dacos, dot, length, normalize, set, v3, type V3 } from './math.ts';
 import { hasActive, hasPassive, hasPerk } from './perks.ts';
 import { R, advance, apart, localFrame, turned } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState, type Ship } from './state.ts';
-import { COINS, GRAVITY, GROUND, GUST, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
+import { COINS, GRAVITY, GROUND, GUST, PARTS, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
 import { newWind, windAt, type Wind } from './wind.ts';
 import { DRAFT, heightAt, regionAt } from './world/index.ts';
 
@@ -37,7 +39,7 @@ export function settledSpeed(ship: Ship, wind: Wind, throttle: number): number {
   point = 1 + (point - 1) * Math.min(1, wind.steady + 0.3);
   if (hasPassive(ship, 'windReader')) point = 1 - (1 - point) * POWERS.windReader;
   const s = wind.strength, airs = s < 1 ? WIND.airs + (1 - WIND.airs) * Math.max(0, s) : 1;
-  let top = SHIP.top * point * airs * throttle;
+  let top = SHIP.top * point * airs * throttle * drive(ship);
   if (hasPassive(ship, 'lightHull')) top *= POWERS.lightHull.speed;
   if (ship.use >= 0) top *= SHIP.using;
   if (ship.slow > 0) top *= PERKS.frostShot.slow;
@@ -50,7 +52,7 @@ export function turnRate(ship: Ship): number {
   if (hasPerk(ship, 'tightTurns')) r *= PERKS.tightTurns;
   if (hasPassive(ship, 'lightHull')) r *= POWERS.lightHull.turn;
   if (ship.boost > 0) r *= GUST.turn;
-  return r * (1 - WEATHER.snow.turn * ship.ice);
+  return r * (1 - WEATHER.snow.turn * ship.ice) * steering(ship);
 }
 
 const W = newWind(), FLOW = v3(), V = v3(), SB = v3(), P1 = v3(), H1 = v3(), PROBE = v3(), WAS = v3(), N = v3(), E = v3(), NN = v3();
@@ -72,12 +74,13 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   ship.turn = steer;
 
   let target = ship.flip > 0 ? 0 : settledSpeed(ship, W, Math.max(0, Math.min(1, input.throttle)));
-  target *= bloomAt(state, ship.pos);
+  target *= bloomAt(state, ship.pos) * blanket(state, i, W);
   if (Math.abs(steer) > SHIP.hard) target = Math.min(target, SHIP.crawl);
   let accel: number = target > ship.speed ? SHIP.accel : SHIP.decel;
   if (ship.boost > 0) {
     ship.boost = elapse(ship.boost);
-    target += GUST.speed;
+    // the gust is a burst of wind in her canvas: with the mainmast down there is less to catch it
+    target += GUST.speed * (ship.fallen > 0 ? PARTS.bare : 1);
     accel = GUST.accel;
   }
   if (ship.power > 0 && hasActive(ship, 'ram')) {

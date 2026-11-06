@@ -1,4 +1,5 @@
-// Damage: the shield takes it first, then the hull. The Storm and trail cuts go straight to the hull.
+// Damage: the shield takes it first, then the hull. The Storm, trail cuts and the sea in a flooded hull go straight to
+// the hull.
 // Ships that reach zero hull are sunk by end.ts at the end of the tick.
 import type { V3 } from './math.ts';
 import { hasPassive } from './perks.ts';
@@ -6,11 +7,11 @@ import { CAUSE, EVENT, FLAG, PHASE, TICK, emit, type MatchState } from './state.
 import { POWERS, SPAR } from './tables.ts';
 
 /** Causes that skip the shield. */
-export const hullOnly = (cause: number): boolean => cause === CAUSE.storm || cause === CAUSE.ink;
+export const hullOnly = (cause: number): boolean => cause === CAUSE.storm || cause === CAUSE.ink || cause === CAUSE.flood;
 
 /** Causes that wear steadily, tick by tick, rather than strike. They don't interrupt a consumable. */
 export const steady = (cause: number): boolean =>
-  cause === CAUSE.storm || cause === CAUSE.burn || cause === CAUSE.ash;
+  cause === CAUSE.storm || cause === CAUSE.burn || cause === CAUSE.ash || cause === CAUSE.flood;
 
 /**
  * Bot captains spar gently: with each other, and with a player who has just come down off the Gale.

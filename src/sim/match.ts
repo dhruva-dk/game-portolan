@@ -20,6 +20,7 @@
 //
 // Reading the state (state.ts has the full schema; names are stable):
 //   state.ships[i]: phase (PHASE gale/glide/sea/sunk), pos (unit vector), head (unit tangent), alt (m above the sea),
+//     torn, mast, fallen/jury, rudder, flood, listTo (her parts, parts.ts),
 //     speed, vel, hull, shield (0–100), slots[5] {kind (ITEM), rarity 0–4, n (ammo or count)}, sel, reload, cool,
 //     use/useT (consumable in use), gusts/gustT, boost, cooldown/power (active ability), active/passive (indices into
 //     ACTIVES/PASSIVES in perks.ts), burn, slow, ice, flip, coins, perks (bit r: region r's perk), held (territory,
@@ -55,7 +56,13 @@
 //               to by (flag 1: it ran dry)
 //   lead        ship took the lead in territory from by
 //   ability / abilityEnd   item active index; amount seconds it runs
-//   mineBurst, lightningWarn (ship targeted, amount warning seconds), lightning, ablaze (ship set burning by by)
+//   mineBurst, lightningWarn (ship targeted, amount warning seconds), lightning, ablaze (ship set burning by by;
+//               flag 1 when the fire leapt from a burning ship upwind)
+//   mastFall    ship's mainmast went over the side (by who brought it down); amount the side, +1 starboard
+//   juryRig     ship has a jury mast up in its place;  quench: ship's fire put out by the weather (flag 1: a heated
+//               shot quenched as it struck)
+//   impact      also carries the parts a ship hit struck, as FLAG.sail / waterline / rudder, and FLAG.rake for a
+//               shot down her length; hull the hull points it took
 //   scrape      ship scraped the ground; ram: ship rammed by; coins: ship earned amount (item: 1 rent, 2 cut,
 //               3 claim, 4 kill)
 //   weatherForms / weatherEnds   item WEATHER_KIND, amount radius; win: ship won
@@ -67,6 +74,7 @@
 import { helm, think } from './captains/brain.ts';
 import { watch } from './captains/learning.ts';
 import { arm, burnTick, fly } from './combat.ts';
+import { partsTick } from './parts.ts';
 import { gulls } from './economy.ts';
 import { over, settle } from './end.ts';
 import { interrupt } from './harm.ts';
@@ -132,6 +140,7 @@ export function step(state: MatchState, input: ShipInput | null = null, inputs: 
   collide(state);
   fly(state);
   burnTick(state);
+  partsTick(state);
   powers(state);
   weatherOnShips(state);
   pickups(state, INPUTS);

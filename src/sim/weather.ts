@@ -4,6 +4,7 @@
 // the Fire Archipelago) burns ships that stay in it. Systems form over a region mostly as that region's own kinds.
 import { eventSky } from './environment.ts';
 import { hurt } from './harm.ts';
+import { mastHeight, struckMast } from './parts.ts';
 import { PI, addScaled, dot, dsin, normalize, rngDir, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
 import { nav, navCell } from './nav.ts';
 import { apart, along, tangentAt } from './sphere.ts';
@@ -208,18 +209,23 @@ function thunder(state: MatchState, rng: Rng, s: WeatherSystem): void {
     emit(state, EVENT.lightning, s.target, -1, s.bolt, { amount: t.damage });
     for (let j = 0; j < SHIPS; j++) {
       const ship = state.ships[j];
-      if (ship.phase === PHASE.sea && apart(ship.pos, s.bolt) < t.reach) hurt(state, j, t.damage, -1, CAUSE.lightning, ship.pos, 10);
+      if (ship.phase !== PHASE.sea || apart(ship.pos, s.bolt) >= t.reach) continue;
+      hurt(state, j, t.damage, -1, CAUSE.lightning, ship.pos, 10);
+      if (j === s.target) struckMast(state, j);
     }
     s.target = -1;
     s.strike = rngRange(rng, t.every[0], t.every[1]);
     return;
   }
+  // it finds the tallest mast: a jury mast draws it less often, and a ship with hers down not at all
   const n = nav();
   let pick = -1, seen = 0;
   for (let j = 0; j < SHIPS; j++) {
-    const ship = state.ships[j];
-    if (ship.phase !== PHASE.sea || depthIn(s, ship.pos) < 0.3 || n.clear[navCell(ship.pos)] < 4) continue;
-    if (rngInt(rng, ++seen) === 0) pick = j;
+    const ship = state.ships[j], tall = mastHeight(ship);
+    if (ship.phase !== PHASE.sea || tall <= 0 || depthIn(s, ship.pos) < 0.3 || n.clear[navCell(ship.pos)] < 4) continue;
+    const weight = Math.round(tall * 4);
+    seen += weight;
+    if (rngInt(rng, seen) < weight) pick = j;
   }
   if (pick < 0) {
     s.strike = 1;

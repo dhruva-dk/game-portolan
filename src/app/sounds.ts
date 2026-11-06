@@ -45,6 +45,10 @@ export class MomentSound {
   private readonly uses = new Map<number, { item: ConsumableKind; use: Use }>();
   /** When the Storm last bit the player's hull, in seconds: its sound comes once a second, not every tick. */
   private storm = -1;
+  /** Each burning ship's crackle, by ship. */
+  private readonly flames = new Map<number, number>();
+  /** When a waterline hit last gushed, per ship, so a broadside's balls make one gush and not four. */
+  private readonly gushed = new Map<number, number>();
 
   constructor(audio: Audio, log: EffectLog) {
     this.audio = audio;
@@ -65,9 +69,16 @@ export class MomentSound {
         a.fire(m.weapon, { pos: this.at(m.ship, m.pos), rarity: m.rarity });
         if (m.weapon === 'mortar') a.whistle(m.pos, 1.4);
         return;
-      case 'impact':
+      case 'impact': {
         if (m.on !== 'ship') a.impact(m.on, { pos: m.pos, weapon: m.weapon });
+        const st = m.struck;
+        if (!st) return;
+        const pos = this.at(m.ship, m.pos);
+        if (st.sail) a.play('sailTear', { pos, gain: m.weapon === 'chain' ? 1 : 0.6 });
+        const now = performance.now() / 1000;
+        if (st.waterline && now - (this.gushed.get(m.ship) ?? -9) > 0.6) { this.gushed.set(m.ship, now); a.play('floodGush', { pos }); }
         return;
+      }
       case 'hit':
         if (m.steady) return;
         if (m.weapon === 'storm') { if (m.ship === me) a.play('stormDamage'); return; }
@@ -171,19 +182,45 @@ export class MomentSound {
       case 'win':
         // the victory screen's ceremony plays the sting
         return;
+      case 'mastFall':
+        a.play('mastFall', { pos: this.at(m.ship, m.pos) });
+        if (m.by === me && m.ship !== me) a.play('stingShieldBreak', { delay: 0.9 });
+        return;
+      case 'juryRig':
+        a.play('juryRig', { pos: this.at(m.ship, m.pos) });
+        return;
+      case 'ablaze':
+        a.play('ignite', { pos: this.at(m.ship, m.pos) });
+        return;
+      case 'quench':
+        a.play('quench', { pos: this.at(m.ship, m.pos) });
+        return;
       default:
         return;
     }
+  }
+
+  /** Keeps a crackle going over every ship that is burning, and stops each as its fire goes out or it sinks. */
+  fires(ships: readonly { burn: number; pos: V3; phase: number }[], sunk: number, metres: (p: V3) => V3): void {
+    ships.forEach((s, i) => {
+      const id = this.flames.get(i), on = s.burn > 0 && s.phase !== sunk;
+      if (on && !id) this.flames.set(i, this.audio.loop('burning', { pos: this.at(i, metres(s.pos)) }));
+      else if (on && id) this.audio.move(id, this.at(i, metres(s.pos)));
+      else if (!on && id) { this.audio.stop(id, 0.8); this.flames.delete(i); }
+    });
   }
 
   /** Stops every use loop (leaving a match). */
   clear(): void {
     for (const u of this.uses.values()) u.use.cancel();
     this.uses.clear();
+    for (const id of this.flames.values()) this.audio.stop(id, 0.3);
+    this.flames.clear();
   }
 }
 
-const FIRE_OK = { cannon: 1, scatter: 1, harpoon: 1, mortar: 1, repeater: 1, broadside: 1 } as const;
+const FIRE_OK = { cannon: 1, scatter: 1, harpoon: 1, mortar: 1, repeater: 1, broadside: 1, chain: 1, heated: 1 } as const;
 const RELOAD: Record<keyof typeof FIRE_OK, SoundName> = {
   cannon: 'reloadCannon', scatter: 'reloadScatter', harpoon: 'reloadHarpoon', mortar: 'reloadMortar', repeater: 'reloadRepeater', broadside: 'reloadBroadside',
+  chain: 'reloadChain', heated: 'reloadHeated',
 };

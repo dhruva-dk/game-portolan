@@ -115,6 +115,8 @@ const sized = (w: number[], n: number): boolean => w.length === n && w.every((x)
 
 function repairLearned(h: Learned): Learned {
   const fresh = newLearned();
+  // classes added since the save was made start unlearnt
+  if (Array.isArray(h.weapon) && h.weapon.length < fresh.weapon.length) h.weapon = [...h.weapon, ...fresh.weapon.slice(h.weapon.length)];
   const ok = sized(h.drop, fresh.drop.length) && sized(h.run, fresh.run.length) && sized(h.storm, fresh.storm.length)
     && sized(h.range, fresh.range.length) && sized(h.weapon, fresh.weapon.length);
   return ok ? h : fresh;

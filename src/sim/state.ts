@@ -22,7 +22,7 @@ export const STREAMS = STREAM.captains + SHIPS;
 export const PHASE = { gale: 0, glide: 1, sea: 2, sunk: 3 } as const;
 
 /** What sank a ship, or hurt it. Weapons use their item kind (1–6). */
-export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28, rock: 29 } as const;
+export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28, rock: 29, flood: 30 } as const;
 
 /** The gull's delivery run. */
 export const GULL = { home: 0, flying: 1, rest: 2 } as const;
@@ -134,6 +134,15 @@ const SHIP = rec(
   ['ash', f64],
   ['flip', f64],
   ['scrape', f64],
+  // her parts (PARTS): canvas torn, the mainmast's damage, seconds until a jury mast stands in a fallen one's place
+  // and whether one does, the rudder's damage, water in her and the side she lists to (+1 to starboard)
+  ['torn', f64],
+  ['mast', f64],
+  ['fallen', f64],
+  ['jury', bool],
+  ['rudder', f64],
+  ['flood', f64],
+  ['listTo', f64],
   ['kills', int],
   ['dealt', f64],
   ['place', int],
@@ -300,16 +309,19 @@ export const EVENT = {
   regionStart: 48,
   regionEnd: 49,
   lavaBomb: 50,
+  mastFall: 51,
+  juryRig: 52,
+  quench: 53,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
   'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
-  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb',
+  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench',
 ];
 
 /** Event flag bits. */
-export const FLAG = { crit: 1, broke: 2, land: 4, ship: 8, steady: 16, done: 32 } as const;
+export const FLAG = { crit: 1, broke: 2, land: 4, ship: 8, steady: 16, done: 32, rake: 64, sail: 128, waterline: 256, rudder: 512 } as const;
 
 const AT = v3();
 

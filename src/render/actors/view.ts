@@ -7,7 +7,7 @@
 
 export interface Vec3 { x: number; y: number; z: number }
 
-export const WEAPONS = ['cannon', 'scatter', 'harpoon', 'mortar', 'repeater', 'broadside'] as const;
+export const WEAPONS = ['cannon', 'scatter', 'harpoon', 'mortar', 'repeater', 'broadside', 'chain', 'heated'] as const;
 export type Weapon = (typeof WEAPONS)[number];
 
 /** 0 common (grey), 1 uncommon (green), 2 rare (blue), 3 epic (purple), 4 legendary (gold). */
@@ -51,6 +51,20 @@ export interface ShipView {
   cosmetics: CosmeticIds;
   /** False once sunk: the sinking animation plays out (from the sink event) and the model goes. */
   alive: boolean;
+  /** Her parts; omitted, all whole. */
+  parts?: PartsView;
+}
+
+/** What has been shot away: her canvas (0 whole, 1 in rags), the mainmast, and the water in her. */
+export interface PartsView {
+  torn: number;
+  /** 'up', 'down' (over the side; the fall plays from the mastFall event) or 'jury' (a short spar rigged in its place). */
+  mast: 'up' | 'down' | 'jury';
+  /** 0 dry .. 1 full; she settles and lists to `listTo` (+1 starboard). */
+  flood: number;
+  listTo: number;
+  /** Seconds left burning; 0 not. */
+  burn: number;
 }
 
 export interface ProjectileView {
@@ -128,7 +142,12 @@ export type ActorEvent =
   /** A region's event brings rock down into the water (the Spires' spire, the Narrows' rockfall): `at` is its spot. */
   | { t: 'rockfall'; region: number; at: Vec3 }
   /** Lightning over a spot: its warning (the leader coming down), then its strike. */
-  | { t: 'lightning'; at: Vec3; warning: boolean };
+  | { t: 'lightning'; at: Vec3; warning: boolean }
+  /** A ship's mainmast going over the side, toward `side` (+1 starboard); her jury mast swayed up in its place. */
+  | { t: 'mastFall'; ship: number; side: number }
+  | { t: 'juryRig'; ship: number }
+  /** Fire put out by the weather, or a heated shot doused as it struck; `at` where. */
+  | { t: 'quench'; ship: number; at: Vec3 };
 
 /** What a moment should do to the camera, the screen and the hand, for the integration step to route. */
 export interface Juice {

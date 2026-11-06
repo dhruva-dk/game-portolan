@@ -5,6 +5,7 @@ import { PI, rngInt, rngRange, set, v3, type V3 } from './math.ts';
 import { openAt } from './nav.ts';
 import { advance, along, apart, tangentAt, tangentToward } from './sphere.ts';
 import { hurt } from './harm.ts';
+import { swamp } from './parts.ts';
 import { rollItem, spawnLoot } from './items.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, WHALE_STATE, copy, emit, type MatchState } from './state.ts';
 import { WHALE } from './tables.ts';
@@ -130,6 +131,8 @@ function breach(state: MatchState): void {
     if (s.alt <= 0) s.alt = 1e-3;
     tangentToward(w.at, s.pos, T);
     if (d > 0.5) set(s.shove, s.shove.x + T.x * 6, s.shove.y + T.y * 6, s.shove.z + T.z * 6);
+    // the wave it throws sweeps over whatever is near, and she ships water
+    swamp(state, i, 1 - d / WHALE.lift);
     if (d <= WHALE.flip) {
       s.flip = WHALE.flipped;
       hurt(state, i, 10, -1, CAUSE.whale, s.pos, 0);

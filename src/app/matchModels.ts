@@ -12,7 +12,7 @@ import {
 import { seaLevelAt } from '../sim/environment.ts';
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE } from '../sim/state.ts';
-import { GALE, GUST, LOOT, PARCELS } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
 import { R, advance, along, apart, tangentAt } from '../sim/sphere.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
@@ -171,6 +171,10 @@ export function hudModel(session: Session): HudModel {
   const use = sh.use >= 0 ? sh.slots[sh.use] : null, r = regionAt(sh.pos), now = s.tick * TICK, level = seaLevelAt(now);
   return {
     shield: Math.round(sh.shield), shieldMax: 100, hull: Math.round(sh.hull), hullMax: 100,
+    parts: {
+      sail: sh.torn, mast: sh.fallen > 0 ? 1 : sh.mast, down: Math.max(0, sh.fallen), jury: sh.jury, rudder: sh.rudder,
+      flood: sh.flood, sinks: PARTS.sinks, burning: sh.burn > 0,
+    },
     slots: sh.slots.map((_, k) => slotOf(sh, k)),
     selected: sh.sel,
     ability: { id, ready: Math.max(0, Math.min(1, 1 - sh.cooldown / cool)), seconds: Math.ceil(Math.max(0, sh.cooldown)) },
@@ -230,7 +234,7 @@ function killerOf(session: Session, i: number, weapon: number): Killer {
   const e = session.plan.fleet[i - 1], cap = CAPTAINS[captainIndex(e.captain)];
   return {
     ...markOf(cap?.look ?? e.look), name: session.names[i], rank: e.rank, temperament: cap ? temperament(cap.temperament).name : '',
-    weapon: weapon >= 1 && weapon <= 6 ? (weaponOf(weapon) as WeaponId) : null, grudge: session.state.ships[i].captain.grudge,
+    weapon: isWeapon(weapon) ? (weaponOf(weapon) as WeaponId) : null, grudge: session.state.ships[i].captain.grudge,
   };
 }
 

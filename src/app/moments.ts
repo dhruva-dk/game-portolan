@@ -12,15 +12,13 @@ import { R, advance, along, tangentAt, tangentToward, turned } from '../sim/sphe
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE, copy } from '../sim/state.ts';
 import { callBreach } from '../sim/whale.ts';
-import { WEATHER, WEATHER_KIND } from '../sim/tables.ts';
+import { WEAPON_KINDS, WEATHER, WEATHER_KIND, isWeapon } from '../sim/tables.ts';
 import { LANDMARKS, REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable, regionShare } from '../sim/world/index.ts';
 import { PI, v3, type V3 } from '../sim/math.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
 
-const isWeapon = (kind: number): boolean => kind >= ITEM.cannon && kind <= ITEM.broadside;
-
-/** An item kind (1–6) as its weapon class. */
-export const weaponOf = (kind: number): WeaponClass => WEAPON_CLASSES[Math.max(0, Math.min(5, kind - ITEM.cannon))];
+/** A weapon's item kind as its weapon class; anything else reads as the cannon. */
+export const weaponOf = (kind: number): WeaponClass => WEAPON_CLASSES[Math.max(0, WEAPON_KINDS.indexOf(kind))];
 
 const CONSUMABLE: Record<number, ConsumableKind> = {
   [ITEM.smallShield]: 'smallShield', [ITEM.bigShield]: 'bigShield', [ITEM.repairKit]: 'repairKit', [ITEM.fullRepair]: 'fullRepair',
@@ -36,7 +34,7 @@ export const itemKey = (kind: number): string => (isWeapon(kind) ? weaponOf(kind
 const CAUSES: Record<number, string> = {
   [CAUSE.storm]: 'storm', [CAUSE.ram]: 'ram', [CAUSE.ink]: 'ink', [CAUSE.burn]: 'burn', [CAUSE.ash]: 'ash',
   [CAUSE.lightning]: 'lightning', [CAUSE.mine]: 'mine', [CAUSE.wave]: 'wave', [CAUSE.whale]: 'whale',
-  [CAUSE.rock]: 'rock',
+  [CAUSE.rock]: 'rock', [CAUSE.flood]: 'flood',
 };
 /** What sank or hurt a ship, by name: a weapon class or one of the causes. */
 export const causeName = (cause: number): string => (isWeapon(cause) ? weaponOf(cause) : CAUSES[cause] ?? 'sea');
@@ -44,7 +42,7 @@ export const causeName = (cause: number): string => (isWeapon(cause) ? weaponOf(
 /** A cause by name, as causeName gives it, back to the sim's number; anything else is the Storm. */
 export function causeOf(name: string): number {
   const w = WEAPON_CLASSES.indexOf(name as WeaponClass);
-  if (w >= 0) return ITEM.cannon + w;
+  if (w >= 0) return WEAPON_KINDS[w];
   const k = Object.keys(CAUSES).find((n) => CAUSES[+n] === name);
   return k ? +k : CAUSE.storm;
 }
@@ -54,6 +52,7 @@ function hurtBy(kind: number): Extract<Moment, { k: 'hit' }>['weapon'] {
   if (kind === CAUSE.storm) return 'storm';
   if (kind === CAUSE.ram) return 'ram';
   if (kind === CAUSE.burn) return 'fire';
+  if (kind === CAUSE.flood) return 'flood';
   return 'other';
 }
 
@@ -74,13 +73,20 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
   const pos = metres(e.at, e.y), ship = e.ship;
   switch (e.kind) {
     case EVENT.fire: return { k: 'fire', ship, weapon: weaponOf(e.item), rarity: e.amount, pos, dir: gunDir(state.ships[ship]) };
-    case EVENT.impact:
-      return { k: 'impact', pos, on: e.flag & FLAG.ship ? 'ship' : e.flag & FLAG.land ? 'land' : 'water', weapon: weaponOf(e.item), ship };
+    case EVENT.impact: {
+      const on = e.flag & FLAG.ship ? 'ship' : e.flag & FLAG.land ? 'land' : 'water';
+      const parts = e.flag & (FLAG.sail | FLAG.waterline | FLAG.rudder | FLAG.rake);
+      return {
+        k: 'impact', pos, on, weapon: weaponOf(e.item), ship, by: e.by,
+        ...(parts ? { struck: { sail: (e.flag & FLAG.sail) !== 0, waterline: (e.flag & FLAG.waterline) !== 0, rudder: (e.flag & FLAG.rudder) !== 0, rake: (e.flag & FLAG.rake) !== 0 } } : {}),
+      };
+    }
     case EVENT.hit:
       if (e.flag & FLAG.steady && e.item === CAUSE.storm) return { k: 'stormHurt', ship };
       return {
         k: 'hit', ship, by: e.by, shield: e.shield, hull: e.hull, crit: (e.flag & FLAG.crit) !== 0, pos, weapon: hurtBy(e.item),
         ...(e.flag & FLAG.steady ? { steady: true } : {}),
+        ...(e.flag & FLAG.rake ? { rake: true } : {}),
       };
     case EVENT.shieldBreak: return { k: 'shieldBreak', ship, by: e.by, pos };
     case EVENT.sink: return { k: 'sink', ship, by: e.by, cause: causeName(e.item), pos };
@@ -112,6 +118,10 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.regionWarn: return { k: 'regionEvent', region: e.item, phase: 'warn', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionStart: return { k: 'regionEvent', region: e.item, phase: 'start', seconds: e.amount, pos: metres(e.at) };
     case EVENT.regionEnd: return { k: 'regionEvent', region: e.item, phase: 'end', seconds: 0, pos: metres(e.at) };
+    case EVENT.mastFall: return { k: 'mastFall', ship, by: e.by, side: e.amount, pos: metres(state.ships[ship].pos, 9) };
+    case EVENT.juryRig: return { k: 'juryRig', ship, pos: metres(state.ships[ship].pos, 6) };
+    case EVENT.ablaze: return { k: 'ablaze', ship, by: e.by, spread: (e.flag & 1) !== 0, pos: metres(state.ships[ship].pos, 4) };
+    case EVENT.quench: return { k: 'quench', ship, shot: (e.flag & 1) !== 0, pos: metres(state.ships[ship].pos, 3) };
     case EVENT.lavaBomb: return { k: 'lavaBomb', pos: metres(e.at), landed: (e.flag & FLAG.done) !== 0, seconds: e.amount };
     default: return null;
   }
@@ -137,7 +147,7 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'hit':
       if (m.steady) return null;
       if (m.weapon === 'ram') return { t: 'ram', at: m.pos };
-      if (m.weapon === 'storm' || m.weapon === 'fire' || m.weapon === 'other') return null;
+      if (m.weapon === 'storm' || m.weapon === 'fire' || m.weapon === 'flood' || m.weapon === 'other') return null;
       return { t: 'hit', ship: m.ship, by: m.by, weapon: m.weapon, at: m.pos, shield: m.shield, hull: m.hull, crit: m.crit };
     case 'impact': return m.on === 'ship' ? null : { t: 'impact', weapon: m.weapon, at: m.pos, on: m.on };
     case 'shieldBreak': return { t: 'shieldBreak', ship: m.ship, at: m.pos };
@@ -152,6 +162,9 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'lavaBomb': return m.landed ? { t: 'lavaBomb', at: m.pos, on: heightAt(m.pos) > 0.5 ? 'land' : 'water' } : null;
     case 'regionEvent': return m.phase === 'start' && REGION_EVENTS[m.region].block ? { t: 'rockfall', region: m.region, at: m.pos } : null;
     case 'lightning': return { t: 'lightning', at: m.pos, warning: m.warning };
+    case 'mastFall': return { t: 'mastFall', ship: m.ship, side: m.side };
+    case 'juryRig': return { t: 'juryRig', ship: m.ship };
+    case 'quench': return { t: 'quench', ship: m.ship, at: m.pos };
     default: return null;
   }
 }
@@ -421,6 +434,22 @@ export const MOMENTS: readonly MomentScript[] = [
     name: 'broadside', note: 'the player\'s broadside', sea: true, lead: 6, every: 2, frames: 14,
     arrange: (s) => (arm(s, weaponItem(ITEM.broadside, 2)), duel(s, 0, 40, {})),
     is: (m) => m.k === 'fire' && m.ship === PLAYER && m.weapon === 'broadside',
+  },
+  {
+    // chain shot at a target whose mainmast is all but gone, aimed high into her rig: the next ball aloft brings it down
+    name: 'mast-fall', note: 'the target\'s mainmast going over the side', sea: true, lead: 8, every: 3, frames: 30,
+    arrange: (s) => {
+      arm(s, weaponItem(ITEM.chain, 2));
+      const sc = duel(s, 45, OFF_BOW.side, { mast: 0.97 });
+      Object.assign(sc[0][1], { aimY: 11 });
+      return sc;
+    },
+    is: (m) => m.k === 'mastFall' && m.ship === TARGET,
+  },
+  {
+    name: 'heated-shot', note: 'the target catching fire from a heated shot', sea: true, lead: 8, every: 4, frames: 24,
+    arrange: (s) => (arm(s, weaponItem(ITEM.heated, 2)), duel(s, OFF_BOW.ahead, OFF_BOW.side, {})),
+    is: (m) => m.k === 'ablaze' && m.ship === TARGET,
   },
   {
     name: 'delivery', note: 'the gull delivering to the player', sea: true, lead: 75, every: 5, frames: 18,

@@ -40,6 +40,11 @@ export const TIPS = {
   tide: { icon: ICON.anchor, title: 'The tide is falling', text: 'Shallows round you are closing. Keep to deep water, or you will run aground.' },
   night: { icon: ICON.moon, title: 'Night', text: 'Far ships show only as lanterns, with no name or health bar.' },
   event: { icon: ICON.storm, title: 'A region\'s event', text: 'Each sea has its own, once a match. The banner says what to do; the map rings where.' },
+  mast: { icon: ICON.mast, title: 'Mainmast down', text: 'You sail on the fore and mizzen until the crew rigs a jury mast. A Full Repair rigs one at once.' },
+  flood: { icon: ICON.leak, title: 'Taking water', text: 'Shot at the waterline lets the sea in: she slows and lists, and too much sinks her. Get clear so the crew can pump.' },
+  rudder: { icon: ICON.rudder, title: 'Rudder hit', text: 'Shot into the stern has her slow to answer the helm. A repair, or quiet water, mends it.' },
+  fire: { icon: ICON.fire, title: 'On fire', text: 'The flames eat your canvas and leap to ships close downwind. Rain puts them out.' },
+  rake: { icon: ICON.target, title: 'Raking fire', text: 'A shot down a ship\'s length from bow or stern does more harm. Cross her bow, or her stern, to rake her.' },
   whale: { icon: ICON.whale, title: 'The whale', text: 'When it breaches it lifts the ships near it, flips any right over it, and scatters loot.' },
   'weather:fog': { icon: WEATHER_ICON.fog, title: 'Fog', text: 'You see less far, and ships deep in it drop off the map.' },
   'weather:rain': { icon: WEATHER_ICON.rain, title: 'Rain', text: 'The wind gusts and swirls, and the sea runs rough.' },
@@ -140,6 +145,9 @@ export class Tips {
       case 'pickup': if (mine) this.offer('loot'); break;
       case 'useStart': if (mine) this.offer('consumable'); break;
       case 'stormPhase': this.offer('storm'); break;
+      case 'mastFall': if (mine) this.offer('mast'); break;
+      case 'ablaze': if (mine) this.offer('fire'); break;
+      case 'hit': if (m.rake && m.by === PLAYER) this.offer('rake'); break;
       case 'perk': {
         const r = REGIONS.find((x) => x.perk === m.perk);
         if (mine && m.on && r) this.offer('landmark', { landmark: r.landmark, perk: r.perkName, perkText: r.perkText });
@@ -194,6 +202,8 @@ export class Tips {
     if (canCall(me, 0)) this.offer('gull');
     if (me.hull < 100 && st.tick - me.lastHit >= Math.round(INK.quiet / TICK) && atHome(st, PLAYER)) this.offer('mend');
     if (isNight(st, me.pos)) this.offer('night');
+    if (me.flood > 0.15) this.offer('flood');
+    if (me.rudder > 0.3) this.offer('rudder');
     this.look -= dt;
     if (this.look > 0) return;
     this.look = LOOK;

@@ -3,6 +3,7 @@
 import { hurt, mend } from './harm.ts';
 import type { ShipInput } from './input.ts';
 import { addScaled, dot, normalize, set, v3 } from './math.ts';
+import { mendParts, swamp } from './parts.ts';
 import { activeOf, cooldownOf } from './perks.ts';
 import { apart, along, tangentToward, turned } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState } from './state.ts';
@@ -61,6 +62,7 @@ export function useAbility(state: MatchState, i: number, input: ShipInput): bool
         normalize(addScaled(P, P, o.pos, -dot(P, o.pos)));
         addScaled(o.shove, o.shove, P, POWERS.wave.push);
         hurt(state, j, POWERS.wave.damage, i, CAUSE.wave, o.pos, 1);
+        swamp(state, j, 0.4);
       }
       break;
     case 'driftMine':
@@ -83,7 +85,11 @@ export function powers(state: MatchState): void {
     if (ship.revealed > 0) ship.revealed = elapse(ship.revealed);
     if (ship.power <= 0) continue;
     const id = activeOf(ship);
-    if (id === 'repair' && ship.phase === PHASE.sea) mend(state, i, (POWERS.repair.hull / POWERS.repair.time) * TICK);
+    if (id === 'repair' && ship.phase === PHASE.sea) {
+      mend(state, i, (POWERS.repair.hull / POWERS.repair.time) * TICK);
+      // the crew turns to her parts as well: over the three seconds, about a third of each mended
+      mendParts(state, i, (0.35 / POWERS.repair.time) * TICK);
+    }
     ship.power = elapse(ship.power);
     if (ship.power === 0) emit(state, EVENT.abilityEnd, i, -1, ship.pos, { item: ship.active });
   }
