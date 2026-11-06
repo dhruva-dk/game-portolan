@@ -374,6 +374,9 @@ export interface HudModel {
   gull: { price: number; ready: boolean; parcels: { name: string; price: number; ready: boolean }[] };
   /** How much sail is set: 1 full, 0.5 half, 0 furled. */
   throttle: number;
+  /** In a seaway, how steady your deck is for a shot (1 at the top of a roll, 0 swinging through upright); null when
+   *  the sea is too slight to roll her. */
+  steady: number | null;
   /** A consumable in use, with its progress. */
   using: { item: ConsumableId; progress: number } | null;
   region: string;

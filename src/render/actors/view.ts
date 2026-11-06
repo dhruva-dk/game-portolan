@@ -42,6 +42,8 @@ export interface ShipView {
   irons?: boolean;
   /** 1 as a thrown gybe slams her yards across, falling to 0: the yards swing fast and the hull jolts. */
   lurch?: number;
+  /** Her roll in a seaway, radians, positive with her starboard side down: the deck the gunners feel, over the waves'. */
+  roll?: number;
   /** 0..1 */
   hull: number;
   /** Shield points and their cap (the shield aura brightens as it fills). */

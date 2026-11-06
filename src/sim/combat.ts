@@ -10,8 +10,9 @@ import { hasPassive, hasPerk } from './perks.ts';
 import { startUse } from './items.ts';
 import { R, advance, apart, along, turned } from './sphere.ts';
 import { CAUSE, EVENT, FLAG, PHASE, SHIPS, STREAM, TICK, copy, emit, elapse, type MatchState, type Ship, type Shot } from './state.ts';
+import { deckOf, newDeck, seaState } from './seaway.ts';
 import {
-  ABOUT,
+  ABOUT, SEAWAY,
   BOXES, BURN, FALLOFF, GUST, LOB, MUZZLE, PERKS, POWERS, RAKE, RARITY, TURN_SPREAD, WEAPONS, WEATHER, isUse, isWeapon,
   type Weapon,
 } from './tables.ts';
@@ -76,6 +77,8 @@ function startReload(state: MatchState, i: number): void {
 const MUZ = v3(), DIR = v3(), RIGHT = v3(), T = v3();
 
 /** Fires the selected weapon at the ship's aim point. */
+const DECK = newDeck();
+
 export function fire(state: MatchState, i: number): void {
   const ship = state.ships[i], it = ship.slots[ship.sel], w = WEAPONS[it.kind], rng = state.rng[STREAM.combat];
   it.n--;
@@ -89,6 +92,9 @@ export function fire(state: MatchState, i: number): void {
   spread *= 1 + turning;
   // a gybe thrown in a blow lurches her deck under the gun
   if (ship.lurch > 0) spread *= 1 + ABOUT.lurchSpread * (ship.lurch / ABOUT.lurch);
+  // and a rolling deck throws it off, least at the top of a roll
+  const deck = deckOf(state, i, seaState(state, ship.pos), DECK);
+  spread *= 1 + SEAWAY.spread * deck.sea * deck.unsteady;
   // captains' hands are less steady than they think
   if (ship.captain.on) spread *= 1 + (1 - ship.captain.skill) * 2.5 + (ship.captain.gentle ? 1 : 0);
   const damage = w.damage * RARITY.damage[it.rarity];
@@ -102,7 +108,8 @@ export function fire(state: MatchState, i: number): void {
       for (let k = 0; k < w.sides; k++) {
         along(ship.pos, ship.head, -4.5 + (9 * k) / Math.max(1, w.sides - 1), MUZ);
         set(DIR, RIGHT.x * side, RIGHT.y * side, RIGHT.z * side);
-        launch(state, i, it.kind, it.rarity, MUZ, DIR, y0, reach, ship.aimY, w, damage, range, spread, rng);
+        // the side rolling up throws its balls long, the side rolling down short (+roll is her starboard side down)
+        launch(state, i, it.kind, it.rarity, MUZ, DIR, y0, reach, ship.aimY, w, damage, range, spread, rng, -side * deck.roll * SEAWAY.throw);
       }
     }
     emit(state, EVENT.fire, i, -1, ship.pos, { y: y0, item: it.kind, amount: it.rarity, flag: 3 });
@@ -123,7 +130,7 @@ export function fire(state: MatchState, i: number): void {
 
 function launch(
   state: MatchState, owner: number, kind: number, rarity: number, from: V3, dir: V3, y0: number, dist: number, aimY: number,
-  w: Weapon, damage: number, range: number, spread: number, rng: Uint32Array,
+  w: Weapon, damage: number, range: number, spread: number, rng: Uint32Array, tilt = 0,
 ): void {
   let v: number, vy: number;
   if (w.lob) {
@@ -134,7 +141,7 @@ function launch(
   } else {
     v = w.speed;
     const t = dist / v;
-    vy = (aimY - y0 + 0.5 * w.gravity * t * t) / t + (rngFloat(rng) - 0.5) * 2 * spread * 0.6 * v;
+    vy = (aimY - y0 + 0.5 * w.gravity * t * t) / t + (rngFloat(rng) - 0.5) * 2 * spread * 0.6 * v + tilt * v;
   }
   const shot: Shot = {
     owner, kind, rarity, pos: { x: from.x, y: from.y, z: from.z }, dir: { x: 0, y: 0, z: 0 }, v, y: y0, vy, g: w.gravity,

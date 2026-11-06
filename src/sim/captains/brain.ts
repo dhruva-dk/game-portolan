@@ -13,6 +13,7 @@ import { rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
 import { coverNear, dangerAt, escapeFrom, newDanger, rewardNear } from '../regionEvents.ts';
 import { draftOf, offWind, pointOfSail, turnRate } from '../sailing.ts';
+import { deckAt, newDeck } from '../seaway.ts';
 import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, WHALE_STATE, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
@@ -900,7 +901,7 @@ const WANT = v3();
 const TIDE_AHEAD = 15;
 const levelFor = (state: MatchState): number => Math.min(seaLevel(state), seaLevelAt(state.tick * TICK + TIDE_AHEAD));
 
-const HERE = newWind(), ON = v3(), OFF = v3(), RUN = v3();
+const HERE = newWind(), ON = v3(), OFF = v3(), RUN = v3(), DECK = newDeck();
 /** How close to the wind a captain beats: `close` radians off the wind's run at its best, and `pinch` higher with
  *  no skill (close to the no-go zone, so the least able pinch into irons now and then); how much nearer the mark must
  *  lie to the other board before it goes about. */
@@ -1132,10 +1133,14 @@ function aimAndFire(state: MatchState, i: number, style: Style, rng: Rng, out: S
     if (c.burst >= 0) c.burst = rngRange(rng, 1.5, 4);
     return;
   } else c.burst = rngRange(rng, 1.5, 4);
+  // in a seaway an able gunner waits for the top of the roll, and the abler for her side to roll down toward the foe
+  const deck = c.skill > 0.55 ? deckAt(state, i, DECK) : null;
+  if (deck && deck.sea > 0.25 && deck.unsteady > 1.15 - c.skill * 0.6) return;
   if (it.kind === ITEM.broadside) {
     tangentToward(ship.pos, target, T);
-    const a = Math.abs(angleTo(ship.head, T, ship.pos));
+    const signed = angleTo(ship.head, T, ship.pos), a = Math.abs(signed);
     if (Math.abs(a - PI / 2) > 0.45) return;
+    if (deck && c.skill > 0.75 && deck.sea > 0.3 && Math.sign(signed) * deck.roll < 0) return;
   }
   out.fire = it.n > 0 || ship.reload <= 0;
 }

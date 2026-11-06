@@ -328,6 +328,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
       parcels: [{ name: 'Supplies', price: 20, ready: true }, { name: 'Armament', price: 45, ready: fight }, { name: 'Treasure', price: 80, ready: fight }],
     },
     throttle: fight ? 1 : storm ? 0.5 : 1,
+    steady: storm ? 0.85 : fight ? 0.4 : null,
     using: storm ? { item: 'repairKit', progress: 0.55 } : null,
     region: storm ? 'the Coral Atolls' : 'the Spice Isles', perk: storm ? null : 'Better Loot', night: state === 'night',
     perks: storm ? [] : fight ? ['betterLoot', 'fastReload', 'spotter'] : ['betterLoot'],

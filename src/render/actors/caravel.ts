@@ -708,6 +708,7 @@ export interface Pose {
   listTo: number; // the side she lists to, +1 starboard
   irons: number; // 1 in irons, the canvas shaking
   lurch: number; // 1 as a thrown gybe slams the yards across, falling to 0
+  roll: number; // the seaway's roll the gunners feel, radians, positive with her starboard side down
 }
 
 /** Shot holes and burns a hull keeps, the oldest giving way to the newest. */
@@ -950,7 +951,7 @@ export class ShipModel {
       const hb = height(0, 6), hs = height(0, -6), hp = height(2.2, 0), hst = height(-2.2, 0);
       b.y += ((hb + hs + hp + hst) / 4 + p.alt - b.y) * Math.min(1, dt * (p.alt > 0.05 ? 12 : 4));
       b.pitch += (-Math.atan2(hb - hs, 12) * 0.9 - p.speed * 0.004 - (p.alt > 0.2 ? 0.12 : 0) - b.pitch) * k;
-      b.roll += (Math.atan2(hp - hst, 4.4) * 0.8 - b.roll) * k;
+      b.roll += (Math.atan2(hp - hst, 4.4) * 0.8 + p.roll - b.roll) * k;
       b.heel += (p.turn * Math.min(1, p.speed / 14) * 0.35 - b.heel) * Math.min(1, dt * 2.5);
       // a thrown gybe: the yards' weight coming across throws her over toward the new lee, and she rocks back
       if (p.lurch > 0) b.roll += Math.sin(p.lurch * Math.PI * 3) * p.lurch * -this.lee * 0.11 * Math.min(1, dt * 30);

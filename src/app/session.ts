@@ -20,6 +20,7 @@ import { EVENT_REGION, currentScales, eventStrength, floeTime, liftsNow, strengt
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
 import { ABOUT, DAY, REGION_EVENT, isWeapon } from '../sim/tables.ts';
 import { newSky, skyAt, vigour } from '../sim/weather.ts';
+import { deckAt, newDeck } from '../sim/seaway.ts';
 import { CENTRES, CURRENTS, REGION_COUNT, REGION_EVENTS, REGIONS, VORTEX, heightAt, regionWeights, summitNear, type WeatherKind } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { MatchTally } from './career.ts';
@@ -72,7 +73,7 @@ const SECOND = Math.round(1 / TICK);
 /** Riding to a picked region: leave the Gale this near its centre (m), and drop this near on the glide. */
 const PICK = { leave: 600, drop: 120 } as const;
 const AIM = { near: 40, far: 260, lock: 300, cone: 0.2, pitch: [0.06, 0.6] as const };
-const WIND = newWind(), STORM = newStormView();
+const WIND = newWind(), STORM = newStormView(), DECK = newDeck();
 /** What the ear reads: the region weights, the sky, and land felt for on eight bearings this far out (m). */
 const EAR = { weights: new Float64Array(REGION_COUNT), sky: newSky(), t: v3(), q: v3(), surf: 35 };
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
@@ -452,7 +453,7 @@ export class Session implements Stepper {
       id: i, pos: metres(at), head: { ...sh.head }, speed: sh.speed, turn: -sh.rate, alt: sh.alt, flip, hull: sh.hull / 100,
       shield: sh.shield, shieldMax: 100, weapon, aim: gunDir(sh), cosmetics: this.looks[i] ?? this.looks[0], alive,
       parts: { torn: sh.torn, mast: sh.fallen > 0 ? 'down' : sh.jury ? 'jury' : 'up', flood: sh.flood, listTo: sh.listTo, burn: sh.burn },
-      irons: sh.irons > 0, lurch: sh.lurch / ABOUT.lurch,
+      irons: sh.irons > 0, lurch: sh.lurch / ABOUT.lurch, roll: deckAt(this.state, i, DECK).roll,
     };
   }
 

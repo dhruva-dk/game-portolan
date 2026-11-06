@@ -6,6 +6,7 @@ import { ability } from '../sim/abilities.ts';
 import { atHome } from '../sim/territory.ts';
 import { openAt } from '../sim/nav.ts';
 import { seaLevelAt } from '../sim/environment.ts';
+import { seaState } from '../sim/seaway.ts';
 import { R, along, tangentAt } from '../sim/sphere.ts';
 import { activeOf } from '../sim/perks.ts';
 import { INK, isWeapon } from '../sim/tables.ts';
@@ -46,6 +47,7 @@ export const TIPS = {
   fire: { icon: ICON.fire, title: 'On fire', text: 'The flames eat your canvas and leap to ships close downwind. Rain puts them out.' },
   rake: { icon: ICON.target, title: 'Raking fire', text: 'A shot down a ship\'s length from bow or stern does more harm. Cross her bow, or her stern, to rake her.' },
   whale: { icon: ICON.whale, title: 'The whale', text: 'When it breaches it lifts the ships near it, flips any right over it, and scatters loot.' },
+  seaway: { icon: ICON.cannon, title: 'Rough sea', text: 'Your deck rolls. Shots fly truest at the top of each roll, when the ring round Fire glows.' },
   irons: { icon: ICON.wind, title: 'In irons', text: 'Head to wind your canvas shakes and she stops. Turn off the wind, or Gust to break free.' },
   tack: { icon: ICON.sail, title: 'Going about', text: 'Turn your bow through the wind briskly and the canvas fills on the new side with a burst of speed.' },
   gybe: { icon: ICON.sail, title: 'Gybe', text: 'Swing your stern through a strong wind too fast and the yards slam across: you lose speed and aim. Ease the turn.' },
@@ -216,6 +218,7 @@ export class Tips {
     const ev = eventOf(st, me.pos);
     if (ev) this.offer('event', {}, EVENT_ICON[ev.region]);
     if (this.closing(st.tick * TICK, me.pos)) this.offer('tide');
+    if (seaState(st, me.pos) > 0.3) this.offer('seaway');
   }
 
   /** Whether the tide is falling and water round p that is open now will be shut in a little while. */

@@ -10,6 +10,7 @@ import {
   stormView, sunDir, type MatchState, type Ship,
 } from '../sim/match.ts';
 import { seaLevelAt } from '../sim/environment.ts';
+import { deckAt, newDeck } from '../sim/seaway.ts';
 import { eventMark, eventTone } from '../sim/regionEvents.ts';
 import { EVENT_STATE } from '../sim/state.ts';
 import { GALE, GUST, LOOT, PARCELS, PARTS, VOYAGE, isWeapon } from '../sim/tables.ts';
@@ -167,6 +168,13 @@ function weatherAt(s: MatchState, p: V3): WeatherName | null {
   return best;
 }
 
+const DECK = newDeck();
+/** How steady the deck is for a shot, or null in water too slight to roll her (seaway.ts). */
+function steadyOf(s: MatchState, i: number): number | null {
+  const d = deckAt(s, i, DECK);
+  return d.sea < 0.2 ? null : 1 - d.unsteady;
+}
+
 export function hudModel(session: Session): HudModel {
   const s = session.state, sh = s.ships[session.watch];
   const id = ACTIVES[sh.active] as ActiveId, cool = ability(id).cooldown;
@@ -192,6 +200,7 @@ export function hudModel(session: Session): HudModel {
       parcels: PARCELS.map((p, t) => ({ name: p.name, price: priceOf(sh, t), ready: canCall(sh, t) })),
     },
     throttle: session.watch === PLAYER ? session.throttle : 1,
+    steady: steadyOf(s, session.watch),
     using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     region: REGIONS[r]?.name ?? 'the open sea',
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,

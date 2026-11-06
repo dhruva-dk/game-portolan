@@ -39,6 +39,14 @@ export const SHIP = {
 export const POINT = { run: 0.92, beam: 1, upwind: 0.75 } as const;
 
 /**
+ * The seaway (seaway.ts). A sea of the wind's speed at `flat` m/s (the squall's own added) rolls nothing, one of `full`
+ * rolls her `roll` radians each way, over about `period` s. A gun fired as the deck swings through upright spreads up to
+ * `spread` more, by how rough the sea is; at the top of a roll, not at all. A broadside's balls rise (or fall) by
+ * `throw` of what the roll would tilt them, toward the rigging on the up-roll and the hull on the down.
+ */
+export const SEAWAY = { flat: 5, full: 17, roll: 0.14, period: 6.5, spread: 1.6, throw: 0.35 } as const;
+
+/**
  * Going about. Pointing higher than `nogo` radians off the wind's run (into the eye of it), she pinches, the canvas
  * shaking; held there past `linger` seconds in any real wind (`breeze` of a fair one) she loses her way and hangs in
  * irons for `irons` s, turning at `ironsTurn` of her rate and making `ironsSpeed` m/s, until she pays off or the gust

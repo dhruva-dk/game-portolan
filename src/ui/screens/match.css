@@ -98,6 +98,12 @@
 .s-hud__pad { right: var(--sp-5); bottom: var(--sp-5); width: calc(270px * var(--k)); height: calc(250px * var(--k)); }
 .s-hud__pad .s-mx__hold { position: absolute; }
 .s-hud__fire { right: 0; bottom: 0; width: calc(132px * var(--k)); height: calc(132px * var(--k)); }
+/* the deck's steadiness in a seaway: a ring that tightens and brightens as she hangs at the top of a roll */
+.s-hud__steady { position: absolute; inset: calc(-7px * var(--k)); border-radius: 50%; pointer-events: none; opacity: 0;
+  border: calc(3px * var(--k)) solid var(--c-cream); transition: opacity 0.3s; --steady: 0;
+  transform: scale(calc(1.12 - var(--steady) * 0.12)); }
+.s-hud__fire.is-rolling .s-hud__steady { opacity: calc(0.12 + var(--steady) * var(--steady) * 0.8);
+  box-shadow: 0 0 calc(14px * var(--k) * var(--steady)) rgba(255, 236, 190, calc(var(--steady) * 0.7)); }
 .s-hud__gust { right: calc(146px * var(--k)); bottom: 0; width: calc(84px * var(--k)); height: calc(84px * var(--k)); }
 .s-hud__abil { right: calc(140px * var(--k)); bottom: calc(104px * var(--k)); width: calc(84px * var(--k)); height: calc(84px * var(--k)); }
 .s-hud__reload { right: calc(16px * var(--k)); bottom: calc(150px * var(--k)); width: calc(72px * var(--k)); height: calc(72px * var(--k)); }

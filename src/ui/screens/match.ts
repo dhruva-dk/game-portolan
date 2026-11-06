@@ -221,7 +221,9 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const takeB = button({ label: 'Take', icon: ICON.hand, kind: 'secondary', size: 'sm', parent: take, what: 'hud:take', onPress: () => { a.press('take', true); a.press('take', false); } });
 
   const pad = box('s-hud__pad', root);
-  holdButton('s-hud__fire', ICON.cannon, 'Fire', pad, 'fire', a);
+  const fireB = holdButton('s-hud__fire', ICON.cannon, 'Fire', pad, 'fire', a);
+  // in a seaway, a ring round Fire that fills as the deck steadies at the top of each roll
+  const steadyRing = el('s-hud__steady', fireB);
   const gust = holdButton('s-hud__gust', ICON.gust, 'Gust', pad, 'gust', a);
   const abil = holdButton('s-hud__abil', ICON.star, 'Ability', pad, 'ability', a);
   const reload = holdButton('s-hud__reload', ICON.reload, 'Reload', pad, 'reload', a);
@@ -372,6 +374,8 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     abil.querySelector('.s-mx__holdN')!.textContent = h.ability.ready >= 1 ? '' : `${h.ability.seconds}`;
     abil.classList.toggle('is-off', h.ability.ready < 1);
     reload.classList.toggle('is-off', h.slots[h.selected]?.kind !== 'weapon');
+    fireB.classList.toggle('is-rolling', h.steady !== null);
+    if (h.steady !== null) steadyRing.style.setProperty('--steady', h.steady.toFixed(2));
     // the weather you are in, the tide's level and way, then the perks you hold
     const level = Math.round(((h.tide.level + 1) / 2) * 10);
     const key = `${h.weather}|${level}|${h.tide.rising}|${h.perks.join()}`;
