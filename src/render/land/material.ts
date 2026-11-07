@@ -32,6 +32,8 @@ type V3 = Node<'vec3'>;
 /** Past this distance the ground is painted with its scans' means alone; the textures fade out over the last part. */
 const FAR = 230;
 const FADE = 70;
+/** Metres under the sea past which the seabed's scans are left off (from half as deep they fade). */
+const DEEP = 12;
 /** How far the height maps push one layer into the next, and over how much height they blend. */
 const HEIGHT_PUSH = 0.65;
 const HEIGHT_SOFT = 0.18;
@@ -224,7 +226,10 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     dpy.assign(dFdy(p));
     const tri = pow(abs(gn), vec3(6)).toVar();
     const triW = tri.div(tri.x.add(tri.y).add(tri.z)).toVar('landTriplanar');
-    const detailFade = float(1).sub(smoothstep(FAR - FADE, FAR, dist)).toVar('landDetail');
+    // the scans' grain is left off with distance, and under the sea once the water over it is deep enough to hide it:
+    // the seabed through deep water shows only its colour, and painting it (three scans a pixel, each along up to
+    // three axes) was most of what the land cost the iPad, the open sea's floor being most of the screen
+    const detailFade = float(1).sub(smoothstep(FAR - FADE, FAR, dist)).mul(smoothstep(-DEEP, -DEEP / 2, above)).toVar('landDetail');
     const flatten = mix(float(1), float(0.45), smoothstep(30, 160, dist)).toVar();
     const broadly = smoothstep(18, 80, dist).toVar();
     const facesX = triW.x.greaterThan(triW.y).and(triW.x.greaterThan(triW.z)).toVar();

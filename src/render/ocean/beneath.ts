@@ -43,6 +43,8 @@ const SUN_BLUR = 0.0047;
 const FOCUS = 0.7;
 /** The brightest a caustic gets, times the light that fell on the surface. */
 const BRIGHTEST = 7;
+/** Metres of water past which the floor takes no caustics and no shadow of its own (from 0.6 of it they fade). */
+const CAUSTICS = 16;
 /** How far the crests can stand above the mean sea, metres: nothing higher than this is ever under water. */
 const CRESTS = 4;
 
@@ -129,17 +131,25 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
           const pixel = length(fwidth(p));
           const blur = max(max(path.mul(SUN_BLUR), pixel.mul(1.5)), 0.01);
           const k = path.mul(BEND);
-          const H = curvature(up, run, FRAMES[0], blur, k).mul(w.x).toVar();
-          If(w.y.greaterThan(0), () => {
-            H.addAssign(curvature(up, run, FRAMES[1], blur, k).mul(w.y));
+          // deeper than CAUSTICS the waves' focus has spread into the even light it averages to, and a hull's shadow
+          // on the floor is lost in the water over it: neither is worked out there, which spares the open sea's floor
+          // the curvature's samples and a second read of the shadow map in every pixel
+          const near = smoothstep(CAUSTICS, CAUSTICS * 0.6, depth).toVar();
+          const caustic = float(1).toVar(), shade = float(1).toVar();
+          If(near.greaterThan(0), () => {
+            const H = curvature(up, run, FRAMES[0], blur, k).mul(w.x).toVar();
+            If(w.y.greaterThan(0), () => {
+              H.addAssign(curvature(up, run, FRAMES[1], blur, k).mul(w.y));
+            });
+            const det = float(1).add(k.mul(H.x)).mul(float(1).add(k.mul(H.y))).sub(k.mul(k).mul(H.z).mul(H.z));
+            const focus = clamp(float(1).div(max(abs(det), 1 / BRIGHTEST)), 0, BRIGHTEST);
+            // a hand's depth of water is too thin to focus anything yet
+            caustic.assign(mix(float(1), mix(float(1), focus, smoothstep(0, 0.25, depth)), near));
+            shade.assign(mix(float(1), sunShadow(), near));
           });
-          const det = float(1).add(k.mul(H.x)).mul(float(1).add(k.mul(H.y))).sub(k.mul(k).mul(H.z).mul(H.z));
-          const focus = clamp(float(1).div(max(abs(det), 1 / BRIGHTEST)), 0, BRIGHTEST);
-          // a hand's depth of water is too thin to focus anything yet
-          const caustic = mix(float(1), focus, smoothstep(0, 0.25, depth));
           // the sun's share of the light on a level patch here, which is the share the caustics move: none in the
           // shadow of a hull or a cliff
-          const sun = luma(sunlight).mul(max(mu, 0)).mul(sunShadow());
+          const sun = luma(sunlight).mul(max(mu, 0)).mul(shade);
           const sky = luma(skyLight(p, up));
           const share = sun.div(max(sun.add(sky), 1e-6));
           out.assign(colour.mul(down.mul(caustic).mul(share).add(diffuse.mul(float(1).sub(share)))));
