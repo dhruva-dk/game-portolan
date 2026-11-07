@@ -81,22 +81,6 @@ export interface PlayerView extends Mark {
   bestTier: number;
 }
 
-// ---------------------------------------------------------------- lobby
-
-export type MenuId = 'abilities' | 'locker' | 'rivals' | 'career' | 'rank' | 'settings';
-
-export interface LobbyModel {
-  player: PlayerView;
-  active: ActiveId;
-  passive: PassiveId;
-  look: Look;
-  /** Counts of new things waiting on each menu, for the badges. */
-  news: Partial<Record<MenuId, number>>;
-  /** One line about the league, such as a rival's grudge. */
-  ticker: string[];
-  stats: { matches: number; wins: number; top5: number };
-}
-
 // ---------------------------------------------------------------- abilities and locker
 
 export interface AbilityView {

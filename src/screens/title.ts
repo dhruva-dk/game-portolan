@@ -10,7 +10,7 @@
 // once done it is painted on the sheet plane once; the rose, once drawn, is a sprite, so it can fly, and only its needle
 // is drawn each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
 import {
-  Pen, Press, canvas, ctx, drawSprite, dryAlpha, ease, flight, galleon, needle, pressLook, rhumbWeb, rose, stamp, unroll,
+  Pen, Press, canvas, ctx, drawSprite, ease, flight, galleon, needle, pressLook, rhumbWeb, rose, stamp, unroll,
   type Baked, type ChartLayer, type Colours, type Rect, type Sprite,
 } from '../chart/index.ts';
 import { effect } from '../ui/parts/feedback.ts';
@@ -33,6 +33,9 @@ export interface TitleHost {
 /** The sheet's tone before its paper is made: the launch screen's and the page's, so the app opens on it. */
 export const BLANK = '#dfc8a2';
 
+/** Seconds from the press to the title's rose landing in its corner, where the lobby takes it up. */
+export const TITLE_LANDS = 0.88;
+
 /** When each thing happens, seconds: from the paper's arrival for the ink, from the press for the leaving. */
 const AT = {
   /** The paper's grain comes up over the blank tone. */
@@ -45,12 +48,12 @@ const AT = {
   thin: 2.4,
   rest: 0.42,
   /** After the press: the sheet, lifted off the world, turns opaque again (vellum is clear only where it lies on what
-   *  is under it); then it rolls off, while the rose flies (landing at `land` of its flight), stamps, and dries. */
+   *  is under it); then it rolls off, while the rose flies (landing at `land` of its flight) and stamps in its corner,
+   *  where the lobby keeps it. */
   lift: 0.16,
   roll: [0.16, 0.92],
   fly: 1.1,
-  land: 0.8,
-  dry: [1.45, 2.05],
+  land: TITLE_LANDS / 1.1,
 } as const;
 
 /** How far through [a, b] the seconds s are, 0..1. */
@@ -91,7 +94,16 @@ function geo(layer: ChartLayer): Geo {
   return { w, h, cx, cy, r, needle: r * 0.52, ring: Math.min(w, h) * 0.56, reach: Math.hypot(w, h), mx: cx, my, size, corner: l.rose };
 }
 
-const ROSE = { points: 32, ring: 0.12, seed: 17 } as const;
+/** The rose: the title's, and the one it becomes in the lobby's corner. */
+export const ROSE = { points: 32, ring: 0.12, seed: 17 } as const;
+
+/** The rose drawn at the size it keeps in the lobby chart's corner: the title's rose lands as it, and the lobby keeps it. */
+export function cornerRose(layer: ChartLayer): Sprite {
+  const c = layer.layout.rose, d = Math.ceil(c.r * 2 + 8);
+  return layer.sprite(`corner-rose|${c.r}`, d, d, d / 2, d / 2, (pen) => rose(pen, d / 2, d / 2, c.r, ROSE, 1));
+}
+
+
 
 export class Title {
   readonly #host: HTMLElement;
@@ -139,15 +151,15 @@ export class Title {
     this.#needle.at = now;
     this.#lay();
     const off = layer.addLive((g, t) => this.#frame(g, t) ?? undefined);
-    layer.setSheet((g, pen) => this.#sheet(g, pen));
+    const offSheet = layer.addSheet((g, pen) => this.#sheet(g, pen));
     layer.presses.add({
       id: 'title', hit: { x: layer.layout.w / 2, y: layer.layout.h / 2, w: layer.layout.w, h: layer.layout.h }, press: this.#press,
       sound: 'tap', haptic: 'selection', act: () => (this.#canLeave(this.#needle.at) ? this.#h.start() : this.#kick()),
     });
     this.#off = () => {
       off();
+      offSheet();
       layer.presses.remove('title');
-      layer.setSheet(null);
     };
   }
 
@@ -155,7 +167,7 @@ export class Title {
   resize(): void {
     if (!this.#layer) return;
     this.#lay();
-    this.#layer.setSheet((g, pen) => this.#sheet(g, pen));
+    this.#layer.invalidate();
     const p = this.#layer.presses.list.find((q) => q.id === 'title');
     if (p) p.hit = { x: this.#layer.layout.w / 2, y: this.#layer.layout.h / 2, w: this.#layer.layout.w, h: this.#layer.layout.h };
   }
@@ -342,21 +354,23 @@ export class Title {
     // the rose lifts off the sheet and flies, shrinking to the corner's size, its shadow falling away beneath it
     const fu = s / AT.fly, to = g.corner, f = flight({ x: g.cx, y: g.cy }, to, fu, 0.3, AT.land);
     const k = (1 + (to.r / g.r - 1) * ease.inOut(Math.min(1, fu / AT.land))) * f.scale;
-    const alpha = dryAlpha(span(s, AT.dry));
-    if (alpha > 0) {
-      if (!f.landed) {
-        const sr = g.r * k * 0.98, sx = f.x + f.shadow.dx, sy = f.y + f.shadow.dy;
-        const sh = gc.createRadialGradient(sx, sy, sr * 0.6, sx, sy, sr * 1.12);
-        sh.addColorStop(0, `rgba(30,18,6,${f.shadow.alpha})`);
-        sh.addColorStop(1, 'rgba(30,18,6,0)');
-        gc.fillStyle = sh;
-        gc.fillRect(sx - sr * 1.2, sy - sr * 1.2, sr * 2.4, sr * 2.4);
-      }
-      drawSprite(gc, this.#flyer!, f.x, f.y, { scale: k, alpha });
-      layer.pen.mood({ dry: 1 - alpha }, () => needle(layer.pen, f.x, f.y, g.needle * k, this.#needle.a, 1));
-      if (f.landed) stamp(layer.pen, to.x, to.y, to.r, f.stamp);
+    if (!f.landed) {
+      const sr = g.r * k * 0.98, sx = f.x + f.shadow.dx, sy = f.y + f.shadow.dy;
+      const sh = gc.createRadialGradient(sx, sy, sr * 0.6, sx, sy, sr * 1.12);
+      sh.addColorStop(0, `rgba(30,18,6,${f.shadow.alpha})`);
+      sh.addColorStop(1, 'rgba(30,18,6,0)');
+      gc.fillStyle = sh;
+      gc.fillRect(sx - sr * 1.2, sy - sr * 1.2, sr * 2.4, sr * 2.4);
+      // as it nears the corner the rose becomes the corner's own, drawn at the weight it keeps there
+      const c = Math.min(1, Math.max(0, (fu / AT.land - 0.55) / 0.45));
+      if (c < 1) drawSprite(gc, this.#flyer!, f.x, f.y, { scale: k, alpha: 1 - c });
+      if (c > 0) drawSprite(gc, cornerRose(layer), f.x, f.y, { scale: (k * g.r) / to.r, alpha: c });
+      needle(layer.pen, f.x, f.y, g.needle * k, this.#needle.a, 1);
+    } else if (fu < 1) {
+      // landed: the lobby has it now; the title leaves only the stamp it made
+      stamp(layer.pen, to.x, to.y, to.r, f.stamp);
     }
-    if (u >= 1 && s >= AT.dry[1]) {
+    if (u >= 1 && fu >= 1) {
       this.dispose();
       this.onGone?.();
     }

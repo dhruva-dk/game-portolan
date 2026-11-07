@@ -8,6 +8,9 @@ import { v3, type V3 } from '../sim/math.ts';
 
 export type CameraMode = 'chase' | 'eye' | 'high' | 'orbit';
 
+/** The orbit view's field of view, degrees: the lobby cuts its chart's window to the planet it frames. */
+export const ORBIT_FOV = 40;
+
 /** What the camera follows: a point on the sea (a unit vector), the way it faces (a unit tangent there). */
 export interface CameraTarget {
   pos: V3;
@@ -122,7 +125,7 @@ export class CameraRig {
     else this.groundPose(mode, pu);
 
     // the flight between modes: round the planet, not through it
-    let pos = this.pos, quat = this.quat, fov = mode === 'orbit' ? 40 : this.fov;
+    let pos = this.pos, quat = this.quat, fov = mode === 'orbit' ? ORBIT_FOV : this.fov;
     if (this.blend < 1) {
       this.blend = Math.min(1, this.blend + dt / this.span);
       const s = smoother(this.blend);

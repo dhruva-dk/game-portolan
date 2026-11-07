@@ -1,13 +1,13 @@
 // The interface gallery. Every part, and every screen driven by fixtures, at iPad and iPhone sizes.
 //
 //   dev/ui.html                               the gallery: a device frame with a picker for screen and device
-//   dev/ui.html?device=iphone&screen=lobby    the same, opened on a screen
+//   dev/ui.html?device=iphone&screen=rank     the same, opened on a screen
 //   dev/ui.html?frame=1&device=ipad&screen=X  one screen alone at the window's size (what the frame shows, and what
 //                                             screenshots load with the viewport at the device's size)
 //   dev/ui.html?grid=1                        every screen at both sizes, side by side
 //
-// Screens are live: their buttons navigate the way the game will (lobby → menus → Gale → match → results),
-// with the fixtures standing in for the career and the match.
+// Screens are live, with the fixtures standing in for the career and the match; the title and the lobby are drawn on
+// the chart (src/screens/) and are not here.
 import { DEVICES, SCREENS, mountScreen, type DeviceName } from './ui-screens.ts';
 
 const q = new URLSearchParams(location.search);

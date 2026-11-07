@@ -1,6 +1,6 @@
 // The chart's small drawings: a pennant on its staff, tally marks, the sand-glass, the pointing hand, gilt stars, the
 // inked cross of a mark, a fight's burst, the sun and the moon, the stamp a landed thing leaves, and the plain
-// instruments of the controls (the stick's ring and nub, the sails' notched quadrant).
+// instruments of the controls (the stick's ring and nub, the sails' notched quadrant, the settings' dividers).
 //
 // All take t, 0..1, and ink themselves in as it runs; the live ones (a pennant's flutter, the sand running) take their
 // state as plain numbers so the live layer can redraw them each frame for the price of a few paths.
@@ -397,6 +397,38 @@ export function stick(pen: Pen, x: number, y: number, r: number, nx: number, ny:
       pen.stroke(arcPts(nx, ny, nr, -Math.PI / 2, Math.PI * 1.5, 40), { w: 'bold', nib: 0.2, pool: 0.3, seed: 83 }, nt);
       pen.stroke(arcPts(nx, ny, nr * 0.55, -Math.PI / 2, Math.PI * 1.5, 30), { w: 'hair', nib: 0.2, pool: 0.1, seed: 84 }, nt);
     });
+  }
+}
+
+/**
+ * The settings' instrument: a pair of brass dividers, the chartmaker's own tool, standing open on their points with the
+ * hinge at the top. `spread` is half the angle between the legs (a press closes them a little); (x, y) is the middle
+ * of the instrument, `size` its height.
+ */
+export function dividers(pen: Pen, x: number, y: number, size: number, spread = 0.36, t = 1): void {
+  if (t <= 0) return;
+  const hx = x, hy = y - size * 0.36, L = size * 0.84, w = size * 0.075;
+  for (const side of [-1, 1]) {
+    // the leg: broad at the hinge, filed to a point, bevelled down its middle
+    const a = side * spread, dx = Math.sin(a), dy = Math.cos(a), nx = dy, ny = -dx;
+    const px = hx + dx * L, py = hy + dy * L, kx = hx + dx * L * 0.78, ky = hy + dy * L * 0.78;
+    const leg = [hx + nx * w, hy + ny * w, kx + nx * w * 0.55, ky + ny * w * 0.55, px, py, kx - nx * w * 0.55, ky - ny * w * 0.55, hx - nx * w, hy - ny * w];
+    pen.gilt(shape(leg), 'gold', hx, hy + L * 0.4, L * 0.6, span(t, 0.35, 0.9));
+    pen.stroke([...leg, leg[0], leg[1]], { w: 'fine', nib: 0.25, pool: 0.3, taper: 1, seed: side > 0 ? 95 : 96 }, span(t, 0, 0.65));
+    pen.rule([[hx, hy, kx, ky]], { w: 'hair', alpha: 0.6, seed: side > 0 ? 97 : 98 }, span(t, 0.3, 0.8));
+  }
+  // the hinge, and the knurled grip above it
+  const ht = span(t, 0.55, 1);
+  if (ht > 0) {
+    const r = size * 0.1, grip = shape([hx - r * 0.45, hy - r * 0.6, hx - r * 0.38, hy - r * 2.6, hx + r * 0.38, hy - r * 2.6, hx + r * 0.45, hy - r * 0.6]);
+    pen.gilt(grip, 'gold', hx, hy - r * 1.6, r * 1.2, ht);
+    pen.stroke([hx - r * 0.45, hy - r * 0.6, hx - r * 0.38, hy - r * 2.6, hx + r * 0.38, hy - r * 2.6, hx + r * 0.45, hy - r * 0.6], { w: 'hair', pool: 0.2, seed: 99 }, ht);
+    pen.rule([0.9, 1.4, 1.9].map((k) => [hx - r * 0.42, hy - r * k, hx + r * 0.42, hy - r * k]), { w: 'hair', alpha: 0.55, seed: 100 }, ht);
+    const pivot = new Path2D();
+    pivot.arc(hx, hy, r, 0, TAU);
+    pen.gilt(pivot, 'gold', hx, hy, r, ht);
+    pen.stroke(arcPts(hx, hy, r, 0, TAU, 24), { w: 'fine', pool: 0.1, seed: 101 }, ht);
+    pen.dot(hx, hy, Math.max(0.6, r * 0.22), 'iron', 0.9 * ht);
   }
 }
 

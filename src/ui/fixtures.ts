@@ -6,7 +6,7 @@ import { ABILITIES, type AbilityId, type ActiveId, type PassiveId } from '../sim
 import { REGIONS } from '../sim/world/index.ts';
 import {
   RANK_LADDER, rarityOf, type AbilitiesModel, type AbilityView, type CareerModel, type CosmeticKind, type CosmeticView,
-  type DeathModel, type GaleModel, type HudModel, type LevelView, type LobbyModel, type LockerModel, type Look, type PlayerView,
+  type DeathModel, type GaleModel, type HudModel, type LevelView, type LockerModel, type Look, type PlayerView,
   type RankModel, type RankView, type ResultsModel, type RivalView, type RivalsModel, type SpectateModel,
   type Unlock, type VictoryModel,
 } from './model.ts';
@@ -255,15 +255,6 @@ export function fxCareer(): CareerModel {
 }
 
 export const fxRank = (): RankModel => ({ rank: rankView(10, 0.62), bestTier: FX_TIER, rewards: fxCosmetics().filter((c) => c.unlock.by === 'rank') });
-
-export function fxLobby(): LobbyModel {
-  return {
-    player: fxPlayer(), active: 'smokeScreen', passive: 'quickReload', look: { ...FX_LOOK },
-    news: { locker: 3, abilities: 1 },
-    ticker: ['Saetta remembers you sank it, and hunts you.', 'Orca has learned you dive into the Spice Isles.'],
-    stats: { matches: 37, wins: 4, top5: 15 },
-  };
-}
 
 export function fxGale(): GaleModel {
   const r = rng(7);

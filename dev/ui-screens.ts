@@ -3,11 +3,10 @@
 import { Shell } from '../src/ui/shell.ts';
 import { applyParchment, el, setChartPainter } from '../src/ui/parts/index.ts';
 import { Parchment } from '../src/render/paper/parchment.ts';
-import { fxAbilities, fxCareer, fxLobby, fxLocker, fxRank, fxRivals } from '../src/ui/fixtures.ts';
+import { fxAbilities, fxCareer, fxLocker, fxRank, fxRivals } from '../src/ui/fixtures.ts';
 import { DEFAULT_SETTINGS } from '../src/ui/model.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen } from '../src/ui/screens/menus.ts';
 import { warmChart } from '../src/ui/screens/chart.ts';
-import { lobbyScreen } from '../src/ui/screens/lobby.ts';
 import { partsGallery } from './ui-parts.ts';
 
 /** The two designed devices, as tools/harness.ts has them: CSS size and safe areas. */
@@ -17,7 +16,7 @@ export const DEVICES = {
 } as const;
 export type DeviceName = keyof typeof DEVICES;
 
-export const SCREENS = ['parts', 'lobby', 'abilities', 'locker', 'rivals', 'career', 'rank', 'settings'];
+export const SCREENS = ['parts', 'abilities', 'locker', 'rivals', 'career', 'rank', 'settings'];
 
 const devStyle = `
   .dev-backdrop { position: fixed; inset: 0; overflow: hidden; background: linear-gradient(180deg, #6d8fb3 0%, #b9c7cf 38%, #e8d2a6 47%, #2f5d72 47.4%, #1f4256 70%, #10283a 100%); }
@@ -75,8 +74,8 @@ export function mountScreen(screen: string, device: DeviceName): void {
   void backdrop;
   const go = (id: string) => { location.search = `?frame=1&device=${device}&screen=${id}`; };
   if (screen === 'parts') shell.show('parts', { el: partsGallery(shell) }, 'fade');
-  if (screen === 'lobby') shell.show('lobby', lobbyScreen(fxLobby(), { onPlay: () => go('gale'), onOpen: (m) => go(m) }), 'fade');
-  const back = () => go('lobby');
+  // the lobby is drawn on the chart now (src/screens/lobby.ts): the menus go back to the parts
+  const back = () => go('parts');
   if (screen === 'abilities') shell.show('abilities', abilitiesScreen(fxAbilities(), { onBack: back, onEquip: () => {} }), 'fade');
   if (screen === 'locker') shell.show('locker', lockerScreen(fxLocker(), { onBack: back, onEquip: () => {}, onPreview: () => {} }), 'fade');
   if (screen === 'rivals') shell.show('rivals', rivalsScreen(fxRivals(), { onBack: back }), 'fade');

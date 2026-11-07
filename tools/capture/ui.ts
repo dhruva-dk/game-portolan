@@ -14,19 +14,24 @@ export interface Transition {
   times?: readonly number[];
 }
 
+/** The title's leaving, into the lobby inking in once its sheet is off; and the lobby inking in. */
+const LEAVE_TITLE = [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200, 2800, 3400];
+const INK_LOBBY = [0, 150, 300, 500, 700, 900, 1200, 1500, 1800, 2200];
+
 // The flow, title to lobby to every menu and back, then a match's screens to the results and home.
 export const TRANSITIONS: readonly Transition[] = [
   // the title is drawn on the chart: it inks itself in over seconds, and leaves (from its inked sheet) as the sheet rolls off
   { name: 'boot-title', from: 'h.go("boot")', to: 'h.go("title")', times: [0, 250, 500, 800, 1200, 1700, 2300, 3000, 3700, 4500] },
   {
     name: 'title-lobby', from: 'h.go("title"); h.freezeUi(true); h.scrubUi(6000); h.freezeUi(false)', to: 'h.go("lobby")',
-    times: [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200],
+    times: LEAVE_TITLE,
   },
+  // the lobby is drawn on the chart: it inks in over two seconds, dries off in a third of one, rolls up into the Gale
   ...['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'].flatMap((s) => [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
-    { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")' },
+    { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),
-  { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })' },
+  { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })', times: [0, 100, 200, 300, 400, 500, 600, 700, 800, 1000] },
   { name: 'gale-match', from: 'h.play({ seed: 11 })', to: 'h.dive()' },
   // the match's own screens follow the sim, which only moves here when a frame is drawn
   { name: 'match-death', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
@@ -34,7 +39,7 @@ export const TRANSITIONS: readonly Transition[] = [
   { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")', to: 'h.finish()' },
   { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer(); await h.draw()' },
   { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()' },
-  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()', to: 'h.go("lobby")' },
+  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()', to: 'h.go("lobby")', times: INK_LOBBY },
 ];
 
 /** Milliseconds into the transition for each frame of the strip. */

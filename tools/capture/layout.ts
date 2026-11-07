@@ -1,7 +1,8 @@
 // The interface's layout rules, measured on every screen at the smallest and largest iPad and iPhone, each with its
 // safe areas. Each screen gets a frame and a list of its touch targets; any rule broken is listed in layout.json and
 // fails the run:
-//   - every touch target is at least 44 points each way, and no two overlap;
+//   - every touch target is at least 44 points each way, and no two overlap (the DOM's targets, and what the chart
+//     offers to be pressed, grown to its touch target; a press over the whole screen, as the title's, is no target);
 //   - nothing you can touch sits under a safe area;
 //   - no text is cut off by its box;
 //   - in a match, the controls used in a fight (fire, gust, ability, reload and the sails) have their centres in the
@@ -102,6 +103,15 @@ async function measure(game: Game): Promise<Measured> {
       const s = getComputedStyle(e);
       const hides = s.overflow !== 'visible' || s.overflowX !== 'visible' || s.textOverflow === 'ellipsis';
       if (hides && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2)) clipped.push(`${e.className || e.tagName}: "${e.textContent!.trim().slice(0, 40)}"`);
+    }
+    // the chart's pressables, each grown to the chart's touch target as the chart grows it to take a finger
+    type Hit = { x: number; y: number; r?: number; w?: number; h?: number };
+    const chart = (window as unknown as { __portolan: { app: { chart: { presses: { list: { id: string; hit: Hit; disabled?: boolean }[] } } | null } } }).__portolan.app.chart;
+    const T = 56;
+    for (const p of chart?.presses.list ?? []) {
+      const h = p.hit, w = h.r !== undefined ? Math.max(h.r * 2, T) : Math.max(h.w ?? 0, T), hh = h.r !== undefined ? w : Math.max(h.h ?? 0, T);
+      if (w >= innerWidth * 0.9 && hh >= innerHeight * 0.9) continue;
+      targets.push({ what: `chart:${p.id}`, x: h.x - w / 2, y: h.y - hh / 2, w, h: hh, fw: w, fh: hh, fight: false });
     }
     return { targets, clipped, safe, vw: innerWidth, vh: innerHeight };
   });

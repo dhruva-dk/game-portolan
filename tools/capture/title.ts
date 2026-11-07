@@ -10,7 +10,7 @@ const INK = [0, 250, 500, 800, 1200, 1700, 2300, 3000, 3700, 4500];
 const LOADING = [5200, 5900, 6600, 7300];
 /** After the world is let be ready, and after the press. */
 const SETTLE = [300, 700, 1200, 2000, 3000];
-const LEAVE = [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200];
+const LEAVE = [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200, 2800, 3400];
 
 /** Steps the held clock to `ms` a frame at a time, drawing the world with it, so whatever is stepped by the frames (the
  *  needle, the camera's flight to the lobby) moves as it would. */
@@ -33,14 +33,17 @@ export async function title(r: Rig, o: { dpr: number; device?: string }): Promis
     const game = await openApp(r, { device, dpr: o.dpr });
     const shots = await Shots.create(`title-${device}`);
     await game.hook((h) => h.holdTitle(0.15));
-    await game.hook((h) => { h.go('title'); h.freezeUi(true); });
-    let at = 0;
+    // a capture opens on the lobby: it is let dry away before the title opens on a blank sheet
+    await game.hook((h) => { h.freezeUi(true); h.go('boot'); });
+    const base = await to(game, 0, 600);
+    await game.hook((h) => h.go('title'));
+    let at = base;
     for (const ms of INK) {
-      at = await to(game, at, ms);
+      at = await to(game, at, base + ms);
       await shots.shot(game, `ink ${ms} ms`);
     }
     for (const ms of LOADING) {
-      at = await to(game, at, ms);
+      at = await to(game, at, base + ms);
       await shots.shot(game, `loading ${ms} ms`);
     }
     // the world is ready: the needle swings to north and settles

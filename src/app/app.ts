@@ -8,6 +8,7 @@ import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { GpuStage } from '../render/gpu/stage.ts';
+import { ORBIT_FOV } from '../render/camera.ts';
 import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
@@ -15,11 +16,11 @@ import { Studio } from '../render/studio.ts';
 import { Parchment } from '../render/paper/parchment.ts';
 import type { Weapon } from '../render/actors/view.ts';
 import { setStudio } from '../ui/parts/art.ts';
-import { equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
+import { careerStats, equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
 import { ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
-import { REGIONS, adoptHeights, regionAt } from '../sim/world/index.ts';
+import { REGIONS, adoptHeights, heightAt, regionAt } from '../sim/world/index.ts';
 import { P } from '../render/gpu/uniforms.ts';
 import { adoptNav, type Nav } from '../sim/nav.ts';
 import type { V3 } from '../sim/math.ts';
@@ -30,17 +31,17 @@ import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './mom
 import type { Moment } from './events.ts';
 import { deathModel, galeModel, hudModel, markOf, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
-import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
+import { frameAt, homeScene, latLonOf, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { CareerHolder } from './career.ts';
-import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivalsModel } from './models.ts';
+import { abilitiesModel, careerModel, levelView, lockerModel, rankModel, rankView, rivalsModel } from './models.ts';
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
-import { ChartLayer, type Insets } from '../chart/index.ts';
-import { Title } from '../screens/title.ts';
-import { lobbyScreen } from '../ui/screens/lobby.ts';
+import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, type Insets } from '../chart/index.ts';
+import { TITLE_LANDS, Title } from '../screens/title.ts';
+import { Lobby, type CareerMarks, type Turn } from '../screens/lobby.ts';
 import { page } from '../ui/screens/frame.ts';
 import {
   deathScreen, galeScreen, hudScreen, resultsScreen, spectateScreen, victoryScreen, type GaleView, type HudView, type SpectateView,
@@ -49,7 +50,7 @@ import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, 
 import { warmChart } from '../ui/screens/chart.ts';
 import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
-  CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, VictoryModel,
+  CosmeticKind, DeathModel, GaleModel, HudModel, ResultsModel, Settings, SpectateModel, VictoryModel,
 } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
@@ -65,6 +66,15 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
+
+/** The rank's tiers (Iron to Legend) as the illuminations rarity is drawn in, plainest first. */
+const TIER_ILLUMINATION: readonly Illumination[] = ['ink', 'ink', 'rubric', 'rubric', 'redBlue', 'redBlue', 'silver', 'gold'];
+
+/** The hour on the device's clock, for the lobby's sun. */
+const localHour = (): number => {
+  const d = new Date();
+  return d.getHours() + d.getMinutes() / 60;
+};
 
 export class App {
   readonly log = new EffectLog();
@@ -92,14 +102,20 @@ export class App {
   readonly options: AppOptions;
   screen: ScreenName = 'boot';
   /** The fixed scene on the stage: the lobby's, the title's, or one the hook jumped to. */
-  view: SceneSpec = titleScene();
+  view: SceneSpec;
+  /** The lobby's hour, by the device's clock (a capture's is fixed), so the planet under it is lit for the real sun. */
+  readonly hour: number;
+  /** Where the lobby's planet is turned to, kept between visits; and its coasts, traced by the chart worker. */
+  private readonly turn: Turn;
+  private coasts: Coasts | null = null;
   ready = false;
   /** True while the hook holds a fixed scene: the ship there sails at full speed for its wake. */
   private fixed = false;
   private readonly canvas: HTMLCanvasElement;
   private loaded: Promise<void> | null = null;
-  /** The title on the chart, while it is up or leaving. */
+  /** The title and the lobby on the chart, while each is up or leaving. */
   private title: Title | null = null;
+  private lobby: Lobby | null = null;
   /** How far the world has loaded, 0..1. */
   private progress = 0;
   /** Whether the stage has drawn the world yet, and whether the ships are built (after the title's materials). */
@@ -110,7 +126,7 @@ export class App {
   /** The capture tools hold the title as if the world were this far loaded (null: as it is). */
   titleHold: number | null = null;
   private readonly sun = new THREE.Vector3();
-  /** Unlocks the player has not looked at yet: badges on the lobby's tiles and "new" on the cards. */
+  /** Unlocks the player has not looked at yet: "new" on the menus' cards. */
   private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
   /** A cosmetic the locker is trying on the lobby's ship, over what it wears. */
   private preview: { kind: CosmeticKind; id: string } | null = null;
@@ -121,6 +137,10 @@ export class App {
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
     this.canvas = canvas;
     this.options = options;
+    this.hour = options.capture ? 16.5 : localHour();
+    this.view = lobbyScene(undefined, this.hour);
+    const home = latLonOf(homeScene().pos);
+    this.turn = { lat: (home.lat * Math.PI) / 180, lon: (home.lon * Math.PI) / 180, vLat: 0, vLon: 0 };
     this.overlay = overlay;
     this.controls = new Controls(layer(overlay, 'app-touch'));
     this.controls.on = false;
@@ -192,6 +212,7 @@ export class App {
     if (!this.chart) return;
     this.chart.resize(innerWidth, innerHeight, devicePixelRatio || 1, safeArea());
     this.title?.resize();
+    this.lobby?.resize();
   }
 
   /** Builds the stage and the actors; the title's needle reads the progress. */
@@ -210,9 +231,10 @@ export class App {
     mark('page');
     // the world's heights and the captains' chart, baked alongside the rest of the boot
     const chart = new Worker(new URL('../sim/chart-worker.ts', import.meta.url), { type: 'module' });
-    chart.onmessage = (e: MessageEvent<{ heights: Float32Array; nav: Nav }>) => {
+    chart.onmessage = (e: MessageEvent<{ heights: Float32Array; nav: Nav; coasts: Coasts }>) => {
       adoptHeights(e.data.heights);
       adoptNav(e.data.nav);
+      this.coasts ??= e.data.coasts;
       chart.terminate();
     };
     chart.postMessage(0);
@@ -224,6 +246,7 @@ export class App {
       this.sizeChart();
       this.chart.attach(window);
       this.title?.attach(this.chart, this.chartNow());
+      this.lobby?.attach(this.chart, this.chartNow());
       mark('paper');
     });
     mark('stage');
@@ -294,13 +317,19 @@ export class App {
     this.screen = name;
     this.log.add('flow', 'screen', { from, to: name });
     this.fixed = false;
-    if (name === 'title' || name === 'lobby' || (MENUS as readonly string[]).includes(name) || name === 'results') {
-      // the lobby's planet: your ship on the water, or the planet from orbit behind the title
-      this.view = name === 'title' ? titleScene() : lobbyScene();
+    if (name === 'title' || name === 'lobby' || name === 'results') {
+      // the planet from orbit, turned as the lobby left it, behind the title, the lobby and a match's results
+      this.view = lobbyScene(this.turnedTo(), this.hour);
+    } else if ((MENUS as readonly string[]).includes(name)) {
+      // the menus stand on her home water, where the locker fits her out
+      this.view = homeScene();
     }
-    // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next
+    // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby rolls up
+    // into the Gale, or dries away
     if (from === 'title' && name !== 'title') this.title?.leave(this.chartNow());
+    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(this.chartNow(), name);
     if (name === 'title') this.openTitle();
+    if (name === 'lobby') this.openLobby(from);
     const view = this.screenView(name, model);
     this.shell.show(name, view, transition(from, name));
   }
@@ -308,14 +337,11 @@ export class App {
   private screenView(name: ScreenName, model?: unknown): ScreenView {
     const career = this.career.career;
     switch (name) {
-      // both are drawn on the chart (the title), or nothing at all
+      // drawn on the chart (the title, the lobby), or nothing at all
       case 'boot':
       case 'title':
-        return { el: el('s-empty') };
       case 'lobby':
-        return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), {
-          onPlay: () => this.play({}), onOpen: (m) => this.go(m),
-        });
+        return { el: el('s-empty') };
       case 'abilities': {
         const v: MenuView<ReturnType<typeof abilitiesModel>> = abilitiesScreen((model as never) ?? abilitiesModel(career, this.fresh.abilities), {
           onBack: this.back,
@@ -411,14 +437,6 @@ export class App {
     redraw();
   }
 
-  /** The lobby's badges: how many unlocks wait unseen behind each menu. */
-  private news(): LobbyModel['news'] {
-    const n: LobbyModel['news'] = {};
-    if (this.fresh.abilities.size) n.abilities = this.fresh.abilities.size;
-    if (this.fresh.cosmetics.size) n.locker = this.fresh.cosmetics.size;
-    return n;
-  }
-
   /** The menu's cards have shown their "new": once you leave, they are old. */
   private seen(set: Set<string>): void {
     queueMicrotask(() => set.clear());
@@ -476,10 +494,22 @@ export class App {
 
   /** Starts a match from the career's plan: the Gale, or (skipGale) already at sea. */
   play(o: PlayOptions = {}): void {
+    this.begin(this.prepare(o), o);
+  }
+
+  /** Makes the next match, not yet begun: the lobby swings its chart to the Gale's course before its sheet comes up. */
+  private prepare(o: PlayOptions = {}): Session {
+    return new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
+  }
+
+  /** The match made ready, held while the lobby's sheet comes up over the world. */
+  private pending: Session | null = null;
+
+  /** Begins a match made ready. */
+  private begin(s: Session, o: PlayOptions = {}): void {
     if (this.session) this.leaveMatch();
     this.actors?.clear();
     this.staged = null;
-    const s = new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
     s.onMoment = (m) => this.onMoment(m);
     s.autoFire = this.settings.settings.autoFire;
     this.session = s;
@@ -708,6 +738,55 @@ export class App {
     else if (this.options.autoplay && at === 'death' && s.seconds - s.tally.ships[PLAYER].sunkAt > 4) this.go('spectate');
   }
 
+  /** The player's own colour and emblem, as the chart's marks take a captain. */
+  private ownMark(): Colours {
+    const m = markOf(wornLook(this.career.career));
+    return { colour: m.colours[0], sigil: { id: m.emblem } };
+  }
+
+  /** The career as the lobby's cartouche draws it. */
+  private careerMarks(): CareerMarks {
+    const c = this.career.career, l = levelView(c), s = careerStats(c);
+    return { level: l.level, into: l.into, need: l.need, illumination: TIER_ILLUMINATION[rankView(c).tier] ?? 'ink', matches: s.matches, wins: s.wins };
+  }
+
+  /** The point the lobby's planet is turned to, a unit vector. */
+  private turnedTo(): V3 {
+    const t = this.turn, c = Math.cos(t.lat);
+    return { x: c * Math.cos(t.lon), y: Math.sin(t.lat), z: -c * Math.sin(t.lon) };
+  }
+
+  /** Puts the lobby on the chart; from the title it inks in once the title's sheet is off it, round the rose landed in
+   *  its corner. */
+  private openLobby(from: ScreenName): void {
+    this.lobby?.dispose();
+    const home = homeScene().pos;
+    const l = new Lobby(this.chartHost, {
+      camera: () => this.stage?.camera ?? null,
+      orbit: () => ({ distance: this.stage?.rig?.orbitDistance ?? 3.2, fov: ORBIT_FOV }),
+      coasts: () => (this.coasts ??= traceCoasts(heightAt)),
+      home: () => home,
+      mark: () => this.ownMark(),
+      career: () => this.careerMarks(),
+      prepare: () => {
+        const s = (this.pending = this.prepare());
+        const g = s.state.gale, f = frameAt(g.from);
+        return Math.atan2(g.dir.x * f.east.x + g.dir.y * f.east.y + g.dir.z * f.east.z, g.dir.x * f.north.x + g.dir.y * f.north.y + g.dir.z * f.north.z);
+      },
+      begin: () => {
+        const s = this.pending;
+        this.pending = null;
+        if (s) this.begin(s);
+      },
+      settings: () => this.go('settings'),
+    }, this.turn, from === 'title' ? { delay: TITLE_LANDS, roseLanded: true } : {});
+    l.onGone = () => {
+      if (this.lobby === l) this.lobby = null;
+    };
+    this.lobby = l;
+    if (this.chart) l.attach(this.chart, this.chartNow());
+  }
+
   /** Puts the title on the chart: a blank sheet at once, inked once the paper is made. */
   private openTitle(): void {
     this.title?.dispose();
@@ -715,10 +794,7 @@ export class App {
       progress: () => this.titleHold ?? this.progress,
       drawn: () => this.#drawn,
       ready: () => this.titleHold === null && this.ready && this.#shipsDone,
-      mark: () => {
-        const m = markOf(wornLook(this.career.career));
-        return { colour: m.colours[0], sigil: { id: m.emblem } };
-      },
+      mark: () => this.ownMark(),
       start: () => this.go('lobby'),
       // the camera is at the lobby before the sheet comes off it, not flying there from orbit
       covered: () => this.stage?.snap(),
@@ -818,15 +894,22 @@ export class App {
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
-    this.chart?.frame(this.chartNow());
     shape.frame(this.screen);
     if (this.options.perfLog && f.realDt > 0) this.logPerf(f.realDt);
+    this.drawWorld(f);
+    // the chart after the world, so what it inks over the planet is where the planet was drawn this frame
+    this.chart?.frame(this.chartNow());
+  }
+
+  private drawWorld(f: Frame): void {
     const stage = this.stage, actors = this.actors;
     if (!stage || !actors) return;
     if (this.session) {
       this.matchFrame(this.session, f, stage, actors);
       return;
     }
+    // the lobby's planet turns under the chart
+    if (this.screen === 'lobby' && this.lobby && !this.fixed) this.view.pos = this.lobby.turned(this.chartNow());
     const v = this.view, sv = sceneStage(v, f.clock);
     sunDirection(sv.hour, sv.tilt, this.sun);
     // in the locker the boom swings out and back, so the whole ship stands clear of the pane on the right

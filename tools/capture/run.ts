@@ -12,6 +12,7 @@
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
 //   npm run capture -- kit [--device ipad,iphone] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
 //   npm run capture -- title [--device ipad,iphone]      the title inking in, its needle, a real tap and the roll-off to the lobby
+//   npm run capture -- lobby [--device ipad,iphone]      the lobby inking in, a drag of the planet, the settings, Play into the Gale
 //   npm run capture -- list                               the moments and transitions there are
 //
 // Shared options: --headed (watch it), --dpr <n> (default 1).
@@ -27,6 +28,7 @@ import { shapes } from './shape.ts';
 import { layout, SCREENS } from './layout.ts';
 import { kit } from './kit.ts';
 import { title } from './title.ts';
+import { lobby } from './lobby.ts';
 
 const { values: a, positionals } = parseArgs({
   allowPositionals: true,
@@ -48,7 +50,7 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr ?? 1), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, shape, kit, title');
+  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, shape, kit, title, lobby');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
   console.log(`layout screens: ${SCREENS.map((s) => s.name).join(', ')}`);
@@ -69,6 +71,7 @@ try {
     case 'perf': await perf(r, opts); break;
     case 'shape': await shapes(r, { ...opts, save: !!a.save }); break;
     case 'title': await title(r, { ...opts, device: a.device }); break;
+    case 'lobby': await lobby(r, { ...opts, device: a.device }); break;
     case 'kit': await kit(r, { dpr: a.dpr === undefined ? undefined : Number(a.dpr), device: a.device, only: a.only }); break;
     default: throw new Error(`unknown capture command "${command}"`);
   }

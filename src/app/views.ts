@@ -78,7 +78,7 @@ function fleetOf(s: SceneSpec): ShipView[] {
 /** A lone ship (or none) at a scene's spot. */
 export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticIds, speed = 0): ActorsView {
   const ships: ShipView[] = s.ship ? [{
-    id: 0, pos: scale(s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
+    id: 0, pos: scale(s.anchor ?? s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
     cosmetics: look, alive: true,
   }] : [];
   ships.push(...fleetOf(s));

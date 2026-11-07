@@ -24,6 +24,8 @@ export interface SceneSpec {
   ebb?: number;
   /** Whether to put the player's ship there. */
   ship: boolean;
+  /** Where her ship lies at anchor, if not under the camera (the lobby's planet turns while she stays home). */
+  anchor?: V3;
   /** Other ships sailing on open water ahead, spread from 60 to 220 m out: their lanterns show at night. */
   fleet?: number;
   /** Whether the fleet sails in review instead, in ranks of five beyond the spot, so the league shows side by side. */
@@ -304,12 +306,17 @@ export function sceneFrom(s: SceneInput): SceneSpec {
   };
 }
 
-/** Where the lobby sits: your ship on open water off the Spice Isles' cove, in the late afternoon, with the low sun
- * over the camera's shoulder so the hull shows its paint rather than its silhouette. */
-export const lobbyScene = (): SceneSpec => sceneFrom({ region: 'spiceIsles', hour: 16.5, tilt: 12, camera: 'chase', ship: true, heading: 120 });
+/** Her home water: your ship at anchor off the Spice Isles' cove, in the late afternoon, with the low sun over the
+ * camera's shoulder so the hull shows its paint rather than its silhouette. The menus stand here, and the locker fits
+ * her out. */
+export const homeScene = (): SceneSpec => sceneFrom({ region: 'spiceIsles', hour: 16.5, tilt: 12, camera: 'chase', ship: true, heading: 120 });
 
-/** The title: the same spot seen from orbit, so tapping in flies down to the lobby. */
-export const titleScene = (): SceneSpec => ({ ...lobbyScene(), camera: 'orbit' });
+/** The lobby's planet from orbit, turned to `look` (her home water if none) and lit for the local `hour` there, with her
+ * ship at anchor on her home water. The title shows it before the turning starts. */
+export function lobbyScene(look?: V3, hour = 16.5): SceneSpec {
+  const home = homeScene();
+  return { ...home, pos: look ?? home.pos, anchor: home.pos, hour, camera: 'orbit' };
+}
 
 /** Every region with its beacon, for the hook's listings. */
 export const regionList = () => REGIONS.map((r, i) => ({ id: r.id, name: r.name, beacon: BEACONS[i]?.pos ?? null }));

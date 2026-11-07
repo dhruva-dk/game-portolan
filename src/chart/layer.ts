@@ -6,7 +6,11 @@
 // The live plane's CPU time is measured every frame (`cost`), for the perf line.
 //
 // The layer never takes a touch it does not want: its canvases pass every touch through, and it listens ahead of the
-// game, keeping only touches that land on one of its pressables (grown to the touch target).
+// game, keeping only touches that land on one of its pressables (grown to the touch target), or, when a screen lays a
+// drag surface under them (the lobby's planet), the touches that land anywhere else.
+//
+// Several screens can share the sheet plane while one gives way to the next (the title's sheet rolling off the lobby):
+// each adds its own painter, and they paint in the order they were added.
 import type { Parchment } from '../render/paper/parchment.ts';
 import { chartLayout, type ChartLayout, type Insets } from './layout.ts';
 import { canvas, ctx, Paper } from './paper.ts';
@@ -35,6 +39,13 @@ export interface Rect {
 export type LivePainter = (g: CanvasRenderingContext2D, now: number, dt: number, layer: ChartLayer) => Rect | Rect[] | void;
 /** Paints the sheet plane. */
 export type SheetPainter = (g: CanvasRenderingContext2D, pen: Pen, layer: ChartLayer) => void;
+
+/** What a finger does on the chart off every pressable: a screen's drag (CSS pixels, the pointer's id). */
+export interface DragSurface {
+  down(id: number, x: number, y: number): void;
+  move(id: number, x: number, y: number): void;
+  up(id: number, x: number, y: number): void;
+}
 
 /** Draws a sprite with its anchor at (x, y); `dark` deepens it (the sprite multiplied over itself, for a press). */
 export function drawSprite(g: CanvasRenderingContext2D, s: Sprite, x: number, y: number, o: { alpha?: number; scale?: number; rot?: number; dark?: number } = {}): void {
@@ -67,7 +78,9 @@ export class ChartLayer {
   sheetPen: Pen;
   /** The live plane's CPU time per frame, milliseconds: the last, a running mean, the worst since reset. */
   readonly cost = { last: 0, mean: 0, worst: 0, frames: 0 };
-  #sheet: SheetPainter | null = null;
+  /** Takes the touches no pressable wants, while a screen has one. */
+  drag: DragSurface | null = null;
+  #sheets: SheetPainter[] = [];
   #live: LivePainter[] = [];
   #dirty: Rect[] | null = null;
   #lastNow = 0;
@@ -115,10 +128,14 @@ export class ChartLayer {
     this.invalidate();
   }
 
-  /** Sets what the sheet plane shows, and paints it. */
-  setSheet(p: SheetPainter | null): void {
-    this.#sheet = p;
+  /** Adds a painter to the sheet plane, over those already there, and paints it; returns its removal. */
+  addSheet(p: SheetPainter): () => void {
+    this.#sheets.push(p);
     this.invalidate();
+    return () => {
+      this.#sheets = this.#sheets.filter((q) => q !== p);
+      this.invalidate();
+    };
   }
 
   /** Repaints the sheet plane (call each frame only while a sheet moves). */
@@ -126,10 +143,10 @@ export class ChartLayer {
     const g = ctx(this.sheetCanvas);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, this.sheetCanvas.width, this.sheetCanvas.height);
-    if (!this.#sheet) return;
+    if (!this.#sheets.length) return;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.sheetPen.on(g);
-    this.#sheet(g, this.sheetPen, this);
+    for (const p of this.#sheets) p(g, this.sheetPen, this);
   }
 
   /** Adds a live painter; returns its removal. */
@@ -209,23 +226,40 @@ export class ChartLayer {
       const r = this.el.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
+    // the fingers the drag surface took, and the surface that took them
+    const dragging = new Map<number, DragSurface>();
     const down = (e: PointerEvent) => {
       const [x, y] = at(e);
       if (this.presses.down(e.pointerId, x, y)) {
         e.stopPropagation();
         e.preventDefault();
+      } else if (this.drag) {
+        dragging.set(e.pointerId, this.drag);
+        this.drag.down(e.pointerId, x, y);
       }
+    };
+    const move = (e: PointerEvent) => {
+      const d = dragging.get(e.pointerId);
+      if (!d) return;
+      const [x, y] = at(e);
+      d.move(e.pointerId, x, y);
     };
     const up = (e: PointerEvent) => {
       const [x, y] = at(e);
       this.presses.up(e.pointerId, x, y, e.type === 'pointercancel');
+      const d = dragging.get(e.pointerId);
+      if (!d) return;
+      dragging.delete(e.pointerId);
+      d.up(e.pointerId, x, y);
     };
     const opts = { capture: true };
     target.addEventListener('pointerdown', down as EventListener, opts);
+    target.addEventListener('pointermove', move as EventListener, opts);
     target.addEventListener('pointerup', up as EventListener, opts);
     target.addEventListener('pointercancel', up as EventListener, opts);
     return () => {
       target.removeEventListener('pointerdown', down as EventListener, opts);
+      target.removeEventListener('pointermove', move as EventListener, opts);
       target.removeEventListener('pointerup', up as EventListener, opts);
       target.removeEventListener('pointercancel', up as EventListener, opts);
     };
