@@ -4,6 +4,7 @@
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
+import { shape } from './shape.ts';
 import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { runFrameWork } from './work.ts';
@@ -184,6 +185,7 @@ export class GpuStage {
     P.night.value = Math.min(1, Math.max(0, (0.08 - up.dot(this.sun)) / 0.16));
     P.space.value = Math.min(1, Math.max(0, (eye.length() - R - 150) / 900));
 
+    shape.system('clouds');
     this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt, FAIR_WEATHER);
     const d = this.clouds.depth;
     P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
@@ -193,19 +195,25 @@ export class GpuStage {
     this.fall.update(eye, wind, { rain: P.rain.value, snow: P.snow.value, ash: d.ash ?? 0 });
     // a squall raises the sea, a thunderhead most
     this.#seaFromWind(eye, wind, Math.max((d.rain ?? 0) * 0.55, d.thunder ?? 0));
+    shape.system('sky');
     this.atmosphere.update(cam, dt);
     this.#mistFrom(v);
     // sea smoke off the cold water round the pole, thickest in the polar night and blown away by a wind
     const poleNight = Math.min(1, Math.max(0, (0.08 - this.sun.y) / 0.16));
     const calm = 1 - Math.min(1, Math.max(0, (wind.length() - 6) / 6));
+    shape.system('fog');
     this.fog.update(this.renderer, eye, cam.getWorldDirection(this.#forward), EYE.viewProjection.value as Matrix4, v.weather,
       (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
+    shape.system('clouds');
     this.clouds.march(this.renderer, size.x * this.#scale, size.y * this.#scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
+    shape.system('flora');
     this.flora.update(this.renderer, cam);
     this.ocean.flow.set(v.currents);
     this.ocean.flow.calms(v.weather, eye);
+    shape.system('sea');
     this.ocean.update(this.renderer, eye, v.time, dt);
+    shape.system('land');
     this.terrain.update(eye);
     this.scans.update(eye, dt);
     this.beacons.update(v.time, P.night.value as number, this.sun);
@@ -216,7 +224,9 @@ export class GpuStage {
     this.clams.update(v.events, v.time, v.tide);
     this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
     this.moonbow.update(eye, wind.length());
+    shape.system('actors');
     runFrameWork(this.renderer);
+    shape.system('scene');
     this.post.focus(v.focus ?? null);
     this.post.render(dt);
 

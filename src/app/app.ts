@@ -30,6 +30,7 @@ import { deathModel, galeModel, hudModel, resultsModel, spectateModel, victoryMo
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
+import { shape } from '../render/gpu/shape.ts';
 import { CareerHolder } from './career.ts';
 import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivalsModel } from './models.ts';
 import { SettingsHolder } from './settings.ts';
@@ -743,12 +744,14 @@ export class App {
     if (w.t < PERF_EVERY) return;
     const st = this.stage?.stats();
     console.info(`perf ${this.screen}: ${(w.frames / w.t).toFixed(1)} fps, worst frame ${(w.worst * 1000).toFixed(0)} ms, ` +
-      `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms`);
+      `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame`);
+    console.info(shape.report(this.screen));
     Object.assign(w, { t: 0, frames: 0, worst: 0 });
   }
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
+    shape.frame(this.screen);
     if (this.options.perfLog && f.realDt > 0) this.logPerf(f.realDt);
     const stage = this.stage, actors = this.actors;
     if (!stage || !actors) return;

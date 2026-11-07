@@ -39,6 +39,7 @@ import { graded } from './grade.ts';
 import { Exposure, exposure } from './exposure.ts';
 import { HAZE_MAX, hazeSpots } from './haze.ts';
 import { P } from './uniforms.ts';
+import { shape } from './shape.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 export const BLOOM = uniform(0.05);
@@ -227,6 +228,14 @@ export class Post {
     (scenePass.getTexture('smear') as Texture).type = UnsignedByteType;
     (scenePass.getTexture('albedo') as Texture).type = UnsignedByteType;
     this.scenePass = scenePass;
+    // for the frame log: what the scene pass draws (the shadow maps with it) is the scene's, what follows is post's
+    const drawScene = scenePass.updateBefore.bind(scenePass);
+    scenePass.updateBefore = (frame) => {
+      shape.system('scene');
+      const r = drawScene(frame);
+      shape.system('post');
+      return r;
+    };
     const smear = scenePass.getTextureNode('smear');
     const beauty = scenePass.getTextureNode('output');
     const depth = clampedLoads(scenePass.getTextureNode('depth'));
