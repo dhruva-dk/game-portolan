@@ -5,7 +5,7 @@
 // it is on the sphere, which is how one sun leaves half the planet dark and how the same shaders hold from the deck
 // and from orbit.
 import { Vector3, Vector4 } from 'three/webgpu';
-import { mix, uniform, uniformArray } from 'three/tsl';
+import { mix, uniform, uniformArray, renderGroup } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 
 export const MAX_LIFTS = 5;
@@ -53,10 +53,13 @@ export const P = {
   space: uniform(0),
   /** The water the regions' events move: each disc's middle (xyz) and how far it moves the sea now (w), and its
    *  radius, fade and region channel; liftOn says whether any moves it at all. */
-  liftAt: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4()), 'vec4'),
-  liftR: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4(1, 1, 0, 0)), 'vec4'),
+  liftAt: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
+  liftR: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4(1, 1, 0, 0)), 'vec4').setGroup(renderGroup),
   liftOn: uniform(0),
 };
+// one buffer for each shader that reads them, set once a render, instead of three's default: a copy in every object's
+// own uniforms, written again for each object every frame
+for (const u of Object.values(P)) u.setGroup(renderGroup);
 
 /** Lightning striking now, as the bolts set it (actors/lightning.ts): where its channel enters the cloud, and how
  *  bright its stroke is, 0…1. The clouds light up round it, and the whole sky flashes by how near it is. */

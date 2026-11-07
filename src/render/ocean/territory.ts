@@ -3,7 +3,7 @@
 // a texture array read texel by texel, without a sampler; the cells' edges are wobbled by noise into a drawn line,
 // and a captain's coast is inked more deeply than the water inside it.
 import { Color, DataArrayTexture, NearestFilter, RGFormat, UnsignedByteType, type Node } from 'three/webgpu';
-import { clamp, floor, ivec2, step, abs, texture, uniform, uniformArray, vec2 } from 'three/tsl';
+import { clamp, floor, ivec2, step, abs, texture, uniform, uniformArray, vec2, renderGroup } from 'three/tsl';
 import { GRID } from '../../sim/sphere.ts';
 import { cubeFace } from '../gpu/cube.ts';
 
@@ -17,7 +17,7 @@ const COLOURS = 32;
 export class Territory {
   readonly texture: DataArrayTexture;
   /** Each captain's colour, by ship index + 1. */
-  readonly colours = uniformArray(Array.from({ length: COLOURS }, (_, i) => new Color().setHSL((i * 0.618) % 1, 0.75, 0.5)), 'color');
+  readonly colours = uniformArray(Array.from({ length: COLOURS }, (_, i) => new Color().setHSL((i * 0.618) % 1, 0.75, 0.5)), 'color').setGroup(renderGroup);
   /** The player's ship index + 1; whether there is any territory to draw. */
   readonly me = uniform(0);
   readonly on = uniform(0);

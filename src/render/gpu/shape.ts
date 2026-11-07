@@ -32,8 +32,15 @@ interface Device {
   createCommandEncoder(d?: { label?: string }): Encoder;
 }
 type Proto<T> = { prototype: T };
+interface Made { destroy(): void }
+interface TextureDescriptor {
+  size: number[] | { width: number; height?: number; depthOrArrayLayers?: number };
+  format: string; mipLevelCount?: number; sampleCount?: number;
+}
 const GPU = globalThis as unknown as {
-  GPUTexture: Proto<Texture>; GPUCommandEncoder: Proto<Encoder>; GPUQueue: Proto<{ submit(b: object[]): void }>;
+  GPUTexture: Proto<Texture & Made>; GPUCommandEncoder: Proto<Encoder>; GPUQueue: Proto<{ submit(b: object[]): void }>;
+  GPUDevice: Proto<{ createBuffer(d: { size: number }): Made; createTexture(d: TextureDescriptor): Made }>;
+  GPUBuffer: Proto<Made>;
   GPUBufferUsage: Record<string, number>; GPUMapMode: Record<string, number>;
 };
 
@@ -95,6 +102,10 @@ class FrameShape {
   #timedAt = 0;
   /** The log's own work, which is not the frame's. */
   #own = false;
+  /** The last pass handed to the GPU. */
+  #submitted: Pass | null = null;
+  /** The bytes and count of the buffers and textures alive on the device. */
+  readonly #held = { buffers: 0, bufferBytes: 0, textures: 0, textureBytes: 0 };
 
   /** Watches every pass, submission and copy the device is handed from now on. */
   install(device: Device): void {
@@ -154,14 +165,69 @@ class FrameShape {
     const submit = GPUQueue.prototype.submit;
     GPUQueue.prototype.submit = function (this: unknown, b: object[]) {
       if (!self.#own) self.#now.submits++;
+      self.#submitted = self.#now.passes.at(-1) ?? self.last.passes.at(-1) ?? null;
       return submit.call(this, b);
     };
+    this.#holding();
     if (device.features.has('timestamp-query')) {
       const { GPUBufferUsage: U } = GPU;
       this.#query = device.createQuerySet({ type: 'timestamp', count: 2 * MAX_TIMED });
       this.#resolve = device.createBuffer({ size: 16 * MAX_TIMED, usage: U.QUERY_RESOLVE | U.COPY_SRC });
       this.#readback = device.createBuffer({ size: 16 * MAX_TIMED, usage: U.MAP_READ | U.COPY_DST });
     }
+  }
+
+  /** Counts every buffer and texture made on the device until it is destroyed or collected. */
+  #holding(): void {
+    const held = this.#held, sizes = new WeakMap<object, [number, boolean]>();
+    const gone = (o: object) => {
+      const e = sizes.get(o);
+      if (!e) return;
+      sizes.delete(o);
+      if (e[1]) { held.textures--; held.textureBytes -= e[0]; } else { held.buffers--; held.bufferBytes -= e[0]; }
+    };
+    const collected = new FinalizationRegistry<[number, boolean]>(([bytes, texture]) => {
+      if (texture) { held.textures--; held.textureBytes -= bytes; } else { held.buffers--; held.bufferBytes -= bytes; }
+    });
+    const keep = (o: object, bytes: number, texture: boolean) => {
+      const e: [number, boolean] = [bytes, texture];
+      sizes.set(o, e);
+      collected.register(o, e, o);
+      if (texture) { held.textures++; held.textureBytes += bytes; } else { held.buffers++; held.bufferBytes += bytes; }
+    };
+    const { GPUDevice, GPUBuffer, GPUTexture } = GPU;
+    const createBuffer = GPUDevice.prototype.createBuffer;
+    GPUDevice.prototype.createBuffer = function (this: unknown, d: { size: number }) {
+      const b = createBuffer.call(this, d);
+      keep(b, d.size, false);
+      return b;
+    };
+    const createTexture = GPUDevice.prototype.createTexture;
+    GPUDevice.prototype.createTexture = function (this: unknown, d: TextureDescriptor) {
+      const t = createTexture.call(this, d);
+      const z = d.size, [w, h, layers] = Array.isArray(z) ? [z[0], z[1] ?? 1, z[2] ?? 1] : [z.width, z.height ?? 1, z.depthOrArrayLayers ?? 1];
+      keep(t, w * h * layers * (TEXEL[d.format] ?? 4) * ((d.mipLevelCount ?? 1) > 1 ? 4 / 3 : 1) * (d.sampleCount ?? 1), true);
+      return t;
+    };
+    for (const P of [GPUBuffer.prototype, GPUTexture.prototype]) {
+      const destroy = P.destroy;
+      P.destroy = function (this: Made) {
+        if (sizes.has(this)) { collected.unregister(this); gone(this); }
+        return destroy.call(this);
+      };
+    }
+  }
+
+  /** What the device holds: its buffers and textures, and their megabytes. */
+  get memory(): string {
+    const h = this.#held, mb = (b: number) => (b / 1048576).toFixed(0);
+    return `memory ${mb(h.bufferBytes + h.textureBytes)} MB: ${h.textures} textures ${mb(h.textureBytes)} MB, ${h.buffers} buffers ${mb(h.bufferBytes)} MB`;
+  }
+
+  /** The last pass handed to the GPU, as the log names it: what a lost device was last given. */
+  get lastSubmitted(): string {
+    const p = this.#submitted;
+    return p ? `${p.system} ${p.kind} pass into ${p.label}${p.size ? ` (${p.size})` : ''}` : 'none';
   }
 
   /** Whether the device can time its passes. */
@@ -186,6 +252,8 @@ class FrameShape {
       this.#screen = screen;
       this.timed = null;
       this.#counts = [];
+      this.#frames = this.#over = 0;
+      this.#worst = null;
       return;
     }
     this.#frames++;
@@ -267,8 +335,9 @@ class FrameShape {
     const first = !this.#reported.has(screen);
     this.#reported.add(screen);
     let out = this.table(screen, this.timed ?? this.last, first);
-    if (this.#over) {
-      const w = this.#worst!, c = COMMITTED[screen];
+    const c = COMMITTED[screen];
+    if (this.#over && c) {
+      const w = this.#worst!;
       out += `\nframe shape over the committed run: ${this.#over} of ${this.#frames} frames on ${screen}, the worst ` +
         `${w.passes.length} passes and ${w.submits} submits against ${c.passes} and ${c.submits}`;
     }

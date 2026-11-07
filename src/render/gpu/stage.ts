@@ -91,6 +91,9 @@ export class GpuStage {
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
   #last = 0;
+  /** The canvas's size and pixel ratio, as last set. */
+  #size = { w: 0, h: 0, ratio: 0 };
+  #shown = false;
 
   private constructor(canvas: HTMLCanvasElement, renderer: WebGPURenderer, form: keyof typeof RENDER_SCALE) {
     this.#canvas = canvas;
@@ -131,8 +134,13 @@ export class GpuStage {
   wave = (p: V3): number => this.ocean.heightAt(p);
 
   resize(): void {
-    const w = this.#canvas.clientWidth || innerWidth, h = this.#canvas.clientHeight || innerHeight;
-    this.renderer.setPixelRatio(pixelRatio(w, h));
+    const w = this.#canvas.clientWidth || innerWidth, h = this.#canvas.clientHeight || innerHeight, ratio = pixelRatio(w, h);
+    // only when it changes: three sets the canvas's size each time it is asked, even to the size it has, and every
+    // time the canvas's drawing buffer is made again
+    const s = this.#size;
+    if (s.w === w && s.h === h && s.ratio === ratio) return;
+    Object.assign(s, { w, h, ratio });
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / Math.max(h, 1);
     this.camera.updateProjectionMatrix();
@@ -235,6 +243,16 @@ export class GpuStage {
     const now = performance.now();
     if (this.#last) this.#fps += (1000 / Math.max(now - this.#last, 1) - this.#fps) * 0.05;
     this.#last = now;
+    if (!this.#shown) this.#show();
+  }
+
+  /** iOS lays the canvas out as a plain element before three gives it its WebGPU context, and never composites what is
+   *  drawn into it until it is laid out again: once the first frame is drawn, it is hidden for a frame and shown. */
+  #show(): void {
+    this.#shown = true;
+    const c = this.#canvas;
+    c.style.display = 'none';
+    requestAnimationFrame(() => { c.style.display = ''; });
   }
 
   /** Mistwood's mist: always some rolling out of the wood, and thick in its Fog Surge. */

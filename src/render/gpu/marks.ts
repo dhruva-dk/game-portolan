@@ -9,7 +9,7 @@
 // projected, so a mark wraps over a cliff edge, into a crack and across a boulder as one piece, and costs nothing
 // where there are none (an empty slot has no radius and drops out at once).
 import { Vector4 } from 'three/webgpu';
-import { Fn, If, Loop, clamp, float, length, max, min, mix, pow, sin, smoothstep, uniform, uniformArray, vec3, vec4 } from 'three/tsl';
+import { Fn, If, Loop, clamp, float, length, max, min, mix, pow, sin, smoothstep, uniform, uniformArray, vec3, vec4, renderGroup } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { P } from './uniforms.ts';
 
@@ -31,8 +31,8 @@ const HOT: Record<MarkKind, number> = { 0: 4, 1: 9, 2: 14 };
 const SPOTS = Array.from({ length: MARKS }, () => new Vector4(0, 0, 0, 0));
 // x: when it was made (P.time); y: how long it stays hot; z: its own seed; w: lava (1) or not
 const LOOKS = Array.from({ length: MARKS }, () => new Vector4(-1e6, 1, 0, 0));
-const spots = uniformArray(SPOTS, 'vec4');
-const looks = uniformArray(LOOKS, 'vec4');
+const spots = uniformArray(SPOTS, 'vec4').setGroup(renderGroup);
+const looks = uniformArray(LOOKS, 'vec4').setGroup(renderGroup);
 /** How many slots have held a mark since the last clear: the shaders look no further. */
 const used = uniform(0, 'int');
 let next = 0, seed = 1;

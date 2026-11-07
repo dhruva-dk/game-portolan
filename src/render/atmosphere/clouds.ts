@@ -33,7 +33,7 @@ import {
 import {
   Break, Discard, Fn, If, abs, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
   interleavedGradientNoise, max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
-  smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4,
+  smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
@@ -113,21 +113,21 @@ function reach(k: Kind): [number, number] {
   return [k.shaft > 0 || k.fog > 0 ? 0 : k.base, k.base + k.tower * 1.08];
 }
 
-const SHAPE_K = uniformArray(KINDS.map((k) => new Vector4(k.base, k.tower, k.sigma, k.albedo)), 'vec4');
-const FALL_K = uniformArray(KINDS.map((k) => new Vector4(k.shaft, k.fall, k.fog, k.anvil)), 'vec4');
-const TINT_K = uniformArray(KINDS.map((k) => new Vector4(...k.tint, k.fair ?? 0)), 'vec4');
+const SHAPE_K = uniformArray(KINDS.map((k) => new Vector4(k.base, k.tower, k.sigma, k.albedo)), 'vec4').setGroup(renderGroup);
+const FALL_K = uniformArray(KINDS.map((k) => new Vector4(k.shaft, k.fall, k.fog, k.anvil)), 'vec4').setGroup(renderGroup);
+const TINT_K = uniformArray(KINDS.map((k) => new Vector4(...k.tint, k.fair ?? 0)), 'vec4').setGroup(renderGroup);
 
 // ---------------------------------------------------------------- the systems
 
 const SYS = {
   /** Each system's middle (a unit vector) and radius in metres. */
-  place: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4(0, 1, 0, 1)), 'vec4'),
+  place: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4(0, 1, 0, 1)), 'vec4').setGroup(renderGroup),
   /** Its kind's index, its strength, its seed. */
-  look: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4'),
+  look: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
   /** Where lightning is lighting it from inside, and how brightly. */
-  flash: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4'),
+  flash: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
   /** The sphere bounding it: its middle and radius. */
-  bound: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4'),
+  bound: uniformArray(Array.from({ length: MAX_CLOUDS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
   count: uniform(0, 'int'),
 };
 

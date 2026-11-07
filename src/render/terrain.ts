@@ -135,6 +135,9 @@ export class Terrain {
     if (!n.mesh) return;
     this.group.remove(n.mesh);
     n.mesh.geometry.dispose();
+    // the renderer keeps what it drew the chunk with (its uniforms, one set for each pass it was drawn in) until the
+    // mesh itself is let go; without this a long match piled them up by the tens of thousands
+    n.mesh.dispose();
     n.mesh = null;
     n.state = NONE;
   }

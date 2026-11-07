@@ -8,7 +8,7 @@
 // The slots are filled straight from a worker's decoded mips with writeTexture, so loading one never makes the GPU
 // redo every other slot's mips, and no copy of the arrays is kept on the CPU.
 import { ExternalTexture, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, Vector3, Vector4, type WebGPURenderer } from 'three/webgpu';
-import { uniformArray } from 'three/tsl';
+import { uniformArray, renderGroup } from 'three/tsl';
 import { regionAt } from '../../sim/world/index.ts';
 import { R } from '../../sim/sphere.ts';
 import { LAYERS, ROLE, ROLE_COUNT, SCANS } from './library.ts';
@@ -44,9 +44,9 @@ export class ScanCache {
   readonly detail: ExternalTexture;
   /** Per region × role, three vec4s: (tint, metres per repeat), (far colour, slot or −1), (wetness, normal strength,
    *  mean roughness, mean height). */
-  readonly paint = uniformArray(LAYERS.map((l) => new Vector4(...l.tint, l.scale)), 'vec4');
-  readonly far = uniformArray(LAYERS.map(() => new Vector4(0.2, 0.2, 0.2, -1)), 'vec4');
-  readonly feel = uniformArray(LAYERS.map((l) => new Vector4(l.wet, l.normalScale, 0.8, 0.5)), 'vec4');
+  readonly paint = uniformArray(LAYERS.map((l) => new Vector4(...l.tint, l.scale)), 'vec4').setGroup(renderGroup);
+  readonly far = uniformArray(LAYERS.map(() => new Vector4(0.2, 0.2, 0.2, -1)), 'vec4').setGroup(renderGroup);
+  readonly feel = uniformArray(LAYERS.map((l) => new Vector4(l.wet, l.normalScale, 0.8, 0.5)), 'vec4').setGroup(renderGroup);
   /** Scans resident now, for the stats. */
   resident = 0;
 

@@ -14,7 +14,7 @@
 import { MeshStandardNodeMaterial, Vector4, type Node, type Texture } from 'three/webgpu';
 import {
   Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, dFdx, dFdy, dot, float, floor, fract, int, length, max, mix, mod,
-  normalWorldGeometry, normalize, positionWorld, pow, select, sin, smoothstep, sqrt, step, texture, uniform, uniformArray, vec2, vec3, vec4,
+  normalWorldGeometry, normalize, positionWorld, pow, select, sin, smoothstep, sqrt, step, texture, uniform, uniformArray, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { REGIONS } from '../../sim/world/index.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
@@ -120,7 +120,7 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
   const surfaceMap = texture(scans.surface);
   const detailMap = texture(scans.detail);
   const noiseMap = texture(noise);
-  const moss = uniformArray(REGIONS.map((r) => new Vector4(MOSS[r.id] ?? 0, 0, 0, 0)), 'vec4');
+  const moss = uniformArray(REGIONS.map((r) => new Vector4(MOSS[r.id] ?? 0, 0, 0, 0)), 'vec4').setGroup(renderGroup);
 
   // what the lighting reads, worked out once at the top of the fragment
   const albedo = vec3(0).toVar('landAlbedo');

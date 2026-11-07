@@ -27,7 +27,7 @@
 import { HalfFloatType, LinearFilter, Matrix4, Storage3DTexture, Vector2, Vector3, Vector4, type ComputeNode, type DepthTexture, type Node, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, exp, min, float, globalId, instancedArray, ivec2, log, max, mix, pow, select, smoothstep, step, texture, texture3D,
-  textureStore, uint, uniform, uniformArray, uvec3, vec2, vec3, vec4,
+  textureStore, uint, uniform, uniformArray, uvec3, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance } from './luts.ts';
@@ -93,16 +93,16 @@ const U = {
 /** The weather's haze: each system's middle (unit) and radius; its extinction at the sea (with its strength), its
  *  albedo, the height it thins by e over, and 1 for ash; its tint. */
 const DISC = {
-  place: uniformArray(Array.from({ length: DISCS }, () => new Vector4(0, 1, 0, 1)), 'vec4'),
-  look: uniformArray(Array.from({ length: DISCS }, () => new Vector4()), 'vec4'),
-  tint: uniformArray(Array.from({ length: DISCS }, () => new Vector4(1, 1, 1, 0)), 'vec4'),
+  place: uniformArray(Array.from({ length: DISCS }, () => new Vector4(0, 1, 0, 1)), 'vec4').setGroup(renderGroup),
+  look: uniformArray(Array.from({ length: DISCS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
+  tint: uniformArray(Array.from({ length: DISCS }, () => new Vector4(1, 1, 1, 0)), 'vec4').setGroup(renderGroup),
   count: uniform(0, 'int'),
 };
 
 /** The lanterns near the eye: where, and their colour times their strength. */
 const LAMP_AT = {
-  at: uniformArray(Array.from({ length: LAMPS }, () => new Vector4()), 'vec4'),
-  colour: uniformArray(Array.from({ length: LAMPS }, () => new Vector4()), 'vec4'),
+  at: uniformArray(Array.from({ length: LAMPS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
+  colour: uniformArray(Array.from({ length: LAMPS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
   count: uniform(0, 'int'),
 };
 

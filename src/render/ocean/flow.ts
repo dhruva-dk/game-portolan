@@ -10,7 +10,7 @@
 // The calms: where a calm system sits the wind drops away and the sea goes glassy, its waves and ripples stilled
 // toward the middle of it.
 import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGBAFormat, Vector2, Vector4, type Node } from 'three/webgpu';
-import { abs, cross, dot, float, int, length, max, select, smoothstep, sqrt, texture, uniform, uniformArray, vec3 } from 'three/tsl';
+import { abs, cross, dot, float, int, length, max, select, smoothstep, sqrt, texture, uniform, uniformArray, vec3, renderGroup } from 'three/tsl';
 import { CURRENTS, GREAT_CURRENT, REGION_COUNT, VORTEX } from '../../sim/world/index.ts';
 import { R } from '../../sim/sphere.ts';
 import { cubeFace } from '../gpu/cube.ts';
@@ -31,11 +31,11 @@ export class Flow {
   readonly on = uniform(0);
   readonly ready: Promise<void>;
   /** Each region's lanes' speed against their charted one. */
-  readonly #scale = uniformArray(new Array<number>(REGION_COUNT).fill(1), 'float');
+  readonly #scale = uniformArray(new Array<number>(REGION_COUNT).fill(1), 'float').setGroup(renderGroup);
   readonly #vortex = uniform(1);
   /** Each calm: its centre and how still (x, y, z, w), and the cosines of its edge and of where it is stillest. */
-  readonly #calm = uniformArray(Array.from({ length: CALMS }, () => new Vector4()), 'vec4');
-  readonly #calmEdge = uniformArray(Array.from({ length: CALMS }, () => new Vector2(2, 2)), 'vec2');
+  readonly #calm = uniformArray(Array.from({ length: CALMS }, () => new Vector4()), 'vec4').setGroup(renderGroup);
+  readonly #calmEdge = uniformArray(Array.from({ length: CALMS }, () => new Vector2(2, 2)), 'vec2').setGroup(renderGroup);
 
   constructor() {
     const t = new DataArrayTexture(new Uint16Array(ROW * ROW * 6 * 4), ROW, ROW, 6);

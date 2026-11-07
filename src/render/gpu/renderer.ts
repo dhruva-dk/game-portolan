@@ -71,6 +71,10 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   shape.install(backend.device as unknown as Parameters<typeof shape.install>[0]);
   // and handed to the queue together (submits.ts)
   batchSubmits(backend.device as unknown as Parameters<typeof batchSubmits>[0]);
+  // a lost device says what it was last given
+  (backend.device as unknown as { lost: Promise<{ reason: string; message: string }> }).lost.then((info) => {
+    if (info.reason !== 'destroyed') console.error(`GPU lost (${info.reason || 'unknown'}: ${info.message}); the last pass submitted: ${shape.lastSubmitted}`);
+  });
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(pixelRatio(innerWidth, innerHeight));
