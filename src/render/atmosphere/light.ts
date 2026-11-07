@@ -4,34 +4,51 @@
 //    over the sun's disc as it sinks behind the limb, so dawn is red on the eastern capes while the sea behind is
 //    still in night, and the terminator is a soft band across the globe; and after the clouds over it (shade.ts);
 //  - the moon: the same, at the moon's illuminance and phase;
+//    each worked out only while its body lights anything the eye can see (bodiesFor): by day the moon is under the
+//    horizon of everything in view, and at night so is the sun, and neither is paid for then;
 //  - the sky: the light of the whole sky and the sea under it on a surface facing its normal (an ambient cube from the
 //    irradiance tables), and the sky's reflection in glossy surfaces (a filtered probe of the sky round the eye,
 //    turned to each fragment's own horizon and coloured by its own sky).
-import { AnalyticLightNode, DirectionalLight, Light, type Node, type NodeBuilder, type Texture } from 'three/webgpu';
 import {
-  Fn, cameraWorldMatrix, clamp, float, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
-  int, pow, roughness, texture, vec2, vec3,
+  AnalyticLightNode, DirectionalLight, DirectionalLightNode, Light, type Node, type NodeBuilder, type Texture, type Vector3,
+} from 'three/webgpu';
+import {
+  Fn, If, cameraWorldMatrix, clamp, float, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
+  int, pow, roughness, texture, uniform, vec2, vec3,
 } from 'three/tsl';
 import { AIR } from './model.ts';
 import { IRRADIANCE, IRRADIANCE_FACE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyIrradiance, tables } from './luts.ts';
-import { P } from '../gpu/uniforms.ts';
+import { P, shared } from '../gpu/uniforms.ts';
 import { probeEye } from './sky.ts';
-import { moonShade, sunShade } from './shade.ts';
+import { bodyShades } from './shade.ts';
 
 type V3 = Node<'vec3'>;
+
+/** 1 while the sun's light, and the moon's, reaches anything the eye can see. */
+export const BODIES = shared({ sun: uniform(1), moon: uniform(1) });
+
+/** How far below the eye's horizon a body has gone (the sine of its height) when it lights nothing in view, not even
+ *  the tops of the spires against the sky: where the clouds take their light from the moon, too. */
+const GONE = -0.55;
+
+/** Which bodies light anything in view from an eye whose up is `up`. */
+export function bodiesFor(up: Vector3, sun: Vector3, moon: Vector3): void {
+  BODIES.sun.value = up.dot(sun) > GONE ? 1 : 0;
+  BODIES.moon.value = up.dot(moon) > GONE && (P.moonPhase.value as number) > 0 ? 1 : 0;
+}
 
 /** The sun's light as it arrives at the fragment being shaded. */
 export const sunlight = Fn(() => {
   const p = positionWorld;
   const r = p.length();
-  return lightTransmittance(r, p.div(r).dot(P.sunDir), SUN_RADIUS).mul(P.sunIlluminance).mul(sunShade(p));
+  return lightTransmittance(r, p.div(r).dot(P.sunDir), SUN_RADIUS).mul(P.sunIlluminance).mul(bodyShades(p).sun);
 })();
 
 /** The moon's light as it arrives at the fragment being shaded. */
 export const moonlight = Fn(() => {
   const p = positionWorld;
   const r = p.length();
-  return lightTransmittance(r, p.div(r).dot(P.moonDir), MOON_RADIUS).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(p));
+  return lightTransmittance(r, p.div(r).dot(P.moonDir), MOON_RADIUS).mul(P.moonIlluminance).mul(P.moonPhase).mul(bodyShades(p).moon);
 })();
 
 /** The faint light left when neither sun nor moon is up: the stars and the glow of the high air. */
@@ -123,11 +140,29 @@ export class SkyLightNode extends AnalyticLightNode<SkyLight> {
   }
 }
 
-/** A light for a body in the sky, its colour taken per fragment through the air. */
-export function bodyLight(colour: V3): DirectionalLight {
-  const light = new DirectionalLight(0xffffff, 1);
-  (light as DirectionalLight & { colorNode: V3 }).colorNode = colour;
-  return light;
+/** A body in the sky's light, its colour taken per fragment through the air, worked out only while `on`. */
+export class BodyLight extends DirectionalLight {
+  readonly colorNode: V3;
+  readonly on: Node<'float'>;
+
+  constructor(colour: V3, on: Node<'float'>) {
+    super(0xffffff, 1);
+    this.colorNode = colour;
+    this.on = on;
+  }
+}
+
+export class BodyLightNode extends DirectionalLightNode {
+  static get type(): string {
+    return 'BodyLightNode';
+  }
+
+  setup(builder: NodeBuilder): undefined {
+    If((this.light as BodyLight).on.greaterThan(0.5), () => {
+      super.setup(builder);
+    });
+    return undefined;
+  }
 }
 
 /**
@@ -137,8 +172,9 @@ export function bodyLight(colour: V3): DirectionalLight {
  */
 export const thinCloudLight = (p: V3): V3 => {
   const r = p.length(), up = p.div(r);
-  const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(sunShade(p));
-  const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(p));
+  const shade = bodyShades(p);
+  const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(shade.sun);
+  const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(shade.moon);
   const sky = skyLight(p, up).add(skyLight(p, up.negate())).mul(0.5);
   return sun.add(moon).mul(0.25).add(sky.div(Math.PI));
 };

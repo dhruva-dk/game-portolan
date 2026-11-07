@@ -52,7 +52,8 @@ export function cloudShade(p: V3): F {
   return mix(float(1), left, inside);
 }
 
-/** The cloud shade on the sun's light at p. */
-export const sunShade = (p: V3): F => mix(float(1), cloudShade(p), SHADE.sun);
-/** The cloud shade on the moon's light at p. */
-export const moonShade = (p: V3): F => mix(cloudShade(p), float(1), SHADE.sun);
+/** The cloud shade at p on the sun's light and on the moon's, from one read of the map. */
+export function bodyShades(p: V3): { sun: F; moon: F } {
+  const shade = cloudShade(p).toVar();
+  return { sun: mix(float(1), shade, SHADE.sun), moon: mix(shade, float(1), SHADE.sun) };
+}

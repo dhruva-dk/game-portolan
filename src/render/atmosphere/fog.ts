@@ -4,8 +4,8 @@
 // bank's, the snow's or the ash's), in its own colour and albedo. The air along a ray is laid out as two columns that
 // thin with height, so the extinction between the eye and any point is worked out in closed form; the light the
 // mist scatters toward the eye is the sun's, the moon's and the sky's at the eye, the sun's and the moon's under the
-// clouds' shade halfway along. Mist scatters forward, so looking toward a light the haze round it blazes. Every
-// material's haze and the sky behind everything read it.
+// clouds' shade halfway along. Mist scatters forward, so looking toward a light the haze round it blazes. The haze
+// (atmosphere/index.ts) and the sky behind everything read it.
 import { Vector2, Vector3, Vector4, type WebGPURenderer } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import { Fn, abs, exp, float, instancedArray, max, min, mix, pow, select, uniform, vec3, vec4 } from 'three/tsl';

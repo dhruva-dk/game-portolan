@@ -97,13 +97,13 @@ class Cascades extends CSMShadowNode {
       inner.setupShadowPosition(b);
       // how far into the reach the point the map is read at lies, 0 at the eye and 1 at the end
       const z = cameraViewMatrix.mul(vec4(shadowPositionWorld as unknown as Node<'vec3'>, 1)).z.negate();
-      const depth = clamp(z.sub(cameraNear).div(float(SHADOW_REACH).sub(cameraNear)), 0, 1).toVar('csmDepth');
+      const depth = clamp(z.sub(cameraNear).div(float(SHADOW_REACH).sub(cameraNear)), 0, 1).toVar();
       // past each boundary, the share taken by the slices beyond it; past the last, the share the shadows have faded
       const beyond = SPLITS.map((b, i) => {
         const t = i === SPLITS.length - 1 ? smoothstep(1 - LAST_FADE, 1, depth) : smoothstep(b * (1 - FADE), b * (1 + FADE), depth);
-        return t.toVar(`csmBeyond${i}`);
+        return t.toVar();
       });
-      const lit = float(1).toVar('csmLit');
+      const lit = float(1).toVar();
       inner._shadowNodes.forEach((map, i) => {
         const weight = (i === 0 ? float(1) : beyond[i - 1]).sub(beyond[i]);
         If(weight.greaterThan(0.001), () => {
@@ -154,6 +154,14 @@ export class SunShadows {
     this.node.fade = true;
     (shadow as unknown as { shadowNode: unknown }).shadowNode = this.node;
     installed = this;
+  }
+
+  /** Whether the sun's shadows are drawn and read: not while it lights nothing the eye can see. */
+  set casting(on: boolean) {
+    for (const l of this.node.lights) {
+      l.shadow!.intensity = on ? 1 : 0;
+      l.shadow!.autoUpdate = on;
+    }
   }
 
   /** Refits the slices when the eye's projection changes. */

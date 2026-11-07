@@ -67,6 +67,13 @@ export function spectrumParams(s: SeaState): SpectrumParams {
   };
 }
 
+/** The sea's significant wave height, metres: four times the root of its variance, the wind sea's and the swell's,
+ *  each the integral of its JONSWAP spectrum. */
+export function significantHeight(p: SpectrumParams): number {
+  const m0 = (alpha: number, peak: number, gamma: number) => (alpha * G * G) / (5 * peak ** 4) / (1 - 0.287 * Math.log(gamma));
+  return 4 * Math.sqrt(m0(p.windAlpha, p.windPeak, GAMMA) + m0(p.swellAlpha, p.swellPeak, SWELL_GAMMA));
+}
+
 function jonswap(w: number, alpha: number, peak: number, gamma: number): number {
   if (w <= 1e-4) return 0;
   const sigma = w <= peak ? 0.07 : 0.09;

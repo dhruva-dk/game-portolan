@@ -1,10 +1,10 @@
 // What the frame already holds, for what is drawn over it. three copies the framebuffer out once a render for every
 // node a material reads it through, and each copy ends the scene's pass: on a tiled GPU (every iPad and iPhone) the
 // pass that follows reloads every target the scene draws into. So everything that reads the frame reads one copy,
-// taken as the sea is drawn, the first of what draws over the scene: the colour and the depth of the scene beneath
-// it, copied together in a single break of the pass (copyTogether). The sea is never in it: what is drawn after the
-// sea (clouds, smoke, trails, the moonbow) fades into the scene under the water's surface, and is cut by the sea
-// itself through the depth test. (The colour is a plain viewport texture: three's shared one keys its copy by node,
+// taken as the haze's veil is drawn (atmosphere/index.ts), the first of what draws over the scene: the colour and the
+// depth of everything solid, copied together in a single break of the pass (copyTogether). The sea is never in it:
+// it reads the floor under it from the copy, and what is drawn after the sea (clouds, smoke, trails, the moonbow)
+// fades into the scene under the water's surface, and is cut by the sea itself through the depth test. (The colour is a plain viewport texture: three's shared one keys its copy by node,
 // so each sample of it copies again.)
 import { FramebufferTexture, type Node, type Texture, type WebGPURenderer } from 'three/webgpu';
 import { screenUV, viewportDepthTexture, viewportTexture } from 'three/tsl';

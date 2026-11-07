@@ -24,7 +24,7 @@ import { P } from '../gpu/uniforms.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 import { thinCloudLight } from '../atmosphere/light.ts';
 import { lightTransmittance, MOON_RADIUS, SUN_RADIUS } from '../atmosphere/luts.ts';
-import { moonShade, sunShade } from '../atmosphere/shade.ts';
+import { bodyShades } from '../atmosphere/shade.ts';
 import { stand } from './landmarks.ts';
 
 type F = Node<'float'>;
@@ -143,8 +143,9 @@ export class Moonbow {
       const p = positionWorld;
       const r = p.length(), up = p.div(r);
       // the direct light on the drops, after the air and the clouds over them
-      const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(sunShade(p));
-      const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(p));
+      const shade = bodyShades(p);
+      const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(shade.sun);
+      const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(shade.moon);
       const view = p.sub(cameraPosition).normalize();
       const angle = acos(clamp(view.dot(this.#light.negate()), -1, 1)).mul(1 / DEG);
       const bow = bowAt(angle);

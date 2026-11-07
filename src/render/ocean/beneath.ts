@@ -17,18 +17,18 @@
 // worked out from the spectrum): a cascade that has overfocused has spread into the even light it averages to, and
 // the caustics left are those of the waves whose focus lies about this deep: the ripples' fine bright net in a hand's
 // depth of water, only the long waves' broad one in the deep.
-import { type Node, type NodeBuilder, type Texture } from 'three/webgpu';
+import { type Node, type Texture } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, dot, exp, float, fwidth, int, length, log2, max, min, mix, smoothstep, sqrt, texture, vec2, vec3,
 } from 'three/tsl';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, SEA } from './waves.ts';
 import { FRAME, FRAMES, inFrame, type Frame } from './surface.ts';
-import { skyLight, sunlight } from '../atmosphere/light.ts';
+import { BODIES, skyLight, sunlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
-import { P } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
 import { waterAt } from '../seaTint.ts';
+import { P } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -45,8 +45,6 @@ const FOCUS = 0.7;
 const BRIGHTEST = 7;
 /** Metres of water past which the floor takes no caustics and no shadow of its own (from 0.6 of it they fade). */
 const CAUSTICS = 16;
-/** How far the crests can stand above the mean sea, metres: nothing higher than this is ever under water. */
-const CRESTS = 4;
 
 const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));
 
@@ -100,15 +98,14 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
   };
 
   return (colour: V3, p: V3): V3 =>
-    Fn((builder: NodeBuilder) => {
-      const material = (builder as unknown as { material?: { userData?: { seaSurface?: boolean } } }).material;
-      if (material?.userData?.seaSurface) return colour;
+    Fn(() => {
       const out = vec3(colour).toVar();
       const r = p.length();
       const up = p.div(r).toVar();
       // (by texel loads: this runs in every material's fragment, the land's among them, which is out of samplers)
       const sea = seaLevelNode(up, true).toVar();
-      If(r.lessThan(sea.add(CRESTS)), () => {
+      // (nothing higher than the highest crest is ever under water)
+      If(r.lessThan(sea.add(SEA.crest)), () => {
         const w = FRAME.weight;
         const surface = rise(up, FRAMES[0]).mul(w.x).toVar();
         If(w.y.greaterThan(0), () => {
@@ -134,9 +131,13 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
           // deeper than CAUSTICS the waves' focus has spread into the even light it averages to, and a hull's shadow
           // on the floor is lost in the water over it: neither is worked out there, which spares the open sea's floor
           // the curvature's samples and a second read of the shadow map in every pixel
+          // (and at night, with the sun gone from everything in view, there is no sun to move)
           const near = smoothstep(CAUSTICS, CAUSTICS * 0.6, depth).toVar();
-          const caustic = float(1).toVar(), shade = float(1).toVar();
-          If(near.greaterThan(0), () => {
+          const caustic = float(1).toVar(), shade = float(1).toVar(), sun = float(0).toVar();
+          If(BODIES.sun.greaterThan(0.5), () => {
+            sun.assign(luma(sunlight).mul(max(mu, 0)));
+          });
+          If(near.greaterThan(0).and(sun.greaterThan(0)), () => {
             const H = curvature(up, run, FRAMES[0], blur, k).mul(w.x).toVar();
             If(w.y.greaterThan(0), () => {
               H.addAssign(curvature(up, run, FRAMES[1], blur, k).mul(w.y));
@@ -149,9 +150,8 @@ export function beneath(field: Texture): (colour: V3, p: V3) => V3 {
           });
           // the sun's share of the light on a level patch here, which is the share the caustics move: none in the
           // shadow of a hull or a cliff
-          const sun = luma(sunlight).mul(max(mu, 0)).mul(shade);
           const sky = luma(skyLight(p, up));
-          const share = sun.div(max(sun.add(sky), 1e-6));
+          const share = sun.mul(shade).div(max(sun.mul(shade).add(sky), 1e-6));
           out.assign(colour.mul(down.mul(caustic).mul(share).add(diffuse.mul(float(1).sub(share)))));
         });
       });

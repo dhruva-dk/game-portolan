@@ -23,14 +23,15 @@
 import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial, Vector2, Vector3, type Node, type Texture } from 'three/webgpu';
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
-  min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
+  min, mix, normalize, output, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
   smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
+import { hazeAt } from '../atmosphere/index.ts';
 import { R } from '../../sim/sphere.ts';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, type Waves } from './waves.ts';
-import { skyLight, sunlight, moonlight } from '../atmosphere/light.ts';
+import { BODIES, moonlight, skyLight, sunlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
 import { LAMP, P, shared } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
@@ -206,9 +207,9 @@ function rainRings(q: V2): V2 {
 
 export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
-  mat.fog = true;
-  // the surface is what the light under it passes through, not something beneath it
-  mat.userData.seaSurface = true;
+  // the sea works out its own haze, once, under the surface (below): it is not something beneath itself either
+  mat.fog = false;
+  const airLoss = vec3(1).toVar('oceanAirLoss'), airLight = vec3(0).toVar('oceanAirLight');
 
   // ----- vertex: the grid on the sphere, moved by the waves
   const along = positionGeometry.x, bearing = positionGeometry.z;
@@ -477,13 +478,22 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const u = normalize(vUp);
     const v = normalize(cameraPosition.sub(p));
     const nv = max(dot(world, v), 0);
+    // the haze between the eye and the water: the floor seen through the water takes it as everything solid does, and
+    // the sea's whole light takes it again (outputNode)
+    const air = hazeAt(p);
+    airLoss.assign(air.loss);
+    airLight.assign(air.light);
     const fresnel = float(0.02).add(pow(float(1).sub(nv), 5).mul(0.98));
-    // what reaches into the water from above: the sky, and the sun and moon by their height, the sun's taken away
-    // where something stands between it and the water
-    const sun = sunlight.mul(sunShadow()).toVar();
-    const down = skyLight(p, u)
-      .add(sun.mul(max(dot(u, P.sunDir), 0)))
-      .add(moonlight.mul(max(dot(u, P.moonDir), 0)));
+    // what reaches into the water from above: the sky, and the sun and moon by their height (each while it lights
+    // anything in view), the sun's taken away where something stands between it and the water
+    const sun = vec3(0).toVar(), down = skyLight(p, u).toVar();
+    If(BODIES.sun.greaterThan(0.5), () => {
+      sun.assign(sunlight.mul(sunShadow()));
+      down.addAssign(sun.mul(max(dot(u, P.sunDir), 0)));
+    });
+    If(BODIES.moon.greaterThan(0.5), () => {
+      down.addAssign(moonlight.mul(max(dot(u, P.moonDir), 0)));
+    });
     // this region's water: its own colour, and how far the eye sees into it
     const water = waterAt(u);
     // the captain's dye: the water's colour turned to theirs
@@ -501,7 +511,8 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const depthZ = max(zHere.sub(behind(uv)), 0);
     const path = depthZ.mul(length(positionView)).div(max(abs(zHere), 1e-3));
     const T = exp(water.extinction.mul(path).negate());
-    const floor = beneathColour(uv).rgb.mul(mix(vec3(1), hue.div(max(max(hue.x, hue.y), max(hue.z, 1e-3))), inked.share.mul(0.5)));
+    const floor = beneathColour(uv).rgb.mul(airLoss).add(airLight)
+      .mul(mix(vec3(1), hue.div(max(max(hue.x, hue.y), max(hue.z, 1e-3))), inked.share.mul(0.5)));
     // the sun through a crest standing between it and the eye (after Atlas's water, GDC 2019)
     const toward = pow(clamp(dot(v, P.sunDir.negate()), 0, 1), 4);
     const thin = pow(clamp(float(0.5).sub(dot(P.sunDir, world).mul(0.5)), 0, 1), 3);
@@ -513,6 +524,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel)).add(inked.glow.mul(P.night).mul(LAMP.mul(2.5)));
   })();
   mat.backdropAlphaNode = float(1).sub(whiteness);
+  mat.outputNode = vec4(output.rgb.mul(airLoss).add(airLight), output.a);
   // the surf's glow at night, the sea's own light (actors' scale)
   mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
 

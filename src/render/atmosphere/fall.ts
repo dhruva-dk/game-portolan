@@ -21,7 +21,7 @@ import {
 import { LAMP, P } from '../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from './luts.ts';
 import { skyLight } from './light.ts';
-import { moonShade, sunShade } from './shade.ts';
+import { bodyShades } from './shade.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
@@ -130,8 +130,9 @@ function layer(spec: Spec): Layer {
     m.colorNode = vec3(2.4, 0.9, 0.25).mul(flicker).mul(LAMP).mul(6);
   } else {
     const r = length(at), up = at.div(r);
-    const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(sunShade(at));
-    const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(moonShade(at));
+    const shade = bodyShades(at);
+    const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance).mul(shade.sun);
+    const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase).mul(shade.moon);
     const sky = skyLight(at, up).add(skyLight(at, up.negate())).mul(0.5).div(Math.PI);
     if (spec.look === 'rain') {
       // a drop bends the whole sky toward the eye, brighter than the haze round it, and the sun glints through it

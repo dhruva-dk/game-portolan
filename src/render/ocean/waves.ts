@@ -22,7 +22,7 @@ import {
   storageTexture, int, uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId, atan,
 } from 'three/tsl';
 import { Vector2, Vector3 } from 'three/webgpu';
-import { CASCADES, CUTS, G, N, SIZES, SWELL_SPREAD, curvatureRms, type SpectrumParams } from './spectrum.ts';
+import { CASCADES, CUTS, G, N, SIZES, SWELL_SPREAD, curvatureRms, significantHeight, type SpectrumParams } from './spectrum.ts';
 import { shared } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
@@ -47,6 +47,8 @@ export const SEA = shared({
   foamLife: uniform(2.8),
   /** Each cascade's RMS curvature, 1/m (spectrum.ts curvatureRms): how hard its waves focus light into caustics. */
   curvature: uniform(new Vector3(0.05, 0.5, 5)),
+  /** The highest a crest stands over the mean sea, metres: a half again over the significant height, and the chop. */
+  crest: uniform(4),
 });
 
 export function setSpectrum(p: SpectrumParams, seed: number): void {
@@ -58,6 +60,7 @@ export function setSpectrum(p: SpectrumParams, seed: number): void {
   (SEA.swellDir.value as Vector2).set(...p.swellDir);
   SEA.seed.value = seed;
   (SEA.curvature.value as Vector3).fromArray(curvatureRms(p));
+  SEA.crest.value = Math.min(1.5 * significantHeight(p) + 0.25, 4);
 }
 
 const NN = N * N;
