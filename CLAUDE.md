@@ -63,8 +63,9 @@ The interface of the first Portolan (commit a3536d0, `src/chart.ts`) is the stan
   A numeral is allowed where the player wants the number (damage dealt, shot in hand, the Storm's clock), written in
   the chartmaker's hand.
 - **Teach with drawings** the first time something appears: a pointing hand, dotted courses, small woodcut diagrams.
-- **Buttons are objects:** seals, cartouches, instruments, pennants. **Screens are sheets:** the lobby is a chart
-  over the live planet, and the menus are its folios. No rounded rectangles, gradients, smoked glass, drop-shadow
+- **On a sheet, everything that can be pressed is a wax seal, or stands on one, and nothing else is.** Play is the
+  only gold seal. In a match the controls are the instruments under the thumbs, taught by drawing. **Screens are
+  sheets:** the lobby is your ship at anchor with chart scraps at the margins, and the menus are its folios. No rounded rectangles, gradients, smoked glass, drop-shadow
   panels or glyph-font icons.
 - **Rarity is illumination:** plain ink, red rubric, red and blue, silver leaf, gold leaf.
 - **Every tap is answered** with a press, a sound and a haptic. **Nothing pops in:** screens animate, lists stagger,
