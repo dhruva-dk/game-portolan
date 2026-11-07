@@ -7,6 +7,7 @@
 import { WebGPURenderer, NoToneMapping, SRGBColorSpace } from 'three/webgpu';
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
+import { batchSubmits } from './submits.ts';
 
 export interface GpuInfo {
   vendor: string;
@@ -68,6 +69,8 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   device.createShaderModule = (d: ShaderSource) => compile({ ...d, code: tightenPrivates(d.code) });
   // and every pass, submission and copy is counted for the frame log (shape.ts)
   shape.install(backend.device as unknown as Parameters<typeof shape.install>[0]);
+  // and handed to the queue together (submits.ts)
+  batchSubmits(backend.device as unknown as Parameters<typeof batchSubmits>[0]);
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(pixelRatio(innerWidth, innerHeight));

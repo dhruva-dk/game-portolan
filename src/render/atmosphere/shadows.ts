@@ -1,4 +1,4 @@
-// The sun's shadows: four cascades of shadow maps fitted to slices of the view (Engel, "Cascaded Shadow Maps", ShaderX5
+// The sun's shadows: cascades of shadow maps fitted to slices of the view (Engel, "Cascaded Shadow Maps", ShaderX5
 // 2006; Dimitrov, "Cascaded Shadow Maps", NVIDIA 2007), each slice's map snapped to whole texels as the eye moves so
 // the edges never crawl, with the slices cross-faded where they meet.
 //
@@ -25,12 +25,14 @@ import {
   shadowPositionWorld, sin, smoothstep, texture, vec2, vec4,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
+import { PARKED } from '../gpu/parked.ts';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 
 /** The shadows reach this far from the eye, metres. */
 export const SHADOW_REACH = 360;
-/** Where each slice ends, as a share of the reach. */
-export const SPLITS = [0.034, 0.12, 0.36, 1];
+/** Where each slice ends, as a share of the reach: two slices while the far ones are parked, the first holding the
+ *  ship and what is round her, the second the rest. */
+export const SPLITS = PARKED.farCascades ? [0.1, 1] : [0.034, 0.12, 0.36, 1];
 export const MAP_SIZE = 2048;
 /** The share of a boundary's distance the slices are cross-faded over, either side of it, and the share of the reach
  *  over which the last slice's shadows thin out. */

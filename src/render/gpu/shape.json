@@ -1,14 +1,14 @@
 {
   "title": {
-    "passes": 147,
-    "submits": 45
+    "passes": 41,
+    "submits": 8
   },
   "lobby": {
-    "passes": 157,
-    "submits": 55
+    "passes": 41,
+    "submits": 8
   },
   "match": {
-    "passes": 148,
-    "submits": 46
+    "passes": 42,
+    "submits": 8
   }
 }

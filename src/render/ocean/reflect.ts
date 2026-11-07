@@ -21,6 +21,7 @@ import {
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { P } from '../gpu/uniforms.ts';
+import { PARKED } from '../gpu/parked.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
@@ -40,6 +41,8 @@ const REACH = FIRST * ((GROW ** STEPS - 1) / (GROW - 1));
  * `normal` is the surface's normal in the world, `rough` its GGX α, `fresnel` how much it reflects looking this way.
  */
 export function seaReflection(normal: V3, rough: F, fresnel: F): V4 {
+  // parked, the sea mirrors the sky's probe alone
+  if (PARKED.seaReflections) return vec4(0);
   return Fn(() => {
     const out = vec4(0).toVar('seaReflect');
     If(fresnel.greaterThan(0.05), () => {

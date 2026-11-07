@@ -24,17 +24,18 @@
 // thickness, so a thick slice never gives back more light than it can scatter. What lies at any depth reads how much
 // light the air in front has scattered toward the eye and how much of its own light comes through. Every material's
 // haze and the sky behind everything read it.
-import { HalfFloatType, LinearFilter, Matrix4, Storage3DTexture, Vector3, Vector4, type ComputeNode, type DepthTexture, type Node, type WebGPURenderer } from 'three/webgpu';
+import { HalfFloatType, LinearFilter, Matrix4, Storage3DTexture, Vector2, Vector3, Vector4, type ComputeNode, type DepthTexture, type Node, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, clamp, exp, float, globalId, ivec2, log, max, mix, pow, select, smoothstep, step, texture, texture3D,
+  Fn, If, abs, clamp, exp, min, float, globalId, instancedArray, ivec2, log, max, mix, pow, select, smoothstep, step, texture, texture3D,
   textureStore, uint, uniform, uniformArray, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance } from './luts.ts';
 import { skyLight } from './light.ts';
-import { moonShade, sunShade } from './shade.ts';
+import { SHADE, cloudShade, moonShade, sunShade } from './shade.ts';
 import { MAP_SIZE, SHADOW_REACH, SPLITS } from './shadows.ts';
 import { P } from '../gpu/uniforms.ts';
+import { PARKED } from '../gpu/parked.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 import { loop } from '../gpu/tsl.ts';
 
@@ -275,9 +276,73 @@ const dispatch = (kernel: Node, size: number[], group: number[]): ComputeNode =>
   return k.compute(size.map((s, i) => Math.ceil(s / group[i])), group);
 };
 
-/** What the froxels hold between the eye and p: the light the mist has scattered toward the eye, and how much of
- *  p's own light comes through. */
+/** While the froxels are parked, the mist the eye stands in, worked out along each ray: the haze over the sea
+ *  (extinction per metre at the water, and the height it thins by e over) with the sea smoke and Mistwood's mist
+ *  folded in, and the weather's haze round the eye (the same, its albedo, and 1 for ash) with its tint. */
+const MIST = {
+  haze: uniform(new Vector2(HAZE, HAZE_HEIGHT)),
+  weather: uniform(new Vector4(0, 100, 0.97, 0)),
+  tint: uniform(new Vector3(1, 1, 1)),
+  /** The light the mist round the eye is lit by: the sun's and the moon's as they reach it, and the sky's, scattered
+   *  evenly. Worked out on the GPU at the eye a few times a second and read back (mistLight). */
+  sun: uniform(new Vector3()),
+  moon: uniform(new Vector3()),
+  sky: uniform(new Vector3()),
+};
+
+/** How often the mist's light is worked out again, seconds. */
+const MIST_LIGHT_EVERY = 0.25;
+
+/** The sun's, the moon's and the sky's light at the eye, for the mist. */
+const mistLightAt = instancedArray(3, 'vec4');
+const mistLightKernel = Fn(() => {
+  const p = EYE.position, r = p.length(), up = p.div(r);
+  const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance);
+  const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase);
+  const sky = skyLight(p, up).add(skyLight(p, up.negate())).div(4 * Math.PI);
+  mistLightAt.element(0).assign(vec4(sun, 0));
+  mistLightAt.element(1).assign(vec4(moon, 0));
+  mistLightAt.element(2).assign(vec4(sky, 0));
+})().compute(1);
+
+/** The extinction along the segment from height a to height b over the sea, `len` long, through matter that thins
+ *  by e every h metres up from `sigma` at the water. */
+const column = (sigma: F, h: F, a: F, b: F, len: F): F => {
+  const d = b.sub(a);
+  const ea = exp(a.max(0).negate().div(h)), eb = exp(b.max(0).negate().div(h));
+  return sigma.mul(len).mul(select(abs(d).greaterThan(0.01), ea.sub(eb).mul(h).div(d), ea));
+};
+
+/** The mist between the eye and p, worked out along the ray: what it takes of p's light and the sun's, the moon's and
+ *  the sky's light it scatters toward the eye. */
+function mistAlong(p: V3): { light: V3; loss: F } {
+  const eye = EYE.position, sea = P.planet.y;
+  // out to where the froxels reached: past it the air's own tables take over
+  const whole = p.sub(eye).length(), d = p.sub(eye).div(max(whole, 1e-3));
+  const len = min(whole, FAR), q = eye.add(d.mul(len));
+  const ha = eye.length().sub(sea), hb = q.length().sub(sea);
+  const haze = column(MIST.haze.x, MIST.haze.y, ha, hb, len);
+  const weather = column(MIST.weather.x, MIST.weather.y, ha, hb, len);
+  const loss = exp(haze.add(weather).negate());
+  // lit as at the eye, under the clouds' shade halfway along
+  const shade = cloudShade(eye.add(q).mul(0.5));
+  const sun = MIST.sun.mul(mix(float(1), shade, SHADE.sun)), moon = MIST.moon.mul(mix(shade, float(1), SHADE.sun));
+  const g = select(MIST.weather.w.greaterThan(0.5), float(G_ASH), float(G_MIST));
+  const scatter = (gg: F) => sun.mul(hgOf(d.dot(P.sunDir), gg)).add(moon.mul(hgOf(d.dot(P.moonDir), gg))).add(MIST.sky);
+  // the haze's light, and the weather's in its own albedo and tint, each as its share of what is taken
+  const share = weather.div(max(haze.add(weather), 1e-6));
+  const albedo = mix(float(0.97), MIST.weather.z, share);
+  const tint = mix(vec3(1), MIST.tint, share);
+  return { light: scatter(g).mul(albedo).mul(tint).mul(float(1).sub(loss)), loss };
+}
+
+/** Henyey and Greenstein's phase function, for an asymmetry worked out on the GPU. */
+const hgOf = (c: F, g: F): F => float(1).sub(g.mul(g)).div(pow(float(1).add(g.mul(g)).sub(c.mul(g).mul(2)), 1.5).mul(4 * Math.PI));
+
+/** What the mist holds between the eye and p: the light it has scattered toward the eye, and how much of p's own
+ *  light comes through. From the froxels, or while they are parked worked out along the ray. */
 export function fogAt(p: V3): { light: V3; loss: F } {
+  if (PARKED.volumeFog) return mistAlong(p);
   const eye = EYE.position;
   const depth = p.sub(eye).dot(U.forward);
   const clip = EYE.viewProjection.mul(vec4(p, 1));
@@ -301,6 +366,8 @@ export class Fog {
   #eye = new Vector3();
   #fwd = new Vector3();
   #up = new Vector3();
+  #reading = false;
+  #lightAt = -Infinity;
 
   constructor() {
     const size = [FROXELS.x, FROXELS.y, FROXELS.z], group = [8, 4, 4];
@@ -375,12 +442,63 @@ export class Fog {
     }
     LAMP_AT.count.value = m;
 
+    if (PARKED.volumeFog) {
+      this.#mistAround(eye, systems, smoke, mist);
+      this.#mistLight(renderer);
+      return;
+    }
     const t = this.#turn;
     renderer.compute([(this.#light ?? this.#lightNoShadow)[t], this.#sum[t]]);
     // what this frame's cells were lit from, for the next to find them by
     (U.before.value as Matrix4).copy(viewProjection);
     this.#turn = 1 - t;
     this.#frames++;
+  }
+
+  /** Works out the mist's light at the eye now and then, and reads it back for the uniforms every material reads. */
+  #mistLight(renderer: WebGPURenderer): void {
+    const now = performance.now() / 1000;
+    if (this.#reading || now - this.#lightAt < MIST_LIGHT_EVERY) return;
+    this.#lightAt = now;
+    this.#reading = true;
+    renderer.compute(mistLightKernel);
+    void renderer.getArrayBufferAsync(mistLightAt.value).then((b) => {
+      const v = new Float32Array(b);
+      (MIST.sun.value as Vector3).set(v[0], v[1], v[2]);
+      (MIST.moon.value as Vector3).set(v[4], v[5], v[6]);
+      (MIST.sky.value as Vector3).set(v[8], v[9], v[10]);
+    }).finally(() => { this.#reading = false; });
+  }
+
+  /** The mist the eye stands in, for the rays to work out while the froxels are parked: the sea's haze, thicker by
+   *  night, with the sea smoke and Mistwood's mist round the eye; and the haze of the weather it is inside. */
+  #mistAround(
+    eye: Vector3, systems: readonly { kind: string; at: { x: number; y: number; z: number }; radius: number; strength: number }[],
+    smoke: number, mist: { at: Vector3; radius: number; amount: number },
+  ): void {
+    const up = this.#up.copy(eye).normalize();
+    const night = P.night.value as number;
+    const inMist = mist.amount * Math.max(0, 1 - Math.acos(Math.max(-1, Math.min(1, up.dot(mist.at)))) * R / Math.max(mist.radius, 1));
+    (MIST.haze.value as Vector2).set(HAZE * (1 + (NIGHT_DAMP - 1) * night) + smoke * 0.004 + inMist * 0.012, HAZE_HEIGHT);
+    let sigma = 0, height = 0, albedo = 0, ash = 0;
+    const tint = new Vector3();
+    for (const s of systems) {
+      const k = WEATHER_HAZE[s.kind];
+      if (!k || s.strength < 0.02) continue;
+      const len = Math.hypot(s.at.x, s.at.y, s.at.z) || 1;
+      const along = Math.acos(Math.max(-1, Math.min(1, (up.x * s.at.x + up.y * s.at.y + up.z * s.at.z) / len))) * R;
+      const inside = s.strength * Math.min(1, Math.max(0, (s.radius - along) / (s.radius * 0.45)));
+      if (inside <= 0) continue;
+      const w = k.sigma * inside;
+      sigma += w;
+      height += k.height * w;
+      albedo += k.albedo * w;
+      ash += (k.ash ? 1 : 0) * w;
+      tint.x += k.tint[0] * w; tint.y += k.tint[1] * w; tint.z += k.tint[2] * w;
+    }
+    const n = Math.max(sigma, 1e-9);
+    (MIST.weather.value as Vector4).set(sigma, sigma > 0 ? height / n : 100, sigma > 0 ? albedo / n : 0.97, ash / n);
+    (MIST.tint.value as Vector3).set(sigma > 0 ? tint.x / n : 1, sigma > 0 ? tint.y / n : 1, sigma > 0 ? tint.z / n : 1);
   }
 }
 

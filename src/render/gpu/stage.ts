@@ -5,6 +5,7 @@ import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURe
 import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { shape } from './shape.ts';
+import { copyTogether } from './behind.ts';
 import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { runFrameWork } from './work.ts';
@@ -117,6 +118,7 @@ export class GpuStage {
     progress(0.02, 'Charting the seas');
     const t0 = performance.now();
     const { renderer, info } = await createRenderer(canvas);
+    copyTogether(renderer);
     progress(0.5, 'Raising the islands');
     const t1 = performance.now();
     const stage = new GpuStage(canvas, renderer, info.form);

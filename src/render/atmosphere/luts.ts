@@ -467,6 +467,10 @@ export const skyFromTables = Fn(([d]: [V3]) => {
   return sun.add(moon);
 });
 
+/** Steps the sky is marched in from outside the air: its light changes smoothly along a ray, and from orbit it is
+ *  marched for every pixel the planet leaves. */
+const MARCH_STEPS = 12;
+
 /** The sky along d from an eye outside the air (or anywhere), marched directly: the light gathered (rgb) and how much
  *  of what lies beyond comes through (returned through the second output). */
 export const skyMarched = Fn(([eye, d]: [V3, V3]) => {
@@ -477,7 +481,7 @@ export const skyMarched = Fn(([eye, d]: [V3, V3]) => {
     const start = max(shell.x, 0);
     const ground = raySphere(eye, d, AIR.bottom);
     const end = select(ground.x.greaterThan(0), ground.x, shell.y);
-    const steps = 24;
+    const steps = MARCH_STEPS;
     const dt = end.sub(start).div(steps);
     loop('s', steps, (i) => {
       const p = eye.add(d.mul(start.add(dt.mul(float(i).add(0.5)))));

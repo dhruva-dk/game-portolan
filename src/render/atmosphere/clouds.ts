@@ -31,7 +31,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Break, Discard, Fn, If, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
+  Break, Discard, Fn, If, abs, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
   interleavedGradientNoise, max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
   smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
@@ -39,6 +39,7 @@ import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
 import type { WeatherKind } from '../../sim/world/index.ts';
 import { P, STRIKE } from '../gpu/uniforms.ts';
+import { PARKED } from '../gpu/parked.ts';
 import { loop } from '../gpu/tsl.ts';
 import { raySphere } from './model.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, aerialAt, lightTransmittance } from './luts.ts';
@@ -542,6 +543,105 @@ function compositeMaterial(source: Held): MeshBasicNodeMaterial {
   return m;
 }
 
+// ---------------------------------------------------------------- the thin layer
+
+/** The share of its towers' height above its base a system's thin layer lies at. */
+const LAYER_AT = 0.4;
+/** The layer is traced at this share of the scene's resolution each way. */
+const LAYER_SCALE = 0.25;
+
+/**
+ * While the volumes are parked, each system is a thin layer, traced at a quarter of the scene's resolution each way:
+ * where the ray crosses the height the system's cloud is thickest at, the column of cloud over and under it is read at
+ * three heights through its towers and lit as a slab, its light's way out toward the key and the orders of its
+ * scattering worked out through the slab as the march works them out step by step. A fog bank lies on the water,
+ * where the mist has it. A texel keeps where along its ray the nearest layer it saw lies, so the scene, drawn at its
+ * own resolution, shows the clouds only in front of whatever it drew.
+ */
+function layerKernel(into: Held, w: number, h: number): ComputeNode {
+  const kernel = Fn(() => {
+    const id = globalId.xy;
+    If(id.x.lessThan(w).and(id.y.lessThan(h)), () => {
+      const uv = vec2(id).add(0.5).div(vec2(w, h));
+      const view = vec3(uv.x.mul(2).sub(1).mul(EYE.tan.x), float(1).sub(uv.y.mul(2)).mul(EYE.tan.y), -1);
+      const d = EYE.world.mul(vec4(view, 0)).xyz.normalize();
+      const eye = EYE.position, sea = P.planet.y;
+      // nothing is seen through the sea
+      const water = raySphere(eye, d, sea);
+      const end = select(water.x.greaterThan(0), water.x, float(1e9));
+      const key = KEY.dir, cosT = d.dot(key);
+      const ph0 = phase(cosT, 1), ph1 = phase(cosT, 0.5), ph2 = phase(cosT, 0.25);
+      const L = vec3(0).toVar(), T = float(1).toVar(), front = float(1e4).toVar();
+      loop('cloudLayer', SYS.count, (i) => {
+        const look = el(SYS.look, i), kind = int(look.x);
+        const shape = el(SHAPE_K, kind), fall = el(FALL_K, kind), tint = el(TINT_K, kind).xyz;
+        If(fall.z.lessThan(0.5), () => {
+          const height = sea.add(shape.x).add(shape.y.mul(LAYER_AT));
+          const cross = raySphere(eye, d, height);
+          const t = select(eye.length().greaterThan(height), cross.x, cross.y);
+          If(t.greaterThan(0).and(t.lessThan(end)), () => {
+            const p = eye.add(d.mul(t));
+            const r = p.length(), up = p.div(r);
+            // the column of cloud over and under the crossing, read at three heights through its towers
+            const at = (k: number) => cloudAt(up.mul(sea.add(shape.x).add(shape.y.mul(k))), i, float(1)).x;
+            const low = at(0.15), mid = at(LAYER_AT), high = at(0.7);
+            const sigma = low.add(mid).add(high).div(3);
+            If(sigma.greaterThan(1e-4), () => {
+              const slab = shape.y.mul(0.7);
+              const alpha = float(1).sub(exp(min(sigma.mul(slab).div(max(abs(d.dot(up)), 0.12)), 60).negate()));
+              const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance);
+              const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase);
+              const light = select(KEY.sun.greaterThan(0.5), sun, moon);
+              // the light's way out from the middle of the slab toward the key, and the orders of its scattering
+              const tau = min(mid.add(high).mul(0.5).mul(slab.mul(0.5)).div(max(up.dot(key), 0.1)), 60);
+              const orders = exp(tau.negate()).mul(ph0).add(exp(tau.mul(-0.4)).mul(ph1).mul(0.5)).add(exp(tau.mul(-0.16)).mul(ph2).mul(0.25));
+              const powder = float(1).sub(exp(sigma.mul(-14)));
+              const direct = light.mul(orders).mul(mix(powder, float(1), cosT.mul(0.5).add(0.5)));
+              const ambient = skyLight(p, up).mul(0.7).add(skyLight(p, up.negate()).mul(0.45)).mul(1 / (2 * Math.PI));
+              const flash = el(SYS.flash, i);
+              const lit = FLASH_COLOUR.mul(flash.w).mul(exp(p.distance(flash.xyz).mul(-1 / 60))).mul(40);
+              const source = direct.add(ambient).add(lit).mul(shape.w).mul(tint);
+              // the haze between the eye and the layer, and the mist closer in
+              const air = aerialAt(p), mist = fogAt(p);
+              L.addAssign(source.mul(air.loss).add(air.light).mul(alpha).mul(mist.loss).add(mist.light.mul(alpha)).mul(T));
+              T.mulAssign(float(1).sub(alpha));
+              front.assign(min(front, t));
+            });
+          });
+        });
+      });
+      textureStore(into.light, uvec2(id.x, id.y), vec4(L, float(1).sub(T)));
+      textureStore(into.depth, uvec2(id.x, id.y), vec4(front, 0, 0, 0));
+    });
+  })();
+  return (kernel as unknown as { compute(size: number[], group: number[]): ComputeNode })
+    .compute([Math.ceil(w / 8), Math.ceil(h / 8), 1], [8, 8, 1]);
+}
+
+/** The thin layer laid over the scene where it lies in front of what the scene drew. */
+function layerComposite(source: Held): MeshBasicNodeMaterial {
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, depthTest: false });
+  m.blending = CustomBlending;
+  m.blendSrc = m.blendSrcAlpha = OneFactor;
+  m.blendDst = m.blendDstAlpha = OneMinusSrcAlphaFactor;
+  m.fog = false;
+  m.vertexNode = vec4(positionGeometry.xy, 0, 1);
+  m.outputNode = Fn(() => {
+    const held = texture(source.light, screenUV);
+    const at = texture(source.depth, screenUV).x;
+    // how far along this pixel's ray the scene has drawn something
+    const viewZ = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
+    const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)));
+    const z = viewZ.negate().mul(vec3(ndc.x.mul(EYE.tan.x), ndc.y.mul(EYE.tan.y), 1).length());
+    const shown = held.a.mul(smoothstep(at.mul(0.97), at, z));
+    If(shown.lessThan(0.002), () => {
+      Discard();
+    });
+    return vec4(held.rgb.mul(shown.div(max(held.a, 1e-4))), shown);
+  })();
+  return m;
+}
+
 // ---------------------------------------------------------------- the shade
 
 /** How high the shade map's march climbs, metres over the sea: over the tallest anvil. */
@@ -602,6 +702,8 @@ export class Clouds {
   /** The quad over the whole view the clouds are laid on with. */
   readonly #quad: Mesh;
   readonly #materials: [MeshBasicNodeMaterial, MeshBasicNodeMaterial] | [] = [];
+  /** The thin layer's texels, kernel and composite, while the volumes are parked. */
+  #layer: { held: Held; kernel: ComputeNode; composite: MeshBasicNodeMaterial } | null = null;
 
   constructor() {
     this.group.name = 'clouds';
@@ -618,6 +720,21 @@ export class Clouds {
    * the fog have followed the camera, and before the scene is drawn.
    */
   march(renderer: WebGPURenderer, w: number, h: number, eye: Vector3, forward: Vector3, viewProjection: Matrix4): void {
+    if (PARKED.cloudVolumes) {
+      const lw = Math.max(8, Math.round(w * LAYER_SCALE)), lh = Math.max(8, Math.round(h * LAYER_SCALE));
+      if (!this.#layer || this.#size.x !== lw || this.#size.y !== lh) {
+        this.#size.set(lw, lh);
+        this.#layer?.held.light.dispose();
+        this.#layer?.held.depth.dispose();
+        this.#layer?.composite.dispose();
+        const held = held2(lw, lh);
+        this.#layer = { held, kernel: layerKernel(held, lw, lh), composite: layerComposite(held) };
+      }
+      this.#quad.material = this.#layer.composite;
+      this.#quad.visible = SYS.count.value > 0;
+      if (this.#quad.visible) renderer.compute(this.#layer.kernel);
+      return;
+    }
     const mw = Math.max(8, Math.round(w * MARCH_SCALE)), mh = Math.max(8, Math.round(h * MARCH_SCALE));
     if (!this.#held || this.#size.x !== mw || this.#size.y !== mh) {
       this.#size.set(mw, mh);

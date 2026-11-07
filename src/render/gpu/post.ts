@@ -32,6 +32,7 @@ import { taau } from 'three/addons/tsl/display/TAAUNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import SSGINode from 'three/addons/tsl/display/SSGINode.js';
 import SSSNode from 'three/addons/tsl/display/SSSNode.js';
+import GTAONode from 'three/addons/tsl/display/GTAONode.js';
 import { gaussianBlur } from 'three/addons/tsl/display/GaussianBlurNode.js';
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { agx, GRADE } from './tonemap.ts';
@@ -40,6 +41,7 @@ import { Exposure, exposure } from './exposure.ts';
 import { HAZE_MAX, hazeSpots } from './haze.ts';
 import { P } from './uniforms.ts';
 import { shape } from './shape.ts';
+import { PARKED } from './parked.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 export const BLOOM = uniform(0.05);
@@ -111,9 +113,10 @@ function clampedLoads(node: TextureNode): TextureNode {
   return node;
 }
 
-/** What the frame's surfaces throw on each other, as the upscaler composites it: the occlusion, the light gathered,
- *  the surface's own colour that takes it, the contact shadows, and the sea's mask (1 off the water). */
-interface Light { ao: TextureNode; gi: TextureNode; albedo: TextureNode; contact: TextureNode | null; dry: TextureNode }
+/** What the frame's surfaces throw on each other, as the upscaler composites it: the occlusion, and while they are
+ *  drawn, the light gathered with the surface's own colour that takes it, the contact shadows, and the sea's mask (1
+ *  off the water). */
+interface Light { ao: TextureNode; gi: TextureNode | null; albedo: TextureNode | null; contact: TextureNode | null; dry: TextureNode | null }
 
 /** The scene as the upscaler loads it, clamped as clampedLoads does, occluded and lit by what the frame's surfaces
  *  throw on each other (sampled at the texel's centre), and capped. */
@@ -125,11 +128,13 @@ function occludedLoads(node: TextureNode, l: Light): TextureNode {
     const c = load(clamp(at as unknown as Node<'vec2'>, ivec2(0, 0) as unknown as Node<'vec2'>, last as unknown as Node<'vec2'>)) as unknown as Node<'vec4'>;
     const st = vec2(at as unknown as Node<'vec2'>).add(0.5).div(vec2(size as unknown as Node<'vec2'>));
     // the contact shadows lie on what is dry: the sea's own crests would shadow its troughs in a moving speckle
-    const dry = (l.dry.sample(st) as unknown as Node<'vec4'>).r;
+    const dry = l.dry ? (l.dry.sample(st) as unknown as Node<'vec4'>).r : float(1);
     const shade = l.contact ? (l.contact.sample(st) as unknown as Node<'vec4'>).r : float(1);
     const touch = mix(float(1), shade, LENS.contact.mul(dry));
     const o = mix(float(1), (l.ao.sample(st) as unknown as Node<'vec4'>).r.mul(touch), LENS.occlusion);
-    const bounce = (l.gi.sample(st) as unknown as Node<'vec4'>).rgb.mul((l.albedo.sample(st) as unknown as Node<'vec4'>).rgb).mul(LENS.bounce);
+    const bounce = l.gi && l.albedo
+      ? (l.gi.sample(st) as unknown as Node<'vec4'>).rgb.mul((l.albedo.sample(st) as unknown as Node<'vec4'>).rgb).mul(LENS.bounce)
+      : vec3(0);
     return min(vec4(c.rgb.mul(o).add(bounce), c.a), vec4(30000));
   };
   return node;
@@ -205,12 +210,13 @@ export class Post {
   readonly pipeline: RenderPipeline;
   readonly scenePass: PassNode;
   readonly exposure: Exposure;
-  readonly occlusion: SSGINode;
+  /** The occlusion (with the bounce while it is drawn) and the contact shadows, null while parked. */
+  readonly occlusion: SSGINode | GTAONode;
   readonly contact: SSSNode | null;
   readonly #renderer: WebGPURenderer;
   readonly #camera: PerspectiveCamera;
   readonly #plain: Node;
-  readonly #focused: Node;
+  readonly #focused: Node | null = null;
   readonly #spots = uniformArray(Array.from({ length: HAZE_MAX }, () => new Vector4()), 'vec4');
   readonly #depths = uniformArray(Array.from({ length: HAZE_MAX }, () => new Vector4()), 'vec4');
   #focus = false;
@@ -221,12 +227,16 @@ export class Post {
     this.#renderer = renderer;
     this.#camera = camera;
     const scenePass = pass(scene, camera);
-    // `smear`: how much of its motion a pixel is blurred by, 1 but where a material says otherwise (the sea)
-    // `albedo`: the surface's own colour, which takes the light bounced onto it
-    scenePass.setMRT(mrt({ output, velocity, smear: float(1), albedo: diffuseColor }));
+    // each pixel's colour and motion; and while what reads them is drawn, `smear`: how much of its motion a pixel is
+    // blurred by, 1 but where a material says otherwise (the sea), and `albedo`: the surface's own colour, which takes
+    // the light bounced onto it
+    const smeared = !PARKED.motionBlur || !PARKED.contact;
+    scenePass.setMRT(mrt({
+      output, velocity, ...(smeared ? { smear: float(1) } : {}), ...(PARKED.bounce ? {} : { albedo: diffuseColor }),
+    }));
     scenePass.setResolutionScale(scale);
-    (scenePass.getTexture('smear') as Texture).type = UnsignedByteType;
-    (scenePass.getTexture('albedo') as Texture).type = UnsignedByteType;
+    if (smeared) (scenePass.getTexture('smear') as Texture).type = UnsignedByteType;
+    if (!PARKED.bounce) (scenePass.getTexture('albedo') as Texture).type = UnsignedByteType;
     this.scenePass = scenePass;
     // for the frame log: what the scene pass draws (the shadow maps with it) is the scene's, what follows is post's
     const drawScene = scenePass.updateBefore.bind(scenePass);
@@ -236,43 +246,58 @@ export class Post {
       shape.system('post');
       return r;
     };
-    const smear = scenePass.getTextureNode('smear');
+    const smear = smeared ? scenePass.getTextureNode('smear') : null;
     const beauty = scenePass.getTextureNode('output');
     const depth = clampedLoads(scenePass.getTextureNode('depth'));
     const motion = clampedLoads(scenePass.getTextureNode('velocity'));
 
-    // occlusion and bounce, from depth alone: normals rebuilt from it, so the smoke and spray drawn over a hull never
-    // muddy it. Two slices of eight steps a pixel, its noise turned each frame for the upscaler to gather; the radius
-    // reaches a few metres, about a hull's beam, so a sail lights the deck beneath it but a cliff doesn't light a ship
-    // a cable off
-    const occlusion = new Bounce(beauty, depth, null as unknown as TextureNode, camera);
-    occlusion.scale = scale * 0.5;
-    occlusion.sliceCount.value = 2;
-    occlusion.stepCount.value = 8;
-    occlusion.radius.value = 4;
-    occlusion.thickness.value = 1.2;
-    occlusion.expFactor.value = 1.6;
-    occlusion.aoIntensity.value = 1;
-    occlusion.giIntensity.value = 1;
-    occlusion.useTemporalFiltering = true;
-    this.occlusion = occlusion;
-    // contact shadows, by day, from the sun
-    let contact: TextureNode | null = null;
+    let light: Light;
     this.contact = null;
-    if (sun) {
-      const c = new SSSNode(depth, camera, sun);
-      c.resolutionScale = scale * 0.75;
-      c.maxDistance.value = 0.7;
-      c.thickness.value = 0.12;
-      c.quality.value = 0.5;
-      c.useTemporalFiltering = true;
-      this.contact = c;
-      contact = c.getTextureNode() as unknown as TextureNode;
+    if (PARKED.bounce) {
+      // ambient occlusion from depth alone at half the scene's resolution, its noise turned each frame for the
+      // upscaler to gather; the radius about a hull's beam, so it darkens under a gunwale and where a hull meets the
+      // water, not a ship a cable off a cliff
+      const occlusion = new GTAONode(depth, null as unknown as Node, camera);
+      occlusion.resolutionScale = 0.5;
+      occlusion.samples.value = 8;
+      occlusion.radius.value = 2.5;
+      occlusion.thickness.value = 1.2;
+      occlusion.useTemporalFiltering = true;
+      this.occlusion = occlusion;
+      light = { ao: occlusion.getTextureNode() as unknown as TextureNode, gi: null, albedo: null, contact: null, dry: null };
+    } else {
+      // occlusion and bounce, from depth alone: normals rebuilt from it, so the smoke and spray drawn over a hull never
+      // muddy it. Two slices of eight steps a pixel, its noise turned each frame for the upscaler to gather; the
+      // radius reaches a few metres, about a hull's beam, so a sail lights the deck beneath it but a cliff doesn't
+      // light a ship a cable off
+      const occlusion = new Bounce(beauty, depth, null as unknown as TextureNode, camera);
+      occlusion.scale = scale * 0.5;
+      occlusion.sliceCount.value = 2;
+      occlusion.stepCount.value = 8;
+      occlusion.radius.value = 4;
+      occlusion.thickness.value = 1.2;
+      occlusion.expFactor.value = 1.6;
+      occlusion.aoIntensity.value = 1;
+      occlusion.giIntensity.value = 1;
+      occlusion.useTemporalFiltering = true;
+      this.occlusion = occlusion;
+      // contact shadows, by day, from the sun
+      let contact: TextureNode | null = null;
+      if (sun && !PARKED.contact) {
+        const c = new SSSNode(depth, camera, sun);
+        c.resolutionScale = scale * 0.75;
+        c.maxDistance.value = 0.7;
+        c.thickness.value = 0.12;
+        c.quality.value = 0.5;
+        c.useTemporalFiltering = true;
+        this.contact = c;
+        contact = c.getTextureNode() as unknown as TextureNode;
+      }
+      light = {
+        ao: occlusion.getAONode() as unknown as TextureNode, gi: occlusion.getGINode() as unknown as TextureNode,
+        albedo: scenePass.getTextureNode('albedo'), contact, dry: smear,
+      };
     }
-    const light: Light = {
-      ao: occlusion.getAONode() as unknown as TextureNode, gi: occlusion.getGINode() as unknown as TextureNode,
-      albedo: scenePass.getTextureNode('albedo'), contact, dry: smear,
-    };
     // the upscaler reads the scene through its loads: occluded and lit there, and capped, since a glint past
     // half-float's range is stored as infinity, which the upscaler's blend turns into a NaN that spreads as black
     // through its history
@@ -282,7 +307,7 @@ export class Post {
     // heat haze, then motion blur, at the screen's resolution
     const spots = this.#spots, depths = this.#depths;
     const viewZ = scenePass.getViewZNode();
-    const moving = Fn(() => {
+    const moving = PARKED.motionBlur ? null : Fn(() => {
       const at = uv().toVar();
       const aspect = screenSize.x.div(screenSize.y);
       const far = viewZ.negate();
@@ -304,7 +329,7 @@ export class Post {
       at.addAssign(bend.mul(LENS.haze));
       // the pixel's own motion, in screen terms (motion vectors are in device coordinates, y up), smeared over the
       // shutter and held to a twentieth of the screen
-      const v = motion.sample(at).xy.mul(vec2(0.5, -0.5)).mul(LENS.shutter).mul(smear.sample(at).r).toVar();
+      const v = motion.sample(at).xy.mul(vec2(0.5, -0.5)).mul(LENS.shutter).mul(smear!.sample(at).r).toVar();
       const len = length(v);
       v.mulAssign(min(float(1), float(0.05).div(max(len, 1e-5))));
       const sum = vec4(0).toVar();
@@ -312,18 +337,19 @@ export class Post {
       for (let i = 0; i < N; i++) sum.addAssign(sharp.sample(at.add(v.mul(i / (N - 1) - 0.5))));
       return sum.div(N);
     })();
-    const moved = rtt(moving);
+    const moved = moving ? rtt(moving) : sharp;
 
     const finish = (hdrIn: Node<'vec4'>): Node<'vec4'> => {
       const glow = bloom(hdrIn, 1, 0.55, 0) as unknown as Node<'vec4'> & { getTextureNode(): TextureNode };
-      // the brightest of the scatter, exposed, throws ghosts across the lens and lights its dust
-      const bright = rtt(glow.rgb.mul(exposure), null, null, { resolutionScale: 0.25 });
-      const ghosts = gaussianBlur(rtt(lensGhosts(bright), null, null, { resolutionScale: 0.125 }), null, 6) as unknown as Node<'vec4'>;
-      const dust = texture(lensDirt(), screenUV).rgb;
-      const lit = max(glow.rgb.mul(exposure).sub(1.6), vec3(0));
-      let hdr = hdrIn.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM)).mul(exposure)
-        .add(ghosts.rgb.mul(LENS.flare))
-        .add(lit.mul(dust).mul(LENS.dirt));
+      let hdr = hdrIn.rgb.mul(float(1).sub(BLOOM)).add(glow.rgb.mul(BLOOM)).mul(exposure);
+      if (!PARKED.flare) {
+        // the brightest of the scatter, exposed, throws ghosts across the lens and lights its dust
+        const bright = rtt(glow.rgb.mul(exposure), null, null, { resolutionScale: 0.25 });
+        const ghosts = gaussianBlur(rtt(lensGhosts(bright), null, null, { resolutionScale: 0.125 }), null, 6) as unknown as Node<'vec4'>;
+        const dust = texture(lensDirt(), screenUV).rgb;
+        const lit = max(glow.rgb.mul(exposure).sub(1.6), vec3(0));
+        hdr = hdr.add(ghosts.rgb.mul(LENS.flare)).add(lit.mul(dust).mul(LENS.dirt));
+      }
       // outside the safe circle the world drains toward a bruised violet, before the tone curve so its light holds
       const lum = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
       hdr = mix(hdr, vec3(lum).mul(vec3(0.55, 0.42, 0.95)).add(hdr.mul(vec3(0.25, 0.15, 0.45))), SCREEN.storm.mul(0.75));
@@ -354,18 +380,20 @@ export class Post {
     };
     if (overlay) renderer.setClearColor(0x000000, 0);
     this.#plain = finish(moved as unknown as Node<'vec4'>);
-    // out of focus a lens spreads each point of light into a disc; the light is tone-weighted before it spreads
-    // (Karis's 1/(1+luma)) and given back after, so a spark or a lantern behind the focus blooms into a soft glow
-    // instead of a hard-edged coin brighter than everything round it
-    const weighed = rtt(Fn(() => {
-      const c = moved.sample(screenUV).rgb.toVar();
-      return vec4(c.div(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure).add(1)), 1);
-    })());
-    const spread = dof(weighed, viewZ, FOCUS.distance, FOCUS.range, FOCUS.bokeh) as unknown as Node<'vec4'>;
-    this.#focused = finish(Fn(() => {
-      const c = spread.rgb.toVar();
-      return vec4(c.div(max(float(1).sub(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure)), 0.02)), 1);
-    })() as unknown as Node<'vec4'>);
+    if (!PARKED.focus) {
+      // out of focus a lens spreads each point of light into a disc; the light is tone-weighted before it spreads
+      // (Karis's 1/(1+luma)) and given back after, so a spark or a lantern behind the focus blooms into a soft glow
+      // instead of a hard-edged coin brighter than everything round it
+      const weighed = rtt(Fn(() => {
+        const c = moved.sample(screenUV).rgb.toVar();
+        return vec4(c.div(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure).add(1)), 1);
+      })());
+      const spread = dof(weighed, viewZ, FOCUS.distance, FOCUS.range, FOCUS.bokeh) as unknown as Node<'vec4'>;
+      this.#focused = finish(Fn(() => {
+        const c = spread.rgb.toVar();
+        return vec4(c.div(max(float(1).sub(dot(c, vec3(0.2126, 0.7152, 0.0722)).mul(exposure)), 0.02)), 1);
+      })() as unknown as Node<'vec4'>);
+    }
     this.pipeline = new RenderPipeline(renderer);
     this.pipeline.outputNode = this.#plain;
     this.exposure = new Exposure(scenePass.getTexture('output') as Texture);
@@ -373,11 +401,11 @@ export class Post {
 
   /** Takes a lens's depth of field, sharp `distance` metres off, or (null) none. */
   focus(distance: number | null): void {
-    const on = distance !== null;
+    const on = distance !== null && this.#focused !== null;
     if (on) FOCUS.distance.value = distance;
     if (on === this.#focus) return;
     this.#focus = on;
-    this.pipeline.outputNode = on ? this.#focused : this.#plain;
+    this.pipeline.outputNode = on ? this.#focused! : this.#plain;
     this.pipeline.needsUpdate = true;
   }
 

@@ -745,7 +745,9 @@ export class App {
     const st = this.stage?.stats();
     console.info(`perf ${this.screen}: ${(w.frames / w.t).toFixed(1)} fps, worst frame ${(w.worst * 1000).toFixed(0)} ms, ` +
       `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame`);
-    console.info(shape.report(this.screen));
+    // in pieces: the device's console cuts a long message short
+    const lines = shape.report(this.screen).split('\n');
+    for (let i = 0; i < lines.length; i += 24) console.info(lines.slice(i, i + 24).join('\n'));
     Object.assign(w, { t: 0, frames: 0, worst: 0 });
   }
 

@@ -131,8 +131,9 @@ function waveField(): StorageArrayTexture {
   t.type = HalfFloatType;
   t.wrapS = t.wrapT = RepeatWrapping;
   t.minFilter = LinearMipmapLinearFilter;
+  // a full chain of mips, which the ocean rebuilds in one compute pass each frame (gpu/mips.ts), not three
   t.generateMipmaps = true;
-  (t as unknown as { mipmapsAutoUpdate: boolean }).mipmapsAutoUpdate = true;
+  (t as unknown as { mipmapsAutoUpdate: boolean }).mipmapsAutoUpdate = false;
   t.anisotropy = 8;
   return t;
 }

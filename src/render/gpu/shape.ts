@@ -217,9 +217,11 @@ class FrameShape {
       const t = new BigInt64Array(rb.getMappedRange(), 0, 2 * n);
       // a tiled GPU starts a pass's vertices while the last pass's pixels are still being drawn, so a pass's own
       // start and end overlap the one before it: each is given the time it adds after the last one ended, which sums
-      // to the frame's
-      let end = t[0];
-      for (let i = 0; i < n; i++) {
+      // to the frame's. Passes are begun nested (the screen's before the scene it shows), so they are taken in the
+      // order the GPU ran them.
+      const order = [...Array(n).keys()].sort((a, b) => (t[2 * a] < t[2 * b] ? -1 : t[2 * a] > t[2 * b] ? 1 : 0));
+      let end = t[2 * order[0]];
+      for (const i of order) {
         const from = t[2 * i] > end ? t[2 * i] : end, ns = Number(t[2 * i + 1] - from);
         // a pass the GPU skipped or a counter that wrapped reads as nothing
         f.passes[i].gpu = ns > 0 && ns < 1e9 ? ns / 1e6 : 0;

@@ -12,6 +12,7 @@ import { Territory } from './territory.ts';
 import { Flow } from './flow.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 import { RIPPLES } from './ripples.ts';
+import { MipChain } from '../gpu/mips.ts';
 
 /** How far the eye sails from the waves' anchor, radians of the planet, before a new one is laid under it: 277 m,
  *  where the map stretches the sea 4% across. */
@@ -27,6 +28,8 @@ interface Anchor { at: Vector3; axis: Vector3 }
 
 export class Ocean {
   readonly waves = new Waves();
+  /** The waves' mips, rebuilt in one pass after the waves are moved on. */
+  #mips: MipChain | null = null;
   readonly long = new LongWaves();
   readonly mesh: Mesh;
   /** The coastline's distance field, which the surf is drawn from: built in a worker as the game starts. */
@@ -91,6 +94,7 @@ export class Ocean {
     SEA.time.value = time;
     SEA.dt.value = Math.min(dt, 0.1);
     renderer.compute(this.waves.frame);
+    (this.#mips ??= new MipChain(renderer, this.waves.field)).run();
     // the wakes and splashes move on and are drawn into their field round the point under the eye
     RIPPLES.step(Math.min(dt, 0.1));
     _w.crossVectors(nadir, FRAME.gridE1.value as Vector3);
