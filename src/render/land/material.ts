@@ -1,10 +1,11 @@
 // The land's material. Every fragment works out what the ground is where it stands, from the two regions whose ground
 // meets there (the chunk carries all sixteen regions' weights per vertex) and, in each, which of six roles it plays:
 // flat high ground, a slope, a cliff, a beach, the shore the tide and the spray keep wet, or the seabed. Of those up
-// to twelve candidates the three that matter most are painted, each a scanned material from the region's set
-// (scans.ts streams them in), projected along the world's three axes so cliffs never smear, and blended by their
-// height maps: sand settles between the pebbles and the grass gives out round the stones rather than fading across
-// them (the height-lerp of "Advanced Terrain Texture Splatting", Mikkelsen 2016).
+// to twelve candidates the two that matter most are painted, each a scanned material from the region's set (scans.ts
+// streams them in), projected along whichever of the world's three axes the ground faces enough to need, so cliffs
+// never smear, and blended by their height maps: sand settles between the pebbles and the grass gives out round the
+// stones rather than fading across them (the height-lerp of "Advanced Terrain Texture Splatting", Mikkelsen 2016).
+// (A third candidate, where three meet, changed no pixel from a deck or from the Gale.)
 //
 // On top, the weather writes into it, as Lagarde's "Water drop" series (2013) has it: water darkens a porous surface
 // and smooths it to a film, and in rain it stands in the hollows as puddles; snow settles on whatever faces up; moss
@@ -38,7 +39,10 @@ const DEEP = 12;
 const HEIGHT_PUSH = 0.65;
 const HEIGHT_SOFT = 0.18;
 /** The candidates painted at a fragment. */
-const PAINTED = 3;
+const PAINTED = 2;
+/** The least share of the ground's facing an axis must have to be projected along: below it, the axes that do share
+ *  it out between them (a tenth leaves no seam; a fifth draws lines down the Narrows' walls). */
+const AXIS_LEAST = 0.1;
 
 const SNOW = vec3(0.82, 0.86, 0.93);
 const MOSS_COLOUR = vec3(0.045, 0.075, 0.022);
@@ -199,18 +203,14 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     lay(ROLE.cliff, cliff);
     const roleW = roles.map((x) => x.toVar());
 
-    // ----- the three strongest of the twelve candidates
+    // ----- the two strongest of the twelve candidates
     const pick = Array.from({ length: PAINTED }, () => ({ at: int(0).toVar(), w: float(0).toVar() }));
     const offer = (at: I, x: F) => {
       If(x.greaterThan(pick[0].w), () => {
-        pick[2].at.assign(pick[1].at); pick[2].w.assign(pick[1].w);
         pick[1].at.assign(pick[0].at); pick[1].w.assign(pick[0].w);
         pick[0].at.assign(at); pick[0].w.assign(x);
       }).ElseIf(x.greaterThan(pick[1].w), () => {
-        pick[2].at.assign(pick[1].at); pick[2].w.assign(pick[1].w);
         pick[1].at.assign(at); pick[1].w.assign(x);
-      }).ElseIf(x.greaterThan(pick[2].w), () => {
-        pick[2].at.assign(at); pick[2].w.assign(x);
       });
     };
     for (let k = 0; k < ROLE_COUNT; k++) {
@@ -225,9 +225,11 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     dpx.assign(dFdx(p));
     dpy.assign(dFdy(p));
     const tri = pow(abs(gn), vec3(6)).toVar();
-    const triW = tri.div(tri.x.add(tri.y).add(tri.z)).toVar('landTriplanar');
+    const faces = tri.div(tri.x.add(tri.y).add(tri.z));
+    const kept = faces.mul(step(vec3(AXIS_LEAST), faces)).toVar();
+    const triW = kept.div(kept.x.add(kept.y).add(kept.z)).toVar('landTriplanar');
     // the scans' grain is left off with distance, and under the sea once the water over it is deep enough to hide it:
-    // the seabed through deep water shows only its colour, and painting it (three scans a pixel, each along up to
+    // the seabed through deep water shows only its colour, and painting it (two scans a pixel, each along up to
     // three axes) was most of what the land cost the iPad, the open sea's floor being most of the screen
     const detailFade = float(1).sub(smoothstep(FAR - FADE, FAR, dist)).mul(smoothstep(-DEEP, -DEEP / 2, above)).toVar('landDetail');
     const flatten = mix(float(1), float(0.45), smoothstep(30, 160, dist)).toVar();
@@ -306,14 +308,12 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     // ----- blended by height
     const lift = painted.map((s, i) => pick[i].w.add(s.height.mul(HEIGHT_PUSH)).mul(select(pick[i].w.greaterThan(0.004), float(1), float(0))).toVar());
     const soft = mix(float(HEIGHT_SOFT), float(0.5), smoothstep(15, 120, dist));
-    const top = max(max(lift[0], lift[1]), lift[2]).sub(soft);
+    const top = max(lift[0], lift[1]).sub(soft);
     const b = lift.map((x) => max(x.sub(top), 0));
-    const total = max(b[0].add(b[1]).add(b[2]), 1e-5);
-    const share3 = b.map((x) => x.div(total));
-    const sum3 = (f: (s: (typeof painted)[number]) => V3): V3 =>
-      f(painted[0]).mul(share3[0]).add(f(painted[1]).mul(share3[1])).add(f(painted[2]).mul(share3[2]));
-    const sum1 = (f: (s: (typeof painted)[number]) => F): F =>
-      f(painted[0]).mul(share3[0]).add(f(painted[1]).mul(share3[1])).add(f(painted[2]).mul(share3[2]));
+    const total = max(b[0].add(b[1]), 1e-5);
+    const shares = b.map((x) => x.div(total));
+    const sum3 = (f: (s: (typeof painted)[number]) => V3): V3 => f(painted[0]).mul(shares[0]).add(f(painted[1]).mul(shares[1]));
+    const sum1 = (f: (s: (typeof painted)[number]) => F): F => f(painted[0]).mul(shares[0]).add(f(painted[1]).mul(shares[1]));
     const a = sum3((s) => s.colour).toVar();
     const h = sum1((s) => s.height).toVar();
     const nb = normalize(sum3((s) => s.normal)).toVar();
