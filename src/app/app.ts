@@ -19,7 +19,8 @@ import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Care
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SECRETS, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
 import { ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
-import { REGIONS, adoptHeights } from '../sim/world/index.ts';
+import { REGIONS, adoptHeights, regionAt } from '../sim/world/index.ts';
+import { P } from '../render/gpu/uniforms.ts';
 import { adoptNav, type Nav } from '../sim/nav.ts';
 import type { V3 } from '../sim/math.ts';
 import { Controls } from './controls.ts';
@@ -771,8 +772,11 @@ export class App {
     if (w.t < PERF_EVERY) return;
     const frames = w.frames, t = w.t, worst = w.worst;
     Object.assign(w, { t: 0, frames: 0, worst: 0 });
-    const st = this.stage?.stats();
-    console.info(`perf ${this.screen}: ${(frames / t).toFixed(1)} fps, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
+    const st = this.stage?.stats(), s = this.session;
+    // where the watched ship is, so a frame that breaks the budget is found by the region it broke in
+    const sky = this.stage ? Object.entries(this.stage.clouds.depth).filter(([, v]) => (v ?? 0) > 0.1).map(([k]) => k).join('+') || 'fair' : '';
+    const at = s ? ` in ${REGIONS[regionAt(s.state.ships[s.watch].pos)].id}, ${sky}, ${P.night.value as number > 0.5 ? 'night' : 'day'}` : '';
+    console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
       `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ${shape.memory}`);
     // in pieces: the device's console cuts a long message short
     const lines = shape.report(this.screen).split('\n');
