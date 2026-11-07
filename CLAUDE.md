@@ -34,7 +34,7 @@ in commit messages. This file and CREDITS.md are the only documents in the repo.
   browser, no `vite --open`, no iOS Simulator.
 - **Devices:** landscape only, on an M1 iPad or newer and an iPhone 15 Pro or newer, running iOS 26 or later. Both
   layouts are designed, not scaled.
-- **Platform:** WebGPU only, through three.js 0.186.1's WebGPURenderer and TSL. No WebGL path, no fallbacks, no
+- **Platform:** WebGPU only, through three.js WebGPURenderer and TSL. No WebGL path, no fallbacks, no
   quality setting, no accessibility options, no older devices.
 
 ## The world
@@ -42,8 +42,7 @@ in commit messages. This file and CREDITS.md are the only documents in the repo.
 - **No humans, and no sign that people ever lived here:** no buildings, ruins, harbours, docks or crews. Ships sail
   themselves, and their captains are spirits.
 - **All geometry is generated in code.** Textures and recorded sounds come from free libraries: the best scanned
-  version on ambientCG or Poly Haven, never ambientCG's "Approximated". Every one is credited in CREDITS.md. The
-  build can be up to 2 GB.
+  version on ambientCG or Poly Haven, never ambientCG's "Approximated". Every one is credited in CREDITS.md. 
 - **One ship.** Every ship is the same ship; captains differ by colour, emblem and cosmetics.
 - **The bar is a current AAA console game as it ships on an iPad,** in motion and up close: physically based and
   art-directed, at a steady 30 fps on an M1 iPad Air. When an effect costs more than it shows, the cheaper one wins.
@@ -59,8 +58,10 @@ Everything the player reads is drawn the way a sixteenth-century chartmaker woul
 iron-gall ink and watercolour, compass roses, rhumb lines, graduated rings, cartouches, pennants and wax seals.
 The interface of the first Portolan (commit a3536d0, `src/chart.ts`) is the standard to meet.
 
-- **No words and no numerals.** Captains are their emblems and colours, places are their signs and coastlines, and
-  quantities are drawn: pennant lengths, inked rings, a sand-glass, tally marks, shot.
+- **No words, anywhere.** Captains are their emblems and colours, places are their signs and coastlines, and
+  quantities are drawn where a drawing reads faster: pennant lengths, inked rings, a sand-glass, tally marks, shot.
+  A numeral is allowed where the player wants the number (damage dealt, shot in hand, the Storm's clock), written in
+  the chartmaker's hand.
 - **Teach with drawings** the first time something appears: a pointing hand, dotted courses, small woodcut diagrams.
 - **Buttons are objects:** seals, cartouches, instruments, pennants. **Screens are sheets:** the lobby is a chart
   over the live planet, and the menus are its folios. No rounded rectangles, gradients, smoked glass, drop-shadow
