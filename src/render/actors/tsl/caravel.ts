@@ -27,7 +27,7 @@ import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
 import { HUNG, type Cloth } from '../cloth.ts';
-import { dither, moved, pick, read, readArray, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
+import { dither, pick, read, readArray, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /**
  * A point in ship space, and normalLocal with it, as the mainmast stands this frame: uMast is the angle it has gone
@@ -57,7 +57,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
     const rope = select(floor(attribute<'float'>('aPart').add(0.5)).equal(8), float(1), float(0));
     const n = normalGeometry, coat = ice.mul(rope);
     const p = positionLocal.add(n.mul(coat.mul(0.022))).add(vec3(0, min(n.y, 0).mul(coat).mul(0.03), 0));
-    return moved(mainmast(u, p));
+    return mainmast(u, p);
   })();
 
   const part = floor(attribute<'float'>('aPart').add(0.5)).toVar('shipPart');
@@ -255,7 +255,7 @@ export function iceNodeMaterial(u: Uniforms): MeshPhysicalNodeMaterial {
   const ice = read(u, 'uIce', 'float'), grow = attribute<'vec4'>('aIce');
   m.positionNode = Fn(() => {
     const k = smoothstep(grow.w, grow.w.add(0.28), ice), girth = min(k.mul(2.2), 1);
-    return moved(positionLocal.add(vec3(grow.x.mul(girth), grow.y.mul(k), grow.z.mul(girth))));
+    return positionLocal.add(vec3(grow.x.mul(girth), grow.y.mul(k), grow.z.mul(girth)));
   })();
   // (thicker at the root, clearer toward the tip)
   const tip = smoothstep(0, -0.3, grow.y);
@@ -286,7 +286,7 @@ export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshPhysicalNodeMater
     // iced: thicker, beaded, and the ice hanging under it
     const coat = ice.mul(bead.mul(0.6).add(0.7));
     const hang = vec3(0, min(out.y, 0).mul(coat).mul(bead.mul(bead).mul(0.07).add(0.012)), 0);
-    return moved(mainmast(u, p.add(out.mul(radius.mul(coat.mul(1.5).add(1)))).add(hang)));
+    return mainmast(u, p.add(out.mul(radius.mul(coat.mul(1.5).add(1)))).add(hang));
   })();
   // laid strands, twisting round the rope
   const strand = sin(rope.w.mul(3).add(positionLocal.length().mul(40))).mul(0.5).add(0.5);
@@ -328,7 +328,7 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
     const n = normalLocal;
     const sparNormal = vec3(n.x.mul(c).add(n.z.mul(s)), n.y, n.x.negate().mul(s).add(n.z.mul(c)));
     normalLocal.assign(select(cloth, normal.div(max(length(normal), 1e-6)), sparNormal));
-    return moved(mainmast(u, select(cloth, at(particle), spar)));
+    return mainmast(u, select(cloth, at(particle), spar));
   })();
 
   const su = uv(), sp = plane, size = rig.y;

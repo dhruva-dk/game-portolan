@@ -1,14 +1,13 @@
 // The planet on screen, on WebGPU: the atmosphere and its light, the sun's shadows, the FFT ocean, the land painted
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
-import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { RENDER_FLOOR, RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
+import { PerspectiveCamera, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { shape } from './shape.ts';
 import { copyTogether } from './behind.ts';
 import { ColourScript, rising } from './grade.ts';
-import { ClusteredLighting, GRID_RATIO } from './clusters.ts';
-import { Resolution } from './resolution.ts';
+import { ClusteredLighting } from './clusters.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
@@ -16,8 +15,6 @@ import { Atmosphere } from '../atmosphere/index.ts';
 import { Clouds } from '../atmosphere/clouds.ts';
 import { AURORA, OVAL } from '../atmosphere/aurora.ts';
 import { Fog } from '../atmosphere/fog.ts';
-import { EYE } from '../atmosphere/luts.ts';
-import { LANTERNS } from '../lanterns.ts';
 import { LANDMARKS, REGIONS } from '../../sim/world/index.ts';
 import { Fall } from '../atmosphere/fall.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
@@ -50,9 +47,8 @@ const FAIR_WEATHER = 0.62;
 const WIND_STEP = 0.75;
 const HEADING_STEP = 8 * DEG;
 
-/** How deep in renders the scene is drawn: inside the upscaler's resolve, inside the quad that puts the frame on the
- *  screen. */
-const SCENE_DEPTH = 2;
+/** How deep in renders the scene is drawn: inside the quad that puts the frame on the screen. */
+const SCENE_DEPTH = 1;
 
 /** The renderer's own state the warm-up borrows. */
 interface Internals {
@@ -97,12 +93,9 @@ export class GpuStage {
   readonly #canvas: HTMLCanvasElement;
   readonly #focus = new Vector3();
   readonly #wind = new Vector3();
-  readonly #forward = new Vector3();
   readonly #buffer = new Vector2();
-  /** The share of the screen the scene is drawn at, held to the frame rate. */
-  readonly #resolution: Resolution;
-  /** Its largest, the share the light grid is laid over. */
-  readonly #most: number;
+  /** The share of the canvas the scene is drawn at, each way. */
+  readonly #scale: number;
   readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
@@ -146,11 +139,10 @@ export class GpuStage {
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.#most = RENDER_SCALE[form];
-    this.#resolution = new Resolution(this.#most, RENDER_FLOOR[form]);
-    // every point light without a shadow is clustered, over the frame as the scene pass draws it at its largest
-    renderer.lighting = new ClusteredLighting(this.#most);
-    this.post = new Post(renderer, this.scene, this.camera, this.#most, this.overlay, this.atmosphere.sun);
+    this.#scale = RENDER_SCALE[form];
+    // every point light without a shadow is clustered, over the frame as the scene pass draws it
+    renderer.lighting = new ClusteredLighting(this.#scale);
+    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
     this.resize();
   }
 
@@ -251,14 +243,10 @@ export class GpuStage {
     const poleNight = Math.min(1, Math.max(0, (0.08 - this.sun.y) / 0.16));
     const calm = 1 - Math.min(1, Math.max(0, (wind.length() - 6) / 6));
     shape.system('fog');
-    this.fog.update(this.renderer, eye, cam.getWorldDirection(this.#forward), EYE.viewProjection.value as Matrix4, v.weather,
-      (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
+    this.fog.update(this.renderer, eye, v.weather, (0.4 + 0.6 * poleNight) * calm, this.#mist);
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
     shape.system('clouds');
-    const scale = this.#resolution.scale;
-    // (a pixel of the scene as drawn now, to the light grid's, which PassNode floors as it does the scene)
-    GRID_RATIO.value = Math.floor(size.x * this.#most) / Math.max(1, Math.floor(size.x * scale));
-    this.clouds.march(this.renderer, size.x * scale, size.y * scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
+    this.clouds.trace(this.renderer, size.x * this.#scale, size.y * this.#scale);
     shape.system('flora');
     this.flora.update(this.renderer, cam);
     this.ocean.flow.set(v.currents);
@@ -287,9 +275,7 @@ export class GpuStage {
       }
       return;
     }
-    this.post.focus(v.focus ?? null);
-    this.post.render(dt);
-    if (this.#resolution.update()) this.post.setScale(this.#resolution.scale);
+    this.post.render();
     if (!this.#checked) {
       this.#checked = true;
       if (this.post.sceneDepth !== SCENE_DEPTH) console.warn(`the scene is drawn ${this.post.sceneDepth} renders deep, not ${SCENE_DEPTH}: its materials were built for the wrong depth and are built again`);
@@ -484,6 +470,6 @@ export class GpuStage {
 
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
-    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#resolution.scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
+    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
   }
 }

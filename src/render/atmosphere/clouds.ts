@@ -1,5 +1,5 @@
-// The weather's clouds: each system the simulation runs is a volume of cloud raymarched where it stands, after
-// Schneider and Vos's Nubis (Horizon Zero Dawn, SIGGRAPH 2015; Schneider, SIGGRAPH 2017) and Hillaire's clouds in
+// The weather's clouds: each system the simulation runs is a field of cloud where it stands, after Schneider and
+// Vos's Nubis (Horizon Zero Dawn, SIGGRAPH 2015; Schneider, SIGGRAPH 2017) and Hillaire's clouds in
 // Frostbite (SIGGRAPH 2016).
 //
 // The shape: a system's own weather map (a low-frequency noise laid over its disc) breaks its coverage into patches
@@ -10,42 +10,35 @@
 // and leaning downwind. The noise rides with the system, so a cloud keeps its shape as it drifts.
 //
 // The light: the sun's or the moon's light through the air (the transmittance table) and then through the cloud
-// toward it (a short march), scattered in several orders that each see less of the cloud and scatter less forward
-// (Wrenninge's approximation of multiple scattering), with Schneider's powder darkening the thin edges facing away
-// from the light; the sky's light from above and the sea's from below; and lightning flickering inside the
-// thunderheads. Integrated per step as Hillaire does, so a step's light never exceeds what the step can scatter.
-// The haze between the eye and the cloud is laid on from the aerial table at the cloud's mean depth.
+// toward it, scattered in several orders that each see less of the cloud and scatter less forward (Wrenninge's
+// approximation of multiple scattering), with Schneider's powder darkening the thin edges facing away from the light;
+// the sky's light from above and the sea's from below; and lightning flickering inside the thunderheads. The haze
+// between the eye and the cloud is laid on from the aerial table and the mist.
 //
-// The clouds are marched in a compute pass at half the scene's resolution each way, every system along each ray,
-// nearest first, each only over the stretch of the ray inside the sphere bounding it. The ray starts on an offset
-// that turns each frame, and each pixel blends what it marches into what it held, reprojected from the frame before
-// at its clouds' mean depth (Schneider 2015), held within reach of what it sees now so a moving cloud leaves no ghost.
-// Under a deck the fall is thin and is lit through the shade map rather than a march of its own. A pixel keeps no
-// scene depth. It keeps where along the ray its clouds begin, take a tenth and half of the light they take, and end,
-// so a quad over the view lays on, at each pixel, the part of the clouds in front of whatever the scene drew there.
-// The same field, without the fine erosion, is marched along the key light over a square round the eye into the
-// shade map that every lit surface reads (shade.ts).
+// Each system is drawn as a thin layer, traced in a compute pass at a quarter of the scene's resolution each way and
+// laid over the scene by a quad in front of whatever it drew (layerKernel). The same field, without the fine erosion,
+// is marched along the key light over a square round the eye into the shade map that every lit surface reads
+// (shade.ts).
 import {
-  CustomBlending, Group, HalfFloatType, LinearFilter, Matrix4, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
+  CustomBlending, Group, HalfFloatType, LinearFilter, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
   PlaneGeometry, RepeatWrapping, Storage3DTexture, StorageTexture, Vector2, Vector3, Vector4, type ComputeNode, type Node,
   type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Break, Discard, Fn, If, abs, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
-  interleavedGradientNoise, max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
+  Discard, Fn, If, abs, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
+  max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
   smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
 import type { WeatherKind } from '../../sim/world/index.ts';
 import { P, STRIKE } from '../gpu/uniforms.ts';
-import { PARKED } from '../gpu/parked.ts';
 import { loop } from '../gpu/tsl.ts';
 import { raySphere } from './model.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, aerialAt, lightTransmittance } from './luts.ts';
 import { skyLight } from './light.ts';
 import { fogAt } from './fog.ts';
-import { SHADE, SHADE_SIZE, cloudShade } from './shade.ts';
+import { SHADE, SHADE_SIZE } from './shade.ts';
 
 type F = Node<'float'>;
 type I = Node<'int'>;
@@ -291,26 +284,8 @@ const phase = (c: F, k: number): F => mix(hg(0.8 * k, c), hg(-0.25 * k, c), 0.25
 
 const FLASH_COLOUR = vec3(0.75, 0.82, 1);
 
-// ---------------------------------------------------------------- the march
-
-/** The clouds are marched at this share of the scene's resolution each way, and gathered over frames. */
-const MARCH_SCALE = 0.5;
-/** How much of each frame's march goes into what each pixel holds, against what it held reprojected. */
-const MARCH_BLEND = 0.25;
-/** Steps through one system; the fair-weather layer is a thin shell, crossed in fewer. */
-const STEPS = 40, FAIR_STEPS = 24;
-/** The shares of the light taken by the clouds at which the march marks how far it has come. */
-const KNOT_1 = 0.1, KNOT_2 = 0.5;
-
-const VIEW = {
-  /** The view-projection of the frame before, for finding where a pixel's cloud was. */
-  before: uniform(new Matrix4()),
-  /** How much of this frame's march goes into each pixel: 1 after a cut. */
-  blend: uniform(1),
-};
-
-/** What the clouds hold for each pixel: the light they send to the eye (rgb) and the light they let through (a); and
- *  how far along the ray they begin, have taken a tenth of what they take, half of it, and end. */
+/** What the layers hold for each texel: the light they send to the eye (rgb) and the share of the light behind them
+ *  they take (a); and how far along the ray the nearest lies, times that share. */
 interface Held { light: StorageTexture; depth: StorageTexture }
 
 function held2(w: number, h: number): Held {
@@ -324,225 +299,6 @@ function held2(w: number, h: number): Held {
   return { light: make(), depth: make() };
 }
 
-/** Where the ray d from eye runs through system i: x where it enters, y where it leaves; x over y if it misses. */
-function span(eye: V3, d: V3, i: I): V2 {
-  const look = el(SYS.look, i);
-  const kind = int(look.x);
-  const shape = el(SHAPE_K, kind), fall = el(FALL_K, kind);
-  const sea = P.planet.y;
-  const lo = select(fall.x.greaterThan(0).or(fall.z.greaterThan(0.5)), float(0), shape.x);
-  const hi = shape.x.add(shape.y.mul(1.08));
-  const outer = raySphere(eye, d, sea.add(hi));
-  const inner = raySphere(eye, d, sea.add(lo));
-  const b = el(SYS.bound, i);
-  const bound = raySphere(eye.sub(b.xyz), d, b.w);
-  const t0 = max(max(outer.x, bound.x), 0.1).toVar();
-  const t1 = min(outer.y, bound.y).toVar();
-  // under the band the ray starts where it rises out of the floor; over it, it stops where it reaches it
-  If(eye.length().lessThan(sea.add(lo)), () => {
-    t0.assign(max(t0, inner.y));
-  }).ElseIf(inner.x.greaterThan(0), () => {
-    t1.assign(min(t1, inner.x));
-  });
-  // and nothing is seen through the sea
-  const water = raySphere(eye, d, sea);
-  If(water.x.greaterThan(0), () => {
-    t1.assign(min(t1, water.x));
-  });
-  return select(outer.y.lessThan(0).or(bound.y.lessThan(0)), vec2(1, 0), vec2(t0, t1));
-}
-
-/**
- * Marches every system along each pixel's ray, nearest first, into `into`, blended with what `from` held where the
- * pixel's cloud was the frame before. A pixel keeps no scene depth: it keeps where along the ray its clouds begin,
- * take a tenth and half of what they take, and end, so the scene can find how much of them lies in front of whatever
- * it has drawn there.
- */
-function marchKernel(into: Held, from: Held, w: number, h: number): ComputeNode {
-  const kernel = Fn(() => {
-    const id = globalId.xy;
-    If(id.x.lessThan(w).and(id.y.lessThan(h)), () => {
-      const uv = vec2(id).add(0.5).div(vec2(w, h));
-      const view = vec3(uv.x.mul(2).sub(1).mul(EYE.tan.x), float(1).sub(uv.y.mul(2)).mul(EYE.tan.y), -1);
-      const d = EYE.world.mul(vec4(view, 0)).xyz.normalize();
-      const eye = EYE.position;
-      const jitter = interleavedGradientNoise(vec2(id).add(P.frame.mul(5.588238)));
-      const key = KEY.dir;
-      const cosT = d.dot(key);
-      const ph0 = phase(cosT, 1), ph1 = phase(cosT, 0.5), ph2 = phase(cosT, 0.25);
-      const sea = P.planet.y;
-
-      const L = vec3(0).toVar();
-      const T = float(1).toVar();
-      const front = float(-1).toVar(), knot1 = float(-1).toVar(), knot2 = float(-1).toVar(), back = float(0).toVar();
-      const depthSum = float(0).toVar(), depthWeight = float(0).toVar();
-      const lastT = float(-1).toVar(), lastI = int(-1).toVar();
-
-      loop('cloudOrder', SYS.count, () => {
-        // the next system the ray enters
-        const best = float(1e9).toVar(), bestI = int(-1).toVar();
-        loop('cloudPick', SYS.count, (i) => {
-          const s = span(eye, d, i);
-          const e = select(s.y.greaterThan(s.x), s.x, float(1e9));
-          const later = e.greaterThan(lastT).or(e.equal(lastT).and(i.greaterThan(lastI)));
-          If(later.and(e.lessThan(best)), () => {
-            best.assign(e);
-            bestI.assign(i);
-          });
-        });
-        If(bestI.lessThan(0).or(best.greaterThan(1e8)).or(T.lessThan(0.015)), () => {
-          Break();
-        });
-        lastT.assign(best);
-        lastI.assign(bestI);
-        const index = bestI;
-        const s = span(eye, d, index);
-        const t0 = s.x, t1 = s.y;
-        const look = el(SYS.look, index);
-        const kind = int(look.x);
-        const shape = el(SHAPE_K, kind), fall = el(FALL_K, kind), tint = el(TINT_K, kind).xyz;
-        const dt = t1.sub(t0).div(select(el(TINT_K, kind).w.greaterThan(0.5), float(FAIR_STEPS), float(STEPS)));
-        const t = t0.add(dt.mul(jitter)).toVar();
-        // this system's own light and what it lets through, and its mean depth
-        const Ls = vec3(0).toVar();
-        const Ts = float(1).toVar();
-        const at = float(0).toVar(), weight = float(0).toVar();
-        // the sky's light from above and the sea's from below, taken where the ray comes in
-        const pIn = eye.add(d.mul(t0));
-        const upIn = pIn.normalize();
-        const skyTop = skyLight(pIn, upIn), skyBottom = skyLight(pIn, upIn.negate());
-        const flash = el(SYS.flash, index);
-        const albedo = shape.w;
-        loop('cloudStep', STEPS, () => {
-          If(T.mul(Ts).lessThan(0.015).or(t.greaterThan(t1)), () => {
-            Break();
-          });
-          const p = eye.add(d.mul(t));
-          const c = cloudAt(p, index, float(1));
-          If(c.x.greaterThan(1e-4), () => {
-            const r = p.length(), up = p.div(r);
-            const sun = lightTransmittance(r, up.dot(P.sunDir), float(SUN_RADIUS)).mul(P.sunIlluminance);
-            const moon = lightTransmittance(r, up.dot(P.moonDir), float(MOON_RADIUS)).mul(P.moonIlluminance).mul(P.moonPhase);
-            const light = select(KEY.sun.greaterThan(0.5), sun, moon);
-            const lit = FLASH_COLOUR.mul(flash.w).mul(exp(p.distance(flash.xyz).mul(-1 / 22))).mul(40);
-            const source = vec3(0).toVar();
-            If(fall.x.greaterThan(0).and(r.sub(sea).lessThan(shape.x)), () => {
-              // in the fall under the cloud the drops are thin: the light comes through the whole cloud over them,
-              // which the shade map has already found, and the sky's through the deck the same way
-              const shade = cloudShade(p);
-              const direct = light.mul(shade).mul(ph0.add(ph1.mul(0.5)).add(ph2.mul(0.25)));
-              const ambient = skyTop.mul(shade.mul(0.7).add(0.3)).add(skyBottom.mul(0.45)).mul(1 / (2 * Math.PI));
-              source.assign(direct.add(ambient).add(lit).mul(albedo).mul(tint));
-            }).Else(() => {
-              // the light's way out toward the key, in steps that double
-              const tau = float(0).toVar();
-              loop('cloudLight', 5, (k) => {
-                const len = pow(float(2), float(k)).mul(3);
-                tau.addAssign(cloudAt(p.add(key.mul(len.mul(1.5).sub(3))), index, float(0)).x.mul(len));
-              });
-              // several orders of scattering, each seeing less of the cloud and scattering less forward (Wrenninge 2015)
-              const orders = exp(tau.negate()).mul(ph0).add(exp(tau.mul(-0.4)).mul(ph1).mul(0.5)).add(exp(tau.mul(-0.16)).mul(ph2).mul(0.25));
-              // the powder: the light scattered back out of a cloud's thin edge is little, seen from away from the light
-              const powder = float(1).sub(exp(c.x.mul(-14)));
-              const direct = light.mul(orders).mul(mix(powder, float(1), cosT.mul(0.5).add(0.5)));
-              // the sky's light comes down through the cloud over the sample, the sea's up through the cloud under it
-              const above = cloudAt(p.add(up.mul(8)), index, float(0)).x.mul(8).add(cloudAt(p.add(up.mul(24)), index, float(0)).x.mul(16));
-              const below = cloudAt(p.sub(up.mul(10)), index, float(0)).x.mul(12);
-              const ambient = skyTop.mul(exp(above.mul(-0.6))).add(skyBottom.mul(exp(below.mul(-0.6))).mul(0.45)).mul(1 / (2 * Math.PI));
-              source.assign(direct.add(ambient).add(lit).mul(albedo).mul(tint));
-            });
-            const tr = exp(c.x.mul(dt).negate());
-            const taken = Ts.mul(float(1).sub(tr));
-            Ls.addAssign(source.mul(taken));
-            at.addAssign(t.mul(taken));
-            weight.addAssign(taken);
-            Ts.mulAssign(tr);
-            // the marks along the ray, by how much of the light all the clouds so far have taken
-            const gone = float(1).sub(T.mul(Ts));
-            If(front.lessThan(0), () => {
-              front.assign(t.sub(dt.mul(0.5)));
-            });
-            If(knot1.lessThan(0).and(gone.greaterThanEqual(KNOT_1)), () => {
-              knot1.assign(t);
-            });
-            If(knot2.lessThan(0).and(gone.greaterThanEqual(KNOT_2)), () => {
-              knot2.assign(t);
-            });
-            back.assign(t.add(dt.mul(0.5)));
-          });
-          t.addAssign(dt);
-        });
-        If(weight.greaterThan(1e-5), () => {
-          const alpha = float(1).sub(Ts);
-          // the haze between the eye and this system, and the mist closer in, at its mean depth
-          const mean = eye.add(d.mul(at.div(weight)));
-          const { light, loss } = aerialAt(mean);
-          const mist = fogAt(mean);
-          L.addAssign(Ls.mul(loss).add(light.mul(alpha)).mul(mist.loss).add(mist.light.mul(alpha)).mul(T));
-          depthSum.addAssign(at.mul(T));
-          depthWeight.addAssign(weight.mul(T));
-          T.mulAssign(Ts);
-        });
-      });
-
-      const gone = float(1).sub(T);
-      const none = gone.lessThan(1e-4);
-      const end = select(none, float(0), back);
-      const marks = vec4(
-        select(none, float(0), max(front, 0)),
-        select(knot1.lessThan(0), end, knot1),
-        select(knot2.lessThan(0), end, knot2),
-        end,
-      );
-      const now = vec4(L, T);
-      // where this pixel's cloud was the frame before: at its mean depth, or far off for clear sky
-      const meanDepth = select(depthWeight.greaterThan(1e-5), depthSum.div(max(depthWeight, 1e-5)), float(3000));
-      const was = VIEW.before.mul(vec4(eye.add(d.mul(meanDepth)), 1));
-      const wuv = vec2(was.x.div(max(was.w, 1e-4)).mul(0.5).add(0.5), float(0.5).sub(was.y.div(max(was.w, 1e-4)).mul(0.5)));
-      const seen = was.w.greaterThan(0).and(wuv.x.greaterThan(0)).and(wuv.x.lessThan(1)).and(wuv.y.greaterThan(0)).and(wuv.y.lessThan(1));
-      const k = select(seen, VIEW.blend, float(1));
-      const beforeLight = texture(from.light, wuv).level(float(0));
-      const beforeMarks = texture(from.depth, wuv).level(float(0));
-      // what the pixel held is kept only within reach of what it sees now, so a cloud that has moved leaves no ghost
-      const keptLight = vec4(beforeLight.rgb.min(L.mul(2).add(0.02)), clamp(beforeLight.a, T.sub(0.35), T.add(0.35)));
-      textureStore(into.light, uvec2(id.x, id.y), mix(keptLight, now, k));
-      textureStore(into.depth, uvec2(id.x, id.y), mix(beforeMarks, marks, k));
-    });
-  })();
-  return (kernel as unknown as { compute(size: number[], group: number[]): ComputeNode })
-    .compute([Math.ceil(w / 8), Math.ceil(h / 8), 1], [8, 8, 1]);
-}
-
-/** The clouds laid over the scene: at each pixel, the part of them that lies in front of what the scene has drawn. */
-function compositeMaterial(source: Held): MeshBasicNodeMaterial {
-  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, depthTest: false });
-  m.blending = CustomBlending;
-  m.blendSrc = m.blendSrcAlpha = OneFactor;
-  m.blendDst = m.blendDstAlpha = OneMinusSrcAlphaFactor;
-  m.fog = false;
-  m.vertexNode = vec4(positionGeometry.xy, 0, 1);
-  m.outputNode = Fn(() => {
-    const held = texture(source.light, screenUV);
-    const marks = texture(source.depth, screenUV);
-    const all = float(1).sub(held.a);
-    If(all.lessThan(0.002), () => {
-      Discard();
-    });
-    // how far along this pixel's ray the scene has drawn something
-    const viewZ = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
-    const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)));
-    const stretch = vec3(ndc.x.mul(EYE.tan.x), ndc.y.mul(EYE.tan.y), 1).length();
-    const z = viewZ.negate().mul(stretch);
-    // the share of the light the clouds take in front of it, piecewise along the marks
-    const a1 = min(all, KNOT_1), a2 = min(all, KNOT_2);
-    const part = (z0: F, z1: F, b0: F, b1: F): F => mix(b0, b1, clamp(z.sub(z0).div(max(z1.sub(z0), 1e-3)), 0, 1));
-    const taken = select(z.lessThan(marks.y), part(marks.x, marks.y, float(0), a1),
-      select(z.lessThan(marks.z), part(marks.y, marks.z, a1, a2), part(marks.z, marks.w, a2, all)));
-    return vec4(held.rgb.mul(taken.div(all)), taken);
-  })();
-  return m;
-}
-
 // ---------------------------------------------------------------- the thin layer
 
 /** The share of its towers' height above its base a system's thin layer lies at. */
@@ -551,7 +307,7 @@ const LAYER_AT = 0.4;
 const LAYER_SCALE = 0.25;
 
 /**
- * While the volumes are parked, each system is a thin layer, traced at a quarter of the scene's resolution each way:
+ * Each system is a thin layer, traced at a quarter of the scene's resolution each way:
  * where the ray crosses the height the system's cloud is thickest at, the column of cloud over and under it is read at
  * three heights through its towers and lit as a slab, its light's way out toward the key and the orders of its
  * scattering worked out through the slab as the march works them out step by step. A fog bank lies on the water,
@@ -610,8 +366,11 @@ function layerKernel(into: Held, w: number, h: number): ComputeNode {
           });
         });
       });
-      textureStore(into.light, uvec2(id.x, id.y), vec4(L, float(1).sub(T)));
-      textureStore(into.depth, uvec2(id.x, id.y), vec4(front, 0, 0, 0));
+      // the distance is kept weighted by the cloud's cover, so a texel with none lends nothing to its neighbours' as
+      // the composite filters them: a clear texel's far mark would push a cloud's edge behind the scene in steps
+      const cover = float(1).sub(T);
+      textureStore(into.light, uvec2(id.x, id.y), vec4(L, cover));
+      textureStore(into.depth, uvec2(id.x, id.y), vec4(front.mul(cover), 0, 0, 0));
     });
   })();
   return (kernel as unknown as { compute(size: number[], group: number[]): ComputeNode })
@@ -628,7 +387,7 @@ function layerComposite(source: Held): MeshBasicNodeMaterial {
   m.vertexNode = vec4(positionGeometry.xy, 0, 1);
   m.outputNode = Fn(() => {
     const held = texture(source.light, screenUV);
-    const at = texture(source.depth, screenUV).x;
+    const at = texture(source.depth, screenUV).x.div(max(held.a, 1e-4));
     // how far along this pixel's ray the scene has drawn something
     const viewZ = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
     const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)));
@@ -691,18 +450,10 @@ export class Clouds {
   #made = false;
   readonly #flickers = new Map<number, Flicker>();
   #time = 0;
-  /** The march's two sets of textures, written and read back in turn, and its kernels for each turn. */
-  #held: [Held, Held] | null = null;
-  #kernels: [ComputeNode, ComputeNode] | null = null;
-  #turn = 0;
   #size = new Vector2();
-  #frames = 0;
-  readonly #eye = new Vector3();
-  readonly #forward = new Vector3();
   /** The quad over the whole view the clouds are laid on with. */
   readonly #quad: Mesh;
-  readonly #materials: [MeshBasicNodeMaterial, MeshBasicNodeMaterial] | [] = [];
-  /** The thin layer's texels, kernel and composite, while the volumes are parked. */
+  /** The thin layer's texels, kernel and composite. */
   #layer: { held: Held; kernel: ComputeNode; composite: MeshBasicNodeMaterial } | null = null;
 
   constructor() {
@@ -715,54 +466,21 @@ export class Clouds {
     this.group.add(this.#quad);
   }
 
-  /**
-   * Marches the clouds for this frame, at MARCH_SCALE of the scene's own size, w × h. Run after the atmosphere and
-   * the fog have followed the camera, and before the scene is drawn.
-   */
-  march(renderer: WebGPURenderer, w: number, h: number, eye: Vector3, forward: Vector3, viewProjection: Matrix4): void {
-    if (PARKED.cloudVolumes) {
-      const lw = Math.max(8, Math.round(w * LAYER_SCALE)), lh = Math.max(8, Math.round(h * LAYER_SCALE));
-      if (!this.#layer || this.#size.x !== lw || this.#size.y !== lh) {
-        this.#size.set(lw, lh);
-        this.#layer?.held.light.dispose();
-        this.#layer?.held.depth.dispose();
-        this.#layer?.composite.dispose();
-        const held = held2(lw, lh);
-        this.#layer = { held, kernel: layerKernel(held, lw, lh), composite: layerComposite(held) };
-      }
-      this.#quad.material = this.#layer.composite;
-      this.#quad.visible = SYS.count.value > 0;
-      if (this.#quad.visible) renderer.compute(this.#layer.kernel);
-      return;
+  /** Traces the layers for this frame, at LAYER_SCALE of the scene's own size, w × h. Run after the atmosphere and
+   *  the fog have followed the camera, and before the scene is drawn. */
+  trace(renderer: WebGPURenderer, w: number, h: number): void {
+    const lw = Math.max(8, Math.round(w * LAYER_SCALE)), lh = Math.max(8, Math.round(h * LAYER_SCALE));
+    if (!this.#layer || this.#size.x !== lw || this.#size.y !== lh) {
+      this.#size.set(lw, lh);
+      this.#layer?.held.light.dispose();
+      this.#layer?.held.depth.dispose();
+      this.#layer?.composite.dispose();
+      const held = held2(lw, lh);
+      this.#layer = { held, kernel: layerKernel(held, lw, lh), composite: layerComposite(held) };
     }
-    const mw = Math.max(8, Math.round(w * MARCH_SCALE)), mh = Math.max(8, Math.round(h * MARCH_SCALE));
-    if (!this.#held || this.#size.x !== mw || this.#size.y !== mh) {
-      this.#size.set(mw, mh);
-      this.#held?.forEach((t) => { t.light.dispose(); t.depth.dispose(); });
-      const held: [Held, Held] = [held2(mw, mh), held2(mw, mh)];
-      this.#held = held;
-      this.#kernels = [marchKernel(held[0], held[1], mw, mh), marchKernel(held[1], held[0], mw, mh)];
-      (this.#materials as MeshBasicNodeMaterial[]).forEach((m) => m.dispose());
-      this.#materials.length = 0;
-      (this.#materials as MeshBasicNodeMaterial[]).push(compositeMaterial(held[0]), compositeMaterial(held[1]));
-      this.#frames = 0;
-    }
+    this.#quad.material = this.#layer.composite;
     this.#quad.visible = SYS.count.value > 0;
-    if (!this.#quad.visible) {
-      this.#frames = 0;
-      return;
-    }
-    // a cut, or the first frame: nothing from before to keep
-    const cut = this.#frames === 0 || this.#eye.distanceTo(eye) > 25 || this.#forward.dot(forward) < 0.8;
-    VIEW.blend.value = cut ? 1 : MARCH_BLEND;
-    this.#eye.copy(eye);
-    this.#forward.copy(forward);
-    const t = this.#turn;
-    renderer.compute(this.#kernels![t]);
-    this.#quad.material = this.#materials[t]!;
-    (VIEW.before.value as Matrix4).copy(viewProjection);
-    this.#turn = 1 - t;
-    this.#frames++;
+    if (this.#quad.visible) renderer.compute(this.#layer.kernel);
   }
 
   /** Lays out the systems' clouds for a frame, and the shade they throw. */

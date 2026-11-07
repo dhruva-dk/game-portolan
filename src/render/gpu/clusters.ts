@@ -18,8 +18,8 @@
 // directly are in their cache key.
 import { Lighting, Vector2, type Light, type LightsNode, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, Loop, Return, attributeArray, clamp, dot, float, floor, instanceIndex, int, ivec2, ivec4, log, max, min, positionView, pow, renderGroup,
-  screenCoordinate, textureLoad, uniform, vec3,
+  Fn, If, Loop, Return, attributeArray, clamp, dot, float, floor, instanceIndex, int, ivec2, ivec4, log, max, min, positionView, pow,
+  screenCoordinate, textureLoad, vec3,
 } from 'three/tsl';
 import ClusteredLightsNode from 'three/addons/tsl/lighting/ClusteredLightsNode.js';
 
@@ -30,10 +30,6 @@ const MAX_LIGHTS = 256;
 const PER_CLUSTER = 32;
 
 const _size = new Vector2();
-
-/** The scene's pixels to the grid's: the grid is laid over the scene at its largest (the stage's resolution may
- *  drop below it to hold the frame rate), and a pixel of a smaller scene falls in the tile its place there would. */
-export const GRID_RATIO = uniform(1).setGroup(renderGroup);
 
 /** Three's clustered node's own state, which the grid is rebuilt into. */
 interface Inner {
@@ -124,7 +120,7 @@ class FittedClusters extends ClusteredLightsNode {
     })().compute(clusters).setName('Clustered lights');
 
     const clusterIndex = Fn(() => {
-      const tile = floor(screenCoordinate.mul(GRID_RATIO).div(TILE));
+      const tile = floor(screenCoordinate.div(TILE));
       const slice = clamp(floor(log(positionView.z.negate().div(near)).div(log(far.div(near))).mul(nz)), 0, nz - 1);
       return int(tile.x).add(int(tile.y).mul(nx)).add(int(slice).mul(nx * ny));
     })().toVar();
@@ -136,7 +132,7 @@ class FittedClusters extends ClusteredLightsNode {
   }
 }
 
-/** The renderer's lighting: clustered point lights, sized to a scene drawn at `scale` of the screen, its largest. */
+/** The renderer's lighting: clustered point lights, sized to a scene drawn at `scale` of the screen. */
 export class ClusteredLighting extends Lighting {
   readonly #scale: number;
 

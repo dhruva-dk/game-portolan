@@ -10,7 +10,6 @@ import { lookKey, lookOf } from './cosmetics.ts';
 import { Effects, RARITY_GLOW } from './effects.ts';
 import { Gulls, type ShipRef } from './gull.ts';
 import { seaLift } from '../lift.ts';
-import { LANTERNS } from '../lanterns.ts';
 import { rockfallAt } from '../regions/eventRocks.ts';
 import { Lightning } from './lightning.ts';
 import { Loot } from './loot.ts';
@@ -20,7 +19,6 @@ import { Projectiles } from './projectiles.ts';
 import { Wakes } from './wakes.ts';
 import { Whales } from './whale.ts';
 import type { ActorEvent, ActorsView, EruptionView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
-import { heat } from '../gpu/haze.ts';
 import { MARK_KIND, addMark, clearMarks } from '../gpu/marks.ts';
 import { heightAt } from '../../sim/world/index.ts';
 
@@ -269,8 +267,6 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
       fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick);
       // and it lights her deck, her sails and the water round her
       if (d < 260) fx.lights.hold(`lantern${v.id}`, at, f.lantern, 260 * n * flick, 34, 1.6);
-      // and the light it throws into the air round her
-      LANTERNS.add(at, f.lantern, n * flick);
       // the wisp at the main truck: past about 180 m the stern lantern has gone under the curve, but this shows to 240 m
       // (not on your own ship, where it would hang at the top of the view)
       if (v.id !== player) fx.light(m.toWorld(MASTHEAD, tmp), Math.max(0.4, d * 0.009), f.lantern, (0.9 + 1.6 * n) * n * flick);
@@ -334,7 +330,6 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   function erupt(e: EruptionView, dt: number): void {
     crater.set(e.crater.x, e.crater.y, e.crater.z);
     fx.plume(crater, e.strength, dt);
-    heat(crater, 26, 0.6 + 0.4 * e.strength);
     for (const b of e.bombs) {
       bombTo.set(b.to.x, b.to.y, b.to.z);
       const k = b.k, r0 = crater.length(), r1 = seaRadius(bombTo), apex = 18 + crater.distanceTo(bombTo) * 0.35;
@@ -359,7 +354,6 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     const elev = focus.dot(AU.uSunDir.value);
     AU.uSunColor.value.copy(HIGH_SUN).lerp(LOW_SUN, 1 - smooth(-0.05, 0.35, elev));
     AU.uNight.value = nightAt(focus);
-    LANTERNS.clear();
     // ships
     const hEye = Math.max(1, eye.length() - SEA.radius), R = SEA.radius;
     const limit = Math.sqrt(2 * R * hEye + hEye * hEye) + Math.sqrt(2 * R * 25) + 30;

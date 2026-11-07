@@ -14,8 +14,8 @@ import {
   MeshBasicNodeMaterial, NormalBlending, Vector3, type Node,
 } from 'three/webgpu';
 import {
-  Fn, attribute, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, cameraWorldMatrix, clamp, cos, float, instanceIndex,
-  length, max, mix, mod, normalize, positionGeometry, positionPrevious, pow, screenSize, select, sin, smoothstep, uniform, uv,
+  attribute, cameraPosition, cameraProjectionMatrix, cameraViewMatrix, cameraWorldMatrix, clamp, cos, float, instanceIndex,
+  length, max, mix, mod, normalize, positionGeometry, pow, screenSize, select, sin, smoothstep, uniform, uv,
   varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { LAMP, P } from '../gpu/uniforms.ts';
@@ -111,10 +111,7 @@ function layer(spec: Spec): Layer {
     thin = pow(size.div(width), 2);
   }
   const world = cameraWorldMatrix.mul(vec4(corner, c.z, 1)).xyz;
-  m.positionNode = Fn(() => {
-    positionPrevious.assign(world.sub(velWorld.mul(P.dt)));
-    return world;
-  })();
+  m.positionNode = world;
   // the last of them thinning in as the weather deepens, those at the box's sides and at the lens thinning out
   const shown = clamp(amount.mul(spec.count).sub(float(instanceIndex)).div(spec.count * 0.08), 0, 1);
   const edge = smoothstep(span * 0.5, span * 0.3, length(q));

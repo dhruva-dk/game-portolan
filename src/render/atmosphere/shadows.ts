@@ -2,9 +2,9 @@
 // 2006; Dimitrov, "Cascaded Shadow Maps", NVIDIA 2007), each slice's map snapped to whole texels as the eye moves so
 // the edges never crawl, with the slices cross-faded where they meet.
 //
-// The slices are cut for a ship's eye: the first ends a dozen metres out, so the deck, the rigging and the rocks by
-// the hull are sharp; the last reaches as far as the land is drawn with any detail. Beyond, the haze has taken most of
-// the contrast a shadow would have had, and the shadows thin out over the last stretch rather than stop.
+// Two slices, cut for a ship's eye: the first holds the ship and what is round her, the second reaches as far as the
+// land is drawn with any detail. Beyond, the haze has taken most of the contrast a shadow would have had, and the
+// shadows thin out over the last stretch rather than stop.
 //
 // The slice a fragment reads is chosen by the depth of the point the map is read at, which is not always the
 // fragment: under the sea it is further along the sun's unbent ray (see refractedShadowPosition). Where two slices
@@ -13,27 +13,22 @@
 //
 // Each map is read with a disc of sixteen hardware-compared taps, whose spread keeps the penumbra at least as wide on
 // the ground as the sun's disc makes it a couple of metres behind an edge, and never under a texel and a half in any
-// slice, so the near slices are not razor-cut and the far ones are not blocky. The disc is turned per pixel and per
-// frame by interleaved gradient noise (Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare",
-// SIGGRAPH 2014): the temporal upscaler gathers the turns into a penumbra far smoother than sixteen fixed taps make.
+// slice, so the near slices are not razor-cut and the far ones are not blocky. The disc is the same at every pixel:
+// turned by a noise, with nothing to gather the turns over frames, a penumbra would be a grain fixed to the screen.
 //
 // Light a material works out for itself, rather than through three's lights (the sea's body, the sun's share of the
 // light the caustics move), reads the same cascades through sunShadow.
-import type { DepthTexture, DirectionalLight, Matrix4, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
+import type { DirectionalLight, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, cameraNear, cameraViewMatrix, clamp, cos, float, interleavedGradientNoise, nodeObject, reference, renderGroup, screenCoordinate,
-  shadowPositionWorld, sin, smoothstep, texture, vec2, vec4,
+  Fn, If, cameraNear, cameraViewMatrix, clamp, float, nodeObject, reference, renderGroup, shadowPositionWorld, smoothstep, texture, vec2, vec4,
 } from 'three/tsl';
-import { P } from '../gpu/uniforms.ts';
-import { PARKED } from '../gpu/parked.ts';
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 
 /** The shadows reach this far from the eye, metres. */
-export const SHADOW_REACH = 360;
-/** Where each slice ends, as a share of the reach: two slices while the far ones are parked, the first holding the
- *  ship and what is round her, the second the rest. */
-export const SPLITS = PARKED.farCascades ? [0.1, 1] : [0.034, 0.12, 0.36, 1];
-export const MAP_SIZE = 2048;
+const SHADOW_REACH = 360;
+/** Where each slice ends, as a share of the reach. */
+const SPLITS = [0.1, 1];
+const MAP_SIZE = 2048;
 /** The share of a boundary's distance the slices are cross-faded over, either side of it, and the share of the reach
  *  over which the last slice's shadows thin out. */
 const FADE = 0.1;
@@ -62,12 +57,9 @@ const discFilter = ({ depthTexture, shadowCoord, shadow, depthLayer }: FilterInp
   const size = perRender(reference('mapSize', 'vec2', shadow));
   const spread = perRender(reference('radius', 'float', shadow));
   const step = vec2(spread).div(size);
-  const turn = interleavedGradientNoise(screenCoordinate.xy.add(P.frame.mul(5.588238))).mul(2 * Math.PI);
-  const c = cos(turn), s = sin(turn);
   let sum: F = float(0);
   for (const [x, y, w] of DISC) {
-    const at = vec2(c.mul(x).sub(s.mul(y)), s.mul(x).add(c.mul(y)));
-    let tap = texture(depthTexture, shadowCoord.xy.add(at.mul(step)));
+    let tap = texture(depthTexture, shadowCoord.xy.add(vec2(x, y).mul(step)));
     if (depthTexture.isArrayTexture) tap = tap.depth(depthLayer);
     sum = sum.add((tap.compare(shadowCoord.z) as unknown as F).mul(w / DISC_WEIGHT));
   }
@@ -162,20 +154,6 @@ export class SunShadows {
     this.node.fade = true;
     (shadow as unknown as { shadowNode: unknown }).shadowNode = this.node;
     installed = this;
-  }
-
-  /** Each slice's map and the matrix that takes a world point into it, once the first frame has made them; for what
-   *  works the sun's shadow out away from a surface (the fog). */
-  get slices(): { matrix: Matrix4; depth: DepthTexture }[] | null {
-    const lights = this.node.lights;
-    if (lights.length !== SPLITS.length) return null;
-    const out: { matrix: Matrix4; depth: DepthTexture }[] = [];
-    for (const l of lights) {
-      const map = l.shadow?.map as { depthTexture?: DepthTexture } | null | undefined;
-      if (!map?.depthTexture) return null;
-      out.push({ matrix: l.shadow!.matrix, depth: map.depthTexture });
-    }
-    return out;
   }
 
   /** Refits the slices when the eye's projection changes. */

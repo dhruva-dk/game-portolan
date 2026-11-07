@@ -24,7 +24,7 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial,
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
-  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, mrt,
+  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
@@ -190,9 +190,6 @@ function rainRings(q: V2): V2 {
 export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   mat.fog = true;
-  // the grid rides with the eye, so its motion vectors don't follow the water: the upscaler takes little history
-  // from them, which keeps the waves' fast-changing glitter sharp, and the motion blur is kept off the sea
-  mat.mrtNode = mrt({ smear: float(0) });
   // the surface is what the light under it passes through, not something beneath it
   mat.userData.seaSurface = true;
 

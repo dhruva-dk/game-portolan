@@ -16,7 +16,6 @@ import {
   Fn, acos, attribute, cameraFar, cameraNear, cameraPosition, cameraWorldMatrix, clamp, dot, exp, float, fract, max, mix,
   modelViewMatrix, modelWorldMatrixInverse, perspectiveDepthToViewZ, positionGeometry, positionView, positionWorld,
   select, sin, smoothstep, texture, uniform, varying, vec2, vec3, vec4, cos,
-  positionPrevious,
 } from 'three/tsl';
 import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
@@ -121,11 +120,7 @@ export class Moonbow {
     const mv = modelViewMatrix.mul(vec4(centre, 1));
     const q = positionGeometry.xy;
     const world = cameraWorldMatrix.mul(vec4(mv.xy.add(q.mul(size)), mv.z, 1));
-    m.positionNode = Fn(() => {
-      const at = modelWorldMatrixInverse.mul(world).xyz.toVar();
-      positionPrevious.assign(at);
-      return at;
-    })();
+    m.positionNode = modelWorldMatrixInverse.mul(world).xyz;
 
     const vq = varying(q, 'vSprayQ') as unknown as V2;
     const va = varying(alpha, 'vSprayA') as unknown as F;

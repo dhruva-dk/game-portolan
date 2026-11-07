@@ -15,8 +15,8 @@
 // hull.
 import { AdditiveBlending, MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import {
-  Fn, abs, cameraFar, cameraNear, cameraViewMatrix, cameraWorldMatrix, clamp, cos, cross, float, floor, instanceIndex, length,
-  max, min, mix, mod, mrt, normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, select, sin, smoothstep,
+  abs, cameraFar, cameraNear, cameraViewMatrix, cameraWorldMatrix, clamp, cos, cross, float, floor, instanceIndex, length,
+  max, min, mix, mod, normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, select, sin, smoothstep,
   texture, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { overDepth } from '../../gpu/behind.ts';
@@ -24,7 +24,7 @@ import { LAMP, P } from '../../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from '../../atmosphere/luts.ts';
 import { skyLight } from '../../atmosphere/light.ts';
 import { FLIP, SMOKE_DEPTH, SMOKE_SIDES } from '../smokeBake.ts';
-import { moved, type F, type V2, type V3, type V4 } from './kit.ts';
+import { type F, type V2, type V3, type V4 } from './kit.ts';
 
 type Buffer = { element(i: unknown): V4 };
 export interface ParticleBuffers { pos: Buffer; vel: Buffer; col: Buffer; shape: Buffer; turn: Buffer; more: Buffer }
@@ -38,9 +38,6 @@ const behind = overDepth();
 export function particleNodeMaterial(atlas: Texture, glow: boolean, b: ParticleBuffers): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: glow ? AdditiveBlending : NormalBlending });
   m.fog = !glow;
-  // the frame's motion and its blur mask are blended like its colour: written with no alpha they keep what lies
-  // behind, where anything else would add a sprite's motion onto the sea's and tear the upscaler's history
-  m.mrtNode = mrt({ velocity: vec4(0), smear: vec4(0) });
   const id = instanceIndex;
   const at = b.pos.element(id), vel = b.vel.element(id), col = b.col.element(id);
   const shape = b.shape.element(id), turn = b.turn.element(id), more = b.more.element(id);
@@ -71,7 +68,7 @@ export function particleNodeMaterial(atlas: Texture, glow: boolean, b: ParticleB
   const streak = vec2(dir.y.negate(), dir.x).mul(size).mul(q.x).add(dir.mul(max(size, len.mul(turn.x))).mul(q.y.sub(1)).mul(0.5));
   const offset = select(mode.greaterThan(0.5), streak, turned.mul(size));
   const facing = cameraWorldMatrix.mul(vec4(centre.xy.add(offset), centre.z, 1)).xyz;
-  m.positionNode = Fn(() => moved(select(alive, select(mode.greaterThan(1.5), flat, facing), vec3(0)) as V3))();
+  m.positionNode = select(alive, select(mode.greaterThan(1.5), flat, facing), vec3(0));
 
   // what the fragment needs of the particle, worked out once per corner
   const vAlpha = varying(alpha as F), vCol = varying(col.rgb as V3), vFrame = varying(frame as F);

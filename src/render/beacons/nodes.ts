@@ -19,7 +19,6 @@ import {
 import { LAMP, P } from '../gpu/uniforms.ts';
 import { aerialAt } from '../atmosphere/luts.ts';
 import { thinCloudLight } from '../atmosphere/light.ts';
-import { moved } from '../actors/tsl/kit.ts';
 import type { Clock } from './kit.ts';
 
 export type F = Node<'float'>;
@@ -139,7 +138,7 @@ export function litNode(clock: Clock, o: LitBase & LitNodes): MeshStandardNodeMa
     vLocal.assign(positionLocal);
     vLN.assign(normalLocal);
     if (!o.vertexNode) return positionLocal;
-    return moved(o.vertexNode({ ...c, p: positionLocal as unknown as V3 }));
+    return o.vertexNode({ ...c, p: positionLocal as unknown as V3 });
   })();
   const fres = pow(float(1).sub(clamp(abs(dot(normalView, positionViewDirection)), 0, 1)), 3);
   const ctx: LitCtx = { ...c, local: vLocal, ln: normalize(vLN), fres, colour: materialColor as unknown as V3 };
@@ -209,7 +208,7 @@ export function particlesNode(clock: Clock, o: ParticleBase & ParticleNodes): Me
   const corner = mv.xy.add(rt.mul(q.x).add(up.mul(q.y).mul(along)).mul(size));
   if (o.nearFade) alpha = alpha.mul(smoothstep(o.nearFade * 0.4, o.nearFade, mv.z.negate()));
   const world = cameraWorldMatrix.mul(vec4(corner, mv.z, 1));
-  m.positionNode = Fn(() => moved(modelWorldMatrixInverse.mul(world).xyz))();
+  m.positionNode = modelWorldMatrixInverse.mul(world).xyz;
 
   const vc = varying(q, 'vBeaconC') as unknown as V2;
   const va = varying(alpha, 'vBeaconA') as unknown as F;
@@ -257,7 +256,7 @@ export function surfaceNode(clock: Clock, o: SurfaceBase & SurfaceNodes): MeshBa
       p = vec3(to.y.mul(p.x), p.y, to.x.negate().mul(p.x)).add(vec3(to.x, 0, to.y).mul(p.z));
     }
     vLocal.assign(p);
-    return o.vertexNode || o.faceY ? moved(p) : p;
+    return p;
   })();
   const paint = o.paintNode({ ...c, uv: uv(), local: vLocal });
   const glowAmt = paint.glow ?? float(1), col = paint.col ?? vec3(1), alpha = paint.alpha ?? float(1);

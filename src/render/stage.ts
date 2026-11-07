@@ -51,6 +51,4 @@ export interface StageView {
   territory: { owner: Uint8Array; trail: Uint8Array; version: number; me: number } | null;
   /** Screen-wide tints, 0…1: outside the safe circle, just hurt, and low on hull. */
   screen?: { storm: number; hurt: number; low: number };
-  /** A lens's depth of field, sharp this many metres from the eye (the lobby and the ceremonies); none when absent. */
-  focus?: number;
 }

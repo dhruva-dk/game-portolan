@@ -19,7 +19,7 @@ import {
 } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, cross, dFdx, dFdy, diffuseColor, dot, float, floor, fract,
-  instanceIndex, length, log2, max, min, mix, mrt, normalGeometry, normalize, positionGeometry, positionPrevious, positionWorld,
+  instanceIndex, length, log2, max, min, mix, mrt, normalGeometry, normalize, positionGeometry, positionWorld,
   select, smoothstep, sqrt, step, texture, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
@@ -214,11 +214,7 @@ export function impostorMaterial(f: FieldNodes, atlas: ImpostorAtlas): Material 
   const rb = cross(ub, e);
   const corner = positionGeometry.xy;
   const world = centre.add(rb.mul(corner.x).add(ub.mul(corner.y)).mul(R.mul(c.size)));
-  m.positionNode = Fn(() => {
-    const at = world.toVar();
-    positionPrevious.assign(at);
-    return at;
-  })();
+  m.positionNode = world;
 
   // the views: the eye in the plant's frame (from its centre, at its size), on the grid
   const eyeL = unturn(c.q, toEye).div(c.size);

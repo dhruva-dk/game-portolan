@@ -14,7 +14,7 @@
 // added at the lamps' scale and shows through the haze. Both fade where they meet what lies behind them.
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import {
-  Fn, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, clamp, cross, exp, float, instanceIndex, length, max, min, mix, mrt,
+  cameraFar, cameraNear, cameraPosition, cameraViewMatrix, clamp, cross, exp, float, instanceIndex, length, max, min, mix,
   normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, select, smoothstep, texture, varying, vec2,
   vec3, vec4,
 } from 'three/tsl';
@@ -22,7 +22,7 @@ import { overDepth } from '../../gpu/behind.ts';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from '../../atmosphere/luts.ts';
 import { skyLight } from '../../atmosphere/light.ts';
-import { moved, type F, type V3, type V4 } from './kit.ts';
+import { type F, type V3, type V4 } from './kit.ts';
 
 type Buffer = { element(i: unknown): V4 };
 export interface RibbonBuffers { pos: Buffer; vel: Buffer; col: Buffer; shape: Buffer; more: Buffer }
@@ -32,7 +32,6 @@ const behind = overDepth();
 export function ribbonNodeMaterial(noise: Texture, glow: boolean, b: RibbonBuffers, points: number): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, blending: glow ? AdditiveBlending : NormalBlending });
   m.fog = !glow;
-  m.mrtNode = mrt({ velocity: vec4(0), smear: vec4(0) });
 
   // this segment runs from point j to j + 1 of its trail's ring; j − 1 and j + 2 give the tangents at its ends
   const id = instanceIndex, base = id.div(points).mul(points), j = id.mod(points);
@@ -58,7 +57,7 @@ export function ribbonNodeMaterial(noise: Texture, glow: boolean, b: RibbonBuffe
   const c = cross(tangent, toEye), cl = length(c);
   const side = select(cl.greaterThan(1e-5), c.div(max(cl, 1e-5)), normalize(cross(normalize(here.xyz), toEye)));
   const wp = here.xyz.add(side.mul(positionGeometry.y).mul(width).mul(0.5));
-  m.positionNode = Fn(() => moved(select(whole, wp, vec3(0)) as V3))();
+  m.positionNode = select(whole, wp, vec3(0));
 
   const vAcross = varying(positionGeometry.y as F), vAlong = varying(more.x as F), vSeed = varying(more.y as F);
   const vAge = varying(k as F), vSec = varying(here.w as F), vForm = varying(more.z as F);

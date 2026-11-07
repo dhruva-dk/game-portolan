@@ -1,9 +1,11 @@
 // What the sea mirrors besides the sky: ships, islands, rocks and the lanterns, found in the frame already drawn.
 //
+// Off for now (SEA_REFLECTIONS): the sea mirrors the sky's probe alone until the frame has room for this, the effect
+// that comes back first when it does.
+//
 // Stochastic screen-space reflections (Stachowiak, "Stochastic Screen-Space Reflections", SIGGRAPH 2015), cut down
 // for water. From each fragment of the sea a ray is reflected about the wave's normal (tilted a little at random by
-// the surface's unresolved roughness, a fresh tilt each frame, which the upscaler's history averages into the
-// glossy blur), and marched through the depth of the scene drawn before the sea in steps that lengthen with
+// the surface's unresolved roughness, a tilt that changes from pixel to pixel, the noise a glossy blur), and marched through the depth of the scene drawn before the sea in steps that lengthen with
 // distance, since the far shore is wide and the near hull is close. Where a step passes just behind a surface the
 // march backs up and halves in on it, and the colour drawn there is what the ray sees. Nothing in the depth is
 // water, so the sea never finds itself.
@@ -21,11 +23,13 @@ import {
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { P } from '../gpu/uniforms.ts';
-import { PARKED } from '../gpu/parked.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
 type V4 = Node<'vec4'>;
+
+/** Whether the sea finds what it mirrors in the frame; off, it mirrors the sky's probe alone. */
+const SEA_REFLECTIONS = false;
 
 /** Steps along the ray, the first one's length (m) and how much longer each is than the last. */
 const STEPS = 15;
@@ -41,14 +45,13 @@ const REACH = FIRST * ((GROW ** STEPS - 1) / (GROW - 1));
  * `normal` is the surface's normal in the world, `rough` its GGX α, `fresnel` how much it reflects looking this way.
  */
 export function seaReflection(normal: V3, rough: F, fresnel: F): V4 {
-  // parked, the sea mirrors the sky's probe alone
-  if (PARKED.seaReflections) return vec4(0);
+  if (!SEA_REFLECTIONS) return vec4(0);
   return Fn(() => {
     const out = vec4(0).toVar('seaReflect');
     If(fresnel.greaterThan(0.05), () => {
       const pv = positionView;
-      // the normal tilted at random within the roughness, differently each frame
-      const s = screenCoordinate.xy.add(P.frame.mul(5.588238));
+      // the normal tilted at random within the roughness
+      const s = screenCoordinate.xy;
       const jitter = vec3(interleavedGradientNoise(s), interleavedGradientNoise(s.add(vec2(17.3, 41.9))), interleavedGradientNoise(s.add(vec2(83.1, 7.7))))
         .sub(0.5).mul(rough.mul(0.9));
       const n = normalize(cameraViewMatrix.mul(vec4(normal, 0)).xyz.add(jitter));

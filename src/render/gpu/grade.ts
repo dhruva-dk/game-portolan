@@ -10,6 +10,10 @@
 // a few slices a frame, then cross-faded in over the last one, so a change of light is never a step.
 //
 // The table is applied after AgX, indexed by the display's encoded value, and holds display-linear colour.
+//
+// The script sets the frame's exposure too, fixed for the light rather than metered off the frame, so nothing in view
+// (a lit aura, a burning deck, a ship crossing the sun's glitter) brightens or darkens the rest: a curve of stops over
+// the sun's height at the eye, opened up a little by day for the weather that dims it.
 import { Data3DTexture, HalfFloatType, LinearFilter, RGBAFormat, ClampToEdgeWrapping, DataUtils, Vector3 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import { Fn, float, max, mix, pow, texture3D, uniform, vec3 } from 'three/tsl';
@@ -76,6 +80,31 @@ const WEATHER: Partial<Record<keyof WeatherDepth, Look>> = {
 };
 
 const KEYS: readonly (keyof Look)[] = ['temp', 'tint', 'contrast', 'saturation', 'warm', 'sea', 'sky', 'shadows', 'highlights', 'fade', 'fadeTo'];
+
+/** The exposure, in stops, by the sun's height over the horizon at the eye (its sine), between the points of a curve
+ *  taken from where the eye's adaptation settled over a day at sea: from noon's through the low sun and the blue hour
+ *  into the night's, which leaves the moonlit night darker than a day, as night should look: half a stop under
+ *  where the eye settled on an empty sea, since a night at sea is lit lanterns and foam more than moonlit water. */
+const EV: readonly (readonly [number, number])[] = [
+  [-1, 4.7], [-0.4, 4.1], [-0.2, 3.4], [-0.1, 2.4], [0, 1.9], [0.07, 1.45], [0.36, 0.7], [0.65, 0.25], [1, 0.1],
+];
+/** Stops each kind of weather opens the exposure by, where the eye is deep in it, by day: about two thirds of what
+ *  the eye's adaptation made up for, so a squall reads darker than the clear day round it and snow brighter. */
+const WEATHER_EV: Partial<Record<keyof WeatherDepth, number>> = { rain: 0.8, fog: 0.7, snow: -0.4, ash: 1.2, thunder: 1.4 };
+
+/** What the scene's light is multiplied by before the tone curve. */
+export const EXPOSURE = uniform(1);
+
+function stops(elevation: number): number {
+  const e = Math.min(1, Math.max(-1, elevation));
+  for (let i = 1; i < EV.length; i++) {
+    const [x1, y1] = EV[i];
+    if (e > x1) continue;
+    const [x0, y0] = EV[i - 1];
+    return y0 + ((y1 - y0) * (e - x0)) / (x1 - x0);
+  }
+  return EV[EV.length - 1][1];
+}
 
 /** Weighted sum of looks (the weights need not add to one: the rest is left neutral). */
 function blend(parts: readonly (readonly [Look, number])[]): Look {
@@ -216,6 +245,11 @@ export class ColourScript {
     const over = Math.min(1, weight);
     const scaled = parts.map(([l, w]) => [l, (w / Math.max(weight, 1e-6)) * over] as [Look, number]);
     this.current = blend([[day, 1 - over], ...scaled]);
+    // the exposure: the hour's, and by day the weather's on it
+    let ev = stops(input.elevation);
+    const daylight = smooth(-0.05, 0.25, input.elevation) * over / Math.max(weight, 1e-6);
+    for (const [kind, w] of Object.entries(input.weather) as [keyof WeatherDepth, number][]) ev += (WEATHER_EV[kind] ?? 0) * Math.min(1, w ?? 0) * daylight;
+    EXPOSURE.value = 2 ** ev;
     // fade in what has been baked
     if (mixing.value < 1) mixing.value = Math.min(1, mixing.value + dt / FADE);
     if (this.#baking) {

@@ -1,9 +1,9 @@
 // The WebGPU renderer: three's WebGPURenderer on the WebGPU backend and nothing else. There is no WebGL path; a
 // browser without a WebGPU adapter stops here with a clear error.
 //
-// The frame is drawn below the screen's resolution and reconstructed by the temporal upscaler in post.ts to the
-// canvas, which holds the screen's pixels up to three quarters of the floor's panel each way: every pass that wants
-// fewer pixels asks for them itself.
+// The scene is drawn at a fixed share of the canvas and brought up to it with a bilinear sample (post.ts); the canvas
+// holds the screen's pixels up to three quarters of the floor's panel each way. Every pass that wants fewer pixels
+// asks for them itself.
 import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, type Node } from 'three/webgpu';
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
@@ -31,15 +31,11 @@ TextureNode.prototype.getTransformedUV = function (this: TextureNode, uv: Node):
   return t.matrix.equals(IDENTITY) ? uv : transformed.call(this, uv);
 } as typeof TextureNode.prototype.getTransformedUV;
 
-/** The share of the canvas's width the scene is drawn at before the upscaler, for each kind of device, at most. */
-export const RENDER_SCALE = { phone: 0.66, tablet: 0.83, desktop: 1 } as const;
-/** The least it is drawn at, when the GPU is slowest (resolution.ts). */
-export const RENDER_FLOOR = { phone: 0.48, tablet: 0.56, desktop: 0.66 } as const;
+/** The share of the canvas's width and height the scene is drawn at, for each kind of device. */
+export const RENDER_SCALE = { phone: 0.6, tablet: 0.75, desktop: 0.9 } as const;
 
 /** The most pixels the canvas holds: three quarters of the width and height of an M1 iPad Air's panel, the floor. The
- *  scene is drawn at well under this and brought up by the upscaler, and past this many the passes after it (the
- *  upscaler's own, the bloom, the finish) cost the floor more than they show; the screen stretches the canvas to fit,
- *  and the chart drawn over it is the page's, at the panel's own pixels. */
+ *  screen stretches the canvas to fit, and the chart drawn over it is the page's, at the panel's own pixels. */
 const MAX_PIXELS = 1770 * 1230;
 
 /** The canvas's pixels per CSS pixel for a canvas w × h CSS pixels. */
@@ -82,8 +78,6 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   if (!adapter) throw new Error('Portolan needs WebGPU, and this device offered no adapter');
   const renderer = new WebGPURenderer({
     canvas, antialias: false, alpha: false, depth: true, stencil: false, powerPreference: 'high-performance',
-    // the bounce light's buffer is packed floats (post.ts)
-    requiredFeatures: ['rg11b10ufloat-renderable'].filter((f) => adapter.features.has(f)),
     requiredLimits: {
       maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
       maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,

@@ -6,7 +6,6 @@ import type { PlayOptions } from './session.ts';
 import { BEACON_LOOKS } from '../render/beacons/index.ts';
 import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
 import { beaconView, borderViews, lapPath, nightView, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
-import { BLOOM, FOCUS, LENS } from '../render/gpu/post.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { MODE_NAMES, OPTION_NAMES, SCORES } from '../sim/captains/brain.ts';
 import { LEAF } from '../sim/captains/tree.ts';
@@ -122,12 +121,6 @@ export function installHook(app: App) {
     /** The last frame's shape as the frame log prints it (every pass with `passes`), and the screen's steady frame. */
     shape: (passes = true) => shape.table(app.screen, undefined, passes),
     shapeSteady: () => shape.steady(),
-    /** Sets the lens's settings (post.ts: LENS, FOCUS, and `bloom`) by name, for comparing frames; returns them all. */
-    lens: (set: Record<string, number> = {}) => {
-      const all: Record<string, { value: number }> = { ...LENS, ...FOCUS, bloom: BLOOM } as never;
-      for (const [k, v] of Object.entries(set)) if (all[k]) all[k].value = v;
-      return Object.fromEntries(Object.entries(all).map(([k, u]) => [k, u.value]));
-    },
   };
   Object.defineProperty(window, '__portolan', { value: hook, configurable: true });
   return hook;

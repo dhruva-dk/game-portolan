@@ -1,6 +1,6 @@
-// The damage numbers as a node material. They are drawn over the finished frame (the stage's
-// overlay), after the temporal upscaler, the exposure and the tone curve, which would smear them as they rise, dim
-// them by day and blow them out at night: a number is something written on the screen, not light in the world.
+// The damage numbers as a node material. They are drawn over the finished frame (the stage's overlay), at the
+// canvas's own resolution and after the exposure and the tone curve, which would soften them, dim them by day and
+// blow them out at night: a number is something written on the screen, not light in the world.
 import { MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import { attribute, cameraProjectionMatrix, cameraViewMatrix, float, floor, min, mix, mod, positionGeometry, select, texture, vec2, vec3, vec4 } from 'three/tsl';
 import type { V3, V4 } from './kit.ts';

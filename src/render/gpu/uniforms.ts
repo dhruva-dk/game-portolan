@@ -25,8 +25,6 @@ export const P = shared({
   time: uniform(0),
   /** Seconds since the last frame. */
   dt: uniform(1 / 60),
-  /** Counts the frames drawn, wrapping at 64: what turns the noise that the temporal upscaler gathers. */
-  frame: uniform(0),
   /** Unit vector toward the sun, in the planet's frame. */
   sunDir: uniform(new Vector3(0.3, 0.5, 0.2).normalize()),
   /** Unit vector toward the moon. */

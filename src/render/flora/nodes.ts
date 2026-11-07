@@ -16,7 +16,7 @@
 //
 // Cut-out cards keep their coverage in the distance, where mipmapping averages a card's alpha away (Castaño, "Computing
 // Alpha Mipmaps", 2010, as a coverage boost by the texel footprint). Neighbouring levels of detail cross-fade over a
-// band with complementary screen-door masks that turn every frame, which the temporal upscaler gathers into a blend.
+// band with complementary screen-door masks.
 import {
   MeshBasicNodeMaterial, MeshStandardNodeMaterial, PhysicalLightingModel, DoubleSide, FrontSide,
   type LightingModelDirectInput, type Material, type MeshStandardMaterial, type Node, type NodeBuilder,
@@ -26,7 +26,6 @@ import {
   interleavedGradientNoise, length, log2, materialColor, materialRoughness, max, min, mix, normalGeometry, normalLocal,
   normalView, normalViewGeometry, normalize, positionGeometry, positionView, positionViewDirection, positionWorld, screenCoordinate,
   int, select, sign, sin, smoothstep, step, texture, textureSize, uint, uv, varying, vec2, vec3, vec4, cameraPosition,
-  positionPrevious,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
 import { thinCloudLight } from '../atmosphere/light.ts';
@@ -269,8 +268,8 @@ export class FloraNodeMaterial extends MeshStandardNodeMaterial {
   }
 }
 
-/** The screen-door noise for the level-of-detail cross-fade, turned every frame. */
-export const door = (): F => interleavedGradientNoise(screenCoordinate.xy.add(vec2(float(P.frame).mul(5.588238), float(P.frame).mul(3.1415))));
+/** The screen-door noise for the level-of-detail cross-fade. */
+export const door = (): F => interleavedGradientNoise(screenCoordinate.xy);
 
 const made = new Map<Material, Material>();
 
@@ -319,10 +318,8 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
     const ws = vec3(wl.z.negate(), 0, wl.x);
     const w: WindIn = { p, n, o: c.at, wl, ws, wd, t: P.time, speed, q: c.q, size: c.size };
     const off = t.kit === 'A' ? windA(w) : t.kit === 'B' ? windB(w, t.mode ?? 'air') : t.kit === 'C' ? windC(w, !!t.surge) : windD(w);
-    // (each copy is placed by this node, not by a matrix: its place is where it was, for the motion vectors)
-    const at = c.at.add(turn(c.q, p.add(off).mul(c.size))).toVar();
-    positionPrevious.assign(at);
-    return at;
+    // (each copy is placed by this node, not by a matrix)
+    return c.at.add(turn(c.q, p.add(off).mul(c.size)));
   })();
 
   // ---- the surface
@@ -426,9 +423,7 @@ function drips(f: FieldNodes): Material {
     const world = c.at.add(turn(c.q, local.mul(c.size)));
     const toEye = normalize(cameraPosition.sub(world));
     const across = normalize(cross(turn(c.q, vec3(0, 1, 0)), toEye));
-    const at = world.add(across.mul(drip.x.mul(0.007))).toVar();
-    positionPrevious.assign(at);
-    return at;
+    return world.add(across.mul(drip.x.mul(0.007)));
   })();
   const va = varying(alpha.mul(c.shown), 'vDripA') as unknown as F;
   m.colorNode = Fn(() => thinCloudLight(positionWorld).mul(0.9).add(vec3(0.02, 0.025, 0.03).mul(P.night.oneMinus())))();

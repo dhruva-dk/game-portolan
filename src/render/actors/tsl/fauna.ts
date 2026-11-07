@@ -11,7 +11,7 @@ import {
   sign, sin, smoothstep, step, texture, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
-import { moved, read, type F, type Uniforms, type V2, type V3 } from './kit.ts';
+import { read, type F, type Uniforms, type V2, type V3 } from './kit.ts';
 
 /** `v` turned by `a` radians about `o`. */
 const turn = (v: V2, o: V2, a: F): V2 => {
@@ -30,7 +30,7 @@ const flap = Fn(() => {
   const n1 = select(joint.greaterThan(1.5), turn(n0.xy, vec2(0), hand), n0.xy);
   const p2 = select(joint.greaterThan(0.5), turn(p1, shoulder, arm), p1);
   const n2 = select(joint.greaterThan(0.5), turn(n1, vec2(0), arm), n1);
-  positionLocal.assign(moved(vec3(p2, p0.z)));
+  positionLocal.assign(vec3(p2, p0.z));
   normalLocal.assign(vec3(n2, n0.z));
 });
 
