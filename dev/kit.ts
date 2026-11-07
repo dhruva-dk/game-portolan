@@ -10,6 +10,8 @@ import { bakeDisc, bakeSheet, drawBaked } from '../src/chart/sheet.ts';
 import { arrow, needle, rhumbWeb, ring, rose } from '../src/chart/rose.ts';
 import { figure } from '../src/chart/numerals.ts';
 import { ILLUMINATIONS, bakeSeal, drawSeal } from '../src/chart/seal.ts';
+import { drawGalleon, galleon, galleonSprite } from '../src/chart/galleon.ts';
+import { burst, cross, dottedRing, hand, moon, pennant, quadrant, sandglass, staff, star, stick, stormRing, sun, tally, wake } from '../src/chart/marks.ts';
 
 const dpr = window.devicePixelRatio || 1;
 const W = window.innerWidth, H = window.innerHeight;
@@ -104,6 +106,64 @@ PLATES.seals = () => {
   figure(pen, '1:30', W * 0.72, H * 0.66, fs);
   figure(pen, '38', W * 0.88, H * 0.66, fs, { ink: 'gold' });
   figure(pen, '2468', W * 0.55, H * 0.85, fs * 0.45);
+};
+
+/** Captains for the specimen: a spread of colours with their emblems, as #30's set will be. */
+const CAPS = [
+  { colour: '#b8322a', emblem: 'goshawk' }, { colour: '#1f4f9a', emblem: 'whale' }, { colour: '#2f6a3c', emblem: 'oak' },
+  { colour: '#d08a1c', emblem: 'sun' }, { colour: '#6a3f8c', emblem: 'owl' }, { colour: '#1d2326', emblem: 'raven' },
+  { colour: '#2b8a8a', emblem: 'turtle' }, { colour: '#e8dcc0', emblem: 'lotus' }, { colour: '#a8452a', emblem: 'fox' },
+  { colour: '#c8b040', emblem: 'comet' },
+];
+
+PLATES.galleons = () => {
+  folio(10);
+  const u = Math.min(W / 1376, H / 1032);
+  // marks at the HUD's size, both ways
+  CAPS.forEach((c, i) => {
+    const sp = galleonSprite(pen, c, { size: 30 * Math.max(u, 0.75), facing: i % 2 ? -1 : 1 });
+    drawGalleon(g, sp, W * (0.08 + i * 0.09), H * 0.16);
+  });
+  // at the lobby's size, the first gilt-rimmed (the player's)
+  CAPS.slice(0, 6).forEach((c, i) => {
+    galleon(pen, c, W * (0.1 + i * 0.16), H * 0.38, { size: 64 * u, gilt: i === 0, facing: 1 });
+  });
+  // the engraving
+  galleon(pen, CAPS[0], W * 0.3, H * 0.86, { size: 300 * u, facing: 1 });
+  galleon(pen, CAPS[1], W * 0.72, H * 0.86, { size: 230 * u, facing: -1, gilt: true });
+};
+
+PLATES.marks = () => {
+  folio(12);
+  const u = Math.min(W / 1376, H / 1032);
+  const x0 = W * 0.06;
+  // pennants on a staff: hull in a captain's colour, shield in blue, at what is left of each
+  staff(pen, x0, H * 0.08, H * 0.42, 1, 5 * u);
+  pennant(pen, { x: x0, y: H * 0.09, length: 200 * u, height: 22 * u, colour: '#b8322a', phase: 0.4 });
+  pennant(pen, { x: x0, y: H * 0.17, length: 120 * u, height: 22 * u, colour: '#2f62b0', phase: 1.6 });
+  pennant(pen, { x: x0, y: H * 0.25, length: 160 * u, height: 18 * u, colour: '#2f6a3c', phase: 2.5, gilt: true, trim: '#d4a84a' });
+  pennant(pen, { x: x0, y: H * 0.33, length: 90 * u, height: 18 * u, colour: '#6a3f8c', phase: 0, wind: 0.2 });
+  // tallies
+  for (let n = 1; n <= 7; n++) tally(pen, n * 2 - 1, W * 0.3, H * (0.06 + n * 0.05), 22 * u);
+  // sand-glasses draining
+  [1, 0.7, 0.4, 0.1, 0].forEach((s, i) => sandglass(pen, W * (0.55 + i * 0.09), H * 0.2, 110 * u, { sand: s, running: s > 0 && s < 1, time: 0.3 }));
+  // the hand, the star, the cross, the burst, the sun, the moon
+  hand(pen, W * 0.2, H * 0.6, 150 * u, 0);
+  hand(pen, W * 0.36, H * 0.72, 90 * u, 0.6);
+  star(pen, W * 0.46, H * 0.56, 22 * u);
+  star(pen, W * 0.52, H * 0.56, 14 * u, 1, 'silver');
+  cross(pen, W * 0.6, H * 0.56, 12 * u, 1, 'rubric');
+  burst(pen, W * 0.68, H * 0.56, 24 * u);
+  sun(pen, W * 0.78, H * 0.56, 30 * u);
+  moon(pen, W * 0.88, H * 0.56, 24 * u);
+  // instruments of the controls
+  stick(pen, W * 0.12, H * 0.86, 56 * u, W * 0.12 + 18 * u, H * 0.86 - 10 * u);
+  quadrant(pen, W * 0.3, H * 0.92, 60 * u, 1);
+  stormRing(pen, W * 0.55, H * 0.82, 70 * u, 1, 0.8);
+  dottedRing(pen, W * 0.55, H * 0.82, 44 * u);
+  const trail: number[] = [];
+  for (let i = 0; i < 30; i++) trail.push(W * 0.72 + i * 8 * u, H * 0.8 + Math.sin(i * 0.25) * 20 * u);
+  wake(pen, trail, '#1f4f9a');
 };
 
 let current = '';
