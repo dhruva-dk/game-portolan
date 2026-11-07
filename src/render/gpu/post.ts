@@ -262,7 +262,7 @@ export class Post {
       // upscaler to gather; the radius about a hull's beam, so it darkens under a gunwale and where a hull meets the
       // water, not a ship a cable off a cliff
       const occlusion = new GTAONode(depth, null as unknown as Node, camera);
-      occlusion.resolutionScale = 0.5;
+      occlusion.resolutionScale = scale * 0.5;
       occlusion.samples.value = 8;
       occlusion.radius.value = 2.5;
       occlusion.thickness.value = 1.2;
@@ -401,6 +401,13 @@ export class Post {
     this.pipeline = new RenderPipeline(renderer);
     this.pipeline.outputNode = this.#plain;
     this.exposure = new Exposure(scenePass.getTexture('output') as Texture);
+  }
+
+  /** Draws the scene at `scale` of the screen from the next frame, its occlusion at half that. */
+  setScale(scale: number): void {
+    this.scenePass.setResolutionScale(scale);
+    if (this.occlusion instanceof GTAONode) this.occlusion.resolutionScale = scale * 0.5;
+    else if (this.occlusion instanceof Bounce) this.occlusion.scale = scale * 0.5;
   }
 
   /** Takes a lens's depth of field, sharp `distance` metres off, or (null) none. */

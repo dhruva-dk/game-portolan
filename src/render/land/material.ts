@@ -106,7 +106,7 @@ function hexTiled(surface: ReturnType<typeof texture>, detail: ReturnType<typeof
 }
 
 /** The lab's switch for looking inside the land's shading. */
-export const LAND = { debug: uniform(0, 'int') };
+export const LAND = { debug: uniform(0, 'int').setGroup(renderGroup) };
 const ROLE_COLOURS: [number, number, number][] = [[0.1, 0.4, 0.05], [0.45, 0.4, 0.05], [0.3, 0.3, 0.3], [0.6, 0.5, 0.3], [0.05, 0.15, 0.5], [0.4, 0.05, 0.4]];
 
 const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));

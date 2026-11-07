@@ -34,7 +34,7 @@ const LOOKS = Array.from({ length: MARKS }, () => new Vector4(-1e6, 1, 0, 0));
 const spots = uniformArray(SPOTS, 'vec4').setGroup(renderGroup);
 const looks = uniformArray(LOOKS, 'vec4').setGroup(renderGroup);
 /** How many slots have held a mark since the last clear: the shaders look no further. */
-const used = uniform(0, 'int');
+const used = uniform(0, 'int').setGroup(renderGroup);
 let next = 0, seed = 1;
 
 /** Leaves a mark at `at` (metres, world). `size` scales the kind's own radius. */

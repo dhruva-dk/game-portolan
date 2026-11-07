@@ -21,7 +21,7 @@ import {
   textureStore, uint, uniform, uvec3, vec2, vec3, vec4, cos, sin,
 } from 'three/tsl';
 import { AIR, densities, distanceToTop, miePhase, raySphere, rayleighPhase, transmittanceParams, transmittanceUV } from './model.ts';
-import { P } from '../gpu/uniforms.ts';
+import { P, shared } from '../gpu/uniforms.ts';
 import { loop } from '../gpu/tsl.ts';
 
 type F = Node<'float'>;
@@ -77,7 +77,7 @@ export const tables = {
 };
 
 /** Where the eye is, and what the aerial perspective volume is laid over. Set by the atmosphere each frame. */
-export const EYE = {
+export const EYE = shared({
   position: uniform(new Vector3(0, 600, 0)),
   /** The camera's world matrix and the tangents of its half angles, for the volume's rays. */
   world: uniform(new Matrix4()),
@@ -86,7 +86,7 @@ export const EYE = {
   viewProjection: uniform(new Matrix4()),
   /** How deep the volume reaches past where each ray enters the air, metres. */
   range: uniform(700),
-};
+});
 
 // ---------------------------------------------------------------- texel ↔ unit range (Bruneton)
 

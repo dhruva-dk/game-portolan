@@ -6,7 +6,7 @@
 import { Vector3, type Node } from 'three/webgpu';
 import {
   Fn, If, abs, clamp, cos, dot, exp, float, floor, fract, max, mix, mx_fractal_noise_float, positionWorldDirection, pow,
-  select, sin, smoothstep, sqrt, vec2, vec3, vec4, cross, normalize, length, uniform,
+  select, sin, smoothstep, sqrt, vec2, vec3, vec4, cross, normalize, length, uniform, renderGroup,
 } from 'three/tsl';
 import { AIR, raySphere } from './model.ts';
 import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyFromTables, skyIrradiance, skyMarched, viewTransmittance } from './luts.ts';
@@ -17,7 +17,7 @@ type F = Node<'float'>;
 type V3 = Node<'vec3'>;
 
 /** How far the sky has turned since noon at longitude 0, radians: the stars wheel with the sun. */
-export const skyTurn = uniform(0);
+export const skyTurn = uniform(0).setGroup(renderGroup);
 
 /** Limb darkening's linear coefficient: the sun's rim is this much dimmer than its middle. */
 const LIMB = 0.6;
@@ -122,7 +122,7 @@ export const stars = Fn(([d]: [V3]) => {
 
 /** Where the reflection probe is taken: over the sea below the eye, however high the eye is, since the probe is what
  *  the surfaces down there reflect. */
-export const probeEye = uniform(new Vector3(0, 600, 0));
+export const probeEye = uniform(new Vector3(0, 600, 0)).setGroup(renderGroup);
 
 /** How much of the stars the eye makes out against the air's own light along the same line: a star is a point the
  *  eye must tell from its background, so they go out one by one as the twilight brightens, the faint first. */

@@ -11,6 +11,7 @@
 // Lengths are metres. The planet's centre is the origin.
 import { Color, Vector3 } from 'three/webgpu';
 import { Fn, If, float, max, select, sqrt, uniform, vec2, vec3, exp, abs, clamp, PI } from 'three/tsl';
+import { shared } from '../gpu/uniforms.ts';
 import type { Node } from 'three/webgpu';
 import { R } from '../../sim/sphere.ts';
 
@@ -58,7 +59,7 @@ export const CLEAR_AIR: Air = {
 const rgb = (c: Color) => new Vector3(c.r, c.g, c.b);
 
 /** The air's uniforms. The stage thickens the haze for weather and the Storm by setting these each frame. */
-export const AIR = {
+export const AIR = shared({
   bottom: uniform(R),
   top: uniform(R + CLEAR_AIR.height),
   rayleigh: uniform(rgb(CLEAR_AIR.rayleigh)),
@@ -72,7 +73,7 @@ export const AIR = {
   ozoneWidth: uniform(CLEAR_AIR.ozoneWidth),
   groundAlbedo: uniform(rgb(CLEAR_AIR.groundAlbedo)),
   lightAirMass: uniform(CLEAR_AIR.lightAirMass),
-};
+});
 
 /** Sets the air's uniforms from a description, keeping the planet's radius. */
 export function setAir(a: Air, bottom = R): void {

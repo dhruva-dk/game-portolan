@@ -1,10 +1,10 @@
 // The WebGPU renderer: three's WebGPURenderer on the WebGPU backend and nothing else. There is no WebGL path; a
 // browser without a WebGPU adapter stops here with a clear error.
 //
-// The frame is drawn below the screen's resolution and reconstructed to it by the temporal upscaler in post.ts, so the
-// renderer's own pixel ratio is the screen's, up to the floor's panel: every pass that wants fewer pixels asks for
-// them itself.
-import { WebGPURenderer, NoToneMapping, SRGBColorSpace } from 'three/webgpu';
+// The frame is drawn below the screen's resolution and reconstructed by the temporal upscaler in post.ts to the
+// canvas, which holds the screen's pixels up to three quarters of the floor's panel each way: every pass that wants
+// fewer pixels asks for them itself.
+import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, type Node } from 'three/webgpu';
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
 import { batchSubmits } from './submits.ts';
@@ -19,13 +19,28 @@ export interface GpuInfo {
   form: keyof typeof RENDER_SCALE;
 }
 
-/** The share of the screen's pixels the scene is drawn at before the upscaler, for each kind of device. */
-export const RENDER_SCALE = { phone: 0.5, tablet: 0.62, desktop: 0.75 } as const;
+// three gives a texture node made without uvs, and every sample taken of one, a uniform for its texture's uv transform,
+// kept among each object's own uniforms and brought up to date for every object drawn. The planet's shaders take
+// samples by the hundred and hardly any of their textures has a transform: on the iPad these uniforms were most of
+// what each draw sent to the GPU. A texture node transforms its uvs only if its texture has a transform.
+const IDENTITY = new Matrix3();
+const transformed = TextureNode.prototype.getTransformedUV as (this: TextureNode, uv: Node) => Node;
+TextureNode.prototype.getTransformedUV = function (this: TextureNode, uv: Node): Node {
+  const t = this.value;
+  if (t.matrixAutoUpdate) t.updateMatrix();
+  return t.matrix.equals(IDENTITY) ? uv : transformed.call(this, uv);
+} as typeof TextureNode.prototype.getTransformedUV;
 
-/** The most pixels the canvas holds: the panel of an M1 iPad Air, the floor. A screen set to show more than its panel
- *  has (an iPad's More Space), or a larger panel, gets this many and is stretched to fit, rather than every pass after
- *  the upscaler paying for pixels the floor can't afford. */
-const MAX_PIXELS = 2360 * 1640;
+/** The share of the canvas's width the scene is drawn at before the upscaler, for each kind of device, at most. */
+export const RENDER_SCALE = { phone: 0.66, tablet: 0.83, desktop: 1 } as const;
+/** The least it is drawn at, when the GPU is slowest (resolution.ts). */
+export const RENDER_FLOOR = { phone: 0.48, tablet: 0.56, desktop: 0.66 } as const;
+
+/** The most pixels the canvas holds: three quarters of the width and height of an M1 iPad Air's panel, the floor. The
+ *  scene is drawn at well under this and brought up by the upscaler, and past this many the passes after it (the
+ *  upscaler's own, the bloom, the finish) cost the floor more than they show; the screen stretches the canvas to fit,
+ *  and the chart drawn over it is the page's, at the panel's own pixels. */
+const MAX_PIXELS = 1770 * 1230;
 
 /** The canvas's pixels per CSS pixel for a canvas w × h CSS pixels. */
 export const pixelRatio = (w: number, h: number): number =>

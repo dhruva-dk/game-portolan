@@ -10,7 +10,17 @@ import { R } from '../../sim/sphere.ts';
 
 export const MAX_LIFTS = 5;
 
-export const P = {
+/**
+ * Puts uniforms every shader reads alike in the render group: one buffer for each shader that reads them, set once a
+ * render, instead of three's default, a copy in every object's own uniforms written again for each object every frame.
+ * On the iPad each draw's own uniforms had grown to two kilobytes of these, sent to the GPU process draw by draw.
+ */
+export function shared<T extends object>(uniforms: T): T {
+  for (const u of Object.values(uniforms) as { isNode?: boolean; setGroup(g: unknown): unknown }[]) if (u.isNode) u.setGroup(renderGroup);
+  return uniforms;
+}
+
+export const P = shared({
   /** Seconds on the clock every animated thing shares. */
   time: uniform(0),
   /** Seconds since the last frame. */
@@ -53,13 +63,10 @@ export const P = {
   space: uniform(0),
   /** The water the regions' events move: each disc's middle (xyz) and how far it moves the sea now (w), and its
    *  radius, fade and region channel; liftOn says whether any moves it at all. */
-  liftAt: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4()), 'vec4').setGroup(renderGroup),
-  liftR: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4(1, 1, 0, 0)), 'vec4').setGroup(renderGroup),
+  liftAt: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4()), 'vec4'),
+  liftR: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4(1, 1, 0, 0)), 'vec4'),
   liftOn: uniform(0),
-};
-// one buffer for each shader that reads them, set once a render, instead of three's default: a copy in every object's
-// own uniforms, written again for each object every frame
-for (const u of Object.values(P)) u.setGroup(renderGroup);
+});
 
 /** Lightning striking now, as the bolts set it (actors/lightning.ts): where its channel enters the cloud, and how
  *  bright its stroke is, 0…1. The clouds light up round it, and the whole sky flashes by how near it is. */

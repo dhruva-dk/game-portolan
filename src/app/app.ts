@@ -126,6 +126,8 @@ export class App {
     this.tips = new Tips(options.capture || !!options.autoplay);
     this.tip = tipCard({ parent: this.shell.root, className: 'pui-tip' });
     this.loop = new Loop((f) => this.frame(f));
+    // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
+    this.loop.frameRate = 30;
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
     this.audio.unlock();

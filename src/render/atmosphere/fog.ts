@@ -34,7 +34,7 @@ import { EYE, MOON_RADIUS, SUN_RADIUS, lightTransmittance } from './luts.ts';
 import { skyLight } from './light.ts';
 import { SHADE, cloudShade, moonShade, sunShade } from './shade.ts';
 import { MAP_SIZE, SHADOW_REACH, SPLITS } from './shadows.ts';
-import { P } from '../gpu/uniforms.ts';
+import { P, shared } from '../gpu/uniforms.ts';
 import { PARKED } from '../gpu/parked.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 import { loop } from '../gpu/tsl.ts';
@@ -74,7 +74,7 @@ const lit = [volume(), volume()];
 /** The light gathered and the light kept from the eye to each slice's far side. */
 const summed = volume();
 
-const U = {
+const U = shared({
   /** The view-projection of the frame before, for finding where a cell was. */
   before: uniform(new Matrix4()),
   /** The eye's forward, for the depth of a point along the view. */
@@ -88,7 +88,7 @@ const U = {
   /** Mistwood's mist: its middle (a unit vector) and radius in metres; and how thick, 0…1. */
   mist: uniform(new Vector4(0, 1, 0, 1)),
   mistAmount: uniform(0),
-};
+});
 
 /** The weather's haze: each system's middle (unit) and radius; its extinction at the sea (with its strength), its
  *  albedo, the height it thins by e over, and 1 for ash; its tint. */
@@ -279,7 +279,7 @@ const dispatch = (kernel: Node, size: number[], group: number[]): ComputeNode =>
 /** While the froxels are parked, the mist the eye stands in, worked out along each ray: the haze over the sea
  *  (extinction per metre at the water, and the height it thins by e over) with the sea smoke and Mistwood's mist
  *  folded in, and the weather's haze round the eye (the same, its albedo, and 1 for ash) with its tint. */
-const MIST = {
+const MIST = shared({
   haze: uniform(new Vector2(HAZE, HAZE_HEIGHT)),
   weather: uniform(new Vector4(0, 100, 0.97, 0)),
   tint: uniform(new Vector3(1, 1, 1)),
@@ -288,7 +288,7 @@ const MIST = {
   sun: uniform(new Vector3()),
   moon: uniform(new Vector3()),
   sky: uniform(new Vector3()),
-};
+});
 
 /** How often the mist's light is worked out again, seconds. */
 const MIST_LIGHT_EVERY = 0.25;

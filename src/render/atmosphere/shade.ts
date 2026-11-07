@@ -4,6 +4,7 @@
 // the sails alike, and lies where the sun puts it rather than straight under the cloud.
 import { NearestFilter, StorageTexture, Vector3, type Node } from 'three/webgpu';
 import { abs, clamp, float, floor, fract, ivec2, max, mix, smoothstep, texture, uniform, vec2 } from 'three/tsl';
+import { shared } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
 type V3 = Node<'vec3'>;
@@ -16,10 +17,13 @@ export const SHADE_SIZE = 128;
 function shadeMap(): StorageTexture {
   const t = new StorageTexture(SHADE_SIZE, SHADE_SIZE);
   t.minFilter = t.magFilter = NearestFilter;
+  // (three would otherwise make its mips after every frame's march, for nothing that reads them)
+  t.generateMipmaps = false;
+  (t as unknown as { mipmapsAutoUpdate: boolean }).mipmapsAutoUpdate = false;
   return t;
 }
 
-export const SHADE = {
+export const SHADE = shared({
   /** The share of the light left after the clouds, in r; 1 where there are none. */
   map: shadeMap(),
   /** The square's middle (on the sea under the eye) and its axes across the beam. */
@@ -32,7 +36,7 @@ export const SHADE = {
   sun: uniform(1),
   /** 0 until the map has been drawn once, or while there are no clouds. */
   on: uniform(0),
-};
+});
 
 /** The share of the light the map follows that reaches p through the clouds. */
 export function cloudShade(p: V3): F {

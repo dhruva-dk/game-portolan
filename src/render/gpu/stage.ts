@@ -2,12 +2,13 @@
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type Object3D, type WebGPURenderer } from 'three/webgpu';
-import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
+import { RENDER_FLOOR, RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { shape } from './shape.ts';
 import { copyTogether } from './behind.ts';
 import { ColourScript, rising } from './grade.ts';
-import { ClusteredLighting } from './clusters.ts';
+import { ClusteredLighting, GRID_RATIO } from './clusters.ts';
+import { Resolution } from './resolution.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
@@ -98,8 +99,10 @@ export class GpuStage {
   readonly #wind = new Vector3();
   readonly #forward = new Vector3();
   readonly #buffer = new Vector2();
-  /** The scene's resolution as a share of the screen's. */
-  readonly #scale: number;
+  /** The share of the screen the scene is drawn at, held to the frame rate. */
+  readonly #resolution: Resolution;
+  /** Its largest, the share the light grid is laid over. */
+  readonly #most: number;
   readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
@@ -143,10 +146,11 @@ export class GpuStage {
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.#scale = RENDER_SCALE[form];
-    // every point light without a shadow is clustered, over the frame as the scene pass draws it
-    renderer.lighting = new ClusteredLighting(this.#scale);
-    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay, this.atmosphere.sun);
+    this.#most = RENDER_SCALE[form];
+    this.#resolution = new Resolution(this.#most, RENDER_FLOOR[form]);
+    // every point light without a shadow is clustered, over the frame as the scene pass draws it at its largest
+    renderer.lighting = new ClusteredLighting(this.#most);
+    this.post = new Post(renderer, this.scene, this.camera, this.#most, this.overlay, this.atmosphere.sun);
     this.resize();
   }
 
@@ -251,7 +255,10 @@ export class GpuStage {
       (0.4 + 0.6 * poleNight) * calm, this.#mist, LANTERNS, this.atmosphere.shadows.slices);
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
     shape.system('clouds');
-    this.clouds.march(this.renderer, size.x * this.#scale, size.y * this.#scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
+    const scale = this.#resolution.scale;
+    // (a pixel of the scene as drawn now, to the light grid's, which PassNode floors as it does the scene)
+    GRID_RATIO.value = Math.floor(size.x * this.#most) / Math.max(1, Math.floor(size.x * scale));
+    this.clouds.march(this.renderer, size.x * scale, size.y * scale, eye, this.#forward, EYE.viewProjection.value as Matrix4);
     shape.system('flora');
     this.flora.update(this.renderer, cam);
     this.ocean.flow.set(v.currents);
@@ -261,7 +268,7 @@ export class GpuStage {
     shape.system('land');
     this.terrain.update(eye);
     this.scans.update(eye, dt);
-    this.beacons.update(v.time, P.night.value as number, this.sun);
+    this.beacons.update(v.time, P.night.value as number, this.sun, eye);
     this.landmarks.update(P.night.value as number, v.time, v.events, this.sun);
     this.floes.update(v.floes ?? v.time, v.tide, P.night.value as number);
     this.rocks.update(v.events, v.time);
@@ -282,6 +289,7 @@ export class GpuStage {
     }
     this.post.focus(v.focus ?? null);
     this.post.render(dt);
+    if (this.#resolution.update()) this.post.setScale(this.#resolution.scale);
     if (!this.#checked) {
       this.#checked = true;
       if (this.post.sceneDepth !== SCENE_DEPTH) console.warn(`the scene is drawn ${this.post.sceneDepth} renders deep, not ${SCENE_DEPTH}: its materials were built for the wrong depth and are built again`);
@@ -476,6 +484,6 @@ export class GpuStage {
 
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
-    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
+    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#resolution.scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
   }
 }

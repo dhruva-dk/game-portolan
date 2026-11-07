@@ -32,7 +32,7 @@ import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, type Waves } from './waves.ts';
 import { skyLight, sunlight, moonlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
-import { LAMP, P } from '../gpu/uniforms.ts';
+import { LAMP, P, shared } from '../gpu/uniforms.ts';
 import { seaLevelNode } from '../lift.ts';
 import type { Coast } from './coast.ts';
 import type { Territory } from './territory.ts';
@@ -90,7 +90,7 @@ function polarGrid(): BufferGeometry {
 // ---------------------------------------------------------------- the frames
 
 /** The grid's centre and axes, and the two frames the waves are laid in with their weights. */
-export const FRAME = {
+export const FRAME = shared({
   nadir: uniform(new Vector3(0, 1, 0)),
   gridE1: uniform(new Vector3(1, 0, 0)),
   gridE2: uniform(new Vector3(0, 0, -1)),
@@ -100,16 +100,16 @@ export const FRAME = {
   axis1: uniform(new Vector3(1, 0, 0)),
   /** cos and sin of the crossfade's angle: (1, 0) with one frame. */
   weight: uniform(new Vector2(1, 0)),
-};
+});
 
 /** The water's light (its colour and clarity are each region's: seaTint.ts waterAt). */
-export const WATER = {
+export const WATER = shared({
   /** The colour light takes through a thin crest. */
   crest: uniform(new Vector3(0.1, 0.55, 0.42)),
   foam: uniform(new Vector3(0.82, 0.86, 0.88)),
   /** The slope variance finer than the smallest cascade: the capillary ripples, raised by rain. */
   ripples: uniform(0.0012),
-};
+});
 
 export interface Frame { anchor: Node<'vec3'>; axis: Node<'vec3'> }
 export const FRAMES: Frame[] = [{ anchor: FRAME.anchor0, axis: FRAME.axis0 }, { anchor: FRAME.anchor1, axis: FRAME.axis1 }];

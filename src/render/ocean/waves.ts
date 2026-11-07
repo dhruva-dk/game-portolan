@@ -23,13 +23,14 @@ import {
 } from 'three/tsl';
 import { Vector2, Vector3 } from 'three/webgpu';
 import { CASCADES, CUTS, G, N, SIZES, SWELL_SPREAD, curvatureRms, type SpectrumParams } from './spectrum.ts';
+import { shared } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
 type V2 = Node<'vec2'>;
 type U = Node<'uint'>;
 
 /** What the waves are built from and moved by. */
-export const SEA = {
+export const SEA = shared({
   windAlpha: uniform(0.01),
   windPeak: uniform(1),
   windDir: uniform(new Vector2(1, 0)),
@@ -46,7 +47,7 @@ export const SEA = {
   foamLife: uniform(2.8),
   /** Each cascade's RMS curvature, 1/m (spectrum.ts curvatureRms): how hard its waves focus light into caustics. */
   curvature: uniform(new Vector3(0.05, 0.5, 5)),
-};
+});
 
 export function setSpectrum(p: SpectrumParams, seed: number): void {
   SEA.windAlpha.value = p.windAlpha;
