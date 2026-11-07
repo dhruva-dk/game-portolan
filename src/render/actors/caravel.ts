@@ -85,7 +85,7 @@ const STERN_Y = rail(0), STERN_Z = zOf(0, STERN_Y), BOWSPRIT = new V3(0, rail(1)
 // ---------------------------------------------------------------- geometry builder
 
 /** Parts index the body material's looks. */
-const P = { hull: 0, gold: 1, bulwark: 2, deck: 3, accent: 6, wood: 7, rope: 8, tar: 9, wisp: 11, bronze: 12, iron: 13, glass: 14 } as const;
+const P = { hull: 0, gold: 1, bulwark: 2, deck: 3, accent: 6, wood: 7, rope: 8, tar: 9, wisp: 11, bronze: 12, iron: 13, glass: 14, lantern: 15 } as const;
 
 class Builder {
   pos: number[] = []; nor: number[] = []; uv: number[] = []; part: number[] = []; aux: number[] = []; main: number[] = []; idx: number[] = [];
@@ -169,12 +169,27 @@ function tube(b: Builder, pts: THREE.Vector3[], r: number, part: number, sides =
   b.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), segs, r, sides, false), part, undefined, (u, v) => [u * 20, v]);
 }
 
-function lantern(b: Builder, at: THREE.Vector3, size: number, segs = 10): void {
-  const pts = [0, 0.2, 0.45, 0.5, 0.45, 0.2, 0].map((r, i) => new THREE.Vector2(Math.max(0.001, r * size), (i / 6 - 0.5) * size * 1.3));
-  b.add(new THREE.LatheGeometry(pts, segs), P.wisp, M(at.x, at.y, at.z));
-  b.add(new THREE.CylinderGeometry(size * 0.22, size * 0.22, size * 0.12, 8), P.gold, M(at.x, at.y + size * 0.68, at.z));
-  b.add(new THREE.CylinderGeometry(size * 0.22, size * 0.22, size * 0.12, 8), P.gold, M(at.x, at.y - size * 0.68, at.z));
-  b.add(new THREE.ConeGeometry(size * 0.3, size * 0.4, 8), P.gold, M(at.x, at.y + size * 0.92, at.z));
+/**
+ * A stern lantern centred on `at`, `size` metres across its roof: six panes of glass in a gilt frame (a base and the
+ * drop under it, a post at each corner, a band, the roof and its finial). The wisp burns small and bright inside;
+ * the glass is drawn with it (the material finds it along the ray through the pane), so the glass carries the
+ * lantern's size as aux.
+ */
+function lantern(b: Builder, at: THREE.Vector3, size: number, hi: boolean): void {
+  const s = size, turn = Math.PI / 6;
+  // (each hexagon turned so a pane, not a post, faces aft)
+  const at6 = (y: number) => M(at.x, at.y + y * s, at.z, 0, turn);
+  b.add(new THREE.CylinderGeometry(0.38 * s, 0.34 * s, 0.8 * s, 6, 1, true), P.lantern, at6(0), undefined, s);
+  b.add(new THREE.CylinderGeometry(0.4 * s, 0.36 * s, 0.1 * s, 6), P.gold, at6(-0.45));
+  b.add(new THREE.ConeGeometry(0.15 * s, 0.22 * s, 6), P.gold, M(at.x, at.y - 0.61 * s, at.z, Math.PI, turn));
+  b.add(new THREE.CylinderGeometry(0.44 * s, 0.42 * s, 0.07 * s, 6), P.gold, at6(0.43));
+  b.add(new THREE.ConeGeometry(0.46 * s, 0.32 * s, 6), P.gold, at6(0.62));
+  b.add(new THREE.SphereGeometry(0.07 * s, 6, 4), P.gold, at6(0.83));
+  if (!hi) return;
+  for (let k = 0; k < 6; k++) {
+    const a = turn + (k * Math.PI) / 3;
+    b.add(new THREE.CylinderGeometry(0.03 * s, 0.03 * s, 0.84 * s, 4), P.gold, M(at.x + Math.sin(a) * 0.37 * s, at.y, at.z + Math.cos(a) * 0.37 * s));
+  }
 }
 
 /** A window lit from within, in a gilt frame, on a face whose frame is `m`; seen from afar, just the light. */
@@ -303,8 +318,9 @@ function hullGeometry(hi: boolean): THREE.BufferGeometry {
     for (const x of [-1, 0, 1]) {
       const big = x === 0, base = new V3(x * wt(STERN_Y) * 0.8, STERN_Y + (big ? 0.6 : 0.1), STERN_Z - 0.05);
       const at = base.clone().add(new V3(0, big ? 0.85 : 0.6, -0.35));
-      rod(b, base, at.clone().add(new V3(0, -0.4, 0)), 0.05, 0.04, P.gold, 5);
-      lantern(b, at, big ? 0.85 : 0.55, hi ? 10 : 6);
+      const size = big ? 0.85 : 0.55;
+      rod(b, base, at.clone().add(new V3(0, -0.62 * size, 0)), 0.05, 0.04, P.gold, 5);
+      lantern(b, at, size, hi);
     }
     // the rudder, hung on the sternpost
     const k0 = keel(0);

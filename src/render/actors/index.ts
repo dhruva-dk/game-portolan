@@ -19,8 +19,13 @@ import { Projectiles } from './projectiles.ts';
 import { Wakes } from './wakes.ts';
 import { Whales } from './whale.ts';
 import type { ActorEvent, ActorsView, EruptionView, HitMarker, Juice, ShipView, Vec3, Weapon } from './view.ts';
+import { EXPOSURE } from '../gpu/grade.ts';
 import { MARK_KIND, addMark, clearMarks } from '../gpu/marks.ts';
 import { heightAt } from '../../sim/world/index.ts';
+
+/** The most the stern lantern's light may be, times the exposure: a sail a couple of metres over it comes out about
+ *  as bright as the screen's white, which leaves the bloom over it a glow rather than a blaze. */
+const LANTERN_LIGHT = 34;
 
 export * from './view.ts';
 export { lookOf, SAIL_COLOURS, PATTERNS, HULL_PAINTS, WAKES, FIGUREHEADS } from './cosmetics.ts';
@@ -259,14 +264,21 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     // and the waves she pushes aside, which the sea is drawn with and other hulls ride over
     if (d < 320 && pose.alt < 0.6 && !sinking) RIPPLES.sail(v.id, onSea(m.toWorld(BOW, tmp), 0, tmp), f.fwd, v.speed, 2.6);
     if (d < 220 && !sinking) fx.wounded(m.toWorld(DECK, tmp), v.hull, dt);
-    // the spirit lantern, sized so it still reads as a point of light at the edge of sight
+    // the spirit lantern, sized so it still reads as a point of light at the edge of sight. Near, the lantern drawn
+    // on her stern is the light, its glass and the wisp inside, and the glow only comes in as it shrinks to a few
+    // pixels: over a lantern seen whole it would wash out the frame and the glass
     if (pose.night > 0.02 && (!sinking || f.sink < 1)) {
       const at = m.toWorld(LANTERN, tmp), n = pose.night * (sinking ? 1 - f.sink : 1);
       const flick = 0.9 + Math.sin(t * 9 + v.id) * 0.05 + Math.sin(t * 23 + v.id * 3) * 0.05;
-      fx.light(at, Math.max(1.1, d * 0.013), f.lantern, (1.4 + 2.2 * n) * n * flick);
-      fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick);
-      // and it lights her deck, her sails and the water round her
-      if (d < 260) fx.lights.hold(`lantern${v.id}`, at, f.lantern, 260 * n * flick, 34, 1.6);
+      const far = THREE.MathUtils.smoothstep(d, 30, 90);
+      if (far > 0) {
+        fx.light(at, Math.max(1.1, d * 0.013), f.lantern, (1.4 + 2.2 * n) * n * flick * far);
+        fx.light(at, Math.max(0.45, d * 0.005), WARM, 5 * n * flick * far);
+      }
+      // and it lights her deck, her sails and the water round her: never brighter on the screen than LANTERN_LIGHT
+      // allows, whatever the hour's exposure, so the mizzen's canvas over it is lit warm and doesn't blaze
+      const lit = Math.min(260 * n, LANTERN_LIGHT / (EXPOSURE.value as number)) * flick;
+      if (d < 260) fx.lights.hold(`lantern${v.id}`, at, f.lantern, lit, 34, 1.6);
       // the wisp at the main truck: past about 180 m the stern lantern has gone under the curve, but this shows to 240 m
       // (not on your own ship, where it would hang at the top of the view)
       if (v.id !== player) fx.light(m.toWorld(MASTHEAD, tmp), Math.max(0.4, d * 0.009), f.lantern, (0.9 + 1.6 * n) * n * flick);

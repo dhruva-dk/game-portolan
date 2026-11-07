@@ -1,7 +1,8 @@
 // The caravel's hull and sails as node materials: paint, cloth and wear read from caravel.ts's uniforms, lit by the atmosphere's lights and shadowed by the sun's cascades.
 //
-// The hull is one mesh coloured by part (aPart): lacquered planks with the gun deck's band, the castles' gilt lattice
-// and the copper below the water; gilt, the deck, dark wood, rope, iron, bronze, the stern's windows and the wisp.
+// The hull is one mesh coloured by part (aPart): planks under a coloured lacquer with the gun deck's band, the castles'
+// gilt lattice and the copper below the water; gilt, the deck, dark wood, rope, iron, bronze, the stern's windows, the
+// lanterns' glass and the wisp.
 // Every part's colour, roughness, metalness and normal strength is worked out as a chain of selects rather than
 // branches, so the four outputs share one evaluation of the planks.
 //
@@ -19,10 +20,11 @@ import {
   DoubleSide, MeshPhysicalNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture,
 } from 'three/webgpu';
 import {
-  Fn, abs, atan, attribute, cameraPosition, clamp, cos, cross, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
-  int, normalGeometry, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture,
-  uv, vec2, vec3,
+  Fn, abs, atan, attribute, cameraPosition, clamp, cos, cross, diffuseColor, dot, float, floor, fract, fwidth, length, max, min, mix, mod,
+  modelWorldMatrix, normalLocal, normalMap, int, normalGeometry, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow,
+  screenUV, select, sin, smoothstep, step, texture, uv, vec2, vec3, vec4,
 } from 'three/tsl';
+import { EXPOSURE } from '../../gpu/grade.ts';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
@@ -43,6 +45,35 @@ function mainmast(u: Uniforms, p: V3): V3 {
   const n = normalLocal;
   normalLocal.assign(vec3(n.x.mul(c).sub(n.y.mul(s)), n.x.mul(s).add(n.y.mul(c)), n.z));
   return vec3(q.x.mul(c).sub(q.y.mul(s)), q.x.mul(s).add(q.y.mul(c)), q.z).add(foot).sub(vec3(0, mast.z, mast.w).mul(on));
+}
+
+/** The scan's mean luminance (linear), which the grain is read against. */
+const WOOD_LUM = 0.083;
+/** How much of the colour on the planks is the lacquer's; the rest is the wood's own. */
+const LACQUER = 0.86;
+/** The planks' normal-map strength. */
+const PLANK_RELIEF = 1.8;
+
+/**
+ * A stern lantern's glass: dimly lit from within, and the wisp seen through it, a small hot core found where the
+ * ray through the pane passes the lantern's middle, so it sits right from every side. The glass carries the
+ * lantern's size (aux), and its middle lies back from the pane along the normal, and level with the pane's middle.
+ * The core never grows narrower than a pixel and a half, keeping its light, so a far lantern holds a steady point.
+ * Both are given as they come out on the screen, whatever the exposure: the core a few times the screen's white,
+ * the glass well under it, so the bloom they make stays a small one.
+ */
+function lanternLight(wisp: V3, night: F, flick: F): V3 {
+  const size = attribute<'float'>('aAux');
+  const n = normalGeometry, out = vec3(n.x, 0, n.z).normalize();
+  const middle = positionGeometry.sub(out.mul(size.mul(0.34))).sub(vec3(0, uv().y.sub(0.5).mul(size.mul(0.8)), 0));
+  const centre = modelWorldMatrix.mul(vec4(middle, 1)).xyz;
+  const ray = positionWorld.sub(cameraPosition).normalize(), to = centre.sub(cameraPosition);
+  const miss = length(to.sub(ray.mul(dot(to, ray))));
+  const r = size.mul(0.1), spread = max(r, fwidth(miss).mul(1.5));
+  const core = smoothstep(spread, spread.mul(0.25), miss).mul(r.div(spread).pow(2));
+  const halo = smoothstep(size.mul(0.4), 0, miss).pow(2);
+  const glass = wisp.mul(night.mul(0.35).add(0.25)).mul(halo.mul(0.7).add(0.3));
+  return glass.add(mix(wisp, vec3(1), 0.55).mul(core).mul(night.add(2.5))).mul(flick).div(EXPOSURE);
 }
 
 /** The hull, figurehead and turret: one material a ship, coloured by part. */
@@ -68,9 +99,12 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   const wood = texture(tex.hull_d).rgb.toVar('shipWood');
   const lum = dot(wood, vec3(0.3, 0.55, 0.15)).toVar('shipLum');
 
-  // lacquer over planks: the grain shows through the gloss
-  const gloss = lum.mul(1.3).add(0.55);
-  const lacquer = select(is(6), accent, hull).mul(gloss);
+  // the planks are the scan's own, warmed as oiled oak; the captain's colour is a lacquer over them, thin enough that
+  // each plank's tone, its seams and its grain come through it, and a little of the wood's own brown with them
+  const bare = wood.mul(vec3(1.3, 1.02, 0.76));
+  const grain = clamp(lum.div(WOOD_LUM), 0.2, 2);
+  const stain = (c: V3): V3 => mix(bare, c.mul(grain), LACQUER);
+  const lacquer = stain(select(is(6), accent, hull));
   // the gun deck's band between the wales, in the accent
   const band = smoothstep(-0.36, -0.33, h).mul(float(1).sub(smoothstep(0.86, 0.89, h)));
   // the castles' sides: a gilt lattice over the lacquer, and gilt mouldings under the band and at the water
@@ -84,7 +118,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   ).toVar('shipGold');
   // below the water: dark copper sheathing
   const bottom = smoothstep(WL - 0.02, WL - 0.06, lp.y).toVar('shipBottom');
-  const planks = mix(mix(mix(lacquer, accent.mul(gloss), band), trim, gold), vec3(0.13, 0.17, 0.15).mul(lum.add(0.5)), bottom);
+  const planks = mix(mix(mix(lacquer, stain(accent), band), trim, gold), vec3(0.13, 0.17, 0.15).mul(lum.add(0.5)), bottom);
 
   const flickWin = sin(P.time.mul(5).add(lp.x.mul(4)).add(lp.z)).mul(0.1).add(0.9);
   const flickWisp = sin(P.time.mul(7).add(lp.y.mul(3))).mul(sin(P.time.mul(3.1))).mul(0.15).add(0.85);
@@ -99,6 +133,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
     [is(8), vec3(0.16, 0.12, 0.09)],
     [is(9), vec3(0.045, 0.035, 0.03).mul(lum.add(0.6))],
     [is(14), vec3(0.02)],
+    [is(15), vec3(0.02, 0.024, 0.024)],
     [is(11), wisp.mul(0.4)],
     [is(12), vec3(0.62, 0.42, 0.22).mul(lum.mul(0.4).add(0.8))],
     [is(13), vec3(0.08, 0.085, 0.09)],
@@ -108,10 +143,12 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
     [is(2), float(0.6)],
     [is(6), lum.mul(0.3).add(0.32)],
     [is(1), float(0.28)], [is(3), float(0.7)], [is(7), float(0.8)], [is(8), float(0.95)], [is(9), float(0.45)],
-    [is(14), float(0.15)], [is(11), float(0.6)], [is(12), float(0.32)], [is(13), float(0.45)],
+    [is(14), float(0.15)], [is(15), float(0.06)], [is(11), float(0.6)], [is(12), float(0.32)], [is(13), float(0.45)],
   ], float(0.75));
   const metal = pick<F>([[is(0), gold.mul(0.9)], [is(1), float(0.95)], [is(12), float(1)], [is(13), float(0.7)]], float(0));
-  const bumps = pick<F>([[is(1), float(0)], [is(8), float(0)], [is(14), float(0)], [is(11), float(0)], [is(12), float(0.3)], [is(13), float(0.3)]], float(1));
+  const bumps = pick<F>([
+    [is(1), float(0)], [is(8), float(0)], [is(14), float(0)], [is(15), float(0)], [is(11), float(0)], [is(12), float(0.3)], [is(13), float(0.3)],
+  ], float(1));
 
   // the windows, lit by the wisp and a warmer lamp behind; the wisp itself
   const lamps = pick<V3>([
@@ -146,7 +183,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   pierced = pierced.toVar('shipPierced');
   splinters = splinters.toVar('shipSplinters');
   soot = soot.toVar('shipSoot');
-  const mark = select(is(11).or(is(14)).or(is(1)).or(is(12)), float(0), float(1));
+  const mark = select(is(11).or(is(14)).or(is(15)).or(is(1)).or(is(12)), float(0), float(1));
   const fresh = vec3(0.24, 0.15, 0.075).mul(lum.mul(0.5).add(0.75));
   const holed = mix(mix(charred.mul(float(1).sub(soot.mul(mark).mul(0.85))), fresh, splinters.mul(mark)), vec3(0.008, 0.006, 0.005), pierced.mul(mark));
 
@@ -163,7 +200,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   // up (the decks, the rail's cap, the castles' tops, the tops of the casks and the capstan), deeper where it drifts;
   // then the spray freezes on her as glaze, thickest forward where it flies and on the faces that stand up to it. Where
   // either lies the water on her is ice, not wet. Nothing settles on the lit windows or the wisp.
-  const lamp = select(is(11).or(is(14)), float(0), float(1));
+  const lamp = select(is(11).or(is(14)).or(is(15)), float(0), float(1));
   const drift = texture(tex.noise, lp.xz.mul(0.37)).g.mul(0.6).add(texture(tex.noise, lp.xz.mul(1.9).add(lp.y)).r.mul(0.4)).toVar('shipDrift');
   const up = normalGeometry.y;
   const snow = smoothstep(0.35, 0.75, up.add(drift.sub(0.5).mul(0.7)))
@@ -205,8 +242,10 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   m.metalnessNode = metal.mul(float(1).sub(crust)).mul(float(1).sub(frozen));
   m.clearcoatNode = max(max(select(lacquered, float(0.75), float(0)).mul(float(1).sub(max(scorch, soot.mul(mark)))), wet).mul(float(1).sub(crust)), glaze).mul(float(1).sub(max(snow, rime)));
   m.clearcoatRoughnessNode = mix(mix(lum.mul(0.08).add(0.08), float(0.03), wet), float(0.05), glaze);
-  m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(0.8).mul(bumps).mul(float(1).sub(max(snow, rime).mul(0.85))).mul(float(1).sub(glaze.mul(0.4))));
-  m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP);
+  // (the planks' relief deeper than the rest, so the seams still read at the scene's three quarters)
+  const relief = mix(select(lacquered, float(PLANK_RELIEF), float(0.8)), float(0.8), gold);
+  m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(relief).mul(bumps).mul(float(1).sub(max(snow, rime).mul(0.85))).mul(float(1).sub(glaze.mul(0.4))));
+  m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP).add(select(is(15), lanternLight(wisp, night, flickWisp), vec3(0)));
   return m;
 }
 
