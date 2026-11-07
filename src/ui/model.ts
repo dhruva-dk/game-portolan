@@ -233,31 +233,6 @@ export const CONSUMABLE: Record<ConsumableId, { name: string; stack: number; sec
   fullRepair: { name: 'Full Repair', stack: 2, seconds: 5.0, text: 'Full hull' },
 };
 
-export interface GaleRegion {
-  index: number;
-  /** False for regions too far off the Gale's road to glide to. */
-  open: boolean;
-  /** Captains heading there now. */
-  heading: number;
-}
-
-export interface GaleModel {
-  /** Seconds left to choose, and the whole window. */
-  seconds: number;
-  total: number;
-  /** The point under the sun, in degrees: day is the half facing it. */
-  sun: { lat: number; lon: number };
-  /** Where you ride, in degrees, and the Gale's road ahead from there to where it lets go. */
-  at: { lat: number; lon: number };
-  path: { lat: number; lon: number }[];
-  regions: GaleRegion[];
-  /** The region you have marked to come down in, or -1. */
-  pick: number;
-  /** The region under you now. */
-  below: number;
-  ships: number;
-}
-
 export type Slot =
   | { kind: 'empty' }
   | { kind: 'weapon'; weapon: WeaponId; rarity: Rarity; ammo: number; mag: number; /** 0–1 while reloading, else 0. */ reload: number }
@@ -374,11 +349,6 @@ export interface DeathModel {
   kills: number;
   damage: number;
   survived: number;
-}
-
-export interface SpectateModel {
-  target: Mark & { name: string; rank: string; kills: number; shield: number; hull: number };
-  ships: number;
 }
 
 export interface VictoryModel {

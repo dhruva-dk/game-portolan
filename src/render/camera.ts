@@ -17,6 +17,9 @@ export interface CameraTarget {
   heading: V3;
   /** Height of the point followed above sea level, in metres (a ship's deck is about 2.5). */
   height?: number;
+  /** Orbit: how far the view is pulled from the point onto the line between day and night (0.8 unless given; the
+   *  Gale looks straight down on its course). */
+  pull?: number;
 }
 
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
@@ -121,7 +124,7 @@ export class CameraRig {
     this.fwd.addScaledVector(pu, -this.fwd.dot(pu)).normalize();
     this.seeded = true;
 
-    if (mode === 'orbit') this.orbitPose(pu, sun, dt);
+    if (mode === 'orbit') this.orbitPose(pu, sun, dt, target.pull ?? 0.8);
     else this.groundPose(mode, pu);
 
     // the flight between modes: round the planet, not through it
@@ -189,10 +192,10 @@ export class CameraRig {
   }
 
   /** The whole planet, turned so the line between day and night runs across it. */
-  private orbitPose(up: THREE.Vector3, sun: THREE.Vector3, dt: number): void {
+  private orbitPose(up: THREE.Vector3, sun: THREE.Vector3, dt: number, pull: number): void {
     this.spun += this.orbitSpin * dt;
     // the target pulled most of the way onto the terminator, a little into the day
-    const dir = new THREE.Vector3().copy(up).addScaledVector(sun, -up.dot(sun) * 0.8);
+    const dir = new THREE.Vector3().copy(up).addScaledVector(sun, -up.dot(sun) * pull);
     if (dir.lengthSq() < 1e-4) dir.copy(this.fwd);
     dir.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.spun);
     const pos = this.pos.copy(dir).multiplyScalar(R * this.orbitDistance);

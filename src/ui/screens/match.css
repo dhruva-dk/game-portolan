@@ -3,7 +3,7 @@
 .pui-screen.s-mx > * { pointer-events: none; }
 .pui-screen.s-mx > .s-mx__box { pointer-events: auto; }
 /* the boxes over the sea keep out of the notch, the rounded corners and the home bar */
-.pui-screen.s-hud, .pui-screen.s-gale, .pui-screen.s-spec { inset: var(--st) var(--sr) var(--sb) var(--sl); }
+.pui-screen.s-hud { inset: var(--st) var(--sr) var(--sb) var(--sl); }
 .s-mx__box { position: absolute; }
 
 /* held controls */
@@ -17,18 +17,6 @@
 .s-mx__holdL { font-family: var(--f-display); font-weight: 800; font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase; }
 .s-mx__holdN { position: absolute; top: -6%; right: -6%; min-width: 1.6em; padding: 0 0.3em; border-radius: 1em; background: var(--c-wax); color: var(--c-cream); font-family: var(--f-display); font-size: var(--fs-micro); text-align: center; }
 .s-mx__holdN:empty { display: none; }
-
-/* the Gale */
-.s-gale__top { left: 50%; top: var(--sp-5); transform: translateX(-50%); padding: var(--sp-3) var(--sp-6); text-align: center; }
-.s-gale__title { font-family: var(--f-display); font-weight: 900; font-size: var(--fs-h3); letter-spacing: 0.06em; }
-.s-gale__line { font-family: var(--f-body); font-size: var(--fs-body); }
-.s-gale__go { right: var(--sp-6); bottom: var(--sp-6); width: calc(320px * var(--k)); }
-.s-gale__map { left: var(--sp-6); bottom: var(--sp-6); width: calc(400px * var(--k)); padding: var(--sp-3); display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); }
-.s-globe { display: block; width: 100%; aspect-ratio: 1; cursor: pointer; touch-action: none; }
-.s-gale__hint { font-family: var(--f-body); font-size: var(--fs-small); text-align: center; }
-.pui[data-form='phone'] .s-gale__map { left: var(--sp-4); bottom: var(--sp-3); top: calc(var(--sp-4) + 64px * var(--k)); width: auto; aspect-ratio: auto; padding: var(--sp-2); }
-.pui[data-form='phone'] .s-globe { width: auto; height: 100%; min-height: 0; flex: 1; }
-.s-gale__go .p-btn { width: 100%; }
 
 /* the HUD */
 .s-hud__vit { left: var(--sp-5); top: var(--sp-5); width: calc(300px * var(--k)); padding: var(--sp-2) var(--sp-3); display: flex; flex-direction: column; gap: var(--sp-2); }
@@ -129,10 +117,6 @@
 .s-end__stat b { font-family: var(--f-display); font-weight: 900; font-size: var(--fs-h3); }
 .s-end__stat span { font-family: var(--f-display); font-size: var(--fs-micro); letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.7; }
 .s-end__row { display: flex; gap: var(--sp-3); margin-top: var(--sp-2); }
-.s-spec__top { left: 50%; top: var(--sp-5); transform: translateX(-50%); padding: var(--sp-2) var(--sp-5); font-family: var(--f-display); font-size: var(--fs-small); }
-.s-spec__top i { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.2em; margin-right: 0.4em; }
-.s-spec__top span { font-size: var(--fs-micro); letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
-.s-spec__leave { right: var(--sp-5); top: var(--sp-5); }
 
 /* results */
 .s-res .s-page__body { align-items: flex-start; justify-content: center; }
@@ -169,7 +153,6 @@
 /* a first-time tip: under the vitals, the region and the sea's state on the HUD, above Dive on the Gale */
 .pui-tip { position: absolute; z-index: 55; }
 .pui-tip[data-at='hud'] { left: calc(var(--sl) + var(--sp-5)); top: calc(var(--st) + var(--sp-5) + 140px * var(--k) + var(--hud-state, 26px * var(--k))); }
-.pui-tip[data-at='gale'] { right: calc(var(--sr) + var(--sp-6)); bottom: calc(var(--sb) + var(--sp-6) + 110px * var(--k)); }
 .pui .pui-tip[data-at=''] { display: none; }
 .pui[data-form='phone'] .pui-tip[data-at='hud'] { top: calc(var(--st) + var(--sp-5) + 106px * var(--k) + var(--hud-state, 26px * var(--k))); }
 

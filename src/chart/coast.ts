@@ -25,8 +25,8 @@ export interface Globe {
   eye: { x: number; y: number; z: number };
   /** The cosine of the angle from `eye` to the limb: a point shows where its dot with `eye` is greater. */
   horizon: number;
-  /** Projects a point on the unit sphere to the screen, CSS pixels, into `out`. */
-  project(x: number, y: number, z: number, out: { x: number; y: number }): void;
+  /** Projects a point on the unit sphere to the screen, CSS pixels, into `out`; false when it is behind the eye. */
+  project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
 }
 
 /** The edges of a cell, by the corners they join: bottom (a-b), right (b-c), top (d-c), left (a-d). */

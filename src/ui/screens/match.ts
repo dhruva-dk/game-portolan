@@ -1,17 +1,15 @@
-// The screens over a running match, blocked out: the Gale's dive, the HUD, death and spectating, victory, and the
-// results. Over the sea only small boxes in the corners take touches; everything else lets them through to the
+// The screens over a running match, blocked out: the HUD, death, victory, and the results (the Gale and spectating
+// are drawn on the chart). Over the sea only small boxes in the corners take touches; everything else lets them through to the
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
 import {
   ABILITY_ICON, button, ceremony, chartMark, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
   rarityFrame, WEATHER_ICON, type BarHandle,
 } from '../parts/index.ts';
-import type {
-  ConsumableId, DeathModel, GaleModel, HudModel, ResultsModel, Slot, SpectateModel, VictoryModel, WeaponId,
-} from '../model.ts';
+import type { ConsumableId, DeathModel, HudModel, ResultsModel, Slot, VictoryModel, WeaponId } from '../model.ts';
 import { CONSUMABLE, WEAPON_NAME } from '../model.ts';
 import type { ScreenView } from '../shell.ts';
-import { galeGlobe, LandLayer } from './chart.ts';
+import { LandLayer } from './chart.ts';
 import { page } from './frame.ts';
 import './match.css';
 
@@ -62,36 +60,6 @@ function holdButton(cls: string, icon: string, label: string, parent: Element, w
   b.addEventListener('pointercancel', up);
   b.addEventListener('lostpointercapture', up);
   return b;
-}
-
-// ── the Gale ──
-
-export interface GaleView extends ScreenView {
-  set(m: GaleModel): void;
-}
-
-export function galeScreen(m: GaleModel, a: { onDive(): void; onPick(region: number): void }): GaleView {
-  const root = el('s-mx s-gale');
-  const top = box('s-gale__top p-smoke', root);
-  el('s-gale__title', top, 'Riding the Gale');
-  const line = el('s-gale__line', top);
-  const map = box('s-gale__map p-smoke', root);
-  const globe = galeGlobe(a.onPick);
-  map.appendChild(globe.el);
-  const hint = el('s-gale__hint', map);
-  const go = box('s-gale__go', root);
-  button({ label: 'Dive', icon: ICON.dive, sub: 'Leave the Gale here', kind: 'gold', size: 'lg', parent: go, what: 'gale:dive', onPress: a.onDive });
-  const set = (g: GaleModel) => {
-    const r = REGIONS[g.below];
-    line.innerHTML = `Below: <b>${esc(r?.name ?? 'the open sea')}</b> · the Gale lets go in ${mmss(g.seconds)}`;
-    const p = REGIONS[g.pick];
-    hint.innerHTML = p ? `Steering for <b>${esc(p.name)}</b>: you leave the Gale over it` : 'Tap a sea in reach to steer for it';
-    globe.set(g);
-  };
-  set(m);
-  // the canvas has no size until it is laid out
-  requestAnimationFrame(() => globe.set(m));
-  return { el: root, set };
 }
 
 // ── the HUD ──
@@ -394,7 +362,7 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   return { el: root, set, leave: () => { for (const [n] of named) a.target?.(n, null); } };
 }
 
-// ── death, spectating and victory ──
+// ── death and victory ──
 
 export function deathScreen(m: DeathModel, a: { onSpectate(): void; onLeave(): void }): ScreenView {
   const root = el('s-mx s-end');
@@ -428,24 +396,6 @@ function sunkBy(m: DeathModel): string {
   if (weapon) return who ? `by ${who}'s ${weapon.toLowerCase()}` : `by a stray ${weapon.toLowerCase()}`;
   const h = HOW[m.how];
   return h ? (who ? h[0].replace('%', who) : h[1]) : who ? `by ${who}` : 'by the sea';
-}
-
-export interface SpectateView extends ScreenView {
-  set(m: SpectateModel): void;
-}
-
-export function spectateScreen(m: SpectateModel, a: { onLeave(): void }): SpectateView {
-  const root = el('s-mx s-spec');
-  const top = box('s-spec__top p-smoke', root);
-  const line = el('s-spec__line', top);
-  const leave = box('s-spec__leave', root);
-  button({ label: 'Leave', icon: ICON.leave, kind: 'dark', size: 'sm', parent: leave, what: 'spectate:leave', onPress: a.onLeave });
-  const set = (s: SpectateModel) => {
-    const rank = s.target.rank ? ` <span>${esc(s.target.rank)}</span>` : '';
-    line.innerHTML = `<i>${ICON.eye}</i>Watching <b>${esc(s.target.name)}</b>${rank} · ${s.target.kills} sunk · ${s.ships} afloat`;
-  };
-  set(m);
-  return { el: root, set };
 }
 
 /** The win: a full-screen ceremony first, then the card with the match's numbers once it is dismissed or done. */

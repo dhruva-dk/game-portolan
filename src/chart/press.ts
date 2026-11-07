@@ -60,9 +60,9 @@ export interface Pressable {
   press: Press;
   sound?: UiSound;
   haptic?: UiHaptic;
-  /** 'up' (default) acts on release over it; 'down' acts at once (the HUD's controls). */
+  /** 'up' (default) acts on release over it; 'down' acts at once (the HUD's controls). Acts where the finger is. */
   on?: 'up' | 'down';
-  act?: () => void;
+  act?: (x: number, y: number) => void;
   disabled?: boolean;
 }
 
@@ -102,7 +102,7 @@ export class Presses {
       p.press.down();
       if (p.on === 'down') {
         feedback(p.sound ?? 'tap', p.haptic ?? 'light', p.id);
-        p.act?.();
+        p.act?.(x, y);
       } else {
         // the paper gives under the finger: a selection tick now, the sound when it acts
         feedback('none', 'selection', p.id);
@@ -120,7 +120,7 @@ export class Presses {
     p.press.up();
     if (p.disabled || p.on === 'down' || cancelled || !hits(p, x, y)) return;
     feedback(p.sound ?? 'tap', p.haptic ?? 'light', p.id);
-    p.act?.();
+    p.act?.(x, y);
   }
 
   /** Steps every press's spring. */

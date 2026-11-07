@@ -1,6 +1,7 @@
-// First-time tips: a short card the first time each of the game's key moments happens to the player, from riding the
-// Gale to the whale rising. Moments and a look over the player's ship each frame offer tips; each shows once ever, one
-// at a time, and the ones shown are kept in the browser's storage beside the settings. Capture mode keeps them in
+// First-time tips: a short card the first time each of the game's key moments happens to the player, from the first
+// weapon to the whale rising, and the drawings the chart teaches with itself (the hand over the Gale). Moments and a
+// look over the player's ship each frame offer tips; each shows once ever, one at a time, and the ones shown are kept
+// in the browser's storage beside the settings. Capture mode keeps them in
 // memory and starts with them off, so the capture tools' frames show only what they arrange.
 import { ability } from '../sim/abilities.ts';
 import { atHome } from '../sim/territory.ts';
@@ -25,7 +26,6 @@ export const TIPS_KEY = 'portolan.tips';
 
 /** Every tip, by id: its glyph, title and line. The ability's, the weapon's and the landmark's are filled in. */
 export const TIPS = {
-  gale: { icon: ICON.dive, title: 'Riding the Gale', text: 'Tap a sea in reach to steer for it, then Dive. The Gale lets everyone go at the end.' },
   weapon: { icon: ICON.cannon, title: 'Your {weapon}', text: 'Drag on the right of the screen to aim, and hold Fire. Shots fly in an arc and take time to land.' },
   shot: { icon: ICON.target, title: 'Lead your shots', text: 'Aim where a ship will be, not where it is. Reload tops the magazine up early.' },
   gust: { icon: ICON.gust, title: 'Gust', text: 'Tap Gust for a burst of speed and a hop. Its charges fill again over time.' },
@@ -58,7 +58,10 @@ export const TIPS = {
   'weather:ash': { icon: WEATHER_ICON.ash, title: 'Ash', text: 'Embers burn ships that stay in it. Sail out.' },
 } as const satisfies Record<string, { icon: string; title: string; text: string }>;
 
-export type TipId = keyof typeof TIPS;
+/** What the chart teaches by drawing it the first time: the Gale's hand, pointing where a press marks the dive. */
+const DRAWN = ['gale'] as const;
+
+export type TipId = keyof typeof TIPS | (typeof DRAWN)[number];
 
 /** Seconds a tip stays, the pause before the next, and how long after landing the first ones wait. */
 const SHOW = 7, GAP = 1.2, SETTLE = 3;
@@ -74,7 +77,7 @@ export function parseSeen(raw: string | null): Set<TipId> {
   const out = new Set<TipId>();
   try {
     const v: unknown = raw ? JSON.parse(raw) : [];
-    if (Array.isArray(v)) for (const id of v) if (typeof id === 'string' && id in TIPS) out.add(id as TipId);
+    if (Array.isArray(v)) for (const id of v) if (typeof id === 'string' && (id in TIPS || (DRAWN as readonly string[]).includes(id))) out.add(id as TipId);
   } catch {
     // a broken save shows the tips again
   }
@@ -84,7 +87,7 @@ export function parseSeen(raw: string | null): Set<TipId> {
 const fill = (s: string, args: Record<string, string>): string => s.replace(/\{(\w+)\}/g, (_, k: string) => args[k] ?? '');
 
 /** A tip as the card shows it, with its blanks filled. */
-export function tipView(id: TipId, args: Record<string, string> = {}, icon?: string): TipView {
+export function tipView(id: keyof typeof TIPS, args: Record<string, string> = {}, icon?: string): TipView {
   const t = TIPS[id];
   return { id, icon: icon ?? t.icon, title: fill(t.title, args), text: fill(t.text, args) };
 }
@@ -131,6 +134,15 @@ export class Tips {
     this.queue.length = 0;
     this.showing = null;
     this.left = this.gap = this.atSea = this.look = 0;
+  }
+
+  /** Whether the chart should draw its teaching for `id` now: true the first time it is asked (and from then on it
+   *  counts as shown). */
+  drawn(id: (typeof DRAWN)[number]): boolean {
+    if (!this.on || this.seen.has(id)) return false;
+    this.seen.add(id);
+    this.save();
+    return true;
   }
 
   /** Forgets every tip shown, so each shows again. */
@@ -193,7 +205,6 @@ export class Tips {
 
   private watch(s: Session, dt: number): void {
     const st = s.state, me = s.me;
-    if (me.phase === PHASE.gale) this.offer('gale');
     if (me.phase !== PHASE.sea) return;
     this.atSea += dt;
     if (this.atSea < SETTLE) return;
@@ -214,7 +225,7 @@ export class Tips {
     if (this.look > 0) return;
     this.look = LOOK;
     skyAt(st, me.pos, SKY);
-    for (const w of WEATHER_NAMES) if (SKY[w] > 0.4) this.offer(`weather:${w}` as TipId);
+    for (const w of WEATHER_NAMES) if (SKY[w] > 0.4) this.offer(`weather:${w}` as keyof typeof TIPS);
     if (this.closing(st.tick * TICK, me.pos)) this.offer('tide');
     if (seaState(st, me.pos) > 0.3) this.offer('seaway');
   }
@@ -233,7 +244,7 @@ export class Tips {
   }
 
   /** Queues a tip that has never shown and isn't already waiting. */
-  private offer(id: TipId, args: Record<string, string> = {}, icon?: string): void {
+  private offer(id: keyof typeof TIPS, args: Record<string, string> = {}, icon?: string): void {
     if (this.seen.has(id) || this.showing?.id === id || this.queue.some((q) => q.id === id)) return;
     this.queue.push(tipView(id, args, icon));
   }

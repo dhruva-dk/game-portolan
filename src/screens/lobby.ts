@@ -10,21 +10,22 @@
 // chart's rhumb lines to the Gale's course, turns the vellum opaque over the world while the match is made under it,
 // and rolls the sheet up into the Gale. Leaving for anything else, the ink dries away.
 //
-// The vellum is the folio baked once for the screen with its middle scraped thin, shown as its own canvas under the
-// chart layer. What holds still once inked (the web, the cartouche) is painted on the layer's sheet plane; what moves
+// The vellum is the folio baked once for the screen with a window cut round the planet's limb (planet.ts), shown as
+// its own canvas under the chart layer. What holds still once inked (the web, the cartouche) is painted on the layer's sheet plane; what moves
 // with the planet (coasts, signs, her mark) and what answers a press is drawn on the live plane each frame. Everything
 // runs off the time it is given, so a capture's frozen clock shows the same instants.
 import type { PerspectiveCamera } from 'three';
 import {
   Pen, Press, arcPts, bakeSeal, canvas, cartouche, coasts, ctx, dividers, drawGalleon, drawSeal, drawSprite, ease, figure,
-  galleon, galleonSprite, needle, pressLook, prims, rhumbWeb, ring, rings, rose, stamp, star, stagger, tally, unroll,
-  woodcut, type Baked, type ChartLayer, type Coasts, type Colours, type Globe, type Illumination, type Seal, type Sprite,
+  galleon, galleonSprite, needle, pressLook, prims, rings, rose, stamp, star, stagger, tally, unroll, woodcut, type Baked,
+  type ChartLayer, type Coasts, type Colours, type Globe, type Illumination, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { REGION_COLOURS } from '../icons/sets/regions.ts';
 import { CENTRES, REGIONS } from '../sim/world/index.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
 import { effect } from '../ui/parts/feedback.ts';
+import { BLEED, cutSheet, facing, globeOf, web, windowOf, type Window } from './planet.ts';
 import { ROSE, cornerRose } from './title.ts';
 
 /** The career as the cartouche draws it. */
@@ -103,6 +104,9 @@ const AT = {
   dry: 0.3,
 } as const;
 
+/** Seconds the lobby's sheet takes to roll up off the Gale, from the match's beginning. */
+export const LOBBY_ROLL = AT.roll[1] - AT.roll[0];
+
 const span = (s: number, [a, b]: readonly [number, number]): number => Math.min(1, Math.max(0, (s - a) / (b - a)));
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -114,23 +118,13 @@ const TAU = Math.PI * 2;
 const TURN = (1.2 * Math.PI) / 180;
 /** How far north or south a finger can turn it. */
 const MOST_LAT = 1.1;
-/** How much ink is in the web's lines on the sheet. */
-const WEB = 0.45;
-/** The folio runs this far past every edge of the screen. */
-const BLEED = 40;
 
 interface Geo {
   w: number;
   h: number;
   phone: boolean;
-  /** The web's middle, its ring of nodes and their reach. */
-  cx: number;
-  cy: number;
-  ring: number;
-  reach: number;
-  /** The window cut in the sheet over the planet, round its limb, and the graduated ring inked round the window. */
-  win: { x: number; y: number; r: number };
-  band: number;
+  /** The window cut in the sheet over the planet, round its limb. */
+  win: Window;
   rose: { x: number; y: number; r: number };
   /** The Play seal, under the right thumb. */
   play: { x: number; y: number; r: number };
@@ -146,13 +140,8 @@ interface Geo {
 function geo(layer: ChartLayer, orbit: { distance: number; fov: number }): Geo {
   const l = layer.layout, { w, h, safe } = l, phone = l.cls === 'iphone', m = l.margin;
   const cw = phone ? 204 : 310, ch = phone ? 114 : 174, ds = phone ? 52 : 72;
-  // the planet's limb from orbit: the camera looks at its centre, so it stands in the middle of the screen
-  const limb = (h / 2 / Math.tan((orbit.fov * Math.PI) / 360)) / Math.sqrt(orbit.distance * orbit.distance - 1);
   return {
-    w, h, phone, cx: w / 2, cy: h / 2, ring: Math.min(w, h) * 0.56, reach: Math.hypot(w, h),
-    // the window a little wider than the limb, so the atmosphere's rim shows inside it
-    win: { x: w / 2, y: h / 2, r: Math.round(limb * 1.035) }, band: phone ? 9 : 14,
-    rose: l.rose,
+    w, h, phone, win: windowOf(layer, orbit), rose: l.rose,
     play: { x: l.thumbs.right.x, y: l.thumbs.right.y, r: phone ? 46 : 66 },
     divs: { x: w - safe.right - m - ds * 0.5, y: safe.top + m + ds * 0.55, size: ds },
     cart: { x: safe.left + m + cw / 2, y: h - safe.bottom - m - ch / 2, w: cw, h: ch },
@@ -327,26 +316,9 @@ export class Lobby {
   #lay(): void {
     const layer = this.#layer!, g = (this.#g = geo(layer, this.#h.orbit())), dpr = layer.dpr;
     // the sheet: the folio with a window cut round the planet's limb, its cut edge shadowing the world under it
-    const folio = layer.sheet('folio', g.w + BLEED * 2, g.h + BLEED * 2, 9, { folds: false });
-    const v = canvas(folio.canvas.width, folio.canvas.height), x = ctx(v);
-    x.drawImage(folio.canvas, 0, 0);
-    const o = (folio.pad + BLEED) * dpr, wx = o + g.win.x * dpr, wy = o + g.win.y * dpr, wr = g.win.r * dpr;
-    x.globalCompositeOperation = 'destination-out';
-    x.beginPath();
-    x.arc(wx, wy, wr, 0, TAU);
-    x.fill();
-    x.globalCompositeOperation = 'source-over';
-    const shade = x.createRadialGradient(wx, wy, wr - 16 * dpr, wx, wy, wr);
-    shade.addColorStop(0, 'rgba(26,14,4,0)');
-    shade.addColorStop(1, 'rgba(26,14,4,0.42)');
-    x.fillStyle = shade;
-    x.beginPath();
-    x.arc(wx, wy, wr, 0, TAU);
-    x.fill();
     this.#vellum?.remove();
-    v.style.cssText = `position:absolute;left:${-BLEED - folio.pad}px;top:${-BLEED - folio.pad}px;width:${folio.w + folio.pad * 2}px;height:${folio.h + folio.pad * 2}px;pointer-events:none;opacity:0`;
-    this.#host.insertBefore(v, layer.el);
-    this.#vellum = v;
+    const { el, folio } = cutSheet(layer, this.#host, g.win);
+    this.#vellum = el;
     this.#cover = folio;
     // the seals, the signs and the dividers, baked once at this size
     const c = this.#career;
@@ -457,28 +429,7 @@ export class Lobby {
   /** The planet as the camera sees it this frame. */
   #globeNow(): Globe | null {
     const cam = this.#h.camera();
-    if (!cam) return null;
-    const p = cam.projectionMatrix.elements, v = cam.matrixWorldInverse.elements, m = this.#mat;
-    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-      m[c * 4 + r] = p[r] * v[c * 4] + p[4 + r] * v[c * 4 + 1] + p[8 + r] * v[c * 4 + 2] + p[12 + r] * v[c * 4 + 3];
-    }
-    const pos = cam.position, d = Math.hypot(pos.x, pos.y, pos.z), W = this.#g!.w, H = this.#g!.h;
-    this.#eye.x = pos.x / d; this.#eye.y = pos.y / d; this.#eye.z = pos.z / d;
-    return {
-      eye: this.#eye, horizon: R / d,
-      project: (x, y, z, out) => {
-        const X = x * R, Y = y * R, Z = z * R;
-        const w = m[3] * X + m[7] * Y + m[11] * Z + m[15];
-        out.x = ((m[0] * X + m[4] * Y + m[8] * Z + m[12]) / w * 0.5 + 0.5) * W;
-        out.y = (0.5 - (m[1] * X + m[5] * Y + m[9] * Z + m[13]) / w * 0.5) * H;
-      },
-    };
-  }
-
-  /** How squarely a point faces the eye, 0 at the limb to 1 under it (negative beyond the limb). */
-  #facing(p: V3): number {
-    const g = this.#globe!, e = g.eye, dot = p.x * e.x + p.y * e.y + p.z * e.z;
-    return (dot - g.horizon) / (1 - g.horizon);
+    return cam ? globeOf(cam, this.#g!.w, this.#g!.h, this.#mat, this.#eye) : null;
   }
 
   /** The sheet plane: the web and the career, once each is inked and while they hold still. */
@@ -493,25 +444,9 @@ export class Lobby {
     if (this.#begun) return;
     const dry = this.#dry();
     pen.mood({ dry }, () => {
-      if (this.#inked.web && this.#playAt < 0) this.#web(pen, gc, 1, 0);
+      if (this.#inked.web && this.#playAt < 0) web(pen, gc, this.#layer!, g.win, 1, 0);
       if (this.#inked.cart) this.#drawCareer(pen, gc, 99);
     });
-  }
-
-  /** The rhumb web on the sheet round the window, inked to t, its north turned by `rot`; and the graduated ring round
-   *  the window. */
-  #web(pen: Pen, gc: CanvasRenderingContext2D, t: number, rot: number, more = 0): void {
-    const g = this.#g!, w = g.win, out = new Path2D();
-    out.rect(-BLEED, -BLEED, g.w + BLEED * 2, g.h + BLEED * 2);
-    out.arc(w.x, w.y, w.r + g.band, 0, TAU);
-    gc.save();
-    gc.clip(out, 'evenodd');
-    gc.translate(g.cx, g.cy);
-    gc.rotate(rot);
-    gc.translate(-g.cx, -g.cy);
-    rhumbWeb(pen, g.cx, g.cy, g.ring, g.reach, t, WEB + more);
-    gc.restore();
-    ring(pen, w.x, w.y, w.r, w.r + g.band, { ticks: 360, seed: 41 }, t, rot);
   }
 
   /** How far the ink has dried, leaving for anything but the Gale. */
@@ -586,11 +521,11 @@ export class Lobby {
   #ink(gc: CanvasRenderingContext2D, pen: Pen, s: number, now: number, north = 0): void {
     const layer = this.#layer!, g = this.#g!, alpha = 1 - pen.dry;
     // the web, then the coasts over it
-    const web = span(s, AT.web);
-    if (web >= 1 && !this.#inked.web) {
+    const webT = span(s, AT.web);
+    if (webT >= 1 && !this.#inked.web) {
       this.#inked.web = true;
       layer.invalidate();
-    } else if (web < 1) this.#web(pen, gc, web, 0);
+    } else if (webT < 1) web(pen, gc, layer, g.win, webT, 0);
     const globe = this.#globe;
     if (globe) {
       // what is inked on the planet stays in the window over it, wherever the camera is on its way there
@@ -602,13 +537,13 @@ export class Lobby {
       // a sign for every sea on the near side, one after another; her mark over them
       const P = { x: 0, y: 0 }, st = span(s, AT.signs);
       for (let i = 0; i < REGIONS.length; i++) {
-        const t = stagger(st, i, REGIONS.length, 0.3), f = this.#facing(CENTRES[i]);
+        const t = stagger(st, i, REGIONS.length, 0.3), f = facing(globe, CENTRES[i]);
         if (t <= 0 || f <= 0.12) continue;
         const c = CENTRES[i];
         globe.project(c.x, c.y, c.z, P);
         drawSprite(gc, this.#signs[i], P.x, P.y, { alpha: alpha * ease.out(t) * smooth(0.12, 0.3, f), scale: 0.85 + 0.15 * ease.back(t) });
       }
-      const home = this.#h.home(), hf = this.#facing(home), mt = span(s, AT.mark);
+      const home = this.#h.home(), hf = facing(globe, home), mt = span(s, AT.mark);
       if (mt > 0 && hf > 0.1) {
         globe.project(home.x, home.y, home.z, P);
         const a = smooth(0.1, 0.28, hf);
@@ -649,7 +584,7 @@ export class Lobby {
       const si = Math.max(AT.done, (now - this.#t0) / 1000);
       // the web, swung from north to the Gale's course about the chart's middle
       const sw = ease.inOut(span(s, AT.swing));
-      this.#web(pen, gc, 1, this.#course * sw, 0.2 * Math.sin(Math.PI * Math.min(1, s / AT.swing[1])));
+      web(pen, gc, layer, g.win, 1, this.#course * sw, 0.2 * Math.sin(Math.PI * Math.min(1, s / AT.swing[1])));
       // the needle over the rose swings with it, and the seal stamps
       this.#ink(gc, pen, si, now, this.#course * sw);
       if (s < AT.stamp) stamp(pen, g.play.x, g.play.y, g.play.r * 1.05, s / AT.stamp, 11);

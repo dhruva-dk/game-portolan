@@ -8,7 +8,7 @@ import { MomentSound } from './sounds.ts';
 import { connectUiFeedback } from './uiFeedback.ts';
 import { Loop, type Frame } from './loop.ts';
 import { GpuStage } from '../render/gpu/stage.ts';
-import { ORBIT_FOV } from '../render/camera.ts';
+import { ORBIT_FOV, type CameraTarget } from '../render/camera.ts';
 import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
@@ -18,8 +18,8 @@ import type { Weapon } from '../render/actors/view.ts';
 import { setStudio } from '../ui/parts/art.ts';
 import { careerStats, equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
-import { PHASE, PLAYER, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
-import { ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
+import { PHASE, PLAYER, SHIPS, TICK, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
+import { GALE, ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
 import { REGIONS, adoptHeights, heightAt, regionAt } from '../sim/world/index.ts';
 import { P } from '../render/gpu/uniforms.ts';
 import { adoptNav, type Nav } from '../sim/nav.ts';
@@ -29,9 +29,9 @@ import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
 import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
-import { deathModel, galeModel, hudModel, markOf, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
+import { deathModel, fleetColours, hudModel, markOf, resultsModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
-import { frameAt, homeScene, latLonOf, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
+import { homeScene, latLonOf, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { CareerHolder } from './career.ts';
@@ -41,17 +41,15 @@ import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, type Insets } from '../chart/index.ts';
 import { TITLE_LANDS, Title } from '../screens/title.ts';
-import { Lobby, type CareerMarks, type Turn } from '../screens/lobby.ts';
+import { LOBBY_ROLL, Lobby, type CareerMarks, type Turn } from '../screens/lobby.ts';
+import { DIVE, Gale, courseBearing, diveView, galeLook } from '../screens/gale.ts';
+import { HudDisc } from '../screens/hud.ts';
 import { page } from '../ui/screens/frame.ts';
-import {
-  deathScreen, galeScreen, hudScreen, resultsScreen, spectateScreen, victoryScreen, type GaleView, type HudView, type SpectateView,
-} from '../ui/screens/match.ts';
+import { deathScreen, hudScreen, resultsScreen, victoryScreen, type HudView } from '../ui/screens/match.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
 import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
-import type {
-  CosmeticKind, DeathModel, GaleModel, HudModel, ResultsModel, Settings, SpectateModel, VictoryModel,
-} from '../ui/model.ts';
+import type { CosmeticKind, DeathModel, HudModel, ResultsModel, Settings, VictoryModel } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
@@ -66,6 +64,9 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
+/** The orbit the lobby and the Gale see the planet from, in radii, and the seconds the camera takes between views. */
+const ORBIT_DISTANCE = 3.2;
+const FLIGHT = 2.2;
 
 /** The rank's tiers (Iron to Legend) as the illuminations rarity is drawn in, plainest first. */
 const TIER_ILLUMINATION: readonly Illumination[] = ['ink', 'ink', 'rubric', 'rubric', 'redBlue', 'redBlue', 'silver', 'gold'];
@@ -113,9 +114,11 @@ export class App {
   private fixed = false;
   private readonly canvas: HTMLCanvasElement;
   private loaded: Promise<void> | null = null;
-  /** The title and the lobby on the chart, while each is up or leaving. */
+  /** The title, the lobby, the Gale and the HUD's disc on the chart, while each is up or leaving. */
   private title: Title | null = null;
   private lobby: Lobby | null = null;
+  private gale: Gale | null = null;
+  private disc: HudDisc | null = null;
   /** How far the world has loaded, 0..1. */
   private progress = 0;
   /** Whether the stage has drawn the world yet, and whether the ships are built (after the title's materials). */
@@ -213,6 +216,7 @@ export class App {
     this.chart.resize(innerWidth, innerHeight, devicePixelRatio || 1, safeArea());
     this.title?.resize();
     this.lobby?.resize();
+    this.gale?.resize();
   }
 
   /** Builds the stage and the actors; the title's needle reads the progress. */
@@ -325,11 +329,17 @@ export class App {
       this.view = homeScene();
     }
     // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby rolls up
-    // into the Gale, or dries away
-    if (from === 'title' && name !== 'title') this.title?.leave(this.chartNow());
-    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(this.chartNow(), name);
+    // into the Gale, or dries away; the Gale's sheet has thinned to nothing by the time she lands; the HUD's disc dries
+    const now = this.chartNow();
+    if (from === 'title' && name !== 'title') this.title?.leave(now);
+    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(now, name);
+    if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
+    if (from === 'match' && name !== 'match') this.disc?.leave(now);
     if (name === 'title') this.openTitle();
     if (name === 'lobby') this.openLobby(from);
+    if (name === 'gale') this.openGale(from);
+    if (name === 'match') this.openDisc();
+    if (name === 'spectate') this.session?.spectate();
     const view = this.screenView(name, model);
     this.shell.show(name, view, transition(from, name));
   }
@@ -337,10 +347,12 @@ export class App {
   private screenView(name: ScreenName, model?: unknown): ScreenView {
     const career = this.career.career;
     switch (name) {
-      // drawn on the chart (the title, the lobby), or nothing at all
+      // drawn on the chart (the title, the lobby, the Gale, spectating), or nothing at all
       case 'boot':
       case 'title':
       case 'lobby':
+      case 'gale':
+      case 'spectate':
         return { el: el('s-empty') };
       case 'abilities': {
         const v: MenuView<ReturnType<typeof abilitiesModel>> = abilitiesScreen((model as never) ?? abilitiesModel(career, this.fresh.abilities), {
@@ -381,20 +393,12 @@ export class App {
   private matchView(name: ScreenName, model?: unknown): ScreenView | null {
     const s = this.session;
     this.hud = null;
-    this.galeView = null;
-    this.spec = null;
     if (name === 'death' || name === 'spectate' || name === 'victory') {
       // the match's markers and numbers don't stay over the end of it
       this.juice.markers?.clear();
       this.juice.numbers?.clear();
     }
     switch (name) {
-      case 'gale': {
-        if (!model && !s) return null;
-        const v = galeScreen((model as GaleModel) ?? galeModel(s!), { onDive: () => this.tap('dive'), onPick: (r) => this.session?.pick(r) });
-        this.galeView = v;
-        return v;
-      }
       case 'match': {
         if (!model && !s) return null;
         const v = hudScreen((model as HudModel) ?? hudModel(s!), {
@@ -407,13 +411,6 @@ export class App {
       case 'death':
         if (!model && !s) return null;
         return deathScreen((model as DeathModel) ?? deathModel(s!), { onSpectate: () => this.go('spectate'), onLeave: () => this.finishMatch() });
-      case 'spectate': {
-        if (!model && !s) return null;
-        s?.spectate();
-        const v = spectateScreen((model as SpectateModel) ?? spectateModel(s!, wornLook(this.career.career)), { onLeave: () => this.finishMatch() });
-        this.spec = v;
-        return v;
-      }
       case 'victory':
         if (!model && !s) return null;
         return victoryScreen((model as VictoryModel) ?? victoryModel(s!), { onContinue: () => this.finishMatch() });
@@ -453,6 +450,8 @@ export class App {
   /** Jumps to a fixed scene, leaving any match. */
   scene(input: SceneInput): SceneSpec {
     if (this.session) this.leaveMatch();
+    for (const c of [this.gale, this.disc]) c?.dispose();
+    this.gale = this.disc = null;
     const s = sceneFrom(input);
     this.view = s;
     this.fixed = true;
@@ -472,8 +471,14 @@ export class App {
   private watched = -1;
   /** How far the camera has drawn back for the win, 0 to 1. */
   private pull = 0;
-  private galeView: GaleView | null = null;
-  private spec: SpectateView | null = null;
+  /** How far the frame is between the last tick and this one. */
+  private alpha = 1;
+  /** Where the camera looks over the Gale, and the course's way there; seconds into her dive (-1 not diving), and
+   *  where the camera looked as it began. */
+  private readonly look = { x: 0, y: 0, z: 1 };
+  private readonly lookHead = { x: 1, y: 0, z: 0 };
+  private diving = -1;
+  private readonly diveFrom = { x: 0, y: 0, z: 1 };
   /** Seconds until the HUD's next refresh: it redraws a few times a second, not every frame. */
   private hudT = 0;
   private readonly eye = { x: 0, y: 0, z: 0 };
@@ -527,12 +532,6 @@ export class App {
     this.go(s.me.phase === PHASE.gale ? 'gale' : 'match');
   }
 
-  /** A tap on a control: pressed and let go at once, read as one edge. */
-  private tap(what: 'dive' | 'gust' | 'take'): void {
-    this.controls.press(what, true);
-    this.controls.press(what, false);
-  }
-
   private onMoment(m: Moment): void {
     const s = this.session;
     if (!s) return;
@@ -544,9 +543,10 @@ export class App {
     this.tips.moment(m, s);
   }
 
-  /** Leaves the Gale now. */
+  /** Marks her dive right under her: she leaves the Gale now and drops where she is. */
   dive(): void {
-    this.session?.dive();
+    const s = this.session;
+    if (s) s.aimFor(s.me.pos);
   }
 
   stepTicks(n: number): number {
@@ -612,10 +612,10 @@ export class App {
     this.controls.on = false;
     this.sound.clear();
     this.juice.clear();
-    this.hud = this.galeView = this.spec = null;
+    this.hud = null;
     this.tip.set(null);
     this.log.tick = -1;
-    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0 });
+    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0, orbitDistance: ORBIT_DISTANCE, flight: FLIGHT });
     this.stage?.snap();
   }
 
@@ -705,6 +705,8 @@ export class App {
     s.sun(this.sun);
     actors.update(s.actorsView(f.clock, f.alpha, this.sun), f.dt, stage.camera);
     const sv = s.stageView(f.clock, f.alpha);
+    this.alpha = f.alpha;
+    if (this.gale && s.watch === PLAYER) this.galeCamera(s, sv, f.realDt);
     stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => s.hearing());
     const c = stage.camera.position;
@@ -714,25 +716,23 @@ export class App {
     this.viewer.me = this.sound.me = s.watch;
     this.viewer.spectating = s.watch !== PLAYER;
     this.follow(s);
-    // a tip over the Gale and the HUD only: the card waits while another screen is up
-    const tipAt = this.screen === 'gale' ? 'gale' : this.screen === 'match' ? 'hud' : '';
+    // a tip over the HUD only: the card waits while another screen is up
+    const tipAt = this.screen === 'match' ? 'hud' : '';
     this.tip.el.dataset.at = tipAt;
     this.tip.set(tipAt ? this.tips.update(s, f.realDt) : null);
     this.hudT -= f.realDt;
     if (this.hudT <= 0 || !this.loop.running) {
       this.hudT = 1 / 12;
       if (this.hud && this.session === s) this.hud.set(hudModel(s));
-      if (this.galeView && this.session === s) this.galeView.set(galeModel(s));
-      if (this.spec && this.session === s) this.spec.set(spectateModel(s, wornLook(this.career.career)));
     }
   }
 
-  /** Moves between the match's screens as the player's ship leaves the Gale, sinks, or wins. */
+  /** Moves between the match's screens as the player's ship lands from the Gale, sinks, or wins. */
   private follow(s: Session): void {
     const me = s.me, at = this.screen;
     if (s.over && s.state.winner === PLAYER && (at === 'match' || at === 'gale')) this.go('victory');
     else if (me.phase === PHASE.sunk && (at === 'match' || at === 'gale')) this.go('death');
-    else if (at === 'gale' && me.phase !== PHASE.gale) this.go('match');
+    else if (at === 'gale' && me.phase === PHASE.sea) this.go('match');
     else if (s.over && at === 'spectate') this.finishMatch();
     // a match that sails itself watches on after its sinking, so a long run keeps the sea busy
     else if (this.options.autoplay && at === 'death' && s.seconds - s.tally.ships[PLAYER].sunkAt > 4) this.go('spectate');
@@ -763,15 +763,14 @@ export class App {
     const home = homeScene().pos;
     const l = new Lobby(this.chartHost, {
       camera: () => this.stage?.camera ?? null,
-      orbit: () => ({ distance: this.stage?.rig?.orbitDistance ?? 3.2, fov: ORBIT_FOV }),
+      orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
       coasts: () => (this.coasts ??= traceCoasts(heightAt)),
       home: () => home,
       mark: () => this.ownMark(),
       career: () => this.careerMarks(),
       prepare: () => {
-        const s = (this.pending = this.prepare());
-        const g = s.state.gale, f = frameAt(g.from);
-        return Math.atan2(g.dir.x * f.east.x + g.dir.y * f.east.y + g.dir.z * f.east.z, g.dir.x * f.north.x + g.dir.y * f.north.y + g.dir.z * f.north.z);
+        const g = (this.pending = this.prepare()).state.gale;
+        return courseBearing(g.from, g.dir);
       },
       begin: () => {
         const s = this.pending;
@@ -785,6 +784,88 @@ export class App {
     };
     this.lobby = l;
     if (this.chart) l.attach(this.chart, this.chartNow());
+  }
+
+  /** Riding the Gale under the chart, the camera looks straight down on its course. Leaving it, it dives with her:
+   *  straight down from the orbit to above her, then round behind her to sail. */
+  private galeCamera(s: Session, sv: { camera: string; target: CameraTarget }, dt: number): void {
+    const rig = this.stage?.rig, me = s.me;
+    if (!rig) return;
+    if (me.phase === PHASE.gale) {
+      const g = s.state.gale;
+      galeLook(g.from, g.dir, this.galeTime(s), this.look, this.lookHead);
+      this.diving = -1;
+    } else if (me.phase === PHASE.glide) {
+      if (this.diving < 0) {
+        this.diving = 0;
+        this.diveFrom.x = this.look.x; this.diveFrom.y = this.look.y; this.diveFrom.z = this.look.z;
+      }
+      this.diving += dt;
+      const d = diveView(this.diveFrom, sv.target.pos, Math.max(0, me.alt), this.diving, ORBIT_DISTANCE, this.look);
+      if (d === null) {
+        // down over her: the chase camera takes her from here, in the settle's time
+        rig.orbitDistance = ORBIT_DISTANCE;
+        rig.flight = DIVE.settle;
+        return;
+      }
+      rig.orbitDistance = d;
+    } else {
+      rig.flight = FLIGHT;
+      return;
+    }
+    rig.flight = FLIGHT;
+    sv.camera = 'orbit';
+    sv.target = { pos: this.look, heading: this.lookHead, pull: 0 };
+  }
+
+  /** Seconds the match's Gale has blown, to the frame. */
+  private galeTime(s: Session): number {
+    return Math.min(GALE.time, Math.max(0, s.state.gale.t - (1 - this.alpha) * TICK));
+  }
+
+  /** Puts the Gale on the chart: under the lobby's sheet as it rolls up off it, or coming up over the world. */
+  private openGale(from: ScreenName): void {
+    this.gale?.dispose();
+    this.gale = null;
+    const s = this.session;
+    if (!s) return;
+    const colours = fleetColours(s, wornLook(this.career.career)), ships = s.state.ships;
+    const rolled = from === 'lobby';
+    const g = new Gale(this.chartHost, {
+      camera: () => this.stage?.camera ?? null,
+      orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
+      course: () => s.state.gale,
+      time: () => this.galeTime(s),
+      colours: () => colours,
+      me: PLAYER,
+      ships: SHIPS,
+      ship: (i, out) => {
+        const sh = ships[i], k = this.alpha, w = sh.was, p = sh.pos;
+        const x = w.x + (p.x - w.x) * k, y = w.y + (p.y - w.y) * k, z = w.z + (p.z - w.z) * k, l = Math.hypot(x, y, z) || 1;
+        out.pos.x = x / l; out.pos.y = y / l; out.pos.z = z / l;
+        out.head.x = sh.head.x; out.head.y = sh.head.y; out.head.z = sh.head.z;
+        out.alt = sh.alt;
+        out.phase = sh.phase;
+        return out;
+      },
+      aim: (p) => s.aimFor(p),
+    }, { delay: rolled ? LOBBY_ROLL : 0, under: rolled, teach: this.tips.drawn('gale') });
+    g.onGone = () => {
+      if (this.gale === g) this.gale = null;
+    };
+    this.gale = g;
+    if (this.chart) g.attach(this.chart, this.chartNow());
+  }
+
+  /** Inks the HUD's disc in as she comes to sea. */
+  private openDisc(): void {
+    this.disc?.dispose();
+    const d = new HudDisc();
+    d.onGone = () => {
+      if (this.disc === d) this.disc = null;
+    };
+    this.disc = d;
+    if (this.chart) d.attach(this.chart, this.chartNow());
   }
 
   /** Puts the title on the chart: a blank sheet at once, inked once the paper is made. */

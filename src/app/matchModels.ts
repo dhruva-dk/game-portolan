@@ -1,5 +1,6 @@
-// The interface's view models from the match: what the Gale, the HUD, death, spectating, victory and the results show,
-// read from the session and the career's changes. Like models.ts, the screens never see the simulation itself.
+// The interface's view models from the match: what the HUD, death, victory and the results show, and the fleet's marks
+// for the chart, read from the session and the career's changes. Like models.ts, the screens never see the simulation
+// itself.
 import {
   ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, temperament, wornLook, type Career, type Look, type MatchChanges, type Rank,
 } from '../career/index.ts';
@@ -7,19 +8,18 @@ import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
 import {
   ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, WEATHER_NAMES, inStorm, isNight, newSky, newStormView, seen, SEEN, skyAt,
-  stormView, sunDir, type MatchState, type Ship,
+  stormView, type MatchState, type Ship,
 } from '../sim/match.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
-import { GALE_SPEED } from '../sim/opening.ts';
-import { R, advance, angleTo, apart, tangentToward } from '../sim/sphere.ts';
+import { GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
+import { R, angleTo, apart, tangentToward } from '../sim/sphere.ts';
 import { aimedAt } from '../sim/combat.ts';
-import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
+import { REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type GaleModel, type HudModel,
-  type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type SpectateModel, type VictoryModel,
+  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type HudModel,
+  type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type VictoryModel,
   type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
 import type { Rarity } from '../ui/parts/tokens.ts';
@@ -30,7 +30,6 @@ import type { CosmeticIds } from '../render/actors/index.ts';
 
 const DEG = 180 / Math.PI;
 const SV = newStormView();
-const SUN = v3();
 const MAP_RANGE = 320;
 const SKY = newSky();
 /** How deep into a weather system before the HUD names it, as the tips do. */
@@ -52,6 +51,14 @@ export const markOf = (look: Look): Mark => markOfIds(cosmeticsOf(look));
 
 /** Ship i's mark, from the look she wears in the match. */
 const shipMark = (session: Session, i: number): Mark => markOfIds(session.looks[i] ?? session.looks[0]);
+
+/** Every ship's colour and charge as the chart's galleon marks take them, the player's from the look she wears. */
+export function fleetColours(session: Session, look: Look): { colour: string; sigil: { id: string } }[] {
+  return session.state.ships.map((_, i) => {
+    const m = i === PLAYER ? markOf(look) : shipMark(session, i);
+    return { colour: m.colours[0], sigil: { id: m.emblem } };
+  });
+}
 
 export const levelFrom = (l: { level: number; into: number; need: number }): LevelView => ({ level: l.level, into: l.into, need: l.need });
 
@@ -198,34 +205,7 @@ export function hudModel(session: Session): HudModel {
   };
 }
 
-/** How far a ship can glide from the Gale before it reaches the sea, m. */
-const GLIDE_REACH = (GALE.height / GALE.fall) * GALE.glide;
-const ROAD = 24, ROAD_P = v3(), ROAD_H = v3();
-
-export function galeModel(session: Session): GaleModel {
-  const s = session.state, g = s.gale, sun = latLon(sunDir(s, SUN));
-  const heading = new Array<number>(REGIONS.length).fill(0);
-  for (let i = 1; i < SHIPS; i++) {
-    const c = s.ships[i].captain;
-    if (c.on && c.region >= 0 && c.region < heading.length) heading[c.region]++;
-  }
-  // the road ahead, and every region with its centre in glide reach of some point on it
-  const path: GaleModel['path'] = [], open = new Array<boolean>(REGIONS.length).fill(false);
-  for (let k = 0; k <= ROAD; k++) {
-    const t = g.t + ((GALE.time - g.t) * k) / ROAD;
-    advance(g.from, g.dir, GALE_SPEED * t, ROAD_P, ROAD_H);
-    path.push(latLon(ROAD_P));
-    for (let r = 0; r < CENTRES.length; r++) if (!open[r] && apart(ROAD_P, CENTRES[r]) < GLIDE_REACH) open[r] = true;
-  }
-  return {
-    seconds: Math.max(0, Math.ceil(GALE.time - g.t)), total: GALE.time, sun,
-    at: latLon(s.ships[PLAYER].pos), path,
-    regions: REGIONS.map((_, index) => ({ index, open: open[index], heading: heading[index] })),
-    pick: session.target, below: regionAt(s.ships[PLAYER].pos), ships: SHIPS,
-  };
-}
-
-/** A captain as the death and spectate screens name it. */
+/** A captain as the death screen names it. */
 function killerOf(session: Session, i: number, weapon: number): Killer {
   const e = session.plan.fleet[i - 1], cap = CAPTAINS[captainIndex(e.captain)];
   return {
@@ -242,13 +222,6 @@ export function deathModel(session: Session): DeathModel {
     cause: by > 0 ? 'ship' : cause === 'storm' ? 'storm' : 'sea', how: cause,
     kills: me.kills, damage: Math.round(t.damage), survived: Math.round(t.sunkAt >= 0 ? t.sunkAt : session.seconds),
   };
-}
-
-export function spectateModel(session: Session, look: Look): SpectateModel {
-  const s = session.state, i = session.watch, sh = s.ships[i];
-  const e = session.plan.fleet[i - 1], mark = i === PLAYER ? markOf(look) : shipMark(session, i);
-  const rank = i === PLAYER ? session.plan.player.rank : e.rank;
-  return { target: { ...mark, name: session.names[i], rank, kills: sh.kills, shield: Math.round(sh.shield), hull: Math.round(sh.hull) }, ships: afloat(s) };
 }
 
 export function victoryModel(session: Session): VictoryModel {

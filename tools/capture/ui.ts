@@ -31,8 +31,12 @@ export const TRANSITIONS: readonly Transition[] = [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),
-  { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })', times: [0, 100, 200, 300, 400, 500, 600, 700, 800, 1000] },
-  { name: 'gale-match', from: 'h.play({ seed: 11 })', to: 'h.dive()' },
+  // the lobby's sheet rolls up off the Gale's, which inks in; the dive runs to the landing, where the HUD's disc inks in
+  { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })', times: [0, 150, 300, 450, 600, 750, 900, 1200, 1600, 2000, 2600] },
+  {
+    name: 'gale-match', from: 'h.play({ seed: 11 })', to: 'h.dive(); for (let i = 0; i < 900 && h.screen !== "match"; i++) await h.draw()',
+    times: [0, 100, 200, 300, 450, 600, 800],
+  },
   // the match's own screens follow the sim, which only moves here when a frame is drawn
   { name: 'match-death', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
   { name: 'death-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)', to: 'h.go("spectate")' },

@@ -1,12 +1,11 @@
-// The charts: the career's parchment map of the sixteen seas, inked in as you sail them, and the Gale's globe with
-// the day side, the seas in glide reach, the road ahead and where you are. Both are drawn on canvases from one
+// The charts: the career's parchment map of the sixteen seas, inked in as you sail them, drawn on a canvas from a
 // mask of the world, sampled once: which region each cell lies in, and how high its ground stands. The HUD's map
 // samples the land round the ship itself, finer, as she sails.
 import { DRAFT, REGIONS, REGION_COUNT, heightExact, regionAt } from '../../sim/world/index.ts';
 import { R, fromLatLon, localFrame } from '../../sim/sphere.ts';
 import { v3, type V3 } from '../../sim/math.ts';
 import { FONT } from '../parts/tokens.ts';
-import type { ChartRegionView, GaleModel } from '../model.ts';
+import type { ChartRegionView } from '../model.ts';
 import { chartPainter } from '../parts/paper.ts';
 
 const DEG = Math.PI / 180;
@@ -35,22 +34,11 @@ export function warmChart(): void {
   if (!MASK) setTimeout(mask, 0);
 }
 
-const cell = (lat: number, lon: number): number => {
-  const j = Math.min(MH - 1, Math.max(0, Math.floor(((90 - lat) / 180) * MH)));
-  const i = ((Math.floor(((lon + 180) / 360) * MW) % MW) + MW) % MW;
-  return j * MW + i;
-};
-
 type RGB = readonly [number, number, number];
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-const INK: RGB = [58, 36, 20], SEA: RGB = [150, 182, 164], DEEP: RGB = [96, 138, 136];
+const SEA: RGB = [150, 182, 164], DEEP: RGB = [96, 138, 136];
 const LAND: RGB = [201, 167, 106], HIGH: RGB = [164, 124, 72];
-
-/** A ground height as chart colour: washed sea deepening offshore, ochre land browning with height. */
-function ground(h: number): RGB {
-  return h < 0 ? mix(SEA, DEEP, Math.min(1, -h / 14)) : mix(LAND, HIGH, Math.min(1, h / 40));
-}
 
 /** Fits a canvas's backing store to its laid-out size; false while it has none. */
 function fit(c: HTMLCanvasElement): boolean {
@@ -71,23 +59,6 @@ const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, 
   g.fillStyle = colour;
   g.fillText(text, x, y);
 };
-
-interface Box { x0: number; y0: number; x1: number; y1: number }
-
-/** A label block's middle (x, y), `half` wide each way, `up` above and `down` below, moved toward the centre (cx, cy)
- *  until all its corners lie within `limit` of it. */
-function inside(x: number, y: number, half: number, up: number, down: number, cx: number, cy: number, limit: number): { x: number; y: number } {
-  for (let i = 0; i < 8; i++) {
-    let worst = 0;
-    for (const [dx, dy] of [[-half, -up], [half, -up], [-half, down], [half, down]]) worst = Math.max(worst, Math.hypot(x + dx - cx, y + dy - cy));
-    if (worst <= limit) break;
-    // step in by the overshoot, along the line to the centre
-    const d = Math.hypot(x - cx, y - cy) || 1, k = Math.min(1, (worst - limit + 1) / d);
-    x -= (x - cx) * k;
-    y -= (y - cy) * k;
-  }
-  return { x, y };
-}
 
 // ── the career's chart ──
 
@@ -129,173 +100,6 @@ export function drawChart(c: HTMLCanvasElement, chart: readonly ChartRegionView[
       g.setTransform(1, 0, 0, 1, 0, 0);
       c.classList.add('is-painted');
     });
-}
-
-// ── the Gale's globe ──
-
-const GLOBE = 220;
-
-export interface Globe {
-  el: HTMLCanvasElement;
-  set(m: GaleModel): void;
-}
-
-/** The planet as a globe turned to where you ride. Tapping a sea in reach marks it; tapping it again clears it. */
-export function galeGlobe(onPick: (region: number) => void, className = ''): Globe {
-  const c = document.createElement('canvas');
-  c.className = `s-globe${className ? ' ' + className : ''}`;
-  const off = document.createElement('canvas');
-  off.width = off.height = GLOBE;
-  const img = new ImageData(GLOBE, GLOBE);
-  const C = v3(), E = v3(), N = v3(), SUN = v3(), P = v3();
-  let model: GaleModel | null = null, drawn = '';
-
-  /** The basis the globe is seen in: C toward the viewer, E right, N up. */
-  const basis = (lat: number, lon: number) => {
-    fromLatLon(lat * DEG, lon * DEG, C);
-    // east, the sim's way round: longitude grows toward −z; north is C × E
-    E.x = -Math.sin(lon * DEG); E.y = 0; E.z = -Math.cos(lon * DEG);
-    N.x = C.y * E.z - C.z * E.y; N.y = C.z * E.x - C.x * E.z; N.z = C.x * E.y - C.y * E.x;
-  };
-
-  /** A point on the planet in globe space: x right, y up, z toward the viewer. */
-  const project = (lat: number, lon: number) => {
-    fromLatLon(lat * DEG, lon * DEG, P);
-    return { x: P.x * E.x + P.y * E.y + P.z * E.z, y: P.x * N.x + P.y * N.y + P.z * N.z, z: P.x * C.x + P.y * C.y + P.z * C.z };
-  };
-
-  const paint = (mm: GaleModel) => {
-    const msk = mask(), d = img.data, open = mm.regions.map((r) => r.open);
-    fromLatLon(mm.sun.lat * DEG, mm.sun.lon * DEG, SUN);
-    for (let py = 0; py < GLOBE; py++) {
-      const y = 1 - ((py + 0.5) / GLOBE) * 2;
-      for (let px = 0; px < GLOBE; px++) {
-        const x = ((px + 0.5) / GLOBE) * 2 - 1, rr = x * x + y * y, o = (py * GLOBE + px) * 4;
-        if (rr > 1) { d[o + 3] = 0; continue; }
-        const z = Math.sqrt(1 - rr);
-        const wx = C.x * z + E.x * x + N.x * y, wy = C.y * z + E.y * x + N.y * y, wz = C.z * z + E.z * x + N.z * y;
-        const lat = Math.asin(Math.max(-1, Math.min(1, wy))) / DEG, lon = Math.atan2(-wz, wx) / DEG;
-        const k = cell(lat, lon), r = msk.region[k];
-        let col = ground(msk.height[k]);
-        if (!open[r]) col = mix(col, [70, 70, 74], 0.55);
-        if (r === mm.pick) col = mix(col, [255, 210, 110], 0.35);
-        const k2 = cell(lat + 180 / MH, lon), k3 = cell(lat, lon + 360 / MW);
-        if (msk.region[k2] !== r || msk.region[k3] !== r) col = mix(col, INK, open[r] ? 0.7 : 0.4);
-        // day and night, with a soft dusk, and the limb darkening
-        const sun = wx * SUN.x + wy * SUN.y + wz * SUN.z, light = 0.32 + 0.68 * Math.min(1, Math.max(0, sun * 3 + 0.35));
-        const limb = 0.75 + 0.25 * z, f = light * limb;
-        d[o] = col[0] * f; d[o + 1] = col[1] * f; d[o + 2] = col[2] * (f * 0.92 + (1 - light) * 0.25);
-        d[o + 3] = 255;
-      }
-    }
-    off.getContext('2d')!.putImageData(img, 0, 0);
-  };
-
-  const draw = () => {
-    const mm = model;
-    if (!mm || !fit(c)) return;
-    basis(mm.at.lat, mm.at.lon);
-    const key = `${mm.at.lat.toFixed(1)},${mm.at.lon.toFixed(1)},${mm.pick},${mm.sun.lon.toFixed(0)},${mm.regions.map((r) => (r.open ? 1 : 0)).join('')}`;
-    if (key !== drawn) { paint(mm); drawn = key; }
-    const g = c.getContext('2d')!, S = Math.min(c.width, c.height), cx = c.width / 2, cy = c.height / 2, rad = S * 0.46;
-    g.clearRect(0, 0, c.width, c.height);
-    // the air round the planet
-    const air = g.createRadialGradient(cx, cy, rad * 0.96, cx, cy, rad * 1.08);
-    air.addColorStop(0, 'rgba(255, 236, 196, 0.5)');
-    air.addColorStop(1, 'rgba(255, 236, 196, 0)');
-    g.fillStyle = air;
-    g.beginPath();
-    g.arc(cx, cy, rad * 1.08, 0, Math.PI * 2);
-    g.fill();
-    g.imageSmoothingEnabled = true;
-    g.drawImage(off, cx - rad, cy - rad, rad * 2, rad * 2);
-    g.strokeStyle = 'rgba(42, 26, 13, 0.9)';
-    g.lineWidth = Math.max(1.5, S / 160);
-    g.beginPath();
-    g.arc(cx, cy, rad, 0, Math.PI * 2);
-    g.stroke();
-    // the road ahead, dashed, on the near side only
-    g.save();
-    g.setLineDash([S / 40, S / 60]);
-    g.strokeStyle = 'rgba(255, 214, 120, 0.95)';
-    g.lineWidth = Math.max(2, S / 90);
-    g.lineCap = 'round';
-    g.beginPath();
-    let pen = false;
-    for (const q of mm.path) {
-      const p = project(q.lat, q.lon);
-      if (p.z < 0.02) { pen = false; continue; }
-      const sx = cx + p.x * rad, sy = cy - p.y * rad;
-      if (pen) g.lineTo(sx, sy); else g.moveTo(sx, sy);
-      pen = true;
-    }
-    g.stroke();
-    g.restore();
-    // the seas' names, and the captains heading for each: the pick first, then the nearest the middle, each kept
-    // inside the globe and clear of those already down, nudged a line up or down, or left out if no nudge clears it
-    const size = Math.max(9, S / 24), placed: Box[] = [];
-    const seas = mm.regions.map((r) => ({ r, p: project(REGIONS[r.index].lat, REGIONS[r.index].lon) })).filter((q) => q.p.z >= 0.2)
-      .sort((a, b) => Number(b.r.index === mm.pick) - Number(a.r.index === mm.pick) || b.p.z - a.p.z);
-    for (const { r, p } of seas) {
-      const info = REGIONS[r.index], on = r.index === mm.pick, fs = size * (on ? 1.15 : 1), ships = r.heading > 0 && r.open;
-      g.font = `700 ${fs}px ${FONT.display}`;
-      // the block round the name (and the ships line under it), from the name's middle
-      const half = g.measureText(info.name).width / 2 + fs * 0.2, up = fs * 0.62, down = ships ? size * 1.15 + size * 0.55 : fs * 0.62;
-      let spot: { x: number; y: number } | null = null;
-      for (const nudge of [0, -1, 1, -2, 2]) {
-        const q = inside(cx + p.x * rad, cy - p.y * rad + nudge * (up + down) * 0.6, half, up, down, cx, cy, rad * 0.97);
-        if (!placed.some((b) => q.x + half > b.x0 && q.x - half < b.x1 && q.y + down > b.y0 && q.y - up < b.y1)) { spot = q; break; }
-      }
-      if (!spot && !on) continue;
-      const { x: sx, y: sy } = spot ?? inside(cx + p.x * rad, cy - p.y * rad, half, up, down, cx, cy, rad * 0.97);
-      placed.push({ x0: sx - half, x1: sx + half, y0: sy - up, y1: sy + down });
-      const ink = on ? 'rgb(255, 222, 140)' : r.open ? 'rgb(255, 246, 226)' : 'rgba(255, 246, 226, 0.45)';
-      label(g, info.name, sx, sy, fs, ink, 'rgba(26, 16, 8, 0.85)');
-      if (ships) label(g, `${r.heading} ${r.heading === 1 ? 'ship' : 'ships'}`, sx, sy + size * 1.15, size * 0.85, 'rgba(255, 246, 226, 0.85)', 'rgba(26, 16, 8, 0.85)');
-    }
-    // you, at the centre, pointing along the road
-    const next = mm.path[1] ? project(mm.path[1].lat, mm.path[1].lon) : { x: 0, y: 1, z: 1 };
-    const a = Math.atan2(-next.y, next.x);
-    g.save();
-    g.translate(cx, cy);
-    g.rotate(a);
-    const u = S / 26;
-    g.fillStyle = 'rgb(255, 214, 120)';
-    g.strokeStyle = 'rgb(42, 26, 13)';
-    g.lineWidth = Math.max(1.5, S / 200);
-    g.beginPath();
-    g.moveTo(u * 1.2, 0);
-    g.lineTo(-u * 0.8, u * 0.7);
-    g.lineTo(-u * 0.4, 0);
-    g.lineTo(-u * 0.8, -u * 0.7);
-    g.closePath();
-    g.fill();
-    g.stroke();
-    g.restore();
-  };
-
-  c.addEventListener('pointerdown', (e) => {
-    e.stopPropagation();
-    const mm = model;
-    if (!mm) return;
-    const r = c.getBoundingClientRect(), S = Math.min(r.width, r.height), rad = S * 0.46;
-    const x = (e.clientX - r.left - r.width / 2) / rad, y = -(e.clientY - r.top - r.height / 2) / rad, rr = x * x + y * y;
-    if (rr > 1) return;
-    basis(mm.at.lat, mm.at.lon);
-    const z = Math.sqrt(1 - rr);
-    P.x = C.x * z + E.x * x + N.x * y; P.y = C.y * z + E.y * x + N.y * y; P.z = C.z * z + E.z * x + N.z * y;
-    const hit = regionAt(P);
-    if (!mm.regions[hit]?.open) return;
-    onPick(hit === mm.pick ? -1 : hit);
-  });
-
-  return {
-    el: c,
-    set(m: GaleModel) {
-      model = m;
-      draw();
-    },
-  };
 }
 
 // ── the HUD's map ──

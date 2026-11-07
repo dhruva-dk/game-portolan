@@ -6,8 +6,8 @@ import { ABILITIES, type AbilityId, type ActiveId, type PassiveId } from '../sim
 import { REGIONS } from '../sim/world/index.ts';
 import {
   RANK_LADDER, rarityOf, type AbilitiesModel, type AbilityView, type CareerModel, type CosmeticKind, type CosmeticView,
-  type DeathModel, type GaleModel, type HudModel, type LevelView, type LockerModel, type Look, type PlayerView,
-  type RankModel, type RankView, type ResultsModel, type RivalView, type RivalsModel, type SpectateModel,
+  type DeathModel, type HudModel, type LevelView, type LockerModel, type Look, type PlayerView,
+  type RankModel, type RankView, type ResultsModel, type RivalView, type RivalsModel,
   type Unlock, type VictoryModel,
 } from './model.ts';
 
@@ -256,16 +256,6 @@ export function fxCareer(): CareerModel {
 
 export const fxRank = (): RankModel => ({ rank: rankView(10, 0.62), bestTier: FX_TIER, rewards: fxCosmetics().filter((c) => c.unlock.by === 'rank') });
 
-export function fxGale(): GaleModel {
-  const r = rng(7);
-  return {
-    seconds: 14, total: 35, sun: { lat: 12, lon: 40 }, pick: 11, below: 6, ships: 20,
-    at: { lat: 18, lon: -30 },
-    path: Array.from({ length: 13 }, (_, k) => ({ lat: 18 + k * 2.5, lon: -30 + k * 6 })),
-    regions: REGIONS.map((_, index) => ({ index, open: index !== 0 && index !== 15, heading: index === 0 || index === 15 ? 0 : Math.floor(r() * 4) })),
-  };
-}
-
 export type HudState = 'calm' | 'fight' | 'storm' | 'night';
 
 export function fxHud(state: HudState = 'calm'): HudModel {
@@ -319,11 +309,6 @@ export function fxDeath(cause: 'ship' | 'storm' = 'ship'): DeathModel {
     place: 7, ships: 20, cause, how: cause === 'ship' ? 'harpoon' : 'storm', kills: 3, damage: 1840, survived: 612,
     killer: cause === 'ship' ? { name, emblem, colours: seal(colour), rank: 'Gold III', temperament: TEMPERAMENTS.find((x) => x.id === t)!.name, weapon: 'harpoon', grudge: 2 } : null,
   };
-}
-
-export function fxSpectate(): SpectateModel {
-  const [, name, , , emblem, , , , colour] = CAPTAIN_ROWS[0];
-  return { target: { name, emblem, colours: seal(colour), rank: 'Gold III', kills: 5, shield: 40, hull: 72 }, ships: 6 };
 }
 
 export const fxVictory = (): VictoryModel => ({ kills: 7, damage: 3920, survived: 1104, ships: 20 });
