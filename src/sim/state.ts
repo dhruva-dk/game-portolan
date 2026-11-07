@@ -18,15 +18,11 @@ export const PLAYER = 0;
 export const STREAM = { world: 0, weather: 1, wind: 2, loot: 3, storm: 4, combat: 5, whale: 6, captains: 7 } as const;
 export const STREAMS = STREAM.captains + SHIPS;
 
-/** What is being sailed: a match (the Storm closes and the last ship afloat wins), or a free voyage on the same planet,
- *  with no Storm and no end, where a wreck refits and sails on (voyage.ts). */
-export const MODE = { match: 0, voyage: 1 } as const;
-
 /** Where a ship is in the match: riding the Gale, gliding down, at sea, or sunk. */
 export const PHASE = { gale: 0, glide: 1, sea: 2, sunk: 3 } as const;
 
 /** What sank a ship, or hurt it. Weapons use their item kind (1–6). */
-export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28, rock: 29, flood: 30 } as const;
+export const CAUSE = { storm: 20, ram: 21, ink: 22, burn: 23, ash: 24, lightning: 25, mine: 26, wave: 27, whale: 28, flood: 30 } as const;
 
 /** The gull's delivery run. */
 export const GULL = { home: 0, flying: 1, rest: 2 } as const;
@@ -197,26 +193,11 @@ const SYSTEM = rec(
   ['strike', f64], ['bolt', XYZ], ['target', int],
 );
 
-const STORM = rec(['region', int], ['centres', list(XYZ)], ['start', int], ['phase', int], ['shrinking', bool], ['scale', f64]);
+const STORM = rec(['region', int], ['centres', list(XYZ)], ['start', int], ['phase', int], ['shrinking', bool]);
 
 const GALE = rec(['from', XYZ], ['dir', XYZ], ['at', XYZ], ['head', XYZ], ['t', f64], ['done', bool]);
 
 const WHALE = rec(['at', XYZ], ['head', XYZ], ['route', list(XYZ)], ['leg', int], ['state', int], ['t', f64], ['breaches', int], ['spot', XYZ]);
-
-/** A region's own event: one each, by region index (regionEvents.ts). */
-export const EVENT_STATE = { waiting: 0, warning: 1, running: 2, over: 3 } as const;
-
-const MARK = rec(['at', XYZ], ['t', f64]);
-
-const REGION_EVENT = rec(
-  ['state', int],
-  // when it starts (match seconds), how long its warning is, how long it runs, and how far into the run it is
-  ['at', f64], ['warn', f64], ['run', f64], ['t', f64],
-  // which of the region's spots it happens at, and where its effect stands now
-  ['k', int], ['spot', XYZ],
-  // a counter and things in flight (the eruption's bombs: where each lands and seconds until it does)
-  ['n', int], ['marks', list(MARK)],
-);
 
 const CLOUD = rec(['owner', int], ['at', XYZ], ['t', f64]);
 const DECOY = rec(['owner', int], ['pos', XYZ], ['head', XYZ], ['t', f64]);
@@ -237,15 +218,9 @@ const HAPPENING = rec(
   ['item', int], ['flag', int], ['cells', list(int)],
 );
 
-/** The voyage's own clocks (voyage.ts): seconds until loot is laid again, until the whale is called, and until a hidden
- *  cache taken is filled again, by cache. */
-const VOYAGE = rec(['lootT', f64], ['whaleT', f64], ['caches', list(f64)]);
-
 const MATCH_SCHEMA = rec(
   ['seed', int],
   ['tick', int],
-  ['rule', int],
-  ['mode', int],
   ['hour', f64],
   ['tilt', f64],
   ['rng', list(words(4), STREAMS)],
@@ -263,9 +238,6 @@ const MATCH_SCHEMA = rec(
   ['decoys', list(DECOY)],
   ['mines', list(MINE)],
   ['whale', WHALE],
-  ['regionEvents', list(REGION_EVENT, 16)],
-  // seconds the Ice Crown's floes have ridden ahead of the clock, when its event drives them on
-  ['floeT', f64],
   ['leader', int],
   ['rentT', f64],
   ['events', list(HAPPENING)],
@@ -273,11 +245,6 @@ const MATCH_SCHEMA = rec(
   ['director', DIRECTOR],
   ['sunk', list(SINKING)],
   ['winner', int],
-  // the secrets the player has found (secrets.ts), carried in from the career and added to as they are found, and
-  // how far along each feat is (a stay counted up, a circle sailed round, the poles reached)
-  ['found', list(int)],
-  ['quest', list(f64)],
-  ['voyage', VOYAGE],
 );
 
 export type Ship = Value<typeof SHIP>;
@@ -291,11 +258,10 @@ export type Happening = Value<typeof HAPPENING>;
 export type Sinking = Value<typeof SINKING>;
 export type Noise = Value<typeof NOISE>;
 export type Director = Value<typeof DIRECTOR>;
-export type RegionEvent = Value<typeof REGION_EVENT>;
 export type Expect = Value<typeof EXPECT>;
 export type MatchState = Value<typeof MATCH_SCHEMA>;
 
-export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 6, schema: MATCH_SCHEMA };
+export const MATCH_FORMAT: Format<typeof MATCH_SCHEMA> = { magic: 'PTLN', version: 7, schema: MATCH_SCHEMA };
 
 /** Every gameplay moment the renderer, the interface and the sound need. Fields per kind are listed in match.ts. */
 export const EVENT = {
@@ -346,25 +312,23 @@ export const EVENT = {
   weatherEnds: 44,
   blocked: 45,
   splash: 46,
-  regionWarn: 47,
-  regionStart: 48,
-  regionEnd: 49,
-  lavaBomb: 50,
-  mastFall: 51,
-  juryRig: 52,
-  quench: 53,
-  secret: 54,
-  refit: 55,
+  mastFall: 47,
+  juryRig: 48,
+  quench: 49,
   /** A ship going about: item 0 a clean tack, 1 a gybe, 2 a gybe thrown so the yards slam, 3 caught in irons. */
-  about: 56,
+  about: 50,
   /** A heavy gun winding up: item weapon kind, amount seconds (0 when it was stood down), by the ship it is aimed at. */
-  windup: 57,
+  windup: 51,
 } as const;
 
 /** Each event kind's name, by number. */
 export const EVENT_NAMES: readonly string[] = [
-  'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel', 'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived', 'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim', 'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze', 'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash',
-  'regionWarn', 'regionStart', 'regionEnd', 'lavaBomb', 'mastFall', 'juryRig', 'quench', 'secret', 'refit', 'about', 'windup',
+  'fire', 'impact', 'hit', 'shieldBreak', 'sink', 'pickup', 'drop', 'gust', 'useStart', 'useDone', 'useCancel',
+  'reload', 'empty', 'select', 'stormWait', 'stormShrink', 'galeDive', 'landing', 'deliveryCalled', 'deliveryArrived',
+  'whaleSurface', 'whaleDive', 'whaleRising', 'whaleBreach', 'flipped', 'perkGained', 'perkLost', 'home', 'claim',
+  'cut', 'swallow', 'freed', 'lead', 'ability', 'abilityEnd', 'mineBurst', 'lightningWarn', 'lightning', 'ablaze',
+  'scrape', 'ram', 'coins', 'win', 'weatherForms', 'weatherEnds', 'blocked', 'splash', 'mastFall', 'juryRig',
+  'quench', 'about', 'windup',
 ];
 
 /** Event flag bits. */

@@ -6,17 +6,8 @@ import type { Point } from '../juice/anim.ts';
 import type { Moment, WeaponClass } from './events.ts';
 import type { ActorEvent, Juice as ActorJuice } from '../render/actors/index.ts';
 import type { V3 } from '../sim/math.ts';
-import { EVENT_REGION as R } from '../sim/environment.ts';
 
 const FIRE_STRENGTH: Record<WeaponClass, number> = { cannon: 1, scatter: 1.1, harpoon: 0.9, mortar: 1.2, repeater: 0.35, broadside: 1.5, chain: 1.05, heated: 1 };
-
-/** The regions whose event shakes the camera as it starts: how hard, and the distances over which it fades. */
-const EVENT_RUMBLE: Record<number, readonly [number, number, number]> = {
-  [R.spires]: [0.6, 80, 600], // the Spires' needle falling
-  [R.narrows]: [0.5, 80, 500], // the Narrows' rockfall
-  [R.fire]: [0.8, 150, 1400], // Cinder Peak erupting
-  [R.maelstrom]: [0.3, 150, 700], // the Maelstrom's vortex rising
-};
 
 const dist = (a: V3, b: V3) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
@@ -133,15 +124,6 @@ export class MomentJuice {
         return;
       case 'lightning':
         if (!m.warning) this.near(m.pos, 0.35, [30, 300]);
-        return;
-      case 'regionEvent': {
-        // the banner gives the warning its haptic; what lands, falls or erupts shakes the camera by how close it is
-        const rumble = m.phase === 'start' ? EVENT_RUMBLE[m.region] : undefined;
-        if (rumble) this.near(m.pos, rumble[0], [rumble[1], rumble[2]]);
-        return;
-      }
-      case 'lavaBomb':
-        if (m.landed) this.near(m.pos, 0.25, [30, 260]);
         return;
       case 'aground':
         if (m.ship === me) { juice.camera.play({ shake: 0.3 }); juice.haptics.play('medium'); }

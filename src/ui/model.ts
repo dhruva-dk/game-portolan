@@ -12,7 +12,7 @@ import type { Rarity } from './parts/tokens.ts';
 export type CosmeticKind = 'sailColour' | 'sailPattern' | 'hullPaint' | 'figurehead' | 'emblem' | 'wake';
 /** One cosmetic id per kind: what a ship wears. */
 export type Look = Record<CosmeticKind, string>;
-export type Unlock = { by: 'level'; level: number } | { by: 'rank'; tier: number } | { by: 'secret'; secret: string };
+export type Unlock = { by: 'level'; level: number } | { by: 'rank'; tier: number };
 
 export const KINDS: readonly { kind: CosmeticKind; name: string; one: string }[] = [
   { kind: 'sailColour', name: 'Sail colours', one: 'Sail colour' },
@@ -58,12 +58,11 @@ export const rankByName = (name: string): { index: number; tier: number; step: n
   RANK_LADDER.find((r) => r.name === name) ?? RANK_LADDER[0];
 
 export const unlockText = (u: Unlock): string =>
-  u.by === 'level' ? `Level ${u.level}` : u.by === 'rank' ? `Reach ${TIER_NAMES[u.tier]}` : 'Find a secret';
+  u.by === 'level' ? `Level ${u.level}` : `Reach ${TIER_NAMES[u.tier]}`;
 
 /** A cosmetic's rarity, from how hard it is to earn: the rank rewards are the rarest. */
 export function rarityOf(u: Unlock): Rarity {
   if (u.by === 'rank') return u.tier >= 5 ? 4 : u.tier >= 3 ? 3 : 2;
-  if (u.by === 'secret') return 3;
   return u.level >= 36 ? 3 : u.level >= 20 ? 2 : u.level >= 9 ? 1 : 0;
 }
 
@@ -102,8 +101,6 @@ export interface LobbyModel {
   /** One line about the league, such as a rival's grudge. */
   ticker: string[];
   stats: { matches: number; wins: number; top5: number };
-  /** The secrets of the planet found, of all there are. */
-  secrets: { found: number; of: number };
 }
 
 // ---------------------------------------------------------------- abilities and locker
@@ -115,10 +112,8 @@ export interface AbilityView {
   text: string;
   /** Seconds, for actives. */
   cooldown: number;
-  /** The level it unlocks at, or Infinity for one found as a secret. */
+  /** The level it unlocks at. */
   level: number;
-  /** For one found as a secret: the riddle, until it is found. */
-  secret?: string;
   unlocked: boolean;
   isNew: boolean;
 }
@@ -209,21 +204,6 @@ export interface CareerModel {
   chart: ChartRegionView[];
   /** What you tend to do, as the captains see it. */
   habits: string[];
-  /** The secrets of the planet: found ones by name with what they gave, the rest as riddles. */
-  secrets: SecretView[];
-}
-
-export interface SecretView {
-  id: string;
-  /** The region's name it lies in, or null for a feat. */
-  region: string | null;
-  found: boolean;
-  /** Its name when found; '?' otherwise. */
-  name: string;
-  /** What finding it was, or the riddle. */
-  text: string;
-  /** What it gives, in a few words (shown once found). */
-  gives: string;
 }
 
 export interface RankModel {
@@ -305,23 +285,9 @@ export type Slot =
   | { kind: 'weapon'; weapon: WeaponId; rarity: Rarity; ammo: number; mag: number; /** 0–1 while reloading, else 0. */ reload: number }
   | { kind: 'consumable'; item: ConsumableId; count: number };
 
-/** The minimap, in metres on the sea round you: x east, y north, you at the centre. */
-/** What a region's event is to you: something to keep clear of, something to go for, or a change in the sea. */
-export type EventTone = 'danger' | 'prize' | 'sea';
-
-export interface EventView {
-  /** The region's id, for its glyph. */
-  region: string;
-  name: string;
-  tip: string;
-  tone: EventTone;
-  /** Warned and not started yet; then seconds until it starts, or else until it ends. */
-  warning: boolean;
-  seconds: number;
-}
-
 export type WeatherName = (typeof WEATHER_NAMES)[number];
 
+/** The minimap, in metres on the sea round you: x east, y north, you at the centre. */
 export interface MapView {
   /** Where you are, in degrees, to centre the chart. */
   lat: number;
@@ -336,9 +302,7 @@ export interface MapView {
   /** Ships the map shows (seen, or spotted). */
   ships: { x: number; y: number; spotted?: boolean }[];
   /** Things worth sailing to: loot, a gull drop, the region's beacon. */
-  marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' | 'cache' }[];
-  /** Region events warned or running in range: where each stands, how far it reaches, and what it is to you. */
-  events: { x: number; y: number; r: number; tone: EventTone; warning: boolean }[];
+  marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' }[];
 }
 
 /** A ship's parts as the HUD shows them: how hurt each is, 0 whole to 1 shot away. */
@@ -396,13 +360,7 @@ export interface HudModel {
   night: boolean;
   /** What a pickup button would take, if anything is in reach. */
   pickup: string | null;
-  /** A region's event, warned or running, in the water you are in or within 240 m of it. */
-  event: EventView | null;
-  /** A second such event while the first shows, in a smaller banner under it. */
-  also?: EventView | null;
   map: MapView;
-  /** On a free voyage: the secrets found of all there are, and while the ship is a wreck, seconds until she refits. */
-  voyage?: { found: number; of: number; refit: number } | null;
 }
 
 /** What the HUD's controls say this frame: integration maps it onto the simulation's input. */

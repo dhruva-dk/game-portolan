@@ -530,12 +530,6 @@ export const PLAYER_EMBLEMS: Record<string, EmblemDef> = {
   gull: def('Gull', gull), scallop: def('Scallop', scallop), seahorse: def('Seahorse', seahorse), dolphin: def('Dolphin', dolphin),
   fern: def('Fern', fern), hare: def('Hare', hare), swan: def('Swan', swan), butterfly: def('Butterfly', butterfly), snowflake: def('Snowflake', snowflake),
   crystal: def('Crystal Heart', crystal, 'crystal'), leviathan: def('Leviathan', leviathan, 'gold'), phoenix: def('Phoenix', phoenix, 'spirit'),
-  // the emblems found as secrets of the planet (sim/secrets.ts)
-  crescentMoon: def('Crescent Moon', rot(crescent, 0.6), 'silver'), sunOnSea: def('Sun on the Sea', sunOnSea, 'gold'), whirlpool: def('Whirlpool', whirlpool),
-  twinStars: def('Twin Stars', twinStars, 'silver'), coralFan: def('Sea Fan', coralFan), jaggedRocks: def('Jagged Rocks', jaggedRocks),
-  firefly: def('Firefly', firefly, 'spirit'), blossom: def('Blossom', blossom), twinFlames: def('Twin Flames', twinFlames, 'gold'),
-  fallingDrop: def('Falling Drop', fallingDrop, 'crystal'), forkedBolt: def('Forked Bolt', forkedBolt, 'silver'), meridianArc: def('Meridian', meridianArc, 'gold'),
-  windRose: def('Wind Rose', windRose, 'gold'), northernCrown: def('Northern Crown', northernCrown, 'gold'), splinterBurst: def('Splinters', splinterBurst),
 };
 
 /** Charges drawn for the library that nothing names yet: more spirits and natural forms for later captains and emblems. */
@@ -549,6 +543,11 @@ export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
   brokenFeather: def('Broken Feather', brokenFeather), tightSpiral: def('Spiral', tightSpiral), undertow: def('Undertow', undertow),
   wave: def('Curling Wave', curlingWave), fourStar: def('Four-pointed Star', fourStar), feather: def('Feather', feather),
   leapingFish: def('Leaping Fish', leapingFish),
+  crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), sunOnSea: def('Sun on the Sea', sunOnSea), whirlpool: def('Whirlpool', whirlpool),
+  twinStars: def('Twin Stars', twinStars), coralFan: def('Sea Fan', coralFan), jaggedRocks: def('Jagged Rocks', jaggedRocks),
+  firefly: def('Firefly', firefly), blossom: def('Blossom', blossom), twinFlames: def('Twin Flames', twinFlames),
+  fallingDrop: def('Falling Drop', fallingDrop), forkedBolt: def('Forked Bolt', forkedBolt), meridianArc: def('Meridian', meridianArc),
+  windRose: def('Wind Rose', windRose), northernCrown: def('Northern Crown', northernCrown), splinterBurst: def('Splinters', splinterBurst),
 };
 
 /** Every charge by id: captains', the player's and spares. Ids are unique across the three. */

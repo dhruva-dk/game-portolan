@@ -9,7 +9,6 @@ import {
   positionWorldDirection, screenUV, vec4,
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
-import { seaLevelNode } from '../lift.ts';
 import { AIR, CLEAR_AIR, setAir, type Air } from './model.ts';
 import { EYE, aerialAt, passes } from './luts.ts';
 import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
@@ -72,7 +71,7 @@ function veil(): Mesh {
     const p = cameraWorldMatrix.mul(vec4(view, 1)).xyz.toVar();
     const r = p.length();
     // (the depth's error grows with distance, and the troughs reach a few metres down)
-    If(r.lessThan(seaLevelNode(p.div(r), true).sub(view.length().mul(0.004).add(3))), () => {
+    If(r.lessThan(P.planet.y.sub(view.length().mul(0.004).add(3))), () => {
       Discard();
     });
     return vec4(hazed(beneathColour().rgb, p), 1);

@@ -6,13 +6,10 @@
 //   ...run the match, then adapt its result into a MatchReport...
 //   const { career: next, changes } = applyMatch(career, report);
 //   saveCareer(store, next);
-//
-// The legacy files beside this one (league, learn, progress, setup, state, voyage) are the old game's career,
-// kept only for an old tool; nothing here uses them.
 export type { FleetEntry, MatchChanges, MatchPlan, MatchReport, PlayerEntry, RivalNews, ShipReport } from './contract.ts';
 export { CAPTAINS, LEAGUE_SIZE, TEMPERAMENTS, captainIndex, temperament, type Captain, type Temperament, type TemperamentId } from './captains.ts';
 export {
-  careerHash, careerLevel, careerRank, copyCareer, equipAbility, equipCosmetic, findSecrets, newCareer, unlockedAbilities, unlockedCosmetics, wornLook,
+  careerHash, careerLevel, careerRank, copyCareer, equipAbility, equipCosmetic, newCareer, unlockedAbilities, unlockedCosmetics, wornLook,
   type CaptainRecord, type Career,
 } from './career.ts';
 export {

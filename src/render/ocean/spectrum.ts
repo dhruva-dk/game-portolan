@@ -183,21 +183,15 @@ export class LongWaves {
     this.count = list.length / 5;
   }
 
-  /** Height (m) at q, a point in the waves' frame, at time t; with slope, also the rise per metre along each axis. */
-  at(qx: number, qz: number, t: number, slope?: [number, number]): number {
+  /** Height (m) at q, a point in the waves' frame, at time t. */
+  at(qx: number, qz: number, t: number): number {
     const m = this.modes;
-    let h = 0, sx = 0, sz = 0;
+    let h = 0;
     for (let i = 0; i < this.count; i++) {
-      const o = i * 5, kx = m[o], kz = m[o + 1];
-      const ph = kx * qx + kz * qz - m[o + 2] * t;
-      const c = Math.cos(ph), s = Math.sin(ph);
-      // 2 Re(h0 e^{iφ}) and its gradient
-      const re = m[o + 3] * c - m[o + 4] * s, im = m[o + 3] * s + m[o + 4] * c;
-      h += 2 * re;
-      sx -= 2 * im * kx;
-      sz -= 2 * im * kz;
+      const o = i * 5, ph = m[o] * qx + m[o + 1] * qz - m[o + 2] * t;
+      // 2 Re(h0 e^{iφ})
+      h += 2 * (m[o + 3] * Math.cos(ph) - m[o + 4] * Math.sin(ph));
     }
-    if (slope) { slope[0] = sx; slope[1] = sz; }
     return h;
   }
 }

@@ -5,7 +5,7 @@
 // (influence.ts). Every tick it steers for the goal (by A* over the nav grid when land is in the way), aims, fires
 // and uses what it carries.
 import { canCall } from '../economy.ts';
-import { aground, currentAt, seaLevel, seaLevelAt, solidAt } from '../environment.ts';
+import { aground, seaLevel, seaLevelAt, solidAt } from '../environment.ts';
 import type { ShipInput } from '../input.ts';
 import { PI, addScaled, dcos, dot, dsin, hash32, length, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from '../math.ts';
 import { cellCentre, clearLine, findPath, lineOfSight, nearestOpen, openAt } from '../nav.ts';
@@ -13,19 +13,18 @@ import { GALE_SPEED, galeSeat } from '../opening.ts';
 import { activeOf, hasPerk } from '../perks.ts';
 import { aimedAt, landing, rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
-import { coverNear, dangerAt, escapeFrom, newDanger, rewardNear } from '../regionEvents.ts';
 import { draftOf, offWind, pointOfSail, turnRate } from '../sailing.ts';
 import { deckAt, newDeck } from '../seaway.ts';
-import { R, apart, along, angleTo, tangentAt, tangentToward } from '../sphere.ts';
+import { R, apart, along, angleTo, tangentAt, tangentToward, turned } from '../sphere.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, WHALE_STATE, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
-import { ABOUT, GALE, ITEM, LOOT, PARCELS, PERKS, REGION_EVENT, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
+import { ABOUT, GALE, ITEM, LOOT, PARCELS, PERKS, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
 import { atHome, holderOf, holdsAt, landmarkHold } from '../territory.ts';
 import { seen, SEEN } from '../visibility.ts';
 import { newSky, skyAt, vigour } from '../weather.ts';
 import { wet } from '../parts.ts';
 import { newWind, windAt } from '../wind.ts';
-import { CENTRES, LANDMARKS, REGIONS, heightAt } from '../world/index.ts';
+import { CENTRES, LANDMARKS, REGIONS, currentAt, heightAt } from '../world/index.ts';
 import { styleOf, type Style } from './temperaments.ts';
 import { hears } from './hearing.ts';
 import { scout } from './influence.ts';
@@ -33,8 +32,8 @@ import { keptClear } from './director.ts';
 import { DONE, leaf, select, sequence, when, type Node } from './tree.ts';
 import { choose, ease, logistic, momentum, ramp, utility, type Option } from './utility.ts';
 
-export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9, event: 10, shelter: 11, landmark: 12, hunt: 13 } as const;
-export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid', 'event', 'shelter', 'landmark', 'hunt'] as const;
+export const MODE = { gale: 0, glide: 1, roam: 2, loot: 3, fight: 4, flee: 5, storm: 6, heal: 7, claim: 8, raid: 9, shelter: 10, landmark: 11, hunt: 12 } as const;
+export const MODE_NAMES = ['gale', 'glide', 'roam', 'loot', 'fight', 'flee', 'storm', 'heal', 'claim', 'raid', 'shelter', 'landmark', 'hunt'] as const;
 
 export const BRAIN = {
   /** Think every this many ticks. */
@@ -84,10 +83,10 @@ export const BRAIN = {
   weave: 0.55,
   /** Metres within which a sharp captain counts the other ships it sees before it picks a fight. */
   crowd: 150,
-  /** A captain on the run makes for an event's fog bank this far off; failing one, a sharp captain looks this far
-   *  round for water behind land, out of its pursuer's sight. */
-  cover: 150,
+  /** A sharp captain on the run looks this far round for water behind land, out of its pursuer's sight. */
   hide: [70, 140],
+  /** Metres outside a danger a captain keeps as it gets clear of one. */
+  berth: 15,
   /**
    * Going to the sound of the guns: a noise (or the director's hunch) is worth going to for `memory` seconds, and gone
    * to once within `arrive` metres. A captain goes with nerve past `nerve` (a hunch adds `hunch`; the director keeping
@@ -134,16 +133,16 @@ export function think(state: MatchState, i: number): void {
   // what it can see
   perceive(state, i, style);
   decide(state, i, style, rng);
-  // whatever it settled on, it keeps out of what a region's event is bringing down
-  // and out of thunder, ash and a rising whale
-  if (c.mode !== MODE.storm && c.mode !== MODE.event && (dangerAt(state, c.goal, 0, DANGER) || foulAt(state, c.goal, 0))) {
-    escapeFrom(DANGER, c.goal, REGION_EVENT.berth, c.goal);
+  // whatever it settled on, it keeps out of thunder, ash and a rising whale
+  if (c.mode !== MODE.storm && foulAt(state, c.goal, 0)) {
+    escapeFrom(c.goal, BRAIN.berth, c.goal);
     if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 20, tide);
   }
   c.lean = leanFor(state, i);
 }
 
-const DANGER = newDanger();
+/** The danger a captain is getting clear of: its centre, and how far from there is safe. */
+const DANGER = { at: v3(), r: 0 };
 
 // ---------------------------------------------------------------- deciding
 //
@@ -169,9 +168,8 @@ interface Mind {
   armed: boolean;
   /** Whether it is partway round a landmark, which it sees through. */
   rounding: boolean;
-  /** The loot it would go for (an index into state.loot, or -1) and the region event's prize, and a rival's trail. */
+  /** The loot it would go for (an index into state.loot, or -1), and a rival's trail. */
   loot: number;
-  prize: boolean;
   trail: number;
   /** The mode the tree that acted settles on (the option's own, unless a leaf says otherwise). */
   mode: number;
@@ -179,7 +177,7 @@ interface Mind {
 
 const MIND: Mind = {
   state: null as unknown as MatchState, i: 0, ship: null as unknown as Ship, c: null as unknown as Captain, style: null as unknown as Style,
-  rng: null as unknown as Rng, edge: 0, late: false, inNext: false, foeD: 0, armed: false, rounding: false, loot: -1, prize: false, trail: -1, mode: 0,
+  rng: null as unknown as Rng, edge: 0, late: false, inNext: false, foeD: 0, armed: false, rounding: false, loot: -1, trail: -1, mode: 0,
 };
 
 /** An option: its name and rank, the mode it puts the captain in (-1: the one it is in), how it scores, its tree. */
@@ -199,17 +197,7 @@ const OPTIONS: readonly Choice[] = [
     }),
   },
   {
-    // then out from under whatever a region's event is about to bring down on it: a falling spire, the rockfall, the
-    // whale, Cinder Peak's bombs, the bloom, the Maelstrom wound up
-    name: 'event', weight: 5.5, mode: MODE.event,
-    score: (m) => (dangerAt(m.state, m.ship.pos, REGION_EVENT.berth * 0.5, DANGER) ? 1 : 0),
-    tree: leaf('clear the event', (m) => {
-      if (!dangerAt(m.state, m.ship.pos, REGION_EVENT.berth * 0.5, DANGER)) return false;
-      wayOut(m.state, m.ship.pos, m.style, m.c.goal);
-    }),
-  },
-  {
-    // and out of a thunderstorm or an ash fall, and from over a whale rising to breach
+    // then out of a thunderstorm or an ash fall, and from over a whale rising to breach
     name: 'shelter', weight: 5.2, mode: MODE.shelter,
     score: (m) => (foulAt(m.state, m.ship.pos, 0) ? 1 : 0),
     tree: leaf('out of the weather', (m) => {
@@ -236,11 +224,6 @@ const OPTIONS: readonly Choice[] = [
     score: (m) => Math.max(losing(m), evading(m)),
     tree: sequence(
       select(
-        // into a fog bank an event has thrown over the sea, when there is one near
-        when((m) => coverNear(m.state, m.ship.pos, BRAIN.cover, U) && toEdge(m.state, U) > m.style.margin, leaf('into the fog', (m) => {
-          copy(m.c.goal, U);
-          if (!openAt(m.c.goal, tide)) nearestOpen(m.c.goal, m.c.goal, 20, tide);
-        })),
         // behind land, out of her pursuer's sight
         when((m) => m.c.skill > 0.35, leaf('behind the land', (m) => behindLand(m.state, m.i, m.style, m.c.goal))),
         leaf('away', (m) => void away(m.ship.pos, foeAt(m.state, m.c), 120, m.c.goal)),
@@ -291,15 +274,6 @@ const OPTIONS: readonly Choice[] = [
       copy(c.goal, l.at);
       // loot lying in the shallows it takes from the edge of the water deep enough to reach it by
       if (!openAt(c.goal, tide)) nearestOpen(c.goal, c.goal, 1, tide);
-    }),
-  },
-  {
-    // 6b. what a region's event offers: a lane in spate to ride, the clam bed's pearls, the sea caves' hoard (inside the calm)
-    name: 'prize', weight: 1.6, mode: MODE.event,
-    score: (m) => (m.prize = rewardNear(m.state, m.ship.pos, REGION_EVENT.reach, PRIZE) >= 0 && toEdge(m.state, PRIZE) > m.style.margin) ? 1 : 0,
-    tree: leaf('the event\'s prize', (m) => {
-      copy(m.c.goal, PRIZE);
-      if (!openAt(m.c.goal, tide)) nearestOpen(m.c.goal, m.c.goal, 6, tide);
     }),
   },
   {
@@ -371,7 +345,6 @@ export const OPTION_NAMES: readonly string[] = OPTIONS.map((o) => o.name);
 /** Each ship's options as last scored (weighted), for anyone watching the captains think; never read by the sim. */
 export const SCORES: Float64Array[] = Array.from({ length: SHIPS }, () => new Float64Array(OPTIONS.length));
 const TRIED = new Float64Array(OPTIONS.length);
-const PRIZE = v3();
 
 function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, m = MIND;
@@ -383,7 +356,7 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   m.foeD = c.foe >= 0 ? apart(ship.pos, foeAt(state, c)) : 1e9;
   m.armed = hasWeapon(ship);
   m.rounding = c.mode === MODE.landmark && c.li < c.ring.length;
-  m.loot = -1; m.prize = false; m.trail = -1;
+  m.loot = -1; m.trail = -1;
   c.claimT -= BRAIN.every * TICK;
 
   // choose, and carry it out; an option whose tree can't be carried out is struck off and the next best chosen
@@ -847,15 +820,15 @@ function away(p: V3, from: V3, d: number, out: V3): V3 {
 /**
  * Out of DANGER from p to open water inside the calm: straight out if that is inside, else swung round the danger a
  * little further each way until it is (pulling it in toward the calm's centre only would lead back into the danger).
- * Where the edge of the danger is dry land, as Cinder Peak's flanks are, it looks on out to the water beyond.
+ * Where the edge of the danger is dry land, it looks on out to the water beyond.
  */
 function wayOut(state: MatchState, p: V3, style: Style, out: V3): void {
   for (let k = 0; k <= 12; k++) {
     const swing = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (PI / 12);
-    for (let m = 0; m <= 60 && (m === 0 || !openAt(out, tide)); m += 10) escapeFrom(DANGER, p, REGION_EVENT.berth + m, out, swing);
+    for (let m = 0; m <= 60 && (m === 0 || !openAt(out, tide)); m += 10) escapeFrom(p, BRAIN.berth + m, out, swing);
     if (toEdge(state, out) >= style.margin && openAt(out, tide)) return;
   }
-  escapeFrom(DANGER, p, REGION_EVENT.berth, out);
+  escapeFrom(p, BRAIN.berth, out);
   keepInside(state, out, style);
   if (!openAt(out, tide)) nearestOpen(out, out, 20, tide);
 }
@@ -870,7 +843,7 @@ const BREACH = WHALE.lift + 15;
 
 /**
  * Whether p is within `pad` of a thunderstorm or an ash fall at more than a third of its strength, or of the spot a
- * whale is rising to breach at, with that in DANGER, as a region event's danger is, so the same ways out serve.
+ * whale is rising to breach at, with that in DANGER.
  */
 function foulAt(state: MatchState, p: V3, pad: number): boolean {
   const w = state.whale;
@@ -883,10 +856,17 @@ function foulAt(state: MatchState, p: V3, pad: number): boolean {
 }
 
 function foul(at: V3, r: number): boolean {
-  DANGER.region = -1;
   copy(DANGER.at, at);
   DANGER.r = r;
   return true;
+}
+
+/** A point `berth` metres outside DANGER, straight out from its centre through p, or swung `swing` radians round from there. */
+function escapeFrom(p: V3, berth: number, out: V3, swing = 0): V3 {
+  if (apart(p, DANGER.at) < 1) tangentAt(DANGER.at, 0, T);
+  else tangentToward(DANGER.at, p, T);
+  if (swing !== 0) turned(T, DANGER.at, swing, T);
+  return along(DANGER.at, T, DANGER.r + berth, out);
 }
 
 /**
@@ -912,7 +892,7 @@ function markLoop(state: MatchState, i: number, style: Style): boolean {
   for (let r = 0; r < LANDMARKS.length; r++) {
     const h = landmarkHold(r), d = apart(home, h);
     if (d >= near || holderOf(state, r) === i || toEdge(state, h) < style.margin + 40) continue;
-    if (length(currentAt(state, h, U)) > 5) continue;
+    if (length(currentAt(h, U)) > 5) continue;
     best = r;
     near = d;
   }
@@ -957,21 +937,21 @@ function leanFor(state: MatchState, i: number): number {
   if (c.mode === MODE.fight || c.mode === MODE.gale || c.mode === MODE.glide || c.path.length > 0 || apart(ship.pos, c.goal) < 60) return 0;
   windAt(state, ship.pos, WIND);
   tangentToward(ship.pos, c.goal, U);
-  const straight = madeGood(state, ship.pos, 0);
+  const straight = madeGood(ship.pos, 0);
   let best = 0, most = straight + LEAN_GAIN;
   for (const a of LEANS) {
-    const m = madeGood(state, ship.pos, a);
+    const m = madeGood(ship.pos, a);
     if (m > most) [best, most] = [a, m];
   }
   return best;
 }
 
 /** Speed made good toward U (the goal's bearing) sailing `a` off it, in the current 35 m out that way. */
-function madeGood(state: MatchState, p: V3, a: number): number {
+function madeGood(p: V3, a: number): number {
   rotateTangent(p, U, a, T);
   along(p, T, 35, Q);
   if (!openAt(Q, tide)) return -Infinity;
-  currentAt(state, Q, FLOW);
+  currentAt(Q, FLOW);
   return SHIP.top * pointOfSail(offWind(T, WIND.v)) * dcos(a) + dot(FLOW, U);
 }
 
@@ -1469,7 +1449,6 @@ function abilityNow(state: MatchState, i: number, style: Style): boolean {
       return Math.abs(angleTo(ship.head, T, ship.pos)) > 2.2;
     }
     // under a foe that can't turn away in time: slow, or close and in the fight
-    case 'whaleCall': return !!foe && c.mode === MODE.fight && d > 45 && d < 105 && foe.speed < 6;
     default: return false;
   }
 }

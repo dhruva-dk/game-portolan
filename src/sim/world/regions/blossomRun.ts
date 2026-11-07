@@ -65,6 +65,4 @@ export const blossomRun: RegionSpec = {
     { kind: 'cherry' as const, x: CHERRY.x, y: CHERRY.y, r: 2.5, height: CHERRY.hill + 66 },
     ...plant(height, 'cherry', [-250, -220, 250, 300], 18, S + 20, 0.55, 3, 60, 0.6, 10),
   ].filter((p, i) => i === 0 || hyp(p.x - CHERRY.x, p.y - CHERRY.y) > 14),
-  // The spring flood: the run races down to the sea.
-  event: { spots: [-30, 130], r: 60 },
 };

@@ -88,6 +88,4 @@ export const fjords: RegionSpec = {
   tidal: [],
   // Dark pines along the shoulders of the walls, thinning onto the bare granite tops.
   props: plant(height, 'pine', [-240, -200, 240, 270], 11, S + 40, 0.55, 4, 70, 0.6, 16),
-  // Meltwater: the Fjord race runs in spate.
-  event: { spots: [-6, -170], r: 60 },
 };

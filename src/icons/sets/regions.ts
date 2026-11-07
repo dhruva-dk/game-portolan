@@ -152,7 +152,7 @@ export const REGION_ICONS: Record<RegionId, Prim[]> = {
     ...[-160, -110, -60, -15, 25].map((a) => fill(frond(9.2, 7.4, a, 6.4), { top: true })),
   ],
   spiceIsles: [
-    // the pearl bloom: an open clam
+    // an open clam with its pearl
     fill('M2.4 13H21.6C21.6 18.4 17.4 21.8 12 21.8S2.4 18.4 2.4 13Z'),
     fill('M3.4 10.6C4.2 5.2 7.8 2.2 12 2.2S19.8 5.2 20.6 10.6Z'),
     ...[-150, -120, -90, -60, -30].map((a) => cutLine(path(12, 10.6, px(12, 8.2, a), py(10.6, 8.2, a)), 0.9)),

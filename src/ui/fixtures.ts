@@ -172,7 +172,7 @@ const COSMETIC_ROWS: readonly CosmeticRow[] = [
   ['wakeOfLegends', 'wake', 'Wake of Legends', 'A blazing trail of fire. For reaching Legend.', -7, '#ff5a1a'],
 ];
 
-const ABILITY_LEVEL: Record<AbilityId, number> = {"repair":1,"salvage":1,"smokeScreen":3,"quickReload":5,"hardTurn":8,"quickHands":10,"ram":13,"lightHull":16,"reveal":19,"windReader":22,"decoy":25,"stormWalker":28,"wave":31,"deepHold":34,"driftMine":37,"steadyAim":40,"whaleCall":Infinity,"darkLantern":Infinity}
+const ABILITY_LEVEL: Record<AbilityId, number> = {"repair":1,"salvage":1,"smokeScreen":3,"quickReload":5,"hardTurn":8,"quickHands":10,"ram":13,"lightHull":16,"reveal":19,"windReader":22,"decoy":25,"stormWalker":28,"wave":31,"deepHold":34,"driftMine":37,"steadyAim":40}
 
 // ---------------------------------------------------------------- helpers
 
@@ -270,12 +270,6 @@ export function fxCareer(): CareerModel {
     stats: { matches: 37, wins: 4, top5: 15, kills: 61, damage: 48210, survived: 37 * 640, bestPlace: 1 },
     chart: REGIONS.map((reg, index) => ({ index, name: reg.name, sailed: sailed[index] })),
     habits: ['You dive into the Spice Isles.', 'You fight at middle range.', 'You favour the cannon.'],
-    secrets: [
-      { id: 'moonbow', region: 'Basalt Stacks', found: true, name: 'The Moonbow', text: 'You sailed under Moonbow Arch by night and saw its pale bow.', gives: 'Emblem: Crescent Moon' },
-      { id: 'thunderFalls', region: 'Fjords', found: true, name: 'Behind the Falls', text: 'Behind Thunder Falls is a slot of still water no one can see into.', gives: 'A cache in every match' },
-      { id: 'cedarHeart', region: 'Mistwood', found: false, name: '?', text: 'The fallen giant is hollow. Few stop to listen inside it.', gives: 'A cache in every match' },
-      { id: 'greatCurrent', region: null, found: false, name: '?', text: 'The Great Current never ends. Neither should you.', gives: 'Emblem: Meridian' },
-    ],
   };
 }
 
@@ -287,7 +281,6 @@ export function fxLobby(): LobbyModel {
     news: { locker: 3, abilities: 1 },
     ticker: ['Saetta remembers you sank it, and hunts you.', 'Orca has learned you dive into the Spice Isles.'],
     stats: { matches: 37, wins: 4, top5: 15 },
-    secrets: { found: 3, of: 21 },
   };
 }
 
@@ -337,21 +330,11 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     tide: { level: fight ? -0.6 : 0.4, rising: !fight },
     pickup: state === 'calm' ? 'Rare Harpoon' : null,
     // the Spice Isles' pearls in a fight, the Coral Atolls' tide in the Storm, and Cinder Peak warned next door at night;
-    // in the Storm the Atolls' tide runs on a second banner while the Spice Isles' bloom is warned at home
-    event: fight ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: false, seconds: 22 }
-      : storm ? { region: 'spiceIsles', name: 'Pearl Bloom', tip: 'Pearls in the cove: race for them.', tone: 'prize', warning: true, seconds: 6 }
-      : state === 'night' ? { region: 'fireArchipelago', name: 'Eruption', tip: 'Get away from the cone and the ash.', tone: 'danger', warning: true, seconds: 7 }
-      : null,
-    also: storm ? { region: 'coralAtolls', name: 'Reef Tide', tip: 'One reef gap shuts, another opens.', tone: 'sea', warning: false, seconds: 41 } : null,
     map: {
       lat: -31, lon: 167, heading: 0.6, range: 260,
       storm: { x: storm ? -210 : -60, y: storm ? 140 : 80, r: storm ? 180 : 420 }, next: { x: -40, y: 120, r: storm ? 110 : 260 },
       ships: fight ? [{ x: 60, y: 40 }, { x: -90, y: 110, spotted: true }, { x: 150, y: -60 }] : [{ x: 160, y: 120 }],
       marks: [{ x: -40, y: -70, kind: 'loot' }, { x: 120, y: 30, kind: 'gull' }, { x: -150, y: -30, kind: 'beacon' }],
-      events: fight ? [{ x: 70, y: -90, r: 60, tone: 'prize', warning: false }]
-        : storm ? [{ x: -120, y: -40, r: 90, tone: 'sea', warning: false }]
-        : state === 'night' ? [{ x: 230, y: 160, r: 140, tone: 'danger', warning: true }]
-        : [],
     },
   };
 }

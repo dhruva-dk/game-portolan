@@ -1,9 +1,9 @@
 // The world's one-shots: the gull and its deliveries, the whale, the Storm, the Gale, the weather's thunder and
-// lightning, the region events, the abilities and the territory.
+// lightning, the ice, the abilities and the territory.
 import { fm, softclip, type Buf, type Rng } from '../dsp.ts';
 import { def } from '../def.ts';
 import {
-  ad, between, bowl, brown, bubbles, burst, crackles, creak, filter, glass, grit, gullNote, hump, knock, metal, mix, n,
+  ad, between, bowl, brown, bubbles, burst, creak, filter, glass, gullNote, hump, knock, metal, mix, n,
   normalize, normAll, pair, pink, scatter, shape, shards, splashOf, splinters, stickSlip, sweep, thump, tone, white, whoosh, blast,
 } from '../kit.ts';
 import { modes, SR, TAU } from '../dsp.ts';
@@ -215,7 +215,7 @@ function iceRigging(r: Rng): Buf {
   return normalize(x, 0.5);
 }
 
-// ---------------------------------------------------------------- region events
+// ---------------------------------------------------------------- the ice
 
 /** A floe splitting: a deep boom with a crack running through the ice. Also heard as life in the Ice Crown. */
 function iceBoom(r: Rng): Buf[] {
@@ -230,149 +230,12 @@ function iceBoom(r: Rng): Buf[] {
   return normAll(out, 0.8);
 }
 
-/** Floes grinding as the rings turn. */
-function floesGrind(r: Rng): Buf {
-  const N = n(2.5), ex = white(N, r);
-  let w = 0.5;
-  for (let i = 0; i < N; i++) {
-    if ((i & 127) === 0) w = Math.min(1, Math.max(0, w + (r() - 0.5) * 0.5));
-    ex[i] *= w * w * hump(i / N, 0.5) * 0.2;
-  }
-  const x = normalize(modes(ex, [1180, 1870, 2690, 3910, 5200].map((f, j) => ({ f: f * between(r, 0.9, 1.1), d: 0.04 / (1 + j * 0.3), g: 1 / (1 + j * 0.3) })), N), 0.6);
-  scatter(r, 0.1, 2.3, 4, (at) => { const a = r(); mix(x, burst(r, 0.05, 'bp', between(r, 2000, 5000), 2, 0.0005, 0.008), at, 0.6 * a); });
-  mix(x, shape(filter(brown(N, r), 'lp', 150), (t) => hump(t / 2.5)), 0, 0.5);
-  return normalize(x, 0.7);
-}
-
-/** Rock breaking away and crashing down: the Narrows' rockfall and the Spires' toppling needle. */
-function rockfall(r: Rng): Buf[] {
-  const s = 5, out = pair(s);
-  out.forEach((o, c) => {
-    mix(o, burst(r, 0.1, 'hp', 1000, 0.7, 0.0005, 0.02), 0, 0.6);
-    mix(o, stickSlip(r, 0.8, 80, 30, [180, 340, 600], 0.05), 0, 0.5);
-    for (let k = 0; k < 14; k++) {
-      const at = 0.6 + k * between(r, 0.08, 0.2) + c * 0.01;
-      mix(o, thump(0.6, between(r, 70, 140), 35, between(r, 0.08, 0.2)), at, between(r, 0.3, 0.8));
-      mix(o, knock(r, between(r, 300, 900), 0.03, 0.2), at, between(r, 0.2, 0.5));
-    }
-    mix(o, shape(filter(brown(o.length, r), 'lp', 200), (t) => ad(t - 0.6, 0.4, 1.4)), 0, 1);
-    grit(o, r, 1, s - 0.5, 30, 0.2);
-    mix(o, splashOf(r, 0.9, 2.5), 2.2, 0.7);
-  });
-  return normAll(out, 0.9);
-}
-
-/** A surge of water: the Fjords' flood and Blossom Run's spring flood. */
-function floodSurge(r: Rng): Buf[] {
-  const s = 5, out = pair(s);
-  out.forEach((o) => {
-    const w = pink(o.length, r);
-    sweep(w, 'lp', (u) => 400 + 2400 * hump(u, 0.7), 0.8);
-    mix(o, shape(w, (t) => hump(t / s, 0.7)), 0, 1);
-    mix(o, shape(filter(brown(o.length, r), 'lp', 160), (t) => hump(t / s, 0.8)), 0, 0.9);
-    bubbles(o, r, 0.5, s - 0.5, 25, 0.06, 300, 1400);
-  });
-  return normAll(out, 0.8);
-}
-
-/** The tide drawing off the Jade Shoals: a long hiss of water running off the sand that falls away as it goes, with
- *  gurgles in the channels as they empty. */
-function tideDraw(r: Rng): Buf[] {
-  const s = 6, out = pair(s);
-  out.forEach((o) => {
-    const w = pink(o.length, r);
-    sweep(w, 'lp', (u) => 2800 - 2300 * u, 0.7);
-    mix(o, shape(w, (t) => hump(t / s, 0.4)), 0, 0.9);
-    mix(o, shape(filter(brown(o.length, r), 'lp', 220), (t) => hump(t / s, 0.6)), 0, 0.6);
-    bubbles(o, r, 1, s - 0.5, 40, 0.08, 200, 900);
-  });
-  return normAll(out, 0.75);
-}
-
-/** Mistwood's fog surge: a cold breath rolling out of the trees. */
-function fogSurge(r: Rng): Buf[] {
-  const s = 5, out = pair(s);
-  out.forEach((o, c) => {
-    mix(o, shape(sweep(pink(o.length, r), 'bp', (u) => 300 + 300 * hump(u), 0.7), (t) => hump(t / s, 1.2)), c * 0.05, 1);
-    mix(o, shape(filter(brown(o.length, r), 'lp', 90), (t) => hump(t / s, 1)), 0, 0.6);
-  });
-  return normAll(out, 0.6);
-}
-
-/** Cinder Peak erupting. */
-function eruption(r: Rng): Buf[] {
-  const out = pair(5);
-  out.forEach((o) => {
-    mix(o, shape(filter(brown(o.length, r), 'lp', 95), (t) => ad(t, 0.35, 1.6)), 0, 1);
-    mix(o, thump(2, 55, 24, 0.8), 0, 0.9);
-    mix(o, shape(filter(white(o.length, r), 'hp', 2800), (t) => 0.18 * ad(t - 0.5, 0.6, 1.5)));
-    scatter(r, 0.2, 3, 8, (at) => { const a = r(); mix(o, thump(0.3, between(r, 90, 160), 60, 0.05), at, 0.3 * a); });
-    crackles(o, r, 0.3, 4, 20, 0.2);
-  });
-  return normAll(out, 0.95);
-}
-
-/** A lava bomb landing. */
-function lavaBomb(r: Rng): Buf {
-  const x = new Float32Array(n(2));
-  mix(x, thump(1, 80, 30, 0.25), 0, 1);
-  mix(x, blast(r, 1, 1500, 6, 0.2), 0, 0.8);
-  mix(x, shape(filter(white(n(1.8), r), 'hp', 2500), (t) => ad(t - 0.05, 0.1, 0.6)), 0, 0.4); // the hiss of hot rock in water
-  crackles(x, r, 0.05, 1.5, 25, 0.3);
-  return normalize(x, 0.85);
-}
-
-/** The Weeping Isle's cloudburst: a downpour arriving in a rush. */
-function cloudburst(r: Rng): Buf[] {
-  const s = 4.5, out = pair(s);
-  out.forEach((o) => {
-    mix(o, shape(filter(pink(o.length, r), 'hp', 900), (t) => Math.min(1, t / 1.5) * hump(t / s, 0.3)), 0, 0.8);
-    scatter(r, 0.3, s - 0.2, 350, (at) => mix(o, burst(r, 0.006, 'bp', between(r, 2000, 7000), 1.5, 0.0002, 0.0012), at, r() * r() * 0.8 * Math.min(1, at / 1.5)));
-    mix(o, shape(filter(brown(o.length, r), 'lp', 300), (t) => hump(t / s, 0.5)), 0, 0.4);
-  });
-  return normAll(out, 0.7);
-}
-
-/** The Maelstrom's vortex strengthening: a vast rising roar. */
-function vortexSurge(r: Rng): Buf[] {
-  const s = 5, out = pair(s);
-  out.forEach((o, c) => {
-    const w = pink(o.length, r);
-    sweep(w, 'bp', (u) => 250 + 700 * u + 120 * Math.sin(TAU * (2 + u * 3) * u + c * Math.PI), 1);
-    mix(o, shape(w, (t) => hump(t / s, 0.6)), 0, 1);
-    mix(o, shape(filter(brown(o.length, r), 'lp', 140), (t) => hump(t / s, 0.6)), 0, 1);
-  });
-  return normAll(out, 0.85);
-}
-
-/** The Kelp Shallows' bloom: the canopy thickening, a rubbery rustle spreading through the water. */
-function kelpBloom(r: Rng): Buf[] {
-  const s = 3.5, out = pair(s);
-  out.forEach((o) => {
-    scatter(r, 0, s - 0.3, 18, (at) => mix(o, kelpBrushOf(r), at, between(r, 0.2, 0.6) * hump(at / s, 0.6)));
-    bubbles(o, r, 0.2, s - 0.2, 20, 0.08, 400, 1600);
-  });
-  return normAll(out, 0.6);
-}
-
 /** A rubbery blade dragging along planks. */
 export function kelpBrushOf(r: Rng): Buf {
   const s = between(r, 0.3, 0.6), x = pink(n(s), r);
   sweep(x, 'bp', (u) => 500 + 600 * hump(u), 1.6);
   shape(x, (t) => hump(t / s, 1.2));
   return mix(x, stickSlip(r, s, 40, 70, [240, 510, 860], 0.03), 0, 0.15);
-}
-
-/** The Spice Isles' pearl bloom: the giant clam bed creaking open with a glint. */
-function clamOpen(r: Rng): Buf[] {
-  const out = pair(3);
-  out.forEach((o, c) => {
-    mix(o, stickSlip(r, 1.4, 12, 30, [90, 170, 280, 430], 0.15), 0, 0.8);
-    bubbles(o, r, 0.3, 1.6, 30, 0.12, 300, 1500);
-    mix(o, glass(r, 2600 * (1 + c * 0.003), 0.6, 1.4), 1.4, 0.35);
-    shards(o, r, 1.4, 2.6, 18, 0.2, 4000, 9000);
-  });
-  return normAll(out, 0.7);
 }
 
 // ---------------------------------------------------------------- abilities
@@ -533,17 +396,6 @@ export const WORLD_SOUNDS = {
   thunder: def(thunder, 3, 'amb', 6, 0.9, 2, { range: 2000 }),
   iceRigging: def(iceRigging, 2, 'fx', 4, 0.5, 2, { range: 60 }),
   iceBoom: def(iceBoom, 3, 'fx', 5, 0.8, 2, { range: 800 }),
-  floesGrind: def(floesGrind, 2, 'fx', 4, 0.6, 2, { range: 300 }),
-  rockfall: def(rockfall, 2, 'fx', 7, 0.9, 1, { range: 900, near: 60 }),
-  floodSurge: def(floodSurge, 1, 'fx', 6, 0.8, 1, { range: 900 }),
-  tideDraw: def(tideDraw, 1, 'fx', 6, 0.75, 1, { range: 900 }),
-  fogSurge: def(fogSurge, 1, 'amb', 6, 0.6, 1),
-  eruption: def(eruption, 1, 'fx', 9, 1, 1, { range: 1500, near: 150 }),
-  lavaBomb: def(lavaBomb, 3, 'fx', 7, 0.85, 4, { range: 600, near: 50 }),
-  cloudburst: def(cloudburst, 1, 'amb', 6, 0.7, 1),
-  vortexSurge: def(vortexSurge, 1, 'amb', 7, 0.85, 1),
-  kelpBloom: def(kelpBloom, 1, 'fx', 5, 0.6, 1, { range: 300 }),
-  clamOpen: def(clamOpen, 1, 'fx', 7, 0.7, 1, { range: 500 }),
   abilitySmoke: def(smokeScreen, 1, 'fx', 7, 0.7, 2, { range: 300 }),
   abilityRam: def(rush, 2, 'fx', 7, 0.8, 2, { range: 300 }),
   abilityRepair: def(repairAbility, 1, 'fx', 6, 0.65, 2, { range: 200 }),

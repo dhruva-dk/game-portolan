@@ -1,5 +1,5 @@
 // The career: everything that lasts between matches. Your record and stats, the hidden rating and the best
-// tier reached, your XP, your loadout, the chart of regions sailed, the secrets of the planet found, and the
+// tier reached, your XP, your loadout, the chart of regions sailed, and the
 // league's forty captains with their ratings, your record against each and what each has learned of you.
 // A career is plain data; every change makes a new one (copyCareer), so the old one stays as it was.
 import { ABILITIES, STARTER_ACTIVE, STARTER_PASSIVE, ability, type AbilityId } from '../sim/abilities.ts';
@@ -11,7 +11,6 @@ import { COSMETICS, STARTER_LOOK, cosmetic, isUnlocked, type Cosmetic, type Look
 import { newLearned } from './habits.ts';
 import { ABILITY_LEVEL, abilityUnlocked, levelOf } from './levels.ts';
 import { rankOf, type Rank } from './ranks.ts';
-import { SECRETS } from '../sim/secrets.ts';
 
 const LEARNED = rec(
   ['drop', list(int)], ['run', list(int)], ['storm', list(int)], ['range', list(int)], ['weapon', list(int)],
@@ -48,18 +47,16 @@ const FIELDS = [
   ['profile', LEARNED],
 ] as const;
 
-const CAREER = rec(
-  ...FIELDS,
-  /** The secrets found (sim/secrets.ts), by id, in the order they were found. */
-  ['secrets', list(str)],
-);
+const CAREER = rec(...FIELDS);
 
 /** The save format. Bump the version when the schema changes, and add a migration in save.ts. */
-export const CAREER_FORMAT: Format<typeof CAREER> = { magic: 'PTLC', version: 4, schema: CAREER };
+export const CAREER_FORMAT: Format<typeof CAREER> = { magic: 'PTLC', version: 5, schema: CAREER };
 
-/** Version 3, before the secrets: kept to read old saves. */
-const CAREER_3 = rec(...FIELDS);
-export const CAREER_V3: Format<typeof CAREER_3> = { magic: 'PTLC', version: 3, schema: CAREER_3 };
+/** Version 3, the same fields, and 4, which also kept a list of what was found on the planet (since cut): kept to
+ *  read old saves. */
+const CAREER_4 = rec(...FIELDS, ['found', list(str)]);
+export const CAREER_V3: Format<typeof CAREER> = { magic: 'PTLC', version: 3, schema: CAREER };
+export const CAREER_V4: Format<typeof CAREER_4> = { magic: 'PTLC', version: 4, schema: CAREER_4 };
 
 export type Career = Value<typeof CAREER>;
 export type CaptainRecord = Career['captains'][number];
@@ -97,31 +94,21 @@ export function newCareer(seed: number): Career {
     chart: new Array<number>(REGION_COUNT).fill(0),
     captains: CAPTAINS.map((c, i) => newCaptainRecord(c.id, rating[i])),
     profile: newLearned(),
-    secrets: [],
   };
 }
 
 export const careerLevel = (c: Career): number => levelOf(c.xp).level;
 export const careerRank = (c: Career): Rank => rankOf(c.rating, c.bestTier);
 
-export const unlockedAbilities = (c: Career): AbilityId[] => ABILITIES.filter((a) => abilityUnlocked(a.id, careerLevel(c), c.secrets)).map((a) => a.id);
-export const unlockedCosmetics = (c: Career): Cosmetic[] => COSMETICS.filter((k) => isUnlocked(k, careerLevel(c), c.bestTier, c.secrets));
-
-/** Records secrets found at sea (ids), each once. What they unlock comes with them. */
-export function findSecrets(c: Career, ids: readonly string[]): Career {
-  const fresh = ids.filter((id, k) => SECRETS.some((s) => s.id === id) && !c.secrets.includes(id) && ids.indexOf(id) === k);
-  if (fresh.length === 0) return c;
-  const next = copyCareer(c);
-  next.secrets.push(...fresh);
-  return next;
-}
+export const unlockedAbilities = (c: Career): AbilityId[] => ABILITIES.filter((a) => abilityUnlocked(a.id, careerLevel(c))).map((a) => a.id);
+export const unlockedCosmetics = (c: Career): Cosmetic[] => COSMETICS.filter((k) => isUnlocked(k, careerLevel(c), c.bestTier));
 
 const knownAbility = (id: string): boolean => ABILITIES.some((a) => a.id === id);
 
 /** Bring an unlocked ability: an active replaces your active, a passive your passive. Locked or unknown throws. */
 export function equipAbility(c: Career, id: AbilityId): Career {
   if (!knownAbility(id)) throw new RangeError(`equipAbility: no ability ${id}`);
-  if (!abilityUnlocked(id, careerLevel(c), c.secrets)) throw new RangeError(`equipAbility: ${id} is locked (level ${ABILITY_LEVEL[id]})`);
+  if (!abilityUnlocked(id, careerLevel(c))) throw new RangeError(`equipAbility: ${id} is locked (level ${ABILITY_LEVEL[id]})`);
   const next = copyCareer(c);
   if (ability(id).kind === 'active') next.active = id;
   else next.passive = id;
@@ -132,7 +119,7 @@ export function equipAbility(c: Career, id: AbilityId): Career {
 export function equipCosmetic(c: Career, id: string): Career {
   const k = cosmetic(id);
   if (!k) throw new RangeError(`equipCosmetic: no cosmetic ${id}`);
-  if (!isUnlocked(k, careerLevel(c), c.bestTier, c.secrets)) throw new RangeError(`equipCosmetic: ${id} is locked`);
+  if (!isUnlocked(k, careerLevel(c), c.bestTier)) throw new RangeError(`equipCosmetic: ${id} is locked`);
   const next = copyCareer(c);
   next.look[k.kind] = id;
   return next;
@@ -141,6 +128,6 @@ export function equipCosmetic(c: Career, id: string): Career {
 /** The look a career wears, each slot checked: anything unknown or locked falls back to the starter. */
 export function wornLook(c: Career): Look {
   const level = careerLevel(c), out: Look = { ...STARTER_LOOK };
-  for (const k of COSMETICS) if (c.look[k.kind] === k.id && isUnlocked(k, level, c.bestTier, c.secrets)) out[k.kind] = k.id;
+  for (const k of COSMETICS) if (c.look[k.kind] === k.id && isUnlocked(k, level, c.bestTier)) out[k.kind] = k.id;
   return out;
 }

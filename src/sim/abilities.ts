@@ -1,11 +1,10 @@
 // The ability catalogue. Every ship brings one active ability (on a button with a cooldown) and one passive
 // into a match. Everyone starts with the same solid pair; later abilities are different, never stronger.
 // The simulation owns the effects; the career owns when each one unlocks; the interface shows these names.
-// Ids are stable: saves and captains refer to them. The last of each kind (Whale Call, Dark Lantern) are not earned by
-// level but by finding a secret on the planet (secrets.ts).
+// Ids are stable: saves and captains refer to them.
 
-export type ActiveId = 'repair' | 'smokeScreen' | 'ram' | 'reveal' | 'hardTurn' | 'decoy' | 'wave' | 'driftMine' | 'whaleCall';
-export type PassiveId = 'salvage' | 'quickReload' | 'quickHands' | 'lightHull' | 'windReader' | 'stormWalker' | 'deepHold' | 'steadyAim' | 'darkLantern';
+export type ActiveId = 'repair' | 'smokeScreen' | 'ram' | 'reveal' | 'hardTurn' | 'decoy' | 'wave' | 'driftMine';
+export type PassiveId = 'salvage' | 'quickReload' | 'quickHands' | 'lightHull' | 'windReader' | 'stormWalker' | 'deepHold' | 'steadyAim';
 export type AbilityId = ActiveId | PassiveId;
 
 export interface AbilityDef {
@@ -27,7 +26,6 @@ export const ABILITIES: readonly AbilityDef[] = [
   { id: 'decoy', kind: 'active', name: 'Decoy', text: 'Leave a ghost ship that sails on and draws fire.', cooldown: 40 },
   { id: 'wave', kind: 'active', name: 'Wave', text: 'Push a wave out that shoves nearby ships away.', cooldown: 35 },
   { id: 'driftMine', kind: 'active', name: 'Drift Mine', text: 'Drop a mine that bursts when a ship comes close.', cooldown: 30 },
-  { id: 'whaleCall', kind: 'active', name: 'Whale Call', text: 'Call the whale up under the water you aim at: it breaches there a few seconds later.', cooldown: 70 },
   { id: 'salvage', kind: 'passive', name: 'Salvage', text: 'Sinking a ship refills some shield.', cooldown: 0 },
   { id: 'quickReload', kind: 'passive', name: 'Quick Reload', text: 'Reload 20% faster.', cooldown: 0 },
   { id: 'quickHands', kind: 'passive', name: 'Quick Hands', text: 'Use consumables 25% faster.', cooldown: 0 },
@@ -36,7 +34,6 @@ export const ABILITIES: readonly AbilityDef[] = [
   { id: 'stormWalker', kind: 'passive', name: 'Storm Walker', text: 'Take less damage from the Storm.', cooldown: 0 },
   { id: 'deepHold', kind: 'passive', name: 'Deep Hold', text: 'Carry one more of every consumable.', cooldown: 0 },
   { id: 'steadyAim', kind: 'passive', name: 'Steady Aim', text: 'Your shots spread less while you turn.', cooldown: 0 },
-  { id: 'darkLantern', kind: 'passive', name: 'Dark Lantern', text: 'At night, ships beyond close range cannot see you at all.', cooldown: 0 },
 ];
 
 export const STARTER_ACTIVE: ActiveId = 'repair';

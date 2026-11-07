@@ -217,17 +217,14 @@ export class Ripples {
     this.#frame++;
   }
 
-  /**
-   * The waves' height (m) at p (a point in the planet's frame, metres) and, if asked, their slope added into `slope`
-   * (a vector along the ground pointing uphill, whose length is the rise per metre).
-   */
-  heightAt(p: V3, slope?: V3): number {
+  /** The waves' height (m) at p, a point in the planet's frame, metres. */
+  heightAt(p: V3): number {
     if (this.#n === 0) return 0;
     const l = Math.hypot(p.x, p.y, p.z) || 1, k = R / l;
     const x = p.x * k, y = p.y * k, z = p.z * k;
     const h = CELL / 2;
     const cx = Math.floor((x - h) / CELL), cy = Math.floor((y - h) / CELL), cz = Math.floor((z - h) / CELL);
-    let sum = 0, gx = 0, gy = 0, gz = 0;
+    let sum = 0;
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) for (let m = 0; m < 2; m++) {
       const ix = cx + i, iy = cy + j, iz = cz + m, b = bucket(ix, iy, iz);
       for (let q = this.#start[b]; q < this.#start[b + 1]; q++) {
@@ -241,20 +238,7 @@ export class Ripples {
         const s = ox * this.#dir[c] + oy * this.#dir[c + 1] + oz * this.#dir[c + 2];
         const wave = Math.cos((KAPPA * s) / r);
         sum += A * bell * wave;
-        if (slope) {
-          const dBell = (-0.5 * Math.PI * Math.sin(Math.PI * rho)) / (r * Math.max(d, 1e-4));
-          const dWave = (-KAPPA / r) * Math.sin((KAPPA * s) / r) * bell;
-          gx += A * (dBell * ox * wave + dWave * this.#dir[c]);
-          gy += A * (dBell * oy * wave + dWave * this.#dir[c + 1]);
-          gz += A * (dBell * oz * wave + dWave * this.#dir[c + 2]);
-        }
       }
-    }
-    if (slope) {
-      const ux = x / R, uy = y / R, uz = z / R, along = gx * ux + gy * uy + gz * uz;
-      slope.x += gx - along * ux;
-      slope.y += gy - along * uy;
-      slope.z += gz - along * uz;
     }
     return sum;
   }

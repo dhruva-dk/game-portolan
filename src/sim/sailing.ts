@@ -1,7 +1,7 @@
 // Sailing on the sphere: ships run great circles at up to 14.5 m/s, faster off the wind than into it, turn,
 // carve, ride the currents, run aground on land and shallows, gust, hop, and bump into each other. A ship upwind
 // steals her wind, and her parts (parts.ts) set what drive and steering she has left.
-import { aground, bloomAt, currentAt, levelAt, solidAt, solidNormal } from './environment.ts';
+import { aground, seaLevel, solidAt, solidNormal } from './environment.ts';
 import { hurt } from './harm.ts';
 import { blanket, drive, steering } from './parts.ts';
 import type { ShipInput } from './input.ts';
@@ -11,7 +11,7 @@ import { R, advance, apart, localFrame, turned } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState, type Ship } from './state.ts';
 import { ABOUT, COINS, GRAVITY, GROUND, GUST, PARTS, PERKS, POINT, POWERS, SHIP, WEATHER, WIND } from './tables.ts';
 import { newWind, windAt, type Wind } from './wind.ts';
-import { DRAFT, heightAt, regionAt } from './world/index.ts';
+import { DRAFT, currentAt, heightAt, regionAt } from './world/index.ts';
 
 const smooth = (a: number, b: number, x: number): number => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
@@ -133,7 +133,7 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   ship.turn = steer;
 
   let target = ship.flip > 0 ? 0 : settledSpeed(ship, W, Math.max(0, Math.min(1, input.throttle)));
-  target *= bloomAt(state, ship.pos) * blanket(state, i, W);
+  target *= blanket(state, i, W);
   if (Math.abs(steer) > SHIP.hard) target = Math.min(target, SHIP.crawl);
   // in irons she barely makes way; a clean tack's canvas fills with a surge
   if (ship.irons > 0) target = Math.min(target, ABOUT.ironsSpeed);
@@ -160,7 +160,7 @@ export function sail(state: MatchState, i: number, input: ShipInput): void {
   ship.drift = -SHIP.carve * ship.speed * (max > 0 ? ship.rate / max : 0);
 
   // velocity: way on, slip, current and any shove
-  currentAt(state, ship.pos, FLOW);
+  currentAt(ship.pos, FLOW);
   const rider = hasPerk(ship, 'currentRider') ? PERKS.currentRider : 1;
   set(SB, ship.head.y * ship.pos.z - ship.head.z * ship.pos.y, ship.head.z * ship.pos.x - ship.head.x * ship.pos.z,
     ship.head.x * ship.pos.y - ship.head.y * ship.pos.x);
@@ -241,7 +241,7 @@ function tryMove(state: MatchState, ship: Ship, grounded: boolean): number | nul
     if (on * fore < 0) continue;
     normalize(addScaled(PROBE, P1, H1, on * half));
     // a hull already touching the ground may still work across the shallows, but not up onto dry land
-    const h = heightAt(PROBE), level = levelAt(state, PROBE);
+    const h = heightAt(PROBE), level = seaLevel(state);
     if (h > (grounded ? level : level - draft) && h > heightAt(normalize(addScaled(WAS, ship.pos, ship.head, on * half)))) {
       hitSolid = false;
       return on;

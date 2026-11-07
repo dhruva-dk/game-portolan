@@ -8,8 +8,6 @@ import { activeOf, cooldownOf } from './perks.ts';
 import { apart, along, tangentToward, turned } from './sphere.ts';
 import { CAUSE, EVENT, PHASE, SHIPS, TICK, copy, emit, elapse, type MatchState } from './state.ts';
 import { POWERS, SHIP } from './tables.ts';
-import { nearestOpen, openAt } from './nav.ts';
-import { callBreach, whaleFree } from './whale.ts';
 
 const T = v3(), P = v3();
 
@@ -30,8 +28,6 @@ export function useAbility(state: MatchState, i: number, input: ShipInput): bool
   const ship = state.ships[i];
   if (ship.phase !== PHASE.sea || ship.cooldown > 0 || ship.flip > 0) return false;
   const id = activeOf(ship);
-  // the whale answers one call at a time
-  if (id === 'whaleCall' && !whaleFree(state)) return false;
   ship.cooldown = cooldownOf(id);
   ship.power = runsFor(id);
   switch (id) {
@@ -74,17 +70,6 @@ export function useAbility(state: MatchState, i: number, input: ShipInput): bool
       along(ship.pos, T, SHIP.half + 3, P);
       state.mines.push({ owner: i, at: { x: P.x, y: P.y, z: P.z }, t: 0 });
       break;
-    case 'whaleCall': {
-      // under the water the guns aim at, as near as the call carries and no further than it reaches; on open water,
-      // or the nearest open water short of it
-      const c = POWERS.whaleCall, d = Math.max(c.near, Math.min(c.far, apart(ship.pos, input.aim)));
-      tangentToward(ship.pos, input.aim, T);
-      if (dot(T, T) < 0.5) set(T, ship.head.x, ship.head.y, ship.head.z);
-      along(ship.pos, T, d, P);
-      if (!openAt(P)) nearestOpen(P, P, 40);
-      callBreach(state, P, i);
-      break;
-    }
     default:
       break;
   }

@@ -87,6 +87,4 @@ export const spires: RegionSpec = {
   zones: [],
   tidal: [],
   props: PINES,
-  // A spire breaks and falls across the run, at the middle of one of its three central reaches, and lies there.
-  event: { spots: FALLS.flatMap((f) => [f.x, f.y]), bearings: FALLS.map((f) => f.bearing), r: 44, block: { length: 64, width: 14, stays: true } },
 };

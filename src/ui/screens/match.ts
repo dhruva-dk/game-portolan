@@ -3,7 +3,7 @@
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
 import {
-  ABILITY_ICON, button, ceremony, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, eventBanner, EVENT_ICON, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
+  ABILITY_ICON, button, ceremony, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
   rarityFrame, WEATHER_ICON, type BarHandle,
 } from '../parts/index.ts';
 import type {
@@ -29,12 +29,7 @@ export interface HudActions {
   call(tier: number): void;
   /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
   target?(name: string, el: HTMLElement | null): void;
-  /** On a voyage: make port, ending it. */
-  port?(): void;
 }
-
-/** The minimap's ink for a region event, by what it is to you. */
-const EVENT_INK = { danger: '#c8341c', prize: '#b8800f', sea: '#1e6e78' } as const;
 
 /** The weather as the HUD names it. */
 const WEATHER_WORD = { fog: 'Fog', rain: 'Rain', thunder: 'Thunder', calm: 'Calm', snow: 'Snow', ash: 'Ash' } as const;
@@ -132,16 +127,6 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
   const count = el('s-hud__count', info);
   const counter = (icon: string) => el('s-hud__n', el('', count, `<i>${icon}</i>`, 'span'), '', 'b');
   const nShips = counter(ICON.flag), nKills = counter(ICON.sink), nCoins = counter(ICON.coin);
-  // a voyage has no Storm and no count of ships left: the line shows the secrets found instead, and a way home
-  if (m.voyage) {
-    nShips.parentElement!.style.display = 'none';
-    button({ label: 'Make port', icon: ICON.port, kind: 'secondary', size: 'sm', parent: info, what: 'hud:port', onPress: () => a.port?.() });
-  }
-
-  // a region's event, under the Storm's line, and a second one smaller under it; they take no touches
-  const events = el('s-hud__event', root);
-  const banner = eventBanner({ parent: events }), also = eventBanner({ parent: events, className: 's-hud__also' });
-
   const map = box('s-hud__map', root);
   const canvas = el<HTMLCanvasElement>('s-hud__mapC', map, undefined, 'canvas');
 
@@ -266,25 +251,8 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
       g.strokeStyle = 'rgba(255, 255, 255, 0.9)'; g.lineWidth = 1.5 * devicePixelRatio;
       g.beginPath(); g.arc(nx, ny, mv.next.r * k, 0, Math.PI * 2); g.stroke();
     }
-    // region events: a wash of their colour over their reach, the rim dashed while they are only warned
-    for (const ev of mv.events) {
-      const [x, y] = at(ev.x, ev.y), ink = EVENT_INK[ev.tone];
-      g.beginPath(); g.arc(x, y, Math.max(5 * devicePixelRatio, ev.r * k), 0, Math.PI * 2);
-      g.fillStyle = `${ink}38`; g.fill();
-      g.setLineDash(ev.warning ? [5 * devicePixelRatio, 4 * devicePixelRatio] : []);
-      g.strokeStyle = ink; g.lineWidth = 2 * devicePixelRatio; g.stroke();
-      g.setLineDash([]);
-    }
     for (const mk of mv.marks) {
       const [x, y] = at(mk.x, mk.y);
-      if (mk.kind === 'cache') {
-        // a cache you know of: a gold diamond, ringed in ink
-        const u = 4.5 * devicePixelRatio;
-        g.beginPath(); g.moveTo(x, y - u); g.lineTo(x + u, y); g.lineTo(x, y + u); g.lineTo(x - u, y); g.closePath();
-        g.fillStyle = '#f2c14e'; g.fill();
-        g.strokeStyle = '#1d1208'; g.lineWidth = 1.4 * devicePixelRatio; g.stroke();
-        continue;
-      }
       g.fillStyle = mk.kind === 'loot' ? '#c99a2e' : '#fff';
       g.fillRect(x - 2 * devicePixelRatio, y - 2 * devicePixelRatio, 4 * devicePixelRatio, 4 * devicePixelRatio);
     }
@@ -333,19 +301,13 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
     grade(pIce, p.ice, 0.7, 'Iced up: slow to turn');
     pIce.label.textContent = p.ice >= 0.15 ? `${Math.round(p.ice * 100)}%` : '';
     partsRow.classList.toggle('is-on', partsRow.querySelector('.is-on') !== null);
-    const st = h.storm, vy = h.voyage;
-    const line = !vy
-      ? `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`
-      : vy.refit > 0
-        ? `<i>${ICON.hull}</i><span>Refitting · ${vy.refit}s</span>`
-        : `<i>${ICON.secret}</i><span>Voyage · ${vy.found}/${vy.of} secrets</span>`;
+    const st = h.storm;
+    const line = `<i>${ICON.storm}</i><span>${st.shrinking ? 'Storm closing' : `Storm ${st.phase + 1}/${st.phases}`} · ${mmss(st.seconds)}</span>`;
     if (storm.dataset.html !== line) storm.innerHTML = storm.dataset.html = line;
-    storm.classList.toggle('is-out', !vy && st.outside);
+    storm.classList.toggle('is-out', st.outside);
     nShips.textContent = `${h.ships}`;
     nKills.textContent = `${h.kills}`;
     nCoins.textContent = `${h.coins}`;
-    banner.set(h.event ? { ...h.event, icon: EVENT_ICON[h.event.region] ?? ICON.storm } : null);
-    also.set(h.also ? { ...h.also, icon: EVENT_ICON[h.also.region] ?? ICON.storm } : null);
     where.innerHTML = `<b>${esc(h.region)}</b>${h.perk ? `<span>${esc(h.perk)}</span>` : ''}${h.night ? `<i>${ICON.moon}</i>` : ''}`;
     h.slots.forEach((s, k) => {
       const v = slots[k];

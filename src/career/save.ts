@@ -7,9 +7,8 @@
 import { ABILITIES, STARTER_ACTIVE, STARTER_PASSIVE } from '../sim/abilities.ts';
 import { REGION_COUNT } from '../sim/world/index.ts';
 import { CAPTAINS } from './captains.ts';
-import { CAREER_FORMAT, CAREER_V3, decodeCareer, encodeCareer, newCaptainRecord, newCareer, wornLook, type Career } from './career.ts';
+import { CAREER_FORMAT, CAREER_V3, CAREER_V4, decodeCareer, encodeCareer, newCaptainRecord, newCareer, wornLook, type Career } from './career.ts';
 import { decode, fromHex, hash64, toHex, versionOf } from './codec.ts';
-import { SECRETS } from '../sim/secrets.ts';
 import { newLearned, type Learned } from './habits.ts';
 import { abilityUnlocked, levelOf } from './levels.ts';
 import { TIERS } from './ranks.ts';
@@ -65,10 +64,14 @@ export type LoadStatus = 'loaded' | 'repaired' | 'missing' | 'corrupt' | 'unknow
 
 /**
  * Migrations from older format versions to the current one, by version. Each takes the old payload and
- * returns a career, or throws. Version 3 is the first of Portolan's career; 4 added the secrets found.
+ * returns a career, or throws. Version 3 is the first of Portolan's career; 4 added what was found on the planet; 5 cut it.
  */
 const MIGRATIONS: Readonly<Record<number, (bytes: Uint8Array) => Career>> = {
-  3: (bytes) => ({ ...decode(CAREER_V3, bytes), secrets: [] }),
+  3: (bytes) => decode(CAREER_V3, bytes),
+  4: (bytes) => {
+    const { found: _, ...c } = decode(CAREER_V4, bytes);
+    return c;
+  },
 };
 
 /** Reads a saved string. Returns null with a reason when it can't be used. */
@@ -138,9 +141,8 @@ export function repairCareer(c: Career): Career {
   c.xp = count(c.xp);
   c.rating = Math.round(clampRating(Number.isInteger(c.rating) ? c.rating : 0));
   c.bestTier = Math.min(TIERS.length - 1, count(c.bestTier));
-  c.secrets = c.secrets.filter((id, k) => SECRETS.some((s) => s.id === id) && c.secrets.indexOf(id) === k);
   const level = levelOf(c.xp).level, owned = (id: string, kind: 'active' | 'passive'): boolean =>
-    ABILITIES.some((a) => a.id === id && a.kind === kind && abilityUnlocked(a.id, level, c.secrets));
+    ABILITIES.some((a) => a.id === id && a.kind === kind && abilityUnlocked(a.id, level));
   if (!owned(c.active, 'active')) c.active = STARTER_ACTIVE;
   if (!owned(c.passive, 'passive')) c.passive = STARTER_PASSIVE;
   c.look = wornLook(c);

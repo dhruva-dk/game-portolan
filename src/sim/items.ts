@@ -6,7 +6,6 @@ import type { ShipInput } from './input.ts';
 import { addScaled, dot, normalize, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
 import { openAt, nearestOpen } from './nav.ts';
 import { hasPassive, hasPerk } from './perks.ts';
-import { RULE } from './rules.ts';
 import { apart, along, tangentAt } from './sphere.ts';
 import { EVENT, PHASE, SHIPS, STREAM, TICK, copy, emit, type Item, type Loot, type MatchState, type Ship } from './state.ts';
 import { COINS, EQUIP, ITEM, LOOT, PARTS, PERKS, POWERS, RARITIES, SLOTS, USES, WEAPONS, WEAPON_KINDS, isUse, isWeapon } from './tables.ts';
@@ -33,10 +32,10 @@ function rollRarity(rng: Rng, boost: number): number {
   return Math.min(RARITIES - 1, k + boost);
 }
 
-/** A random item, by rarity. Under the harpoons-only rule every weapon is a harpoon. */
-export function rollItem(state: MatchState, rng: Rng, boost = 0): Item {
+/** A random item, by rarity. */
+export function rollItem(rng: Rng, boost = 0): Item {
   if (rngFloat(rng) < LOOT.weapon) {
-    const kind = state.rule === RULE.harpoonsOnly ? ITEM.harpoon : WEAPON_KINDS[rngInt(rng, WEAPON_KINDS.length)];
+    const kind = WEAPON_KINDS[rngInt(rng, WEAPON_KINDS.length)];
     return weaponItem(kind, rollRarity(rng, boost));
   }
   const r = rngFloat(rng);
@@ -45,7 +44,7 @@ export function rollItem(state: MatchState, rng: Rng, boost = 0): Item {
 }
 
 /** The weapon every ship starts with in slot 0. */
-export const starter = (state: MatchState): Item => weaponItem(state.rule === RULE.harpoonsOnly ? ITEM.harpoon : ITEM.cannon, 0);
+export const starter = (): Item => weaponItem(ITEM.cannon, 0);
 
 // ---------------------------------------------------------------- loot on the water
 
@@ -96,9 +95,9 @@ export function seedLoot(state: MatchState): void {
   fallback();
   const rng = state.rng[STREAM.loot], spots = lootSpots();
   for (let s = 0; s < spots.length; s++) {
-    spawnLoot(state, spots[s].pos, rollItem(state, rng), -1, s);
+    spawnLoot(state, spots[s].pos, rollItem(rng), -1, s);
     if (rngFloat(rng) < LOOT.second) {
-      const l = spawnLoot(state, spots[s].pos, rollItem(state, rng), -1, s);
+      const l = spawnLoot(state, spots[s].pos, rollItem(rng), -1, s);
       tangentAt(l.at, rngRange(rng, -3.14159, 3.14159), T);
       along(l.at, T, 4, l.at);
     }

@@ -34,7 +34,6 @@ import { LAYER, type Waves } from './waves.ts';
 import { BODIES, moonlight, skyLight, sunlight } from '../atmosphere/light.ts';
 import { sunShadow } from '../atmosphere/shadows.ts';
 import { LAMP, P, shared } from '../gpu/uniforms.ts';
-import { seaLevelNode } from '../lift.ts';
 import type { Coast } from './coast.ts';
 import type { Territory } from './territory.ts';
 import { REACH } from './coastField.ts';
@@ -50,7 +49,7 @@ const SURF_PERIOD = 7, SHOAL = 1;
  *  back. Long enough that the jump is rare, short enough that nothing is stretched past recognition. */
 const FLOW_PERIOD = 2.4;
 /** Water slower than this carries no foam of its own, m/s; faster than FAST it runs white: the Great Current's pace
- *  and below is quiet, a race in spate is not. */
+ *  and below is quiet; the Maelstrom's whirl, and a lane running into the Great Current, are not. */
 const SLOW = 4.4, FAST = 8;
 /** How much brighter water a captain's dye has coloured is than the sea's own: a shade, so their hue reads through
  *  the water and the water still reads as the sea, its waves and glitter over it. */
@@ -152,7 +151,7 @@ export const SEA_FIELD: { texture: Texture | null } = { texture: null };
 
 /**
  * The sea's surface over `up` in metres from the planet's centre, as near as anything riding it needs: the level of
- * the tide and the events, and the height of the waves of every cascade at their finest mip, in both frames. For
+ * the tide, and the height of the waves of every cascade at their finest mip, in both frames. For
  * compute work (particles landing on the water); null until the ocean is built.
  */
 export function seaHeightNode(up: V3): F | null {
@@ -166,7 +165,7 @@ export function seaHeightNode(up: V3): F | null {
     for (let c = 0; c < CASCADES; c++) d = d.add(field.sample(q.div(SIZES[c])).depth(int(LAYER.displacement + c)).level(float(0)).y);
     h = h.add(d.mul(k === 0 ? FRAME.weight.x : FRAME.weight.y));
   });
-  return seaLevelNode(up).add(h);
+  return float(P.planet.y).add(h);
 }
 
 // ---------------------------------------------------------------- rain on the water
@@ -265,8 +264,8 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     vq.assign(q);
     vRise.assign(rise.mul(still));
     vUp.assign(up);
-    // on the sea's level: the tide's, raised or drawn down where the regions' events move the water
-    const level = seaLevelNode(up).toVar();
+    // on the sea's level: the tide's
+    const level = float(P.planet.y).toVar();
     vLevel.assign(level.sub(R));
     return up.mul(level).add(lift.mul(still));
   })();

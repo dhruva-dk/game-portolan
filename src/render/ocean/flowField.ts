@@ -1,8 +1,7 @@
 // The current lanes as a field over the planet, for the sea's surface to stream along: at every node of six
 // equal-angle cube faces (as sim/sphere.ts faceUV), the lanes' flow there at their charted speed, metres a second
-// along the surface, and the region whose lane it is, so an event that sends one region's lanes into spate can scale
-// them on the GPU. The Great Current and the Maelstrom's whirl are smooth enough to be worked out where they are drawn
-// (flow.ts) and are left out. Pure arithmetic over the simulation's lanes: it runs in a worker and in node.
+// along the surface. The Great Current and the Maelstrom's whirl are smooth enough to be worked out where they are
+// drawn (flow.ts) and are left out. Pure arithmetic over the simulation's lanes: it runs in a worker and in node.
 import { CURRENTS, currentAt } from '../../sim/world/index.ts';
 import { v3 } from '../../sim/math.ts';
 
@@ -29,37 +28,22 @@ function nodeDir(face: number, i: number, j: number, out: { x: number; y: number
   out.z = z / l;
 }
 
-/**
- * Four floats a node, face by face, row (j) by row, node (i) by node: the lanes' flow (x, y, z, m/s, a tangent) and
- * the region whose lane moves the water there most, or, where none does, whose lane's cap (which reaches well past
- * the water that moves) is nearest, so the region holds steady across a lane's edges where the flow fades out.
- */
+/** Four floats a node, face by face, row (j) by row, node (i) by node: the lanes' flow (x, y, z, m/s, a tangent), and 0. */
 export function flowField(): Float32Array {
   const out = new Float32Array(6 * FACE * 4);
-  const none = new Array<number>(CURRENTS.length).fill(0), one = none.slice();
-  const p = v3(), lane = v3(), base = v3();
+  const none = new Array<number>(CURRENTS.length).fill(0), all = none.map(() => 1);
+  const p = v3(), lanes = v3(), base = v3();
   for (let f = 0; f < 6; f++) {
     for (let j = 0; j <= N; j++) {
       for (let i = 0; i <= N; i++) {
         nodeDir(f, i, j, p);
+        if (!CURRENTS.some((l) => p.x * l.centre.x + p.y * l.centre.y + p.z * l.centre.z >= l.cos)) continue;
+        currentAt(p, base, none, 0);
+        currentAt(p, lanes, all, 0);
         const o = (f * FACE + j * ROW + i) * 4;
-        let region = 0, near = -2, most = 0, base0 = false;
-        for (let k = 0; k < CURRENTS.length; k++) {
-          const l = CURRENTS[k];
-          const d = p.x * l.centre.x + p.y * l.centre.y + p.z * l.centre.z;
-          if (d < l.cos) continue;
-          if (!base0) (currentAt(p, base, none, 0), (base0 = true));
-          one[k] = 1;
-          currentAt(p, lane, one, 0);
-          one[k] = 0;
-          const x = lane.x - base.x, y = lane.y - base.y, z = lane.z - base.z, s = Math.hypot(x, y, z);
-          out[o] += x;
-          out[o + 1] += y;
-          out[o + 2] += z;
-          if (s > most) (most = s), (region = l.region);
-          else if (most === 0 && d > near) (near = d), (region = l.region);
-        }
-        out[o + 3] = region;
+        out[o] = lanes.x - base.x;
+        out[o + 1] = lanes.y - base.y;
+        out[o + 2] = lanes.z - base.z;
       }
     }
   }

@@ -1,7 +1,7 @@
 // The whale: a giant that swims a loop of deep water in the Glass Sea, surfacing and diving as it goes.
 // As the Storm calls certain phases it rises under the busiest water near it and breaches: ships near it are
 // lifted, those right over it are flipped, and it scatters loot.
-import { PI, rngInt, rngRange, set, v3, type V3 } from './math.ts';
+import { PI, rngInt, rngRange, set, v3 } from './math.ts';
 import { openAt } from './nav.ts';
 import { advance, along, apart, tangentAt, tangentToward } from './sphere.ts';
 import { hurt } from './harm.ts';
@@ -11,13 +11,13 @@ import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, WHALE_STATE, copy, emit, type
 import { WHALE } from './tables.ts';
 import { CENTRES, heightAt, regionIndex } from './world/index.ts';
 
-export const WHALE_HOME = regionIndex('glassSea');
+const HOME = regionIndex('glassSea');
 
 const T = v3(), P = v3();
 
 /** Lays out the whale's route: deep, open water around the Glass Sea. */
 export function planWhale(state: MatchState): void {
-  const rng = state.rng[STREAM.whale], w = state.whale, c = CENTRES[WHALE_HOME];
+  const rng = state.rng[STREAM.whale], w = state.whale, c = CENTRES[HOME];
   w.route = [];
   for (let k = 0; k < WHALE.waypoints; k++) {
     let placed = false;
@@ -40,21 +40,10 @@ export function planWhale(state: MatchState): void {
   w.breaches = 0;
 }
 
-/** Whether the whale is free to be called: not already rising or breaching. */
-export const whaleFree = (state: MatchState): boolean => state.whale.state !== WHALE_STATE.rising && state.whale.state !== WHALE_STATE.breach;
-
-/** Calls the breach: the whale rises under the busiest water within reach, or under `at` when the Glass Sea calls it
- *  there or a ship calls it (`by`, with Whale Call). */
-export function callBreach(state: MatchState, at: V3 | null = null, by = -1): void {
+/** Calls the breach: the whale rises under the busiest water within reach. */
+export function callBreach(state: MatchState): void {
   const w = state.whale;
-  if (!whaleFree(state)) return;
-  if (at !== null) {
-    copy(w.spot, at);
-    w.state = WHALE_STATE.rising;
-    w.t = WHALE.rising;
-    emit(state, EVENT.whaleRising, -1, by, w.spot, { amount: WHALE.rising, y: WHALE.lift });
-    return;
-  }
+  if (w.state === WHALE_STATE.rising || w.state === WHALE_STATE.breach) return;
   let best = -1, bestN = 0;
   for (let i = 0; i < SHIPS; i++) {
     const s = state.ships[i];
@@ -140,9 +129,5 @@ function breach(state: MatchState): void {
       emit(state, EVENT.flipped, i, -1, s.pos, { amount: WHALE.flipped });
     }
   }
-  for (let k = 0; k < WHALE.loot; k++) spawnLoot(state, w.at, rollItem(state, rng, rngInt(rng, 2)), -1, -1, 6 + k);
-}
-
-export function whaleNear(state: MatchState, p: V3, r: number): boolean {
-  return state.whale.state !== WHALE_STATE.under && apart(state.whale.at, p) < r;
+  for (let k = 0; k < WHALE.loot; k++) spawnLoot(state, w.at, rollItem(rng, rngInt(rng, 2)), -1, -1, 6 + k);
 }

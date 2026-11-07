@@ -78,6 +78,4 @@ export const jadeShoals: RegionSpec = {
   zones: [],
   tidal: TIDAL,
   props: plant(height, 'palm', [-250, -260, 250, 300], 9, S + 20, 0.25, 1.5, 10, 0.3, 7),
-  // The great ebb: the sea drains off the shoals and every gap through the bars runs dry.
-  event: { spots: [DUNE.x, DUNE.y], r: 260, lift: [{ x: DUNE.x, y: DUNE.y, r: 260, fade: 80, by: -2.5 }] },
 };

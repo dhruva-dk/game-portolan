@@ -63,6 +63,4 @@ export const weepingIsle: RegionSpec = {
   zones: [{ kind: 'spray', x: ISLE.x, y: ISLE.y, r: ISLE.r + 30 }],
   tidal: [],
   props: [],
-  // A cloudburst: rain and fog close in round the isle.
-  event: { spots: [ISLE.x, ISLE.y], r: 320 },
 };

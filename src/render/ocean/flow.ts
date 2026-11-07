@@ -2,7 +2,7 @@
 //
 // The currents: the Great Current east along the equator and the Maelstrom's whirl are worked out here as the
 // simulation does (sim/world currentAt, vortexAt); the lanes come from a field laid over the planet in a worker
-// (flowField.ts), scaled region by region as the events send them into spate. The surface streams its ripples and
+// (flowField.ts). The surface streams its ripples and
 // its foam along them by Vlachos's flow map ("Water Flow in Portal 2", SIGGRAPH 2010): each is read twice, carried
 // down the flow for a period's two halves offset by half a period, and the two blended so whichever has been
 // carried furthest is gone when it jumps back.
@@ -10,8 +10,8 @@
 // The calms: where a calm system sits the wind drops away and the sea goes glassy, its waves and ripples stilled
 // toward the middle of it.
 import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGBAFormat, Vector2, Vector4, type Node } from 'three/webgpu';
-import { abs, cross, dot, float, int, length, max, select, smoothstep, sqrt, texture, uniform, uniformArray, vec3, renderGroup } from 'three/tsl';
-import { CURRENTS, GREAT_CURRENT, REGION_COUNT, VORTEX } from '../../sim/world/index.ts';
+import { abs, cross, dot, float, length, max, select, smoothstep, sqrt, texture, uniform, uniformArray, vec3, renderGroup } from 'three/tsl';
+import { GREAT_CURRENT, VORTEX } from '../../sim/world/index.ts';
 import { R } from '../../sim/sphere.ts';
 import { cubeFace } from '../gpu/cube.ts';
 import { FLOW_NODES } from './flowField.ts';
@@ -30,9 +30,6 @@ export class Flow {
   /** 1 once the lanes have arrived. */
   readonly on = uniform(0);
   readonly ready: Promise<void>;
-  /** Each region's lanes' speed against their charted one. */
-  readonly #scale = uniformArray(new Array<number>(REGION_COUNT).fill(1), 'float').setGroup(renderGroup);
-  readonly #vortex = uniform(1);
   /** Each calm: its centre and how still (x, y, z, w), and the cosines of its edge and of where it is stillest. */
   readonly #calm = uniformArray(Array.from({ length: CALMS }, () => new Vector4()), 'vec4').setGroup(renderGroup);
   readonly #calmEdge = uniformArray(Array.from({ length: CALMS }, () => new Vector2(2, 2)), 'vec2').setGroup(renderGroup);
@@ -62,18 +59,6 @@ export class Flow {
       };
       w.postMessage(0);
     });
-  }
-
-  /** The events' hold on the currents: each lane's speed scale (by its index in CURRENTS) and the vortex's. */
-  set(currents?: { lanes: readonly number[]; vortex: number }): void {
-    const s = this.#scale.array as number[];
-    if (!currents) s.fill(1);
-    else {
-      s.fill(0);
-      CURRENTS.forEach((l, i) => (s[l.region] = Math.max(s[l.region], currents.lanes[i] ?? 1)));
-      for (let r = 0; r < s.length; r++) if (!CURRENTS.some((l) => l.region === r)) s[r] = 1;
-    }
-    this.#vortex.value = currents?.vortex ?? 1;
   }
 
   /** The calm systems over the planet now, the nearest the eye first when there are more than the sea can hold. */
@@ -114,12 +99,10 @@ export class Flow {
     const gs = float(GREAT_CURRENT.speed).mul(float(1).sub(smoothstep(GREAT_CURRENT.half, GREAT_CURRENT.fade, de)));
     const east = vec3(up.z, 0, up.x.negate());
     const great = east.div(max(length(east), 1e-6)).mul(gs);
-    // the lanes, each region's at its events' pace
+    // the lanes
     const { face, eq } = cubeFace(up);
     const uv = eq.add(1).mul(N / 2).add(0.5).div(ROW);
-    const l = texture(this.texture, uv).depth(face).level(float(0));
-    const scale = (this.#scale as unknown as { element(i: Node<'int'>): F }).element(int(l.w.add(0.5)));
-    const lanes = l.xyz.mul(scale);
+    const lanes = texture(this.texture, uv).depth(face).level(float(0)).xyz;
     // the Maelstrom: round the Eye clockwise seen from above the pole and in toward it, stilled in the eye itself
     const c = vec3(VORTEX.pos.x, VORTEX.pos.y, VORTEX.pos.z);
     const d = dot(up, c);
@@ -130,8 +113,8 @@ export class Flow {
     const u = rho.div(VORTEX.r);
     const rim = float(1).sub(smoothstep(0.75, 1, u));
     const still = smoothstep(VORTEX.eye * 0.6, VORTEX.eye * 1.6, rho);
-    const swirl = this.#vortex.mul(VORTEX.swirl).mul(rim).mul(still).mul(float(1).sub(u).mul(0.55).add(0.45));
-    const inflow = this.#vortex.mul(VORTEX.inflow).mul(rim).mul(still);
+    const swirl = rim.mul(still).mul(float(1).sub(u).mul(0.55).add(0.45)).mul(VORTEX.swirl);
+    const inflow = rim.mul(still).mul(VORTEX.inflow);
     const whirl = select(d.greaterThanEqual(lim), cross(up, radial).mul(swirl).add(radial.mul(inflow)), vec3(0));
     return great.add(lanes).add(whirl) as V3;
   }

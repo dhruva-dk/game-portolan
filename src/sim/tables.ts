@@ -326,8 +326,6 @@ export const POWERS = {
   stormWalker: 0.6,
   deepHold: 1,
   steadyAim: 0.2,
-  /** Whale Call: how far ahead along the aim the whale is called to, at the nearest and furthest. */
-  whaleCall: { near: 45, far: 110 },
 } as const;
 
 /** How much turning spreads shots, at the full turning rate. */
@@ -474,76 +472,7 @@ export const WHALE = {
   loot: 6,
 } as const;
 
-// ---------------------------------------------------------------- the regions' events
-
-/**
- * Each region's own event (regionEvents.ts), once a match, in region order: the first `first` seconds in, then one every
- * `every` seconds, each up to `late` seconds later than that, with a warning of `warn` seconds before it.
- */
-export const REGION_EVENT = {
-  first: 45,
-  every: 27,
-  late: 12,
-  warn: [5, 10],
-  /** How long each runs, and how many seconds it takes to build up and to die down, by region index. The Glass Sea's
-   *  runs through the whale's leap until it is down and the wall of water thrown. */
-  run: [60, 45, 60, 4, 75, 60, 70, 50, 7, 70, 70, 60, 45, 60, 70, 45],
-  ramp: [8, 6, 10, 0, 0, 6, 10, 6, 0, 10, 10, 0, 4, 10, 10, 8],
-  /** The Ice Crown: how many times as fast the floes ride, and how close to one a captain will go. */
-  ice: { speed: 4, berth: 16 },
-  /** The Fjords' and the Blossom Run's lanes run this many times as fast. */
-  surge: 2.5,
-  /** Mistwood's fog bank: its radius as it starts and at its height. */
-  mist: { from: 140, r: 290 },
-  /** The falling spire and the Narrows' rockfall: damage to a ship caught under them. */
-  fall: 25,
-  rock: 20,
-  /** The Basalt Stacks' tunnel: a ship needs this much air between the sea and the roof. */
-  air: 9.5,
-  /** The kelp bloom: its radius at its height, and the share of her speed a ship in it keeps. */
-  bloom: { r: 110, slow: 0.5 },
-  /** The Spice Isles' clam bed: how many pearls, and how much rarer than usual they roll. The Basalt Stacks' cave hoard, likewise. */
-  pearls: { n: 5, boost: 3 },
-  hoard: { n: 3, boost: 1 },
-  /**
-   * Cinder Peak: a bomb every `every` seconds, `flight` seconds in the air, landing `near` to `far` metres from the peak,
-   * hurting ships within `reach` and setting them burning for `burn` seconds; one in `aimed` falls near a ship. The ash
-   * cloud's radius, how fast it drifts on the wind (m/s), and how far it can go.
-   */
-  eruption: { every: 0.7, flight: 1.4, near: 28, far: 130, reach: 9, damage: 14, burn: 3, aimed: 3, ash: { r: 100, drift: 3, far: 220 } },
-  /** The Weeping Isle's cloudburst: the radius of its fog and of its rain. */
-  cloudburst: { fog: 320, rain: 260 },
-  /** The Maelstrom's vortex at the event's height, as a multiple of its usual strength. */
-  vortex: 2.4,
-  /** A captain goes for an event's prize this far off, and keeps this far outside a danger it is escaping. */
-  reach: 300,
-  berth: 15,
-  /** Metres of the Storm's calm an event's danger must leave clear of it (past the berth) by its end; one that would not comes earlier. */
-  room: 60,
-} as const;
-
 // ---------------------------------------------------------------- the match
 
 export const MATCH = { ships: 20, tick: 1 / 30 } as const;
 
-/** The free voyage (voyage.ts). */
-export const VOYAGE = {
-  /** Captains who sail the voyage with you; the rest of the fleet stays ashore. */
-  captains: 7,
-  /** Seconds a wreck waits before it refits and sails again: yours, and a captain's. */
-  refit: 8,
-  refitCaptain: 30,
-  /** Metres a refitted ship comes back clear of every other ship, and a captain's clear of you. */
-  clear: 160,
-  clearYou: 320,
-  /** Seconds between loot laid again on an empty spot. */
-  loot: 6,
-  /** Seconds what a wreck spilled floats before it goes down. */
-  spill: 240,
-  /** Seconds a region's event rests before it comes round again, at the least and the most. */
-  rest: [150, 330],
-  /** Seconds between the whale's breaches, at the least and the most. */
-  whale: [150, 260],
-  /** Seconds before a hidden cache taken is filled again. */
-  cache: 120,
-} as const;

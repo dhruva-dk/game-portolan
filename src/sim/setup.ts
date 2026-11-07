@@ -1,21 +1,16 @@
-// Making a match from its setup: the seed, the date (which picks the rule), and the fleet.
+// Making a match from its setup: the seed and the fleet.
 import { STARTER_ACTIVE, STARTER_PASSIVE, type ActiveId, type PassiveId } from './abilities.ts';
 import type { LearntMind } from './end.ts';
 import { empty, seedLoot, starter } from './items.ts';
 import { hash32, rngFrom, rngFloat, rngInt, rngRange } from './math.ts';
 import { galeSeat, planGale } from './opening.ts';
 import { activeIndex, passiveIndex } from './perks.ts';
-import { chartEvents, planEvents } from './regionEvents.ts';
-import { RULE, ruleFor } from './rules.ts';
 import { TERRITORY } from './sphere.ts';
-import { SECRET_COUNT, seedCaches } from './secrets.ts';
-import { EVENT_STATE, GULL, MODE, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
+import { GULL, PHASE, SHIPS, STREAM, STREAMS, WHALE_STATE, type Captain, type MatchState, type Ship } from './state.ts';
 import { planStorm } from './storm.ts';
-import { DAY, GALE, GUST, SLOTS, VOYAGE } from './tables.ts';
-import { planVoyage } from './voyage.ts';
+import { DAY, GALE, GUST, SLOTS } from './tables.ts';
 import { newWeather } from './weather.ts';
 import { planWhale } from './whale.ts';
-import { REGION_COUNT } from './world/index.ts';
 import { newGusts } from './wind.ts';
 
 /** One ship in the fleet. Leave `captain` false for the player's ship. */
@@ -39,10 +34,6 @@ export interface FleetEntry {
 
 export interface MatchSetup {
   seed: number;
-  /** The day, as YYYY-MM-DD: it picks the rotating rule. */
-  date?: string;
-  /** Overrides the date's rule (see rules.ts). */
-  rule?: number;
   /** Overrides the random start hour (0–24) and tilt (radians). */
   hour?: number;
   tilt?: number;
@@ -50,10 +41,6 @@ export interface MatchSetup {
   fleet?: readonly FleetEntry[];
   /** Every captain is gentle: a first match. */
   gentle?: boolean;
-  /** A free voyage (voyage.ts) instead of a match: no Storm, no end, and only the first VOYAGE.captains captains. */
-  voyage?: boolean;
-  /** The secrets the player has already found, as indices into SECRETS (secrets.ts). */
-  found?: readonly number[];
 }
 
 const xyz = () => ({ x: 0, y: 0, z: 1 });
@@ -78,7 +65,7 @@ function newShip(state: MatchState, e: FleetEntry, i: number, gentle: boolean): 
   const ship: Ship = {
     name: e.name ?? i, look: e.look ?? i, phase: PHASE.gale, pos: xyz(), head: { x: 1, y: 0, z: 0 }, was: xyz(), alt: GALE.height, vy: 0,
     speed: 0, drift: 0, rate: 0, turn: 0, shove: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 },
-    hull: 100, shield: state.rule === RULE.fullShields ? 100 : 0,
+    hull: 100, shield: 0,
     slots: Array.from({ length: SLOTS }, empty), sel: 0, cool: 0, reload: 0, equip: 0, windup: 0, use: -1, useT: 0,
     gusts: GUST.charges, gustT: 0, boost: 0, aim: xyz(), aimY: 0,
     active: Math.max(0, activeIndex(e.active ?? STARTER_ACTIVE)), passive: Math.max(0, passiveIndex(e.passive ?? STARTER_PASSIVE)),
@@ -90,7 +77,7 @@ function newShip(state: MatchState, e: FleetEntry, i: number, gentle: boolean): 
     gull: { state: GULL.home, t: 0, tier: 0, at: xyz(), alt: 0 },
     near: -1, captain: newCaptain(e, i, state.seed, gentle),
   };
-  ship.slots[0] = starter(state);
+  ship.slots[0] = starter();
   galeSeat(state, i, 0, ship.pos, ship.head);
   ship.was = { ...ship.pos };
   return ship;
@@ -101,40 +88,28 @@ export function createMatch(setup: MatchSetup): MatchState {
   const seed = setup.seed >>> 0;
   const rng = Array.from({ length: STREAMS }, (_, k) => rngFrom(hash32(seed, k)));
   const w = rng[STREAM.world];
-  // the day's rule is for matches: a voyage sails under the usual rules
-  const rule = setup.rule ?? (setup.voyage ? RULE.none : ruleFor(setup.date));
   const state: MatchState = {
-    seed, tick: 0, rule, mode: setup.voyage ? MODE.voyage : MODE.match,
+    seed, tick: 0,
     hour: setup.hour ?? rngRange(w, 0, 24),
     tilt: setup.tilt ?? rngRange(w, -DAY.tilt, DAY.tilt),
     rng,
     ships: [],
     gale: { from: xyz(), dir: { x: 1, y: 0, z: 0 }, at: xyz(), head: { x: 1, y: 0, z: 0 }, t: 0, done: false },
-    storm: { region: 0, centres: [], start: 0, phase: 0, shrinking: false, scale: 1 },
+    storm: { region: 0, centres: [], start: 0, phase: 0, shrinking: false },
     gusts: newGusts(),
     weather: newWeather(),
     owner: new Uint8Array(TERRITORY.cells),
     trail: new Uint8Array(TERRITORY.cells),
     loot: [], nextId: 1, shots: [], clouds: [], decoys: [], mines: [],
     whale: { at: xyz(), head: { x: 1, y: 0, z: 0 }, route: [], leg: 0, state: WHALE_STATE.under, t: 0, breaches: 0, spot: xyz() },
-    regionEvents: Array.from({ length: REGION_COUNT }, () => ({ state: EVENT_STATE.waiting, at: 0, warn: 0, run: 0, t: 0, k: 0, spot: xyz(), n: 0, marks: [] })),
-    floeT: 0,
     leader: -1, rentT: 0, events: [], noise: [], director: { phase: 0, heat: 0, t: 0, quiet: 0, hunches: 0 }, sunk: [], winner: -1,
-    found: [...new Set(setup.found ?? [])].filter((k) => k >= 0 && k < SECRET_COUNT).sort((a, b) => a - b),
-    quest: new Array<number>(SECRET_COUNT).fill(0),
-    voyage: { lootT: 0, whaleT: 0, caches: [] },
   };
-  // the captains' chart starts from a quiet sea, whatever the last match left on it
-  chartEvents(state);
   planGale(state);
   const fleet = setup.fleet ?? [{ captain: false }];
   for (let i = 0; i < SHIPS; i++) state.ships.push(newShip(state, fleet[i] ?? { captain: true }, i, setup.gentle ?? false));
   planStorm(state);
-  planEvents(state);
   planWhale(state);
   seedLoot(state);
-  seedCaches(state);
-  if (setup.voyage) planVoyage(state, VOYAGE.captains);
   return state;
 }
 

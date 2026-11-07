@@ -25,14 +25,8 @@ import { CameraRig } from '../camera.ts';
 import { Beacons } from '../regions/beacons.ts';
 import { Landmarks } from '../regions/landmarks.ts';
 import { Floes } from '../regions/floes.ts';
-import { EventRocks } from '../regions/eventRocks.ts';
-import { EventKelp } from '../regions/eventKelp.ts';
-import { EventClams } from '../regions/eventClams.ts';
-import { EventPetals } from '../regions/eventPetals.ts';
 import { Moonbow } from '../regions/moonbow.ts';
 import { Flora } from '../flora/field.ts';
-import { rideOn } from '../swell.ts';
-import { seaLift, setLifts } from '../lift.ts';
 import { seaDeepAt } from '../seaTint.ts';
 import { moonDirection, sunDirection } from '../sun.ts';
 import { R } from '../../sim/sphere.ts';
@@ -40,7 +34,6 @@ import type { V3 } from '../../sim/math.ts';
 import type { StageView } from '../stage.ts';
 
 const DEG = Math.PI / 180;
-const NO_LIFT: readonly number[] = [];
 /** How built up the fair-weather cumulus is over the planet, where its own map heaps it most. */
 const FAIR_WEATHER = 0.62;
 /** The wind sea is rebuilt only when the wind has changed by this much, m/s and radians: a rebuild is a pop. */
@@ -83,20 +76,16 @@ export class GpuStage {
   readonly beacons = new Beacons(1);
   readonly landmarks = new Landmarks();
   readonly floes = new Floes();
-  readonly rocks = new EventRocks();
-  readonly kelp = new EventKelp();
-  readonly clams = new EventClams();
-  readonly petals = new EventPetals();
   readonly moonbow = new Moonbow();
   readonly fog = new Fog();
   readonly flora = new Flora();
   readonly #canvas: HTMLCanvasElement;
-  readonly #focus = new Vector3();
   readonly #wind = new Vector3();
   readonly #buffer = new Vector2();
   /** The share of the canvas the scene is drawn at, each way. */
   readonly #scale: number;
-  readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0 };
+  /** Mistwood's mist: always some rolling out of the wood. */
+  readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0.35 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
   #last = 0;
@@ -133,10 +122,8 @@ export class GpuStage {
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
-    this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group, this.flora.group);
+    this.scene.add(this.floes.group, this.moonbow.group, this.flora.group);
     this.flora.prepare = (group) => this.#compile(group, true);
-    // what floats rides the sea this stage draws
-    rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
     this.#scale = RENDER_SCALE[form];
@@ -197,7 +184,6 @@ export class GpuStage {
     const dark = Math.cos(Math.min(Math.PI, Math.acos(Math.max(-1, Math.min(1, this.sun.y))) + OVAL)) < 0.08;
     AURORA.strength.value = dark ? 0.7 + 0.3 * Math.sin(v.time * 0.013) * Math.sin(v.time * 0.031 + 1.3) : 0;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
-    setLifts(v.lift ?? NO_LIFT);
     const terr = v.territory;
     this.ocean.territory.set(terr?.owner ?? null, terr?.trail ?? null, terr?.version ?? 0, terr?.me ?? 0);
     // the deep water's colour under the eye, for the sea the sky draws past the horizon
@@ -220,8 +206,6 @@ export class GpuStage {
     this.onCamera?.(cam);
     cam.updateMatrixWorld();
     const eye = cam.position;
-    const t = v.target.pos;
-    this.#focus.set(t.x, t.y, t.z).normalize().multiplyScalar(R + v.tide);
     const up = eye.clone().normalize();
     P.night.value = Math.min(1, Math.max(0, (0.08 - up.dot(this.sun)) / 0.16));
     P.space.value = Math.min(1, Math.max(0, (eye.length() - R - 150) / 900));
@@ -238,7 +222,6 @@ export class GpuStage {
     this.#seaFromWind(eye, wind, Math.max((d.rain ?? 0) * 0.55, d.thunder ?? 0));
     shape.system('sky');
     this.atmosphere.update(cam, dt);
-    this.#mistFrom(v);
     // sea smoke off the cold water round the pole, thickest in the polar night and blown away by a wind
     const poleNight = Math.min(1, Math.max(0, (0.08 - this.sun.y) / 0.16));
     const calm = 1 - Math.min(1, Math.max(0, (wind.length() - 6) / 6));
@@ -249,7 +232,6 @@ export class GpuStage {
     this.clouds.trace(this.renderer, size.x * this.#scale, size.y * this.#scale);
     shape.system('flora');
     this.flora.update(this.renderer, cam);
-    this.ocean.flow.set(v.currents);
     this.ocean.flow.calms(v.weather, eye);
     shape.system('sea');
     this.ocean.update(this.renderer, eye, v.time, dt);
@@ -257,12 +239,8 @@ export class GpuStage {
     this.terrain.update(eye);
     this.scans.update(eye, dt);
     this.beacons.update(v.time, P.night.value as number, this.sun, eye);
-    this.landmarks.update(P.night.value as number, v.time, v.events, this.sun);
-    this.floes.update(v.floes ?? v.time, v.tide, P.night.value as number);
-    this.rocks.update(v.events, v.time);
-    this.kelp.update(v.events, v.time, v.tide);
-    this.clams.update(v.events, v.time, v.tide);
-    this.petals.update(this.#focus, v.events, v.currents, v.time, v.tide, dt);
+    this.landmarks.update(P.night.value as number, v.time, this.sun);
+    this.floes.update(v.time, v.tide, P.night.value as number);
     this.moonbow.update(eye, wind.length());
     shape.system('actors');
     runFrameWork(this.renderer);
@@ -294,14 +272,6 @@ export class GpuStage {
     const c = this.#canvas;
     c.style.display = 'none';
     requestAnimationFrame(() => { c.style.display = ''; });
-  }
-
-  /** Mistwood's mist: always some rolling out of the wood, and thick in its Fog Surge. */
-  #mistFrom(v: StageView): void {
-    const m = this.#mist;
-    const e = v.events?.mistwood;
-    const surge = e?.phase === 'running' ? Math.min(1, e.since / 5, e.left / 5) : 0;
-    m.amount = 0.35 + 0.65 * surge;
   }
 
   /** The wind sea from the wind where the camera looks, and the gusts of the weather over it: rebuilt only when it
@@ -338,13 +308,13 @@ export class GpuStage {
     this.#warm = 'done';
     this.#warmed();
     // after the title, what a match brings in first: the ships with their shot and wreckage; then the weather's falls
-    // and the regions' events, hidden till a match calls them up; then the beacons and landmarks
+    // and the floes; then the beacons and landmarks
     for (const { group, built } of later) {
       await this.#compile(group, true);
       group.visible = true;
       built();
     }
-    for (const group of [this.fall.group, this.moonbow.group, this.floes.group, this.kelp.group, this.clams.group, this.petals.group]) {
+    for (const group of [this.fall.group, this.moonbow.group, this.floes.group]) {
       await this.#compile(group, true);
     }
     for (const group of sites) {

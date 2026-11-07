@@ -1,7 +1,7 @@
 // Things that come over a screen: toasts, pop-ups and modals, and the full-screen ceremony for big moments (winning,
 // levelling up, ranking up, unlocking an ability, and the shield break in a match).
 import { button, iconButton, type ButtonOptions } from './button.ts';
-import { el, esc, mmss } from './dom.ts';
+import { el, esc } from './dom.ts';
 import { effect, type UiHaptic, type UiSound } from './feedback.ts';
 import { ICON } from './icons.ts';
 
@@ -33,57 +33,6 @@ export class Toasts {
     while (this.el.children.length > 3) this.el.firstElementChild!.remove();
     return t;
   }
-}
-
-// ---------------------------------------------------------------- a region's event
-
-export interface EventBannerView {
-  /** The event's glyph. */
-  icon: string;
-  name: string;
-  tip: string;
-  /** Something to keep clear of, something to go for, or a change in the sea: its colour once it runs. */
-  tone: 'danger' | 'prize' | 'sea';
-  /** Warned and not started yet: it pulses gold, and the time counts down to the start. */
-  warning: boolean;
-  seconds: number;
-}
-
-export interface EventBannerHandle { el: HTMLElement; set(v: EventBannerView | null): void }
-
-/**
- * A region's event over the match: a glyph disc, the event's name and what to do about it, and the time to its
- * start or its end. It springs in when it is first warned, and again as it starts.
- */
-export function eventBanner(o: { parent: Element; className?: string }): EventBannerHandle {
-  const b = el(`p-event${o.className ? ' ' + o.className : ''}`, o.parent);
-  b.dataset.part = 'eventBanner';
-  const icon = el('p-event__icon', b);
-  const words = el('p-event__words', b);
-  const name = el('p-event__name', words, '', 'b');
-  const tip = el('p-event__tip', words, '', 'span');
-  const time = el('p-event__time', b, '', 'b');
-  let shown = '';
-  const set = (v: EventBannerView | null) => {
-    b.classList.toggle('is-on', v !== null);
-    if (!v) { shown = ''; return; }
-    const key = `${v.name}|${v.warning}`;
-    if (key !== shown) {
-      shown = key;
-      icon.innerHTML = v.icon;
-      name.textContent = v.name;
-      tip.textContent = v.tip;
-      b.dataset.tone = v.tone;
-      b.classList.toggle('is-warn', v.warning);
-      // spring in again
-      b.classList.remove('is-on');
-      void b.offsetWidth;
-      b.classList.add('is-on');
-      effect(`event:${key}`, 'none', v.warning ? 'warning' : 'medium');
-    }
-    time.textContent = v.warning ? `in ${mmss(v.seconds)}` : mmss(v.seconds);
-  };
-  return { el: b, set };
 }
 
 // ---------------------------------------------------------------- a first-time tip

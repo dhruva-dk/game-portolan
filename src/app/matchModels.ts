@@ -11,17 +11,14 @@ import {
 } from '../sim/match.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { eventMark, eventTone } from '../sim/regionEvents.ts';
-import { EVENT_STATE } from '../sim/state.ts';
-import { GALE, GUST, LOOT, PARCELS, PARTS, VOYAGE, isWeapon } from '../sim/tables.ts';
-import { CACHE_PLACES, SECRET_COUNT, secretIndex } from '../sim/secrets.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
 import { GALE_SPEED } from '../sim/opening.ts';
-import { R, advance, along, angleTo, apart, tangentAt, tangentToward } from '../sim/sphere.ts';
+import { R, advance, angleTo, apart, tangentToward } from '../sim/sphere.ts';
 import { aimedAt } from '../sim/combat.ts';
 import { CENTRES, REGIONS, regionAt } from '../sim/world/index.ts';
-import { PI, v3, type V3 } from '../sim/math.ts';
+import { v3, type V3 } from '../sim/math.ts';
 import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type EventView, type GaleModel, type HudModel,
+  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type GaleModel, type HudModel,
   type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type SpectateModel, type VictoryModel,
   type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
@@ -98,58 +95,12 @@ function mapOf(s: MatchState, i: number): MapView {
   }
   const marks: MapView['marks'] = [];
   for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push({ ...rel(l.at), kind: 'loot' });
-  // the hidden caches of the secrets you know, wherever they are within reach of the chart
-  for (const c of CACHE_PLACES) if (s.found.includes(secretIndex(c.secret)) && apart(p, c.at) < MAP_RANGE * 1.5) marks.push({ ...rel(c.at), kind: 'cache' });
   if (sh.gull.state !== 0) marks.push({ ...rel(sh.gull.at), kind: 'gull' });
-  const events: MapView['events'] = [];
-  for (let ri = 0; ri < s.regionEvents.length; ri++) {
-    const st = s.regionEvents[ri].state;
-    if (st !== EVENT_STATE.warning && st !== EVENT_STATE.running) continue;
-    const r = eventMark(s, ri, MARK);
-    if (r > 0 && apart(p, MARK) < MAP_RANGE * 1.5 + r) events.push({ ...rel(MARK), r, tone: eventTone(ri), warning: st === EVENT_STATE.warning });
-  }
   return {
     lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: MAP_RANGE,
-    storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks, events,
+    storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
   };
 }
-
-const MARK = v3(), NEAR_P = v3(), NEAR_T = v3();
-/** How far past a region's border its event's banner still shows, m. */
-const EVENT_NEAR = 240;
-
-/** Whether region ri's water lies within EVENT_NEAR metres of p: rings of points round p, 16 bearings each. */
-function nearRegion(p: V3, ri: number): boolean {
-  for (let d = EVENT_NEAR / 3; d <= EVENT_NEAR; d += EVENT_NEAR / 3) {
-    for (let k = 0; k < 16; k++) if (regionAt(along(p, tangentAt(p, (k * PI) / 8, NEAR_T), d, NEAR_P)) === ri) return true;
-  }
-  return false;
-}
-
-function eventView(s: MatchState, ri: number): EventView {
-  const ev = s.regionEvents[ri], info = REGIONS[ri], warning = ev.state === EVENT_STATE.warning;
-  const left = warning ? ev.at - s.tick * TICK : ev.run - ev.t;
-  return { region: info.id, name: info.event, tip: info.eventTip, tone: eventTone(ri), warning, seconds: Math.max(0, Math.ceil(left)) };
-}
-
-/**
- * The region events the banners show at p, warned or running in the water there or near it: its own region's first,
- * then those running before those warned, so a warning never hides an event already running beside you. At most two.
- */
-export function eventsOf(s: MatchState, p: V3): { event: EventView | null; also: EventView | null } {
-  const here = regionAt(p), shown: number[] = [];
-  const live = (ri: number) => s.regionEvents[ri].state === EVENT_STATE.warning || s.regionEvents[ri].state === EVENT_STATE.running;
-  if (here >= 0 && here < s.regionEvents.length && live(here)) shown.push(here);
-  for (const st of [EVENT_STATE.running, EVENT_STATE.warning]) {
-    for (let ri = 0; ri < s.regionEvents.length && shown.length < 2; ri++) {
-      if (ri !== here && s.regionEvents[ri].state === st && nearRegion(p, ri)) shown.push(ri);
-    }
-  }
-  return { event: shown.length ? eventView(s, shown[0]) : null, also: shown.length > 1 ? eventView(s, shown[1]) : null };
-}
-
-/** The region event the first banner shows at p. */
-export const eventOf = (s: MatchState, p: V3): EventView | null => eventsOf(s, p).event;
 
 /** What a take would pick up: the nearest loot in reach. */
 function pickupOf(s: MatchState, sh: Ship): string | null {
@@ -229,16 +180,8 @@ export function hudModel(session: Session): HudModel {
     tide: { level, rising: seaLevelAt(now + 1) > level },
     night: isNight(s, sh.pos),
     pickup: pickupOf(s, sh),
-    ...eventsOf(s, sh.pos),
     map: mapOf(s, session.watch),
-    voyage: session.voyage ? { found: s.found.length, of: SECRET_COUNT, refit: refitIn(s) } : null,
   };
-}
-
-/** Seconds until the player's wreck refits on a voyage, or 0 while she is afloat. */
-function refitIn(s: MatchState): number {
-  const me = s.ships[PLAYER];
-  return me.phase === PHASE.sunk && me.sunk >= 0 ? Math.max(0, Math.ceil(VOYAGE.refit - (s.tick - me.sunk) * TICK)) : 0;
 }
 
 /** How far a ship can glide from the Gale before it reaches the sea, m. */

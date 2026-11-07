@@ -4,7 +4,6 @@
 import type { ShipInput } from './input.ts';
 import { rngFloat, set, v3, type V3 } from './math.ts';
 import { hasPerk } from './perks.ts';
-import { RULE } from './rules.ts';
 import { advance, apart, along, tangentToward } from './sphere.ts';
 import { EVENT, GULL, PHASE, SHIPS, STREAM, TICK, copy, emit, type Item, type MatchState, type Ship } from './state.ts';
 import { DELIVERY, ITEM, PARCELS, PERKS, WEAPON_KINDS } from './tables.ts';
@@ -90,7 +89,7 @@ function deliver(state: MatchState, i: number, at: V3): void {
 export function parcel(state: MatchState, tier: number): Item[] {
   const rng = state.rng[STREAM.loot];
   const weapon = (lo: number, hi: number): Item => {
-    const kind = state.rule === RULE.harpoonsOnly ? ITEM.harpoon : WEAPON_KINDS[Math.floor(rngFloat(rng) * WEAPON_KINDS.length)];
+    const kind = WEAPON_KINDS[Math.floor(rngFloat(rng) * WEAPON_KINDS.length)];
     return weaponItem(kind, lo + Math.floor(rngFloat(rng) * (hi - lo + 1)));
   };
   if (tier === 0) return [useItem(ITEM.smallShield, 3), useItem(ITEM.repairKit, 3)];

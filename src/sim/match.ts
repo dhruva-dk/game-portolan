@@ -4,7 +4,7 @@
 //
 // ---------------------------------------------------------------- the API
 //
-//   const state = createMatch({ seed, date: '2026-11-01', fleet: [{ captain: false }] });
+//   const state = createMatch({ seed, fleet: [{ captain: false }] });
 //   for (;;) { step(state, playerInput); if (over(state)) break; }   // 30 times a second (TICK = 1/30 s)
 //   const r = result(state);
 //
@@ -63,18 +63,11 @@
 //   mastFall    ship's mainmast went over the side (by who brought it down); amount the side, +1 starboard
 //   juryRig     ship has a jury mast up in its place;  quench: ship's fire put out by the weather (flag 1: a heated
 //               shot quenched as it struck)
-//   secret      the player found a secret (secrets.ts): item its index into SECRETS, at where
-//   refit       on a voyage, a wrecked ship sails again: at where she comes back
 //   impact      also carries the parts a ship hit struck, as FLAG.sail / waterline / rudder, and FLAG.rake for a
 //               shot down her length; hull the hull points it took
 //   scrape      ship scraped the ground; ram: ship rammed by; coins: ship earned amount (item: 1 rent, 2 cut,
 //               3 claim, 4 kill)
 //   weatherForms / weatherEnds   item WEATHER_KIND, amount radius; win: ship won
-//   regionWarn / regionStart / regionEnd   a region's own event (regionEvents.ts): item region index, at its spot,
-//               y its reach; amount warning seconds (warn) or how long it runs (start). state.regionEvents[r] has its
-//               state (EVENT_STATE), start time, run, spot k and where its effect stands now
-//   lavaBomb    Cinder Peak threw a bomb: at where it will land, amount seconds in the air, y its reach; FLAG.done
-//               when it lands
 //
 // state.noise: what the captains can hear or see from afar (captains/hearing.ts); state.director: the pacing
 // director's phase and the player's heat (captains/director.ts).
@@ -91,7 +84,6 @@ import { copyInput, idleInput, inputAt, replay, type Recording, type ShipInput }
 import { drop, driftLoot, pickups, select, swap, useTick } from './items.ts';
 import { blow, glide, ride } from './opening.ts';
 import { powers, useAbility } from './powers.ts';
-import { tickEvents } from './regionEvents.ts';
 import { collide, gust, rechargeGust, refloat, sail } from './sailing.ts';
 import { PHASE, PLAYER, SHIPS, type MatchState } from './state.ts';
 import { storm } from './storm.ts';
@@ -99,8 +91,6 @@ import { chart, mendAtHome, perks, rent } from './territory.ts';
 import { brew, weatherOnShips } from './weather.ts';
 import { swim, callBreach } from './whale.ts';
 import { stir } from './wind.ts';
-import { seek } from './secrets.ts';
-import { isVoyage, voyageTick } from './voyage.ts';
 import { EVENT } from './state.ts';
 import { WHALE } from './tables.ts';
 
@@ -113,7 +103,6 @@ export const lastInputs = (): readonly ShipInput[] => INPUTS;
 export function step(state: MatchState, input: ShipInput | null = null, inputs: readonly (ShipInput | null)[] | null = null): void {
   if (over(state)) return;
   state.events.length = 0;
-  tickEvents(state);
   brew(state);
   stir(state);
   blow(state);
@@ -165,11 +154,9 @@ export function step(state: MatchState, input: ShipInput | null = null, inputs: 
   for (const e of state.events) if (e.kind === EVENT.stormWait && (WHALE.at as readonly number[]).includes(e.item)) callBreach(state);
   swim(state);
   settle(state);
-  if (isVoyage(state)) voyageTick(state);
-  seek(state);
-  // what the captains will hear of this tick, and the director's read of it (a voyage is left to itself)
+  // what the captains will hear of this tick, and the director's read of it
   listen(state);
-  if (!isVoyage(state)) direct(state);
+  direct(state);
   state.tick++;
   for (let i = 0; i < SHIPS; i++) if (state.ships[i].captain.on) watch(state, i);
 }
@@ -188,20 +175,17 @@ export function resolve(state: MatchState, limit = 60 * 60 * 30): void {
 }
 
 export { createMatch, type FleetEntry, type MatchSetup } from './setup.ts';
-export { SECRETS, SECRET_COUNT, CACHE_PLACES, SECRET_PLACES, secret, secretIndex, type SecretDef, type SecretId } from './secrets.ts';
-export { isVoyage, ashore } from './voyage.ts';
 export { idleInput, recorder, record, replay, inputAt, parseRecording, type ShipInput, type Recording } from './input.ts';
 export { over, result, type MatchResult, type ShipResult, type LearntMind } from './end.ts';
 export {
-  EVENT, EVENT_NAMES, FLAG, MODE, PHASE, CAUSE, GULL, WHALE_STATE, PLAYER, SHIPS, TICK, encodeMatch, decodeMatch, matchHash,
+  EVENT, EVENT_NAMES, FLAG, PHASE, CAUSE, GULL, WHALE_STATE, PLAYER, SHIPS, TICK, encodeMatch, decodeMatch, matchHash,
   type MatchState, type Ship, type Happening, type Item, type Loot, type Shot,
 } from './state.ts';
 export { ITEM, ITEM_NAMES, RARITY, WEAPONS, USES, SLOTS, WEATHER_KIND, WEATHER_NAMES, ZONES, STORM } from './tables.ts';
-export { RULE, RULE_NAMES, RULE_TEXT, ruleFor } from './rules.ts';
 export { ACTIVES, PASSIVES, PERK, hasPerk } from './perks.ts';
 export { stormView, newStormView, calmNow, inStorm, type StormView, type Calm } from './storm.ts';
 export { seen, SEEN, sightOf } from './visibility.ts';
-export { seaLevel, sunDir, sunUp, isNight, localHour, hourOf } from './environment.ts';
+export { seaLevel, sunDir, isNight, localHour, hourOf } from './environment.ts';
 export { windAt, newWind, type Wind } from './wind.ts';
 export { skyAt, newSky, type Sky } from './weather.ts';
 export { squareMetres, holderOf, landmarkHold } from './territory.ts';

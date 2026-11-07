@@ -62,46 +62,6 @@ export interface PropSpec {
   height: number;
 }
 
-/** A disc where the sea rises (by > 0) or is drawn down while the event runs: full inside r, fading out over `fade` metres. */
-export interface LiftSpec {
-  x: number;
-  y: number;
-  r: number;
-  fade: number;
-  by: number;
-  /** Odd spots turn the sign: the other side rises. */
-  flip?: boolean;
-}
-
-/** Rock overhead: a slab `length` long along its bearing and `width` wide, its underside `under` metres above mean sea. */
-export interface RoofSpec {
-  x: number;
-  y: number;
-  bearing: number;
-  length: number;
-  width: number;
-  under: number;
-}
-
-/**
- * The region's own event (sim/regionEvents.ts says what each one does): where it can happen, flat x, y pairs, of which
- * each match picks one, and whatever geometry its effect needs.
- */
-export interface EventSpec {
-  spots: readonly number[];
-  /** A bearing for each spot, degrees: which way what falls there lies. */
-  bearings?: readonly number[];
-  /** Reach of the danger, or of the prize, round the spot, metres. */
-  r: number;
-  lift?: readonly LiftSpec[];
-  /**
-   * What falls across the water at the spot: a bar `length` long along its bearing and `width` wide, or a disc `width`
-   * across when length is 0. It lies there while the event runs, or for the rest of the match if it `stays`.
-   */
-  block?: { length: number; width: number; stays?: boolean };
-  roofs?: readonly RoofSpec[];
-}
-
 export interface RegionSpec {
   /** Ground height in metres (negative is sea floor). Must be defined everywhere, well past the border. */
   height(x: number, y: number): number;
@@ -117,5 +77,4 @@ export interface RegionSpec {
   /** Tidal sills (flat x, y pairs): passages between -2.5 and -0.5 m that open and close with the tide. */
   tidal: readonly number[];
   props: readonly PropSpec[];
-  event: EventSpec;
 }

@@ -2,7 +2,6 @@
 // Fog shortens the sightline, rain makes the wind gusty and the water rough, thunder throws lightning at ships
 // in the open, a calm kills the wind, snow (only near the Ice Crown) ices the rigging, and ash (only downwind of
 // the Fire Archipelago) burns ships that stay in it. Systems form over a region mostly as that region's own kinds.
-import { eventSky } from './environment.ts';
 import { hurt } from './harm.ts';
 import { mastHeight, struckMast } from './parts.ts';
 import { PI, addScaled, dot, dsin, normalize, rngDir, rngFloat, rngInt, rngRange, set, v3, type Rng, type V3 } from './math.ts';
@@ -77,8 +76,6 @@ export function skyAt(state: MatchState, p: V3, out: Sky): Sky {
       default: out.ash = Math.max(out.ash, d);
     }
   }
-  // the regions' events bring their own: Mistwood's fog bank, the Weeping Isle's cloudburst, Cinder Peak's ash
-  eventSky(state, p, out);
   const wet = Math.max(out.rain, out.thunder), { fog, rain, calm } = WEATHER;
   out.sight = 1 - (1 - fog.sight) * out.fog;
   out.wind = (1 + (rain.wind - 1) * wet) * (1 - (1 - calm.wind) * out.calm);
@@ -100,12 +97,8 @@ export function bend(state: MatchState, p: V3, v: V3): void {
 /** Ships inside a fog bank deep enough drop off the map. */
 export function inFog(state: MatchState, p: V3): boolean {
   for (const s of state.weather) if (s.kind === WEATHER_KIND.fog && depthIn(s, p) >= 0.5) return true;
-  EVENT_FOG.fog = EVENT_FOG.rain = EVENT_FOG.ash = 0;
-  eventSky(state, p, EVENT_FOG);
-  return EVENT_FOG.fog >= 0.5;
+  return false;
 }
-
-const EVENT_FOG = { fog: 0, rain: 0, ash: 0 };
 
 // ---------------------------------------------------------------- forming and drifting
 

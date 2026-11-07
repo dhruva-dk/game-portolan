@@ -49,7 +49,6 @@ export class Effects {
   readonly lights = new Lights();
   private readonly wisps: Wisp[] = [];
   private readonly p = new THREE.Vector3();
-  private flick = 0;
 
   constructor(wood: THREE.Texture) {
     const { glow, smoke } = makeParticles();
@@ -209,74 +208,6 @@ export class Effects {
       this.glow.emit({ x, y, z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.3, 0.55), size: 0.22, r: 1, g: 2.6, b: 5, frame: SPRITE.star, fadeIn: 0 });
     }
     this.glow.emit({ x, y, z, life: 0.12, size: 1.8, grow: 1.6, r: 0.8, g: 2.2, b: 4.5, frame: SPRITE.puff, fadeIn: 0 });
-  }
-
-  // ---------------------------------------------------------------- Cinder Peak
-
-  /** The crater's ash column and the glow and cinders over it; called each frame while the peak is awake. */
-  plume(crater: THREE.Vector3, strength: number, dt: number): void {
-    const L = this.L.at(crater);
-    // the column: dark ash boiling up and spreading as it rises, a thin thread of it while the peak is only warned
-    const n = (2 + strength * 30) * dt;
-    for (let i = 0; i < n || Math.random() < n - i; i++) {
-      const o = this.at(crater, L.vec(Math.random() * TAU, rand(0, 6), rand(-2, 2))), v = L.vec(Math.random() * TAU, rand(0.3, 2.5), rand(16, 34) * (0.3 + strength));
-      const d = rand(0.04, 0.1);
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(7, 11), size: rand(6, 11) * (0.5 + strength * 0.8), grow: 5, r: d, g: d * 0.92, b: d * 0.88, a: 0.6 + strength * 0.35, frame: SPRITE.billow, drag: 0.25, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
-      if (i > 20) break;
-    }
-    if (strength < 0.05) return;
-    // the crater's fire under it, lit from below
-    const f = 0.75 + 0.25 * Math.sin(this.flick += dt * 13) * Math.sin(this.flick * 0.37);
-    this.glow.emit({ x: crater.x, y: crater.y, z: crater.z, life: 0, size: 22 * strength, r: 5 * f, g: 1.6 * f, b: 0.35, frame: SPRITE.puff });
-    const c = (6 * strength) * dt;
-    for (let i = 0; i < c || Math.random() < c - i; i++) {
-      const o = this.at(crater, L.vec(Math.random() * TAU, rand(0, 4), 1)), v = L.vec(Math.random() * TAU, rand(1, 6), rand(10, 24));
-      this.glow.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(0.8, 1.6), size: rand(0.6, 1.4), grow: 0.3, r: 6, g: 2.4, b: 0.5, frame: SPRITE.flame, grav: 9, drag: 0.3, fadeIn: 0.05 });
-      if (i > 10) break;
-    }
-  }
-
-  /** A bomb in flight: a glowing clot of rock trailing fire and smoke. */
-  bomb(at: THREE.Vector3, dt: number): void {
-    const { x, y, z } = at;
-    this.glow.emit({ x, y, z, life: 0, size: 6, r: 7, g: 2.8, b: 0.7, frame: SPRITE.puff });
-    this.glow.emit({ x, y, z, life: 0.35, size: 2.6, grow: -0.6, r: 6, g: 2.2, b: 0.5, frame: SPRITE.flame, fadeIn: 0 });
-    if (Math.random() < 40 * dt) {
-      const d = rand(0.08, 0.16);
-      this.smoke.emit({ x, y, z, life: rand(1.6, 2.6), size: rand(1.6, 2.6), grow: 2.4, r: d, g: d * 0.95, b: d * 0.9, a: 0.65, frame: SPRITE.blast, heat: 0.7, drag: 0.6, grav: -0.6, spin: rand(-0.4, 0.4), fadeIn: 0.05 });
-    }
-  }
-
-  /** A bomb come down: it bursts, and on the water throws up steam; on land its cinders glow a while. */
-  lavaLand(at: THREE.Vector3, onWater: boolean): void {
-    this.explode(at, 0.6, onWater);
-    const L = this.L.at(at);
-    if (onWater) {
-      const c = onSea(at, 0.3, new THREE.Vector3());
-      for (let i = 0; i < 10; i++) {
-        const o = this.at(c, L.vec(Math.random() * TAU, rand(0, 2), 0)), v = L.vec(Math.random() * TAU, rand(0.3, 1.5), rand(3, 7));
-        this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(2.5, 4), size: rand(1.5, 2.5), grow: 3.5, r: 1.15, g: 1.15, b: 1.18, a: 0.5, frame: SPRITE.billow, drag: 0.8, spin: rand(-0.4, 0.4), fadeIn: 0.1 });
-      }
-      return;
-    }
-    for (let i = 0; i < 8; i++) {
-      const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 3), 0.2));
-      this.glow.emit({ x: o.x, y: o.y, z: o.z, life: rand(2, 4), size: rand(0.4, 0.9), grow: -0.2, r: 4.5, g: 1.4, b: 0.3, frame: SPRITE.puff, fadeIn: 0 });
-    }
-  }
-
-  /** Rock coming down into the sea at a point on it: a tall sheet of spray, a ring and a pall of rock dust. */
-  rockfall(at: THREE.Vector3): void {
-    this.splash(at, 2.6);
-    const L = this.L.at(at);
-    for (let i = 0; i < 16; i++) {
-      const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 4), 0)), v = L.vec(Math.random() * TAU, rand(2, 6), rand(14, 26));
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(1.2, 2), size: rand(1.5, 2.6), grow: 3, r: 1.3, g: 1.35, b: 1.4, a: 0.75, frame: SPRITE.spray, grav: GRAV, drag: 0.5, float: true });
-    }
-    for (let i = 0; i < 6; i++) {
-      const o = this.at(at, L.vec(Math.random() * TAU, rand(0, 6), 2)), v = L.vec(Math.random() * TAU, rand(0.5, 2), rand(1, 3)), d = rand(0.5, 0.65);
-      this.smoke.emit({ x: o.x, y: o.y, z: o.z, vx: v.x, vy: v.y, vz: v.z, life: rand(3, 5), size: rand(4, 7), grow: 4, r: d, g: d * 0.93, b: d * 0.85, a: 0.45, frame: SPRITE.billow, drag: 0.7, spin: rand(-0.3, 0.3), fadeIn: 0.15 });
-    }
   }
 
   // ---------------------------------------------------------------- ships

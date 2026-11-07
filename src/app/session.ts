@@ -7,22 +7,21 @@
 // the look, as far as its pitch reaches, and lock onto a ship close to that line.
 import { captainIndex, CAPTAINS, LEARNING, type Expect, type MatchPlan, type TemperamentId } from '../career/index.ts';
 import type { AmbienceMix, RegionId } from '../audio/index.ts';
-import type { ActorsView, CosmeticIds, EruptionView, LootView, ProjectileView, ShipView, WhaleView } from '../render/actors/index.ts';
-import type { EventPhase, StageView, WeatherSystem } from '../render/stage.ts';
+import type { ActorsView, CosmeticIds, LootView, ProjectileView, ShipView, WhaleView } from '../render/actors/index.ts';
+import type { StageView, WeatherSystem } from '../render/stage.ts';
 import { sink, settle } from '../sim/end.ts';
-import { EVENT_STATE, copy } from '../sim/state.ts';
 import {
   CAUSE, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
-import { EVENT_REGION, currentScales, eventStrength, floeTime, liftsNow, strengthAt, sunHeight } from '../sim/environment.ts';
+import { sunHeight } from '../sim/environment.ts';
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
-import { ABOUT, DAY, REGION_EVENT, WEAPONS, isWeapon } from '../sim/tables.ts';
+import { ABOUT, DAY, WEAPONS, isWeapon } from '../sim/tables.ts';
 import { landing } from '../sim/combat.ts';
 import { newSky, skyAt, vigour } from '../sim/weather.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { CENTRES, CURRENTS, REGION_COUNT, REGION_EVENTS, REGIONS, VORTEX, heightAt, regionWeights, summitNear, type WeatherKind } from '../sim/world/index.ts';
+import { CENTRES, REGION_COUNT, REGIONS, VORTEX, heightAt, regionWeights, type WeatherKind } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import { MatchTally } from './career.ts';
 import type { Intents } from './controls.ts';
@@ -42,10 +41,6 @@ export interface PlayOptions {
   autopilot?: boolean;
   /** The player's input from a tick on, merged into what was held: [[tick, input], ...]. */
   script?: [number, Partial<ShipInput>][];
-  /** A free voyage instead of a match (sim/voyage.ts). */
-  voyage?: boolean;
-  /** The secrets the player has found, as indices into SECRETS. */
-  found?: readonly number[];
 }
 
 /** The career's expectation (confidence 0 to LEARNING.full) as the simulation keeps it (confidence 0 to 1). */
@@ -86,12 +81,6 @@ const metres = (p: V3, h = 0, out: V3 = v3()): V3 => {
   out.y = p.y * (R + h);
   out.z = p.z * (R + h);
   return out;
-};
-
-/** Cinder Peak's crater over an eruption's spot, in metres from the centre. */
-const crater = (spot: V3): V3 => {
-  const top = summitNear(spot, 160);
-  return metres(top.at, top.h);
 };
 
 /** Between last tick's position and this one's, `k` of the way. */
@@ -146,11 +135,6 @@ export class Session implements Stepper {
   private hurtTick = -1e9;
   private readonly p = v3();
   private readonly q = v3();
-  private readonly lifts: number[] = [];
-  private readonly eruption = { crater: v3(), strength: 0, bombs: [] as { to: V3; k: number }[] };
-  private readonly craters: V3[] = [];
-  private readonly phases: Partial<Record<RegionId, EventPhase>> = {};
-  private readonly currents = { lanes: new Array<number>(CURRENTS.length).fill(1), vortex: 1 };
   private readonly want = v3();
   private readonly ships: ShipView[] = [];
   private readonly shots: ProjectileView[] = [];
@@ -159,8 +143,7 @@ export class Session implements Stepper {
 
   constructor(plan: MatchPlan, look: CosmeticIds, o: PlayOptions = {}) {
     this.plan = plan;
-    this.state = createMatch({ ...setupFrom(plan, o.seed ?? plan.seed), voyage: o.voyage ?? false, found: o.found ?? [] });
-    this.voyage = o.voyage ?? false;
+    this.state = createMatch(setupFrom(plan, o.seed ?? plan.seed));
     this.tally = new MatchTally(SHIPS);
     this.names = ['You', ...plan.fleet.map((e) => e.name)];
     this.looks = [look, ...plan.fleet.map((e) => cosmeticsOf(CAPTAINS[captainIndex(e.captain)]?.look ?? e.look))];
@@ -175,9 +158,6 @@ export class Session implements Stepper {
   get me(): Ship {
     return this.state.ships[PLAYER];
   }
-
-  /** A free voyage: no Storm, no end, and wrecks refit. */
-  readonly voyage: boolean;
 
   get over(): boolean {
     return over(this.state);
@@ -260,8 +240,6 @@ export class Session implements Stepper {
       if (m.k === 'hit' && m.ship === this.watch && !m.steady && m.shield + m.hull > 0) this.hurtTick = s.tick;
       // the player's own wreck stays in view until they choose to spectate
       if (m.k === 'sink' && m.ship === this.watch && m.ship !== PLAYER) this.rewatch(m.by);
-      // refitted, the player's ship has the view back
-      if (m.k === 'refit' && m.ship === PLAYER) this.back();
       this.onMoment(m);
     }
   }
@@ -271,14 +249,6 @@ export class Session implements Stepper {
     stormView(s, STORM);
     const storm = { closing: STORM.calm.r < ZONES[0] - 1, outside: s.ships[PLAYER].phase === PHASE.sea && inStorm(s, s.ships[PLAYER].pos) };
     this.tally.sample(this.seconds, s.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })), storm);
-  }
-
-  /** The view back on the player's own ship, behind her. */
-  private back(): void {
-    this.watch = PLAYER;
-    this.view.x = this.me.head.x;
-    this.view.y = this.me.head.y;
-    this.view.z = this.me.head.z;
   }
 
   /** Spectating once the player's ship has sunk: watch the ship that sank it, or else the one afloat with the most kills. */
@@ -400,8 +370,7 @@ export class Session implements Stepper {
     ships.length = 0;
     for (let i = 0; i < SHIPS; i++) {
       const sh = s.ships[i], alive = sh.phase !== PHASE.sunk;
-      // ships in fog or past sight stay hidden; the sunk stay listed so they finish sinking; a voyage's empty berths
-      // never put to sea
+      // ships in fog or past sight stay hidden; the sunk stay listed so they finish sinking
       if (alive && i !== this.watch && !(seen(s, this.watch, i) & (SEEN.visible | SEEN.lantern))) continue;
       if (!alive && sh.sunk < 0) continue;
       ships.push(this.shipView(i, sh, alive, alpha));
@@ -433,24 +402,7 @@ export class Session implements Stepper {
     const wind = windAt(s, s.ships[this.watch].pos, WIND).v;
     return {
       time, sun, seaLevel: seaLevel(s), wind: { ...wind }, player: PLAYER, ships, projectiles: shots, loot, whales: [this.whaleView()],
-      eruption: this.eruptionView(alpha),
     };
-  }
-
-  /** Cinder Peak while it is warned or erupting: its crater, how hard it goes, and its bombs where they fly now. */
-  private eruptionView(alpha: number): EruptionView | null {
-    const s = this.state, ri = EVENT_REGION.fire, ev = s.regionEvents[ri];
-    if (ev.state !== EVENT_STATE.warning && ev.state !== EVENT_STATE.running) return null;
-    const e = this.eruption, flight = REGION_EVENT.eruption.flight;
-    copy(e.crater, (this.craters[ev.k] ??= crater(REGION_EVENTS[ri].spots[ev.k])));
-    e.strength = ev.state === EVENT_STATE.warning ? 0.02 : Math.max(0.15, eventStrength(s, ri));
-    e.bombs.length = ev.marks.length;
-    ev.marks.forEach((m, i) => {
-      const b = (e.bombs[i] ??= { to: v3(), k: 0 });
-      metres(m.at, 0, b.to);
-      b.k = clamp01(1 - (m.t - alpha * TICK) / flight);
-    });
-    return e;
   }
 
   private shipView(i: number, sh: Ship, alive: boolean, alpha: number): ShipView {
@@ -493,37 +445,18 @@ export class Session implements Stepper {
     const own = this.watch === PLAYER;
     const hurt = own ? Math.max(0, 1 - ((s.tick - this.hurtTick) * TICK) / 0.5) : 0;
     const low = !own || w.phase === PHASE.sunk ? 0 : Math.max(0, (35 - w.hull) / 35) * 0.8;
-    const weather = eventWeather(s, []);
-    // the events' own weather first, then the simulation's slots, each with an id of its own
-    weather.forEach((w, i) => (w.id = 100 + i));
+    const weather: WeatherSystem[] = [];
     s.weather.forEach((sys, slot) => {
       if (sys.kind >= 0) weather.push({ kind: WEATHER_NAMES[sys.kind] as WeatherKind, at: sys.at, radius: sys.r, strength: vigour(sys), id: slot });
     });
     return {
-      time, hour: hourOf(s), tilt: (s.tilt * 180) / Math.PI, tide: seaLevel(s), floes: floeTime(s), lift: liftsNow(s, this.lifts), events: this.eventPhases(alpha),
-      currents: ((this.currents.vortex = currentScales(s, this.currents.lanes)), this.currents), wind: { ...windAt(s, at, WIND).v }, camera: 'chase',
+      time, hour: hourOf(s), tilt: (s.tilt * 180) / Math.PI, tide: seaLevel(s), wind: { ...windAt(s, at, WIND).v }, camera: 'chase',
       target: { pos: { ...at }, heading: { ...this.view }, height: 2.5 + w.alt },
       weather,
       storm: formed ? { centre: { ...STORM.calm.at }, radius: STORM.calm.r } : null,
       territory: { owner: s.owner, trail: s.trail, version: Math.floor(s.tick / 6), me: this.watch + 1 },
       screen: { storm: own ? outside : outside * 0.5, hurt, low },
     };
-  }
-
-  /** Where each region's event has got to, as the stage moves rock for it. */
-  private eventPhases(alpha: number): Partial<Record<RegionId, EventPhase>> {
-    const s = this.state, now = (s.tick - 1 + alpha) * TICK, out = this.phases;
-    s.regionEvents.forEach((ev, ri) => {
-      const p = (out[REGIONS[ri].id] ??= { phase: 'waiting', k: 0, since: 0, left: 0 }), warned = ev.at - ev.warn, ends = ev.at + ev.run;
-      p.k = ev.k;
-      if (ev.state === EVENT_STATE.waiting) [p.phase, p.since, p.left] = ['waiting', now, warned - now];
-      else if (ev.state === EVENT_STATE.warning) [p.phase, p.since, p.left] = ['warning', now - warned, ev.at - now];
-      else if (ev.state === EVENT_STATE.running) [p.phase, p.since, p.left] = ['running', now - ev.at, ends - now];
-      else [p.phase, p.since, p.left] = ['over', now - ends, Infinity];
-      p.left = Math.max(0, p.left);
-      p.strength = strengthAt(s, ri, now);
-    });
-    return out;
   }
 
   /** The sea's beds around the watched ship: the regions it is in, the weather over it, its wind and speed, the Storm,
@@ -579,20 +512,4 @@ export class Session implements Stepper {
     const sh = this.state.ships[i];
     return sh.phase === PHASE.sunk ? -1 : i === this.state.winner ? 1e6 : sh.hull + sh.shield;
   }
-}
-
-/** The weather the regions' events bring, first so the stage never drops it for the sea's own: Mistwood's fog bank
- *  spreading as it thickens, the Weeping Isle's cloudburst, and Cinder Peak's ash. */
-function eventWeather(state: MatchState, out: WeatherSystem[]): WeatherSystem[] {
-  const ev = state.regionEvents, { mist, cloudburst, eruption } = REGION_EVENT;
-  let s = eventStrength(state, EVENT_REGION.mist);
-  if (s > 0) out.push({ kind: 'fog', at: ev[EVENT_REGION.mist].spot, radius: mist.from + (mist.r - mist.from) * s, strength: s });
-  s = eventStrength(state, EVENT_REGION.weeping);
-  if (s > 0) {
-    out.push({ kind: 'fog', at: ev[EVENT_REGION.weeping].spot, radius: cloudburst.fog, strength: s });
-    out.push({ kind: 'rain', at: ev[EVENT_REGION.weeping].spot, radius: cloudburst.rain, strength: s });
-  }
-  s = eventStrength(state, EVENT_REGION.fire);
-  if (s > 0) out.push({ kind: 'ash', at: ev[EVENT_REGION.fire].spot, radius: eruption.ash.r, strength: s });
-  return out;
 }

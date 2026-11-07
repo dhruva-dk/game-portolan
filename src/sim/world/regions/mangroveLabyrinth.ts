@@ -85,6 +85,4 @@ export const mangroveLabyrinth: RegionSpec = {
   zones: [{ kind: 'canopy', x: 0, y: 0, r: 240 }],
   tidal: SILLS,
   props: plant(height, 'mangrove', [-260, -280, 260, 300], 19, S + 20, 0.6, 0.4, 3, 0.6, 9),
-  // The king tide floods the labyrinth: the sills go under and the channels between the roots open.
-  event: { spots: [GATE.x, GATE.y], r: 280, lift: [{ x: GATE.x, y: GATE.y, r: 280, fade: 60, by: 2.5 }] },
 };

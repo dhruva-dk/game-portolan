@@ -8,12 +8,10 @@ import {
   ACTIVES, CAUSE, EVENT, FLAG, ITEM, PHASE, PLAYER, SHIPS, SLOTS, STORM, TICK, calmNow, idleInput, localHour, priceOf,
   type Happening, type Item, type MatchState, type Ship, type ShipInput,
 } from '../sim/match.ts';
-import { R, advance, along, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
-import { eventMark, eventTone } from '../sim/regionEvents.ts';
-import { EVENT_STATE, copy } from '../sim/state.ts';
+import { R, advance, along, tangentAt, tangentToward } from '../sim/sphere.ts';
 import { callBreach } from '../sim/whale.ts';
 import { WEAPON_KINDS, WEATHER, WEATHER_KIND, isWeapon } from '../sim/tables.ts';
-import { LANDMARKS, REGIONS, REGION_EVENTS, TIDE_AMPLITUDE, heightAt, navigable, regionShare } from '../sim/world/index.ts';
+import { REGIONS, TIDE_AMPLITUDE, navigable } from '../sim/world/index.ts';
 import { PI, v3, type V3 } from '../sim/math.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
 
@@ -37,7 +35,7 @@ export const itemKey = (kind: number): string => (isWeapon(kind) ? weaponOf(kind
 const CAUSES: Record<number, string> = {
   [CAUSE.storm]: 'storm', [CAUSE.ram]: 'ram', [CAUSE.ink]: 'ink', [CAUSE.burn]: 'burn', [CAUSE.ash]: 'ash',
   [CAUSE.lightning]: 'lightning', [CAUSE.mine]: 'mine', [CAUSE.wave]: 'wave', [CAUSE.whale]: 'whale',
-  [CAUSE.rock]: 'rock', [CAUSE.flood]: 'flood',
+  [CAUSE.flood]: 'flood',
 };
 /** What sank or hurt a ship, by name: a weapon class or one of the causes. */
 export const causeName = (cause: number): string => (isWeapon(cause) ? weaponOf(cause) : CAUSES[cause] ?? 'sea');
@@ -118,18 +116,12 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.scrape: return { k: 'aground', ship, pos };
     case EVENT.ram: return { k: 'ram', ship, by: e.by, pos };
     case EVENT.win: return { k: 'win', ship };
-    case EVENT.secret: return { k: 'secret', ship, secret: e.item, pos };
-    case EVENT.refit: return { k: 'refit', ship, pos };
     case EVENT.windup: return { k: 'windup', ship, weapon: weaponOf(e.item), at: e.by, seconds: e.amount, pos: metres(state.ships[ship].pos, 3) };
     case EVENT.about: return { k: 'about', ship, how: ABOUT_HOW[e.item] ?? 'tack', surge: e.amount, pos: metres(state.ships[ship].pos, 6) };
-    case EVENT.regionWarn: return { k: 'regionEvent', region: e.item, phase: 'warn', seconds: e.amount, pos: metres(e.at) };
-    case EVENT.regionStart: return { k: 'regionEvent', region: e.item, phase: 'start', seconds: e.amount, pos: metres(e.at) };
-    case EVENT.regionEnd: return { k: 'regionEvent', region: e.item, phase: 'end', seconds: 0, pos: metres(e.at) };
     case EVENT.mastFall: return { k: 'mastFall', ship, by: e.by, side: e.amount, pos: metres(state.ships[ship].pos, 9) };
     case EVENT.juryRig: return { k: 'juryRig', ship, pos: metres(state.ships[ship].pos, 6) };
     case EVENT.ablaze: return { k: 'ablaze', ship, by: e.by, spread: (e.flag & 1) !== 0, pos: metres(state.ships[ship].pos, 4) };
     case EVENT.quench: return { k: 'quench', ship, shot: (e.flag & 1) !== 0, pos: metres(state.ships[ship].pos, 3) };
-    case EVENT.lavaBomb: return { k: 'lavaBomb', pos: metres(e.at), landed: (e.flag & FLAG.done) !== 0, seconds: e.amount };
     default: return null;
   }
 }
@@ -166,8 +158,6 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'ram': return { t: 'ram', at: m.pos };
     case 'aground': return { t: 'scrape', at: m.pos };
     case 'whaleBreach': return { t: 'breach', at: m.pos, head: whaleHead };
-    case 'lavaBomb': return m.landed ? { t: 'lavaBomb', at: m.pos, on: heightAt(m.pos) > 0.5 ? 'land' : 'water' } : null;
-    case 'regionEvent': return m.phase === 'start' && REGION_EVENTS[m.region].block ? { t: 'rockfall', region: m.region, at: m.pos } : null;
     case 'lightning': return { t: 'lightning', at: m.pos, warning: m.warning };
     case 'mastFall': return { t: 'mastFall', ship: m.ship, side: m.side };
     case 'juryRig': return { t: 'juryRig', ship: m.ship };
@@ -276,67 +266,6 @@ export function daylight(state: MatchState, hour = 15): void {
   state.hour = (((state.hour + hour - localHour(state, state.ships[PLAYER].pos)) % 24) + 24) % 24;
 }
 
-/** Open water `d` metres or more from a spot, on a course facing it, with room astern and to either side. With
- *  `sight`, only where nothing stands between the ship and the spot short of its last `bare` metres, so the camera
- *  behind her sees it, and well inside region `own` when one is given, so the current doesn't carry her out of it: null
- *  when there's no such water. */
-function facing(spot: V3, d: number, sight = false, own = -1, bare = 50): Course | null {
-  const t = v3(), q = v3();
-  for (let r = d; r <= d + (sight ? 260 : 400); r += 20) {
-    for (let k = 0, n = sight ? 64 : 32; k < n; k++) {
-      const pos = along(spot, tangentAt(spot, (k * 2 * PI) / n, t), r, v3()), c = { pos, head: tangentToward(pos, spot, v3()) };
-      let ok = own < 0 || regionShare(own, pos) > 0.8;
-      for (let s = -40; s <= 10 && ok; s += 10) for (const x of [-12, 0, 12]) if (ok && !open(off(c, s, x).pos)) ok = false;
-      // (the spot's own ground, a dune or a peak, is what she looks at: only what stands short of it hides it)
-      for (let s = 10; sight && ok && s < r - bare; s += 10) if (heightAt(along(pos, c.head, s, q)) > 4) ok = false;
-      if (ok) return c;
-    }
-  }
-  return sight ? null : { pos: v3(spot.x, spot.y, spot.z), head: tangentAt(spot, 0, v3()) };
-}
-
-/** A region's event, warned a second from now, with the player at rest facing it: just outside a danger's reach,
- *  or close by for the rest. Every other region's event waits out the strip. */
-function eventMoment(id: string): MomentScript {
-  const ri = REGIONS.findIndex((r) => r.id === id);
-  return {
-    name: `event-${id}`, note: `${REGIONS[ri].event} starting`, sea: true, lead: 120, every: 30, frames: 16,
-    arrange: (s) => {
-      const now = s.tick * TICK, spot = v3(), ev = s.regionEvents[ri], spots = REGION_EVENTS[ri].spots;
-      s.regionEvents.forEach((e, j) => {
-        e.state = EVENT_STATE.waiting;
-        e.at = j === ri ? now + ev.warn + 1 : 1e6;
-      });
-      // (Cinder Peak stands tall: far enough off to see its plume and where its bombs come down; the kelp lies flat on
-      // the water, so the ship waits inside its reach and the bloom spreads up to her and round her; the Maelstrom's
-      // whirl races fastest well inside its reach, so she waits in it, where the water foams; the Narrows' rock comes
-      // down into the slot of water between the Gorge's walls, so she waits off the mouth, back far enough to see the
-      // wall tops it falls from, looking straight in with nothing at all in the way)
-      const r = eventMark(s, ri, spot), id = REGIONS[ri].id;
-      const off = id === 'fireArchipelago' ? r + 120 : id === 'kelpShallows' ? r * 0.25 : id === 'maelstrom' ? 80
-        : id === 'narrows' ? r + 90 : eventTone(ri) === 'danger' ? r + 40 : Math.min(90, r);
-      const bare = id === 'narrows' ? 10 : 50;
-      // the match's spot when the region's own water looks on it, else the first of its others that does; then
-      // the same from any water
-      // (the Fjords' surge is seen at its source: the ship lies on the outflow, looking up the fjord at the falls)
-      let c: Course | null = id === 'fjords' ? facing(LANDMARKS[ri].pos, 140, true, ri) : null;
-      for (const own of [ri, -1]) {
-        for (let j = 0; j < spots.length && !c; j++) {
-          const k = (ev.k + j) % spots.length;
-          c = facing(k === ev.k ? spot : spots[k], off, true, own, bare);
-          if (c && k !== ev.k) (ev.k = k), copy(ev.spot, spots[k]);
-        }
-      }
-      c ??= facing(spot, off)!;
-      // a little off it, so the hull in front of the camera doesn't hide the spot
-      turned(c.head, c.pos, 0.4, c.head);
-      place(s, PLAYER, c);
-      return [[s.tick, { throttle: 0, steer: 0 }]];
-    },
-    is: (m) => m.k === 'regionEvent' && m.region === ri && m.phase === 'start',
-  };
-}
-
 /** A one-tick input at tick t, let go the tick after. */
 const tap = (t: number, on: Partial<ShipInput>, offIs: Partial<ShipInput>): Script => [[t, on], [t + 1, offIs]];
 
@@ -396,7 +325,7 @@ export const MOMENTS: readonly MomentScript[] = [
           break;
         }
       }
-      s.storm.start = s.tick - Math.round((STORM.phases[0].wait * s.storm.scale - 2) / TICK);
+      s.storm.start = s.tick - Math.round((STORM.phases[0].wait - 2) / TICK);
       return [[s.tick, { throttle: 0, steer: 0 }]];
     },
     is: (m) => m.k === 'stormPhase',
@@ -469,7 +398,6 @@ export const MOMENTS: readonly MomentScript[] = [
     },
     is: (m) => m.k === 'deliveryArrived' && m.ship === PLAYER,
   },
-  ...REGIONS.map((r) => eventMoment(r.id)),
 ];
 
 /** Every ship but the player's held still with furled sails, as step's inputs. */

@@ -1,10 +1,9 @@
 // Who can see whom. A ship sees another within the sightline (about 240 m, less in fog), unless land stands
 // between them or it hides in smoke. At night, ships beyond about 150 m show only as a lantern: no name, no
-// health bar, and one sailing with a Dark Lantern not at all. Separately, a ship is on the map unless fog or Hidden Wake
-// hides it; Reveal and Spotter show it.
+// health bar. Separately, a ship is on the map unless fog or Hidden Wake hides it; Reveal and Spotter show it.
 import { isNight } from './environment.ts';
 import { lineOfSight } from './nav.ts';
-import { hasPassive, hasPerk } from './perks.ts';
+import { hasPerk } from './perks.ts';
 import { inSmoke } from './powers.ts';
 import { apart } from './sphere.ts';
 import { PHASE, SHIPS, type MatchState } from './state.ts';
@@ -43,9 +42,9 @@ export function seen(state: MatchState, v: number, j: number): number {
   }
   const d = apart(a.pos, b.pos);
   const range = Math.min(sightOf(state, v), skyRange(state, j));
-  // past the lantern's range at night a ship shows only as its lantern, and with its lantern dark not at all
+  // past the lantern's range at night a ship shows only as its lantern
   const dark = d > SIGHT.lantern && isNight(state, b.pos) && !hasPerk(a, 'fogSight');
-  if (d <= range && !(inSmoke(state, j) && d > 12) && (d < 30 || lineOfSight(a.pos, b.pos)) && !(dark && hasPassive(b, 'darkLantern'))) {
+  if (d <= range && !(inSmoke(state, j) && d > 12) && (d < 30 || lineOfSight(a.pos, b.pos))) {
     out |= SEEN.visible;
     if (dark) out |= SEEN.lantern;
   }

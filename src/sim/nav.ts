@@ -3,7 +3,7 @@
 // so it is the same for every match.
 import { addScaled, cross, dot, normalize, set, v3, type V3 } from './math.ts';
 import { R, cellDir, cellOf, cubeGrid, localFrame, neighbor, type CubeGrid } from './sphere.ts';
-import { DRAFT, OBSTACLES, REGION_EVENTS, blockAt, heightAt, liftOf, roofAt } from './world/index.ts';
+import { DRAFT, OBSTACLES, heightAt } from './world/index.ts';
 
 /** About 6.8 m cells. */
 export const NAV: CubeGrid = cubeGrid(128);
@@ -25,41 +25,7 @@ export interface Nav {
   readonly shut: Uint8Array;
   /** Cells of open water to the nearest shore, up to 4. */
   readonly clear: Uint8Array;
-  /** The region whose event raises or draws down the sea over the cell, or -1. */
-  readonly liftRegion: Int8Array;
-  /** That event's rise at full strength over the cell, for an even spot and an odd one. */
-  readonly liftEven: Float32Array;
-  readonly liftOdd: Float32Array;
-  /** The code of an event's fallen rock or roof over the cell (see EVENT_CODES), or 0. */
-  readonly code: Uint8Array;
 }
-
-/**
- * What the regions' events are doing to the chart now, set by the simulation at the start of every step (regionEvents.ts),
- * so every route a captain plans in that step sees the same sea.
- */
-export const NAV_EVENTS = {
-  /** The share of each region's rise to count: the least it will be over the next while, so a falling sea strands no one. */
-  up: new Float64Array(16),
-  /** The share of each region's drawdown to count: the most it will be over the next while. */
-  down: new Float64Array(16),
-  /** Each region's spot this match. */
-  k: new Int32Array(16),
-  /** Whether each code's rock or roof is shut. */
-  shut: new Uint8Array(64),
-};
-
-/** The codes of the events' rocks and roofs: block[ri][k] for region ri's rock at spot k, roof[ri][o] for its roof o. */
-export const EVENT_CODES = ((): { block: number[][]; roof: number[][] } => {
-  let next = 1;
-  return {
-    block: REGION_EVENTS.map((e) => (e.block === null ? [] : e.spots.map(() => next++))),
-    roof: REGION_EVENTS.map((e) => e.roofs.map(() => next++)),
-  };
-})();
-
-/** Margins kept off an event's fallen rock and under-roof, metres: a cell is coded when its centre is this close. */
-const ROCK_BERTH = 4, ROOF_BERTH = 2;
 
 let built: Nav | null = null;
 
@@ -93,41 +59,11 @@ export function buildNav(): Nav {
       for (let k = 0; k < 4; k++) if (clear[neighbor(NAV, c, k)] === round) { clear[c] = round + 1; break; }
     }
   }
-  const liftRegion = new Int8Array(cells).fill(-1), liftEven = new Float32Array(cells), liftOdd = new Float32Array(cells), code = new Uint8Array(cells);
-  for (let c = 0; c < cells; c++) {
-    cellDir(NAV, c, p);
-    for (const e of REGION_EVENTS) {
-      const ri = e.region;
-      if (e.lift.length > 0 && liftRegion[c] < 0) {
-        const a = liftOf(ri, 0, p), b = liftOf(ri, 1, p);
-        if (a !== 0 || b !== 0) {
-          liftRegion[c] = ri;
-          liftEven[c] = a;
-          liftOdd[c] = b;
-        }
-      }
-      if (code[c] !== 0) continue;
-      for (let k = 0; k < EVENT_CODES.block[ri].length; k++) if (blockAt(ri, k, p, ROCK_BERTH)) { code[c] = EVENT_CODES.block[ri][k]; break; }
-      const o = e.roofs.length > 0 ? roofAt(ri, p, ROOF_BERTH) : -1;
-      if (o >= 0 && code[c] === 0) code[c] = EVENT_CODES.roof[ri][o];
-    }
-  }
-  return { height, crest, open, shut, clear, liftRegion, liftEven, liftOdd, code };
+  return { height, crest, open, shut, clear };
 }
 
-/**
- * Whether cell c is open water with the sea at `level`: a falling tide closes the shallows, a rising one opens them, and
- * so do the regions' events, which can also drop rock across the water or bring a roof down to it.
- */
-function openCell(n: Nav, c: number, level: number): boolean {
-  if (n.shut[c] !== 0 || NAV_EVENTS.shut[n.code[c]] !== 0) return false;
-  const ri = n.liftRegion[c];
-  if (ri >= 0) {
-    const v = NAV_EVENTS.k[ri] % 2 === 1 ? n.liftOdd[c] : n.liftEven[c];
-    level += v * (v > 0 ? NAV_EVENTS.up[ri] : NAV_EVENTS.down[ri]);
-  }
-  return n.crest[c] < level + OPEN;
-}
+/** Whether cell c is open water with the sea at `level`: a falling tide closes the shallows, a rising one opens them. */
+const openCell = (n: Nav, c: number, level: number): boolean => n.shut[c] === 0 && n.crest[c] < level + OPEN;
 
 /** Margin kept off a column or a log's wall, metres. */
 const BERTH = 1.5;

@@ -47,10 +47,6 @@ export type Moment =
   | { k: 'lightning'; pos: V3; warning: boolean }
   | { k: 'aground'; ship: number; pos: V3 }
   | { k: 'ram'; ship: number; by: number; pos: V3 }
-  /** A region's own event warned, started or ended: seconds of warning, or how long it runs. */
-  | { k: 'regionEvent'; region: number; phase: 'warn' | 'start' | 'end'; seconds: number; pos: V3 }
-  /** Cinder Peak threw a bomb (pos where it will land, seconds in the air), or it landed. */
-  | { k: 'lavaBomb'; pos: V3; landed: boolean; seconds: number }
   /** The mainmast went over the side (side +1 starboard), brought down by `by`; a jury mast stands in its place. */
   | { k: 'mastFall'; ship: number; by: number; side: number; pos: V3 }
   | { k: 'juryRig'; ship: number; pos: V3 }
@@ -59,10 +55,6 @@ export type Moment =
   /** The weather put a ship's fire out, or (`shot`) quenched a heated shot as it struck. */
   | { k: 'quench'; ship: number; shot: boolean; pos: V3 }
   | { k: 'win'; ship: number }
-  /** The player found a secret of the planet: its index into SECRETS. */
-  | { k: 'secret'; ship: number; secret: number; pos: V3 }
-  /** On a voyage, a wreck sails again. */
-  | { k: 'refit'; ship: number; pos: V3 }
   /**
    * A ship going about: a clean tack or a gybe filling her canvas on the new board (`surge`, m/s more for a moment), a
    * gybe thrown so hard her yards slam across, or caught head to wind in irons.

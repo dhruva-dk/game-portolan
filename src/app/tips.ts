@@ -14,12 +14,11 @@ import { PHASE, PLAYER, TICK, WEATHER_NAMES, canCall, isNight, newSky, skyAt } f
 import { REGIONS } from '../sim/world/index.ts';
 import { v3 } from '../sim/math.ts';
 // straight from the icons, not the parts kit's index, so the tips load without its stylesheet (and under node)
-import { ABILITY_ICON, EVENT_ICON, ICON, WEATHER_ICON } from '../ui/parts/icons.ts';
+import { ABILITY_ICON, ICON, WEATHER_ICON } from '../ui/parts/icons.ts';
 import type { TipView } from '../ui/parts/overlays.ts';
 import { WEAPON_NAME, type WeaponId } from '../ui/model.ts';
 import type { Moment } from './events.ts';
 import type { Session } from './session.ts';
-import { eventOf } from './matchModels.ts';
 import { weaponOf } from './moments.ts';
 
 export const TIPS_KEY = 'portolan.tips';
@@ -40,7 +39,6 @@ export const TIPS = {
   storm: { icon: ICON.storm, title: 'The Storm closes in', text: 'Stay inside the white ring on the map. Outside it, the Storm wears your hull down.' },
   tide: { icon: ICON.anchor, title: 'The tide is falling', text: 'Shallows round you are closing. Keep to deep water, or you will run aground.' },
   night: { icon: ICON.moon, title: 'Night', text: 'Far ships show only as lanterns, with no name or health bar.' },
-  event: { icon: ICON.storm, title: 'A region\'s event', text: 'Each sea has its own, once a match. The banner says what to do; the map rings where.' },
   mast: { icon: ICON.mast, title: 'Mainmast down', text: 'You sail on the fore and mizzen until the crew rigs a jury mast. A Full Repair rigs one at once.' },
   flood: { icon: ICON.leak, title: 'Taking water', text: 'Shot at the waterline lets the sea in: she slows and lists, and too much sinks her. Get clear so the crew can pump.' },
   rudder: { icon: ICON.rudder, title: 'Rudder hit', text: 'Shot into the stern has her slow to answer the helm. A repair, or quiet water, mends it.' },
@@ -64,7 +62,7 @@ export type TipId = keyof typeof TIPS;
 
 /** Seconds a tip stays, the pause before the next, and how long after landing the first ones wait. */
 const SHOW = 7, GAP = 1.2, SETTLE = 3;
-/** Seconds between the slower looks round: the weather, the tide, the region's event. */
+/** Seconds between the slower looks round: the weather and the tide. */
 const LOOK = 0.5;
 /** Metres round the ship searched for a passage the tide is about to shut, and seconds ahead it looks. */
 const PASSAGE = [14, 26, 40], AHEAD = 20;
@@ -217,8 +215,6 @@ export class Tips {
     this.look = LOOK;
     skyAt(st, me.pos, SKY);
     for (const w of WEATHER_NAMES) if (SKY[w] > 0.4) this.offer(`weather:${w}` as TipId);
-    const ev = eventOf(st, me.pos);
-    if (ev) this.offer('event', {}, EVENT_ICON[ev.region]);
     if (this.closing(st.tick * TICK, me.pos)) this.offer('tide');
     if (seaState(st, me.pos) > 0.3) this.offer('seaway');
   }

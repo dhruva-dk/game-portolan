@@ -21,7 +21,6 @@ import { REGIONS } from '../../sim/world/index.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
 import { marksAt, scorch } from '../gpu/marks.ts';
 import { refractedShadowPosition } from '../ocean/beneath.ts';
-import { seaLevelNode } from '../lift.ts';
 import { MOSS, ROLE, ROLE_COUNT } from './library.ts';
 import type { ScanCache } from './scans.ts';
 
@@ -152,8 +151,7 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     const gn = normalize(normalWorldGeometry).toVar('landGn');
     const r = length(p).toVar();
     const up = p.div(r).toVar('landUp');
-    // (the share table by texel loads: the land is out of samplers)
-    const above = r.sub(seaLevelNode(up, true)).toVar('landAbove');
+    const above = r.sub(P.planet.y).toVar('landAbove');
     const slope = float(1).sub(dot(gn, up)).toVar();
     const dist = length(p.sub(cameraPosition)).toVar('landDist');
     // noise at three scales, in a projection of the world that has no seams

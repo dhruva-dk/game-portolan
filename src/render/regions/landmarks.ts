@@ -9,10 +9,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { R, along, tangentAt } from '../../sim/sphere.ts';
 import { v3 } from '../../sim/math.ts';
 import { LANDMARKS, OBSTACLES, REGIONS, heightAt, type Landmark, type Obstacle, type RegionId } from '../../sim/world/index.ts';
-import type { EventPhase } from './eventRocks.ts';
 import { Kit, particles, strip, surface, tick } from '../beacons/kit.ts';
 import { abs, cos, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
-import { bNoise, glowNode, num, shapePuff } from '../beacons/nodes.ts';
+import { bNoise, glowNode, shapePuff } from '../beacons/nodes.ts';
 
 const rock = (color: number, rough = 0.9) => new THREE.MeshStandardMaterial({ color, roughness: rough, flatShading: true });
 
@@ -210,12 +209,10 @@ type Build = (lm: Landmark) => THREE.Object3D;
 
 const SHAPES: Partial<Record<RegionId, Build>> = {
   // the falls: a sheet of white water poured off the cliff top at the head of the fjord, arching out as it drops and
-  // streaming down in ragged strands, its foot lost in mist; it faces the cliff. In the Flood Surge it widens, runs
-  // whiter and thicker, and its mist billows up
+  // streaming down in ragged strands, its foot lost in mist; it faces the cliff
   fjords: (lm) => {
-    const k = new Kit(lm.region * 977 + 5, 'landmark:falls'), swell = { value: 0 }, facing = highest(lm, 40);
+    const k = new Kit(lm.region * 977 + 5, 'landmark:falls'), facing = highest(lm, 40);
     k.root.userData.facing = facing;
-    k.root.userData.swell = swell;
     // the cliff as it stands toward the head of the fjord: the lip is where the face has climbed most of the way to
     // the top, the foot the last of the water short of it
     const ground = (d: number) => heightAt(along(lm.pos, facing, d, v3()));
@@ -234,9 +231,8 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
     const length = pts.reduce((s, p, i) => s + (i ? p.distanceTo(pts[i - 1]) : 0), 0);
     k.add(surface(k, strip(pts, widths), {
       color: 0xbfe4ee, day: 0, night: 0.25, blend: 'alpha', matter: 0xd8e6ea,
-      vertexNode: ({ p }) => vec3(p.x.mul(num(swell).mul(0.75).add(1)), p.y, p.z),
       paintNode: ({ uv: f, t }) => {
-        const x = f.x, v = f.y, sw = num(swell);
+        const x = f.x, v = f.y;
         const edge = smoothstep(0, 0.16, x).mul(smoothstep(1, 0.84, x));
         const n1 = bNoise(vec3(x.mul(7), v.mul(0.05).sub(t.mul(0.9)), 0));
         const n2 = bNoise(vec3(x.mul(19), v.mul(0.14).sub(t.mul(1.7)), 3));
@@ -244,10 +240,10 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
         const streak = smoothstep(0.3, 0.95, n1.mul(0.55).add(n2.mul(0.35)).add(n3.mul(0.25)));
         // ragged at the edges, thin at the lip, dissolving into the mist at the foot
         const lipF = smoothstep(0, 3, v), footF = smoothstep(length - 15, length, v).oneMinus();
-        const body = edge.mul(mix(0.35, 0.6, sw)).add(edge.mul(sw.mul(0.25).add(0.4)).mul(streak));
+        const body = edge.mul(0.35).add(edge.mul(0.4).mul(streak));
         return {
           alpha: body.mul(lipF).mul(footF).mul(n2.mul(0.45).add(0.55)),
-          col: mix(vec3(0.72, 0.82, 0.86), vec3(1.12), streak.mul(sw.mul(0.4).add(0.55))),
+          col: mix(vec3(0.72, 0.82, 0.86), vec3(1.12), streak.mul(0.55)),
           glow: body.mul(streak),
         };
       },
@@ -257,12 +253,11 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
       count: 180, color: 0xbfe4ee, day: 0, night: 0.05, blend: 'alpha', matter: 0xe2eaec,
       shapeNode: shapePuff,
       motionNode: ({ s, t }) => {
-        const sw = num(swell), life = fract(s.x.add(t.mul(s.y.mul(0.05).add(0.05))));
-        const a = s.z.mul(6.2831), grow = sw.mul(1.3).add(1);
-        const rr = life.mul(s.w.mul(12).add(9)).add(4).mul(grow);
+        const life = fract(s.x.add(t.mul(s.y.mul(0.05).add(0.05))));
+        const a = s.z.mul(6.2831), rr = life.mul(s.w.mul(12).add(9)).add(4);
         return {
-          pos: vec3(cos(a).mul(rr), life.mul(s.y.mul(20).add(10)).mul(grow).add(1), abs(sin(a)).mul(rr).mul(-0.7).add(foot + 1)),
-          size: life.mul(7).add(3.5).mul(sw.mul(0.5).add(0.8)), alpha: sin(life.mul(Math.PI)).mul(sw.mul(0.14).add(0.14)),
+          pos: vec3(cos(a).mul(rr), life.mul(s.y.mul(20).add(10)).add(1), abs(sin(a)).mul(rr).mul(-0.7).add(foot + 1)),
+          size: life.mul(7).add(3.5).mul(0.8), alpha: sin(life.mul(Math.PI)).mul(0.14),
         };
       },
     }));
@@ -413,24 +408,12 @@ const SHAPES: Partial<Record<RegionId, Build>> = {
   },
 };
 
-/** How far the Fjords' Flood Surge has the falls swollen, 0…1: rising through the warning, with the event's strength
- *  while it runs, and settling back once it's over. */
-export function swollen(e: EventPhase | undefined): number {
-  if (!e) return 0;
-  if (e.phase === 'warning') return 0.35 * Math.min(1, e.since / 8);
-  if (e.phase === 'running') return Math.max(0.35, e.strength ?? 1);
-  if (e.phase === 'over') return Math.max(0, 0.35 * (1 - e.since / 6));
-  return 0;
-}
-
 export class Landmarks {
   readonly group = new THREE.Group();
   /** The glows, dimmed by day, with the outward normal where each stands. */
   private readonly glows: { mesh: THREE.Mesh; up: THREE.Vector3 }[] = [];
   /** The shapes drawn with the beacons' kit, whose clocks run with the frame. */
   private readonly kits: { obj: THREE.Object3D; up: THREE.Vector3 }[] = [];
-  /** How swollen the falls are, as their shaders read it. */
-  private falls: { value: number } | null = null;
 
   constructor() {
     this.group.name = 'landmarks';
@@ -442,7 +425,6 @@ export class Landmarks {
       stand(shape, lm.pos, shape.userData.facing ?? lm.facing, R);
       const up = new THREE.Vector3(lm.pos.x, lm.pos.y, lm.pos.z).normalize();
       if (shape.userData.beacon) this.kits.push({ obj: shape, up });
-      if (shape.userData.swell) this.falls = shape.userData.swell;
       shape.traverse((o) => {
         if ((o as THREE.Mesh).isMesh && o.userData.glow) this.glows.push({ mesh: o as THREE.Mesh, up });
         // (the kit's sheets and mist are see-through: they cast no shadow)
@@ -452,17 +434,15 @@ export class Landmarks {
     }
   }
 
-  /** night: 0 day to 1 night where the camera is; `time` the clock the swell and beacons share; the regions'
-   *  events, for the falls' swell. Given the sun's direction, each landmark takes its own night from the sun's height
-   *  over it instead. */
-  update(night: number, time: number, events?: Partial<Record<RegionId, EventPhase>>, sun?: THREE.Vector3): void {
+  /** night: 0 day to 1 night where the camera is; `time` the clock the beacons share. Given the sun's direction, each
+   *  landmark takes its own night from the sun's height over it instead. */
+  update(night: number, time: number, sun?: THREE.Vector3): void {
     const here = (up: THREE.Vector3) => (sun ? Math.min(1, Math.max(0, (0.08 - up.dot(sun)) / 0.16)) : night);
     for (const { mesh, up } of this.glows) {
       const { power, level } = mesh.userData.glow as { power: number; level: { value: number } };
       level.value = 0.25 + here(up) * power;
     }
     for (const { obj, up } of this.kits) tick(obj, time, here(up));
-    if (this.falls) this.falls.value = swollen(events?.fjords);
   }
 }
 

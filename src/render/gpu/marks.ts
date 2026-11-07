@@ -20,16 +20,16 @@ type V4 = Node<'vec4'>;
 /** How many marks the ground keeps at once; past that the oldest goes. */
 export const MARKS = 32;
 
-export const MARK_KIND = { shot: 0, heated: 1, lava: 2 } as const;
+export const MARK_KIND = { shot: 0, heated: 1 } as const;
 export type MarkKind = (typeof MARK_KIND)[keyof typeof MARK_KIND];
 
 /** The radius each kind leaves, in metres, and how long it stays hot. */
-const SIZE: Record<MarkKind, number> = { 0: 1.6, 1: 2.6, 2: 5.5 };
-const HOT: Record<MarkKind, number> = { 0: 4, 1: 9, 2: 14 };
+const SIZE: Record<MarkKind, number> = { 0: 1.6, 1: 2.6 };
+const HOT: Record<MarkKind, number> = { 0: 4, 1: 9 };
 
 // xyz: where, in metres from the planet's centre; w: radius (0: an empty slot)
 const SPOTS = Array.from({ length: MARKS }, () => new Vector4(0, 0, 0, 0));
-// x: when it was made (P.time); y: how long it stays hot; z: its own seed; w: lava (1) or not
+// x: when it was made (P.time); y: how long it stays hot; z: its own seed
 const LOOKS = Array.from({ length: MARKS }, () => new Vector4(-1e6, 1, 0, 0));
 const spots = uniformArray(SPOTS, 'vec4').setGroup(renderGroup);
 const looks = uniformArray(LOOKS, 'vec4').setGroup(renderGroup);
@@ -53,7 +53,7 @@ export function addMark(at: { x: number; y: number; z: number }, kind: MarkKind,
   next = (next + 1) % MARKS;
   SPOTS[i].set(at.x, at.y, at.z, SIZE[kind] * size);
   seed = (seed * 16807) % 2147483647;
-  LOOKS[i].set(P.time.value as number, HOT[kind], (seed % 1000) / 1000, kind === MARK_KIND.lava ? 1 : 0);
+  LOOKS[i].set(P.time.value as number, HOT[kind], (seed % 1000) / 1000, 0);
   used.value = Math.max(used.value as number, i + 1);
 }
 
@@ -87,8 +87,8 @@ export const marksAt = Fn(([p, n]: [V3, F]) => {
         .add(sin(u.x.mul(9.3).add(u.y.mul(7.1)).add(k.mul(0.3))).mul(sin(u.z.mul(8.7).sub(u.y.mul(6.1)).add(k.mul(1.9)))).mul(0.16));
       const reach = d.div(max(r, 1e-3)).sub(torn).sub(n.sub(0.5).mul(0.12));
       const char = smoothstep(1, 0.55, reach);
-      // the bite of a shot: pale broken stone; a lava bomb's crater stays black
-      const gouge = smoothstep(0.3, 0.12, reach).mul(float(1).sub(l.w));
+      // the bite of a shot: pale broken stone
+      const gouge = smoothstep(0.3, 0.12, reach);
       const soot = smoothstep(1.9, 0.9, reach).mul(0.6);
       const hot = clamp(float(1).sub(P.time.sub(l.x).div(l.y)), 0, 1);
       const coals = pow(smoothstep(0.85, 0.2, reach), float(1.5)).mul(hot).mul(hot);

@@ -1,5 +1,5 @@
-// The lobby: transparent over the live planet and your ship. Your level and rank, the loadout you bring, play, a free
-// voyage, and a tile for every menu.
+// The lobby: transparent over the live planet and your ship. Your level and rank, the loadout you bring, play, and a
+// tile for every menu.
 import { ability } from '../../sim/abilities.ts';
 import { button, el, esc, ICON, iconButton, press, stagger, tile } from '../parts/index.ts';
 import type { LobbyModel, MenuId } from '../model.ts';
@@ -9,8 +9,6 @@ import './lobby.css';
 
 export interface LobbyActions {
   onPlay(): void;
-  /** A free voyage: no Storm, no end, secrets to find. */
-  onVoyage?(): void;
   onOpen(menu: MenuId): void;
 }
 
@@ -52,12 +50,6 @@ export function lobbyScreen(m: LobbyModel, a: LobbyActions): LobbyView {
     press(s, () => a.onOpen('abilities'), { sound: 'open', what: 'lobby:loadout' });
   }
   button({ label: 'Play', icon: ICON.play, sub: '20 ships · the Gale', kind: 'gold', size: 'lg', parent: go, className: 's-lobby__play', what: 'lobby:play', onPress: a.onPlay });
-  if (a.onVoyage) {
-    button({
-      label: 'Voyage', icon: ICON.secret, sub: `No Storm · ${m.secrets.found}/${m.secrets.of} secrets`, kind: 'secondary', size: 'md', parent: go,
-      className: 's-lobby__voyage', what: 'lobby:voyage', onPress: a.onVoyage,
-    });
-  }
 
   const ticker = el('s-lobby__ticker p-paper p-torn', safe);
   el('s-lobby__tickI', ticker, ICON.rivals);

@@ -5,10 +5,8 @@
 // it is on the sphere, which is how one sun leaves half the planet dark and how the same shaders hold from the deck
 // and from orbit.
 import { Vector3, Vector4 } from 'three/webgpu';
-import { mix, uniform, uniformArray, renderGroup } from 'three/tsl';
+import { mix, uniform, renderGroup } from 'three/tsl';
 import { R } from '../../sim/sphere.ts';
-
-export const MAX_LIFTS = 5;
 
 /**
  * Puts uniforms every shader reads alike in the render group: one buffer for each shader that reads them, set once a
@@ -59,11 +57,6 @@ export const P = shared({
   snow: uniform(0),
   /** How far the camera is up into space, 0 at sea to 1 in orbit. */
   space: uniform(0),
-  /** The water the regions' events move: each disc's middle (xyz) and how far it moves the sea now (w), and its
-   *  radius, fade and region channel; liftOn says whether any moves it at all. */
-  liftAt: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4()), 'vec4'),
-  liftR: uniformArray(Array.from({ length: MAX_LIFTS }, () => new Vector4(1, 1, 0, 0)), 'vec4'),
-  liftOn: uniform(0),
 });
 
 /** Lightning striking now, as the bolts set it (actors/lightning.ts): where its channel enters the cloud, and how

@@ -132,30 +132,22 @@ export class Ocean {
     (FRAME.weight.value as Vector2).set(Math.cos(t), this.#to ? Math.sin(t) : 0);
   }
 
-  /** The sea's height (m) over its level at p, a point in the planet's frame (the swell, and the wakes and splashes
-   *  on it), and if asked its slope: a vector along the ground pointing uphill whose length is the rise per metre (a
-   *  hull's up is normalize(up - slope)). */
-  heightAt(p: V3, slope?: V3): number {
+  /** The sea's height (m) over its level at p, a point in the planet's frame: the swell, and the wakes and splashes
+   *  on it. */
+  heightAt(p: V3): number {
     const w = FRAME.weight.value as Vector2;
     const up = _v.set(p.x, p.y, p.z).normalize();
-    if (slope) { slope.x = 0; slope.y = 0; slope.z = 0; }
     let h = 0;
     const frames: [Anchor | null, number][] = [[this.#from, w.x], [this.#to, w.y]];
     for (const [f, weight] of frames) {
       if (!f || weight <= 0) continue;
-      const { qx, qz, e1, e2 } = inFrame(up, f);
-      h += this.long.at(qx, qz, this.#time, _s) * weight;
-      if (slope) {
-        slope.x += (e1.x * _s[0] + e2.x * _s[1]) * weight;
-        slope.y += (e1.y * _s[0] + e2.y * _s[1]) * weight;
-        slope.z += (e1.z * _s[0] + e2.z * _s[1]) * weight;
-      }
+      const { qx, qz } = inFrame(up, f);
+      h += this.long.at(qx, qz, this.#time) * weight;
     }
-    return h + RIPPLES.heightAt(p, slope);
+    return h + RIPPLES.heightAt(p);
   }
 }
 
-const _s: [number, number] = [0, 0];
 
 /** A new anchor at a point, its axis carried there from the last one along the great circle between them. */
 function anchorAt(at: Vector3, last: Anchor | null): Anchor {

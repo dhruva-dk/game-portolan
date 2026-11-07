@@ -112,9 +112,6 @@ export const ICON = {
   fire: svg('<path d="M12 22c-4.4 0-7.5-3-7.5-7.2 0-3.4 2.2-5.6 3.8-7.6.3 2 1.2 3.2 2.6 3.8C10.6 7 12.2 4.2 15 2c-.5 3.4 1 5.4 2.7 7.4 1.4 1.7 1.8 3.4 1.8 5.4C19.5 19 16.4 22 12 22z"/>'),
   skip: svg('<path d="M4 4l10 8-10 8z"/><rect x="16" y="4" width="3.6" height="16" rx="1"/>'),
   new: svg(star(8, 10.8, 7)),
-  // a secret of the planet: a compass rose with a spark at its heart
-  secret: svg(star(4, 11, 2.4) + star(4, 6.6, 1.6, 12, 12, -Math.PI / 4) + '<circle cx="12" cy="12" r="1.8" fill="rgba(255,250,230,.9)"/>'),
-  port: svg(st('M12 6v15M7.5 9.5h9M3.8 13.5c0 4.4 3.6 7.5 8.2 7.5s8.2-3.1 8.2-7.5', 2.4) + '<circle cx="12" cy="4" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/>' + st('M1 21h3M20 21h3', 1.8)),
 };
 
 // ---------------------------------------------------------------- the abilities
@@ -136,8 +133,6 @@ export const ABILITY_ICON: Record<string, string> = {
   stormWalker: svg(`<path d="${SHIELD_D}"/>` + st('M13.2 11.6a1.2 1.2 0 1 1-1.2-1.2 3 3 0 0 1 3 3 4.6 4.6 0 0 1-9.2 0 6.4 6.4 0 0 1 6.4-6.4', 1.8).replace('currentColor', 'rgba(255,250,230,.9)')),
   deepHold: svg('<path d="M3 8.5h18v12.2H3z"/><path d="M4.4 3.3h15.2L21 7H3z"/>' + st('M3 12.6h18M3 16.6h18', 1.2).replace('currentColor', 'rgba(255,250,230,.6)') + dot(12, 14.6, 1.6)),
   steadyAim: svg(ring(7.4, 2) + st('M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5', 2.4) + dot(12, 12, 2.4)),
-  whaleCall: svg('<path d="M10.8 12.6c0-2.4-.2-3.8-1.2-5C8 5.8 4.6 6.2 1.8 1.8c0 4 3 6.8 6.6 7 .8.6 1.2 2 1 3.8zM13.2 12.6c0-2.4.2-3.8 1.2-5 1.6-1.8 5-1.4 7.8-5.8 0 4-3 6.8-6.6 7-.8.6-1.2 2-1 3.8z"/><path d="M9.2 12.8c.6-2.4 1.6-4.2 2.8-5.6 1.2 1.4 2.2 3.2 2.8 5.6z"/>' + st('M1.5 15.5c3.2-1.4 6-1.4 10.5 0s7.3 1.4 10.5 0M5 19.4c4-1 10-1 14 0', 1.8)),
-  darkLantern: svg('<path d="M5.8 8.6h9.2v10.6H5.8zM5.6 8.8l1.8-2.6h6l1.8 2.6zM4.8 19h11.2v3H4.8z"/>' + st('M8.2 11.2v5.6M10.4 11.2v5.6M12.6 11.2v5.6', 1.1).replace('currentColor', 'rgba(255,250,230,.7)') + '<circle cx="10.4" cy="4.4" r="1.7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M20.4 2.2a5 5 0 1 0 2.2 8.4 4 4 0 1 1-2.2-8.4z"/>'),
 };
 
 // ---------------------------------------------------------------- cosmetic kinds
@@ -206,16 +201,6 @@ export function emblem(name: string): string {
   const n = 3 + (Math.abs(h) % 6);
   return svg(star(n, 10.5, 4 + (Math.abs(h >> 4) % 4)));
 }
-
-// ---------------------------------------------------------------- the regions' events
-
-/** Each region's event as a glyph on its banner, by region id. */
-export const EVENT_ICON: Record<string, string> = {
-  iceCrown: EMBLEM.snowflake, fjords: EMBLEM.waves, mistwood: ICON.wind, spires: EMBLEM.peak, narrows: EMBLEM.zigzag,
-  basaltStacks: EMBLEM.hexagon, kelpShallows: EMBLEM.fern, blossomRun: EMBLEM.leaf, glassSea: EMBLEM.whaleTail,
-  jadeShoals: EMBLEM.crescent, coralAtolls: EMBLEM.shell, spiceIsles: EMBLEM.circle, fireArchipelago: EMBLEM.flame,
-  weepingIsle: EMBLEM.drop, mangroveLabyrinth: EMBLEM.moonPhases, maelstrom: EMBLEM.spiral,
-};
 
 // ---------------------------------------------------------------- the landmarks' perks and the weather
 

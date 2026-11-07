@@ -5,9 +5,8 @@
 import { hurt } from './harm.ts';
 import { HALF_PI, PI, addScaled, dacos, dcos, dot, dsin, dtan, fmix32, normalize, rngFloat, rngRange, set, v3, type Rng, type V3 } from './math.ts';
 import { openAt } from './nav.ts';
-import { RULE } from './rules.ts';
 import { R, TERRITORY, along, tangentAt } from './sphere.ts';
-import { CAUSE, EVENT, MODE, PHASE, SHIPS, STREAM, TICK, emit, type MatchState } from './state.ts';
+import { CAUSE, EVENT, PHASE, SHIPS, STREAM, TICK, emit, type MatchState } from './state.ts';
 import { STORM, ZONES } from './tables.ts';
 import { swallow } from './territory.ts';
 import { BLEND, CENTRES, REGIONS, heightAt, regionMix } from './world/index.ts';
@@ -37,7 +36,6 @@ export function finaleRegion(seed: number): number {
 export function planStorm(state: MatchState): void {
   const rng = state.rng[STREAM.storm], s = state.storm;
   s.region = finaleRegion(state.seed);
-  s.scale = state.rule === RULE.doubleStorm ? 0.5 : 1;
   s.phase = 0;
   s.shrinking = false;
   s.start = Math.round(STORM.first / TICK);
@@ -117,11 +115,10 @@ const W = v3();
 const clock = (state: MatchState): number => Math.max(0, (state.tick - state.storm.start) * TICK);
 
 /** Which phase is running at storm time t, whether it is closing, and how far through that part it is. */
-export function phaseAt(state: MatchState, t: number): { k: number; closing: boolean; f: number; left: number } {
-  const sc = state.storm.scale;
+export function phaseAt(t: number): { k: number; closing: boolean; f: number; left: number } {
   let s = 0;
   for (let k = 0; k < LAST; k++) {
-    const p = STORM.phases[k], wait = p.wait * sc, shrink = p.shrink * sc;
+    const p = STORM.phases[k], wait = p.wait, shrink = p.shrink;
     if (t < s + wait) return { k, closing: false, f: (t - s) / wait, left: s + wait - t };
     s += wait;
     if (t < s + shrink) return { k, closing: true, f: (t - s) / shrink, left: s + shrink - t };
@@ -131,18 +128,11 @@ export function phaseAt(state: MatchState, t: number): { k: number; closing: boo
 }
 
 /** The phase running now: 0 for the first, up to LAST once the Storm has closed. */
-export const stormPhase = (state: MatchState): number => phaseAt(state, clock(state)).k;
+export const stormPhase = (state: MatchState): number => phaseAt(clock(state)).k;
 
 /** The safe circle at storm time t. */
 export function calmAt(state: MatchState, t: number, out: Calm): Calm {
-  const ph = phaseAt(state, t), c = state.storm.centres;
-  if (state.mode === MODE.voyage) {
-    // no Storm on a voyage: the whole planet is calm
-    set(out.at, c[0].x, c[0].y, c[0].z);
-    out.r = PI * R;
-    out.cos = -1;
-    return out;
-  }
+  const ph = phaseAt(t), c = state.storm.centres;
   if (!ph.closing) {
     const z = Math.min(ph.k, ZONES.length - 1);
     set(out.at, c[z].x, c[z].y, c[z].z);
@@ -182,10 +172,10 @@ export const toEdge = (state: MatchState, p: V3): number => {
 
 /** The Storm's damage a second, past the shield. */
 export function stormDamage(state: MatchState): number {
-  const t = clock(state), ph = phaseAt(state, t);
+  const t = clock(state), ph = phaseAt(t);
   if (ph.k < LAST) return STORM.phases[ph.k].damage;
   let total = 0;
-  for (const p of STORM.phases) total += (p.wait + p.shrink) * state.storm.scale;
+  for (const p of STORM.phases) total += p.wait + p.shrink;
   return STORM.phases[LAST - 1].damage + STORM.rise * Math.floor((t - total) / STORM.every + 1);
 }
 
@@ -206,7 +196,7 @@ export function newStormView(): StormView {
 }
 
 export function stormView(state: MatchState, out: StormView): StormView {
-  const t = clock(state), ph = phaseAt(state, t), c = calmNow(state);
+  const t = clock(state), ph = phaseAt(t), c = calmNow(state);
   out.phase = ph.k;
   out.closing = ph.closing;
   out.left = ph.left;
@@ -250,8 +240,7 @@ function scan(state: MatchState, calm: Calm): void {
 }
 
 export function storm(state: MatchState): void {
-  if (state.mode === MODE.voyage) return;
-  const s = state.storm, t = clock(state), ph = phaseAt(state, t);
+  const s = state.storm, t = clock(state), ph = phaseAt(t);
   if (state.tick === s.start || ph.k !== s.phase || ph.closing !== s.shrinking) {
     if (ph.k < LAST) {
       const z = ph.closing ? ph.k + 1 : ph.k;
