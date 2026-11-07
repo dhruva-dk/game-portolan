@@ -81,7 +81,7 @@ async function main(): Promise<void> {
   const ocean = new Ocean(3);
   atmosphere.install(scene, ocean.beneath);
   scene.add(ocean.mesh);
-  const post = new Post(renderer, scene, camera, info.phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop);
+  const post = new Post(renderer, scene, camera, RENDER_SCALE[info.form]);
   const fog = scene.fogNode;
 
   // the land, painted with the scans of the regions round the eye

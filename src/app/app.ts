@@ -165,7 +165,17 @@ export class App {
       this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
       this.title?.setProgress(this.progress.f, this.progress.what);
     };
+    // with the frame log on, how long each step of the boot took
+    let last = performance.now();
+    const mark = (what: string) => {
+      if (!this.options.perfLog) return;
+      const now = performance.now();
+      console.info(`boot ${what}: ${((now - last) / 1000).toFixed(2)} s (at ${(now / 1000).toFixed(1)} s)`);
+      last = now;
+    };
+    mark('page');
     const stage = await GpuStage.create(this.canvas, report);
+    mark('stage');
     this.stage = stage;
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
@@ -176,14 +186,18 @@ export class App {
     const parchment = await Parchment.create(stage.renderer);
     applyParchment(await parchment.sheets());
     setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
+    mark('parchment');
     this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     warmChart();
+    mark('actors');
     await this.actors.ready;
+    mark('actors ready');
     // the locker's cards and the rewards are drawn from the ship itself
     const studio = new Studio(stage.renderer, this.actors.kit);
     // a weapon's art is its mount on her deck; anything else is a cosmetic as worn
     setStudio((kind, id) => (kind === 'weapon' ? studio.weapon(id as Weapon) : studio.cosmetic(kind, id)));
     await rockTexturesReady();
+    mark('studio and rocks');
     stage.snap();
     this.progress = { f: 1, what: 'Ready' };
     this.title?.setProgress(1, 'Ready');

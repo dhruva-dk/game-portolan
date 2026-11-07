@@ -370,7 +370,9 @@ export class Atlas<K extends string> {
   paint(): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = this.size;
-    const g = canvas.getContext('2d')!;
+    // held in memory, not on the GPU: bleed reads it back, and reading back a GPU canvas waits on everything the GPU
+    // process has queued, which while the game's shaders compile at boot has frozen the page for over a minute
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
     let n = 1;
     for (const k of Object.keys(this.specs) as K[]) {
       const c = this.specs[k];

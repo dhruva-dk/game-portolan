@@ -24,9 +24,9 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial,
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
-  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
-  mrt,
+  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, mrt,
 } from 'three/tsl';
+import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
 import { CASCADES, N, SIZES } from './spectrum.ts';
 import { LAYER, type Waves } from './waves.ts';
@@ -401,7 +401,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     // that dips under the surface and finds nothing (the sky past the curve of the sea, ground not built yet) comes
     // out over the surface again, and the water there is deep
     const zHere = positionView.z;
-    const zFloor = perspectiveDepthToViewZ(viewportDepthTexture(screenUV).x, cameraNear, cameraFar);
+    const zFloor = perspectiveDepthToViewZ(beneathDepth().x, cameraNear, cameraFar);
     const floorAt = cameraPosition.add(p.sub(cameraPosition).mul(zFloor.div(zHere)));
     const drop = length(p).sub(length(floorAt));
     const under = select(drop.lessThan(0), float(1e3), drop).toVar();
@@ -478,13 +478,13 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const nViewXY = cameraViewMatrix.mul(vec4(world.sub(u), 0)).xy;
     const zHere = positionView.z;
     const bend = nViewXY.mul(0.12).div(max(zHere.negate().mul(0.05), 1));
-    const behind = (uv: V2) => perspectiveDepthToViewZ(viewportDepthTexture(uv).x, cameraNear, cameraFar);
+    const behind = (uv: V2) => perspectiveDepthToViewZ(beneathDepth(uv).x, cameraNear, cameraFar);
     const bent = screenUV.add(bend);
     const uv = select(behind(bent).lessThan(zHere), bent, screenUV);
     const depthZ = max(zHere.sub(behind(uv)), 0);
     const path = depthZ.mul(length(positionView)).div(max(abs(zHere), 1e-3));
     const T = exp(water.extinction.mul(path).negate());
-    const floor = viewportSharedTexture(uv).rgb;
+    const floor = beneathColour(uv).rgb;
     // the sun through a crest standing between it and the eye (after Atlas's water, GDC 2019)
     const toward = pow(clamp(dot(v, P.sunDir.negate()), 0, 1), 4);
     const thin = pow(clamp(float(0.5).sub(dot(P.sunDir, world).mul(0.5)), 0, 1), 3);

@@ -62,7 +62,8 @@ export class ScanCache {
   #since = Infinity;
   #wanted: number[] = [];
 
-  constructor(renderer: WebGPURenderer, base = `${import.meta.env.BASE_URL}`) {
+  // the base is made absolute here: the build's is relative, and a worker would resolve it against its own script
+  constructor(renderer: WebGPURenderer, base = new URL(import.meta.env.BASE_URL, document.baseURI).href) {
     this.#base = base;
     this.#device = (renderer.backend as unknown as { device: Device }).device;
     this.surface = this.#array('rgba8unorm-srgb');

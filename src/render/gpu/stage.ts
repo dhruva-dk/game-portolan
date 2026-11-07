@@ -2,7 +2,7 @@
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
-import { RENDER_SCALE, createRenderer } from './renderer.ts';
+import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
@@ -90,7 +90,7 @@ export class GpuStage {
   #fps = 60;
   #last = 0;
 
-  private constructor(canvas: HTMLCanvasElement, renderer: WebGPURenderer, phone: boolean) {
+  private constructor(canvas: HTMLCanvasElement, renderer: WebGPURenderer, form: keyof typeof RENDER_SCALE) {
     this.#canvas = canvas;
     this.renderer = renderer;
     this.atmosphere = new Atmosphere(renderer);
@@ -105,7 +105,7 @@ export class GpuStage {
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.#scale = phone ? RENDER_SCALE.phone : RENDER_SCALE.desktop;
+    this.#scale = RENDER_SCALE[form];
     // every point light without a shadow is clustered, over the frame as the scene pass draws it
     renderer.lighting = new ClusteredLighting(this.#scale);
     this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay, this.atmosphere.sun);
@@ -114,9 +114,12 @@ export class GpuStage {
 
   static async create(canvas: HTMLCanvasElement, progress: (f: number, what: string) => void = () => {}): Promise<GpuStage> {
     progress(0.02, 'Charting the seas');
+    const t0 = performance.now();
     const { renderer, info } = await createRenderer(canvas);
     progress(0.5, 'Raising the islands');
-    const stage = new GpuStage(canvas, renderer, info.phone);
+    const t1 = performance.now();
+    const stage = new GpuStage(canvas, renderer, info.form);
+    console.info(`boot renderer ${((t1 - t0) / 1000).toFixed(2)} s, stage built ${((performance.now() - t1) / 1000).toFixed(2)} s`);
     progress(1, '');
     return stage;
   }
@@ -126,6 +129,7 @@ export class GpuStage {
 
   resize(): void {
     const w = this.#canvas.clientWidth || innerWidth, h = this.#canvas.clientHeight || innerHeight;
+    this.renderer.setPixelRatio(pixelRatio(w, h));
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / Math.max(h, 1);
     this.camera.updateProjectionMatrix();
@@ -254,6 +258,6 @@ export class GpuStage {
 
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
-    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: RENDER_SCALE.desktop, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
+    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
   }
 }

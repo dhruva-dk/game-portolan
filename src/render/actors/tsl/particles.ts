@@ -16,9 +16,10 @@
 import { AdditiveBlending, MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import {
   Fn, abs, cameraFar, cameraNear, cameraViewMatrix, cameraWorldMatrix, clamp, cos, cross, float, floor, instanceIndex, length,
-  max, min, mix, mod, mrt, normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, screenUV, select, sin, smoothstep,
-  texture, varying, vec2, vec3, vec4, viewportDepthTexture,
+  max, min, mix, mod, mrt, normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, select, sin, smoothstep,
+  texture, varying, vec2, vec3, vec4,
 } from 'three/tsl';
+import { overDepth } from '../../gpu/behind.ts';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from '../../atmosphere/luts.ts';
 import { skyLight } from '../../atmosphere/light.ts';
@@ -31,8 +32,8 @@ export interface ParticleBuffers { pos: Buffer; vel: Buffer; col: Buffer; shape:
 /** The first sprite drawn from the baked smoke (particles.ts SPRITE.billow); the one after burns (SPRITE.blast). */
 const BILLOW = 8;
 
-/** What lies behind the sprites, once the opaque scene is drawn. */
-const behind = viewportDepthTexture(screenUV);
+/** What lies behind the sprites: the scene with the sea in it. */
+const behind = overDepth();
 
 export function particleNodeMaterial(atlas: Texture, glow: boolean, b: ParticleBuffers): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: glow ? AdditiveBlending : NormalBlending });

@@ -33,8 +33,9 @@ import {
 import {
   Break, Discard, Fn, If, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
   interleavedGradientNoise, max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
-  smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4, viewportDepthTexture,
+  smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
+import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
 import type { WeatherKind } from '../../sim/world/index.ts';
 import { P, STRIKE } from '../gpu/uniforms.ts';
@@ -527,7 +528,7 @@ function compositeMaterial(source: Held): MeshBasicNodeMaterial {
       Discard();
     });
     // how far along this pixel's ray the scene has drawn something
-    const viewZ = perspectiveDepthToViewZ(viewportDepthTexture(screenUV).x, cameraNear, cameraFar);
+    const viewZ = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
     const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)));
     const stretch = vec3(ndc.x.mul(EYE.tan.x), ndc.y.mul(EYE.tan.y), 1).length();
     const z = viewZ.negate().mul(stretch);

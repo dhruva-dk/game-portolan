@@ -17,9 +17,9 @@
 import { PhysicalLightingModel, type NodeBuilder, type Node } from 'three/webgpu';
 import {
   Break, Fn, If, Loop, cameraFar, cameraNear, cameraProjectionMatrix, cameraViewMatrix, cameraWorldMatrix, clamp, float, interleavedGradientNoise, length, max,
-  min, mix, normalize, perspectiveDepthToViewZ, positionView, reflect, screenCoordinate, select, smoothstep, vec2, vec3, vec4, viewportDepthTexture,
-  viewportSharedTexture,
+  min, mix, normalize, perspectiveDepthToViewZ, positionView, reflect, screenCoordinate, select, smoothstep, vec2, vec3, vec4,
 } from 'three/tsl';
+import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type F = Node<'float'>;
@@ -59,7 +59,7 @@ export function seaReflection(normal: V3, rough: F, fresnel: F): V4 {
         const behind = (at: V3) => {
           const clip = cameraProjectionMatrix.mul(vec4(at, 1));
           const uv = clip.xy.div(clip.w).mul(vec2(0.5, -0.5)).add(0.5);
-          const depth = viewportDepthTexture(uv).x;
+          const depth = beneathDepth(uv).x;
           const scene = perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
           // what the frame shows there, in the world: the sky (at the far plane) and the seabed seen through the
           // water (the sea itself is not in the depth) are nothing a ray from above the water could meet
@@ -93,7 +93,7 @@ export function seaReflection(normal: V3, rough: F, fresnel: F): V4 {
           const { uv } = behind(pv.add(r.mul(hi)));
           const edge = smoothstep(0, 0.07, min(min(uv.x, float(1).sub(uv.x)), min(uv.y, float(1).sub(uv.y))));
           const far = smoothstep(1, 0.6, hi.div(REACH));
-          out.assign(vec4(viewportSharedTexture(uv).rgb, clamp(edge.mul(far).mul(away), 0, 1)));
+          out.assign(vec4(beneathColour(uv).rgb, clamp(edge.mul(far).mul(away), 0, 1)));
         });
       });
     });

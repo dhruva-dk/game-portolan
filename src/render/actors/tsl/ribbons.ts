@@ -15,9 +15,10 @@
 import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, NormalBlending, type Texture } from 'three/webgpu';
 import {
   Fn, cameraFar, cameraNear, cameraPosition, cameraViewMatrix, clamp, cross, exp, float, instanceIndex, length, max, min, mix, mrt,
-  normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, screenUV, select, smoothstep, texture, varying, vec2,
-  vec3, vec4, viewportDepthTexture,
+  normalize, perspectiveDepthToViewZ, positionGeometry, positionView, pow, select, smoothstep, texture, varying, vec2,
+  vec3, vec4,
 } from 'three/tsl';
+import { overDepth } from '../../gpu/behind.ts';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import { MOON_RADIUS, SUN_RADIUS, lightTransmittance } from '../../atmosphere/luts.ts';
 import { skyLight } from '../../atmosphere/light.ts';
@@ -26,7 +27,7 @@ import { moved, type F, type V3, type V4 } from './kit.ts';
 type Buffer = { element(i: unknown): V4 };
 export interface RibbonBuffers { pos: Buffer; vel: Buffer; col: Buffer; shape: Buffer; more: Buffer }
 
-const behind = viewportDepthTexture(screenUV);
+const behind = overDepth();
 
 export function ribbonNodeMaterial(noise: Texture, glow: boolean, b: RibbonBuffers, points: number): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, blending: glow ? AdditiveBlending : NormalBlending });

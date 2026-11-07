@@ -14,10 +14,11 @@ import { Group, InstancedBufferAttribute, InstancedBufferGeometry, Float32Buffer
 import type { Node } from 'three/webgpu';
 import {
   Fn, acos, attribute, cameraFar, cameraNear, cameraPosition, cameraWorldMatrix, clamp, dot, exp, float, fract, max, mix,
-  modelViewMatrix, modelWorldMatrixInverse, perspectiveDepthToViewZ, positionGeometry, positionView, positionWorld, screenUV,
-  select, sin, smoothstep, texture, uniform, varying, vec2, vec3, vec4, viewportDepthTexture, cos,
+  modelViewMatrix, modelWorldMatrixInverse, perspectiveDepthToViewZ, positionGeometry, positionView, positionWorld,
+  select, sin, smoothstep, texture, uniform, varying, vec2, vec3, vec4, cos,
   positionPrevious,
 } from 'three/tsl';
+import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
 import { LANDMARKS, REGIONS } from '../../sim/world/index.ts';
 import { P } from '../gpu/uniforms.ts';
@@ -136,7 +137,7 @@ export class Moonbow {
       .mul(0.65).add(texture(noise, vq.mul(0.9).add(vec2(P.time.mul(0.017), vseed.mul(3.3)))).g.mul(0.35));
     const shape = smoothstep(1, 0.1, r2).mul(smoothstep(0.4, 0.85, tear.add(float(0.32).sub(r2.mul(0.5)))));
     // soft where it meets the rock and the water
-    const behind = perspectiveDepthToViewZ(viewportDepthTexture(screenUV).x, cameraNear, cameraFar);
+    const behind = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
     const soft = clamp(positionView.z.sub(behind).div(max(vsize.mul(0.4), 1)), 0, 1);
     // and thin up close, so the eye sails through it rather than into a wall
     const near = smoothstep(1, 6, positionView.z.negate());

@@ -2,8 +2,10 @@
 // browser without a WebGPU adapter stops here with a clear error.
 //
 // The frame is drawn below the screen's resolution and reconstructed to it by the temporal upscaler in post.ts, so the
-// renderer's own pixel ratio is the screen's: every pass that wants fewer pixels asks for them itself.
+// renderer's own pixel ratio is the screen's, up to the floor's panel: every pass that wants fewer pixels asks for
+// them itself.
 import { WebGPURenderer, NoToneMapping, SRGBColorSpace } from 'three/webgpu';
+import { tightenPrivates } from './wgsl.ts';
 
 export interface GpuInfo {
   vendor: string;
@@ -11,12 +13,21 @@ export interface GpuInfo {
   /** The device's limits the effects size themselves by. */
   maxWorkgroupStorage: number;
   maxInvocations: number;
-  /** True on a phone-class GPU (an iPhone), where the internal resolution and the effects' budgets are trimmed. */
-  phone: boolean;
+  /** The kind of device, which sets the share of the screen the scene is drawn at. */
+  form: keyof typeof RENDER_SCALE;
 }
 
 /** The share of the screen's pixels the scene is drawn at before the upscaler, for each kind of device. */
 export const RENDER_SCALE = { phone: 0.5, tablet: 0.62, desktop: 0.75 } as const;
+
+/** The most pixels the canvas holds: the panel of an M1 iPad Air, the floor. A screen set to show more than its panel
+ *  has (an iPad's More Space), or a larger panel, gets this many and is stretched to fit, rather than every pass after
+ *  the upscaler paying for pixels the floor can't afford. */
+const MAX_PIXELS = 2360 * 1640;
+
+/** The canvas's pixels per CSS pixel for a canvas w × h CSS pixels. */
+export const pixelRatio = (w: number, h: number): number =>
+  Math.min(devicePixelRatio || 1, 3, Math.sqrt(MAX_PIXELS / Math.max(1, w * h)));
 
 // The little of the WebGPU API this file touches; three owns the device itself.
 interface Adapter {
@@ -27,6 +38,8 @@ interface Adapter {
 interface Gpu {
   requestAdapter(options?: { powerPreference?: string }): Promise<Adapter | null>;
 }
+interface ShaderSource { code: string }
+interface Device { createShaderModule(d: ShaderSource): unknown }
 
 export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ renderer: WebGPURenderer; info: GpuInfo }> {
   const gpu = (navigator as Navigator & { gpu?: Gpu }).gpu;
@@ -47,22 +60,27 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
     },
   } as ConstructorParameters<typeof WebGPURenderer>[0]);
   await renderer.init();
-  const backend = renderer.backend as { isWebGPUBackend?: boolean };
+  const backend = renderer.backend as unknown as { isWebGPUBackend?: boolean; device: Device };
   if (!backend.isWebGPUBackend) throw new Error('Portolan needs WebGPU, and three fell back to WebGL');
+  // every shader three writes passes through here on its way to the device (wgsl.ts)
+  const device = backend.device, compile = device.createShaderModule.bind(device);
+  device.createShaderModule = (d: ShaderSource) => compile({ ...d, code: tightenPrivates(d.code) });
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 3));
+  renderer.setPixelRatio(pixelRatio(innerWidth, innerHeight));
   renderer.shadowMap.enabled = true;
   const ai = adapter.info ?? { vendor: '', architecture: '' };
   // an iPhone's screen is short and dense: a landscape height under 500 CSS pixels on a 3x display
   const phone = (devicePixelRatio >= 2.5 && Math.min(innerWidth, innerHeight) < 500) || /iPhone/.test(navigator.userAgent);
+  // an iPad calls itself a Mac, and is told apart by its touch screen
+  const form = phone ? 'phone' : navigator.maxTouchPoints > 0 ? 'tablet' : 'desktop';
   return {
     renderer,
     info: {
       vendor: ai.vendor, architecture: ai.architecture,
       maxWorkgroupStorage: adapter.limits.maxComputeWorkgroupStorageSize,
       maxInvocations: adapter.limits.maxComputeInvocationsPerWorkgroup,
-      phone,
+      form,
     },
   };
 }
