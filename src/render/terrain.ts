@@ -37,8 +37,13 @@ export class Terrain {
   stats: TerrainStats = { drawn: 0, built: 0, pending: 0, queued: 0 };
   private readonly nodes = new Map<string, Node>();
   private readonly roots: Node[] = [];
+  #faces!: () => void;
+  /** Resolves once the six faces of the whole planet are built. */
+  readonly faces = new Promise<void>((r) => { this.#faces = r; });
   private readonly workers: Worker[] = [];
   private readonly idle: Worker[] = [];
+  /** The requests each worker has yet to answer. */
+  private readonly load = new Map<Worker, number>();
   private readonly inFlight = new Map<number, Node>();
   private readonly index: [THREE.BufferAttribute, THREE.BufferAttribute];
   private readonly flip: boolean[] = [];
@@ -70,12 +75,25 @@ export class Terrain {
     } catch {
       // no workers: chunks are built on the main thread, a few a frame
     }
-    // the six faces are built at once, so there is always a whole planet to draw
+    // the six faces are asked for first, so there is soon a whole planet to draw; built here, they held the page still
+    // for seconds as the game started
     for (let f = 0; f < 6; f++) {
       const n = this.node(f, 0, 0, 0, -40, 220);
       this.roots.push(n);
-      this.accept(n, buildChunk({ id: 0, face: f, level: 0, i: 0, j: 0 }));
+      if (this.workers.length) this.ask(n, this.workers.reduce((a, b) => ((this.load.get(b) ?? 0) < (this.load.get(a) ?? 0) ? b : a)));
+      else this.accept(n, buildChunk({ id: 0, face: f, level: 0, i: 0, j: 0 }));
     }
+  }
+
+  /** Sends worker w the request for node n's chunk. */
+  private ask(n: Node, w: Worker): void {
+    const id = this.nextId++;
+    n.state = PENDING;
+    this.inFlight.set(id, n);
+    this.load.set(w, (this.load.get(w) ?? 0) + 1);
+    const i = this.idle.indexOf(w);
+    if (i >= 0) this.idle.splice(i, 1);
+    w.postMessage({ id, face: n.face, level: n.level, i: n.i, j: n.j } satisfies ChunkRequest);
   }
 
   private node(face: number, level: number, i: number, j: number, minH: number, maxH: number): Node {
@@ -122,12 +140,15 @@ export class Terrain {
     n.minH = c.minH;
     n.maxH = c.maxH;
     n.state = READY;
+    if (n.level === 0 && this.roots.every((r) => r.state === READY)) this.#faces();
   }
 
   private receive(w: Worker, c: ChunkData): void {
     const n = this.inFlight.get(c.id);
     this.inFlight.delete(c.id);
-    this.idle.push(w);
+    const load = (this.load.get(w) ?? 1) - 1;
+    this.load.set(w, load);
+    if (load === 0) this.idle.push(w);
     if (n && n.state === PENDING) this.accept(n, c);
   }
 
@@ -179,12 +200,9 @@ export class Terrain {
     want.sort((a, b) => a.dist / a.side - b.dist / b.side);
     if (this.workers.length) {
       for (const n of want) {
-        const w = this.idle.pop();
+        const w = this.idle.at(-1);
         if (!w) break;
-        const id = this.nextId++;
-        n.state = PENDING;
-        this.inFlight.set(id, n);
-        w.postMessage({ id, face: n.face, level: n.level, i: n.i, j: n.j } satisfies ChunkRequest);
+        this.ask(n, w);
       }
     } else {
       for (const n of want.slice(0, 3)) this.accept(n, buildChunk({ id: 0, face: n.face, level: n.level, i: n.i, j: n.j }, CHUNK_N));

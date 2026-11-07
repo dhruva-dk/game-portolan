@@ -43,6 +43,23 @@ interface Gpu {
 interface ShaderSource { code: string }
 interface Device { createShaderModule(d: ShaderSource): unknown }
 
+// Three builds materials ahead of drawing them (compileAsync), yielding to the page after every step of every one,
+// through scheduler.yield where the browser has it and otherwise a whole animation frame each time, which on Safari
+// stretched the building of the planet's materials over minutes. There a yield gives the page back only once the
+// building has held it for YIELD_AFTER ms, by a message to the page's own task queue: the title is drawn between
+// stretches that long, and the building goes on as soon as it is.
+const YIELD_AFTER = 40;
+const S = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } };
+if (!S.scheduler?.yield) {
+  const channel = new MessageChannel(), waiting: (() => void)[] = [];
+  let since = performance.now();
+  channel.port1.onmessage = () => { since = performance.now(); waiting.shift()?.(); };
+  S.scheduler = {
+    ...S.scheduler,
+    yield: () => (performance.now() - since < YIELD_AFTER ? Promise.resolve() : new Promise<void>((r) => { waiting.push(r); channel.port2.postMessage(0); })),
+  };
+}
+
 export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ renderer: WebGPURenderer; info: GpuInfo }> {
   const gpu = (navigator as Navigator & { gpu?: Gpu }).gpu;
   if (!gpu) throw new Error('Portolan needs WebGPU, and this browser has none');

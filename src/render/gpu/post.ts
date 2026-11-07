@@ -209,6 +209,8 @@ function lensDirt(): Texture {
 export class Post {
   readonly pipeline: RenderPipeline;
   readonly scenePass: PassNode;
+  /** How deep in renders the scene was last drawn. */
+  sceneDepth = 0;
   readonly exposure: Exposure;
   /** The occlusion (with the bounce while it is drawn) and the contact shadows, null while parked. */
   readonly occlusion: SSGINode | GTAONode;
@@ -242,6 +244,8 @@ export class Post {
     const drawScene = scenePass.updateBefore.bind(scenePass);
     scenePass.updateBefore = (frame) => {
       shape.system('scene');
+      // the stage builds the scene's materials ahead for this depth (stage.ts, SCENE_DEPTH)
+      this.sceneDepth = (renderer as unknown as { _callDepth: number })._callDepth + 1;
       const r = drawScene(frame);
       shape.system('post');
       return r;

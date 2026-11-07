@@ -1,7 +1,7 @@
 // The planet on screen, on WebGPU: the atmosphere and its light, the sun's shadows, the FFT ocean, the land painted
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
-import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type WebGPURenderer } from 'three/webgpu';
+import { PerspectiveCamera, Scene, Vector2, Vector3, type Matrix4, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { shape } from './shape.ts';
@@ -49,6 +49,19 @@ const FAIR_WEATHER = 0.62;
 const WIND_STEP = 0.75;
 const HEADING_STEP = 8 * DEG;
 
+/** How deep in renders the scene is drawn: inside the upscaler's resolve, inside the quad that puts the frame on the
+ *  screen. */
+const SCENE_DEPTH = 2;
+
+/** The renderer's own state the warm-up borrows. */
+interface Internals {
+  _renderContexts: { get(target: unknown, mrt: unknown, depth?: number): unknown };
+  _nodes: { getForRenderAsync(ro: unknown): Promise<unknown>; getForRender(ro: unknown): unknown };
+  _pipelines: { getForRender(ro: unknown, promises: unknown): unknown };
+  setRenderTarget(target: unknown): void;
+  setMRT(mrt: unknown): void;
+}
+
 export class GpuStage {
   readonly scene = new Scene();
   /** What is written on the screen rather than lit in the world (the damage numbers), drawn over the finished frame. */
@@ -91,6 +104,25 @@ export class GpuStage {
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
   #fps = 60;
   #last = 0;
+  /** The planet seen whole, from five radii out: what the materials are gathered for (#compile). */
+  readonly #whole = (() => {
+    const c = new PerspectiveCamera(60, 1, 1, 10 * R);
+    c.position.set(0, 0, 5 * R);
+    c.lookAt(0, 0, 0);
+    c.updateMatrixWorld();
+    return c;
+  })();
+  /** Whether the first frame drawn has been checked against the depth the materials were built for. */
+  #checked = false;
+  #allBuilt!: () => void;
+  readonly #all = new Promise<void>((r) => { this.#allBuilt = r; });
+  /** What the app has asked to be built after the title (later), in order. */
+  readonly #later = new Map<Object3D, { group: Object3D; built: () => void }>();
+  /** Whether the scene's materials are built (#build), and what is told the share built meanwhile. */
+  #warm: 'no' | 'building' | 'done' = 'no';
+  #warmed!: () => void;
+  readonly warmed = new Promise<void>((r) => { this.#warmed = r; });
+  onWarm?: (f: number) => void;
   /** The canvas's size and pixel ratio, as last set. */
   #size = { w: 0, h: 0, ratio: 0 };
   #shown = false;
@@ -153,6 +185,8 @@ export class GpuStage {
 
   /** Lays out the planet for a frame and draws it. */
   frame(v: StageView, dt: number): void {
+    // while the materials are being built, the page is left to them and to the title
+    if (this.#warm === 'building') return;
     P.time.value = v.time;
     P.dt.value = dt;
     sunDirection(v.hour, v.tilt, this.sun);
@@ -237,8 +271,20 @@ export class GpuStage {
     shape.system('actors');
     runFrameWork(this.renderer);
     shape.system('scene');
+    // nothing is drawn until every material in the scene is built (warm)
+    if (this.#warm !== 'done') {
+      if (this.#warm === 'no') {
+        this.#warm = 'building';
+        void this.#build();
+      }
+      return;
+    }
     this.post.focus(v.focus ?? null);
     this.post.render(dt);
+    if (!this.#checked) {
+      this.#checked = true;
+      if (this.post.sceneDepth !== SCENE_DEPTH) console.warn(`the scene is drawn ${this.post.sceneDepth} renders deep, not ${SCENE_DEPTH}: its materials were built for the wrong depth and are built again`);
+    }
 
     const now = performance.now();
     if (this.#last) this.#fps += (1000 / Math.max(now - this.#last, 1) - this.#fps) * 0.05;
@@ -277,8 +323,118 @@ export class GpuStage {
     this.ocean.sea = s;
   }
 
-  /** Resolves when the land round the camera has been built and painted. */
+  /**
+   * Builds every material in the scene before it is drawn: drawn straight away, the first frame built them all at
+   * once and held the page still for the better part of 20 s on the iPad. It starts from the first frame, so the lights
+   * stand as that frame set them (which lights cast shadows is part of what a material is built for), and draws
+   * nothing until the planet the title shows is built. What the title can do without (the ships and all they carry,
+   * asked for by the app, and the regions' beacons and landmarks: two thirds of the materials, and nothing that shows
+   * from orbit) is built after that, with the title up, each hidden until its own are.
+   */
+  async #build(): Promise<void> {
+    // the land's material is built for its chunks, the first of which the workers are still making
+    await this.terrain.faces;
+    this.atmosphere.shadows.node.ready(this.camera, this.renderer);
+    // the land's chunks are shown by the view that wants them
+    this.terrain.update(this.#whole.position);
+    const later = [...this.#later.values(), ...[this.beacons.group, this.landmarks.group].map((group) => ({ group, built: () => {} }))];
+    for (const { group } of later) group.visible = false;
+    await this.#compile(this.scene, false, (f) => this.onWarm?.(f));
+    this.#warm = 'done';
+    this.#warmed();
+    for (const { group, built } of later) {
+      await this.#compile(group, true);
+      group.visible = true;
+      built();
+    }
+    // and last, everything in the scene still hidden: the parts shown by the hour or the distance, the shot and
+    // wreckage kept ready for a match, the weather's falls; so none of it holds a frame up the first time it shows
+    await this.#compile(this.scene, true);
+    this.#allBuilt();
+  }
+
+  /** Builds `group`'s materials after the title's (#build), in the order asked, keeping it hidden till then; resolves
+   *  once they are built. Asked before the first frame. */
+  later(group: Object3D): Promise<void> {
+    return new Promise((built) => { this.#later.set(group, { group, built }); });
+  }
+
+  /**
+   * Builds the materials of everything under `root` as the scene pass will draw them, one object at a time between
+   * the page's other work, with three's compileAsync. That builds for the call depth it is made at, and the scene is
+   * drawn deeper, inside the frame's own pass; so the draws are gathered at the pass's depth, and each object is built
+   * into the pass's target and with its outputs, which are set for that object alone and put back before anything
+   * else may run (the frames go on meanwhile). `root` is gathered as if shown, with the whole planet in view, so
+   * nothing is left out for lying off the edge of the frame; with `hidden`, so is all that lies hidden under it.
+   */
+  async #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
+    const r = this.renderer as unknown as Internals, pass = this.post.scenePass;
+    const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines } = r;
+    const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
+    // an object is built in one go, straight after its target is set, and the target is put back once its pipeline is
+    // asked for, the last step before three waits for it (and only then: the frames draw meanwhile, and ask for theirs)
+    let set = false;
+    const unset = () => {
+      if (!set) return;
+      set = false;
+      r.setRenderTarget(null);
+      r.setMRT(null);
+    };
+    nodes.getForRenderAsync = (ro: unknown) => {
+      r.setRenderTarget(pass.renderTarget);
+      r.setMRT(pass.getMRT());
+      set = true;
+      try {
+        return Promise.resolve(nodes.getForRender(ro));
+      } catch (e) {
+        unset();
+        throw e;
+      }
+    };
+    pipelines.getForRender = (ro: unknown, promises: unknown) => {
+      try {
+        return pipeline.call(pipelines, ro, promises);
+      } finally {
+        unset();
+      }
+    };
+    // shown for the gathering: `root` itself, and with `hidden` everything under it but the lights (which lights shine
+    // is part of what every material is built for, and a light is shown only while it is lit)
+    const shown: Object3D[] = [];
+    root.traverse((o) => {
+      if (o.visible || (o !== root && (!hidden || (o as { isLight?: boolean }).isLight))) return;
+      shown.push(o);
+      o.visible = true;
+    });
+    contexts.get = (target: unknown, mrt: unknown) => get.call(contexts, target, mrt, SCENE_DEPTH);
+    r.setRenderTarget(pass.renderTarget);
+    r.setMRT(pass.getMRT());
+    set = true;
+    let built: Promise<void>;
+    try {
+      // the key of the scene's lights, which every material is built for, is worked out once per draw call and kept
+      // until the next; the first material built sets the lights' nodes up and changes it, and with no draws between
+      // them the rest would be built for the stale key and built again by the first frame: so each counts as a call
+      built = this.renderer.compileAsync(root, this.#whole, root === this.scene ? null : this.scene, (e: ProgressEvent) => {
+        (this.renderer.info as { calls: number }).calls++;
+        progress?.(e.loaded / Math.max(e.total, 1));
+      });
+    } finally {
+      contexts.get = get;
+      for (const o of shown) o.visible = false;
+      unset();
+    }
+    try {
+      await built;
+    } finally {
+      nodes.getForRenderAsync = build;
+      pipelines.getForRender = pipeline;
+    }
+  }
+
+  /** Resolves when every material is built and the land round the camera has been built and painted. */
   async settled(): Promise<void> {
+    await this.#all;
     await this.terrain.settled();
     await this.flora.settled();
     await this.scans.settled(this.camera.position);

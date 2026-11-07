@@ -96,6 +96,8 @@ export class App {
   private loaded: Promise<void> | null = null;
   private title: TitleView | null = null;
   private progress = { f: 0, what: 'Charting the seas' };
+  /** Resolves once the ships' materials are built, which they are after the title's. */
+  #shipsBuilt: Promise<void> = Promise.resolve();
   private readonly sun = new THREE.Vector3();
   /** Unlocks the player has not looked at yet: badges on the lobby's tiles and "new" on the cards. */
   private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
@@ -189,8 +191,22 @@ export class App {
     setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
     mark('parchment');
     this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
+    // the ships are built after the planet, with the title up; leaving the title waits for them
+    this.#shipsBuilt = stage.later(this.actors.group);
     warmChart();
     mark('actors');
+    // the first frame builds every material, a few at a time, before anything is drawn
+    report(0.5, 'Painting the seas');
+    stage.onWarm = (f) => report(0.5 + 0.45 * f, '');
+    // with the loop held (captures), the frame that starts it is drawn here
+    let warm = false;
+    void stage.warmed.then(() => { warm = true; });
+    while (!warm && !this.loop.running) {
+      this.loop.drawNow(0);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    await stage.warmed;
+    mark('warm');
     await this.actors.ready;
     mark('actors ready');
     // the locker's cards and the rewards are drawn from the ship itself
@@ -246,7 +262,7 @@ export class App {
     switch (name) {
       case 'title': {
         const m = (model as TitleModel | undefined) ?? { progress: this.progress.f, status: this.progress.what, version: VERSION };
-        return titleScreen(m, { onStart: () => this.go('lobby') });
+        return titleScreen(m, { onStart: () => void this.#shipsBuilt.then(() => this.go('lobby')) });
       }
       case 'lobby':
         return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), {

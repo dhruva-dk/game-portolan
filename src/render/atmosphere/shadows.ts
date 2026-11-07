@@ -83,12 +83,24 @@ interface Inner {
 
 /** The cascades, with each slice's bias and spread kept to its texel size as the slices are refitted. */
 class Cascades extends CSMShadowNode {
+  /** Makes the slices, each with its own light, the first time a material is built for them or they are readied. */
+  #init(builder: { camera: unknown; renderer: unknown }): void {
+    if (this.camera !== null) return;
+    (this as unknown as Inner)._init(builder as unknown as NodeBuilder);
+    for (const l of this.lights) (l.shadow as unknown as { filterNode: unknown }).filterNode = discFilter;
+  }
+
+  /** Makes the slices and puts their lights in the scene, as the first frame drawn would: the lights in the scene are
+   *  part of what a material is built for, so materials built ahead of the first frame are built for these. */
+  ready(camera: PerspectiveCamera, renderer: WebGPURenderer): void {
+    this.#init({ camera, renderer });
+    const parent = this.light.parent;
+    for (const l of this.lights) if (l.parent === null && parent) parent.add(l.target, l);
+  }
+
   override setup(builder: NodeBuilder): Node | null | undefined {
     const inner = this as unknown as Inner;
-    if (this.camera === null) {
-      inner._init(builder);
-      for (const l of this.lights) (l.shadow as unknown as { filterNode: unknown }).filterNode = discFilter;
-    }
+    this.#init(builder as unknown as { camera: unknown; renderer: unknown });
     return Fn((b: NodeBuilder) => {
       inner.setupShadowPosition(b);
       // how far into the reach the point the map is read at lies, 0 at the eye and 1 at the end

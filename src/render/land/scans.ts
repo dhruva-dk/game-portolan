@@ -56,6 +56,8 @@ export class ScanCache {
   readonly #inSlot = new Int16Array(SLOTS).fill(-1);
   readonly #wantedAt = new Float64Array(SLOTS);
   readonly #pending = new Map<number, number>();
+  /** Scans that failed to load, which are not asked for again. */
+  readonly #failed = new Set<number>();
   readonly #workers: Worker[] = [];
   readonly #idle: Worker[] = [];
   #clock = 0;
@@ -106,7 +108,7 @@ export class ScanCache {
     }
     for (const s of this.#wanted) {
       if (!this.#idle.length) break;
-      if (this.#slotOf[s] >= 0 || [...this.#pending.values()].includes(s)) continue;
+      if (this.#slotOf[s] >= 0 || this.#failed.has(s) || [...this.#pending.values()].includes(s)) continue;
       const slot = this.#freeSlot();
       if (slot < 0) break;
       // the scan that was here goes at once, so nothing samples the slot while it is being refilled
@@ -145,7 +147,10 @@ export class ScanCache {
     if (slot < 0) return;
     this.#pending.delete(slot);
     if (r.error) {
+      // the land keeps the scan's far look where it would have been; asked for again, it would be fetched and fail
+      // each time a worker came free
       console.error('scan', SCANS[r.id].key, r.error);
+      this.#failed.add(r.id);
       return;
     }
     const write = (t: ExternalTexture, mips: Uint8Array[]) => {
