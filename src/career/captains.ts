@@ -1,4 +1,4 @@
-// The league: forty captains. Each is a spirit, known by the sigil on its sail (never a face), with a
+// The league: twenty captains. Each is a spirit, known by its colour and the sigil on its sail (never a face), with a
 // temperament that sets how it plays, and the one active and one passive ability it always brings, so you
 // learn what each rival carries. Ids are stable: saves refer to them.
 // Sigil ids are the captain charges drawn in src/render/cosmetics/emblems.ts (CAPTAIN_EMBLEMS).
@@ -39,66 +39,55 @@ export interface Captain {
   temperament: TemperamentId;
   /** The sigil on its sail: a spirit or natural form, never a face. */
   sigil: { id: string; name: string };
+  /** Its colour, '#rrggbb': its sail, hull, pennant, chart mark and seal all wear it. */
+  colour: string;
   active: ActiveId;
   passive: PassiveId;
   look: Look;
 }
 
-const PATTERNS = cosmeticsOf('sailPattern').filter((c) => c.unlock.by === 'level');
 const FIGUREHEADS = cosmeticsOf('figurehead').filter((c) => c.unlock.by === 'level');
 const WAKES = cosmeticsOf('wake').filter((c) => c.unlock.by === 'level');
 
-type Row = readonly [id: string, name: string, meaning: string, t: TemperamentId, sigil: string, sigilName: string, active: ActiveId, passive: PassiveId, sail: string, hull: string];
+type Row = readonly [id: string, name: string, meaning: string, t: TemperamentId, sigil: string, sigilName: string, active: ActiveId, passive: PassiveId, colour: string];
 
+// The twenty colours go round the hue circle a step (18°) apart in OKLCH, so no two are within a step of each other,
+// at a lightness of 0.68 and 0.80 in turn, so neighbours differ in value as well and every one stands well above the
+// sea's (about 0.4 at noon in deep water, 0.13 at night), with as much chroma as sRGB holds there, up to 0.15. The
+// charges are twenty different shapes at the chart mark's 24 px, no two overlapping by more than 0.53 of their area:
+// a spiked disc, a ring, a crescent, a star, a cloud, lines, a peak, a flame, a bolt, a paw, antlers, wings, a bird
+// perched and one in flight, a fluke and five creatures of distinct outline.
 const ROWS: readonly Row[] = [
-  ['saetta', 'Saetta', 'Lightning bolt', 'hunter', 'lightning', 'a forked bolt', 'ram', 'quickReload', 'emberRed', 'pitchBlack'],
-  ['murena', 'Murena', 'Moray eel', 'hunter', 'serpent', 'a sea serpent', 'hardTurn', 'steadyAim', 'mistwoodMoss', 'pineBark'],
-  ['astore', 'Astore', 'Goshawk', 'hunter', 'goshawk', 'a goshawk in its stoop', 'reveal', 'lightHull', 'narrowsOchre', 'driftwood'],
-  ['fiera', 'Fiera', 'Wild beast', 'hunter', 'wolf', 'a running wolf', 'ram', 'steadyAim', 'flameTree', 'lavaRock'],
-  ['morsa', 'Morsa', 'Grip', 'hunter', 'bearPaw', 'a bear’s paw', 'hardTurn', 'quickReload', 'basaltBlack', 'verdigris'],
-  ['orca', 'Orca', 'Killer whale', 'hunter', 'whale', 'a whale', 'ram', 'lightHull', 'basaltBlack', 'pearl'],
-  ['narvalo', 'Narvalo', 'Narwhal', 'hunter', 'narwhal', 'a narwhal', 'reveal', 'quickReload', 'coralBloom', 'ashGrey'],
-  ['meridiana', 'Meridiana', 'Meridian', 'holder', 'sun', 'the noon sun', 'repair', 'stormWalker', 'weepingSapphire', 'sandbar'],
-  ['marea', 'Marea', 'Tide', 'holder', 'waves', 'three stacked waves', 'wave', 'deepHold', 'glacierBlue', 'seaGlass'],
-  ['aurora', 'Aurora', 'Dawn', 'holder', 'risingSun', 'the sun rising over the sea', 'repair', 'salvage', 'duskRose', 'moonstone'],
-  ['lontana', 'Lontana', 'Far away', 'holder', 'northStar', 'the north star', 'driftMine', 'stormWalker', 'maelstromNavy', 'deepIndigo'],
-  ['rosaDeiVenti', 'Rosa dei Venti', 'Rose of the winds', 'holder', 'wind', 'a gust of wind', 'wave', 'stormWalker', 'kelpGold', 'cedarRed'],
-  ['rocca', 'Rocca', 'Crag', 'holder', 'mountain', 'a jagged peak', 'repair', 'deepHold', 'seafoam', 'ashGrey'],
-  ['corallo', 'Corallo', 'Coral', 'holder', 'starfish', 'a starfish', 'driftMine', 'salvage', 'coralBloom', 'pearl'],
-  ['gazza', 'Gazza', 'Magpie', 'looter', 'magpie', 'a magpie', 'smokeScreen', 'deepHold', 'bareCanvas', 'pitchBlack'],
-  ['volpe', 'Volpe', 'Fox', 'looter', 'fox', 'a fox', 'hardTurn', 'quickHands', 'narrowsOchre', 'rustBloom'],
-  ['rapina', 'Rapina', 'Plunder', 'looter', 'octopus', 'an octopus, arms spread', 'decoy', 'salvage', 'emberRed', 'driftwood'],
-  ['scheggia', 'Scheggia', 'Splinter', 'looter', 'swordfish', 'a swordfish', 'smokeScreen', 'quickHands', 'jadeWater', 'verdigris'],
-  ['ladra', 'Ladra', 'Thief', 'looter', 'bat', 'a bat', 'decoy', 'deepHold', 'weepingSapphire', 'sandbar'],
-  ['granchio', 'Granchio', 'Crab', 'looter', 'crab', 'a crab', 'smokeScreen', 'salvage', 'flameTree', 'rustBloom'],
-  ['corvo', 'Corvo', 'Raven', 'looter', 'raven', 'a raven', 'decoy', 'quickHands', 'basaltBlack', 'deepIndigo'],
-  ['testuggine', 'Testuggine', 'Tortoise', 'survivor', 'turtle', 'a sea turtle', 'repair', 'stormWalker', 'mistwoodMoss', 'sandbar'],
-  ['quieta', 'Quieta', 'The still one', 'survivor', 'lotus', 'a lotus', 'smokeScreen', 'windReader', 'seafoam', 'moonstone'],
-  ['conchiglia', 'Conchiglia', 'Shell', 'survivor', 'nautilus', 'a nautilus shell', 'repair', 'lightHull', 'cherryPetal', 'pearl'],
-  ['riccio', 'Riccio', 'Urchin', 'survivor', 'pufferfish', 'a spined pufferfish', 'decoy', 'stormWalker', 'mangroveTea', 'pineBark'],
-  ['quercia', 'Quercia', 'Oak', 'survivor', 'oak', 'an oak', 'smokeScreen', 'lightHull', 'kelpGold', 'ashGrey'],
-  ['acero', 'Acero', 'Maple', 'survivor', 'maple', 'a maple leaf', 'smokeScreen', 'windReader', 'glacierBlue', 'driftwood'],
-  ['lucciola', 'Lucciola', 'Firefly', 'survivor', 'moth', 'a moth', 'decoy', 'lightHull', 'auroraGreen', 'deepIndigo'],
-  ['pazienza', 'Pazienza', 'Patience', 'ambusher', 'heron', 'a heron, waiting', 'driftMine', 'steadyAim', 'maelstromNavy', 'ashGrey'],
-  ['ombra', 'Ombra', 'Shadow', 'ambusher', 'eclipse', 'a black sun', 'decoy', 'quickReload', 'basaltBlack', 'lavaRock'],
-  ['gufo', 'Gufo', 'Owl', 'ambusher', 'owl', 'an owl', 'reveal', 'steadyAim', 'mangroveTea', 'cedarRed'],
-  ['avvoltoio', 'Avvoltoio', 'Vulture', 'ambusher', 'vulture', 'a vulture', 'driftMine', 'windReader', 'kelpGold', 'pitchBlack'],
-  ['sorniona', 'Sorniona', 'The sly one', 'ambusher', 'scorpion', 'a scorpion', 'decoy', 'windReader', 'jadeWater', 'emberGlaze'],
-  ['cervo', 'Cervo', 'Stag', 'ambusher', 'stag', 'a stag', 'driftMine', 'quickReload', 'weepingSapphire', 'seaGlass'],
-  ['fortuna', 'Fortuna', 'Fortune', 'skirmisher', 'clover', 'a four-leaf clover', 'wave', 'windReader', 'kelpGold', 'sandbar'],
-  ['azzardo', 'Azzardo', 'Hazard', 'skirmisher', 'volcano', 'a smoking volcano', 'hardTurn', 'lightHull', 'emberRed', 'pitchBlack'],
-  ['tempesta', 'Tempesta', 'Storm', 'skirmisher', 'stormCloud', 'a storm cloud', 'wave', 'quickReload', 'maelstromNavy', 'deepIndigo'],
-  ['cometa', 'Cometa', 'Comet', 'skirmisher', 'comet', 'a comet and its tail', 'hardTurn', 'windReader', 'auroraGreen', 'pearl'],
-  ['sirocchia', 'Sirocchia', 'Sister', 'skirmisher', 'flame', 'a flame', 'smokeScreen', 'lightHull', 'flameTree', 'cedarRed'],
-  ['rondine', 'Rondine', 'Swallow', 'skirmisher', 'swift', 'a swift in flight', 'wave', 'steadyAim', 'seafoam', 'verdigris'],
+  ['corvo', 'Corvo', 'Raven', 'survivor', 'raven', 'a raven', 'smokeScreen', 'windReader', '#e66e68'],
+  ['corallo', 'Corallo', 'Coral', 'holder', 'starfish', 'a starfish', 'driftMine', 'salvage', '#f9a685'],
+  ['sirocchia', 'Sirocchia', 'Sister', 'skirmisher', 'flame', 'a flame', 'smokeScreen', 'lightHull', '#d68129'],
+  ['meridiana', 'Meridiana', 'Meridian', 'holder', 'sun', 'the noon sun', 'repair', 'stormWalker', '#f1b136'],
+  ['sorniona', 'Sorniona', 'The sly one', 'ambusher', 'scorpion', 'a scorpion', 'decoy', 'windReader', '#ae982a'],
+  ['saetta', 'Saetta', 'Lightning bolt', 'hunter', 'lightning', 'a forked bolt', 'ram', 'quickReload', '#bbc949'],
+  ['testuggine', 'Testuggine', 'Tortoise', 'survivor', 'turtle', 'a sea turtle', 'repair', 'stormWalker', '#72ab42'],
+  ['cervo', 'Cervo', 'Stag', 'ambusher', 'stag', 'a stag', 'driftMine', 'quickReload', '#6cd98b'],
+  ['rocca', 'Rocca', 'Crag', 'holder', 'mountain', 'a jagged peak', 'repair', 'deepHold', '#30b08b'],
+  ['marea', 'Marea', 'Tide', 'holder', 'waves', 'three stacked waves', 'wave', 'deepHold', '#3ed8cb'],
+  ['orca', 'Orca', 'Killer whale', 'hunter', 'whale', 'a whale', 'ram', 'lightHull', '#30abb7'],
+  ['rondine', 'Rondine', 'Swallow', 'skirmisher', 'swift', 'a swift in flight', 'wave', 'steadyAim', '#4ccff9'],
+  ['tempesta', 'Tempesta', 'Storm', 'skirmisher', 'stormCloud', 'a storm cloud', 'wave', 'quickReload', '#2ea1e7'],
+  ['quieta', 'Quieta', 'The still one', 'survivor', 'crescentMoon', 'a crescent moon', 'smokeScreen', 'windReader', '#9abff9'],
+  ['ombra', 'Ombra', 'Shadow', 'ambusher', 'eclipse', 'a black sun', 'decoy', 'quickReload', '#828df3'],
+  ['ladra', 'Ladra', 'Thief', 'looter', 'bat', 'a bat', 'decoy', 'deepHold', '#c2b1f9'],
+  ['gufo', 'Gufo', 'Owl', 'ambusher', 'owl', 'an owl', 'reveal', 'steadyAim', '#b87ad9'],
+  ['rapina', 'Rapina', 'Plunder', 'looter', 'octopus', 'an octopus, arms spread', 'decoy', 'salvage', '#f498ea'],
+  ['morsa', 'Morsa', 'Grip', 'hunter', 'bearPaw', 'a bear’s paw', 'hardTurn', 'quickReload', '#da6ea7'],
+  ['granchio', 'Granchio', 'Crab', 'looter', 'crab', 'a crab', 'smokeScreen', 'quickHands', '#f9a0b2'],
 ];
 
-export const CAPTAINS: readonly Captain[] = ROWS.map(([id, name, meaning, t, sigil, sigilName, active, passive, sail, hull], i) => ({
-  id, name, meaning, temperament: t, sigil: { id: sigil, name: sigilName }, active, passive,
+export const CAPTAINS: readonly Captain[] = ROWS.map(([id, name, meaning, t, sigil, sigilName, active, passive, colour], i) => ({
+  id, name, meaning, temperament: t, sigil: { id: sigil, name: sigilName }, colour, active, passive,
+  // her colour stands for the sail colour and hull paint, which the look keeps only as the catalogue's plainest
   look: {
-    sailColour: sail,
-    sailPattern: PATTERNS[(i * 5 + 1) % PATTERNS.length].id,
-    hullPaint: hull,
+    colour,
+    sailColour: 'bareCanvas',
+    sailPattern: 'plain',
+    hullPaint: 'driftwood',
     figurehead: FIGUREHEADS[(i * 7 + 1) % FIGUREHEADS.length].id,
     emblem: sigil,
     wake: WAKES[(i * 3) % WAKES.length].id,

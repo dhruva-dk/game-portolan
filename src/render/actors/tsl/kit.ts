@@ -1,8 +1,8 @@
 // What the actors' node materials share: their uniforms, read straight from the records the actors already keep (so a
 // ship's colours, damage and hit flash are set once and both renderers see them), a chain of cases for shaders that
 // colour by part, and a dither for fading a surface out without blending it.
-import type { Node, Texture } from 'three/webgpu';
-import { interleavedGradientNoise, materialEmissive, reference, screenCoordinate, select, texture } from 'three/tsl';
+import type { Node } from 'three/webgpu';
+import { interleavedGradientNoise, materialEmissive, reference, screenCoordinate, select } from 'three/tsl';
 import { LAMP } from '../../gpu/uniforms.ts';
 
 export type F = Node<'float'>;
@@ -45,14 +45,6 @@ export function readArray(u: Uniforms, name: string, type: 'vec4'): Node & { ele
   if (!(name in u)) throw new Error(`the actor has no uniform ${name}`);
   const path = DRAWN.has(u) ? `userData.u.${name}.value` : 'value';
   return reference(path, type, DRAWN.has(u) ? null : u[name]) as unknown as Node & { element(i: unknown): Node };
-}
-
-/** Samples one of an actor's textures at `at`, following the record when the texture in it is swapped. */
-export function readTexture(u: Uniforms, name: string, at: V2): V4 {
-  if (!(name in u)) throw new Error(`the actor has no uniform ${name}`);
-  const node = texture(u[name].value as Texture, at) as unknown as V4 & { onObjectUpdate(f: (frame: { object: { userData: { u: Uniforms } } | null }) => unknown): unknown };
-  node.onObjectUpdate(DRAWN.has(u) ? ({ object }) => object!.userData.u[name].value : () => u[name].value);
-  return node;
 }
 
 /** The first case whose test holds, else the fallback: a chain of selects, with no branches for a shared node to be

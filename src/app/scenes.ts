@@ -26,6 +26,8 @@ export interface SceneSpec {
   ship: boolean;
   /** Other ships sailing on open water ahead, spread from 60 to 220 m out: their lanterns show at night. */
   fleet?: number;
+  /** Whether the fleet sails in review instead, in ranks of five beyond the spot, so the league shows side by side. */
+  lineup?: boolean;
   /** The camera's target over the sea, in metres, if not the ship's deck or the water. */
   height?: number;
   region?: string;
@@ -57,6 +59,7 @@ export interface SceneInput {
   ebb?: number;
   ship?: boolean;
   fleet?: number;
+  lineup?: boolean;
   height?: number;
   systems?: readonly SceneSystem[];
 }
@@ -296,6 +299,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     ...(s.ebb !== undefined && { ebb: s.ebb }),
     ...(s.height !== undefined && { height: s.height }),
     ...(s.fleet !== undefined && { fleet: s.fleet }),
+    ...(s.lineup && { lineup: true }),
     ...(s.systems && { systems: s.systems }),
   };
 }

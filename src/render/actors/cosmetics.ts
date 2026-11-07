@@ -31,6 +31,7 @@ export interface Look {
   hull: number; // lacquer
   accent: number; // the gun deck's band, the castles' bulkheads, the port lids
   trim: number; // metal and gilding
+  roundel?: number; // the field round the sails' charge, where it is not the trim
   sail: number;
   sail2: number;
   pattern: number; // 0 plain, 1 bands, 2 leech band, 3 centre stripe, 4 quarters, 5 chevrons
@@ -45,6 +46,9 @@ export const SAIL_COLOURS: Record<string, [number, number]> = {
   royal: [0x2b3f86, 0xf1ece0], saffron: [0xe0a136, 0x1d1d22], jade: [0x2f6b55, 0xf1ece0], violet: [0x7a3c8f, 0xe0a136],
   rose: [0xe7a5b8, 0x7a3c8f], storm: [0x55606e, 0xd9dde2],
 };
+
+/** Iron-gall ink, and the gilding of a captain's trim. */
+const INK = 0x1d1a17, GILT = 0xd8a64a;
 
 export const PATTERNS: Record<string, number> = { plain: 0, bands: 1, leech: 2, stripe: 3, quarters: 4, chevrons: 5 };
 
@@ -91,6 +95,16 @@ export function lookOf(c: CosmeticIds): Look {
   if (sc !== null) { sail = sc; sail2 = lum(sc) > 0.55 ? mixHex(sc, 0x1b2233, 0.8) : mixHex(sc, 0xf3ead8, 0.85); }
   const hc = hex(c.hull ? cosmetic(c.hull)?.colour : undefined);
   if (hc !== null) { paint.hull = hc; paint.accent = lum(hc) > 0.5 ? 0x24324a : mixHex(hc, 0xe6dccb, 0.55); }
+  // a captain's own colour: the sail and the planks' lacquer both, a darker shade of it on the gun deck's band, gilt
+  // trim, and her charge in ink on her colour, ringed in ink, as her chart mark and her seal draw it
+  const cc = hex(c.colour);
+  const roundel = cc ?? undefined;
+  if (cc !== null) {
+    sail = paint.hull = cc;
+    sail2 = INK;
+    paint.accent = mixHex(cc, INK, 0.55);
+    paint.trim = GILT;
+  }
   const wc = hex(c.wake ? cosmetic(c.wake)?.colour : undefined);
   if (wc !== null) {
     const plain = c.wake === 'foam' || c.wake === 'bubbles';
@@ -101,10 +115,10 @@ export function lookOf(c: CosmeticIds): Look {
   const f = c.figurehead ?? '';
   const fig = (FIGUREHEADS as readonly string[]).includes(f) ? (f as Figurehead) : CAREER_HEADS[f] ?? FIGUREHEADS[f ? hash(f) % (FIGUREHEADS.length - 1) : 0];
   return {
-    ...paint, sail, sail2, pattern, emblem, figurehead: fig,
+    ...paint, roundel, sail, sail2, pattern, emblem, figurehead: fig,
     wisp: wake.wisp, wake: { color: wake.color, glow: wake.glow, sparkle: wake.sparkle },
   };
 }
 
 /** A key that changes when the look does, so a ship rebuilds only what changed. */
-export const lookKey = (c: CosmeticIds): string => `${c.sail}|${c.pattern}|${c.hull}|${c.figurehead}|${c.emblem}|${c.wake}`;
+export const lookKey = (c: CosmeticIds): string => `${c.colour}|${c.sail}|${c.pattern}|${c.hull}|${c.figurehead}|${c.emblem}|${c.wake}`;

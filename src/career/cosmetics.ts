@@ -156,8 +156,10 @@ export const cosmeticsOf = (k: CosmeticKind): Cosmetic[] => COSMETICS.filter((c)
 export const isUnlocked = (c: Cosmetic, level: number, bestTier: number): boolean =>
   c.unlock.by === 'level' ? level >= c.unlock.level : bestTier >= c.unlock.tier;
 
-/** What a ship looks like: one cosmetic id per kind. A captain's emblem is its own sigil (see captains.ts). */
+/** What a ship looks like: one cosmetic id per kind. A captain's emblem is its own sigil, and its own colour, '#rrggbb',
+ *  is worn on the sail, hull and pennant in place of a sail colour and hull paint (see captains.ts). */
 export interface Look {
+  colour?: string;
   sailColour: string;
   sailPattern: string;
   hullPaint: string;

@@ -1,5 +1,5 @@
 // Fixtures: every view model filled with real-shaped data at real counts, for the gallery and for tests. The
-// tables below were taken from the career's own catalogues (src/career/captains.ts and cosmetics.ts: forty
+// tables below were taken from the career's own catalogues (src/career/captains.ts and cosmetics.ts: twenty
 // captains, 102 cosmetics) without importing them, so the interface stays independent of the career's internals.
 // Each builder returns a fresh object, so a screen may change what it is given.
 import { ABILITIES, type AbilityId, type ActiveId, type PassiveId } from '../sim/abilities.ts';
@@ -11,51 +11,33 @@ import {
   type Unlock, type VictoryModel,
 } from './model.ts';
 
-type CaptainRow = readonly [id: string, name: string, meaning: string, temperament: string, emblem: string, sigil: string, active: ActiveId, passive: PassiveId, sail: string, hull: string];
+type CaptainRow = readonly [id: string, name: string, meaning: string, temperament: string, emblem: string, sigil: string, active: ActiveId, passive: PassiveId, colour: string];
+/** A captain's seal: its charge in ink on its colour. */
+const seal = (colour: string): [string, string] => [colour, '#1d1a17'];
 /** Unlock: a level, or minus the rank tier. */
 type CosmeticRow = readonly [id: string, kind: CosmeticKind, name: string, hint: string, unlock: number, colour?: string];
 
 const CAPTAIN_ROWS: readonly CaptainRow[] = [
-  ['saetta', 'Saetta', 'Lightning bolt', 'hunter', 'lightning', 'a forked bolt', 'ram', 'quickReload', '#b8322a', '#1c1a18'],
-  ['murena', 'Murena', 'Moray eel', 'hunter', 'serpent', 'an eel coiled to strike', 'hardTurn', 'steadyAim', '#2f5a4c', '#5a3423'],
-  ['astore', 'Astore', 'Goshawk', 'hunter', 'goshawk', 'a hawk in its stoop', 'reveal', 'lightHull', '#c4823a', '#9a8f80'],
-  ['fiera', 'Fiera', 'Wild beast', 'hunter', 'wolf', 'three claw marks', 'ram', 'steadyAim', '#e0441c', '#2a1512'],
-  ['morsa', 'Morsa', 'Grip', 'hunter', 'scorpion', 'a claw closing', 'hardTurn', 'quickReload', '#26282b', '#4f9a88'],
-  ['orca', 'Orca', 'Killer whale', 'hunter', 'whale', 'a tall black fin', 'ram', 'lightHull', '#26282b', '#efe6d6'],
-  ['zanna', 'Zanna', 'Fang', 'hunter', 'swordfish', 'a serrated tooth', 'reveal', 'quickReload', '#f07a5a', '#77736e'],
-  ['meridiana', 'Meridiana', 'Meridian', 'holder', 'sun', 'an arc over the world', 'repair', 'stormWalker', '#1f4f9a', '#d7b277'],
-  ['marea', 'Marea', 'Tide', 'holder', 'waves', 'three stacked waves', 'wave', 'deepHold', '#7fc3c9', '#8fbfae'],
-  ['aurora', 'Aurora', 'Dawn', 'holder', 'risingSun', 'rays over the sea line', 'repair', 'salvage', '#d89aa0', '#d6dfe8'],
-  ['lontana', 'Lontana', 'Far away', 'holder', 'northStar', 'an eight-pointed star', 'driftMine', 'stormWalker', '#18233f', '#232a5c'],
-  ['rosaDeiVenti', 'Rosa dei Venti', 'Rose of the winds', 'holder', 'wind', 'a rose of the winds', 'wave', 'stormWalker', '#b59a3c', '#8c3b2a'],
-  ['rocca', 'Rocca', 'Crag', 'holder', 'mountain', 'a jagged peak', 'repair', 'deepHold', '#cfe8dc', '#77736e'],
-  ['corallo', 'Corallo', 'Coral', 'holder', 'starfish', 'a branching coral fan', 'driftMine', 'salvage', '#f07a5a', '#efe6d6'],
-  ['gazza', 'Gazza', 'Magpie', 'looter', 'magpie', 'a pied wing', 'smokeScreen', 'deepHold', '#e8dcc0', '#1c1a18'],
-  ['volpe', 'Volpe', 'Fox', 'looter', 'fox', 'a brush tail', 'hardTurn', 'quickHands', '#c4823a', '#9c4a22'],
-  ['rapina', 'Rapina', 'Plunder', 'looter', 'octopus', 'a talon clutching', 'decoy', 'salvage', '#b8322a', '#9a8f80'],
-  ['scheggia', 'Scheggia', 'Splinter', 'looter', 'volcano', 'a burst of splinters', 'smokeScreen', 'quickHands', '#8fcfb0', '#4f9a88'],
-  ['ladra', 'Ladra', 'Thief', 'looter', 'bat', 'a hooked crescent', 'decoy', 'deepHold', '#1f4f9a', '#d7b277'],
-  ['granchio', 'Granchio', 'Crab', 'looter', 'crab', 'a crab shell', 'smokeScreen', 'salvage', '#e0441c', '#9c4a22'],
-  ['corvo', 'Corvo', 'Raven', 'looter', 'raven', 'a black wing', 'decoy', 'quickHands', '#26282b', '#232a5c'],
-  ['testuggine', 'Testuggine', 'Tortoise', 'survivor', 'turtle', 'a shell of hexagons', 'repair', 'stormWalker', '#2f5a4c', '#d7b277'],
-  ['quieta', 'Quieta', 'The still one', 'survivor', 'lotus', 'a single still ring', 'smokeScreen', 'windReader', '#cfe8dc', '#d6dfe8'],
-  ['conchiglia', 'Conchiglia', 'Shell', 'survivor', 'nautilus', 'a whorled shell', 'repair', 'lightHull', '#f2b8c6', '#efe6d6'],
-  ['riccio', 'Riccio', 'Urchin', 'survivor', 'pufferfish', 'a ball of spines', 'decoy', 'stormWalker', '#7a5530', '#5a3423'],
-  ['scoglio', 'Scoglio', 'Reef rock', 'survivor', 'oak', 'a rock awash', 'smokeScreen', 'lightHull', '#b59a3c', '#77736e'],
-  ['nebbia', 'Nebbia', 'Fog', 'survivor', 'moth', 'a bank of fog', 'smokeScreen', 'windReader', '#7fc3c9', '#9a8f80'],
-  ['lucciola', 'Lucciola', 'Firefly', 'survivor', 'maple', 'a spark with wings', 'decoy', 'lightHull', '#3fe0a0', '#232a5c'],
-  ['pazienza', 'Pazienza', 'Patience', 'ambusher', 'heron', 'a falling drop', 'driftMine', 'steadyAim', '#18233f', '#77736e'],
-  ['ombra', 'Ombra', 'Shadow', 'ambusher', 'eclipse', 'a black sun', 'decoy', 'quickReload', '#26282b', '#2a1512'],
-  ['gufo', 'Gufo', 'Owl', 'ambusher', 'owl', 'spread owl wings', 'reveal', 'steadyAim', '#7a5530', '#8c3b2a'],
-  ['avvoltoio', 'Avvoltoio', 'Vulture', 'ambusher', 'vulture', 'a broken feather', 'driftMine', 'windReader', '#b59a3c', '#1c1a18'],
-  ['sorniona', 'Sorniona', 'The sly one', 'ambusher', 'stag', 'a tight spiral', 'decoy', 'windReader', '#8fcfb0', '#5c1410'],
-  ['risacca', 'Risacca', 'Undertow', 'ambusher', 'narwhal', 'a wave folding under', 'driftMine', 'quickReload', '#1f4f9a', '#8fbfae'],
-  ['fortuna', 'Fortuna', 'Fortune', 'skirmisher', 'clover', 'a four-leaf sprig', 'wave', 'windReader', '#b59a3c', '#d7b277'],
-  ['azzardo', 'Azzardo', 'Hazard', 'skirmisher', 'bearPaw', 'rocks breaking the surface', 'hardTurn', 'lightHull', '#b8322a', '#1c1a18'],
-  ['tempesta', 'Tempesta', 'Storm', 'skirmisher', 'stormCloud', 'a storm cloud', 'wave', 'quickReload', '#18233f', '#232a5c'],
-  ['cometa', 'Cometa', 'Comet', 'skirmisher', 'comet', 'a comet and its tail', 'hardTurn', 'windReader', '#3fe0a0', '#efe6d6'],
-  ['sirocchia', 'Sirocchia', 'Sister', 'skirmisher', 'flame', 'two flames', 'smokeScreen', 'lightHull', '#e0441c', '#8c3b2a'],
-  ['rondine', 'Rondine', 'Swallow', 'skirmisher', 'swift', 'a forked swallow tail', 'wave', 'steadyAim', '#cfe8dc', '#4f9a88'],
+  ['corvo', 'Corvo', 'Raven', 'survivor', 'raven', 'a raven', 'smokeScreen', 'windReader', '#e66e68'],
+  ['corallo', 'Corallo', 'Coral', 'holder', 'starfish', 'a starfish', 'driftMine', 'salvage', '#f9a685'],
+  ['sirocchia', 'Sirocchia', 'Sister', 'skirmisher', 'flame', 'a flame', 'smokeScreen', 'lightHull', '#d68129'],
+  ['meridiana', 'Meridiana', 'Meridian', 'holder', 'sun', 'the noon sun', 'repair', 'stormWalker', '#f1b136'],
+  ['sorniona', 'Sorniona', 'The sly one', 'ambusher', 'scorpion', 'a scorpion', 'decoy', 'windReader', '#ae982a'],
+  ['saetta', 'Saetta', 'Lightning bolt', 'hunter', 'lightning', 'a forked bolt', 'ram', 'quickReload', '#bbc949'],
+  ['testuggine', 'Testuggine', 'Tortoise', 'survivor', 'turtle', 'a sea turtle', 'repair', 'stormWalker', '#72ab42'],
+  ['cervo', 'Cervo', 'Stag', 'ambusher', 'stag', 'a stag', 'driftMine', 'quickReload', '#6cd98b'],
+  ['rocca', 'Rocca', 'Crag', 'holder', 'mountain', 'a jagged peak', 'repair', 'deepHold', '#30b08b'],
+  ['marea', 'Marea', 'Tide', 'holder', 'waves', 'three stacked waves', 'wave', 'deepHold', '#3ed8cb'],
+  ['orca', 'Orca', 'Killer whale', 'hunter', 'whale', 'a whale', 'ram', 'lightHull', '#30abb7'],
+  ['rondine', 'Rondine', 'Swallow', 'skirmisher', 'swift', 'a swift in flight', 'wave', 'steadyAim', '#4ccff9'],
+  ['tempesta', 'Tempesta', 'Storm', 'skirmisher', 'stormCloud', 'a storm cloud', 'wave', 'quickReload', '#2ea1e7'],
+  ['quieta', 'Quieta', 'The still one', 'survivor', 'crescentMoon', 'a crescent moon', 'smokeScreen', 'windReader', '#9abff9'],
+  ['ombra', 'Ombra', 'Shadow', 'ambusher', 'eclipse', 'a black sun', 'decoy', 'quickReload', '#828df3'],
+  ['ladra', 'Ladra', 'Thief', 'looter', 'bat', 'a bat', 'decoy', 'deepHold', '#c2b1f9'],
+  ['gufo', 'Gufo', 'Owl', 'ambusher', 'owl', 'an owl', 'reveal', 'steadyAim', '#b87ad9'],
+  ['rapina', 'Rapina', 'Plunder', 'looter', 'octopus', 'an octopus, arms spread', 'decoy', 'salvage', '#f498ea'],
+  ['morsa', 'Morsa', 'Grip', 'hunter', 'bearPaw', 'a bear’s paw', 'hardTurn', 'quickReload', '#da6ea7'],
+  ['granchio', 'Granchio', 'Crab', 'looter', 'crab', 'a crab', 'smokeScreen', 'quickHands', '#f9a0b2'],
 ];
 
 const TEMPERAMENTS = [
@@ -242,7 +224,7 @@ const RIVAL_AT = 0.3;
 
 export function fxRivals(): RivalsModel {
   const r = rng(40);
-  const rivals: RivalView[] = CAPTAIN_ROWS.map(([id, name, meaning, t, emblem, sigil, active, passive, sail, hull], i) => {
+  const rivals: RivalView[] = CAPTAIN_ROWS.map(([id, name, meaning, t, emblem, sigil, active, passive, colour], i) => {
     // a mid-career player: most captains met a few times, a handful often, and only those often sunk either way are rivals
     const met = i % 7 === 6 ? 0 : Math.floor(r() * r() * 26);
     const sankYou = Math.floor(r() * Math.min(met, 8) * 0.4), sunkByYou = Math.floor(r() * Math.min(met, 8) * 0.4);
@@ -255,7 +237,7 @@ export function fxRivals(): RivalsModel {
       met === 0 ? 'Has never met you.' : `Sank you ${sankYou}, sunk by you ${sunkByYou}, in ${met} ${met === 1 ? 'match' : 'matches'} together.`];
     const rank = RANK_LADDER[Math.min(19, Math.max(0, Math.round(4 + r() * 13 + (i % 9 === 0 ? 3 : 0))))].name;
     return {
-      id, name, meaning, sigil, emblem, colours: [sail, hull], temperament: TEMPERAMENTS.find((x) => x.id === t)!, rank, active, passive,
+      id, name, meaning, sigil, emblem, colours: seal(colour), temperament: TEMPERAMENTS.find((x) => x.id === t)!, rank, active, passive,
       met, ahead, behind, sankYou, sunkByYou, grudge, rivalry, isRival: rivalry >= RIVAL_AT, lines,
     };
   });
@@ -333,23 +315,25 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     map: {
       lat: -31, lon: 167, heading: 0.6, range: 260,
       storm: { x: storm ? -210 : -60, y: storm ? 140 : 80, r: storm ? 180 : 420 }, next: { x: -40, y: 120, r: storm ? 110 : 260 },
-      ships: fight ? [{ x: 60, y: 40 }, { x: -90, y: 110, spotted: true }, { x: 150, y: -60 }] : [{ x: 160, y: 120 }],
+      ships: fight
+        ? [{ x: 60, y: 40, emblem: 'lightning', colour: '#bbc949' }, { x: -90, y: 110, emblem: 'whale', colour: '#30abb7', spotted: true }, { x: 150, y: -60, emblem: 'octopus', colour: '#f498ea' }]
+        : [{ x: 160, y: 120, emblem: 'owl', colour: '#b87ad9' }],
       marks: [{ x: -40, y: -70, kind: 'loot' }, { x: 120, y: 30, kind: 'gull' }, { x: -150, y: -30, kind: 'beacon' }],
     },
   };
 }
 
 export function fxDeath(cause: 'ship' | 'storm' = 'ship'): DeathModel {
-  const [, name, , t, emblem, , , , sail, hull] = CAPTAIN_ROWS[0];
+  const [, name, , t, emblem, , , , colour] = CAPTAIN_ROWS[0];
   return {
     place: 7, ships: 20, cause, how: cause === 'ship' ? 'harpoon' : 'storm', kills: 3, damage: 1840, survived: 612,
-    killer: cause === 'ship' ? { name, emblem, colours: [sail, hull], rank: 'Gold III', temperament: TEMPERAMENTS.find((x) => x.id === t)!.name, weapon: 'harpoon', grudge: 2 } : null,
+    killer: cause === 'ship' ? { name, emblem, colours: seal(colour), rank: 'Gold III', temperament: TEMPERAMENTS.find((x) => x.id === t)!.name, weapon: 'harpoon', grudge: 2 } : null,
   };
 }
 
 export function fxSpectate(): SpectateModel {
-  const [, name, , , emblem, , , , sail, hull] = CAPTAIN_ROWS[0];
-  return { target: { name, emblem, colours: [sail, hull], rank: 'Gold III', kills: 5, shield: 40, hull: 72 }, ships: 6 };
+  const [, name, , , emblem, , , , colour] = CAPTAIN_ROWS[0];
+  return { target: { name, emblem, colours: seal(colour), rank: 'Gold III', kills: 5, shield: 40, hull: 72 }, ships: 6 };
 }
 
 export const fxVictory = (): VictoryModel => ({ kills: 7, damage: 3920, survived: 1104, ships: 20 });
@@ -392,4 +376,4 @@ export function fxResults(state: ResultsState = 'levelUp'): ResultsModel {
 }
 
 /** Every captain's mark, for whoever needs a crowd (the Gale, the spectate switcher). */
-export const fxMarks = () => CAPTAIN_ROWS.map(([id, name, , , emblem, , , , sail, hull]) => ({ id, name, emblem, colours: [sail, hull] as [string, string] }));
+export const fxMarks = () => CAPTAIN_ROWS.map(([id, name, , , emblem, , , , colour]) => ({ id, name, emblem, colours: seal(colour) }));

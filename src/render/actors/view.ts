@@ -18,6 +18,7 @@ export type Rarity = 0 | 1 | 2 | 3 | 4;
  * grow without touching the renderer. See cosmetics.ts for the ids the placeholders know.
  */
 export interface CosmeticIds {
+  colour?: string; // a captain's own colour, '#rrggbb', worn on the sail, hull and flags in place of `sail` and `hull`
   sail?: string; // sail colour
   pattern?: string; // sail pattern
   hull?: string; // hull paint

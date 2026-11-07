@@ -29,7 +29,7 @@ import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
 import { HUNG, type Cloth } from '../cloth.ts';
-import { dither, pick, read, readArray, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
+import { dither, pick, read, readArray, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /**
  * A point in ship space, and normalLocal with it, as the mainmast stands this frame: uMast is the angle it has gone
@@ -340,11 +340,11 @@ export function ropeNodeMaterial(u: Uniforms, sim: Cloth): MeshPhysicalNodeMater
 }
 
 /** The lateens, their yards, the pennants and the ensign: one material a ship, double-sided cloth. */
-export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, sim: Cloth): MeshPhysicalNodeMaterial {
+export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Texture, emblems: Texture, sim: Cloth): MeshPhysicalNodeMaterial {
   const m = new MeshPhysicalNodeMaterial({ side: DoubleSide, roughness: 0.85, metalness: 0 });
   const side = read(u, 'uSide', 'float'), boom = read(u, 'uBoom', 'float'), slot = read(u, 'uClothSlot', 'float');
   const sailA = read(u, 'uSailA', 'color'), sailB = read(u, 'uSailB', 'color'), trimC = read(u, 'uTrimC', 'color');
-  const pattern = read(u, 'uPattern', 'float'), emblem = read(u, 'uEmblem', 'float'), rect = read(u, 'uEmblemRect', 'vec4');
+  const pattern = read(u, 'uPattern', 'float'), emblem = read(u, 'uEmblem', 'float');
   const damage = read(u, 'uDamage', 'float'), fade = read(u, 'uFade', 'float'), torn = read(u, 'uTorn', 'float');
 
   const kind = attribute<'float'>('aKind');
@@ -375,7 +375,7 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
   const lin = texture(tex.linen_d, sp.mul(size).mul(0.3)).rgb.toVar('sailLinen');
   // the yards: oiled spars
   const spar = vec3(0.13, 0.085, 0.05).mul(texture(tex.linen_d, su.mul(vec2(6, 1))).r.mul(0.4).add(0.8));
-  // the lateens are painted in the ship's pattern; the flags are in her second colour
+  // the lateens are painted in the ship's pattern; the pennants and the ensign are her first colour
   const stripe = sp.y.mul(size);
   const between = (lo: number, hi: number): B => pattern.greaterThan(lo).and(pattern.lessThan(hi));
   const painted = pick<V3>([
@@ -385,19 +385,21 @@ export function sailNodeMaterial(u: Uniforms, tex: ActorTextures, sailNoise: Tex
     [between(3.5, 4.5), select(sp.x.mul(sp.y).greaterThan(0), sailB, sailA)],
     [pattern.greaterThan(4.5), select(mod(floor(sp.y.sub(abs(sp.x).mul(0.8)).mul(size).div(2.2)), 2).lessThan(0.5), sailA, sailB)],
   ], sailA);
-  const base = pick<V3>([[kind.lessThan(0.5), painted], [kind.greaterThan(1.5), sailB]], sailA).toVar('sailBase');
+  const base = select(kind.lessThan(0.5), painted, sailA).toVar('sailBase');
   let cloth: V3 = base.mul(lin.mul(0.55).add(0.62));
 
-  // the emblem, on the lateens and the ensign: its roundel in the trim, the charge in the second colour, inked
+  // the emblem, on the lateens and the ensign: its roundel in the trim, the charge in the second colour, inked, so the
+  // ensign flies the same charge on the same colour as the sails
   const onLateen = kind.lessThan(0.5);
   const ep = sp.sub(vec2(0, select(onLateen, float(0.12), float(0)))).mul(select(onLateen, float(1), float(0.62)));
   const eq = ep.div(0.3).mul(0.5).add(0.5);
   const inside = eq.x.greaterThanEqual(0).and(eq.y.greaterThanEqual(0)).and(eq.x.lessThanEqual(1)).and(eq.y.lessThanEqual(1));
   const shown = inside.and(onLateen.or(kind.greaterThan(2.5))).and(emblem.greaterThan(-0.5));
-  const roundel = readTexture(u, 'uEmblemAtlas', rect.xy.add(eq.clamp(0, 1).mul(rect.zw))).rgb;
+  // her own layer of the roundels: a number each ship's uniforms carry, where a texture of her own never rebound
+  const roundel = texture(emblems, eq.clamp(0, 1)).depth(int(max(emblem, 0))).rgb;
   const e = select(shown, roundel, vec3(0));
   const field = mix(trimC, base, 0.35).mul(lin.mul(0.4).add(0.7));
-  const charge0 = select(onLateen, sailB, sailA).mul(lin.mul(0.4).add(0.7));
+  const charge0 = sailB.mul(lin.mul(0.4).add(0.7));
   const charge = select(dot(charge0.sub(field), charge0.sub(field)).lessThan(0.02), vec3(0.08), charge0);
   cloth = mix(mix(mix(cloth, field, e.x.mul(0.92)), charge, e.y), vec3(0.05, 0.04, 0.035), e.z.mul(0.85));
   // the cloths' seams run down the sail; bolt-ropes round the edges

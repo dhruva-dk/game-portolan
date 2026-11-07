@@ -7,7 +7,7 @@
 //
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
-import { emblemRoundel } from '../cosmetics/emblems.ts';
+import { EMBLEM_IDS, EMBLEMS, emblemRoundel } from '../cosmetics/emblems.ts';
 import { type ActorTextures } from './common.ts';
 import { hullNodeMaterial, iceNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
 import { drawnUniforms } from './tsl/kit.ts';
@@ -736,19 +736,39 @@ export class Kit {
   readonly sailNoise: THREE.Texture;
   /** Every ship's sails and flags, simulated together. */
   readonly cloth: Cloth;
-  private readonly emblems = new Map<string, THREE.DataTexture>();
-  /** The roundels the emblem worker has painted, by emblem. */
-  readonly #painted = new Map<string, Uint8Array>();
+  /**
+   * Every emblem's roundel (r the field, g the charge, b the ink), one layer each in the library's order, which the
+   * sails share and each ship picks her own layer of by a number. A texture of each ship's own, swapped on the shared
+   * sail material as she is drawn, never reached the GPU: three binds a texture again only when its version differs
+   * from the last one's, and every emblem's was 1, so every ship flew the first ship's charge.
+   */
+  readonly #roundels = new Uint8Array(4 * EMBLEM_SIZE * EMBLEM_SIZE * EMBLEM_IDS.length);
+  readonly emblems = new THREE.DataArrayTexture(this.#roundels, EMBLEM_SIZE, EMBLEM_SIZE, EMBLEM_IDS.length);
+  /** The layers painted so far, by the worker or here. */
+  readonly #painted = new Set<number>();
   #materials: ReturnType<Kit['materials']> | null = null;
   constructor(tex: ActorTextures) {
     this.tex = tex;
     this.sailNoise = sailNoise(tex.noise);
     this.cloth = new Cloth(this.sails, this.rigging, this.sailNoise);
     for (const k of WEAPONS) this.turrets.set(k, turretGeometry(k));
+    const t = this.emblems;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.anisotropy = 4;
     if (typeof Worker !== 'undefined') {
       const w = new Worker(new URL('../cosmetics/emblem-worker.ts', import.meta.url), { type: 'module' });
       w.onmessage = (e: MessageEvent<[string, Uint8Array][]>) => {
-        for (const [id, px] of e.data) this.#painted.set(id, px);
+        // the rest at once, in one upload
+        for (const [id, px] of e.data) {
+          const k = EMBLEM_IDS.indexOf(id);
+          if (k < 0 || this.#painted.has(k)) continue;
+          this.#roundels.set(px, k * px.length);
+          this.#painted.add(k);
+        }
+        t.clearLayerUpdates();
+        t.needsUpdate = true;
         w.terminate();
       };
       w.postMessage(EMBLEM_SIZE);
@@ -761,7 +781,7 @@ export class Kit {
     if (!this.#materials) {
       const shared = drawnUniforms(u);
       this.#materials = {
-        body: hullNodeMaterial(shared, this.tex), sail: sailNodeMaterial(shared, this.tex, this.sailNoise, this.cloth),
+        body: hullNodeMaterial(shared, this.tex), sail: sailNodeMaterial(shared, this.tex, this.sailNoise, this.emblems, this.cloth),
         rope: ropeNodeMaterial(shared, this.cloth), ice: iceNodeMaterial(shared),
       };
     }
@@ -773,21 +793,17 @@ export class Kit {
     if (!g) this.heads.set(kind, (g = figureheadGeometry(kind)));
     return g;
   }
-  /** One emblem's roundel from the cosmetics library (r the field, g the charge, b the ink), as the emblem worker
-   *  painted it, or painted here if it has not yet. */
-  emblem(id: string): THREE.DataTexture {
-    let t = this.emblems.get(id);
-    if (!t) {
-      const N = EMBLEM_SIZE;
-      t = new THREE.DataTexture(this.#painted.get(id) ?? emblemRoundel(id, N), N, N, THREE.RGBAFormat);
-      t.generateMipmaps = true;
-      t.minFilter = THREE.LinearMipmapLinearFilter;
-      t.magFilter = THREE.LinearFilter;
-      t.anisotropy = 4;
+  /** An emblem's layer of the roundels, painted here if the worker has not painted it yet. */
+  emblem(id: string): number {
+    const k = Math.max(0, EMBLEM_IDS.indexOf(id in EMBLEMS ? id : 'gull'));
+    if (!this.#painted.has(k)) {
+      const N = EMBLEM_SIZE, t = this.emblems;
+      emblemRoundel(EMBLEM_IDS[k], N, this.#roundels.subarray(k * 4 * N * N, (k + 1) * 4 * N * N));
+      this.#painted.add(k);
+      t.addLayerUpdate(k);
       t.needsUpdate = true;
-      this.emblems.set(id, t);
     }
-    return t;
+    return k;
   }
 }
 
@@ -884,8 +900,8 @@ export class ShipModel {
       uHull: { value: new THREE.Color(look.hull) }, uAccent: { value: new THREE.Color(look.accent) }, uTrim: { value: new THREE.Color(look.trim) },
       uWisp: { value: new THREE.Color(look.wisp) }, uHit: { value: 0 }, uHitAt: { value: new THREE.Vector3(0, -99, 0) }, uDamage: { value: 0 }, uNight: { value: 0 },
       uDeckMap: { value: kit.tex.deck_d }, uDeckN: { value: kit.tex.deck_n }, uDmgNoise: { value: kit.tex.noise },
-      uSailA: { value: new THREE.Color(look.sail) }, uSailB: { value: new THREE.Color(look.sail2) }, uTrimC: { value: new THREE.Color(look.trim) },
-      uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? 0 : -1 }, uEmblemAtlas: { value: kit.emblem(look.emblem ?? 'gull') }, uEmblemRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+      uSailA: { value: new THREE.Color(look.sail) }, uSailB: { value: new THREE.Color(look.sail2) }, uTrimC: { value: new THREE.Color(look.roundel ?? look.trim) },
+      uPattern: { value: look.pattern }, uEmblem: { value: look.emblem ? kit.emblem(look.emblem) : -1 },
       uLinen: { value: kit.tex.linen_d }, uSailNoise: { value: kit.sailNoise },
       uFill: { value: 0.6 }, uSide: { value: 1 }, uBoom: { value: 0 }, uLuff: { value: 0 }, uFade: { value: 0 },
       uMast: { value: new THREE.Vector4(0, 1, 0, 0) }, uTorn: { value: 0 }, uClothSlot: { value: 0 }, uWet: { value: 0.2 },
@@ -925,11 +941,10 @@ export class ShipModel {
   setLook(look: Look): void {
     const u = this.u;
     this.look = look;
-    u.uHull.value.setHex(look.hull); u.uAccent.value.setHex(look.accent); u.uTrim.value.setHex(look.trim); u.uTrimC.value.setHex(look.trim);
+    u.uHull.value.setHex(look.hull); u.uAccent.value.setHex(look.accent); u.uTrim.value.setHex(look.trim); u.uTrimC.value.setHex(look.roundel ?? look.trim);
     u.uWisp.value.setHex(look.wisp); u.uSailA.value.setHex(look.sail); u.uSailB.value.setHex(look.sail2);
     u.uPattern.value = look.pattern;
-    u.uEmblem.value = look.emblem ? 0 : -1;
-    if (look.emblem) u.uEmblemAtlas.value = this.kit.emblem(look.emblem);
+    u.uEmblem.value = look.emblem ? this.kit.emblem(look.emblem) : -1;
     this.head.geometry = this.kit.figurehead(look.figurehead);
   }
 

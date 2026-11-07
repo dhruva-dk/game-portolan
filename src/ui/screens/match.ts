@@ -3,7 +3,7 @@
 // controls layer underneath, where the stick and the look live.
 import { REGIONS } from '../../sim/world/index.ts';
 import {
-  ABILITY_ICON, button, ceremony, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
+  ABILITY_ICON, button, ceremony, chartMark, chip, cosmeticArt, el, EMBLEM, emblemBadge, esc, hydrate, ICON, mmss, ordinal, PERK_ICON, progressBar,
   rarityFrame, WEATHER_ICON, type BarHandle,
 } from '../parts/index.ts';
 import type {
@@ -30,6 +30,9 @@ export interface HudActions {
   /** Names an element for the juice to pop, squash or count up; null as the HUD leaves. */
   target?(name: string, el: HTMLElement | null): void;
 }
+
+/** A ship's mark on the map, CSS pixels across: the chart mark's size. */
+const MARK = 24;
 
 /** The weather as the HUD names it. */
 const WEATHER_WORD = { fog: 'Fog', rain: 'Rain', thunder: 'Thunder', calm: 'Calm', snow: 'Snow', ash: 'Ash' } as const;
@@ -256,11 +259,14 @@ export function hudScreen(m: HudModel, a: HudActions): HudView {
       g.fillStyle = mk.kind === 'loot' ? '#c99a2e' : '#fff';
       g.fillRect(x - 2 * devicePixelRatio, y - 2 * devicePixelRatio, 4 * devicePixelRatio, 4 * devicePixelRatio);
     }
+    // each ship by her captain's mark; one only spotted, faint
+    const mark = Math.round(MARK * devicePixelRatio);
     for (const sh of mv.ships) {
       const [x, y] = at(sh.x, sh.y);
-      g.fillStyle = sh.spotted ? 'rgba(178, 40, 24, 0.55)' : '#b22818';
-      g.beginPath(); g.arc(x, y, 3.2 * devicePixelRatio, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = sh.spotted ? 0.55 : 1;
+      g.drawImage(chartMark(sh.emblem, sh.colour, mark), x - mark / 2, y - mark / 2);
     }
+    g.globalAlpha = 1;
     g.translate(c, c);
     g.rotate(mv.heading);
     g.fillStyle = '#1d1208';

@@ -66,7 +66,8 @@ export function rarityOf(u: Unlock): Rarity {
   return u.level >= 36 ? 3 : u.level >= 20 ? 2 : u.level >= 9 ? 1 : 0;
 }
 
-/** A captain's or the player's mark: an emblem id and two colours (sail and hull). */
+/** A captain's or the player's mark: an emblem id and two colours, the disc's and the charge's (a captain's own colour
+ *  and ink; the player's sail colour and hull paint). */
 export interface Mark {
   emblem: string;
   colours: [string, string];
@@ -299,8 +300,8 @@ export interface MapView {
   /** The Storm's safe circle now and the next one, centred relative to you; null before the Storm. */
   storm: { x: number; y: number; r: number } | null;
   next: { x: number; y: number; r: number } | null;
-  /** Ships the map shows (seen, or spotted). */
-  ships: { x: number; y: number; spotted?: boolean }[];
+  /** Ships the map shows (seen, or spotted), each by its captain's charge and colour. */
+  ships: { x: number; y: number; emblem: string; colour: string; spotted?: boolean }[];
   /** Things worth sailing to: loot, a gull drop, the region's beacon. */
   marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' }[];
 }

@@ -1,6 +1,6 @@
 // Emblems drawn from the cosmetics library's own charges (src/render/cosmetics/emblems.ts), so the rivals page shows
 // exactly what flies on the sails. Each charge is rasterised once into an alpha mask and coloured by CSS; masks are
-// made a few per frame, so a page of forty captains never stalls, and each fades in as it lands. Ids the library
+// made a few per frame, so a page of twenty captains never stalls, and each fades in as it lands. Ids the library
 // does not know fall back to the kit's own glyphs.
 import { EMBLEMS, isEmblem, type EmblemId } from '../../render/cosmetics/emblems.ts';
 
@@ -60,6 +60,36 @@ export function withMask(id: EmblemId, cb: (url: string) => void): void {
   if (list) list.push(cb);
   else waiting.set(id, [cb]);
   if (!running) { running = true; requestAnimationFrame(pump); }
+}
+
+const marks = new Map<string, HTMLCanvasElement>();
+const INK = '#1d1a17';
+
+/**
+ * A captain's chart mark, `px` device pixels across: its charge in ink on a disc of its colour, ringed in ink, as its
+ * seal and its ensign show it. Drawn once for each charge, colour and size, and kept.
+ */
+export function chartMark(id: string, colour: string, px: number): HTMLCanvasElement {
+  const key = `${id}|${colour}|${px}`;
+  let c = marks.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = c.height = px;
+  const g = c.getContext('2d')!, h = px / 2, ring = Math.max(1, px / 16);
+  g.fillStyle = colour;
+  g.beginPath(); g.arc(h, h, h - ring / 2, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = INK; g.lineWidth = ring; g.stroke();
+  // the charge, edge-softened over a pixel, filling the disc inside its ring
+  const charge = chargeOf(id), f = EMBLEMS[charge ?? 'gull'].charge, img = g.getImageData(0, 0, px, px), d = img.data, step = 2.2 / px;
+  for (let j = 0; j < px; j++) for (let i = 0; i < px; i++) {
+    const v = f((i + 0.5) * step - 1.1, 1.1 - (j + 0.5) * step), a = Math.min(1, Math.max(0, 0.5 - v / step));
+    if (a <= 0) continue;
+    const o = (j * px + i) * 4;
+    d[o] += (0x1d - d[o]) * a; d[o + 1] += (0x1a - d[o + 1]) * a; d[o + 2] += (0x17 - d[o + 2]) * a;
+  }
+  g.putImageData(img, 0, 0);
+  marks.set(key, c);
+  return c;
 }
 
 /** Fills an element with the charge as a CSS mask over its background colour (currentColor by default). */

@@ -1,6 +1,6 @@
 // The career: everything that lasts between matches. Your record and stats, the hidden rating and the best
 // tier reached, your XP, your loadout, the chart of regions sailed, and the
-// league's forty captains with their ratings, your record against each and what each has learned of you.
+// league's twenty captains with their ratings, your record against each and what each has learned of you.
 // A career is plain data; every change makes a new one (copyCareer), so the old one stays as it was.
 import { ABILITIES, STARTER_ACTIVE, STARTER_PASSIVE, ability, type AbilityId } from '../sim/abilities.ts';
 import { hash32, rngFrom, rngInt } from '../sim/math.ts';
@@ -67,7 +67,8 @@ export const careerHash = (c: Career): string => hash64(encodeCareer(c));
 export const copyCareer = (c: Career): Career => decodeCareer(encodeCareer(c));
 
 /** The league starts spread over the whole ladder, from below Iron I to Legend, in an order the seed shuffles. */
-export const LEAGUE_SPREAD = { from: -150, step: 62, jitter: 40 } as const;
+/** The league's starting ratings: twenty captains a step apart, spanning the ladder from the gentlest to the strongest. */
+export const LEAGUE_SPREAD = { from: -150, step: 124, jitter: 80 } as const;
 const NEW = 0x6e657721;
 
 export const newCaptainRecord = (id: string, rating: number): CaptainRecord => ({

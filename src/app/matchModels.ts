@@ -25,6 +25,8 @@ import {
 import type { Rarity } from '../ui/parts/tokens.ts';
 import { causeName, consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
+import { cosmeticsOf } from './views.ts';
+import type { CosmeticIds } from '../render/actors/index.ts';
 
 const DEG = 180 / Math.PI;
 const SV = newStormView();
@@ -37,8 +39,19 @@ const WEATHER_DEEP = 0.4;
 const rarityOf = (n: number): Rarity => Math.max(0, Math.min(4, Math.round(n))) as Rarity;
 const colourOf = (id: string, fallback: string): string => cosmetic(id)?.colour ?? fallback;
 
-/** A look's sail sigil and colours, for the emblem discs. */
-export const markOf = (look: Look): Mark => ({ emblem: look.emblem, colours: [colourOf(look.sailColour, '#f4ead6'), colourOf(look.hullPaint, '#5a3423')] });
+/** Iron-gall ink: a captain's charge on its seal. */
+const INK = '#1d1a17';
+
+/** A ship's sigil and colours, for the emblem discs and the chart's marks: a captain's charge in ink on its colour,
+ *  the player's on its sail colour and hull paint. */
+const markOfIds = (c: CosmeticIds): Mark => ({
+  emblem: c.emblem ?? 'gull',
+  colours: c.colour ? [c.colour, INK] : [colourOf(c.sail ?? '', '#f4ead6'), colourOf(c.hull ?? '', '#5a3423')],
+});
+export const markOf = (look: Look): Mark => markOfIds(cosmeticsOf(look));
+
+/** Ship i's mark, from the look she wears in the match. */
+const shipMark = (session: Session, i: number): Mark => markOfIds(session.looks[i] ?? session.looks[0]);
 
 export const levelFrom = (l: { level: number; into: number; need: number }): LevelView => ({ level: l.level, into: l.into, need: l.need });
 
@@ -76,8 +89,8 @@ function slotOf(sh: Ship, k: number): Slot {
 const afloat = (s: MatchState): number => s.ships.reduce((n, sh) => n + (sh.phase !== PHASE.sunk ? 1 : 0), 0);
 
 /** The minimap round ship i. */
-function mapOf(s: MatchState, i: number): MapView {
-  const sh = s.ships[i], p = sh.pos, { e, n } = frame(p), ll = latLon(p);
+function mapOf(session: Session, i: number): MapView {
+  const s = session.state, sh = s.ships[i], p = sh.pos, { e, n } = frame(p), ll = latLon(p);
   const rel = (q: V3) => {
     const d = { x: q.x - p.x, y: q.y - p.y, z: q.z - p.z };
     return { x: R * dot(d, e), y: R * dot(d, n) };
@@ -91,7 +104,8 @@ function mapOf(s: MatchState, i: number): MapView {
     const v = seen(s, i, j);
     if (!(v & (SEEN.visible | SEEN.map))) continue;
     if (apart(p, s.ships[j].pos) > MAP_RANGE * 1.5) continue;
-    ships.push({ ...rel(s.ships[j].pos), ...(v & SEEN.visible ? {} : { spotted: true }) });
+    const mark = shipMark(session, j);
+    ships.push({ ...rel(s.ships[j].pos), emblem: mark.emblem, colour: mark.colours[0], ...(v & SEEN.visible ? {} : { spotted: true }) });
   }
   const marks: MapView['marks'] = [];
   for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push({ ...rel(l.at), kind: 'loot' });
@@ -180,7 +194,7 @@ export function hudModel(session: Session): HudModel {
     tide: { level, rising: seaLevelAt(now + 1) > level },
     night: isNight(s, sh.pos),
     pickup: pickupOf(s, sh),
-    map: mapOf(s, session.watch),
+    map: mapOf(session, session.watch),
   };
 }
 
@@ -232,7 +246,7 @@ export function deathModel(session: Session): DeathModel {
 
 export function spectateModel(session: Session, look: Look): SpectateModel {
   const s = session.state, i = session.watch, sh = s.ships[i];
-  const e = session.plan.fleet[i - 1], mark = i === PLAYER ? markOf(look) : markOf(CAPTAINS[captainIndex(e.captain)]?.look ?? e.look);
+  const e = session.plan.fleet[i - 1], mark = i === PLAYER ? markOf(look) : shipMark(session, i);
   const rank = i === PLAYER ? session.plan.player.rank : e.rank;
   return { target: { ...mark, name: session.names[i], rank, kills: sh.kills, shield: Math.round(sh.shield), hull: Math.round(sh.hull) }, ships: afloat(s) };
 }

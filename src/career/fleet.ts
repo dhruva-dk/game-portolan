@@ -1,6 +1,6 @@
-// The draw: each match the career picks 19 of the league's captains whose ratings sit near yours, with a
-// little luck so the same 19 don't sail every time, and with your rivals pulled closer so they turn up more
-// often. The first match draws the gentlest captains, softened further, and bringing the starter pair.
+// The draw: each match the career picks 19 of the league's twenty captains, leaving ashore the one whose rating sits
+// farthest from yours, with a little luck so it is not always the same one, and with your rivals pulled closer so
+// they are the last left out. The first match draws the gentlest captains, softened further, and bringing the starter pair.
 import { STARTER_ACTIVE, STARTER_PASSIVE, type ActiveId, type PassiveId } from '../sim/abilities.ts';
 import { hash32, rngFloat, rngFrom } from '../sim/math.ts';
 import { CAPTAINS, LEAGUE_SIZE } from './captains.ts';

@@ -2,7 +2,7 @@
 // the lobby, where the player's ship sits on the water wearing their cosmetics.
 import type { AmbienceMix, RegionId } from '../audio/index.ts';
 import type { ActorsView, CosmeticIds, ShipView } from '../render/actors/index.ts';
-import type { Look } from '../career/index.ts';
+import { CAPTAINS, type Look } from '../career/index.ts';
 import { R } from '../sim/sphere.ts';
 import { REGION_COUNT, REGIONS, heightAt, regionWeights } from '../sim/world/index.ts';
 import type { V3 } from '../sim/math.ts';
@@ -12,7 +12,7 @@ import { latLonOf, towards, travel, type SceneSpec } from './scenes.ts';
 
 /** The career's look as the actors' cosmetic ids. */
 export const cosmeticsOf = (look: Look): CosmeticIds => ({
-  sail: look.sailColour, pattern: look.sailPattern, hull: look.hullPaint, figurehead: look.figurehead, emblem: look.emblem, wake: look.wake,
+  ...(look.colour && { colour: look.colour }), sail: look.sailColour, pattern: look.sailPattern, hull: look.hullPaint, figurehead: look.figurehead, emblem: look.emblem, wake: look.wake,
 });
 
 const scale = (v: V3, k: number): V3 => ({ x: v.x * k, y: v.y * k, z: v.z * k });
@@ -28,12 +28,36 @@ function inSight(p: V3, q: V3, eye: number, top: number): boolean {
   return true;
 }
 
+/** The league's captains in their own colours, in the roster's order: the scenes' fleets wear them. */
+const LEAGUE: readonly CosmeticIds[] = CAPTAINS.map((c) => cosmeticsOf(c.look));
+
+const ship = (k: number, at: V3, head: V3): ShipView => ({
+  id: 1 + k, pos: scale(at, R), head, speed: 8, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
+  cosmetics: LEAGUE[k % LEAGUE.length], alive: true,
+});
+
+/** The fleet in review: ranks of five across the view, from the scene's spot to 90 m beyond it, 27 m between bows and
+ *  30 m between ranks, each rank shifted half a berth on the last, all on the same tack. One over land is left out. */
+function lineupOf(s: SceneSpec): ShipView[] {
+  const out: ShipView[] = [], n = s.fleet ?? 0;
+  for (let k = 0; k < n; k++) {
+    const rank = Math.floor(k / 5), col = k % 5;
+    const ahead = travel(s.pos, s.heading, rank * 30), cross = across(ahead.pos, ahead.heading);
+    const at = travel(ahead.pos, cross, (col - 2) * 27 + (rank % 2 ? 7 : -7)).pos;
+    if (heightAt(at) > -3) continue;
+    out.push(ship(k, at, travel(at, cross, 1).heading));
+  }
+  return out;
+}
+
 /**
  * Where a scene's fleet sails: n ships spread from 60 to 220 m ahead, each off to one side or the other so the middle of
  * the view stays clear, on water deep enough to float where the eye can see her masthead, sailing across the view so
- * their hulls show. Each takes the nearest such spot to her place; one with none near it is left out.
+ * their hulls show. Each takes the nearest such spot to her place; one with none near it is left out. Each wears a
+ * captain's colours.
  */
-function fleetOf(s: SceneSpec, look: CosmeticIds): ShipView[] {
+function fleetOf(s: SceneSpec): ShipView[] {
+  if (s.lineup) return lineupOf(s);
   const out: ShipView[] = [], n = s.fleet ?? 0, eye = (s.height ?? (s.ship ? 2.5 : 0)) + 0.8;
   for (let k = 0; k < n; k++) {
     const far = 60 + (160 * k) / Math.max(1, n - 1);
@@ -44,10 +68,7 @@ function fleetOf(s: SceneSpec, look: CosmeticIds): ShipView[] {
     for (const { at, cross } of spots) {
       if (heightAt(at) > -3 || !inSight(s.pos, at, eye, MASTHEAD.y)) continue;
       const head = travel(at, cross, 1).heading;
-      out.push({
-        id: 1 + k, pos: scale(at, R), head: k % 2 ? scale(head, -1) : head, speed: 8, turn: 0, hull: 1, shield: 0, shieldMax: 100,
-        weapon: 'cannon', cosmetics: look, alive: true,
-      });
+      out.push(ship(k, at, k % 2 ? scale(head, -1) : head));
       break;
     }
   }
@@ -60,7 +81,7 @@ export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticI
     id: 0, pos: scale(s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
     cosmetics: look, alive: true,
   }] : [];
-  ships.push(...fleetOf(s, look));
+  ships.push(...fleetOf(s));
   // a steady breeze from behind the ship's port quarter
   const wind = { x: s.heading.x * 6, y: s.heading.y * 6, z: s.heading.z * 6 };
   return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [] };

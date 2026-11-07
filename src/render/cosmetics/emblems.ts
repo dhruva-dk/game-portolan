@@ -508,18 +508,14 @@ export interface EmblemDef {
 }
 const def = (name: string, charge: SDF, finish: EmblemFinish = 'ink'): EmblemDef => ({ name, charge, finish });
 
-/** The forty captains' charges. src/career/captains.ts names each captain's sigil by these ids. */
+/** The twenty captains' charges, each a different shape at the chart mark's 24 px. src/career/captains.ts names each
+ *  captain's sigil by these ids. */
 export const CAPTAIN_EMBLEMS: Record<string, EmblemDef> = {
-  swift: def('Swift', swift), narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf),
-  crab: def('Crab', crab), sun: def('Noon Sun', sunburst), waves: def('Tide', waves), risingSun: def('Dawn', risingSun),
-  northStar: def('North Star', northStar), wind: def('Wind', wind), magpie: def('Magpie', magpie), fox: def('Fox', fox),
-  raven: def('Raven', raven), lightning: def('Lightning', lightning), octopus: def('Octopus', octopus), turtle: def('Turtle', turtle),
-  mountain: def('Mountain', mountain), oak: def('Oak', oak), pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus),
-  heron: def('Heron', heron), eclipse: def('Eclipse', eclipse), owl: def('Owl', owl), vulture: def('Vulture', vulture),
-  nautilus: def('Nautilus', nautilus), clover: def('Clover', clover), scorpion: def('Scorpion', scorpion), stormCloud: def('Storm', stormCloud),
-  comet: def('Comet', comet), flame: def('Flame', flame), whale: def('Whale', whale), serpent: def('Serpent', serpent),
-  stag: def('Stag', stag), bearPaw: def('Bear', bearPaw), bat: def('Bat', bat), moth: def('Moth', moth),
-  swordfish: def('Swordfish', swordfish), maple: def('Maple', maple), volcano: def('Volcano', volcano), starfish: def('Starfish', starfish),
+  raven: def('Raven', raven), starfish: def('Starfish', starfish), flame: def('Flame', flame), sun: def('Noon Sun', sunburst),
+  scorpion: def('Scorpion', scorpion), lightning: def('Lightning', lightning), turtle: def('Turtle', turtle), stag: def('Stag', stag),
+  mountain: def('Mountain', mountain), waves: def('Tide', waves), whale: def('Whale', whale), swift: def('Swift', swift),
+  stormCloud: def('Storm', stormCloud), crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), eclipse: def('Eclipse', eclipse),
+  bat: def('Bat', bat), owl: def('Owl', owl), octopus: def('Octopus', octopus), bearPaw: def('Bear', bearPaw), crab: def('Crab', crab),
 };
 
 /**
@@ -534,6 +530,12 @@ export const PLAYER_EMBLEMS: Record<string, EmblemDef> = {
 
 /** Charges drawn for the library that nothing names yet: more spirits and natural forms for later captains and emblems. */
 export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
+  narwhal: def('Narwhal', narwhal), goshawk: def('Goshawk', goshawk), wolf: def('Wolf', wolf), risingSun: def('Dawn', risingSun),
+  northStar: def('North Star', northStar), wind: def('Wind', wind), magpie: def('Magpie', magpie), fox: def('Fox', fox),
+  maple: def('Maple', maple), oak: def('Oak', oak), pufferfish: def('Pufferfish', union(pufferfish, pufferEye)), lotus: def('Lotus', lotus),
+  heron: def('Heron', heron), vulture: def('Vulture', vulture), nautilus: def('Nautilus', nautilus), clover: def('Clover', clover),
+  comet: def('Comet', comet), serpent: def('Serpent', serpent), moth: def('Moth', moth), swordfish: def('Swordfish', swordfish),
+  volcano: def('Volcano', volcano),
   eelCoil: def('Coiled Eel', eelCoil), stoopingHawk: def('Stooping Hawk', stoopingHawk),
   clawRake: def('Claw Marks', clawRake), crabClaw: def('Crab Claw', crabClaw), orcaFin: def('Orca Fin', orcaFin), sharkTooth: def('Shark Tooth', sharkTooth),
   magpieWing: def('Pied Wing', wing(true)), foxTail: def('Brush Tail', foxTail), clutchingTalon: def('Talon', clutchingTalon),
@@ -543,7 +545,7 @@ export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
   brokenFeather: def('Broken Feather', brokenFeather), tightSpiral: def('Spiral', tightSpiral), undertow: def('Undertow', undertow),
   wave: def('Curling Wave', curlingWave), fourStar: def('Four-pointed Star', fourStar), feather: def('Feather', feather),
   leapingFish: def('Leaping Fish', leapingFish),
-  crescentMoon: def('Crescent Moon', rot(crescent, 0.6)), sunOnSea: def('Sun on the Sea', sunOnSea), whirlpool: def('Whirlpool', whirlpool),
+  sunOnSea: def('Sun on the Sea', sunOnSea), whirlpool: def('Whirlpool', whirlpool),
   twinStars: def('Twin Stars', twinStars), coralFan: def('Sea Fan', coralFan), jaggedRocks: def('Jagged Rocks', jaggedRocks),
   firefly: def('Firefly', firefly), blossom: def('Blossom', blossom), twinFlames: def('Twin Flames', twinFlames),
   fallingDrop: def('Falling Drop', fallingDrop), forkedBolt: def('Forked Bolt', forkedBolt), meridianArc: def('Meridian', meridianArc),
@@ -553,7 +555,6 @@ export const SPARE_EMBLEMS: Record<string, EmblemDef> = {
 /** Every charge by id: captains', the player's and spares. Ids are unique across the three. */
 export const EMBLEMS: Record<string, EmblemDef> = { ...SPARE_EMBLEMS, ...CAPTAIN_EMBLEMS, ...PLAYER_EMBLEMS };
 export type EmblemId = string;
-export const CAPTAIN_EMBLEM_IDS = Object.keys(CAPTAIN_EMBLEMS), PLAYER_EMBLEM_IDS = Object.keys(PLAYER_EMBLEMS), SPARE_EMBLEM_IDS = Object.keys(SPARE_EMBLEMS);
 export const EMBLEM_IDS = Object.keys(EMBLEMS);
 
 /**
@@ -593,18 +594,5 @@ export function emblemRoundel(id: EmblemId, size: number, out = new Uint8Array(4
     out[o + 3] = Math.round(255 * Math.max(field, ink));
   }
   return out;
-}
-
-export const ATLAS_COLS = 8;
-/** Every emblem in one atlas (rows bottom-up, as a texture reads them), with each one's cell. */
-export function emblemAtlas(cell = 128, ids: readonly EmblemId[] = EMBLEM_IDS): { data: Uint8Array; width: number; height: number; rects: Record<string, [number, number, number, number]> } {
-  const rows = Math.ceil(ids.length / ATLAS_COLS), width = ATLAS_COLS * cell, height = rows * cell, data = new Uint8Array(4 * width * height);
-  const rects: Record<string, [number, number, number, number]> = {};
-  ids.forEach((id, k) => {
-    const cx = k % ATLAS_COLS, cy = rows - 1 - Math.floor(k / ATLAS_COLS);
-    emblemRoundel(id, cell, data, width, cx * cell, cy * cell);
-    rects[id] = [cx / ATLAS_COLS, cy / rows, 1 / ATLAS_COLS, 1 / rows];
-  });
-  return { data, width, height, rects };
 }
 
