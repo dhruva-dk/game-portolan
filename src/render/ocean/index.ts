@@ -5,7 +5,7 @@ import type { V3 } from '../../sim/math.ts';
 import { R } from '../../sim/sphere.ts';
 import { CALM_SEA, LongWaves, spectrumParams, type SeaState } from './spectrum.ts';
 import { SEA, Waves, setSpectrum } from './waves.ts';
-import { FRAME, SEA_FIELD, WATER, oceanSurface } from './surface.ts';
+import { FRAME, SEA_FIELD, WATER, gridToHorizon, oceanSurface } from './surface.ts';
 import { beneath } from './beneath.ts';
 import { Coast } from './coast.ts';
 import { Territory } from './territory.ts';
@@ -80,6 +80,9 @@ export class Ocean {
     this.#time = time;
     const nadir = _v.copy(eye).normalize();
     this.#follow(nadir, dt);
+    // the grid out to the horizon only (the sea's level here is near enough for it: the cut keeps a crest's margin)
+    const grid = this.mesh.geometry;
+    grid.setDrawRange(0, Math.min(gridToHorizon(eye.length() - R), grid.index!.count));
 
     const s = this.#state;
     const key = [s.wind, s.heading, s.fetch, s.swell, s.swellLength, s.swellHeading].map((x) => x.toFixed(3)).join();

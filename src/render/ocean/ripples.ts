@@ -29,9 +29,10 @@ import { R } from '../../sim/sphere.ts';
 
 /** Particles at once. */
 const MAX = 16384;
-/** The field: metres from the point under the eye to its edge, and texels across it. */
+/** The field: metres from the point under the eye to its edge, and texels across it, 0.6 m each: a splash's humps
+ *  are 0.8 m across and a wake's twice that, and read bilinearly their crests and foam hold. */
 export const RIPPLE_SPAN = 160;
-const TEXELS = 1024;
+const TEXELS = 512;
 /** The spatial hash: cells this many metres on a side (no hump is wider), buckets in its table. */
 const CELL = 8;
 const TABLE = 4096;
