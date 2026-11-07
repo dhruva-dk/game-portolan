@@ -6,7 +6,8 @@ const night = '#0d1520';
 const config: CapacitorConfig = {
   appId: 'com.portolan.game',
   appName: 'Portolan',
-  webDir: 'dist',
+  // the production build; `npm run ios:ipad:dev` alone names a shell whose page loads the code from this Mac (tools/ios.ts)
+  webDir: process.env.PORTOLAN_DEV_SHELL || 'dist',
   backgroundColor: night,
   ios: {
     backgroundColor: night,
