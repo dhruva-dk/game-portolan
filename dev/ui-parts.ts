@@ -1,7 +1,7 @@
 // The gallery of every shared part, at the size of the frame it is in.
 import {
   ABILITY_ICON, CONSUMABLE_ICON, COLOR, EMBLEM, ICON, KIND_ICON, RARITY, RANK_TIERS, SPACE, TYPE, WEAPON_ICON, button, card, ceremony, chip, countUp, el,
-  emblemBadge, eventBanner, EVENT_ICON, flyTo, header, iconButton, modal, panel, progressBar, rankBadge, rankSvg, rarityFrame, ring, seal, segmented, slider, stagger, stat, tabs, toggle,
+  emblemBadge, flyTo, header, iconButton, modal, panel, progressBar, rankBadge, rankSvg, rarityFrame, ring, seal, segmented, slider, stagger, stat, tabs, toggle,
   type Rarity,
 } from '../src/ui/parts/index.ts';
 import type { Shell } from '../src/ui/shell.ts';
@@ -169,13 +169,6 @@ export function partsGallery(shell: Shell): HTMLElement {
       void ceremony({ kind, parent: shell.overlay, ...o });
     };
     for (const k of ['victory', 'levelUp', 'rankUp', 'unlock', 'shieldBreak'] as const) button({ label: k, kind: 'secondary', size: 'sm', parent: r, onPress: cer(k) });
-    const r3 = row(b, 'Region events');
-    for (const [region, name, tip, tone, warning, seconds] of [
-      ['fireArchipelago', 'Eruption', 'Get away from the cone and the ash.', 'danger', true, 7],
-      ['fireArchipelago', 'Eruption', 'Get away from the cone and the ash.', 'danger', false, 84],
-      ['spiceIsles', 'Pearl Bloom', 'Pearls in the cove: race for them.', 'prize', false, 22],
-      ['basaltStacks', 'Low Tide at the Arch', 'The cave under the arch is open.', 'sea', false, 61],
-    ] as const) eventBanner({ parent: r3 }).set({ icon: EVENT_ICON[region], name, tip, tone, warning, seconds });
     const r2 = row(b, 'At rest');
     el('p-toast dev-static', r2, `<span class="p-toast__icon" style="--tc:var(--rar2)">${ICON.bigShield}</span><span>Big Shield</span><span class="p-toast__sub">picked up</span>`);
     const sheet = el('p-modal__sheet p-paper p-ruled dev-static dev-sheet', r2);
