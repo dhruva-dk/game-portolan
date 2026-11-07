@@ -1,16 +1,17 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// The night of the page behind the game (index.html) and of the launch screen, so launch never flashes white.
-const night = '#0d1520';
+// The blank sheet the app opens on: the launch screen's and the page's tone (index.html), which the title's paper takes
+// its grain over (src/screens/title.ts BLANK), so the app opens on the sheet and nothing flashes.
+const sheet = '#dfc8a2';
 
 const config: CapacitorConfig = {
   appId: 'com.portolan.game',
   appName: 'Portolan',
   // the production build; `npm run ios:ipad:dev` alone names a shell whose page loads the code from this Mac (tools/ios.ts)
   webDir: process.env.PORTOLAN_DEV_SHELL || 'dist',
-  backgroundColor: night,
+  backgroundColor: sheet,
   ios: {
-    backgroundColor: night,
+    backgroundColor: sheet,
     contentInset: 'never', // the web view runs edge to edge; the game keeps clear of env(safe-area-inset-*)
     scrollEnabled: false, // no rubber-band bounce
   },

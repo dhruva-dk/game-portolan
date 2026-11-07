@@ -166,7 +166,7 @@ export function galleon(pen: Pen, cap: Colours, x: number, y: number, o: Galleon
   });
   const et = span(t, 0.6, 0.85);
   const [ex, ey, es] = rig.emblem;
-  if (et > 0) drawEmblem(g, pen.paper, cap.emblem, cap.colour, x + ex * s * f, y + ey * s, s * es, pen.dpr, et);
+  if (et > 0) drawEmblem(g, pen.paper, cap.sigil.id, cap.colour, x + ex * s * f, y + ey * s, s * es, pen.dpr, et);
   // the hull, washed in her colour, its wales and ports in ink
   const ht = span(t, 0, 0.45);
   const wt = span(t, 0.35, 0.75);
@@ -212,7 +212,7 @@ const cache = new Map<string, { c: HTMLCanvasElement; ax: number; ay: number; w:
  * size, facing and gilt, so a fleet of twenty costs twenty bakes once and a draw each per frame after.
  */
 export function galleonSprite(pen: Pen, cap: Colours, o: GalleonOptions): { c: HTMLCanvasElement; ax: number; ay: number; w: number; h: number } {
-  const key = `${cap.colour}|${cap.emblem}|${o.size}|${o.facing ?? 1}|${o.gilt ? 1 : 0}|${pen.dpr}`;
+  const key = `${cap.colour}|${cap.sigil.id}|${o.size}|${o.facing ?? 1}|${o.gilt ? 1 : 0}|${pen.dpr}`;
   let sp = cache.get(key);
   if (sp) return sp;
   const s = o.size / 2.3, w = s * 3.2, ay = s * (o.size >= 90 ? 2.65 : 2.1), h = ay + s * 0.45, ax = w / 2;

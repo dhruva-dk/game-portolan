@@ -28,7 +28,7 @@ import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
 import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
-import { deathModel, galeModel, hudModel, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
+import { deathModel, galeModel, hudModel, markOf, resultsModel, spectateModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { lobbyScene, sceneFrom, titleScene, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
@@ -38,7 +38,8 @@ import { abilitiesModel, careerModel, lobbyModel, lockerModel, rankModel, rivals
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
-import { titleScreen, type TitleView } from '../ui/screens/title.ts';
+import { ChartLayer, type Insets } from '../chart/index.ts';
+import { Title } from '../screens/title.ts';
 import { lobbyScreen } from '../ui/screens/lobby.ts';
 import { page } from '../ui/screens/frame.ts';
 import {
@@ -48,7 +49,7 @@ import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, 
 import { warmChart } from '../ui/screens/chart.ts';
 import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type {
-  CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, TitleModel, VictoryModel,
+  CosmeticKind, DeathModel, GaleModel, HudModel, LobbyModel, ResultsModel, Settings, SpectateModel, VictoryModel,
 } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
@@ -64,8 +65,6 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
-
-const VERSION = 'Portolan · pass 1';
 
 export class App {
   readonly log = new EffectLog();
@@ -84,9 +83,12 @@ export class App {
   readonly overlay: HTMLElement;
   /** Thumbs, mouse and keys in a match, on a layer under the interface. */
   readonly controls: Controls;
-  /** The interface's layer, and the juice library's (markers, numbers, flashes) above it. */
+  /** The interface's layer, the chart's over it, and the juice library's (markers, numbers, flashes) above both. */
   readonly uiLayer: HTMLElement;
+  readonly chartHost: HTMLElement;
   readonly juiceLayer: HTMLElement;
+  /** The chart: the one canvas layer the interface is drawn on, once its paper is made. */
+  chart: ChartLayer | null = null;
   readonly options: AppOptions;
   screen: ScreenName = 'boot';
   /** The fixed scene on the stage: the lobby's, the title's, or one the hook jumped to. */
@@ -96,10 +98,17 @@ export class App {
   private fixed = false;
   private readonly canvas: HTMLCanvasElement;
   private loaded: Promise<void> | null = null;
-  private title: TitleView | null = null;
-  private progress = { f: 0, what: 'Charting the seas' };
-  /** Resolves once the ships' materials are built, which they are after the title's. */
-  #shipsBuilt: Promise<void> = Promise.resolve();
+  /** The title on the chart, while it is up or leaving. */
+  private title: Title | null = null;
+  /** How far the world has loaded, 0..1. */
+  private progress = 0;
+  /** Whether the stage has drawn the world yet, and whether the ships are built (after the title's materials). */
+  #drawn = false;
+  #shipsDone = false;
+  /** The chart's clock: real time, or held and scrubbed by the capture tools, and never running backwards when let go. */
+  private readonly chartClock = { held: -1, scrub: 0, offset: 0 };
+  /** The capture tools hold the title as if the world were this far loaded (null: as it is). */
+  titleHold: number | null = null;
   private readonly sun = new THREE.Vector3();
   /** Unlocks the player has not looked at yet: badges on the lobby's tiles and "new" on the cards. */
   private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
@@ -118,6 +127,10 @@ export class App {
     this.uiLayer = layer(overlay, 'app-ui');
     // only the screens' own parts take touches: the rest fall through to the controls beneath
     this.uiLayer.style.pointerEvents = 'none';
+    // the chart takes only the touches that land on what it draws to be pressed (ChartLayer.attach)
+    this.chartHost = layer(overlay, 'app-chart');
+    this.chartHost.style.pointerEvents = 'none';
+    this.chartHost.style.overflow = 'hidden';
     this.juiceLayer = layer(overlay, 'app-juice');
     this.juiceLayer.style.pointerEvents = 'none';
     this.shell = new Shell(this.uiLayer);
@@ -136,7 +149,10 @@ export class App {
     this.momentJuice = new MomentJuice(this.juice, this.viewer);
     connectUiFeedback((what, sound) => this.log.add('screen', what, sound !== 'none' ? { sound } : undefined), this.juice.haptics, (n) => this.audio.play(n));
     if (options.capture) this.loop.running = false;
-    addEventListener('resize', () => this.stage?.resize());
+    addEventListener('resize', () => {
+      this.stage?.resize();
+      this.sizeChart();
+    });
     this.applySettings();
   }
 
@@ -165,11 +181,23 @@ export class App {
     if (this.options.autoplay) void this.loaded.then(() => this.play({ autopilot: true }));
   }
 
-  /** Builds the stage and the actors, reporting progress on the title. */
+  /** The chart's time now, milliseconds. */
+  chartNow(): number {
+    const c = this.chartClock;
+    return c.held >= 0 ? c.held + c.scrub : performance.now() + c.offset;
+  }
+
+  /** The chart to the window's size and its safe areas. */
+  private sizeChart(): void {
+    if (!this.chart) return;
+    this.chart.resize(innerWidth, innerHeight, devicePixelRatio || 1, safeArea());
+    this.title?.resize();
+  }
+
+  /** Builds the stage and the actors; the title's needle reads the progress. */
   private async load(): Promise<void> {
-    const report = (f: number, what: string) => {
-      this.progress = { f: Math.min(0.97, f), what: what || this.progress.what };
-      this.title?.setProgress(this.progress.f, this.progress.what);
+    const report = (f: number) => {
+      this.progress = Math.min(0.97, f);
     };
     // with the frame log on, how long each step of the boot took
     let last = performance.now();
@@ -188,27 +216,35 @@ export class App {
       chart.terminate();
     };
     chart.postMessage(0);
-    const stage = await GpuStage.create(this.canvas, report);
+    // the title's paper is made on the renderer first, so the chart inks in while the planet is built
+    let parchment!: Parchment;
+    const stage = await GpuStage.create(this.canvas, (f) => report(0.2 * f), async (renderer) => {
+      parchment = await Parchment.create(renderer);
+      this.chart = await ChartLayer.create(parchment, this.chartHost);
+      this.sizeChart();
+      this.chart.attach(window);
+      this.title?.attach(this.chart, this.chartNow());
+      mark('paper');
+    });
     mark('stage');
     this.stage = stage;
+    void stage.warmed.then(() => { this.#drawn = true; });
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
     // the interface's parchment, rendered on the stage's own GPU, and the chart painted the same way
-    const parchment = await Parchment.create(stage.renderer);
     applyParchment(await parchment.sheets());
     setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
     mark('parchment');
     this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
     // the ships are built after the planet, with the title up; leaving the title waits for them
-    this.#shipsBuilt = stage.later(this.actors.group);
+    void stage.later(this.actors.group).then(() => { this.#shipsDone = true; });
     warmChart();
     mark('actors');
     // the first frame builds every material, a few at a time, before anything is drawn
-    report(0.5, 'Painting the seas');
-    stage.onWarm = (f) => report(0.5 + 0.45 * f, '');
+    stage.onWarm = (f) => report(0.2 + 0.75 * f);
     // with the loop held (captures), the frame that starts it is drawn here
     let warm = false;
     void stage.warmed.then(() => { warm = true; });
@@ -227,8 +263,7 @@ export class App {
     await rockTexturesReady();
     mark('studio and rocks');
     stage.snap();
-    this.progress = { f: 1, what: 'Ready' };
-    this.title?.setProgress(1, 'Ready');
+    this.progress = 1;
     this.ready = true;
   }
 
@@ -263,18 +298,20 @@ export class App {
       // the lobby's planet: your ship on the water, or the planet from orbit behind the title
       this.view = name === 'title' ? titleScene() : lobbyScene();
     }
+    // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next
+    if (from === 'title' && name !== 'title') this.title?.leave(this.chartNow());
+    if (name === 'title') this.openTitle();
     const view = this.screenView(name, model);
-    this.title = name === 'title' ? (view as TitleView) : null;
     this.shell.show(name, view, transition(from, name));
   }
 
   private screenView(name: ScreenName, model?: unknown): ScreenView {
     const career = this.career.career;
     switch (name) {
-      case 'title': {
-        const m = (model as TitleModel | undefined) ?? { progress: this.progress.f, status: this.progress.what, version: VERSION };
-        return titleScreen(m, { onStart: () => void this.#shipsBuilt.then(() => this.go('lobby')) });
-      }
+      // both are drawn on the chart (the title), or nothing at all
+      case 'boot':
+      case 'title':
+        return { el: el('s-empty') };
       case 'lobby':
         return lobbyScreen((model as LobbyModel | undefined) ?? lobbyModel(career, this.news()), {
           onPlay: () => this.play({}), onOpen: (m) => this.go(m),
@@ -671,9 +708,38 @@ export class App {
     else if (this.options.autoplay && at === 'death' && s.seconds - s.tally.ships[PLAYER].sunkAt > 4) this.go('spectate');
   }
 
+  /** Puts the title on the chart: a blank sheet at once, inked once the paper is made. */
+  private openTitle(): void {
+    this.title?.dispose();
+    const t = new Title(this.chartHost, {
+      progress: () => this.titleHold ?? this.progress,
+      drawn: () => this.#drawn,
+      ready: () => this.titleHold === null && this.ready && this.#shipsDone,
+      mark: () => {
+        const m = markOf(wornLook(this.career.career));
+        return { colour: m.colours[0], sigil: { id: m.emblem } };
+      },
+      start: () => this.go('lobby'),
+      // the camera is at the lobby before the sheet comes off it, not flying there from orbit
+      covered: () => this.stage?.snap(),
+    });
+    t.onGone = () => {
+      if (this.title === t) this.title = null;
+    };
+    this.title = t;
+    if (this.chart) t.attach(this.chart, this.chartNow());
+  }
+
   // ── interface capture: pause every running animation and scrub them together ──
   private frozen: Animation[] = [];
   freezeUi(on: boolean): void {
+    const c = this.chartClock, now = this.chartNow();
+    if (on) c.held = now;
+    else {
+      c.offset = now - performance.now();
+      c.held = -1;
+    }
+    c.scrub = 0;
     if (on) {
       this.frozen = document.getAnimations();
       for (const a of this.frozen) a.pause();
@@ -693,6 +759,8 @@ export class App {
       const t = a.effect?.getComputedTiming(), end = Number(t?.endTime ?? ms);
       a.currentTime = Math.min(ms, Number.isFinite(end) ? end : ms);
     }
+    this.chartClock.scrub = ms;
+    this.chart?.frame(this.chartNow());
   }
 
   // ── numbers ──
@@ -719,6 +787,15 @@ export class App {
     return { frameMs: +mean.toFixed(2), p95Ms: +times[Math.floor(times.length * 0.95)].toFixed(2), tris, calls };
   }
 
+  /** The chart's share of the frame since the last perf line: its mean and worst CPU time. */
+  private chartCost(): string {
+    const c = this.chart?.cost;
+    if (!c?.frames) return '';
+    const out = `chart ${c.mean.toFixed(1)} ms (worst ${c.worst.toFixed(0)}), `;
+    c.worst = 0;
+    return out;
+  }
+
   private logPerf(dt: number): void {
     const w = this.perfWindow;
     w.t += dt;
@@ -732,7 +809,8 @@ export class App {
     const sky = this.stage ? Object.entries(this.stage.clouds.depth).filter(([, v]) => (v ?? 0) > 0.1).map(([k]) => k).join('+') || 'fair' : '';
     const at = s ? ` in ${REGIONS[regionAt(s.state.ships[s.watch].pos)].id}, ${sky}, ${P.night.value as number > 0.5 ? 'night' : 'day'}` : '';
     console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
-      `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ${shape.memory}`);
+      `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ` +
+      `${this.chartCost()}${shape.memory}`);
     // in pieces: the device's console cuts a long message short
     const lines = shape.report(this.screen).split('\n');
     for (let i = 0; i < lines.length; i += 24) console.info(lines.slice(i, i + 24).join('\n'));
@@ -740,6 +818,7 @@ export class App {
 
   private frame(f: Frame): void {
     this.log.clock = f.clock;
+    this.chart?.frame(this.chartNow());
     shape.frame(this.screen);
     if (this.options.perfLog && f.realDt > 0) this.logPerf(f.realDt);
     const stage = this.stage, actors = this.actors;
@@ -783,10 +862,22 @@ export class App {
 /** How one screen gives way to the next. */
 function transition(from: ScreenName, to: ScreenName): Transition {
   if (from === 'boot') return 'fade';
-  if (from === 'title') return 'zoom';
+  // the lobby is already there when the title's sheet rolls off it
+  if (from === 'title') return 'none';
   if ((MENUS as readonly string[]).includes(to)) return 'push';
   if ((MENUS as readonly MenuName[]).includes(from as MenuName) && to === 'lobby') return 'pop';
   return 'fade';
+}
+
+/** The safe areas' insets as the page resolves them, CSS pixels. */
+function safeArea(): Insets {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;inset:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
+  const s = getComputedStyle(probe), px = (v: string) => parseFloat(v) || 0;
+  const out = { top: px(s.paddingTop), right: px(s.paddingRight), bottom: px(s.paddingBottom), left: px(s.paddingLeft) };
+  probe.remove();
+  return out;
 }
 
 function layer(parent: HTMLElement, cls: string): HTMLElement {

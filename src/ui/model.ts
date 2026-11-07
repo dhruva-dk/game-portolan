@@ -81,14 +81,7 @@ export interface PlayerView extends Mark {
   bestTier: number;
 }
 
-// ---------------------------------------------------------------- title and lobby
-
-export interface TitleModel {
-  /** Loading, 0–1. */
-  progress: number;
-  status: string;
-  version: string;
-}
+// ---------------------------------------------------------------- lobby
 
 export type MenuId = 'abilities' | 'locker' | 'rivals' | 'career' | 'rank' | 'settings';
 

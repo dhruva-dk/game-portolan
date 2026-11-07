@@ -3,12 +3,11 @@
 import { Shell } from '../src/ui/shell.ts';
 import { applyParchment, el, setChartPainter } from '../src/ui/parts/index.ts';
 import { Parchment } from '../src/render/paper/parchment.ts';
-import { fxAbilities, fxCareer, fxLobby, fxLocker, fxRank, fxRivals, fxTitle } from '../src/ui/fixtures.ts';
+import { fxAbilities, fxCareer, fxLobby, fxLocker, fxRank, fxRivals } from '../src/ui/fixtures.ts';
 import { DEFAULT_SETTINGS } from '../src/ui/model.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen } from '../src/ui/screens/menus.ts';
 import { warmChart } from '../src/ui/screens/chart.ts';
 import { lobbyScreen } from '../src/ui/screens/lobby.ts';
-import { titleScreen } from '../src/ui/screens/title.ts';
 import { partsGallery } from './ui-parts.ts';
 
 /** The two designed devices, as tools/harness.ts has them: CSS size and safe areas. */
@@ -18,8 +17,7 @@ export const DEVICES = {
 } as const;
 export type DeviceName = keyof typeof DEVICES;
 
-export const SCREENS = ['parts', 'title', 'lobby', 'abilities', 'locker', 'rivals', 'career', 'rank', 'settings'];
-export const STATES: Record<string, string[]> = { title: ['loading', 'ready'] };
+export const SCREENS = ['parts', 'lobby', 'abilities', 'locker', 'rivals', 'career', 'rank', 'settings'];
 
 const devStyle = `
   .dev-backdrop { position: fixed; inset: 0; overflow: hidden; background: linear-gradient(180deg, #6d8fb3 0%, #b9c7cf 38%, #e8d2a6 47%, #2f5d72 47.4%, #1f4256 70%, #10283a 100%); }
@@ -61,7 +59,7 @@ const parchment = Parchment.create().then(async (p) => {
   setChartPainter((w, h, mask, sailed) => p.chart(w, h, mask, sailed));
 });
 
-export function mountScreen(screen: string, device: DeviceName, state: string): void {
+export function mountScreen(screen: string, device: DeviceName): void {
   void parchment;
   const st = document.createElement('style');
   st.textContent = devStyle;
@@ -77,10 +75,6 @@ export function mountScreen(screen: string, device: DeviceName, state: string): 
   void backdrop;
   const go = (id: string) => { location.search = `?frame=1&device=${device}&screen=${id}`; };
   if (screen === 'parts') shell.show('parts', { el: partsGallery(shell) }, 'fade');
-  if (screen === 'title') {
-    const t = titleScreen(fxTitle(state === 'ready' ? 1 : 0.64), { onStart: () => go('lobby') });
-    shell.show('title', t, 'fade');
-  }
   if (screen === 'lobby') shell.show('lobby', lobbyScreen(fxLobby(), { onPlay: () => go('gale'), onOpen: (m) => go(m) }), 'fade');
   const back = () => go('lobby');
   if (screen === 'abilities') shell.show('abilities', abilitiesScreen(fxAbilities(), { onBack: back, onEquip: () => {} }), 'fade');

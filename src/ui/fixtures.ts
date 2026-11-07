@@ -7,7 +7,7 @@ import { REGIONS } from '../sim/world/index.ts';
 import {
   RANK_LADDER, rarityOf, type AbilitiesModel, type AbilityView, type CareerModel, type CosmeticKind, type CosmeticView,
   type DeathModel, type GaleModel, type HudModel, type LevelView, type LobbyModel, type LockerModel, type Look, type PlayerView,
-  type RankModel, type RankView, type ResultsModel, type RivalView, type RivalsModel, type SpectateModel, type TitleModel,
+  type RankModel, type RankView, type ResultsModel, type RivalView, type RivalsModel, type SpectateModel,
   type Unlock, type VictoryModel,
 } from './model.ts';
 
@@ -192,7 +192,6 @@ export function fxPlayer(): PlayerView {
   return { name: 'Your ship', level: levelView(FX_LEVEL, 512), rank: rankView(10, 0.62), bestTier: FX_TIER, emblem: 'risingSun', colours: ['#b8322a', '#5a3423'] };
 }
 
-export const fxTitle = (progress = 0.64): TitleModel => ({ progress, status: progress < 1 ? 'Charting the seas' : 'Ready', version: 'Portolan · build 2' });
 
 export function fxAbilityViews(level = FX_LEVEL): AbilityView[] {
   return ABILITIES.map((a) => ({

@@ -49,6 +49,8 @@ export interface ChartLayout {
   margin: number;
   /** The galleon mark's hull length on the HUD and on the lobby's chart. */
   mark: { hud: number; chart: number };
+  /** The lobby chart's compass rose, in its top left corner: where the title's rose flies to. */
+  rose: Circle;
 }
 
 /** The class of a landscape screen of this size: a phone is the one less than 500 points tall. */
@@ -77,6 +79,7 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
       figure: { hit: 26, clock: 22, large: 64 },
       margin: 22,
       mark: { hud: 34, chart: 64 },
+      rose: { x: safe.left + 22 + 72, y: safe.top + 22 + 72, r: 72 },
     };
   }
   const L = { x: safe.left + 92, y: h - safe.bottom - 102, r: 56 };
@@ -99,6 +102,7 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
     figure: { hit: 18, clock: 16, large: 44 },
     margin: 12,
     mark: { hud: 26, chart: 48 },
+    rose: { x: safe.left + 12 + 46, y: safe.top + 12 + 46, r: 46 },
   };
 }
 

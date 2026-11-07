@@ -1,6 +1,7 @@
 // A captain's emblem, from the cosmetics library's own charges (src/render/cosmetics/emblems.ts), so the chart shows
-// exactly what flies on her sail. The kit takes a captain as nothing more than a colour and an emblem id, and draws
-// whatever it is given: a charge it does not know falls back to the library's own fallback.
+// exactly what flies on her sail. The kit takes a captain as the roster keeps her (src/career/captains.ts): her colour
+// and her sigil, nothing more; the player's own mark comes in the same shape from her worn look. A charge it does not
+// know falls back to the library's own fallback.
 //
 // On the chart an emblem is painted the way a colourist would: the charge washed in the captain's colour, deeper at
 // its rim where the wash dried, soaked into the paper's grain, and at a size where it can carry one, a fine ink line
@@ -9,12 +10,12 @@ import { emblemDef } from '../render/cosmetics/emblems.ts';
 import { rgbOf } from './inks.ts';
 import { canvas, ctx, type Paper } from './paper.ts';
 
-/** What the kit needs of a captain. */
+/** What the kit needs of a captain: a roster record (Captain) is one as it stands. */
 export interface Colours {
   /** Her one colour (hull, sail, pennant, seal). */
   colour: string;
-  /** Her emblem's id in the cosmetics library. */
-  emblem: string;
+  /** Her sigil: its id is her emblem's in the cosmetics library. */
+  sigil: { id: string };
 }
 
 const masks = new Map<string, Float32Array>();

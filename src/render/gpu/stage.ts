@@ -133,16 +133,19 @@ export class GpuStage {
     this.resize();
   }
 
-  static async create(canvas: HTMLCanvasElement, progress: (f: number, what: string) => void = () => {}): Promise<GpuStage> {
-    progress(0.02, 'Charting the seas');
+  /** Makes the renderer, hands it to `first` (the title's paper is made on it before the planet), then builds the
+   *  stage. */
+  static async create(canvas: HTMLCanvasElement, progress: (f: number) => void = () => {}, first?: (r: WebGPURenderer) => Promise<void>): Promise<GpuStage> {
+    progress(0.02);
     const t0 = performance.now();
     const { renderer, info } = await createRenderer(canvas);
     copyTogether(renderer);
-    progress(0.5, 'Raising the islands');
+    await first?.(renderer);
+    progress(0.5);
     const t1 = performance.now();
     const stage = new GpuStage(canvas, renderer, info.form);
     console.info(`boot renderer ${((t1 - t0) / 1000).toFixed(2)} s, stage built ${((performance.now() - t1) / 1000).toFixed(2)} s`);
-    progress(1, '');
+    progress(1);
     return stage;
   }
 

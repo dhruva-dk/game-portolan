@@ -4,12 +4,11 @@
 //   dev/ui.html?device=iphone&screen=lobby    the same, opened on a screen
 //   dev/ui.html?frame=1&device=ipad&screen=X  one screen alone at the window's size (what the frame shows, and what
 //                                             screenshots load with the viewport at the device's size)
-//   &state=...                                a screen's variant (see STATES in ui-screens.ts)
 //   dev/ui.html?grid=1                        every screen at both sizes, side by side
 //
-// Screens are live: their buttons navigate the way the game will (title → lobby → menus → Gale → match → results),
+// Screens are live: their buttons navigate the way the game will (lobby → menus → Gale → match → results),
 // with the fixtures standing in for the career and the match.
-import { DEVICES, SCREENS, STATES, mountScreen, type DeviceName } from './ui-screens.ts';
+import { DEVICES, SCREENS, mountScreen, type DeviceName } from './ui-screens.ts';
 
 const q = new URLSearchParams(location.search);
 const device = (q.get('device') ?? 'ipad') as DeviceName;
@@ -31,7 +30,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 if (q.get('frame')) {
-  mountScreen(screen, device, q.get('state') ?? '');
+  mountScreen(screen, device);
 } else if (q.get('grid')) {
   // every screen at both sizes, small
   const grid = document.createElement('div');
@@ -68,12 +67,7 @@ if (q.get('frame')) {
   };
   for (const d of ['ipad', 'iphone'] as DeviceName[]) link(DEVICES[d].label, { device: d }, d === device);
   top.appendChild(Object.assign(document.createElement('span'), { className: 'sep' }));
-  for (const s of SCREENS) link(s, { screen: s, state: '' }, s === screen);
-  const states = STATES[screen] ?? [];
-  if (states.length) {
-    top.appendChild(Object.assign(document.createElement('span'), { className: 'sep' }));
-    for (const st of states) link(st || 'default', { state: st }, (q.get('state') ?? '') === st);
-  }
+  for (const s of SCREENS) link(s, { screen: s }, s === screen);
   link('grid', { grid: '1' }, false);
   document.body.appendChild(top);
   const stage = document.createElement('div');
@@ -82,7 +76,7 @@ if (q.get('frame')) {
   const D = DEVICES[device];
   const frame = document.createElement('iframe');
   frame.className = 'dev-frame';
-  frame.src = `?frame=1&device=${device}&screen=${screen}&state=${q.get('state') ?? ''}`;
+  frame.src = `?frame=1&device=${device}&screen=${screen}`;
   frame.style.width = `${D.width}px`;
   frame.style.height = `${D.height}px`;
   stage.appendChild(frame);
@@ -97,7 +91,6 @@ if (q.get('frame')) {
     if (e.data?.type !== 'ui-screen') return;
     const p = new URLSearchParams(location.search);
     p.set('screen', e.data.screen);
-    p.delete('state');
     history.replaceState(null, '', `?${p}`);
   });
 }

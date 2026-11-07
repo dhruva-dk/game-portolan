@@ -6,6 +6,7 @@
 // match: the disc, the fleet, the Storm, the pennants, the hit-marks and every control, with the thumbs' homes and the
 // touch targets drawn over it. window.__kit drives it for the capture tool: ready, plates, plate(name),
 // measure(frames) (the live layer's CPU time per frame), problems() (the layout's).
+import { CAPTAINS } from '../src/career/captains.ts';
 import { Parchment } from '../src/render/paper/parchment.ts';
 import {
   ChartLayer, ILLUMINATIONS, Paper, Pen, Press, WASH, arcPts, arrow, bakeDisc, bakeSeal, bakeSheet, burst, cartouche, chartLayout, cross,
@@ -62,13 +63,8 @@ function folio(seed = 4): void {
   pen.on(g, 0, 0);
 }
 
-/** Captains for the specimen: a spread of colours with their emblems, as #30's set will be. */
-const CAPS = [
-  { colour: '#b8322a', emblem: 'goshawk' }, { colour: '#1f4f9a', emblem: 'whale' }, { colour: '#2f6a3c', emblem: 'oak' },
-  { colour: '#d08a1c', emblem: 'sun' }, { colour: '#6a3f8c', emblem: 'owl' }, { colour: '#1d2326', emblem: 'raven' },
-  { colour: '#2b8a8a', emblem: 'turtle' }, { colour: '#e8dcc0', emblem: 'lotus' }, { colour: '#a8452a', emblem: 'fox' },
-  { colour: '#c8b040', emblem: 'comet' },
-];
+/** The league's captains as the roster keeps them, every tenth of the colour circle for the specimen. */
+const CAPS = CAPTAINS.filter((_, i) => i % 2 === 0);
 
 /** Seals are baked once per size and kind. */
 const seals = new Map<string, Seal>();
@@ -155,7 +151,7 @@ PLATES.seals = () => {
   folio(8);
   const size = 104 * u;
   ILLUMINATIONS.forEach((ill, i) => {
-    const dev = i === 4 ? { figure: '1' } : i === 3 ? 'star' as const : { emblem: CAPS[i].emblem };
+    const dev = i === 4 ? { figure: '1' } : i === 3 ? 'star' as const : { emblem: CAPS[i].sigil.id };
     const s = seal(ill, size, dev, i + 3);
     drawSeal(g, s, W * (0.11 + i * 0.195), H * 0.2, { phase: 0.5 });
     drawSeal(g, s, W * (0.11 + i * 0.195), H * 0.45, { phase: 0.1, press: 1 });
@@ -335,7 +331,7 @@ function hud(): void {
   const quadS = layer.sprite('hud-sails', l.controls.sails.r * 3, l.controls.sails.r * 3, l.controls.sails.r * 1.5, l.controls.sails.r * 2, (p) => quadrant(p, l.controls.sails.r * 1.5, l.controls.sails.r * 2, l.controls.sails.r * 1.2, 2, 1));
   const fireSeal = bakeSeal(paper, l.widths, 'rubric', { size: l.controls.fire.r * 2, dpr, device: { emblem: 'goshawk' }, seed: 5 });
   const disc = layer.disc();
-  const fleet = CAPS.concat(CAPS).slice(0, 19).map((c, i) => ({ c, a: i * 2.39, d: 0.18 + ((i * 37) % 19) / 19 * 0.62, h: i * 1.7 }));
+  const fleet = CAPTAINS.slice(1).map((c, i) => ({ c, a: i * 2.39, d: 0.18 + ((i * 37) % 19) / 19 * 0.62, h: i * 1.7 }));
   const marks = fleet.map((s, i) => [galleonSprite(layer.pen, s.c, { size: l.mark.hud, facing: 1, seed: i }), galleonSprite(layer.pen, s.c, { size: l.mark.hud, facing: -1, seed: i })]);
   const me = galleonSprite(layer.pen, CAPS[0], { size: l.mark.hud * 1.15, gilt: true });
   const presses = {

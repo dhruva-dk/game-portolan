@@ -10,12 +10,18 @@ export interface Transition {
   from: string;
   /** The hook call that makes the change. */
   to: string;
+  /** Milliseconds into the transition for each frame, when it runs longer than most. */
+  times?: readonly number[];
 }
 
 // The flow, title to lobby to every menu and back, then a match's screens to the results and home.
 export const TRANSITIONS: readonly Transition[] = [
-  { name: 'boot-title', from: 'h.go("boot")', to: 'h.go("title")' },
-  { name: 'title-lobby', from: 'h.go("title")', to: 'h.go("lobby")' },
+  // the title is drawn on the chart: it inks itself in over seconds, and leaves (from its inked sheet) as the sheet rolls off
+  { name: 'boot-title', from: 'h.go("boot")', to: 'h.go("title")', times: [0, 250, 500, 800, 1200, 1700, 2300, 3000, 3700, 4500] },
+  {
+    name: 'title-lobby', from: 'h.go("title"); h.freezeUi(true); h.scrubUi(6000); h.freezeUi(false)', to: 'h.go("lobby")',
+    times: [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200],
+  },
   ...['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'].flatMap((s) => [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")' },
@@ -51,7 +57,7 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
   // one frame for the change to take hold and its animations to start, then freeze them all
   await game.page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await game.hook((h) => h.freezeUi(true));
-  for (const ms of TIMES) {
+  for (const ms of t.times ?? TIMES) {
     await game.hook((h, at) => h.scrubUi(at), ms);
     await shots.shot(game, `${ms} ms`);
   }

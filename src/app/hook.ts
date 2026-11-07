@@ -64,6 +64,8 @@ export function installHook(app: App) {
     go: (name: string, model?: unknown) => app.go(name, model),
     freezeUi: (on: boolean) => app.freezeUi(on),
     scrubUi: (ms: number) => app.scrubUi(ms),
+    /** Holds the title as if the world were p loaded, its needle wandering (null lets it be ready). */
+    holdTitle: (p: number | null) => { app.titleHold = p; },
 
     // ── matches ──
     /** Starts a match: { seed, skipGale, autopilot, script: [[tick, input], ...] }. */
