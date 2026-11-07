@@ -12,7 +12,7 @@
 // Each is drawn to a target, read back and made an image URL; the sheet's own canvas and height field are kept for
 // the chart (chart.ts paints with them).
 import {
-  ClampToEdgeWrapping, DataTexture, FloatType, HalfFloatType, LinearFilter, NearestFilter, NoBlending, NodeMaterial, QuadMesh, RGBAFormat,
+  ClampToEdgeWrapping, DataTexture, DataUtils, FloatType, HalfFloatType, LinearFilter, NearestFilter, NoBlending, NodeMaterial, QuadMesh, RGBAFormat,
   RenderTarget, RepeatWrapping, UnsignedByteType, Vector2, WebGPURenderer,
 } from 'three/webgpu';
 import {
@@ -114,6 +114,19 @@ export class Parchment {
       },
       tile,
     };
+  }
+
+  /**
+   * The sheet's height field read back: per texel of the tile (TILE², rows from the top), its height, fibre tint,
+   * formation and fibre cover, four floats each. The chart's drawing kit (src/chart) soaks its ink by them, so a line
+   * thins on the fibres that stand up and pools in the hollows between them, the same fibres the paper shows.
+   */
+  async fields(): Promise<Float32Array> {
+    await this.sheets();
+    const raw = (await this.renderer.readRenderTargetPixelsAsync(this.height, 0, 0, TILE, TILE)) as Uint16Array;
+    const out = new Float32Array(TILE * TILE * 4);
+    for (let k = 0; k < out.length; k++) out[k] = DataUtils.fromHalfFloat(raw[k]);
+    return out;
   }
 
   /** Draws a material over a whole target. */
