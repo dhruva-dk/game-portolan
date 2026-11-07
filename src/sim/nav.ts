@@ -1,5 +1,6 @@
 // The captains' chart: a coarse grid of open water over the sphere, baked once from the world's heights,
-// with routes found by A*. Built lazily on first use; the world is fixed, so it is the same for every match.
+// with routes found by A*. Built on first use, unless a worker has handed one over (adoptNav); the world is fixed,
+// so it is the same for every match.
 import { addScaled, cross, dot, normalize, set, v3, type V3 } from './math.ts';
 import { R, cellDir, cellOf, cubeGrid, localFrame, neighbor, type CubeGrid } from './sphere.ts';
 import { DRAFT, OBSTACLES, REGION_EVENTS, blockAt, heightAt, liftOf, roofAt } from './world/index.ts';
@@ -63,7 +64,16 @@ const ROCK_BERTH = 4, ROOF_BERTH = 2;
 let built: Nav | null = null;
 
 export function nav(): Nav {
-  if (built) return built;
+  return (built ??= buildNav());
+}
+
+/** Installs a chart built elsewhere by buildNav (the same code, so the same chart), unless one was built here first. */
+export function adoptNav(n: Nav): void {
+  built ??= n;
+}
+
+/** Bakes the chart: some seconds' work on a phone, which the app has a worker do at boot (chart-worker.ts). */
+export function buildNav(): Nav {
   const cells = NAV.cells, height = new Float32Array(cells), crest = new Float32Array(cells), open = new Uint8Array(cells), shut = new Uint8Array(cells), clear = new Uint8Array(cells);
   const p = v3(), q = v3(), e = v3(), nn = v3();
   shutObstacles(shut);
@@ -102,8 +112,7 @@ export function nav(): Nav {
       if (o >= 0 && code[c] === 0) code[c] = EVENT_CODES.roof[ri][o];
     }
   }
-  built = { height, crest, open, shut, clear, liftRegion, liftEven, liftOdd, code };
-  return built;
+  return { height, crest, open, shut, clear, liftRegion, liftEven, liftOdd, code };
 }
 
 /**

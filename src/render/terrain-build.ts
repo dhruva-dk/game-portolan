@@ -23,6 +23,9 @@ export interface ChunkData {
   weights: Uint8Array;
   minH: number;
   maxH: number;
+  /** The sphere round the positions (centre and radius), as three's computeBoundingSphere finds it, worked out here
+   *  rather than on the page as the chunk is shown. */
+  bound: [number, number, number, number];
 }
 
 export const WEIGHTS = 16;
@@ -83,7 +86,7 @@ export function buildChunk(req: ChunkRequest, n = CHUNK_N): ChunkData {
     edge(2 * (n + 1) + a, a * (n + 1));
     edge(3 * (n + 1) + a, a * (n + 1) + n);
   }
-  return { id: req.id, centre: [cx, cy, cz], position, normal, weights, minH, maxH };
+  return { id: req.id, centre: [cx, cy, cz], position, normal, weights, minH, maxH, bound: sphereRound(position) };
 }
 
 /** The triangles of a chunk; `flip` reverses the winding for faces whose coordinates run the other way. */
@@ -104,4 +107,22 @@ export function chunkIndex(flip: boolean, n = CHUNK_N): Uint16Array {
     quad(k * (n + 1) + n, right + k, (k + 1) * (n + 1) + n, right + k + 1);
   }
   return new Uint16Array(idx);
+}
+
+/** The bounding sphere three would give the positions: the middle of their box, and the farthest from it. */
+function sphereRound(p: Float32Array): [number, number, number, number] {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < p.length; i += 3) {
+    const x = p[i], y = p[i + 1], z = p[i + 2];
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+    if (z < z0) z0 = z;
+    if (z > z1) z1 = z;
+  }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+  let r2 = 0;
+  for (let i = 0; i < p.length; i += 3) r2 = Math.max(r2, (p[i] - cx) ** 2 + (p[i + 1] - cy) ** 2 + (p[i + 2] - cz) ** 2);
+  return [cx, cy, cz, Math.sqrt(r2)];
 }

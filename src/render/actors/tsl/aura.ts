@@ -1,12 +1,12 @@
 // The shield aura as a node material: a shell of hexes round the hull, driven by aura.ts's uniforms. It brightens as the shield fills, ripples from each hit, cracks as it weakens, flashes when it
 // breaks and knits up from the waterline when it is refilled. Added light, at the lamps' scale, and not hazed.
-import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial, type Vector4 } from 'three/webgpu';
+import { AdditiveBlending, DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn, abs, atan, clamp, dot, float, floor, fract, length, max, min, mix, mod, normalView, normalize, positionGeometry,
-  positionViewDirection, pow, select, sin, smoothstep, uniformArray, vec2, vec3,
+  positionViewDirection, pow, select, sin, smoothstep, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
-import { read, type F, type Uniforms, type V2, type V3, type V4 } from './kit.ts';
+import { read, readArray, type F, type Uniforms, type V2, type V3, type V4 } from './kit.ts';
 
 /** How near a point is to the edge of its hex, 0 inside to 1 on the edge. */
 const hexEdge = (p0: V2): F => {
@@ -33,12 +33,12 @@ const cracks = Fn(([p]: [V3]) => {
   return d2.sub(d1);
 });
 
-export function auraNodeMaterial(u: Uniforms, hits: Vector4[]): MeshBasicNodeMaterial {
+export function auraNodeMaterial(u: Uniforms, hits: number): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide, blending: AdditiveBlending });
   m.fog = false;
   const fill = read(u, 'uFill', 'float'), crack = read(u, 'uCrack', 'float'), shimmer = read(u, 'uShimmer', 'float');
   const flash = read(u, 'uFlash', 'float'), vis = read(u, 'uVis', 'float'), colour = read(u, 'uColor', 'color');
-  const struck = uniformArray(hits, 'vec4');
+  const struck = readArray(u, 'uHits', 'vec4');
   const t = P.time;
 
   const fres = pow(clamp(float(1).sub(abs(dot(normalView, positionViewDirection))), 0, 1), 2.2);
@@ -49,7 +49,7 @@ export function auraNodeMaterial(u: Uniforms, hits: Vector4[]): MeshBasicNodeMat
   const drift = sin(dir.y.mul(9).sub(t.mul(1.7)).add(round.mul(3))).mul(0.5).add(0.5);
   let a: F = fres.mul(fill.mul(0.65).add(0.35)).add(hex.mul(fill.mul(0.32).add(0.08)).mul(drift.mul(0.3).add(0.7)));
   // ripples out from each hit
-  for (let k = 0; k < hits.length; k++) {
+  for (let k = 0; k < hits; k++) {
     const h = struck.element(k) as unknown as V4;
     const d = dir.distance(h.xyz);
     const fresh = float(1).sub(h.w).mul(select(h.w.lessThanEqual(1), float(1), float(0)));

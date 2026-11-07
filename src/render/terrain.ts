@@ -126,7 +126,7 @@ export class Terrain {
     const ib = new THREE.InterleavedBuffer(c.weights, WEIGHTS);
     for (let k = 0; k < 4; k++) g.setAttribute(`aW${k}`, new THREE.InterleavedBufferAttribute(ib, 4, k * 4, true));
     g.setIndex(this.index[this.flip[n.face] ? 1 : 0]);
-    g.computeBoundingSphere();
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(c.bound[0], c.bound[1], c.bound[2]), c.bound[3]);
     const m = new THREE.Mesh(g, this.material);
     m.position.set(c.centre[0], c.centre[1], c.centre[2]);
     m.matrixAutoUpdate = false;

@@ -193,6 +193,8 @@ export class Flora {
   /** The tall plants' impostors, and the bake that fills their atlas on the first frame drawn. */
   #atlas: ImpostorAtlas | null = null;
   #bake: ImpostorSource[] | null = null;
+  /** Builds the group's materials ahead of drawing them (the stage's): the plants are shown once it has. */
+  prepare: ((group: Group) => Promise<void>) | null = null;
 
   constructor() {
     this.group.name = 'flora';
@@ -473,6 +475,12 @@ export class Flora {
       this.#bake = impostors;
     }
     this.group.matrixAutoUpdate = false;
+    // every kind's materials at once, drawn the moment they were added, held a frame for over a second on the iPad
+    if (this.prepare) {
+      this.group.visible = false;
+      await this.prepare(this.group);
+      this.group.visible = true;
+    }
     this.#live = true;
   }
 

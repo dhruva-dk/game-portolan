@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { emblemRoundel } from '../cosmetics/emblems.ts';
 import { type ActorTextures } from './common.ts';
 import { hullNodeMaterial, iceNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
+import { drawnUniforms } from './tsl/kit.ts';
 import { Cloth, ropeGeometry, type ClothGrid, type ClothRope } from './cloth.ts';
 import type { Figurehead, Look } from './cosmetics.ts';
 import { WEAPONS, type Weapon } from './view.ts';
@@ -702,7 +703,10 @@ function sailNoise(noise: THREE.DataTexture): THREE.DataTexture {
   return t;
 }
 
-/** Everything the fleet shares: the geometry, built once, and the textures. */
+/** Texels across an emblem's roundel. */
+const EMBLEM_SIZE = 128;
+
+/** Everything the fleet shares: the geometry, built once, the textures and the materials. */
 export class Kit {
   readonly hull = hullGeometry(true);
   readonly hullFar = hullGeometry(false);
@@ -717,23 +721,49 @@ export class Kit {
   /** Every ship's sails and flags, simulated together. */
   readonly cloth: Cloth;
   private readonly emblems = new Map<string, THREE.DataTexture>();
+  /** The roundels the emblem worker has painted, by emblem. */
+  readonly #painted = new Map<string, Uint8Array>();
+  #materials: ReturnType<Kit['materials']> | null = null;
   constructor(tex: ActorTextures) {
     this.tex = tex;
     this.sailNoise = sailNoise(tex.noise);
     this.cloth = new Cloth(this.sails, this.rigging, this.sailNoise);
     for (const k of WEAPONS) this.turrets.set(k, turretGeometry(k));
+    if (typeof Worker !== 'undefined') {
+      const w = new Worker(new URL('../cosmetics/emblem-worker.ts', import.meta.url), { type: 'module' });
+      w.onmessage = (e: MessageEvent<[string, Uint8Array][]>) => {
+        for (const [id, px] of e.data) this.#painted.set(id, px);
+        w.terminate();
+      };
+      w.postMessage(EMBLEM_SIZE);
+    }
   }
+  /** The materials every ship is drawn with, made from the first ship's uniforms and reading each ship's own as she
+   *  is drawn: built once for every ship, where a ship's own were 8 builds each (with their shadows' as the sun draws
+   *  them), some 160 as a match began. */
+  materials(u: Uniforms): { body: THREE.Material; sail: THREE.Material; rope: THREE.Material; ice: THREE.Material } {
+    if (!this.#materials) {
+      const shared = drawnUniforms(u);
+      this.#materials = {
+        body: hullNodeMaterial(shared, this.tex), sail: sailNodeMaterial(shared, this.tex, this.sailNoise, this.cloth),
+        rope: ropeNodeMaterial(shared, this.cloth), ice: iceNodeMaterial(shared),
+      };
+    }
+    return this.#materials;
+  }
+
   figurehead(kind: Figurehead): THREE.BufferGeometry {
     let g = this.heads.get(kind);
     if (!g) this.heads.set(kind, (g = figureheadGeometry(kind)));
     return g;
   }
-  /** One emblem's roundel from the cosmetics library (r the field, g the charge, b the ink), drawn when first worn. */
+  /** One emblem's roundel from the cosmetics library (r the field, g the charge, b the ink), as the emblem worker
+   *  painted it, or painted here if it has not yet. */
   emblem(id: string): THREE.DataTexture {
     let t = this.emblems.get(id);
     if (!t) {
-      const N = 128;
-      t = new THREE.DataTexture(emblemRoundel(id, N), N, N, THREE.RGBAFormat);
+      const N = EMBLEM_SIZE;
+      t = new THREE.DataTexture(this.#painted.get(id) ?? emblemRoundel(id, N), N, N, THREE.RGBAFormat);
       t.generateMipmaps = true;
       t.minFilter = THREE.LinearMipmapLinearFilter;
       t.magFilter = THREE.LinearFilter;
@@ -806,7 +836,6 @@ export class ShipModel {
   private readonly turretBase: THREE.Mesh;
   private readonly barrelMesh: THREE.Mesh;
   private readonly icicles: THREE.Mesh;
-  private readonly mats: THREE.Material[];
   private muzzleZ = 3;
   private readonly kit: Kit;
   private bob = { y: 0, pitch: 0, roll: 0, heel: 0 };
@@ -849,8 +878,7 @@ export class ShipModel {
       uHoles: { value: Array.from({ length: HOLES }, () => new THREE.Vector4(0, -99, 0, 0)) },
     };
     this.slot = this.u.uClothSlot.value = kit.cloth.acquire();
-    const body = hullNodeMaterial(this.u, kit.tex);
-    const sail = sailNodeMaterial(this.u, kit.tex, kit.sailNoise, kit.cloth);
+    const { body, sail, rope, ice } = kit.materials(this.u);
     const hull = this.hull = new THREE.Mesh(kit.hull, body);
     hull.castShadow = hull.receiveShadow = true;
     this.head = new THREE.Mesh(kit.figurehead(look.figurehead), body);
@@ -858,13 +886,10 @@ export class ShipModel {
     const sails = new THREE.Mesh(kit.sails, sail);
     sails.castShadow = true;
     sails.receiveShadow = true;
-    const rope = ropeNodeMaterial(this.u, kit.cloth);
     const rigging = new THREE.Mesh(kit.rigging, rope);
     rigging.castShadow = true;
-    const ice = iceNodeMaterial(this.u);
     this.icicles = new THREE.Mesh(kit.icicles, ice);
     this.icicles.visible = false;
-    this.mats = [body, sail, rope, ice];
     // the node material's own motion and holes are used for its shadow
     this.turretBase = new THREE.Mesh(undefined, body);
     this.barrelMesh = new THREE.Mesh(undefined, body);
@@ -873,6 +898,8 @@ export class ShipModel {
     this.barrel.add(this.barrelMesh);
     this.turret.position.set(0, deckHeight(SHIP.turretZ), SHIP.turretZ);
     this.body.add(hull, this.head, sails, rigging, this.turret, this.icicles);
+    // the kit's materials read her own uniforms from whichever of her parts they draw
+    for (const m of [hull, this.head, sails, rigging, this.icicles, this.turretBase, this.barrelMesh]) m.userData.u = this.u;
     this.root.add(this.body);
     this.root.matrixAutoUpdate = false;
     this.setLook(look);
@@ -1120,7 +1147,8 @@ export class ShipModel {
   }
 
   dispose(): void {
-    for (const m of this.mats) m.dispose();
+    // the renderer keeps what it drew each part with until the part itself is let go
+    this.root.traverse((o) => o.dispose());
     this.kit.cloth.release(this.slot);
   }
 }

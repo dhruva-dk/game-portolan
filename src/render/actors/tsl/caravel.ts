@@ -16,18 +16,18 @@
 // its foot, scales it about the foot (a jury mast is a short spar; gone is nothing), and lets it sink and drag astern
 // where it lies in the water. Shot-torn canvas (uTorn) opens holes in the lateens as hull damage does.
 import {
-  DoubleSide, MeshPhysicalNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture, type Vector4,
+  DoubleSide, MeshPhysicalNodeMaterial, PhysicalLightingModel, type LightingModelDirectInput, type Node, type NodeBuilder, type Texture,
 } from 'three/webgpu';
 import {
   Fn, abs, atan, attribute, cameraPosition, clamp, cos, cross, diffuseColor, dot, float, floor, fract, length, max, min, mix, mod, normalLocal, normalMap,
-  int, normalGeometry, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture, uniformArray,
+  int, normalGeometry, normalView, positionGeometry, positionLocal, positionViewDirection, positionWorld, pow, screenUV, select, sin, smoothstep, step, texture,
   uv, vec2, vec3,
 } from 'three/tsl';
 import { LAMP, P } from '../../gpu/uniforms.ts';
 import type { ActorTextures } from '../common.ts';
 import { HOLES, MAIN_FOOT, WL } from '../caravel.ts';
 import { HUNG, type Cloth } from '../cloth.ts';
-import { dither, moved, pick, read, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
+import { dither, moved, pick, read, readArray, readTexture, type B, type F, type Uniforms, type V3 } from './kit.ts';
 
 /**
  * A point in ship space, and normalLocal with it, as the mainmast stands this frame: uMast is the angle it has gone
@@ -128,7 +128,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
 
   // shot holes that stay: a dark hole torn ragged, a ring of fresh splintered wood round it, soot beyond; a burn is a
   // broad black scorch. Each is a point on her skin (caravel.ts struck), so they sit where the shots went in.
-  const holes = uniformArray(u.uHoles.value as Vector4[], 'vec4');
+  const holes = readArray(u, 'uHoles', 'vec4');
   // the grain of the planking: what a hole's edge splits along, and the long splinters it leaves
   const grainJag = texture(tex.noise, vec2(lp.z.mul(0.35), lp.y.mul(3.1))).r.toVar('shipJag');
   let pierced: F = float(0), splinters: F = float(0), soot: F = float(0);

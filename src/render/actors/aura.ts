@@ -4,10 +4,12 @@
 import * as THREE from 'three';
 import { TAU, rand } from './common.ts';
 import { auraNodeMaterial } from './tsl/aura.ts';
+import { drawnUniforms } from './tsl/kit.ts';
 
 /** The shell's size round the ship (half-axes in metres) and its centre over the hull's origin. */
 export const SHELL = { x: 6.4, y: 8.2, z: 12.6, cy: 4.2 };
 const HITS = 4;
+let shared: THREE.Material | null = null;
 
 export class Aura {
   readonly mesh: THREE.Mesh;
@@ -23,8 +25,10 @@ export class Aura {
   private readonly v = new THREE.Vector3();
 
   constructor(geo: THREE.BufferGeometry) {
-    const m = auraNodeMaterial(this.u, this.u.uHits.value);
-    this.mesh = new THREE.Mesh(geo, m);
+    // one material for every aura, reading each one's own uniforms as it is drawn: built once, not once a ship
+    shared ??= auraNodeMaterial(drawnUniforms(this.u), HITS);
+    this.mesh = new THREE.Mesh(geo, shared);
+    this.mesh.userData.u = this.u;
     this.mesh.renderOrder = 9;
     this.mesh.scale.set(SHELL.x, SHELL.y, SHELL.z);
     this.mesh.position.y = SHELL.cy;
@@ -72,7 +76,7 @@ export class Aura {
   }
 
   dispose(): void {
-    (this.mesh.material as THREE.Material).dispose();
+    this.mesh.dispose();
   }
 }
 

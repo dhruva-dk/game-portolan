@@ -14,7 +14,7 @@
 // impostor bake does the same with a camera per view). Colour is kept as its square root, for the dark greens' sake
 // in eight bits.
 import {
-  Color, DoubleSide, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RenderTarget, Scene,
+  Color, DepthTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RenderTarget, Scene,
   UnsignedByteType, type BufferGeometry, type Material, type MeshStandardMaterial, type Node, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
@@ -80,7 +80,8 @@ export class ImpostorAtlas {
   constructor(count: number) {
     this.side = Math.max(1, Math.ceil(Math.sqrt(count)));
     const size = this.side * SLOT;
-    this.target = new RenderTarget(size, size, { count: 2, type: UnsignedByteType, depthBuffer: true });
+    // the depth is the atlas's own, to be let go once the views are baked (64 MB at the size the planet's flora takes)
+    this.target = new RenderTarget(size, size, { count: 2, type: UnsignedByteType, depthBuffer: true, depthTexture: new DepthTexture(size, size) });
     const [albedo, info] = this.target.textures;
     albedo.name = 'albedo';
     info.name = 'info';
@@ -136,6 +137,7 @@ export class ImpostorAtlas {
     renderer.autoClear = autoWas;
     for (const m of made) m.dispose();
     for (const s of sources) for (const p of s.parts) p.geometry.dispose();
+    this.target.depthTexture?.dispose();
     this.baked = true;
   }
 }

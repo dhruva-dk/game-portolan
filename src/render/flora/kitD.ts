@@ -195,10 +195,13 @@ export function atlas(key: string, grid: number, size: number, cells: readonly (
   };
   atlases.set(key, a);
   const names = Object.keys(SHEETS) as SheetName[];
-  const job = Promise.all(names.map((n) => image(SHEETS[n].file))).then((imgs) => {
+  // painted a cell at a time between the frames, since the scans arrive while the game is being played
+  const job = (async () => {
+    const imgs = await Promise.all(names.map((n) => image(SHEETS[n].file)));
     const sheet = Object.fromEntries(names.map((n, i) => [n, imgs[i]])) as Record<SheetName, HTMLImageElement>;
     const g = canvas.getContext('2d', { willReadFrequently: true })!;
-    cells.forEach((paint, i) => {
+    for (const [i, paint] of cells.entries()) {
+      await breathe();
       const x0 = (i % grid) * s, y0 = Math.floor(i / grid) * s;
       g.save();
       g.translate(x0, y0);
@@ -222,11 +225,12 @@ export function atlas(key: string, grid: number, size: number, cells: readonly (
       };
       paint(p);
       g.restore();
-    });
+    }
+    await breathe();
     // the transparent texels keep their leaves' colour, so mipmaps don't fringe the cards in a dark halo
     bleed(g, size);
     texture.needsUpdate = true;
-  });
+  })();
   pending.push(job);
   return a;
 }
@@ -244,30 +248,30 @@ function toneRect(g: CanvasRenderingContext2D, x: number, y: number, s: number, 
   g.putImageData(img, x, y);
 }
 
-/** Spreads opaque colour into the clear texels around it (a few passes), keeping alpha. */
+/** Spreads opaque colour into the clear texels around it (a few passes), keeping alpha. Written without allocating:
+ *  a 1024² atlas, a neighbour list made for every texel of every pass, held the page for 2 s on the iPad. */
 function bleed(g: CanvasRenderingContext2D, size: number): void {
   const img = g.getImageData(0, 0, size, size), d = img.data;
-  const filled = new Uint8Array(size * size);
+  let filled = new Uint8Array(size * size), next = new Uint8Array(size * size);
   for (let i = 0; i < size * size; i++) filled[i] = d[i * 4 + 3] > 8 ? 1 : 0;
   for (let pass = 0; pass < 4; pass++) {
-    const next = filled.slice();
+    next.set(filled);
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const i = y * size + x;
       if (filled[i]) continue;
       let r = 0, gg = 0, b = 0, n = 0;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const xx = x + dx, yy = y + dy;
-        if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
-        const j = yy * size + xx;
-        if (!filled[j]) continue;
-        r += d[j * 4]; gg += d[j * 4 + 1]; b += d[j * 4 + 2]; n++;
-      }
+      if (x + 1 < size && filled[i + 1]) { const j = (i + 1) * 4; r += d[j]; gg += d[j + 1]; b += d[j + 2]; n++; }
+      if (x > 0 && filled[i - 1]) { const j = (i - 1) * 4; r += d[j]; gg += d[j + 1]; b += d[j + 2]; n++; }
+      if (y + 1 < size && filled[i + size]) { const j = (i + size) * 4; r += d[j]; gg += d[j + 1]; b += d[j + 2]; n++; }
+      if (y > 0 && filled[i - size]) { const j = (i - size) * 4; r += d[j]; gg += d[j + 1]; b += d[j + 2]; n++; }
       if (n) { d[i * 4] = r / n; d[i * 4 + 1] = gg / n; d[i * 4 + 2] = b / n; next[i] = 1; }
     }
-    filled.set(next);
+    [filled, next] = [next, filled];
   }
   g.putImageData(img, 0, 0);
 }
+
+const breathe = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
 
 // ---------------------------------------------------------------- shared painters
 

@@ -138,6 +138,7 @@ export class GpuStage {
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
     this.scene.add(this.floes.group, this.rocks.group, this.kelp.group, this.clams.group, this.petals.group, this.moonbow.group, this.flora.group);
+    this.flora.prepare = (group) => this.#compile(group, true);
     // what floats rides the sea this stage draws
     rideOn((p, slope) => this.ocean.heightAt(p, slope) + seaLift(p));
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
@@ -337,18 +338,27 @@ export class GpuStage {
     this.atmosphere.shadows.node.ready(this.camera, this.renderer);
     // the land's chunks are shown by the view that wants them
     this.terrain.update(this.#whole.position);
-    const later = [...this.#later.values(), ...[this.beacons.group, this.landmarks.group].map((group) => ({ group, built: () => {} }))];
-    for (const { group } of later) group.visible = false;
+    const later = [...this.#later.values()], sites = [this.beacons.group, this.landmarks.group];
+    for (const group of [...later.map((l) => l.group), ...sites]) group.visible = false;
     await this.#compile(this.scene, false, (f) => this.onWarm?.(f));
     this.#warm = 'done';
     this.#warmed();
+    // after the title, what a match brings in first: the ships with their shot and wreckage; then the weather's falls
+    // and the regions' events, hidden till a match calls them up; then the beacons and landmarks
     for (const { group, built } of later) {
       await this.#compile(group, true);
       group.visible = true;
       built();
     }
-    // and last, everything in the scene still hidden: the parts shown by the hour or the distance, the shot and
-    // wreckage kept ready for a match, the weather's falls; so none of it holds a frame up the first time it shows
+    for (const group of [this.fall.group, this.moonbow.group, this.floes.group, this.kelp.group, this.clams.group, this.petals.group]) {
+      await this.#compile(group, true);
+    }
+    for (const group of sites) {
+      await this.#compile(group, true);
+      group.visible = true;
+    }
+    // and last, everything in the scene still hidden: the parts shown by the hour or the distance; so none of it holds
+    // a frame up the first time it shows
     await this.#compile(this.scene, true);
     this.#allBuilt();
   }
@@ -367,7 +377,16 @@ export class GpuStage {
    * else may run (the frames go on meanwhile). `root` is gathered as if shown, with the whole planet in view, so
    * nothing is left out for lying off the edge of the frame; with `hidden`, so is all that lies hidden under it.
    */
-  async #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
+  #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
+    // one at a time, each setting the renderer up for its own objects
+    const run = this.#compiling.then(() => this.#compileNow(root, hidden, progress));
+    this.#compiling = run.catch(() => {});
+    return run;
+  }
+
+  #compiling: Promise<void> = Promise.resolve();
+
+  async #compileNow(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
     const r = this.renderer as unknown as Internals, pass = this.post.scenePass;
     const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines } = r;
     const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
@@ -391,9 +410,12 @@ export class GpuStage {
         throw e;
       }
     };
+    // three waits for each object's pipeline before it builds the next: they are left to compile together instead,
+    // and waited for at the end (which on the iPad took the building after the title from 52 s to 25 s)
+    const compiling: Promise<unknown>[] = [];
     pipelines.getForRender = (ro: unknown, promises: unknown) => {
       try {
-        return pipeline.call(pipelines, ro, promises);
+        return pipeline.call(pipelines, ro, promises ? compiling : promises);
       } finally {
         unset();
       }
@@ -405,6 +427,14 @@ export class GpuStage {
       if (o.visible || (o !== root && (!hidden || (o as { isLight?: boolean }).isLight))) return;
       shown.push(o);
       o.visible = true;
+    });
+    // and nothing tested against the view, which holds the whole planet: the tests would work out the bounds of every
+    // hidden thing at once (half a second on the iPad), where the frames work each out when it is first seen
+    const culled: Object3D[] = [];
+    root.traverse((o) => {
+      if (!o.frustumCulled) return;
+      culled.push(o);
+      o.frustumCulled = false;
     });
     contexts.get = (target: unknown, mrt: unknown) => get.call(contexts, target, mrt, SCENE_DEPTH);
     r.setRenderTarget(pass.renderTarget);
@@ -422,10 +452,12 @@ export class GpuStage {
     } finally {
       contexts.get = get;
       for (const o of shown) o.visible = false;
+      for (const o of culled) o.frustumCulled = true;
       unset();
     }
     try {
       await built;
+      await Promise.all(compiling);
     } finally {
       nodes.getForRenderAsync = build;
       pipelines.getForRender = pipeline;

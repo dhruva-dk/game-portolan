@@ -19,7 +19,8 @@ import { cosmetic, equipAbility, equipCosmetic, findSecrets, wornLook, type Care
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SECRETS, SHIPS, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
 import { ITEM, WEAPONS, WEATHER } from '../sim/tables.ts';
-import { REGIONS } from '../sim/world/index.ts';
+import { REGIONS, adoptHeights } from '../sim/world/index.ts';
+import { adoptNav, type Nav } from '../sim/nav.ts';
 import type { V3 } from '../sim/math.ts';
 import { Controls } from './controls.ts';
 import { Session, type PlayOptions } from './session.ts';
@@ -177,6 +178,14 @@ export class App {
       last = now;
     };
     mark('page');
+    // the world's heights and the captains' chart, baked alongside the rest of the boot
+    const chart = new Worker(new URL('../sim/chart-worker.ts', import.meta.url), { type: 'module' });
+    chart.onmessage = (e: MessageEvent<{ heights: Float32Array; nav: Nav }>) => {
+      adoptHeights(e.data.heights);
+      adoptNav(e.data.nav);
+      chart.terminate();
+    };
+    chart.postMessage(0);
     const stage = await GpuStage.create(this.canvas, report);
     mark('stage');
     this.stage = stage;

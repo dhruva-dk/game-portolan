@@ -25,10 +25,11 @@ const TO_SRGB = new Uint8Array(4096).map((_, i) => {
   return Math.round(Math.min(Math.max(c, 0), 1) * 255);
 });
 
-async function bitmap(url: string): Promise<ImageBitmap> {
+/** A map decoded straight at `size` square: decoded whole, a scan's 2048² maps held 80 MB at once in each worker. */
+async function bitmap(url: string, size: number): Promise<ImageBitmap> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
-  return createImageBitmap(await res.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' });
+  return createImageBitmap(await res.blob(), { colorSpaceConversion: 'none', premultiplyAlpha: 'none', resizeWidth: size, resizeHeight: size, resizeQuality: 'high' });
 }
 
 /** Halves an RGBA image, averaging each 2×2 block; channels flagged sRGB are averaged as light. */
@@ -55,21 +56,18 @@ function chain(top: Uint8Array, size: number, srgb: readonly boolean[]): Uint8Ar
 self.onmessage = async (e: MessageEvent<ScanRequest>) => {
   const { id, base, maps, size } = e.data;
   try {
-    const [albedo, normal, rough, ao, disp] = await Promise.all([
-      bitmap(base + maps.albedo), bitmap(base + maps.normal), bitmap(base + maps.roughness), bitmap(base + maps.ao),
-      maps.displacement ? bitmap(base + maps.displacement) : Promise.resolve(null),
-    ]);
     const canvas = new OffscreenCanvas(size, size);
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    const read = (b: ImageBitmap): Uint8ClampedArray => {
+    // one map at a time, each let go as soon as its texels are read
+    const read = async (url: string): Promise<Uint8ClampedArray> => {
+      const b = await bitmap(base + url, size);
       ctx.clearRect(0, 0, size, size);
       ctx.drawImage(b, 0, 0, size, size);
       b.close();
       return ctx.getImageData(0, 0, size, size).data;
     };
-    const a = read(albedo), n = read(normal), r = read(rough), o = read(ao), h = disp ? read(disp) : null;
+    const a = await read(maps.albedo), n = await read(maps.normal), r = await read(maps.roughness), o = await read(maps.ao);
+    const h = maps.displacement ? await read(maps.displacement) : null;
     const surface = new Uint8Array(size * size * 4), detail = new Uint8Array(size * size * 4);
     for (let i = 0; i < size * size; i++) {
       const p = i * 4;
