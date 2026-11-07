@@ -1,7 +1,8 @@
 // Capture tools for looking at the game headless. Each command writes PNG frames, a contact sheet (contact.png) and any logs to
 // captures/<name>/ (gitignored).
 //
-//   npm run capture -- regions [--region <id>]           fixed scenes in each region at dawn, midday, dusk and night
+//   npm run capture -- regions [--region <id,…>] [--tide <s,…>]  fixed scenes in each region at dawn, midday, dusk and
+//                                                         night, at mean tide or at the tide each given second of a match
 //   npm run capture -- borders                            each region from orbit, and 8 m up on the sea at every border
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
@@ -27,6 +28,7 @@ const { values: a, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     region: { type: 'string' },
+    tide: { type: 'string' },
     ring: { type: 'string' },
     device: { type: 'string' },
     only: { type: 'string' },
@@ -54,7 +56,7 @@ log(`Chromium: ${r.renderer}`);
 const t0 = Date.now();
 try {
   switch (command) {
-    case 'regions': await regions(r, { ...opts, region: a.region }); break;
+    case 'regions': await regions(r, { ...opts, region: a.region, tide: a.tide }); break;
     case 'borders': await borders(r, opts); break;
     case 'lap': await lap(r, { ...opts, ring: a.ring }); break;
     case 'moment': await moment(r, { ...opts, name: arg ?? 'all' }); break;

@@ -1,7 +1,7 @@
 // The Basalt Stacks. Black columnar basalt: plateau islands with flat green turf tops and cliffs that step down
 // into the sea in hexagonal columns, sea stacks standing off them, and Moonbow Arch, a span of rock 86 m high
 // between two pillars, that you sail under. Behind the arch a narrow cut through the arch-head is floored by a
-// sill: it opens at high tide and closes at low. Across the cut, east to west, runs a deeper channel through the turf.
+// sill: it opens at high tide and closes at low.
 // Chart: x east, y north; the Ice Crown lies north, the Great Current along the south edge.
 import { dcos, dsin } from '../../math.ts';
 import { R } from '../../sphere.ts';
@@ -26,8 +26,6 @@ const ARCH = { x: 60, y: -40, half: 28, top: 86, clear: 40 };
 // The hidden passage: a cut north through the arch-head plateau, floored by a sill at -1.5 m.
 const PASSAGE = [112, -40, 112, 40];
 const LANE = [-10, 300, -8, 140, 12, 50, 48, 0, 60, -40, 82, -100, 130, -200, 196, -340];
-// The channel east to west through the arch-head, floored 7 m down.
-const TUNNEL = { x0: 66, x1: 158, y: 14, half: 6.5 };
 
 /** Columns: quantises the ground into hexagonal basalt columns, each with its own height jitter. */
 function columns(x: number, y: number, f: (x: number, y: number) => number): number {
@@ -73,10 +71,7 @@ function height(x: number, y: number): number {
     return d > 10 ? -1e9 : d < 0 ? 1.2 * smoothstep(0, 3, -d) : -60 * smoothstep(0, 10, d);
   }, (cx, cy) => fromEquator(cx, cy, R, false) < 30 || polyDist(cx, cy, LANE) < 16);
   // Shoals across the open water, so no straight course runs empty for long.
-  h = shoals(x, y, h, 140, S + 40);
-  // The tunnel, cut last so nothing stands in it.
-  const dt = segDist(x, y, TUNNEL.x0, TUNNEL.y, TUNNEL.x1, TUNNEL.y);
-  return dt < TUNNEL.half + 3 ? Math.min(h, -7 + 45 * smoothstep(TUNNEL.half, TUNNEL.half + 3, dt)) : h;
+  return shoals(x, y, h, 140, S + 40);
 }
 
 export const basaltStacks: RegionSpec = {

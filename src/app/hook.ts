@@ -5,6 +5,7 @@ import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
 import { BEACON_LOOKS } from '../render/beacons/index.ts';
 import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
+import { ebbAt, seaLevelAt } from '../sim/environment.ts';
 import { beaconView, borderViews, lapPath, nightView, orbitView, regionList, regionView, type SceneInput } from './scenes.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { MODE_NAMES, OPTION_NAMES, SCORES } from '../sim/captains/brain.ts';
@@ -33,7 +34,9 @@ export function installHook(app: App) {
       return beaconView(i, base + Math.max(look.lightHeight, 0.6 * look.height));
     },
     borderViews: () => borderViews(),
-    /** Jumps to a fixed scene: { region | lat,lon | pos, heading, hour, tilt, weather, camera, tide, ship, fleet }. */
+    /** The tide t seconds into a match, as a scene takes it: { tide, ebb }. */
+    tide: (t: number) => ({ tide: seaLevelAt(t), ebb: ebbAt(t) }),
+    /** Jumps to a fixed scene: { region | lat,lon | pos, heading, hour, tilt, weather, camera, tide, ebb, ship, fleet }. */
     scene: (s: SceneInput) => app.scene(s),
     /** Draws `frames` frames, then waits until the page has presented the last one. */
     async settle(frames = 4) {

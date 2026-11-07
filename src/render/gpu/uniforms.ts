@@ -35,6 +35,8 @@ export const P = shared({
   moonPhase: uniform(1),
   /** x: the ground's radius, y: the sea's radius (radius plus tide), z: the tide, w: the air's top radius. */
   planet: uniform(new Vector4(R, R, 0, R + 180)),
+  /** How far above the water the falling tide has left the shore wet, metres. */
+  ebb: uniform(0),
   /** The wind at the camera, a tangent in metres per second. */
   wind: uniform(new Vector3(4, 0, 2)),
   /** How far the wind has carried things so far: what ripples, clouds and leaves scroll by. */

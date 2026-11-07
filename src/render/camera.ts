@@ -20,6 +20,8 @@ const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 
 export class CameraRig {
   mode: CameraMode = 'chase';
+  /** The sea's level against the mean, metres: the tide, which the target and the camera ride. */
+  sea = 0;
   /** Chase: the boom's length and pitch, a sideways offset, and a turn of the camera about the target (radians). */
   dist = 27;
   pitch = 0.2;
@@ -82,7 +84,7 @@ export class CameraRig {
   private ground(x: THREE.Vector3): number {
     const l = x.length();
     this.p.x = x.x / l; this.p.y = x.y / l; this.p.z = x.z / l;
-    return Math.max(0, heightAt(this.p));
+    return Math.max(this.sea, heightAt(this.p));
   }
 
   update(cam: THREE.PerspectiveCamera, mode: CameraMode, target: CameraTarget, sun: THREE.Vector3, dt: number, t: number): void {
@@ -104,7 +106,7 @@ export class CameraRig {
     this.gliding = 0;
     this.mode = mode;
     const up = this.a.set(target.pos.x, target.pos.y, target.pos.z).normalize();
-    const pivot = this.b.copy(up).multiplyScalar(R + (target.height ?? 2.5));
+    const pivot = this.b.copy(up).multiplyScalar(R + this.sea + (target.height ?? 2.5));
     const k = this.seeded ? 1 - Math.exp(-dt * 12) : 1;
     this.pivot.lerp(pivot, k);
     // the heading, swung toward the target's and kept along the ground

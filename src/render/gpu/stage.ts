@@ -184,6 +184,7 @@ export class GpuStage {
     const dark = Math.cos(Math.min(Math.PI, Math.acos(Math.max(-1, Math.min(1, this.sun.y))) + OVAL)) < 0.08;
     AURORA.strength.value = dark ? 0.7 + 0.3 * Math.sin(v.time * 0.013) * Math.sin(v.time * 0.031 + 1.3) : 0;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
+    P.ebb.value = v.ebb;
     const terr = v.territory;
     this.ocean.territory.set(terr?.owner ?? null, terr?.trail ?? null, terr?.version ?? 0, terr?.me ?? 0);
     // the deep water's colour under the eye, for the sea the sky draws past the horizon
@@ -202,6 +203,7 @@ export class GpuStage {
 
     const cam = this.camera;
     this.resize();
+    this.rig.sea = v.tide;
     this.rig.update(cam, v.camera, v.target, this.sun, dt, v.time);
     this.onCamera?.(cam);
     cam.updateMatrixWorld();

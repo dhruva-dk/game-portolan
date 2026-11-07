@@ -20,6 +20,8 @@ export interface SceneSpec {
   camera: CameraMode;
   /** Sea level offset in metres, -1…1. */
   tide: number;
+  /** How far above the water a falling tide has left the shore wet, metres; none if not given. */
+  ebb?: number;
   /** Whether to put the player's ship there. */
   ship: boolean;
   /** Other ships sailing on open water ahead, spread from 60 to 220 m out: their lanterns show at night. */
@@ -52,6 +54,7 @@ export interface SceneInput {
   weather?: WeatherKind | 'clear';
   camera?: CameraMode;
   tide?: number;
+  ebb?: number;
   ship?: boolean;
   fleet?: number;
   height?: number;
@@ -290,6 +293,7 @@ export function sceneFrom(s: SceneInput): SceneSpec {
     ...base,
     hour: s.hour ?? base.hour, tilt: s.tilt ?? base.tilt, weather: s.weather ?? base.weather,
     camera: s.camera ?? base.camera, tide: s.tide ?? 0, ship: s.ship ?? base.ship, region: reg.id, regionName: reg.name,
+    ...(s.ebb !== undefined && { ebb: s.ebb }),
     ...(s.height !== undefined && { height: s.height }),
     ...(s.fleet !== undefined && { fleet: s.fleet }),
     ...(s.systems && { systems: s.systems }),

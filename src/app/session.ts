@@ -15,7 +15,7 @@ import {
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
-import { sunHeight } from '../sim/environment.ts';
+import { ebbAt, sunHeight } from '../sim/environment.ts';
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
 import { ABOUT, DAY, WEAPONS, isWeapon } from '../sim/tables.ts';
 import { landing } from '../sim/combat.ts';
@@ -450,7 +450,8 @@ export class Session implements Stepper {
       if (sys.kind >= 0) weather.push({ kind: WEATHER_NAMES[sys.kind] as WeatherKind, at: sys.at, radius: sys.r, strength: vigour(sys), id: slot });
     });
     return {
-      time, hour: hourOf(s), tilt: (s.tilt * 180) / Math.PI, tide: seaLevel(s), wind: { ...windAt(s, at, WIND).v }, camera: 'chase',
+      time, hour: hourOf(s), tilt: (s.tilt * 180) / Math.PI, tide: seaLevel(s), ebb: ebbAt(s.tick * TICK),
+      wind: { ...windAt(s, at, WIND).v }, camera: 'chase',
       target: { pos: { ...at }, heading: { ...this.view }, height: 2.5 + w.alt },
       weather,
       storm: formed ? { centre: { ...STORM.calm.at }, radius: STORM.calm.r } : null,

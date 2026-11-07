@@ -157,6 +157,9 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     // noise at three scales, in a projection of the world that has no seams
     const q = p.xz.add(vec2(0.71, -0.53).mul(p.y)).toVar();
     const n = vec3(noiseMap.sample(q.mul(0.0045)).r, noiseMap.sample(q.mul(0.031)).g, noiseMap.sample(q.mul(0.11)).b).toVar('landNoise');
+    // the height over the wet line a falling tide leaves on the shore, ragged along it: what the spray, the salt and the
+    // moss stand on, so the band the water has dropped from shows dark and glossy over it
+    const shore = above.sub(P.ebb.mul(n.y.mul(0.3).add(0.85))).toVar('landShore');
     // and the lie of the land, at scales no scan holds: a hundred metres and more, and ten
     const broad = vec4(noiseMap.sample(q.mul(0.0021))).toVar('landBroad');
     const patchy = vec4(noiseMap.sample(q.mul(0.013))).toVar('landPatchy');
@@ -339,23 +342,23 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     const poleward = normalize(pole.sub(up.mul(dot(pole, up))).add(vec3(1e-4, 0, 0)));
     const shaded = smoothstep(-0.1, 0.6, dot(nb, poleward)).mul(float(1).sub(ao.mul(0.6)).add(0.4));
     const mossy = clamp(mossHere.mul(cliffShare.add(roleW[ROLE.slope].mul(0.35))).mul(shaded)
-      .mul(smoothstep(0.35, 0.65, n.y.add(float(0.55).sub(h).mul(0.8)))).mul(smoothstep(1.5, 3, above)), 0, 1);
+      .mul(smoothstep(0.35, 0.65, n.y.add(float(0.55).sub(h).mul(0.8)))).mul(smoothstep(1.5, 3, shore)), 0, 1);
     a.assign(mix(a, MOSS_COLOUR.mul(mix(float(0.8), float(1.25), n.z)), mossy));
     rg.assign(mix(rg, float(0.92), mossy));
 
     // salt, dried white on the rock in a band above the tideline, on the ridges of its relief
-    const band = smoothstep(0.35, 0.9, above).mul(float(1).sub(smoothstep(1.3, float(2.2).add(n.x.mul(1.2)), above)));
+    const band = smoothstep(0.35, 0.9, shore).mul(float(1).sub(smoothstep(1.3, float(2.2).add(n.x.mul(1.2)), shore)));
     const salt = clamp(band.mul(rocky).mul(smoothstep(0.5, 0.8, h.add(n.z.sub(0.5).mul(0.7)).add(n.y.sub(0.5).mul(0.4)))).mul(0.55), 0, 1);
     a.assign(mix(a, SALT, salt));
     rg.assign(mix(rg, float(0.75), salt));
 
-    // wetness: the layer's own, the spray's and the tide's band over the sea, and the rain on whatever faces up
-    const spray = float(1).sub(smoothstep(0.1, float(1.1).add(n.x.mul(0.7)), above));
+    // wetness: the layer's own, the band the tide has left and the spray's over it, and the rain on whatever faces up
+    const spray = float(1).sub(smoothstep(0.1, float(1.1).add(n.x.mul(0.7)), shore));
     const rained = P.rain.mul(smoothstep(-0.3, 0.5, facing));
     const wetness = clamp(max(max(layerWet, spray), rained.mul(0.9)), 0, 1);
     // a porous surface darkens as its pores fill; the film of water on top is glossy
     a.assign(a.mul(mix(float(1), float(0.45), wetness.mul(float(1).sub(salt.mul(0.6))))));
-    rg.assign(mix(rg, float(0.14), wetness));
+    rg.assign(mix(rg, float(0.22), wetness));
     // puddles stand in the hollows of level ground in the rain
     const level = smoothstep(0.9, 0.97, dot(gn, up));
     const puddle = P.rain.mul(level).mul(smoothstep(0.45, 0.3, h.add(n.y.sub(0.5).mul(0.35)))).mul(smoothstep(0.2, 0.6, above));

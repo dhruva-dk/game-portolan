@@ -52,14 +52,15 @@ function texture(id: TexId, kind: 'd' | 'n'): THREE.Texture {
   return t;
 }
 
-const materials = new Map<SkinId, THREE.MeshStandardMaterial>();
+const materials = new Map<string, THREE.MeshStandardMaterial>();
 
-/** The material for a skin, built once and shared. */
-export function rockMaterial(id: SkinId): THREE.MeshStandardMaterial {
-  let m = materials.get(id);
+/** The material for a skin, built once and shared; `floats` for a floe riding the water, which the tide leaves no mark on. */
+export function rockMaterial(id: SkinId, floats = false): THREE.MeshStandardMaterial {
+  const key = floats ? `${id}:floats` : id;
+  let m = materials.get(key);
   if (m) return m;
-  m = (rockNodeMaterial(id, SKINS[id], texture, ROCK_UNIFORMS) as unknown as THREE.MeshStandardMaterial);
-  materials.set(id, m);
+  m = (rockNodeMaterial(id, SKINS[id], texture, ROCK_UNIFORMS, floats) as unknown as THREE.MeshStandardMaterial);
+  materials.set(key, m);
   return m;
 }
 

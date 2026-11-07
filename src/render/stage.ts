@@ -28,6 +28,8 @@ export interface StageView {
   tilt: number;
   /** Sea level against the mean, in metres. */
   tide: number;
+  /** How far above the water the falling tide has left the shore wet, in metres (sim/environment.ts ebbAt). */
+  ebb: number;
   /** The wind where the camera looks, a tangent in metres per second. */
   wind: V3;
   camera: CameraMode;

@@ -10,6 +10,21 @@ export const seaLevelAt = (t: number): number => TIDE_AMPLITUDE * dsin((2 * PI *
 
 export const seaLevel = (state: MatchState): number => seaLevelAt(state.tick * TICK);
 
+/** How fast the shore the tide has left dries, metres of its wet line a second: wet basalt stays dark for minutes. */
+const DRYING = 0.006;
+
+/**
+ * How far above the water the falling tide has left the shore wet, in metres, t seconds into the match: nothing while
+ * the water stands at or over its wet line, and as it falls, the band it falls from, drying down from the top at
+ * DRYING. The wet line was last left where the water began to fall faster than the shore dries, just past high
+ * water, so it is that point's height less what has dried since. For the eye: the simulation never reads it.
+ */
+export function ebbAt(t: number): number {
+  const w = (2 * PI) / TIDE.period, k = DRYING / (TIDE_AMPLITUDE * w), left = PI - Math.acos(k);
+  const since = ((((w * t - left) % (2 * PI)) + 2 * PI) % (2 * PI)) / w;
+  return Math.max(0, TIDE_AMPLITUDE * Math.sqrt(1 - k * k) - DRYING * since - seaLevelAt(t));
+}
+
 /** Too shallow for a keel drawing `draft` metres at the sea level `level`. */
 export const shoal = (p: V3, level: number, draft = DRAFT): boolean => heightAt(p) > level - draft;
 

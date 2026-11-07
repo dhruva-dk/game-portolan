@@ -85,7 +85,8 @@ export const planetHour = (p: V3, local: number): number => (((local - latLonOf(
 /** A fixed scene as the stage draws it: no Storm, no territory, and the scene's weather standing over the spot. */
 export function sceneStage(s: SceneSpec, time: number): StageView {
   return {
-    time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, wind: scale(s.heading, 6), camera: s.camera,
+    time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, ebb: s.ebb ?? 0, wind: scale(s.heading, 6),
+    camera: s.camera,
     target: { pos: s.pos, heading: s.heading, height: s.height ?? (s.ship ? 2.5 : 0) },
     weather: [
       ...(s.weather === 'clear' ? [] : [{ kind: s.weather, at: s.pos, radius: 220, strength: 1, id: 0 }]),

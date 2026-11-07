@@ -47,7 +47,7 @@ function height(x: number, y: number): number {
   return shoals(x, y, h, 140, S + 40);
 }
 
-// The tidal gaps inside the region, for the simulation and the tests.
+// The tidal gaps inside the region whose middle the dune or a shoal has not buried, for the simulation and the tests.
 const TIDAL: number[] = [];
 for (let k = -7; k <= 7; k++) {
   for (let j = -4; j <= 3; j++) {
@@ -55,7 +55,7 @@ for (let k = -7; k <= 7; k++) {
     if (!g.tidal) continue;
     // A point on the bar's centre line at the gap (the offset is a function of u alone).
     const v = k * SP + offset(g.u), x = g.u * SU + v * CU, y = g.u * CU - v * SU;
-    if (Math.abs(x) < 190 && y > -230 && y < 230 && fromEquator(x, y, R, true) > 50) TIDAL.push(x, y);
+    if (Math.abs(x) < 190 && y > -230 && y < 230 && fromEquator(x, y, R, true) > 50 && Math.abs(height(x, y) + 1.5) < 0.4) TIDAL.push(x, y);
   }
 }
 

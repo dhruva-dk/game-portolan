@@ -28,6 +28,7 @@ import {
   int, select, sign, sin, smoothstep, step, texture, textureSize, uint, uv, varying, vec2, vec3, vec4, cameraPosition,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
+import { TIDE_AMPLITUDE } from '../../sim/world/index.ts';
 import { thinCloudLight } from '../atmosphere/light.ts';
 import { tagOf, type FloraTag } from './tag.ts';
 
@@ -343,11 +344,13 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
       col.rgb.assign(mix(col.rgb, moss.mul(vec3(ms.tint.r, ms.tint.g, ms.tint.b)), k));
     }
     if (t.tide) {
-      // under water: dark and slick; the band the tide covers: a green-brown stain; above: dry
-      const seaH = length(positionWorld).sub(P.planet.y);
-      const under = smoothstep(-0.15, 0.1, seaH).oneMinus();
-      const band = smoothstep(-0.2, 0.05, seaH).mul(smoothstep(0.55, 1.1, seaH).oneMinus());
-      col.rgb.assign(mix(col.rgb, col.rgb.mul(vec3(0.55, 0.6, 0.42)), band.mul(0.8)).mul(mix(1, 0.45, under)));
+      // the band between low and high water, whatever the tide is now: a green-brown stain the water's height reads
+      // against; under the water and up the band a falling tide has left, dark and slick; above, dry
+      const h = length(positionWorld);
+      const band = smoothstep(-TIDE_AMPLITUDE - 0.2, -TIDE_AMPLITUDE + 0.05, h.sub(P.planet.x))
+        .mul(smoothstep(TIDE_AMPLITUDE + 0.05, TIDE_AMPLITUDE + 0.6, h.sub(P.planet.x)).oneMinus());
+      const wet = smoothstep(-0.15, P.ebb.add(0.1), h.sub(P.planet.y)).oneMinus();
+      col.rgb.assign(mix(col.rgb, col.rgb.mul(vec3(0.55, 0.6, 0.42)), band.mul(0.8)).mul(mix(1, 0.45, wet)));
     }
     if (builder.geometry.hasAttribute('color')) col.rgb.mulAssign(attribute<'vec3'>('color') as unknown as V3);
     if (t.bleach) col.rgb.assign(mix(col.rgb, vec3(dot(col.rgb, vec3(0.3, 0.59, 0.11)).mul(2.2)), t.bleach));
@@ -368,9 +371,10 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
   m.roughnessNode = Fn(() => {
     let r: F = materialRoughness as unknown as F;
     if (t.tide) {
-      const seaH = length(positionWorld).sub(P.planet.y);
-      const wet = max(smoothstep(-0.15, 0.1, seaH).oneMinus(), smoothstep(-0.2, 0.05, seaH).mul(smoothstep(0.55, 1.1, seaH).oneMinus()).mul(0.7));
-      r = mix(r, 0.28, wet);
+      // slick under the water and up the band a falling tide has left; damp over the rest of the tide's stain
+      const h = length(positionWorld), above = h.sub(P.planet.x);
+      const band = smoothstep(-TIDE_AMPLITUDE - 0.2, -TIDE_AMPLITUDE + 0.05, above).mul(smoothstep(TIDE_AMPLITUDE + 0.05, TIDE_AMPLITUDE + 0.6, above).oneMinus());
+      r = mix(r, 0.28, max(smoothstep(-0.15, P.ebb.add(0.1), h.sub(P.planet.y)).oneMinus(), band.mul(0.5)));
     }
     return mix(r, 0.3, P.rain.mul(0.65));
   })();

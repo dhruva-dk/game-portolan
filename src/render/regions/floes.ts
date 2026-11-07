@@ -34,7 +34,7 @@ export class Floes {
     for (let k = 0; k < SHAPES; k++) {
       const n = FLOES.filter((_, i) => i % SHAPES === k).length;
       for (const part of form.parts(0x1ce0 + 17 * k, 2 * MID * COVER, 0)) {
-        const mesh = new THREE.InstancedMesh(part.geo, rockMaterial(part.skin ?? 'floe'), n);
+        const mesh = new THREE.InstancedMesh(part.geo, rockMaterial(part.skin ?? 'floe', true), n);
         mesh.castShadow = mesh.receiveShadow = true;
         mesh.frustumCulled = false;
         mesh.userData.shape = k;

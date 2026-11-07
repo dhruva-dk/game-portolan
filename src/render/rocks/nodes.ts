@@ -15,6 +15,7 @@ import {
 } from 'three/tsl';
 import { marksAt, scorch } from '../gpu/marks.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
+import { TIDE_AMPLITUDE } from '../../sim/world/index.ts';
 import type { Skin, SkinId, TexId } from './skins.ts';
 
 type F = Node<'float'>;
@@ -40,8 +41,9 @@ const pick4 = (k: F, a: V3, b: V3, c: V3, d: V3): V3 => select(k.lessThan(1), a,
 /** a under 0.4, b under 0.75, else c. */
 const pick3 = (k: F, a: V3, b: V3, c: V3): V3 => select(k.lessThan(0.4), a, select(k.lessThan(0.75), b, c));
 
-/** The node material for a skin; `tex` loads one of the photographs, `shared` is what every rock reads. */
-export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd' | 'n') => Texture, shared: RockShared): MeshStandardNodeMaterial {
+/** The node material for a skin; `tex` loads one of the photographs, `shared` is what every rock reads; `floats` for one
+ *  riding the water, which the tide leaves no mark on. */
+export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd' | 'n') => Texture, shared: RockShared, floats = false): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ roughness: s.rough[0], metalness: 0, name: `rock:${id}` });
   const alb = tex(s.tex, 'd'), nrm = tex(s.tex, 'n');
   const scale = vec2(1 / s.tile, 1 / (s.tile * (s.aspect ?? 1)));
@@ -119,6 +121,11 @@ export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd'
   const rH = select(round, length(wp.sub(sea.xyz)).sub(sea.w), wp.y.sub(sea.y));
   const rGeoW = normalize(vAxX.mul(rN.x).add(vAxY.mul(rN.y)).add(vAxZ.mul(rN.z)));
   const rFacing = dot(rGeoW, rUp);
+  // the tide's marks: how far up the water has fallen from and left wet, and the height the growth between low and high
+  // water stands by, over mean sea; a floe rides the water, so for it both are the water's own
+  const ebb: F = floats ? float(0) : P.ebb;
+  const rTide: F = floats ? rH : rH.add(P.planet.z);
+  const reach = floats ? 0 : TIDE_AMPLITUDE;
   const rCav = vRock.x;
   const rVar = macro.sub(0.45);
 
@@ -152,8 +159,9 @@ export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd'
   // cavities: dark cracks and undersides
   rA = rA.mul(rCav.mul(-0.62).add(1));
 
-  // wetness: dark and glossy toward the sea, wet in cracks, wet streaks down cliff faces
-  let rWet: F = smoothstep(0, macro.mul(0.9).add(0.55).mul(spray).add(0.05), rH).oneMinus();
+  // wetness: dark and glossy toward the sea and over the band a falling tide has left, wet in cracks, wet streaks
+  // down cliff faces
+  let rWet: F = smoothstep(0, macro.mul(0.9).add(0.55).mul(spray).add(0.05), rH.sub(ebb.mul(macro.mul(0.3).add(0.85)))).oneMinus();
   rWet = max(rWet, rCav.mul(0.25).add(0.75).mul(wetAll));
   if (s.streak) {
     const su = vec2(dot(p.xz, vec2(0.71, 0.7)).mul(0.11), p.y.mul(0.006).add(P.time.mul(0.015)));
@@ -163,10 +171,10 @@ export function rockNodeMaterial(id: SkinId, s: Skin, tex: (id: TexId, kind: 'd'
   }
   rWet = clamp(rWet.add(rCav.mul(0.25).mul(step(rH, spray * 2))), 0, 1);
   const rUnder = smoothstep(0.05, -0.35, rH);
-  const rTideBand = smoothstep(-1.2, -0.25, rH).mul(smoothstep(0.7, 0.05, rH));
+  const rTideBand = smoothstep(-reach - 1.2, -reach - 0.25, rTide).mul(smoothstep(reach + 0.7, reach + 0.05, rTide));
   let rWetA: V3 = rA.mul(mix(1, 0.42, rWet));
   rWetA = mix(vec3(lum(rWetA)), rWetA, rWet.mul(0.25).add(1));
-  // growth at the tide line and below it
+  // growth between low and high water and below it
   if (s.algae) {
     const [ac, amount] = s.algae;
     rWetA = mix(rWetA, rgb(ac).mul(macro.add(0.6)), max(rTideBand, rUnder.mul(0.7)).mul(smoothstep(0.25, 0.6, macro.add(rCav.mul(0.4)))).mul(amount));
