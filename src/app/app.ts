@@ -70,6 +70,8 @@ const PERF_EVERY = 5;
 /** The orbit the Gale sees the planet from, in radii, and the seconds the camera takes between views. */
 const ORBIT_DISTANCE = 3.2;
 const FLIGHT = 2.2;
+/** Seconds the camera takes to fly from the anchorage to the Gale. */
+const TO_THE_GALE = 2.6;
 
 const norm = (p: V3): V3 => {
   const l = Math.hypot(p.x, p.y, p.z) || 1;
@@ -462,16 +464,14 @@ export class App {
     this.begin(this.prepare(o), o);
   }
 
-  /** Makes the next match, not yet begun: the lobby swings its chart to the Gale's course before it unrolls it. */
+  /** Makes the next match, not yet begun. */
   private prepare(o: PlayOptions = {}): Session {
     return new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
   }
 
-  /** The match made ready, held while the lobby's chart unrolls over her ship. */
-  private pending: Session | null = null;
-
-  /** Begins a match made ready. */
-  private begin(s: Session, o: PlayOptions = {}): void {
+  /** Begins a match made ready. Played from the lobby the camera flies from the anchorage to the Gale, the actors and
+   *  the hour changing under the paper the lobby came down with. */
+  private begin(s: Session, o: PlayOptions = {}, fly = false): void {
     if (this.session) this.leaveMatch();
     this.actors?.clear();
     this.staged = null;
@@ -488,7 +488,8 @@ export class App {
     this.loop.run(s);
     this.controls.on = true;
     if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 9, shoulder: 0, yaw: 0 });
-    this.stage?.snap();
+    if (fly) this.stage?.rig.glide(TO_THE_GALE);
+    else this.stage?.snap();
     this.go(s.me.phase === PHASE.gale ? 'gale' : 'match');
   }
 
@@ -734,18 +735,9 @@ export class App {
    *  on its plate; its tabs, plate and wheel unroll their sheets over it. */
   private openLobby(from: ScreenName): void {
     this.lobby?.dispose();
-    const l = new Lobby(this.chartHost, {
-      ...this.planet,
+    const l = new Lobby({
       career: () => this.careerMarks(),
-      prepare: () => {
-        const g = (this.pending = this.prepare()).state.gale;
-        return courseBearing(g.from, g.dir);
-      },
-      begin: () => {
-        const s = this.pending;
-        this.pending = null;
-        if (s) this.begin(s);
-      },
+      begin: () => this.begin(this.prepare(), {}, true),
       settings: () => this.go('settings'),
       rank: () => this.go('rank'),
       open: (folio) => this.go(folio),

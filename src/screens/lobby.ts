@@ -11,23 +11,22 @@
 //
 // Entering, the instruments are laid one after another (from the right, behind the title's sheet as it rolls off that
 // way) and ink in; the title's rose lands on the plate, where the level's ring inks in over it as it dries. PLAY
-// springs under the finger with a flash of light on its gold, and the Gale's planet chart unrolls over her ship from
-// the right; under it the match begins, the camera is put over the Gale's course, and the sheet thins in its window to
-// the planet, where the Gale's own sheet lies under it. Leaving for anything else, the ink dries away.
+// springs under the finger with a flash of light on its gold, and a sheet of paper comes down over the instruments;
+// under it the match begins and the camera leaves the anchorage for the Gale, and the paper thins away on the flight,
+// so she is seen going. Leaving for anything else, the ink dries away.
 //
 // Everything here can be pressed, so everything is drawn on the live plane: each instrument drawn with the pen while it
 // inks in, then baked once to a sprite and drawn as one image with its press look; only the ring's gold is drawn with
 // the pen each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
 import type { Prim } from '../icons/draw.ts';
 import {
-  Press, arcPts, bakeSeal, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, unroll, woodcut, word,
+  Press, arcPts, bakeSeal, drawBaked, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, woodcut, word,
   type Baked, type ChartLayer, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp, noise1 } from '../chart/noise.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import { Sheets, type Folio, type SheetHost, type SheetName } from './folio.ts';
 import { paper, roundButton, slipPath } from './instruments.ts';
-import { BLEED, PlanetChart, type PlanetHost } from './planet.ts';
 import { TITLE_LANDS, cornerRose } from './title.ts';
 
 /** The career as the plate draws it. */
@@ -43,11 +42,9 @@ export interface CareerMarks {
   wins: number;
 }
 
-export interface LobbyHost extends PlanetHost {
+export interface LobbyHost {
   career(): CareerMarks;
-  /** Makes the next match ready, and returns the Gale's course as a bearing from north (radians, clockwise). */
-  prepare(): number;
-  /** Begins the match made ready, under the Gale's chart. */
+  /** Begins the match; the camera flies from the anchorage to the Gale. */
   begin(): void;
   /** Opens the settings. */
   settings(): void;
@@ -104,21 +101,19 @@ const AT = {
   /** The title's rose, landed on the plate, dries away under the ring in this long. */
   rose: 0.5,
   done: 1.85,
-  /** After Play's press: the flash on its gold, the Gale's chart unrolling from the right, and its window opening on
-   *  the planet. */
+  /** After Play's press: the flash on its gold, the paper coming down over the instruments, and it thinning away over
+   *  the flight to the Gale. */
   flash: 0.45,
-  unroll: [0.3, 1.1],
-  open: 0.55,
+  cover: [0.16, 0.48],
+  thin: 0.6,
   /** Leaving for anything but the Gale. */
   dry: 0.3,
 } as const;
 
-/** Seconds the window takes to open on the planet once the lobby's chart is down and the match begun: the Gale inks
- *  in after it. */
-export const LOBBY_OPENS = AT.open;
-
 const span = (s: number, [a, b]: readonly [number, number]): number => clamp((s - a) / (b - a));
 const TAU = Math.PI * 2;
+/** The folio runs this far past every edge of the screen. */
+const BLEED = 40;
 /** Room round a baked instrument for its shadow. */
 const PAD = 20;
 
@@ -272,7 +267,6 @@ interface Geo {
 }
 
 export class Lobby {
-  readonly #host: HTMLElement;
   readonly #h: LobbyHost;
   #layer: ChartLayer | null = null;
   #g: Geo | null = null;
@@ -280,18 +274,16 @@ export class Lobby {
   #badge: Seal | null = null;
   /** The instruments at rest, baked. */
   #sprites: { plate: Sprite; wheel: Sprite; tabs: Sprite[]; play: Sprite } | null = null;
-  /** When it came, Play was pressed, it left, and the window began to open (ms; -1 not yet). */
+  /** When it came, Play was pressed, it left, and the match began under the paper (ms; -1 not yet). */
   #born = -1;
   #playAt = -1;
   #leftAt = -1;
-  #openAt = -1;
+  #beganAt = -1;
   /** Everything is inked. */
   #inked = false;
   readonly #roseLanded: boolean;
-  /** The Gale's chart, whole, unrolling over her ship; then laid in the page under the Gale's. */
-  #planet: PlanetChart | null = null;
-  #chart: Baked | null = null;
-  #chartEl: HTMLCanvasElement | null = null;
+  /** The paper that comes down over the instruments when Play is pressed. */
+  #paper: Baked | null = null;
   readonly #press = { play: new Press(), wheel: new Press(), plate: new Press(), tabs: TABS.map(() => new Press()) };
   #off: (() => void) | null = null;
   /** The chart's time at the last frame: a press acts between frames. */
@@ -310,8 +302,7 @@ export class Lobby {
   /** Called once the lobby has gone. */
   onGone?: () => void;
 
-  constructor(host: HTMLElement, h: LobbyHost, o: LobbyOptions = {}) {
-    this.#host = host;
+  constructor(h: LobbyHost, o: LobbyOptions = {}) {
     this.#h = h;
     this.#career = h.career();
     this.#roseLanded = !!o.roseLanded;
@@ -345,11 +336,6 @@ export class Lobby {
   /** Whether a finger is on her: the camera is the finger's, and does not drift back. */
   get held(): boolean {
     return this.#fingers.size > 0;
-  }
-
-  /** Whether Play unrolled the Gale's chart over her ship, and the match began under it. */
-  get unrolled(): boolean {
-    return this.#openAt >= 0;
   }
 
   attach(layer: ChartLayer, now: number): void {
@@ -410,7 +396,7 @@ export class Lobby {
     this.#layer.invalidate();
   }
 
-  /** Leaves for anything but the Gale Play unrolled: the ink dries away. */
+  /** Leaves for anything but the Gale: the ink dries away. */
   leave(now: number): void {
     if (this.#leftAt >= 0 || this.#playAt >= 0) return;
     const layer = this.#layer;
@@ -429,8 +415,7 @@ export class Lobby {
     this.#off = null;
     this.#unpress();
     this.#sheets?.dispose();
-    this.#chartEl?.remove();
-    this.#chartEl = null;
+    this.#paper = null;
   }
 
   // ── layout and bakes ──
@@ -502,16 +487,11 @@ export class Lobby {
   #pressPlay(): void {
     const s = (this.#lastNow - this.#born) / 1000;
     if (this.#playAt >= 0 || this.#leftAt >= 0 || s < AT.banner[0]) return;
-    const layer = this.#layer!;
+    const layer = this.#layer!, l = layer.layout;
     this.#playAt = this.#lastNow;
     this.#unpress();
     this.#inked = true;
-    // the match made ready, and the Gale's chart, whole, its web and needle swung to the course, to unroll over her
-    let c = this.#h.prepare() % TAU;
-    if (c > Math.PI) c -= TAU;
-    if (c < -Math.PI) c += TAU;
-    this.#planet = new PlanetChart(layer, this.#h);
-    this.#chart = this.#planet.sheet(c, true);
+    this.#paper = layer.sheet('folio', l.w + BLEED * 2, l.h + BLEED * 2, 9, { folds: false });
     effect('lobby:unroll', 'whoosh', 'none');
   }
 
@@ -618,28 +598,23 @@ export class Lobby {
     ];
   }
 
-  /** Play: the gold flashes, the Gale's chart unrolls over her ship from the right, the match begins under it, and its
-   *  window opens on the planet. */
+  /** Play: the gold flashes, the paper comes down over the instruments, and under it the match begins and the camera
+   *  leaves for the Gale; the paper thins away over the flight. */
   #playing(gc: CanvasRenderingContext2D, now: number): void {
-    const layer = this.#layer!, pen = layer.pen, s = (now - this.#playAt) / 1000;
-    if (this.#openAt < 0) {
+    const layer = this.#layer!, pen = layer.pen, s = (now - this.#playAt) / 1000, b = this.#paper!;
+    if (this.#beganAt < 0) {
       // the press, no longer routed, still springs back under the lettering
       this.#press.play.step(Math.min(0.1, Math.max(0, (now - this.#lastNow) / 1000) || 1 / 30));
       this.#draw(gc, pen, Infinity, 1, now);
-      const u = span(s, AT.unroll);
-      if (u < 1) {
-        unroll(gc, pen.paper, this.#chart!, -BLEED, -BLEED, u, 'left', layer.dpr);
-        return;
-      }
-      // down over her: laid in the page under the Gale's, the instruments taken off, and the match begun under it
-      this.#chartEl = this.#planet!.place(this.#host, this.#chart!, 1);
-      this.#openAt = now;
+      drawBaked(gc, b, -BLEED, -BLEED, ease.out(span(s, AT.cover)));
+      if (s < AT.cover[1]) return;
+      // down over her: the match begins under it, and the instruments stay under the paper
+      this.#beganAt = now;
       this.#h.begin();
       return;
     }
-    // the window opens: this sheet thins away over the Gale's, which is cut there
-    const o = clamp((now - this.#openAt) / 1000 / AT.open);
-    if (this.#chartEl) this.#chartEl.style.opacity = String(1 - ease.inOut(o));
+    const o = clamp((now - this.#beganAt) / 1000 / AT.thin);
+    drawBaked(gc, b, -BLEED, -BLEED, 1 - ease.inOut(o));
     if (o >= 1) {
       this.dispose();
       this.onGone?.();
