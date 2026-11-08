@@ -461,13 +461,13 @@ export class Sheets {
     // the stick side: a hand on the side the stick is
     {
       const { x, y } = at(0), press = new Press(), field = 'leftHanded' as const;
-      const sprite = (left: boolean) => this.#bake(`set|hand|${left}`, col, rh, (pen, _gc, cx, cy) => this.#stickSide(pen, cx, cy, col, left));
+      const sprite = (stickLeft: boolean) => this.#bake(`set|hand|${stickLeft}`, col, rh, (pen, _gc, cx, cy) => this.#stickSide(pen, cx, cy, col, stickLeft));
       items.push({
         id: 'set:leftHanded', x, y, w: col, h: rh,
         take: { press, sound: 'toggle', haptic: 'selection', act: () => set({ [field]: !h.settings()[field] }) },
         live: (g, _pen, ix, iy, alpha) => {
           const look = pressLook(press.sink);
-          drawSprite(g, sprite(h.settings()[field]), ix + col / 2, iy + rh / 2 + look.dy, { alpha, scale: look.scale, dark: look.dark });
+          drawSprite(g, sprite(!h.settings()[field]), ix + col / 2, iy + rh / 2 + look.dy, { alpha, scale: look.scale, dark: look.dark });
         },
       });
     }
