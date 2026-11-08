@@ -1,6 +1,6 @@
 // Each scan's mean linear albedo (rgb), roughness and height, by region/scan: what the ground shows where its scan
-// is not loaded or is too far off to tell. Worked out by scan-worker.ts from the full images (the GPU lab's
-// scanMeans); work them out again whenever a scan is replaced.
+// is not loaded or is too far off to tell. Worked out from the full images; work them out again whenever a scan is
+// replaced.
 export const SCAN_MEANS: Record<string, [number, number, number, number, number]> = {
   'iceCrown/snow': [0.2961, 0.305, 0.305, 0.2902, 0.6392],
   'iceCrown/frostlichen': [0.314, 0.305, 0.2423, 0.4824, 0.4902],

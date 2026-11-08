@@ -1,27 +1,27 @@
 // The scanned ground near the eye, held on the GPU. Every region paints with five or so scans of its own, eighty-one
 // in all, at 2K: far more than a GPU should hold at once. So the GPU keeps a fixed number of slots, two texture
-// arrays (surface and detail, see scan-worker.ts), and the scans of the regions round the eye are streamed into them,
+// arrays (surface and detail, see tools/scans.ts), and the scans of the regions round the eye are streamed into them,
 // nearest region first, the least recently wanted giving way. Anything whose scan is not in (or too far to tell)
 // takes the scan's mean colour, roughness and height, which is what its mips settle to with distance anyway: the
 // whole planet is always painted, and only the near ground ever needs the detail.
 //
-// The slots are filled straight from a worker's decoded mips with writeTexture, so loading one never makes the GPU
-// redo every other slot's mips, and no copy of the arrays is kept on the CPU.
+// The build packs every scan's mips as ASTC 4×4 blocks (tools/scans.ts), a byte a texel, and a slot is filled with
+// them as they arrive, level by level with writeTexture: nothing is decoded, loading one never makes the GPU redo
+// every other slot's mips, and no copy of the arrays is kept on the CPU.
 import { ExternalTexture, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, Vector3, Vector4, type WebGPURenderer } from 'three/webgpu';
 import { uniformArray, renderGroup } from 'three/tsl';
 import { regionAt } from '../../sim/world/index.ts';
 import { R } from '../../sim/sphere.ts';
 import { LAYERS, ROLE, ROLE_COUNT, SCANS } from './library.ts';
 import { SCAN_MEANS } from './means.ts';
-import type { ScanRequest, ScanResult } from './scan-worker.ts';
 
-/** Slots on the GPU, and their size: 24 × 1024² × 2 arrays × 4 bytes, with mips, is 270 MB. */
+/** Slots on the GPU, and their size: 24 × 1024² × 2 arrays × a byte, with mips, is 67 MB. */
 export const SLOTS = 24;
 export const SCAN_SIZE = 1024;
 const LEVELS = Math.log2(SCAN_SIZE) + 1;
 /** How far round the eye the regions whose ground is streamed in reach, metres. */
 const REACH = 320;
-/** Scans being decoded at once. */
+/** Scans being fetched at once. */
 const IN_FLIGHT = 2;
 /** How often the wanted scans are worked out again, seconds. */
 const EVERY = 0.3;
@@ -58,26 +58,17 @@ export class ScanCache {
   readonly #pending = new Map<number, number>();
   /** Scans that failed to load, which are not asked for again. */
   readonly #failed = new Set<number>();
-  readonly #workers: Worker[] = [];
-  readonly #idle: Worker[] = [];
+  #inFlight = 0;
   #clock = 0;
   #since = Infinity;
   #wanted: number[] = [];
 
-  // the base is made absolute here: the build's is relative, and a worker would resolve it against its own script
-  constructor(renderer: WebGPURenderer, base = new URL(import.meta.env.BASE_URL, document.baseURI).href) {
+  constructor(renderer: WebGPURenderer, base = import.meta.env.BASE_URL) {
     this.#base = base;
     this.#device = (renderer.backend as unknown as { device: Device }).device;
-    this.surface = this.#array('rgba8unorm-srgb');
-    this.detail = this.#array('rgba8unorm');
+    this.surface = this.#array('astc-4x4-unorm-srgb');
+    this.detail = this.#array('astc-4x4-unorm');
     for (let s = 0; s < SCANS.length; s++) this.#paint(s);
-    for (let k = 0; k < IN_FLIGHT; k++) {
-      const w = new Worker(new URL('./scan-worker.ts', import.meta.url), { type: 'module' });
-      w.onmessage = (e: MessageEvent<ScanResult>) => this.#receive(w, e.data);
-      w.onerror = (e) => console.error('scan worker', e.message);
-      this.#workers.push(w);
-      this.#idle.push(w);
-    }
   }
 
   #array(format: string): ExternalTexture {
@@ -107,7 +98,7 @@ export class ScanCache {
       }
     }
     for (const s of this.#wanted) {
-      if (!this.#idle.length) break;
+      if (this.#inFlight >= IN_FLIGHT) break;
       if (this.#slotOf[s] >= 0 || this.#failed.has(s) || [...this.#pending.values()].includes(s)) continue;
       const slot = this.#freeSlot();
       if (slot < 0) break;
@@ -120,9 +111,7 @@ export class ScanCache {
       this.#inSlot[slot] = -1;
       this.#pending.set(slot, s);
       this.#wantedAt[slot] = this.#clock;
-      const w = this.#idle.pop()!;
-      const req: ScanRequest = { id: s, base: this.#base, maps: SCANS[s].maps, size: SCAN_SIZE };
-      w.postMessage(req);
+      void this.#load(s, slot);
     }
   }
 
@@ -140,31 +129,40 @@ export class ScanCache {
     return best;
   }
 
-  #receive(w: Worker, r: ScanResult): void {
-    this.#idle.push(w);
-    let slot = -1;
-    for (const [k, s] of this.#pending) if (s === r.id) slot = k;
-    if (slot < 0) return;
-    this.#pending.delete(slot);
-    if (r.error) {
+  async #load(scan: number, slot: number): Promise<void> {
+    this.#inFlight++;
+    try {
+      const at = `${this.#base}scans/${SCANS[scan].key}`;
+      const [surface, detail] = await Promise.all(['surface', 'detail'].map(async (kind) => {
+        const res = await fetch(`${at}.${kind}.astc`);
+        if (!res.ok) throw new Error(`${kind}: ${res.status}`);
+        return new Uint8Array(await res.arrayBuffer());
+      }));
+      this.#write(this.surface, surface, slot);
+      this.#write(this.detail, detail, slot);
+      this.#inSlot[slot] = scan;
+      this.#slotOf[scan] = slot;
+      this.#paint(scan);
+      this.resident = this.#inSlot.reduce((n, s) => n + (s >= 0 ? 1 : 0), 0);
+    } catch (err) {
       // the land keeps the scan's far look where it would have been; asked for again, it would be fetched and fail
-      // each time a worker came free
-      console.error('scan', SCANS[r.id].key, r.error);
-      this.#failed.add(r.id);
-      return;
+      // each time a fetch came free
+      console.error('scan', SCANS[scan].key, String(err));
+      this.#failed.add(scan);
+    } finally {
+      this.#pending.delete(slot);
+      this.#inFlight--;
     }
-    const write = (t: ExternalTexture, mips: Uint8Array[]) => {
-      mips.forEach((data, level) => {
-        const s = SCAN_SIZE >> level;
-        this.#device.queue.writeTexture({ texture: t.sourceTexture, mipLevel: level, origin: [0, 0, slot] }, data, { bytesPerRow: s * 4, rowsPerImage: s }, [s, s, 1]);
-      });
-    };
-    write(this.surface, r.surface);
-    write(this.detail, r.detail);
-    this.#inSlot[slot] = r.id;
-    this.#slotOf[r.id] = slot;
-    this.#paint(r.id);
-    this.resident = this.#inSlot.reduce((n, s) => n + (s >= 0 ? 1 : 0), 0);
+  }
+
+  /** Writes a scan's mips, its 4×4 blocks one level after the next, into a slot. */
+  #write(t: ExternalTexture, data: Uint8Array, slot: number): void {
+    let at = 0;
+    for (let level = 0; level < LEVELS; level++) {
+      const blocks = Math.ceil((SCAN_SIZE >> level) / 4), bytes = blocks * blocks * 16;
+      this.#device.queue.writeTexture({ texture: t.sourceTexture, mipLevel: level, origin: [0, 0, slot] }, data.subarray(at, at + bytes), { bytesPerRow: blocks * 16, rowsPerImage: blocks }, [blocks * 4, blocks * 4, 1]);
+      at += bytes;
+    }
   }
 
   /** Writes where a scan is and its far look into every role that paints with it. */
@@ -187,10 +185,6 @@ export class ScanCache {
       this.update(eye, EVERY);
       await new Promise((r) => setTimeout(r, 30));
     }
-  }
-
-  dispose(): void {
-    for (const w of this.#workers) w.terminate();
   }
 }
 

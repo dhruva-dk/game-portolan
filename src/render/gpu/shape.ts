@@ -44,9 +44,9 @@ const GPU = globalThis as unknown as {
   GPUBufferUsage: Record<string, number>; GPUMapMode: Record<string, number>;
 };
 
-/** Bytes a texel takes in the formats three draws into. */
+/** Bytes a texel takes in the formats three draws into, and the land's scans' (a 16-byte block of 4 × 4). */
 const TEXEL: Record<string, number> = {
-  r8unorm: 1, rg8unorm: 2, r16float: 2, rgba8unorm: 4, 'rgba8unorm-srgb': 4, bgra8unorm: 4, 'bgra8unorm-srgb': 4,
+  'astc-4x4-unorm': 1, 'astc-4x4-unorm-srgb': 1, r8unorm: 1, rg8unorm: 2, r16float: 2, rgba8unorm: 4, 'rgba8unorm-srgb': 4, bgra8unorm: 4, 'bgra8unorm-srgb': 4,
   rg16float: 4, r32float: 4, rgb10a2unorm: 4, rg11b10ufloat: 4, rgba16float: 8, rg32float: 8, rgba32float: 16,
   depth16unorm: 2, depth24plus: 4, depth32float: 4, 'depth24plus-stencil8': 4, 'depth32float-stencil8': 5,
 };

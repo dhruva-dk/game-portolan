@@ -26,6 +26,7 @@
     "@capacitor/cli": "8.5.3",
     "@types/node": "24.19.2",
     "@types/three": "0.186.0",
+    "astcenc": "^4.3.1-9",
     "playwright": "1.64.1",
     "typescript": "5.9.3",
     "vite": "8.3.4"
