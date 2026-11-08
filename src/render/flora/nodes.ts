@@ -239,7 +239,9 @@ function bump(n: V3, h: F, k: number): V3 {
   return normalize(n.mul(abs(det)).sub(grad));
 }
 
-/** Leaves: each light's direct term gains what comes through the blade from behind. */
+/** Leaves: the sun's and the moon's direct term gains what comes through the blade from behind. The clustered lights
+ *  (lanterns, gun flashes, fire) light the leaves as any surface: they are small and near, and what they put through
+ *  a leaf would show only in the few leaves round them, at the price of a second term for every one in every leaf. */
 export class LeafLight extends PhysicalLightingModel {
   readonly #through: F;
   constructor(through: F) {
@@ -248,6 +250,8 @@ export class LeafLight extends PhysicalLightingModel {
   }
   override direct(input: LightingModelDirectInput, builder: NodeBuilder): void {
     super.direct(input, builder);
+    const source = (input as { lightNode?: { light?: { isDirectionalLight?: boolean } } }).lightNode?.light;
+    if (!source?.isDirectionalLight) return;
     const lightDirection = input.lightDirection as unknown as V3, lightColor = input.lightColor as unknown as V3;
     const reflectedLight = input.reflectedLight as unknown as { directDiffuse: V3 };
     const away = lightDirection.negate();

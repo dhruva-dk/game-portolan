@@ -25,6 +25,7 @@ import { Fn, If, atomicAdd, atomicLoad, atomicStore, bool, dot, instanceIndex, l
 import type { Node } from 'three/webgpu';
 import { BEACONS, LANDMARKS } from '../../sim/world/index.ts';
 import { P } from '../gpu/uniforms.ts';
+import { RENDER_SCALE } from '../gpu/renderer.ts';
 import { ImpostorAtlas, SHARP, impostorMaterial, type ImpostorSource } from './impostor.ts';
 import { LEVELS, floraMaterial, turn, type FieldNodes } from './nodes.ts';
 import { SPECIES, type Lod, type Species } from './species.ts';
@@ -38,9 +39,11 @@ type U = Node<'uint'>;
 const BAND = 0.08;
 /** Kinds sparser than this per 100 m² have a crown that needs room, and more variants to tell them apart. */
 const SPARSE = 3;
-/** The view's focal length in pixels (its height over twice the tangent of half its field of view), for judging how
- *  big a plant stands on screen. */
-const FOCAL = 1450;
+/** The view's focal length in the scene's own pixels (its height over twice the tangent of half its field of view),
+ *  for judging how big a plant stands on screen: the scene on the floor iPad, 1230 of the canvas's pixels tall drawn
+ *  at RENDER_SCALE.tablet, under the deck camera's 58°. (It was the panel's, twice the scene's, which kept every
+ *  plant built in full twice as far out as its impostor could have stood in for it.) */
+const FOCAL = (1230 * RENDER_SCALE.tablet) / (2 * Math.tan((29 * Math.PI) / 180));
 /** Plants shorter than this, metres, are not worth an impostor: they are gone before one would take over. */
 const TALL = 3;
 /** The levels built from the plant itself; the impostor is the one past them. */
