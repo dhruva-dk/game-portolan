@@ -44,8 +44,16 @@ export interface Turn {
   vLon: number;
 }
 
-/** How far north or south a finger can turn the planet. */
-const MOST_LAT = 1.1;
+/** How far north or south a finger can turn the planet: just short of where the orbit camera loses north. */
+const MOST_LAT = 1.25;
+
+/** Turns `turn` as a finger moving (dx, dy) pixels carries the ground at `rp` pixels a radian; returns how far it went. */
+export function carry(turn: Turn, dx: number, dy: number, rp: number): { lon: number; lat: number } {
+  const lon = -dx / (rp * Math.cos(turn.lat)), lat = dy / rp;
+  turn.lon += lon;
+  turn.lat = Math.max(-MOST_LAT, Math.min(MOST_LAT, turn.lat + lat));
+  return { lon, lat };
+}
 
 export class PlanetChart {
   readonly #layer: ChartLayer;
@@ -143,12 +151,17 @@ export class PlanetChart {
     gc.restore();
   }
 
-  /** The planet's radius on the screen, pixels: how far a finger moves it a radian. */
+  /** How many pixels at the middle of the window carry the ground under it a radian, from `alt` metres over the sea
+   *  (the camera looks straight down, so the ground under it scales as the height does). */
+  pxPerRadian(alt: number): number {
+    const focal = this.#layer.layout.h / 2 / Math.tan((this.#h.orbit().fov * Math.PI) / 360);
+    return (focal * R) / Math.max(1, alt);
+  }
+
+  /** The same from where the camera is this frame. */
   #radiusPx(): number {
     const cam = this.#h.camera();
-    if (!cam) return 300;
-    const d = cam.position.length(), focal = this.#layer.layout.h / 2 / Math.tan((cam.fov * Math.PI) / 360);
-    return (focal * R) / Math.sqrt(Math.max(1, d * d - R * R));
+    return cam ? this.pxPerRadian(cam.position.length() - R) : 300;
   }
 
   /**
@@ -167,9 +180,7 @@ export class PlanetChart {
         const f = finger;
         if (!f || f.id !== id) return;
         const rp = this.#radiusPx(), now = performance.now(), dt = Math.max(1, now - f.at) / 1000;
-        const dLon = -(x - f.x) / rp, dLat = (y - f.y) / rp;
-        turn.lon += dLon;
-        turn.lat = Math.max(-MOST_LAT, Math.min(MOST_LAT, turn.lat + dLat));
+        const { lon: dLon, lat: dLat } = carry(turn, x - f.x, y - f.y, rp);
         const k = Math.min(1, dt * 12);
         f.vLon += (dLon / dt - f.vLon) * k;
         f.vLat += (dLat / dt - f.vLat) * k;

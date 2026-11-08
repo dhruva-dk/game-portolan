@@ -1,7 +1,8 @@
 // The full map, opened from the minimap's disc over the drop or the match, which go on under it. A round window on the
 // live planet in a sheet of paper, north up: the coasts inked over it, the Storm's edge and its next circle, every ship
 // in range by her emblem, hers gilt, and her marker a pennant where she has set it. One finger spins the planet and it
-// runs on when let go; a tap in the window sets or moves the marker; a tap outside the sheet, or on the disc, shuts it.
+// runs on when let go; two pinch it from the whole planet down to a coast's bays and points, and carry it as they go; a
+// tap in the window sets or moves the marker; a tap outside the sheet, or on the disc, shuts it.
 // The camera is the stage's own orbit view, held on the point the finger has turned to the middle of the window.
 import {
   drawEmblem, drawGalleon, galleonSprite, pennant, staff, WASH, type ChartLayer, type Coasts, type Colours, type DragSurface, type Globe, type Pen,
@@ -9,7 +10,7 @@ import {
 import type { PerspectiveCamera } from 'three';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
-import { PlanetChart, facing, unproject, type Turn } from './planet.ts';
+import { PlanetChart, carry, facing, unproject, type Turn } from './planet.ts';
 
 /** A ship on the planet, from the app's model. */
 export interface MapShip {
@@ -47,8 +48,15 @@ const DISTANCE = 3.6;
 const LAY = 0.16;
 /** A finger that travels less than this before it lifts is a tap, CSS pixels. */
 const TAP = 10;
+/** How low a pinch can bring the eye, metres over the sea: close enough to read a coast's bays and points. */
+const NEAREST = 150;
+/** How high it can take it, metres over the sea: the whole planet in the window. */
+const FARTHEST = (DISTANCE - 1) * R;
+/** How fast the eye goes to the height asked of it, per second. */
+const FLY = 14;
 const TAU = Math.PI * 2;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
+const within = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 
 export class FullMap {
   readonly #host: HTMLElement;
@@ -61,6 +69,12 @@ export class FullMap {
   #drag: (DragSurface & { turned(now: number): V3 }) | null = null;
   readonly #turn: Turn = { lat: 0, lon: 0, vLat: 0, vLon: 0 };
   #tap: { id: number; x: number; y: number; far: boolean } | null = null;
+  /** The fingers on the map, two at most: one spins it, two pinch it. */
+  readonly #fingers = new Map<number, { x: number; y: number }>();
+  /** How high the fingers have asked for the eye, and how high it is, metres over the sea. */
+  #want = FARTHEST;
+  #alt = FARTHEST;
+  #flew = -1;
   /** The point under the camera: what the app turns its orbit to. */
   centre: V3 = { x: 0, y: 0, z: 1 };
   /** The orbit's distance, in radii: a pinch can drive it; the window follows it (see `refit`). */
@@ -86,25 +100,7 @@ export class FullMap {
     this.#chart = new PlanetChart(layer, { camera: () => this.#h.camera(), orbit: () => ({ distance: this.distance, fov: this.#h.fov }), coasts: () => this.#h.coasts() });
     this.#wasDrag = layer.drag;
     this.#drag = this.#chart.drag(this.#turn);
-    layer.drag = {
-      down: (id, x, y) => {
-        if (!this.#tap) this.#tap = { id, x, y, far: false };
-        this.#drag!.down(id, x, y);
-      },
-      move: (id, x, y) => {
-        const t = this.#tap;
-        if (t && t.id === id && Math.hypot(x - t.x, y - t.y) > TAP) t.far = true;
-        this.#drag!.move(id, x, y);
-      },
-      up: (id, x, y) => {
-        this.#drag!.up(id, x, y);
-        const t = this.#tap;
-        if (t && t.id === id) {
-          this.#tap = null;
-          if (!t.far) this.tap(x, y);
-        }
-      },
-    };
+    layer.drag = { down: (id, x, y) => this.#down(id, x, y), move: (id, x, y) => this.#move(id, x, y), up: (id, x, y) => this.#up(id, x, y) };
     this.#lay();
     this.#off = layer.addLive((g, t) => this.#frame(g, t));
   }
@@ -145,6 +141,73 @@ export class FullMap {
     if (this.#layer && this.#drag) this.#layer.drag = this.#wasDrag;
   }
 
+  // ── the fingers ──
+
+  /** A finger landed. The first may be a tap or a spin; a second makes it a pinch, never a tap and no spin. */
+  #down(id: number, x: number, y: number): void {
+    const n = this.#fingers.size;
+    if (n >= 2) return;
+    this.#fingers.set(id, { x, y });
+    if (n === 0) {
+      this.#tap = { id, x, y, far: false };
+      this.#drag!.down(id, x, y);
+      return;
+    }
+    this.#tap = null;
+    for (const [k, q] of this.#fingers) if (k !== id) this.#drag!.up(k, q.x, q.y);
+    this.#turn.vLat = this.#turn.vLon = 0;
+  }
+
+  #move(id: number, x: number, y: number): void {
+    const f = this.#fingers.get(id);
+    if (!f) return;
+    if (this.#fingers.size === 1) {
+      const t = this.#tap;
+      if (t && t.id === id && Math.hypot(x - t.x, y - t.y) > TAP) t.far = true;
+      this.#drag!.move(id, x, y);
+    } else {
+      this.#pinch(id, f, x, y);
+    }
+    f.x = x;
+    f.y = y;
+  }
+
+  #up(id: number, x: number, y: number): void {
+    if (!this.#fingers.delete(id)) return;
+    if (this.#fingers.size === 1) {
+      // the pinch is over: the finger still down goes on as a spin, from where it is
+      for (const [k, q] of this.#fingers) this.#drag!.down(k, q.x, q.y);
+      return;
+    }
+    this.#drag!.up(id, x, y);
+    const t = this.#tap;
+    this.#tap = null;
+    if (t && t.id === id && !t.far) this.tap(x, y);
+  }
+
+  /** Finger `id` of two moved from `f` to (x, y): their span takes the eye up or down, about their middle, and the
+   *  middle's own move carries the planet. */
+  #pinch(id: number, f: { x: number; y: number }, x: number, y: number): void {
+    let o = f;
+    for (const [k, q] of this.#fingers) if (k !== id) o = q;
+    const d0 = Math.hypot(f.x - o.x, f.y - o.y), d1 = Math.hypot(x - o.x, y - o.y);
+    if (d0 <= 8 || d1 <= 8) return;
+    const chart = this.#chart!, w = chart.win, a0 = this.#want, a1 = within((a0 * d0) / d1, NEAREST, FARTHEST);
+    const rp0 = chart.pxPerRadian(a0), rp1 = chart.pxPerRadian(a1), k = 1 - rp0 / rp1;
+    // the ground under the middle of the fingers stays there as the planet grows or shrinks about it
+    carry(this.#turn, ((f.x + o.x) / 2 - w.x) * -k, ((f.y + o.y) / 2 - w.y) * -k, rp0);
+    carry(this.#turn, (x - f.x) / 2, (y - f.y) / 2, rp1);
+    this.#want = a1;
+  }
+
+  /** The eye toward the height asked of it. */
+  #fly(now: number): void {
+    const dt = this.#flew < 0 ? 0 : Math.min(0.1, Math.max(0, (now - this.#flew) / 1000));
+    this.#flew = now;
+    this.#alt += (this.#want - this.#alt) * (1 - Math.exp(-FLY * dt));
+    this.distance = 1 + this.#alt / R;
+  }
+
   #lay(): void {
     const chart = this.#chart!;
     chart.resize();
@@ -155,6 +218,7 @@ export class FullMap {
   #frame(g: CanvasRenderingContext2D, now: number): void {
     const layer = this.#layer!, pen = layer.pen, chart = this.#chart!;
     this.centre = this.#drag!.turned(now);
+    this.#fly(now);
     if (now - this.#modelAt > 80) {
       this.#modelAt = now;
       this.#model = this.#h.model();
