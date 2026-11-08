@@ -1,10 +1,10 @@
 // HUD glyphs (read at a glance in a fight), menu glyphs, and the gull's delivery tiers.
 import {
-  all, arcArrow, chest, circle, cut, cutLine, fill, flame, gear, gull, line, poly, rect, shield, ship, sparkle, wave,
+  all, arcArrow, chest, circle, cut, cutLine, fill, flame, gear, gull, line, path, poly, px, py, rect, shield, ship, sparkle, wave,
   type Prim,
 } from '../draw.ts';
 
-export type HudId = 'gust' | 'storm' | 'shipsLeft' | 'kills' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'lantern' | 'gull';
+export type HudId = 'gust' | 'storm' | 'spiral' | 'shipsLeft' | 'kills' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'sail' | 'lantern' | 'gull';
 export type MenuId = 'play' | 'back' | 'settings' | 'locker' | 'abilities' | 'rivals' | 'chart' | 'rank' | 'close' | 'lock' | 'check';
 export type GullTierId = 'supplies' | 'armament' | 'treasure';
 
@@ -13,6 +13,16 @@ export const HULL = 'M1.6 7.6L22.4 6.2C21.6 9.6 20.4 13.4 18 16.4C16.9 17.8 15.4
 
 /** The storm's swirl: an eye with two hooked arms. */
 const stormArm = 'M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z';
+
+/** A spiral winding in from radius r0 to r1 over `turns`, as a polyline. */
+const spiral = (cx: number, cy: number, r0: number, r1: number, turns: number, a0 = -90): string => {
+  const p: number[] = [], n = Math.ceil(turns * 24);
+  for (let i = 0; i <= n; i++) {
+    const u = i / n, r = r0 + (r1 - r0) * u, a = a0 + u * turns * 360;
+    p.push(px(cx, r, a), py(cy, r, a));
+  }
+  return path(...p);
+};
 
 export const HUD_ICONS: Record<HudId, Prim[]> = {
   gust: [
@@ -26,6 +36,11 @@ export const HUD_ICONS: Record<HudId, Prim[]> = {
     fill(stormArm, { tint: true, tr: 'rotate(180 12 12)' }),
     fill(stormArm, { tint: true, tr: 'rotate(90 12 12)', fine: true, op: 0.45 }),
     fill(stormArm, { tint: true, tr: 'rotate(270 12 12)', fine: true, op: 0.45 }),
+  ],
+  /** The Storm closing: a line winding in to the eye, for the clock. */
+  spiral: [
+    line(spiral(12, 12, 10.6, 1.6, 2.5), 2),
+    fill(circle(12, 12, 1.3)),
   ],
   shipsLeft: ship(12, 21.6),
   kills: [
@@ -65,6 +80,14 @@ export const HUD_ICONS: Record<HudId, Prim[]> = {
     line('M5 4.4V7M10 4.1V6.7M15 3.7V6.3M20 3.4V6', 1.3, { fine: true }),
   ],
   reload: arcArrow(12, 12, 8, 20, 300, 2.8),
+  /** A square sail bellied on its yard, for the sails' instrument. */
+  sail: [
+    line('M2.6 4.6H21.4', 2),
+    line('M12 1.2V4.6M12 19V22.8', 1.8),
+    fill('M4.4 5.8H19.6C21.2 10 21.2 14.6 19.6 18.8H4.4C2.8 14.6 2.8 10 4.4 5.8Z'),
+    cutLine('M3.8 10Q12 11.8 20.2 10', 1.1),
+    cutLine('M3.8 14.4Q12 16.2 20.2 14.4', 1.1, { fine: true }),
+  ],
   lantern: [
     line(circle(12, 3.2, 1.8), 1.4),
     fill('M7 7.8L8.8 5.2H15.2L17 7.8Z'),

@@ -2,18 +2,21 @@
 //
 //   dev/kit.html?plate=paper   one plate: paper, ink, objects, seals, galleons, marks, motion, press, hud
 //
-// The hud plate is the live layer itself (a ChartLayer over a stand-in for the world) at a representative frame of a
-// match: the disc, the fleet, the Storm, the pennants, the hit-marks and every control, with the thumbs' homes and the
-// touch targets drawn over it. window.__kit drives it for the capture tool: ready, plates, plate(name),
-// measure(frames) (the live layer's CPU time per frame), problems() (the layout's).
+// The hud plate is the live layer itself (a ChartLayer over a stand-in for the world) showing the match HUD's
+// instrument family at rest (issue #54): the vitals' bars, the Storm's clock and the ships afloat, the minimap disc,
+// the stick, the sails, the hotbar, the round buttons and the reticle, each where src/chart/layout.ts puts it on this
+// device; ?rules draws the thumbs' homes, the touch targets and the safe area over it. window.__kit drives it for the
+// capture tool: ready, plates, plate(name), measure(frames) (the live layer's CPU time per frame), problems() (the
+// layout's).
 import { CAPTAINS } from '../src/career/captains.ts';
 import { Parchment } from '../src/render/paper/parchment.ts';
 import {
   ChartLayer, ILLUMINATIONS, Paper, Pen, Press, WASH, arcPts, arrow, bakeDisc, bakeSeal, bakeSheet, burst, cartouche, chartLayout, cross,
   cubic, dottedRing, drawBaked, drawGalleon, drawSeal, drawSprite, dryAlpha, figure, flight, galleon, galleonSprite, hand, layoutProblems,
   moon, needle, part, pennant, pressLook, prims, quadrant, rhumbWeb, ring, rings, rose, sandglass, shape, stagger, stamp, staff, star,
-  stick, stormRing, sun, tally, unroll, wake, woodcut, word, type ChartLayout, type Rect, type Seal,
+  stick, stormRing, sun, tally, unroll, wake, woodcut, word, type ChartLayout, type Rect, type Seal, type Sprite,
 } from '../src/chart/index.ts';
+import { badge, bar, paper as laid, reticle, roundButton, sailsArc, slipPath, slot, stickRing, type SlotOptions } from '../src/screens/instruments.ts';
 
 const dpr = window.devicePixelRatio || 1;
 const W = window.innerWidth, H = window.innerHeight;
@@ -311,7 +314,7 @@ PLATES.press = () => {
   }, ms);
 };
 
-// ---------------------------------------------------------------- the HUD: the live layer at a representative frame
+// ---------------------------------------------------------------- the HUD: the instrument family at rest
 
 const host = document.createElement('div');
 host.style.cssText = `position:fixed;left:0;top:0;width:${W}px;height:${H}px;display:none`;
@@ -320,107 +323,80 @@ const layer = new ChartLayer(paper, host);
 layer.resize(W, H, dpr, SAFE);
 let hudReady = false;
 
+/**
+ * Every element of the match HUD (issue #54's table) at rest, drawn with src/screens/instruments.ts and laid out by
+ * src/chart/layout.ts. What holds still is baked once to a sprite, as the live HUD will bake it; each frame draws the
+ * sprites, the controls with their press look, the stick and the reticle. The thumbs' homes, the targets and the safe
+ * area are drawn over it with ?rules.
+ */
 function hud(): void {
   if (hudReady) return;
   hudReady = true;
-  const l = layer.layout, D = l.hud, R = D.r;
-  const ringS = layer.sprite('hud-ring', R * 2, R * 2, R, R, (p) => {
-    ring(p, R, R, R * 0.8, R * 0.92, { ticks: 128 }, 1);
-    star(p, R, R - R * 0.86, R * 0.05);
+  const l = layer.layout, D = l.hud, R = D.r, c = l.controls, me = CAPS[3];
+  const PAD = 16;
+  /** A drawing baked once, w × h plus a margin for its shadow, anchored at its centre. */
+  const bake = (key: string, w: number, h: number, draw: (p: Pen, cx: number, cy: number) => void) =>
+    layer.sprite(key, w + PAD * 2, h + PAD * 2, w / 2 + PAD, h / 2 + PAD, (p) => draw(p, w / 2 + PAD, h / 2 + PAD));
+  // top left: the shield's bar over the hull's, on one slip
+  const sb = l.bars.shield, hb = l.bars.hull, vw = sb.w + 20, vh = hb.y + hb.h / 2 - (sb.y - sb.h / 2) + 20, vy = (sb.y + hb.y) / 2;
+  const vitals = bake('hud-vitals', vw, vh, (p, cx, cy) => {
+    laid(p, slipPath(cx, cy, vw, vh, 3), { burn: 4 });
+    bar(p, { ...sb, x: cx, y: cy - (vy - sb.y) }, 0.62, { colour: WASH.azure, figure: '62', seed: 5 });
+    bar(p, { ...hb, x: cx, y: cy + (hb.y - vy) }, 0.84, { colour: me.colour, figure: '84', seed: 6 });
   });
-  const sign = Math.round(R * 0.2);
-  const region = layer.sprite('hud-region', sign * 2, sign * 2, sign, sign, (p) => woodcut(p, prims('region.fjords'), sign, sign, sign * 1.5));
-  const abilityS = layer.sprite('hud-ability', l.controls.ability.w + 40, l.controls.ability.h + 40, (l.controls.ability.w + 40) / 2, (l.controls.ability.h + 40) / 2, (p) => {
-    const f = cartouche(p, (l.controls.ability.w + 40) / 2, (l.controls.ability.h + 40) / 2, l.controls.ability.w, l.controls.ability.h, { field: '#d8c39a' });
-    woodcut(p, prims('ability.smokeScreen'), f.cx, f.cy, f.ry * 1.5);
-  });
-  const quadS = layer.sprite('hud-sails', l.controls.sails.r * 3, l.controls.sails.r * 3, l.controls.sails.r * 1.5, l.controls.sails.r * 2, (p) => quadrant(p, l.controls.sails.r * 1.5, l.controls.sails.r * 2, l.controls.sails.r * 1.2, 2, 1));
-  const fireSeal = bakeSeal(paper, l.widths, 'rubric', { size: l.controls.fire.r * 2, dpr, device: { emblem: 'goshawk' }, seed: 5 });
+  // top centre: the Storm's clock and the ships afloat
+  const clock = bake('hud-clock', l.clock.w, l.clock.h, (p, cx, cy) => badge(p, { ...l.clock, x: cx, y: cy }, prims('hud.spiral'), '1:30', { seed: 9 }));
+  const afloat = bake('hud-afloat', l.afloat.w, l.afloat.h, (p, cx, cy) => badge(p, { ...l.afloat, x: cx, y: cy }, prims('hud.shipsLeft'), '23', { seed: 10 }));
+  // top right: the minimap disc with its compass rim, north up, a star at north
   const disc = layer.disc();
-  const fleet = CAPTAINS.slice(1).map((c, i) => ({ c, a: i * 2.39, d: 0.18 + ((i * 37) % 19) / 19 * 0.62, h: i * 1.7 }));
-  const marks = fleet.map((s, i) => [galleonSprite(layer.pen, s.c, { size: l.mark.hud, facing: 1, seed: i }), galleonSprite(layer.pen, s.c, { size: l.mark.hud, facing: -1, seed: i })]);
-  const me = galleonSprite(layer.pen, CAPS[0], { size: l.mark.hud * 1.15, gilt: true });
+  const rimS = layer.sprite('hud-rim', R * 2, R * 2, R, R, (p) => {
+    ring(p, R, R, R * 0.84, R * 0.96, { ticks: 128 }, 1);
+    star(p, R, R - R * 0.9, R * 0.05);
+  });
+  // the controls, each at rest
+  const sailsS = bake('hud-sails', c.sails.r * 2, c.sails.r * 2, (p, cx, cy) => sailsArc(p, cx, cy, c.sails.r, 2, { seed: 17 }));
+  const fireS = bake('hud-fire', c.fire.r * 2, c.fire.r * 2, (p, cx, cy) => roundButton(p, cx, cy, c.fire.r, prims('weapon.cannon'), { seed: 21, icon: 1.2 }));
+  const reloadS = bake('hud-reload', c.reload.r * 2, c.reload.r * 2, (p, cx, cy) => roundButton(p, cx, cy, c.reload.r, prims('hud.reload'), { seed: 22 }));
+  const abilityS = bake('hud-ability', c.ability.r * 2, c.ability.r * 2, (p, cx, cy) => roundButton(p, cx, cy, c.ability.r, prims('ability.smokeScreen'), { seed: 23 }));
+  const gustS = bake('hud-gust', c.gust.r * 2, c.gust.r * 2, (p, cx, cy) => roundButton(p, cx, cy, c.gust.r, prims('hud.gust'), { seed: 24, pips: { n: 2, full: 2 } }));
+  // the hotbar: a cannon chosen with its shot, a harpoon with its lines, three empty slots
+  const holds: SlotOptions[] = [{ drawing: prims('weapon.cannon'), count: '24', chosen: true }, { drawing: prims('weapon.harpoon'), count: '6' }, {}, {}, {}];
+  const slotS = l.slots.map((b, i) => bake(`hud-slot-${i}`, b.w, b.h, (p, cx, cy) => slot(p, { ...b, x: cx, y: cy }, { ...holds[i], seed: 31 + i })));
   const presses = {
-    fire: layer.presses.add({ id: 'fire', hit: l.controls.fire, press: new Press(), sound: 'fire', haptic: 'medium', on: 'down' }),
-    gust: layer.presses.add({ id: 'gust', hit: l.controls.gust, press: new Press(), sound: 'gust', haptic: 'light', on: 'down' }),
-    ability: layer.presses.add({ id: 'ability', hit: l.controls.ability, press: new Press(), sound: 'ability', haptic: 'medium', on: 'down' }),
-    reload: layer.presses.add({ id: 'reload', hit: l.controls.reload, press: new Press(), on: 'down' }),
-    sails: layer.presses.add({ id: 'sails', hit: l.controls.sails, press: new Press(), on: 'down' }),
+    fire: layer.presses.add({ id: 'fire', hit: c.fire, press: new Press(), sound: 'fire', haptic: 'medium', on: 'down' }),
+    gust: layer.presses.add({ id: 'gust', hit: c.gust, press: new Press(), sound: 'gust', haptic: 'light', on: 'down' }),
+    ability: layer.presses.add({ id: 'ability', hit: c.ability, press: new Press(), sound: 'ability', haptic: 'medium', on: 'down' }),
+    reload: layer.presses.add({ id: 'reload', hit: c.reload, press: new Press(), on: 'down' }),
+    sails: layer.presses.add({ id: 'sails', hit: c.sails, press: new Press(), on: 'down' }),
+    slots: l.slots.map((b, i) => layer.presses.add({ id: `slot-${i + 1}`, hit: b, press: new Press() })),
   };
-  const hitMarks = [{ x: -0.3, y: -0.2, v: '42', born: 0 }, { x: 0.25, y: 0.1, v: '118', born: 300 }, { x: 0.1, y: -0.45, v: '7', born: 700 }];
+  const pressed = (gg: CanvasRenderingContext2D, s: Sprite, x: number, y: number, sink: number) => {
+    const look = pressLook(sink);
+    drawSprite(gg, s, x, y + look.dy, { scale: look.scale, dark: look.dark });
+  };
 
-  layer.addLive((gg, now) => {
-    const t = now / 1000, P = layer.pen;
-    const north = 0.4 + t * 0.05;
-    // the disc and its compass ring, turning with north
+  layer.addLive((gg) => {
+    const P = layer.pen;
+    drawSprite(gg, vitals, sb.x, vy);
+    drawSprite(gg, clock, l.clock.x, l.clock.y);
+    drawSprite(gg, afloat, l.afloat.x, l.afloat.y);
     drawBaked(gg, disc, D.x - R, D.y - R);
-    gg.save();
-    gg.beginPath();
-    gg.arc(D.x, D.y, R * 0.8, 0, Math.PI * 2);
-    gg.clip();
-    // the rhumbs from my mark, in three tones by point of sail
-    const tones: number[][][] = [[], [], []];
-    for (let k = 0; k < 32; k++) {
-      const a = (k / 32) * Math.PI * 2 + north, rel = Math.abs(Math.atan2(Math.sin(a - 0.6), Math.cos(a - 0.6)));
-      tones[rel < 0.7 ? 2 : rel < 1.4 ? 1 : 0].push([D.x, D.y, D.x + Math.sin(a) * R * 0.8, D.y - Math.cos(a) * R * 0.8]);
-    }
-    P.rule(tones[0], { w: 'hair', ink: 'iron', alpha: 0.5, seed: 1 });
-    P.rule(tones[1], { w: 'hair', ink: 'green', alpha: 0.6, seed: 2 });
-    P.rule(tones[2], { w: 'hair', ink: 'rubric', alpha: 0.6, seed: 3 });
-    // the Storm: its edge and its next circle
-    stormRing(P, D.x + R * 0.25, D.y + R * 0.2, R * 0.66, 1, 0.7);
-    dottedRing(P, D.x + R * 0.18, D.y + R * 0.14, R * 0.4);
-    // wakes and the fleet
-    fleet.forEach((s, i) => {
-      const x = D.x + Math.cos(s.a + t * 0.02) * s.d * R * 0.78, y = D.y + Math.sin(s.a + t * 0.02) * s.d * R * 0.78;
-      const hx = Math.cos(s.h + t * 0.1), hy = Math.sin(s.h + t * 0.1);
-      const trail: number[] = [];
-      for (let k = 0; k < 8; k++) trail.push(x - hx * k * 4 + Math.sin(k * 0.6 + i) * 1.5, y - hy * k * 4 + Math.cos(k * 0.5) * 1.5);
-      wake(P, trail, s.c.colour, 0.6);
-      drawGalleon(gg, marks[i][hx >= 0 ? 0 : 1], x, y);
-    });
-    drawGalleon(gg, me, D.x, D.y + l.mark.hud * 0.15);
-    // hit-marks: rubric figures floating up and drying out
-    for (const m of hitMarks) {
-      const age = ((now - m.born) % 1600) / 1600;
-      P.mood({ dry: Math.max(0, age * 1.4 - 0.4) }, () => figure(P, m.v, D.x + m.x * R, D.y + m.y * R - age * 18, l.figure.hit * (m.v.length > 2 ? 1.15 : 0.9), { ink: 'rubric', align: 'center', seed: m.born }, Math.min(1, age * 6)));
-    }
-    gg.restore();
-    drawSprite(gg, ringS, D.x, D.y, { rot: north });
-    // the lubber mark, the region's sign and the hour's sun at the top
-    drawSprite(gg, region, D.x - R * 0.16, D.y - R * 0.62);
-    sun(P, D.x + R * 0.16, D.y - R * 0.62, R * 0.07, 1);
-    // the wind on the rim, a feathered arrow its strength long
-    const wa = 2.2 + Math.sin(t * 0.3) * 0.1;
-    arrow(P, D.x + Math.cos(wa) * R * 1.02, D.y + Math.sin(wa) * R * 1.02, D.x + Math.cos(wa + 0.35) * R * 1.02, D.y + Math.sin(wa + 0.35) * R * 1.02);
-    // hull and shield: two pennants on a staff at the rim
-    const sx = D.x - R * 1.06, sy = D.y - R * 0.55;
-    staff(P, sx, sy, sy + R * 0.95, 1, 3.5);
-    pennant(P, { x: sx, y: sy + 4, length: R * 0.75, height: 13, colour: CAPS[0].colour, dir: -1, phase: t * 4 });
-    pennant(P, { x: sx, y: sy + 24, length: R * 0.42, height: 13, colour: '#2f62b0', dir: -1, phase: t * 4 + 1.3 });
-    // the Storm's clock: a figure beside a small sand-glass; shot in hand as tallies
-    sandglass(P, D.x - R * 0.74, D.y + R + l.figure.clock * 0.55, l.figure.clock * 1.5, { sand: 0.6 - (t % 30) / 75, running: true, time: t });
-    figure(P, '1:30', D.x - R * 0.58, D.y + R + l.figure.clock, l.figure.clock);
-    tally(P, 4, D.x + R * 0.3, D.y + R + l.figure.clock, l.figure.clock * 0.9);
-    // the controls
-    const c = l.controls;
-    stick(P, c.stick.x, c.stick.y, c.stick.r, c.stick.x + Math.cos(t) * c.stick.r * 0.3, c.stick.y + Math.sin(t) * c.stick.r * 0.3);
-    const f = pressLook(presses.fire.press.sink);
-    drawSeal(gg, fireSeal, c.fire.x, c.fire.y, { press: f.dark, scale: f.scale / (1 - 0.045 * f.dark), phase: 0.5 + 0.5 * Math.sin(t * 0.8) });
-    const gl = pressLook(presses.gust.press.sink);
-    staff(P, c.gust.x - c.gust.r * 0.6, c.gust.y - c.gust.r * 0.8 + gl.dy, c.gust.y + c.gust.r * 0.8 + gl.dy, 1, 3);
-    P.mood({ dark: gl.dark }, () => pennant(P, { x: c.gust.x - c.gust.r * 0.6, y: c.gust.y - c.gust.r * 0.75 + gl.dy, length: c.gust.r * 1.5, height: c.gust.r * 0.55, colour: '#e8dcc0', phase: t * 5, gilt: true }));
-    const al = pressLook(presses.ability.press.sink);
-    drawSprite(gg, abilityS, c.ability.x, c.ability.y + al.dy, { scale: al.scale, dark: al.dark });
-    const rl = pressLook(presses.reload.press.sink);
-    P.mood({ dark: rl.dark }, () => sandglass(P, c.reload.x, c.reload.y + rl.dy, c.reload.r * 1.7 * rl.scale, { sand: (t * 0.2) % 1, running: true, time: t }));
-    const ql = pressLook(presses.sails.press.sink);
-    drawSprite(gg, quadS, c.sails.x, c.sails.y + ql.dy, { scale: ql.scale, dark: ql.dark });
+    drawSprite(gg, rimS, D.x, D.y);
+    arrow(P, D.x, D.y + R * 0.16, D.x, D.y - R * 0.16);
+    stickRing(P, c.stick.x, c.stick.y, c.stick.r, 0, 0);
+    pressed(gg, sailsS, c.sails.x, c.sails.y, presses.sails.press.sink);
+    l.slots.forEach((b, i) => pressed(gg, slotS[i], b.x, b.y, presses.slots[i].press.sink));
+    pressed(gg, fireS, c.fire.x, c.fire.y, presses.fire.press.sink);
+    pressed(gg, reloadS, c.reload.x, c.reload.y, presses.reload.press.sink);
+    pressed(gg, abilityS, c.ability.x, c.ability.y, presses.ability.press.sink);
+    pressed(gg, gustS, c.gust.x, c.gust.y, presses.gust.press.sink);
+    reticle(P, l.reticle.x, l.reticle.y, l.reticle.r);
     const pad = 30;
     const box = (x: number, y: number, r: number): Rect => ({ x: x - r - pad, y: y - r - pad, w: (r + pad) * 2, h: (r + pad) * 2 });
-    return [box(D.x, D.y, R * 1.25), { x: sx - R * 0.85, y: sy - 20, w: R * 0.9, h: R * 1.1 }, box(c.stick.x, c.stick.y, c.stick.r), box(c.fire.x, c.fire.y, c.fire.r * 1.2),
-      box(c.gust.x, c.gust.y, c.gust.r * 1.6), box(c.ability.x, c.ability.y, Math.max(c.ability.w, c.ability.h) * 0.75),
-      box(c.reload.x, c.reload.y, c.reload.r * 1.2), box(c.sails.x, c.sails.y, c.sails.r * 1.6)];
+    return [box(D.x, D.y, R * 1.2), box(sb.x, vy, Math.max(vw, vh) * 0.6), box(l.clock.x, l.clock.y, l.clock.w * 0.6), box(l.afloat.x, l.afloat.y, l.afloat.w * 0.6),
+      box(c.stick.x, c.stick.y, c.stick.r), box(c.sails.x, c.sails.y, c.sails.r), ...l.slots.map((b) => box(b.x, b.y, b.w * 0.6)),
+      box(c.fire.x, c.fire.y, c.fire.r), box(c.reload.x, c.reload.y, c.reload.r), box(c.ability.x, c.ability.y, c.ability.r), box(c.gust.x, c.gust.y, c.gust.r),
+      box(l.reticle.x, l.reticle.y, l.reticle.r)];
   });
 }
 
@@ -428,9 +404,9 @@ PLATES.hud = () => {
   world();
   hud();
   host.style.display = 'block';
-  layer.presses.list.find((p) => p.id === 'fire')?.press.down();
   for (let i = 0; i < 12; i++) layer.frame(1000 + i * 33);
-  // the layout's rules drawn over it: the thumbs' homes (dashed), every target's reach (dotted)
+  if (!new URLSearchParams(location.search).has('rules')) return;
+  // the layout's rules drawn over it: the thumbs' homes (dashed), every target's reach (dotted), the safe area
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const over = document.createElement('canvas');
   over.width = cv.width;

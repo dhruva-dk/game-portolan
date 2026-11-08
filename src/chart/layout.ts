@@ -1,8 +1,10 @@
 // Where things go on the two devices, designed for each and not scaled from one to the other. An iPad is held by its
 // sides with the thumbs resting a hand's width in from its lower corners; a phone is held by its ends with the thumbs
-// low on either side, a finger's breadth from its rounded corners and clear of the camera's notch. The HUD's disc sits
-// top right, out from under both thumbs; the controls sit under the thumbs, every one at least the touch target; the
-// right thumb's cluster is laid round it in an arc it can sweep without moving the hand.
+// low on either side, a finger's breadth from its rounded corners and clear of the camera's notch. The match HUD is laid
+// out as the genre lays it (issue #54): the vitals' bars top left, the Storm's clock and the ships afloat top centre,
+// the minimap disc top right, out from under both thumbs; the controls sit under the thumbs, every one at least the
+// touch target, the right thumb's cluster laid round it in an arc it can sweep without moving the hand; the hotbar's
+// five slots run along the bottom between the thumbs, where a thumb moves to them between fights.
 import { TARGET } from './press.ts';
 import type { Widths } from './pen.ts';
 
@@ -39,10 +41,19 @@ export interface ChartLayout {
   target: number;
   /** Where the thumbs rest, and how much of the screen each covers there. */
   thumbs: { left: Circle; right: Circle };
-  /** The HUD's papyrus disc. */
+  /** The minimap disc, top right. */
   hud: Circle;
-  /** The match's controls: the stick under the left thumb, the fire seal under the right, the rest round it. */
-  controls: { stick: Circle; fire: Circle; gust: Circle; ability: Box; reload: Circle; sails: Circle };
+  /** The shield's bar over the hull's, top left: each box is the ruled strip and the numeral at its right end. */
+  bars: { shield: Box; hull: Box };
+  /** The Storm's clock (its spiral and the countdown) and the ships afloat beside it, top centre. */
+  clock: Box;
+  afloat: Box;
+  /** The match's controls: the stick under the left thumb, the fire button under the right, the rest round it. */
+  controls: { stick: Circle; fire: Circle; gust: Circle; ability: Circle; reload: Circle; sails: Circle };
+  /** The hotbar's five slots, left to right along the bottom. */
+  slots: Box[];
+  /** The reticle at the screen's centre; drawn, never pressed. */
+  reticle: Circle;
   /** Body heights of the numeral hand: a hit-mark, the Storm's clock, a result's large figure. */
   figure: { hit: number; clock: number; large: number };
   /** A sheet's margin from the screen's edge. */
@@ -52,6 +63,10 @@ export interface ChartLayout {
   /** The lobby chart's compass rose, in its top left corner: where the title's rose flies to. */
   rose: Circle;
 }
+
+/** n boxes of `size` square in a row centred at (x, y), `gap` apart. */
+const row = (x: number, y: number, size: number, gap: number, n = 5): Box[] =>
+  Array.from({ length: n }, (_, i) => ({ x: x + (i - (n - 1) / 2) * (size + gap), y, w: size, h: size }));
 
 /** The class of a landscape screen of this size: a phone is the one less than 500 points tall. */
 export const deviceClass = (w: number, h: number): DeviceClass => (Math.min(w, h) < 500 ? 'iphone' : 'ipad');
@@ -68,14 +83,22 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
       target: TARGET,
       thumbs: { left: L, right: R },
       hud: { x: w - safe.right - disc - 26, y: safe.top + disc + 26, r: disc },
+      bars: {
+        shield: { x: safe.left + 26 + 150, y: safe.top + 26 + 13, w: 300, h: 26 },
+        hull: { x: safe.left + 26 + 150, y: safe.top + 26 + 13 + 32, w: 300, h: 26 },
+      },
+      clock: { x: w / 2 - 66, y: safe.top + 26 + 22, w: 120, h: 44 },
+      afloat: { x: w / 2 + 66, y: safe.top + 26 + 22, w: 120, h: 44 },
       controls: {
         stick: { x: L.x, y: L.y, r: 72 },
         fire: { x: R.x, y: R.y, r: 54 },
         gust: { x: R.x - 128, y: R.y - 92, r: 34 },
-        ability: { x: R.x - 14, y: R.y - 160, w: 118, h: 84 },
+        ability: { x: R.x - 14, y: R.y - 160, r: 40 },
         reload: { x: R.x - 150, y: R.y + 46, r: 34 },
         sails: { x: L.x + 18, y: L.y - 170, r: 36 },
       },
+      slots: row((L.x + R.x) / 2, h - safe.bottom - 46, 68, 12),
+      reticle: { x: w / 2, y: h / 2, r: 14 },
       figure: { hit: 26, clock: 22, large: 64 },
       margin: 22,
       mark: { hud: 34, chart: 64 },
@@ -91,14 +114,23 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
     target: TARGET,
     thumbs: { left: L, right: R },
     hud: { x: w - safe.right - disc - 10, y: safe.top + disc + 10, r: disc },
+    bars: {
+      shield: { x: safe.left + 12 + 95, y: safe.top + 12 + 10, w: 190, h: 20 },
+      hull: { x: safe.left + 12 + 95, y: safe.top + 12 + 10 + 24, w: 190, h: 20 },
+    },
+    clock: { x: w / 2 - 46, y: safe.top + 12 + 17, w: 84, h: 34 },
+    afloat: { x: w / 2 + 46, y: safe.top + 12 + 17, w: 84, h: 34 },
     controls: {
       stick: { x: L.x, y: L.y, r: 56 },
       fire: { x: R.x, y: R.y, r: 40 },
       gust: { x: R.x + 6, y: R.y - 86, r: 28 },
-      ability: { x: R.x - 100, y: R.y - 58, w: 88, h: 62 },
+      ability: { x: R.x - 100, y: R.y - 58, r: 31 },
       reload: { x: R.x - 112, y: R.y + 30, r: 28 },
       sails: { x: L.x + 6, y: L.y - 110, r: 28 },
     },
+    // between the stick's reach and the reload's, centred on the gap
+    slots: row((L.x + 56 + R.x - 112 - 28) / 2, h - safe.bottom - 31, 50, 6),
+    reticle: { x: w / 2, y: h / 2, r: 10 },
     figure: { hit: 18, clock: 16, large: 44 },
     margin: 12,
     mark: { hud: 26, chart: 48 },
@@ -116,25 +148,34 @@ const overlap = (a: Shape, b: Shape): boolean => {
 };
 
 /**
- * What breaks the layout's rules: a control smaller than the target, two controls' targets overlapping, the disc
- * under a thumb, anything outside the safe area. Empty when the layout holds.
+ * What breaks the layout's rules: a control smaller than the target, two controls' targets overlapping (the hotbar's
+ * slots are controls too), the disc under a thumb or over a control, the readings (bars, clock, ships afloat) under
+ * the disc or a control, anything outside the safe area. Empty when the layout holds.
  */
 export function layoutProblems(l: ChartLayout): string[] {
   const out: string[] = [];
   const t = l.target / 2;
-  const ctl: [string, Shape][] = Object.entries(l.controls).map(([k, v]) => [k, 'r' in v
-    ? { kind: 'circle', c: { ...v, r: Math.max(v.r, t) } }
-    : { kind: 'box', b: { ...v, w: Math.max(v.w, l.target), h: Math.max(v.h, l.target) } }]);
+  const asShape = (v: Circle | Box, grow: boolean): Shape => ('r' in v
+    ? { kind: 'circle', c: { ...v, r: grow ? Math.max(v.r, t) : v.r } }
+    : { kind: 'box', b: { ...v, w: grow ? Math.max(v.w, l.target) : v.w, h: grow ? Math.max(v.h, l.target) : v.h } });
+  const ctl: [string, Shape][] = [...Object.entries(l.controls), ...l.slots.map((b, i) => [`slot ${i + 1}`, b] as const)]
+    .map(([k, v]) => [k, asShape(v, true)]);
   for (let i = 0; i < ctl.length; i++) for (let j = i + 1; j < ctl.length; j++) {
     if (overlap(ctl[i][1], ctl[j][1])) out.push(`${ctl[i][0]} and ${ctl[j][0]} overlap`);
   }
   const disc: Shape = { kind: 'circle', c: l.hud };
   for (const [k, th] of Object.entries(l.thumbs)) if (overlap(disc, { kind: 'circle', c: th })) out.push(`the disc is under the ${k} thumb`);
   for (const [k, s] of ctl) if (overlap(disc, s)) out.push(`the disc covers ${k}`);
+  const readings: [string, Shape][] = [['shield bar', asShape(l.bars.shield, false)], ['hull bar', asShape(l.bars.hull, false)],
+    ['clock', asShape(l.clock, false)], ['ships afloat', asShape(l.afloat, false)]];
+  for (const [k, s] of readings) {
+    if (overlap(disc, s)) out.push(`the disc covers the ${k}`);
+    for (const [c, cs] of ctl) if (overlap(s, cs)) out.push(`the ${k} is under ${c}`);
+  }
   const inside = (s: Shape) => {
     const b = s.kind === 'box' ? s.b : { x: s.c.x, y: s.c.y, w: s.c.r * 2, h: s.c.r * 2 };
     return b.x - b.w / 2 >= l.safe.left && b.x + b.w / 2 <= l.w - l.safe.right && b.y - b.h / 2 >= l.safe.top && b.y + b.h / 2 <= l.h - l.safe.bottom;
   };
-  for (const [k, s] of [...ctl, ['disc', disc] as [string, Shape]]) if (!inside(s)) out.push(`${k} is outside the safe area`);
+  for (const [k, s] of [...ctl, ...readings, ['disc', disc] as [string, Shape]]) if (!inside(s)) out.push(`${k} is outside the safe area`);
   return out;
 }
