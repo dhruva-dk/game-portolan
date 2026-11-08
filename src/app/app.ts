@@ -767,11 +767,6 @@ export class App {
     return this.map?.window ?? null;
   }
 
-  /** A tap on the full map at (x, y), as a finger would give it. */
-  tapMap(x: number, y: number): void {
-    this.map?.tap(x, y);
-  }
-
   /** Shuts the full map. `sailing`: the match goes on, and the controls come back to the player. */
   private closeMap(sailing = true): void {
     const m = this.map;

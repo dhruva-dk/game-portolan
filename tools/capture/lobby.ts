@@ -1,7 +1,7 @@
 // The lobby, frame by frame on each device: the instruments laid and inked in over her ship at anchor, the camera
 // drifting round her over a few seconds, a press on the wheel, the career plate and each tab (and the way back from
-// each), a finger orbiting her and two pinching in and out, the camera easing home, and a press on PLAY: the Gale's
-// chart unrolling over her from the right, the match begun under it and the window opening on the planet, where the
+// each), a finger orbiting her and two pinching in and out, the camera easing home, and a press on PLAY: paper
+// coming down over her, the match begun under it and thinning away on the camera's flight to the Gale, where the
 // Gale inks in. The chart's clock is held and stepped a frame at a time with the world drawn each step, so every run
 // shows the same instants. Fails unless every press reaches its screen and the camera answers the fingers.
 import { log, openApp, Shots, type Rig } from './common.ts';
@@ -132,7 +132,7 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
     }
     const home = await boom();
     if (Math.abs(home.yaw) >= Math.abs(orbit.yaw) * 0.25 || Math.abs(home.zoom - 1) >= 0.25) throw new Error(`lobby ${device}: the camera did not ease home: ${JSON.stringify(home)}`);
-    // PLAY: the Gale's chart unrolls over her, the window opens on the planet and the Gale inks in
+    // PLAY: the paper comes down over her, and thins away on the camera's flight to the Gale, as the drop's chart inks in
     at = await press(game, shots, at, await where(game, 'lobby:play'), 'play');
     const played = at;
     for (const ms of PLAY) {

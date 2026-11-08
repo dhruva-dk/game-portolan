@@ -12,7 +12,7 @@ export interface Transition {
   to: string;
   /** Milliseconds into the transition for each frame, when it runs longer than most. */
   times?: readonly number[];
-  /** The world moves under it (the camera put over the Gale under the lobby's chart): it is drawn a frame at a time as
+  /** The world moves under it (the camera flying to the Gale under the lobby's paper): it is drawn a frame at a time as
    *  the clock is scrubbed. */
   world?: boolean;
 }
@@ -34,7 +34,7 @@ export const TRANSITIONS: readonly Transition[] = [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),
-  // Play stamps, the Gale's chart unrolls over her ship, its window opens on the planet and the Gale inks in; the dive
+  // Play stamps, paper comes down over her ship and thins on the flight to the Gale, and the drop inks in; the dive
   // runs to the landing, where the HUD inks in
   {
     name: 'lobby-gale', from: 'h.go("lobby")', to: 'await h.draw(); h.press("lobby:play")', world: true,
