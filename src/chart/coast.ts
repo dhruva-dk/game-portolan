@@ -6,8 +6,8 @@
 // chains begin at the same points. A rock under three cells is left off, as a chartmaker left off what no ship would
 // strike. Tracing touches no page or canvas, so a worker can do it.
 //
-// Inking projects each chain through the live camera (a Globe), keeps the runs on the near side of the limb and lays
-// them as one ruled path with no tremor: the line is held to the geography, so it never crawls as the planet turns.
+// Inking projects each chain through the live camera (a Globe), keeps the runs on the near side of the limb (or within
+// the view's own reach, closer in) and lays them as one ruled path with no tremor: the line is held to the geography, so it never crawls as the planet turns.
 import { faceDir } from '../sim/sphere.ts';
 import { v3 } from '../sim/math.ts';
 import type { LineStyle, Pen, Pts } from './pen.ts';
@@ -25,6 +25,8 @@ export interface Globe {
   eye: { x: number; y: number; z: number };
   /** The cosine of the angle from `eye` to the limb: a point shows where its dot with `eye` is greater. */
   horizon: number;
+  /** Tighter than the horizon where the view takes in less than the limb: the cosine of the angle it reaches to. */
+  reach?: number;
   /** Projects a point on the unit sphere to the screen, CSS pixels, into `out`; false when it is behind the eye. */
   project(x: number, y: number, z: number, out: { x: number; y: number }): boolean;
 }
@@ -126,7 +128,7 @@ const P = { x: 0, y: 0 };
 
 /** The coasts' runs on the near side of the globe, projected: one list of screen points a run. */
 export function coastRuns(c: Coasts, globe: Globe): Pts[] {
-  const { eye, horizon } = globe, out: Pts[] = [], limb = Math.acos(Math.max(-1, Math.min(1, horizon)));
+  const { eye } = globe, edge = Math.max(globe.horizon, globe.reach ?? globe.horizon), out: Pts[] = [], limb = Math.acos(Math.max(-1, Math.min(1, edge)));
   for (let k = 0; k < c.chains.length; k++) {
     // a chain wholly over the limb is passed by
     const m = k * 4, dc = c.caps[m] * eye.x + c.caps[m + 1] * eye.y + c.caps[m + 2] * eye.z;
@@ -135,7 +137,7 @@ export function coastRuns(c: Coasts, globe: Globe): Pts[] {
     let run: Pts | null = null, lx = 0, ly = 0;
     for (let i = 0; i < ch.length; i += 3) {
       const x = ch[i], y = ch[i + 1], z = ch[i + 2];
-      if (x * eye.x + y * eye.y + z * eye.z <= horizon) {
+      if (x * eye.x + y * eye.y + z * eye.z <= edge) {
         if (run && run.length >= 4) out.push(run);
         run = null;
         continue;

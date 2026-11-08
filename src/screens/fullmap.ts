@@ -3,7 +3,9 @@
 // in range by her emblem, hers gilt, and her marker a pennant where she has set it. One finger spins the planet and it
 // runs on when let go; two pinch it from the whole planet down to a coast's bays and points, and carry it as they go; a
 // tap in the window sets or moves the marker; a tap outside the sheet, or on the disc, shuts it.
-// The camera is the stage's own orbit view, held on the point the finger has turned to the middle of the window.
+// The camera is the stage's own orbit view, held on the point the finger has turned to the middle of the window. The
+// window is cut once for the whole planet and the zoom happens in it; everything inked in it is placed from the live
+// camera, so it stands right at every height, in a size that does not change.
 import {
   drawEmblem, drawGalleon, galleonSprite, pennant, staff, WASH, type ChartLayer, type Coasts, type Colours, type DragSurface, type Globe, type Pen,
 } from '../chart/index.ts';
@@ -44,7 +46,7 @@ export interface FullMapHost {
   close(): void;
 }
 
-/** The distance of the orbit the planet is seen from at first, in radii. */
+/** The distance of the orbit the planet is seen from at first and at its farthest, in radii: the window is cut for it. */
 const DISTANCE = 3.6;
 /** Seconds the sheet comes up over. */
 const LAY = 0.16;
@@ -60,6 +62,8 @@ const CLEAR = 60;
 const AHEAD = 30;
 /** How fast the eye goes to the height asked of it, per second. */
 const FLY = 14;
+/** The colour of the dark round the sheet when the planet outgrows the paper. */
+const VEIL = '#100b08';
 const TAU = Math.PI * 2;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const within = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
@@ -79,6 +83,9 @@ export class FullMap {
   #layer: ChartLayer | null = null;
   #chart: PlanetChart | null = null;
   #sheet: HTMLCanvasElement | null = null;
+  /** The dark round the sheet: under it, over the planet once the planet has grown past the paper. */
+  #veil: HTMLDivElement | null = null;
+  #veiled = -1;
   #off: (() => void) | null = null;
   #wasDrag: DragSurface | null = null;
   #drag: (DragSurface & { turned(now: number): V3 }) | null = null;
@@ -94,7 +101,7 @@ export class FullMap {
   #floor = 0;
   /** The point under the camera: what the app turns its orbit to. */
   centre: V3 = { x: 0, y: 0, z: 1 };
-  /** The orbit's distance, in radii: a pinch can drive it; the window follows it (see `refit`). */
+  /** The orbit's distance, in radii: where the fingers and the ground have the eye. */
   distance = DISTANCE;
   #born = -1;
   #model: PlanetMapModel | null = null;
@@ -114,7 +121,7 @@ export class FullMap {
     this.#turn.lat = Math.asin(Math.max(-1, Math.min(1, m.y)));
     this.#turn.lon = Math.atan2(-m.z, m.x);
     this.centre = { ...m };
-    this.#chart = new PlanetChart(layer, { camera: () => this.#h.camera(), orbit: () => ({ distance: this.distance, fov: this.#h.fov }), coasts: () => this.#h.coasts() });
+    this.#chart = new PlanetChart(layer, { camera: () => this.#h.camera(), orbit: () => ({ distance: DISTANCE, fov: this.#h.fov }), coasts: () => this.#h.coasts() });
     this.#wasDrag = layer.drag;
     this.#drag = this.#chart.drag(this.#turn);
     layer.drag = { down: (id, x, y) => this.#down(id, x, y), move: (id, x, y) => this.#move(id, x, y), up: (id, x, y) => this.#up(id, x, y) };
@@ -145,16 +152,13 @@ export class FullMap {
     if (this.#layer) this.#lay();
   }
 
-  /** Re-lays the window and its sheet for the current `distance`. */
-  refit(): void {
-    this.#lay();
-  }
-
   dispose(): void {
     this.#off?.();
     this.#off = null;
     this.#sheet?.remove();
     this.#sheet = null;
+    this.#veil?.remove();
+    this.#veil = null;
     if (this.#layer && this.#drag) this.#layer.drag = this.#wasDrag;
   }
 
@@ -247,6 +251,10 @@ export class FullMap {
     chart.resize();
     this.#sheet?.remove();
     this.#sheet = chart.place(this.#host, chart.sheet(), 0);
+    const w = chart.win, half = w.r + w.band, veil = (this.#veil ??= document.createElement('div'));
+    veil.style.cssText = `position:absolute;left:${w.x - half}px;top:${w.y - half}px;width:${half * 2}px;height:${half * 2}px;box-shadow:0 0 0 200vmax ${VEIL};pointer-events:none;opacity:0`;
+    this.#host.insertBefore(veil, this.#sheet);
+    this.#veiled = -1;
   }
 
   #frame(g: CanvasRenderingContext2D, now: number): void {
@@ -259,6 +267,11 @@ export class FullMap {
     }
     const a = clamp((now - this.#born) / 1000 / LAY);
     if (this.#sheet) this.#sheet.style.opacity = String(a);
+    const veiled = Math.round(a * clamp((DISTANCE - this.distance) / 0.4) * 50) / 50;
+    if (this.#veil && veiled !== this.#veiled) {
+      this.#veil.style.opacity = String(veiled);
+      this.#veiled = veiled;
+    }
     const globe = chart.globe(), m = this.#model;
     if (!globe || !m) return;
     pen.mood({ dry: 1 - a }, () => this.#ink(g, pen, globe, m, now));
@@ -271,8 +284,8 @@ export class FullMap {
     const clip = new Path2D();
     clip.arc(w.x, w.y, w.r, 0, TAU);
     g.clip(clip);
-    if (m.storm) this.#circle(pen, globe, m.storm.at, m.storm.r, { w: 'bold', ink: 'rubric', alpha: 0.95, wobble: 0.3, seed: 61 });
-    this.#circle(pen, globe, m.next.at, m.next.r, { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0.2, seed: 62 }, [0, 7]);
+    if (m.storm) this.#circle(pen, globe, m.storm.at, m.storm.r, { w: 'bold', ink: 'rubric', alpha: 0.95, wobble: 0, seed: 61 });
+    this.#circle(pen, globe, m.next.at, m.next.r, { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0, seed: 62 }, [0, 7]);
     for (const sh of m.ships) {
       const f = facing(globe, sh.pos);
       if (f <= 0.02 || !globe.project(sh.pos.x, sh.pos.y, sh.pos.z, P)) continue;
@@ -290,23 +303,32 @@ export class FullMap {
     g.restore();
   }
 
-  /** A circle of angular radius r/R round `c` on the sphere, in the runs that face the eye. */
+  /** A circle of angular radius r/R round `c` on the sphere: as many points as the whole of it, laid along the arc
+   *  the window can see, so a storm's edge stays a true curve however close the eye comes. */
   #circle(pen: Pen, globe: Globe, c: V3, r: number, st: Parameters<Pen['rule']>[1], dash?: number[]): void {
-    const a = r / R, ca = Math.cos(a), sa = Math.sin(a), P = this.#P;
-    // two tangents at c
-    const ref = Math.abs(c.y) > 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
-    let tx = c.y * ref.z - c.z * ref.y, ty = c.z * ref.x - c.x * ref.z, tz = c.x * ref.y - c.y * ref.x;
-    const l = Math.hypot(tx, ty, tz) || 1;
-    tx /= l; ty /= l; tz /= l;
-    const bx = c.y * tz - c.z * ty, by = c.z * tx - c.x * tz, bz = c.x * ty - c.y * tx;
+    const a = r / R, ca = Math.cos(a), sa = Math.sin(a), P = this.#P, { t, b } = tangents(c), e = globe.eye;
+    // a point's dot with the eye runs round the circle as A + B cos(th - phi): the arc that clears `edge` is what shows
+    const edge = Math.max(globe.horizon, globe.reach ?? globe.horizon);
+    const A = ca * (c.x * e.x + c.y * e.y + c.z * e.z), te = t.x * e.x + t.y * e.y + t.z * e.z, be = b.x * e.x + b.y * e.y + b.z * e.z;
+    const B = sa * Math.hypot(te, be), phi = Math.atan2(be, te);
+    let from = 0, span = TAU;
+    if (B > 1e-9) {
+      const need = (edge - A) / B;
+      if (need >= 1) return;
+      if (need > -1) {
+        const w = Math.acos(need);
+        from = phi - w;
+        span = 2 * w;
+      }
+    } else if (A <= edge) return;
     const runs: number[][] = [];
     let run: number[] | null = null;
     const N = 120, q = { x: 0, y: 0, z: 0 };
     for (let i = 0; i <= N; i++) {
-      const th = (i / N) * TAU, u = sa * Math.cos(th), v = sa * Math.sin(th);
-      q.x = c.x * ca + tx * u + bx * v;
-      q.y = c.y * ca + ty * u + by * v;
-      q.z = c.z * ca + tz * u + bz * v;
+      const th = from + (i / N) * span, u = sa * Math.cos(th), v = sa * Math.sin(th);
+      q.x = c.x * ca + t.x * u + b.x * v;
+      q.y = c.y * ca + t.y * u + b.y * v;
+      q.z = c.z * ca + t.z * u + b.z * v;
       if (facing(globe, q) <= 0.01 || !globe.project(q.x, q.y, q.z, P)) { run = null; continue; }
       if (!run) runs.push((run = []));
       run.push(P.x, P.y);

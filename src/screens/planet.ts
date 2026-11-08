@@ -29,7 +29,8 @@ export interface Window {
 export interface PlanetHost {
   /** The camera the planet is drawn with this frame, or null before the stage. */
   camera(): PerspectiveCamera | null;
-  /** The orbit the planet is seen from: distance from its centre in radii, and the field of view in degrees. */
+  /** The orbit the window is cut for: distance from the planet's centre in radii (the farthest the view goes, so the
+   *  window never has to change as it zooms), and the field of view in degrees. */
   orbit(): { distance: number; fov: number };
   /** The planet's coasts. */
   coasts(): Coasts;
@@ -80,7 +81,7 @@ export class PlanetChart {
    *  and the window a little wider. */
   #window(): Window {
     const { w, h, cls } = this.#layer.layout, o = this.#h.orbit();
-    const limb = (h / 2 / Math.tan((o.fov * Math.PI) / 360)) / Math.sqrt(o.distance * o.distance - 1);
+    const limb = this.#focal() / Math.sqrt(o.distance * o.distance - 1);
     return { x: w / 2, y: h / 2, r: Math.round(limb * 1.035), band: cls === 'iphone' ? 9 : 14 };
   }
 
@@ -137,7 +138,13 @@ export class PlanetChart {
   /** The planet as the camera sees it this frame, or null before the stage. */
   globe(): Globe | null {
     const cam = this.#h.camera(), l = this.#layer.layout;
-    return cam ? globeOf(cam, l.w, l.h, this.#mat, this.#eye) : null;
+    if (!cam) return null;
+    const g = globeOf(cam, l.w, l.h, this.#mat, this.#eye);
+    // how far round the planet the window can see from here: a ray at the window's rim (a little past it) meets the
+    // sphere at reach, or misses it, and then the window goes to the limb
+    const a = Math.atan((this.win.r * 1.06) / this.#focal()), rim = Math.sin(a) * (cam.position.length() / R);
+    if (rim < 1) g.reach = Math.cos(Math.asin(rim) - a);
+    return g;
   }
 
   /** The coasts inked to `tc` at `alpha`, in the window. */
@@ -154,8 +161,12 @@ export class PlanetChart {
   /** How many pixels at the middle of the window carry the ground under it a radian, from `alt` metres over the sea
    *  (the camera looks straight down, so the ground under it scales as the height does). */
   pxPerRadian(alt: number): number {
-    const focal = this.#layer.layout.h / 2 / Math.tan((this.#h.orbit().fov * Math.PI) / 360);
-    return (focal * R) / Math.max(1, alt);
+    return (this.#focal() * R) / Math.max(1, alt);
+  }
+
+  /** The orbit view's focal length on this screen, pixels. */
+  #focal(): number {
+    return this.#layer.layout.h / 2 / Math.tan((this.#h.orbit().fov * Math.PI) / 360);
   }
 
   /** The same from where the camera is this frame. */
