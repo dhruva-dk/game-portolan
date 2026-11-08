@@ -7,6 +7,7 @@
 //
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { EMBLEM_IDS, EMBLEMS, emblemRoundel } from '../cosmetics/emblems.ts';
 import { cpuMips } from '../gpu/mips.ts';
 import { type ActorTextures } from './common.ts';
@@ -731,7 +732,7 @@ export class Kit {
   readonly rigging = riggingGeometry();
   readonly icicles = icicleGeometry();
   readonly turrets = new Map<Weapon, ReturnType<typeof turretGeometry>>();
-  private readonly heads = new Map<Figurehead, THREE.BufferGeometry>();
+  private readonly heads = new Map<string, THREE.BufferGeometry>();
   envMap: THREE.Texture | null = null;
   readonly tex: ActorTextures;
   readonly sailNoise: THREE.Texture;
@@ -793,9 +794,12 @@ export class Kit {
     return this.#materials;
   }
 
-  figurehead(kind: Figurehead): THREE.BufferGeometry {
-    let g = this.heads.get(kind);
-    if (!g) this.heads.set(kind, (g = figureheadGeometry(kind)));
+  /** The hull with a figurehead at her bow, in one geometry so a ship's body is one draw (and one in each of the
+   *  shadow's cascades), not two; the far cut too. */
+  hullWith(kind: Figurehead, far: boolean): THREE.BufferGeometry {
+    const key = `${kind}${far ? ' far' : ''}`;
+    let g = this.heads.get(key);
+    if (!g) this.heads.set(key, (g = mergeGeometries([far ? this.hullFar : this.hull, figureheadGeometry(kind)])!));
     return g;
   }
   /** An emblem's layer of the roundels, painted here if the worker has not painted it yet. */
@@ -874,7 +878,7 @@ export class ShipModel {
   weapon: Weapon = 'cannon';
   look: Look;
   private readonly hull: THREE.Mesh;
-  private readonly head: THREE.Mesh;
+  #far = false;
   private readonly turretBase: THREE.Mesh;
   private readonly barrelMesh: THREE.Mesh;
   private readonly icicles: THREE.Mesh;
@@ -921,10 +925,8 @@ export class ShipModel {
     };
     this.slot = this.u.uClothSlot.value = kit.cloth.acquire();
     const { body, sail, rope, ice } = kit.materials(this.u);
-    const hull = this.hull = new THREE.Mesh(kit.hull, body);
+    const hull = this.hull = new THREE.Mesh(kit.hullWith(look.figurehead, false), body);
     hull.castShadow = hull.receiveShadow = true;
-    this.head = new THREE.Mesh(kit.figurehead(look.figurehead), body);
-    this.head.castShadow = true;
     const sails = new THREE.Mesh(kit.sails, sail);
     sails.castShadow = true;
     sails.receiveShadow = true;
@@ -939,9 +941,9 @@ export class ShipModel {
     this.turret.add(this.turretBase, this.barrel);
     this.barrel.add(this.barrelMesh);
     this.turret.position.set(0, deckHeight(SHIP.turretZ), SHIP.turretZ);
-    this.body.add(hull, this.head, sails, rigging, this.turret, this.icicles);
+    this.body.add(hull, sails, rigging, this.turret, this.icicles);
     // the kit's materials read her own uniforms from whichever of her parts they draw
-    for (const m of [hull, this.head, sails, rigging, this.icicles, this.turretBase, this.barrelMesh]) m.userData.u = this.u;
+    for (const m of [hull, sails, rigging, this.icicles, this.turretBase, this.barrelMesh]) m.userData.u = this.u;
     this.root.add(this.body);
     this.root.matrixAutoUpdate = false;
     this.setLook(look);
@@ -955,7 +957,7 @@ export class ShipModel {
     u.uWisp.value.setHex(look.wisp); u.uSailA.value.setHex(look.sail); u.uSailB.value.setHex(look.sail2);
     u.uPattern.value = look.pattern;
     u.uEmblem.value = look.emblem ? this.kit.emblem(look.emblem) : -1;
-    this.head.geometry = this.kit.figurehead(look.figurehead);
+    this.hull.geometry = this.kit.hullWith(look.figurehead, this.#far);
   }
 
   /**
@@ -990,7 +992,9 @@ export class ShipModel {
 
   /** Far from the camera, the lighter cut of the hull. */
   set far(on: boolean) {
-    this.hull.geometry = on ? this.kit.hullFar : this.kit.hull;
+    if (on === this.#far) return;
+    this.#far = on;
+    this.hull.geometry = this.kit.hullWith(this.look.figurehead, on);
   }
 
   setWeapon(kind: Weapon): void {
