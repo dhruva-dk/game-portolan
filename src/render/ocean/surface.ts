@@ -39,7 +39,7 @@ import type { Territory } from './territory.ts';
 import { REACH } from './coastField.ts';
 import { waterAt } from '../seaTint.ts';
 import type { Flow } from './flow.ts';
-import { SeaLight, seaReflection } from './reflect.ts';
+import { SeaLight } from './light.ts';
 import { RIPPLES, RIPPLE_SPAN } from './ripples.ts';
 
 /** The surf: seconds between the lines of swell coming in, and how fast the lines close up toward the shore (the
@@ -467,10 +467,6 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const alpha = clamp(sigma2.mul(2).sqrt(), 0.02, 1);
   mat.roughnessNode = mix(alpha.sqrt(), float(0.9), whiteness);
 
-  // ----- what it mirrors of the frame, in place of the sky behind it (reflect.ts), where the water reflects enough
-  // for it to show and no foam lies
-  const facing = float(1).sub(max(dot(world, normalize(cameraPosition.sub(positionWorld))), 0));
-  const reflectance = float(0.02).add(pow(facing, 5).mul(0.98)).mul(float(1).sub(whiteness));
   // the sun's shadow on the water, read once for its glitter and its body (SeaLight, the lighting works it out first),
   // and only where something can throw one that shows: near the eye (the ships', the gulls') and on the coast (the
   // cliffs'); the open sea further out lies in the sun
@@ -482,7 +478,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     return sunShade;
   };
   mat.setupLightingModel = () => new SeaLight(
-    () => seaReflection(world, alpha, reflectance), shade,
+    shade,
     [mat.useClearcoat, mat.useSheen, mat.useIridescence, mat.useAnisotropy, mat.useTransmission, mat.useDispersion],
   );
 
