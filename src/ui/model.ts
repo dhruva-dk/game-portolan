@@ -222,7 +222,7 @@ export interface MapView {
   /** While the Gale blows: its course in dotted runs of metres (x, y, x, y…), the Storm's first circle in metres, and
    *  the fleet, too close together for emblems at this range, shown as marks. */
   course?: readonly (readonly number[])[];
-  first?: readonly number[];
+  first?: readonly (readonly number[])[];
   fleet?: boolean;
 }
 

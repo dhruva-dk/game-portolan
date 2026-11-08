@@ -13,7 +13,7 @@ import {
 import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
 import { R, angleTo, apart, tangentToward } from '../sim/sphere.ts';
 import { aimedAt } from '../sim/combat.ts';
 import { REGIONS, regionAt } from '../sim/world/index.ts';
@@ -52,14 +52,6 @@ export const markOf = (look: Look): Mark => markOfIds(cosmeticsOf(look));
 
 /** Ship i's mark, from the look she wears in the match. */
 const shipMark = (session: Session, i: number): Mark => markOfIds(session.looks[i] ?? session.looks[0]);
-
-/** Every ship's colour and charge as the chart's galleon marks take them, the player's from the look she wears. */
-export function fleetColours(session: Session, look: Look): { colour: string; sigil: { id: string } }[] {
-  return session.state.ships.map((_, i) => {
-    const m = i === PLAYER ? markOf(look) : shipMark(session, i);
-    return { colour: m.colours[0], sigil: { id: m.emblem } };
-  });
-}
 
 export const levelFrom = (l: { level: number; into: number; need: number }): LevelView => ({ level: l.level, into: l.into, need: l.need });
 
@@ -123,6 +115,55 @@ function mapOf(session: Session, i: number): MapView {
     storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
     marker: i === PLAYER && session.mark ? rel(session.mark) : null,
   };
+}
+
+/** The Gale's disc: a whole hemisphere round her, as far as a chart can show, with the Gale's course dotted across it,
+ *  the Storm's first circle, the fleet as marks and my marker, pinned to the rim while it lies on the planet's far side. */
+export function galeMap(session: Session): { view: MapView; tide: number } {
+  const s = session.state, sh = s.ships[PLAYER], p = sh.pos, { e, n } = frame(p), ll = latLon(p), g = s.gale;
+  const rel = (q: V3) => ({ x: R * dot(q, e), y: R * dot(q, n) });
+  // what faces her, in runs broken where a line goes round the planet's far side
+  const trace = (steps: number, at: (k: number) => V3): number[][] => {
+    const runs: number[][] = [];
+    let run: number[] | null = null;
+    for (let k = 0; k <= steps; k++) {
+      const q = at(k);
+      if (dot(q, p) <= 0.02) { run = null; continue; }
+      const m = rel(q);
+      if (!run) runs.push((run = []));
+      run.push(m.x, m.y);
+    }
+    return runs;
+  };
+  const course = trace(72, (k) => {
+    const a = (GALE.arc * k) / 72, c = Math.cos(a), si = Math.sin(a);
+    return { x: g.from.x * c + g.dir.x * si, y: g.from.y * c + g.dir.y * si, z: g.from.z * c + g.dir.z * si };
+  });
+  stormView(s, SV);
+  const c = SV.next.at, a = SV.next.r / R, ca = Math.cos(a), sa = Math.sin(a), f = frame(c);
+  const first = trace(96, (k) => {
+    const th = (k / 96) * Math.PI * 2, u = sa * Math.cos(th), v = sa * Math.sin(th);
+    return { x: c.x * ca + f.e.x * u + f.n.x * v, y: c.y * ca + f.e.y * u + f.n.y * v, z: c.z * ca + f.e.z * u + f.n.z * v };
+  });
+  const ships: MapView['ships'] = [];
+  for (let j = 0; j < SHIPS; j++) {
+    if (j === PLAYER || s.ships[j].phase === PHASE.sunk || dot(s.ships[j].pos, p) <= 0.02) continue;
+    const mark = shipMark(session, j);
+    ships.push({ ...rel(s.ships[j].pos), emblem: mark.emblem, colour: mark.colours[0] });
+  }
+  let marker: MapView['marker'] = null;
+  if (session.mark) {
+    marker = rel(session.mark);
+    if (dot(session.mark, p) < 0.05) {
+      const l = Math.hypot(marker.x, marker.y) || 1;
+      marker = { x: (marker.x / l) * R * 1.5, y: (marker.y / l) * R * 1.5 };
+    }
+  }
+  const view: MapView = {
+    lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: R,
+    storm: null, next: null, ships, marks: [], marker, course, first, fleet: true,
+  };
+  return { view, tide: seaLevelAt(s.tick * TICK) };
 }
 
 /** What a take would pick up: the nearest loot in reach. */

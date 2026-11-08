@@ -70,19 +70,14 @@ export class Minimap {
       const [nx, ny] = at(v.next.x, v.next.y);
       dottedRing(pen, nx, ny, v.next.r * k, 1, 'iron', 5, 0.85);
     }
-    if (v.first) {
-      const first: number[] = [];
-      for (let i = 0; i < v.first.length; i += 2) first.push(...at(v.first[i], v.first[i + 1]));
-      pen.rule([first], { w: 'fine', ink: 'rubric', alpha: 0.9, wobble: 0.3, seed: 43 });
-    }
-    if (v.course) {
-      const dots = v.course.map((run) => {
-        const pts: number[] = [];
-        for (let i = 0; i < run.length; i += 2) pts.push(...at(run[i], run[i + 1]));
-        return pts;
-      });
-      pen.rule(dots, { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0.2, seed: 44 }, 1, [0, 6]);
-    }
+    // the Storm's first circle a line of red, the Gale's course a dotted line, each in the runs that face her
+    const runs = (list: readonly (readonly number[])[]) => list.map((run) => {
+      const pts: number[] = [];
+      for (let i = 0; i < run.length; i += 2) pts.push(...at(run[i], run[i + 1]));
+      return pts;
+    });
+    if (v.first) pen.rule(runs(v.first), { w: 'fine', ink: 'rubric', alpha: 0.9, wobble: 0.3, seed: 43 });
+    if (v.course) pen.rule(runs(v.course), { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0.2, seed: 44 }, 1, [0, 6]);
     const loot = new Path2D();
     for (const mk of v.marks) {
       if (mk.kind !== 'loot') continue;
