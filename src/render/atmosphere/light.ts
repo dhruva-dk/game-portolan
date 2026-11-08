@@ -13,8 +13,8 @@ import {
   AnalyticLightNode, DirectionalLight, DirectionalLightNode, Light, type Node, type NodeBuilder, type Texture, type Vector3,
 } from 'three/webgpu';
 import {
-  Fn, If, cameraWorldMatrix, clamp, float, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection, positionWorld,
-  int, pow, roughness, texture, uniform, vec2, vec3,
+  Fn, If, cameraWorldMatrix, clamp, float, instancedArray, max, mix, normalView, normalWorld, pmremTexture, positionViewDirection,
+  positionWorld, int, pow, roughness, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import { AIR } from './model.ts';
 import { IRRADIANCE, IRRADIANCE_FACE, MOON_RADIUS, SUN_RADIUS, lightTransmittance, skyIrradiance, tables } from './luts.ts';
@@ -31,10 +31,12 @@ export const BODIES = shared({ sun: uniform(1), moon: uniform(1) });
  *  the tops of the spires against the sky: where the clouds take their light from the moon, too. */
 const GONE = -0.55;
 
-/** Which bodies light anything in view from an eye whose up is `up`. */
-export function bodiesFor(up: Vector3, sun: Vector3, moon: Vector3): void {
+/** Which bodies light anything in view from an eye whose up is `up`; `high`, for an eye that sees the night side of
+ *  the planet whatever the sun is doing over it. Below that, the moon lights nothing anyone could see while the sun
+ *  is up: by day its light is a millionth of the sun's. */
+export function bodiesFor(up: Vector3, sun: Vector3, moon: Vector3, high: boolean): void {
   BODIES.sun.value = up.dot(sun) > GONE ? 1 : 0;
-  BODIES.moon.value = up.dot(moon) > GONE && (P.moonPhase.value as number) > 0 ? 1 : 0;
+  BODIES.moon.value = up.dot(moon) > GONE && (P.moonPhase.value as number) > 0 && (high || up.dot(sun) < 0) ? 1 : 0;
 }
 
 /** The sun's light as it arrives at the fragment being shaded. */
@@ -58,13 +60,17 @@ const NIGHT_FLOOR = vec3(0.0009, 0.0012, 0.0022);
  *  coming from above, a little round the sides and hardly from below. */
 const FLASH_LIGHT = vec3(0.72, 0.78, 1).mul(5);
 
-/** The sky's irradiance on a surface at p facing n, from the sun and the moon, and lightning's flash. */
+/** The sky's irradiance on a surface at p facing n, from the sun and the moon (each while it lights anything in
+ *  view), and lightning's flash. */
 export const skyLight = Fn(([p, n]: [V3, V3]) => {
-  const flash = FLASH_LIGHT.mul(P.flash).mul(n.dot(p.normalize()).mul(0.45).add(0.55));
-  return skyIrradiance(p, n, P.sunDir).mul(P.sunIlluminance)
-    .add(skyIrradiance(p, n, P.moonDir).mul(P.moonIlluminance).mul(P.moonPhase))
-    .add(NIGHT_FLOOR)
-    .add(flash);
+  const light = FLASH_LIGHT.mul(P.flash).mul(n.dot(p.normalize()).mul(0.45).add(0.55)).add(NIGHT_FLOOR).toVar();
+  If(BODIES.sun.greaterThan(0.5), () => {
+    light.addAssign(skyIrradiance(p, n, P.sunDir).mul(P.sunIlluminance));
+  });
+  If(BODIES.moon.greaterThan(0.5), () => {
+    light.addAssign(skyIrradiance(p, n, P.moonDir).mul(P.moonIlluminance).mul(P.moonPhase));
+  });
+  return light;
 });
 
 /** The sky's overall brightness straight up at p: what the probe of the eye's sky is scaled by elsewhere. */
@@ -78,6 +84,13 @@ const zenithLight = (p: V3): V3 => {
     .add(upward(P.moonDir).mul(P.moonIlluminance).mul(P.moonPhase))
     .add(NIGHT_FLOOR);
 };
+
+/** The sky's brightness straight up where the probe was taken, the same for every fragment: worked out once a frame
+ *  (probeZenithPass, run with the sky's tables). */
+const probeZenith = instancedArray(1, 'vec4');
+export const probeZenithPass = Fn(() => {
+  probeZenith.element(0).assign(vec4(zenithLight(probeEye), 1));
+})().compute(1);
 
 /**
  * Turns a direction at the fragment's place into the same direction at the eye's: the rotation that takes the
@@ -130,7 +143,7 @@ export class SkyLightNode extends AnalyticLightNode<SkyLight> {
     const eyeUp = eye.normalize();
     const turned = toEyeFrame(lobe, up, eyeUp);
     const here = zenithLight(p);
-    const there = zenithLight(eye);
+    const there = probeZenith.element(0).xyz;
     const scale = clamp(here.div(max(there, vec3(1e-6))), vec3(0), vec3(4));
     // close to the eye the probe is right as it is; the scaling takes over with distance
     const near = clamp(p.sub(eye).length().div(120), 0, 1);

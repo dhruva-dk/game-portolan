@@ -141,10 +141,11 @@ export const skyIrradiance = Fn(([p, n, l]: [V3, V3, V3]) => {
   const uv = irradianceUV(r, muS);
   const ny = n.dot(up), nt = n.dot(toward);
   const ns2 = max(float(1).sub(ny.mul(ny)).sub(nt.mul(nt)), 0);
-  const face = (k: number) => texture(tables.irradiance, uv).depth(int(k)).rgb;
-  const vertical = select(ny.greaterThan(0), face(IRRADIANCE_FACE.up), face(IRRADIANCE_FACE.down));
-  const along = select(nt.greaterThan(0), face(IRRADIANCE_FACE.toward), face(IRRADIANCE_FACE.away));
-  return vertical.mul(ny.mul(ny)).add(along.mul(nt.mul(nt))).add(face(IRRADIANCE_FACE.aside).mul(ns2));
+  // one read of each axis's face: the side the normal leans to is chosen before the read, not after two
+  const face = (k: Node<'int'>) => texture(tables.irradiance, uv).depth(k).rgb;
+  const vertical = face(select(ny.greaterThan(0), int(IRRADIANCE_FACE.up), int(IRRADIANCE_FACE.down)));
+  const along = face(select(nt.greaterThan(0), int(IRRADIANCE_FACE.toward), int(IRRADIANCE_FACE.away)));
+  return vertical.mul(ny.mul(ny)).add(along.mul(nt.mul(nt))).add(face(int(IRRADIANCE_FACE.aside)).mul(ns2));
 });
 
 // ---------------------------------------------------------------- the sky view's mapping (Hillaire)

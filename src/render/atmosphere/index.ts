@@ -12,7 +12,7 @@ import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { AIR, CLEAR_AIR, setAir, type Air } from './model.ts';
 import { EYE, aerialAt, passes } from './luts.ts';
 import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
-import { BODIES, BodyLight, BodyLightNode, SkyLight, SkyLightNode, bodiesFor, moonlight, sunlight } from './light.ts';
+import { BODIES, BodyLight, BodyLightNode, SkyLight, SkyLightNode, bodiesFor, moonlight, probeZenithPass, sunlight } from './light.ts';
 import { SunShadows } from './shadows.ts';
 import { fogAt } from './fog.ts';
 import { P } from '../gpu/uniforms.ts';
@@ -93,6 +93,9 @@ const skyThroughMist = Fn(() => {
 /** How often the probe of the sky round the eye is retaken, seconds, unless the light or the eye moves a lot. */
 const PROBE_EVERY = 0.75;
 
+/** Metres over the sea past which the eye sees the planet's night side whatever the sun does over it. */
+const HIGH = 3000;
+
 const _m = new Matrix4();
 const _v = new Vector3();
 const _u = new Vector3();
@@ -170,11 +173,11 @@ export class Atmosphere {
       this.#dirty = false;
       this.#probeAge = Infinity;
     }
-    renderer.compute([passes.sky, passes.moonSky, passes.aerial]);
+    renderer.compute([passes.sky, passes.moonSky, passes.aerial, probeZenithPass]);
 
     // the lights hang over the ground below the eye, which is also where the shadows' cascades are fitted; the sun's
     // shadows are drawn only while it lights anything in view
-    bodiesFor(_u.copy(eye).normalize(), P.sunDir.value as Vector3, P.moonDir.value as Vector3);
+    bodiesFor(_u.copy(eye).normalize(), P.sunDir.value as Vector3, P.moonDir.value as Vector3, r - b > HIGH);
     this.shadows.casting = BODIES.sun.value === 1;
     const ground = _v.copy(eye).setLength(b);
     this.sun.target.position.copy(ground);
