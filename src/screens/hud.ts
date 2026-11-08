@@ -141,6 +141,8 @@ export class Hud {
   #born = -1;
   #leftAt = -1;
   #off: (() => void) | null = null;
+  /** The full map is open over the sea: only the disc shows, and takes a press. */
+  #covered = false;
   /** Called once the HUD has gone. */
   onGone?: () => void;
   /** What this frame draws with: the whole HUD's opacity, the time, the regions it drew into, what it may re-ink. */
@@ -252,6 +254,22 @@ export class Hud {
     this.#unpress();
   }
 
+  /** The full map is open: only the disc shows, and only it takes a press. */
+  cover(on: boolean): void {
+    if (this.#covered === on) return;
+    this.#covered = on;
+    const layer = this.#layer;
+    if (!layer || !this.#p) return;
+    if (on) this.#bare(layer);
+    else this.#place(layer);
+  }
+
+  /** Every press off the chart but the disc's. */
+  #bare(layer: ChartLayer): void {
+    const p = this.#p!;
+    for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, ...p.slots]) layer.presses.remove(q.id);
+  }
+
   /** No more touches: a held Fire is still let go when its finger lifts, Presses keeping the finger's pressable. */
   #unpress(): void {
     const p = this.#p, layer = this.#layer;
@@ -293,6 +311,7 @@ export class Hud {
       map: this.#host.openMap ? add({ id: 'hud:map', hit: l.hud, on: 'up', act: () => this.#host.openMap?.() }) : null,
     };
     this.#pressing = true;
+    if (this.#covered) this.#bare(layer);
     if (this.#leftAt >= 0) this.#unpress();
   }
 
@@ -350,6 +369,10 @@ export class Hud {
     this.#bakes = BAKES;
     if (this.#signDue) { this.#signAt = now; this.#signDue = false; }
     const plates = this.#plates!;
+    if (this.#covered) {
+      this.#minimap(g, layer, m, plates.map);
+      return this.#rects;
+    }
     this.#stormRim(g, layer, m, dt);
     this.#incoming(layer, m);
     this.#vitalsAndHurts(g, layer, m, plates.vitals, dt);

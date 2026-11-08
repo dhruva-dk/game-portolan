@@ -30,7 +30,7 @@ import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
 import { MOMENTS, actorEvent, arrangeFight, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
-import { deathModel, galeMap, hudModel, markOf, resultsModel, victoryModel } from './matchModels.ts';
+import { deathModel, galeMap, hudModel, markOf, planetMap, resultsModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { LOBBY_CAMERA, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type ScreenName } from './flow.ts';
@@ -42,6 +42,7 @@ import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { ChartLayer, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
+import { FullMap } from '../screens/fullmap.ts';
 import { Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
 import type { SheetName } from '../screens/folio.ts';
 import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
@@ -67,8 +68,7 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
-/** The orbit the Gale sees the planet from, in radii, and the seconds the camera takes between views. */
-const ORBIT_DISTANCE = 3.2;
+/** The seconds the camera takes between views. */
 const FLIGHT = 2.2;
 /** Seconds the camera takes to fly from the anchorage to the Gale. */
 const TO_THE_GALE = 2.6;
@@ -126,6 +126,8 @@ export class App {
   /** Where a finger has taken the lobby's camera off its resting view. */
   private readonly boom: Orbit = { yaw: 0, pitch: 0, zoom: 1 };
   private gale: Gale | null = null;
+  /** The full map, while it is open. */
+  private map: FullMap | null = null;
   /** How far the world has loaded, 0..1. */
   private progress = 0;
   /** Whether the stage has drawn the world yet, and whether the ships are built (after the title's materials). */
@@ -219,6 +221,7 @@ export class App {
     this.title?.resize();
     this.lobby?.resize();
     this.gale?.resize();
+    this.map?.resize();
   }
 
   /** Builds the stage and the actors; the title's needle reads the progress. */
@@ -340,6 +343,7 @@ export class App {
     if (toLobby && (!atLobby || !this.lobby)) this.openLobby(from);
     if (toLobby) this.lobby?.show(name === 'lobby' ? null : (name as SheetName), now);
     if (name === 'gale') this.openGale();
+    if (name !== 'match' && name !== 'gale') this.closeMap(false);
     if (name === 'match') this.openHud(model);
     // (after what comes in under it, so it is drawn over it)
     if (from === 'title' && name !== 'title') this.title?.leave(now);
@@ -567,6 +571,7 @@ export class App {
   }
 
   private leaveMatch(): void {
+    this.closeMap(false);
     this.session = null;
     this.loop.run(null);
     this.controls.on = false;
@@ -575,7 +580,7 @@ export class App {
     this.hud?.leave(this.chartNow());
     this.tip.set(null);
     this.log.tick = -1;
-    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0, orbitDistance: ORBIT_DISTANCE, flight: FLIGHT });
+    if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0, flight: FLIGHT });
     this.stage?.snap();
   }
 
@@ -681,6 +686,13 @@ export class App {
     const sv = s.stageView(f.clock, f.alpha);
     this.alpha = f.alpha;
     if (this.gale && s.watch === PLAYER) this.galeCamera(s, sv, f.realDt);
+    if (this.map) {
+      // the full map holds the orbit over the point the finger has turned to the middle of its window
+      sv.camera = 'orbit';
+      sv.target = { pos: this.map.centre, heading: sv.target.heading, pull: 0 };
+      stage.rig.orbitDistance = this.map.distance;
+      sv.gale = null;
+    }
     stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => s.hearing());
     const c = stage.camera.position;
@@ -724,12 +736,53 @@ export class App {
     return { level: l.level, into: l.into, need: l.need, illumination: TIER_ILLUMINATION[rankView(c).tier] ?? 'ink', matches: s.matches, wins: s.wins };
   }
 
-  /** The planet chart's view of the planet: the stage's camera, the Gale's orbit and the coasts. */
-  private readonly planet = {
-    camera: () => this.stage?.camera ?? null,
-    orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
-    coasts: () => (this.coasts ??= traceCoasts(heightAt)),
-  };
+  /** Opens or shuts the full map over the drop or the match. */
+  private toggleMap(): void {
+    if (this.map) this.closeMap();
+    else this.openMap();
+  }
+
+  private openMap(): void {
+    const s = this.session, stage = this.stage, layer = this.chart;
+    if (this.map || !s || !stage || !layer) return;
+    const m = new FullMap(this.chartHost, {
+      camera: () => this.stage?.camera ?? null,
+      coasts: () => (this.coasts ??= traceCoasts(heightAt)),
+      fov: ORBIT_FOV,
+      model: () => planetMap(s),
+      mine: this.ownMark(),
+      aim: (p) => s.aimFor(p),
+      close: () => this.closeMap(),
+    });
+    m.attach(layer, this.chartNow());
+    this.map = m;
+    this.controls.on = false;
+    this.hud?.cover(true);
+    this.gale?.cover(true);
+    stage.rig.snap();
+  }
+
+  /** The window on the planet, for the test hook: where the full map's window is, or null while it is shut. */
+  get mapWindow(): { x: number; y: number; r: number } | null {
+    return this.map?.window ?? null;
+  }
+
+  /** A tap on the full map at (x, y), as a finger would give it. */
+  tapMap(x: number, y: number): void {
+    this.map?.tap(x, y);
+  }
+
+  /** Shuts the full map. `sailing`: the match goes on, and the controls come back to the player. */
+  private closeMap(sailing = true): void {
+    const m = this.map;
+    if (!m) return;
+    m.dispose();
+    this.map = null;
+    this.controls.on = sailing;
+    this.hud?.cover(false);
+    this.gale?.cover(false);
+    this.stage?.rig.snap();
+  }
 
   /** Puts the lobby on the chart, its instruments laid as the title's sheet rolls off them and the title's rose landing
    *  on its plate; its tabs, plate and wheel unroll their sheets over it. */
@@ -807,7 +860,7 @@ export class App {
       marker: () => s.mark,
       project: (p) => this.project(p),
       eye: () => this.eye,
-      openMap: () => {},
+      openMap: () => this.toggleMap(),
     }, { teach: this.tips.drawn('gale') });
     g.onGone = () => {
       if (this.gale === g) this.gale = null;
@@ -827,7 +880,9 @@ export class App {
       sight: this.viewer,
       shipAt: (i) => this.session?.shipAt(i) ?? null,
       lefty: () => this.controls.lefty,
+      openMap: () => this.toggleMap(),
     });
+    if (this.map) h.cover(true);
     h.onGone = () => {
       if (this.hud === h) this.hud = null;
     };

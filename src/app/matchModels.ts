@@ -23,6 +23,7 @@ import {
   type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type VictoryModel,
   type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
+import type { MapShip, PlanetMapModel } from '../screens/fullmap.ts';
 import type { Rarity } from '../ui/parts/tokens.ts';
 import { causeName, consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
@@ -164,6 +165,27 @@ export function galeMap(session: Session): { view: MapView; tide: number } {
     storm: null, next: null, ships, marks: [], marker, course, first, fleet: true,
   };
   return { view, tide: seaLevelAt(s.tick * TICK) };
+}
+
+/** What the full map shows of the match: every ship in range on the planet, the Storm's edge once it has formed and its
+ *  next circle, her marker. */
+export function planetMap(session: Session): PlanetMapModel {
+  const s = session.state, i = session.watch, sh = s.ships[i];
+  stormView(s, SV);
+  const formed = SV.calm.r < Math.PI * R * 0.49;
+  const ships: MapShip[] = [];
+  for (let j = 0; j < SHIPS; j++) {
+    if (j === i || s.ships[j].phase === PHASE.sunk) continue;
+    if (!(seen(s, i, j) & (SEEN.visible | SEEN.map))) continue;
+    const mark = shipMark(session, j);
+    ships.push({ pos: { ...s.ships[j].pos }, emblem: mark.emblem, colour: mark.colours[0] });
+  }
+  return {
+    me: { ...sh.pos }, ships,
+    storm: formed ? { at: { ...SV.calm.at }, r: SV.calm.r } : null,
+    next: { at: { ...SV.next.at }, r: SV.next.r },
+    marker: session.mark ? { ...session.mark } : null,
+  };
 }
 
 /** What a take would pick up: the nearest loot in reach. */

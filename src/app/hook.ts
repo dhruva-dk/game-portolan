@@ -69,6 +69,9 @@ export function installHook(app: App) {
       c.presses.down(-7, p.hit.x, p.hit.y);
       c.presses.up(-7, p.hit.x, p.hit.y);
     },
+    /** The full map's window on the planet, or null while it is shut, and a tap on the map. */
+    get mapWindow() { return app.mapWindow; },
+    tapMap: (x: number, y: number) => app.tapMap(x, y),
     freezeUi: (on: boolean) => app.freezeUi(on),
     scrubUi: (ms: number) => app.scrubUi(ms),
     /** Holds the title as if the world were p loaded, its needle wandering (null lets it be ready). */

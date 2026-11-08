@@ -1,32 +1,22 @@
-// The planet chart: the sheet laid over the planet from orbit, and what is inked on the planet through it. A window is
-// cut in the folio round the planet's limb (a little wider, so the atmosphere's rim shows), its cut edge shading the
-// world under it; round it the paper carries the rhumb web and a graduated ring, and the rose in its corner with its
-// needle, web and needle swung to a bearing (the Gale's course). Through the window the planet's coasts are inked where
-// its land meets the sea and every sea on the near side has its sign, drawn each frame where the planet was drawn this
-// frame (a chart is drawn after the world). A finger can turn the planet under it. The Gale drop draws on it, and the
-// match's map will.
+// The planet chart: a sheet laid over the planet from orbit, and what is inked on the planet through it. A window is
+// cut in the paper round the planet's limb (a little wider, so the atmosphere's rim shows), its cut edge shading the
+// world under it; round it the paper carries the rhumb web and a graduated ring. Through the window the planet's coasts
+// are inked where its land meets the sea, each frame where the planet was drawn this frame (a chart is drawn after the
+// world). A finger can turn the planet under it. The full map (fullmap.ts) draws on it.
 import { Vector3, type PerspectiveCamera } from 'three';
 import {
-  Pen, arcPts, canvas, coasts, ctx, drawSprite, ease, needle, prims, rhumbWeb, ring, stagger, woodcut, type Baked,
-  type ChartLayer, type Coasts, type DragSurface, type Globe, type Sprite,
+  Pen, canvas, coasts, ctx, rhumbWeb, ring, type Baked, type ChartLayer, type Coasts, type DragSurface, type Globe,
 } from '../chart/index.ts';
-import { REGION_COLOURS } from '../icons/sets/regions.ts';
-import { CENTRES, REGIONS } from '../sim/world/index.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
-import { cornerRose } from './title.ts';
 
-/** The folio runs this far past every edge of the screen. */
-export const BLEED = 40;
 /** How much ink is in the web's lines on the sheet, and in the coasts: a light hand, under what is drawn on the
  *  planet. */
 const WEB = 0.45;
 const COAST = 0.5;
 const TAU = Math.PI * 2;
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
+/** Paper round the graduated ring, CSS pixels. */
+const MARGIN = 34;
 
 /** The window over the planet, CSS pixels, and the width of the graduated band round it. */
 export interface Window {
@@ -62,7 +52,6 @@ export class PlanetChart {
   readonly #h: PlanetHost;
   /** The window, laid out for the layer's size. */
   win: Window;
-  #signs: Sprite[] | null = null;
   readonly #mat = new Float64Array(16);
   readonly #eye = { x: 0, y: 0, z: 1 };
   readonly #P = { x: 0, y: 0 };
@@ -74,29 +63,9 @@ export class PlanetChart {
     this.resize();
   }
 
-  /** Lays the window out for the layer's size; the seas' signs are baked again at it when next inked. */
+  /** Lays the window out for the layer's size and the orbit's distance. */
   resize(): void {
     this.win = this.#window();
-    this.#signs = null;
-  }
-
-  /** The seas' signs, baked once at this size: a paper roundel ringed in the sea's colour, its woodcut in it. */
-  #signsNow(): Sprite[] {
-    if (this.#signs) return this.#signs;
-    const layer = this.#layer, size = layer.layout.cls === 'iphone' ? 34 : 46, d = Math.ceil(size + 6);
-    return (this.#signs = REGIONS.map((reg) => layer.sprite(`planet-sign|${reg.id}|${size}`, d, d, d / 2, d / 2, (pen) => {
-      const r = size / 2, c0 = d / 2;
-      const disc = new Path2D();
-      disc.arc(c0, c0, r, 0, TAU);
-      pen.paperFill(disc, 0.94);
-      const band = new Path2D();
-      band.arc(c0, c0, r, 0, TAU);
-      band.arc(c0, c0, r * 0.8, 0, TAU, true);
-      pen.wash(band, REGION_COLOURS[reg.id], { alpha: 0.7, edge: 0.5, gran: 0.6, shift: [0, 0] });
-      pen.stroke(arcPts(c0, c0, r, 0, TAU, 40), { w: 'fine', nib: 0.2, pool: 0.2, seed: reg.lat | 0 });
-      pen.rule([arcPts(c0, c0, r * 0.8, 0, TAU, 36)], { w: 'hair', alpha: 0.6, seed: (reg.lon | 0) + 3 });
-      woodcut(pen, prims(`region.${reg.id}`), c0, c0, r * 1.25);
-    })));
   }
 
   /** The planet's limb on the screen from the orbit (the camera looks at its centre, in the middle of the screen),
@@ -107,57 +76,52 @@ export class PlanetChart {
     return { x: w / 2, y: h / 2, r: Math.round(limb * 1.035), band: cls === 'iphone' ? 9 : 14 };
   }
 
+  /** Half the sheet's side, CSS pixels: the window, its ring and the paper round them. */
+  get half(): number {
+    return this.win.r + this.win.band + MARGIN;
+  }
+
   /**
-   * The sheet, baked: the folio, the web round the window and the rose's needle swung to `rot` (radians clockwise from
-   * north), the ring round the window and the rose in its corner; the window cut out of it and its edge shaded, unless
-   * the sheet is `whole` (it unrolls over the world before the planet is under it). Its canvas is laid in the page
-   * with `place`.
+   * The sheet, baked: the paper, the web on it round the window and the ring round the window, north up, the window cut
+   * out of it and its edge shaded. Its canvas is laid in the page with `place`.
    */
-  sheet(rot: number, whole = false): Baked {
-    const layer = this.#layer, { w, h } = layer.layout, dpr = layer.dpr, win = this.win, rose = layer.layout.rose;
-    const folio = layer.sheet('folio', w + BLEED * 2, h + BLEED * 2, 9, { folds: false });
+  sheet(): Baked {
+    const layer = this.#layer, dpr = layer.dpr, win = this.win, s = this.half * 2, c0 = s / 2;
+    const folio = layer.sheet('folio', s, s, 9, { folds: false });
     const c = canvas(folio.canvas.width, folio.canvas.height), x = ctx(c);
     x.drawImage(folio.canvas, 0, 0);
-    const o = (folio.pad + BLEED) * dpr;
+    const o = folio.pad * dpr;
     x.setTransform(dpr, 0, 0, dpr, o, o);
     const pen = new Pen(layer.paper, dpr, layer.layout.widths).on(x, o, o);
-    // the web on the paper round the window, its north turned to the bearing; the ring round the window
-    const cx = w / 2, cy = h / 2, out = new Path2D();
-    out.rect(-BLEED, -BLEED, w + BLEED * 2, h + BLEED * 2);
-    out.arc(win.x, win.y, win.r + win.band, 0, TAU);
+    const out = new Path2D();
+    out.rect(0, 0, s, s);
+    out.arc(c0, c0, win.r + win.band, 0, TAU);
     x.save();
     x.clip(out, 'evenodd');
-    x.translate(cx, cy);
-    x.rotate(rot);
-    x.translate(-cx, -cy);
-    rhumbWeb(pen, cx, cy, Math.min(w, h) * 0.56, Math.hypot(w, h), 1, WEB);
+    rhumbWeb(pen, c0, c0, s * 0.42, s, 1, WEB);
     x.restore();
-    ring(pen, win.x, win.y, win.r, win.r + win.band, { ticks: 360, seed: 41 }, 1, rot);
-    drawSprite(x, cornerRose(layer), rose.x, rose.y);
-    needle(pen, rose.x, rose.y, rose.r * 0.52, rot, 1);
+    ring(pen, c0, c0, win.r, win.r + win.band, { ticks: 360, seed: 41 }, 1, 0);
     x.setTransform(1, 0, 0, 1, 0, 0);
-    if (!whole) {
-      const wx = o + win.x * dpr, wy = o + win.y * dpr, wr = win.r * dpr;
-      x.globalCompositeOperation = 'destination-out';
-      x.beginPath();
-      x.arc(wx, wy, wr, 0, TAU);
-      x.fill();
-      x.globalCompositeOperation = 'source-over';
-      const shade = x.createRadialGradient(wx, wy, wr - 16 * dpr, wx, wy, wr);
-      shade.addColorStop(0, 'rgba(26,14,4,0)');
-      shade.addColorStop(1, 'rgba(26,14,4,0.42)');
-      x.fillStyle = shade;
-      x.beginPath();
-      x.arc(wx, wy, wr, 0, TAU);
-      x.fill();
-    }
+    const w0 = o + c0 * dpr, wr = win.r * dpr;
+    x.globalCompositeOperation = 'destination-out';
+    x.beginPath();
+    x.arc(w0, w0, wr, 0, TAU);
+    x.fill();
+    x.globalCompositeOperation = 'source-over';
+    const shade = x.createRadialGradient(w0, w0, wr - 16 * dpr, w0, w0, wr);
+    shade.addColorStop(0, 'rgba(26,14,4,0)');
+    shade.addColorStop(1, 'rgba(26,14,4,0.42)');
+    x.fillStyle = shade;
+    x.beginPath();
+    x.arc(w0, w0, wr, 0, TAU);
+    x.fill();
     return { ...folio, canvas: c };
   }
 
-  /** Lays a baked sheet in `host` under the chart layer, over whatever was laid there before it, at `opacity`. */
+  /** Lays a baked sheet in `host` under the chart layer, centred on the window, at `opacity`. */
   place(host: HTMLElement, b: Baked, opacity: number): HTMLCanvasElement {
-    const el = b.canvas;
-    el.style.cssText = `position:absolute;left:${-BLEED - b.pad}px;top:${-BLEED - b.pad}px;width:${b.w + b.pad * 2}px;height:${b.h + b.pad * 2}px;pointer-events:none;opacity:${opacity}`;
+    const el = b.canvas, w = this.win, half = b.w / 2;
+    el.style.cssText = `position:absolute;left:${w.x - half - b.pad}px;top:${w.y - half - b.pad}px;width:${b.w + b.pad * 2}px;height:${b.h + b.pad * 2}px;pointer-events:none;opacity:${opacity}`;
     host.insertBefore(el, this.#layer.el);
     return el;
   }
@@ -168,20 +132,14 @@ export class PlanetChart {
     return cam ? globeOf(cam, l.w, l.h, this.#mat, this.#eye) : null;
   }
 
-  /** The coasts inked to `tc` and the seas' signs, one after another, to `ts`, at `alpha`, in the window opened to a
-   *  radius of `open` (the window's own unless given). */
-  ink(pen: Pen, gc: CanvasRenderingContext2D, globe: Globe, tc: number, ts: number, alpha: number, open = this.win.r): void {
-    if (alpha <= 0 || (tc <= 0 && ts <= 0)) return;
-    const w = this.win, clip = new Path2D(), P = this.#P, signs = this.#signsNow();
-    clip.arc(w.x, w.y, open, 0, TAU);
+  /** The coasts inked to `tc` at `alpha`, in the window. */
+  ink(pen: Pen, gc: CanvasRenderingContext2D, globe: Globe, tc: number, alpha: number): void {
+    if (alpha <= 0 || tc <= 0) return;
+    const w = this.win, clip = new Path2D();
+    clip.arc(w.x, w.y, w.r, 0, TAU);
     gc.save();
     gc.clip(clip);
     pen.mood({ dry: 1 - COAST * alpha * (1 - pen.dry) }, () => coasts(pen, this.#h.coasts(), globe, {}, tc));
-    for (let i = 0; i < REGIONS.length; i++) {
-      const t = stagger(ts, i, REGIONS.length, 0.3), c = CENTRES[i], f = facing(globe, c);
-      if (t <= 0 || f <= 0.12 || !globe.project(c.x, c.y, c.z, P)) continue;
-      drawSprite(gc, signs[i], P.x, P.y, { alpha: alpha * (1 - pen.dry) * ease.out(t) * smooth(0.12, 0.3, f), scale: 0.85 + 0.15 * ease.back(t) });
-    }
     gc.restore();
   }
 
