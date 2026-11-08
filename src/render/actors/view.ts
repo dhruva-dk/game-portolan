@@ -101,6 +101,8 @@ export interface LootView {
   rarity: Rarity;
   /** Seconds since it appeared, for the pop-in. */
   age: number;
+  /** Within the player's pickup reach: its mark brightens, and the hotbar offers the swap when the hold is full. */
+  near?: boolean;
 }
 
 /** The whale on its route: deep (unseen), rising, at the surface (blowing now and then) or diving, k 0..1 through each. */

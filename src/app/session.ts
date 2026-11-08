@@ -17,7 +17,7 @@ import {
 } from '../sim/match.ts';
 import { ebbAt, sunHeight } from '../sim/environment.ts';
 import { R, along, angleTo, apart, flatten, surfaceDistance, tangentAt, tangentToward, turned } from '../sim/sphere.ts';
-import { ABOUT, DAY, WEAPONS, isWeapon } from '../sim/tables.ts';
+import { ABOUT, DAY, LOOT, WEAPONS, isWeapon } from '../sim/tables.ts';
 import { landing } from '../sim/combat.ts';
 import { newSky, skyAt, vigour } from '../sim/weather.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
@@ -396,10 +396,12 @@ export class Session implements Stepper {
       }
       shots.push(view);
     }
-    const loot = this.loot;
+    const loot = this.loot, me = s.ships[PLAYER], afloat = me.phase === PHASE.sea;
     loot.length = 0;
     for (const l of s.loot) {
-      loot.push({ id: l.id, pos: metres(l.at), kind: lootKind(l.item.kind), rarity: Math.max(0, Math.min(4, l.item.rarity)) as 0, age: l.age });
+      // in reach as the sim's own sweep (items.ts pickups) measures it
+      const near = afloat && apart(me.pos, l.at) <= LOOT.reach;
+      loot.push({ id: l.id, pos: metres(l.at), kind: lootKind(l.item.kind), rarity: Math.max(0, Math.min(4, l.item.rarity)) as 0, age: l.age, near });
     }
     const wind = windAt(s, s.ships[this.watch].pos, WIND).v;
     return {

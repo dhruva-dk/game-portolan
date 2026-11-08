@@ -265,7 +265,10 @@ export class App {
     applyParchment(await parchment.sheets());
     setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
     mark('parchment');
-    this.actors = createActors(stage.scene, { radius: R, wave: stage.wave, overlay: stage.overlay, onJuice: (j, cause) => this.momentJuice.world(j, cause) });
+    this.actors = createActors(stage.scene, {
+      radius: R, wave: stage.wave, overlay: stage.overlay, sceneDepth: stage.post.scenePass.getTexture('depth'),
+      onJuice: (j, cause) => this.momentJuice.world(j, cause),
+    });
     // the ships are built after the planet, with the title up; leaving the title waits for them
     void stage.later(this.actors.group).then(() => { this.#shipsDone = true; });
     warmChart();

@@ -1,16 +1,37 @@
-// Loot on the water: each item floats as a token of itself (the gun, the shield crystal, the repair cask, the coin),
-// turning slowly and bobbing on the swell, glowing in its rarity's colour (grey, green, blue, purple, gold) over a
-// halo on the water and under a column of light that rises higher the rarer it is.
+// Loot on the water, drawn as the chart would draw it: a cask (shields, repairs, coin) or a crate (a gun) rides the
+// swell inside an iron outline, and a column of hatching in its rarity's ink stands over it, scrolling upward, so a
+// piece reads as a mark inked onto the sea and its colour as how good it is. The hatching is written on the screen
+// in the chart's own inks, after the frame is exposed and toned, thins to a line of its colour far off, and fills in
+// cross-hatched when the piece is in the player's reach. Five draw calls for all of it: two shapes, their outlines,
+// and the hatching.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { onSea, tangents } from './common.ts';
-import { beamNodeMaterial, tokenNodeMaterial } from './tsl/loot.ts';
-import { RARITY_GLOW, type Effects } from './effects.ts';
-import { SPRITE } from './particles.ts';
-import { WEAPONS, type LootKind, type LootView, type Weapon } from './view.ts';
+import { hatchNodeMaterial, outlineNodeMaterial, woodNodeMaterial } from './tsl/loot.ts';
+import { INKS, type InkName } from '../../chart/inks.ts';
+import { WEAPONS, type LootKind, type LootView } from './view.ts';
 
-const KINDS: readonly LootKind[] = [...WEAPONS, 'smallShield', 'bigShield', 'repairKit', 'fullRepair', 'coin'];
+/** Each rarity's ink, common to legendary, from the chart's pots: silver, verdigris, azurite, vermilion, shell gold.
+ *  The interface takes its rarity colours from here too, so a mark on the water matches its slot in the hold. */
+export const LOOT_INKS: readonly InkName[] = ['silver', 'green', 'blue', 'rubric', 'gold'];
+/** The same as '#rrggbb', by rarity, for the interface's styles. */
+export const LOOT_INK_HEX: readonly string[] = LOOT_INKS.map((n) => '#' + INKS[n].rgb.map((c) => c.toString(16).padStart(2, '0')).join(''));
+
+/** A pot as a linear colour for the renderer. */
+const linear = (n: InkName): THREE.Color => {
+  const [r, g, b] = INKS[n].rgb;
+  return new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+};
+const INK = LOOT_INKS.map(linear);
+const IRON = linear('iron');
+
 const CAP = 200;
+/** How far a piece's shape is drawn; its column is drawn as far as it can be seen. */
+const SHAPE_RANGE = 320;
+const COLUMN_RANGE = 700;
+
+type Shape = 'cask' | 'crate';
+const shapeOf = (k: LootKind): Shape => ((WEAPONS as readonly string[]).includes(k) ? 'crate' : 'cask');
 
 /** A cask on its side: bellied staves, a hoop near each end and one round each side of the belly. */
 function cask(r: number, len: number): THREE.BufferGeometry {
@@ -24,56 +45,35 @@ function cask(r: number, len: number): THREE.BufferGeometry {
   return new THREE.LatheGeometry(pts, 14).rotateZ(Math.PI / 2);
 }
 
-/** A ship's gun as it stands on deck: its mount, and its barrel on the pivot. */
-export interface GunShape { base: THREE.BufferGeometry; barrel: THREE.BufferGeometry; pivot: number }
-
-function tokenGeometry(kind: LootKind, guns: Map<Weapon, GunShape>): THREE.BufferGeometry {
-  switch (kind) {
-    case 'smallShield': return new THREE.OctahedronGeometry(0.6, 0).scale(0.8, 1.3, 0.8);
-    case 'bigShield': return new THREE.OctahedronGeometry(0.85, 0).scale(0.85, 1.45, 0.85);
-    case 'repairKit': return cask(0.46, 1.0);
-    case 'fullRepair': return cask(0.64, 1.3);
-    case 'coin': return new THREE.CylinderGeometry(0.55, 0.55, 0.12, 20).rotateX(Math.PI / 2);
-    default: {
-      // the gun on its mount with the barrel cocked up, so it reads as a gun and not a length of pipe on the water;
-      // the broadside's mount is only a sighting post, so its short gun sits on a truck carriage of its own
-      const gun = guns.get(kind)!;
-      if (kind === 'broadside') return centred(mergeGeometries([...truck(), plain(gun.barrel.clone().rotateX(-0.15).translate(0, 0.62, -0.1))]));
-      const barrel = gun.barrel.clone().rotateX(-0.4).translate(0, gun.pivot, 0);
-      return centred(mergeGeometries([gun.base.clone(), barrel]));
-    }
-  }
+/** A crate: a box with a batten round it near each end. */
+function crate(): THREE.BufferGeometry {
+  const parts = [new THREE.BoxGeometry(1.15, 0.95, 0.95)];
+  for (const x of [-0.4, 0.4]) parts.push(new THREE.BoxGeometry(0.1, 1.02, 1.02).translate(x, 0, 0));
+  return mergeGeometries(parts);
 }
 
-/** A ship's gun carriage: two cheeks on a bed, on four small wheels, in the barrel's frame (along +z). */
-function truck(): THREE.BufferGeometry[] {
-  const parts: THREE.BufferGeometry[] = [new THREE.BoxGeometry(0.6, 0.1, 1.0).translate(0, 0.24, 0)];
-  for (const x of [-0.3, 0.3]) parts.push(new THREE.BoxGeometry(0.12, 0.4, 1.05).translate(x, 0.44, 0));
-  for (const z of [-0.36, 0.38]) {
-    parts.push(new THREE.CylinderGeometry(0.05, 0.05, 0.84, 6).rotateZ(Math.PI / 2).translate(0, 0.17, z));
-    for (const x of [-0.4, 0.4]) parts.push(new THREE.CylinderGeometry(0.17, 0.17, 0.1, 12).rotateZ(Math.PI / 2).translate(x, 0.17, z));
-  }
-  return parts;
+/** The same shape with one normal a corner, so the outline's hull swells evenly instead of splitting at the edges. */
+function hull(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const h = g.clone();
+  h.deleteAttribute('normal');
+  h.deleteAttribute('uv');
+  const merged = mergeVertices(h);
+  merged.computeVertexNormals();
+  return merged;
 }
 
-/** The ship builder's extra attributes dropped, so its parts merge with plain shapes. */
-function plain(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
-  return g;
-}
-
-/** Centred on its bounding box and scaled up a little to read on the water. */
-function centred(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  g.computeBoundingBox();
-  const c = g.boundingBox!.getCenter(new THREE.Vector3());
-  return g.translate(-c.x, -c.y, -c.z).scale(1.15, 1.15, 1.15);
-}
+interface Shapes { body: THREE.InstancedMesh; outline: THREE.InstancedMesh; n: number }
 
 export class Loot {
+  /** The pieces, in the world. */
   readonly group = new THREE.Group();
-  private readonly tokens = new Map<LootKind, THREE.InstancedMesh>();
-  private readonly beams: THREE.InstancedMesh;
-  private readonly fx: Effects;
+  /** The columns of hatching, written on the screen (the stage's overlay). */
+  readonly marks: THREE.Mesh;
+  private readonly shapes: Record<Shape, Shapes>;
+  private readonly geo: THREE.InstancedBufferGeometry;
+  private readonly foot: THREE.InstancedBufferAttribute;
+  private readonly ink: THREE.InstancedBufferAttribute;
+  private readonly size: THREE.InstancedBufferAttribute;
   private readonly tmp = new THREE.Matrix4();
   private readonly rot = new THREE.Matrix4();
   private readonly sc = new THREE.Matrix4();
@@ -81,84 +81,72 @@ export class Loot {
   private readonly a = new THREE.Vector3();
   private readonly b = new THREE.Vector3();
   private readonly p = new THREE.Vector3();
-  private readonly beamU = { uTime: { value: 0 } };
+  private readonly sea = new THREE.Vector3();
 
-  constructor(fx: Effects, guns: Map<Weapon, GunShape>) {
-    this.fx = fx;
-    for (const k of KINDS) {
-      const shieldy = k === 'smallShield' || k === 'bigShield';
-      const base = shieldy ? { color: 0x9fe8ff, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.88 }
-        : k === 'coin' ? { color: 0xffc843, roughness: 0.25, metalness: 0.95 }
-          : k === 'repairKit' || k === 'fullRepair' ? { color: 0x8b6a48, roughness: 0.75 }
-            // iron with enough of a matt skin for the sun to model it: fully metal, with no sky in the scene for it to
-            // mirror, it showed only its glow, a flat grey cutout on the water
-            : { color: 0x58534c, roughness: 0.5, metalness: 0.45 };
-      const glow = shieldy ? 0.6 : k === 'coin' ? 0.35 : 0.28;
-      const m = tokenNodeMaterial(base, glow);
-      const mesh = new THREE.InstancedMesh(tokenGeometry(k, guns), m, CAP);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
-      mesh.count = 0;
-      mesh.frustumCulled = false;
-      this.tokens.set(k, mesh);
-      this.group.add(mesh);
-    }
-    const bc = new THREE.CylinderGeometry(0.5, 0.8, 1, 12, 1, true).translate(0, 0.5, 0);
-    const bm = beamNodeMaterial();
-    this.beams = new THREE.InstancedMesh(bc, bm, CAP);
-    this.beams.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
-    this.beams.count = 0;
-    this.beams.frustumCulled = false;
-    this.beams.renderOrder = 6;
-    this.group.add(this.beams);
+  constructor(sceneDepth: THREE.Texture | null) {
+    const make = (g: THREE.BufferGeometry, colour: number, roughness: number): Shapes => {
+      const body = new THREE.InstancedMesh(g, woodNodeMaterial(colour, roughness), CAP);
+      body.count = 0;
+      body.frustumCulled = false;
+      // the outline rides the same instance matrices, set once for both
+      const outline = new THREE.InstancedMesh(hull(g), outlineNodeMaterial(IRON, 1.3), CAP);
+      outline.instanceMatrix = body.instanceMatrix;
+      outline.count = 0;
+      outline.frustumCulled = false;
+      this.group.add(body, outline);
+      return { body, outline, n: 0 };
+    };
+    this.shapes = { cask: make(cask(0.55, 1.2), 0x8b6a48, 0.75), crate: make(crate(), 0xa08a5e, 0.8) };
+    const geo = (this.geo = new THREE.InstancedBufferGeometry());
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0], 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const attr = (k: number) => new THREE.InstancedBufferAttribute(new Float32Array(CAP * k), k).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('iFoot', (this.foot = attr(4)));
+    geo.setAttribute('iInk', (this.ink = attr(4)));
+    geo.setAttribute('iSize', (this.size = attr(2)));
+    geo.instanceCount = 0;
+    this.marks = new THREE.Mesh(geo, hatchNodeMaterial(sceneDepth));
+    this.marks.frustumCulled = false;
+    this.marks.renderOrder = 10;
   }
 
   update(items: readonly LootView[], t: number, eye: THREE.Vector3): void {
-    this.beamU.uTime.value = t;
-    const counts = new Map<LootKind, number>();
-    let nb = 0;
-    const col = new THREE.Color();
+    const F = this.foot.array as Float32Array, I = this.ink.array as Float32Array, S = this.size.array as Float32Array;
+    for (const s of Object.values(this.shapes)) s.n = 0;
+    let nh = 0;
     for (const l of items) {
       const d = eye.distanceTo(this.p.set(l.pos.x, l.pos.y, l.pos.z));
-      if (d > 520) continue;
-      const c = RARITY_GLOW[l.rarity];
+      if (d > COLUMN_RANGE) continue;
       this.up.copy(this.p).normalize();
       tangents(this.up, this.a, this.b);
-      // the beam, standing up from the water
-      const sea = onSea(this.p, 0, new THREE.Vector3());
-      if (nb < CAP) {
-        const h = 14 + l.rarity * 7, w = d > 300 ? 1.5 : 1;
-        this.tmp.makeBasis(this.a, this.up, this.b).setPosition(sea);
-        this.sc.makeScale(w, h, w);
-        this.beams.setMatrixAt(nb, this.tmp.multiply(this.sc));
-        this.beams.setColorAt(nb, col.copy(c).multiplyScalar(1.6 * (0.35 + l.rarity * 0.18) * w));
-        nb++;
-      }
-      if (d > 260) continue;
-      const mesh = this.tokens.get(l.kind)!;
-      const i = counts.get(l.kind) ?? 0;
-      if (i >= CAP) continue;
-      counts.set(l.kind, i + 1);
+      const sea = onSea(this.p, 0, this.sea);
       // pops up out of the water when it appears, then bobs and turns
       const pop = Math.min(1, l.age * 2.5);
-      const lift = 1.5 + Math.sin(t * 2 + l.id) * 0.25 - (1 - pop) * 2;
-      this.tmp.makeBasis(this.a, this.up, this.b).setPosition(sea.clone().addScaledVector(this.up, lift));
-      this.rot.makeRotationY(t * 1.4 + l.id).multiply(this.sc.makeRotationX(l.kind === 'repairKit' || l.kind === 'fullRepair' ? 0.3 : 0.15));
-      this.tmp.multiply(this.rot).multiply(this.sc.makeScale(0.4 + pop * 0.6, 0.4 + pop * 0.6, 0.4 + pop * 0.6));
-      mesh.setMatrixAt(i, this.tmp);
-      mesh.setColorAt(i, c);
-      // a halo on the water under it
-      if (d < 140) {
-        const r = onSea(this.p, 0.12, this.p);
-        this.fx.glow.emit({ x: r.x, y: r.y, z: r.z, life: 0, size: 1.6 + Math.sin(t * 3 + l.id) * 0.15, r: c.r * 1.2, g: c.g * 1.2, b: c.b * 1.2, a: 0.7, frame: SPRITE.ring, mode: 2, rot: 0 });
+      // the column, standing on the water, taller the rarer and shorter close to, where the piece itself is in view
+      if (nh < CAP) {
+        const h = (16 + l.rarity * 4) * pop * (0.5 + 0.5 * Math.min(1, Math.max(0, (d - 12) / 50)));
+        const ink = INK[l.rarity];
+        F[nh * 4] = sea.x + this.up.x * 0.4; F[nh * 4 + 1] = sea.y + this.up.y * 0.4; F[nh * 4 + 2] = sea.z + this.up.z * 0.4; F[nh * 4 + 3] = (l.id % 97) * 0.37;
+        I[nh * 4] = ink.r; I[nh * 4 + 1] = ink.g; I[nh * 4 + 2] = ink.b; I[nh * 4 + 3] = l.near ? 1 : 0;
+        S[nh * 2] = h; S[nh * 2 + 1] = 1.1;
+        nh++;
       }
+      if (d > SHAPE_RANGE) continue;
+      const shape = shapeOf(l.kind), set = this.shapes[shape];
+      if (set.n >= CAP) continue;
+      const lift = 1.2 + Math.sin(t * 2 + l.id) * 0.25 - (1 - pop) * 2;
+      this.tmp.makeBasis(this.a, this.up, this.b).setPosition(sea.addScaledVector(this.up, lift));
+      this.rot.makeRotationY(t * 0.5 + l.id).multiply(this.sc.makeRotationX(shape === 'cask' ? 0.25 : 0.1));
+      const k = 0.4 + pop * 0.6;
+      this.tmp.multiply(this.rot).multiply(this.sc.makeScale(k, k, k));
+      set.body.setMatrixAt(set.n++, this.tmp);
     }
-    for (const [k, mesh] of this.tokens) {
-      mesh.count = counts.get(k) ?? 0;
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    for (const s of Object.values(this.shapes)) {
+      s.body.count = s.outline.count = s.n;
+      s.body.instanceMatrix.needsUpdate = true;
     }
-    this.beams.count = nb;
-    this.beams.instanceMatrix.needsUpdate = true;
-    if (this.beams.instanceColor) this.beams.instanceColor.needsUpdate = true;
+    this.geo.instanceCount = nh;
+    for (const a of [this.foot, this.ink, this.size]) a.needsUpdate = true;
   }
 }

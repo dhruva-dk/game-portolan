@@ -45,6 +45,9 @@ export interface ActorsOptions {
   /** Where things written on the screen (the damage numbers) go, if the stage draws them over the finished frame;
    *  with the rest of the actors when absent. */
   overlay?: THREE.Object3D;
+  /** The scene's depth as drawn, for what is written on the screen (the loot's marks) to be hidden behind the world;
+   *  without it they are drawn over everything. */
+  sceneDepth?: THREE.Texture;
   /** Thin the player's own sail round the middle of the screen, where the crosshair is. Default true. */
   fadePlayerSail?: boolean;
   /** Camera shake, kicks, flashes, hit-stop and haptics, for the integration to route. */
@@ -129,13 +132,13 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
   const wakes = new Wakes();
   const numbers = new Numbers();
   const projectiles = new Projectiles(fx);
-  const loot = new Loot(fx, kit.turrets);
+  const loot = new Loot(options.sceneDepth ?? null);
   const gulls = new Gulls(fx);
   const whales = new Whales(fx);
   const lightning = new Lightning(fx);
   const ships = new THREE.Group();
   group.add(ships, wakes.mesh, loot.group, projectiles.group, gulls.group, whales.group, fx.group, shards.mesh, lightning.mesh, lightning.light);
-  (options.overlay ?? group).add(numbers.mesh);
+  (options.overlay ?? group).add(numbers.mesh, loot.marks);
   const auraGeo = new THREE.SphereGeometry(1, 48, 32);
 
   const fleet = new Map<number, Fleet>();
