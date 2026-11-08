@@ -239,6 +239,13 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const vRipple = varyingProperty('vec3', 'vOceanRipple');
   const vRippleE1 = varyingProperty('vec3', 'vOceanRippleE1');
   const vRippleE2 = varyingProperty('vec3', 'vOceanRippleE2');
+  // what changes over metres, not over a pixel, worked out at the grid's vertices and carried across its triangles:
+  // the haze between the eye and the water, the sky's light falling into it, and this region's water
+  const vAirLoss = varyingProperty('vec3', 'vOceanAirLoss');
+  const vAirLight = varyingProperty('vec3', 'vOceanAirLight');
+  const vSkyDown = varyingProperty('vec3', 'vOceanSkyDown');
+  const vDeep = varyingProperty('vec3', 'vOceanDeep');
+  const vExtinction = varyingProperty('vec3', 'vOceanExtinction');
   const near: Frame = { anchor: FRAME.nadir, axis: FRAME.gridE1 };
   mat.positionNode = Fn(() => {
     const a = displaced(FRAMES[0]);
@@ -269,7 +276,15 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     // on the sea's level: the tide's
     const level = float(P.planet.y).toVar();
     vLevel.assign(level.sub(R));
-    return up.mul(level).add(lift.mul(still));
+    const there = up.mul(level).add(lift.mul(still)).toVar();
+    const air = hazeAt(there);
+    vAirLoss.assign(air.loss);
+    vAirLight.assign(air.light);
+    vSkyDown.assign(skyLight(there, up));
+    const water = waterAt(up);
+    vDeep.assign(water.deep);
+    vExtinction.assign(water.extinction);
+    return there;
   })();
 
   // ----- fragment: the surface's slope, its unresolved roughness and its foam, worked out once at the top of the
@@ -488,15 +503,14 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const u = normalize(vUp);
     const v = normalize(cameraPosition.sub(p));
     const nv = max(dot(world, v), 0);
-    // the haze between the eye and the water: the floor seen through the water takes it as everything solid does, and
-    // the sea's whole light takes it again (outputNode)
-    const air = hazeAt(p);
-    airLoss.assign(air.loss);
-    airLight.assign(air.light);
+    // the haze between the eye and the water (from the vertices): the floor seen through the water takes it as
+    // everything solid does, and the sea's whole light takes it again (outputNode)
+    airLoss.assign(vAirLoss);
+    airLight.assign(vAirLight);
     const fresnel = float(0.02).add(pow(float(1).sub(nv), 5).mul(0.98));
     // what reaches into the water from above: the sky, and the sun and moon by their height (each while it lights
     // anything in view), the sun's taken away where something stands between it and the water
-    const sun = vec3(0).toVar(), down = skyLight(p, u).toVar();
+    const sun = vec3(0).toVar(), down = vec3(vSkyDown).toVar();
     If(BODIES.sun.greaterThan(0.5), () => {
       sun.assign(sunlight.mul(sunShade));
       down.addAssign(sun.mul(max(dot(u, P.sunDir), 0)));
@@ -505,7 +519,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       down.addAssign(moonlight.mul(max(dot(u, P.moonDir), 0)));
     });
     // this region's water: its own colour, and how far the eye sees into it
-    const water = waterAt(u);
+    const water = { deep: vDeep, extinction: vExtinction };
     // the captain's dye: the water's colour turned to theirs
     const inked = ink(u);
     const hue = inked.colour.div(max(dot(inked.colour, LUMA), 1e-3));
