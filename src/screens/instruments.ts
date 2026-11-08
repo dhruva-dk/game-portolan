@@ -241,6 +241,8 @@ export interface SlotOptions {
   count?: string;
   /** The chosen slot, its square gilt. */
   chosen?: boolean;
+  /** The ink of the square's inner line: what's in it, by its rarity. */
+  edge?: InkName;
   press?: number;
   alpha?: number;
   seed?: number;
@@ -277,9 +279,9 @@ export function slot(pen: Pen, b: Box, o: SlotOptions = {}, t = 1): void {
       leaf.closePath();
       pen.gilt(leaf, 'gold', b.x, b.y, b.w / 2, alpha * part(t, 0.2, 0.7));
       pen.stroke(outer, { w: 'fine', nib: 0.2, pool: 0.2, wobble: 0.2, seed, alpha: 0.9 * alpha }, part(t, 0, 0.6));
-      pen.stroke(inner, { w: 'hair', nib: 0.2, pool: 0.1, wobble: 0.2, seed: seed + 1, alpha: 0.8 * alpha }, part(t, 0.1, 0.7));
+      pen.stroke(inner, { w: 'hair', nib: 0.2, pool: 0.1, wobble: 0.2, seed: seed + 1, alpha: 0.8 * alpha, ...(o.edge ? { ink: o.edge } : {}) }, part(t, 0.1, 0.7));
     } else {
-      pen.stroke(square(0), { w: 'fine', nib: 0.2, pool: 0.2, wobble: 0.25, seed, alpha: 0.9 * alpha }, part(t, 0, 0.6));
+      pen.stroke(square(0), { w: o.edge ? 'bold' : 'fine', nib: 0.2, pool: 0.2, wobble: 0.25, seed, alpha: 0.9 * alpha, ...(o.edge ? { ink: o.edge } : {}) }, part(t, 0, 0.6));
     }
     // the item up and to the left a little, so its count has the corner to itself
     const wt = part(t, 0.3, 1);
@@ -332,14 +334,25 @@ export function sailsArc(pen: Pen, x: number, y: number, r: number, at: number, 
 
 // ── on the world itself: the stick and the reticle, in lead white ──
 
-/** The stick: a ring of lead white where the thumb set it down, the nub a small paper disc pushed (dx, dy) from it. */
-export function stickRing(pen: Pen, x: number, y: number, r: number, dx: number, dy: number, press = 0, alpha = 1, t = 1): void {
+/** The stick's ring of lead white where the thumb set it down, drawn alone so a live stick can bake it apart from its nub. */
+export function stickBase(pen: Pen, x: number, y: number, r: number, alpha = 1, t = 1): void {
   if (t <= 0) return;
   const n = Math.max(48, Math.ceil(r));
   pen.rule([arcPts(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * part(t, 0, 0.7), n)], { w: 'fine', ink: 'white', alpha: 0.8 * alpha, wobble: 0.3, seed: 81 });
   pen.rule([arcPts(x, y, r * 0.9, 0, TAU * part(t, 0.1, 0.8), n)], { w: 'hair', ink: 'white', alpha: 0.5 * alpha, wobble: 0.2, seed: 82 }, 1, [0, 4]);
+}
+
+/** The stick's nub: a small paper disc, for a ring of radius r. */
+export function stickNub(pen: Pen, x: number, y: number, r: number, press = 0, alpha = 1): void {
+  roundButton(pen, x, y, r * 0.36, null, { press, alpha, seed: 83 });
+}
+
+/** The stick: a ring of lead white where the thumb set it down, the nub a small paper disc pushed (dx, dy) from it. */
+export function stickRing(pen: Pen, x: number, y: number, r: number, dx: number, dy: number, press = 0, alpha = 1, t = 1): void {
+  if (t <= 0) return;
+  stickBase(pen, x, y, r, alpha, t);
   const nt = part(t, 0.4, 1);
-  if (nt > 0) roundButton(pen, x + dx, y + dy, r * 0.36, null, { press, alpha: alpha * nt, seed: 83 });
+  if (nt > 0) stickNub(pen, x + dx, y + dy, r, press, alpha * nt);
 }
 
 /** The reticle: a small cross in lead white over its ink shadow, open at the centre, where the guns bear. */
