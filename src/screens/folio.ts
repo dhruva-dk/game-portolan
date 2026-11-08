@@ -9,14 +9,16 @@
 // half-rolled under the frame still drags. The worn seal and the settings' bars are the only things drawn on top each
 // frame.
 import {
-  Press, bakeSeal, drawSeal, drawSprite, ease, figure, pressLook, prims, unroll, woodcut,
-  type Baked, type ChartLayer, type Illumination, type InkName, type Pen, type Pressable, type Rect, type Seal, type Sprite,
+  Press, WASH, arcPts, bakeSeal, drawGalleon, drawSeal, drawSprite, ease, figure, figureWidth, galleonSprite, hand, pennant, pressLook, prims, staff,
+  star, unroll, woodcut,
+  type Baked, type ChartLayer, type Device, type Illumination, type InkName, type Pen, type Pressable, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
 import type { AbilityId } from '../sim/abilities.ts';
-import type { AbilitiesModel, CosmeticView, LockerModel, RankModel, RivalsModel, Settings } from '../ui/model.ts';
+import { rankByName, type AbilitiesModel, type CosmeticView, type LockerModel, type RankModel, type RivalView, type RivalsModel, type Settings } from '../ui/model.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import { TIER_ILLUMINATION, card, cosmeticArt, kindArt, rarityInk, type Art } from './cards.ts';
+import { bar, pips } from './instruments.ts';
 
 /** The folios the tabs unroll. */
 export type Folio = 'abilities' | 'locker' | 'rank' | 'rivals';
@@ -30,6 +32,8 @@ export interface SheetHost {
   rank(): RankModel;
   rivals(): RivalsModel;
   settings(): Settings;
+  /** Matches sailed and won, for the rank folio. */
+  career(): { matches: number; wins: number };
   equipAbility(id: AbilityId): void;
   equipCosmetic(id: string): void;
   setSettings(s: Partial<Settings>): void;
@@ -80,6 +84,11 @@ const CARD_MIN = 104;
 const WORN = 26;
 /** How much of a press's touch target has to show before it can be pressed. */
 const TARGET = 56;
+
+/** How many tiers the rank's staff flies. */
+const TIERS = 8;
+/** The tiers' pennant colours, Iron to Legend. */
+const TIER_WASH: readonly string[] = ['#5a4a3a', '#a06a34', WASH.azure, WASH.gold, '#b4b8c2', '#8fcfe0', WASH.storm, WASH.vermilion];
 
 export class Sheets {
   readonly #layer: ChartLayer;
@@ -210,7 +219,7 @@ export class Sheets {
 
   /** Builds the sheet's strip for what is on it now. */
   #fill(name: SheetName): void {
-    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : { items: [], height: 0 };
+    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : name === 'rank' ? this.#rank() : { items: [], height: 0 };
     this.#refresh();
   }
 
@@ -229,8 +238,8 @@ export class Sheets {
     }
   }
 
-  #seal(ill: Illumination, size: number, device: 'star' | 'rose' = 'star', seed = 13): Seal {
-    const key = `${ill}|${size}|${device}|${seed}`;
+  #seal(ill: Illumination, size: number, device: Device = 'star', name = 'star', seed = 13): Seal {
+    const key = `${ill}|${size}|${name}|${seed}`;
     let s = this.#seals.get(key);
     if (!s) {
       s = bakeSeal(this.#layer.paper, this.#layer.layout.widths, ill, { size, dpr: this.#layer.dpr, device, seed });
@@ -332,6 +341,49 @@ export class Sheets {
     return { items, height: y, worn: () => Object.values(this.#h.locker().look) };
   }
 
+  // ── rank ──
+
+  /** My rank's seal on a staff of the tiers' pennants, the best I have reached marked; matches and wins as numerals; and
+   *  the cosmetics each tier brings. */
+  #rank(): Body {
+    const m = this.#h.rank(), marks = this.#h.career(), items: Item[] = [], W = this.#g!.W.w, h = 340, r = m.rank, cols = this.#cols();
+    items.push({
+      id: 'rank-staff', x: 0, y: 0, w: W, h,
+      bake: () => this.#bake(`rank|${r.index}|${m.bestTier}|${marks.matches}|${marks.wins}`, W, h, (pen, gc, cx, cy) => this.#staffOfTiers(pen, gc, cx, cy, W, h, m, marks)),
+    });
+    let y = h + 16;
+    for (let tier = 1; tier < TIERS; tier++) {
+      const rewards = m.rewards.filter((c) => c.unlock.by === 'rank' && c.unlock.tier === tier);
+      if (!rewards.length) continue;
+      const seal = this.#seal(TIER_ILLUMINATION[tier], 30);
+      y = this.#head(items, `tier-${tier}`, y, (pen, x, yy) => drawSeal(pen.g, seal, x, yy, { phase: 0.5 }));
+      y = this.#grid(items, rewards, cols, y, 1.2, (v, x, ky, w, ch) => this.#cosmetic(v, x, ky, w, ch, 401 + items.length)) + 14;
+    }
+    return { items, height: y, worn: () => Object.values(this.#h.locker().look) };
+  }
+
+  #staffOfTiers(pen: Pen, gc: CanvasRenderingContext2D, cx: number, cy: number, W: number, h: number, m: RankModel, marks: { matches: number; wins: number }): void {
+    const x0 = cx - W / 2, y0 = cy - h / 2 + 12, y1 = cy + h / 2 - 12, sx = x0 + 74, step = (y1 - y0 - 34) / TIERS, r = m.rank;
+    const hoist = (tier: number) => y1 - 26 - tier * step;
+    staff(pen, sx, y0, y1, 1, 5);
+    for (let tier = 0; tier < TIERS; tier++) {
+      const len = 130 + tier * 12, y = hoist(tier);
+      // a tier not reached yet is ink still faint on the page
+      pen.mood({ dry: tier > m.bestTier ? 0.62 : 0 }, () =>
+        pennant(pen, { x: sx + 2, y, length: len, height: Math.max(16, step * 0.56), colour: TIER_WASH[tier], dir: 1, phase: tier * 1.3, wind: 0.5, gilt: tier === r.tier, seed: 501 + tier }));
+      if (tier === m.bestTier) star(pen, sx + len + 22, y + Math.max(16, step * 0.56) / 2, 11, 1, 'gold');
+    }
+    const device: Device = r.tier < 6 ? { figure: String(r.step) } : 'star';
+    drawSeal(gc, this.#seal(TIER_ILLUMINATION[r.tier], 68, device, `step${r.tier < 6 ? r.step : 0}`), sx, hoist(r.tier) + Math.max(16, step * 0.56) / 2, { phase: 0.5 });
+    const right = cx + W / 2 - 6, size = 52;
+    const sailed = String(marks.matches), won = String(marks.wins);
+    const sw = figureWidth(sailed, size), ww = figureWidth(won, size), ym = cy - 30, yw = cy + 54;
+    figure(pen, sailed, right, ym + size * 0.5, size, { align: 'right', seed: 7 });
+    woodcut(pen, prims('hud.shipsLeft'), right - sw - 34, ym, 44);
+    figure(pen, won, right, yw + size * 0.5, size, { align: 'right', ink: 'rubric', seed: 8 });
+    star(pen, right - ww - 34, yw, 22, 1, 'gold');
+  }
+
   // ── what shows ──
 
   /** Offers what shows to be pressed, each hit clipped to the window; takes back what has gone. */
@@ -408,3 +460,4 @@ export class Sheets {
     return { x: S.x - paper.pad, y: S.y - paper.pad, w: S.w + paper.pad * 2, h: S.h + paper.pad * 2 };
   }
 }
+

@@ -758,6 +758,7 @@ export class App {
         rank: () => rankModel(this.career.career),
         rivals: () => rivalsModel(this.career.career),
         settings: () => this.settings.settings,
+        career: () => this.careerMarks(),
         equipAbility: (id: AbilityId) => this.equip((c) => equipAbility(c, id)),
         equipCosmetic: (id) => this.equip((c) => equipCosmetic(c, id)),
         setSettings: (s) => this.setSettings(s),

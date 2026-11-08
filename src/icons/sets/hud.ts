@@ -6,7 +6,7 @@ import {
 
 export type HudId = 'gust' | 'storm' | 'spiral' | 'shipsLeft' | 'kills' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'sail' | 'lantern' | 'gull';
 export type MenuId = 'play' | 'back' | 'settings' | 'locker' | 'abilities' | 'rivals' | 'chart' | 'rank' | 'close' | 'lock' | 'check'
-  | 'wheel' | 'chest' | 'burst' | 'pennants' | 'ships';
+  | 'wheel' | 'chest' | 'burst' | 'pennants' | 'ships' | 'speaker' | 'arrows';
 export type GullTierId = 'supplies' | 'armament' | 'treasure';
 
 /** The hull in profile, bow to the right, used by the hull glyph and the repair ability. */
@@ -178,6 +178,19 @@ export const MENU_ICONS: Record<MenuId, Prim[]> = {
   ships: [
     ...ship(6.4, 22.4, 0.56),
     ...all(ship(6.4, 22.4, 0.56), { tr: 'matrix(-1 0 0 1 24 0)' }),
+  ],
+  /** A speaker's cone and two waves leaving it. A sound's volume. */
+  speaker: [
+    fill('M2.6 9.4H7.2L13.2 4.2V19.8L7.2 14.6H2.6Z'),
+    line('M16 8.4C17.8 10.4 17.8 13.6 16 15.6', 1.9),
+    line('M18.8 5.8C22 9.4 22 14.6 18.8 18.2', 1.9),
+  ],
+  /** An arrow up and an arrow down, side by side. Invert the look. */
+  arrows: [
+    line('M8 20.6V6', 2.5),
+    fill(poly(8, 2, 12.8, 9.4, 3.2, 9.4)),
+    line('M16 3.4V18', 2.5),
+    fill(poly(16, 22, 11.2, 14.6, 20.8, 14.6)),
   ],
 };
 
