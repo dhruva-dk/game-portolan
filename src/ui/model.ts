@@ -316,28 +316,6 @@ export interface HudInput {
   pause: boolean;
 }
 
-export type Killer = Mark & { name: string; rank: string; temperament: string; weapon: WeaponId | null; grudge: number };
-
-export interface DeathModel {
-  place: number;
-  ships: number;
-  /** Who sank you, or null when the Storm or the sea did. */
-  killer: Killer | null;
-  cause: 'ship' | 'storm' | 'sea';
-  /** How: the weapon class, or ram, burn, ink, mine, wave, storm, lightning, ash, whale, rock, flood or sea. */
-  how: string;
-  kills: number;
-  damage: number;
-  survived: number;
-}
-
-export interface VictoryModel {
-  kills: number;
-  damage: number;
-  survived: number;
-  ships: number;
-}
-
 export interface ResultsModel {
   place: number;
   ships: number;

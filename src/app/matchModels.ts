@@ -1,8 +1,8 @@
-// The interface's view models from the match: what the HUD, death, victory and the results show, and the fleet's marks
+// The interface's view models from the match: what the HUD and the results show, and the fleet's marks
 // for the chart, read from the session and the career's changes. Like models.ts, the screens never see the simulation
 // itself.
 import {
-  ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, temperament, wornLook, type Career, type Look, type MatchChanges, type Rank,
+  ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, wornLook, type Career, type Look, type MatchChanges, type Rank,
 } from '../career/index.ts';
 import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
@@ -13,19 +13,19 @@ import {
 import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { GALE, GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS } from '../sim/tables.ts';
 import { R, angleTo, apart, tangentToward } from '../sim/sphere.ts';
 import { aimedAt } from '../sim/combat.ts';
 import { REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type DeathModel, type HudModel,
-  type Killer, type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot, type VictoryModel,
+  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type HudModel,
+  type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot,
   type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
 import type { MapShip, PlanetMapModel } from '../screens/fullmap.ts';
 import type { Rarity } from '../ui/parts/tokens.ts';
-import { causeName, consumableOf, itemKey, weaponOf } from './moments.ts';
+import { consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
 import { cosmeticsOf } from './views.ts';
 import type { CosmeticIds } from '../render/actors/index.ts';
@@ -282,30 +282,6 @@ export function hudModel(session: Session): HudModel {
     pickup: pickupOf(s, sh),
     map: mapOf(session, session.watch),
   };
-}
-
-/** A captain as the death screen names it. */
-function killerOf(session: Session, i: number, weapon: number): Killer {
-  const e = session.plan.fleet[i - 1], cap = CAPTAINS[captainIndex(e.captain)];
-  return {
-    ...markOf(cap?.look ?? e.look), name: session.names[i], rank: e.rank, temperament: cap ? temperament(cap.temperament).name : '',
-    weapon: isWeapon(weapon) ? (weaponOf(weapon) as WeaponId) : null, grudge: session.state.ships[i].captain.grudge,
-  };
-}
-
-export function deathModel(session: Session): DeathModel {
-  const s = session.state, me = s.ships[PLAYER], t = session.tally.ships[PLAYER];
-  const by = me.by >= 1 && me.by < SHIPS ? me.by : -1, cause = causeName(me.cause);
-  return {
-    place: me.place || afloat(s) + 1, ships: SHIPS, killer: by > 0 ? killerOf(session, by, me.cause) : null,
-    cause: by > 0 ? 'ship' : cause === 'storm' ? 'storm' : 'sea', how: cause,
-    kills: me.kills, damage: Math.round(t.damage), survived: Math.round(t.sunkAt >= 0 ? t.sunkAt : session.seconds),
-  };
-}
-
-export function victoryModel(session: Session): VictoryModel {
-  const me = session.me, t = session.tally.ships[PLAYER];
-  return { kills: me.kills, damage: Math.round(t.damage), survived: Math.round(session.seconds), ships: SHIPS };
 }
 
 function abilityView(id: AbilityId): AbilityView {

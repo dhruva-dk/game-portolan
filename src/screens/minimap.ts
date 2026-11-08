@@ -7,7 +7,7 @@ import {
 } from '../chart/index.ts';
 import type { Controls } from '../app/controls.ts';
 import type { MapView } from '../ui/model.ts';
-import { LandLayer } from '../ui/screens/chart.ts';
+import { LandLayer } from './land.ts';
 import { stickBase, stickNub } from './instruments.ts';
 
 const TAU = Math.PI * 2;

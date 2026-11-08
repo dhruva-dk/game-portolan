@@ -1,7 +1,7 @@
 // The HUD's map: it samples the land round the ship itself as she sails.
-import { DRAFT, heightExact } from '../../sim/world/index.ts';
-import { R, fromLatLon, localFrame } from '../../sim/sphere.ts';
-import { v3, type V3 } from '../../sim/math.ts';
+import { DRAFT, heightExact } from '../sim/world/index.ts';
+import { R, fromLatLon, localFrame } from '../sim/sphere.ts';
+import { v3, type V3 } from '../sim/math.ts';
 
 const DEG = Math.PI / 180;
 type RGB = readonly [number, number, number];

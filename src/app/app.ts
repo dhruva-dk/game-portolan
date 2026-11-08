@@ -13,10 +13,7 @@ import type { StageView } from '../render/stage.ts';
 import { sunDirection } from '../render/sun.ts';
 import { createActors, type Actors } from '../render/actors/index.ts';
 import { rockTexturesReady } from '../render/rocks/index.ts';
-import { Studio } from '../render/studio.ts';
 import { Parchment } from '../render/paper/parchment.ts';
-import type { Weapon } from '../render/actors/view.ts';
-import { setStudio } from '../ui/parts/art.ts';
 import { careerStats, equipAbility, equipCosmetic, wornLook, type Career } from '../career/index.ts';
 import { R, TERRITORY, cellOf } from '../sim/sphere.ts';
 import { PHASE, PLAYER, SHIPS, TICK, WEATHER_KIND, landmarkHold } from '../sim/match.ts';
@@ -39,7 +36,7 @@ import { CareerHolder } from './career.ts';
 import { abilitiesModel, levelView, lockerModel, rankModel, rankView, rivalsModel } from './models.ts';
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
-import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
+import { Shell } from '../ui/shell.ts';
 import { ChartLayer, Press, everywhere, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
 import { FullMap } from '../screens/fullmap.ts';
@@ -49,8 +46,7 @@ import type { SheetName } from '../screens/folio.ts';
 import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
-import { page } from '../ui/screens/frame.ts';
-import { applyParchment, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
+import { applyParchment, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import type { HudModel, ResultsModel, Settings } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
@@ -295,12 +291,8 @@ export class App {
     mark('warm');
     await this.actors.ready;
     mark('actors ready');
-    // the locker's cards and the rewards are drawn from the ship itself
-    const studio = new Studio(stage.renderer, this.actors.kit);
-    // a weapon's art is its mount on her deck; anything else is a cosmetic as worn
-    setStudio((kind, id) => (kind === 'weapon' ? studio.weapon(id as Weapon) : studio.cosmetic(kind, id)));
     await rockTexturesReady();
-    mark('studio and rocks');
+    mark('rocks');
     stage.snap();
     this.progress = 1;
     this.ready = true;
@@ -368,42 +360,9 @@ export class App {
     if (name === 'spectate') this.startSpectating(model);
     if (name === 'victory') this.startVictory();
     if (name === 'results') this.openResult(model as ResultsModel);
-    const view = this.screenView(name, model);
-    this.shell.show(name, view, transition(from, name));
-  }
-
-  private screenView(name: ScreenName, model?: unknown): ScreenView {
-    const career = this.career.career;
-    switch (name) {
-      // drawn on the chart (the title, the lobby and its sheets, the Gale, spectating), or nothing at all
-      case 'boot':
-      case 'title':
-      case 'lobby':
-      case 'abilities':
-      case 'locker':
-      case 'rivals':
-      case 'rank':
-      case 'settings':
-      case 'gale':
-      case 'spectate':
-      case 'victory':
-      case 'results':
-        return { el: el('s-empty') };
-      default:
-        return this.matchView(name, model) ?? this.placeholder(name);
-    }
-  }
-
-  /** The screens over a match, from the live session or a model the hook hands in; null when there is neither. */
-  private matchView(name: ScreenName, model?: unknown): ScreenView | null {
-    const s = this.session;
-    switch (name) {
-      case 'match':
-        // the HUD is on the chart (openHud); touches it does not take go through this empty screen to the controls
-        return !model && !s ? null : { el: el('s-empty') };
-      default:
-        return this.placeholder(name);
-    }
+    // a screen giving way to the next, unless the chart's own sheets are what moved
+    const quiet = from === 'title' || folio(from) || folio(name);
+    effect(`screen:${name}`, quiet ? 'none' : 'whoosh', 'none');
   }
 
   /** She has sunk: the camera cuts to the captain who sank her, or the best captain still afloat, and the HUD keeps only
@@ -461,14 +420,6 @@ export class App {
     }
   }
 
-  /** A screen still being built: its frame, its name, and a way back. */
-  private placeholder(name: ScreenName): ScreenView {
-    const back = name === 'results' ? 'lobby' : null;
-    const p = page({ title: name[0].toUpperCase() + name.slice(1), onBack: back ? () => this.go(back) : undefined });
-    el('s-page__note', p.body, esc(`The ${name} screen is not built yet.`));
-    return p;
-  }
-
   /** Jumps to a fixed scene, leaving any match. */
   scene(input: SceneInput): SceneSpec {
     if (this.session) this.leaveMatch();
@@ -478,7 +429,6 @@ export class App {
     this.view = s;
     this.fixed = true;
     this.stage?.snap();
-    this.shell.show('scene', { el: el('s-empty') }, 'none');
     return s;
   }
 
@@ -1106,16 +1056,6 @@ export class App {
     e.t = 0.1;
     this.audio.setAmbience(mix());
   }
-}
-
-/** How one screen gives way to the next. */
-function transition(from: ScreenName, to: ScreenName): Transition {
-  if (from === 'boot') return 'fade';
-  // the lobby is already there when the title's sheet rolls off it
-  if (from === 'title') return 'none';
-  // a folio's sheet is the chart's to unroll
-  if ((MENUS as readonly string[]).includes(to) || (MENUS as readonly string[]).includes(from)) return 'none';
-  return 'fade';
 }
 
 /** The safe areas' insets as the page resolves them, CSS pixels. */

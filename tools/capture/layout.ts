@@ -75,7 +75,7 @@ async function measure(game: Game): Promise<Measured> {
       }
       return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     };
-    const SEL = 'button, [role="button"], .p-tile, .p-row[data-part], .s-globe, [data-what]';
+    const SEL = 'button, [role="button"], [data-what]';
     const seen = new Set<Element>();
     const targets = [...ui.querySelectorAll(SEL)].filter((e) => {
       // the innermost target counts once: a button's own face or label is not another target
