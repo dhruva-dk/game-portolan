@@ -4,7 +4,7 @@
 // The scene is drawn at a fixed share of the canvas and brought up to it with a bilinear sample (post.ts); the canvas
 // holds the screen's pixels up to three quarters of the floor's panel each way. Every pass that wants fewer pixels
 // asks for them itself.
-import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, type Node } from 'three/webgpu';
+import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, type Material, type Node } from 'three/webgpu';
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
 import { batchSubmits } from './submits.ts';
@@ -31,6 +31,32 @@ TextureNode.prototype.getTransformedUV = function (this: TextureNode, uv: Node):
   if (t.matrixAutoUpdate) t.updateMatrix();
   return t.matrix.equals(IDENTITY) ? uv : transformed.call(this, uv);
 } as typeof TextureNode.prototype.getTransformedUV;
+
+// A shadow pass draws every object with one material, which three dresses in each object's own before drawing it:
+// its alphaTest among the rest, and a material's version goes up whenever its alphaTest crosses zero. The plants' cut
+// leaves have one and hulls and ground have none, so in every pass the version went up between one kind and the other,
+// and three worked the material's whole cache key out again for each object drawn after (about a sixth of the CPU's
+// frame in a fight). The shadow material's alphaTest now changes nothing, and its version goes up instead when an
+// object's own material is not what it was the last time that object cast a shadow: what three rebuilds for.
+const casters = new WeakMap<object, { material: Material; version: number }>();
+const quiet = new WeakSet<Material>();
+type RenderObject = (this: WebGPURenderer, object: object, scene: { overrideMaterial: Material | null }, camera: unknown, geometry: unknown, material: Material, ...rest: unknown[]) => void;
+const renderObject = (WebGPURenderer.prototype as unknown as { renderObject: RenderObject }).renderObject;
+(WebGPURenderer.prototype as unknown as { renderObject: RenderObject }).renderObject = function (object, scene, camera, geometry, material, ...rest) {
+  const over = scene.overrideMaterial as (Material & { isShadowPassMaterial?: boolean; _alphaTest: number }) | null;
+  if (over?.isShadowPassMaterial && material.allowOverride) {
+    if (!quiet.has(over)) {
+      quiet.add(over);
+      Object.defineProperty(over, 'alphaTest', { get() { return this._alphaTest; }, set(v: number) { this._alphaTest = v; }, configurable: true });
+    }
+    const was = casters.get(object);
+    if (!was || was.material !== material || was.version !== material.version) {
+      over.needsUpdate = true;
+      casters.set(object, { material, version: material.version });
+    }
+  }
+  renderObject.call(this, object, scene, camera, geometry, material, ...rest);
+};
 
 /** The share of the canvas's width and height the scene is drawn at, for each kind of device. */
 export const RENDER_SCALE = { phone: 0.6, tablet: 0.66, desktop: 0.9 } as const;
