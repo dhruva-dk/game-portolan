@@ -760,6 +760,7 @@ export class App {
       coasts: () => (this.coasts ??= traceCoasts(heightAt)),
       fov: ORBIT_FOV,
       model: () => planetMap(s),
+      ground: heightAt,
       mine: this.ownMark(),
       aim: (p) => s.aimFor(p),
       close: () => this.closeMap(),

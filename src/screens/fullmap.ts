@@ -34,6 +34,8 @@ export interface FullMapHost {
   /** The orbit view's field of view, degrees. */
   readonly fov: number;
   model(): PlanetMapModel;
+  /** The land's height at a point on the planet, metres over the sea (negative under it). */
+  ground(p: V3): number;
   /** Her colours and charge: her gilt mark. */
   mine: Colours;
   /** Sets or moves her marker. */
@@ -52,11 +54,24 @@ const TAP = 10;
 const NEAREST = 150;
 /** How high it can take it, metres over the sea: the whole planet in the window. */
 const FARTHEST = (DISTANCE - 1) * R;
+/** How far the eye keeps above the highest ground under the view, metres, however close the fingers ask for it. */
+const CLEAR = 60;
+/** How far out from under the view the ground is looked at, metres, so the eye rises ahead of a peak spun under it. */
+const AHEAD = 30;
 /** How fast the eye goes to the height asked of it, per second. */
 const FLY = 14;
 const TAU = Math.PI * 2;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const within = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
+
+/** Two unit tangents at the unit vector c. */
+function tangents(c: V3): { t: V3; b: V3 } {
+  const ref = Math.abs(c.y) > 0.9 ? { x: 1, y: 0, z: 0 } : { x: 0, y: 1, z: 0 };
+  let tx = c.y * ref.z - c.z * ref.y, ty = c.z * ref.x - c.x * ref.z, tz = c.x * ref.y - c.y * ref.x;
+  const l = Math.hypot(tx, ty, tz) || 1;
+  tx /= l; ty /= l; tz /= l;
+  return { t: { x: tx, y: ty, z: tz }, b: { x: c.y * tz - c.z * ty, y: c.z * tx - c.x * tz, z: c.x * ty - c.y * tx } };
+}
 
 export class FullMap {
   readonly #host: HTMLElement;
@@ -75,6 +90,8 @@ export class FullMap {
   #want = FARTHEST;
   #alt = FARTHEST;
   #flew = -1;
+  /** The lowest the eye may stand here, metres over the sea: the ground under the view and its clearance. */
+  #floor = 0;
   /** The point under the camera: what the app turns its orbit to. */
   centre: V3 = { x: 0, y: 0, z: 1 };
   /** The orbit's distance, in radii: a pinch can drive it; the window follows it (see `refit`). */
@@ -192,7 +209,8 @@ export class FullMap {
     for (const [k, q] of this.#fingers) if (k !== id) o = q;
     const d0 = Math.hypot(f.x - o.x, f.y - o.y), d1 = Math.hypot(x - o.x, y - o.y);
     if (d0 <= 8 || d1 <= 8) return;
-    const chart = this.#chart!, w = chart.win, a0 = this.#want, a1 = within((a0 * d0) / d1, NEAREST, FARTHEST);
+    const chart = this.#chart!, w = chart.win, a0 = Math.max(this.#want, this.#floor);
+    const a1 = within((a0 * d0) / d1, Math.max(NEAREST, this.#floor), FARTHEST);
     const rp0 = chart.pxPerRadian(a0), rp1 = chart.pxPerRadian(a1), k = 1 - rp0 / rp1;
     // the ground under the middle of the fingers stays there as the planet grows or shrinks about it
     carry(this.#turn, ((f.x + o.x) / 2 - w.x) * -k, ((f.y + o.y) / 2 - w.y) * -k, rp0);
@@ -204,8 +222,24 @@ export class FullMap {
   #fly(now: number): void {
     const dt = this.#flew < 0 ? 0 : Math.min(0.1, Math.max(0, (now - this.#flew) / 1000));
     this.#flew = now;
-    this.#alt += (this.#want - this.#alt) * (1 - Math.exp(-FLY * dt));
+    this.#floor = this.#ground() + CLEAR;
+    this.#alt += (Math.max(this.#want, this.#floor) - this.#alt) * (1 - Math.exp(-FLY * dt));
     this.distance = 1 + this.#alt / R;
+  }
+
+  /** The highest ground under the view and just round it, metres, never below the sea. */
+  #ground(): number {
+    const c = this.centre, { t, b } = tangents(c), a = AHEAD / R, ca = Math.cos(a), sa = Math.sin(a), h = this.#h;
+    let top = h.ground(c);
+    const q = { x: 0, y: 0, z: 0 };
+    for (let i = 0; i < 8; i++) {
+      const th = (i / 8) * TAU, u = sa * Math.cos(th), v = sa * Math.sin(th);
+      q.x = c.x * ca + t.x * u + b.x * v;
+      q.y = c.y * ca + t.y * u + b.y * v;
+      q.z = c.z * ca + t.z * u + b.z * v;
+      top = Math.max(top, h.ground(q));
+    }
+    return Math.max(0, top);
   }
 
   #lay(): void {
