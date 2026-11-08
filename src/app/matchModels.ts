@@ -121,6 +121,7 @@ function mapOf(session: Session, i: number): MapView {
   return {
     lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: MAP_RANGE,
     storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
+    marker: i === PLAYER && session.mark ? rel(session.mark) : null,
   };
 }
 
@@ -193,7 +194,7 @@ export function hudModel(session: Session): HudModel {
     passive: PASSIVES[sh.passive],
     gust: { charges: sh.gusts, max: GUST.charges, recharge: sh.gusts >= GUST.charges ? 1 : Math.min(1, sh.gustT / GUST.recharge) },
     storm: {
-      phase: SV.phase, phases: STORM.phases.length, seconds: Math.ceil(SV.left), shrinking: SV.closing, progress: stormProgress(SV),
+      phase: SV.phase, phases: STORM.phases.length, seconds: Math.ceil(SV.left), shrinking: SV.closing, grace: s.tick < s.storm.start, progress: stormProgress(SV),
       outside: inStorm(s, sh.pos), depth: Math.max(0, Math.min(1, -toEdge(s, sh.pos) / STORM_DEEP)),
     },
     ships: afloat(s),

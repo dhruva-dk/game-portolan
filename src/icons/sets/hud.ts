@@ -25,6 +25,9 @@ const spiral = (cx: number, cy: number, r0: number, r1: number, turns: number, a
   return path(...p);
 };
 
+/** The Storm's spiral wound `turns` times: tighter, the more turns. The clock winds it in as the circle closes. */
+export const stormSpiral = (turns: number): Prim[] => [line(spiral(12, 12, 10.6, 1.6, turns), 2), fill(circle(12, 12, 1.3))];
+
 export const HUD_ICONS: Record<HudId, Prim[]> = {
   gust: [
     line('M2.6 8.4H13.4A3 3 0 1 0 10.4 5.4', 2.5),
@@ -39,10 +42,7 @@ export const HUD_ICONS: Record<HudId, Prim[]> = {
     fill(stormArm, { tint: true, tr: 'rotate(270 12 12)', fine: true, op: 0.45 }),
   ],
   /** The Storm closing: a line winding in to the eye, for the clock. */
-  spiral: [
-    line(spiral(12, 12, 10.6, 1.6, 2.5), 2),
-    fill(circle(12, 12, 1.3)),
-  ],
+  spiral: stormSpiral(2.5),
   shipsLeft: ship(12, 21.6),
   kills: [
     // a ship going down by the bow

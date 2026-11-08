@@ -276,7 +276,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     ability: { id: 'smokeScreen', ready: fight ? 0.35 : 1, seconds: fight ? 23 : 0 },
     passive: 'quickReload',
     gust: { charges: fight ? 0 : storm ? 1 : 2, max: 2, recharge: fight ? 0.7 : 0.4 },
-    storm: { phase: storm ? 4 : 2, phases: 7, seconds: storm ? 38 : 72, shrinking: storm, progress: storm ? 0.3 : 0.1, outside: storm, depth: storm ? 0.5 : 0 },
+    storm: { phase: storm ? 4 : 2, phases: 7, seconds: storm ? 38 : 72, shrinking: storm, grace: false, progress: storm ? 0.3 : 0.1, outside: storm, depth: storm ? 0.5 : 0 },
     ships: fight ? 9 : storm ? 6 : 17, kills: fight ? 3 : storm ? 4 : 1, coins: fight ? 140 : 85,
     gull: {
       price: 20, ready: fight,
@@ -299,6 +299,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
         ? [{ x: 60, y: 40, emblem: 'lightning', colour: '#bbc949' }, { x: -90, y: 110, emblem: 'whale', colour: '#30abb7', spotted: true }, { x: 150, y: -60, emblem: 'octopus', colour: '#f498ea' }]
         : [{ x: 160, y: 120, emblem: 'owl', colour: '#b87ad9' }],
       marks: [{ x: -40, y: -70, kind: 'loot' }, { x: 120, y: 30, kind: 'gull' }, { x: -150, y: -30, kind: 'beacon' }],
+      marker: null,
     },
   };
 }
