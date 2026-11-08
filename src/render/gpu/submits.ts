@@ -6,6 +6,10 @@
 // runs, which is only safe if nothing held reads it: so every buffer a held pass binds, draws from or copies is noted,
 // and writing one of those first submits what is held. Anything else (a texture written, a read back, a buffer or
 // texture destroyed) always does.
+//
+// Neither is anything held while a shader or a pipeline is built: building one can hold the GPU's process for a long
+// while, and on iOS a submission waiting behind a burst of them nears the GPU's watchdog. What is held goes first, so
+// the GPU works on it while the compiler does.
 
 type Fn = (...a: unknown[]) => unknown;
 type Proto = { prototype: Record<string, Fn> };
@@ -14,7 +18,7 @@ interface BindGroupEntry { resource: unknown }
 
 const GPU = globalThis as unknown as Record<string, Proto>;
 
-export function batchSubmits(device: { queue: Queue; createBindGroup(d: { entries: BindGroupEntry[] }): object }): void {
+export function batchSubmits(device: { queue: Queue; createBindGroup(d: { entries: BindGroupEntry[] }): object; [op: string]: unknown }): void {
   const queue = device.queue, submit = queue.submit.bind(queue);
   let held: unknown[] = [];
   /** The buffers what is held (and what is being recorded) uses. */
@@ -43,6 +47,14 @@ export function batchSubmits(device: { queue: Queue; createBindGroup(d: { entrie
   for (const op of ['mapAsync', 'destroy']) first(GPU.GPUBuffer.prototype, op);
   first(GPU.GPUTexture.prototype, 'destroy');
   first(GPU.GPUQuerySet.prototype, 'destroy');
+  // (three builds a pipeline while it records the pass that draws with it, so what that pass uses stays noted)
+  for (const op of ['createShaderModule', 'createRenderPipeline', 'createComputePipeline', 'createRenderPipelineAsync', 'createComputePipelineAsync']) {
+    const f = device[op] as Fn | undefined;
+    if (f) device[op] = function (this: unknown, ...a: unknown[]) {
+      if (held.length) { submit(held); held = []; }
+      return f.apply(this, a);
+    };
+  }
 
   // the buffers in each bind group, noted as it is made
   const groups = new WeakMap<object, object[]>();
