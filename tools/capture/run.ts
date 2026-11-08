@@ -8,7 +8,7 @@
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
 //   npm run capture -- ui [--device ipad,ipadSmall,iphone,iphoneSmall] [--only a,b]  transition strips for each screen change (all four by default)
 //   npm run capture -- layout [--device …] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
-//   npm run capture -- perf                               frame time, triangles and draw calls per region
+//   npm run capture -- perf                               frame time, triangles and draw calls per region, and a fast zoom of the full map
 //   npm run capture -- fight [--seconds n]                #8's frozen fight: the median GPU time of each pass (12 s by default)
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
 //   npm run capture -- kit [--device ipad,iphone] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
