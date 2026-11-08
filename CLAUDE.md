@@ -1,6 +1,7 @@
 # Working
 
 Writeup what you built with screenshots in the relevant GitHub issue.
+Write any documentation you feel needed in the issue, not the repo.
 Do not deploy to vercel.
 Commit and push to main often, maintaining linear history.
 
