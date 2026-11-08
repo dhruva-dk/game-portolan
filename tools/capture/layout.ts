@@ -25,11 +25,10 @@ export const SCREENS: readonly Screen[] = [
   ...['abilities', 'locker', 'rivals', 'rank', 'settings'].map((s) => ({ name: s, setup: `h.go("${s}")` })),
   { name: 'gale', setup: 'h.play({ seed: 11 })' },
   { name: 'hud', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90)', thumbs: true },
-  // a first-time tip over the HUD (the starter weapon's, once the ship has settled), and the Gale's drawn hand
-  // the state row under the region tag (weather, the tide and three perks' chips), and a tip under it however it wraps
-  { name: 'hud-perks', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11, skipGale: true }); h.step(30); h.stagePlayer({ perks: ["betterLoot", "fastReload", "spotter"], weather: "rain" }); h.step(60); await h.run(4)' },
-  { name: 'hud-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11, skipGale: true }); h.step(90); await h.run(4)' },
-  { name: 'gale-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11 }); await h.run(1)' },
+  { name: 'hud-perks', setup: 'h.play({ seed: 11, skipGale: true }); h.step(30); h.stagePlayer({ perks: ["betterLoot", "fastReload", "spotter"], weather: "rain" }); h.step(60); await h.run(4)' },
+  // the teaching scraps, pinned clear of everything and taking no touches: one over the HUD, and the hand over DIVE
+  { name: 'hud-scrap', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.teach("closing"); await h.run(1)' },
+  { name: 'gale-scrap', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11 }); await h.run(4)' },
   { name: 'spectate', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)' },
   { name: 'results', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()' },
 ];

@@ -3,6 +3,7 @@
 // any screen with its live or fixture model, and read state.
 import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
+import type { ScrapId } from '../screens/scraps.ts';
 import { BEACON_LOOKS } from '../render/beacons/index.ts';
 import { BEACONS, REGIONS, heightAt } from '../sim/world/index.ts';
 import { ebbAt, seaLevelAt } from '../sim/environment.ts';
@@ -114,13 +115,15 @@ export function installHook(app: App) {
     },
     get app() { return app; },
 
-    // ── tips ──
-    /** Turns the first-time tips on or off (off in capture mode to start); returns the ones shown so far. */
+    // ── teaching ──
+    /** Turns the teaching scraps on or off (off in capture mode to start); returns the ones shown so far. */
     tips(on?: boolean) {
       if (on !== undefined) app.tips.on = on;
       return app.tips.shown;
     },
     forgetTips: () => app.tips.forget(),
+    /** Pins a teaching scrap over the HUD at once, without waiting for its moment. */
+    teach: (id: ScrapId) => app.teach(id),
 
     // ── moments ──
     moment: (name: string, seed: number) => app.moment(name, seed),
