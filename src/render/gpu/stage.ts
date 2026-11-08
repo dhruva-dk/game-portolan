@@ -17,6 +17,7 @@ import { AURORA, OVAL } from '../atmosphere/aurora.ts';
 import { Fog } from '../atmosphere/fog.ts';
 import { LANDMARKS, REGIONS } from '../../sim/world/index.ts';
 import { Fall } from '../atmosphere/fall.ts';
+import { GaleAir } from '../atmosphere/gale.ts';
 import { Ocean, CALM_SEA, type SeaState } from '../ocean/index.ts';
 import { Terrain } from '../terrain.ts';
 import { ScanCache } from '../land/scans.ts';
@@ -73,6 +74,7 @@ export class GpuStage {
   /** The grade for the hour and the weather where the eye is. */
   readonly colour = new ColourScript();
   readonly fall = new Fall();
+  readonly galeAir = new GaleAir();
   readonly beacons = new Beacons(1);
   readonly landmarks = new Landmarks();
   readonly floes = new Floes();
@@ -121,7 +123,7 @@ export class GpuStage {
     this.scene.add(this.ocean.mesh);
     this.scans = new ScanCache(renderer);
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
-    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.beacons.group, this.landmarks.group);
+    this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.galeAir.group, this.beacons.group, this.landmarks.group);
     this.scene.add(this.floes.group, this.moonbow.group, this.flora.group);
     this.flora.prepare = (group) => this.#compile(group, true);
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
@@ -223,6 +225,7 @@ export class GpuStage {
     P.snow.value = d.snow ?? 0;
     P.flash.value = this.clouds.flash;
     this.fall.update(eye, wind, { rain: P.rain.value, snow: P.snow.value, ash: d.ash ?? 0 });
+    this.galeAir.update(v.gale ?? null);
     // a squall raises the sea, a thunderhead most
     this.#seaFromWind(eye, wind, Math.max((d.rain ?? 0) * 0.55, d.thunder ?? 0));
     shape.system('sky');
@@ -319,7 +322,7 @@ export class GpuStage {
       group.visible = true;
       built();
     }
-    for (const group of [this.fall.group, this.moonbow.group, this.floes.group]) {
+    for (const group of [this.fall.group, this.galeAir.group, this.moonbow.group, this.floes.group]) {
       await this.#compile(group, true);
     }
     for (const group of sites) {

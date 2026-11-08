@@ -39,6 +39,8 @@ export interface StageView {
   storm: { centre: V3; radius: number } | null;
   /** Each cell's owner and trail as ship index + 1 (the simulation's grid), with a version that changes with them. */
   territory: { owner: Uint8Array; trail: Uint8Array; version: number; me: number } | null;
+  /** The Gale blowing round the fleet while it rides; left out when nothing is. */
+  gale?: { at: V3; way: V3; height: number; strength: number } | null;
   /** Screen-wide tints, 0…1: outside the safe circle, just hurt, and low on hull. */
   screen?: { storm: number; hurt: number; low: number };
 }
