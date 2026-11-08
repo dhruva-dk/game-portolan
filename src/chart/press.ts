@@ -63,6 +63,11 @@ export interface Pressable {
   /** 'up' (default) acts on release over it; 'down' acts at once (the HUD's controls). Acts where the finger is. */
   on?: 'up' | 'down';
   act?: (x: number, y: number) => void;
+  /**
+   * For an 'on: down' pressable, the finger lifting or being cancelled, wherever it is by then (Fire acts on down and
+   * holds until this). An 'up' pressable acts on release and has no use for it.
+   */
+  release?: (x: number, y: number) => void;
   disabled?: boolean;
 }
 
@@ -118,7 +123,12 @@ export class Presses {
     if (!p) return;
     this.#held.delete(pointer);
     p.press.up();
-    if (p.disabled || p.on === 'down' || cancelled || !hits(p, x, y)) return;
+    if (p.disabled) return;
+    if (p.on === 'down') {
+      p.release?.(x, y);
+      return;
+    }
+    if (cancelled || !hits(p, x, y)) return;
     feedback(p.sound ?? 'tap', p.haptic ?? 'light', p.id);
     p.act?.(x, y);
   }
