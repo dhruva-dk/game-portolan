@@ -698,6 +698,7 @@ export class App {
       sv.target = { pos: this.map.centre, heading: sv.target.heading, pull: 0 };
       stage.rig.orbitDistance = this.map.distance;
       sv.gale = null;
+      stage.terrain.hold = stage.scans.hold = this.map.restless;
     }
     stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => s.hearing());
@@ -787,7 +788,10 @@ export class App {
     this.controls.on = sailing;
     this.hud?.cover(false);
     this.gale?.cover(false);
-    this.stage?.rig.snap();
+    if (this.stage) {
+      this.stage.terrain.hold = this.stage.scans.hold = false;
+      this.stage.rig.snap();
+    }
   }
 
   /** Puts the lobby on the chart, its instruments laid as the title's sheet rolls off them and the title's rose landing

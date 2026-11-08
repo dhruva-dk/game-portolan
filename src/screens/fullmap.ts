@@ -62,6 +62,12 @@ const CLEAR = 60;
 const AHEAD = 30;
 /** How fast the eye goes to the height asked of it, per second. */
 const FLY = 14;
+/** The eye counts as moving fast above this zoom (natural-log change of its height a second) or this speed of the
+ *  ground across the window (pixels a second): while it does, the land asks for nothing new. */
+const FAST_ZOOM = 0.8;
+const FAST_SPIN = 1200;
+/** How long the eye must have been slow before the land catches up, milliseconds. */
+const REST = 250;
 /** The colour of the dark round the sheet when the planet outgrows the paper. */
 const VEIL = '#100b08';
 const TAU = Math.PI * 2;
@@ -97,6 +103,9 @@ export class FullMap {
   #want = FARTHEST;
   #alt = FARTHEST;
   #flew = -1;
+  /** The point under the eye the last frame, and when the eye last moved fast. */
+  #before: V3 | null = null;
+  #movedAt = -Infinity;
   /** The lowest the eye may stand here, metres over the sea: the ground under the view and its clearance. */
   #floor = 0;
   /** The point under the camera: what the app turns its orbit to. */
@@ -227,8 +236,20 @@ export class FullMap {
     const dt = this.#flew < 0 ? 0 : Math.min(0.1, Math.max(0, (now - this.#flew) / 1000));
     this.#flew = now;
     this.#floor = this.#ground() + CLEAR;
+    const alt0 = this.#alt;
     this.#alt += (Math.max(this.#want, this.#floor) - this.#alt) * (1 - Math.exp(-FLY * dt));
     this.distance = 1 + this.#alt / R;
+    const c = this.centre, p = this.#before;
+    if (dt > 0 && p) {
+      const ground = (Math.hypot(c.x - p.x, c.y - p.y, c.z - p.z) * this.#chart!.pxPerRadian(this.#alt)) / dt;
+      if (Math.abs(Math.log(this.#alt / alt0)) / dt > FAST_ZOOM || ground > FAST_SPIN) this.#movedAt = now;
+    }
+    this.#before = c;
+  }
+
+  /** Whether the eye is moving too fast for the land to chase: it asks for no chunk or scan until it slows. */
+  get restless(): boolean {
+    return this.#flew - this.#movedAt < REST;
   }
 
   /** The highest ground under the view and just round it, metres, never below the sea. */

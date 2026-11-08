@@ -49,6 +49,8 @@ export class ScanCache {
   readonly feel = uniformArray(LAYERS.map((l) => new Vector4(l.wet, l.normalScale, 0.8, 0.5)), 'vec4').setGroup(renderGroup);
   /** Scans resident now, for the stats. */
   resident = 0;
+  /** While true no new scan is fetched: the eye is moving faster than the ground should chase it. */
+  hold = false;
 
   readonly #device: Device;
   readonly #base: string;
@@ -88,6 +90,7 @@ export class ScanCache {
   update(eye: Vector3, dt: number): void {
     this.#clock += dt;
     this.#since += dt;
+    if (this.hold) return;
     if (this.#since >= EVERY) {
       this.#since = 0;
       this.#wanted = wantedScans(eye);

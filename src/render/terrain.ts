@@ -34,6 +34,8 @@ export class Terrain {
   /** The finest level (cells of about 0.4 m at 6), and the level every visible chunk reaches at least. */
   maxLevel = 6;
   minLevel = 2;
+  /** While true nothing new is asked for: the camera is moving faster than the land should chase it. */
+  hold = false;
   stats: TerrainStats = { drawn: 0, built: 0, pending: 0, queued: 0 };
   private readonly nodes = new Map<string, Node>();
   private readonly roots: Node[] = [];
@@ -198,14 +200,16 @@ export class Terrain {
     this.wanted = want.length;
     // nearest and coarsest first
     want.sort((a, b) => a.dist / a.side - b.dist / b.side);
-    if (this.workers.length) {
-      for (const n of want) {
-        const w = this.idle.at(-1);
-        if (!w) break;
-        this.ask(n, w);
+    if (!this.hold) {
+      if (this.workers.length) {
+        for (const n of want) {
+          const w = this.idle.at(-1);
+          if (!w) break;
+          this.ask(n, w);
+        }
+      } else {
+        for (const n of want.slice(0, 3)) this.accept(n, buildChunk({ id: 0, face: n.face, level: n.level, i: n.i, j: n.j }, CHUNK_N));
       }
-    } else {
-      for (const n of want.slice(0, 3)) this.accept(n, buildChunk({ id: 0, face: n.face, level: n.level, i: n.i, j: n.j }, CHUNK_N));
     }
     // forget chunks long out of use
     let built = 0;
