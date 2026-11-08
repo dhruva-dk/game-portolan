@@ -48,8 +48,7 @@ import { Hud } from '../screens/hud.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
 import { page } from '../ui/screens/frame.ts';
 import { deathScreen, resultsScreen, victoryScreen } from '../ui/screens/match.ts';
-import { warmChart } from '../ui/screens/chart.ts';
-import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
+import { applyParchment, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import type { DeathModel, HudModel, ResultsModel, Settings, VictoryModel } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
@@ -256,9 +255,8 @@ export class App {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    // the interface's parchment, rendered on the stage's own GPU, and the chart painted the same way
+    // the interface's parchment, rendered on the stage's own GPU
     applyParchment(await parchment.sheets());
-    setChartPainter((w, h, mask, sailed) => parchment.chart(w, h, mask, sailed));
     mark('parchment');
     this.actors = createActors(stage.scene, {
       radius: R, wave: stage.wave, overlay: stage.overlay, sceneDepth: stage.post.scenePass.getTexture('depth'),
@@ -266,7 +264,6 @@ export class App {
     });
     // the ships are built after the planet, with the title up; leaving the title waits for them
     void stage.later(this.actors.group).then(() => { this.#shipsDone = true; });
-    warmChart();
     mark('actors');
     // the first frame builds every material, a few at a time, before anything is drawn
     stage.onWarm = (f) => report(0.2 + 0.75 * f);
@@ -354,7 +351,6 @@ export class App {
       case 'abilities':
       case 'locker':
       case 'rivals':
-      case 'career':
       case 'rank':
       case 'settings':
       case 'gale':

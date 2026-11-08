@@ -29,8 +29,8 @@ export const TRANSITIONS: readonly Transition[] = [
     name: 'title-lobby', from: 'h.go("title"); h.freezeUi(true); h.scrubUi(6000); h.freezeUi(false)', to: 'h.go("lobby")',
     times: LEAVE_TITLE,
   },
-  // the lobby's scraps are laid and ink in over two seconds, and dry off in a third of one
-  ...['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'].flatMap((s) => [
+  // the lobby's folios unroll over it and roll back
+  ...['abilities', 'locker', 'rivals', 'rank', 'settings'].flatMap((s) => [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),

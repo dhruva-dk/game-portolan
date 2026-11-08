@@ -1,7 +1,7 @@
 // The screens and the ways between them. Title, then the lobby over the live planet with its menus, then the Gale, the
 // match, death and spectating or victory, the results, and back to the lobby.
 
-export const MENUS = ['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'] as const;
+export const MENUS = ['abilities', 'locker', 'rivals', 'rank', 'settings'] as const;
 export type MenuName = (typeof MENUS)[number];
 
 export const SCREENS = [

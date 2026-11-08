@@ -71,8 +71,6 @@ export function rarityFrame(rarity: Rarity, art: string, o: { name?: boolean; pa
   return f;
 }
 
-/** A small rarity gem and name, for text. */
-export const rarityLabel = (r: Rarity): string => `<span class="p-rar--${r}" style="display:inline-flex;align-items:center;gap:.35em;font-family:var(--f-display);font-weight:800;color:var(--rl)"><i class="p-rargem p-rar--${r}"></i>${RARITY[r].name}</span>`;
 
 export interface PanelOptions {
   title?: string;

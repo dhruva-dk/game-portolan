@@ -1,13 +1,11 @@
 // The interface's view models from the career: what each screen shows, read from the saved record. The screens never
 // see the career itself, and the career never sees the screens.
 import {
-  ABILITY_LEVEL, COSMETICS, careerLevel, careerRank, careerStats, chartOf, cosmetic, isUnlocked, levelOf, rivalsOf, unlockedAbilities, wornLook,
-  yourHabits, type Career, type Cosmetic,
+  ABILITY_LEVEL, COSMETICS, careerLevel, careerRank, isUnlocked, levelOf, rivalsOf, unlockedAbilities, wornLook, type Career, type Cosmetic,
 } from '../career/index.ts';
 import { ABILITIES, type ActiveId, type PassiveId } from '../sim/abilities.ts';
 import {
-  rarityOf, type AbilitiesModel, type CareerModel, type CosmeticView, type LevelView, type LockerModel, type PlayerView,
-  type RankModel, type RankView, type RivalsModel,
+  rarityOf, type AbilitiesModel, type CosmeticView, type LevelView, type LockerModel, type RankModel, type RankView, type RivalsModel,
 } from '../ui/model.ts';
 import { markOf } from './matchModels.ts';
 
@@ -20,17 +18,6 @@ export function rankView(c: Career): RankView {
   const r = careerRank(c);
   return { index: r.step.index, tier: r.step.tier, step: r.step.step, name: r.step.name, progress: r.progress, floored: r.floored };
 }
-
-const colourOf = (id: string, fallback: string): string => cosmetic(id)?.colour ?? fallback;
-
-export function playerView(c: Career): PlayerView {
-  const look = wornLook(c);
-  return {
-    name: 'Your ship', level: levelView(c), rank: rankView(c), bestTier: c.bestTier, emblem: look.emblem,
-    colours: [colourOf(look.sailColour, '#f4ead6'), colourOf(look.hullPaint, '#5a3423')],
-  };
-}
-
 
 /** Every ability, the ones your level has reached unlocked, with those the last match unlocked marked new. */
 export function abilitiesModel(c: Career, fresh: ReadonlySet<string> = new Set()): AbilitiesModel {
@@ -62,12 +49,6 @@ export function rivalsModel(c: Career): RivalsModel {
       active: r.captain.active, passive: r.captain.passive, met: r.met, ahead: r.ahead, behind: r.behind, sankYou: r.sankYou,
       sunkByYou: r.sunkByYou, grudge: r.grudge, rivalry: r.rivalry, isRival: r.isRival, lines: r.lines,
     })),
-  };
-}
-
-export function careerModel(c: Career): CareerModel {
-  return {
-    player: playerView(c), stats: careerStats(c), chart: chartOf(c).map(({ index, name, sailed }) => ({ index, name, sailed })), habits: yourHabits(c),
   };
 }
 

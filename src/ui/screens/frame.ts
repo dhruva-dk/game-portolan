@@ -1,4 +1,4 @@
-// The frame every menu page is built in: a backdrop over the live planet, the safe area, a header with a back
+// The frame a page is built in: a backdrop over the live planet, the safe area, a header with a back
 // button, and a body. Escape (or the browser's back key on a keyboard) leaves, the same as the back button.
 import { el, header } from '../parts/index.ts';
 import type { ScreenView } from '../shell.ts';
@@ -7,8 +7,6 @@ export interface PageOptions {
   title: string;
   sub?: string;
   onBack?: () => void;
-  /** 'chart' darkens the planet and lays a faint chart over it; 'side' darkens only one side (the locker); 'clear' leaves it. */
-  backdrop?: 'chart' | 'side' | 'clear';
   className?: string;
 }
 
@@ -21,7 +19,7 @@ export interface Page extends ScreenView {
 
 export function page(o: PageOptions): Page {
   const root = el(`s-page${o.className ? ' ' + o.className : ''}`);
-  el(`s-backdrop s-backdrop--${o.backdrop ?? 'chart'}`, root);
+  el('s-backdrop s-backdrop--chart', root);
   const safe = el('pui-safe s-page__safe', root);
   const h = header({ title: o.title, sub: o.sub, onBack: o.onBack, parent: safe });
   const body = el('s-page__body', safe);

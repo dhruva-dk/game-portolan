@@ -22,7 +22,7 @@ interface Screen {
 export const SCREENS: readonly Screen[] = [
   { name: 'title', setup: 'h.go("title")' },
   { name: 'lobby', setup: 'h.go("lobby")' },
-  ...['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'].map((s) => ({ name: s, setup: `h.go("${s}")` })),
+  ...['abilities', 'locker', 'rivals', 'rank', 'settings'].map((s) => ({ name: s, setup: `h.go("${s}")` })),
   { name: 'gale', setup: 'h.play({ seed: 11 })' },
   { name: 'hud', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90)', thumbs: true },
   // a first-time tip over the HUD (the starter weapon's, once the ship has settled), and the Gale's drawn hand

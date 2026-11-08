@@ -44,8 +44,6 @@ export const mmss = (s: number): string => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
 };
 
-/** Thousands with thin separators, as 12 450. */
-export const thousands = (n: number): string => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 /** An ordinal place, as 1st, 2nd, 13th. */
 export const ordinal = (n: number): string => {
@@ -53,5 +51,3 @@ export const ordinal = (n: number): string => {
   return n + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
 };
 
-/** Removes every child. */
-export const clear = (e: Element): void => { while (e.firstChild) e.removeChild(e.firstChild); };

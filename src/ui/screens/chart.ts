@@ -1,39 +1,9 @@
-// The charts: the career's parchment map of the sixteen seas, inked in as you sail them, drawn on a canvas from a
-// mask of the world, sampled once: which region each cell lies in, and how high its ground stands. The HUD's map
-// samples the land round the ship itself, finer, as she sails.
-import { DRAFT, REGIONS, REGION_COUNT, heightExact, regionAt } from '../../sim/world/index.ts';
+// The HUD's map: it samples the land round the ship itself as she sails.
+import { DRAFT, heightExact } from '../../sim/world/index.ts';
 import { R, fromLatLon, localFrame } from '../../sim/sphere.ts';
 import { v3, type V3 } from '../../sim/math.ts';
-import { FONT } from '../parts/tokens.ts';
-import type { ChartRegionView } from '../model.ts';
-import { chartPainter } from '../parts/paper.ts';
 
 const DEG = Math.PI / 180;
-/** The mask: an equirectangular grid, west to east and north to south. */
-const MW = 384, MH = 192;
-
-interface Mask { region: Uint8Array; height: Float32Array }
-let MASK: Mask | null = null;
-
-function mask(): Mask {
-  if (MASK) return MASK;
-  const region = new Uint8Array(MW * MH), height = new Float32Array(MW * MH), p = v3();
-  for (let j = 0; j < MH; j++) {
-    const lat = 90 - ((j + 0.5) * 180) / MH;
-    for (let i = 0; i < MW; i++) {
-      fromLatLon(lat * DEG, (-180 + ((i + 0.5) * 360) / MW) * DEG, p);
-      region[j * MW + i] = regionAt(p);
-      height[j * MW + i] = heightExact(p);
-    }
-  }
-  return (MASK = { region, height });
-}
-
-/** Samples the world for the charts ahead of the first one, off the frame that asked. */
-export function warmChart(): void {
-  if (!MASK) setTimeout(mask, 0);
-}
-
 type RGB = readonly [number, number, number];
 const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
@@ -41,67 +11,6 @@ const SEA: RGB = [150, 182, 164], DEEP: RGB = [96, 138, 136];
 const LAND: RGB = [201, 167, 106], HIGH: RGB = [164, 124, 72];
 
 /** Fits a canvas's backing store to its laid-out size; false while it has none. */
-function fit(c: HTMLCanvasElement): boolean {
-  const r = c.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
-  if (r.width < 4 || r.height < 4) return false;
-  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  return true;
-}
-
-const label = (g: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, colour: string, halo: string) => {
-  g.font = `700 ${size}px ${FONT.display}`;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.lineWidth = size * 0.28;
-  g.strokeStyle = halo;
-  g.strokeText(text, x, y);
-  g.fillStyle = colour;
-  g.fillText(text, x, y);
-};
-
-// ── the career's chart ──
-
-/** Which painting each chart canvas is waiting on, so a stale one never lands over a newer. */
-const PAINTING = new WeakMap<HTMLCanvasElement, number>();
-
-/**
- * The whole world on parchment: the seas you have sailed washed in watercolour with their coasts inked, the rest bare
- * paper with their borders in pencil. The GPU paints it (src/render/paper); the names go on over it here.
- */
-export function drawChart(c: HTMLCanvasElement, chart: readonly ChartRegionView[]): void {
-  if (!fit(c)) return;
-  const m = mask(), sailed = new Uint8Array(REGION_COUNT);
-  for (const r of chart) sailed[r.index] = r.sailed > 0 ? 1 : 0;
-  // the chart keeps its 2:1 in whatever box it gets, centred (its width a multiple of 64, as the GPU's rows are read
-  // back whole)
-  const W = Math.floor(Math.min(c.width, c.height * 2) / 64) * 64, H = W / 2;
-  if (W < 64) return;
-  const ticket = (PAINTING.get(c) ?? 0) + 1;
-  PAINTING.set(c, ticket);
-  void chartPainter()
-    .then((paint) => paint(W, H, { width: MW, height: MH, region: m.region, ground: m.height }, sailed))
-    .then((px) => {
-      if (PAINTING.get(c) !== ticket || c.width < W) return;
-      const g = c.getContext('2d')!, x0 = Math.round((c.width - W) / 2), y0 = Math.round((c.height - H) / 2);
-      g.setTransform(1, 0, 0, 1, 0, 0);
-      g.clearRect(0, 0, c.width, c.height);
-      const img = new ImageData(W, H);
-      img.data.set(px.subarray(0, W * H * 4));
-      g.putImageData(img, x0, y0);
-      // names: the seas you know in ink, the rest faint
-      g.translate(x0, y0);
-      const size = Math.max(9, W / 64);
-      for (let ri = 0; ri < REGIONS.length; ri++) {
-        const r = REGIONS[ri], known = sailed[ri];
-        const x = ((r.lon + 180) / 360) * W, y = ((90 - r.lat) / 180) * H;
-        label(g, r.name, x, y, size, known ? 'rgb(58, 36, 20)' : 'rgba(58, 36, 20, 0.38)', known ? 'rgba(240, 226, 192, 0.85)' : 'rgba(240, 226, 192, 0.4)');
-      }
-      g.setTransform(1, 0, 0, 1, 0, 0);
-      c.classList.add('is-painted');
-    });
-}
-
 // ── the HUD's map ──
 
 /** Samples across the land once settled, and on the first draw, which takes them all at once. */

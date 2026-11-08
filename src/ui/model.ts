@@ -57,9 +57,6 @@ export const RANK_LADDER: readonly { index: number; tier: number; step: number; 
 export const rankByName = (name: string): { index: number; tier: number; step: number; name: string } =>
   RANK_LADDER.find((r) => r.name === name) ?? RANK_LADDER[0];
 
-export const unlockText = (u: Unlock): string =>
-  u.by === 'level' ? `Level ${u.level}` : `Reach ${TIER_NAMES[u.tier]}`;
-
 /** A cosmetic's rarity, from how hard it is to earn: the rank rewards are the rarest. */
 export function rarityOf(u: Unlock): Rarity {
   if (u.by === 'rank') return u.tier >= 5 ? 4 : u.tier >= 3 ? 3 : 2;
@@ -71,14 +68,6 @@ export function rarityOf(u: Unlock): Rarity {
 export interface Mark {
   emblem: string;
   colours: [string, string];
-}
-
-export interface PlayerView extends Mark {
-  name: string;
-  level: LevelView;
-  rank: RankView;
-  /** The best tier reached: the floor. */
-  bestTier: number;
 }
 
 // ---------------------------------------------------------------- abilities and locker
@@ -154,34 +143,6 @@ export interface RivalView extends Mark {
 
 export interface RivalsModel {
   rivals: RivalView[];
-}
-
-export interface CareerStatsView {
-  matches: number;
-  wins: number;
-  top5: number;
-  kills: number;
-  damage: number;
-  /** Seconds afloat over every match. */
-  survived: number;
-  /** 0 before the first match. */
-  bestPlace: number;
-}
-
-export interface ChartRegionView {
-  /** Index into REGIONS. */
-  index: number;
-  name: string;
-  /** Matches you sailed it in; 0 is still blank on the chart. */
-  sailed: number;
-}
-
-export interface CareerModel {
-  player: PlayerView;
-  stats: CareerStatsView;
-  chart: ChartRegionView[];
-  /** What you tend to do, as the captains see it. */
-  habits: string[];
 }
 
 export interface RankModel {

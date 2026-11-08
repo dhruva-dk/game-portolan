@@ -73,7 +73,7 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
       at = await to(game, at, still + s * 1000);
       await shots.shot(game, `drift +${s} s`);
     }
-    // each press: the ink dries off the screen it opens, and back
+    // each press: its sheet unrolls over the lobby, and rolls back
     await game.hook((h) => h.clearEffects());
     for (const [id, want] of PRESSES) {
       at = await press(game, shots, at, await where(game, id), want);
@@ -91,8 +91,6 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
         if (want === 'settings') await shots.shot(game, `back +${ms} ms`);
       }
     }
-    // (the DOM's sheet fades on the real clock, whatever the held one says)
-    await game.page.waitForTimeout(500);
     // the fingers on open water: the camera turns and tilts with one, and comes closer and farther with two
     const { w: vw, h: vh } = await game.hook((h) => h.app.chart.layout);
     const mid = { x: vw * 0.55, y: vh * 0.4 }, boom = () => game.hook((h) => ({ ...h.app.boom }));
