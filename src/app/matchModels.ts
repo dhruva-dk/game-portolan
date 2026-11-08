@@ -8,8 +8,9 @@ import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
 import { canCall, priceOf } from '../sim/economy.ts';
 import {
   ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, WEATHER_NAMES, inStorm, isNight, newSky, newStormView, seen, SEEN, skyAt,
-  stormView, type MatchState, type Ship,
+  stormView, type MatchState, type Ship, type StormView,
 } from '../sim/match.ts';
+import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
 import { GUST, LOOT, PARCELS, PARTS, isWeapon } from '../sim/tables.ts';
@@ -141,6 +142,15 @@ function weatherAt(s: MatchState, p: V3): WeatherName | null {
   return best;
 }
 
+/** Metres into the Storm at which its tint on the screen is deepest. */
+const STORM_DEEP = 400;
+
+/** How far the Storm is through its wait or its closing, 0–1. */
+function stormProgress(v: StormView): number {
+  const p = STORM.phases[Math.min(v.phase, STORM.phases.length - 1)], whole = v.closing ? p.shrink : p.wait;
+  return Math.max(0, Math.min(1, 1 - v.left / whole));
+}
+
 const DECK = newDeck();
 /** How steady the deck is for a shot, or null in water too slight to roll her (seaway.ts). */
 function steadyOf(s: MatchState, i: number): number | null {
@@ -182,7 +192,10 @@ export function hudModel(session: Session): HudModel {
     ability: { id, ready: Math.max(0, Math.min(1, 1 - sh.cooldown / cool)), seconds: Math.ceil(Math.max(0, sh.cooldown)) },
     passive: PASSIVES[sh.passive],
     gust: { charges: sh.gusts, max: GUST.charges, recharge: sh.gusts >= GUST.charges ? 1 : Math.min(1, sh.gustT / GUST.recharge) },
-    storm: { phase: SV.phase, phases: STORM.phases.length, seconds: Math.ceil(SV.left), shrinking: SV.closing, outside: inStorm(s, sh.pos) },
+    storm: {
+      phase: SV.phase, phases: STORM.phases.length, seconds: Math.ceil(SV.left), shrinking: SV.closing, progress: stormProgress(SV),
+      outside: inStorm(s, sh.pos), depth: Math.max(0, Math.min(1, -toEdge(s, sh.pos) / STORM_DEEP)),
+    },
     ships: afloat(s),
     kills: sh.kills,
     coins: Math.floor(sh.coins),
@@ -195,6 +208,8 @@ export function hudModel(session: Session): HudModel {
     aimed: aimedOf(s, session.watch, session.aim),
     using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     region: REGIONS[r]?.name ?? 'the open sea',
+    regionId: REGIONS[r]?.id ?? null,
+    colour: shipMark(session, session.watch).colours[0],
     perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,
     perks: REGIONS.filter((_, k) => sh.perks & (1 << k)).map((x) => x.perk),
     weather: weatherAt(s, sh.pos),

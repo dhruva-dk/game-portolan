@@ -276,7 +276,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     ability: { id: 'smokeScreen', ready: fight ? 0.35 : 1, seconds: fight ? 23 : 0 },
     passive: 'quickReload',
     gust: { charges: fight ? 0 : storm ? 1 : 2, max: 2, recharge: fight ? 0.7 : 0.4 },
-    storm: { phase: storm ? 4 : 2, phases: 7, seconds: storm ? 38 : 72, shrinking: storm, outside: storm },
+    storm: { phase: storm ? 4 : 2, phases: 7, seconds: storm ? 38 : 72, shrinking: storm, progress: storm ? 0.3 : 0.1, outside: storm, depth: storm ? 0.5 : 0 },
     ships: fight ? 9 : storm ? 6 : 17, kills: fight ? 3 : storm ? 4 : 1, coins: fight ? 140 : 85,
     gull: {
       price: 20, ready: fight,
@@ -286,7 +286,7 @@ export function fxHud(state: HudState = 'calm'): HudModel {
     steady: storm ? 0.85 : fight ? 0.4 : null,
     aimed: fight ? { weapon: 'Harpoon', bearing: 0.9, wound: 0.6 } : null,
     using: storm ? { item: 'repairKit', progress: 0.55 } : null,
-    region: storm ? 'the Coral Atolls' : 'the Spice Isles', perk: storm ? null : 'Better Loot', night: state === 'night',
+    region: storm ? 'the Coral Atolls' : 'the Spice Isles', regionId: storm ? 'coralAtolls' : 'spiceIsles', colour: '#b8301a', perk: storm ? null : 'Better Loot', night: state === 'night',
     perks: storm ? [] : fight ? ['betterLoot', 'fastReload', 'spotter'] : ['betterLoot'],
     weather: storm ? 'rain' : state === 'night' ? 'fog' : null,
     tide: { level: fight ? -0.6 : 0.4, rising: !fight },

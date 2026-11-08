@@ -4,7 +4,7 @@
 // straight from src/sim, which is allowed: they are fixed tables.
 import type { AbilityId, ActiveId, PassiveId } from '../sim/abilities.ts';
 import type { WEATHER_NAMES } from '../sim/tables.ts';
-import type { PerkId } from '../sim/world/index.ts';
+import type { PerkId, RegionId } from '../sim/world/index.ts';
 import type { Rarity } from './parts/tokens.ts';
 
 // ---------------------------------------------------------------- shared
@@ -285,7 +285,13 @@ export interface HudModel {
   ability: { id: ActiveId; /** 0–1, 1 ready. */ ready: number; /** Seconds left, while cooling down. */ seconds: number };
   passive: PassiveId;
   gust: { charges: number; max: number; /** 0–1 toward the next charge. */ recharge: number };
-  storm: { phase: number; phases: number; seconds: number; shrinking: boolean; outside: boolean };
+  storm: {
+    phase: number; phases: number; seconds: number; shrinking: boolean;
+    /** How far through the wait or the closing, 0–1. */
+    progress: number;
+    /** Outside the safe circle, and how deep into the Storm, 0 at its edge to 1 far out. */
+    outside: boolean; depth: number;
+  };
   ships: number;
   kills: number;
   coins: number;
@@ -302,6 +308,10 @@ export interface HudModel {
   /** A consumable in use, with its progress. */
   using: { item: ConsumableId; progress: number } | null;
   region: string;
+  /** The region's id, for its sign; null on the open sea. */
+  regionId: RegionId | null;
+  /** The watched ship's own colour: her hull bar's wash. */
+  colour: string;
   /** The region's perk, when you are in your drop region's water. */
   perk: string | null;
   /** Every perk you hold, in the regions' order. */

@@ -5,6 +5,7 @@
 import type { Prim } from '../icons/draw.ts';
 import { ABILITY_ICONS } from '../icons/sets/abilities.ts';
 import { GULL_TIER_ICONS, HUD_ICONS, MENU_ICONS } from '../icons/sets/hud.ts';
+import { HURT_ICONS } from '../icons/sets/hurts.ts';
 import { PERK_ICONS } from '../icons/sets/perks.ts';
 import { REGION_ICONS } from '../icons/sets/regions.ts';
 import { CONSUMABLE_ICONS, WEAPON_ICONS } from '../icons/sets/weapons.ts';
@@ -13,7 +14,7 @@ import type { Pen } from './pen.ts';
 
 const FAMILIES: Record<string, Record<string, Prim[]>> = {
   ability: ABILITY_ICONS, perk: PERK_ICONS, region: REGION_ICONS, hud: HUD_ICONS, menu: MENU_ICONS, gull: GULL_TIER_ICONS,
-  weapon: WEAPON_ICONS, item: CONSUMABLE_ICONS,
+  weapon: WEAPON_ICONS, item: CONSUMABLE_ICONS, hurt: HURT_ICONS,
 };
 
 /** An icon's drawing by its name in the icon set ('ability.ram', 'region.fjords'). */
