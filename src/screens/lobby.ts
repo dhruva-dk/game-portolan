@@ -4,7 +4,7 @@
 // level, and beside it her rank's tier as a small wax seal in its illumination; pressed, it opens the rank folio. Top
 // right, a ship's wheel on a round paper button: the settings. Bottom left, four tabs in a row, each a slip of paper
 // with a rounded crown and a woodcut: a burst (abilities), a chest (locker), a staff of pennants (rank) and two ships
-// bow to bow (rivals); each unrolls its folio. Bottom right, under the thumb, PLAY: the one word on the screen, gilt
+// bow to bow (rivals); each unrolls its folio (folio.ts) over her, her ship live beside it. Bottom right, under the thumb, PLAY: the one word on the screen, gilt
 // capitals on a drawn ribbon, the largest thing here. The ship herself answers a finger anywhere else: one finger
 // orbits the camera round her and tilts it a little, two fingers pinch it closer or farther, and let go she drifts
 // back to her resting view over a few seconds.
@@ -21,10 +21,11 @@
 import type { Prim } from '../icons/draw.ts';
 import {
   Press, arcPts, bakeSeal, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, unroll, woodcut, word,
-  type Baked, type ChartLayer, type DragSurface, type Illumination, type Pen, type Pts, type Rect, type Seal, type Sprite,
+  type Baked, type ChartLayer, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp, noise1 } from '../chart/noise.ts';
 import { effect } from '../ui/parts/feedback.ts';
+import { Sheets, type Folio, type SheetHost, type SheetName } from './folio.ts';
 import { paper, roundButton, slipPath } from './instruments.ts';
 import { BLEED, PlanetChart, type PlanetHost } from './planet.ts';
 import { TITLE_LANDS, cornerRose } from './title.ts';
@@ -42,9 +43,6 @@ export interface CareerMarks {
   wins: number;
 }
 
-/** The folios the tabs unroll. */
-export type Folio = 'abilities' | 'locker' | 'rank' | 'rivals';
-
 export interface LobbyHost extends PlanetHost {
   career(): CareerMarks;
   /** Makes the next match ready, and returns the Gale's course as a bearing from north (radians, clockwise). */
@@ -57,6 +55,10 @@ export interface LobbyHost extends PlanetHost {
   rank(): void;
   /** Unrolls a folio: its tab was pressed. */
   open(folio: Folio): void;
+  /** Rolls the sheet back. */
+  close(): void;
+  /** What the folios and settings read and change. */
+  readonly sheets: SheetHost;
   /** Where a finger has taken the camera. The app's: it goes on easing home after the lobby has gone to a folio. */
   readonly boom: Orbit;
 }
@@ -297,6 +299,14 @@ export class Lobby {
   /** The fingers on the view. */
   readonly #fingers = new Map<number, { x: number; y: number }>();
   readonly #drag: DragSurface;
+  /** The fingers dragging the sheet, not the camera. */
+  readonly #scrolling = new Set<number>();
+  /** The folios' sheet, and what wants to be on it before the chart has come. */
+  #sheets: Sheets | null = null;
+  #want: SheetName | null = null;
+  /** PLAY's press, which goes while the sheet covers it, and the presses that stay over the sheet's backdrop. */
+  #playPress: Pressable | null = null;
+  #over: Pressable[] = [];
   /** Called once the lobby has gone. */
   onGone?: () => void;
 
@@ -307,11 +317,23 @@ export class Lobby {
     this.#roseLanded = !!o.roseLanded;
     this.#drag = {
       down: (id, x, y) => {
+        if (this.#sheets?.takes(x, y)) {
+          this.#scrolling.add(id);
+          this.#sheets.down(id, x, y);
+          return;
+        }
         if (this.#fingers.size >= 2 || this.#playAt >= 0 || this.#leftAt >= 0) return;
         this.#fingers.set(id, { x, y });
       },
-      move: (id, x, y) => this.#finger(id, x, y),
+      move: (id, x, y) => {
+        if (this.#scrolling.has(id)) this.#sheets?.move(id, x, y);
+        else this.#finger(id, x, y);
+      },
       up: (id) => {
+        if (this.#scrolling.delete(id)) {
+          this.#sheets?.up(id);
+          return;
+        }
         this.#fingers.delete(id);
         // let go, she comes back the short way round
         const o = this.#h.boom;
@@ -334,19 +356,50 @@ export class Lobby {
     this.#layer = layer;
     this.#born = now;
     this.#lastNow = now;
+    this.#sheets = new Sheets(layer, this.#h.sheets, () => {
+      for (const p of this.#over) layer.presses.add(p);
+    }, () => this.#h.close());
     this.#lay();
     const off = layer.addLive((g, t) => this.#frame(g, t));
     const p = this.#press;
-    layer.presses.add({ id: 'lobby:play', hit: { x: 0, y: 0, r: 1 }, press: p.play, sound: 'play', haptic: 'heavy', act: () => this.#pressPlay() });
-    layer.presses.add({ id: 'lobby:settings', hit: { x: 0, y: 0, r: 1 }, press: p.wheel, sound: 'open', haptic: 'light', act: () => this.#h.settings() });
-    layer.presses.add({ id: 'lobby:career', hit: { x: 0, y: 0, r: 1 }, press: p.plate, sound: 'open', haptic: 'light', act: () => this.#h.rank() });
-    TABS.forEach((tb, i) => layer.presses.add({ id: `lobby:${tb.folio}`, hit: { x: 0, y: 0, r: 1 }, press: p.tabs[i], sound: 'open', haptic: 'light', act: () => this.#h.open(tb.folio) }));
+    const add = (id: string, press: Press, sound: 'play' | 'open', haptic: 'heavy' | 'light', act: () => void) =>
+      layer.presses.add({ id: `lobby:${id}`, hit: { x: 0, y: 0, r: 1 }, press, sound, haptic, act });
+    this.#playPress = add('play', p.play, 'play', 'heavy', () => this.#pressPlay());
+    this.#over = [
+      add('settings', p.wheel, 'open', 'light', () => this.#toggle('settings')),
+      add('career', p.plate, 'open', 'light', () => this.#toggle('rank')),
+      ...TABS.map((tb, i) => add(tb.folio, p.tabs[i], 'open', 'light', () => this.#toggle(tb.folio))),
+    ];
     this.#placePresses();
     layer.drag = this.#drag;
+    if (this.#want) this.show(this.#want, now);
     this.#off = () => {
       off();
       this.#unpress();
     };
+  }
+
+  /** Unrolls a folio or the settings, or (null) rolls the sheet back. */
+  show(name: SheetName | null, now: number): void {
+    const layer = this.#layer, sheets = this.#sheets;
+    if (!layer || !sheets || this.#playAt >= 0 || this.#leftAt >= 0) {
+      this.#want = name;
+      return;
+    }
+    if (name) layer.presses.remove('lobby:play');
+    sheets.show(name, now);
+    if (!name && this.#playPress) {
+      layer.presses.add(this.#playPress);
+      this.#placePresses();
+    }
+  }
+
+  /** A tab, the plate or the wheel: its sheet unrolls, or rolls back if it was the one down. */
+  #toggle(name: SheetName): void {
+    if (this.#sheets?.name === name) this.#h.close();
+    else if (name === 'settings') this.#h.settings();
+    else if (name === 'rank') this.#h.rank();
+    else this.#h.open(name);
   }
 
   /** The screen changed size: laid out and baked again. */
@@ -365,6 +418,7 @@ export class Lobby {
       this.dispose();
       return;
     }
+    this.#sheets?.show(null, now);
     this.#unpress();
     this.#leftAt = now;
     this.#inked = false;
@@ -374,6 +428,7 @@ export class Lobby {
     this.#off?.();
     this.#off = null;
     this.#unpress();
+    this.#sheets?.dispose();
     this.#chartEl?.remove();
     this.#chartEl = null;
   }
@@ -396,6 +451,7 @@ export class Lobby {
       tabs: TABS.map((tb, i) => bake(`lobby-tab|${size}|${tb.folio}`, g.tabs[i].r * 2, g.tabs[i].r * 2, (p, _gc, cx, cy) => tab(p, cx, cy, g.tabs[i].r, prims(tb.cut), { seed: 11 + i }))),
       play: bake(`lobby-play|${size}`, g.play.w, g.play.h, (p, _gc, cx, cy) => banner(p, cx, cy, g.play.w, g.play.h, { seed: 23 })),
     };
+    this.#sheets?.lay();
   }
 
   #placePresses(): void {
@@ -418,6 +474,7 @@ export class Lobby {
     for (const id of ['lobby:play', 'lobby:settings', 'lobby:career', ...TABS.map((t) => `lobby:${t.folio}`)]) layer.presses.remove(id);
     if (layer.drag === this.#drag) layer.drag = null;
     this.#fingers.clear();
+    this.#scrolling.clear();
   }
 
   // ── the ship: orbit and pinch ──
@@ -474,7 +531,8 @@ export class Lobby {
     }
     if (!this.#inked && this.#leftAt < 0 && s >= AT.done) this.#inked = true;
     pen.mood({ dry }, () => this.#draw(gc, pen, this.#inked ? Infinity : s, dryAlpha(dry), now));
-    return this.#inked && dry === 0 ? this.#rects() : undefined;
+    const sheet = this.#sheets?.frame(gc, now);
+    return this.#inked && dry === 0 ? (sheet ? [...this.#rects(), sheet] : this.#rects()) : undefined;
   }
 
   /** The career plate at (x, y): its slip, the level's ring and figure, and the rank's seal pressed beside it; the
@@ -543,7 +601,8 @@ export class Lobby {
     const tt = span(s, AT.tabs);
     TABS.forEach((tb, i) => {
       const t = rest ? 1 : stagger(tt, i, TABS.length, 0.5), c = g.tabs[i];
-      if (t >= 1) pressed(sp.tabs[i], c.x, c.y, p.tabs[i].sink);
+      // the open folio's tab stands proud of its fellows
+      if (t >= 1) pressed(sp.tabs[i], c.x, c.y - (tb.folio === this.#sheets?.name ? 10 : 0), p.tabs[i].sink);
       else tab(pen, c.x, c.y, c.r, prims(tb.cut), { alpha, seed: 11 + i }, t);
     });
   }

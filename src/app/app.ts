@@ -32,24 +32,25 @@ import type { Moment } from './events.ts';
 import { deathModel, fleetColours, hudModel, markOf, resultsModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { LOBBY_CAMERA, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
-import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
+import { isScreen, MENUS, type ScreenName } from './flow.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { CareerHolder } from './career.ts';
-import { abilitiesModel, careerModel, levelView, lockerModel, rankModel, rankView, rivalsModel } from './models.ts';
+import { abilitiesModel, levelView, lockerModel, rankModel, rankView, rivalsModel } from './models.ts';
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
-import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, type Insets } from '../chart/index.ts';
+import { ChartLayer, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
 import { LOBBY_OPENS, Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
+import type { SheetName } from '../screens/folio.ts';
 import { DIVE, Gale, courseBearing, diveView, galeLook } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
+import { TIER_ILLUMINATION } from '../screens/cards.ts';
 import { page } from '../ui/screens/frame.ts';
 import { deathScreen, resultsScreen, victoryScreen } from '../ui/screens/match.ts';
-import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
 import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
-import type { CosmeticKind, DeathModel, HudModel, ResultsModel, Settings, VictoryModel } from '../ui/model.ts';
+import type { DeathModel, HudModel, ResultsModel, Settings, VictoryModel } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
@@ -69,9 +70,6 @@ const PERF_EVERY = 5;
 /** The orbit the Gale sees the planet from, in radii, and the seconds the camera takes between views. */
 const ORBIT_DISTANCE = 3.2;
 const FLIGHT = 2.2;
-
-/** The rank's tiers (Iron to Legend) as the illuminations rarity is drawn in, plainest first. */
-const TIER_ILLUMINATION: readonly Illumination[] = ['ink', 'ink', 'rubric', 'rubric', 'redBlue', 'redBlue', 'silver', 'gold'];
 
 /** The hour on the device's clock, for the lobby's sun. */
 const localHour = (): number => {
@@ -131,10 +129,6 @@ export class App {
   /** The capture tools hold the title as if the world were this far loaded (null: as it is). */
   titleHold: number | null = null;
   private readonly sun = new THREE.Vector3();
-  /** Unlocks the player has not looked at yet: "new" on the menus' cards. */
-  private readonly fresh = { abilities: new Set<string>(), cosmetics: new Set<string>() };
-  /** A cosmetic the locker is trying on the lobby's ship, over what it wears. */
-  private preview: { kind: CosmeticKind; id: string } | null = null;
   /** The frames since the last perf line: seconds, how many, and the longest. */
   private readonly perfWindow = { t: 0, frames: 0, worst: 0 };
   private readonly ear = { fwd: new THREE.Vector3(), up: new THREE.Vector3(), t: 0 };
@@ -321,7 +315,7 @@ export class App {
 
   go(name: ScreenName | string, model?: unknown): void {
     if (!isScreen(name)) throw new RangeError(`go: no screen "${name}"`);
-    const from = this.screen;
+    const from = this.screen, folio = (n: ScreenName) => (MENUS as readonly string[]).includes(n);
     this.screen = name;
     this.log.add('flow', 'screen', { from, to: name });
     this.fixed = false;
@@ -333,11 +327,14 @@ export class App {
     // already down over the Gale if Play unrolled it, or its ink dries away; the Gale's sheet has thinned to nothing by
     // the time she lands; the HUD dries
     const now = this.chartNow(), unrolled = from === 'lobby' && !!this.lobby?.unrolled;
-    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(now);
+    const atLobby = from === 'lobby' || folio(from), toLobby = name === 'lobby' || folio(name);
+    if (atLobby && !toLobby) this.lobby?.leave(now);
     if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
     if (from === 'match' && name !== 'match') this.hud?.leave(now);
     if (name === 'title') this.openTitle();
-    if (name === 'lobby') this.openLobby(from);
+    // a folio or the settings unrolls over the lobby that is already here, or one that comes with it
+    if (toLobby && (!atLobby || !this.lobby)) this.openLobby(from);
+    if (toLobby) this.lobby?.show(name === 'lobby' ? null : (name as SheetName), now);
     if (name === 'gale') this.openGale(unrolled);
     if (name === 'match') this.openHud(model);
     // (after what comes in under it, so it is drawn over it)
@@ -350,43 +347,19 @@ export class App {
   private screenView(name: ScreenName, model?: unknown): ScreenView {
     const career = this.career.career;
     switch (name) {
-      // drawn on the chart (the title, the lobby, the Gale, spectating), or nothing at all
+      // drawn on the chart (the title, the lobby and its sheets, the Gale, spectating), or nothing at all
       case 'boot':
       case 'title':
       case 'lobby':
+      case 'abilities':
+      case 'locker':
+      case 'rivals':
+      case 'career':
+      case 'rank':
+      case 'settings':
       case 'gale':
       case 'spectate':
         return { el: el('s-empty') };
-      case 'abilities': {
-        const v: MenuView<ReturnType<typeof abilitiesModel>> = abilitiesScreen((model as never) ?? abilitiesModel(career, this.fresh.abilities), {
-          onBack: this.back,
-          onEquip: (id: AbilityId) => this.equip((c) => equipAbility(c, id), () => v.set(abilitiesModel(this.career.career, this.fresh.abilities))),
-        });
-        this.seen(this.fresh.abilities);
-        return v;
-      }
-      case 'locker': {
-        const v: MenuView<ReturnType<typeof lockerModel>> = lockerScreen((model as never) ?? lockerModel(career, this.fresh.cosmetics), {
-          onBack: this.back,
-          onEquip: (id) => {
-            this.preview = null;
-            this.equip((c) => equipCosmetic(c, id), () => v.set(lockerModel(this.career.career, this.fresh.cosmetics)));
-          },
-          onPreview: (kind, id) => { this.preview = id ? { kind, id } : null; },
-        });
-        this.seen(this.fresh.cosmetics);
-        return v;
-      }
-      case 'rivals':
-        return rivalsScreen((model as never) ?? rivalsModel(career), { onBack: this.back });
-      case 'career':
-        return careerScreen((model as never) ?? careerModel(career), { onBack: this.back });
-      case 'rank':
-        return rankScreen((model as never) ?? rankModel(career), { onBack: this.back });
-      case 'settings': {
-        const v = settingsScreen((model as Settings | undefined) ?? this.settings.settings, { onBack: this.back, onChange: (x) => this.setSettings(x) });
-        return v;
-      }
       default:
         return this.matchView(name, model) ?? this.placeholder(name);
     }
@@ -417,27 +390,19 @@ export class App {
     }
   }
 
-  private readonly back = (): void => this.go('lobby');
-
-  /** Changes the career in a menu (an equip), saves, and redraws the menu; a locked item changes nothing. */
-  private equip(change: (c: Career) => Career, redraw: () => void): void {
+  /** Changes the career from a folio (an equip) and saves; a locked item changes nothing. */
+  private equip(change: (c: Career) => Career): void {
     try {
       this.career.set(change(this.career.career));
       this.log.add('flow', 'equip', {});
     } catch (e) {
       this.log.add('flow', 'equip-refused', { why: String(e) });
     }
-    redraw();
-  }
-
-  /** The menu's cards have shown their "new": once you leave, they are old. */
-  private seen(set: Set<string>): void {
-    queueMicrotask(() => set.clear());
   }
 
   /** A screen still being built: its frame, its name, and a way back. */
   private placeholder(name: ScreenName): ScreenView {
-    const back = (MENUS as readonly string[]).includes(name) || name === 'results' ? 'lobby' : null;
+    const back = name === 'results' ? 'lobby' : null;
     const p = page({ title: name[0].toUpperCase() + name.slice(1), onBack: back ? () => this.go(back) : undefined });
     el('s-page__note', p.body, esc(`The ${name} screen is not built yet.`));
     return p;
@@ -597,8 +562,6 @@ export class App {
     if (!s) return;
     const report = s.tally.report(s.plan.fleet.map((e) => e.captain), (i) => s.standing(i));
     const changes = this.career.apply(report), mine = report.ships[PLAYER];
-    for (const id of changes.unlocked.abilities) this.fresh.abilities.add(id);
-    for (const id of changes.unlocked.cosmetics) this.fresh.cosmetics.add(id);
     this.log.add('flow', 'finish', { place: changes.place, kills: changes.kills, xp: changes.xp.total, tick: s.state.tick });
     this.leaveMatch();
     this.go('results', resultsModel(changes, this.career.career, { damage: mine.damage, survived: mine.survived }));
@@ -770,7 +733,7 @@ export class App {
   };
 
   /** Puts the lobby on the chart, its instruments laid as the title's sheet rolls off them and the title's rose landing
-   *  on its plate. Until the folios are drawn on the chart (issue #54), its tabs open the DOM's. */
+   *  on its plate; its tabs, plate and wheel unroll their sheets over it. */
   private openLobby(from: ScreenName): void {
     this.lobby?.dispose();
     const l = new Lobby(this.chartHost, {
@@ -788,6 +751,17 @@ export class App {
       settings: () => this.go('settings'),
       rank: () => this.go('rank'),
       open: (folio) => this.go(folio),
+      close: () => this.go('lobby'),
+      sheets: {
+        abilities: () => abilitiesModel(this.career.career),
+        locker: () => lockerModel(this.career.career),
+        rank: () => rankModel(this.career.career),
+        rivals: () => rivalsModel(this.career.career),
+        settings: () => this.settings.settings,
+        equipAbility: (id: AbilityId) => this.equip((c) => equipAbility(c, id)),
+        equipCosmetic: (id) => this.equip((c) => equipCosmetic(c, id)),
+        setSettings: (s) => this.setSettings(s),
+      },
       boom: this.boom,
     }, { roseLanded: from === 'title' });
     l.onGone = () => {
@@ -1011,8 +985,8 @@ export class App {
     const v = this.view, sv = sceneStage(v, f.clock);
     sunDirection(sv.hour, sv.tilt, this.sun);
     // at anchor the camera stands off her bow on the quarter and drifts slowly round her and back, a finger turning it
-    // about her and pinching it closer; in the locker the boom swings out, so the whole ship stands clear of the pane on
-    // the right
+    // about her and pinching it closer; in the locker the boom swings out, so the whole ship stands clear of the sheet
+    // on the right
     const locker = this.screen === 'locker';
     if (stage.rig && !this.fixed) {
       const k = Math.min(1, f.realDt * 3), c = LOBBY_CAMERA, b = this.boom;
@@ -1022,8 +996,7 @@ export class App {
       stage.rig.pitch = c.pitch + b.pitch;
       stage.rig.yaw = Math.PI - c.quarter + c.drift * Math.sin((f.clock / c.period) * Math.PI * 2) + b.yaw;
     }
-    const worn = wornLook(this.career.career), p = locker ? this.preview : null;
-    const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
+    const look = cosmeticsOf(wornLook(this.career.career));
     const speed = v.camera === 'chase' && this.fixed ? 14.5 : 0;
     // at anchor she is shown whole, her sails sheeted out and not thinned for a crosshair
     const av = sceneActors(v, f.clock, this.sun, look, speed);
@@ -1053,8 +1026,8 @@ function transition(from: ScreenName, to: ScreenName): Transition {
   if (from === 'boot') return 'fade';
   // the lobby is already there when the title's sheet rolls off it
   if (from === 'title') return 'none';
-  if ((MENUS as readonly string[]).includes(to)) return 'push';
-  if ((MENUS as readonly MenuName[]).includes(from as MenuName) && to === 'lobby') return 'pop';
+  // a folio's sheet is the chart's to unroll
+  if ((MENUS as readonly string[]).includes(to) || (MENUS as readonly string[]).includes(from)) return 'none';
   return 'fade';
 }
 

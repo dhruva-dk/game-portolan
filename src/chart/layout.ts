@@ -64,8 +64,9 @@ export interface ChartLayout {
   rose: Circle;
   /** The lobby (issue #54): the career plate top left (the level's ring, the rank's seal badge beside it), the
    *  settings' wheel top right, the four folio tabs along the bottom left and PLAY's banner under the right thumb. The
-   *  title's rose flies to the ring. */
-  lobby: { plate: Box; ring: Circle; badge: Circle; wheel: Circle; tabs: Circle[]; play: Box };
+   *  title's rose flies to the ring. The folios' sheet lies on the right under the wheel, clear of the plate and tabs
+   *  and over PLAY, which it hides while it is down. */
+  lobby: { plate: Box; ring: Circle; badge: Circle; wheel: Circle; tabs: Circle[]; play: Box; sheet: Box };
 }
 
 /** The lobby's places on each device, from its margins. */
@@ -76,6 +77,7 @@ function lobbyLayout(w: number, h: number, safe: Insets, phone: boolean): ChartL
   const plate = { x: safe.left + m + pw / 2, y: safe.top + m + ph / 2, w: pw, h: ph };
   const wheel = phone ? 24 : 30, tab = phone ? 23 : 30, step = phone ? 58 : 72;
   const bw = phone ? 228 : 330, bh = phone ? 74 : 104;
+  const sw = Math.round(w * 0.56), top = safe.top + m + wheel * 2 + 12, foot = h - safe.bottom - m;
   return {
     plate,
     ring: { x: plate.x - pw / 2 + pad + ring, y: plate.y, r: ring },
@@ -83,6 +85,7 @@ function lobbyLayout(w: number, h: number, safe: Insets, phone: boolean): ChartL
     wheel: { x: w - safe.right - m - wheel, y: safe.top + m + wheel, r: wheel },
     tabs: Array.from({ length: 4 }, (_, i) => ({ x: safe.left + m + tab + i * step, y: h - safe.bottom - m - tab, r: tab })),
     play: { x: w - safe.right - m - bw / 2, y: h - safe.bottom - (phone ? 102 : 210), w: bw, h: bh },
+    sheet: { x: w - safe.right - m - sw / 2, y: (top + foot) / 2, w: sw, h: Math.round(foot - top) },
   };
 }
 
@@ -208,5 +211,8 @@ export function layoutProblems(l: ChartLayout): string[] {
     if (overlap(lobby[i][1], lobby[j][1])) out.push(`${lobby[i][0]} and ${lobby[j][0]} overlap`);
   }
   for (const [k, s] of lobby) if (!inside(s)) out.push(`${k} is outside the safe area`);
+  const sheet = asShape(lb.sheet, false);
+  if (!inside(sheet)) out.push('the folio sheet is outside the safe area');
+  for (const [k, s] of lobby) if (k !== 'play' && overlap(sheet, s)) out.push(`the folio sheet covers ${k}`);
   return out;
 }
