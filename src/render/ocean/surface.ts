@@ -319,7 +319,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
         s.addAssign(sl);
         dxz.addAssign(mo.w);
         v.addAssign(max(mo.x.sub(sl.x.mul(sl.x)), 0).add(max(mo.y.sub(sl.y.mul(sl.y)), 0)));
-        white.addAssign(sample(uv, LAYER.displacement + c).w);
+        white.addAssign(mo.z);
       }
       const sx = s.x.div(max(s.z.add(1), 0.2)), sz = s.y.div(max(s.w.add(1), 0.2));
       world.addAssign(e1.mul(sx).add(e2.mul(sz)).mul(w));

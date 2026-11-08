@@ -5,12 +5,13 @@
 // spectra (height, the two horizontal displacements and five of their derivatives), packed two real fields to a
 // complex number and two complex numbers to a vec4; then a Stockham FFT, a whole row in one workgroup's memory,
 // across the rows and down the columns; then one kernel per cascade writes three textures:
-//   displacement  (x, height, z, persistent foam)
+//   displacement  (x, height, z)
 //   slope         (∂h/∂x, ∂h/∂z, λ∂Dx/∂x, λ∂Dz/∂z), for the normal and the fold of the surface
-//   moments       ((∂h/∂x)², (∂h/∂z)², ∂h/∂x ∂h/∂z, λ∂Dx/∂z): filtered down the mips, the slopes' variance over a
-//                 pixel's footprint, which turns detail too fine to draw into roughness (Bruneton, Neyret and
+//   moments       ((∂h/∂x)², (∂h/∂z)², persistent foam, λ∂Dx/∂z): filtered down the mips, the slopes' variance over
+//                 a pixel's footprint, which turns detail too fine to draw into roughness (Bruneton, Neyret and
 //                 Holzschuch, "Real-time Realistic Ocean Lighting", 2010), so the sun's glitter widens into a road
-//                 toward the horizon and the sea never sparkles in noise.
+//                 toward the horizon and the sea never sparkles in noise. The foam rides here rather than with the
+//                 displacement, which the surface's fragments never read, so they read two textures a cascade.
 //   curvature     (∂²h/∂x², ∂²h/∂z², ∂²h/∂x∂z), central differences of the slopes: how the surface focuses the light
 //                 under it into caustics. Its mips are the curvature blurred over the sun's disc at a depth, so the
 //                 caustics of the shortest ripples fade a little way down and only the long waves' reach the deep.
@@ -248,9 +249,9 @@ export class Waves {
       f.assign(max(kept, fresh));
       const at = uvec2(x, y);
       const layer = int(c);
-      store.depth(layer.add(LAYER.displacement)).store(at, vec4(dx, dy, dz, f));
+      store.depth(layer.add(LAYER.displacement)).store(at, vec4(dx, dy, dz, 0));
       store.depth(layer.add(LAYER.slope)).store(at, vec4(dyx, dyz, dxx, dzz));
-      store.depth(layer.add(LAYER.moments)).store(at, vec4(dyx.mul(dyx), dyz.mul(dyz), dyx.mul(dyz), dxz));
+      store.depth(layer.add(LAYER.moments)).store(at, vec4(dyx.mul(dyx), dyz.mul(dyz), f, dxz));
       // the slopes either side, the tile wrapping round
       const slopes = (u: U, v: U) => work.element(c.add(uint(CASCADES)).mul(uint(NN)).add(v.mul(uint(N))).add(u)).xy;
       const east = slopes(x.add(uint(1)).mod(uint(N)), y), west = slopes(x.add(uint(N - 1)).mod(uint(N)), y);
