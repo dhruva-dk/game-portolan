@@ -27,7 +27,7 @@ import {
 import {
   Discard, Fn, If, abs, cameraFar, cameraNear, clamp, exp, float, floor, fract, globalId, instanceIndex, int,
   max, min, mix, mod, perspectiveDepthToViewZ, positionGeometry, pow, screenUV, select, sin,
-  smoothstep, texture, texture3D, textureStore, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4, renderGroup,
+  smoothstep, texture, texture3D, textureStore, uint, uniform, uniformArray, uvec2, uvec3, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { overDepth } from '../gpu/behind.ts';
 import { R } from '../../sim/sphere.ts';
@@ -407,8 +407,15 @@ function layerComposite(source: Held): MeshBasicNodeMaterial {
 const SHADE_TOP = 260;
 const SHADE_STEPS = 24;
 
-const shadeKernel = Fn(() => {
-  const x = instanceIndex.mod(SHADE_SIZE), y = instanceIndex.div(SHADE_SIZE);
+/** The march is spread over this many frames, a frame marching every this-many-th row in turn: a texel is 7.5 m
+ *  across, and in that many frames the eye moves a metre or so. */
+const SHADE_ROUNDS = 4;
+/** The row, of each SHADE_ROUNDS, this frame marches. */
+const shadeRound = uniform(0);
+
+/** The march over `rows` of every SHADE_ROUNDS rows: all of them, or the one shadeRound picks. */
+const shadeKernel = (every: number) => Fn(() => {
+  const x = instanceIndex.mod(SHADE_SIZE), y = instanceIndex.div(SHADE_SIZE).mul(every).add(every > 1 ? uint(shadeRound) : uint(0));
   const uv = vec2(x, y).add(0.5).div(SHADE_SIZE).mul(2).sub(1).mul(SHADE.extent);
   const o = SHADE.centre.add(SHADE.e1.mul(uv.x)).add(SHADE.e2.mul(uv.y));
   const key = KEY.dir;
@@ -429,7 +436,8 @@ const shadeKernel = Fn(() => {
     });
   });
   textureStore(SHADE.map, uvec2(x, y), vec4(exp(tau.negate()), 0, 0, 1));
-})().compute(SHADE_SIZE * SHADE_SIZE);
+})().compute((SHADE_SIZE * SHADE_SIZE) / every);
+const shadeWhole = shadeKernel(1), shadeRows = shadeKernel(SHADE_ROUNDS);
 
 // ---------------------------------------------------------------- the stage's side
 
@@ -448,6 +456,8 @@ export class Clouds {
   /** Lightning's flash at the eye, 0…1, by how near and how bright. */
   flash = 0;
   #made = false;
+  #shadeOn = 0;
+  #shadeSun = -1;
   readonly #flickers = new Map<number, Flicker>();
   #time = 0;
   #size = new Vector2();
@@ -563,8 +573,13 @@ export class Clouds {
       _e2.crossVectors(key, _e1);
       (SHADE.e1.value as Vector3).copy(_e1);
       (SHADE.e2.value as Vector3).copy(_e2);
-      renderer.compute(shadeKernel as ComputeNode);
+      // the whole map when it first shows or the light changes from one body to the other, a round of its rows after
+      const fresh = SHADE.on.value !== this.#shadeOn || KEY.sun.value !== this.#shadeSun;
+      shadeRound.value = (shadeRound.value + 1) % SHADE_ROUNDS;
+      renderer.compute((fresh ? shadeWhole : shadeRows) as ComputeNode);
     }
+    this.#shadeOn = SHADE.on.value;
+    this.#shadeSun = KEY.sun.value;
   }
 
   /** The lightning inside a thunderhead this frame: a few quick pulses every few seconds, somewhere in its column. */
