@@ -219,7 +219,7 @@ export class Sheets {
 
   /** Builds the sheet's strip for what is on it now. */
   #fill(name: SheetName): void {
-    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : name === 'rank' ? this.#rank() : name === 'settings' ? this.#settings() : { items: [], height: 0 };
+    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : name === 'rank' ? this.#rank() : name === 'rivals' ? this.#rivals() : this.#settings();
     this.#refresh();
   }
 
@@ -382,6 +382,40 @@ export class Sheets {
     woodcut(pen, prims('hud.shipsLeft'), right - sw - 34, ym, 44);
     figure(pen, won, right, yw + size * 0.5, size, { align: 'right', ink: 'rubric', seed: 8 });
     star(pen, right - ww - 34, yw, 22, 1, 'gold');
+  }
+
+  // ── the rivals ──
+
+  /** Each league captain as a card: her galleon and emblem, her rank's seal, her two ability woodcuts, and our record,
+   *  ships sunk by me and ships sunk by her. */
+  #rivals(): Body {
+    const m = this.#h.rivals(), items: Item[] = [], cols = Math.max(2, this.#cols(290));
+    const height = this.#grid(items, m.rivals, cols, 0, 0.62, (r, x, y, w, h) => this.#rivalCard(r, x, y, w, h, 601 + items.length)) + 4;
+    return { items, height };
+  }
+
+  #rivalCard(r: RivalView, x: number, y: number, w: number, h: number, seed: number): Item {
+    return {
+      id: `rival:${r.id}`, x, y, w, h,
+      bake: () => this.#bake(`rival|${r.id}|${r.rank}|${r.sunkByYou}|${r.sankYou}`, w, h, (pen, gc, cx, cy) => {
+        card(pen, gc, cx, cy, { w, h, edge: 'iron', locked: false, seed, unlock: () => {}, art: (p) => {
+          const x0 = cx - w / 2, y0 = cy - h / 2;
+          // the galleon, with her emblem on her sail, on the left
+          const sp = galleonSprite(p, { colour: r.colours[0], sigil: { id: r.emblem } }, { size: h * 0.52, facing: 1, seed: seed + 3 });
+          drawGalleon(p.g, sp, x0 + w * 0.3, y0 + h * 0.62, 1, 1);
+          drawSeal(p.g, this.#seal(TIER_ILLUMINATION[rankByName(r.rank).tier], 40), x0 + w - 32, y0 + 32, { phase: 0.5 });
+          const size = Math.min(h * 0.26, 44);
+          woodcut(p, prims(`ability.${r.active}`), x0 + w - 96, y0 + h * 0.52, size);
+          woodcut(p, prims(`ability.${r.passive}`), x0 + w - 42, y0 + h * 0.52, size);
+          const ny = y0 + h - 15, fs = h * 0.17;
+          // our record: the ship going down in her colour, the numeral of those I sank, and in iron those she sank of mine
+          woodcut(p, prims('hud.kills'), x0 + w - 158, ny - fs * 0.45, fs * 1.5, r.colours[0]);
+          figure(p, String(r.sunkByYou), x0 + w - 132, ny, fs, { seed: seed + 5 });
+          woodcut(p, prims('hud.kills'), x0 + w - 78, ny - fs * 0.45, fs * 1.5, 'iron');
+          figure(p, String(r.sankYou), x0 + w - 52, ny, fs, { seed: seed + 6 });
+        } });
+      }),
+    };
   }
 
   // ── settings ──
