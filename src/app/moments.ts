@@ -3,7 +3,7 @@
 // actorEvent. Positions in moments are metres from the planet's centre. At the end, the capture tools' scripted
 // moments.
 import type { ActorEvent, LootKind, Rarity } from '../render/actors/index.ts';
-import { empty, useItem, weaponItem } from '../sim/items.ts';
+import { empty, spawnLoot, useItem, weaponItem } from '../sim/items.ts';
 import {
   ACTIVES, CAUSE, EVENT, FLAG, ITEM, PHASE, PLAYER, SHIPS, SLOTS, STORM, TICK, calmNow, idleInput, localHour, priceOf,
   type Happening, type Item, type MatchState, type Ship, type ShipInput,
@@ -397,6 +397,31 @@ export const MOMENTS: readonly MomentScript[] = [
       return [[t, { throttle: 0, steer: 0 }], ...tap(t + 10, { hail: 0 }, { hail: -1 })];
     },
     is: (m) => m.k === 'deliveryArrived' && m.ship === PLAYER,
+  },
+  {
+    // loot of every rarity laid out ahead on open water, from in reach to 400 m off, with the hold full so the nearest
+    // waits in reach instead of being swept up: the player swaps for it
+    name: 'loot', note: 'the player swapping for the loot in reach', sea: true, lead: 12, every: 6, frames: 10,
+    arrange: (s) => {
+      const c = openCourse(s, 420, 30);
+      place(s, PLAYER, c);
+      // the held fleet astern, out of the view up the course
+      for (let i = 1; i < SHIPS; i++) place(s, i, off(c, -140 - i * 12, i % 2 ? 45 : -45));
+      arm(s, weaponItem(ITEM.cannon, 0), weaponItem(ITEM.scatter, 1), useItem(ITEM.smallShield), useItem(ITEM.repairKit), weaponItem(ITEM.harpoon, 0));
+      // laid a while ago, so it has popped up by the first frame
+      const lay = (d: number, side: number, item: Item) => { spawnLoot(s, off(c, d, side).pos, item, -1).age = 1; };
+      lay(7, 5, weaponItem(ITEM.cannon, 4));
+      lay(40, -8, useItem(ITEM.smallShield));
+      lay(80, 14, weaponItem(ITEM.scatter, 2));
+      lay(150, -6, weaponItem(ITEM.mortar, 3));
+      lay(150, 22, useItem(ITEM.repairKit));
+      lay(230, 6, useItem(ITEM.fullRepair));
+      lay(300, -16, weaponItem(ITEM.harpoon, 0));
+      lay(400, 4, weaponItem(ITEM.cannon, 4));
+      const t = s.tick;
+      return [[t, { throttle: 0, steer: 0 }], ...tap(t + 12, { take: true }, { take: false })];
+    },
+    is: (m) => m.k === 'pickup' && m.ship === PLAYER,
   },
 ];
 
