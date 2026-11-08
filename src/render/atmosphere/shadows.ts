@@ -28,7 +28,7 @@ import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js';
 const SHADOW_REACH = 360;
 /** Where each slice ends, as a share of the reach. */
 const SPLITS = [0.1, 1];
-const MAP_SIZE = 2048;
+const MAP_SIZE = 1024;
 /** The share of a boundary's distance the slices are cross-faded over, either side of it, and the share of the reach
  *  over which the last slice's shadows thin out. */
 const FADE = 0.1;
