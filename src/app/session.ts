@@ -244,7 +244,7 @@ export class Session implements Stepper {
     for (const m of this.buf) {
       this.tally.observe(m, (i) => metres(s.ships[i].pos), (i) => s.ships[i].hull);
       if (m.k === 'hit' && m.ship === this.watch && !m.steady && m.shield + m.hull > 0) this.hurtTick = s.tick;
-      // the player's own wreck stays in view until they choose to spectate
+      // the player's own sinking is the app's to cut from (spectate, as the match leaves for it)
       if (m.k === 'sink' && m.ship === this.watch && m.ship !== PLAYER) this.rewatch(m.by);
       this.onMoment(m);
     }

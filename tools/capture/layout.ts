@@ -30,8 +30,7 @@ export const SCREENS: readonly Screen[] = [
   { name: 'hud-perks', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11, skipGale: true }); h.step(30); h.stagePlayer({ perks: ["betterLoot", "fastReload", "spotter"], weather: "rain" }); h.step(60); await h.run(4)' },
   { name: 'hud-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11, skipGale: true }); h.step(90); await h.run(4)' },
   { name: 'gale-tip', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11 }); await h.run(1)' },
-  { name: 'death', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)' },
-  { name: 'spectate', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")' },
+  { name: 'spectate', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)' },
   { name: 'results', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()' },
 ];
 

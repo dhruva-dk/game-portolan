@@ -30,7 +30,7 @@ import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
 import { MOMENTS, actorEvent, arrangeFight, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
-import { deathModel, galeMap, hudModel, markOf, planetMap, resultsModel, victoryModel } from './matchModels.ts';
+import { galeMap, hudModel, markOf, planetMap, resultsModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { LOBBY_CAMERA, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type ScreenName } from './flow.ts';
@@ -40,7 +40,7 @@ import { abilitiesModel, levelView, lockerModel, rankModel, rankView, rivalsMode
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
-import { ChartLayer, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
+import { ChartLayer, Press, everywhere, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
 import { FullMap } from '../screens/fullmap.ts';
 import { Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
@@ -49,9 +49,10 @@ import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
 import { page } from '../ui/screens/frame.ts';
-import { deathScreen, resultsScreen, victoryScreen } from '../ui/screens/match.ts';
+import { resultsScreen } from '../ui/screens/match.ts';
 import { applyParchment, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
-import type { DeathModel, HudModel, ResultsModel, Settings, VictoryModel } from '../ui/model.ts';
+import { effect } from '../ui/parts/feedback.ts';
+import type { HudModel, ResultsModel, Settings } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
 
 export interface AppOptions {
@@ -72,6 +73,8 @@ const PERF_EVERY = 5;
 const FLIGHT = 2.2;
 /** Seconds the camera takes to fly from the anchorage to the Gale. */
 const TO_THE_GALE = 2.6;
+/** Seconds the end of the match holds before the result: watching the last ship left, and the camera drawing back on a win. */
+const HOLD = { spectate: 3, victory: 6 } as const;
 
 const norm = (p: V3): V3 => {
   const l = Math.hypot(p.x, p.y, p.z) || 1;
@@ -337,7 +340,9 @@ export class App {
     const atLobby = from === 'lobby' || folio(from), toLobby = name === 'lobby' || folio(name);
     if (atLobby && !toLobby) this.lobby?.leave(now);
     if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
-    if (from === 'match' && name !== 'match') this.hud?.leave(now);
+    // the HUD stays from the match into spectating; it dries when both are done
+    const hudStays = (n: ScreenName) => n === 'match' || n === 'spectate';
+    if (hudStays(from) && !hudStays(name)) this.hud?.leave(now);
     if (name === 'title') this.openTitle();
     // a folio or the settings unrolls over the lobby that is already here, or one that comes with it
     if (toLobby && (!atLobby || !this.lobby)) this.openLobby(from);
@@ -347,7 +352,14 @@ export class App {
     if (name === 'match') this.openHud(model);
     // (after what comes in under it, so it is drawn over it)
     if (from === 'title' && name !== 'title') this.title?.leave(now);
-    if (name === 'spectate') this.session?.spectate();
+    if (name === 'spectate' || name === 'victory') {
+      // the match's markers and numbers don't stay over the end of it
+      this.juice.markers?.clear();
+      this.juice.numbers?.clear();
+    }
+    if (from === 'victory' && name !== 'victory') this.chart?.presses.remove('match:tap');
+    if (name === 'spectate') this.startSpectating(model);
+    if (name === 'victory') this.startVictory();
     const view = this.screenView(name, model);
     this.shell.show(name, view, transition(from, name));
   }
@@ -366,6 +378,7 @@ export class App {
       case 'settings':
       case 'gale':
       case 'spectate':
+      case 'victory':
         return { el: el('s-empty') };
       default:
         return this.matchView(name, model) ?? this.placeholder(name);
@@ -375,26 +388,38 @@ export class App {
   /** The screens over a match, from the live session or a model the hook hands in; null when there is neither. */
   private matchView(name: ScreenName, model?: unknown): ScreenView | null {
     const s = this.session;
-    if (name === 'death' || name === 'spectate' || name === 'victory') {
-      // the match's markers and numbers don't stay over the end of it
-      this.juice.markers?.clear();
-      this.juice.numbers?.clear();
-    }
     switch (name) {
       case 'match':
         // the HUD is on the chart (openHud); touches it does not take go through this empty screen to the controls
         return !model && !s ? null : { el: el('s-empty') };
-      case 'death':
-        if (!model && !s) return null;
-        return deathScreen((model as DeathModel) ?? deathModel(s!), { onSpectate: () => this.go('spectate'), onLeave: () => this.finishMatch() });
-      case 'victory':
-        if (!model && !s) return null;
-        return victoryScreen((model as VictoryModel) ?? victoryModel(s!), { onContinue: () => this.finishMatch() });
       case 'results':
         return model ? resultsScreen(model as ResultsModel, { onDone: () => this.go('lobby') }) : null;
       default:
         return this.placeholder(name);
     }
+  }
+
+  /** She has sunk: the camera cuts to the captain who sank her, or the best captain still afloat, and the HUD keeps only
+   *  its disc and clock over that ship; a tap anywhere skips to the result. */
+  private startSpectating(model?: unknown): void {
+    const s = this.session;
+    if (s) {
+      s.spectate();
+      // a cut, not the flight between ships the match's frame would otherwise make of it
+      this.watched = s.watch;
+      this.stage?.snap();
+    }
+    if (!this.hud) this.openHud(model);
+    this.hud?.spectate(() => this.finishMatch());
+    this.controls.on = false;
+  }
+
+  /** The win: the HUD has dried, the camera draws back and circles her; a tap anywhere (or the hold) goes to the result. */
+  private startVictory(): void {
+    this.controls.on = false;
+    effect('screen:victory', 'victory', 'success');
+    const c = this.chart;
+    if (c) c.presses.add({ id: 'match:tap', hit: everywhere(c.layout), press: new Press(), sound: 'none', haptic: 'light', act: () => this.finishMatch() });
   }
 
   /** Changes the career from a folio (an equip) and saves; a locked item changes nothing. */
@@ -447,6 +472,8 @@ export class App {
   private diving = -1;
   /** Seconds until the HUD's next refresh: it redraws a few times a second, not every frame. */
   private hudT = 0;
+  /** Seconds the match has been over and its end held on screen. */
+  private endHeld = 0;
   private readonly eye = { x: 0, y: 0, z: 0 };
   private readonly ndc = new THREE.Vector3();
   /** Where the juice sees from: the camera, and the ship the player watches. */
@@ -484,6 +511,7 @@ export class App {
     this.session = s;
     this.watched = -1;
     this.pull = 0;
+    this.endHeld = 0;
     this.tips.reset();
     this.viewer.me = this.sound.me = PLAYER;
     this.viewer.spectating = false;
@@ -701,7 +729,7 @@ export class App {
     this.eye.z = c.z;
     this.viewer.me = this.sound.me = s.watch;
     this.viewer.spectating = s.watch !== PLAYER;
-    this.follow(s);
+    this.follow(s, f.realDt);
     // a tip over the HUD only: the card waits while another screen is up
     const tipAt = this.screen === 'match' ? 'hud' : '';
     this.tip.el.dataset.at = tipAt;
@@ -713,15 +741,18 @@ export class App {
     }
   }
 
-  /** Moves between the match's screens as the player's ship lands from the Gale, sinks, or wins. */
-  private follow(s: Session): void {
+  /** Moves between the match's screens as the player's ship lands from the Gale, sinks, or wins. Every way on ends at
+   *  the result: a win or a sinking comes off the sea here, and a match that has ended holds for a moment, then finishes. */
+  private follow(s: Session, dt: number): void {
     const me = s.me, at = this.screen;
     if (s.over && s.state.winner === PLAYER && (at === 'match' || at === 'gale')) this.go('victory');
-    else if (me.phase === PHASE.sunk && (at === 'match' || at === 'gale')) this.go('death');
+    else if (me.phase === PHASE.sunk && (at === 'match' || at === 'gale')) this.go('spectate');
     else if (at === 'gale' && me.phase === PHASE.sea) this.go('match');
-    else if (s.over && at === 'spectate') this.finishMatch();
-    // a match that sails itself watches on after its sinking, so a long run keeps the sea busy
-    else if (this.options.autoplay && at === 'death' && s.seconds - s.tally.ships[PLAYER].sunkAt > 4) this.go('spectate');
+    else if (s.over && (at === 'spectate' || at === 'victory')) {
+      // the match is over: a moment to see it end, then the result
+      this.endHeld += dt;
+      if (this.endHeld >= HOLD[at]) this.finishMatch();
+    }
   }
 
   /** The player's own colour and emblem, as the chart's marks take a captain. */

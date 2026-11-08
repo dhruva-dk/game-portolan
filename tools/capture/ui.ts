@@ -45,9 +45,8 @@ export const TRANSITIONS: readonly Transition[] = [
     times: [0, 100, 200, 300, 450, 600, 800],
   },
   // the match's own screens follow the sim, which only moves here when a frame is drawn
-  { name: 'match-death', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
-  { name: 'death-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60)', to: 'h.go("spectate")' },
-  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")', to: 'h.finish()' },
+  { name: 'match-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
+  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); await h.draw(); await h.draw()', to: 'h.finish()' },
   { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer(); await h.draw()' },
   { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()' },
   // her ship at anchor behind the result, as the scraps ink back in round her

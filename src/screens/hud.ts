@@ -3,8 +3,10 @@
 // holds still is baked once as a sprite; what a number or state changes is a plate re-inked when it changes; only what
 // moves (the rings, the arcs, the figures, the stick) is placed each frame. The chart takes only touches on its
 // pressables here; everything else falls through to the controls layer, which keeps the floating stick and the look.
+// Once she has sunk the same HUD spectates: only the disc and the Storm's clock stay, the disc gilt over the ship
+// watched, and a tap anywhere skips to the result.
 import {
-  Press, arcPts, canvas, cross, ctx, drawSprite, dryAlpha, ease, figure, figureWidth, hand, part, pressLook, prims,
+  Press, arcPts, canvas, cross, ctx, drawSprite, dryAlpha, ease, everywhere, figure, figureWidth, hand, part, pressLook, prims,
   woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pen, type Pressable, type Pts, type Rect, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
@@ -143,6 +145,8 @@ export class Hud {
   #off: (() => void) | null = null;
   /** The full map is open over the sea: only the disc shows, and takes a press. */
   #covered = false;
+  /** She has sunk and the HUD spectates, or null: what a tap anywhere does then (skips to the result). */
+  #skip: (() => void) | null = null;
   /** Called once the HUD has gone. */
   onGone?: () => void;
   /** What this frame draws with: the whole HUD's opacity, the time, the regions it drew into, what it may re-ink. */
@@ -264,6 +268,23 @@ export class Hud {
     else this.#place(layer);
   }
 
+  /** She has sunk: the controls and the vitals go, the disc and the Storm's clock stay over the ship watched, and a tap
+   *  anywhere is `skip`. */
+  spectate(skip: () => void): void {
+    if (this.#skip) return;
+    this.#skip = skip;
+    const layer = this.#layer;
+    if (layer && this.#p) this.#watchOnly(layer);
+  }
+
+  /** Every press off the chart, and the one over the whole screen that skips to the result. */
+  #watchOnly(layer: ChartLayer): void {
+    this.#bare(layer);
+    layer.presses.remove('hud:map');
+    const skip = this.#skip!;
+    layer.presses.add({ id: 'hud:skip', hit: everywhere(layer.layout), press: new Press(), sound: 'none', haptic: 'light', act: () => skip() });
+  }
+
   /** Every press off the chart but the disc's. */
   #bare(layer: ChartLayer): void {
     const p = this.#p!;
@@ -276,6 +297,7 @@ export class Hud {
     if (!p || !layer || !this.#pressing) return;
     this.#pressing = false;
     for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, ...p.slots, ...(p.map ? [p.map] : [])]) layer.presses.remove(q.id);
+    layer.presses.remove('hud:skip');
   }
 
   /** The places, the plates and the pressables for this screen size. */
@@ -312,6 +334,7 @@ export class Hud {
     };
     this.#pressing = true;
     if (this.#covered) this.#bare(layer);
+    if (this.#skip) this.#watchOnly(layer);
     if (this.#leftAt >= 0) this.#unpress();
   }
 
@@ -373,10 +396,17 @@ export class Hud {
       this.#minimap(g, layer, m, plates.map);
       return this.#rects;
     }
+    if (this.#skip) {
+      // spectating: the disc and the Storm's clock, over the ship watched
+      this.#stormClock(g, layer.layout, m, plates);
+      this.#minimap(g, layer, m, plates.map, true);
+      return this.#rects;
+    }
     this.#stormRim(g, layer, m, dt);
     this.#incoming(layer, m);
     this.#vitalsAndHurts(g, layer, m, plates.vitals, dt);
-    this.#readings(g, layer.layout, m, plates);
+    this.#stormClock(g, layer.layout, m, plates);
+    this.#afloat(g, layer.layout, m, plates);
     this.#minimap(g, layer, m, plates.map);
     this.#controls(g, layer, m, plates, dt);
     this.#combat(g, layer, m);
@@ -464,8 +494,8 @@ export class Hud {
     }
   }
 
-  /** The Storm's clock and the ships afloat, top centre. No clock for the second before the first phase, or once the Storm is done closing. */
-  #readings(g: CanvasRenderingContext2D, l: ChartLayout, m: HudModel, plates: Plates): void {
+  /** The Storm's clock, top centre. No clock for the second before the first phase, or once the Storm is done closing. */
+  #stormClock(g: CanvasRenderingContext2D, l: ChartLayout, m: HudModel, plates: Plates): void {
     const st = m.storm;
     if (!st.grace && (st.seconds > 0 || st.shrinking)) {
       const text = clockText(st.seconds), tight = st.shrinking ? Math.round(clamp(st.progress) * 4) : -1;
@@ -475,19 +505,24 @@ export class Hud {
         badge(p, { ...l.clock, x: cx, y: cy }, drawing, text, { figureInk: st.shrinking ? 'rubric' : 'iron', seed: 9 });
       });
     }
+  }
+
+  /** The ships afloat, beside the clock. */
+  #afloat(g: CanvasRenderingContext2D, l: ChartLayout, m: HudModel, plates: Plates): void {
     this.#plate(g, plates.afloat, String(m.ships), l.afloat.x, l.afloat.y, (p, cx, cy) => {
       badge(p, { ...l.afloat, x: cx, y: cy }, prims('hud.shipsLeft'), String(m.ships), { seed: 10 });
     });
   }
 
-  /** The minimap disc: the paper, the sea round her north up, her arrow, and the region's sign when she enters one. */
-  #minimap(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plate: Plate): void {
+  /** The minimap disc: the paper, the sea round her north up, her arrow, and the region's sign when she enters one;
+   *  watching another ship (`gilt`), her arrow gilt and no sign. */
+  #minimap(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plate: Plate, gilt = false): void {
     const D = layer.layout.hud;
     const size = mapFace(g, layer, D, this.#a, m.map.heading, () => {
       this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide.level));
-    });
+    }, gilt);
     this.#touch(D.x, D.y, size, size);
-    this.#regionSign(g, layer, D);
+    if (!gilt) this.#regionSign(g, layer, D);
   }
 
   /** The region's woodcut, inked in at the top of the disc on entering it, standing a few seconds, drying out. */

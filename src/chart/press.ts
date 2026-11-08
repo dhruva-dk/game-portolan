@@ -53,6 +53,9 @@ export function pressLook(sink: number): { scale: number; dy: number; dark: numb
 
 export type Hit = { x: number; y: number; r: number } | { x: number; y: number; w: number; h: number };
 
+/** A hit over the whole screen, for a tap anywhere (the result sheet's, the spectator's). */
+export const everywhere = (l: { w: number; h: number }): Hit => ({ x: l.w / 2, y: l.h / 2, w: l.w, h: l.h });
+
 export interface Pressable {
   id: string;
   /** Where it is, CSS pixels: a circle or a box centred at (x, y). Grown to the touch target if smaller. */

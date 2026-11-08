@@ -115,9 +115,9 @@ export class Minimap {
   }
 }
 
-/** The disc at D: its paper, then `plate` drawing what is on the sea, then the rim and her arrow on top; the width of
- *  the square it was all drawn in. */
-export function mapFace(g: CanvasRenderingContext2D, layer: ChartLayer, D: Circle, alpha: number, heading: number, plate: () => void): number {
+/** The disc at D: its paper, then `plate` drawing what is on the sea, then the rim and her arrow on top, gilt with a
+ *  star at its heart when she is the ship watched after a sinking; the width of the square it was all drawn in. */
+export function mapFace(g: CanvasRenderingContext2D, layer: ChartLayer, D: Circle, alpha: number, heading: number, plate: () => void, gilt = false): number {
   const R = D.r, d = layer.disc(R);
   drawBaked(g, d, D.x - R, D.y - R, alpha);
   plate();
@@ -127,7 +127,10 @@ export function mapFace(g: CanvasRenderingContext2D, layer: ChartLayer, D: Circl
   });
   drawSprite(g, rim, D.x, D.y, { alpha });
   const size = Math.ceil(R * 0.44), h = size / 2;
-  const arrowS = layer.sprite(`hud|arrow|${size}`, size, size, h, h, (p) => arrow(p, h, h + R * 0.16, h, h - R * 0.16));
+  const arrowS = layer.sprite(`hud|arrow|${size}|${gilt ? 1 : 0}`, size, size, h, h, (p) => {
+    arrow(p, h, h + R * 0.16, h, h - R * 0.16, 1, gilt ? 'gold' : 'iron');
+    if (gilt) star(p, h, h, R * 0.075);
+  });
   drawSprite(g, arrowS, D.x, D.y, { alpha, rot: heading });
   return (R + d.pad) * 2.2;
 }

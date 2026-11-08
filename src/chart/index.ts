@@ -39,5 +39,5 @@ export { letterStrokes, word, wordWidth, type WordOptions } from './letters.ts';
 export { prims, woodcut } from './woodcut.ts';
 export { coastRuns, coasts, traceCoasts, type Coasts, type Globe } from './coast.ts';
 export { dryAlpha, ease, flight, part, progress, stagger, thin, unroll, type Flight } from './motion.ts';
-export { Press, Presses, TARGET, hits, pressLook, type Hit, type Pressable } from './press.ts';
+export { Press, Presses, TARGET, everywhere, hits, pressLook, type Hit, type Pressable } from './press.ts';
 export { chartLayout, deviceClass, layoutProblems, type Box, type ChartLayout, type Circle, type DeviceClass, type Insets } from './layout.ts';
