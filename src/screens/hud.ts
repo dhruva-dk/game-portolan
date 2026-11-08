@@ -2,7 +2,7 @@
 // nothing on it yet. It inks in as she comes to sea (laid on the chart and settling) and dries away when the match's
 // screens leave it.
 import {
-  Pen, Press, arcPts, arrow, canvas, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, dryAlpha, ease, figure, figureWidth, pennant, pressLook, prims, ring, star, stormRing,
+  Pen, Press, arcPts, arrow, canvas, cross, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, dryAlpha, ease, figure, figureWidth, hand, part, pennant, pressLook, prims, ring, star, stormRing,
   woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pressable, type Pts, type Rect, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
@@ -10,13 +10,14 @@ import type { Prim } from '../icons/draw.ts';
 import { stormSpiral } from '../icons/sets/hud.ts';
 import type { HurtId } from '../icons/sets/hurts.ts';
 import { SAILS, type Controls } from '../app/controls.ts';
+import type { Moment } from '../app/events.ts';
 import type { V3 } from '../sim/math.ts';
 import type { RegionId } from '../sim/world/index.ts';
 import type { HudModel, PartsModel, Slot } from '../ui/model.ts';
 import { feedback } from '../ui/parts/feedback.ts';
 import { LOOT_INKS } from '../render/actors/loot.ts';
 import { LandLayer } from '../ui/screens/chart.ts';
-import { badge, bar, discPath, drainRing, paper, roundButton, sailsArc, slipPath, slot, stickBase, stickNub, type SlotOptions } from './instruments.ts';
+import { badge, bar, discPath, drainRing, paper, reticle, roundButton, sailsArc, slipPath, slot, stickBase, stickNub, type SlotOptions } from './instruments.ts';
 
 const AT = { lay: 0.5, dry: 0.3 } as const;
 export class HudDisc {
@@ -74,6 +75,14 @@ const BAKES = 3;
 /** Seconds a slot is held before what is in it goes over the side; the share of that a finger rests before it shows. */
 const HOLD = 0.6;
 const HOLD_SHOWS = 0.18;
+/** Seconds: the cross at the reticle on a hit, a damage figure's rise, an arc toward whoever struck her. */
+const MARK = { cross: 0.22, figure: 0.9, arc: 1.1 } as const;
+/** Hits on one ship this close together (ms) add to one figure, and from one shooter to one arc. */
+const MERGE = 350;
+/** The most figures and arcs kept at once: a broadside must not cost the frame. */
+const MOST = { figures: 12, arcs: 6 } as const;
+/** Half an incoming arc's sweep, radians; the ellipse it runs on, as shares of the screen. */
+const ARC = { half: 0.22, w: 0.46, h: 0.4 } as const;
 
 /** A hurt to the ship as the HUD shows it, 0 (whole or mended) to 1. */
 const hurtShown = (k: number): number => clamp((k - 0.08) / 0.22);
@@ -145,6 +154,22 @@ interface Plates {
   sails: Plate;
   gust: Plate;
   slots: Plate[];
+}
+
+/** A damage figure rising from the ship struck. */
+interface HitFigure {
+  ship: number;
+  pos: V3;
+  value: number;
+  at: number;
+  /** She sank: the figure is gold and largest. */
+  sunk: boolean;
+}
+
+/** An arc at the screen's edge toward a ship that hit me. */
+interface FireArc {
+  ship: number;
+  at: number;
 }
 
 /** The controls' places: the layout's, the thumbs changed about for the left hand. */
@@ -221,6 +246,11 @@ export class Hud {
   #abilityLeft = 0;
   /** A slot held: which, since when (ms), whether it was the chosen one, and whether the hold has dropped what's in it. */
   #hold: { k: number; at: number; was: boolean; spent: boolean } | null = null;
+  /** When the last hit of mine landed (ms), and whether it sank her. */
+  #markAt = -1;
+  #markSunk = false;
+  readonly #figures: HitFigure[] = [];
+  readonly #arcs: FireArc[] = [];
 
   constructor(host: HudHost) {
     this.#host = host;
@@ -242,6 +272,40 @@ export class Hud {
       if (m.regionId) { this.#sign = m.regionId; this.#signDue = true; }
     }
     if (this.#refresh++ % 2 === 0) this.#mapKey++;
+  }
+
+  /** A moment of the match: what is hit, and who hit her. The marks are for the player's own ship, never a spectator's. */
+  moment(e: Moment): void {
+    const s = this.#host.sight;
+    if (s.spectating) return;
+    if (e.k === 'sink' && e.by === s.me && e.ship !== s.me) {
+      for (let i = this.#figures.length - 1; i >= 0; i--) {
+        const f = this.#figures[i];
+        if (f.ship === e.ship) { f.sunk = true; f.at = this.#now; break; }
+      }
+      this.#markAt = this.#now;
+      this.#markSunk = true;
+    }
+    if (e.k !== 'hit' || e.steady) return;
+    const value = Math.round(e.shield + e.hull);
+    if (value <= 0) return;
+    if (e.by === s.me && e.ship !== s.me) {
+      this.#markAt = this.#now;
+      this.#markSunk = false;
+      const last = this.#figures.find((f) => f.ship === e.ship && this.#now - f.at < MERGE && !f.sunk);
+      if (last) { last.value += value; last.pos = { ...e.pos }; }
+      else {
+        if (this.#figures.length >= MOST.figures) this.#figures.shift();
+        this.#figures.push({ ship: e.ship, pos: { ...e.pos }, value, at: this.#now, sunk: false });
+      }
+    } else if (e.ship === s.me && e.by >= 0 && e.by !== s.me) {
+      const arc = this.#arcs.find((a) => a.ship === e.by);
+      if (arc) arc.at = this.#now;
+      else {
+        if (this.#arcs.length >= MOST.arcs) this.#arcs.shift();
+        this.#arcs.push({ ship: e.by, at: this.#now });
+      }
+    }
   }
 
   /** The ink dries away from `now`; the HUD takes no more touches. */
@@ -356,10 +420,12 @@ export class Hud {
     if (this.#signDue) { this.#signAt = now; this.#signDue = false; }
     const plates = this.#plates!;
     this.#stormRim(g, layer, m, dt);
+    this.#incoming(layer, m);
     this.#vitalsAndHurts(g, layer, m, plates.vitals, dt);
     this.#readings(g, layer.layout, m, plates);
     this.#minimap(g, layer, m, plates.map);
     this.#controls(g, layer, m, plates, dt);
+    this.#combat(g, layer, m);
     return this.#rects;
   }
 
@@ -634,6 +700,85 @@ export class Hud {
         this.#touch(b.x, b.y, b.w + 12, b.h + 12);
       }
     }
+  }
+
+  // ── combat ──
+
+  /** Red arcs at the screen's edge: toward each ship that has just hit me, and, pulsing, toward a heavy gun winding up. */
+  #incoming(layer: ChartLayer, m: HudModel): void {
+    const now = this.#now, arcs = this.#arcs;
+    for (let i = arcs.length - 1; i >= 0; i--) {
+      const f = (now - arcs[i].at) / 1000 / MARK.arc;
+      if (f >= 1) { arcs.splice(i, 1); continue; }
+      const at = this.#host.shipAt(arcs[i].ship);
+      if (at) this.#arc(layer, this.#host.sight.bearing(at), 1 - ease.in(f), 5);
+    }
+    if (m.aimed) {
+      const w = clamp(m.aimed.wound), beat = 0.5 + 0.5 * Math.sin((now / 1000) * TAU * (1.4 + w * 2.6));
+      this.#arc(layer, m.aimed.bearing, (0.35 + 0.65 * w) * (0.45 + 0.55 * beat), 7);
+    }
+  }
+
+  /** One arc of red on an ellipse just inside the screen's edge, centred on a bearing (radians clockwise from ahead). */
+  #arc(layer: ChartLayer, bearing: number, alpha: number, w: number): void {
+    const l = layer.layout, cx = l.w / 2, cy = l.h / 2, ex = l.w * ARC.w, ey = l.h * ARC.h, pts: Pts = [];
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = 0; i <= 8; i++) {
+      const a = bearing + (i / 8 - 0.5) * ARC.half * 2, x = cx + Math.sin(a) * ex, y = cy - Math.cos(a) * ey;
+      pts.push(x, y);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    layer.pen.rule([pts], { w, ink: 'rubric', alpha: alpha * this.#a, wobble: 0.2, seed: 121 });
+    this.#rects.push({ x: x0 - w, y: y0 - w, w: x1 - x0 + w * 2, h: y1 - y0 + w * 2 });
+  }
+
+  /** What lies over the sea at the centre: the reticle, a hit's cross, the damage rising; and the hand offering a swap. */
+  #combat(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel): void {
+    const l = layer.layout, c = l.reticle, a = this.#a, now = this.#now;
+    if (m.slots[m.selected]?.kind === 'weapon') {
+      const h = c.r + PAD, s = layer.sprite(`hud|reticle|${c.r}`, h * 2, h * 2, h, h, (p) => reticle(p, h, h, c.r));
+      drawSprite(g, s, c.x, c.y, { alpha: a });
+      this.#touch(c.x, c.y, h * 2, h * 2);
+    }
+    const f = (now - this.#markAt) / 1000 / MARK.cross;
+    if (this.#markAt >= 0 && f < 1) {
+      const ink = this.#markSunk ? 'gold' : 'white', r = c.r * 1.3, h = Math.ceil(r + PAD);
+      const s = layer.sprite(`hud|hit|${ink}|${r}`, h * 2, h * 2, h, h, (p) => {
+        cross(p, h + 0.8, h + 0.8, r, 1, 'iron');
+        cross(p, h, h, r, 1, ink);
+      });
+      drawSprite(g, s, c.x, c.y, { alpha: a * (1 - ease.in(f)), scale: 1.2 - 0.2 * ease.out(f * 2) });
+      this.#touch(c.x, c.y, h * 2.5, h * 2.5);
+    }
+    this.#hitFigures(g, layer);
+    if (m.pickup !== null && m.slots.every((q) => q.kind !== 'empty')) this.#offer(g, layer, m);
+  }
+
+  /** The damage each hit of mine did, rising from the ship struck in red, larger for larger; gold when it sinks her. */
+  #hitFigures(g: CanvasRenderingContext2D, layer: ChartLayer): void {
+    const H = layer.layout.figure.hit, figs = this.#figures, now = this.#now;
+    for (let i = figs.length - 1; i >= 0; i--) {
+      const f = figs[i], s = (now - f.at) / 1000 / MARK.figure;
+      if (s >= 1) { figs.splice(i, 1); continue; }
+      const at = this.#host.sight.project(f.pos);
+      if (!at) continue;
+      const size = f.sunk ? H * 1.6 : H * (f.value < 15 ? 0.85 : f.value < 40 ? 1.1 : 1.45);
+      const n = this.#numeral(layer, String(f.value), f.sunk ? 'gold' : 'rubric', size, true);
+      const y = at.y - ease.out(s * 1.6) * size * 1.6;
+      drawSprite(g, n, at.x, y, { alpha: this.#a * (1 - part(s, 0.65, 1)), scale: 1 + 0.25 * (1 - ease.out(s * 6)) });
+      this.#touch(at.x, y, n.w * 1.3, n.h * 1.3);
+    }
+  }
+
+  /** Loot in reach and the hold full: the hand points down at the chosen slot, the one a tap on it would give up. */
+  #offer(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel): void {
+    const b = layer.layout.slots[m.selected];
+    if (!b) return;
+    const size = 40, w = 40, h = size + 8, tip = h - 4;
+    const s = layer.sprite(`hud|hand|${size}`, w, h, w / 2, tip, (p) => hand(p, w / 2, tip, size, Math.PI / 2));
+    const y = b.y - b.h / 2 - 6 - (0.5 + 0.5 * Math.sin((this.#now / 1000) * TAU * 1.2)) * 4;
+    drawSprite(g, s, b.x, y, { alpha: this.#a });
+    this.#rects.push({ x: b.x - w / 2 - 2, y: y - tip - 6, w: w + 4, h: h + 12 });
   }
 }
 
