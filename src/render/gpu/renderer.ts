@@ -33,7 +33,7 @@ TextureNode.prototype.getTransformedUV = function (this: TextureNode, uv: Node):
 } as typeof TextureNode.prototype.getTransformedUV;
 
 /** The share of the canvas's width and height the scene is drawn at, for each kind of device. */
-export const RENDER_SCALE = { phone: 0.6, tablet: 0.75, desktop: 0.9 } as const;
+export const RENDER_SCALE = { phone: 0.6, tablet: 0.66, desktop: 0.9 } as const;
 
 /** The most pixels the canvas holds: three quarters of the width and height of an M1 iPad Air's panel, the floor. The
  *  screen stretches the canvas to fit, and the chart drawn over it is the page's, at the panel's own pixels. */

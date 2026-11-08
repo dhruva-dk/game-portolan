@@ -242,7 +242,7 @@ export function hullNodeMaterial(u: Uniforms, tex: ActorTextures): MeshPhysicalN
   m.metalnessNode = metal.mul(float(1).sub(crust)).mul(float(1).sub(frozen));
   m.clearcoatNode = max(max(select(lacquered, float(0.75), float(0)).mul(float(1).sub(max(scorch, soot.mul(mark)))), wet).mul(float(1).sub(crust)), glaze).mul(float(1).sub(max(snow, rime)));
   m.clearcoatRoughnessNode = mix(mix(lum.mul(0.08).add(0.08), float(0.03), wet), float(0.05), glaze);
-  // (the planks' relief deeper than the rest, so the seams still read at the scene's three quarters)
+  // (the planks' relief deeper than the rest, so the seams still read at the scene's two thirds)
   const relief = mix(select(lacquered, float(PLANK_RELIEF), float(0.8)), float(0.8), gold);
   m.normalNode = normalMap(select(is(3), texture(tex.deck_n), texture(tex.hull_n)).xyz, vec2(relief).mul(bumps).mul(float(1).sub(max(snow, rime).mul(0.85))).mul(float(1).sub(glaze.mul(0.4))));
   m.emissiveNode = lamps.add(embers).add(flash).mul(LAMP).add(select(is(15), lanternLight(wisp, night, flickWisp), vec3(0)));
