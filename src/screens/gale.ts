@@ -5,7 +5,7 @@
 // Once she has gone the stick comes up under the thumb for the glide and her marker stands on the water, an inked
 // pennant on a staff, where she has set it. The disc's own press opens the full map. Nothing but DIVE is written.
 import {
-  Press, drawSprite, dryAlpha, ease, figure, figureWidth, hand, pennant, pressLook, staff, word, wordWidth, WASH, type Box, type ChartLayer,
+  Press, drawSprite, dryAlpha, ease, figure, figureWidth, pennant, pressLook, staff, word, wordWidth, WASH, type Box, type ChartLayer,
   type Circle, type Pressable, type Pen,
 } from '../chart/index.ts';
 import { GALE } from '../sim/tables.ts';
@@ -16,6 +16,7 @@ import type { Controls } from '../app/controls.ts';
 import type { MapView } from '../ui/model.ts';
 import { paper, slipPath } from './instruments.ts';
 import { Minimap, Plate, drawStick, mapFace } from './minimap.ts';
+import { SCRAP, SCRAP_TOTAL, handSprite, scrapAlpha, slipSprite } from './scraps.ts';
 
 /** What the drop needs of the game. */
 export interface GaleHost {
@@ -39,13 +40,13 @@ export interface GaleHost {
 }
 
 export interface GaleOptions {
-  /** The first Gale: a hand points at DIVE. */
+  /** The first Gale: a drawn hand is pinned to the edge over DIVE, pointing at it. */
   teach?: boolean;
 }
 
 /** Seconds: the chart coming up, DIVE inking in, the countdown drying when she goes, the stick coming up, everything
  *  drying away for anything but the sea. */
-const AT = { lay: 0.4, ink: 0.5, count: 0.35, stick: 0.3, dry: 0.3, hand: [0.4, 0.9] as const } as const;
+const AT = { lay: 0.4, ink: 0.5, count: 0.35, stick: 0.3, dry: 0.3 } as const;
 /** Seconds into the Gale before she may leave it: the Gale takes her up, and DIVE is inked in as it sets her at its
  *  height. */
 export const DIVE_ALLOWED = 2.8;
@@ -82,6 +83,10 @@ export class Gale {
   #dive: Pressable | null = null;
   #diveBox: Box = { x: 0, y: 0, w: 0, h: 0 };
   #stick: Circle = { x: 0, y: 0, r: 72 };
+  /** The first drop's scrap: its place over DIVE, when it went up (ms; -1 not yet), and whether it has gone. */
+  #scrap: Box = { x: 0, y: 0, w: 0, h: 0 };
+  #scrapAt = -1;
+  #scrapDone = false;
   #plate: Plate | null = null;
   readonly #map = new Minimap();
   #model: { view: MapView; tide: number } | null = null;
@@ -101,7 +106,7 @@ export class Gale {
     this.#layer = layer;
     this.#born = now;
     this.#lay();
-    this.#off = layer.addLive((g, t) => this.#frame(g, t));
+    this.#off = layer.addLive((g, t, dt) => this.#frame(g, t, dt));
   }
 
   resize(): void {
@@ -137,6 +142,9 @@ export class Gale {
     const margin = 14 + w / 2, x = Math.min(l.w - s.right - margin, Math.max(s.left + margin, f.x));
     const y = Math.min(l.h - s.bottom - 14 - h / 2, f.y);
     this.#diveBox = { x, y, w, h };
+    // the first drop's scrap, pinned to the edge on DIVE's side and over it
+    const sw = 118, sh = 128, sx = f.x > l.w / 2 ? l.w - s.right - 14 - sw / 2 : s.left + 14 + sw / 2;
+    this.#scrap = { x: sx, y: Math.max(s.top + 14 + sh / 2, y - h / 2 - 12 - sh / 2), w: sw, h: sh };
     this.#plate = new Plate(layer, l.hud.r * 2, l.hud.r * 2);
     this.#unpress();
     if (this.#leftAt >= 0) return;
@@ -158,7 +166,7 @@ export class Gale {
     c.press('dive', false);
   }
 
-  #frame(g: CanvasRenderingContext2D, now: number): void {
+  #frame(g: CanvasRenderingContext2D, now: number, dt: number): void {
     const layer = this.#layer!, h = this.#h, phase = h.phase();
     if (phase === PHASE.sea || phase === PHASE.sunk) {
       // she is down; the HUD takes the disc and the stick from here
@@ -184,15 +192,41 @@ export class Gale {
       this.#mapKey++;
     }
     this.#disc(g, layer, a);
-    if (this.#covered) return;
+    if (this.#covered) {
+      // the scrap waits behind the full map
+      if (this.#scrapAt >= 0) this.#scrapAt += dt * 1000;
+      return;
+    }
     const down = this.#diveAt >= 0;
     const went = down ? clamp((now - this.#diveAt) / 1000 / AT.count) : 0;
     if (went < 1) this.#countdown(g, layer, t, a * (1 - went));
-    if (!down) this.#diveButton(g, layer, t, now, a);
+    if (!down) this.#diveButton(g, layer, t, a);
     else {
       drawStick(g, layer, this.#stick, h.controls.stickView, a * ease.out(clamp((now - this.#diveAt) / 1000 / AT.stick)));
       this.#pennant(layer.pen, now, dry);
     }
+    this.#teaching(g, layer, t, now, a, down);
+  }
+
+  /** The first drop's scrap: a hand on a slip pinned to the edge over DIVE, tapping down at the letters, for a few seconds
+   *  once she may go; it dries out at once if she goes first. It is drawn only, and takes no touch. */
+  #teaching(g: CanvasRenderingContext2D, layer: ChartLayer, t: number, now: number, a: number, down: boolean): void {
+    if (!this.#teach || this.#scrapDone || t < DIVE_ALLOWED) return;
+    if (this.#scrapAt < 0) {
+      // she went before it came up: it never shows
+      if (down) { this.#scrapDone = true; return; }
+      this.#scrapAt = now;
+    }
+    if (down && now - this.#scrapAt < SCRAP.stand * 1000) this.#scrapAt = now - SCRAP.stand * 1000;
+    const s = (now - this.#scrapAt) / 1000;
+    if (s >= SCRAP_TOTAL) {
+      this.#scrapDone = true;
+      return;
+    }
+    const box = this.#scrap, dive = this.#diveBox, alpha = a * scrapAlpha(s);
+    drawSprite(g, slipSprite(layer, 'gale', box.w, box.h, 21), box.x, box.y, { alpha });
+    const tap = Math.abs(Math.sin(s * Math.PI * 1.1)), tip = dive.y - dive.h / 2 + 12 - (10 + 12 * tap);
+    drawSprite(g, handSprite(layer, 84), box.x, tip, { rot: Math.PI / 2, alpha });
   }
 
   /** The disc, its contents re-inked some six times a second. */
@@ -219,7 +253,7 @@ export class Gale {
   }
 
   /** DIVE: faint while the Gale is taking her up, inked in when she may go, sinking under a finger. */
-  #diveButton(g: CanvasRenderingContext2D, layer: ChartLayer, t: number, now: number, a: number): void {
+  #diveButton(g: CanvasRenderingContext2D, layer: ChartLayer, t: number, a: number): void {
     const b = this.#diveBox, ready = t >= DIVE_ALLOWED, inked = clamp((t - DIVE_ALLOWED) / AT.ink);
     if (this.#dive) this.#dive.disabled = !ready;
     const size = layer.layout.figure.large, W = b.w + 16, H = b.h + 16;
@@ -227,13 +261,6 @@ export class Gale {
     const look = pressLook(this.#press.sink);
     drawSprite(g, faint, b.x, b.y + look.dy, { alpha: a * (1 - inked), scale: look.scale, dark: look.dark });
     if (inked > 0) drawSprite(g, full, b.x, b.y + look.dy, { alpha: a * inked, scale: look.scale, dark: look.dark });
-    if (this.#teach && ready && this.#diveAt < 0) {
-      const f = (now - this.#born) / 1000 - DIVE_ALLOWED;
-      const ht = clamp((f - AT.hand[0]) / (AT.hand[1] - AT.hand[0])), tap = Math.abs(Math.sin(f * Math.PI * 1.1));
-      // down and to the right, onto the letters
-      const rot = Math.PI * 0.25, back = 10 + 12 * tap;
-      if (ht > 0) hand(layer.pen, b.x - b.w * 0.22 - Math.cos(rot) * back, b.y - b.h * 0.28 - Math.sin(rot) * back, 84, rot, ht * a);
-    }
   }
 
   #diveSprite(layer: ChartLayer, size: number, b: Box, W: number, H: number, ink: number) {

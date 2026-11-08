@@ -54,6 +54,9 @@ export interface ChartLayout {
   slots: Box[];
   /** The reticle at the screen's centre; drawn, never pressed. */
   reticle: Circle;
+  /** Where a teaching scrap pins (src/screens/scraps.ts): against the left edge, under the vitals and the row of hurts
+   *  below them, over every control that side can hold whichever hand has the stick. Drawn, never pressed. */
+  scrap: Box;
   /** Body heights of the numeral hand: a hit-mark, the Storm's clock, a result's large figure. */
   figure: { hit: number; clock: number; large: number };
   /** A sheet's margin from the screen's edge. */
@@ -89,6 +92,15 @@ function lobbyLayout(w: number, h: number, safe: Insets, phone: boolean): ChartL
   };
 }
 
+/** The teaching scrap's place: `m` in from the left edge, starting under the vitals' slip and the row of hurts it can
+ *  grow, as tall as there is room for over the highest control and at most its design height, half as wide again. */
+function scrapPlace(safe: Insets, m: number, bars: ChartLayout['bars'], c: ChartLayout['controls']): Box {
+  const top = Math.ceil(bars.hull.y + bars.hull.h / 2 + 30 + Math.round(bars.hull.h * 0.72) * 2);
+  const under = Math.min(...Object.values(c).map((q) => q.y - q.r * 1.2)) - m / 2;
+  const h = Math.floor(Math.min(132, under - top)), w = Math.round(h * 1.45);
+  return { x: safe.left + m + Math.ceil(w / 2), y: top + Math.ceil(h / 2), w, h };
+}
+
 /** n boxes of `size` square in a row centred at (x, y), `gap` apart. */
 const row = (x: number, y: number, size: number, gap: number, n = 5): Box[] =>
   Array.from({ length: n }, (_, i) => ({ x: x + (i - (n - 1) / 2) * (size + gap), y, w: size, h: size }));
@@ -102,28 +114,31 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
     const L = { x: safe.left + 150, y: h - safe.bottom - 210, r: 78 };
     const R = { x: w - safe.right - 150, y: h - safe.bottom - 210, r: 78 };
     const disc = Math.round(Math.min(150, Math.max(124, Math.min(w, h) * 0.14)));
+    const bars = {
+      shield: { x: safe.left + 26 + 150, y: safe.top + 26 + 13, w: 300, h: 26 },
+      hull: { x: safe.left + 26 + 150, y: safe.top + 26 + 13 + 32, w: 300, h: 26 },
+    };
+    const controls = {
+      stick: { x: L.x, y: L.y, r: 72 },
+      fire: { x: R.x, y: R.y, r: 54 },
+      gust: { x: R.x - 128, y: R.y - 92, r: 34 },
+      ability: { x: R.x - 14, y: R.y - 160, r: 40 },
+      reload: { x: R.x - 150, y: R.y + 46, r: 34 },
+      sails: { x: L.x + 18, y: L.y - 170, r: 36 },
+    };
     return {
       cls, w, h, safe,
       widths: { hair: 0.6, fine: 1.05, bold: 1.9 },
       target: TARGET,
       thumbs: { left: L, right: R },
       hud: { x: w - safe.right - disc - 26, y: safe.top + disc + 26, r: disc },
-      bars: {
-        shield: { x: safe.left + 26 + 150, y: safe.top + 26 + 13, w: 300, h: 26 },
-        hull: { x: safe.left + 26 + 150, y: safe.top + 26 + 13 + 32, w: 300, h: 26 },
-      },
+      bars,
       clock: { x: w / 2 - 66, y: safe.top + 26 + 22, w: 120, h: 44 },
       afloat: { x: w / 2 + 66, y: safe.top + 26 + 22, w: 120, h: 44 },
-      controls: {
-        stick: { x: L.x, y: L.y, r: 72 },
-        fire: { x: R.x, y: R.y, r: 54 },
-        gust: { x: R.x - 128, y: R.y - 92, r: 34 },
-        ability: { x: R.x - 14, y: R.y - 160, r: 40 },
-        reload: { x: R.x - 150, y: R.y + 46, r: 34 },
-        sails: { x: L.x + 18, y: L.y - 170, r: 36 },
-      },
+      controls,
       slots: row((L.x + R.x) / 2, h - safe.bottom - 46, 68, 12),
       reticle: { x: w / 2, y: h / 2, r: 14 },
+      scrap: scrapPlace(safe, 16, bars, controls),
       figure: { hit: 26, clock: 22, large: 64 },
       margin: 22,
       mark: { hud: 34, chart: 64 },
@@ -134,29 +149,32 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
   const L = { x: safe.left + 92, y: h - safe.bottom - 102, r: 56 };
   const R = { x: w - safe.right - 92, y: h - safe.bottom - 102, r: 56 };
   const disc = Math.round(Math.min(92, Math.max(64, h * 0.17)));
+  const bars = {
+    shield: { x: safe.left + 12 + 95, y: safe.top + 12 + 10, w: 190, h: 20 },
+    hull: { x: safe.left + 12 + 95, y: safe.top + 12 + 10 + 24, w: 190, h: 20 },
+  };
+  const controls = {
+    stick: { x: L.x, y: L.y, r: 56 },
+    fire: { x: R.x, y: R.y, r: 40 },
+    gust: { x: R.x + 6, y: R.y - 86, r: 28 },
+    ability: { x: R.x - 100, y: R.y - 58, r: 31 },
+    reload: { x: R.x - 112, y: R.y + 30, r: 28 },
+    sails: { x: L.x + 6, y: L.y - 110, r: 28 },
+  };
   return {
     cls, w, h, safe,
     widths: { hair: 0.5, fine: 0.9, bold: 1.6 },
     target: TARGET,
     thumbs: { left: L, right: R },
     hud: { x: w - safe.right - disc - 10, y: safe.top + disc + 10, r: disc },
-    bars: {
-      shield: { x: safe.left + 12 + 95, y: safe.top + 12 + 10, w: 190, h: 20 },
-      hull: { x: safe.left + 12 + 95, y: safe.top + 12 + 10 + 24, w: 190, h: 20 },
-    },
+    bars,
     clock: { x: w / 2 - 46, y: safe.top + 12 + 17, w: 84, h: 34 },
     afloat: { x: w / 2 + 46, y: safe.top + 12 + 17, w: 84, h: 34 },
-    controls: {
-      stick: { x: L.x, y: L.y, r: 56 },
-      fire: { x: R.x, y: R.y, r: 40 },
-      gust: { x: R.x + 6, y: R.y - 86, r: 28 },
-      ability: { x: R.x - 100, y: R.y - 58, r: 31 },
-      reload: { x: R.x - 112, y: R.y + 30, r: 28 },
-      sails: { x: L.x + 6, y: L.y - 110, r: 28 },
-    },
+    controls,
     // between the stick's reach and the reload's, centred on the gap
     slots: row((L.x + 56 + R.x - 112 - 28) / 2, h - safe.bottom - 31, 50, 6),
     reticle: { x: w / 2, y: h / 2, r: 10 },
+    scrap: scrapPlace(safe, 12, bars, controls),
     figure: { hit: 18, clock: 16, large: 44 },
     margin: 12,
     mark: { hud: 26, chart: 48 },
@@ -194,7 +212,7 @@ export function layoutProblems(l: ChartLayout): string[] {
   for (const [k, th] of Object.entries(l.thumbs)) if (overlap(disc, { kind: 'circle', c: th })) out.push(`the disc is under the ${k} thumb`);
   for (const [k, s] of ctl) if (overlap(disc, s)) out.push(`the disc covers ${k}`);
   const readings: [string, Shape][] = [['shield bar', asShape(l.bars.shield, false)], ['hull bar', asShape(l.bars.hull, false)],
-    ['clock', asShape(l.clock, false)], ['ships afloat', asShape(l.afloat, false)]];
+    ['clock', asShape(l.clock, false)], ['ships afloat', asShape(l.afloat, false)], ['scrap', asShape(l.scrap, false)]];
   for (const [k, s] of readings) {
     if (overlap(disc, s)) out.push(`the disc covers the ${k}`);
     for (const [c, cs] of ctl) if (overlap(s, cs)) out.push(`the ${k} is under ${c}`);

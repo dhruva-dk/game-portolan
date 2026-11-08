@@ -45,8 +45,9 @@ import { Result } from '../screens/result.ts';
 import type { SheetName } from '../screens/folio.ts';
 import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
+import type { ScrapId } from '../screens/scraps.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
-import { applyParchment, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
+import { applyParchment } from '../ui/parts/index.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import type { HudModel, ResultsModel, Settings } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
@@ -92,9 +93,8 @@ export class App {
   readonly shell: Shell;
   readonly career: CareerHolder;
   readonly settings: SettingsHolder;
-  /** First-time tips, and the card they show on over the Gale and the HUD. */
+  /** What the game has taught: the scraps it has pinned once in the career. */
   readonly tips: Tips;
-  private readonly tip: TipCardHandle;
   stage: GpuStage | null = null;
   actors: Actors | null = null;
   readonly overlay: HTMLElement;
@@ -165,7 +165,6 @@ export class App {
     this.career = new CareerHolder(options.capture || !!options.autoplay || !!options.fight);
     this.settings = new SettingsHolder(options.capture || !!options.autoplay || !!options.fight);
     this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
-    this.tip = tipCard({ parent: this.shell.root, className: 'pui-tip' });
     this.loop = new Loop((f) => this.frame(f));
     // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
     this.loop.frameRate = 30;
@@ -586,7 +585,6 @@ export class App {
     this.sound.clear();
     this.juice.clear();
     this.hud?.leave(this.chartNow());
-    this.tip.set(null);
     this.log.tick = -1;
     if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0, flight: FLIGHT });
     this.stage?.snap();
@@ -710,10 +708,11 @@ export class App {
     this.viewer.me = this.sound.me = s.watch;
     this.viewer.spectating = s.watch !== PLAYER;
     this.follow(s, f.realDt);
-    // a tip over the HUD only: the card waits while another screen is up
-    const tipAt = this.screen === 'match' ? 'hud' : '';
-    this.tip.el.dataset.at = tipAt;
-    this.tip.set(tipAt ? this.tips.update(s, f.realDt) : null);
+    // a teaching scrap pinned over the HUD when it has room; one waits for it while another screen is up
+    if (this.hud?.teachable) {
+      const id = this.tips.next();
+      if (id) this.hud.teach(id);
+    }
     this.hudT -= f.realDt;
     if (this.hudT <= 0 || !this.loop.running) {
       this.hudT = 1 / 12;
@@ -873,6 +872,11 @@ export class App {
     };
     this.gale = g;
     if (this.chart) g.attach(this.chart, this.chartNow());
+  }
+
+  /** Pins a teaching scrap over the HUD at once, for the test hook. */
+  teach(id: ScrapId): void {
+    this.hud?.teach(id);
   }
 
   /** Inks the HUD in as she comes to sea, from the live session or a model the hook hands in. */

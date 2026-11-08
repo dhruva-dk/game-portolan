@@ -22,6 +22,7 @@ import { feedback } from '../ui/parts/feedback.ts';
 import { LOOT_INKS } from '../render/actors/loot.ts';
 import { badge, bar, discPath, drainRing, paper, reticle, roundButton, sailsArc, slipPath, slot, type SlotOptions } from './instruments.ts';
 import { Minimap, Plate, drawStick, mapFace } from './minimap.ts';
+import { SCRAP_TOTAL, drawScrap, scrapAlpha, type ScrapId } from './scraps.ts';
 
 /** Room round a baked instrument for its shadow. */
 const PAD = 16;
@@ -30,6 +31,8 @@ const TAU = Math.PI * 2;
 const TIME = { lay: 0.5, dry: 0.3, sign: [0.5, 3.2, 0.9] as const } as const;
 /** The plates a frame may re-ink: no more of them than the frame can afford, the rest waiting for the next. */
 const BAKES = 3;
+/** Milliseconds: the settling before the first scrap may go up over a new HUD, and the bare time between two. */
+const SCRAP_GAP = { first: 1500, next: 1200 } as const;
 /** Seconds a slot is held before what is in it goes over the side; the share of that a finger rests before it shows. */
 const HOLD = 0.6;
 const HOLD_SHOWS = 0.18;
@@ -171,6 +174,11 @@ export class Hud {
   #sign: RegionId | null = null;
   #signAt = -1;
   #signDue = false;
+  /** The teaching scrap pinned, when it went up (ms), whether that is still to come, and when the next may go up. */
+  #scrap: ScrapId | null = null;
+  #scrapAt = -1;
+  #scrapDue = false;
+  #scrapFree = Infinity;
   #c: ControlPlaces | null = null;
   #p: HudPresses | null = null;
   /** Whether the pressables are on the chart: they come off once, when she leaves, while the press springs still draw. */
@@ -197,7 +205,19 @@ export class Hud {
   attach(layer: ChartLayer, now: number): void {
     this.#layer = layer;
     this.#born = now;
+    this.#scrapFree = now + SCRAP_GAP.first;
     this.#off = layer.addLive((g, t, dt) => this.#frame(g, t, dt, layer));
+  }
+
+  /** Whether a teaching scrap may go up: the HUD is up at sea, nothing else is pinned, and it is not behind the map. */
+  get teachable(): boolean {
+    return this.#m !== null && this.#leftAt < 0 && !this.#covered && !this.#skip && !this.#scrap && this.#now >= this.#scrapFree;
+  }
+
+  /** Pins a teaching scrap to the edge for a few seconds. */
+  teach(id: ScrapId): void {
+    this.#scrap = id;
+    this.#scrapDue = true;
   }
 
   /** What the HUD shows: the model is refreshed a few times a second; the plates redraw when what they show changes. */
@@ -393,6 +413,8 @@ export class Hud {
     if (this.#signDue) { this.#signAt = now; this.#signDue = false; }
     const plates = this.#plates!;
     if (this.#covered) {
+      // a scrap waits behind the full map
+      if (this.#scrap && !this.#scrapDue) this.#scrapAt += dt * 1000;
       this.#minimap(g, layer, m, plates.map);
       return this.#rects;
     }
@@ -410,6 +432,7 @@ export class Hud {
     this.#minimap(g, layer, m, plates.map);
     this.#controls(g, layer, m, plates, dt);
     this.#combat(g, layer, m);
+    this.#teaching(g, layer);
     return this.#rects;
   }
 
@@ -620,6 +643,24 @@ export class Hud {
         this.#touch(b.x, b.y, b.w + 12, b.h + 12);
       }
     }
+  }
+
+  // ── teaching ──
+
+  /** The scrap pinned at the edge of the sea, inking in, standing and drying out; it is drawn only, and takes no touch. */
+  #teaching(g: CanvasRenderingContext2D, layer: ChartLayer): void {
+    if (!this.#scrap) return;
+    if (this.#scrapDue) { this.#scrapAt = this.#now; this.#scrapDue = false; }
+    const s = (this.#now - this.#scrapAt) / 1000;
+    if (s >= SCRAP_TOTAL) {
+      this.#scrap = null;
+      this.#scrapFree = this.#now + SCRAP_GAP.next;
+      return;
+    }
+    const b = layer.layout.scrap;
+    drawScrap(g, layer, this.#scrap, b, s, this.#a * scrapAlpha(s));
+    // the slip's shadow, and the tracing hand's reach past it
+    this.#touch(b.x, b.y, b.w + 120, b.h + 120);
   }
 
   // ── combat ──
