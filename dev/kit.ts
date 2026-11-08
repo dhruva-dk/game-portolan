@@ -12,7 +12,7 @@ import {
   ChartLayer, ILLUMINATIONS, Paper, Pen, Press, WASH, arcPts, arrow, bakeDisc, bakeSeal, bakeSheet, burst, cartouche, chartLayout, cross,
   cubic, dottedRing, drawBaked, drawGalleon, drawSeal, drawSprite, dryAlpha, figure, flight, galleon, galleonSprite, hand, layoutProblems,
   moon, needle, part, pennant, pressLook, prims, quadrant, rhumbWeb, ring, rings, rose, sandglass, shape, stagger, stamp, staff, star,
-  stick, stormRing, sun, tally, unroll, wake, woodcut, type ChartLayout, type Rect, type Seal,
+  stick, stormRing, sun, tally, unroll, wake, woodcut, word, type ChartLayout, type Rect, type Seal,
 } from '../src/chart/index.ts';
 
 const dpr = window.devicePixelRatio || 1;
@@ -164,6 +164,12 @@ PLATES.seals = () => {
   figure(pen, '38', W * 0.86, H * 0.7, fs, { ink: 'gold' });
   figure(pen, '2468', W * 0.52, H * 0.87, L.figure.hit);
   figure(pen, '45', W * 0.68, H * 0.87, L.figure.clock);
+  // the lettering hand: the alphabet, and the two words the game has
+  word(pen, 'ABCDEFGHIJKLM', W * 0.07, H * 0.59, fs * 0.5);
+  word(pen, 'NOPQRSTUVWXYZ', W * 0.07, H * 0.64, fs * 0.5, { ink: 'rubric' });
+  word(pen, 'PLAY', W * 0.52, H * 0.8, fs * 0.72, { gilt: true });
+  word(pen, 'DIVE', W * 0.74, H * 0.8, fs * 0.72, { alpha: 0.4 });
+  word(pen, 'DIVE', W * 0.88, H * 0.8, fs * 0.72);
 };
 
 PLATES.galleons = () => {
