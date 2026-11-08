@@ -322,6 +322,7 @@ function loadTex(file: string, color: boolean): THREE.Texture {
   let t = texCache.get(file);
   if (!t) {
     t = typeof document === 'undefined' ? new THREE.Texture() : new THREE.TextureLoader().load(texBase + file);
+    t.name = `flora/a/${file}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 8;
     if (color) t.colorSpace = THREE.SRGBColorSpace;

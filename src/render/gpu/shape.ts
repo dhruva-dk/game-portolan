@@ -7,7 +7,7 @@
 import committed from './shape.json';
 
 /** The little of the WebGPU API this file touches. */
-interface Texture { label: string; width: number; height: number; format: string; createView(d?: unknown): object }
+interface Texture { label: string; width: number; height: number; depthOrArrayLayers: number; mipLevelCount: number; format: string; createView(d?: unknown): object }
 interface Attachment { view: object; loadOp?: string; storeOp?: string; depthLoadOp?: string; depthStoreOp?: string }
 interface PassDescriptor {
   label?: string;
@@ -39,7 +39,7 @@ interface TextureDescriptor {
 }
 const GPU = globalThis as unknown as {
   GPUTexture: Proto<Texture & Made>; GPUCommandEncoder: Proto<Encoder>; GPUQueue: Proto<{ submit(b: object[]): void }>;
-  GPUDevice: Proto<{ createBuffer(d: { size: number }): Made; createTexture(d: TextureDescriptor): Made }>;
+  GPUDevice: Proto<{ createBuffer(d: { size: number }): Made; createTexture(d: TextureDescriptor): Made; createCommandEncoder(d?: { label?: string }): Encoder }>;
   GPUBuffer: Proto<Made>;
   GPUBufferUsage: Record<string, number>; GPUMapMode: Record<string, number>;
 };
@@ -66,7 +66,15 @@ export interface Pass {
   gpu: number;
 }
 
-export interface Frame { passes: Pass[]; submits: number; copies: number }
+export interface Frame {
+  passes: Pass[];
+  submits: number;
+  copies: number;
+  /** Command encoders made, and textures made on the device with their bytes: what a burst of uploads adds. */
+  encoders: number;
+  made: number;
+  madeBytes: number;
+}
 
 /** The committed run's passes and submissions, by screen. */
 const COMMITTED = committed as Record<string, { passes: number; submits: number }>;
@@ -76,7 +84,7 @@ const MAX_TIMED = 256;
 /** Milliseconds between timed frames. */
 const TIME_EVERY = 1000;
 
-const blank = (): Frame => ({ passes: [], submits: 0, copies: 0 });
+const blank = (): Frame => ({ passes: [], submits: 0, copies: 0, encoders: 0, made: 0, madeBytes: 0 });
 
 class FrameShape {
   /** The last whole frame, and the last whose passes were timed (null where the device can't time them). */
@@ -104,8 +112,12 @@ class FrameShape {
   #own = false;
   /** The last pass handed to the GPU. */
   #submitted: Pass | null = null;
-  /** The bytes and count of the buffers and textures alive on the device. */
+  /** The bytes and count of the buffers and textures alive on the device, and the textures themselves (weakly). */
   readonly #held = { buffers: 0, bufferBytes: 0, textures: 0, textureBytes: 0 };
+  #textures: WeakRef<Texture & Made>[] = [];
+  readonly #dead = new WeakSet<object>();
+  /** How many textures were held at the last report, so the next lists them if the count has moved. */
+  #listed = -1;
 
   /** Watches every pass, submission and copy the device is handed from now on. */
   install(device: Device): void {
@@ -168,6 +180,11 @@ class FrameShape {
       self.#submitted = self.#now.passes.at(-1) ?? self.last.passes.at(-1) ?? null;
       return submit.call(this, b);
     };
+    const createEncoder = GPU.GPUDevice.prototype.createCommandEncoder;
+    GPU.GPUDevice.prototype.createCommandEncoder = function (this: unknown, d?: { label?: string }) {
+      if (!self.#own) self.#now.encoders++;
+      return createEncoder.call(this, d);
+    };
     this.#holding();
     if (device.features.has('timestamp-query')) {
       const { GPUBufferUsage: U } = GPU;
@@ -184,6 +201,7 @@ class FrameShape {
       const e = sizes.get(o);
       if (!e) return;
       sizes.delete(o);
+      this.#dead.add(o);
       if (e[1]) { held.textures--; held.textureBytes -= e[0]; } else { held.buffers--; held.bufferBytes -= e[0]; }
     };
     const collected = new FinalizationRegistry<[number, boolean]>(([bytes, texture]) => {
@@ -193,7 +211,10 @@ class FrameShape {
       const e: [number, boolean] = [bytes, texture];
       sizes.set(o, e);
       collected.register(o, e, o);
-      if (texture) { held.textures++; held.textureBytes += bytes; } else { held.buffers++; held.bufferBytes += bytes; }
+      if (texture) {
+        held.textures++; held.textureBytes += bytes; this.#now.made++; this.#now.madeBytes += bytes;
+        this.#textures.push(new WeakRef(o as Texture & Made));
+      } else { held.buffers++; held.bufferBytes += bytes; }
     };
     const { GPUDevice, GPUBuffer, GPUTexture } = GPU;
     const createBuffer = GPUDevice.prototype.createBuffer;
@@ -222,6 +243,33 @@ class FrameShape {
   get memory(): string {
     const h = this.#held, mb = (b: number) => (b / 1048576).toFixed(0);
     return `memory ${mb(h.bufferBytes + h.textureBytes)} MB: ${h.textures} textures ${mb(h.textureBytes)} MB, ${h.buffers} buffers ${mb(h.bufferBytes)} MB`;
+  }
+
+  /** The textures the device holds, grouped by name, size and format, the heaviest group first: what the memory is. */
+  inventory(top = 24): string {
+    const live: Texture[] = [];
+    this.#textures = this.#textures.filter((r) => {
+      const t = r.deref();
+      if (!t || this.#dead.has(t)) return false;
+      live.push(t);
+      return true;
+    });
+    const groups = new Map<string, { n: number; bytes: number }>();
+    for (const t of live) {
+      const layers = t.depthOrArrayLayers, mips = t.mipLevelCount;
+      const key = `${t.label || '(unnamed)'} ${t.width}×${t.height}${layers > 1 ? `×${layers}` : ''} ${t.format}${mips > 1 ? ` ${mips} mips` : ''}`;
+      const bytes = t.width * t.height * layers * (TEXEL[t.format] ?? 4) * (mips > 1 ? 4 / 3 : 1);
+      const g = groups.get(key) ?? { n: 0, bytes: 0 };
+      g.n++;
+      g.bytes += bytes;
+      groups.set(key, g);
+    }
+    const mb = (b: number) => (b / 1048576).toFixed(1).padStart(7);
+    const rows = [...groups].sort((a, b) => b[1].bytes - a[1].bytes);
+    const lines = rows.slice(0, top).map(([k, g]) => `  ${mb(g.bytes)} MB ${String(g.n).padStart(3)} × ${k}`);
+    const rest = rows.slice(top);
+    if (rest.length) lines.push(`  ${mb(rest.reduce((s, [, g]) => s + g.bytes, 0))} MB ${String(rest.reduce((s, [, g]) => s + g.n, 0)).padStart(3)} × (${rest.length} smaller kinds)`);
+    return `textures held: ${live.length}\n${lines.join('\n')}`;
   }
 
   /** The last pass handed to the GPU, as the log names it: what a lost device was last given. */
@@ -311,7 +359,7 @@ class FrameShape {
     const lines = [
       `frame ${screen}: ${f.passes.length} passes (${render} render, ${f.passes.length - render} compute), ` +
       `${f.submits} submits, ${f.copies} copies, ${sum(f.passes, 'loads')} loads and ${sum(f.passes, 'stores')} stores ` +
-      `(${mb(sum(f.passes, 'bytes'))} MB), gpu ${ms(gpu(f.passes))} ms` +
+      `(${mb(sum(f.passes, 'bytes'))} MB), ${f.encoders} encoders, ${f.made} textures made (${mb(f.madeBytes)} MB), gpu ${ms(gpu(f.passes))} ms` +
       (c ? `; committed ${c.passes} passes, ${c.submits} submits` : '; no committed run'),
     ];
     const systems = new Map<string, Pass[]>();
@@ -339,10 +387,16 @@ class FrameShape {
     if (this.#over && c) {
       const w = this.#worst!;
       out += `\nframe shape over the committed run: ${this.#over} of ${this.#frames} frames on ${screen}, the worst ` +
-        `${w.passes.length} passes and ${w.submits} submits against ${c.passes} and ${c.submits}`;
+        `${w.passes.length} passes and ${w.submits} submits against ${c.passes} and ${c.submits}; that frame:\n` +
+        this.table(screen, w, false).split('\n').map((l) => `  ${l}`).join('\n');
     }
     this.#frames = this.#over = 0;
     this.#worst = null;
+    // the textures, listed whenever their number has moved since the last report
+    if (this.#held.textures !== this.#listed) {
+      this.#listed = this.#held.textures;
+      out += `\n${this.inventory()}`;
+    }
     return out;
   }
 

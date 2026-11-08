@@ -159,6 +159,7 @@ export function scan(file: string, srgb: boolean): THREE.Texture {
   let done!: () => void;
   pending.push(new Promise<void>((r) => (done = r)));
   const t = loader.load(BASE + file, () => done(), undefined, () => done());
+  t.name = `flora/b/${file}`;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;

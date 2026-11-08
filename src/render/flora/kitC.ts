@@ -134,6 +134,7 @@ export function scanTexture(file: string, srgb: boolean): THREE.Texture {
   let done: (v?: unknown) => void = () => {};
   pending.push(new Promise((res) => (done = res)));
   const t = new THREE.TextureLoader().load(`${ROOT}tex/flora/c/${file}`, () => done(), undefined, () => done());
+  t.name = `flora/c/${file}`;
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;

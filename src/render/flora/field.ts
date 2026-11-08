@@ -199,7 +199,8 @@ export class Flora {
   constructor() {
     this.group.name = 'flora';
     this.#ready = this.#start().catch((e: unknown) => {
-      console.warn('flora:', e);
+      // (as text: the device's console prints an Error object as {})
+      console.warn(`flora: ${e instanceof Error ? `${e.name}: ${e.message}\n${e.stack ?? ''}` : String(e)}`);
     });
   }
 

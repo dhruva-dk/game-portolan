@@ -44,6 +44,7 @@ function texture(id: TexId, kind: 'd' | 'n'): THREE.Texture {
     let done!: () => void;
     loading.push(new Promise<void>((ok) => (done = ok)));
     t = loader.load(`${base}${key}.jpg`, done, undefined, done);
+    t.name = `rock/${key}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = kind === 'd' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
     t.anisotropy = anisotropy;

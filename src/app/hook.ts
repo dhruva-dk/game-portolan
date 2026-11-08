@@ -133,6 +133,8 @@ export function installHook(app: App) {
     /** The last frame's shape as the frame log prints it (every pass with `passes`), and the screen's steady frame. */
     shape: (passes = true) => shape.table(app.screen, undefined, passes),
     shapeSteady: () => shape.steady(),
+    /** The textures the device holds, the heaviest kinds first, and the whole memory line. */
+    textures: (top = 40) => `${shape.memory}\n${shape.inventory(top)}`,
   };
   Object.defineProperty(window, '__portolan', { value: hook, configurable: true });
   return hook;

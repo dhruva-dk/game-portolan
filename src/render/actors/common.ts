@@ -175,6 +175,7 @@ export function loadTextures(base: string): ActorTextures {
   const load = (name: string, srgb: boolean) => {
     let t!: THREE.Texture;
     pending.push(new Promise((ok) => { t = loader.load(base + name, ok, undefined, () => ok(null)); }));
+    t.name = `ship/${name}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 8;
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
