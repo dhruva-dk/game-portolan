@@ -93,6 +93,7 @@ export class Lightning {
     // (an empty draw range is still drawn, and WebGPU warns of a draw of no vertices: hidden instead)
     this.mesh.visible = false;
     this.light.name = 'lightning-light';
+    this.light.visible = false;
   }
 
   /** The warning over `at`: the leader starts down toward it. */
@@ -119,6 +120,7 @@ export class Lightning {
     this.#bolts.length = 0;
     STRIKE.light = 0;
     this.light.intensity = 0;
+    this.light.visible = false;
     this.#geo.setDrawRange(0, 0);
     this.mesh.visible = false;
   }
@@ -256,6 +258,8 @@ export class Lightning {
     }
     STRIKE.light = light;
     this.light.intensity = light * 2500;
+    // shown only while it has light: it reaches every cluster in view, so every lit fragment would light itself by it
+    this.light.visible = light > 0;
     if (light > 0) this.light.position.copy(lit);
     this.#geo.setDrawRange(0, quads * 6);
     this.mesh.visible = quads > 0;
