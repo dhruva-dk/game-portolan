@@ -24,8 +24,8 @@ export interface SceneSpec {
   ebb?: number;
   /** Whether to put the player's ship there. */
   ship: boolean;
-  /** Where her ship lies at anchor, if not under the camera (the lobby's planet turns while she stays home). */
-  anchor?: V3;
+  /** The way the wind blows, a unit tangent, if not along the heading. */
+  wind?: V3;
   /** Other ships sailing on open water ahead, spread from 60 to 220 m out: their lanterns show at night. */
   fleet?: number;
   /** Whether the fleet sails in review instead, in ranks of five beyond the spot, so the league shows side by side. */
@@ -306,16 +306,67 @@ export function sceneFrom(s: SceneInput): SceneSpec {
   };
 }
 
-/** Her home water: your ship at anchor off the Spice Isles' cove, in the late afternoon, with the low sun over the
- * camera's shoulder so the hull shows its paint rather than its silhouette. The menus stand here, and the locker fits
- * her out. */
-export const homeScene = (): SceneSpec => sceneFrom({ region: 'spiceIsles', hour: 16.5, tilt: 12, camera: 'chase', ship: true, heading: 120 });
+/** The lobby's camera on her at anchor: standing off her bow on the starboard quarter (radians round from dead ahead),
+ *  its boom's length (m) and pitch, the height it looks at (m over the sea: her mainsail's foot, so the hull sits low
+ *  and the sails stand whole), and its drift round her (radians either way, and the seconds a sweep takes). */
+export const LOBBY_CAMERA = { quarter: 0.95, dist: 30, pitch: 0.1, height: 7, drift: 0.26, period: 90 } as const;
+/** How far further round than the camera the sun stands from her (radians), so it lights her bow and side; how high it
+ *  stands (radians): low, and well clear of the horizon at any latitude; and the wind's way off the camera's line of
+ *  sight (radians), blowing away from it across her so her sails fill toward it and show their faces. */
+const SUN_ROUND = 0.5;
+const SUN_LOW = 0.14;
+const WIND_OFF = 0.5;
 
-/** The lobby's planet from orbit, turned to `look` (her home water if none) and lit for the local `hour` there, with her
- * ship at anchor on her home water. The title shows it before the turning starts. */
-export function lobbyScene(look?: V3, hour = 16.5): SceneSpec {
-  const home = homeScene();
-  return { ...home, pos: look ?? home.pos, anchor: home.pos, hour, camera: 'orbit' };
+/** Her anchorage under the morning's low sun and the evening's, found once. */
+const anchorages = new Map<boolean, SceneSpec>();
+
+/**
+ * Her home water, where the lobby, the title, the menus and a match's results stand: your ship at anchor off the Spice
+ * Isles, under a low sun (the morning's when the device's clock is before noon, the evening's after), her bow swung so
+ * the camera off it has the sun over its shoulder: the hull shows its paint and the sails their colour rather than
+ * their silhouettes, as they do in the league's line-up. She lies in the nearest water open round her and the camera,
+ * where the sea beyond her, as the camera looks, runs out to the horizon.
+ */
+export function lobbyScene(clock = 16.5): SceneSpec {
+  const morning = clock < 12, tilt = 12, c = LOBBY_CAMERA;
+  const known = anchorages.get(morning);
+  if (known) return { ...known };
+  const base = sceneFrom({ region: 'spiceIsles', hour: 12, tilt, camera: 'chase', ship: true, height: c.height });
+  // the hour the sun stands that low there, going down or coming up
+  let hour = 12;
+  while (Math.abs(hour - 12) < 11 && Math.asin(dot(sunFor(base.pos, hour, tilt), base.pos)) > SUN_LOW) hour += morning ? -0.05 : 0.05;
+  const toSun = (p: V3) => {
+    const { east, north } = frameAt(p), sun = sunFor(p, hour, tilt);
+    return Math.atan2(dot(sun, east), dot(sun, north));
+  };
+  // the nearest water in her own seas with room for her to swing, open under the camera's drift, and the sea running on
+  // beyond her as it looks
+  const home = regionAt(base.pos);
+  const ok = (p: V3) => {
+    if (regionAt(p) !== home || !openWater(p, 22)) return false;
+    const cam = toSun(p) - SUN_ROUND;
+    for (const k of [-1, -0.5, 0, 0.5, 1]) {
+      const out = bearingTangent(p, cam + k * c.drift);
+      for (const d of [c.dist * 0.5, c.dist, c.dist * 1.5]) if (!isWater(travel(p, out, d).pos)) return false;
+    }
+    return clearTowards(p, travel(p, bearingTangent(p, cam + Math.PI), 300).pos, 300);
+  };
+  let pos = base.pos;
+  search: for (let d = 0; d <= 400; d += 20) {
+    for (let k = 0; k < (d ? 24 : 1); k++) {
+      const p = travel(base.pos, bearingTangent(base.pos, (k * Math.PI) / 12), d).pos;
+      if (ok(p)) {
+        pos = p;
+        break search;
+      }
+    }
+  }
+  const reg = REGIONS[regionAt(pos)], cam = toSun(pos) - SUN_ROUND, s: SceneSpec = {
+    ...base, pos, hour, heading: bearingTangent(pos, cam - c.quarter), wind: bearingTangent(pos, cam + Math.PI + WIND_OFF),
+    region: reg.id, regionName: reg.name,
+  };
+  anchorages.set(morning, s);
+  return { ...s };
 }
 
 /** Every region with its beacon, for the hook's listings. */

@@ -31,7 +31,7 @@ import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './mom
 import type { Moment } from './events.ts';
 import { deathModel, fleetColours, hudModel, markOf, resultsModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
-import { homeScene, latLonOf, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
+import { LOBBY_CAMERA, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type MenuName, type ScreenName } from './flow.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { CareerHolder } from './career.ts';
@@ -40,8 +40,8 @@ import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, type Insets } from '../chart/index.ts';
-import { TITLE_LANDS, Title } from '../screens/title.ts';
-import { LOBBY_ROLL, Lobby, type CareerMarks, type Turn } from '../screens/lobby.ts';
+import { Title } from '../screens/title.ts';
+import { LOBBY_OPENS, Lobby, type CareerMarks } from '../screens/lobby.ts';
 import { DIVE, Gale, courseBearing, diveView, galeLook } from '../screens/gale.ts';
 import { HudDisc } from '../screens/hud.ts';
 import { page } from '../ui/screens/frame.ts';
@@ -64,7 +64,7 @@ export interface AppOptions {
 
 /** Seconds between perf lines. */
 const PERF_EVERY = 5;
-/** The orbit the lobby and the Gale see the planet from, in radii, and the seconds the camera takes between views. */
+/** The orbit the Gale sees the planet from, in radii, and the seconds the camera takes between views. */
 const ORBIT_DISTANCE = 3.2;
 const FLIGHT = 2.2;
 
@@ -104,10 +104,9 @@ export class App {
   screen: ScreenName = 'boot';
   /** The fixed scene on the stage: the lobby's, the title's, or one the hook jumped to. */
   view: SceneSpec;
-  /** The lobby's hour, by the device's clock (a capture's is fixed), so the planet under it is lit for the real sun. */
+  /** The hour by the device's clock (a capture's is fixed): the lobby's low sun is the morning's or the evening's. */
   readonly hour: number;
-  /** Where the lobby's planet is turned to, kept between visits; and its coasts, traced by the chart worker. */
-  private readonly turn: Turn;
+  /** The planet's coasts, traced for the Gale's chart. */
   private coasts: Coasts | null = null;
   ready = false;
   /** True while the hook holds a fixed scene: the ship there sails at full speed for its wake. */
@@ -141,9 +140,7 @@ export class App {
     this.canvas = canvas;
     this.options = options;
     this.hour = options.capture ? 16.5 : localHour();
-    this.view = lobbyScene(undefined, this.hour);
-    const home = latLonOf(homeScene().pos);
-    this.turn = { lat: (home.lat * Math.PI) / 180, lon: (home.lon * Math.PI) / 180, vLat: 0, vLon: 0 };
+    this.view = lobbyScene(this.hour);
     this.overlay = overlay;
     this.controls = new Controls(layer(overlay, 'app-touch'));
     this.controls.on = false;
@@ -321,24 +318,23 @@ export class App {
     this.screen = name;
     this.log.add('flow', 'screen', { from, to: name });
     this.fixed = false;
-    if (name === 'title' || name === 'lobby' || name === 'results') {
-      // the planet from orbit, turned as the lobby left it, behind the title, the lobby and a match's results
-      this.view = lobbyScene(this.turnedTo(), this.hour);
-    } else if ((MENUS as readonly string[]).includes(name)) {
-      // the menus stand on her home water, where the locker fits her out
-      this.view = homeScene();
+    if (name === 'title' || name === 'lobby' || name === 'results' || (MENUS as readonly string[]).includes(name)) {
+      // her ship at anchor on her home water, behind the title, the lobby, its folios and a match's results
+      this.view = lobbyScene(this.hour);
     }
-    // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby rolls up
-    // into the Gale, or dries away; the Gale's sheet has thinned to nothing by the time she lands; the HUD's disc dries
-    const now = this.chartNow();
-    if (from === 'title' && name !== 'title') this.title?.leave(now);
-    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(now, name);
+    // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby's chart is
+    // already down over the Gale if Play unrolled it, or its ink dries away; the Gale's sheet has thinned to nothing by
+    // the time she lands; the HUD's disc dries
+    const now = this.chartNow(), unrolled = from === 'lobby' && !!this.lobby?.unrolled;
+    if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(now);
     if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
     if (from === 'match' && name !== 'match') this.disc?.leave(now);
     if (name === 'title') this.openTitle();
     if (name === 'lobby') this.openLobby(from);
-    if (name === 'gale') this.openGale(from);
+    if (name === 'gale') this.openGale(unrolled);
     if (name === 'match') this.openDisc();
+    // (after what comes in under it, so it is drawn over it)
+    if (from === 'title' && name !== 'title') this.title?.leave(now);
     if (name === 'spectate') this.session?.spectate();
     const view = this.screenView(name, model);
     this.shell.show(name, view, transition(from, name));
@@ -502,12 +498,12 @@ export class App {
     this.begin(this.prepare(o), o);
   }
 
-  /** Makes the next match, not yet begun: the lobby swings its chart to the Gale's course before its sheet comes up. */
+  /** Makes the next match, not yet begun: the lobby swings its chart to the Gale's course before it unrolls it. */
   private prepare(o: PlayOptions = {}): Session {
     return new Session(this.career.plan(), cosmeticsOf(wornLook(this.career.career)), o);
   }
 
-  /** The match made ready, held while the lobby's sheet comes up over the world. */
+  /** The match made ready, held while the lobby's chart unrolls over her ship. */
   private pending: Session | null = null;
 
   /** Begins a match made ready. */
@@ -750,23 +746,19 @@ export class App {
     return { level: l.level, into: l.into, need: l.need, illumination: TIER_ILLUMINATION[rankView(c).tier] ?? 'ink', matches: s.matches, wins: s.wins };
   }
 
-  /** The point the lobby's planet is turned to, a unit vector. */
-  private turnedTo(): V3 {
-    const t = this.turn, c = Math.cos(t.lat);
-    return { x: c * Math.cos(t.lon), y: Math.sin(t.lat), z: -c * Math.sin(t.lon) };
-  }
+  /** The planet chart's view of the planet: the stage's camera, the Gale's orbit and the coasts. */
+  private readonly planet = {
+    camera: () => this.stage?.camera ?? null,
+    orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
+    coasts: () => (this.coasts ??= traceCoasts(heightAt)),
+  };
 
-  /** Puts the lobby on the chart; from the title it inks in once the title's sheet is off it, round the rose landed in
+  /** Puts the lobby on the chart, its scraps laid as the title's sheet rolls off them and the title's rose landing in
    *  its corner. */
   private openLobby(from: ScreenName): void {
     this.lobby?.dispose();
-    const home = homeScene().pos;
     const l = new Lobby(this.chartHost, {
-      camera: () => this.stage?.camera ?? null,
-      orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
-      coasts: () => (this.coasts ??= traceCoasts(heightAt)),
-      home: () => home,
-      mark: () => this.ownMark(),
+      ...this.planet,
       career: () => this.careerMarks(),
       prepare: () => {
         const g = (this.pending = this.prepare()).state.gale;
@@ -778,7 +770,7 @@ export class App {
         if (s) this.begin(s);
       },
       settings: () => this.go('settings'),
-    }, this.turn, from === 'title' ? { delay: TITLE_LANDS, roseLanded: true } : {});
+    }, { roseLanded: from === 'title' });
     l.onGone = () => {
       if (this.lobby === l) this.lobby = null;
     };
@@ -823,17 +815,15 @@ export class App {
     return Math.min(GALE.time, Math.max(0, s.state.gale.t - (1 - this.alpha) * TICK));
   }
 
-  /** Puts the Gale on the chart: under the lobby's sheet as it rolls up off it, or coming up over the world. */
-  private openGale(from: ScreenName): void {
+  /** Puts the Gale on the chart: under the lobby's chart as its window opens, or coming up over the world. */
+  private openGale(under: boolean): void {
     this.gale?.dispose();
     this.gale = null;
     const s = this.session;
     if (!s) return;
     const colours = fleetColours(s, wornLook(this.career.career)), ships = s.state.ships;
-    const rolled = from === 'lobby';
     const g = new Gale(this.chartHost, {
-      camera: () => this.stage?.camera ?? null,
-      orbit: () => ({ distance: ORBIT_DISTANCE, fov: ORBIT_FOV }),
+      ...this.planet,
       course: () => s.state.gale,
       time: () => this.galeTime(s),
       colours: () => colours,
@@ -849,7 +839,7 @@ export class App {
         return out;
       },
       aim: (p) => s.aimFor(p),
-    }, { delay: rolled ? LOBBY_ROLL : 0, under: rolled, teach: this.tips.drawn('gale') });
+    }, { delay: under ? LOBBY_OPENS : 0, under, teach: this.tips.drawn('gale') });
     g.onGone = () => {
       if (this.gale === g) this.gale = null;
     };
@@ -989,21 +979,25 @@ export class App {
       this.matchFrame(this.session, f, stage, actors);
       return;
     }
-    // the lobby's planet turns under the chart
-    if (this.screen === 'lobby' && this.lobby && !this.fixed) this.view.pos = this.lobby.turned(this.chartNow());
     const v = this.view, sv = sceneStage(v, f.clock);
     sunDirection(sv.hour, sv.tilt, this.sun);
-    // in the locker the boom swings out and back, so the whole ship stands clear of the pane on the right
+    // at anchor the camera stands off her bow on the quarter and drifts slowly round her and back; in the locker the
+    // boom swings out, so the whole ship stands clear of the pane on the right
     const locker = this.screen === 'locker';
     if (stage.rig && !this.fixed) {
-      const k = Math.min(1, f.realDt * 3);
+      const k = Math.min(1, f.realDt * 3), c = LOBBY_CAMERA;
       stage.rig.shoulder += ((locker ? 7.5 : 0) - stage.rig.shoulder) * k;
-      stage.rig.dist += ((locker ? 34 : 27) - stage.rig.dist) * k;
+      stage.rig.dist += ((locker ? c.dist - 6 : c.dist) - stage.rig.dist) * k;
+      stage.rig.pitch = c.pitch;
+      stage.rig.yaw = Math.PI - c.quarter + c.drift * Math.sin((f.clock / c.period) * Math.PI * 2);
     }
     const worn = wornLook(this.career.career), p = locker ? this.preview : null;
     const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
     const speed = v.camera === 'chase' && this.fixed ? 14.5 : 0;
-    actors.update(sceneActors(v, f.clock, this.sun, look, speed), f.dt, stage.camera);
+    // at anchor she is shown whole, her sails sheeted out and not thinned for a crosshair
+    const av = sceneActors(v, f.clock, this.sun, look, speed);
+    av.aiming = this.fixed;
+    actors.update(av, f.dt, stage.camera);
     stage.frame(sv, f.dt);
     this.hear(stage, f.realDt, () => sceneHearing(v, speed));
   }

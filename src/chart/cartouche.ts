@@ -12,6 +12,9 @@ const span = (t: number, a: number, b: number) => (t >= 1 ? 1 : clamp((t - a) / 
 export interface CartoucheOptions {
   /** How the strap is laid: ochre wash, or gold leaf. */
   strap?: 'ochre' | 'gold';
+  /** Drawn flat, in line and wash with no hatched shade, so it lies on the sheet rather than standing off it: for
+   *  what cannot be pressed. */
+  flat?: boolean;
   /** A wash over the field. */
   field?: string;
   seed?: number;
@@ -87,7 +90,7 @@ export function cartouche(pen: Pen, x: number, y: number, w: number, h: number, 
       lay(p, e.mid[0], e.mid[1], h * 0.3, smooth(0.3, 1, lt));
       const xs = e.mid.filter((_, q) => q % 2 === 0), ys = e.mid.filter((_, q) => q % 2 === 1);
       const bx = Math.min(...xs) - b, by = Math.min(...ys) - b, bw = Math.max(...xs) - bx + b, bh = Math.max(...ys) - by + b;
-      pen.hatch(p, bx, by + bh * 0.45, bw, bh * 0.6, 0.9, Math.max(1.6, b * 0.32), { alpha: 0.5, seed: seed + i }, lt);
+      if (!o.flat) pen.hatch(p, bx, by + bh * 0.45, bw, bh * 0.6, 0.9, Math.max(1.6, b * 0.32), { alpha: 0.5, seed: seed + i }, lt);
       pen.stroke(r.left, { w: 'fine', nib: 0.3, pool: 0.4, seed: seed + 10 + i }, lt);
       pen.stroke(r.right, { w: 'hair', nib: 0.3, pool: 0.3, seed: seed + 20 + i }, lt);
     });
@@ -106,7 +109,7 @@ export function cartouche(pen: Pen, x: number, y: number, w: number, h: number, 
       clip.addPath(inner);
       g.clip(clip, 'evenodd');
       lay(outer, x, y - field.ry, field.rx + b, smooth(0.2, 1, bt));
-      pen.hatch(outer, x - field.rx - b, y + field.ry * 0.2, (field.rx + b) * 2, field.ry + b, -0.5, Math.max(1.6, b * 0.3), { alpha: 0.45, seed: seed + 30 }, bt);
+      if (!o.flat) pen.hatch(outer, x - field.rx - b, y + field.ry * 0.2, (field.rx + b) * 2, field.ry + b, -0.5, Math.max(1.6, b * 0.3), { alpha: 0.45, seed: seed + 30 }, bt);
       g.restore();
     }
     // the field: bare paper, a faint wash, a double rule inside the band

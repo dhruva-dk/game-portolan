@@ -250,7 +250,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     }
     if (v.windup && v.windup > 0 && d < 420 && f.sink < 0) windUp(f, v, v.windup, t, dt);
     m.far = d > 140;
-    m.fade = v.id === player && options.fadePlayerSail !== false ? 1 : 0;
+    m.fade = v.id === player && view.aiming !== false && options.fadePlayerSail !== false ? 1 : 0;
     // the shield's shell
     f.aura.update(v.shieldMax > 0 ? clamp(v.shield / v.shieldMax, 0, 1) : 0, dt, t, v.alive && f.sink < 0);
     // her wake, her bow wave, her wounds

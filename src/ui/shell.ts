@@ -1,6 +1,6 @@
 // The interface's root: it hangs the parchment and the tokens on the page, keeps the layers in order (screens, the HUD,
 // overlays, ceremonies, toasts, fliers), and moves between screens with an animation every time. The layer is
-// transparent, so the game canvas behind it shows through (the lobby sits over the live planet).
+// transparent, so the game canvas behind it shows through (the lobby's scraps sit over her ship at anchor).
 import { Toasts, applyTokens, effect, el, setFlyLayer, type Form } from './parts/index.ts';
 import './screens/screens.css';
 

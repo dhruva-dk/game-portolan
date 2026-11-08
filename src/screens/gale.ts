@@ -5,23 +5,23 @@
 // leaves the Gale the sheet thins to the world as the camera dives with her, and is gone when she lands. Nothing is
 // written.
 //
-// The sheet (the folio with its window, the web swung to the course as the lobby's swung, the ring and the rose) is
-// baked once onto a canvas under the chart layer, so the lobby's sheet rolling up off it finds it already there. The
-// camera looks straight down on the course, at a point that moves along it at two thirds of the fleet's pace, so the
-// course is a straight line through the window's middle and the fleet slides along it while the planet turns. The course and the
-// dive's line are dots fixed on the planet, so they turn with it and never crawl. The fleet rides in a formation drawn
+// The sheet is the planet chart's (planet.ts): the folio with its window, the web and the rose's needle swung to the
+// course, baked once onto a canvas under the chart layer, with the planet's coasts and its seas' signs inked through
+// the window. Played from the lobby, the same sheet whole has unrolled over her ship, and lies under this one until it
+// thins away to open the window on the planet. The camera looks straight down on the course, at a point that moves
+// along it at two thirds of the fleet's pace, so the course is a straight line through the window's middle and the
+// fleet slides along it while the planet turns. The course and the dive's line are dots fixed on the planet, so they
+// turn with it and never crawl. The fleet rides in a formation drawn
 // wider than it sails, so each captain reads; a captain who leaves the Gale peels off to where she really is.
-import type { PerspectiveCamera } from 'three';
 import {
-  Press, arcPts, cross, drawGalleon, drawSprite, ease, galleonSprite, hand, needle, sandglass, stagger, type ChartLayer,
-  type Colours, type Globe, type Pen,
+  Press, arcPts, cross, drawGalleon, ease, galleonSprite, hand, sandglass, stagger, type ChartLayer, type Colours, type Globe,
+  type Pen,
 } from '../chart/index.ts';
 import { GALE } from '../sim/tables.ts';
 import { R } from '../sim/sphere.ts';
 import { PHASE } from '../sim/state.ts';
 import type { V3 } from '../sim/math.ts';
-import { cutSheet, facing, globeOf, unproject, web, windowOf, type Window } from './planet.ts';
-import { cornerRose } from './title.ts';
+import { PlanetChart, facing, unproject, type PlanetHost, type Window } from './planet.ts';
 
 /** A ship as the chart reads her this frame. */
 export interface GaleShip {
@@ -31,11 +31,7 @@ export interface GaleShip {
   phase: number;
 }
 
-export interface GaleHost {
-  /** The camera the planet is drawn with this frame, or null before the stage. */
-  camera(): PerspectiveCamera | null;
-  /** The orbit view the Gale is seen from: distance from the planet's centre in radii, field of view in degrees. */
-  orbit(): { distance: number; fov: number };
+export interface GaleHost extends PlanetHost {
   /** The Gale's course: where it rises (a unit vector) and its way from there (a unit tangent). */
   course(): { from: V3; dir: V3 };
   /** Seconds the Gale has blown, to the frame. */
@@ -52,9 +48,9 @@ export interface GaleHost {
 }
 
 export interface GaleOptions {
-  /** Seconds before the ink begins (the lobby's sheet still rolling up off it). */
+  /** Seconds before the ink begins (the window still opening in the lobby's sheet over it). */
   delay?: number;
-  /** The sheet is up at once (the lobby's sheet rolls up off it); otherwise it comes up. */
+  /** The sheet is up at once (the lobby unrolled it, whole, and it opens over this one); otherwise it comes up. */
   under?: boolean;
   /** The first Gale: a hand points where a press marks the dive. */
   teach?: boolean;
@@ -63,6 +59,9 @@ export interface GaleOptions {
 /** When each thing happens, seconds from the ink's start; the press's and the leaving's from theirs. */
 const AT = {
   sheet: 0.35,
+  /** The planet's coasts, and its seas' signs one after another. */
+  coasts: [0, 1.0],
+  signs: [0.3, 1.3],
   course: [0, 0.9],
   fleet: [0.25, 1.1],
   glass: [0.35, 1.0],
@@ -154,6 +153,7 @@ export class Gale {
   readonly #host: HTMLElement;
   readonly #h: GaleHost;
   #layer: ChartLayer | null = null;
+  #chart: PlanetChart | null = null;
   #win: Window | null = null;
   #sheet: HTMLCanvasElement | null = null;
   #colours: readonly Colours[];
@@ -172,8 +172,6 @@ export class Gale {
   readonly #press = new Press();
   #off: (() => void) | null = null;
   #lastNow = 0;
-  readonly #mat = new Float64Array(16);
-  readonly #eye = { x: 0, y: 0, z: 1 };
   readonly #ship: GaleShip = { pos: { x: 0, y: 0, z: 1 }, head: { x: 1, y: 0, z: 0 }, alt: 0, phase: 0 };
   readonly #q = { x: 0, y: 0, z: 1 };
   readonly #r = { x: 0, y: 0, z: 1 };
@@ -229,16 +227,14 @@ export class Gale {
   // ── the sheet ──
 
   #lay(): void {
-    const layer = this.#layer!, win = (this.#win = windowOf(layer, this.#h.orbit()));
-    const c = this.#h.course(), rot = courseBearing(c.from, c.dir), rose = layer.layout.rose;
+    const layer = this.#layer!, chart = this.#chart;
+    if (chart) chart.resize();
+    else this.#chart = new PlanetChart(layer, this.#h);
+    this.#win = this.#chart!.win;
+    const c = this.#h.course();
     this.#sheet?.remove();
-    // the web and the rose's needle swung to the course, as the lobby swung them
-    this.#sheet = cutSheet(layer, this.#host, win, (pen, g) => {
-      web(pen, g, layer, win, 1, rot);
-      drawSprite(g, cornerRose(layer), rose.x, rose.y);
-      needle(pen, rose.x, rose.y, rose.r * 0.52, rot, 1);
-    }).el;
-    this.#sheet.style.opacity = this.#under ? '1' : '0';
+    // the web and the rose's needle swung to the course
+    this.#sheet = this.#chart!.place(this.#host, this.#chart!.sheet(courseBearing(c.from, c.dir)), this.#under ? 1 : 0);
   }
 
   /** The press over the window, kept out of the safe areas (the phone's window runs under its home bar). */
@@ -287,9 +283,8 @@ export class Gale {
     const paper = (this.#under ? 1 : ease.out(clamp(born / AT.sheet))) * (1 - ease.inOut(kt));
     if (this.#sheet) this.#sheet.style.opacity = String(paper * (1 - dry));
     const s = (now - this.#t0) / 1000;
-    const cam = h.camera();
-    if (s < 0 || !cam) return;
-    const globe = globeOf(cam, layer.layout.w, layer.layout.h, this.#mat, this.#eye);
+    const globe = this.#chart!.globe();
+    if (s < 0 || !globe) return;
     pen.mood({ dry }, () => this.#ink(g, pen, globe, s, now, kt, down));
   }
 
@@ -305,6 +300,8 @@ export class Gale {
     // the dots a degree apart on the iPad, wider on the phone where a degree is smaller
     const step = (phone ? 9 : 12) / (w.r * 1.36), r = phone ? 1.7 : 2.3;
     const gone = 1 - ease.inOut(clamp(kt / 0.3));
+    // the planet's coasts and its seas' signs under everything else inked on it
+    this.#chart!.ink(pen, g, globe, span(s, AT.coasts), span(s, AT.signs), gone, clipR);
     // the course: dots fixed on it from where the Gale rose to where it lets go, inked from its start
     const ct = span(s, AT.course);
     if (ct > 0 && gone > 0) {
@@ -415,8 +412,11 @@ export class Gale {
         dots(pen, pts, 'rubric', a);
       }
       if (globe.project(X.x, X.y, X.z, P) && facing(globe, X) > 0) {
-        // the cross over a ground of lead white, so it reads on the night side as on the day
+        // the cross over a ground of lead white, so it reads over the coasts and the night side as on open sea
         pen.mood({ dry: Math.max(pen.dry, 1 - a) }, () => {
+          const halo = new Path2D();
+          halo.arc(P.x, P.y, cr * 1.45, 0, TAU);
+          pen.fill(halo, 'white', 0.5 * ease.out(xt));
           cross(pen, P.x, P.y, cr * 1.08, xt, 'white');
           cross(pen, P.x, P.y, cr, xt, 'rubric');
         });

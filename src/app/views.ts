@@ -78,12 +78,12 @@ function fleetOf(s: SceneSpec): ShipView[] {
 /** A lone ship (or none) at a scene's spot. */
 export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticIds, speed = 0): ActorsView {
   const ships: ShipView[] = s.ship ? [{
-    id: 0, pos: scale(s.anchor ?? s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
+    id: 0, pos: scale(s.pos, R), head: s.heading, speed, turn: 0, hull: 1, shield: 0, shieldMax: 100, weapon: 'cannon',
     cosmetics: look, alive: true,
   }] : [];
   ships.push(...fleetOf(s));
   // a steady breeze from behind the ship's port quarter
-  const wind = { x: s.heading.x * 6, y: s.heading.y * 6, z: s.heading.z * 6 };
+  const w = s.wind ?? s.heading, wind = { x: w.x * 6, y: w.y * 6, z: w.z * 6 };
   return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [] };
 }
 
@@ -106,7 +106,7 @@ export const planetHour = (p: V3, local: number): number => (((local - latLonOf(
 /** A fixed scene as the stage draws it: no Storm, no territory, and the scene's weather standing over the spot. */
 export function sceneStage(s: SceneSpec, time: number): StageView {
   return {
-    time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, ebb: s.ebb ?? 0, wind: scale(s.heading, 6),
+    time, hour: planetHour(s.pos, s.hour), tilt: s.tilt, tide: s.tide, ebb: s.ebb ?? 0, wind: scale(s.wind ?? s.heading, 6),
     camera: s.camera,
     target: { pos: s.pos, heading: s.heading, height: s.height ?? (s.ship ? 2.5 : 0) },
     weather: [

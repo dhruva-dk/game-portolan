@@ -123,6 +123,9 @@ export interface ActorsView {
   wind: Vec3;
   /** The player's ship id: its hits raise hit markers and its events raise camera juice. -1 for none. */
   player: number;
+  /** Whether she is sailed from behind with the crosshair over her (unless false): her own sail is then sheeted close
+   *  and thinned round the middle of the screen. At anchor in the lobby she is shown whole. */
+  aiming?: boolean;
   ships: readonly ShipView[];
   projectiles: readonly ProjectileView[];
   loot: readonly LootView[];

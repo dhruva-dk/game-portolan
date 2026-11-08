@@ -1,4 +1,4 @@
-// The lobby's menus, each in the page frame over the planet: abilities, the locker, rivals, the career with its
+// The lobby's menus, each in the page frame over her ship at anchor: abilities, the locker, rivals, the career with its
 // chart, the rank ladder, and the settings. Each renders from its model and calls back; the app changes the career
 // and hands the screen the new model through set().
 import { ability, type AbilityId } from '../../sim/abilities.ts';

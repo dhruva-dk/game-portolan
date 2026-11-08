@@ -62,6 +62,13 @@ export function installHook(app: App) {
 
     // ── screens ──
     go: (name: string, model?: unknown) => app.go(name, model),
+    /** Presses what the chart offers to be pressed under `id` as a finger would, down and up at its middle. */
+    press: (id: string) => {
+      const c = app.chart, p = c?.presses.list.find((q) => q.id === id);
+      if (!c || !p) throw new Error(`press: nothing on the chart called ${id}`);
+      c.presses.down(-7, p.hit.x, p.hit.y);
+      c.presses.up(-7, p.hit.x, p.hit.y);
+    },
     freezeUi: (on: boolean) => app.freezeUi(on),
     scrubUi: (ms: number) => app.scrubUi(ms),
     /** Holds the title as if the world were p loaded, its needle wandering (null lets it be ready). */

@@ -85,13 +85,13 @@ export function flight(from: { x: number; y: number }, to: { x: number; y: numbe
 }
 
 /**
- * Draws a baked sheet unrolled to t, its top left at (x, y): open from its left edge rightward ('right') or from its
- * top downward ('down'). The roll lies at the open edge, its back showing, shaded as a cylinder, its end showing the
- * wound layers, shadowing the sheet behind it and the world in front.
+ * Draws a baked sheet unrolled to t, its top left at (x, y): open from its left edge rightward ('right'), from its
+ * right edge leftward ('left') or from its top downward ('down'). The roll lies at the open edge, its back showing,
+ * shaded as a cylinder, its end showing the wound layers, shadowing the sheet behind it and the world in front.
  */
-export function unroll(g: CanvasRenderingContext2D, paper: Paper, b: Baked, x: number, y: number, t: number, dir: 'right' | 'down' = 'right', dpr = b.dpr): void {
+export function unroll(g: CanvasRenderingContext2D, paper: Paper, b: Baked, x: number, y: number, t: number, dir: 'right' | 'left' | 'down' = 'right', dpr = b.dpr): void {
   if (t <= 0) return;
-  const W = b.w, H = b.h, along = dir === 'right' ? W : H, across = dir === 'right' ? H : W;
+  const W = b.w, H = b.h, along = dir === 'down' ? H : W, across = dir === 'down' ? W : H;
   if (t >= 1) {
     g.drawImage(b.canvas, x - b.pad, y - b.pad, W + b.pad * 2, H + b.pad * 2);
     return;
@@ -103,6 +103,7 @@ export function unroll(g: CanvasRenderingContext2D, paper: Paper, b: Baked, x: n
   g.save();
   g.beginPath();
   if (dir === 'right') g.rect(x - b.pad, y - b.pad, open + b.pad, H + b.pad * 2);
+  else if (dir === 'left') g.rect(x + W - open, y - b.pad, open + b.pad, H + b.pad * 2);
   else g.rect(x - b.pad, y - b.pad, W + b.pad * 2, open + b.pad);
   g.clip();
   g.drawImage(b.canvas, x - b.pad, y - b.pad, W + b.pad * 2, H + b.pad * 2);
@@ -110,6 +111,7 @@ export function unroll(g: CanvasRenderingContext2D, paper: Paper, b: Baked, x: n
   // a local frame for the roll: u along the opening, v across it
   g.save();
   if (dir === 'right') g.setTransform(dpr, 0, 0, dpr, (x + open) * dpr, y * dpr);
+  else if (dir === 'left') g.setTransform(-dpr, 0, 0, dpr, (x + W - open) * dpr, y * dpr);
   else g.setTransform(0, dpr, dpr, 0, x * dpr, (y + open) * dpr);
   // its shadow on the sheet behind it, and on the world ahead
   const back = g.createLinearGradient(-r - 10, 0, -r * 0.2, 0);

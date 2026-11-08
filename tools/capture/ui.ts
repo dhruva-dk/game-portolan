@@ -12,6 +12,9 @@ export interface Transition {
   to: string;
   /** Milliseconds into the transition for each frame, when it runs longer than most. */
   times?: readonly number[];
+  /** The world moves under it (the camera put over the Gale under the lobby's chart): it is drawn a frame at a time as
+   *  the clock is scrubbed. */
+  world?: boolean;
 }
 
 /** The title's leaving, into the lobby inking in once its sheet is off; and the lobby inking in. */
@@ -26,13 +29,17 @@ export const TRANSITIONS: readonly Transition[] = [
     name: 'title-lobby', from: 'h.go("title"); h.freezeUi(true); h.scrubUi(6000); h.freezeUi(false)', to: 'h.go("lobby")',
     times: LEAVE_TITLE,
   },
-  // the lobby is drawn on the chart: it inks in over two seconds, dries off in a third of one, rolls up into the Gale
+  // the lobby's scraps are laid and ink in over two seconds, and dry off in a third of one
   ...['abilities', 'locker', 'rivals', 'career', 'rank', 'settings'].flatMap((s) => [
     { name: `lobby-${s}`, from: 'h.go("lobby")', to: `h.go("${s}")` },
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),
-  // the lobby's sheet rolls up off the Gale's, which inks in; the dive runs to the landing, where the HUD's disc inks in
-  { name: 'lobby-gale', from: 'h.go("lobby")', to: 'h.play({ seed: 11 })', times: [0, 150, 300, 450, 600, 750, 900, 1200, 1600, 2000, 2600] },
+  // Play stamps, the Gale's chart unrolls over her ship, its window opens on the planet and the Gale inks in; the dive
+  // runs to the landing, where the HUD's disc inks in
+  {
+    name: 'lobby-gale', from: 'h.go("lobby")', to: 'await h.draw(); h.press("lobby:play")', world: true,
+    times: [0, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350, 1500, 1700, 2000, 2600],
+  },
   {
     name: 'gale-match', from: 'h.play({ seed: 11 })', to: 'h.dive(); for (let i = 0; i < 900 && h.screen !== "match"; i++) await h.draw()',
     times: [0, 100, 200, 300, 450, 600, 800],
@@ -43,7 +50,8 @@ export const TRANSITIONS: readonly Transition[] = [
   { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); h.step(60); h.go("spectate")', to: 'h.finish()' },
   { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer(); await h.draw()' },
   { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()' },
-  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()', to: 'h.go("lobby")', times: INK_LOBBY },
+  // her ship at anchor behind the result, as the scraps ink back in round her
+  { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish(); for (let i = 0; i < 30; i++) await h.draw()', to: 'h.go("lobby")', times: INK_LOBBY, world: true },
 ];
 
 /** Milliseconds into the transition for each frame of the strip. */
@@ -66,8 +74,20 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
   // one frame for the change to take hold and its animations to start, then freeze them all
   await game.page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await game.hook((h) => h.freezeUi(true));
+  let at = 0;
   for (const ms of t.times ?? TIMES) {
-    await game.hook((h, at) => h.scrubUi(at), ms);
+    if (t.world) {
+      await game.page.evaluate(({ a, b }) => {
+        const h = (window as unknown as { __portolan: { scrubUi(ms: number): void; app: { loop: { drawNow(dt: number): void } } } }).__portolan;
+        for (let s = a + 1000 / 30; s < b; s += 1000 / 30) {
+          h.scrubUi(s);
+          h.app.loop.drawNow(1 / 30);
+        }
+        h.scrubUi(b);
+        h.app.loop.drawNow(1 / 30);
+      }, { a: at, b: ms });
+      at = ms;
+    } else await game.hook((h, m) => h.scrubUi(m), ms);
     await shots.shot(game, `${ms} ms`);
   }
   await game.hook((h) => h.freezeUi(false));

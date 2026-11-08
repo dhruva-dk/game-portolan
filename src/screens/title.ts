@@ -132,6 +132,7 @@ export class Title {
   /** The needle: its bearing off north and how fast it swings, stepped by the clock. */
   readonly #needle = { a: 2.2, v: 0, at: -1 };
   #off: (() => void) | null = null;
+  #offLive: (() => void) | null = null;
   /** Called once the title has gone. */
   onGone?: () => void;
 
@@ -150,14 +151,14 @@ export class Title {
     this.#t0 = now;
     this.#needle.at = now;
     this.#lay();
-    const off = layer.addLive((g, t) => this.#frame(g, t) ?? undefined);
+    this.#offLive = layer.addLive((g, t) => this.#frame(g, t) ?? undefined);
     const offSheet = layer.addSheet((g, pen) => this.#sheet(g, pen));
     layer.presses.add({
       id: 'title', hit: { x: layer.layout.w / 2, y: layer.layout.h / 2, w: layer.layout.w, h: layer.layout.h }, press: this.#press,
       sound: 'tap', haptic: 'selection', act: () => (this.#canLeave(this.#needle.at) ? this.#h.start() : this.#kick()),
     });
     this.#off = () => {
-      off();
+      this.#offLive?.();
       offSheet();
       layer.presses.remove('title');
     };
@@ -182,6 +183,9 @@ export class Title {
     }
     this.#leftAt = now;
     layer.presses.remove('title');
+    // drawn over whatever came in under it, so the rose flies over the lobby's scraps and lands on its own
+    this.#offLive?.();
+    this.#offLive = layer.addLive((g, t) => this.#frame(g, t) ?? undefined);
     const s = (now - this.#t0) / 1000;
     this.#flyer = this.#roseSprite(span(s, AT.rose));
     this.#lifted = { s, opacity: Number(this.#paperEl?.style.opacity || 1) };

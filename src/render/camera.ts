@@ -1,6 +1,6 @@
 // The cameras on the sphere: the chase camera from the rewrite's Rig (src/scene.ts), now keeping the local up where
-// it stands, an eye-level and a high view for captures, and an orbit view of the whole planet for the Gale and the
-// lobby that puts the line between day and night across the globe. Switching modes flies between them.
+// it stands, an eye-level and a high view for captures, and an orbit view of the whole planet for the Gale that puts
+// the line between day and night across the globe. Switching modes flies between them.
 import * as THREE from 'three';
 import { R } from '../sim/sphere.ts';
 import { heightAt } from '../sim/world/index.ts';
@@ -8,7 +8,7 @@ import { v3, type V3 } from '../sim/math.ts';
 
 export type CameraMode = 'chase' | 'eye' | 'high' | 'orbit';
 
-/** The orbit view's field of view, degrees: the lobby cuts its chart's window to the planet it frames. */
+/** The orbit view's field of view, degrees: the planet chart cuts its window to the planet it frames. */
 export const ORBIT_FOV = 40;
 
 /** What the camera follows: a point on the sea (a unit vector), the way it faces (a unit tangent there). */

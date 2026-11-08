@@ -1,15 +1,15 @@
-// The lobby, frame by frame on each device: the chart inking in over the planet and staggering in, a finger dragging
-// the planet round and letting it run on, a press on the settings' dividers (and the way back), and a press on the
-// Play seal: its stamp, the rhumb lines swinging to the Gale's course, the vellum turning opaque and the sheet rolling
-// up into the Gale. The chart's clock is held and stepped a frame at a time with the world drawn each step, so every
-// run shows the same instants. Fails unless the Play seal's press reaches the Gale.
+// The lobby, frame by frame on each device: the scraps laid and inked in over her ship at anchor, the camera drifting
+// round her over a few seconds, a press on the settings' seal (and the way back), and a press on the Play seal: its
+// stamp, the Gale's chart unrolling over her from the right, the match begun under it and the window opening on the
+// planet, where the Gale inks in. The chart's clock is held and stepped a frame at a time with the world drawn each
+// step, so every run shows the same instants. Fails unless the Play seal's press reaches the Gale.
 import { log, openApp, Shots, type Rig } from './common.ts';
 import { DEVICES, type DeviceName, type Game } from '../harness.ts';
 
 /** Milliseconds into the lobby's ink, and from each press. */
 const INK = [0, 150, 300, 500, 700, 900, 1200, 1500, 1800, 2200];
 const DRY = [0, 150, 300, 600];
-const PLAY = [0, 150, 300, 450, 600, 750, 900, 1050, 1200, 1400, 1650];
+const PLAY = [0, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350, 1500, 1700, 2000, 2400, 3000];
 
 /** Steps the held clock to `ms` a frame at a time, drawing the world with it. */
 async function to(game: Game, from: number, ms: number): Promise<number> {
@@ -48,7 +48,6 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
     if (!(device in DEVICES)) throw new Error(`--device must be among ${Object.keys(DEVICES).join(', ')}`);
     const game = await openApp(r, { device, dpr: o.dpr });
     const shots = await Shots.create(`lobby-${device}`);
-    const { width, height } = DEVICES[device];
     // a captain some way into her career, so the cartouche has its marks
     await game.hook((h) => {
       const c = h.app.career;
@@ -60,22 +59,13 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
       at = await to(game, at, ms);
       await shots.shot(game, `ink ${ms} ms`);
     }
-    // a finger drags the planet a third of the way across the screen and lets go while it is still moving
-    const cx = width / 2, cy = height / 2;
-    await game.page.mouse.move(cx + width * 0.15, cy);
-    await game.page.mouse.down();
-    for (let k = 1; k <= 8; k++) {
-      await game.page.mouse.move(cx + width * 0.15 - k * width * 0.04, cy + k * height * 0.01);
-      at = await to(game, at, at + 34);
-      if (k === 4) await shots.shot(game, 'dragging');
+    // the camera drifting round her
+    const still = at;
+    for (const s of [3, 6, 9]) {
+      at = await to(game, at, still + s * 1000);
+      await shots.shot(game, `drift +${s} s`);
     }
-    await game.page.mouse.up();
-    const released = at;
-    for (const ms of [100, 500, 1500]) {
-      at = await to(game, at, released + ms);
-      await shots.shot(game, `let go +${ms} ms`);
-    }
-    // the settings' dividers: pressed, the chart dries off the settings, and back
+    // the settings' seal: pressed, the scraps dry off the settings, and back
     await game.hook((h) => h.clearEffects());
     at = await press(game, shots, at, await where(game, 'lobby:settings'), 'settings');
     const set = at;
@@ -90,7 +80,7 @@ export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promis
       at = await to(game, at, back + ms);
       await shots.shot(game, `back +${ms} ms`);
     }
-    // Play: the seal stamps, the web swings, the sheet comes up and rolls into the Gale
+    // Play: the seal stamps, the Gale's chart unrolls over her, the window opens on the planet and the Gale inks in
     at = await press(game, shots, at, await where(game, 'lobby:play'), 'play');
     const played = at;
     for (const ms of PLAY) {

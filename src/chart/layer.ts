@@ -7,9 +7,9 @@
 //
 // The layer never takes a touch it does not want: its canvases pass every touch through, and it listens ahead of the
 // game, keeping only touches that land on one of its pressables (grown to the touch target), or, when a screen lays a
-// drag surface under them (the lobby's planet), the touches that land anywhere else.
+// drag surface under them (the planet chart's), the touches that land anywhere else.
 //
-// Several screens can share the sheet plane while one gives way to the next (the title's sheet rolling off the lobby):
+// Several screens can share the sheet plane while one gives way to the next (the title's sheet rolling off the lobby's scraps):
 // each adds its own painter, and they paint in the order they were added.
 import type { Parchment } from '../render/paper/parchment.ts';
 import { chartLayout, type ChartLayout, type Insets } from './layout.ts';
