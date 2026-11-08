@@ -4,8 +4,8 @@
 // moves (the rings, the arcs, the figures, the stick) is placed each frame. The chart takes only touches on its
 // pressables here; everything else falls through to the controls layer, which keeps the floating stick and the look.
 import {
-  Pen, Press, arcPts, arrow, canvas, cross, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, dryAlpha, ease, figure, figureWidth, hand, part, pennant, pressLook, prims, ring, star, stormRing,
-  woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pressable, type Pts, type Rect, type Sprite,
+  Press, arcPts, canvas, cross, ctx, drawSprite, dryAlpha, ease, figure, figureWidth, hand, part, pressLook, prims,
+  woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pen, type Pressable, type Pts, type Rect, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
 import type { Prim } from '../icons/draw.ts';
@@ -18,8 +18,8 @@ import type { RegionId } from '../sim/world/index.ts';
 import type { HudModel, PartsModel, Slot } from '../ui/model.ts';
 import { feedback } from '../ui/parts/feedback.ts';
 import { LOOT_INKS } from '../render/actors/loot.ts';
-import { LandLayer } from '../ui/screens/chart.ts';
-import { badge, bar, discPath, drainRing, paper, reticle, roundButton, sailsArc, slipPath, slot, stickBase, stickNub, type SlotOptions } from './instruments.ts';
+import { badge, bar, discPath, drainRing, paper, reticle, roundButton, sailsArc, slipPath, slot, type SlotOptions } from './instruments.ts';
+import { Minimap, Plate, drawStick, mapFace } from './minimap.ts';
 
 /** Room round a baked instrument for its shadow. */
 const PAD = 16;
@@ -54,31 +54,6 @@ const clockText = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60)
 
 /** Woodcuts in the order the eye reads them. */
 const HURTS: readonly HurtId[] = ['sail', 'mast', 'rudder', 'leak', 'fire', 'ice'];
-
-/**
- * One instrument baked to its own small canvas and re-inked only when what it shows has changed, drawn each frame as a
- * single image. Everything on the HUD that a number or a state can change is one of these; what never changes is a
- * sprite (ChartLayer.sprite), and only what truly moves (the rings, the needle) is drawn with the pen each frame.
- */
-class Plate {
-  readonly sprite: Sprite;
-  readonly pen: Pen;
-  key = '';
-
-  constructor(layer: ChartLayer, w: number, h: number) {
-    const W = Math.ceil(w), H = Math.ceil(h), c = canvas(W * layer.dpr, H * layer.dpr), g = ctx(c);
-    g.setTransform(layer.dpr, 0, 0, layer.dpr, 0, 0);
-    this.pen = new Pen(layer.paper, layer.dpr, layer.layout.widths).on(g);
-    this.sprite = { c, w: W, h: H, ax: W / 2, ay: H / 2 };
-  }
-
-  /** Re-inks it, centred at (cx, cy) in its own coordinates. */
-  ink(key: string, draw: (pen: Pen, cx: number, cy: number) => void): void {
-    this.key = key;
-    this.pen.g.clearRect(0, 0, this.sprite.w, this.sprite.h);
-    draw(this.pen, this.sprite.w / 2, this.sprite.h / 2);
-  }
-}
 
 /** What the HUD needs of the game. */
 export interface HudHost {
@@ -177,8 +152,8 @@ export class Hud {
   #vitals: VitalsPlace = { x: 0, y: 0, w: 0, h: 0 };
   /** How far each hurt shows, easing as the part mends or breaks. */
   readonly #hurts: Record<HurtId, number> = { sail: 0, mast: 0, rudder: 0, leak: 0, fire: 0, ice: 0 };
-  /** The land under the map, sampled round the ship as she sails. */
-  readonly #land = new LandLayer();
+  /** What is on the sea in the disc, and the land under it, sampled round the ship as she sails. */
+  readonly #map = new Minimap();
   /** The map's plate is re-inked every other model refresh: the sea round her does not change at twelve hertz. */
   #mapKey = 0;
   #refresh = 0;
@@ -484,69 +459,12 @@ export class Hud {
 
   /** The minimap disc: the paper, the sea round her north up, her arrow, and the region's sign when she enters one. */
   #minimap(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plate: Plate): void {
-    const D = layer.layout.hud, R = D.r, d = layer.disc(R);
-    drawBaked(g, d, D.x - R, D.y - R, this.#a);
-    this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#inkMap(p, cx, cy, layer, m));
-    const rim = layer.sprite(`hud|rim|${R}`, R * 2, R * 2, R, R, (p) => {
-      ring(p, R, R, R * 0.84, R * 0.96, { ticks: 128 }, 1);
-      star(p, R, R - R * 0.9, R * 0.05);
+    const D = layer.layout.hud;
+    const size = mapFace(g, layer, D, this.#a, m.map.heading, () => {
+      this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide.level));
     });
-    drawSprite(g, rim, D.x, D.y, { alpha: this.#a });
-    const size = Math.ceil(R * 0.44), h = size / 2;
-    const arrowS = layer.sprite(`hud|arrow|${size}`, size, size, h, h, (p) => arrow(p, h, h + R * 0.16, h, h - R * 0.16));
-    drawSprite(g, arrowS, D.x, D.y, { alpha: this.#a, rot: m.map.heading });
-    const sr = (R + d.pad) * 1.1;
-    this.#touch(D.x, D.y, sr * 2, sr * 2);
+    this.#touch(D.x, D.y, size, size);
     this.#regionSign(g, layer, D);
-  }
-
-  /** The map's contents: the land, the Storm's edge in red, the next circle dotted, loot in gold, ships by their emblems, my marker's pennant. */
-  #inkMap(pen: Pen, cx: number, cy: number, layer: ChartLayer, m: HudModel): void {
-    const g = pen.g, v = m.map, R = layer.layout.hud.r, ri = R * 0.82, k = ri / v.range;
-    g.save();
-    g.beginPath();
-    g.arc(cx, cy, ri, 0, TAU);
-    g.clip();
-    g.save();
-    g.translate(cx - ri, cy - ri);
-    g.globalAlpha = 0.6;
-    this.#land.draw(g, ri, v.lat, v.lon, v.range, m.tide.level);
-    g.restore();
-    const at = (x: number, y: number) => [cx + x * k, cy - y * k] as const;
-    if (v.storm) {
-      const [sx, sy] = at(v.storm.x, v.storm.y), sr = v.storm.r * k;
-      // everything outside the safe circle under a thin wash of the Storm's red
-      const outside = new Path2D();
-      outside.rect(cx - R, cy - R, R * 2, R * 2);
-      outside.arc(sx, sy, sr, 0, TAU, true);
-      g.fillStyle = 'rgba(176,40,22,0.14)';
-      g.fill(outside, 'evenodd');
-      stormRing(pen, sx, sy, sr, 1, 0.5);
-    }
-    if (v.next) {
-      const [nx, ny] = at(v.next.x, v.next.y);
-      dottedRing(pen, nx, ny, v.next.r * k, 1, 'iron', 5, 0.85);
-    }
-    const loot = new Path2D();
-    for (const mk of v.marks) {
-      if (mk.kind !== 'loot') continue;
-      const [x, y] = at(mk.x, mk.y);
-      loot.moveTo(x + 2.4, y);
-      loot.arc(x, y, 2.4, 0, TAU);
-    }
-    pen.fill(loot, 'gold', 0.95);
-    const size = Math.max(20, Math.round(R * 0.2));
-    for (const sh of v.ships) {
-      const [x, y] = at(sh.x, sh.y);
-      drawEmblem(g, layer.paper, sh.emblem, sh.colour, x, y, size, layer.dpr, sh.spotted ? 0.55 : 1);
-    }
-    if (v.marker) {
-      // pinned to the rim when it lies farther than the map shows
-      const dx = v.marker.x, dy = v.marker.y, far = Math.min(1, v.range * 0.95 / Math.max(1, Math.hypot(dx, dy)));
-      const [x, y] = at(dx * far, dy * far);
-      pennant(pen, { x, y: y - 16, length: 22, height: 9, colour: WASH.vermilion, seed: 41 });
-    }
-    g.restore();
   }
 
   /** The region's woodcut, inked in at the top of the disc on entering it, standing a few seconds, drying out. */
@@ -575,7 +493,7 @@ export class Hud {
     p.ability.disabled = m.ability.ready < 1;
     p.reload.disabled = !gun;
     this.#dropHeld(m);
-    this.#stick(g, layer, c);
+    drawStick(g, layer, c.stick, this.#host.controls.stickView, this.#a, (x, y, w, h) => this.#touch(x, y, w, h));
     // the sails: the needle swings to the notch set
     this.#at += (this.#wantAt - this.#at) * (1 - Math.exp(-dt * 14));
     if (Math.abs(this.#wantAt - this.#at) < 0.01) this.#at = this.#wantAt;
@@ -621,18 +539,6 @@ export class Hud {
   #button(layer: ChartLayer, name: string, r: number, drawing: readonly Prim[], faint: boolean, seed: number): Sprite {
     const size = (r + PAD) * 2, h = size / 2;
     return layer.sprite(`hud|${name}|${r}|${faint ? 1 : 0}`, size, size, h, h, (p) => roundButton(p, h, h, r, drawing, { seed, faint }));
-  }
-
-  /** The stick: floating where the thumb is, or resting faintly at its home so a cold player knows to put a thumb there. */
-  #stick(g: CanvasRenderingContext2D, layer: ChartLayer, c: ControlPlaces): void {
-    const v = this.#host.controls.stickView, r = v.r, base = (r + PAD) * 2, nub = (r * 0.36 + PAD) * 2;
-    const ring0 = layer.sprite(`hud|stick|${r}`, base, base, base / 2, base / 2, (p) => stickBase(p, base / 2, base / 2, r));
-    const nubS = layer.sprite(`hud|nub|${r}`, nub, nub, nub / 2, nub / 2, (p) => stickNub(p, nub / 2, nub / 2, r));
-    const x = v.active ? v.x : c.stick.x, y = v.active ? v.y : c.stick.y, alpha = (v.active ? 1 : 0.42) * this.#a;
-    drawSprite(g, ring0, x, y, { alpha });
-    drawSprite(g, nubS, x + (v.active ? v.dx : 0), y + (v.active ? v.dy : 0), { alpha });
-    this.#touch(x, y, base, base);
-    if (v.active) this.#touch(x + v.dx, y + v.dy, nub, nub);
   }
 
   /** The hotbar's five slots along the bottom: each baked with what is in it; a hold shows as a line running round its square. */

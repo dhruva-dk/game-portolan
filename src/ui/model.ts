@@ -219,6 +219,11 @@ export interface MapView {
   marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' }[];
   /** The player's own marker, set on the planet's chart, or null. */
   marker: { x: number; y: number } | null;
+  /** While the Gale blows: its course in dotted runs of metres (x, y, x, y…), the Storm's first circle in metres, and
+   *  the fleet, too close together for emblems at this range, shown as marks. */
+  course?: readonly (readonly number[])[];
+  first?: readonly number[];
+  fleet?: boolean;
 }
 
 /** A ship's parts as the HUD shows them: how hurt each is, 0 whole to 1 shot away. */
