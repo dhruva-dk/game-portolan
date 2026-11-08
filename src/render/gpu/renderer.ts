@@ -8,6 +8,7 @@ import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, ty
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
 import { batchSubmits } from './submits.ts';
+import type { CpuMip } from './mips.ts';
 
 export interface GpuInfo {
   vendor: string;
@@ -71,6 +72,31 @@ if (!S.scheduler?.yield) {
   };
 }
 
+/** The little of three's texture utils this file reaches into. */
+interface ArrayTexture { isDataArrayTexture?: boolean; mipmaps: unknown[]; flipY: boolean; layerUpdates?: Set<number>; image: { depth: number } }
+interface TextureUtils {
+  updateTexture(texture: ArrayTexture, options: unknown): void;
+  _copyBufferToTexture(image: CpuMip, textureGPU: object, descriptor: object, originDepth: number, flipY: boolean, depth: number, mipLevel: number): void;
+}
+
+function writeArrayMips(renderer: WebGPURenderer): void {
+  const backend = renderer.backend as unknown as { textureUtils: TextureUtils; get(o: object): { texture?: object; textureDescriptorGPU?: object } };
+  const utils = backend.textureUtils, update = utils.updateTexture.bind(utils);
+  utils.updateTexture = (texture, options) => {
+    // the layers three is about to write (all, if none in particular); it clears the set as it goes
+    const layers = texture.layerUpdates?.size ? [...texture.layerUpdates] : null;
+    update(texture, options);
+    if (!texture.isDataArrayTexture || !texture.mipmaps.length) return;
+    const data = backend.get(texture);
+    if (!data.texture || !data.textureDescriptorGPU) return;
+    const which = layers ?? [...Array(texture.image.depth).keys()];
+    // (the base, mipmaps[0], three has written; it reads layer `depth` of each level's data itself)
+    texture.mipmaps.forEach((m, i) => {
+      if (i) for (const l of which) utils._copyBufferToTexture(m as CpuMip, data.texture!, data.textureDescriptorGPU!, l, texture.flipY, l, i);
+    });
+  };
+}
+
 export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ renderer: WebGPURenderer; info: GpuInfo }> {
   const gpu = (navigator as Navigator & { gpu?: Gpu }).gpu;
   if (!gpu) throw new Error('Portolan needs WebGPU, and this browser has none');
@@ -93,14 +119,30 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   // every shader three writes passes through here on its way to the device (wgsl.ts)
   const device = backend.device, compile = device.createShaderModule.bind(device);
   device.createShaderModule = (d: ShaderSource) => compile({ ...d, code: tightenPrivates(d.code) });
+  // a data array texture that brings its own mips (mips.ts cpuMips) has them written level by level: three uploads only
+  // an array's base level and builds the rest with a render pass per level per layer, which for the ships' ninety-one
+  // emblems was 637 passes in one frame
+  writeArrayMips(renderer);
   // and every pass, submission and copy is counted for the frame log (shape.ts)
   shape.install(backend.device as unknown as Parameters<typeof shape.install>[0]);
   // and handed to the queue together (submits.ts)
   batchSubmits(backend.device as unknown as Parameters<typeof batchSubmits>[0]);
-  // a lost device says what it was last given
+  // a lost device says what it was last given: by its lost promise, and (WebKit does not always settle that) by the
+  // first encoder it refuses
+  const gone = (how: string) => console.error(`GPU lost (${how}); the last pass submitted: ${shape.lastSubmitted}; ${shape.memory}`);
   (backend.device as unknown as { lost: Promise<{ reason: string; message: string }> }).lost.then((info) => {
-    if (info.reason !== 'destroyed') console.error(`GPU lost (${info.reason || 'unknown'}: ${info.message}); the last pass submitted: ${shape.lastSubmitted}`);
+    if (info.reason !== 'destroyed') gone(`${info.reason || 'unknown'}: ${info.message}`);
   });
+  const dev = device as unknown as { createCommandEncoder(d?: unknown): unknown }, encoder = dev.createCommandEncoder.bind(dev);
+  let said = false;
+  dev.createCommandEncoder = (d?: unknown) => {
+    try {
+      return encoder(d);
+    } catch (e) {
+      if (!said) { said = true; gone(String(e)); }
+      throw e;
+    }
+  };
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.setPixelRatio(pixelRatio(innerWidth, innerHeight));

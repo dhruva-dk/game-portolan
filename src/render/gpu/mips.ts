@@ -18,6 +18,41 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(level, vec2i(id.xy), l, sum * 0.25);
 }`;
 
+/** One level of a mip chain made on the CPU: every layer's texels, layer after layer. */
+export interface CpuMip { data: Uint8Array; width: number; height: number }
+
+/**
+ * The whole mip chain of an 8-bit RGBA array texture, built here: the base first (as three's `mipmaps` has it), then
+ * each level a 2×2 box down from the one above, for every layer. Given as a data array texture's `mipmaps`, the
+ * levels are written to the device as they are (renderer.ts), where three would build them with a render pass per
+ * level per layer.
+ */
+export function cpuMips(base: Uint8Array, width: number, height: number, layers: number): CpuMip[] {
+  const out: CpuMip[] = [{ data: base, width, height }];
+  let above = base, w = width, h = height;
+  while (w > 1 || h > 1) {
+    const nw = Math.max(1, w >> 1), nh = Math.max(1, h >> 1);
+    const level = new Uint8Array(nw * nh * layers * 4);
+    for (let l = 0; l < layers; l++) {
+      const from = l * w * h * 4, to = l * nw * nh * 4;
+      for (let y = 0; y < nh; y++) {
+        const y0 = Math.min(2 * y, h - 1), y1 = Math.min(2 * y + 1, h - 1);
+        for (let x = 0; x < nw; x++) {
+          const x0 = Math.min(2 * x, w - 1), x1 = Math.min(2 * x + 1, w - 1);
+          const a = from + (y0 * w + x0) * 4, b = from + (y0 * w + x1) * 4, c = from + (y1 * w + x0) * 4, d = from + (y1 * w + x1) * 4;
+          const o = to + (y * nw + x) * 4;
+          for (let k = 0; k < 4; k++) level[o + k] = (above[a + k] + above[b + k] + above[c + k] + above[d + k] + 2) >> 2;
+        }
+      }
+    }
+    out.push({ data: level, width: nw, height: nh });
+    above = level;
+    w = nw;
+    h = nh;
+  }
+  return out;
+}
+
 interface GpuTexture { width: number; height: number; depthOrArrayLayers: number; mipLevelCount: number; format: string; createView(d: object): object }
 interface Pass { setPipeline(p: object): void; setBindGroup(i: number, g: object): void; dispatchWorkgroups(x: number, y: number, z: number): void; end(): void }
 interface Device {

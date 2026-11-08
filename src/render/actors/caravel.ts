@@ -8,6 +8,7 @@
 // Everything here is in the ship's own frame: +y up, +z toward the bow, +x to port. ships.ts places it on the sphere.
 import * as THREE from 'three';
 import { EMBLEM_IDS, EMBLEMS, emblemRoundel } from '../cosmetics/emblems.ts';
+import { cpuMips } from '../gpu/mips.ts';
 import { type ActorTextures } from './common.ts';
 import { hullNodeMaterial, iceNodeMaterial, ropeNodeMaterial, sailNodeMaterial } from './tsl/caravel.ts';
 import { drawnUniforms } from './tsl/kit.ts';
@@ -753,7 +754,10 @@ export class Kit {
     this.cloth = new Cloth(this.sails, this.rigging, this.sailNoise);
     for (const k of WEAPONS) this.turrets.set(k, turretGeometry(k));
     const t = this.emblems;
-    t.generateMipmaps = true;
+    // the mips are made here and written with the roundels (#mips): built on the GPU, three draws them a pass per
+    // level per layer, 637 passes in one frame for the library
+    t.generateMipmaps = false;
+    this.#mips();
     t.minFilter = THREE.LinearMipmapLinearFilter;
     t.magFilter = THREE.LinearFilter;
     t.anisotropy = 4;
@@ -768,6 +772,7 @@ export class Kit {
           this.#painted.add(k);
         }
         t.clearLayerUpdates();
+        this.#mips();
         t.needsUpdate = true;
         w.terminate();
       };
@@ -800,10 +805,15 @@ export class Kit {
       const N = EMBLEM_SIZE, t = this.emblems;
       emblemRoundel(EMBLEM_IDS[k], N, this.#roundels.subarray(k * 4 * N * N, (k + 1) * 4 * N * N));
       this.#painted.add(k);
+      this.#mips();
       t.addLayerUpdate(k);
       t.needsUpdate = true;
     }
     return k;
+  }
+  /** The roundels' mip chain as they stand, for the next upload. */
+  #mips(): void {
+    this.emblems.mipmaps = cpuMips(this.#roundels, EMBLEM_SIZE, EMBLEM_SIZE, EMBLEM_IDS.length) as unknown as typeof this.emblems.mipmaps;
   }
 }
 
