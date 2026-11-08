@@ -219,7 +219,7 @@ export class Sheets {
 
   /** Builds the sheet's strip for what is on it now. */
   #fill(name: SheetName): void {
-    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : name === 'rank' ? this.#rank() : { items: [], height: 0 };
+    this.#body = name === 'abilities' ? this.#abilities() : name === 'locker' ? this.#locker() : name === 'rank' ? this.#rank() : name === 'settings' ? this.#settings() : { items: [], height: 0 };
     this.#refresh();
   }
 
@@ -384,6 +384,80 @@ export class Sheets {
     star(pen, right - ww - 34, yw, 22, 1, 'gold');
   }
 
+  // ── settings ──
+
+  /** The settings, in words nowhere: one control for each field, a woodcut and a bar, or a woodcut and a pip. */
+  #settings(): Body {
+    const items: Item[] = [], W = this.#g!.W.w, cols = 2, col = Math.floor((W - 24) / cols), rh = 92, BX = 92, bw = col - BX - 12;
+    const h = this.#h, at = (i: number) => ({ x: (col + 24) * (i % cols), y: Math.floor(i / cols) * rh + 8 });
+    const set = (s: Partial<Settings>) => h.setSettings(s);
+    /** A bar reading settings[field] mapped from [lo, hi], and following the finger. */
+    const slider = (i: number, field: 'master' | 'effects' | 'ambience' | 'interface' | 'shake' | 'sensitivity', art: Art, lo = 0, hi = 1) => {
+      const { x, y } = at(i), press = new Press();
+      const put = (px: number) => set({ [field]: lo + clamp((px - (this.#g!.W.x + x + BX)) / bw) * (hi - lo) });
+      items.push({
+        id: `set:${field}`, x, y, w: col, h: rh,
+        bake: () => this.#bake(`set|${field}`, col, rh, (pen, _gc, cx, cy) => art(pen, cx - col / 2 + 44, cy, 46, 1)),
+        take: { press, sound: 'slide', haptic: 'selection', on: 'down', act: put, move: put },
+        live: (_g, pen, ix, iy, alpha) => {
+          const look = pressLook(press.sink), v = (h.settings()[field] - lo) / (hi - lo);
+          pen.mood({ dark: look.dark }, () => bar(pen, { x: ix + BX + bw / 2, y: iy + rh / 2 + look.dy, w: bw, h: 26 }, v, { colour: field === 'sensitivity' ? WASH.ochre : field === 'shake' ? WASH.sienna : WASH.azure, alpha, seed: 11 + i }));
+        },
+      });
+    };
+    /** A pip reading a flag, flipped by a tap. */
+    const toggle = (i: number, field: 'haptics' | 'invertY' | 'autoFire', art: Art) => {
+      const { x, y } = at(i), press = new Press();
+      items.push({
+        id: `set:${field}`, x, y, w: col, h: rh,
+        bake: () => this.#bake(`set|${field}`, col, rh, (pen, _gc, cx, cy) => art(pen, cx - col / 2 + 44, cy, 46, 1)),
+        take: { press, sound: 'toggle', haptic: 'selection', act: () => set({ [field]: !h.settings()[field] }) },
+        live: (_g, pen, ix, iy, alpha) => {
+          const look = pressLook(press.sink);
+          pips(pen, ix + col - 40, iy + rh / 2 + look.dy, 1, h.settings()[field] ? 1 : 0, 10, h.settings()[field] ? 'rubric' : 'iron', alpha);
+        },
+      });
+    };
+
+    const speaker = (mark?: string): Art => (pen, x, y, s, a) => {
+      woodcut(pen, prims('menu.speaker'), x - s * 0.1, y, s * 0.8, 'iron', a);
+      if (mark) woodcut(pen, prims(mark), x + s * 0.32, y + s * 0.32, s * 0.42, 'iron', a);
+    };
+
+    // the stick side: a hand on the side the stick is
+    {
+      const { x, y } = at(0), press = new Press(), field = 'leftHanded' as const;
+      const sprite = (left: boolean) => this.#bake(`set|hand|${left}`, col, rh, (pen, _gc, cx, cy) => this.#stickSide(pen, cx, cy, col, left));
+      items.push({
+        id: 'set:leftHanded', x, y, w: col, h: rh,
+        take: { press, sound: 'toggle', haptic: 'selection', act: () => set({ [field]: !h.settings()[field] }) },
+        live: (g, _pen, ix, iy, alpha) => {
+          const look = pressLook(press.sink);
+          drawSprite(g, sprite(h.settings()[field]), ix + col / 2, iy + rh / 2 + look.dy, { alpha, scale: look.scale, dark: look.dark });
+        },
+      });
+    }
+    toggle(1, 'haptics', motionHand(Math.PI / 2, false));
+    slider(2, 'master', speaker());
+    slider(3, 'shake', motionHand(0, true));
+    slider(4, 'effects', speaker('weapon.cannon'));
+    slider(5, 'sensitivity', reticleMark, 0.5, 2);
+    slider(6, 'ambience', speaker('hud.gust'));
+    toggle(7, 'invertY', (pen, x, y, s, a) => woodcut(pen, prims('menu.arrows'), x, y, s * 0.8, 'iron', a));
+    slider(8, 'interface', speaker('menu.wheel'));
+    toggle(9, 'autoFire', (pen, x, y, s, a) => woodcut(pen, prims('weapon.cannon'), x, y, s * 0.9, 'iron', a));
+    return { items, height: at(9).y + rh };
+  }
+
+  /** The stick's side: the screen as a small ruled frame with the stick in it on one side, a hand reaching it from there. */
+  #stickSide(pen: Pen, cx: number, cy: number, w: number, left: boolean): void {
+    const fw = 74, fh = 44, fx = cx - w / 2 + 64, stick = left ? fx - fw * 0.28 : fx + fw * 0.28;
+    pen.rule([[fx - fw / 2, cy - fh / 2, fx + fw / 2, cy - fh / 2, fx + fw / 2, cy + fh / 2, fx - fw / 2, cy + fh / 2, fx - fw / 2, cy - fh / 2]], { w: 'fine', alpha: 0.85, seed: 71 });
+    pen.stroke(arcPts(stick, cy + 4, 11, 0, Math.PI * 2, 24), { w: 'fine', nib: 0.2, pool: 0.2, wobble: 0.2, seed: 72, alpha: 0.9 });
+    pen.dot(stick, cy + 4, 4.2, 'iron', 0.92);
+    hand(pen, stick, cy + 4, 40, left ? -0.75 : -Math.PI + 0.75);
+  }
+
   // ── what shows ──
 
   /** Offers what shows to be pressed, each hit clipped to the window; takes back what has gone. */
@@ -461,3 +535,22 @@ export class Sheets {
   }
 }
 
+/** A hand with lines of motion round it: its fingertip pointing down (haptics) or across (shake). */
+function motionHand(rot: number, across: boolean): Art {
+  return (pen, x, y, s, a) => {
+    const size = s * 0.82, tip = across ? [x + s * 0.34, y] : [x, y + s * 0.34];
+    hand(pen, tip[0], tip[1], size, rot, 1);
+    const lines: number[][] = across
+      ? [[tip[0] + 5, y - 11, tip[0] + 11, y - 15], [tip[0] + 5, y + 11, tip[0] + 11, y + 15], [tip[0] + 7, y, tip[0] + 14, y]]
+      : [[x - s * 0.42, y + s * 0.12, x - s * 0.5, y + s * 0.22], [x + s * 0.42, y + s * 0.12, x + s * 0.5, y + s * 0.22], [x - s * 0.34, y + s * 0.42, x + s * 0.34, y + s * 0.42]];
+    pen.rule(lines, { w: 'fine', alpha: 0.75 * a, seed: 81 });
+  };
+}
+
+/** A reticle in ink: a ring, its four arms and its centre. */
+const reticleMark: Art = (pen, x, y, s, a) => {
+  const r = s * 0.42, gap = r * 0.36;
+  pen.stroke(arcPts(x, y, r * 0.62, 0, Math.PI * 2, 40), { w: 'fine', nib: 0.2, pool: 0.2, wobble: 0.2, seed: 101, alpha: 0.92 * a });
+  pen.rule([[x - r, y, x - gap, y], [x + gap, y, x + r, y], [x, y - r, x, y - gap], [x, y + gap, x, y + r]], { w: 'fine', alpha: 0.92 * a, seed: 102 });
+  pen.dot(x, y, r * 0.1, 'iron', 0.9 * a);
+};
