@@ -76,7 +76,7 @@ async function measure(game: Game): Promise<Measured> {
       }
       return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     };
-    const SEL = 'button, [role="button"], .p-tile, .p-row[data-part], .s-mx__hold, .s-hud__slot, .s-hud__sail, .s-globe, [data-what]';
+    const SEL = 'button, [role="button"], .p-tile, .p-row[data-part], .s-globe, [data-what]';
     const seen = new Set<Element>();
     const targets = [...ui.querySelectorAll(SEL)].filter((e) => {
       // the innermost target counts once: a button's own face or label is not another target
@@ -91,7 +91,7 @@ async function measure(game: Game): Promise<Measured> {
       return {
         what: h.dataset.what ?? h.dataset.part ?? h.dataset.slot ?? (h.getAttribute('aria-label') || h.className.toString().split(' ')[0]),
         ...v, fw: r.width, fh: r.height,
-        fight: h.classList.contains('s-mx__hold') || h.classList.contains('s-hud__sail'),
+        fight: false,
       };
     });
     // text cut off: a box whose text runs past it while it hides the overflow
@@ -111,7 +111,7 @@ async function measure(game: Game): Promise<Measured> {
     for (const p of chart?.presses.list ?? []) {
       const h = p.hit, w = h.r !== undefined ? Math.max(h.r * 2, T) : Math.max(h.w ?? 0, T), hh = h.r !== undefined ? w : Math.max(h.h ?? 0, T);
       if (w >= innerWidth * 0.9 && hh >= innerHeight * 0.9) continue;
-      targets.push({ what: `chart:${p.id}`, x: h.x - w / 2, y: h.y - hh / 2, w, h: hh, fw: w, fh: hh, fight: false });
+      targets.push({ what: `chart:${p.id}`, x: h.x - w / 2, y: h.y - hh / 2, w, h: hh, fw: w, fh: hh, fight: /^hud:(fire|gust|ability|reload|sails)$/.test(p.id) });
     }
     return { targets, clipped, safe, vw: innerWidth, vh: innerHeight };
   });

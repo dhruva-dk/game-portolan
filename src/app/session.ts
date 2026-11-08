@@ -160,6 +160,11 @@ export class Session implements Stepper {
     return this.state.ships[PLAYER];
   }
 
+  /** Where ship i is on the water, in the world's metres. */
+  shipAt(i: number): V3 {
+    return metres(this.state.ships[i].pos);
+  }
+
   get over(): boolean {
     return over(this.state);
   }

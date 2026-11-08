@@ -1,6 +1,8 @@
-// The HUD's disc, top right, as it stands until the HUD is drawn on it: the papyrus disc cut round, its rim frayed,
-// nothing on it yet. It inks in as she comes to sea (laid on the chart and settling) and dries away when the match's
-// screens leave it.
+// The match's HUD on the chart: every reading, control and combat mark over the sea, in the instruments' hand
+// (src/screens/instruments.ts). It inks in as she comes to sea and dries away when the match's screens leave it. What
+// holds still is baked once as a sprite; what a number or state changes is a plate re-inked when it changes; only what
+// moves (the rings, the arcs, the figures, the stick) is placed each frame. The chart takes only touches on its
+// pressables here; everything else falls through to the controls layer, which keeps the floating stick and the look.
 import {
   Pen, Press, arcPts, arrow, canvas, cross, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, dryAlpha, ease, figure, figureWidth, hand, part, pennant, pressLook, prims, ring, star, stormRing,
   woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pressable, type Pts, type Rect, type Sprite,
@@ -18,52 +20,6 @@ import { feedback } from '../ui/parts/feedback.ts';
 import { LOOT_INKS } from '../render/actors/loot.ts';
 import { LandLayer } from '../ui/screens/chart.ts';
 import { badge, bar, discPath, drainRing, paper, reticle, roundButton, sailsArc, slipPath, slot, stickBase, stickNub, type SlotOptions } from './instruments.ts';
-
-const AT = { lay: 0.5, dry: 0.3 } as const;
-export class HudDisc {
-  #layer: ChartLayer | null = null;
-  #born = -1;
-  #leftAt = -1;
-  #off: (() => void) | null = null;
-  /** Called once the disc has gone. */
-  onGone?: () => void;
-
-  attach(layer: ChartLayer, now: number): void {
-    this.#layer = layer;
-    this.#born = now;
-    this.#off = layer.addLive((g, t) => this.#frame(g, t));
-  }
-
-  leave(now: number): void {
-    if (this.#leftAt < 0) this.#leftAt = now;
-  }
-
-  dispose(): void {
-    this.#off?.();
-    this.#off = null;
-  }
-
-  #frame(g: CanvasRenderingContext2D, now: number): Rect | void {
-    const layer = this.#layer!, c = layer.layout.hud, d = layer.disc(c.r);
-    const dry = this.#leftAt < 0 ? 0 : clamp((now - this.#leftAt) / 1000 / AT.dry);
-    if (dry >= 1) {
-      this.dispose();
-      this.onGone?.();
-      return;
-    }
-    // laid down: it comes in a little large and settles onto the chart as its ink takes
-    const t = clamp((now - this.#born) / 1000 / AT.lay), k = 1 + 0.08 * (1 - ease.back(t));
-    g.save();
-    g.translate(c.x, c.y);
-    g.scale(k, k);
-    drawBaked(g, d, -c.r, -c.r, ease.out(t) * dryAlpha(dry));
-    g.restore();
-    const r = (c.r + d.pad) * 1.1;
-    return { x: c.x - r, y: c.y - r, w: r * 2, h: r * 2 };
-  }
-}
-
-// ── the match's HUD ──
 
 /** Room round a baked instrument for its shadow. */
 const PAD = 16;

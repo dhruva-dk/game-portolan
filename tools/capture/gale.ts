@@ -1,7 +1,7 @@
 // The Gale on the chart, frame by frame on each device: Play from the lobby and its sheet rolling up off the Gale's,
 // the fleet sliding along the course as the planet turns under it, a first press on the planet marking the dive and a
 // second moving it, the sand-glass draining until she leaves the Gale, the sheet thinning as the camera dives with
-// her, and the landing with the HUD's disc inking in. The chart's clock is held and stepped a frame at a time with the
+// her, and the landing with the HUD inking in. The chart's clock is held and stepped a frame at a time with the
 // match stepped with it, so every run shows the same instants. Fails unless the dive lands her in the match.
 import { log, openApp, Shots, type Rig } from './common.ts';
 import { DEVICES, type DeviceName, type Game } from '../harness.ts';

@@ -35,7 +35,7 @@ export const TRANSITIONS: readonly Transition[] = [
     { name: `${s}-lobby`, from: `h.go("${s}")`, to: 'h.go("lobby")', times: INK_LOBBY },
   ]),
   // Play stamps, the Gale's chart unrolls over her ship, its window opens on the planet and the Gale inks in; the dive
-  // runs to the landing, where the HUD's disc inks in
+  // runs to the landing, where the HUD inks in
   {
     name: 'lobby-gale', from: 'h.go("lobby")', to: 'await h.draw(); h.press("lobby:play")', world: true,
     times: [0, 150, 300, 450, 600, 750, 900, 1050, 1200, 1350, 1500, 1700, 2000, 2600],

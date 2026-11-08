@@ -43,9 +43,9 @@ import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, 
 import { Title } from '../screens/title.ts';
 import { LOBBY_OPENS, Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
 import { DIVE, Gale, courseBearing, diveView, galeLook } from '../screens/gale.ts';
-import { HudDisc } from '../screens/hud.ts';
+import { Hud } from '../screens/hud.ts';
 import { page } from '../ui/screens/frame.ts';
-import { deathScreen, hudScreen, resultsScreen, victoryScreen, type HudView } from '../ui/screens/match.ts';
+import { deathScreen, resultsScreen, victoryScreen } from '../ui/screens/match.ts';
 import { abilitiesScreen, careerScreen, lockerScreen, rankScreen, rivalsScreen, settingsScreen, type MenuView } from '../ui/screens/menus.ts';
 import { warmChart } from '../ui/screens/chart.ts';
 import { applyParchment, el, esc, setChartPainter, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
@@ -115,13 +115,12 @@ export class App {
   private fixed = false;
   private readonly canvas: HTMLCanvasElement;
   private loaded: Promise<void> | null = null;
-  /** The title, the lobby, the Gale and the HUD's disc on the chart, while each is up or leaving. */
+  /** The title, the lobby and the Gale on the chart, while each is up or leaving. */
   private title: Title | null = null;
   private lobby: Lobby | null = null;
   /** Where a finger has taken the lobby's camera off its resting view. */
   private readonly boom: Orbit = { yaw: 0, pitch: 0, zoom: 1 };
   private gale: Gale | null = null;
-  private disc: HudDisc | null = null;
   /** How far the world has loaded, 0..1. */
   private progress = 0;
   /** Whether the stage has drawn the world yet, and whether the ships are built (after the title's materials). */
@@ -158,7 +157,7 @@ export class App {
     this.juiceLayer = layer(overlay, 'app-juice');
     this.juiceLayer.style.pointerEvents = 'none';
     this.shell = new Shell(this.uiLayer);
-    this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
+    this.juice = new Juice({ hud: this.juiceLayer, seed: 1, marks: false });
     this.career = new CareerHolder(options.capture || !!options.autoplay || !!options.fight);
     this.settings = new SettingsHolder(options.capture || !!options.autoplay || !!options.fight);
     this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
@@ -332,15 +331,15 @@ export class App {
     }
     // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby's chart is
     // already down over the Gale if Play unrolled it, or its ink dries away; the Gale's sheet has thinned to nothing by
-    // the time she lands; the HUD's disc dries
+    // the time she lands; the HUD dries
     const now = this.chartNow(), unrolled = from === 'lobby' && !!this.lobby?.unrolled;
     if (from === 'lobby' && name !== 'lobby') this.lobby?.leave(now);
     if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
-    if (from === 'match' && name !== 'match') this.disc?.leave(now);
+    if (from === 'match' && name !== 'match') this.hud?.leave(now);
     if (name === 'title') this.openTitle();
     if (name === 'lobby') this.openLobby(from);
     if (name === 'gale') this.openGale(unrolled);
-    if (name === 'match') this.openDisc();
+    if (name === 'match') this.openHud(model);
     // (after what comes in under it, so it is drawn over it)
     if (from === 'title' && name !== 'title') this.title?.leave(now);
     if (name === 'spectate') this.session?.spectate();
@@ -396,22 +395,15 @@ export class App {
   /** The screens over a match, from the live session or a model the hook hands in; null when there is neither. */
   private matchView(name: ScreenName, model?: unknown): ScreenView | null {
     const s = this.session;
-    this.hud = null;
     if (name === 'death' || name === 'spectate' || name === 'victory') {
       // the match's markers and numbers don't stay over the end of it
       this.juice.markers?.clear();
       this.juice.numbers?.clear();
     }
     switch (name) {
-      case 'match': {
-        if (!model && !s) return null;
-        const v = hudScreen((model as HudModel) ?? hudModel(s!), {
-          press: (w, d) => this.controls.press(w, d), pick: (k) => this.controls.pick(k), target: (n, e) => this.juice.target(n, e),
-          trade: (f, t) => this.controls.trade(f, t), sails: (v) => { this.controls.throttle = v; }, call: (t) => this.controls.call(t),
-        });
-        this.hud = v;
-        return v;
-      }
+      case 'match':
+        // the HUD is on the chart (openHud); touches it does not take go through this empty screen to the controls
+        return !model && !s ? null : { el: el('s-empty') };
       case 'death':
         if (!model && !s) return null;
         return deathScreen((model as DeathModel) ?? deathModel(s!), { onSpectate: () => this.go('spectate'), onLeave: () => this.finishMatch() });
@@ -454,8 +446,8 @@ export class App {
   /** Jumps to a fixed scene, leaving any match. */
   scene(input: SceneInput): SceneSpec {
     if (this.session) this.leaveMatch();
-    for (const c of [this.gale, this.disc]) c?.dispose();
-    this.gale = this.disc = null;
+    for (const c of [this.gale, this.hud]) c?.dispose();
+    this.gale = this.hud = null;
     const s = sceneFrom(input);
     this.view = s;
     this.fixed = true;
@@ -470,7 +462,8 @@ export class App {
   private readonly momentJuice: MomentJuice;
   /** The scripted moment the match was set up for, if any. */
   private staged: MomentScript | null = null;
-  private hud: HudView | null = null;
+  /** The HUD on the chart, while a match is up or its ink is drying. */
+  private hud: Hud | null = null;
   /** The ship the camera followed last frame (-1: none yet). */
   private watched = -1;
   /** How far the camera has drawn back for the win, 0 to 1. */
@@ -545,6 +538,7 @@ export class App {
     this.momentJuice.react(m);
     this.sound.react(m);
     this.tips.moment(m, s);
+    this.hud?.moment(m);
   }
 
   /** Marks her dive right under her: she leaves the Gale now and drops where she is. */
@@ -616,7 +610,7 @@ export class App {
     this.controls.on = false;
     this.sound.clear();
     this.juice.clear();
-    this.hud = null;
+    this.hud?.leave(this.chartNow());
     this.tip.set(null);
     this.log.tick = -1;
     if (this.stage?.rig) Object.assign(this.stage.rig, { follow: 2.2, pitch: 0.2, dist: 27, yaw: 0, orbitDistance: ORBIT_DISTANCE, flight: FLIGHT });
@@ -872,15 +866,24 @@ export class App {
     if (this.chart) g.attach(this.chart, this.chartNow());
   }
 
-  /** Inks the HUD's disc in as she comes to sea. */
-  private openDisc(): void {
-    this.disc?.dispose();
-    const d = new HudDisc();
-    d.onGone = () => {
-      if (this.disc === d) this.disc = null;
+  /** Inks the HUD in as she comes to sea, from the live session or a model the hook hands in. */
+  private openHud(model?: unknown): void {
+    this.hud?.dispose();
+    this.hud = null;
+    const s = this.session;
+    if (!model && !s) return;
+    const h = new Hud({
+      controls: this.controls,
+      sight: this.viewer,
+      shipAt: (i) => this.session?.shipAt(i) ?? null,
+      lefty: () => this.controls.lefty,
+    });
+    h.onGone = () => {
+      if (this.hud === h) this.hud = null;
     };
-    this.disc = d;
-    if (this.chart) d.attach(this.chart, this.chartNow());
+    h.set((model as HudModel) ?? hudModel(s!));
+    this.hud = h;
+    if (this.chart) h.attach(this.chart, this.chartNow());
   }
 
   /** Puts the title on the chart: a blank sheet at once, inked once the paper is made. */

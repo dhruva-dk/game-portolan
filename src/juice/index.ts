@@ -79,6 +79,8 @@ export interface JuiceOptions {
   haptics?: HapticDriver | null;
   /** Draw flashes and vignettes with DOM layers (default true with a hud). Turn off when the grade draws them. */
   domScreen?: boolean;
+  /** False: the hit markers and damage numbers are someone else's to draw (the HUD draws them on the chart). */
+  marks?: boolean;
 }
 
 const STRONGER: Partial<Record<HapticKind, HapticKind>> = { heavy: 'medium', medium: 'light', light: 'select' };
@@ -104,8 +106,10 @@ export class Juice {
     this.hud = opts.hud ?? null;
     if (this.hud) {
       if (opts.domScreen !== false) this.screenDom = new ScreenFxDom(this.hud);
-      this.numbers = new DamageNumbers(this.hud);
-      this.markers = new HitMarkers(this.hud);
+      if (opts.marks !== false) {
+        this.numbers = new DamageNumbers(this.hud);
+        this.markers = new HitMarkers(this.hud);
+      }
       const c = document.createElement('canvas');
       c.className = 'juice-fly';
       c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
