@@ -147,12 +147,24 @@ export const modeOf = (i: number): number => (i < N / 2 ? i : i - N);
 /**
  * The longest waves, summed directly on the CPU: every mode of the first cascade within a few of the origin that
  * carries any energy. Their sum is the swell the hulls ride; the shorter waves only rock them, and the GPU draws those.
+ *
+ * The modes lie on the first cascade's lattice, k = (mx, my) 2π/L, so a mode's turn at q, e^{ik·q}, is a product of
+ * powers of e^{i2πqx/L} and e^{i2πqz/L}: a point costs four trigonometric calls and the rest is multiplication, where
+ * a cosine and a sine for every mode at every point (every hull's samples, every wake's points, everything afloat)
+ * was the largest single cost on the CPU in a fight. The modes' turns with time are worked out once for each t.
  */
 export class LongWaves {
-  /** Per mode: kx, kz, ω, and the complex amplitude h0 (re, im). */
+  /** Per mode: mx, my (lattice steps from the origin), ω, and the complex amplitude h0 (re, im). */
   modes = new Float32Array(0);
   count = 0;
   #g: [number, number] = [0, 0];
+  #reach = 0;
+  /** e^{-iωt} per mode, for the time #t. */
+  #turn = new Float64Array(0);
+  #t = NaN;
+  /** e^{i m 2πq/L} for m from −reach to reach, along each axis: re, im interleaved. */
+  #px = new Float64Array(0);
+  #pz = new Float64Array(0);
 
   /** Rebuilds the modes for a sea state. */
   update(p: SpectrumParams, seed: number, reach = 10, limit = 160): void {
@@ -167,7 +179,7 @@ export class LongWaves {
       const [gr, gi] = gaussian(0, (mx + N) % N, (my + N) % N, seed, this.#g);
       const e = (gr * gr + gi * gi) * a * a;
       if (e < 1e-9) continue;
-      found.push([kx, kz, Math.sqrt(G * k), gr * a, gi * a]);
+      found.push([mx, my, Math.sqrt(G * k), gr * a, gi * a]);
       total += e;
     }
     // the largest first, and no more than carry nearly all the long waves' energy
@@ -181,17 +193,51 @@ export class LongWaves {
     }
     this.modes = Float32Array.from(list);
     this.count = list.length / 5;
+    this.#reach = reach;
+    this.#turn = new Float64Array(this.count * 2);
+    this.#t = NaN;
+    this.#px = new Float64Array((2 * reach + 1) * 2);
+    this.#pz = new Float64Array((2 * reach + 1) * 2);
   }
 
   /** Height (m) at q, a point in the waves' frame, at time t. */
   at(qx: number, qz: number, t: number): number {
-    const m = this.modes;
+    const m = this.modes, n = this.count, turn = this.#turn, px = this.#px, pz = this.#pz, r = this.#reach;
+    if (t !== this.#t) {
+      this.#t = t;
+      for (let i = 0; i < n; i++) {
+        const w = m[i * 5 + 2] * t;
+        turn[i * 2] = Math.cos(w);
+        turn[i * 2 + 1] = -Math.sin(w);
+      }
+    }
+    const dk = (2 * Math.PI) / SIZES[0];
+    powers(px, r, dk * qx);
+    powers(pz, r, dk * qz);
     let h = 0;
-    for (let i = 0; i < this.count; i++) {
-      const o = i * 5, ph = m[o] * qx + m[o + 1] * qz - m[o + 2] * t;
+    for (let i = 0; i < n; i++) {
+      const o = i * 5, x = (m[o] + r) * 2, z = (m[o + 1] + r) * 2;
+      // e^{iφ} = e^{i kx qx} e^{i kz qz} e^{-iωt}
+      const ar = px[x] * pz[z] - px[x + 1] * pz[z + 1], ai = px[x] * pz[z + 1] + px[x + 1] * pz[z];
+      const tr = turn[i * 2], ti = turn[i * 2 + 1];
+      const er = ar * tr - ai * ti, ei = ar * ti + ai * tr;
       // 2 Re(h0 e^{iφ})
-      h += 2 * (m[o + 3] * Math.cos(ph) - m[o + 4] * Math.sin(ph));
+      h += 2 * (m[o + 3] * er - m[o + 4] * ei);
     }
     return h;
+  }
+}
+
+/** e^{i j a} for j from −reach to reach into out (re, im interleaved, j = 0 at out[2 reach]). */
+function powers(out: Float64Array, reach: number, a: number): void {
+  const c = Math.cos(a), s = Math.sin(a), o = reach * 2;
+  out[o] = 1;
+  out[o + 1] = 0;
+  for (let j = 1; j <= reach; j++) {
+    const ur = out[o + (j - 1) * 2], ui = out[o + (j - 1) * 2 + 1];
+    out[o + j * 2] = ur * c - ui * s;
+    out[o + j * 2 + 1] = ur * s + ui * c;
+    out[o - j * 2] = out[o + j * 2];
+    out[o - j * 2 + 1] = -out[o + j * 2 + 1];
   }
 }
