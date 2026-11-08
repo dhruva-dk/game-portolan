@@ -62,6 +62,9 @@ export const moonDisc = Fn(([d]: [V3]) => {
   return vec4(radiance.mul(cover), cover);
 });
 
+/** The cosine of the angle from the moon's middle past which its disc (and its soft edge) has nothing to draw. */
+const MOON_NEAR = Math.cos(MOON_RADIUS * 1.05);
+
 const hash = (p: V3): F => fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
 
 /** The galaxy's plane, fixed among the stars. */
@@ -137,9 +140,20 @@ export const skyRadiance = Fn(([d]: [V3]) => {
   }).Else(() => {
     L.assign(skyMarched(eye, d).rgb);
   });
-  const moon = moonDisc(d);
-  const beyond = sunDisc(d).add(moon.rgb).add(stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(L)));
-  return L.add(viewTransmittance(d).mul(beyond.add(auroraAlong(eye, d))));
+  // the moon's face and the stars are worked out only where they show: the moon's within its disc, the stars where
+  // the air is dark enough to make them out (by day, nowhere), so the sky pays for neither most of the time
+  const beyond = sunDisc(d).add(auroraAlong(eye, d)).toVar();
+  const hidden = float(0).toVar();
+  If(d.dot(P.moonDir).greaterThan(MOON_NEAR), () => {
+    const moon = moonDisc(d);
+    beyond.addAssign(moon.rgb);
+    hidden.assign(moon.a);
+  });
+  const seen = starsSeen(L).mul(float(1).sub(hidden)).toVar();
+  If(seen.greaterThan(0), () => {
+    beyond.addAssign(stars(d).mul(seen));
+  });
+  return L.add(viewTransmittance(d).mul(beyond));
 });
 
 /** The scene's background: the sky in every direction no surface covers. */
@@ -169,10 +183,18 @@ export const probeBackground = Fn(() => {
     const down = body(P.sunDir, P.sunIlluminance, SUN_RADIUS).add(body(P.moonDir, P.moonIlluminance.mul(P.moonPhase), MOON_RADIUS));
     beyond.assign(sky.mul(fresnel).add(down.mul(P.seaDeep).div(Math.PI).mul(float(1).sub(fresnel))));
   }).Else(() => {
-    const moon = moonDisc(d);
-    const starry = stars(d).mul(float(1).sub(moon.a)).mul(starsSeen(marched.rgb));
     // the aurora too, which the sea under it mirrors
-    beyond.assign(moon.rgb.add(starry).add(auroraAlong(eye, d)));
+    beyond.assign(auroraAlong(eye, d));
+    const hidden = float(0).toVar();
+    If(d.dot(P.moonDir).greaterThan(MOON_NEAR), () => {
+      const moon = moonDisc(d);
+      beyond.addAssign(moon.rgb);
+      hidden.assign(moon.a);
+    });
+    const seen = starsSeen(marched.rgb).mul(float(1).sub(hidden)).toVar();
+    If(seen.greaterThan(0), () => {
+      beyond.addAssign(stars(d).mul(seen));
+    });
   });
   return vec4(marched.rgb.add(beyond.mul(marched.a)), 1);
 })();
