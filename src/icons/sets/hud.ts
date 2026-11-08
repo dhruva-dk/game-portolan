@@ -1,11 +1,12 @@
 // HUD glyphs (read at a glance in a fight), menu glyphs, and the gull's delivery tiers.
 import {
-  all, arcArrow, chest, circle, cut, cutLine, fill, flame, gear, gull, line, path, poly, px, py, rect, shield, ship, sparkle, wave,
+  all, arcArrow, chest, circle, cut, cutLine, fill, flame, gear, gull, line, path, poly, px, py, rect, ring, shield, ship, sparkle, star, wave,
   type Prim,
 } from '../draw.ts';
 
 export type HudId = 'gust' | 'storm' | 'spiral' | 'shipsLeft' | 'kills' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'sail' | 'lantern' | 'gull';
-export type MenuId = 'play' | 'back' | 'settings' | 'locker' | 'abilities' | 'rivals' | 'chart' | 'rank' | 'close' | 'lock' | 'check';
+export type MenuId = 'play' | 'back' | 'settings' | 'locker' | 'abilities' | 'rivals' | 'chart' | 'rank' | 'close' | 'lock' | 'check'
+  | 'wheel' | 'chest' | 'burst' | 'pennants' | 'ships';
 export type GullTierId = 'supplies' | 'armament' | 'treasure';
 
 /** The hull in profile, bow to the right, used by the hull glyph and the repair ability. */
@@ -145,6 +146,39 @@ export const MENU_ICONS: Record<MenuId, Prim[]> = {
     cut(rect(11.1, 15.2, 1.8, 3.8, 0.6)),
   ],
   check: [line('M4 12.8L9.4 18.2L20 6', 3.4)],
+  // the lobby's woodcuts (issue #54): each stands only for its own meaning
+  /** A ship's wheel: the rim, its hub, eight spokes run out through the rim to their handles. Settings. */
+  wheel: [
+    fill(ring(12, 12, 8.2, 6.2)),
+    fill(circle(12, 12, 2.6)),
+    line(Array.from({ length: 8 }, (_, k) => `M${px(12, 2.6, k * 45)} ${py(12, 2.6, k * 45)}L${px(12, 11.2, k * 45)} ${py(12, 11.2, k * 45)}`).join(''), 2),
+    fill(Array.from({ length: 8 }, (_, k) => circle(px(12, 11, k * 45), py(12, 11, k * 45), 1.3)).join(''), { fine: true }),
+  ],
+  /** A sea chest, its lid shut and its lock on the front. The locker. */
+  chest: [
+    fill(chest(12, 21.6, 18, 13.6), { tint: true }),
+    cutLine('M3 13.2H21', 1.1),
+    cut(rect(10.6, 14.2, 2.8, 3.8, 0.7)),
+    cutLine('M6.2 13.2V21M17.8 13.2V21', 1, { fine: true }),
+  ],
+  /** A burst of rays from a point. The abilities. */
+  burst: [
+    fill(star(12, 12, 8, 11.2, 4.6)),
+    cut(circle(12, 12, 1.8)),
+  ],
+  /** A staff flying three pennants, the longest uppermost. The rank. */
+  pennants: [
+    line('M4.4 2.2V22.6', 2.2),
+    fill(circle(4.4, 1.9, 1.5)),
+    fill(poly(5.6, 3.4, 21.6, 5.6, 5.6, 7.8)),
+    fill(poly(5.6, 9.2, 18.4, 11.4, 5.6, 13.6)),
+    fill(poly(5.6, 15, 15.4, 17.2, 5.6, 19.4)),
+  ],
+  /** Two ships bow to bow. The rivals. */
+  ships: [
+    ...ship(6.4, 22.4, 0.56),
+    ...all(ship(6.4, 22.4, 0.56), { tr: 'matrix(-1 0 0 1 24 0)' }),
+  ],
 };
 
 /** The gull with what it carries, bigger and richer at each tier. */

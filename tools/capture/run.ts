@@ -13,7 +13,7 @@
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
 //   npm run capture -- kit [--device ipad,iphone] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
 //   npm run capture -- title [--device ipad,iphone]      the title inking in, its needle, a real tap and the roll-off to the lobby
-//   npm run capture -- lobby [--device ipad,iphone]      the lobby inking in, a drag of the planet, the settings, Play into the Gale
+//   npm run capture -- lobby [--device ipad,iphone]      the lobby inking in, every press, orbit and pinch, Play into the Gale
 //   npm run capture -- gale [--device ipad,iphone]       the Gale on the chart: the fleet carried, two presses, the dive, the landing
 //   npm run capture -- list                               the moments and transitions there are
 //

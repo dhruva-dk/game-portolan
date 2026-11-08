@@ -60,8 +60,30 @@ export interface ChartLayout {
   margin: number;
   /** The galleon mark's hull length on the HUD and on the lobby's chart. */
   mark: { hud: number; chart: number };
-  /** The lobby chart's compass rose, in its top left corner: where the title's rose flies to. */
+  /** The planet chart's compass rose, in its top left corner. */
   rose: Circle;
+  /** The lobby (issue #54): the career plate top left (the level's ring, the rank's seal badge beside it), the
+   *  settings' wheel top right, the four folio tabs along the bottom left and PLAY's banner under the right thumb. The
+   *  title's rose flies to the ring. */
+  lobby: { plate: Box; ring: Circle; badge: Circle; wheel: Circle; tabs: Circle[]; play: Box };
+}
+
+/** The lobby's places on each device, from its margins. */
+function lobbyLayout(w: number, h: number, safe: Insets, phone: boolean): ChartLayout['lobby'] {
+  const m = phone ? 12 : 22;
+  const ring = phone ? 25 : 34, badge = phone ? 13 : 18, pad = phone ? 12 : 18, gap = phone ? 10 : 16;
+  const pw = pad + ring * 2 + gap + badge * 2 + pad, ph = ring * 2 + pad * 2 * 0.75;
+  const plate = { x: safe.left + m + pw / 2, y: safe.top + m + ph / 2, w: pw, h: ph };
+  const wheel = phone ? 24 : 30, tab = phone ? 23 : 30, step = phone ? 58 : 72;
+  const bw = phone ? 228 : 330, bh = phone ? 74 : 104;
+  return {
+    plate,
+    ring: { x: plate.x - pw / 2 + pad + ring, y: plate.y, r: ring },
+    badge: { x: plate.x + pw / 2 - pad - badge, y: plate.y, r: badge },
+    wheel: { x: w - safe.right - m - wheel, y: safe.top + m + wheel, r: wheel },
+    tabs: Array.from({ length: 4 }, (_, i) => ({ x: safe.left + m + tab + i * step, y: h - safe.bottom - m - tab, r: tab })),
+    play: { x: w - safe.right - m - bw / 2, y: h - safe.bottom - (phone ? 102 : 210), w: bw, h: bh },
+  };
 }
 
 /** n boxes of `size` square in a row centred at (x, y), `gap` apart. */
@@ -103,6 +125,7 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
       margin: 22,
       mark: { hud: 34, chart: 64 },
       rose: { x: safe.left + 22 + 72, y: safe.top + 22 + 72, r: 72 },
+      lobby: lobbyLayout(w, h, safe, false),
     };
   }
   const L = { x: safe.left + 92, y: h - safe.bottom - 102, r: 56 };
@@ -135,6 +158,7 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
     margin: 12,
     mark: { hud: 26, chart: 48 },
     rose: { x: safe.left + 12 + 46, y: safe.top + 12 + 46, r: 46 },
+    lobby: lobbyLayout(w, h, safe, true),
   };
 }
 
@@ -177,5 +201,12 @@ export function layoutProblems(l: ChartLayout): string[] {
     return b.x - b.w / 2 >= l.safe.left && b.x + b.w / 2 <= l.w - l.safe.right && b.y - b.h / 2 >= l.safe.top && b.y + b.h / 2 <= l.h - l.safe.bottom;
   };
   for (const [k, s] of [...ctl, ...readings, ['disc', disc] as [string, Shape]]) if (!inside(s)) out.push(`${k} is outside the safe area`);
+  // the lobby: its pressables apart from one another and inside the safe area
+  const lb = l.lobby, lobby: [string, Shape][] = [['career plate', asShape(lb.plate, true)], ['wheel', asShape(lb.wheel, true)],
+    ...lb.tabs.map((c, i) => [`tab ${i + 1}`, asShape(c, true)] as [string, Shape]), ['play', asShape(lb.play, true)]];
+  for (let i = 0; i < lobby.length; i++) for (let j = i + 1; j < lobby.length; j++) {
+    if (overlap(lobby[i][1], lobby[j][1])) out.push(`${lobby[i][0]} and ${lobby[j][0]} overlap`);
+  }
+  for (const [k, s] of lobby) if (!inside(s)) out.push(`${k} is outside the safe area`);
   return out;
 }

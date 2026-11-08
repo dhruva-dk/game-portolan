@@ -1,38 +1,49 @@
-// The lobby: her ship, live, at anchor on her home water, and the chart only at the margins, on torn scraps pinned over
-// the view, which is never covered. The rose keeps the top left corner on a scrap of its own (the title's rose lands
-// there); beside it the career is a strapwork cartouche on a scrap, drawn flat because it cannot be pressed: her level
-// as rings inked round a roundel bearing the level's figure, her rank as that roundel's illumination, her matches as
-// tally marks and her wins as gilt stars. What can be pressed is a wax seal, and nothing else is: a small red seal
-// bearing the dividers, top right, for the settings; and Play, the one gold seal and the largest thing on the screen,
-// under the right thumb. The bottom edge left of Play is kept clear for the folios' seals. Nothing is written.
+// The lobby (issue #54): her ship, live, at anchor on her home water, and six things on the view, each an instrument
+// of the HUD's family (paper laid on the world, inked in iron, a woodcut where one is wanted) and nothing else. Top
+// left, the career plate: her level's figure inside a ring that fills with gold leaf as her XP comes toward the next
+// level, and beside it her rank's tier as a small wax seal in its illumination; pressed, it opens the rank folio. Top
+// right, a ship's wheel on a round paper button: the settings. Bottom left, four tabs in a row, each a slip of paper
+// with a rounded crown and a woodcut: a burst (abilities), a chest (locker), a staff of pennants (rank) and two ships
+// bow to bow (rivals); each unrolls its folio. Bottom right, under the thumb, PLAY: the one word on the screen, gilt
+// capitals on a drawn ribbon, the largest thing here. The ship herself answers a finger anywhere else: one finger
+// orbits the camera round her and tilts it a little, two fingers pinch it closer or farther, and let go she drifts
+// back to her resting view over a few seconds.
 //
-// Entering, the scraps are laid one after another (from the right, behind the title's sheet as it rolls off that way)
-// and what is on them inks in. Play stamps its seal and the Gale's planet chart unrolls over her ship from the right;
-// under it the match begins, the camera is put over the Gale's course, and the sheet thins in its window to the planet,
-// where the Gale's own sheet lies under it. Leaving for anything else, the ink dries away.
+// Entering, the instruments are laid one after another (from the right, behind the title's sheet as it rolls off that
+// way) and ink in; the title's rose lands on the plate, where the level's ring inks in over it as it dries. PLAY
+// springs under the finger with a flash of light on its gold, and the Gale's planet chart unrolls over her ship from
+// the right; under it the match begins, the camera is put over the Gale's course, and the sheet thins in its window to
+// the planet, where the Gale's own sheet lies under it. Leaving for anything else, the ink dries away.
 //
-// Each scrap and what is on it is drawn on the live plane while it inks in, then painted once on the sheet plane; the
-// live plane keeps only the two seals, which answer a press, and Play's sheen. Everything runs off the time it is
-// given, so a capture's frozen clock shows the same instants.
+// Everything here can be pressed, so everything is drawn on the live plane: each instrument drawn with the pen while it
+// inks in, then baked once to a sprite and drawn as one image with its press look; only the ring's gold is drawn with
+// the pen each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
+import type { Prim } from '../icons/draw.ts';
 import {
-  Press, arcPts, bakeSeal, cartouche, drawBaked, drawSeal, drawSprite, ease, figure, needle, pressLook, rings, rose, stamp,
-  star, stagger, tally, unroll, type Baked, type ChartLayer, type Illumination, type Pen, type Rect, type Seal,
+  Press, arcPts, bakeSeal, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, unroll, woodcut, word,
+  type Baked, type ChartLayer, type DragSurface, type Illumination, type Pen, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
+import { clamp, noise1 } from '../chart/noise.ts';
 import { effect } from '../ui/parts/feedback.ts';
+import { paper, roundButton, slipPath } from './instruments.ts';
 import { BLEED, PlanetChart, type PlanetHost } from './planet.ts';
-import { ROSE, TITLE_LANDS, cornerRose } from './title.ts';
+import { TITLE_LANDS, cornerRose } from './title.ts';
 
-/** The career as the cartouche draws it. */
+/** The career as the plate draws it. */
 export interface CareerMarks {
   level: number;
   /** XP into the level, and what the level takes. */
   into: number;
   need: number;
-  /** The rank's tier as the roundel's illumination. */
+  /** The rank's tier as the seal's illumination. */
   illumination: Illumination;
+  /** Kept for the rank folio; the plate does not draw them. */
   matches: number;
   wins: number;
 }
+
+/** The folios the tabs unroll. */
+export type Folio = 'abilities' | 'locker' | 'rank' | 'rivals';
 
 export interface LobbyHost extends PlanetHost {
   career(): CareerMarks;
@@ -42,35 +53,58 @@ export interface LobbyHost extends PlanetHost {
   begin(): void;
   /** Opens the settings. */
   settings(): void;
+  /** Opens the rank folio: the career plate was pressed. */
+  rank(): void;
+  /** Unrolls a folio: its tab was pressed. */
+  open(folio: Folio): void;
+  /** Where a finger has taken the camera. The app's: it goes on easing home after the lobby has gone to a folio. */
+  readonly boom: Orbit;
 }
 
 export interface LobbyOptions {
-  /** Entering from the title: the rose is flying to its corner, and lands there. */
+  /** Entering from the title: the rose is flying to the plate, and lands there. */
   roseLanded?: boolean;
+}
+
+/** Where a finger has taken the camera off its resting view: a turn round her (radians), a tilt of the boom (radians,
+ *  up positive) and the boom's length as a share of its rest. */
+export interface Orbit {
+  yaw: number;
+  pitch: number;
+  zoom: number;
+}
+
+/** How far a finger can take the camera (the tilt either way, the pinch in and out, the near end keeping 18 m of boom
+ *  so it stands clear of her bowsprit's tip, 14.6 m out), how far a swipe across the screen turns her (radians), and how
+ *  fast she drifts back once let go (the share of the way left closed a second). */
+export const LOBBY_ORBIT = { pitch: [-0.07, 0.42], zoom: [0.6, 1.8], swipe: Math.PI * 1.5, back: 0.9 } as const;
+
+/** No finger on her: the camera drifts back to its resting view. */
+export function relaxOrbit(o: Orbit, dt: number): void {
+  const k = 1 - Math.exp(-LOBBY_ORBIT.back * dt);
+  o.yaw -= o.yaw * k;
+  o.pitch -= o.pitch * k;
+  o.zoom += (1 - o.zoom) * k;
 }
 
 /** When each thing happens, seconds: from the lobby's coming for entering, from the press for Play, from the leave for
  *  drying. */
 const AT = {
-  /** Each scrap is laid in this long, in turn from the right, each as soon as the title's sheet rolling off that way
-   *  has uncovered its place. */
-  lay: 0.24,
-  scraps: { settings: 0.42, play: 0.48, career: 0.68, rose: 0.78 },
-  /** The rose inks itself in on its scrap (unless the title's lands there), its needle last. */
-  rose: [0.85, 1.6],
-  needle: [1.3, 1.6],
-  /** The cartouche, then the career in it: the roundel, its rings, the tallies and the stars. */
-  cartouche: [0.8, 1.4],
-  career: [1.15, 1.5],
-  rings: [1.35, 1.85],
-  tally: [1.45, 1.95],
-  stars: [1.65, 2.1],
-  /** The seals are pressed onto their scraps: the settings', then Play's, which stamps. */
-  settings: [0.6, 0.85],
-  play: [0.9, 1.2],
-  done: 2.15,
-  /** After Play's press: the stamp, the Gale's chart unrolling from the right, and its window opening on the planet. */
-  stamp: 0.5,
+  /** Each instrument is laid and inks in, in turn from the right, each as soon as the title's sheet rolling off that
+   *  way has uncovered its place. */
+  wheel: [0.4, 0.95],
+  banner: [0.46, 1.15],
+  letters: [0.9, 1.5],
+  plate: [0.66, 1.3],
+  badge: [1.0, 1.35],
+  fill: [1.15, 1.75],
+  tabs: [0.72, 1.8],
+  /** The title's rose, landed on the plate, dries away under the ring in this long. */
+  rose: 0.5,
+  done: 1.85,
+  /** After Play's press: the flash on its gold, the Gale's chart unrolling from the right, and its window opening on
+   *  the planet. */
+  flash: 0.45,
   unroll: [0.3, 1.1],
   open: 0.55,
   /** Leaving for anything but the Gale. */
@@ -81,130 +115,158 @@ const AT = {
  *  in after it. */
 export const LOBBY_OPENS = AT.open;
 
-const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const span = (s: number, [a, b]: readonly [number, number]): number => clamp((s - a) / (b - a));
 const TAU = Math.PI * 2;
+/** Room round a baked instrument for its shadow. */
+const PAD = 20;
 
-/** A scrap's middle, size and tilt. */
-interface Scrap {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  rot: number;
-  seed: number;
+/** The tabs' folios, left to right, and their woodcuts. */
+const TABS: readonly { folio: Folio; cut: string }[] = [
+  { folio: 'abilities', cut: 'menu.burst' },
+  { folio: 'locker', cut: 'menu.chest' },
+  { folio: 'rank', cut: 'menu.pennants' },
+  { folio: 'rivals', cut: 'menu.ships' },
+];
+
+// ── the instruments ──
+
+/** The level's ring, radius r at (x, y), as the instruments' rim: a bold ring with a hairline inside it, the level's
+ *  figure in the middle. The gold between the two is `ringFill`'s. */
+function levelRing(pen: Pen, x: number, y: number, r: number, level: number, alpha: number, t: number): void {
+  if (t <= 0) return;
+  pen.stroke(arcPts(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * part(t, 0, 0.6), Math.max(48, Math.ceil(r * 1.5))),
+    { w: 'bold', nib: 0.15, pool: 0.3, wobble: 0.3, drift: 0.2, seed: 41, alpha: 0.92 * alpha }, 1);
+  pen.rule([arcPts(x, y, r * 0.76, 0, TAU * part(t, 0.1, 0.7), 56)], { w: 'hair', alpha: 0.6 * alpha, seed: 42 });
+  const text = String(level), size = r * (text.length > 1 ? 0.76 : 0.92);
+  figure(pen, text, x, y + size * 0.5, size, { align: 'center', seed: 5, alpha }, part(t, 0.35, 1));
 }
+
+/** The ring's gold: leaf laid between the ring and its hairline from north, clockwise, as far round as the XP has come,
+ *  its leading edge ruled in ink. */
+function ringFill(pen: Pen, x: number, y: number, r: number, f: number, alpha: number): void {
+  if (f <= 0.003 || alpha <= 0.003) return;
+  const r0 = r * 0.79, r1 = r * 0.96, a0 = -Math.PI / 2, a1 = a0 + TAU * Math.min(1, f);
+  const p = new Path2D();
+  p.arc(x, y, r1, a0, a1);
+  p.arc(x, y, r0, a1, a0, true);
+  p.closePath();
+  pen.gilt(p, 'gold', x, y, r, alpha);
+  if (f < 0.995) pen.rule([[x + Math.cos(a1) * r0, y + Math.sin(a1) * r0, x + Math.cos(a1) * r1, y + Math.sin(a1) * r1]], { w: 'fine', alpha: 0.85 * alpha, seed: 43 });
+}
+
+/** A tab's outline: a slip w × h with its top corners rounded to rr, cut by hand, from its top left; `inset` draws
+ *  it that much inside. */
+function tabPts(x0: number, y0: number, w: number, h: number, rr: number, inset: number, seed: number, wobble: number): Pts {
+  const out: Pts = [], L = x0 + inset, R = x0 + w - inset, T = y0 + inset, B = y0 + h - inset, r = Math.max(1, rr - inset);
+  const put = (x: number, y: number, s: number) => {
+    const d = wobble * (0.7 * noise1(s / 11, seed) + 0.35 * noise1(s / 3.5, seed + 1));
+    out.push(x + d, y + d * 0.6);
+  };
+  let s = 0;
+  put(L, B, s);
+  for (let y = B; y > T + r; y -= 3) put(L, y, s += 3);
+  for (let k = 0; k <= 8; k++) {
+    const a = Math.PI + (k / 8) * (Math.PI / 2);
+    put(L + r + Math.cos(a) * r, T + r + Math.sin(a) * r, s += 1);
+  }
+  for (let x = L + r; x < R - r; x += 3) put(x, T, s += 3);
+  for (let k = 0; k <= 8; k++) {
+    const a = -Math.PI / 2 + (k / 8) * (Math.PI / 2);
+    put(R - r + Math.cos(a) * r, T + r + Math.sin(a) * r, s += 1);
+  }
+  for (let y = T + r; y < B; y += 3) put(R, y, s += 3);
+  put(R, B, s);
+  return out;
+}
+
+/**
+ * A folio's tab, r the half-width of its slip, centred at (x, y): a slip of paper with a rounded crown and a square
+ * foot, the crown ruled in a bold line with a hairline under it as the round button's rim is, and its woodcut on the
+ * face. The row of them along the bottom edge reads as the tabs of folios stacked under the view.
+ */
+function tab(pen: Pen, x: number, y: number, r: number, drawing: readonly Prim[], o: { press?: number; alpha?: number; seed?: number } = {}, t = 1): void {
+  if (t <= 0) return;
+  const g = pen.g, look = pressLook(o.press ?? 0), alpha = (o.alpha ?? 1), seed = o.seed ?? 3;
+  const w = r * 2, h = r * 1.9, x0 = x - r, y0 = y - h / 2, rr = r * 0.5;
+  g.save();
+  g.translate(x, y + look.dy);
+  g.scale(look.scale, look.scale);
+  g.translate(-x, -y);
+  const outline: Pts = tabPts(x0, y0, w, h, rr, 0, seed, 1);
+  outline.push(outline[0], outline[1]);
+  paper(pen, shape(outline), { alpha: alpha * ease.out(part(t, 0, 0.3)), burn: Math.max(3, r * 0.1) });
+  pen.mood({ dark: look.dark }, () => {
+    // the crown's rule from one foot round to the other, and the hairline inside it
+    const rim = tabPts(x0, y0, w, h, rr, r * 0.09, seed, 0), hair = tabPts(x0, y0, w, h, rr, r * 0.2, seed, 0);
+    pen.stroke(rim, { w: 'bold', nib: 0.15, pool: 0.3, wobble: 0.3, drift: 0.2, seed, alpha: 0.92 * alpha }, part(t, 0.1, 0.7));
+    pen.rule([hair], { w: 'hair', alpha: 0.6 * alpha, seed: seed + 1 }, part(t, 0.2, 0.8));
+    const wt = part(t, 0.4, 1);
+    if (wt > 0) woodcut(pen, drawing, x, y + r * 0.08, r * 1.12, 'iron', alpha * wt);
+  });
+  g.restore();
+}
+
+/** The ribbon's outline, w × h centred at (x, y): a banderole with its ends cut in swallowtails and its long edges
+ *  waving a little, as a chart's title ribbon flies. `inset` draws it that much inside. */
+function ribbonPts(x: number, y: number, w: number, h: number, inset: number): Pts {
+  const x0 = x - w / 2 + inset, x1 = x + w / 2 - inset, y0 = y - h / 2 + inset, y1 = y + h / 2 - inset;
+  const tail = h * 0.4 - inset * 0.6, amp = h * 0.045, n = 36, out: Pts = [];
+  const wave = (u: number, sgn: number) => sgn * amp * Math.sin(u * Math.PI * 2.1 + 0.6) + sgn * amp * 0.4 * Math.sin(u * Math.PI * 4.7 + 2);
+  out.push(x0 + tail, y);
+  out.push(x0, y0 + wave(0, 1));
+  for (let i = 1; i <= n; i++) {
+    const u = i / n;
+    out.push(x0 + (x1 - x0) * u, y0 + wave(u, 1));
+  }
+  out.push(x1 - tail, y);
+  out.push(x1, y1 + wave(1, -1));
+  for (let i = n - 1; i >= 0; i--) {
+    const u = i / n;
+    out.push(x0 + (x1 - x0) * u, y1 + wave(u, -1));
+  }
+  out.push(x0 + tail, y);
+  return out;
+}
+
+/**
+ * PLAY: a ribbon w × h centred at (x, y), paper laid on the world, its outline inked bold with a hairline inside, its
+ * ends shaded where they turn back, and the word lettered across it in gold leaf over an iron shadow, its cap height
+ * half the ribbon's. `letters` is the word's own ink-in.
+ */
+function banner(pen: Pen, x: number, y: number, w: number, h: number, o: { press?: number; alpha?: number; seed?: number } = {}, t = 1, letters = t): void {
+  if (t <= 0) return;
+  const g = pen.g, look = pressLook(o.press ?? 0), alpha = o.alpha ?? 1, seed = o.seed ?? 23;
+  g.save();
+  g.translate(x, y + look.dy);
+  g.scale(look.scale, look.scale);
+  g.translate(-x, -y);
+  const outline = ribbonPts(x, y, w, h, 0), p = shape(outline);
+  paper(pen, shape(outline.map((v, i) => v + (0.7 * noise1(i / 5, seed) * (i & 1 ? 1 : 0.5)))), { alpha: alpha * ease.out(part(t, 0, 0.3)), burn: 6 });
+  pen.mood({ dark: look.dark }, () => {
+    // the ends, hatched where the ribbon turns from the light
+    const tail = h * 0.4, ht = part(t, 0.3, 0.8);
+    g.save();
+    g.clip(p);
+    pen.hatch(p, x - w / 2, y - h / 2, tail * 1.9, h, 0.95, 3.2, { alpha: 0.38 * alpha, seed: seed + 1 }, ht);
+    pen.hatch(p, x + w / 2 - tail * 1.9, y - h / 2, tail * 1.9, h, 0.95, 3.2, { alpha: 0.38 * alpha, seed: seed + 2 }, ht);
+    g.restore();
+    pen.stroke(outline, { w: 'bold', nib: 0.15, pool: 0.3, wobble: 0.3, drift: 0.3, seed, alpha: 0.92 * alpha }, part(t, 0.05, 0.75));
+    pen.rule([ribbonPts(x, y, w, h, h * 0.11)], { w: 'hair', alpha: 0.6 * alpha, seed: seed + 3 }, part(t, 0.15, 0.85));
+    const cap = h * 0.5;
+    word(pen, 'PLAY', x, y + cap * 0.5, cap, { align: 'center', gilt: true, seed: 3, alpha }, letters);
+  });
+  g.restore();
+}
+
+// ── the lobby ──
 
 interface Geo {
-  phone: boolean;
-  rose: { x: number; y: number; r: number };
-  scraps: { rose: Scrap; career: Scrap; settings: Scrap; play: Scrap };
-  /** The cartouche on the career's scrap, and where the career's marks go in its field. */
-  cart: { x: number; y: number; w: number; h: number };
-  field: { sx: number; sy: number; sr: number; gap: number; tx: number; ty: number; th: number; st: number };
-  settings: { x: number; y: number; r: number };
-  /** Play, under the right thumb. */
-  play: { x: number; y: number; r: number };
-}
-
-function geo(layer: ChartLayer): Geo {
-  const l = layer.layout, { w, safe } = l, phone = l.cls === 'iphone', m = l.margin, rose = l.rose;
-  // the rose's scrap round the corner's rose, the career's beside it
-  const rs = rose.r * 2 + (phone ? 20 : 28);
-  const cw = phone ? 186 : 268, ch = phone ? 104 : 148, gap = phone ? 8 : 12;
-  const career: Scrap = { x: rose.x + rs / 2 + gap + cw / 2, y: rose.y + (phone ? 2 : 4), w: cw, h: ch, rot: 0.018, seed: 5 };
-  const cart = { x: career.x, y: career.y + 1, w: cw - (phone ? 14 : 22), h: ch - (phone ? 14 : 20) };
-  const rx = cart.w * 0.3, sr = phone ? 11 : 15;
-  // the seals: the settings' small in the top right corner, Play's the largest thing on the screen
-  const setR = phone ? 24 : 30, ss = setR * 2 + (phone ? 20 : 26);
-  const settings = { x: w - safe.right - m - ss / 2, y: safe.top + m + ss / 2, r: setR };
-  const play = { x: l.thumbs.right.x, y: l.thumbs.right.y, r: phone ? 60 : 88 }, ps = play.r * 2 + (phone ? 22 : 30);
-  return {
-    phone, rose,
-    scraps: {
-      rose: { x: rose.x, y: rose.y, w: rs, h: rs - 4, rot: -0.022, seed: 3 },
-      career,
-      settings: { x: settings.x, y: settings.y, w: ss, h: ss - 2, rot: 0.03, seed: 11 },
-      play: { x: play.x, y: play.y, w: ps, h: ps - 6, rot: -0.02, seed: 17 },
-    },
-    cart,
-    field: {
-      sx: cart.x - rx * 0.46, sy: cart.y, sr, gap: phone ? 2.2 : 3,
-      tx: cart.x + rx * 0.08, ty: cart.y - cart.h * 0.02, th: phone ? 14 : 20, st: cart.y + cart.h * 0.19,
-    },
-    settings, play,
-  };
-}
-
-/** Play's device: a ship under sail, white on the matrix, pressed into the leaf. */
-function shipDevice(g: CanvasRenderingContext2D, r: number): void {
-  g.fillStyle = '#fff';
-  g.strokeStyle = '#fff';
-  g.beginPath();
-  g.moveTo(-0.8 * r, 0.16 * r);
-  g.lineTo(0.84 * r, 0.12 * r);
-  g.quadraticCurveTo(0.62 * r, 0.52 * r, 0.04 * r, 0.54 * r);
-  g.quadraticCurveTo(-0.6 * r, 0.52 * r, -0.8 * r, 0.16 * r);
-  g.fill();
-  g.lineWidth = r * 0.06;
-  g.lineCap = 'round';
-  for (const [x, top, sw, sh] of [[-0.4, -0.5, 0.36, 0.5], [0.06, -0.74, 0.44, 0.68], [0.5, -0.42, 0.3, 0.42]]) {
-    g.beginPath();
-    g.moveTo(x * r, 0.14 * r);
-    g.lineTo(x * r, (top - 0.12) * r);
-    g.stroke();
-    // a square sail, bellied forward
-    const x0 = (x - sw / 2) * r, x1 = (x + sw / 2) * r, y0 = top * r, y1 = (top + sh) * r;
-    g.beginPath();
-    g.moveTo(x0, y0);
-    g.lineTo(x1, y0);
-    g.quadraticCurveTo(x1 + sw * 0.18 * r, (y0 + y1) / 2, x1, y1);
-    g.lineTo(x0, y1);
-    g.quadraticCurveTo(x0 + sw * 0.18 * r, (y0 + y1) / 2, x0, y0);
-    g.fill();
-  }
-}
-
-/** The settings' device: a pair of dividers, white on the matrix: the handle's knob, the round hinge, and the two legs
- *  spread wide and filed to points. */
-function dividersDevice(g: CanvasRenderingContext2D, r: number): void {
-  g.fillStyle = '#fff';
-  g.strokeStyle = '#fff';
-  const hy = -0.5 * r, L = 1.3 * r, spread = 0.5;
-  for (const side of [-1, 1]) {
-    const a = side * spread, dx = Math.sin(a), dy = Math.cos(a), nx = dy * 0.11 * r, ny = -dx * 0.11 * r;
-    g.beginPath();
-    g.moveTo(nx, hy + ny);
-    g.quadraticCurveTo(dx * L * 0.5 + nx * 0.8, hy + dy * L * 0.5 + ny * 0.8, dx * L, hy + dy * L);
-    g.quadraticCurveTo(dx * L * 0.5 - nx * 0.8, hy + dy * L * 0.5 - ny * 0.8, -nx, hy - ny);
-    g.fill();
-  }
-  g.beginPath();
-  g.arc(0, hy, r * 0.2, 0, TAU);
-  g.fill();
-  g.lineWidth = r * 0.12;
-  g.lineCap = 'round';
-  g.beginPath();
-  g.moveTo(0, hy - r * 0.2);
-  g.lineTo(0, hy - r * 0.42);
-  g.stroke();
-  g.beginPath();
-  g.arc(0, hy - r * 0.5, r * 0.11, 0, TAU);
-  g.fill();
-}
-
-/** The career's roundel: an impression in ink, not wax (it cannot be pressed), the rank's illumination laid in it and
- *  the level's figure written over: plain ink, red rubric, red in a blue ring, silver leaf or gold leaf. */
-function roundel(pen: Pen, x: number, y: number, r: number, ill: Illumination, level: number, t: number): void {
-  if (t <= 0) return;
-  const lt = clamp(t / 0.55), ft = clamp((t - 0.4) / 0.6), disc = new Path2D();
-  disc.arc(x, y, r, 0, TAU);
-  if (ill === 'gold' || ill === 'silver') pen.gilt(disc, ill, x, y, r, ease.out(lt));
-  const ring = ill === 'rubric' ? 'rubric' : ill === 'redBlue' ? 'blue' : 'iron';
-  pen.stroke(arcPts(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * lt, 48), { w: 'fine', ink: ring, nib: 0.2, pool: 0.3, seed: 61 }, 1);
-  if (lt >= 1) pen.rule([arcPts(x, y, r * 0.8, 0, TAU, 40)], { w: 'hair', ink: ring, alpha: 0.7, seed: 62 });
-  const text = String(level), size = r * (text.length > 1 ? 0.92 : 1.1);
-  figure(pen, text, x, y + size / 2, size, { align: 'center', ink: ill === 'rubric' || ill === 'redBlue' ? 'rubric' : 'iron', seed: 5 }, ft);
+  plate: { x: number; y: number; w: number; h: number };
+  ring: { x: number; y: number; r: number };
+  badge: { x: number; y: number; r: number };
+  wheel: { x: number; y: number; r: number };
+  tabs: { x: number; y: number; r: number }[];
+  play: { x: number; y: number; w: number; h: number };
 }
 
 export class Lobby {
@@ -213,27 +275,28 @@ export class Lobby {
   #layer: ChartLayer | null = null;
   #g: Geo | null = null;
   #career: CareerMarks;
-  #paper: Record<keyof Geo['scraps'], Baked> | null = null;
-  #setSeal: Seal | null = null;
-  #playSeal: Seal | null = null;
+  #badge: Seal | null = null;
+  /** The instruments at rest, baked. */
+  #sprites: { plate: Sprite; wheel: Sprite; tabs: Sprite[]; play: Sprite } | null = null;
   /** When it came, Play was pressed, it left, and the window began to open (ms; -1 not yet). */
   #born = -1;
   #playAt = -1;
   #leftAt = -1;
   #openAt = -1;
-  /** Everything is inked, and held on the sheet plane; and the Gale's chart is down over it. */
+  /** Everything is inked. */
   #inked = false;
-  #covered = false;
   readonly #roseLanded: boolean;
   /** The Gale's chart, whole, unrolling over her ship; then laid in the page under the Gale's. */
   #planet: PlanetChart | null = null;
   #chart: Baked | null = null;
   #chartEl: HTMLCanvasElement | null = null;
-  readonly #play = new Press();
-  readonly #set = new Press();
+  readonly #press = { play: new Press(), wheel: new Press(), plate: new Press(), tabs: TABS.map(() => new Press()) };
   #off: (() => void) | null = null;
   /** The chart's time at the last frame: a press acts between frames. */
   #lastNow = 0;
+  /** The fingers on the view. */
+  readonly #fingers = new Map<number, { x: number; y: number }>();
+  readonly #drag: DragSurface;
   /** Called once the lobby has gone. */
   onGone?: () => void;
 
@@ -242,6 +305,24 @@ export class Lobby {
     this.#h = h;
     this.#career = h.career();
     this.#roseLanded = !!o.roseLanded;
+    this.#drag = {
+      down: (id, x, y) => {
+        if (this.#fingers.size >= 2 || this.#playAt >= 0 || this.#leftAt >= 0) return;
+        this.#fingers.set(id, { x, y });
+      },
+      move: (id, x, y) => this.#finger(id, x, y),
+      up: (id) => {
+        this.#fingers.delete(id);
+        // let go, she comes back the short way round
+        const o = this.#h.boom;
+        o.yaw = Math.atan2(Math.sin(o.yaw), Math.cos(o.yaw));
+      },
+    };
+  }
+
+  /** Whether a finger is on her: the camera is the finger's, and does not drift back. */
+  get held(): boolean {
+    return this.#fingers.size > 0;
   }
 
   /** Whether Play unrolled the Gale's chart over her ship, and the match began under it. */
@@ -255,15 +336,15 @@ export class Lobby {
     this.#lastNow = now;
     this.#lay();
     const off = layer.addLive((g, t) => this.#frame(g, t));
-    const offSheet = layer.addSheet((g, pen) => {
-      if (this.#inked && !this.#covered && this.#leftAt < 0) this.#scrapsAt(g, pen, Infinity);
-    });
-    layer.presses.add({ id: 'lobby:play', hit: { x: 0, y: 0, r: 1 }, press: this.#play, sound: 'play', haptic: 'heavy', act: () => this.#pressPlay() });
-    layer.presses.add({ id: 'lobby:settings', hit: { x: 0, y: 0, r: 1 }, press: this.#set, sound: 'open', haptic: 'light', act: () => this.#h.settings() });
+    const p = this.#press;
+    layer.presses.add({ id: 'lobby:play', hit: { x: 0, y: 0, r: 1 }, press: p.play, sound: 'play', haptic: 'heavy', act: () => this.#pressPlay() });
+    layer.presses.add({ id: 'lobby:settings', hit: { x: 0, y: 0, r: 1 }, press: p.wheel, sound: 'open', haptic: 'light', act: () => this.#h.settings() });
+    layer.presses.add({ id: 'lobby:career', hit: { x: 0, y: 0, r: 1 }, press: p.plate, sound: 'open', haptic: 'light', act: () => this.#h.rank() });
+    TABS.forEach((tb, i) => layer.presses.add({ id: `lobby:${tb.folio}`, hit: { x: 0, y: 0, r: 1 }, press: p.tabs[i], sound: 'open', haptic: 'light', act: () => this.#h.open(tb.folio) }));
     this.#placePresses();
+    layer.drag = this.#drag;
     this.#off = () => {
       off();
-      offSheet();
       this.#unpress();
     };
   }
@@ -287,12 +368,12 @@ export class Lobby {
     this.#unpress();
     this.#leftAt = now;
     this.#inked = false;
-    layer.invalidate();
   }
 
   dispose(): void {
     this.#off?.();
     this.#off = null;
+    this.#unpress();
     this.#chartEl?.remove();
     this.#chartEl = null;
   }
@@ -300,39 +381,74 @@ export class Lobby {
   // ── layout and bakes ──
 
   #lay(): void {
-    const layer = this.#layer!, g = (this.#g = geo(layer)), dpr = layer.dpr, s = g.scraps;
-    const scrap = (c: Scrap) => layer.sheet('scrap', Math.round(c.w), Math.round(c.h), c.seed);
-    this.#paper = { rose: scrap(s.rose), career: scrap(s.career), settings: scrap(s.settings), play: scrap(s.play) };
-    this.#setSeal = bakeSeal(layer.paper, layer.layout.widths, 'rubric', { size: g.settings.r * 2, dpr, device: dividersDevice, seed: 13 });
-    this.#playSeal = bakeSeal(layer.paper, layer.layout.widths, 'gold', { size: g.play.r * 2, dpr, device: shipDevice, seed: 23 });
+    const layer = this.#layer!, l = layer.layout.lobby, dpr = layer.dpr, c = this.#career;
+    const g: Geo = (this.#g = { plate: l.plate, ring: l.ring, badge: l.badge, wheel: l.wheel, tabs: l.tabs, play: l.play });
+    this.#badge = bakeSeal(layer.paper, layer.layout.widths, c.illumination, { size: g.badge.r * 2, dpr, device: 'star', seed: 13 });
+    const badge = this.#badge;
+    /** A drawing baked once, w × h plus room for its shadow, anchored at its centre. */
+    const bake = (key: string, w: number, h: number, draw: (p: Pen, gc: CanvasRenderingContext2D, cx: number, cy: number) => void) =>
+      layer.sprite(key, Math.ceil(w + PAD * 2), Math.ceil(h + PAD * 2), w / 2 + PAD, h / 2 + PAD, (p, gc) => draw(p, gc, w / 2 + PAD, h / 2 + PAD));
+    const size = `${layer.layout.cls}|${g.plate.w}`;
+    this.#sprites = {
+      plate: bake(`lobby-plate|${size}|${c.level}|${c.illumination}`, g.plate.w, g.plate.h + g.badge.r * 2, (p, gc, cx, cy) =>
+        this.#plate(p, gc, cx, cy - g.badge.r, badge, 1, 1)),
+      wheel: bake(`lobby-wheel|${size}`, g.wheel.r * 2, g.wheel.r * 2, (p, _gc, cx, cy) => roundButton(p, cx, cy, g.wheel.r, prims('menu.wheel'), { seed: 7 })),
+      tabs: TABS.map((tb, i) => bake(`lobby-tab|${size}|${tb.folio}`, g.tabs[i].r * 2, g.tabs[i].r * 2, (p, _gc, cx, cy) => tab(p, cx, cy, g.tabs[i].r, prims(tb.cut), { seed: 11 + i }))),
+      play: bake(`lobby-play|${size}`, g.play.w, g.play.h, (p, _gc, cx, cy) => banner(p, cx, cy, g.play.w, g.play.h, { seed: 23 })),
+    };
   }
 
   #placePresses(): void {
-    const layer = this.#layer!, g = this.#g!;
-    const play = layer.presses.list.find((p) => p.id === 'lobby:play');
-    if (play) play.hit = { x: g.play.x, y: g.play.y, r: g.play.r };
-    const set = layer.presses.list.find((p) => p.id === 'lobby:settings');
-    if (set) set.hit = { x: g.settings.x, y: g.settings.y, r: g.settings.r };
+    const layer = this.#layer!, g = this.#g!, find = (id: string) => layer.presses.list.find((p) => p.id === id);
+    const play = find('lobby:play');
+    if (play) play.hit = { ...g.play };
+    const set = find('lobby:settings');
+    if (set) set.hit = { ...g.wheel };
+    const plate = find('lobby:career');
+    if (plate) plate.hit = { ...g.plate };
+    TABS.forEach((tb, i) => {
+      const t = find(`lobby:${tb.folio}`);
+      if (t) t.hit = { ...g.tabs[i] };
+    });
   }
 
   #unpress(): void {
-    this.#layer?.presses.remove('lobby:play');
-    this.#layer?.presses.remove('lobby:settings');
+    const layer = this.#layer;
+    if (!layer) return;
+    for (const id of ['lobby:play', 'lobby:settings', 'lobby:career', ...TABS.map((t) => `lobby:${t.folio}`)]) layer.presses.remove(id);
+    if (layer.drag === this.#drag) layer.drag = null;
+    this.#fingers.clear();
+  }
+
+  // ── the ship: orbit and pinch ──
+
+  /** A finger moved: one finger turns and tilts the camera, two pinch it closer or farther. */
+  #finger(id: number, x: number, y: number): void {
+    const f = this.#fingers.get(id), layer = this.#layer, o = this.#h.boom;
+    if (!f || !layer) return;
+    if (this.#fingers.size === 1) {
+      const l = layer.layout, [p0, p1] = LOBBY_ORBIT.pitch;
+      o.yaw -= ((x - f.x) / l.w) * LOBBY_ORBIT.swipe;
+      o.pitch = clamp(o.pitch + ((y - f.y) / l.h) * 1.2, p0, p1);
+    } else {
+      let other = f;
+      for (const [k, q] of this.#fingers) if (k !== id) other = q;
+      const d0 = Math.hypot(f.x - other.x, f.y - other.y), d1 = Math.hypot(x - other.x, y - other.y), [z0, z1] = LOBBY_ORBIT.zoom;
+      if (d0 > 8 && d1 > 8) o.zoom = clamp((o.zoom * d0) / d1, z0, z1);
+    }
+    f.x = x;
+    f.y = y;
   }
 
   // ── Play ──
 
   #pressPlay(): void {
     const s = (this.#lastNow - this.#born) / 1000;
-    if (this.#playAt >= 0 || this.#leftAt >= 0 || s < AT.play[0]) return;
+    if (this.#playAt >= 0 || this.#leftAt >= 0 || s < AT.banner[0]) return;
     const layer = this.#layer!;
     this.#playAt = this.#lastNow;
     this.#unpress();
-    // whatever was still inking is laid as it ends
-    if (!this.#inked) {
-      this.#inked = true;
-      layer.invalidate();
-    }
+    this.#inked = true;
     // the match made ready, and the Gale's chart, whole, its web and needle swung to the course, to unroll over her
     let c = this.#h.prepare() % TAU;
     if (c > Math.PI) c -= TAU;
@@ -344,127 +460,120 @@ export class Lobby {
 
   // ── drawing ──
 
-  /** One frame of the live plane: everything while it inks in or dries, then only the seals. */
+  /** One frame of the live plane: the instruments inking in or drying, or at rest with their press looks. */
   #frame(gc: CanvasRenderingContext2D, now: number): Rect[] | void {
     this.#lastNow = now;
-    const layer = this.#layer!, pen = layer.pen, s = (now - this.#born) / 1000;
+    const layer = this.#layer!, pen = layer.pen;
     if (this.#playAt >= 0) return this.#playing(gc, now);
+    const s = (now - this.#born) / 1000;
     const dry = this.#leftAt < 0 ? 0 : clamp((now - this.#leftAt) / 1000 / AT.dry);
     if (dry >= 1) {
       this.dispose();
       this.onGone?.();
       return;
     }
-    if (!this.#inked && this.#leftAt < 0 && s >= AT.done) {
-      this.#inked = true;
-      layer.invalidate();
+    if (!this.#inked && this.#leftAt < 0 && s >= AT.done) this.#inked = true;
+    pen.mood({ dry }, () => this.#draw(gc, pen, this.#inked ? Infinity : s, dryAlpha(dry), now));
+    return this.#inked && dry === 0 ? this.#rects() : undefined;
+  }
+
+  /** The career plate at (x, y): its slip, the level's ring and figure, and the rank's seal pressed beside it; the
+   *  ring's gold is drawn apart, over it. */
+  #plate(pen: Pen, gc: CanvasRenderingContext2D, x: number, y: number, badge: Seal, alpha: number, t: number, bt = t): void {
+    const g = this.#g!, c = this.#career, ring = { x: x + (g.ring.x - g.plate.x), y: y + (g.ring.y - g.plate.y), r: g.ring.r };
+    const bx = x + (g.badge.x - g.plate.x), by = y + (g.badge.y - g.plate.y);
+    paper(pen, slipPath(x, y, g.plate.w, g.plate.h, 5), { alpha: alpha * ease.out(part(t, 0, 0.3)), burn: 5 });
+    if (this.#roseLanded && t < 1) {
+      // the title's rose, landed here, dries away as the ring inks in over it
+      const s = (this.#lastNow - this.#born) / 1000, rt = s < TITLE_LANDS ? -1 : clamp((s - TITLE_LANDS) / AT.rose);
+      if (rt >= 0 && rt < 1) drawSprite(gc, cornerRose(this.#layer!), ring.x, ring.y, { scale: ring.r / this.#layer!.layout.rose.r, alpha: alpha * dryAlpha(rt) });
     }
-    if (this.#inked) return this.#seals(gc, now, s, 1);
-    pen.mood({ dry }, () => this.#scrapsAt(gc, pen, s));
-    this.#seals(gc, now, s, 1 - dry);
+    levelRing(pen, ring.x, ring.y, ring.r, c.level, alpha, part(t, 0.25, 1));
+    if (bt > 0) {
+      drawSeal(gc, badge, bx, by, { phase: 0.5, scale: 1 + 0.3 * (1 - ease.back(bt)), alpha: alpha * clamp(bt * 3) });
+      if (bt < 1) stamp(pen, bx, by, g.badge.r, bt, 7);
+    }
   }
 
-  /** A scrap laid at its place by t: it drops onto the view, a little large and faint at first. */
-  #scrap(gc: CanvasRenderingContext2D, b: Baked, c: Scrap, t: number, alpha: number): void {
-    if (t <= 0 || alpha <= 0) return;
-    const k = 1 + 0.06 * (1 - ease.out(t));
-    gc.save();
-    gc.translate(c.x, c.y);
-    gc.rotate(c.rot);
-    gc.scale(k, k);
-    drawBaked(gc, b, -b.w / 2, -b.h / 2, alpha * ease.out(clamp(t * 1.6)));
-    gc.restore();
+  /** The XP as a share of the level, and how far the ring's gold has come at s seconds. */
+  #fill(s: number): number {
+    const c = this.#career, f = c.need > 0 ? clamp(c.into / c.need) : 1;
+    return f * ease.out(span(s, AT.fill));
   }
 
-  /** The scraps and what is inked on them at s seconds (not the seals). */
-  #scrapsAt(gc: CanvasRenderingContext2D, pen: Pen, s: number): void {
-    const g = this.#g!, p = this.#paper!, a = 1 - pen.dry, layer = this.#layer!;
-    const laid = (at: number) => clamp((s - at) / AT.lay);
-    this.#scrap(gc, p.play, g.scraps.play, laid(AT.scraps.play), a);
-    this.#scrap(gc, p.settings, g.scraps.settings, laid(AT.scraps.settings), a);
-    this.#scrap(gc, p.career, g.scraps.career, laid(AT.scraps.career), a);
-    this.#scrap(gc, p.rose, g.scraps.rose, laid(AT.scraps.rose), a);
-    // the rose in its corner, its needle at north: the title's lands there, or it inks itself in
-    if (this.#roseLanded) {
-      if (s >= TITLE_LANDS) {
-        drawSprite(gc, cornerRose(layer), g.rose.x, g.rose.y, { alpha: a });
-        needle(pen, g.rose.x, g.rose.y, g.rose.r * 0.52, 0, 1);
+  /** Every instrument as inked at s seconds (Infinity: at rest), at `alpha`, with its press look. */
+  #draw(gc: CanvasRenderingContext2D, pen: Pen, s: number, alpha: number, now: number): void {
+    const g = this.#g!, sp = this.#sprites!, p = this.#press, rest = s === Infinity;
+    /** A sprite with its press look, or nothing while the pen still draws it. */
+    const pressed = (sprite: Sprite, x: number, y: number, sink: number, a = alpha) => {
+      const look = pressLook(sink);
+      drawSprite(gc, sprite, x, y + look.dy, { scale: look.scale, dark: look.dark, alpha: a });
+      return look;
+    };
+    // the wheel
+    const wt = span(s, AT.wheel);
+    if (rest || wt >= 1) pressed(sp.wheel, g.wheel.x, g.wheel.y, p.wheel.sink);
+    else roundButton(pen, g.wheel.x, g.wheel.y, g.wheel.r, prims('menu.wheel'), { alpha: alpha * ease.out(part(wt, 0, 0.3)), seed: 7 }, wt);
+    // PLAY, with the flash of light on its gold after the press
+    const bt = span(s, AT.banner), lt = span(s, AT.letters);
+    if (rest || (bt >= 1 && lt >= 1)) {
+      const fk = this.#playAt < 0 ? 1 : clamp((now - this.#playAt) / 1000 / AT.flash);
+      const k = 1 + 0.07 * Math.sin(Math.PI * fk), look = pressLook(p.play.sink);
+      drawSprite(gc, sp.play, g.play.x, g.play.y + look.dy, { scale: look.scale * k, dark: look.dark, alpha });
+      if (fk < 1) {
+        const cap = g.play.h * 0.5 * k;
+        word(pen, 'PLAY', g.play.x, g.play.y + look.dy + cap * 0.5, cap, { align: 'center', ink: 'white', seed: 3, alpha: alpha * 0.9 * (1 - ease.in(fk)) });
       }
-    } else {
-      const rt = span(s, AT.rose);
-      if (rt >= 1) drawSprite(gc, cornerRose(layer), g.rose.x, g.rose.y, { alpha: a });
-      else if (rt > 0) rose(pen, g.rose.x, g.rose.y, g.rose.r, ROSE, rt);
-      needle(pen, g.rose.x, g.rose.y, g.rose.r * 0.52, 0, span(s, AT.needle));
+    } else banner(pen, g.play.x, g.play.y, g.play.w, g.play.h, { alpha, seed: 23 }, bt, lt);
+    // the career plate, and the ring's gold over it, which moves with its press
+    const pt = span(s, AT.plate), kt = span(s, AT.badge);
+    let look = pressLook(0);
+    if (rest || (pt >= 1 && kt >= 1 && !(this.#roseLanded && s < TITLE_LANDS + AT.rose))) look = pressed(sp.plate, g.plate.x, g.plate.y + g.badge.r, p.plate.sink);
+    else this.#plate(pen, gc, g.plate.x, g.plate.y, this.#badge!, alpha, pt, kt);
+    const f = this.#fill(s);
+    if (f > 0) {
+      gc.save();
+      gc.translate(g.plate.x, g.plate.y + look.dy);
+      gc.scale(look.scale, look.scale);
+      gc.translate(-g.plate.x, -g.plate.y);
+      pen.mood({ dark: look.dark }, () => ringFill(pen, g.ring.x, g.ring.y, g.ring.r, f, alpha));
+      gc.restore();
     }
-    this.#drawCareer(pen, s);
+    // the tabs, one after another
+    const tt = span(s, AT.tabs);
+    TABS.forEach((tb, i) => {
+      const t = rest ? 1 : stagger(tt, i, TABS.length, 0.5), c = g.tabs[i];
+      if (t >= 1) pressed(sp.tabs[i], c.x, c.y, p.tabs[i].sink);
+      else tab(pen, c.x, c.y, c.r, prims(tb.cut), { alpha, seed: 11 + i }, t);
+    });
   }
 
-  /** The cartouche, flat, and the career in it, as inked at s seconds. */
-  #drawCareer(pen: Pen, s: number): void {
-    const g = this.#g!, c = this.#career, f = g.field, cart = g.cart;
-    cartouche(pen, cart.x, cart.y, cart.w, cart.h, { field: '#d8c39a', seed: 31, flat: true }, span(s, AT.cartouche));
-    // the level: rings round the roundel, one for each level up to six, the newest closing as the level fills
-    const rt = span(s, AT.rings);
-    if (rt > 0) rings(pen, f.sx, f.sy, f.sr + (g.phone ? 3 : 4), f.gap, Math.min(6, c.level), rt * Math.max(0.04, c.need > 0 ? c.into / c.need : 1));
-    roundel(pen, f.sx, f.sy, f.sr, c.illumination, c.level, span(s, AT.career));
-    // matches: tally marks, a figure once they are more than marks read at a glance
-    const tt = span(s, AT.tally);
-    if (tt > 0) {
-      if (c.matches <= 10) tally(pen, c.matches, f.tx, f.ty, f.th, tt, 'iron', 13);
-      else {
-        const w = figure(pen, String(c.matches), f.tx, f.ty, f.th, { seed: 5 }, tt);
-        tally(pen, 5, f.tx + w + f.th * 0.4, f.ty, f.th * 0.7, tt, 'iron', 13);
-      }
-    }
-    // wins: gilt stars, and past three a star and its figure
-    const wt = span(s, AT.stars), sr = f.th * 0.42, gap = sr * 2.4;
-    if (wt > 0) {
-      if (c.wins <= 3) for (let i = 0; i < c.wins; i++) star(pen, f.tx + sr + i * gap, f.st, sr, stagger(wt, i, Math.max(1, c.wins), 0.6));
-      else {
-        star(pen, f.tx + sr, f.st, sr, wt);
-        figure(pen, String(c.wins), f.tx + sr * 2.5, f.st + f.th * 0.42, f.th * 0.9, { seed: 9 }, wt);
-      }
-    }
+  /** Where the instruments draw, with room for their shadows and press looks. */
+  #rects(): Rect[] {
+    const g = this.#g!, P = PAD + 6, box = (x: number, y: number, w: number, h: number): Rect => ({ x: x - w / 2 - P, y: y - h / 2 - P, w: w + P * 2, h: h + P * 2 });
+    return [
+      box(g.plate.x, g.plate.y + g.badge.r, g.plate.w, g.plate.h + g.badge.r * 2),
+      box(g.wheel.x, g.wheel.y, g.wheel.r * 2, g.wheel.r * 2),
+      ...g.tabs.map((c) => box(c.x, c.y, c.r * 2, c.r * 2)),
+      box(g.play.x, g.play.y, g.play.w * 1.08, g.play.h * 1.1),
+    ];
   }
 
-  /** The two seals, pressed onto their scraps and answering a press; Play's leaf catching the light. Returns where
-   *  they drew. */
-  #seals(gc: CanvasRenderingContext2D, now: number, s: number, alpha: number): Rect[] {
-    const g = this.#g!, pen = this.#layer!.pen, out: Rect[] = [];
-    const box = (c: { x: number; y: number; r: number }, k: number) => out.push({ x: c.x - c.r * k, y: c.y - c.r * k, w: c.r * k * 2, h: c.r * k * 2 });
-    const st = span(s, AT.settings);
-    if (st > 0 && this.#setSeal) {
-      const look = pressLook(this.#set.sink);
-      drawSeal(gc, this.#setSeal, g.settings.x, g.settings.y + look.dy, { phase: 0.5, press: this.#set.sink, scale: 1 + 0.3 * (1 - ease.back(st)), alpha: alpha * clamp(st * 3) });
-      if (st < 1) stamp(pen, g.settings.x, g.settings.y, g.settings.r, st, 7);
-    }
-    box(g.settings, 1.6);
-    const pt = span(s, AT.play);
-    if (pt > 0 && this.#playSeal) {
-      drawSeal(gc, this.#playSeal, g.play.x, g.play.y, { phase: 0.5 + 0.5 * Math.sin(now / 1400), press: this.#play.sink, scale: 1 + 0.3 * (1 - ease.back(pt)), alpha: alpha * clamp(pt * 3) });
-      const sk = (s - AT.play[1]) / 0.45;
-      if (sk > 0 && sk < 1) stamp(pen, g.play.x, g.play.y, g.play.r, sk, 5);
-    }
-    box(g.play, 1.6);
-    return out;
-  }
-
-  /** Play: the seal stamps, the Gale's chart unrolls over her ship from the right, the match begins under it, and its
+  /** Play: the gold flashes, the Gale's chart unrolls over her ship from the right, the match begins under it, and its
    *  window opens on the planet. */
   #playing(gc: CanvasRenderingContext2D, now: number): void {
-    const layer = this.#layer!, g = this.#g!, pen = layer.pen, s = (now - this.#playAt) / 1000;
+    const layer = this.#layer!, pen = layer.pen, s = (now - this.#playAt) / 1000;
     if (this.#openAt < 0) {
-      this.#seals(gc, now, Infinity, 1);
-      if (s < AT.stamp) stamp(pen, g.play.x, g.play.y, g.play.r * 1.05, s / AT.stamp, 11);
+      // the press, no longer routed, still springs back under the lettering
+      this.#press.play.step(Math.min(0.1, Math.max(0, (now - this.#lastNow) / 1000) || 1 / 30));
+      this.#draw(gc, pen, Infinity, 1, now);
       const u = span(s, AT.unroll);
       if (u < 1) {
         unroll(gc, pen.paper, this.#chart!, -BLEED, -BLEED, u, 'left', layer.dpr);
         return;
       }
-      // down over her: laid in the page under the Gale's, the scraps taken off, and the match begun under it
+      // down over her: laid in the page under the Gale's, the instruments taken off, and the match begun under it
       this.#chartEl = this.#planet!.place(this.#host, this.#chart!, 1);
-      this.#covered = true;
-      layer.invalidate();
       this.#openAt = now;
       this.#h.begin();
       return;

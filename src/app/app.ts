@@ -41,7 +41,7 @@ import { Tips } from './tips.ts';
 import { Shell, type ScreenView, type Transition } from '../ui/shell.ts';
 import { ChartLayer, traceCoasts, type Coasts, type Colours, type Illumination, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
-import { LOBBY_OPENS, Lobby, type CareerMarks } from '../screens/lobby.ts';
+import { LOBBY_OPENS, Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
 import { DIVE, Gale, courseBearing, diveView, galeLook } from '../screens/gale.ts';
 import { HudDisc } from '../screens/hud.ts';
 import { page } from '../ui/screens/frame.ts';
@@ -118,6 +118,8 @@ export class App {
   /** The title, the lobby, the Gale and the HUD's disc on the chart, while each is up or leaving. */
   private title: Title | null = null;
   private lobby: Lobby | null = null;
+  /** Where a finger has taken the lobby's camera off its resting view. */
+  private readonly boom: Orbit = { yaw: 0, pitch: 0, zoom: 1 };
   private gale: Gale | null = null;
   private disc: HudDisc | null = null;
   /** How far the world has loaded, 0..1. */
@@ -760,7 +762,7 @@ export class App {
     return { colour: m.colours[0], sigil: { id: m.emblem } };
   }
 
-  /** The career as the lobby's cartouche draws it. */
+  /** The career as the lobby's plate draws it. */
   private careerMarks(): CareerMarks {
     const c = this.career.career, l = levelView(c), s = careerStats(c);
     return { level: l.level, into: l.into, need: l.need, illumination: TIER_ILLUMINATION[rankView(c).tier] ?? 'ink', matches: s.matches, wins: s.wins };
@@ -773,8 +775,8 @@ export class App {
     coasts: () => (this.coasts ??= traceCoasts(heightAt)),
   };
 
-  /** Puts the lobby on the chart, its scraps laid as the title's sheet rolls off them and the title's rose landing in
-   *  its corner. */
+  /** Puts the lobby on the chart, its instruments laid as the title's sheet rolls off them and the title's rose landing
+   *  on its plate. Until the folios are drawn on the chart (issue #54), its tabs open the DOM's. */
   private openLobby(from: ScreenName): void {
     this.lobby?.dispose();
     const l = new Lobby(this.chartHost, {
@@ -790,6 +792,9 @@ export class App {
         if (s) this.begin(s);
       },
       settings: () => this.go('settings'),
+      rank: () => this.go('rank'),
+      open: (folio) => this.go(folio),
+      boom: this.boom,
     }, { roseLanded: from === 'title' });
     l.onGone = () => {
       if (this.lobby === l) this.lobby = null;
@@ -995,21 +1000,24 @@ export class App {
   private drawWorld(f: Frame): void {
     const stage = this.stage, actors = this.actors;
     if (!stage || !actors) return;
+    if (!this.lobby?.held) relaxOrbit(this.boom, f.realDt);
     if (this.session) {
       this.matchFrame(this.session, f, stage, actors);
       return;
     }
     const v = this.view, sv = sceneStage(v, f.clock);
     sunDirection(sv.hour, sv.tilt, this.sun);
-    // at anchor the camera stands off her bow on the quarter and drifts slowly round her and back; in the locker the
-    // boom swings out, so the whole ship stands clear of the pane on the right
+    // at anchor the camera stands off her bow on the quarter and drifts slowly round her and back, a finger turning it
+    // about her and pinching it closer; in the locker the boom swings out, so the whole ship stands clear of the pane on
+    // the right
     const locker = this.screen === 'locker';
     if (stage.rig && !this.fixed) {
-      const k = Math.min(1, f.realDt * 3), c = LOBBY_CAMERA;
+      const k = Math.min(1, f.realDt * 3), c = LOBBY_CAMERA, b = this.boom;
       stage.rig.shoulder += ((locker ? 7.5 : 0) - stage.rig.shoulder) * k;
-      stage.rig.dist += ((locker ? c.dist - 6 : c.dist) - stage.rig.dist) * k;
-      stage.rig.pitch = c.pitch;
-      stage.rig.yaw = Math.PI - c.quarter + c.drift * Math.sin((f.clock / c.period) * Math.PI * 2);
+      // a pinch answers at once; only the locker's swing is eased
+      stage.rig.dist += ((locker ? c.dist - 6 : c.dist) * b.zoom - stage.rig.dist) * (this.lobby?.held ? 1 : k);
+      stage.rig.pitch = c.pitch + b.pitch;
+      stage.rig.yaw = Math.PI - c.quarter + c.drift * Math.sin((f.clock / c.period) * Math.PI * 2) + b.yaw;
     }
     const worn = wornLook(this.career.career), p = locker ? this.preview : null;
     const look = cosmeticsOf(p ? { ...worn, [p.kind]: p.id } : worn);
