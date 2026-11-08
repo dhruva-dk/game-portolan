@@ -7,12 +7,9 @@ import { EMBLEMS, LEGACY_EMBLEMS } from '../cosmetics/emblems.ts';
 import type { CosmeticIds } from './view.ts';
 
 /** The career's sail patterns and figureheads, onto the shader's six patterns and the model's seven heads. */
-const CAREER_PATTERNS: Record<string, number> = {
-  plain: 0, singleStripe: 3, twinBands: 1, quartered: 4, chevron: 5, waveCrest: 2, tideLines: 1, laurelEdge: 2, forkedLightning: 5,
-};
+const CAREER_PATTERNS: Record<string, number> = { plain: 0, twinBands: 1, laurelEdge: 2, singleStripe: 3, quartered: 4, chevron: 5 };
 const CAREER_HEADS: Record<string, Figurehead> = {
-  plainStem: 'none', heron: 'gull', stormPetrel: 'gull', narwhalTusk: 'ram', coiledEel: 'orb', ammonite: 'orb', coralAntler: 'star',
-  iceShard: 'star', kelpCrown: 'sun', whaleFluke: 'whale', leapingDolphin: 'whale', emberBloom: 'sun', sunburst: 'sun', greatWhale: 'whale',
+  plainStem: 'none', heron: 'gull', greatWhale: 'whale', coralAntler: 'star', ammonite: 'orb', narwhalTusk: 'ram', sunburst: 'sun',
 };
 
 const hex = (s: string | undefined): number | null => (s && /^#[0-9a-f]{6}$/i.test(s) ? parseInt(s.slice(1), 16) : null);
@@ -107,7 +104,7 @@ export function lookOf(c: CosmeticIds): Look {
   }
   const wc = hex(c.wake ? cosmetic(c.wake)?.colour : undefined);
   if (wc !== null) {
-    const plain = c.wake === 'foam' || c.wake === 'bubbles';
+    const plain = c.wake === 'foam';
     Object.assign(wake, { color: plain ? 0x7fe7ff : wc, glow: plain ? 0.6 : 1.3, sparkle: !plain, wisp: plain ? 0x7fe7ff : mixHex(wc, 0xffffff, 0.25) });
   }
   const emblem = c.emblem === 'none' ? null : !c.emblem ? 'gull' : c.emblem in EMBLEMS ? c.emblem : LEGACY_EMBLEMS[c.emblem] ?? 'gull';

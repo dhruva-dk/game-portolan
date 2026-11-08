@@ -68,6 +68,10 @@ export interface Pressable {
    * holds until this). An 'up' pressable acts on release and has no use for it.
    */
   release?: (x: number, y: number) => void;
+  /** The finger moved while it holds this (a bar follows it). */
+  move?: (x: number, y: number) => void;
+  /** It lies on something that scrolls: a finger that travels before it lifts lets this go and drags instead. */
+  scrolls?: boolean;
   disabled?: boolean;
 }
 
@@ -115,6 +119,11 @@ export class Presses {
       return true;
     }
     return false;
+  }
+
+  /** What a finger is holding, if it holds anything. */
+  holding(pointer: number): Pressable | undefined {
+    return this.#held.get(pointer);
   }
 
   /** A finger lifted (or was cancelled, `inside` false). */

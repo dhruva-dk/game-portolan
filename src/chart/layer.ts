@@ -47,6 +47,9 @@ export interface DragSurface {
   up(id: number, x: number, y: number): void;
 }
 
+/** How far a finger on something that scrolls travels before it is a drag and not a press, CSS pixels. */
+const SLOP = 10;
+
 /** Draws a sprite with its anchor at (x, y); `dark` deepens it (the sprite multiplied over itself, for a press). */
 export function drawSprite(g: CanvasRenderingContext2D, s: Sprite, x: number, y: number, o: { alpha?: number; scale?: number; rot?: number; dark?: number } = {}): void {
   const a = o.alpha ?? 1;
@@ -226,11 +229,14 @@ export class ChartLayer {
       const r = this.el.getBoundingClientRect();
       return [e.clientX - r.left, e.clientY - r.top] as const;
     };
-    // the fingers the drag surface took, and the surface that took them
+    // the fingers the drag surface took, and the surface that took them; where the others landed, for one that leaves
+    // what it pressed on something that scrolls
     const dragging = new Map<number, DragSurface>();
+    const landed = new Map<number, readonly [number, number]>();
     const down = (e: PointerEvent) => {
       const [x, y] = at(e);
       if (this.presses.down(e.pointerId, x, y)) {
+        landed.set(e.pointerId, [x, y]);
         e.stopPropagation();
         e.preventDefault();
       } else if (this.drag) {
@@ -239,14 +245,26 @@ export class ChartLayer {
       }
     };
     const move = (e: PointerEvent) => {
-      const d = dragging.get(e.pointerId);
-      if (!d) return;
-      const [x, y] = at(e);
-      d.move(e.pointerId, x, y);
+      const [x, y] = at(e), d = dragging.get(e.pointerId);
+      if (d) {
+        d.move(e.pointerId, x, y);
+        return;
+      }
+      const p = this.presses.holding(e.pointerId), from = landed.get(e.pointerId);
+      if (!p || !from) return;
+      p.move?.(x, y);
+      if (!p.scrolls || !this.drag || Math.hypot(x - from[0], y - from[1]) < SLOP) return;
+      // it was a drag all along: the press is let go without acting, and the surface has the finger from where it landed
+      this.presses.up(e.pointerId, x, y, true);
+      landed.delete(e.pointerId);
+      dragging.set(e.pointerId, this.drag);
+      this.drag.down(e.pointerId, from[0], from[1]);
+      this.drag.move(e.pointerId, x, y);
     };
     const up = (e: PointerEvent) => {
       const [x, y] = at(e);
       this.presses.up(e.pointerId, x, y, e.type === 'pointercancel');
+      landed.delete(e.pointerId);
       const d = dragging.get(e.pointerId);
       if (!d) return;
       dragging.delete(e.pointerId);

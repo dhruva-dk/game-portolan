@@ -1,7 +1,9 @@
 // The cosmetics catalogue: sail colours, sail patterns, hull paints, figureheads, emblems and wake trails.
 // Plain kinds, evocative names. Each has one unlock rule: a level, or a rank tier (the show-off ones).
 // Nothing is bought: there is no shop and no currency between matches.
-// Ids are stable: saves and captains refer to them. Add to the end of a kind; never rename or reuse an id.
+// Ids are stable: saves and captains refer to them. Add to the end of a kind; never rename or reuse an id. No two items
+// of a kind look alike on the ship or in the locker: a sail pattern for each of the shader's six, a figurehead for each
+// of the model's seven. Ids cut for looking like another are in RETIRED.
 // Figureheads and emblems are natural forms and spirits: never people, never faces. Emblem ids are the player
 // charges drawn in src/render/cosmetics/emblems.ts (PLAYER_EMBLEMS).
 import { TIER } from './ranks.ts';
@@ -39,26 +41,17 @@ const kind = (k: CosmeticKind, items: readonly (readonly [id: string, name: stri
 export const COSMETICS: readonly Cosmetic[] = [
   ...kind('sailColour', [
     ['bareCanvas', 'Bare Canvas', 'Undyed sailcloth.', at(1), '#e8dcc0'],
-    ['seafoam', 'Seafoam', 'Pale green-white.', at(1), '#cfe8dc'],
     ['duskRose', 'Dusk Rose', 'Soft evening pink.', at(2), '#d89aa0'],
     ['kelpGold', 'Kelp Gold', 'Olive gold.', at(4), '#b59a3c'],
     ['emberRed', 'Ember Red', 'Deep glowing red.', at(6), '#b8322a'],
     ['glacierBlue', 'Glacier Blue', 'Milky turquoise.', at(9), '#7fc3c9'],
     ['mistwoodMoss', 'Mistwood Moss', 'Dark blue-green.', at(12), '#2f5a4c'],
-    ['narrowsOchre', 'Narrows Ochre', 'Warm sandstone ochre.', at(15), '#c4823a'],
-    ['cherryPetal', 'Cherry Petal', 'Blossom pink.', at(18), '#f2b8c6'],
-    ['basaltBlack', 'Basalt Black', 'Near-black grey.', at(21), '#26282b'],
-    ['jadeWater', 'Jade Water', 'Pale jade.', at(24), '#8fcfb0'],
     ['coralBloom', 'Coral Bloom', 'Coral orange-pink.', at(27), '#f07a5a'],
-    ['flameTree', 'Flame Tree', 'Hot orange-red.', at(30), '#e0441c'],
     ['weepingSapphire', 'Weeping Sapphire', 'Deep sapphire blue.', at(33), '#1f4f9a'],
-    ['mangroveTea', 'Mangrove Tea', 'Tea brown.', at(38), '#7a5530'],
-    ['maelstromNavy', 'Maelstrom Navy', 'Storm-dark navy.', at(44), '#18233f'],
     ['auroraGreen', 'Aurora Green', 'Shimmering polar green.', at(50), '#3fe0a0'],
     ['bronzeLeaf', 'Bronze Leaf', 'Burnished bronze. For reaching Bronze.', rank(TIER.bronze), '#a86b32'],
     ['silverMist', 'Silver Mist', 'Bright silver. For reaching Silver.', rank(TIER.silver), '#c9ced6'],
     ['goldenHour', 'Golden Hour', 'Shining gold. For reaching Gold.', rank(TIER.gold), '#e8b830'],
-    ['platinumDawn', 'Platinum Dawn', 'Pale platinum with a dawn blush. For reaching Platinum.', rank(TIER.platinum), '#e4e2ec'],
     ['diamondFrost', 'Diamond Frost', 'Glittering ice blue. For reaching Diamond.', rank(TIER.diamond), '#bfeaff'],
     ['abyssalInk', 'Abyssal Ink', 'Black-blue with a deep sheen. For reaching Admiral.', rank(TIER.admiral), '#0b1430'],
     ['livingFlame', 'Living Flame', 'Gold fading to red, as if alight. For reaching Legend.', rank(TIER.legend), '#ff7a18'],
@@ -69,17 +62,7 @@ export const COSMETICS: readonly Cosmetic[] = [
     ['twinBands', 'Twin Bands', 'Two narrow bands.', at(5)],
     ['quartered', 'Quartered', 'The sail split into four.', at(7)],
     ['chevron', 'Chevron', 'A V pointing down the sail.', at(11)],
-    ['waveCrest', 'Wave Crest', 'A curling wave along the foot.', at(14)],
-    ['spiral', 'Spiral', 'A spiral at the centre of the sail.', at(17)],
-    ['scales', 'Scales', 'Overlapping fish scales.', at(20)],
-    ['ripples', 'Ripples', 'Rings spreading from one corner.', at(23)],
-    ['starfield', 'Starfield', 'Scattered small stars.', at(26)],
-    ['feathered', 'Feathered', 'Long feather shapes.', at(29)],
-    ['forkedLightning', 'Forked Lightning', 'A bolt across the sail.', at(35)],
-    ['tideLines', 'Tide Lines', 'Fine wavy lines like a sand flat.', at(41)],
     ['laurelEdge', 'Laurel Edge', 'A leaf border. For reaching Gold.', rank(TIER.gold)],
-    ['diamondLattice', 'Diamond Lattice', 'A glittering diamond grid. For reaching Diamond.', rank(TIER.diamond)],
-    ['crownOfStars', 'Crown of Stars', 'A ring of bright stars. For reaching Legend.', rank(TIER.legend)],
   ]),
   ...kind('hullPaint', [
     ['driftwood', 'Driftwood', 'Sun-bleached grey wood.', at(1), '#9a8f80'],
@@ -89,14 +72,9 @@ export const COSMETICS: readonly Cosmetic[] = [
     ['verdigris', 'Verdigris', 'Blue-green patina.', at(10), '#4f9a88'],
     ['pineBark', 'Pine Bark', 'Dark red-brown.', at(13), '#5a3423'],
     ['sandbar', 'Sandbar', 'Warm amber sand.', at(16), '#d7b277'],
-    ['lavaRock', 'Lava Rock', 'Black with red cracks.', at(19), '#2a1512'],
-    ['moonstone', 'Moonstone', 'Milky blue-white.', at(22), '#d6dfe8'],
-    ['ashGrey', 'Ash Grey', 'Soft volcanic grey.', at(25), '#77736e'],
-    ['cedarRed', 'Cedar Red', 'Rich red wood.', at(28), '#8c3b2a'],
     ['pearl', 'Pearl', 'Lustrous cream.', at(32), '#efe6d6'],
     ['kelpBronze', 'Kelp Bronze', 'Olive bronze.', at(36), '#6e5f2c'],
     ['deepIndigo', 'Deep Indigo', 'Night blue.', at(42), '#232a5c'],
-    ['emberGlaze', 'Ember Glaze', 'Dark red that glows at night.', at(48), '#5c1410'],
     ['quicksilver', 'Quicksilver', 'Mirror silver. For reaching Silver.', rank(TIER.silver), '#c6ccd4'],
     ['sunlitGold', 'Sunlit Gold', 'Gleaming gold. For reaching Gold.', rank(TIER.gold), '#d9a520'],
     ['stormGlass', 'Storm Glass', 'Dark glass with moving cloud. For reaching Admiral.', rank(TIER.admiral), '#2d3b4a'],
@@ -104,16 +82,9 @@ export const COSMETICS: readonly Cosmetic[] = [
   ...kind('figurehead', [
     ['plainStem', 'Plain Stem', 'A bare curved stem.', at(1)],
     ['heron', 'Heron', 'A heron with its neck outstretched.', at(3)],
-    ['stormPetrel', 'Storm Petrel', 'A small seabird skimming the waves.', at(6)],
     ['narwhalTusk', 'Narwhal Tusk', 'A long spiral tusk.', at(9)],
-    ['coiledEel', 'Coiled Eel', 'An eel wound around the stem.', at(12)],
     ['ammonite', 'Ammonite', 'A great spiral shell.', at(15)],
     ['coralAntler', 'Coral Antler', 'Branching red coral.', at(19)],
-    ['iceShard', 'Ice Shard', 'A blade of blue ice.', at(23)],
-    ['kelpCrown', 'Kelp Crown', 'Kelp fronds streaming back.', at(27)],
-    ['whaleFluke', 'Whale Fluke', 'A whale tail rising.', at(31)],
-    ['leapingDolphin', 'Leaping Dolphin', 'A dolphin mid-leap.', at(36)],
-    ['emberBloom', 'Ember Bloom', 'A glowing flame-tree flower.', at(43)],
     ['sunburst', 'Sunburst', 'Rays of gold. For reaching Platinum.', rank(TIER.platinum)],
     ['greatWhale', 'Great Whale', 'A breaching whale. For reaching Legend.', rank(TIER.legend)],
   ]),
@@ -133,21 +104,28 @@ export const COSMETICS: readonly Cosmetic[] = [
   ]),
   ...kind('wake', [
     ['foam', 'Foam', 'Plain white foam.', at(1), '#ffffff'],
-    ['bubbles', 'Bubbles', 'A stream of bubbles.', at(5), '#d8f2ff'],
     ['petalTrail', 'Petal Trail', 'Cherry petals on the water.', at(11), '#f6c2cf'],
     ['glowingPlankton', 'Glowing Plankton', 'Blue light that shows at night.', at(18), '#3cc8ff'],
-    ['iceCrystals', 'Ice Crystals', 'Glittering frost.', at(26), '#e2f6ff'],
-    ['emberSparks', 'Ember Sparks', 'Drifting sparks.', at(34), '#ff8a3a'],
-    ['rainbowSpray', 'Rainbow Spray', 'Spray that throws a rainbow.', at(40), '#ffe27a'],
     ['bronzeRipple', 'Bronze Ripple', 'Burnished ripples. For reaching Bronze.', rank(TIER.bronze), '#c08040'],
     ['silverWake', 'Silver Wake', 'A shining silver trail. For reaching Silver.', rank(TIER.silver), '#dfe4ea'],
     ['gildedWake', 'Gilded Wake', 'A trail of gold light. For reaching Gold.', rank(TIER.gold), '#ffd24a'],
-    ['platinumComet', 'Platinum Comet', 'A pale comet tail. For reaching Platinum.', rank(TIER.platinum), '#f2f0ff'],
     ['diamondDust', 'Diamond Dust', 'Sparkling ice dust. For reaching Diamond.', rank(TIER.diamond), '#c8f0ff'],
     ['auroraWake', 'Aurora Wake', 'Green and violet ribbons. For reaching Admiral.', rank(TIER.admiral), '#7affc0'],
     ['wakeOfLegends', 'Wake of Legends', 'A blazing trail of fire. For reaching Legend.', rank(TIER.legend), '#ff5a1a'],
   ]),
 ];
+
+/** Ids a saved career can still be wearing that have gone from the catalogue, each to the item it looked most like. */
+export const RETIRED: Readonly<Record<string, string>> = {
+  seafoam: 'bareCanvas', cherryPetal: 'duskRose', narrowsOchre: 'kelpGold', jadeWater: 'glacierBlue', flameTree: 'emberRed',
+  basaltBlack: 'abyssalInk', mangroveTea: 'bronzeLeaf', maelstromNavy: 'abyssalInk', platinumDawn: 'silverMist',
+  waveCrest: 'laurelEdge', spiral: 'plain', scales: 'twinBands', ripples: 'plain', starfield: 'plain', feathered: 'chevron',
+  forkedLightning: 'chevron', tideLines: 'twinBands', diamondLattice: 'quartered', crownOfStars: 'laurelEdge',
+  lavaRock: 'pitchBlack', moonstone: 'quicksilver', ashGrey: 'driftwood', cedarRed: 'rustBloom', emberGlaze: 'pineBark',
+  stormPetrel: 'heron', coiledEel: 'ammonite', iceShard: 'coralAntler', kelpCrown: 'sunburst', whaleFluke: 'greatWhale',
+  leapingDolphin: 'greatWhale', emberBloom: 'sunburst', bubbles: 'foam', iceCrystals: 'diamondDust', emberSparks: 'wakeOfLegends',
+  rainbowSpray: 'gildedWake', platinumComet: 'silverWake',
+};
 
 export const cosmetic = (id: string): Cosmetic | undefined => COSMETICS.find((c) => c.id === id);
 

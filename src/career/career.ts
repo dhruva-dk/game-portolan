@@ -7,7 +7,7 @@ import { hash32, rngFrom, rngInt } from '../sim/math.ts';
 import { REGION_COUNT } from '../sim/world/index.ts';
 import { CAPTAINS, LEAGUE_SIZE } from './captains.ts';
 import { decode, encode, hash64, int, list, rec, str, type Format, type Value } from './codec.ts';
-import { COSMETICS, STARTER_LOOK, cosmetic, isUnlocked, type Cosmetic, type Look } from './cosmetics.ts';
+import { COSMETICS, RETIRED, STARTER_LOOK, cosmetic, isUnlocked, type Cosmetic, type Look } from './cosmetics.ts';
 import { newLearned } from './habits.ts';
 import { ABILITY_LEVEL, abilityUnlocked, levelOf } from './levels.ts';
 import { rankOf, type Rank } from './ranks.ts';
@@ -126,9 +126,13 @@ export function equipCosmetic(c: Career, id: string): Career {
   return next;
 }
 
-/** The look a career wears, each slot checked: anything unknown or locked falls back to the starter. */
+/** The look a career wears, each slot checked: an id since cut is read as the item it became, and anything unknown or
+ *  locked falls back to the starter. */
 export function wornLook(c: Career): Look {
   const level = careerLevel(c), out: Look = { ...STARTER_LOOK };
-  for (const k of COSMETICS) if (c.look[k.kind] === k.id && isUnlocked(k, level, c.bestTier)) out[k.kind] = k.id;
+  for (const k of COSMETICS) {
+    const worn = c.look[k.kind];
+    if ((RETIRED[worn] ?? worn) === k.id && isUnlocked(k, level, c.bestTier)) out[k.kind] = k.id;
+  }
   return out;
 }
