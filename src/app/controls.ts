@@ -1,7 +1,7 @@
 // Thumbs, mouse and keys, folded into one set of intents each frame. Ported from the rewrite's Controls (src/ui.ts):
 // a floating stick under the left thumb, a drag on the right to look, pointer lock and the left button for the
-// mouse, and keys. The HUD's buttons press through `press`. The session turns these intents into the ship's input.
-import { el } from '../ui/parts/index.ts';
+// mouse, and keys. The HUD's buttons press through `press`; the chart draws the stick from `stickView`. The session
+// turns these intents into the ship's input.
 
 /** One frame's intents. The look is the turn since the last read; the edges are true once, on the read after the press. */
 export interface Intents {
@@ -41,6 +41,11 @@ export class Controls {
   invert = false;
   /** Left-handed: the stick under the right thumb and the look on the left. */
   lefty = false;
+  /**
+   * The stick as the chart draws it, CSS pixels: whether a thumb is on it, where the thumb set it down (its ring's
+   * centre), how far the nub is pushed from there, and the ring's radius.
+   */
+  readonly stickView = { active: false, x: 0, y: 0, dx: 0, dy: 0, r: STICK_RADIUS };
   private readonly keys = new Set<string>();
   private readonly held = new Set<Press>();
   private readonly edges = new Set<Press>();
@@ -57,8 +62,6 @@ export class Controls {
   private readonly last = new Map<number, { x: number; y: number }>();
   private origin = { x: 0, y: 0 };
   private readonly layer: HTMLElement;
-  private readonly stickEl: HTMLElement;
-  private readonly knob: HTMLElement;
   private readonly out: Intents = {
     stick: { x: 0, y: 0 }, look: { x: 0, y: 0 }, idle: 99, fire: false, dive: false, gust: false, reload: false, ability: false,
     drop: false, take: false, select: -1, swap: -1, hail: -1, throttle: 1,
@@ -68,12 +71,6 @@ export class Controls {
   constructor(layer: HTMLElement) {
     this.layer = layer;
     layer.style.touchAction = 'none';
-    this.stickEl = el('app-stick', layer);
-    this.stickEl.style.cssText = 'position:absolute;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;'
-      + 'border:2px solid rgba(255,248,230,0.35);background:rgba(20,16,10,0.18);opacity:0;transition:opacity .2s;pointer-events:none;';
-    this.knob = el('app-stick__knob', this.stickEl);
-    this.knob.style.cssText = 'position:absolute;left:37px;top:37px;width:50px;height:50px;border-radius:50%;'
-      + 'background:rgba(255,248,230,0.55);box-shadow:0 2px 6px rgba(0,0,0,0.35);';
     layer.addEventListener('pointerdown', (e) => this.down(e));
     layer.addEventListener('pointermove', (e) => this.move(e));
     layer.addEventListener('pointerup', (e) => this.up(e));
@@ -141,7 +138,7 @@ export class Controls {
     this.stickId = this.lookId = -1;
     this.stick.x = this.stick.y = 0;
     this.last.clear();
-    this.stickEl.style.opacity = '0';
+    this.stickView.active = false;
   }
 
   /** This frame's intents; the look and the edges are spent by reading them. */
@@ -231,7 +228,7 @@ export class Controls {
       this.stickId = e.pointerId;
       this.origin = { x: e.clientX, y: e.clientY };
       this.place(e.clientX, e.clientY, 0, 0);
-      this.stickEl.style.opacity = '1';
+      this.stickView.active = true;
     } else if (this.lookId < 0) {
       this.lookId = e.pointerId;
       this.last.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -268,7 +265,7 @@ export class Controls {
     if (e.pointerId === this.stickId) {
       this.stickId = -1;
       this.stick.x = this.stick.y = 0;
-      this.stickEl.style.opacity = '0';
+      this.stickView.active = false;
     }
     if (e.pointerId === this.lookId) {
       this.lookId = -1;
@@ -276,9 +273,11 @@ export class Controls {
     }
   }
 
-  private place(x: number, y: number, kx: number, ky: number): void {
-    this.stickEl.style.left = `${x}px`;
-    this.stickEl.style.top = `${y}px`;
-    this.knob.style.transform = `translate(${kx}px, ${ky}px)`;
+  private place(x: number, y: number, dx: number, dy: number): void {
+    const v = this.stickView;
+    v.x = x;
+    v.y = y;
+    v.dx = dx;
+    v.dy = dy;
   }
 }
