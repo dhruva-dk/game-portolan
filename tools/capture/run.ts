@@ -9,6 +9,7 @@
 //   npm run capture -- ui [--device ipad,ipadSmall,iphone,iphoneSmall] [--only a,b]  transition strips for each screen change (all four by default)
 //   npm run capture -- layout [--device …] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
 //   npm run capture -- perf                               frame time, triangles and draw calls per region
+//   npm run capture -- fight [--seconds n]                #8's frozen fight: the median GPU time of each pass (12 s by default)
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
 //   npm run capture -- kit [--device ipad,iphone] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
 //   npm run capture -- title [--device ipad,iphone]      the title inking in, its needle, a real tap and the roll-off to the lobby
@@ -26,6 +27,7 @@ import { moment, MOMENTS } from './moment.ts';
 import { ui, TRANSITIONS } from './ui.ts';
 import { perf } from './perf.ts';
 import { shapes } from './shape.ts';
+import { fight } from './fight.ts';
 import { layout, SCREENS } from './layout.ts';
 import { kit } from './kit.ts';
 import { title } from './title.ts';
@@ -43,6 +45,7 @@ const { values: a, positionals } = parseArgs({
     seed: { type: 'string', default: '7' },
     dpr: { type: 'string' },
     every: { type: 'string', default: '4' },
+    seconds: { type: 'string', default: '12' },
     headed: { type: 'boolean', default: false },
     save: { type: 'boolean', default: false },
   },
@@ -52,7 +55,7 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr ?? 1), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, shape, kit, title, lobby, gale');
+  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, fight, shape, kit, title, lobby, gale');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
   console.log(`layout screens: ${SCREENS.map((s) => s.name).join(', ')}`);
@@ -71,6 +74,7 @@ try {
     case 'ui': await ui(r, { ...opts, device: a.device, only: a.only }); break;
     case 'layout': await layout(r, { ...opts, device: a.device, only: a.only }); break;
     case 'perf': await perf(r, opts); break;
+    case 'fight': await fight(r, { ...opts, seconds: Number(a.seconds) }); break;
     case 'shape': await shapes(r, { ...opts, save: !!a.save }); break;
     case 'title': await title(r, { ...opts, device: a.device }); break;
     case 'lobby': await lobby(r, { ...opts, device: a.device }); break;

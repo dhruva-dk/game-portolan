@@ -6,10 +6,11 @@ import { installHook } from './hook.ts';
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const overlay = document.getElementById('ui') as HTMLElement;
-// the native app has no query: VITE_AUTOPLAY=1 at build time stands in for ?autoplay
+// the native app has no query: VITE_AUTOPLAY=1 and VITE_FIXTURE=fight at build time stand in for ?autoplay and ?fight
 const app = new App(canvas, overlay, {
   capture: q.has('capture'), perfLog: q.has('perflog') || Capacitor.isNativePlatform(),
   autoplay: q.has('autoplay') || import.meta.env.VITE_AUTOPLAY === '1',
+  fight: q.has('fight') || import.meta.env.VITE_FIXTURE === 'fight',
 });
 installHook(app);
 app.start();

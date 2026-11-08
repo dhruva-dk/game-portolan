@@ -78,6 +78,8 @@ export function installHook(app: App) {
     /** Starts a match: { seed, skipGale, autopilot, script: [[tick, input], ...] }. */
     play: (o: PlayOptions = {}) => app.play(o),
     dive: () => app.dive(),
+    /** #8's frozen fight: the frame every budget is measured on. */
+    fight: () => app.fight(),
     /** Steps n ticks now, without drawing; returns how many ran. */
     step: (n: number) => app.stepTicks(n),
     /** Steps n ticks, then draws one frame of n ticks' time. */
@@ -133,6 +135,8 @@ export function installHook(app: App) {
     /** The last frame's shape as the frame log prints it (every pass with `passes`), and the screen's steady frame. */
     shape: (passes = true) => shape.table(app.screen, undefined, passes),
     shapeSteady: () => shape.steady(),
+    /** The last timed frame's GPU milliseconds by pass, as { label, system, gpu }; null until one is timed. */
+    timed: () => shape.timed?.passes.map((p) => ({ label: p.label, system: p.system, gpu: p.gpu })) ?? null,
     /** The textures the device holds, the heaviest kinds first, and the whole memory line. */
     textures: (top = 40) => `${shape.memory}\n${shape.inventory(top)}`,
   };

@@ -403,3 +403,34 @@ export const MOMENTS: readonly MomentScript[] = [
 /** Every ship but the player's held still with furled sails, as step's inputs. */
 export const heldStill = (): (ShipInput | null)[] =>
   Array.from({ length: SHIPS }, (_, i) => (i === PLAYER ? null : { ...idleInput(), throttle: 0 }));
+
+/** Where the captains of the frozen fight lie: metres ahead of the player and to starboard. */
+const FIGHT_AT = [[45, 30], [60, -40], [90, 75], [110, -15], [140, 40], [150, -90], [175, 5], [190, 100], [20, -80]] as const;
+const FIGHTERS = FIGHT_AT.length;
+
+/** The frozen fight (#8's fixture): the player on open water just inside the Storm's edge and facing it, so the wall
+ *  stands across the view, with nine captains armed and lying ahead and abeam at 20 to 190 metres. */
+export function arrangeFight(state: MatchState): void {
+  const calm = calmNow(state), out = v3(), t = v3();
+  let best: Course | null = null;
+  for (let k = 0; k < 32 && !best; k++) {
+    // a point 90 m inside the edge, heading out across it, with water clear 220 m ahead and 90 m to either side
+    const edge = along(calm.at, tangentAt(calm.at, (k * PI) / 16, t), calm.r - 90, v3());
+    const c = { pos: edge, head: tangentToward(edge, along(calm.at, t, calm.r + 400, out), v3()) };
+    let ok = true;
+    for (let s = -30; s <= 220 && ok; s += 15) for (const x of [0, -90, 90]) if (ok && !open(off(c, s, x).pos)) ok = false;
+    if (ok) best = c;
+  }
+  const me = best ?? openCourse(state, 220, 90);
+  place(state, PLAYER, me);
+  const weapons = [ITEM.cannon, ITEM.chain, ITEM.heated, ITEM.cannon];
+  for (let i = 1; i <= FIGHTERS; i++) {
+    const [ahead, side] = FIGHT_AT[i - 1], at = off(me, ahead, side);
+    place(state, i, { pos: at.pos, head: tangentToward(at.pos, me.pos, v3()) });
+    const ship = state.ships[i];
+    ship.slots[0] = weaponItem(weapons[i % weapons.length], 2);
+    ship.sel = 0;
+  }
+  arm(state, weaponItem(ITEM.cannon, 2));
+  daylight(state, 19);
+}

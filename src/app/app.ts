@@ -27,7 +27,7 @@ import type { V3 } from '../sim/math.ts';
 import { Controls } from './controls.ts';
 import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
-import { MOMENTS, actorEvent, causeOf, daylight, type MomentScript } from './moments.ts';
+import { MOMENTS, actorEvent, arrangeFight, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
 import { deathModel, fleetColours, hudModel, markOf, resultsModel, victoryModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
@@ -60,6 +60,8 @@ export interface AppOptions {
   /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
    *  device, ?autoplay). */
   autoplay?: boolean;
+  /** Open on #8's frozen fight (?fight, or VITE_FIXTURE=fight on the device). */
+  fight?: boolean;
 }
 
 /** Seconds between perf lines. */
@@ -155,9 +157,9 @@ export class App {
     this.juiceLayer.style.pointerEvents = 'none';
     this.shell = new Shell(this.uiLayer);
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1 });
-    this.career = new CareerHolder(options.capture || !!options.autoplay);
-    this.settings = new SettingsHolder(options.capture || !!options.autoplay);
-    this.tips = new Tips(options.capture || !!options.autoplay);
+    this.career = new CareerHolder(options.capture || !!options.autoplay || !!options.fight);
+    this.settings = new SettingsHolder(options.capture || !!options.autoplay || !!options.fight);
+    this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
     this.tip = tipCard({ parent: this.shell.root, className: 'pui-tip' });
     this.loop = new Loop((f) => this.frame(f));
     // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
@@ -198,7 +200,8 @@ export class App {
   start(): void {
     this.go(this.options.capture ? 'lobby' : 'title');
     this.loaded = this.load();
-    if (this.options.autoplay) void this.loaded.then(() => this.play({ autopilot: true }));
+    if (this.options.fight) void this.loaded.then(() => this.fight());
+    else if (this.options.autoplay) void this.loaded.then(() => this.play({ autopilot: true }));
   }
 
   /** The chart's time now, milliseconds. */
@@ -643,6 +646,20 @@ export class App {
     this.staged = def;
     this.log.add('flow', 'moment', { name, seed, tick: s.state.tick });
     this.stage?.snap();
+  }
+
+  /** #8's frozen fight, the frame every budget is measured on: seed 5 at sea, nine captains around the player at the
+   *  Storm's edge, dusk and a thunderstorm over them, four seconds fought, then held there. The simulation stops; the
+   *  frame goes on drawing the moment (sea, cloth, weather and smoke moving in place). */
+  fight(): void {
+    this.play({ seed: 5, skipGale: true, autopilot: true });
+    const s = this.session!;
+    arrangeFight(s.state);
+    this.stagePlayer({ weather: 'thunder' });
+    this.stage?.snap();
+    this.stepTicks(4 * 30);
+    this.loop.run(null);
+    this.log.add('flow', 'fight', { tick: s.state.tick });
   }
 
   /** A dry run of the moment just set up: the tick its trigger fires on (or -1), and how to frame it. */

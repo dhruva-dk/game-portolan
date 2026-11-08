@@ -11,6 +11,7 @@
     "ios": "node tools/ios.ts",
     "ios:ipad": "node tools/ios.ts --real",
     "ios:ipad:dev": "node tools/ios.ts --real --dev",
+    "ios:fight": "VITE_FIXTURE=fight node tools/ios.ts --real",
     "capture": "node tools/capture/run.ts",
     "check:assets": "vite build --logLevel warn && node tools/check-assets.ts"
   },
