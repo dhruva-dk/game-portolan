@@ -27,7 +27,7 @@ export { INKS, WASH, type InkName } from './inks.ts';
 export { bakeDisc, bakeSheet, drawBaked, ruledFrame, type Baked, type SheetWeight, type Side } from './sheet.ts';
 export { arrow, fleur, needle, rhumb, rhumbWeb, ring, rose, type RingOptions, type RoseOptions } from './rose.ts';
 export {
-  burst, cross, dividers, dottedRing, hand, moon, pennant, quadrant, sandglass, staff, stamp, star, stick, stormRing, sun, tally, wake,
+  burst, cross, dividers, dottedRing, hand, laurel, moon, pennant, quadrant, sandglass, staff, stamp, star, stick, stormRing, sun, tally, wake,
   type GlassOptions, type PennantOptions,
 } from './marks.ts';
 export { ILLUMINATIONS, bakeSeal, drawSeal, type Device, type Illumination, type Seal } from './seal.ts';

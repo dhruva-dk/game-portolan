@@ -21,7 +21,7 @@
 import type { Prim } from '../icons/draw.ts';
 import {
   Press, arcPts, bakeSeal, drawBaked, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, woodcut, word,
-  type Baked, type ChartLayer, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
+  type Baked, type Box, type ChartLayer, type Circle, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp, noise1 } from '../chart/noise.ts';
 import { effect } from '../ui/parts/feedback.ts';
@@ -138,9 +138,34 @@ function levelRing(pen: Pen, x: number, y: number, r: number, level: number, alp
   figure(pen, text, x, y + size * 0.5, size, { align: 'center', seed: 5, alpha }, part(t, 0.35, 1));
 }
 
+/** The career plate's places (the layout's for the lobby; the result sheet draws it larger): the slip, the level's
+ *  ring and the rank's seal. Only the offsets from the slip's centre are read, so it can be drawn anywhere. */
+export interface PlateGeo {
+  plate: Box;
+  ring: Circle;
+  badge: Circle;
+}
+
+/**
+ * The career plate centred at (x, y): its slip, the level's ring and figure, and the rank's seal pressed beside it,
+ * inked as t and bt run. `under` draws on the slip before the ring. The gold on the ring is `ringFill`'s, drawn over
+ * it where it moves.
+ */
+export function careerPlate(pen: Pen, gc: CanvasRenderingContext2D, x: number, y: number, g: PlateGeo, level: number, badge: Seal, alpha: number, t: number, bt = t, under?: (ring: Circle) => void): void {
+  const ring = { x: x + (g.ring.x - g.plate.x), y: y + (g.ring.y - g.plate.y), r: g.ring.r };
+  const bx = x + (g.badge.x - g.plate.x), by = y + (g.badge.y - g.plate.y);
+  paper(pen, slipPath(x, y, g.plate.w, g.plate.h, 5), { alpha: alpha * ease.out(part(t, 0, 0.3)), burn: 5 });
+  under?.(ring);
+  levelRing(pen, ring.x, ring.y, ring.r, level, alpha, part(t, 0.25, 1));
+  if (bt > 0) {
+    drawSeal(gc, badge, bx, by, { phase: 0.5, scale: 1 + 0.3 * (1 - ease.back(bt)), alpha: alpha * clamp(bt * 3) });
+    if (bt < 1) stamp(pen, bx, by, g.badge.r, bt, 7);
+  }
+}
+
 /** The ring's gold: leaf laid between the ring and its hairline from north, clockwise, as far round as the XP has come,
  *  its leading edge ruled in ink. */
-function ringFill(pen: Pen, x: number, y: number, r: number, f: number, alpha: number): void {
+export function ringFill(pen: Pen, x: number, y: number, r: number, f: number, alpha: number): void {
   if (f <= 0.003 || alpha <= 0.003) return;
   const r0 = r * 0.79, r1 = r * 0.96, a0 = -Math.PI / 2, a1 = a0 + TAU * Math.min(1, f);
   const p = new Path2D();
@@ -515,22 +540,15 @@ export class Lobby {
     return this.#inked && dry === 0 ? (sheet ? [...this.#rects(), sheet] : this.#rects()) : undefined;
   }
 
-  /** The career plate at (x, y): its slip, the level's ring and figure, and the rank's seal pressed beside it; the
-   *  ring's gold is drawn apart, over it. */
+  /** The career plate at (x, y), the title's rose drying away under the ring as it inks in; the ring's gold is drawn
+   *  apart, over it. */
   #plate(pen: Pen, gc: CanvasRenderingContext2D, x: number, y: number, badge: Seal, alpha: number, t: number, bt = t): void {
-    const g = this.#g!, c = this.#career, ring = { x: x + (g.ring.x - g.plate.x), y: y + (g.ring.y - g.plate.y), r: g.ring.r };
-    const bx = x + (g.badge.x - g.plate.x), by = y + (g.badge.y - g.plate.y);
-    paper(pen, slipPath(x, y, g.plate.w, g.plate.h, 5), { alpha: alpha * ease.out(part(t, 0, 0.3)), burn: 5 });
-    if (this.#roseLanded && t < 1) {
+    const landing = this.#roseLanded && t < 1 ? (ring: Circle) => {
       // the title's rose, landed here, dries away as the ring inks in over it
       const s = (this.#lastNow - this.#born) / 1000, rt = s < TITLE_LANDS ? -1 : clamp((s - TITLE_LANDS) / AT.rose);
       if (rt >= 0 && rt < 1) drawSprite(gc, cornerRose(this.#layer!), ring.x, ring.y, { scale: ring.r / this.#layer!.layout.rose.r, alpha: alpha * dryAlpha(rt) });
-    }
-    levelRing(pen, ring.x, ring.y, ring.r, c.level, alpha, part(t, 0.25, 1));
-    if (bt > 0) {
-      drawSeal(gc, badge, bx, by, { phase: 0.5, scale: 1 + 0.3 * (1 - ease.back(bt)), alpha: alpha * clamp(bt * 3) });
-      if (bt < 1) stamp(pen, bx, by, g.badge.r, bt, 7);
-    }
+    } : undefined;
+    careerPlate(pen, gc, x, y, this.#g!, this.#career.level, badge, alpha, t, bt, landing);
   }
 
   /** The XP as a share of the level, and how far the ring's gold has come at s seconds. */

@@ -44,12 +44,12 @@ import { ChartLayer, Press, everywhere, traceCoasts, type Coasts, type Colours, 
 import { Title } from '../screens/title.ts';
 import { FullMap } from '../screens/fullmap.ts';
 import { Lobby, relaxOrbit, type CareerMarks, type Orbit } from '../screens/lobby.ts';
+import { Result } from '../screens/result.ts';
 import type { SheetName } from '../screens/folio.ts';
 import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
 import { page } from '../ui/screens/frame.ts';
-import { resultsScreen } from '../ui/screens/match.ts';
 import { applyParchment, el, esc, tipCard, type TipCardHandle } from '../ui/parts/index.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import type { HudModel, ResultsModel, Settings } from '../ui/model.ts';
@@ -126,6 +126,8 @@ export class App {
   /** The title, the lobby and the Gale on the chart, while each is up or leaving. */
   private title: Title | null = null;
   private lobby: Lobby | null = null;
+  /** The result sheet, while it is down or going up. */
+  private result: Result | null = null;
   /** Where a finger has taken the lobby's camera off its resting view. */
   private readonly boom: Orbit = { yaw: 0, pitch: 0, zoom: 1 };
   private gale: Gale | null = null;
@@ -223,6 +225,7 @@ export class App {
     this.chart.resize(innerWidth, innerHeight, devicePixelRatio || 1, safeArea());
     this.title?.resize();
     this.lobby?.resize();
+    this.result?.resize();
     this.gale?.resize();
     this.map?.resize();
   }
@@ -326,18 +329,22 @@ export class App {
 
   go(name: ScreenName | string, model?: unknown): void {
     if (!isScreen(name)) throw new RangeError(`go: no screen "${name}"`);
+    // the result has nothing to show without a match's model: home
+    if (name === 'results' && !model) return this.go('lobby');
     const from = this.screen, folio = (n: ScreenName) => (MENUS as readonly string[]).includes(n);
     this.screen = name;
     this.log.add('flow', 'screen', { from, to: name });
     this.fixed = false;
-    if (name === 'title' || name === 'lobby' || name === 'results' || (MENUS as readonly string[]).includes(name)) {
-      // her ship at anchor on her home water, behind the title, the lobby, its folios and a match's results
+    if (name === 'title' || name === 'lobby' || (MENUS as readonly string[]).includes(name)) {
+      // her ship at anchor on her home water, behind the title, the lobby and its folios
       this.view = lobbyScene(this.hour);
     }
     // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby's ink dries
     // away; the Gale's chart is gone by the time she lands; the HUD dries
     const now = this.chartNow();
-    const atLobby = from === 'lobby' || folio(from), toLobby = name === 'lobby' || folio(name);
+    // (first, so that if it has not come fully down the lobby it has yet to lay under it is here for what follows)
+    if (from === 'results' && name !== 'results') this.result?.lift(now);
+    const atLobby = from === 'lobby' || from === 'results' || folio(from), toLobby = name === 'lobby' || folio(name);
     if (atLobby && !toLobby) this.lobby?.leave(now);
     if (from === 'gale' && name !== 'gale') this.gale?.leave(now);
     // the HUD stays from the match into spectating; it dries when both are done
@@ -360,6 +367,7 @@ export class App {
     if (from === 'victory' && name !== 'victory') this.chart?.presses.remove('match:tap');
     if (name === 'spectate') this.startSpectating(model);
     if (name === 'victory') this.startVictory();
+    if (name === 'results') this.openResult(model as ResultsModel);
     const view = this.screenView(name, model);
     this.shell.show(name, view, transition(from, name));
   }
@@ -379,6 +387,7 @@ export class App {
       case 'gale':
       case 'spectate':
       case 'victory':
+      case 'results':
         return { el: el('s-empty') };
       default:
         return this.matchView(name, model) ?? this.placeholder(name);
@@ -392,8 +401,6 @@ export class App {
       case 'match':
         // the HUD is on the chart (openHud); touches it does not take go through this empty screen to the controls
         return !model && !s ? null : { el: el('s-empty') };
-      case 'results':
-        return model ? resultsScreen(model as ResultsModel, { onDone: () => this.go('lobby') }) : null;
       default:
         return this.placeholder(name);
     }
@@ -412,6 +419,28 @@ export class App {
     if (!this.hud) this.openHud(model);
     this.hud?.spectate(() => this.finishMatch());
     this.controls.on = false;
+  }
+
+  /** The result sheet comes down over the end of the match. */
+  private openResult(model: ResultsModel): void {
+    this.result?.dispose();
+    const r = new Result({ covered: () => this.underSheet(), done: () => {
+      if (this.screen === 'results') this.go('lobby');
+    } }, model);
+    r.onGone = () => {
+      if (this.result === r) this.result = null;
+    };
+    this.result = r;
+    if (this.chart) r.attach(this.chart, this.chartNow());
+    else this.underSheet();
+  }
+
+  /** The sheet is down: the match goes, and her ship and the lobby are laid out of sight under it. */
+  private underSheet(): void {
+    if (this.session) this.leaveMatch();
+    this.view = lobbyScene(this.hour);
+    if (!this.lobby) this.openLobby('results');
+    this.result?.raise();
   }
 
   /** The win: the HUD has dried, the camera draws back and circles her; a tap anywhere (or the hold) goes to the result. */
@@ -443,8 +472,8 @@ export class App {
   /** Jumps to a fixed scene, leaving any match. */
   scene(input: SceneInput): SceneSpec {
     if (this.session) this.leaveMatch();
-    for (const c of [this.gale, this.hud]) c?.dispose();
-    this.gale = this.hud = null;
+    for (const c of [this.gale, this.hud, this.result]) c?.dispose();
+    this.gale = this.hud = this.result = null;
     const s = sceneFrom(input);
     this.view = s;
     this.fixed = true;
@@ -588,13 +617,14 @@ export class App {
   }
 
   /** Ends the match where it stands: the career takes the report, and the results show what changed. */
+  /** The match is done: the career takes it, and the result sheet comes down over the sea, which runs on under it until
+   *  it has covered the view. */
   finishMatch(): void {
     const s = this.session;
-    if (!s) return;
+    if (!s || this.screen === 'results') return;
     const report = s.tally.report(s.plan.fleet.map((e) => e.captain), (i) => s.standing(i));
     const changes = this.career.apply(report), mine = report.ships[PLAYER];
     this.log.add('flow', 'finish', { place: changes.place, kills: changes.kills, xp: changes.xp.total, tick: s.state.tick });
-    this.leaveMatch();
     this.go('results', resultsModel(changes, this.career.career, { damage: mine.damage, survived: mine.survived }));
   }
 

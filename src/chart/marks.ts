@@ -336,6 +336,55 @@ export function stamp(pen: Pen, x: number, y: number, r: number, k: number, seed
   }
 }
 
+// ---------------------------------------------------------------- the laurel
+
+/**
+ * A laurel wreath round (x, y), radius r: two branches rising from where they cross at the foot, leaves in pairs along
+ * them, open at the crown. In `gold` or `silver` the leaves are gilt, rimmed in iron; in any other ink they are that
+ * ink, solid. It inks itself in from the foot up.
+ */
+export function laurel(pen: Pen, x: number, y: number, r: number, ink: InkName = 'iron', t = 1, seed = 5): void {
+  if (t <= 0) return;
+  const metal = ink === 'gold' || ink === 'silver' ? ink : null, n = 13, rise = Math.PI - 0.6;
+  for (const sgn of [1, -1]) {
+    // the angle round the wreath at u along the branch, from the foot (just past its fellow's side) to the crown
+    const at = (u: number) => Math.PI / 2 + sgn * (-0.1 + u * rise);
+    const stem: Pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const a = at(i / 40);
+      stem.push(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    pen.stroke(stem, { w: 'fine', ink, nib: 0.2, pool: 0.3, seed: seed + sgn }, span(t, 0, 0.7));
+    for (let k = 0; k < n; k++) {
+      const u = (k + 0.5) / n, a = at(u), lt = span(t, u * 0.75, u * 0.75 + 0.2);
+      if (lt <= 0) continue;
+      const L = r * (0.26 - 0.1 * u), px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      const heading = a + (sgn * Math.PI) / 2;
+      for (const side of [1, -1]) {
+        const dir = heading + side * sgn * (0.5 + 0.12 * hash(k, side, seed)), L1 = L * (0.92 + 0.14 * hash(k, side + 2, seed)) * smooth(0, 1, lt);
+        const cx = px + Math.cos(dir) * L1, cy = py + Math.sin(dir) * L1, ux = Math.cos(dir), uy = Math.sin(dir), hw = L1 * 0.23;
+        const leaf: Pts = [];
+        for (let i = 0; i <= 8; i++) {
+          const v = i / 8, w = Math.sin(v * Math.PI) * hw;
+          leaf.push(px + ux * L1 * v - uy * w, py + uy * L1 * v + ux * w);
+        }
+        for (let i = 8; i >= 1; i--) {
+          const v = i / 8, w = Math.sin(v * Math.PI) * hw;
+          leaf.push(px + ux * L1 * v + uy * w, py + uy * L1 * v - ux * w);
+        }
+        leaf.push(leaf[0], leaf[1]);
+        const path = shape(leaf);
+        if (metal) {
+          pen.gilt(path, metal, cx, cy, L1, 0.95);
+          pen.stroke(leaf, { w: 'hair', seed: seed + k * 3 + side, pool: 0.1 }, 1);
+        } else pen.fill(path, ink, 0.86);
+      }
+    }
+  }
+  // the tie, where the stems cross
+  pen.rule([[x - r * 0.12, y + r * 1.03, x + r * 0.12, y + r * 0.97], [x - r * 0.1, y + r * 0.96, x + r * 0.1, y + r * 1.04]], { w: 'fine', ink, seed: seed + 9 }, span(t, 0.1, 0.5));
+}
+
 // ---------------------------------------------------------------- sun and moon
 
 /** The sun: a gilt disc with straight and flaming rays alternating, no face. */

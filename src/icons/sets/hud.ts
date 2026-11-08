@@ -4,7 +4,7 @@ import {
   type Prim,
 } from '../draw.ts';
 
-export type HudId = 'gust' | 'storm' | 'spiral' | 'shipsLeft' | 'kills' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'sail' | 'lantern' | 'gull';
+export type HudId = 'gust' | 'storm' | 'spiral' | 'shipsLeft' | 'kills' | 'damage' | 'afloat' | 'coins' | 'map' | 'shield' | 'hull' | 'reload' | 'sail' | 'lantern' | 'gull';
 export type MenuId = 'play' | 'back' | 'settings' | 'locker' | 'abilities' | 'rivals' | 'chart' | 'rank' | 'close' | 'lock' | 'check'
   | 'wheel' | 'chest' | 'burst' | 'pennants' | 'ships' | 'speaker' | 'arrows';
 export type GullTierId = 'supplies' | 'armament' | 'treasure';
@@ -51,6 +51,22 @@ export const HUD_ICONS: Record<HudId, Prim[]> = {
     line(wave(1.6, 22.4, 20.6, 0.9, 3), 1.8),
     fill(circle(19.6, 6.4, 1.2), { fine: true }),
     fill(circle(21.4, 3.4, 0.8), { fine: true }),
+  ],
+  damage: [
+    // a round shot breaking a plank, splinters flying from the breach
+    fill('M1.6 15.4L9 14L11 16.6L13.6 14.2L22.4 15V21.4H1.6Z'),
+    cutLine('M4 18.4H20', 0.9, { fine: true }),
+    cutLine('M11.4 16.4L10.8 21.4', 1.1),
+    fill(circle(12.2, 7.6, 4.2)),
+    line('M7.6 12.4L4.4 8.6', 1.5),
+    line('M16.4 12.2L19.8 8.8', 1.5),
+    line('M12.4 12.8V9.4', 1.2, { fine: true }),
+  ],
+  afloat: [
+    // a ship upright on her waves, under way
+    ...ship(12, 16.8, 0.92),
+    line(wave(1.2, 22.8, 20.4, 0.9, 3), 1.8),
+    line(wave(3.4, 20.6, 22.9, 0.7, 2), 1.2, { fine: true }),
   ],
   coins: [
     // a stack and one standing coin

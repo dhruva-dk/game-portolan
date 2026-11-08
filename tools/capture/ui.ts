@@ -17,6 +17,8 @@ export interface Transition {
   world?: boolean;
 }
 
+/** The result sheet coming down and inking in, beat by beat, to the gold's climb and the seal. */
+const INK_RESULT = [0, 150, 300, 450, 600, 900, 1300, 1800, 2400, 3000, 3800, 4600, 5500];
 /** The title's leaving, into the lobby inking in once its sheet is off; and the lobby inking in. */
 const LEAVE_TITLE = [0, 120, 250, 400, 550, 700, 850, 1000, 1300, 1700, 2200, 2800, 3400];
 const INK_LOBBY = [0, 150, 300, 500, 700, 900, 1200, 1500, 1800, 2200];
@@ -46,10 +48,10 @@ export const TRANSITIONS: readonly Transition[] = [
   },
   // the match's own screens follow the sim, which only moves here when a frame is drawn
   { name: 'match-spectate', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.sinkPlayer(3, "cannon"); await h.draw()' },
-  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); await h.draw(); await h.draw()', to: 'h.finish()' },
+  { name: 'spectate-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.sinkPlayer(3, "cannon"); await h.draw(); await h.draw()', to: 'h.finish()', times: INK_RESULT },
   { name: 'match-victory', from: 'h.play({ seed: 11, skipGale: true }); h.step(90)', to: 'h.winPlayer(); await h.draw()' },
-  { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()' },
-  // her ship at anchor behind the result, as the scraps ink back in round her
+  { name: 'victory-results', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60)', to: 'h.finish()', times: INK_RESULT },
+  // the sheet lifts, and her ship at anchor and the lobby are under it
   { name: 'results-lobby', from: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish(); for (let i = 0; i < 30; i++) await h.draw()', to: 'h.go("lobby")', times: INK_LOBBY, world: true },
 ];
 
