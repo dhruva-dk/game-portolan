@@ -11,7 +11,7 @@
 // meet they are cross-faded over a tenth of the distance either side, with weights that sum to one, and each slice's
 // map is read once, in its own branch, only where it has any weight.
 //
-// Each map is read with a disc of sixteen hardware-compared taps, whose spread keeps the penumbra at least as wide on
+// Each map is read with a disc of eight hardware-compared taps (each a bilinear 2×2 compare), whose spread keeps the penumbra at least as wide on
 // the ground as the sun's disc makes it a couple of metres behind an edge, and never under a texel and a half in any
 // slice, so the near slices are not razor-cut and the far ones are not blocky. The disc is the same at every pixel:
 // turned by a noise, with nothing to gather the turns over frames, a penumbra would be a grain fixed to the screen.
@@ -40,9 +40,9 @@ const PENUMBRA_AT = 2.5;
 const SPREAD_MIN = 1.5;
 const SPREAD_MAX = 5;
 
-/** Sixteen points on the unit disc (Vogel's spiral), weighted toward the middle so the penumbra falls off softly. */
-const DISC = Array.from({ length: 16 }, (_, i) => {
-  const r = Math.sqrt((i + 0.5) / 16), a = i * 2.399963229728653;
+/** Eight points on the unit disc (Vogel's spiral), weighted toward the middle so the penumbra falls off softly. */
+const DISC = Array.from({ length: 8 }, (_, i) => {
+  const r = Math.sqrt((i + 0.5) / 8), a = i * 2.399963229728653;
   return [r * Math.cos(a), r * Math.sin(a), 1 - 0.5 * r * r] as const;
 });
 const DISC_WEIGHT = DISC.reduce((s, d) => s + d[2], 0);

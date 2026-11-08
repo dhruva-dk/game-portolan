@@ -54,6 +54,8 @@ const SLOW = 4.4, FAST = 8;
 /** How much brighter water a captain's dye has coloured is than the sea's own: a shade, so their hue reads through
  *  the water and the water still reads as the sea, its waves and glitter over it. */
 const DYE = 3;
+/** The sea shows shadows this near the eye, metres, beyond the coast's reach: past the nearer cascade. */
+const SHADOWED_WITHIN = 80;
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 type F = Node<'float'>;
@@ -378,6 +380,8 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   // ----- the surf
   const shore = float(0).toVar('oceanShore');
   const shoreGlow = float(0).toVar('oceanShoreGlow');
+  /** Whether the water here lies within the coast's reach, where cliffs and stacks throw their shadows on it. */
+  const coastal = float(0).toVar('oceanCoastal');
   // ----- the captains' ink: their colour in the water they hold, deepest on its coast, and the trail each is laying,
   // pulsing along its length and glowing at night. The ink is a dye in the water, not a paint on it: it colours the
   // light that comes back out of the water (the water's own colour, and the floor seen through it), and leaves the
@@ -422,6 +426,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const c = coast.at(u);
     const d = c.y.toVar();
     If(under.lessThan(1.2).or(coast.on.greaterThan(0).and(d.lessThan(REACH - 4))), () => {
+      coastal.assign(1);
       const n2 = noiseMap.sample(q.mul(0.13).sub(vec2(t.mul(0.017), t.mul(0.009)))).b;
       const n3 = noiseMap.sample(q.mul(0.47).add(vec2(t.mul(0.023), t.mul(0.004)))).a;
       // the depth by the grid, the field off where it has not arrived
@@ -466,8 +471,18 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   // for it to show and no foam lies
   const facing = float(1).sub(max(dot(world, normalize(cameraPosition.sub(positionWorld))), 0));
   const reflectance = float(0.02).add(pow(facing, 5).mul(0.98)).mul(float(1).sub(whiteness));
+  // the sun's shadow on the water, read once for its glitter and its body (SeaLight, the lighting works it out first),
+  // and only where something can throw one that shows: near the eye (the ships', the gulls') and on the coast (the
+  // cliffs'); the open sea further out lies in the sun
+  const sunShade = float(1).toVar('oceanSunShade');
+  const shade = () => {
+    If(coastal.greaterThan(0).or(length(positionWorld.sub(cameraPosition)).lessThan(SHADOWED_WITHIN)), () => {
+      sunShade.assign(sunShadow());
+    });
+    return sunShade;
+  };
   mat.setupLightingModel = () => new SeaLight(
-    () => seaReflection(world, alpha, reflectance),
+    () => seaReflection(world, alpha, reflectance), shade,
     [mat.useClearcoat, mat.useSheen, mat.useIridescence, mat.useAnisotropy, mat.useTransmission, mat.useDispersion],
   );
 
@@ -487,7 +502,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     // anything in view), the sun's taken away where something stands between it and the water
     const sun = vec3(0).toVar(), down = skyLight(p, u).toVar();
     If(BODIES.sun.greaterThan(0.5), () => {
-      sun.assign(sunlight.mul(sunShadow()));
+      sun.assign(sunlight.mul(sunShade));
       down.addAssign(sun.mul(max(dot(u, P.sunDir), 0)));
     });
     If(BODIES.moon.greaterThan(0.5), () => {
@@ -529,7 +544,6 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
 
   const mesh = new Mesh(polarGrid(), mat);
   mesh.frustumCulled = false;
-  mesh.receiveShadow = true;
   mesh.name = 'sea';
   return mesh;
 }

@@ -110,10 +110,20 @@ export function seaReflection(normal: V3, rough: F, fresnel: F): V4 {
 /** The sea's light: three's physical model, with what the sea reflects of the frame put in for the sky behind it. */
 export class SeaLight extends PhysicalLightingModel {
   readonly #reflection: () => V4;
+  readonly #shade: () => Node<'float'>;
 
-  constructor(reflection: () => V4, flags: boolean[]) {
+  /** `shade` is the sun's shadow on the water, which its light here is darkened by (the sea takes no shadow from
+   *  three's lights: it reads the cascades itself, once, only where a shadow on it can show). */
+  constructor(reflection: () => V4, shade: () => Node<'float'>, flags: boolean[]) {
     super(...(flags as [boolean, boolean, boolean, boolean, boolean, boolean]));
     this.#reflection = reflection;
+    this.#shade = shade;
+  }
+
+  direct(input: Parameters<PhysicalLightingModel['direct']>[0], builder: NodeBuilder): void {
+    const light = (input as { lightNode?: { light?: { name: string } } }).lightNode?.light;
+    const lit = light?.name === 'sun' ? { ...input, lightColor: (input.lightColor as Node<'vec3'>).mul(this.#shade()) } : input;
+    super.direct(lit, builder);
   }
 
   indirectSpecular(builder: NodeBuilder): void {
