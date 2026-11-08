@@ -1,5 +1,5 @@
-// The interface's root: it hangs the tokens on the page and holds what is still DOM over the chart (the tip card). It is
-// transparent and takes no touches.
+// The interface's root: it hangs the tokens on the page. It is transparent and takes no touches; every screen is drawn on
+// the chart above it.
 import { applyTokens, el } from './parts/index.ts';
 
 export class Shell {
