@@ -432,5 +432,5 @@ export function arrangeFight(state: MatchState): void {
     ship.sel = 0;
   }
   arm(state, weaponItem(ITEM.cannon, 2));
-  daylight(state, 19);
+  daylight(state, 18);
 }
