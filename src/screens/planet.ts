@@ -63,7 +63,6 @@ export class PlanetChart {
   win: Window;
   readonly #mat = new Float64Array(16);
   readonly #eye = { x: 0, y: 0, z: 1 };
-  readonly #P = { x: 0, y: 0 };
 
   constructor(layer: ChartLayer, h: PlanetHost) {
     this.#layer = layer;
