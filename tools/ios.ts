@@ -139,7 +139,7 @@ export function lanAddress(): string {
 }
 
 /**
- * The dev shell: the app's own page with the public assets (textures, fonts) as the production build has them, whose
+ * The dev shell: the app's own page with the public assets (textures) as the production build has them, whose
  * code is loaded from the dev server at `origin` on this Mac, so a change to the code is a reload on the device, not a
  * rebuild. The page itself stays the app's (capacitor://localhost) rather than the dev server's: WebGPU is given only
  * to a secure context, which a page served over plain http from a LAN address is not. The page is free to load

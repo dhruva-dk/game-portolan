@@ -5,22 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Portolan icons</title>
 <style>
-  @font-face { font-family: 'Fell'; src: url('/fonts/IMFellEnglish-Roman.ttf') format('truetype'); font-display: block; }
-  @font-face { font-family: 'Cinzel'; src: url('/fonts/Cinzel.ttf') format('truetype'); font-weight: 400 900; font-display: block; }
   :root {
     --ink: #2a1a0d; --cream: #f6e9c8; --paper: #e9d7b0; --paper-d: #d9c08f; --night: #2a1d12; --night-d: #1a120a;
     --sea: #1b4a5e; --sea-d: #0b2532; --sky: #a9cfdc;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Fell', Georgia, serif; color: var(--ink); background: #cdb88e; }
+  body { margin: 0; font-family: Georgia, serif; color: var(--ink); background: #cdb88e; }
   header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 16px;
     background: var(--night); color: var(--cream); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
-  header h1 { margin: 0 12px 0 0; font: 700 18px 'Cinzel', serif; letter-spacing: .08em; }
+  header h1 { margin: 0 12px 0 0; font: 700 18px Georgia, serif; letter-spacing: .08em; }
   header label { font-size: 14px; display: flex; gap: 6px; align-items: center; }
   header select, header input { font: inherit; }
   main { padding: 12px 16px 48px; }
-  h2 { font: 700 15px 'Cinzel', serif; letter-spacing: .1em; text-transform: uppercase; margin: 26px 0 10px; }
-  h2 small { font: italic 14px 'Fell', serif; text-transform: none; letter-spacing: 0; opacity: .75; margin-left: 8px; }
+  h2 { font: 700 15px Georgia, serif; letter-spacing: .1em; text-transform: uppercase; margin: 26px 0 10px; }
+  h2 small { font: italic 14px Georgia, serif; text-transform: none; letter-spacing: 0; opacity: .75; margin-left: 8px; }
   .light { background: radial-gradient(ellipse at 30% 20%, #f3e5c2, transparent 70%), radial-gradient(ellipse at 80% 90%, #d2b580, transparent 60%), var(--paper); color: var(--ink); }
   .dark { background: radial-gradient(ellipse at 30% 20%, #3b2a1a, transparent 70%), radial-gradient(ellipse at 80% 90%, #120c06, transparent 60%), var(--night); color: var(--cream); }
   .sea { background: linear-gradient(180deg, var(--sky) 0 38%, #5f9bb0 38%, var(--sea) 60%, var(--sea-d)); color: var(--cream); }
@@ -29,7 +27,7 @@
   .card .name { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 15px; background: rgba(42,26,13,.08); }
   .card .name code { font: 11px ui-monospace, Menlo, monospace; opacity: .65; align-self: center; }
   .row { display: flex; align-items: center; gap: 14px; padding: 8px 10px; min-height: 40px; }
-  .row .tag { width: 34px; font: italic 11px 'Fell', serif; opacity: .7; }
+  .row .tag { width: 34px; font: italic 11px Georgia, serif; opacity: .7; }
   .row svg { flex: none; display: block; }
   .strip { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; border-radius: 10px; }
   .strip > span { display: grid; place-items: center; width: 34px; height: 34px; }
