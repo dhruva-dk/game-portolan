@@ -321,7 +321,7 @@ let hudReady = false;
 
 /**
  * Every element of the match HUD (issue #54's table) at rest, drawn with src/screens/instruments.ts and laid out by
- * src/chart/layout.ts. What holds still is baked once to a sprite, as the live HUD will bake it; each frame draws the
+ * src/chart/layout.ts. What holds still is baked once to a sprite, as the live HUD bakes it; each frame draws the
  * sprites, the controls with their press look, the stick and the reticle. The thumbs' homes, the targets and the safe
  * area are drawn over it with ?rules.
  */

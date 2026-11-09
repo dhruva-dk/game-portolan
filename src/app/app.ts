@@ -108,7 +108,7 @@ export class App {
   view: SceneSpec;
   /** The hour by the device's clock (a capture's is fixed): the lobby's low sun is the morning's or the evening's. */
   readonly hour: number;
-  /** The planet's coasts, traced for the Gale's chart. */
+  /** The planet's coasts, traced for the full map. */
   private coasts: Coasts | null = null;
   ready = false;
   /** True while the hook holds a fixed scene: the ship there sails at full speed for its wake. */
@@ -317,7 +317,7 @@ export class App {
       this.view = lobbyScene(this.hour);
     }
     // the title leaves on the chart (the rose flies, the sheet rolls off) over whatever comes next; the lobby's ink dries
-    // away; the Gale's chart is gone by the time she lands; the HUD dries
+    // away; the Gale's instruments are gone by the time she lands; the HUD dries
     const now = this.chartNow();
     // (first, so that if it has not come fully down the lobby it has yet to lay under it is here for what follows)
     if (from === 'results' && name !== 'results') this.result?.lift(now);

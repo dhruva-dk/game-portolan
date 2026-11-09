@@ -112,7 +112,7 @@ export class Session implements Stepper {
   lock = -1;
   /** Fire on its own while the guns hold a lock (a setting). */
   autoFire = false;
-  /** Where the player marked her dive on the Gale's chart (a unit vector), or null: she leaves the Gale as she nears
+  /** Where the player marked on the full map (a unit vector), or null: she leaves the Gale as she nears
    *  it, then glides for it and drops. */
   mark: V3 | null = null;
   private targetD = Infinity;

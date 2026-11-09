@@ -6,15 +6,15 @@
 //   npm run capture -- borders                            each region from orbit, and 8 m up on the sea at every border
 //   npm run capture -- lap [--ring equator|north|south]   a frame every 4 s of sailing a full lap (all three by default)
 //   npm run capture -- moment <name|all> [--seed n]       a scripted mechanic moment as a frame strip plus its effect log
-//   npm run capture -- ui [--device ipad,ipadSmall,iphone,iphoneSmall] [--only a,b]  transition strips for each screen change (all four by default)
-//   npm run capture -- layout [--device …] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
+//   npm run capture -- ui [--device ipad,ipadSmall] [--only a,b]  transition strips for each screen change
+//   npm run capture -- layout [--device ipad,ipadSmall] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
 //   npm run capture -- perf                               frame time, triangles and draw calls per region, and a fast zoom of the full map
 //   npm run capture -- fight [--seconds n]                #8's frozen fight: the median GPU time of each pass (12 s by default)
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
-//   npm run capture -- kit [--device ipad,iphone] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
-//   npm run capture -- title [--device ipad,iphone]      the title inking in, its needle, a real tap and the roll-off to the lobby
-//   npm run capture -- lobby [--device ipad,iphone]      the lobby inking in, every press, orbit and pinch, Play into the Gale
-//   npm run capture -- gale [--device ipad,iphone]       the Gale on the chart: the fleet carried, two presses, the dive, the landing
+//   npm run capture -- kit [--device ipad,ipadSmall] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
+//   npm run capture -- title [--device ipad,ipadSmall]   the title inking in, its needle, a real tap and the roll-off to the lobby
+//   npm run capture -- lobby [--device ipad,ipadSmall]   the lobby inking in, every press, orbit and pinch, Play into the Gale
+//   npm run capture -- gale [--device ipad,ipadSmall]    the Gale on the chart: the fleet carried, two presses, the dive, the landing
 //   npm run capture -- list                               the moments and transitions there are
 //
 // Shared options: --headed (watch it), --dpr <n> (default 1).

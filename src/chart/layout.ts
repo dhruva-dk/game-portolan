@@ -61,9 +61,9 @@ export interface ChartLayout {
   figure: { hit: number; clock: number; large: number };
   /** A sheet's margin from the screen's edge. */
   margin: number;
-  /** The galleon mark's hull length on the HUD and on the lobby's chart. */
+  /** The galleon mark's hull length on the HUD and on the full map. */
   mark: { hud: number; chart: number };
-  /** The planet chart's compass rose, in its top left corner. */
+  /** The small rose the title's rose becomes as it lands on the lobby's ring: only its radius is read. */
   rose: Circle;
   /** The lobby (issue #54): the career plate top left (the level's ring, the rank's seal badge beside it), the
    *  settings' wheel top right, the four folio tabs along the bottom left and PLAY's banner under the right thumb. The

@@ -88,7 +88,7 @@ async function run(game: Game, code: string): Promise<void> {
 }
 
 export async function layout(r: Rig, o: { dpr: number; device?: string; only?: string }): Promise<void> {
-  const devices = (o.device?.split(',') ?? ['iphoneSmall', 'iphone', 'ipadSmall', 'ipad']) as DeviceName[];
+  const devices = (o.device?.split(',') ?? ['ipadSmall', 'ipad']) as DeviceName[];
   const only = o.only?.split(',');
   const screens = only ? SCREENS.filter((s) => only.includes(s.name)) : SCREENS;
   const report: Record<string, Record<string, { targets: number; broken: string[] }>> = {};

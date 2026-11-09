@@ -1,4 +1,4 @@
-// Woodcuts: the icon set's drawings (src/icons) cut as a printer cut a block, for an ability's cartouche, a region's
+// Woodcuts: the icon set's drawings (src/icons) cut as a printer cut a block, for an ability's button, a region's
 // sign, the small diagrams that teach. A solid shape is never printed flat (that is a glyph, not a cut): it is a firm
 // outline round close hatching, the hatching crossed where the shape turns from the light, at its lower right; the
 // cuts are bare paper. The icon set stays the one place the game's glyphs are drawn; here they are only inked.

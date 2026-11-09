@@ -94,11 +94,10 @@ function geo(layer: ChartLayer): Geo {
   return { w, h, cx, cy, r, needle: r * 0.52, ring: Math.min(w, h) * 0.56, reach: Math.hypot(w, h), mx: cx, my, size, corner: l.lobby.ring };
 }
 
-/** The rose: the title's, and the one it becomes in the lobby's corner. */
+/** The rose: the title's, and the one it becomes as it lands on the lobby's ring. */
 export const ROSE = { points: 32, ring: 0.12, seed: 17 } as const;
 
-/** The rose drawn at the size it keeps in the planet chart's corner; the title's rose lands as it, scaled to the ring it
- *  lands on. */
+/** The rose drawn at its landing size; the title's rose lands as it, scaled to the ring it lands on. */
 export function cornerRose(layer: ChartLayer): Sprite {
   const c = layer.layout.rose, d = Math.ceil(c.r * 2 + 8);
   return layer.sprite(`corner-rose|${c.r}`, d, d, d / 2, d / 2, (pen) => rose(pen, d / 2, d / 2, c.r, ROSE, 1));
@@ -366,7 +365,7 @@ export class Title {
       sh.addColorStop(1, 'rgba(30,18,6,0)');
       gc.fillStyle = sh;
       gc.fillRect(sx - sr * 1.2, sy - sr * 1.2, sr * 2.4, sr * 2.4);
-      // as it nears the plate the rose becomes the chart's own small rose, at the weight it keeps there
+      // as it nears the plate the rose becomes the small rose it lands as, at that rose's weight
       const c = Math.min(1, Math.max(0, (fu / AT.land - 0.55) / 0.45));
       if (c < 1) drawSprite(gc, this.#flyer!, f.x, f.y, { scale: k, alpha: 1 - c });
       if (c > 0) drawSprite(gc, cornerRose(layer), f.x, f.y, { scale: (k * g.r) / layer.layout.rose.r, alpha: c });

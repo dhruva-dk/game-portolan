@@ -1,5 +1,5 @@
 // The chart's drawing kit: everything the player reads, drawn the way a sixteenth-century chartmaker drew it, on one
-// canvas layer over the game (layer.ts). The kit draws; screens (#41-#47) decide what and where.
+// canvas layer over the game (layer.ts). The kit draws; the screens (src/screens) decide what and where.
 //
 //   const layer = await ChartLayer.create(parchment, host);   // on the GPU painter's paper
 //   layer.resize(innerWidth, innerHeight, devicePixelRatio, safeArea);

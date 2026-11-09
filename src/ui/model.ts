@@ -162,7 +162,7 @@ export interface MapView {
   ships: { x: number; y: number; emblem: string; colour: string; spotted?: boolean }[];
   /** Loot worth sailing to. */
   marks: { x: number; y: number }[];
-  /** The player's own marker, set on the planet's chart, or null. */
+  /** The player's own marker, set on the full map, or null. */
   marker: { x: number; y: number } | null;
   /** While the Gale blows: its course in dotted runs of metres (x, y, x, y…), the Storm's first circle in metres, and
    *  the fleet, too close together for emblems at this range, shown as marks. */

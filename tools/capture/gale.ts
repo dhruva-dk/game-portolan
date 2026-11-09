@@ -42,7 +42,7 @@ async function press(game: Game, shots: Shots, at: number, p: { x: number; y: nu
 }
 
 export async function gale(r: Rig, o: { dpr: number; device?: string }): Promise<void> {
-  const devices = (o.device?.split(',') ?? ['ipad', 'iphone']) as DeviceName[];
+  const devices = (o.device?.split(',') ?? ['ipad', 'ipadSmall']) as DeviceName[];
   for (const device of devices) {
     if (!(device in DEVICES)) throw new Error(`--device must be among ${Object.keys(DEVICES).join(', ')}`);
     const game = await openApp(r, { device, dpr: o.dpr });

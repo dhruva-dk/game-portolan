@@ -1,4 +1,4 @@
-// Interface transition strips, at the smallest and largest iPad (1180×820, 1376×1032) and iPhone (852×393, 956×440). Each transition is driven through the
+// Interface transition strips, at the smallest and largest iPad (1180×820, 1376×1032). Each transition is driven through the
 // app's real flow, then every running animation on the page is paused and scrubbed through fixed times, so each strip
 // shows the same instants on every run. A last frame shows the screen after everything has settled.
 import { log, openApp, Shots, type Rig } from './common.ts';
@@ -102,7 +102,7 @@ async function strip(game: Game, r: Rig, t: Transition, device: string): Promise
 }
 
 export async function ui(r: Rig, o: { dpr: number; device?: string; only?: string }): Promise<void> {
-  const devices = o.device ? o.device.split(',') : ['ipad', 'ipadSmall', 'iphone', 'iphoneSmall'];
+  const devices = o.device ? o.device.split(',') : ['ipad', 'ipadSmall'];
   const only = o.only?.split(',');
   const list = only ? TRANSITIONS.filter((t) => only.includes(t.name)) : TRANSITIONS;
   for (const device of devices) {

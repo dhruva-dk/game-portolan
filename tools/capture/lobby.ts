@@ -51,12 +51,12 @@ async function press(game: Game, shots: Shots, at: number, p: { x: number; y: nu
 }
 
 export async function lobby(r: Rig, o: { dpr: number; device?: string }): Promise<void> {
-  const devices = (o.device?.split(',') ?? ['ipad', 'iphone']) as DeviceName[];
+  const devices = (o.device?.split(',') ?? ['ipad', 'ipadSmall']) as DeviceName[];
   for (const device of devices) {
     if (!(device in DEVICES)) throw new Error(`--device must be among ${Object.keys(DEVICES).join(', ')}`);
     const game = await openApp(r, { device, dpr: o.dpr });
     const shots = await Shots.create(`lobby-${device}`);
-    // a captain some way into her career, so the cartouche has its marks
+    // a captain some way into her career, so the career plate has its marks
     await game.hook((h) => {
       const c = h.app.career;
       c.career = { ...c.career, xp: 5200, matches: 37, wins: 4, bestTier: 3 };
