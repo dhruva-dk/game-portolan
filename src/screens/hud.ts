@@ -542,7 +542,7 @@ export class Hud {
   #minimap(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plate: Plate, gilt = false): void {
     const D = layer.layout.hud;
     const size = mapFace(g, layer, D, this.#a, m.map.heading, () => {
-      this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide.level));
+      this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide));
     }, gilt);
     this.#touch(D.x, D.y, size, size);
     if (!gilt) this.#regionSign(g, layer, D);

@@ -3,8 +3,7 @@
 // nothing here reads the simulation's state or the career's internals. The abilities and the regions are read
 // straight from src/sim, which is allowed: they are fixed tables.
 import type { AbilityId, ActiveId, PassiveId } from '../sim/abilities.ts';
-import type { WEATHER_NAMES } from '../sim/tables.ts';
-import type { PerkId, RegionId } from '../sim/world/index.ts';
+import type { RegionId } from '../sim/world/index.ts';
 
 // ---------------------------------------------------------------- shared
 
@@ -15,15 +14,6 @@ export type CosmeticKind = 'sailColour' | 'sailPattern' | 'hullPaint' | 'figureh
 /** One cosmetic id per kind: what a ship wears. */
 export type Look = Record<CosmeticKind, string>;
 export type Unlock = { by: 'level'; level: number } | { by: 'rank'; tier: number };
-
-export const KINDS: readonly { kind: CosmeticKind; name: string; one: string }[] = [
-  { kind: 'sailColour', name: 'Sail colours', one: 'Sail colour' },
-  { kind: 'sailPattern', name: 'Sail patterns', one: 'Sail pattern' },
-  { kind: 'hullPaint', name: 'Hull paints', one: 'Hull paint' },
-  { kind: 'figurehead', name: 'Figureheads', one: 'Figurehead' },
-  { kind: 'emblem', name: 'Emblems', one: 'Emblem' },
-  { kind: 'wake', name: 'Wake trails', one: 'Wake trail' },
-];
 
 export interface LevelView {
   level: number;
@@ -39,14 +29,9 @@ export interface RankView {
   tier: number;
   /** 1–3 inside the stepped tiers, 0 for Admiral and Legend. */
   step: number;
-  name: string;
-  /** 0–1 toward the next step. */
-  progress: number;
-  /** True when the tier floor is holding the rank up. */
-  floored: boolean;
 }
 
-export const TIER_NAMES = ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Admiral', 'Legend'] as const;
+const TIER_NAMES = ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Admiral', 'Legend'] as const;
 
 /** Every rank, Iron I to Legend, as the ladder shows them. */
 export const RANK_LADDER: readonly { index: number; tier: number; step: number; name: string }[] = [
@@ -77,18 +62,12 @@ export interface Mark {
 export interface AbilityView {
   id: AbilityId;
   kind: 'active' | 'passive';
-  name: string;
-  text: string;
-  /** Seconds, for actives. */
-  cooldown: number;
   /** The level it unlocks at. */
   level: number;
   unlocked: boolean;
-  isNew: boolean;
 }
 
 export interface AbilitiesModel {
-  level: number;
   abilities: AbilityView[];
   active: ActiveId;
   passive: PassiveId;
@@ -97,19 +76,14 @@ export interface AbilitiesModel {
 export interface CosmeticView {
   id: string;
   kind: CosmeticKind;
-  name: string;
-  hint: string;
   /** The main colour, for colours, paints and wakes. */
   colour?: string;
   rarity: Rarity;
   unlock: Unlock;
   unlocked: boolean;
-  isNew: boolean;
 }
 
 export interface LockerModel {
-  level: number;
-  bestTier: number;
   cosmetics: CosmeticView[];
   look: Look;
 }
@@ -118,29 +92,12 @@ export interface LockerModel {
 
 export interface RivalView extends Mark {
   id: string;
-  name: string;
-  /** What the name means. */
-  meaning: string;
-  /** The sigil, in words. */
-  sigil: string;
-  temperament: { id: string; name: string; text: string };
   /** League standing, such as "Gold II". */
   rank: string;
   active: ActiveId;
   passive: PassiveId;
-  met: number;
-  /** Matches you finished ahead of it, and behind it. */
-  ahead: number;
-  behind: number;
   sankYou: number;
   sunkByYou: number;
-  /** 0–3. */
-  grudge: number;
-  /** 0–1. */
-  rivalry: number;
-  isRival: boolean;
-  /** Plain lines for its card: grudge, what it has learned, the record. */
-  lines: string[];
 }
 
 export interface RivalsModel {
@@ -184,24 +141,10 @@ export const DEFAULT_SETTINGS: Settings = {
 export type WeaponId = 'cannon' | 'harpoon' | 'mortar' | 'repeater' | 'scatter' | 'broadside' | 'chain' | 'heated';
 export type ConsumableId = 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
-export const WEAPON_NAME: Record<WeaponId, string> = {
-  cannon: 'Cannon', harpoon: 'Harpoon', mortar: 'Mortar', repeater: 'Repeater', scatter: 'Scatter Gun', broadside: 'Broadside',
-  chain: 'Chain Shot', heated: 'Heated Shot',
-};
-
-export const CONSUMABLE: Record<ConsumableId, { name: string; stack: number; seconds: number; text: string }> = {
-  smallShield: { name: 'Small Shield', stack: 6, seconds: 1.0, text: '+25 shield, up to 50' },
-  bigShield: { name: 'Big Shield', stack: 3, seconds: 2.6, text: '+50 shield, up to 100' },
-  repairKit: { name: 'Repair Kit', stack: 8, seconds: 1.8, text: '+15 hull, up to 75' },
-  fullRepair: { name: 'Full Repair', stack: 2, seconds: 5.0, text: 'Full hull' },
-};
-
 export type Slot =
   | { kind: 'empty' }
-  | { kind: 'weapon'; weapon: WeaponId; rarity: Rarity; ammo: number; mag: number; /** 0–1 while reloading, else 0. */ reload: number }
+  | { kind: 'weapon'; weapon: WeaponId; rarity: Rarity; ammo: number; /** 0–1 while reloading, else 0. */ reload: number }
   | { kind: 'consumable'; item: ConsumableId; count: number };
-
-export type WeatherName = (typeof WEATHER_NAMES)[number];
 
 /** The minimap, in metres on the sea round you: x east, y north, you at the centre. */
 export interface MapView {
@@ -217,8 +160,8 @@ export interface MapView {
   next: { x: number; y: number; r: number } | null;
   /** Ships the map shows (seen, or spotted), each by its captain's charge and colour. */
   ships: { x: number; y: number; emblem: string; colour: string; spotted?: boolean }[];
-  /** Things worth sailing to: loot, a gull drop, the region's beacon. */
-  marks: { x: number; y: number; kind: 'loot' | 'gull' | 'beacon' }[];
+  /** Loot worth sailing to. */
+  marks: { x: number; y: number }[];
   /** The player's own marker, set on the planet's chart, or null. */
   marker: { x: number; y: number } | null;
   /** While the Gale blows: its course in dotted runs of metres (x, y, x, y…), the Storm's first circle in metres, and
@@ -253,10 +196,9 @@ export interface HudModel {
   slots: Slot[];
   selected: number;
   ability: { id: ActiveId; /** 0–1, 1 ready. */ ready: number; /** Seconds left, while cooling down. */ seconds: number };
-  passive: PassiveId;
   gust: { charges: number; max: number; /** 0–1 toward the next charge. */ recharge: number };
   storm: {
-    phase: number; phases: number; seconds: number; shrinking: boolean;
+    seconds: number; shrinking: boolean;
     /** The second before the first phase: no clock is shown for it. */
     grace: boolean;
     /** How far through the wait or the closing, 0–1. */
@@ -265,70 +207,32 @@ export interface HudModel {
     outside: boolean; depth: number;
   };
   ships: number;
-  kills: number;
-  coins: number;
-  /** The cheapest gull delivery's price, and whether you can call one here; and each parcel's. */
-  gull: { price: number; ready: boolean; parcels: { name: string; price: number; ready: boolean }[] };
   /** How much sail is set: 1 full, 0.5 half, 0 furled. */
   throttle: number;
   /** In a seaway, how steady your deck is for a shot (1 at the top of a roll, 0 swinging through upright); null when
    *  the sea is too slight to roll her. */
   steady: number | null;
-  /** A heavy gun winding up on you (the nearest to firing): its plain name, where it is (radians round from where you
-   *  aim, positive to the right), and how far through its wind-up it is, 0..1. */
-  aimed: { weapon: string; bearing: number; wound: number } | null;
-  /** A consumable in use, with its progress. */
-  using: { item: ConsumableId; progress: number } | null;
-  region: string;
+  /** A heavy gun winding up on you (the nearest to firing): where it is (radians round from where you aim, positive
+   *  to the right), and how far through its wind-up it is, 0..1. */
+  aimed: { bearing: number; wound: number } | null;
+  /** How far through using a consumable, 0–1, while one is in use. */
+  using: { progress: number } | null;
   /** The region's id, for its sign; null on the open sea. */
   regionId: RegionId | null;
   /** The watched ship's own colour: her hull bar's wash. */
   colour: string;
-  /** The region's perk, when you are in your drop region's water. */
-  perk: string | null;
-  /** Every perk you hold, in the regions' order. */
-  perks: PerkId[];
-  /** The weather you are well inside, if any. */
-  weather: WeatherName | null;
-  /** The sea level in metres, from −1 at low water to +1 at high, and whether it is rising. */
-  tide: { level: number; rising: boolean };
-  night: boolean;
-  /** What a pickup button would take, if anything is in reach. */
+  /** The sea level in metres, from −1 at low water to +1 at high. */
+  tide: number;
+  /** What a swap would take, if anything is in reach. */
   pickup: string | null;
   map: MapView;
 }
 
-/** What the HUD's controls say this frame: integration maps it onto the simulation's input. */
-export interface HudInput {
-  /** The stick: x right, y forward, each -1 to 1. */
-  steer: { x: number; y: number };
-  /** Aim turned since the last read, in radians (yaw right, pitch down), sensitivity applied. */
-  look: { x: number; y: number };
-  fire: boolean;
-  /** Edges: true for the one read after the tap. */
-  gust: boolean;
-  ability: boolean;
-  /** A slot tapped, or -1. */
-  select: number;
-  reload: boolean;
-  drop: boolean;
-  pickup: boolean;
-  gull: boolean;
-  map: boolean;
-  pause: boolean;
-}
-
 export interface ResultsModel {
   place: number;
-  ships: number;
   kills: number;
   damage: number;
   survived: number;
-  xp: { parts: { label: string; amount: number }[]; total: number };
   level: { before: LevelView; after: LevelView };
-  rank: { before: RankView; after: RankView; change: 'up' | 'down' | 'same'; newTier: boolean };
-  unlocked: { abilities: AbilityView[]; cosmetics: CosmeticView[] };
-  /** Regions charted for the first time. */
-  newRegions: { index: number; name: string }[];
-  rivals: (Mark & { id: string; name: string; what: 'sankYou' | 'sunkByYou' | 'grudge' | 'firstMeeting' })[];
+  rank: { before: RankView; after: RankView };
 }

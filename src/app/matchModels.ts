@@ -1,28 +1,20 @@
 // The interface's view models from the match: what the HUD and the results show, and the fleet's marks
 // for the chart, read from the session and the career's changes. Like models.ts, the screens never see the simulation
 // itself.
+import { cosmetic, levelOf, type Career, type Look, type MatchChanges, type Rank } from '../career/index.ts';
+import { ability, type ActiveId } from '../sim/abilities.ts';
 import {
-  ABILITY_LEVEL, CAPTAINS, captainIndex, cosmetic, levelOf, wornLook, type Career, type Look, type MatchChanges, type Rank,
-} from '../career/index.ts';
-import { ability, type AbilityId, type ActiveId } from '../sim/abilities.ts';
-import { canCall, priceOf } from '../sim/economy.ts';
-import {
-  ACTIVES, PASSIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, WEATHER_NAMES, inStorm, isNight, newSky, newStormView, seen, SEEN, skyAt,
-  stormView, type MatchState, type Ship, type StormView,
+  ACTIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, inStorm, newStormView, seen, SEEN, stormView, type MatchState, type Ship, type StormView,
 } from '../sim/match.ts';
 import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { GALE, GUST, LOOT, PARCELS, PARTS } from '../sim/tables.ts';
+import { GALE, GUST, LOOT, PARTS } from '../sim/tables.ts';
 import { R, angleTo, apart, tangentToward } from '../sim/sphere.ts';
 import { aimedAt } from '../sim/combat.ts';
 import { REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
-import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type HudModel, type Rarity,
-  type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot,
-  type WeaponId, type WeatherName, WEAPON_NAME,
-} from '../ui/model.ts';
+import type { ConsumableId, HudModel, LevelView, MapView, Mark, RankView, Rarity, ResultsModel, Slot, WeaponId } from '../ui/model.ts';
 import type { MapShip, PlanetMapModel } from '../screens/fullmap.ts';
 import { consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
@@ -32,9 +24,6 @@ import type { CosmeticIds } from '../render/actors/index.ts';
 const DEG = 180 / Math.PI;
 const SV = newStormView();
 const MAP_RANGE = 320;
-const SKY = newSky();
-/** How deep into a weather system before the HUD names it, as the tips do. */
-const WEATHER_DEEP = 0.4;
 
 const rarityOf = (n: number): Rarity => Math.max(0, Math.min(4, Math.round(n))) as Rarity;
 const colourOf = (id: string, fallback: string): string => cosmetic(id)?.colour ?? fallback;
@@ -55,9 +44,7 @@ const shipMark = (session: Session, i: number): Mark => markOfIds(session.looks[
 
 export const levelFrom = (l: { level: number; into: number; need: number }): LevelView => ({ level: l.level, into: l.into, need: l.need });
 
-export const rankFrom = (r: Rank): RankView => ({
-  index: r.step.index, tier: r.step.tier, step: r.step.step, name: r.step.name, progress: r.progress, floored: r.floored,
-});
+export const rankFrom = (r: Rank): RankView => ({ index: r.step.index, tier: r.step.tier, step: r.step.step });
 
 /** Latitude and longitude in degrees, the sim's way round: longitude grows east, toward −z. */
 function latLon(p: V3): { lat: number; lon: number } {
@@ -81,7 +68,7 @@ function slotOf(sh: Ship, k: number): Slot {
   const w = WEAPONS[it.kind];
   if (w) {
     const reload = k === sh.sel && sh.reload > 0 ? Math.max(0, Math.min(1, 1 - sh.reload / w.reload)) : 0;
-    return { kind: 'weapon', weapon: weaponOf(it.kind) as WeaponId, rarity: rarityOf(it.rarity), ammo: it.n, mag: w.mag, reload };
+    return { kind: 'weapon', weapon: weaponOf(it.kind) as WeaponId, rarity: rarityOf(it.rarity), ammo: it.n, reload };
   }
   return { kind: 'consumable', item: consumableOf(it.kind) as ConsumableId, count: it.n };
 }
@@ -108,8 +95,7 @@ function mapOf(session: Session, i: number): MapView {
     ships.push({ ...rel(s.ships[j].pos), emblem: mark.emblem, colour: mark.colours[0], ...(v & SEEN.visible ? {} : { spotted: true }) });
   }
   const marks: MapView['marks'] = [];
-  for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push({ ...rel(l.at), kind: 'loot' });
-  if (sh.gull.state !== 0) marks.push({ ...rel(sh.gull.at), kind: 'gull' });
+  for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push(rel(l.at));
   return {
     lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: MAP_RANGE,
     storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
@@ -197,14 +183,6 @@ function pickupOf(s: MatchState, sh: Ship): string | null {
   return best;
 }
 
-/** The weather the HUD names at p: the deepest kind you are well inside, or null. */
-function weatherAt(s: MatchState, p: V3): WeatherName | null {
-  skyAt(s, p, SKY);
-  let best: WeatherName | null = null;
-  for (const w of WEATHER_NAMES) if (SKY[w] > WEATHER_DEEP && (!best || SKY[w] > SKY[best])) best = w;
-  return best;
-}
-
 /** Metres into the Storm at which its tint on the screen is deepest. */
 const STORM_DEEP = 400;
 
@@ -233,7 +211,7 @@ function aimedOf(s: MatchState, i: number, aim: V3): HudModel['aimed'] {
     left = o.windup;
     tangentToward(me.pos, aim, AIM_T);
     tangentToward(me.pos, o.pos, TO_T);
-    best = { weapon: WEAPON_NAME[weaponOf(o.slots[o.sel].kind) as WeaponId], bearing: angleTo(AIM_T, TO_T, me.pos), wound: 1 - o.windup / w.windup };
+    best = { bearing: angleTo(AIM_T, TO_T, me.pos), wound: 1 - o.windup / w.windup };
   }
   return best;
 }
@@ -243,7 +221,7 @@ export function hudModel(session: Session): HudModel {
   const s = session.state, sh = s.ships[session.watch];
   const id = ACTIVES[sh.active] as ActiveId, cool = ability(id).cooldown;
   stormView(s, SV);
-  const use = sh.use >= 0 ? sh.slots[sh.use] : null, r = regionAt(sh.pos), now = s.tick * TICK, level = seaLevelAt(now);
+  const use = sh.use >= 0 ? sh.slots[sh.use] : null, r = regionAt(sh.pos);
   return {
     shield: Math.round(sh.shield), shieldMax: 100, hull: Math.round(sh.hull), hullMax: 100,
     parts: {
@@ -253,62 +231,29 @@ export function hudModel(session: Session): HudModel {
     slots: sh.slots.map((_, k) => slotOf(sh, k)),
     selected: sh.sel,
     ability: { id, ready: Math.max(0, Math.min(1, 1 - sh.cooldown / cool)), seconds: Math.ceil(Math.max(0, sh.cooldown)) },
-    passive: PASSIVES[sh.passive],
     gust: { charges: sh.gusts, max: GUST.charges, recharge: sh.gusts >= GUST.charges ? 1 : Math.min(1, sh.gustT / GUST.recharge) },
     storm: {
-      phase: SV.phase, phases: STORM.phases.length, seconds: Math.ceil(SV.left), shrinking: SV.closing, grace: s.tick < s.storm.start, progress: stormProgress(SV),
+      seconds: Math.ceil(SV.left), shrinking: SV.closing, grace: s.tick < s.storm.start, progress: stormProgress(SV),
       outside: inStorm(s, sh.pos), depth: Math.max(0, Math.min(1, -toEdge(s, sh.pos) / STORM_DEEP)),
     },
     ships: afloat(s),
-    kills: sh.kills,
-    coins: Math.floor(sh.coins),
-    gull: {
-      price: priceOf(sh, 0), ready: canCall(sh, 0),
-      parcels: PARCELS.map((p, t) => ({ name: p.name, price: priceOf(sh, t), ready: canCall(sh, t) })),
-    },
     throttle: session.watch === PLAYER ? session.throttle : 1,
     steady: steadyOf(s, session.watch),
     aimed: aimedOf(s, session.watch, session.aim),
-    using: use ? { item: consumableOf(use.kind) as ConsumableId, progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
-    region: REGIONS[r]?.name ?? 'the open sea',
+    using: use ? { progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     regionId: REGIONS[r]?.id ?? null,
     colour: shipMark(session, session.watch).colours[0],
-    perk: sh.perks & (1 << r) ? REGIONS[r].perkName : null,
-    perks: REGIONS.filter((_, k) => sh.perks & (1 << k)).map((x) => x.perk),
-    weather: weatherAt(s, sh.pos),
-    tide: { level, rising: seaLevelAt(now + 1) > level },
-    night: isNight(s, sh.pos),
+    tide: seaLevelAt(s.tick * TICK),
     pickup: pickupOf(s, sh),
     map: mapOf(session, session.watch),
   };
 }
 
-function abilityView(id: AbilityId): AbilityView {
-  const a = ability(id);
-  return { id, kind: a.kind, name: a.name, text: a.text, cooldown: a.cooldown, level: ABILITY_LEVEL[id], unlocked: true, isNew: true };
-}
-
-function cosmeticView(id: string): CosmeticView | null {
-  const c = cosmetic(id);
-  if (!c) return null;
-  return { id, kind: c.kind, name: c.name, hint: c.hint, ...(c.colour ? { colour: c.colour } : {}), rarity: unlockRarity(c.unlock), unlock: c.unlock, unlocked: true, isNew: true };
-}
-
 /** The results, from what the career's applyMatch changed and the match's own numbers. */
 export function resultsModel(c: MatchChanges, after: Career, report: { damage: number; survived: number }): ResultsModel {
   return {
-    place: c.place, ships: SHIPS, kills: c.kills, damage: report.damage, survived: report.survived,
-    xp: { parts: c.xp.parts.map((p) => ({ ...p })), total: c.xp.total },
+    place: c.place, kills: c.kills, damage: report.damage, survived: report.survived,
     level: { before: levelFrom(c.level.before), after: levelFrom(levelOf(after.xp)) },
-    rank: { before: rankFrom(c.rank.before), after: rankFrom(c.rank.after), change: c.rank.change, newTier: c.rank.newTier },
-    unlocked: {
-      abilities: c.unlocked.abilities.map(abilityView),
-      cosmetics: c.unlocked.cosmetics.map(cosmeticView).filter((v): v is CosmeticView => v !== null),
-    },
-    newRegions: c.newRegions.map((index) => ({ index, name: REGIONS[index]?.name ?? '' })),
-    rivals: c.rivals.map((r) => {
-      const cap = CAPTAINS[captainIndex(r.captain)];
-      return { ...markOf(cap?.look ?? wornLook(after)), id: r.captain, name: cap?.name ?? r.captain, what: r.what };
-    }),
+    rank: { before: rankFrom(c.rank.before), after: rankFrom(c.rank.after) },
   };
 }

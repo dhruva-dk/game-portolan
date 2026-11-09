@@ -16,38 +16,32 @@ export function levelView(c: Career): LevelView {
 
 export function rankView(c: Career): RankView {
   const r = careerRank(c);
-  return { index: r.step.index, tier: r.step.tier, step: r.step.step, name: r.step.name, progress: r.progress, floored: r.floored };
+  return { index: r.step.index, tier: r.step.tier, step: r.step.step };
 }
 
-/** Every ability, the ones your level has reached unlocked, with those the last match unlocked marked new. */
-export function abilitiesModel(c: Career, fresh: ReadonlySet<string> = new Set()): AbilitiesModel {
+/** Every ability, the ones your level has reached unlocked. */
+export function abilitiesModel(c: Career): AbilitiesModel {
   const open = new Set<string>(unlockedAbilities(c));
   return {
-    level: careerLevel(c), active: c.active as ActiveId, passive: c.passive as PassiveId,
-    abilities: ABILITIES.map((a) => ({
-      id: a.id, kind: a.kind, name: a.name, text: a.text, cooldown: a.cooldown, level: ABILITY_LEVEL[a.id], unlocked: open.has(a.id), isNew: fresh.has(a.id),
-    })),
+    active: c.active as ActiveId, passive: c.passive as PassiveId,
+    abilities: ABILITIES.map((a) => ({ id: a.id, kind: a.kind, level: ABILITY_LEVEL[a.id], unlocked: open.has(a.id) })),
   };
 }
 
-const cosmeticView = (k: Cosmetic, level: number, bestTier: number, fresh: ReadonlySet<string>): CosmeticView => ({
-  id: k.id, kind: k.kind, name: k.name, hint: k.hint, ...(k.colour ? { colour: k.colour } : {}), rarity: rarityOf(k.unlock), unlock: k.unlock,
-  unlocked: isUnlocked(k, level, bestTier), isNew: fresh.has(k.id),
+const cosmeticView = (k: Cosmetic, level: number, bestTier: number): CosmeticView => ({
+  id: k.id, kind: k.kind, ...(k.colour ? { colour: k.colour } : {}), rarity: rarityOf(k.unlock), unlock: k.unlock, unlocked: isUnlocked(k, level, bestTier),
 });
 
-export function lockerModel(c: Career, fresh: ReadonlySet<string> = new Set()): LockerModel {
+export function lockerModel(c: Career): LockerModel {
   const level = careerLevel(c);
-  return { level, bestTier: c.bestTier, cosmetics: COSMETICS.map((k) => cosmeticView(k, level, c.bestTier, fresh)), look: wornLook(c) };
+  return { cosmetics: COSMETICS.map((k) => cosmeticView(k, level, c.bestTier)), look: wornLook(c) };
 }
 
 /** The league's captains, rivals first, with your record against each. */
 export function rivalsModel(c: Career): RivalsModel {
   return {
     rivals: rivalsOf(c).map((r) => ({
-      ...markOf(r.captain.look), id: r.captain.id, name: r.captain.name, meaning: r.captain.meaning, sigil: r.captain.sigil.name,
-      temperament: { id: r.temperament.id, name: r.temperament.name, text: r.temperament.text }, rank: r.rank,
-      active: r.captain.active, passive: r.captain.passive, met: r.met, ahead: r.ahead, behind: r.behind, sankYou: r.sankYou,
-      sunkByYou: r.sunkByYou, grudge: r.grudge, rivalry: r.rivalry, isRival: r.isRival, lines: r.lines,
+      ...markOf(r.captain.look), id: r.captain.id, rank: r.rank, active: r.captain.active, passive: r.captain.passive, sankYou: r.sankYou, sunkByYou: r.sunkByYou,
     })),
   };
 }
@@ -56,6 +50,6 @@ export function rankModel(c: Career): RankModel {
   const level = careerLevel(c);
   return {
     rank: rankView(c), bestTier: c.bestTier,
-    rewards: COSMETICS.filter((k) => k.unlock.by === 'rank').map((k) => cosmeticView(k, level, c.bestTier, new Set())),
+    rewards: COSMETICS.filter((k) => k.unlock.by === 'rank').map((k) => cosmeticView(k, level, c.bestTier)),
   };
 }

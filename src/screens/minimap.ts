@@ -80,7 +80,6 @@ export class Minimap {
     if (v.course) pen.rule(runs(v.course), { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0.2, seed: 44 }, 1, [0, 6]);
     const loot = new Path2D();
     for (const mk of v.marks) {
-      if (mk.kind !== 'loot') continue;
       const [x, y] = at(mk.x, mk.y);
       loot.moveTo(x + 2.4, y);
       loot.arc(x, y, 2.4, 0, TAU);
