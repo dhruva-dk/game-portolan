@@ -1,11 +1,11 @@
-// The chart's small drawings: a pennant on its staff, tally marks, the sand-glass, the pointing hand, gilt stars, the
-// inked cross of a mark, a fight's burst, the sun and the moon, the stamp a landed thing leaves, and the plain
-// instruments of the controls (the stick's ring and nub, the sails' notched quadrant, the settings' dividers).
+// The chart's small drawings: a pennant on its staff, the pointing hand, gilt stars, the inked cross of a mark, a fight's
+// burst, the sun and the moon, the stamp a landed thing leaves, a laurel, and the dotted and burning rings of a course
+// and the Storm.
 //
-// All take t, 0..1, and ink themselves in as it runs; the live ones (a pennant's flutter, the sand running) take their
-// state as plain numbers so the live layer can redraw them each frame for the price of a few paths.
+// All take t, 0..1, and ink themselves in as it runs; a live one (a pennant's flutter) takes its state as plain numbers
+// so the live layer can redraw it each frame for the price of a few paths.
 import { hash, clamp, smooth, noise1 } from './noise.ts';
-import { arcPts, cubic, shape, trace, type Pen, type Pts } from './pen.ts';
+import { arcPts, shape, trace, type Pen, type Pts } from './pen.ts';
 import type { InkName } from './inks.ts';
 
 const TAU = Math.PI * 2;
@@ -119,129 +119,6 @@ export function pennant(pen: Pen, o: PennantOptions, t = 1): void {
     g.restore();
   }
   pen.rule([sh.outline], { w: 'fine', seed: o.seed ?? 5, wobble: 0.15 });
-}
-
-// ---------------------------------------------------------------- tally
-
-/** Tally marks for n: fours struck through by a fifth, each a quill stroke, inked one after another. */
-export function tally(pen: Pen, n: number, x: number, y: number, h: number, t = 1, ink: InkName = 'iron', seed = 9): number {
-  const gap = h * 0.24, groupW = gap * 3 + h * 0.62;
-  const strokes: Pts[] = [];
-  for (let i = 0; i < n; i++) {
-    const gi = Math.floor(i / 5), k = i % 5, gx = x + gi * groupW;
-    const j1 = hash(i, 1, seed) - 0.5, j2 = hash(i, 2, seed) - 0.5, j3 = hash(i, 3, seed) - 0.5;
-    if (k < 4) {
-      const sx = gx + k * gap + j1 * gap * 0.2;
-      strokes.push([sx + j2 * h * 0.05, y - h * (0.98 + j3 * 0.08), sx - h * 0.04, y + j1 * h * 0.04]);
-    } else {
-      strokes.push([gx - gap * 0.75, y - h * (0.12 + j1 * 0.06), gx + gap * 3.8, y - h * (0.9 + j2 * 0.08)]);
-    }
-  }
-  pen.strokes(strokes, { w: Math.max(pen.widths.fine, h * 0.075), ink, nib: 0.45, angle: -0.7, pool: 0.7, taper: h * 0.12, seed }, t, 0.1);
-  const groups = Math.ceil(n / 5);
-  return groups * groupW - (n % 5 === 0 || n === 0 ? h * 0.62 - gap * 0.5 : 0);
-}
-
-// ---------------------------------------------------------------- sand-glass
-
-/** The glass's half-width at a height v (−1 the top plate, 0 the waist, +1 the bottom plate), as a share of its width. */
-const bulb = (v: number) => {
-  const a = Math.abs(v);
-  return 0.045 + 0.4 * Math.sin(Math.min(1, a / 0.86) * Math.PI * 0.94) ** 0.9 * (a < 0.15 ? smooth(0.02, 0.15, a) * 0.6 + 0.4 : 1);
-};
-
-export interface GlassOptions {
-  /** Share of the sand still in the top bulb, 1 full to 0 run out. */
-  sand: number;
-  /** The thread of sand falling. */
-  running?: boolean;
-  /** The sand's wash. */
-  colour?: string;
-  /** For the falling grains. */
-  time?: number;
-}
-
-/**
- * A sand-glass, `h` tall, centred at (x, y): turned end plates and posts, two blown bulbs with their glints, and the
- * sand: a dip in the top as it drains, a cone growing in the bottom, the thread falling between.
- */
-export function sandglass(pen: Pen, x: number, y: number, h: number, o: GlassOptions, t = 1): void {
-  if (t <= 0) return;
-  const w = h * 0.56, hh = h / 2, plate = h * 0.07, inner = hh - plate;
-  const sandC = o.colour ?? '#c99a4a';
-  // the glass: its profile as points, down the right side and up the left
-  const right: Pts = [], left: Pts = [];
-  for (let i = 0; i <= 24; i++) {
-    const v = -1 + (i / 24) * 2, hw = bulb(v) * w;
-    right.push(x + hw, y + v * inner);
-  }
-  for (let i = 24; i >= 0; i--) {
-    const v = -1 + (i / 24) * 2, hw = bulb(v) * w;
-    left.push(x - hw, y + v * inner);
-  }
-  const glass = shape([...right, ...left]);
-  const gt = span(t, 0.2, 0.7);
-  // the sand: top, below a dished surface; bottom, a heap
-  const st = span(t, 0.55, 1);
-  if (st > 0) {
-    const s = clamp(o.sand), g = pen.g;
-    g.save();
-    g.clip(glass);
-    if (s > 0.005) {
-      // the top bulb's sand: from the waist up to a level that falls as it drains, dished in the middle
-      const level = -0.04 - 0.8 * Math.pow(s, 0.8), dish = 0.12 * (1 - s) + 0.04;
-      const pts: Pts = [];
-      for (let i = 0; i <= 16; i++) {
-        const u = i / 16, xx = x + (u - 0.5) * w * 1.1;
-        pts.push(xx, y + inner * (level + dish * (1 - Math.pow(2 * u - 1, 2))));
-      }
-      pts.push(x + w, y, x - w, y);
-      pen.wash(shape(pts), sandC, { alpha: 0.9, edge: 0.5, gran: 1, shift: [0, 0] }, st);
-    }
-    const heap = 0.1 + 0.62 * (1 - s);
-    const pile: Pts = [x - w, y + inner, x + w, y + inner];
-    for (let i = 0; i <= 16; i++) {
-      const u = i / 16, xx = x + (0.5 - u) * w * 1.2, d = Math.abs(1 - 2 * u);
-      pile.push(xx, y + inner * (1 - heap * (1 - Math.pow(d, 1.4)) - 0.08));
-    }
-    pen.wash(shape(pile), sandC, { alpha: 0.95, edge: 0.5, gran: 1, shift: [0, 0] }, st);
-    if (o.running && s > 0.005) {
-      const top = y + inner * 0.02, bot = y + inner * (1 - heap - 0.08);
-      pen.rule([[x, top, x, bot]], { w: Math.max(0.7, h * 0.012), ink: '#a8782e', wobble: 0 });
-      const tm = o.time ?? 0;
-      for (let i = 0; i < 4; i++) {
-        const f = (tm * 2.2 + i / 4) % 1;
-        pen.dot(x + (hash(i, Math.floor(tm * 2.2 + i / 4), 3) - 0.5) * 1.6, top + (bot - top) * f, Math.max(0.5, h * 0.008), '#a8782e', 0.8);
-      }
-    }
-    g.restore();
-  }
-  // glints on the glass: lead white, down the left of each bulb
-  if (gt > 0) {
-    pen.stroke(cubic([], x - w * 0.27, y - inner * 0.82, x - w * 0.34, y - inner * 0.62, x - w * 0.33, y - inner * 0.42, x - w * 0.2, y - inner * 0.24, 8), { w: Math.max(1, h * 0.022), ink: 'white', alpha: 0.75, nib: 0, pool: 0, seed: 4 }, gt);
-    pen.stroke(cubic([], x - w * 0.22, y + inner * 0.3, x - w * 0.33, y + inner * 0.46, x - w * 0.34, y + inner * 0.64, x - w * 0.27, y + inner * 0.8, 8), { w: Math.max(1, h * 0.018), ink: 'white', alpha: 0.6, nib: 0, pool: 0, seed: 5 }, gt);
-    pen.stroke(right, { w: 'fine', nib: 0.2, pool: 0.1, taper: 1, seed: 6 }, gt);
-    pen.stroke(left, { w: 'fine', nib: 0.2, pool: 0.1, taper: 1, seed: 7 }, gt);
-  }
-  // the frame: plates, turned posts, knobs
-  const ft = span(t, 0, 0.5);
-  for (const sgn of [-1, 1]) {
-    const py = y + sgn * (hh - plate / 2);
-    const pl = shape([x - w * 0.62, py - plate / 2, x + w * 0.62, py - plate / 2, x + w * 0.66, py + plate / 2, x - w * 0.66, py + plate / 2]);
-    pen.wash(pl, '#8a5a2c', { alpha: 0.85 * ft, edge: 0.4, gran: 0.6, shift: [0, 0] });
-    pen.stroke([x - w * 0.62, py - plate / 2, x + w * 0.62, py - plate / 2, x + w * 0.66, py + plate / 2, x - w * 0.66, py + plate / 2, x - w * 0.62, py - plate / 2], { w: 'fine', nib: 0.2, pool: 0.2, taper: 1, seed: 10 + sgn }, ft);
-    // knob
-    pen.stroke(arcPts(x, py + sgn * plate * 0.95, plate * 0.42, sgn > 0 ? 0 : Math.PI, sgn > 0 ? Math.PI : TAU), { w: 'fine', pool: 0.2, seed: 12 + sgn }, ft);
-  }
-  for (const sgn of [-1, 1]) {
-    const px = x + sgn * w * 0.54, pts: Pts = [];
-    // a bobbin-turned post: swelling and necking down its length
-    for (let i = 0; i <= 20; i++) {
-      const v = -1 + (i / 20) * 2;
-      pts.push(px + sgn * Math.sin(v * Math.PI * 3) * h * 0.012, y + v * (inner + 1));
-    }
-    pen.stroke(pts, { w: Math.max(pen.widths.fine, h * 0.03), nib: 0.1, pool: 0.1, seed: 20 + sgn }, ft);
-  }
 }
 
 // ---------------------------------------------------------------- the pointing hand
@@ -429,90 +306,7 @@ export function moon(pen: Pen, x: number, y: number, r: number, t = 1): void {
   pen.stroke(c, { w: Math.max(pen.widths.hair, r * 0.06), pool: 0.3, seed: 75 }, span(t, 0, 0.8));
 }
 
-// ---------------------------------------------------------------- instruments for the controls
-
-/** The stick: a plain inked ring, and the nub within it at (nx, ny), paper over ink. */
-export function stick(pen: Pen, x: number, y: number, r: number, nx: number, ny: number, t = 1, press = 0): void {
-  if (t <= 0) return;
-  pen.rule([arcPts(x, y, r, -Math.PI / 2, -Math.PI / 2 + TAU * span(t, 0, 0.7), 60)], { w: 'fine', alpha: 0.85, seed: 81 });
-  pen.rule([arcPts(x, y, r * 0.93, 0, TAU * span(t, 0.1, 0.8), 60)], { w: 'hair', alpha: 0.5, seed: 82 }, 1, [0, 4]);
-  const nt = span(t, 0.5, 1), nr = r * 0.36;
-  if (nt > 0) {
-    const nub = new Path2D();
-    nub.arc(nx, ny, nr, 0, TAU);
-    pen.paperFill(nub, nt);
-    pen.mood({ dark: press }, () => {
-      pen.wash(nub, '#a07850', { alpha: 0.25 + 0.3 * press, edge: 0.6, gran: 0.6, shift: [0, 0] }, nt);
-      pen.stroke(arcPts(nx, ny, nr, -Math.PI / 2, Math.PI * 1.5, 40), { w: 'bold', nib: 0.2, pool: 0.3, seed: 83 }, nt);
-      pen.stroke(arcPts(nx, ny, nr * 0.55, -Math.PI / 2, Math.PI * 1.5, 30), { w: 'hair', nib: 0.2, pool: 0.1, seed: 84 }, nt);
-    });
-  }
-}
-
-/**
- * The settings' instrument: a pair of brass dividers, the chartmaker's own tool, standing open on their points with the
- * hinge at the top. `spread` is half the angle between the legs (a press closes them a little); (x, y) is the middle
- * of the instrument, `size` its height.
- */
-export function dividers(pen: Pen, x: number, y: number, size: number, spread = 0.36, t = 1): void {
-  if (t <= 0) return;
-  const hx = x, hy = y - size * 0.36, L = size * 0.84, w = size * 0.075;
-  for (const side of [-1, 1]) {
-    // the leg: broad at the hinge, filed to a point, bevelled down its middle
-    const a = side * spread, dx = Math.sin(a), dy = Math.cos(a), nx = dy, ny = -dx;
-    const px = hx + dx * L, py = hy + dy * L, kx = hx + dx * L * 0.78, ky = hy + dy * L * 0.78;
-    const leg = [hx + nx * w, hy + ny * w, kx + nx * w * 0.55, ky + ny * w * 0.55, px, py, kx - nx * w * 0.55, ky - ny * w * 0.55, hx - nx * w, hy - ny * w];
-    pen.gilt(shape(leg), 'gold', hx, hy + L * 0.4, L * 0.6, span(t, 0.35, 0.9));
-    pen.stroke([...leg, leg[0], leg[1]], { w: 'fine', nib: 0.25, pool: 0.3, taper: 1, seed: side > 0 ? 95 : 96 }, span(t, 0, 0.65));
-    pen.rule([[hx, hy, kx, ky]], { w: 'hair', alpha: 0.6, seed: side > 0 ? 97 : 98 }, span(t, 0.3, 0.8));
-  }
-  // the hinge, and the knurled grip above it
-  const ht = span(t, 0.55, 1);
-  if (ht > 0) {
-    const r = size * 0.1, grip = shape([hx - r * 0.45, hy - r * 0.6, hx - r * 0.38, hy - r * 2.6, hx + r * 0.38, hy - r * 2.6, hx + r * 0.45, hy - r * 0.6]);
-    pen.gilt(grip, 'gold', hx, hy - r * 1.6, r * 1.2, ht);
-    pen.stroke([hx - r * 0.45, hy - r * 0.6, hx - r * 0.38, hy - r * 2.6, hx + r * 0.38, hy - r * 2.6, hx + r * 0.45, hy - r * 0.6], { w: 'hair', pool: 0.2, seed: 99 }, ht);
-    pen.rule([0.9, 1.4, 1.9].map((k) => [hx - r * 0.42, hy - r * k, hx + r * 0.42, hy - r * k]), { w: 'hair', alpha: 0.55, seed: 100 }, ht);
-    const pivot = new Path2D();
-    pivot.arc(hx, hy, r, 0, TAU);
-    pen.gilt(pivot, 'gold', hx, hy, r, ht);
-    pen.stroke(arcPts(hx, hy, r, 0, TAU, 24), { w: 'fine', pool: 0.1, seed: 101 }, ht);
-    pen.dot(hx, hy, Math.max(0.6, r * 0.22), 'iron', 0.9 * ht);
-  }
-}
-
-/**
- * The sails' instrument: a brass quadrant with three notches, the index arm resting in one (0, 1, 2: furled, half,
- * full). `at` may be fractional while the arm swings.
- */
-export function quadrant(pen: Pen, x: number, y: number, r: number, at: number, t = 1): void {
-  if (t <= 0) return;
-  const a0 = -Math.PI * 0.85, a1 = -Math.PI * 0.15;
-  const limb = new Path2D();
-  limb.arc(x, y, r, a0, a1);
-  limb.arc(x, y, r * 0.78, a1, a0, true);
-  limb.closePath();
-  pen.wash(limb, '#b48a3c', { alpha: 0.8, edge: 0.6, gran: 0.8, shift: [0, 0] }, span(t, 0.3, 0.9));
-  pen.stroke([...arcPts(x, y, r, a0, a1, 30), x + Math.cos(a1) * r * 0.78, y + Math.sin(a1) * r * 0.78, ...arcPts(x, y, r * 0.78, a1, a0, 24), x + Math.cos(a0) * r, y + Math.sin(a0) * r],
-    { w: 'fine', nib: 0.2, pool: 0.3, seed: 91 }, span(t, 0, 0.6));
-  // the radii to the centre, and the three notches
-  pen.rule([[x, y, x + Math.cos(a0) * r * 0.78, y + Math.sin(a0) * r * 0.78], [x, y, x + Math.cos(a1) * r * 0.78, y + Math.sin(a1) * r * 0.78]], { w: 'hair', seed: 92 }, span(t, 0.2, 0.7));
-  for (let k = 0; k < 3; k++) {
-    const a = a0 + ((k + 0.5) / 3) * (a1 - a0);
-    const notch = shape([x + Math.cos(a - 0.06) * r, y + Math.sin(a - 0.06) * r, x + Math.cos(a) * r * 0.86, y + Math.sin(a) * r * 0.86, x + Math.cos(a + 0.06) * r, y + Math.sin(a + 0.06) * r]);
-    pen.fill(notch, 'iron', 0.85 * span(t, 0.5, 0.9));
-  }
-  // the index arm
-  const it = span(t, 0.6, 1);
-  if (it > 0) {
-    const a = a0 + ((clamp(at, 0, 2) + 0.5) / 3) * (a1 - a0);
-    pen.stroke([x, y, x + Math.cos(a) * r * 1.06, y + Math.sin(a) * r * 1.06], { w: 'bold', nib: 0.1, pool: 0.6, seed: 93 }, it);
-    const piv = new Path2D();
-    piv.arc(x, y, r * 0.09, 0, TAU);
-    pen.gilt(piv, 'gold', x, y, r * 0.1, it);
-    pen.stroke(arcPts(x, y, r * 0.09, 0, TAU, 16), { w: 'hair', pool: 0, seed: 94 }, it);
-  }
-}
+// ---------------------------------------------------------------- courses and circles
 
 /** Wake: an ink trail that dries out toward its far end, through points from the ship back. */
 export function wake(pen: Pen, pts: ArrayLike<number>, colour: InkName | string = 'iron', alpha = 0.7): void {

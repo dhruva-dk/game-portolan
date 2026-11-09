@@ -12,8 +12,7 @@
 // Ink (pen.ts, inks.ts): quill strokes with t, rules, washes, gilt, hatching; iron-gall, rubric, verdigris, azurite,
 // shell gold, lead white; washes in any captain's colour and the sea's.
 // Objects: rose.ts (rose 8/16/32, graduated ring, rhumb line and web, fleur, needle, feathered arrow), marks.ts
-// (pennant and staff, tally, sand-glass, pointing hand, stars, cross, burst, stamp, sun, moon, stick, quadrant,
-// dividers, wake, dotted and storm rings), coast.ts (the planet's coastlines, traced from its heights and inked over
+// (pennant and staff, pointing hand, stars, cross, burst, stamp, laurel, sun, moon, wake, dotted and storm rings), coast.ts (the planet's coastlines, traced from its heights and inked over
 // the live globe), seal.ts (wax seals in five illuminations, with relief and sheen), cartouche.ts (strapwork
 // cartouche, level rings), galleon.ts (the captain's mark), emblem.ts, numerals.ts (the numeral hand), letters.ts (roman
 // capitals for PLAY and DIVE), woodcut.ts
@@ -27,8 +26,7 @@ export { INKS, WASH, type InkName } from './inks.ts';
 export { bakeDisc, bakeSheet, drawBaked, ruledFrame, type Baked, type SheetWeight, type Side } from './sheet.ts';
 export { arrow, fleur, needle, rhumb, rhumbWeb, ring, rose, type RingOptions, type RoseOptions } from './rose.ts';
 export {
-  burst, cross, dividers, dottedRing, hand, laurel, moon, pennant, quadrant, sandglass, staff, stamp, star, stick, stormRing, sun, tally, wake,
-  type GlassOptions, type PennantOptions,
+  burst, cross, dottedRing, hand, laurel, moon, pennant, staff, stamp, star, stormRing, sun, wake, type PennantOptions,
 } from './marks.ts';
 export { ILLUMINATIONS, bakeSeal, drawSeal, type Device, type Illumination, type Seal } from './seal.ts';
 export { cartouche, rings, type CartoucheOptions, type Field } from './cartouche.ts';

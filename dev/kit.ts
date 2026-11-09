@@ -13,8 +13,8 @@ import { Parchment } from '../src/render/paper/parchment.ts';
 import {
   ChartLayer, ILLUMINATIONS, Paper, Pen, Press, WASH, arcPts, arrow, bakeDisc, bakeSeal, bakeSheet, burst, cartouche, chartLayout, cross,
   cubic, dottedRing, drawBaked, drawGalleon, drawSeal, drawSprite, dryAlpha, figure, flight, galleon, galleonSprite, hand, layoutProblems,
-  moon, needle, part, pennant, pressLook, prims, quadrant, rhumbWeb, ring, rings, rose, sandglass, shape, stagger, stamp, staff, star,
-  stick, stormRing, sun, tally, unroll, wake, woodcut, word, type ChartLayout, type Rect, type Seal, type Sprite,
+  moon, needle, part, pennant, pressLook, prims, rhumbWeb, ring, rings, rose, shape, stagger, stamp, staff, star,
+  stormRing, sun, unroll, wake, woodcut, word, type ChartLayout, type Rect, type Seal, type Sprite,
 } from '../src/chart/index.ts';
 import { badge, bar, paper as laid, reticle, roundButton, sailsArc, slipPath, slot, stickRing, type SlotOptions } from '../src/screens/instruments.ts';
 
@@ -194,8 +194,6 @@ PLATES.marks = () => {
   pennant(pen, { x: x0, y: H * 0.17, length: 120 * u, height: 22 * u, colour: '#2f62b0', phase: 1.6 });
   pennant(pen, { x: x0, y: H * 0.25, length: 160 * u, height: 18 * u, colour: '#2f6a3c', phase: 2.5, gilt: true, trim: '#d4a84a' });
   pennant(pen, { x: x0, y: H * 0.33, length: 90 * u, height: 18 * u, colour: '#6a3f8c', phase: 0, wind: 0.2 });
-  for (let n = 1; n <= 7; n++) tally(pen, n * 2 - 1, W * 0.3, H * (0.06 + n * 0.055), 22 * u);
-  [1, 0.7, 0.4, 0.1, 0].forEach((s, i) => sandglass(pen, W * (0.55 + i * 0.09), H * 0.2, 110 * u, { sand: s, running: s > 0 && s < 1, time: 0.3 }));
   hand(pen, W * 0.24, H * 0.6, 150 * u, 0);
   hand(pen, W * 0.4, H * 0.76, 90 * u, 0.6);
   star(pen, W * 0.48, H * 0.56, 22 * u);
@@ -204,8 +202,6 @@ PLATES.marks = () => {
   burst(pen, W * 0.69, H * 0.56, 24 * u);
   sun(pen, W * 0.79, H * 0.56, 30 * u);
   moon(pen, W * 0.89, H * 0.56, 24 * u);
-  stick(pen, W * 0.12, H * 0.86, 56 * u, W * 0.12 + 18 * u, H * 0.86 - 10 * u);
-  quadrant(pen, W * 0.3, H * 0.93, 60 * u, 1);
   stormRing(pen, W * 0.55, H * 0.82, 70 * u, 1, 0.8);
   dottedRing(pen, W * 0.55, H * 0.82, 44 * u);
   const trail: number[] = [];
@@ -262,9 +258,9 @@ PLATES.motion = () => {
     drawSeal(g, s, f.x, f.y - f.lift * 10, { scale: f.scale, phase: t });
   });
   y += rowH + gap;
-  // stagger: a list of tallies inking in one after another
+  // stagger: a row of stars inking in one after another
   strip(y, rowH, n, (cx, cy, cw, ch, t) => {
-    for (let i = 0; i < 4; i++) tally(pen, 3 + i, cx - cw * 0.38, cy - ch * 0.3 + i * ch * 0.2, ch * 0.13, stagger(t, i, 4, 0.45), 'iron', 5 + i);
+    for (let i = 0; i < 4; i++) star(pen, cx - cw * 0.3 + i * cw * 0.2, cy, ch * 0.12, stagger(t, i, 4, 0.45));
   });
   y += rowH + gap;
   // dry: a hit-mark in rubric rising and drying away (drawn live, in the pen's dry mood), and a sunk captain's baked
