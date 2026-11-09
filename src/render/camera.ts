@@ -139,7 +139,10 @@ export class CameraRig {
       // climb out early, settle in late
       const lift = Math.sin(s * Math.PI) * Math.min(ang * R * 0.5, 600);
       pos = new THREE.Vector3().copy(dir).multiplyScalar(Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift);
-      quat = new THREE.Quaternion().copy(this.fromQuat).slerp(this.quat, s);
+      // the look is carried round the planet with the camera, so through a long flight it keeps its place against the
+      // horizon rather than swinging out to the stars
+      const carried = new THREE.Quaternion().setFromUnitVectors(d0, d1).multiply(this.fromQuat);
+      quat = carried.slerp(this.quat, s).premultiply(new THREE.Quaternion().setFromUnitVectors(d1, dir));
       fov = this.fromFov + (fov - this.fromFov) * s;
     }
 
