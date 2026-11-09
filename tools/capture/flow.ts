@@ -390,6 +390,11 @@ async function hud(run: Run): Promise<void> {
     l.v = { x: 0, y: 0, z: 0 };
     return { kind: l.item.kind, n: l.item.n };
   });
+  // (something other than what is in the chosen slot: a swap of like for like would change nothing to see)
+  await game.hook((h, I: typeof ITEM) => {
+    const st = h.sim, s = st.ships[0], held = s.slots[s.sel].kind;
+    if (st.loot.length) st.loot[0].item = { ...st.loot[0].item, kind: held === I.scatter ? I.cannon : I.scatter, n: 3 };
+  }, ITEM);
   run.check('there is loot to put in reach', !!placed, JSON.stringify(placed));
   await run.wait(350);
   await run.shot('offer with a full hold');
@@ -461,6 +466,18 @@ const PATHS = {
       await hud(run);
       await endOfMatch(run);
     }
+    // and again on the same page, as a player plays on: the second match must build over what the first left
+    if ((await run.screen()) === 'lobby') {
+      await run.wait(1500);
+      if (await play(run)) {
+        await run.wait(4000);
+        await run.press('gale:dive');
+        if (await run.reach('match', 90_000)) {
+          await run.wait(3000);
+          await run.shot('second match');
+        }
+      }
+    }
     await finish(run);
   },
   async never(r: Rig, shots: Shots, device: DeviceName, all: Run[]): Promise<void> {
@@ -486,7 +503,7 @@ const PATHS = {
     await run.press('hud:map');
     await run.wait(700);
     run.check('the disc shuts it', !(await run.game.hook((h) => h.mapWindow)));
-    run.check('the controls come back', await run.game.hook((h) => h.app.controls.on));
+    run.check('the controls come back', await run.game.hook((h) => h.app.controls.enabled));
     run.check('the HUD presses are back', !!(await run.hit('hud:fire')));
     await run.shot('hud after the map shut');
     await finish(run);
