@@ -36,7 +36,6 @@ import { CareerHolder } from './career.ts';
 import { abilitiesModel, levelView, lockerModel, rankModel, rankView, rivalsModel } from './models.ts';
 import { SettingsHolder } from './settings.ts';
 import { Tips } from './tips.ts';
-import { Shell } from '../ui/shell.ts';
 import { ChartLayer, Press, everywhere, traceCoasts, type Coasts, type Colours, type Insets } from '../chart/index.ts';
 import { Title } from '../screens/title.ts';
 import { FullMap } from '../screens/fullmap.ts';
@@ -47,7 +46,6 @@ import { DIVE, Gale, RIDE, fleetAt } from '../screens/gale.ts';
 import { Hud } from '../screens/hud.ts';
 import type { ScrapId } from '../screens/scraps.ts';
 import { TIER_ILLUMINATION } from '../screens/cards.ts';
-import { applyParchment } from '../ui/parts/index.ts';
 import { effect } from '../ui/parts/feedback.ts';
 import type { HudModel, ResultsModel, Settings } from '../ui/model.ts';
 import type { AbilityId } from '../sim/abilities.ts';
@@ -90,7 +88,6 @@ export class App {
   readonly audio: Audio;
   readonly sound: MomentSound;
   readonly loop: Loop;
-  readonly shell: Shell;
   readonly career: CareerHolder;
   readonly settings: SettingsHolder;
   /** What the game has taught: the scraps it has pinned once in the career. */
@@ -98,10 +95,9 @@ export class App {
   stage: GpuStage | null = null;
   actors: Actors | null = null;
   readonly overlay: HTMLElement;
-  /** Thumbs, mouse and keys in a match, on a layer under the interface. */
+  /** Thumbs, mouse and keys in a match, on a layer under the chart. */
   readonly controls: Controls;
-  /** The interface's layer, the chart's over it, and the juice library's (markers, numbers, flashes) above both. */
-  readonly uiLayer: HTMLElement;
+  /** The chart's layer, and the juice library's (markers, numbers, flashes) above it. */
   readonly chartHost: HTMLElement;
   readonly juiceLayer: HTMLElement;
   /** The chart: the one canvas layer the interface is drawn on, once its paper is made. */
@@ -151,16 +147,12 @@ export class App {
     this.overlay = overlay;
     this.controls = new Controls(layer(overlay, 'app-touch'));
     this.controls.on = false;
-    this.uiLayer = layer(overlay, 'app-ui');
-    // only the screens' own parts take touches: the rest fall through to the controls beneath
-    this.uiLayer.style.pointerEvents = 'none';
     // the chart takes only the touches that land on what it draws to be pressed (ChartLayer.attach)
     this.chartHost = layer(overlay, 'app-chart');
     this.chartHost.style.pointerEvents = 'none';
     this.chartHost.style.overflow = 'hidden';
     this.juiceLayer = layer(overlay, 'app-juice');
     this.juiceLayer.style.pointerEvents = 'none';
-    this.shell = new Shell(this.uiLayer);
     this.juice = new Juice({ hud: this.juiceLayer, seed: 1, marks: false });
     this.career = new CareerHolder(options.capture || !!options.autoplay || !!options.fight);
     this.settings = new SettingsHolder(options.capture || !!options.autoplay || !!options.fight);
@@ -198,7 +190,6 @@ export class App {
     this.controls.invert = s.invertY;
     this.controls.lefty = s.leftHanded;
     if (this.session) this.session.autoFire = s.autoFire;
-    this.uiLayer.dataset.hand = s.leftHanded ? 'left' : 'right';
   }
 
   start(): void {
@@ -249,10 +240,8 @@ export class App {
     };
     chart.postMessage(0);
     // the title's paper is made on the renderer first, so the chart inks in while the planet is built
-    let parchment!: Parchment;
     const stage = await GpuStage.create(this.canvas, (f) => report(0.2 * f), async (renderer) => {
-      parchment = await Parchment.create(renderer);
-      this.chart = await ChartLayer.create(parchment, this.chartHost);
+      this.chart = await ChartLayer.create(await Parchment.create(renderer), this.chartHost);
       this.sizeChart();
       this.chart.attach(window);
       this.title?.attach(this.chart, this.chartNow());
@@ -267,9 +256,6 @@ export class App {
       this.juice.applyCamera(cam, cam.fov);
       cam.updateMatrixWorld();
     };
-    // the interface's parchment, rendered on the stage's own GPU
-    applyParchment(await parchment.sheets());
-    mark('parchment');
     this.actors = createActors(stage.scene, {
       radius: R, wave: stage.wave, overlay: stage.overlay, sceneDepth: stage.post.scenePass.getTexture('depth'),
       onJuice: (j, cause) => this.momentJuice.world(j, cause),

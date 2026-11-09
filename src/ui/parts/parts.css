@@ -1,7 +1,0 @@
-/* The interface's root: transparent, and it takes no touches. Everything on it is drawn on the chart; only the tokens
-   from tokens.ts still hang here. */
-.pui {
-  position: fixed; inset: 0; overflow: hidden; pointer-events: none;
-  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
-  -webkit-tap-highlight-color: transparent;
-}

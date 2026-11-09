@@ -5,9 +5,11 @@
 import type { AbilityId, ActiveId, PassiveId } from '../sim/abilities.ts';
 import type { WEATHER_NAMES } from '../sim/tables.ts';
 import type { PerkId, RegionId } from '../sim/world/index.ts';
-import type { Rarity } from './parts/tokens.ts';
 
 // ---------------------------------------------------------------- shared
+
+/** 0 common to 4 legendary. */
+export type Rarity = 0 | 1 | 2 | 3 | 4;
 
 export type CosmeticKind = 'sailColour' | 'sailPattern' | 'hullPaint' | 'figurehead' | 'emblem' | 'wake';
 /** One cosmetic id per kind: what a ship wears. */

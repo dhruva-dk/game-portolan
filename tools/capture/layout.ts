@@ -1,13 +1,11 @@
-// The interface's layout rules, measured on every screen at the smallest and largest iPad and iPhone, each with its
-// safe areas. Each screen gets a frame and a list of its touch targets; any rule broken is listed in layout.json and
-// fails the run:
-//   - every touch target is at least 44 points each way, and no two overlap (the DOM's targets, and what the chart
-//     offers to be pressed, grown to its touch target; a press over the whole screen, as the title's, is no target);
+// The interface's layout rules, measured on every screen at each device with its safe areas. Each screen gets a frame
+// and a list of its touch targets (what the chart offers to be pressed, grown to its touch target; a press over the whole
+// screen, as the title's, is no target); any rule broken is listed in layout.json and fails the run:
+//   - every touch target is at least 44 points each way, and no two overlap;
 //   - nothing you can touch sits under a safe area;
-//   - no text is cut off by its box;
 //   - in a match, the controls used in a fight (fire, gust, ability, reload and the sails) have their centres in the
-//     bottom 60% of the screen and within 40% of its width from the left or the right edge. The hotbar, the gull and
-//     the drop sit along the bottom middle, where a thumb moves to tap them between fights.
+//     bottom 60% of the screen and within 40% of its width from the left or the right edge. The hotbar sits along the
+//     bottom middle, where a thumb moves to tap it between fights.
 import { log, openApp, Shots, type Rig } from './common.ts';
 import { DEVICES, type DeviceName, type Game } from '../harness.ts';
 
@@ -25,7 +23,6 @@ export const SCREENS: readonly Screen[] = [
   ...['abilities', 'locker', 'rivals', 'rank', 'settings'].map((s) => ({ name: s, setup: `h.go("${s}")` })),
   { name: 'gale', setup: 'h.play({ seed: 11 })' },
   { name: 'hud', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90)', thumbs: true },
-  { name: 'hud-perks', setup: 'h.play({ seed: 11, skipGale: true }); h.step(30); h.stagePlayer({ perks: ["betterLoot", "fastReload", "spotter"], weather: "rain" }); h.step(60); await h.run(4)' },
   // the teaching scraps, pinned clear of everything and taking no touches: one over the HUD, and the hand over DIVE
   { name: 'hud-scrap', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.teach("closing"); await h.run(1)' },
   { name: 'gale-scrap', setup: 'h.forgetTips(); h.tips(true); h.play({ seed: 11 }); await h.run(4)' },
@@ -33,15 +30,13 @@ export const SCREENS: readonly Screen[] = [
   { name: 'results', setup: 'h.play({ seed: 11, skipGale: true }); h.step(90); h.winPlayer(); h.step(60); h.finish()' },
 ];
 
-/** A target where it can be touched (the part its scrollers show), and its own full size. */
-interface Target { what: string; x: number; y: number; w: number; h: number; fw: number; fh: number; fight: boolean }
-interface Measured { targets: Target[]; clipped: string[]; safe: { top: number; right: number; bottom: number; left: number }; vw: number; vh: number }
+interface Target { what: string; x: number; y: number; w: number; h: number; fight: boolean }
+interface Measured { targets: Target[]; safe: { top: number; right: number; bottom: number; left: number }; vw: number; vh: number }
 
 const MIN = 44;
 
 async function measure(game: Game): Promise<Measured> {
   return game.page.evaluate(() => {
-    const ui = document.querySelector('.pui') ?? document.body;
     const px = (v: string) => parseFloat(v) || 0;
     // the safe-area insets as the page resolved them
     const probe = document.createElement('div');
@@ -50,58 +45,7 @@ async function measure(game: Game): Promise<Measured> {
     const ps = getComputedStyle(probe);
     const safe = { top: px(ps.paddingTop), right: px(ps.paddingRight), bottom: px(ps.paddingBottom), left: px(ps.paddingLeft) };
     probe.remove();
-    const shown = (e: Element) => {
-      const r = e.getBoundingClientRect();
-      if (r.width < 1 || r.height < 1) return false;
-      for (let n: Element | null = e; n; n = n.parentElement) {
-        const s = getComputedStyle(n);
-        if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
-      }
-      return true;
-    };
-    // a list scrolls its cards out of sight: only the part every scroller round a card shows can be touched
-    const showing = (e: Element) => {
-      const r = e.getBoundingClientRect();
-      let x0 = r.left, y0 = r.top, x1 = r.right, y1 = r.bottom;
-      for (let n = e.parentElement; n && n !== document.body; n = n.parentElement) {
-        const s = getComputedStyle(n);
-        if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
-        const c = n.getBoundingClientRect(), l = c.left + n.clientLeft, t = c.top + n.clientTop;
-        x0 = Math.max(x0, l);
-        y0 = Math.max(y0, t);
-        x1 = Math.min(x1, l + n.clientWidth);
-        y1 = Math.min(y1, t + n.clientHeight);
-      }
-      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-    };
-    const SEL = 'button, [role="button"], [data-what]';
-    const seen = new Set<Element>();
-    const targets = [...ui.querySelectorAll(SEL)].filter((e) => {
-      // the innermost target counts once: a button's own face or label is not another target
-      if ([...seen].some((s) => s.contains(e))) return false;
-      if (!shown(e) || getComputedStyle(e).pointerEvents === 'none') return false;
-      const v = showing(e);
-      if (v.w < 1 || v.h < 1) return false;
-      seen.add(e);
-      return true;
-    }).map((e) => {
-      const r = e.getBoundingClientRect(), v = showing(e), h = e as HTMLElement;
-      return {
-        what: h.dataset.what ?? h.dataset.part ?? h.dataset.slot ?? (h.getAttribute('aria-label') || h.className.toString().split(' ')[0]),
-        ...v, fw: r.width, fh: r.height,
-        fight: false,
-      };
-    });
-    // text cut off: a box whose text runs past it while it hides the overflow
-    const clipped: string[] = [];
-    for (const e of ui.querySelectorAll<HTMLElement>('*')) {
-      if (!shown(e) || !e.childNodes.length) continue;
-      const own = [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent!.trim());
-      if (!own) continue;
-      const s = getComputedStyle(e);
-      const hides = s.overflow !== 'visible' || s.overflowX !== 'visible' || s.textOverflow === 'ellipsis';
-      if (hides && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 2)) clipped.push(`${e.className || e.tagName}: "${e.textContent!.trim().slice(0, 40)}"`);
-    }
+    const targets: Target[] = [];
     // the chart's pressables, each grown to the chart's touch target as the chart grows it to take a finger
     type Hit = { x: number; y: number; r?: number; w?: number; h?: number };
     const chart = (window as unknown as { __portolan: { app: { chart: { presses: { list: { id: string; hit: Hit; disabled?: boolean }[] } } | null } } }).__portolan.app.chart;
@@ -109,9 +53,9 @@ async function measure(game: Game): Promise<Measured> {
     for (const p of chart?.presses.list ?? []) {
       const h = p.hit, w = h.r !== undefined ? Math.max(h.r * 2, T) : Math.max(h.w ?? 0, T), hh = h.r !== undefined ? w : Math.max(h.h ?? 0, T);
       if (w >= innerWidth * 0.9 && hh >= innerHeight * 0.9) continue;
-      targets.push({ what: `chart:${p.id}`, x: h.x - w / 2, y: h.y - hh / 2, w, h: hh, fw: w, fh: hh, fight: /^hud:(fire|gust|ability|reload|sails)$/.test(p.id) });
+      targets.push({ what: `chart:${p.id}`, x: h.x - w / 2, y: h.y - hh / 2, w, h: hh, fight: /^hud:(fire|gust|ability|reload|sails)$/.test(p.id) });
     }
-    return { targets, clipped, safe, vw: innerWidth, vh: innerHeight };
+    return { targets, safe, vw: innerWidth, vh: innerHeight };
   });
 }
 
@@ -119,7 +63,7 @@ function judge(m: Measured, thumbs: boolean): string[] {
   const bad: string[] = [];
   for (const t of m.targets) {
     const name = `${t.what} (${t.w.toFixed(0)}×${t.h.toFixed(0)} at ${t.x.toFixed(0)},${t.y.toFixed(0)})`;
-    if (t.fw < MIN - 0.5 || t.fh < MIN - 0.5) bad.push(`under 44 points: ${name}`);
+    if (t.w < MIN - 0.5 || t.h < MIN - 0.5) bad.push(`under 44 points: ${name}`);
     const s = m.safe;
     if (t.x < s.left - 0.5 || t.y < s.top - 0.5 || t.x + t.w > m.vw - s.right + 0.5 || t.y + t.h > m.vh - s.bottom + 0.5) bad.push(`under a safe area: ${name}`);
     if (thumbs && t.fight) {
@@ -133,7 +77,6 @@ function judge(m: Measured, thumbs: boolean): string[] {
     const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     if (ox > 1 && oy > 1) bad.push(`overlapping: ${a.what} and ${b.what}`);
   }));
-  for (const c of m.clipped) bad.push(`text cut off: ${c}`);
   return bad;
 }
 

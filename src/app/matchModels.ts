@@ -19,12 +19,11 @@ import { aimedAt } from '../sim/combat.ts';
 import { REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
 import {
-  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type HudModel,
+  rarityOf as unlockRarity, type AbilityView, type ConsumableId, type CosmeticView, type HudModel, type Rarity,
   type LevelView, type MapView, type Mark, type RankView, type ResultsModel, type Slot,
   type WeaponId, type WeatherName, WEAPON_NAME,
 } from '../ui/model.ts';
 import type { MapShip, PlanetMapModel } from '../screens/fullmap.ts';
-import type { Rarity } from '../ui/parts/tokens.ts';
 import { consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
 import { cosmeticsOf } from './views.ts';
