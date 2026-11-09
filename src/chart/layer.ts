@@ -44,7 +44,8 @@ export type SheetPainter = (g: CanvasRenderingContext2D, pen: Pen, layer: ChartL
 export interface DragSurface {
   down(id: number, x: number, y: number): void;
   move(id: number, x: number, y: number): void;
-  up(id: number, x: number, y: number): void;
+  /** `cancelled`: the system took the finger, so it was no tap. */
+  up(id: number, x: number, y: number, cancelled?: boolean): void;
 }
 
 /** How far a finger on something that scrolls travels before it is a drag and not a press, CSS pixels. */
@@ -268,7 +269,7 @@ export class ChartLayer {
       const d = dragging.get(e.pointerId);
       if (!d) return;
       dragging.delete(e.pointerId);
-      d.up(e.pointerId, x, y);
+      d.up(e.pointerId, x, y, e.type === 'pointercancel');
     };
     const opts = { capture: true };
     target.addEventListener('pointerdown', down as EventListener, opts);

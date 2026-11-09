@@ -133,7 +133,7 @@ export class FullMap {
     this.#chart = new PlanetChart(layer, { camera: () => this.#h.camera(), orbit: () => ({ distance: DISTANCE, fov: this.#h.fov }), coasts: () => this.#h.coasts() });
     this.#wasDrag = layer.drag;
     this.#drag = this.#chart.drag(this.#turn);
-    layer.drag = { down: (id, x, y) => this.#down(id, x, y), move: (id, x, y) => this.#move(id, x, y), up: (id, x, y) => this.#up(id, x, y) };
+    layer.drag = { down: (id, x, y) => this.#down(id, x, y), move: (id, x, y) => this.#move(id, x, y), up: (id, x, y, cancelled) => this.#up(id, x, y, cancelled) };
     this.#lay();
     this.#off = layer.addLive((g, t) => this.#frame(g, t));
   }
@@ -202,7 +202,7 @@ export class FullMap {
     f.y = y;
   }
 
-  #up(id: number, x: number, y: number): void {
+  #up(id: number, x: number, y: number, cancelled = false): void {
     if (!this.#fingers.delete(id)) return;
     if (this.#fingers.size === 1) {
       // the pinch is over: the finger still down goes on as a spin, from where it is
@@ -212,7 +212,7 @@ export class FullMap {
     this.#drag!.up(id, x, y);
     const t = this.#tap;
     this.#tap = null;
-    if (t && t.id === id && !t.far) this.tap(x, y);
+    if (t && t.id === id && !t.far && !cancelled) this.tap(x, y);
   }
 
   /** Finger `id` of two moved from `f` to (x, y): their span takes the eye up or down, about their middle, and the
