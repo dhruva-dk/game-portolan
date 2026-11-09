@@ -501,10 +501,9 @@ export class App {
     this.hud?.moment(m);
   }
 
-  /** Marks her dive right under her: she leaves the Gale now and drops where she is. */
+  /** She leaves the Gale now and drops where she is. */
   dive(): void {
-    const s = this.session;
-    if (s) s.aimFor(s.me.pos);
+    this.session?.dive();
   }
 
   stepTicks(n: number): number {

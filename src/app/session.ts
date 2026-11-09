@@ -112,10 +112,9 @@ export class Session implements Stepper {
   lock = -1;
   /** Fire on its own while the guns hold a lock (a setting). */
   autoFire = false;
-  /** Where the player marked on the full map (a unit vector), or null: she leaves the Gale as she nears
-   *  it, then glides for it and drops. */
+  /** Where the player marked on the full map (a unit vector), or null: once she has left the Gale she glides for it
+   *  and drops. Leaving the Gale is DIVE's alone. */
   mark: V3 | null = null;
-  private targetD = Infinity;
   readonly aim = v3(0, 0, 1);
   private readonly input = idleInput();
   private readonly held = idleInput();
@@ -320,22 +319,23 @@ export class Session implements Stepper {
     inp.aimY = 0;
   }
 
+  /** Leaves the Gale, as DIVE does. */
+  dive(): void {
+    this.diving = true;
+  }
+
   /** Marks where to come down: a point on the planet. */
   aimFor(p: V3): void {
     this.mark = { x: p.x, y: p.y, z: p.z };
-    this.targetD = Infinity;
   }
 
-  /** Rides to the mark: the Gale outruns any glide, so she rides it until it has carried her nearest the mark (or over
-   *  it), then glides for it and drops onto it. */
+  /** Glides for the mark and drops onto it. On the Gale the mark only shows her where; she leaves when she presses DIVE. */
   private toward(w: Ship, c: V3, inp: ShipInput): void {
-    const d = apart(w.pos, c);
     if (w.phase === PHASE.gale) {
-      if (d < PICK.drop || d > this.targetD + 0.01) this.diving = true;
-      this.targetD = d;
       inp.steer = 0;
       return;
     }
+    const d = apart(w.pos, c);
     tangentToward(w.pos, c, this.want);
     inp.steer = angleTo(w.head, this.want, w.pos);
     if (d < PICK.drop) this.diving = true;
