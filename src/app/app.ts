@@ -139,7 +139,7 @@ export class App {
   titleHold: number | null = null;
   private readonly sun = new THREE.Vector3();
   /** The frames since the last perf line: seconds, how many, and the longest. */
-  private readonly perfWindow = { t: 0, frames: 0, worst: 0 };
+  private readonly perfWindow = { t: 0, frames: 0, worst: 0, intervals: [] as number[] };
   private readonly ear = { fwd: new THREE.Vector3(), up: new THREE.Vector3(), t: 0 };
 
   constructor(canvas: HTMLCanvasElement, overlay: HTMLElement, options: AppOptions) {
@@ -272,7 +272,7 @@ export class App {
       onJuice: (j, cause) => this.momentJuice.world(j, cause),
     });
     // the ships are built after the planet, with the title up; leaving the title waits for them
-    void stage.later(this.actors.group).then(() => { this.#shipsDone = true; });
+    void Promise.all([stage.later(this.actors.group), stage.dropReady]).then(() => { this.#shipsDone = true; });
     mark('actors');
     // the first frame builds every material, a few at a time, before anything is drawn
     stage.onWarm = (f) => report(0.2 + 0.75 * f);
@@ -286,6 +286,7 @@ export class App {
     await stage.warmed;
     mark('warm');
     await this.actors.ready;
+    await stage.dropReady;
     mark('actors ready');
     await rockTexturesReady();
     mark('rocks');
@@ -1010,17 +1011,22 @@ export class App {
     const w = this.perfWindow;
     w.t += dt;
     w.frames++;
+    if (w.intervals.length < 2048) w.intervals.push(dt * 1000);
     w.worst = Math.max(w.worst, dt);
     if (w.t < PERF_EVERY) return;
     const frames = w.frames, t = w.t, worst = w.worst;
+    const intervals = w.intervals.sort((a, b) => a - b);
+    const percentile = (p: number) => (intervals[Math.min(intervals.length - 1, Math.ceil(intervals.length * p) - 1)] ?? 0).toFixed(1);
+    const distribution = `p95 ${percentile(0.95)} ms, p99 ${percentile(0.99)} ms`;
+    w.intervals = [];
     Object.assign(w, { t: 0, frames: 0, worst: 0 });
     const st = this.stage?.stats(), s = this.session;
     // where the watched ship is, so a frame that breaks the budget is found by the region it broke in
     const sky = this.stage ? Object.entries(this.stage.clouds.depth).filter(([, v]) => (v ?? 0) > 0.1).map(([k]) => k).join('+') || 'fair' : '';
     const at = s ? ` in ${REGIONS[regionAt(s.state.ships[s.watch].pos)].id}, ${sky}, ${P.night.value as number > 0.5 ? 'night' : 'day'}` : '';
-    console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
+    console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, ${distribution}, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
       `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ` +
-      `${this.chartCost()}${shape.memory}`);
+      `${this.chartCost()}${shape.memory}, pipelines ${JSON.stringify(shape.pipelines)}`);
     // in pieces: the device's console cuts a long message short
     const lines = shape.report(this.screen).split('\n');
     for (let i = 0; i < lines.length; i += 24) console.info(lines.slice(i, i + 24).join('\n'));
@@ -1029,7 +1035,7 @@ export class App {
   private frame(f: Frame): void {
     this.log.clock = f.clock;
     shape.frame(this.screen);
-    if (this.options.perfLog && f.realDt > 0) this.logPerf(f.realDt);
+    if (this.options.perfLog && f.wallDt > 0) this.logPerf(f.wallDt);
     this.drawWorld(f);
     // the chart after the world, so what it inks over the planet is where the planet was drawn this frame
     this.chart?.frame(this.chartNow());

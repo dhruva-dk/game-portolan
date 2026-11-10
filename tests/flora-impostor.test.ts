@@ -1,0 +1,146 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { BoxGeometry, Color, MeshStandardMaterial, RenderTarget, type Mesh, type Scene, type WebGPURenderer } from 'three/webgpu';
+import { ImpostorAtlas, VIEWS, type ImpostorSource } from '../src/render/flora/impostor.ts';
+import { tag } from '../src/render/flora/tag.ts';
+
+function rendererMock() {
+  const originalTarget = new RenderTarget(2, 2);
+  const originalMrt = {};
+  let target: RenderTarget | null = originalTarget, mrt: unknown = originalMrt;
+  const color = new Color(0x123456);
+  let alpha = 0.7;
+  const renders: { meshes: Mesh[]; clear: boolean; mipmaps: boolean[] }[] = [];
+  const compiled: Mesh[] = [];
+  let pause: Promise<void> | null = null;
+  let fail = false;
+  const r = {
+    autoClear: true,
+    getRenderTarget: () => target,
+    setRenderTarget: (t: RenderTarget | null) => { target = t; },
+    getMRT: () => mrt,
+    setMRT: (m: unknown) => { mrt = m; },
+    getClearColor: (out: Color) => out.copy(color),
+    getClearAlpha: () => alpha,
+    setClearColor: (c: number | Color, a: number) => { color.set(c); alpha = a; },
+    _nodes: {
+      getForRenderAsync: async (_ro: unknown) => {},
+      getForRender: (_ro: unknown) => { assert.notEqual(target, originalTarget); assert.equal(mrt, null); },
+    },
+    _pipelines: { getForRender: (_ro: unknown, _promises: unknown) => {
+      assert.notEqual(target, originalTarget); assert.equal(mrt, null);
+    } },
+    compileAsync: async (scene: Scene) => {
+      assert.notEqual(target, originalTarget);
+      assert.ok(target!.textures.every((t) => t.generateMipmaps), 'allocate a full mip chain before any rendering');
+      const object = scene.children[0] as Mesh;
+      compiled.push(object);
+      await r._nodes.getForRenderAsync({ object });
+      r._pipelines.getForRender({ object }, []);
+      if (pause) await pause;
+      if (fail) throw new Error('compile failed');
+    },
+    render: (scene: Scene) => {
+      assert.notEqual(target, originalTarget);
+      assert.equal(mrt, null);
+      renders.push({ meshes: [...scene.children] as Mesh[], clear: r.autoClear, mipmaps: target!.textures.map((t) => t.generateMipmaps) });
+    },
+  };
+  return {
+    r: r as unknown as WebGPURenderer, compiled, renders,
+    pause: (p: Promise<void>) => { pause = p; },
+    fail: () => { fail = true; },
+    restored: () => {
+      assert.equal(target, originalTarget);
+      assert.equal(mrt, originalMrt);
+      assert.equal(alpha, 0.7);
+      assert.equal(color.getHex(), 0x123456);
+      assert.equal(r.autoClear, true);
+    },
+  };
+}
+
+function sources() {
+  const material = tag(new MeshStandardMaterial(), { kit: 'A' });
+  let materialDisposed = 0, geometryDisposed = 0;
+  material.addEventListener('dispose', () => { materialDisposed++; });
+  const inputs: ImpostorSource[] = Array.from({ length: 2 }, (_, slot) => ({
+    slot, centre: slot + 1, radius: slot + 3,
+    parts: Array.from({ length: 2 }, () => {
+      const geometry = new BoxGeometry();
+      geometry.addEventListener('dispose', () => { geometryDisposed++; });
+      return { geometry, material };
+    }),
+  }));
+  return { inputs, materialDisposed: () => materialDisposed, geometryDisposed: () => geometryDisposed };
+}
+
+test('atlas compiles without rendering, shares variant materials, then draws one part per step with one clear and final mips', async () => {
+  const mock = rendererMock(), source = sources(), atlas = new ImpostorAtlas(2);
+  let depthDisposed = 0, bakeMaterialDisposed = 0;
+  atlas.target.depthTexture!.addEventListener('dispose', () => { depthDisposed++; });
+  atlas.step(mock.r);
+  assert.equal(mock.renders.length, 0);
+  await atlas.prepare(mock.r, source.inputs);
+  assert.equal(atlas.baked, false);
+  assert.equal(mock.compiled.length, 4);
+  assert.equal(new Set(mock.compiled.map((m) => m.material)).size, 1, 'variant slot and bounds must not make fresh shader graphs');
+  (mock.compiled[0].material as MeshStandardMaterial).addEventListener('dispose', () => { bakeMaterialDisposed++; });
+  assert.equal(mock.renders.length, 0);
+  assert.equal(source.geometryDisposed(), 0);
+  mock.restored();
+  for (let i = 0; i < 4; i++) {
+    atlas.step(mock.r);
+    assert.equal(mock.renders.length, i + 1);
+    assert.equal(mock.renders[i].meshes.length, 1);
+    assert.equal(mock.renders[i].meshes[0].count, VIEWS * VIEWS);
+    assert.equal(mock.renders[i].clear, i === 0);
+    assert.deepEqual(mock.renders[i].mipmaps, [i === 3, i === 3]);
+    assert.equal(atlas.baked, i === 3);
+    assert.equal(source.geometryDisposed(), i === 3 ? 4 : 0);
+    mock.restored();
+  }
+  assert.equal(depthDisposed, 1);
+  assert.equal(bakeMaterialDisposed, 1);
+  assert.equal(source.materialDisposed(), 0, 'source material belongs to the kits');
+  atlas.step(mock.r);
+  assert.equal(mock.renders.length, 4);
+  atlas.dispose();
+});
+
+test('cancelling pending compilation prevents rendering and releases owned resources after compilation returns', async () => {
+  const mock = rendererMock(), source = sources(), atlas = new ImpostorAtlas(2);
+  let resume!: () => void;
+  mock.pause(new Promise<void>((resolve) => { resume = resolve; }));
+  const preparing = atlas.prepare(mock.r, source.inputs);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(mock.compiled.length, 1);
+  mock.restored();
+  atlas.dispose();
+  atlas.dispose();
+  atlas.step(mock.r);
+  assert.equal(source.geometryDisposed(), 0, 'compilation still owns its source geometry');
+  resume();
+  await preparing;
+  assert.equal(source.geometryDisposed(), 4);
+  assert.equal(mock.renders.length, 0);
+  assert.equal(atlas.baked, false);
+  assert.equal(source.materialDisposed(), 0);
+  mock.restored();
+});
+
+test('failed compilation restores renderer hooks and target and leaves the atlas unavailable', async () => {
+  const mock = rendererMock(), source = sources(), atlas = new ImpostorAtlas(2);
+  const internals = mock.r as unknown as { _nodes: { getForRenderAsync: unknown }; _pipelines: { getForRender: unknown } };
+  const build = internals._nodes.getForRenderAsync, pipeline = internals._pipelines.getForRender;
+  mock.fail();
+  await assert.rejects(atlas.prepare(mock.r, source.inputs), /compile failed/);
+  assert.equal(internals._nodes.getForRenderAsync, build);
+  assert.equal(internals._pipelines.getForRender, pipeline);
+  atlas.step(mock.r);
+  assert.equal(mock.renders.length, 0);
+  assert.equal(atlas.baked, false);
+  assert.equal(source.geometryDisposed(), 4);
+  assert.equal(source.materialDisposed(), 0);
+  mock.restored();
+});

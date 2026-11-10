@@ -88,6 +88,8 @@ const blank = (): Frame => ({ passes: [], submits: 0, copies: 0, encoders: 0, ma
 
 class FrameShape {
   /** The last whole frame, and the last whose passes were timed (null where the device can't time them). */
+  /** Cumulative creation counts distinguish compilation from frame work. */
+  readonly pipelines = { render: 0, compute: 0, async: 0, pending: 0, shaders: 0 };
   last: Frame = blank();
   timed: Frame | null = null;
   #now: Frame = blank();
@@ -122,6 +124,24 @@ class FrameShape {
   /** Watches every pass, submission and copy the device is handed from now on. */
   install(device: Device): void {
     this.#device = device;
+    // Count creation calls only; per-draw bindings and dispatches are untouched.
+    if (import.meta.env.VITE_RELEASE !== '1') {
+      const d = device as unknown as Record<string, (...args: unknown[]) => unknown>;
+      const counts = this.pipelines;
+      for (const name of ['createShaderModule', 'createRenderPipeline', 'createComputePipeline', 'createRenderPipelineAsync', 'createComputePipelineAsync']) {
+        const original = d[name].bind(device);
+        d[name] = (...args) => {
+          if (name === 'createShaderModule') counts.shaders++;
+          else if (name.includes('Render')) counts.render++;
+          else counts.compute++;
+          if (!name.endsWith('Async')) return original(...args);
+          counts.async++;
+          counts.pending++;
+          try { return Promise.resolve(original(...args)).finally(() => { counts.pending--; }); }
+          catch (error) { counts.pending--; throw error; }
+        };
+      }
+    }
     const textures = new WeakMap<object, Texture>();
     const { GPUTexture, GPUCommandEncoder, GPUQueue } = GPU;
     const createView = GPUTexture.prototype.createView;

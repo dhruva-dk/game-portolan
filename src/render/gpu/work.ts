@@ -16,3 +16,15 @@ export function everyFrame(work: FrameWork): () => void {
 export function runFrameWork(renderer: WebGPURenderer): void {
   for (const w of queue) w(renderer);
 }
+
+// Compilation temporarily borrows renderer state. Scene warm-up and offscreen bakes must never borrow it together.
+const preparing = new WeakMap<object, Promise<unknown>>();
+
+/** Serializes asynchronous preparation on this renderer; a failed job does not strand later work. */
+export function serializePreparation<T>(renderer: object, work: () => Promise<T>): Promise<T> {
+  const run = (preparing.get(renderer) ?? Promise.resolve()).then(work);
+  const tail = run.catch(() => {});
+  preparing.set(renderer, tail);
+  void tail.then(() => { if (preparing.get(renderer) === tail) preparing.delete(renderer); });
+  return run;
+}

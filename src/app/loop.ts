@@ -13,6 +13,8 @@ export interface Frame {
   readonly dt: number;
   /** Seconds since the last frame, ignoring hit-stop (for interface motion). */
   readonly realDt: number;
+  /** Unclamped foreground time between drawn frames, for performance reporting only. */
+  readonly wallDt: number;
   /** The loop's own clock, in seconds; it stops while paused. */
   readonly clock: number;
   /** How far between the last tick and the next, 0…1. */
@@ -46,7 +48,7 @@ export class Loop {
   /** Turns real seconds into game seconds (hit-stop); identity by default. */
   scale: (realDt: number) => number = (dt) => dt;
   private readonly draw: (f: Frame) => void;
-  private readonly f = { dt: 0, realDt: 0, clock: 0, alpha: 1 };
+  private readonly f = { dt: 0, realDt: 0, wallDt: 0, clock: 0, alpha: 1 };
 
   constructor(draw: (f: Frame) => void) {
     this.draw = draw;
@@ -95,16 +97,17 @@ export class Loop {
       return;
     }
     if (this.frameRate !== null && this.last !== null && now - this.last < 1000 / this.frameRate - FRAME_SLACK) return;
-    const dt = this.last === null ? 0 : Math.min((now - this.last) / 1000, MAX_FRAME);
+    const wallDt = this.last === null ? 0 : Math.max(0, (now - this.last) / 1000);
+    const dt = Math.min(wallDt, MAX_FRAME);
     this.last = now;
-    this.pass(dt);
+    this.pass(dt, wallDt);
     const p = this.perf, ms = performance.now() - now;
     p.frames++;
     p.frame = ms;
     p.frameMean += (ms - p.frameMean) / Math.min(p.frames, 120);
   };
 
-  private pass(realDt: number): void {
+  private pass(realDt: number, wallDt = realDt): void {
     let dt = 0;
     if (!this.paused && !this.away) {
       dt = this.scale(realDt);
@@ -112,6 +115,7 @@ export class Loop {
       if (this.sim) this.advance(dt);
     }
     const f = this.f;
+    f.wallDt = this.away ? 0 : wallDt;
     f.dt = dt;
     f.realDt = this.paused || this.away ? 0 : realDt;
     f.clock = this.clock;

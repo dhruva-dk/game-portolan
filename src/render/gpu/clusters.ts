@@ -19,7 +19,7 @@
 import { Lighting, Vector2, type Light, type LightsNode, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, Loop, Return, attributeArray, clamp, dot, float, floor, instanceIndex, int, ivec2, ivec4, log, max, min, positionView, pow,
-  screenCoordinate, textureLoad, vec3,
+  screenCoordinate, textureLoad, uniform, vec3,
 } from 'three/tsl';
 import ClusteredLightsNode from 'three/addons/tsl/lighting/ClusteredLightsNode.js';
 
@@ -31,13 +31,13 @@ const PER_CLUSTER = 32;
 
 const _size = new Vector2();
 
-/** Three's clustered node's own state, which the grid is rebuilt into. */
+/** Three's clustered node's own state. */
 interface Inner {
   _bufferSize: Vector2 | null;
   _lightIndexes: unknown;
   _screenClusterIndex: unknown;
-  _compute: { dispose(): void; getCacheKey(): number } | null;
-  _gridDimensions: { value: Vector2 };
+  _compute: { dispose(): void; getCacheKey(): number; count: number } | null;
+  _gridDimensions: { value: Vector2; x: ReturnType<typeof float>; y: ReturnType<typeof float> };
   _cameraNear: ReturnType<typeof float>;
   _cameraFar: ReturnType<typeof float>;
   _cameraProjectionMatrix: { element(i: number): { element(j: number): ReturnType<typeof float> } };
@@ -55,6 +55,8 @@ class FittedClusters extends ClusteredLightsNode {
   readonly #share: Share;
   #width = 0;
   #height = 0;
+  #capacity = 0;
+  readonly #frameSize = uniform(new Vector2(1, 1));
 
   constructor(share: Share) {
     super(MAX_LIGHTS, TILE, SLICES, PER_CLUSTER);
@@ -68,17 +70,29 @@ class FittedClusters extends ClusteredLightsNode {
     if (w === this.#width && h === this.#height && (this as unknown as Inner)._bufferSize) return;
     this.#width = w;
     this.#height = h;
-    this.#build(w, h);
+    const self = this as unknown as Inner;
+    const nx = Math.ceil(w / TILE), ny = Math.ceil(h / TILE), clusters = nx * ny * SLICES;
+    self._gridDimensions.value.set(nx, ny);
+    this.#frameSize.value.set(w, h);
+    if (!self._compute || clusters > this.#capacity) {
+      // Reserve the full drawing buffer once. Lower scales and orientation changes then use the same storage and
+      // graph; only a genuinely larger canvas needs a new allocation. Do not retain a graph for every scale.
+      this.#capacity = Math.max(1, Math.ceil(_size.width / TILE)) * Math.max(1, Math.ceil(_size.height / TILE)) * SLICES;
+      this.#build(this.#capacity, clusters);
+    }
+    // Three reads count for dispatch and exposes it as a bounds-check uniform, without changing its cache key.
+    self._compute!.count = clusters;
+    self._bufferSize!.set(nx * TILE, ny * TILE);
   }
 
-  #build(width: number, height: number): void {
+  #build(capacity: number, clusters: number): void {
     const self = this as unknown as Inner;
-    const nx = Math.ceil(width / TILE), ny = Math.ceil(height / TILE), nz = SLICES, clusters = nx * ny * nz;
+    const nx = int(self._gridDimensions.x), ny = int(self._gridDimensions.y), nz = SLICES;
+    const width = this.#frameSize.x, height = this.#frameSize.y;
     const chunks = self._chunksPerCluster;
-    self._gridDimensions.value.set(nx, ny);
     if (self._compute) self._compute.dispose();
 
-    const length = clusters * chunks * 4;
+    const length = capacity * chunks * 4;
     let indexes = self._lightIndexes as unknown;
     if (!indexes || (indexes as unknown as { value: { array: Int32Array } }).value.array.length < length) {
       indexes = attributeArray(new Int32Array(length), 'ivec4').setName('lightIndexes');
@@ -92,13 +106,13 @@ class FittedClusters extends ClusteredLightsNode {
     const compute = Fn(() => {
       const invFocalX = float(1).div(proj.element(0).element(0));
       const invFocalY = float(1).div(proj.element(1).element(1));
-      const cx = id.mod(nx), cy = id.div(nx).mod(ny), cz = id.div(nx * ny);
+      const cx = id.mod(nx), cy = id.div(nx).mod(ny), cz = id.div(nx.mul(ny));
       // the tile's box from the pixels it covers, the last row and column cut short at the frame's edge; y runs down
       // the frame and up in NDC
       const x0 = float(cx).mul(TILE), x1 = min(float(cx.add(1)).mul(TILE), width);
       const y0 = float(cy).mul(TILE), y1 = min(float(cy.add(1)).mul(TILE), height);
-      const ndcXmin = x0.mul(2 / width).sub(1), ndcXmax = x1.mul(2 / width).sub(1);
-      const ndcYmax = float(1).sub(y0.mul(2 / height)), ndcYmin = float(1).sub(y1.mul(2 / height));
+      const ndcXmin = x0.mul(2).div(width).sub(1), ndcXmax = x1.mul(2).div(width).sub(1);
+      const ndcYmax = float(1).sub(y0.mul(2).div(height)), ndcYmin = float(1).sub(y1.mul(2).div(height));
       // the slice: evenly spaced in log depth
       const ratio = far.div(near);
       const zNear = near.mul(pow(ratio, float(cz).mul(1 / nz))).negate();
@@ -127,10 +141,10 @@ class FittedClusters extends ClusteredLightsNode {
     const clusterIndex = Fn(() => {
       const tile = floor(screenCoordinate.div(TILE));
       const slice = clamp(floor(log(positionView.z.negate().div(near)).div(log(far.div(near))).mul(nz)), 0, nz - 1);
-      return int(tile.x).add(int(tile.y).mul(nx)).add(int(slice).mul(nx * ny));
+      return int(tile.x).add(int(tile.y).mul(nx)).add(int(slice).mul(nx.mul(ny)));
     })().toVar();
 
-    self._bufferSize = new Vector2(nx * TILE, ny * TILE);
+    self._bufferSize ??= new Vector2();
     self._lightIndexes = indexes;
     self._screenClusterIndex = clusterIndex;
     self._compute = compute as unknown as Inner['_compute'];

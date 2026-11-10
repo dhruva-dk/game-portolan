@@ -314,11 +314,11 @@ const LAYER_SCALE = 0.25;
  * where the mist has it. A texel keeps where along its ray the nearest layer it saw lies, so the scene, drawn at its
  * own resolution, shows the clouds only in front of whatever it drew.
  */
-function layerKernel(into: Held, w: number, h: number): ComputeNode {
+function layerKernel(into: Held, size: V2): ComputeNode {
   const kernel = Fn(() => {
     const id = globalId.xy;
-    If(id.x.lessThan(w).and(id.y.lessThan(h)), () => {
-      const uv = vec2(id).add(0.5).div(vec2(w, h));
+    If(id.x.lessThan(uint(size.x)).and(id.y.lessThan(uint(size.y))), () => {
+      const uv = vec2(id).add(0.5).div(size);
       const view = vec3(uv.x.mul(2).sub(1).mul(EYE.tan.x), float(1).sub(uv.y.mul(2)).mul(EYE.tan.y), -1);
       const d = EYE.world.mul(vec4(view, 0)).xyz.normalize();
       const eye = EYE.position, sea = P.planet.y;
@@ -374,11 +374,11 @@ function layerKernel(into: Held, w: number, h: number): ComputeNode {
     });
   })();
   return (kernel as unknown as { compute(size: number[], group: number[]): ComputeNode })
-    .compute([Math.ceil(w / 8), Math.ceil(h / 8), 1], [8, 8, 1]);
+    .compute([1, 1, 1], [8, 8, 1]);
 }
 
 /** The thin layer laid over the scene where it lies in front of what the scene drew. */
-function layerComposite(source: Held): MeshBasicNodeMaterial {
+function layerComposite(source: Held, size: V2, capacity: V2): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, depthTest: false });
   m.blending = CustomBlending;
   m.blendSrc = m.blendSrcAlpha = OneFactor;
@@ -386,8 +386,11 @@ function layerComposite(source: Held): MeshBasicNodeMaterial {
   m.fog = false;
   m.vertexNode = vec4(positionGeometry.xy, 0, 1);
   m.outputNode = Fn(() => {
-    const held = texture(source.light, screenUV);
-    const at = texture(source.depth, screenUV).x.div(max(held.a, 1e-4));
+    // Clamp to the active texel centres: linear filtering must never read the unused allocation, whose contents
+    // may be from a larger previous frame. Both textures use exactly the same coordinates.
+    const uv = clamp(screenUV.mul(size), vec2(0.5), size.sub(0.5)).div(capacity);
+    const held = texture(source.light, uv);
+    const at = texture(source.depth, uv).x.div(max(held.a, 1e-4));
     // how far along this pixel's ray the scene has drawn something
     const viewZ = perspectiveDepthToViewZ(overDepth().x, cameraNear, cameraFar);
     const ndc = vec2(screenUV.x.mul(2).sub(1), float(1).sub(screenUV.y.mul(2)));
@@ -460,7 +463,8 @@ export class Clouds {
   #shadeSun = -1;
   readonly #flickers = new Map<number, Flicker>();
   #time = 0;
-  #size = new Vector2();
+  readonly #size = uniform(new Vector2(8, 8));
+  readonly #capacity = uniform(new Vector2());
   /** The quad over the whole view the clouds are laid on with. */
   readonly #quad: Mesh;
   /** The thin layer's texels, kernel and composite. */
@@ -480,15 +484,24 @@ export class Clouds {
    *  the fog have followed the camera, and before the scene is drawn. */
   trace(renderer: WebGPURenderer, w: number, h: number): void {
     const lw = Math.max(8, Math.round(w * LAYER_SCALE)), lh = Math.max(8, Math.round(h * LAYER_SCALE));
-    if (!this.#layer || this.#size.x !== lw || this.#size.y !== lh) {
-      this.#size.set(lw, lh);
-      this.#layer?.held.light.dispose();
-      this.#layer?.held.depth.dispose();
-      this.#layer?.composite.dispose();
-      const held = held2(lw, lh);
-      this.#layer = { held, kernel: layerKernel(held, lw, lh), composite: layerComposite(held) };
+    this.#size.value.set(lw, lh);
+    // A square holds either orientation. Keep a high-water allocation in 64-texel steps, so adaptive resolution
+    // changes only the uniforms and dispatch; storage grows only beyond the largest view seen so far. The pair
+    // costs 16 bytes per reserved texel, bounded by the rounded-up longest layer edge squared.
+    const edge = Math.ceil(Math.max(lw, lh) / 64) * 64;
+    if (!this.#layer) {
+      this.#capacity.value.set(edge, edge);
+      const held = held2(edge, edge);
+      this.#layer = { held, kernel: layerKernel(held, this.#size), composite: layerComposite(held, this.#size, this.#capacity) };
+      this.#quad.material = this.#layer.composite;
+    } else if (edge > this.#capacity.value.x) {
+      this.#capacity.value.set(edge, edge);
+      // setSize preserves the texture objects referenced by both node graphs. Three invalidates the old GPU
+      // allocations and refreshes their bindings; the kernel and composite pipelines remain the same.
+      this.#layer.held.light.setSize(edge, edge, 1);
+      this.#layer.held.depth.setSize(edge, edge, 1);
     }
-    this.#quad.material = this.#layer.composite;
+    this.#layer.kernel.dispatchSize = [Math.ceil(lw / 8), Math.ceil(lh / 8), 1];
     this.#quad.visible = SYS.count.value > 0;
     if (this.#quad.visible) renderer.compute(this.#layer.kernel);
   }

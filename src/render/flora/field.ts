@@ -15,7 +15,7 @@
 //
 // The tall plants have a fourth level past the third: an octahedral impostor (impostor.ts), one quad a copy, which
 // takes over where the plant stands small enough on screen for its views' texels to hold it. Their variants are baked
-// into the atlas on the first frame the field is drawn.
+// into the atlas in small slices after their materials have compiled.
 import {
   BufferGeometry, Float32BufferAttribute, Frustum, Group, IndirectStorageBufferAttribute, Matrix4, Mesh, Sphere,
   StorageBufferAttribute, Uint32BufferAttribute, Vector3, Vector4,
@@ -195,9 +195,10 @@ export class Flora {
   /** Each kind grown: its copies, the size of its biggest variant's nearest build, where it is last drawn, and where
    *  its impostor takes over (null, none). */
   readonly kinds: { id: string; region: number; copies: number; height: number; radius: number; far: number; impostor: number | null; reach: number }[] = [];
-  /** The tall plants' impostors, and the bake that fills their atlas on the first frame drawn. */
+  /** The tall plants' impostors, filled a part per frame after preparing the bake materials. */
   #atlas: ImpostorAtlas | null = null;
   #bake: ImpostorSource[] | null = null;
+  #restoreFade: (() => void) | null = null;
   /** Builds the group's materials ahead of drawing them (the stage's): the plants are shown once it has. */
   prepare: ((group: Group) => Promise<void>) | null = null;
 
@@ -348,7 +349,18 @@ export class Flora {
     const copiesAttr = new StorageBufferAttribute(place, 4);
     const keyAttr = new StorageBufferAttribute(key, 1);
     const baseAttr = new StorageBufferAttribute(base, 1);
+    // Until every atlas slice and its mipmaps are valid, extend the last geometric level to the kind's full
+    // range. Both compute culling and the material read this same buffer, so distant plants never disappear.
+    const readyFade = fade.slice();
+    for (const source of impostors) {
+      const far = readyFade[(source.sv * LEVELS + BUILT) * 4 + 2];
+      const last = (source.sv * LEVELS + BUILT - 1) * 4;
+      fade[last + 2] = far;
+      fade[last + 3] = far * BAND * 1.5;
+      fade.set([1e9, 1, 1e9, 1], (source.sv * LEVELS + BUILT) * 4);
+    }
     const fadeAttr = new StorageBufferAttribute(fade, 4);
+    this.#restoreFade = () => { fade.set(readyFade); fadeAttr.needsUpdate = true; };
     const shapeAttr = new StorageBufferAttribute(shape, 4);
     const shownAttr = new StorageBufferAttribute(new Uint32Array(Math.max(listed, 1)), 1);
     const countAttr = new StorageBufferAttribute(new Uint32Array(buckets), 1);
@@ -512,10 +524,18 @@ export class Flora {
     this.#frustum.setFromProjectionMatrix(this.#m, camera.coordinateSystem, (camera as { reversedDepth?: boolean }).reversedDepth ?? false);
     const planes = this.#planes.array as Vector4[];
     this.#frustum.planes.forEach((p, i) => planes[i].set(p.normal.x, p.normal.y, p.normal.z, p.constant));
-    // the impostors' views, drawn the first time the field is drawn with every photograph they need loaded
+    // Compile before drawing, once every photograph is loaded. Preparation is serialized with the stage's
+    // material warmup; frames continue with geometric plants until the final slice has generated the atlas mips.
     if (this.#bake && this.#atlas && this.#bake.every((b) => b.parts.every((p) => loaded(p.material)))) {
-      this.#atlas.bake(renderer, this.#bake);
+      void this.#atlas.prepare(renderer, this.#bake).catch((e: unknown) => {
+        console.warn(`flora impostors: ${e instanceof Error ? e.message : String(e)}`);
+      });
       this.#bake = null;
+    }
+    this.#atlas?.step(renderer);
+    if (this.#atlas?.baked && this.#restoreFade) {
+      this.#restoreFade();
+      this.#restoreFade = null;
     }
     // whole kinds out of reach are not drawn at all
     for (const d of this.#drawn) {

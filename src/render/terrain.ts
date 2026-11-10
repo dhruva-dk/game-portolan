@@ -8,6 +8,9 @@ import { v3 } from '../sim/math.ts';
 import { buildChunk, chunkIndex, CHUNK_N, WEIGHTS, type ChunkData, type ChunkRequest } from './terrain-build.ts';
 
 const NONE = 0, PENDING = 1, READY = 2;
+// A chunk has ~49 KB of vertex data. Shared indices are allocated once; detail residency stays below 48 MiB.
+const CACHE_BYTES = 48 * 1024 * 1024, UNUSED_MS = 10_000;
+const ADMIT_PER_UPDATE = 1, EVICT_PER_UPDATE = 4;
 
 interface Node {
   key: string;
@@ -20,11 +23,17 @@ interface Node {
   mesh: THREE.Mesh | null;
   minH: number; maxH: number;
   used: number;
+  needed: number;
+  bytes: number;
   dist: number;
   kids: Node[] | null;
 }
 
-export interface TerrainStats { drawn: number; built: number; pending: number; queued: number }
+export interface TerrainStats {
+  drawn: number; built: number; pending: number; queued: number;
+  /** Resident vertex arrays (shared indices excluded), and worker results still waiting for admission. */
+  residentBytes: number; queuedBytes: number;
+}
 
 export class Terrain {
   readonly group = new THREE.Group();
@@ -34,9 +43,9 @@ export class Terrain {
   /** The finest level (cells of about 0.4 m at 6), and the level every visible chunk reaches at least. */
   maxLevel = 6;
   minLevel = 2;
-  /** While true nothing new is asked for: the camera is moving faster than the land should chase it. */
+  /** While true new requests and mesh admissions wait: the camera is moving faster than the land should chase it. */
   hold = false;
-  stats: TerrainStats = { drawn: 0, built: 0, pending: 0, queued: 0 };
+  stats: TerrainStats = { drawn: 0, built: 0, pending: 0, queued: 0, residentBytes: 0, queuedBytes: 0 };
   private readonly nodes = new Map<string, Node>();
   private readonly roots: Node[] = [];
   #faces!: () => void;
@@ -47,6 +56,10 @@ export class Terrain {
   /** The requests each worker has yet to answer. */
   private readonly load = new Map<Worker, number>();
   private readonly inFlight = new Map<number, Node>();
+  // Keep a worker occupied until its result is admitted or discarded. At most four results can wait here.
+  private readonly completed: { node: Node; chunk: ChunkData; worker: Worker }[] = [];
+  private residentBytes = 0;
+  private disposed = false;
   private readonly index: [THREE.BufferAttribute, THREE.BufferAttribute];
   private readonly flip: boolean[] = [];
   private nextId = 1;
@@ -67,7 +80,7 @@ export class Terrain {
       this.flip.push(nx * a.x + ny * a.y + nz * a.z < 0);
     }
     try {
-      for (let k = 0; k < workers; k++) {
+      for (let k = 0; k < Math.min(4, workers); k++) {
         const w = new Worker(new URL('./terrain-worker.ts', import.meta.url), { type: 'module' });
         w.onmessage = (e: MessageEvent<ChunkData>) => this.receive(w, e.data);
         w.onerror = (e) => console.error('terrain worker', e.message);
@@ -108,7 +121,7 @@ export class Terrain {
     // the node's corner, for its angular radius
     faceDir(face, -1 + i * s, -1 + j * s, d);
     const half = Math.acos(Math.min(1, dir.x * d.x + dir.y * d.y + dir.z * d.z)) * 1.05;
-    n = { key, face, level, i, j, dir, half, side: (Math.PI / 2 / (1 << level)) * R, state: NONE, mesh: null, minH, maxH, used: 0, dist: 0, kids: null };
+    n = { key, face, level, i, j, dir, half, side: (Math.PI / 2 / (1 << level)) * R, state: NONE, mesh: null, minH, maxH, used: performance.now(), needed: 0, bytes: 0, dist: 0, kids: null };
     this.nodes.set(key, n);
     return n;
   }
@@ -122,6 +135,18 @@ export class Terrain {
   }
 
   private accept(n: Node, c: ChunkData): void {
+    const bytes = c.position.byteLength + c.normal.byteLength + c.weights.byteLength;
+    if (this.residentBytes + bytes > CACHE_BYTES) {
+      // Preserve coarse coverage and every parent/child the current view depends on. Pressure may evict unused
+      // detail before its usual expiry, but it never uploads a chunk past the byte ceiling.
+      const unused = [...this.nodes.values()].filter((k) => k.mesh && k.level > 2 && k.needed !== this.frame)
+        .sort((a, b) => a.used - b.used);
+      for (const k of unused.slice(0, EVICT_PER_UPDATE)) {
+        if (this.residentBytes + bytes <= CACHE_BYTES) break;
+        this.release(k);
+      }
+      if (this.residentBytes + bytes > CACHE_BYTES) { n.state = NONE; return; }
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(c.position, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(c.normal, 3));
@@ -142,6 +167,8 @@ export class Terrain {
     n.minH = c.minH;
     n.maxH = c.maxH;
     n.state = READY;
+    n.bytes = bytes;
+    this.residentBytes += bytes;
     if (n.level === 0 && this.roots.every((r) => r.state === READY)) this.#faces();
   }
 
@@ -150,8 +177,14 @@ export class Terrain {
     this.inFlight.delete(c.id);
     const load = (this.load.get(w) ?? 1) - 1;
     this.load.set(w, load);
-    if (load === 0) this.idle.push(w);
-    if (n && n.state === PENDING) this.accept(n, c);
+    if (this.disposed) return;
+    if (n && n.state === PENDING && n.level > 0) {
+      this.completed.push({ node: n, chunk: c, worker: w });
+    } else {
+      // Startup awaits faces before the first update, so roots cannot wait in the admission queue.
+      if (n && n.state === PENDING) this.accept(n, c);
+      if (load === 0) this.idle.push(w);
+    }
   }
 
   private release(n: Node): void {
@@ -162,12 +195,16 @@ export class Terrain {
     // mesh itself is let go; without this a long match piled them up by the tens of thousands
     n.mesh.dispose();
     n.mesh = null;
+    this.residentBytes -= n.bytes;
+    n.bytes = 0;
     n.state = NONE;
   }
 
   /** Picks the chunks to draw from where the camera is, and asks for the ones still missing. */
   update(eye: THREE.Vector3): void {
+    if (this.disposed) return;
     this.frame++;
+    const now = performance.now();
     const camR = eye.length(), cam = eye.clone().divideScalar(camR), camAlt = camR - R;
     const hc = Math.acos(R / Math.max(camR, R + 0.5));
     for (const n of this.drawn) if (n.mesh) n.mesh.visible = false;
@@ -181,14 +218,18 @@ export class Terrain {
       return edge <= hc + hn + 0.003;
     };
     const visit = (n: Node): void => {
-      n.used = this.frame;
       if (!visible(n)) return;
+      n.used = now;
+      n.needed = this.frame;
       const split = n.level < this.maxLevel && (n.level < this.minLevel || n.dist < this.detail * n.side) && (n.maxH > -6 || n.level < 3);
       if (split) {
         const kids = this.children(n);
         let ready = true;
         for (const k of kids) {
-          if (k.state === READY || !visible(k)) continue;
+          if (!visible(k)) continue;
+          k.used = now;
+          k.needed = this.frame;
+          if (k.state === READY) continue;
           ready = false;
           if (k.state === NONE) want.push(k);
         }
@@ -197,6 +238,19 @@ export class Terrain {
       if (n.mesh) { n.mesh.visible = true; this.drawn.push(n); }
     };
     for (const r of this.roots) visit(r);
+    // Recheck demand after the camera has moved, before creating geometry. A completed child remains PENDING
+    // until admitted, so traversal keeps drawing its ready parent throughout this queue.
+    this.completed.sort((a, b) => a.node.dist / a.node.side - b.node.dist / b.node.side);
+    let admitted = 0;
+    for (let i = 0; i < this.completed.length;) {
+      const result = this.completed[i]!;
+      const needed = result.node.needed === this.frame;
+      if (needed && (this.hold || admitted >= ADMIT_PER_UPDATE)) { i++; continue; }
+      this.completed.splice(i, 1);
+      if (needed) { this.accept(result.node, result.chunk); admitted++; }
+      else result.node.state = NONE;
+      this.idle.push(result.worker);
+    }
     this.wanted = want.length;
     // nearest and coarsest first
     want.sort((a, b) => a.dist / a.side - b.dist / b.side);
@@ -208,22 +262,25 @@ export class Terrain {
           this.ask(n, w);
         }
       } else {
-        for (const n of want.slice(0, 3)) this.accept(n, buildChunk({ id: 0, face: n.face, level: n.level, i: n.i, j: n.j }, CHUNK_N));
+        for (const n of want.slice(0, ADMIT_PER_UPDATE)) this.accept(n, buildChunk({ id: 0, face: n.face, level: n.level, i: n.i, j: n.j }, CHUNK_N));
       }
     }
-    // forget chunks long out of use
-    let built = 0;
-    for (const n of this.nodes.values()) if (n.mesh) built++;
-    if (built > 1100) {
-      for (const n of this.nodes.values()) if (n.mesh && n.level > 2 && n.used < this.frame - 300) { this.release(n); built--; }
+    // Expire by elapsed time, including when slow frames mean very few updates. Bound disposal work as well.
+    let evicted = 0, built = 0;
+    for (const n of this.nodes.values()) if (n.mesh) {
+      if (evicted < EVICT_PER_UPDATE && n.level > 2 && n.needed !== this.frame && now - n.used > UNUSED_MS) {
+        this.release(n); evicted++;
+      } else built++;
     }
-    this.stats = { drawn: this.drawn.length, built, pending: this.inFlight.size, queued: want.length };
+    const queuedBytes = this.completed.reduce((sum, { chunk: c }) => sum + c.position.byteLength + c.normal.byteLength + c.weights.byteLength, 0);
+    this.stats = { drawn: this.drawn.length, built, pending: this.inFlight.size, queued: want.length + this.completed.length,
+      residentBytes: this.residentBytes, queuedBytes };
     if (!this.busy) for (const w of this.waiters.splice(0)) w();
   }
 
   /** True while chunks the view wants are still being built. */
   get busy(): boolean {
-    return this.wanted > 0 || this.inFlight.size > 0;
+    return this.wanted > 0 || this.inFlight.size > 0 || this.completed.length > 0;
   }
 
   /** Resolves once every chunk the view wants is built (keep calling update meanwhile). */
@@ -232,6 +289,10 @@ export class Terrain {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.completed.length = 0;
+    this.inFlight.clear();
+    this.idle.length = 0;
     for (const w of this.workers) w.terminate();
     for (const n of this.nodes.values()) this.release(n);
   }

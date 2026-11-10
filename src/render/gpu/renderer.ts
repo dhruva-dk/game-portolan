@@ -87,7 +87,7 @@ interface Device { createShaderModule(d: ShaderSource): unknown }
 // stretched the building of the planet's materials over minutes. There a yield gives the page back only once the
 // building has held it for YIELD_AFTER ms, by a message to the page's own task queue: the title is drawn between
 // stretches that long, and the building goes on as soon as it is.
-const YIELD_AFTER = 40;
+const YIELD_AFTER = 4;
 const S = globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } };
 if (!S.scheduler?.yield) {
   const channel = new MessageChannel(), waiting: (() => void)[] = [];

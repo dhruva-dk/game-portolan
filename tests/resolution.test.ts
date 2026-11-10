@@ -64,3 +64,34 @@ test('a held scale does not move', () => {
     Resolution.held = false;
   }
 });
+
+test('sustained severe overload loses steps instead of renewing the hitch hold forever', () => {
+  for (const fps of [12, 3, 1]) {
+    const r = new Resolution(0.66);
+    run(r, 1 / fps, 15);
+    assert.ok(Math.abs(r.scale - 0.66 * 0.65) < 1e-12, `${fps} FPS must reach the bounded floor`);
+  }
+});
+
+test('repeated hitches cannot count as calm recovery', () => {
+  const r = new Resolution(0.66);
+  run(r, SLOW, 1.5);
+  const low = r.scale;
+  for (let i = 0; i < 100; i++) {
+    r.frame(0.25);
+    run(r, GOOD, 0.75);
+  }
+  assert.ok(r.scale <= low, 'hitches must reset the recovery clock');
+});
+
+
+test('an optional 40 FPS target keeps 40 FPS steady and gives ground at 30 FPS', () => {
+  const r = new Resolution(0.66, 40);
+  assert.equal(run(r, 1 / 40, 60), 0);
+  assert.ok(run(r, 1 / 30, 3) > 0);
+  for (const fps of [12, 3]) {
+    const severe = new Resolution(0.66, 40);
+    run(severe, 1 / fps, 15);
+    assert.ok(Math.abs(severe.scale - 0.66 * 0.65) < 1e-12);
+  }
+});

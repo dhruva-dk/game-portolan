@@ -15,14 +15,15 @@
 // in eight bits.
 import {
   Color, DepthTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RenderTarget, Scene,
-  UnsignedByteType, type BufferGeometry, type Material, type MeshStandardMaterial, type Node, type Texture, type WebGPURenderer,
+  UnsignedByteType, Vector4, type BufferGeometry, type Material, type MeshStandardMaterial, type Node, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, cross, dFdx, dFdy, diffuseColor, dot, float, floor, fract,
   instanceIndex, length, log2, max, min, mix, mrt, normalGeometry, normalize, positionGeometry, positionWorld,
-  select, smoothstep, sqrt, step, texture, uv, varying, vec2, vec3, vec4,
+  select, smoothstep, sqrt, step, texture, uniform, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
+import { serializePreparation } from '../gpu/work.ts';
 import { FloraNodeMaterial, copyOf, door, turn, unturn, type FieldNodes } from './nodes.ts';
 import { tagOf } from './tag.ts';
 
@@ -71,21 +72,45 @@ export interface ImpostorSource {
   radius: number;
 }
 
+interface BakePart {
+  mesh: Mesh;
+  view: Vector4;
+  source: ImpostorSource;
+}
+
+// Like the scene warmup, keep the target set only while building an object's nodes and asking for its pipeline.
+// Three yields while compiling: holding the target across those yields would redirect the game's next frame.
+interface BakeRenderer {
+  _nodes: { getForRenderAsync(ro: unknown): Promise<unknown>; getForRender(ro: unknown): unknown };
+  _pipelines: { getForRender(ro: unknown, promises: unknown): unknown };
+}
+
 export class ImpostorAtlas {
   readonly target: RenderTarget;
   /** Slots along each side. */
   readonly side: number;
   baked = false;
+  readonly #scene = new Scene();
+  readonly #camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  #parts: BakePart[] = [];
+  #sources: readonly ImpostorSource[] = [];
+  #materials: Material[] = [];
+  #next = 0;
+  #prepared = false;
+  #disposed = false;
+  #preparing: Promise<void> | null = null;
 
   constructor(count: number) {
     this.side = Math.max(1, Math.ceil(Math.sqrt(count)));
     const size = this.side * SLOT;
-    // the depth is the atlas's own, to be let go once the views are baked (64 MB at the size the planet's flora takes)
+    // The depth stays alive across slices: a later part must still be hidden by an earlier part of the plant.
     this.target = new RenderTarget(size, size, { count: 2, type: UnsignedByteType, depthBuffer: true, depthTexture: new DepthTexture(size, size) });
     const [albedo, info] = this.target.textures;
     albedo.name = 'albedo';
     info.name = 'info';
     for (const t of this.target.textures) {
+      // Keep this true during allocation/compile so Three allocates the complete mip chain. During intermediate
+      // renders it is temporarily false, otherwise Three regenerates the entire atlas's mips after every part.
       t.generateMipmaps = true;
       t.minFilter = LinearMipmapLinearFilter;
       t.magFilter = LinearFilter;
@@ -105,40 +130,143 @@ export class ImpostorAtlas {
     return [n % this.side, Math.floor(n / this.side)];
   }
 
-  /** Draws every variant's views into the atlas, all at once. */
-  bake(renderer: WebGPURenderer, sources: readonly ImpostorSource[]): void {
-    const scene = new Scene();
-    const made: Material[] = [];
-    for (const s of sources) {
-      const slot = this.slotAt(s.slot);
-      for (const p of s.parts) {
-        // (the drips falling from leaf tips are not part of the plant's picture)
-        if (!tagOf(p.material)) continue;
+  /** Compile each part before any bake draws. Source materials and textures stay owned by the plant kits. */
+  prepare(renderer: WebGPURenderer, sources: readonly ImpostorSource[]): Promise<void> {
+    if (this.#preparing) return this.#preparing;
+    if (this.#disposed || this.baked) return Promise.resolve();
+    this.#sources = sources;
+    this.#preparing = this.#prepare(renderer).finally(() => {
+      if (this.#disposed) { this.#release(); this.target.dispose(); }
+    });
+    return this.#preparing;
+  }
+
+  async #prepare(renderer: WebGPURenderer): Promise<void> {
+    // The same source material appears in every variant. Its slot and bounds are uniforms so those variants
+    // share the same shader graph, instead of compiling a distinct graph with each variant's baked constants.
+    const materials = new Map<string, { material: MeshBasicNodeMaterial; view: { value: Vector4 } }>();
+    try {
+      for (const source of this.#sources) for (const p of source.parts) {
+        if (this.#disposed) return;
+        if (!tagOf(p.material)) continue; // leaf-tip drips are not part of the picture
         if (!p.geometry.getAttribute('normal')) p.geometry.computeVertexNormals();
-        const m = bakeMaterial(p.material, p.geometry, slot, this.side, s.centre, s.radius);
-        made.push(m);
-        const mesh = new Mesh(p.geometry, m);
+        const key = `${p.material.uuid}:${p.geometry.hasAttribute('color')}`;
+        let shared = materials.get(key);
+        if (!shared) {
+          const view = uniform(new Vector4());
+          const material = bakeMaterial(p.material, p.geometry, view as unknown as V4, this.side);
+          shared = { material, view };
+          materials.set(key, shared);
+          this.#materials.push(material);
+        }
+        const mesh = new Mesh(p.geometry, shared.material);
         mesh.count = VIEWS * VIEWS;
         mesh.frustumCulled = false;
-        scene.add(mesh);
+        const part = { mesh, view: shared.view.value, source };
+        this.#parts.push(part);
+        await serializePreparation(renderer, async () => {
+          if (this.#disposed) return;
+          this.#show(part);
+          await this.#compile(renderer);
+        });
+        // Give a frame a chance between parts even where Three's scheduler has unused time in its yield budget.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
+      if (!this.#disposed) this.#prepared = true;
+    } catch (error) {
+      this.#disposed = true;
+      throw error;
     }
-    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  }
+
+  #show(part: BakePart): void {
+    const [x, y] = this.slotAt(part.source.slot);
+    part.view.set(x, y, part.source.centre, part.source.radius);
+    this.#scene.clear();
+    this.#scene.add(part.mesh);
+  }
+
+  async #compile(renderer: WebGPURenderer): Promise<void> {
+    const { _nodes: nodes, _pipelines: pipelines } = renderer as unknown as BakeRenderer;
+    const build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
+    const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT();
+    const restore = () => { renderer.setRenderTarget(was); renderer.setMRT(mrtWas); };
+    const set = () => { renderer.setRenderTarget(this.target); renderer.setMRT(null); };
+    nodes.getForRenderAsync = (ro) => {
+      set();
+      try { return Promise.resolve(nodes.getForRender(ro)); }
+      catch (e) { restore(); throw e; }
+    };
+    pipelines.getForRender = (ro, promises) => {
+      // Ordinary frames also use this function while the asynchronous GPU compiler is working.
+      // Their renderer state belongs to the frame, so only restore for the bake scene's object.
+      const isBake = (ro as { object?: Mesh }).object?.parent === this.#scene;
+      if (isBake) set();
+      try { return pipeline.call(pipelines, ro, promises); }
+      finally { if (isBake) restore(); }
+    };
+    try {
+      let built: Promise<void>;
+      set();
+      try { built = renderer.compileAsync(this.#scene, this.#camera); }
+      finally { restore(); }
+      await built;
+    } finally {
+      nodes.getForRenderAsync = build;
+      pipelines.getForRender = pipeline;
+      restore();
+    }
+  }
+
+  /** At most one mesh's 64 views per frame; never clear a previous slice or expose incomplete mipmaps. */
+  step(renderer: WebGPURenderer): void {
+    if (!this.#prepared || this.#disposed || this.baked) return;
+    const part = this.#parts[this.#next];
+    if (part) this.#show(part);
+    else this.#scene.clear();
+    const last = this.#next + 1 >= this.#parts.length;
     const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT(), autoWas = renderer.autoClear;
     const clearWas = renderer.getClearColor(new Color()), alphaWas = renderer.getClearAlpha();
-    renderer.setMRT(null);
-    renderer.setRenderTarget(this.target);
-    renderer.setClearColor(0x000000, 0);
-    renderer.autoClear = true;
-    renderer.render(scene, camera);
-    renderer.setRenderTarget(was);
-    renderer.setMRT(mrtWas);
-    renderer.setClearColor(clearWas, alphaWas);
-    renderer.autoClear = autoWas;
-    for (const m of made) m.dispose();
-    for (const s of sources) for (const p of s.parts) p.geometry.dispose();
-    this.target.depthTexture?.dispose();
-    this.baked = true;
+    try {
+      renderer.setMRT(null);
+      renderer.setRenderTarget(this.target);
+      renderer.setClearColor(0x000000, 0);
+      renderer.autoClear = this.#next === 0;
+      for (const t of this.target.textures) t.generateMipmaps = last;
+      renderer.render(this.#scene, this.#camera);
+    } finally {
+      renderer.setRenderTarget(was);
+      renderer.setMRT(mrtWas);
+      renderer.setClearColor(clearWas, alphaWas);
+      renderer.autoClear = autoWas;
+      for (const t of this.target.textures) t.generateMipmaps = true;
+    }
+    this.#next++;
+    if (last) {
+      this.baked = true;
+      this.#release();
+      this.target.depthTexture?.dispose();
+    }
+  }
+
+  #release(): void {
+    this.#scene.clear();
+    for (const m of this.#materials) m.dispose();
+    for (const g of new Set(this.#sources.flatMap((s) => s.parts.map((p) => p.geometry)))) g.dispose();
+    this.#materials = [];
+    this.#sources = [];
+    this.#parts = [];
+  }
+
+  /** Cancels queued preparation and baking. In-flight compilation releases its geometry when it returns. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.baked = false;
+    if (!this.#preparing || this.#prepared) {
+      this.#release();
+      this.target.dispose();
+    }
   }
 }
 
@@ -146,7 +274,8 @@ export class ImpostorAtlas {
  * The material a plant's mesh is baked with: its colour as the kit made it (map, colour, vertex colours) and its
  * cut-out, unlit, written into the atlas with its normal in each view's frame. Instance n is view n.
  */
-function bakeMaterial(src: Material, g: BufferGeometry, slot: [number, number], side: number, centre: number, radius: number): MeshBasicNodeMaterial {
+function bakeMaterial(src: Material, g: BufferGeometry, view: V4, side: number): MeshBasicNodeMaterial {
+  const centre = view.z, radius = view.w;
   const s = src as MeshStandardMaterial, t = tagOf(src);
   const m = new MeshBasicNodeMaterial();
   m.name = 'flora:bake';
@@ -171,8 +300,8 @@ function bakeMaterial(src: Material, g: BufferGeometry, slot: [number, number], 
   const p = positionGeometry.sub(vec3(0, centre, 0));
   m.vertexNode = Fn(() => {
     const x = dot(p, fr.x).div(radius), y = dot(p, fr.y).div(radius), z = dot(p, f).div(radius);
-    const X = x.mul(0.5).add(0.5).add(cell.x).div(VIEWS).add(slot[0]).div(side).mul(2).sub(1);
-    const Y = y.mul(0.5).add(0.5).add(cell.y).div(VIEWS).add(slot[1]).div(side).mul(2).sub(1);
+    const X = x.mul(0.5).add(0.5).add(cell.x).div(VIEWS).add(view.x).div(side).mul(2).sub(1);
+    const Y = y.mul(0.5).add(0.5).add(cell.y).div(VIEWS).add(view.y).div(side).mul(2).sub(1);
     return vec4(X, Y, z.mul(-0.5).add(0.5), 1);
   })();
   const n0 = varying(vec3(dot(normalGeometry, fr.x), dot(normalGeometry, fr.y), dot(normalGeometry, f)), 'vBakeN') as unknown as V3;

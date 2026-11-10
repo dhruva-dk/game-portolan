@@ -11,7 +11,7 @@ import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { Resolution } from './resolution.ts';
 import { Motes } from '../actors/motes.ts';
-import { runFrameWork } from './work.ts';
+import { runFrameWork, serializePreparation } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
@@ -117,6 +117,9 @@ export class GpuStage {
   })();
   /** Whether the first frame drawn has been checked against the depth the materials were built for. */
   #checked = false;
+  #dropReady!: () => void;
+  /** Ships and immediate weather are prepared before the drop can expose them. */
+  readonly dropReady = new Promise<void>((resolve) => { this.#dropReady = resolve; });
   #allBuilt!: () => void;
   readonly #all = new Promise<void>((r) => { this.#allBuilt = r; });
   /** What the app has asked to be built after the title (later), in order. */
@@ -358,6 +361,7 @@ export class GpuStage {
     for (const group of [this.fall.group, this.galeAir.group, this.moonbow.group, this.floes.group]) {
       await this.#compile(group, true);
     }
+    this.#dropReady();
     for (const group of sites) {
       await this.#compile(group, true);
       group.visible = true;
@@ -383,13 +387,8 @@ export class GpuStage {
    * nothing is left out for lying off the edge of the frame; with `hidden`, so is all that lies hidden under it.
    */
   #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
-    // one at a time, each setting the renderer up for its own objects
-    const run = this.#compiling.then(() => this.#compileNow(root, hidden, progress));
-    this.#compiling = run.catch(() => {});
-    return run;
+    return serializePreparation(this.renderer, () => this.#compileNow(root, hidden, progress));
   }
-
-  #compiling: Promise<void> = Promise.resolve();
 
   async #compileNow(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
     const r = this.renderer as unknown as Internals, pass = this.post.scenePass;
@@ -415,12 +414,16 @@ export class GpuStage {
         throw e;
       }
     };
-    // three waits for each object's pipeline before it builds the next: they are left to compile together instead,
-    // and waited for at the end (which on the iPad took the building after the title from 52 s to 25 s)
-    const compiling: Promise<unknown>[] = [];
+    // Keep Three's per-object await: background preparation must not flood the driver with pipelines.
     pipelines.getForRender = (ro: unknown, promises: unknown) => {
+      // compileAsync resumes after its initial target was restored; regular frame draws have no promises array.
+      if (Array.isArray(promises)) {
+        r.setRenderTarget(pass.renderTarget);
+        r.setMRT(pass.getMRT());
+        set = true;
+      }
       try {
-        return pipeline.call(pipelines, ro, promises ? compiling : promises);
+        return pipeline.call(pipelines, ro, promises);
       } finally {
         unset();
       }
@@ -462,8 +465,8 @@ export class GpuStage {
     }
     try {
       await built;
-      await Promise.all(compiling);
     } finally {
+      unset();
       nodes.getForRenderAsync = build;
       pipelines.getForRender = pipeline;
     }
