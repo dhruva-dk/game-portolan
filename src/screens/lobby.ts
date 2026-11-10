@@ -20,8 +20,8 @@
 // the pen each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
 import type { Prim } from '../icons/draw.ts';
 import {
-  Press, arcPts, bakeSeal, drawBaked, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, shape, stagger, stamp, woodcut, word,
-  type Baked, type Box, type ChartLayer, type Circle, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
+  Press, arcPts, bakeSeal, drawBaked, drawSeal, drawSprite, dryAlpha, ease, figure, part, pressLook, prims, setSail, shape, stagger, stamp, woodcut,
+  type Baked, type Box, type ChartLayer, type Circle, type Colours, type DragSurface, type Illumination, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp, noise1 } from '../chart/noise.ts';
 import { effect } from '../ui/parts/feedback.ts';
@@ -44,6 +44,8 @@ export interface CareerMarks {
 
 export interface LobbyHost {
   career(): CareerMarks;
+  /** Her own colour and emblem, for the ship on the button. */
+  mark(): Colours;
   /** Begins the match; the camera flies from the anchorage to the Gale. */
   begin(): void;
   /** Opens the settings. */
@@ -93,7 +95,7 @@ const AT = {
    *  way has uncovered its place. */
   wheel: [0.4, 0.95],
   banner: [0.46, 1.15],
-  letters: [0.9, 1.5],
+  ship: [0.9, 1.5],
   plate: [0.66, 1.3],
   badge: [1.0, 1.35],
   fill: [1.15, 1.75],
@@ -251,11 +253,11 @@ function ribbonPts(x: number, y: number, w: number, h: number, inset: number): P
 }
 
 /**
- * PLAY: a ribbon w × h centred at (x, y), paper laid on the world, its outline inked bold with a hairline inside, its
- * ends shaded where they turn back, and the word lettered across it in gold leaf over an iron shadow, its cap height
- * half the ribbon's. `letters` is the word's own ink-in.
+ * The button that starts a match: a ribbon w × h centred at (x, y), paper laid on the world, its outline inked bold
+ * with a hairline inside, its ends shaded where they turn back, and across it her own ship setting out to sea. `ship`
+ * is the drawing's own ink-in.
  */
-function banner(pen: Pen, x: number, y: number, w: number, h: number, o: { press?: number; alpha?: number; seed?: number } = {}, t = 1, letters = t): void {
+function banner(pen: Pen, cap: Colours, x: number, y: number, w: number, h: number, o: { press?: number; alpha?: number; seed?: number } = {}, t = 1, ship = t): void {
   if (t <= 0) return;
   const g = pen.g, look = pressLook(o.press ?? 0), alpha = o.alpha ?? 1, seed = o.seed ?? 23;
   g.save();
@@ -274,8 +276,11 @@ function banner(pen: Pen, x: number, y: number, w: number, h: number, o: { press
     g.restore();
     pen.stroke(outline, { w: 'bold', nib: 0.15, pool: 0.3, wobble: 0.3, drift: 0.3, seed, alpha: 0.92 * alpha }, part(t, 0.05, 0.75));
     pen.rule([ribbonPts(x, y, w, h, h * 0.11)], { w: 'hair', alpha: 0.6 * alpha, seed: seed + 3 }, part(t, 0.15, 0.85));
-    const cap = h * 0.5;
-    word(pen, 'PLAY', x, y + cap * 0.5, cap, { align: 'center', gilt: true, seed: 3, alpha }, letters);
+    g.save();
+    g.clip(p);
+    g.globalAlpha *= alpha;
+    setSail(pen, cap, x, y, w, h, { seed: 3 }, ship);
+    g.restore();
   });
   g.restore();
 }
@@ -453,13 +458,13 @@ export class Lobby {
     /** A drawing baked once, w × h plus room for its shadow, anchored at its centre. */
     const bake = (key: string, w: number, h: number, draw: (p: Pen, gc: CanvasRenderingContext2D, cx: number, cy: number) => void) =>
       layer.sprite(key, Math.ceil(w + PAD * 2), Math.ceil(h + PAD * 2), w / 2 + PAD, h / 2 + PAD, (p, gc) => draw(p, gc, w / 2 + PAD, h / 2 + PAD));
-    const size = `${layer.layout.cls}|${g.plate.w}`;
+    const size = `${layer.layout.cls}|${g.plate.w}`, mark = this.#h.mark();
     this.#sprites = {
       plate: bake(`lobby-plate|${size}|${c.level}|${c.illumination}`, g.plate.w, g.plate.h + g.badge.r * 2, (p, gc, cx, cy) =>
         this.#plate(p, gc, cx, cy - g.badge.r, badge, 1, 1)),
       wheel: bake(`lobby-wheel|${size}`, g.wheel.r * 2, g.wheel.r * 2, (p, _gc, cx, cy) => roundButton(p, cx, cy, g.wheel.r, prims('menu.wheel'), { seed: 7 })),
       tabs: TABS.map((tb, i) => bake(`lobby-tab|${size}|${tb.folio}`, g.tabs[i].r * 2, g.tabs[i].r * 2, (p, _gc, cx, cy) => tab(p, cx, cy, g.tabs[i].r, prims(tb.cut), { seed: 11 + i }))),
-      play: bake(`lobby-play|${size}`, g.play.w, g.play.h, (p, _gc, cx, cy) => banner(p, cx, cy, g.play.w, g.play.h, { seed: 23 })),
+      play: bake(`lobby-play|${size}|${mark.colour}|${mark.sigil.id}`, g.play.w, g.play.h, (p, _gc, cx, cy) => banner(p, mark, cx, cy, g.play.w, g.play.h, { seed: 23 })),
     };
     this.#sheets?.lay();
   }
@@ -571,16 +576,12 @@ export class Lobby {
     if (rest || wt >= 1) pressed(sp.wheel, g.wheel.x, g.wheel.y, p.wheel.sink);
     else roundButton(pen, g.wheel.x, g.wheel.y, g.wheel.r, prims('menu.wheel'), { alpha: alpha * ease.out(part(wt, 0, 0.3)), seed: 7 }, wt);
     // PLAY, with the flash of light on its gold after the press
-    const bt = span(s, AT.banner), lt = span(s, AT.letters);
+    const bt = span(s, AT.banner), lt = span(s, AT.ship);
     if (rest || (bt >= 1 && lt >= 1)) {
       const fk = this.#playAt < 0 ? 1 : clamp((now - this.#playAt) / 1000 / AT.flash);
       const k = 1 + 0.07 * Math.sin(Math.PI * fk), look = pressLook(p.play.sink);
       drawSprite(gc, sp.play, g.play.x, g.play.y + look.dy, { scale: look.scale * k, dark: look.dark, alpha });
-      if (fk < 1) {
-        const cap = g.play.h * 0.5 * k;
-        word(pen, 'PLAY', g.play.x, g.play.y + look.dy + cap * 0.5, cap, { align: 'center', ink: 'white', seed: 3, alpha: alpha * 0.9 * (1 - ease.in(fk)) });
-      }
-    } else banner(pen, g.play.x, g.play.y, g.play.w, g.play.h, { alpha, seed: 23 }, bt, lt);
+    } else banner(pen, this.#h.mark(), g.play.x, g.play.y, g.play.w, g.play.h, { alpha, seed: 23 }, bt, lt);
     // the career plate, and the ring's gold over it, which moves with its press
     const pt = span(s, AT.plate), kt = span(s, AT.badge);
     let look = pressLook(0);

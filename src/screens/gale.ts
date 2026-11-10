@@ -3,10 +3,10 @@
 // left to carry her, top centre, the disc in its corner, showing the Gale's course dotted, the fleet, the Storm's first
 // circle and my marker, and DIVE at the right hand, faint while the Gale is taking her up, inked in when she may go.
 // Once she has gone the stick comes up under the thumb for the glide and her marker stands on the water, an inked
-// pennant on a staff, where she has set it. The disc's own press opens the full map. Nothing but DIVE is written.
+// pennant on a staff, where she has set it. The disc's own press opens the full map. Nothing is written; her ship stooping down a gust is the way off it.
 import {
-  Press, drawSprite, dryAlpha, ease, figure, figureWidth, pennant, pressLook, staff, word, wordWidth, WASH, type Box, type ChartLayer,
-  type Circle, type Pressable, type Pen,
+  Press, drawSprite, dryAlpha, ease, figure, figureWidth, gust, pennant, pressLook, staff, WASH, type Box, type ChartLayer,
+  type Circle, type Colours, type Pressable, type Pen,
 } from '../chart/index.ts';
 import { GALE } from '../sim/tables.ts';
 import { R } from '../sim/sphere.ts';
@@ -21,6 +21,8 @@ import { SCRAP, SCRAP_TOTAL, handSprite, scrapAlpha, slipSprite } from './scraps
 /** What the drop needs of the game. */
 export interface GaleHost {
   readonly controls: Pick<Controls, 'press' | 'stickView'>;
+  /** Her own colour and emblem, for the ship on the button. */
+  mark(): Colours;
   /** Left-handed: the stick and DIVE change sides. */
   lefty(): boolean;
   /** Seconds the Gale has blown, to the frame. */
@@ -138,7 +140,7 @@ export class Gale {
     const layer = this.#layer!, l = layer.layout, c = l.controls, s = l.safe;
     const mirror = (p: Circle): Circle => (this.#h.lefty() ? { ...p, x: l.w - p.x } : p);
     this.#stick = mirror(c.stick);
-    const size = l.figure.large, w = Math.ceil(wordWidth('DIVE', size) + size * 0.85), h = Math.ceil(size * 1.7), f = mirror(c.fire);
+    const size = l.figure.large, w = Math.ceil(size * 2.9), h = Math.ceil(size * 2.3), f = mirror(c.fire);
     const margin = 14 + w / 2, x = Math.min(l.w - s.right - margin, Math.max(s.left + margin, f.x));
     const y = Math.min(l.h - s.bottom - 14 - h / 2, f.y);
     this.#diveBox = { x, y, w, h };
@@ -208,7 +210,7 @@ export class Gale {
     this.#teaching(g, layer, t, now, a, down);
   }
 
-  /** The first drop's scrap: a hand on a slip pinned to the edge over DIVE, tapping down at the letters, for a few seconds
+  /** The first drop's scrap: a hand on a slip pinned to the edge over DIVE, tapping down at the ship, for a few seconds
    *  once she may go; it dries out at once if she goes first. It is drawn only, and takes no touch. */
   #teaching(g: CanvasRenderingContext2D, layer: ChartLayer, t: number, now: number, a: number, down: boolean): void {
     if (!this.#teach || this.#scrapDone || t < DIVE_ALLOWED) return;
@@ -256,18 +258,16 @@ export class Gale {
   #diveButton(g: CanvasRenderingContext2D, layer: ChartLayer, t: number, a: number): void {
     const b = this.#diveBox, ready = t >= DIVE_ALLOWED, inked = clamp((t - DIVE_ALLOWED) / AT.ink);
     if (this.#dive) this.#dive.disabled = !ready;
-    const size = layer.layout.figure.large, W = b.w + 16, H = b.h + 16;
-    const faint = this.#diveSprite(layer, size, b, W, H, 0.42), full = this.#diveSprite(layer, size, b, W, H, 1);
-    const look = pressLook(this.#press.sink);
-    drawSprite(g, faint, b.x, b.y + look.dy, { alpha: a * (1 - inked), scale: look.scale, dark: look.dark });
-    if (inked > 0) drawSprite(g, full, b.x, b.y + look.dy, { alpha: a * inked, scale: look.scale, dark: look.dark });
+    const size = layer.layout.figure.large, look = pressLook(this.#press.sink);
+    drawSprite(g, this.#diveSprite(layer, size, b, b.w + 16, b.h + 16), b.x, b.y + look.dy, { alpha: a * (0.45 + 0.55 * inked), scale: look.scale, dark: look.dark });
   }
 
-  #diveSprite(layer: ChartLayer, size: number, b: Box, W: number, H: number, ink: number) {
-    return layer.sprite(`gale|dive|${size}|${ink}`, W, H, W / 2, H / 2, (p) => {
+  #diveSprite(layer: ChartLayer, size: number, b: Box, W: number, H: number) {
+    const mark = this.#h.mark();
+    return layer.sprite(`gale|dive|${size}|${mark.colour}|${mark.sigil.id}`, W, H, W / 2, H / 2, (p) => {
       const cx = W / 2, cy = H / 2;
-      paper(p, slipPath(cx, cy, b.w, b.h, 13), { alpha: ink < 1 ? 0.5 : 1, burn: 5 });
-      word(p, 'DIVE', cx, cy + size * 0.37, size, { align: 'center', seed: 19, alpha: ink }, 1);
+      paper(p, slipPath(cx, cy, b.w, b.h, 13), { burn: 5 });
+      gust(p, mark, cx, cy, size, { seed: 19 });
     });
   }
 

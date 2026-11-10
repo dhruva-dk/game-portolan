@@ -803,6 +803,7 @@ export class App {
     this.lobby?.dispose();
     const l = new Lobby({
       career: () => this.careerMarks(),
+      mark: () => this.ownMark(),
       begin: () => this.begin(this.prepare(), {}, true),
       settings: () => this.go('settings'),
       rank: () => this.go('rank'),
@@ -865,6 +866,7 @@ export class App {
     const s = this.session;
     if (!s) return;
     const g = new Gale({
+      mark: () => this.ownMark(),
       controls: this.controls,
       lefty: () => this.controls.lefty,
       time: () => this.galeTime(s),

@@ -82,7 +82,7 @@ function lobbyLayout(w: number, h: number, safe: Insets, phone: boolean): ChartL
   const pw = pad + ring * 2 + gap + badge * 2 + pad, ph = ring * 2 + pad * 2 * 0.75;
   const plate = { x: safe.left + m + pw / 2, y: safe.top + m + ph / 2, w: pw, h: ph };
   const wheel = phone ? 24 : 30, tab = phone ? 23 : 30, step = phone ? 58 : 72;
-  const bw = phone ? 228 : 330, bh = phone ? 74 : 104;
+  const bw = phone ? 210 : 300, bh = phone ? 100 : 140;
   const sw = Math.round(w * 0.56), top = safe.top + m + wheel * 2 + 12, foot = h - safe.bottom - m;
   return {
     plate,
