@@ -96,6 +96,7 @@ export class GpuStage {
   readonly flora = new Flora();
   readonly motes = new Motes();
   readonly #up = new Vector3();
+  readonly #focus = new Vector3();
   readonly #canvas: HTMLCanvasElement;
   readonly #wind = new Vector3();
   readonly #buffer = new Vector2();
@@ -267,7 +268,7 @@ export class GpuStage {
     shape.system('clouds');
     this.clouds.trace(this.renderer, size.x * this.#resolution.scale, size.y * this.#resolution.scale);
     shape.system('flora');
-    this.flora.update(this.renderer, cam);
+    this.flora.update(this.renderer, cam, this.#focus.set(v.target.pos.x, v.target.pos.y, v.target.pos.z).multiplyScalar(R + (v.target.height ?? 2.5)));
     this.motes.update(eye, v.target.pos);
     this.motes.mesh.visible = eye.length() - R < 200;
     this.ocean.flow.calms(v.weather, eye);

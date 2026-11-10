@@ -181,6 +181,8 @@ function meshesOf(root: Object3D): { material: Material; geometry: BufferGeometr
 export class Flora {
   readonly group = new Group();
   readonly #eye = uniform(new Vector3());
+  /** What the eye follows. */
+  readonly #focus = uniform(new Vector3());
   readonly #planes = uniformArray(Array.from({ length: 6 }, () => new Vector4()), 'vec4');
   readonly #frustum = new Frustum();
   readonly #m = new Matrix4();
@@ -396,7 +398,9 @@ export class Flora {
     const lists = storage(shownAttr, 'uint', listed) as unknown as { element(i: U): { assign(v: U): void } };
     const planes = this.#planes as unknown as { element(i: number): V4 };
     const eye = this.#eye as unknown as V3;
+    const focus = this.#focus as unknown as V3;
     const sort = Fn(() => {
+      const toFocus = focus.sub(eye).toVar();
       const i = instanceIndex;
       const a = placeRead.element(i.mul(2)), q = placeRead.element(i.mul(2).add(1));
       const sv = keys.element(i);
@@ -413,6 +417,16 @@ export class Flora {
           seen.assign(false);
         });
       }
+      // nothing that stands between the eye and the ship it follows: where the line of sight passes nearest its upright
+      // axis, seen from above, the line is in reach of it and under its top
+      const flat = (v: V3): V3 => v.sub(up.mul(dot(v, up))) as V3;
+      const offset = eye.sub(a.xyz).toVar(), run = flat(toFocus).toVar();
+      const along = dot(flat(offset), run).negate().div(max(dot(run, run), 1)).toVar();
+      const nearest = offset.add(toFocus.mul(along)).toVar();
+      If(along.greaterThan(0).and(along.lessThan(0.9)).and(length(flat(nearest)).lessThan(r.mul(0.35)))
+        .and(dot(nearest, up).lessThan(sh.x.mul(a.w).mul(2))), () => {
+        seen.assign(false);
+      });
       If(seen, () => {
         const d = length(a.xyz.sub(eye)).toVar();
         for (let l = 0; l < LEVELS; l++) {
@@ -489,10 +503,11 @@ export class Flora {
   }
 
   /** Sorts the copies for this eye; runs before the frame is drawn. */
-  update(renderer: WebGPURenderer, camera: PerspectiveCamera): void {
+  update(renderer: WebGPURenderer, camera: PerspectiveCamera, focus: Vector3): void {
     if (!this.#live) return;
     const eye = this.#eye.value as Vector3;
     camera.getWorldPosition(eye);
+    (this.#focus.value as Vector3).copy(focus);
     this.#m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.#frustum.setFromProjectionMatrix(this.#m, camera.coordinateSystem, (camera as { reversedDepth?: boolean }).reversedDepth ?? false);
     const planes = this.#planes.array as Vector4[];
