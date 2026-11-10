@@ -15,6 +15,8 @@ const config: CapacitorConfig = {
     contentInset: 'never', // the web view runs edge to edge; the game keeps clear of env(safe-area-inset-*)
     scrollEnabled: false, // no rubber-band bounce
   },
+  // the app's iOS 26 floor goes into the Swift package Capacitor writes, and only tools 6.2 and later know .v26
+  experimental: { ios: { spm: { swiftToolsVersion: '6.2' } } },
   plugins: {
     SystemBars: { hidden: true }, // no status bar; the home indicator fades out while the game is played
   },

@@ -1,7 +1,17 @@
 // The new app's entry: the canvas and interface layer from the page, the app, and the test hook.
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
+import { BACKUP_KEY, SAVE_KEY } from '../career/save.ts';
+import { openDurable } from './durable.ts';
+import { SETTINGS_KEY } from './settings.ts';
+import { TIPS_KEY } from './tips.ts';
 import { App } from './app.ts';
 import { installHook } from './hook.ts';
+
+// the native app's saves are read before anything asks for them; a store that will not open leaves local storage, not a blank screen
+if (Capacitor.isNativePlatform()) {
+  await openDurable(Preferences, localStorage, [SAVE_KEY, BACKUP_KEY, SETTINGS_KEY, TIPS_KEY]).catch((e) => console.error('saves', e));
+}
 
 const q = new URLSearchParams(location.search);
 const canvas = document.getElementById('view') as HTMLCanvasElement;

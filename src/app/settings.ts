@@ -1,5 +1,6 @@
 // The player's settings: kept in the browser's storage beside the career (never in capture mode), and applied at
 // once to the sound, the juice and the controls whenever they change.
+import { durable, type Item } from './durable.ts';
 import { DEFAULT_SETTINGS, type Settings } from '../ui/model.ts';
 
 export const SETTINGS_KEY = 'portolan.settings';
@@ -28,12 +29,12 @@ export function parseSettings(raw: string | null): Settings {
 
 export class SettingsHolder {
   settings: Settings;
-  private readonly storage: Storage | null;
+  private readonly storage: Item | null;
 
   constructor(capture: boolean) {
-    let st: Storage | null = null;
+    let st: Item | null = null;
     try {
-      st = capture ? null : localStorage;
+      st = capture ? null : durable();
     } catch {
       // storage blocked: the settings live in memory
     }

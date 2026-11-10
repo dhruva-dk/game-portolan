@@ -1,3 +1,4 @@
+import { writeNotices } from './notices.ts';
 import { execFileSync, spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -89,6 +90,7 @@ export async function archiveApp(team: string, upload: boolean): Promise<string>
   const archive = join(DERIVED, 'Portolan.xcarchive'), exported = join(DERIVED, 'export');
   process.env.VITE_RELEASE = '1';
   await build({ root, logLevel: 'warn' });
+  writeNotices(join(root, 'dist'));
   step('cap-sync', 'npx', ['cap', 'sync', 'ios'], { ...process.env, PORTOLAN_DEV_SHELL: '' });
   // a new build number each time: App Store Connect refuses one it has seen
   const number = new Date().toISOString().replace(/\D/g, '').slice(0, 12);

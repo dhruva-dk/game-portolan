@@ -23,6 +23,7 @@
     "@capacitor/core": "8.5.3",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "8.5.3",
+    "@capacitor/preferences": "8.0.1",
     "three": "0.186.1"
   },
   "devDependencies": {

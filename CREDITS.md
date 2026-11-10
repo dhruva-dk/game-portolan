@@ -193,7 +193,7 @@ colour.
 ## Libraries
 
 - three — https://threejs.org — three.js authors — MIT (runtime)
-- @capacitor/core, @capacitor/ios, @capacitor/app, @capacitor/haptics — https://capacitorjs.com — Ionic and Capacitor contributors — MIT (runtime: the iOS shell, backgrounding, haptics)
+- @capacitor/core, @capacitor/ios, @capacitor/app, @capacitor/haptics, @capacitor/preferences — https://capacitorjs.com — Ionic and Capacitor contributors — MIT (runtime: the iOS shell, backgrounding, haptics, saves)
 - vite — https://vite.dev — Evan You and Vite contributors — MIT (build)
 - typescript — https://www.typescriptlang.org — Microsoft — Apache-2.0 (dev)
 - playwright — https://playwright.dev — Microsoft — Apache-2.0 (tests)

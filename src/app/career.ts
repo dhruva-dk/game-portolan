@@ -1,5 +1,6 @@
 // The career, as the app holds it: loaded from and saved to the browser's storage (never in capture mode), a plan for
 // each match, and a tally kept through the match that becomes the career's MatchReport at the end.
+import { durable } from './durable.ts';
 import {
   applyMatch, loadCareer, memoryStore, planMatch, saveCareer, webStore, NO_HABITS, WEAPON_CLASSES as CAREER_WEAPONS,
   type Career, type MatchChanges, type MatchPlan, type MatchReport, type PlayerHabits, type SaveStore,
@@ -50,7 +51,7 @@ export class CareerHolder {
 
 function safeWebStore(): SaveStore {
   try {
-    return webStore(localStorage);
+    return webStore(durable());
   } catch {
     return memoryStore();
   }

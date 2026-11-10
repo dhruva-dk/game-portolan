@@ -2,6 +2,7 @@
 // and the hand over the Gale), each once in a career. The match's moments offer scraps, the HUD pins them one at a time
 // as it has room, and the ones shown are kept in the browser's storage beside the settings. Capture mode keeps them in
 // memory and starts with them off, so the capture tools' frames show only what they arrange.
+import { durable, type Item } from './durable.ts';
 import { PLAYER } from '../sim/match.ts';
 import type { ScrapId } from '../screens/scraps.ts';
 import type { Moment } from './events.ts';
@@ -34,13 +35,13 @@ export class Tips {
   /** Whether scraps are offered at all: off in capture mode until the hook turns them on. */
   on: boolean;
   private readonly seen: Set<TipId>;
-  private readonly storage: Storage | null;
+  private readonly storage: Item | null;
   private readonly queue: ScrapId[] = [];
 
   constructor(capture: boolean) {
-    let st: Storage | null = null;
+    let st: Item | null = null;
     try {
-      st = capture ? null : localStorage;
+      st = capture ? null : durable();
     } catch {
       // storage blocked: the scraps seen are remembered for this visit
     }
