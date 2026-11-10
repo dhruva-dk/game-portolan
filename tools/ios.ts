@@ -325,7 +325,7 @@ if (import.meta.main) {
   const t0 = Date.now(), done = (what: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(0).padStart(4)} s  ${what}`);
   if (a.archive) {
     done(`archived to ${await archiveApp(signingTeam(), a.upload)}`);
-    return;
+    process.exit(0);
   }
   if (a.real) {
     const target = realDevice(device === 'ipad' ? 'iPad' : 'iPhone');
