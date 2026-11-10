@@ -196,6 +196,14 @@ export class App {
   }
 
   start(): void {
+    // out of sight, the match and its sound wait
+    if (!this.options.capture) {
+      document.addEventListener('visibilitychange', () => {
+        this.loop.suspended = document.hidden;
+        if (document.hidden) this.audio.suspend();
+        else this.audio.resume();
+      });
+    }
     this.go(this.options.capture ? 'lobby' : 'title');
     this.loaded = this.load();
     if (this.options.fight) void this.loaded.then(() => this.fight());

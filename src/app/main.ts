@@ -8,9 +8,10 @@ const canvas = document.getElementById('view') as HTMLCanvasElement;
 const overlay = document.getElementById('ui') as HTMLElement;
 // the native app has no query: VITE_AUTOPLAY=1 and VITE_FIXTURE=fight at build time stand in for ?autoplay and ?fight
 const app = new App(canvas, overlay, {
-  capture: q.has('capture'), perfLog: q.has('perflog') || Capacitor.isNativePlatform(),
+  capture: q.has('capture'), perfLog: q.has('perflog') || (Capacitor.isNativePlatform() && import.meta.env.VITE_RELEASE !== '1'),
   autoplay: q.has('autoplay') || import.meta.env.VITE_AUTOPLAY === '1',
   fight: q.has('fight') || import.meta.env.VITE_FIXTURE === 'fight',
 });
-installHook(app);
+// (a release has no test hook: the comparison is settled at build time, and the hook goes with it)
+if (import.meta.env.VITE_RELEASE !== '1') installHook(app);
 app.start();

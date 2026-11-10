@@ -7,6 +7,7 @@
 import { Matrix3, TextureNode, WebGPURenderer, NoToneMapping, SRGBColorSpace, type Material, type Node } from 'three/webgpu';
 import { tightenPrivates } from './wgsl.ts';
 import { shape } from './shape.ts';
+import { shouldReload } from './recover.ts';
 import { batchSubmits } from './submits.ts';
 import type { CpuMip } from './mips.ts';
 
@@ -155,7 +156,11 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
   batchSubmits(backend.device as unknown as Parameters<typeof batchSubmits>[0]);
   // a lost device says what it was last given: by its lost promise, and (WebKit does not always settle that) by the
   // first encoder it refuses
-  const gone = (how: string) => console.error(`GPU lost (${how}); the last pass submitted: ${shape.lastSubmitted}; ${shape.memory}`);
+  const gone = (how: string) => {
+    console.error(`GPU lost (${how}); the last pass submitted: ${shape.lastSubmitted}; ${shape.memory}`);
+    // nothing brings a lost device back: start again at the title (a test wants to see the failure instead)
+    if (!navigator.webdriver && shouldReload(sessionStorage, Date.now())) location.reload();
+  };
   (backend.device as unknown as { lost: Promise<{ reason: string; message: string }> }).lost.then((info) => {
     if (info.reason !== 'destroyed') gone(`${info.reason || 'unknown'}: ${info.message}`);
   });
