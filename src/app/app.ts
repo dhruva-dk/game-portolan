@@ -82,6 +82,9 @@ const localHour = (): number => {
   return d.getHours() + d.getMinutes() / 60;
 };
 
+/** The chase camera at sea: the boom's length, and how much higher than the aim's own pitch it rides, radians. */
+const CHASE = { dist: 36, lift: 0.12 } as const;
+
 export class App {
   readonly log = new EffectLog();
   readonly juice: Juice;
@@ -660,8 +663,8 @@ export class App {
     if (stage.rig) {
       // high up, the planet curves away below the horizon: the boom tips down and lengthens to keep the sea in view
       const alt = Math.max(0, s.state.ships[s.watch].alt), dip = Math.acos(R / (R + alt));
-      stage.rig.pitch = Math.max(s.pitch, Math.min(1.05, dip * 0.9 + 0.1));
-      stage.rig.dist = 27 + alt * 0.08;
+      stage.rig.pitch = Math.max(s.pitch + CHASE.lift, Math.min(1.05, dip * 0.9 + 0.1));
+      stage.rig.dist = CHASE.dist + alt * 0.08;
       // the win: the camera draws back and circles the last ship afloat
       this.pull += ((this.screen === 'victory' ? 1 : 0) - this.pull) * (1 - Math.exp(-f.realDt * 1.5));
       stage.rig.yaw += f.realDt * 0.22 * this.pull;
