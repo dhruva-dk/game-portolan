@@ -1,6 +1,7 @@
 // window.__portolan: the test hook. Playwright (tools/capture/) drives the game through it:
 // jump to a scene, start a seeded match with scripted player input, step the simulation, read the effect log, open
 // any screen with its live or fixture model, and read state.
+import { Resolution } from '../render/gpu/resolution.ts';
 import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
 import type { ScrapId } from '../screens/scraps.ts';
@@ -15,6 +16,8 @@ import { LEAF } from '../sim/captains/tree.ts';
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()));
 
 export function installHook(app: App) {
+  // a capture's pictures do not depend on how the frames before them went
+  if (navigator.webdriver) Resolution.held = true;
   const { loop, log } = app;
   const hook = {
     get ready() { return app.ready; },

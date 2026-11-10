@@ -46,20 +46,25 @@ interface Inner {
   getLightData(i: unknown): { viewPosition: ReturnType<typeof vec3>; distance: ReturnType<typeof float> };
 }
 
+/** The share of the screen the scene is drawn at just now. */
+interface Share {
+  readonly scale: number;
+}
+
 class FittedClusters extends ClusteredLightsNode {
-  readonly #scale: number;
+  readonly #share: Share;
   #width = 0;
   #height = 0;
 
-  constructor(scale: number) {
+  constructor(share: Share) {
     super(MAX_LIGHTS, TILE, SLICES, PER_CLUSTER);
-    this.#scale = scale;
+    this.#share = share;
   }
 
   /** The frame as the scene pass draws it (PassNode floors the scaled screen). */
   updateProgram(renderer: WebGPURenderer): void {
     renderer.getDrawingBufferSize(_size);
-    const w = Math.max(1, Math.floor(_size.width * this.#scale)), h = Math.max(1, Math.floor(_size.height * this.#scale));
+    const scale = this.#share.scale, w = Math.max(1, Math.floor(_size.width * scale)), h = Math.max(1, Math.floor(_size.height * scale));
     if (w === this.#width && h === this.#height && (this as unknown as Inner)._bufferSize) return;
     this.#width = w;
     this.#height = h;
@@ -132,16 +137,16 @@ class FittedClusters extends ClusteredLightsNode {
   }
 }
 
-/** The renderer's lighting: clustered point lights, sized to a scene drawn at `scale` of the screen. */
+/** The renderer's lighting: clustered point lights, sized to a scene drawn at its share of the screen. */
 export class ClusteredLighting extends Lighting {
-  readonly #scale: number;
+  readonly #share: Share;
 
-  constructor(scale: number) {
+  constructor(share: Share) {
     super();
-    this.#scale = scale;
+    this.#share = share;
   }
 
   createNode(lights: Light[] = []): LightsNode {
-    return new FittedClusters(this.#scale).setLights(lights);
+    return new FittedClusters(this.#share).setLights(lights);
   }
 }

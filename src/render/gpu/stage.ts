@@ -9,6 +9,7 @@ import { shape } from './shape.ts';
 import { copyTogether } from './behind.ts';
 import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
+import { Resolution } from './resolution.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
@@ -52,8 +53,8 @@ const FAIR_WEATHER = 0.62;
 const WIND_STEP = 0.75;
 const HEADING_STEP = 8 * DEG;
 
-/** How deep in renders the scene is drawn: inside the quad that puts the frame on the screen. */
-const SCENE_DEPTH = 1;
+/** How deep in renders the scene is drawn: inside the picture at its own size, inside the quad that puts it on the screen. */
+const SCENE_DEPTH = 2;
 
 /** The renderer's own state the warm-up borrows. */
 interface Internals {
@@ -96,7 +97,7 @@ export class GpuStage {
   readonly #wind = new Vector3();
   readonly #buffer = new Vector2();
   /** The share of the canvas the scene is drawn at, each way. */
-  readonly #scale: number;
+  readonly #resolution: Resolution;
   /** Mistwood's mist: always some rolling out of the wood. */
   readonly #mist = { at: new Vector3(0, 1, 0), radius: 240, amount: 0.35 };
   readonly #sea: SeaState = { ...CALM_SEA, fetch: 12000, swell: 0.6, swellLength: 40, swellHeading: 0.9, chop: 1 };
@@ -139,10 +140,10 @@ export class GpuStage {
     this.flora.prepare = (group) => this.#compile(group, true);
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.#scale = RENDER_SCALE[form];
+    this.#resolution = new Resolution(RENDER_SCALE[form]);
     // every point light without a shadow is clustered, over the frame as the scene pass draws it
-    renderer.lighting = new ClusteredLighting(this.#scale);
-    this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
+    renderer.lighting = new ClusteredLighting(this.#resolution);
+    this.post = new Post(renderer, this.scene, this.camera, this.#resolution.scale, this.overlay);
     this.ocean.territory.attach(renderer);
     this.resize();
   }
@@ -254,7 +255,7 @@ export class GpuStage {
     this.fog.update(this.renderer, eye, v.weather, (0.4 + 0.6 * poleNight) * calm, this.#mist);
     const size = this.renderer.getDrawingBufferSize(this.#buffer);
     shape.system('clouds');
-    this.clouds.trace(this.renderer, size.x * this.#scale, size.y * this.#scale);
+    this.clouds.trace(this.renderer, size.x * this.#resolution.scale, size.y * this.#resolution.scale);
     shape.system('flora');
     this.flora.update(this.renderer, cam);
     this.ocean.flow.calms(v.weather, eye);
@@ -286,6 +287,7 @@ export class GpuStage {
 
     const now = performance.now();
     if (this.#last) this.#fps += (1000 / Math.max(now - this.#last, 1) - this.#fps) * 0.05;
+    if (this.#last && this.#resolution.frame((now - this.#last) / 1000)) this.post.rescale(this.#resolution.scale);
     this.#last = now;
     if (!this.#shown) this.#show();
   }
@@ -465,6 +467,6 @@ export class GpuStage {
 
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
-    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
+    return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#resolution.scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };
   }
 }
