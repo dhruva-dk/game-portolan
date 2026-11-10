@@ -51,7 +51,11 @@ export class LandLayer {
     }
     const s = this.shown!;
     const dx = R * (dot3(s.at, e) - dot3(p, e)), dy = R * (dot3(s.at, n) - dot3(p, n));
-    if (this.job) this.work(LAND_BUDGET);
+    // cut to another ship, or carried past the samples' edge: a coarse grid at once, so the disc is never half blank
+    if (Math.hypot(dx, dy) > s.span - range) {
+      this.start(LAND_FIRST, range);
+      this.work(Infinity);
+    } else if (this.job) this.work(LAND_BUDGET);
     else if (s.n < LAND_N || Math.hypot(dx, dy) > range * LAND_MOVE || Math.abs(s.span - range * LAND_OVER) > 1) this.start(LAND_N, range);
     const now = this.shown!;
     if (now !== this.painted || Math.abs(tide - this.tide) > 0.02) this.paint(tide);

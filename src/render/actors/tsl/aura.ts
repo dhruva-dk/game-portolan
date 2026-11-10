@@ -47,7 +47,7 @@ export function auraNodeMaterial(u: Uniforms, hits: number): MeshBasicNodeMateri
   const hex = hexEdge(vec2(round.mul(2.6), dir.y.mul(4)).mul(1.6)).toVar('auraHex');
   // a slow drift of light through the cells, stronger as the shield fills
   const drift = sin(dir.y.mul(9).sub(t.mul(1.7)).add(round.mul(3))).mul(0.5).add(0.5);
-  let a: F = fres.mul(fill.mul(0.65).add(0.35)).add(hex.mul(fill.mul(0.32).add(0.08)).mul(drift.mul(0.3).add(0.7)));
+  let a: F = fres.mul(fill.mul(0.3).add(0.15)).add(hex.mul(fill.mul(0.09).add(0.03)).mul(drift.mul(0.3).add(0.7)));
   // ripples out from each hit
   for (let k = 0; k < hits; k++) {
     const h = struck.element(k) as unknown as V4;

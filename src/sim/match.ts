@@ -183,7 +183,7 @@ export {
 } from './state.ts';
 export { ITEM, ITEM_NAMES, RARITY, WEAPONS, USES, SLOTS, WEATHER_KIND, WEATHER_NAMES, ZONES, STORM } from './tables.ts';
 export { ACTIVES, PASSIVES, PERK, hasPerk } from './perks.ts';
-export { stormView, newStormView, calmNow, inStorm, type StormView, type Calm } from './storm.ts';
+export { stormView, newStormView, calmNow, inStorm, stormBites, type StormView, type Calm } from './storm.ts';
 export { seen, SEEN, sightOf } from './visibility.ts';
 export { seaLevel, sunDir, isNight, localHour, hourOf } from './environment.ts';
 export { windAt, newWind, type Wind } from './wind.ts';

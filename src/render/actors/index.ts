@@ -270,7 +270,8 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     // on her stern is the light, its glass and the wisp inside, and the glow only comes in as it shrinks to a few
     // pixels: over a lantern seen whole it would wash out the frame and the glass
     if (pose.night > 0.02 && (!sinking || f.sink < 1)) {
-      const at = m.toWorld(LANTERN, tmp), n = pose.night * (sinking ? 1 - f.sink : 1);
+      // aloft on the Gale she is in the sun, and a lantern's glow would only bloom into a disc round her
+      const at = m.toWorld(LANTERN, tmp), n = pose.night * (sinking ? 1 - f.sink : 1) * (1 - THREE.MathUtils.smoothstep(pose.alt, 20, 80));
       const flick = 0.9 + Math.sin(t * 9 + v.id) * 0.05 + Math.sin(t * 23 + v.id * 3) * 0.05;
       const far = THREE.MathUtils.smoothstep(d, 30, 90);
       if (far > 0) {

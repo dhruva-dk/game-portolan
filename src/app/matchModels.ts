@@ -5,7 +5,7 @@ import { Color, SRGBColorSpace } from 'three';
 import { cosmetic, levelOf, type Career, type Look, type MatchChanges, type Rank } from '../career/index.ts';
 import { ability, type ActiveId } from '../sim/abilities.ts';
 import {
-  ACTIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, inStorm, newStormView, seen, SEEN, stormView, type MatchState, type Ship, type StormView,
+  ACTIVES, PHASE, PLAYER, SHIPS, STORM, TICK, USES, WEAPONS, inStorm, stormBites, newStormView, seen, SEEN, stormView, type MatchState, type Ship, type StormView,
 } from '../sim/match.ts';
 import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
@@ -53,6 +53,14 @@ export function waterInk(c: CosmeticIds): string {
     if (hsl.s >= 0.34 && hsl.l >= 0.22 && hsl.l <= 0.72 && (hsl.h < 0.44 || hsl.h > 0.72)) return hex;
   }
   return '#d4501f';
+}
+
+/** A captain's colour as a bar on the parchment: as it is if it reads there, deepened until it does if it is too pale. */
+function onParchment(hex: string): string {
+  const c = new Color(hex);
+  const luma = () => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  for (let i = 0; i < 24 && luma() > 0.17; i++) c.multiplyScalar(0.92);
+  return `#${c.getHexString(SRGBColorSpace)}`;
 }
 
 /** Ship i's mark, from the look she wears in the match. */
@@ -280,7 +288,7 @@ export function hudModel(session: Session): HudModel {
     gust: { charges: sh.gusts, max: GUST.charges, recharge: sh.gusts >= GUST.charges ? 1 : Math.min(1, sh.gustT / GUST.recharge) },
     storm: {
       seconds: Math.ceil(SV.left), shrinking: SV.closing, grace: s.tick < s.storm.start, progress: stormProgress(SV),
-      outside: inStorm(s, sh.pos), depth: Math.max(0, Math.min(1, -toEdge(s, sh.pos) / STORM_DEEP)),
+      outside: stormBites(s) && inStorm(s, sh.pos), depth: Math.max(0, Math.min(1, -toEdge(s, sh.pos) / STORM_DEEP)),
     },
     ships: afloat(s),
     throttle: session.watch === PLAYER ? session.throttle : 1,
@@ -288,7 +296,7 @@ export function hudModel(session: Session): HudModel {
     aimed: aimedOf(s, session.watch, session.aim),
     using: use ? { progress: Math.max(0, Math.min(1, 1 - sh.useT / (USES[use.kind]?.time ?? 1))) } : null,
     regionId: REGIONS[r]?.id ?? null,
-    colour: shipMark(session, session.watch).colours[0],
+    colour: onParchment(shipMark(session, session.watch).colours[0]),
     tide: seaLevelAt(s.tick * TICK),
     pickup: pickupOf(s, sh),
     gull: { coins: sh.coins, best: PARCELS.reduce((b, _p, t) => (sh.coins >= priceOf(sh, t) ? t : b), -1), home: sh.gull.state === GULL.home },

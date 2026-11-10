@@ -336,6 +336,8 @@ export class App {
     if (toLobby) this.lobby?.show(name === 'lobby' ? null : (name as SheetName), now);
     if (name === 'gale') this.openGale();
     if (name !== 'match' && name !== 'gale') this.closeMap(false);
+    // she has landed: the map gives way to the sea she must now sail
+    if (name === 'match' && from === 'gale') this.closeMap();
     if (name === 'match') this.openHud(model);
     // (after what comes in under it, so it is drawn over it)
     if (from === 'title' && name !== 'title') this.title?.leave(now);
@@ -898,7 +900,6 @@ export class App {
       lefty: () => this.controls.lefty,
       openMap: () => this.toggleMap(),
     });
-    if (this.map) h.cover(true);
     h.onGone = () => {
       if (this.hud === h) this.hud = null;
     };

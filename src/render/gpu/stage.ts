@@ -36,6 +36,16 @@ import type { V3 } from '../../sim/math.ts';
 import type { StageView } from '../stage.ts';
 
 const DEG = Math.PI / 180;
+/** The sine of the sun's height as an eye `alt` metres up has it: over the air the horizon falls away, and whatever
+ *  flies up there stands in sunlight over a sea already in the dark. The exposure goes part of the way to the sun it is
+ *  in, so she does not blaze and the dark sea she is falling to can still be read. */
+function sunSeen(elevation: number, alt: number): number {
+  const over = Math.min(1, Math.max(0, (alt - 40) / 180));
+  if (over <= 0) return elevation;
+  const dip = 0.6 * Math.acos(R / (R + alt)) * over * over * (3 - 2 * over);
+  return Math.sin(Math.min(Math.PI / 2, Math.asin(Math.min(1, Math.max(-1, elevation))) + dip));
+}
+
 /** How built up the fair-weather cumulus is over the planet, where its own map heaps it most. */
 const FAIR_WEATHER = 0.62;
 /** The wind sea is rebuilt only when the wind has changed by this much, m/s and radians: a rebuild is a pop. */
@@ -226,7 +236,8 @@ export class GpuStage {
     this.clouds.update(this.renderer, v.weather, eye, this.sun, this.moon, dt, FAIR_WEATHER);
     const d = this.clouds.depth;
     P.rain.value = Math.max(d.rain ?? 0, d.thunder ?? 0);
-    this.colour.update({ elevation: up.dot(this.sun), rising: rising(up, this.sun), weather: d }, dt);
+    // the full map looks at the planet from outside its weather: the grade of a squall or the ash the eye dips into is not on the chart
+    this.colour.update({ elevation: sunSeen(up.dot(this.sun), eye.length() - R), rising: rising(up, this.sun), weather: v.camera === 'orbit' ? {} : d }, dt);
     P.snow.value = d.snow ?? 0;
     P.flash.value = this.clouds.flash;
     this.fall.update(eye, wind, { rain: P.rain.value, snow: P.snow.value, ash: d.ash ?? 0 });

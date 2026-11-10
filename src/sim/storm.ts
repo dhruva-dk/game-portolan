@@ -162,6 +162,9 @@ export function calmNow(state: MatchState): Calm {
   return NOW;
 }
 
+/** Whether the Storm hurts yet: the first circle is only a warning, until it first starts to close. */
+export const stormBites = (state: MatchState): boolean => state.tick >= state.storm.start && (state.storm.phase > 0 || state.storm.shrinking);
+
 export const inStorm = (state: MatchState, p: V3): boolean => dot(p, calmNow(state).at) < calmNow(state).cos;
 
 /** Metres from p to the edge of the safe circle: positive inside. */
@@ -252,7 +255,7 @@ export function storm(state: MatchState): void {
     s.shrinking = ph.closing;
   }
   // the first circle is only a warning: the Storm bites once it first starts to close
-  if (state.tick < s.start || (ph.k === 0 && !ph.closing)) return;
+  if (!stormBites(state)) return;
   const calm = calmNow(state), hurtNow = stormDamage(state) * TICK;
   for (let i = 0; i < SHIPS; i++) {
     const ship = state.ships[i];
