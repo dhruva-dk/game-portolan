@@ -376,8 +376,13 @@ export class GpuStage {
       group.visible = true;
       built();
     }
-    for (const group of [this.fall.group, this.galeAir.group, this.moonbow.group, this.floes.group]) {
-      await this.#compile(group, true);
+    // The orbit title hides the near-eye motes and can hide the cloud composite. Prepare those explicitly along
+    // with weather; all other scene roots are either visible in the title or have their own preparation owner.
+    for (const [group, label] of [
+      [this.clouds.group, 'clouds'], [this.motes.mesh, 'motes'], [this.fall.group, 'fall'],
+      [this.galeAir.group, 'gale'], [this.moonbow.group, 'moonbow'], [this.floes.group, 'floes'],
+    ] as const) {
+      await this.#compile(group, true, undefined, label);
     }
     this.#dropReady();
     // A world-sized sites batch used to keep building far-away variants while the player dropped. Prepare one
@@ -392,9 +397,8 @@ export class GpuStage {
       this.#siteReady.add(site);
       site.visible = true;
     }
-    // and last, everything in the scene still hidden: the parts shown by the hour or the distance; so none of it holds
-    // a frame up the first time it shows
-    await this.#compile(this.scene, true, undefined, 'hidden world');
+    // No second scene-wide traversal: actors, flora and each site's hidden variants have already been prepared
+    // by their owners. Traversing them all again creates render objects for hidden terrain and plant instances.
     this.#allBuilt();
   }
 
