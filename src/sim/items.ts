@@ -210,8 +210,12 @@ export function pickups(state: MatchState, inputs: readonly ShipInput[]): void {
     let nearest = -1, nd: number = LOOT.reach;
     for (let k = state.loot.length - 1; k >= 0; k--) {
       const l = state.loot[k];
-      if (l.age < LOOT.settle && l.from === i) continue;
       const d = apart(ship.pos, l.at);
+      // what a ship put over the side stays there until she has sailed clear of it
+      if (l.from === i) {
+        if (l.age >= LOOT.settle && d > LOOT.reach) l.from = -1;
+        continue;
+      }
       if (d > LOOT.reach) continue;
       if (roomFor(ship, l.item) >= 0) {
         take(state, i, k);
