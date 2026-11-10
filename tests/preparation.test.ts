@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serializePreparation, sitePreparationYield } from '../src/render/gpu/work.ts';
+import { serializePreparation, sitePreparationYield, withPreparationSide } from '../src/render/gpu/work.ts';
 
 test('preparation cannot borrow the same renderer concurrently, including after failure', async () => {
   const renderer = {}, events: string[] = [];
@@ -20,10 +20,11 @@ test('preparation cannot borrow the same renderer concurrently, including after 
 });
 
 test('yielding node build matches installed Three stages and restores renderer state at every yield', async (t) => {
-  const { NodeBuilder } = await import('three/webgpu');
+  const { NodeBuilder, DoubleSide, FrontSide } = await import('three/webgpu');
   const { buildNodeForTargetAsync } = await import('../src/render/gpu/work.ts');
   const events: string[] = [];
   const target = {}, mrt = {}, context = {};
+  const material = { side: DoubleSide };
   let currentTarget: unknown = null, currentMRT: unknown = null;
   const renderer = {
     _currentRenderContext: null as unknown,
@@ -34,10 +35,11 @@ test('yielding node build matches installed Three stages and restores renderer s
     assert.equal(currentTarget, target);
     assert.equal(currentMRT, mrt);
     assert.equal(renderer._currentRenderContext, context);
+    assert.equal(material.side, FrontSide);
   };
   const record = (event: string) => { check(); events.push(event); };
   const builder = {
-    renderer, context: { position: { isNode: true } },
+    renderer, material, context: { position: { isNode: true } },
     flowNodes: Object.fromEntries(['fragment', 'vertex', 'compute'].map((stage) => [stage, [{ build: () => record(`node ${stage}`) }]])),
     prebuild: () => record('prebuild'), setBuildStage: (stage: unknown) => record(`build ${stage}`),
     setShaderStage: (stage: unknown) => record(`shader ${stage}`), flowNodeFromShaderStage: () => record('position'),
@@ -49,7 +51,8 @@ test('yielding node build matches installed Three stages and restores renderer s
     assert.equal(currentTarget, null);
     assert.equal(currentMRT, null);
     assert.equal(renderer._currentRenderContext, null);
-  });
+    assert.equal(material.side, DoubleSide);
+  }, FrontSide);
   assert.equal(yields, 9);
   const actual = [...events];
   events.length = 0;
@@ -58,15 +61,17 @@ test('yielding node build matches installed Three stages and restores renderer s
     Object.defineProperty(globalThis, key, { configurable: true, value });
     t.after(() => { if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); });
   }
-  currentTarget = target; currentMRT = mrt; renderer._currentRenderContext = context;
+  currentTarget = target; currentMRT = mrt; renderer._currentRenderContext = context; material.side = FrontSide;
   await (NodeBuilder.prototype as any).buildAsync.call(builder);
   assert.deepEqual(actual, events, 'pin the actual installed Three build order');
 });
 
 test('yielding node build restores target and context after early, resumed, final and yield failures', async () => {
   const { buildNodeForTargetAsync } = await import('../src/render/gpu/work.ts');
+  const { DoubleSide, BackSide } = await import('three/webgpu');
   for (const failure of ['prebuild', 'resumed', 'code', 'yield']) {
     let target: unknown = null, mrt: unknown = null, stage: string | null = null;
+    const material = { side: DoubleSide };
     const renderer = {
       _currentRenderContext: null,
       getRenderTarget: () => target, getMRT: () => mrt,
@@ -74,7 +79,7 @@ test('yielding node build restores target and context after early, resumed, fina
     };
     const fail = () => { throw new Error('bad material'); };
     const builder = {
-      renderer, context: {},
+      renderer, material, context: {},
       prebuild() { if (failure === 'prebuild') fail(); },
       setBuildStage(value: string | null) { stage = value; }, setShaderStage() {},
       flowNodes: { fragment: [{ build() { if (failure === 'resumed' && stage === 'analyze') fail(); } }], vertex: [], compute: [] },
@@ -82,7 +87,8 @@ test('yielding node build restores target and context after early, resumed, fina
     };
     await assert.rejects(buildNodeForTargetAsync(builder, {} as any, {} as any, {}, async () => {
       if (failure === 'yield') fail();
-    }), /bad material/);
+    }, BackSide), /bad material/);
+    assert.equal(material.side, DoubleSide, failure);
     assert.equal(target, null, failure); assert.equal(mrt, null, failure); assert.equal(renderer._currentRenderContext, null, failure);
   }
 });
@@ -142,4 +148,20 @@ test('optional site pacing waits for browser rAF followed by a task without need
   task();
   await pending;
   assert.equal(resumed, true);
+});
+
+
+test('queued face preparation scopes material side for cache keys and pipelines, including throws', async () => {
+  const { DoubleSide, FrontSide, BackSide } = await import('three/webgpu');
+  const material = { side: DoubleSide };
+  for (const side of [BackSide, FrontSide]) {
+    const key = withPreparationSide(material, side, () => material.side);
+    assert.equal(key, side);
+    assert.equal(material.side, DoubleSide);
+    assert.throws(() => withPreparationSide(material, side, () => { throw new Error('pipeline failed'); }), /pipeline failed/);
+    assert.equal(material.side, DoubleSide);
+    const asyncWork = withPreparationSide(material, side, () => Promise.resolve());
+    assert.equal(material.side, DoubleSide, 'an asynchronous operation must not retain borrowed material state');
+    await asyncWork;
+  }
 });

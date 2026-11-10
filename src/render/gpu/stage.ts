@@ -2,7 +2,7 @@
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
 import type { InkMark } from '../ocean/territory.ts';
-import { PerspectiveCamera, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { BackSide, DoubleSide, FrontSide, PerspectiveCamera, Scene, Vector2, Vector3, type Material, type Object3D, type Side, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
 import { shape } from './shape.ts';
@@ -11,7 +11,7 @@ import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { Resolution } from './resolution.ts';
 import { Motes } from '../actors/motes.ts';
-import { buildNodeForTargetAsync, runFrameWork, serializePreparation, sitePreparationYield } from './work.ts';
+import { buildNodeForTargetAsync, runFrameWork, serializePreparation, sitePreparationYield, withPreparationSide } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
@@ -60,6 +60,7 @@ const SCENE_DEPTH = 2;
 /** The renderer's own state the warm-up borrows. */
 interface Internals {
   _renderContexts: { get(target: unknown, mrt: unknown, depth?: number): unknown };
+  _objects: { get(object: unknown, material: Material, scene: unknown, camera: unknown, lights: unknown, context: unknown, clipping: unknown, passId?: string): object };
   _nodes: { getForRenderAsync(ro: unknown): Promise<unknown>; getForRender(ro: unknown): unknown };
   _pipelines: { getForRender(ro: unknown, promises: unknown): unknown };
   setRenderTarget(target: unknown): void;
@@ -430,8 +431,19 @@ export class GpuStage {
 
   async #compileNow(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
     const r = this.renderer as unknown as Internals, pass = this.post.scenePass;
-    const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines } = r;
-    const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
+    const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines, _objects: objects } = r;
+    const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender, getObject = objects.get;
+    const sides = new WeakMap<object, Side>();
+    // Three queues a material reference while gathering transparent front/back passes, then restores DoubleSide
+    // before processing them. Construct each queued render object under its real pass side so its initial cache
+    // key and shader match the first draw. Normal frames use a different camera and keep their own material state.
+    objects.get = (object, material, scene, camera, lights, context, clipping, passId) => {
+      const side = camera === this.#whole && material.transparent && material.side === DoubleSide && !material.forceSinglePass
+        ? passId === 'backSide' ? BackSide : FrontSide : undefined;
+      const ro = withPreparationSide(material, side, () => getObject.call(objects, object, material, scene, camera, lights, context, clipping, passId));
+      if (side !== undefined) sides.set(ro, side);
+      return ro;
+    };
     const created = this.renderer.debug.onNodeBuilderCreated;
     // Only optional sites spend this frame-paced budget; title, actors and immediate weather keep their critical
     // preparation path. Share the budget across a site's builders so the next object cannot start another burst.
@@ -439,7 +451,7 @@ export class GpuStage {
     this.renderer.debug.onNodeBuilderCreated = (builder, object) => {
       created?.(builder, object);
       const context = (object as { context: unknown }).context;
-      const buildForTarget = () => buildNodeForTargetAsync(builder, pass.renderTarget, pass.getMRT(), context, yieldSite);
+      const buildForTarget = () => buildNodeForTargetAsync(builder, pass.renderTarget, pass.getMRT(), context, yieldSite, sides.get(object as object));
       (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = yieldSite
         ? async () => { await yieldSite(); return buildForTarget(); }
         : buildForTarget;
@@ -460,7 +472,8 @@ export class GpuStage {
       try {
         // Native async building yields between shader stages. Its builder hook borrows the target separately for
         // each stage; restore it now, then set it again only for Three's synchronous bindings/pipeline preparation.
-        return build.call(nodes, ro).then((state) => {
+        const material = (ro as { material: Material }).material;
+        return withPreparationSide(material, sides.get(ro as object), () => build.call(nodes, ro)).then((state) => {
           r.setRenderTarget(pass.renderTarget);
           r.setMRT(pass.getMRT());
           set = true;
@@ -479,7 +492,8 @@ export class GpuStage {
         set = true;
       }
       try {
-        return pipeline.call(pipelines, ro, promises);
+        const material = (ro as { material: Material }).material;
+        return withPreparationSide(material, sides.get(ro as object), () => pipeline.call(pipelines, ro, promises));
       } finally {
         unset();
       }
@@ -525,6 +539,7 @@ export class GpuStage {
       unset();
       nodes.getForRenderAsync = build;
       pipelines.getForRender = pipeline;
+      objects.get = getObject;
       this.renderer.debug.onNodeBuilderCreated = created;
     }
   }

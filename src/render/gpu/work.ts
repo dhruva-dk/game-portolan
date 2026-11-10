@@ -1,6 +1,6 @@
 // GPU work queued for the frame by things that have no renderer of their own (the actors' particles): each runs once
 // a frame, after the actors have moved and before the scene is drawn, so what it computes is what the frame shows.
-import type { WebGPURenderer } from 'three/webgpu';
+import type { Side, WebGPURenderer } from 'three/webgpu';
 
 export type FrameWork = (renderer: WebGPURenderer) => void;
 
@@ -32,6 +32,7 @@ export function serializePreparation<T>(renderer: object, work: () => Promise<T>
 /** The installed Three builder's async stages, with renderer state held only during each synchronous segment. */
 interface StagedBuilder {
   renderer: WebGPURenderer;
+  material?: { side: Side };
   context: { position?: { isNode?: boolean } };
   flowNodes: Record<string, { build(builder: StagedBuilder): void }[]>;
   prebuild(): void;
@@ -57,6 +58,7 @@ export async function buildNodeForTargetAsync(
     const scheduler = (globalThis as unknown as { scheduler?: { yield(): Promise<unknown> } }).scheduler;
     return scheduler ? scheduler.yield() : new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
   },
+  materialSide?: Side,
 ): Promise<object> {
   const builder = nodeBuilder as StagedBuilder;
   const renderer = builder.renderer;
@@ -66,7 +68,7 @@ export async function buildNodeForTargetAsync(
     renderer.setRenderTarget(target);
     renderer.setMRT(mrt);
     internal._currentRenderContext = context;
-    try { work(); }
+    try { withPreparationSide(builder.material, materialSide, work); }
     finally {
       renderer.setRenderTarget(was);
       renderer.setMRT(mrtWas);
@@ -113,4 +115,14 @@ export function sitePreparationYield(
     await nextFrame();
     since = now();
   };
+}
+
+
+/** A queued transparent pass must use its front/back variant without leaving that side on the live material. */
+export function withPreparationSide<T>(material: { side: Side } | undefined, side: Side | undefined, work: () => T): T {
+  if (!material || side === undefined) return work();
+  const was = material.side;
+  material.side = side;
+  try { return work(); }
+  finally { material.side = was; }
 }
