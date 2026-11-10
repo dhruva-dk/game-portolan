@@ -58,6 +58,9 @@ function hurtBy(kind: number): Extract<Moment, { k: 'hit' }>['weapon'] {
   return 'other';
 }
 
+/** The glow of a parcel, by tier. */
+const PARCEL_RARITY = [1, 2, 3] as const;
+
 const metres = (at: V3, y = 0): V3 => ({ x: at.x * (R + y), y: at.y * (R + y), z: at.z * (R + y) });
 
 /** The way a ship's guns point: from its position toward its aim, along the ground. */
@@ -105,9 +108,10 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.galeDive: return { k: 'galeDive', ship, region: e.item, pos };
     case EVENT.landing: return { k: 'landing', ship, pos };
     case EVENT.deliveryCalled: return { k: 'deliveryCalled', ship, pos };
-    case EVENT.deliveryArrived: return { k: 'deliveryArrived', ship, pos };
+    case EVENT.deliveryArrived: return { k: 'deliveryArrived', ship, pos, rarity: PARCEL_RARITY[e.item] ?? 1 };
     case EVENT.coins: return { k: 'coins', ship, amount: e.amount, pos };
     case EVENT.claim: return { k: 'claim', ship, cells: e.cells, area: e.amount, pos };
+    case EVENT.freed: return { k: 'freed', ship, cells: e.cells };
     case EVENT.cut: return { k: 'cut', ship, by: e.by, cells: e.cells, dry: e.flag === 1, pos };
     case EVENT.whaleBreach: return { k: 'whaleBreach', pos };
     case EVENT.whaleSurface: return { k: 'whaleSurface', pos };
@@ -157,7 +161,7 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'sink': return { t: 'sink', ship: m.ship };
     case 'gust': return { t: 'gust', ship: m.ship };
     case 'pickup': return { t: 'pickup', ship: m.ship, rarity: rarity(m.rarity) };
-    case 'deliveryArrived': return { t: 'delivery', ship: m.ship };
+    case 'deliveryArrived': return { t: 'delivery', ship: m.ship, at: m.pos, rarity: m.rarity };
     case 'cut': return m.dry ? null : { t: 'cut', ship: m.ship, at: m.pos };
     case 'ram': return { t: 'ram', at: m.pos };
     case 'aground': return { t: 'scrape', at: m.pos };

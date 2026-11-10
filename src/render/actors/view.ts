@@ -115,6 +115,8 @@ export interface WhaleView {
 }
 
 export interface ActorsView {
+  /** The gulls on the wing, where they are. */
+  gulls: readonly { ship: number; pos: Vec3; tier: number }[];
   /** Seconds, for waves and flutter. */
   time: number;
   /** Unit vector toward the sun, world frame. Half the planet is dark; lanterns and wakes glow there. */
@@ -144,7 +146,7 @@ export type ActorEvent =
   | { t: 'sink'; ship: number }
   | { t: 'gust'; ship: number }
   | { t: 'pickup'; ship: number; rarity: Rarity }
-  | { t: 'delivery'; ship: number; rarity?: Rarity }
+  | { t: 'delivery'; ship: number; rarity: Rarity; at: Vec3 }
   /** A trail crossed at `at`: ship's ink bursts where it broke. */
   | { t: 'cut'; ship: number; at: Vec3 }
   | { t: 'ram'; at: Vec3 }

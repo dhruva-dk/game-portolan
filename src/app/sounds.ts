@@ -18,6 +18,7 @@ export class MomentSound {
   /** When the Storm last bit the player's hull, in seconds: its sound comes once a second, not every tick. */
   private storm = -1;
   /** Each burning ship's crackle, by ship. */
+  private readonly cries = new Map<number, number>();
   private readonly flames = new Map<number, number>();
   /** When a waterline hit last gushed, per ship, so a broadside's balls make one gush and not four. */
   private readonly gushed = new Map<number, number>();
@@ -125,10 +126,11 @@ export class MomentSound {
         else if (m.ship === me) a.play('inkCut', { gain: m.dry ? 0.35 : 0.8 });
         return;
       case 'deliveryCalled':
-        if (m.ship === me) { a.play('coinSpend'); a.play('gullCall', { pos: m.pos }); }
+        if (m.ship === me) { a.play('coinSpend'); a.play('gullCall'); }
         return;
       case 'deliveryArrived':
         a.play('gullWings', { pos: m.pos });
+        a.play('impactWater', { pos: m.pos });
         a.play('deliveryThud', { pos: m.pos, delay: 0.15 });
         return;
       case 'coins':
@@ -192,6 +194,17 @@ export class MomentSound {
       else if (on && id) this.audio.move(id, this.at(i, metres(s.pos)));
       else if (!on && id) { this.audio.stop(id, 0.8); this.flames.delete(i); }
     });
+  }
+
+  /** The gulls in flight, heard coming: a cry and a few wingbeats now and then from where each is. */
+  flights(list: readonly { ship: number; pos: V3 }[], dt: number): void {
+    for (const f of list) {
+      const left = (this.cries.get(f.ship) ?? 0.2) - dt;
+      if (left > 0) { this.cries.set(f.ship, left); continue; }
+      this.cries.set(f.ship, 1.1 + Math.random() * 1.2);
+      this.audio.play(Math.random() < 0.6 ? 'gullKek' : 'gullWings', { pos: f.pos });
+    }
+    if (list.length === 0) this.cries.clear();
   }
 
   /** Stops every use loop (leaving a match). */

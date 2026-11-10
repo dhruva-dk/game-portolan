@@ -3,7 +3,7 @@
 // second, a dotted course and the Storm's first circle drawn on it while the Gale blows. The stick floats where the
 // thumb set it, or rests faintly at its home.
 import {
-  Pen, arrow, canvas, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, pennant, ring, star, stormRing, WASH, type ChartLayer, type Circle, type Sprite,
+  Pen, arrow, canvas, cross, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, pennant, ring, star, stormRing, WASH, type ChartLayer, type Circle, type Sprite,
 } from '../chart/index.ts';
 import type { Controls } from '../app/controls.ts';
 import type { MapView } from '../ui/model.ts';
@@ -42,20 +42,62 @@ export class Plate {
 /** The map's contents on their plate: the land round her, sampled as she sails, and what `v` shows on the sea. */
 export class Minimap {
   readonly #land = new LandLayer();
+  /** The wash of held water, drawn small and stretched soft. */
+  #washC: HTMLCanvasElement | null = null;
+  #washI: ImageData | null = null;
+
+  /** Each captain's water a wash in their colour, mine the deeper. */
+  #water(g: CanvasRenderingContext2D, cx: number, cy: number, ri: number, w: NonNullable<MapView['water']>): void {
+    if (!this.#washC || this.#washC.width !== w.n) {
+      this.#washC = canvas(w.n, w.n);
+      this.#washI = ctx(this.#washC).createImageData(w.n, w.n);
+    }
+    const d = this.#washI!.data;
+    for (let i = 0; i < w.ids.length; i++) {
+      const id = w.ids[i], a = i * 4;
+      if (id === 0) { d[a + 3] = 0; continue; }
+      const [r, gr, b] = Pen.rgb(w.inks[id - 1]);
+      d[a] = r; d[a + 1] = gr; d[a + 2] = b;
+      d[a + 3] = id === w.me ? 205 : 130;
+    }
+    ctx(this.#washC).putImageData(this.#washI!, 0, 0);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(this.#washC, cx - ri, cy - ri, ri * 2, ri * 2);
+  }
 
   /** The land, the Storm's edge in red, the next circle dotted, the Gale's course dotted, loot in gold, ships by their emblems or as marks, my marker's pennant. */
-  ink(pen: Pen, cx: number, cy: number, layer: ChartLayer, v: MapView, tide: number): void {
+  ink(pen: Pen, cx: number, cy: number, layer: ChartLayer, v: MapView, tide: number, cuts: readonly { x: number; y: number; a: number }[] = []): void {
     const g = pen.g, R = layer.layout.hud.r, ri = R * 0.82, k = ri / v.range;
     g.save();
     g.beginPath();
     g.arc(cx, cy, ri, 0, TAU);
     g.clip();
+    if (v.water) this.#water(g, cx, cy, ri, v.water);
     g.save();
     g.translate(cx - ri, cy - ri);
     g.globalAlpha = 0.6;
     this.#land.draw(g, ri, v.lat, v.lon, v.range, tide);
     g.restore();
     const at = (x: number, y: number) => [cx + x * k, cy - y * k] as const;
+    if (v.loop && v.loop.length >= 4 && v.loopInk) {
+      // the loop being sailed, as it is laid
+      g.beginPath();
+      for (let i = 0; i < v.loop.length; i += 2) {
+        const [x, y] = at(v.loop[i], v.loop[i + 1]);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.strokeStyle = v.loopInk;
+      g.lineWidth = 2.4;
+      g.lineCap = g.lineJoin = 'round';
+      g.globalAlpha = 0.95;
+      g.stroke();
+      g.globalAlpha = 1;
+    }
+    // a cut in a trail, red where it broke, going as the moment passes
+    for (const c of cuts) {
+      const [x, y] = at(c.x, c.y);
+      cross(pen, x, y, 6, 1, 'rubric');
+    }
     if (v.storm) {
       const [sx, sy] = at(v.storm.x, v.storm.y), sr = v.storm.r * k;
       // everything outside the safe circle under a thin wash of the Storm's red

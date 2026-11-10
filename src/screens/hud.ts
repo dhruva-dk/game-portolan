@@ -6,8 +6,8 @@
 // Once she has sunk the same HUD spectates: only the disc and the Storm's clock stay, the disc gilt over the ship
 // watched, and a tap anywhere skips to the result.
 import {
-  Press, arcPts, canvas, cross, ctx, drawSprite, dryAlpha, ease, everywhere, figure, figureWidth, hand, part, pressLook, prims,
-  woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type InkName, type Pen, type Pressable, type Pts, type Rect, type Sprite,
+  Press, arcPts, bakeSeal, canvas, cross, ctx, drawSeal, drawSprite, dryAlpha, ease, everywhere, figure, figureWidth, hand, part, pressLook, prims,
+  woodcut, WASH, type Box, type ChartLayer, type ChartLayout, type Circle, type Illumination, type InkName, type Pen, type Pressable, type Pts, type Rect, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
 import type { Prim } from '../icons/draw.ts';
@@ -63,7 +63,7 @@ const HURTS: readonly HurtId[] = ['sail', 'mast', 'rudder', 'leak', 'fire', 'ice
 /** What the HUD needs of the game. */
 export interface HudHost {
   /** The stick's place for the chart to draw, and what the HUD's controls press. */
-  readonly controls: Pick<Controls, 'press' | 'pick' | 'stickView'> & { throttle: number };
+  readonly controls: Pick<Controls, 'press' | 'pick' | 'stickView' | 'call'> & { throttle: number };
   /** Where the camera sees from, for the marks pinned to the world. */
   readonly sight: { readonly me: number; readonly spectating: boolean; project(p: V3): { x: number; y: number } | null; bearing(p: V3): number };
   /** Where ship i is now, for an arc turned toward her; null if she is not to be shown. */
@@ -89,8 +89,28 @@ interface Plates {
   map: Plate;
   sails: Plate;
   gust: Plate;
+  tally: Plate;
   slots: Plate[];
 }
+
+/** The seal's illumination by the best parcel the coins buy: plain ink for none, rubric, red and blue, gold. */
+const HAIL_INK: readonly Illumination[] = ['ink', 'rubric', 'redBlue', 'gold'];
+/** A gull with its wings up, white on the wax. */
+function gullDevice(g: CanvasRenderingContext2D, r: number): void {
+  g.beginPath();
+  g.moveTo(-r * 0.9, -r * 0.18);
+  g.quadraticCurveTo(-r * 0.46, -r * 0.62, -r * 0.08, -r * 0.05);
+  g.quadraticCurveTo(0, r * 0.14, r * 0.08, -r * 0.05);
+  g.quadraticCurveTo(r * 0.46, -r * 0.62, r * 0.9, -r * 0.18);
+  g.quadraticCurveTo(r * 0.48, -r * 0.3, r * 0.14, r * 0.28);
+  g.quadraticCurveTo(0, r * 0.56, -r * 0.14, r * 0.28);
+  g.quadraticCurveTo(-r * 0.48, -r * 0.3, -r * 0.9, -r * 0.18);
+  g.fill();
+}
+/** Seconds the seal takes to stamp; to ink back once the gull is home; a cut's mark on the disc; the hand at the seal. */
+const HAIL = { stamp: 0.32, back: 0.7, cut: 3, hand: 9 } as const;
+/** The tally stands for this many coins a stroke, and shows at most this many strokes. */
+const TALLY = { coins: 5, most: 25 } as const;
 
 /** A damage figure rising from the ship struck. */
 interface HitFigure {
@@ -126,6 +146,7 @@ interface HudPresses {
   sails: Pressable;
   slots: Pressable[];
   map: Pressable | null;
+  hail: Pressable;
 }
 
 /** A slot's woodcut and what stands in its corner. */
@@ -194,6 +215,15 @@ export class Hud {
   /** When the last hit of mine landed (ms), and whether it sank her. */
   #markAt = -1;
   #markSunk = false;
+  /** The hail's seals as baked, when it was last stamped (ms), when the gull last came home (ms), whether it is home, and until when the hand shows. */
+  readonly #seals = new Map<string, Seal>();
+  #stampAt = -Infinity;
+  #homeAt = -Infinity;
+  #home = true;
+  #handDue = false;
+  #handUntil = 0;
+  /** Where trails were cut, and when. */
+  readonly #cuts: { pos: V3; at: number }[] = [];
   readonly #figures: HitFigure[] = [];
   readonly #arcs: FireArc[] = [];
 
@@ -220,6 +250,11 @@ export class Hud {
     this.#scrapDue = true;
   }
 
+  /** The first hail: a hand at the seal. */
+  teachHail(): void {
+    this.#handDue = true;
+  }
+
   /** What the HUD shows: the model is refreshed a few times a second; the plates redraw when what they show changes. */
   set(m: HudModel): void {
     this.#m = m;
@@ -235,6 +270,7 @@ export class Hud {
   moment(e: Moment): void {
     const s = this.#host.sight;
     if (s.spectating) return;
+    if (e.k === 'cut' && !e.dry && (e.by === s.me || e.ship === s.me)) this.#cuts.push({ pos: { ...e.pos }, at: this.#now });
     if (e.k === 'sink' && e.by === s.me && e.ship !== s.me) {
       for (let i = this.#figures.length - 1; i >= 0; i--) {
         const f = this.#figures[i];
@@ -308,7 +344,7 @@ export class Hud {
   /** Every press off the chart but the disc's. */
   #bare(layer: ChartLayer): void {
     const p = this.#p!;
-    for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, ...p.slots]) layer.presses.remove(q.id);
+    for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, p.hail, ...p.slots]) layer.presses.remove(q.id);
   }
 
   /** No more touches: a held Fire is still let go when its finger lifts, Presses keeping the finger's pressable. */
@@ -316,7 +352,7 @@ export class Hud {
     const p = this.#p, layer = this.#layer;
     if (!p || !layer || !this.#pressing) return;
     this.#pressing = false;
-    for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, ...p.slots, ...(p.map ? [p.map] : [])]) layer.presses.remove(q.id);
+    for (const q of [p.fire, p.reload, p.ability, p.gust, p.sails, p.hail, ...p.slots, ...(p.map ? [p.map] : [])]) layer.presses.remove(q.id);
     layer.presses.remove('hud:skip');
   }
 
@@ -333,6 +369,7 @@ export class Hud {
       map: new Plate(layer, l.hud.r * 2, l.hud.r * 2),
       sails: new Plate(layer, (l.controls.sails.r + PAD) * 2, (l.controls.sails.r + PAD) * 2),
       gust: new Plate(layer, (l.controls.gust.r + PAD) * 2, (l.controls.gust.r + PAD) * 2),
+      tally: new Plate(layer, l.tally.w + PAD * 2, l.tally.h + PAD * 2),
       slots: l.slots.map((b) => new Plate(layer, b.w + PAD * 2, b.h + PAD * 2)),
     };
     const mirror = (c: Circle): Circle => (this.#host.lefty() ? { ...c, x: l.w - c.x } : c);
@@ -340,6 +377,7 @@ export class Hud {
       stick: mirror(cs.stick), fire: mirror(cs.fire), gust: mirror(cs.gust), ability: mirror(cs.ability), reload: mirror(cs.reload), sails: mirror(cs.sails),
     };
     this.#c = c;
+    this.#seals.clear();
     this.#unpress();
     const a = this.#host.controls, tap = (w: Parameters<typeof a.press>[0]) => { a.press(w); a.press(w, false); };
     const add = (q: Omit<Pressable, 'press'>) => layer.presses.add({ press: new Press(), ...q });
@@ -351,11 +389,23 @@ export class Hud {
       sails: add({ id: 'hud:sails', hit: { ...c.sails, r: c.sails.r * 1.2 }, on: 'down', sound: 'tick', haptic: 'selection', act: (x) => this.#setSails(x, c.sails) }),
       slots: l.slots.map((b, k) => add({ id: `hud:slot${k + 1}`, hit: b, on: 'down', sound: 'slot', haptic: 'selection', act: () => this.#slotDown(k), release: () => this.#slotUp(k) })),
       map: this.#host.openMap ? add({ id: 'hud:map', hit: l.hud, on: 'up', act: () => this.#host.openMap?.() }) : null,
+      // after the disc, so it is asked first where the two touch
+      hail: add({ id: 'hud:hail', hit: { ...l.hail, r: Math.max(l.hail.r, l.target / 2) }, on: 'down', sound: 'slot', haptic: 'medium', act: () => this.#hailed() }),
     };
     this.#pressing = true;
     if (this.#covered) this.#bare(layer);
     if (this.#skip) this.#watchOnly(layer);
     if (this.#leftAt >= 0) this.#unpress();
+  }
+
+  /** The seal pressed: it stamps and the gull is away. */
+  #hailed(): void {
+    const m = this.#m;
+    if (!m || m.gull.best < 0 || !m.gull.home) return;
+    this.#host.controls.call(m.gull.best);
+    this.#stampAt = this.#now;
+    this.#handUntil = 0;
+    this.#handDue = false;
   }
 
   /** A notch of the sails tapped: left, middle or right of the instrument. */
@@ -430,6 +480,7 @@ export class Hud {
     this.#stormClock(g, layer.layout, m, plates);
     this.#afloat(g, layer.layout, m, plates);
     this.#minimap(g, layer, m, plates.map);
+    this.#hail(g, layer, m, plates);
     this.#controls(g, layer, m, plates, dt);
     this.#combat(g, layer, m);
     this.#teaching(g, layer);
@@ -542,10 +593,61 @@ export class Hud {
   #minimap(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plate: Plate, gilt = false): void {
     const D = layer.layout.hud;
     const size = mapFace(g, layer, D, this.#a, m.map.heading, () => {
-      this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide));
+      this.#plate(g, plate, String(this.#mapKey), D.x, D.y, (p, cx, cy) => this.#map.ink(p, cx, cy, layer, m.map, m.tide, this.#cutsOn(m)));
     }, gilt);
     this.#touch(D.x, D.y, size, size);
     if (!gilt) this.#regionSign(g, layer, D);
+  }
+
+  /** The cuts still showing, where they lie on the disc. */
+  #cutsOn(m: HudModel): { x: number; y: number; a: number }[] {
+    const out: { x: number; y: number; a: number }[] = [], place = m.map.place;
+    for (let i = this.#cuts.length - 1; i >= 0; i--) {
+      const a = (this.#now - this.#cuts[i].at) / 1000 / HAIL.cut;
+      if (a >= 1) this.#cuts.splice(i, 1);
+      else if (place) out.push({ ...place(this.#cuts[i].pos), a });
+    }
+    return out;
+  }
+
+  /** The hail: a seal with the gull on it, illuminated by the best parcel the coins buy; the coins a tally beside it; the
+   *  seal plain while the gull is away, inking back when it is home; and a hand at it the first time it can be hailed. */
+  #hail(g: CanvasRenderingContext2D, layer: ChartLayer, m: HudModel, plates: Plates): void {
+    const l = layer.layout, H = l.hail, T = l.tally, press = this.#p!.hail, gull = m.gull, now = this.#now;
+    if (gull.home !== this.#home) {
+      this.#home = gull.home;
+      if (gull.home) this.#homeAt = now;
+    }
+    press.disabled = gull.best < 0 || !gull.home;
+    const ill = gull.home ? HAIL_INK[gull.best + 1] : 'ink', key = `${ill}|${H.r}`;
+    let seal = this.#seals.get(key);
+    if (!seal) {
+      seal = bakeSeal(layer.paper, l.widths, ill, { size: H.r * 2, dpr: layer.dpr, device: gullDevice, seed: 77 });
+      this.#seals.set(key, seal);
+    }
+    const f = (now - this.#stampAt) / 1000 / HAIL.stamp, stamping = f >= 0 && f < 1;
+    const inked = gull.home ? 0.4 + 0.6 * clamp((now - this.#homeAt) / 1000 / HAIL.back) : 0.4;
+    drawSeal(g, seal, H.x, H.y, {
+      phase: (now / 2400) % 1, alpha: this.#a * inked,
+      scale: stamping ? 1 + 0.42 * (1 - ease.out(clamp(f * 2.2))) : 1,
+      press: stamping ? 1 - f : press.press.sink,
+    });
+    this.#touch(H.x, H.y, H.r * 3.4, H.r * 3.4);
+    const strokes = Math.min(TALLY.most, Math.floor(gull.coins / TALLY.coins));
+    if (strokes > 0) {
+      this.#plate(g, plates.tally, String(strokes), T.x, T.y, (q, cx, cy) => {
+        paper(q, slipPath(cx, cy, T.w, T.h, 3), { burn: 3 });
+        tallyMarks(q, cx, cy, T, strokes);
+      });
+    }
+    if (this.#handDue) { this.#handDue = false; this.#handUntil = now + HAIL.hand * 1000; }
+    if (now < this.#handUntil) {
+      const size = 40, w = 44, h = size + 10, tip = 5;
+      const s = layer.sprite(`hud|handUp|${size}`, w, h, w / 2, tip, (p) => hand(p, w / 2, tip, size, -Math.PI / 2));
+      const y = H.y + H.r + 7 + (0.5 + 0.5 * Math.sin((now / 1000) * TAU * 1.2)) * 5;
+      drawSprite(g, s, H.x, y, { alpha: this.#a });
+      this.#rects.push({ x: H.x - w / 2 - 2, y: y - tip - 6, w: w + 4, h: h + 14 });
+    }
   }
 
   /** The region's woodcut, inked in at the top of the disc on entering it, standing a few seconds, drying out. */
@@ -740,6 +842,20 @@ export class Hud {
     const y = b.y - b.h / 2 - 6 - (0.5 + 0.5 * Math.sin((this.#now / 1000) * TAU * 1.2)) * 4;
     drawSprite(g, s, b.x, y, { alpha: this.#a });
     this.#rects.push({ x: b.x - w / 2 - 2, y: y - tip - 6, w: w + 4, h: h + 12 });
+  }
+}
+
+/** Tally marks for `n` strokes, four and a slash to a group of five. */
+function tallyMarks(p: Pen, cx: number, cy: number, b: Box, n: number): void {
+  const pitch = (b.w - 14) / 5, h = b.h * 0.56, x0 = cx - b.w / 2 + 10, step = pitch * 0.16;
+  for (let i = 0; i < n; i++) {
+    const group = Math.floor(i / 5), k = i % 5, gx = x0 + group * pitch;
+    if (k < 4) {
+      const x = gx + k * step, lean = ((i * 37) % 5) * 0.3 - 0.6;
+      p.rule([[x + lean, cy - h / 2, x - lean, cy + h / 2]], { w: 'fine', ink: 'iron', wobble: 0.3, seed: 200 + i });
+    } else {
+      p.rule([[gx - step * 0.5, cy + h * 0.32, gx + step * 3.5, cy - h * 0.32]], { w: 'fine', ink: 'iron', wobble: 0.3, seed: 200 + i });
+    }
   }
 }
 

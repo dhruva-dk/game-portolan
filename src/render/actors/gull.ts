@@ -1,18 +1,19 @@
 // Gulls, ported from the rewrite's gull and drawn as one instanced flock: the wings are hinged at the shoulder and the
 // wrist in the shader, so every bird flaps on its own beat in a single draw call. Small flocks wheel over the ships
-// nearest the camera; a delivery gull flies in from far off with a parcel, drops it on the ship's deck, and goes.
+// nearest the camera; a delivery gull rises from its landmark, flies to the ship as the sim has it, lets its parcel fall to the water ahead of her, and goes.
 import * as THREE from 'three';
 import { TAU, patch, rand, seaRadius, smooth, tangents } from './common.ts';
 import { gullNodeMaterial } from './tsl/fauna.ts';
 import { RARITY_GLOW, type Effects } from './effects.ts';
 import { C, Mesher } from './mesher.ts';
-import { SPRITE } from './particles.ts';
 import type { Juice, Rarity } from './view.ts';
 
 /** What the gulls need to know of a ship. */
 export interface ShipRef { pos: THREE.Vector3; fwd: THREE.Vector3; speed: number; alive: boolean }
 
 const CAP = 64;
+/** The rarity a parcel's tier glows in. */
+const TIER_RARITY = [1, 2, 3] as const;
 
 /** The rewrite's gull, nose along +z, one unit about 1 m at scale 1. Wing vertices carry their side and joint. */
 function gullGeometry(): THREE.BufferGeometry {
@@ -45,7 +46,9 @@ interface Flock { ship: number; centre: THREE.Vector3; mates: Flockmate[]; here:
 
 interface Delivery {
   ship: number; rarity: Rarity; pos: THREE.Vector3; vel: THREE.Vector3; t: number; phase: number;
-  state: 'in' | 'out'; drop: number; rel0: THREE.Vector3; parcel: THREE.Mesh; flap: number; landed: boolean;
+  state: 'in' | 'out'; drop: number; rel0: THREE.Vector3; at: THREE.Vector3; parcel: THREE.Mesh; flap: number; landed: boolean;
+  /** Where the sim has it now; frames it has been missing from the sim (the ship sank under it). */
+  want: THREE.Vector3; lost: number;
 }
 
 export class Gulls {
@@ -84,29 +87,32 @@ export class Gulls {
     this.parcelGeo = new THREE.IcosahedronGeometry(0.75, 1);
   }
 
-  /** A gull flies a parcel in to ship `ship`, from far off beyond it as the camera sees it. */
-  deliver(ship: number, rarity: Rarity, ref: ShipRef | null, eye: THREE.Vector3): void {
-    if (!ref) return;
-    const up = this.up.copy(ref.pos).normalize();
-    // away from the eye across the water, swung a little to one side
-    const away = this.f.copy(ref.pos).sub(eye);
-    away.addScaledVector(up, -away.dot(up));
-    if (away.lengthSq() < 1) tangents(up, away, this.x);
-    away.normalize();
-    const ang = rand(0.25, 0.75) * (Math.random() < 0.5 ? -1 : 1);
-    this.x.crossVectors(up, away);
-    const out = away.multiplyScalar(Math.cos(ang)).addScaledVector(this.x, Math.sin(ang)).normalize().clone();
-    const pos = ref.pos.clone().addScaledVector(out, 210).normalize().multiplyScalar(seaRadius(ref.pos) + 48);
+  /** A parcel's gull, come into being where the sim has it. */
+  private flight(ship: number, tier: number, at: THREE.Vector3Like): Delivery {
+    const rarity = (TIER_RARITY[tier] ?? 1) as Rarity, pos = new THREE.Vector3().copy(at);
     const parcel = this.parcels.pop() ?? new THREE.Mesh(this.parcelGeo, patch(new THREE.MeshStandardMaterial({ color: 0x4b6b3a, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0.9 })));
-    (parcel.material as THREE.MeshStandardMaterial).emissive.copy(RARITY_GLOW[rarity]).multiplyScalar(0.8);
+    (parcel.material as THREE.MeshStandardMaterial).emissive.copy(RARITY_GLOW[rarity]).multiplyScalar(0.3);
     parcel.visible = true;
     parcel.position.copy(pos);
     this.group.add(parcel);
-    this.deliveries.push({ ship, rarity, pos, vel: out.multiplyScalar(-34), t: 0, phase: rand(0, TAU), state: 'in', drop: -1, rel0: new THREE.Vector3(), parcel, flap: 1, landed: false });
+    const d: Delivery = { ship, rarity, pos, vel: new THREE.Vector3(), want: pos.clone(), t: 0, phase: rand(0, TAU), state: 'in', drop: -1, rel0: new THREE.Vector3(), at: new THREE.Vector3(), parcel, flap: 1, landed: false, lost: 0 };
+    this.deliveries.push(d);
+    return d;
+  }
+
+  /** The gull over `ship` lets its parcel go: it falls to the water at `at`, and the gull climbs away. */
+  drop(ship: number, rarity: Rarity, at: THREE.Vector3Like): void {
+    const d = this.deliveries.find((q) => q.ship === ship && q.state === 'in') ?? this.flight(ship, 1, at);
+    d.state = 'out';
+    d.t = 0;
+    d.drop = 0;
+    d.rarity = rarity;
+    d.rel0.copy(d.parcel.position);
+    d.at.copy(at);
   }
 
   /** One frame: flocks over the ships nearest `eye`, deliveries in flight. Returns juice for parcels landing on `player`. */
-  update(ships: ReadonlyMap<number, ShipRef>, eye: THREE.Vector3, dt: number, t: number, player: number): Juice | null {
+  update(ships: ReadonlyMap<number, ShipRef>, flying: readonly { ship: number; pos: THREE.Vector3Like; tier: number }[], eye: THREE.Vector3, dt: number, t: number, player: number): Juice | null {
     let juice: Juice | null = null;
     this.birds = [];
     // which ships keep a flock
@@ -122,24 +128,24 @@ export class Gulls {
       if (s) fl.centre.lerp(this.f.copy(s.pos).addScaledVector(s.fwd, s.speed * 1.2), Math.min(1, dt * 1.5));
       this.flock(fl, dt, t);
     }
-    // deliveries
-    const gup = new THREE.Vector3(), sup = new THREE.Vector3();
+    // the gulls on the wing, as the sim flies them, and the ones that have let go, climbing away
+    for (const d of this.deliveries) d.lost++;
+    for (const v of flying) {
+      const d = this.deliveries.find((q) => q.ship === v.ship && q.state === 'in') ?? this.flight(v.ship, v.tier, v.pos);
+      d.want.copy(v.pos);
+      d.lost = 0;
+    }
+    const gup = new THREE.Vector3();
     for (let i = this.deliveries.length - 1; i >= 0; i--) {
-      const d = this.deliveries[i], s = ships.get(d.ship), pc = d.parcel, c = RARITY_GLOW[d.rarity];
+      const d = this.deliveries[i], pc = d.parcel, c = RARITY_GLOW[d.rarity];
       d.t += dt;
       gup.copy(d.pos).normalize();
       if (d.state === 'in') {
-        // home on a point over the deck, leading the ship a little; flap hard far out, glide down the last stretch
-        const target = s ? this.x.copy(s.pos).addScaledVector(s.fwd, s.speed * 0.6).normalize().multiplyScalar(s.pos.length() + 15) : this.x.copy(d.pos);
-        const to = this.f.copy(target).sub(d.pos), dist = to.length();
-        d.vel.lerp(to.normalize().multiplyScalar(18 + Math.min(1, dist / 80) * 20), Math.min(1, dt * 2.2));
-        d.flap = dist > 90 ? 1 : 0.15;
-        pc.position.copy(d.pos).addScaledVector(gup, -1.0);
-        if (!s || !s.alive || dist < 4 || d.t > 14) {
-          d.state = 'out';
-          d.t = 0;
-          if (s && s.alive) { d.drop = 0; d.rel0.copy(pc.position).sub(s.pos); } else pc.visible = false;
-        }
+        if (d.lost > 3) { d.state = 'out'; d.t = 0; pc.visible = false; d.landed = true; }
+        const to = this.f.copy(d.want).sub(d.pos);
+        d.vel.lerp(to.multiplyScalar(12), Math.min(1, dt * 12));
+        d.flap = 1;
+        pc.position.copy(d.pos).addScaledVector(gup, -1.4);
       } else {
         // climb away, flapping hard, and go
         d.vel.addScaledVector(gup, dt * 7).multiplyScalar(1 + dt * 0.25);
@@ -147,26 +153,22 @@ export class Gulls {
         if (d.t > 7) { this.deliveries.splice(i, 1); this.parcels.push(pc); this.group.remove(pc); continue; }
       }
       d.pos.addScaledVector(d.vel, dt);
-      // the parcel falls to the deck, tumbling, and bursts open in its rarity's light
+      // the parcel falls to the water, tumbling, and goes in with a splash, loot where it lands
       if (d.drop >= 0 && !d.landed) {
-        if (!s) { pc.visible = false; d.landed = true; } else {
-          d.drop += dt;
-          const k = Math.min(1, d.drop / 0.85);
-          sup.copy(s.pos).normalize();
-          pc.position.copy(s.pos).add(this.f.copy(d.rel0).lerp(this.x.copy(sup).multiplyScalar(3.2), k * k));
-          pc.rotation.set(d.drop * 5, d.drop * 3, 0);
-          if (k >= 1) {
-            d.landed = true;
-            pc.visible = false;
-            const p = pc.position;
-            this.fx.sparkle(p, c, 26 + d.rarity * 8, 2.5);
-            this.fx.glow.emit({ x: p.x, y: p.y, z: p.z, life: 0.35, size: 5 + d.rarity, grow: 1.8, r: c.r * 3, g: c.g * 3, b: c.b * 3, frame: SPRITE.puff, fadeIn: 0 });
-            this.fx.glow.emit({ x: p.x, y: p.y, z: p.z, life: 0.6, size: 2, grow: 5, r: c.r * 2.5, g: c.g * 2.5, b: c.b * 2.5, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
-            if (d.ship === player) juice = { shake: 0.06, haptic: 'light' };
-          }
+        d.drop += dt;
+        const k = Math.min(1, d.drop / 0.8);
+        pc.position.copy(d.rel0).lerp(d.at, k * k);
+        pc.rotation.set(d.drop * 5, d.drop * 3, 0);
+        if (k >= 1) {
+          d.landed = true;
+          pc.visible = false;
+          const p = pc.position;
+          this.fx.splash(p, 0.9);
+          this.fx.sparkle(p, c, 18 + d.rarity * 6, 2.5);
+          if (d.ship === player) juice = { shake: 0.05, haptic: 'light' };
         }
       }
-      if (pc.visible) this.fx.light(pc.position, 2.3, c, 1.5);
+      if (pc.visible) this.fx.light(pc.position, 1.2, c, 0.8);
       // the bird
       const fwd = this.f.copy(d.vel), vr = fwd.dot(gup);
       fwd.addScaledVector(gup, -vr);

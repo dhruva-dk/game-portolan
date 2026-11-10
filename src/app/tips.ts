@@ -12,7 +12,7 @@ export const TIPS_KEY = 'portolan.tips';
 /** The scraps the HUD pins. */
 const SCRAPS: readonly ScrapId[] = ['wind', 'fight', 'closing'];
 /** What the chart teaches in place: the Gale's hand at DIVE. */
-const DRAWN = ['gale'] as const;
+const DRAWN = ['gale', 'hail'] as const;
 
 export type TipId = ScrapId | (typeof DRAWN)[number];
 

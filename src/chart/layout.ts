@@ -43,6 +43,9 @@ export interface ChartLayout {
   thumbs: { left: Circle; right: Circle };
   /** The minimap disc, top right. */
   hud: Circle;
+  /** The hail's seal, at the disc's lower left, and the coins' tally beside it. */
+  hail: Circle;
+  tally: Box;
   /** The shield's bar over the hull's, top left: each box is the ruled strip and the numeral at its right end. */
   bars: { shield: Box; hull: Box };
   /** The Storm's clock (its spiral and the countdown) and the ships afloat beside it, top centre. */
@@ -132,6 +135,8 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
       target: TARGET,
       thumbs: { left: L, right: R },
       hud: { x: w - safe.right - disc - 26, y: safe.top + disc + 26, r: disc },
+      hail: { x: w - safe.right - disc * 2 - 26 - 32 - 6, y: safe.top + disc + 26 + disc * 0.62, r: 32 },
+      tally: { x: w - safe.right - disc * 2 - 26 - 64 - 6 - 10 - 72, y: safe.top + disc + 26 + disc * 0.62, w: 144, h: 36 },
       bars,
       clock: { x: w / 2 - 66, y: safe.top + 26 + 22, w: 120, h: 44 },
       afloat: { x: w / 2 + 66, y: safe.top + 26 + 22, w: 120, h: 44 },
@@ -167,6 +172,8 @@ export function chartLayout(w: number, h: number, safe: Insets = { top: 0, right
     target: TARGET,
     thumbs: { left: L, right: R },
     hud: { x: w - safe.right - disc - 10, y: safe.top + disc + 10, r: disc },
+    hail: { x: w - safe.right - disc * 2 - 10 - 25 - 5, y: safe.top + disc + 10 + disc * 0.62, r: 25 },
+    tally: { x: w - safe.right - disc * 2 - 10 - 50 - 5 - 7 - 52, y: safe.top + disc + 10 + disc * 0.62, w: 104, h: 28 },
     bars,
     clock: { x: w / 2 - 46, y: safe.top + 12 + 17, w: 84, h: 34 },
     afloat: { x: w / 2 + 46, y: safe.top + 12 + 17, w: 84, h: 34 },
@@ -203,7 +210,7 @@ export function layoutProblems(l: ChartLayout): string[] {
   const asShape = (v: Circle | Box, grow: boolean): Shape => ('r' in v
     ? { kind: 'circle', c: { ...v, r: grow ? Math.max(v.r, t) : v.r } }
     : { kind: 'box', b: { ...v, w: grow ? Math.max(v.w, l.target) : v.w, h: grow ? Math.max(v.h, l.target) : v.h } });
-  const ctl: [string, Shape][] = [...Object.entries(l.controls), ...l.slots.map((b, i) => [`slot ${i + 1}`, b] as const)]
+  const ctl: [string, Shape][] = [...Object.entries(l.controls), ['hail', l.hail] as const, ...l.slots.map((b, i) => [`slot ${i + 1}`, b] as const)]
     .map(([k, v]) => [k, asShape(v, true)]);
   for (let i = 0; i < ctl.length; i++) for (let j = i + 1; j < ctl.length; j++) {
     if (overlap(ctl[i][1], ctl[j][1])) out.push(`${ctl[i][0]} and ${ctl[j][0]} overlap`);
@@ -212,7 +219,7 @@ export function layoutProblems(l: ChartLayout): string[] {
   for (const [k, th] of Object.entries(l.thumbs)) if (overlap(disc, { kind: 'circle', c: th })) out.push(`the disc is under the ${k} thumb`);
   for (const [k, s] of ctl) if (overlap(disc, s)) out.push(`the disc covers ${k}`);
   const readings: [string, Shape][] = [['shield bar', asShape(l.bars.shield, false)], ['hull bar', asShape(l.bars.hull, false)],
-    ['clock', asShape(l.clock, false)], ['ships afloat', asShape(l.afloat, false)], ['scrap', asShape(l.scrap, false)]];
+    ['clock', asShape(l.clock, false)], ['ships afloat', asShape(l.afloat, false)], ['tally', asShape(l.tally, false)], ['scrap', asShape(l.scrap, false)]];
   for (const [k, s] of readings) {
     if (overlap(disc, s)) out.push(`the disc covers the ${k}`);
     for (const [c, cs] of ctl) if (overlap(s, cs)) out.push(`the ${k} is under ${c}`);

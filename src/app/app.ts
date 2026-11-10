@@ -27,7 +27,7 @@ import { Session, type PlayOptions } from './session.ts';
 import { MomentJuice, type Viewer } from './juice.ts';
 import { MOMENTS, actorEvent, arrangeFight, causeOf, daylight, type MomentScript } from './moments.ts';
 import type { Moment } from './events.ts';
-import { galeMap, hudModel, markOf, planetMap, resultsModel } from './matchModels.ts';
+import { galeMap, heldChart, hudModel, markOf, planetMap, resultsModel } from './matchModels.ts';
 import { cosmeticsOf, sceneActors, sceneHearing, sceneStage } from './views.ts';
 import { LOBBY_CAMERA, lobbyScene, sceneFrom, type SceneInput, type SceneSpec } from './scenes.ts';
 import { isScreen, MENUS, type ScreenName } from './flow.ts';
@@ -441,6 +441,8 @@ export class App {
   private hudT = 0;
   /** Seconds the match has been over and its end held on screen. */
   private endHeld = 0;
+  /** The water she held when she sank; null while she is afloat. */
+  private sunkWater: readonly number[] | null = null;
   private readonly eye = { x: 0, y: 0, z: 0 };
   private readonly ndc = new THREE.Vector3();
   /** Where the juice sees from: the camera, and the ship the player watches. */
@@ -479,6 +481,7 @@ export class App {
     this.watched = -1;
     this.pull = 0;
     this.endHeld = 0;
+    this.sunkWater = null;
     this.tips.reset();
     this.viewer.me = this.sound.me = PLAYER;
     this.viewer.spectating = false;
@@ -496,6 +499,7 @@ export class App {
     const s = this.session;
     if (!s) return;
     this.log.tick = s.state.tick;
+    if (m.k === 'freed' && m.ship === PLAYER) this.sunkWater = m.cells;
     if (m.k === 'claim') this.stage?.inkMark({ k: 'claim', ship: m.ship, cells: m.cells, at: m.pos });
     else if (m.k === 'cut') this.stage?.inkMark({ k: 'cut', ship: m.ship, cells: m.cells, at: m.pos, dry: m.dry });
     const ev = actorEvent(m, s.state.whale.head);
@@ -564,7 +568,9 @@ export class App {
     const report = s.tally.report(s.plan.fleet.map((e) => e.captain), (i) => s.standing(i));
     const changes = this.career.apply(report), mine = report.ships[PLAYER];
     this.log.add('flow', 'finish', { place: changes.place, kills: changes.kills, xp: changes.xp.total, tick: s.state.tick });
-    this.go('results', resultsModel(changes, this.career.career, { damage: mine.damage, survived: mine.survived }));
+    const owner = s.state.owner, water: number[] = this.sunkWater ? [...this.sunkWater] : [];
+    if (!this.sunkWater) for (let c = 0; c < owner.length; c++) if (owner[c] === PLAYER + 1) water.push(c);
+    this.go('results', resultsModel(changes, this.career.career, { damage: mine.damage, survived: mine.survived }, heldChart(water, s.inks[PLAYER])));
   }
 
   private leaveMatch(): void {
@@ -707,7 +713,11 @@ export class App {
     this.hudT -= f.realDt;
     if (this.hudT <= 0 || !this.loop.running) {
       this.hudT = 1 / 12;
-      if (this.hud && this.session === s) this.hud.set(hudModel(s));
+      if (this.hud && this.session === s) {
+        const model = hudModel(s);
+        this.hud.set(model);
+        if (model.gull.best >= 0 && s.watch === PLAYER && this.tips.drawn('hail')) this.hud.teachHail();
+      }
     }
   }
 
@@ -870,8 +880,9 @@ export class App {
   }
 
   /** Pins a teaching scrap over the HUD at once, for the test hook. */
-  teach(id: ScrapId): void {
-    this.hud?.teach(id);
+  teach(id: ScrapId | 'hail'): void {
+    if (id === 'hail') this.hud?.teachHail();
+    else this.hud?.teach(id);
   }
 
   /** Inks the HUD in as she comes to sea, from the live session or a model the hook hands in. */
@@ -1049,7 +1060,10 @@ export class App {
     e.up.set(0, 1, 0).applyQuaternion(cam.quaternion);
     this.audio.setListener(cam.position, e.fwd, e.up);
     const s = this.session;
-    if (s) this.sound.fires(s.state.ships, PHASE.sunk, (p) => ({ x: p.x * R, y: p.y * R, z: p.z * R }));
+    if (s) {
+      this.sound.fires(s.state.ships, PHASE.sunk, (p) => ({ x: p.x * R, y: p.y * R, z: p.z * R }));
+      this.sound.flights(s.flights(), dt);
+    }
     e.t -= dt;
     if (e.t > 0 && this.loop.running) return;
     e.t = 0.1;

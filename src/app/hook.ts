@@ -123,7 +123,7 @@ export function installHook(app: App) {
     },
     forgetTips: () => app.tips.forget(),
     /** Pins a teaching scrap over the HUD at once, without waiting for its moment. */
-    teach: (id: ScrapId) => app.teach(id),
+    teach: (id: ScrapId | 'hail') => app.teach(id),
 
     // ── moments ──
     moment: (name: string, seed: number) => app.moment(name, seed),

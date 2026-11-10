@@ -11,7 +11,7 @@ import type { ActorsView, CosmeticIds, LootView, ProjectileView, ShipView, Whale
 import type { StageView, WeatherSystem } from '../render/stage.ts';
 import { sink, settle } from '../sim/end.ts';
 import {
-  CAUSE, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
+  CAUSE, GULL, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
@@ -142,6 +142,7 @@ export class Session implements Stepper {
   private readonly ships: ShipView[] = [];
   private readonly shots: ProjectileView[] = [];
   private readonly loot: LootView[] = [];
+  private readonly gulls: { ship: number; pos: V3; tier: number }[] = [];
   private readonly laid: (readonly number[])[] = [];
   private readonly whale: WhaleView = { id: 0, pos: v3(), head: v3(), state: 'deep', k: 0 };
 
@@ -415,7 +416,7 @@ export class Session implements Stepper {
     }
     const wind = windAt(s, s.ships[this.watch].pos, WIND).v;
     return {
-      time, sun, seaLevel: seaLevel(s), wind: { ...wind }, player: PLAYER, ships, projectiles: shots, loot, whales: [this.whaleView()],
+      time, sun, seaLevel: seaLevel(s), wind: { ...wind }, player: PLAYER, ships, projectiles: shots, loot, whales: [this.whaleView()], gulls: this.flights(),
     };
   }
 
@@ -472,6 +473,18 @@ export class Session implements Stepper {
       territory: { owner: s.owner, laid: this.trails(), version: Math.floor(s.tick / 6), me: this.watch + 1, inks: this.inks },
       screen: { storm: own ? outside : outside * 0.5, hurt, low },
     };
+  }
+
+  /** Every gull on the wing: where it is, in metres, and what it carries. It rises from the landmark at the start of its flight. */
+  flights(): readonly { ship: number; pos: V3; tier: number }[] {
+    const s = this.state, out = this.gulls;
+    out.length = 0;
+    for (let i = 0; i < SHIPS; i++) {
+      const g = s.ships[i].gull;
+      if (g.state !== GULL.flying) continue;
+      out.push({ ship: i, pos: metres(g.at, seaLevel(s) + Math.min(g.alt, 14 + g.t * 14)), tier: g.tier });
+    }
+    return out;
   }
 
   /** Every ship's trail as it is laid. */

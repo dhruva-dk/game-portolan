@@ -84,7 +84,7 @@ export function sceneActors(s: SceneSpec, time: number, sun: V3, look: CosmeticI
   ships.push(...fleetOf(s));
   // a steady breeze from behind the ship's port quarter
   const w = s.wind ?? s.heading, wind = { x: w.x * 6, y: w.y * 6, z: w.z * 6 };
-  return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [] };
+  return { time, sun, seaLevel: s.tide, wind, player: s.ship ? 0 : -1, ships, projectiles: [], loot: [], whales: [], gulls: [] };
 }
 
 const WEIGHTS = new Float64Array(REGION_COUNT);

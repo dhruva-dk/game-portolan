@@ -394,7 +394,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     loot.update(view.loot, t, eye);
     refs.clear();
     for (const f of fleet.values()) refs.set(f.id, { pos: f.pos, fwd: f.fwd, speed: f.view.speed, alive: f.view.alive && f.sink < 0 });
-    juice(gulls.update(refs, eye, dt, t, player), null);
+    juice(gulls.update(refs, view.gulls, eye, dt, t, player), null);
     juice(whales.update(view.whales, dt, t, eye), null);
     shards.update(dt);
     lightning.update(dt, camera);
@@ -537,7 +537,7 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           break;
         }
         case 'delivery':
-          gulls.deliver(e.ship, e.rarity ?? 0, refs.get(e.ship) ?? null, eye);
+          gulls.drop(e.ship, e.rarity, e.at);
           break;
         case 'ram': {
           const at = v3(e.at);

@@ -2,6 +2,7 @@
 // career's own record (src/career/record.ts, contract.ts) so integration maps one onto the other in a few lines;
 // nothing here reads the simulation's state or the career's internals. The abilities and the regions are read
 // straight from src/sim, which is allowed: they are fixed tables.
+import type { V3 } from '../sim/math.ts';
 import type { AbilityId, ActiveId, PassiveId } from '../sim/abilities.ts';
 import type { RegionId } from '../sim/world/index.ts';
 
@@ -169,6 +170,14 @@ export interface MapView {
   course?: readonly (readonly number[])[];
   first?: readonly (readonly number[])[];
   fleet?: boolean;
+  /** The water held round the ship: `ids` a square of n × n owners (0 for nobody, else captain + 1) across the map's
+   *  width, north at the top; `inks` each captain's colour; `me` the ship the map is for, + 1. */
+  water?: { n: number; ids: Uint8Array; inks: readonly string[]; me: number };
+  /** The loop being sailed, as it is laid: metres (x, y, x, y…), oldest first, in `loopInk`. */
+  loop?: readonly number[];
+  loopInk?: string;
+  /** Where a point of the sea lies on this map, metres. */
+  place?: (q: V3) => { x: number; y: number };
 }
 
 /** A ship's parts as the HUD shows them: how hurt each is, 0 whole to 1 shot away. */
@@ -223,6 +232,8 @@ export interface HudModel {
   colour: string;
   /** The sea level in metres, from −1 at low water to +1 at high. */
   tide: number;
+  /** The gull: the coins to hail it with, the best parcel they buy now (-1 none, else 0–2), and whether it is home. */
+  gull: { coins: number; best: number; home: boolean };
   /** What a swap would take, if anything is in reach. */
   pickup: string | null;
   map: MapView;
@@ -235,4 +246,13 @@ export interface ResultsModel {
   survived: number;
   level: { before: LevelView; after: LevelView };
   rank: { before: RankView; after: RankView };
+  /** The water she held at the end, in her colour; null if none. */
+  held: HeldChart | null;
+}
+
+/** Water held, for a small chart: each cell's middle (x, y, x, y… in −1..1 across the chart) and its half width. */
+export interface HeldChart {
+  pts: Float32Array;
+  half: number;
+  ink: string;
 }

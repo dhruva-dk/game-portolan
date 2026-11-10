@@ -10,12 +10,14 @@ import {
 import { toEdge } from '../sim/storm.ts';
 import { seaLevelAt } from '../sim/environment.ts';
 import { deckAt, newDeck } from '../sim/seaway.ts';
-import { GALE, GUST, LOOT, PARTS } from '../sim/tables.ts';
-import { R, angleTo, apart, tangentToward } from '../sim/sphere.ts';
+import { GALE, GUST, LOOT, PARCELS, PARTS } from '../sim/tables.ts';
+import { R, TERRITORY, angleTo, apart, cellDir, cellOf, tangentToward } from '../sim/sphere.ts';
+import { GULL } from '../sim/state.ts';
+import { priceOf } from '../sim/economy.ts';
 import { aimedAt } from '../sim/combat.ts';
 import { REGIONS, regionAt } from '../sim/world/index.ts';
 import { v3, type V3 } from '../sim/math.ts';
-import type { ConsumableId, HudModel, LevelView, MapView, Mark, RankView, Rarity, ResultsModel, Slot, WeaponId } from '../ui/model.ts';
+import type { ConsumableId, HeldChart, HudModel, LevelView, MapView, Mark, RankView, Rarity, ResultsModel, Slot, WeaponId } from '../ui/model.ts';
 import type { MapShip, PlanetMapModel } from '../screens/fullmap.ts';
 import { consumableOf, itemKey, weaponOf } from './moments.ts';
 import type { Session } from './session.ts';
@@ -90,6 +92,29 @@ function slotOf(sh: Ship, k: number): Slot {
 const afloat = (s: MatchState): number => s.ships.reduce((n, sh) => n + (sh.phase !== PHASE.sunk ? 1 : 0), 0);
 
 /** The minimap round ship i. */
+/** How many samples across the disc's wash of held water. */
+const WASH_N = 64;
+const WASH_IDS = new Uint8Array(WASH_N * WASH_N);
+const SAMPLE = v3();
+
+/** The owners of the water round p, north at the top, for the disc. */
+function washAround(owner: Uint8Array, p: V3, e: V3, n: V3): Uint8Array {
+  for (let j = 0; j < WASH_N; j++) {
+    const y = (1 - ((j + 0.5) / WASH_N) * 2) * MAP_RANGE;
+    for (let i = 0; i < WASH_N; i++) {
+      const x = (((i + 0.5) / WASH_N) * 2 - 1) * MAP_RANGE, k = j * WASH_N + i;
+      if (x * x + y * y > MAP_RANGE * MAP_RANGE * 1.06) { WASH_IDS[k] = 0; continue; }
+      SAMPLE.x = p.x + (e.x * x + n.x * y) / R;
+      SAMPLE.y = p.y + (e.y * x + n.y * y) / R;
+      SAMPLE.z = p.z + (e.z * x + n.z * y) / R;
+      const l = Math.hypot(SAMPLE.x, SAMPLE.y, SAMPLE.z);
+      SAMPLE.x /= l; SAMPLE.y /= l; SAMPLE.z /= l;
+      WASH_IDS[k] = owner[cellOf(TERRITORY, SAMPLE)];
+    }
+  }
+  return WASH_IDS;
+}
+
 function mapOf(session: Session, i: number): MapView {
   const s = session.state, sh = s.ships[i], p = sh.pos, { e, n } = frame(p), ll = latLon(p);
   const rel = (q: V3) => {
@@ -110,10 +135,17 @@ function mapOf(session: Session, i: number): MapView {
   }
   const marks: MapView['marks'] = [];
   for (const l of s.loot) if (apart(p, l.at) < MAP_RANGE) marks.push(rel(l.at));
+  const loop: number[] = [];
+  for (const c of sh.laid) {
+    const m = rel(cellDir(TERRITORY, c, SAMPLE));
+    if (loop.length > 0 || Math.abs(m.x) < MAP_RANGE * 1.4) loop.push(m.x, m.y);
+  }
   return {
     lat: ll.lat, lon: ll.lon, heading: Math.atan2(dot(sh.head, e), dot(sh.head, n)), range: MAP_RANGE,
     storm: formed ? circle(SV.calm) : null, next: formed ? circle(SV.next) : null, ships, marks,
     marker: i === PLAYER && session.mark ? rel(session.mark) : null,
+    water: { n: WASH_N, ids: washAround(s.owner, p, e, n), inks: session.inks, me: i + 1 },
+    loop, loopInk: session.inks[i], place: rel,
   };
 }
 
@@ -259,14 +291,35 @@ export function hudModel(session: Session): HudModel {
     colour: shipMark(session, session.watch).colours[0],
     tide: seaLevelAt(s.tick * TICK),
     pickup: pickupOf(s, sh),
+    gull: { coins: sh.coins, best: PARCELS.reduce((b, _p, t) => (sh.coins >= priceOf(sh, t) ? t : b), -1), home: sh.gull.state === GULL.home },
     map: mapOf(session, session.watch),
   };
 }
 
+/** The chart of the water in `cells`, centred on it, or null if there is none. */
+export function heldChart(cells: readonly number[], ink: string): HeldChart | null {
+  if (cells.length === 0) return null;
+  const c = v3(), d = v3();
+  for (const k of cells) { cellDir(TERRITORY, k, d); c.x += d.x; c.y += d.y; c.z += d.z; }
+  const l = Math.hypot(c.x, c.y, c.z) || 1;
+  c.x /= l; c.y /= l; c.z /= l;
+  const { e, n } = frame(c), pts = new Float32Array(cells.length * 2);
+  let far = 40;
+  cells.forEach((k, i) => {
+    cellDir(TERRITORY, k, d);
+    const x = R * (d.x * e.x + d.y * e.y + d.z * e.z), y = R * (d.x * n.x + d.y * n.y + d.z * n.z);
+    pts[i * 2] = x; pts[i * 2 + 1] = y;
+    far = Math.max(far, Math.hypot(x, y));
+  });
+  const scale = 1 / (far * 1.12);
+  for (let i = 0; i < pts.length; i++) pts[i] *= scale;
+  return { pts, half: 2.2 * scale, ink };
+}
+
 /** The results, from what the career's applyMatch changed and the match's own numbers. */
-export function resultsModel(c: MatchChanges, after: Career, report: { damage: number; survived: number }): ResultsModel {
+export function resultsModel(c: MatchChanges, after: Career, report: { damage: number; survived: number }, held: HeldChart | null): ResultsModel {
   return {
-    place: c.place, kills: c.kills, damage: report.damage, survived: report.survived,
+    held, place: c.place, kills: c.kills, damage: report.damage, survived: report.survived,
     level: { before: levelFrom(c.level.before), after: levelFrom(levelOf(after.xp)) },
     rank: { before: rankFrom(c.rank.before), after: rankFrom(c.rank.after) },
   };

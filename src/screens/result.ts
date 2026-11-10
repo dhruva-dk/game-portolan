@@ -8,7 +8,7 @@
 // Each thing is drawn with the pen while it inks in, then baked once to a sprite; only the ring's gold is drawn with
 // the pen each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
 import {
-  Press, bakeSeal, drawBaked, drawSprite, ease, everywhere, figure, figureWidth, laurel, part, prims, stamp, woodcut,
+  Press, bakeSeal, drawBaked, drawSprite, ease, everywhere, figure, figureWidth, laurel, part, prims, ring, stamp, woodcut,
   type Baked, type ChartLayer, type Circle, type Illumination, type InkName, type Pen, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
@@ -78,6 +78,8 @@ function climbs(before: LevelView, after: LevelView): Climb[] {
 
 interface Geo {
   wreath: Circle;
+  /** The little chart of the water she held. */
+  chart: Circle;
   /** The numeral's size. */
   place: number;
   stats: { x: number; y: number; art: number; size: number; gap: number; text: string; drawing: string }[];
@@ -186,6 +188,7 @@ export class Result {
     const place = String(m.place);
     this.#g = {
       wreath: { x: cx, y: H * 0.3, r: H * 0.215 },
+      chart: { x: cx - H * 0.47, y: H * 0.3, r: H * 0.17 },
       place: H * (place.length > 1 ? 0.17 : 0.2),
       stats: [['hud.kills', String(m.kills)], ['hud.damage', String(Math.round(m.damage))], ['hud.afloat', mmss(m.survived)]].map(([drawing, text], i) => (
         { x: cx + (i - 1) * H * 0.36, y: H * 0.62, art: H * 0.085, size: H * 0.05, gap: H * 0.012, text, drawing }
@@ -219,6 +222,7 @@ export class Result {
     gc.translate(0, -H * (1 - ease.out(span(s, AT.sheet))) - H * up);
     drawBaked(gc, this.#sheet!, -BLEED, -BLEED);
     this.#crest(gc, layer.pen, s);
+    this.#water(gc, s);
     this.#stats(gc, layer.pen, s);
     this.#plate(gc, layer.pen, s);
     gc.restore();
@@ -239,6 +243,26 @@ export class Result {
     if (t < 1) return draw(pen, W.x, W.y, t);
     const d = W.r * 2.7;
     drawSprite(gc, this.#bake(`crest|${text}`, d, d, (p, _g, x, y) => draw(p, x, y, 1)), W.x, W.y);
+  }
+
+  /** The water she held at the end, inked in her colour on a small round chart beside the laurel. */
+  #water(gc: CanvasRenderingContext2D, s: number): void {
+    const held = this.#m.held, C = this.#g!.chart, t = span(s, AT.laurel);
+    if (!held || t <= 0) return;
+    const d = C.r * 2.3;
+    const sprite = this.#bake('water', d, d, (p, g, x, y) => {
+      g.save();
+      g.beginPath();
+      g.arc(x, y, C.r, 0, Math.PI * 2);
+      g.clip();
+      g.fillStyle = held.ink;
+      g.globalAlpha = 0.72;
+      const half = Math.max(held.half * C.r, 0.8);
+      for (let i = 0; i < held.pts.length; i += 2) g.fillRect(x + held.pts[i] * C.r - half, y - held.pts[i + 1] * C.r - half, half * 2, half * 2);
+      g.restore();
+      ring(p, x, y, C.r * 0.96, C.r * 1.08, { ticks: 128 }, 1);
+    });
+    drawSprite(gc, sprite, C.x, C.y, { alpha: t });
   }
 
   /** The time the i-th figure has finished landing. */
