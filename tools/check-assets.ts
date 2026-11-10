@@ -52,7 +52,7 @@ const sources = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '
 }).split('\0').filter((f) => f && existsSync(join(root, f)));
 if (!existsSync(join(root, BUILD))) throw new Error(`no ${BUILD}/: build the game first (npm run build)`);
 const build = walk(join(root, BUILD));
-const files = [...new Set([...sources, ...build])].filter((f) => !OUTSIDE.test(f)).sort();
+const files = [...new Set([...sources, ...build])].filter((f) => !OUTSIDE.test(f) && statSync(join(root, f)).isFile()).sort();
 
 const offenders = files.map((f) => [f, inspect(join(root, f))] as const).filter(([, found]) => found.length);
 for (const [f, found] of offenders) console.log(`${f}: ${found.join('; ')}`);
