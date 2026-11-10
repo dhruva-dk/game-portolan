@@ -19,11 +19,11 @@ import {
 } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, cross, dFdx, dFdy, diffuseColor, dot, float, floor, fract,
-  instanceIndex, length, log2, max, min, mix, mrt, normalGeometry, normalize, positionGeometry, positionWorld,
-  select, smoothstep, sqrt, step, texture, uniform, uv, varying, vec2, vec3, vec4,
+  instanceIndex, length, log2, max, min, mix, mrt, materialReference, normalGeometry, normalize, positionGeometry, positionWorld,
+  select, smoothstep, sqrt, step, texture, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
-import { serializePreparation } from '../gpu/work.ts';
+import { buildNodeForTargetAsync, serializePreparation } from '../gpu/work.ts';
 import { FloraNodeMaterial, copyOf, door, turn, unturn, type FieldNodes } from './nodes.ts';
 import { tagOf } from './tag.ts';
 
@@ -144,7 +144,8 @@ export class ImpostorAtlas {
   async #prepare(renderer: WebGPURenderer): Promise<void> {
     // The same source material appears in every variant. Its slot and bounds are uniforms so those variants
     // share the same shader graph, instead of compiling a distinct graph with each variant's baked constants.
-    const materials = new Map<string, { material: MeshBasicNodeMaterial; view: { value: Vector4 } }>();
+    const materials = new Map<string, { material: MeshBasicNodeMaterial; view: Vector4 }>();
+    const graphs = new Map<string, MeshBasicNodeMaterial>();
     try {
       for (const source of this.#sources) for (const p of source.parts) {
         if (this.#disposed) return;
@@ -153,8 +154,11 @@ export class ImpostorAtlas {
         const key = `${p.material.uuid}:${p.geometry.hasAttribute('color')}`;
         let shared = materials.get(key);
         if (!shared) {
-          const view = uniform(new Vector4());
-          const material = bakeMaterial(p.material, p.geometry, view as unknown as V4, this.side);
+          const view = new Vector4();
+          const t = tagOf(p.material)!, src = p.material as MeshStandardMaterial;
+          const family = `${p.geometry.hasAttribute('color')}:${t.cutout !== undefined && !!src.map}:${!!t.crownNormals}`;
+          const material = bakeMaterial(p.material, p.geometry, view, this.side, graphs.get(family));
+          graphs.set(family, material);
           shared = { material, view };
           materials.set(key, shared);
           this.#materials.push(material);
@@ -162,7 +166,7 @@ export class ImpostorAtlas {
         const mesh = new Mesh(p.geometry, shared.material);
         mesh.count = VIEWS * VIEWS;
         mesh.frustumCulled = false;
-        const part = { mesh, view: shared.view.value, source };
+        const part = { mesh, view: shared.view, source };
         this.#parts.push(part);
         await serializePreparation(renderer, async () => {
           if (this.#disposed) return;
@@ -189,13 +193,21 @@ export class ImpostorAtlas {
   async #compile(renderer: WebGPURenderer): Promise<void> {
     const { _nodes: nodes, _pipelines: pipelines } = renderer as unknown as BakeRenderer;
     const build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
+    const created = renderer.debug.onNodeBuilderCreated;
+    renderer.debug.onNodeBuilderCreated = (builder, object) => {
+      created?.(builder, object);
+      const context = (object as { context: unknown }).context;
+      (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = () =>
+        buildNodeForTargetAsync(builder, this.target, null, context);
+    };
     const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT();
     const restore = () => { renderer.setRenderTarget(was); renderer.setMRT(mrtWas); };
     const set = () => { renderer.setRenderTarget(this.target); renderer.setMRT(null); };
     nodes.getForRenderAsync = (ro) => {
       set();
-      try { return Promise.resolve(nodes.getForRender(ro)); }
-      catch (e) { restore(); throw e; }
+      try {
+        return build.call(nodes, ro).then((state) => { set(); return state; });
+      } finally { restore(); }
     };
     pipelines.getForRender = (ro, promises) => {
       // Ordinary frames also use this function while the asynchronous GPU compiler is working.
@@ -214,6 +226,7 @@ export class ImpostorAtlas {
     } finally {
       nodes.getForRenderAsync = build;
       pipelines.getForRender = pipeline;
+      renderer.debug.onNodeBuilderCreated = created;
       restore();
     }
   }
@@ -274,7 +287,8 @@ export class ImpostorAtlas {
  * The material a plant's mesh is baked with: its colour as the kit made it (map, colour, vertex colours) and its
  * cut-out, unlit, written into the atlas with its normal in each view's frame. Instance n is view n.
  */
-function bakeMaterial(src: Material, g: BufferGeometry, view: V4, side: number): MeshBasicNodeMaterial {
+function bakeMaterial(src: Material, g: BufferGeometry, bounds: Vector4, side: number, template?: MeshBasicNodeMaterial): MeshBasicNodeMaterial {
+  const view = materialReference('userData.floraBakeView', 'vec4') as unknown as V4;
   const centre = view.z, radius = view.w;
   const s = src as MeshStandardMaterial, t = tagOf(src);
   const m = new MeshBasicNodeMaterial();
@@ -285,9 +299,18 @@ function bakeMaterial(src: Material, g: BufferGeometry, view: V4, side: number):
   m.side = DoubleSide;
   const cutout = t?.cutout !== undefined && !!s.map;
   m.alphaTest = cutout ? 0.4 : s.alphaTest || 0;
+  m.userData.floraBakeView = bounds;
+  m.userData.floraBakeCutout = t?.cutout && t.cutout > 0 ? t.cutout : 512;
+  m.userData.floraBakeThrough = t?.translucency ?? 0;
+  if (template) {
+    m.vertexNode = template.vertexNode;
+    m.opacityNode = template.opacityNode;
+    m.mrtNode = template.mrtNode;
+    return m;
+  }
   if (cutout) {
     // the cards' coverage kept at the size a view sees them (as the plant's own material keeps it in the distance)
-    const size = vec2((t!.cutout as number) > 0 ? (t!.cutout as number) : 512);
+    const size = vec2(materialReference('userData.floraBakeCutout', 'float') as unknown as F);
     m.opacityNode = Fn(() => {
       const fx = dFdx(uv().mul(size)), fy = dFdy(uv().mul(size));
       return log2(max(dot(fx, fx), dot(fy, fy))).mul(0.5).max(0).mul(0.3).add(1);
@@ -309,7 +332,7 @@ function bakeMaterial(src: Material, g: BufferGeometry, view: V4, side: number):
   const n1 = normalize(n0);
   // a card seen from behind shows its other face, turned to the eye; a crown's cards keep the crown's normal
   const n = t?.crownNormals ? n1 : select(n1.z.lessThan(0), n1.negate(), n1);
-  const through = float(t?.translucency ?? 0);
+  const through = materialReference('userData.floraBakeThrough', 'float') as unknown as F;
   m.mrtNode = mrt({
     albedo: vec4(sqrt(max(diffuseColor.rgb, 0)), 1),
     info: vec4(n.xy.mul(0.5).add(0.5), through, depth.mul(0.5).add(0.5)),

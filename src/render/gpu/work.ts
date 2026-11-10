@@ -28,3 +28,73 @@ export function serializePreparation<T>(renderer: object, work: () => Promise<T>
   void tail.then(() => { if (preparing.get(renderer) === tail) preparing.delete(renderer); });
   return run;
 }
+
+/** The installed Three builder's async stages, with renderer state held only during each synchronous segment. */
+interface StagedBuilder {
+  renderer: WebGPURenderer;
+  context: { position?: { isNode?: boolean } };
+  flowNodes: Record<string, { build(builder: StagedBuilder): void }[]>;
+  prebuild(): void;
+  setBuildStage(stage: string | null): void;
+  setShaderStage(stage: string | null): void;
+  flowNodeFromShaderStage(stage: string, node: unknown): void;
+  flowNode(node: unknown): void;
+  buildCode(): void;
+  buildUpdateNodes(): void;
+}
+
+type BuildTarget = ReturnType<WebGPURenderer['getRenderTarget']>;
+type BuildMRT = ReturnType<WebGPURenderer['getMRT']> | null;
+
+/**
+ * Three r186's buildAsync yields between shader stages, but those stages read the renderer's target and MRT.
+ * Borrow them for each segment and restore them before yielding, so normal frames can draw throughout preparation.
+ * Keep this in step with NodeBuilder.buildAsync; the regression test compares their executed stages directly.
+ */
+export async function buildNodeForTargetAsync(
+  nodeBuilder: object, target: BuildTarget, mrt: BuildMRT, context: unknown,
+  yieldToMain: () => Promise<unknown> = () => {
+    const scheduler = (globalThis as unknown as { scheduler?: { yield(): Promise<unknown> } }).scheduler;
+    return scheduler ? scheduler.yield() : new Promise<void>((resolve) => { requestAnimationFrame(() => resolve()); });
+  },
+): Promise<object> {
+  const builder = nodeBuilder as StagedBuilder;
+  const renderer = builder.renderer;
+  const internal = renderer as unknown as { _currentRenderContext: unknown };
+  const segment = (work: () => void) => {
+    const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT(), contextWas = internal._currentRenderContext;
+    renderer.setRenderTarget(target);
+    renderer.setMRT(mrt);
+    internal._currentRenderContext = context;
+    try { work(); }
+    finally {
+      renderer.setRenderTarget(was);
+      renderer.setMRT(mrtWas);
+      internal._currentRenderContext = contextWas;
+    }
+  };
+  segment(() => builder.prebuild());
+  for (const buildStage of ['setup', 'analyze', 'generate']) {
+    segment(() => {
+      builder.setBuildStage(buildStage);
+      if (builder.context.position?.isNode) builder.flowNodeFromShaderStage('vertex', builder.context.position);
+    });
+    for (const shaderStage of ['fragment', 'vertex', 'compute']) {
+      segment(() => {
+        builder.setShaderStage(shaderStage);
+        for (const node of builder.flowNodes[shaderStage]!) {
+          if (buildStage === 'generate') builder.flowNode(node);
+          else node.build(builder);
+        }
+      });
+      await yieldToMain();
+    }
+  }
+  segment(() => {
+    builder.setBuildStage(null);
+    builder.setShaderStage(null);
+    builder.buildCode();
+    builder.buildUpdateNodes();
+  });
+  return nodeBuilder;
+}

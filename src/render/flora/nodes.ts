@@ -23,7 +23,7 @@ import {
 } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, attribute, cos, cross, dFdx, dFdy, diffuseColor, dot, float, floor, fract, fwidth, instanceIndex,
-  interleavedGradientNoise, length, log2, materialColor, materialRoughness, max, min, mix, normalGeometry, normalLocal,
+  interleavedGradientNoise, length, log2, materialColor, reference, materialRoughness, max, min, mix, normalGeometry, normalLocal,
   normalView, normalViewGeometry, normalize, positionGeometry, positionView, positionViewDirection, positionWorld, screenCoordinate,
   int, select, sign, sin, smoothstep, step, texture, textureSize, uint, uv, varying, vec2, vec3, vec4, cameraPosition,
 } from 'three/tsl';
@@ -276,15 +276,31 @@ export class FloraNodeMaterial extends MeshStandardNodeMaterial {
 /** The screen-door noise for the level-of-detail cross-fade. */
 export const door = (): F => interleavedGradientNoise(screenCoordinate.xy);
 
-const made = new Map<Material, Material>();
+const made = new WeakMap<FieldNodes, Map<Material, Material>>();
+const graphs = new WeakMap<FieldNodes, Map<string, FloraNodeMaterial>>();
+
+/** Standard maps, tints and surface values are already material uniforms. Keep only shader structure and the
+ * few auxiliary texture graphs here; different source UUIDs must not rebuild identical kit wind/fade shaders. */
+function family(src: MeshStandardMaterial, t: FloraTag): string {
+  return JSON.stringify([
+    t.kit, t.mode ?? 'air', !!t.surge, !!t.tide, !!t.crownNormals, !!t.edgeFade,
+    !!t.translucency, !!t.bleach, !!src.map,
+    t.cutout, t.cutout === 0 ? src.map?.uuid : null,
+    t.cover && [t.cover.map.uuid, t.cover.tint.toArray(), t.cover.scale],
+    t.moss && [t.moss.map.uuid, t.moss.tint.toArray(), t.moss.amount],
+    t.coral,
+  ]);
+}
 
 /** The node twin of a kit's plant material, placed by the field. One per source material; shared by every copy. */
 export function floraMaterial(src: Material, f: FieldNodes): Material {
-  const hit = made.get(src);
+  let cache = made.get(f);
+  if (!cache) made.set(f, cache = new Map());
+  const hit = cache.get(src);
   if (hit) return hit;
   const t = tagOf(src);
   const m = t ? standard(src as MeshStandardMaterial, t, f) : drips(f);
-  made.set(src, m);
+  cache.set(src, m);
   return m;
 }
 
@@ -298,10 +314,26 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
   m.roughness = src.roughness;
   m.metalness = src.metalness;
   m.emissive.copy(src.emissive);
-  m.side = src.side;
+  m.side = src.side === DoubleSide ? DoubleSide : FrontSide;
   // the screen-door needs a cut-out on every material
   m.alphaTest = src.alphaTest || 0.01;
   m.vertexColors = false;
+  m.userData.flora = t;
+
+  let cache = graphs.get(f);
+  if (!cache) graphs.set(f, cache = new Map());
+  const key = family(src, t), template = cache.get(key);
+  if (template) {
+    m.positionNode = template.positionNode;
+    m.colorNode = template.colorNode;
+    m.opacityNode = template.opacityNode;
+    m.roughnessNode = template.roughnessNode;
+    m.normalNode = template.normalNode;
+    m.turnNormal = template.turnNormal;
+    m.through = template.through;
+    return m;
+  }
+  cache.set(key, m);
 
   const c = copyOf(f);
   const vShown = varying(c.shown, 'vFloraShown') as unknown as F;
@@ -357,7 +389,7 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
       col.rgb.assign(mix(col.rgb, col.rgb.mul(vec3(0.55, 0.6, 0.42)), band.mul(0.8)).mul(mix(1, 0.45, wet)));
     }
     if (builder.geometry.hasAttribute('color')) col.rgb.mulAssign(attribute<'vec3'>('color') as unknown as V3);
-    if (t.bleach) col.rgb.assign(mix(col.rgb, vec3(dot(col.rgb, vec3(0.3, 0.59, 0.11)).mul(2.2)), t.bleach));
+    if (t.bleach) col.rgb.assign(mix(col.rgb, vec3(dot(col.rgb, vec3(0.3, 0.59, 0.11)).mul(2.2)), reference('material.userData.flora.bleach', 'float', null) as unknown as F));
     if (t.coral) {
       const h = coralHeight(varying(positionGeometry, 'vCoralP') as unknown as V3, t.coral);
       col.rgb.mulAssign(t.coral.kind === 'brain' ? h.mul(0.22).add(0.78) : h.mul(0.15).add(0.85));
@@ -407,7 +439,7 @@ function standard(src: MeshStandardMaterial, t: FloraTag, f: FieldNodes): Materi
     const coral = t.coral;
     m.normalNode = Fn(() => bump(normalView, coralHeight(varying(positionGeometry, 'vCoralP') as unknown as V3, coral), coral.bump))();
   }
-  if (t.translucency) m.through = float(t.translucency);
+  if (t.translucency) m.through = reference('material.userData.flora.translucency', 'float', null) as unknown as F;
   m.side = src.side === DoubleSide ? DoubleSide : FrontSide;
   return m;
 }

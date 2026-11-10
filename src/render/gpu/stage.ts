@@ -11,7 +11,7 @@ import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { Resolution } from './resolution.ts';
 import { Motes } from '../actors/motes.ts';
-import { runFrameWork, serializePreparation } from './work.ts';
+import { buildNodeForTargetAsync, runFrameWork, serializePreparation } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
@@ -118,22 +118,29 @@ export class GpuStage {
   /** Whether the first frame drawn has been checked against the depth the materials were built for. */
   #checked = false;
   #dropReady!: () => void;
+  #dropFailed!: (error: unknown) => void;
   /** Ships and immediate weather are prepared before the drop can expose them. */
-  readonly dropReady = new Promise<void>((resolve) => { this.#dropReady = resolve; });
+  readonly dropReady = new Promise<void>((resolve, reject) => { this.#dropReady = resolve; this.#dropFailed = reject; });
   #allBuilt!: () => void;
-  readonly #all = new Promise<void>((r) => { this.#allBuilt = r; });
+  #allFailed!: (error: unknown) => void;
+  readonly #all = new Promise<void>((resolve, reject) => { this.#allBuilt = resolve; this.#allFailed = reject; });
   /** What the app has asked to be built after the title (later), in order. */
-  readonly #later = new Map<Object3D, { group: Object3D; built: () => void }>();
+  readonly #later = new Map<Object3D, { group: Object3D; built: () => void; failed: (error: unknown) => void }>();
+  readonly #siteReady = new WeakSet<Object3D>();
   /** Whether the scene's materials are built (#build), and what is told the share built meanwhile. */
-  #warm: 'no' | 'building' | 'done' = 'no';
+  #warm: 'no' | 'building' | 'done' | 'failed' = 'no';
   #warmed!: () => void;
-  readonly warmed = new Promise<void>((r) => { this.#warmed = r; });
+  #warmFailed!: (error: unknown) => void;
+  readonly warmed = new Promise<void>((resolve, reject) => { this.#warmed = resolve; this.#warmFailed = reject; });
   onWarm?: (f: number) => void;
   /** The canvas's size and pixel ratio, as last set. */
   #size = { w: 0, h: 0, ratio: 0 };
   #shown = false;
 
-  private constructor(canvas: HTMLCanvasElement, renderer: WebGPURenderer, form: keyof typeof RENDER_SCALE) {
+  private constructor(canvas: HTMLCanvasElement, renderer: WebGPURenderer, form: keyof typeof RENDER_SCALE, frameRate: 30 | 40) {
+    // These may fail before the app starts awaiting them. Keep the rejection available to callers without an
+    // unhandled rejection from the stage's own background task.
+    void Promise.all([this.warmed, this.dropReady, this.#all]).catch(() => {});
     this.#canvas = canvas;
     this.renderer = renderer;
     this.atmosphere = new Atmosphere(renderer);
@@ -148,7 +155,7 @@ export class GpuStage {
     this.flora.prepare = (group) => this.#compile(group, true);
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
-    this.#resolution = new Resolution(RENDER_SCALE[form]);
+    this.#resolution = new Resolution(RENDER_SCALE[form], frameRate);
     // every point light without a shadow is clustered, over the frame as the scene pass draws it
     renderer.lighting = new ClusteredLighting(this.#resolution);
     this.post = new Post(renderer, this.scene, this.camera, this.#resolution.scale, this.overlay);
@@ -158,7 +165,7 @@ export class GpuStage {
 
   /** Makes the renderer, hands it to `first` (the title's paper is made on it before the planet), then builds the
    *  stage. */
-  static async create(canvas: HTMLCanvasElement, progress: (f: number) => void = () => {}, first?: (r: WebGPURenderer) => Promise<void>): Promise<GpuStage> {
+  static async create(canvas: HTMLCanvasElement, progress: (f: number) => void = () => {}, first?: (r: WebGPURenderer) => Promise<void>, frameRate: 30 | 40 = 30): Promise<GpuStage> {
     progress(0.02);
     const t0 = performance.now();
     const { renderer, info } = await createRenderer(canvas);
@@ -166,7 +173,7 @@ export class GpuStage {
     await first?.(renderer);
     progress(0.5);
     const t1 = performance.now();
-    const stage = new GpuStage(canvas, renderer, info.form);
+    const stage = new GpuStage(canvas, renderer, info.form, frameRate);
     console.info(`boot renderer ${((t1 - t0) / 1000).toFixed(2)} s, stage built ${((performance.now() - t1) / 1000).toFixed(2)} s`);
     progress(1);
     return stage;
@@ -206,7 +213,7 @@ export class GpuStage {
   /** Lays out the planet for a frame and draws it. */
   frame(v: StageView, dt: number): void {
     // while the materials are being built, the page is left to them and to the title
-    if (this.#warm === 'building') return;
+    if (this.#warm === 'building' || this.#warm === 'failed') return;
     P.time.value = v.time;
     P.dt.value = dt;
     sunDirection(v.hour, v.tilt, this.sun);
@@ -282,6 +289,10 @@ export class GpuStage {
     this.scans.update(eye, dt);
     this.beacons.update(v.time, P.night.value as number, this.sun, eye);
     this.landmarks.update(P.night.value as number, v.time, this.sun);
+    // An individual site becomes drawable after its own preparation, without waiting for every region's sites.
+    for (const group of [this.beacons.group, this.landmarks.group]) {
+      for (const site of group.children) if (!this.#siteReady.has(site)) site.visible = false;
+    }
     this.floes.update(v.time, v.tide, P.night.value as number);
     this.moonbow.update(eye, wind.length());
     shape.system('actors');
@@ -291,7 +302,14 @@ export class GpuStage {
     if (this.#warm !== 'done') {
       if (this.#warm === 'no') {
         this.#warm = 'building';
-        void this.#build();
+        void this.#build().catch((error: unknown) => {
+          if (this.#warm !== 'done') this.#warm = 'failed';
+          this.#warmFailed(error);
+          this.#dropFailed(error);
+          this.#allFailed(error);
+          for (const later of this.#later.values()) later.failed(error);
+          console.error('prepare failed', error);
+        });
       }
       return;
     }
@@ -348,7 +366,7 @@ export class GpuStage {
     this.terrain.update(this.#whole.position);
     const later = [...this.#later.values()], sites = [this.beacons.group, this.landmarks.group];
     for (const group of [...later.map((l) => l.group), ...sites]) group.visible = false;
-    await this.#compile(this.scene, false, (f) => this.onWarm?.(f));
+    await this.#compile(this.scene, false, (f) => this.onWarm?.(f), 'title');
     this.#warm = 'done';
     this.#warmed();
     // after the title, what a match brings in first: the ships with their shot and wreckage; then the weather's falls
@@ -362,20 +380,28 @@ export class GpuStage {
       await this.#compile(group, true);
     }
     this.#dropReady();
-    for (const group of sites) {
-      await this.#compile(group, true);
-      group.visible = true;
+    // A world-sized sites batch used to keep building far-away variants while the player dropped. Prepare one
+    // site at a time, nearest the live camera first. Re-sort after each job so a moved camera gets priority; every
+    // site still finishes, and unprepared children remain hidden until their own material variants are ready.
+    const pending = sites.flatMap((group) => group.children.map((site) => ({ site, at: site.getWorldPosition(new Vector3()) })));
+    for (const group of sites) group.visible = true;
+    while (pending.length) {
+      pending.sort((a, b) => a.at.distanceToSquared(this.camera.position) - b.at.distanceToSquared(this.camera.position));
+      const { site } = pending.shift()!;
+      await this.#compile(site, true, undefined, `site ${site.name || site.type}`);
+      this.#siteReady.add(site);
+      site.visible = true;
     }
     // and last, everything in the scene still hidden: the parts shown by the hour or the distance; so none of it holds
     // a frame up the first time it shows
-    await this.#compile(this.scene, true);
+    await this.#compile(this.scene, true, undefined, 'hidden world');
     this.#allBuilt();
   }
 
   /** Builds `group`'s materials after the title's (#build), in the order asked, keeping it hidden till then; resolves
    *  once they are built. Asked before the first frame. */
   later(group: Object3D): Promise<void> {
-    return new Promise((built) => { this.#later.set(group, { group, built }); });
+    return new Promise((built, failed) => { this.#later.set(group, { group, built, failed }); });
   }
 
   /**
@@ -386,14 +412,28 @@ export class GpuStage {
    * else may run (the frames go on meanwhile). `root` is gathered as if shown, with the whole planet in view, so
    * nothing is left out for lying off the edge of the frame; with `hidden`, so is all that lies hidden under it.
    */
-  #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
-    return serializePreparation(this.renderer, () => this.#compileNow(root, hidden, progress));
+  #compile(root: Object3D, hidden: boolean, progress?: (f: number) => void, label = root.name || root.type): Promise<void> {
+    return serializePreparation(this.renderer, async () => {
+      const since = performance.now();
+      if (import.meta.env.VITE_RELEASE !== '1') console.info(`prepare ${label}: start`);
+      try { await this.#compileNow(root, hidden, progress); }
+      finally {
+        if (import.meta.env.VITE_RELEASE !== '1') console.info(`prepare ${label}: ${((performance.now() - since) / 1000).toFixed(2)} s`);
+      }
+    });
   }
 
   async #compileNow(root: Object3D, hidden: boolean, progress?: (f: number) => void): Promise<void> {
     const r = this.renderer as unknown as Internals, pass = this.post.scenePass;
     const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines } = r;
     const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
+    const created = this.renderer.debug.onNodeBuilderCreated;
+    this.renderer.debug.onNodeBuilderCreated = (builder, object) => {
+      created?.(builder, object);
+      const context = (object as { context: unknown }).context;
+      (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = () =>
+        buildNodeForTargetAsync(builder, pass.renderTarget, pass.getMRT(), context);
+    };
     // an object is built in one go, straight after its target is set, and the target is put back once its pipeline is
     // asked for, the last step before three waits for it (and only then: the frames draw meanwhile, and ask for theirs)
     let set = false;
@@ -408,10 +448,16 @@ export class GpuStage {
       r.setMRT(pass.getMRT());
       set = true;
       try {
-        return Promise.resolve(nodes.getForRender(ro));
-      } catch (e) {
+        // Native async building yields between shader stages. Its builder hook borrows the target separately for
+        // each stage; restore it now, then set it again only for Three's synchronous bindings/pipeline preparation.
+        return build.call(nodes, ro).then((state) => {
+          r.setRenderTarget(pass.renderTarget);
+          r.setMRT(pass.getMRT());
+          set = true;
+          return state;
+        });
+      } finally {
         unset();
-        throw e;
       }
     };
     // Keep Three's per-object await: background preparation must not flood the driver with pipelines.
@@ -469,6 +515,7 @@ export class GpuStage {
       unset();
       nodes.getForRenderAsync = build;
       pipelines.getForRender = pipeline;
+      this.renderer.debug.onNodeBuilderCreated = created;
     }
   }
 

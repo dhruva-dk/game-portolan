@@ -53,6 +53,8 @@ import type { AbilityId } from '../sim/abilities.ts';
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
   capture: boolean;
+  /** Internal render cadence; simulation remains at 30 Hz. */
+  frameRate?: 30 | 40;
   /** Log the frame rate, the worst frame and what was drawn every few seconds (the iOS build's log, ?perflog). */
   perfLog?: boolean;
   /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
@@ -162,7 +164,7 @@ export class App {
     this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
     this.loop = new Loop((f) => this.frame(f));
     // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
-    this.loop.frameRate = 30;
+    this.loop.frameRate = options.frameRate ?? 30;
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
     this.audio.unlock();
@@ -206,8 +208,10 @@ export class App {
     }
     this.go(this.options.capture ? 'lobby' : 'title');
     this.loaded = this.load();
-    if (this.options.fight) void this.loaded.then(() => this.fight());
-    else if (this.options.autoplay) void this.loaded.then(() => this.play({ autopilot: true }));
+    void this.loaded.then(() => {
+      if (this.options.fight) return this.fight();
+      if (this.options.autoplay) this.play({ autopilot: true });
+    }).catch((error: unknown) => console.error('boot failed', error));
   }
 
   /** The chart's time now, milliseconds. */
@@ -258,10 +262,10 @@ export class App {
       this.title?.attach(this.chart, this.chartNow());
       this.lobby?.attach(this.chart, this.chartNow());
       mark('paper');
-    });
+    }, this.options.frameRate ?? 30);
     mark('stage');
     this.stage = stage;
-    void stage.warmed.then(() => { this.#drawn = true; });
+    void stage.warmed.then(() => { this.#drawn = true; }, () => {});
     // the juice's shake and kicks ride on the camera the rig placed
     stage.onCamera = (cam) => {
       this.juice.applyCamera(cam, cam.fov);
@@ -272,13 +276,13 @@ export class App {
       onJuice: (j, cause) => this.momentJuice.world(j, cause),
     });
     // the ships are built after the planet, with the title up; leaving the title waits for them
-    void Promise.all([stage.later(this.actors.group), stage.dropReady]).then(() => { this.#shipsDone = true; });
+    void Promise.all([stage.later(this.actors.group), stage.dropReady]).then(() => { this.#shipsDone = true; }, () => {});
     mark('actors');
     // the first frame builds every material, a few at a time, before anything is drawn
     stage.onWarm = (f) => report(0.2 + 0.75 * f);
     // with the loop held (captures), the frame that starts it is drawn here
     let warm = false;
-    void stage.warmed.then(() => { warm = true; });
+    void stage.warmed.then(() => { warm = true; }, () => { warm = true; });
     while (!warm && !this.loop.running) {
       this.loop.drawNow(0);
       await new Promise((r) => requestAnimationFrame(r));
@@ -1017,7 +1021,7 @@ export class App {
     const frames = w.frames, t = w.t, worst = w.worst;
     const intervals = w.intervals.sort((a, b) => a - b);
     const percentile = (p: number) => (intervals[Math.min(intervals.length - 1, Math.ceil(intervals.length * p) - 1)] ?? 0).toFixed(1);
-    const distribution = `p95 ${percentile(0.95)} ms, p99 ${percentile(0.99)} ms`;
+    const distribution = `p50 ${percentile(0.5)} ms, p95 ${percentile(0.95)} ms, p99 ${percentile(0.99)} ms`;
     w.intervals = [];
     Object.assign(w, { t: 0, frames: 0, worst: 0 });
     const st = this.stage?.stats(), s = this.session;

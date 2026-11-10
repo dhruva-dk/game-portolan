@@ -16,6 +16,7 @@ function rendererMock() {
   let fail = false;
   const r = {
     autoClear: true,
+    debug: { onNodeBuilderCreated: null },
     getRenderTarget: () => target,
     setRenderTarget: (t: RenderTarget | null) => { target = t; },
     getMRT: () => mrt,
@@ -143,4 +144,20 @@ test('failed compilation restores renderer hooks and target and leaves the atlas
   assert.equal(source.geometryDisposed(), 4);
   assert.equal(source.materialDisposed(), 0);
   mock.restored();
+});
+
+
+test('bake materials share structural graphs across source textures and use material references for bounds and translucency', async () => {
+  const mock = rendererMock(), atlas = new ImpostorAtlas(2);
+  const source = sources();
+  const other = tag(new MeshStandardMaterial({ color: 0x00ff00 }), { kit: 'A', translucency: 0.8 });
+  source.inputs[1].parts.forEach((p) => { p.material = other; });
+  await atlas.prepare(mock.r, source.inputs);
+  const materials = [...new Set(mock.compiled.map((m) => m.material as MeshStandardMaterial))];
+  assert.equal(materials.length, 2);
+  assert.equal(new Set(materials.map((m) => m.customProgramCacheKey())).size, 1);
+  assert.notEqual(materials[0].userData.floraBakeView, materials[1].userData.floraBakeView);
+  assert.equal(materials[0].userData.floraBakeThrough, 0);
+  assert.equal(materials[1].userData.floraBakeThrough, 0.8);
+  atlas.dispose();
 });

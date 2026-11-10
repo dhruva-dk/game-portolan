@@ -15,6 +15,7 @@ import { probeBackground, probeEye, skyBackground, skyTurn } from './sky.ts';
 import { BODIES, BodyLight, BodyLightNode, SkyLight, SkyLightNode, bodiesFor, moonlight, probeZenithPass, sunlight } from './light.ts';
 import { SunShadows } from './shadows.ts';
 import { fogAt } from './fog.ts';
+import { AURORA } from './aurora.ts';
 import { P } from '../gpu/uniforms.ts';
 
 type V3 = Node<'vec3'>;
@@ -90,8 +91,18 @@ const skyThroughMist = Fn(() => {
   return vec4(skyBackground.rgb.mul(mist.loss).add(mist.light), 1);
 })();
 
-/** How often the probe of the sky round the eye is retaken, seconds, unless the light or the eye moves a lot. */
-const PROBE_EVERY = 0.75;
+/** The full filtered sky costs 27 render passes. Meaningful changes coalesce to at most one capture a second;
+ *  only the night sky needs a periodic refresh, for the aurora and stars. The visible sky still updates every frame. */
+const PROBE_MIN = 1;
+const PROBE_NIGHT = 2;
+
+interface ProbeState {
+  up: Vector3; sun: Vector3; moon: Vector3; sunLight: Vector3; moonLight: Vector3; sea: Vector3;
+  phase: number; turn: number; aurora: number;
+}
+
+/** Colours and illuminances have different scales, so compare their relative change. */
+const changedLight = (a: Vector3, b: Vector3): boolean => a.distanceToSquared(b) > Math.max(a.lengthSq(), b.lengthSq(), 1e-12) * 0.02 ** 2;
 
 /** Metres over the sea past which the eye sees the planet's night side whatever the sun does over it. */
 const HIGH = 3000;
@@ -112,8 +123,7 @@ export class Atmosphere {
   #probeTarget: RenderTarget | null = null;
   #generator: PMREMGenerator;
   #probeAge = Infinity;
-  #probeSun = new Vector3();
-  #probeEye = new Vector3();
+  #probeState: ProbeState | null = null;
 
   constructor(renderer: WebGPURenderer) {
     this.#renderer = renderer;
@@ -172,6 +182,7 @@ export class Atmosphere {
       renderer.compute([passes.transmittance, passes.multi, passes.irradiance]);
       this.#dirty = false;
       this.#probeAge = Infinity;
+      this.#probeState = null;
     }
     renderer.compute([passes.sky, passes.moonSky, passes.aerial, probeZenithPass]);
 
@@ -189,21 +200,34 @@ export class Atmosphere {
     this.shadows.update(camera);
 
     this.#probeAge += dt;
-    const sun = P.sunDir.value as Vector3;
-    const turned = this.#probeSun.dot(sun) < 0.9995;
-    const moved = this.#probeEye.distanceTo(eye) > 40;
-    if (this.#probeAge >= PROBE_EVERY || turned || moved || !this.#probeTarget) {
+    const up = _u, sun = P.sunDir.value as Vector3, moon = P.moonDir.value as Vector3;
+    const sunLight = P.sunIlluminance.value as Vector3, moonLight = P.moonIlluminance.value as Vector3;
+    const sea = P.seaDeep.value as Vector3, phase = P.moonPhase.value as number;
+    const turn = skyTurn.value as number, aurora = AURORA.strength.value as number;
+    const previous = this.#probeState;
+    // The probe contains the clear sky and mirrored sea, not local clouds or mist. Its ground frame matters;
+    // camera orientation and altitude do not. Surface shaders already turn and scale it to their own horizon.
+    const changed = !previous || previous.up.dot(up) < 0.9994 || previous.sun.dot(sun) < 0.99996 || previous.moon.dot(moon) < 0.99996
+      || changedLight(previous.sunLight, sunLight) || changedLight(previous.moonLight, moonLight) || changedLight(previous.sea, sea)
+      || Math.abs(previous.phase - phase) > 0.01 || Math.abs(previous.aurora - aurora) > 0.02
+      || (up.dot(sun) < 0.02 && Math.abs(Math.sin((previous.turn - turn) / 2)) > 0.005);
+    const animatedNight = up.dot(sun) < 0.02 && this.#probeAge >= PROBE_NIGHT;
+    if (!this.#probeTarget || !previous || (this.#probeAge >= PROBE_MIN && (changed || animatedNight))) {
       this.#takeProbe(eye);
       this.#probeAge = 0;
-      this.#probeSun.copy(sun);
-      this.#probeEye.copy(eye);
+      this.#probeState = {
+        up: up.clone(), sun: sun.clone(), moon: moon.clone(), sunLight: sunLight.clone(), moonLight: moonLight.clone(),
+        sea: sea.clone(), phase, turn, aurora,
+      };
     }
   }
 
   /** Renders the sky over the sea below the eye into a cube and filters it for every roughness. */
   #takeProbe(eye: Vector3): void {
     const b = AIR.bottom.value as number;
-    const at = (probeEye.value as Vector3).copy(eye).setLength(b + Math.min(Math.max(eye.length() - b, 2), 40));
+    // Reflections belong to the surfaces below the camera, including during the drop from orbit. Keep the
+    // existing sea-surface capture height explicit instead of depending on the ground-position scratch alias.
+    const at = (probeEye.value as Vector3).copy(eye).setLength(b + 2);
     const target = this.#generator.fromScene(this.#probeScene, 0, 0.1, 100, {
       size: 128, position: at, renderTarget: this.#probeTarget,
     } as Parameters<PMREMGenerator['fromScene']>[4]);
