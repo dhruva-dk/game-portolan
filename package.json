@@ -11,8 +11,10 @@
     "ios": "node tools/ios.ts",
     "ios:ipad": "node tools/ios.ts --real",
     "ios:ipad:dev": "node tools/ios.ts --real --dev",
+    "ios:archive": "node tools/ios.ts --archive",
     "ios:fight": "VITE_FIXTURE=fight node tools/ios.ts --real",
     "capture": "node tools/capture/run.ts",
+    "appicon": "node tools/appicon.ts",
     "check:assets": "vite build --logLevel warn && node tools/check-assets.ts"
   },
   "dependencies": {

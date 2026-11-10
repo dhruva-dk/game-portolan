@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const sheet = '#dfc8a2';
 
 const config: CapacitorConfig = {
-  appId: 'com.portolan.game',
+  appId: 'com.dhruvakumar.portolan',
   appName: 'Portolan',
   // the production build; `npm run ios:ipad:dev` alone names a shell whose page loads the code from this Mac (tools/ios.ts)
   webDir: process.env.PORTOLAN_DEV_SHELL || 'dist',

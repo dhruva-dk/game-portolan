@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { build, createServer } from 'vite';
 import { root, DEVICES, type DeviceName } from './harness.ts';
 
-export const APP_ID = 'com.portolan.game';
+export const APP_ID = 'com.dhruvakumar.portolan';
 export const LOGS = join(tmpdir(), 'portolan-ios');
 export const APP_LOG = join(LOGS, 'app.log');
 const DERIVED = join(root, 'ios/DerivedData');
@@ -81,6 +81,36 @@ export async function buildDeviceApp(team: string, device?: RealDevice, dev?: st
     `DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic', '-quiet', 'build',
   ]);
   return DEVICE_APP;
+}
+
+/** A Release archive of the production build with the test hooks taken out, signed by `team`. With `upload` it goes to
+ *  App Store Connect, for internal TestFlight testers only; without, it is exported beside the archive and stays here. */
+export async function archiveApp(team: string, upload: boolean): Promise<string> {
+  const archive = join(DERIVED, 'Portolan.xcarchive'), exported = join(DERIVED, 'export');
+  process.env.VITE_RELEASE = '1';
+  await build({ root, logLevel: 'warn' });
+  step('cap-sync', 'npx', ['cap', 'sync', 'ios'], { ...process.env, PORTOLAN_DEV_SHELL: '' });
+  // a new build number each time: App Store Connect refuses one it has seen
+  const number = new Date().toISOString().replace(/\D/g, '').slice(0, 12);
+  step('xcodebuild-archive', 'xcodebuild', [
+    '-project', 'ios/App/App.xcodeproj', '-scheme', 'App', '-configuration', 'Release', '-destination', 'generic/platform=iOS',
+    '-derivedDataPath', DERIVED, '-archivePath', archive, '-allowProvisioningUpdates',
+    `DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic', `CURRENT_PROJECT_VERSION=${number}`, '-quiet', 'archive',
+  ]);
+  const options = join(LOGS, 'export-options.plist');
+  writeFileSync(options, `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>method</key><string>app-store-connect</string>
+  <key>destination</key><string>${upload ? 'upload' : 'export'}</string>
+  <key>teamID</key><string>${team}</string>
+  <key>signingStyle</key><string>automatic</string>
+  <key>testFlightInternalTestingOnly</key><true/>
+  <key>manageAppVersionAndBuildNumber</key><false/>
+</dict></plist>
+`);
+  step('xcodebuild-export', 'xcodebuild', ['-exportArchive', '-archivePath', archive, '-exportPath', exported, '-exportOptionsPlist', options, '-allowProvisioningUpdates']);
+  return upload ? archive : exported;
 }
 
 export interface RealDevice { id: string; udid: string; name: string; type: string; paired: boolean; developerMode: boolean; connected: boolean }
@@ -285,11 +315,18 @@ if (import.meta.main) {
       real: { type: 'boolean', default: false },
       // with --real: the dev shell, loading the code from the dev server this keeps running (devShell)
       dev: { type: 'boolean', default: false },
+      // a Release archive for TestFlight, kept here; with --upload, sent to App Store Connect
+      archive: { type: 'boolean', default: false },
+      upload: { type: 'boolean', default: false },
     },
   });
   const device = a.device as DeviceName;
   if (!(device in DEVICES)) throw new Error(`--device must be one of ${Object.keys(DEVICES).join(', ')}`);
   const t0 = Date.now(), done = (what: string) => console.log(`${((Date.now() - t0) / 1000).toFixed(0).padStart(4)} s  ${what}`);
+  if (a.archive) {
+    done(`archived to ${await archiveApp(signingTeam(), a.upload)}`);
+    return;
+  }
   if (a.real) {
     const target = realDevice(device === 'ipad' ? 'iPad' : 'iPhone');
     const team = signingTeam();
