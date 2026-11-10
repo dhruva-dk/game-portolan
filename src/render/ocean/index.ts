@@ -9,6 +9,7 @@ import { FRAME, SEA_FIELD, WATER, gridToHorizon, oceanSurface } from './surface.
 import { beneath } from './beneath.ts';
 import { Coast } from './coast.ts';
 import { Territory } from './territory.ts';
+import { Slicks } from './slicks.ts';
 import { Flow } from './flow.ts';
 import { sharedNoise } from '../gpu/noise.ts';
 import { RIPPLES } from './ripples.ts';
@@ -36,6 +37,7 @@ export class Ocean {
   readonly coast = new Coast();
   /** The captains' water and trails, inked on the sea. */
   readonly territory = new Territory();
+  readonly slicks = new Slicks();
   /** The currents the surface streams along, and the calms that still it. */
   readonly flow = new Flow();
   readonly #seed: number;
@@ -51,7 +53,7 @@ export class Ocean {
 
   constructor(seed = 1) {
     this.#seed = seed;
-    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory, this.flow);
+    this.mesh = oceanSurface(this.waves, this.coast, sharedNoise(), this.territory, this.flow, this.slicks);
     SEA_FIELD.texture = this.waves.field;
     this.beneath = beneath(this.waves.field);
   }

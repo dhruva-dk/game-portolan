@@ -504,6 +504,7 @@ export class App {
     if (m.k === 'freed' && m.ship === PLAYER) this.sunkWater = m.cells;
     if (m.k === 'claim') this.stage?.inkMark({ k: 'claim', ship: m.ship, cells: m.cells, at: m.pos });
     else if (m.k === 'freed') this.stage?.inkMark({ k: 'freed', ship: m.ship, cells: m.cells });
+    else if (m.k === 'sink') this.stage?.wreck(m.pos);
     else if (m.k === 'cut') this.stage?.inkMark({ k: 'cut', ship: m.ship, cells: m.cells, at: m.pos, dry: m.dry });
     const ev = actorEvent(m, s.state.whale.head);
     if (ev) this.actors?.fire([ev]);

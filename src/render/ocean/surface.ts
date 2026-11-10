@@ -36,6 +36,7 @@ import { sunShadow } from '../atmosphere/shadows.ts';
 import { LAMP, P, shared } from '../gpu/uniforms.ts';
 import type { Coast } from './coast.ts';
 import type { Territory } from './territory.ts';
+import type { Slicks } from './slicks.ts';
 import { REACH } from './coastField.ts';
 import { waterAt } from '../seaTint.ts';
 import type { Flow } from './flow.ts';
@@ -205,7 +206,7 @@ function rainRings(q: V2): V2 {
 
 // ---------------------------------------------------------------- the material
 
-export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow): Mesh {
+export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow, slicks: Slicks): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   // the sea works out its own haze, once, under the surface (below): it is not something beneath itself either
   mat.fog = false;
@@ -570,7 +571,8 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const dyed = mix(lit, hue.mul(bright).mul(DYE), inked.share.mul(held));
     const light = vSkyDown.add(sunlight.mul(BODIES.sun).mul(max(dot(u, P.sunDir), 0))).add(moonlight.mul(BODIES.moon).mul(max(dot(u, P.moonDir), 0)));
     const ruled = mix(dyed, inked.lineInk.mul(light).div(Math.PI).mul(0.8), inked.lineShare.mul(float(1).sub(whiteness)));
-    return vec4(ruled.add(inked.glow.mul(P.night).mul(LAMP.mul(2.5))).mul(airLoss).add(airLight), output.a);
+    const filmed = slicks.over(ruled, u, vSkyDown, noise);
+    return vec4(filmed.add(inked.glow.mul(P.night).mul(LAMP.mul(2.5))).mul(airLoss).add(airLight), output.a);
   })();
   // the surf's glow at night, the sea's own light (actors' scale)
   mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));

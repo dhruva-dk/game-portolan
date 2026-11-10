@@ -10,6 +10,7 @@ import { copyTogether } from './behind.ts';
 import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { Resolution } from './resolution.ts';
+import { Motes } from '../actors/motes.ts';
 import { runFrameWork } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
@@ -93,6 +94,7 @@ export class GpuStage {
   readonly moonbow = new Moonbow();
   readonly fog = new Fog();
   readonly flora = new Flora();
+  readonly motes = new Motes();
   readonly #canvas: HTMLCanvasElement;
   readonly #wind = new Vector3();
   readonly #buffer = new Vector2();
@@ -137,6 +139,7 @@ export class GpuStage {
     this.terrain = new Terrain(landMaterial(this.scans, sharedNoise()));
     this.scene.add(this.terrain.group, this.clouds.group, this.fall.group, this.galeAir.group, this.beacons.group, this.landmarks.group);
     this.scene.add(this.floes.group, this.moonbow.group, this.flora.group);
+    this.scene.add(this.motes.mesh);
     this.flora.prepare = (group) => this.#compile(group, true);
     const wood = LANDMARKS.find((l) => REGIONS[l.region].id === 'mistwood');
     if (wood) this.#mist.at.set(wood.pos.x, wood.pos.y, wood.pos.z).normalize();
@@ -186,6 +189,11 @@ export class GpuStage {
     this.ocean.territory.mark(m);
   }
 
+  /** A wreck has gone down here: it leaves a film on the water. */
+  wreck(at: V3): void {
+    this.ocean.slicks.add(at);
+  }
+
   snap(): void {
     this.rig.snap();
   }
@@ -209,6 +217,7 @@ export class GpuStage {
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
     P.ebb.value = v.ebb;
     this.ocean.territory.set(v.territory, v.time, v.target.pos);
+    this.ocean.slicks.update(v.time);
     // the deep water's colour under the eye, for the sea the sky draws past the horizon
     seaDeepAt(v.target.pos, P.seaDeep.value as Vector3);
     const wind = this.#wind.set(v.wind.x, v.wind.y, v.wind.z);
@@ -258,6 +267,8 @@ export class GpuStage {
     this.clouds.trace(this.renderer, size.x * this.#resolution.scale, size.y * this.#resolution.scale);
     shape.system('flora');
     this.flora.update(this.renderer, cam);
+    this.motes.update(eye, v.target.pos);
+    this.motes.mesh.visible = eye.length() - R < 200;
     this.ocean.flow.calms(v.weather, eye);
     shape.system('sea');
     this.ocean.update(this.renderer, eye, v.time, dt);
