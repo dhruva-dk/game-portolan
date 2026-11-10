@@ -116,6 +116,13 @@ export class MomentJuice {
           juice.haptics.play('heavy');
         }
         return;
+      case 'claim':
+        if (m.ship === me && m.area > 0) juice.haptics.play('success');
+        return;
+      case 'cut':
+        if (m.by === me && m.ship !== me) juice.haptics.play('heavy');
+        else if (m.ship === me) juice.haptics.play(m.dry ? 'light' : 'warning');
+        return;
       case 'deliveryArrived':
         if (m.ship === me) juice.haptics.play('medium');
         return;

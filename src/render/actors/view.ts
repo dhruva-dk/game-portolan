@@ -145,6 +145,8 @@ export type ActorEvent =
   | { t: 'gust'; ship: number }
   | { t: 'pickup'; ship: number; rarity: Rarity }
   | { t: 'delivery'; ship: number; rarity?: Rarity }
+  /** A trail crossed at `at`: ship's ink bursts where it broke. */
+  | { t: 'cut'; ship: number; at: Vec3 }
   | { t: 'ram'; at: Vec3 }
   | { t: 'scrape'; at: Vec3 }
   | { t: 'breach'; at: Vec3; head?: Vec3 }

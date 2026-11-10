@@ -1,6 +1,7 @@
 // The planet on screen, on WebGPU: the atmosphere and its light, the sun's shadows, the FFT ocean, the land painted
 // with its regions' scans, the plants, the beacons and landmarks, the ships, and the frame's finish, seen through the
 // camera rig and driven by the StageView the app makes each frame; nothing here reads the simulation.
+import type { InkMark } from '../ocean/territory.ts';
 import { PerspectiveCamera, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { RENDER_SCALE, createRenderer, pixelRatio } from './renderer.ts';
 import { Post, SCREEN } from './post.ts';
@@ -168,6 +169,11 @@ export class GpuStage {
   }
 
   /** Points the camera for the view at once, with no flight between modes. */
+  /** A loop closed or a trail washed out, for the sea to play. */
+  inkMark(m: InkMark): void {
+    this.ocean.territory.mark(m);
+  }
+
   snap(): void {
     this.rig.snap();
   }
@@ -190,8 +196,7 @@ export class GpuStage {
     AURORA.strength.value = dark ? 0.7 + 0.3 * Math.sin(v.time * 0.013) * Math.sin(v.time * 0.031 + 1.3) : 0;
     (P.planet.value as { set(x: number, y: number, z: number, w: number): void }).set(R, R + v.tide, v.tide, R + 180);
     P.ebb.value = v.ebb;
-    const terr = v.territory;
-    this.ocean.territory.set(terr?.owner ?? null, terr?.trail ?? null, terr?.version ?? 0, terr?.me ?? 0);
+    this.ocean.territory.set(v.territory, v.time, v.target.pos);
     // the deep water's colour under the eye, for the sea the sky draws past the horizon
     seaDeepAt(v.target.pos, P.seaDeep.value as Vector3);
     const wind = this.#wind.set(v.wind.x, v.wind.y, v.wind.z);

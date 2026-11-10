@@ -28,6 +28,7 @@ import type { Intents } from './controls.ts';
 import type { Moment } from './events.ts';
 import type { Stepper } from './loop.ts';
 import { gunDir, heldStill, lootKind, momentsOf, weaponOf } from './moments.ts';
+import { waterInk } from './matchModels.ts';
 import { cosmeticsOf } from './views.ts';
 
 /** The career's temperaments as the simulation's styles (Hunter, Homesteader, Raider, Turtle, Scavenger, Brawler). */
@@ -98,6 +99,8 @@ export class Session implements Stepper {
   readonly tally: MatchTally;
   readonly names: string[];
   readonly looks: CosmeticIds[];
+  /** Each ship's ink on the water and on the chart. */
+  readonly inks: readonly string[];
   /** Every moment as it happens; the app routes them on. */
   onMoment: (m: Moment) => void = () => {};
   /** Where the player looks: a tangent at the ship followed, and how far down (radians). */
@@ -139,6 +142,7 @@ export class Session implements Stepper {
   private readonly ships: ShipView[] = [];
   private readonly shots: ProjectileView[] = [];
   private readonly loot: LootView[] = [];
+  private readonly laid: (readonly number[])[] = [];
   private readonly whale: WhaleView = { id: 0, pos: v3(), head: v3(), state: 'deep', k: 0 };
 
   constructor(plan: MatchPlan, look: CosmeticIds, o: PlayOptions = {}) {
@@ -147,6 +151,7 @@ export class Session implements Stepper {
     this.tally = new MatchTally(SHIPS);
     this.names = ['You', ...plan.fleet.map((e) => e.name)];
     this.looks = [look, ...plan.fleet.map((e) => cosmeticsOf(CAPTAINS[captainIndex(e.captain)]?.look ?? e.look))];
+    this.inks = this.looks.map(waterInk);
     plan.fleet.forEach((e, k) => { this.state.ships[k + 1].captain.grudge = e.grudge; });
     this.script = o.script ? [...o.script].sort((a, b) => a[0] - b[0]) : null;
     this.autopilot = o.autopilot ?? false;
@@ -464,9 +469,16 @@ export class Session implements Stepper {
       target: { pos: { ...at }, heading: { ...this.view }, height: 2.5 + w.alt },
       weather,
       storm: formed ? { centre: { ...STORM.calm.at }, radius: STORM.calm.r } : null,
-      territory: { owner: s.owner, trail: s.trail, version: Math.floor(s.tick / 6), me: this.watch + 1 },
+      territory: { owner: s.owner, laid: this.trails(), version: Math.floor(s.tick / 6), me: this.watch + 1, inks: this.inks },
       screen: { storm: own ? outside : outside * 0.5, hurt, low },
     };
+  }
+
+  /** Every ship's trail as it is laid. */
+  private trails(): readonly (readonly number[])[] {
+    const s = this.state, out = this.laid;
+    for (let i = 0; i < SHIPS; i++) out[i] = s.ships[i].laid;
+    return out;
   }
 
   /** The sea's beds around the watched ship: the regions it is in, the weather over it, its wind and speed, the Storm,

@@ -1,6 +1,7 @@
 // The interface's view models from the match: what the HUD and the results show, and the fleet's marks
 // for the chart, read from the session and the career's changes. Like models.ts, the screens never see the simulation
 // itself.
+import { Color, SRGBColorSpace } from 'three';
 import { cosmetic, levelOf, type Career, type Look, type MatchChanges, type Rank } from '../career/index.ts';
 import { ability, type ActiveId } from '../sim/abilities.ts';
 import {
@@ -38,6 +39,19 @@ const markOfIds = (c: CosmeticIds): Mark => ({
   colours: c.colour ? [c.colour, INK] : [colourOf(c.sail ?? '', '#f4ead6'), colourOf(c.hull ?? '', '#5a3423')],
 });
 export const markOf = (look: Look): Mark => markOfIds(cosmeticsOf(look));
+
+/** The colour a ship's water and trail are inked in: the first of her colours that would read as a dye on the sea. A
+ *  near-white sail, a brown hull or the sea's own blue would not, and such a captain sails under a plain vermilion. */
+export function waterInk(c: CosmeticIds): string {
+  if (c.colour) return c.colour;
+  for (const hex of [colourOf(c.sail ?? '', ''), colourOf(c.hull ?? '', '')]) {
+    if (!hex) continue;
+    const hsl = { h: 0, s: 0, l: 0 };
+    new Color(hex).getHSL(hsl, SRGBColorSpace);
+    if (hsl.s >= 0.34 && hsl.l >= 0.22 && hsl.l <= 0.72 && (hsl.h < 0.44 || hsl.h > 0.72)) return hex;
+  }
+  return '#d4501f';
+}
 
 /** Ship i's mark, from the look she wears in the match. */
 const shipMark = (session: Session, i: number): Mark => markOfIds(session.looks[i] ?? session.looks[0]);

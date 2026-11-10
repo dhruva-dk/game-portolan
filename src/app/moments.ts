@@ -12,7 +12,8 @@ import { R, advance, along, tangentAt, tangentToward } from '../sim/sphere.ts';
 import { callBreach } from '../sim/whale.ts';
 import { WEAPON_KINDS, WEATHER, WEATHER_KIND, isWeapon } from '../sim/tables.ts';
 import { REGIONS, TIDE_AMPLITUDE, navigable } from '../sim/world/index.ts';
-import { PI, v3, type V3 } from '../sim/math.ts';
+import { PI, normalize, v3, type V3 } from '../sim/math.ts';
+import { chart, inkHome } from '../sim/territory.ts';
 import { WEAPON_CLASSES, type ConsumableKind, type Moment, type WeaponClass } from './events.ts';
 
 /** The sim's going-about events by item, as the moment names them. */
@@ -106,6 +107,8 @@ export function momentOf(state: MatchState, e: Happening): Moment | null {
     case EVENT.deliveryCalled: return { k: 'deliveryCalled', ship, pos };
     case EVENT.deliveryArrived: return { k: 'deliveryArrived', ship, pos };
     case EVENT.coins: return { k: 'coins', ship, amount: e.amount, pos };
+    case EVENT.claim: return { k: 'claim', ship, cells: e.cells, area: e.amount, pos };
+    case EVENT.cut: return { k: 'cut', ship, by: e.by, cells: e.cells, dry: e.flag === 1, pos };
     case EVENT.whaleBreach: return { k: 'whaleBreach', pos };
     case EVENT.whaleSurface: return { k: 'whaleSurface', pos };
     case EVENT.whaleDive: return { k: 'whaleDive', pos };
@@ -155,6 +158,7 @@ export function actorEvent(m: Moment, whaleHead: V3): ActorEvent | null {
     case 'gust': return { t: 'gust', ship: m.ship };
     case 'pickup': return { t: 'pickup', ship: m.ship, rarity: rarity(m.rarity) };
     case 'deliveryArrived': return { t: 'delivery', ship: m.ship };
+    case 'cut': return m.dry ? null : { t: 'cut', ship: m.ship, at: m.pos };
     case 'ram': return { t: 'ram', at: m.pos };
     case 'aground': return { t: 'scrape', at: m.pos };
     case 'whaleBreach': return { t: 'breach', at: m.pos, head: whaleHead };
@@ -268,6 +272,34 @@ export function daylight(state: MatchState, hour = 15): void {
 
 /** A one-tick input at tick t, let go the tick after. */
 const tap = (t: number, on: Partial<ShipInput>, offIs: Partial<ShipInput>): Script => [[t, on], [t + 1, offIs]];
+
+/** Sails ship i over `path` (its own laying of trail, as a tick would lay it), in steps of a metre or so, leaving her at
+ *  the last point heading along the last leg. */
+function sailTrail(state: MatchState, i: number, path: readonly Course[]): void {
+  const ship = state.ships[i];
+  for (const c of path) {
+    Object.assign(ship.was, ship.pos);
+    Object.assign(ship.pos, c.pos);
+    Object.assign(ship.head, c.head);
+    chart(state);
+  }
+  Object.assign(ship.was, ship.pos);
+  state.events.length = 0;
+}
+
+/** Her home water at `c`, and a loop out of it round a circle ahead, stopped a few metres short of coming home. */
+function nearlyHome(state: MatchState, c: Course): Course[] {
+  const path: Course[] = [];
+  inkHome(state, PLAYER);
+  const r = 50, cy = 65;
+  for (let deg = 0; deg <= 329; deg += 1) {
+    const a = (deg * PI) / 180, x = r * Math.sin(a), y = cy - r * Math.cos(a), next = a + 0.02;
+    const to = off(c, y, x), p2 = off(c, cy - r * Math.cos(next), r * Math.sin(next));
+    const h = v3(p2.pos.x - to.pos.x, p2.pos.y - to.pos.y, p2.pos.z - to.pos.z);
+    path.push({ pos: to.pos, head: normalize(h) });
+  }
+  return path;
+}
 
 export const MOMENTS: readonly MomentScript[] = [
   {
@@ -397,6 +429,36 @@ export const MOMENTS: readonly MomentScript[] = [
       return [[t, { throttle: 0, steer: 0 }], ...tap(t + 10, { hail: 0 }, { hail: -1 })];
     },
     is: (m) => m.k === 'deliveryArrived' && m.ship === PLAYER,
+  },
+  {
+    name: 'claim', note: 'the player closing a loop', sea: true, lead: 8, every: 6, frames: 14,
+    arrange: (s) => {
+      const c = openCourse(s, 130, 60);
+      place(s, PLAYER, c);
+      for (let i = 1; i < SHIPS; i++) place(s, i, off(c, -170 - i * 12, i % 2 ? 60 : -60));
+      sailTrail(s, PLAYER, nearlyHome(s, c));
+      const me = s.ships[PLAYER], t = s.tick;
+      me.speed = 12;
+      return [[t, { throttle: 1, steer: 0, aim: off(c, 65).pos, aimY: 2 }]];
+    },
+    is: (m) => m.k === 'claim' && m.ship === PLAYER,
+  },
+  {
+    name: 'cut', note: 'the player crossing a rival\'s trail', sea: true, lead: 10, every: 4, frames: 16,
+    arrange: (s) => {
+      const c = openCourse(s, 90, 80), from = off(c, 34, -70);
+      place(s, PLAYER, c);
+      place(s, TARGET, from);
+      for (let i = 2; i < SHIPS; i++) place(s, i, off(c, -170 - i * 12, i % 2 ? 60 : -60));
+      inkHome(s, TARGET);
+      const path: Course[] = [];
+      for (let x = -70; x <= 70; x += 1) path.push(off(c, 34, x));
+      sailTrail(s, TARGET, path);
+      const me = s.ships[PLAYER], t = s.tick;
+      me.speed = 12;
+      return [[t, { throttle: 1, steer: 0, aim: off(c, 60).pos, aimY: 2 }]];
+    },
+    is: (m) => m.k === 'cut' && m.by === PLAYER,
   },
   {
     // loot of every rarity laid out ahead on open water, from in reach to 400 m off, with the hold full so the nearest

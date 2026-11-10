@@ -25,6 +25,8 @@ export const MOMENTS: readonly MomentDef[] = [
   { name: 'mast-fall', about: 'chain shot brings the target\'s mainmast down over the side' },
   { name: 'heated-shot', about: 'a heated shot sets the target burning' },
   { name: 'delivery', about: 'the player calls a gull delivery and it arrives' },
+  { name: 'claim', about: 'the player closes a loop and the water floods with her ink' },
+  { name: 'cut', about: 'the player sails across a rival\'s trail and breaks it' },
   { name: 'loot', about: 'loot of every rarity laid out ahead to 400 m, the nearest in reach, which the player swaps for' },
 ];
 

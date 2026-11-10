@@ -117,6 +117,13 @@ export class MomentSound {
       case 'landing':
         if (m.ship === me) a.play('galeLand');
         return;
+      case 'claim':
+        if (m.ship === me && m.area > 0) a.play('claim', { gain: Math.min(1.5, 0.8 + m.area / 9000) });
+        return;
+      case 'cut':
+        if (m.by === me && m.ship !== me) a.play('inkCut');
+        else if (m.ship === me) a.play('inkCut', { gain: m.dry ? 0.35 : 0.8 });
+        return;
       case 'deliveryCalled':
         if (m.ship === me) { a.play('coinSpend'); a.play('gullCall', { pos: m.pos }); }
         return;

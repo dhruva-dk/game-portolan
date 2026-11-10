@@ -356,6 +356,15 @@ function claim(r: Rng): Buf {
   return normalize(x, 0.4);
 }
 
+/** A trail crossed: the line snaps, a torn rip with a knock under it. */
+function inkCut(r: Rng): Buf {
+  const x = new Float32Array(n(0.5));
+  mix(x, whoosh(r, 0.22, 3000, 700, 2, 0.9), 0, 0.7);
+  mix(x, knock(r, 180, 0.12), 0.02, 0.8);
+  mix(x, glass(r, between(r, 1100, 1500), 0.18, 0.5), 0.04, 0.25);
+  return normalize(x, 0.6);
+}
+
 /** Holding a landmark: its perk is yours. A deep resonant hit with a bloom of light. */
 function landmarkTaken(r: Rng): Buf[] {
   const s = 3.2, out = pair(s);
@@ -407,6 +416,7 @@ export const WORLD_SOUNDS = {
   mineBurst: def(mineBurst, 2, 'fx', 8, 0.95, 3, { range: 600 }),
   abilityReady: def(abilityReady, 1, 'ui', 6, 0.5, 1, { jitter: 0 }),
   claim: def(claim, 2, 'ui', 3, 0.35, 1),
+  inkCut: def(inkCut, 3, 'ui', 3, 0.5, 1),
   landmarkTaken: def(landmarkTaken, 1, 'ui', 9, 0.8, 1, { jitter: 0 }),
   landmarkLost: def(landmarkLost, 1, 'ui', 8, 0.7, 1, { jitter: 0 }),
 };

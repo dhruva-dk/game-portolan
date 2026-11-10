@@ -496,6 +496,8 @@ export class App {
     const s = this.session;
     if (!s) return;
     this.log.tick = s.state.tick;
+    if (m.k === 'claim') this.stage?.inkMark({ k: 'claim', ship: m.ship, cells: m.cells, at: m.pos });
+    else if (m.k === 'cut') this.stage?.inkMark({ k: 'cut', ship: m.ship, cells: m.cells, at: m.pos, dry: m.dry });
     const ev = actorEvent(m, s.state.whale.head);
     if (ev) this.actors?.fire([ev]);
     this.momentJuice.react(m);

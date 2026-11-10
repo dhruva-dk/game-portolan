@@ -33,6 +33,9 @@ export { SHIP } from './caravel.ts';
 export { WHALE_LENGTH, BREACH } from './whale.ts';
 export { swell } from './common.ts';
 
+/** The rubric of a crossed trail's burst. */
+const CUT_INK = new THREE.Color(0xb8301a);
+
 export interface ActorsOptions {
   /** The planet's mean radius in metres (R in src/sim/world). */
   radius?: number;
@@ -525,6 +528,12 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
           fx.sparkle(at, c, 20 + e.rarity * 8, 2.5);
           fx.glow.emit({ x: at.x, y: at.y, z: at.z, life: 0.5, size: 2, grow: 5, r: c.r * 2, g: c.g * 2, b: c.b * 2, frame: SPRITE.ring, mode: 2, fadeIn: 0 });
           if (e.ship === player) juice({ shake: 0.03 + e.rarity * 0.02, haptic: e.rarity >= 3 ? 'medium' : 'light' }, e);
+          break;
+        }
+        case 'cut': {
+          const p = new THREE.Vector3(e.at.x, e.at.y, e.at.z);
+          fx.splash(p, 0.7);
+          fx.sparkle(p, CUT_INK, 22, 3);
           break;
         }
         case 'delivery':

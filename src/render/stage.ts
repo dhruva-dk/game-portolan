@@ -3,6 +3,7 @@
 import type { V3 } from '../sim/math.ts';
 import type { WeatherKind } from '../sim/world/index.ts';
 import type { CameraMode, CameraTarget } from './camera.ts';
+import type { TerritoryInput } from './ocean/territory.ts';
 
 export type { CameraMode, CameraTarget } from './camera.ts';
 
@@ -38,7 +39,7 @@ export interface StageView {
   /** The safe circle: its centre (a unit vector) and its radius along the surface in metres; null before it forms. */
   storm: { centre: V3; radius: number } | null;
   /** Each cell's owner and trail as ship index + 1 (the simulation's grid), with a version that changes with them. */
-  territory: { owner: Uint8Array; trail: Uint8Array; version: number; me: number } | null;
+  territory: TerritoryInput | null;
   /** The Gale blowing round the fleet while it rides; left out when nothing is. */
   gale?: { at: V3; way: V3; height: number; strength: number } | null;
   /** Screen-wide tints, 0…1: outside the safe circle, just hurt, and low on hull. */

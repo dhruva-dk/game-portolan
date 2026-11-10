@@ -51,9 +51,8 @@ const FLOW_PERIOD = 2.4;
 /** Water slower than this carries no foam of its own, m/s; faster than FAST it runs white: the Great Current's pace
  *  and below is quiet; the Maelstrom's whirl, and a lane running into the Great Current, are not. */
 const SLOW = 4.4, FAST = 8;
-/** How much brighter water a captain's dye has coloured is than the sea's own: a shade, so their hue reads through
- *  the water and the water still reads as the sea, its waves and glitter over it. */
-const DYE = 3;
+/** How bright water under a captain's dye is against its own: a saturated hue carries a lot of light in one channel. */
+const DYE = 0.7;
 /** The sea shows shadows this near the eye, metres, beyond the coast's reach: past the nearer cascade. */
 const SHADOWED_WITHIN = 80;
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -397,31 +396,42 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const shoreGlow = float(0).toVar('oceanShoreGlow');
   /** Whether the water here lies within the coast's reach, where cliffs and stacks throw their shadows on it. */
   const coastal = float(0).toVar('oceanCoastal');
-  // ----- the captains' ink: their colour in the water they hold, deepest on its coast, and the trail each is laying,
-  // pulsing along its length and glowing at night. The ink is a dye in the water, not a paint on it: it colours the
-  // light that comes back out of the water (the water's own colour, and the floor seen through it), and leaves the
-  // surface as it is, so the held water still has its waves, its glitter and its depth, only in the captain's hue.
-  // (worked out where the water's light is, which three builds ahead of the colour, so it is its own)
+  // ----- the captains' ink: their colour in the water they hold, and for the eye a line round it, plain by day and
+  // faintly alight at night, a flood's bright edge as a closed loop inks the water, the trail each is laying, and the
+  // ghost of one just washed out. Worked out once for the whole of the water's light (outputNode).
   const ink = (u: V3) => {
     const colour = vec3(0).toVar('oceanInk'), share = float(0).toVar('oceanInkShare'), glow = vec3(0).toVar('oceanInkGlow');
+    const lineInk = vec3(0).toVar('oceanLineInk'), lineShare = float(0).toVar('oceanLineShare');
     If(territory.on.greaterThan(0.5), () => {
       const p = positionWorld;
       const q = p.xz.add(vec2(0.71, -0.53).mul(p.y));
       const t = territory.at(u, noiseMap.sample(q.mul(0.045)).rg.sub(0.5));
       If(t.owner.greaterThan(0.5), () => {
         const mine = float(1).sub(step(0.5, abs(t.owner.sub(territory.me))));
-        colour.assign(territory.colour(t.owner));
-        share.assign(float(0.32).add(mine.mul(0.08)).add(t.edge.mul(0.4)));
+        const hue = territory.colour(t.owner);
+        colour.assign(hue);
+        share.assign(float(0.4).add(mine.mul(0.25)).add(t.edge.mul(0.2)).add(t.front.mul(0.3)));
+        glow.assign(hue.mul(float(0.03).add(mine.mul(0.05)).add(t.edge.mul(0.16).add(t.edge.mul(mine).mul(0.2))).add(t.front.mul(0.5))));
+        lineInk.assign(hue);
+        // a thin wash on the surface too, so the dye still reads where the water only mirrors the sky
+        lineShare.assign(max(float(0.03).add(mine.mul(0.05)), max(t.edge.mul(float(0.35).add(mine.mul(0.5))), t.front.mul(0.65))));
       });
-      If(t.trail.greaterThan(0.5), () => {
-        const pulse = sin(P.time.mul(5).sub(dot(q, vec2(0.35)))).mul(0.25).add(0.75);
+      If(t.ghostLine.greaterThan(0.01), () => {
+        const tc = territory.colour(t.ghost);
+        lineInk.assign(tc);
+        lineShare.assign(t.ghostLine.mul(0.8));
+      });
+      If(t.line.greaterThan(0.01), () => {
+        const pulse = sin(P.time.mul(5).sub(dot(q, vec2(0.35)))).mul(0.2).add(0.8);
         const tc = territory.colour(t.trail);
-        colour.assign(mix(colour, tc.mul(pulse), float(0.6).div(max(share.add(0.6), 0.6))));
-        share.assign(share.add(float(0.6).mul(float(1).sub(share))));
-        glow.assign(tc.mul(pulse).mul(0.6));
+        colour.assign(mix(colour, tc, t.line));
+        share.assign(max(share, t.line.mul(0.85)));
+        glow.addAssign(tc.mul(pulse).mul(t.line).mul(0.6));
+        lineInk.assign(mix(lineInk, tc.mul(pulse), t.line));
+        lineShare.assign(max(lineShare, t.line.mul(0.85)));
       });
     });
-    return { colour, share, glow };
+    return { colour, share, glow, lineInk, lineShare };
   };
   const noiseMap = texture(noise);
   const surf = (u: V3) => {
@@ -520,11 +530,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     });
     // this region's water: its own colour, and how far the eye sees into it
     const water = { deep: vDeep, extinction: vExtinction };
-    // the captain's dye: the water's colour turned to theirs
-    const inked = ink(u);
-    const hue = inked.colour.div(max(dot(inked.colour, LUMA), 1e-3));
-    const deep = mix(water.deep, hue.mul(dot(water.deep, LUMA).mul(DYE)), inked.share);
-    const body = down.mul(deep).div(Math.PI);
+    const body = down.mul(water.deep).div(Math.PI);
     // the floor through the surface, bent by its slope, and the path through the water to it
     const nViewXY = cameraViewMatrix.mul(vec4(world.sub(u), 0)).xy;
     const zHere = positionView.z;
@@ -535,8 +541,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const depthZ = max(zHere.sub(behind(uv)), 0);
     const path = depthZ.mul(length(positionView)).div(max(abs(zHere), 1e-3));
     const T = exp(water.extinction.mul(path).negate());
-    const floor = beneathColour(uv).rgb.mul(airLoss).add(airLight)
-      .mul(mix(vec3(1), hue.div(max(max(hue.x, hue.y), max(hue.z, 1e-3))), inked.share.mul(0.5)));
+    const floor = beneathColour(uv).rgb.mul(airLoss).add(airLight);
     // the sun through a crest standing between it and the eye (after Atlas's water, GDC 2019)
     const toward = pow(clamp(dot(v, P.sunDir.negate()), 0, 1), 4);
     const thin = pow(clamp(float(0.5).sub(dot(P.sunDir, world).mul(0.5)), 0, 1), 3);
@@ -544,11 +549,24 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const through = sun.mul(WATER.crest).mul(toward.mul(thin).mul(crest).mul(0.09));
     // looking down into the water a little more of its own light comes back
     const sss = body.mul(mix(float(0.6), float(1.2), nv));
-    // and the trail's glow at night (actors' scale)
-    return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel)).add(inked.glow.mul(P.night).mul(LAMP.mul(2.5)));
+    return floor.mul(T).add(sss.add(through).mul(float(1).sub(T))).mul(float(1).sub(fresnel));
   })();
   mat.backdropAlphaNode = float(1).sub(whiteness);
-  mat.outputNode = vec4(output.rgb.mul(airLoss).add(airLight), output.a);
+  // the ink goes on last, over all the water's light: the dye turns its hue and keeps its brightness, so the waves and
+  // the depth still read, and leaves the sun's glitter and the foam white; the lines lie on the water, lit as paper is;
+  // and the ink's glow at night (actors' scale)
+  mat.outputNode = Fn(() => {
+    const u = normalize(vUp);
+    const inked = ink(u);
+    const lit = output.rgb.toVar();
+    const bright = dot(lit, LUMA).toVar();
+    const hue = inked.colour.div(max(dot(inked.colour, LUMA), 1e-3));
+    const held = float(1).sub(smoothstep(0.5, 1.8, bright)).mul(float(1).sub(whiteness));
+    const dyed = mix(lit, hue.mul(bright).mul(DYE), inked.share.mul(held));
+    const light = vSkyDown.add(sunlight.mul(BODIES.sun).mul(max(dot(u, P.sunDir), 0))).add(moonlight.mul(BODIES.moon).mul(max(dot(u, P.moonDir), 0)));
+    const ruled = mix(dyed, inked.lineInk.mul(light).div(Math.PI).mul(0.8), inked.lineShare.mul(float(1).sub(whiteness)));
+    return vec4(ruled.add(inked.glow.mul(P.night).mul(LAMP.mul(2.5))).mul(airLoss).add(airLight), output.a);
+  })();
   // the surf's glow at night, the sea's own light (actors' scale)
   mat.emissiveNode = vec3(0.1, 0.75, 1.0).mul(shoreGlow.mul(P.night).mul(0.35)).mul(LAMP.mul(2.5));
 

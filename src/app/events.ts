@@ -40,6 +40,10 @@ export type Moment =
   | { k: 'deliveryCalled'; ship: number; pos: V3 }
   | { k: 'deliveryArrived'; ship: number; pos: V3 }
   | { k: 'coins'; ship: number; amount: number; pos: V3 }
+  /** A loop closed: the trail it was closed with, and the square metres of water it took. */
+  | { k: 'claim'; ship: number; cells: readonly number[]; area: number; pos: V3 }
+  /** A trail washed out: crossed by ship `by`, or run dry (`by` -1). `pos` is where it was crossed. */
+  | { k: 'cut'; ship: number; by: number; cells: readonly number[]; dry: boolean; pos: V3 }
   | { k: 'whaleBreach'; pos: V3 }
   | { k: 'whaleSurface'; pos: V3 }
   | { k: 'whaleDive'; pos: V3 }
