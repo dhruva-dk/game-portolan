@@ -95,6 +95,7 @@ export class GpuStage {
   readonly fog = new Fog();
   readonly flora = new Flora();
   readonly motes = new Motes();
+  readonly #up = new Vector3();
   readonly #canvas: HTMLCanvasElement;
   readonly #wind = new Vector3();
   readonly #buffer = new Vector2();
@@ -290,6 +291,7 @@ export class GpuStage {
       }
       return;
     }
+    this.post.shafts.update(this.camera, this.#up.copy(this.camera.position).normalize());
     this.post.render();
     if (!this.#checked) {
       this.#checked = true;

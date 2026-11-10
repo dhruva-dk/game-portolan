@@ -1,6 +1,7 @@
 // The frame after the scene. The scene is drawn at a share of the canvas (renderer.ts, resolution.ts), everything below
 // the upscale at that same size; over it:
 // - light: a bloom blurs a few percent of everything (a lens's scatter, not a glow on chosen things);
+// - shafts of light from the sun or moon through whatever stands before the sky (shafts.ts);
 // - exposure and tone: the colour script's exposure for the hour and the weather, AgX and the grade map it to the
 //   screen (grade.ts);
 // - the match's own washes: the Storm's violet outside the safe circle, a hit's red edge, a failing hull's pulse;
@@ -14,6 +15,7 @@ import { agx, GRADE } from './tonemap.ts';
 import { EXPOSURE, graded } from './grade.ts';
 import { P } from './uniforms.ts';
 import { shape } from './shape.ts';
+import { Shafts } from './shafts.ts';
 
 /** How much of the frame the bloom spreads, as a share of its light. */
 const BLOOM = 0.05;
@@ -102,6 +104,7 @@ export class Post {
   readonly scenePass: PassNode;
   /** How deep in renders the scene was last drawn. */
   sceneDepth = 0;
+  readonly shafts: Shafts;
   readonly #glow: { setResolutionScale(s: number): unknown };
   readonly #image: Image;
   readonly #texel = uniform(new Vector2(1, 1));
@@ -129,7 +132,8 @@ export class Post {
     const glow = bloom(hdrIn, 1, 0.55, 0);
     glow.setResolutionScale(scale * 0.5);
     this.#glow = glow;
-    let hdr = hdrIn.rgb.mul(1 - BLOOM).add((glow as unknown as Node<'vec4'>).rgb.mul(BLOOM)).mul(EXPOSURE);
+    this.shafts = new Shafts(hdrIn as unknown as V4, scenePass.getTextureNode('depth').r as unknown as Node<'float'>, EXPOSURE as unknown as Node<'float'>, scale);
+    let hdr = hdrIn.rgb.mul(1 - BLOOM).add((glow as unknown as Node<'vec4'>).rgb.mul(BLOOM)).add(this.shafts.node).mul(EXPOSURE);
     // outside the safe circle the world drains toward a bruised violet, before the tone curve so its light holds
     const lum = dot(hdr, LUMA);
     hdr = mix(hdr, vec3(lum).mul(vec3(0.55, 0.42, 0.95)).add(hdr.mul(vec3(0.25, 0.15, 0.45))), SCREEN.storm.mul(0.75));
@@ -170,6 +174,7 @@ export class Post {
     this.scenePass.setResolutionScale(scale);
     this.#glow.setResolutionScale(scale * 0.5);
     this.#image.setResolutionScale(scale);
+    this.shafts.rescale(scale);
   }
 
   /** Draws the frame. */
