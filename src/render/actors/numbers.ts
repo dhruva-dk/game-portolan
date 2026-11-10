@@ -2,6 +2,7 @@
 // screen-sized glyphs anchored in the world, so they read the same at phone size near or far. One draw call.
 import * as THREE from 'three';
 import { rand } from './common.ts';
+import { figureStrokes, figureWidth } from '../../chart/numerals.ts';
 import { numberNodeMaterial } from './tsl/numbers.ts';
 
 const GLYPHS = '0123456789+!';
@@ -11,17 +12,27 @@ function makeDigits(): THREE.CanvasTexture {
   const C = 64, cv = document.createElement('canvas');
   cv.width = C * 4; cv.height = C * 4;
   const g = cv.getContext('2d')!;
-  g.font = `900 ${C * 0.86}px system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif`;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.lineJoin = 'round';
+  g.lineJoin = g.lineCap = 'round';
+  // the chart's own figures, in the hand of the hud's numerals: a dark line first, the figure over it
   [...GLYPHS].forEach((ch, i) => {
-    const x = (i % 4) * C + C / 2, y = Math.floor(i / 4) * C + C / 2 + C * 0.04;
-    g.lineWidth = C * 0.16;
+    const x = (i % 4) * C + C / 2, y = Math.floor(i / 4) * C + C / 2 + C * 0.14;
+    const runs = /\d/.test(ch) ? figureStrokes(ch, x - figureWidth(ch, C * 0.46) / 2, y, C * 0.46) : ch === '+'
+      ? [[x - C * 0.2, y - C * 0.14, x + C * 0.2, y - C * 0.14], [x, y - C * 0.34, x, y + C * 0.06]]
+      : [[x, y - C * 0.42, x, y - C * 0.02], [x, y + C * 0.12, x, y + C * 0.13]];
+    const line = () => {
+      g.beginPath();
+      for (const r of runs) {
+        g.moveTo(r[0], r[1]);
+        for (let k = 2; k < r.length; k += 2) g.lineTo(r[k], r[k + 1]);
+      }
+      g.stroke();
+    };
+    g.lineWidth = C * 0.19;
     g.strokeStyle = 'rgba(0,0,0,0.85)';
-    g.strokeText(ch, x, y);
-    g.fillStyle = '#fff';
-    g.fillText(ch, x, y);
+    line();
+    g.lineWidth = C * 0.085;
+    g.strokeStyle = '#fff';
+    line();
   });
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.NoColorSpace;
