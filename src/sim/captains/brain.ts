@@ -15,7 +15,8 @@ import { aimedAt, landing, rangeOf } from '../combat.ts';
 import { roomFor, useful } from '../items.ts';
 import { draftOf, offWind, pointOfSail, turnRate } from '../sailing.ts';
 import { deckAt, newDeck } from '../seaway.ts';
-import { R, apart, along, angleTo, tangentAt, tangentToward, turned } from '../sphere.ts';
+import { R, TERRITORY, apart, along, angleTo, cellDir, tangentAt, tangentToward, turned } from '../sphere.ts';
+import { exposure, haven } from './exposure.ts';
 import { PHASE, PLAYER, SHIPS, STREAM, TICK, WHALE_STATE, copy, type Captain, type MatchState, type Ship } from '../state.ts';
 import { calmNow, inStorm, stormPhase, stormView, newStormView, toEdge } from '../storm.ts';
 import { ABOUT, GALE, ITEM, LOOT, PARCELS, PERKS, SHIP, SLOTS, WEAPONS, WEATHER_KIND, WHALE, ZONES, isUse, isWeapon } from '../tables.ts';
@@ -284,10 +285,21 @@ const OPTIONS: readonly Choice[] = [
       m.trail = nearestTrail(m.state, m.i, 160);
       return m.trail < 0 ? 0 : m.style.raid * 0.8;
     },
-    tree: leaf('cut her trail', (m) => void cellCentre(m.trail, m.c.goal)),
+    tree: leaf('cut her trail', (m) => void cellDir(TERRITORY, m.trail, m.c.goal)),
   },
   {
-    // 8. claim water: a loop out from home and back, or round a landmark, seen through once begun
+    // 8. make for its own water while it can: a rival could reach the open trail before it is safe. Seen through once begun.
+    name: 'turn back', weight: 2.3, mode: -1,
+    score: (m) => (exposed(m) ? 1 : 0),
+    tree: leaf('make for home', (m) => {
+      const c = m.c;
+      if (!haven(m.state, m.i, c.goal)) return false;
+      c.ring = [];
+      c.li = 0;
+    }),
+  },
+  {
+    // 9. claim water: a loop out from home and back, or round a landmark, seen through once begun
     name: 'ring', weight: 1.5, mode: -1,
     score: (m) => ((m.c.mode === MODE.claim || m.c.mode === MODE.landmark) && m.c.li < m.c.ring.length ? 1 : 0),
     tree: leaf('round the loop', (m) => {
@@ -317,7 +329,7 @@ const OPTIONS: readonly Choice[] = [
     ),
   },
   {
-    // 9. otherwise roam: home water when it has some, else somewhere in the circle
+    // 10. otherwise roam: home water when it has some, else somewhere in the circle
     name: 'roam', weight: 1, mode: MODE.roam,
     score: () => 0.15,
     tree: leaf('roam', (m) => {
@@ -345,6 +357,7 @@ export const OPTION_NAMES: readonly string[] = OPTIONS.map((o) => o.name);
 /** Each ship's options as last scored (weighted), for anyone watching the captains think; never read by the sim. */
 export const SCORES: Float64Array[] = Array.from({ length: SHIPS }, () => new Float64Array(OPTIONS.length));
 const TRIED = new Float64Array(OPTIONS.length);
+const HAVEN = v3();
 
 function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
   const ship = state.ships[i], c = ship.captain, m = MIND;
@@ -384,6 +397,17 @@ function decide(state: MatchState, i: number, style: Style, rng: Rng): void {
 function mendNeed(m: Mind): number {
   const { ship, c, style } = m, hull = style.mend + 20 * c.skill, shield = 25 + 25 * c.skill;
   return Math.max(ramp(ship.hull, hull + 8, hull - 8), ramp(ship.shield, shield + 8, shield - 8), crippled(ship) ? 1 : 0);
+}
+
+/** Out on a trail with too little head start on the quickest rival (each captain's reading of it out by a share that
+ *  shrinks with skill), or already making for home. */
+function exposed(m: Mind): boolean {
+  const { c, ship, style, state, i } = m;
+  if (ship.laid.length === 0 || (c.mode !== MODE.claim && c.mode !== MODE.landmark)) return false;
+  if (!haven(state, i, HAVEN)) return false;
+  if (c.ring.length === 0) return true;
+  const misjudged = 1 + (1 - c.skill) * 0.35 * (rngFloat(m.rng) * 2 - 1);
+  return exposure(state, i, apart(ship.pos, HAVEN), misjudged) > -style.headStart;
 }
 
 /** Losing a fight: her hull down past where its temperament runs (sooner when gentle), with the foe close. */
@@ -731,7 +755,7 @@ function nearestTrail(state: MatchState, i: number, reach: number): number {
     if (j === i) continue;
     const laid = state.ships[j].laid;
     for (let k = 0; k < laid.length; k += 6) {
-      const d = apart(ship.pos, cellCentre(laid[k], P));
+      const d = apart(ship.pos, cellDir(TERRITORY, laid[k], P));
       if (d < bd) {
         bd = d;
         best = laid[k];

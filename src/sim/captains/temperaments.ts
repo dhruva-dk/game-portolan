@@ -27,18 +27,20 @@ export interface Style {
   thrift: number;
   /** How often a loop it plans goes round a landmark near enough to take, 0–1. */
   marks: number;
+  /** The head start in seconds over the quickest rival it insists on while out on a trail: under that it turns for home. */
+  headStart: number;
 }
 
-export const GENTLE: Style = { fight: 0.15, notice: 70, run: 55, mend: 75, loot: 0.8, lootReach: 140, loop: 40, raid: 0, margin: 40, standoff: 1.3, thrift: 20, marks: 0.2 };
+export const GENTLE: Style = { fight: 0.15, notice: 70, run: 55, mend: 75, loot: 0.8, lootReach: 140, loop: 40, raid: 0, margin: 40, standoff: 1.3, thrift: 20, marks: 0.2, headStart: 8 };
 
 /** Hunter, Homesteader, Raider, Turtle, Scavenger, Brawler. */
 export const STYLES: readonly Style[] = [
-  { fight: 0.8, notice: 200, run: 25, mend: 50, loot: 0.4, lootReach: 120, loop: 45, raid: 0.5, margin: 25, standoff: 0.9, thrift: 0, marks: 0.25 },
-  { fight: 0.3, notice: 110, run: 45, mend: 65, loot: 0.5, lootReach: 130, loop: 90, raid: 0.1, margin: 35, standoff: 1.1, thrift: 30, marks: 0.9 },
-  { fight: 0.55, notice: 160, run: 35, mend: 55, loot: 0.5, lootReach: 120, loop: 40, raid: 1, margin: 25, standoff: 0.9, thrift: 0, marks: 0.2 },
-  { fight: 0.35, notice: 120, run: 50, mend: 70, loot: 0.6, lootReach: 110, loop: 30, raid: 0, margin: 45, standoff: 1.25, thrift: 45, marks: 0.5 },
-  { fight: 0.3, notice: 120, run: 40, mend: 60, loot: 1, lootReach: 220, loop: 35, raid: 0.2, margin: 30, standoff: 1.15, thrift: 0, marks: 0.3 },
-  { fight: 1, notice: 220, run: 15, mend: 40, loot: 0.3, lootReach: 90, loop: 30, raid: 0.3, margin: 15, standoff: 0.7, thrift: 0, marks: 0.1 },
+  { fight: 0.8, notice: 200, run: 25, mend: 50, loot: 0.4, lootReach: 120, loop: 45, raid: 0.5, margin: 25, standoff: 0.9, thrift: 0, marks: 0.25, headStart: 3 },
+  { fight: 0.3, notice: 110, run: 45, mend: 65, loot: 0.5, lootReach: 130, loop: 90, raid: 0.1, margin: 35, standoff: 1.1, thrift: 30, marks: 0.9, headStart: 6 },
+  { fight: 0.55, notice: 160, run: 35, mend: 55, loot: 0.5, lootReach: 120, loop: 40, raid: 1, margin: 25, standoff: 0.9, thrift: 0, marks: 0.2, headStart: 3 },
+  { fight: 0.35, notice: 120, run: 50, mend: 70, loot: 0.6, lootReach: 110, loop: 30, raid: 0, margin: 45, standoff: 1.25, thrift: 45, marks: 0.5, headStart: 8 },
+  { fight: 0.3, notice: 120, run: 40, mend: 60, loot: 1, lootReach: 220, loop: 35, raid: 0.2, margin: 30, standoff: 1.15, thrift: 0, marks: 0.3, headStart: 5 },
+  { fight: 1, notice: 220, run: 15, mend: 40, loot: 0.3, lootReach: 90, loop: 30, raid: 0.3, margin: 15, standoff: 0.7, thrift: 0, marks: 0.1, headStart: 0 },
 ];
 
 export const STYLE_NAMES = ['hunter', 'homesteader', 'raider', 'turtle', 'scavenger', 'brawler'] as const;
