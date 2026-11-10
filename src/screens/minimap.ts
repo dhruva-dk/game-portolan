@@ -2,6 +2,7 @@
 // hold still and are baked; what is on the sea (the land, the Storm, the ships) is a plate re-inked a few times a
 // second, a dotted course and the Storm's first circle drawn on it while the Gale blows. The stick floats where the
 // thumb set it, or rests faintly at its home.
+import { paintWash } from './wash.ts';
 import {
   Pen, arrow, canvas, cross, ctx, dottedRing, drawBaked, drawEmblem, drawSprite, pennant, ring, star, stormRing, WASH, type ChartLayer, type Circle, type Sprite,
 } from '../chart/index.ts';
@@ -52,14 +53,7 @@ export class Minimap {
       this.#washC = canvas(w.n, w.n);
       this.#washI = ctx(this.#washC).createImageData(w.n, w.n);
     }
-    const d = this.#washI!.data;
-    for (let i = 0; i < w.ids.length; i++) {
-      const id = w.ids[i], a = i * 4;
-      if (id === 0) { d[a + 3] = 0; continue; }
-      const [r, gr, b] = Pen.rgb(w.inks[id - 1]);
-      d[a] = r; d[a + 1] = gr; d[a + 2] = b;
-      d[a + 3] = id === w.me ? 205 : 130;
-    }
+    paintWash(this.#washI!.data, w.ids, w.n, w.me, (id) => Pen.rgb(w.inks[id - 1]));
     ctx(this.#washC).putImageData(this.#washI!, 0, 0);
     g.imageSmoothingEnabled = true;
     g.drawImage(this.#washC, cx - ri, cy - ri, ri * 2, ri * 2);

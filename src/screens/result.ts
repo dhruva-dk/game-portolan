@@ -7,17 +7,22 @@
 //
 // Each thing is drawn with the pen while it inks in, then baked once to a sprite; only the ring's gold is drawn with
 // the pen each frame. Everything runs off the time it is given, so a capture's frozen clock shows the same instants.
+import { paintWash, rasterHeld } from './wash.ts';
 import {
   Press, bakeSeal, drawBaked, drawSprite, ease, everywhere, figure, figureWidth, laurel, part, prims, ring, stamp, woodcut,
-  type Baked, type ChartLayer, type Circle, type Illumination, type InkName, type Pen, type Seal, type Sprite,
+  type Baked, type ChartLayer, type Circle, type Illumination, type InkName, Pen, type Seal, type Sprite,
 } from '../chart/index.ts';
 import { clamp } from '../chart/noise.ts';
+import { canvas, ctx } from '../chart/paper.ts';
 import { effect, type UiHaptic, type UiSound } from '../ui/parts/feedback.ts';
 import type { LevelView, ResultsModel } from '../ui/model.ts';
 import { TIER_ILLUMINATION } from './cards.ts';
 import { careerPlate, ringFill, type PlateGeo } from './lobby.ts';
 
 const BLEED = 40;
+/** The side of the grid the held water's wash is laid on. */
+const HELD_N = 96;
+
 /** Room round a baked drawing for its shadow and the wobble of its ink. */
 const PAD = 12;
 /** The beats of the sheet, in seconds from its coming down. */
@@ -255,12 +260,13 @@ export class Result {
       g.beginPath();
       g.arc(x, y, C.r, 0, Math.PI * 2);
       g.clip();
-      g.fillStyle = held.ink;
-      g.globalAlpha = 0.72;
-      const half = Math.max(held.half * C.r, 0.8);
-      g.beginPath();
-      for (let i = 0; i < held.pts.length; i += 2) g.rect(x + held.pts[i] * C.r - half, y - held.pts[i + 1] * C.r - half, half * 2, half * 2);
-      g.fill();
+      // the wash laid on a small grid and stretched soft over the chart
+      const ids = new Uint8Array(HELD_N * HELD_N), cells = canvas(HELD_N, HELD_N), c = ctx(cells), image = c.createImageData(HELD_N, HELD_N), rgb = Pen.rgb(held.ink);
+      rasterHeld(ids, HELD_N, held.pts, held.half, 1);
+      paintWash(image.data, ids, HELD_N, 1, () => rgb);
+      c.putImageData(image, 0, 0);
+      g.imageSmoothingEnabled = true;
+      g.drawImage(cells, x - C.r, y - C.r, C.r * 2, C.r * 2);
       g.restore();
       ring(p, x, y, C.r * 0.96, C.r * 1.08, { ticks: 128 }, 1);
     });
