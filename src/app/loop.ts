@@ -39,6 +39,9 @@ export class Loop {
   running = true;
   clock = 0;
   readonly perf = { frames: 0, frame: 0, frameMean: 0, tickMean: 0, tickMax: 0, ticks: 0 };
+  /** Optional diagnostic: observed animation callbacks, including ones skipped by the render cap. */
+  cadence: { callbacks: number; elapsed: number } | null = null;
+  private callbackAt: number | null = null;
 
   private away = false;
   private sim: Stepper | null = null;
@@ -75,6 +78,7 @@ export class Loop {
   set suspended(away: boolean) {
     this.away = away;
     this.last = null;
+    this.callbackAt = null;
   }
 
   /** Steps the simulation n ticks now, without drawing (tests and captures). */
@@ -92,6 +96,13 @@ export class Loop {
 
   private readonly frame = (now: number): void => {
     requestAnimationFrame(this.frame);
+    if (this.cadence && this.running && !this.away) {
+      if (this.callbackAt !== null) {
+        this.cadence.callbacks++;
+        this.cadence.elapsed += Math.max(0, now - this.callbackAt);
+      }
+      this.callbackAt = now;
+    } else this.callbackAt = null;
     if (!this.running) {
       this.last = null;
       return;

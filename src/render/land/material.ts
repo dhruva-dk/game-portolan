@@ -359,20 +359,26 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     // a porous surface darkens as its pores fill; the film of water on top is glossy
     a.assign(a.mul(mix(float(1), float(0.45), wetness.mul(float(1).sub(salt.mul(0.6))))));
     rg.assign(mix(rg, float(0.22), wetness));
-    // puddles stand in the hollows of level ground in the rain
-    const level = smoothstep(0.9, 0.97, dot(gn, up));
-    const puddle = P.rain.mul(level).mul(smoothstep(0.45, 0.3, h.add(n.y.sub(0.5).mul(0.35)))).mul(smoothstep(0.2, 0.6, above));
-    a.assign(a.mul(mix(float(1), float(0.6), puddle)));
-    rg.assign(mix(rg, float(0.03), puddle));
-    nb.assign(normalize(mix(nb, gn, puddle)));
+    // Puddles and snow contribute exactly zero in dry, snow-free weather. These uniform branches keep their
+    // normal blending and surface math out of those frames without changing the material graph or pipeline.
+    If(P.rain.greaterThan(0), () => {
+      const level = smoothstep(0.9, 0.97, dot(gn, up));
+      const puddle = P.rain.mul(level).mul(smoothstep(0.45, 0.3, h.add(n.y.sub(0.5).mul(0.35)))).mul(smoothstep(0.2, 0.6, above));
+      a.assign(a.mul(mix(float(1), float(0.6), puddle)));
+      rg.assign(mix(rg, float(0.03), puddle));
+      nb.assign(normalize(mix(nb, gn, puddle)));
+    });
 
-    // snow on whatever faces up, deepest in the hollows the wind fills
-    const snowy = clamp(P.snow.mul(1.6).sub(float(1).sub(smoothstep(0.45, 0.85, facing.add(n.y.sub(0.5).mul(0.3))))).sub(h.mul(0.35)), 0, 1)
-      .mul(smoothstep(0.2, 0.8, above));
-    a.assign(mix(a, SNOW, snowy));
-    rg.assign(mix(rg, float(0.55), snowy));
-    nb.assign(normalize(mix(nb, gn, snowy.mul(0.7))));
-    ao.assign(mix(ao, float(1), snowy));
+    const snowy = float(0).toVar('landSnow');
+    If(P.snow.greaterThan(0), () => {
+      // Snow on whatever faces up, deepest in the hollows the wind fills.
+      snowy.assign(clamp(P.snow.mul(1.6).sub(float(1).sub(smoothstep(0.45, 0.85, facing.add(n.y.sub(0.5).mul(0.3))))).sub(h.mul(0.35)), 0, 1)
+        .mul(smoothstep(0.2, 0.8, above)));
+      a.assign(mix(a, SNOW, snowy));
+      rg.assign(mix(rg, float(0.55), snowy));
+      nb.assign(normalize(mix(nb, gn, snowy.mul(0.7))));
+      ao.assign(mix(ao, float(1), snowy));
+    });
 
     // the scars of the match: where shot and fire struck, the ground is charred for the rest of it (gpu/marks.ts)
     const scar = vec4(marksAt(p, n.z)).toVar('landScar');
@@ -383,15 +389,24 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
 
     // the surf on the sand: the swash running up the shore and back with the waves, and a band of foam in the wash
     // just under the water's edge, where the sea's own surf (ocean/surface.ts) meets the land; at night it glows
-    const fn = noiseMap.sample(q.mul(0.11).add(vec2(P.time.mul(0.01), 0))).b;
-    const surge = sin(P.time.mul(1.1).add(fn.mul(5))).mul(0.25).sub(0.05);
-    const swash = smoothstep(0.35, 0, abs(above.sub(surge))).mul(smoothstep(0.35, 0.65, fn.add(0.15))).mul(smoothstep(-2, 0, above));
-    const wash = smoothstep(0.8, 1, sin(above.mul(-4).sub(P.time.mul(1.6)).add(fn.mul(4))))
-      .mul(smoothstep(-1.6, -0.2, above)).mul(step(above, 0)).mul(smoothstep(0.35, 0.7, fn));
-    const surf = clamp(swash.mul(0.9).add(wash.mul(0.4)), 0, 1).mul(float(1).sub(snowy));
-    a.assign(mix(a, SURF, surf));
-    rg.assign(mix(rg, float(0.6), surf));
-    glow.assign(surf.mul(fn.add(0.6)));
+    // The surge is always in [-0.30, 0.20], so swash is zero above 0.55 m; wash is zero below -1.6 m.
+    // Take gradients outside the spatial branch: filtering must remain defined for quads crossing either edge.
+    const surfUv = q.mul(0.11).add(vec2(P.time.mul(0.01), 0)).toVar();
+    const surfGx = vec2(0).toVar(), surfGy = vec2(0).toVar();
+    surfGx.assign(dFdx(surfUv));
+    surfGy.assign(dFdy(surfUv));
+    glow.assign(0);
+    If(above.greaterThan(-1.6).and(above.lessThan(0.55)), () => {
+      const fn = noiseMap.sample(surfUv).grad(surfGx, surfGy).b;
+      const surge = sin(P.time.mul(1.1).add(fn.mul(5))).mul(0.25).sub(0.05);
+      const swash = smoothstep(0.35, 0, abs(above.sub(surge))).mul(smoothstep(0.35, 0.65, fn.add(0.15))).mul(smoothstep(-2, 0, above));
+      const wash = smoothstep(0.8, 1, sin(above.mul(-4).sub(P.time.mul(1.6)).add(fn.mul(4))))
+        .mul(smoothstep(-1.6, -0.2, above)).mul(step(above, 0)).mul(smoothstep(0.35, 0.7, fn));
+      const surf = clamp(swash.mul(0.9).add(wash.mul(0.4)), 0, 1).mul(float(1).sub(snowy));
+      a.assign(mix(a, SURF, surf));
+      rg.assign(mix(rg, float(0.6), surf));
+      glow.assign(surf.mul(fn.add(0.6)));
+    });
 
     albedo.assign(a);
     // the lab's looks inside: 1 the roles, 2 the nearer region, 3 the strongest candidate's scan untinted, 4 its slot,

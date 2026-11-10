@@ -141,6 +141,9 @@ export async function createRenderer(canvas: HTMLCanvasElement): Promise<{ rende
     },
   } as ConstructorParameters<typeof WebGPURenderer>[0]);
   await renderer.init();
+  // The app owns its animation loop. Three's independent animation callback otherwise clears these counters
+  // before the app reads the previous frame, reporting zero triangles/draws despite a fully rendered scene.
+  renderer.info.autoReset = false;
   const backend = renderer.backend as unknown as { isWebGPUBackend?: boolean; device: Device };
   if (!backend.isWebGPUBackend) throw new Error('Portolan needs WebGPU, and three fell back to WebGL');
   // every shader three writes passes through here on its way to the device (wgsl.ts)

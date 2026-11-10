@@ -148,7 +148,7 @@ export class Post {
     ldr = mix(ldr, vec3(0.75, 0.05, 0.02), edge.mul(SCREEN.hurt.clamp(0, 1)).mul(0.65));
     ldr = mix(ldr, vec3(0.25, 0, 0.02), edge.mul(SCREEN.low).mul(sin(P.time.mul(5)).mul(0.15).add(0.35)));
     // finished at the scene's own size, its light in the alpha for FXAA to find edges by, and brought up to the canvas
-    const image = rtt(vec4(ldr, sqrt(max(dot(ldr, LUMA), 0))));
+    const image = rtt(vec4(ldr, sqrt(max(dot(ldr, LUMA), 0))), null, null, { depthBuffer: false });
     image.setResolutionScale(scale);
     this.#image = image as unknown as Image;
     ldr = clamp(finish((q) => image.sample(q).level(int(0)) as unknown as V4, this.#texel as unknown as V2), 0, 1) as typeof ldr;
@@ -158,9 +158,17 @@ export class Post {
     ldr = clamp(ldr.add(n.sub(0.5).mul(1 / 255)), 0, 1);
     if (overlay) {
       // cleared to nothing and blended over, the overlay's colour comes premultiplied by its coverage
-      const written = pass(overlay, camera);
+      const written = pass(overlay, camera, { depthBuffer: false });
       // (in eight bits: it is drawn after the tone curve)
       (written.getTexture('output') as Texture).type = UnsignedByteType;
+      // Three's PassNode.setup replaces a pass's texture type with the renderer's HDR output type. Restore this
+      // display overlay's explicit format after setup, before its first allocation (and after any later rebuild).
+      const setupWritten = written.setup.bind(written);
+      written.setup = (builder) => {
+        const node = setupWritten(builder);
+        written.getTexture('output').type = UnsignedByteType;
+        return node;
+      };
       const over = written.getTextureNode('output');
       ldr = ldr.mul(float(1).sub(over.a)).add(over.rgb);
       renderer.setClearColor(0x000000, 0);

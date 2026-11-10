@@ -69,9 +69,9 @@ export class Shafts {
       const d = from(uv0);
       return vec4(sum.div(TOTAL).mul(exp(dot(d, d).mul(-falloff))), 1);
     })() as V4;
-    const first = rtt(mask) as unknown as Pass;
-    const second = rtt(blur(first, 1, 0)) as unknown as Pass;
-    const third = rtt(blur(second, 1 / TAPS, 2.5)) as unknown as Pass;
+    const first = rtt(mask, null, null, { depthBuffer: false }) as unknown as Pass;
+    const second = rtt(blur(first, 1, 0), null, null, { depthBuffer: false }) as unknown as Pass;
+    const third = rtt(blur(second, 1 / TAPS, 2.5), null, null, { depthBuffer: false }) as unknown as Pass;
     this.#passes = [first, second, third];
     this.rescale(scale);
     this.node = third.sample(screenUV as unknown as V2).rgb.mul(this.#strength as unknown as F) as V3;

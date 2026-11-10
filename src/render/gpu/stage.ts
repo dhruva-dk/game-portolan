@@ -212,6 +212,7 @@ export class GpuStage {
 
   /** Lays out the planet for a frame and draws it. */
   frame(v: StageView, dt: number): void {
+    this.renderer.info.reset();
     // while the materials are being built, the page is left to them and to the title
     if (this.#warm === 'building' || this.#warm === 'failed') return;
     P.time.value = v.time;

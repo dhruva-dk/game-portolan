@@ -25,3 +25,26 @@ test('wall timing records a full stall while simulation catch-up stays bounded',
     globalThis.requestAnimationFrame = original;
   }
 });
+
+test('callback cadence includes capped frames and excludes time suspended', () => {
+  const original = globalThis.requestAnimationFrame;
+  let callback!: FrameRequestCallback;
+  globalThis.requestAnimationFrame = (cb) => { callback = cb; return 1; };
+  try {
+    let drawn = 0;
+    const loop = new Loop(() => drawn++);
+    loop.frameRate = 40;
+    loop.cadence = { callbacks: 0, elapsed: 0 };
+    for (let i = 0; i <= 60; i++) callback(i * 1000 / 60);
+    assert.equal(drawn, 31, 'a 60 Hz callback source cannot deliver evenly paced 40 FPS');
+    assert.equal(loop.cadence.callbacks, 60);
+    assert.equal(loop.cadence.elapsed, 1000);
+    loop.suspended = true;
+    callback(2000);
+    loop.suspended = false;
+    callback(10000);
+    assert.equal(loop.cadence.elapsed, 1000);
+  } finally {
+    globalThis.requestAnimationFrame = original;
+  }
+});

@@ -9,13 +9,13 @@
 // from behind; snow and rain lie on it as they do on the plant.
 //
 // The bake draws every view of a variant in one instanced draw per mesh: each instance is one view, and its vertex
-// stage projects the plant orthographically along that view straight into the view's cell of the variant's slot in the
-// atlas, so the whole forest is baked in a few dozen draws into one render target with two textures (Wronski's MRT
-// impostor bake does the same with a camera per view). Colour is kept as its square root, for the dark greens' sake
-// in eight bits.
+// stage projects the plant orthographically along that view into its cell in a slot-sized scratch target. A variant's
+// parts keep their shared depth there, then its two textures are copied into the atlas; the next variant reuses the
+// scratch target (Wronski's MRT impostor bake does the same with a camera per view). Colour is kept as its square root,
+// for the dark greens' sake in eight bits.
 import {
   Color, DepthTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, OrthographicCamera, RenderTarget, Scene,
-  UnsignedByteType, Vector4, type BufferGeometry, type Material, type MeshStandardMaterial, type Node, type Texture, type WebGPURenderer,
+  UnsignedByteType, Vector2, Vector4, type BufferGeometry, type Material, type MeshStandardMaterial, type Node, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
   Discard, Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, cross, dFdx, dFdy, diffuseColor, dot, float, floor, fract,
@@ -92,6 +92,11 @@ export class ImpostorAtlas {
   baked = false;
   readonly #scene = new Scene();
   readonly #camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  // Only parts of the same variant need to share depth. Keeping it in a slot-sized target avoids loading and
+  // storing a planet-sized depth/color attachment on every small bake draw.
+  readonly #scratch = new RenderTarget(SLOT, SLOT, { count: 2, type: UnsignedByteType, depthBuffer: true, depthTexture: new DepthTexture(SLOT, SLOT) });
+  #scratchDisposed = false;
+  #atlasInitialized = false;
   #parts: BakePart[] = [];
   #sources: readonly ImpostorSource[] = [];
   #materials: Material[] = [];
@@ -103,14 +108,16 @@ export class ImpostorAtlas {
   constructor(count: number) {
     this.side = Math.max(1, Math.ceil(Math.sqrt(count)));
     const size = this.side * SLOT;
-    // The depth stays alive across slices: a later part must still be hidden by an earlier part of the plant.
-    this.target = new RenderTarget(size, size, { count: 2, type: UnsignedByteType, depthBuffer: true, depthTexture: new DepthTexture(size, size) });
+    this.target = new RenderTarget(size, size, { count: 2, type: UnsignedByteType, depthBuffer: false });
+    const [scratchAlbedo, scratchInfo] = this.#scratch.textures;
+    scratchAlbedo.name = 'albedo';
+    scratchInfo.name = 'info';
     const [albedo, info] = this.target.textures;
     albedo.name = 'albedo';
     info.name = 'info';
     for (const t of this.target.textures) {
-      // Keep this true during allocation/compile so Three allocates the complete mip chain. During intermediate
-      // renders it is temporarily false, otherwise Three regenerates the entire atlas's mips after every part.
+      // Allocate the complete mip chain before copying. Intermediate tile copies temporarily disable automatic
+      // mip generation; only the final tile copy generates the atlas mips.
       t.generateMipmaps = true;
       t.minFilter = LinearMipmapLinearFilter;
       t.magFilter = LinearFilter;
@@ -157,7 +164,7 @@ export class ImpostorAtlas {
           const view = new Vector4();
           const t = tagOf(p.material)!, src = p.material as MeshStandardMaterial;
           const family = `${p.geometry.hasAttribute('color')}:${t.cutout !== undefined && !!src.map}:${!!t.crownNormals}`;
-          const material = bakeMaterial(p.material, p.geometry, view, this.side, graphs.get(family));
+          const material = bakeMaterial(p.material, p.geometry, view, 1, graphs.get(family));
           graphs.set(family, material);
           shared = { material, view };
           materials.set(key, shared);
@@ -184,8 +191,7 @@ export class ImpostorAtlas {
   }
 
   #show(part: BakePart): void {
-    const [x, y] = this.slotAt(part.source.slot);
-    part.view.set(x, y, part.source.centre, part.source.radius);
+    part.view.set(0, 0, part.source.centre, part.source.radius);
     this.#scene.clear();
     this.#scene.add(part.mesh);
   }
@@ -198,11 +204,11 @@ export class ImpostorAtlas {
       created?.(builder, object);
       const context = (object as { context: unknown }).context;
       (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = () =>
-        buildNodeForTargetAsync(builder, this.target, null, context);
+        buildNodeForTargetAsync(builder, this.#scratch, null, context);
     };
     const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT();
     const restore = () => { renderer.setRenderTarget(was); renderer.setMRT(mrtWas); };
-    const set = () => { renderer.setRenderTarget(this.target); renderer.setMRT(null); };
+    const set = () => { renderer.setRenderTarget(this.#scratch); renderer.setMRT(null); };
     nodes.getForRenderAsync = (ro) => {
       set();
       try {
@@ -231,22 +237,41 @@ export class ImpostorAtlas {
     }
   }
 
-  /** At most one mesh's 64 views per frame; never clear a previous slice or expose incomplete mipmaps. */
+  /** At most one mesh's 64 views per frame. A finished variant is copied into its permanent atlas slot. */
   step(renderer: WebGPURenderer): void {
     if (!this.#prepared || this.#disposed || this.baked) return;
     const part = this.#parts[this.#next];
     if (part) this.#show(part);
     else this.#scene.clear();
     const last = this.#next + 1 >= this.#parts.length;
+    const firstPart = !part || this.#parts[this.#next - 1]?.source !== part.source;
+    const lastPart = last || this.#parts[this.#next + 1]?.source !== part?.source;
     const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT(), autoWas = renderer.autoClear;
     const clearWas = renderer.getClearColor(new Color()), alphaWas = renderer.getClearAlpha();
     try {
       renderer.setMRT(null);
-      renderer.setRenderTarget(this.target);
       renderer.setClearColor(0x000000, 0);
-      renderer.autoClear = this.#next === 0;
-      for (const t of this.target.textures) t.generateMipmaps = last;
+      renderer.setRenderTarget(this.#scratch);
+      renderer.autoClear = firstPart;
       renderer.render(this.#scene, this.#camera);
+      if (lastPart) {
+        if (!this.#atlasInitialized) {
+          // initRenderTarget allocates all mip levels while generateMipmaps is true. Clear once so empty slots
+          // and their contributions to the final mip chain are transparent, regardless of allocation behavior.
+          renderer.initRenderTarget(this.target);
+          renderer.setRenderTarget(this.target);
+          renderer.clear(true, false, false);
+          this.#atlasInitialized = true;
+        }
+        const [x, y] = this.slotAt(part?.source.slot ?? 0);
+        // Clip-space up runs opposite the texture's row order. Each local slot keeps the original view layout.
+        const destination = new Vector2(x * SLOT, this.target.height - (y + 1) * SLOT);
+        for (let i = 0; i < this.target.textures.length; i++) {
+          const texture = this.target.textures[i];
+          texture.generateMipmaps = last;
+          renderer.copyTextureToTexture(this.#scratch.textures[i], texture, null, destination);
+        }
+      }
     } finally {
       renderer.setRenderTarget(was);
       renderer.setMRT(mrtWas);
@@ -258,12 +283,15 @@ export class ImpostorAtlas {
     if (last) {
       this.baked = true;
       this.#release();
-      this.target.depthTexture?.dispose();
     }
   }
 
   #release(): void {
     this.#scene.clear();
+    if (!this.#scratchDisposed) {
+      this.#scratch.dispose();
+      this.#scratchDisposed = true;
+    }
     for (const m of this.#materials) m.dispose();
     for (const g of new Set(this.#sources.flatMap((s) => s.parts.map((p) => p.geometry)))) g.dispose();
     this.#materials = [];

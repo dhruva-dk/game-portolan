@@ -163,6 +163,7 @@ export class App {
     this.settings = new SettingsHolder(options.capture || !!options.autoplay || !!options.fight);
     this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
     this.loop = new Loop((f) => this.frame(f));
+    if (options.perfLog) this.loop.cadence = { callbacks: 0, elapsed: 0 };
     // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
     this.loop.frameRate = options.frameRate ?? 30;
     this.loop.scale = (dt) => this.juice.update(dt);
@@ -1028,9 +1029,12 @@ export class App {
     // where the watched ship is, so a frame that breaks the budget is found by the region it broke in
     const sky = this.stage ? Object.entries(this.stage.clouds.depth).filter(([, v]) => (v ?? 0) > 0.1).map(([k]) => k).join('+') || 'fair' : '';
     const at = s ? ` in ${REGIONS[regionAt(s.state.ships[s.watch].pos)].id}, ${sky}, ${P.night.value as number > 0.5 ? 'night' : 'day'}` : '';
+    const cadence = this.loop.cadence;
+    const callbacks = cadence && cadence.elapsed > 0 ? `, rAF ${(cadence.callbacks * 1000 / cadence.elapsed).toFixed(1)} Hz` : '';
+    if (cadence) Object.assign(cadence, { callbacks: 0, elapsed: 0 });
     console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, ${distribution}, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
       `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ` +
-      `${this.chartCost()}${shape.memory}, pipelines ${JSON.stringify(shape.pipelines)}`);
+      `${this.chartCost()}${shape.memory}, pipelines ${JSON.stringify(shape.pipelines)}${callbacks}`);
     // in pieces: the device's console cuts a long message short
     const lines = shape.report(this.screen).split('\n');
     for (let i = 0; i < lines.length; i += 24) console.info(lines.slice(i, i + 24).join('\n'));
