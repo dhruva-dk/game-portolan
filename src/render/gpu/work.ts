@@ -98,3 +98,19 @@ export async function buildNodeForTargetAsync(
   });
   return nodeBuilder;
 }
+
+/** Optional sites give a presented frame a chance after each millisecond of preparation. Browser rAF also runs
+ *  while captures hold the game loop; waiting for a drawn game frame here would strand boot's shared preparation. */
+export function sitePreparationYield(
+  now: () => number = () => performance.now(),
+  nextFrame: () => Promise<void> = () => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => { setTimeout(resolve, 0); });
+  }),
+): () => Promise<void> {
+  let since = now();
+  return async () => {
+    if (now() - since < 1) return;
+    await nextFrame();
+    since = now();
+  };
+}

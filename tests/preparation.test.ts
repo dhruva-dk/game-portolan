@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serializePreparation } from '../src/render/gpu/work.ts';
+import { serializePreparation, sitePreparationYield } from '../src/render/gpu/work.ts';
 
 test('preparation cannot borrow the same renderer concurrently, including after failure', async () => {
   const renderer = {}, events: string[] = [];
@@ -85,4 +85,61 @@ test('yielding node build restores target and context after early, resumed, fina
     }), /bad material/);
     assert.equal(target, null, failure); assert.equal(mrt, null, failure); assert.equal(renderer._currentRenderContext, null, failure);
   }
+});
+
+
+test('optional site preparation yields at its one millisecond budget and resets after the frame', async () => {
+  let clock = 0, frames = 0, advance!: () => void;
+  const yieldSite = sitePreparationYield(() => clock, () => {
+    frames++;
+    return new Promise<void>((resolve) => { advance = resolve; });
+  });
+  clock = 0.99;
+  await yieldSite();
+  assert.equal(frames, 0);
+  clock = 1;
+  let resumed = false;
+  const waiting = yieldSite().then(() => { resumed = true; });
+  await Promise.resolve();
+  assert.equal(frames, 1);
+  assert.equal(resumed, false);
+  clock = 500; // browser/driver waiting is not charged against the next frame's CPU budget
+  advance();
+  await waiting;
+  clock = 500.99;
+  await yieldSite();
+  assert.equal(frames, 1);
+  clock = 501;
+  const next = yieldSite();
+  assert.equal(frames, 2);
+  advance();
+  await next;
+});
+
+test('optional site pacing waits for browser rAF followed by a task without needing a game frame', async (t) => {
+  let clock = 0, animation!: FrameRequestCallback, task!: () => void;
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame');
+  Object.defineProperty(globalThis, 'requestAnimationFrame', { configurable: true, value: (callback: FrameRequestCallback) => {
+    animation = callback;
+    return 1;
+  } });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'requestAnimationFrame', original);
+    else Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
+  });
+  t.mock.method(globalThis, 'setTimeout', (callback: () => void) => { task = callback; return 1; });
+  const yieldSite = sitePreparationYield(() => clock);
+  clock = 2;
+  let resumed = false;
+  const pending = yieldSite().then(() => { resumed = true; });
+  await Promise.resolve();
+  assert.equal(typeof animation, 'function');
+  assert.equal(task, undefined);
+  animation(1000);
+  await Promise.resolve();
+  assert.equal(typeof task, 'function');
+  assert.equal(resumed, false);
+  task();
+  await pending;
+  assert.equal(resumed, true);
 });

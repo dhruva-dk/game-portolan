@@ -11,7 +11,7 @@ import { ColourScript, rising } from './grade.ts';
 import { ClusteredLighting } from './clusters.ts';
 import { Resolution } from './resolution.ts';
 import { Motes } from '../actors/motes.ts';
-import { buildNodeForTargetAsync, runFrameWork, serializePreparation } from './work.ts';
+import { buildNodeForTargetAsync, runFrameWork, serializePreparation, sitePreparationYield } from './work.ts';
 import { P } from './uniforms.ts';
 import { sharedNoise } from './noise.ts';
 import { Atmosphere } from '../atmosphere/index.ts';
@@ -433,11 +433,16 @@ export class GpuStage {
     const { _renderContexts: contexts, _nodes: nodes, _pipelines: pipelines } = r;
     const get = contexts.get, build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
     const created = this.renderer.debug.onNodeBuilderCreated;
+    // Only optional sites spend this frame-paced budget; title, actors and immediate weather keep their critical
+    // preparation path. Share the budget across a site's builders so the next object cannot start another burst.
+    const yieldSite = root.parent === this.beacons.group || root.parent === this.landmarks.group ? sitePreparationYield() : undefined;
     this.renderer.debug.onNodeBuilderCreated = (builder, object) => {
       created?.(builder, object);
       const context = (object as { context: unknown }).context;
-      (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = () =>
-        buildNodeForTargetAsync(builder, pass.renderTarget, pass.getMRT(), context);
+      const buildForTarget = () => buildNodeForTargetAsync(builder, pass.renderTarget, pass.getMRT(), context, yieldSite);
+      (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = yieldSite
+        ? async () => { await yieldSite(); return buildForTarget(); }
+        : buildForTarget;
     };
     // an object is built in one go, straight after its target is set, and the target is put back once its pipeline is
     // asked for, the last step before three waits for it (and only then: the frames draw meanwhile, and ask for theirs)
