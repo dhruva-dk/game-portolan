@@ -20,7 +20,9 @@ const overlay = document.getElementById('ui') as HTMLElement;
 // the native app has no query: VITE_AUTOPLAY=1 and VITE_FIXTURE=fight at build time stand in for ?autoplay and ?fight
 if (import.meta.env.VITE_RELEASE !== '1' && import.meta.env.VITE_FIXED_SCALE === '1') Resolution.held = true;
 const app = new App(canvas, overlay, {
-  frameRate: import.meta.env.VITE_RELEASE !== '1' && import.meta.env.VITE_RENDER_FPS === '40' ? 40 : 30,
+  frameRate: import.meta.env.VITE_RELEASE === '1' ? 30
+    : import.meta.env.VITE_RENDER_FPS === 'uncapped' ? null
+    : import.meta.env.VITE_RENDER_FPS === '40' ? 40 : 30,
   capture: q.has('capture'), perfLog: q.has('perflog') || (Capacitor.isNativePlatform() && import.meta.env.VITE_RELEASE !== '1'),
   autoplay: q.has('autoplay') || import.meta.env.VITE_AUTOPLAY === '1',
   fight: q.has('fight') || import.meta.env.VITE_FIXTURE === 'fight',

@@ -53,8 +53,8 @@ import type { AbilityId } from '../sim/abilities.ts';
 export interface AppOptions {
   /** Capture mode: no title wait, a fresh career that is never saved, and frames drawn only when the hook asks. */
   capture: boolean;
-  /** Internal render cadence; simulation remains at 30 Hz. */
-  frameRate?: 30 | 40;
+  /** Internal render cadence; null draws every browser frame. Simulation remains at 30 Hz. */
+  frameRate?: 30 | 40 | null;
   /** Log the frame rate, the worst frame and what was drawn every few seconds (the iOS build's log, ?perflog). */
   perfLog?: boolean;
   /** A captain sails a match as soon as the stage is built, on a career that is never saved (measuring a match on a
@@ -164,8 +164,8 @@ export class App {
     this.tips = new Tips(options.capture || !!options.autoplay || !!options.fight);
     this.loop = new Loop((f) => this.frame(f));
     if (options.perfLog) this.loop.cadence = { callbacks: 0, elapsed: 0 };
-    // every frame on the screen for the same time: a thirtieth of a second, every other refresh of a 60 Hz panel
-    this.loop.frameRate = options.frameRate ?? 30;
+    // A diagnostic null leaves rendering uncapped; omitted cadence keeps the normal 30 Hz presentation target.
+    this.loop.frameRate = options.frameRate === undefined ? 30 : options.frameRate;
     this.loop.scale = (dt) => this.juice.update(dt);
     this.audio = createAudio();
     this.audio.unlock();
