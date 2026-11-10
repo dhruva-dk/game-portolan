@@ -143,6 +143,7 @@ export class GpuStage {
     // every point light without a shadow is clustered, over the frame as the scene pass draws it
     renderer.lighting = new ClusteredLighting(this.#scale);
     this.post = new Post(renderer, this.scene, this.camera, this.#scale, this.overlay);
+    this.ocean.territory.attach(renderer);
     this.resize();
   }
 

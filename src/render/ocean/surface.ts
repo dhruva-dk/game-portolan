@@ -24,7 +24,7 @@ import { BufferGeometry, Float32BufferAttribute, Mesh, MeshPhysicalNodeMaterial,
 import {
   Fn, If, abs, atan, cameraFar, floor, fract, cameraNear, cameraPosition, cameraViewMatrix, clamp, cos, dot, exp, float, length, log2, max,
   min, mix, normalize, output, perspectiveDepthToViewZ, pow, positionGeometry, positionView, positionWorld, screenUV, select, sin,
-  smoothstep, sqrt, step, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4,
+  smoothstep, sqrt, texture, uniform, fwidth, int, varyingProperty, vec2, vec3, vec4, dFdx, dFdy,
 } from 'three/tsl';
 import { beneathColour, beneathDepth } from '../gpu/behind.ts';
 import { hazeAt } from '../atmosphere/index.ts';
@@ -402,23 +402,28 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   const ink = (u: V3) => {
     const colour = vec3(0).toVar('oceanInk'), share = float(0).toVar('oceanInkShare'), glow = vec3(0).toVar('oceanInkGlow');
     const lineInk = vec3(0).toVar('oceanLineInk'), lineShare = float(0).toVar('oceanLineShare');
+    // across the screen, here while control flow is still uniform; and the water's grain for the lines' ink
+    const dx = dFdx(u), dy = dFdy(u);
+    const p = positionWorld;
+    const q = p.xz.add(vec2(0.71, -0.53).mul(p.y));
+    const grain = noiseMap.sample(q.mul(0.045)).r;
     If(territory.on.greaterThan(0.5), () => {
-      const p = positionWorld;
-      const q = p.xz.add(vec2(0.71, -0.53).mul(p.y));
-      const t = territory.at(u, noiseMap.sample(q.mul(0.045)).rg.sub(0.5));
-      If(t.owner.greaterThan(0.5), () => {
-        const mine = float(1).sub(step(0.5, abs(t.owner.sub(territory.me))));
-        const hue = territory.colour(t.owner);
-        colour.assign(hue);
-        share.assign(float(0.4).add(mine.mul(0.25)).add(t.edge.mul(0.2)).add(t.front.mul(0.3)));
-        glow.assign(hue.mul(float(0.03).add(mine.mul(0.05)).add(t.edge.mul(0.16).add(t.edge.mul(mine).mul(0.2))).add(t.front.mul(0.5))));
-        lineInk.assign(hue);
+      const t = territory.at(u, dx, dy, grain);
+      If(t.cover.greaterThan(0.003).or(t.edge.greaterThan(0.003)), () => {
+        const mine = t.mine, edge = min(t.edge, 1), crest = min(t.crest, 1);
+        colour.assign(t.hue);
+        share.assign(t.cover.mul(float(0.4).add(mine.mul(0.25)).add(edge.mul(0.2)).add(crest.mul(0.3))));
+        glow.assign(t.hue.mul(t.cover.mul(float(0.03).add(mine.mul(0.05))).add(edge.mul(float(0.16).add(mine.mul(0.2)))).add(crest.mul(0.5))));
+        lineInk.assign(t.hue);
         // a thin wash on the surface too, so the dye still reads where the water only mirrors the sky
-        lineShare.assign(max(float(0.03).add(mine.mul(0.05)), max(t.edge.mul(float(0.35).add(mine.mul(0.5))), t.front.mul(0.65))));
+        lineShare.assign(max(t.cover.mul(float(0.03).add(mine.mul(0.05))), max(edge.mul(float(0.35).add(mine.mul(0.5))), crest.mul(0.65))));
+      });
+      If(t.drain.greaterThan(0.01), () => {
+        lineInk.assign(mix(lineInk, vec3(0.8, 0.84, 0.86), t.drain));
+        lineShare.assign(max(lineShare, t.drain.mul(0.3)));
       });
       If(t.ghostLine.greaterThan(0.01), () => {
-        const tc = territory.colour(t.ghost);
-        lineInk.assign(tc);
+        lineInk.assign(mix(territory.colour(t.ghost), vec3(0.85, 0.88, 0.9), t.ghostPale));
         lineShare.assign(t.ghostLine.mul(0.8));
       });
       If(t.line.greaterThan(0.01), () => {
