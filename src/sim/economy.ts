@@ -1,5 +1,5 @@
-// Coins and gull deliveries. Coins come from sailing, loot, kills, claims, cuts and rent (see where each is
-// paid); they belong to the match and start at zero every match. A ship spends them on a parcel: the gull
+// Coins and gull deliveries. Coins come mostly from rent on held water, and a little from sailing, loot, kills, claims
+// and cuts (see where each is paid); they belong to the match and start at zero every match. A ship spends them on a parcel: the gull
 // leaves the nearest landmark, flies the parcel out and drops it just ahead of the ship.
 import type { ShipInput } from './input.ts';
 import { rngFloat, set, v3, type V3 } from './math.ts';

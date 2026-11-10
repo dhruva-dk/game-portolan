@@ -262,22 +262,23 @@ export const INK = {
   home: 26,
   /** Cutting a rival's trail: what it costs the hull that laid it (past the shield), and pays the cutter. */
   cut: 28,
-  cutCoins: 10,
+  cutCoins: 5,
   /** A trail longer than this many cells runs dry. */
   trail: 260,
   /** Hull mended a second in your own water, once nobody has hit you for `quiet` seconds. */
   repair: 2.5,
   quiet: 4,
-  /** Coins a claimed square metre pays, and a held square metre every `every` seconds. */
-  claim: 1 / 220,
-  rent: 1 / 2600,
+  /** Coins a claimed square metre pays once, and a held square metre every `every` seconds: rent is the main income,
+   *  so whoever holds more water hails the gull more often. Home water alone pays about 3 every 10 s. */
+  claim: 1 / 1200,
+  rent: 1 / 650,
   every: 10,
 } as const;
 
 export const COINS = {
   /** One coin for every this many metres sailed. */
-  metres: 40,
-  kill: 12,
+  metres: 130,
+  kill: 6,
   loot: 1,
 } as const;
 
