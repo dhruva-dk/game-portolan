@@ -30,7 +30,7 @@ import { StorageBufferAttribute, type ComputeNode, type WebGPURenderer } from 't
 import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, min, select, sin, storage, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
-import { everyFrame } from '../gpu/work.ts';
+import { everyFrame, serializePreparation } from '../gpu/work.ts';
 import { P } from '../gpu/uniforms.ts';
 import type { Node } from 'three/webgpu';
 import type { F, V3, V4 } from './tsl/kit.ts';
@@ -139,6 +139,8 @@ export class Cloth {
   readonly #noise: THREE.Texture;
   readonly #h = uniform(1 / 240);
   readonly #free: number[] = [];
+  #prepared = false;
+  #preparing: Promise<void> | null = null;
   #predict: ComputeNode | null = null;
   #solve: ComputeNode | null = null;
   #ropePredict: ComputeNode | null = null;
@@ -228,6 +230,21 @@ export class Cloth {
     everyFrame((renderer) => this.#run(renderer));
   }
 
+  /** Builds pipelines without dispatching, advancing time, consuming staged writes or resetting live slots. */
+  prepare(renderer: WebGPURenderer): Promise<void> {
+    if (this.#prepared) return Promise.resolve();
+    if (this.#preparing) return this.#preparing;
+    this.#preparing = (async () => {
+      if (!this.#predict) this.#build();
+      for (const pass of [this.#predict!, this.#ropePredict!, this.#solve!, this.#ropeSolve!]) {
+        await serializePreparation(renderer, () => renderer.compileComputeAsync(pass));
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      this.#prepared = true;
+    })().finally(() => { this.#preparing = null; });
+    return this.#preparing;
+  }
+
   /** A slot for a new ship's cloth, laid out flat on its first frame. Slots are recycled when there are none free. */
   acquire(): number {
     const s = this.#free.pop() ?? 0;
@@ -264,6 +281,9 @@ export class Cloth {
   }
 
   #run(renderer: WebGPURenderer): void {
+    // An explicit warmup may yield while building a pass; the frame must not compile/dispatch that same pass.
+    // Pending CPU inputs stay queued and are consumed by the usual run once preparation finishes.
+    if (this.#preparing) return;
     if (!this.#any || this.#dt <= 0) return;
     if (!this.#predict) this.#build();
     this.#h.value = Math.min(this.#dt, 1 / 20) / SUBSTEPS;

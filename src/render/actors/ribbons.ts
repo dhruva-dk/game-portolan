@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import { StorageBufferAttribute, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
 import { Fn, If, Return, float, instanceIndex, max, storage, uniform, vec4 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
-import { everyFrame } from '../gpu/work.ts';
+import { everyFrame, serializePreparation } from '../gpu/work.ts';
 import { curl } from './particles.ts';
 import { ribbonNodeMaterial, type RibbonBuffers } from './tsl/ribbons.ts';
 import type { F, V3, V4 } from './tsl/kit.ts';
@@ -70,6 +70,8 @@ export class Ribbons {
   readonly #stagedAttr: StorageBufferAttribute;
   readonly #buffers: StorageBufferAttribute[];
   readonly #dt = uniform(0);
+  #prepared = false;
+  #preparing: Promise<void> | null = null;
   #step: ComputeNode | null = null;
   #write: ComputeNode | null = null;
   #wipe: ComputeNode | null = null;
@@ -106,6 +108,21 @@ export class Ribbons {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = glow ? 8 : 7;
     everyFrame((renderer) => this.#run(renderer));
+  }
+
+  /** Builds pipelines without dispatching, advancing time, consuming staged writes or resetting live slots. */
+  prepare(renderer: WebGPURenderer): Promise<void> {
+    if (this.#prepared) return Promise.resolve();
+    if (this.#preparing) return this.#preparing;
+    this.#preparing = (async () => {
+      if (!this.#step) this.#build();
+      for (const pass of [this.#step!, this.#wipe!, this.#write!]) {
+        await serializePreparation(renderer, () => renderer.compileComputeAsync(pass));
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      this.#prepared = true;
+    })().finally(() => { this.#preparing = null; });
+    return this.#preparing;
   }
 
   /** Trails being drawn. */
@@ -174,6 +191,9 @@ export class Ribbons {
   }
 
   #run(renderer: WebGPURenderer): void {
+    // An explicit warmup may yield while building a pass; the frame must not compile/dispatch that same pass.
+    // Pending CPU inputs stay queued and are consumed by the usual run once preparation finishes.
+    if (this.#preparing) return;
     if (!this.mesh.parent) return;
     if (!this.#step) this.#build();
     if (this.#wiped) {

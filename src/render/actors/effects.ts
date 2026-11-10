@@ -3,6 +3,7 @@
 // sunk and the wisp of a lost ship's lantern rising free. Every direction is worked out in the local frame (up away
 // from the planet's centre), so nothing here assumes a flat sea.
 import * as THREE from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 import { AU, TAU, onSea, rand, tangents } from './common.ts';
 import { makeParticles, SPRITE, type Particles } from './particles.ts';
 import { Ribbons } from './ribbons.ts';
@@ -60,6 +61,11 @@ export class Effects {
     this.debris = new Debris(wood);
     this.debris.onSplash = (at, big) => this.plop(at, big);
     this.group.add(this.debris.group, this.lights.group);
+  }
+
+  /** Prepares every pool's step, clear and emission pipelines without emitting or simulating effects. */
+  async prepare(renderer: WebGPURenderer): Promise<void> {
+    for (const pool of [this.glow, this.smoke, this.trails, this.heatTrails]) await pool.prepare(renderer);
   }
 
   /** Drops everything still in the air or afloat, for a new match. */

@@ -2,6 +2,7 @@
 // camera)`, called every frame with plain data about the match, and `fire(events)`, for the one-shot moments. Nothing
 // here imports the simulation; the integration adapts its state into an ActorsView (see view.ts).
 import * as THREE from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 import { Aura, SHELL, Shards } from './aura.ts';
 import { GUNPORTS, Kit, LANTERN, MAIN_FOOT, MAIN_HEIGHT, MASTHEAD, ShipModel, type Pose } from './caravel.ts';
 import { RIPPLES } from '../ocean/ripples.ts';
@@ -65,6 +66,8 @@ export interface Actors {
   readonly kit: Kit;
   /** Resolves when the textures are in. */
   readonly ready: Promise<void>;
+  /** Compiles cloth and effect compute pipelines without changing their simulation state. */
+  prepare(renderer: WebGPURenderer): Promise<void>;
   update(view: ActorsView, dt: number, camera: THREE.Camera): void;
   fire(events: readonly ActorEvent[]): void;
   /** Where ship `id`'s gun muzzle is this frame and which way it points; false if she is not shown. */
@@ -593,6 +596,10 @@ export function createActors(scene: THREE.Object3D, options: ActorsOptions = {})
     group,
     kit,
     ready: tex.ready,
+    async prepare(renderer) {
+      await kit.cloth.prepare(renderer);
+      await fx.prepare(renderer);
+    },
     update,
     fire,
     muzzle(id, pos, dir) {

@@ -291,6 +291,9 @@ export class App {
     await stage.warmed;
     mark('warm');
     await this.actors.ready;
+    // Compile the actors' simulation programs without dispatching them: the first clear or burst of particles
+    // must not compile synchronously as the player enters the drop or fires a weapon.
+    await this.actors.prepare(stage.renderer);
     await stage.dropReady;
     mark('actors ready');
     await rockTexturesReady();

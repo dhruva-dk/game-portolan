@@ -18,7 +18,7 @@ import {
 import { TAU } from './common.ts';
 import { particleNodeMaterial, type ParticleBuffers } from './tsl/particles.ts';
 import { bakeSmoke } from './smokeBake.ts';
-import { everyFrame } from '../gpu/work.ts';
+import { everyFrame, serializePreparation } from '../gpu/work.ts';
 import { P } from '../gpu/uniforms.ts';
 import { seaHeightNode } from '../ocean/surface.ts';
 import type { F, V3, V4 } from './tsl/kit.ts';
@@ -115,6 +115,8 @@ export class Particles {
   readonly #death: Float32Array;
   readonly #buffers: StorageBufferAttribute[];
   readonly #dt = uniform(0);
+  #prepared = false;
+  #preparing: Promise<void> | null = null;
   #step: ComputeNode | null = null;
   #write: ComputeNode | null = null;
   #wipe: ComputeNode | null = null;
@@ -154,6 +156,21 @@ export class Particles {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = glow ? 8 : 7;
     everyFrame((renderer) => this.#run(renderer));
+  }
+
+  /** Builds pipelines without dispatching, advancing time, consuming staged writes or resetting live slots. */
+  prepare(renderer: WebGPURenderer): Promise<void> {
+    if (this.#prepared) return Promise.resolve();
+    if (this.#preparing) return this.#preparing;
+    this.#preparing = (async () => {
+      if (!this.#step) this.#build();
+      for (const pass of [this.#step!, this.#wipe!, this.#write!]) {
+        await serializePreparation(renderer, () => renderer.compileComputeAsync(pass));
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      this.#prepared = true;
+    })().finally(() => { this.#preparing = null; });
+    return this.#preparing;
   }
 
   /** Particles alive in the ring, by the lifetimes they were given. */
@@ -212,6 +229,9 @@ export class Particles {
   }
 
   #run(renderer: WebGPURenderer): void {
+    // An explicit warmup may yield while building a pass; the frame must not compile/dispatch that same pass.
+    // Pending CPU inputs stay queued and are consumed by the usual run once preparation finishes.
+    if (this.#preparing) return;
     if (!this.mesh.parent) return;
     if (!this.glow) bakeSmoke(renderer);
     if (!this.#step) this.#build();
