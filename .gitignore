@@ -6,3 +6,4 @@ dist/
 out/
 captures/
 public/scans/
+public/tex/**/*.astc

@@ -5,6 +5,8 @@
 //
 // Units are metres. A plant's local +Y is up from the ground, and its root sits at the origin.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
+import { packedPhotograph } from '../gpu/photographs.ts';
 import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the contract
@@ -321,7 +323,8 @@ const texCache = new Map<string, THREE.Texture>();
 function loadTex(file: string, color: boolean): THREE.Texture {
   let t = texCache.get(file);
   if (!t) {
-    t = typeof document === 'undefined' ? new THREE.Texture() : new THREE.TextureLoader().load(texBase + file);
+    t = typeof document === 'undefined' ? new THREE.Texture() : packedPhotograph(`tex/flora/a/${file}`)
+      ? loadAstc(texBase + file, color) : new THREE.TextureLoader().load(texBase + file);
     t.name = `flora/a/${file}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 8;

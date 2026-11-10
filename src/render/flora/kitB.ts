@@ -6,6 +6,8 @@
 // Frames: every plant is built in metres with +Y up (the planet's up where it stands) and its origin at its anchor.
 // See `Anchor` for where that is. Render code, not simulation, so Math.sin and friends are fine here.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
+import { packedPhotograph } from '../gpu/photographs.ts';
 import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the plant contract
@@ -158,7 +160,9 @@ export function scan(file: string, srgb: boolean): THREE.Texture {
   if (hit) return hit;
   let done!: () => void;
   pending.push(new Promise<void>((r) => (done = r)));
-  const t = loader.load(BASE + file, () => done(), undefined, () => done());
+  const t = packedPhotograph(`tex/flora/b/${file}`)
+    ? loadAstc(BASE + file, srgb, () => done(), () => done())
+    : loader.load(BASE + file, () => done(), undefined, () => done());
   t.name = `flora/b/${file}`;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;

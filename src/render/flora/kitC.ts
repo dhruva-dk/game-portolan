@@ -5,6 +5,8 @@
 // Every plant is built in its own frame: metres, +Y up from the ground at the origin. The integration step
 // turns +Y to the sphere's local up.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
+import { packedPhotograph } from '../gpu/photographs.ts';
 import { tag, type FloraTag } from './tag.ts';
 
 // ---------------------------------------------------------------- the API every region file exports
@@ -133,7 +135,10 @@ export function scanTexture(file: string, srgb: boolean): THREE.Texture {
   if (hit) return hit;
   let done: (v?: unknown) => void = () => {};
   pending.push(new Promise((res) => (done = res)));
-  const t = new THREE.TextureLoader().load(`${ROOT}tex/flora/c/${file}`, () => done(), undefined, () => done());
+  const url = `${ROOT}tex/flora/c/${file}`;
+  const t = packedPhotograph(`tex/flora/c/${file}`)
+    ? loadAstc(url, srgb, () => done(), () => done())
+    : new THREE.TextureLoader().load(url, () => done(), undefined, () => done());
   t.name = `flora/c/${file}`;
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;

@@ -2,6 +2,8 @@ import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import { packScans } from './tools/scans.ts';
+import { packPhotographs } from './tools/photographs.ts';
+import { PHOTOGRAPHS } from './src/render/gpu/photographs.ts';
 
 let out = '';
 
@@ -17,8 +19,12 @@ export default defineConfig({
   plugins: [{
     name: 'scans',
     configResolved: (c) => { out = resolve(c.root, c.build.outDir); },
-    buildStart: () => packScans(),
-    closeBundle: () => rm(join(out, 'tex', 'regions'), { recursive: true, force: true }),
+    buildStart: async () => { await packScans(); await packPhotographs(); },
+    closeBundle: async () => {
+      await rm(join(out, 'tex', 'regions'), { recursive: true, force: true });
+      // These opaque scans are sampled from their ASTC siblings; keep source JPEGs for authoring, outside builds.
+      await Promise.all(PHOTOGRAPHS.map((p) => rm(join(out, p.file), { force: true })));
+    },
   }],
   server: { host: true, cors: { origin: 'capacitor://localhost' }, warmup: { clientFiles: ['./src/app/main.ts'] } },
   optimizeDeps: { include: ['three', 'three/webgpu', 'three/tsl', 'three/addons/tsl/display/*.js', 'three/addons/csm/*.js', 'three/addons/objects/SkyMesh.js'] },

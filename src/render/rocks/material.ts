@@ -6,6 +6,7 @@
 // The sea is described once for every rock by ROCK_UNIFORMS.uSea: (centre, radius) of the sea sphere, or, with a
 // radius of 0, a flat sea at y = centre.y. The integration step points it at the planet and adds the tide.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
 import { SKINS, type SkinId, type TexId } from './skins.ts';
 import { rockNodeMaterial } from './nodes.ts';
 
@@ -26,7 +27,6 @@ export function setRockTextureBase(url: string): void {
   base = url.endsWith('/') ? url : url + '/';
 }
 
-const loader = new THREE.TextureLoader();
 const textures = new Map<string, THREE.Texture>();
 const loading: Promise<void>[] = [];
 /** Settles once every rock texture asked for so far has loaded (or failed), so a still is never shot of black rock. */
@@ -43,7 +43,7 @@ function texture(id: TexId, kind: 'd' | 'n'): THREE.Texture {
   if (!t) {
     let done!: () => void;
     loading.push(new Promise<void>((ok) => (done = ok)));
-    t = loader.load(`${base}${key}.jpg`, done, undefined, done);
+    t = loadAstc(`${base}${key}.jpg`, kind === 'd', done, done);
     t.name = `rock/${key}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = kind === 'd' ? THREE.SRGBColorSpace : THREE.NoColorSpace;

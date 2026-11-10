@@ -10,6 +10,8 @@
 // Up is the plant's local +Y. On the sphere, each plant stands with +Y along the planet's radius; the wind is
 // projected onto each plant's own horizontal plane, so one world-space wind vector works everywhere.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
+import { packedPhotograph } from '../gpu/photographs.ts';
 import { tag } from './tag.ts';
 
 // ---------------------------------------------------------------- the API every region file exports
@@ -126,11 +128,18 @@ function image(file: string): Promise<HTMLImageElement> {
 export function texture(file: string, color: boolean): THREE.Texture {
   let t = textures.get(file);
   if (!t) {
-    const tex = new THREE.Texture();
+    let tex: THREE.Texture;
+    if (packedPhotograph(`tex/flora/d/${file}`)) {
+      let done!: () => void, failed!: (error: unknown) => void;
+      pending.push(new Promise<void>((resolve, reject) => { done = resolve; failed = reject; }));
+      tex = loadAstc(base + file, color, done, failed);
+    } else {
+      tex = new THREE.Texture();
+      image(file).then((img) => { tex.image = img; tex.needsUpdate = true; });
+    }
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.anisotropy = 4;
     if (color) tex.colorSpace = THREE.SRGBColorSpace;
-    image(file).then((img) => { tex.image = img; tex.needsUpdate = true; });
     textures.set(file, tex);
     t = tex;
   }

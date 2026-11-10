@@ -1,6 +1,7 @@
 // Shared by every actor: the planet's frame (up, forward and right at any point on the sphere), the sea surface with
 // its swell and tide, the uniforms all actor materials read, a tileable noise texture, and the scanned textures.
 import * as THREE from 'three';
+import { loadAstc } from '../gpu/astc.ts';
 import { lampEmissive } from './tsl/kit.ts';
 import type { Vec3 } from './view.ts';
 
@@ -170,11 +171,10 @@ export interface ActorTextures {
 
 /** Loads the hull, deck and sailcloth scans from `base` (the public tex/ folder). Materials can use them at once. */
 export function loadTextures(base: string): ActorTextures {
-  const loader = new THREE.TextureLoader();
   const pending: Promise<unknown>[] = [];
   const load = (name: string, srgb: boolean) => {
     let t!: THREE.Texture;
-    pending.push(new Promise((ok) => { t = loader.load(base + name, ok, undefined, () => ok(null)); }));
+    pending.push(new Promise((ok) => { t = loadAstc(base + name, srgb, ok, () => ok(null)); }));
     t.name = `ship/${name}`;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 8;

@@ -9,86 +9,23 @@
 // The maps are read at the scan's size by a headless browser, so they are resized as the game always resized them.
 // Only scans whose maps (or this file) changed since they were last packed are packed again. The vite config runs
 // this before every build and dev server.
-import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import type { Browser } from 'playwright';
+import { encodeAstc, mipChain } from './astc.ts';
 
-const run = promisify(execFile);
 const HERE = fileURLToPath(import.meta.url);
 const ROOT = join(dirname(HERE), '..');
 const SIZE = 1024;
-
-const TO_LINEAR = new Float32Array(256).map((_, i) => {
-  const c = i / 255;
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-});
-const TO_SRGB = new Uint8Array(4096).map((_, i) => {
-  const l = i / 4095;
-  const c = l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055;
-  return Math.round(Math.min(Math.max(c, 0), 1) * 255);
-});
-
-/** Halves an RGBA image, averaging each 2×2 block; channels flagged sRGB are averaged as light. */
-function halve(src: Uint8Array, size: number, srgb: readonly boolean[]): Uint8Array {
-  const h = size >> 1, out = new Uint8Array(h * h * 4);
-  for (let y = 0; y < h; y++) for (let x = 0; x < h; x++) {
-    const a = ((2 * y) * size + 2 * x) * 4, b = a + 4, c = a + size * 4, d = c + 4, o = (y * h + x) * 4;
-    for (let k = 0; k < 4; k++) {
-      if (srgb[k]) {
-        const l = (TO_LINEAR[src[a + k]] + TO_LINEAR[src[b + k]] + TO_LINEAR[src[c + k]] + TO_LINEAR[src[d + k]]) * 0.25;
-        out[o + k] = TO_SRGB[Math.round(l * 4095)];
-      } else out[o + k] = (src[a + k] + src[b + k] + src[c + k] + src[d + k] + 2) >> 2;
-    }
-  }
-  return out;
-}
-
-function chain(top: Uint8Array, size: number, srgb: readonly boolean[]): Uint8Array[] {
-  const out = [top];
-  for (let s = size; s > 1; s >>= 1) out.push(halve(out[out.length - 1], s, srgb));
-  return out;
-}
-
-/** An uncompressed 32-bit TGA, top row first: what the encoder reads. */
-function tga(rgba: Uint8Array, size: number): Uint8Array {
-  const out = new Uint8Array(18 + rgba.length);
-  out[2] = 2;
-  out[12] = size & 255; out[13] = size >> 8;
-  out[14] = size & 255; out[15] = size >> 8;
-  out[16] = 32;
-  out[17] = 0x28;
-  for (let i = 0; i < rgba.length; i += 4) {
-    out[18 + i] = rgba[i + 2]; out[19 + i] = rgba[i + 1]; out[20 + i] = rgba[i]; out[21 + i] = rgba[i + 3];
-  }
-  return out;
-}
-
-/** Every mip encoded, one after the next, without the encoder's headers. */
-async function encode(mips: Uint8Array[], srgb: boolean, work: string): Promise<Uint8Array> {
-  const bin = join(ROOT, 'node_modules', '.bin', 'astcenc');
-  const parts: Uint8Array[] = [];
-  for (let level = 0; level < mips.length; level++) {
-    const size = SIZE >> level, src = join(work, `${level}.tga`), dst = join(work, `${level}.astc`);
-    await writeFile(src, tga(mips[level], size));
-    await run(bin, [srgb ? '-cs' : '-cl', src, dst, '4x4', '-medium', '-silent']);
-    parts.push((await readFile(dst)).subarray(16));
-  }
-  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-  let at = 0;
-  for (const p of parts) { out.set(p, at); at += p.length; }
-  return out;
-}
 
 const mtime = async (f: string): Promise<number> => (await stat(f).catch(() => null))?.mtimeMs ?? -1;
 
 /** Packs every scan whose packing is missing or older than its maps. */
 export async function packScans(): Promise<void> {
   const { SCANS } = await import('../src/render/land/library.ts');
-  const self = await mtime(HERE);
+  const self = Math.max(await mtime(HERE), await mtime(join(dirname(HERE), 'astc.ts')));
   const stale: typeof SCANS = [];
   for (const s of SCANS) {
     const out = join(ROOT, 'public', 'scans', s.key);
@@ -141,8 +78,8 @@ export async function packScans(): Promise<void> {
       }
       const out = join(ROOT, 'public', 'scans', s.key);
       await mkdir(dirname(out), { recursive: true });
-      await writeFile(`${out}.surface.astc`, await encode(chain(surface, SIZE, [true, true, true, false]), true, work));
-      await writeFile(`${out}.detail.astc`, await encode(chain(detail, SIZE, [false, false, false, false]), false, work));
+      await writeFile(`${out}.surface.astc`, await encodeAstc(mipChain(surface, SIZE, SIZE, [true, true, true, false]), true, work, join(ROOT, 'node_modules', '.bin', 'astcenc')));
+      await writeFile(`${out}.detail.astc`, await encodeAstc(mipChain(detail, SIZE, SIZE, [false, false, false, false]), false, work, join(ROOT, 'node_modules', '.bin', 'astcenc')));
       console.log(`  ${s.key}`);
     }
   } finally {
