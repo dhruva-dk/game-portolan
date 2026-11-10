@@ -224,6 +224,7 @@ export function planetMap(session: Session): PlanetMapModel {
     storm: formed ? { at: { ...SV.calm.at }, r: SV.calm.r } : null,
     next: { at: { ...SV.next.at }, r: SV.next.r },
     marker: session.mark ? { ...session.mark } : null,
+    stats: { afloat: afloat(s), kills: sh.kills, damage: sh.dealt, storm: Math.ceil(SV.left), closing: SV.closing },
   };
 }
 

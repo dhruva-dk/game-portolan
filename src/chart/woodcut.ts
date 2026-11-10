@@ -44,9 +44,10 @@ function matrixOf(tr: string | undefined): DOMMatrix {
 
 /**
  * Inks a drawing from the icon set centred at (x, y), `size` CSS pixels across (the set's 24-unit grid): its solids
- * hatched and outlined, its lines in ink, its cuts as paper. Fine detail shows from 40 px.
+ * hatched and outlined, its lines in ink, its cuts as paper. Fine detail shows from 40 px. With `hole` the cuts are
+ * taken out of the canvas instead, for a plate laid over a sheet of another tone.
  */
-export function woodcut(pen: Pen, drawing: readonly Prim[], x: number, y: number, size: number, ink: InkName | string = 'iron', alpha = 1): void {
+export function woodcut(pen: Pen, drawing: readonly Prim[], x: number, y: number, size: number, ink: InkName | string = 'iron', alpha = 1, hole = false): void {
   if (alpha <= 0) return;
   const g = pen.g, k = size / 24, fine = size >= 40;
   const x0 = x - 12 * k, y0 = y - 12 * k;
@@ -68,6 +69,7 @@ export function woodcut(pen: Pen, drawing: readonly Prim[], x: number, y: number
     g.lineJoin = 'round';
     if (p.dash) g.setLineDash(p.dash.split(/[\s,]+/).map(Number));
     if (paper) {
+      if (hole) g.globalCompositeOperation = 'destination-out';
       g.strokeStyle = pen.paper.anchor(g, pen.paper.surface, pen.ox, pen.oy, pen.dpr);
     } else {
       g.globalCompositeOperation = 'multiply';
@@ -117,7 +119,12 @@ export function woodcut(pen: Pen, drawing: readonly Prim[], x: number, y: number
   pass(shown.filter((q) => !q.cut && !q.top));
   // the cuts: the block cut away, the paper left bare
   for (const p of shown.filter((q) => q.cut)) {
-    if (p.k === 'f') pen.paperFill(shapeOf(p, true), alpha);
+    if (p.k === 'f' && hole) {
+      g.save();
+      g.globalCompositeOperation = 'destination-out';
+      g.fill(shapeOf(p, true));
+      g.restore();
+    } else if (p.k === 'f') pen.paperFill(shapeOf(p, true), alpha);
     else strokeIt(p, true);
   }
   pass(shown.filter((q) => !q.cut && q.top));

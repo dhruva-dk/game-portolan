@@ -1,17 +1,22 @@
-// The full map, opened from the minimap's disc over the drop or the match, which go on under it. A round window on the
-// live planet in a sheet of paper, north up: the coasts inked over it, the Storm's edge and its next circle, every ship
+// The full map, opened from the minimap's disc over the drop or the match, which go on under it. A sheet over the whole
+// screen with a window on the live planet as tall as the screen, north up, and how the match stands down its right
+// side: the coasts inked over it, the Storm's edge and its next circle, every ship
 // in range by her emblem, hers gilt, and her marker a pennant where she has set it. One finger spins the planet and it
 // runs on when let go; two pinch it from the whole planet down to a coast's bays and points, and carry it as they go; a
-// tap in the window sets or moves the marker; a tap outside the sheet, or on the disc, shuts it.
+// tap in the window sets or moves the marker; a tap beside the window, or on the disc, shuts it.
 // The camera is the stage's own orbit view, held on the point the finger has turned to the middle of the window. The
 // window is cut once for the whole planet and the zoom happens in it; everything inked in it is placed from the live
 // camera, so it stands right at every height, in a size that does not change.
 import {
-  drawEmblem, drawGalleon, galleonSprite, pennant, staff, WASH, type ChartLayer, type Coasts, type Colours, type DragSurface, type Globe, type Pen,
+  drawEmblem, drawGalleon, drawSprite, figure, figureWidth, galleonSprite, pennant, prims, staff, woodcut, WASH, type ChartLayer, type Coasts, type Colours, type DragSurface, type Globe, type Pen,
 } from '../chart/index.ts';
 import type { PerspectiveCamera } from 'three';
+import type { InkName } from '../chart/index.ts';
+import type { Prim } from '../icons/draw.ts';
 import { R } from '../sim/sphere.ts';
 import type { V3 } from '../sim/math.ts';
+import { stormSpiral } from '../icons/sets/hud.ts';
+import { Plate } from './minimap.ts';
 import { PlanetChart, carry, facing, unproject, type Turn } from './planet.ts';
 
 /** A ship on the planet, from the app's model. */
@@ -28,6 +33,18 @@ export interface PlanetMapModel {
   storm: { at: V3; r: number } | null;
   next: { at: V3; r: number };
   marker: V3 | null;
+  /** How the match stands, down the map's right side. */
+  stats: MapStats;
+}
+
+export interface MapStats {
+  afloat: number;
+  kills: number;
+  damage: number;
+  /** Seconds on the Storm's clock. */
+  storm: number;
+  /** The Storm is closing now, not waiting. */
+  closing: boolean;
 }
 
 export interface FullMapHost {
@@ -44,10 +61,12 @@ export interface FullMapHost {
   aim(p: V3): void;
   /** Shuts the map. */
   close(): void;
+  /** Slides the world left this far, CSS pixels, so the planet stands in the window. */
+  shift(dx: number): void;
 }
 
 /** The distance of the orbit the planet is seen from at first and at its farthest, in radii: the window is cut for it. */
-const DISTANCE = 3.6;
+const DISTANCE = 3.2;
 /** Seconds the sheet comes up over. */
 const LAY = 0.16;
 /** A finger that travels less than this before it lifts is a tap, CSS pixels. */
@@ -68,8 +87,12 @@ const FAST_ZOOM = 0.8;
 const FAST_SPIN = 1200;
 /** How long the eye must have been slow before the land catches up, milliseconds. */
 const REST = 250;
-/** The colour of the dark round the sheet when the planet outgrows the paper. */
-const VEIL = '#100b08';
+/** How far the planet has to grow past the whole-planet view, in radii of orbit, for the window's corners to thin away. */
+const OUTGROWN = 0.4;
+/** The stats' rows: their height at most, the woodcut's size, and the figure's, CSS pixels. */
+const ROW = 96;
+const ART = 54;
+const FIGURE = 44;
 const TAU = Math.PI * 2;
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 const within = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
@@ -89,9 +112,10 @@ export class FullMap {
   #layer: ChartLayer | null = null;
   #chart: PlanetChart | null = null;
   #sheet: HTMLCanvasElement | null = null;
-  /** The dark round the sheet: under it, over the planet once the planet has grown past the paper. */
-  #veil: HTMLDivElement | null = null;
-  #veiled = -1;
+  /** The paper over the window's corners, while the whole planet is round in it. */
+  #corners: HTMLCanvasElement | null = null;
+  #cornered = -1;
+  #rows: Plate[] = [];
   #off: (() => void) | null = null;
   #wasDrag: DragSurface | null = null;
   #drag: (DragSurface & { turned(now: number): V3 }) | null = null;
@@ -148,13 +172,13 @@ export class FullMap {
   tap(x: number, y: number): void {
     const layer = this.#layer, chart = this.#chart, cam = this.#h.camera();
     if (!layer || !chart || !cam) return;
-    const w = chart.win, half = chart.half;
-    if (Math.abs(x - w.x) > half || Math.abs(y - w.y) > half) {
+    const w = chart.win;
+    if (Math.abs(x - w.x) > w.r || Math.abs(y - w.y) > w.r) {
       this.#h.close();
       return;
     }
-    if (Math.hypot(x - w.x, y - w.y) >= w.r) return;
-    this.#h.aim(unproject(cam, x, y, layer.layout.w, layer.layout.h, { x: 0, y: 0, z: 1 }));
+    if (this.#cornered > 0.5 && Math.hypot(x - w.x, y - w.y) >= w.r - w.band) return;
+    this.#h.aim(unproject(cam, x + chart.shift, y, layer.layout.w, layer.layout.h, { x: 0, y: 0, z: 1 }));
   }
 
   resize(): void {
@@ -166,8 +190,9 @@ export class FullMap {
     this.#off = null;
     this.#sheet?.remove();
     this.#sheet = null;
-    this.#veil?.remove();
-    this.#veil = null;
+    this.#corners?.remove();
+    this.#corners = null;
+    this.#h.shift(0);
     if (this.#layer && this.#drag) this.#layer.drag = this.#wasDrag;
   }
 
@@ -271,11 +296,48 @@ export class FullMap {
     const chart = this.#chart!;
     chart.resize();
     this.#sheet?.remove();
-    this.#sheet = chart.place(this.#host, chart.sheet(), 0);
-    const w = chart.win, half = w.r + w.band, veil = (this.#veil ??= document.createElement('div'));
-    veil.style.cssText = `position:absolute;left:${w.x - half}px;top:${w.y - half}px;width:${half * 2}px;height:${half * 2}px;box-shadow:0 0 0 200vmax ${VEIL};pointer-events:none;opacity:0`;
-    this.#host.insertBefore(veil, this.#sheet);
-    this.#veiled = -1;
+    this.#corners?.remove();
+    this.#sheet = chart.place(this.#host, chart.sheet(), -40, -40, 0);
+    const w = chart.win;
+    this.#corners = chart.place(this.#host, chart.corners(), w.x - w.r, w.y - w.r, 0);
+    this.#cornered = -1;
+    this.#h.shift(chart.shift);
+    const layer = this.#layer!, { w: side } = this.#column();
+    this.#rows = Array.from({ length: 4 }, () => new Plate(layer, side, this.#rowH()));
+  }
+
+  /** The right side of the sheet under the disc, CSS pixels. */
+  #column(): { x: number; y: number; w: number } {
+    const l = this.#layer!.layout;
+    return { x: l.hud.x, y: l.hud.y + l.hud.r + 26, w: l.hud.r * 2 + 16 };
+  }
+
+  #rowH(): number {
+    const l = this.#layer!.layout, { y } = this.#column();
+    return Math.min(ROW, Math.floor((l.h - l.safe.bottom - 20 - y) / 4));
+  }
+
+  /** How the match stands, each row re-inked only when its numeral changes. */
+  #stats(g: CanvasRenderingContext2D, m: PlanetMapModel, a: number): void {
+    const { x, y, w } = this.#column(), H = this.#rowH(), s = m.stats, k = Math.min(1, H / ROW), art = ART * k, size = FIGURE * k;
+    const clock = `${Math.floor(s.storm / 60)}:${String(s.storm % 60).padStart(2, '0')}`;
+    const rows: { key: string; text: string; art: readonly Prim[]; ink?: InkName }[] = [
+      { key: 'afloat', text: String(s.afloat), art: prims('hud.shipsLeft') },
+      { key: 'kills', text: String(s.kills), art: prims('hud.kills') },
+      { key: 'damage', text: String(Math.round(s.damage)), art: prims('hud.damage') },
+      { key: 'storm', text: clock, art: s.closing ? stormSpiral(3.5) : prims('hud.spiral'), ink: s.closing ? 'rubric' : 'iron' },
+    ];
+    rows.forEach((r, i) => {
+      const plate = this.#rows[i], key = `${r.key}|${r.text}|${r.ink ?? ''}`;
+      if (plate.key !== key) {
+        plate.ink(key, (p, cx, cy) => {
+          woodcut(p, r.art, cx - w / 2 + 14 + art / 2, cy, art, 'iron', 1, true);
+          figure(p, r.text, cx + w / 2 - 14 - figureWidth(r.text, size), cy + size * 0.4, size, { ink: r.ink ?? 'iron', seed: 70 + i });
+          if (i < rows.length - 1) p.rule([[cx - w / 2 + 10, cy + H / 2 - 1, cx + w / 2 - 10, cy + H / 2 - 1]], { w: 'hair', ink: 'iron', alpha: 0.5, wobble: 0.3, seed: 80 + i });
+        });
+      }
+      drawSprite(g, plate.sprite, x, y + H * (i + 0.5), { alpha: a });
+    });
   }
 
   #frame(g: CanvasRenderingContext2D, now: number): void {
@@ -288,23 +350,22 @@ export class FullMap {
     }
     const a = clamp((now - this.#born) / 1000 / LAY);
     if (this.#sheet) this.#sheet.style.opacity = String(a);
-    const veiled = Math.round(a * clamp((DISTANCE - this.distance) / 0.4) * 50) / 50;
-    if (this.#veil && veiled !== this.#veiled) {
-      this.#veil.style.opacity = String(veiled);
-      this.#veiled = veiled;
+    const cornered = Math.round(a * (1 - clamp((DISTANCE - this.distance) / OUTGROWN)) * 50) / 50;
+    if (this.#corners && cornered !== this.#cornered) {
+      this.#corners.style.opacity = String(cornered);
+      this.#cornered = cornered;
     }
     const globe = chart.globe(), m = this.#model;
+    if (m) this.#stats(g, m, a);
     if (!globe || !m) return;
     pen.mood({ dry: 1 - a }, () => this.#ink(g, pen, globe, m, now));
   }
 
   #ink(g: CanvasRenderingContext2D, pen: Pen, globe: Globe, m: PlanetMapModel, now: number): void {
-    const chart = this.#chart!, layer = this.#layer!, w = chart.win, P = this.#P, l = layer.layout, a = 1 - pen.dry;
+    const chart = this.#chart!, layer = this.#layer!, P = this.#P, l = layer.layout, a = 1 - pen.dry;
     chart.ink(pen, g, globe, 1, 1);
     g.save();
-    const clip = new Path2D();
-    clip.arc(w.x, w.y, w.r, 0, TAU);
-    g.clip(clip);
+    chart.clip(g);
     if (m.storm) this.#circle(pen, globe, m.storm.at, m.storm.r, { w: 'bold', ink: 'rubric', alpha: 0.95, wobble: 0, seed: 61 });
     this.#circle(pen, globe, m.next.at, m.next.r, { w: 'fine', ink: 'iron', alpha: 0.9, wobble: 0, seed: 62 }, [0, 7]);
     for (const sh of m.ships) {

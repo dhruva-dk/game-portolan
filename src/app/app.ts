@@ -767,6 +767,7 @@ export class App {
       mine: this.ownMark(),
       aim: (p) => s.aimFor(p),
       close: () => this.closeMap(),
+      shift: (dx) => { this.canvas.style.transform = dx ? `translateX(${-dx}px)` : ''; },
     });
     m.attach(layer, this.chartNow());
     this.map = m;
