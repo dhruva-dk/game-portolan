@@ -315,11 +315,13 @@ export class App {
     if (!settled || this.loop.running) return settled;
     // the terrain builds only as frames are drawn: with the loop held (captures), draw still ones until it has
     let done = false;
-    void settled.then(() => { done = true; });
+    void settled.then(() => { done = true; }, () => { done = true; });
     for (let i = 0; i < 1800 && !done; i++) {
       this.loop.drawNow(0);
       await new Promise((r) => requestAnimationFrame(r));
     }
+    if (!done) throw new Error('Scene preparation did not settle within 1800 capture frames');
+    await settled;
   }
 
   // ── screens ──
