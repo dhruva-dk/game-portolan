@@ -91,7 +91,7 @@ export class Gulls {
   private flight(ship: number, tier: number, at: THREE.Vector3Like): Delivery {
     const rarity = (TIER_RARITY[tier] ?? 1) as Rarity, pos = new THREE.Vector3().copy(at);
     const parcel = this.parcels.pop() ?? new THREE.Mesh(this.parcelGeo, patch(new THREE.MeshStandardMaterial({ color: 0x4b6b3a, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0.9 })));
-    (parcel.material as THREE.MeshStandardMaterial).emissive.copy(RARITY_GLOW[rarity]).multiplyScalar(0.3);
+    (parcel.material as THREE.MeshStandardMaterial).emissive.copy(RARITY_GLOW[rarity]).multiplyScalar(0.1);
     parcel.visible = true;
     parcel.position.copy(pos);
     this.group.add(parcel);

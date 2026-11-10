@@ -258,7 +258,9 @@ export class Result {
       g.fillStyle = held.ink;
       g.globalAlpha = 0.72;
       const half = Math.max(held.half * C.r, 0.8);
-      for (let i = 0; i < held.pts.length; i += 2) g.fillRect(x + held.pts[i] * C.r - half, y - held.pts[i + 1] * C.r - half, half * 2, half * 2);
+      g.beginPath();
+      for (let i = 0; i < held.pts.length; i += 2) g.rect(x + held.pts[i] * C.r - half, y - held.pts[i + 1] * C.r - half, half * 2, half * 2);
+      g.fill();
       g.restore();
       ring(p, x, y, C.r * 0.96, C.r * 1.08, { ticks: 128 }, 1);
     });

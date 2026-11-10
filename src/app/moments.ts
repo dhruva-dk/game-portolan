@@ -424,7 +424,7 @@ export const MOMENTS: readonly MomentScript[] = [
     is: (m) => m.k === 'ablaze' && m.ship === TARGET,
   },
   {
-    name: 'delivery', note: 'the gull delivering to the player', sea: true, lead: 75, every: 5, frames: 18,
+    name: 'delivery', note: 'the gull delivering to the player', sea: true, lead: 60, every: 6, frames: 20,
     arrange: (s) => {
       place(s, PLAYER, openCourse(s, 60, 20));
       const me = s.ships[PLAYER];

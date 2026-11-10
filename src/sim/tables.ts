@@ -289,7 +289,7 @@ export const PARCELS = [
   { name: 'Treasure', cost: 80 },
 ] as const;
 
-export const DELIVERY = { speed: 30, height: 40, drop: 5, ahead: 12, rest: 18, fetch: 2.5 } as const;
+export const DELIVERY = { speed: 30, height: 40, drop: 5, ahead: 30, rest: 18, fetch: 2.5 } as const;
 
 /** Region perks: the numbers behind each. */
 export const PERKS = {
