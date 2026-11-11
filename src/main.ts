@@ -1,5 +1,6 @@
 import { WebGPURenderer } from 'three/webgpu';
 import { createEnvironment, updateEnvironment } from './environment';
+import { createFly } from './fly';
 import { createFrame } from './frame';
 import { createMeter } from './meter';
 import { addProbe } from './probe';
@@ -31,6 +32,7 @@ frame.resize(innerWidth, innerHeight);
 for (const axis of ['x', 'y', 'z'] as const) if (params.has(axis)) frame.camera.position[axis] = Number(params.get(axis));
 frame.camera.rotation.set((Number(params.get('look') ?? -6) * Math.PI) / 180, (Number(params.get('yaw') ?? 0) * Math.PI) / 180, 0, 'YXZ');
 addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
+const fly = createFly(frame.camera, renderer.domElement);
 
 let last = performance.now();
 renderer.setAnimationLoop(() => {
@@ -38,6 +40,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min((start - last) / 1000, 0.1);
   last = start;
 
+  fly(dt);
   updateEnvironment(env, dt);
   frame.render(env, dt);
 
