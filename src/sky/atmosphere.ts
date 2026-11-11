@@ -22,6 +22,8 @@ export const OZONE_ABSORPTION = [0.65e-3, 1.881e-3, 0.085e-3] as const;
 export const OZONE_CENTRE = 25;
 export const OZONE_HALF_WIDTH = 15;
 export const GROUND_ALBEDO = 0.3;
+/** The sea's albedo under a diffuse sky, for light it bounces up onto undersides and clouds. */
+export const SEA_ALBEDO = 0.06;
 /** The sun's angular radius, radians. */
 export const SUN_ANGULAR_RADIUS = 0.004675;
 

@@ -6,7 +6,6 @@
 import { EquirectangularReflectionMapping, HalfFloatType, LinearFilter, StorageTexture, type WebGPURenderer } from 'three/webgpu';
 import { Fn, cos, float, instanceIndex, max, normalize, pmremTexture, sin, textureStore, uvec2, vec3, vec4 } from 'three/tsl';
 import type { View } from '../view/view';
-import { cloudsAlong } from './clouds';
 import { skyRadiance } from './tables';
 
 type N = any;
@@ -21,8 +20,11 @@ panorama.minFilter = panorama.magFilter = LinearFilter;
 panorama.mapping = EquirectangularReflectionMapping;
 panorama.generateMipmaps = false;
 
-/** sunDirection: toward the sun, as the eye's sky shows it. */
-export function createReflection(renderer: WebGPURenderer, view: View, sunDirection: N) {
+/**
+ * sunDirection: toward the sun, as the eye's sky shows it; cloudsAlong: the clouds' light (rgb) and transmittance (a)
+ * along a sky direction, marched in at most so many steps.
+ */
+export function createReflection(renderer: WebGPURenderer, view: View, sunDirection: N, cloudsAlong: (d: N, steps: number) => N) {
   // the inverse of three's equirectUV
   const bake = Fn(() => {
     const x = instanceIndex.mod(W), y = instanceIndex.div(W);

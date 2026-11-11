@@ -18,7 +18,7 @@ import { Fn, cos, dot, exp, float, max, mix, normalWorldGeometry, normalize, smo
 import type { Environment } from '../environment';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
-import { MIE_EXTINCTION, RAYLEIGH_SCATTERING, SUN_ANGULAR_RADIUS } from './atmosphere';
+import { MIE_EXTINCTION, RAYLEIGH_SCATTERING, SEA_ALBEDO, SUN_ANGULAR_RADIUS } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { VIEW_RADIUS, createTables, haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
@@ -27,8 +27,6 @@ type N = any;
 
 /** The sun's radiance over its disc for unit illuminance: E / (π α²). */
 const SUN_RADIANCE = 1 / (Math.PI * SUN_ANGULAR_RADIUS * SUN_ANGULAR_RADIUS);
-/** The sea's albedo under a diffuse sky, for light bounced up onto undersides. */
-const SEA_ALBEDO = 0.06;
 
 /** Extinction of the air at sea level, per km. */
 const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
@@ -48,7 +46,7 @@ export function createSky(renderer: WebGPURenderer, view: View) {
   const sun = uniform(new Vector3(0, 1, 0));
   const skySun = uniform(new Vector3(0, 1, 0));
   const clouds = createClouds(renderer, view);
-  const reflection = createReflection(renderer, view, skySun);
+  const reflection = createReflection(renderer, view, skySun, clouds.along);
 
   const sunIlluminance = (p: N): N => sunTransmittance(VIEW_RADIUS, dot(view.up(p), sun));
 
