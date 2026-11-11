@@ -8,7 +8,7 @@ import {
   ACESFilmicToneMapping, AgXToneMapping, NeutralToneMapping, DirectionalLight, HemisphereLight, Matrix4, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3,
   WebGPURenderer, type Node,
 } from 'three/webgpu';
-import { Fn, dot, exp, fract, clamp, min, pass, rtt, screenCoordinate, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, dot, exp, clamp, min, pass, rtt, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { R, U, bodies, dayFor } from './world.ts';
 import { AIR_TOP, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
@@ -101,11 +101,10 @@ const shafts = (() => {
     const bright = clamp(exposed.sub(3), vec3(0), vec3(2));
     return vec4(bright.mul(isSky).mul(exp(dot(d, d).mul(-36))), 1);
   })();
-  const noise = fract(fract(dot(screenCoordinate.xy, vec2(0.06711056, 0.00583715))).mul(52.9829189));
   const blur = (source: Nd, span: number, falloff: number): Nd => Fn(() => {
     const uv0 = screenUV;
     const step = SHAFT.light.sub(uv0).mul(span / TAPS).toVar();
-    const uv = uv0.add(step.mul(noise)).toVar();
+    const uv = uv0.add(step.mul(0.5)).toVar();
     let sum: Nd = vec3(0);
     for (const w of WEIGHTS) {
       sum = sum.add(source.sample(uv).rgb.mul(w));
