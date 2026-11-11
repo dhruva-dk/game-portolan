@@ -5,6 +5,9 @@ import {
 import type { Environment } from './environment';
 import { VIEW_HEIGHT } from './sky/atmosphere';
 import { createSky, fog } from './sky/sky';
+import { createLand } from './land/land';
+import { createSeabed } from './land/seabed';
+import { createIsland } from './land/terrain';
 import { createWater } from './water/water';
 
 /** Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. */
@@ -13,7 +16,8 @@ const EXPOSURE = 10;
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
  *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam)
- *   2. scene    — sky backdrop, sea, (later) land and ship
+ *   2. scene    — sky backdrop; then the solid things (the island, later the ships); then the sea, which reads what was
+ *                 drawn before it behind itself (the floor through the shallows)
  *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping
  * Systems hand this file meshes and shader nodes; they never create passes themselves.
  */
@@ -26,8 +30,11 @@ export function createFrame(renderer: WebGPURenderer) {
   const camera = new PerspectiveCamera(60, 1, 0.5, 40000);
   // the eye stands where the sky's view is worked out from
   camera.position.y = VIEW_HEIGHT * 1000;
-  const water = createWater(renderer, sky.reflect);
-  scene.add(water.mesh);
+  const island = createIsland([0, -300]);
+  const seabed = createSeabed(island);
+  const land = createLand(island);
+  const water = createWater(renderer, sky.reflect, seabed);
+  scene.add(land.mesh, water.mesh);
 
   const scenePass = pass(scene, camera);
   const post = Fn(() => {

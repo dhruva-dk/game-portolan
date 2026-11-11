@@ -17,7 +17,8 @@ document.body.appendChild(renderer.domElement);
 await renderer.init();
 
 const env = createEnvironment();
-// Debug: ?t=hours sets the time of day; ?wind=m/s the wind's speed; ?look=deg pitches and ?yaw=deg turns the camera (0 north, 90 west).
+// Debug: ?t=hours sets the time of day; ?wind=m/s the wind's speed; ?look=deg pitches and ?yaw=deg turns the camera
+// (0 north, 90 west); ?x=&y=&z= metres move it (the island lies 300 m north, at z = −300).
 const params = new URLSearchParams(location.search);
 if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
@@ -27,6 +28,7 @@ const meter = createMeter(renderer, meterEl);
 if (params.has('probe')) addProbe(frame.scene, frame.sky.reflect);
 
 frame.resize(innerWidth, innerHeight);
+for (const axis of ['x', 'y', 'z'] as const) if (params.has(axis)) frame.camera.position[axis] = Number(params.get(axis));
 frame.camera.rotation.set((Number(params.get('look') ?? -6) * Math.PI) / 180, (Number(params.get('yaw') ?? 0) * Math.PI) / 180, 0, 'YXZ');
 addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
 
