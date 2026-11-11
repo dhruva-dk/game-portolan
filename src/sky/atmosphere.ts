@@ -13,9 +13,15 @@ export const VIEW_HEIGHT = 0.01;
 
 export const RAYLEIGH_SCATTERING = [5.802e-3, 13.558e-3, 33.1e-3] as const;
 export const RAYLEIGH_SCALE_HEIGHT = 8;
-export const MIE_SCATTERING = 3.996e-3;
-export const MIE_EXTINCTION = 4.44e-3;
-export const MIE_SCALE_HEIGHT = 1.2;
+/**
+ * Aerosol on a clear day over the trade-wind sea (Environment.haze = 1): sea salt held in the marine boundary layer,
+ * so a short scale height, and an optical depth at 550 nm of 0.08 (maritime AERONET sites read 0.06–0.1), absorbing
+ * little (single-scattering albedo 0.98). Hillaire's continental defaults (3.996e-3, 4.44e-3, 1.2 km) are 16 times
+ * clearer: a sky deep blue to the horizon, without the pale band at its foot.
+ */
+export const MIE_SCATTERING = 0.1;
+export const MIE_EXTINCTION = 0.102;
+export const MIE_SCALE_HEIGHT = 0.8;
 export const MIE_G = 0.8;
 export const OZONE_ABSORPTION = [0.65e-3, 1.881e-3, 0.085e-3] as const;
 /** Ozone's density is a tent 30 km wide centred 25 km up. */
