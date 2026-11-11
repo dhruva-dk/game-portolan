@@ -1,6 +1,7 @@
 # Working
 Commit and push to main often, maintaining linear history.
 Explain progress as you go.
+Be brief and minimize wasted tokens when reasoning.
 
 # Builds, Platform and Testing
 
