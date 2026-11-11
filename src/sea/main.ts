@@ -316,7 +316,7 @@ const wind = new Vector3();
 const perf = { t: 0, frames: 0, worst: 0, intervals: [] as number[] };
 const cap = num('fps', touch ? 40 : 0);
 let last = performance.now(), lastDrawn = 0;
-const hook = { ready: false, frames: 0 };
+const hook = { ready: false, frames: 0, ship, rig };
 (window as unknown as { __sea: object }).__sea = hook;
 
 function frame(now: number): void {
@@ -348,6 +348,7 @@ function frame(now: number): void {
   wind.set(-ship.up.z, 0, ship.up.x).normalize().multiplyScalar(-8);
   shape.system('ship');
   ship.update(dt, time, ocean, wind, night);
+  ocean.wake(ship.up, ship.fwd, ship.speed, dt);
   runFrameWork(renderer);
   placeCamera();
   (U.eye.value as Vector3).copy(camera.position);

@@ -17,12 +17,13 @@
 //
 // The water's light: the sky and clouds reflected (the panorama, blurred by the slopes' variance) by Fresnel; the sun's
 // glitter (Beckmann, its width the variance); under the surface the light scattered back by the deep, blue; the sun
-// through the thin crests, turquoise (after Atlas, GDC 2019); and foam where the surface folds and after.
-import { BufferGeometry, Float32BufferAttribute, HalfFloatType, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, Quaternion, RepeatWrapping, StorageArrayTexture, Vector2, Vector3, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
+// through the thin crests, turquoise (after Atlas, GDC 2019); and foam where the surface folds and after, and where
+// the ship has passed: round her hull, in the Kelvin wedge off her bow and along the churned track she leaves.
+import { BufferGeometry, Float32BufferAttribute, HalfFloatType, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, Quaternion, RepeatWrapping, StorageArrayTexture, Vector2, Vector3, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, atan, cameraPosition, clamp, cos, cosh, dot, exp, float, instanceIndex, instancedArray, int, length, localId, log, log2, max, min, mix,
+  Fn, If, Loop as LoopTyped, abs, atan, cameraPosition, clamp, cos, cosh, cross, dot, exp, float, instanceIndex, instancedArray, int, length, localId, log, log2, max, min, mix,
   normalize, positionGeometry, positionWorld, pow, reflect, screenUV, select, sin, smoothstep, sqrt, storageTexture, tanh, texture, uint,
-  uniform, uvec2, varyingProperty, vec2, vec3, vec4, workgroupArray, workgroupBarrier, workgroupId,
+  uniform, uniformArray, uvec2, varyingProperty, vec2, vec3, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import { CALM_SEA, CASCADES, CUTS, G, LongWaves, N, SIZES, SWELL_SPREAD, significantHeight, spectrumParams, type SeaState, type SpectrumParams } from '../render/ocean/spectrum.ts';
 import { MipChain, R, U, shared } from './world.ts';
@@ -285,7 +286,55 @@ function inFrame(up: Nd, f: FrameNodes): { q: Nd; e1: Nd; e2: Nd } {
 
 // ---------------------------------------------------------------- the water's look
 
-export const WATER = shared({
+export /** The ship's wake: where she is and heads, how fast, and her track (points a second apart, newest first). */
+const TRACK = 24, TRACK_STEP = 1;
+const WAKE = shared({
+  at: uniform(new Vector3(0, R, 0)),
+  fwd: uniform(new Vector3(0, 0, 1)),
+  speed: uniform(0),
+});
+/** The track: xyz on the sea, w the seconds since she was there. */
+const track = uniformArray(Array.from({ length: TRACK }, () => new Vector4(0, R, 0, 99)), 'vec4');
+/** Her hull's half-length and half-beam, m, and the speed at which her wake is fullest. */
+const HALF_L = 9, HALF_B = 2.7, FULL = 12;
+
+/** How white the ship leaves the sea at p (on the sphere, up u): 0 to 1. */
+function wakeFoam(p: Nd, u: Nd): Nd {
+  const white = float(0).toVar();
+  const rel = p.sub(WAKE.at);
+  If(dot(rel, rel).lessThan(600 * 600), () => {
+    const flat = (v: Nd) => v.sub(u.mul(dot(v, u)));
+    const r = flat(rel);
+    const side = cross(u, WAKE.fwd);
+    const a = dot(r, WAKE.fwd), b = dot(r, side);
+    const pace = clamp(WAKE.speed.div(FULL), 0, 1.3);
+    // round the hull, heaped at the bow
+    const e = vec2(a.div(HALF_L), b.div(HALF_B)).length();
+    const bow = mix(float(0.35), float(1), smoothstep(-0.6, 0.9, a.div(HALF_L)));
+    const hull = smoothstep(0.92, 1.05, e).mul(smoothstep(pace.mul(0.9).add(1.15), float(1.02), e)).mul(bow).mul(pace.mul(1.4));
+    // the Kelvin wedge, 19.5° each side, its arms spreading and fading behind her
+    const t = float(HALF_L).sub(a);
+    const arm = abs(b).sub(t.mul(0.354)).div(t.mul(0.022).add(0.45));
+    const kelvin = exp(arm.mul(arm).negate()).mul(smoothstep(2, 10, t)).mul(exp(t.div(-45))).mul(pace).mul(0.55);
+    white.assign(max(hull.mul(0.8), kelvin));
+    // the churned track astern, wider and fainter as it ages
+    (LoopTyped as Nd)({ start: int(0), end: int(TRACK - 1), type: 'int', condition: '<', name: 'tk' }, ({ tk }: { tk: Nd }) => {
+      const A = track.element(tk) as unknown as Nd, B = track.element(tk.add(1)) as unknown as Nd;
+      const ab = flat(B.xyz.sub(A.xyz)), ap = flat(p.sub(A.xyz));
+      const len2 = max(dot(ab, ab), 1e-4);
+      const h = clamp(dot(ap, ab).div(len2), 0, 1);
+      const d = ap.sub(ab.mul(h)).length();
+      const age = mix(A.w, B.w, h);
+      const pace0 = clamp(len2.sqrt().div(float(TRACK_STEP * FULL)), 0, 1.3);
+      const width = age.mul(0.3).add(HALF_B * 0.6);
+      const churn = exp(d.div(width).pow(2).negate()).mul(exp(age.div(-7))).mul(pace0).mul(0.7);
+      white.assign(max(white, churn));
+    });
+  });
+  return min(white, 0.75);
+}
+
+const WATER = shared({
   /** What the deep scatters back of the light that enters it (an albedo): a dark, saturated blue. */
   deep: uniform(new Vector3(0.0025, 0.011, 0.034)),
   /** The colour light takes through a thin crest. */
@@ -410,7 +459,7 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const through = sunE.mul(WATER.crest).mul(toward.mul(thin).mul(crest).mul(facing).mul(0.035).add(crest.mul(0.004)));
     // foam where it folds now and where it folded a moment ago, broken into lace by the ripples under it
     const fresh = smoothstep(0.45, -0.1, fold);
-    const amount = clamp(foam.mul(0.9).add(fresh.mul(0.8)), 0, 1);
+    const amount = clamp(foam.mul(0.9).add(fresh.mul(0.8)).add(wakeFoam(p, u)), 0, 1);
     const grain = clamp(lace.mul(18).add(0.5), 0, 1);
     const far = smoothstep(60, 260, dist);
     const white = mix(smoothstep(float(1).sub(amount), float(1.25).sub(amount), grain.mul(0.6).add(amount.mul(0.4))).mul(amount.sqrt()), amount.mul(0.5), far);
@@ -463,6 +512,25 @@ export class Ocean {
   get significantHeight(): number { return significantHeight(this.#params); }
 
   /** Follows the point under the eye, rebuilds the spectrum if the sea has changed, and moves the waves on. */
+  #trackClock = 0;
+
+  /** The ship's place, heading (unit, tangent) and speed, m/s, this frame: her wake follows. */
+  wake(up: Vector3, fwd: Vector3, speed: number, dt: number): void {
+    const at = (WAKE.at.value as Vector3).copy(up).multiplyScalar(R);
+    (WAKE.fwd.value as Vector3).copy(fwd);
+    WAKE.speed.value = speed;
+    const pts = track.array as Vector4[];
+    for (const v of pts) v.w += dt;
+    this.#trackClock += dt;
+    if (this.#trackClock >= TRACK_STEP) {
+      this.#trackClock -= TRACK_STEP;
+      for (let i = pts.length - 1; i > 0; i--) pts[i].copy(pts[i - 1]);
+    }
+    // the newest point stays at her stern
+    pts[0].set(at.x - fwd.x * HALF_L, at.y - fwd.y * HALF_L, at.z - fwd.z * HALF_L, 0);
+    if (pts[1].w > 90) for (let i = 1; i < pts.length; i++) pts[i].copy(pts[0]).setW(99);
+  }
+
   update(renderer: WebGPURenderer, eye: Vector3, time: number, dt: number): void {
     this.#time = time;
     const nadir = _v.copy(eye).normalize();
