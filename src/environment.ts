@@ -26,11 +26,11 @@ export interface Environment {
 
 export function createEnvironment(): Environment {
   const env: Environment = {
-    timeOfDay: 15,
+    timeOfDay: 14,
     sunDirection: new Vector3(),
     windSpeed: 7.6,
     windDirection: new Vector3(1, 0, 0),
-    cloudCoverage: 0.5,
+    cloudCoverage: 0.3,
     haze: 1,
   };
   placeSun(env);
