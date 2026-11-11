@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { R, along, distance, faceDir, frameAt, fromChart, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { bakeFaces, createPlanet } from '../src/world/planet.ts';
 import { ISLANDS } from '../src/world/planet-islands.ts';
-import { random } from '../src/world/scatter.ts';
+import { random } from '../src/world/random.ts';
 
 const SEEDS = [1, 2, 3];
 const planets = new Map(SEEDS.map((s) => [s, createPlanet(s)]));

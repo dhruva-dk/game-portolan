@@ -15,7 +15,8 @@ import {
   Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
-import { random, scatterPalms } from '../world/scatter';
+import { random } from '../world/random';
+import { scatterPalms } from '../world/scatter';
 import { type Light, leafLight } from './light';
 import { standing, type Site } from './site';
 

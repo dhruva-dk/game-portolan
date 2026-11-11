@@ -13,7 +13,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 import { R, add, cross, distance, frameAt, scale, type Chart, type Vec3 } from './sphere.ts';
-import { random } from './scatter.ts';
+import { random } from './random.ts';
 import type { Noise3 } from './noise3.ts';
 
 export const ISLANDS = {

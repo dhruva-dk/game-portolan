@@ -10,7 +10,8 @@ import {
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorld, vec3 } from 'three/tsl';
-import { random, scatterShrubs } from '../world/scatter';
+import { random } from '../world/random';
+import { scatterShrubs } from '../world/scatter';
 import { type Light, leafLight } from './light';
 import { standing, type Site } from './site';
 

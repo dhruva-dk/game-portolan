@@ -3,7 +3,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { random } from './scatter.ts';
+import { random } from './random.ts';
 
 /** The twelve edge directions of a cube, Perlin's gradients, as x, y, z triples. */
 const G = new Float64Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1]);

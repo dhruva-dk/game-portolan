@@ -12,7 +12,8 @@ import {
 import { Fn, abs, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { View } from '../view/view';
-import { random, scatterRocks } from '../world/scatter';
+import { random } from '../world/random';
+import { scatterRocks } from '../world/scatter';
 import type { Light } from './light';
 import { standing, type Site } from './site';
 

@@ -12,19 +12,8 @@
 // has been washed off the reef rock beneath. Each outcrop a cluster: a few large blocks with many small ones round
 // them, sunk into the sand by a third of their height.
 
+import { random } from './random.ts';
 import { fbm, type Island } from './terrain.ts';
-
-/** A seeded generator, 0…1 (mulberry32). */
-export function random(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 export interface Rock {
   x: number;
