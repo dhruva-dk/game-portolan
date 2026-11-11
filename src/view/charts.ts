@@ -16,7 +16,7 @@
 // coordinates across the pixel, worked out from the world position's: dq = (dp·e1, dp·e2).
 
 import { Vector4 } from 'three/webgpu';
-import { If, Loop, acos, clamp, cross, dot, float, fract, int, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
+import { If, Loop, acos, clamp, cross, dot, float, fract, int, length, max, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
 import { FREQUENCY, anchors, band, cover, icosphere, near, type Likeness } from '../world/lattice';
 import { R, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
@@ -29,6 +29,8 @@ export interface Read {
   q: N; e1: N; e2: N; w: N;
   /** q's change across the pixel, right and down (fragment stage only, when asked for). */
   dx: N; dy: N;
+  /** w's gradient over the sphere, per metre (a world vector; with dx, dy only). */
+  dw: N;
 }
 
 export type Charts = ReturnType<typeof createCharts>;
@@ -48,8 +50,12 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   const count = uniform(3, 'int');
   let listed = '';
 
-  /** The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1. */
-  const pick = (u: N) => {
+  /**
+   * The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1; and if asked,
+   * the weights' gradients over the sphere, per metre. Each weight is s/|s| with s = smoothstep(width, 0, arc − arc₀)
+   * of the arcs to the anchors, and an arc's gradient is the unit tangent pointing away from its anchor.
+   */
+  const pick = (u: N, gradients = false) => {
     const c = [float(-2).toVar(), float(-2).toVar(), float(-2).toVar()];
     const i = [int(0).toVar(), int(0).toVar(), int(0).toVar()];
     Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: k }: { i: N }) => {
@@ -68,7 +74,20 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     const arc = c.map((x) => acos(clamp(x, -1, 1)).mul(R));
     const s = [float(1), smoothstep(width, 0, arc[1].sub(arc[0])), smoothstep(width, 0, arc[2].sub(arc[0]))];
     const size = sqrt(s[0].add(s[1].mul(s[1])).add(s[2].mul(s[2])));
-    return { index: i, weight: s.map((x) => x.div(size).toVar()) };
+    const weight = s.map((x) => x.div(size).toVar());
+    if (!gradients) return { index: i, weight, slope: [] as N[] };
+    const away = i.map((k, j) => {
+      const t = u.mul(c[j]).sub(centres.element(k).xyz);
+      return t.div(max(length(t), 1e-6));
+    });
+    // ds/dx of smoothstep(width, 0, x) is −6t(1 − t)/width, t = 1 − x/width
+    const ds = [1, 2].map((j) => {
+      const t = clamp(float(1).sub(arc[j].sub(arc[0]).div(width)), 0, 1);
+      return away[j].sub(away[0]).mul(t.mul(float(1).sub(t)).mul(-6 / width));
+    });
+    const dsize = ds[0].mul(s[1]).add(ds[1].mul(s[2])).div(size);
+    const slope = [vec3(0), ...ds].map((d, j) => d.sub(dsize.mul(weight[j])).div(size));
+    return { index: i, weight, slope };
   };
 
   /**
@@ -78,14 +97,14 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
    */
   function each(p: N, read: (r: Read, slot: number) => void, dp?: [N, N]) {
     const u = normalize(p);
-    const { index, weight } = pick(u);
+    const { index, weight, slope } = pick(u, dp !== undefined);
     index.forEach((k, slot) => {
       const run = () => {
         const C = centres.element(k), X = axes.element(k);
         const at = C.xyz, axis = X.xyz;
         const c = chartNodes(at, axis, cross(axis, at))(u);
         const grad = (d: N) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
-        read({ q: c.q.add(vec2(C.w, X.w)), e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]) }, slot);
+        read({ q: c.q.add(vec2(C.w, X.w)), e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]), dw: slope[slot] ?? vec3(0) }, slot);
       };
       if (slot === 0) run();
       else If(weight[slot].greaterThan(0), run);

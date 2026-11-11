@@ -135,14 +135,20 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     charts.each(p, (c, slot) => {
       if (slot === 0) q.assign(c.q);
       const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
-      let s2: N = vec2(0), v: N = float(0), cover: N = surf;
+      let s2: N = vec2(0), v: N = float(0), cover: N = surf, h: N = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
         v = v.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(m.mul(m)));
-        if (k < 2) cover = cover.add(read(waves.displacement[k], float(1 / L)).w);
+        if (k < 2) {
+          const d = read(waves.displacement[k], float(1 / L));
+          cover = cover.add(d.w);
+          h = h.add(d.y.mul(m));
+        }
       });
-      slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w));
+      // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
+      // tilts it too (the long cascades' height; the shortest's is too small to matter)
+      slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
       variance.addAssign(v.mul(c.w.mul(c.w)));
       foam.addAssign(foamOn(c, saturate(cover), thickness, footprint).mul(c.w.mul(c.w)));
     }, dp);
@@ -174,8 +180,8 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const path = select(depthBehind.greaterThanEqual(1), float(1e4), length(behindAt(uv).sub(positionView)));
     const behind = viewportSharedTexture(uv).rgb;
 
-    // the facets' α² is the mean square slope over both axes
     const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
+    // the facets' α² is the mean square slope over both axes
     return optics.seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, behind, path, sparkle);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
