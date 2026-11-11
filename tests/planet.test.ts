@@ -126,7 +126,7 @@ test('each island: the waterline is its coast, the beach about 1:8 there, the su
 test('cover: 0…1, no sea grass on land or in the deeps', () => {
   for (const p of lattice(20000)) {
     const h = planet.height(p), c = planet.cover(p);
-    for (const v of [c.grass, c.rubble, c.mottle]) assert.ok(v >= 0 && v <= 1);
+    for (const v of [c.grass, c.rubble, c.mottle, c.clump]) assert.ok(v >= 0 && v <= 1);
     if (h > 0 || h < -25) assert.equal(c.grass, 0);
   }
 });
@@ -140,7 +140,7 @@ test('bakeFaces: the nodes are height() at faceDir, and the faces agree along th
     const p = faceDir(face, (2 * i) / (n - 1) - 1, (2 * j) / (n - 1) - 1), k = j * n + i;
     const h = planet.height(p), c = planet.cover(p);
     assert.ok(Math.abs(height[face][k] - h) < 1e-3 * (1 + Math.abs(h)), `face ${face} (${i}, ${j}): ${height[face][k]} vs ${h}`);
-    assert.ok(Math.abs(cover[face][k * 4] - c.grass * 255) <= 1 && Math.abs(cover[face][k * 4 + 1] - c.rubble * 255) <= 1 && Math.abs(cover[face][k * 4 + 2] - c.mottle * 255) <= 1);
+    assert.ok(Math.abs(cover[face][k * 4] - c.grass * 255) <= 1 && Math.abs(cover[face][k * 4 + 1] - c.rubble * 255) <= 1 && Math.abs(cover[face][k * 4 + 2] - c.mottle * 255) <= 1 && Math.abs(cover[face][k * 4 + 3] - c.clump * 255) <= 1);
     if (i === 0 || j === 0 || i === n - 1 || j === n - 1) {
       const key = p.map((v) => v.toFixed(7)).join();
       byDirection.set(key, [...(byDirection.get(key) ?? []), height[face][k]]);

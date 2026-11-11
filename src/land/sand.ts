@@ -10,10 +10,11 @@
 // Lit like everything else (light.ts).
 
 import { NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
-import { If, abs, cameraPosition, float, mix, mx_noise_float, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
+import { If, abs, cameraPosition, float, mix, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from './light';
+import { SHALLOWEST } from './seabed';
 import { createStrewn } from './strewn';
 
 type N = any;
@@ -31,8 +32,6 @@ const WET = 0.65, DAMP = 0.6, SWASH = 0.3;
 const FILM = 0.02, FILMED = 0.5;
 /** Sea grass's albedo, and the most it covers the sand: thin, with the sand between its blades. */
 const GRASS = [0.1, 0.11, 0.055], GRASS_COVER = 0.7;
-/** The grass grows in clumps about this many metres across. */
-const CLUMP = 2.2;
 /** Coral and rubble's: browns and olives, darker than the sand. */
 const CORAL = [0.15, 0.115, 0.08];
 /** The litter texture (ambientCG Ground053) repeats every this many metres; its mean colour, linear (measured), and
@@ -59,7 +58,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
 
   /**
    * The colour of the ground at world position p, n its normal (world), litter 0…1 how thickly fronds and leaves
-   * lie there (null where none can).
+   * lie there (null on the sea floor's mesh, where none can).
    */
   return (p, n, litter) => {
     const up = view.up(p), height = view.altitude(p);
@@ -70,8 +69,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
       const q = p.div(tile).add(shift);
       return texture(t, q.zy).mul(w.x).add(texture(t, q.xz).mul(w.y)).add(texture(t, q.xy).mul(w.z));
     };
-    // two scales of the texture, so it doesn't visibly repeat
-    const grain = tri(sand, SAND_TILE).rgb.mul(0.65).add(tri(sand, SAND_TILE * 3.7, 0.37).rgb.mul(0.35));
+    const grain = tri(sand, SAND_TILE).rgb;
     let albedo: N = grain.div(vec3(...SAND_MEAN)).mul(vec3(...SAND_ALBEDO));
     const cover: N = ground.cover(p);
     // mottled: damper hollows and drier, paler rises
@@ -83,7 +81,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     const coral = smoothstep(0.25, 0.8, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2))).mul(0.85);
     albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.6).add(0.7)), coral);
     // sea grass in soft-edged clumps, thin enough to show the sand between
-    const lumpy: N = mx_noise_float(p.div(CLUMP));
+    const lumpy: N = cover.w.sub(0.5).mul(1.1);
     const clumps = smoothstep(-0.3, 0.45, lumpy.add(grain.g.sub(SAND_MEAN[1]).mul(2)));
     const grass = smoothstep(0.1, 0.8, cover.x).mul(clumps).mul(GRASS_COVER);
     albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
@@ -112,9 +110,14 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
       const q = p.div(tile).add(warp), bx = b(q.zy), by = b(q.xz), bz = b(q.xy);
       return vec3(0, bx.y, bx.x).mul(w.x).add(vec3(by.x, 0, by.y).mul(w.y)).add(vec3(bz.x, bz.y, 0).mul(w.z));
     };
-    // the broad ones two sets crossing, bent about by the grass's lumpy noise: dimpled, their crests wandering
-    const broad = ripples(SAND_TILE * BROAD, lumpy.mul(0.12), 0).add(ripples(SAND_TILE * BROAD * 0.8, lumpy.mul(-0.1), 1.2));
-    const tilt = ripples(SAND_TILE, float(0), 0).mul(1.2).add(broad.mul(0.4));
+    let tilt: N = ripples(SAND_TILE, float(0), 0).mul(1.2);
+    if (litter) {
+      // on the islands' ground the broad ones too, two sets crossing, bent about by the lumpy noise: dimpled, their
+      // crests wandering. They fade out before the sea floor's mesh begins (they don't show through that much water),
+      // so where the two meshes overlap they agree.
+      const broad = ripples(SAND_TILE * BROAD, lumpy.mul(0.12), 0).add(ripples(SAND_TILE * BROAD * 0.8, lumpy.mul(-0.1), 1.2));
+      tilt = tilt.add(broad.mul(smoothstep(-SHALLOWEST, -0.5, height).mul(0.4)));
+    }
     const shown = normalize(n.add(tilt.mul(bare.mul(float(1).sub(grass)).mul(float(1).sub(stones.a)))));
 
     // where the waves wash up, the wet sand's film mirrors the sky, more as the view grazes it

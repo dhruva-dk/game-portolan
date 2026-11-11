@@ -52,6 +52,8 @@ export interface Cover {
   rubble: number;
   /** 0…1: the sand's large-scale mottling, damp and dark (0) to dry and pale (1). */
   mottle: number;
+  /** 0…1: fine lumpy noise, features a couple of metres across, that breaks the grass into clumps. */
+  clump: number;
 }
 
 export interface Planet {
@@ -80,6 +82,9 @@ const unit = (p: Vec3): Vec3 => {
   return Math.abs(l - 1) < 1e-12 ? p : [p[0] / l, p[1] / l, p[2] / l];
 };
 
+/** The clumps' noise's feature size, metres: about two baked texels (ground.ts bakes 1.1 m texels). */
+const CLUMP = 2.6;
+
 /** Rubble round an island's foot thins out between these distances from its coast, metres. */
 const FOOT = [15, 35] as const;
 
@@ -91,7 +96,7 @@ export function createPlanet(seed: number): Planet {
   const rand = random(seed * 92821 + 13);
   // each field reads the noise from its own place in it
   const shift = () => [rand() * 256, rand() * 256, rand() * 256] as const;
-  const at = { bank: shift(), bank2: shift(), sand: shift(), ripple: shift(), channel: shift(), channel2: shift(), deep: shift(), grass: shift(), grass2: shift(), rubble: shift(), rubble2: shift(), mottle: shift() };
+  const at = { bank: shift(), bank2: shift(), sand: shift(), ripple: shift(), channel: shift(), channel2: shift(), deep: shift(), grass: shift(), grass2: shift(), rubble: shift(), rubble2: shift(), mottle: shift(), clump: shift() };
   type At = readonly [number, number, number];
   // the point being worked on: its direction, and its position in metres from the centre (direction × R)
   let px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0;
@@ -168,6 +173,7 @@ export function createPlanet(seed: number): Planet {
       const rubble = Math.max(shoulder, foot, smoothstep(0.45, 0.65, read(30, at.rubble2))) * smoothstep(0, 0.5, depth);
       cover.rubble = rubble > 0 ? rubble * smoothstep(-0.1, 0.25, read(7, at.rubble)) : 0;
       cover.mottle = sat(0.5 + 1.1 * read(12, at.mottle));
+      cover.clump = sat(0.5 + 0.9 * read(CLUMP, at.clump));
     }
     return h;
   };
@@ -176,7 +182,7 @@ export function createPlanet(seed: number): Planet {
     islands,
     height: (p) => ground(unit(p), null),
     cover: (p) => {
-      const c: Cover = { grass: 0, rubble: 0, mottle: 0 };
+      const c: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };
       ground(unit(p), c);
       return c;
     },
@@ -187,13 +193,13 @@ export function createPlanet(seed: number): Planet {
 /**
  * The planet baked onto the six cube faces (sphere.ts faceDir), n × n nodes each from corner to corner (so
  * neighbouring faces share their edge nodes), row j at v = 2j/(n−1) − 1, column i at u likewise: heights in
- * metres, and cover as RGBA8 (grass, rubble, mottle, unused).
+ * metres, and cover as RGBA8 (grass, rubble, mottle, clump).
  */
 export function bakeFaces(planet: Planet, n: number): { height: Float32Array[]; cover: Uint8Array[] } {
   const height: Float32Array[] = [], cover: Uint8Array[] = [];
   // faceDir's arithmetic, without its allocations: the gnomonic coordinates of each row and column
   const t = Float64Array.from({ length: n }, (_, i) => Math.tan(((2 * i) / (n - 1) - 1) * (Math.PI / 4)));
-  const p: [number, number, number] = [0, 0, 0], cv: Cover = { grass: 0, rubble: 0, mottle: 0 };
+  const p: [number, number, number] = [0, 0, 0], cv: Cover = { grass: 0, rubble: 0, mottle: 0, clump: 0 };
   for (let face = 0; face < 6; face++) {
     const h = new Float32Array(n * n), c = new Uint8Array(n * n * 4);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
@@ -211,6 +217,7 @@ export function bakeFaces(planet: Planet, n: number): { height: Float32Array[]; 
       c[k * 4] = Math.round(cv.grass * 255);
       c[k * 4 + 1] = Math.round(cv.rubble * 255);
       c[k * 4 + 2] = Math.round(cv.mottle * 255);
+      c[k * 4 + 3] = Math.round(cv.clump * 255);
     }
     height.push(h);
     cover.push(c);

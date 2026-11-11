@@ -3,7 +3,7 @@
 //
 //   height  R16F, metres above the sea (half floats keep a centimetre to 16 m down and 3 cm in the deepest basins; 32-bit
 //           floats can't be filtered in WebGPU without an optional feature)
-//   cover   RGBA8: sea grass, rubble, the sand's mottling (planet.ts Cover)
+//   cover   RGBA8: sea grass, rubble, the sand's mottling, the grass's clumps (planet.ts Cover)
 //
 // Each face is a layer of an array texture, its n × n nodes laid corner to corner on texel centres, so a face's edge
 // nodes are the very directions its neighbour's are, holding the same values: read with clamp-to-edge and filtered
@@ -26,7 +26,7 @@ const TEXEL = ((Math.PI / 2) * R) / (NODES - 1);
 export interface Ground {
   /** Metres above the sea at world position (or direction) p. */
   height(p: N): N;
-  /** What lies on the ground at p: sea grass, rubble, mottling (each 0…1). */
+  /** What lies on the ground at p: sea grass, rubble, mottling, clumps (each 0…1). */
   cover(p: N): N;
   /** The ground's normal at p (world), from its heights a texel either side. */
   normal(p: N): N;
@@ -72,7 +72,7 @@ export function createGround(seed: number): Ground {
   const height = (p: N): N => read(heights, p).x;
   return {
     height,
-    cover: (p) => read(covers, p).xyz,
+    cover: (p) => read(covers, p),
     normal: (p) => {
       // central differences a texel apart, along two tangents
       const u: N = normalize(p);
