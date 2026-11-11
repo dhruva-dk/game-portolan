@@ -1,26 +1,37 @@
-// Debug only (?probe): grey blocks at 0.3, 1, 3 and 8 km, lit by the sky's light, to judge the light and the haze;
-// and a mirror and a rough sphere 60 m off, to judge the sky's reflection.
+// Debug only (?probe): grey blocks at 30, 60, 100 and 150 m north of where the camera starts, lit by the sky's light,
+// to judge the light and the haze; and a mirror and a rough sphere 60 m north, to judge the sky's reflection. Each
+// stands upright on the sphere.
 
-import { BoxGeometry, Mesh, MeshBasicNodeMaterial, SphereGeometry, type Scene } from 'three/webgpu';
+import { BoxGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, SphereGeometry, Vector3, type Scene } from 'three/webgpu';
 import { dot, float, max, normalWorld, positionWorld, reflectVector, vec3 } from 'three/tsl';
-import { ambient, cloudShadow, sunDirection, sunIlluminance } from './sky/sky';
+import type { Sky } from './sky/sky';
+import { add, along, frameAt, place, type Vec3 } from './world/sphere';
 
-export function addProbe(scene: Scene, reflect: (dir: any, roughness: any) => any) {
+export function addProbe(scene: Scene, sky: Sky, eye: Vector3) {
+  const f = frameAt([eye.x, eye.y, eye.z]);
+  /** Stands a mesh `north` and `east` metres from under the eye, its foot `height` up, upright there. */
+  const stand = (mesh: Mesh, north: number, east: number, height: number) => {
+    const out = add(add([0, 0, 0], f.north, north), f.east, east);
+    const metres = Math.hypot(...out);
+    const at: Vec3 = metres > 0 ? along(f.up, out.map((v) => v / metres) as unknown as Vec3, metres).p : f.up;
+    const g = frameAt(at);
+    mesh.matrixAutoUpdate = false;
+    mesh.matrix.makeBasis(new Vector3(...g.east), new Vector3(...g.up), new Vector3(...g.north).negate())
+      .setPosition(...place(at, height))
+      .multiply(new Matrix4().makeRotationY(0.6));
+    scene.add(mesh);
+  };
   for (const [roughness, x] of [[0, -12], [0.35, 12]]) {
     const m = new MeshBasicNodeMaterial();
-    m.colorNode = reflect(reflectVector, float(roughness));
-    const ball = new Mesh(new SphereGeometry(8, 64, 32), m);
-    ball.position.set(x, 8, -60);
-    scene.add(ball);
+    m.colorNode = sky.reflect(reflectVector, float(roughness));
+    stand(new Mesh(new SphereGeometry(8, 64, 32), m), 60, x, 8);
   }
   const material = new MeshBasicNodeMaterial();
   const albedo = vec3(0.5);
-  material.colorNode = albedo.mul(sunIlluminance.mul(cloudShadow(positionWorld)).mul(max(dot(normalWorld, sunDirection), 0)).add(ambient(normalWorld)));
-  for (const [km, x] of [[0.3, -0.12], [1, 0.25], [3, -0.6], [8, 1.5]]) {
-    const size = 30 * km;
-    const box = new Mesh(new BoxGeometry(size, size * 1.5, size), material);
-    box.position.set(x * 1000 * km, size * 0.75 - 5, -1000 * km);
-    box.rotation.y = 0.6;
-    scene.add(box);
+  const p = positionWorld;
+  material.colorNode = albedo.mul(sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(max(dot(normalWorld, sky.sun), 0)).add(sky.ambient(p, normalWorld)));
+  for (const [metres, x] of [[30, -12], [60, 25], [100, -40], [150, 60]]) {
+    const size = metres / 10;
+    stand(new Mesh(new BoxGeometry(size, size * 1.5, size), material), metres, x, size * 0.75 - 1);
   }
 }

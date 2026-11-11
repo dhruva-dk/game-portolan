@@ -2,7 +2,7 @@
 // stands on the island) and its ambient light; below the water, only what of them the water lets down to that depth.
 
 import { saturate } from 'three/tsl';
-import { ambient, cloudShadow, sunDirection, sunIlluminance } from '../sky/sky';
+import type { Sky } from '../sky/sky';
 
 type N = any;
 
@@ -13,10 +13,10 @@ export interface Below { sun(p: N): N; sky(p: N): N }
 export type Light = (p: N, n: N) => N;
 
 /** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
-export function createLighting(below: Below, visible: (p: N, n: N) => N): Light {
+export function createLighting(sky: Sky, below: Below, visible: (p: N, n: N) => N): Light {
   return (p, n) => {
-    const sun = sunIlluminance.mul(cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
-    return sun.mul(saturate(n.dot(sunDirection))).div(Math.PI).add(ambient(n).mul(below.sky(p)));
+    const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
+    return sun.mul(saturate(n.dot(sky.sun))).div(Math.PI).add(sky.ambient(p, n).mul(below.sky(p)));
   };
 }
 

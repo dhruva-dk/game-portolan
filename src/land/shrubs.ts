@@ -10,9 +10,9 @@ import {
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorld, vec3 } from 'three/tsl';
+import { random, scatterShrubs } from '../world/scatter';
 import { type Light, leafLight } from './light';
-import { random, scatterShrubs } from './scatter';
-import type { Island } from './terrain';
+import { standing, type Site } from './site';
 
 type N = any;
 
@@ -68,7 +68,7 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-export function createShrubs(island: Island, light: Light) {
+export function createShrubs(site: Site, light: Light) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld).mul(faceDirection);
@@ -79,8 +79,8 @@ export function createShrubs(island: Island, light: Light) {
     return albedo.mul(leafLight(light, p, n, THROUGH));
   })();
 
-  const shrubs = scatterShrubs(island, SHAPES);
-  const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), at = new Vector3(), up = new Vector3(0, 1, 0);
+  const shrubs = scatterShrubs(site.island, SHAPES);
+  const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
   const meshes = Array.from({ length: SHAPES }, (_, k) => {
     const mine = shrubs.filter((b) => b.shape === k);
     const geometry = shape(k + 101);
@@ -88,8 +88,8 @@ export function createShrubs(island: Island, light: Light) {
     const mesh = new InstancedMesh(geometry, material, Math.max(mine.length, 1));
     mesh.count = mine.length;
     mine.forEach((b, i) => {
-      m.compose(at.set(b.x, b.y - 0.05 * b.size, b.z), q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
-      mesh.setMatrixAt(i, m);
+      m.compose(zero, q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
+      mesh.setMatrixAt(i, standing(site, b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()));
     });
     mesh.computeBoundingSphere();
     return mesh;

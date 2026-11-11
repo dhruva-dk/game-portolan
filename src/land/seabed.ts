@@ -1,14 +1,15 @@
-// The terrain (terrain.ts) baked once into a texture over the island and its reef, for the water: how deep it is
-// over any point, and how sheltered.
+// The terrain (world/terrain.ts) baked once into a texture over the island and its reef, on the island's chart, for
+// the water: how deep it is over any point, and how sheltered.
 //
 //   R  height above sea level, metres
 //   G  passage: the shallowest water crossed coming in from the open sea (PASSAGE_NONE outside the reef)
 //
-// Outside the map the texture's edge carries on: the open sea's floor, unsheltered.
+// Outside the map the texture's edge carries on: the open sea's floor, unsheltered, the whole planet round.
 
 import { ClampToEdgeWrapping, DataTexture, DataUtils, HalfFloatType, LinearFilter, RGFormat, Vector2 } from 'three/webgpu';
 import { float, texture, uniform } from 'three/tsl';
-import type { Island } from './terrain';
+import type { View } from '../view/view';
+import type { Site } from './site';
 
 type N = any;
 
@@ -17,13 +18,17 @@ const SIZE = 512;
 const PASSAGE_NONE = 1000;
 
 export interface Seabed {
-  /** The ground's height above sea level under world (x, z), metres. Safe in a vertex shader. */
-  height(xz: N): N;
-  /** The shallowest water a wave crosses to reach world (x, z), metres. */
-  passage(xz: N): N;
+  /** Where on the map world position p lies (a vec2, safe to interpolate). */
+  locate(p: N): N;
+  /** The ground's height above sea level at a place on the map (locate), metres. Safe in a vertex shader. */
+  height(at: N): N;
+  /** The shallowest water a wave crosses to reach a place on the map, metres. */
+  passage(at: N): N;
 }
 
-export function createSeabed(island: Island): Seabed {
+export function createSeabed(site: Site, view: View): Seabed {
+  const { island } = site;
+  const chart = view.chart(site.chart);
   const size = island.reach * 2;
   const origin = [island.centre[0] - island.reach, island.centre[1] - island.reach];
   const data = new Uint16Array(SIZE * SIZE * 2);
@@ -39,9 +44,10 @@ export function createSeabed(island: Island): Seabed {
   map.needsUpdate = true;
 
   const from = uniform(new Vector2(origin[0], origin[1])), span = uniform(size);
-  const at = (xz: N) => texture(map, xz.sub(from).div(span)).level(float(0));
+  const read = (at: N) => texture(map, at).level(float(0));
   return {
-    height: (xz) => at(xz).x,
-    passage: (xz) => at(xz).y,
+    locate: (p) => chart(p).q.sub(from).div(span),
+    height: (at) => read(at).x,
+    passage: (at) => read(at).y,
   };
 }

@@ -1,14 +1,16 @@
 import { Vector2, Vector3 } from 'three/webgpu';
+import { fromLatLon } from './world/sphere';
 
 /** The one shared world state. Systems read it every frame; only the game loop writes it. */
 export interface Environment {
-  /** Hours, 0–24. */
+  /** Hours, 0–24: the time of day at longitude 0. */
   timeOfDay: number;
-  /** Degrees north. The archipelago sits in the tropics. */
-  latitude: number;
-  /** Unit vector toward the sun, world space (y up, -z north). Derived from timeOfDay and latitude. */
+  /**
+   * Unit vector toward the sun, in the planet's frame (world space: the north pole is +y; world/sphere.ts): one
+   * direction for the whole planet, so it has a day side and a night side. Derived from timeOfDay.
+   */
   sunDirection: Vector3;
-  /** Metres per second, on the xz plane. */
+  /** Metres per second, along the sea's chart: x along its axis (east at the island), y along its z (south). */
   wind: Vector2;
   /** 0–1. */
   cloudCoverage: number;
@@ -19,7 +21,6 @@ export interface Environment {
 export function createEnvironment(): Environment {
   const env: Environment = {
     timeOfDay: 15,
-    latitude: 12,
     sunDirection: new Vector3(),
     wind: new Vector2(7, 3),
     cloudCoverage: 0.5,
@@ -32,11 +33,7 @@ export function createEnvironment(): Environment {
 const DECLINATION = (23.44 * Math.PI) / 180; // solstice; fixed until seasons matter
 
 export function updateEnvironment(env: Environment, _dt: number): void {
+  // the sun stands over the point at its declination where it is noon: at longitude 0 at 12:00, and west of it later
   const hourAngle = ((env.timeOfDay - 12) / 12) * Math.PI;
-  const lat = (env.latitude * Math.PI) / 180;
-  // Equatorial → horizon coordinates: x east, y up, z south.
-  const east = -Math.cos(DECLINATION) * Math.sin(hourAngle);
-  const up = Math.sin(lat) * Math.sin(DECLINATION) + Math.cos(lat) * Math.cos(DECLINATION) * Math.cos(hourAngle);
-  const south = Math.sin(lat) * Math.cos(DECLINATION) * Math.cos(hourAngle) - Math.cos(lat) * Math.sin(DECLINATION);
-  env.sunDirection.set(east, up, south).normalize();
+  env.sunDirection.set(...fromLatLon(DECLINATION, -hourAngle));
 }

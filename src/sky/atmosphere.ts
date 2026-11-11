@@ -2,8 +2,9 @@
 // (EGSR 2020). Plain numbers and CPU functions only: the GPU tables (tables.ts) use the same constants and mappings,
 // and the tests check them here.
 //
-// Units are kilometres. The world is flat; the planet's curvature exists only inside the atmosphere's maths, with the
-// eye a few metres above the sea at the top of a sphere of radius BOTTOM.
+// Units are kilometres. These are Earth's tables, tied to the observer: the eye stands a few metres above the sea at
+// the top of a sphere of radius BOTTOM, and the small planet's own sky is read through them (view.toSky stretches its
+// elevations so its horizon falls on Earth's).
 
 export const BOTTOM = 6360;
 export const TOP = 6460;

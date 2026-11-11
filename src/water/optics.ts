@@ -12,11 +12,15 @@
 //              same water's colour after a couple of metres (exp(−a·d)), the turquoise in the faces of the waves
 //   foam       over all of it where the waves break: white and rough, lit by the sun and the sky like any matte surface
 //
+// "Up" and the sun's elevation are those at the point itself (view.up), so the sea is lit as the planet turns under the
+// sun; depths are heights below the sea's level there (view.altitude).
+//
 // The water is Jerlov's oceanic type IA, the clear blue of the tropics: absorption mostly pure water (Pope & Fry
 // 1997), backscatter pure water's plus a little from particles.
 
-import { exp, float, max, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
-import { ambient, cloudShadow, sunDirection, sunIlluminance } from '../sky/sky';
+import { dot, exp, float, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
+import type { Sky } from '../sky/sky';
+import type { View } from '../view/view';
 
 type N = any;
 
@@ -46,25 +50,36 @@ const absorption = vec3(...ABSORPTION);
 /** Schlick's Fresnel for water. */
 export const fresnel = (cos: N): N => float(F0).add(pow(float(1).sub(saturate(cos)), 5).mul(1 - F0));
 
-/** 1 below the sea's mean level, 0 above, over a few centimetres. */
-const wet = (p: N): N => smoothstep(0.03, -0.03, p.y);
+export function createOptics(sky: Sky, view: View) {
+  /** 1 below the sea's mean level, 0 above, over a few centimetres. */
+  const wet = (p: N): N => smoothstep(0.03, -0.03, view.altitude(p));
 
-/**
- * The share of the sun's light (as it is above the water) that reaches world position p below the surface: through
- * the surface (Fresnel), then down the refracted ray to p's depth, absorbed on the way. 1 above the water.
- */
-export const sunBelow = (p: N): N => {
-  const depth = max(p.y.negate(), 0);
-  const cos = sqrt(float(1).sub(float(1).sub(sunDirection.y.mul(sunDirection.y)).div(N_WATER * N_WATER)));
-  const through = exp(absorption.mul(depth.div(cos)).negate()).mul(float(1).sub(fresnel(max(sunDirection.y, 0))));
-  return mix(vec3(1), through, wet(p));
-};
+  /**
+   * The share of the sun's light (as it is above the water) that reaches world position p below the surface: through
+   * the surface (Fresnel), then down the refracted ray to p's depth, absorbed on the way. 1 above the water.
+   */
+  const sunBelow = (p: N): N => {
+    const depth = max(view.altitude(p).negate(), 0);
+    const ly = dot(view.up(p), sky.sun);
+    const cos = sqrt(float(1).sub(float(1).sub(ly.mul(ly)).div(N_WATER * N_WATER)));
+    const through = exp(absorption.mul(depth.div(cos)).negate()).mul(float(1).sub(fresnel(max(ly, 0))));
+    return mix(vec3(1), through, wet(p));
+  };
 
-/** The same for the sky's light, which comes down from every direction: on average a path about 1.2 times the depth. */
-export const skyBelow = (p: N): N => {
-  const through = exp(absorption.mul(max(p.y.negate(), 0).mul(1.2)).negate()).mul(1 - 0.066);
-  return mix(vec3(1), through, wet(p));
-};
+  /** The same for the sky's light, which comes down from every direction: on average a path about 1.2 times the depth. */
+  const skyBelow = (p: N): N => {
+    const through = exp(absorption.mul(max(view.altitude(p).negate(), 0).mul(1.2)).negate()).mul(1 - 0.066);
+    return mix(vec3(1), through, wet(p));
+  };
+
+  return {
+    sunBelow,
+    skyBelow,
+    /** The light leaving the sea toward the eye (seaRadiance, below). */
+    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N): N =>
+      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path),
+  };
+}
 
 /** GGX's distribution and height-correlated Smith visibility, for roughness α (not squared). */
 function ggx(nh: N, nl: N, nv: N, alpha: N): N {
@@ -85,35 +100,37 @@ function ggx(nh: N, nl: N, nv: N, alpha: N): N {
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
  *   path   metres from the surface to it through the water (Infinity for open sea)
  */
-export function seaRadiance(
-  p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, reflect: (dir: N, roughness: N) => N,
+function seaRadiance(
+  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N,
 ): N {
-  const l = sunDirection;
+  const l = sky.sun, up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
   const F = fresnel(nv);
-  const sun = sunIlluminance.mul(cloudShadow(p));
+  const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p));
 
   // radiance off a reflectance R under irradiance E is R·E/π; ambient() is the sky's radiance, so its E/π is itself
-  const irradiance = sun.mul(max(l.y, 0)).div(Math.PI).add(ambient(vec3(0, 1, 0)));
+  const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
   const body = BODY.mul(irradiance);
 
   // The sky, along the reflected ray, blurred to the roughness (three's PMREM takes √α). A ray reflected down
-  // from a facet turned away from the eye meets the back of the next wave, not the sky: it sees the sea's own colour.
+  // (below the horizon here, by the up here) from a facet turned away from the eye meets the back of the next wave,
+  // not the sky: it sees the sea's own colour.
   const r = v.negate().reflect(n);
-  const above = reflect(normalize(vec3(r.x, max(r.y, 0), r.z)), sqrt(alpha));
-  const sky = mix(above, body, saturate(r.y.mul(-20)));
+  const below = dot(r, up);
+  const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), sqrt(alpha));
+  const seen = mix(above, body, saturate(below.mul(-20)));
   const h = normalize(l.add(v));
   const glint = sun.mul(ggx(saturate(n.dot(h)), nl, nv, alpha)).mul(nl);
-  const reflected = sky.add(glint).mul(F);
+  const reflected = seen.add(glint).mul(F);
 
   // toward the sun the crests glow; side-on a little, from the light scattered out sideways
-  const into = saturate(v.negate().dot(normalize(vec3(l.x, 0, l.z))));
+  const into = saturate(v.negate().dot(normalize(l.sub(up.mul(dot(l, up))))));
   const crests = CREST.mul(sun).mul(mix(float(0.3), float(1), crest)).mul(mix(float(0.15), float(1), pow(into, 4)));
   // what lies behind, seen through `path` metres of water: dimmed by it, while the water's own glow (and the
   // crests') builds toward the deep's — over the path there and back, so twice the absorption
-  const seen = behind.mul(exp(absorption.mul(path).negate())).div(N_WATER * N_WATER);
+  const through = behind.mul(exp(absorption.mul(path).negate())).div(N_WATER * N_WATER);
   const glow = body.add(crests).mul(float(1).sub(exp(absorption.mul(path).mul(-2))));
-  const water = reflected.add(seen.add(glow).mul(float(1).sub(F)));
-  const froth = sun.mul(nl).div(Math.PI).add(ambient(n)).mul(FOAM_ALBEDO);
+  const water = reflected.add(through.add(glow).mul(float(1).sub(F)));
+  const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
   return mix(water, froth, foam);
 }

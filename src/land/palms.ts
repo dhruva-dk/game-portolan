@@ -15,9 +15,9 @@ import {
   Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
+import { random, scatterPalms } from '../world/scatter';
 import { type Light, leafLight } from './light';
-import { random, scatterPalms } from './scatter';
-import type { Island } from './terrain';
+import { standing, type Site } from './site';
 
 type N = any;
 
@@ -155,7 +155,7 @@ function shape(lean: number, seed: number): Shape {
   return { trunk, crown };
 }
 
-export function createPalms(island: Island, light: Light) {
+export function createPalms(site: Site, light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -187,9 +187,9 @@ export function createPalms(island: Island, light: Light) {
     return albedo.mul(leafLight(light, p, n, THROUGH));
   })();
 
-  const palms = scatterPalms(island);
+  const palms = scatterPalms(site.island);
   const shapes = LEANS.map((lean, k) => shape(lean, k + 11));
-  const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), at = new Vector3(), up = new Vector3(0, 1, 0);
+  const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
   const meshes: InstancedMesh[] = [];
   shapes.forEach((sh, k) => {
     const mine = palms.filter((p) => LEANS.reduce((best, l, j) => (Math.abs(l - p.lean) < Math.abs(LEANS[best] - p.lean) ? j : best), 0) === k);
@@ -197,11 +197,11 @@ export function createPalms(island: Island, light: Light) {
     const crown = new InstancedMesh(sh.crown, crownMaterial, Math.max(mine.length, 1));
     trunk.count = crown.count = mine.length;
     mine.forEach((p, i) => {
-      // the shape leans toward +x; turn it to the palm's heading
+      // the shape leans toward +x; turn it to the palm's heading, and stand it on the sphere
       q.setFromAxisAngle(up, -p.heading);
-      m.compose(at.set(p.x, p.y, p.z), q, s.setScalar(p.height / HEIGHT));
-      trunk.setMatrixAt(i, m);
-      crown.setMatrixAt(i, m);
+      const placed = standing(site, p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4());
+      trunk.setMatrixAt(i, placed);
+      crown.setMatrixAt(i, placed);
     });
     trunk.computeBoundingSphere();
     crown.computeBoundingSphere();

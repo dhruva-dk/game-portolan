@@ -9,7 +9,8 @@ import {
   OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, type WebGPURenderer,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
-import type { Island } from './terrain';
+import { place } from '../world/sphere';
+import type { Site } from './site';
 
 type N = any;
 
@@ -35,7 +36,8 @@ export interface Shadow {
   update(sun: Vector3): void;
 }
 
-export function createShadow(renderer: WebGPURenderer, island: Island): Shadow {
+export function createShadow(renderer: WebGPURenderer, site: Site): Shadow {
+  const { island } = site;
   const reach = Math.max(...Array.from({ length: 360 }, (_, i) => island.coast((i / 180) * Math.PI))) + MARGIN;
   const target = new RenderTarget(SIZE, SIZE, { format: RedFormat });
   target.depthTexture = new DepthTexture(SIZE, SIZE, FloatType);
@@ -47,7 +49,9 @@ export function createShadow(renderer: WebGPURenderer, island: Island): Shadow {
 
   const matrix = uniform(new Matrix4());
   const map = texture(target.depthTexture);
-  const centre = new Vector3(island.centre[0], 0, island.centre[1]);
+  // looking down the sun's rays at the island's centre, its up kept up the map's
+  const centre = new Vector3(...place(site.chart.at, 0));
+  const up = new Vector3(...site.chart.at), north = up.clone().cross(new Vector3(...site.chart.axis));
   const last = new Vector3();
   let dirty = false;
 
@@ -82,8 +86,7 @@ export function createShadow(renderer: WebGPURenderer, island: Island): Shadow {
       dirty = false;
       last.copy(sun);
       camera.position.copy(centre).addScaledVector(sun, SPAN);
-      camera.up.set(0, 1, 0);
-      if (Math.abs(sun.y) > 0.99) camera.up.set(0, 0, 1);
+      camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);
       camera.lookAt(centre);
       camera.updateMatrixWorld();
       camera.coordinateSystem = renderer.coordinateSystem;

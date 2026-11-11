@@ -1,9 +1,11 @@
 // The sky as a reflection: a 256×128 panorama of the air and the clouds round the eye, redone every few frames,
-// and filtered by three's PMREM so a rough surface reads it blurred. The sun's disc is left out: surfaces draw its
+// and filtered by three's PMREM so a rough surface reads it blurred. It is the eye's sky, so it is laid out in the
+// sky's directions (view.toSky) and read along them. The sun's disc is left out: surfaces draw its
 // glint themselves.
 
 import { EquirectangularReflectionMapping, HalfFloatType, LinearFilter, StorageTexture, type WebGPURenderer } from 'three/webgpu';
-import { Fn, cos, float, instanceIndex, pmremTexture, sin, textureStore, uvec2, vec3, vec4 } from 'three/tsl';
+import { Fn, cos, float, instanceIndex, max, normalize, pmremTexture, sin, textureStore, uvec2, vec3, vec4 } from 'three/tsl';
+import type { View } from '../view/view';
 import { cloudsAlong } from './clouds';
 import { skyRadiance } from './tables';
 
@@ -19,7 +21,8 @@ panorama.minFilter = panorama.magFilter = LinearFilter;
 panorama.mapping = EquirectangularReflectionMapping;
 panorama.generateMipmaps = false;
 
-export function createReflection(renderer: WebGPURenderer, sunDirection: N) {
+/** sunDirection: toward the sun, as the eye's sky shows it. */
+export function createReflection(renderer: WebGPURenderer, view: View, sunDirection: N) {
   // the inverse of three's equirectUV
   const bake = Fn(() => {
     const x = instanceIndex.mod(W), y = instanceIndex.div(W);
@@ -32,8 +35,14 @@ export function createReflection(renderer: WebGPURenderer, sunDirection: N) {
 
   let frame = 0;
   return {
-    /** The sky's light reflected toward unit direction dir off a surface of the given roughness (0–1). */
-    reflect: (dir: N, roughness: N): N => pmremTexture(panorama, dir, roughness),
+    /**
+     * The sky's light reflected toward world direction dir off a surface of the given roughness (0–1). Only the sky
+     * above its horizon: a ray from the sea past the horizon's edge still meets the sky's horizon.
+     */
+    reflect: (dir: N, roughness: N): N => {
+      const d = view.toSky(dir);
+      return pmremTexture(panorama, normalize(vec3(d.x, max(d.y, 0), d.z)), roughness);
+    },
     update() {
       if (frame++ % EVERY !== 0) return;
       renderer.compute(bake);

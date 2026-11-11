@@ -4,6 +4,7 @@
 //
 // The mesh is a polar grid about the island's centre whose rings follow the coast, so the waterline lies along a
 // ring: rings a metre or so apart across the beach and the shallows, growing apart inland and out over the deep.
+// It is worked out on the island's chart and laid on the sphere (site.ts); the textures are laid along the chart.
 //
 // What covers the ground (sea grass, coral, the sand's mottling, litter) rides on the mesh's vertices: only the land
 // needs it.
@@ -14,9 +15,11 @@ import {
   BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace,
   TextureLoader, Vector3,
 } from 'three/webgpu';
-import { Fn, attribute, float, mix, normalGeometry, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import { Fn, attribute, cross, dot, float, mix, normalGeometry, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import type { View } from '../view/view';
+import { ISLAND } from '../world/terrain';
 import type { Light } from './light';
-import { ISLAND, type Island } from './terrain';
+import { onSphere, type Site } from './site';
 
 type N = any;
 
@@ -47,18 +50,24 @@ function rings(): number[] {
   return out;
 }
 
-function geometry(island: Island, litter: (x: number, z: number) => number): BufferGeometry {
+function geometry(site: Site, litter: (x: number, z: number) => number): BufferGeometry {
+  const { island } = site;
   const ds = rings();
-  const positions: number[] = [], normals: number[] = [], cover: number[] = [], fallen: number[] = [];
+  const positions: number[] = [], normals: number[] = [], axes: number[] = [], ground: number[] = [];
+  const cover: number[] = [], fallen: number[] = [];
   const n = new Vector3(), e = 0.5;
   for (const d of ds) for (let s = 0; s < SPOKES; s++) {
     const t = (s / SPOKES) * 2 * Math.PI, c = island.coast(t);
     // inland the rings shrink with the coast toward the centre; seaward they keep their distance from it
     const r = d < 0 ? c * (1 + d / ISLAND.radius) : c + d;
     const x = island.centre[0] + Math.cos(t) * r, z = island.centre[1] + Math.sin(t) * r;
-    positions.push(x, island.height(x, z), z);
+    const at = onSphere(site, x, island.height(x, z), z);
+    positions.push(...at.p);
+    // the ground's normal on the chart (x, up, z), turned onto the sphere
     n.set(island.height(x - e, z) - island.height(x + e, z), 2 * e, island.height(x, z - e) - island.height(x, z + e)).normalize();
-    normals.push(n.x, n.y, n.z);
+    for (let i = 0; i < 3; i++) normals.push(at.e1[i] * n.x + at.up[i] * n.y + at.e2[i] * n.z);
+    axes.push(...at.e1);
+    ground.push(x, z);
     cover.push(island.patches(x, z), island.reef(x, z), island.mottle(x, z));
     fallen.push(d < 0 ? litter(x, z) : 0);
   }
@@ -70,6 +79,8 @@ function geometry(island: Island, litter: (x: number, z: number) => number): Buf
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(positions, 3));
   g.setAttribute('normal', new Float32BufferAttribute(normals, 3));
+  g.setAttribute('axis', new Float32BufferAttribute(axes, 3));
+  g.setAttribute('ground', new Float32BufferAttribute(ground, 2));
   g.setAttribute('cover', new Float32BufferAttribute(cover, 3));
   g.setAttribute('litter', new Float32BufferAttribute(fallen, 1));
   g.setIndex(index);
@@ -77,7 +88,7 @@ function geometry(island: Island, litter: (x: number, z: number) => number): Buf
 }
 
 /** litter(x, z): 0…1, how thickly fallen fronds and leaves cover the ground (scatter.litter). */
-export function createLand(island: Island, light: Light, litter: (x: number, z: number) => number) {
+export function createLand(site: Site, view: View, light: Light, litter: (x: number, z: number) => number) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -90,7 +101,8 @@ export function createLand(island: Island, light: Light, litter: (x: number, z: 
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {
-    const p = positionWorld, xz = p.xz;
+    // where on the island's chart, and how high
+    const p = positionWorld, xz = attribute('ground', 'vec2'), height = view.altitude(p), up = view.up(p);
     // two scales of the texture, so it doesn't visibly repeat
     const uv = xz.div(SAND_TILE), uv2 = xz.div(SAND_TILE * 3.7).add(0.37);
     const grain = texture(sand, uv).rgb.mul(0.65).add(texture(sand, uv2).rgb.mul(0.35));
@@ -98,29 +110,32 @@ export function createLand(island: Island, light: Light, litter: (x: number, z: 
     const cover: N = attribute('cover', 'vec3');
     // mottled: damper hollows and drier, paler rises
     albedo = albedo.mul(cover.z.mul(0.12).add(1));
-    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.4, 0.05, p.y)));
+    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.4, 0.05, height)));
     // coral and rubble on the reef, mottled by the sand's pattern and its own
     const coral = smoothstep(0.2, 0.7, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2)));
     albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.3).add(1)), coral);
     // sea grass, its edges broken by the sand's own pattern, only on the lagoon's floor (not the beach, nor the reef's wall)
-    const floor = smoothstep(-1.2, -2.5, p.y).mul(smoothstep(-8, -6, p.y)).mul(smoothstep(0.9, 0.97, normalGeometry.y));
+    const flat = dot(normalize(normalGeometry), up);
+    const floor = smoothstep(-1.2, -2.5, height).mul(smoothstep(-8, -6, height)).mul(smoothstep(0.9, 0.97, flat));
     const grass = smoothstep(0.35, 0.65, cover.x.add(grain.g.sub(SAND_MEAN[1]).mul(1.5))).mul(floor);
     albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
 
     // litter on the dry sand, its edges broken by its own pattern
     const strewn: N = texture(leaves, xz.div(LITTER_TILE)).rgb;
     const litter = smoothstep(0.35, 0.65, attribute('litter', 'float').add(cover.z.mul(0.25)).add(strewn.r.sub(LITTER_MEAN[0]).mul(3)))
-      .mul(smoothstep(0.3, 1, p.y));
+      .mul(smoothstep(0.3, 1, height));
     albedo = mix(albedo, strewn.div(vec3(...LITTER_MEAN)).mul(vec3(...LITTER_ALBEDO)), litter);
 
-    // the ripples' normal map, laid flat on the ground (the ground is never steep enough for that to matter), and none
-    // under the litter; the mesh sits in world space, so its normals are the world's
+    // the ripples' normal map, laid flat on the ground along the chart's axes (the ground is never steep enough for
+    // that to matter), and none under the litter; the mesh sits in world space, so its normals are the world's
     const bump = texture(sandNormal, uv).xyz.mul(2).sub(1);
-    const n = normalize(normalize(normalGeometry).add(vec3(bump.x, 0, bump.y.negate()).mul(float(1.2).mul(float(1).sub(litter)))));
+    const e1 = normalize(attribute('axis', 'vec3')), e2 = cross(e1, up);
+    const tilt = e1.mul(bump.x).sub(e2.mul(bump.y)).mul(float(1.2).mul(float(1).sub(litter)));
+    const n = normalize(normalize(normalGeometry).add(tilt));
 
     return albedo.mul(light(p, n));
   })();
 
-  const mesh = new Mesh(geometry(island, litter), material);
+  const mesh = new Mesh(geometry(site, litter), material);
   return { mesh, material };
 }

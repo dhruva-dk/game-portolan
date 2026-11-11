@@ -2,8 +2,8 @@
 //
 // Each shape is a sphere made lumpy by noise, its faces then sheared off by a few planes (the blocky, jointed look of
 // weathered reef rock), and squashed flatter than it is wide. Textured by projecting ambientCG Rock030 along the
-// world's three axes and blending by the surface's facing (no seams, no UVs to unwrap); darker where wet; lit like
-// everything on the island (light.ts).
+// world's three axes and blending by the surface's facing (no seams, no UVs to unwrap: any three axes do, so the
+// world's serve); darker where wet; lit like everything on the island (light.ts). Each stands on the sphere (site.ts).
 
 import {
   BufferGeometry, Euler, IcosahedronGeometry, InstancedMesh, Matrix4, MeshBasicNodeMaterial, NoColorSpace, Quaternion,
@@ -11,9 +11,10 @@ import {
 } from 'three/webgpu';
 import { Fn, abs, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import type { View } from '../view/view';
+import { random, scatterRocks } from '../world/scatter';
 import type { Light } from './light';
-import { random, scatterRocks } from './scatter';
-import type { Island } from './terrain';
+import { standing, type Site } from './site';
 
 type N = any;
 
@@ -77,7 +78,7 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-export function createRocks(island: Island, light: Light) {
+export function createRocks(site: Site, view: View, light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -90,7 +91,7 @@ export function createRocks(island: Island, light: Light) {
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {
-    const p = positionWorld, g = normalize(normalWorld);
+    const p = positionWorld, g = normalize(normalWorld), height = view.altitude(p);
     // the texture along each axis, weighed by how squarely the surface faces it
     let w: N = abs(g).pow(4);
     w = w.div(w.x.add(w.y).add(w.z));
@@ -103,13 +104,13 @@ export function createRocks(island: Island, light: Light) {
     const n = normalize(g.add(tilt));
 
     let albedo: N = grain.div(vec3(...ROCK_MEAN)).mul(vec3(...ROCK_ALBEDO));
-    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, p.y)));
-    albedo = mix(albedo, vec3(...ALGAE).mul(grain.div(vec3(...ROCK_MEAN))), smoothstep(-0.1, -0.6, p.y).mul(0.6));
+    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, height)));
+    albedo = mix(albedo, vec3(...ALGAE).mul(grain.div(vec3(...ROCK_MEAN))), smoothstep(-0.1, -0.6, height).mul(0.6));
     return albedo.mul(light(p, n));
   })();
 
-  const rocks = scatterRocks(island, SHAPES);
-  const m = new Matrix4(), q = new Quaternion(), e = new Euler(), s = new Vector3(), at = new Vector3();
+  const rocks = scatterRocks(site.island, SHAPES);
+  const m = new Matrix4(), q = new Quaternion(), e = new Euler(), s = new Vector3(), zero = new Vector3();
   const meshes = Array.from({ length: SHAPES }, (_, k) => {
     const mine = rocks.filter((r) => r.shape === k);
     const mesh = new InstancedMesh(shape(k + 1), material, Math.max(mine.length, 1));
@@ -117,8 +118,8 @@ export function createRocks(island: Island, light: Light) {
     mine.forEach((r, i) => {
       // a slight lean, as if settled
       e.set((Math.sin(r.yaw * 3) * 0.12), r.yaw, Math.cos(r.yaw * 5) * 0.12);
-      m.compose(at.set(r.x, r.y, r.z), q.setFromEuler(e), s.setScalar(r.size));
-      mesh.setMatrixAt(i, m);
+      m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
+      mesh.setMatrixAt(i, standing(site, r.x, r.y, r.z, m, m.clone()));
     });
     mesh.computeBoundingSphere();
     return mesh;

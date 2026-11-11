@@ -11,18 +11,21 @@
 // moved to where the camera now sees them (reprojected by the cloud's distance) and held to the new samples' range.
 // After four frames every half-resolution pixel is fresh.
 //
-// Units inside are kilometres, relative to the camera; the planet's centre is BOTTOM below the sea.
+// The shell is the eye's, like the sky (view.toSky): Earth's curvature under it, its directions the sky's (x east, y
+// up, z south, elevations stretched to put its horizon on the sea's). Its map slides under the eye as the eye moves
+// over the planet. Units inside are kilometres, relative to the camera; Earth's centre is BOTTOM below the sea.
 
 import {
-  HalfFloatType, LinearFilter, Matrix4, NearestFilter, RepeatWrapping, Storage3DTexture, StorageTexture, Vector3,
-  ClampToEdgeWrapping, type PerspectiveCamera, type WebGPURenderer,
+  HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector3, ClampToEdgeWrapping,
+  type PerspectiveCamera, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Break, Fn, If, Loop, abs, clamp, cos, dot, exp, float, floor, fract, instanceIndex, int, ivec2, length, max, min,
-  mix, mod, normalize, pow, select, sin, smoothstep, sqrt, texture, texture3D, textureLoad, textureStore, uint,
-  uniform, uvec2, uvec3, vec2, vec3, vec4,
+  Break, Fn, If, Loop, abs, clamp, dot, exp, float, fract, instanceIndex, int, ivec2, length, max, min, mix, normalize,
+  pow, select, smoothstep, sqrt, texture, texture3D, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
+import type { View } from '../view/view';
 import { BOTTOM, MIE_EXTINCTION, RAYLEIGH_SCATTERING } from './atmosphere';
+import { bakeCloudNoise, detailVolume, remap, shapeVolume, weatherMap } from './cloud-noise';
 import { skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
 
 type N = any;
@@ -43,99 +46,24 @@ const AIR_EXTINCTION = vec3(...RAYLEIGH_SCATTERING).add(MIE_EXTINCTION).mul(0.8)
 /** Farthest distance marched, km; the clouds fade into the haze before it. */
 const MAX_DISTANCE = 40;
 
-const SHAPE_N = 64, DETAIL_N = 32, WEATHER_N = 256;
-
-function volume(n: number): Storage3DTexture {
-  const t = new Storage3DTexture(n, n, n);
-  t.wrapS = t.wrapT = t.wrapR = RepeatWrapping;
-  t.minFilter = t.magFilter = LinearFilter;
-  t.generateMipmaps = false;
-  return t;
-}
-const shapeVolume = volume(SHAPE_N);
-const detailVolume = volume(DETAIL_N);
-const weatherMap = new StorageTexture(WEATHER_N, WEATHER_N);
-weatherMap.wrapS = weatherMap.wrapT = RepeatWrapping;
-weatherMap.generateMipmaps = false;
-
-const hash33 = (c: N): N =>
-  fract(sin(vec3(dot(c, vec3(127.1, 311.7, 74.7)), dot(c, vec3(269.5, 183.3, 246.1)), dot(c, vec3(113.5, 271.9, 124.6)))).mul(43758.5453));
-
-/** Tiling Worley noise, inverted: 1 at feature points. */
-const worley = Fn(([p, period]: [N, N]) => {
-  const cell = floor(p), f = fract(p);
-  let near: N = float(4);
-  for (let z = -1; z <= 1; z++) for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
-    const o = vec3(x, y, z);
-    near = min(near, length(o.add(hash33(mod(cell.add(o), period))).sub(f)));
-  }
-  return clamp(float(1).sub(near), 0, 1);
-}).setLayout({ name: 'worley', type: 'float', inputs: [{ name: 'p', type: 'vec3' }, { name: 'period', type: 'float' }] });
-
-/** Tiling gradient noise in [-1, 1]. */
-const perlin = Fn(([p, period]: [N, N]) => {
-  const i: N = floor(p), f: N = fract(p);
-  const u: N = f.mul(f).mul(f).mul(f.mul(f.mul(6).sub(15)).add(10));
-  const g = (x: number, y: number, z: number): N => {
-    const o = vec3(x, y, z);
-    return dot(normalize(hash33(mod(i.add(o), period)).mul(2).sub(1)), f.sub(o));
-  };
-  const a = mix(mix(g(0, 0, 0), g(1, 0, 0), u.x), mix(g(0, 1, 0), g(1, 1, 0), u.x), u.y);
-  const b = mix(mix(g(0, 0, 1), g(1, 0, 1), u.x), mix(g(0, 1, 1), g(1, 1, 1), u.x), u.y);
-  return mix(a, b, u.z);
-}).setLayout({ name: 'perlin', type: 'float', inputs: [{ name: 'p', type: 'vec3' }, { name: 'period', type: 'float' }] });
-
-const worleyFbm = (p: N, f: number): N =>
-  worley(p.mul(f), float(f)).mul(0.625).add(worley(p.mul(2 * f), float(2 * f)).mul(0.25)).add(worley(p.mul(4 * f), float(4 * f)).mul(0.125));
-
-const perlinFbm = (p: N, f: number, octaves: number): N => {
-  let sum: N = float(0);
-  let amp = 0.5;
-  for (let o = 0; o < octaves; o++, f *= 2, amp *= 0.5) sum = sum.add(perlin(p.mul(f), float(f)).mul(amp));
-  return sum;
-};
-
-const remap = (x: N, a: N, b: N, c: N, d: N): N => c.add(x.sub(a).div(max(b.sub(a), 1e-4)).mul(d.sub(c)));
-
-function texel3(n: number) {
-  const x = instanceIndex.mod(n), y = instanceIndex.div(n).mod(n), z = instanceIndex.div(n * n);
-  return { at: uvec3(x, y, z), uvw: vec3(x, y, z).add(0.5).div(n) };
-}
-
-/** R: Perlin-Worley billows; G, B, A: Worley at rising frequencies, to lift the billows' floor. */
-const shapeKernel = Fn(() => {
-  const { at, uvw } = texel3(SHAPE_N);
-  const pn = clamp(perlinFbm(uvw, 4, 3).mul(1.1).add(0.5), 0, 1);
-  const w2 = worleyFbm(uvw, 2), w4 = worleyFbm(uvw, 4), w8 = worleyFbm(uvw, 8);
-  const pw = clamp(remap(pn, w2.sub(1), float(1), float(0), float(1)), 0, 1);
-  textureStore(shapeVolume, at, vec4(pw, w2, w4, w8));
-})().compute(SHAPE_N ** 3, [64]);
-
-const detailKernel = Fn(() => {
-  const { at, uvw } = texel3(DETAIL_N);
-  textureStore(detailVolume, at, vec4(worleyFbm(uvw, 2), worleyFbm(uvw, 4), worleyFbm(uvw, 8), 1));
-})().compute(DETAIL_N ** 3, [64]);
-
-/** R: where cloud may form; G: how tall it grows there. */
-const weatherKernel = Fn(() => {
-  const x = instanceIndex.mod(WEATHER_N), y = instanceIndex.div(WEATHER_N);
-  const uv = vec3(vec2(x, y).add(0.5).div(WEATHER_N), 0.5);
-  const cover = clamp(perlinFbm(uv, 4, 5).mul(1.3).add(0.5), 0, 1);
-  const height = clamp(perlinFbm(uv.add(vec3(0.37, 0.71, 0)), 2, 3).add(0.5), 0, 1);
-  textureStore(weatherMap, uvec2(x, y), vec4(cover, height, 0, 1));
-})().compute(WEATHER_N * WEATHER_N, [64]);
-
 // ------------------------------------------------------------------ per-frame inputs
 
 const coverage = uniform(0.5);
 /** How far the wind has carried the clouds, km. */
 const drift = uniform(new Vector3());
+/** Toward the sun, as the eye's sky shows it. */
 const sunDir = uniform(new Vector3(0, 1, 0));
-/** The camera's position, km. */
+/** The eye: x and z where it is over the clouds' map, y its height above the sea; km. */
 const eye = uniform(new Vector3());
+/** Where it was over the map last frame. */
+const previousEye = uniform(new Vector3());
 const projectionInverse = uniform(new Matrix4());
 const cameraWorld = uniform(new Matrix4());
 const previousViewProjection = uniform(new Matrix4());
+/** The eye's frame and its horizon's dip last frame, for finding where a cloud was seen then. */
+const previousFrame = {
+  east: uniform(new Vector3(1, 0, 0)), up: uniform(new Vector3(0, 1, 0)), south: uniform(new Vector3(0, 0, 1)), dip: uniform(0),
+};
 const frameIndex = uniform(0, 'uint');
 
 /** Cloud density (0–1) at q, km relative to the eye. `fine` erodes the edges. */
@@ -262,13 +190,14 @@ const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 /** Interleaved gradient noise (Jimenez 2014), for the march's start. */
 const ign = (p: N): N => fract(float(52.9829189).mul(fract(dot(p, vec2(0.06711056, 0.00583715)))));
 
-function rayAt(uv: N): N {
-  const ndc = vec4(uv.x.mul(2).sub(1), float(1).sub(uv.y.mul(2)), 1, 1);
-  const view = projectionInverse.mul(ndc);
-  return normalize(cameraWorld.mul(vec4(view.xyz.div(view.w), 0)).xyz);
-}
+function createPasses(width: number, height: number, view: View) {
+  /** The sky's direction through the screen at uv. */
+  const rayAt = (uv: N): N => {
+    const ndc = vec4(uv.x.mul(2).sub(1), float(1).sub(uv.y.mul(2)), 1, 1);
+    const camera = projectionInverse.mul(ndc);
+    return view.toSky(cameraWorld.mul(vec4(camera.xyz.div(camera.w), 0)).xyz);
+  };
 
-function createPasses(width: number, height: number) {
   const HW = Math.max(1, Math.ceil(width / 2)), HH = Math.max(1, Math.ceil(height / 2));
   const MW = Math.ceil(HW / 2), MH = Math.ceil(HH / 2);
   const marched = target(MW, MH, NearestFilter);
@@ -297,10 +226,11 @@ function createPasses(width: number, height: number) {
       const current = textureLoad(marched, m).toVar();
       const out = current.toVar();
       const outDistance = textureLoad(marchedDistance, m).x.toVar();
-      // where this pixel's cloud was last frame, found by its distance now
+      // where this pixel's cloud was last frame, found by its distance now: seen from where the eye was over the
+      // map then, and turned from that frame's sky back into the world, where last frame's camera saw it
       const uv = vec2(x, y).add(0.5).div(vec2(HW, HH));
-      const world = eye.mul(1000).add(rayAt(uv).mul(outDistance.mul(1000)));
-      const clip = previousViewProjection.mul(vec4(world, 1));
+      const then = rayAt(uv).mul(outDistance).add(eye).sub(previousEye);
+      const clip = previousViewProjection.mul(vec4(view.fromSky(normalize(then), previousFrame), 0));
       const prev = vec2(clip.x.div(clip.w).mul(0.5).add(0.5), float(0.5).sub(clip.y.div(clip.w).mul(0.5)));
       const onScreen = prev.x.greaterThanEqual(0).and(prev.x.lessThanEqual(1))
         .and(prev.y.greaterThanEqual(0)).and(prev.y.lessThanEqual(1)).and(clip.w.greaterThan(0));
@@ -357,9 +287,9 @@ const shadowKernel = Fn(() => {
   textureStore(shadowMap, uvec2(x, y), vec4(mix(0.15, 1, exp(tau.negate())), 0, 0, 1));
 })().compute(SHADOW_N * SHADOW_N, [64]);
 
-/** Fraction of the sun's light the clouds let through to a point at world position p (metres). */
-export const cloudShadow = (p: N): N => {
-  const uv = p.xz.mul(0.001).sub(shadowCentre.xz).div(SHADOW_EXTENT).add(0.5);
+/** Fraction of the sun's light the clouds let through to world position p (metres), read where p lies on the eye's chart. */
+const cloudShadow = (view: View) => (p: N): N => {
+  const uv = view.local(p).mul(0.001).add(eye.xz).sub(shadowCentre.xz).div(SHADOW_EXTENT).add(0.5);
   const edge = smoothstep(0.5, 0.4, max(abs(uv.x.sub(0.5)), abs(uv.y.sub(0.5))));
   return mix(float(1), texture(shadowMap).sample(uv).level(float(0)).r, edge);
 };
@@ -368,19 +298,19 @@ export const cloudShadow = (p: N): N => {
 
 export interface CloudInputs {
   coverage: number;
-  /** m/s on xz. */
+  /** m/s, east (x) and south (y). */
   wind: { x: number; y: number };
+  /** Toward the sun, as the eye's sky shows it (view.toSky). */
   sunDirection: Vector3;
 }
 
-export function createClouds(renderer: WebGPURenderer) {
-  renderer.compute(shapeKernel);
-  renderer.compute(detailKernel);
-  renderer.compute(weatherKernel);
+export function createClouds(renderer: WebGPURenderer, view: View) {
+  bakeCloudNoise(renderer);
 
-  let passes = createPasses(1, 1);
+  let passes = createPasses(1, 1, view);
   let size = [0, 0];
   let frame = 0;
+  let last: readonly number[] | null = null;
   const viewProjection = new Matrix4();
   const historyTexture = texture(passes.history[0]);
   const historyDistanceTexture = texture(passes.historyDistance[0]);
@@ -390,11 +320,12 @@ export function createClouds(renderer: WebGPURenderer) {
     color: historyTexture,
     /** Distance to the clouds, km. */
     distance: historyDistanceTexture,
+    shadow: cloudShadow(view),
 
     update(inputs: CloudInputs, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       if (width !== size[0] || height !== size[1]) {
         size = [width, height];
-        passes = createPasses(width, height);
+        passes = createPasses(width, height, view);
         frame = 0;
       }
       coverage.value = inputs.coverage;
@@ -402,7 +333,17 @@ export function createClouds(renderer: WebGPURenderer) {
       drift.value.z += (inputs.wind.y * dt) / 1000;
       drift.value.y += dt * 0.002; // the billows slowly turn over
       sunDir.value.copy(inputs.sunDirection);
-      eye.value.copy(camera.position).multiplyScalar(0.001);
+      // the eye slides over the map as it moves over the planet, by its step along its own east and south
+      const { position, frame: f, height: h } = view.eye;
+      previousEye.value.copy(eye.value);
+      if (last) {
+        const step = [position[0] - last[0], position[1] - last[1], position[2] - last[2]];
+        eye.value.x += (step[0] * f.east[0] + step[1] * f.east[1] + step[2] * f.east[2]) / 1000;
+        eye.value.z -= (step[0] * f.north[0] + step[1] * f.north[1] + step[2] * f.north[2]) / 1000;
+      }
+      eye.value.y = h / 1000;
+      if (!last) previousEye.value.copy(eye.value);
+      last = position;
       projectionInverse.value.copy(camera.projectionMatrixInverse);
       cameraWorld.value.copy(camera.matrixWorld);
       frameIndex.value = frame;
@@ -421,6 +362,10 @@ export function createClouds(renderer: WebGPURenderer) {
       }
 
       previousViewProjection.value.copy(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      previousFrame.east.value.set(...f.east);
+      previousFrame.up.value.set(...f.up);
+      previousFrame.south.value.set(-f.north[0], -f.north[1], -f.north[2]);
+      previousFrame.dip.value = view.eye.dip;
       frame++;
     },
   };

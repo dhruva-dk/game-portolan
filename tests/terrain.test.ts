@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ISLAND, createIsland } from '../src/land/terrain.ts';
-import { scatterPalms, scatterRocks, scatterShrubs } from '../src/land/scatter.ts';
+import { ISLAND, createIsland } from '../src/world/terrain.ts';
+import { scatterPalms, scatterRocks, scatterShrubs } from '../src/world/scatter.ts';
 
 const island = createIsland([0, -300], 1);
 const at = (t: number, r: number): [number, number] => [island.centre[0] + Math.cos(t) * r, island.centre[1] + Math.sin(t) * r];
