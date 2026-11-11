@@ -373,10 +373,13 @@ function marchClouds(o: N, d: N, t0: N, t1: N, steps: number, jitter: N, S: N, T
       const h = clamp(pr.sub(R + CLOUD.base).div(CLOUD.top - CLOUD.base), 0, 1);
       const sun = lightTransmittance(pr, dot(up, key)).mul(keyLight);
       // Wrenninge's octaves: each scatters less forward and sees less of the cloud
+      // and a last one for the light scattered many times over, which leaves a thick cloud almost evenly every way:
+      // why a cumulus seen from above, with the sun behind the eye, is still white
       const ms = hg(c, float(0.78)).mul(0.65).add(hg(c, float(-0.25)).mul(0.35)).mul(exp(tau.negate()))
         .add(hg(c, float(0.39)).mul(0.5).mul(exp(tau.mul(-0.5))))
-        .add(hg(c, float(0.2)).mul(0.25).mul(exp(tau.mul(-0.25))));
-      const powder = float(1).sub(exp(dense.mul(SIGMA * -60))).mul(0.6).add(0.4);
+        .add(hg(c, float(0.2)).mul(0.25).mul(exp(tau.mul(-0.25))))
+        .add(float(0.6 / (4 * Math.PI)).mul(exp(tau.mul(-0.12))));
+      const powder = float(1).sub(exp(dense.mul(SIGMA * -60))).mul(0.4).add(0.6);
       const sky = ambientAt(up).mul(mix(float(0.35), float(1), h)).mul(1 / (4 * Math.PI));
       const ext = dense.mul(SIGMA);
       const light = sun.mul(ms).mul(powder).mul(4 * Math.PI * 0.25).add(sky).mul(ext);
@@ -517,10 +520,12 @@ const envKernel = Fn(() => {
 })().compute(ENV_W * ENV_ROWS, [64]);
 
 /** The sky and clouds the sea reflects along world direction d (folded above the horizon), blurred by `lod` mips. */
-export function reflected(d: N, lod: N): N {
-  const up = dot(d, SKY.envUp);
+export function reflected(d: N, lod: N, local: N): N {
+  // read as if seen from the panorama's eye: the elevation off the local up, the bearing carried over to its frame
+  const up = dot(d, local);
   const el = atan(max(up, 0), sqrt(max(float(1).sub(up.mul(up)), 1e-6)));
-  const az = atan(dot(d, SKY.envNorth), dot(d, SKY.envEast));
+  const flat = d.sub(local.mul(up));
+  const az = atan(dot(flat, SKY.envNorth), dot(flat, SKY.envEast));
   const uv = vec2(fract(az.div(Math.PI * 2)), sqrt(el.div(Math.PI / 2)));
   return texture(envMap).sample(uv).depth(int(0)).level(lod).rgb;
 }

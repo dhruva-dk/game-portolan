@@ -377,7 +377,7 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const below = dot(r, u);
     r.assign(normalize(r.sub(u.mul(min(below, 0).mul(2.0)))));
     const blur = log2(max(sqrt(sigma2).mul(2 * 81), 1));
-    const sky = reflected(r, blur);
+    const sky = reflected(r, blur, u);
     // Fresnel (Schlick, water's 0.02), dimmed toward grazing as rough slopes shadow each other
     const fresnel = float(0.02).add(pow(float(1).sub(nv), 5).mul(0.98)).mul(mix(float(1), float(0.75), smoothstep(0.01, 0.06, sigma2))).toVar();
 
