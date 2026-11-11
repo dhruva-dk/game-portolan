@@ -3,16 +3,13 @@
 // Starts the Vite dev server, opens one page per query, waits for frames, writes captures/<query>.png.
 // The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
 
-import { chromium } from 'playwright';
-import { createServer } from 'vite';
 import { mkdirSync } from 'node:fs';
+import { launch } from './launch.ts';
 
 const queries = process.argv.slice(2);
 if (queries.length === 0) queries.push('');
 
-const server = await createServer({ logLevel: 'error', server: { port: 5199 } });
-await server.listen();
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
+const { browser, url, close } = await launch();
 mkdirSync('captures', { recursive: true });
 
 try {
@@ -21,7 +18,7 @@ try {
     const page = await browser.newPage({ viewport: { width: 956, height: 440 } });
     page.on('console', (m) => ['error', 'warning'].includes(m.type()) && console.error(`[${q}] ${m.text()}`));
     page.on('pageerror', (e) => console.error(`[${q}] ${e.message}`));
-    await page.goto(`http://localhost:5199/?${q}`);
+    await page.goto(`${url}?${q}`);
     await page.waitForTimeout(2500);
     const file = `captures/${q.replace(/[^\w.=-]+/g, '_') || 'default'}.png`;
     await page.screenshot({ path: file });
@@ -29,6 +26,5 @@ try {
     await page.close();
   }
 } finally {
-  await browser.close();
-  await server.close();
+  await close();
 }

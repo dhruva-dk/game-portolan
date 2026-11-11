@@ -10,6 +10,7 @@
     "ios": "npm run build && cap run ios",
     "test": "node --test tests/*.test.ts",
     "capture": "node tools/capture.ts",
+    "reference": "node tools/reference.ts",
     "shot": "xcrun devicectl device capture screenshot --device 00008140-000268A80140801C --destination captures/phone.png"
   },
   "dependencies": {
