@@ -1,10 +1,11 @@
 // How light leaves the sea toward the eye, given the surface's normal and roughness there. Units are the sky's:
 // radiance per unit sun illuminance at the top of the air.
 //
-//   reflected  the sky and clouds (sky.reflect, prefiltered to the surface's roughness) and the sun (Beckmann facets), weighted
-//              by Fresnel for water (F0 = 0.02)
+//   reflected  the sky and clouds (sky.reflect, prefiltered to the surface's roughness) and the sun (Beckmann
+//              facets), weighted by Fresnel for water (F0 = 0.02)
 //   body       light scattered back up out of deep water: the irradiance from the sun and sky, times the water's
-//              reflectance R ≈ 0.33·b_b/a (Morel & Prieur 1977), through the surface twice and spread by n² on the way out
+//              reflectance R ≈ 0.33·b_b/(a + b_b) (Gordon et al. 1975), through the surface twice and spread by n² on
+//              the way out
 //   below      what lies under shallow water (the sea floor, already lit by what light reaches it: sunBelow, skyBelow),
 //              dimmed along the eye's path through the water and spread by n² on the way out, with the water's own
 //              glow in front of it growing toward the deep water's over the path
@@ -15,8 +16,10 @@
 // "Up" and the sun's elevation are those at the point itself (view.up), so the sea is lit as the planet turns under the
 // sun; depths are heights below the sea's level there (view.altitude).
 //
-// The water is Jerlov's oceanic type IA, the clear blue of the tropics: absorption mostly pure water (Pope & Fry
-// 1997), backscatter pure water's plus a little from particles.
+// The water is the clear water over the tropics' carbonate banks (Jerlov's oceanic IB): absorption mostly pure
+// water's (Pope & Fry 1997), and backscatter pure water's plus the fine carbonate silt the waves keep stirred up,
+// b_bp ≈ 0.01 m⁻¹ at 550 nm, rising toward the blue as λ⁻¹ (Bahamas Banks, Dierssen et al. 2009): what turns its
+// deep water a bright, saturated blue and its shallows turquoise, where the open ocean's clearest water is navy.
 
 import { dot, exp, float, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
@@ -25,9 +28,9 @@ import type { View } from '../view/view';
 type N = any;
 
 /** Absorption per metre, red/green/blue (680, 550, 440 nm). */
-const ABSORPTION = [0.45, 0.065, 0.022];
-/** Backscatter per metre. */
-const BACKSCATTER = [0.0012, 0.0018, 0.0032];
+const ABSORPTION = [0.45, 0.068, 0.025];
+/** Backscatter per metre: pure sea water's, and the silt's. */
+const BACKSCATTER = [0.0012 + 0.008, 0.0018 + 0.01, 0.0032 + 0.0125];
 /** Refractive index of sea water. */
 export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
@@ -41,7 +44,7 @@ const CREST_SCATTER = 0.06;
 const FOAM_ALBEDO = 0.8;
 
 /** What comes back out of deep water per unit irradiance on it: R·(1 − F)²/n², with F ≈ F0 for light near normal. */
-const BODY = vec3(...ABSORPTION.map((a, i) => (0.33 * BACKSCATTER[i]) / a * ((1 - F0) ** 2) / (N_WATER * N_WATER)));
+const BODY = vec3(...ABSORPTION.map((a, i) => ((0.33 * BACKSCATTER[i]) / (a + BACKSCATTER[i])) * ((1 - F0) ** 2) / (N_WATER * N_WATER)));
 /** The water's colour after the light's path through a crest. */
 const CREST = vec3(...ABSORPTION.map((a) => Math.exp(-a * CREST_PATH) * CREST_SCATTER));
 
