@@ -38,7 +38,7 @@ const CORAL = [0.15, 0.115, 0.08];
  * the dry fronds' and leaves' mean albedo it is scaled to. */
 const LITTER_TILE = 3;
 const LITTER_MEAN = [0.173, 0.106, 0.065];
-const LITTER_ALBEDO = [0.2, 0.16, 0.11];
+const LITTER_ALBEDO = [0.13, 0.095, 0.06];
 /** How sharply the three projections hand over to each other. */
 const SHARP = 8;
 
@@ -95,7 +95,8 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
       const fallen: N = tri(leaves, LITTER_TILE).rgb;
       const lying = smoothstep(0.15, 0.85, litter.add(cover.z.sub(0.5).mul(0.6)).add(fallen.r.sub(LITTER_MEAN[0]).mul(2)))
         .mul(smoothstep(0.3, 1, height)).mul(0.85);
-      albedo = mix(albedo, fallen.div(vec3(...LITTER_MEAN)).mul(vec3(...LITTER_ALBEDO)), lying);
+      // its own pattern's contrast halved: dead fronds and leaves, not pale gravel
+      albedo = mix(albedo, mix(vec3(1), fallen.div(vec3(...LITTER_MEAN)), 0.5).mul(vec3(...LITTER_ALBEDO)), lying);
       bare = float(1).sub(lying);
     }
 
