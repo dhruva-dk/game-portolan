@@ -3,7 +3,9 @@
 //
 // An island: a wandering coast; a beach at about 1:8 at the waterline, easing inland into a berm and seaward into a
 // shallow apron a metre or two deep; inland a dome to 5–12 m with one or two lesser mounds (saddles between them)
-// and fine dune relief. Past the apron its flank falls away until it meets the bank's floor.
+// and fine dune relief. Past the apron its flank falls gently to the depth of the banks islands stand on, then
+// steeply on past the deepest floor (it meets the bank's floor wherever it gets there first), so by its reach it is
+// below every floor and the sea floor there is the bank's alone.
 //
 // Where they lie: as many as the planet's area holds at ISLANDS.density, each on the shallowest bank that is clear
 // of deep water and far enough from the others; the largest placed first, as they need the most room.
@@ -41,8 +43,10 @@ export const ISLANDS = {
   gap: 160,
   /** At least this far from the coast to the deep's edge, metres, beyond the apron. */
   clearance: 30,
-  /** How deep the bank under an island may be at most, metres (the flank is carried this deep before the island ends). */
+  /** How deep the bank under an island may be at most, metres: the flank falls gently this far. */
   floor: 17,
+  /** The flank's slope below `floor`. */
+  steep: 0.6,
 } as const;
 
 /** A lesser mound on an island: where on its chart, how wide (Gaussian σ) and how high, metres. */
@@ -63,6 +67,8 @@ export interface IslandSite {
   coast(theta: number): number;
   /** The island's own ground at chart (x, z), before the bank: metres above the sea, falling without end past the apron. */
   mound(x: number, z: number): number;
+  /** The highest the mound can be r metres from the centre (+Infinity within the apron's farthest reach). */
+  ceiling(r: number): number;
 }
 
 const smoothstep = (a: number, b: number, x: number) => {
@@ -80,8 +86,8 @@ const wave = (h: Harmonic[], t: number) => {
   return s;
 };
 
-/** One island on `chart`, its coast `radius` metres out on average. */
-export function createIslandSite(chart: Chart, radius: number, noise: Noise3, seed: number): IslandSite {
+/** One island on `chart`, its coast `radius` metres out on average; no sea floor is deeper than `deepest` metres. */
+export function createIslandSite(chart: Chart, radius: number, noise: Noise3, seed: number, deepest: number): IslandSite {
   const rand = random(seed * 7919 + 101);
   const I = ISLANDS;
   const size = (radius - I.radius[0]) / (I.radius[1] - I.radius[0]);
@@ -103,6 +109,13 @@ export function createIslandSite(chart: Chart, radius: number, noise: Noise3, se
   });
   const dunesAt: Vec3 = [rand() * 256, rand() * 256, rand() * 256];
 
+  /** The depth of the flank `past` metres beyond the apron, below the beach's `beach`. */
+  const flankDepth = (beach: number, past: number) => {
+    const e = I.flankEase, fall = past <= 0 ? 0 : past < e ? (past * past) / (2 * e) : past - e / 2;
+    const depth = beach + I.flank * fall;
+    return depth <= I.floor ? depth : I.floor + (depth - I.floor) * (I.steep / I.flank);
+  };
+
   const mound = (x: number, z: number) => {
     const r = Math.hypot(x, z), t = Math.atan2(z, x), c = coast(t);
     const d = r - c;
@@ -110,9 +123,8 @@ export function createIslandSite(chart: Chart, radius: number, noise: Noise3, se
       // the beach runs on down and levels into the apron; past the apron the flank falls, easing in
       const beach = apron * (1 - Math.exp(-(d * I.beach) / apron));
       const l = I.lobes.size * radius, lobes = I.lobes.depth * width * noise.value(x / l + dunesAt[2], z / l + dunesAt[0], dunesAt[1]);
-      const past = d - apronWidth(t) - lobes, e = I.flankEase;
-      const fall = past <= 0 ? 0 : past < e ? (past * past) / (2 * e) : past - e / 2;
-      return -beach - I.flank * fall;
+      const past = d - apronWidth(t) - lobes;
+      return -flankDepth(beach, past);
     }
     const rho = r / c, inside = (1 - rho * rho) ** 2;
     // the berm: up at the beach's slope from the waterline; at the centre (where the coast's angle means nothing) level
@@ -136,14 +148,16 @@ export function createIslandSite(chart: Chart, radius: number, noise: Noise3, se
   };
   relief = (target - berm) / (highest() - berm);
   const summit = highest();
-  // how far it reaches: the farthest apron, then the flank carried down past the deepest bank an island stands on
+  // how far it reaches: the farthest apron, then the flank carried down past the deepest floor
   let most = 0;
   for (let i = 0; i < 360; i++) {
     const t = (i / 180) * Math.PI;
     most = Math.max(most, coast(t) + apronWidth(t) + I.lobes.depth * width);
   }
-  const reach = most + (I.floor - apron) / I.flank + I.flankEase;
-  return { chart, radius, shelf: most, reach, summit, coast, mound };
+  const reach = most + I.flankEase + (I.floor - apron) / I.flank + (deepest - I.floor) / I.steep;
+  // past the farthest apron, the flank is at least r − most beyond it
+  const ceiling = (r: number) => (r <= most ? Infinity : -flankDepth(0, r - most));
+  return { chart, radius, shelf: most, reach, summit, coast, mound, ceiling };
 }
 
 /** The sea floor at unit direction p before any island: how deep, and how far from the deep water's edge (negative inside it), metres. */
@@ -158,8 +172,8 @@ function lattice(count: number): Vec3[] {
   });
 }
 
-/** The islands for a planet whose banks and deeps are `ground`. */
-export function placeIslands(ground: Ground, noise: Noise3, seed: number): IslandSite[] {
+/** The islands for a planet whose banks and deeps are `ground`, its floor nowhere deeper than `deepest` metres. */
+export function placeIslands(ground: Ground, noise: Noise3, seed: number, deepest: number): IslandSite[] {
   const rand = random(seed * 15485863 + 7);
   const area = 4 * Math.PI * R * R;
   const count = Math.max(1, Math.round(area * ISLANDS.density));
@@ -174,7 +188,7 @@ export function placeIslands(ground: Ground, noise: Noise3, seed: number): Islan
   const placed: IslandSite[] = [];
   for (const [i, radius] of radii.entries()) {
     // the island's shape is its own; only its chart says where it lies
-    const shape = createIslandSite({ at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + i + 1);
+    const shape = createIslandSite({ at: [0, 1, 0], axis: [1, 0, 0] }, radius, noise, seed * 31 + i + 1, deepest);
     const spot = candidates.find((c) => c.clear > shape.shelf + ISLANDS.clearance &&
       placed.every((o) => distance(o.chart.at, c.p) > shape.shelf + o.shelf + ISLANDS.gap));
     if (!spot) continue;

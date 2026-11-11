@@ -28,13 +28,13 @@ export const SEA = {
   /** Small ripples of relief on every floor under water, not on the beaches. */
   ripples: { size: 14, height: 0.25 },
   /** The channels: how far apart they wind, their floor's mean half-width, and how wide each side's fall is. */
-  channel: { size: 520, half: 15, side: 60 },
+  channel: { size: 520, half: 8, side: 80 },
   /** How far the deeps' edges wander in and out along their length, metres (by the banks' finer swell). */
   ragged: 20,
   /** How deep the deeps are, shallowest to deepest, and how broad their changes. */
   deep: { depth: [32, 58], size: 600 },
   /** The basins: where the deeps' field is deepest (its noise above this), and their sides. */
-  basin: { above: 0.3, side: 60 },
+  basin: { above: 0.35, side: 80 },
   /** How smoothly an island's flank meets the bank, metres. */
   meet: 1.5,
 } as const;
@@ -74,6 +74,9 @@ const unit = (p: Vec3): Vec3 => {
   return Math.abs(l - 1) < 1e-12 ? p : [p[0] / l, p[1] / l, p[2] / l];
 };
 
+/** Rubble round an island's foot thins out between these distances from its coast, metres. */
+const FOOT = [15, 35] as const;
+
 /** What the sea floor's fields give at a point before any island. */
 interface Floor { height: number; depth: number; deep: number; clearance: number }
 
@@ -101,7 +104,7 @@ export function createPlanet(seed: number): Planet {
       for (let i = 0; i < 3; i++) g[i] += g2[i];
     }
     const radial = g[0] * px + g[1] * py + g[2] * pz;
-    const slope = Math.sqrt(Math.max(g[0] * g[0] + g[1] * g[1] + g[2] * g[2] - radial * radial, 0) + 0.09);
+    const slope = Math.sqrt(Math.max(g[0] * g[0] + g[1] * g[1] + g[2] * g[2] - radial * radial, 0) + 0.36);
     level = v;
     return ((v - to) * size) / slope;
   };
@@ -131,7 +134,7 @@ export function createPlanet(seed: number): Planet {
     return f;
   };
 
-  const islands = placeIslands((p) => floor(unit(p)), noise, seed);
+  const islands = placeIslands((p) => floor(unit(p)), noise, seed, SEA.deep.depth[1] + SEA.meet);
   const near = islands.map((s) => Math.cos(s.reach / R)), charts = islands.map((s) => charter(s.chart));
   const xzr = new Float64Array(3);
 
@@ -144,9 +147,9 @@ export function createPlanet(seed: number): Planet {
       if (px * c[0] + py * c[1] + pz * c[2] < near[i]) continue;
       charts[i](p, xzr);
       const x = xzr[0], z = xzr[1], r = xzr[2];
-      const w = smoothstep(s.reach, s.reach * 0.8, r);
-      h += (smax(h, s.mound(x, z), SEA.meet) - h) * w;
-      if (cover) shore = Math.min(shore, r - s.coast(Math.atan2(z, x)));
+      // (where the mound is surely below the floor, the floor is the ground)
+      if (s.ceiling(r) >= h - SEA.meet) h += (smax(h, s.mound(x, z), SEA.meet) - h) * smoothstep(s.reach, s.reach * 0.8, r);
+      if (cover && r < s.shelf + FOOT[1]) shore = Math.min(shore, r - s.coast(Math.atan2(z, x)));
     }
     const depth = -h;
     if (depth > 0.5) h += SEA.ripples.height * read(SEA.ripples.size, at.ripple) * smoothstep(0.5, 3, depth);
@@ -155,7 +158,7 @@ export function createPlanet(seed: number): Planet {
       cover.grass = where > 0 ? where * smoothstep(0.1, 0.35, read(9, at.grass) + 0.5 * read(60, at.grass2)) : 0;
       // rubble on the deeps' shoulders, round the islands' feet past the beach, and scattered over the banks
       const shoulder = smoothstep(0.02, 0.15, f.deep) * (1 - smoothstep(0.35, 0.6, f.deep));
-      const foot = smoothstep(2, 5, shore) * (1 - smoothstep(15, 35, shore));
+      const foot = smoothstep(2, 5, shore) * (1 - smoothstep(FOOT[0], FOOT[1], shore));
       const rubble = Math.max(shoulder, foot, smoothstep(0.45, 0.65, read(30, at.rubble2))) * smoothstep(0, 0.5, depth);
       cover.rubble = rubble > 0 ? rubble * smoothstep(-0.1, 0.25, read(7, at.rubble)) : 0;
       cover.mottle = sat(0.5 + 1.1 * read(12, at.mottle));
