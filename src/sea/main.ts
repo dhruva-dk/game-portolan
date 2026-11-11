@@ -21,7 +21,8 @@ import { P } from '../render/gpu/uniforms.ts';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Nd = any;
 
-const q = new URLSearchParams(location.search);
+// the page's query, or one built in (for a device run: VITE_SEA_QUERY='fps=0' node tools/ios.ts ...)
+const q = new URLSearchParams(location.search || (import.meta.env.VITE_SEA_QUERY as string | undefined) || '');
 const num = (k: string, d: number) => (q.has(k) ? Number(q.get(k)) : d);
 const touch = navigator.maxTouchPoints > 0;
 
@@ -120,6 +121,7 @@ const shafts = (() => {
 })();
 
 const glow = bloom(vec4(min(exposed, vec3(14)), 1) as Nd, 0.12, 0.5, 1.0) as Nd;
+(glow as unknown as { setResolutionScale(s: number): void }).setResolutionScale(0.25);
 const post = new RenderPipeline(renderer);
 post.outputNode = vec4(exposed.add(glow.rgb).add(shafts.node), 1) as unknown as Node;
 
@@ -355,7 +357,7 @@ function frame(now: number): void {
 
   shape.system('sky');
   const w = renderer.domElement.width * scale, h = renderer.domElement.height * scale;
-  sky.resize(w, h, num('air', 3));
+  sky.resize(w, h, num('air', 4));
   sky.update(camera, ship.up, dt);
   shape.system('sea');
   ocean.update(renderer, camera.position, time, dt);

@@ -594,7 +594,7 @@ export class Sky {
       // a different offset into the march each frame (interleaved gradient noise, turned by the golden ratio)
       const ign = fract(float(52.9829189).mul(fract(dot(vec2(float(x), float(y)), vec2(0.06711056, 0.00583715)))));
       const jitter = fract(ign.add(SKY.frame.mul(0.618034)));
-      const s = traceSky(U.eye, d, jitter, 36, 8);
+      const s = traceSky(U.eye, d, jitter, 32, 8);
       // whether the ray ends on the sea, so the sea and the sky each read only their own texels
       const sea = select(raySphere(U.eye, d, float(R)).x.greaterThan(0), float(1), float(0));
       // where this direction was on the screen last frame, and what was traced there then
