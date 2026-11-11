@@ -22,9 +22,10 @@ type N = any;
 /** The sand texture (ambientCG Ground055S) repeats every this many metres; its ripples are laid again this many
  * times larger (twice, crossing), the wind's broader ripples that show from afar. */
 const SAND_TILE = 4, BROAD = 4.3;
-/** Its mean colour, linear (measured), and the coral sand's mean albedo it is scaled to: a warm beige. */
+/** Its mean colour, linear (measured), and the coral sand's mean albedo it is scaled to: a warm beige (dry carbonate
+ * sand reflects 0.4–0.5, less toward the blue). */
 const SAND_MEAN = [0.345, 0.315, 0.221];
-const SAND_ALBEDO = [0.21, 0.18, 0.125];
+const SAND_ALBEDO = [0.45, 0.4, 0.3];
 /** Wet sand reflects less: water fills the gaps between the grains. It is damp to this height, metres,
  * and glistens below SWASH, where the waves wash up. */
 const WET = 0.65, DAMP = 0.6, SWASH = 0.3;
