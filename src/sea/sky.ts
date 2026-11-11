@@ -47,7 +47,10 @@ export const AIR = {
   ozoneWidth: 150,
   ozone: EARTH_OZONE.map((b) => (b * 16667) / 150),
   groundAlbedo: [0.04, 0.06, 0.08],
-  lightAirMass: 4,
+  lightAirMass: 7,
+  /** How soft the planet's shadow falls across the air (in the cosine of the sun's height): the light scattered round
+   * into it, which a single bounce would leave out. */
+  shadowSoft: 0.15,
 };
 
 export const SKY = shared({
@@ -147,7 +150,7 @@ export const lightTransmittance = (r: N, mu: N): N => {
   const rr = clamp(r, R + 0.5, RT - 0.5);
   const t = texture(transmittanceTable).sample(transmittanceUV(rr, max(mu, -1))).level(float(0)).rgb;
   const horizon = sqrt(max(float(1).sub(float(R * R).div(rr.mul(rr))), 0)).negate();
-  return t.mul(smoothstep(horizon.sub(0.012), horizon.add(0.012), mu));
+  return t.mul(smoothstep(horizon.sub(AIR.shadowSoft), horizon.add(AIR.shadowSoft), mu));
 };
 
 const multiScattering = (r: N, mu: N): N =>
@@ -749,7 +752,7 @@ const cpu = {
 /** The light that reaches height r from a body at cosine mu off the zenith (as lightTransmittance). */
 export function transmittanceCpu(r: number, mu: number, out: Vector3): Vector3 {
   const horizon = -Math.sqrt(Math.max(0, 1 - (R * R) / (r * r)));
-  const shadow = smooth(horizon - 0.012, horizon + 0.012, mu);
+  const shadow = smooth(horizon - AIR.shadowSoft, horizon + AIR.shadowSoft, mu);
   if (shadow <= 0) return out.set(0, 0, 0);
   const m = Math.max(mu, -1);
   const b = r * m, c = r * r - RT * RT, far = -b + Math.sqrt(Math.max(b * b - c, 0));

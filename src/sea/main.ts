@@ -30,7 +30,7 @@ const touch = navigator.maxTouchPoints > 0;
 const DAY = num('day', 24 * 60);
 /** The sun's light at the top of the air, in the scene's units (the exposure brings it to the screen). */
 const SUN = new Vector3(1, 0.975, 0.94).multiplyScalar(20);
-const MOON = new Vector3(0.78, 0.86, 1).multiplyScalar(20 * 0.012);
+const MOON = new Vector3(0.78, 0.86, 1).multiplyScalar(20 * 0.02);
 
 // ---------------------------------------------------------------- the renderer
 
@@ -243,6 +243,9 @@ const T = new Vector3(), A = new Vector3(), light = new Vector3(), unproject = n
 const lum = (v: Vector3) => 0.2126 * v.x + 0.7152 * v.y + 0.0722 * v.z;
 let exposure = 0.5;
 
+const meter = { sun: 0, sky: 0, elev: 0, open: 0 };
+/** What the meter reads with the sun overhead. */
+const NOON = 5.6;
 function lights(dt: number): number {
   const sun = U.sunDir.value as Vector3, moon = U.moonDir.value as Vector3;
   bodies(day, sun, moon);
@@ -276,9 +279,13 @@ function lights(dt: number): number {
   skyLight.color.setRGB(amb.x, amb.y, amb.z);
   skyLight.groundColor.setRGB(amb.x * 0.12 + sunE.x * 0.01, amb.y * 0.14 + sunE.y * 0.012, amb.z * 0.18 + sunE.z * 0.014);
   skyLight.position.copy(at);
-  // the eye adapts: a white surface lying open to the sky comes out a little under the screen's white
-  const open = (lum(sunE) * Math.max(at.dot(sun), 0) + lum(amb) + lum(moonE) * Math.max(at.dot(moon), 0)) / Math.PI;
-  const want = num('ev', 0) ? 2 ** num('ev', 0) : 0.62 / Math.max(open, 0.12);
+  // the eye adapts to what it sees: the light on a white ball (the bodies' light on its lit side, whatever their
+  // height, so a low sun still counts the glare it makes in the air round it) and the sky's over it all
+  const facing = (c: number) => (c > -0.05 ? 0.3 + 0.7 * Math.max(c, 0) : 0);
+  const open = (lum(sunE) * facing(at.dot(sun)) + lum(amb) + lum(moonE) * facing(at.dot(moon))) / Math.PI;
+  meter.sun = lum(sunE); meter.sky = lum(amb); meter.elev = at.dot(sun); meter.open = open;
+  // only partly: dusk and night are darker than noon on the screen as they are to the eye
+  const want = num('ev', 0) ? 2 ** num('ev', 0) : (0.62 / NOON) * (NOON / Math.max(open, 0.03)) ** 0.6;
   exposure += (want - exposure) * Math.min(1, dt * 1.5);
   U.exposure.value = exposure;
   return 1 - smooth(-0.08, 0.05, at.dot(sun));
@@ -316,7 +323,7 @@ const wind = new Vector3();
 const perf = { t: 0, frames: 0, worst: 0, intervals: [] as number[] };
 const cap = num('fps', touch ? 40 : 0);
 let last = performance.now(), lastDrawn = 0;
-const hook = { ready: false, frames: 0, ship, rig };
+const hook = { ready: false, frames: 0, ship, rig, meter };
 (window as unknown as { __sea: object }).__sea = hook;
 
 function frame(now: number): void {
