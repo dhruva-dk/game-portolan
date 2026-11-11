@@ -209,15 +209,16 @@ export function createWaves(renderer: WebGPURenderer) {
           if (c < FOAMING) {
             // each breaking cascade lays its share of the whitecaps
             const spread = Math.sqrt(mss) * CHOP;
-            breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(sea.wind) / FOAMING, 1e-6)) * spread, spread * 0.5);
+            breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(sea.wind) / FOAMING, 1e-6)) * spread, spread);
           }
         });
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
         ripples.value = Math.max(coxMunk(sea.wind) - held, RIPPLE_FLOOR);
       }
-      // foam lasts longer the harder the wind blows: τ from half a second to two and a half
-      fade.value = Math.exp(-dt / (0.5 + 2 * Math.min(Math.max((sea.wind - 5) / 15, 0), 1)));
+      // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
+      // Monahan's stage B, a few seconds)
+      fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((sea.wind - 5) / 15, 0), 1)));
       clock = (clock + dt) % PERIOD;
       time.value = clock;
       renderer.compute(spectrumKernel);

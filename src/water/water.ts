@@ -20,7 +20,7 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { DoubleSide, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, TextureLoader, type WebGPURenderer } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
@@ -35,6 +35,7 @@ import { R } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { BANDS, CASCADES, SIZE } from './cascades';
 import { createCaustics } from './caustics';
+import { createFoam } from './foam';
 import { N_WATER, createOptics } from './optics';
 import { likeness } from './spectrum';
 import { createWaves } from './waves';
@@ -50,8 +51,6 @@ const BREAKER = 0.78;
 const FACING = 0.05;
 /** Refracted rays are followed no deeper than this: beyond, the floor is too dim through the water to matter. */
 const MAX_REFRACT_DEPTH = 20;
-/** The foam pattern (ambientCG Foam002) repeats every this many metres across the wind. */
-const FOAM_TILE = 3;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
 const FETCH = 300_000;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
@@ -107,10 +106,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   const height: N = varying(dot(wave.xyz, grid.up));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
   const phase: N = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
-  const foamPattern = new TextureLoader().load(`${import.meta.env.BASE_URL}tex/foam.png`);
-  foamPattern.wrapS = foamPattern.wrapT = RepeatWrapping;
-  foamPattern.anisotropy = 4;
-  foamPattern.colorSpace = NoColorSpace;
+  const foamOn = createFoam();
   const rest: N = varying(grid.up);
   material.colorNode = Fn(() => {
     const { long, short, breaking } = shallows(rest);
@@ -119,18 +115,20 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     // the water at rest under this pixel, and its change across the pixel, for the charts' reads
     const p = normalize(rest).mul(R);
     const dp: [N, N] = [dFdx(p), dFdy(p)];
-    // surf: the breaking waves' fronts white, from the crest down the face, the troughs between them less so
-    const surf = breaking.mul(smoothstep(0.35, 0.8, phase).mul(0.8).add(0.2));
+    const footprint = max(length(dp[0]), length(dp[1]));
+    // the water over the ground here, as the waves lift it and let it fall: the swash's
+    const thickness = ground.height(rest).negate().add(height);
+    // surf: the breaking waves' fronts white, from the crest down the face; the troughs between keep what the
+    // whitecaps' fading leaves
+    const surf = breaking.mul(smoothstep(0.4, 0.85, phase)).mul(0.7);
 
     // Per chart: the slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the
     // slopes' variance within the footprint) becomes roughness, as do the ripples too small for any cascade. The
     // slopes, as a tangent vector, sum with the charts' weights; the variances, independent, with their squares.
-    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by the foam
-    // pattern: fresh foam is white but for the pattern's holes, and as it fades only its brighter strands are left,
-    // so a whitecap thins into a web and then into flecks. The pattern is stretched along the wind (the chart's x),
-    // as foam is drawn out in streaks, and read at two scales so it doesn't repeat. Cover is no Gaussian height: summed
-    // with weights w it could pass one sea's, or a whitecap's 1. Weighted by w² (Σw² = 1), each chart's foam fades
-    // across the band as its waves do, the mean cover stays one sea's, and no pixel is whiter than a whitecap.
+    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by foam.ts.
+    // Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1. Weighted by w²
+    // (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one sea's, and no
+    // pixel is whiter than a whitecap.
     const slope = vec3(0).toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
     charts.each(p, (c) => {
       const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
@@ -143,9 +141,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       });
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w));
       variance.addAssign(v.mul(c.w.mul(c.w)));
-      const strands = read(foamPattern, vec2(1 / (2 * FOAM_TILE), 1 / FOAM_TILE)).r.mul(0.6)
-        .add(read(foamPattern, vec2(1 / (5.3 * FOAM_TILE), 1 / (2.7 * FOAM_TILE))).r.mul(0.4));
-      foam.addAssign(saturate(strands.sub(float(1).sub(saturate(cover)).mul(0.7)).mul(2.5)).mul(c.w.mul(c.w)));
+      foam.addAssign(foamOn(c, saturate(cover), thickness, footprint).mul(c.w.mul(c.w)));
     }, dp);
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
