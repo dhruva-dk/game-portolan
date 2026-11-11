@@ -22,8 +22,8 @@ type N = any;
 
 /** About how wide a ripple facet is, metres: a capillary ripple's flank. */
 const FACET = 0.01;
-/** The solid angle a facet reflects the sun over, sr: the sun's disc (6.8e-5) widened by the facet's curvature (~3°). */
-const OMEGA = 8e-3;
+/** The solid angle a facet reflects the sun over, sr: the sun's disc (6.8e-5) widened by the facet's curvature (~1°). */
+const OMEGA = 1e-3;
 /** Times a second each cell draws anew. */
 const RATE = 8;
 /** The draw's grid: its finest cells, metres. */
