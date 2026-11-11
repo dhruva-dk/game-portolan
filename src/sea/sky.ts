@@ -58,7 +58,7 @@ export const SKY = shared({
   haze: uniform(1),
   /** How much of the sky the clouds cover, 0–1, and how dense they are. */
   coverage: uniform(0.58),
-  cloudDensity: uniform(1),
+  cloudDensity: uniform(2.5),
   /** How far the clouds have drifted, metres in the world (they ride the wind aloft). */
   drift: uniform(new Vector3()),
   /** The panorama the sea reflects: its up, east and north, and its eye. */

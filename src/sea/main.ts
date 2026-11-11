@@ -67,6 +67,7 @@ const sky = new Sky(renderer);
 const ocean = new Ocean();
 ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
 SKY.coverage.value = num('cover', 0.55);
+SKY.cloudDensity.value = num('dens', SKY.cloudDensity.value as number);
 SEA.foamFold.value = num('fold', SEA.foamFold.value as number);
 SEA.foamLife.value = num('life', SEA.foamLife.value as number);
 scene.add(ocean.mesh);
