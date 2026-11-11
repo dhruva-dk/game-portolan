@@ -10,8 +10,9 @@
 // arrives higher than the depth allows, it is breaking: surf on the crest and along the beach.
 //
 // The water is drawn after everything solid, and reads it behind itself (the colour and depth the frame has drawn so
-// far) to see the sea floor through the water. The look-up is shifted by the surface's slope, as if refracted — the
-// one screen-space approximation here: true refraction would trace each ray through the water.
+// far) to see the sea floor through the water: along the eye's ray refracted at the surface and followed down to
+// the floor's depth, then looked up where that lands on the screen — the one screen-space approximation here (what
+// lies off the screen, or behind something nearer, can't be seen through the water).
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
@@ -20,15 +21,17 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, cameraPosition, cameraProjectionMatrixInverse, float, getViewPosition, length, log2, max, min, normalize,
+  Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, float, getScreenPosition,
+  getViewPosition, length, log2, max, min, mix, normalize,
   positionGeometry, positionView, positionWorld, saturate, screenUV, select, smoothstep, sqrt, texture, uniform, varying,
-  vec2, vec3, viewportDepthTexture, viewportSharedTexture,
+  vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Seabed } from '../land/seabed';
 import type { Environment } from '../environment';
-import { seaRadiance } from './optics';
+import { N_WATER, seaRadiance, skyBelow, sunBelow } from './optics';
+import { sunDirection } from '../sky/sky';
 import { CASCADES, SIZE } from './cascades';
-import { createWaves } from './waves';
+import { CURVED, createWaves } from './waves';
 
 type N = any;
 
@@ -38,8 +41,8 @@ const GROWTH = 1.05;
 const REACH = 20000;
 /** The breaker index: the highest wave (significant height) water of a given depth holds. */
 const BREAKER = 0.78;
-/** How far the view behind is shifted per unit of the surface's slope, in metres at the surface. */
-const REFRACT = 0.6;
+/** Refracted rays are followed no deeper than this: beyond, the floor is too dim through the water to matter. */
+const MAX_REFRACT_DEPTH = 20;
 /** The foam pattern (ambientCG Foam002) repeats every this many metres across the wind. */
 const FOAM_TILE = 3;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
@@ -140,10 +143,16 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
       .add(texture(foamPattern, along.mul(vec2(1 / (5.3 * FOAM_TILE), 1 / (2.7 * FOAM_TILE)))).r.mul(0.4));
     const foam = saturate(strands.sub(float(1).sub(saturate(cover)).mul(0.7)).mul(2.5));
 
-    // What lies behind the surface, looked up a little off to the side where the surface slopes, as refraction
-    // bends it (nearer, less). If the shifted look-up lands on something in front of the water, it looks straight.
-    const shift = n.xz.mul(REFRACT).div(max(positionView.z.negate(), 1));
-    const shifted = screenUV.add(vec2(shift.x, shift.y.negate()));
+    // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
+    // here to the floor's depth and looked up where that lands on the screen. If the look-up lands on something in
+    // front of the water, it looks straight through instead.
+    const ray = v.negate().refract(n, 1 / N_WATER);
+    const down = min(max(seabed.height(at).negate(), 0), MAX_REFRACT_DEPTH);
+    const end = positionWorld.add(ray.mul(down.div(max(ray.y.negate(), 0.2))));
+    // near the screen's edges the look-up eases back to straight through, so it never reaches past them
+    const landed = getScreenPosition(cameraViewMatrix.mul(vec4(end, 1)).xyz, cameraProjectionMatrix);
+    const margin = min(min(landed.x, landed.y), min(float(1).sub(landed.x), float(1).sub(landed.y)));
+    const shifted = mix(screenUV, landed, smoothstep(0, 0.05, margin));
     const behindAt = (uv: N) => getViewPosition(uv, viewportDepthTexture(uv).x, cameraProjectionMatrixInverse);
     const inFront = behindAt(shifted).z.greaterThan(positionView.z);
     const uv = select(inFront, screenUV, shifted);
@@ -160,8 +169,36 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
   const mesh = new Mesh(rings(), material);
   mesh.frustumCulled = false;
 
+  /**
+   * Caustics: how much the waves above focus the sunlight reaching world position p under the water. A bit of the
+   * surface refracts its light down onto the floor a depth D below, moving it sideways by D·(1 − 1/n)·∇h; the patch it
+   * lights is the surface's own area times the determinant J of I + D·(1 − 1/n)·H (H, the height's second
+   * derivatives), so the light there is 1/|J| as bright. Under a crest, which bulges like a lens, J < 1: the bright
+   * net on the floor. H is the two smaller cascades' curvature (waves.ts), read where the light came in
+   * (toward the sun); far off their mips smooth the slopes and the net fades to an even light, as it should.
+   */
+  const caustics = (p: N): N => {
+    const depth = max(p.y.negate(), 0);
+    const { long, short } = shallows(p.xz);
+    const l = sunDirection;
+    const sin = sqrt(float(1).sub(l.y.mul(l.y))).div(N_WATER);
+    const across = l.xz.div(max(length(l.xz), 1e-4)).mul(depth.mul(sin).div(sqrt(float(1).sub(sin.mul(sin)))));
+    const entry = p.xz.add(across);
+    let H: N = vec3(0);
+    CURVED.forEach((c, i) => { H = H.add(texture(waves.curvature[i], entry.div(CASCADES[c])).xyz.mul(c < 2 ? long : short)); });
+    const hxx = H.x, hzz = H.y, hxz = H.z;
+    const f = depth.mul(1 - 1 / N_WATER);
+    const J = float(1).add(f.mul(hxx)).mul(float(1).add(f.mul(hzz))).sub(f.mul(hxz).mul(f.mul(hxz)));
+    return mix(float(1), float(1).div(max(J.abs(), 0.15)), smoothstep(0, 0.3, depth));
+  };
+
   return {
     mesh,
+    /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
+    below: {
+      sun: (p: N): N => sunBelow(p).mul(caustics(p)),
+      sky: (p: N): N => skyBelow(p),
+    },
     update(env: Environment, dt: number) {
       wind.value.copy(env.wind).normalize();
       waves.update({ wind: env.wind.length(), heading: Math.atan2(env.wind.y, env.wind.x), fetch: FETCH }, dt);

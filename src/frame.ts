@@ -32,8 +32,8 @@ export function createFrame(renderer: WebGPURenderer) {
   camera.position.y = VIEW_HEIGHT * 1000;
   const island = createIsland([0, -300]);
   const seabed = createSeabed(island);
-  const land = createLand(island);
   const water = createWater(renderer, sky.reflect, seabed);
+  const land = createLand(island, water.below);
   scene.add(land.mesh, water.mesh);
 
   const scenePass = pass(scene, camera);

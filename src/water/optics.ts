@@ -25,7 +25,7 @@ const ABSORPTION = [0.45, 0.065, 0.022];
 /** Backscatter per metre. */
 const BACKSCATTER = [0.0012, 0.0018, 0.0032];
 /** Refractive index of sea water. */
-const N_WATER = 1.34;
+export const N_WATER = 1.34;
 /** Reflectance at normal incidence, ((n − 1)/(n + 1))². */
 const F0 = 0.02;
 /** How far the sun's light runs through a crest before it leaves toward the eye, metres. */

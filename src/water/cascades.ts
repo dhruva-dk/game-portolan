@@ -9,9 +9,11 @@ export const CASCADES = [1024, 128, 16];
 /**
  * Each patch's band of wavenumbers, rad/m. A patch hands the next the waves six of whose wavelengths fit across
  * the next patch: shorter than that, the larger patch's texels would draw them coarsely, and longer, the smaller
- * patch has too few modes to draw them well.
+ * patch has too few modes to draw them well. The last patch stops at its grid's Nyquist circle: the square grid holds
+ * shorter waves in its corners, but only along the diagonals, and those would draw the grid's axes into the
+ * ripples (and the caustics, which weigh the shortest waves most). What it leaves out the ripples' roughness takes.
  */
-export const BANDS: [number, number][] = CASCADES.map((_, c) => [
-  c === 0 ? 0 : (12 * Math.PI) / CASCADES[c],
-  c === CASCADES.length - 1 ? Infinity : (12 * Math.PI) / CASCADES[c + 1],
+export const BANDS: [number, number][] = CASCADES.map((L, c) => [
+  c === 0 ? 0 : (12 * Math.PI) / L,
+  c === CASCADES.length - 1 ? (Math.PI * SIZE) / L : (12 * Math.PI) / CASCADES[c + 1],
 ]);

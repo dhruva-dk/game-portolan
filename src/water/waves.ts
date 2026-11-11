@@ -37,6 +37,8 @@ type N = any;
 const PERIOD = 200;
 /** How far the crests lean: the sideways displacement's scale. */
 const CHOP = 1;
+/** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
+export const CURVED = [1, 2];
 /** Cascades whose waves break. */
 const FOAMING = 2;
 /** The ripples' mean square slope is never taken below this, however much the cascades hold. */
@@ -165,11 +167,31 @@ export function createWaves(renderer: WebGPURenderer) {
     textureStore(slopes[c], uvec2(x, y), vec4(a.w, b.x, a.w.mul(a.w), b.x.mul(b.x)));
   })().compute(AREA, [64]));
 
+  // The two smaller cascades' curvature, (∂²h/∂x², ∂²h/∂z², ∂²h/∂x∂z), from their slopes' differences across
+  // neighbouring texels of the FFT's own grid: what focuses the sunlight into caustics on the floor (water.ts). Kept as
+  // its own texture so it can be interpolated: interpolated slopes, differenced, would show bilinear's texel grid.
+  const curvature = CURVED.map(surface);
+  const curvatureKernels = CURVED.map((c, i) => Fn(() => {
+    const x = instanceIndex.mod(SIZE), y = instanceIndex.div(SIZE);
+    const h = (dx: number, dy: number) => {
+      const xx = x.add(SIZE + dx).mod(SIZE), yy = y.add(SIZE + dy).mod(SIZE);
+      const k = yy.mul(SIZE).add(xx).add(c * AREA);
+      const sign = float(1).sub(float(xx.add(yy).bitAnd(uint(1))).mul(2));
+      return fieldsA.element(k).x.mul(sign);
+    };
+    const e2 = (CASCADES[c] / SIZE) ** 2, h0 = h(0, 0).mul(2);
+    const hxx = h(1, 0).add(h(-1, 0)).sub(h0).div(e2), hzz = h(0, 1).add(h(0, -1)).sub(h0).div(e2);
+    const hxz = h(1, 1).sub(h(1, -1)).sub(h(-1, 1)).add(h(-1, -1)).div(4 * e2);
+    textureStore(curvature[i], uvec2(x, y), vec4(hxx, hzz, hxz, 0));
+  })().compute(AREA, [64]));
+
   let wind = -1, heading = 0, clock = 0;
 
   return {
     displacement,
     slopes,
+    /** For CURVED's cascades, in that order. */
+    curvature,
     amplitude,
     ripples,
     update(sea: Sea, dt: number) {
@@ -201,6 +223,7 @@ export function createWaves(renderer: WebGPURenderer) {
       renderer.compute(rowsKernel);
       renderer.compute(columnsKernel);
       for (const k of assembleKernels) renderer.compute(k);
+      for (const k of curvatureKernels) renderer.compute(k);
     },
   };
 }
