@@ -19,3 +19,6 @@ export function createLighting(below: Below, visible: (p: N, n: N) => N): Light 
     return sun.mul(saturate(n.dot(sunDirection))).div(Math.PI).add(ambient(n).mul(below.sky(p)));
   };
 }
+
+/** A leaf facing n (the side toward the eye): lit on that side, and by the share `through` of what falls on the other. */
+export const leafLight = (light: Light, p: N, n: N, through: number): N => light(p, n).add(light(p, n.negate()).mul(through));

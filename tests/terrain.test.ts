@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ISLAND, createIsland } from '../src/land/terrain.ts';
-import { scatterPalms, scatterRocks } from '../src/land/scatter.ts';
+import { scatterPalms, scatterRocks, scatterShrubs } from '../src/land/scatter.ts';
 
 const island = createIsland([0, -300], 1);
 const at = (t: number, r: number): [number, number] => [island.centre[0] + Math.cos(t) * r, island.centre[1] + Math.sin(t) * r];
@@ -78,4 +78,14 @@ test('the palms stand on dry land, apart, leaning seaward', () => {
   }
   assert.ok(seaward > palms.length * 0.9, `seaward ${seaward}/${palms.length}`);
   assert.deepEqual(scatterPalms(island), palms, 'the same every time');
+});
+
+test('the shrubs stand on dry land behind the beach', () => {
+  const shrubs = scatterShrubs(island, 4);
+  assert.ok(shrubs.length > 100, `count ${shrubs.length}`);
+  for (const s of shrubs) {
+    assert.ok(island.height(s.x, s.z) > 0.4, 'dry');
+    assert.ok(s.shape >= 0 && s.shape < 4);
+  }
+  assert.deepEqual(scatterShrubs(island, 4), shrubs, 'the same every time');
 });

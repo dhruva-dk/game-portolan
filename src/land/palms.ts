@@ -15,7 +15,7 @@ import {
   Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
-import type { Light } from './light';
+import { type Light, leafLight } from './light';
 import { random, scatterPalms } from './scatter';
 import type { Island } from './terrain';
 
@@ -184,7 +184,7 @@ export function createPalms(island: Island, light: Light) {
     // the side facing the eye
     const n = normalize(normalWorld).mul(faceDirection);
     const albedo = mix(vec3(...LEAF), vec3(...OLD_LEAF), smoothstep(0.55, 1, leaf.x)).mul(leaf.y);
-    return albedo.mul(light(p, n).add(light(p, n.negate()).mul(THROUGH)));
+    return albedo.mul(leafLight(light, p, n, THROUGH));
   })();
 
   const palms = scatterPalms(island);

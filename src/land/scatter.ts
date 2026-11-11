@@ -1,5 +1,8 @@
 // Where things stand on the island: pure arithmetic over terrain.ts, so it runs in node for the tests.
 //
+// Shrubs: beach shrubs in a broken hedge along the top of the beach, where the spray lets nothing taller grow, and
+// in clumps under the palms. Most waist- to chest-high, a few taller.
+//
 // Palms: coconut palms in groves, thickest along the top of the beach where the nuts wash up and take root, thinning
 // inland. They lean out toward the sea and the open light, the nearer the coast the more; the lean recurves upward.
 //
@@ -108,4 +111,40 @@ export function scatterPalms(island: Island, seed = 1): Palm[] {
     });
   }
   return palms;
+}
+
+export interface Shrub {
+  x: number;
+  y: number;
+  z: number;
+  /** Across, metres. */
+  size: number;
+  yaw: number;
+  /** Which of the shapes it is. */
+  shape: number;
+  /** 0…1: a little paler or darker than the rest. */
+  tint: number;
+}
+
+/** How many shrubs, at least how far apart (by their sizes), and where: the hedge's band, and how far inland they go. */
+const SHRUBS = 120;
+const HEDGE = [-14, -5], INMOST_SHRUB = -45;
+
+export function scatterShrubs(island: Island, shapes: number, seed = 1): Shrub[] {
+  const rand = random(seed * 15485863 + 5);
+  const shrubs: Shrub[] = [];
+  for (let tries = 0; shrubs.length < SHRUBS && tries < SHRUBS * 200; tries++) {
+    const t = rand() * 2 * Math.PI, d = HEDGE[1] + rand() * (INMOST_SHRUB - HEDGE[1]);
+    const r = island.coast(t) + d;
+    if (r < 3) continue;
+    const x = island.centre[0] + Math.cos(t) * r, z = island.centre[1] + Math.sin(t) * r;
+    // the hedge, broken into stretches; inland, clumps where the noise says
+    const hedge = d > HEDGE[0] ? Math.min(Math.max((fbm(x / 14, z / 14, seed + 83, 2) + 0.25) / 0.3, 0), 1) : 0;
+    const clump = Math.min(Math.max((fbm(x / 10, z / 10, seed + 89, 3) - 0.1) / 0.2, 0), 1) * 0.6;
+    if (rand() > Math.max(hedge, clump)) continue;
+    const size = 1.8 + 3.2 * rand() ** 2;
+    if (shrubs.some((s) => Math.hypot(s.x - x, s.z - z) < (s.size + size) * 0.35)) continue;
+    shrubs.push({ x, z, y: island.height(x, z), size, yaw: rand() * 2 * Math.PI, shape: Math.floor(rand() * shapes), tint: rand() });
+  }
+  return shrubs;
 }

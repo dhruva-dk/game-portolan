@@ -11,6 +11,7 @@ import { createPalms } from './land/palms';
 import { createRocks } from './land/rocks';
 import { createSeabed } from './land/seabed';
 import { createShadow } from './land/shadow';
+import { createShrubs } from './land/shrubs';
 import { createIsland } from './land/terrain';
 import { createWater } from './water/water';
 
@@ -43,8 +44,9 @@ export function createFrame(renderer: WebGPURenderer) {
   const land = createLand(island, light);
   const rocks = createRocks(island, light);
   const palms = createPalms(island, light);
-  shadow.cast(...rocks.meshes, ...palms.meshes);
-  scene.add(land.mesh, ...rocks.meshes, ...palms.meshes, water.mesh);
+  const shrubs = createShrubs(island, light);
+  shadow.cast(...rocks.meshes, ...palms.meshes, ...shrubs.meshes);
+  scene.add(land.mesh, ...rocks.meshes, ...palms.meshes, ...shrubs.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
   const post = Fn(() => {
