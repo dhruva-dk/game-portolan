@@ -24,7 +24,7 @@ import { DoubleSide, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, 
 import {
   Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
-  screenUV, select, smoothstep, sqrt, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  screenUV, select, smoothstep, sqrt, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Ground } from '../land/ground';
@@ -162,10 +162,13 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const ray = v.negate().refract(n, 1 / N_WATER);
     const down = min(max(ground.height(rest).negate(), 0), MAX_REFRACT_DEPTH);
     const end = positionWorld.add(ray.mul(down.div(max(dot(ray, up).negate(), 0.2))));
-    // near the screen's edges the look-up eases back to straight through, so it never reaches past them
+    // Near the screen's edges the look-up is shortened, along each axis to at most half the way left to the edge it
+    // heads for, so it never reaches past it and the image behind is only gently squeezed there (easing it back once it
+    // had passed the edge folded the image over on itself: a band of streaks).
     const landed = getScreenPosition(cameraViewMatrix.mul(vec4(end, 1)).xyz, cameraProjectionMatrix);
-    const margin = min(min(landed.x, landed.y), min(float(1).sub(landed.x), float(1).sub(landed.y)));
-    const shifted = mix(screenUV, landed, smoothstep(0, 0.05, margin));
+    const off = landed.sub(screenUV);
+    const room = mix(screenUV, vec2(1).sub(screenUV), step(0, off));
+    const shifted = screenUV.add(off.mul(min(room.div(max(off.abs().mul(2), 1e-6)), 1)));
     const behindAt = (uv: N) => getViewPosition(uv, viewportDepthTexture(uv).x, cameraProjectionMatrixInverse);
     const inFront = behindAt(shifted).z.greaterThan(positionView.z);
     const uv = select(inFront, screenUV, shifted);
