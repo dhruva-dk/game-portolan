@@ -81,6 +81,30 @@ export function meanSquareSlope(N: number, L: number, sea: Sea, band: Band): num
   return sum;
 }
 
+/**
+ * How alike two reads of one drawn sea are, (x, z) metres apart on an N×N patch L wide: the correlation of their
+ * heights, Σ S(k)·cos(k·lag) / Σ S(k), over the `modes` wavevectors that hold the most of it (the rest only add
+ * to the total), so it is quick enough to be asked often.
+ */
+export function likeness(N: number, L: number, sea: Sea, band: Band, modes = 96): (x: number, z: number) => number {
+  const S = banded(spectrum(sea), band), dk = (2 * Math.PI) / L;
+  const all: [number, number, number][] = [];
+  let total = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const kx = (x - N / 2) * dk, kz = (y - N / 2) * dk;
+    // a real sea's height holds k and −k alike
+    const s = (S(kx, kz) + S(-kx, -kz)) / 2;
+    if (s > 0) all.push([kx, kz, s]);
+    total += s;
+  }
+  const top = all.sort((a, b) => b[2] - a[2]).slice(0, modes);
+  return (x, z) => {
+    let sum = 0;
+    for (const [kx, kz, s] of top) sum += s * Math.cos(kx * x + kz * z);
+    return total > 0 ? sum / total : 0;
+  };
+}
+
 /** The sea's whole mean square slope, ripples included, by wind (Cox & Munk 1954, clean surface). */
 export const coxMunk = (wind: number) => 0.003 + 5.12e-3 * wind;
 
