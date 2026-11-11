@@ -54,5 +54,5 @@ export function createFrame(renderer: WebGPURenderer) {
     pipeline.render();
   }
 
-  return { scene, camera, resize, render };
+  return { scene, camera, sky, resize, render };
 }

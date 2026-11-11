@@ -1,10 +1,18 @@
-// Debug only (?probe): grey blocks at 0.3, 1, 3 and 8 km, lit by the sky's light, to judge the light and the haze.
+// Debug only (?probe): grey blocks at 0.3, 1, 3 and 8 km, lit by the sky's light, to judge the light and the haze;
+// and a mirror and a rough sphere 60 m off, to judge the sky's reflection.
 
-import { BoxGeometry, Mesh, MeshBasicNodeMaterial, type Scene } from 'three/webgpu';
-import { dot, max, normalWorld, positionWorld, vec3 } from 'three/tsl';
+import { BoxGeometry, Mesh, MeshBasicNodeMaterial, SphereGeometry, type Scene } from 'three/webgpu';
+import { dot, float, max, normalWorld, positionWorld, reflectVector, vec3 } from 'three/tsl';
 import { ambient, cloudShadow, sunDirection, sunIlluminance } from './sky/sky';
 
-export function addProbe(scene: Scene) {
+export function addProbe(scene: Scene, reflect: (dir: any, roughness: any) => any) {
+  for (const [roughness, x] of [[0, -12], [0.35, 12]]) {
+    const m = new MeshBasicNodeMaterial();
+    m.colorNode = reflect(reflectVector, float(roughness));
+    const ball = new Mesh(new SphereGeometry(8, 64, 32), m);
+    ball.position.set(x, 8, -60);
+    scene.add(ball);
+  }
   const material = new MeshBasicNodeMaterial();
   const albedo = vec3(0.5);
   material.colorNode = albedo.mul(sunIlluminance.mul(cloudShadow(positionWorld)).mul(max(dot(normalWorld, sunDirection), 0)).add(ambient(normalWorld)));

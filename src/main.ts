@@ -23,7 +23,7 @@ if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
 const frame = createFrame(renderer);
 const meter = createMeter(renderer, meterEl);
-if (params.has('probe')) addProbe(frame.scene);
+if (params.has('probe')) addProbe(frame.scene, frame.sky.reflect);
 
 frame.resize(innerWidth, innerHeight);
 frame.camera.rotation.set((Number(params.get('look') ?? 10) * Math.PI) / 180, (Number(params.get('yaw') ?? 0) * Math.PI) / 180, 0, 'YXZ');

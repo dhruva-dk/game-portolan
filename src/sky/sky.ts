@@ -6,12 +6,14 @@
 //   cloudShadow(p)   the fraction of it the clouds let through to world position p
 //   ambient(n)       the sky's light on a surface facing n, as radiance (multiply by albedo)
 //   fog(c, dir, m)   colour c seen m metres away along dir, through the air
+//   reflect(d, r)    the sky and clouds seen along d off a surface of roughness r
 
 import type { PerspectiveCamera, WebGPURenderer } from 'three/webgpu';
 import { Fn, cos, dot, exp, float, max, mix, normalWorldGeometry, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { MIE_EXTINCTION, RAYLEIGH_SCATTERING, SUN_ANGULAR_RADIUS } from './atmosphere';
 import { cloudShadow, createClouds } from './clouds';
+import { createReflection } from './reflection';
 import { VIEW_RADIUS, createTables, haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
 
 type N = any;
@@ -44,6 +46,7 @@ export const fog = (color: N, dir: N, metres: N): N => {
 export function createSky(renderer: WebGPURenderer) {
   const tables = createTables(renderer);
   const clouds = createClouds(renderer);
+  const reflection = createReflection(renderer, sunDirection);
 
   const background = Fn(() => {
     const dir = normalize(normalWorldGeometry);
@@ -56,10 +59,12 @@ export function createSky(renderer: WebGPURenderer) {
   return {
     background,
     clouds,
+    reflect: reflection.reflect,
     update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       sunDirection.value.copy(env.sunDirection);
       tables.update(env.sunDirection.y, env.haze);
       clouds.update({ coverage: env.cloudCoverage, wind: env.wind, sunDirection: env.sunDirection }, camera, dt, width, height);
+      reflection.update();
     },
   };
 }

@@ -1,6 +1,7 @@
 // Screenshots of the game in headless Chromium with WebGPU, for judging changes by eye.
 //   node tools/capture.ts [query ...]      e.g. node tools/capture.ts t=10 t=15 t=18.6
 // Starts the Vite dev server, opens one page per query, waits for frames, writes captures/<query>.png.
+// The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
 
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -11,7 +12,7 @@ if (queries.length === 0) queries.push('');
 
 const server = await createServer({ logLevel: 'error', server: { port: 5199 } });
 await server.listen();
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
 mkdirSync('captures', { recursive: true });
 
 try {

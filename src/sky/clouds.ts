@@ -239,6 +239,9 @@ function march(d: N, steps: number, jitter: N, distance: N): N {
   return vec4(seen.mul(fade), mix(float(1), T, fade));
 }
 
+/** The clouds along unit direction d from the eye, with a coarser march: light (rgb) and transmittance (a). */
+export const cloudsAlong = (d: N, steps: number): N => march(d, steps, float(0.5), float(0).toVar());
+
 // ------------------------------------------------------------------ the frame's targets and passes
 
 function target(w: number, h: number, filter: typeof LinearFilter | typeof NearestFilter = LinearFilter): StorageTexture {
