@@ -1,13 +1,11 @@
 # Working
-Do not deploy to vercel.
 Commit and push to main often, maintaining linear history.
+Explain progress as you go.
 
 # Builds, Platform and Testing
 
-Use headless chromium when testing on this mac. Only test on the iPad when necessary due to
-the additional build time overhead.
 Platform is WebGPU. No WebGL path, no fallbacks, no quality setting, no older devices.
-Target device is M1 iPad at 30 FPS.
+Target device is iPhone 16 Pro Max at 30-40 FPS.
 
 # The Game World and UI
 
