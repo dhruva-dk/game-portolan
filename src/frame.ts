@@ -1,7 +1,9 @@
 import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraProjectionMatrixInverse, cameraWorldMatrix, getViewPosition, length, normalize, pass, screenUV, select, vec4,
+  Fn, cameraProjectionMatrixInverse, cameraWorldMatrix, getViewPosition, length, normalize, pass, renderOutput, screenUV,
+  select, vec4,
 } from 'three/tsl';
+import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { Environment } from './environment';
 import { createSky } from './sky/sky';
 import { createGround } from './land/ground';
@@ -26,7 +28,9 @@ const FAR = 2000;
  *                 the sun, redrawn only when the sun has moved or another island has become the nearest
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, later the ships); then the sea,
  *                 which reads what was drawn before it behind itself (the floor through the water)
- *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping
+ *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping; then FXAA, on the
+ *                 tone-mapped image (its edge test wants the screen's values), for the edges of the sea's crests and
+ *                 the islands against the sky
  * Systems hand this file meshes and shader nodes; they never create passes themselves.
  *
  * The world is the planet's (world/sphere.ts): its centre at the origin, up away from it. The view (view/view.ts)
@@ -71,7 +75,8 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     const inFront = depth.greaterThanEqual(1).or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
     return vec4(select(inFront, hazed.mul(cloud.a).add(cloud.rgb), hazed), 1);
   })();
-  const pipeline = new RenderPipeline(renderer, post);
+  const pipeline = new RenderPipeline(renderer, fxaa(renderOutput(post)));
+  pipeline.outputColorTransform = false;
 
   function resize(width: number, height: number) {
     renderer.setSize(width, height);
