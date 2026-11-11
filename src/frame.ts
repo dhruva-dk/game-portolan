@@ -1,4 +1,4 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, type WebGPURenderer } from 'three/webgpu';
+import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, cameraProjectionMatrixInverse, cameraWorldMatrix, getViewPosition, length, normalize, pass, screenUV, select, vec4,
 } from 'three/tsl';
@@ -10,9 +10,9 @@ const EXPOSURE = 10;
 
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
- *   1. compute  — per-system simulation (sky tables, ocean FFT, foam)
+ *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam)
  *   2. scene    — sky backdrop, land, ship (later: water reading opaque depth and colour)
- *   3. post     — haze by distance; (later: clouds composited); tone mapping
+ *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping
  * Systems hand this file meshes and shader nodes; they never create passes themselves.
  */
 export function createFrame(renderer: WebGPURenderer) {
@@ -29,8 +29,13 @@ export function createFrame(renderer: WebGPURenderer) {
     const depth = scenePass.getTextureNode('depth').x;
     const view = getViewPosition(screenUV, depth, cameraProjectionMatrixInverse);
     const dir = normalize(cameraWorldMatrix.mul(vec4(view, 0)).xyz);
+    const metres = length(view);
     // the backdrop is the sky itself, already seen through all the air
-    return select(depth.greaterThanEqual(1), color, vec4(fog(color.rgb, dir, length(view)), 1));
+    const hazed = select(depth.greaterThanEqual(1), color.rgb, fog(color.rgb, dir, metres));
+    // clouds in front of whatever the pixel shows
+    const cloud = sky.clouds.color.sample(screenUV);
+    const inFront = depth.greaterThanEqual(1).or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
+    return vec4(select(inFront, hazed.mul(cloud.a).add(cloud.rgb), hazed), 1);
   })();
   const pipeline = new RenderPipeline(renderer, post);
 
@@ -40,8 +45,12 @@ export function createFrame(renderer: WebGPURenderer) {
     camera.updateProjectionMatrix();
   }
 
-  function render(env: Environment, _dt: number) {
-    sky.update(env);
+  const size = new Vector2();
+
+  function render(env: Environment, dt: number) {
+    camera.updateMatrixWorld();
+    renderer.getDrawingBufferSize(size);
+    sky.update(env, camera, dt, size.x, size.y);
     pipeline.render();
   }
 

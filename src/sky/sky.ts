@@ -3,13 +3,15 @@
 // What materials use:
 //   sunDirection     unit vector toward the sun
 //   sunIlluminance   the sun's light at sea level, after the air (per unit sun at the top of the air)
+//   cloudShadow(p)   the fraction of it the clouds let through to world position p
 //   ambient(n)       the sky's light on a surface facing n, as radiance (multiply by albedo)
 //   fog(c, dir, m)   colour c seen m metres away along dir, through the air
 
-import type { WebGPURenderer } from 'three/webgpu';
+import type { PerspectiveCamera, WebGPURenderer } from 'three/webgpu';
 import { Fn, cos, dot, exp, float, max, mix, normalWorldGeometry, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { MIE_EXTINCTION, RAYLEIGH_SCATTERING, SUN_ANGULAR_RADIUS } from './atmosphere';
+import { cloudShadow, createClouds } from './clouds';
 import { VIEW_RADIUS, createTables, haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
 
 type N = any;
@@ -21,6 +23,7 @@ const SEA_ALBEDO = 0.06;
 
 export const sunDirection = uniform(vec3(0, 1, 0));
 export const sunIlluminance: N = sunTransmittance(VIEW_RADIUS, sunDirection.y);
+export { cloudShadow };
 
 export const ambient = (n: N): N => {
   const sky = skyAmbientUp;
@@ -40,6 +43,7 @@ export const fog = (color: N, dir: N, metres: N): N => {
 
 export function createSky(renderer: WebGPURenderer) {
   const tables = createTables(renderer);
+  const clouds = createClouds(renderer);
 
   const background = Fn(() => {
     const dir = normalize(normalWorldGeometry);
@@ -51,9 +55,11 @@ export function createSky(renderer: WebGPURenderer) {
 
   return {
     background,
-    update(env: Environment) {
+    clouds,
+    update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       sunDirection.value.copy(env.sunDirection);
       tables.update(env.sunDirection.y, env.haze);
+      clouds.update({ coverage: env.cloudCoverage, wind: env.wind, sunDirection: env.sunDirection }, camera, dt, width, height);
     },
   };
 }

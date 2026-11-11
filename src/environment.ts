@@ -22,7 +22,7 @@ export function createEnvironment(): Environment {
     latitude: 12,
     sunDirection: new Vector3(),
     wind: new Vector2(7, 3),
-    cloudCoverage: 0.35,
+    cloudCoverage: 0.5,
     haze: 1,
   };
   updateEnvironment(env, 0);
