@@ -33,7 +33,8 @@ const FAR = 2000;
  * The world is the planet's (world/sphere.ts): its centre at the origin, up away from it. The view (view/view.ts)
  * says how it looks from the eye, worked out first each frame, and every system that draws is handed it.
  */
-export function createFrame(renderer: WebGPURenderer) {
+/** debug: a debug view's name (water.ts), or ''. */
+export function createFrame(renderer: WebGPURenderer, debug = '') {
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = EXPOSURE;
   const view = createView();
@@ -43,7 +44,7 @@ export function createFrame(renderer: WebGPURenderer) {
   const camera = new PerspectiveCamera(60, 1, 0.5, FAR);
   const site = createSite();
   const seabed = createSeabed(site, view);
-  const water = createWater(renderer, view, sky.light, seabed, site.chart);
+  const water = createWater(renderer, view, sky.light, seabed, debug);
   const shadow = createShadow(renderer, site);
   const light = createLighting(sky.light, water.below, shadow.visible);
   const rocks = createRocks(site, view, light);

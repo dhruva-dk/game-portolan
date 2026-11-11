@@ -1,0 +1,118 @@
+// The sea's charts as the shaders see them (their CPU half is world/lattice.ts): at a point, the three anchors
+// nearest it, their weights, and for each one that weighs in, where the point lies on its chart and the chart's axes
+// carried there (view.ts's chartNodes, the one place the shaders do a chart's arithmetic).
+//
+// The anchors that can matter on screen — those within the drawn sea's reach of the eye, and a cell and a band past
+// it — are uploaded nearest first to a uniform array each frame (two vec4 each: centre and axis, the offset in their
+// w). A uniform array rather than a data texture: a few hundred floats, indexed directly with no sampler. Each vertex
+// and pixel walks the list with one dot product per anchor, keeping the three nearest. The choice and the weights
+// depend on the point alone, never on the eye (the list only bounds the search): the sea is a function of place and
+// time.
+//
+// Reads are skipped where a chart has no weight: the second and third charts' work happens inside an `if` on their
+// weight, so in a cell's interior (where only the nearest weighs in) their texture reads never run. Inside the `if`,
+// fragment reads must not use implicit derivatives (WGSL forbids them in non-uniform control flow, and the chart
+// coordinates jump where the nearest anchor changes), so each chart hands its reads the gradients of its own
+// coordinates across the pixel, worked out from the world position's: dq = (dp·e1, dp·e2).
+
+import { Vector4 } from 'three/webgpu';
+import { If, Loop, acos, clamp, cross, dot, float, fract, int, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
+import { FREQUENCY, anchors, band, cover, icosphere, near, prevailing, type Likeness } from '../world/lattice';
+import { R, type Vec3 } from '../world/sphere';
+import { chartNodes } from './view';
+
+type N = any;
+
+/** One chart's read at a point: where on the patches (metres, offset included), its axes there, and its weight. */
+export interface Read {
+  q: N; e1: N; e2: N; w: N;
+  /** q's change across the pixel, right and down (fragment stage only, when asked for). */
+  dx: N; dy: N;
+}
+
+export type Charts = ReturnType<typeof createCharts>;
+
+/**
+ * span: the width of the largest patch, metres, over which the anchors' offsets are spread; alike: how alike two
+ * reads of the patches are, for choosing offsets that make neighbouring charts' seas independent (lattice.anchors).
+ */
+export function createCharts(span: number, alike: Likeness) {
+  const all = anchors(icosphere(FREQUENCY), prevailing, span, alike);
+  const width = band(FREQUENCY);
+  /** Past the drawn sea, the furthest an anchor can lie and still weigh in somewhere on it. */
+  const margin = cover(FREQUENCY) + width;
+  const centres: N = uniformArray(all.map(() => new Vector4()), 'vec4');
+  const axes: N = uniformArray(all.map(() => new Vector4()), 'vec4');
+  const count = uniform(3, 'int');
+  let listed = '';
+
+  /** The three anchors nearest the unit vector u (indices into the list) and their weights, Σw² = 1. */
+  const pick = (u: N) => {
+    const c = [float(-2).toVar(), float(-2).toVar(), float(-2).toVar()];
+    const i = [int(0).toVar(), int(0).toVar(), int(0).toVar()];
+    Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: k }: { i: N }) => {
+      const d = dot(u, centres.element(k).xyz).toVar();
+      If(d.greaterThan(c[0]), () => {
+        c[2].assign(c[1]); i[2].assign(i[1]);
+        c[1].assign(c[0]); i[1].assign(i[0]);
+        c[0].assign(d); i[0].assign(k);
+      }).ElseIf(d.greaterThan(c[1]), () => {
+        c[2].assign(c[1]); i[2].assign(i[1]);
+        c[1].assign(d); i[1].assign(k);
+      }).ElseIf(d.greaterThan(c[2]), () => {
+        c[2].assign(d); i[2].assign(k);
+      });
+    });
+    const arc = c.map((x) => acos(clamp(x, -1, 1)).mul(R));
+    const s = [float(1), smoothstep(width, 0, arc[1].sub(arc[0])), smoothstep(width, 0, arc[2].sub(arc[0]))];
+    const size = sqrt(s[0].add(s[1].mul(s[1])).add(s[2].mul(s[2])));
+    return { index: i, weight: s.map((x) => x.div(size).toVar()) };
+  };
+
+  /**
+   * Calls `read` for each chart with weight at world position p (nearest first; the first always), inside a branch
+   * on its weight for the second and third. Must be called inside an Fn. dp: p's change across the pixel, right and
+   * down, for the reads' gradients (fragment stage); worked out before any branch.
+   */
+  function each(p: N, read: (r: Read, slot: number) => void, dp?: [N, N]) {
+    const u = normalize(p);
+    const { index, weight } = pick(u);
+    index.forEach((k, slot) => {
+      const run = () => {
+        const C = centres.element(k), X = axes.element(k);
+        const at = C.xyz, axis = X.xyz;
+        const c = chartNodes(at, axis, cross(axis, at))(u);
+        const grad = (d: N) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
+        read({ q: c.q.add(vec2(C.w, X.w)), e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]) }, slot);
+      };
+      if (slot === 0) run();
+      else If(weight[slot].greaterThan(0), run);
+    });
+  }
+
+  /** For ?debug=charts: the three weights as red, green and blue, each cell a little lighter or darker than the next. */
+  function debug(p: N): N {
+    const { index, weight } = pick(normalize(p));
+    const shade = fract(sin(float(index[0]).mul(12.9898)).mul(43758.5453)).mul(0.5).add(0.5);
+    return vec3(weight[0], weight[1], weight[2]).mul(shade);
+  }
+
+  return {
+    each,
+    debug,
+    /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */
+    update(eye: Vec3, reach: number) {
+      const order = near(all, eye, Math.PI * R);
+      const n = Math.max(3, near(all, eye, reach + margin).length);
+      const key = order.slice(0, n).join(',');
+      if (key === listed) return;
+      listed = key;
+      order.slice(0, n).forEach((a, k) => {
+        const { at, axis, offset } = all[a];
+        (centres.array[k] as Vector4).set(at[0], at[1], at[2], offset[0]);
+        (axes.array[k] as Vector4).set(axis[0], axis[1], axis[2], offset[1]);
+      });
+      count.value = n;
+    },
+  };
+}

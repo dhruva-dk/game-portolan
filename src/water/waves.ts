@@ -185,7 +185,7 @@ export function createWaves(renderer: WebGPURenderer) {
     textureStore(curvature[i], uvec2(x, y), vec4(hxx, hzz, hxz, 0));
   })().compute(AREA, [64]));
 
-  let wind = -1, heading = 0, clock = 0;
+  let wind = -1, clock = 0;
 
   return {
     displacement,
@@ -196,9 +196,8 @@ export function createWaves(renderer: WebGPURenderer) {
     ripples,
     update(sea: Sea, dt: number) {
       // a new sea only when the wind changes; the same seeds keep the waves where they are
-      if (Math.abs(sea.wind - wind) > 0.05 || Math.abs(sea.heading - heading) > 0.01) {
+      if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
-        heading = sea.heading;
         const data = initial.image.data as Float32Array;
         let held = 0;
         CASCADES.forEach((L, c) => {

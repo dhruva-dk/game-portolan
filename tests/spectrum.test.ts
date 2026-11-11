@@ -50,7 +50,7 @@ test('the spread sums to one over every direction', () => {
 });
 
 test('the spectrum holds the sea state\'s height', () => {
-  const sea = { wind: 7.6, heading: 0.4, fetch: 300_000 };
+  const sea = { wind: 7.6, fetch: 300_000 };
   const { hs } = seaState(sea.wind, sea.fetch);
   const S = spectrum(sea), N = 1024, L = 4096, dk = (2 * Math.PI) / L;
   let m0 = 0;
@@ -59,7 +59,7 @@ test('the spectrum holds the sea state\'s height', () => {
 });
 
 test('a drawn sea is real, and the FFT keeps its energy', () => {
-  const sea = { wind: 7.6, heading: 0.4, fetch: 300_000 };
+  const sea = { wind: 7.6, fetch: 300_000 };
   const N = 256, L = 256, data = initialSpectrum(N, L, sea, 7);
   // at t = 0 the spectrum of the height is h₀(k) + conj h₀(−k)
   const re = new Float64Array(N * N), im = new Float64Array(N * N);
@@ -92,7 +92,7 @@ test('a drawn sea is real, and the FFT keeps its energy', () => {
 });
 
 test('drawn seas are as high as their spectrum, on average', () => {
-  const sea = { wind: 7.6, heading: 0.4, fetch: 300_000 };
+  const sea = { wind: 7.6, fetch: 300_000 };
   const N = 256, L = 256, dk = (2 * Math.PI) / L, S = spectrum(sea), seeds = 64;
   let expected = 0, drawn = 0;
   for (let i = 0; i < N * N; i++) expected += S(((i % N) - N / 2) * dk, (Math.floor(i / N) - N / 2) * dk) * dk * dk;
@@ -105,7 +105,7 @@ test('drawn seas are as high as their spectrum, on average', () => {
 
 test('the cascades hold the sea between them, and fewer slopes than the whole sea has', () => {
   for (const wind of [5, 7.6, 12]) {
-    const sea = { wind, heading: 0.4, fetch: 300_000 };
+    const sea = { wind, fetch: 300_000 };
     const { hs } = seaState(wind, sea.fetch);
     let m0 = 0, slopes = 0;
     CASCADES.forEach((L, c) => {

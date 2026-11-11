@@ -33,11 +33,14 @@ export interface Eye {
   dip: number;
 }
 
-/** A point's place on a chart (metres), the chart's x and z axes carried to it, and up there. */
-export interface Charted { q: N; e1: N; e2: N; up: N }
+/** A point's place on a chart (metres), the chart's x and z axes carried to it, up there, and its arc from the centre (radians). */
+export interface Charted { q: N; e1: N; e2: N; up: N; theta: N }
 
-/** A chart given by its centre `A` and axes `a1`, `a2` = a1 × A, as nodes (constants or uniforms). */
-function chartNodes(A: N, a1: N, a2: N) {
+/**
+ * A chart given by its centre `A` and axes `a1`, `a2` = a1 × A, as nodes (constants, uniforms or a uniform array's
+ * elements): the one place the shaders work out where a point lies on a chart.
+ */
+export function chartNodes(A: N, a1: N, a2: N) {
   return (p: N): Charted => {
     const u = normalize(p);
     const c = dot(u, A);
@@ -49,7 +52,7 @@ function chartNodes(A: N, a1: N, a2: N) {
     // the radial direction carried to p, and the one across it, which the carrying leaves as it is
     const g = dir.mul(cos(theta)).sub(A.mul(sin(theta)));
     const t = cross(dir, A);
-    return { q: vec2(cp, sp).mul(theta.mul(R)), e1: g.mul(cp).sub(t.mul(sp)), e2: g.mul(sp).add(t.mul(cp)), up: u };
+    return { q: vec2(cp, sp).mul(theta.mul(R)), e1: g.mul(cp).sub(t.mul(sp)), e2: g.mul(sp).add(t.mul(cp)), up: u, theta };
   };
 }
 
@@ -123,12 +126,13 @@ export function createView() {
       geometry,
       arc,
       up: up0.mul(cos(theta)).add(out.mul(sin(theta))) as N,
-      /** Draws only the rings that can be seen. */
-      update(crest: number) {
+      /** Draws only the rings that can be seen; returns how far out the last drawn ring lies, metres. */
+      update(crest: number): number {
         const reach = Math.min(R * (horizonDip(eye.height) + horizonDip(crest)), Math.PI * R);
         let k = 1;
         while (k < radii.length - 1 && radii[k] < reach) k++;
         geometry.setDrawRange(0, 3 * spokes + 6 * spokes * k);
+        return radii[Math.min(k + 1, radii.length - 1)];
       },
     };
   }

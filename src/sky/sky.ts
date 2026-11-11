@@ -88,7 +88,8 @@ export function createSky(renderer: WebGPURenderer, view: View) {
       const s = toSky(view.eye.frame, view.eye.dip, [env.sunDirection.x, env.sunDirection.y, env.sunDirection.z]);
       skySun.value.set(s[0], s[1], s[2]);
       tables.update(s[1], env.haze);
-      clouds.update({ coverage: env.cloudCoverage, wind: env.wind, sunDirection: skySun.value }, camera, dt, width, height);
+      // the clouds drift east over the eye, as the prevailing wind blows (world/lattice.ts), at the sea's wind speed
+      clouds.update({ coverage: env.cloudCoverage, wind: { x: env.windSpeed, y: 0 }, sunDirection: skySun.value }, camera, dt, width, height);
       reflection.update();
     },
   };

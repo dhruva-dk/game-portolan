@@ -3,8 +3,10 @@
 //
 // The rings start a metre out and each lies 5% further than the last, with 128 spokes, so a cell is about as long as
 // it is wide and covers about as much of the screen near as far; only those out to the horizon are drawn. The grid
-// follows the eye; the waves stay put on the planet, read from the cascades' patches that tile a chart of the sea
-// (cascadesAt), and move the water along that chart's axes and up.
+// follows the eye; the waves stay put on the planet, read from the cascades' patches through the sea's charts
+// (view/charts.ts): each point through its nearest anchor's chart, and near a cell's border through up to three,
+// each read moved and tilted along its own chart's axes and summed with its weight (Σw² = 1, so the sum of
+// independent seas has one sea's height). The wind blows along each chart's x (the patches' +x).
 //
 // In shallow water a wave can be no higher than about 0.78 of the depth (the breaker index, McCowan 1894): higher
 // and it breaks. So the long waves (the two larger cascades) are cut to that height over the seabed, and to what got
@@ -18,19 +20,21 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { DoubleSide, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, TextureLoader, Vector2, type WebGPURenderer } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, TextureLoader, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dot, float, getScreenPosition,
-  getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate, screenUV, select,
-  smoothstep, sqrt, texture, uniform, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
+  getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
+  screenUV, select, smoothstep, sqrt, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Seabed } from '../land/seabed';
 import type { Sky } from '../sky/sky';
+import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
-import type { Chart } from '../world/sphere';
-import { CASCADES, SIZE } from './cascades';
+import { R } from '../world/sphere';
+import { BANDS, CASCADES, SIZE } from './cascades';
 import { N_WATER, createOptics } from './optics';
+import { likeness } from './spectrum';
 import { CURVED, createWaves } from './waves';
 
 type N = any;
@@ -48,27 +52,21 @@ const MAX_REFRACT_DEPTH = 20;
 const FOAM_TILE = 3;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
 const FETCH = 300_000;
+/** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
+const LIKENESS_WINDS = [5, 10, 15, 20];
 
-/** chart: the sea's chart, whose x and z the cascades' patches tile and the wind is given along. */
-export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seabed: Seabed, chart: Chart) {
+/** debug: 'charts' colours the sea by its charts' weights (red, green, blue: nearest first). */
+export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seabed: Seabed, debug = '') {
   const waves = createWaves(renderer);
   const optics = createOptics(sky, view);
+  // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
+  const each = LIKENESS_WINDS.flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
+  const charts = createCharts(CASCADES[0], (x, z) => Math.max(...each.map((f) => Math.abs(f(x, z)))));
   const material = new MeshBasicNodeMaterial();
-  /** The way the wind blows, a unit vector along the sea's chart (x, z). */
-  const wind = uniform(new Vector2(1, 0));
-
-  /**
-   * Where the cascades are read for world position p (q, metres on the sea's chart) and the axes their x and z run
-   * along there (e1, e2, unit tangents; e1 × up = e2). One chart for now, so the waves stretch a little far from
-   * its centre: about 1.04 times across at 100 m, 1.6 a quarter of the way round, and without bound at the far side.
-   */
-  const cascadesAt = view.chart(chart);
 
   // The water under this vertex at rest, and where the waves have moved it. Each cascade is read at the mip whose
   // texels are as wide as the grid's cell here, so waves too short for the grid to draw average away, not alias.
   const grid = view.rings(FIRST, GROWTH, SPOKES);
-  const rest = cascadesAt(grid.up);
-  const ground = rest.q;
   const cell = max(grid.arc.mul(GROWTH - 1), FIRST);
 
   // How much of the waves the depth here lets through: the long waves cut to what the depth and the way in hold,
@@ -88,55 +86,74 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
   const where = seabed.locate(grid.up);
   const { long, short } = shallows(where);
 
-  let moved: N = vec3(0), swell: N = float(0);
-  CASCADES.forEach((L, c) => {
-    const lod = log2(max(cell.div(L / SIZE), 1));
-    const d = texture(waves.displacement[c], ground.div(L)).level(lod).xyz;
-    moved = moved.add(d.mul(c < 2 ? long : short));
-    swell = swell.add(d.y);
-  });
-  material.positionNode = view.place(grid.up, moved.y).add(rest.e1.mul(moved.x)).add(rest.e2.mul(moved.z));
+  // The water's move, along each chart's axes and up (xyz), and the waves' height here unscaled by the depth (w).
+  const wave: N = Fn(() => {
+    const moved = vec3(0).toVar(), swell = float(0).toVar();
+    charts.each(grid.up, (c) => {
+      let d: N = vec3(0), h: N = float(0);
+      CASCADES.forEach((L, k) => {
+        const lod = log2(max(cell.div(L / SIZE), 1));
+        const r = texture(waves.displacement[k], c.q.div(L)).level(lod).xyz;
+        d = d.add(r.mul(k < 2 ? long : short));
+        h = h.add(r.y);
+      });
+      moved.addAssign(c.e1.mul(d.x).add(c.e2.mul(d.z)).add(grid.up.mul(d.y)).mul(c.w));
+      swell.addAssign(h.mul(c.w));
+    });
+    return vec4(moved, swell);
+  })();
+  material.positionNode = view.place(grid.up, 0).add(wave.xyz);
 
-  const height: N = varying(moved.y);
+  const height: N = varying(dot(wave.xyz, grid.up));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
-  const phase: N = varying(saturate(swell.div(waves.amplitude).mul(0.5).add(0.5)));
+  const phase: N = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
   const foamPattern = new TextureLoader().load(`${import.meta.env.BASE_URL}tex/foam.png`);
   foamPattern.wrapS = foamPattern.wrapT = RepeatWrapping;
   foamPattern.anisotropy = 4;
   foamPattern.colorSpace = NoColorSpace;
-  const at: N = varying(ground), e1: N = varying(rest.e1), e2: N = varying(rest.e2), here: N = varying(where);
+  const rest: N = varying(grid.up), here: N = varying(where);
   material.colorNode = Fn(() => {
     const { long, short, breaking } = shallows(here);
     const up = view.up(positionWorld);
     const scale = (c: number): N => (c < 2 ? long : short);
-    // The slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the slopes'
-    // variance within the footprint) becomes roughness, as do the ripples too small for any cascade.
-    let slope: N = vec2(0), variance: N = waves.ripples.mul(short);
-    CASCADES.forEach((L, c) => {
-      const s = texture(waves.slopes[c], at.div(L)), k = scale(c);
-      slope = slope.add(s.xy.mul(k));
-      variance = variance.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(k.mul(k)));
-    });
+    // the water at rest under this pixel, and its change across the pixel, for the charts' reads
+    const p = normalize(rest).mul(R);
+    const dp: [N, N] = [dFdx(p), dFdy(p)];
+    // surf: the breaking waves' fronts white, from the crest down the face, the troughs between them less so
+    const surf = breaking.mul(smoothstep(0.35, 0.8, phase).mul(0.8).add(0.2));
+
+    // Per chart: the slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the
+    // slopes' variance within the footprint) becomes roughness, as do the ripples too small for any cascade. The
+    // slopes, as a tangent vector, sum with the charts' weights; the variances, independent, with their squares.
+    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by the foam
+    // pattern: fresh foam is white but for the pattern's holes, and as it fades only its brighter strands are left,
+    // so a whitecap thins into a web and then into flecks. The pattern is stretched along the wind (the chart's x),
+    // as foam is drawn out in streaks, and read at two scales so it doesn't repeat. Cover is no Gaussian height: summed
+    // with weights w it could pass one sea's, or a whitecap's 1. Weighted by w² (Σw² = 1), each chart's foam fades
+    // across the band as its waves do, the mean cover stays one sea's, and no pixel is whiter than a whitecap.
+    const slope = vec3(0).toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
+    charts.each(p, (c) => {
+      const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
+      let s2: N = vec2(0), v: N = float(0), cover: N = surf;
+      CASCADES.forEach((L, k) => {
+        const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
+        s2 = s2.add(s.xy.mul(m));
+        v = v.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(m.mul(m)));
+        if (k < 2) cover = cover.add(read(waves.displacement[k], float(1 / L)).w);
+      });
+      slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w));
+      variance.addAssign(v.mul(c.w.mul(c.w)));
+      const strands = read(foamPattern, vec2(1 / (2 * FOAM_TILE), 1 / FOAM_TILE)).r.mul(0.6)
+        .add(read(foamPattern, vec2(1 / (5.3 * FOAM_TILE), 1 / (2.7 * FOAM_TILE))).r.mul(0.4));
+      foam.addAssign(saturate(strands.sub(float(1).sub(saturate(cover)).mul(0.7)).mul(2.5)).mul(c.w.mul(c.w)));
+    }, dp);
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
     // until the eye just sees them.
-    const tilted = normalize(up.sub(e1.mul(slope.x)).sub(e2.mul(slope.y)));
+    const tilted = normalize(up.sub(slope));
     const n: N = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
     const crest = saturate(height.div(waves.amplitude));
-
-    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by the foam
-    // pattern: fresh foam is white but for the pattern's holes, and as it fades only its brighter strands are left,
-    // so a whitecap thins into a web and then into flecks. The pattern is
-    // stretched along the wind, as foam is drawn out in streaks, and read at two scales so it doesn't repeat.
-    let cover: N = float(0);
-    CASCADES.slice(0, 2).forEach((L, c) => { cover = cover.add(texture(waves.displacement[c], at.div(L)).w); });
-    // surf: the breaking waves' fronts white, from the crest down the face, the troughs between them less so
-    cover = cover.add(breaking.mul(smoothstep(0.35, 0.8, phase).mul(0.8).add(0.2)));
-    const along = vec2(at.dot(wind), at.dot(vec2(wind.y.negate(), wind.x)));
-    const strands = texture(foamPattern, along.mul(vec2(1 / (2 * FOAM_TILE), 1 / FOAM_TILE))).r.mul(0.6)
-      .add(texture(foamPattern, along.mul(vec2(1 / (5.3 * FOAM_TILE), 1 / (2.7 * FOAM_TILE)))).r.mul(0.4));
-    const foam = saturate(strands.sub(float(1).sub(saturate(cover)).mul(0.7)).mul(2.5));
 
     // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
     // here to the floor's depth and looked up where that lands on the screen. If the look-up lands on something in
@@ -158,6 +175,8 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
     // GGX's α² is the mean square slope over both axes
     return optics.seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, behind, path);
   })();
+  // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
+  if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
 
   // drawn after everything solid, which it reads behind itself; and both sides of it, since near the horizon the eye
   // looks so low across the waves that it sees the backs of their faces past the crests
@@ -173,23 +192,41 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
    * derivatives), so the light there is 1/|J| as bright. Under a crest, which bulges like a lens, J < 1: the bright
    * net on the floor. H is the two smaller cascades' curvature (waves.ts), read where the light came in
    * (toward the sun); far off their mips smooth the slopes and the net fades to an even light, as it should.
-   * All of it on the sea's chart, about the up at p.
+   * Read through each of the sea's charts at p, each H turned into the first chart's axes and summed with the
+   * chart's weight (H is linear in the height, which sums so).
    */
-  const caustics = (p: N): N => {
-    const { q, e1, e2, up } = cascadesAt(p);
+  const caustics = (p: N): N => Fn(() => {
+    const up = view.up(p);
     const depth = max(view.altitude(p).negate(), 0);
     const { long, short } = shallows(seabed.locate(p));
-    const l = sky.sun, ly = dot(l, up), lxz = vec2(dot(l, e1), dot(l, e2));
+    const l = sky.sun, ly = dot(l, up), flat = l.sub(up.mul(ly));
     const sin = sqrt(float(1).sub(ly.mul(ly))).div(N_WATER);
-    const across = lxz.div(max(length(lxz), 1e-4)).mul(depth.mul(sin).div(sqrt(float(1).sub(sin.mul(sin)))));
-    const entry = q.add(across);
-    let H: N = vec3(0);
-    CURVED.forEach((c, i) => { H = H.add(texture(waves.curvature[i], entry.div(CASCADES[c])).xyz.mul(c < 2 ? long : short)); });
+    const across = flat.div(max(length(flat), 1e-4)).mul(depth.mul(sin).div(sqrt(float(1).sub(sin.mul(sin)))));
+    const E1 = vec3(1, 0, 0).toVar(), E2 = vec3(0, 0, 1).toVar(), H = vec3(0).toVar();
+    charts.each(p, (c, slot) => {
+      if (slot === 0) {
+        E1.assign(c.e1);
+        E2.assign(c.e2);
+      }
+      const entry = c.q.add(vec2(dot(across, c.e1), dot(across, c.e2)));
+      let h: N = vec3(0);
+      CURVED.forEach((k, i) => {
+        const L = CASCADES[k];
+        h = h.add(texture(waves.curvature[i], entry.div(L)).grad(c.dx.div(L), c.dy.div(L)).xyz.mul(k < 2 ? long : short));
+      });
+      // (hxx, hzz, hxz) on this chart's axes, onto the first's
+      const a = dot(c.e1, E1), b = dot(c.e2, E1), e = dot(c.e1, E2), d = dot(c.e2, E2);
+      H.addAssign(vec3(
+        h.x.mul(a.mul(a)).add(h.y.mul(b.mul(b))).add(h.z.mul(a.mul(b).mul(2))),
+        h.x.mul(e.mul(e)).add(h.y.mul(d.mul(d))).add(h.z.mul(e.mul(d).mul(2))),
+        h.x.mul(a.mul(e)).add(h.y.mul(b.mul(d))).add(h.z.mul(a.mul(d).add(b.mul(e)))),
+      ).mul(c.w));
+    }, [dFdx(p), dFdy(p)]);
     const hxx = H.x, hzz = H.y, hxz = H.z;
     const f = depth.mul(1 - 1 / N_WATER);
     const J = float(1).add(f.mul(hxx)).mul(float(1).add(f.mul(hzz))).sub(f.mul(hxz).mul(f.mul(hxz)));
     return mix(float(1), float(1).div(max(J.abs(), 0.15)), smoothstep(0, 0.3, depth));
-  };
+  })();
 
   return {
     mesh,
@@ -199,10 +236,9 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
       sky: (p: N): N => optics.skyBelow(p),
     },
     update(env: Environment, dt: number) {
-      wind.value.copy(env.wind).normalize();
-      waves.update({ wind: env.wind.length(), heading: Math.atan2(env.wind.y, env.wind.x), fetch: FETCH }, dt);
-      // past the horizon, as far as a crest could still show over it
-      grid.update(waves.amplitude.value * 2);
+      waves.update({ wind: env.windSpeed, fetch: FETCH }, dt);
+      // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
+      charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
     },
   };
 }

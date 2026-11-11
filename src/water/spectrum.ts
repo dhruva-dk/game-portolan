@@ -45,7 +45,8 @@ function scale(hs: number, peak: number): number {
   return (hs / 4) ** 2 / sum;
 }
 
-export interface Sea { wind: number; heading: number; fetch: number }
+/** A sea: the wind's speed (m/s), blowing along +x, and how far it has blown over the water (m). */
+export interface Sea { wind: number; fetch: number }
 
 /**
  * The spectrum over the wavevector plane, m⁴ (variance per dkx·dkz): S(ω)·D(θ)·(dω/dk)/k, with deep water's ω² = g k.
@@ -58,7 +59,7 @@ export function spectrum(sea: Sea): (kx: number, kz: number) => number {
     const k = Math.hypot(kx, kz);
     if (k === 0) return 0;
     const w = Math.sqrt(G * k);
-    return alpha * jonswap(w, peak) * spread(w, peak, Math.atan2(kz, kx) - sea.heading) * (0.5 * Math.sqrt(G / k)) / k;
+    return alpha * jonswap(w, peak) * spread(w, peak, Math.atan2(kz, kx)) * (0.5 * Math.sqrt(G / k)) / k;
   };
 }
 

@@ -1,4 +1,4 @@
-import { Vector2, Vector3 } from 'three/webgpu';
+import { Vector3 } from 'three/webgpu';
 import { fromLatLon } from './world/sphere';
 
 /** The one shared world state. Systems read it every frame; only the game loop writes it. */
@@ -10,8 +10,11 @@ export interface Environment {
    * direction for the whole planet, so it has a day side and a night side. Derived from timeOfDay.
    */
   sunDirection: Vector3;
-  /** Metres per second, along the sea's chart: x along its axis (east at the island), y along its z (south). */
-  wind: Vector2;
+  /**
+   * The wind's speed over the sea, metres per second. Its direction is the prevailing wind's, which varies over the
+   * planet (world/lattice.ts: toward the east, for now).
+   */
+  windSpeed: number;
   /** 0–1. */
   cloudCoverage: number;
   /** Aerosol in the air as a multiple of a clear day's (1). Thickens the haze and whitens the sky. */
@@ -22,7 +25,7 @@ export function createEnvironment(): Environment {
   const env: Environment = {
     timeOfDay: 15,
     sunDirection: new Vector3(),
-    wind: new Vector2(7, 3),
+    windSpeed: 7.6,
     cloudCoverage: 0.5,
     haze: 1,
   };

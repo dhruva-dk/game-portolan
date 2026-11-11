@@ -26,8 +26,9 @@ const params = new URLSearchParams(location.search);
 const number = (name: string, fallback: number) => (params.has(name) ? Number(params.get(name)) : fallback);
 if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
-if (params.has('wind')) env.wind.setLength(Number(params.get('wind')));
-const frame = createFrame(renderer);
+if (params.has('wind')) env.windSpeed = Number(params.get('wind'));
+// ?debug=charts colours the sea by its charts' weights
+const frame = createFrame(renderer, params.get('debug') ?? '');
 const meter = createMeter(renderer, meterEl);
 const degrees = Math.PI / 180;
 const fly = createFly(frame.camera, renderer.domElement, {

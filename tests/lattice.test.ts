@@ -15,7 +15,7 @@ const points = (n: number): Vec3[] => Array.from({ length: n }, (_, i) => {
 });
 
 const FETCH = 300_000;
-const quick = [5, 10, 15, 20].flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, heading: 0, fetch: FETCH }, BANDS[c])));
+const quick = [5, 10, 15, 20].flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
 const all: Anchor[] = anchors(icosphere(FREQUENCY), prevailing, CASCADES[0], (x, z) => Math.max(...quick.map((f) => Math.abs(f(x, z)))));
 const width = band(FREQUENCY);
 const sorted = (p: Vec3) => all.map((a) => distance(a.at, p)).sort((a, b) => a - b);
@@ -112,7 +112,7 @@ test('neighbouring charts read nearly independent seas along their borders, at a
   for (const wind of [5, 7.6, 12, 20]) {
     CASCADES.forEach((L, c) => {
       // more of the spectrum than the anchors were chosen with
-      const alike = likeness(SIZE, L, { wind, heading: 0, fetch: FETCH }, BANDS[c], 1500);
+      const alike = likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c], 1500);
       let worst = 0;
       next.forEach((ns, i) => ns.forEach((j) => { if (j > i) worst = Math.max(worst, overlap(all[i], all[j], alike)); }));
       assert.ok(worst < 0.25, `wind ${wind}, ${L} m patch: neighbours correlate by ${worst}`);
