@@ -361,6 +361,11 @@ function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
     const rockR = ratio('rock', vec2(q.y, vH)).mul(ax).add(ratio('rock', vec2(q.x, vH)).mul(ay)).add(ratio('rock', q).mul(az)).div(ax.add(ay).add(az));
     const detail = clamp(mix(ground, rockR, rock), vec3(0.15), vec3(2.6));
     const albedo = col.rgb.mul(mix(vec3(1), detail, near)).toVar();
+    // couloirs: the rock streaked down its fall line, dark gullies between paler ribs
+    const fall = normalize(vec2(nx, ny).add(vec2(1e-4, 0)));
+    const across = dot(q, vec2(fall.y.negate(), fall.x)), down = dot(q, fall);
+    const streak = valueNoise(vec2(across.div(9), down.div(90))).mul(0.65).add(valueNoise(vec2(across.div(3), down.div(25))).mul(0.35));
+    albedo.mulAssign(mix(float(1), streak.mul(0.9).add(0.55), rock.mul(smoothstep(0.25, 0.6, length(vec2(nx, ny))))));
 
     // far: the forest's crowns, conifers and the autumn broadleaves
     const canopy = forest.mul(smoothstep(CANOPY_IN[0], CANOPY_IN[1], dist));

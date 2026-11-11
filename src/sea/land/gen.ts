@@ -452,21 +452,21 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
         const snowLine = 500 + 70 * v1 - 90 * wet[i];
         snow = smooth(snowLine - 25, snowLine + 45, z) * (1 - smooth(1.0, 1.5, slope));
         const treeLine = 360 + 70 * v1 + 50 * wet[i];
-        const clearing = smooth(-0.35, 0.05, noise.fbm(px / 180 + 20, py / 180, 3) + 0.25 * wet[i]);
+        const clearing = smooth(-0.6, -0.25, noise.fbm(px / 180 + 20, py / 180, 3) + 0.25 * wet[i]);
         forest = (1 - smooth(treeLine - 70, treeLine + 15, z)) * (1 - smooth(0.85, 1.2, slope)) * clearing * smooth(1.6, 4, z) * smooth(8 + 22 * beach[i], 20 + 40 * beach[i], d);
         leaf = clamp01(0.3 * (1 - smooth(20, 220, z)) + 0.45 * v1 + 0.2 * v2);
         sand = (1 - smooth(1.8, 3.2, z)) * smooth(0.15, 0.5, beach[i]) * (1 - smooth(0.25, 0.45, slope));
         const scrub = smooth(treeLine - 140, treeLine - 20, z) * (1 - snow);
         grass = clamp01(1 - sand - rock - snow - scrub * 0.8);
         // the ground's colour: meadow and autumn scrub mixed by height and patch, forest floor under trees
-        const meadow = [0.085 + 0.03 * v2, 0.11 + 0.02 * v1, 0.04];
-        const heath = [0.19 + 0.06 * v1 + 0.03 * v2, 0.1 + 0.03 * v2, 0.045];
+        const meadow = [0.075 + 0.025 * v2, 0.08 + 0.015 * v1, 0.035];
+        const heath = [0.3 + 0.08 * v1 + 0.04 * v2, 0.13 + 0.04 * v2, 0.035];
         const olive = [0.12, 0.105, 0.05];
-        const s1 = clamp01(scrub * (0.7 + 0.5 * v1)), s2 = clamp01(0.5 + v2);
+        const s1 = clamp01(scrub * (0.9 + 0.5 * v1)), s2 = clamp01(0.75 + v2);
         let gr = [meadow[0] + (heath[0] * s2 + olive[0] * (1 - s2) - meadow[0]) * s1, meadow[1] + (heath[1] * s2 + olive[1] * (1 - s2) - meadow[1]) * s1, meadow[2] + (heath[2] * s2 + olive[2] * (1 - s2) - meadow[2]) * s1];
         const floor = [0.055, 0.045, 0.03];
         gr = gr.map((c, k) => c + (floor[k] - c) * forest);
-        const stone = [0.15 + 0.03 * v2, 0.155 + 0.025 * v2, 0.145 + 0.02 * v2].map((c) => c * (0.75 + 0.35 * clamp01(0.5 + v1)) * (1 - 0.35 * wet[i] * smooth(0, 200, z)));
+        const stone = [0.12 + 0.03 * v2 + 0.02 * v1, 0.11 + 0.025 * v2, 0.095 + 0.02 * v2].map((c) => c * (0.75 + 0.35 * clamp01(0.5 + v1)) * (1 - 0.35 * wet[i] * smooth(0, 200, z)));
         const sandC = z < 0.7 ? [0.2, 0.17, 0.12] : [0.43, 0.38, 0.29];
         const snowC = [0.78, 0.8, 0.84];
         const mix3 = (a: number[], c: number[], w: number) => a.map((v, k) => v + (c[k] - v) * w);
