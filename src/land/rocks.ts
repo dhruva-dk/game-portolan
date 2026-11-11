@@ -30,7 +30,7 @@ const ROCK_MEAN = [0.084, 0.079, 0.066];
 const ROCK_ALBEDO = [0.2, 0.105, 0.06];
 /** The bleached tops' albedo. */
 const BLEACHED = [0.3, 0.2, 0.13];
-/** Deep in a crack or under a ledge, the share of the albedo (and of the light) left. */
+/** Deep in a crack or under a ledge, the share of the albedo left: it stands for the light that doesn't reach in. */
 const CAVITY = 0.3;
 /** Wet rock reflects about half as much; below the waterline it is filmed with algae. */
 const WET = 0.5;
