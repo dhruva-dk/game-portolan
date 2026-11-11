@@ -10,7 +10,7 @@ import {
 } from 'three/webgpu';
 import { Fn, dot, exp, clamp, min, pass, rtt, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import { R, U, bodies, dayFor, eastAt } from './world.ts';
+import { R, U, bodies, dayFor, eastAt, sail } from './world.ts';
 import { Land } from './land/land.ts';
 import { AIR_TOP, OBJECT_HAZE, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
 import { CALM_SEA, Ocean, SEA } from './ocean.ts';
@@ -67,7 +67,11 @@ const camera = new PerspectiveCamera(55, innerWidth / innerHeight, 0.3, 10000);
 const sky = new Sky(renderer);
 const start = new Vector3(0.8, 0.12, 0.58).normalize();
 // PROTOTYPE (land look): a generated coast round the start, made before the sea so the sea knows its shallows
-const land = q.get('land') === '0' ? null : await Land.create(start, eastAt(start, new Vector3()), num('seed', 7));
+// PROTOTYPE (land look): ?near= slides the land that many metres toward the ship's starboard beach, to see it close
+const landAt = start.clone(), landEast = eastAt(start, new Vector3());
+if (num('near', 0)) sail(landAt, new Vector3().crossVectors(start, landEast).normalize(), num('near', 0));
+landEast.addScaledVector(landAt, -landEast.dot(landAt)).normalize();
+const land = q.get('land') === '0' ? null : await Land.create(landAt, landEast, num('seed', 7));
 if (land) scene.add(land.group);
 OBJECT_HAZE.value = num('haze', land ? 0.7 : 1);
 const ocean = new Ocean();

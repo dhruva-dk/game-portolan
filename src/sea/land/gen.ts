@@ -464,9 +464,9 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
         const olive = [0.12, 0.105, 0.05];
         const s1 = clamp01(scrub * (0.9 + 0.5 * v1)), s2 = clamp01(0.75 + v2);
         let gr = [meadow[0] + (heath[0] * s2 + olive[0] * (1 - s2) - meadow[0]) * s1, meadow[1] + (heath[1] * s2 + olive[1] * (1 - s2) - meadow[1]) * s1, meadow[2] + (heath[2] * s2 + olive[2] * (1 - s2) - meadow[2]) * s1];
-        const floor = [0.055, 0.045, 0.03];
+        const floor = [0.06, 0.06, 0.035];
         gr = gr.map((c, k) => c + (floor[k] - c) * forest);
-        const stone = [0.12 + 0.03 * v2 + 0.02 * v1, 0.11 + 0.025 * v2, 0.095 + 0.02 * v2].map((c) => c * (0.75 + 0.35 * clamp01(0.5 + v1)) * (1 - 0.35 * wet[i] * smooth(0, 200, z)));
+        const stone = [0.15 + 0.03 * v2 + 0.02 * v1, 0.14 + 0.025 * v2, 0.12 + 0.02 * v2].map((c) => c * (0.75 + 0.35 * clamp01(0.5 + v1)) * (1 - 0.35 * wet[i] * smooth(0, 200, z)));
         const sandC = z < 0.7 ? [0.2, 0.17, 0.12] : [0.43, 0.38, 0.29];
         const snowC = [0.78, 0.8, 0.84];
         const mix3 = (a: number[], c: number[], w: number) => a.map((v, k) => v + (c[k] - v) * w);
@@ -498,7 +498,7 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
       const keep = r();
       if (sea[i] || h[i] < 2.5 || keep > Math.max(f * 1.05, 0.012 * (1 - material[i * 4 + 2] / 255) * (h[i] < 260 ? 1 : 0))) continue;
       const broad = r() < leafAt[i] ? 1 : 0;
-      const height = (broad ? 9 + 7 * r() : 13 + 13 * r()) * (0.55 + 0.45 * (1 - smooth(120, 300, h[i]))) * (0.8 + 0.2 * f);
+      const height = (broad ? 9 + 7 * r() : 16 + 14 * r()) * (0.55 + 0.45 * (1 - smooth(120, 300, h[i]))) * (0.8 + 0.2 * f);
       trees.push(px, py, height, broad + 0.999 * r());
     }
   }

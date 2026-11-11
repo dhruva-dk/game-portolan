@@ -353,7 +353,10 @@ function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
     // near: the scans' detail over the map's colour (their own colour divided out, so near and far agree)
     const near = float(1).sub(smoothstep(60, 260, dist));
     const d = t.details;
-    const ratio = (k: string, uvd: Nd) => texture(d[k].tex).sample(uvd.div(d[k].scale)).rgb.div(vec3(d[k].mean.x, d[k].mean.y, d[k].mean.z));
+    // each scan at two scales, the second turned, so neither repeats in a grid
+    const ratio = (k: string, uvd: Nd) => texture(d[k].tex).sample(uvd.div(d[k].scale)).rgb
+      .add(texture(d[k].tex).sample(vec2(uvd.x.mul(0.6).sub(uvd.y.mul(0.8)), uvd.x.mul(0.8).add(uvd.y.mul(0.6))).div(d[k].scale * 2.7)).rgb)
+      .mul(0.5).div(vec3(d[k].mean.x, d[k].mean.y, d[k].mean.z));
     const floorW = max(float(1).sub(sand).sub(snow).sub(grass), 0);
     const ground = ratio('sand', q).mul(sand).add(ratio('snow', q).mul(snow)).add(ratio('grass', q).mul(grass)).add(ratio('forest', q).mul(floorW))
       .div(max(sand.add(snow).add(grass).add(floorW), 1e-3));
@@ -371,10 +374,10 @@ function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
     const canopy = forest.mul(smoothstep(CANOPY_IN[0], CANOPY_IN[1], dist));
     const fw = length(fwidth(q));
     const crowns = mix(valueNoise(q.div(4.5)).mul(0.7).add(valueNoise(q.div(1.7)).mul(0.3)), float(0.5), smoothstep(1.2, 4.0, fw));
-    const autumn = mix(vec3(0.2, 0.075, 0.02), vec3(0.16, 0.12, 0.03), valueNoise(q.div(37)));
+    const autumn = mix(vec3(0.3, 0.11, 0.025), vec3(0.24, 0.17, 0.04), valueNoise(q.div(37)));
     // conifers the dark mass, the broadleaves in bright clumps through it
-    const clump = smoothstep(0.55, 0.8, valueNoise(q.div(14).add(7)).mul(0.5).add(valueNoise(q.div(4)).mul(0.5)).add(leaf.sub(0.4).mul(0.5)));
-    const crownCol = mix(vec3(0.026, 0.05, 0.03), autumn, clump);
+    const clump = smoothstep(0.5, 0.9, valueNoise(q.div(9).add(7)).mul(0.35).add(valueNoise(q.div(2.6)).mul(0.65)).add(leaf.sub(0.45).mul(0.6)));
+    const crownCol = mix(mix(vec3(0.034, 0.068, 0.04), vec3(0.05, 0.078, 0.036), valueNoise(q.div(17).add(3))), autumn, clump);
     albedo.assign(mix(albedo, crownCol.mul(crowns.mul(1.1).add(0.45)), canopy));
 
     // the light: the sun (shadowed by the land), the moon, and the sky over the open part of the dome
@@ -383,7 +386,7 @@ function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
     const sunE = sunAt(f.up), moonE = moonAt(f.up), amb = ambientAt(f.up);
     const open = dot(n, f.up).mul(0.5).add(0.5).mul(ao);
     // the canopy scatters light more softly than bare ground takes it
-    const nl = mix(max(dot(n, L), 0), dot(n, L).mul(0.5).add(0.5).mul(0.8), canopy);
+    const nl = mix(max(dot(n, L), 0), max(dot(n, L).mul(0.8).add(0.2), 0).mul(0.9), canopy);
     const E = sunE.mul(nl.mul(shadow)).add(moonE.mul(max(dot(n, U.moonDir), 0))).add(amb.mul(open));
     return vec4(albedo.mul(E).div(Math.PI), 1);
   })();
@@ -415,7 +418,7 @@ function treeMaterial(heightAt: (q: Nd) => Nd, shadowAt: (q: Nd) => Nd): MeshBas
     const out = float(CARDS_OUT[0]).add(seed.mul(CARDS_OUT[1] - CARDS_OUT[0]));
     const keep = select(dist.lessThan(out), float(1), float(0));
     const height = tree.z.mul(keep);
-    const width = height.mul(select(kind.greaterThan(0.5), float(0.8), float(0.46)));
+    const width = height.mul(select(kind.greaterThan(0.5), float(0.8), float(0.3).add(seed.mul(0.16))));
     vUV.assign(vec2(positionGeometry.x.add(0.5), positionGeometry.y));
     vKind.assign(vec2(kind, seed));
     vRight.assign(right);
@@ -429,9 +432,13 @@ function treeMaterial(heightAt: (q: Nd) => Nd, shadowAt: (q: Nd) => Nd): MeshBas
     const seed = vKind.y;
     const broad = vKind.x.greaterThan(0.5);
     // a conifer: tiers of drooping boughs narrowing to the tip, ragged at the ends
-    const tier = fract(v.mul(6.5).add(seed.mul(3)));
-    const cone = pow(max(float(1).sub(v), 0), 1.05).mul(0.5).mul(float(0.62).add(float(0.38).mul(tier)))
-      .add(sin(v.mul(70).add(seed.mul(40))).mul(0.025)).mul(smoothstep(0.03, 0.09, v));
+    // boughs: each tier sweeps out and droops at its tip, one side a little longer than the other, the tips ragged
+    const tiers = float(8).add(seed.mul(5));
+    const tier = fract(v.mul(tiers).add(seed.mul(3)));
+    const side = select(u.greaterThan(0), seed.sub(0.5).mul(0.3), seed.sub(0.5).mul(-0.3));
+    const ragged = hash(vec2(floor(v.mul(tiers.mul(4))), select(u.greaterThan(0), float(1), float(0)).add(seed.mul(13)))).mul(0.3);
+    const cone = pow(max(float(1).sub(v), 0), 1.2).mul(0.5).mul(float(0.5).add(float(0.5).mul(pow(tier, 0.7))).mul(float(1).add(side)).mul(float(0.82).add(ragged)))
+      .mul(smoothstep(0.02, 0.07, v));
     const conifer = cone.sub(abs(u));
     // a broadleaf: a lumpy round crown on a short trunk
     const c = vec2(u.mul(1.15), v.sub(0.58));
@@ -463,11 +470,14 @@ function treeMaterial(heightAt: (q: Nd) => Nd, shadowAt: (q: Nd) => Nd): MeshBas
     const sunE = sunAt(up), amb = ambientAt(up);
     const wrap = dot(n, L).mul(0.6).add(0.4).max(0);
     // inside the crown is darker; the conifer's tiers shade the one below
-    const tier = fract(v.mul(6.5).add(seed.mul(3)));
-    const inner = select(broad, float(0.55).add(v.mul(0.5)), float(0.45).add(tier.mul(0.4)).add(v.mul(0.25)));
+    const tier = fract(v.mul(float(8).add(seed.mul(5))).add(seed.mul(3)));
+    // clumps of needles and leaves: lit tufts with dark gaps between, deeper toward the trunk
+    const tuft = valueNoise(vec2(u.mul(16), v.mul(34)).add(seed.mul(50))).mul(0.6).add(valueNoise(vec2(u.mul(40), v.mul(80)).add(seed.mul(9))).mul(0.4));
+    const core = float(1).sub(abs(sx).mul(0.6));
+    const inner = select(broad, float(0.4).add(v.mul(0.4)).add(tuft.mul(0.45)), float(0.3).add(tier.mul(0.45)).add(v.mul(0.2)).add(tuft.mul(0.35))).mul(float(1).sub(core.mul(0.25)));
     const hue = fract(seed.mul(7.31));
-    const conifer = mix(vec3(0.018, 0.04, 0.02), vec3(0.03, 0.05, 0.022), hue);
-    const leaves = mix(mix(vec3(0.24, 0.085, 0.02), vec3(0.2, 0.15, 0.035), smoothstep(0.2, 0.6, hue)), vec3(0.055, 0.08, 0.025), smoothstep(0.75, 0.95, hue));
+    const conifer = mix(vec3(0.034, 0.068, 0.04), vec3(0.05, 0.078, 0.036), hue);
+    const leaves = mix(mix(vec3(0.34, 0.12, 0.025), vec3(0.27, 0.19, 0.045), smoothstep(0.2, 0.6, hue)), vec3(0.075, 0.1, 0.03), smoothstep(0.75, 0.95, hue));
     const bark = vec3(0.05, 0.035, 0.025);
     const trunkZone = select(broad, v.lessThan(0.22), v.lessThan(0.08));
     const albedo = select(trunkZone, bark, select(broad, leaves, conifer));
