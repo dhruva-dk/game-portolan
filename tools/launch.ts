@@ -2,15 +2,16 @@
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+/** The port asked for; if it is taken (another checkout's tools running), Vite takes the next free one. */
 export const PORT = 5199;
 
 export async function launch() {
-  const server = await createServer({ logLevel: 'error', server: { port: PORT } });
+  const server = await createServer({ logLevel: 'error', server: { port: PORT, strictPort: false } });
   await server.listen();
   const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'] });
   return {
     browser,
-    url: `http://localhost:${PORT}/`,
+    url: server.resolvedUrls?.local[0] ?? `http://localhost:${PORT}/`,
     close: async () => {
       await browser.close();
       await server.close();
