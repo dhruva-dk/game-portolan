@@ -6,7 +6,7 @@
 
 import { HalfFloatType, LinearFilter, RepeatWrapping, Storage3DTexture, StorageTexture, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, sin, smoothstep,
+  Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, sin, smoothstep,
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 
@@ -58,19 +58,21 @@ const perlin = Fn(([p, period]: [N, N]) => {
 
 /**
  * Cumulus cells on a tiling 2D lattice of the given period: each cell's feature point raises a cone of slope 1 (in
- * cells) and random height v = 0.1 + 0.9u², most cells weak and a few strong; the highest cone wins.
+ * cells) and random height v = 0.1 + 0.9u², most cells weak and a few strong; the highest cone wins. Returns its
+ * value here and its peak.
  */
 const cells = Fn(([p, period]: [N, N]) => {
   const cell = floor(p), f = fract(p);
-  let best: N = float(0);
+  const best = vec2(0, 0).toVar();
   for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
     const o = vec2(x, y);
     const h = hash33(vec3(mod(cell.add(o), period), period));
     const v = h.z.mul(h.z).mul(0.9).add(0.1);
-    best = max(best, v.sub(length(o.add(h.xy).sub(f))));
+    const c = v.sub(length(o.add(h.xy).sub(f)));
+    best.assign(select(c.greaterThan(best.x), vec2(c, v), best));
   }
   return best;
-}).setLayout({ name: 'cells', type: 'float', inputs: [{ name: 'p', type: 'vec2' }, { name: 'period', type: 'float' }] });
+}).setLayout({ name: 'cells', type: 'vec2', inputs: [{ name: 'p', type: 'vec2' }, { name: 'period', type: 'float' }] });
 
 const perlinFbm = (p: N, f: number, octaves: number): N => {
   let sum: N = float(0);
@@ -116,18 +118,20 @@ export const POTENTIAL_DECILES = [0, 0.027, 0.11, 0.181, 0.25, 0.325, 0.415, 0.5
 
 /**
  * R: cumulus cells at three sizes as a potential in km: past the threshold the cover sets, how far a point lies
- * inside its cloud's edge; G: the large-scale field (0–1) that gathers them into fields of cloud with clear sky between.
+ * inside its cloud's edge; G: the large-scale field (0–1) that gathers them into fields of cloud with clear sky between;
+ * B: the potential at the peak of the cell that holds the point (km), from which its cloud's dome is drawn.
  */
 const weatherKernel = Fn(() => {
   const x = instanceIndex.mod(WEATHER_N), y = instanceIndex.div(WEATHER_N);
   const uv = vec2(x, y).add(0.5).div(WEATHER_N);
-  let potential: N = float(0);
+  const potential = vec2(0, 0).toVar();
   for (const size of CELL_SIZES) {
     const n = WEATHER_TILE / size;
-    potential = max(potential, cells(uv.mul(n), float(n)).mul(size));
+    const c = cells(uv.mul(n), float(n)).mul(size);
+    potential.assign(select(c.x.greaterThan(potential.x), c, potential));
   }
   const field = smoothstep(-0.35, 0.35, perlinFbm(vec3(uv, 0.5), 3, 3));
-  textureStore(weatherMap, uvec2(x, y), vec4(potential, field, 0, 1));
+  textureStore(weatherMap, uvec2(x, y), vec4(max(potential.x, 0), field, potential.y, 1));
 })().compute(WEATHER_N * WEATHER_N, [64]);
 
 /** Bakes the patterns; once, before the clouds are first drawn. */

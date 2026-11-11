@@ -39,18 +39,22 @@ const fall = (a: number | N, b: number | N, x: N): N => float(1).sub(smoothstep(
 
 /** The shell, km above the sea: fair-weather cumulus. */
 export const BASE = 1.2, TOP = 2.6;
-/** Tile sizes of the billows (500–125 m) and the erosion (150–40 m), km. The cells are cloud-noise.ts's. */
-const SHAPE_SCALE = 2, DETAIL_SCALE = 0.6;
+/** Tile sizes of the billows (375–95 m) and the erosion (150–40 m), km. The cells are cloud-noise.ts's. */
+const SHAPE_SCALE = 1.5, DETAIL_SCALE = 0.6;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
-/** Radius of the circle a cloud's dome follows near its edge, km. */
-const DOME_RADIUS = 0.3;
+/**
+ * A cloud's top: DOME·p^¾ km over its cell's peak, p km of potential past the threshold — about as
+ * tall as wide for a cloud of 1–2 km (cumulus mediocris), flatter for the small puffs (humilis) — falling to its
+ * edge as a quarter circle.
+ */
+const DOME = 1.2;
 /** Depth below a cloud's surface within which the billows carve it, km. */
-const BILLOW = 0.25;
+const BILLOW = 0.45;
 /** How much of the billows the erosion can take. */
-const EROSION = 0.5;
+const EROSION = 0.55;
 /** Farthest distance marched, km: about where the shell's base meets the horizon (√(2·6360·1.2) = 124). */
 export const MAX_DISTANCE = 120;
 /** Past this distance the erosion is finer than a pixel, km; it is left out. */
@@ -110,11 +114,14 @@ export function createCloudField() {
     const w = texture(weatherMap).sample(p.xz.div(WEATHER_TILE)).level(float(0));
     // how far inside its cloud's edge the point lies, km: the fields of cloud lower the threshold, the clear skies
     // between raise it
-    const inside = w.r.sub(threshold).add(w.g.sub(0.5).mul(fieldShift));
-    // each cloud a dome on a flat base, as tall as a circle of radius DOME_RADIUS fitted to its edge (√(2re)), so
-    // the broad clouds tower and the small stay low; within BILLOW of its surface the billows decide whether a
-    // point is cloud, so they carve the whole outline (Schneider 2017's dimensional profile)
-    const dome = min(sqrt(max(inside, 0).mul(2 * DOME_RADIUS)), TOP - BASE);
+    const shift = w.g.sub(0.5).mul(fieldShift).sub(threshold);
+    const inside = w.r.add(shift);
+    // each cloud a dome on a flat base: rounding over from its edge to a top above its cell's peak, the broad ones
+    // towering and the small staying low; within BILLOW of its surface the billows decide whether a point is cloud,
+    // so they carve the whole outline (Schneider 2017's dimensional profile)
+    const peak = max(w.b.add(shift), inside);
+    const s = clamp(inside.div(max(peak, 1e-3)), 0, 1);
+    const dome = min(pow(max(peak, 0), 0.75).mul(DOME).mul(sqrt(s.mul(float(2).sub(s)))), TOP - BASE);
     const reach = clamp(min(dome.sub(h.mul(TOP - BASE)), inside).div(BILLOW), 0, 1);
     const dense = float(0).toVar();
     If(reach.greaterThan(0), () => {
