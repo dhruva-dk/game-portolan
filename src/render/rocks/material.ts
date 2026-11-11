@@ -14,7 +14,6 @@ import { rockNodeMaterial } from './nodes.ts';
 export const ROCK_UNIFORMS = {
   /** xyz: the sea's centre; w: its radius (0 means a flat sea at y = centre.y). Tide moves the radius. */
   uSea: { value: new THREE.Vector4(0, 0, 0, 0) },
-  uTime: { value: 0 },
   /** Daylight 0..1: scales the light ice seems to hold inside, so it does not glow at night. */
   uDaylight: { value: 1 },
   /** Distances in metres over which the close-up detail normal fades out. */

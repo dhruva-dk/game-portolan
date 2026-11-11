@@ -11,7 +11,7 @@ import type { ActorsView, CosmeticIds, LootView, ProjectileView, ShipView, Whale
 import type { StageView, WeatherSystem } from '../render/stage.ts';
 import { sink, settle } from '../sim/end.ts';
 import {
-  CAUSE, GULL, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, ZONES, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
+  CAUSE, GULL, PHASE, PLAYER, SEEN, SHIPS, TICK, WEATHER_NAMES, WHALE_STATE, createMatch, hourOf, idleInput, inStorm, matchHash, newStormView,
   newWind, over, seaLevel, seen, step, stormView, sunDir, windAt, type FleetEntry, type MatchSetup, type MatchState, type Ship,
   type ShipInput, type Shot,
 } from '../sim/match.ts';
@@ -258,7 +258,7 @@ export class Session implements Stepper {
   private sample(): void {
     const s = this.state;
     stormView(s, STORM);
-    const storm = { closing: STORM.calm.r < ZONES[0] - 1, outside: s.ships[PLAYER].phase === PHASE.sea && inStorm(s, s.ships[PLAYER].pos) };
+    const storm = { closing: STORM.formed, outside: s.ships[PLAYER].phase === PHASE.sea && inStorm(s, s.ships[PLAYER].pos) };
     this.tally.sample(this.seconds, s.ships.map((sh) => ({ pos: sh.pos, afloat: sh.phase !== PHASE.sunk })), storm);
   }
 
@@ -453,7 +453,7 @@ export class Session implements Stepper {
   stageView(time: number, alpha: number): StageView {
     const s = this.state, w = s.ships[this.watch], at = between(w.was, w.pos, alpha, this.q);
     stormView(s, STORM);
-    const formed = STORM.calm.r < ZONES[0] - 1;
+    const formed = STORM.formed;
     const dist = formed ? R * Math.acos(Math.max(-1, Math.min(1, at.x * STORM.calm.at.x + at.y * STORM.calm.at.y + at.z * STORM.calm.at.z))) : 0;
     const outside = formed && dist > STORM.calm.r ? Math.min(1, 0.45 + (dist - STORM.calm.r) / 60) : 0;
     // the screen's hurt and low-hull edges are the player's own; spectating, the Storm's tint is half as strong
@@ -502,7 +502,7 @@ export class Session implements Stepper {
     const regions: Partial<Record<RegionId, number>> = {};
     for (let i = 0; i < REGION_COUNT; i++) if (EAR.weights[i] > 0.01) regions[REGIONS[i].id] = EAR.weights[i];
     stormView(s, STORM);
-    const formed = STORM.calm.r < ZONES[0] - 1, level = seaLevel(s);
+    const formed = STORM.formed, level = seaLevel(s);
     let land = 0;
     for (let k = 0; k < 8; k++) if (heightAt(along(p, tangentAt(p, (k * Math.PI) / 4, EAR.t), EAR.surf, EAR.q)) > level) land++;
     return {

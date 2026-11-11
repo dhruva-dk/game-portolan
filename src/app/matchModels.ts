@@ -130,7 +130,7 @@ function mapOf(session: Session, i: number): MapView {
     return { x: R * dot(d, e), y: R * dot(d, n) };
   };
   stormView(s, SV);
-  const formed = SV.calm.r < Math.PI * R * 0.49;
+  const formed = SV.formed;
   const circle = (c: { at: V3; r: number }) => ({ ...rel(c.at), r: c.r });
   const ships: MapView['ships'] = [];
   for (let j = 0; j < SHIPS; j++) {
@@ -211,7 +211,7 @@ export function galeMap(session: Session): { view: MapView; tide: number } {
 export function planetMap(session: Session): PlanetMapModel {
   const s = session.state, i = session.watch, sh = s.ships[i];
   stormView(s, SV);
-  const formed = SV.calm.r < Math.PI * R * 0.49;
+  const formed = SV.formed;
   const ships: MapShip[] = [];
   for (let j = 0; j < SHIPS; j++) {
     if (j === i || s.ships[j].phase === PHASE.sunk) continue;

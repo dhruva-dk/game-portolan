@@ -15,7 +15,7 @@
 import { MeshStandardNodeMaterial, Vector4, type Node, type Texture } from 'three/webgpu';
 import {
   Fn, If, abs, attribute, cameraPosition, cameraViewMatrix, clamp, cos, dFdx, dFdy, dot, float, floor, fract, int, length, max, mix, mod,
-  normalWorldGeometry, normalize, positionWorld, pow, select, sin, smoothstep, sqrt, step, texture, uniform, uniformArray, vec2, vec3, vec4, renderGroup,
+  normalWorldGeometry, normalize, positionWorld, pow, select, sin, smoothstep, sqrt, step, texture, uniformArray, vec2, vec3, vec4, renderGroup,
 } from 'three/tsl';
 import { REGIONS } from '../../sim/world/index.ts';
 import { LAMP, P } from '../gpu/uniforms.ts';
@@ -108,8 +108,10 @@ function hexTiled(surface: ReturnType<typeof texture>, detail: ReturnType<typeof
   return { surface: S.mul(inv), detail: D.mul(inv), tilt: T.mul(inv) };
 }
 
-/** The lab's switch for looking inside the land's shading. */
-export const LAND = { debug: uniform(0, 'int').setGroup(renderGroup) };
+/** The lab's look inside the land's shading, chosen when the shader is built (0 for none): 1 the roles, 2 the nearer
+ *  region, 3 the strongest candidate's scan untinted, 4 its slot, 5 the axis the ground is projected along. Set here and
+ *  rebuilt, it costs the shipped shader nothing; as a uniform it was a five-way branch in every fragment of the land. */
+const DEBUG_VIEW = 0 as 0 | 1 | 2 | 3 | 4 | 5;
 const ROLE_COLOURS: [number, number, number][] = [[0.1, 0.4, 0.05], [0.45, 0.4, 0.05], [0.3, 0.3, 0.3], [0.6, 0.5, 0.3], [0.05, 0.15, 0.5], [0.4, 0.05, 0.4]];
 
 const luma = (c: V3): F => dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -409,20 +411,15 @@ export function landMaterial(scans: ScanCache, noise: Texture): MeshStandardNode
     });
 
     albedo.assign(a);
-    // the lab's looks inside: 1 the roles, 2 the nearer region, 3 the strongest candidate's scan untinted, 4 its slot,
-    // 5 the axis the ground is projected along (red x, green y, blue z, grey between)
-    If(LAND.debug.equal(1), () => {
-      albedo.assign(ROLE_COLOURS.reduce((c, col, k) => c.add(vec3(...col).mul(roleW[k])), vec3(0) as V3));
-    }).ElseIf(LAND.debug.equal(2), () => {
-      albedo.assign(vec3(fract(float(ra).mul(0.618)), fract(float(ra).mul(0.381).add(0.3)), fract(float(ra).mul(0.211).add(0.6))).mul(0.6));
-    }).ElseIf(LAND.debug.equal(3), () => {
-      albedo.assign(painted[0].colour.div(max(element(scans.paint, pick[0].at).rgb, vec3(1e-3))));
-    }).ElseIf(LAND.debug.equal(5), () => {
-      albedo.assign(select(triW.x.greaterThan(0.5), vec3(0.6, 0, 0), select(triW.y.greaterThan(0.5), vec3(0, 0.6, 0), select(triW.z.greaterThan(0.5), vec3(0, 0, 0.6), vec3(0.6)))));
-    }).ElseIf(LAND.debug.equal(4), () => {
+    // the lab's looks inside (DEBUG_VIEW)
+    if (DEBUG_VIEW === 1) albedo.assign(ROLE_COLOURS.reduce((c, col, k) => c.add(vec3(...col).mul(roleW[k])), vec3(0) as V3));
+    else if (DEBUG_VIEW === 2) albedo.assign(vec3(fract(float(ra).mul(0.618)), fract(float(ra).mul(0.381).add(0.3)), fract(float(ra).mul(0.211).add(0.6))).mul(0.6));
+    else if (DEBUG_VIEW === 3) albedo.assign(painted[0].colour.div(max(element(scans.paint, pick[0].at).rgb, vec3(1e-3))));
+    else if (DEBUG_VIEW === 5) albedo.assign(select(triW.x.greaterThan(0.5), vec3(0.6, 0, 0), select(triW.y.greaterThan(0.5), vec3(0, 0.6, 0), select(triW.z.greaterThan(0.5), vec3(0, 0, 0.6), vec3(0.6)))));
+    else if (DEBUG_VIEW === 4) {
       const slot = element(scans.far, pick[0].at).w;
       albedo.assign(select(slot.lessThan(0), vec3(0.6, 0, 0), vec3(fract(slot.mul(0.618)), fract(slot.mul(0.381).add(0.3)), 0.4).mul(0.6)));
-    });
+    }
     normal.assign(nb);
     rough.assign(clamp(rg, 0.03, 1));
     occlusion.assign(ao);

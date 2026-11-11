@@ -10,7 +10,7 @@
 // Each region's terrain is its own code, in ./regions/<id>.ts, written in that region's local chart. This file
 // places the charts on the sphere, blends neighbours across their borders, carves the current lanes, and bakes
 // heights into a grid for the simulation.
-import { PI, dcos, dot, dsin, normalize, set, v3, type V3 } from '../math.ts';
+import { PI, datan2, dcos, dot, dsin, normalize, set, v3, type V3 } from '../math.ts';
 import { R, faceDir, faceUV, fromLatLon, localFrame, type FaceUV } from '../sphere.ts';
 import { noise, noise3, smax, smin, smoothstep } from './kit.ts';
 import type { LaneSpec, ObstacleKind, RegionSpec, ZoneKind } from './spec.ts';
@@ -319,7 +319,7 @@ function channel(x: number, run: number, half: number, floor: number, seed: numb
   // 0.7 m a metre at first, 1.6 once past the shoulder, joined smoothly
   const shoulder = out - 3.5, k = 1.5;
   const steep = shoulder < -k ? 0 : shoulder > k ? shoulder : ((shoulder + k) * (shoulder + k)) / (4 * k);
-  const bed = floor - 1.1 * (0.5 + 0.5 * noise(run / 28, 7.5, seed + 2)) + 0.3 * Math.sin(run * 0.72 + 2.2 * noise(run / 19, x / 23, seed + 3));
+  const bed = floor - 1.1 * (0.5 + 0.5 * noise(run / 28, 7.5, seed + 2)) + 0.3 * dsin(run * 0.72 + 2.2 * noise(run / 19, x / 23, seed + 3));
   return bed + 0.7 * out + 0.9 * steep;
 }
 
@@ -327,7 +327,7 @@ function channel(x: number, run: number, half: number, floor: number, seed: numb
 function carve(p: V3, h: number): number {
   const de = fromEquator(p);
   if (de < GREAT_CURRENT.fade + 40) {
-    const across = p.y < 0 ? -de : de, run = Math.atan2(p.z, p.x) * R;
+    const across = p.y < 0 ? -de : de, run = datan2(p.z, p.x) * R;
     h = smin(h, channel(across, run, GREAT_CURRENT.half / 0.6, -6.5, 41), 3);
   }
   for (let i = 0; i < CURRENTS.length; i++) {

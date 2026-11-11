@@ -13,7 +13,7 @@
 //   afloat     floating on the sea (floes)
 //   density    copies per hectare (10,000 m²) of the eligible ground, at the middle of the size range
 //
-// Materials share ROCK_UNIFORMS: point uSea at the planet (centre, radius + tide) and tick uTime.
+// Materials share ROCK_UNIFORMS: point uSea at the planet (centre, radius + tide); their time is the shared P.time.
 import * as THREE from 'three';
 import type { RegionId } from '../../sim/world/index.ts';
 import { basaltColumns, basaltStack, boulderBeach } from './forms/basalt.ts';

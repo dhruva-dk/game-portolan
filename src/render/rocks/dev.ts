@@ -315,7 +315,6 @@ let frames = 0;
 function frame(): void {
   clock.update();
   const dt = Math.min(0.05, clock.getDelta());
-  ROCK_UNIFORMS.uTime.value += dt;
   if (state.spin && state.view === 'grid') for (const o of spinners) o.rotation.y += dt * 0.25;
   controls.update();
   content.updateMatrixWorld();

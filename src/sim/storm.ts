@@ -163,6 +163,9 @@ export function calmNow(state: MatchState): Calm {
 }
 
 /** Whether the Storm hurts yet: the first circle is only a warning, until it first starts to close. */
+/** Whether the calm has begun to close from the whole planet: the Storm has formed. */
+export const stormFormed = (calm: Calm): boolean => calm.r < ZONES[0] - 1;
+
 export const stormBites = (state: MatchState): boolean => state.tick >= state.storm.start && (state.storm.phase > 0 || state.storm.shrinking);
 
 export const inStorm = (state: MatchState, p: V3): boolean => dot(p, calmNow(state).at) < calmNow(state).cos;
@@ -184,6 +187,9 @@ export function stormDamage(state: MatchState): number {
 
 export interface StormView {
   phase: number;
+  /** Whether the Storm has formed: its calm has begun to close from the whole planet. Everything that shows the Storm
+   *  (the sea's tint, the HUD, the map, the ambience) asks this, not a threshold of its own. */
+  formed: boolean;
   closing: boolean;
   /** Seconds until the next change: the wait ending or the closing ending. */
   left: number;
@@ -195,7 +201,7 @@ export interface StormView {
 }
 
 export function newStormView(): StormView {
-  return { phase: 0, closing: false, left: 0, calm: newCalm(), next: newCalm(), damage: 0, region: 0 };
+  return { phase: 0, formed: false, closing: false, left: 0, calm: newCalm(), next: newCalm(), damage: 0, region: 0 };
 }
 
 export function stormView(state: MatchState, out: StormView): StormView {
@@ -206,6 +212,7 @@ export function stormView(state: MatchState, out: StormView): StormView {
   set(out.calm.at, c.at.x, c.at.y, c.at.z);
   out.calm.r = c.r;
   out.calm.cos = c.cos;
+  out.formed = stormFormed(c);
   const z = Math.min(ph.k + 1, ZONES.length - 1), n = state.storm.centres[z];
   set(out.next.at, n.x, n.y, n.z);
   out.next.r = ZONES[z];
