@@ -64,6 +64,8 @@ const twice = (a: N, w: N): N => vec4(
   a.z.mul(w.x).sub(a.w.mul(w.y)), a.z.mul(w.y).add(a.w.mul(w.x)),
 );
 
+export type Waves = ReturnType<typeof createWaves>;
+
 export function createWaves(renderer: WebGPURenderer) {
   // each cascade's h₀ stacked: cascade c in rows c·N … c·N + N − 1
   const initial = new DataTexture(new Float32Array(AREA * COUNT * 4), SIZE, SIZE * COUNT, RGBAFormat, FloatType);
