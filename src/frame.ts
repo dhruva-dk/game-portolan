@@ -1,5 +1,9 @@
-import { Color, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
+import { ACESFilmicToneMapping, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
 import type { Environment } from './environment';
+import { createSky } from './sky/sky';
+
+/** Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. */
+const EXPOSURE = 10;
 
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
@@ -11,8 +15,11 @@ import type { Environment } from './environment';
  * Systems hand this file meshes and shader nodes; they never create passes themselves.
  */
 export function createFrame(renderer: WebGPURenderer) {
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.toneMappingExposure = EXPOSURE;
+  const sky = createSky(renderer);
   const scene = new Scene();
-  scene.background = new Color(0x1d4f73);
+  scene.backgroundNode = sky.background;
   const camera = new PerspectiveCamera(60, 1, 0.1, 20000);
 
   function resize(width: number, height: number) {
@@ -21,7 +28,8 @@ export function createFrame(renderer: WebGPURenderer) {
     camera.updateProjectionMatrix();
   }
 
-  function render(_env: Environment, _dt: number) {
+  function render(env: Environment, _dt: number) {
+    sky.update(env);
     renderer.render(scene, camera);
   }
 

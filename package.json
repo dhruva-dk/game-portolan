@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "ios": "npm run build && cap run ios"
+    "ios": "npm run build && cap run ios",
+    "test": "node --test tests/*.test.ts",
+    "capture": "node tools/capture.ts"
   },
   "dependencies": {
     "@capacitor/core": "8.6.0",
@@ -17,6 +19,7 @@
     "@capacitor/cli": "8.6.0",
     "@types/three": "0.187.0",
     "@webgpu/types": "0.1.74",
+    "playwright": "1.64.1",
     "typescript": "5.9.3",
     "vite": "8.3.8"
   }
