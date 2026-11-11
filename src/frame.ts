@@ -6,6 +6,7 @@ import type { Environment } from './environment';
 import { VIEW_HEIGHT } from './sky/atmosphere';
 import { createSky, fog } from './sky/sky';
 import { createLand } from './land/land';
+import { createRocks } from './land/rocks';
 import { createSeabed } from './land/seabed';
 import { createIsland } from './land/terrain';
 import { createWater } from './water/water';
@@ -34,7 +35,8 @@ export function createFrame(renderer: WebGPURenderer) {
   const seabed = createSeabed(island);
   const water = createWater(renderer, sky.reflect, seabed);
   const land = createLand(island, water.below);
-  scene.add(land.mesh, water.mesh);
+  const rocks = createRocks(island, water.below);
+  scene.add(land.mesh, ...rocks.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
   const post = Fn(() => {

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ISLAND, createIsland } from '../src/land/terrain.ts';
+import { scatterRocks } from '../src/land/scatter.ts';
 
 const island = createIsland([0, -300], 1);
 const at = (t: number, r: number): [number, number] => [island.centre[0] + Math.cos(t) * r, island.centre[1] + Math.sin(t) * r];
@@ -50,4 +51,17 @@ test('the reef\'s crest shelters the lagoon', () => {
     for (let r = c + 30; r < island.reach; r += 0.5) shallowest = Math.min(shallowest, -island.height(...at(t, r)));
     assert.ok(shallowest <= inside + 0.3, `crossed ${shallowest} vs passage ${inside}`);
   }
+});
+
+test('the rocks lie along the coast, apart, sunk into the ground', () => {
+  const rocks = scatterRocks(island, 6);
+  assert.ok(rocks.length > 40 && rocks.length < 100, `count ${rocks.length}`);
+  for (const r of rocks) {
+    const t = Math.atan2(r.z - island.centre[1], r.x - island.centre[0]);
+    const d = Math.hypot(r.x - island.centre[0], r.z - island.centre[1]) - island.coast(t);
+    assert.ok(d > -5 && d < 6, `from the waterline ${d}`);
+    assert.ok(r.y < island.height(r.x, r.z), 'sunk');
+    for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * 0.79, 'apart');
+  }
+  assert.deepEqual(scatterRocks(island, 6), rocks, 'the same every time');
 });

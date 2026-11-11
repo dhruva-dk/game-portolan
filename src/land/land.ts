@@ -7,15 +7,14 @@
 //
 // What covers the ground (sea grass, coral, the sand's mottling) rides on the mesh's vertices: only the land needs it.
 //
-// Lit like everything else: the sky's sun (through the clouds' shadow) and its ambient light; below the water, only
-// what of them the water lets down to that depth, the sun's focused by the waves into caustics (water.below).
+// Lit like everything on the island (light.ts).
 
 import {
   BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace,
   TextureLoader, Vector3,
 } from 'three/webgpu';
-import { Fn, attribute, float, mix, normalGeometry, normalize, positionWorld, saturate, smoothstep, texture, vec3 } from 'three/tsl';
-import { ambient, cloudShadow, sunDirection, sunIlluminance } from '../sky/sky';
+import { Fn, attribute, float, mix, normalGeometry, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import { type Below, light } from './light';
 import { ISLAND, type Island } from './terrain';
 
 type N = any;
@@ -69,9 +68,6 @@ function geometry(island: Island): BufferGeometry {
   return g;
 }
 
-/** The light under the water at a point, as a share of what is above it. */
-export interface Below { sun(p: N): N; sky(p: N): N }
-
 export function createLand(island: Island, below: Below) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
@@ -107,9 +103,7 @@ export function createLand(island: Island, below: Below) {
     const bump = texture(sandNormal, uv).xyz.mul(2).sub(1);
     const n = normalize(normalize(normalGeometry).add(vec3(bump.x, 0, bump.y.negate()).mul(1.2)));
 
-    const sun = sunIlluminance.mul(cloudShadow(p)).mul(below.sun(p));
-    const lit = sun.mul(saturate(n.dot(sunDirection))).div(Math.PI).add(ambient(n).mul(below.sky(p)));
-    return albedo.mul(lit);
+    return albedo.mul(light(p, n, below));
   })();
 
   const mesh = new Mesh(geometry(island), material);
