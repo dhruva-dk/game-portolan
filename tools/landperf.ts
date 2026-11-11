@@ -11,7 +11,7 @@ try {
   for (const query of queries) {
     const game = await openGame(browser, server.url, { device: 'ipad', query: Object.fromEntries(new URLSearchParams(`${query}&fps=0&throttle=0`)), hook: '__sea', dpr: 1 });
     const lines: string[] = [];
-    game.page.on('console', (m) => { if (m.text().startsWith('perfjson')) lines.push(m.text().slice(9)); });
+    game.page.on('console', (m) => { if (m.text().startsWith('perfjson')) lines.push(m.text().slice(9)); else if (m.text().startsWith('land:')) console.log('  ', m.text()); });
     await game.page.waitForFunction(() => (window as unknown as { __sea?: { ready: boolean } }).__sea?.ready, null, { timeout: 60000 });
     const t = Date.now();
     while (lines.length < 2 && Date.now() - t < 30000) await game.page.waitForTimeout(500);

@@ -14,7 +14,7 @@
 // The patch is a plane laid on the sphere round the ship's start by the azimuthal-equidistant map (as the waves are).
 import {
   BufferGeometry, ClampToEdgeWrapping, DataTexture, DataUtils, Float32BufferAttribute, Group, HalfFloatType, InstancedMesh, LinearFilter,
-  LinearMipmapLinearFilter, Matrix4, Mesh, MeshBasicNodeMaterial, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, Sphere, StorageTexture,
+  Frustum, LinearMipmapLinearFilter, Matrix4, Mesh, MeshBasicNodeMaterial, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, Sphere, StorageTexture,
   TextureLoader, UnsignedByteType, Vector2, Vector3, Vector4, type ComputeNode, type Material, type PerspectiveCamera, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
@@ -95,6 +95,11 @@ interface Scatter {
   /** Per variant, per level: the meshes (one per material). */
   meshes: InstancedMesh[][][];
   far: number[];
+  /** Made once: each copy's matrix (16 floats), and the middle of it (world) with a radius that holds it. */
+  matrices?: Float32Array;
+  spheres?: Float32Array;
+  /** The copy's reach above its base, metres at scale 1. */
+  height: number;
 }
 
 export class Land {
@@ -107,6 +112,7 @@ export class Land {
   readonly #e2: Vector3;
   readonly #scatters: Scatter[] = [];
   #at = new Vector2(1e9, 1e9);
+  readonly #look = new Vector3();
   #frame = 0;
 
   /** Generates the islands round `anchor` (x along `east`) in a worker and makes everything that draws them. */
@@ -231,7 +237,7 @@ export class Land {
   /** The coconut palms: six seeds of the palm at three levels of detail, each copy turned to lean toward the sea. */
   #palms(): void {
     const coconut = ATOLL_PLANTS.find((p) => p.id === 'coconutPalm')!;
-    const src = this.maps.palms, count = src.length / 4, K = 6;
+    const src = this.maps.palms, count = src.length / 4, K = 4;
     const items = new Float32Array(count * 6);
     const per = new Array(K).fill(0);
     const q = new Vector2();
@@ -241,7 +247,8 @@ export class Land {
       per[vt]++;
     }
     const meshes = Array.from({ length: K }, (_, vt) => [0, 1, 2].map((lod) => instanced(coconut.build(101 + vt * 37, lod as 0 | 1 | 2), per[vt], `palm${vt}.${lod}`)));
-    this.#addScatter({ items, stride: 6, meshes, far: [70, 280, 1400] });
+    console.info('land: palm triangles per level', [0, 1, 2].map((l) => meshes[0][l].reduce((t, m) => t + (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3, 0)));
+    this.#addScatter({ items, stride: 6, meshes, far: [45, 160, 1400], height: 16 });
   }
 
   /** Granite: boulders by the shore, slabs and tors on the hills, four shapes of each, scaled to each copy's size. */
@@ -268,10 +275,29 @@ export class Land {
         return m;
       });
     }).map((l) => l.flat()));
-    this.#addScatter({ items, stride: 6, meshes: meshes.map((v) => v.map((l) => l)), far: [45, 200, 1100] });
+    this.#addScatter({ items, stride: 6, meshes, far: [40, 180, 1000], height: 6 });
   }
 
+  /** Each copy's matrix and bounds, made once: the copies never move, only which level and whether they are drawn. */
   #addScatter(s: Scatter): void {
+    const n = s.items.length / s.stride;
+    s.matrices = new Float32Array(n * 16);
+    s.spheres = new Float32Array(n * 4);
+    const up = new Vector3(), x = new Vector3(), z = new Vector3(), tx = new Vector3(), ty = new Vector3(), Y = new Vector3();
+    for (let k = 0; k < n; k++) {
+      const i = k * s.stride, px = s.items[i], py = s.items[i + 1], a = s.items[i + 2], s0 = s.items[i + 3];
+      this.#cpuUp(px, py, up);
+      // the plane's x and y carried to this point (as frameAt), turned by the copy's own turn
+      this.#cpuUp(px + 1, py, tx).sub(up).normalize();
+      this.#cpuUp(px, py + 1, ty).sub(up).normalize();
+      x.copy(tx).multiplyScalar(Math.cos(a)).addScaledVector(ty, Math.sin(a)).normalize();
+      z.crossVectors(x, up);
+      M.makeBasis(x.multiplyScalar(s0), Y.copy(up).multiplyScalar(s0), z.multiplyScalar(s0));
+      M.setPosition(up.clone().multiplyScalar(R + s.items[i + 5]));
+      M.toArray(s.matrices, k * 16);
+      const h = s.height * s0;
+      s.spheres.set([up.x * (R + s.items[i + 5] + h / 2), up.y * (R + s.items[i + 5] + h / 2), up.z * (R + s.items[i + 5] + h / 2), h * 0.75 + 2], k * 4);
+    }
     for (const v of s.meshes) for (const l of v) for (const m of l) this.group.add(m);
     this.#scatters.push(s);
   }
@@ -311,39 +337,43 @@ export class Land {
       const k = d < TILE_LOD[0] ? 0 : d < TILE_LOD[1] ? 1 : d < TILE_LOD[2] ? 2 : 3;
       for (let i = 0; i < 4; i++) t.meshes[i].visible = i === k;
     }
-    if (this.#at.distanceTo(eye) > 8) {
+    // the copies re-sorted when the eye moves a few metres or turns a couple of degrees
+    const look = camera.getWorldDirection(V3);
+    if (this.#at.distanceTo(eye) > 4 || look.dot(this.#look) < 0.9994) {
       this.#at.copy(eye);
+      this.#look.copy(look);
+      FRUSTUM.setFromProjectionMatrix(PV.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const s of this.#scatters) this.#place(s, eye);
     }
     if (this.#frame++ % 4 === 0) renderer.compute(this.#shadow);
   }
 
-  /** Every copy within reach into its shape's mesh at the level its distance asks for. */
+  /** Every copy within reach and in view into its shape's mesh at the level its distance asks for. */
   #place(s: Scatter, eye: Vector2): void {
-    const { items, stride, meshes, far } = s;
+    const { items, stride, meshes, far, matrices, spheres } = s;
     for (const v of meshes) for (const l of v) for (const m of l) m.count = 0;
-    const up = TMP, x = new Vector3(), z = new Vector3(), tx = new Vector3(), ty = new Vector3(), up2 = new Vector3();
-    for (let i = 0; i < items.length; i += stride) {
-      const px = items[i], py = items[i + 1];
-      const d = Math.hypot(px - eye.x, py - eye.y);
+    // a little wider than the view, so turning between re-sorts never shows a copy popping in at the edge
+    const planes = FRUSTUM.planes;
+    for (let i = 0, k = 0; i < items.length; i += stride, k++) {
+      const d = Math.hypot(items[i] - eye.x, items[i + 1] - eye.y);
       if (d > far[2]) continue;
+      V3.fromArray(spheres!, k * 4);
+      const r = spheres![k * 4 + 3] + 6;
+      let inside = true;
+      for (let p = 0; p < 6 && inside; p++) inside = planes[p].distanceToPoint(V3) > -r;
+      if (!inside) continue;
       const lod = d < far[0] ? 0 : d < far[1] ? 1 : 2;
-      this.#cpuUp(px, py, up);
-      // the plane's x and y carried to this point (as frameAt), turned by the copy's own turn
-      this.#cpuUp(px + 1, py, tx).sub(up).normalize();
-      this.#cpuUp(px, py + 1, ty).sub(up).normalize();
-      const a = items[i + 2], s0 = items[i + 3];
-      x.copy(tx).multiplyScalar(Math.cos(a)).addScaledVector(ty, Math.sin(a)).normalize();
-      up2.copy(up);
-      z.crossVectors(x, up2);
-      M.makeBasis(x.multiplyScalar(s0), up2.clone().multiplyScalar(s0), z.multiplyScalar(s0));
-      M.setPosition(up.multiplyScalar(R + items[i + 5]));
-      for (const m of meshes[items[i + 4]][lod]) m.setMatrixAt(m.count++, M);
+      for (const m of meshes[items[i + 4]][lod]) (m.instanceMatrix.array as Float32Array).set(matrices!.subarray(k * 16, k * 16 + 16), 16 * m.count++);
     }
-    for (const v of meshes) for (const l of v) for (const m of l) { m.instanceMatrix.needsUpdate = true; m.visible = m.count > 0; }
+    for (const v of meshes) for (const l of v) for (const m of l) {
+      m.instanceMatrix.clearUpdateRanges();
+      m.instanceMatrix.addUpdateRange(0, Math.max(16, m.count * 16));
+      m.instanceMatrix.needsUpdate = true;
+      m.visible = m.count > 0;
+    }
   }
 }
-const TMP = new Vector3(), Q = new Vector2(), M = new Matrix4();
+const TMP = new Vector3(), Q = new Vector2(), M = new Matrix4(), V3 = new Vector3(), PV = new Matrix4(), FRUSTUM = new Frustum();
 void Vector4;
 
 /** One InstancedMesh per mesh of a built plant, sharing its geometry and material. */
