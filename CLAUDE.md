@@ -7,6 +7,7 @@ Explain progress as you go.
 Platform is WebGPU. No WebGL path, no fallbacks, no quality setting, no older devices.
 Target device is iPhone 16 Pro Max at 30-40 FPS.
 
+
 # The Game World and UI
 
 No humans, and no sign that people ever lived here.
