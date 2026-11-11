@@ -206,6 +206,9 @@ function rainRings(q: V2): V2 {
 
 // ---------------------------------------------------------------- the material
 
+/** A map's rate of change across the pixel, along the screen's x and y. */
+interface Rate { x: V2; y: V2 }
+
 export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territory: Territory, flow: Flow, slicks: Slicks): Mesh {
   const mat = new MeshPhysicalNodeMaterial({ metalness: 0, ior: 1.333, specularIntensity: 1 });
   // the sea works out its own haze, once, under the surface (below): it is not something beneath itself either
@@ -220,6 +223,12 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   // the grid's spacing here, and the mip of each cascade that holds no wave shorter than four spacings
   const field = texture(waves.field);
   const sample = (uv: V2, layer: number) => field.sample(uv).depth(int(layer));
+  // a read inside a branch that only some of a quad's pixels take has no derivatives of its own to choose its mip by
+  // (WGSL leaves them undefined there): such a read is given its map's rate of change across the pixel, worked out
+  // at the top of the fragment (colorNode), scaled as the read scales the map
+  const sampleAcross = (uv: V2, layer: number, d: Rate, k: number) => field.sample(uv).depth(int(layer)).grad(d.x.mul(k), d.y.mul(k));
+  const noiseMap = texture(noise);
+  const noiseAcross = (uv: V2, d: Rate, k: number) => noiseMap.sample(uv).grad(d.x.mul(k), d.y.mul(k));
   const spacing = max(along.mul(GROWTH - 1).add(FIRST), sin(th).mul((R * 2 * Math.PI) / SPOKES));
   const displaced = (f: Frame) => {
     const { q, e1, e2 } = inFrame(up, f);
@@ -231,6 +240,11 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     return { q, world: e1.mul(d.x).add(up.mul(d.y)).add(e2.mul(d.z)), height: d.y };
   };
   const vq = varyingProperty('vec4', 'vOceanQ');
+  // the rates of change across the pixel of the two frames' maps and of the land's projection (surf)
+  const landMap = positionWorld.xz.add(vec2(0.71, -0.53).mul(positionWorld.y));
+  const D0: Rate = { x: dFdx(vq.xy).toVar('oceanD0x'), y: dFdy(vq.xy).toVar('oceanD0y') };
+  const D1: Rate = { x: dFdx(vq.zw).toVar('oceanD1x'), y: dFdy(vq.zw).toVar('oceanD1y') };
+  const DL: Rate = { x: dFdx(landMap).toVar('oceanDLx'), y: dFdy(landMap).toVar('oceanDLy') };
   const vRise = varyingProperty('float', 'vOceanRise');
   const vUp = varyingProperty('vec3', 'vOceanUp');
   const vLevel = varyingProperty('float', 'vOceanLevel');
@@ -305,7 +319,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const weights = vec2(w0, float(1).sub(w0)).toVar('oceanFlowWeights');
     const current = flow.at(u).toVar('oceanCurrent');
     const calm = flow.calmAt(u).toVar('oceanCalm');
-    const shade = (q: V2, f: Frame, w: F) => {
+    const shade = (q: V2, f: Frame, w: F, d: Rate) => {
       const { e1, e2 } = inFrame(u, f);
       const s = vec4(0).toVar();
       const dxz = float(0).toVar(), v = float(0).toVar(), white = float(0).toVar();
@@ -319,11 +333,12 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
           const slv = vec4(0).toVar(), mov = vec4(0).toVar();
           If(moving, () => {
             const a = q.sub(along.mul(phase.x)).div(SIZES[c]), b = q.sub(along.mul(phase.y)).div(SIZES[c]);
-            slv.assign(sample(a, LAYER.slope + c).mul(weights.x).add(sample(b, LAYER.slope + c).mul(weights.y)));
-            mov.assign(sample(a, LAYER.moments + c).mul(weights.x).add(sample(b, LAYER.moments + c).mul(weights.y)));
+            const k = 1 / SIZES[c];
+            slv.assign(sampleAcross(a, LAYER.slope + c, d, k).mul(weights.x).add(sampleAcross(b, LAYER.slope + c, d, k).mul(weights.y)));
+            mov.assign(sampleAcross(a, LAYER.moments + c, d, k).mul(weights.x).add(sampleAcross(b, LAYER.moments + c, d, k).mul(weights.y)));
           }).Else(() => {
-            slv.assign(sample(uv, LAYER.slope + c));
-            mov.assign(sample(uv, LAYER.moments + c));
+            slv.assign(sampleAcross(uv, LAYER.slope + c, d, 1 / SIZES[c]));
+            mov.assign(sampleAcross(uv, LAYER.moments + c, d, 1 / SIZES[c]));
           });
           sl = slv;
           mo = mov;
@@ -342,9 +357,9 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       foam.addAssign(white.mul(w.mul(w)));
       fold.assign(min(fold, s.z.add(1).mul(s.w.add(1)).sub(dxz.mul(dxz))));
     };
-    shade(vq.xy, FRAMES[0], FRAME.weight.x);
+    shade(vq.xy, FRAMES[0], FRAME.weight.x, D0);
     If(FRAME.weight.y.greaterThan(0), () => {
-      shade(vq.zw, FRAMES[1], FRAME.weight.y);
+      shade(vq.zw, FRAMES[1], FRAME.weight.y, D1);
     });
     // a calm: the slopes, their unresolved spread and the breaking all stilled toward its middle
     const still = float(1).sub(calm.mul(0.85));
@@ -362,13 +377,13 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
       const streak = (carried: F) => {
         const base = vq.xy.sub(along.mul(carried));
         let n: F = float(0);
-        for (let k = -2; k <= 2; k++) n = n.add(noiseMap.sample(base.add(dir.mul(k * 0.9)).mul(0.11)).g.mul(k === 0 ? 0.28 : k * k === 1 ? 0.2 : 0.16));
+        for (let k = -2; k <= 2; k++) n = n.add(noiseAcross(base.add(dir.mul(k * 0.9)).mul(0.11), D0, 0.11).g.mul(k === 0 ? 0.28 : k * k === 1 ? 0.2 : 0.16));
         return n;
       };
       const n = streak(phase.x).mul(weights.x).add(streak(phase.y).mul(weights.y));
       // and a finer grain carried with it, so the streaks' edges fray
-      const fine = noiseMap.sample(vq.xy.sub(along.mul(phase.x)).mul(0.37)).a.mul(weights.x)
-        .add(noiseMap.sample(vq.xy.sub(along.mul(phase.y)).mul(0.37)).a.mul(weights.y));
+      const fine = noiseAcross(vq.xy.sub(along.mul(phase.x)).mul(0.37), D0, 0.37).a.mul(weights.x)
+        .add(noiseAcross(vq.xy.sub(along.mul(phase.y)).mul(0.37), D0, 0.37).a.mul(weights.y));
       const m = n.mul(0.75).add(fine.mul(0.25));
       const lace = smoothstep(float(0.66).sub(fast.mul(0.1)), float(0.76).sub(fast.mul(0.1)), m);
       const far = smoothstep(140, 420, length(positionWorld.sub(cameraPosition)));
@@ -378,7 +393,7 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     If(vRipple.z.greaterThan(0), () => {
       const w = ripples.sample(vRipple.xy).level(float(0)).mul(vRipple.z);
       world.addAssign(vRippleE1.mul(w.y).add(vRippleE2.mul(w.z)).mul(still));
-      const lace = noiseMap.sample(vq.xy.mul(0.31)).a.add(w.w.mul(0.6));
+      const lace = noiseAcross(vq.xy.mul(0.31), D0, 0.31).a.add(w.w.mul(0.6));
       wakeFoam.assign(smoothstep(0.1, 0.32, w.x).mul(smoothstep(0.5, 0.72, lace)).mul(0.85));
     });
     // rain ringing the water near the eye, where the rings can be seen
@@ -439,13 +454,12 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     });
     return { colour, share, glow, lineInk, lineShare };
   };
-  const noiseMap = texture(noise);
   const surf = (u: V3) => {
     const p = positionWorld;
     const t = P.time;
     // the land's seamless projection of the world, and noise drifting on it at three scales
     const q = p.xz.add(vec2(0.71, -0.53).mul(p.y)).toVar();
-    const n1 = noiseMap.sample(q.mul(0.045).add(vec2(t.mul(0.011), t.mul(-0.007)))).g.toVar();
+    const n1 = noiseAcross(q.mul(0.045).add(vec2(t.mul(0.011), t.mul(-0.007))), DL, 0.045).g.toVar();
     // the water straight down from here to whatever the eye sees through it: the ground, a rock, a hull. A line
     // that dips under the surface and finds nothing (the sky past the curve of the sea, ground not built yet) comes
     // out over the surface again, and the water there is deep
@@ -458,8 +472,8 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
     const d = c.y.toVar();
     If(under.lessThan(1.2).or(coast.on.greaterThan(0).and(d.lessThan(REACH - 4))), () => {
       coastal.assign(1);
-      const n2 = noiseMap.sample(q.mul(0.13).sub(vec2(t.mul(0.017), t.mul(0.009)))).b;
-      const n3 = noiseMap.sample(q.mul(0.47).add(vec2(t.mul(0.023), t.mul(0.004)))).a;
+      const n2 = noiseAcross(q.mul(0.13).sub(vec2(t.mul(0.017), t.mul(0.009))), DL, 0.13).b;
+      const n3 = noiseAcross(q.mul(0.47).add(vec2(t.mul(0.023), t.mul(0.004))), DL, 0.47).a;
       // the depth by the grid, the field off where it has not arrived
       const depth = select(coast.on.greaterThan(0), vLevel.sub(c.x), float(50));
       const out = select(coast.on.greaterThan(0), max(d, 0), float(REACH));
@@ -488,6 +502,9 @@ export function oceanSurface(waves: Waves, coast: Coast, noise: Texture, territo
   // the foam, and how much of the water it covers: the rest is the water itself
   const whiteness = clamp(foam.mul(1.4).add(smoothstep(0.35, -0.1, fold).mul(0.8)).add(shore).add(race).add(wakeFoam), 0, 1);
   mat.colorNode = Fn(() => {
+    // every value the fragment's parts share is declared here, at the top: three (r187) takes a variable first met
+    // inside a branch for that branch's own, and declares it again, at its starting value, where it is next read
+    for (const v of [D0.x, D0.y, D1.x, D1.y, DL.x, DL.y, world, variance, foam, fold, race, wakeFoam, shore, shoreGlow, coastal, sunShade]) v.toStack();
     surface();
     return WATER.foam;
   })();

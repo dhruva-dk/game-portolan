@@ -2,8 +2,9 @@
 // pass for `seconds` more, printed as the median of each pass and system, with a frame of the fixture saved beside
 // them. The two scene passes are told apart by order: the opaque scene, then the sea and the rest after the copy.
 import { log, openApp, Shots, type Rig } from './common.ts';
+import { look } from './look.ts';
 
-export async function fight(r: Rig, o: { dpr: number; seconds: number }): Promise<void> {
+export async function fight(r: Rig, o: { dpr: number; seconds: number; save?: boolean }): Promise<void> {
   const shots = await Shots.create('fight');
   const game = await openApp(r, { dpr: o.dpr });
   await game.hook((h) => h.fight());
@@ -17,7 +18,7 @@ export async function fight(r: Rig, o: { dpr: number; seconds: number }): Promis
     if (t && t !== last && JSON.stringify(t) !== JSON.stringify(last)) frames.push(t);
     last = t;
   }
-  await shots.shot(game, 'fight');
+  const seen = await look(r.browser, await shots.shot(game, 'fight'), 'fight', o.save);
   const median = (xs: number[]) => xs.sort((a, b) => a - b)[xs.length >> 1] ?? 0;
   const name = (p: { label: string; system: string }, k: number) => `${String(k).padStart(2)} ${p.system}/${p.label}`;
   const rows: Record<string, { gpu: number }> = {}, systems: Record<string, { gpu: number }> = {};
@@ -36,4 +37,5 @@ export async function fight(r: Rig, o: { dpr: number; seconds: number }): Promis
   log(`fight: ${frames.length} timed frames, gpu median ${total} ms; cpu ${cpu.frameMs} ms a frame (p95 ${cpu.p95Ms}), ${cpu.tris} tris, ${cpu.calls} calls`);
   await shots.json('fight.json', { renderer: r.renderer, dpr: o.dpr, total, systems, rows, cpu });
   game.assertClean();
+  if (seen && !seen.ok) throw new Error('fight: the fight does not look as it did (tools/baselines/looks/fight.png; --save to accept)');
 }

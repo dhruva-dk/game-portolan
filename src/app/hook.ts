@@ -1,6 +1,7 @@
 // window.__portolan: the test hook. Playwright (tools/capture/) drives the game through it:
 // jump to a scene, start a seeded match with scripted player input, step the simulation, read the effect log, open
 // any screen with its live or fixture model, and read state.
+import type { Object3D } from 'three/webgpu';
 import { Resolution } from '../render/gpu/resolution.ts';
 import type { App } from './app.ts';
 import type { PlayOptions } from './session.ts';
@@ -19,6 +20,7 @@ export function installHook(app: App) {
   // a capture's pictures do not depend on how the frames before them went
   if (navigator.webdriver) Resolution.held = true;
   const { loop, log } = app;
+  const missed: string[] = [];
   const hook = {
     get ready() { return app.ready; },
     get screen() { return app.screen; },
@@ -146,11 +148,42 @@ export function installHook(app: App) {
     /** Pipelines and shader modules the device has been asked to create so far (preparation's misses are the ones made
      *  after it has finished). */
     pipelines: () => ({ ...shape.pipelines }),
+    /** From now on, names each material or kernel built outside preparation (a frame waited for it): read with misses(). */
+    watchMisses() {
+      const r = app.stage!.renderer, was = r.debug.onNodeBuilderCreated;
+      r.debug.onNodeBuilderCreated = (builder, object) => {
+        was?.(builder, object);
+        // preparation builds each object between three's begin and finish of its precompilation
+        if ((r as unknown as { _precompilationState: unknown })._precompilationState) return;
+        const o = object as unknown as { isComputeNode?: boolean; name?: string; object?: { name: string; type: string; parent?: { name: string } | null }; material?: { name: string; type: string } };
+        missed.push(o.isComputeNode ? `compute ${o.name || '?'}`
+          : `${o.object?.parent?.name ? `${o.object.parent.name}/` : ''}${o.object?.name || o.object?.type} ${o.material?.type}${o.material?.name ? ` ${o.material.name}` : ''}`);
+      };
+    },
+    /** What was built outside preparation since the last call. */
+    misses: () => missed.splice(0),
     /** Resolves once every material is prepared and the land round the camera is built. */
     settled: () => app.stage?.settled() ?? Promise.resolve(),
     /** The last timed frame's GPU milliseconds by pass, as { label, system, gpu }; null until one is timed. */
     timed: () => shape.timed?.passes.map((p) => ({ label: p.label, system: p.system, gpu: p.gpu })) ?? null,
     /** The textures the device holds, the heaviest kinds first, and the whole memory line. */
+    /** Every material in the scene as three generates it for WebGPU, once each: { "parent/object|type|name": WGSL },
+     *  the vertex stage, a line `//==FRAGMENT==`, then the fragment stage. */
+    async shaders(): Promise<Record<string, string>> {
+      const st = app.stage!, out: Record<string, string> = {}, seen = new Set<unknown>();
+      const all: Object3D[] = [];
+      st.scene.traverse((o) => { all.push(o); });
+      for (const o of all) {
+        const m = (o as { material?: { type: string; name: string } }).material;
+        if (!m || Array.isArray(m) || seen.has(m)) continue;
+        seen.add(m);
+        try {
+          const s = await st.renderer.debug.getShaderAsync(st.scene, st.camera, o);
+          out[`${o.parent?.name ?? ''}/${o.name}|${m.type}|${m.name}`] = `${s.vertexShader}\n//==FRAGMENT==\n${s.fragmentShader}`;
+        } catch (e) { out[`${o.parent?.name ?? ''}/${o.name}|${m.type}|${m.name}`] = `error: ${String(e)}`; }
+      }
+      return out;
+    },
     textures: (top = 40) => `${shape.memory}\n${shape.inventory(top)}`,
   };
   Object.defineProperty(window, '__portolan', { value: hook, configurable: true });

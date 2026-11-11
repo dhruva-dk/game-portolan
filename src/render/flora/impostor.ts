@@ -23,7 +23,7 @@ import {
   select, smoothstep, sqrt, step, texture, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import { P } from '../gpu/uniforms.ts';
-import { buildNodeForTargetAsync, serializePreparation } from '../gpu/work.ts';
+import { Preparation } from '../gpu/preparation.ts';
 import { FloraNodeMaterial, copyOf, door, turn, unturn, type FieldNodes } from './nodes.ts';
 import { tagOf } from './tag.ts';
 
@@ -76,13 +76,6 @@ interface BakePart {
   mesh: Mesh;
   view: Vector4;
   source: ImpostorSource;
-}
-
-// Like the scene warmup, keep the target set only while building an object's nodes and asking for its pipeline.
-// Three yields while compiling: holding the target across those yields would redirect the game's next frame.
-interface BakeRenderer {
-  _nodes: { getForRenderAsync(ro: unknown): Promise<unknown>; getForRender(ro: unknown): unknown };
-  _pipelines: { getForRender(ro: unknown, promises: unknown): unknown };
 }
 
 export class ImpostorAtlas {
@@ -175,10 +168,10 @@ export class ImpostorAtlas {
         mesh.frustumCulled = false;
         const part = { mesh, view: shared.view, source };
         this.#parts.push(part);
-        await serializePreparation(renderer, async () => {
-          if (this.#disposed) return;
+        await Preparation.of(renderer).scene(() => {
+          if (this.#disposed) return null;
           this.#show(part);
-          await this.#compile(renderer);
+          return { label: 'impostor bake', quiet: true, root: this.#scene, camera: this.#camera, target: this.#scratch, mrt: null };
         });
         // Give a frame a chance between parts even where Three's scheduler has unused time in its yield budget.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -194,47 +187,6 @@ export class ImpostorAtlas {
     part.view.set(0, 0, part.source.centre, part.source.radius);
     this.#scene.clear();
     this.#scene.add(part.mesh);
-  }
-
-  async #compile(renderer: WebGPURenderer): Promise<void> {
-    const { _nodes: nodes, _pipelines: pipelines } = renderer as unknown as BakeRenderer;
-    const build = nodes.getForRenderAsync, pipeline = pipelines.getForRender;
-    const created = renderer.debug.onNodeBuilderCreated;
-    renderer.debug.onNodeBuilderCreated = (builder, object) => {
-      created?.(builder, object);
-      const context = (object as { context: unknown }).context;
-      (builder as unknown as { buildAsync(): Promise<object> }).buildAsync = () =>
-        buildNodeForTargetAsync(builder, this.#scratch, null, context);
-    };
-    const was = renderer.getRenderTarget(), mrtWas = renderer.getMRT();
-    const restore = () => { renderer.setRenderTarget(was); renderer.setMRT(mrtWas); };
-    const set = () => { renderer.setRenderTarget(this.#scratch); renderer.setMRT(null); };
-    nodes.getForRenderAsync = (ro) => {
-      set();
-      try {
-        return build.call(nodes, ro).then((state) => { set(); return state; });
-      } finally { restore(); }
-    };
-    pipelines.getForRender = (ro, promises) => {
-      // Ordinary frames also use this function while the asynchronous GPU compiler is working.
-      // Their renderer state belongs to the frame, so only restore for the bake scene's object.
-      const isBake = (ro as { object?: Mesh }).object?.parent === this.#scene;
-      if (isBake) set();
-      try { return pipeline.call(pipelines, ro, promises); }
-      finally { if (isBake) restore(); }
-    };
-    try {
-      let built: Promise<void>;
-      set();
-      try { built = renderer.compileAsync(this.#scene, this.#camera); }
-      finally { restore(); }
-      await built;
-    } finally {
-      nodes.getForRenderAsync = build;
-      pipelines.getForRender = pipeline;
-      renderer.debug.onNodeBuilderCreated = created;
-      restore();
-    }
   }
 
   /** At most one mesh's 64 views per frame. A finished variant is copied into its permanent atlas slot. */

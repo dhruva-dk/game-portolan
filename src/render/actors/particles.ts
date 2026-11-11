@@ -18,7 +18,8 @@ import {
 import { TAU } from './common.ts';
 import { particleNodeMaterial, type ParticleBuffers } from './tsl/particles.ts';
 import { bakeSmoke } from './smokeBake.ts';
-import { everyFrame, serializePreparation } from '../gpu/work.ts';
+import { everyFrame } from '../gpu/work.ts';
+import { Preparation } from '../gpu/preparation.ts';
 import { P } from '../gpu/uniforms.ts';
 import { seaHeightNode } from '../ocean/surface.ts';
 import type { F, V3, V4 } from './tsl/kit.ts';
@@ -164,10 +165,7 @@ export class Particles {
     if (this.#preparing) return this.#preparing;
     this.#preparing = (async () => {
       if (!this.#step) this.#build();
-      for (const pass of [this.#step!, this.#wipe!, this.#write!]) {
-        await serializePreparation(renderer, () => renderer.compileComputeAsync(pass));
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      }
+      await Preparation.of(renderer).compute('particle kernels', [this.#step!, this.#wipe!, this.#write!]);
       this.#prepared = true;
     })().finally(() => { this.#preparing = null; });
     return this.#preparing;
@@ -250,7 +248,7 @@ export class Particles {
       a.addUpdateRange(0, this.#n * REC);
       a.needsUpdate = true;
       this.#write!.count = this.#n;
-      renderer.compute(this.#write!, this.#n);
+      renderer.compute(this.#write!);
     }
     this.#n = 0;
     this.#onceN = 0;

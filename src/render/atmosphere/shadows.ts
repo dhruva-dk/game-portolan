@@ -18,7 +18,7 @@
 //
 // Light a material works out for itself, rather than through three's lights (the sea's body, the sun's share of the
 // light the caustics move), reads the same cascades through sunShadow.
-import type { DirectionalLight, Node, NodeBuilder, NodeFrame, PerspectiveCamera, Texture, WebGPURenderer } from 'three/webgpu';
+import type { Camera, DirectionalLight, Material, Node, NodeBuilder, NodeFrame, PerspectiveCamera, RenderTarget, Texture, WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, cameraNear, cameraViewMatrix, clamp, float, nodeObject, reference, renderGroup, shadowPositionWorld, smoothstep, texture, vec2, vec4,
 } from 'three/tsl';
@@ -162,6 +162,15 @@ export class SunShadows {
       l.shadow!.intensity = on ? 1 : 0;
       l.shadow!.autoUpdate = on;
     }
+  }
+
+  /** How the nearest slice's map is drawn (its pass's material, camera and target), once a material has been built
+   *  for the slices; the other slices draw the same programs into maps of the same kind, so preparing one is enough. */
+  get pass(): { material: Material; camera: Camera; target: RenderTarget } | null {
+    const map = (this.node as unknown as Inner)._shadowNodes?.[0] as unknown as
+      { shadowMap?: RenderTarget; light: DirectionalLight; getShadowMaterial(): Material } | undefined;
+    if (!map?.shadowMap) return null;
+    return { material: map.getShadowMaterial(), camera: map.light.shadow.camera, target: map.shadowMap };
   }
 
   /** Refits the slices when the eye's projection changes. */

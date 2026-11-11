@@ -16,7 +16,7 @@ function clothFixture(): Cloth {
   return new Cloth(g, ropeGeometry([{ from: new Vector3(0, 2, 0), to: new Vector3(1, 0, 0), lee: true, mastZ: 0, swing: 1, slack: 1.1, radius: 0.01, main: 0 }]), new Texture());
 }
 
-test('actor preparation serializes all step/wipe/write graphs without dispatching or consuming pending inputs', async () => {
+test('actor preparation builds all step/wipe/write graphs one system at a time without dispatching or consuming pending inputs', async () => {
   const cloth = clothFixture(), particles = new Particles(4, 2, true, new Texture()), ribbons = new Ribbons(2, 4, true, new Texture());
   new Group().add(particles.mesh, ribbons.mesh);
   const slot = cloth.acquire();
@@ -29,12 +29,14 @@ test('actor preparation serializes all step/wipe/write graphs without dispatchin
   let active = 0, peak = 0, dispatches = 0;
   const compiled: ComputeNode[] = [];
   const renderer = {
-    async compileComputeAsync(node: ComputeNode) {
+    async compileComputeAsync(nodes: ComputeNode | ComputeNode[]) {
       active++;
       peak = Math.max(peak, active);
-      assert.equal(node.isComputeNode, true);
-      assert.equal(node.onInitFunction, null);
-      compiled.push(node);
+      for (const node of [nodes].flat()) {
+        assert.equal(node.isComputeNode, true);
+        assert.equal(node.onInitFunction, null);
+        compiled.push(node);
+      }
       await new Promise((resolve) => setTimeout(resolve, 0));
       active--;
     },

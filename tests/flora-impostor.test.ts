@@ -28,24 +28,32 @@ function rendererMock() {
     getClearColor: (out: Color) => out.copy(color),
     getClearAlpha: () => alpha,
     setClearColor: (c: number | Color, a: number) => { color.set(c); alpha = a; },
-    _nodes: {
-      getForRenderAsync: async (_ro: unknown) => {},
-      getForRender: (_ro: unknown) => { assert.notEqual(target, originalTarget); assert.equal(mrt, null); },
-    },
-    _pipelines: { getForRender: (_ro: unknown, _promises: unknown) => {
-      assert.notEqual(target, originalTarget); assert.equal(mrt, null);
-    } },
+    // three r187's precompilation: a snapshot of the target when gathering begins, set again for each queued object
+    // and put back (that same snapshot) when each finishes
+    info: { calls: 0 },
+    _renderContexts: { get: () => ({}) },
+    _precompilationState: null as { target: RenderTarget | null; mrt: unknown } | null,
+    _beginPreCompile(state: { target: RenderTarget | null; mrt: unknown }) { target = state.target; mrt = state.mrt; r._precompilationState = state; },
+    _finishPreCompile() { const s = r._precompilationState!; target = s.target; mrt = s.mrt; r._precompilationState = null; },
     compileAsync: async (scene: Scene) => {
       assert.notEqual(target, originalTarget);
       assert.equal(target!.width, 512);
       assert.equal(target!.height, 512);
       assert.equal(target!.depthBuffer, true);
       assert.ok(target!.textures.every((t) => !t.generateMipmaps), 'the scratch slot needs only its base level');
+      assert.equal(mrt, null);
       compiledTargets.push(target!);
       const object = scene.children[0] as Mesh;
       compiled.push(object);
-      await r._nodes.getForRenderAsync({ object });
-      r._pipelines.getForRender({ object }, []);
+      const state = { target, mrt };
+      r._beginPreCompile(state);
+      r._finishPreCompile();
+      await Promise.resolve();
+      // the object, built between frames under the state it was gathered with
+      r._beginPreCompile(state);
+      assert.equal(target, compiledTargets.at(-1)); assert.equal(mrt, null);
+      r._finishPreCompile();
+      assert.equal(target, originalTarget, 'a frame drawn between builds draws where it would have');
       if (pause) await pause;
       if (fail) throw new Error('compile failed');
     },
@@ -164,12 +172,12 @@ test('cancelling pending compilation prevents rendering and releases owned resou
 
 test('failed compilation restores renderer hooks and target and leaves the atlas unavailable', async () => {
   const mock = rendererMock(), source = sources(), atlas = new ImpostorAtlas(2);
-  const internals = mock.r as unknown as { _nodes: { getForRenderAsync: unknown }; _pipelines: { getForRender: unknown } };
-  const build = internals._nodes.getForRenderAsync, pipeline = internals._pipelines.getForRender;
+  const internals = mock.r as unknown as { _finishPreCompile: unknown; debug: { onNodeBuilderCreated: unknown } };
+  const finish = internals._finishPreCompile, created = internals.debug.onNodeBuilderCreated;
   mock.fail();
   await assert.rejects(atlas.prepare(mock.r, source.inputs), /compile failed/);
-  assert.equal(internals._nodes.getForRenderAsync, build);
-  assert.equal(internals._pipelines.getForRender, pipeline);
+  assert.equal(internals._finishPreCompile, finish);
+  assert.equal(internals.debug.onNodeBuilderCreated, created);
   atlas.step(mock.r);
   assert.equal(mock.renders.length, 0);
   assert.equal(atlas.baked, false);

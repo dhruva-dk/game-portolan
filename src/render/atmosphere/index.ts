@@ -127,8 +127,9 @@ export class Atmosphere {
 
   constructor(renderer: WebGPURenderer) {
     this.#renderer = renderer;
-    renderer.library.addLight(SkyLightNode, SkyLight);
-    renderer.library.addLight(BodyLightNode, BodyLight as unknown as new () => DirectionalLight);
+    // each light's own class names the node that lights the materials with it
+    SkyLight.registerNode(SkyLightNode);
+    BodyLight.registerNode(BodyLightNode);
     this.sun = new BodyLight(sunlight, BODIES.sun);
     this.moon = new BodyLight(moonlight, BODIES.moon);
     this.sun.name = 'sun';

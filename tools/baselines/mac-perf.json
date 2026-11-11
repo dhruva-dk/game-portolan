@@ -4,168 +4,168 @@
   "rows": [
     {
       "region": "iceCrown",
-      "frameMs": 10.92,
-      "p95Ms": 15.1,
-      "cpuMs": 3.4,
-      "cpuP95Ms": 4.9,
-      "tris": 1352089,
-      "calls": 323
+      "frameMs": 6.29,
+      "p95Ms": 16.3,
+      "cpuMs": 2.07,
+      "cpuP95Ms": 5.5,
+      "tris": 1516387,
+      "calls": 280
     },
     {
       "region": "fjords",
-      "frameMs": 11.05,
-      "p95Ms": 20.3,
-      "cpuMs": 3.58,
-      "cpuP95Ms": 5.7,
-      "tris": 1336973,
-      "calls": 365
+      "frameMs": 9.99,
+      "p95Ms": 17.2,
+      "cpuMs": 3.2,
+      "cpuP95Ms": 5.3,
+      "tris": 986163,
+      "calls": 311
     },
     {
       "region": "mistwood",
-      "frameMs": 13.61,
-      "p95Ms": 21.6,
-      "cpuMs": 4.45,
-      "cpuP95Ms": 5.9,
-      "tris": 1275275,
-      "calls": 425
+      "frameMs": 13.3,
+      "p95Ms": 18.5,
+      "cpuMs": 4.16,
+      "cpuP95Ms": 5.4,
+      "tris": 1023459,
+      "calls": 376
     },
     {
       "region": "spires",
-      "frameMs": 12.39,
-      "p95Ms": 21,
-      "cpuMs": 4.05,
-      "cpuP95Ms": 5.9,
-      "tris": 1282386,
-      "calls": 358
+      "frameMs": 13.68,
+      "p95Ms": 19.5,
+      "cpuMs": 4.06,
+      "cpuP95Ms": 5.2,
+      "tris": 932706,
+      "calls": 302
     },
     {
       "region": "narrows",
-      "frameMs": 5.92,
-      "p95Ms": 13.6,
-      "cpuMs": 1.91,
-      "cpuP95Ms": 4.6,
-      "tris": 830314,
-      "calls": 303
-    },
-    {
-      "region": "basaltStacks",
-      "frameMs": 13.55,
-      "p95Ms": 21.9,
-      "cpuMs": 3.98,
-      "cpuP95Ms": 5.7,
-      "tris": 1226194,
-      "calls": 303
-    },
-    {
-      "region": "kelpShallows",
-      "frameMs": 10.19,
-      "p95Ms": 19.5,
-      "cpuMs": 2.93,
-      "cpuP95Ms": 5,
-      "tris": 1168918,
-      "calls": 263
-    },
-    {
-      "region": "blossomRun",
-      "frameMs": 15.1,
-      "p95Ms": 23.7,
-      "cpuMs": 4.7,
-      "cpuP95Ms": 5.8,
-      "tris": 1413924,
-      "calls": 380
-    },
-    {
-      "region": "glassSea",
-      "frameMs": 7.4,
-      "p95Ms": 16.3,
-      "cpuMs": 2.24,
-      "cpuP95Ms": 4.5,
-      "tris": 782813,
-      "calls": 232
-    },
-    {
-      "region": "jadeShoals",
-      "frameMs": 10.17,
+      "frameMs": 10.51,
       "p95Ms": 18,
-      "cpuMs": 3.31,
-      "cpuP95Ms": 5.5,
-      "tris": 1622988,
-      "calls": 418
-    },
-    {
-      "region": "coralAtolls",
-      "frameMs": 9.08,
-      "p95Ms": 18.1,
-      "cpuMs": 2.58,
+      "cpuMs": 2.92,
       "cpuP95Ms": 4.5,
-      "tris": 1445927,
+      "tris": 695198,
       "calls": 254
     },
     {
-      "region": "spiceIsles",
-      "frameMs": 13.39,
-      "p95Ms": 19.3,
-      "cpuMs": 3.99,
+      "region": "basaltStacks",
+      "frameMs": 11.07,
+      "p95Ms": 20.2,
+      "cpuMs": 3.22,
+      "cpuP95Ms": 4.8,
+      "tris": 1003526,
+      "calls": 264
+    },
+    {
+      "region": "kelpShallows",
+      "frameMs": 15.88,
+      "p95Ms": 20.2,
+      "cpuMs": 4.1,
+      "cpuP95Ms": 4.7,
+      "tris": 848172,
+      "calls": 219
+    },
+    {
+      "region": "blossomRun",
+      "frameMs": 14.57,
+      "p95Ms": 22.6,
+      "cpuMs": 4.43,
+      "cpuP95Ms": 5.5,
+      "tris": 1023902,
+      "calls": 330
+    },
+    {
+      "region": "glassSea",
+      "frameMs": 7.55,
+      "p95Ms": 16.2,
+      "cpuMs": 2.05,
+      "cpuP95Ms": 4.1,
+      "tris": 565787,
+      "calls": 194
+    },
+    {
+      "region": "jadeShoals",
+      "frameMs": 9.95,
+      "p95Ms": 18.4,
+      "cpuMs": 3.19,
       "cpuP95Ms": 5.2,
-      "tris": 1379950,
-      "calls": 356
+      "tris": 802426,
+      "calls": 345
+    },
+    {
+      "region": "coralAtolls",
+      "frameMs": 9.57,
+      "p95Ms": 19.8,
+      "cpuMs": 2.54,
+      "cpuP95Ms": 4.3,
+      "tris": 670829,
+      "calls": 191
+    },
+    {
+      "region": "spiceIsles",
+      "frameMs": 12.4,
+      "p95Ms": 19.3,
+      "cpuMs": 3.47,
+      "cpuP95Ms": 4.9,
+      "tris": 751834,
+      "calls": 314
     },
     {
       "region": "fireArchipelago",
-      "frameMs": 7.75,
-      "p95Ms": 16.3,
-      "cpuMs": 2.5,
-      "cpuP95Ms": 5.2,
-      "tris": 865078,
-      "calls": 344
+      "frameMs": 9.47,
+      "p95Ms": 18.5,
+      "cpuMs": 2.75,
+      "cpuP95Ms": 4.7,
+      "tris": 801658,
+      "calls": 315
     },
     {
       "region": "weepingIsle",
-      "frameMs": 9.83,
-      "p95Ms": 15.6,
-      "cpuMs": 2.77,
-      "cpuP95Ms": 4.7,
-      "tris": 871220,
-      "calls": 217
+      "frameMs": 7.57,
+      "p95Ms": 15.8,
+      "cpuMs": 2.06,
+      "cpuP95Ms": 4.2,
+      "tris": 759852,
+      "calls": 183
     },
     {
       "region": "mangroveLabyrinth",
-      "frameMs": 9.61,
-      "p95Ms": 19.9,
-      "cpuMs": 2.69,
+      "frameMs": 10.15,
+      "p95Ms": 17.8,
+      "cpuMs": 2.73,
       "cpuP95Ms": 4.5,
-      "tris": 690801,
-      "calls": 238
+      "tris": 581599,
+      "calls": 202
     },
     {
       "region": "maelstrom",
-      "frameMs": 8.69,
-      "p95Ms": 17.7,
-      "cpuMs": 2.51,
-      "cpuP95Ms": 4.6,
-      "tris": 629961,
-      "calls": 273
+      "frameMs": 8.14,
+      "p95Ms": 17.1,
+      "cpuMs": 2.21,
+      "cpuP95Ms": 4.1,
+      "tris": 622005,
+      "calls": 259
     },
     {
       "region": "match",
-      "frameMs": 22.04,
-      "p95Ms": 29.6,
-      "cpuMs": 9.38,
-      "cpuP95Ms": 13,
-      "tris": 1405558,
-      "calls": 444
+      "frameMs": 25.1,
+      "p95Ms": 35,
+      "cpuMs": 10.3,
+      "cpuP95Ms": 15.2,
+      "tris": 1196232,
+      "calls": 398
     },
     {
       "region": "full map zoom",
-      "frameMs": 20.44,
-      "p95Ms": 27.1,
-      "worstMs": 28.9,
-      "over33": 0,
+      "frameMs": 22.69,
+      "p95Ms": 33.9,
+      "worstMs": 46.9,
+      "over33": 6,
       "frames": 120,
-      "tris": 1021476,
-      "calls": 374,
-      "chartMs": 1.42,
-      "chartWorstMs": 5.9,
+      "tris": 1021366,
+      "calls": 373,
+      "chartMs": 1.5,
+      "chartWorstMs": 5.8,
       "mostPending": 12,
       "restMs": 18
     }

@@ -31,19 +31,23 @@ const PER_CLUSTER = 32;
 
 const _size = new Vector2();
 
-/** Three's clustered node's own state. */
+type F = ReturnType<typeof float>;
+
+/** Three's clustered node's own state and steps (r187), which the fitting replaces or reads. */
 interface Inner {
   _bufferSize: Vector2 | null;
-  _lightIndexes: unknown;
+  _lightIndexes: { value: { array: Int32Array; dispose(): void } } | null;
   _screenClusterIndex: unknown;
-  _compute: { dispose(): void; getCacheKey(): number; count: number } | null;
-  _gridDimensions: { value: Vector2; x: ReturnType<typeof float>; y: ReturnType<typeof float> };
-  _cameraNear: ReturnType<typeof float>;
-  _cameraFar: ReturnType<typeof float>;
-  _cameraProjectionMatrix: { element(i: number): { element(j: number): ReturnType<typeof float> } };
+  _compute: { dispose(): void; count: number } | null;
+  _needsRebuild: boolean;
+  _gridDimensions: { value: Vector2; x: F; y: F };
+  _cameraNear: F;
+  _cameraFar: F;
+  _cameraProjectionMatrix: { element(i: number): { element(j: number): F } };
   _zSliceRangesTexture: unknown;
   _chunksPerCluster: number;
-  getLightData(i: unknown): { viewPosition: ReturnType<typeof vec3>; distance: ReturnType<typeof float> };
+  needsUpdate: boolean;
+  _getLightBounds(i: unknown): { center: ReturnType<typeof vec3>; radius: F };
 }
 
 /** The share of the screen the scene is drawn at just now. */
@@ -53,8 +57,6 @@ interface Share {
 
 class FittedClusters extends ClusteredLightsNode {
   readonly #share: Share;
-  #width = 0;
-  #height = 0;
   #capacity = 0;
   readonly #frameSize = uniform(new Vector2(1, 1));
 
@@ -63,40 +65,49 @@ class FittedClusters extends ClusteredLightsNode {
     this.#share = share;
   }
 
+  // Three fits the grid once, to whatever target is bound when it is first built (a shadow map, a bake's target, the
+  // screen): the grid here is fitted every frame, and always to the frame as the scene pass draws it.
+  _initGrid(renderer: WebGPURenderer): void {
+    this._fitToRenderer(renderer);
+  }
+
   /** The frame as the scene pass draws it (PassNode floors the scaled screen). */
-  updateProgram(renderer: WebGPURenderer): void {
+  _fitToRenderer(renderer: WebGPURenderer): void {
     renderer.getDrawingBufferSize(_size);
-    const scale = this.#share.scale, w = Math.max(1, Math.floor(_size.width * scale)), h = Math.max(1, Math.floor(_size.height * scale));
-    if (w === this.#width && h === this.#height && (this as unknown as Inner)._bufferSize) return;
-    this.#width = w;
-    this.#height = h;
+    const scale = this.#share.scale;
+    this._resize(Math.max(1, Math.floor(_size.width * scale)), Math.max(1, Math.floor(_size.height * scale)));
+  }
+
+  _resize(w: number, h: number): void {
     const self = this as unknown as Inner;
+    if (self._compute && self._bufferSize?.width === w && self._bufferSize.height === h) return;
     const nx = Math.ceil(w / TILE), ny = Math.ceil(h / TILE), clusters = nx * ny * SLICES;
-    self._gridDimensions.value.set(nx, ny);
-    this.#frameSize.value.set(w, h);
     if (!self._compute || clusters > this.#capacity) {
       // Reserve the full drawing buffer once. Lower scales and orientation changes then use the same storage and
       // graph; only a genuinely larger canvas needs a new allocation. Do not retain a graph for every scale.
       this.#capacity = Math.max(1, Math.ceil(_size.width / TILE)) * Math.max(1, Math.ceil(_size.height / TILE)) * SLICES;
-      this.#build(this.#capacity, clusters);
+      this._create(Math.max(this.#capacity, clusters));
     }
+    self._gridDimensions.value.set(nx, ny);
+    this.#frameSize.value.set(w, h);
     // Three reads count for dispatch and exposes it as a bounds-check uniform, without changing its cache key.
     self._compute!.count = clusters;
-    self._bufferSize!.set(nx * TILE, ny * TILE);
+    (self._bufferSize ??= new Vector2()).set(w, h);
   }
 
-  #build(capacity: number, clusters: number): void {
+  _create(capacity: number): void {
     const self = this as unknown as Inner;
     const nx = int(self._gridDimensions.x), ny = int(self._gridDimensions.y), nz = SLICES;
     const width = this.#frameSize.x, height = this.#frameSize.y;
     const chunks = self._chunksPerCluster;
-    if (self._compute) self._compute.dispose();
-
-    const length = capacity * chunks * 4;
-    let indexes = self._lightIndexes as unknown;
-    if (!indexes || (indexes as unknown as { value: { array: Int32Array } }).value.array.length < length) {
-      indexes = attributeArray(new Int32Array(length), 'ivec4').setName('lightIndexes');
+    if (self._compute) {
+      // new storage needs the materials' bindings made again; the first does not
+      this.needsUpdate = true;
+      self._compute.dispose();
+      self._lightIndexes?.value.dispose();
     }
+
+    const indexes = attributeArray(new Int32Array(capacity * chunks * 4), 'ivec4').setName('lightIndexes');
     const list = indexes as unknown as { element(i: unknown): { assign(v: unknown): void; element(j: unknown): { assign(v: unknown): void } } };
     const id = int(instanceIndex);
     const chunk = (k: unknown) => list.element(id.mul(chunks).add(int(k as never)));
@@ -128,15 +139,15 @@ class FittedClusters extends ClusteredLightsNode {
       Loop(MAX_LIGHTS, ({ i }: { i: unknown }) => {
         const index = first.add(i as never);
         If(count.greaterThanEqual(PER_CLUSTER).or(index.greaterThanEqual(end)), () => { Return(); });
-        const { viewPosition, distance } = self.getLightData(index);
-        // the light's sphere against the cluster's box
-        const d = viewPosition.sub(max(lo, min(viewPosition, hi)));
-        If(dot(d, d).lessThanEqual(distance.mul(distance)), () => {
+        // the light's bounding sphere against the cluster's box (a light with no cutoff reaches every cluster)
+        const { center, radius } = self._getLightBounds(index);
+        const d = center.sub(max(lo, min(center, hi)));
+        If(radius.lessThan(0).or(dot(d, d).lessThanEqual(radius.mul(radius))), () => {
           slot(count).assign(index.add(1));
           count.addAssign(1);
         });
       });
-    })().compute(clusters).setName('Clustered lights');
+    })().compute(capacity).setName('Clustered lights');
 
     const clusterIndex = Fn(() => {
       const tile = floor(screenCoordinate.div(TILE));
@@ -144,10 +155,10 @@ class FittedClusters extends ClusteredLightsNode {
       return int(tile.x).add(int(tile.y).mul(nx)).add(int(slice).mul(nx.mul(ny)));
     })().toVar();
 
-    self._bufferSize ??= new Vector2();
-    self._lightIndexes = indexes;
+    self._lightIndexes = indexes as unknown as Inner['_lightIndexes'];
     self._screenClusterIndex = clusterIndex;
     self._compute = compute as unknown as Inner['_compute'];
+    self._needsRebuild = false;
   }
 }
 

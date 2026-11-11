@@ -9,9 +9,13 @@
 //   npm run capture -- ui [--device ipad,ipadSmall] [--only a,b]  transition strips for each screen change
 //   npm run capture -- layout [--device ipad,ipadSmall] [--only a,b]  every screen's touch targets against the layout rules (fails on a break)
 //   npm run capture -- perf                               frame time, triangles and draw calls per region, and a fast zoom of the full map
-//   npm run capture -- fight [--seconds n]                #8's frozen fight: the median GPU time of each pass (12 s by default)
+//   npm run capture -- fight [--seconds n] [--save]       #8's frozen fight: the median GPU time of each pass (12 s by default),
+//                                                         and its look against the committed one
 //   npm run capture -- shape [--save]                     the frame log's table for the title, the lobby and a match
-//   npm run capture -- prepare                            pipelines built after preparation finished, by screen (misses)
+//   npm run capture -- prepare [--save]                   pipelines built after preparation finished, by screen (misses), and
+//                                                         the match against its committed look (--save accepts a new one)
+//   npm run capture -- shaders                            every material's WGSL in a match and the fight, checked for values
+//                                                         a branch sets and three declares again before they are read
 //   npm run capture -- kit [--device ipad,ipadSmall] [--only paper,hud]  the chart's drawing kit: specimen plates and the live layer's cost
 //   npm run capture -- title [--device ipad,ipadSmall]   the title inking in, its needle, a real tap and the roll-off to the lobby
 //   npm run capture -- lobby [--device ipad,ipadSmall]   the lobby inking in, every press, orbit and pinch, Play into the Gale
@@ -31,6 +35,7 @@ import { perf } from './perf.ts';
 import { shapes } from './shape.ts';
 import { prepare } from './prepare.ts';
 import { fight } from './fight.ts';
+import { shaders } from './shaders.ts';
 import { layout, SCREENS } from './layout.ts';
 import { kit } from './kit.ts';
 import { title } from './title.ts';
@@ -59,7 +64,7 @@ const [command, arg] = positionals;
 const opts = { seed: Number(a.seed), dpr: Number(a.dpr ?? 1), every: Number(a.every) };
 
 if (!command || command === 'list' || command === 'help') {
-  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, fight, shape, prepare, kit, title, lobby, gale, flow');
+  console.log('commands: regions, borders, lap, moment <name|all>, ui, layout, perf, fight, shape, prepare, shaders, kit, title, lobby, gale, flow');
   console.log(`moments: ${MOMENTS.map((m) => m.name).join(', ')}`);
   console.log(`transitions: ${TRANSITIONS.map((t) => t.name).join(', ')}`);
   console.log(`layout screens: ${SCREENS.map((s) => s.name).join(', ')}`);
@@ -78,9 +83,10 @@ try {
     case 'ui': await ui(r, { ...opts, device: a.device, only: a.only }); break;
     case 'layout': await layout(r, { ...opts, device: a.device, only: a.only }); break;
     case 'perf': await perf(r, opts); break;
-    case 'fight': await fight(r, { ...opts, seconds: Number(a.seconds) }); break;
+    case 'fight': await fight(r, { ...opts, seconds: Number(a.seconds), save: !!a.save }); break;
     case 'shape': await shapes(r, { ...opts, save: !!a.save }); break;
-    case 'prepare': await prepare(r, opts); break;
+    case 'prepare': await prepare(r, { ...opts, save: !!a.save }); break;
+    case 'shaders': await shaders(r, opts); break;
     case 'title': await title(r, { ...opts, device: a.device }); break;
     case 'lobby': await lobby(r, { ...opts, device: a.device }); break;
     case 'gale': await gale(r, { ...opts, device: a.device }); break;

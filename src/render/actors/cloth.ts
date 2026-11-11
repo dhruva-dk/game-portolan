@@ -30,7 +30,8 @@ import { StorageBufferAttribute, type ComputeNode, type WebGPURenderer } from 't
 import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, min, select, sin, storage, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
-import { everyFrame, serializePreparation } from '../gpu/work.ts';
+import { everyFrame } from '../gpu/work.ts';
+import { Preparation } from '../gpu/preparation.ts';
 import { P } from '../gpu/uniforms.ts';
 import type { Node } from 'three/webgpu';
 import type { F, V3, V4 } from './tsl/kit.ts';
@@ -236,10 +237,7 @@ export class Cloth {
     if (this.#preparing) return this.#preparing;
     this.#preparing = (async () => {
       if (!this.#predict) this.#build();
-      for (const pass of [this.#predict!, this.#ropePredict!, this.#solve!, this.#ropeSolve!]) {
-        await serializePreparation(renderer, () => renderer.compileComputeAsync(pass));
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      }
+      await Preparation.of(renderer).compute('cloth kernels', [this.#predict!, this.#ropePredict!, this.#solve!, this.#ropeSolve!]);
       this.#prepared = true;
     })().finally(() => { this.#preparing = null; });
     return this.#preparing;
