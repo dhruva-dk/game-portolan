@@ -7,10 +7,13 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { launch } from './launch.ts';
 
 // Camera pairs. Retune here. The north stars are 2602x2394; `crop` is the UI-free region in their pixels.
-// Camera: x/y/z metres (island at z = -300, 70 m radius), look = pitch degrees, yaw = degrees (0 north), t = hours.
+// Camera: lat/lon degrees on the 554 m planet (a degree is 9.67 m; the island is centred at lat 12, lon 0, its coast
+// about 70 m out), alt metres, look = pitch degrees, yaw = compass degrees from local north, t = hours.
+// sea: 300 m south of the island, looking south over open water; island: 190 m south of its centre, ~120 m from its
+// near edge, looking north at it.
 const PAIRS = [
-  { name: 'sea', star: 'docs/north-star/sea.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 't=15&wind=15&x=0&y=35&z=0&look=-20&yaw=180' },
-  { name: 'island', star: 'docs/north-star/island.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 't=15&wind=15&x=0&y=40&z=-110&look=-20&yaw=0' },
+  { name: 'sea', star: 'docs/north-star/sea.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 't=15&wind=15&lat=-19.03&lon=0&alt=35&look=-20&yaw=180' },
+  { name: 'island', star: 'docs/north-star/island.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 't=15&wind=15&lat=-7.65&lon=0&alt=40&look=-20&yaw=0' },
 ];
 
 const only = process.argv.slice(2);
