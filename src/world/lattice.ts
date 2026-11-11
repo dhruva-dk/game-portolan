@@ -4,7 +4,7 @@
 // (about 1%), and the same everywhere on the planet, whatever the eye does — the sea is a function of place and time.
 //
 // The anchors are the vertices of an icosphere: an icosahedron's faces cut into F × F triangles, pushed out onto the
-// sphere. Each anchor's chart has its x axis along the prevailing wind there (the waves' patches blow along their +x),
+// sphere. Each anchor's chart has its x axis along the prevailing wind there (wind.ts; the waves' patches blow along +x),
 // and reads the patches from its own offset into them, so that neighbouring charts show different seas.
 //
 // Weights: w = smoothstep(band, 0, d − d_min) for each anchor d metres away, scaled so Σw² = 1, since the sum of
@@ -13,7 +13,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, add, along, cross, distance, dot, frameAt, normalize, scale, toChart, type Vec3 } from './sphere.ts';
+import { R, add, along, cross, distance, dot, normalize, scale, toChart, type Vec3 } from './sphere.ts';
 
 /** The icosphere's frequency: each of the icosahedron's edges is cut into this many. */
 export const FREQUENCY = 3;
@@ -88,9 +88,6 @@ export function cover(frequency: number): number {
   }
   return most;
 }
-
-/** The prevailing wind's direction at p: toward the east (frameAt's east; a fixed direction at the poles). */
-export const prevailing = (p: Vec3): Vec3 => frameAt(p).east;
 
 /** How alike two reads of the patches are, `x`, `z` metres apart on them: 0 unrelated, ±1 the same (or opposite) sea. */
 export type Likeness = (x: number, z: number) => number;

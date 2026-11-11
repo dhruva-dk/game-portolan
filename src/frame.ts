@@ -13,6 +13,7 @@ import { createShadow } from './land/shadow';
 import { createView } from './view/view';
 import { createWater } from './water/water';
 import { createPlanet } from './world/planet';
+import { createWind } from './world/wind';
 
 /** Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. */
 const EXPOSURE = 10;
@@ -46,7 +47,8 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   // the ground baked for the shaders in a worker, while the islands are built here
   const ground = createGround(seed);
   const planet = createPlanet(seed);
-  const water = createWater(renderer, view, sky.light, ground, debug);
+  const wind = createWind(seed);
+  const water = createWater(renderer, view, sky.light, ground, wind, debug);
   const shadow = createShadow(renderer);
   const light = createLighting(sky.light, water.below, shadow.visible);
   const sand = createSand(view, ground, light);
@@ -90,5 +92,5 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     pipeline.render();
   }
 
-  return { scene, camera, sky, view, planet, resize, render, ready: ground.ready };
+  return { scene, camera, sky, view, planet, wind, resize, render, ready: ground.ready };
 }

@@ -17,8 +17,9 @@
 
 import { Vector4 } from 'three/webgpu';
 import { If, Loop, acos, clamp, cross, dot, float, fract, int, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
-import { FREQUENCY, anchors, band, cover, icosphere, near, prevailing, type Likeness } from '../world/lattice';
+import { FREQUENCY, anchors, band, cover, icosphere, near, type Likeness } from '../world/lattice';
 import { R, type Vec3 } from '../world/sphere';
+import type { Wind } from '../world/wind';
 import { chartNodes } from './view';
 
 type N = any;
@@ -34,10 +35,11 @@ export type Charts = ReturnType<typeof createCharts>;
 
 /**
  * span: the width of the largest patch, metres, over which the anchors' offsets are spread; alike: how alike two
- * reads of the patches are, for choosing offsets that make neighbouring charts' seas independent (lattice.anchors).
+ * reads of the patches are, for choosing offsets that make neighbouring charts' seas independent (lattice.anchors);
+ * wind: the prevailing wind, along which each chart's x axis is laid.
  */
-export function createCharts(span: number, alike: Likeness) {
-  const all = anchors(icosphere(FREQUENCY), prevailing, span, alike);
+export function createCharts(span: number, alike: Likeness, wind: Wind) {
+  const all = anchors(icosphere(FREQUENCY), wind, span, alike);
   const width = band(FREQUENCY);
   /** Past the drawn sea, the furthest an anchor can lie and still weigh in somewhere on it. */
   const margin = cover(FREQUENCY) + width;

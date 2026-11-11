@@ -62,7 +62,8 @@ renderer.setAnimationLoop(() => {
   last = start;
 
   fly(dt);
-  updateEnvironment(env, dt);
+  const { x, y, z } = frame.camera.position;
+  updateEnvironment(env, dt, [x, y, z], frame.wind);
   frame.render(env, dt);
 
   meter.sample(performance.now() - start);

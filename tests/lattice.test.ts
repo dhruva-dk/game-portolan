@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FREQUENCY, anchors, band, blend, cover, geodesic, icosphere, near, neighbours, overlap, prevailing, spacing, stretch, weigh,
+  FREQUENCY, anchors, band, blend, cover, geodesic, icosphere, near, neighbours, overlap, spacing, stretch, weigh,
   type Anchor,
 } from '../src/world/lattice.ts';
-import { R, along, cross, distance, dot, frameAt, length, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, cross, distance, dot, length, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { createWind } from '../src/world/wind.ts';
 import { likeness } from '../src/water/spectrum.ts';
 import { BANDS, CASCADES, SIZE } from '../src/water/cascades.ts';
 
@@ -16,7 +17,8 @@ const points = (n: number): Vec3[] => Array.from({ length: n }, (_, i) => {
 
 const FETCH = 300_000;
 const quick = [5, 10, 15, 20].flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
-const all: Anchor[] = anchors(icosphere(FREQUENCY), prevailing, CASCADES[0], (x, z) => Math.max(...quick.map((f) => Math.abs(f(x, z)))));
+const wind = createWind(3);
+const all: Anchor[] = anchors(icosphere(FREQUENCY), wind, CASCADES[0], (x, z) => Math.max(...quick.map((f) => Math.abs(f(x, z)))));
 const width = band(FREQUENCY);
 const sorted = (p: Vec3) => all.map((a) => distance(a.at, p)).sort((a, b) => a - b);
 
@@ -94,7 +96,7 @@ test('weights change smoothly along great circles, across every border they cros
 test('anchors: axes are unit tangents along the prevailing wind; neighbours\' offsets differ', () => {
   for (const a of all) {
     assert.ok(Math.abs(length(a.axis) - 1) < 1e-12 && Math.abs(dot(a.axis, a.at)) < 1e-12);
-    assert.ok(dot(a.axis, frameAt(a.at).east) > 0.999);
+    assert.ok(dot(a.axis, wind(a.at)) > 0.999999);
   }
   const next = neighbours(all.map((a) => a.at));
   next.forEach((ns, i) => {

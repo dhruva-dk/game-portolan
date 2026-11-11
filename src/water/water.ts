@@ -32,6 +32,7 @@ import type { Sky } from '../sky/sky';
 import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
 import { R } from '../world/sphere';
+import type { Wind } from '../world/wind';
 import { BANDS, CASCADES, SIZE } from './cascades';
 import { N_WATER, createOptics } from './optics';
 import { likeness } from './spectrum';
@@ -58,13 +59,13 @@ const FETCH = 300_000;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
 const LIKENESS_WINDS = [5, 10, 15, 20];
 
-/** debug: 'charts' colours the sea by its charts' weights (red, green, blue: nearest first). */
-export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, debug = '') {
+/** wind: the planet's prevailing wind; debug: 'charts' colours the sea by its charts' weights (red, green, blue: nearest first). */
+export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, wind: Wind, debug = '') {
   const waves = createWaves(renderer);
   const optics = createOptics(sky, view);
   // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
   const each = LIKENESS_WINDS.flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
-  const charts = createCharts(CASCADES[0], (x, z) => Math.max(...each.map((f) => Math.abs(f(x, z)))));
+  const charts = createCharts(CASCADES[0], (x, z) => Math.max(...each.map((f) => Math.abs(f(x, z)))), wind);
   const material = new MeshBasicNodeMaterial();
 
   // The water under this vertex at rest, and where the waves have moved it. Each cascade is read at the mip whose
