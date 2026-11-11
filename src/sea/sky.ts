@@ -15,12 +15,12 @@
 // still reddens at dusk as it would through Earth's air.
 import {
   HalfFloatType, LinearFilter, RepeatWrapping, Storage3DTexture, StorageArrayTexture,
-  StorageTexture, Vector2, Vector3, ClampToEdgeWrapping, type ComputeNode, type WebGPURenderer, type PerspectiveCamera,
+  Matrix4, StorageTexture, Vector2, Vector3, ClampToEdgeWrapping, type ComputeNode, type WebGPURenderer, type PerspectiveCamera,
 } from 'three/webgpu';
 import {
   Break, Fn, If, Loop as LoopTyped, abs, acos, atan, clamp, cos, distance, dot, exp, float, floor, fract, instanceIndex, instancedArray,
   int, length, max, min, mix, mod, normalize, output, positionWorld, cameraPosition, pow, screenUV, select, sin, smoothstep, sqrt,
-  storageTexture, texture, texture3D, textureStore, uint, uniform, uvec2, uvec3, vec2, vec3, vec4,
+  ivec2, storageTexture, texture, texture3D, textureLoad, textureStore, uint, uniform, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 import { MipChain, R, U, shared } from './world.ts';
 
@@ -38,9 +38,9 @@ const EARTH_OZONE = [0.65e-6, 1.881e-6, 0.085e-6];
 export const AIR = {
   rayleighHeight: 90,
   // Earth's Rayleigh spectrum at a density that leaves a column about 0.6 of Earth's: a deep blue zenith
-  rayleigh: EARTH_RAYLEIGH.map((b) => (b * 4923) / 90),
-  mieHeight: 38,
-  mieScattering: 2.4e-3,
+  rayleigh: EARTH_RAYLEIGH.map((b) => (b * 8000) / 90),
+  mieHeight: 30,
+  mieScattering: 1.1e-3,
   mieAbsorption: 0.25e-3,
   mieG: 0.8,
   ozoneCentre: 250,
@@ -67,6 +67,10 @@ export const SKY = shared({
   envRow: uniform(0, 'uint'),
   /** The traced air's size in texels. */
   airSize: uniform(new Vector2(1, 1)),
+  /** Last frame's projection of directions, how much of the last frame's trace is kept, and the frame's number. */
+  lastVP: uniform(new Matrix4()),
+  history: uniform(0),
+  frame: uniform(0),
 });
 
 /** The cumulus shell, metres over the sea. */
@@ -316,7 +320,7 @@ function cloudDensity(p: N, fine: boolean): N {
   const h = clamp(length(p).sub(R + CLOUD.base).div(CLOUD.top - CLOUD.base), 0, 1);
   const q = p.add(SKY.drift);
   // where clouds may form at all: broad patches a few kilometres across
-  const weather = texture3D(shapeVolume, q.mul(1 / 5200)).level(float(0));
+  const weather = texture3D(shapeVolume, q.mul(1 / 2900)).level(float(0));
   const patch = clamp(remap(weather.g.mul(0.7).add(weather.r.mul(0.3)), float(0.25), float(0.85), float(0), float(1)), 0, 1);
   // a cumulus profile: a flat base, swelling, rounding off at the top; taller where the patch is strong
   const top = mix(float(0.45), float(1), patch);
@@ -405,8 +409,10 @@ function cloudSpan(o: N, d: N, end: N): N {
  * The light a ray from o along d brings to the eye from the air and the clouds (L) and the share of what lies behind
  * that survives (T), up to the sea or out of the air. `steps` sets the cloud march's quality.
  */
-function traceSky(o: N, d: N, jitter: N, cloudSteps: number, airSteps: number): { L: N; T: N } {
+function traceSky(o: N, d: N, jitter: N, cloudSteps: number, airSteps: number): { L: N; T: N; near: N } {
   const L = vec3(0).toVar(), T = vec3(1).toVar();
+  // the air's own colour before any cloud: what it would show were it thick enough to hide what lies behind
+  const near = vec3(0).toVar();
   const air = raySphere(o, d, float(RT));
   // from orbit the march begins where the ray enters the air
   const start = max(air.x, 0);
@@ -419,15 +425,17 @@ function traceSky(o: N, d: N, jitter: N, cloudSteps: number, airSteps: number): 
       marchClouds(o, d, span.x, span.y, cloudSteps, jitter, S, Tc, mid);
       const m = clamp(mid, start, end);
       marchAir(o, d, start, m, airSteps, L, T, 'a1');
+      near.assign(L.div(max(vec3(1).sub(T), vec3(1e-4))));
       const L2 = vec3(0).toVar(), T2 = vec3(1).toVar();
       marchAir(o, d, m, end, airSteps, L2, T2, 'a2');
       L.addAssign(T.mul(S.add(L2.mul(Tc))));
       T.mulAssign(T2.mul(Tc));
     }).Else(() => {
       marchAir(o, d, start, end, airSteps + 4, L, T, 'a0');
+      near.assign(L.div(max(vec3(1).sub(T), vec3(1e-4))));
     });
   });
-  return { L, T };
+  return { L, T, near };
 }
 
 // ---------------------------------------------------------------- the sky's light on the sea
@@ -523,6 +531,14 @@ export class Sky {
   /** The traced air: light toward the eye (rgb) and what survives (rgb), at a fraction of the scene's size. */
   airL: StorageTexture;
   airT: StorageTexture;
+  /** The air's own colour along each ray, before the clouds, for hazing what stands in it (the ship). */
+  airN: StorageTexture;
+  /** Last frame's, which each frame's trace is blended into (reprojected by direction): its jitter averages out. */
+  readonly #histL = table(1, 1);
+  readonly #histT = table(1, 1);
+  readonly #lastVP = new Matrix4();
+  readonly #vp = new Matrix4();
+  #frame = 0;
   #air: ComputeNode | null = null;
   #size = new Vector2();
   readonly #renderer: WebGPURenderer;
@@ -535,6 +551,7 @@ export class Sky {
     this.#renderer = renderer;
     this.airL = this.#target(1, 1);
     this.airT = this.#target(1, 1);
+    this.airN = this.#target(1, 1);
     SKY_TEXTURES.L = this.airL;
     SKY_TEXTURES.T = this.airT;
     this.#envMips = new MipChain(renderer, envMap);
@@ -560,24 +577,36 @@ export class Sky {
     if (w === this.#size.x && h === this.#size.y) return;
     this.#size.set(w, h);
     // the textures are kept (materials hold them): their images are remade at the new size
-    this.airL.setSize(w, h, 1);
-    this.airT.setSize(w, h, 1);
+    for (const t of [this.airL, this.airT, this.airN, this.#histL, this.#histT]) t.setSize(w, h, 1);
+    this.#frame = 0;
     (SKY.airSize.value as Vector2).set(w, h);
     this.#air = this.#airKernel(w, h);
   }
 
   #airKernel(w: number, h: number): ComputeNode {
-    const L = this.airL, T = this.airT;
+    const L = this.airL, T = this.airT, NR = this.airN, HL = this.#histL, HT = this.#histT;
     return Fn(() => {
       const id = instanceIndex;
       const x = id.mod(w), y = id.div(w);
       const ndc = vec2(float(x).add(0.5).div(w).mul(2).sub(1), float(1).sub(float(y).add(0.5).div(h).mul(2)));
       const far = U.unproject.mul(vec4(ndc, 1, 1));
       const d = normalize(far.xyz.div(far.w));
-      const jitter = fract(float(52.9829189).mul(fract(dot(vec2(float(x), float(y)), vec2(0.06711056, 0.00583715)))));
-      const s = traceSky(U.eye, d, jitter, 44, 8);
-      textureStore(L, uvec2(x, y), vec4(s.L, 1));
-      textureStore(T, uvec2(x, y), vec4(s.T, 1));
+      // a different offset into the march each frame (interleaved gradient noise, turned by the golden ratio)
+      const ign = fract(float(52.9829189).mul(fract(dot(vec2(float(x), float(y)), vec2(0.06711056, 0.00583715)))));
+      const jitter = fract(ign.add(SKY.frame.mul(0.618034)));
+      const s = traceSky(U.eye, d, jitter, 36, 8);
+      // whether the ray ends on the sea, so the sea and the sky each read only their own texels
+      const sea = select(raySphere(U.eye, d, float(R)).x.greaterThan(0), float(1), float(0));
+      // where this direction was on the screen last frame, and what was traced there then
+      const clip = SKY.lastVP.mul(vec4(d, 0));
+      const was = vec2(clip.x.div(clip.w).mul(0.5).add(0.5), float(0.5).sub(clip.y.div(clip.w).mul(0.5)));
+      const inside = clip.w.greaterThan(0).and(was.x.greaterThan(0)).and(was.x.lessThan(1)).and(was.y.greaterThan(0)).and(was.y.lessThan(1));
+      const hl = texture(HL).sample(was).level(float(0)), ht = texture(HT).sample(was).level(float(0));
+      // kept where it was the same side of the horizon, and only while the history is warm
+      const keep = select(inside.and(abs(ht.a.sub(sea)).lessThan(0.5)), SKY.history, float(0));
+      textureStore(L, uvec2(x, y), vec4(mix(s.L, hl.rgb, keep), 1));
+      textureStore(T, uvec2(x, y), vec4(mix(s.T, ht.rgb, keep), sea));
+      textureStore(NR, uvec2(x, y), vec4(s.near, 1));
     })().compute(w * h, [64]);
   }
 
@@ -602,8 +631,18 @@ export class Sky {
       (SKY.envNorth.value as Vector3).crossVectors(up, east);
     }
     this.#envSlice();
-    void camera;
-    if (this.#air) this.#renderer.compute(this.#air);
+    // the direction's projection this frame (the eye's turn only: the trace is reprojected by direction)
+    this.#vp.copy(camera.matrixWorldInverse).setPosition(0, 0, 0).premultiply(camera.projectionMatrix);
+    (SKY.lastVP.value as Matrix4).copy(this.#frame > 0 ? this.#lastVP : this.#vp);
+    SKY.history.value = this.#frame > 0 ? 0.82 : 0;
+    SKY.frame.value = this.#frame % 4096;
+    if (this.#air) {
+      this.#renderer.compute(this.#air);
+      this.#renderer.copyTextureToTexture(this.airL, this.#histL);
+      this.#renderer.copyTextureToTexture(this.airT, this.#histT);
+    }
+    this.#lastVP.copy(this.#vp);
+    this.#frame++;
   }
 
   /** The traced air at a point of the screen: light toward the eye and what survives. */
@@ -626,12 +665,35 @@ export const viewDir = (uv: N): N => {
   return normalize(far.xyz.div(far.w));
 };
 
+/**
+ * The traced air at a point of the screen, read from the four texels round it as a bilinear filter would, but leaving
+ * out those whose rays ended on the other side of the horizon (the sea's for the sky, the sky's for the sea), so the
+ * low-resolution trace does not bleed the bright sky into the water along the horizon or the sea into the sky.
+ */
+export function airAt(uv: N, sea: boolean): { L: N; T: N } {
+  const size = SKY.airSize;
+  const p = uv.mul(size).sub(0.5);
+  const i0: N = floor(p), f: N = fract(p);
+  const L = vec3(0).toVar(), T = vec3(0).toVar(), W = float(0).toVar();
+  for (const [ox, oy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+    const at = ivec2(clamp(i0.add(vec2(ox, oy)), vec2(0), size.sub(1)));
+    const l = textureLoad(SKY_TEXTURES.L!, at), t = textureLoad(SKY_TEXTURES.T!, at);
+    const bw = (ox ? f.x : float(1).sub(f.x)).mul(oy ? f.y : float(1).sub(f.y));
+    const side = sea ? t.a : float(1).sub(t.a);
+    const w = bw.mul(side.mul(0.9999).add(0.0001));
+    L.addAssign(l.rgb.mul(w));
+    T.addAssign(t.rgb.mul(w));
+    W.addAssign(w);
+  }
+  return { L: L.div(W), T: T.div(W) };
+}
+
 /** The background: the traced sky, the sun's and the moon's discs and the stars behind what survives of it. */
-export function background(sky: Sky): N {
+export function background(): N {
   return Fn(() => {
     const uv = screenUV;
     const d = viewDir(uv);
-    const L = texture(sky.airL).sample(uv).rgb, T = texture(sky.airT).sample(uv).rgb;
+    const { L, T } = airAt(uv, false);
     // the sun's disc (0.53° across), limb-darkened, and a little glare round it
     const cs = dot(d, U.sunDir);
     const sunR = 0.0093;
@@ -662,17 +724,13 @@ export function background(sky: Sky): N {
  */
 export function airFog(sky: Sky): N {
   return Fn(() => {
-    const uv = screenUV;
-    const L = texture(sky.airL).sample(uv).rgb, T = texture(sky.airT).sample(uv).rgb;
-    const d = normalize(positionWorld.sub(cameraPosition));
-    const sea = raySphere(cameraPosition, d, float(R));
-    const air = raySphere(cameraPosition, d, float(RT));
-    const end = select(sea.x.greaterThan(0), sea.x, max(air.y, 1));
-    const k = clamp(distance(positionWorld, cameraPosition).div(max(end.sub(max(air.x, 0)), 1)), 0, 1);
-    const Tk = pow(max(T, vec3(1e-4)), vec3(k));
-    const Lk = L.mul(vec3(1).sub(Tk)).div(max(vec3(1).sub(T), vec3(1e-3)));
-    const Lsafe = select(T.x.greaterThan(0.999), L.mul(k), Lk);
-    return vec4(output.rgb.mul(Tk).add(Lsafe), output.a);
+    const near = texture(sky.airN).sample(screenUV).rgb;
+    // what survives the air between the eye and the point: its density by Simpson's rule over the straight path
+    const a = length(cameraPosition).sub(R), b = length(positionWorld).sub(R);
+    const m = length(cameraPosition.add(positionWorld).mul(0.5)).sub(R);
+    const den = densities(a).add(densities(m).mul(4)).add(densities(b)).div(6);
+    const Tk = exp(extinction(den).negate().mul(distance(positionWorld, cameraPosition)));
+    return vec4(output.rgb.mul(Tk).add(near.mul(vec3(1).sub(Tk))), output.a);
   })();
 }
 

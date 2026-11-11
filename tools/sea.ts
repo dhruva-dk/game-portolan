@@ -7,7 +7,8 @@ import { launch, openGame, root, serve } from './harness.ts';
 
 const STANDING: Record<string, string> = {
   afternoon: 'hour=15.5&yaw=0.55&pitch=0.16&dist=34',
-  toward: 'hour=16.5&yaw=3.4&pitch=0.1&dist=30',
+  toward: 'hour=16.2&facesun&pitch=0.12&dist=30',
+  low: 'hour=17.4&facesun&pitch=0.06&dist=30',
   dusk: 'hour=18.4&yaw=2.6&pitch=0.12&dist=40',
   high: 'hour=13&yaw=0.9&pitch=0.6&dist=160',
   orbit: 'hour=14&yaw=0.9&pitch=0.9&dist=5200',

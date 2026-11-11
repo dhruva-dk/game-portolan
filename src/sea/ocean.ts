@@ -26,7 +26,7 @@ import {
 } from 'three/tsl';
 import { CALM_SEA, CASCADES, CUTS, G, LongWaves, N, SIZES, SWELL_SPREAD, significantHeight, spectrumParams, type SeaState, type SpectrumParams } from '../render/ocean/spectrum.ts';
 import { MipChain, R, U, shared } from './world.ts';
-import { SKY_TEXTURES, ambientAt, moonAt, reflected, sunAt } from './sky.ts';
+import { airAt, ambientAt, moonAt, reflected, sunAt } from './sky.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Nd = any;
@@ -47,7 +47,7 @@ export const SEA = shared({
   time: uniform(0),
   dt: uniform(1 / 60),
   /** Foam: the fold below which the surface breaks white, how fast it whitens, how long it lasts, s. */
-  foamFold: uniform(0.6),
+  foamFold: uniform(0.8),
   foamGain: uniform(2.2),
   foamLife: uniform(3.2),
   crest: uniform(2),
@@ -287,7 +287,7 @@ function inFrame(up: Nd, f: FrameNodes): { q: Nd; e1: Nd; e2: Nd } {
 
 export const WATER = shared({
   /** What the deep scatters back of the light that enters it (an albedo): a dark, saturated blue. */
-  deep: uniform(new Vector3(0.0045, 0.016, 0.042)),
+  deep: uniform(new Vector3(0.0025, 0.011, 0.034)),
   /** The colour light takes through a thin crest. */
   crest: uniform(new Vector3(0.06, 0.62, 0.55)),
   foam: uniform(new Vector3(0.8, 0.84, 0.86)),
@@ -419,8 +419,8 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const water = sky.mul(fresnel).add(body.add(through).mul(float(1).sub(fresnel))).add(glitter.add(moonGlint).mul(float(1).sub(white)));
     const lit = mix(water, foamLit, white);
     // the air between the eye and the sea, traced at a fraction of the screen's size
-    const airL = texture(SKY_TEXTURES.L!).sample(screenUV).rgb, airT = texture(SKY_TEXTURES.T!).sample(screenUV).rgb;
-    return lit.mul(airT).add(airL);
+    const air = airAt(screenUV, true);
+    return lit.mul(air.T).add(air.L);
   })();
 
   return mat;

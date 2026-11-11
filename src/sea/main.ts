@@ -5,10 +5,10 @@
 // the sea and the ship hazed by the air between them and the eye); and over it the light shafts toward the sun, the
 // bloom, and the tone map to the screen.
 import {
-  AgXToneMapping, Color, DirectionalLight, HemisphereLight, Matrix4, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3,
+  ACESFilmicToneMapping, AgXToneMapping, NeutralToneMapping, DirectionalLight, HemisphereLight, Matrix4, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3,
   WebGPURenderer, type Node,
 } from 'three/webgpu';
-import { Fn, dot, exp, fract, max, min, pass, rtt, screenCoordinate, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import { Fn, dot, exp, fract, clamp, min, pass, rtt, screenCoordinate, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { R, U, bodies, dayFor } from './world.ts';
 import { AIR_TOP, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
@@ -29,7 +29,7 @@ const touch = navigator.maxTouchPoints > 0;
 const DAY = num('day', 24 * 60);
 /** The sun's light at the top of the air, in the scene's units (the exposure brings it to the screen). */
 const SUN = new Vector3(1, 0.975, 0.94).multiplyScalar(20);
-const MOON = new Vector3(0.82, 0.88, 1).multiplyScalar(20 * 0.0045);
+const MOON = new Vector3(0.78, 0.86, 1).multiplyScalar(20 * 0.012);
 
 // ---------------------------------------------------------------- the renderer
 
@@ -52,7 +52,7 @@ await renderer.init();
 renderer.info.autoReset = false;
 const backend = renderer.backend as unknown as { device: Parameters<typeof shape.install>[0] };
 shape.install(backend.device);
-renderer.toneMapping = AgXToneMapping;
+renderer.toneMapping = ({ agx: AgXToneMapping, neutral: NeutralToneMapping } as unknown as Record<string, typeof AgXToneMapping>)[q.get('tm') ?? ''] ?? ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 const dpr = Math.min(devicePixelRatio, 2);
 renderer.setPixelRatio(dpr);
@@ -64,9 +64,10 @@ const scene = new Scene();
 const camera = new PerspectiveCamera(55, innerWidth / innerHeight, 0.3, 10000);
 const sky = new Sky(renderer);
 const ocean = new Ocean();
-ocean.sea = { ...CALM_SEA, wind: num('wind', 9), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.1 };
+ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
+SKY.coverage.value = num('cover', 0.55);
 scene.add(ocean.mesh);
-const start = new Vector3(0.35, 0.8, 0.5).normalize();
+const start = new Vector3(0.8, 0.12, 0.58).normalize();
 const ship = new Ship(start);
 scene.add(ship.model.root);
 
@@ -74,7 +75,7 @@ const sunLight = new DirectionalLight(0xffffff, 1);
 const moonLight = new DirectionalLight(0xffffff, 1);
 const skyLight = new HemisphereLight(0xffffff, 0x000000, 1);
 scene.add(sunLight, sunLight.target, moonLight, moonLight.target, skyLight);
-scene.backgroundNode = background(sky);
+scene.backgroundNode = background();
 scene.fogNode = airFog(sky);
 
 // ---------------------------------------------------------------- the frame after the scene
@@ -94,8 +95,8 @@ const shafts = (() => {
   const mask = Fn(() => {
     const isSky = smoothstep(0.99999, 1, depth.r);
     const d = from(screenUV);
-    const bright = max(min(exposed, vec3(8)).sub(0.9), vec3(0));
-    return vec4(bright.mul(isSky).mul(exp(dot(d, d).mul(-8))), 1);
+    const bright = clamp(exposed.sub(3), vec3(0), vec3(2));
+    return vec4(bright.mul(isSky).mul(exp(dot(d, d).mul(-36))), 1);
   })();
   const noise = fract(fract(dot(screenCoordinate.xy, vec2(0.06711056, 0.00583715))).mul(52.9829189));
   const blur = (source: Nd, span: number, falloff: number): Nd => Fn(() => {
@@ -118,7 +119,7 @@ const shafts = (() => {
   return { node: c.sample(screenUV).rgb.mul(SHAFT.strength) as Nd, passes };
 })();
 
-const glow = bloom(vec4(exposed, 1) as Nd, 0.14, 0.55, 0.95) as Nd;
+const glow = bloom(vec4(min(exposed, vec3(14)), 1) as Nd, 0.12, 0.5, 1.0) as Nd;
 const post = new RenderPipeline(renderer);
 post.outputNode = vec4(exposed.add(glow.rgb).add(shafts.node), 1) as unknown as Node;
 
@@ -203,9 +204,14 @@ addEventListener('resize', () => {
 });
 
 const side = new Vector3(), toEye = new Vector3(), focus = new Vector3(), lookAt = new Vector3(), shipUp = new Vector3();
+const faceSun = q.has('facesun');
 function placeCamera(): void {
   shipUp.copy(ship.up);
   side.crossVectors(shipUp, ship.fwd);
+  if (faceSun) {
+    const sun = U.sunDir.value as Vector3;
+    rig.yaw = Math.atan2(-sun.dot(side), sun.dot(ship.fwd));
+  }
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw), cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
   toEye.copy(ship.fwd).multiplyScalar(-cy * cp).addScaledVector(side, sy * cp).addScaledVector(shipUp, sp).normalize();
   // close to her the eye looks at her rig; far out, at the planet's middle
@@ -270,7 +276,7 @@ function lights(dt: number): number {
   skyLight.position.copy(at);
   // the eye adapts: a white surface lying open to the sky comes out a little under the screen's white
   const open = (lum(sunE) * Math.max(at.dot(sun), 0) + lum(amb) + lum(moonE) * Math.max(at.dot(moon), 0)) / Math.PI;
-  const want = num('ev', 0) ? 2 ** num('ev', 0) : 0.62 / Math.max(open, 0.0016);
+  const want = num('ev', 0) ? 2 ** num('ev', 0) : 0.62 / Math.max(open, 0.12);
   exposure += (want - exposure) * Math.min(1, dt * 1.5);
   U.exposure.value = exposure;
   return 1 - smooth(-0.08, 0.05, at.dot(sun));
@@ -288,7 +294,7 @@ function aimShafts(): void {
   const elev = (Math.asin(Math.min(1, Math.max(-1, up.dot(sun)))) * 180) / Math.PI;
   const strength = smooth(-3, 2, elev) * (1 - 0.6 * smooth(15, 45, elev));
   const v = sv.copy(sun).transformDirection(camera.matrixWorldInverse);
-  const amount = strength * smooth(0, 0.5, -v.z) * 0.08;
+  const amount = strength * smooth(0, 0.5, -v.z) * 0.1 * num('shafts', 1);
   const on = amount > 1e-3;
   SHAFT.strength.value = on ? amount : 0;
   for (const p of shafts.passes) p.autoUpdate = on;
@@ -392,6 +398,4 @@ function logPerf(dt: number): void {
   Object.assign(perf, { t: 0, frames: 0, worst: 0, intervals: [] });
 }
 
-void SKY;
-void Color;
 requestAnimationFrame(frame);
