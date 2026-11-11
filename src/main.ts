@@ -21,7 +21,7 @@ await renderer.init();
 
 const env = createEnvironment();
 // Debug: ?t=hours sets the time of day (at longitude 0); ?wind=m/s the wind's speed; ?haze= the air's aerosol;
-// ?seed= the planet's (world/planet.ts; SEED by default); ?lat=&lon= degrees put the camera over a point of the
+// ?cloud= the cloud cover (0–1); ?seed= the planet's (world/planet.ts; SEED by default); ?lat=&lon= degrees put the camera over a point of the
 // planet and ?alt= metres above the sea; ?yaw=deg turns it (clockwise from north: 90 east) and ?look=deg pitches it.
 // The planet is 554 m in radius, so a degree is 9.67 m. By default the camera starts on the water south of the
 // largest island, START metres off its coast, looking north at it (for seed 3 the island's centre is at lat 8.7,
@@ -31,6 +31,7 @@ const number = (name: string, fallback: number) => (params.has(name) ? Number(pa
 if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
 if (params.has('wind')) env.windSpeed = Number(params.get('wind'));
+if (params.has('cloud')) env.cloudCoverage = Number(params.get('cloud'));
 // ?debug=charts colours the sea by its charts' weights
 const frame = createFrame(renderer, number('seed', SEED), params.get('debug') ?? '');
 const meter = createMeter(renderer, meterEl);
