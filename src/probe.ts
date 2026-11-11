@@ -5,15 +5,15 @@
 import { BoxGeometry, Matrix4, Mesh, MeshBasicNodeMaterial, SphereGeometry, Vector3, type Scene } from 'three/webgpu';
 import { dot, float, max, normalWorld, positionWorld, reflectVector, vec3 } from 'three/tsl';
 import type { Sky } from './sky/sky';
-import { add, along, frameAt, place, type Vec3 } from './world/sphere';
+import { add, along, frameAt, length, normalize, place, type Vec3 } from './world/sphere';
 
 export function addProbe(scene: Scene, sky: Sky, eye: Vector3) {
   const f = frameAt([eye.x, eye.y, eye.z]);
   /** Stands a mesh `north` and `east` metres from under the eye, its foot `height` up, upright there. */
   const stand = (mesh: Mesh, north: number, east: number, height: number) => {
     const out = add(add([0, 0, 0], f.north, north), f.east, east);
-    const metres = Math.hypot(...out);
-    const at: Vec3 = metres > 0 ? along(f.up, out.map((v) => v / metres) as unknown as Vec3, metres).p : f.up;
+    const metres = length(out);
+    const at: Vec3 = metres > 0 ? along(f.up, normalize(out), metres).p : f.up;
     const g = frameAt(at);
     mesh.matrixAutoUpdate = false;
     mesh.matrix.makeBasis(new Vector3(...g.east), new Vector3(...g.up), new Vector3(...g.north).negate())
