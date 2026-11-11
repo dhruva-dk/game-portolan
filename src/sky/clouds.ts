@@ -253,6 +253,9 @@ function target(w: number, h: number, filter: typeof LinearFilter | typeof Neare
   return t;
 }
 
+/** How much of a fresh sample goes into the history. */
+const BLEND = 0.25;
+
 /** The 2×2 cell each frame takes, in an order that spreads them. */
 const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 
@@ -294,25 +297,27 @@ function createPasses(width: number, height: number) {
       const current = textureLoad(marched, m).toVar();
       const out = current.toVar();
       const outDistance = textureLoad(marchedDistance, m).x.toVar();
-      If(fresh.not(), () => {
-        // where this pixel's cloud was last frame, found by its distance now
-        const uv = vec2(x, y).add(0.5).div(vec2(HW, HH));
-        const world = eye.mul(1000).add(rayAt(uv).mul(outDistance.mul(1000)));
-        const clip = previousViewProjection.mul(vec4(world, 1));
-        const prev = vec2(clip.x.div(clip.w).mul(0.5).add(0.5), float(0.5).sub(clip.y.div(clip.w).mul(0.5)));
-        const onScreen = prev.x.greaterThanEqual(0).and(prev.x.lessThanEqual(1))
-          .and(prev.y.greaterThanEqual(0)).and(prev.y.lessThanEqual(1)).and(clip.w.greaterThan(0));
-        If(onScreen, () => {
-          const old = texture(history[read]).sample(prev).level(float(0));
-          // held to the range of the fresh samples round it, so moved or changed cloud can't linger
-          const lo = vec4(1e4).toVar(), hi = vec4(-1e4).toVar();
-          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-            const s = textureLoad(marched, (clamp as N)(m.add(ivec2(i, j)), ivec2(0, 0), ivec2(MW - 1, MH - 1)));
-            lo.assign(min(lo, s));
-            hi.assign(max(hi, s));
-          }
-          out.assign(clamp(old, lo, hi));
-        });
+      // where this pixel's cloud was last frame, found by its distance now
+      const uv = vec2(x, y).add(0.5).div(vec2(HW, HH));
+      const world = eye.mul(1000).add(rayAt(uv).mul(outDistance.mul(1000)));
+      const clip = previousViewProjection.mul(vec4(world, 1));
+      const prev = vec2(clip.x.div(clip.w).mul(0.5).add(0.5), float(0.5).sub(clip.y.div(clip.w).mul(0.5)));
+      const onScreen = prev.x.greaterThanEqual(0).and(prev.x.lessThanEqual(1))
+        .and(prev.y.greaterThanEqual(0)).and(prev.y.lessThanEqual(1)).and(clip.w.greaterThan(0));
+      If(onScreen, () => {
+        const old = texture(history[read]).sample(prev).level(float(0));
+        // the history is held to the range of this frame's samples round it (a little widened, since the samples
+        // themselves are noisy), which rejects cloud that has moved or changed without pulling settled cloud about
+        const lo = vec4(1e4).toVar(), hi = vec4(-1e4).toVar();
+        for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+          const s = textureLoad(marched, (clamp as N)(m.add(ivec2(i, j)), ivec2(0, 0), ivec2(MW - 1, MH - 1)));
+          lo.assign(min(lo, s));
+          hi.assign(max(hi, s));
+        }
+        const margin = hi.sub(lo).mul(0.1);
+        const held = clamp(old, lo.sub(margin), hi.add(margin));
+        // a fresh sample is blended in, so its noise averages away over visits; the others keep the history
+        out.assign(select(fresh, mix(held, current, BLEND), held));
       });
       textureStore(history[write], uvec2(x, y), out);
       textureStore(historyDistance[write], uvec2(x, y), vec4(outDistance, 0, 0, 1));
