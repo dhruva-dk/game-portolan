@@ -3,6 +3,8 @@
 // Shrubs: beach shrubs in a broken hedge along the top of the beach, where the spray lets nothing taller grow, and
 // in clumps under the palms. Most waist- to chest-high, a few taller.
 //
+// Litter: fallen fronds and leaves lie under the palms and round the shrubs, thinning out past their crowns.
+//
 // Palms: coconut palms in groves, thickest along the top of the beach where the nuts wash up and take root, thinning
 // inland. They lean out toward the sea and the open light, the nearer the coast the more; the lean recurves upward.
 //
@@ -147,4 +149,23 @@ export function scatterShrubs(island: Island, shapes: number, seed = 1): Shrub[]
     shrubs.push({ x, z, y: island.height(x, z), size, yaw: rand() * 2 * Math.PI, shape: Math.floor(rand() * shapes), tint: rand() });
   }
   return shrubs;
+}
+
+/** How far past a palm's foot its litter reaches (about its crown's reach), and past a shrub's middle (by its size). */
+const PALM_LITTER = 4.5, SHRUB_LITTER = 0.4;
+
+/** 0…1: how thickly litter covers the ground at (x, z). */
+export function litter(palms: Palm[], shrubs: Shrub[]): (x: number, z: number) => number {
+  const spots = [
+    ...palms.map((p) => ({ x: p.x, z: p.z, r: PALM_LITTER })),
+    ...shrubs.map((s) => ({ x: s.x, z: s.z, r: s.size * SHRUB_LITTER })),
+  ];
+  return (x, z) => {
+    let sum = 0;
+    for (const s of spots) {
+      const d2 = (s.x - x) ** 2 + (s.z - z) ** 2;
+      if (d2 < 9 * s.r * s.r) sum += Math.exp(-d2 / (2 * s.r * s.r));
+    }
+    return Math.min(sum, 1);
+  };
 }
