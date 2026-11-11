@@ -17,7 +17,7 @@ import {
 } from 'three/tsl';
 import type { View } from '../view/view';
 import { bakeCloudNoise } from './cloud-noise';
-import { BASE, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
+import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
 
 type N = any;
 
@@ -174,8 +174,9 @@ function createShadow(view: View, field: CloudField) {
       // the eroded shape, as the eye sees it: the uneroded one is far fatter, and its shadow covers the sea
       tau.addAssign(field.density(sea.add(sunDir.mul(t0.add(float(i).add(0.5).mul(dt))))).mul(SIGMA).mul(dt));
     });
-    // a soft floor: thick cloud still lets some light round it
-    textureStore(map, uvec2(x, y), vec4(mix(0.15, 1, exp(tau.negate())), 0, 0, 1));
+    // the sun's light through the cloud, direct and diffused forward together (the two-stream slab's 1/(1 + ¾(1−g)τ)):
+    // a fair-weather cumulus (τ 10–30) still lets a quarter to a half through, a thick one little
+    textureStore(map, uvec2(x, y), vec4(float(1).div(tau.mul(DIFFUSION).add(1)), 0, 0, 1));
   })().compute(SHADOW_N * SHADOW_N, [64]);
 
   return {
