@@ -322,7 +322,7 @@ function wakeAt(p: Nd, u: Nd): Nd {
   // round the hull, heaped at the bow
   const e = vec2(a.div(HALF_L), b.div(HALF_B)).length();
   const bow = mix(float(0.35), float(1), smoothstep(-0.6, 0.9, a.div(HALF_L)));
-  const hull = smoothstep(0.92, 1.05, e).mul(smoothstep(pace.mul(0.9).add(1.15), float(1.02), e)).mul(bow).mul(pace.mul(1.4));
+  const hull = smoothstep(0.94, 1.02, e).mul(smoothstep(pace.mul(0.22).add(1.08), float(1.0), e)).mul(bow).mul(pace.mul(1.4));
   // the Kelvin wedge, 19.5° each side, its arms spreading and fading behind her
   const t = float(HALF_L).sub(a);
   const arm = abs(b).sub(t.mul(0.354)).div(t.mul(0.022).add(0.45));
