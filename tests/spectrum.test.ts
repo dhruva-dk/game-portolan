@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coxMunk, initialSpectrum, meanSquareSlope, seaState, spectrum, spread } from '../src/water/spectrum.ts';
+import { coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, spectrum, spread, whitecaps } from '../src/water/spectrum.ts';
 import { BANDS, CASCADES, SIZE } from '../src/water/cascades.ts';
 
 const near = (a: number, b: number, tol: number) => assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
@@ -119,4 +119,11 @@ test('the cascades hold the sea between them, and fewer slopes than the whole se
     near(4 * Math.sqrt(m0), hs, hs * 0.05);
     assert.ok(slopes < coxMunk(wind), `${slopes} ≥ ${coxMunk(wind)}`);
   }
+});
+
+test('the normal quantile and the whitecaps', () => {
+  near(normalQuantile(0.975), 1.959964, 1e-6);
+  near(normalQuantile(0.5), 0, 1e-9);
+  near(normalQuantile(0.001), -3.090232, 1e-6);
+  near(whitecaps(10), 0.0099, 0.0003); // about 1% at 10 m/s
 });

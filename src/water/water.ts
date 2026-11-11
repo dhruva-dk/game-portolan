@@ -6,9 +6,13 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, length, log2, max, normalize, positionGeometry, positionWorld, saturate, sqrt, texture, varying, vec2, vec3,
+  BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, TextureLoader, Vector2,
+  type WebGPURenderer,
+} from 'three/webgpu';
+import {
+  Fn, cameraPosition, float, length, log2, max, normalize, positionGeometry, positionWorld, saturate, smoothstep, sqrt, texture,
+  uniform, varying, vec2, vec3,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { seaRadiance } from './optics';
@@ -21,6 +25,8 @@ const SPOKES = 128;
 const FIRST = 1;
 const GROWTH = 1.05;
 const REACH = 20000;
+/** The foam pattern (ambientCG Foam002) repeats every this many metres across the wind. */
+const FOAM_TILE = 3;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
 const FETCH = 300_000;
 
@@ -50,6 +56,8 @@ function rings(): BufferGeometry {
 export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughness: N) => N) {
   const waves = createWaves(renderer);
   const material = new MeshBasicNodeMaterial();
+  /** The way the wind blows, a unit vector in the sea's plane (x, z). */
+  const wind = uniform(new Vector2(1, 0));
 
   // The water under this vertex at rest, and where the waves have moved it. Each cascade is read at the mip whose
   // texels are as wide as the grid's cell here, so waves too short for the grid to draw average away, not alias.
@@ -63,6 +71,10 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
   material.positionNode = vec3(ground.x.add(moved.x), moved.y, ground.y.add(moved.z));
 
   const height: N = varying(moved.y);
+  const foamPattern = new TextureLoader().load(`${import.meta.env.BASE_URL}tex/foam.png`);
+  foamPattern.wrapS = foamPattern.wrapT = RepeatWrapping;
+  foamPattern.anisotropy = 4;
+  foamPattern.colorSpace = NoColorSpace;
   const at: N = varying(ground);
   material.colorNode = Fn(() => {
     // The slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the slopes'
@@ -76,8 +88,20 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
     const n = normalize(vec3(slope.x.negate(), 1, slope.y.negate()));
     const v = normalize(cameraPosition.sub(positionWorld));
     const crest = saturate(height.div(waves.amplitude));
+
+    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by the foam
+    // pattern: fresh foam is white but for the pattern's holes, and as it fades only its brighter strands are left,
+    // so a whitecap thins into a web and then into flecks. The pattern is
+    // stretched along the wind, as foam is drawn out in streaks, and read at two scales so it doesn't repeat.
+    let cover: N = float(0);
+    CASCADES.slice(0, 2).forEach((L, c) => { cover = cover.add(texture(waves.displacement[c], at.div(L)).w); });
+    const along = vec2(at.dot(wind), at.dot(vec2(wind.y.negate(), wind.x)));
+    const strands = texture(foamPattern, along.mul(vec2(1 / (2 * FOAM_TILE), 1 / FOAM_TILE))).r.mul(0.6)
+      .add(texture(foamPattern, along.mul(vec2(1 / (5.3 * FOAM_TILE), 1 / (2.7 * FOAM_TILE)))).r.mul(0.4));
+    const foam = saturate(strands.sub(float(1).sub(saturate(cover)).mul(0.7)).mul(2.5));
+
     // GGX's α² is the mean square slope over both axes
-    return seaRadiance(positionWorld, n, v, sqrt(variance), crest, reflect);
+    return seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, reflect);
   })();
 
   const mesh = new Mesh(rings(), material);
@@ -86,6 +110,7 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
   return {
     mesh,
     update(env: Environment, dt: number) {
+      wind.value.copy(env.wind).normalize();
       waves.update({ wind: env.wind.length(), heading: Math.atan2(env.wind.y, env.wind.x), fetch: FETCH }, dt);
     },
   };

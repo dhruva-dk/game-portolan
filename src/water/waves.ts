@@ -9,8 +9,12 @@
 //   2. rows       an inverse FFT along each row: one workgroup per row, radix-2 Stockham in workgroup memory.
 //   3. columns    the same down each column.
 //   4. assemble   per cascade, undo the centred wavevectors' (−1)^(x+y) and write two textures:
-//                   displacement  (x, height, z, J − 1): where the Jacobian J < 1 the surface is squeezed, and
-//                                 where J < 0 it has folded over: a breaking crest
+//                   displacement  (x, height, z, foam): foam is laid where the surface's Jacobian J is lowest,
+//                                 where the waves squeeze the water together toward folding over (Tessendorf §4.4),
+//                                 and fades over seconds after. J − 1 has the cascade's mean square slope for its
+//                                 variance, so J is about 1 ± √mss; the threshold is set so that the share of the sea
+//                                 breaking is what is seen at sea at that wind (Monahan). The two larger cascades
+//                                 only: the 16 m patch's ripples don't break.
 //                   slopes        (∂h/∂x, ∂h/∂z, and their squares), so that the mipmaps three builds from them hold
 //                                 the slopes' mean and mean square, and so their variance, over any footprint
 //
@@ -18,14 +22,14 @@
 
 import {
   DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
-  type WebGPURenderer,
+  Vector2, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, select, sin, sqrt, textureLoad, textureStore,
+  Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import { BANDS, CASCADES, SIZE } from './cascades';
-import { G, coxMunk, initialSpectrum, meanSquareSlope, seaState, type Sea } from './spectrum';
+import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from './spectrum';
 
 type N = any;
 
@@ -33,6 +37,8 @@ type N = any;
 const PERIOD = 200;
 /** How far the crests lean: the sideways displacement's scale. */
 const CHOP = 1;
+/** Cascades whose waves break. */
+const FOAMING = 2;
 /** The ripples' mean square slope is never taken below this, however much the cascades hold. */
 const RIPPLE_FLOOR = 4e-4;
 
@@ -67,6 +73,12 @@ export function createWaves(renderer: WebGPURenderer) {
   // the eight fields' spectra for every cascade, then (in place) their surfaces
   const fieldsA = instancedArray(AREA * COUNT, 'vec4');
   const fieldsB = instancedArray(AREA * COUNT, 'vec4');
+  /** Each breaking cascade's foam, 0–1 per texel, kept from frame to frame. */
+  const foam = instancedArray(AREA * FOAMING, 'float');
+  /** How much foam is left after this frame: e^(−dt/τ). */
+  const fade = uniform(0.95);
+  /** Per breaking cascade: the J below which it breaks, and how much further below the foam is whole. */
+  const breaking = Array.from({ length: FOAMING }, () => uniform(new Vector2(0, 0.01)));
   const displacement = CASCADES.map(surface);
   const slopes = CASCADES.map(surface);
 
@@ -141,8 +153,15 @@ export function createWaves(renderer: WebGPURenderer) {
     const sign = float(1).sub(float(x.add(y).bitAnd(uint(1))).mul(2));
     const a = fieldsA.element(at).mul(sign), b = fieldsB.element(at).mul(sign);
     // a = (height, Dx, Dz, slope x), b = (slope z, ∂Dx/∂x, ∂Dz/∂z, ∂Dx/∂z)
-    const squeeze = b.y.add(b.z).mul(CHOP).add(b.y.mul(b.z).sub(b.w.mul(b.w)).mul(CHOP * CHOP));
-    textureStore(displacement[c], uvec2(x, y), vec4(a.y.mul(CHOP), a.x, a.z.mul(CHOP), squeeze));
+    let froth: N = float(0);
+    if (c < FOAMING) {
+      const jacobian = float(1).add(b.y.mul(CHOP)).mul(float(1).add(b.z.mul(CHOP))).sub(b.w.mul(b.w).mul(CHOP * CHOP));
+      const kept = foam.element(instanceIndex.add(c * AREA));
+      const at = breaking[c];
+      froth = max(kept.mul(fade), smoothstep(at.x, at.x.sub(at.y), jacobian)).toVar();
+      kept.assign(froth);
+    }
+    textureStore(displacement[c], uvec2(x, y), vec4(a.y.mul(CHOP), a.x, a.z.mul(CHOP), froth));
     textureStore(slopes[c], uvec2(x, y), vec4(a.w, b.x, a.w.mul(a.w), b.x.mul(b.x)));
   })().compute(AREA, [64]));
 
@@ -162,12 +181,20 @@ export function createWaves(renderer: WebGPURenderer) {
         let held = 0;
         CASCADES.forEach((L, c) => {
           data.set(initialSpectrum(SIZE, L, sea, c + 1, BANDS[c]), c * AREA * 4);
-          held += meanSquareSlope(SIZE, L, sea, BANDS[c]);
+          const mss = meanSquareSlope(SIZE, L, sea, BANDS[c]);
+          held += mss;
+          if (c < FOAMING) {
+            // each breaking cascade lays its share of the whitecaps
+            const spread = Math.sqrt(mss) * CHOP;
+            breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(sea.wind) / FOAMING, 1e-6)) * spread, spread * 0.5);
+          }
         });
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
         ripples.value = Math.max(coxMunk(sea.wind) - held, RIPPLE_FLOOR);
       }
+      // foam lasts longer the harder the wind blows: τ from half a second to two and a half
+      fade.value = Math.exp(-dt / (0.5 + 2 * Math.min(Math.max((sea.wind - 5) / 15, 0), 1)));
       clock = (clock + dt) % PERIOD;
       time.value = clock;
       renderer.compute(spectrumKernel);
