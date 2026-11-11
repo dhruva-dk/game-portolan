@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "play": "vite --open",
     "build": "tsc --noEmit && vite build",
     "ios": "npm run build && cap run ios",
     "test": "node --test tests/*.test.ts",
