@@ -730,6 +730,10 @@ export function background(): N {
  * The haze laid over what the scene draws in front of the sea: the traced air to the sea along the same ray, scaled to
  * how far the surface stands short of the sea (a ship is nearer than the water behind it).
  */
+/** PROTOTYPE (land look): how thick the haze over solid things is against the air's own (1). The air is dense enough
+ * to blue a 900 m sky, which whites out land a kilometre off; land wants a thinner haze to keep its layers. */
+export const OBJECT_HAZE = uniform(1);
+
 export function airFog(sky: Sky): N {
   return Fn(() => {
     const near = texture(sky.airN).sample(screenUV).rgb;
@@ -737,7 +741,7 @@ export function airFog(sky: Sky): N {
     const a = length(cameraPosition).sub(R), b = length(positionWorld).sub(R);
     const m = length(cameraPosition.add(positionWorld).mul(0.5)).sub(R);
     const den = densities(a).add(densities(m).mul(4)).add(densities(b)).div(6);
-    const Tk = exp(extinction(den).negate().mul(distance(positionWorld, cameraPosition)));
+    const Tk = exp(extinction(den).negate().mul(distance(positionWorld, cameraPosition)).mul(OBJECT_HAZE));
     return vec4(output.rgb.mul(Tk).add(near.mul(vec3(1).sub(Tk))), output.a);
   })();
 }

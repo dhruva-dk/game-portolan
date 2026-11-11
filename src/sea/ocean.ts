@@ -34,6 +34,13 @@ type Nd = any;
 
 export { CALM_SEA, type SeaState };
 
+/**
+ * PROTOTYPE (land look): what lies under the sea where there is land, given a point's up: the depth to the bed
+ * (metres, positive under the sea), the bed's colour, and how much of the sun reaches it past the land. Set before
+ * the ocean is made; left empty, the sea is deep everywhere.
+ */
+export const SHORE: { depth: ((up: Nd) => Nd) | null; bed: ((up: Nd) => Nd) | null; shadow: ((up: Nd) => Nd) | null } = { depth: null, bed: null, shadow: null };
+
 // ---------------------------------------------------------------- the waves
 
 export const SEA = shared({
@@ -408,6 +415,12 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
       lift.addAssign(b.world.mul(FRAME.weight.y));
       rise.addAssign(b.height.mul(FRAME.weight.y));
     });
+    // the waves calm over the shallows
+    if (SHORE.depth) {
+      const calm = clamp(SHORE.depth(up).div(7), 0.15, 1);
+      lift.mulAssign(calm);
+      rise.mulAssign(calm);
+    }
     vq.assign(q);
     vRise.assign(rise);
     vUp.assign(up);
@@ -460,7 +473,8 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const fresnel = float(0.02).add(pow(float(1).sub(nv), 5).mul(0.98)).mul(mix(float(1), float(0.75), smoothstep(0.01, 0.06, sigma2))).toVar();
 
     // the light arriving: the sun and the moon, and the sky over the whole dome
-    const sunE = sunAt(u), moonE = moonAt(u);
+    const landShade = SHORE.shadow ? SHORE.shadow(u) : float(1);
+    const sunE = sunAt(u).mul(landShade), moonE = moonAt(u);
     const ambient = ambientAt(u);
     const L = U.sunDir;
     const nl = max(dot(n, L), 0), ul = max(dot(u, L), 0);
@@ -479,7 +493,15 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
 
     // under the surface: the light into the water scattered back by the deep
     const into = ambient.add(sunE.mul(ul)).add(moonE.mul(max(dot(u, Lm), 0)));
-    const body = into.mul(WATER.deep).mul(mix(float(0.75), float(1.1), nv));
+    const body = into.mul(WATER.deep).mul(mix(float(0.75), float(1.1), nv)).toVar();
+    // over the shallows the bed shows through, its light taken by the water there and back, red first
+    const shore = SHORE.depth ? SHORE.depth(u) : float(1000);
+    const water_ = max(shore.add(vRise), 0);
+    if (SHORE.bed) {
+      const path = water_.mul(float(1).add(float(1).div(max(nv, 0.3))));
+      const T = exp(vec3(0.42, 0.1, 0.07).mul(path).negate());
+      body.assign(body.mul(vec3(1).sub(T)).add(SHORE.bed(u).mul(into).mul(T).div(Math.PI)));
+    }
     // the sun through a thin crest standing between it and the eye
     const toward = pow(clamp(dot(v, L.negate()).mul(0.5).add(0.5), 0, 1), 3);
     const thin = pow(clamp(float(0.5).sub(dot(L, n).mul(0.5)).add(0.2), 0, 1), 2);
@@ -488,7 +510,9 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const through = sunE.mul(WATER.crest).mul(toward.mul(thin).mul(crest).mul(facing).mul(0.035).add(crest.mul(0.004)));
     // foam where it folds now and where it folded a moment ago, broken into lace by the ripples under it
     const fresh = smoothstep(0.45, -0.1, fold);
-    const amount = clamp(foam.mul(0.9).add(fresh.mul(0.8)).add(wakeFoam(p, u)), 0, 1);
+    // surf where the water runs thin over the bed, in bands that come in
+    const surf = smoothstep(1.8, 0.1, water_).mul(sin(shore.mul(3.2).sub(U.time.mul(1.3))).mul(0.4).add(0.6));
+    const amount = clamp(foam.mul(0.9).add(fresh.mul(0.8)).add(wakeFoam(p, u)).add(surf), 0, 1);
     const grain = clamp(lace.mul(18).add(0.5), 0, 1);
     const far = smoothstep(60, 260, dist);
     const white = mix(smoothstep(float(1).sub(amount), float(1.25).sub(amount), grain.mul(0.6).add(amount.mul(0.4))).mul(amount.sqrt()), amount.mul(0.5), far);

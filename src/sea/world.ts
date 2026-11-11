@@ -6,8 +6,12 @@
 import { Matrix4, Vector2, Vector3 } from 'three/webgpu';
 import { renderGroup, uniform } from 'three/tsl';
 
-/** The planet's radius, metres. From a deck 10 m up the horizon is 173 m off and dips 6.6° below level. */
-export const R = 1500;
+/**
+ * The planet's radius, metres. From a deck 10 m up the horizon is 173 m off and dips 6.6° below level. `?R=` sets
+ * another, to see how the land reads on a flatter world (the land prototype's question; a render-only flattening
+ * would give the look without changing the sailing).
+ */
+export const R = Number(new URLSearchParams(location.search || (import.meta.env.VITE_SEA_QUERY as string | undefined) || '').get('R')) || 1500;
 
 /** Uniforms every shader reads alike: one buffer bound per render instead of a copy written into every draw. */
 export function shared<T extends object>(uniforms: T): T {

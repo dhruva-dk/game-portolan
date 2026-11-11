@@ -10,8 +10,9 @@ import {
 } from 'three/webgpu';
 import { Fn, dot, exp, clamp, min, pass, rtt, screenUV, smoothstep, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import { R, U, bodies, dayFor } from './world.ts';
-import { AIR_TOP, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
+import { R, U, bodies, dayFor, eastAt } from './world.ts';
+import { Land } from './land/land.ts';
+import { AIR_TOP, OBJECT_HAZE, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
 import { CALM_SEA, Ocean, SEA } from './ocean.ts';
 import { Ship } from './ship.ts';
 import { shape } from '../render/gpu/shape.ts';
@@ -64,6 +65,11 @@ renderer.setSize(innerWidth, innerHeight, false);
 const scene = new Scene();
 const camera = new PerspectiveCamera(55, innerWidth / innerHeight, 0.3, 10000);
 const sky = new Sky(renderer);
+const start = new Vector3(0.8, 0.12, 0.58).normalize();
+// PROTOTYPE (land look): a generated coast round the start, made before the sea so the sea knows its shallows
+const land = q.get('land') === '0' ? null : await Land.create(start, eastAt(start, new Vector3()), num('seed', 7));
+if (land) scene.add(land.group);
+OBJECT_HAZE.value = num('haze', land ? 0.35 : 1);
 const ocean = new Ocean();
 ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
 SKY.coverage.value = num('cover', 0.55);
@@ -71,7 +77,6 @@ SKY.cloudDensity.value = num('dens', SKY.cloudDensity.value as number);
 SEA.foamFold.value = num('fold', SEA.foamFold.value as number);
 SEA.foamLife.value = num('life', SEA.foamLife.value as number);
 scene.add(ocean.mesh);
-const start = new Vector3(0.8, 0.12, 0.58).normalize();
 const ship = new Ship(start);
 scene.add(ship.model.root);
 
@@ -207,6 +212,7 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
 });
 
+const eyeQ = new Vector2(), bowQ = new Vector2(), bow = new Vector3();
 const side = new Vector3(), toEye = new Vector3(), focus = new Vector3(), lookAt = new Vector3(), shipUp = new Vector3();
 const faceSun = q.has('facesun');
 function placeCamera(): void {
@@ -223,9 +229,10 @@ function placeCamera(): void {
   focus.copy(shipUp).multiplyScalar(R + 5 * (1 - out));
   lookAt.copy(focus).multiplyScalar(1 - out);
   camera.position.copy(focus).addScaledVector(toEye, rig.dist);
-  // never under the waves
+  // never under the waves, nor in a hillside
+  const floor = land ? Math.max(0, land.heightAt(land.planeOf(camera.position, eyeQ)) + 3) : 0;
   const h = camera.position.length() - R;
-  if (h < 2.5) camera.position.setLength(R + 2.5);
+  if (h < floor + 2.5) camera.position.setLength(R + floor + 2.5);
   camera.up.copy(shipUp);
   camera.lookAt(lookAt);
   const height = camera.position.length() - R;
@@ -355,6 +362,11 @@ function frame(now: number): void {
   const night = lights(dt);
   // the wind: steady from the waves' heading, carried to her as a tangent
   wind.set(-ship.up.z, 0, ship.up.x).normalize().multiplyScalar(-8);
+  // aground: she stops where the bed rises under her bow
+  if (land) {
+    bow.copy(ship.up).multiplyScalar(R).addScaledVector(ship.fwd, 10);
+    if (land.heightAt(land.planeOf(bow, bowQ)) > -1.6) ship.speed = Math.min(ship.speed, 0);
+  }
   shape.system('ship');
   ship.update(dt, time, ocean, wind, night);
   ocean.wake(ship.up, ship.fwd, ship.speed, dt);
@@ -365,6 +377,10 @@ function frame(now: number): void {
   unproject.multiplyMatrices(camera.projectionMatrix, rot).invert();
   (U.unproject.value as Matrix4).copy(unproject);
 
+  if (land) {
+    shape.system('land');
+    land.update(renderer, camera);
+  }
   shape.system('sky');
   const w = renderer.domElement.width * scale, h = renderer.domElement.height * scale;
   sky.resize(w, h, num('air', 4));
