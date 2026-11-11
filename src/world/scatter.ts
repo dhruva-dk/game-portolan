@@ -58,8 +58,8 @@ const BOULDER = [0.3, 1.6] as const, BOULDERS = [6, 14] as const;
 /** Where outcrops lie, metres from the waterline (negative inland): on the shoulders, or at the waterline reaching
  * out into the shallows. */
 const SHOULDER = [-16, -6] as const, WATERLINE = [-3, 9] as const;
-/** How deep a rock is sunk, as a share of its radius: the big masses deeper. */
-const SUNK = { big: 0.45, boulder: 0.35 };
+/** How deep a rock is sunk below the lowest ground under it, as a share of its radius. */
+const SUNK = { big: 0.15, boulder: 0.3 };
 
 /** Where on the chart: angle t round the centre, d metres out from the coast there (negative inland). */
 const onCoast = (site: IslandSite, t: number, d: number): [number, number] => {

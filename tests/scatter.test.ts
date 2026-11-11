@@ -20,7 +20,7 @@ test('rocks: big masses 5–12 m across in outcrops on the shoulders and at the 
       assert.ok(d > -17 && d < 10, `from the waterline ${d}`);
     }
     for (const r of rocks) {
-      assert.ok(r.y < i.height(r.x, r.z) - 0.3 * r.size, 'sunk');
+      assert.ok(r.y < i.height(r.x, r.z) - 0.1 * r.size, 'sunk');
       assert.ok(r.shape >= 0 && r.shape < 4);
       for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * 0.74, 'apart');
     }

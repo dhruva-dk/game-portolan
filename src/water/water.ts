@@ -48,6 +48,9 @@ const BREAKER = 0.78;
 const FACING = 0.05;
 /** Refracted rays are followed no deeper than this: beyond, the floor is too dim through the water to matter. */
 const MAX_REFRACT_DEPTH = 20;
+/** Caustics focus as if the floor were no deeper than about this, metres: deeper, the nets of the many short waves
+ * cross past their foci and, with the sun's disc, blur toward an even light (drawn sharp, they would only speckle). */
+const FOCUS = 2.5;
 /** The foam pattern (ambientCG Foam002) repeats every this many metres across the wind. */
 const FOAM_TILE = 3;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
@@ -186,7 +189,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   /**
    * Caustics: how much the waves above focus the sunlight reaching world position p under the water. A bit of the
    * surface refracts its light down onto the floor a depth D below, moving it sideways by D·(1 − 1/n)·∇h; the patch it
-   * lights is the surface's own area times the determinant J of I + D·(1 − 1/n)·H (H, the height's second
+   * lights is the surface's own area times the determinant J of I + D·(1 − 1/n)·H (D eased to at most FOCUS) (H, the height's second
    * derivatives), so the light there is 1/|J| as bright. Under a crest, which bulges like a lens, J < 1: the bright
    * net on the floor. H is the two smaller cascades' curvature (waves.ts), read where the light came in
    * (toward the sun); far off their mips smooth the slopes and the net fades to an even light, as it should.
@@ -221,7 +224,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       ).mul(c.w));
     }, [dFdx(p), dFdy(p)]);
     const hxx = H.x, hzz = H.y, hxz = H.z;
-    const f = depth.mul(1 - 1 / N_WATER);
+    const f = depth.div(sqrt(float(1).add(depth.div(FOCUS).pow(2)))).mul(1 - 1 / N_WATER);
     const J = float(1).add(f.mul(hxx)).mul(float(1).add(f.mul(hzz))).sub(f.mul(hxz).mul(f.mul(hxz)));
     return mix(float(1), float(1).div(max(J.abs(), 0.15)), smoothstep(0, 0.3, depth));
   })();

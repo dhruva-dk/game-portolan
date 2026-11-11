@@ -24,7 +24,7 @@ const SAND_ALBEDO = [0.46, 0.43, 0.37];
 /** Wet sand reflects about half as much: water fills the gaps between the grains. */
 const WET = 0.55;
 /** Sea grass's albedo. */
-const GRASS = [0.06, 0.075, 0.04];
+const GRASS = [0.07, 0.09, 0.045];
 /** Coral and rubble's: browns and olives, darker than the sand. */
 const CORAL = [0.16, 0.12, 0.08];
 /** The litter texture (ambientCG Ground053) repeats every this many metres; its mean colour, linear (measured), and
@@ -72,7 +72,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     const coral = smoothstep(0.2, 0.7, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2)));
     albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.6).add(0.7)), coral);
     // sea grass, its edges broken by the sand's own pattern
-    const grass = smoothstep(0.35, 0.65, cover.x.add(grain.g.sub(SAND_MEAN[1]).mul(1.5)));
+    const grass = smoothstep(0.5, 0.8, cover.x.add(grain.g.sub(SAND_MEAN[1]).mul(1.5)));
     albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
 
     let bare: N = float(1);
