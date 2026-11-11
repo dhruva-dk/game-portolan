@@ -265,6 +265,20 @@ class FrameShape {
     return `memory ${mb(h.bufferBytes + h.textureBytes)} MB: ${h.textures} textures ${mb(h.textureBytes)} MB, ${h.buffers} buffers ${mb(h.bufferBytes)} MB`;
   }
 
+  /** The last timed frame in brief, for a line a machine reads: GPU milliseconds in all (-1 untimed) and by system, its
+   *  passes and submissions, and the megabytes the device holds. */
+  brief(): { gpu: number; systems: Record<string, number>; passes: number; submits: number; mb: number } {
+    const f = this.timed ?? this.last, systems: Record<string, number> = {};
+    let gpu = 0;
+    for (const p of f.passes) {
+      if (p.gpu < 0) continue;
+      systems[p.system] = +((systems[p.system] ?? 0) + p.gpu).toFixed(2);
+      gpu += p.gpu;
+    }
+    const h = this.#held;
+    return { gpu: this.timed ? +gpu.toFixed(2) : -1, systems, passes: f.passes.length, submits: f.submits, mb: Math.round((h.bufferBytes + h.textureBytes) / 1048576) };
+  }
+
   /** The textures the device holds, grouped by name, size and format, the heaviest group first: what the memory is. */
   inventory(top = 24): string {
     const live: Texture[] = [];

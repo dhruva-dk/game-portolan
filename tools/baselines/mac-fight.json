@@ -1,0 +1,149 @@
+{
+  "renderer": "WebGPU apple/metal-3",
+  "dpr": 1,
+  "total": 10.45,
+  "systems": {
+    "clouds": {
+      "gpu": 0.06
+    },
+    "sky": {
+      "gpu": 0.27
+    },
+    "fog": {
+      "gpu": 0
+    },
+    "flora": {
+      "gpu": 0.07
+    },
+    "sea": {
+      "gpu": 0.33
+    },
+    "actors": {
+      "gpu": 0.52
+    },
+    "scene": {
+      "gpu": 8.05
+    },
+    "shadows": {
+      "gpu": 0.67
+    },
+    "post": {
+      "gpu": 0.42
+    }
+  },
+  "rows": {
+    " 0 clouds/computeGroup_1275": {
+      "gpu": 0.31
+    },
+    " 1 sky/computeGroup_undefined": {
+      "gpu": 0.23
+    },
+    " 2 fog/computeGroup_1234": {
+      "gpu": 0
+    },
+    " 3 clouds/computeGroup_92690": {
+      "gpu": 0.07
+    },
+    " 4 flora/computeGroup_undefined": {
+      "gpu": 0
+    },
+    " 5 sea/computeGroup_undefined": {
+      "gpu": 0
+    },
+    " 6 sea/mips": {
+      "gpu": 0.08
+    },
+    " 7 sea/ripples": {
+      "gpu": 0
+    },
+    " 8 actors/computeGroup_undefined": {
+      "gpu": 0.48
+    },
+    " 9 actors/computeGroup_167614": {
+      "gpu": 0
+    },
+    "10 actors/computeGroup_167604": {
+      "gpu": 0.01
+    },
+    "11 actors/computeGroup_171327": {
+      "gpu": 0.02
+    },
+    "12 actors/computeGroup_171317": {
+      "gpu": 0.01
+    },
+    "13 actors/computeGroup_172336": {
+      "gpu": 0.01
+    },
+    "14 actors/computeGroup_172458": {
+      "gpu": 0.01
+    },
+    "15 scene/depthBuffer": {
+      "gpu": 0.22
+    },
+    "16 scene/renderContext_8": {
+      "gpu": 0.09
+    },
+    "17 scene/output": {
+      "gpu": 5.49
+    },
+    "18 shadows/ShadowMap": {
+      "gpu": 0.29
+    },
+    "19 shadows/ShadowMap": {
+      "gpu": 0.38
+    },
+    "20 scene/computeGroup_258941": {
+      "gpu": 0.04
+    },
+    "21 scene/output": {
+      "gpu": 2.82
+    },
+    "22 post/UnrealBloomPass.bright": {
+      "gpu": 0.02
+    },
+    "23 post/UnrealBloomPass.h0": {
+      "gpu": 0.05
+    },
+    "24 post/UnrealBloomPass.v0": {
+      "gpu": 0.07
+    },
+    "25 post/UnrealBloomPass.h1": {
+      "gpu": 0.02
+    },
+    "26 post/UnrealBloomPass.v1": {
+      "gpu": 0.04
+    },
+    "27 post/UnrealBloomPass.h2": {
+      "gpu": 0.02
+    },
+    "28 post/UnrealBloomPass.v2": {
+      "gpu": 0.04
+    },
+    "29 post/UnrealBloomPass.h3": {
+      "gpu": 0.02
+    },
+    "30 post/UnrealBloomPass.v3": {
+      "gpu": 0.04
+    },
+    "31 post/UnrealBloomPass.h4": {
+      "gpu": 0.01
+    },
+    "32 post/UnrealBloomPass.v4": {
+      "gpu": 0.04
+    },
+    "33 post/UnrealBloomPass.h0": {
+      "gpu": 0.01
+    },
+    "34 post/output": {
+      "gpu": 0.03
+    }
+  },
+  "cpu": {
+    "frameMs": 20.59,
+    "p95Ms": 27.5,
+    "cpuMs": 8.35,
+    "cpuP95Ms": 9.3,
+    "tris": 1591805,
+    "calls": 498
+  }
+}

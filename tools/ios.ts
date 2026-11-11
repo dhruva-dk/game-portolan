@@ -1,11 +1,12 @@
 import { writeNotices } from './notices.ts';
 import { execFileSync, spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from 'node:fs';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { build, createServer } from 'vite';
 import { root, DEVICES, type DeviceName } from './harness.ts';
+import { diff, formatDiff, metrics, parseConsole, type DeviceProfile } from './profile.ts';
 
 export const APP_ID = 'com.dhruvakumar.portolan';
 export const LOGS = join(tmpdir(), 'portolan-ios');
@@ -215,9 +216,77 @@ async function serveDev(): Promise<{ close(): Promise<void> }> {
 }
 
 /** Installs the device build on a real device and starts it. */
-export function installOnDevice(device: RealDevice, app = DEVICE_APP): void {
+export function installOnDevice(device: RealDevice, app = DEVICE_APP, launch = true): void {
   step('devicectl-install', 'xcrun', ['devicectl', 'device', 'install', 'app', '--device', device.id, app]);
-  step('devicectl-launch', 'xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device.id, '--terminate-existing', APP_ID]);
+  if (launch) step('devicectl-launch', 'xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device.id, '--terminate-existing', APP_ID]);
+}
+
+/** The device's console, as the last profile run heard it. */
+export const DEVICE_LOG = join(LOGS, 'device.log');
+
+/**
+ * Starts the installed app on `device` with its output bridged here (devicectl --console: Capacitor prints the page's
+ * console to stdout in a Debug build), writes it to DEVICE_LOG, and reads it into a profile once `windows` perf
+ * windows have come in after the first. It never waits on silence: no output within `quiet` seconds of the launch, or no
+ * perf window within `boot` seconds, and it stops and says so.
+ */
+export async function profileOnDevice(device: RealDevice, windows: number, o: { quiet?: number; boot?: number; screen?: string } = {}): Promise<DeviceProfile> {
+  const quiet = (o.quiet ?? 60) * 1000, bootLimit = (o.boot ?? 300) * 1000;
+  mkdirSync(LOGS, { recursive: true });
+  const lines: string[] = [], log = openSync(DEVICE_LOG, 'w'), t0 = Date.now(), steps: Record<string, number> = {};
+  const child = spawn('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', device.id, '--terminate-existing', '--console', APP_ID], {
+    cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const since = () => +((Date.now() - t0) / 1000).toFixed(1);
+  let seen = 0, failure: string | null = null;
+  try {
+    await new Promise<void>((done, fail) => {
+      const stop = (why: string | null) => {
+        clearTimeout(silent);
+        clearTimeout(slow);
+        failure = why;
+        child.kill('SIGINT');
+        if (why) fail(new Error(`${why}; the console so far: ${DEVICE_LOG}`));
+        else done();
+      };
+      const silent = setTimeout(() => stop(`the app printed nothing within ${quiet / 1000} s of its launch (is it a Debug build? is the device unlocked?)`), quiet);
+      const slow = setTimeout(() => stop(`no ${o.screen ? `${o.screen} ` : ''}perf window within ${bootLimit / 1000} s of the launch`), bootLimit);
+      const hear = (chunk: Buffer) => {
+        writeSync(log, chunk);
+        for (const line of chunk.toString('utf8').split('\n')) {
+          if (!line.trim()) continue;
+          lines.push(line);
+          if (steps['first output'] === undefined) {
+            steps['first output'] = since();
+            clearTimeout(silent);
+          }
+          if (!line.includes('perfjson ')) continue;
+          // only the screen asked for counts (the title's windows come first while the rest is prepared)
+          if (o.screen && !line.includes(`"screen":"${o.screen}"`)) continue;
+          seen++;
+          if (seen === 1) {
+            steps['first perf window'] = since();
+            clearTimeout(slow);
+          }
+          try {
+            const w = JSON.parse(line.slice(line.indexOf('perfjson ') + 9)) as { screen: string; p50: number; p95: number; gpu: number };
+            console.log(`  window ${seen}/${windows + 1}: ${w.screen} p50 ${w.p50} ms, p95 ${w.p95} ms, gpu ${w.gpu} ms`);
+          } catch {
+            console.log(`  window ${seen}/${windows + 1}: (cut short in the console)`);
+          }
+          if (seen > windows) stop(null);
+        }
+      };
+      child.stdout.on('data', hear);
+      child.stderr.on('data', hear);
+      child.on('exit', (code) => { if (failure === null && seen <= windows) stop(`devicectl ended (code ${code}) before ${windows + 1} perf windows`); });
+    });
+  } finally {
+    closeSync(log);
+  }
+  const profile = parseConsole(lines, device.name);
+  profile.steps = { ...steps, total: since() };
+  return profile;
 }
 
 
@@ -320,6 +389,12 @@ if (import.meta.main) {
       // a Release archive for TestFlight, kept here; with --upload, sent to App Store Connect
       archive: { type: 'boolean', default: false },
       upload: { type: 'boolean', default: false },
+      // with --real: start with the console bridged here and gather this many perf windows after the first into
+      // captures/device/, compared with tools/baselines/device-<device>.json (--save makes this run that baseline)
+      profile: { type: 'string' },
+      save: { type: 'boolean', default: false },
+      // with --profile: count only this screen's windows (match, title, lobby…)
+      screen: { type: 'string' },
     },
   });
   const device = a.device as DeviceName;
@@ -334,6 +409,40 @@ if (import.meta.main) {
     const team = signingTeam();
     const origin = a.dev ? `http://${lanAddress()}:${DEV_PORT}` : undefined;
     done(`installing on ${target.name}, signed by team ${team}${origin ? `, loading its code from ${origin}` : ''}`);
+    if (a.profile !== undefined && !origin) {
+      const steps: Record<string, number> = {}, timed = async <T>(name: string, work: () => T | Promise<T>): Promise<T> => {
+        const t = Date.now(), r = await work();
+        steps[name] = +((Date.now() - t) / 1000).toFixed(1);
+        done(`${name} (${steps[name]} s)`);
+        return r;
+      };
+      // with --no-build the app already on the device is only started again: the install is most of a run's minute
+      if (!a['no-build']) {
+        await timed('build', () => buildDeviceApp(team, target));
+        await timed('install', () => installOnDevice(target, DEVICE_APP, false));
+      }
+      done(`launching with its console bridged here (${DEVICE_LOG}); waiting for ${+a.profile + 1} ${a.screen ? `${a.screen} ` : ''}perf windows`);
+      const profile = await profileOnDevice(target, Math.max(1, +a.profile), { screen: a.screen });
+      profile.steps = { ...steps, ...profile.steps };
+      const dir = join(root, 'captures/device'), stamp = profile.at.replace(/[:.]/g, '-');
+      mkdirSync(dir, { recursive: true });
+      const json = JSON.stringify(profile, null, 2) + '\n';
+      writeFileSync(join(dir, `${stamp}.json`), json);
+      writeFileSync(join(dir, 'latest.json'), json);
+      done(`profile written to ${join(dir, `${stamp}.json`)} (and latest.json)`);
+      for (const e of profile.errors) console.log(`app: ${e}`);
+      const baseline = join(root, `tools/baselines/device-${device}.json`);
+      if (a.save) {
+        mkdirSync(dirname(baseline), { recursive: true });
+        writeFileSync(baseline, json);
+        done(`baseline saved to ${baseline}`);
+      } else if (existsSync(baseline)) {
+        console.log(formatDiff(diff(metrics(JSON.parse(readFileSync(baseline, 'utf8'))), metrics(profile))));
+      } else {
+        console.log(formatDiff(diff({}, metrics(profile))));
+      }
+      process.exit(0);
+    }
     if (!a['no-build']) done(`built ${await buildDeviceApp(team, target, origin)}`);
     if (!origin) {
       installOnDevice(target);

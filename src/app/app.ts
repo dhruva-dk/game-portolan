@@ -989,23 +989,30 @@ export class App {
     return { ...this.loop.perf, ...(this.stage?.stats() ?? {}) };
   }
 
-  /** Draws `frames` frames as fast as the page allows and reports frame times, triangles and draw calls. */
+  /** Draws `frames` frames back to back and reports how long each took: `frameMs` from the start of the frame until
+   *  the GPU has finished it, `cpuMs` until it was handed over, with the triangles and draw calls. Neither waits for the
+   *  display, so neither is held to its refresh (waiting for the next animation frame read 16.7 ms whatever the cost). */
   async measure(frames: number) {
     await this.whenLoaded();
-    const times: number[] = [];
+    const stage = this.stage!, times: number[] = [], cpu: number[] = [];
     let tris = 0, calls = 0;
+    await stage.gpuDone();
     for (let i = 0; i < frames; i++) {
       const t0 = performance.now();
       this.loop.drawNow(1 / 30);
-      await new Promise((r) => requestAnimationFrame(r));
+      cpu.push(performance.now() - t0);
+      await stage.gpuDone();
       times.push(performance.now() - t0);
-      const st = this.stage!.stats();
+      const st = stage.stats();
       tris = Math.max(tris, st.tris);
       calls = Math.max(calls, st.calls);
     }
-    times.sort((a, b) => a - b);
-    const mean = times.reduce((a, b) => a + b, 0) / times.length;
-    return { frameMs: +mean.toFixed(2), p95Ms: +times[Math.floor(times.length * 0.95)].toFixed(2), tris, calls };
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const p95 = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length * 0.95)];
+    return {
+      frameMs: +mean(times).toFixed(2), p95Ms: +p95(times).toFixed(2),
+      cpuMs: +mean(cpu).toFixed(2), cpuP95Ms: +p95(cpu).toFixed(2), tris, calls,
+    };
   }
 
   /** The chart's share of the frame since the last perf line: its mean and worst CPU time. */
@@ -1040,6 +1047,14 @@ export class App {
     console.info(`perf ${this.screen}${at}: ${(frames / t).toFixed(1)} fps, ${distribution}, worst frame ${(worst * 1000).toFixed(0)} ms, ` +
       `scale ${st?.scale.toFixed(2)}, ${st?.tris} tris, ${st?.calls} calls, tick ${this.loop.perf.tickMean.toFixed(2)} ms, cpu ${this.loop.perf.frameMean.toFixed(1)} ms a frame, ` +
       `${this.chartCost()}${shape.memory}, pipelines ${JSON.stringify(shape.pipelines)}${callbacks}`);
+    // the same window as one line a machine reads (tools/ios.ts --profile gathers these from the device's console)
+    const ms = (p: number) => +percentile(p);
+    console.info(`perfjson ${JSON.stringify({
+      screen: this.screen, region: s ? REGIONS[regionAt(s.state.ships[s.watch].pos)].id : null, sky, night: (P.night.value as number) > 0.5,
+      fps: +(frames / t).toFixed(1), p50: ms(0.5), p95: ms(0.95), p99: ms(0.99), worst: Math.round(worst * 1000),
+      scale: st ? +st.scale.toFixed(2) : null, tris: st?.tris ?? null, calls: st?.calls ?? null,
+      tick: +this.loop.perf.tickMean.toFixed(2), cpu: +this.loop.perf.frameMean.toFixed(2), ...shape.brief(), pipelines: shape.pipelines,
+    })}`);
     // in pieces: the device's console cuts a long message short
     const lines = shape.report(this.screen).split('\n');
     for (let i = 0; i < lines.length; i += 24) console.info(lines.slice(i, i + 24).join('\n'));

@@ -48,7 +48,8 @@ async function fullMapZoom(game: Game): Promise<Record<string, unknown>> {
     const draw = async () => {
       const t0 = performance.now();
       app.loop.drawNow(1 / 30);
-      await new Promise((d) => requestAnimationFrame(d));
+      // until the GPU has finished it, not the display's next refresh (App.measure)
+      await stage.gpuDone();
       times.push(performance.now() - t0);
       const st = stage.stats();
       tris = Math.max(tris, st.tris);

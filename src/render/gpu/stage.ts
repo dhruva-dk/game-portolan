@@ -554,6 +554,12 @@ export class GpuStage {
     await this.ocean.flow.ready;
   }
 
+  /** Resolves when the GPU has finished all the work handed to it so far: the end of a frame without the display's
+   *  refresh in it, for measuring how long a frame really takes. */
+  gpuDone(): Promise<void> {
+    return (this.renderer.backend as unknown as { device: { queue: { onSubmittedWorkDone(): Promise<void> } } }).device.queue.onSubmittedWorkDone();
+  }
+
   stats() {
     const info = this.renderer.info.render, tr = this.terrain.stats;
     return { tris: info.triangles, calls: info.drawCalls, fps: this.#fps, scale: this.#resolution.scale, chunks: tr.drawn, pending: tr.pending + tr.queued, plants: this.flora.copies };

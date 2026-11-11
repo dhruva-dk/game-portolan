@@ -1,0 +1,36 @@
+{
+  "kind": "prepare",
+  "renderer": "WebGPU apple/metal-3",
+  "rows": [
+    {
+      "screen": "title",
+      "render": 5,
+      "compute": 0,
+      "shaders": 4
+    },
+    {
+      "screen": "lobby",
+      "render": 0,
+      "compute": 0,
+      "shaders": 0
+    },
+    {
+      "screen": "match",
+      "render": 15,
+      "compute": 0,
+      "shaders": 18
+    },
+    {
+      "screen": "full map",
+      "render": 2,
+      "compute": 0,
+      "shaders": 4
+    },
+    {
+      "screen": "fight",
+      "render": 0,
+      "compute": 0,
+      "shaders": 0
+    }
+  ]
+}

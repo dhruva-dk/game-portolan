@@ -143,6 +143,11 @@ export function installHook(app: App) {
     /** The last frame's shape as the frame log prints it (every pass with `passes`), and the screen's steady frame. */
     shape: (passes = true) => shape.table(app.screen, undefined, passes),
     shapeSteady: () => shape.steady(),
+    /** Pipelines and shader modules the device has been asked to create so far (preparation's misses are the ones made
+     *  after it has finished). */
+    pipelines: () => ({ ...shape.pipelines }),
+    /** Resolves once every material is prepared and the land round the camera is built. */
+    settled: () => app.stage?.settled() ?? Promise.resolve(),
     /** The last timed frame's GPU milliseconds by pass, as { label, system, gpu }; null until one is timed. */
     timed: () => shape.timed?.passes.map((p) => ({ label: p.label, system: p.system, gpu: p.gpu })) ?? null,
     /** The textures the device holds, the heaviest kinds first, and the whole memory line. */

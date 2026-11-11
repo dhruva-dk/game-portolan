@@ -14,6 +14,9 @@
     "ios:ipad:dev": "node tools/ios.ts --real --dev",
     "ios:archive": "node tools/ios.ts --archive",
     "ios:fight": "VITE_FIXTURE=fight node tools/ios.ts --real",
+    "ios:profile": "VITE_AUTOPLAY=1 node tools/ios.ts --real --profile 6 --screen match",
+    "ios:profile:fight": "VITE_FIXTURE=fight node tools/ios.ts --real --profile 6 --screen match",
+    "profile:diff": "node tools/profile.ts diff",
     "capture": "node tools/capture/run.ts",
     "appicon": "node tools/appicon.ts",
     "check:assets": "vite build --logLevel warn && node tools/check-assets.ts"
