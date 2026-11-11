@@ -18,7 +18,7 @@ import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, select, sin, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import { G, initialSpectrum, type Sea } from './spectrum';
+import { G, initialSpectrum, seaState, type Sea } from './spectrum';
 
 type N = any;
 
@@ -50,6 +50,8 @@ const twice = (a: N, w: N): N => vec4(
 export function createWaves(renderer: WebGPURenderer) {
   const initial = new DataTexture(new Float32Array(SIZE * SIZE * 4), SIZE, SIZE, RGBAFormat, FloatType);
   const time = uniform(0);
+  /** Half the sea's significant height: about how high a crest stands. */
+  const amplitude = uniform(1);
   // the eight fields' spectra, then (in place) their surfaces
   const fieldsA = instancedArray(SIZE * SIZE, 'vec4');
   const fieldsB = instancedArray(SIZE * SIZE, 'vec4');
@@ -133,6 +135,7 @@ export function createWaves(renderer: WebGPURenderer) {
   return {
     displacement,
     slopes,
+    amplitude,
     update(sea: Sea, dt: number) {
       // a new sea only when the wind changes; the same seed keeps the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05 || Math.abs(sea.heading - heading) > 0.01) {
@@ -140,6 +143,7 @@ export function createWaves(renderer: WebGPURenderer) {
         heading = sea.heading;
         (initial.image.data as Float32Array).set(initialSpectrum(SIZE, PATCH, sea));
         initial.needsUpdate = true;
+        amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
       }
       clock = (clock + dt) % PERIOD;
       time.value = clock;

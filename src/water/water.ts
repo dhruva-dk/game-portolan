@@ -4,16 +4,14 @@
 // it is wide and covers about as much of the screen near as far: ~36K triangles out to 20 km. The grid follows the
 // eye; the waves stay put in the world, read by world position from the patch that tiles the sea.
 //
-// The shading here is the first, plain one, so the waves can be seen: the sky mirrored by Fresnel, the sun's glint,
-// and a little light from inside the water. Fog and clouds come from the frame's post pass, as for anything solid.
+// The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
 import { BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, dot, float, length, max, mix, normalize, positionGeometry, positionWorld, pow, reflect as mirror,
-  smoothstep, texture, varying, vec3,
+  Fn, cameraPosition, float, length, normalize, positionGeometry, positionWorld, saturate, smoothstep, texture, varying, vec3,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import { ambient, sunDirection, sunIlluminance } from '../sky/sky';
+import { seaRadiance } from './optics';
 import { PATCH, createWaves } from './waves';
 
 type N = any;
@@ -26,10 +24,8 @@ const REACH = 20000;
 const FADE = 3000;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
 const FETCH = 300_000;
-/** What the water sends back out of itself, as albedo (a placeholder until absorption and scatter). */
-const BODY = vec3(0.004, 0.02, 0.03);
-/** The glint's sharpness (Phong exponent). */
-const GLINT = 2000;
+/** GGX roughness of the ripples the patch can't hold. */
+const ROUGHNESS = 0.06;
 
 function rings(): BufferGeometry {
   const radii = [0];
@@ -65,17 +61,13 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
   const moved = texture(waves.displacement, uv).level(float(0)).xyz.mul(fade);
   material.positionNode = vec3(ground.x.add(moved.x), moved.y, ground.y.add(moved.z));
 
+  const height = varying(moved.y);
   material.colorNode = Fn(() => {
     const slope = texture(waves.slopes, varying(uv)).xy;
     const n = normalize(vec3(slope.x.negate(), 1, slope.y.negate()));
     const v = normalize(cameraPosition.sub(positionWorld));
-    const r = mirror(v.negate(), n);
-    const up = normalize(vec3(r.x, max(r.y, 0), r.z));
-    const fresnel = float(0.02).add(pow(float(1).sub(max(dot(n, v), 0)), 5).mul(0.98));
-    const sky = reflect(up, float(0.05));
-    const glint = sunIlluminance.mul(pow(max(dot(r, sunDirection), 0), GLINT)).mul((GLINT + 2) / (2 * Math.PI));
-    const body = BODY.mul(sunIlluminance.mul(max(sunDirection.y, 0)).add(ambient(vec3(0, 1, 0))));
-    return mix(body, sky.add(glint), fresnel);
+    const crest = saturate(height.div(waves.amplitude));
+    return seaRadiance(positionWorld, n, v, float(ROUGHNESS), crest, reflect);
   })();
 
   const mesh = new Mesh(rings(), material);

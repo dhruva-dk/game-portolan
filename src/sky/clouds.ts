@@ -346,11 +346,12 @@ const shadowKernel = Fn(() => {
   const sea = vec3(ground.x.add(shadowCentre.x).sub(eye.x), eye.y.negate(), ground.y.add(shadowCentre.z).sub(eye.z));
   const up = max(sunDir.y, 0.05);
   const t0 = float(BASE).div(up), t1 = float(TOP).div(up);
-  const STEPS = 6;
+  const STEPS = 12;
   const dt = t1.sub(t0).div(STEPS);
   const tau = float(0).toVar();
   loop('ss', STEPS, (i) => {
-    tau.addAssign(density(sea.add(sunDir.mul(t0.add(float(i).add(0.5).mul(dt)))), false).mul(SIGMA).mul(dt));
+    // the eroded shape, as the eye sees it: the uneroded one is far fatter, and its shadow covers the sea
+    tau.addAssign(density(sea.add(sunDir.mul(t0.add(float(i).add(0.5).mul(dt)))), true).mul(SIGMA).mul(dt));
   });
   // a soft floor: thick cloud still lets some light round it
   textureStore(shadowMap, uvec2(x, y), vec4(mix(0.15, 1, exp(tau.negate())), 0, 0, 1));
