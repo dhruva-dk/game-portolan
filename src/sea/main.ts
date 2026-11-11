@@ -69,7 +69,7 @@ const start = new Vector3(0.8, 0.12, 0.58).normalize();
 // PROTOTYPE (land look): a generated coast round the start, made before the sea so the sea knows its shallows
 const land = q.get('land') === '0' ? null : await Land.create(start, eastAt(start, new Vector3()), num('seed', 7));
 if (land) scene.add(land.group);
-OBJECT_HAZE.value = num('haze', land ? 0.35 : 1);
+OBJECT_HAZE.value = num('haze', land ? 0.7 : 1);
 const ocean = new Ocean();
 ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
 SKY.coverage.value = num('cover', 0.55);

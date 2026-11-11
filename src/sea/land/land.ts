@@ -29,7 +29,7 @@ type Nd = any;
 
 const SIZE = 4096, HALF = SIZE / 2;
 /** Cells a side of each clipmap level, the finest spacing (m), and how many levels. */
-const M = 128, FINEST = 2, LEVELS = 5;
+const M = 192, FINEST = 2, LEVELS = 5;
 /** Where the cards give way to the canopy drawn on the ground, metres from the eye. */
 const CARDS_OUT = [330, 470], CANOPY_IN = [250, 450];
 /** The canopy's height over the ground, where the forest is full. */
@@ -367,7 +367,9 @@ function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
     const fw = length(fwidth(q));
     const crowns = mix(valueNoise(q.div(4.5)).mul(0.7).add(valueNoise(q.div(1.7)).mul(0.3)), float(0.5), smoothstep(1.2, 4.0, fw));
     const autumn = mix(vec3(0.2, 0.075, 0.02), vec3(0.16, 0.12, 0.03), valueNoise(q.div(37)));
-    const crownCol = mix(vec3(0.022, 0.042, 0.022), autumn, leaf.mul(smoothstep(0.35, 0.65, valueNoise(q.div(11).add(7)))));
+    // conifers the dark mass, the broadleaves in bright clumps through it
+    const clump = smoothstep(0.55, 0.8, valueNoise(q.div(14).add(7)).mul(0.5).add(valueNoise(q.div(4)).mul(0.5)).add(leaf.sub(0.4).mul(0.5)));
+    const crownCol = mix(vec3(0.026, 0.05, 0.03), autumn, clump);
     albedo.assign(mix(albedo, crownCol.mul(crowns.mul(1.1).add(0.45)), canopy));
 
     // the light: the sun (shadowed by the land), the moon, and the sky over the open part of the dome
