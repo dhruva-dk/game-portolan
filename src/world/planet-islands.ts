@@ -31,10 +31,10 @@ export const ISLANDS = {
   apron: [1.2, 2.2],
   /** The apron's width as a share of the radius, before it wanders. */
   apronWidth: [0.45, 0.8],
-  /** How far the apron's edge wanders in lobes and bays, as a share of its width, and the lobes' size as a share of the radius. */
-  lobes: { depth: 0.4, size: 0.7 },
+  /** How far the apron's edge wanders in lobes and bays, as a share of its width; the lobes' size, metres plus a share of the radius. */
+  lobes: { depth: 0.4, size: [25, 0.6] },
   /** The flank's slope past the apron, down to the bank. */
-  flank: 0.14,
+  flank: 0.22,
   /** How far the flank eases into its slope, metres. */
   flankEase: 8,
   /** Fine dune relief inland, metres high and across. */
@@ -42,7 +42,7 @@ export const ISLANDS = {
   /** At least this much clear water between islands' aprons, metres. */
   gap: 160,
   /** At least this far from the coast to the deep's edge, metres, beyond the apron. */
-  clearance: 30,
+  clearance: 60,
   /** How deep the bank under an island may be at most, metres: the flank falls gently this far. */
   floor: 17,
   /** The flank's slope below `floor`. */
@@ -122,7 +122,7 @@ export function createIslandSite(chart: Chart, radius: number, noise: Noise3, se
     if (d >= 0) {
       // the beach runs on down and levels into the apron; past the apron the flank falls, easing in
       const beach = apron * (1 - Math.exp(-(d * I.beach) / apron));
-      const l = I.lobes.size * radius, lobes = I.lobes.depth * width * noise.value(x / l + dunesAt[2], z / l + dunesAt[0], dunesAt[1]);
+      const l = I.lobes.size[0] + I.lobes.size[1] * radius, lobes = I.lobes.depth * width * noise.value(x / l + dunesAt[2], z / l + dunesAt[0], dunesAt[1]);
       const past = d - apronWidth(t) - lobes;
       return -flankDepth(beach, past);
     }

@@ -28,13 +28,13 @@ export const SEA = {
   /** Small ripples of relief on every floor under water, not on the beaches. */
   ripples: { size: 14, height: 0.25 },
   /** The channels: how far apart they wind, their floor's mean half-width, and how wide each side's fall is. */
-  channel: { size: 520, half: 8, side: 80 },
+  channel: { size: 520, half: 4, side: 80 },
   /** How far the deeps' edges wander in and out along their length, metres (by the banks' finer swell). */
   ragged: 20,
   /** How deep the deeps are, shallowest to deepest, and how broad their changes. */
   deep: { depth: [32, 58], size: 600 },
   /** The basins: where the deeps' field is deepest (its noise above this), and their sides. */
-  basin: { above: 0.35, side: 80 },
+  basin: { above: 0.42, side: 80 },
   /** How smoothly an island's flank meets the bank, metres. */
   meet: 1.5,
 } as const;
