@@ -14,7 +14,7 @@ import {
   TextureLoader, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, float, mix, normalGeometry, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
-import { type Below, light } from './light';
+import type { Light } from './light';
 import { ISLAND, type Island } from './terrain';
 
 type N = any;
@@ -68,7 +68,7 @@ function geometry(island: Island): BufferGeometry {
   return g;
 }
 
-export function createLand(island: Island, below: Below) {
+export function createLand(island: Island, light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -103,7 +103,7 @@ export function createLand(island: Island, below: Below) {
     const bump = texture(sandNormal, uv).xyz.mul(2).sub(1);
     const n = normalize(normalize(normalGeometry).add(vec3(bump.x, 0, bump.y.negate()).mul(1.2)));
 
-    return albedo.mul(light(p, n, below));
+    return albedo.mul(light(p, n));
   })();
 
   const mesh = new Mesh(geometry(island), material);

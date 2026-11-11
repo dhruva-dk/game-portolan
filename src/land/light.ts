@@ -1,16 +1,21 @@
-// How anything standing on the island is lit: the sky's sun (through the clouds' shadow) and its ambient light;
-// below the water, only what of them the water lets down to that depth (water.below).
+// How anything standing on the island is lit: the sky's sun (through the clouds' shadow, and the shadows of what
+// stands on the island) and its ambient light; below the water, only what of them the water lets down to that depth.
 
 import { saturate } from 'three/tsl';
 import { ambient, cloudShadow, sunDirection, sunIlluminance } from '../sky/sky';
 
 type N = any;
 
-/** The light under the water at a point, as a share of what is above it. */
+/** The light under the water at a point, as a share of what is above it (water.below). */
 export interface Below { sun(p: N): N; sky(p: N): N }
 
-/** Light reaching a matte surface at p facing n, as radiance per unit albedo. */
-export const light = (p: N, n: N, below: Below): N => {
-  const sun = sunIlluminance.mul(cloudShadow(p)).mul(below.sun(p));
-  return sun.mul(saturate(n.dot(sunDirection))).div(Math.PI).add(ambient(n).mul(below.sky(p)));
-};
+/** Light reaching a matte surface at world position p facing n, as radiance per unit albedo. */
+export type Light = (p: N, n: N) => N;
+
+/** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
+export function createLighting(below: Below, visible: (p: N, n: N) => N): Light {
+  return (p, n) => {
+    const sun = sunIlluminance.mul(cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
+    return sun.mul(saturate(n.dot(sunDirection))).div(Math.PI).add(ambient(n).mul(below.sky(p)));
+  };
+}

@@ -11,7 +11,7 @@ import {
 } from 'three/webgpu';
 import { Fn, abs, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { type Below, light } from './light';
+import type { Light } from './light';
 import { random, scatterRocks } from './scatter';
 import type { Island } from './terrain';
 
@@ -77,7 +77,7 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-export function createRocks(island: Island, below: Below) {
+export function createRocks(island: Island, light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -105,7 +105,7 @@ export function createRocks(island: Island, below: Below) {
     let albedo: N = grain.div(vec3(...ROCK_MEAN)).mul(vec3(...ROCK_ALBEDO));
     albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, p.y)));
     albedo = mix(albedo, vec3(...ALGAE).mul(grain.div(vec3(...ROCK_MEAN))), smoothstep(-0.1, -0.6, p.y).mul(0.6));
-    return albedo.mul(light(p, n, below));
+    return albedo.mul(light(p, n));
   })();
 
   const rocks = scatterRocks(island, SHAPES);

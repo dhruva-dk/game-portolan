@@ -4,10 +4,12 @@ import {
 } from 'three/tsl';
 import type { Environment } from './environment';
 import { VIEW_HEIGHT } from './sky/atmosphere';
-import { createSky, fog } from './sky/sky';
+import { createSky, fog, sunDirection } from './sky/sky';
 import { createLand } from './land/land';
+import { createLighting } from './land/light';
 import { createRocks } from './land/rocks';
 import { createSeabed } from './land/seabed';
+import { createShadow } from './land/shadow';
 import { createIsland } from './land/terrain';
 import { createWater } from './water/water';
 
@@ -16,7 +18,8 @@ const EXPOSURE = 10;
 
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
- *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam)
+ *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam); the island's shadow map from the sun,
+ *                 redrawn only when the sun has moved
  *   2. scene    — sky backdrop; then the solid things (the island, later the ships); then the sea, which reads what was
  *                 drawn before it behind itself (the floor through the shallows)
  *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping
@@ -34,8 +37,11 @@ export function createFrame(renderer: WebGPURenderer) {
   const island = createIsland([0, -300]);
   const seabed = createSeabed(island);
   const water = createWater(renderer, sky.reflect, seabed);
-  const land = createLand(island, water.below);
-  const rocks = createRocks(island, water.below);
+  const shadow = createShadow(renderer, island);
+  const light = createLighting(water.below, shadow.visible);
+  const land = createLand(island, light);
+  const rocks = createRocks(island, light);
+  shadow.cast(...rocks.meshes);
   scene.add(land.mesh, ...rocks.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
@@ -67,6 +73,7 @@ export function createFrame(renderer: WebGPURenderer) {
     renderer.getDrawingBufferSize(size);
     sky.update(env, camera, dt, size.x, size.y);
     water.update(env, dt);
+    shadow.update(sunDirection.value);
     pipeline.render();
   }
 
