@@ -36,7 +36,7 @@ export function rockShape(seed: number, detail: number, big: boolean): BufferGeo
   // the bedding: beds this thick, leaning off the level
   const dip = new Vector3(rand() * 0.6 - 0.3, 1, rand() * 0.6 - 0.3).normalize();
   const bed = big ? 0.3 + rand() * 0.15 : 0.35;
-  const stretch = big ? new Vector3(1, 0.7 + rand() * 0.35, 0.75 + rand() * 0.3) : new Vector3(1, 0.55 + rand() * 0.3, 0.7 + rand() * 0.4);
+  const stretch = big ? new Vector3(1, 0.85 + rand() * 0.3, 0.75 + rand() * 0.3) : new Vector3(1, 0.55 + rand() * 0.3, 0.7 + rand() * 0.4);
 
   const pos = g.getAttribute('position'), cavity = new Float32Array(pos.count), p = new Vector3();
   const v = (q: Vector3, f: number, k: number) => noise.value(q.x * f + k * 17.1, q.y * f + k * 5.3, q.z * f + k * 11.7);
