@@ -1,37 +1,35 @@
-import { WebGPURenderer, Scene, PerspectiveCamera, Color } from 'three/webgpu';
+import { WebGPURenderer } from 'three/webgpu';
+import { createEnvironment, updateEnvironment } from './environment';
+import { createFrame } from './frame';
+import { createMeter } from './meter';
 
-const fps = document.getElementById('fps')!;
+const meterEl = document.getElementById('meter')!;
 
 if (!navigator.gpu) {
-  fps.textContent = 'no WebGPU';
+  meterEl.textContent = 'no WebGPU';
   throw new Error('WebGPU unavailable');
 }
 
-const renderer = new WebGPURenderer({ antialias: false });
+const renderer = new WebGPURenderer({ antialias: false, trackTimestamp: true });
 renderer.setPixelRatio(1);
-renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 await renderer.init();
 
-const scene = new Scene();
-scene.background = new Color(0x1d4f73);
-const camera = new PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+const env = createEnvironment();
+const frame = createFrame(renderer);
+const meter = createMeter(renderer, meterEl);
 
-addEventListener('resize', () => {
-  renderer.setSize(innerWidth, innerHeight);
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-});
+frame.resize(innerWidth, innerHeight);
+addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
 
-let frames = 0;
 let last = performance.now();
 renderer.setAnimationLoop(() => {
-  renderer.render(scene, camera);
-  frames++;
-  const now = performance.now();
-  if (now - last >= 1000) {
-    fps.textContent = String(Math.round((frames * 1000) / (now - last)));
-    frames = 0;
-    last = now;
-  }
+  const start = performance.now();
+  const dt = Math.min((start - last) / 1000, 0.1);
+  last = start;
+
+  updateEnvironment(env, dt);
+  frame.render(env, dt);
+
+  meter.sample(performance.now() - start);
 });
