@@ -113,12 +113,13 @@ function seaRadiance(
   const body = BODY.mul(irradiance);
 
   // The sky, along the reflected ray, blurred to the roughness (three's PMREM takes √α). A ray reflected down
-  // (below the horizon here, by the up here) from a facet turned away from the eye meets the back of the next wave,
-  // not the sky: it sees the sea's own colour.
+  // (below the horizon here, by the up here) from a facet turned away from the eye meets the next wave instead, at
+  // about the angle it points down: glancing, that wave mirrors the sky at its horizon; steeper, the light comes
+  // through it, the sea's own colour. Fresnel weighs the two.
   const r = v.negate().reflect(n);
   const below = dot(r, up);
   const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), sqrt(alpha));
-  const seen = mix(above, body, saturate(below.mul(-20)));
+  const seen = mix(body, above, fresnel(below.negate()));
   const h = normalize(l.add(v));
   const glint = sun.mul(ggx(saturate(n.dot(h)), nl, nv, alpha)).mul(nl);
   const reflected = seen.add(glint).mul(F);

@@ -69,7 +69,8 @@ export function createSky(renderer: WebGPURenderer, view: View) {
   const background = Fn(() => {
     const dir = normalize(normalWorldGeometry);
     const d = view.toSky(dir);
-    const sky = skyRadiance(d, skySun);
+    // below the horizon there is only more sea, beyond the troughs at its edge, and glancing it mirrors the horizon
+    const sky = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
     // a soft edge one pixel wide so the disc doesn't alias
     const disc = smoothstep(Math.cos(SUN_ANGULAR_RADIUS * 1.1), cos(SUN_ANGULAR_RADIUS), dot(dir, sun));
     return sky.add(sunTransmittance(VIEW_RADIUS, d.y).mul(disc.mul(SUN_RADIANCE)));

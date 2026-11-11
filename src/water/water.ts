@@ -40,6 +40,8 @@ const FIRST = 1;
 const GROWTH = 1.05;
 /** The breaker index: the highest wave (significant height) water of a given depth holds. */
 const BREAKER = 0.78;
+/** The least the surface's normal faces the eye (cosine): no less than the eye can see. */
+const FACING = 0.05;
 /** Refracted rays are followed no deeper than this: beyond, the floor is too dim through the water to matter. */
 const MAX_REFRACT_DEPTH = 20;
 /** The foam pattern (ambientCG Foam002) repeats every this many metres across the wind. */
@@ -115,8 +117,12 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
       slope = slope.add(s.xy.mul(k));
       variance = variance.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(k.mul(k)));
     });
-    const n: N = normalize(up.sub(e1.mul(slope.x)).sub(e2.mul(slope.y)));
     const v = normalize(cameraPosition.sub(positionWorld));
+    // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
+    // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
+    // until the eye just sees them.
+    const tilted = normalize(up.sub(e1.mul(slope.x)).sub(e2.mul(slope.y)));
+    const n: N = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
     const crest = saturate(height.div(waves.amplitude));
 
     // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by the foam
