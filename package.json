@@ -1,0 +1,23 @@
+{
+  "name": "portolan",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "ios": "npm run build && cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@types/three": "0.187.0",
+    "@webgpu/types": "0.1.74",
+    "typescript": "5.9.3",
+    "vite": "8.3.8"
+  }
+}
