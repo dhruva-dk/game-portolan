@@ -19,11 +19,11 @@
 // glitter (Beckmann, its width the variance); under the surface the light scattered back by the deep, blue; the sun
 // through the thin crests, turquoise (after Atlas, GDC 2019); and foam where the surface folds and after, and where
 // the ship has passed: round her hull, in the Kelvin wedge off her bow and along the churned track she leaves.
-import { BufferGeometry, Float32BufferAttribute, HalfFloatType, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, Quaternion, RepeatWrapping, StorageArrayTexture, Vector2, Vector3, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
+import { BufferGeometry, Float32BufferAttribute, HalfFloatType, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, Quaternion, RepeatWrapping, StorageArrayTexture, StorageTexture, LinearFilter, ClampToEdgeWrapping, Vector2, Vector3, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, Loop as LoopTyped, abs, atan, cameraPosition, clamp, cos, cosh, cross, dot, exp, float, instanceIndex, instancedArray, int, length, localId, log, log2, max, min, mix,
   normalize, positionGeometry, positionWorld, pow, reflect, screenUV, select, sin, smoothstep, sqrt, storageTexture, tanh, texture, uint,
-  uniform, uniformArray, uvec2, varyingProperty, vec2, vec3, vec4, workgroupArray, workgroupBarrier, workgroupId,
+  textureStore, uniform, uniformArray, uvec2, varyingProperty, vec2, vec3, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import { CALM_SEA, CASCADES, CUTS, G, LongWaves, N, SIZES, SWELL_SPREAD, significantHeight, spectrumParams, type SeaState, type SpectrumParams } from '../render/ocean/spectrum.ts';
 import { MipChain, R, U, shared } from './world.ts';
@@ -298,40 +298,69 @@ const track = uniformArray(Array.from({ length: TRACK }, () => new Vector4(0, R,
 /** Her hull's half-length and half-beam, m, and the speed at which her wake is fullest. */
 const HALF_L = 9, HALF_B = 2.7, FULL = 12;
 
-/** How white the ship leaves the sea at p (on the sphere, up u): 0 to 1. */
-function wakeFoam(p: Nd, u: Nd): Nd {
+/**
+ * The wake is drawn once a frame into a map lying flat round her, its x along her heading: the sea reads one texel
+ * where tracing her track in every fragment of the sea would cost the frame.
+ */
+const WAKE_N = 512, WAKE_SPAN = 400, WAKE_AHEAD = 60;
+const wakeMap = new StorageTexture(WAKE_N, WAKE_N);
+wakeMap.type = HalfFloatType;
+wakeMap.minFilter = wakeMap.magFilter = LinearFilter;
+wakeMap.wrapS = wakeMap.wrapT = ClampToEdgeWrapping;
+wakeMap.generateMipmaps = false;
+/** The map's middle on the sea, a little astern of her. */
+const wakeMiddle = (): Nd => WAKE.at.sub(WAKE.fwd.mul(WAKE_SPAN / 2 - WAKE_AHEAD));
+
+/** How white she leaves the sea at p (flat round her, her up u): 0 to 1. */
+function wakeAt(p: Nd, u: Nd): Nd {
   const white = float(0).toVar();
-  const rel = p.sub(WAKE.at);
-  If(dot(rel, rel).lessThan(600 * 600), () => {
-    const flat = (v: Nd) => v.sub(u.mul(dot(v, u)));
-    const r = flat(rel);
-    const side = cross(u, WAKE.fwd);
-    const a = dot(r, WAKE.fwd), b = dot(r, side);
-    const pace = clamp(WAKE.speed.div(FULL), 0, 1.3);
-    // round the hull, heaped at the bow
-    const e = vec2(a.div(HALF_L), b.div(HALF_B)).length();
-    const bow = mix(float(0.35), float(1), smoothstep(-0.6, 0.9, a.div(HALF_L)));
-    const hull = smoothstep(0.92, 1.05, e).mul(smoothstep(pace.mul(0.9).add(1.15), float(1.02), e)).mul(bow).mul(pace.mul(1.4));
-    // the Kelvin wedge, 19.5° each side, its arms spreading and fading behind her
-    const t = float(HALF_L).sub(a);
-    const arm = abs(b).sub(t.mul(0.354)).div(t.mul(0.022).add(0.45));
-    const kelvin = exp(arm.mul(arm).negate()).mul(smoothstep(2, 10, t)).mul(exp(t.div(-45))).mul(pace).mul(0.55);
-    white.assign(max(hull.mul(0.8), kelvin));
-    // the churned track astern, wider and fainter as it ages
-    (LoopTyped as Nd)({ start: int(0), end: int(TRACK - 1), type: 'int', condition: '<', name: 'tk' }, ({ tk }: { tk: Nd }) => {
-      const A = track.element(tk) as unknown as Nd, B = track.element(tk.add(1)) as unknown as Nd;
-      const ab = flat(B.xyz.sub(A.xyz)), ap = flat(p.sub(A.xyz));
-      const len2 = max(dot(ab, ab), 1e-4);
-      const h = clamp(dot(ap, ab).div(len2), 0, 1);
-      const d = ap.sub(ab.mul(h)).length();
-      const age = mix(A.w, B.w, h);
-      const pace0 = clamp(len2.sqrt().div(float(TRACK_STEP * FULL)), 0, 1.3);
-      const width = age.mul(0.3).add(HALF_B * 0.6);
-      const churn = exp(d.div(width).pow(2).negate()).mul(exp(age.div(-7))).mul(pace0).mul(0.7);
-      white.assign(max(white, churn));
-    });
+  const flat = (v: Nd) => v.sub(u.mul(dot(v, u)));
+  const r = flat(p.sub(WAKE.at));
+  const side = cross(u, WAKE.fwd);
+  const a = dot(r, WAKE.fwd), b = dot(r, side);
+  const pace = clamp(WAKE.speed.div(FULL), 0, 1.3);
+  // round the hull, heaped at the bow
+  const e = vec2(a.div(HALF_L), b.div(HALF_B)).length();
+  const bow = mix(float(0.35), float(1), smoothstep(-0.6, 0.9, a.div(HALF_L)));
+  const hull = smoothstep(0.92, 1.05, e).mul(smoothstep(pace.mul(0.9).add(1.15), float(1.02), e)).mul(bow).mul(pace.mul(1.4));
+  // the Kelvin wedge, 19.5° each side, its arms spreading and fading behind her
+  const t = float(HALF_L).sub(a);
+  const arm = abs(b).sub(t.mul(0.354)).div(t.mul(0.022).add(0.45));
+  const kelvin = exp(arm.mul(arm).negate()).mul(smoothstep(2, 10, t)).mul(exp(t.div(-45))).mul(pace).mul(0.55);
+  white.assign(max(hull.mul(0.8), kelvin));
+  // the churned track astern, wider and fainter as it ages
+  (LoopTyped as Nd)({ start: int(0), end: int(TRACK - 1), type: 'int', condition: '<', name: 'tk' }, ({ tk }: { tk: Nd }) => {
+    const A = track.element(tk) as unknown as Nd, B = track.element(tk.add(1)) as unknown as Nd;
+    const ab = flat(B.xyz.sub(A.xyz)), ap = flat(p.sub(A.xyz));
+    const len2 = max(dot(ab, ab), 1e-4);
+    const h = clamp(dot(ap, ab).div(len2), 0, 1);
+    const d = ap.sub(ab.mul(h)).length();
+    const age = mix(A.w, B.w, h);
+    const pace0 = clamp(len2.sqrt().div(float(TRACK_STEP * FULL)), 0, 1.3);
+    const width = age.mul(0.3).add(HALF_B * 0.6);
+    const churn = exp(d.div(width).pow(2).negate()).mul(exp(age.div(-7))).mul(pace0).mul(0.7);
+    white.assign(max(white, churn));
   });
   return min(white, 0.75);
+}
+
+const wakeKernel = Fn(() => {
+  const x = instanceIndex.mod(WAKE_N), y = instanceIndex.div(WAKE_N);
+  const u = normalize(WAKE.at);
+  const side = cross(u, WAKE.fwd);
+  const l = vec2(float(x), float(y)).add(0.5).div(WAKE_N).sub(0.5).mul(WAKE_SPAN);
+  const p = wakeMiddle().add(WAKE.fwd.mul(l.x)).add(side.mul(l.y));
+  textureStore(wakeMap, uvec2(x, y), vec4(wakeAt(p, u), 0, 0, 1));
+})().compute(WAKE_N * WAKE_N, [64]);
+
+/** The wake under a point of the sea, read from the map (nothing beyond it). */
+function wakeFoam(p: Nd, u: Nd): Nd {
+  const side = cross(normalize(WAKE.at), WAKE.fwd);
+  const r = p.sub(wakeMiddle());
+  const uv = vec2(dot(r, WAKE.fwd), dot(r, side)).div(WAKE_SPAN).add(0.5);
+  const inside = uv.x.greaterThan(0).and(uv.x.lessThan(1)).and(uv.y.greaterThan(0)).and(uv.y.lessThan(1));
+  void u;
+  return select(inside, texture(wakeMap).sample(uv).level(float(0)).r, float(0));
 }
 
 const WATER = shared({
@@ -559,6 +588,7 @@ export class Ocean {
     SEA.dt.value = Math.min(dt, 0.1);
     renderer.compute(this.#kernels.frame);
     (this.#mips ??= new MipChain(renderer, this.field)).run();
+    renderer.compute(wakeKernel);
   }
 
   #follow(nadir: Vector3, dt: number): void {
