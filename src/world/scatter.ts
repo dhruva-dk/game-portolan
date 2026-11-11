@@ -11,9 +11,9 @@
 // Palms: coconut palms in groves, thickest along the top of the beach where the nuts wash up and take root, thinning
 // inland. They lean out toward the sea and the open light, the nearer the coast the more; the lean recurves upward.
 //
-// Rocks: outcrops of weathered rock: a few big rounded masses, 5–12 m across, on the island's shoulders above the
-// beach and at the waterline, where the sand has been washed off the rock beneath — some of the waterline's out in
-// the shallows — sunk deep in the sand; and smaller boulders round them. None stand in a palm's or a shrub's place.
+// Rocks: outcrops of weathered rock: big masses, 5–12 m across, heaped against each other into piles 10–25 m long, on
+// the island's shoulders above the beach and at the waterline, where the sand has been washed off the rock beneath —
+// some of the waterline's out in the shallows — sunk in the sand; and smaller boulders round them. None stand in a palm's or a shrub's place.
 
 import { createNoise3 } from './noise3.ts';
 import type { IslandSite } from './planet-islands.ts';
@@ -50,14 +50,16 @@ const REFERENCE_RADIUS = 70;
 const perArea = (site: IslandSite, count: number) => Math.max(1, Math.round(count * (site.radius / REFERENCE_RADIUS) ** 2));
 
 /** Outcrops: one per this many metres of coast, at least one. */
-const COAST_PER_OUTCROP = 75;
-/** Big masses' radii, metres (5–12 m across); per outcrop, how many. */
-const BIG = [2.5, 6] as const, BIG_COUNT = [2, 4] as const;
+const COAST_PER_OUTCROP = 55;
+/** Big masses' radii, metres (5–12 m across); per outcrop, how many, heaped against each other. */
+const BIG = [2.5, 6] as const, BIG_COUNT = [4, 7] as const;
+/** How far apart two masses' centres may come, as a share of their radii's sum: they overlap into one heap. */
+const HEAPED = 0.6;
 /** Boulders' radii, metres, most small; per outcrop, how many. */
 const BOULDER = [0.3, 1.6] as const, BOULDERS = [6, 14] as const;
 /** Where outcrops lie, metres from the waterline (negative inland): on the shoulders, or at the waterline reaching
  * out into the shallows. */
-const SHOULDER = [-16, -6] as const, WATERLINE = [-3, 9] as const;
+const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 7] as const;
 /** How deep a rock is sunk below the lowest ground under it, as a share of its radius. */
 const SUNK = { big: 0.15, boulder: 0.3 };
 
@@ -82,20 +84,27 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
   const { site } = isle;
   const rand = random(seed * 7919 + 17);
   const rocks: Rock[] = [];
-  const clear = (x: number, z: number, size: number) =>
-    rocks.every((r) => Math.hypot(r.x - x, r.z - z) > (r.size + size) * (r.big ? 0.75 : 0.85));
+  const clear = (x: number, z: number, size: number, big: boolean) =>
+    rocks.every((r) => Math.hypot(r.x - x, r.z - z) > (r.size + size) * (r.big && big ? HEAPED : 0.85));
   const outcrops = Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
   for (let o = 0; o < outcrops; o++) {
     const centre = ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI;
     const band = rand() < 0.5 ? SHOULDER : WATERLINE;
     const masses: Rock[] = [];
     const count = BIG_COUNT[0] + Math.floor(rand() * (BIG_COUNT[1] - BIG_COUNT[0] + 1));
-    for (let i = 0, tries = 0; i < count && tries < 40; tries++) {
-      // the largest first, at the outcrop's middle; the rest along the coast beside it
-      const size = BIG[0] + (BIG[1] - BIG[0]) * (i === 0 ? 0.6 + 0.4 * rand() : rand() ** 1.5);
-      const along = i === 0 ? 0 : (rand() * 2 - 1) * 14, d = band[0] + rand() * (band[1] - band[0]);
-      const [x, z] = onCoast(site, centre + along / site.coast(centre), d);
-      if (Math.hypot(x, z) < size || !clear(x, z, size)) continue;
+    for (let i = 0, tries = 0; i < count && tries < 60; tries++) {
+      // the largest first, at the outcrop's middle; each of the rest heaped against one already there
+      const size = BIG[0] + (BIG[1] - BIG[0]) * (i === 0 ? 0.6 + 0.4 * rand() : rand() ** 0.8);
+      let x: number, z: number;
+      if (i === 0) [x, z] = onCoast(site, centre, band[0] + rand() * (band[1] - band[0]));
+      else {
+        const m = masses[Math.floor(rand() * masses.length)], a = rand() * 2 * Math.PI, out = (m.size + size) * (HEAPED + 0.02 + 0.15 * rand());
+        x = m.x + Math.cos(a) * out;
+        z = m.z + Math.sin(a) * out;
+        const d = Math.hypot(x, z) - site.coast(Math.atan2(z, x));
+        if (d < SHOULDER[0] - 2 || d > WATERLINE[1] + 2) continue;
+      }
+      if (Math.hypot(x, z) < size || !clear(x, z, size, true)) continue;
       const r: Rock = { x, z, y: seat(isle, x, z, size, SUNK.big), size, yaw: rand() * 2 * Math.PI, big: true, shape: Math.floor(rand() * bigShapes) };
       rocks.push(r);
       masses.push(r);
@@ -108,7 +117,7 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
       const size = BOULDER[0] + (BOULDER[1] - BOULDER[0]) * rand() ** 2.5;
       const a = rand() * 2 * Math.PI, out = m.size * (0.9 + 0.5 * rand()) + size + rand() * 4;
       const x = m.x + Math.cos(a) * out, z = m.z + Math.sin(a) * out;
-      if (!clear(x, z, size)) continue;
+      if (!clear(x, z, size, false)) continue;
       rocks.push({ x, z, y: seat(isle, x, z, size, SUNK.boulder), size, yaw: rand() * 2 * Math.PI, big: false, shape: Math.floor(rand() * boulderShapes) });
       i++;
     }

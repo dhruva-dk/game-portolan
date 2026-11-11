@@ -8,7 +8,7 @@ const isles = planet.islands.map((s) => isle(s, planet.height));
 const big = isles[0], small = isles[isles.length - 1];
 const fromCoast = (i: (typeof isles)[number], x: number, z: number) => Math.hypot(x, z) - i.site.coast(Math.atan2(z, x));
 
-test('rocks: big masses 5–12 m across in outcrops on the shoulders and at the waterline, boulders round them', () => {
+test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and at the waterline, boulders round them', () => {
   for (const [k, i] of isles.entries()) {
     const rocks = scatterRocks(i, 4, 4, k + 1);
     const masses = rocks.filter((r) => r.big), boulders = rocks.filter((r) => !r.big);
@@ -22,7 +22,8 @@ test('rocks: big masses 5–12 m across in outcrops on the shoulders and at the 
     for (const r of rocks) {
       assert.ok(r.y < i.height(r.x, r.z) - 0.1 * r.size, 'sunk');
       assert.ok(r.shape >= 0 && r.shape < 4);
-      for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * 0.74, 'apart');
+      // masses heap against each other; boulders stand apart
+      for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * (o.big && r.big ? 0.59 : 0.74), 'apart');
     }
     assert.deepEqual(scatterRocks(i, 4, 4, k + 1), rocks, 'the same every time');
   }
