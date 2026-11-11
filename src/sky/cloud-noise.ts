@@ -12,7 +12,7 @@ import {
 
 type N = any;
 
-const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 512;
+const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
 
 function volume(n: number): Storage3DTexture {
   const t = new Storage3DTexture(n, n, n);
@@ -107,14 +107,15 @@ const detailKernel = Fn(() => {
 /** The weather map's tile, km. */
 export const WEATHER_TILE = 40;
 /** Spacing of the cells at each of the weather map's three sizes of cloud, km. */
-const CELL_SIZES = [2, 1, 0.5] as const;
+const CELL_SIZES = [1, 0.5, 0.25] as const;
 /**
  * The cells' potential (km) at each tenth of the map's area, measured by sampling the same construction (0 to 100%;
  * the last is the 99.5th percentile). Cloud stands where the potential passes its value at the share of the map that
- * is to stay clear. Over the 40 km tile at 40% cover this makes ~650 clouds: half under 270 m across, one in ten
- * over 1.4 km, and a few merged masses of several km.
+ * is to stay clear. Over the 40 km tile at 40% cover this makes ~2600 clouds: half under 140 m across, one in ten
+ * over 700 m, and a few merged masses of a couple of km. (Each size's cones scale with it, so these are half those
+ * once measured for cells twice the size.)
  */
-export const POTENTIAL_DECILES = [0, 0.027, 0.11, 0.181, 0.25, 0.325, 0.415, 0.529, 0.675, 0.908, 1.579] as const;
+export const POTENTIAL_DECILES = [0, 0.0135, 0.055, 0.0905, 0.125, 0.1625, 0.2075, 0.2645, 0.3375, 0.454, 0.7895] as const;
 
 /**
  * R: cumulus cells at three sizes as a potential in km: past the threshold the cover sets, how far a point lies

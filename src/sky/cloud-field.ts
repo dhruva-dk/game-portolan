@@ -4,7 +4,8 @@
 //
 // Shape. A shell of cloud between BASE and TOP over the curved sea. A weather map (cloud-noise.ts) holds cumulus
 // cells of three sizes, gathered into fields with clear sky between; the cover (0–1) sets how much of it may hold
-// cloud. Where a cell is strong the cloud towers, where weak it stays a low puff; bases are flat. A Perlin-Worley
+// cloud, and past broken cover merges the cells into a layer. Where a cell is strong the cloud stands a few hundred
+// metres, where weak it stays a low puff; bases are flat, thinning over their lowest metres. A Perlin-Worley
 // volume gives the billows, a Worley volume erodes their edges: wisps toward the base, cauliflower higher up.
 //
 // Light. Per unit sun at the top of the air: the sun through the cloud toward it (a short cone of taps), scattered
@@ -37,22 +38,26 @@ const fall = (a: number | N, b: number | N, x: N): N => float(1).sub(smoothstep(
 
 // ------------------------------------------------------------------ constants
 
-/** The shell, km above the sea: fair-weather cumulus. */
-export const BASE = 1.2, TOP = 2.6;
-/** Tile sizes of the billows (375–95 m) and the erosion (150–40 m), km. The cells are cloud-noise.ts's. */
-const SHAPE_SCALE = 1.5, DETAIL_SCALE = 0.6;
+/** The shell, km above the sea: fair-weather cumulus, the trade wind's, capped by its inversion. */
+export const BASE = 1.2, TOP = 2.0;
+/** Tile sizes of the billows (250–60 m) and the erosion (100–25 m), km. The cells are cloud-noise.ts's. */
+const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
+/** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
+const LAYER = 0.3;
 /**
- * A cloud's top: DOME·p^¾ km over its cell's peak, p km of potential past the threshold — about as
- * tall as wide for a cloud of 1–2 km (cumulus mediocris), flatter for the small puffs (humilis) — falling to its
- * edge as a quarter circle.
+ * A cloud's top: DOME·p^¾ km over its cell's peak, p km of potential past the threshold — a third as tall as wide
+ * for a cloud of 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps),
+ * flatter still for the small puffs — falling to its edge as a quarter circle.
  */
-const DOME = 1.2;
+const DOME = 0.6;
+/** Height over which a cloud's base thins out to nothing, km: the condensation level is a few tens of metres deep. */
+const BASE_FADE = 0.1;
 /** Depth below a cloud's surface within which the billows carve it, km. */
-const BILLOW = 0.45;
+const BILLOW = 0.25;
 /** How much of the billows the erosion can take. */
 const EROSION = 0.55;
 /** Farthest distance marched, km: about where the shell's base meets the horizon (√(2·6360·1.2) = 124). */
@@ -62,7 +67,7 @@ const DETAIL_DISTANCE = 25;
 /** Target step, km; a ray takes as many as its path through the shell needs, up to its cap. */
 const STEP = 0.06;
 /** Two-stream diffusion through cloud of asymmetry g: transmitted share 1/(1 + ¾(1−g)τ). */
-const DIFFUSION = 0.75 * (1 - 0.85);
+export const DIFFUSION = 0.75 * (1 - 0.85);
 /** Taps toward the sun, km, spaced wider as they go. */
 const TAPS = [0.05, 0.15, 0.35, 0.8];
 
@@ -75,13 +80,17 @@ export type CloudField = ReturnType<typeof createCloudField>;
 
 /**
  * The cells' potential (km) above which cloud stands for a cover of k (0–1), read from the measured deciles: a share
- * k of the map passes it. And how far the large-scale field moves it either way (km), most at middling cover.
+ * k of the map passes it. Past broken cover the cells merge into a layer (stratocumulus): the threshold sinks below
+ * zero, by up to LAYER at full cover, so even the gaps between cells lie that deep inside cloud and the billows no
+ * longer open them. And how far the large-scale field moves it either way (km), most at middling cover.
  */
 export function cloudThreshold(k: number): { threshold: number; fieldShift: number } {
   const x = Math.min(Math.max(1 - k, 0), 1) * 10;
   const i = Math.min(Math.floor(x), 9);
   const D = POTENTIAL_DECILES;
-  return { threshold: D[i] + (x - i) * (D[i + 1] - D[i]), fieldShift: FIELD_SHIFT * 4 * k * (1 - k) };
+  const t = Math.min(Math.max((k - 0.6) / 0.4, 0), 1);
+  const layer = LAYER * t * t * (3 - 2 * t);
+  return { threshold: D[i] + (x - i) * (D[i + 1] - D[i]) - layer, fieldShift: FIELD_SHIFT * 4 * k * (1 - k) };
 }
 
 export function createCloudField() {
@@ -128,8 +137,8 @@ export function createCloudField() {
       const n = texture3D(shapeVolume, p.div(SHAPE_SCALE)).level(float(0));
       const floorNoise = n.g.mul(0.625).add(n.b.mul(0.25)).add(n.a.mul(0.125));
       const billows = clamp(remap(n.r, floorNoise.sub(1), float(1), float(0), float(1)), 0, 1);
-      // and a flat base, cut sharply
-      dense.assign(clamp(remap(billows, float(1).sub(reach), float(1), float(0), float(1)), 0, 1).mul(smoothstep(0, 0.03, h)));
+      // and a flat base, thinning out over its lowest BASE_FADE
+      dense.assign(clamp(remap(billows, float(1).sub(reach), float(1), float(0), float(1)), 0, 1).mul(smoothstep(0, BASE_FADE / (TOP - BASE), h)));
     });
     return { dense, h, top: dome.div(TOP - BASE) };
   };
