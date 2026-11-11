@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ISLAND, createIsland } from '../src/land/terrain.ts';
-import { scatterRocks } from '../src/land/scatter.ts';
+import { scatterPalms, scatterRocks } from '../src/land/scatter.ts';
 
 const island = createIsland([0, -300], 1);
 const at = (t: number, r: number): [number, number] => [island.centre[0] + Math.cos(t) * r, island.centre[1] + Math.sin(t) * r];
@@ -64,4 +64,18 @@ test('the rocks lie along the coast, apart, sunk into the ground', () => {
     for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * 0.79, 'apart');
   }
   assert.deepEqual(scatterRocks(island, 6), rocks, 'the same every time');
+});
+
+test('the palms stand on dry land, apart, leaning seaward', () => {
+  const palms = scatterPalms(island);
+  assert.ok(palms.length > 30, `count ${palms.length}`);
+  let seaward = 0;
+  for (const p of palms) {
+    assert.ok(island.height(p.x, p.z) > 0.3, 'dry');
+    for (const o of palms) if (o !== p) assert.ok(Math.hypot(o.x - p.x, o.z - p.z) >= 3.5, 'apart');
+    const out = Math.atan2(p.z - island.centre[1], p.x - island.centre[0]);
+    if (Math.cos(p.heading - out) > 0) seaward++;
+  }
+  assert.ok(seaward > palms.length * 0.9, `seaward ${seaward}/${palms.length}`);
+  assert.deepEqual(scatterPalms(island), palms, 'the same every time');
 });

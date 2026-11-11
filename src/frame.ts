@@ -7,6 +7,7 @@ import { VIEW_HEIGHT } from './sky/atmosphere';
 import { createSky, fog, sunDirection } from './sky/sky';
 import { createLand } from './land/land';
 import { createLighting } from './land/light';
+import { createPalms } from './land/palms';
 import { createRocks } from './land/rocks';
 import { createSeabed } from './land/seabed';
 import { createShadow } from './land/shadow';
@@ -41,8 +42,9 @@ export function createFrame(renderer: WebGPURenderer) {
   const light = createLighting(water.below, shadow.visible);
   const land = createLand(island, light);
   const rocks = createRocks(island, light);
-  shadow.cast(...rocks.meshes);
-  scene.add(land.mesh, ...rocks.meshes, water.mesh);
+  const palms = createPalms(island, light);
+  shadow.cast(...rocks.meshes, ...palms.meshes);
+  scene.add(land.mesh, ...rocks.meshes, ...palms.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
   const post = Fn(() => {

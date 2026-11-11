@@ -1,10 +1,13 @@
 // Where things stand on the island: pure arithmetic over terrain.ts, so it runs in node for the tests.
 //
+// Palms: coconut palms in groves, thickest along the top of the beach where the nuts wash up and take root, thinning
+// inland. They lean out toward the sea and the open light, the nearer the coast the more; the lean recurves upward.
+//
 // Rocks: outcrops of beach rock along stretches of the coast, from a few metres inland to a few out, where the sand
 // has been washed off the reef rock beneath. Each outcrop a cluster: a few large blocks with many small ones round
 // them, sunk into the sand by a third of their height.
 
-import type { Island } from './terrain';
+import { fbm, type Island } from './terrain.ts';
 
 /** A seeded generator, 0…1 (mulberry32). */
 export function random(seed: number): () => number {
@@ -64,4 +67,45 @@ export function scatterRocks(island: Island, shapes: number, seed = 1): Rock[] {
     }
   }
   return rocks;
+}
+
+export interface Palm {
+  x: number;
+  /** The trunk's foot: the ground's height, less a little where it is sunk. */
+  y: number;
+  z: number;
+  /** Metres from the foot to the crown. */
+  height: number;
+  /** How far the trunk leans at its foot, radians from the vertical. */
+  lean: number;
+  /** Which way it leans, radians about the vertical (atan2(z, x)). */
+  heading: number;
+}
+
+/** How many palms, at least how far apart, metres, and where: from the beach's top to well inland (from the waterline). */
+const PALMS = 60;
+const SPACING = 3.5;
+const BEACH_TOP = -4, INNERMOST = -50;
+
+export function scatterPalms(island: Island, seed = 1): Palm[] {
+  const rand = random(seed * 104729 + 3);
+  const palms: Palm[] = [];
+  for (let tries = 0; palms.length < PALMS && tries < PALMS * 200; tries++) {
+    const t = rand() * 2 * Math.PI, d = BEACH_TOP + rand() * (INNERMOST - BEACH_TOP);
+    const r = island.coast(t) + d;
+    if (r < 5) continue;
+    const x = island.centre[0] + Math.cos(t) * r, z = island.centre[1] + Math.sin(t) * r;
+    // groves, and the beach's top more than inland
+    const grove = Math.min(Math.max((fbm(x / 28, z / 28, seed + 71, 3) - 0.02) / 0.25, 0), 1) ** 2;
+    const coastal = Math.exp(d / 15);
+    if (rand() > grove * (0.25 + 0.75 * coastal)) continue;
+    if (palms.some((p) => Math.hypot(p.x - x, p.z - z) < SPACING)) continue;
+    palms.push({
+      x, z, y: island.height(x, z) - 0.2,
+      height: 7 + rand() * 6,
+      lean: 0.06 + (0.1 + 0.35 * coastal) * rand(),
+      heading: t + (rand() * 2 - 1) * 0.7,
+    });
+  }
+  return palms;
 }
