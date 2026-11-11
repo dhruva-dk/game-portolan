@@ -373,8 +373,8 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
       wet[i] = clamp01(bicubic(cWet, coarse, u, v));
       beach[i] = coast.beach(px, py);
       // crags: ridged detail that grows with height, so silhouettes break up and the low ground stays smooth
-      const crag = detail.ridged(px / 75, py / 75, 4) - 0.45;
-      h[i] = m + crag * 26 * smooth(40, 400, m) + detail.fbm(px / 30, py / 30, 3) * 2.5 * smooth(5, 60, m);
+      const crag = detail.ridged(px / 75, py / 75, 4) - 0.45 + 0.5 * (detail.ridged(px / 190 + 9, py / 190, 3) - 0.45);
+      h[i] = m + crag * 34 * smooth(60, 450, m) + detail.fbm(px / 30, py / 30, 3) * 2.5 * smooth(5, 60, m);
     }
   }
   lap('resample');
@@ -424,7 +424,7 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
 
   // ---------------- the maps
   const colour = new Uint8Array(N * 4), normal = new Uint8Array(N * 4), material = new Uint8Array(N * 4);
-  const near = blur(h, n, 6), far = blur(h, n, 24);
+  const near = blur(h, n, 6), far = blur(h, n, 24), soft = blur(h, n, 3);
   const enc = (c: number) => Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055));
   const forestAt = new Float32Array(N), leafAt = new Float32Array(N);
   for (let y = 0; y < n; y++) {
@@ -432,7 +432,8 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
       const i = y * n + x, px = at(x, n), py = at(y, n);
       const hx = (h[y * n + Math.min(n - 1, x + 1)] - h[y * n + Math.max(0, x - 1)]) / (2 * dx);
       const hy = (h[Math.min(n - 1, y + 1) * n + x] - h[Math.max(0, y - 1) * n + x]) / (2 * dx);
-      const slope = Math.hypot(hx, hy);
+      // cover follows the slope of the ground at a tree's scale, not the crags' (they are relief, not cliff)
+      const slope = Math.hypot(soft[y * n + Math.min(n - 1, x + 1)] - soft[y * n + Math.max(0, x - 1)], soft[Math.min(n - 1, y + 1) * n + x] - soft[Math.max(0, y - 1) * n + x]) / (2 * dx);
       const nl = 1 / Math.sqrt(hx * hx + hy * hy + 1);
       const ao = Math.min(1, Math.max(0.3, 1 - 0.02 * Math.max(near[i] - h[i], 0) - 0.006 * Math.max(far[i] - h[i], 0)));
       const z = h[i];
@@ -447,15 +448,15 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
         rock = rk;
       } else {
         const d = toSea[i] * dx;
-        rock = Math.max(smooth(0.72, 1.05, slope + 0.12 * v2), smooth(480, 700, z) * 0.6);
-        const snowLine = 450 + 70 * v1 - 90 * wet[i];
+        rock = Math.max(smooth(0.95, 1.35, slope + 0.2 * v2), smooth(520, 720, z) * 0.6);
+        const snowLine = 500 + 70 * v1 - 90 * wet[i];
         snow = smooth(snowLine - 25, snowLine + 45, z) * (1 - smooth(1.0, 1.5, slope));
-        const treeLine = 250 + 60 * v1 - 40 * wet[i];
+        const treeLine = 360 + 70 * v1 + 50 * wet[i];
         const clearing = smooth(-0.35, 0.05, noise.fbm(px / 180 + 20, py / 180, 3) + 0.25 * wet[i]);
-        forest = (1 - smooth(treeLine - 70, treeLine + 15, z)) * (1 - smooth(0.6, 0.85, slope)) * clearing * smooth(4, 14, z) * smooth(25 + 40 * beach[i], 55 + 50 * beach[i], d);
-        leaf = clamp01(0.75 * (1 - smooth(10, 140, z)) + 0.35 * v1 + 0.15 * v2);
+        forest = (1 - smooth(treeLine - 70, treeLine + 15, z)) * (1 - smooth(0.85, 1.2, slope)) * clearing * smooth(1.6, 4, z) * smooth(8 + 22 * beach[i], 20 + 40 * beach[i], d);
+        leaf = clamp01(0.3 * (1 - smooth(20, 220, z)) + 0.45 * v1 + 0.2 * v2);
         sand = (1 - smooth(1.8, 3.2, z)) * smooth(0.15, 0.5, beach[i]) * (1 - smooth(0.25, 0.45, slope));
-        const scrub = smooth(90, 220, z) * (1 - snow);
+        const scrub = smooth(treeLine - 140, treeLine - 20, z) * (1 - snow);
         grass = clamp01(1 - sand - rock - snow - scrub * 0.8);
         // the ground's colour: meadow and autumn scrub mixed by height and patch, forest floor under trees
         const meadow = [0.085 + 0.03 * v2, 0.11 + 0.02 * v1, 0.04];
@@ -486,7 +487,7 @@ export function generate(seed = 7, size = 4096, n = 1024, coarse = 512): LandMap
 
   // ---------------- the trees: a jittered grid kept where the forest is, and a few in the open
   const r = rng(seed * 31 + 5);
-  const SPACING = 6.5, cells = Math.floor(size / SPACING);
+  const SPACING = 5.5, cells = Math.floor(size / SPACING);
   const trees: number[] = [];
   for (let cy = 0; cy < cells; cy++) {
     for (let cx = 0; cx < cells; cx++) {

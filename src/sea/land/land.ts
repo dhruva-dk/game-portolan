@@ -35,7 +35,7 @@ const CARDS_OUT = [330, 470], CANOPY_IN = [250, 450];
 /** The canopy's height over the ground, where the forest is full. */
 const CANOPY = 13;
 const SHADOW_N = 512;
-const MAX_TREES = 24000;
+const MAX_TREES = 32000;
 
 const DEBUG = new Set((new URLSearchParams(location.search).get('debug') ?? '').split(','));
 
