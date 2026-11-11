@@ -370,7 +370,7 @@ function wakeFoam(p: Nd, u: Nd): Nd {
   return select(inside, texture(wakeMap).sample(uv).level(float(0)).r, float(0));
 }
 
-const WATER = shared({
+export const WATER = shared({
   /** What the deep scatters back of the light that enters it (an albedo): a dark, saturated blue. */
   deep: uniform(new Vector3(0.0025, 0.011, 0.034)),
   /** The colour light takes through a thin crest. */
@@ -378,6 +378,8 @@ const WATER = shared({
   foam: uniform(new Vector3(0.8, 0.84, 0.86)),
   /** The slope variance finer than the smallest cascade: capillary ripples. */
   ripples: uniform(0.0016),
+  /** What a metre of water takes of the light (red first), where the bed shows through. */
+  absorb: uniform(new Vector3(0.42, 0.1, 0.07)),
 });
 
 function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
@@ -499,7 +501,7 @@ function surfaceMaterial(field: StorageArrayTexture): MeshBasicNodeMaterial {
     const water_ = max(shore.add(vRise), 0);
     if (SHORE.bed) {
       const path = water_.mul(float(1).add(float(1).div(max(nv, 0.3))));
-      const T = exp(vec3(0.42, 0.1, 0.07).mul(path).negate());
+      const T = exp(WATER.absorb.mul(path).negate());
       body.assign(body.mul(vec3(1).sub(T)).add(SHORE.bed(u).mul(into).mul(T).div(Math.PI)));
     }
     // the sun through a thin crest standing between it and the eye

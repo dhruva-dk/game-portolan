@@ -13,7 +13,7 @@ import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { R, U, bodies, dayFor, eastAt, sail } from './world.ts';
 import { Land } from './land/land.ts';
 import { AIR_TOP, OBJECT_HAZE, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
-import { CALM_SEA, Ocean, SEA } from './ocean.ts';
+import { CALM_SEA, Ocean, SEA, WATER } from './ocean.ts';
 import { Ship } from './ship.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { runFrameWork } from '../render/gpu/work.ts';
@@ -54,7 +54,7 @@ await renderer.init();
 renderer.info.autoReset = false;
 const backend = renderer.backend as unknown as { device: Parameters<typeof shape.install>[0] };
 shape.install(backend.device);
-renderer.toneMapping = ({ agx: AgXToneMapping, neutral: NeutralToneMapping } as unknown as Record<string, typeof AgXToneMapping>)[q.get('tm') ?? ''] ?? ACESFilmicToneMapping;
+renderer.toneMapping = ({ agx: AgXToneMapping, neutral: NeutralToneMapping } as unknown as Record<string, typeof AgXToneMapping>)[q.get('tm') ?? (q.get('land') === '0' ? '' : 'neutral')] ?? ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 const dpr = Math.min(devicePixelRatio, 2);
 renderer.setPixelRatio(dpr);
@@ -70,13 +70,27 @@ const start = new Vector3(0.8, 0.12, 0.58).normalize();
 // PROTOTYPE (land look): ?near= slides the land that many metres toward the ship's starboard beach, to see it close
 const landAt = start.clone(), landEast = eastAt(start, new Vector3());
 if (num('near', 0)) sail(landAt, new Vector3().crossVectors(start, landEast).normalize(), num('near', 0));
+// PROTOTYPE (archipelago look): ?at=x,y puts the ship at that point of the islands' plane (x her heading, y to port)
+if (q.get('at')) {
+  const [ax, ay] = q.get('at')!.split(',').map(Number), e2 = new Vector3().crossVectors(start, landEast).normalize();
+  sail(landAt, landEast.clone().multiplyScalar(-ax).addScaledVector(e2, -ay).normalize(), Math.hypot(ax, ay));
+}
 landEast.addScaledVector(landAt, -landEast.dot(landAt)).normalize();
 const land = q.get('land') === '0' ? null : await Land.create(landAt, landEast, num('seed', 7));
 if (land) scene.add(land.group);
-OBJECT_HAZE.value = num('haze', land ? 0.7 : 1);
+OBJECT_HAZE.value = num('haze', land ? 0.5 : 1);
+// PROTOTYPE (archipelago look): the tropics are airy: clear water over white sand, a brighter, bluer deep, the
+// picture keyed brighter. ?deep=r,g,b, ?absorb=r,g,b and ?key= to tune them
+const vec = (k: string, d: number[]) => (q.get(k)?.split(',').map(Number) ?? d) as [number, number, number];
+if (land) {
+  (WATER.deep.value as Vector3).set(...vec('deep', [0.006, 0.03, 0.062]));
+  (WATER.absorb.value as Vector3).set(...vec('absorb', [0.38, 0.065, 0.04]));
+}
+const KEY = num('key', land ? 1.2 : 0.62);
 const ocean = new Ocean();
 ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
-SKY.coverage.value = num('cover', 0.55);
+SKY.coverage.value = num('cover', land ? 0.3 : 0.55);
+SKY.haze.value = num('mie', land ? 1.6 : (SKY.haze.value as number));
 SKY.cloudDensity.value = num('dens', SKY.cloudDensity.value as number);
 SEA.foamFold.value = num('fold', SEA.foamFold.value as number);
 SEA.foamLife.value = num('life', SEA.foamLife.value as number);
@@ -298,7 +312,7 @@ function lights(dt: number): number {
   const open = (lum(sunE) * facing(at.dot(sun)) + lum(amb) + lum(moonE) * facing(at.dot(moon))) / Math.PI;
   meter.sun = lum(sunE); meter.sky = lum(amb); meter.elev = at.dot(sun); meter.open = open;
   // only partly: dusk and night are darker than noon on the screen as they are to the eye
-  const want = num('ev', 0) ? 2 ** num('ev', 0) : (0.62 / NOON) * (NOON / Math.max(open, 0.03)) ** 0.6;
+  const want = num('ev', 0) ? 2 ** num('ev', 0) : (KEY / NOON) * (NOON / Math.max(open, 0.03)) ** 0.6;
   exposure += (want - exposure) * Math.min(1, dt * 1.5);
   U.exposure.value = exposure;
   return 1 - smooth(-0.08, 0.05, at.dot(sun));

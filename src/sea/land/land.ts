@@ -1,41 +1,41 @@
-// PROTOTYPE (land look): the generated coast drawn on the sphere. Throwaway; it answers whether code-made land reaches
-// the north star's look on this sea and sky, and what it costs. Not the shipping design (see the land handoff).
+// PROTOTYPE (archipelago look): the generated islands drawn on the sphere. Throwaway; it answers whether a light,
+// airy tropical archipelago reaches the north star's look on this sea and sky, and what it costs. (The fjord coast
+// before it is kept at the tag fjord-prototype.)
 //
-//   terrain  nested square grids round the eye (a clipmap), each twice as coarse as the one inside it, snapped to
-//            their own spacing so nothing swims, the outer band of each morphed onto the next one's grid; heights,
-//            normals, colour and the near detail from the generated maps; the sun's shadow from a march over the
-//            heights (in compute, a few frames apart); the forest far off drawn as canopy on the ground itself
-//   trees    one camera-facing card each, shape and shading made in the shader (no textures), out to ~450 m, the
-//            nearest first; past that the canopy on the ground takes over
-//   shore    the sea told the depth under it (shallows, surf, waves calmed) and the mountains' shadow on it
+//   islands  each 128 m tile that has land is a mesh at four spacings (2, 4, 8, 16 m), the one drawn chosen by its
+//            distance; skirts hang from the tiles' edges so neighbours at different spacings never show a crack;
+//            heights from the generated map in the vertex shader, normals from it in the fragment, the scans' detail
+//            near; the sun's shadow from a march over the heights (in compute, a few frames apart)
+//   palms    the old game's coconut palm, a few seeds of it at three levels of detail, instanced round the eye
+//   granite  the old game's sea boulders and granite slabs, the same way
+//   shore    the sea told the depth and the bed under it (sand, seagrass, coral, lit through by caustics), and the
+//            hills' shadow
 //
 // The patch is a plane laid on the sphere round the ship's start by the azimuthal-equidistant map (as the waves are).
 import {
-  BufferGeometry, ClampToEdgeWrapping, DataTexture, DataUtils, Float32BufferAttribute, Group, HalfFloatType, InstancedBufferAttribute, InstancedBufferGeometry,
-  LinearFilter, LinearMipmapLinearFilter, Mesh, MeshBasicNodeMaterial, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, StorageTexture,
-  TextureLoader, UnsignedByteType, Vector2, Vector3, type ComputeNode, type PerspectiveCamera, type Texture, type WebGPURenderer,
+  BufferGeometry, ClampToEdgeWrapping, DataTexture, DataUtils, Float32BufferAttribute, Group, HalfFloatType, InstancedMesh, LinearFilter,
+  LinearMipmapLinearFilter, Matrix4, Mesh, MeshBasicNodeMaterial, RedFormat, RepeatWrapping, RGBAFormat, SRGBColorSpace, Sphere, StorageTexture,
+  TextureLoader, UnsignedByteType, Vector2, Vector3, Vector4, type ComputeNode, type Material, type PerspectiveCamera, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, abs, acos, atan, cameraPosition, clamp, cos, cross, dot, exp, float, floor, fract, fwidth, instanceIndex, length, max, min, mix, normalize,
-  positionGeometry, positionWorld, pow, select, sin, smoothstep, sqrt, texture, textureStore, uniform, uvec2, varyingProperty, vec2, vec3, vec4, attribute,
+  Fn, abs, acos, cameraPosition, clamp, cos, dot, float, floor, fract, length, max, min, mix, normalize, positionGeometry, positionWorld,
+  select, sin, smoothstep, texture, textureStore, uniform, uvec2, varyingProperty, vec2, vec3, vec4, instanceIndex, pow,
 } from 'three/tsl';
+import type { Object3D } from 'three';
 import { R, U, shared } from '../world.ts';
 import { ambientAt, moonAt, sunAt } from '../sky.ts';
 import { SHORE } from '../ocean.ts';
-import type { LandMaps } from './gen.ts';
+import { TILE, type LandMaps } from './gen.ts';
+import { PLANTS as ATOLL_PLANTS } from '../../render/flora/coralAtolls.ts';
+import { ROCK_UNIFORMS, rockById, rockMaterial } from '../../render/rocks/index.ts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Nd = any;
 
 const SIZE = 4096, HALF = SIZE / 2;
-/** Cells a side of each clipmap level, the finest spacing (m), and how many levels. */
-const M = 192, FINEST = 2, LEVELS = 5;
-/** Where the cards give way to the canopy drawn on the ground, metres from the eye. */
-const CARDS_OUT = [330, 470], CANOPY_IN = [250, 450];
-/** The canopy's height over the ground, where the forest is full. */
-const CANOPY = 13;
+/** Beyond these distances (m) a tile is drawn at the next coarser spacing. */
+const TILE_LOD = [200, 480, 1100];
 const SHADOW_N = 512;
-const MAX_TREES = 32000;
 
 const DEBUG = new Set((new URLSearchParams(location.search).get('debug') ?? '').split(','));
 
@@ -68,30 +68,48 @@ function planeOf(u: Nd): Nd {
 }
 
 const uvOf = (q: Nd): Nd => q.div(SIZE).add(0.5);
-const hash = (p: Nd): Nd => fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
-function valueNoise(p: Nd): Nd {
-  const i: Nd = floor(p), f: Nd = fract(p);
-  const u: Nd = f.mul(f).mul(f.mul(-2).add(3));
-  const a = hash(i), b = hash(i.add(vec2(1, 0))), c = hash(i.add(vec2(0, 1))), d = hash(i.add(vec2(1, 1)));
-  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+
+/** Light gathered by the rippled surface onto the bed: a cheap iterated warp, bright threads on a darker floor. */
+function caustics(q: Nd, t: Nd): Nd {
+  const p = q.div(0.24);
+  const acc = float(0).toVar();
+  const i = p.toVar();
+  for (let n = 0; n < 3; n++) {
+    const tt = t.mul(1 - 3.5 / (n + 1)).mul(0.6);
+    i.assign(p.add(vec2(cos(tt.sub(i.x)).add(sin(tt.add(i.y))), sin(tt.sub(i.y)).add(cos(tt.add(i.x))))));
+    acc.addAssign(float(1).div(length(vec2(p.x.div(sin(i.x.add(tt)).div(0.006)), p.y.div(cos(i.y.add(tt)).div(0.006))))));
+  }
+  const c = float(1.17).sub(pow(acc.div(3), 1.4));
+  return pow(abs(c), 7).min(3);
 }
 
 // ---------------------------------------------------------------- the land
 
 interface Detail { tex: Texture; mean: Vector3; scale: number }
 
+/** Copies of a few shapes at three levels of detail, kept round the eye. */
+interface Scatter {
+  /** Per item: x, y, turn (rad), scale, variant, base height. */
+  items: Float32Array;
+  stride: number;
+  /** Per variant, per level: the meshes (one per material). */
+  meshes: InstancedMesh[][][];
+  far: number[];
+}
+
 export class Land {
   readonly group = new Group();
   readonly maps: LandMaps;
-  readonly #levels: Mesh[] = [];
-  readonly #trees: { mesh: Mesh; geo: InstancedBufferGeometry; attr: InstancedBufferAttribute; cells: Int32Array[]; cellN: number; at: Vector2 };
+  readonly #tiles: { meshes: Mesh[]; centre: Vector2 }[] = [];
   readonly #shadow: ComputeNode;
   readonly #anchor: Vector3;
   readonly #e1: Vector3;
   readonly #e2: Vector3;
+  readonly #scatters: Scatter[] = [];
+  #at = new Vector2(1e9, 1e9);
   #frame = 0;
 
-  /** Generates the coast round `anchor` (x along `east`) in a worker and makes everything that draws it. */
+  /** Generates the islands round `anchor` (x along `east`) in a worker and makes everything that draws them. */
   static async create(anchor: Vector3, east: Vector3, seed = 7): Promise<Land> {
     const worker = new Worker(new URL('./gen.worker.ts', import.meta.url), { type: 'module' });
     const t = performance.now();
@@ -101,7 +119,7 @@ export class Land {
       worker.postMessage({ seed });
     });
     worker.terminate();
-    console.info(`land: generated in ${Math.round(performance.now() - t)} ms`, maps.timing, `${maps.trees.length / 4} trees`);
+    console.info(`land: generated in ${Math.round(performance.now() - t)} ms`, maps.timing, `${maps.tiles.length} tiles, ${maps.palms.length / 4} palms, ${maps.rocks.length / 5} rocks`);
     const details = await loadDetails();
     return new Land(maps, anchor, east, details);
   }
@@ -115,7 +133,7 @@ export class Land {
     (LAND.e1.value as Vector3).copy(this.#e1);
     (LAND.e2.value as Vector3).copy(this.#e2);
 
-    const n = maps.n;
+    const n = maps.n, cn = maps.cn;
     const half = new Uint16Array(n * n);
     for (let i = 0; i < n * n; i++) half[i] = DataUtils.toHalfFloat(maps.height[i]);
     const heightTex = new DataTexture(half, n, n, RedFormat, HalfFloatType);
@@ -123,7 +141,7 @@ export class Land {
     heightTex.wrapS = heightTex.wrapT = ClampToEdgeWrapping;
     heightTex.needsUpdate = true;
     const rgba = (data: Uint8Array, srgb: boolean) => {
-      const t = new DataTexture(data, n, n, RGBAFormat, UnsignedByteType);
+      const t = new DataTexture(data, cn, cn, RGBAFormat, UnsignedByteType);
       t.minFilter = LinearMipmapLinearFilter;
       t.magFilter = LinearFilter;
       t.wrapS = t.wrapT = ClampToEdgeWrapping;
@@ -133,7 +151,7 @@ export class Land {
       t.needsUpdate = true;
       return t;
     };
-    const colourTex = rgba(maps.colour, true), normalTex = rgba(maps.normal, false), materialTex = rgba(maps.material, false);
+    const colourTex = rgba(maps.colour, true), bedTex = rgba(maps.bed, true), materialTex = rgba(maps.material, false);
     const shadowTex = new StorageTexture(SHADOW_N, SHADOW_N);
     shadowTex.minFilter = shadowTex.magFilter = LinearFilter;
     shadowTex.wrapS = shadowTex.wrapT = ClampToEdgeWrapping;
@@ -142,13 +160,22 @@ export class Land {
     /** Height at a point of the plane, sinking to the deep beyond the patch. */
     const heightAt = (q: Nd): Nd => {
       const h = texture(heightTex).sample(uvOf(q)).level(float(0)).r;
-      return mix(h, float(-60), smoothstep(HALF - 220, HALF - 10, max(abs(q.x), abs(q.y))));
+      return mix(h, float(-46), smoothstep(HALF - 220, HALF - 10, max(abs(q.x), abs(q.y))));
     };
     const shadowAt = (q: Nd): Nd => select(max(abs(q.x), abs(q.y)).lessThan(HALF), texture(shadowTex).sample(uvOf(q)).level(float(0)).r, float(1));
 
-    // ----- the sea's side of the shore
+    // ----- the sea's side of the shore: the bed's colour, lit through by caustics where the sun reaches it
     SHORE.depth = (up: Nd) => heightAt(planeOf(normalize(up))).negate();
-    SHORE.bed = (up: Nd) => texture(colourTex).sample(uvOf(planeOf(normalize(up)))).rgb;
+    SHORE.bed = (up: Nd) => {
+      const q = planeOf(normalize(up));
+      const depth = heightAt(q).negate();
+      const sun = shadowAt(q).mul(smoothstep(0.0, 0.25, dot(normalize(up), U.sunDir)));
+      // the threads blur to their mean with distance, and the deeper the bed the softer they are
+      const dist = length(cameraPosition.sub(normalize(up).mul(R)));
+      const sharp = float(1).sub(smoothstep(25, 90, dist)).mul(smoothstep(0.2, 1.2, depth)).mul(float(1).sub(smoothstep(5, 14, depth))).mul(sun);
+      const c = mix(float(0.32), caustics(q, U.time), sharp);
+      return texture(bedTex).sample(uvOf(q)).rgb.mul(c.mul(sun.mul(0.8).add(0.2)).mul(1.1).add(0.7));
+    };
     SHORE.shadow = (up: Nd) => shadowAt(planeOf(normalize(up)));
 
     // ----- the sun's shadow: from each texel, march toward the sun over the heights (the planet curving away under the ray)
@@ -162,10 +189,10 @@ export class Land {
       const fl = max(length(flat), 1e-4);
       const dir = flat.div(fl);
       const rise = el.div(fl);
-      const h0 = heightAt(q).add(2);
+      const h0 = max(heightAt(q), 0).add(1.5);
       const lit = float(1).toVar();
-      for (let i = 0; i < 28; i++) {
-        const t = 5 * 1.25 ** i;
+      for (let i = 0; i < 22; i++) {
+        const t = 4 * 1.25 ** i;
         const ray = h0.add(rise.mul(t)).sub((t * t) / (2 * R));
         const soft = 0.025 * t + 1;
         lit.assign(min(lit, smoothstep(-soft, soft, ray.sub(heightAt(q.add(dir.mul(t)))))));
@@ -173,42 +200,87 @@ export class Land {
       textureStore(shadowTex, uvec2(x, y), vec4(select(el.greaterThan(-0.04), lit, float(0)), 0, 0, 1));
     })().compute(SHADOW_N * SHADOW_N, [64]);
 
-    // ----- the terrain
-    const terrain = terrainMaterial({ heightAt, shadowAt, colourTex, normalTex, materialTex, details });
-    for (let l = 0; l < LEVELS; l++) {
-      const mesh = new Mesh(levelGeometry(l > 0), terrain);
-      mesh.frustumCulled = false;
-      mesh.userData = { center: new Vector2(), spacing: FINEST * 2 ** l, bias: l * 0.0012 };
-      mesh.name = `land${l}`;
-      mesh.visible = !DEBUG.has(`nol${l}`);
-      this.#levels.push(mesh);
-      this.group.add(mesh);
+    // ----- the islands' tiles
+    const ground = groundMaterial({ heightAt, shadowAt, colourTex, materialTex, details, texel: SIZE / n });
+    const v = new Vector3(), up = new Vector3();
+    for (const t of maps.tiles) {
+      const centre = new Vector2(t.x + TILE / 2, t.y + TILE / 2);
+      this.#cpuUp(centre.x, centre.y, up);
+      const sphere = new Sphere(v.copy(up).multiplyScalar(R + 20), TILE * 0.75 + 40);
+      const meshes = t.lods.map((l, k) => {
+        const g = new BufferGeometry();
+        g.setAttribute('position', new Float32BufferAttribute(l.pos, 3));
+        g.setIndex(Array.from(l.index));
+        g.boundingSphere = sphere.clone();
+        const m = new Mesh(g, ground);
+        m.name = `tile${k}`;
+        m.visible = false;
+        m.matrixAutoUpdate = false;
+        this.group.add(m);
+        return m;
+      });
+      this.#tiles.push({ meshes, centre });
     }
 
-    // ----- the trees, sorted into 64 m cells for gathering round the eye
-    const cellN = SIZE / 64;
-    const lists: number[][] = Array.from({ length: cellN * cellN }, () => []);
-    for (let i = 0; i < maps.trees.length / 4; i++) {
-      const cx = Math.min(cellN - 1, Math.max(0, Math.floor((maps.trees[i * 4] + HALF) / 64)));
-      const cy = Math.min(cellN - 1, Math.max(0, Math.floor((maps.trees[i * 4 + 1] + HALF) / 64)));
-      lists[cy * cellN + cx].push(i);
+    // ----- palms and granite
+    ROCK_UNIFORMS.uSea.value.set(0, 0, 0, R);
+    if (!DEBUG.has('nopalms')) this.#palms();
+    if (!DEBUG.has('norocks')) this.#rocks();
+  }
+
+  /** The coconut palms: six seeds of the palm at three levels of detail, each copy turned to lean toward the sea. */
+  #palms(): void {
+    const coconut = ATOLL_PLANTS.find((p) => p.id === 'coconutPalm')!;
+    const src = this.maps.palms, count = src.length / 4, K = 6;
+    const items = new Float32Array(count * 6);
+    const per = new Array(K).fill(0);
+    const q = new Vector2();
+    for (let i = 0; i < count; i++) {
+      const vt = Math.floor(src[i * 4 + 3]) % K;
+      items.set([src[i * 4], src[i * 4 + 1], src[i * 4 + 2], 0.8 + 0.35 * ((src[i * 4 + 3] * 0.618) % 1), vt, this.heightAt(q.set(src[i * 4], src[i * 4 + 1])) - 0.2], i * 6);
+      per[vt]++;
     }
-    const quad = new BufferGeometry();
-    quad.setAttribute('position', new Float32BufferAttribute([-0.5, 0, 0, 0.5, 0, 0, 0.5, 1, 0, -0.5, 1, 0], 3));
-    quad.setIndex([0, 1, 2, 0, 2, 3]);
-    const geo = new InstancedBufferGeometry();
-    geo.index = quad.index;
-    geo.setAttribute('position', quad.getAttribute('position'));
-    const attr = new InstancedBufferAttribute(new Float32Array(MAX_TREES * 4), 4);
-    attr.setUsage(35048); // DynamicDrawUsage
-    geo.setAttribute('tree', attr);
-    geo.instanceCount = 0;
-    const trees = new Mesh(geo, treeMaterial(heightAt, shadowAt));
-    trees.frustumCulled = false;
-    trees.visible = !DEBUG.has('notrees');
-    trees.name = 'trees';
-    this.group.add(trees);
-    this.#trees = { mesh: trees, geo, attr, cells: lists.map((l) => Int32Array.from(l)), cellN, at: new Vector2(1e9, 1e9) };
+    const meshes = Array.from({ length: K }, (_, vt) => [0, 1, 2].map((lod) => instanced(coconut.build(101 + vt * 37, lod as 0 | 1 | 2), per[vt], `palm${vt}.${lod}`)));
+    this.#addScatter({ items, stride: 6, meshes, far: [70, 280, 1400] });
+  }
+
+  /** Granite: boulders by the shore, slabs and tors on the hills, four shapes of each, scaled to each copy's size. */
+  #rocks(): void {
+    const src = this.maps.rocks, count = src.length / 5;
+    const forms = [rockById('seaBoulder')!, rockById('graniteSlab')!];
+    const K = 4, mid = [2.5, 12];
+    const items = new Float32Array(count * 6);
+    const per = new Array(K * 2).fill(0);
+    const q = new Vector2();
+    for (let i = 0; i < count; i++) {
+      const kind = src[i * 5 + 4], size = src[i * 5 + 2], vt = kind * K + (Math.floor(src[i * 5 + 3]) % K);
+      items.set([src[i * 5], src[i * 5 + 1], (src[i * 5 + 3] * 0.37) % (Math.PI * 2), size / mid[kind], vt, this.heightAt(q.set(src[i * 5], src[i * 5 + 1])) - 0.12 * size], i * 6);
+      per[vt]++;
+    }
+    const meshes = Array.from({ length: K * 2 }, (_, vt) => [0, 1, 2].map((lod) => {
+      const kind = Math.floor(vt / K), form = forms[kind];
+      const parts = form.parts(7 + vt * 13, mid[kind], lod as 0 | 1 | 2, { skin: 'tropicGranite' });
+      return parts.map((p) => {
+        const m = new InstancedMesh(p.geo, rockMaterial(p.skin ?? 'tropicGranite') as unknown as Material, Math.max(1, per[vt]));
+        m.count = 0;
+        m.frustumCulled = false;
+        m.name = `granite${vt}.${lod}`;
+        return m;
+      });
+    }).map((l) => l.flat()));
+    this.#addScatter({ items, stride: 6, meshes: meshes.map((v) => v.map((l) => l)), far: [45, 200, 1100] });
+  }
+
+  #addScatter(s: Scatter): void {
+    for (const v of s.meshes) for (const l of v) for (const m of l) this.group.add(m);
+    this.#scatters.push(s);
+  }
+
+  /** The unit vector from the planet's centre under a point of the plane (CPU). */
+  #cpuUp(x: number, y: number, out: Vector3): Vector3 {
+    const r = Math.max(Math.hypot(x, y), 0.01), th = r / R;
+    return out.copy(this.#anchor).multiplyScalar(Math.cos(th))
+      .addScaledVector(this.#e1, (x / r) * Math.sin(th)).addScaledVector(this.#e2, (y / r) * Math.sin(th));
   }
 
   /** The point of the plane under a world position (CPU). */
@@ -225,266 +297,127 @@ export class Land {
   heightAt(q: Vector2): number {
     const { n, height } = this.maps;
     const x = (q.x / SIZE + 0.5) * n - 0.5, y = (q.y / SIZE + 0.5) * n - 0.5;
-    if (x < 0 || y < 0 || x >= n - 1 || y >= n - 1) return -60;
+    if (x < 0 || y < 0 || x >= n - 1 || y >= n - 1) return -46;
     const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * n + xi;
     return (height[i] * (1 - fx) + height[i + 1] * fx) * (1 - fy) + (height[i + n] * (1 - fx) + height[i + n + 1] * fx) * fy;
   }
 
-  /** Each frame: the grids follow the eye, the trees round it are gathered, the shadow is redone every few frames. */
+  /** Each frame: each tile at the spacing its distance asks for; the palms and rocks round the eye re-sorted when it moves. */
   update(renderer: WebGPURenderer, camera: PerspectiveCamera): void {
     const eye = this.planeOf(camera.position, Q);
-    for (let l = 0; l < LEVELS; l++) {
-      const s = FINEST * 2 ** (l + 1);
-      (this.#levels[l].userData.center as Vector2).set(Math.round(eye.x / s) * s, Math.round(eye.y / s) * s);
+    const lift = Math.max(0, camera.position.length() - R);
+    for (const t of this.#tiles) {
+      const d = Math.hypot(t.centre.distanceTo(eye) - TILE * 0.5, lift * 0.5);
+      const k = d < TILE_LOD[0] ? 0 : d < TILE_LOD[1] ? 1 : d < TILE_LOD[2] ? 2 : 3;
+      for (let i = 0; i < 4; i++) t.meshes[i].visible = i === k;
     }
-    const tr = this.#trees;
-    if (tr.at.distanceTo(eye) > 6) {
-      tr.at.copy(eye);
-      this.#gather(eye);
+    if (this.#at.distanceTo(eye) > 8) {
+      this.#at.copy(eye);
+      for (const s of this.#scatters) this.#place(s, eye);
     }
     if (this.#frame++ % 4 === 0) renderer.compute(this.#shadow);
   }
 
-  /** The trees within reach of the eye into the instance buffer, nearest cells first. */
-  #gather(eye: Vector2): void {
-    const { cells, cellN, attr, geo } = this.#trees;
-    const reach = CARDS_OUT[1] + 40;
-    const cx = (eye.x + HALF) / 64, cy = (eye.y + HALF) / 64, r = reach / 64;
-    const near: [number, number][] = [];
-    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(cellN - 1, Math.floor(cy + r)); y++) {
-      for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(cellN - 1, Math.floor(cx + r)); x++) {
-        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-        if (d < r + 0.75) near.push([d, y * cellN + x]);
-      }
+  /** Every copy within reach into its shape's mesh at the level its distance asks for. */
+  #place(s: Scatter, eye: Vector2): void {
+    const { items, stride, meshes, far } = s;
+    for (const v of meshes) for (const l of v) for (const m of l) m.count = 0;
+    const up = TMP, x = new Vector3(), z = new Vector3(), tx = new Vector3(), ty = new Vector3(), up2 = new Vector3();
+    for (let i = 0; i < items.length; i += stride) {
+      const px = items[i], py = items[i + 1];
+      const d = Math.hypot(px - eye.x, py - eye.y);
+      if (d > far[2]) continue;
+      const lod = d < far[0] ? 0 : d < far[1] ? 1 : 2;
+      this.#cpuUp(px, py, up);
+      // the plane's x and y carried to this point (as frameAt), turned by the copy's own turn
+      this.#cpuUp(px + 1, py, tx).sub(up).normalize();
+      this.#cpuUp(px, py + 1, ty).sub(up).normalize();
+      const a = items[i + 2], s0 = items[i + 3];
+      x.copy(tx).multiplyScalar(Math.cos(a)).addScaledVector(ty, Math.sin(a)).normalize();
+      up2.copy(up);
+      z.crossVectors(x, up2);
+      M.makeBasis(x.multiplyScalar(s0), up2.clone().multiplyScalar(s0), z.multiplyScalar(s0));
+      M.setPosition(up.multiplyScalar(R + items[i + 5]));
+      for (const m of meshes[items[i + 4]][lod]) m.setMatrixAt(m.count++, M);
     }
-    near.sort((a, b) => a[0] - b[0]);
-    const src = this.maps.trees, dst = attr.array as Float32Array;
-    let k = 0;
-    for (const [, c] of near) {
-      for (const i of cells[c]) {
-        if (k >= MAX_TREES) break;
-        dst[k * 4] = src[i * 4]; dst[k * 4 + 1] = src[i * 4 + 1]; dst[k * 4 + 2] = src[i * 4 + 2]; dst[k * 4 + 3] = src[i * 4 + 3];
-        k++;
-      }
-    }
-    attr.clearUpdateRanges();
-    attr.addUpdateRange(0, Math.max(4, k * 4));
-    attr.needsUpdate = true;
-    geo.instanceCount = k;
+    for (const v of meshes) for (const l of v) for (const m of l) { m.instanceMatrix.needsUpdate = true; m.visible = m.count > 0; }
   }
 }
-const TMP = new Vector3(), Q = new Vector2();
+const TMP = new Vector3(), Q = new Vector2(), M = new Matrix4();
+void Vector4;
 
-// ---------------------------------------------------------------- the clipmap's grids
-
-/** (M+1)² vertices at integer grid coordinates (x, 0, z); a ring has the middle half cut out, less a cell each side so
- * the finer level always overlaps it. */
-function levelGeometry(ring: boolean): BufferGeometry {
-  const pos: number[] = [];
-  for (let j = 0; j <= M; j++) for (let i = 0; i <= M; i++) pos.push(i, 0, j);
-  const idx: number[] = [];
-  const lo = M / 4 + 1, hi = (3 * M) / 4 - 1;
-  for (let j = 0; j < M; j++) {
-    for (let i = 0; i < M; i++) {
-      if (ring && i >= lo && i < hi && j >= lo && j < hi) continue;
-      const a = j * (M + 1) + i, b = a + 1, c = a + M + 1, d = c + 1;
-      idx.push(a, b, c, b, d, c);
-    }
-  }
-  const g = new BufferGeometry();
-  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
-  g.setIndex(idx);
-  return g;
+/** One InstancedMesh per mesh of a built plant, sharing its geometry and material. */
+function instanced(o: Object3D, count: number, name: string): InstancedMesh[] {
+  const out: InstancedMesh[] = [];
+  o.traverse((c) => {
+    const mesh = c as unknown as Mesh;
+    if (!mesh.isMesh) return;
+    const m = new InstancedMesh(mesh.geometry, mesh.material as Material, Math.max(1, count));
+    m.count = 0;
+    m.frustumCulled = false;
+    m.name = name;
+    out.push(m);
+  });
+  return out;
 }
 
-// ---------------------------------------------------------------- the terrain's material
+// ---------------------------------------------------------------- the ground's material
 
-interface TerrainInputs {
+interface GroundInputs {
   heightAt: (q: Nd) => Nd;
   shadowAt: (q: Nd) => Nd;
   colourTex: Texture;
-  normalTex: Texture;
   materialTex: Texture;
   details: Record<string, Detail>;
+  texel: number;
 }
 
-function terrainMaterial(t: TerrainInputs): MeshBasicNodeMaterial {
+function groundMaterial(t: GroundInputs): MeshBasicNodeMaterial {
   const mat = new MeshBasicNodeMaterial();
-  const center = uniform(new Vector2()).onObjectUpdate(({ object }) => object!.userData.center as Vector2);
-  const spacing = uniform(1).onObjectUpdate(({ object }) => object!.userData.spacing as number);
-  const bias = uniform(0).onObjectUpdate(({ object }) => object!.userData.bias as number);
   const vQ = varyingProperty('vec2', 'vLandQ');
-  const vH = varyingProperty('float', 'vLandH');
 
   mat.positionNode = Fn(() => {
-    const g = positionGeometry.xz;
-    const q = center.sub(spacing.mul(M / 2)).add(g.mul(spacing)).toVar();
-    // the outer band morphs onto the grid of the level outside, so the two meet without cracks
-    const edge = max(abs(q.x.sub(center.x)), abs(q.y.sub(center.y))).div(spacing.mul(M / 2));
-    const k = smoothstep(0.8, 0.97, edge);
-    q.subAssign(fract(g.mul(0.5)).mul(2).mul(spacing).mul(k));
-    const ground = t.heightAt(q);
-    const eye = length(cameraPosition.sub(frameAt(q).up.mul(R)));
-    // far off, the forest's crowns are the ground
-    const forest = texture(t.colourTex).sample(uvOf(q)).level(float(2)).a;
-    const h = ground.add(forest.mul(CANOPY).mul(smoothstep(CANOPY_IN[0], CANOPY_IN[1], eye)));
+    const q = positionGeometry.xy;
+    // the skirt hangs a few metres below the tile's edge
+    const h = t.heightAt(q).sub(positionGeometry.z.mul(6));
     vQ.assign(q);
-    vH.assign(ground);
-    const p = frameAt(q).up.mul(h.add(R));
-    // coarser levels a hair further back, so where two overlap the finer one shows
-    return p.add(p.sub(cameraPosition).mul(bias));
+    return frameAt(q).up.mul(h.add(R));
   })();
 
   mat.colorNode = Fn(() => {
     const q = vQ;
     const uv = uvOf(q);
     const f = frameAt(q);
-    const nm = texture(t.normalTex).sample(uv);
-    const nx = nm.r.mul(2).sub(1), ny = nm.g.mul(2).sub(1);
-    const nup = sqrt(max(float(1).sub(nx.mul(nx)).sub(ny.mul(ny)), 0.02));
-    const n = normalize(f.tx.mul(nx).add(f.ty.mul(ny)).add(f.up.mul(nup)));
-    const ao = nm.b, leaf = nm.a;
-    const col = texture(t.colourTex).sample(uv);
-    const forest = col.a;
+    const e = t.texel;
+    const hx = t.heightAt(q.add(vec2(e, 0))).sub(t.heightAt(q.sub(vec2(e, 0)))).div(2 * e);
+    const hy = t.heightAt(q.add(vec2(0, e))).sub(t.heightAt(q.sub(vec2(0, e)))).div(2 * e);
+    const n = normalize(f.up.sub(f.tx.mul(hx)).sub(f.ty.mul(hy)));
+    const col = DEBUG.has('mip0') ? texture(t.colourTex).sample(uv).level(float(0)) : texture(t.colourTex).sample(uv);
     const w = texture(t.materialTex).sample(uv);
-    const sand = w.r, snow = w.g, rock = w.b, grass = w.a;
+    const dry = w.r, wet = w.g, rock = w.b, green = w.a;
     const dist = length(cameraPosition.sub(positionWorld));
 
     // near: the scans' detail over the map's colour (their own colour divided out, so near and far agree)
-    const near = float(1).sub(smoothstep(60, 260, dist));
+    const near = float(1).sub(smoothstep(50, 240, dist));
     const d = t.details;
-    // each scan at two scales, the second turned, so neither repeats in a grid
     const ratio = (k: string, uvd: Nd) => texture(d[k].tex).sample(uvd.div(d[k].scale)).rgb
       .add(texture(d[k].tex).sample(vec2(uvd.x.mul(0.6).sub(uvd.y.mul(0.8)), uvd.x.mul(0.8).add(uvd.y.mul(0.6))).div(d[k].scale * 2.7)).rgb)
       .mul(0.5).div(vec3(d[k].mean.x, d[k].mean.y, d[k].mean.z));
-    const floorW = max(float(1).sub(sand).sub(snow).sub(grass), 0);
-    const ground = ratio('sand', q).mul(sand).add(ratio('snow', q).mul(snow)).add(ratio('grass', q).mul(grass)).add(ratio('forest', q).mul(floorW))
-      .div(max(sand.add(snow).add(grass).add(floorW), 1e-3));
-    const ax = nx.mul(nx), ay = ny.mul(ny), az = nup.mul(nup).mul(0.4);
-    const rockR = ratio('rock', vec2(q.y, vH)).mul(ax).add(ratio('rock', vec2(q.x, vH)).mul(ay)).add(ratio('rock', q).mul(az)).div(ax.add(ay).add(az));
-    const detail = clamp(mix(ground, rockR, rock), vec3(0.15), vec3(2.6));
-    const albedo = col.rgb.mul(mix(vec3(1), detail, near)).toVar();
-    // couloirs: the rock streaked down its fall line, dark gullies between paler ribs
-    const fall = normalize(vec2(nx, ny).add(vec2(1e-4, 0)));
-    const across = dot(q, vec2(fall.y.negate(), fall.x)), down = dot(q, fall);
-    const streak = valueNoise(vec2(across.div(9), down.div(90))).mul(0.65).add(valueNoise(vec2(across.div(3), down.div(25))).mul(0.35));
-    albedo.mulAssign(mix(float(1), streak.mul(0.9).add(0.55), rock.mul(smoothstep(0.25, 0.6, length(vec2(nx, ny))))));
+    const sum = max(dry.add(wet).add(rock).add(green), 1e-3);
+    const detail = ratio('sand', q).mul(dry).add(ratio('wet', q).mul(wet)).add(ratio('rock', q).mul(rock)).add(ratio('green', q).mul(green)).div(sum);
+    const albedo = col.rgb.mul(mix(vec3(1), clamp(detail, vec3(0.2), vec3(2.4)), near));
 
-    // far: the forest's crowns, conifers and the autumn broadleaves
-    const canopy = forest.mul(smoothstep(CANOPY_IN[0], CANOPY_IN[1], dist));
-    const fw = length(fwidth(q));
-    const crowns = mix(valueNoise(q.div(4.5)).mul(0.7).add(valueNoise(q.div(1.7)).mul(0.3)), float(0.5), smoothstep(1.2, 4.0, fw));
-    const autumn = mix(vec3(0.3, 0.11, 0.025), vec3(0.24, 0.17, 0.04), valueNoise(q.div(37)));
-    // conifers the dark mass, the broadleaves in bright clumps through it
-    const clump = smoothstep(0.5, 0.9, valueNoise(q.div(9).add(7)).mul(0.35).add(valueNoise(q.div(2.6)).mul(0.65)).add(leaf.sub(0.45).mul(0.6)));
-    const crownCol = mix(mix(vec3(0.034, 0.068, 0.04), vec3(0.05, 0.078, 0.036), valueNoise(q.div(17).add(3))), autumn, clump);
-    albedo.assign(mix(albedo, crownCol.mul(crowns.mul(1.1).add(0.45)), canopy));
-
-    // the light: the sun (shadowed by the land), the moon, and the sky over the open part of the dome
+    // the light: the sun (shadowed by the hills), the moon, and the sky over the open part of the dome
     const L = U.sunDir;
     const shadow = t.shadowAt(q);
     const sunE = sunAt(f.up), moonE = moonAt(f.up), amb = ambientAt(f.up);
-    const open = dot(n, f.up).mul(0.5).add(0.5).mul(ao);
-    // the canopy scatters light more softly than bare ground takes it
-    const nl = mix(max(dot(n, L), 0), max(dot(n, L).mul(0.8).add(0.2), 0).mul(0.9), canopy);
-    const E = sunE.mul(nl.mul(shadow)).add(moonE.mul(max(dot(n, U.moonDir), 0))).add(amb.mul(open));
+    const open = dot(n, f.up).mul(0.5).add(0.5);
+    const E = sunE.mul(max(dot(n, L), 0).mul(shadow)).add(moonE.mul(max(dot(n, U.moonDir), 0))).add(amb.mul(open));
+    if (DEBUG.has('albedo')) return vec4(albedo.mul(4), 1);
+    if (DEBUG.has('raw')) return vec4(col.rgb.mul(4), 1);
+    if (DEBUG.has('mat')) return vec4(vec3(dry, rock, green).mul(2), 1);
+    if (DEBUG.has('near')) return vec4(vec3(near, 0, 0), 1);
     return vec4(albedo.mul(E).div(Math.PI), 1);
-  })();
-  return mat;
-}
-
-// ---------------------------------------------------------------- the trees' material
-
-function treeMaterial(heightAt: (q: Nd) => Nd, shadowAt: (q: Nd) => Nd): MeshBasicNodeMaterial {
-  const mat = new MeshBasicNodeMaterial();
-  mat.alphaToCoverage = true;
-  mat.alphaTest = 0.5;
-  const tree = attribute('tree', 'vec4');
-  const vUV = varyingProperty('vec2', 'vTreeUV');
-  const vKind = varyingProperty('vec2', 'vTreeKind');
-  const vRight = varyingProperty('vec3', 'vTreeRight');
-  const vUp = varyingProperty('vec3', 'vTreeUp');
-  const vLight = varyingProperty('float', 'vTreeShadow');
-
-  mat.positionNode = Fn(() => {
-    const q = tree.xy;
-    const kind = floor(tree.w), seed = fract(tree.w);
-    const f = frameAt(q);
-    const base = f.up.mul(heightAt(q).sub(0.5).add(R));
-    const toEye = cameraPosition.sub(base);
-    const dist = length(toEye);
-    const right = normalize(cross(f.up, toEye));
-    // each tree leaves at its own distance, so the forest thins into the canopy rather than stepping
-    const out = float(CARDS_OUT[0]).add(seed.mul(CARDS_OUT[1] - CARDS_OUT[0]));
-    const keep = select(dist.lessThan(out), float(1), float(0));
-    const height = tree.z.mul(keep);
-    const width = height.mul(select(kind.greaterThan(0.5), float(0.8), float(0.3).add(seed.mul(0.16))));
-    vUV.assign(vec2(positionGeometry.x.add(0.5), positionGeometry.y));
-    vKind.assign(vec2(kind, seed));
-    vRight.assign(right);
-    vUp.assign(f.up);
-    vLight.assign(shadowAt(q));
-    return base.add(right.mul(positionGeometry.x.mul(width))).add(f.up.mul(positionGeometry.y.mul(height)));
-  })();
-
-  const shape = Fn(() => {
-    const u = vUV.x.sub(0.5), v = vUV.y;
-    const seed = vKind.y;
-    const broad = vKind.x.greaterThan(0.5);
-    // a conifer: tiers of drooping boughs narrowing to the tip, ragged at the ends
-    // boughs: each tier sweeps out and droops at its tip, one side a little longer than the other, the tips ragged
-    const tiers = float(8).add(seed.mul(5));
-    const tier = fract(v.mul(tiers).add(seed.mul(3)));
-    const side = select(u.greaterThan(0), seed.sub(0.5).mul(0.3), seed.sub(0.5).mul(-0.3));
-    const ragged = hash(vec2(floor(v.mul(tiers.mul(4))), select(u.greaterThan(0), float(1), float(0)).add(seed.mul(13)))).mul(0.3);
-    const cone = pow(max(float(1).sub(v), 0), 1.2).mul(0.5).mul(float(0.5).add(float(0.5).mul(pow(tier, 0.7))).mul(float(1).add(side)).mul(float(0.82).add(ragged)))
-      .mul(smoothstep(0.02, 0.07, v));
-    const conifer = cone.sub(abs(u));
-    // a broadleaf: a lumpy round crown on a short trunk
-    const c = vec2(u.mul(1.15), v.sub(0.58));
-    const a = atan(c.y, c.x);
-    const lump = float(0.4).add(sin(a.mul(5).add(seed.mul(20))).mul(0.045)).add(sin(a.mul(11).add(seed.mul(9))).mul(0.03));
-    const crown = lump.sub(length(c.mul(vec2(1, 1.15))));
-    const trunk = float(0.035).sub(abs(u)).min(float(0.3).sub(v));
-    const broadleaf = max(crown, trunk);
-    const coniferTrunk = float(0.025).sub(abs(u)).min(float(0.12).sub(v));
-    return select(broad, broadleaf, max(conifer, coniferTrunk));
-  });
-
-  mat.opacityNode = Fn(() => {
-    const sd = shape();
-    return clamp(sd.div(max(fwidth(sd), 1e-4)).add(0.5), 0, 1);
-  })();
-
-  mat.colorNode = Fn(() => {
-    const u = vUV.x.sub(0.5), v = vUV.y;
-    const seed = vKind.y;
-    const broad = vKind.x.greaterThan(0.5);
-    const up = normalize(vUp), right = normalize(vRight);
-    const toEye = normalize(cross(right, up));
-    // a rounded body: the side toward the edge of the card faces out
-    const w = select(broad, float(0.42), pow(max(float(1).sub(v), 0.05), 1.05).mul(0.5));
-    const sx = clamp(u.div(w), -1, 1);
-    const n = normalize(right.mul(sx).add(toEye.mul(sqrt(max(float(1).sub(sx.mul(sx)), 0)))).add(up.mul(0.35)));
-    const L = U.sunDir;
-    const sunE = sunAt(up), amb = ambientAt(up);
-    const wrap = dot(n, L).mul(0.6).add(0.4).max(0);
-    // inside the crown is darker; the conifer's tiers shade the one below
-    const tier = fract(v.mul(float(8).add(seed.mul(5))).add(seed.mul(3)));
-    // clumps of needles and leaves: lit tufts with dark gaps between, deeper toward the trunk
-    const tuft = valueNoise(vec2(u.mul(16), v.mul(34)).add(seed.mul(50))).mul(0.6).add(valueNoise(vec2(u.mul(40), v.mul(80)).add(seed.mul(9))).mul(0.4));
-    const core = float(1).sub(abs(sx).mul(0.6));
-    const inner = select(broad, float(0.4).add(v.mul(0.4)).add(tuft.mul(0.45)), float(0.3).add(tier.mul(0.45)).add(v.mul(0.2)).add(tuft.mul(0.35))).mul(float(1).sub(core.mul(0.25)));
-    const hue = fract(seed.mul(7.31));
-    const conifer = mix(vec3(0.034, 0.068, 0.04), vec3(0.05, 0.078, 0.036), hue);
-    const leaves = mix(mix(vec3(0.34, 0.12, 0.025), vec3(0.27, 0.19, 0.045), smoothstep(0.2, 0.6, hue)), vec3(0.075, 0.1, 0.03), smoothstep(0.75, 0.95, hue));
-    const bark = vec3(0.05, 0.035, 0.025);
-    const trunkZone = select(broad, v.lessThan(0.22), v.lessThan(0.08));
-    const albedo = select(trunkZone, bark, select(broad, leaves, conifer));
-    // light through the leaves when the sun is behind
-    const through = pow(max(dot(toEye.negate(), L), 0), 4).mul(0.35);
-    const E = sunE.mul(wrap.add(through).mul(vLight)).add(amb.mul(inner.mul(0.9)));
-    return vec4(albedo.mul(E).mul(inner.mul(0.6).add(0.4)).div(Math.PI), 1);
   })();
   return mat;
 }
@@ -494,7 +427,12 @@ function treeMaterial(heightAt: (q: Nd) => Nd, shadowAt: (q: Nd) => Nd): MeshBas
 async function loadDetails(): Promise<Record<string, Detail>> {
   const loader = new TextureLoader();
   const base = `${import.meta.env.BASE_URL}tex/`;
-  const want: Record<string, [string, number]> = { sand: ['sand_d', 4], grass: ['grass_d', 3], snow: ['snow_d', 6], forest: ['forest_d', 3], rock: ['cliff_d', 14] };
+  const want: Record<string, [string, number]> = {
+    sand: ['regions/coralAtolls/shellSand_albedo', 3],
+    wet: ['regions/jadeShoals/tidalSand_albedo', 4],
+    green: ['regions/jadeShoals/duneGrass_albedo', 3],
+    rock: ['rocks/granite_d', 6],
+  };
   const out: Record<string, Detail> = {};
   await Promise.all(Object.entries(want).map(async ([k, [file, scale]]) => {
     const tex = await loader.loadAsync(`${base}${file}.jpg`);
@@ -519,4 +457,4 @@ function meanOf(img: HTMLImageElement | ImageBitmap): Vector3 {
   return m.multiplyScalar(4 / d.length);
 }
 
-void exp;
+void floor; void fract;

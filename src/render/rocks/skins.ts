@@ -70,6 +70,11 @@ export const SKINS = {
     algae: [WEED, 0.6],
     cover: { tex: 'moss', tile: 2.2, tint: [1.05, 0.95, 0.55], amount: 0.55, up: 0.72, soft: 0.12 },
   },
+  // the tropics: pale warm granite, sun-bleached and clean above the tide, dark only where the sea wets it
+  tropicGranite: {
+    tex: 'granite', tile: 4, tint: [1.12, 1.06, 1.0], grade: [0.85, 1.15, 1], rough: [0.7, 0.18], spray: 0.9,
+    algae: [[0.16, 0.15, 0.1], 0.35],
+  },
   // the Spires: pale limestone with dark weathering
   limestone: {
     tex: 'limestone', tile: 5, tint: [1.02, 1.0, 0.95], grade: [0.9, 1.1, 1.05], rough: [0.8, 0.25], spray: 1.6,
