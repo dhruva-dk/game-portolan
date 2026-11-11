@@ -2,17 +2,18 @@
 //
 // The rings start a metre out and each lies 5% further than the last, with 128 spokes, so a cell is about as long as
 // it is wide and covers about as much of the screen near as far: ~36K triangles out to 20 km. The grid follows the
-// eye; the waves stay put in the world, read by world position from the patch that tiles the sea.
+// eye; the waves stay put in the world, read by world position from the cascades' patches that tile the sea.
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
 import { BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, float, length, normalize, positionGeometry, positionWorld, saturate, smoothstep, texture, varying, vec3,
+  Fn, cameraPosition, length, log2, max, normalize, positionGeometry, positionWorld, saturate, sqrt, texture, varying, vec2, vec3,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { seaRadiance } from './optics';
-import { PATCH, createWaves } from './waves';
+import { CASCADES, SIZE } from './cascades';
+import { createWaves } from './waves';
 
 type N = any;
 
@@ -20,12 +21,8 @@ const SPOKES = 128;
 const FIRST = 1;
 const GROWTH = 1.05;
 const REACH = 20000;
-/** Beyond this the grid is too coarse for the patch's waves; their displacement fades out by here. */
-const FADE = 3000;
 /** Open ocean: the trade winds have blown over hundreds of kilometres. */
 const FETCH = 300_000;
-/** GGX roughness of the ripples the patch can't hold. */
-const ROUGHNESS = 0.06;
 
 function rings(): BufferGeometry {
   const radii = [0];
@@ -54,20 +51,33 @@ export function createWater(renderer: WebGPURenderer, reflect: (dir: N, roughnes
   const waves = createWaves(renderer);
   const material = new MeshBasicNodeMaterial();
 
-  // the water under this vertex at rest, and where the waves have moved it
+  // The water under this vertex at rest, and where the waves have moved it. Each cascade is read at the mip whose
+  // texels are as wide as the grid's cell here, so waves too short for the grid to draw average away, not alias.
   const ground = positionGeometry.xz.add(cameraPosition.xz);
-  const uv = ground.div(PATCH);
-  const fade = smoothstep(FADE, FADE / 3, length(positionGeometry.xz));
-  const moved = texture(waves.displacement, uv).level(float(0)).xyz.mul(fade);
+  const cell = max(length(positionGeometry.xz).mul(GROWTH - 1), FIRST);
+  let moved: N = vec3(0);
+  CASCADES.forEach((L, c) => {
+    const lod = log2(max(cell.div(L / SIZE), 1));
+    moved = moved.add(texture(waves.displacement[c], ground.div(L)).level(lod).xyz);
+  });
   material.positionNode = vec3(ground.x.add(moved.x), moved.y, ground.y.add(moved.z));
 
-  const height = varying(moved.y);
+  const height: N = varying(moved.y);
+  const at: N = varying(ground);
   material.colorNode = Fn(() => {
-    const slope = texture(waves.slopes, varying(uv)).xy;
+    // The slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the slopes'
+    // variance within the footprint) becomes roughness, as do the ripples too small for any cascade.
+    let slope: N = vec2(0), variance: N = waves.ripples;
+    CASCADES.forEach((L, c) => {
+      const s = texture(waves.slopes[c], at.div(L));
+      slope = slope.add(s.xy);
+      variance = variance.add(max(s.z.sub(s.x.mul(s.x)), 0)).add(max(s.w.sub(s.y.mul(s.y)), 0));
+    });
     const n = normalize(vec3(slope.x.negate(), 1, slope.y.negate()));
     const v = normalize(cameraPosition.sub(positionWorld));
     const crest = saturate(height.div(waves.amplitude));
-    return seaRadiance(positionWorld, n, v, float(ROUGHNESS), crest, reflect);
+    // GGX's α² is the mean square slope over both axes
+    return seaRadiance(positionWorld, n, v, sqrt(variance), crest, reflect);
   })();
 
   const mesh = new Mesh(rings(), material);

@@ -62,6 +62,28 @@ export function spectrum(sea: Sea): (kx: number, kz: number) => number {
   };
 }
 
+/** The wavenumbers a patch holds, rad/m: [from, to). Patches of different sizes hold different bands, so no wave is drawn twice. */
+export type Band = [number, number];
+
+const banded = (S: (kx: number, kz: number) => number, [lo, hi]: Band) => (kx: number, kz: number) => {
+  const k = Math.hypot(kx, kz);
+  return k >= lo && k < hi ? S(kx, kz) : 0;
+};
+
+/** The mean square slope (both axes together) of the waves an N×N patch L wide holds in its band. */
+export function meanSquareSlope(N: number, L: number, sea: Sea, band: Band): number {
+  const S = banded(spectrum(sea), band), dk = (2 * Math.PI) / L;
+  let sum = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const kx = (x - N / 2) * dk, kz = (y - N / 2) * dk;
+    sum += (kx * kx + kz * kz) * S(kx, kz) * dk * dk;
+  }
+  return sum;
+}
+
+/** The sea's whole mean square slope, ripples included, by wind (Cox & Munk 1954, clean surface). */
+export const coxMunk = (wind: number) => 0.003 + 5.12e-3 * wind;
+
 /** A seeded generator of standard normal numbers (mulberry32, Box–Muller). */
 function normals(seed: number) {
   let s = seed >>> 0;
@@ -80,8 +102,8 @@ function normals(seed: number) {
  * without looking anywhere else. E|h₀|² = S·Δk²/2, so the height's variance, Σ|h̃|², is the spectrum's.
  * The same seed gives the same sea, so a change of wind changes the waves' sizes, not where they are.
  */
-export function initialSpectrum(N: number, L: number, sea: Sea, seed = 1): Float32Array {
-  const S = spectrum(sea), dk = (2 * Math.PI) / L, gauss = normals(seed);
+export function initialSpectrum(N: number, L: number, sea: Sea, seed = 1, band: Band = [0, Infinity]): Float32Array {
+  const S = banded(spectrum(sea), band), dk = (2 * Math.PI) / L, gauss = normals(seed);
   const h0 = new Float64Array(N * N * 2);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const a = (dk * Math.sqrt(S((x - N / 2) * dk, (y - N / 2) * dk))) / 2;

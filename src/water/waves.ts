@@ -1,43 +1,52 @@
-// The sea's waves on the GPU: a random sea drawn from the spectrum (spectrum.ts), moved on in time and turned into a
-// surface by an inverse FFT each frame (Tessendorf, "Simulating Ocean Water", 2001).
+// The sea's waves on the GPU: random seas drawn from the spectrum (spectrum.ts) for each cascade (cascades.ts), moved
+// on in time and turned into surfaces by an inverse FFT each frame (Tessendorf, "Simulating Ocean Water", 2001).
 //
-// Each frame, for one N×N patch L metres wide that tiles the sea:
+// Each frame, for all the cascades' N×N patches at once:
 //   1. spectrum   h̃(k, t) = h₀(k)·e^{−iωt} + conj h₀(−k)·e^{iωt}, and from it the spectra of seven more fields: the
 //                 sideways displacement (x, z) that sharpens the crests, the slopes (x, z), and the displacement's
 //                 derivatives for the Jacobian. Their surfaces are real, so they go two to a complex FFT: eight
 //                 fields in four, held as two vec4 per texel.
 //   2. rows       an inverse FFT along each row: one workgroup per row, radix-2 Stockham in workgroup memory.
 //   3. columns    the same down each column.
-//   4. assemble   undo the centred wavevectors' (−1)^(x+y), and write the displacement (x, height, z) and the slopes
-//                 with the Jacobian, where J < 1 the surface is squeezed and J < 0 it has folded: a breaking crest.
+//   4. assemble   per cascade, undo the centred wavevectors' (−1)^(x+y) and write two textures:
+//                   displacement  (x, height, z, J − 1): where the Jacobian J < 1 the surface is squeezed, and
+//                                 where J < 0 it has folded over: a breaking crest
+//                   slopes        (∂h/∂x, ∂h/∂z, and their squares), so that the mipmaps three builds from them hold
+//                                 the slopes' mean and mean square, and so their variance, over any footprint
 //
 // ω is rounded to multiples of 2π/PERIOD, so the sea repeats every PERIOD seconds and time can wrap without a jump.
 
-import { DataTexture, FloatType, HalfFloatType, LinearFilter, RGBAFormat, RepeatWrapping, StorageTexture, type WebGPURenderer } from 'three/webgpu';
+import {
+  DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
+  type WebGPURenderer,
+} from 'three/webgpu';
 import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, select, sin, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import { G, initialSpectrum, seaState, type Sea } from './spectrum';
+import { BANDS, CASCADES, SIZE } from './cascades';
+import { G, coxMunk, initialSpectrum, meanSquareSlope, seaState, type Sea } from './spectrum';
 
 type N = any;
 
-/** Texels across the patch. */
-export const SIZE = 256;
-/** The patch's width, metres. */
-export const PATCH = 256;
 /** The sea repeats after this many seconds. */
 const PERIOD = 200;
 /** How far the crests lean: the sideways displacement's scale. */
 const CHOP = 1;
+/** The ripples' mean square slope is never taken below this, however much the cascades hold. */
+const RIPPLE_FLOOR = 4e-4;
 
 const HALF = SIZE / 2;
+const AREA = SIZE * SIZE;
+const COUNT = CASCADES.length;
 
 function surface(): StorageTexture {
   const t = new StorageTexture(SIZE, SIZE);
   t.type = HalfFloatType;
-  t.minFilter = t.magFilter = LinearFilter;
+  t.minFilter = LinearMipmapLinearFilter;
+  t.magFilter = LinearFilter;
   t.wrapS = t.wrapT = RepeatWrapping;
+  t.anisotropy = 4;
   return t;
 }
 
@@ -48,30 +57,33 @@ const twice = (a: N, w: N): N => vec4(
 );
 
 export function createWaves(renderer: WebGPURenderer) {
-  const initial = new DataTexture(new Float32Array(SIZE * SIZE * 4), SIZE, SIZE, RGBAFormat, FloatType);
+  // each cascade's h₀ stacked: cascade c in rows c·N … c·N + N − 1
+  const initial = new DataTexture(new Float32Array(AREA * COUNT * 4), SIZE, SIZE * COUNT, RGBAFormat, FloatType);
   const time = uniform(0);
   /** Half the sea's significant height: about how high a crest stands. */
   const amplitude = uniform(1);
-  // the eight fields' spectra, then (in place) their surfaces
-  const fieldsA = instancedArray(SIZE * SIZE, 'vec4');
-  const fieldsB = instancedArray(SIZE * SIZE, 'vec4');
-  /** x, height, z: where the water at a point of the patch has moved to, metres. */
-  const displacement = surface();
-  /** The height's slopes along x and z, and the Jacobian of the sideways displacement. */
-  const slopes = surface();
+  /** The mean square slope of the ripples no cascade holds, for the surface's roughness. */
+  const ripples = uniform(0.01);
+  // the eight fields' spectra for every cascade, then (in place) their surfaces
+  const fieldsA = instancedArray(AREA * COUNT, 'vec4');
+  const fieldsB = instancedArray(AREA * COUNT, 'vec4');
+  const displacement = CASCADES.map(surface);
+  const slopes = CASCADES.map(surface);
 
   const spectrumKernel = Fn(() => {
-    const x = instanceIndex.mod(SIZE), y = instanceIndex.div(SIZE);
-    const h0 = textureLoad(initial, uvec2(x, y));
-    const k = vec2(float(x).sub(HALF), float(y).sub(HALF)).mul((2 * Math.PI) / PATCH);
+    const c = instanceIndex.div(AREA), i = instanceIndex.mod(AREA);
+    const x = i.mod(SIZE), y = i.div(SIZE);
+    const width = (select as N)(c.equal(0), CASCADES[0], select(c.equal(1), CASCADES[1], CASCADES[2]));
+    const h0 = textureLoad(initial, uvec2(x, y.add(c.mul(SIZE))));
+    const k = vec2(float(x).sub(HALF), float(y).sub(HALF)).mul(float(2 * Math.PI).div(width));
     const kl = length(k);
     const step = (2 * Math.PI) / PERIOD;
     const w = floor(sqrt(kl.mul(G)).div(step)).mul(step);
-    const c = cos(w.mul(time)), s = sin(w.mul(time));
+    const cw = cos(w.mul(time)), sw = sin(w.mul(time));
     // h̃ = h₀·e^{−iωt} + conj h₀(−k)·e^{iωt}: with the surface Σ h̃ e^{ik·x}, the waves at k run toward k
     const h = vec2(
-      h0.x.mul(c).add(h0.y.mul(s)).add(h0.z.mul(c)).sub(h0.w.mul(s)),
-      h0.y.mul(c).sub(h0.x.mul(s)).add(h0.z.mul(s)).add(h0.w.mul(c)),
+      h0.x.mul(cw).add(h0.y.mul(sw)).add(h0.z.mul(cw)).sub(h0.w.mul(sw)),
+      h0.y.mul(cw).sub(h0.x.mul(sw)).add(h0.z.mul(sw)).add(h0.w.mul(cw)),
     ).toVar();
     const some = kl.greaterThan(1e-6);
     const unit = select(some, k.div(kl), vec2(0)) as N;
@@ -87,12 +99,15 @@ export function createWaves(renderer: WebGPURenderer) {
     const pack = (a: N, b: N) => vec2(a.x.sub(b.y), a.y.add(b.x));
     fieldsA.element(instanceIndex).assign(vec4(pack(h, dx), pack(dz, sx)));
     fieldsB.element(instanceIndex).assign(vec4(pack(sz, jxx), pack(jzz, jxz)));
-  })().compute(SIZE * SIZE, [64]);
+  })().compute(AREA * COUNT, [64]);
 
-  /** An inverse FFT of every row (or column) of both buffers: a workgroup a line, a thread a butterfly. */
+  /** An inverse FFT of every row (or column) of every cascade: a workgroup a line, a thread a butterfly. */
   const fft = (rows: boolean) => Fn(() => {
     const line = workgroupId.x, i = localId.x;
-    const at = (j: N) => (rows ? line.mul(SIZE).add(j) : j.mul(SIZE).add(line));
+    // rows of all the cascades follow one another; a column is a line within one cascade
+    const at = (j: N) => (rows
+      ? line.mul(SIZE).add(j)
+      : line.div(SIZE).mul(AREA).add(j.mul(SIZE)).add(line.mod(SIZE)));
     const a = workgroupArray('vec4', SIZE) as N, b = workgroupArray('vec4', SIZE) as N;
     a.element(i).assign(fieldsA.element(at(i)));
     a.element(i.add(HALF)).assign(fieldsA.element(at(i.add(HALF))));
@@ -117,18 +132,19 @@ export function createWaves(renderer: WebGPURenderer) {
     fieldsA.element(at(i.add(HALF))).assign(a.element(i.add(HALF)));
     fieldsB.element(at(i)).assign(b.element(i));
     fieldsB.element(at(i.add(HALF))).assign(b.element(i.add(HALF)));
-  })().compute(SIZE * HALF, [HALF]);
+  })().compute(SIZE * COUNT * HALF, [HALF]);
   const rowsKernel = fft(true), columnsKernel = fft(false);
 
-  const assembleKernel = Fn(() => {
+  const assembleKernels = CASCADES.map((_, c) => Fn(() => {
     const x = instanceIndex.mod(SIZE), y = instanceIndex.div(SIZE);
+    const at = instanceIndex.add(c * AREA);
     const sign = float(1).sub(float(x.add(y).bitAnd(uint(1))).mul(2));
-    const a = fieldsA.element(instanceIndex).mul(sign), b = fieldsB.element(instanceIndex).mul(sign);
+    const a = fieldsA.element(at).mul(sign), b = fieldsB.element(at).mul(sign);
     // a = (height, Dx, Dz, slope x), b = (slope z, ∂Dx/∂x, ∂Dz/∂z, ∂Dx/∂z)
-    const jacobian = float(1).add(b.y.mul(CHOP)).mul(float(1).add(b.z.mul(CHOP))).sub(b.w.mul(b.w).mul(CHOP * CHOP));
-    textureStore(displacement, uvec2(x, y), vec4(a.y.mul(CHOP), a.x, a.z.mul(CHOP), 1));
-    textureStore(slopes, uvec2(x, y), vec4(a.w, b.x, jacobian, 1));
-  })().compute(SIZE * SIZE, [64]);
+    const squeeze = b.y.add(b.z).mul(CHOP).add(b.y.mul(b.z).sub(b.w.mul(b.w)).mul(CHOP * CHOP));
+    textureStore(displacement[c], uvec2(x, y), vec4(a.y.mul(CHOP), a.x, a.z.mul(CHOP), squeeze));
+    textureStore(slopes[c], uvec2(x, y), vec4(a.w, b.x, a.w.mul(a.w), b.x.mul(b.x)));
+  })().compute(AREA, [64]));
 
   let wind = -1, heading = 0, clock = 0;
 
@@ -136,21 +152,28 @@ export function createWaves(renderer: WebGPURenderer) {
     displacement,
     slopes,
     amplitude,
+    ripples,
     update(sea: Sea, dt: number) {
-      // a new sea only when the wind changes; the same seed keeps the waves where they are
+      // a new sea only when the wind changes; the same seeds keep the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05 || Math.abs(sea.heading - heading) > 0.01) {
         wind = sea.wind;
         heading = sea.heading;
-        (initial.image.data as Float32Array).set(initialSpectrum(SIZE, PATCH, sea));
+        const data = initial.image.data as Float32Array;
+        let held = 0;
+        CASCADES.forEach((L, c) => {
+          data.set(initialSpectrum(SIZE, L, sea, c + 1, BANDS[c]), c * AREA * 4);
+          held += meanSquareSlope(SIZE, L, sea, BANDS[c]);
+        });
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
+        ripples.value = Math.max(coxMunk(sea.wind) - held, RIPPLE_FLOOR);
       }
       clock = (clock + dt) % PERIOD;
       time.value = clock;
       renderer.compute(spectrumKernel);
       renderer.compute(rowsKernel);
       renderer.compute(columnsKernel);
-      renderer.compute(assembleKernel);
+      for (const k of assembleKernels) renderer.compute(k);
     },
   };
 }

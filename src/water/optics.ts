@@ -59,15 +59,18 @@ export function seaRadiance(p: N, n: N, v: N, alpha: N, crest: N, reflect: (dir:
   const F = fresnel(nv);
   const sun = sunIlluminance.mul(cloudShadow(p));
 
-  // the sky, along the reflected ray turned up out of the sea, blurred to the roughness (three's PMREM takes √α)
+  const irradiance = sun.mul(max(l.y, 0)).add(ambient(vec3(0, 1, 0)));
+  const body = BODY.mul(irradiance);
+
+  // The sky, along the reflected ray, blurred to the roughness (three's PMREM takes √α). A ray reflected down
+  // from a facet turned away from the eye meets the back of the next wave, not the sky: it sees the sea's own colour.
   const r = v.negate().reflect(n);
-  const sky = reflect(normalize(vec3(r.x, max(r.y, 0), r.z)), sqrt(alpha));
+  const above = reflect(normalize(vec3(r.x, max(r.y, 0), r.z)), sqrt(alpha));
+  const sky = mix(above, body, saturate(r.y.mul(-20)));
   const h = normalize(l.add(v));
   const glint = sun.mul(ggx(saturate(n.dot(h)), nl, nv, alpha)).mul(nl);
   const reflected = sky.add(glint).mul(F);
 
-  const irradiance = sun.mul(max(l.y, 0)).add(ambient(vec3(0, 1, 0)));
-  const body = BODY.mul(irradiance);
   // toward the sun the crests glow; side-on a little, from the light scattered out sideways
   const into = saturate(v.negate().dot(normalize(vec3(l.x, 0, l.z))));
   const crests = CREST.mul(sun).mul(mix(float(0.3), float(1), crest)).mul(mix(float(0.15), float(1), pow(into, 4)));

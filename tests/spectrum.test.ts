@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialSpectrum, seaState, spectrum, spread } from '../src/water/spectrum.ts';
+import { coxMunk, initialSpectrum, meanSquareSlope, seaState, spectrum, spread } from '../src/water/spectrum.ts';
+import { BANDS, CASCADES, SIZE } from '../src/water/cascades.ts';
 
 const near = (a: number, b: number, tol: number) => assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
 
@@ -100,4 +101,22 @@ test('drawn seas are as high as their spectrum, on average', () => {
     for (let i = 0; i < N * N; i++) drawn += (data[i * 4] + data[i * 4 + 2]) ** 2 + (data[i * 4 + 1] + data[i * 4 + 3]) ** 2;
   }
   near(drawn / seeds, expected, expected * 0.05);
+});
+
+test('the cascades hold the sea between them, and fewer slopes than the whole sea has', () => {
+  for (const wind of [5, 7.6, 12]) {
+    const sea = { wind, heading: 0.4, fetch: 300_000 };
+    const { hs } = seaState(wind, sea.fetch);
+    let m0 = 0, slopes = 0;
+    CASCADES.forEach((L, c) => {
+      const S = spectrum(sea), dk = (2 * Math.PI) / L, [lo, hi] = BANDS[c];
+      for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+        const kx = (x - SIZE / 2) * dk, kz = (y - SIZE / 2) * dk, k = Math.hypot(kx, kz);
+        if (k >= lo && k < hi) m0 += S(kx, kz) * dk * dk;
+      }
+      slopes += meanSquareSlope(SIZE, L, sea, BANDS[c]);
+    });
+    near(4 * Math.sqrt(m0), hs, hs * 0.05);
+    assert.ok(slopes < coxMunk(wind), `${slopes} ≥ ${coxMunk(wind)}`);
+  }
 });
