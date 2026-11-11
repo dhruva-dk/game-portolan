@@ -1,16 +1,21 @@
-// The sun's shadows on the island: what stands on it (rocks, palms), seen from the sun into a depth map over the
-// island. Nothing on the island moves, so the map is drawn again only when the sun has.
+// The sun's shadows on an island: what stands on it (rocks, palms, shrubs), seen from the sun into a depth map over
+// the island. One map, over the nearest island in view (site.ts orders them): on a globe each island faces the sun
+// its own way and the islands lie hundreds of metres apart, so one map round one island keeps its texels small,
+// and the others, farther off, go without. Nothing on the islands moves, so the map is drawn again only when the sun
+// has moved or the nearest island has changed.
 //
 // It draws stand-ins for the casters (each shares its caster's geometry and instance matrices, plain black), so the
-// casters themselves are untouched and the depth pass costs no more than their vertices.
+// casters themselves are untouched and the depth pass costs no more than their vertices: just the nearest island's,
+// which come first among each caster's instances.
 
 import {
-  DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, Mesh, MeshBasicNodeMaterial,
+  DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial,
   OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, type WebGPURenderer,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import type { IslandSite } from '../world/planet';
 import { place } from '../world/sphere';
-import type { Site } from './site';
+import type { Instances } from './site';
 
 type N = any;
 
@@ -31,29 +36,26 @@ export interface Shadow {
   /** 0…1: how much of the sun reaches world position p on a surface facing n. */
   visible(p: N, n: N): N;
   /** Adds things that cast shadows. */
-  cast(...meshes: Mesh[]): void;
-  /** Redraws the map if the sun has moved (sun: unit vector toward it). */
-  update(sun: Vector3): void;
+  cast(...casters: Instances[]): void;
+  /** Redraws the map if the sun has moved or the island has changed (sun: unit vector toward it; island: the nearest
+   * in view, or null). */
+  update(sun: Vector3, island: IslandSite | null): void;
 }
 
-export function createShadow(renderer: WebGPURenderer, site: Site): Shadow {
-  const { island } = site;
-  const reach = Math.max(...Array.from({ length: 360 }, (_, i) => island.coast((i / 180) * Math.PI))) + MARGIN;
+export function createShadow(renderer: WebGPURenderer): Shadow {
   const target = new RenderTarget(SIZE, SIZE, { format: RedFormat });
   target.depthTexture = new DepthTexture(SIZE, SIZE, FloatType);
   target.depthTexture.compareFunction = LessEqualCompare;
-  const camera = new OrthographicCamera(-reach, reach, reach, -reach, 1, 2 * SPAN);
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 1, 2 * SPAN);
   const scene = new Scene();
   const black = new MeshBasicNodeMaterial({ side: DoubleSide });
   black.colorNode = vec3(0);
 
   const matrix = uniform(new Matrix4());
   const map = texture(target.depthTexture);
-  // looking down the sun's rays at the island's centre, its up kept up the map's
-  const centre = new Vector3(...place(site.chart.at, 0));
-  const up = new Vector3(...site.chart.at), north = up.clone().cross(new Vector3(...site.chart.axis));
-  const last = new Vector3();
-  let dirty = false;
+  const stands: { stand: InstancedMesh; caster: Instances }[] = [];
+  const centre = new Vector3(), up = new Vector3(), north = new Vector3(), last = new Vector3();
+  let covered: IslandSite | null = null;
 
   return {
     visible(p, n) {
@@ -68,22 +70,28 @@ export function createShadow(renderer: WebGPURenderer, site: Site): Shadow {
       const inside = uv.x.greaterThan(0).and(uv.x.lessThan(1)).and(uv.y.greaterThan(0)).and(uv.y.lessThan(1));
       return select(inside, lit, float(1));
     },
-    cast(...meshes) {
-      for (const m of meshes) {
-        const stand = m instanceof InstancedMesh ? new InstancedMesh(m.geometry, black, m.count) : new Mesh(m.geometry, black);
-        if (m instanceof InstancedMesh) (stand as InstancedMesh).instanceMatrix = m.instanceMatrix;
-        m.updateMatrixWorld();
-        stand.matrixAutoUpdate = false;
-        stand.matrix.copy(m.matrixWorld);
-        stand.matrixWorldNeedsUpdate = true;
+    cast(...casters) {
+      for (const caster of casters) {
+        const m = caster.mesh, stand = new InstancedMesh(m.geometry, black, m.instanceMatrix.count);
+        stand.instanceMatrix = m.instanceMatrix;
         stand.frustumCulled = false;
+        stands.push({ stand, caster });
         scene.add(stand);
       }
-      dirty = true;
     },
-    update(sun) {
-      if (!dirty && sun.angleTo(last) < MOVED) return;
-      dirty = false;
+    update(sun, island) {
+      if (!island || (island === covered && sun.angleTo(last) < MOVED)) return;
+      if (island !== covered) {
+        // looking down the sun's rays at the island's centre, its up kept up the map's, out past its coast
+        covered = island;
+        const reach = Math.max(...Array.from({ length: 360 }, (_, i) => island.coast((i / 180) * Math.PI))) + MARGIN;
+        camera.left = camera.bottom = -reach;
+        camera.right = camera.top = reach;
+        centre.set(...place(island.chart.at, 0));
+        up.set(...island.chart.at);
+        north.copy(up).cross(new Vector3(...island.chart.axis));
+      }
+      for (const { stand, caster } of stands) stand.count = caster.near;
       last.copy(sun);
       camera.position.copy(centre).addScaledVector(sun, SPAN);
       camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);

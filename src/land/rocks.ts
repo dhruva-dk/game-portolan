@@ -1,32 +1,39 @@
-// The rocks along the coast (scatter.ts says where). A handful of shapes, each drawn once for all its rocks.
+// The islands' rocks (scatter.ts says where): big rounded masses and the boulders round them. A handful of shapes of
+// each, each drawn once for all its rocks on the islands in view (site.ts).
 //
-// Each shape is a sphere made lumpy by noise, its faces then sheared off by a few planes (the blocky, jointed look of
-// weathered reef rock), and squashed flatter than it is wide. Textured by projecting ambientCG Rock030 along the
-// world's three axes and blending by the surface's facing (no seams, no UVs to unwrap: any three axes do, so the
-// world's serve); darker where wet; lit like everything on the island (light.ts). Each stands on the sphere (site.ts).
+// Each shape is a sphere swollen into a few broad lobes by low noise, creased by its folded ridges, its faces then
+// pared by a few planes (the boulders' more sharply: they are broken pieces, the masses weathered round), and
+// squashed flatter than it is wide. Textured by projecting ambientCG Rock030 along the world's three axes and
+// blending by the surface's facing (no seams, no UVs to unwrap: any three axes do, so the world's serve), scaled to
+// a weathered brown, paler on the tops the sun and rain bleach; darker where wet, filmed with algae below the
+// waterline; lit like everything else (light.ts).
+//
+// Triangles: 20 × (detail + 1)² a shape: 3380 for a mass, 720 for a boulder.
 
 import {
-  BufferGeometry, Euler, IcosahedronGeometry, InstancedMesh, Matrix4, MeshBasicNodeMaterial, NoColorSpace, Quaternion,
-  RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
+  BufferGeometry, Euler, IcosahedronGeometry, Matrix4, MeshBasicNodeMaterial, NoColorSpace, Quaternion, RepeatWrapping,
+  SRGBColorSpace, TextureLoader, Vector3,
 } from 'three/webgpu';
-import { Fn, abs, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import { Fn, abs, dot, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { View } from '../view/view';
 import { random } from '../world/random';
-import { scatterRocks } from '../world/scatter';
+import type { Rock } from '../world/scatter';
+import type { Chart } from '../world/sphere';
 import type { Light } from './light';
-import { standing, type Site } from './site';
+import { createInstances, standing, type Placed } from './site';
 
 type N = any;
 
-const SHAPES = 6;
-/** Triangles per shape: 20 × (DETAIL + 1)². */
-const DETAIL = 8;
+/** How many shapes of each kind, and how finely each is made. */
+export const KINDS = { big: { shapes: 4, detail: 12 }, boulder: { shapes: 4, detail: 5 } };
 /** The texture repeats every this many metres. */
 const ROCK_TILE = 2.5;
-/** Its mean colour, linear (measured), and the weathered grey rock's mean albedo it is scaled to. */
+/** Its mean colour, linear (measured), and the weathered rock's mean albedo it is scaled to: a warm brown. */
 const ROCK_MEAN = [0.084, 0.079, 0.066];
-const ROCK_ALBEDO = [0.22, 0.21, 0.19];
+const ROCK_ALBEDO = [0.3, 0.2, 0.13];
+/** The bleached tops' albedo. */
+const BLEACHED = [0.42, 0.33, 0.24];
 /** Wet rock reflects about half as much; below the waterline it is filmed with algae. */
 const WET = 0.5;
 const ALGAE = [0.06, 0.07, 0.04];
@@ -47,30 +54,30 @@ function noise3(x: number, y: number, z: number, seed: number): number {
   return lerp(plane(zi), plane(zi + 1), w) * 2 - 1;
 }
 
-function shape(seed: number): BufferGeometry {
+function shape(seed: number, big: boolean): BufferGeometry {
   const rand = random(seed * 131 + 7);
-  let g: BufferGeometry = new IcosahedronGeometry(1, DETAIL);
+  let g: BufferGeometry = new IcosahedronGeometry(1, big ? KINDS.big.detail : KINDS.boulder.detail);
   g.deleteAttribute('normal');
   g.deleteAttribute('uv');
   g = mergeVertices(g);
-  // the planes that shear it: mostly its sides and top (the bottom is buried)
-  const cuts = Array.from({ length: 5 + Math.floor(rand() * 4) }, () => {
+  // the planes that pare it: mostly its sides and top (the bottom is buried)
+  const cuts = Array.from({ length: (big ? 3 : 5) + Math.floor(rand() * 3) }, () => {
     const a = rand() * 2 * Math.PI, up = rand() * 1.2 - 0.2;
-    const n = new Vector3(Math.cos(a), up, Math.sin(a)).normalize();
-    return { n, at: 0.5 + rand() * 0.3 };
+    return { n: new Vector3(Math.cos(a), up, Math.sin(a)).normalize(), at: (big ? 0.75 : 0.5) + rand() * 0.25 };
   });
-  const stretch = new Vector3(1, 0.55 + rand() * 0.3, 0.7 + rand() * 0.4);
+  const stretch = big ? new Vector3(1, 0.6 + rand() * 0.25, 0.75 + rand() * 0.35) : new Vector3(1, 0.55 + rand() * 0.3, 0.7 + rand() * 0.4);
   const pos = g.getAttribute('position'), p = new Vector3();
   for (let i = 0; i < pos.count; i++) {
     p.fromBufferAttribute(pos, i);
-    let r = 1, f = 1.3, a = 0.28;
+    // broad lobes, then finer lumps
+    let r = 1, f = big ? 0.9 : 1.3, a = big ? 0.32 : 0.28;
     for (let o = 0; o < 4; o++, f *= 2.1, a *= 0.45) r += a * noise3(p.x * f, p.y * f, p.z * f, seed + o);
-    // ridges: the folded crease of noise
-    r += 0.09 * (1 - 2 * Math.abs(noise3(p.x * 4, p.y * 4, p.z * 4, seed + 9)));
+    // ridges and clefts: the folded crease of noise
+    r += (big ? 0.07 : 0.09) * (1 - 2 * Math.abs(noise3(p.x * 3.5, p.y * 3.5, p.z * 3.5, seed + 9)));
     p.multiplyScalar(r);
     for (const { n, at } of cuts) {
       const over = p.dot(n) - at;
-      if (over > 0) p.addScaledVector(n, -over * 0.93);
+      if (over > 0) p.addScaledVector(n, -over * (big ? 0.6 : 0.93));
     }
     p.multiply(stretch);
     pos.setXYZ(i, p.x, p.y, p.z);
@@ -79,7 +86,8 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-export function createRocks(site: Site, view: View, light: Light) {
+/** rocks[i]: those on island i, whose chart is charts[i]. */
+export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -104,26 +112,22 @@ export function createRocks(site: Site, view: View, light: Light) {
     const tilt = vec3(0, tx.y, tx.x).mul(w.x).add(vec3(ty.x, 0, ty.y).mul(w.y)).add(vec3(tz.x, tz.y, 0).mul(w.z));
     const n = normalize(g.add(tilt));
 
-    let albedo: N = grain.div(vec3(...ROCK_MEAN)).mul(vec3(...ROCK_ALBEDO));
+    const tone = grain.div(vec3(...ROCK_MEAN));
+    let albedo: N = mix(vec3(...ROCK_ALBEDO), vec3(...BLEACHED), smoothstep(0.55, 0.95, dot(g, view.up(p)))).mul(tone);
     albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, height)));
-    albedo = mix(albedo, vec3(...ALGAE).mul(grain.div(vec3(...ROCK_MEAN))), smoothstep(-0.1, -0.6, height).mul(0.6));
+    albedo = mix(albedo, vec3(...ALGAE).mul(tone), smoothstep(-0.1, -0.6, height).mul(0.6));
     return albedo.mul(light(p, n));
   })();
 
-  const rocks = scatterRocks(site.island, SHAPES);
   const m = new Matrix4(), q = new Quaternion(), e = new Euler(), s = new Vector3(), zero = new Vector3();
-  const meshes = Array.from({ length: SHAPES }, (_, k) => {
-    const mine = rocks.filter((r) => r.shape === k);
-    const mesh = new InstancedMesh(shape(k + 1), material, Math.max(mine.length, 1));
-    mesh.count = mine.length;
-    mine.forEach((r, i) => {
-      // a slight lean, as if settled
-      e.set((Math.sin(r.yaw * 3) * 0.12), r.yaw, Math.cos(r.yaw * 5) * 0.12);
-      m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
-      mesh.setMatrixAt(i, standing(site, r.x, r.y, r.z, m, m.clone()));
-    });
-    mesh.computeBoundingSphere();
-    return mesh;
-  });
-  return { meshes, material, rocks };
+  const place = (r: Rock, chart: Chart): Placed => {
+    // a slight lean, as if settled
+    e.set(Math.sin(r.yaw * 3) * 0.12, r.yaw, Math.cos(r.yaw * 5) * 0.12);
+    m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
+    return { matrix: standing(chart, r.x, r.y, r.z, m, new Matrix4()) };
+  };
+  const kind = (big: boolean) => Array.from({ length: big ? KINDS.big.shapes : KINDS.boulder.shapes }, (_, k) =>
+    createInstances(shape(k + (big ? 1 : 51), big), material,
+      rocks.map((on, i) => on.filter((r) => r.big === big && r.shape === k).map((r) => place(r, charts[i])))));
+  return [...kind(true), ...kind(false)];
 }

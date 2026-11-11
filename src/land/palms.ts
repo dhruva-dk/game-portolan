@@ -1,5 +1,5 @@
 // The coconut palms (scatter.ts says where). A few shapes, from nearly upright to leaning far, each drawn once for
-// every palm of about its lean, turned to its heading and scaled to its height.
+// every palm of about its lean on the islands in view (site.ts), turned to its heading and scaled to its height.
 //
 // The trunk: a tapering tube up a curve that leans from the foot and recurves toward the vertical, flared at the
 // foot, ambientCG Bark015 scaled to the grey-brown of a palm's trunk and ringed by the scars of fallen fronds. Under
@@ -11,14 +11,15 @@
 // removal). Lit on both sides, and glowing through from behind as leaves do.
 
 import {
-  BufferGeometry, DoubleSide, Float32BufferAttribute, InstancedMesh, Matrix4, MeshBasicNodeMaterial, NoColorSpace,
+  BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, NoColorSpace,
   Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
 import { random } from '../world/random';
-import { scatterPalms } from '../world/scatter';
+import type { Palm } from '../world/scatter';
+import type { Chart } from '../world/sphere';
 import { type Light, leafLight } from './light';
-import { standing, type Site } from './site';
+import { createInstances, standing, type Placed } from './site';
 
 type N = any;
 
@@ -156,7 +157,8 @@ function shape(lean: number, seed: number): Shape {
   return { trunk, crown };
 }
 
-export function createPalms(site: Site, light: Light) {
+/** palms[i]: those on island i, whose chart is charts[i]. */
+export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
   const loader = new TextureLoader();
   const load = (file: string, srgb: boolean) => {
     const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
@@ -188,25 +190,15 @@ export function createPalms(site: Site, light: Light) {
     return albedo.mul(leafLight(light, p, n, THROUGH));
   })();
 
-  const palms = scatterPalms(site.island);
   const shapes = LEANS.map((lean, k) => shape(lean, k + 11));
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
-  const meshes: InstancedMesh[] = [];
-  shapes.forEach((sh, k) => {
-    const mine = palms.filter((p) => LEANS.reduce((best, l, j) => (Math.abs(l - p.lean) < Math.abs(LEANS[best] - p.lean) ? j : best), 0) === k);
-    const trunk = new InstancedMesh(sh.trunk, trunkMaterial, Math.max(mine.length, 1));
-    const crown = new InstancedMesh(sh.crown, crownMaterial, Math.max(mine.length, 1));
-    trunk.count = crown.count = mine.length;
-    mine.forEach((p, i) => {
-      // the shape leans toward +x; turn it to the palm's heading, and stand it on the sphere
+  const nearest = (p: Palm) => LEANS.reduce((best, l, j) => (Math.abs(l - p.lean) < Math.abs(LEANS[best] - p.lean) ? j : best), 0);
+  return shapes.flatMap((sh, k) => {
+    // the shape leans toward +x; turn it to the palm's heading, and stand it on the sphere
+    const placed = palms.map((on, i) => on.filter((p) => nearest(p) === k).map((p): Placed => {
       q.setFromAxisAngle(up, -p.heading);
-      const placed = standing(site, p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4());
-      trunk.setMatrixAt(i, placed);
-      crown.setMatrixAt(i, placed);
-    });
-    trunk.computeBoundingSphere();
-    crown.computeBoundingSphere();
-    meshes.push(trunk, crown);
+      return { matrix: standing(charts[i], p.x, p.y, p.z, m.compose(zero, q, s.setScalar(p.height / HEIGHT)), new Matrix4()) };
+    }));
+    return [createInstances(sh.trunk, trunkMaterial, placed), createInstances(sh.crown, crownMaterial, placed)];
   });
-  return { meshes, palms };
 }

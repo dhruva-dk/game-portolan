@@ -29,7 +29,9 @@ try {
     game.on('console', (m) => ['error', 'warning'].includes(m.type()) && console.error(`[${p.name}] ${m.text()}`));
     game.on('pageerror', (e) => console.error(`[${p.name}] ${e.message}`));
     await game.goto(`${url}?${p.query}`);
-    await game.waitForTimeout(3000);
+    // the meter's first reading: a second of frames has run (the ground's bake comes first)
+    await game.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
+    await game.waitForTimeout(2000);
     const ours = (await game.screenshot()).toString('base64');
     await game.close();
 

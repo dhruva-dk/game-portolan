@@ -1,14 +1,14 @@
 // A look at the planet's ground, no browser needed.
-//   node tools/planet-map.ts [seed]
+//   node tools/planet-map.ts [seed]      (the game's, SEED, by default)
 // Writes captures/planet-<seed>.ppm (equirectangular, coloured by depth band: land, 0–3, 3–8, 8–15, 15–30, 30+ m,
 // hill-shaded) and captures/planet-<seed>-island.ppm (the largest island on its own chart, 0.5 m a pixel), and
 // prints the area shares and the islands. Convert with: sips -s format png captures/planet-1.ppm --out captures/planet-1.png
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { R, fromChart, fromLatLon } from '../src/world/sphere.ts';
-import { bakeFaces, createPlanet } from '../src/world/planet.ts';
+import { SEED, bakeFaces, createPlanet } from '../src/world/planet.ts';
 
-const seed = Number(process.argv[2] ?? 1);
+const seed = Number(process.argv[2] ?? SEED);
 const t0 = performance.now();
 const planet = createPlanet(seed);
 console.log(`created in ${(performance.now() - t0).toFixed(0)} ms`);

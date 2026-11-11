@@ -1,53 +1,38 @@
-// The terrain (world/terrain.ts) baked once into a texture over the island and its reef, on the island's chart, for
-// the water: how deep it is over any point, and how sheltered.
+// The sea floor: a grid of rings round the point under the eye, laid on the sphere (view.rings) like the sea's and
+// raised to the ground's height (ground.ts). It follows the eye, so nothing on it may depend on where the eye is:
+// its look is the ground's at each pixel's world position (sand.ts), its normal the ground's there, never the
+// mesh's; only its shape (which the water hides but for the parallax through it) is the grid's sampling.
 //
-//   R  height above sea level, metres
-//   G  passage: the shallowest water crossed coming in from the open sea (PASSAGE_NONE outside the reef)
+// Near an island the island's own mesh (land.ts) shows the ground: the floor is drawn only where the ground lies
+// more than SHALLOWEST metres down, and never higher than that (so a coarse far cell straddling a coast can't rise
+// through the sea); the islands' meshes reach a little deeper, so the two overlap and no gap shows.
 //
-// Outside the map the texture's edge carries on: the open sea's floor, unsheltered, the whole planet round.
+// The rings start half a metre out and each lies 3.5% further than the last, with 160 spokes: cells a few metres
+// across at a hundred metres, about as long as wide.
 
-import { ClampToEdgeWrapping, DataTexture, DataUtils, HalfFloatType, LinearFilter, RGFormat, Vector2 } from 'three/webgpu';
-import { float, texture, uniform } from 'three/tsl';
+import { Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
+import { Fn, min, positionWorld } from 'three/tsl';
 import type { View } from '../view/view';
-import type { Site } from './site';
+import type { Ground } from './ground';
+import type { Sand } from './sand';
 
-type N = any;
+/** The floor is drawn where the ground is deeper than this, metres. */
+export const SHALLOWEST = 1.5;
+const FIRST = 0.5, GROWTH = 1.035, SPOKES = 160;
 
-const SIZE = 512;
-/** Stands for "no shelter": deeper than any wave could notice. */
-const PASSAGE_NONE = 1000;
-
-export interface Seabed {
-  /** Where on the map world position p lies (a vec2, safe to interpolate). */
-  locate(p: N): N;
-  /** The ground's height above sea level at a place on the map (locate), metres. Safe in a vertex shader. */
-  height(at: N): N;
-  /** The shallowest water a wave crosses to reach a place on the map, metres. */
-  passage(at: N): N;
-}
-
-export function createSeabed(site: Site, view: View): Seabed {
-  const { island } = site;
-  const chart = view.chart(site.chart);
-  const size = island.reach * 2;
-  const origin = [island.centre[0] - island.reach, island.centre[1] - island.reach];
-  const data = new Uint16Array(SIZE * SIZE * 2);
-  for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) {
-    const x = origin[0] + ((i + 0.5) / SIZE) * size, z = origin[1] + ((j + 0.5) / SIZE) * size;
-    const k = (j * SIZE + i) * 2;
-    data[k] = DataUtils.toHalfFloat(island.height(x, z));
-    data[k + 1] = DataUtils.toHalfFloat(Math.min(island.passage(x, z), PASSAGE_NONE));
-  }
-  const map = new DataTexture(data, SIZE, SIZE, RGFormat, HalfFloatType);
-  map.wrapS = map.wrapT = ClampToEdgeWrapping;
-  map.magFilter = map.minFilter = LinearFilter;
-  map.needsUpdate = true;
-
-  const from = uniform(new Vector2(origin[0], origin[1])), span = uniform(size);
-  const read = (at: N) => texture(map, at).level(float(0));
+export function createSeabed(view: View, ground: Ground, sand: Sand) {
+  const grid = view.rings(FIRST, GROWTH, SPOKES);
+  const material = new MeshBasicNodeMaterial();
+  material.positionNode = view.place(grid.up, min(ground.height(grid.up), -SHALLOWEST));
+  material.maskNode = ground.height(positionWorld).lessThan(-SHALLOWEST);
+  material.colorNode = Fn(() => sand(positionWorld, ground.normal(positionWorld), null))();
+  const mesh = new Mesh(grid.geometry, material);
+  mesh.frustumCulled = false;
   return {
-    locate: (p) => chart(p).q.sub(from).div(span),
-    height: (at) => read(at).x,
-    passage: (at) => read(at).y,
+    mesh,
+    /** Draws the rings out to the horizon. */
+    update() {
+      grid.update(0);
+    },
   };
 }

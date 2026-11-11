@@ -1,4 +1,5 @@
-// The beach shrubs (scatter.ts says where). A few shapes, each drawn once for all its shrubs.
+// The beach shrubs (scatter.ts says where). A few shapes, each drawn once for all its shrubs on the islands in view
+// (site.ts).
 //
 // A shrub: a few overlapping rounded masses of fleshy leaves, each leaf its own two triangles (no cut-out texture).
 // Leaves lie mostly on the masses' surfaces, some inside. Each leaf's normal is bent halfway toward its mass's: the
@@ -6,18 +7,20 @@
 // facing alone would scatter into noise. Leaves deeper in a mass see less of the sky and are darker.
 
 import {
-  BufferGeometry, DoubleSide, Float32BufferAttribute, InstancedBufferAttribute, InstancedMesh, Matrix4,
+  BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4,
   MeshBasicNodeMaterial, Quaternion, Vector3,
 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorld, vec3 } from 'three/tsl';
 import { random } from '../world/random';
-import { scatterShrubs } from '../world/scatter';
+import type { Shrub } from '../world/scatter';
+import type { Chart } from '../world/sphere';
 import { type Light, leafLight } from './light';
-import { standing, type Site } from './site';
+import { createInstances, standing, type Placed } from './site';
 
 type N = any;
 
-const SHAPES = 4;
+/** How many shapes the shrubs come in. */
+export const SHAPES = 4;
 const LEAVES = 650;
 /** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.08;
@@ -69,7 +72,8 @@ function shape(seed: number): BufferGeometry {
   return g;
 }
 
-export function createShrubs(site: Site, light: Light) {
+/** shrubs[i]: those on island i, whose chart is charts[i]; each one of SHAPES shapes. */
+export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld).mul(faceDirection);
@@ -80,20 +84,10 @@ export function createShrubs(site: Site, light: Light) {
     return albedo.mul(leafLight(light, p, n, THROUGH));
   })();
 
-  const shrubs = scatterShrubs(site.island, SHAPES);
   const m = new Matrix4(), q = new Quaternion(), s = new Vector3(), zero = new Vector3(), up = new Vector3(0, 1, 0);
-  const meshes = Array.from({ length: SHAPES }, (_, k) => {
-    const mine = shrubs.filter((b) => b.shape === k);
-    const geometry = shape(k + 101);
-    geometry.setAttribute('tint', new InstancedBufferAttribute(new Float32Array(mine.map((b) => b.tint)), 1));
-    const mesh = new InstancedMesh(geometry, material, Math.max(mine.length, 1));
-    mesh.count = mine.length;
-    mine.forEach((b, i) => {
+  return Array.from({ length: SHAPES }, (_, k) => createInstances(shape(k + 101), material,
+    shrubs.map((on, i) => on.filter((b) => b.shape === k).map((b): Placed => {
       m.compose(zero, q.setFromAxisAngle(up, b.yaw), s.set(b.size, b.size * 0.8, b.size));
-      mesh.setMatrixAt(i, standing(site, b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()));
-    });
-    mesh.computeBoundingSphere();
-    return mesh;
-  });
-  return { meshes, shrubs };
+      return { matrix: standing(charts[i], b.x, b.y - 0.05 * b.size, b.z, m, new Matrix4()), tint: b.tint };
+    })), true));
 }

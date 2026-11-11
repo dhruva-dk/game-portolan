@@ -9,9 +9,9 @@
 // independent seas has one sea's height). The wind blows along each chart's x (the patches' +x).
 //
 // In shallow water a wave can be no higher than about 0.78 of the depth (the breaker index, McCowan 1894): higher
-// and it breaks. So the long waves (the two larger cascades) are cut to that height over the seabed, and to what got
-// across the reef's crest on the way in (seabed.passage) — the lagoon behind the reef lies calm — and where a wave
-// arrives higher than the depth allows, it is breaking: surf on the crest and along the beach.
+// and it breaks. So the long waves (the two larger cascades) are cut to that height over the ground (land/ground.ts,
+// the whole planet's), and where a wave arrives higher than the depth allows, it is breaking: surf on the shallowest
+// banks and along the beaches.
 //
 // The water is drawn after everything solid, and reads it behind itself (the colour and depth the frame has drawn so
 // far) to see the sea floor through the water: along the eye's ray refracted at the surface and followed down to
@@ -27,7 +27,7 @@ import {
   screenUV, select, smoothstep, sqrt, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
-import type { Seabed } from '../land/seabed';
+import type { Ground } from '../land/ground';
 import type { Sky } from '../sky/sky';
 import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
@@ -56,7 +56,7 @@ const FETCH = 300_000;
 const LIKENESS_WINDS = [5, 10, 15, 20];
 
 /** debug: 'charts' colours the sea by its charts' weights (red, green, blue: nearest first). */
-export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seabed: Seabed, debug = '') {
+export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, debug = '') {
   const waves = createWaves(renderer);
   const optics = createOptics(sky, view);
   // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
@@ -69,22 +69,20 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
   const grid = view.rings(FIRST, GROWTH, SPOKES);
   const cell = max(grid.arc.mul(GROWTH - 1), FIRST);
 
-  // How much of the waves the depth here lets through: the long waves cut to what the depth and the way in hold,
-  // the ripples only in the last few centimetres. Where waves arrive higher than the depth holds, they break.
+  // How much of the waves the depth at world position p lets through: the long waves cut to what the depth holds,
+  // the ripples only in the last few centimetres. Where waves are higher than the depth holds, they break.
   // Worked out per vertex for moving the water, and again per pixel for its look: far off the grid's cells are wider
-  // than the reef's crest.
-  const shallows = (where: N) => {
-    const depth = max(seabed.height(where).negate(), 0);
+  // than a beach.
+  const shallows = (p: N) => {
+    const depth = max(ground.height(p).negate(), 0);
     const hs = waves.amplitude.mul(2);
-    const arriving = min(hs, seabed.passage(where).mul(BREAKER));
     return {
-      long: saturate(min(arriving, depth.mul(BREAKER)).div(hs)),
+      long: saturate(min(hs, depth.mul(BREAKER)).div(hs)),
       short: saturate(depth.div(0.3)),
-      breaking: saturate(arriving.div(max(depth.mul(BREAKER), 0.01)).sub(1).mul(0.4)).mul(smoothstep(0, 0.05, depth)),
+      breaking: saturate(hs.div(max(depth.mul(BREAKER), 0.01)).sub(1).mul(0.4)).mul(smoothstep(0, 0.05, depth)),
     };
   };
-  const where = seabed.locate(grid.up);
-  const { long, short } = shallows(where);
+  const { long, short } = shallows(grid.up);
 
   // The water's move, along each chart's axes and up (xyz), and the waves' height here unscaled by the depth (w).
   const wave: N = Fn(() => {
@@ -111,9 +109,9 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
   foamPattern.wrapS = foamPattern.wrapT = RepeatWrapping;
   foamPattern.anisotropy = 4;
   foamPattern.colorSpace = NoColorSpace;
-  const rest: N = varying(grid.up), here: N = varying(where);
+  const rest: N = varying(grid.up);
   material.colorNode = Fn(() => {
-    const { long, short, breaking } = shallows(here);
+    const { long, short, breaking } = shallows(rest);
     const up = view.up(positionWorld);
     const scale = (c: number): N => (c < 2 ? long : short);
     // the water at rest under this pixel, and its change across the pixel, for the charts' reads
@@ -159,7 +157,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
     // here to the floor's depth and looked up where that lands on the screen. If the look-up lands on something in
     // front of the water, it looks straight through instead.
     const ray = v.negate().refract(n, 1 / N_WATER);
-    const down = min(max(seabed.height(here).negate(), 0), MAX_REFRACT_DEPTH);
+    const down = min(max(ground.height(rest).negate(), 0), MAX_REFRACT_DEPTH);
     const end = positionWorld.add(ray.mul(down.div(max(dot(ray, up).negate(), 0.2))));
     // near the screen's edges the look-up eases back to straight through, so it never reaches past them
     const landed = getScreenPosition(cameraViewMatrix.mul(vec4(end, 1)).xyz, cameraProjectionMatrix);
@@ -198,7 +196,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, seab
   const caustics = (p: N): N => Fn(() => {
     const up = view.up(p);
     const depth = max(view.altitude(p).negate(), 0);
-    const { long, short } = shallows(seabed.locate(p));
+    const { long, short } = shallows(p);
     const l = sky.sun, ly = dot(l, up), flat = l.sub(up.mul(ly));
     const sin = sqrt(float(1).sub(ly.mul(ly))).div(N_WATER);
     const across = flat.div(max(length(flat), 1e-4)).mul(depth.mul(sin).div(sqrt(float(1).sub(sin.mul(sin)))));

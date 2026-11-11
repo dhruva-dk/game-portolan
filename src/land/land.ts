@@ -1,141 +1,86 @@
-// The island: one mesh from the dunes down the beach, across the lagoon's floor and the reef, and down the reef's
-// wall to where the water is too deep for the floor to be seen (terrain.ts). Coral sand all over, wet and darker
-// near and below the waterline, with sea grass in patches on the lagoon's floor.
+// The islands' ground: one mesh for each island, from its summit down the beach and across its apron to where the
+// water is deep enough for the sea floor's own mesh (seabed.ts) to take over, overlapping it a little; then a skirt
+// tucked under. Shaded as all the ground is (sand.ts), with litter under the palms and shrubs.
 //
-// The mesh is a polar grid about the island's centre whose rings follow the coast, so the waterline lies along a
-// ring: rings a metre or so apart across the beach and the shallows, growing apart inland and out over the deep.
-// It is worked out on the island's chart and laid on the sphere (site.ts); the textures are laid along the chart.
-//
-// What covers the ground (sea grass, coral, the sand's mottling, litter) rides on the mesh's vertices: only the land
-// needs it.
-//
-// Lit like everything on the island (light.ts).
+// Each is a polar grid about the island's centre on its chart, laid on the sphere (site.ts), whose rings follow the
+// coast so the waterline lies along a ring: rings a metre or so apart across the beach and the shallows, growing
+// apart inland and out over the apron; spokes about a metre apart at the coast, as many as the island's size needs.
+// Seaward each spoke stops where the ground has gone below DEEPEST for good (the farthest it is shallower, along the
+// spoke and its neighbours, plus a margin: past the apron's farthest reach the flank only falls); spokes that stop
+// sooner leave their last rings on that point.
 
-import {
-  BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace,
-  TextureLoader, Vector3,
-} from 'three/webgpu';
-import { Fn, attribute, cross, dot, float, mix, normalGeometry, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
-import type { View } from '../view/view';
-import { ISLAND } from '../world/terrain';
-import type { Light } from './light';
-import { onSphere, type Site } from './site';
+import { BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicNodeMaterial, Vector3 } from 'three/webgpu';
+import { Fn, attribute, normalWorld, normalize, positionWorld } from 'three/tsl';
+import type { Isle } from '../world/scatter';
+import type { Sand } from './sand';
+import { SHALLOWEST } from './seabed';
+import { onSphere } from './site';
 
-type N = any;
+/** The island's mesh reaches out to where the ground is this deep (the sea floor's begins at SHALLOWEST). */
+const DEEPEST = SHALLOWEST + 1;
+/** Past that, metres; and the skirt's drop. */
+const MARGIN = 2, SKIRT = 1.5;
+/** Metres between spokes at the coast, and between rings across the beach. */
+const SPOKE = 1.2, RING = 1.2;
 
-const SPOKES = 360;
-/** The sand texture (ambientCG Ground055S) repeats every this many metres. */
-const SAND_TILE = 4;
-/** Its mean colour, linear (measured), and the coral sand's mean albedo it is scaled to. */
-const SAND_MEAN = [0.345, 0.315, 0.221];
-const SAND_ALBEDO = [0.46, 0.43, 0.37];
-/** Wet sand reflects about half as much: water fills the gaps between the grains. */
-const WET = 0.55;
-/** Sea grass's albedo. */
-const GRASS = [0.06, 0.075, 0.04];
-/** Coral and rubble's: browns and olives, darker than the sand. */
-const CORAL = [0.16, 0.12, 0.08];
-/** The litter texture (ambientCG Ground053) repeats every this many metres; its mean colour, linear (measured), and
- * the dry fronds' and leaves' mean albedo it is scaled to. */
-const LITTER_TILE = 3;
-const LITTER_MEAN = [0.173, 0.106, 0.065];
-const LITTER_ALBEDO = [0.22, 0.18, 0.12];
-
-/** How far each ring lies from the waterline, metres (negative inland), for an island of the mean radius. */
-function rings(): number[] {
-  const out: number[] = [];
-  for (let d = -ISLAND.radius; d < -24; d += 2) out.push(d);
-  for (let d = -24; d < 40; d += 1.2) out.push(d);
-  for (let d = 40, step = 1.2; d < ISLAND.lagoon * 1.3 + ISLAND.wall * 4; d += step, step *= 1.04) out.push(d);
-  return out;
+/** How far out from the coast each ring lies, metres (negative inland), for an island out to `out` past its coast. */
+function rings(radius: number, out: number): number[] {
+  const ds: number[] = [];
+  const near = Math.min(24, radius);
+  for (let d = -radius; d < -near; d += 2) ds.push(d);
+  for (let d = -near; d < 24; d += RING) ds.push(d);
+  for (let d = 24, step = RING; d < out; d += step, step *= 1.04) ds.push(d);
+  ds.push(out);
+  return ds;
 }
 
-function geometry(site: Site, litter: (x: number, z: number) => number): BufferGeometry {
-  const { island } = site;
-  const ds = rings();
-  const positions: number[] = [], normals: number[] = [], axes: number[] = [], ground: number[] = [];
-  const cover: number[] = [], fallen: number[] = [];
+function geometry(isle: Isle, litter: (x: number, z: number) => number): BufferGeometry {
+  const { site, height } = isle;
+  const spokes = Math.max(96, Math.round((2 * Math.PI * site.radius) / SPOKE));
+  const angle = (s: number) => (s / spokes) * 2 * Math.PI;
+  // how far past the coast each spoke must reach: the farthest the ground is still shallower than DEEPEST
+  const raw = Array.from({ length: spokes }, (_, s) => {
+    const t = angle(s), c = site.coast(t);
+    let last = 0;
+    for (let d = 0; c + d < site.shelf + 30; d += 0.5) if (height(Math.cos(t) * (c + d), Math.sin(t) * (c + d)) > -DEEPEST) last = d;
+    return last;
+  });
+  const reach = raw.map((_, s) => Math.max(...Array.from({ length: 13 }, (_, k) => raw[(s + k - 6 + spokes) % spokes])) + MARGIN);
+  const ds = rings(site.radius, Math.max(...reach));
+
+  const positions: number[] = [], normals: number[] = [], fallen: number[] = [];
   const n = new Vector3(), e = 0.5;
-  for (const d of ds) for (let s = 0; s < SPOKES; s++) {
-    const t = (s / SPOKES) * 2 * Math.PI, c = island.coast(t);
+  const vertex = (s: number, d: number, drop: number) => {
+    const t = angle(s), c = site.coast(t);
     // inland the rings shrink with the coast toward the centre; seaward they keep their distance from it
-    const r = d < 0 ? c * (1 + d / ISLAND.radius) : c + d;
-    const x = island.centre[0] + Math.cos(t) * r, z = island.centre[1] + Math.sin(t) * r;
-    const at = onSphere(site, x, island.height(x, z), z);
+    const r = d < 0 ? c * (1 + d / site.radius) : c + Math.min(d, reach[s]);
+    const x = Math.cos(t) * r, z = Math.sin(t) * r;
+    const at = onSphere(site.chart, x, height(x, z) - drop, z);
     positions.push(...at.p);
     // the ground's normal on the chart (x, up, z), turned onto the sphere
-    n.set(island.height(x - e, z) - island.height(x + e, z), 2 * e, island.height(x, z - e) - island.height(x, z + e)).normalize();
+    n.set(height(x - e, z) - height(x + e, z), 2 * e, height(x, z - e) - height(x, z + e)).normalize();
     for (let i = 0; i < 3; i++) normals.push(at.e1[i] * n.x + at.up[i] * n.y + at.e2[i] * n.z);
-    axes.push(...at.e1);
-    ground.push(x, z);
-    cover.push(island.patches(x, z), island.reef(x, z), island.mottle(x, z));
     fallen.push(d < 0 ? litter(x, z) : 0);
-  }
+  };
+  for (const d of ds) for (let s = 0; s < spokes; s++) vertex(s, d, 0);
+  for (let s = 0; s < spokes; s++) vertex(s, Infinity, SKIRT);
+
   const index: number[] = [];
-  const at = (k: number, s: number) => k * SPOKES + (s % SPOKES);
-  for (let k = 0; k < ds.length - 1; k++) for (let s = 0; s < SPOKES; s++) {
+  const at = (k: number, s: number) => k * spokes + (s % spokes);
+  for (let k = 0; k < ds.length; k++) for (let s = 0; s < spokes; s++) {
     index.push(at(k, s), at(k, s + 1), at(k + 1, s), at(k, s + 1), at(k + 1, s + 1), at(k + 1, s));
   }
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(positions, 3));
   g.setAttribute('normal', new Float32BufferAttribute(normals, 3));
-  g.setAttribute('axis', new Float32BufferAttribute(axes, 3));
-  g.setAttribute('ground', new Float32BufferAttribute(ground, 2));
-  g.setAttribute('cover', new Float32BufferAttribute(cover, 3));
   g.setAttribute('litter', new Float32BufferAttribute(fallen, 1));
   g.setIndex(index);
   return g;
 }
 
-/** litter(x, z): 0…1, how thickly fallen fronds and leaves cover the ground (scatter.litter). */
-export function createLand(site: Site, view: View, light: Light, litter: (x: number, z: number) => number) {
-  const loader = new TextureLoader();
-  const load = (file: string, srgb: boolean) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = srgb ? SRGBColorSpace : NoColorSpace;
-    return t;
-  };
-  const sand = load('sand.jpg', true), sandNormal = load('sand-normal.jpg', false), leaves = load('litter.jpg', true);
-
+/** litters[i](x, z): 0…1, how thickly fallen fronds and leaves cover island i's ground (scatter.litter). */
+export function createLand(isles: Isle[], litters: ((x: number, z: number) => number)[], sand: Sand): Mesh[] {
   const material = new MeshBasicNodeMaterial();
-  material.colorNode = Fn(() => {
-    // where on the island's chart, and how high
-    const p = positionWorld, xz = attribute('ground', 'vec2'), height = view.altitude(p), up = view.up(p);
-    // two scales of the texture, so it doesn't visibly repeat
-    const uv = xz.div(SAND_TILE), uv2 = xz.div(SAND_TILE * 3.7).add(0.37);
-    const grain = texture(sand, uv).rgb.mul(0.65).add(texture(sand, uv2).rgb.mul(0.35));
-    let albedo: N = grain.div(vec3(...SAND_MEAN)).mul(vec3(...SAND_ALBEDO));
-    const cover: N = attribute('cover', 'vec3');
-    // mottled: damper hollows and drier, paler rises
-    albedo = albedo.mul(cover.z.mul(0.12).add(1));
-    albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.4, 0.05, height)));
-    // coral and rubble on the reef, mottled by the sand's pattern and its own
-    const coral = smoothstep(0.2, 0.7, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2)));
-    albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.3).add(1)), coral);
-    // sea grass, its edges broken by the sand's own pattern, only on the lagoon's floor (not the beach, nor the reef's wall)
-    const flat = dot(normalize(normalGeometry), up);
-    const floor = smoothstep(-1.2, -2.5, height).mul(smoothstep(-8, -6, height)).mul(smoothstep(0.9, 0.97, flat));
-    const grass = smoothstep(0.35, 0.65, cover.x.add(grain.g.sub(SAND_MEAN[1]).mul(1.5))).mul(floor);
-    albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
-
-    // litter on the dry sand, its edges broken by its own pattern
-    const strewn: N = texture(leaves, xz.div(LITTER_TILE)).rgb;
-    const litter = smoothstep(0.35, 0.65, attribute('litter', 'float').add(cover.z.mul(0.25)).add(strewn.r.sub(LITTER_MEAN[0]).mul(3)))
-      .mul(smoothstep(0.3, 1, height));
-    albedo = mix(albedo, strewn.div(vec3(...LITTER_MEAN)).mul(vec3(...LITTER_ALBEDO)), litter);
-
-    // the ripples' normal map, laid flat on the ground along the chart's axes (the ground is never steep enough for
-    // that to matter), and none under the litter; the mesh sits in world space, so its normals are the world's
-    const bump = texture(sandNormal, uv).xyz.mul(2).sub(1);
-    const e1 = normalize(attribute('axis', 'vec3')), e2 = cross(e1, up);
-    const tilt = e1.mul(bump.x).sub(e2.mul(bump.y)).mul(float(1.2).mul(float(1).sub(litter)));
-    const n = normalize(normalize(normalGeometry).add(tilt));
-
-    return albedo.mul(light(p, n));
-  })();
-
-  const mesh = new Mesh(geometry(site, litter), material);
-  return { mesh, material };
+  material.colorNode = Fn(() => sand(positionWorld, normalize(normalWorld), attribute('litter', 'float')))();
+  return isles.map((isle, i) => new Mesh(geometry(isle, litters[i]), material));
 }

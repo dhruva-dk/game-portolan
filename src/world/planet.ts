@@ -39,6 +39,12 @@ export const SEA = {
   meet: 1.5,
 } as const;
 
+/**
+ * The planet the game opens on: one whose largest island lies in the tropics, lit all day by the solstice's sun
+ * (environment.ts), where the first seed's lies in the polar night.
+ */
+export const SEED = 3;
+
 export interface Cover {
   /** 0…1: sea grass patches. */
   grass: number;
