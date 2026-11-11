@@ -12,6 +12,8 @@ export interface Environment {
   wind: Vector2;
   /** 0–1. */
   cloudCoverage: number;
+  /** Aerosol in the air as a multiple of a clear day's (1). Thickens the haze and whitens the sky. */
+  haze: number;
 }
 
 export function createEnvironment(): Environment {
@@ -21,6 +23,7 @@ export function createEnvironment(): Environment {
     sunDirection: new Vector3(),
     wind: new Vector2(7, 3),
     cloudCoverage: 0.35,
+    haze: 1,
   };
   updateEnvironment(env, 0);
   return env;

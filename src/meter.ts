@@ -18,8 +18,11 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
       frames++;
       cpu += cpuMs;
       if (gpu) {
+        // read before awaiting: the counts are this frame's. Three repeats the last duration when nothing ran.
+        const computed = renderer.info.compute.frameCalls > 0;
         render += (await renderer.resolveTimestampsAsync('render')) ?? 0;
-        compute += (await renderer.resolveTimestampsAsync('compute')) ?? 0;
+        const c = (await renderer.resolveTimestampsAsync('compute')) ?? 0;
+        if (computed) compute += c;
       }
       const now = performance.now();
       if (now - last < 1000) return;

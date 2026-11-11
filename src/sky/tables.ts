@@ -2,11 +2,12 @@
 //   transmittance  256×64   light surviving from a height along a direction to the top of the air
 //   multiple       32×32    light scattered more than once, per height and sun elevation
 //   sky view       200×100  the sky's radiance round an eye at the sea, per direction relative to the sun
-// The first two depend only on the air and are integrated once; the sky view is redone when the sun moves.
+//   ambient        3×1      from the sky view: upward irradiance / π, the horizon's and the zenith's radiance
+// The first two depend only on the air and are redone when the haze changes; the others when the sun moves.
 // Mappings and constants match atmosphere.ts, where the tests check them.
 
 import {
-  ClampToEdgeWrapping, HalfFloatType, LinearFilter, StorageTexture, type WebGPURenderer,
+  ClampToEdgeWrapping, HalfFloatType, LinearFilter, NearestFilter, StorageTexture, type WebGPURenderer,
 } from 'three/webgpu';
 import {
   Fn, If, Loop, abs, acos, clamp, cos, dot, exp, float, instanceIndex, int, length, max, normalize, pow, select,
@@ -39,6 +40,8 @@ function table(w: number, h: number): StorageTexture {
 const transmittanceTable = table(T_W, T_H);
 const multipleTable = table(M_N, M_N);
 const skyViewTable = table(V_W, V_H);
+const ambientTable = table(3, 1);
+ambientTable.minFilter = ambientTable.magFilter = NearestFilter;
 
 /** Nearest and farthest hits of a ray from o along unit d with a sphere of radius r at the origin; (-1,-1) if none. */
 const raySphere = Fn(([o, d, r]: [N, N, N]) => {
@@ -52,11 +55,14 @@ const raySphere = Fn(([o, d, r]: [N, N, N]) => {
   return out;
 });
 
+/** Multiple of a clear day's aerosol (Environment.haze). */
+export const haze = uniform(1);
+
 /** Rayleigh, Mie and ozone densities at height h. */
 const densities = (h: N): N =>
   vec3(
     exp(h.negate().div(A.RAYLEIGH_SCALE_HEIGHT)),
-    exp(h.negate().div(A.MIE_SCALE_HEIGHT)),
+    exp(h.negate().div(A.MIE_SCALE_HEIGHT)).mul(haze),
     max(float(1).sub(abs(h.sub(A.OZONE_CENTRE)).div(A.OZONE_HALF_WIDTH)), 0),
   );
 
@@ -223,20 +229,56 @@ export const skyRadiance = (dir: N, sunDir: N): N => {
   return texture(skyViewTable).sample(uv).level(float(0)).rgb;
 };
 
+/** Integrates the sky view over the upper hemisphere, once per sky-view update. */
+const ambientKernel = Fn(() => {
+  const AZ = 16, EL = 8;
+  const sun = vec3(sqrt(max(float(1).sub(sunCosZenith.mul(sunCosZenith)), 0)), sunCosZenith, 0);
+  const up = vec3(0).toVar(), horizon = vec3(0).toVar();
+  loop('el', EL, (e) => {
+    // midpoint rule in cos θ; the cosine weight and solid angle make each cell's weight equal for irradiance
+    const cosT = float(e).add(0.5).div(EL), sinT = sqrt(float(1).sub(cosT.mul(cosT)));
+    loop('az', AZ, (a) => {
+      const phi = float(a).add(0.5).mul((2 * Math.PI) / AZ);
+      const L = skyRadiance(vec3(sinT.mul(cos(phi)), cosT, sinT.mul(sin(phi))), sun);
+      // E/π = (1/π)∫L cosθ dω; with dω = dcosθ dφ, the sum of L·cosθ over cells times (1/EL)(2π/AZ)/π
+      up.addAssign(L.mul(cosT).mul(2 / (EL * AZ)));
+    });
+  });
+  loop('hz', AZ, (a) => {
+    const phi = float(a).add(0.5).mul((2 * Math.PI) / AZ);
+    horizon.addAssign(skyRadiance(vec3(cos(phi), 0.02, sin(phi)), sun).div(AZ));
+  });
+  textureStore(ambientTable, uvec2(0, 0), vec4(up, 1));
+  textureStore(ambientTable, uvec2(1, 0), vec4(horizon, 1));
+  textureStore(ambientTable, uvec2(2, 0), vec4(skyRadiance(vec3(0, 1, 0), sun), 1));
+})().compute(1, [1]);
+
+const ambientAt = (i: number): N => texture(ambientTable).sample(vec2((i + 0.5) / 3, 0.5)).level(float(0)).rgb;
+/** Irradiance from the whole sky on an upward surface, over π: the radiance of an evenly lit sky giving the same light. */
+export const skyAmbientUp = ambientAt(0);
+/** The sky's mean radiance just above the horizon. */
+export const skyHorizon = ambientAt(1);
+/** The sky's radiance at the zenith. */
+export const skyZenith = ambientAt(2);
+
 /** Radius of the eye for sampling transmittance from the sea. */
 export const VIEW_RADIUS = VIEW_R;
 
 export function createTables(renderer: WebGPURenderer) {
-  renderer.compute(transmittanceKernel);
-  renderer.compute(multipleKernel);
-  let lastCos = NaN;
+  let lastCos = NaN, lastHaze = NaN;
   return {
-    /** Re-integrates the sky view when the sun has moved. */
-    update(sunY: number) {
-      if (Math.abs(sunY - lastCos) < 1e-4) return;
-      lastCos = sunY;
-      sunCosZenith.value = sunY;
+    /** Re-integrates what has changed: the air's tables with the haze, the sky view and ambient with the sun. */
+    update(sunY: number, hazeAmount: number) {
+      const airChanged = hazeAmount !== lastHaze;
+      if (airChanged) {
+        lastHaze = haze.value = hazeAmount;
+        renderer.compute(transmittanceKernel);
+        renderer.compute(multipleKernel);
+      }
+      if (!airChanged && Math.abs(sunY - lastCos) < 1e-4) return;
+      lastCos = sunCosZenith.value = sunY;
       renderer.compute(skyViewKernel);
+      renderer.compute(ambientKernel);
     },
   };
 }
