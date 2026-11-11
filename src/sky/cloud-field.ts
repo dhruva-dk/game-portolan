@@ -219,7 +219,13 @@ export function createCloudField() {
             distSum.addAssign(t.mul(absorbed));
             weightSum.addAssign(absorbed);
             T.mulAssign(stepT);
-            If(T.lessThan(0.01), () => { Break(); });
+            // a cloud this deep is opaque on through (its depth runs to tens): what is left is taken as gone, with
+            // its share of light given to what was seen, else the sun's disc would shine through every cumulus
+            If(T.lessThan(0.01), () => {
+              L.divAssign(float(1).sub(T));
+              T.assign(0);
+              Break();
+            });
           });
         });
       });

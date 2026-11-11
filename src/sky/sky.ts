@@ -14,19 +14,28 @@
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
 
 import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
-import { Fn, cos, dot, exp, float, max, mix, normalWorldGeometry, normalize, smoothstep, uniform, vec3 } from 'three/tsl';
+import { Fn, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
-import { MIE_EXTINCTION, RAYLEIGH_SCATTERING, SEA_ALBEDO, SUN_ANGULAR_RADIUS } from './atmosphere';
+import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO, SUN_ANGULAR_RADIUS } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { VIEW_RADIUS, createTables, haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
 
 type N = any;
 
-/** The sun's radiance over its disc for unit illuminance: E / (π α²). */
-const SUN_RADIANCE = 1 / (Math.PI * SUN_ANGULAR_RADIUS * SUN_ANGULAR_RADIUS);
+/** Limb darkening of the sun's disc in the visible: radiance ∝ 1 − u(1 − μ), μ the cosine on its surface. */
+const LIMB = 0.6;
+/** The radiance at the disc's centre for unit illuminance: E / (π α² (1 − u/3)), the disc's mean being 1 − u/3 of it. */
+const SUN_RADIANCE = 1 / (Math.PI * SUN_ANGULAR_RADIUS * SUN_ANGULAR_RADIUS * (1 - LIMB / 3));
+/**
+ * Aerosol's diffraction peak, which the sky-view table's broad Mie lobe (g = 0.8, Cornette-Shanks) cannot hold at its
+ * resolution: a share of the Mie scattering in a Henyey-Greenstein lobe of g = 0.95, worked out per pixel. Near the
+ * sun the view and the sunlight share one path, so single scattering is the sun's light at the eye times the phase
+ * times the Mie scattering depth along the view. Added on top; the table keeps its own lobe.
+ */
+const PEAK_SHARE = 0.25, PEAK_G = 0.95;
 
 /** Extinction of the air at sea level, per km. */
 const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
@@ -69,9 +78,17 @@ export function createSky(renderer: WebGPURenderer, view: View) {
     const d = view.toSky(dir);
     // below the horizon there is only more sea, beyond the troughs at its edge, and glancing it mirrors the horizon
     const sky = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
-    // a soft edge one pixel wide so the disc doesn't alias
-    const disc = smoothstep(Math.cos(SUN_ANGULAR_RADIUS * 1.1), cos(SUN_ANGULAR_RADIUS), dot(dir, sun));
-    return sky.add(sunTransmittance(VIEW_RADIUS, d.y).mul(disc.mul(SUN_RADIANCE)));
+    const c = dot(dir, sun);
+    const T = sunTransmittance(VIEW_RADIUS, d.y);
+    // the disc, darkening to its limb, with an edge about a pixel wide (a pixel is about half its radius) so it
+    // doesn't alias; its angle off the sun's centre from 1 − cos, which keeps its precision so close
+    const r = sqrt(max(float(1).sub(c).mul(2), 0)).div(SUN_ANGULAR_RADIUS);
+    const limb = float(1).sub(float(1).sub(sqrt(max(float(1).sub(r.mul(r)), 0))).mul(LIMB));
+    const disc = float(1).sub(smoothstep(0.8, 1.2, r)).mul(limb).mul(SUN_RADIANCE);
+    const g2 = PEAK_G * PEAK_G;
+    const peak = float((1 - g2) / (4 * Math.PI)).div(pow(float(1 + g2).sub(c.mul(2 * PEAK_G)), 1.5));
+    const mieDepth = haze.mul(MIE_SCATTERING * MIE_SCALE_HEIGHT * PEAK_SHARE).div(max(d.y, 0.03));
+    return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();
 
   const light: Sky = { sun, sunIlluminance, cloudShadow: clouds.shadow, ambient, reflect: reflection.reflect };
