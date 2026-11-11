@@ -22,7 +22,7 @@
 
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
+  Fn, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
@@ -36,6 +36,7 @@ import type { Wind } from '../world/wind';
 import { BANDS, CASCADES, SIZE } from './cascades';
 import { createCaustics } from './caustics';
 import { createFoam } from './foam';
+import { glitter } from './glitter';
 import { N_WATER, createOptics } from './optics';
 import { likeness } from './spectrum';
 import { createWaves } from './waves';
@@ -130,7 +131,9 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     // (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one sea's, and no
     // pixel is whiter than a whitecap.
     const slope = vec3(0).toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
-    charts.each(p, (c) => {
+    const q = vec2(0).toVar();
+    charts.each(p, (c, slot) => {
+      if (slot === 0) q.assign(c.q);
       const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
       let s2: N = vec2(0), v: N = float(0), cover: N = surf;
       CASCADES.forEach((L, k) => {
@@ -171,8 +174,9 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const path = select(depthBehind.greaterThanEqual(1), float(1e4), length(behindAt(uv).sub(positionView)));
     const behind = viewportSharedTexture(uv).rgb;
 
-    // GGX's α² is the mean square slope over both axes
-    return optics.seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, behind, path);
+    // the facets' α² is the mean square slope over both axes
+    const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
+    return optics.seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, behind, path, sparkle);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();

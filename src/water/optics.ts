@@ -1,7 +1,7 @@
 // How light leaves the sea toward the eye, given the surface's normal and roughness there. Units are the sky's:
 // radiance per unit sun illuminance at the top of the air.
 //
-//   reflected  the sky and clouds (sky.reflect, prefiltered to the surface's roughness) and the sun (GGX), weighted
+//   reflected  the sky and clouds (sky.reflect, prefiltered to the surface's roughness) and the sun (Beckmann facets), weighted
 //              by Fresnel for water (F0 = 0.02)
 //   body       light scattered back up out of deep water: the irradiance from the sun and sky, times the water's
 //              reflectance R ≈ 0.33·b_b/a (Morel & Prieur 1977), through the surface twice and spread by n² on the way out
@@ -76,32 +76,40 @@ export function createOptics(sky: Sky, view: View) {
     sunBelow,
     skyBelow,
     /** The light leaving the sea toward the eye (seaRadiance, below). */
-    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N): N =>
-      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path),
+    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle): N =>
+      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle),
   };
 }
 
-/** GGX's distribution and height-correlated Smith visibility, for roughness α (not squared). */
-function ggx(nh: N, nl: N, nv: N, alpha: N): N {
-  const a2 = alpha.mul(alpha);
-  const d = nh.mul(nh).mul(a2.sub(1)).add(1);
-  const D = a2.div(d.mul(d).mul(Math.PI));
+/** How the glint off the unresolved ripples gathers into flashes (glitter.ts), given D, n·h and h·l: its multiplier. */
+export type Sparkle = (D: N, nh: N, hl: N) => N;
+
+/**
+ * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
+ * axes. The slopes are Gaussian (Cox & Munk 1954), so D is Beckmann's; V is the height-correlated Smith term in
+ * GGX's closed form, which differs from Beckmann's by little at these slopes. (GGX's long tails would spread the
+ * sun's glint far off its path.)
+ */
+function facets(nh: N, nl: N, nv: N, alpha: N): { D: N; V: N } {
+  const a2 = alpha.mul(alpha), c2 = max(nh.mul(nh), 1e-4);
+  const D = exp(float(1).sub(c2).div(c2.mul(a2)).negate()).div(a2.mul(c2.mul(c2)).mul(Math.PI));
   const vl = nv.mul(sqrt(nl.mul(nl).mul(float(1).sub(a2)).add(a2)));
   const vv = nl.mul(sqrt(nv.mul(nv).mul(float(1).sub(a2)).add(a2)));
-  return D.mul(float(0.5).div(max(vl.add(vv), 1e-5)));
+  return { D, V: float(0.5).div(max(vl.add(vv), 1e-5)) };
 }
 
 /**
  * The light leaving the sea at world position p toward the eye.
  *   n      the surface's normal          v      unit vector from p to the eye
- *   alpha  GGX roughness (the slopes the pixel can't resolve, plus the ripples no cascade holds)
+ *   alpha  roughness, √(mean square slope) (the slopes the pixel can't resolve, plus the ripples no cascade holds)
  *   crest  0 in the troughs … 1 at the tops of the waves, where the water is thinnest
  *   foam   the share of the pixel covered in foam
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
  *   path   metres from the surface to it through the water (Infinity for open sea)
+ *   sparkle how the sun's glint gathers into flashes
  */
 function seaRadiance(
-  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N,
+  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle,
 ): N {
   const l = sky.sun, up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
@@ -121,7 +129,8 @@ function seaRadiance(
   const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), sqrt(alpha));
   const seen = mix(body, above, fresnel(below.negate()));
   const h = normalize(l.add(v));
-  const glint = sun.mul(ggx(saturate(n.dot(h)), nl, nv, alpha)).mul(nl);
+  const nh = saturate(n.dot(h)), { D, V } = facets(nh, nl, nv, alpha);
+  const glint = sun.mul(D.mul(V).mul(nl)).mul(sparkle(D, nh, saturate(h.dot(l))));
   const reflected = seen.add(glint).mul(F);
 
   // toward the sun the crests glow; side-on a little, from the light scattered out sideways
