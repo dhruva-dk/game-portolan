@@ -8,7 +8,7 @@
 //
 // Litter: fallen fronds and leaves lie under the palms and round the shrubs, thinning out past their crowns.
 //
-// Palms: coconut palms in groves, thickest along the top of the beach where the nuts wash up and take root, thinning
+// Palms: coconut palms in small groves of a few, thickest along the top of the beach where the nuts wash up and take root, thinning
 // inland. They lean out toward the sea and the open light, the nearer the coast the more; the lean recurves upward.
 //
 // Rocks: outcrops of weathered rock: big masses, 5–12 m across, heaped against each other into piles 10–25 m long, on
@@ -144,7 +144,7 @@ export interface Palm {
 
 /** How many palms (on a 70 m island), at least how far apart, metres, and where: from the beach's top to well
  * inland (from the waterline). */
-const PALMS = 60;
+export const PALMS = 20;
 const SPACING = 3.5;
 const BEACH_TOP = -4, INNERMOST = -50;
 
@@ -161,7 +161,7 @@ export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
     const [x, z] = onCoast(site, t, d);
     if (Math.hypot(x, z) < 5) continue;
     // groves, and the beach's top more than inland
-    const grove = Math.min(Math.max((field(noise, x, z, 28, 0.5) + 0.05) / 0.35, 0), 1) ** 2;
+    const grove = Math.min(Math.max((field(noise, x, z, 16, 0.5) - 0.2) / 0.3, 0), 1) ** 2;
     const coastal = Math.exp(d / 15);
     if (rand() > grove * (0.25 + 0.75 * coastal)) continue;
     if (palms.some((p) => Math.hypot(p.x - x, p.z - z) < SPACING) || onRock(rocks, x, z, 1)) continue;
@@ -191,7 +191,7 @@ export interface Shrub {
 }
 
 /** How many shrubs (on a 70 m island), and where: the hedge's band, and how far inland they go (from the waterline). */
-const SHRUBS = 120;
+export const SHRUBS = 50;
 const HEDGE = [-14, -5], INMOST_SHRUB = -45;
 
 export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 1): Shrub[] {

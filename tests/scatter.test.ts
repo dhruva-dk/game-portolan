@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPlanet } from '../src/world/planet.ts';
-import { isle, litter, scatterPalms, scatterRocks, scatterShrubs } from '../src/world/scatter.ts';
+import { PALMS, SHRUBS, isle, litter, scatterPalms, scatterRocks, scatterShrubs } from '../src/world/scatter.ts';
 
 const planet = createPlanet(1);
 const isles = planet.islands.map((s) => isle(s, planet.height));
@@ -48,7 +48,7 @@ test('palms stand on dry land, apart, off the rocks, leaning seaward, as many as
     assert.deepEqual(scatterPalms(i, rocks, k + 1), palms, 'the same every time');
   }
   const n = (i: (typeof isles)[number]) => scatterPalms(i, scatterRocks(i, 4, 4), 1).length;
-  const expected = 60 * (big.site.radius / 70) ** 2;
+  const expected = PALMS * (big.site.radius / 70) ** 2;
   assert.ok(n(big) > expected * 0.7, `largest: ${n(big)} palms, about ${expected.toFixed(0)} hoped`);
   assert.ok(n(small) < n(big) / 3, `smallest ${n(small)} vs largest ${n(big)}`);
 });
@@ -62,7 +62,7 @@ test('shrubs stand on dry land behind the beach, as many as the island\'s area h
     }
     assert.deepEqual(scatterShrubs(i, scatterRocks(i, 4, 4, k + 1), 4, k + 1), shrubs, 'the same every time');
   }
-  const shrubs = scatterShrubs(big, scatterRocks(big, 4, 4), 4).length, expected = 120 * (big.site.radius / 70) ** 2;
+  const shrubs = scatterShrubs(big, scatterRocks(big, 4, 4), 4).length, expected = SHRUBS * (big.site.radius / 70) ** 2;
   assert.ok(shrubs > expected * 0.7, `largest: ${shrubs} shrubs, about ${expected.toFixed(0)} hoped`);
 });
 

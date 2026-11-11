@@ -21,13 +21,13 @@ type N = any;
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;
-const LEAVES = 650;
+const LEAVES = 450;
 /** A leaf's length, as a share of the shrub's size. */
-const LEAF = 0.08;
+const LEAF = 0.095;
 /** Leaves' albedo: the shrubs' fleshy green, and the paler, yellower and the darker ends of their range. */
-const GREEN = [0.08, 0.15, 0.04];
-const PALE = [0.13, 0.18, 0.05];
-const DARK = [0.05, 0.1, 0.03];
+const GREEN = [0.045, 0.07, 0.022];
+const PALE = [0.08, 0.095, 0.035];
+const DARK = [0.03, 0.05, 0.018];
 /** How much of the light on a leaf's far side comes through it: fleshy leaves pass less than a palm's. */
 const THROUGH = 0.25;
 

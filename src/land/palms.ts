@@ -5,7 +5,7 @@
 // foot, ambientCG Bark015 scaled to the grey-brown of a palm's trunk and ringed by the scars of fallen fronds. Under
 // the crown, a cluster of nuts.
 //
-// The crown: a score of fronds in every direction from the young, pointing up, to the old, drooping, each a rachis
+// The crown: sixteen fronds in every direction from the young, pointing up, to the old, drooping, each a rachis
 // that arches out and bends under its own weight with leaflets down both sides — every leaflet its own few
 // triangles, so the leaves need no cut-out texture (an alpha test would cost the phone's GPU its hidden-surface
 // removal). Lit on both sides, and glowing through from behind as leaves do.
@@ -28,18 +28,20 @@ const LEANS = [0.08, 0.2, 0.32, 0.46];
 /** A shape's height, metres: each palm is scaled from it to its own. */
 const HEIGHT = 10;
 const TRUNK_ALONG = 28, TRUNK_AROUND = 9;
-const FRONDS = 24, LEAFLETS = 42, RACHIS = 14;
+const FRONDS = 16, LEAFLETS = 28, RACHIS = 10;
 /** The bark texture's mean colour, linear (measured), and the trunk's mean albedo it is scaled to. */
 const BARK_MEAN = [0.271, 0.206, 0.094];
 const BARK_ALBEDO = [0.3, 0.27, 0.22];
 /** Leaf scars ring the trunk every this many metres. */
 const RING = 0.09;
-/** Leaves' albedo: young fronds' green, old ones' yellowing, and the nuts'. */
-const LEAF = [0.07, 0.13, 0.025];
-const OLD_LEAF = [0.2, 0.18, 0.05];
+/** Leaves' albedo: young fronds' olive green, old ones' yellowing, and the nuts'. */
+const LEAF = [0.04, 0.06, 0.018];
+const OLD_LEAF = [0.12, 0.1, 0.035];
 const NUT = [0.16, 0.14, 0.04];
 /** How much of the light falling on a leaf's far side comes through it. */
-const THROUGH = 0.45;
+const THROUGH = 0.3;
+/** Of the sky's light, the share that reaches a leaflet at a frond's base, in the crown's heart (all reaches its tip). */
+const HEART = 0.4;
 
 interface Shape { trunk: BufferGeometry; crown: BufferGeometry }
 
@@ -122,28 +124,29 @@ function shape(lean: number, seed: number): Shape {
       along.push(t);
       p.addScaledVector(t, length / RACHIS);
     }
-    const shadeOf = () => 0.85 + rand() * 0.3;
+    // each leaflet a little lighter or darker than the next, and darker toward the crown's heart
+    const shadeOf = (u: number) => (0.85 + rand() * 0.3) * (HEART + (1 - HEART) * u);
     for (let k = 0; k < RACHIS; k++) {
       // the rachis: a narrow strip
       const side = along[k].clone().cross(world).normalize().multiplyScalar(0.025 * (1 - k / RACHIS) + 0.008);
       const lift = side.clone().cross(along[k]).normalize();
       const a = spine[k].clone().add(side), b = spine[k].clone().sub(side), d = spine[k + 1].clone().add(side), e = spine[k + 1].clone().sub(side);
-      tri(a, b, d, lift, age, 0.8);
-      tri(b, e, d, lift, age, 0.8);
+      tri(a, b, d, lift, age, 0.8 * shadeOf(k / RACHIS));
+      tri(b, e, d, lift, age, 0.8 * shadeOf(k / RACHIS));
     }
     for (let l = 0; l < LEAFLETS; l++) {
       const u = 0.1 + (0.9 * (l + 0.5)) / LEAFLETS, k = Math.min(Math.floor(u * RACHIS), RACHIS - 1), f = u * RACHIS - k;
       const at = spine[k].clone().lerp(spine[k + 1], f), t = along[k];
       const side = t.clone().cross(world).normalize(), lift = side.clone().cross(t).normalize();
       // longest mid-frond, short at the base and the tip
-      const len = 1.15 * Math.sin(Math.PI * (0.06 + 0.9 * u)) * (1 - 0.35 * u), w = 0.08 * (1 - 0.4 * u);
+      const len = 1.15 * Math.sin(Math.PI * (0.06 + 0.9 * u)) * (1 - 0.35 * u), w = 0.11 * (1 - 0.4 * u);
       for (const sign of [-1, 1]) {
         const dir = side.clone().multiplyScalar(sign * 0.8).addScaledVector(t, 0.45).addScaledVector(lift, -0.15 - 0.25 * age).normalize();
         const across = t.clone().multiplyScalar(w / 2);
         const sag = (0.15 + 0.35 * age) * len;
         const mid = at.clone().addScaledVector(dir, len * 0.5).addScaledVector(lift, -sag * 0.3);
         const tip = at.clone().addScaledVector(dir, len).addScaledVector(lift, -sag);
-        const s = shadeOf();
+        const s = shadeOf(u);
         tri(at.clone().sub(across), at.clone().add(across), mid.clone().add(across.clone().multiplyScalar(0.8)), lift, age, s);
         tri(at.clone().sub(across), mid.clone().add(across.clone().multiplyScalar(0.8)), mid.clone().sub(across.clone().multiplyScalar(0.8)), lift, age, s);
         tri(mid.clone().sub(across.clone().multiplyScalar(0.8)), mid.clone().add(across.clone().multiplyScalar(0.8)), tip, lift, age, s);
