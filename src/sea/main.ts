@@ -12,7 +12,7 @@ import { Fn, dot, exp, fract, clamp, min, pass, rtt, screenCoordinate, screenUV,
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { R, U, bodies, dayFor } from './world.ts';
 import { AIR_TOP, SKY, Sky, airFog, ambientCpu, background, transmittanceCpu } from './sky.ts';
-import { CALM_SEA, Ocean } from './ocean.ts';
+import { CALM_SEA, Ocean, SEA } from './ocean.ts';
 import { Ship } from './ship.ts';
 import { shape } from '../render/gpu/shape.ts';
 import { runFrameWork } from '../render/gpu/work.ts';
@@ -67,6 +67,8 @@ const sky = new Sky(renderer);
 const ocean = new Ocean();
 ocean.sea = { ...CALM_SEA, wind: num('wind', 12), fetch: 40000, swell: 0.9, swellLength: 60, chop: 1.15 };
 SKY.coverage.value = num('cover', 0.55);
+SEA.foamFold.value = num('fold', SEA.foamFold.value as number);
+SEA.foamLife.value = num('life', SEA.foamLife.value as number);
 scene.add(ocean.mesh);
 const start = new Vector3(0.8, 0.12, 0.58).normalize();
 const ship = new Ship(start);

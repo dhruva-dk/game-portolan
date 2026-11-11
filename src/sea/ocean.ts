@@ -48,7 +48,7 @@ export const SEA = shared({
   time: uniform(0),
   dt: uniform(1 / 60),
   /** Foam: the fold below which the surface breaks white, how fast it whitens, how long it lasts, s. */
-  foamFold: uniform(0.8),
+  foamFold: uniform(0.84),
   foamGain: uniform(2.2),
   foamLife: uniform(3.2),
   crest: uniform(2),
