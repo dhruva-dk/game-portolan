@@ -2,9 +2,11 @@
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in rubric under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts); a tap opens the full map
-//   right edge  Gust, with a pip for each charge; under it, in the right thumb's reach, Fire (the old game's place):
-//               the gun's mark on a paper disc, the reload sweeping round it in rubric, faint and struck through
-//               with no gun
+//   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
+//               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
+//               above it, with a pip for each charge
+//   centre      the old game's reticle, four arms round a gap, gilt and drawn in while the aim assist has a ship
+//               (sim/gun.ts); none with no gun
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot, then three more
 // No words. The stick (play/stick.ts) is drawn by the game; look drags take the rest of the screen.
 //
@@ -34,8 +36,9 @@ export interface HudState {
   chosen: number;
   /** Gust's charges ready, of GUSTS. */
   gust: number;
-  /** Her gun: its rarity (0–4) and how far loaded (0…1, 1 ready); null with none. */
-  gun: { rarity: number; ready: number } | null;
+  /** Her gun: its rarity (0–4), how far loaded (0…1, 1 ready), and whether the assist has a ship to lay on; null
+   * with none. */
+  gun: { rarity: number; ready: number; locked: boolean } | null;
   /** Where she is (unit sphere) and the way she heads (unit tangent). */
   at: Vec3; heading: Vec3;
 }
@@ -45,8 +48,11 @@ export interface HudActions { slot(i: number): void; gust(): void; map(): void; 
 const GUSTS = 2;
 const SLOT = 50, GAP = 6;
 const MINIMAP = 132;
-/** Fire's radius, px, and its centre from the safe area's right and bottom edges (the old game's, chart/layout.ts). */
-const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102;
+/** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
+ * game's, chart/layout.ts: 802, 317 on the phone's 956 × 440). */
+const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102, GUST_RIGHT = 6, GUST_UP = 86;
+/** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship. */
+const RETICLE = 10, LOCKED = 0.75;
 
 /** m:ss */
 export const clock = (s: number) => {
@@ -62,10 +68,13 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   const vitals = piece(root, 'top left');
   const readings = piece(root, 'top centre');
   const map = piece(root, 'top right', true);
-  const gust = piece(root, 'right', true);
-  gust.style.top = '46%';
+  // (each piece stands 4 px in from the safe area's edge: ui.ts)
+  const gust = piece(root, 'right bottom', true);
+  gust.style.margin = `0 ${FIRE_RIGHT - GUST_RIGHT - 30 - 4}px ${FIRE_BOTTOM + GUST_UP - 30 - 4}px 0`;
   const fire = piece(root, 'right bottom', true);
   fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
+  const reticle = piece(root, '');
+  reticle.style.cssText = `left:50%;top:50%;transform:translate(-50%,-50%)`;
   // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
@@ -125,7 +134,17 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       const loaded = s.gun ? Math.floor(Math.min(1, s.gun.ready) * 48) : -1, c = FIRE + 2;
       draw(fire, `${loaded}`, () => svg(2 * c, 2 * c, `<g opacity="${loaded < 0 ? 0.5 : 1}">${paperDisc(c, c, FIRE - 2)}${glyph('weapon.cannon', c, c, 1.2 * FIRE)}`
         + (loaded < 0 ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
-        + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 4, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
+        + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
+
+      // the reticle: iron under lead white, or gilt while the assist has a ship
+      const lock = s.gun ? (s.gun.locked ? 'locked' : 'free') : 'none';
+      draw(reticle, lock, () => {
+        if (lock === 'none') return '';
+        const h = RETICLE + 3, r = lock === 'locked' ? RETICLE * LOCKED : RETICLE, gap = r * 0.32;
+        const arms = `M${h - r} ${h}H${h - gap}M${h + gap} ${h}H${h + r}M${h} ${h - r}V${h - gap}M${h} ${h + gap}V${h + r}`;
+        return svg(2 * h, 2 * h, `<path d="${arms}" stroke="${INK.iron}" stroke-width="2.6" opacity=".6" transform="translate(.6 .8)"/>`
+          + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>`);
+      });
 
       s.slots.forEach((slot, i) => draw(slots[i], `${slot?.glyph} ${slot?.count} ${s.chosen === i}`, () => {
         const chosen = s.chosen === i;

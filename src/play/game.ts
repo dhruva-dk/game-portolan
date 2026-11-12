@@ -28,7 +28,7 @@ import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from
 import { mind, rammed, think, type Memory, type Seen } from '../sim/bot';
 import { afloat, stepFleet, type Vessel } from '../sim/contact';
 import { STEP, blendPose, fixedClock } from '../sim/fixed';
-import { gunOf } from '../sim/gun';
+import { chosen, gunOf, lead, muzzle } from '../sim/gun';
 import { GUN, HEALTH, SHIP } from '../sim/handling';
 import { sunk } from '../sim/health';
 import { knocked, pose, ride, settled, type Ride } from '../sim/ride';
@@ -69,8 +69,9 @@ export interface Status {
   at: Vec3; heading: Vec3;
   /** Her hit points, and their most. */
   hull: number; hullMax: number; shield: number; shieldMax: number;
-  /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities) and how far loaded (0…1, 1 ready); null with none. */
-  gun: { rarity: number; ready: number } | null;
+  /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities), how far loaded (0…1, 1 ready), and whether its assist
+   * has a ship to lay on where she is aimed (sim/gun.ts); null with none. */
+  gun: { rarity: number; ready: number; locked: boolean } | null;
   /** Ships still afloat, hers among them; whether hers is sunk. */
   afloat: number; sunk: boolean;
   /** Seconds till the storm next holds or closes (0 once it has closed for good), and its calm (radius in metres). */
@@ -193,6 +194,12 @@ export function createGame(
   let drawn = 0, eye = { centre: [0, 0, 1] as Vec3, radius: -1 };
   const storm = () => match.storm(drawn);
 
+  /** Whether her gun's assist, aimed where the camera looks, has a ship it can lay on. */
+  const locked = (v: Vessel, rarity: number) => {
+    const from = muzzle(v), mark = chosen(from, chase.axes().ahead, GUN.assist[rarity], fleet.filter((o) => o.id !== v.id));
+    return !!mark && lead(from, mark) !== null;
+  };
+
   /** What the HUD reads of the match. (Its calm is a new object only when it has moved or changed by a metre.) */
   const status = (): Status => {
     const c = battle.crews.find((k) => k.id === PLAYER)!, v = mine(), s = storm();
@@ -202,7 +209,7 @@ export function createGame(
     return {
       at: v?.ship.at ?? last.up, heading: v?.ship.heading ?? last.forward,
       hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
-      gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full } : null,
+      gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full, locked: !!v && locked(v, c.gun.rarity) } : null,
       afloat: fleet.length, sunk: sunk(c.health),
       storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, eye,
     };
