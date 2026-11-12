@@ -225,7 +225,7 @@ export function createGame(
       if (v.id === PLAYER) [helms[i], orders[i]] = [helm, gun];
       else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
       else {
-        const r = think(seen[i], seen.filter((o) => o.id !== v.id), depth, a.mind, seedOf(v.id), STEP, chart);
+        const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm: match.storm(time()) }, a.mind, seedOf(v.id));
         [a.mind, helms[i], orders[i]] = [r.memory, r.helm, r.order];
       }
     });

@@ -1,0 +1,160 @@
+// What a bot is, shared by her mind (bot.ts), her helm (helmsman.ts) and her gun (gunner.ts): what she is tuned by,
+// how she sees a ship, what she carries from one step to the next, what a step of her weighs, and the few bits of the
+// sphere and of chance they all reach for.
+//
+// Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
+
+import { add, cross, dot, length, scale, type Vec3 } from '../world/sphere.ts';
+import { random } from '../world/random.ts';
+import { STEP } from './fixed.ts';
+import { SHIP } from './handling.ts';
+import { gunner, type Gunner } from './gunner.ts';
+import type { ShipState } from './ship.ts';
+import type { Chart, Route } from './route.ts';
+import type { Depth } from './shoal.ts';
+import type { Storm } from './storm.ts';
+import type { Temper } from './temper.ts';
+
+/** Everything a bot is tuned by. Seconds and metres; 0117's values unless said. */
+export const BOT = {
+  /** Think every this many steps (0117: 6 ticks, 0.2 s). */
+  every: 6,
+  /** The farthest she looks for a ship, m; seconds she follows one out of sight; ground higher than `sightLine` m
+   *  hides one, looked for every `sightStep` m along the way. */
+  sightMax: 240, forget: 4, sightLine: 2.5, sightStep: 20,
+  /** A ship that rammed her within `grudge` s is seen as `nearer` as far, and rouses her will to fight by `roused`,
+   *  cooling from `cool` s on (0117: 150, 240 and 90 ticks). Rammed within `fresh` s, by one she won't fight, she runs. */
+  grudge: 5, nearer: 0.5, roused: 0.4, cool: 3, fresh: 3,
+  /** Within `crowd` m each other ship she sees takes this much off her will, by her skill. */
+  crowd: 150, crowding: 0.25,
+  /** The will at which she is in two minds, and how sharply it decides (logistic width). */
+  will: 0.35, willWidth: 0.1,
+  /** Closer than `closeFrom` m she starts to fight whatever her will; closer than `closeAt`, wholly. */
+  closeFrom: 50, closeAt: 35,
+  /** A ship sailing away is let go from `letGo` m (0117's, then only while holding back early in a match: here always,
+   *  as a ram can't catch a ship as fast as she is). */
+  letGo: 90,
+  /** Her speed away, m/s, over which she is let go from a fight, and over which she isn't taken up (new: a ram must
+   *  catch her, sailing up to SHIP.top). */
+  outrun: [0.75 * SHIP.top, 0.95 * SHIP.top] as const, outran: [0.55 * SHIP.top, 0.75 * SHIP.top] as const,
+  /** Running, she makes for open water this far off from her foe; she looks this far round a run for open water. */
+  run: 120,
+  /** Roaming: a new mark every `roam` s or within `arrive` m, `near`–`far` m off. */
+  roam: 9, arrive: 20, near: 60, far: 160,
+  /** Water open to her: this deep past her draught (0117's OPEN). */
+  open: 0.3,
+  /** Feeling ahead for shoal water: this far plus her speed (m/s × 1 s); sides felt `side` rad either way, a little
+   *  further; a turn off land is `firm` rad of steer when one side is open, `hard` when neither is; held `avoid` s once
+   *  the way clears. */
+  feel: 14, feelSide: 16, side: 0.6, firm: 0.9, hard: 1.2, avoid: 0.8,
+  /**
+   * Backing off a bank: making less than `crawl` m/s she is stuck (0117: 1, by top speed 14.5 → 12). With shoal water
+   * `bow` m past her forefoot (0117: 4 m past a shorter hull's centre), she waits `wade` s, then makes for the deepest
+   * water `sound` m round her for up to `most` s. Else stuck `stuck` s, she turns hard (steer `full`) toward the open
+   * side at about `rate` rad/s (0117: 0.65 at her turn of 0.55; here SHIP.turn 0.42), for `least`–2.2×`least` s, at most
+   * `most`, until her course lies within `slack` of half a turn ahead; at `slow` throttle.
+   */
+  crawl: 0.83, bow: 4, wade: 1, sound: 14, stuck: 2.5, full: 2.4, rate: 0.5, least: 1, most: 4.5, slack: 0.6, slow: 0.6,
+  /** Ramming (new): the lead is at most `lead` s; from further than `commit` m, a ship she lies more than `abeam`
+   *  (cosine) ahead or astern of is come at by way of a point off her beam, half the way out, `offMin`–`offMax` m; once
+   *  her hull touches her foe's, she bears away for `recoil` s (a ram's blow lands once until they are RAM.rearm clear). */
+  lead: 8, commit: 25, abeam: 0.5, offMin: 15, offMax: 50, recoil: 3,
+  /** Answering a ram (adapted from 0117's answer to a gun): a ship within `threat` m, her bow within `aimed` rad of
+   *  her, closing faster than `closing` of a ram's least, due within `warn` s and passing within `miss` m. Whether she
+   *  sees it is decided once each `warn` s, with a chance of 0.2 + 0.75 × skill. */
+  threat: 90, aimed: 0.6, closing: 0.8, warn: 5, miss: 0.75 * SHIP.length,
+  /**
+   * The storm (0117's storm option, keepInside, inward and roamGoal), by her temperament's margin (Temper): the next
+   * cap is `late` when it is closing or due to within this many s; getting inside is urgent from `ease[0]` of her
+   * margin in from the edge, wholly by `ease[1]`; late, she is well inside the next cap `inNext` of her margin in.
+   * Within `nearEdge` of her margin of the edge she makes for the cap she is in, else for the next. Making in, she
+   * makes for open water `inward` of the way out from the centre to her edge less her margin, found within `shore` m
+   * of it in rings `ring` m apart (0117: 20 of its 6.8 m cells). Once the cap is under `drift` m, a roaming mark is
+   * drawn `drawn` of the way in toward its centre (a chord's share, as 0117 drew it).
+   */
+  late: 25, ease: [0.55, 0.3] as const, inNext: 0.5, nearEdge: 0.4, inward: 0.6, shore: 136, ring: 6.8, drift: 600, drawn: 0.4,
+} as const;
+
+/** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
+ *  whole and none when not given), and whether she carries a gun. */
+export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean }
+
+/** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
+ *  no routes round land, only feels her way along it; and the storm now (storm.ts), without which she pays it no heed. */
+export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null }
+
+export type Mode = 'roam' | 'fight' | 'flee' | 'storm';
+
+/** What a bot carries from one step to the next, her gunnery's with it. */
+export interface Memory extends Gunner {
+  /** Her random draws' state; seconds she has been afloat; steps to her next think. */
+  rand: number;
+  clock: number;
+  think: number;
+  /** What she is about, since when (s), and where she makes for. */
+  mode: Mode;
+  since: number;
+  goal: Vec3;
+  /** Her foe (an id, or -1), when she last saw her, and where. */
+  foe: number;
+  seen: number;
+  last: Vec3;
+  /** Who last rammed her (-1: none) and when. */
+  hitBy: number;
+  hitT: number;
+  /** Seconds and way (sign, + to port) she holds a turn off land; seconds left backing off a bank (below 0: working
+   *  off a bar), seconds crawling, and the way she backs off; seconds left bearing away from a ram. */
+  avoid: number;
+  backT: number;
+  stuckT: number;
+  strafe: number;
+  recoil: number;
+  /** Where she was a step ago. */
+  was: Vec3;
+  /** The route round land she follows (route.ts), if any. */
+  route: Route | null;
+}
+
+/** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
+export const mind = (seed: number, at: Vec3): Memory => ({
+  rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
+  foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at, route: null,
+  ...gunner(),
+});
+
+/** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */
+export const rammed = (m: Memory, by: number): Memory => ({ ...m, hitBy: by, hitT: m.clock });
+
+/** What a think and a step weigh: her, the others afloat, the sea, her memory (written to), her temperament, her foe
+ *  as she sees her now and how far off, and her seed. */
+export interface Ctx { own: Seen; others: readonly Seen[]; sea: Sea; m: Memory; t: Temper; foe: Seen | null; foeD: number; seed: number }
+
+// ---------------------------------------------------------------- the sphere
+
+/** The way from p toward q along the surface: a unit tangent at p, or null at q (or its antipode). */
+export function toward(p: Vec3, q: Vec3): Vec3 | null {
+  const t = add(q, p, -dot(p, q)), l = length(t);
+  return l > 1e-12 ? scale(t, 1 / l) : null;
+}
+/** Tangent t at p turned `a` radians to port. */
+export const rotate = (p: Vec3, t: Vec3, a: number): Vec3 => add(scale(t, Math.cos(a)), cross(p, t), Math.sin(a));
+/** A ship's way through the water and her shove: m/s, a tangent at her place. */
+export const velocity = (o: Seen): Vec3 => add(scale(o.ship.heading, o.ship.speed), o.shove ?? [0, 0, 0]);
+
+// ---------------------------------------------------------------- chance and the water
+
+/** A number 0..1 fixed by its two keys, for a choice made once and kept. */
+export const unitHash = (a: number, b: number) => random((Math.imul(a, 0x9e3779b1) ^ Math.imul(b, 0x85ebca6b)) >>> 0)();
+/** Her next draw, 0..1. */
+export const roll = (m: Memory) => {
+  const r = random(m.rand)();
+  m.rand = (m.rand + 0x6d2b79f5) >>> 0;
+  return r;
+};
+export const between = (m: Memory, lo: number, hi: number) => lo + (hi - lo) * roll(m);
+
+/** Whether the water at p is open to her. */
+export const open = (c: Ctx, p: Vec3) => c.sea.depth(p) >= SHIP.draught + BOT.open;
+
+/** Whether she saw her foe when she last looked. */
+export const inSight = (c: Ctx) => c.m.foe >= 0 && c.m.clock - c.m.seen < (BOT.every - 0.5) * STEP;

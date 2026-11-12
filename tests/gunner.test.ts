@@ -44,7 +44,7 @@ function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)
     fleet.forEach((v, i) => {
       const m = minds[i];
       if (!m) { helms.push(held); orders.push({ aim: null, fire: false }); return; }
-      const r = think(seen[i], seen.filter((o) => o.id !== v.id), deep, m, seeds[i]!);
+      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep }, m, seeds[i]!);
       minds[i] = r.memory;
       helms.push(r.helm);
       orders.push(r.order);

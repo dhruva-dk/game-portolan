@@ -331,6 +331,23 @@ A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its f
 
 **What I left:** magazines, the other seven weapons, crits and the weak spot, falloff with range, parts damage, the spread from turning, the seaway and weather, bots' sparring scale, and the shield-skipping causes (supported by `harmed(…, past)` but unused).
 
+## 13. Bots and the Storm
+
+`src/sim/bot.ts` (the mind), `helmsman.ts` (the helm), `captain.ts` (the shared table, memory and context). `think` takes the storm now on the match's clock (`storm.ts` `Storm`: cap, next cap, closing, seconds to next, phase) as plain input in its `Sea`; without one a bot ignores it, so storm-free voyages are bit-for-bit what they were.
+
+**Ported from 0117** (`src/sim/captains/brain.ts`; temperament margins already in `temper.ts` from `temperaments.ts`)
+- **The `storm` option** (`brain.ts:191-200`), first, weight 6: score `max(ramp(edge, 0.55·margin, 0.3·margin), late && !inNext && phase < LAST)`. `late` is closing or under 25 s to the close (`decide`, `brain.ts:368`); `inNext` is more than half her margin inside the next cap (`brain.ts:367`). It makes for the current cap while not late or within 0.4 of her margin of its edge, else for the next one.
+- **`inward`** (`brain.ts:827`): stay put if within `r − margin`, else 0.6 of `r` out from the centre toward her, then open water near there (`nav.ts nearestOpen`, 20 cells of 6.8 m, here rings out to 136 m).
+- **`keepInside`** (`brain.ts:860`) on the flee option's mark (`brain.ts:221-233`).
+- **`roamGoal`** (`brain.ts:797-815`): marks kept a margin inside the edge, drawn 0.4 toward the centre once the cap is under 600 m, and a fall-back inward by twice her margin.
+
+**New here**
+- While the next cap is late, roam marks are kept inside it, not inside the current cap. This storm's edge closes at up to 8 m/s, 0117's at 2 to 4 m/s. With 0117's rule, a bot with a small margin sat just inside the next cap, roamed out between the two caps, and was overtaken (`tests/bot.test.ts`).
+- `inward` measures along the surface; 0117 used the chord.
+- The fall-back to the deepest water is kept when she is already well inside.
+
+**Left:** the fight option's "wait at the edge" for a player who lingers in the Storm (needs `learning.ts`), hunting, sheltering from weather, and the Storm-edge checks of loot, home and hunt.
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.

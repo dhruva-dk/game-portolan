@@ -68,7 +68,7 @@ function voyage(depth: Depth, ch: Chart | null, from: Vessel, mark: Vec3, seed: 
   let fleet = [from], m: Memory = mind(seed, from.ship.at), least = Infinity;
   for (let n = 1; n <= most / STEP; n++) {
     m = { ...m, goal: mark, since: 0 };
-    const r = think(fleet[0], [], depth, m, seed, STEP, ch);
+    const r = think(fleet[0], [], { depth, chart: ch }, m, seed);
     m = r.memory;
     fleet = stepFleet(fleet, [r.helm], STEP, depth).fleet;
     least = Math.min(least, clearance(fleet[0].ship.at, fleet[0].ship.heading, depth).least);
@@ -142,7 +142,7 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   for (let n = 0; n < steps; n++) {
     const t0 = performance.now();
     const helms = fleet.map((v, i) => {
-      const r = think(v, fleet.filter((o) => o.id !== v.id), depth, minds[i], v.id + 1, STEP, ch);
+      const r = think(v, fleet.filter((o) => o.id !== v.id), { depth, chart: ch }, minds[i], v.id + 1);
       minds[i] = r.memory;
       return r.helm;
     });
