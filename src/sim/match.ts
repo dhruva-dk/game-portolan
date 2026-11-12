@@ -16,6 +16,9 @@ export const HOLD = { spectating: 3, won: 6 } as const;
 /** The player's ship's id. */
 export const PLAYER = 0;
 
+/** The ships in a match with a drop, hers among them (0117's tables.ts MATCH.ships). */
+export const SHIPS = 20;
+
 /** A ship sunk: who, and who sank her (null: the storm, or none). */
 export interface Sunk { id: number; by: number | null }
 

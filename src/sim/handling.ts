@@ -18,7 +18,14 @@ export const SHIP = {
   fullBite: 0.32,
   /** Rudder per radian still to turn: full rudder from 48° off the course. */
   steer: 1.2,
-  /** Hull, metres: her keel's depth below the waterline, her length and beam. */
+  /**
+   * Hull, metres: her keel's depth below the waterline, her length and beam, for her capsule (contact.ts, shot.ts) and
+   * her soundings (shoal.ts). The length is the drawn galleon's overall, beak and bowsprit in (src/ship at 0.6×, as
+   * its commit gives it: 26 m overall), not her waterline, which is 18.6 m by 5.0 m (src/ship/waterline.ts): so her
+   * capsule meets a bowsprit, and she sounds 10.4 m ahead, past her stem at 9.2. 0117's hull, a circle, went by its
+   * waterline (tables.ts SHIP half 8.6, beam 2.6: 17.2 m by 5.2). The beam is wider than the drawn hull's 5.2 m at
+   * its widest, and nothing records why; left as it is until it is tuned by feel.
+   */
   draught: 2.2,
   length: 26,
   beam: 6.5,
@@ -103,7 +110,9 @@ export const GUN = {
   assist: [0.2, 0.25, 0.3, 0.36, 0.42],
   /** In choosing among those in the cone, the share of range that counts as much as the cone's whole width. */
   nearer: 0.5,
-  /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth (src/ship/mount.ts). */
+  /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth, whose top is 2.97 m ahead and
+   *  1.99 m up (src/ship/mount.ts GUN_MOUNT), its bore 0.6 m above that. (tests/battle.test.ts holds the two together;
+   *  the drawn plinth should come to read these.) */
   ahead: 3,
   up: 2.6,
   /** Her hull, for a ball: the hull's capsule (contact.ts) standing from the waterline to this many metres up. */

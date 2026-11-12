@@ -5,6 +5,7 @@ import { afloat, stepFleet, type Blow, type Vessel } from '../src/sim/contact.ts
 import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle } from '../src/sim/gun.ts';
 import { GUN, HEALTH, SHIP } from '../src/sim/handling.ts';
+import { GUN_MOUNT } from '../src/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
 import { BEST, elevationFor, flightTime, flown, loosed, reach, type Ball } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -195,6 +196,13 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
   const gun = gunOf(2), clean = laid(fleet[0], gun, fleet[0].ship.heading, fleet, 5, 0).dir;
   const off = (k: number) => Math.acos(Math.min(1, dot(laid(fleet[0], gun, fleet[0].ship.heading, fleet, 5, GUN.spread[2] * k).dir, clean)));
   assert.ok(Math.abs(off(2.5) / off(1) - 2.5) < 0.01, `${off(1)}, ${off(2.5)}`);
+});
+
+test('the muzzle stands on the drawn plinth: as far ahead, and its bore a little above the top', () => {
+  assert.ok(Math.abs(GUN.ahead - GUN_MOUNT[2]) < 0.05, `${GUN.ahead} m ahead, the plinth ${GUN_MOUNT[2]}`);
+  assert.equal(GUN_MOUNT[0], 0);
+  const bore = GUN.up - GUN_MOUNT[1];
+  assert.ok(bore > 0.3 && bore < 1, `bore ${bore.toFixed(2)} m above the plinth`);
 });
 
 // ------------------------------------------------------------------ the fighting
