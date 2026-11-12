@@ -1,7 +1,8 @@
 // The galleon's hull and what is fixed to it, ported from the galleon branch: the planked skin and flat transom,
 // the wales and the painted strakes over them (the captain's colour), the solid bulwarks with their cap rail, the
-// decks and the bulkheads where they step, the stern's gilt mouldings and crest, the rudder, the beakhead (bare: no
-// figure), the catheads and anchors, gratings, and the plinth amidships that a gun will stand on.
+// decks and the bulkheads where they step, the transom's framing (gilt rails, dark stiles, panels of upright
+// planking, a frieze in her colour) and crest, the rudder, the beakhead (bare: no figure), the catheads and anchors,
+// gratings, and the plinth amidships that a gun will stand on.
 //
 // Left out, by the owner's rule that nothing on her shows that anyone was ever aboard: windows, the stern lantern,
 // quarter galleries, doors, ladders, the ship's boat, the capstan, the whipstaff's hood and the gunports.
@@ -27,8 +28,9 @@ export function buildHull(body: Acc, D: Detail): void {
   if (D.inboard) bulwarks(body, D);
   decks(body, D);
   if (D.inboard) bulkheads(body, D);
+  if (D.run) frieze(body);
   if (D.fittings) stern(body);
-  if (D.head) { rudder(body); beakhead(body, D); }
+  if (D.head) { rudder(body, D); beakhead(body, D); }
   plinth(body, D);
   if (D.fittings) fittings(body);
 }
@@ -192,31 +194,85 @@ function bulkheads(acc: Acc, D: Detail): void {
 
 // ---------------------------------------------------------------- the stern
 
-/** Gilt mouldings across the transom at each deck, and a carved crest over the taffrail. */
-function stern(acc: Acc): void {
-  const zT = (y: number) => zOf(0, y) - 0.04;
+/** The transom's face at height y, a hair aft of its planking; and the way it faces (aft, and down as it rakes). */
+const zT = (y: number) => zOf(0, y) - 0.04;
+const AFT = V(0, -0.2, -1).normalize();
+/** The transom's rails, bottom to top: the counter's, under and over the quarterdeck, under the poop, the taffrail. */
+const railsAt = () => {
   const qd = levelDeck(LEVELS[1], 0), pd = levelDeck(LEVELS[0], 0);
+  return [mainDeck(0) - 0.4, qd - 0.15, qd + 0.45, pd - 0.25, sideTop(0) - 0.05];
+};
+/** Panels across each tier between two rails; one is a frieze in the captain's colour. */
+const TIERS = [2, 1, 3, 3], FRIEZE = 1;
+
+/** A flat panel on the transom between heights y0 and y1, from fraction a to b of its breadth, `out` proud of it. */
+function panel(acc: Acc, y0: number, y1: number, a: number, b: number, inset: number, out: number, upright: boolean): void {
+  const grid = [y0 + inset, y1 - inset].map((y) => {
+    const h = halfAt(0, y) - 0.06;
+    return [lerp(-h, h, a) + inset, lerp(-h, h, b) - inset].map((x) => V(x, y, zT(y) - out));
+  });
+  // upright: its planks run up and down, across the transom's own
+  const uv = (p: Vector3): [number, number] => (upright ? [p.y / PLANK_TILE, p.x / PLANK_TILE + 0.2] : [p.x / PLANK_TILE, p.y / PLANK_TILE]);
+  sheet(acc, grid, grid.map((r) => r.map(uv)), AFT);
+}
+
+/** The frieze in the captain's colour between the quarterdeck's rails, the one part of the stern every level shows. */
+function frieze(acc: Acc): void {
+  const rails = railsAt();
+  acc.with({ kind: KIND.paint }, () => panel(acc, rails[FRIEZE], rails[FRIEZE + 1], 0, 1, 0.06, 0.02, false));
+}
+
+/**
+ * The transom framed: gilt rails across her at each deck and the counter, dark stiles between them, and between
+ * those plain panels of upright planking, the frieze in her colour; the fashion pieces up either edge; a carved crest
+ * over the taffrail.
+ */
+function stern(acc: Acc): void {
+  const rails = railsAt();
   acc.with({ kind: KIND.gilt }, () => {
-    for (const y of [mainDeck(0) - 0.4, qd - 0.15, qd + 0.45, pd - 0.25, sideTop(0) - 0.05]) {
+    for (const y of rails) {
       const h = halfAt(0, y);
       tube(acc, [V(-h, y, zT(y) - 0.02), V(h, y, zT(y) - 0.02)], 0.07, 5, { caps: true });
     }
+  });
+  TIERS.forEach((n, i) => {
+    const y0 = rails[i], y1 = rails[i + 1];
+    acc.with({ kind: KIND.dark }, () => {
+      for (let k = 1; k < n; k++) {
+        const x = (y: number) => lerp(-(halfAt(0, y) - 0.06), halfAt(0, y) - 0.06, k / n);
+        beam(acc, V(x(y0), y0, zT(y0) - 0.03), V(x(y1), y1, zT(y1) - 0.03), 0.16, 0.08, V(0, 0, 1));
+      }
+    });
+    if (i === FRIEZE) return;
+    acc.with({ kind: KIND.planks }, () => { for (let k = 0; k < n; k++) panel(acc, y0, y1, k / n, (k + 1) / n, 0.14, 0.015, true); });
+  });
+  // the fashion pieces: where the transom meets her sides, from the counter's foot to the taffrail
+  acc.with({ kind: KIND.dark }, () => {
+    for (const side of [1, -1]) {
+      const pts = range(0.5, sideTop(0) - 0.05, 10).map((y) => V(side * (halfAt(0, y) - 0.05), y, zT(y) - 0.02));
+      tube(acc, pts, 0.11, 5, { caps: true });
+    }
+  });
+  acc.with({ kind: KIND.gilt }, () => {
     const top = sideTop(0) + 0.06, ht = halfAt(0, sideTop(0)) - 0.15, zc = zT(top) + 0.1;
     const arch = range(-1, 1, 12).map((t) => V(t * ht, top + 0.7 * Math.cos((t * Math.PI) / 2) ** 0.8, zc));
     tube(acc, arch, 0.08, 5, { caps: true });
-    const panel = [V(-ht, top - 0.05, zc + 0.05), ...arch.map((p) => p.clone().add(V(0, -0.03, 0.05))), V(ht, top - 0.05, zc + 0.05)];
+    const crest = [V(-ht, top - 0.05, zc + 0.05), ...arch.map((p) => p.clone().add(V(0, -0.03, 0.05))), V(ht, top - 0.05, zc + 0.05)];
     acc.with({ kind: KIND.spar }, () => {
-      fan(acc, panel, V(0, 0.2, 1).normalize(), 1);
-      fan(acc, panel.map((p) => p.clone().add(V(0, 0, -0.03))), V(0, 0.2, -1).normalize(), 1);
+      fan(acc, crest, V(0, 0.2, 1).normalize(), 1);
+      fan(acc, crest.map((p) => p.clone().add(V(0, 0, -0.03))), V(0, 0.2, -1).normalize(), 1);
     });
   });
 }
 
 // ---------------------------------------------------------------- the rudder
 
-function rudder(acc: Acc): void {
+/** The rudder hung on the sternpost, tapering from 1.5 m at its foot to 0.55 at its head, capped; at the finest level
+ * its iron straps (the pintles' and gudgeons', as the galleon branch has them). */
+function rudder(acc: Acc, D: Detail): void {
   const y0 = keel(0) + 0.1, y1 = mainDeck(0) + 0.9;
-  const pts = range(y0, y1, 4).map((y) => { const z = zOf(0, y) - 0.12, w = lerp(1.5, 0.55, (y - y0) / (y1 - y0)); return [V(0, y, z), V(0, y, z - w)]; });
+  const width = (y: number) => lerp(1.5, 0.55, (y - y0) / (y1 - y0));
+  const pts = range(y0, y1, 4).map((y) => { const z = zOf(0, y) - 0.12; return [V(0, y, z), V(0, y, z - width(y))]; });
   acc.with({ kind: KIND.dark }, () => {
     for (const side of [1, -1]) {
       const grid = pts.map((r) => r.map((p) => V(side * 0.16, p.y, p.z)));
@@ -224,6 +280,15 @@ function rudder(acc: Acc): void {
     }
     const edge = pts.map((r) => [V(-0.16, r[1].y, r[1].z), V(0.16, r[1].y, r[1].z)]);
     sheet(acc, edge, edge.map((r) => r.map((p): [number, number] => [p.x, p.y / 2])), V(0, 0, -1));
+    const [fore, aft] = pts[pts.length - 1];
+    fan(acc, [V(0.16, y1, fore.z), V(-0.16, y1, fore.z), V(-0.16, y1, aft.z), V(0.16, y1, aft.z)], V(0, 1, 0), 1);
+  });
+  if (!D.fittings) return;
+  acc.with({ kind: KIND.iron }, () => {
+    for (const y of range(y0 + 0.5, y1 - 0.4, 4)) {
+      const w = width(y);
+      box(acc, trs(V(0, y, zOf(0, y) - 0.12 - w * 0.45)), 0.36, 0.12, w * 0.9 + 0.3);
+    }
   });
 }
 
