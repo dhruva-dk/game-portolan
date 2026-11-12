@@ -5,7 +5,7 @@
 //   g  height of the wake's waves over the sea's, metres: the bow wave and the Kelvin wedge spreading off it
 //   b  air worked into the water astern (0…1): it scatters more light back (the wake's pale turquoise) and calms
 //      the ripples on the surface over it
-//   a  the ships' shadows: each ship's outline cast along the sun's rays onto the sea under her
+//   a  the ships' shadows: how much of the sun each ship's hull and canvas take from the sea under her (0…1)
 //
 // Drawn into it, in one pass of three draws:
 //   - each ship's wake, a ribbon along the path her bow has cut (sim/wake.ts), wide enough to hold her Kelvin wedge,
@@ -15,12 +15,21 @@
 //     its arm v·t·0.354 out from her track, so the wedge bends round her turns as the real one does;
 //   - a patch round each hull for what hugs her: foam along her waterline (ship/waterline.ts), thin at rest, heaped
 //     at the bow with speed, the water piled against her bow and boiling up under her transom;
-//   - each ship's farthest level of detail (a hull, masts and five sails), pressed flat onto the sea along the sun.
+//   - each ship's third level of detail (her hull, spars and bellied sails), pressed flat onto the sea along the sun:
+//     her hull takes all of the sun, her canvas all but what comes through it, and where they overlap (or two ships'
+//     do) the darker is kept, not their sum.
 // Nothing here is a flat-world shortcut: the wake is laid along great circles and placed on the eye's chart, as the
 // sea's own waves are, and the shadows are cast onto the sea's level at each ship.
 //
 // A texel is half a metre, which the foam's lace (foam.ts) dresses. The marks fade out toward REACH: from the chase
 // camera the horizon lies a little past it, where a wake is a hair's breadth.
+//
+// The shadows are read apart from the rest (`shade`): where the sun's ray through the water on the waves meets the
+// sea's level, as they were cast — read under the water at rest instead, they swam with the waves and their edges
+// tore into saw teeth across every crest — and softened over a couple of metres. A shadow on the sea is soft: what
+// the eye sees of it is the light scattered back from under the surface, and the water under a shadow is lit by
+// sunlight that came in beside it. A spar's or a sail's thin shadow edge-on to the sun is then a faint smudge, as it
+// is from a deck; only the hull's and a broadside sail's are deep.
 //
 // With no ship near enough to mark it, the map isn't drawn at all and the sea is told it is empty: a pass that drew
 // nothing would still be a pass, and one with no work in it leaves the GPU's timestamps for it unwritten (the frame
@@ -28,14 +37,16 @@
 
 import {
   AddEquation, BufferAttribute, Color, BufferGeometry, CustomBlending, DoubleSide, DynamicDrawUsage, HalfFloatType,
-  InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LinearFilter, Mesh, MeshBasicNodeMaterial,
+  InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LinearFilter, MaxEquation, Mesh, MeshBasicNodeMaterial,
   OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, max, normalize, saturate, select, sin, smoothstep, texture, uniform, vec2, vec3, vec4,
+  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, normalize, saturate, select, sin, smoothstep, texture, uniform,
+  vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { PIVOT_Z, buildShip } from '../ship/build';
+import { THROUGH } from '../ship/materials';
 import { WATERLINE } from '../ship/waterline';
 import { WAKE, laid, type WakePoint } from '../sim/wake';
 import type { Sky } from '../sky/sky';
@@ -70,6 +81,9 @@ const LAPPING = 0.7, BOW = 0.45;
 const PATCH = { astern: 7, ahead: 4, out: 4.5 };
 /** The least the sun's rays may lie along the sea for her shadow: low suns stretch it no further. */
 const LOW_SUN = 0.15;
+/** A shadow is read as the mean of a SOFT × SOFT grid of taps a texel apart (each one filtered), so softened over about
+ * SOFT + 1 texels. */
+const SOFT = 3;
 
 const vertices = WAKE.most + 1;
 
@@ -152,23 +166,28 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
     return vec4(foam, height, ring.mul(pace).mul(0.7).add(boil), 0);
   })()));
 
-  // ---- the shadows: each ship's farthest level pressed onto the sea along the sun
-  const far = buildShip(3);
+  // ---- the shadows: each ship's third level pressed onto the sea along the sun (its sails bellied, as the farthest
+  // level's flat ones are not: edge-on to the sun, those cast only a line)
+  const caster = buildShip(2);
   const shadowGeometry = new InstancedBufferGeometry();
   {
-    const parts = [far.body, far.cloth];
-    const position = new Float32Array(parts.reduce((n, p) => n + p.position.length, 0));
-    const part = new Uint8Array(parts.reduce((n, p) => n + p.part.length, 0));
+    // the hull's and spars' shadow is whole; the canvas lets some of the sun through
+    const parts = [{ p: caster.body, dark: 1 }, { p: caster.cloth, dark: 1 - THROUGH }];
+    const position = new Float32Array(parts.reduce((n, { p }) => n + p.position.length, 0));
+    const part = new Uint8Array(parts.reduce((n, { p }) => n + p.part.length, 0));
+    const dark = new Float32Array(parts.reduce((n, { p }) => n + p.vertices, 0));
     const index: number[] = [];
     let base = 0;
-    for (const p of parts) {
+    for (const { p, dark: d } of parts) {
       position.set(p.position, base * 3);
       part.set(p.part, base * 4);
+      dark.fill(d, base, base + p.vertices);
       p.index.forEach((i) => index.push(i + base));
       base += p.vertices;
     }
     shadowGeometry.setAttribute('position', new BufferAttribute(position, 3));
     shadowGeometry.setAttribute('part', new BufferAttribute(part, 4, true));
+    shadowGeometry.setAttribute('dark', new BufferAttribute(dark, 1));
     shadowGeometry.setIndex(index);
   }
   const poses = new InstancedInterleavedBuffer(new Float32Array(capacity * 12), 12).setUsage(DynamicDrawUsage);
@@ -189,7 +208,10 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
     const drop = dot(p.sub(n.mul(R)), n).div(max(dot(sky.sun, n), LOW_SUN));
     return view.local(p.sub(sky.sun.mul(drop)));
   })();
-  const shadows = new Mesh(shadowGeometry as BufferGeometry, marker(shadowOn, vec4(0, 0, 0, 1)));
+  const shadowMarker = marker(shadowOn, vec4(0, 0, 0, attribute('dark', 'float')));
+  // the darkest shadow over each texel, not their sum (the other marks leave the shadows' channel as it is)
+  shadowMarker.blendEquationAlpha = MaxEquation;
+  const shadows = new Mesh(shadowGeometry as BufferGeometry, shadowMarker);
 
   for (const mesh of [trails, patches, shadows]) {
     mesh.frustumCulled = false;
@@ -239,19 +261,29 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
 
   return {
     /**
-     * The marks at world position p on the sea at rest, faded out toward the map's edges: foam, height, air and shadow
-     * (vec4; the shadow softened over the three reads), and the height's slope there as a world vector (its gradient
-     * along the sea). For the fragment stage.
+     * The marks at world position p on the sea at rest, faded out toward the map's edges: foam, height and air
+     * (vec3), and the height's slope there as a world vector (its gradient along the sea). For the fragment stage.
      */
     read(p: N): { marks: N; slope: N } {
       const { uv, fade, e1, e2 } = place(p);
       const look = (o: N) => texture(target.texture, o).mul(fade);
       const here = look(uv), east = look(uv.add(vec2(1 / SIZE, 0))), south = look(uv.sub(vec2(0, 1 / SIZE)));
-      const shadow = here.w.add(east.w).add(south.w).div(3);
       return {
-        marks: vec4(here.xyz, shadow),
+        marks: here.xyz,
         slope: e1.mul(east.y.sub(here.y)).add(e2.mul(south.y.sub(here.y))).div(TEXEL),
       };
+    },
+    /** The share of the sun the ships' shadows take from world position p on the waves, 0…1, softened. For the
+     * fragment stage. */
+    shade(p: N): N {
+      // down the sun's ray to the sea's level, as the shadows were cast
+      const up = normalize(p);
+      const { uv, fade } = place(p.sub(sky.sun.mul(lengthN(p).sub(R).div(max(dot(sky.sun, up), LOW_SUN)))));
+      let sum: N = float(0);
+      for (let i = 0; i < SOFT; i++) for (let j = 0; j < SOFT; j++) {
+        sum = sum.add(texture(target.texture, uv.add(vec2(i - (SOFT - 1) / 2, j - (SOFT - 1) / 2).div(SIZE))).w);
+      }
+      return sum.mul(fade).div(SOFT * SOFT);
     },
     /** The wakes' height at world position p on the sea at rest, metres: for the vertex stage. */
     height: (p: N): N => {

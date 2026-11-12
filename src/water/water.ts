@@ -19,7 +19,8 @@
 // lies off the screen, or behind something nearer, can't be seen through the water).
 //
 // The ships' marks on it — foam round their hulls and down their wakes, the wakes' waves, the air worked into the
-// water astern, their shadows — are wake.ts's map, read once a pixel (and once a vertex, for the waves' height). The
+// water astern, their shadows — are wake.ts's map, read once a pixel (and once a vertex, for the waves' height; the
+// shadows where the sun's ray through the water meets the sea's level, softened). The
 // hulls of the few nearest the eye cut the surface away inside them and shade the water against them (hulls.ts).
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
@@ -197,7 +198,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
 
     const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
-    const near = { lit: float(1).sub(saturate(marks.marks.w)), glow: hull.glow, air };
+    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air };
     // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it
     return optics.seaRadiance(positionWorld, n, v, sqrt(variance.mul(float(1).sub(air.mul(0.6)))), crest, foam, behind, path, sparkle, near);
   })();
@@ -207,7 +208,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   if (debug === 'wake') {
     material.colorNode = Fn(() => {
       const m = wake.read(normalize(rest).mul(R)).marks;
-      return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(saturate(m.w).mul(0.7))).mul(0.1);
+      return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(wake.shade(positionWorld).mul(0.7))).mul(0.1);
     })();
   }
 

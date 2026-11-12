@@ -32,7 +32,7 @@ type N = any;
 /** Tarred hemp, weathered grey. */
 const ROPE = [0.13, 0.11, 0.085];
 /** How much of the light on a sail's far side comes through the canvas. */
-const THROUGH = 0.3;
+export const THROUGH = 0.3;
 /** A square sail's cloths: how many across it (each about 0.4 m), shown as faint seams. */
 const CLOTHS = 26;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
