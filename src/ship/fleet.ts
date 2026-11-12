@@ -8,12 +8,11 @@
 // is the planet's at her less her own motion (the apparent wind), in her own frame: sails and pennants lean with it in
 // the shader.
 //
-// One ship may be the player's own (`own`): she is always drawn at the finest level, and her sails thin out round
-// the aim point on the screen (`aim`, the screen's middle by default) so they never hide what she aims at.
+// One ship may be the player's own (`own`): she is always drawn at the finest level.
 
 import {
   BufferAttribute, BufferGeometry, DynamicDrawUsage, Frustum, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
-  Matrix4, Mesh, Sphere, Vector2, Vector3, type Material, type PerspectiveCamera,
+  Matrix4, Mesh, Sphere, Vector3, type Material, type PerspectiveCamera,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import type { Light } from '../land/light';
@@ -33,8 +32,8 @@ export interface Look {
   brace: number;
 }
 
-/** Floats an instance: at, fwd, up, paint, cloth (each a vec4) and clear (materials.ts). */
-const STRIDE = 21;
+/** Floats an instance: at, fwd, up, paint and cloth, each a vec4 (materials.ts). */
+const STRIDE = 20;
 /** Her middle, above the waterline, metres, and a sphere round her whole rig from there. */
 const MIDDLE = 9, RADIUS = 18;
 /** The wind at which the sails are full and the pennants stream straight, metres per second. */
@@ -52,7 +51,6 @@ function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Mate
   g.setIndex(new BufferAttribute(p.index, 1));
   ['shipAt', 'shipFwd', 'shipUp', 'shipPaint', 'shipCloth'].forEach((name, i) =>
     g.setAttribute(name, new InterleavedBufferAttribute(instances, 4, i * 4)));
-  g.setAttribute('shipClear', new InterleavedBufferAttribute(instances, 1, 20));
   g.instanceCount = 0;
   const mesh = new Mesh(g as BufferGeometry, material);
   mesh.frustumCulled = false;
@@ -66,8 +64,8 @@ export type Fleet = ReturnType<typeof createFleet>;
 
 /** capacity: the most ships there will be. */
 export function createFleet(light: Light, wind: Wind, capacity: number) {
-  const pixel = uniform(0.0026), aim = uniform(new Vector2(0.5, 0.5));
-  const materials = createShipMaterials(light, pixel, aim);
+  const pixel = uniform(0.0026);
+  const materials = createShipMaterials(light, pixel);
   const instances = Array.from({ length: levels }, () => {
     const buffer = new InstancedInterleavedBuffer(new Float32Array(capacity * STRIDE), STRIDE);
     return buffer.setUsage(DynamicDrawUsage);
@@ -113,7 +111,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       const strength = size > 0 ? Math.min(size / FULL, 1) / size : 0, port = cross(pose.up, pose.forward);
       const a = instances[k].array as Float32Array, o = filled[k]++ * STRIDE;
       a.set([...pose.position, look.brace, ...pose.forward, dot(w, port) * strength, ...pose.up, dot(w, pose.forward) * strength,
-        ...look.paint, look.band ? 1 : 0, ...look.sail, (i * 2.399) % (2 * Math.PI), i === own ? 1 : 0], o);
+        ...look.paint, look.band ? 1 : 0, ...look.sail, (i * 2.399) % (2 * Math.PI)], o);
     }
     draws.forEach((three, k) => {
       instances[k].needsUpdate = true;
@@ -128,11 +126,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     meshes,
     set,
     update,
-    /** Ship i is the player's own (or none, for null): her sails thin out round the aim point. */
+    /** Ship i is the player's own (or none, for null): she is always drawn at the finest level. */
     own(i: number | null) { own = i ?? -1; },
-    /** The aim point on the screen, which the player's sails keep clear: 0…1 across from the left and down from the
-     * top (the screen's middle until it is set). */
-    aim(x: number, y: number) { aim.value.set(x, y); },
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },
     get count() { return count; },

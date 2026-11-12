@@ -45,7 +45,7 @@ export function createGame(frame: Frame, env: Environment, element: HTMLElement,
   const chase = createChase(frame.camera, ground, sea);
   const clock = fixedClock();
 
-  // her sails keep the screen's middle, where the chase camera aims, clear
+  // (always drawn whole: the chase camera holds her at the finest level's edge)
   frame.fleet.own(0);
   let ship = shipAt(start.at, bearing(start.at, start.bearing));
   let tick = 0;
