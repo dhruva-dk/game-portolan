@@ -101,30 +101,38 @@ export const WEATHER_TILE = 40;
 /** Spacing of the cells at each of the weather map's three sizes of cloud, km. */
 const CELL_SIZES = [1, 0.5, 0.25] as const;
 /**
- * The cells' potential (km) at each tenth of the map's area, measured by sampling the same construction (0 to 100%;
- * the last is the 99.5th percentile). Cloud stands where the potential passes its value at the share of the map that
- * is to stay clear. Over the 40 km tile at 40% cover this makes ~2600 clouds: half under 140 m across, one in ten
- * over 700 m, and a few merged masses of a couple of km. (Each size's cones scale with it, so these are half those
- * once measured for cells twice the size.)
+ * The map's potential (km) at each tenth of its area, measured by sampling the same construction on the CPU (0 to
+ * 100%; the last is the 99.5th percentile; 360 000 points). Cloud stands where the potential passes its value at the
+ * share of the map that is to stay clear.
  */
-export const POTENTIAL_DECILES = [0, 0.0135, 0.055, 0.0905, 0.125, 0.1625, 0.2075, 0.2645, 0.3375, 0.454, 0.7895] as const;
+export const POTENTIAL_DECILES = [0, 0, 0.0133, 0.0757, 0.1305, 0.1847, 0.241, 0.3057, 0.3897, 0.5153, 0.8973] as const;
+
+/**
+ * How the cells' round outlines are broken up, so that noise rather than the cells draws the clouds: the map is
+ * warped by WARP km (gradient noise of 2.5 km down to 600 m), which bends them out of round and draws them into lobes
+ * and tails, and the potential is roughened by RAGGED km of noise (1.25 km down to 300 m; its sum is mostly within a
+ * sixth of that either way), which merges neighbours into ragged masses, frays the edges and leaves scraps between:
+ * a broad spread of sizes, from scraps of a hundred metres to masses of several km.
+ */
+const WARP = 0.8, WARP_PERIODS = 16, RAGGED = 1.2, RAGGED_PERIODS = 32;
 
 /**
  * R: cumulus cells at three sizes as a potential in km: past the threshold the cover sets, how far a point lies
- * inside its cloud's edge; G: the large-scale field (0–1) that gathers them into fields of cloud with clear sky between;
- * B: the potential at the peak of the cell that holds the point (km), from which its cloud's dome is drawn.
+ * inside its cloud's edge; G: the large-scale field (0–1) that gathers them into fields of cloud with clear sky between.
  */
 const weatherKernel = (weatherMap: StorageTexture) => Fn(() => {
   const x = instanceIndex.mod(WEATHER_N), y = instanceIndex.div(WEATHER_N);
-  const uv = vec2(x, y).add(0.5).div(WEATHER_N);
-  const potential = vec2(0, 0).toVar();
+  const uv0 = vec2(x, y).add(0.5).div(WEATHER_N);
+  const warp = vec2(perlinFbm(vec3(uv0, 0.1), WARP_PERIODS, 3), perlinFbm(vec3(uv0, 0.7), WARP_PERIODS, 3));
+  const uv = uv0.add(warp.mul(WARP / WEATHER_TILE));
+  const potential = float(0).toVar();
   for (const size of CELL_SIZES) {
     const n = WEATHER_TILE / size;
-    const c = cells(uv.mul(n), float(n)).mul(size);
-    potential.assign(select(c.x.greaterThan(potential.x), c, potential));
+    potential.assign(max(potential, cells(uv.mul(n), float(n)).x.mul(size)));
   }
-  const field = smoothstep(-0.35, 0.35, perlinFbm(vec3(uv, 0.5), 3, 3));
-  textureStore(weatherMap, uvec2(x, y), vec4(max(potential.x, 0), field, potential.y, 1));
+  const ragged = perlinFbm(vec3(uv0, 0.3), RAGGED_PERIODS, 3).mul(RAGGED);
+  const field = smoothstep(-0.35, 0.35, perlinFbm(vec3(uv0, 0.5), 3, 3));
+  textureStore(weatherMap, uvec2(x, y), vec4(max(potential.add(ragged), 0), field, 0, 1));
 })().compute(WEATHER_N * WEATHER_N, [64]);
 
 export type CloudNoise = ReturnType<typeof createCloudNoise>;

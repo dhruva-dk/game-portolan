@@ -2,17 +2,18 @@
 // 2017) and Hillaire ("Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", SIGGRAPH 2016): what the
 // cloud is at a point, and what the eye sees along a ray through it. clouds.ts spreads the rays over frames.
 //
-// Shape. A shell of cloud between BASE and TOP over the curved sea. A weather map (cloud-noise.ts) holds cumulus
-// cells of three sizes, gathered into fields with clear sky between; the cover (0–1) sets how much of it may hold
-// cloud, and past broken cover merges the cells into a layer. Where a cell is strong the cloud stands a few hundred
-// metres, where weak it stays a low puff; bases are flat, thinning over their lowest metres. A Perlin-Worley
-// volume gives the billows, a Worley volume erodes their edges: wisps toward the base, cauliflower higher up.
+// Shape. A shell of cloud between BASE and TOP over the curved sea. A weather map (cloud-noise.ts) holds a potential:
+// cumulus cells of three sizes, warped and roughened by noise so that the noise draws their outlines, gathered into
+// fields with clear sky between; the cover (0–1) sets how much of it may hold cloud, and past broken cover merges
+// them into a layer. Where the potential is deep the cloud stands a few hundred metres, at its fringes it stays a low,
+// thin scrap whose base lifts toward its edge. A Perlin-Worley volume gives the billows, which carve top, sides and
+// base alike; a Worley volume erodes their edges: wisps toward the base, cauliflower higher up.
 //
 // Light. Per unit sun at the top of the air: the sun through the cloud toward it (a short cone of taps), scattered
 // once with a two-lobed phase (the silver lining toward the sun) and many times — Wrenninge's octaves near the
-// surface, and deep inside the diffused light of a two-stream slab, which falls off only as 1/(1 + ¾(1−g)τ) and so
-// leaves bases grey rather than dark blue; the sky's light from above and the sea's from below, each through the
-// cloud between. Then the air between the eye and the cloud: its extinction integrated in closed form up to the
+// surface, and the diffused light of a two-stream slab, a radiance of 1/π (a white surface's) at the lit face falling
+// off only as 1/(1 + ¾(1−g)τ), so lit sides are white and bases a light grey; the sky's light through the nearer of
+// the cloud's top and side, and the sea's from below, through the cloud between. Then the air between the eye and the cloud: its extinction integrated in closed form up to the
 // cloud's height, and its glow, so far clouds sink into the haze.
 //
 // The shell is the eye's, like the sky (view.toSky): Earth's curvature under it, its directions the sky's (x east, y
@@ -51,11 +52,13 @@ const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
 const LAYER = 0.3;
 /**
- * A cloud's top: DOME·p^¾ km over its cell's peak, p km of potential past the threshold — a third as tall as wide
- * for a cloud of 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps),
- * flatter still for the small puffs — falling to its edge as a quarter circle.
+ * A cloud's top: DOME·p^¾ km where it lies p km of potential inside its edge — a third as tall as wide for a cloud of
+ * 1–1.5 km, the most fair weather grows (cumulus humilis; mediocris would want towers this caps), flatter still for
+ * the small puffs.
  */
 const DOME = 0.6;
+/** How far a cloud's base lifts at its edge, km, and how far in it has come down to the shell's base, km of potential. */
+const LIFT = 0.15, MARGIN = 0.3;
 /** Height over which a cloud's base thins out to nothing, km: the condensation level is a few tens of metres deep. */
 const BASE_FADE = 0.1;
 /** Depth below a cloud's surface within which the billows carve it, km. */
@@ -129,13 +132,14 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     // between raise it
     const shift = w.g.sub(0.5).mul(fieldShift).sub(threshold);
     const inside = w.r.add(shift);
-    // each cloud a dome on a flat base: rounding over from its edge to a top above its cell's peak, the broad ones
-    // towering and the small staying low; within BILLOW of its surface the billows decide whether a point is cloud,
-    // so they carve the whole outline (Schneider 2017's dimensional profile)
-    const peak = max(w.b.add(shift), inside);
-    const s = clamp(inside.div(max(peak, 1e-3)), 0, 1);
-    const dome = min(pow(max(peak, 0), 0.75).mul(DOME).mul(sqrt(s.mul(float(2).sub(s)))), TOP - BASE);
-    const reach = clamp(min(dome.sub(h.mul(TOP - BASE)), inside).div(BILLOW), 0, 1);
+    // each cloud as tall as it lies deep inside its edge here, so its top follows the map's ragged potential: the
+    // broad ones towering, the small and the fringes staying low; its base lifts toward its margins, which are thin;
+    // within BILLOW of its surface, top, side or base, the billows decide whether a point is cloud, so they carve the
+    // whole outline (Schneider 2017's dimensional profile)
+    const z = h.mul(TOP - BASE);
+    const top = min(pow(max(inside, 0), 0.75).mul(DOME), TOP - BASE);
+    const bottom = min(fall(0, MARGIN, inside).mul(LIFT), top.mul(0.5));
+    const reach = clamp(min(min(top.sub(z), z.sub(bottom).mul(2)), inside).div(BILLOW), 0, 1);
     const dense = float(0).toVar();
     If(reach.greaterThan(0), () => {
       const n = texture3D(noise.shape, p.div(SHAPE_SCALE)).level(float(0));
@@ -144,7 +148,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
       // and a flat base, thinning out over its lowest BASE_FADE
       dense.assign(clamp(remap(billows, float(1).sub(reach), float(1), float(0), float(1)), 0, 1).mul(smoothstep(0, BASE_FADE / (TOP - BASE), h)));
     });
-    return { dense, h, top: dome.div(TOP - BASE) };
+    return { dense, h, top: top.div(TOP - BASE), inside };
   };
 
   /** Erodes a density at q: wisps toward the base, billows higher up. */
@@ -224,13 +228,17 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
               const a = 0.6 ** k;
               ms = ms.add(exp(tau.mul(-a)).mul(phase(cosSun, a)).mul(a));
             }
-            ms = max(ms, float(1 / (4 * Math.PI)).div(tau.mul(DIFFUSION).add(1)));
-            const powder = float(1).sub(exp(rho.mul(-SIGMA * 0.08)).mul(0.5));
+            // the slab's diffuse light is a radiance of E·T/π (T its transmitted share), as off a white surface: a deep
+            // cloud scatters back nearly all the light on it, which a few octaves fall well short of
+            ms = max(ms, float(1 / Math.PI).div(tau.mul(DIFFUSION).add(1)));
+            // thin cloud has had little depth to build the scattered light up in (the powder effect): darker at the
+            // edges seen away from the sun, while toward it the light through them shines (Schneider 2015)
+            const powder = float(1).sub(exp(rho.mul(-SIGMA * 0.08)).mul(float(0.25).sub(cosSun.mul(0.25))));
             const radius = length(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z));
             const sunLight = sunTransmittance(radius, dot(normalize(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z)), sunDir));
             // the sky above and the sea below, half of each hemisphere's light, through the cloud between as a slab of
             // this density up to the cloud's top and down to its base
-            const above = float(TOP - BASE).mul(max(c.top.sub(c.h), 0)).mul(rho).mul(SIGMA * DIFFUSION).add(1);
+            const above = min(float(TOP - BASE).mul(max(c.top.sub(c.h), 0)), max(c.inside, 0)).mul(rho).mul(SIGMA * DIFFUSION).add(1);
             const below = float(TOP - BASE).mul(c.h).mul(rho).mul(SIGMA * DIFFUSION).add(1);
             const S = sunLight.mul(exp(tau.negate()).mul(single).add(ms.mul(powder)))
               .add(skyAmbientUp.mul(0.5).div(above)).add(sea.mul(0.5).div(below));
