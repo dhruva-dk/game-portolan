@@ -1,0 +1,101 @@
+// The shallows: a ship can't sail where the water is shallower than her draught.
+//
+// Two points of her keel must clear the floor: her forefoot, near the bow, and amidships (behind them she follows
+// her own wake, so her stern finds the water they found). Within WARNING metres of grounding, the part of her way
+// heading into shallower water is taken off, all of it at her draught, so she slows softly and then slides along the
+// shore, losing way in proportion to how squarely she meets it. Close to grounding the slope eases her back off
+// it, so she can always come about, even with no reverse.
+//
+// Each step is then checked: the new place must leave both keel points clear of the floor, or at least no worse off
+// than before (so a ship set down in the shallows can always work her way out). Failing that she keeps her heading,
+// then gives up her way, then stays put. A step moves her at most a third of a metre, far less than any shore's
+// slope, so nothing is tunnelled through.
+//
+// Pure arithmetic: no three, so it runs in node for the tests.
+
+import { add, along, dot, frameAt, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { SHIP } from './handling.ts';
+import type { ShipState } from './ship.ts';
+
+/** Metres of water over the floor at a point (a vector from the centre): negative on land. */
+export type Depth = (p: Vec3) => number;
+
+/** Within this many metres of grounding she is slowed. */
+const WARNING = 2;
+/** Within this many she is eased off, at up to EASE m/s. */
+const NEAR = 0.3;
+const EASE = 0.6;
+/** How fast she loses the way she can't make, per second, when she meets the shallows head on. */
+const GRIND = 1.5;
+/** Her keel's points that must clear the floor: metres ahead of amidships. */
+const KEEL = [0.4 * SHIP.length, 0];
+/** Metres either side at which the floor's slope is measured. */
+const PROBE = 1.5;
+
+/** How much water she has under her keel at its shallowest point, metres, and where that is. */
+export function clearance(at: Vec3, heading: Vec3, depth: Depth): { least: number; where: Vec3 } {
+  let least = Infinity, where = at;
+  for (const ahead of KEEL) {
+    const p = ahead === 0 ? at : along(at, heading, ahead).p;
+    const c = depth(p) - SHIP.draught;
+    if (c < least) [least, where] = [c, p];
+  }
+  return { least, where };
+}
+
+/** The way into deeper water at p: a unit tangent there, or null where the floor is level. */
+function deeper(p: Vec3, depth: Depth): Vec3 | null {
+  const f = frameAt(p);
+  const slope = (t: Vec3) => (depth(along(p, t, PROBE).p) - depth(along(p, t, -PROBE).p)) / (2 * PROBE);
+  const g = add(scale(f.east, slope(f.east)), f.north, slope(f.north));
+  const size = length(g);
+  return size > 1e-6 ? scale(g, 1 / size) : null;
+}
+
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+};
+
+/** From `at`, the place `move` (a tangent there) takes her, her heading carried along. */
+function moved(at: Vec3, heading: Vec3, move: Vec3): { at: Vec3; heading: Vec3 } {
+  const metres = length(move);
+  if (metres === 0) return { at, heading };
+  const to = along(at, scale(move, 1 / metres), metres).p;
+  return { at: to, heading: normalize(transport(heading, at, to)) };
+}
+
+/**
+ * The ship `s` (her speed and turn already this step's) sailing dt seconds on `heading` (a unit tangent at s.at, her
+ * heading after this step's turn), kept out of the shallows.
+ */
+export function navigate(s: ShipState, heading: Vec3, dt: number, depth: Depth): ShipState {
+  const before = clearance(s.at, s.heading, depth);
+  let move = scale(heading, s.speed * dt), push: Vec3 = [0, 0, 0], speed = s.speed;
+  if (before.least < WARNING) {
+    const n0 = deeper(before.where, depth);
+    if (n0) {
+      // the slope at the keel point, brought to amidships, along the surface there
+      const n = normalize(add(n0, s.at, -dot(n0, s.at)));
+      const into = -dot(move, n);
+      if (into > 0) {
+        const taken = into * (1 - smoothstep(0, WARNING, before.least));
+        move = add(move, n, taken);
+        speed *= Math.exp((-GRIND * taken) / s.speed);
+      }
+      if (before.least < NEAR) push = scale(n, EASE * dt * (1 - Math.max(before.least, 0) / NEAR));
+    }
+  }
+  const fine = (to: { at: Vec3; heading: Vec3 }) => {
+    const c = clearance(to.at, to.heading, depth).least;
+    return c >= 0 || c >= before.least;
+  };
+  const turning = moved(s.at, heading, add(move, push));
+  if (fine(turning)) return { ...turning, speed, turn: s.turn };
+  const straight = moved(s.at, s.heading, add(move, push));
+  if (fine(straight)) return { ...straight, speed, turn: 0 };
+  const stopped = Math.min(speed, s.speed) * Math.exp(-GRIND * dt);
+  const eased = moved(s.at, s.heading, push);
+  if (fine(eased)) return { ...eased, speed: stopped, turn: 0 };
+  return { at: s.at, heading: s.heading, speed: stopped, turn: 0 };
+}

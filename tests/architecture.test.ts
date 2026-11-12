@@ -52,6 +52,21 @@ test('a. src/world is pure: no three, nothing outside src/world', () => {
   none(found, 'src/world may import only from src/world');
 });
 
+test('a2. src/sim is pure: no three, nothing outside src/sim and src/world', () => {
+  const found: string[] = [];
+  const within = (path: string, dir: string) => (path + sep).startsWith(join(SRC, dir) + sep);
+  for (const f of files.filter((f) => f.rel.startsWith('sim/'))) {
+    code(f.text).forEach((line, i) => {
+      const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/.exec(line)?.[1];
+      if (spec === undefined) return;
+      const to = resolve(dirname(f.path), spec);
+      const bad = !spec.startsWith('.') || !(within(to, 'sim') || within(to, 'world'));
+      if (bad) found.push(`src/${f.rel}:${i + 1}: imports '${spec}'`);
+    });
+  }
+  none(found, 'src/sim may import only from src/sim and src/world');
+});
+
 test('b. no file in src is over 450 lines', () => {
   const found = files.flatMap((f) => (f.text.split('\n').length - (f.text.endsWith('\n') ? 1 : 0) > 450 ? [`src/${f.rel}: ${f.text.split('\n').length} lines`] : []));
   none(found, 'files over 450 lines');
