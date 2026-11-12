@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { battleOf, crewOf, stepBattle, type Battle, type Order, type Strike } from '../src/sim/battle.ts';
+import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order, type Strike } from '../src/sim/battle.ts';
 import { afloat, stepFleet, type Blow, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle } from '../src/sim/gun.ts';
@@ -233,4 +233,18 @@ test('the same fleet under the same orders fights the same way, to the bit', () 
   const b = fight(four(), battleOf(crews(), 42), orders, 20, [0.6, 0.8, 1, 0.4]);
   assert.ok(a.shots > 10 && a.strikes.length > 0, `${a.shots} shots, ${a.strikes.length} strikes`);
   assert.deepEqual(a, b);
+});
+
+test('the storm wears at a ship outside its cap, past her shield, and sinks her; inside it, nothing', () => {
+  const inside = afloat(0, lying(centre, 0)), beyond = afloat(1, lying(out(centre, 0, 120), 0));
+  const storm = { centre, radius: 50 / R, damage: 0.05 };
+  let b = battleOf([crewOf(0), crewOf(1)], 1), sank: number[] = [];
+  for (let i = 0; i < Math.round(21 / STEP); i++) {
+    const w = weathered(b, [inside, beyond], storm, STEP);
+    b = w.battle;
+    sank = sank.concat(w.sunk);
+  }
+  assert.deepEqual(b.crews[0].health, whole());
+  assert.equal(b.crews[1].health.shield, HEALTH.start);
+  assert.deepEqual(sank, [1]);
 });

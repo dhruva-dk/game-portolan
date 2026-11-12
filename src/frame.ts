@@ -16,6 +16,7 @@ import { createShadow } from './land/shadow';
 import { createView } from './view/view';
 import { createWater } from './water/water';
 import { createFleet } from './ship/fleet';
+import { createGunfire } from './gunfire/gunfire';
 import { createPlanet } from './world/planet';
 import { sunAt } from './world/sun';
 import { createWind } from './world/wind';
@@ -49,8 +50,9 @@ const FAR = 2000;
  *        island       the nearest island's shadow map from the sun over it (land/shadow.ts), redrawn only when the
  *                     sun has moved or another island has become the nearest
  *        cloth        the near ships' sails (ship/cloth.ts), a few small steps of it, while any are held
- *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, the ships); then the sea, which
- *                 reads what was drawn before it behind itself (the floor through the water)
+ *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, the ships, the balls in flight);
+ *                 then the sea, which reads what was drawn before it behind itself (the floor through the water); then
+ *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — haze by distance, clouds over whatever they stand in front of, the storm's rain and cloud over
  *                 all of it (sky/storm.ts: no march, the ray against its cone), tone mapping; then FXAA, on the
  *                 tone-mapped image (its edge test wants the screen's values), for the edges of the sea's crests and
@@ -87,7 +89,8 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const islands = createIslands(planet, seed, view, light, sand);
   shadow.cast(...islands.casters);
   const fleet = createFleet(light, wind, SHIPS);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh);
+  const gunfire = createGunfire(light);
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes);
 
   const scenePass = pass(scene, camera);
   // the scene's camera, as uniforms of its own matrices: in the post pass three's camera nodes are the screen quad's
@@ -151,6 +154,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     renderer.getDrawingBufferSize(size);
     const air = sky.update(env, storm, camera, dt, size.x, size.y);
     const ships = fleet.update(camera, env.windSpeed, size.y, dt);
+    gunfire.update(camera, size.y);
     const sea = water.update(env, dt, fleet.ships);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
@@ -170,5 +174,5 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     pipeline.render();
   }
 
-  return { scene, camera, sky, view, planet, wind, fleet, anchors: water.anchors, resize, render, ready: ground.ready };
+  return { scene, camera, sky, view, planet, wind, fleet, gunfire, anchors: water.anchors, resize, render, ready: ground.ready };
 }

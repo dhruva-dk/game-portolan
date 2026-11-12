@@ -16,6 +16,8 @@ export interface Hands {
   stick: { x: number; y: number; centre: [number, number] | null } | null;
   /** The look: pixels dragged right and down since the last read, and whether a finger is on it. */
   look: { x: number; y: number; held: boolean };
+  /** TEMPORARY (until the HUD's fire button is the only way): the gun ordered fired, Space held at a desk. */
+  fire: boolean;
 }
 
 interface Finger { stick: boolean; x: number; y: number; cx: number; cy: number }
@@ -71,7 +73,7 @@ export function createInput(element: HTMLElement) {
       }
       const look = { x: lookX, y: lookY, held: held.some((f) => !f.stick) };
       lookX = lookY = 0;
-      return { stick, look };
+      return { stick, look, fire: keys.has('Space') };
     },
   };
 }

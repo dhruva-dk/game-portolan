@@ -49,14 +49,16 @@ const [cx, cz] = toChart(largest.chart, along(largest.chart.at, southward, 1).p)
 const south = along(largest.chart.at, southward, largest.coast(Math.atan2(cz, cx)) + START).p;
 
 const others = demoShips(frame, south);
-const game = switches.flying ? null : createGame(frame, env, renderer.domElement, { at: south, bearing: 0 }, switches.drive, others);
+// the match: its storm on its own clock, the bots' minds from its seed (the planet's, until matches are dealt)
+const match = { seed: switches.seed, storm: (t: number) => storm(switches.storm ?? t), gun: switches.gun };
+const game = switches.flying ? null : createGame(frame, env, renderer.domElement, { at: south, bearing: 0 }, switches.drive, others, match);
 const move = game ?? flyer(frame, renderer.domElement, env, south);
 move(0);
 frame.camera.updateMatrixWorld();
 probe(frame);
 
 // The match's HUD over the world, fed by the game and, where the sim has nothing yet, the placeholder.
-const placeholder = createPlaceholder(frame.planet.islands);
+const placeholder = createPlaceholder();
 const layer = uiLayer();
 safeArea(layer);
 const coasts = traceCoasts(frame.planet.islands);
@@ -65,6 +67,7 @@ let shown: HudState | null = null;
 const hud = createHud(layer, coasts, {
   slot: (i) => placeholder.choose(i),
   gust: () => {},
+  fire: () => game?.fire(),
   map: () => shown && globe.show(shown),
 });
 // a release build opens at the title; the dev server at sea, unless ?screen= says otherwise (also map, rank, settings)
@@ -89,14 +92,14 @@ renderer.setAnimationLoop(() => {
 
   move(dt);
   if (game && flow) {
-    shown = placeholder.state(game.status(), dt);
+    shown = placeholder.state(game.status());
     flow.update(dt, shown);
     if (opening) globe.show(shown);
     opening = false;
   }
   const { x, y, z } = frame.camera.position;
   updateEnvironment(env, dt, [x, y, z], frame.wind);
-  frame.render(env, dt, storm(switches.storm ?? env.clock));
+  frame.render(env, dt, game?.storm() ?? storm(switches.storm ?? env.clock));
 
   meter?.sample(performance.now() - start);
 });

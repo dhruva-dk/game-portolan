@@ -1,15 +1,22 @@
-// The game view: the player's ship (the fleet's first) on the sea, sailed by the stick, watched by the chase camera.
+// The game view: the player's ship on the sea, sailed by the stick, watched by the chase camera, among the others
+// she fights.
 //
-// Each frame: the hands are read and turned into the helm's orders, the simulation takes as many fixed steps as the
-// frame has time for (sim/fixed.ts), the ship is drawn blended between the last two, and the world's clock (the
-// sea's) is set to the moment drawn, so the hull and the waves under her are the same instant.
+// Each frame: the hands are read and turned into the helm's and the gun's orders, the simulation takes as many fixed
+// steps as the frame has time for (sim/fixed.ts), the ships are drawn blended between the last two, and the world's
+// clock (the sea's) is set to the moment drawn, so the hulls and the waves under them are the same instant.
 //
 // The stick steers by the screen: pushed toward a direction on the screen, she heads that way across the sea as the
-// camera looks at it, as fast as it is pushed. Let go, she coasts.
+// camera looks at it, as fast as it is pushed. Let go, she coasts. Her gun is aimed where the camera looks along the
+// sea (the gun's assist lays it on a ship near that bearing: sim/gun.ts), and fired by fire() (the HUD's button) or,
+// for now, Space.
 //
 // She sails among others as one fleet (sim/contact.ts): hulls that meet shove apart, and a ram knocks the struck ship
-// over a little (sim/ride.ts knocked). The others are bots (sim/bot.ts), each seeded by her place in the fleet, unless
-// main.ts sets them a way to make (?way=), when they hold a straight course as scripted ships for captures.
+// over a little (sim/ride.ts knocked). After the fleet's step comes the fighting's (sim/battle.ts): rams and balls
+// take off hit points, the storm (sim/storm.ts, on the match's clock: the steps sailed) wears at ships outside its
+// cap, and a ship sunk is taken off the sea and drawn going down (sinking.ts) until she is gone. What the fighting did
+// is drawn as it happens (gunfire/gunfire.ts). The others are bots (sim/bot.ts), each seeded by the match and her
+// slot, unless main.ts sets them a way to make (?way=), when they hold a straight course as scripted ships for
+// captures. Ships put to sea gunless, unless ?gun= arms them all (debug.ts).
 //
 // Debug: a drive, `legs` as "bearing,throttle,seconds;…" (bearings in degrees clockwise from north where she is),
 // is sailed before the first frame; she holds its last order until a hand takes the helm.
@@ -17,23 +24,32 @@
 import type { Environment } from '../environment';
 import type { createFrame } from '../frame';
 import type { Look } from '../ship/fleet';
-import { mind, rammed, think, type Memory } from '../sim/bot';
+import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from '../sim/battle';
+import { mind, rammed, think, type Memory, type Seen } from '../sim/bot';
 import { afloat, stepFleet, type Vessel } from '../sim/contact';
 import { STEP, blendPose, fixedClock } from '../sim/fixed';
-import { SHIP } from '../sim/handling';
+import { gunOf } from '../sim/gun';
+import { GUN, HEALTH, SHIP } from '../sim/handling';
+import { sunk } from '../sim/health';
+import { knocked, pose, ride, settled, type Ride } from '../sim/ride';
 import { chart as bakeChart } from '../sim/route';
-import { knocked, pose, ride, settled } from '../sim/ride';
 import { shipAt, type Helm, type ShipState } from '../sim/ship';
+import type { Storm } from '../sim/storm';
 import { createSwell } from '../water/swell';
-import { add, frameAt, scale, type Vec3 } from '../world/sphere';
+import type { ShipPose } from '../world/pose';
+import { hash } from '../world/random';
+import { R, add, frameAt, scale, type Vec3 } from '../world/sphere';
 import { createChase } from './chase';
 import { createInput, type Hands } from './input';
+import { sinking } from './sinking';
 import { createStickView } from './stick';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
 /** The player's colours (ship/fleet.ts): a red hull under weathered canvas. */
 const LOOK: Look = { paint: [0.3, 0.03, 0.02], sail: [0.62, 0.57, 0.46], band: false };
+/** The player's ship's id (and her slot in the drawn fleet, as every ship's id is hers). */
+const PLAYER = 0;
 
 type Frame = ReturnType<typeof createFrame>;
 
@@ -47,63 +63,123 @@ const bearing = (at: Vec3, b: number): Vec3 => {
  * bot; or, given a `way` (m/s), on a straight course at that speed, her rudder amidships. */
 export interface Other { at: Vec3; heading: Vec3; look: Look; way: number }
 
-/** The match as the HUD reads it (ui/hud.ts). */
-export interface Status { at: Vec3; heading: Vec3; afloat: number }
+/** The match as the HUD reads it (ui/hud.ts HudState): a plain snapshot, made fresh each time it is asked for. */
+export interface Status {
+  /** Where she is (unit sphere) and the way she heads (unit tangent). */
+  at: Vec3; heading: Vec3;
+  /** Her hit points, and their most. */
+  hull: number; hullMax: number; shield: number; shieldMax: number;
+  /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities) and how far loaded (0…1, 1 ready); null with none. */
+  gun: { rarity: number; ready: number } | null;
+  /** Ships still afloat, hers among them; whether hers is sunk. */
+  afloat: number; sunk: boolean;
+  /** Seconds till the storm next holds or closes (0 once it has closed for good), and its calm (radius in metres). */
+  storm: number; eye: { centre: Vec3; radius: number };
+}
+
+/** The match: its seed (each bot's mind comes from it and her slot), its storm by the match's clock (s), and the
+ * rarity of gun every ship is armed with (?gun=), or null for none. */
+export interface Match { seed: number; storm: (seconds: number) => Storm; gun: number | null }
+
+/** What the game keeps of a ship afloat beside her Vessel: her colours, her bot (null: the player's, or a scripted
+ * ship's), the orders a scripted ship holds, how she rides the sea, and her last two poses. */
+interface Aboard { look: Look; mind: Memory | null; steady: Helm; ride: Ride; before: ShipPose; after: ShipPose }
+/** A ship going down: her pose when she sank and the step she sank at, listing to `side`. */
+interface Wreck { id: number; look: Look; pose: ShipPose; tick: number; side: number }
 
 /** start: where she lies and the bearing she heads (radians); legs: a debug drive, or ''; others: the others afloat. */
 export function createGame(
-  frame: Frame, env: Environment, element: HTMLElement, start: { at: Vec3; bearing: number }, legs: string, others: readonly Other[] = [],
+  frame: Frame, env: Environment, element: HTMLElement, start: { at: Vec3; bearing: number }, legs: string, others: readonly Other[], match: Match,
 ) {
   const ground = frame.planet.height;
   const depth = (p: Vec3) => -ground(p);
-  // the bots' chart of open water, for routes round land (sim/route.ts): baked here while the ground's worker bakes
-  // (frame.ready), in about a fifth of its time, so it holds back no frame
-  const charted = performance.now(), chart = bakeChart(depth);
-  console.info(`chart baked in ${(performance.now() - charted).toFixed(0)} ms`);
   const sea = createSwell(frame.anchors, ground, env.seaWind);
   const input = createInput(element);
   const drawStick = createStickView();
   const chase = createChase(frame.camera, ground, sea);
   const clock = fixedClock();
+  // the bots' chart of open water, for routes round land (sim/route.ts): baked here while the ground's worker bakes
+  // (frame.ready), in about a fifth of its time, so it holds back no frame
+  const charted = performance.now(), chart = bakeChart(depth);
+  console.info(`chart baked in ${(performance.now() - charted).toFixed(0)} ms`);
 
   // (always drawn whole: the chase camera holds her at the finest level's edge)
-  frame.fleet.own(0);
+  frame.fleet.own(PLAYER);
   let fleet: Vessel[] = [
-    afloat(0, shipAt(start.at, bearing(start.at, start.bearing))),
+    afloat(PLAYER, shipAt(start.at, bearing(start.at, start.bearing))),
     ...others.map((o, i) => afloat(i + 1, { ...shipAt(o.at, o.heading), speed: o.way })),
   ];
-  const looks = [LOOK, ...others.map((o) => o.look)];
-  const steady: Helm[] = others.map((o) => ({ course: null, throttle: o.way / SHIP.top }));
-  let minds: (Memory | null)[] = fleet.map((v, i) => (i > 0 && others[i - 1].way <= 0 ? mind(i, v.ship.at) : null));
-  /** Each other ship's orders: her bot's, or her straight course. */
-  const theirs = () => fleet.slice(1).map((v, k) => {
-    const m = minds[k + 1];
-    if (!m) return steady[k];
-    const r = think(v, fleet.filter((o) => o.id !== v.id), depth, m, v.id, STEP, chart);
-    minds[k + 1] = r.memory;
-    return r.helm;
-  });
-  let tick = 0;
-  let motions = fleet.map((v) => settled(v.ship, sea, 0));
-  let before = fleet.map((v, i) => pose(v.ship, motions[i])), after = before;
-  const advance = (helm: Helm) => {
-    const met = stepFleet(fleet, [helm, ...theirs()], STEP, depth);
+  const seedOf = (id: number) => hash(match.seed, id);
+  const aboard = new Map<number, Aboard>(fleet.map((v, i) => {
+    const o = i > 0 ? others[i - 1] : null, r = settled(v.ship, sea, 0), p = pose(v.ship, r);
+    return [v.id, {
+      look: o?.look ?? LOOK, mind: o && o.way <= 0 ? mind(seedOf(v.id), v.ship.at) : null,
+      steady: { course: null, throttle: (o?.way ?? 0) / SHIP.top }, ride: r, before: p, after: p,
+    }];
+  }));
+  let battle: Battle = battleOf(fleet.map((v) => crewOf(v.id, match.gun === null ? null : gunOf(match.gun))), match.seed);
+  const wrecks: Wreck[] = [];
+  let tick = 0, pulled = false, last = aboard.get(PLAYER)!.after;
+
+  /** One step: the player's helm and gun, everyone else's from her bot or her script; then the fleet's step and the
+   * fighting's, and what it did set to be drawn. */
+  const advance = (helm: Helm, gun: Order) => {
+    const crews = new Map(battle.crews.map((c) => [c.id, c]));
+    const seen: Seen[] = fleet.map((v) => {
+      const c = crews.get(v.id)!;
+      return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun };
+    });
+    const helms: Helm[] = [], orders: Order[] = [];
+    fleet.forEach((v, i) => {
+      const a = aboard.get(v.id)!;
+      if (v.id === PLAYER) [helms[i], orders[i]] = [helm, gun];
+      else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
+      else {
+        const r = think(seen[i], seen.filter((o) => o.id !== v.id), depth, a.mind, seedOf(v.id), STEP, chart);
+        [a.mind, helms[i], orders[i]] = [r.memory, r.helm, r.order];
+      }
+    });
+    const met = stepFleet(fleet, helms, STEP, depth);
     fleet = met.fleet;
-    for (const b of met.blows) minds = minds.map((m, i) => (m && fleet[i].id === b.struck.id ? rammed(m, b.striker.id) : m));
+    for (const b of met.blows) {
+      const a = aboard.get(b.struck.id);
+      if (a?.mind) a.mind = rammed(a.mind, b.striker.id);
+    }
+    const fought = stepBattle(battle, fleet, orders, met.blows, STEP, depth);
+    const worn = weathered(fought.battle, fleet, match.storm(tick * STEP), STEP);
+    battle = worn.battle;
     tick++;
-    motions = motions.map((m, i) => ride(knocked(m, fleet[i].ship, met.jolts[i]), fleet[i].ship, sea, tick * STEP, STEP));
-    before = after;
-    after = fleet.map((v, i) => pose(v.ship, motions[i]));
+    fleet.forEach((v, i) => {
+      const a = aboard.get(v.id)!;
+      a.ride = ride(knocked(a.ride, v.ship, met.jolts[i]), v.ship, sea, tick * STEP, STEP);
+      [a.before, a.after] = [a.after, pose(v.ship, a.ride)];
+    });
+    // what the fighting did, drawn from this step on
+    const t = tick * STEP;
+    for (const s of fought.shots) frame.gunfire.shot(t, s.from, s.dir);
+    for (const s of fought.splashes) frame.gunfire.splash(t, s.at, s.land);
+    for (const s of fought.strikes) frame.gunfire.strike(t, s.at, s.ram);
+    // the sunk taken off the sea, to go down
+    for (const id of [...fought.sunk, ...worn.sunk]) {
+      const a = aboard.get(id);
+      if (!a) continue;
+      wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
+      aboard.delete(id);
+    }
+    fleet = fleet.filter((v) => aboard.has(v.id));
   };
+
+  const mine = () => fleet.find((v) => v.id === PLAYER) ?? null;
 
   // the drive, sailed now
   let held: ((s: ShipState) => Helm) | null = null;
+  const still: Order = { aim: null, fire: false };
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
     held = (s) => ({ course: bearing(s.at, (b * Math.PI) / 180), throttle });
-    for (let i = 0; i < Math.round(seconds / STEP); i++) advance(held(fleet[0].ship));
+    for (let i = 0; i < Math.round(seconds / STEP) && mine(); i++) advance(held(mine()!.ship), still);
   }
-  chase.reset(after[0], tick * STEP);
+  chase.reset(aboard.get(PLAYER)?.after ?? last, tick * STEP);
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -113,20 +189,60 @@ export function createGame(
     return { course: add(scale(ahead, stick.y), right, stick.x), throttle: Math.min(1, (push - DEAD) / (1 - DEAD)) };
   };
 
-  /** What the HUD reads of the match: where she is, the way she heads, and how many ships are afloat. */
-  const status = (): Status => ({ at: fleet[0].ship.at, heading: fleet[0].ship.heading, afloat: fleet.length });
+  /** The storm as drawn: on the match's clock, at the moment drawn. */
+  let drawn = 0, eye = { centre: [0, 0, 1] as Vec3, radius: -1 };
+  const storm = () => match.storm(drawn);
+
+  /** What the HUD reads of the match. (Its calm is a new object only when it has moved or changed by a metre.) */
+  const status = (): Status => {
+    const c = battle.crews.find((k) => k.id === PLAYER)!, v = mine(), s = storm();
+    const radius = Math.round(s.radius * R);
+    if (radius !== eye.radius || s.centre.some((x, i) => Math.abs(x - eye.centre[i]) * R > 1)) eye = { centre: s.centre, radius };
+    const full = c.gun ? GUN.reload * GUN.reloadBy[c.gun.rarity] : 1;
+    return {
+      at: v?.ship.at ?? last.up, heading: v?.ship.heading ?? last.forward,
+      hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
+      gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full } : null,
+      afloat: fleet.length, sunk: sunk(c.health),
+      storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, eye,
+    };
+  };
 
   return Object.assign((dt: number) => {
     const hands = input.read();
     drawStick(hands.stick);
     if (hands.stick || hands.look.held) held = null;
     const { steps, between } = clock(dt);
-    for (let i = 0; i < steps; i++) advance(held ? held(fleet[0].ship) : orders(hands.stick));
+    for (let i = 0; i < steps; i++) {
+      const v = mine();
+      const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
+      advance(helm, { aim: chase.axes().ahead, fire: pulled || hands.fire });
+      pulled = false;
+    }
     // what is drawn is `between` of the way from the step before last to the last
-    env.clock = (tick - 1 + between) * STEP;
-    fleet.forEach(({ ship, shove }, i) => {
-      frame.fleet.set(i, blendPose(before[i], after[i], between), looks[i], add(scale(ship.heading, ship.speed), shove));
-    });
-    chase.update(blendPose(before[0], after[0], between), hands.look, dt, tick * STEP);
-  }, { status });
+    const now = (tick - 1 + between) * STEP;
+    env.clock = drawn = now;
+    for (const { id, ship, shove } of fleet) {
+      const a = aboard.get(id)!, p = blendPose(a.before, a.after, between);
+      frame.fleet.set(id, p, a.look, add(scale(ship.heading, ship.speed), shove));
+      if (id === PLAYER) last = p;
+    }
+    for (let k = wrecks.length - 1; k >= 0; k--) {
+      const w = wrecks[k], p = sinking(w.pose, now - w.tick * STEP, w.side);
+      if (p) frame.fleet.set(w.id, p, w.look, [0, 0, 0], false);
+      else {
+        frame.fleet.drop(w.id);
+        wrecks.splice(k, 1);
+      }
+      if (w.id === PLAYER && p) last = p;
+    }
+    frame.gunfire.draw(now, battle.balls.map((b) => add(b.p, b.v, (between - 1) * STEP)));
+    chase.update(last, hands.look, dt, tick * STEP);
+  }, {
+    status,
+    /** The storm at the moment drawn, for the frame (sim/storm.ts). */
+    storm,
+    /** Fire her gun at the next step, if it is loaded then (the HUD's button). */
+    fire() { pulled = true; },
+  });
 }

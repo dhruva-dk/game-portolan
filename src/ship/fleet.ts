@@ -13,6 +13,9 @@
 //
 // One ship may be the player's own (`own`): she is always drawn at the finest level.
 //
+// A ship going down is drawn but not afloat: the sea neither fits round her hull nor takes her wake or shadow, so it
+// closes over her. One gone is dropped, and not drawn.
+//
 // Her canvas and pennants are simulated as cloth while she is among the few nearest the eye (berths.ts, cloth.ts),
 // the player's own always: each frame the berths are handed out, and each berthed ship's sails' wind and motion
 // (motion.ts) handed to the cloth, before it is moved on. Every other ship's are the drawn shape the shader fills.
@@ -96,6 +99,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   const meshes = draws.flat();
 
   const poses: ShipPose[] = [], looks: Look[] = [], velocities: Vec3[] = [], was: number[] = [];
+  /** Whether ship i floats (else she is going down), and whether she is drawn at all. */
+  const floats: boolean[] = [], shown: boolean[] = [];
   /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
    * frame, metres a second. */
   const braces: number[] = [], sails: Vec3[] = [];
@@ -104,9 +109,12 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   const motions: (Motion | null)[] = new Array(BERTHS).fill(null);
   const frustum = new Frustum(), sphere = new Sphere(), m = new Matrix4();
 
-  /** The ship i's pose, look and velocity (metres per second, world space); ships 0…count−1 are drawn. */
-  function set(i: number, pose: ShipPose, look: Look, velocity: Vec3 = [0, 0, 0]) {
+  /** The ship i's pose, look and velocity (metres per second, world space), and whether she floats; ships 0…count−1
+   * are drawn, but those dropped. */
+  function set(i: number, pose: ShipPose, look: Look, velocity: Vec3 = [0, 0, 0], afloat = true) {
     if (i >= capacity) throw new Error(`fleet: ship ${i} past capacity ${capacity}`);
+    floats[i] = afloat;
+    shown[i] = true;
     poses[i] = pose;
     looks[i] = look;
     velocities[i] = velocity;
@@ -125,7 +133,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       braces[i] = Number.isNaN(braces[i]) ? trim(blowing, speed, 0) : hauled(braces[i], blowing, speed, dt);
       sails[i] = filling(blowing, speed, braces[i]);
     }
-    const metres = poses.slice(0, count).map((p) => eye.distanceTo(new Vector3(...add(p.position, p.up, MIDDLE))));
+    const metres = poses.slice(0, count).map((p, i) => (shown[i] ? eye.distanceTo(new Vector3(...add(p.position, p.up, MIDDLE))) : Infinity));
     const before = berths;
     berths = moor(berths, simulating ? metres : metres.map(() => Infinity), simulating ? own : -1, dt);
     berths.forEach((b, k) => {
@@ -150,6 +158,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     const filled = new Array<number>(levels).fill(0);
     for (let i = 0; i < count; i++) {
       const pose = poses[i], look = looks[i];
+      if (!shown[i]) { was[i] = -1; continue; }
       const middle = add(pose.position, pose.up, MIDDLE);
       sphere.set(new Vector3(...middle), RADIUS);
       if (!frustum.intersectsSphere(sphere)) { was[i] = -1; continue; }
@@ -178,13 +187,17 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     update,
     /** Ship i is the player's own (or none, for null): she is always drawn at the finest level. */
     own(i: number | null) { own = i ?? -1; },
+    /** Ship i is gone: not drawn till she is set again. */
+    drop(i: number) { shown[i] = false; },
     /** Simulate the near ships' canvas as cloth, or (false: a debug view) draw every ship's as its wind fills it. */
     simulate(on: boolean) { simulating = on; },
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },
     get count() { return count; },
-    /** Ships 0…count−1 as last set: each one's pose, look (and her yards' brace) and velocity (for the marks she leaves
+    /** The ships afloat as last set: each one's pose, look (and her yards' brace) and velocity (for the marks she leaves
      * on the sea). */
-    get ships() { return poses.slice(0, count).map((pose, i) => ({ pose, look: { ...looks[i], brace: braces[i] }, velocity: velocities[i] })); },
+    get ships() {
+      return poses.slice(0, count).flatMap((pose, i) => (shown[i] && floats[i] ? [{ pose, look: { ...looks[i], brace: braces[i] }, velocity: velocities[i] }] : []));
+    },
   };
 }

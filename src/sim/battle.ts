@@ -4,13 +4,17 @@
 // reloads the guns, and fires those ordered to that are loaded. A ship sunk takes no more, fires no more, and is no
 // longer laid on or struck; her crew is kept, sunk, for the game to take her off the sea.
 //
+// The storm (storm.ts) wears at every ship outside its cap, a share of a full hull a second, past the shield as the old
+// game's did (weathered, after the step).
+//
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs. Crews are kept in
 // order of their ships' ids, so it makes no difference in which order the fleet is listed.
 
 import type { Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
-import { GUN } from './handling.ts';
+import { GUN, HEALTH } from './handling.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
+import { outside, type Storm } from './storm.ts';
 import { laid, type Gun } from './gun.ts';
 import { fly, loosed, type Ball } from './shot.ts';
 import type { Depth } from './shoal.ts';
@@ -124,4 +128,19 @@ export function stepBattle(
     battle: { crews: [...crews.values()].sort((x, y) => x.id - y.id), balls, seed: b.seed },
     shots, strikes, splashes, sunk: sunkNow,
   };
+}
+
+/** The storm's wear over dt seconds on every ship of `fleet` outside its cap: `storm.damage` of a full hull a second,
+ * past the shield. The battle after it, and the ships it sank. */
+export function weathered(b: Battle, fleet: readonly Vessel[], storm: Pick<Storm, 'centre' | 'radius' | 'damage'>, dt: number): { battle: Battle; sunk: number[] } {
+  const out = new Set(fleet.filter((v) => outside(v.ship.at, storm)).map((v) => v.id));
+  if (out.size === 0 || !(storm.damage > 0)) return { battle: b, sunk: [] };
+  const sunkNow: number[] = [];
+  const crews = b.crews.map((c) => {
+    if (!out.has(c.id) || sunk(c.health)) return c;
+    const health = harmed(c.health, storm.damage * HEALTH.hull * dt, true).health;
+    if (sunk(health)) sunkNow.push(c.id);
+    return { ...c, health };
+  });
+  return { battle: { ...b, crews }, sunk: sunkNow };
 }

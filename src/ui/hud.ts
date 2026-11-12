@@ -2,7 +2,9 @@
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in rubric under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts); a tap opens the full map
-//   right edge  Gust, with a pip for each charge
+//   right edge  Gust, with a pip for each charge; under it, in the right thumb's reach, Fire (the old game's place):
+//               the gun's mark on a paper disc, the reload sweeping round it in rubric, faint and struck through
+//               with no gun
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot, then three more
 // No words. The stick (play/stick.ts) is drawn by the game; look drags take the rest of the screen.
 //
@@ -11,7 +13,7 @@
 import type { Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
-import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, slip, svg } from './ink';
+import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
 import { createMinimap, stormRing, type Storm } from './minimap';
 import { onTap, piece } from './ui';
 
@@ -32,15 +34,19 @@ export interface HudState {
   chosen: number;
   /** Gust's charges ready, of GUSTS. */
   gust: number;
+  /** Her gun: its rarity (0–4) and how far loaded (0…1, 1 ready); null with none. */
+  gun: { rarity: number; ready: number } | null;
   /** Where she is (unit sphere) and the way she heads (unit tangent). */
   at: Vec3; heading: Vec3;
 }
 
-export interface HudActions { slot(i: number): void; gust(): void; map(): void }
+export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(): void }
 
 const GUSTS = 2;
 const SLOT = 50, GAP = 6;
 const MINIMAP = 132;
+/** Fire's radius, px, and its centre from the safe area's right and bottom edges (the old game's, chart/layout.ts). */
+const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102;
 
 /** m:ss */
 export const clock = (s: number) => {
@@ -58,6 +64,13 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   const map = piece(root, 'top right', true);
   const gust = piece(root, 'right', true);
   gust.style.top = '46%';
+  const fire = piece(root, 'right bottom', true);
+  fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
+  // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
+  fire.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    act.fire();
+  });
   const hotbar = piece(root, 'bottom');
   hotbar.style.left = 'calc(50% + 14px)';
 
@@ -107,6 +120,12 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         for (let i = 0; i < GUSTS; i++) pips += `<circle cx="${30 + (i - (GUSTS - 1) / 2) * 10}" cy="44" r="2.8" fill="${i < s.gust ? INK.iron : PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
         return svg(60, 60, `<g opacity="${s.gust > 0 ? 1 : 0.55}">${paperDisc(30, 30, 28)}${glyph('hud.gust', 30, 26, 32)}${pips}</g>`);
       });
+
+      // the reload's sweep in steps of a 48th, so it is redrawn a few times a second at most
+      const loaded = s.gun ? Math.floor(Math.min(1, s.gun.ready) * 48) : -1, c = FIRE + 2;
+      draw(fire, `${loaded}`, () => svg(2 * c, 2 * c, `<g opacity="${loaded < 0 ? 0.5 : 1}">${paperDisc(c, c, FIRE - 2)}${glyph('weapon.cannon', c, c, 1.2 * FIRE)}`
+        + (loaded < 0 ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
+        + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 4, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
 
       s.slots.forEach((slot, i) => draw(slots[i], `${slot?.glyph} ${slot?.count} ${s.chosen === i}`, () => {
         const chosen = s.chosen === i;

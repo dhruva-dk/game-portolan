@@ -10,7 +10,7 @@
 // (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
 // ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
 // lie by default (for seed 3 the largest island's centre is at lat 8.7, lon −11.6, its coast about 69 m out).
-// ?drive= sails a debug drive first (play/game.ts). ?probe stands grey blocks and mirrors ahead (probe.ts). The meter
+// ?drive= sails a debug drive first (play/game.ts); ?gun=0…4 arms every ship with a gun of that rarity (sim/gun.ts). ?probe stands grey blocks and mirrors ahead (probe.ts). The meter
 // (meter.ts) shows the frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets
 // (iPhone 16 Pro Max in landscape: ?safe=0,62,21,62). ?screen= opens the UI at a screen (title, lobby, drop, match, result; ui/flow.ts).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
@@ -48,6 +48,8 @@ export const switches = (() => {
     probe: params.has('probe'),
     meter: DEBUG,
     screen: params.get('screen'),
+    /** ?gun=0…4: every ship armed with a gun of that rarity (until there is loot to find one in). */
+    gun: params.has('gun') ? number('gun', 0) : null,
   };
 })();
 
