@@ -56,7 +56,8 @@ const reflection = storage(W, H);
 reflection.minFilter = LinearMipmapLinearFilter;
 reflection.wrapS = RepeatWrapping;
 reflection.wrapT = ClampToEdgeWrapping;
-reflection.mipmaps = Array.from({ length: LEVELS + 1 }, (_, k) => ({ width: W >> k, height: H >> k })) as any;
+// three allots the whole chain of mips and leaves them alone: the compute passes below write the first LEVELS + 1
+reflection.generateMipmaps = true;
 reflection.mipmapsAutoUpdate = false;
 
 /** The direction at the centre of texel (x, y) of a w×h panorama: the inverse of three's equirectUV. */
