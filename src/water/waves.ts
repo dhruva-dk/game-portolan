@@ -24,12 +24,13 @@
 
 import {
   DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
-  Vector2, type WebGPURenderer,
+  Vector2,
 } from 'three/webgpu';
 import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from './cascades';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from './spectrum';
 
@@ -64,7 +65,7 @@ const twice = (a: N, w: N): N => vec4(
 
 export type Waves = ReturnType<typeof createWaves>;
 
-export function createWaves(renderer: WebGPURenderer) {
+export function createWaves() {
   // each cascade's h₀ stacked: cascade c in rows c·N … c·N + N − 1
   const initial = new DataTexture(new Float32Array(AREA * COUNT * 4), SIZE, SIZE * COUNT, RGBAFormat, FloatType);
   const time = uniform(0);
@@ -186,6 +187,8 @@ export function createWaves(renderer: WebGPURenderer) {
     const hxz = h(1, 1).sub(h(1, -1)).sub(h(-1, 1)).add(h(-1, -1)).div(4 * e2);
     textureStore(curvature[i], uvec2(x, y), vec4(hxx, hzz, hxz, 0));
   })().compute(AREA, [64]));
+  /** A frame's passes, in order, each its own. */
+  const passes: Compute[] = [spectrumKernel, rowsKernel, columnsKernel, ...assembleKernels, ...curvatureKernels];
 
   let wind = -1, gusting = -1, held = 0;
   const spreads = CASCADES.map(() => 0);
@@ -201,9 +204,9 @@ export function createWaves(renderer: WebGPURenderer) {
     /**
      * sea: the sea the wind has raised (its mean over the match: waves take hours to grow); now: the wind blowing
      * now, m/s, which the whitecaps, the ripples and the foam follow within seconds; clock: the world's, seconds; dt:
-     * since the last update, for the foam's fading.
+     * since the last update, for the foam's fading. Returns the passes due: every one, every frame.
      */
-    update(sea: Sea, now: number, clock: number, dt: number) {
+    update(sea: Sea, now: number, clock: number, dt: number): Compute[] {
       // a new sea only when its wind changes; the same seeds keep the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
@@ -232,11 +235,7 @@ export function createWaves(renderer: WebGPURenderer) {
       // Monahan's stage B, a few seconds)
       fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((now - 5) / 15, 0), 1)));
       time.value = clock % PERIOD;
-      renderer.compute(spectrumKernel);
-      renderer.compute(rowsKernel);
-      renderer.compute(columnsKernel);
-      for (const k of assembleKernels) renderer.compute(k);
-      for (const k of curvatureKernels) renderer.compute(k);
+      return passes;
     },
   };
 }

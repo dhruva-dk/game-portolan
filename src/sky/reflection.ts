@@ -10,12 +10,13 @@
 
 import {
   ClampToEdgeWrapping, HalfFloatType, LinearFilter, LinearMipmapLinearFilter,
-  RepeatWrapping, StorageTexture, Vector4, type WebGPURenderer,
+  RepeatWrapping, StorageTexture, Vector4,
 } from 'three/webgpu';
 import {
   Fn, Loop, abs, cos, cross, dot, equirectUV, float, instanceIndex, max, normalize, select, sin, storageTexture,
   texture, textureLoad, textureStore, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 import type { View } from '../view/view';
 import type { Tables } from './tables';
 
@@ -113,7 +114,7 @@ function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): 
  * clouds' light (rgb) and transmittance (a) along a sky direction, marched in at most so many steps.
  */
 export function createReflection(
-  renderer: WebGPURenderer, view: View, skyRadiance: Tables['skyRadiance'], sunDirection: N, cloudsAlong: (d: N, steps: number) => N,
+  view: View, skyRadiance: Tables['skyRadiance'], sunDirection: N, cloudsAlong: (d: N, steps: number) => N,
 ) {
   const panorama = storage(W, H);
   const reduced = storage(RW, RH);
@@ -156,8 +157,9 @@ export function createReflection(
       const d = view.toSky(dir);
       return texture(reflection, equirectUV(normalize(vec3(d.x, max(d.y, 0), d.z)))).level(level(roughness)).rgb;
     },
-    update() {
-      if (frame++ % EVERY === 0) renderer.compute(passes);
+    /** The passes due this frame: all of them, one after another in one pass, every EVERY frames. */
+    update(): Compute[] {
+      return frame++ % EVERY === 0 ? [passes] : [];
     },
   };
 }

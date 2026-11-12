@@ -9,12 +9,13 @@
 
 import {
   ClampToEdgeWrapping, HalfFloatType, LinearFilter, Matrix4, NearestFilter, StorageTexture, Vector3,
-  type PerspectiveCamera, type WebGPURenderer,
+  type PerspectiveCamera,
 } from 'three/webgpu';
 import {
   Fn, If, Loop, abs, clamp, dot, exp, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 import type { View } from '../view/view';
 import { createCloudNoise } from './cloud-noise';
 import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
@@ -203,8 +204,9 @@ export interface CloudInputs {
 }
 
 /** tables: the air's (tables.ts), which light the clouds and the air in front of them. */
-export function createClouds(renderer: WebGPURenderer, view: View, tables: Tables) {
-  const field = createCloudField(tables, createCloudNoise(renderer));
+export function createClouds(view: View, tables: Tables) {
+  const noise = createCloudNoise();
+  const field = createCloudField(tables, noise);
   const { coverage, drift, sunDir, eye } = field.inputs;
   const cam = cameraInputs();
   const shadow = createShadow(view, field);
@@ -213,7 +215,8 @@ export function createClouds(renderer: WebGPURenderer, view: View, tables: Table
   let size = [0, 0];
   let frame = 0;
   let last: readonly number[] | null = null;
-  const viewProjection = new Matrix4();
+  /** Where the camera looked from last frame, and the eye's frame then (the uniforms' own values before the first). */
+  const seen = { viewProjection: new Matrix4(), east: [1, 0, 0], up: [0, 1, 0], south: [0, 0, 1], dip: 0 };
   const historyTexture = texture(passes.history[0]);
   const historyDistanceTexture = texture(passes.historyDistance[0]);
 
@@ -225,7 +228,11 @@ export function createClouds(renderer: WebGPURenderer, view: View, tables: Table
     shadow: shadow.at,
     /** The clouds along a sky direction, coarser, for the reflection. */
     along: field.along,
+    /** The passes that fill the clouds' patterns, to be run once before the first frame. */
+    bake: noise.bake,
 
+    /** Readies this frame's march, and returns the passes due: the march, its resolve, and every fourth frame the
+     * shadow map. */
     update(inputs: CloudInputs, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       if (width !== size[0] || height !== size[1]) {
         size = [width, height];
@@ -256,26 +263,31 @@ export function createClouds(renderer: WebGPURenderer, view: View, tables: Table
       cam.projectionInverse.value.copy(camera.projectionMatrixInverse);
       cam.cameraWorld.value.copy(camera.matrixWorld);
       cam.frameIndex.value = frame;
+      // last frame's camera and eye, for the resolve to find where a cloud was seen then; and this frame's, for the next
+      cam.previousViewProjection.value.copy(seen.viewProjection);
+      cam.previousFrame.east.value.set(seen.east[0], seen.east[1], seen.east[2]);
+      cam.previousFrame.up.value.set(seen.up[0], seen.up[1], seen.up[2]);
+      cam.previousFrame.south.value.set(seen.south[0], seen.south[1], seen.south[2]);
+      cam.previousFrame.dip.value = seen.dip;
+      seen.viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      seen.east = [...f.east];
+      seen.up = [...f.up];
+      seen.south = [-f.north[0], -f.north[1], -f.north[2]];
+      seen.dip = view.eye.dip;
 
       const [cx, cy] = LATTICE[frame % 4];
       passes.cell.value.set(cx, cy, 0);
-      renderer.compute(passes.marchKernel);
       const write = frame % 2;
-      renderer.compute(passes.resolveKernels[write]);
+      const due: Compute[] = [passes.marchKernel, passes.resolveKernels[write]];
       historyTexture.value = passes.history[write];
       historyDistanceTexture.value = passes.historyDistance[write];
 
       if (frame % 4 === 0) {
         shadow.centre.value.set(Math.round(eye.value.x), 0, Math.round(eye.value.z));
-        renderer.compute(shadow.kernel);
+        due.push(shadow.kernel);
       }
-
-      cam.previousViewProjection.value.copy(viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-      cam.previousFrame.east.value.set(...f.east);
-      cam.previousFrame.up.value.set(...f.up);
-      cam.previousFrame.south.value.set(-f.north[0], -f.north[1], -f.north[2]);
-      cam.previousFrame.dip.value = view.eye.dip;
       frame++;
+      return due;
     },
   };
 }

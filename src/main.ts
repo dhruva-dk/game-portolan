@@ -18,7 +18,6 @@ if (!navigator.gpu) {
 }
 
 const renderer = new WebGPURenderer({ antialias: false, trackTimestamp: true });
-renderer.setPixelRatio(1);
 document.body.appendChild(renderer.domElement);
 await renderer.init();
 

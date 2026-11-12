@@ -19,9 +19,10 @@
 
 import {
   BufferAttribute, BufferGeometry, DynamicDrawUsage, Frustum, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
-  Matrix4, Mesh, Sphere, Vector3, type Material, type PerspectiveCamera, type WebGPURenderer,
+  Matrix4, Mesh, Sphere, Vector3, type Material, type PerspectiveCamera,
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
+import type { Compute } from '../gpu';
 import type { Light } from '../land/light';
 import type { ShipPose } from '../world/pose';
 import { add, length, scale, type Vec3 } from '../world/sphere';
@@ -78,9 +79,9 @@ function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Mate
 export type Fleet = ReturnType<typeof createFleet>;
 
 /** capacity: the most ships there will be. */
-export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, capacity: number) {
+export function createFleet(light: Light, wind: Wind, capacity: number) {
   const pixel = uniform(0.0026);
-  const cloth = createCloth(renderer);
+  const cloth = createCloth();
   const materials = createShipMaterials(light, pixel, cloth);
   const instances = Array.from({ length: levels }, () => {
     const buffer = new InstancedInterleavedBuffer(new Float32Array(capacity * STRIDE), STRIDE);
@@ -115,9 +116,9 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
     count = Math.max(count, i + 1);
   }
 
-  /** Each ship's yards hauled round dt seconds on, her sails' wind found, the berths handed out, and each berthed ship's
-   * canvas moved on dt seconds. */
-  function sail(eye: Vector3, windSpeed: number, dt: number) {
+  /** Each ship's yards hauled round dt seconds on, her sails' wind found, and the berths handed out; returns the passes
+   * that move each berthed ship's canvas on dt seconds. */
+  function sail(eye: Vector3, windSpeed: number, dt: number): Compute[] {
     for (let i = 0; i < count; i++) {
       const pose = poses[i], speed = length(velocities[i]);
       const blowing = inFrame(pose, scale(wind(pose.position), windSpeed));
@@ -133,18 +134,18 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
       motions[k] = motion;
       cloth.set(k, { brace: braces[b.ship], phase: phaseOf(b.ship), wind: sails[b.ship], ...feeling(motion) }, b.fresh);
     });
-    cloth.update(dt);
+    return cloth.update(dt);
   }
 
   /**
    * Each frame, after the camera has moved: windSpeed in metres per second; height the drawing buffer's, pixels; dt
-   * the seconds since the last.
+   * the seconds since the last. Returns what is due: the near ships' canvas as cloth.
    */
-  function update(camera: PerspectiveCamera, windSpeed: number, height: number, dt: number) {
+  function update(camera: PerspectiveCamera, windSpeed: number, height: number, dt: number): { cloth: Compute[] } {
     pixel.value = (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
     frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const eye = camera.getWorldPosition(new Vector3());
-    sail(eye, windSpeed, dt);
+    const canvas = sail(eye, windSpeed, dt);
     const shares = new Map(berths.flatMap((b, k) => (b ? [[b.ship, [k, b.share]] as const] : [])));
     const filled = new Array<number>(levels).fill(0);
     for (let i = 0; i < count; i++) {
@@ -168,6 +169,7 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
         mesh.visible = filled[k] > 0;
       }
     });
+    return { cloth: canvas };
   }
 
   return {

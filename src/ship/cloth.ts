@@ -22,11 +22,12 @@
 // normals: 17 dispatches of 3132 threads, nothing when no berth is held. Nothing is read back: the cloth's material
 // reads the particles straight from their buffers in the vertex stage (materials.ts).
 
-import { Vector4, type WebGPURenderer } from 'three/webgpu';
+import { Vector4 } from 'three/webgpu';
 import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, min, normalize, select, sin, uniform, uniformArray,
   vec3, vec4, instancedArray,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 import type { Vec3 } from '../world/sphere';
 import { BERTHS } from './berths';
 import { cutCanvas } from './canvas';
@@ -93,7 +94,7 @@ export interface Felt {
 
 export type Cloth = ReturnType<typeof createCloth>;
 
-export function createCloth(renderer: WebGPURenderer) {
+export function createCloth() {
   const canvas = cutCanvas(), n = canvas.count, total = BERTHS * n;
   const X: N = instancedArray(total, 'vec4'), Vel: N = instancedArray(total, 'vec4'), P: N = instancedArray(total, 'vec4');
   const Nrm: N = instancedArray(total, 'vec4');
@@ -248,7 +249,8 @@ export function createCloth(renderer: WebGPURenderer) {
     grids,
     clock,
     /**
-     * Berth k this frame: empty (null), or a ship feeling `felt`, her cloth laid out as cut first if `fresh`.
+     * Berth k this frame: empty (null), or a ship feeling `felt`, her cloth laid out as cut first if `fresh`. Every
+     * berth is set every frame, before the update: a fresh berth is fresh for that frame's steps only.
      */
     set(k: number, felt: Felt | null, fresh = false) {
       const [p0, p1, p2, p3, p4] = values.slice(k * PARAMS, k * PARAMS + PARAMS);
@@ -260,15 +262,14 @@ export function createCloth(renderer: WebGPURenderer) {
       p4.set(...felt.spinning, 0);
       live = true;
     },
-    /** Each frame, after the berths are set: the cloth moved on dt seconds. */
-    update(dt: number) {
+    /** Each frame, after the berths are set: the steps that move the cloth on dt seconds, in one pass; none while no
+     * berth is held. */
+    update(dt: number): Compute[] {
       clock.value += dt;
-      if (!live || dt <= 0) return;
+      if (!live || dt <= 0) return [];
       h.value = Math.min(dt, LONGEST) / SUBSTEPS;
-      renderer.compute(steps);
-      // a fresh berth has been laid out
-      for (let k = 0; k < BERTHS; k++) values[k * PARAMS].y = 0;
       live = false;
+      return [steps];
     },
   };
 }

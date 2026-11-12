@@ -4,11 +4,12 @@
 // Each pattern's finest octave keeps at least four texels per period, so the trilinear reads stay crisp rather than
 // aliasing into mush.
 
-import { HalfFloatType, LinearFilter, RepeatWrapping, Storage3DTexture, StorageTexture, type WebGPURenderer } from 'three/webgpu';
+import { HalfFloatType, LinearFilter, RepeatWrapping, Storage3DTexture, StorageTexture } from 'three/webgpu';
 import {
   Fn, clamp, dot, float, floor, fract, instanceIndex, length, max, min, mix, mod, normalize, select, sin, smoothstep,
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 
 type N = any;
 
@@ -137,8 +138,8 @@ const weatherKernel = (weatherMap: StorageTexture) => Fn(() => {
 
 export type CloudNoise = ReturnType<typeof createCloudNoise>;
 
-/** The patterns, baked here once, before the clouds are first drawn. */
-export function createCloudNoise(renderer: WebGPURenderer) {
+/** The patterns, and `bake`: the passes that fill them, to be run once before the clouds are first drawn. */
+export function createCloudNoise() {
   const shape = volume(SHAPE_N);
   const detail = volume(DETAIL_N);
   const weather = new StorageTexture(WEATHER_N, WEATHER_N);
@@ -146,8 +147,6 @@ export function createCloudNoise(renderer: WebGPURenderer) {
   // half floats: it holds a potential in km, from which the clouds' tops are worked out
   weather.type = HalfFloatType;
   weather.generateMipmaps = false;
-  renderer.compute(shapeKernel(shape));
-  renderer.compute(detailKernel(detail));
-  renderer.compute(weatherKernel(weather));
-  return { shape, detail, weather };
+  const bake: Compute[] = [shapeKernel(shape), detailKernel(detail), weatherKernel(weather)];
+  return { shape, detail, weather, bake };
 }

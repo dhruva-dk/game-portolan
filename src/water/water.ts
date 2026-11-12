@@ -25,13 +25,14 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { DoubleSide, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Discard, Fn, If, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
+import type { Compute, Draw } from '../gpu';
 import type { Ground } from '../land/ground';
 import type { Sky } from '../sky/sky';
 import { createCharts } from '../view/charts';
@@ -77,9 +78,9 @@ const RUNUP = 0.5, BACKWASH = 0.3, SWASH_FROM = 0.5;
  * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
  * weights (red, green, blue: nearest first); 'wake' shows the ships' marks (wake.ts).
  */
-export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, debug = '') {
-  const waves = createWaves(renderer);
-  const wake = createWake(renderer, view, sky, ships);
+export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, debug = '') {
+  const waves = createWaves();
+  const wake = createWake(view, sky, ships);
   const hulls = createHulls();
   const optics = createOptics(sky, view);
   // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
@@ -258,13 +259,14 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       sun: (p: N): N => optics.sunBelow(p).mul(caustics(p)),
       sky: (p: N): N => optics.skyBelow(p),
     },
-    /** Each frame: the world, and the ships on the sea. */
-    update(env: Environment, dt: number, ships: readonly Afloat[]) {
-      waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
-      wake.update(env, ships);
+    /** Each frame: the world, and the ships on the sea. Returns what is due: the waves' passes, the marks' draw. */
+    update(env: Environment, dt: number, ships: readonly Afloat[]): { waves: Compute[]; wake: Draw | null } {
+      const swell = waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
+      const marks = wake.update(env, ships);
       hulls.update(ships.map((s) => s.pose), view.eye.position);
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
       charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
+      return { waves: swell, wake: marks };
     },
   };
 }

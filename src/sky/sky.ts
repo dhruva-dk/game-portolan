@@ -14,9 +14,10 @@
 // and the frame's post pass:
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
 
-import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
+import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
+import type { Compute } from '../gpu';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
@@ -59,8 +60,8 @@ export interface Sky {
   reflect(dir: N, roughness: N): N;
 }
 
-export function createSky(renderer: WebGPURenderer, view: View) {
-  const tables = createTables(renderer);
+export function createSky(view: View) {
+  const tables = createTables();
   const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   /** Extinction of the air at sea level, per km. */
   const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
@@ -71,8 +72,8 @@ export function createSky(renderer: WebGPURenderer, view: View) {
   const origin = uniform(new Vector3(0, 1, 0));
   const there = uniform(new Vector3(0, 1, 0));
   const rise = uniform(1);
-  const clouds = createClouds(renderer, view, tables);
-  const reflection = createReflection(renderer, view, skyRadiance, skySun, clouds.along);
+  const clouds = createClouds(view, tables);
+  const reflection = createReflection(view, skyRadiance, skySun, clouds.along);
 
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
   const sunOver = (p: N): N => {
@@ -122,18 +123,21 @@ export function createSky(renderer: WebGPURenderer, view: View) {
     clouds,
     light,
     fog,
-    update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number) {
+    /** The clouds' patterns' passes, to be run once before the first frame. */
+    bake: clouds.bake,
+    /** Readies the sky for this frame, and returns the passes due from each part of it. */
+    update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
       sun.value.copy(env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
       rise.value = sunInSky(env.timeOfDay)[1];
       const s = toSky(view.eye.frame, view.eye.dip, [env.sunDirection.x, env.sunDirection.y, env.sunDirection.z]);
       skySun.value.set(s[0], s[1], s[2]);
-      tables.update(s[1], env.haze);
+      const air = tables.update(s[1], env.haze);
       // the clouds drift over the eye with the prevailing wind there (Environment.windDirection), on the eye's east and south
       const w = env.windDirection, f = view.eye.frame, along = (a: readonly number[]) => env.windSpeed * (w.x * a[0] + w.y * a[1] + w.z * a[2]);
-      clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, camera, dt, width, height);
-      reflection.update();
+      const cover = clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, camera, dt, width, height);
+      return { tables: air, clouds: cover, reflection: reflection.update() };
     },
   };
 }

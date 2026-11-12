@@ -6,13 +6,12 @@
 // The first two depend only on the air and are redone when the haze changes; the others when the sun moves.
 // Mappings and constants match atmosphere.ts, where the tests check them.
 
-import {
-  ClampToEdgeWrapping, HalfFloatType, LinearFilter, NearestFilter, StorageTexture, type WebGPURenderer,
-} from 'three/webgpu';
+import { ClampToEdgeWrapping, HalfFloatType, LinearFilter, NearestFilter, StorageTexture } from 'three/webgpu';
 import {
   Fn, If, Loop, abs, acos, clamp, cos, dot, exp, float, instanceIndex, length, max, normalize, pow, select,
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
+import type { Compute } from '../gpu';
 import * as A from './atmosphere';
 
 // TSL nodes are dynamically typed; the tables are small enough that a loose alias reads better than casts.
@@ -81,7 +80,7 @@ export const VIEW_RADIUS = VIEW_R;
 
 export type Tables = ReturnType<typeof createTables>;
 
-export function createTables(renderer: WebGPURenderer) {
+export function createTables() {
   const transmittanceTable = table(T_W, T_H);
   const multipleTable = table(M_N, M_N);
   const skyViewTable = table(V_W, V_H);
@@ -281,24 +280,26 @@ export function createTables(renderer: WebGPURenderer) {
      * Re-integrates what has changed: the air's tables with the haze, the sky view and ambient with the sun. The haze
      * drifts (world/weather.ts), so it is taken in steps of HAZE_STEP of itself, far finer than the eye can tell, and
      * its tables are integrated one a frame (each is about a millisecond on the Mac), the sky view on the last.
+     * Returns the passes that are due, in order.
      */
-    update(sunY: number, hazeAmount: number) {
+    update(sunY: number, hazeAmount: number): Compute[] {
       // the first time all at once
       const first = Number.isNaN(lastHaze);
       if (next === air.length && !(Math.abs(hazeAmount - lastHaze) <= HAZE_STEP * lastHaze)) {
         lastHaze = haze.value = hazeAmount;
         next = 0;
       }
+      const due: Compute[] = [];
       if (next < air.length) {
-        do renderer.compute(air[next++]);
+        do due.push(air[next++]);
         while (first && next < air.length);
-        if (next < air.length) return;
+        if (next < air.length) return due;
         lastCos = NaN;
       }
-      if (Math.abs(sunY - lastCos) < 1e-4) return;
+      if (Math.abs(sunY - lastCos) < 1e-4) return due;
       lastCos = sunCosZenith.value = sunY;
-      renderer.compute(skyViewKernel);
-      renderer.compute(ambientKernel);
+      due.push(skyViewKernel, ambientKernel);
+      return due;
     },
   };
 }

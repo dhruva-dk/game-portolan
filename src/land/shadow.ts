@@ -10,9 +10,10 @@
 
 import {
   DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial,
-  OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, type WebGPURenderer,
+  OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, type CoordinateSystem,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
+import type { Draw } from '../gpu';
 import type { IslandSite } from '../world/planet';
 import { place } from '../world/sphere';
 import type { Instances } from './site';
@@ -37,17 +38,19 @@ export interface Shadow {
   visible(p: N, n: N): N;
   /** Adds things that cast shadows. */
   cast(...casters: Instances[]): void;
-  /** Redraws the map if the sun has moved or the island has changed (sun: unit vector toward it; island: the nearest
-   * in view, or null). */
-  update(sun: Vector3, island: IslandSite | null): void;
+  /** The map's draw if it is due: if the sun has moved or the island has changed (sun: unit vector toward it; island:
+   * the nearest in view, or null); else null. */
+  update(sun: Vector3, island: IslandSite | null): Draw | null;
 }
 
-export function createShadow(renderer: WebGPURenderer): Shadow {
+/** coordinateSystem: the renderer's, which the map's projection is worked out in. */
+export function createShadow(coordinateSystem: CoordinateSystem): Shadow {
   const target = new RenderTarget(SIZE, SIZE, { format: RedFormat });
   target.depthTexture = new DepthTexture(SIZE, SIZE, FloatType);
   target.depthTexture.compareFunction = LessEqualCompare;
   const camera = new OrthographicCamera(-1, 1, 1, -1, 1, 2 * SPAN);
   const scene = new Scene();
+  const draw: Draw = { scene, camera, target };
   const black = new MeshBasicNodeMaterial({ side: DoubleSide });
   black.colorNode = vec3(0);
 
@@ -80,7 +83,7 @@ export function createShadow(renderer: WebGPURenderer): Shadow {
       }
     },
     update(sun, island) {
-      if (!island || (island === covered && sun.angleTo(last) < MOVED)) return;
+      if (!island || (island === covered && sun.angleTo(last) < MOVED)) return null;
       if (island !== covered) {
         // looking down the sun's rays at the island's centre, its up kept up the map's, out past its coast
         covered = island;
@@ -97,13 +100,10 @@ export function createShadow(renderer: WebGPURenderer): Shadow {
       camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);
       camera.lookAt(centre);
       camera.updateMatrixWorld();
-      camera.coordinateSystem = renderer.coordinateSystem;
+      camera.coordinateSystem = coordinateSystem;
       camera.updateProjectionMatrix();
       matrix.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-      const before = renderer.getRenderTarget();
-      renderer.setRenderTarget(target);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(before);
+      return draw;
     },
   };
 }

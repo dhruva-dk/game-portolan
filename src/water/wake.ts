@@ -41,15 +41,16 @@
 // meter would read whatever they last held).
 
 import {
-  AddEquation, BufferAttribute, Color, BufferGeometry, CustomBlending, DoubleSide, DynamicDrawUsage, HalfFloatType,
+  AddEquation, BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, DynamicDrawUsage, HalfFloatType,
   InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute, LinearFilter, MaxEquation, Mesh, MeshBasicNodeMaterial,
-  OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene, type WebGPURenderer,
+  OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene,
 } from 'three/webgpu';
 import {
   Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, mx_noise_float, normalize, saturate, select, sin, smoothstep,
   texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
+import type { Draw } from '../gpu';
 import { PIVOT_Z, buildShip } from '../ship/build';
 import { THROUGH } from '../ship/materials';
 import { WATERLINE } from '../ship/waterline';
@@ -121,14 +122,15 @@ const dynamic = (n: number, size: number) => new BufferAttribute(new Float32Arra
 export type Wake = ReturnType<typeof createWake>;
 
 /** capacity: the most ships. */
-export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capacity: number) {
+export function createWake(view: View, sky: Sky, capacity: number) {
   const target = new RenderTarget(SIZE, SIZE, { type: HalfFloatType, format: RGBAFormat, depthBuffer: false });
   target.texture.minFilter = target.texture.magFilter = LinearFilter;
   target.texture.generateMipmaps = false;
   const scene = new Scene();
   // (unused: every draw places itself on the map)
   const camera = new OrthographicCamera();
-  const clear = new Color();
+  /** The map's draw, cleared to nothing: no foam, no height, no air, no shadow. */
+  const draw: Draw = { scene, camera, target, clear: { color: 0x000000, alpha: 0 } };
   /** 1 while the map holds this frame's marks, 0 while no ship is near enough to draw any. */
   const live = uniform(0);
   /** How rough the sea is, 0…1, by the wind. */
@@ -326,8 +328,8 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
       const { uv, fade } = place(p);
       return texture(target.texture, uv).level(float(0)).y.mul(fade);
     },
-    /** Each frame, before the sea is drawn: the ships. */
-    update(env: Environment, ships: readonly Afloat[]) {
+    /** Each frame, before the sea is drawn: the ships. Returns the map's draw, or null when no ship is near. */
+    update(env: Environment, ships: readonly Afloat[]): Draw | null {
       const eye = view.eye, chart: Chart = { at: eye.frame.up, axis: eye.frame.east };
       const now = env.clock;
       rough.value = Math.min(Math.max((env.windSpeed - ROUGHEST / 4) / (ROUGHEST * 0.75), 0), 1);
@@ -371,15 +373,7 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
       for (const a of [trailAt, trailMark, trailLaid, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
       poses.needsUpdate = true;
       live.value = near > 0 ? 1 : 0;
-      if (near === 0) return;
-      // cleared to nothing: no foam, no height, no air, no shadow
-      const before = renderer.getRenderTarget(), alpha = renderer.getClearAlpha();
-      renderer.getClearColor(clear);
-      renderer.setRenderTarget(target);
-      renderer.setClearColor(0x000000, 0);
-      renderer.render(scene, camera);
-      renderer.setClearColor(clear, alpha);
-      renderer.setRenderTarget(before);
+      return near > 0 ? draw : null;
     },
   };
 }
