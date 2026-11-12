@@ -27,7 +27,7 @@ import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, fract, fwidth, max, min, mix, normalize, positionWorld,
   faceDirection, int, select, sign, sin, smoothstep, storage, varying, vec2, vec3,
 } from 'three/tsl';
-import { type Light, leafLight } from '../land/light';
+import type { Light } from '../land/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
 import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';
@@ -43,6 +43,8 @@ export const THROUGH = 0.3;
 const CLOTHS = 26;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
 const ABACK = 0.3;
+/** Inside a sail's bag, the most of the light on it that its own canvas takes, and how deep the bag is then, metres. */
+const HOLLOW = 0.35, DEEP = 1.6;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
 const FLAP = 2.2, WAVES = 1.6;
 /** A rope is widened to at least this many pixels in radius (below about a pixel and a half across, a line at a slant
@@ -149,6 +151,9 @@ export function createShipMaterials(light: Light, pixel: N, canvas: Cloth): Ship
   const drawn: N = select(isPennant, across, filled), drawnNormal: N = normalize(drawn);
   const clothNormal: N = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
   const clothKind: N = varying(kind);
+  // how far the canvas here stands out of its flat, metres (the side it bellies to: +), and which way that is
+  const standOff: N = varying(select(isPennant, float(0), dot(shaped.sub(local), out)));
+  const outward: N = varying(turn(brace(out, false)));
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
     // seams between the cloths, and the boltrope round the edges, each about a pixel wide and fading out once too
@@ -163,7 +168,13 @@ export function createShipMaterials(light: Light, pixel: N, canvas: Cloth): Ship
     const band = paint.w.mul(smoothstep(0.36, 0.37, uvs.y)).mul(smoothstep(0.64, 0.63, uvs.y));
     let albedo: N = mix(cloth.rgb, paint.rgb, band);
     albedo = select(clothKind.greaterThan(CLOTH.pennant - 0.5), paint.rgb, albedo.mul(float(1).sub(seams).sub(edge)));
-    return albedo.mul(leafLight(light, positionWorld, normalize(clothNormal).mul(faceDirection), THROUGH));
+    // Seen from inside its bag, a sail's own canvas hides some of the sky and the sun from it, the more the deeper
+    // the bag; what comes through the canvas comes through all the same.
+    const n: N = normalize(clothNormal).mul(faceDirection);
+    const inside: N = dot(n, outward).mul(standOff).lessThan(0);
+    const hollow = select(inside, smoothstep(0.1, DEEP, abs(standOff)).mul(HOLLOW), float(0));
+    const lit = light(positionWorld, n).mul(float(1).sub(hollow)).add(light(positionWorld, n.negate()).mul(THROUGH));
+    return albedo.mul(lit);
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });
