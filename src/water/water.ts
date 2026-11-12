@@ -65,6 +65,11 @@ const LIKENESS_WINDS = [5, 10, 15, 20];
  * the ripples' mean square slope is (1 − GATHER·tanh(s/σ)) of its mean, s the slope along the wind and σ its rms.
  */
 const GATHER = 0.8;
+/**
+ * In the storm (sky/storm.ts) the wind's gusts roughen the sea by STORM_ROUGH more mean square slope, its whitecaps
+ * cover STORM_FOAM of it, and the rain on it and the dark over it take STORM_DARK of its light.
+ */
+const STORM_ROUGH = 0.03, STORM_FOAM = 0.35, STORM_DARK = 0.35;
 /** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
 const SMOOTHEST = 1e-4;
 /**
@@ -194,6 +199,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
     }, dp);
     variance.addAssign(waves.ripples.mul(short).mul(float(1).sub(tanh(lean.div(waves.steepness)).mul(GATHER))));
+    const storm = sky.storm(p);
+    variance.addAssign(storm.mul(STORM_ROUGH));
+    foam.assign(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
@@ -229,7 +237,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near);
+    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near).mul(float(1).sub(storm.mul(STORM_DARK)));
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();

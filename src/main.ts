@@ -2,6 +2,7 @@ import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { DEBUG, demoShips, flyer, probe, safeArea, switches } from './debug';
 import { createEnvironment, updateEnvironment } from './environment';
 import { createFrame } from './frame';
+import { createStorm } from './sim/storm';
 import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
@@ -40,6 +41,8 @@ const meter = switches.meter ? createMeter(renderer, meterEl) : null;
 
 // The player's ship lies on the water south of the largest island, START metres off its coast, heading north toward
 // it, the chase camera behind her (play/game.ts).
+// The storm's safe cap by the match's clock (sim/storm.ts); ?storm=seconds holds it
+const storm = createStorm(switches.seed, (p) => -frame.planet.height(p));
 const START = 80;
 const largest = frame.planet.islands[0], southward = scale(frameAt(largest.chart.at).north, -1);
 const [cx, cz] = toChart(largest.chart, along(largest.chart.at, southward, 1).p);
@@ -93,7 +96,7 @@ renderer.setAnimationLoop(() => {
   }
   const { x, y, z } = frame.camera.position;
   updateEnvironment(env, dt, [x, y, z], frame.wind);
-  frame.render(env, dt);
+  frame.render(env, dt, storm(switches.storm ?? env.clock));
 
   meter?.sample(performance.now() - start);
 });

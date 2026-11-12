@@ -11,12 +11,16 @@
 //   cloudShadow(p)   the fraction of it the clouds let through to p
 //   ambient(p, n)    the sky's light on a surface at p facing n, as radiance (multiply by albedo)
 //   reflect(d, r)    the sky and clouds seen along world direction d off a surface of roughness r
+//   storm(p)         0…1, how deep in the storm (storm.ts) world position p lies; the sun and the sky's glow there are
+//                    already dimmed by it
 // and the frame's post pass:
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
+//   veil(c, dir, m)  the same through the storm's rain and cloud: last, over everything, the sky and clouds too
 
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
+import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
@@ -24,6 +28,7 @@ import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
+import { createStormLook } from './storm';
 import { VIEW_RADIUS, createTables } from './tables';
 
 type N = any;
@@ -50,6 +55,11 @@ const SUN_RADIANCE = 8, EDGE = 0.3, HALO = 0.04, WIDTH = 0.6;
  * as wide as the drawn disc, and at a quarter it was a white blur that hid the disc in it.
  */
 const PEAK_SHARE = 0.05, PEAK_G = 0.95;
+/**
+ * In the storm, the share of the sun its cloud lets through, and of the sky's glow; and the light in the storm's
+ * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted cold.
+ */
+const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.85, 0.92, 1] as const;
 
 /** The light the sky gives everything else. */
 export interface Sky {
@@ -58,6 +68,7 @@ export interface Sky {
   cloudShadow(p: N): N;
   ambient(p: N, n: N): N;
   reflect(dir: N, roughness: N): N;
+  storm(p: N): N;
 }
 
 export function createSky(view: View) {
@@ -74,6 +85,7 @@ export function createSky(view: View) {
   const rise = uniform(1);
   const clouds = createClouds(view, tables);
   const reflection = createReflection(view, skyRadiance, skySun, clouds.along);
+  const storm = createStormLook(view);
 
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
   const sunOver = (p: N): N => {
@@ -88,8 +100,9 @@ export function createSky(view: View) {
   const ambient = (p: N, n: N): N => {
     const up = view.up(p);
     const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
-    return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5));
+    return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5)).mul(mix(1, STORM_SKY, storm.depth(p)));
   };
+  const stormLight: N = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0)).mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT));
 
   const fog = (color: N, dir: N, metres: N): N => {
     const T = exp(seaLevelExtinction.mul(metres).mul(-0.001));
@@ -116,17 +129,22 @@ export function createSky(view: View) {
     return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();
 
-  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow: clouds.shadow, ambient, reflect: reflection.reflect };
+  const cloudShadow = (p: N): N => clouds.shadow(p).mul(mix(1, STORM_SUN, storm.depth(p)));
+  // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
+  const reflect = (dir: N, roughness: N): N => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
+  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, ambient, reflect, storm: storm.depth };
 
   return {
     background,
     clouds,
     light,
     fog,
+    veil: (color: N, dir: N, metres: N): N => storm.veil(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
     /** Readies the sky for this frame, and returns the passes due from each part of it. */
-    update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
+    update(env: Environment, cap: Cap, camera: PerspectiveCamera, dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
+      storm.update(cap, env.clock);
       sun.value.copy(env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));

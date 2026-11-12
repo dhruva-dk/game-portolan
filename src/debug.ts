@@ -40,6 +40,7 @@ export const switches = (() => {
   return {
     seed: number('seed', SEED),
     time: params.has('t') ? number('t', 12) : null,
+    storm: params.has('storm') ? number('storm', 0) : null,
     weather: { mean, swing },
     view: params.get('debug') ?? '',
     drive: params.get('drive') ?? '',

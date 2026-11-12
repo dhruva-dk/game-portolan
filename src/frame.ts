@@ -1,10 +1,11 @@
 import { ACESFilmicToneMapping, Color, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec4,
+  Fn, float, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { Environment } from './environment';
 import type { Compute, Draw } from './gpu';
+import type { Cap } from './sim/storm';
 import { createSky } from './sky/sky';
 import { createGround } from './land/ground';
 import { createIslands } from './land/islands';
@@ -50,7 +51,8 @@ const FAR = 2000;
  *        cloth        the near ships' sails (ship/cloth.ts), a few small steps of it, while any are held
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, the ships); then the sea, which
  *                 reads what was drawn before it behind itself (the floor through the water)
- *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping; then FXAA, on the
+ *   3. post     — haze by distance, clouds over whatever they stand in front of, the storm's rain and cloud over
+ *                 all of it (sky/storm.ts: no march, the ray against its cone), tone mapping; then FXAA, on the
  *                 tone-mapped image (its edge test wants the screen's values), for the edges of the sea's crests and
  *                 the islands against the sky
  * Each frame every system first does its CPU work, in the order one reads another, and says what of its GPU work is
@@ -101,7 +103,9 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     // clouds in front of whatever the pixel shows
     const cloud = sky.clouds.color.sample(screenUV);
     const inFront = depth.greaterThanEqual(1).or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
-    return vec4(select(inFront, hazed.mul(cloud.a).add(cloud.rgb), hazed), 1);
+    const seen = select(inFront, hazed.mul(cloud.a).add(cloud.rgb), hazed);
+    // and the storm's rain over all of it, the clouds above it too: its wall stands nearer than they
+    return vec4(sky.veil(seen, dir, select(depth.greaterThanEqual(1), float(1e5), metres)), 1);
   })();
   const pipeline = new RenderPipeline(renderer, fxaa(renderOutput(post)));
   pipeline.outputColorTransform = false;
@@ -139,12 +143,13 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const size = new Vector2();
   const islandSun = new Vector3();
 
-  function render(env: Environment, dt: number) {
+  /** storm: the safe cap now (sim/storm.ts); outside it the weather is foul. */
+  function render(env: Environment, dt: number, storm: Cap) {
     // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
     camera.updateMatrixWorld();
     view.update(camera);
     renderer.getDrawingBufferSize(size);
-    const air = sky.update(env, camera, dt, size.x, size.y);
+    const air = sky.update(env, storm, camera, dt, size.x, size.y);
     const ships = fleet.update(camera, env.windSpeed, size.y, dt);
     const sea = water.update(env, dt, fleet.ships);
     seabed.update();
