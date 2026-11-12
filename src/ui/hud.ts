@@ -9,6 +9,7 @@
 //               (sim/gun.ts); none with no gun
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot, then three more
 // No words. The stick (play/stick.ts) is drawn by the game; look drags take the rest of the screen.
+// Once she has sunk it watches another ship (watch): only the Storm's clock and the disc stay, her arrow gilt.
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
@@ -108,9 +109,17 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   };
 
   let eye: Storm | null = null, ring: Vec3[] | null = null;
+  /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock and the disc stay,
+   *  her arrow on it gilt, and the disc takes no touch. */
+  let watching = false;
 
   return {
     root,
+    watch(on: boolean) {
+      watching = on;
+      for (const el of [vitals, gust, fire, reticle, hotbar]) el.style.display = on ? 'none' : '';
+      map.classList.toggle('press', !on);
+    },
     update(s: HudState) {
       const shield = Math.round(s.shield), hull = Math.round(s.hull);
       draw(vitals, `${shield}/${s.shieldMax} ${hull}/${s.hullMax}`, () => svg(214, 60,
@@ -119,10 +128,10 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         + bar(11, 41, 158, 15, hull / s.hullMax, WASH.hull) + figure(176, 41, hull, 17, { anchor: 'start' })));
 
       const time = clock(s.storm), closing = s.storm < 30;
-      draw(readings, `${time} ${s.afloat}`, () => svg(184, 38,
+      draw(readings, `${time} ${watching ? '' : s.afloat}`, () => svg(184, 38,
         slip(1, 2, 88, 34) + glyph('hud.spiral', 20, 19, 22, { ink: closing ? 'rubric' : 'iron' })
         + figure(60, 19, time, 23, { fill: closing ? INK.rubric : INK.iron })
-        + slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23)));
+        + (watching ? '' : slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23))));
 
       draw(gust, `${s.gust}`, () => {
         let pips = '';
@@ -163,7 +172,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         eye = s.eye;
         ring = eye ? stormRing(eye) : null;
       }
-      drawMap(s.at, s.heading, ring);
+      drawMap(s.at, s.heading, ring, { gilt: watching });
     },
   };
 }

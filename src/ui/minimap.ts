@@ -46,16 +46,22 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
   host.appendChild(over);
   const her = over.querySelector('#her')!;
   const ctx = canvas.getContext('2d')!;
-  const k = (inner * dpr) / SPAN;
 
-  let last = '';
-  return (at: Vec3, heading: Vec3, storm: Vec3[] | null) => {
+  let last = '', gilt = false;
+  return (at: Vec3, heading: Vec3, storm: Vec3[] | null, more: More = {}) => {
     const { north, east } = frameAt(at);
-    const bearing = Math.atan2(dot(heading, east), dot(heading, north));
-    const key = `${at.map((v) => v.toFixed(5))}${bearing.toFixed(2)}${storm?.length}`;
+    const bearing = Math.atan2(dot(heading, east), dot(heading, north)), span = more.span ?? SPAN, k = (inner * dpr) / span;
+    const key = `${at.map((v) => v.toFixed(5))}${bearing.toFixed(2)}${storm?.length}${span}${more.course?.length}${more.fleet?.map((q) => q[0].toFixed(4)).join()}${more.first?.length}${!!more.gilt}`;
     if (key === last) return;
     last = key;
     her.setAttribute('transform', `translate(${r} ${r}) rotate(${(bearing * 180) / Math.PI})`);
+    if (!!more.gilt !== gilt) {
+      // watching another ship after a sinking: her arrow gilt, a star at its heart (0117 minimap.ts mapFace)
+      gilt = !!more.gilt;
+      her.innerHTML = gilt
+        ? `<path d="M0 -9L5.5 6.5L0 3.5L-5.5 6.5Z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width=".9"/><path d="${star(0, 0.5, 2.6)}" fill="${INK.white}"/>`
+        : `<path d="M0 -8L5 6L0 3L-5 6Z" fill="${INK.iron}" stroke="${INK.white}" stroke-width="1.2" paint-order="stroke"/>`;
+    }
     const c = canvas.width / 2;
     const toDisc = (q: Vec3): [number, number] => [c + dot(q, east) * R * k, c - dot(q, north) * R * k];
     const near = (q: Vec3, reach: number) => dot(q, at) > Math.cos(reach / R);
@@ -75,7 +81,7 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
     ctx.lineTo(2 * c, c);
     ctx.stroke();
     for (const coast of coasts) {
-      if (!near(coast.centre, SPAN * 1.6 + coast.radius * 2)) continue;
+      if (!near(coast.centre, Math.min(span * 1.6 + coast.radius * 2, (R * Math.PI) / 2))) continue;
       trace(coast.ring);
       ctx.fillStyle = WASH.sand;
       ctx.fill();
@@ -101,6 +107,65 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
         ctx.stroke();
       } else ctx.restore();
     }
+    /** A line through the points, in the runs on her side of the planet. */
+    const runs = (line: readonly Vec3[], closed: boolean) => {
+      ctx.beginPath();
+      let on = false;
+      for (const q of closed ? [...line, line[0]] : line) {
+        if (dot(q, at) <= 0) on = false;
+        else if (on) ctx.lineTo(...toDisc(q));
+        else {
+          ctx.moveTo(...toDisc(q));
+          on = true;
+        }
+      }
+    };
+    if (more.first) {
+      // the Storm's first circle a line of rubric (0117: while the Gale blows)
+      runs(more.first, true);
+      ctx.strokeStyle = INK.rubric;
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.globalAlpha = 0.9;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (more.course) {
+      // the Gale's course, dotted
+      runs(more.course, false);
+      ctx.strokeStyle = INK.iron;
+      ctx.setLineDash([0.1 * dpr, 4 * dpr]);
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 2 * dpr;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineCap = 'butt';
+    }
+    if (more.fleet) {
+      // a fleet this far off is too close together for marks: each ship a dot of ink on a fleck of white
+      for (const [fill, size] of [[INK.white, 3.4], [INK.iron, 2.2]] as const) {
+        ctx.beginPath();
+        for (const q of more.fleet) {
+          if (dot(q, at) <= 0) continue;
+          const [x, y] = toDisc(q);
+          ctx.moveTo(x + size * dpr, y);
+          ctx.arc(x, y, size * dpr, 0, Math.PI * 2);
+        }
+        ctx.fillStyle = fill;
+        ctx.globalAlpha = fill === INK.white ? 0.75 : 0.95;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
   };
 }
+
+/** What else the disc may show: how far to its rim, metres (the drop's shows a whole hemisphere); the Gale's course,
+ *  the fleet in the air and the Storm's first circle; and her arrow gilt, for a ship watched after a sinking. */
+export interface More { span?: number; course?: readonly Vec3[]; fleet?: readonly Vec3[]; first?: readonly Vec3[]; gilt?: boolean }
+
+/** A small five-pointed star's path at (x, y). */
+const star = (x: number, y: number, r: number) => Array.from({ length: 10 }, (_, i) => {
+  const a = (i * Math.PI) / 5 - Math.PI / 2, d = i % 2 ? r * 0.45 : r;
+  return `${i ? 'L' : 'M'}${(x + d * Math.cos(a)).toFixed(2)} ${(y + d * Math.sin(a)).toFixed(2)}`;
+}).join('') + 'Z';
 
