@@ -331,7 +331,7 @@ function beakhead(acc: Acc, D: Detail): void {
       const mid = V(side * (1.25 - r * 0.12), 4.15 + r * 0.4, lerp(end.z, tip.z, 0.32));
       const st = tip.clone().add(V(side * 0.12, 0.05 + r * 0.05, -0.2 - r * 0.25));
       const pts = range(0, 1, 8).map((t) => st.clone().multiplyScalar((1 - t) ** 2).addScaledVector(mid, 2 * t * (1 - t)).addScaledVector(end, t * t));
-      acc.with({ kind: r === 1 ? KIND.gilt : KIND.paint }, () => tube(acc, pts, 0.065, 4, { caps: true }));
+      acc.with({ kind: r === 1 ? KIND.gilt : KIND.paint }, () => tube(acc, pts, 0.065, 6, { caps: true }));
     }
     // the cathead, and the anchor hanging from it
     const ch = onSkin(0.91, deckAt(0.91) + 0.25, side), end = ch.clone().add(V(side * 1.3, 0.35, 0.55));
