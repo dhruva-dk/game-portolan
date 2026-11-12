@@ -147,7 +147,14 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
     })().compute(HW * HH, [64]);
   });
 
-  return { history, historyDistance, cell, marchKernel, resolveKernels };
+  return {
+    history, historyDistance, cell, marchKernel, resolveKernels,
+    /** Frees the textures and the kernels' pipelines (for a new size). */
+    dispose() {
+      for (const t of [marched, marchedDistance, ...history, ...historyDistance]) t.dispose();
+      for (const k of [marchKernel, ...resolveKernels]) k.dispose();
+    },
+  };
 }
 
 // ------------------------------------------------------------------ cloud shadows
@@ -236,6 +243,8 @@ export function createClouds(view: View, tables: Tables) {
     update(inputs: CloudInputs, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       if (width !== size[0] || height !== size[1]) {
         size = [width, height];
+        // (three frees a texture's memory and a kernel's pipeline and bindings once it is disposed)
+        passes.dispose();
         passes = createPasses(width, height, view, field, cam);
         frame = 0;
       }
