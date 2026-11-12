@@ -49,17 +49,6 @@ function storage(width: number, height: number) {
   return t;
 }
 
-const panorama = storage(W, H);
-const reduced = storage(RW, RH);
-/** The panorama and its levels, as one texture's mips. */
-const reflection = storage(W, H);
-reflection.minFilter = LinearMipmapLinearFilter;
-reflection.wrapS = RepeatWrapping;
-reflection.wrapT = ClampToEdgeWrapping;
-// three allots the whole chain of mips and leaves them alone: the compute passes below write the first LEVELS + 1
-reflection.generateMipmaps = true;
-reflection.mipmapsAutoUpdate = false;
-
 /** The direction at the centre of texel (x, y) of a w×h panorama: the inverse of three's equirectUV. */
 function texelDirection(x: N, y: N, w: number, h: number): N {
   const phi = float(x).add(0.5).div(w).sub(0.5).mul(2 * Math.PI);
@@ -71,7 +60,7 @@ function texelDirection(x: N, y: N, w: number, h: number): N {
  * A sharp level: the GGX lobe of its roughness round each texel's direction, in SAMPLES directions drawn from it
  * (Hammersley; three's VNDF sampling with the view along the normal) as (x, y, z) in the lobe's frame and n·l.
  */
-function sharp(k: number): N {
+function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture): N {
   const w = W >> k, h = H >> k, a = roughnessAt(k) ** 2, a2 = a * a;
   const samples: number[][] = [];
   for (let i = 0; i < SAMPLES; i++) {
@@ -100,7 +89,7 @@ function sharp(k: number): N {
 }
 
 /** A rough level: every texel of the reduced panorama, weighted by the GGX lobe, n·l and its solid angle. */
-function rough(k: number): N {
+function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): N {
   const w = W >> k, h = H >> k, a = roughnessAt(k) ** 2, a2 = a * a;
   return Fn(() => {
     const x = instanceIndex.mod(w), y = instanceIndex.div(w);
@@ -124,6 +113,17 @@ function rough(k: number): N {
  * along a sky direction, marched in at most so many steps.
  */
 export function createReflection(renderer: WebGPURenderer, view: View, sunDirection: N, cloudsAlong: (d: N, steps: number) => N) {
+  const panorama = storage(W, H);
+  const reduced = storage(RW, RH);
+  /** The panorama and its levels, as one texture's mips. */
+  const reflection = storage(W, H);
+  reflection.minFilter = LinearMipmapLinearFilter;
+  reflection.wrapS = RepeatWrapping;
+  reflection.wrapT = ClampToEdgeWrapping;
+  // three allots the whole chain of mips and leaves them alone: the compute passes below write the first LEVELS + 1
+  reflection.generateMipmaps = true;
+  reflection.mipmapsAutoUpdate = false;
+
   const bake = Fn(() => {
     const x = instanceIndex.mod(W), y = instanceIndex.div(W);
     const d = texelDirection(x, y, W, H);
@@ -142,7 +142,7 @@ export function createReflection(renderer: WebGPURenderer, view: View, sunDirect
     textureStore(reduced, uvec2(x, y), vec4(sum.div(16), 1));
   })().compute(RW * RH, [64]);
 
-  const passes = [bake, reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1) : rough(i + 1)))];
+  const passes = [bake, reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1, panorama, reflection) : rough(i + 1, reduced, reflection)))];
 
   let frame = 0;
   return {
