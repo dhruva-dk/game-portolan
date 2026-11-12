@@ -1,7 +1,8 @@
 // The player's hands: a stick under the left thumb, a look under the right, both at once; the keyboard at a desk.
 //
-// A finger put down anywhere on the left of the screen holds the stick there, its centre where it landed; pushed
-// past the rim, the centre follows the finger, so it never needs bringing back. Any other finger drags the look.
+// A finger put down anywhere on the left of the screen holds the stick there, its centre where it landed (kept its
+// own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
+// pushed that way. Any other finger drags the look.
 // WASD or the arrows push the stick all the way while no finger holds it. What the stick and look mean is the
 // game's business; this only reports them.
 
@@ -27,7 +28,9 @@ export function createInput(element: HTMLElement) {
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
     const stick = e.clientX < innerWidth * LEFT && ![...fingers.values()].some((f) => f.stick);
-    fingers.set(e.pointerId, { stick, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY });
+    const within = (v: number, size: number) => Math.min(Math.max(v, STICK), size - STICK);
+    const cx = stick ? within(e.clientX, innerWidth) : e.clientX, cy = stick ? within(e.clientY, innerHeight) : e.clientY;
+    fingers.set(e.pointerId, { stick, x: e.clientX, y: e.clientY, cx, cy });
   });
   element.addEventListener('pointermove', (e) => {
     const f = fingers.get(e.pointerId);
@@ -38,12 +41,6 @@ export function createInput(element: HTMLElement) {
     }
     f.x = e.clientX;
     f.y = e.clientY;
-    // past the rim, the centre is dragged along
-    const dx = f.x - f.cx, dy = f.y - f.cy, d = Math.hypot(dx, dy);
-    if (f.stick && d > STICK) {
-      f.cx += dx * (1 - STICK / d);
-      f.cy += dy * (1 - STICK / d);
-    }
   });
   const lift = (e: PointerEvent) => fingers.delete(e.pointerId);
   element.addEventListener('pointerup', lift);
@@ -62,7 +59,11 @@ export function createInput(element: HTMLElement) {
       const held = [...fingers.values()];
       const thumb = held.find((f) => f.stick);
       let stick: Hands['stick'] = null;
-      if (thumb) stick = { x: (thumb.x - thumb.cx) / STICK, y: (thumb.cy - thumb.y) / STICK, centre: [thumb.cx, thumb.cy] };
+      if (thumb) {
+        // past the rim she is pushed all the way, no further
+        const x = (thumb.x - thumb.cx) / STICK, y = (thumb.cy - thumb.y) / STICK, over = Math.max(1, Math.hypot(x, y));
+        stick = { x: x / over, y: y / over, centre: [thumb.cx, thumb.cy] };
+      }
       else {
         const x = key(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), y = key(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']);
         const size = Math.hypot(x, y);
