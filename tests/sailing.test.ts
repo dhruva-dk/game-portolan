@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SHIP } from '../src/sim/handling.ts';
-import { clearance, type Depth } from '../src/sim/shoal.ts';
+import { clearance, hullAt, type Depth } from '../src/sim/shoal.ts';
 import { offCourse, shipAt, step, turned, type Helm, type ShipState } from '../src/sim/ship.ts';
 import { STEP, fixedClock } from '../src/sim/fixed.ts';
 import { R, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, type Vec3 } from '../src/world/sphere.ts';
@@ -140,6 +140,45 @@ test('set down in the shallows, she can work her way out to deep water', () => {
     last = c;
   });
   assert.ok(clearance(s.at, s.heading, shoal).least > 5);
+});
+
+/** The least water under any of her hull, metres past her draught: her keel from sternpost to forefoot every metre,
+ * and her quarters. */
+const underHull = (s: ShipState, depth: Depth) => {
+  let least = Infinity;
+  for (let a = -0.4 * SHIP.length; a <= 0.4 * SHIP.length + 1e-9; a += 0.4 * SHIP.length / 10) least = Math.min(least, depth(hullAt(s.at, s.heading, [a, 0])));
+  for (const side of [-1, 1]) least = Math.min(least, depth(hullAt(s.at, s.heading, [-0.3 * SHIP.length, side * 0.3 * SHIP.beam])));
+  return least - SHIP.draught;
+};
+
+test('coming about close along the shore, her stern swings clear of it, not onto it', () => {
+  for (const off of [1, 3, 6]) for (const away of [90, 135]) {
+    // sailing along the contour `off` metres outside it, then put about `away` degrees to seaward
+    const from = along(coast, seaward, DRY + off).p;
+    let s = run(shipAt(from, frameAt(from).north), () => ({ course: frameAt(from).north, throttle: 1 }), 5, shoal);
+    const course = turned(s, -away * deg);
+    let least = Infinity;
+    s = run(s, () => ({ course, throttle: 1 }), 20, shoal, (s) => { least = Math.min(least, underHull(s, shoal)); });
+    assert.ok(least >= -1e-6, `${off} m off, ${away}°: ${least} m under her hull`);
+    assert.ok(Math.abs(offCourse(s, course)) < 2 * deg, `${off} m off, ${away}°: she came about (${offCourse(s, course) / deg}° to go)`);
+  }
+});
+
+test('however she meets the shore, steered away she gets off it, her whole hull clear all the while', () => {
+  for (const angle of [0, 30, 60, 89]) for (const side of [-1, 1]) {
+    // into the shore `angle` off square to it, until she lies against it
+    const from = along(coast, seaward, DRY + 40).p;
+    const s0 = shipAt(from, frameAt(from).east.map((x) => -x) as unknown as Vec3);
+    const course = turned(s0, side * angle * deg);
+    let least = Infinity;
+    const watch = (s: ShipState) => { least = Math.min(least, underHull(s, shoal)); };
+    const a = run(s0, () => ({ course, throttle: 1 }), 40, shoal, watch);
+    assert.ok(offshore(a.at) - DRY < 16, `${angle}° ${side}: she reached the shore`);
+    // then put about for the open sea
+    const b = run(a, () => ({ course: seaward, throttle: 1 }), 40, shoal, watch);
+    assert.ok(least >= -1e-6, `${angle}° ${side}: ${least} m under her hull`);
+    assert.ok(offshore(b.at) - DRY > 150, `${angle}° ${side}: only ${offshore(b.at) - DRY} m off`);
+  }
 });
 
 test('fixed steps: as many as the frames add up to, whatever the frame rate', () => {
