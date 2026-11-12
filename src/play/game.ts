@@ -82,6 +82,14 @@ export interface Status {
  * rarity of gun every ship is armed with (?gun=), or null for none. */
 export interface Match { seed: number; storm: (seconds: number) => Storm; gun: number | null }
 
+/** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
+ * when, on the match's clock (s), and where she went down and the way she headed. */
+export interface Sinking { id: number; by: number | null; cause: 'shot' | 'ram' | 'storm'; time: number; at: Vec3; heading: Vec3 }
+
+/** A ship as the match's flow reads her: who she is (0 the player's), where she is and heads, her hit points, whether
+ * she carries a gun, and whether she is still afloat. */
+export interface Afloat { id: number; at: Vec3; heading: Vec3; hull: number; shield: number; armed: boolean; afloat: boolean }
+
 /** What the game keeps of a ship afloat beside her Vessel: her colours, her bot (null: the player's, or a scripted
  * ship's), the orders a scripted ship holds, how she rides the sea, and her last two poses. */
 interface Aboard { look: Look; mind: Memory | null; steady: Helm; ride: Ride; before: ShipPose; after: ShipPose }
@@ -119,7 +127,7 @@ export function createGame(
     }];
   }));
   let battle: Battle = battleOf(fleet.map((v) => crewOf(v.id, match.gun === null ? null : gunOf(match.gun))), match.seed);
-  const wrecks: Wreck[] = [];
+  const wrecks: Wreck[] = [], sinkings: Sinking[] = [];
   let tick = 0, pulled = false, last = aboard.get(PLAYER)!.after;
 
   /** One step: the player's helm and gun, everyone else's from her bot or her script; then the fleet's step and the
@@ -160,10 +168,16 @@ export function createGame(
     for (const s of fought.shots) frame.gunfire.shot(t, s.from, s.dir);
     for (const s of fought.splashes) frame.gunfire.splash(t, s.at, s.land);
     for (const s of fought.strikes) frame.gunfire.strike(t, s.at, s.ram);
+    const where = (id: number) => {
+      const v = fleet.find((o) => o.id === id)!;
+      return { at: v.ship.at, heading: v.ship.heading };
+    };
     // the sunk taken off the sea, to go down
     for (const id of [...fought.sunk, ...worn.sunk]) {
       const a = aboard.get(id);
       if (!a) continue;
+      const blow = fought.sunk.includes(id) ? fought.strikes.findLast((s) => s.struck === id) : undefined;
+      sinkings.push({ id, by: blow?.shooter ?? null, cause: blow ? (blow.ram ? 'ram' : 'shot') : 'storm', time: t, ...where(id) });
       wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
       aboard.delete(id);
     }
@@ -247,6 +261,18 @@ export function createGame(
     chase.update(last, hands.look, dt, tick * STEP);
   }, {
     status,
+    /** Every ship sunk so far, in the order they went down (a new entry is a ship just sunk). */
+    sinkings: (): readonly Sinking[] => sinkings,
+    /** Every ship of the match, afloat or sunk, as she stands now, in order of her id. */
+    ships: (): Afloat[] => {
+      const afloatNow = new Map(fleet.map((v) => [v.id, v]));
+      return battle.crews.map((c) => {
+        const v = afloatNow.get(c.id), gone = sinkings.find((k) => k.id === c.id)!;
+        return { id: c.id, at: v?.ship.at ?? gone.at, heading: v?.ship.heading ?? gone.heading, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun, afloat: !!v };
+      });
+    },
+    /** The match's clock: seconds sailed. */
+    time: () => tick * STEP,
     /** The storm at the moment drawn, for the frame (sim/storm.ts). */
     storm,
     /** Fire her gun at the next step, if it is loaded then (the HUD's button). */
