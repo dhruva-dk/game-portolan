@@ -1,0 +1,1700 @@
+<!doctype html>
+<html lang="en" class="safe">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portolan UI Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fbfaf8; --panel: #ffffff; --text: #1d1c1a; --muted: #6b6862; --line: #e4e1db; --soft: #f3f1ed;
+  --keep: #2f6b3a; --keep-bg: #e7f1e8; --rework: #8a5a00; --rework-bg: #f7eedb; --cut: #a3301c; --cut-bg: #f8e6e2;
+  --accent: #7a4a24; --focus: #2f5fa8;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141413; --panel: #1b1a19; --text: #ecebe8; --muted: #a19d96; --line: #2e2c2a; --soft: #222120;
+    --keep: #8cc79a; --keep-bg: #1e2c21; --rework: #e2b45c; --rework-bg: #2e2617; --cut: #ee8b76; --cut-bg: #33201c;
+    --accent: #d9a877; --focus: #8fb4ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141413; --panel: #1b1a19; --text: #ecebe8; --muted: #a19d96; --line: #2e2c2a; --soft: #222120;
+  --keep: #8cc79a; --keep-bg: #1e2c21; --rework: #e2b45c; --rework-bg: #2e2617; --cut: #ee8b76; --cut-bg: #33201c;
+  --accent: #d9a877; --focus: #8fb4ff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 72px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); -webkit-text-size-adjust: 100%; }
+a { color: inherit; }
+code { font: 12.5px var(--mono); background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* top bar */
+.bar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line); }
+.bar-in { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; padding: 10px 16px; max-width: 1560px; margin: 0 auto; }
+.bar h1 { font-size: 15px; font-weight: 650; margin: 0; letter-spacing: .01em; }
+.bar h1 span { color: var(--muted); font-weight: 400; }
+.toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+.tg { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; min-height: 30px; }
+.tg[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.copy { border: 1px solid var(--accent); color: var(--accent); background: transparent; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 30px; }
+.copy:hover { background: var(--accent); color: var(--bg); }
+.status { font-size: 12.5px; color: var(--muted); min-width: 0; }
+
+/* layout */
+.wrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 0 28px; max-width: 1560px; margin: 0 auto; padding: 0 16px; }
+nav.index { position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 66px); overflow: auto; padding: 18px 0 24px; font-size: 13.5px; }
+nav.index ol { list-style: none; margin: 0; padding: 0; }
+nav.index li a { display: flex; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 6px; text-decoration: none; color: var(--muted); }
+nav.index li a:hover { background: var(--soft); color: var(--text); }
+nav.index li a.on { color: var(--text); background: var(--soft); }
+nav.index .n { font: 11.5px var(--mono); min-width: 20px; }
+nav.index .t { flex: 1; }
+nav.index .d { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; background: var(--line); }
+nav.index .d.keep { background: var(--keep); } nav.index .d.rework { background: var(--rework); } nav.index .d.cut { background: var(--cut); }
+nav.index h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 16px 8px 6px; font-weight: 600; }
+main { min-width: 0; padding: 22px 0 80px; }
+
+.intro { max-width: 900px; }
+.intro h2 { font-size: 26px; line-height: 1.2; margin: 6px 0 10px; font-weight: 650; }
+.intro p { margin: 0 0 10px; }
+.intro .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); margin-top: 12px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+
+/* screens */
+section.screen { border-top: 1px solid var(--line); padding: 28px 0 30px; }
+.sh { display: flex; align-items: baseline; gap: 10px 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.sh .num { font: 13px var(--mono); color: var(--muted); }
+.sh h2 { font-size: 21px; margin: 0; font-weight: 650; }
+.sh .src { font-size: 12.5px; color: var(--muted); }
+.chip { font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .05em; }
+.chip.keep { color: var(--keep); background: var(--keep-bg); } .chip.rework { color: var(--rework); background: var(--rework-bg); } .chip.cut { color: var(--cut); background: var(--cut-bg); }
+.row { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 22px 30px; align-items: start; }
+.stage { min-width: 0; position: sticky; top: 64px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+.tabs button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; min-height: 28px; }
+.tabs button[aria-pressed="true"] { border-color: var(--text); background: var(--text); color: var(--bg); }
+.tabs .sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+.tabs .orig[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.mock { cursor: zoom-in; border-radius: 22px; }
+.mock svg { display: block; width: 100%; height: auto; }
+.cap { font-size: 12.5px; color: var(--muted); margin: 8px 2px 0; }
+.crit { font-size: 14.5px; min-width: 0; }
+.crit .lede { margin: 0 0 10px; }
+.crit h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 14px 0 4px; font-weight: 650; }
+.crit ul { margin: 0; padding-left: 18px; }
+.crit li { margin: 2px 0; }
+.crit p { margin: 0 0 6px; }
+.verdict { margin-top: 14px; padding: 10px 12px; border-radius: 8px; border-left: 3px solid; }
+.verdict.keep { background: var(--keep-bg); border-color: var(--keep); }
+.verdict.rework { background: var(--rework-bg); border-color: var(--rework); }
+.verdict.cut { background: var(--cut-bg); border-color: var(--cut); }
+.verdict b { text-transform: uppercase; letter-spacing: .04em; font-size: 12.5px; }
+
+/* feedback */
+.fb { margin-top: 18px; padding: 12px 14px; background: var(--soft); border-radius: 10px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; align-items: start; }
+.fb .lbl { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding-top: 4px; }
+.fb fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.fb fieldset label { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 11px; cursor: pointer; font-size: 13px; min-height: 30px; }
+.fb fieldset input { margin: 0; accent-color: var(--accent); }
+.fb fieldset label:has(input:checked) { border-color: var(--accent); }
+.fb textarea { width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 8px 10px; font-size: 14px; }
+.fb .saved { grid-column: 2; font-size: 12px; color: var(--muted); min-height: 1em; }
+
+/* summary */
+.sum h3 { font-size: 17px; margin: 26px 0 8px; }
+.sum p, .sum li { max-width: 860px; }
+.sum ol.q > li { margin: 0 0 10px; }
+.sum ol.q .rec { color: var(--muted); }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; max-width: 900px; }
+.swatch { display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+.swatch i { width: 34px; height: 26px; border-radius: 4px; border: 1px solid var(--line); flex: none; }
+.swatch code { background: none; padding: 0; font-size: 11.5px; color: var(--muted); }
+.iconsheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; max-width: 900px; margin-top: 8px; }
+.iconsheet figure { margin: 0; background: #f4e9d2; border-radius: 6px; padding: 4px 2px 2px; text-align: center; }
+.iconsheet figcaption { font: 9.5px var(--mono); color: #6b5a44; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tbl { border-collapse: collapse; font-size: 13.5px; width: 100%; max-width: 900px; }
+.tbl th, .tbl td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.scroll-x { overflow-x: auto; }
+
+/* zoom */
+dialog#zoom { border: 0; padding: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
+dialog#zoom::backdrop { background: rgba(10, 10, 10, .82); }
+.zin { width: 100%; height: 100%; overflow: auto; display: grid; place-items: center; padding: 44px 16px 16px; }
+.zin svg { width: 988px; height: auto; flex: none; display: block; }
+.zclose { position: fixed; top: 10px; right: 14px; z-index: 2; background: #fff; color: #111; border: 0; border-radius: 999px; padding: 6px 14px; font-weight: 600; cursor: pointer; }
+.znote { position: fixed; top: 14px; left: 16px; color: #ddd; font-size: 13px; }
+
+/* overlays inside mocks */
+.ov-thumbs, .ov-targets { display: none; }
+html.thumbs .ov-thumbs, html.targets .ov-targets { display: inline; }
+html:not(.safe) .ov-safe { display: none; }
+.fig { font-family: "EB Garamond", "Iowan Old Style", Georgia, serif; font-style: italic; font-variant-numeric: lining-nums; }
+.ovt { font-family: var(--sans); font-style: normal; }
+
+@media (max-width: 1180px) {
+  .row { grid-template-columns: minmax(0, 1fr); }
+  .stage { position: static; }
+}
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  html { scroll-padding-top: 54px; }
+  .bar { position: static; }
+  nav.index { position: sticky; top: 0; z-index: 10; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+  nav.index h3 { display: none; }
+  nav.index ol { display: flex; gap: 4px; white-space: nowrap; }
+  nav.index li a { padding: 3px 8px; }
+  nav.index .t { white-space: nowrap; }
+  .fb { grid-template-columns: minmax(0, 1fr); }
+  .fb .saved { grid-column: 1; }
+  .bar h1 span { display: none; }
+}
+@media print { .bar, nav.index, .fb, .tabs { display: none; } .wrap { display: block; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs id="shared-defs"></defs>
+</svg>
+
+<div class="bar"><div class="bar-in">
+  <h1>Portolan UI sheet <span>· the old battle royale's screens (0117, <code>ae981b6</code>) on a 956×440 phone</span></h1>
+  <div class="toggles" role="group" aria-label="Overlays">
+    <button class="tg" data-tg="safe" aria-pressed="true">Safe area</button>
+    <button class="tg" data-tg="thumbs" aria-pressed="false">Thumb zones</button>
+    <button class="tg" data-tg="targets" aria-pressed="false">Touch targets</button>
+    <button class="tg" data-tg="theme" aria-pressed="false" title="Switch the sheet's light/dark theme">Dark sheet</button>
+    <button class="copy" id="copyAll">Copy all feedback</button>
+    <span class="status" id="copyStatus" aria-live="polite"></span>
+  </div>
+</div></div>
+
+<div class="wrap">
+<nav class="index" aria-label="Screens"><h3>Screens</h3><ol id="idx"></ol></nav>
+<main>
+
+<div class="intro">
+  <h2>Every screen of the old game, on the phone we ship to</h2>
+  <p>Each screen of the old battle royale (worktree <code>game-portolan-0117</code>, commit <code>ae981b6</code>, 11-11 01:17) is redrawn here from its source at the iPhone 16 Pro Max's landscape page size, 956×440 CSS px. The old code was laid out for an iPad first and carried a phone layout of its own (<code>src/chart/layout.ts</code>, <code>deviceClass</code> under 500 pt tall); the mocks use that phone layout's numbers exactly. In-match mocks sit on real captures of the <em>current</em> game; the <strong>0117 capture</strong> button swaps in a real headless capture of the old game at the same size, so you can check the port against what existed.</p>
+  <p>Click any phone to see it at 1:1. Use <strong>Thumb zones</strong> to see the current game's floating stick (left 45%) and right-thumb look drag, and <strong>Touch targets</strong> to see every pressable at its drawn size (red under 44 pt; the dashed ring is the old code's enlarged hit, 56 pt). Under each screen, leave a verdict and a note; <strong>Copy all feedback</strong> puts everything on the clipboard as plain text.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:rgba(60,120,220,.35)"></i>stick zone (left 45%)</span>
+    <span><i class="sw" style="background:rgba(230,140,40,.35)"></i>look drag (right 55%)</span>
+    <span><i class="sw" style="background:rgba(255,255,255,.5);border:1px dashed #888"></i>safe-area insets: 62 pt at each end, 21 pt at the bottom</span>
+    <span>Words in the old UI: <strong>0</strong> on every screen (numerals only)</span>
+  </div>
+</div>
+
+<!-- ============================================================ 01 TITLE -->
+<section class="screen" id="title" data-name="01 Title" data-verdict="keep">
+  <div class="sh"><span class="num">01</span><h2>Title</h2><span class="src"><code>src/screens/title.ts</code> (382 lines), <code>chart/rose.ts</code>, <code>chart/galleon.ts</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="title"></div>
+      <p class="cap">Backdrop: current game, the ship at anchor (<code>fly&amp;ships=1&amp;alt=6</code>), under the title's thinning sheet.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The first thing on launch. A blank sheet; the rhumb web grows from the centre, a 32-point rose draws itself, the player's galleon mark is inked beneath in gilt. The rose's needle swings while the world loads and settles north when it is ready; the sheet thins to show the world. One press anywhere and the rose flies to the lobby's career plate.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The needle is the loading bar. No spinner, no percentage, no words, and it means something.</li>
+        <li>The whole screen is one target, so it is reachable from either thumb.</li>
+        <li>The rose and web are the most "portolan" thing in the game: verdigris half winds, vermilion quarter winds, gilt fleur-de-lis.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The rose is 256 px across in a 440 px-tall screen. The galleon mark sits at y≈350, just inside the bottom inset. Nothing collides with the island or home indicator.</li>
+        <li>Nothing tells you when to press. That is fine while the needle swings; once it settles, a still screen reads as frozen. The old code had no "ready" cue beyond the needle stopping.</li>
+        <li>The web's hairlines (0.5 px) vanish on a 3× screen over bright sky, and the sheet's opacity has to fight the current game's bright noon.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. No people. No music: the old title had wind and paper sounds only.</p>
+      <h4>Aesthetic</h4>
+      <p>Exactly on brief. It is the reference every other screen should be held to.</p>
+      <div class="verdict keep"><b>Keep.</b> Port as is. When the world is ready, add one cue: the needle gives a single small overshoot and the gilt glints. Hold the sheet a little more opaque (about 85%) over the bright noon sea.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="title"></div>
+</section>
+
+<!-- ============================================================ 02 LOBBY -->
+<section class="screen" id="lobby" data-name="02 Lobby" data-verdict="rework">
+  <div class="sh"><span class="num">02</span><h2>Lobby</h2><span class="src"><code>src/screens/lobby.ts</code> (642), <code>chart/layout.ts</code> <code>lobbyLayout()</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="lobby"></div>
+      <p class="cap">Backdrop: current game, a galleon at anchor (<code>fly&amp;ships=1&amp;alt=6&amp;look=-3</code>). One finger anywhere else orbits the camera round her; two pinch.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Home, between matches. Her ship is live at anchor, with six instruments on the view. Top left is the career plate: the level numeral in a ring that fills with gold leaf, and the rank as a small wax seal (press it for the rank folio). Top right is a ship's wheel for settings. Bottom left are four tabs: abilities, locker, rank, rivals. Bottom right, under the thumb, is the PLAY banner: a ribbon with her galleon on it.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>PLAY is the largest thing on screen and sits right under the right thumb (centre 777, 318). It is the best-placed control in the old UI.</li>
+        <li>No word. By 0117 the banner carries a drawn galleon instead of the word PLAY, which the 11-10 build still wrote.</li>
+        <li>The ship itself is the backdrop and is touchable: orbit and pinch. It is the one 3D toy in the menus.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The four tabs are 46 pt discs 58 pt apart, bottom left, comfortable for the left thumb. But they are four ways into meta-game that a new player cannot read without opening each one.</li>
+        <li>The settings wheel (48 pt) is in the top-right corner, a full stretch for the right thumb. That is acceptable for settings.</li>
+        <li>The career plate's seal badge is 26 pt. It shares the plate's single 110×68 hit, so the press is fine, but the seal itself is too small to read its colour.</li>
+        <li>The backdrop drag (orbit) takes every touch outside the instruments, so a missed tab press swings the camera. That is harmless.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Levels and ranks are numerals and seals. The "rivals" tab shows two ships bow to bow, which implies other captains, but no people are drawn.</p>
+      <h4>Aesthetic</h4>
+      <p>Strong: paper laid on the world, iron ink, a wax seal, a ribbon banner. The tabs' rounded-crown slips read more like a mobile tab bar than a chart. Fine, but the weakest drawing here.</p>
+      <div class="verdict rework"><b>Rework.</b> Keep the plate, the wheel and the banner. Cut the tab row to what survives the meta decisions (Q2 below); if only abilities survives, it becomes a single seal beside the banner showing the ability worn. The lobby then has four things on it.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="lobby"></div>
+</section>
+
+<!-- ============================================================ 03 ABILITIES -->
+<section class="screen" id="abilities" data-name="03 Folio: Abilities" data-verdict="rework">
+  <div class="sh"><span class="num">03</span><h2>Folio · Abilities</h2><span class="src"><code>src/screens/folio.ts</code> <code>#abilities()</code>, <code>screens/cards.ts</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="abilities"></div>
+      <p class="cap">The folio sheet docks right under the wheel: 535×336, window inset 40, so 455×256 of content shows. 8 actives over 8 passives; a card pressed is worn at once.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The sheet the burst tab unrolls. It holds two rows of woodcut cards: actives (repair, smoke, ram, reveal, hard turn, decoy, wave, drift mine) under a burst head, and passives under a lantern head. The worn card has a gilt seal; a locked card is faint, with the level that unlocks it.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Wordless cards: a woodcut and, if locked, a numeral. That is the right grammar.</li>
+        <li>One press wears a card. No confirm step.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The phone layout gives each card 212 pt, so only <strong>1⅓ cards</strong> show at a time. Choosing among 16 means scrolling about eight rows on a 256 pt window.</li>
+        <li>Run at phone size, the old flow test could not scroll the long folio lists ("a drag on the sheet scrolls the long list" failed). The window is too short for momentum to help.</li>
+        <li>No hint of what an ability does: the woodcut alone must carry it. Ram (hull + arrow) and hard turn (curved arrow) are guessable; deep hold, salvage and quick hands are not.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. "Quick hands" is drawn as a hand icon, a human sign (see Q1).</p>
+      <h4>Aesthetic</h4>
+      <p>Faithful to the chart look: card stock, hatching, fold lines and a coffee ring on the sheet.</p>
+      <div class="verdict rework"><b>Rework.</b> If abilities stay, show both rows at once as small 56 pt seals, 8 across (fits 455 pt), with the chosen one large on the left of the sheet. Each card's effect is taught by a short looping woodcut animation when pressed, not by text.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="abilities"></div>
+</section>
+
+<!-- ============================================================ 04 LOCKER -->
+<section class="screen" id="locker" data-name="04 Folio: Locker" data-verdict="cut">
+  <div class="sh"><span class="num">04</span><h2>Folio · Locker</h2><span class="src"><code>src/screens/folio.ts</code> <code>#locker()</code>, <code>cards.ts</code>; six kinds: sail colour, sail pattern, hull paint, figurehead, emblem, wake</span><span class="chip cut">Cut</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="locker"></div>
+      <p class="cap">Sail colours shown. Unlock levels 2, 4, 6 are inked under the locked cards; the worn one has the gilt seal.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Cosmetics, opened from the chest tab. Six groups of cards, each under a small head drawing; the worn card in each group is sealed. Unlocks come by level (a numeral) or by rank tier (a wax seal).</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Swatches are drawn as little sails, hulls and wakes: the clearest cards in the folios.</li>
+        <li>Lock state is legible without words: faint ink plus a level numeral.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Four 100 pt cards a row, so 1¾ rows visible of a list six groups long. Scrolling is the whole interaction.</li>
+        <li>A "worn" change has no preview: the ship behind the sheet changes, but the sheet covers the ship's right half.</li>
+        <li>In the old flow test at phone size, "a press on an unlocked card changes her look" failed.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Figureheads (heron, whale, ammonite, narwhal tusk, coral antler, sunburst, plain stem) are carved work, a mild sign of a carver.</p>
+      <h4>Aesthetic</h4>
+      <p>On style. The card stock and rarity rules (silver, verdigris, azure, vermilion, gold) carry over from the loot.</p>
+      <div class="verdict cut"><b>Cut</b> for the first build. Cosmetics are a retention system, not part of the core loop, and this screen is mostly scrolling. If they return, put them on the ship: tap her sail in the lobby to cycle sail colours in place, with no sheet.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="locker"></div>
+</section>
+
+<!-- ============================================================ 05 RANK -->
+<section class="screen" id="rank" data-name="05 Folio: Rank" data-verdict="rework">
+  <div class="sh"><span class="num">05</span><h2>Folio · Rank</h2><span class="src"><code>src/screens/folio.ts</code> <code>#rank()</code>, <code>#staffOfTiers()</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="rank"></div>
+      <p class="cap">Opened from the pennants tab or the career plate. Eight tiers (Iron to Legend) as pennants on a staff; tiers not reached are faint. Matches sailed (ship) and wins (gold star, red figure) on the right.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Where you stand. A staff flies eight pennants, one per tier, with your seal at your tier's hoist and a gold star at your best. On the right are two big numerals, matches and wins. Below the staff, the cosmetics each tier brings.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The staff of pennants is a beautiful, wordless ladder, and the most chart-like folio.</li>
+        <li>Two numerals carry the career; that is the right amount.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The staff body is 340 pt tall in a 256 pt window, so the bottom tiers <em>and your own seal</em> are below the fold (a new player is Iron, tier 0). The capture shows the staff without the one thing it is for.</li>
+        <li>The tier colours (pale wash on paper) are hard to tell apart when faint: violet, silver and diamond-blue run together.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Ranks imply a league of people; drawn as pennants, they read as a ladder. Acceptable.</p>
+      <h4>Aesthetic</h4>
+      <p>On style. Pennants and a staff with a gilt finial are period-correct chart ornaments.</p>
+      <div class="verdict rework"><b>Rework.</b> Fold rank into the career plate and the result sheet; do not give it its own folio. If kept, lay the staff horizontally across the sheet (pennants hanging down, 8 across 455 pt) so the whole ladder and your seal fit without scrolling.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="rank"></div>
+</section>
+
+<!-- ============================================================ 06 RIVALS -->
+<section class="screen" id="rivals" data-name="06 Folio: Rivals" data-verdict="cut">
+  <div class="sh"><span class="num">06</span><h2>Folio · Rivals</h2><span class="src"><code>src/screens/folio.ts</code> <code>#rivals()</code>, <code>#rivalCard()</code></span><span class="chip cut">Cut</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="rivals"></div>
+      <p class="cap">Each league captain (a bot) as a card: her galleon in her colours, her emblem on the sail, her rank's seal, her two abilities, and your record against her (ships of hers you sank / ships of yours she sank).</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> A roster of the 19 bot captains you meet, with a head-to-head record per captain. Opened from the two-ships tab.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The coloured galleons with emblems are charming and make each bot recognisable on the full map later.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Two cards a row at 214×133 pt: about 3 cards visible out of 19.</li>
+        <li>Each card packs 6 marks (ship, seal, two abilities, two tallies) at 20–30 pt. The tallies' icons differ only by ink colour, which is illegible at this size.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. But this screen is about <em>captains</em>: persistent persons with records. That is the closest the old UI comes to depicting people.</p>
+      <h4>Aesthetic</h4>
+      <p>On style, though six marks to a card is busy for a chart.</p>
+      <div class="verdict cut"><b>Cut.</b> It is information without a decision attached. Keep the emblems: they belong on the full map and in the hit feedback, where they help you tell ships apart.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="rivals"></div>
+</section>
+
+<!-- ============================================================ 07 SETTINGS -->
+<section class="screen" id="settings" data-name="07 Settings" data-verdict="keep">
+  <div class="sh"><span class="num">07</span><h2>Settings</h2><span class="src"><code>src/screens/folio.ts</code> <code>#settings()</code>, <code>app/settings.ts</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="settings"></div>
+      <p class="cap">Ten controls in two columns of five rows (92 pt each); three rows show. Hidden below: ambience, invert look, interface volume, auto-fire.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The wheel's sheet. "The settings, in words nowhere": each control is a woodcut plus a bar or a pip. Stick side (a frame with the stick and a hand), haptics, master volume, shake, effects volume, look sensitivity, ambience, invert look, interface volume, auto-fire.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Fully wordless settings that still read: speaker plus cannon is effects, speaker plus gust is ambience. Clever and in style.</li>
+        <li>The stick-side control is a little picture of the screen with the stick on the side it will be.</li>
+        <li>No music setting, because there is no music.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li><strong>Only 6 of 10 controls are visible.</strong> In the old flow test at phone size, invert look, auto-fire, ambience and interface volume could not be reached ("no such press"): the bottom two rows were unreachable.</li>
+        <li>Bars are 111 pt long and 26 pt tall; the hit is the whole 215×92 row, which is good. Pips (on/off) are 20 pt drawn, inside the same row hit.</li>
+        <li>The haptics and shake icons are hands. See Q1.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Hands drawn ×3 (stick side, haptics, shake).</p>
+      <h4>Aesthetic</h4>
+      <p>On style. The azure, sienna and ochre washes in the bars echo the chart's colourist.</p>
+      <div class="verdict keep"><b>Keep</b> the wordless approach; fix the fit. Cut it to the 6 controls a phone needs (stick side, master, effects, ambience, sensitivity, haptics) in three columns of two rows so all of them show. Fold invert look into sensitivity (drag past zero) and drop auto-fire.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="settings"></div>
+</section>
+
+<!-- ============================================================ 08 GALE -->
+<section class="screen" id="gale" data-name="08 The Gale (drop)" data-verdict="keep">
+  <div class="sh"><span class="num">08</span><h2>The Gale · the drop</h2><span class="src"><code>src/screens/gale.ts</code> (287), <code>screens/minimap.ts</code>, <code>screens/scraps.ts</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="gale"></div>
+      <p class="cap">Backdrop: current game from 160 m (<code>fly&amp;alt=160&amp;look=-50&amp;ships=8</code>). The old Gale carried the fleet high over the planet on a wind; DIVE is faint for the first 2.8 s.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The battle royale's drop. The fleet is carried on a gale over the planet. At the top centre, the seconds the Gale has left; the disc shows the Gale's dotted course, the fleet and the Storm's first circle. DIVE, under the right thumb, is a slip with her ship stooping down a gust. After the dive, the stick comes up for the glide and her marker (a vermilion pennant on a staff) stands on the water.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>DIVE sits exactly where Fire will be. The thumb learns the spot before the match starts.</li>
+        <li>Wordless: the 11-10 build still said "DIVE"; 0117 draws it.</li>
+        <li>The countdown slip is one numeral, legible at 32 pt.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The first-drop teaching slip (118×128, a hand tapping down) is pinned <em>over the minimap disc</em>: it spans y 127–255 and the disc reaches y 160 (see the "First drop" state and its capture).</li>
+        <li>The DIVE drawing is a 128×102 slip. The gust curls and the ship are each about 40 pt, and the ship stooping is hard to read at a glance.</li>
+        <li>The disc press opens the full map, but the disc sits inside the look-drag zone. A look drag that starts on the disc opens the map on release.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. The teaching hand is a human sign (Q1). The Gale is a fixed per-match carrier, not a scripted event; it is the genre's drop.</p>
+      <h4>Aesthetic</h4>
+      <p>On style; the pennant marker on the water is a lovely chart gesture.</p>
+      <div class="verdict keep"><b>Keep.</b> Move the first-drop hint off the disc: pulse DIVE's own slip, three ink rings radiating from it, with no hand. Make the DIVE drawing simpler and bigger: the ship alone, bow down, filling the slip.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="gale"></div>
+</section>
+
+<!-- ============================================================ 09 FULL MAP -->
+<section class="screen" id="fullmap" data-name="09 Full map" data-verdict="keep">
+  <div class="sh"><span class="num">09</span><h2>Full map</h2><span class="src"><code>src/screens/fullmap.ts</code> (420), <code>screens/planet.ts</code> (336)</span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="fullmap"></div>
+      <p class="cap">Backdrop: current game from orbit (<code>fly&amp;alt=1100&amp;look=-89</code>), slid left under a square window cut in the sheet, as the old code slid the world.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Opened by pressing the minimap disc, over the drop or the match, which go on underneath. The sheet covers the whole screen with a square window on the live planet, as tall as the screen, north up. Coasts are inked over it, with the Storm's edge and next circle, every ship in range by her emblem (yours gilt) and your marker pennant. Down the right are ships afloat, your kills, your damage and the Storm's clock. One finger spins the planet, two pinch from the whole planet down to a bay, and a tap sets the marker. Tap outside or on the disc to close.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The live planet seen through a cut window is the old game's best idea. It is the globe as a chart.</li>
+        <li>Four readings with woodcut icons and numerals: the standings without a word.</li>
+        <li>Spin, pinch and tap are honest phone gestures.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The window is ~430 pt square, 45% of the screen width. On a 6.9" phone the whole planet is about 7 cm across. Enough.</li>
+        <li>The match goes on under it, but the stick and fire are gone while it is open, so opening it in a fight is a trap.</li>
+        <li>Closing is "tap outside the window or on the disc". The disc is a 150 pt target top right, but nothing marks it as a close button.</li>
+        <li>The readings' icons (kills vs damage) are hard to tell apart at 22 pt.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Sheet, web, square frame with a graduated band: on brief.</p>
+      <h4>Aesthetic</h4>
+      <p>The most convincing "16th-century map" moment in the match.</p>
+      <div class="verdict keep"><b>Keep.</b> Keep the stick live while the map is open (left thumb still steers), and close it on a second tap of the disc, drawn as the disc rolled up into the corner. Cut the damage row; three readings are enough.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="fullmap"></div>
+</section>
+
+<!-- ============================================================ 10 HUD -->
+<section class="screen" id="hud" data-name="10 Match HUD" data-verdict="rework">
+  <div class="sh"><span class="num">10</span><h2>Match HUD · at sea</h2><span class="src"><code>src/screens/hud.ts</code> (872), <code>screens/instruments.ts</code>, <code>screens/minimap.ts</code>, <code>chart/layout.ts</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="hud"></div>
+      <p class="cap">Backdrop: current game sailing (<code>drive=0,1,12</code>). Positions are <code>chartLayout(956, 440, safe 62/62/20)</code>. Left-handed mirrors the six controls; the readings stay put.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The match. Top left: the vitals slip, shield bar (azure) over hull bar (her colour), each with its numeral. Top centre: the Storm's clock (spiral + m:ss) and ships afloat (ship + count). Top right: the minimap disc, with the region's woodcut inking in on entering a region. Under the left thumb: the floating stick (resting ring) and the sails lever above it (furled, half, full). Under the right thumb: Fire (cannon), with Gust (pips for charges), Ability and Reload round it. Bottom centre: the hotbar's five slots. Centre: the reticle. Below the disc: the gull's hail seal.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Genre-standard placement (the code cites issue #54): readings along the top, controls under the thumbs, hotbar between them. A battle-royale player is at home.</li>
+        <li>One visual family: every instrument is paper laid on the world, ruled in iron, with a woodcut.</li>
+        <li>The right cluster is laid on an arc the thumb sweeps without moving the hand (ability 106 pt and reload 113 pt from Fire).</li>
+        <li>Everything pressable has at least a 56 pt hit (<code>TARGET</code>), though some are drawn smaller.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li><strong>16 things on screen</strong> before a fight starts: vitals, clock, afloat, disc, seal, sails, stick, 5 slots, fire, gust, ability, reload, reticle. It is an iPad HUD shrunk, not a phone HUD.</li>
+        <li><strong>Stick-zone collisions:</strong> slots 1–2 (x 299–405) and the sails lever (x 132–188) lie inside the current game's stick zone (left 45%, x &lt; 430). The chart takes touches first, so a thumb landing there for the stick hits a slot or the sails instead.</li>
+        <li><strong>Look-zone collisions:</strong> every right-thumb button sits in the look zone, as does the disc (150 pt). A look drag that starts on Fire fires.</li>
+        <li>The hail seal (704, 131) is high in the right thumb's stretch zone: unreachable mid-fight without regripping.</li>
+        <li>Lead-white marks (stick ring, empty slots, reticle) were drawn for the old night sea. Over the current game's bright noon water they disappear (toggle the 0117 capture: it is at night).</li>
+        <li>The sails lever duplicates the current stick, which already sets speed by how far it is pushed.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Numerals: 0, 100, 1:21, 20, 8. No people drawn on the calm HUD.</p>
+      <h4>Aesthetic</h4>
+      <p>Consistent and handsome as a family. The paper slips' drop shadows make it read as cards floating over water more than ink on a chart, which is the one stylistic tension.</p>
+      <div class="verdict rework"><b>Rework.</b> Phone HUD at 9 things: vitals, clock and afloat merged into one top slip; disc; stick (no sails lever); Fire; Ability; Gust; a hotbar of 3 slots placed right of centre, out of the stick zone (x 470–640). Reload becomes automatic (a drain ring on Fire). The gull is cut (see 14). Every lead-white mark gets an iron halo so it holds on bright water.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="hud"></div>
+</section>
+
+<!-- ============================================================ 11 FIGHT -->
+<section class="screen" id="fight" data-name="11 HUD in a fight" data-verdict="keep">
+  <div class="sh"><span class="num">11</span><h2>HUD · in a fight</h2><span class="src"><code>src/screens/hud.ts</code> <code>#combat()</code>, <code>#incoming()</code>, <code>#vitalsAndHurts()</code>, <code>#hitFigures()</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="fight"></div>
+      <p class="cap">Backdrop: current game with a fleet ahead (<code>ships=6</code>). The figures and arcs are drawn at the moment they are brightest; all fade within 0.9–1.1 s.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> What a fight adds. When your shot lands, a white cross flashes at the reticle and a red damage figure rises from the ship struck (larger for larger hits, gold when it sinks her). Red arcs at the screen's edge point toward each ship that hit you, and a pulsing arc marks a heavy gun winding up. A row of hurts (sail, mast, rudder, leak, fire, ice) sits under the vitals while each lasts. Reload shows a draining red ring, ability cooldown a ring and seconds, and Fire a ring that fills as the deck steadies.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The arcs: direction of threat without a word, at the edge, out of the play area.</li>
+        <li>Damage figures in vermilion with a white halo read over sea and sky, and gold for the sink is a reward.</li>
+        <li>Hurts are woodcuts that appear only while true. That is good economy.</li>
+        <li>The steadiness ring on Fire teaches the swell mechanic in place.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Four ring indicators (steady, reload, ability, gust pips) cluster under one thumb. The thumb covers the ring it is pressing, so its own feedback is hidden.</li>
+        <li>Hurt discs are 28 pt with 20 pt woodcuts: legible as shapes, not as which part is hurt.</li>
+        <li>The arc ellipse sits 4% inside the edges, so on the left the arc runs through the safe inset and under the stick.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Numerals only.</p>
+      <h4>Aesthetic</h4>
+      <p>Vermilion rubric for harm and gold for triumph: exactly the chartmaker's two accent inks.</p>
+      <div class="verdict keep"><b>Keep</b> the marks. Move the steadiness ring from Fire to the reticle (it is where the eye is). Keep the incoming arcs inside the safe area. Show hurts as at most 3 at once, at 36 pt.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="fight"></div>
+</section>
+
+<!-- ============================================================ 12 HOTBAR -->
+<section class="screen" id="hotbar" data-name="12 Hotbar and loot" data-verdict="rework">
+  <div class="sh"><span class="num">12</span><h2>HUD · hotbar and loot</h2><span class="src"><code>src/screens/hud.ts</code> <code>#hotbar()</code>, <code>#offer()</code>, <code>#slotDown/#slotUp/#dropHeld</code>; <code>instruments.ts</code> <code>slot()</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="hotbar"></div>
+      <p class="cap">Slots are 50 pt squares 6 pt apart (hit 56). A tap chooses; tap the chosen one to use a consumable; hold 0.6 s to throw it over the side. With the hold full and loot in reach, a hand points at the chosen slot: tap it to swap.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Loot. Eight weapons (cannon, scatter, harpoon, mortar, repeater, broadside, chain, heated) by rarity ink, and four consumables (small and big shield, repair kit, full repair) with counts. The chosen slot is gilt. A consumable in use runs a gold line along the slot's top. A held slot draws a vermilion line round its square until it drops.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Wordless swapping: the hand over the chosen slot when the hold is full says "this one goes".</li>
+        <li>Hold-to-drop draws its own progress round the square. Discoverable once seen.</li>
+        <li>Counts are numerals in the slot corner.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>5 slots × 50 pt = 274 pt of bottom edge, and 2 of them sit in the stick zone (see 10). A thumb reaching for the stick near the bottom chooses slot 1 instead.</li>
+        <li>The offer hand (40 pt) hovers above slot 1, right beside the resting stick, in the busiest part of the left thumb's area.</li>
+        <li>Swapping needs the right thumb to leave the fire cluster and travel 250–480 pt left, mid-fight.</li>
+        <li>Weapons are told apart only by woodcut at 31 pt. Scatter, chain and broadside are near-identical at that size.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. The pointing hand is a human sign (Q1).</p>
+      <h4>Aesthetic</h4>
+      <p>Slots on paper chits, gilt for chosen: on style. Empty slots as lead-white outlines are the least chart-like mark in the HUD.</p>
+      <div class="verdict rework"><b>Rework.</b> Three slots, right of centre (above Reload's old spot), so the right thumb reaches them without crossing. Pick up by sailing over loot: the swap takes the chosen slot automatically, undoable by tapping the dropped item's mark within 3 s. Replace the hand with the slot's own square inking red.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="hotbar"></div>
+</section>
+
+<!-- ============================================================ 13 STORM -->
+<section class="screen" id="storm" data-name="13 Storm closing / outside" data-verdict="keep">
+  <div class="sh"><span class="num">13</span><h2>HUD · the Storm</h2><span class="src"><code>src/screens/hud.ts</code> <code>#stormClock()</code>, <code>#stormRim()</code>; <code>icons/sets/hud.ts</code> <code>stormSpiral()</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="storm"></div>
+      <p class="cap">Backdrop: current game at dusk (<code>t=18.6&amp;ships=4</code>). The Storm is the shrinking circle; outside it, the hull wears down.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The battle royale's circle. The clock's spiral winds tighter in four steps as the circle closes, and the figure turns vermilion while it shrinks. Outside the circle the screen's rim is washed red, deeper the farther out. On the disc, the Storm's edge and the next circle.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The spiral that winds tighter is a wordless, period-plausible clock face. Excellent.</li>
+        <li>The red rim is unmissable without covering the centre.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The rim is an ellipse at 62% of the half-screen, so on a 2.17:1 phone the red reaches well into the stick and fire areas at full depth. That is fine as a wash, but the controls lose contrast.</li>
+        <li>The clock's four spiral steps are only 1–2 pt apart at 24 pt; nobody will read them.</li>
+        <li>No direction to safety on the main view: you must read the disc.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. The Storm circle is a rule of the genre, not a scripted event.</p>
+      <h4>Aesthetic</h4>
+      <p>The rim is a screen-space vignette, not a chart mark. Acceptable as "the sea bleeding red".</p>
+      <div class="verdict keep"><b>Keep.</b> Add a vermilion edge arc toward the circle's centre while outside (the same mark as incoming fire, in a different weight). Let the spiral's tightening go; the red figure says "closing" on its own.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="storm"></div>
+</section>
+
+<!-- ============================================================ 14 GULL -->
+<section class="screen" id="gull" data-name="14 Gull hail" data-verdict="cut">
+  <div class="sh"><span class="num">14</span><h2>HUD · hailing the gull</h2><span class="src"><code>src/screens/hud.ts</code> <code>#hail()</code>, <code>gullDevice()</code>, <code>tallyMarks()</code>; <code>chart/seal.ts</code></span><span class="chip cut">Cut</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="gull"></div>
+      <p class="cap">The seal (25 pt radius) at the disc's lower left; the coins' tally slip (104×28) beside it, one stroke per 5 coins. The seal's illumination shows the best parcel the coins buy: plain ink, rubric, red-and-blue, gold.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> A delivery. Coins picked up at sea buy a parcel (supplies, armament, treasure) that a gull flies to you. A wax seal with a gull on it is the button; its wax colour says which parcel you can afford. While the gull is away the seal is plain and faint. The first time, a hand points up at the seal.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Wax-seal illumination as a price tier is a clever, wordless idea.</li>
+        <li>Tally marks for coins are period-perfect.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>The seal is at (704, 131): top of the right thumb's stretch, a regrip mid-match.</li>
+        <li>The seal is <em>always</em> drawn, black, even with no coins. It is a black disc on the HUD that does nothing for most of the match (see the calm capture).</li>
+        <li>A second economy (coins) on top of loot is a lot to teach on a 6-inch screen.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. But coins, a tally and "treasure" are signs of people: money is made by someone. A hand points at the seal on first use (Q1).</p>
+      <h4>Aesthetic</h4>
+      <p>The seal is on style. The tally slip is one more paper chit in an already crowded top right.</p>
+      <div class="verdict cut"><b>Cut.</b> Drop coins and the gull delivery. If supply drops matter, let gulls drop crates at sea that anyone can sail to: the same idea with no button and no money.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="gull"></div>
+</section>
+
+<!-- ============================================================ 15 SCRAPS -->
+<section class="screen" id="scraps" data-name="15 Teaching scraps" data-verdict="rework">
+  <div class="sh"><span class="num">15</span><h2>Teaching scraps</h2><span class="src"><code>src/screens/scraps.ts</code> (106), <code>app/tips.ts</code>; placed by <code>layout.ts</code> <code>scrapPlace()</code></span><span class="chip rework">Rework</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="scraps"></div>
+      <p class="cap">The scrap's phone box is computed as 78×54 pt at (113, 141): what fits between the vitals' hurt row and the sails lever. The inset (drawn by the sheet, not the game) shows it 3×.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Wordless tutorial. The first time a mechanic matters, a drawn slip pins to the left edge for 6.9 s and dries out, once per career. <em>Wind</em>: a ship head to wind with a dotted course tacking up through it. <em>Fight</em>: a hull with a shot's dotted arc coming in. <em>Closing</em>: the Storm spiral with a hand tracing it inward. It takes no touch.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>Teaching by drawing, once, in place, with no pause and no button: right for a wordless game.</li>
+        <li>Remembered per career, so it never nags.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li><strong>78×54 pt is too small</strong> for a diagram: the ship is 19 pt, the dotted course 1 pt dots. Compare the capture: it reads as a smudge.</li>
+        <li>It sits in the stick zone, above the sails lever, where the left thumb's knuckle covers it.</li>
+        <li>6.9 s on screen, during the moment it teaches (a fight, the circle closing), when the eye is elsewhere.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. The closing scrap uses a tracing hand (Q1). The wind scrap's course is a ship sailing itself: fine.</p>
+      <h4>Aesthetic</h4>
+      <p>A pinned slip with a pin glint: on style.</p>
+      <div class="verdict rework"><b>Rework.</b> Pin scraps top-centre under the clock at 160×110 pt, out of both thumb zones, and draw them before the moment (the first time the Storm's clock appears, not when it closes). The closing scrap animates its dotted line instead of a hand.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="scraps"></div>
+</section>
+
+<!-- ============================================================ 16 SPECTATE -->
+<section class="screen" id="spectate" data-name="16 Spectate" data-verdict="keep">
+  <div class="sh"><span class="num">16</span><h2>Spectating</h2><span class="src"><code>src/screens/hud.ts</code> <code>spectate()</code>, <code>#watchOnly()</code>; <code>app/app.ts</code> (<code>HOLD.spectate = 3</code>)</span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="spectate"></div>
+      <p class="cap">Backdrop: current game, a fleet (<code>ships=6</code>). After she sinks, the controls and vitals go; the disc (rimmed gilt, the watched ship's arrow gilt) and the Storm's clock stay. A tap anywhere skips to the result.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> After sinking: the camera follows another ship, and the HUD is pared to the clock and the disc, gilt so you know it is not you. One tap anywhere skips.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>The right amount of UI: two readings, and the whole screen is a 956×440 skip button.</li>
+        <li>Gilt on the disc as "this is someone else" is a quiet, consistent signal.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Nothing says you sank or by whom. The 0117 capture shows the moment: a planet, some debris, a clock.</li>
+        <li>A whole-screen skip means a nervous thumb (still on the stick zone) skips by accident the instant the ship sinks.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>.</p>
+      <h4>Aesthetic</h4>
+      <p>Fine, and minimal.</p>
+      <div class="verdict keep"><b>Keep.</b> Add the sinker's emblem stamped on a small slip under the clock for 3 s (who did it, without a name). Ignore taps for the first 0.8 s, as the result sheet already does.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="spectate"></div>
+</section>
+
+<!-- ============================================================ 17 VICTORY -->
+<section class="screen" id="victory" data-name="17 Victory" data-verdict="keep">
+  <div class="sh"><span class="num">17</span><h2>Victory</h2><span class="src"><code>src/app/app.ts</code> <code>startVictory()</code>; <code>flow.ts</code> screen <code>victory</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="victory"></div>
+      <p class="cap">Backdrop: current game at golden hour (<code>t=17.4</code>). There is no chart on this screen: the HUD dries away, the camera draws back and circles her, a sting plays (synthesised, not music). Tap anywhere, or wait 6 s.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> The win. No UI at all; the camera ceremony is the reward. Then the result sheet.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>No banner, no word: the camera pulling back from the last ship afloat says it.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Indistinguishable from a cut-scene or a hang for a first-time winner. There is no mark that this is the win until the laurel arrives.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. The victory sting (<code>stingVictory</code>) is a synthesised struck-metal tail, "never for tunes" per <code>audio/kit.ts</code>, so not music. Worth the owner hearing once.</p>
+      <h4>Aesthetic</h4>
+      <p>n/a: no chart drawn.</p>
+      <div class="verdict keep"><b>Keep.</b> Add one mark: the gold laurel (the result sheet's) inks in small at top centre where the clock was, so the ceremony is labelled without a word.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="victory"></div>
+</section>
+
+<!-- ============================================================ 18 RESULT -->
+<section class="screen" id="result" data-name="18 Result sheet" data-verdict="keep">
+  <div class="sh"><span class="num">18</span><h2>Result sheet</h2><span class="src"><code>src/screens/result.ts</code> (342), <code>screens/wash.ts</code> (71), <code>lobby.ts</code> <code>careerPlate()</code></span><span class="chip keep">Keep</span></div>
+  <div class="row">
+    <div class="stage"><div class="mock" data-mock="result"></div>
+      <p class="cap">Full folio over the end of the match. Laurel ink by place: gold 1st, silver top 5, red top 10, iron below. Stats: ships sunk, damage dealt, time afloat. The career plate fills its ring with gold, levels tick, and a new rank seal is struck.</p></div>
+    <div class="crit">
+      <p class="lede"><strong>What it is.</strong> Where you came. Left: a little round chart of the water you held, a watercolour wash. Centre: your place, one large numeral in a laurel. Below: three woodcuts with numerals. Bottom: the career plate drawn large, its gold filling. A tap anywhere lifts the sheet and the lobby is under it.</p>
+      <h4>Works</h4>
+      <ul>
+        <li>One numeral in a laurel is the whole message. The laurel's ink grades the place without a word.</li>
+        <li>Paced reveal (laurel, then stats, then plate) with sound and haptics: a real ceremony.</li>
+        <li>Three stats, not twelve.</li>
+      </ul>
+      <h4>On a phone</h4>
+      <ul>
+        <li>Everything is scaled from screen height (440), so the plate is drawn <em>smaller</em> than in the lobby (80×49 pt), and the gold climbing its ring, the payoff, is 36 pt across.</li>
+        <li>The held-water chart (r 75) is a flat orange disc unless territory is in the game; without it, it is a puzzle (see capture).</li>
+        <li>Kills vs damage icons again too alike at 37 pt.</li>
+      </ul>
+      <h4>Rules</h4>
+      <p>Words: <strong>0</strong>. Numerals: place, 0, 0, 0:13, level.</p>
+      <h4>Aesthetic</h4>
+      <p>A clean sheet with a gilt laurel: the most "printed chart" screen in the game.</p>
+      <div class="verdict keep"><b>Keep.</b> Drop the held-water chart unless territory returns. Make the career plate the second-largest thing (ring r 40), centred under the stats. Swap the damage stat for time afloat alone if kills ≥ 1, else keep two stats.</div>
+    </div>
+  </div>
+  <div class="fb" data-fb="result"></div>
+</section>
+
+<!-- ============================================================ SUMMARY -->
+<section class="screen sum" id="summary" data-name="Summary">
+  <div class="sh"><span class="num">Σ</span><h2>Summary</h2></div>
+
+  <h3>The shared visual language, as it existed</h3>
+  <p><strong>One kit, one hand.</strong> Everything is drawn on a single canvas chart layer by <code>src/chart/*</code> (~6k lines): a quill pen with three line weights, parchment with grain and burnt rims, iron-gall ink that multiplies into the paper, and bodied pigments laid over it. On the phone the weights are <strong>hair 0.5, fine 0.9, bold 1.6 pt</strong> (iPad 0.6/1.05/1.9).</p>
+  <div class="swatches" id="inks"></div>
+  <p style="margin-top:10px"><strong>Lettering.</strong> No letters anywhere at 0117. Numerals are drawn by <code>chart/numerals.ts</code> in an italic hand at three body heights on the phone: 18 (hit figures), 16 (clocks), 44 (result and DIVE). The mocks use EB Garamond italic with lining figures as the stand-in.</p>
+  <p><strong>Instruments.</strong> <code>screens/instruments.ts</code> defines the HUD family. A <em>slip</em> is a hand-cut paper rectangle with a shadow. A <em>disc</em> is a paper round with a bold ring and a hairline inside. A <em>bar</em> is a ruled strip with a wash and a numeral. A <em>badge</em> is a woodcut plus a numeral on a slip. A <em>slot</em> is a chit with an inked square, gilt when chosen. The <em>stick</em> is a lead-white ring with a paper nub, and the <em>reticle</em> a white cross over its ink shadow. Wax <em>seals</em> come in five illuminations (ink, rubric, red-and-blue, silver, gold).</p>
+  <p><strong>Icons.</strong> 116 drawings on a 24-unit grid (<code>src/icons/sets/*</code>), cut as woodcuts by <code>chart/woodcut.ts</code>: solid shapes are a firm outline round close hatching, crossed on the shadow side, with cuts left as bare paper. The 86 the screens use, rendered below from the original prims (the rest are perks and folio heads):</p>
+  <div class="iconsheet" id="iconsheet"></div>
+
+  <h3>Cross-screen problems</h3>
+  <ol>
+    <li><strong>It is an iPad UI with a phone layout, not a phone UI.</strong> The README says "for iPad"; the phone layout shrinks the same 16-item HUD and 5-folio lobby into 440 pt. Every folio shows 1–2 rows of a long list; settings hide 40% of their controls.</li>
+    <li><strong>Pressables in the stick zone.</strong> The old stick zone was the left 42%; the current game's is 45%. Hotbar slots 1–2, the sails lever and the teaching scrap's area all sit inside it, and the chart takes touches first.</li>
+    <li><strong>Every right-hand control is in the look zone.</strong> There is no reserved strip for look; a drag that starts on any button presses it.</li>
+    <li><strong>Lead white was tuned for night.</strong> 0117 matches often started at dusk or night (random start hour); the current game is bright noon. White marks need an ink halo or they vanish.</li>
+    <li><strong>Paper-card density.</strong> Up to 14 paper chits float over the sea at once. The chart look is strongest where there is <em>less</em> paper (title, full map, result).</li>
+    <li><strong>The manicule.</strong> A drawn pointing hand appears in the Gale hint, the closing scrap, the loot offer, the hail hint and three settings icons. It is the one recurring human sign.</li>
+    <li><strong>Meta-game breadth.</strong> Levels, 8 rank tiers, 16 abilities, 6 cosmetic kinds, 19 rivals and coins: a large retention layer around a core that is not built yet.</li>
+    <li><strong>Icon pairs too alike at phone size:</strong> kills/damage, scatter/chain/broadside, rank tier washes when faint.</li>
+  </ol>
+
+  <h3>Open decisions</h3>
+  <ol class="q">
+    <li><strong>Is a drawn hand a "sign of people"?</strong> <span class="rec">Recommend yes. Replace every manicule with ink rings, a dotted course or the target itself pulsing.</span></li>
+    <li><strong>How much meta-game?</strong> (levels, rank, abilities, cosmetics, rivals) <span class="rec">Recommend: level ring and one ability choice only for now. Cut locker, rivals and the rank folio; rank lives on the plate.</span></li>
+    <li><strong>Keep coins and the gull delivery?</strong> <span class="rec">Recommend cut: money is a sign of people, and it adds a button at the worst reach.</span></li>
+    <li><strong>How many hotbar slots on the phone?</strong> <span class="rec">Recommend 3, right of centre, out of the stick zone.</span></li>
+    <li><strong>Keep the sails lever?</strong> <span class="rec">Recommend cut: the current stick already sets speed by push.</span></li>
+    <li><strong>Manual reload or automatic?</strong> <span class="rec">Recommend automatic, shown as a drain ring on Fire. That is one less button.</span></li>
+    <li><strong>Strictly zero words, or numerals plus nothing else?</strong> <span class="rec">Recommend: keep 0117's rule of numerals only, no letters, including no region names.</span></li>
+    <li><strong>Should the look drag ever start on a button?</strong> <span class="rec">Recommend: buttons win only on a tap. A touch that moves more than 10 pt within 120 ms becomes a look drag.</span></li>
+    <li><strong>Teaching scraps: keep?</strong> <span class="rec">Recommend keep 3, larger, top-centre, shown before the moment rather than during it.</span></li>
+    <li><strong>Left-handed mirroring?</strong> <span class="rec">Recommend keep: it is cheap in this layout (6 controls mirror, readings stay).</span></li>
+    <li><strong>Paper shadows (cards floating over the world) or flat ink on the view?</strong> <span class="rec">Recommend: drop the shadow for HUD instruments and keep it for sheets (folio, map, result), so the HUD reads as marks and the sheets as paper.</span></li>
+  </ol>
+
+  <h3>Proposed build order</h3>
+  <div class="scroll-x"><table class="tbl">
+    <thead><tr><th>#</th><th>Build</th><th>From</th><th>Why now</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Chart kit core: paper, pen weights, inks, woodcut, numerals</td><td><code>chart/paper, pen, inks, woodcut, numerals</code></td><td>Every screen draws with it</td></tr>
+      <tr><td>2</td><td>Match HUD, phone cut: vitals+clock slip, disc, stick, Fire, Ability, Gust</td><td>10</td><td>The core loop needs it first</td></tr>
+      <tr><td>3</td><td>Fight marks: reticle, hit figures, incoming arcs, hurts (≤3)</td><td>11</td><td>Combat is unreadable without them</td></tr>
+      <tr><td>4</td><td>Storm clock and red rim, plus the arc to safety</td><td>13</td><td>Defines the battle royale</td></tr>
+      <tr><td>5</td><td>Hotbar of 3 and loot pickup</td><td>12</td><td>Once loot exists</td></tr>
+      <tr><td>6</td><td>Full map</td><td>09</td><td>Needs the disc and the Storm</td></tr>
+      <tr><td>7</td><td>The Gale and DIVE</td><td>08</td><td>Needs the full map's planet window</td></tr>
+      <tr><td>8</td><td>Spectate and victory marks</td><td>16, 17</td><td>Small</td></tr>
+      <tr><td>9</td><td>Result sheet</td><td>18</td><td>Closes the loop</td></tr>
+      <tr><td>10</td><td>Title</td><td>01</td><td>Rose and web exist in the kit by then</td></tr>
+      <tr><td>11</td><td>Lobby (plate, wheel, banner, one ability seal)</td><td>02</td><td>Home</td></tr>
+      <tr><td>12</td><td>Settings (6 controls)</td><td>07</td><td>Before external testing</td></tr>
+      <tr><td>13</td><td>Teaching scraps</td><td>15</td><td>Last: they teach what is final</td></tr>
+      <tr><td>later</td><td>Abilities sheet, rank on the plate</td><td>03, 05</td><td>If Q2 keeps them</td></tr>
+      <tr><td>cut</td><td>Locker, rivals, gull hail</td><td>04, 06, 14</td><td>Per Q2–Q3</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px;color:var(--muted);font-size:13px">Sources: <code>docs/ports.md</code> §8; worktree <code>game-portolan-0117</code> at <code>ae981b6</code>. The galleon, shipyard and simplify worktrees carry the same UI code (no differences in <code>src/screens</code>, <code>src/chart</code> or <code>src/icons</code>), so they add no screens. The earlier DOM-era menus are left out on purpose: this sheet reviews the chart UI only. Captures for "0117 capture" were made for this sheet with the old repo's own headless tools (<code>node tools/capture/run.ts layout --device iphone</code> and <code>flow --device iphone --only plates,main</code>), with output written outside the old worktree. Backdrops are from the current game via its <code>tools/launch.ts</code> (the capture tool's settings, with the frame meter hidden).</p>
+  <div class="fb" data-fb="summary"></div>
+</section>
+
+</main>
+</div>
+
+<dialog id="zoom" aria-label="Screen at 1:1">
+  <button class="zclose" id="zclose">Close</button>
+  <div class="znote" id="znote"></div>
+  <div class="zin" id="zin"></div>
+</dialog>
+
+<script type="application/json" id="prims">{"ability.repair":[{"k":"f","d":"M1.6 7.6L22.4 6.2C21.6 9.6 20.4 13.4 18 16.4C16.9 17.8 15.4 18.6 13.6 18.6H6.2C4.6 18.6 3.5 17.7 3.1 16.3Z","tr":"translate(0 4.2)"},{"k":"s","d":"M3 11L21.2 9.8","w":1.1,"cut":true,"tr":"translate(0 4.2)"},{"k":"s","d":"M1 10.6H23","w":1.6,"cut":true},{"k":"f","d":"M10.4 1.2L13.6 1.2L13.6 4.6L17 4.6L17 7.8L13.6 7.8L13.6 11.2L10.4 11.2L10.4 7.8L7 7.8L7 4.6L10.4 4.6Z"}],"ability.smokeScreen":[{"k":"f","d":"M3 13.4a4.6 4.6 0 1 1 9.2 0a4.6 4.6 0 1 1 -9.2 0Z"},{"k":"f","d":"M7.6 9.8a5.6 5.6 0 1 1 11.2 0a5.6 5.6 0 1 1 -11.2 0Z"},{"k":"f","d":"M13.8 14.2a4.2 4.2 0 1 1 8.4 0a4.2 4.2 0 1 1 -8.4 0Z"},{"k":"f","d":"M5.6 13.4h14a2.4 2.4 0 0 1 2.4 2.4v0a2.4 2.4 0 0 1 -2.4 2.4h-14a2.4 2.4 0 0 1 -2.4 -2.4v0a2.4 2.4 0 0 1 2.4 -2.4Z"},{"k":"s","d":"M10.83 14.88A5.6 5.6 0 0 1 7.62 10.29","w":1.1,"cut":true,"fine":true},{"k":"s","d":"M14.05 15.64A4.2 4.2 0 0 1 14.78 11.5","w":1.1,"cut":true,"fine":true},{"k":"f","d":"M1.9 6.8a1.7 1.7 0 1 1 3.4 0a1.7 1.7 0 1 1 -3.4 0Z"},{"k":"f","d":"M19.2 5.6a1.4 1.4 0 1 1 2.8 0a1.4 1.4 0 1 1 -2.8 0Z"},{"k":"s","d":"M2 21.6C3.67 20.7 3.67 20.7 5.33 21.6C7 22.5 7 22.5 8.67 21.6C10.33 20.7 10.33 20.7 12 21.6C13.67 22.5 13.67 22.5 15.33 21.6C17 20.7 17 20.7 18.67 21.6C20.33 22.5 20.33 22.5 22 21.6","w":1.8}],"ability.ram":[{"k":"f","d":"M1.6 8H12.6C14.4 8 15.2 9 16.2 10.4L18.2 13.2L15.4 15.8C14.4 16.8 13.4 17.6 11.8 17.6H4.6C3 17.6 2 16.4 1.8 14.8Z"},{"k":"s","d":"M2 12.6H15.8","w":1.1,"cut":true,"fine":true},{"k":"s","d":"M14.4 13.2a5.2 5.2 0 1 1 10.4 0a5.2 5.2 0 1 1 -10.4 0Z","w":1.4,"cut":true},{"k":"f","d":"M19.6 8.8L20.33 11.44L22.71 10.09L21.36 12.47L24 13.2L21.36 13.93L22.71 16.31L20.33 14.96L19.6 17.6L18.87 14.96L16.49 16.31L17.84 13.93L15.2 13.2L17.84 12.47L16.49 10.09L18.87 11.44Z","top":true},{"k":"s","d":"M2.6 4.6H8.6","w":1.6},{"k":"s","d":"M1.2 21H7","w":1.6}],"ability.reveal":[{"k":"s","d":"M2.4 12a9.6 9.6 0 1 1 19.2 0a9.6 9.6 0 1 1 -19.2 0Z","w":1.8},{"k":"s","d":"M6.6 12a5.4 5.4 0 1 1 10.8 0a5.4 5.4 0 1 1 -10.8 0Z","w":1.3,"fine":true},{"k":"f","d":"M12 12L12 2.4A9.6 9.6 0 0 1 20.31 7.2Z"},{"k":"f","d":"M10.1 12a1.9 1.9 0 1 1 3.8 0a1.9 1.9 0 1 1 -3.8 0Z"},{"k":"f","d":"M14.9 7.2a1.5 1.5 0 1 1 3 0a1.5 1.5 0 1 1 -3 0Z","cut":true},{"k":"f","d":"M5 15.6a1.6 1.6 0 1 1 3.2 0a1.6 1.6 0 1 1 -3.2 0Z"},{"k":"f","d":"M14.5 17.4a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z"}],"ability.hardTurn":[{"k":"s","d":"M6.2 21V10.4A5.8 5.8 0 0 1 17.8 10.4V13.6","w":2.8},{"k":"f","d":"M13.2 12.6L22.4 12.6L17.8 19.8Z"},{"k":"s","d":"M1.6 17.4H3.4M1.6 13.4H3.4","w":1.6,"fine":true}],"ability.decoy":[{"k":"s","d":"M2.65 12.93H14.55L13.19 15.66C12.94 16.15 12.44 16.4 11.95 16.4H5.25C4.76 16.4 4.26 16.15 4.01 15.66Z","w":1.1,"dash":"1.4 1.2"},{"k":"s","d":"M8.04 4.87V12.18H3.39C4.51 9.83 5.13 7.35 8.04 4.87Z","w":1.1,"dash":"1.4 1.2"},{"k":"s","d":"M9.16 6.23C11.45 7.97 12.69 10.08 13.44 12.18H9.16Z","w":1.1,"dash":"1.4 1.2"},{"k":"s","d":"M8.04 4.25L10.46 4.87L8.04 5.49Z","w":1.1,"dash":"1.4 1.2"},{"k":"f","d":"M8.49 18.37H22.31L20.73 21.54C20.44 22.11 19.86 22.4 19.29 22.4H11.51C10.94 22.4 10.36 22.11 10.07 21.54Z"},{"k":"f","d":"M14.75 9.01V17.5H9.35C10.65 14.77 11.37 11.89 14.75 9.01Z"},{"k":"f","d":"M16.05 10.59C18.71 12.61 20.15 15.06 21.02 17.5H16.05Z"},{"k":"f","d":"M14.75 8.29L17.56 9.01L14.75 9.73Z"}],"ability.wave":[{"k":"f","d":"M1.6 21.4C1.6 13.4 6.4 5 14.2 3.8C18.8 3.2 22.2 5.8 22 9.6C21.8 12.8 18.6 14.2 16.4 12.6C14.8 11.4 15.6 9 17.4 9.4C16.6 7.4 12.4 7.4 10 10.8C7.6 14.2 8.6 18.4 11.6 21.4Z"},{"k":"s","d":"M4.4 18.6C4.6 13.6 7.6 8.4 12.4 6.6","w":1.1,"cut":true,"fine":true},{"k":"s","d":"M12.6 21.4H22.4","w":2},{"k":"f","d":"M19 17.4a1.2 1.2 0 1 1 2.4 0a1.2 1.2 0 1 1 -2.4 0Z","fine":true},{"k":"f","d":"M16.7 16.6a0.9 0.9 0 1 1 1.8 0a0.9 0.9 0 1 1 -1.8 0Z","fine":true}],"ability.driftMine":[{"k":"f","d":"M6.8 10.4a5.2 5.2 0 1 1 10.4 0a5.2 5.2 0 1 1 -10.4 0Z"},{"k":"s","d":"M12 6.2L12 2.6","w":1.8},{"k":"f","d":"M10.75 2.4a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 1 1 -2.5 0Z"},{"k":"s","d":"M15.64 8.3L18.75 6.5","w":1.8},{"k":"f","d":"M17.68 6.4a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 1 1 -2.5 0Z"},{"k":"s","d":"M15.64 12.5L18.75 14.3","w":1.8},{"k":"f","d":"M17.68 14.4a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 1 1 -2.5 0Z"},{"k":"s","d":"M8.36 12.5L5.25 14.3","w":1.8},{"k":"f","d":"M3.82 14.4a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 1 1 -2.5 0Z"},{"k":"s","d":"M8.36 8.3L5.25 6.5","w":1.8},{"k":"f","d":"M3.82 6.4a1.25 1.25 0 1 1 2.5 0a1.25 1.25 0 1 1 -2.5 0Z"},{"k":"f","d":"M0 16.6C3 15.4 5 15.4 7.6 16.6S12.6 17.8 15.4 16.6S20.6 15.4 24 16.6V24H0Z","cut":true},{"k":"s","d":"M1.6 19.2C3.33 18.3 3.33 18.3 5.07 19.2C6.8 20.1 6.8 20.1 8.53 19.2C10.27 18.3 10.27 18.3 12 19.2C13.73 20.1 13.73 20.1 15.47 19.2C17.2 18.3 17.2 18.3 18.93 19.2C20.67 20.1 20.67 20.1 22.4 19.2","w":1.8},{"k":"f","d":"M8.7 8.4a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z","cut":true,"fine":true}],"ability.salvage":[{"k":"f","d":"M5.5 3.2Q12 0.8 18.5 3.2V8.9C18.5 13.1 14.86 15.8 12 16.7C9.14 15.8 5.5 13.1 5.5 8.9Z"},{"k":"f","d":"M12 3.6L16.2 8.6L13.6 8.6L13.6 13.4L10.4 13.4L10.4 8.6L7.8 8.6Z","cut":true},{"k":"f","d":"M1.6 18.6L10.2 17L9.6 18.6L10.6 19.6L10.2 21L2.2 22.6Z"},{"k":"f","d":"M13.8 17.6L22.4 18.4L22 22.4L13.4 21.4L14.4 20.2L13.2 19.2Z"}],"ability.quickReload":[{"k":"s","d":"M20.08 14.94A8.6 8.6 0 1 1 15.22 4.03","w":2.4},{"k":"f","d":"M19.7 8.17L13.59 7.1L19.01 2.01Z"},{"k":"f","d":"M7.8 12a4.2 4.2 0 1 1 8.4 0a4.2 4.2 0 1 1 -8.4 0Z"},{"k":"s","d":"M9.55 11.11A2.6 2.6 0 0 1 11.11 9.55","w":0.8400000000000001,"cut":true,"fine":true}],"ability.quickHands":[{"k":"s","d":"M5.6 2.6H18.4M5.6 21.4H18.4","w":2.2},{"k":"s","d":"M7.4 3.4C7.4 8.4 10.6 10 10.6 12S7.4 15.6 7.4 20.6M16.6 3.4C16.6 8.4 13.4 10 13.4 12S16.6 15.6 16.6 20.6","w":1.6},{"k":"f","d":"M8.6 6.4H15.4C14.6 8.4 12.8 9.4 12 10.4C11.2 9.4 9.4 8.4 8.6 6.4Z"},{"k":"f","d":"M12 15.4L15.6 20.6H8.4Z"},{"k":"s","d":"M12 11V15.6","w":1,"fine":true},{"k":"s","d":"M0.8 8.4H3.2M0.6 12H2.6M0.8 15.6H3.2","w":1.5}],"ability.lightHull":[{"k":"f","d":"M20.4 2C12.4 3 6.6 9.2 5.8 17.4L7.6 18.4C14.8 15.8 20 10.4 20.4 2Z"},{"k":"s","d":"M18.8 4.2C14.4 8.4 10.4 12.8 6.8 17.8","w":1.1,"cut":true},{"k":"s","d":"M14.6 5.4L13.4 8.4M10.6 9.2L9.8 12M17.6 9.4L14.6 10.4M14.4 13.4L11.6 14.4","w":0.9,"cut":true,"fine":true},{"k":"s","d":"M7.2 17.4L3.2 21.6","w":2}],"ability.windReader":[{"k":"s","d":"M7.2 2.6V19","w":1.8},{"k":"f","d":"M8.4 3.4C13.4 6 14.8 12 13.6 17.4H8.4Z"},{"k":"f","d":"M2.6 18.4H16.6L15 21.6H4.6Z"},{"k":"s","d":"M22.4 5.6H17.6","w":1.8},{"k":"s","d":"M22.4 10H16.2","w":1.8},{"k":"s","d":"M22.4 14.4H17.6","w":1.8},{"k":"f","d":"M16.6 3.6L16.6 7.6L14.4 5.6Z","fine":true}],"ability.stormWalker":[{"k":"f","d":"M3.2 4.04Q12 0.78 20.8 4.04V11.79C20.8 17.5 15.87 21.18 12 22.4C8.13 21.18 3.2 17.5 3.2 11.79Z"},{"k":"f","d":"M13.4 3.6L7 13.2H11.4L9.8 20.4L17 10.4H12.6L14.6 3.6Z","cut":true}],"ability.deepHold":[{"k":"f","d":"M4.6 4.4H14.2C16.2 8 16.2 16.4 14.2 20H4.6C2.6 16.4 2.6 8 4.6 4.4Z"},{"k":"s","d":"M2.8 8.8H16","w":1.1,"cut":true},{"k":"s","d":"M2.8 15.6H16","w":1.1,"cut":true},{"k":"s","d":"M12.8 6.4a5.4 5.4 0 1 1 10.8 0a5.4 5.4 0 1 1 -10.8 0Z","w":1.6,"cut":true},{"k":"f","d":"M13.6 6.4a4.6 4.6 0 1 1 9.2 0a4.6 4.6 0 1 1 -9.2 0ZM17.3 3.6L19.1 3.6L19.1 5.5L21 5.5L21 7.3L19.1 7.3L19.1 9.2L17.3 9.2L17.3 7.3L15.4 7.3L15.4 5.5L17.3 5.5Z","top":true,"evenodd":true}],"ability.steadyAim":[{"k":"s","d":"M5 12a7 7 0 1 1 14 0a7 7 0 1 1 -14 0Z","w":2},{"k":"s","d":"M12 1.4V6.4M12 17.6V22.6M1.4 12H6.4M17.6 12H22.6","w":2.2},{"k":"f","d":"M10 12a2 2 0 1 1 4 0a2 2 0 1 1 -4 0Z"},{"k":"s","d":"M2.42 8.51A10.2 10.2 0 0 1 8.51 2.42","w":1.3,"fine":true},{"k":"s","d":"M21.58 15.49A10.2 10.2 0 0 1 15.49 21.58","w":1.3,"fine":true}],"region.iceCrown":[{"k":"f","d":"M2.6 16.6L4.4 8.6L7.2 12.4L9.2 4.6L12 1.4L14.8 4.6L16.8 12.4L19.6 8.6L21.4 16.6Z"},{"k":"s","d":"M12 2.4L11 15.4M9.4 5.6L10.6 9.6M14.6 5.6L13.4 9.6","w":0.9,"cut":true,"fine":true},{"k":"f","d":"M1.2 18.4L10.6 18.4L9.4 22L2.6 22Z"},{"k":"f","d":"M12.6 18.4L22.8 18.4L21.6 22L13.4 22Z"}],"region.fjords":[{"k":"f","d":"M1.4 22V6.4L4.2 2.6L7.4 4.8C7.6 11 8.4 16.8 10.2 22Z"},{"k":"f","d":"M22.6 22V5.2L19.8 2L16.6 4.2C16.4 11 15.6 16.8 13.8 22Z"},{"k":"f","d":"M7.4 6.4L16.6 6.4L16.2 13.4L7.8 13.4Z"},{"k":"f","d":"M11 6.2H13V13.6C13.6 15 13.6 16.6 12 16.8C10.4 16.6 10.4 15 11 13.6Z","cut":true},{"k":"s","d":"M8.8 19.4H15.2","w":1.5},{"k":"f","d":"M8.7 16a0.9 0.9 0 1 1 1.8 0a0.9 0.9 0 1 1 -1.8 0Z","fine":true},{"k":"f","d":"M13.5 16a0.9 0.9 0 1 1 1.8 0a0.9 0.9 0 1 1 -1.8 0Z","fine":true}],"region.mistwood":[{"k":"f","d":"M7.6 1.6L9.8 6.16L8.8 6.16L11.2 11.1L9.6 11.1L12.6 16.8L2.6 16.8L5.6 11.1L4 11.1L6.4 6.16L5.4 6.16Z"},{"k":"f","d":"M16.4 5.2L18.38 8.94L17.48 8.94L19.64 13L18.2 13L20.9 17.68L11.9 17.68L14.6 13L13.16 13L15.32 8.94L14.42 8.94Z"},{"k":"s","d":"M0 14.2H24","w":2.6,"cut":true},{"k":"s","d":"M0 19.2H24","w":2.6,"cut":true},{"k":"s","d":"M2.4 14.2H10.6M13.4 14.2H21.6","w":1.5},{"k":"s","d":"M5 19.2H19","w":1.5}],"region.spires":[{"k":"f","d":"M4.2 21.4L5.8 8.6L7.4 4.4L9 8.6L10.4 21.4Z"},{"k":"f","d":"M9.8 21.4L11.2 5.4L12.6 1.2L14 5.4L15.2 21.4Z"},{"k":"f","d":"M15.4 21.4L16.8 11.6L18.2 8.2L19.6 11.6L20.6 21.4Z"},{"k":"s","d":"M10.4 21.6L9.6 12M15.2 21.6L15.6 13","w":0.9,"cut":true,"fine":true},{"k":"f","d":"M7.4 2.4L8.6 5L6.2 5Z","fine":true},{"k":"f","d":"M18.2 6.4L19.4 8.8L17 8.8Z","fine":true},{"k":"s","d":"M1.6 22.4H22.4","w":1.4}],"region.narrows":[{"k":"f","d":"M1.4 21.4V4.4C4 3.4 7.2 3.6 10 4.4L10.8 21.4Z"},{"k":"f","d":"M22.6 21.4V3.6C20 2.8 16.8 3 14 3.8L13.2 21.4Z"},{"k":"s","d":"M0 9.4H24","w":1,"cut":true},{"k":"s","d":"M0 15.2H24","w":1,"cut":true},{"k":"s","d":"M0 12.2H24","w":0.6,"cut":true,"fine":true},{"k":"s","d":"M10.8 21.6H13.2","w":1.2,"fine":true},{"k":"s","d":"M1.6 23H22.4","w":1.2,"fine":true}],"region.basaltStacks":[{"k":"f","d":"M1.6 21V8.4C1.6 5.6 3.6 3.6 6.4 3.6H17.6C20.4 3.6 22.4 5.6 22.4 8.4V21H16.4V13.6C16.4 10.8 14.4 9 12 9S7.6 10.8 7.6 13.6V21Z"},{"k":"s","d":"M4.6 6.4V21M19.4 6.4V21","w":1,"cut":true},{"k":"s","d":"M10 3.4V8.8M14 3.4V8.8","w":0.9,"cut":true,"fine":true},{"k":"s","d":"M2 3.2C6 1.8 18 1.8 22 3.2","w":1.4,"fine":true},{"k":"s","d":"M1.6 22.4C3.33 21.6 3.33 21.6 5.07 22.4C6.8 23.2 6.8 23.2 8.53 22.4C10.27 21.6 10.27 21.6 12 22.4C13.73 23.2 13.73 23.2 15.47 22.4C17.2 21.6 17.2 21.6 18.93 22.4C20.67 23.2 20.67 23.2 22.4 22.4","w":1.4}],"region.kelpShallows":[{"k":"s","d":"M1.6 3.6C3.33 2.7 3.33 2.7 5.07 3.6C6.8 4.5 6.8 4.5 8.53 3.6C10.27 2.7 10.27 2.7 12 3.6C13.73 4.5 13.73 4.5 15.47 3.6C17.2 2.7 17.2 2.7 18.93 3.6C20.67 4.5 20.67 4.5 22.4 3.6","w":1.7},{"k":"s","d":"M6 22.6C4.4 18.4 7.6 14.4 6 7.4","w":1.7},{"k":"s","d":"M12 22.6C10.4 17.6 13.6 13.6 12 6.2","w":1.7},{"k":"s","d":"M18 22.6C16.4 18.4 19.6 14.8 18 8.6","w":1.7},{"k":"f","d":"M6 11C3 7.8 1 10 1.5999999999999996 11.6C3 12.4 4.8 12 6 11Z"},{"k":"f","d":"M6.4 17C9.4 13.8 11.4 16 10.8 17.6C9.4 18.4 7.6000000000000005 18 6.4 17Z"},{"k":"f","d":"M12.2 9.4C15.2 6.2 17.2 8.4 16.6 10C15.2 10.8 13.399999999999999 10.4 12.2 9.4Z"},{"k":"f","d":"M11.8 15.4C8.8 12.2 6.800000000000001 14.4 7.4 16C8.8 16.8 10.600000000000001 16.4 11.8 15.4Z"},{"k":"f","d":"M18.2 12C15.2 8.8 13.2 11 13.799999999999999 12.6C15.2 13.4 17 13 18.2 12Z"},{"k":"f","d":"M17.8 18.2C20.8 15 22.8 17.2 22.200000000000003 18.8C20.8 19.599999999999998 19 19.2 17.8 18.2Z"},{"k":"f","d":"M5.1 7a1.1 1.1 0 1 1 2.2 0a1.1 1.1 0 1 1 -2.2 0Z","fine":true},{"k":"f","d":"M11.1 5.8a1.1 1.1 0 1 1 2.2 0a1.1 1.1 0 1 1 -2.2 0Z","fine":true}],"region.blossomRun":[{"k":"f","d":"M12 12C8.4 9.8 8.2 4.6 10.2 2.4L12 4L13.8 2.4C15.8 4.6 15.6 9.8 12 12Z","tr":"rotate(0 12 12.4)"},{"k":"f","d":"M12 12C8.4 9.8 8.2 4.6 10.2 2.4L12 4L13.8 2.4C15.8 4.6 15.6 9.8 12 12Z","tr":"rotate(72 12 12.4)"},{"k":"f","d":"M12 12C8.4 9.8 8.2 4.6 10.2 2.4L12 4L13.8 2.4C15.8 4.6 15.6 9.8 12 12Z","tr":"rotate(144 12 12.4)"},{"k":"f","d":"M12 12C8.4 9.8 8.2 4.6 10.2 2.4L12 4L13.8 2.4C15.8 4.6 15.6 9.8 12 12Z","tr":"rotate(216 12 12.4)"},{"k":"f","d":"M12 12C8.4 9.8 8.2 4.6 10.2 2.4L12 4L13.8 2.4C15.8 4.6 15.6 9.8 12 12Z","tr":"rotate(288 12 12.4)"},{"k":"f","d":"M9.4 12.4a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0Z","cut":true},{"k":"f","d":"M10.8 12.4a1.2 1.2 0 1 1 2.4 0a1.2 1.2 0 1 1 -2.4 0Z","top":true},{"k":"s","d":"M13.76 9.97L15.06 8.19","w":0.8,"cut":true,"fine":true},{"k":"s","d":"M14.85 13.33L16.95 14.01","w":0.8,"cut":true,"fine":true},{"k":"s","d":"M12 15.4L12 17.6","w":0.8,"cut":true,"fine":true},{"k":"s","d":"M9.15 13.33L7.05 14.01","w":0.8,"cut":true,"fine":true},{"k":"s","d":"M10.24 9.97L8.94 8.19","w":0.8,"cut":true,"fine":true}],"region.glassSea":[{"k":"f","d":"M10.8 13C10.8 11 10.6 9.6 9.8 8.6C8.4 7 5.2 7.4 2.6 3.4C2.6 7 5.4 9.4 8.6 9.6C9.4 10.2 9.8 11.4 9.6 13ZM13.2 13C13.2 11 13.4 9.6 14.2 8.6C15.6 7 18.8 7.4 21.4 3.4C21.4 7 18.6 9.4 15.4 9.6C14.6 10.2 14.2 11.4 14.4 13Z"},{"k":"f","d":"M9.4 13C10 10.8 11 9.2 12 7.8C13 9.2 14 10.8 14.6 13Z"},{"k":"s","d":"M1.4 14.6H22.6","w":1.6},{"k":"f","d":"M9.4 16.2C10 18.4 11 20 12 21.4C13 20 14 18.4 14.6 16.2Z","op":0.4},{"k":"f","d":"M2.6 22C5.2 19.2 8 19.4 9.6 18","fine":true,"op":0.4},{"k":"f","d":"M21.4 22C18.8 19.2 16 19.4 14.4 18","fine":true,"op":0.4}],"region.jadeShoals":[{"k":"f","d":"M1.4 20.6C3.6 15.6 7.6 12.2 11.4 12.2C14.6 12.2 16 14.8 18.4 15.8C20 16.4 21.4 16.6 22.6 16.6V20.6Z"},{"k":"s","d":"M11.4 12.4C12.4 14.6 12 17.4 9.4 20.6","w":1,"cut":true,"fine":true},{"k":"f","d":"M11.4 1.2Q12.28 4.72 15.8 5.6Q12.28 6.48 11.4 10Q10.52 6.48 7 5.6Q10.52 4.72 11.4 1.2Z"},{"k":"s","d":"M11.4 0.6V1.2M5.2 5.6H6M16.8 5.6H17.6","w":1.2,"fine":true},{"k":"s","d":"M2.6 22.8H9.4M12.6 22.8H21.4","w":1.4}],"region.coralAtolls":[{"k":"s","d":"M2.2 17.6a9.8 4.2 0 1 1 19.6 0a9.8 4.2 0 1 1 -19.6 0Z","w":2.4},{"k":"s","d":"M21.6 14L24 12M2.4 21L0 23","w":2.4,"cut":true},{"k":"s","d":"M10.6 16.8L10.4 24","w":3,"cut":true},{"k":"s","d":"M10.6 17.2C11 13.4 10.6 10.4 9.2 7.4","w":1.7,"top":true},{"k":"f","d":"M9.2 7.4Q5.892281974833601 3.7960890954936453 3.1859672269701855 7.451071082715719Q5.892281974833601 6.596089095493646 9.2 7.4Z","top":true},{"k":"f","d":"M9.2 7.4Q7.996089095493645 1.692281974833602 7.01107108271572 3.6259672269701855Q7.996089095493645 4.4922819748336025 9.2 7.4Z","top":true},{"k":"f","d":"M9.2 7.4Q10.96 1.9515905786787757 12.4 4.097437415779593Q10.96 4.751590578678776 9.2 7.4Z","top":true},{"k":"f","d":"M9.2 7.4Q12.60005890853752 4.088956961239127 15.381925288250038 7.983558111343868Q12.60005890853752 6.888956961239128 9.2 7.4Z","top":true},{"k":"f","d":"M9.2 7.4Q12.390203410369008 6.487616281327263 15.000369837034558 12.344756875140478Q12.390203410369008 9.287616281327264 9.2 7.4Z","top":true}],"region.spiceIsles":[{"k":"f","d":"M2.4 13H21.6C21.6 18.4 17.4 21.8 12 21.8S2.4 18.4 2.4 13Z"},{"k":"f","d":"M3.4 10.6C4.2 5.2 7.8 2.2 12 2.2S19.8 5.2 20.6 10.6Z"},{"k":"s","d":"M12 10.6L4.9 6.5","w":0.9,"cut":true},{"k":"s","d":"M12 10.6L7.9 3.5","w":0.9,"cut":true},{"k":"s","d":"M12 10.6L12 2.4","w":0.9,"cut":true},{"k":"s","d":"M12 10.6L16.1 3.5","w":0.9,"cut":true},{"k":"s","d":"M12 10.6L19.1 6.5","w":0.9,"cut":true},{"k":"s","d":"M2 10.8H22","w":1,"cut":true},{"k":"s","d":"M8.2 13.4a3.8 3.8 0 1 1 7.6 0a3.8 3.8 0 1 1 -7.6 0Z","w":1.3,"cut":true},{"k":"f","d":"M9 13.4a3 3 0 1 1 6 0a3 3 0 1 1 -6 0Z","top":true},{"k":"f","d":"M10.2 12.4a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z","cut":true,"fine":true},{"k":"s","d":"M5 16.4Q12 18.6 19 16.4","w":0.9,"cut":true,"fine":true}],"region.fireArchipelago":[{"k":"f","d":"M1.4 22L8.6 10.4H15.4L22.6 22Z"},{"k":"s","d":"M11.2 10.6L9.8 15L11 18.6L10 22","w":1.2,"cut":true},{"k":"s","d":"M14.2 10.6L15.4 15.4","w":1,"cut":true,"fine":true},{"k":"s","d":"M7.6 8.6H16.6","w":1.6,"cut":true},{"k":"f","d":"M6.4 5.6a2.8 2.8 0 1 1 5.6 0a2.8 2.8 0 1 1 -5.6 0Z"},{"k":"f","d":"M10.2 4.2a3.4 3.4 0 1 1 6.8 0a3.4 3.4 0 1 1 -6.8 0Z"},{"k":"f","d":"M15.2 6.2a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1 -4.8 0Z"},{"k":"f","d":"M9.6 7.4a2 2 0 1 1 4 0a2 2 0 1 1 -4 0Z"}],"region.weepingIsle":[{"k":"f","d":"M1.4 21.4C1.4 12.6 5.8 7.2 12 7.2S22.6 12.6 22.6 21.4Z"},{"k":"s","d":"M5.4 14V21.6","w":1,"cut":true},{"k":"s","d":"M9 10.4V21.6","w":1,"cut":true},{"k":"s","d":"M12 10.4V21.6","w":1,"cut":true},{"k":"s","d":"M15 10.4V21.6","w":1,"cut":true},{"k":"s","d":"M18.6 14V21.6","w":1,"cut":true},{"k":"s","d":"M3 7.8C5 4.6 9 4.6 10 5.2C11.4 2 17.4 2.2 18 5.4C20.4 5 22 6.6 21.6 8.6","w":1.6,"cut":true},{"k":"f","d":"M3.6 7C5.2 4.6 8.4 4.4 9.8 5C11.2 2.4 16.8 2.4 17.6 4.8C19.8 4.4 21.4 5.8 21 7.6Z","top":true},{"k":"s","d":"M1.6 23C3.33 22.2 3.33 22.2 5.07 23C6.8 23.8 6.8 23.8 8.53 23C10.27 22.2 10.27 22.2 12 23C13.73 23.8 13.73 23.8 15.47 23C17.2 22.2 17.2 22.2 18.93 23C20.67 23.8 20.67 23.8 22.4 23","w":1.2}],"region.mangroveLabyrinth":[{"k":"f","d":"M2.4 7.6a4.2 4.2 0 1 1 8.4 0a4.2 4.2 0 1 1 -8.4 0Z"},{"k":"f","d":"M7.2 5.6a4.8 4.8 0 1 1 9.6 0a4.8 4.8 0 1 1 -9.6 0Z"},{"k":"f","d":"M13.2 7.6a4.2 4.2 0 1 1 8.4 0a4.2 4.2 0 1 1 -8.4 0Z"},{"k":"f","d":"M2.6 9.4a9.4 3 0 1 1 18.8 0a9.4 3 0 1 1 -18.8 0Z"},{"k":"s","d":"M12 10V14","w":2},{"k":"s","d":"M12 13C9.6 14 6 16 3.6 21.6","w":1.6},{"k":"s","d":"M12 13C10.8 15.4 9.6 18 9 21.6","w":1.6},{"k":"s","d":"M12 13C14.4 14 18 16 20.4 21.6","w":1.6},{"k":"s","d":"M12 13C13.2 15.4 14.4 18 15 21.6","w":1.6},{"k":"s","d":"M1.6 21.8H22.4","w":1.4}],"region.maelstrom":[{"k":"s","d":"M1.6 13L2 10.72L2.89 8.62L4.21 6.79L5.88 5.33L7.81 4.29L9.88 3.72L12 3.63L14.05 4.01L15.94 4.82L17.57 6.02L18.87 7.52L19.78 9.25L20.28 11.11L20.34 13L19.99 14.82L19.25 16.49L18.18 17.93L16.84 19.06L15.3 19.85L13.66 20.27L12 20.31L10.41 19.99L8.95 19.33L7.71 18.37L6.74 17.19L6.07 15.85L5.73 14.43L5.71 13L6.02 11.63L6.6 10.4L7.43 9.36L8.45 8.55L9.59 8L10.8 7.73L12 7.74L13.14 8.02L14.15 8.53L15 9.23L15.65 10.09L16.07 11.04L16.27 12.03L16.23 13L15.98 13.91L15.55 14.71L14.96 15.36L14.27 15.85L13.52 16.15L12.74 16.26L12 16.2","w":2.1},{"k":"s","d":"M12 4V14","w":4,"cut":true},{"k":"f","d":"M10.6 14.6L11.6 6.6L12.4 4.4L13.2 6.6L13.8 14.6Z","top":true}],"hud.gust":[{"k":"s","d":"M2.6 8.4H13.4A3 3 0 1 0 10.4 5.4","w":2.5},{"k":"s","d":"M1.8 13H17.6A3 3 0 1 1 14.6 16","w":2.5},{"k":"s","d":"M4.6 17.8H10","w":2.5}],"hud.storm":[{"k":"f","d":"M6.6 12a5.4 5.4 0 1 1 10.8 0a5.4 5.4 0 1 1 -10.8 0ZM9.8 12a2.2 2.2 0 1 0 4.4 0a2.2 2.2 0 1 0 -4.4 0Z"},{"k":"f","d":"M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z"},{"k":"f","d":"M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z","tr":"rotate(180 12 12)"},{"k":"f","d":"M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z","fine":true,"tr":"rotate(90 12 12)","op":0.45},{"k":"f","d":"M12 7.2C11.6 3.6 14.6 1.2 19.6 1.6C16.4 2.8 15.2 4.8 15.6 8.4Z","fine":true,"tr":"rotate(270 12 12)","op":0.45}],"hud.spiral":[{"k":"s","d":"M12 1.4L14.7 1.91L17.15 3.08L19.18 4.82L20.66 7L21.51 9.45L21.7 12L21.22 14.47L20.14 16.7L18.54 18.54L16.55 19.88L14.32 20.65L12 20.8L9.76 20.36L7.75 19.36L6.1 17.9L4.9 16.1L4.22 14.08L4.1 12L4.51 9.99L5.42 8.2L6.73 6.73L8.35 5.68L10.15 5.09L12 5L13.77 5.38L15.35 6.2L16.63 7.37L17.54 8.8L18.04 10.38L18.1 12L17.75 13.54L17.02 14.9L16 16L14.75 16.76L13.38 17.17L12 17.2L10.69 16.88L9.55 16.24L8.64 15.36L8.02 14.3L7.7 13.15L7.7 12L7.99 10.93L8.54 10L9.28 9.28L10.15 8.8L11.08 8.57L12 8.6L12.84 8.86L13.55 9.32L14.09 9.91L14.42 10.6L14.56 11.31L14.5 12L14.27 12.61L13.91 13.1L13.45 13.45L12.95 13.65L12.45 13.69L12 13.6","w":2},{"k":"f","d":"M10.7 12a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z"}],"hud.shipsLeft":[{"k":"f","d":"M2.4 16H21.6L19.4 20.4C19 21.2 18.2 21.6 17.4 21.6H6.6C5.8 21.6 5 21.2 4.6 20.4Z"},{"k":"f","d":"M11.1 3V14.8H3.6C5.4 11 6.4 7 11.1 3Z"},{"k":"f","d":"M12.9 5.2C16.6 8 18.6 11.4 19.8 14.8H12.9Z"},{"k":"f","d":"M11.1 2L15 3L11.1 4Z"}],"hud.kills":[{"k":"f","d":"M3.36 13.36H20.64L18.66 17.32C18.3 18.04 17.58 18.4 16.86 18.4H7.14C6.42 18.4 5.7 18.04 5.34 17.32Z","tr":"rotate(34 12 13)"},{"k":"f","d":"M11.19 1.66V12.28H4.44C6.06 8.86 6.96 5.26 11.19 1.66Z","tr":"rotate(34 12 13)"},{"k":"f","d":"M12.81 3.64C16.14 6.16 17.94 9.22 19.02 12.28H12.81Z","tr":"rotate(34 12 13)"},{"k":"f","d":"M11.19 0.76L14.7 1.66L11.19 2.56Z","tr":"rotate(34 12 13)"},{"k":"f","d":"M0 17.6C3 16.4 5 16.4 7.6 17.6S12.6 18.8 15.4 17.6S20.6 16.4 24 17.6V24H0Z","cut":true},{"k":"s","d":"M1.6 20.6C3.33 19.7 3.33 19.7 5.07 20.6C6.8 21.5 6.8 21.5 8.53 20.6C10.27 19.7 10.27 19.7 12 20.6C13.73 21.5 13.73 21.5 15.47 20.6C17.2 19.7 17.2 19.7 18.93 20.6C20.67 21.5 20.67 21.5 22.4 20.6","w":1.8},{"k":"f","d":"M18.4 6.4a1.2 1.2 0 1 1 2.4 0a1.2 1.2 0 1 1 -2.4 0Z","fine":true},{"k":"f","d":"M20.6 3.4a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z","fine":true}],"hud.damage":[{"k":"f","d":"M1.6 15.4L9 14L11 16.6L13.6 14.2L22.4 15V21.4H1.6Z"},{"k":"s","d":"M4 18.4H20","w":0.9,"cut":true,"fine":true},{"k":"s","d":"M11.4 16.4L10.8 21.4","w":1.1,"cut":true},{"k":"f","d":"M8 7.6a4.2 4.2 0 1 1 8.4 0a4.2 4.2 0 1 1 -8.4 0Z"},{"k":"s","d":"M7.6 12.4L4.4 8.6","w":1.5},{"k":"s","d":"M16.4 12.2L19.8 8.8","w":1.5},{"k":"s","d":"M12.4 12.8V9.4","w":1.2,"fine":true}],"hud.afloat":[{"k":"f","d":"M3.17 11.65H20.83L18.81 15.7C18.44 16.43 17.7 16.8 16.97 16.8H7.03C6.3 16.8 5.56 16.43 5.19 15.7Z"},{"k":"f","d":"M11.17 -0.31V10.54H4.27C5.93 7.05 6.85 3.37 11.17 -0.31Z"},{"k":"f","d":"M12.83 1.71C16.23 4.29 18.07 7.42 19.18 10.54H12.83Z"},{"k":"f","d":"M11.17 -1.23L14.76 -0.31L11.17 0.61Z"},{"k":"s","d":"M1.2 20.4C3 19.5 3 19.5 4.8 20.4C6.6 21.3 6.6 21.3 8.4 20.4C10.2 19.5 10.2 19.5 12 20.4C13.8 21.3 13.8 21.3 15.6 20.4C17.4 19.5 17.4 19.5 19.2 20.4C21 21.3 21 21.3 22.8 20.4","w":1.8},{"k":"s","d":"M3.4 22.9C5.55 22.2 5.55 22.2 7.7 22.9C9.85 23.6 9.85 23.6 12 22.9C14.15 22.2 14.15 22.2 16.3 22.9C18.45 23.6 18.45 23.6 20.6 22.9","w":1.2,"fine":true}],"hud.coins":[{"k":"f","d":"M1.8 15A6.4 2.5 0 0 1 14.6 15V19.4A6.4 2.5 0 0 1 1.8 19.4Z"},{"k":"s","d":"M1.8 15A6.4 2.5 0 0 0 14.6 15","w":1,"cut":true},{"k":"s","d":"M1.8 17.3A6.4 2.5 0 0 0 14.6 17.3","w":0.8,"cut":true,"fine":true},{"k":"s","d":"M6.6 10a8.4 8.4 0 1 1 16.8 0a8.4 8.4 0 1 1 -16.8 0Z","w":1.6,"cut":true},{"k":"f","d":"M7.6 10a7.4 7.4 0 1 1 14.8 0a7.4 7.4 0 1 1 -14.8 0ZM9.6 10a5.4 5.4 0 1 0 10.8 0a5.4 5.4 0 1 0 -10.8 0Z","top":true},{"k":"f","d":"M15 6.1Q15.78 9.22 18.9 10Q15.78 10.78 15 13.9Q14.22 10.78 11.1 10Q14.22 9.22 15 6.1Z","top":true}],"hud.map":[{"k":"f","d":"M1.8 5.4L8.4 2.8L15.6 5.4L22.2 2.8L22.2 18.6L15.6 21.2L8.4 18.6L1.8 21.2Z"},{"k":"s","d":"M8.4 2.6V18.8","w":1.1,"cut":true},{"k":"s","d":"M15.6 5.2V21.4","w":1.1,"cut":true},{"k":"s","d":"M4.6 16.4C7 13.4 9.4 15.6 12 12.4S16.4 9.6 17.6 9","w":1.2,"cut":true,"fine":true,"dash":"1.6 1.6"},{"k":"s","d":"M17.4 6.4L20 9M20 6.4L17.4 9","w":1.2,"cut":true,"fine":true}],"hud.shield":[{"k":"f","d":"M3.2 4.04Q12 0.78 20.8 4.04V11.79C20.8 17.5 15.87 21.18 12 22.4C8.13 21.18 3.2 17.5 3.2 11.79Z"},{"k":"s","d":"M5.7 6.02Q12 3.59 18.3 6.02V11.8C18.3 16.05 14.77 18.79 12 19.7C9.23 18.79 5.7 16.05 5.7 11.8Z","w":1.2,"cut":true},{"k":"f","d":"M7.2 7.22Q12 5.27 16.8 7.22V11.86C16.8 15.27 14.11 17.47 12 18.2C9.89 17.47 7.2 15.27 7.2 11.86Z","fine":true,"op":0.45}],"hud.hull":[{"k":"f","d":"M1.6 7.6L22.4 6.2C21.6 9.6 20.4 13.4 18 16.4C16.9 17.8 15.4 18.6 13.6 18.6H6.2C4.6 18.6 3.5 17.7 3.1 16.3Z"},{"k":"s","d":"M3 11L21.2 9.8","w":1.1,"cut":true},{"k":"s","d":"M4.4 14.6L19 13.6","w":1.1,"cut":true},{"k":"s","d":"M1.6 4.6L22.4 3.2","w":1.6,"fine":true},{"k":"s","d":"M5 4.4V7M10 4.1V6.7M15 3.7V6.3M20 3.4V6","w":1.3,"fine":true}],"hud.reload":[{"k":"s","d":"M19.52 14.74A8 8 0 1 1 14.73 4.48","w":2.8},{"k":"f","d":"M19.61 9.54L12.62 7.8L19.38 2.34Z"}],"hud.sail":[{"k":"s","d":"M2.6 4.6H21.4","w":2},{"k":"s","d":"M12 1.2V4.6M12 19V22.8","w":1.8},{"k":"f","d":"M4.4 5.8H19.6C21.2 10 21.2 14.6 19.6 18.8H4.4C2.8 14.6 2.8 10 4.4 5.8Z"},{"k":"s","d":"M3.8 10Q12 11.8 20.2 10","w":1.1,"cut":true},{"k":"s","d":"M3.8 14.4Q12 16.2 20.2 14.4","w":1.1,"cut":true,"fine":true}],"hud.lantern":[{"k":"s","d":"M10.2 3.2a1.8 1.8 0 1 1 3.6 0a1.8 1.8 0 1 1 -3.6 0Z","w":1.4},{"k":"f","d":"M7 7.8L8.8 5.2H15.2L17 7.8Z"},{"k":"f","d":"M8.8 7.6h6.4a1.6 1.6 0 0 1 1.6 1.6v7.4a1.6 1.6 0 0 1 -1.6 1.6h-6.4a1.6 1.6 0 0 1 -1.6 -1.6v-7.4a1.6 1.6 0 0 1 1.6 -1.6Z"},{"k":"f","d":"M7.3 18h9.4a1.1 1.1 0 0 1 1.1 1.1v0.8a1.1 1.1 0 0 1 -1.1 1.1h-9.4a1.1 1.1 0 0 1 -1.1 -1.1v-0.8a1.1 1.1 0 0 1 1.1 -1.1Z"},{"k":"f","d":"M12 8.4C13.19 10.98 15.3 12.53 15.3 14.76C15.3 16.31 13.85 17 12 17C10.15 17 8.7 16.31 8.7 14.76C8.7 12.7 10.68 11.67 12 8.4Z","cut":true},{"k":"f","d":"M12 12.2C12.54 13.52 13.5 14.31 13.5 15.46C13.5 16.25 12.84 16.6 12 16.6C11.16 16.6 10.5 16.25 10.5 15.46C10.5 14.4 11.4 13.87 12 12.2Z","top":true},{"k":"s","d":"M3.2 9.4L1.6 8.6M3.2 14H1.4M20.8 9.4L22.4 8.6M20.8 14H22.6","w":1.3,"fine":true}],"hud.gull":[{"k":"f","d":"M12 11.8C10.4 8.8 8.4 7.6 6.4 7.6C4.2 7.6 2.4 9.4 1.2 12.2C3.2 10.6 5 10.4 6.4 10.8C8.4 11.4 10.2 13.2 12 15.4C13.8 13.2 15.6 11.4 17.6 10.8C19 10.4 20.8 10.6 22.8 12.2C21.6 9.4 19.8 7.6 17.6 7.6C15.6 7.6 13.6 8.8 12 11.8Z"}],"menu.play":[{"k":"f","d":"M7 4C7 2.9 8.1 2.3 9 2.9L20.4 10.4C21.3 11 21.3 12.4 20.4 13L9 20.6C8.1 21.2 7 20.6 7 19.5Z"}],"menu.back":[{"k":"s","d":"M10.6 4.6L3.4 12L10.6 19.4","w":3},{"k":"s","d":"M4.4 12H20.6","w":3}],"menu.settings":[{"k":"f","d":"M9.09 4.98L9.57 1.89L12.49 1.61L13.42 4.53L14.91 4.98L17.43 3.13L19.69 5L18.29 7.73L19.02 9.09L22.11 9.57L22.39 12.49L19.47 13.42L19.02 14.91L20.87 17.43L19 19.69L16.27 18.29L14.91 19.02L14.43 22.11L11.51 22.39L10.58 19.47L9.09 19.02L6.57 20.87L4.31 19L5.71 16.27L4.98 14.91L1.89 14.43L1.61 11.51L4.53 10.58L4.98 9.09L3.13 6.57L5 4.31L7.73 5.71ZM8.8 12a3.2 3.2 0 1 0 6.4 0a3.2 3.2 0 1 0 -6.4 0Z"}],"menu.locker":[{"k":"s","d":"M2.4 3.6H21.6","w":2.2},{"k":"f","d":"M4.4 4.8H19.6C20.8 9.6 20.8 15 18.8 19.8H5.2C3.2 15 3.2 9.6 4.4 4.8Z"},{"k":"s","d":"M3.4 11.2Q12 13.2 20.6 11.2","w":2.2,"cut":true},{"k":"s","d":"M5.6 19.6L3.4 22.2M18.4 19.6L20.6 22.2","w":1.4},{"k":"s","d":"M12 1V3.6","w":1.6}],"menu.abilities":[{"k":"f","d":"M10.4 4Q11.87 11.73 19.6 13.2Q11.87 14.67 10.4 22.4Q8.93 14.67 1.2 13.2Q8.93 11.73 10.4 4Z"},{"k":"f","d":"M19.2 1Q19.96 4.04 23 4.8Q19.96 5.56 19.2 8.6Q18.44 5.56 15.4 4.8Q18.44 4.04 19.2 1Z"},{"k":"f","d":"M18.7 13.4a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z","fine":true}],"menu.rivals":[{"k":"s","d":"M4.6 21.6L17.4 2.8","w":2},{"k":"s","d":"M19.4 21.6L6.6 2.8","w":2},{"k":"f","d":"M17.2 3.2L23 5.6L19.4 7L21.8 9.8L14.6 7Z"},{"k":"f","d":"M6.8 3.2L1 5.6L4.6 7L2.2 9.8L9.4 7Z"}],"menu.chart":[{"k":"f","d":"M12 1.4Q14.12 9.88 22.6 12Q14.12 14.12 12 22.6Q9.88 14.12 1.4 12Q9.88 9.88 12 1.4Z"},{"k":"f","d":"M12 4.8Q13.73 10.27 19.2 12Q13.73 13.73 12 19.2Q10.27 13.73 4.8 12Q10.27 10.27 12 4.8Z","tr":"rotate(45 12 12)"},{"k":"f","d":"M9.6 12a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1 -4.8 0Z","cut":true},{"k":"f","d":"M11 12a1 1 0 1 1 2 0a1 1 0 1 1 -2 0Z","fine":true},{"k":"f","d":"M12 1.4L13.7 10.3L12 12Z","cut":true,"fine":true},{"k":"f","d":"M22.6 12L13.7 13.7L12 12Z","cut":true,"fine":true},{"k":"f","d":"M12 22.6L10.3 13.7L12 12Z","cut":true,"fine":true},{"k":"f","d":"M1.4 12L10.3 10.3L12 12Z","cut":true,"fine":true}],"menu.rank":[{"k":"f","d":"M3.5 4.2Q12 1 20.5 4.2V11.8C20.5 17.4 15.74 21 12 22.2C8.26 21 3.5 17.4 3.5 11.8Z"},{"k":"s","d":"M6.6 9.6L12 13.2L17.4 9.6","w":2,"cut":true},{"k":"s","d":"M6.6 14.4L12 18L17.4 14.4","w":2,"cut":true},{"k":"f","d":"M12 3.2Q12.72 4.88 14.4 5.6Q12.72 6.32 12 8Q11.28 6.32 9.6 5.6Q11.28 4.88 12 3.2Z","cut":true,"fine":true}],"menu.close":[{"k":"s","d":"M5 5L19 19M19 5L5 19","w":3.2}],"menu.lock":[{"k":"s","d":"M7.8 10.8V7.6C7.8 5.1 9.6 3.2 12 3.2S16.2 5.1 16.2 7.6V10.8","w":2.6},{"k":"f","d":"M6.8 10.2h10.4a2.4 2.4 0 0 1 2.4 2.4v6.8a2.4 2.4 0 0 1 -2.4 2.4h-10.4a2.4 2.4 0 0 1 -2.4 -2.4v-6.8a2.4 2.4 0 0 1 2.4 -2.4Z"},{"k":"f","d":"M10.2 14.8a1.8 1.8 0 1 1 3.6 0a1.8 1.8 0 1 1 -3.6 0Z","cut":true},{"k":"f","d":"M11.7 15.2h0.6a0.6 0.6 0 0 1 0.6 0.6v2.6a0.6 0.6 0 0 1 -0.6 0.6h-0.6a0.6 0.6 0 0 1 -0.6 -0.6v-2.6a0.6 0.6 0 0 1 0.6 -0.6Z","cut":true}],"menu.check":[{"k":"s","d":"M4 12.8L9.4 18.2L20 6","w":3.4}],"menu.wheel":[{"k":"f","d":"M3.8 12a8.2 8.2 0 1 1 16.4 0a8.2 8.2 0 1 1 -16.4 0ZM5.8 12a6.2 6.2 0 1 0 12.4 0a6.2 6.2 0 1 0 -12.4 0Z"},{"k":"f","d":"M9.4 12a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0Z"},{"k":"s","d":"M14.6 12L23.2 12M13.838477631085023 13.838477631085023L19.91959594928933 19.91959594928933M12 14.6L12 23.2M10.161522368914977 13.838477631085023L4.080404050710669 19.91959594928933M9.4 12L0.8000000000000007 12.000000000000002M10.161522368914977 10.161522368914977L4.0804040507106665 4.080404050710669M12 9.4L11.999999999999998 0.8000000000000007M13.838477631085023 10.161522368914977L19.91959594928933 4.0804040507106665","w":2},{"k":"f","d":"M21.7 12a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM18.48 19.78a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM10.7 23a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM2.92 19.78a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM-0.3 12a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM2.92 4.22a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM10.7 1a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0ZM18.48 4.22a1.3 1.3 0 1 1 2.6 0a1.3 1.3 0 1 1 -2.6 0Z","fine":true}],"menu.chest":[{"k":"f","d":"M4.2 13.17h15.6a1.2 1.2 0 0 1 1.2 1.2v6.03a1.2 1.2 0 0 1 -1.2 1.2h-15.6a1.2 1.2 0 0 1 -1.2 -1.2v-6.03a1.2 1.2 0 0 1 1.2 -1.2ZM3 13.16V11.62C3 8 21 8 21 11.62V13.16Z"},{"k":"s","d":"M3 13.2H21","w":1.1,"cut":true},{"k":"f","d":"M11.3 14.2h1.4a0.7 0.7 0 0 1 0.7 0.7v2.4a0.7 0.7 0 0 1 -0.7 0.7h-1.4a0.7 0.7 0 0 1 -0.7 -0.7v-2.4a0.7 0.7 0 0 1 0.7 -0.7Z","cut":true},{"k":"s","d":"M6.2 13.2V21M17.8 13.2V21","w":1,"cut":true,"fine":true}],"menu.burst":[{"k":"f","d":"M12 0.8L13.76 7.75L19.92 4.08L16.25 10.24L23.2 12L16.25 13.76L19.92 19.92L13.76 16.25L12 23.2L10.24 16.25L4.08 19.92L7.75 13.76L0.8 12L7.75 10.24L4.08 4.08L10.24 7.75Z"},{"k":"f","d":"M10.2 12a1.8 1.8 0 1 1 3.6 0a1.8 1.8 0 1 1 -3.6 0Z","cut":true}],"menu.pennants":[{"k":"s","d":"M4.4 2.2V22.6","w":2.2},{"k":"f","d":"M2.9 1.9a1.5 1.5 0 1 1 3 0a1.5 1.5 0 1 1 -3 0Z"},{"k":"f","d":"M5.6 3.4L21.6 5.6L5.6 7.8Z"},{"k":"f","d":"M5.6 9.2L18.4 11.4L5.6 13.6Z"},{"k":"f","d":"M5.6 15L15.4 17.2L5.6 19.4Z"}],"menu.ships":[{"k":"f","d":"M1.02 19.26H11.78L10.54 21.73C10.32 22.18 9.87 22.4 9.42 22.4H3.38C2.93 22.4 2.48 22.18 2.26 21.73Z"},{"k":"f","d":"M5.9 11.98V18.59H1.7C2.7 16.46 3.26 14.22 5.9 11.98Z"},{"k":"f","d":"M6.9 13.22C8.98 14.78 10.1 16.69 10.77 18.59H6.9Z"},{"k":"f","d":"M5.9 11.42L8.08 11.98L5.9 12.54Z"},{"k":"f","d":"M1.02 19.26H11.78L10.54 21.73C10.32 22.18 9.87 22.4 9.42 22.4H3.38C2.93 22.4 2.48 22.18 2.26 21.73Z","tr":"matrix(-1 0 0 1 24 0)"},{"k":"f","d":"M5.9 11.98V18.59H1.7C2.7 16.46 3.26 14.22 5.9 11.98Z","tr":"matrix(-1 0 0 1 24 0)"},{"k":"f","d":"M6.9 13.22C8.98 14.78 10.1 16.69 10.77 18.59H6.9Z","tr":"matrix(-1 0 0 1 24 0)"},{"k":"f","d":"M5.9 11.42L8.08 11.98L5.9 12.54Z","tr":"matrix(-1 0 0 1 24 0)"}],"menu.speaker":[{"k":"f","d":"M2.6 9.4H7.2L13.2 4.2V19.8L7.2 14.6H2.6Z"},{"k":"s","d":"M16 8.4C17.8 10.4 17.8 13.6 16 15.6","w":1.9},{"k":"s","d":"M18.8 5.8C22 9.4 22 14.6 18.8 18.2","w":1.9}],"menu.arrows":[{"k":"s","d":"M8 20.6V6","w":2.5},{"k":"f","d":"M8 2L12.8 9.4L3.2 9.4Z"},{"k":"s","d":"M16 3.4V18","w":2.5},{"k":"f","d":"M16 22L11.2 14.6L20.8 14.6Z"}],"gull.supplies":[{"k":"f","d":"M12 5.61C10.43 2.67 8.47 1.5 6.51 1.5C4.36 1.5 2.59 3.26 1.42 6C3.38 4.44 5.14 4.24 6.51 4.63C8.47 5.22 10.24 6.98 12 9.14C13.76 6.98 15.53 5.22 17.49 4.63C18.86 4.24 20.62 4.44 22.58 6C21.41 3.26 19.64 1.5 17.49 1.5C15.53 1.5 13.57 2.67 12 5.61Z"},{"k":"s","d":"M12 10.4V12.6","w":1.2},{"k":"f","d":"M12 12.4C10.8 12.4 10.4 13.2 10.6 14.2C7.6 15.4 6.8 18.4 7.4 20.4C7.9 22 9.4 22.6 12 22.6S16.1 22 16.6 20.4C17.2 18.4 16.4 15.4 13.4 14.2C13.6 13.2 13.2 12.4 12 12.4Z"},{"k":"s","d":"M10.2 14.6H13.8","w":1,"cut":true}],"gull.armament":[{"k":"f","d":"M12 5.61C10.43 2.67 8.47 1.5 6.51 1.5C4.36 1.5 2.59 3.26 1.42 6C3.38 4.44 5.14 4.24 6.51 4.63C8.47 5.22 10.24 6.98 12 9.14C13.76 6.98 15.53 5.22 17.49 4.63C18.86 4.24 20.62 4.44 22.58 6C21.41 3.26 19.64 1.5 17.49 1.5C15.53 1.5 13.57 2.67 12 5.61Z"},{"k":"s","d":"M12 10.4V12.6","w":1.2},{"k":"f","d":"M7.4 12.6h9.2a1.2 1.2 0 0 1 1.2 1.2v7.6a1.2 1.2 0 0 1 -1.2 1.2h-9.2a1.2 1.2 0 0 1 -1.2 -1.2v-7.6a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"s","d":"M8.6 14.6h6.8a0.4 0.4 0 0 1 0.4 0.4v5.2a0.4 0.4 0 0 1 -0.4 0.4h-6.8a0.4 0.4 0 0 1 -0.4 -0.4v-5.2a0.4 0.4 0 0 1 0.4 -0.4Z","w":1,"cut":true},{"k":"s","d":"M8.4 20.4L15.6 14.8","w":1,"cut":true}],"gull.treasure":[{"k":"f","d":"M12 5.61C10.43 2.67 8.47 1.5 6.51 1.5C4.36 1.5 2.59 3.26 1.42 6C3.38 4.44 5.14 4.24 6.51 4.63C8.47 5.22 10.24 6.98 12 9.14C13.76 6.98 15.53 5.22 17.49 4.63C18.86 4.24 20.62 4.44 22.58 6C21.41 3.26 19.64 1.5 17.49 1.5C15.53 1.5 13.57 2.67 12 5.61Z"},{"k":"s","d":"M12 10.4V12.6","w":1.2},{"k":"f","d":"M5.7 16.35h12.6a1.2 1.2 0 0 1 1.2 1.2v4.05a1.2 1.2 0 0 1 -1.2 1.2h-12.6a1.2 1.2 0 0 1 -1.2 -1.2v-4.05a1.2 1.2 0 0 1 1.2 -1.2ZM4.5 16.34V15.17C4.5 12.4 19.5 12.4 19.5 15.17V16.34Z"},{"k":"s","d":"M4.5 16.6H19.5","w":1,"cut":true},{"k":"f","d":"M11.4 15.4h1.2a0.6 0.6 0 0 1 0.6 0.6v2.2a0.6 0.6 0 0 1 -0.6 0.6h-1.2a0.6 0.6 0 0 1 -0.6 -0.6v-2.2a0.6 0.6 0 0 1 0.6 -0.6Z","cut":true},{"k":"f","d":"M2.8 11Q3.27 13.13 5.4 13.6Q3.27 14.07 2.8 16.2Q2.33 14.07 0.2 13.6Q2.33 13.13 2.8 11Z"},{"k":"f","d":"M21.4 10.4Q21.8 12.2 23.6 12.6Q21.8 13 21.4 14.8Q21 13 19.2 12.6Q21 12.2 21.4 10.4Z"},{"k":"f","d":"M21.6 17.6Q21.85 18.75 23 19Q21.85 19.25 21.6 20.4Q21.35 19.25 20.2 19Q21.35 18.75 21.6 17.6Z","fine":true}],"weapon.cannon":[{"k":"f","d":"M5.2 6.3L18.2 7.7V7H21.8V13H18.2V12.3L5.2 13.7C3.4 13.7 2.6 12 2.6 10S3.4 6.3 5.2 6.3Z","tr":"rotate(-9 12 10)"},{"k":"f","d":"M0.7 10a1.5 1.5 0 1 1 3 0a1.5 1.5 0 1 1 -3 0Z","tr":"rotate(-9 12 10)"},{"k":"s","d":"M8.4 6.4V13.6","w":1,"cut":true,"fine":true,"tr":"rotate(-9 12 10)"},{"k":"s","d":"M16.6 7.2V12.8","w":1,"cut":true,"tr":"rotate(-9 12 10)"},{"k":"f","d":"M4.6 13.6L16.8 12.2L15.6 18.2L5.4 18.2Z"},{"k":"s","d":"M3.6 13.5L17.6 11.9","w":1.2,"cut":true},{"k":"f","d":"M4.5 19.2a3.1 3.1 0 1 1 6.2 0a3.1 3.1 0 1 1 -6.2 0ZM6.6 19.2a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z","top":true},{"k":"f","d":"M11.5 19.2a3.1 3.1 0 1 1 6.2 0a3.1 3.1 0 1 1 -6.2 0ZM13.6 19.2a1 1 0 1 0 2 0a1 1 0 1 0 -2 0Z","top":true},{"k":"s","d":"M3.7 19.2a3.9 3.9 0 1 1 7.8 0a3.9 3.9 0 1 1 -7.8 0Z","w":1.3,"cut":true},{"k":"s","d":"M10.7 19.2a3.9 3.9 0 1 1 7.8 0a3.9 3.9 0 1 1 -7.8 0Z","w":1.3,"cut":true}],"weapon.scatter":[{"k":"f","d":"M3.4 8.5H11.2C13.2 8.5 14.4 5.8 16.6 4.6V15.4C14.4 14.2 13.2 11.5 11.2 11.5H3.4Z"},{"k":"f","d":"M1.2 10a2.4 2.4 0 1 1 4.8 0a2.4 2.4 0 1 1 -4.8 0Z"},{"k":"s","d":"M15.2 5.6V14.4","w":1,"cut":true},{"k":"s","d":"M8.6 12.4V18.6","w":2.4},{"k":"s","d":"M5.6 12.4Q8.6 16.2 11.6 12.4","w":1.8,"fine":true},{"k":"f","d":"M5.8 18.4h5.6a1.2 1.2 0 0 1 1.2 1.2v0.6a1.2 1.2 0 0 1 -1.2 1.2h-5.6a1.2 1.2 0 0 1 -1.2 -1.2v-0.6a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"f","d":"M17.9 5.2a1.5 1.5 0 1 1 3 0a1.5 1.5 0 1 1 -3 0Z"},{"k":"f","d":"M19.7 10a1.7 1.7 0 1 1 3.4 0a1.7 1.7 0 1 1 -3.4 0Z"},{"k":"f","d":"M17.9 14.8a1.5 1.5 0 1 1 3 0a1.5 1.5 0 1 1 -3 0Z"},{"k":"f","d":"M21.5 6.6a0.9 0.9 0 1 1 1.8 0a0.9 0.9 0 1 1 -1.8 0Z","fine":true},{"k":"f","d":"M21.5 13.4a0.9 0.9 0 1 1 1.8 0a0.9 0.9 0 1 1 -1.8 0Z","fine":true}],"weapon.harpoon":[{"k":"s","d":"M4.2 12H16.6","w":2.4,"tr":"rotate(-38 12 12)"},{"k":"f","d":"M23 12L14.2 7.2L16.6 11H15.4V13H16.6L14.2 16.8Z","tr":"rotate(-38 12 12)"},{"k":"s","d":"M0.9 12a1.7 1.7 0 1 1 3.4 0a1.7 1.7 0 1 1 -3.4 0Z","w":1.5,"tr":"rotate(-38 12 12)"},{"k":"s","d":"M13 12H14.6","w":3,"cut":true,"fine":true,"tr":"rotate(-38 12 12)"},{"k":"s","d":"M12.8 10.6V13.4","w":1.2,"fine":true,"tr":"rotate(-38 12 12)","cap":"butt"},{"k":"s","d":"M2.6 15.6C2 19 5.4 18.2 6 20.4C6.5 22.2 4.2 22.8 2.6 22.2","w":1.4}],"weapon.mortar":[{"k":"f","d":"M7 7.6h4.4a1.6 1.6 0 0 1 1.6 1.6v8a1.6 1.6 0 0 1 -1.6 1.6h-4.4a1.6 1.6 0 0 1 -1.6 -1.6v-8a1.6 1.6 0 0 1 1.6 -1.6Z","tr":"rotate(32 9.2 13.2)"},{"k":"f","d":"M5.5 6.4h7.4a1.2 1.2 0 0 1 1.2 1.2v0.4a1.2 1.2 0 0 1 -1.2 1.2h-7.4a1.2 1.2 0 0 1 -1.2 -1.2v-0.4a1.2 1.2 0 0 1 1.2 -1.2Z","tr":"rotate(32 9.2 13.2)"},{"k":"s","d":"M5.2 9.6H13.2","w":1,"cut":true,"tr":"rotate(32 9.2 13.2)"},{"k":"s","d":"M5.2 13.4H13.2","w":0.9,"cut":true,"fine":true,"tr":"rotate(32 9.2 13.2)"},{"k":"f","d":"M3.3 18.2h13a1.3 1.3 0 0 1 1.3 1.3v1.2a1.3 1.3 0 0 1 -1.3 1.3h-13a1.3 1.3 0 0 1 -1.3 -1.3v-1.2a1.3 1.3 0 0 1 1.3 -1.3Z"},{"k":"s","d":"M2 18.1H17.6","w":1.2,"cut":true},{"k":"s","d":"M14.2 4.6Q18.4 0.6 21 6.8","w":1.5,"dash":"0.1 2.8"},{"k":"f","d":"M18 11a2.6 2.6 0 1 1 5.2 0a2.6 2.6 0 1 1 -5.2 0Z"},{"k":"s","d":"M19.09 10.45A1.61 1.61 0 0 1 20.05 9.49","w":0.8,"cut":true,"fine":true}],"weapon.repeater":[{"k":"f","d":"M10.6 5.4h10.2a1.2 1.2 0 0 1 1.2 1.2v0.4a1.2 1.2 0 0 1 -1.2 1.2h-10.2a1.2 1.2 0 0 1 -1.2 -1.2v-0.4a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"f","d":"M10.6 9.6h11a1.2 1.2 0 0 1 1.2 1.2v0.4a1.2 1.2 0 0 1 -1.2 1.2h-11a1.2 1.2 0 0 1 -1.2 -1.2v-0.4a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"f","d":"M10.6 13.8h10.2a1.2 1.2 0 0 1 1.2 1.2v0.4a1.2 1.2 0 0 1 -1.2 1.2h-10.2a1.2 1.2 0 0 1 -1.2 -1.2v-0.4a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"f","d":"M18.6 4.4h0.8a0.8 0.8 0 0 1 0.8 0.8v11.6a0.8 0.8 0 0 1 -0.8 0.8h-0.8a0.8 0.8 0 0 1 -0.8 -0.8v-11.6a0.8 0.8 0 0 1 0.8 -0.8Z"},{"k":"s","d":"M1.3 11a6.3 6.3 0 1 1 12.6 0a6.3 6.3 0 1 1 -12.6 0Z","w":1.2,"cut":true},{"k":"f","d":"M2.1 11a5.5 5.5 0 1 1 11 0a5.5 5.5 0 1 1 -11 0ZM5.9 11a1.7 1.7 0 1 0 3.4 0a1.7 1.7 0 1 0 -3.4 0Z","top":true},{"k":"f","d":"M6.2 16h2.8v4.4h-2.8Z"},{"k":"f","d":"M4.2 19.8h6.8a1 1 0 0 1 1 1v0.4a1 1 0 0 1 -1 1h-6.8a1 1 0 0 1 -1 -1v-0.4a1 1 0 0 1 1 -1Z"},{"k":"s","d":"M1.4 16.2L3.6 14.2","w":1.6}],"weapon.broadside":[{"k":"s","d":"M12 2.4V9.4","w":1.8},{"k":"f","d":"M8.6 3.2H15.4C15.8 4.8 15.8 6.4 15.4 8H8.6C8.2 6.4 8.2 4.8 8.6 3.2Z"},{"k":"f","d":"M6.8 9.6H17.2L16 15.6C15.4 18.4 13.8 19.6 12 19.6C10.2 19.6 8.6 18.4 8 15.6Z"},{"k":"s","d":"M7.8 12.6H16.2","w":1,"cut":true,"fine":true},{"k":"f","d":"M4.2 11.2h3a0.8 0.8 0 0 1 0.8 0.8v1a0.8 0.8 0 0 1 -0.8 0.8h-3a0.8 0.8 0 0 1 -0.8 -0.8v-1a0.8 0.8 0 0 1 0.8 -0.8Z"},{"k":"f","d":"M16.8 11.2h3a0.8 0.8 0 0 1 0.8 0.8v1a0.8 0.8 0 0 1 -0.8 0.8h-3a0.8 0.8 0 0 1 -0.8 -0.8v-1a0.8 0.8 0 0 1 0.8 -0.8Z"},{"k":"f","d":"M4.8 12.5L3.19 12.98L3.82 14.53L2.44 13.57L1.62 15.03L1.51 13.36L-0.14 13.63L1.1 12.5L-0.14 11.37L1.51 11.64L1.62 9.97L2.44 11.43L3.82 10.47L3.19 12.02Z"},{"k":"f","d":"M19.2 12.5L20.81 12.02L20.18 10.47L21.56 11.43L22.38 9.97L22.49 11.64L24.14 11.37L22.9 12.5L24.14 13.63L22.49 13.36L22.38 15.03L21.56 13.57L20.18 14.53L20.81 12.98Z"},{"k":"s","d":"M2 21.6C3.67 20.7 3.67 20.7 5.33 21.6C7 22.5 7 22.5 8.67 21.6C10.33 20.7 10.33 20.7 12 21.6C13.67 22.5 13.67 22.5 15.33 21.6C17 20.7 17 20.7 18.67 21.6C20.33 22.5 20.33 22.5 22 21.6","w":1.6}],"weapon.chain":[{"k":"f","d":"M2.2 9.4A4.6 4.6 0 0 1 6.8 4.8V14Z","tr":"rotate(-24 6.8 9.4)"},{"k":"f","d":"M21.8 14.6A4.6 4.6 0 0 1 17.2 19.2V10Z","tr":"rotate(-24 17.2 14.6)"},{"k":"s","d":"M7.45 10.4a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":1.1,"cut":true},{"k":"s","d":"M9.75 11.5a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":1.1,"cut":true},{"k":"s","d":"M12.05 12.6a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":1.1,"cut":true},{"k":"s","d":"M14.35 13.7a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":1.1,"cut":true},{"k":"s","d":"M7.45 10.4a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":0.9,"fine":true},{"k":"s","d":"M9.75 11.5a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":0.9,"fine":true},{"k":"s","d":"M12.05 12.6a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":0.9,"fine":true},{"k":"s","d":"M14.35 13.7a1.15 1.15 0 1 1 2.3 0a1.15 1.15 0 1 1 -2.3 0Z","w":0.9,"fine":true},{"k":"s","d":"M3.4 17.6Q2 21 5.6 21.8","w":1.2,"fine":true},{"k":"s","d":"M20.6 6.4Q22 3 18.4 2.2","w":1.2,"fine":true}],"weapon.heated":[{"k":"f","d":"M6.8 9.4a5.2 5.2 0 1 1 10.4 0a5.2 5.2 0 1 1 -10.4 0Z"},{"k":"f","d":"M8.8 7.6a1.4 1.4 0 1 1 2.8 0a1.4 1.4 0 1 1 -2.8 0Z","cut":true,"fine":true},{"k":"s","d":"M3.2 2.6L9.2 6.4","w":1.8},{"k":"s","d":"M3.2 7.8L8.2 9.6","w":1.8},{"k":"f","d":"M4.8 17.4h14.4a1.4 1.4 0 0 1 1.4 1.4v1.6a1.4 1.4 0 0 1 -1.4 1.4h-14.4a1.4 1.4 0 0 1 -1.4 -1.4v-1.6a1.4 1.4 0 0 1 1.4 -1.4Z"},{"k":"f","d":"M5.6 17.4C5.6 15.6 7 15 7.8 13.8 8 15 8.8 15.6 9.6 15.8 9.6 14.6 10.4 13.8 11.2 13.4 11.4 14.8 12.4 15.6 13.4 15.8 13.8 15 14 14.2 13.8 13.4 15.4 14.4 18.2 15.6 18.4 17.4Z"},{"k":"s","d":"M3.8 19.6H20.2","w":0.9,"cut":true,"fine":true}],"item.smallShield":[{"k":"f","d":"M5.4 15.4a6.6 6.6 0 1 1 13.2 0a6.6 6.6 0 1 1 -13.2 0Z"},{"k":"f","d":"M10.4 5.2h3.2a0.6 0.6 0 0 1 0.6 0.6v4.2a0.6 0.6 0 0 1 -0.6 0.6h-3.2a0.6 0.6 0 0 1 -0.6 -0.6v-4.2a0.6 0.6 0 0 1 0.6 -0.6Z"},{"k":"f","d":"M10 2h4a1.2 1.2 0 0 1 1.2 1.2v1a1.2 1.2 0 0 1 -1.2 1.2h-4a1.2 1.2 0 0 1 -1.2 -1.2v-1a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"s","d":"M8.4 5.3H15.6","w":0.9,"cut":true},{"k":"f","d":"M8.8 12.64Q12 11.46 15.2 12.64V15.45C15.2 17.52 13.41 18.86 12 19.3C10.59 18.86 8.8 17.52 8.8 15.45Z","cut":true},{"k":"f","d":"M10.34 14.06Q12 13.45 13.66 14.06V15.52C13.66 16.6 12.73 17.29 12 17.52C11.27 17.29 10.34 16.6 10.34 15.52Z","fine":true}],"item.bigShield":[{"k":"f","d":"M8 8.4h6.4a4.6 4.6 0 0 1 4.6 4.6v4.8a4.6 4.6 0 0 1 -4.6 4.6h-6.4a4.6 4.6 0 0 1 -4.6 -4.6v-4.8a4.6 4.6 0 0 1 4.6 -4.6Z"},{"k":"f","d":"M7.6 9.2C7.6 6.8 9.2 6 9.2 4.6H13.2C13.2 6 14.8 6.8 14.8 9.2Z"},{"k":"f","d":"M9.4 1.2h3.6a1.2 1.2 0 0 1 1.2 1.2v1.2a1.2 1.2 0 0 1 -1.2 1.2h-3.6a1.2 1.2 0 0 1 -1.2 -1.2v-1.2a1.2 1.2 0 0 1 1.2 -1.2Z"},{"k":"s","d":"M7.6 4.7H14.8","w":0.9,"cut":true},{"k":"s","d":"M7 8.8H15.4","w":0.9,"cut":true},{"k":"s","d":"M19 11.4C23 11.4 23 18.4 19 18.4","w":2},{"k":"f","d":"M6.6 11.44Q11.2 9.78 15.8 11.44V15.39C15.8 18.3 13.22 20.18 11.2 20.8C9.18 20.18 6.6 18.3 6.6 15.39Z","cut":true},{"k":"f","d":"M8.81 13.44Q11.2 12.57 13.59 13.44V15.49C13.59 17.01 12.25 17.98 11.2 18.3C10.15 17.98 8.81 17.01 8.81 15.49Z","fine":true}],"item.repairKit":[{"k":"f","d":"M2.8 13.6h18.4a1.2 1.2 0 0 1 1.2 1.2v3.2a1.2 1.2 0 0 1 -1.2 1.2h-18.4a1.2 1.2 0 0 1 -1.2 -1.2v-3.2a1.2 1.2 0 0 1 1.2 -1.2Z","tr":"rotate(-14 12 16.4)"},{"k":"f","d":"M3.8 17.2a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z","cut":true,"fine":true},{"k":"f","d":"M18.8 13.4a0.8 0.8 0 1 1 1.6 0a0.8 0.8 0 1 1 -1.6 0Z","cut":true,"fine":true},{"k":"s","d":"M5.4 21.6L15.8 7.4","w":4.2,"cut":true},{"k":"s","d":"M5.4 21.6L14.6 9","w":2.2,"top":true},{"k":"f","d":"M11.2 2.2h7.6a1.6 1.6 0 0 1 1.6 1.6v3.2a1.6 1.6 0 0 1 -1.6 1.6h-7.6a1.6 1.6 0 0 1 -1.6 -1.6v-3.2a1.6 1.6 0 0 1 1.6 -1.6Z","top":true,"tr":"rotate(36 15 5.4)"},{"k":"s","d":"M12.6 6.6L17.6 10.2","w":1.2,"cut":true,"fine":true,"tr":"translate(-1.4 -1.6)"}],"item.fullRepair":[{"k":"f","d":"M5 8.2h14a2.6 2.6 0 0 1 2.6 2.6v8.4a2.6 2.6 0 0 1 -2.6 2.6h-14a2.6 2.6 0 0 1 -2.6 -2.6v-8.4a2.6 2.6 0 0 1 2.6 -2.6Z"},{"k":"s","d":"M8.4 8.4V6.2C8.4 4.9 9.1 4.2 10.4 4.2H13.6C14.9 4.2 15.6 4.9 15.6 6.2V8.4","w":2.2},{"k":"s","d":"M2.4 11.6H21.6","w":1,"cut":true},{"k":"f","d":"M10.6 12.2L13.4 12.2L13.4 15L16.2 15L16.2 17.8L13.4 17.8L13.4 20.6L10.6 20.6L10.6 17.8L7.8 17.8L7.8 15L10.6 15Z","cut":true}],"hurt.sail":[{"k":"s","d":"M2.6 4.6H21.4","w":2},{"k":"s","d":"M12 1.2V4.6","w":1.8},{"k":"f","d":"M4.4 5.8H19.6C21.2 10 21.2 14.6 19.6 18.8H4.4C2.8 14.6 2.8 10 4.4 5.8Z"},{"k":"f","d":"M9.4 5.8L12.6 10.2L10.4 12.4L14.2 18.8L11.6 18.8L8.4 13L10.6 10.6L7.4 5.8Z","cut":true}],"hurt.mast":[{"k":"s","d":"M4.6 22.4H19.4","w":2},{"k":"s","d":"M12 22.4V12.6","w":2.8},{"k":"s","d":"M12.6 11.8L18.6 2.8","w":2.6},{"k":"s","d":"M14.2 8.2L21.6 10.4","w":1.6,"fine":true},{"k":"f","d":"M10.4 12.8L13.6 12.8L13.1 10.6L12.3 12L11.4 10.2Z"}],"hurt.rudder":[{"k":"s","d":"M12 1.6V8.2","w":2.4},{"k":"s","d":"M8.6 3.4H15.4","w":1.8},{"k":"f","d":"M8.2 8H15.8V14C15.8 18.4 14 21.4 12 22.8C10 21.4 8.2 18.4 8.2 14Z"},{"k":"f","d":"M8.2 12.2L11.6 13.8L9.4 16L12.8 18.6L11.4 18.6L8.2 17.2Z","cut":true}],"hurt.leak":[{"k":"f","d":"M1.6 7.6L22.4 6.2C21.6 9.6 20.4 13.4 18 16.4C16.9 17.8 15.4 18.6 13.6 18.6H6.2C4.6 18.6 3.5 17.7 3.1 16.3Z"},{"k":"f","d":"M2.4 12.6L21.6 11.4L20.4 14.4L3.4 15.4Z","cut":true},{"k":"s","d":"M1.6 13.6C3.33 12.6 3.33 12.6 5.07 13.6C6.8 14.6 6.8 14.6 8.53 13.6C10.27 12.6 10.27 12.6 12 13.6C13.73 14.6 13.73 14.6 15.47 13.6C17.2 12.6 17.2 12.6 18.93 13.6C20.67 14.6 20.67 14.6 22.4 13.6","w":1.6,"top":true},{"k":"s","d":"M1.6 4.2C3.33 3.1 3.33 3.1 5.07 4.2C6.8 5.3 6.8 5.3 8.53 4.2C10.27 3.1 10.27 3.1 12 4.2C13.73 5.3 13.73 5.3 15.47 4.2C17.2 3.1 17.2 3.1 18.93 4.2C20.67 5.3 20.67 5.3 22.4 4.2","w":1.8}],"hurt.fire":[{"k":"f","d":"M11 2.4C13.16 8.4 17 12 17 17.2C17 20.8 14.36 22.4 11 22.4C7.64 22.4 5 20.8 5 17.2C5 12.4 8.6 10 11 2.4Z"},{"k":"f","d":"M11 13C11.97 15.82 13.7 17.51 13.7 19.96C13.7 21.65 12.51 22.4 11 22.4C9.49 22.4 8.3 21.65 8.3 19.96C8.3 17.7 9.92 16.57 11 13Z","cut":true},{"k":"f","d":"M18.4 13.8C19.3 16.38 20.9 17.93 20.9 20.16C20.9 21.71 19.8 22.4 18.4 22.4C17 22.4 15.9 21.71 15.9 20.16C15.9 18.1 17.4 17.07 18.4 13.8Z","tr":"rotate(14 18.4 22.4)"},{"k":"s","d":"M5.2 4.6L4 1.6","w":1.4,"cut":true,"fine":true}],"hurt.ice":[{"k":"s","d":"M12 12L12 1.8M12 12L20.83 6.9M12 12L20.83 17.1M12 12L12 22.2M12 12L3.17 17.1M12 12L3.17 6.9","w":1.8},{"k":"s","d":"M9.55 3.34L12 5.4L14.45 3.34M18.27 5.55L17.72 8.7L20.72 9.79M20.72 14.21L17.72 15.3L18.27 18.45M14.45 20.66L12 18.6L9.55 20.66M5.73 18.45L6.28 15.3L3.28 14.21M3.28 9.79L6.28 8.7L5.73 5.55","w":1.4,"fine":true},{"k":"s","d":"M9.55 3.34L12 5.4L14.45 3.34M18.27 5.55L17.72 8.7L20.72 9.79M20.72 14.21L17.72 15.3L18.27 18.45M14.45 20.66L12 18.6L9.55 20.66M5.73 18.45L6.28 15.3L3.28 14.21M3.28 9.79L6.28 8.7L5.73 5.55","w":1.6,"bold":true}]}</script>
+<script>
+(function () {
+'use strict';
+/* ---------------------------------------------------------------------------------------------
+   The mocks are drawn as SVG in the phone's own page coordinates: 956 x 440 pt, origin top left,
+   safe insets 62 left and right, 20 bottom (21 home indicator). Positions come from 0117's
+   src/chart/layout.ts for the phone class; inks from src/chart/inks.ts; icons are 0117's prims
+   (src/icons/sets/*) cut as woodcuts the way src/chart/woodcut.ts cuts them.
+--------------------------------------------------------------------------------------------- */
+var W = 956, H = 440, SL = 62, SR = 62, SB = 20;
+var P = {};
+try { P = JSON.parse(document.getElementById('prims').textContent); } catch (e) { P = {}; }
+
+var INK = { iron: 'rgb(38,25,16)', rubric: 'rgb(184,48,26)', green: 'rgb(58,104,62)', blue: 'rgb(38,76,140)', gold: 'rgb(190,138,44)', sepia: 'rgb(128,94,62)', white: 'rgb(252,246,230)', silver: 'rgb(150,154,160)' };
+var WASH = { ultramarine: '#3d5f9e', viridian: '#4f9488', turquoise: '#6fb0b0', ochre: '#c99a4a', sienna: '#a8582c', sap: '#6f8a3c', vermilion: '#c4452a', azure: '#4a78b8', gold: '#d4a84a', storm: '#6a4a7a' };
+var PAPER = '#f1e4c8', PAPER2 = '#e9d7b2', CUT = '#f4e8cf';
+var TIER = ['#5a4a3a', '#a06a34', WASH.azure, WASH.gold, '#b4b8c2', '#8fcfe0', WASH.storm, WASH.vermilion];
+
+/* ---------- small helpers ---------- */
+function f(n) { return Math.round(n * 100) / 100; }
+function hash(a, b) { var s = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return s - Math.floor(s); }
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+var TG = null; // touch targets collected while drawing a mock
+function tgt(x, y, d, hit, shape) { if (TG) TG.push({ x: x, y: y, d: d, hit: hit || Math.max(56, d), shape: shape || 'c' }); }
+function tgtR(x, y, w, h) { if (TG) TG.push({ x: x, y: y, w: w, h: h, shape: 'r' }); }
+
+/* rough-cut paper edge */
+function roughRect(x, y, w, h, seed) {
+  var pts = [], step = 11, i, n;
+  n = Math.max(2, Math.round(w / step));
+  for (i = 0; i <= n; i++) pts.push([x + w * i / n, y + (hash(i, seed) - .5) * 1.2]);
+  n = Math.max(2, Math.round(h / step));
+  for (i = 1; i <= n; i++) pts.push([x + w + (hash(i + 40, seed) - .5) * 1.2, y + h * i / n]);
+  n = Math.max(2, Math.round(w / step));
+  for (i = n - 1; i >= 0; i--) pts.push([x + w * i / n, y + h + (hash(i + 80, seed) - .5) * 1.2]);
+  n = Math.max(2, Math.round(h / step));
+  for (i = n - 1; i >= 1; i--) pts.push([x + (hash(i + 120, seed) - .5) * 1.2, y + h * i / n]);
+  return 'M' + pts.map(function (p) { return f(p[0]) + ' ' + f(p[1]); }).join('L') + 'Z';
+}
+function roughCircle(cx, cy, r, seed, amp) {
+  var n = Math.max(18, Math.round(r * 1.2)), s = '', i;
+  for (i = 0; i < n; i++) {
+    var a = i / n * Math.PI * 2, rr = r + (hash(i, seed) - .5) * (amp || 1);
+    s += (i ? 'L' : 'M') + f(cx + Math.cos(a) * rr) + ' ' + f(cy + Math.sin(a) * rr);
+  }
+  return s + 'Z';
+}
+function fig(x, y, str, size, o) {
+  o = o || {};
+  var halo = o.halo ? ' stroke="' + o.halo + '" stroke-width="' + (o.hw || 3) + '" paint-order="stroke" stroke-linejoin="round"' : '';
+  return '<text class="fig" x="' + f(x) + '" y="' + f(y) + '" font-size="' + size + '" fill="' + (o.fill || INK.iron) + '" text-anchor="' + (o.anchor || 'middle') + '" dominant-baseline="central"' + (o.op != null ? ' opacity="' + o.op + '"' : '') + halo + '>' + esc(str) + '</text>';
+}
+function arcPath(cx, cy, r, a0, a1) {
+  var x0 = cx + Math.cos(a0) * r, y0 = cy + Math.sin(a0) * r, x1 = cx + Math.cos(a1) * r, y1 = cy + Math.sin(a1) * r;
+  return 'M' + f(x0) + ' ' + f(y0) + 'A' + r + ' ' + r + ' 0 ' + (a1 - a0 > Math.PI ? 1 : 0) + ' 1 ' + f(x1) + ' ' + f(y1);
+}
+
+/* ---------- woodcut icon from 0117 prims ---------- */
+function wc(name, x, y, size, o) {
+  o = o || {};
+  var ps = P[name];
+  if (!ps) return '';
+  var inkName = o.ink || 'iron', ink = INK[inkName] || inkName, s = size / 24, big = size >= 40;
+  var paper = o.paper || CUT;
+  var ow = Math.max(0.9, size / 34) / s * 0.85;
+  var hatch = 'url(#h-' + (INK[inkName] ? inkName : 'iron') + (size >= 56 ? '-d' : '') + ')';
+  var list = ps.filter(function (p) { return !(p.fine && !big) && !(p.bold && big); });
+  function one(p, cut) {
+    var tr = p.tr ? ' transform="' + p.tr + '"' : '', op = p.op != null ? ' opacity="' + p.op + '"' : '', fr = p.evenodd ? ' fill-rule="evenodd"' : '';
+    if (p.k === 'f') {
+      if (cut) return '<path d="' + p.d + '" fill="' + paper + '"' + fr + tr + op + '/>';
+      return '<path d="' + p.d + '" fill="' + hatch + '" stroke="' + ink + '" stroke-width="' + f(ow) + '" stroke-linejoin="round"' + fr + tr + op + '/>';
+    }
+    var dash = p.dash ? ' stroke-dasharray="' + p.dash + '"' : '';
+    return '<path d="' + p.d + '" fill="none" stroke="' + (cut ? paper : ink) + '" stroke-width="' + (p.w || 1.5) + '" stroke-linecap="' + (p.cap || 'round') + '" stroke-linejoin="round"' + dash + tr + op + '/>';
+  }
+  var a = '', b = '', c = '';
+  list.forEach(function (p) { if (p.cut) b += one(p, true); else if (p.top) c += one(p); else a += one(p); });
+  var rot = o.rot ? ' rotate(' + o.rot + ' 12 12)' : '';
+  return '<g transform="translate(' + f(x - size / 2) + ' ' + f(y - size / 2) + ') scale(' + f(s) + ')' + rot + '"' + (o.op != null ? ' opacity="' + o.op + '"' : '') + '>' + a + b + c + '</g>';
+}
+
+/* ---------- the instrument family (screens/instruments.ts) ---------- */
+function slip(x, y, w, h, o) {
+  o = o || {};
+  var seed = x * 3 + y * 7 + w;
+  return '<g' + (o.op != null ? ' opacity="' + o.op + '"' : '') + '><path d="' + roughRect(x, y, w, h, seed) + '" fill="' + (o.fill || 'url(#pg)') + '" stroke="' + INK.iron + '" stroke-width="' + (o.bold ? 1.6 : .9) + '" filter="' + (o.flat ? '' : 'url(#sh)') + '"/>' +
+    (o.rule === false ? '' : '<rect x="' + f(x + 3) + '" y="' + f(y + 3) + '" width="' + f(w - 6) + '" height="' + f(h - 6) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".5" opacity=".55"/>') + '</g>';
+}
+function paperDisc(x, y, r, o) {
+  o = o || {};
+  return '<g' + (o.op != null ? ' opacity="' + o.op + '"' : '') + '><path d="' + roughCircle(x, y, r, x + y, .9) + '" fill="url(#pg)" stroke="' + (o.ring || INK.iron) + '" stroke-width="' + (o.rw || 1.6) + '" filter="url(#sh)"/>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + f(r - 3.2) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".5" opacity=".6"/></g>';
+}
+function btn(x, y, r, icon, o) {
+  o = o || {};
+  tgt(x, y, r * 2);
+  return '<g' + (o.op != null ? ' opacity="' + o.op + '"' : '') + '>' + paperDisc(x, y, r, o) + wc(icon, x, y + (o.dy || 0), r * (o.k || 1.25), { ink: o.ink }) + (o.extra || '') + '</g>';
+}
+function bar(x, y, w, h, frac, wash, num) {
+  return '<rect x="' + x + '" y="' + f(y - h / 2) + '" width="' + w + '" height="' + h + '" fill="' + PAPER + '" stroke="' + INK.iron + '" stroke-width=".9"/>' +
+    '<rect x="' + f(x + 1.5) + '" y="' + f(y - h / 2 + 1.5) + '" width="' + f(Math.max(0, (w - 3) * frac)) + '" height="' + f(h - 3) + '" fill="' + wash + '" opacity=".85"/>' +
+    (num != null ? fig(x + w + 6, y, num, 15, { anchor: 'start' }) : '');
+}
+function stick(x, y, r, o) {
+  o = o || {};
+  var nx = x + (o.dx || 0), ny = y + (o.dy || 0);
+  return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="rgba(252,246,230,.06)" stroke="' + INK.white + '" stroke-width="1.6" opacity=".75"/>' +
+    '<circle cx="' + nx + '" cy="' + ny + '" r="' + f(r * .36) + '" fill="#9b9a92" stroke="' + INK.white + '" stroke-width="1.6" opacity=".9"/>';
+}
+function reticle(x, y, r, o) {
+  o = o || {};
+  var c = o.ink || INK.white, s = '';
+  [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(function (d) {
+    s += '<line x1="' + f(x + d[0] * r * .45) + '" y1="' + f(y + d[1] * r * .45) + '" x2="' + f(x + d[0] * r * 1.3) + '" y2="' + f(y + d[1] * r * 1.3) + '" stroke="' + INK.iron + '" stroke-width="3" opacity=".35" stroke-linecap="round"/>' +
+      '<line x1="' + f(x + d[0] * r * .45) + '" y1="' + f(y + d[1] * r * .45) + '" x2="' + f(x + d[0] * r * 1.3) + '" y2="' + f(y + d[1] * r * 1.3) + '" stroke="' + c + '" stroke-width="1.4" stroke-linecap="round"/>';
+  });
+  return s;
+}
+function hitCross(x, y, gold) {
+  var s = '', c = gold ? WASH.gold : INK.white;
+  [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (d) {
+    s += '<line x1="' + (x + d[0] * 8) + '" y1="' + (y + d[1] * 8) + '" x2="' + (x + d[0] * 17) + '" y2="' + (y + d[1] * 17) + '" stroke="' + INK.iron + '" stroke-width="4" stroke-linecap="round" opacity=".45"/>' +
+      '<line x1="' + (x + d[0] * 8) + '" y1="' + (y + d[1] * 8) + '" x2="' + (x + d[0] * 17) + '" y2="' + (y + d[1] * 17) + '" stroke="' + c + '" stroke-width="2.2" stroke-linecap="round"/>';
+  });
+  return s;
+}
+function ring(x, y, r, frac, col, w, start) {
+  if (frac <= 0) return '';
+  var a0 = (start == null ? -Math.PI / 2 : start), a1 = a0 + Math.PI * 2 * Math.min(frac, .999);
+  return '<path d="' + arcPath(x, y, r, a0, a1) + '" fill="none" stroke="' + col + '" stroke-width="' + (w || 3) + '" stroke-linecap="round"/>';
+}
+function seal(x, y, r, illum, o) {
+  o = o || {};
+  var g = { ink: ['#3a302a', '#1c1612'], rubric: ['#c9452a', '#7e1d0f'], redBlue: ['#c9452a', '#7e1d0f'], silver: ['#cfd2d6', '#7f848b'], gold: ['#e3b75a', '#9a6a1c'] }[illum] || ['#3a302a', '#1c1612'];
+  var id = 'wax' + illum;
+  var s = '<g' + (o.op != null ? ' opacity="' + o.op + '"' : '') + '><path d="' + roughCircle(x, y, r, x * 2 + y, r * .12) + '" fill="url(#' + id + ')" filter="url(#sh)"/>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + f(r * .72) + '" fill="none" stroke="' + g[1] + '" stroke-width="' + f(Math.max(.8, r * .07)) + '" opacity=".8"/>';
+  if (illum === 'redBlue') s += '<path d="' + arcPath(x, y, r * .86, Math.PI * .5, Math.PI * 1.5) + '" fill="none" stroke="' + WASH.ultramarine + '" stroke-width="' + f(r * .22) + '"/>';
+  if (o.icon) s += wc(o.icon, x, y, r * 1.15, { ink: illum === 'gold' || illum === 'silver' ? 'iron' : 'white', paper: g[0], op: .9 });
+  return s + '</g>';
+}
+function pin(x, y) { return '<circle cx="' + x + '" cy="' + y + '" r="2.4" fill="#2a2a2a"/><circle cx="' + (x - .7) + '" cy="' + (y - .7) + '" r=".8" fill="#ddd"/>'; }
+
+/* the minimap disc with its graduated rim (screens/minimap.ts) */
+function disc(x, y, r, o) {
+  o = o || {};
+  tgt(x, y, r * 2);
+  var cid = 'dc' + Math.round(x) + Math.round(y) + Math.round(r) + (o.k || '');
+  var rimCol = o.gilt ? WASH.gold : '#5b3a1e';
+  var s = '<g><clipPath id="' + cid + '"><circle cx="' + x + '" cy="' + y + '" r="' + f(r * .86) + '"/></clipPath>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + rimCol + '" filter="url(#sh)"/>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + f(r * .93) + '" fill="none" stroke="' + PAPER + '" stroke-width="' + f(r * .1) + '" stroke-dasharray="' + f(r * .06) + ' ' + f(r * .06) + '"/>' +
+    '<circle cx="' + x + '" cy="' + y + '" r="' + f(r * .86) + '" fill="#d6e4cf"/>' +
+    '<g clip-path="url(#' + cid + ')">' +
+    '<path d="M' + f(x - r) + ' ' + f(y + r * .25) + 'C' + f(x - r * .55) + ' ' + f(y + r * .05) + ' ' + f(x - r * .45) + ' ' + f(y + r * .6) + ' ' + f(x - r * .1) + ' ' + f(y + r) + 'L' + f(x - r) + ' ' + f(y + r) + 'Z" fill="#e7d39e" stroke="#8a6a3a" stroke-width=".7"/>' +
+    '<path d="M' + f(x + r * .25) + ' ' + f(y - r) + 'C' + f(x + r * .3) + ' ' + f(y - r * .6) + ' ' + f(x + r * .7) + ' ' + f(y - r * .55) + ' ' + f(x + r) + ' ' + f(y - r * .35) + 'L' + f(x + r) + ' ' + f(y - r) + 'Z" fill="#e7d39e" stroke="#8a6a3a" stroke-width=".7"/>' +
+    '<ellipse cx="' + f(x + r * .35) + '" cy="' + f(y + r * .35) + '" rx="' + f(r * .12) + '" ry="' + f(r * .08) + '" fill="#e7d39e" stroke="#8a6a3a" stroke-width=".6"/>' +
+    '<ellipse cx="' + f(x - r * .3) + '" cy="' + f(y - r * .4) + '" rx="' + f(r * .07) + '" ry="' + f(r * .05) + '" fill="#e7d39e" stroke="#8a6a3a" stroke-width=".6"/>' +
+    (o.storm ? '<circle cx="' + f(x + r * .2) + '" cy="' + f(y + r * .1) + '" r="' + f(r * o.storm) + '" fill="none" stroke="' + INK.rubric + '" stroke-width="2"/>' +
+      '<circle cx="' + f(x + r * .25) + '" cy="' + f(y + r * .15) + '" r="' + f(r * o.storm * .55) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".9" stroke-dasharray="3 2"/>' : '') +
+    (o.course ? '<line x1="' + f(x - r) + '" y1="' + f(y + r * .7) + '" x2="' + f(x + r) + '" y2="' + f(y - r * .6) + '" stroke="' + INK.iron + '" stroke-width="1.2" stroke-dasharray="1.5 3" stroke-linecap="round"/>' : '') +
+    (o.fleet ? [[-.2, .1], [-.05, 0], [.1, -.08], [-.12, .2], [.05, .1]].map(function (p) { return '<circle cx="' + f(x + p[0] * r) + '" cy="' + f(y + p[1] * r) + '" r="1.8" fill="' + INK.iron + '"/>'; }).join('') : '') +
+    '</g>' +
+    (o.marker ? pennantMark(x + r * .15, y - r * .1, r * .32) : '') +
+    '<path d="M' + x + ' ' + f(y - 7) + 'L' + f(x + 4.5) + ' ' + f(y + 5) + 'L' + x + ' ' + f(y + 2.5) + 'L' + f(x - 4.5) + ' ' + f(y + 5) + 'Z" fill="' + (o.gilt ? WASH.gold : INK.iron) + '" stroke="' + INK.iron + '" stroke-width=".6"/>' +
+    (o.region ? '<g>' + slip(x - 20, y - r * .56 - 15, 40, 30, { op: .95 }) + wc(o.region, x, y - r * .56, 24) + '</g>' : '') +
+    '</g>';
+  return s;
+}
+function pennantMark(x, y, h) {
+  return '<line x1="' + f(x) + '" y1="' + f(y) + '" x2="' + f(x) + '" y2="' + f(y - h) + '" stroke="' + INK.iron + '" stroke-width="1.2"/>' +
+    '<path d="M' + f(x) + ' ' + f(y - h) + 'L' + f(x + h * .7) + ' ' + f(y - h * .82) + 'L' + f(x) + ' ' + f(y - h * .62) + 'Z" fill="' + WASH.vermilion + '" stroke="' + INK.iron + '" stroke-width=".6"/>';
+}
+
+/* a galleon mark (chart/galleon.ts, simplified) in a 100-unit box centred on x,y */
+function galleon(x, y, s, o) {
+  o = o || {};
+  var sail = o.sail || CUT, hull = o.hull || 'url(#h-iron)', k = s / 100;
+  return '<g transform="translate(' + f(x - s / 2) + ' ' + f(y - s / 2) + ') scale(' + f(k) + ')"' + (o.op != null ? ' opacity="' + o.op + '"' : '') + ' stroke="' + INK.iron + '" stroke-linejoin="round">' +
+    '<path d="M35 64V16M53 62V8M71 62V20M71 26L92 36" stroke-width="1.6" fill="none"/>' +
+    '<path d="M35 18L19 54L41 52Z" fill="' + sail + '" stroke-width="1.3"/>' +
+    '<path d="M40 14Q53 11 66 14Q68 22 66 30Q53 33 40 30Q38 22 40 14Z" fill="' + sail + '" stroke-width="1.3"/>' +
+    '<path d="M41 34Q53 31 65 34Q67 43 65 52Q53 55 41 52Q39 43 41 34Z" fill="' + sail + '" stroke-width="1.3"/>' +
+    '<path d="M61 24Q71 22 80 24Q82 31 80 38Q71 40 61 38Q59 31 61 24Z" fill="' + sail + '" stroke-width="1.3"/>' +
+    '<path d="M62 42Q71 40 80 42Q81 48 80 54Q71 56 62 54Q61 48 62 42Z" fill="' + sail + '" stroke-width="1.3"/>' +
+    (o.emblem ? '<circle cx="53" cy="43" r="5" fill="' + o.emblem + '" stroke-width=".8"/>' : '') +
+    '<path d="M53 8L64 10L53 12Z" fill="' + WASH.vermilion + '" stroke-width=".8"/>' +
+    '<path d="M8 58L8 50L24 50L26 60L84 58L92 56L84 74Q52 82 22 76Z" fill="' + hull + '" stroke-width="1.8"/>' +
+    '<path d="M18 66L84 64" stroke-width=".8" fill="none"/>' +
+    (o.waves ? '<path d="M6 84q6-4 12 0t12 0t12 0t12 0t12 0t12 0t12 0t12 0M12 91q6-4 12 0t12 0t12 0t12 0t12 0t12 0t12 0" fill="none" stroke="' + WASH.ultramarine + '" stroke-width="1.6"/>' : '') +
+    '</g>';
+}
+/* the manicule (drawn pointing right; rot in degrees) */
+function hand(x, y, s, rot, o) {
+  o = o || {};
+  var k = s / 40;
+  return '<g transform="translate(' + f(x) + ' ' + f(y) + ') rotate(' + (rot || 0) + ') scale(' + f(k) + ') translate(-20 -20)"' + (o.op != null ? ' opacity="' + o.op + '"' : '') + ' stroke="' + INK.iron + '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">' +
+    '<path d="M1 13H9V29H1Z" fill="url(#h-iron)"/>' +
+    '<path d="M9 14Q14 11 19 13L37 13Q40 15.5 37 18L24 18" fill="' + CUT + '"/>' +
+    '<path d="M9 14V28Q12 31 17 30H24Q27 29 26 26.5Q28 25.5 27 23Q29 21 26.5 19L24 18" fill="' + CUT + '"/>' +
+    '<path d="M17 23H26.5M17 26.5H26M15 18Q19 20 24 18" fill="none"/>' +
+    '</g>';
+}
+/* compass rose (chart/rose.ts): principal iron, half green, quarter rubric, gilt fleur-de-lis and boss */
+function rose(cx, cy, R, needle) {
+  var s = '', i;
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="rgba(241,228,200,.55)" stroke="' + INK.iron + '" stroke-width="2"/>';
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + f(R * .93) + '" fill="none" stroke="' + INK.iron + '" stroke-width="1"/>';
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + f(R * .965) + '" fill="none" stroke="' + INK.iron + '" stroke-width="' + f(R * .035) + '" stroke-dasharray="' + f(R * .9651 * Math.PI * 2 / 64) + '"/>';
+  function point(a, L, w, dark, light) {
+    var tx = cx + Math.cos(a) * L, ty = cy + Math.sin(a) * L;
+    var lx = cx + Math.cos(a - Math.PI / 2) * w, ly = cy + Math.sin(a - Math.PI / 2) * w;
+    var rx = cx + Math.cos(a + Math.PI / 2) * w, ry = cy + Math.sin(a + Math.PI / 2) * w;
+    return '<path d="M' + f(cx) + ' ' + f(cy) + 'L' + f(lx) + ' ' + f(ly) + 'L' + f(tx) + ' ' + f(ty) + 'Z" fill="' + dark + '" stroke="' + INK.iron + '" stroke-width=".6"/>' +
+      '<path d="M' + f(cx) + ' ' + f(cy) + 'L' + f(rx) + ' ' + f(ry) + 'L' + f(tx) + ' ' + f(ty) + 'Z" fill="' + light + '" stroke="' + INK.iron + '" stroke-width=".6"/>';
+  }
+  for (i = 0; i < 32; i++) if (i % 2) s += point(-Math.PI / 2 + i * Math.PI / 16, R * .58, R * .045, '#c0452c', '#f3e3c4');
+  for (i = 0; i < 16; i++) if (i % 2) s += point(-Math.PI / 2 + i * Math.PI / 8, R * .72, R * .065, '#4a7c4c', '#f3e3c4');
+  for (i = 0; i < 8; i++) s += point(-Math.PI / 2 + i * Math.PI / 4, i % 2 ? R * .8 : R * .92, R * .09, '#2a1a10', '#f3e3c4');
+  var fy = cy - R * .92;
+  s += '<path d="M' + cx + ' ' + f(fy - R * .2) + 'C' + f(cx + R * .05) + ' ' + f(fy - R * .12) + ' ' + f(cx + R * .05) + ' ' + f(fy - R * .05) + ' ' + cx + ' ' + f(fy) + 'C' + f(cx - R * .05) + ' ' + f(fy - R * .05) + ' ' + f(cx - R * .05) + ' ' + f(fy - R * .12) + ' ' + cx + ' ' + f(fy - R * .2) + 'Z' +
+    'M' + f(cx - R * .02) + ' ' + f(fy - R * .05) + 'C' + f(cx - R * .12) + ' ' + f(fy - R * .14) + ' ' + f(cx - R * .14) + ' ' + f(fy - R * .02) + ' ' + f(cx - R * .08) + ' ' + f(fy + R * .01) + 'Z' +
+    'M' + f(cx + R * .02) + ' ' + f(fy - R * .05) + 'C' + f(cx + R * .12) + ' ' + f(fy - R * .14) + ' ' + f(cx + R * .14) + ' ' + f(fy - R * .02) + ' ' + f(cx + R * .08) + ' ' + f(fy + R * .01) + 'Z" fill="' + WASH.gold + '" stroke="' + INK.iron + '" stroke-width=".8"/>';
+  var na = (needle || 0) * Math.PI / 180;
+  s += '<g transform="rotate(' + (needle || 0) + ' ' + cx + ' ' + cy + ')"><path d="M' + cx + ' ' + f(cy - R * .66) + 'L' + f(cx + R * .03) + ' ' + cy + 'L' + cx + ' ' + f(cy + R * .5) + 'L' + f(cx - R * .03) + ' ' + cy + 'Z" fill="' + INK.blue + '" stroke="' + INK.iron + '" stroke-width=".6"/></g>';
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + f(R * .055) + '" fill="' + WASH.gold + '" stroke="' + INK.iron + '" stroke-width=".8"/>';
+  return s;
+}
+function rhumbs(cx, cy, R, op) {
+  var s = '', i, cols = ['#2a1a10', '#c0452c', '#4a7c4c', '#c0452c'];
+  for (i = 0; i < 32; i++) {
+    var a = i * Math.PI / 16;
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + f(cx + Math.cos(a) * R) + '" y2="' + f(cy + Math.sin(a) * R) + '" stroke="' + cols[i % 4] + '" stroke-width="' + (i % 4 ? .5 : .8) + '"/>';
+  }
+  for (var k = 0; k < 8; k++) {
+    var sx = cx + Math.cos(k * Math.PI / 4) * 340, sy = cy + Math.sin(k * Math.PI / 4) * 340;
+    for (i = 0; i < 16; i++) {
+      var b = i * Math.PI / 8;
+      s += '<line x1="' + f(sx) + '" y1="' + f(sy) + '" x2="' + f(sx + Math.cos(b) * 700) + '" y2="' + f(sy + Math.sin(b) * 700) + '" stroke="' + cols[i % 4] + '" stroke-width=".45" opacity=".7"/>';
+    }
+  }
+  return '<g opacity="' + (op || .35) + '">' + s + '</g>';
+}
+function laurel(cx, cy, r, col) {
+  var s = '', side, i;
+  for (side = -1; side <= 1; side += 2) {
+    s += '<path d="' + (side < 0 ? arcPath(cx, cy, r, Math.PI * .58, Math.PI * 1.32).replace(/A[^A]*$/, function (m) { return m; }) : arcPath(cx, cy, r, -Math.PI * .32, Math.PI * .42)) + '" fill="none" stroke="' + col + '" stroke-width="2"/>';
+    for (i = 0; i < 12; i++) {
+      var a = side < 0 ? Math.PI * (.6 + i * .06) : Math.PI * (.4 - i * .06);
+      var px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+      var deg = a * 180 / Math.PI + (side < 0 ? 90 : -90);
+      [-1, 1].forEach(function (o) {
+        s += '<ellipse cx="' + f(px + Math.cos(a) * o * 7) + '" cy="' + f(py + Math.sin(a) * o * 7) + '" rx="3.4" ry="8" transform="rotate(' + f(deg + o * 28 * side) + ' ' + f(px + Math.cos(a) * o * 7) + ' ' + f(py + Math.sin(a) * o * 7) + ')" fill="' + col + '" stroke="' + INK.iron + '" stroke-width=".5" opacity=".95"/>';
+      });
+    }
+  }
+  return s;
+}
+function star(x, y, r, col) {
+  var s = '', i;
+  for (i = 0; i < 10; i++) {
+    var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r;
+    s += (i ? 'L' : 'M') + f(x + Math.cos(a) * rr) + ' ' + f(y + Math.sin(a) * rr);
+  }
+  return '<path d="' + s + 'Z" fill="' + col + '" stroke="' + INK.iron + '" stroke-width=".9"/>';
+}
+
+/* ---------- composite instruments ---------- */
+function vitals(shield, hull, o) {
+  o = o || {};
+  var s = slip(64, 2, 210, 64);
+  s += bar(74, 22, 162, 16, shield / 100, WASH.azure, shield);
+  s += bar(74, 46, 162, 16, hull / (o.max || 100), o.hullWash || '#6e6152', hull);
+  return s;
+}
+function clockSlip(t, o) {
+  o = o || {};
+  var red = o.closing, s = slip(390, 12, 84, 34);
+  s += wc('hud.spiral', 408, 29, o.tight ? 19 : 22, { ink: red ? 'rubric' : 'iron' });
+  s += fig(445, 29, t, 24, { fill: red ? INK.rubric : INK.iron });
+  return s;
+}
+function afloatSlip(n) { return slip(482, 12, 84, 34) + wc('hud.shipsLeft', 502, 29, 22) + fig(537, 29, n, 24); }
+function sails(x, y, level) {
+  tgt(x, y, 56);
+  var s = paperDisc(x, y, 28), i;
+  s += '<path d="' + arcPath(x, y + 6, 17, -Math.PI * .85, -Math.PI * .15) + '" fill="none" stroke="' + INK.iron + '" stroke-width="1.4"/>';
+  for (i = 0; i < 3; i++) { var a = -Math.PI * (.8 - i * .3); s += '<line x1="' + f(x + Math.cos(a) * 14) + '" y1="' + f(y + 6 + Math.sin(a) * 14) + '" x2="' + f(x + Math.cos(a) * 20) + '" y2="' + f(y + 6 + Math.sin(a) * 20) + '" stroke="' + INK.iron + '" stroke-width="1.2"/>'; }
+  var na = -Math.PI * (.8 - (level == null ? 2 : level) * .3);
+  s += '<line x1="' + x + '" y1="' + (y + 6) + '" x2="' + f(x + Math.cos(na) * 19) + '" y2="' + f(y + 6 + Math.sin(na) * 19) + '" stroke="' + INK.rubric + '" stroke-width="1.8" stroke-linecap="round"/>';
+  s += wc('hud.sail', x, y + 13, 13);
+  return s;
+}
+function slot(x, y, item, o) {
+  o = o || {};
+  var S = 50, x0 = x - S / 2, y0 = y - S / 2, s = '';
+  tgt(x, y, S, 56, 'r');
+  if (!item) return '<rect x="' + x0 + '" y="' + y0 + '" width="' + S + '" height="' + S + '" fill="rgba(252,246,230,.04)" stroke="' + INK.white + '" stroke-width="1.1" opacity=".7"/>';
+  s += slip(x0, y0, S, S, { fill: o.chosen ? '#f3dfa8' : 'url(#pg)', bold: o.chosen });
+  if (o.chosen) s += '<rect x="' + (x0 + 2) + '" y="' + (y0 + 2) + '" width="' + (S - 4) + '" height="' + (S - 4) + '" fill="none" stroke="' + WASH.gold + '" stroke-width="2"/>';
+  s += wc(item, x - 3, y, 31, { ink: o.ink });
+  if (o.n != null) s += fig(x + 18, y + 12, o.n, 17, { anchor: 'middle' });
+  if (o.using) s += '<line x1="' + (x0 + 3) + '" y1="' + (y0 - 3) + '" x2="' + f(x0 + 3 + (S - 6) * o.using) + '" y2="' + (y0 - 3) + '" stroke="' + WASH.gold + '" stroke-width="3" stroke-linecap="round"/>';
+  if (o.drop) {
+    var per = S * 4, len = per * o.drop;
+    s += '<rect x="' + (x0 - 3) + '" y="' + (y0 - 3) + '" width="' + (S + 6) + '" height="' + (S + 6) + '" fill="none" stroke="' + INK.rubric + '" stroke-width="2.6" stroke-dasharray="' + f(len) + ' ' + f(per + 30) + '"/>';
+  }
+  return s;
+}
+function hotbar(items) {
+  var s = '';
+  for (var i = 0; i < 5; i++) s += slot(324 + i * 56, 389, items[i] && items[i].icon, items[i] || {});
+  return s;
+}
+function controls(o) {
+  o = o || {};
+  var m = o.mirror ? function (x) { return W - x; } : function (x) { return x; };
+  var s = '';
+  s += stick(m(154), 318, 56, o.stick || {});
+  if (o.sails !== false) s += sails(m(160), 208, o.sailsLevel);
+  var fireExtra = ring(m(802), 318, 44, o.steady == null ? .7 : o.steady, (o.steady || .7) > .92 ? WASH.gold : INK.white, 2.6);
+  s += btn(m(802), 318, 40, 'weapon.cannon', { k: 1.35, extra: fireExtra });
+  var pips = '<circle cx="' + (m(808) - 5) + '" cy="248" r="2.6" fill="' + INK.iron + '"/><circle cx="' + (m(808) + 5) + '" cy="248" r="2.6" fill="' + (o.gustPips === 1 ? 'none' : INK.iron) + '" stroke="' + INK.iron + '"/>';
+  s += btn(m(808), 232, 28, 'hud.gust', { dy: -4, k: 1.15, extra: pips });
+  var ab = o.abilityCd ? ring(m(702), 260, 34, o.abilityCd, INK.rubric, 2.6) + fig(m(702), 260, o.abilitySec, 24, { halo: PAPER, hw: 3 }) : '';
+  s += btn(m(702), 260, 31, o.ability || 'ability.repair', { op: o.abilityCd ? .55 : 1, extra: ab });
+  var rl = o.reload ? ring(m(690), 348, 31, o.reload, INK.rubric, 3) : '';
+  s += btn(m(690), 348, 28, 'hud.reload', { op: o.reload ? .7 : 1, extra: rl });
+  return s;
+}
+function hudCore(o) {
+  o = o || {};
+  var s = '';
+  s += vitals(o.shield == null ? 0 : o.shield, o.hull == null ? 100 : o.hull);
+  s += clockSlip(o.clock || '1:21', { closing: o.closing, tight: o.tight }) + afloatSlip(o.afloat || 20);
+  s += disc(809, 85, 75, { marker: true, storm: o.discStorm, region: o.region });
+  if (o.hail !== false) s += hail(o.hail || {});
+  s += controls(o);
+  s += hotbar(o.slots || [{ icon: 'weapon.cannon', n: 8, chosen: true }]);
+  if (o.reticle !== false) s += reticle(478, 220, 10);
+  return s;
+}
+function hail(o) {
+  var s = '';
+  tgt(704, 131.5, 50);
+  if (o.tally) {
+    s += slip(620 - 52, 131.5 - 14, 104, 28);
+    for (var i = 0; i < o.tally; i++) s += '<line x1="' + (578 + i * 6 + (i >= 4 ? 4 : 0)) + '" y1="124" x2="' + (578 + i * 6 + (i >= 4 ? 4 : 0)) + '" y2="139" stroke="' + INK.iron + '" stroke-width="1.6" stroke-linecap="round"/>';
+  }
+  s += seal(704, 131.5, 25, o.illum || 'ink', { icon: 'hud.gull', op: o.away ? .45 : 1 });
+  return s;
+}
+
+/* ---------- lobby chrome (screens/lobby.ts with lobbyLayout for the phone) ---------- */
+function plate(cx, cy, k, level, frac, rankInk) {
+  var w = 110 * k, h = 68 * k, s = slip(cx - w / 2, cy - h / 2, w, h);
+  var rx = cx - 18 * k, r = 25 * k;
+  tgtR(cx - w / 2, cy - h / 2, w, h);
+  s += '<circle cx="' + rx + '" cy="' + cy + '" r="' + f(r) + '" fill="' + PAPER + '" stroke="' + INK.iron + '" stroke-width="1.6"/>';
+  s += ring(rx, cy, r - 2.5 * k, frac || 0, WASH.gold, 3.5 * k);
+  s += '<circle cx="' + rx + '" cy="' + cy + '" r="' + f(r - 5 * k) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".6"/>';
+  s += fig(rx, cy + 1, level, 34 * k);
+  s += seal(cx + 30 * k, cy, 13 * k, rankInk || 'ink');
+  return s;
+}
+function lobbyChrome(tab, o) {
+  o = o || {};
+  var s = plate(129, 46, 1, '1', 0, 'ink');
+  s += btn(858, 36, 24, 'menu.wheel', { k: 1.3 });
+  var tabs = ['menu.burst', 'menu.chest', 'menu.pennants', 'menu.ships'];
+  tabs.forEach(function (ic, i) {
+    var x = 97 + i * 58, y = 385, on = tab === i, dy = on ? -4 : 0;
+    tgt(x, y, 46);
+    s += slip(x - 23, y - 23 + dy, 46, 46, { bold: on, fill: on ? '#f6ead0' : 'url(#pg)' }) + wc(ic, x, y + dy, 28);
+  });
+  if (o.play !== false) s += playBanner();
+  return s;
+}
+function playBanner() {
+  var x0 = 672, x1 = 882, y0 = 268, y1 = 368;
+  tgtR(x0, y0, 210, 100);
+  var d = 'M' + x0 + ' ' + (y0 + 14) + 'Q777 ' + (y0 + 2) + ' ' + x1 + ' ' + (y0 + 10) + 'L' + (x1 - 26) + ' 318L' + x1 + ' ' + (y1 - 6) + 'Q777 ' + (y1 - 14) + ' ' + x0 + ' ' + (y1 - 4) + 'L' + (x0 + 24) + ' 318Z';
+  return '<path d="' + d + '" fill="url(#pg)" stroke="' + INK.iron + '" stroke-width="1.6" filter="url(#sh)"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + INK.iron + '" stroke-width=".5" transform="translate(777 318) scale(.93) translate(-777 -318)" opacity=".55"/>' +
+    galleon(777, 314, 78, { sail: CUT, waves: true });
+}
+function folio(o) {
+  o = o || {};
+  var x = 347, y = 72, w = 535, h = 336, s = '';
+  s += '<path d="' + roughRect(x, y, w, h, 9) + '" fill="url(#pg)" stroke="' + INK.iron + '" stroke-width="1" filter="url(#sh)"/>';
+  s += '<rect x="' + (x + 10) + '" y="' + (y + 10) + '" width="' + (w - 20) + '" height="' + (h - 20) + '" fill="none" stroke="' + INK.iron + '" stroke-width="1.4"/>';
+  s += '<rect x="' + (x + 14) + '" y="' + (y + 14) + '" width="' + (w - 28) + '" height="' + (h - 28) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".5"/>';
+  s += '<line x1="' + (x + w / 2) + '" y1="' + y + '" x2="' + (x + w / 2) + '" y2="' + (y + h) + '" stroke="#b49a70" stroke-width="1" opacity=".5"/>';
+  s += '<line x1="' + x + '" y1="' + (y + h / 2) + '" x2="' + (x + w) + '" y2="' + (y + h / 2) + '" stroke="#b49a70" stroke-width="1" opacity=".35"/>';
+  s += '<circle cx="' + (x + w - 92) + '" cy="' + (y + 58) + '" r="38" fill="none" stroke="#b08a58" stroke-width="5" opacity=".18"/>';
+  s += '<clipPath id="fwin"><rect x="387" y="112" width="455" height="256"/></clipPath>';
+  s += '<g clip-path="url(#fwin)">' + (o.content || '') + '</g>';
+  if (o.scrollHint) s += '<rect x="846" y="' + o.scrollHint[0] + '" width="3" height="' + o.scrollHint[1] + '" rx="1.5" fill="' + INK.iron + '" opacity=".35"/>';
+  return s;
+}
+function card(x, y, w, h, o) {
+  o = o || {};
+  tgtR(x, y, w, h);
+  var s = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#f6ecd8" stroke="' + INK.iron + '" stroke-width="1.2"/>' +
+    '<rect x="' + (x + 4) + '" y="' + (y + 4) + '" width="' + (w - 8) + '" height="' + (h - 8) + '" fill="none" stroke="' + INK.iron + '" stroke-width=".5" opacity=".6"/>';
+  if (o.draw) s += '<g opacity="' + (o.locked ? .35 : 1) + '">' + o.draw(x + w / 2, y + h * (o.level ? .42 : .5)) + '</g>';
+  else if (o.icon) s += wc(o.icon, x + w / 2, y + h * (o.level ? .42 : .5), o.size || w * .5, { op: o.locked ? .35 : 1, paper: '#f6ecd8' });
+  if (o.level) s += fig(x + w / 2, y + h * .8, o.level, Math.min(40, h * .22), { op: .75 });
+  if (o.worn) s += seal(x + w - 12, y + 12, 9, 'gold');
+  return s;
+}
+function sailSwatch(col) {
+  return function (cx, cy) {
+    return '<path d="M' + (cx - 26) + ' ' + (cy - 26) + 'Q' + cx + ' ' + (cy - 30) + ' ' + (cx + 26) + ' ' + (cy - 26) + 'Q' + (cx + 31) + ' ' + cy + ' ' + (cx + 26) + ' ' + (cy + 24) + 'Q' + cx + ' ' + (cy + 30) + ' ' + (cx - 26) + ' ' + (cy + 24) + 'Q' + (cx - 31) + ' ' + cy + ' ' + (cx - 26) + ' ' + (cy - 26) + 'Z" fill="' + col + '" stroke="' + INK.iron + '" stroke-width="1" opacity=".9"/>';
+  };
+}
+
+/* ---------- screens ---------- */
+var M = {};
+M.title = { v: [
+  { id: 'loading', label: 'Loading: needle swings', bg: 'now-lobby', orig: 'old-title', draw: function () { return titleDraw(38); }, whole: true },
+  { id: 'ready', label: 'Ready: needle north', bg: 'now-lobby', orig: 'old-title', draw: function () { return titleDraw(0); }, whole: true }
+] };
+function titleDraw(needle) {
+  return '<rect width="956" height="440" fill="#dfc8a2" opacity=".62"/>' + rhumbs(478, 182, 1100, .3) + rose(478, 182, 126, needle) + galleon(478, 352, 74, { sail: CUT, hull: 'url(#h-gold)' });
+}
+M.lobby = { v: [{ id: 'lobby', label: 'Lobby', bg: 'now-lobby', orig: 'old-lobby', draw: function () { return lobbyChrome(-1); } }] };
+
+M.abilities = { v: [
+  { id: 'actives', label: 'Actives (top of list)', bg: 'now-lobby', orig: 'old-abilities', draw: function () {
+    var c = wc('menu.burst', 404, 128, 20) +
+      card(397, 146, 206, 192, { icon: 'ability.repair', worn: true, size: 104 }) + card(617, 146, 206, 192, { icon: 'ability.smokeScreen', locked: true, level: '3', size: 104 }) +
+      card(397, 350, 206, 192, { icon: 'ability.ram', size: 104 }) + card(617, 350, 206, 192, { icon: 'ability.reveal', locked: true, level: '5', size: 104 });
+    return lobbyChrome(0, { play: false }) + folio({ content: c, scrollHint: [116, 34] });
+  } },
+  { id: 'passives', label: 'Passives (scrolled 7 rows)', bg: 'now-lobby', orig: null, draw: function () {
+    var c = card(397, 60, 206, 192, { icon: 'ability.driftMine', locked: true, level: '9', size: 104 }) + card(617, 60, 206, 192, { icon: 'ability.wave', locked: true, level: '8', size: 104 }) +
+      wc('hud.lantern', 404, 270, 20) +
+      card(397, 288, 206, 192, { icon: 'ability.salvage', worn: true, size: 104 }) + card(617, 288, 206, 192, { icon: 'ability.quickHands', size: 104 });
+    return lobbyChrome(0, { play: false }) + folio({ content: c, scrollHint: [250, 34] });
+  } }
+] };
+M.locker = { v: [{ id: 'sails', label: 'Sail colours', bg: 'now-lobby', orig: 'old-locker', draw: function () {
+  var cols = ['#efe3c8', '#e8bfb4', '#cfd0a0', '#e7a99a', '#bcd6bf', '#9fb79a', '#f0c2a6', '#a9bad3'], lv = [null, '2', '4', '6', null, null, null, null], c = '';
+  c += '<rect x="397" y="120" width="18" height="13" fill="' + WASH.azure + '" stroke="' + INK.iron + '" stroke-width=".8"/>';
+  cols.forEach(function (col, i) {
+    var x = 397 + (i % 4) * 110, y = 142 + Math.floor(i / 4) * 132;
+    c += card(x, y, 100, 120, { draw: sailSwatch(col), level: lv[i], locked: i > 0 && i < 4, worn: i === 0 });
+  });
+  return lobbyChrome(1, { play: false }) + folio({ content: c, scrollHint: [116, 22] });
+} }] };
+M.rank = { v: [
+  { id: 'top', label: 'As it opens', bg: 'now-lobby', orig: 'old-rank', draw: function () { return lobbyChrome(2, { play: false }) + folio({ content: rankContent(0), scrollHint: [116, 60] }); } },
+  { id: 'seal', label: 'Scrolled to her seal (tier 0)', bg: 'now-lobby', orig: null, draw: function () { return lobbyChrome(2, { play: false }) + folio({ content: rankContent(150), scrollHint: [300, 60] }); } }
+] };
+function rankContent(dy) {
+  var s = '<line x1="461" y1="' + (126 + dy) + '" x2="461" y2="' + (440 + dy) + '" stroke="' + INK.iron + '" stroke-width="2"/>' +
+    '<circle cx="461" cy="' + (124 + dy) + '" r="4" fill="' + WASH.gold + '" stroke="' + INK.iron + '" stroke-width=".8"/>';
+  for (var t = 0; t < 8; t++) {
+    var y = 414 - t * 35.25 + dy, L = 130 + t * 12;
+    s += '<path d="M462 ' + f(y - 9) + 'Q' + f(462 + L * .5) + ' ' + f(y - 13) + ' ' + f(462 + L) + ' ' + f(y - 6) + 'L' + f(462 + L - 14) + ' ' + f(y) + 'L' + f(462 + L) + ' ' + f(y + 4) + 'Q' + f(462 + L * .5) + ' ' + f(y + 2) + ' 462 ' + f(y + 7) + 'Z" fill="' + TIER[t] + '" opacity="' + (t === 0 ? .9 : .38) + '" stroke="' + INK.iron + '" stroke-width=".5"/>';
+  }
+  s += seal(444, 414 + dy, 12, 'ink');
+  s += wc('hud.shipsLeft', 780, 252, 30) + fig(836, 252, '0', 56, { anchor: 'end' });
+  s += star(780, 336, 15, WASH.gold) + fig(836, 336, '0', 56, { anchor: 'end', fill: INK.rubric });
+  return s;
+}
+M.rivals = { v: [{ id: 'roster', label: 'Roster (first 4 of 19)', bg: 'now-lobby', orig: 'old-rivals', draw: function () {
+  var R = [['#8fcf8f', '#3a7c3a', 'rubric', 'ability.ram', 'ability.windReader'], ['#f2b6a0', '#c0452c', 'gold', 'ability.ram', 'ability.salvage'], ['#e98c80', '#b8301a', 'ink', 'ability.decoy', 'ability.steadyAim'], ['#f2b8c8', '#b8506e', 'rubric', 'ability.hardTurn', 'ability.quickReload']], c = '';
+  R.forEach(function (r, i) {
+    var x = 395 + (i % 2) * 224, y = 120 + Math.floor(i / 2) * 143;
+    c += card(x, y, 214, 133, {});
+    c += galleon(x + 52, y + 50, 74, { sail: r[0], hull: 'url(#h-iron)', emblem: r[1] });
+    c += wc(r[3], x + 118, y + 52, 24) + wc(r[4], x + 148, y + 52, 24);
+    c += seal(x + 190, y + 26, 13, r[2]);
+    c += wc('hud.kills', x + 40, y + 104, 22, { ink: r[1] }) + fig(x + 62, y + 104, '0', 22);
+    c += wc('hud.kills', x + 112, y + 104, 22) + fig(x + 134, y + 104, '0', 22);
+  });
+  return lobbyChrome(3, { play: false }) + folio({ content: c, scrollHint: [116, 18] });
+} }] };
+
+function settingsRows(rows) {
+  var s = '';
+  rows.forEach(function (row, ri) {
+    row.forEach(function (it, ci) {
+      var L = 395 + ci * 222, cy = 158 + ri * 92;
+      tgtR(L, cy - 46, 215, 92);
+      s += it.art(L + 44, cy);
+      if (it.bar != null) s += '<rect x="' + (L + 92) + '" y="' + (cy - 13) + '" width="111" height="26" fill="' + PAPER + '" stroke="' + INK.iron + '" stroke-width=".9"/><rect x="' + (L + 94) + '" y="' + (cy - 11) + '" width="' + f(107 * it.bar) + '" height="22" fill="' + it.wash + '" opacity=".85"/>';
+      if (it.pip != null) s += '<circle cx="' + (L + 175) + '" cy="' + cy + '" r="10" fill="' + (it.pip ? WASH.vermilion : 'none') + '" stroke="' + INK.iron + '" stroke-width="1.2"/><circle cx="' + (L + 175) + '" cy="' + cy + '" r="14" fill="none" stroke="' + INK.iron + '" stroke-width=".5"/>';
+    });
+  });
+  return s;
+}
+var ART = {
+  side: function (left) { return function (x, y) { return '<rect x="' + (x - 34) + '" y="' + (y - 20) + '" width="68" height="36" fill="none" stroke="' + INK.iron + '" stroke-width="1.1"/><circle cx="' + (x + (left ? 18 : -18)) + '" cy="' + (y + 4) + '" r="7" fill="none" stroke="' + INK.iron + '" stroke-width="1.2"/><circle cx="' + (x + (left ? 18 : -18)) + '" cy="' + (y + 4) + '" r="2.5" fill="' + INK.iron + '"/>' + hand(x + (left ? 24 : -24), y + 14, 26, left ? 135 : 45); }; },
+  haptics: function (x, y) { return hand(x, y - 4, 30, 90) + '<path d="M' + (x - 12) + ' ' + (y + 18) + 'h-6M' + (x + 12) + ' ' + (y + 18) + 'h6M' + (x - 8) + ' ' + (y + 23) + 'l-4 3M' + (x + 8) + ' ' + (y + 23) + 'l4 3" stroke="' + INK.iron + '" stroke-width="1"/>'; },
+  speaker: function (extra) { return function (x, y) { return wc('menu.speaker', x - 4, y, 30) + (extra ? wc(extra, x + 14, y + 10, 16) : ''); }; },
+  shake: function (x, y) { return hand(x - 4, y, 30, 0) + '<path d="M' + (x + 16) + ' ' + (y - 6) + 'l6-3M' + (x + 17) + ' ' + y + 'h7M' + (x + 16) + ' ' + (y + 6) + 'l6 3" stroke="' + INK.iron + '" stroke-width="1"/>'; },
+  aim: function (x, y) { return '<circle cx="' + x + '" cy="' + y + '" r="10" fill="none" stroke="' + INK.iron + '" stroke-width="1.2"/><path d="M' + (x - 16) + ' ' + y + 'h32M' + x + ' ' + (y - 16) + 'v32" stroke="' + INK.iron + '" stroke-width="1"/>'; },
+  icon: function (n) { return function (x, y) { return wc(n, x, y, 30); }; }
+};
+M.settings = { v: [
+  { id: 'top', label: 'Rows 1 to 3 (what shows)', bg: 'now-lobby', orig: 'old-settings', draw: function () {
+    return lobbyChrome(-1, { play: false }) + folio({ scrollHint: [116, 150], content: settingsRows([
+      [{ art: ART.side(false) }, { art: ART.haptics, pip: true }],
+      [{ art: ART.speaker(), bar: .9, wash: WASH.azure }, { art: ART.shake, bar: 1, wash: WASH.sienna }],
+      [{ art: ART.speaker('weapon.cannon'), bar: .9, wash: WASH.azure }, { art: ART.aim, bar: .33, wash: WASH.ochre }]]) });
+  } },
+  { id: 'below', label: 'Rows 4 and 5 (below the fold)', bg: 'now-lobby', orig: null, draw: function () {
+    return lobbyChrome(-1, { play: false }) + folio({ scrollHint: [218, 150], content: settingsRows([
+      [{ art: ART.speaker('weapon.cannon'), bar: .9, wash: WASH.azure }, { art: ART.aim, bar: .33, wash: WASH.ochre }],
+      [{ art: ART.speaker('hud.gust'), bar: .7, wash: WASH.azure }, { art: ART.icon('menu.arrows'), pip: false }],
+      [{ art: ART.speaker('menu.wheel'), bar: .8, wash: WASH.azure }, { art: ART.icon('weapon.cannon'), pip: false }]]) });
+  } },
+  { id: 'left', label: 'Stick on the right (left-handed)', bg: 'now-lobby', orig: 'old-settings-left', draw: function () {
+    return lobbyChrome(-1, { play: false }) + folio({ scrollHint: [116, 150], content: settingsRows([
+      [{ art: ART.side(true) }, { art: ART.haptics, pip: true }],
+      [{ art: ART.speaker(), bar: .9, wash: WASH.azure }, { art: ART.shake, bar: 1, wash: WASH.sienna }],
+      [{ art: ART.speaker('weapon.cannon'), bar: .9, wash: WASH.azure }, { art: ART.aim, bar: .33, wash: WASH.ochre }]]) });
+  } }
+] };
+
+function diveSlip(op) {
+  tgtR(738, 267, 128, 102);
+  return '<g opacity="' + op + '">' + slip(738, 267, 128, 102) +
+    '<path d="M752 290q10-8 20 0t20 0M750 302q12-8 24 0t22 0M758 314q8-6 16 0" fill="none" stroke="' + INK.iron + '" stroke-width="1.4" stroke-linecap="round"/>' +
+    '<g transform="rotate(32 818 312)">' + galleon(818, 312, 70, {}) + '</g>' +
+    '<path d="M752 352h100" stroke="' + WASH.ultramarine + '" stroke-width="1.4" stroke-dasharray="3 3"/></g>';
+}
+function countdown(n) { return slip(458, 30, 40, 40) + fig(478, 50, n, 40); }
+M.gale = { v: [
+  { id: 'riding', label: 'Riding (DIVE faint, first 2.8 s)', bg: 'now-gale', orig: 'old-gale', draw: function () { return countdown('33') + disc(809, 85, 75, { course: true, fleet: true, storm: .7 }) + diveSlip(.45); } },
+  { id: 'first', label: 'DIVE ready, first-drop hint', bg: 'now-gale', orig: 'old-dive', draw: function () {
+    return countdown('25') + disc(809, 85, 75, { course: true, fleet: true, storm: .7 }) + diveSlip(1) +
+      slip(762, 127, 118, 128) + pin(770, 135) + hand(821, 186, 64, 90) + '<path d="M806 228q15 8 30 0" fill="none" stroke="' + INK.iron + '" stroke-width="1"/>';
+  } },
+  { id: 'glide', label: 'Gliding after the dive', bg: 'now-gale', orig: 'old-gliding', draw: function () {
+    return disc(809, 85, 75, { marker: true, storm: .7 }) + '<g opacity=".35">' + slip(762, 127, 118, 128) + hand(821, 186, 64, 90) + '</g>' + stick(154, 318, 56) + pennantMark(640, 384, 44);
+  } }
+] };
+
+M.fullmap = { v: [{ id: 'map', label: 'Open at sea', bg: null, orig: 'old-fullmap', draw: function () {
+  var k = 205 / 135, s = '';
+  s += '<rect width="956" height="440" fill="#0a1626"/>';
+  s += '<clipPath id="fmwin"><rect x="82" y="5" width="430" height="430"/></clipPath>';
+  s += '<g clip-path="url(#fmwin)"><image href="img/now-orbit.jpg" x="' + f(297 - 478 * k) + '" y="' + f(220 - 227 * k) + '" width="' + f(956 * k) + '" height="' + f(440 * k) + '" preserveAspectRatio="none"/>' +
+    '<circle cx="315" cy="205" r="120" fill="none" stroke="' + INK.rubric + '" stroke-width="2.4" opacity=".9"/>' +
+    '<circle cx="330" cy="215" r="70" fill="none" stroke="' + INK.white + '" stroke-width="1.4" stroke-dasharray="5 4"/>' +
+    [[250, 160], [360, 140], [395, 260], [220, 270], [300, 300]].map(function (p) { return galleon(p[0], p[1], 22, { sail: '#e98c80' }); }).join('') +
+    galleon(300, 215, 26, { sail: WASH.gold, hull: 'url(#h-gold)' }) + pennantMark(345, 250, 26) + '</g>';
+  s += '<path fill-rule="evenodd" d="M0 0H956V440H0ZM82 5V435H512V5Z" fill="url(#pg)"/>';
+  s += '<g clip-path="url(#fmout)">' + rhumbs(700, 220, 900, .25) + '</g><clipPath id="fmout"><path clip-rule="evenodd" d="M0 0H956V440H0ZM73 -4V444H521V-4Z"/></clipPath>';
+  s += '<rect x="82" y="5" width="430" height="430" fill="none" stroke="' + INK.iron + '" stroke-width="1.6"/>';
+  s += '<rect x="75" y="-2" width="444" height="444" fill="none" stroke="' + INK.iron + '" stroke-width="1"/>';
+  s += '<rect x="78.5" y="1.5" width="437" height="437" fill="none" stroke="' + INK.iron + '" stroke-width="5" stroke-dasharray="8 8" opacity=".55"/>';
+  s += disc(809, 85, 75, { marker: true, storm: .6 });
+  [['hud.shipsLeft', '20', 210], ['hud.kills', '0', 263], ['hud.damage', '0', 317], ['hud.spiral', '1:34', 370]].forEach(function (r) { s += wc(r[0], 757, r[2], 22) + fig(880, r[2], r[1], 28, { anchor: 'end' }); });
+  tgtR(82, 5, 430, 430);
+  return s;
+} }] };
+
+var SLOTS_FULL = [{ icon: 'weapon.cannon', n: 8, chosen: true }, { icon: 'weapon.harpoon', n: 3, ink: 'green' }, { icon: 'weapon.mortar', n: 1, ink: 'blue' }, { icon: 'weapon.repeater', n: 1, ink: 'rubric' }, { icon: 'item.smallShield', n: 2 }];
+M.hud = { v: [
+  { id: 'calm', label: 'At sea, calm', bg: 'now-sail', orig: 'old-hud-calm', draw: function () { return hudCore({}); } },
+  { id: 'left', label: 'Left-handed (stick right)', bg: 'now-sail', orig: null, mirror: true, draw: function () { return hudCore({ mirror: true }); } },
+  { id: 'region', label: 'Entering a region', bg: 'now-sail', orig: null, draw: function () { return hudCore({ region: 'region.coralAtolls' }); } }
+] };
+M.fight = { v: [{ id: 'fight', label: 'Trading broadsides', bg: 'now-fleet', orig: 'old-fight', draw: function () {
+  var s = hudCore({ shield: 0, hull: 62, reload: .55, abilityCd: .4, abilitySec: '7', steady: .96, reticle: true });
+  var hurts = ['hurt.sail', 'hurt.leak', 'hurt.fire'];
+  hurts.forEach(function (h, i) { s += paperDisc(80 + i * 34, 86, 14, { rw: 1.1 }) + wc(h, 80 + i * 34, 86, 20, { ink: h === 'hurt.fire' ? 'rubric' : 'iron' }); });
+  s += hitCross(478, 220);
+  s += fig(560, 168, '24', 30, { fill: INK.rubric, halo: INK.white, hw: 3.5 });
+  s += fig(650, 196, '61', 40, { fill: WASH.gold, halo: INK.iron, hw: 3 });
+  var ex = 478 * .92, ey = 220 * .92;
+  [[Math.PI * .98, .9], [-Math.PI * .22, .7]].forEach(function (a) {
+    var a0 = a[0] - .22, a1 = a[0] + .22, p = 'M';
+    for (var i = 0; i <= 16; i++) { var t = a0 + (a1 - a0) * i / 16; p += (i ? 'L' : '') + f(478 + Math.cos(t) * ex) + ' ' + f(220 + Math.sin(t) * ey); }
+    s += '<path d="' + p + '" fill="none" stroke="' + INK.white + '" stroke-width="9" opacity=".35" stroke-linecap="round"/><path d="' + p + '" fill="none" stroke="' + INK.rubric + '" stroke-width="5" opacity="' + a[1] + '" stroke-linecap="round"/>';
+  });
+  return s;
+} }] };
+M.hotbar = { v: [
+  { id: 'offer', label: 'Hold full, loot in reach', bg: 'now-sail', orig: 'old-offer', draw: function () { return hudCore({ slots: SLOTS_FULL, sailsLevel: 1 }) + hand(324, 337, 40, 90); } },
+  { id: 'use', label: 'Using a shield, dropping a slot', bg: 'now-sail', orig: 'old-consumable', draw: function () {
+    return hudCore({ shield: 0, hull: 60, slots: [{ icon: 'weapon.cannon', n: 8 }, { icon: 'weapon.scatter', n: 8, drop: .6, ink: 'green' }, { icon: 'item.smallShield', n: 2, chosen: true, using: .45 }, null, null] });
+  } },
+  { id: 'weapons', label: 'Every weapon, by rarity ink', bg: 'now-sail', orig: null, draw: function () {
+    var s = hudCore({ slots: [{ icon: 'weapon.scatter', n: 6, ink: 'silver' }, { icon: 'weapon.chain', n: 4, ink: 'green', chosen: true }, { icon: 'weapon.broadside', n: 3, ink: 'blue' }, { icon: 'weapon.heated', n: 2, ink: 'rubric' }, { icon: 'item.fullRepair', n: 1, ink: 'gold' }] });
+    return s;
+  } }
+] };
+M.storm = { v: [
+  { id: 'closing', label: 'Circle closing', bg: 'now-dusk', orig: 'old-storm-closing', draw: function () { return hudCore({ clock: '0:50', closing: true, tight: true, hull: 85, discStorm: .5, hail: { illum: 'rubric', tally: 3 } }); } },
+  { id: 'outside', label: 'Outside the circle', bg: 'now-dusk', orig: 'old-storm-outside', draw: function () { return '<rect width="956" height="440" fill="url(#rim)"/>' + hudCore({ clock: '0:31', closing: true, tight: true, hull: 41, discStorm: .4 }); } }
+] };
+M.gull = { v: [
+  { id: 'none', label: 'No coins (seal always drawn)', bg: 'now-sail', orig: 'old-hud-calm', draw: function () { return hudCore({}); } },
+  { id: 'gold', label: 'Coins for treasure', bg: 'now-sail', orig: null, draw: function () { return hudCore({ hail: { illum: 'gold', tally: 7 } }); } },
+  { id: 'first', label: 'First hail: the hand', bg: 'now-sail', orig: null, draw: function () { return hudCore({ hail: { illum: 'rubric', tally: 3 } }) + hand(704, 182, 38, -90); } },
+  { id: 'away', label: 'Gull away', bg: 'now-sail', orig: null, draw: function () { return hudCore({ hail: { illum: 'ink', away: true } }); } }
+] };
+
+/* scraps: drawn in a 78 x 54 box at the phone's place (113,141) */
+var SCRAP = {
+  wind: function () {
+    return '<g transform="rotate(90 18 14)">' + wc('hud.gust', 18, 14, 18) + '</g>' + galleon(52, 40, 20, {}) +
+      '<path d="M52 32L44 24L56 16L46 8" fill="none" stroke="' + INK.rubric + '" stroke-width="1.1" stroke-dasharray="1.2 2.2" stroke-linecap="round"/>';
+  },
+  fight: function () {
+    return wc('hud.hull', 52, 34, 26) + '<circle cx="18" cy="16" r="3" fill="' + INK.iron + '"/><path d="M21 16Q36 4 46 26" fill="none" stroke="' + INK.iron + '" stroke-width="1.1" stroke-dasharray="1.2 2.2"/>';
+  },
+  closing: function () { return wc('hud.spiral', 34, 28, 30) + hand(56, 32, 20, 200); }
+};
+function scrap(kind, x, y, k) {
+  k = k || 1;
+  return '<g transform="translate(' + x + ' ' + y + ') scale(' + k + ')">' + slip(0, 0, 78, 54, { flat: k > 1 }) + pin(7, 7) + SCRAP[kind]() + '</g>';
+}
+function scrapScreen(kind) {
+  return hudCore({}) + scrap(kind, 74, 114) +
+    '<g class="note"><path d="M152 141L330 130" stroke="#fff" stroke-width="1" stroke-dasharray="3 3"/>' +
+    '<rect x="330" y="70" width="248" height="182" rx="6" fill="rgba(20,20,20,.55)" stroke="#fff" stroke-width="1" stroke-dasharray="3 3"/>' +
+    scrap(kind, 337, 77, 3) + '<text class="ovt" x="572" y="245" fill="#fff" font-size="11" text-anchor="end">×3, sheet inset</text></g>';
+}
+M.scraps = { v: [
+  { id: 'wind', label: 'Wind', bg: 'now-sail', orig: 'old-scrap-wind', draw: function () { return scrapScreen('wind'); } },
+  { id: 'fight', label: 'Fight', bg: 'now-sail', orig: 'old-scrap-fight', draw: function () { return scrapScreen('fight'); } },
+  { id: 'closing', label: 'Closing', bg: 'now-sail', orig: 'old-scrap-closing', draw: function () { return scrapScreen('closing'); } }
+] };
+M.spectate = { v: [{ id: 'watch', label: 'Watching another ship', bg: 'now-fleet', orig: 'old-spectate', whole: true, draw: function () { return clockSlip('1:19') + disc(809, 85, 75, { gilt: true, storm: .6 }); } }] };
+M.victory = { v: [{ id: 'win', label: 'Last afloat', bg: 'now-golden', orig: null, whole: true, draw: function () { return ''; } }] };
+
+function resultDraw(place, ink, figInk) {
+  var s = '<rect width="956" height="440" fill="url(#pg)"/>';
+  s += '<path d="M0 60Q120 40 160 0" fill="none" stroke="#b49a70" stroke-width="1" opacity=".5"/><path d="M0 330Q90 340 110 440" fill="none" stroke="#b49a70" stroke-width="1" opacity=".5"/>';
+  s += '<circle cx="271" cy="132" r="74.8" fill="' + PAPER + '" stroke="' + INK.iron + '" stroke-width="1.6"/><circle cx="271" cy="132" r="69" fill="none" stroke="' + INK.iron + '" stroke-width=".6"/>';
+  s += '<path d="' + roughCircle(271, 132, 46, 5, 8) + '" fill="' + WASH.vermilion + '" opacity=".75"/>';
+  s += laurel(478, 132, 82, ink);
+  s += fig(478, 132, place, 108, { fill: figInk });
+  [['hud.kills', '0', 319.6], ['hud.damage', '0', 478], ['hud.afloat', '0:13', 636.4]].forEach(function (r) { s += wc(r[0], r[2] - 20, 272.8, 37.4) + fig(r[2] + 4, 272.8, r[1], 32, { anchor: 'start' }); });
+  s += plate(478, 360.8, .724, '2', .35, 'ink');
+  return s;
+}
+M.result = { v: [
+  { id: 'p1', label: '1st (gold)', bg: null, orig: 'old-results', whole: true, draw: function () { return resultDraw('1', WASH.gold, WASH.gold); } },
+  { id: 'p4', label: '4th (silver)', bg: null, orig: 'old-result-4', whole: true, draw: function () { return resultDraw('4', '#b4b8c2', '#7f848b'); } },
+  { id: 'p9', label: '9th (red)', bg: null, orig: 'old-result-9', whole: true, draw: function () { return resultDraw('9', WASH.vermilion, INK.rubric); } },
+  { id: 'p23', label: '23rd (iron)', bg: null, orig: 'old-result-23', whole: true, draw: function () { return resultDraw('23', '#6b5a4a', INK.iron); } }
+] };
+
+/* ---------- the phone frame and its overlays ---------- */
+function overlays(v, targets) {
+  var s = '';
+  // safe area
+  s += '<g class="ov-safe"><rect x="0" y="0" width="' + SL + '" height="440" fill="url(#safeh)"/><rect x="' + (W - SR) + '" y="0" width="' + SR + '" height="440" fill="url(#safeh)"/>' +
+    '<rect x="0" y="' + (H - SB - 1) + '" width="956" height="' + (SB + 1) + '" fill="url(#safeh)"/>' +
+    '<path d="M' + SL + ' 0V' + (H - SB - 1) + 'H' + (W - SR) + 'V0" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 4" opacity=".7"/>' +
+    '<rect x="378" y="430" width="200" height="5" rx="2.5" fill="#fff" opacity=".85"/></g>';
+  // thumbs
+  var m = v.mirror, zx = m ? W * .55 : 0, lx = m ? 0 : W * .45;
+  s += '<g class="ov-thumbs"><rect x="' + zx + '" y="0" width="' + (W * .45) + '" height="440" fill="rgba(60,120,220,.26)"/>' +
+    '<rect x="' + lx + '" y="0" width="' + (W * .55) + '" height="440" fill="rgba(230,140,40,.2)"/>' +
+    '<line x1="' + (m ? W * .55 : W * .45) + '" y1="0" x2="' + (m ? W * .55 : W * .45) + '" y2="440" stroke="#fff" stroke-width="1.5" stroke-dasharray="6 4"/>' +
+    '<path d="M40 210A230 230 0 0 1 270 440M40 130A340 340 0 0 1 380 440" fill="none" stroke="#fff" stroke-width="1.4" stroke-dasharray="2 4" transform="translate(0 0)"/>' +
+    '<path d="M916 210A230 230 0 0 0 686 440M916 130A340 340 0 0 0 576 440" fill="none" stroke="#fff" stroke-width="1.4" stroke-dasharray="2 4"/>' +
+    lab(m ? 540 : 84, 400 - 330, m ? 'stick (right 45%)' : 'stick (left 45%)', 'start') + lab(m ? 420 : 870, 70, 'look drag', 'end') +
+    lab(200, 330, 'easy', 'middle') + lab(300, 250, 'stretch', 'middle') + lab(756, 330, 'easy', 'middle') + lab(656, 250, 'stretch', 'middle') + '</g>';
+  // targets
+  var t = '';
+  if (v.whole) t += '<rect x="4" y="4" width="948" height="432" fill="rgba(60,170,90,.12)" stroke="#3faa5a" stroke-width="2" stroke-dasharray="8 5"/>' + lab(478, 412, 'whole screen is one target', 'middle');
+  targets.forEach(function (g) {
+    if (g.shape === 'r') {
+      if (g.w != null) {
+        var small = Math.min(g.w, g.h) < 44;
+        t += '<rect x="' + g.x + '" y="' + g.y + '" width="' + g.w + '" height="' + g.h + '" fill="' + (small ? 'rgba(230,50,40,.22)' : 'rgba(60,170,90,.18)') + '" stroke="' + (small ? '#e5372b' : '#3faa5a') + '" stroke-width="1.6"/>' + lab(g.x + g.w - 4, g.y + 12, Math.round(g.w) + '×' + Math.round(g.h), 'end');
+      } else {
+        t += '<rect x="' + (g.x - g.d / 2) + '" y="' + (g.y - g.d / 2) + '" width="' + g.d + '" height="' + g.d + '" fill="rgba(60,170,90,.18)" stroke="#3faa5a" stroke-width="1.6"/>' +
+          '<rect x="' + (g.x - 28) + '" y="' + (g.y - 28) + '" width="56" height="56" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3"/>' + lab(g.x, g.y + 36, g.d + '', 'middle');
+      }
+    } else {
+      var sm = g.d < 44;
+      t += '<circle cx="' + g.x + '" cy="' + g.y + '" r="' + g.d / 2 + '" fill="' + (sm ? 'rgba(230,50,40,.25)' : 'rgba(60,170,90,.18)') + '" stroke="' + (sm ? '#e5372b' : '#3faa5a') + '" stroke-width="1.8"/>' +
+        (g.hit > g.d ? '<circle cx="' + g.x + '" cy="' + g.y + '" r="' + g.hit / 2 + '" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3"/>' : '') +
+        lab(g.x, g.y + Math.max(g.d, g.hit) / 2 + 10, Math.round(g.d) + '', 'middle');
+    }
+  });
+  s += '<g class="ov-targets">' + t + '</g>';
+  return s;
+}
+function lab(x, y, str, anchor) {
+  return '<text class="ovt" x="' + f(x) + '" y="' + f(y) + '" font-size="12" font-weight="600" fill="#fff" stroke="rgba(0,0,0,.75)" stroke-width="3" paint-order="stroke" text-anchor="' + anchor + '" dominant-baseline="central">' + esc(str) + '</text>';
+}
+var uid = 0;
+function phone(name, vi, showOrig) {
+  var v = M[name].v[vi];
+  TG = [];
+  var ui = v.draw();
+  var targets = TG; TG = null;
+  var id = 'scr' + (++uid);
+  var bg = v.bg ? '<image href="img/' + v.bg + '.jpg" x="0" y="0" width="956" height="440" preserveAspectRatio="xMidYMid slice"/>' : '';
+  var orig = v.orig && showOrig ? '<image href="img/' + v.orig + '.jpg" x="0" y="0" width="956" height="440" preserveAspectRatio="none"/>' +
+    '<g><rect x="70" y="8" width="128" height="22" rx="11" fill="rgba(122,74,36,.92)"/><text class="ovt" x="134" y="19.5" fill="#fff" font-size="12" font-weight="600" text-anchor="middle" dominant-baseline="central">0117 capture</text></g>' : '';
+  return '<svg viewBox="-16 -16 988 472" role="img" aria-label="' + esc(name + ': ' + v.label) + '" xmlns="http://www.w3.org/2000/svg">' +
+    '<rect x="-16" y="-16" width="988" height="472" rx="70" fill="#121212"/><rect x="-11" y="-11" width="978" height="462" rx="65" fill="none" stroke="#3a3a3a" stroke-width="1.5"/>' +
+    '<clipPath id="' + id + '"><rect width="956" height="440" rx="54"/></clipPath>' +
+    '<g clip-path="url(#' + id + ')"><rect width="956" height="440" fill="#0d2233"/>' + bg + (orig ? orig : '<g>' + ui + '</g>') + overlays(v, orig ? [] : targets) + '</g>' +
+    '<rect x="11" y="157" width="37" height="126" rx="18.5" fill="#000"/>' +
+    '</svg>';
+}
+
+/* ---------- shared defs ---------- */
+(function defs() {
+  var d = '';
+  d += '<radialGradient id="pg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#f7eedb"/><stop offset=".7" stop-color="#f0e2c4"/><stop offset="1" stop-color="#dcc396"/></radialGradient>';
+  d += '<filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="#1a1008" flood-opacity=".45"/></filter>';
+  Object.keys(INK).forEach(function (k) {
+    [['', 1.3, .42], ['-d', .8, .26]].forEach(function (p) {
+      d += '<pattern id="h-' + k + p[0] + '" patternUnits="userSpaceOnUse" width="' + p[1] + '" height="' + p[1] + '" patternTransform="rotate(-45)">' +
+        '<rect width="' + p[1] + '" height="' + p[1] + '" fill="' + INK[k] + '" opacity=".12"/><rect width="' + p[1] + '" height="' + p[2] + '" fill="' + INK[k] + '"/></pattern>';
+    });
+  });
+  d += '<pattern id="safeh" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(255,255,255,.06)"/><rect width="1.5" height="8" fill="rgba(255,255,255,.26)"/></pattern>';
+  [['ink', '#4a3e36', '#1c1612'], ['rubric', '#d65a3c', '#7e1d0f'], ['redBlue', '#d65a3c', '#7e1d0f'], ['silver', '#e2e4e8', '#7f848b'], ['gold', '#f0c86a', '#9a6a1c']].forEach(function (g) {
+    d += '<radialGradient id="wax' + g[0] + '" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="' + g[1] + '"/><stop offset="1" stop-color="' + g[2] + '"/></radialGradient>';
+  });
+  d += '<radialGradient id="rim" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#a01e12" stop-opacity="0"/><stop offset=".85" stop-color="#a01e12" stop-opacity=".45"/><stop offset="1" stop-color="#8a1408" stop-opacity=".8"/></radialGradient>';
+  document.getElementById('shared-defs').innerHTML = d;
+})();
+
+/* ---------- storage (never required) ---------- */
+var KEY = 'portolan-ui-sheet-v1', MEM = {};
+function load() { try { var s = window.localStorage.getItem(KEY); if (s) return JSON.parse(s) || {}; } catch (e) {} return MEM; }
+function save(o) { MEM = o; try { window.localStorage.setItem(KEY, JSON.stringify(o)); return true; } catch (e) { return false; } }
+var STORE = load();
+
+/* ---------- build the page ---------- */
+var sections = [].slice.call(document.querySelectorAll('section.screen'));
+var idx = document.getElementById('idx');
+sections.forEach(function (sec) {
+  var name = sec.getAttribute('data-name'), parts = name.split(' '), num = parts.shift();
+  var li = document.createElement('li');
+  li.innerHTML = '<a href="#' + sec.id + '"><span class="n">' + esc(num === 'Summary' ? 'Σ' : num) + '</span><span class="t">' + esc(num === 'Summary' ? 'Summary' : parts.join(' ')) + '</span>' + (sec.dataset.verdict ? '<span class="d ' + sec.dataset.verdict + '" title="Sheet says ' + sec.dataset.verdict + '"></span>' : '') + '</a>';
+  idx.appendChild(li);
+});
+
+var orig = {};
+[].slice.call(document.querySelectorAll('[data-mock]')).forEach(function (el) {
+  var name = el.getAttribute('data-mock'), vs = M[name].v, cur = 0;
+  orig[name] = false;
+  var tabs = document.createElement('div');
+  tabs.className = 'tabs';
+  var hasOrig = vs.some(function (v) { return v.orig; });
+  var html = '';
+  if (vs.length > 1) vs.forEach(function (v, i) { html += '<button type="button" data-v="' + i + '" aria-pressed="' + (i === 0) + '">' + esc(v.label) + '</button>'; });
+  else html += '<span style="font-size:12.5px;color:var(--muted)">' + esc(vs[0].label) + '</span>';
+  if (hasOrig) html += '<span class="sep"></span><button type="button" class="orig" aria-pressed="false" title="Swap the mock for a real headless capture of the old game at 956×440">0117 capture</button>';
+  tabs.innerHTML = html;
+  el.parentNode.insertBefore(tabs, el);
+  var origBtn = tabs.querySelector('.orig');
+  function draw() {
+    el.innerHTML = phone(name, cur, orig[name]);
+    if (origBtn) { origBtn.disabled = !vs[cur].orig; origBtn.title = vs[cur].orig ? 'Swap the mock for a real headless capture of the old game at 956×440' : 'No capture of this state'; }
+  }
+  tabs.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('orig')) { orig[name] = !orig[name]; b.setAttribute('aria-pressed', orig[name]); }
+    else { cur = +b.getAttribute('data-v'); [].forEach.call(tabs.querySelectorAll('[data-v]'), function (x) { x.setAttribute('aria-pressed', x === b); }); }
+    draw();
+  });
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-label', 'Open ' + name + ' at 1:1');
+  el.addEventListener('click', function () { zoom(el, name); });
+  el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zoom(el, name); } });
+  draw();
+});
+
+var dlg = document.getElementById('zoom');
+function zoom(el, name) {
+  var zin = document.getElementById('zin');
+  zin.innerHTML = el.innerHTML;
+  document.getElementById('znote').textContent = el.querySelector('svg').getAttribute('aria-label') + ' · 1:1, 956×440 pt';
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+}
+document.getElementById('zclose').addEventListener('click', function () { dlg.close ? dlg.close() : dlg.removeAttribute('open'); });
+dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.id === 'zin') dlg.close(); });
+
+/* toggles */
+var root = document.documentElement;
+[].forEach.call(document.querySelectorAll('[data-tg]'), function (b) {
+  var k = b.getAttribute('data-tg');
+  b.addEventListener('click', function () {
+    if (k === 'theme') {
+      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.setAttribute('data-theme', dark ? 'light' : 'dark');
+      syncTheme();
+      try { localStorage.setItem(KEY + '-theme', root.getAttribute('data-theme')); } catch (e) {}
+      return;
+    }
+    var on = !root.classList.contains(k);
+    root.classList.toggle(k, on);
+    b.setAttribute('aria-pressed', on);
+  });
+});
+function syncTheme() {
+  var b = document.querySelector('[data-tg="theme"]');
+  var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  b.textContent = dark ? 'Light sheet' : 'Dark sheet';
+}
+try { var th = localStorage.getItem(KEY + '-theme'); if (th) root.setAttribute('data-theme', th); } catch (e) {}
+syncTheme();
+
+/* feedback boxes */
+[].forEach.call(document.querySelectorAll('[data-fb]'), function (box) {
+  var key = box.getAttribute('data-fb'), sec = box.closest('section'), name = sec.getAttribute('data-name');
+  var st = STORE[key] || {};
+  var radios = sec.dataset.verdict ? '<fieldset aria-label="Your call on ' + esc(name) + '">' + ['keep', 'rework', 'cut'].map(function (v) {
+    return '<label><input type="radio" name="fb-' + key + '" value="' + v + '"' + (st.call === v ? ' checked' : '') + '>' + v[0].toUpperCase() + v.slice(1) + '</label>';
+  }).join('') + '</fieldset>' : '<span></span>';
+  box.innerHTML = '<span class="lbl">Your call</span><div>' + radios + '<textarea aria-label="Notes on ' + esc(name) + '" placeholder="Notes for this screen">' + esc(st.note || '') + '</textarea></div><span class="saved"></span>';
+  var saved = box.querySelector('.saved');
+  function put() {
+    var c = box.querySelector('input:checked'), n = box.querySelector('textarea').value;
+    STORE[key] = { call: c ? c.value : '', note: n };
+    saved.textContent = save(STORE) ? 'Saved in this browser' : 'Not saved (storage blocked); copy before leaving';
+  }
+  box.addEventListener('change', put);
+  box.querySelector('textarea').addEventListener('input', put);
+});
+
+function feedbackText() {
+  var out = ['Portolan UI sheet: owner feedback', ''];
+  sections.forEach(function (sec) {
+    var box = sec.querySelector('[data-fb]');
+    if (!box) return;
+    var c = box.querySelector('input:checked'), n = box.querySelector('textarea').value.trim();
+    out.push('## ' + sec.getAttribute('data-name'));
+    if (sec.dataset.verdict) out.push('Call: ' + (c ? c.value : '(none)') + ' (sheet: ' + sec.dataset.verdict + ')');
+    out.push(n ? n : '(no notes)');
+    out.push('');
+  });
+  return out.join('\n');
+}
+window.portolanFeedbackText = feedbackText;
+var status = document.getElementById('copyStatus');
+document.getElementById('copyAll').addEventListener('click', function () {
+  var text = feedbackText();
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) { status.textContent = 'Copied'; return; }
+    var zin = document.getElementById('zin');
+    zin.innerHTML = '<textarea style="width:min(900px,92vw);height:80vh;font:13px var(--mono);padding:12px" readonly></textarea>';
+    zin.firstChild.value = text;
+    document.getElementById('znote').textContent = 'Copy blocked: select all and copy';
+    dlg.showModal ? dlg.showModal() : dlg.setAttribute('open', '');
+    zin.firstChild.select();
+    status.textContent = '';
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { status.textContent = 'Copied'; }, fallback);
+    else fallback();
+  } catch (e) { fallback(); }
+  setTimeout(function () { status.textContent = ''; }, 2500);
+});
+
+/* index highlight */
+if ('IntersectionObserver' in window) {
+  var links = {};
+  [].forEach.call(idx.querySelectorAll('a'), function (a) { links[a.getAttribute('href').slice(1)] = a; });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { for (var k in links) links[k].classList.remove('on'); var a = links[e.target.id]; if (a) { a.classList.add('on'); var nav = a.closest('nav'); if (nav.scrollWidth > nav.clientWidth) nav.scrollLeft = a.offsetLeft - 24; } } });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  sections.forEach(function (s) { io.observe(s); });
+}
+
+/* summary: inks and the icon sheet */
+var inks = document.getElementById('inks');
+var sw = [['iron', INK.iron, 'principal winds, outlines, figures'], ['rubric', INK.rubric, 'harm, the Storm, quarter winds'], ['green', INK.green, 'half winds, uncommon'], ['blue', INK.blue, 'rare, the needle'], ['gold', INK.gold, 'chosen, sunk, first place'], ['sepia', INK.sepia, 'faint ink'], ['white', INK.white, 'lead white: stick, reticle, empty slots'], ['silver', INK.silver, 'common']];
+Object.keys(WASH).forEach(function (k) { sw.push([k + ' wash', WASH[k], '']); });
+sw.push(['paper', '#f6ecdc', 'folio stock'], ['title sheet', '#dfc8a2', '']);
+inks.innerHTML = sw.map(function (s) { return '<div class="swatch"><i style="background:' + s[1] + '"></i><span>' + esc(s[0]) + '<br><code>' + esc(s[1]) + '</code>' + (s[2] ? '<br><span style="color:var(--muted)">' + esc(s[2]) + '</span>' : '') + '</span></div>'; }).join('');
+var sheet = document.getElementById('iconsheet');
+sheet.innerHTML = Object.keys(P).map(function (n) {
+  return '<figure><svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">' + wc(n, 24, 24, 44, { paper: '#f4e9d2' }) + '</svg><figcaption title="' + esc(n) + '">' + esc(n.split('.')[1]) + '</figcaption></figure>';
+}).join('');
+})();
+
+</script>
+</body>
+</html>
