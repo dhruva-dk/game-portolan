@@ -172,7 +172,7 @@ function createShadow(view: View, field: CloudField) {
     const dt = t1.sub(t0).div(SHADOW_STEPS);
     const tau = float(0).toVar();
     loop('ss', SHADOW_STEPS, (i) => {
-      // the eroded shape, as the eye sees it: the uneroded one is far fatter, and its shadow covers the sea
+      // the cloud as the eye sees it (eroded: the uneroded one is far fatter, and its shadow covers the sea)
       tau.addAssign(field.density(sea.add(sunDir.mul(t0.add(float(i).add(0.5).mul(dt))))).mul(SIGMA).mul(dt));
     });
     // the sun's light through the cloud, direct and diffused forward together (the two-stream slab's 1/(1 + ¾(1−g)τ)):

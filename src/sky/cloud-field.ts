@@ -156,10 +156,10 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     return clamp(remap(dense, e.mul(EROSION), float(1), float(0), float(1)), 0, 1);
   };
 
-  /** The eroded density at q. */
+  /** The cloud's density at q (0–1, of SIGMA), eroded, as the march sees it. */
   const density = (q: N): N => {
     const c = coarse(q);
-    return select(c.dense.greaterThan(0), erode(c.dense, q, c.h), float(0));
+    return select(c.dense.greaterThan(0), clamp(erode(c.dense, q, c.h).div(FULL), 0, 1), float(0));
   };
 
   /** Distance along unit d from the eye to the sphere of altitude a (km); the eye is below it. */
