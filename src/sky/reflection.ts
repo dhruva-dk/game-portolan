@@ -17,7 +17,7 @@ import {
   texture, textureLoad, textureStore, uniformArray, uvec2, vec3, vec4,
 } from 'three/tsl';
 import type { View } from '../view/view';
-import { skyRadiance } from './tables';
+import type { Tables } from './tables';
 
 type N = any;
 
@@ -109,10 +109,12 @@ function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): 
 }
 
 /**
- * sunDirection: toward the sun, as the eye's sky shows it; cloudsAlong: the clouds' light (rgb) and transmittance (a)
- * along a sky direction, marched in at most so many steps.
+ * skyRadiance: the air's (tables.ts); sunDirection: toward the sun, as the eye's sky shows it; cloudsAlong: the
+ * clouds' light (rgb) and transmittance (a) along a sky direction, marched in at most so many steps.
  */
-export function createReflection(renderer: WebGPURenderer, view: View, sunDirection: N, cloudsAlong: (d: N, steps: number) => N) {
+export function createReflection(
+  renderer: WebGPURenderer, view: View, skyRadiance: Tables['skyRadiance'], sunDirection: N, cloudsAlong: (d: N, steps: number) => N,
+) {
   const panorama = storage(W, H);
   const reduced = storage(RW, RH);
   /** The panorama and its levels, as one texture's mips. */

@@ -21,14 +21,6 @@ function volume(n: number): Storage3DTexture {
   t.generateMipmaps = false;
   return t;
 }
-export const shapeVolume = volume(SHAPE_N);
-export const detailVolume = volume(DETAIL_N);
-export const weatherMap = new StorageTexture(WEATHER_N, WEATHER_N);
-weatherMap.wrapS = weatherMap.wrapT = RepeatWrapping;
-// half floats: it holds a potential in km, from which the clouds' tops are worked out
-weatherMap.type = HalfFloatType;
-weatherMap.generateMipmaps = false;
-
 const hash33 = (c: N): N =>
   fract(sin(vec3(dot(c, vec3(127.1, 311.7, 74.7)), dot(c, vec3(269.5, 183.3, 246.1)), dot(c, vec3(113.5, 271.9, 124.6)))).mul(43758.5453));
 
@@ -89,7 +81,7 @@ function texel3(n: number) {
 }
 
 /** R: Perlin-Worley billows (4–16 periods a tile); G, B, A: Worley at 4, 8 and 16, to lift the billows' floor. */
-const shapeKernel = Fn(() => {
+const shapeKernel = (shapeVolume: Storage3DTexture) => Fn(() => {
   const { at, uvw } = texel3(SHAPE_N);
   const pn = clamp(perlinFbm(uvw, 4, 3).mul(1.1).add(0.5), 0, 1);
   const w4 = worley(uvw.mul(4), float(4)), w8 = worley(uvw.mul(8), float(8)), w16 = worley(uvw.mul(16), float(16));
@@ -99,7 +91,7 @@ const shapeKernel = Fn(() => {
 })().compute(SHAPE_N ** 3, [64]);
 
 /** Worley at 4, 8 and 16 periods a tile: the erosion's octaves. */
-const detailKernel = Fn(() => {
+const detailKernel = (detailVolume: Storage3DTexture) => Fn(() => {
   const { at, uvw } = texel3(DETAIL_N);
   textureStore(detailVolume, at, vec4(worley(uvw.mul(4), float(4)), worley(uvw.mul(8), float(8)), worley(uvw.mul(16), float(16)), 1));
 })().compute(DETAIL_N ** 3, [64]);
@@ -122,7 +114,7 @@ export const POTENTIAL_DECILES = [0, 0.0135, 0.055, 0.0905, 0.125, 0.1625, 0.207
  * inside its cloud's edge; G: the large-scale field (0–1) that gathers them into fields of cloud with clear sky between;
  * B: the potential at the peak of the cell that holds the point (km), from which its cloud's dome is drawn.
  */
-const weatherKernel = Fn(() => {
+const weatherKernel = (weatherMap: StorageTexture) => Fn(() => {
   const x = instanceIndex.mod(WEATHER_N), y = instanceIndex.div(WEATHER_N);
   const uv = vec2(x, y).add(0.5).div(WEATHER_N);
   const potential = vec2(0, 0).toVar();
@@ -135,9 +127,19 @@ const weatherKernel = Fn(() => {
   textureStore(weatherMap, uvec2(x, y), vec4(max(potential.x, 0), field, potential.y, 1));
 })().compute(WEATHER_N * WEATHER_N, [64]);
 
-/** Bakes the patterns; once, before the clouds are first drawn. */
-export function bakeCloudNoise(renderer: WebGPURenderer) {
-  renderer.compute(shapeKernel);
-  renderer.compute(detailKernel);
-  renderer.compute(weatherKernel);
+export type CloudNoise = ReturnType<typeof createCloudNoise>;
+
+/** The patterns, baked here once, before the clouds are first drawn. */
+export function createCloudNoise(renderer: WebGPURenderer) {
+  const shape = volume(SHAPE_N);
+  const detail = volume(DETAIL_N);
+  const weather = new StorageTexture(WEATHER_N, WEATHER_N);
+  weather.wrapS = weather.wrapT = RepeatWrapping;
+  // half floats: it holds a potential in km, from which the clouds' tops are worked out
+  weather.type = HalfFloatType;
+  weather.generateMipmaps = false;
+  renderer.compute(shapeKernel(shape));
+  renderer.compute(detailKernel(detail));
+  renderer.compute(weatherKernel(weather));
+  return { shape, detail, weather };
 }

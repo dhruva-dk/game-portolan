@@ -21,7 +21,7 @@ import { toSky } from '../world/sphere';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO, SUN_ANGULAR_RADIUS } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
-import { VIEW_RADIUS, createTables, haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
+import { VIEW_RADIUS, createTables } from './tables';
 
 type N = any;
 
@@ -37,9 +37,6 @@ const SUN_RADIANCE = 1 / (Math.PI * SUN_ANGULAR_RADIUS * SUN_ANGULAR_RADIUS * (1
  */
 const PEAK_SHARE = 0.25, PEAK_G = 0.95;
 
-/** Extinction of the air at sea level, per km. */
-const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
-
 /** The light the sky gives everything else. */
 export interface Sky {
   sun: N;
@@ -51,11 +48,14 @@ export interface Sky {
 
 export function createSky(renderer: WebGPURenderer, view: View) {
   const tables = createTables(renderer);
+  const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
+  /** Extinction of the air at sea level, per km. */
+  const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
   /** Toward the sun: in the world, and as the eye's sky shows it. */
   const sun = uniform(new Vector3(0, 1, 0));
   const skySun = uniform(new Vector3(0, 1, 0));
-  const clouds = createClouds(renderer, view);
-  const reflection = createReflection(renderer, view, skySun, clouds.along);
+  const clouds = createClouds(renderer, view, tables);
+  const reflection = createReflection(renderer, view, skyRadiance, skySun, clouds.along);
 
   const sunIlluminance = (p: N): N => sunTransmittance(VIEW_RADIUS, dot(view.up(p), sun));
 

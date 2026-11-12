@@ -27,8 +27,8 @@ import {
 import {
   BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT, RAYLEIGH_SCATTERING, SEA_ALBEDO,
 } from './atmosphere';
-import { POTENTIAL_DECILES, WEATHER_TILE, detailVolume, remap, shapeVolume, weatherMap } from './cloud-noise';
-import { haze, skyAmbientUp, skyRadiance, sunTransmittance } from './tables';
+import { POTENTIAL_DECILES, WEATHER_TILE, remap, type CloudNoise } from './cloud-noise';
+import type { Tables } from './tables';
 
 type N = any;
 
@@ -95,7 +95,9 @@ export function cloudThreshold(k: number): { threshold: number; fieldShift: numb
   return { threshold: D[i] + (x - i) * (D[i + 1] - D[i]) - layer, fieldShift: FIELD_SHIFT * 4 * k * (1 - k) };
 }
 
-export function createCloudField() {
+/** tables: the air's (tables.ts); noise: the clouds' patterns (cloud-noise.ts). */
+export function createCloudField(tables: Tables, noise: CloudNoise) {
+  const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   const threshold = uniform(0.4);
   const fieldShift = uniform(0);
   const coverage = {
@@ -122,7 +124,7 @@ export function createCloudField() {
   /** The cloud's density (0–1) at q before erosion, its height in the shell and its dome's top there (fractions). */
   const coarse = (q: N) => {
     const { p, h } = locate(q);
-    const w = texture(weatherMap).sample(p.xz.div(WEATHER_TILE)).level(float(0));
+    const w = texture(noise.weather).sample(p.xz.div(WEATHER_TILE)).level(float(0));
     // how far inside its cloud's edge the point lies, km: the fields of cloud lower the threshold, the clear skies
     // between raise it
     const shift = w.g.sub(0.5).mul(fieldShift).sub(threshold);
@@ -136,7 +138,7 @@ export function createCloudField() {
     const reach = clamp(min(dome.sub(h.mul(TOP - BASE)), inside).div(BILLOW), 0, 1);
     const dense = float(0).toVar();
     If(reach.greaterThan(0), () => {
-      const n = texture3D(shapeVolume, p.div(SHAPE_SCALE)).level(float(0));
+      const n = texture3D(noise.shape, p.div(SHAPE_SCALE)).level(float(0));
       const floorNoise = n.g.mul(0.625).add(n.b.mul(0.25)).add(n.a.mul(0.125));
       const billows = clamp(remap(n.r, floorNoise.sub(1), float(1), float(0), float(1)), 0, 1);
       // and a flat base, thinning out over its lowest BASE_FADE
@@ -148,7 +150,7 @@ export function createCloudField() {
   /** Erodes a density at q: wisps toward the base, billows higher up. */
   const erode = (dense: N, q: N, h: N): N => {
     const { p } = locate(q);
-    const d = texture3D(detailVolume, p.div(DETAIL_SCALE)).level(float(0));
+    const d = texture3D(noise.detail, p.div(DETAIL_SCALE)).level(float(0));
     const df = d.r.mul(0.625).add(d.g.mul(0.25)).add(d.b.mul(0.125));
     const e = mix(df, float(1).sub(df), clamp(h.mul(4), 0, 1));
     return clamp(remap(dense, e.mul(EROSION), float(1), float(0), float(1)), 0, 1);

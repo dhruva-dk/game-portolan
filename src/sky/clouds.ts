@@ -16,8 +16,9 @@ import {
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { View } from '../view/view';
-import { bakeCloudNoise } from './cloud-noise';
+import { createCloudNoise } from './cloud-noise';
 import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
+import type { Tables } from './tables';
 
 type N = any;
 
@@ -201,9 +202,9 @@ export interface CloudInputs {
   sunDirection: Vector3;
 }
 
-export function createClouds(renderer: WebGPURenderer, view: View) {
-  bakeCloudNoise(renderer);
-  const field = createCloudField();
+/** tables: the air's (tables.ts), which light the clouds and the air in front of them. */
+export function createClouds(renderer: WebGPURenderer, view: View, tables: Tables) {
+  const field = createCloudField(tables, createCloudNoise(renderer));
   const { coverage, drift, sunDir, eye } = field.inputs;
   const cam = cameraInputs();
   const shadow = createShadow(view, field);
