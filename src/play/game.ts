@@ -39,7 +39,7 @@ const bearing = (at: Vec3, b: number): Vec3 => {
 export function createGame(frame: Frame, env: Environment, element: HTMLElement, start: { at: Vec3; bearing: number }, legs: string) {
   const ground = frame.planet.height;
   const depth = (p: Vec3) => -ground(p);
-  const sea = createSwell(frame.anchors, ground, env.windSpeed);
+  const sea = createSwell(frame.anchors, ground, env.seaWind);
   const input = createInput(element);
   const drawStick = createStickView();
   const chase = createChase(frame.camera, ground, sea);

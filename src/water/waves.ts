@@ -187,7 +187,8 @@ export function createWaves(renderer: WebGPURenderer) {
     textureStore(curvature[i], uvec2(x, y), vec4(hxx, hzz, hxz, 0));
   })().compute(AREA, [64]));
 
-  let wind = -1;
+  let wind = -1, gusting = -1, held = 0;
+  const spreads = CASCADES.map(() => 0);
 
   return {
     displacement,
@@ -197,31 +198,39 @@ export function createWaves(renderer: WebGPURenderer) {
     amplitude,
     ripples,
     steepness,
-    /** clock: the world's, seconds; dt: since the last update, for the foam's fading. */
-    update(sea: Sea, clock: number, dt: number) {
-      // a new sea only when the wind changes; the same seeds keep the waves where they are
+    /**
+     * sea: the sea the wind has raised (its mean over the match: waves take hours to grow); now: the wind blowing
+     * now, m/s, which the whitecaps, the ripples and the foam follow within seconds; clock: the world's, seconds; dt:
+     * since the last update, for the foam's fading.
+     */
+    update(sea: Sea, now: number, clock: number, dt: number) {
+      // a new sea only when its wind changes; the same seeds keep the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
         const data = initial.image.data as Float32Array;
-        let held = 0;
+        held = 0;
         CASCADES.forEach((L, c) => {
           data.set(initialSpectrum(SIZE, L, sea, c + 1, BANDS[c]), c * AREA * 4);
           const mss = meanSquareSlope(SIZE, L, sea, BANDS[c]);
           held += mss;
-          if (c < FOAMING) {
-            // each breaking cascade lays its share of the whitecaps
-            const spread = Math.sqrt(mss) * CHOP;
-            breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(sea.wind) / FOAMING, 1e-6)) * spread, spread);
-          }
+          spreads[c] = Math.sqrt(mss) * CHOP;
         });
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
-        ripples.value = Math.max(coxMunk(sea.wind) - held, RIPPLE_FLOOR);
         steepness.value = Math.sqrt(held / 2);
+        gusting = -1;
+      }
+      if (Math.abs(now - gusting) > 0.01) {
+        gusting = now;
+        // each breaking cascade lays its share of the whitecaps
+        for (let c = 0; c < FOAMING; c++) {
+          breaking[c].value.set(1 + normalQuantile(Math.max(whitecaps(now) / FOAMING, 1e-6)) * spreads[c], spreads[c]);
+        }
+        ripples.value = Math.max(coxMunk(now) - held, RIPPLE_FLOOR);
       }
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
       // Monahan's stage B, a few seconds)
-      fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((sea.wind - 5) / 15, 0), 1)));
+      fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((now - 5) / 15, 0), 1)));
       time.value = clock % PERIOD;
       renderer.compute(spectrumKernel);
       renderer.compute(rowsKernel);

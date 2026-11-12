@@ -27,6 +27,8 @@ const RAYLEIGH = vec3(...A.RAYLEIGH_SCATTERING);
 const OZONE = vec3(...A.OZONE_ABSORPTION);
 
 const T_W = 256, T_H = 64, M_N = 32, V_W = 200, V_H = 100;
+/** The least change in the haze, as a share of it, that the air's tables are integrated again for. */
+const HAZE_STEP = 0.01;
 
 function table(w: number, h: number): StorageTexture {
   const t = new StorageTexture(w, h);
@@ -261,6 +263,9 @@ export function createTables(renderer: WebGPURenderer) {
   const ambientAt = (i: number): N => texture(ambientTable).sample(vec2((i + 0.5) / 3, 0.5)).level(float(0)).rgb;
 
   let lastCos = NaN, lastHaze = NaN;
+  /** The air's tables, in the order they are integrated (each reads the one before), and the next due, if any. */
+  const air = [transmittanceKernel, multipleKernel];
+  let next = air.length;
   return {
     /** Multiple of a clear day's aerosol the air's tables were last integrated for (Environment.haze). */
     haze,
@@ -272,15 +277,25 @@ export function createTables(renderer: WebGPURenderer) {
     skyHorizon: ambientAt(1),
     /** The sky's radiance at the zenith. */
     skyZenith: ambientAt(2),
-    /** Re-integrates what has changed: the air's tables with the haze, the sky view and ambient with the sun. */
+    /**
+     * Re-integrates what has changed: the air's tables with the haze, the sky view and ambient with the sun. The haze
+     * drifts (world/weather.ts), so it is taken in steps of HAZE_STEP of itself, far finer than the eye can tell, and
+     * its tables are integrated one a frame (each is about a millisecond on the Mac), the sky view on the last.
+     */
     update(sunY: number, hazeAmount: number) {
-      const airChanged = hazeAmount !== lastHaze;
-      if (airChanged) {
+      // the first time all at once
+      const first = Number.isNaN(lastHaze);
+      if (next === air.length && !(Math.abs(hazeAmount - lastHaze) <= HAZE_STEP * lastHaze)) {
         lastHaze = haze.value = hazeAmount;
-        renderer.compute(transmittanceKernel);
-        renderer.compute(multipleKernel);
+        next = 0;
       }
-      if (!airChanged && Math.abs(sunY - lastCos) < 1e-4) return;
+      if (next < air.length) {
+        do renderer.compute(air[next++]);
+        while (first && next < air.length);
+        if (next < air.length) return;
+        lastCos = NaN;
+      }
+      if (Math.abs(sunY - lastCos) < 1e-4) return;
       lastCos = sunCosZenith.value = sunY;
       renderer.compute(skyViewKernel);
       renderer.compute(ambientKernel);

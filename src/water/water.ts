@@ -260,7 +260,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     },
     /** Each frame: the world, and the ships on the sea. */
     update(env: Environment, dt: number, ships: readonly Afloat[]) {
-      waves.update({ wind: env.windSpeed, fetch: FETCH }, env.clock, dt);
+      waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
       wake.update(env, ships);
       hulls.update(ships.map((s) => s.pose), view.eye.position);
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
