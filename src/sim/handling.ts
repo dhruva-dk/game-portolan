@@ -61,3 +61,54 @@ export const RAM = {
   skin: 0.01,
   rearm: 3,
 } as const;
+
+/**
+ * A ship's hit points (health.ts): 0117's (src/sim/tables.ts SHIP, harm.ts), 100 of hull behind 100 of shield. The
+ * shield takes every blow first and what it can't hold goes on to the hull in the same blow; it never comes back of
+ * itself, only from what heals it. At 0 hull she sinks.
+ */
+export const HEALTH = {
+  /** The most hull and shield she can have. */
+  hull: 100,
+  shield: 100,
+  /** The shield she puts to sea with (0117: none, filled from loot; full here until there is loot). */
+  start: 100,
+} as const;
+
+/**
+ * Her gun (gun.ts) and its balls (shot.ts): one at most, on the plinth in her waist, firing one ball at a time.
+ * 0117's cannon (tables.ts WEAPONS) with its muzzle speed brought down by the same share as her top speed (165 m/s at
+ * 14.5, so 136 at 12) and its 200 m reach kept, on the same 554 m planet. The balls fly true orbits round the
+ * planet's centre, under a pull chosen so that 136 m/s carries a ball no further than `range` at its best elevation
+ * (shot.ts MU): some 11 g at the sea, for this tiny world; a flat shot's ball would otherwise go round it.
+ * Rarity is 0117's five tiers: it mostly closes up the spread and widens the assist; damage and reload ease a little.
+ */
+export const GUN = {
+  /** The tiers, worst to best (0117's). */
+  rarities: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
+  /** Muzzle speed, m/s; and the furthest a ball carries, m along the sea, before it is back down to the muzzle's height. */
+  speed: 136,
+  range: 200,
+  /** Hit points a ball takes off, and seconds to reload: 0117's cannon's 20, and between its 0.42 s a shot from the
+   * magazine and its 1.9 s reload, for a gun that fires one ball at a time; each scaled by 0117's rarity table. */
+  damage: 20,
+  reload: 2,
+  damageBy: [1, 1.08, 1.16, 1.24, 1.32],
+  reloadBy: [1, 0.95, 0.9, 0.85, 0.8],
+  /** The spread: each ball goes off within this cone (half-angle, radians) of where it is laid; about 7 m off at
+   * 150 m for a common gun and 2 m for a legendary one. New: 0117 laid its guns on the touched point, 0.008 rad. */
+  spread: [0.05, 0.038, 0.028, 0.02, 0.014],
+  /** The assist: the ship nearest the bearing she is aimed on, within this cone (half-angle, radians) of it and in
+   * range, is laid on, led for her course. New: 0117 had none, but aimed at a touched point. */
+  assist: [0.2, 0.25, 0.3, 0.36, 0.42],
+  /** In choosing among those in the cone, the share of range that counts as much as the cone's whole width. */
+  nearer: 0.5,
+  /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth (src/ship/mount.ts). */
+  ahead: 3,
+  up: 2.6,
+  /** Her hull, for a ball: the hull's capsule (contact.ts) standing from the waterline to this many metres up. */
+  freeboard: 4,
+  /** A ball's path is looked along every this many metres for a hull or the ground; and gone after this many seconds. */
+  probe: 0.25,
+  life: 8,
+} as const;

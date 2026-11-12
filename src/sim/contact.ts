@@ -64,8 +64,8 @@ export interface Blow {
 export const afloat = (id: number, ship: ShipState): Vessel => ({ id, ship, shove: [0, 0, 0], engaged: [] });
 
 /** Her hull's half-width, and how far ahead and astern of amidships its rounded ends are centred. */
-const RADIUS = SHIP.beam / 2;
-const KEEL = SHIP.length / 2 - RADIUS;
+export const RADIUS = SHIP.beam / 2;
+export const KEEL = SHIP.length / 2 - RADIUS;
 /** Passes of pushing apart, for a pile. */
 const PASSES = 8;
 

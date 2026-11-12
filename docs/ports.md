@@ -314,6 +314,23 @@ A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its f
 
 **Verdict:** port the rules and numbers, rewrite the code. 0117's code is 50 lines tied to `MatchState`, `hurt` and `emit`. It is order-dependent, uses circle hulls and has no shoal check. The numbers are the part worth keeping.
 
+## 12. Health, the gun and aim assist
+
+**What 0117 did** (`src/sim/harm.ts`, `combat.ts`, `tables.ts`)
+- **Health:** 100 hull, shield capped at 100 but put to sea at **0** (`setup.ts:68`) and filled only from loot (`USES`, caps 50 or 100). `hurt` takes the shield first and the overflow to the hull in the same blow; the storm, trail cuts and flooding skip the shield. No regeneration. Rams went through the shield.
+- **Cannon:** 20 damage, 8-ball magazine at 0.42 s, 1.9 s reload, 165 m/s, a fake 7 m/s² drop, 200 m range, 0.008 rad spread. Laid on the touched point, a fixed flight time to it; balls flew great circles at a height, and took nothing of the ship's way. Five rarities, Common to Legendary, scaling damage (1 to 1.32) and reload (1 to 0.8).
+
+**What I took:** the shield-first rule and its overflow, the 100/100 caps, the five tiers and their damage and reload tables, 20 damage, the 200 m reach, and the muzzle speed scaled by top speed (165 × 12/14.5 = 136 m/s). Balls still take nothing of the ship's way.
+
+**What I wrote new** (`src/sim/health.ts`, `gun.ts`, `shot.ts`, `battle.ts`, `tests/battle.test.ts`)
+- **Flight:** a true orbit about the centre, stepped by velocity Verlet. At 136 m/s a ball on a 554 m planet under 9.8 m/s² would go round it, so the pull is chosen to make 200 m the furthest carry: some 11 g at the sea. Carry and flight time are had in closed form (the range-angle equation and Kepler's), which the stepped flight matches to centimetres (tested). 150 m takes 1.2 s, as 0117's 200 m did.
+- **One gun, one ball:** at most one gun, on the waist's plinth; none at the start. Reload 2 s, one ball at a time.
+- **Aim assist:** aimed on a bearing; the ship nearest it within a cone (0.2 to 0.42 rad by rarity) and in range is laid on, led along her present course by iterating the closed-form flight time; else along the bearing at full range. Spread: a seeded draw within a cone (0.05 to 0.014 rad by rarity), from the battle's seed, the ship's id and her shot count.
+- **Hits:** the hull capsule of contact.ts standing 4 m from the waterline, probed every 0.25 m along the path; land in the way stops a ball.
+- **Shield at sea:** full (100), since there is no loot yet to fill it.
+
+**What I left:** magazines, the other seven weapons, crits and the weak spot, falloff with range, parts damage, the spread from turning, the seaway and weather, bots' sparring scale, and the shield-skipping causes (supported by `harmed(…, past)` but unused).
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.
