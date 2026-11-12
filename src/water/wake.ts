@@ -21,6 +21,10 @@
 //
 // A texel is half a metre, which the foam's lace (foam.ts) dresses. The marks fade out toward REACH: from the chase
 // camera the horizon lies a little past it, where a wake is a hair's breadth.
+//
+// With no ship near enough to mark it, the map isn't drawn at all and the sea is told it is empty: a pass that drew
+// nothing would still be a pass, and one with no work in it leaves the GPU's timestamps for it unwritten (the frame
+// meter would read whatever they last held).
 
 import {
   AddEquation, BufferAttribute, Color, BufferGeometry, CustomBlending, DoubleSide, DynamicDrawUsage, HalfFloatType,
@@ -28,7 +32,7 @@ import {
   OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, max, normalize, saturate, select, sin, smoothstep, texture, vec2, vec3, vec4,
+  Fn, abs, attribute, cos, cross, dot, exp, float, max, normalize, saturate, select, sin, smoothstep, texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { PIVOT_Z, buildShip } from '../ship/build';
@@ -99,6 +103,8 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
   // (unused: every draw places itself on the map)
   const camera = new OrthographicCamera();
   const clear = new Color();
+  /** 1 while the map holds this frame's marks, 0 while no ship is near enough to draw any. */
+  const live = uniform(0);
 
   // ---- the wakes: ribbons along the bows' paths
   const trailGeometry = new BufferGeometry();
@@ -195,7 +201,7 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
     const c = view.onEye(p);
     return {
       uv: vec2(c.q.x.div(2 * REACH).add(0.5), c.q.y.div(-2 * REACH).add(0.5)),
-      fade: smoothstep(REACH, REACH * 0.8, max(abs(c.q.x), abs(c.q.y))),
+      fade: smoothstep(REACH, REACH * 0.8, max(abs(c.q.x), abs(c.q.y))).mul(live),
       e1: c.e1,
       e2: c.e2,
     };
@@ -289,6 +295,8 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
       shadowGeometry.instanceCount = near;
       for (const a of [trailAt, trailMark, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
       poses.needsUpdate = true;
+      live.value = near > 0 ? 1 : 0;
+      if (near === 0) return;
       // cleared to nothing: no foam, no height, no air, no shadow
       const before = renderer.getRenderTarget(), alpha = renderer.getClearAlpha();
       renderer.getClearColor(clear);
