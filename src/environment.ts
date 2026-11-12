@@ -4,6 +4,8 @@ import type { Wind } from './world/wind';
 
 /** The one shared world state. Systems read it every frame; only the game loop writes it. */
 export interface Environment {
+  /** Seconds on the world's clock: what the sea's waves run on (the CPU's copy of them, water/swell.ts, too). */
+  clock: number;
   /** Hours, 0–24: the time of day at longitude 0. */
   timeOfDay: number;
   /**
@@ -26,6 +28,7 @@ export interface Environment {
 
 export function createEnvironment(): Environment {
   const env: Environment = {
+    clock: 0,
     timeOfDay: 14,
     sunDirection: new Vector3(),
     windSpeed: 7.6,

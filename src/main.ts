@@ -82,6 +82,7 @@ renderer.setAnimationLoop(() => {
   last = start;
 
   fly(dt);
+  env.clock += dt;
   const { x, y, z } = frame.camera.position;
   updateEnvironment(env, dt, [x, y, z], frame.wind);
   frame.render(env, dt);

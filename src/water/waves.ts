@@ -19,6 +19,8 @@
 //                                 the slopes' mean and mean square, and so their variance, over any footprint
 //
 // ω is rounded to multiples of 2π/PERIOD, so the sea repeats every PERIOD seconds and time can wrap without a jump.
+// The waves run on the world's clock (Environment.clock), so the CPU's copy of the long waves (swell.ts) can be read
+// at the same moment.
 
 import {
   DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
@@ -28,15 +30,11 @@ import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
   uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
 } from 'three/tsl';
-import { BANDS, CASCADES, SIZE } from './cascades';
+import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from './cascades';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from './spectrum';
 
 type N = any;
 
-/** The sea repeats after this many seconds. */
-const PERIOD = 200;
-/** How far the crests lean: the sideways displacement's scale. */
-const CHOP = 1;
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
 export const CURVED = [1, 2];
 /** Cascades whose waves break. */
@@ -187,7 +185,7 @@ export function createWaves(renderer: WebGPURenderer) {
     textureStore(curvature[i], uvec2(x, y), vec4(hxx, hzz, hxz, 0));
   })().compute(AREA, [64]));
 
-  let wind = -1, clock = 0;
+  let wind = -1;
 
   return {
     displacement,
@@ -196,7 +194,8 @@ export function createWaves(renderer: WebGPURenderer) {
     curvature,
     amplitude,
     ripples,
-    update(sea: Sea, dt: number) {
+    /** clock: the world's, seconds; dt: since the last update, for the foam's fading. */
+    update(sea: Sea, clock: number, dt: number) {
       // a new sea only when the wind changes; the same seeds keep the waves where they are
       if (Math.abs(sea.wind - wind) > 0.05) {
         wind = sea.wind;
@@ -219,8 +218,7 @@ export function createWaves(renderer: WebGPURenderer) {
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
       // Monahan's stage B, a few seconds)
       fade.value = Math.exp(-dt / (1 + 4 * Math.min(Math.max((sea.wind - 5) / 15, 0), 1)));
-      clock = (clock + dt) % PERIOD;
-      time.value = clock;
+      time.value = clock % PERIOD;
       renderer.compute(spectrumKernel);
       renderer.compute(rowsKernel);
       renderer.compute(columnsKernel);

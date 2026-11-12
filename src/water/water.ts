@@ -33,7 +33,7 @@ import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
 import { R } from '../world/sphere';
 import type { Wind } from '../world/wind';
-import { BANDS, CASCADES, SIZE } from './cascades';
+import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from './cascades';
 import { createCaustics } from './caustics';
 import { createFoam } from './foam';
 import { glitter } from './glitter';
@@ -46,14 +46,10 @@ type N = any;
 const SPOKES = 128;
 const FIRST = 1;
 const GROWTH = 1.05;
-/** The breaker index: the highest wave (significant height) water of a given depth holds. */
-const BREAKER = 0.78;
 /** The least the surface's normal faces the eye (cosine): no less than the eye can see. */
 const FACING = 0.05;
 /** Refracted rays are followed no deeper than this: beyond, the floor is too dim through the water to matter. */
 const MAX_REFRACT_DEPTH = 20;
-/** Open ocean: the trade winds have blown over hundreds of kilometres. */
-const FETCH = 300_000;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
 const LIKENESS_WINDS = [5, 10, 15, 20];
 
@@ -94,7 +90,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       CASCADES.forEach((L, k) => {
         const lod = log2(max(cell.div(L / SIZE), 1));
         const r = texture(waves.displacement[k], c.q.div(L)).level(lod).xyz;
-        d = d.add(r.mul(k < 2 ? long : short));
+        d = d.add(r.mul(k < LONG ? long : short));
         h = h.add(r.y);
       });
       moved.addAssign(c.e1.mul(d.x).add(c.e2.mul(d.z)).add(grid.up.mul(d.y)).mul(c.w));
@@ -112,7 +108,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   material.colorNode = Fn(() => {
     const { long, short, breaking } = shallows(rest);
     const up = view.up(positionWorld);
-    const scale = (c: number): N => (c < 2 ? long : short);
+    const scale = (c: number): N => (c < LONG ? long : short);
     // the water at rest under this pixel, and its change across the pixel, for the charts' reads
     const p = normalize(rest).mul(R);
     const dp: [N, N] = [dFdx(p), dFdy(p)];
@@ -204,7 +200,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       sky: (p: N): N => optics.skyBelow(p),
     },
     update(env: Environment, dt: number) {
-      waves.update({ wind: env.windSpeed, fetch: FETCH }, dt);
+      waves.update({ wind: env.windSpeed, fetch: FETCH }, env.clock, dt);
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
       charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
     },
