@@ -13,7 +13,8 @@
 //   She runs from a fight she is losing, or from a ship that rams her that she won't fight.
 // Every step she steers, as 0117's helm did:
 // - for her goal: the ship she would ram (to strike her side, led for where she will be: new here, as 0117 rammed
-//   only in passing), away from one she runs from, or a roaming mark 60–160 m off;
+//   only in passing), away from one she runs from, or a roaming mark 60–160 m off; by a route round land (route.ts)
+//   when the water to it isn't clear and she has a chart;
 // - feeling ahead along that course for shoal water, and turning off toward the side that lies open, holding the turn a
 //   moment once the way clears rather than swing back at what she turned from;
 // - answering a ram coming at her (0117's answer to a gun winding up on her): bow or stern to it, whichever is the
@@ -32,6 +33,7 @@ import { gap } from './contact.ts';
 import { STEP } from './fixed.ts';
 import { RAM, SHIP } from './handling.ts';
 import { offCourse, turned, type Helm, type ShipState } from './ship.ts';
+import { course as routed, type Chart, type Route } from './route.ts';
 import type { Depth } from './shoal.ts';
 import { temper, type Temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
@@ -118,12 +120,14 @@ export interface Memory {
   recoil: number;
   /** Where she was a step ago. */
   was: Vec3;
+  /** The route round land she follows (route.ts), if any. */
+  route: Route | null;
 }
 
 /** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
-  foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at,
+  foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at, route: null,
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */
@@ -146,7 +150,7 @@ const unitHash = (a: number, b: number) => random((Math.imul(a, 0x9e3779b1) ^ Ma
 // ---------------------------------------------------------------- one step
 
 /** What a think and a step weigh. */
-interface Ctx { own: Seen; others: readonly Seen[]; depth: Depth; m: Memory; t: Temper; foe: Seen | null; foeD: number; seed: number }
+interface Ctx { own: Seen; others: readonly Seen[]; depth: Depth; m: Memory; t: Temper; foe: Seen | null; foeD: number; seed: number; chart: Chart | null }
 
 const open = (c: Ctx, p: Vec3) => c.depth(p) >= SHIP.draught + BOT.open;
 /** Her next draw, 0..1. */
@@ -159,11 +163,12 @@ const between = (m: Memory, lo: number, hi: number) => lo + (hi - lo) * roll(m);
 
 /**
  * One step of dt seconds of a bot's mind: what she orders her helm, and her memory after. `own` is her own ship,
- * `others` every other ship afloat (she sees only those in her sight), `seed` hers for good.
+ * `others` every other ship afloat (she sees only those in her sight), `seed` hers for good; `chart` the sea's
+ * (route.ts), without which she finds no routes round land, only feels her way along it.
  */
-export function think(own: Seen, others: readonly Seen[], depth: Depth, memory: Memory, seed: number, dt = STEP): { helm: Helm; memory: Memory } {
+export function think(own: Seen, others: readonly Seen[], depth: Depth, memory: Memory, seed: number, dt = STEP, chart: Chart | null = null): { helm: Helm; memory: Memory } {
   const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1 };
-  const c: Ctx = { own, others, depth, m, t: temper(seed), foe: null, foeD: Infinity, seed };
+  const c: Ctx = { own, others, depth, m, t: temper(seed), foe: null, foeD: Infinity, seed, chart };
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
@@ -262,7 +267,7 @@ function decide(c: Ctx): void {
   const current = OPTIONS.findIndex((o) => o.mode === m.mode);
   const k = choose(OPTIONS, c, current, c.t.skill, () => roll(m), momentum(m.since));
   const o = OPTIONS[k < 0 ? 2 : k];
-  if (o.mode !== m.mode) [m.mode, m.since] = [o.mode, 0];
+  if (o.mode !== m.mode) [m.mode, m.since, m.route] = [o.mode, 0, null];
   o.act(c);
 }
 
@@ -337,16 +342,21 @@ function steer(c: Ctx, dt: number): Helm {
   const foe = m.mode === 'fight' && inSight(c) ? c.foe : null;
   if (foe && gap(ship, foe.ship) < 1) m.recoil = BOT.recoil;
   m.recoil = Math.max(0, m.recoil - dt);
-  let want: Vec3 | null;
+  let want: Vec3 | null, toD = foe ? c.foeD : distance(ship.at, m.goal);
   if (foe && m.recoil > 0) {
     const at = toward(ship.at, foe.ship.at);
     want = at && scale(at, -1);
-  } else if (foe) want = ramCourse(c, foe);
-  else want = toward(ship.at, m.goal);
+  } else {
+    // land in the way: by a route round it (route.ts), as far along it as the water is clear
+    const r = c.chart && routed(c.chart, ship.at, foe ? foe.ship.at : m.goal, m.route, dt);
+    m.route = r ? r.route : null;
+    if (r && r.to) [want, toD] = [toward(ship.at, r.to), distance(ship.at, r.to)];
+    else want = foe ? ramCourse(c, foe) : toward(ship.at, m.goal);
+  }
   let turn = want ? offCourse(ship, want) : 0;
   const course = turn;
   // feel ahead along the course (not her heading: coming round, she would only ever feel the bank)
-  const ahead = Math.min(BOT.feel + ship.speed, foe ? c.foeD : distance(ship.at, m.goal));
+  const ahead = Math.min(BOT.feel + ship.speed, toD);
   if (want && !open(c, along(ship.at, normalize(add(want, ship.at, -dot(want, ship.at))), ahead).p)) {
     const port = probe(c, BOT.side, BOT.feelSide + ship.speed), starboard = probe(c, -BOT.side, BOT.feelSide + ship.speed);
     // she keeps turning off the way she began to, unless only the other side lies open
@@ -403,6 +413,7 @@ function stuck(c: Ctx, dt: number, course: number): Helm | null {
   if (held && m.backT > -(BOT.wade + BOT.most)) {
     m.backT -= dt;
     if (m.backT > -BOT.wade) return null;
+    if (m.backT + dt > -BOT.wade) m.route = null;
     const deep = deepest(c);
     // (with the way off astern she holds the turn she is in, or she would swing from one side to the other)
     return order(Math.abs(deep) > Math.PI / 2 && ship.turn * deep < 0 ? Math.sign(ship.turn) * BOT.full : Math.max(-BOT.full, Math.min(BOT.full, 2 * deep)));
@@ -414,6 +425,7 @@ function stuck(c: Ctx, dt: number, course: number): Helm | null {
   else m.stuckT = Math.max(0, m.stuckT - 2 * dt);
   if (m.stuckT <= BOT.stuck) return null;
   m.stuckT = 0;
+  m.route = null;
   // she turns off toward whichever side lies open, or the way to her course when both do, until it lies less than half
   // a turn on, so she doesn't swing back across the bank
   const reach = BOT.feelSide + ship.speed, port = probe(c, 2 * BOT.side, reach), starboard = probe(c, -2 * BOT.side, reach);

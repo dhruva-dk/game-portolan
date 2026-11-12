@@ -21,6 +21,7 @@ import { mind, rammed, think, type Memory } from '../sim/bot';
 import { afloat, stepFleet, type Vessel } from '../sim/contact';
 import { STEP, blendPose, fixedClock } from '../sim/fixed';
 import { SHIP } from '../sim/handling';
+import { chart as bakeChart } from '../sim/route';
 import { knocked, pose, ride, settled } from '../sim/ride';
 import { shipAt, type Helm, type ShipState } from '../sim/ship';
 import { createSwell } from '../water/swell';
@@ -55,6 +56,10 @@ export function createGame(
 ) {
   const ground = frame.planet.height;
   const depth = (p: Vec3) => -ground(p);
+  // the bots' chart of open water, for routes round land (sim/route.ts): baked here while the ground's worker bakes
+  // (frame.ready), in about a fifth of its time, so it holds back no frame
+  const charted = performance.now(), chart = bakeChart(depth);
+  console.info(`chart baked in ${(performance.now() - charted).toFixed(0)} ms`);
   const sea = createSwell(frame.anchors, ground, env.seaWind);
   const input = createInput(element);
   const drawStick = createStickView();
@@ -74,7 +79,7 @@ export function createGame(
   const theirs = () => fleet.slice(1).map((v, k) => {
     const m = minds[k + 1];
     if (!m) return steady[k];
-    const r = think(v, fleet.filter((o) => o.id !== v.id), depth, m, v.id);
+    const r = think(v, fleet.filter((o) => o.id !== v.id), depth, m, v.id, STEP, chart);
     minds[k + 1] = r.memory;
     return r.helm;
   });
