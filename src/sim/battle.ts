@@ -33,11 +33,12 @@ export interface Battle {
   seed: number;
 }
 
-/** What she is ordered: the bearing she is aimed on (any vector; its part along the surface counts), and whether to
- * fire. */
+/** What she is ordered: the bearing she is aimed on (any vector; its part along the surface counts), whether to fire,
+ * and how many times the gun's own spread her balls go off within (a bot's unsteady hand, gunner.ts; 1 if not given). */
 export interface Order {
   aim: Vec3 | null;
   fire: boolean;
+  spread?: number;
 }
 
 /** A ball fired: by whom, from where (metres, from the centre), the way it went off (a unit vector), and the ship it
@@ -116,7 +117,7 @@ export function stepBattle(
     if (!c.gun || sunk(c.health)) return;
     let gun = { ...c.gun, loading: Math.max(0, c.gun.loading - dt) };
     if (order?.fire && gun.loading < 1e-9) {
-      const lay = laid(v, gun, order.aim ?? v.ship.heading, targets, b.seed);
+      const lay = laid(v, gun, order.aim ?? v.ship.heading, targets, b.seed, GUN.spread[gun.rarity] * (order.spread ?? 1));
       balls.push(loosed(v.id, lay.from, lay.dir, GUN.damage * GUN.damageBy[gun.rarity]));
       shots.push({ shooter: v.id, ...lay });
       gun = { ...gun, loading: GUN.reload * GUN.reloadBy[gun.rarity], fired: gun.fired + 1 };

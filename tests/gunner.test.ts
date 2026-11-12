@@ -5,7 +5,7 @@ import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
-import { reactTime } from '../src/sim/gunner.ts';
+import { reactTime, spreadBy } from '../src/sim/gunner.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { add, along, distance, frameAt, fromLatLon, scale, type Vec3 } from '../src/world/sphere.ts';
@@ -130,4 +130,18 @@ test('holding back, she still fires back at a ship close by that is shooting her
     console.log(`# seed ${seed}: ${back} shots back`);
     assert.ok(back > 0, `${seed}: never fired back`);
   }
+});
+
+test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () => {
+  const by = (ok: (skill: number) => boolean) => {
+    const out: number[] = [];
+    for (let s = 1; out.length < 4; s++) if (ok(temper(s).skill) && temper(s).fight > 0.5) out.push(s);
+    return out;
+  };
+  const green = by((k) => k < 0.5), sharp = by((k) => k > 0.8);
+  assert.ok(spreadBy(temper(green[0]).skill) > 2 * spreadBy(1) && spreadBy(1) === 1);
+  const hits = (seeds: number[]) => seeds.reduce((n, seed) => n + battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 40, { course: null, throttle: 0.4 }).strikes, 0);
+  const g = hits(green), s = hits(sharp);
+  console.log(`# hits in 40 s on a steady ship: green ${g}, sharp ${s}`);
+  assert.ok(g < s, `green ${g}, sharp ${s}`);
 });

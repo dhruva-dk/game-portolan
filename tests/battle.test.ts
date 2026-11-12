@@ -182,6 +182,21 @@ test('the spread closes up with rarity, and is the same for the same seed', () =
   assert.ok(hits[1] > hits[0] + 0.1, `common hits ${hits[0]}, legendary ${hits[1]}`);
 });
 
+test("an order's spread widens the gun's by that many times: the same draw, further off, and fewer hits", () => {
+  const fleet = pair(150, 0, 90 * deg, 0);
+  const shots = (spread?: number) => {
+    const r = fight(fleet, battleOf([crewOf(1, gunOf(2)), { ...crewOf(2), health: { hull: 1e6, shield: 0 } }], 5), (f) => f.map((_, i) => ({ aim: fleet[0].ship.heading, fire: i === 0, spread })), 60, [0, 0]);
+    return r.strikes.length / r.shots;
+  };
+  const plain = shots(), as1 = shots(1), wide = shots(2.5);
+  assert.equal(plain, as1);
+  assert.ok(wide < plain - 0.1, `hits ${plain} plain, ${wide} at 2.5 times the spread`);
+  // laid by the battle as by laid() with the gun's spread times the order's
+  const gun = gunOf(2), clean = laid(fleet[0], gun, fleet[0].ship.heading, fleet, 5, 0).dir;
+  const off = (k: number) => Math.acos(Math.min(1, dot(laid(fleet[0], gun, fleet[0].ship.heading, fleet, 5, GUN.spread[2] * k).dir, clean)));
+  assert.ok(Math.abs(off(2.5) / off(1) - 2.5) < 0.01, `${off(1)}, ${off(2.5)}`);
+});
+
 // ------------------------------------------------------------------ the fighting
 
 test('the land is in the way: a ball laid over an island falls on it', () => {

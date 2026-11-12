@@ -7,7 +7,8 @@
 // She lays her gun on where her foe will be when the ball comes down, with a wandering error that a sharp captain
 // keeps to a sixth of a green one's, and fires when her foe is in range, past the moment's surprise of first seeing
 // her, and in a burst, not in the pause between two. The gun's aim assist (gun.ts) takes what she lays on as a player's
-// thumb, so her error mostly shows past the edge of its cone.
+// thumb, so her error mostly shows past the edge of its cone; and her hand is unsteadier than she thinks, a green
+// captain's balls spreading wider than a sharp one's (0117's combat.ts fire).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
@@ -31,6 +32,9 @@ export const GUNNER = {
   error: 0.2, wander: [0.6, 1.4] as const,
   /** She fires within this share of the gun's range, in bursts of `burst` s with pauses of `pause` s. */
   reach: 0.95, burst: [1.5, 4] as const, pause: [0.8, 2.2] as const,
+  /** Her hand is less steady than she thinks (0117's combat.ts fire): her balls spread 1 + `unsteady` × (1 − skill)
+   *  times the gun's own. */
+  unsteady: 2.5,
 } as const;
 
 /** What her gunnery carries from one step to the next. */
@@ -61,6 +65,9 @@ const toward = (p: Vec3, q: Vec3): Vec3 | null => {
 };
 const between = (draw: () => number, [lo, hi]: readonly [number, number]) => lo + (hi - lo) * draw();
 
+/** How many times the gun's own spread her balls go off within, by her skill (0117's). */
+export const spreadBy = (skill: number) => 1 + GUNNER.unsteady * (1 - skill);
+
 /** The seconds before she fires on a ship she has just seen, by her skill (0117's reactTime). */
 export const reactTime = (skill: number) => GUNNER.react[0] + (GUNNER.react[1] - GUNNER.react[0]) * skill;
 
@@ -83,7 +90,7 @@ export function ring(g: Gunner, at: Vec3, foe: Mark, standoff: number, skill: nu
 /**
  * Her gun's orders this step (0117's aimAndFire): laid on where `foe` will be when the ball comes down, with her
  * wandering error, and fired when she is in range, has got over first seeing her, is in a burst, and isn't told to
- * `hold` it. With no foe in sight she lays it along her heading and holds her fire. `clock` is hers (s). Updates `g`.
+ * `hold` it; her balls spread by her skill. With no foe in sight she lays it along her heading and holds her fire. `clock` is hers (s). Updates `g`.
  */
 export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: number, skill: number, draw: () => number, dt: number, hold = false): Order {
   if (!foe) return { aim: own.heading, fire: false };
@@ -112,5 +119,5 @@ export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: n
     if (g.burst >= 0) g.burst = between(draw, GUNNER.burst);
     return { aim, fire: false };
   } else g.burst = between(draw, GUNNER.burst);
-  return { aim, fire: true };
+  return { aim, fire: true, spread: spreadBy(skill) };
 }

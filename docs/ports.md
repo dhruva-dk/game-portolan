@@ -357,6 +357,12 @@ A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its f
 - Unchanged: ramming bots keep their speed-based let-go at all times.
 - **Effect** (19 armed bots and a slow ship among them, 5 seeds, scratch run): time to sink her goes from 27 to 74 s with no restraint to 44 s to over 120 s in phase 0. Bots still often fight, because 0117's restraint worked with the loot (1.8) and claim (0.7) options outscoring a weak fight, and here only roam (0.15) competes.
 
+**Unsteady hands, ported** (`combat.ts:149` `fire`)
+- A captain's spread is multiplied by `1 + 2.5 × (1 − skill)`, from 2.6× for the greenest to 1.25× for the sharpest. The gentle captain's +1 is left out, as there are no gentle captains here.
+- The factor travels on the `Order` (`spread`, 1 when not given, so the player is unaffected). `stepBattle` multiplies the gun's rarity spread by it, and `gunner.ts` `spreadBy` gives it.
+- Note: the gun's own spread here (0.05 to 0.014 rad) is new and much wider than 0117's 0.008, so the factor bites harder than it did there.
+- **Effect** (same scratch run, with restraint): 80 s to over 120 s in phase 0, and 37 to 61 s with no storm.
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.
