@@ -20,7 +20,7 @@ import {
   InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor, type PerspectiveCamera,
 } from 'three/webgpu';
 import {
-  Fn, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
+  Fn, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import type { Light } from '../land/light';
 import { random } from '../world/random';
@@ -95,7 +95,9 @@ function puffMesh(light: Light, now: N) {
   m.positionNode = centre.add(right.mul(turned.x).add(upward.mul(turned.y)).mul(size));
   const uv: N = varying(local.xy), mid: N = varying(centre), facing: N = varying(normalize(up.add(eye.mul(0.6))));
   const tv: N = varying(t);
-  const shapeOf = (r: N): N => mix(smoothstep(1, 0.55, r), exp(r.mul(r).mul(-3)).mul(smoothstep(1, 0.7, r)), look.z);
+  // a drop's hard disc, or a cloud's soft one billowed round its edge by a few lobes (its own, by its seed)
+  const lobes: N = (uvv: N) => sin(atan(uvv.y, uvv.x).mul(5).add(look.y.mul(40))).mul(0.5).add(sin(atan(uvv.y, uvv.x).mul(3).sub(look.y.mul(17))).mul(0.5));
+  const shapeOf = (r: N): N => mix(smoothstep(1, 0.55, r), exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r.mul(float(1).sub(lobes(uv).mul(0.18))))), look.z);
   const fade: N = (tt: N) => smoothstep(0, max(look.w, 1e-3), tt).mul(pow(float(1).sub(tt).max(0), 1.5));
   const alpha: N = Fn(() => look.x.mul(shapeOf(uv.length())).mul(fade(tv)))();
   m.colorNode = Fn(() => {
@@ -113,6 +115,7 @@ function puffMesh(light: Light, now: N) {
   mesh.frustumCulled = false;
   // after the sea, which reads what was drawn before it
   mesh.renderOrder = 2;
+  mesh.visible = false;
   return { mesh, buffer, geometry: g };
 }
 
@@ -192,6 +195,7 @@ export function createGunfire(light: Light) {
       balls.geometry.instanceCount = n;
       balls.mesh.visible = n > 0;
       puffs.geometry.instanceCount = laid;
+      puffs.mesh.visible = laid > 0;
       if (dirty) puffs.buffer.needsUpdate = true;
       dirty = false;
     },

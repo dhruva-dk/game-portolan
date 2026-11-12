@@ -1,5 +1,6 @@
 // Screenshots of the game in headless Chromium with WebGPU, for judging changes by eye.
-//   node tools/capture.ts [query ...]      e.g. node tools/capture.ts t=10 t=15 t=18.6
+//   node tools/capture.ts [--shots=n --every=ms] [query ...]      e.g. node tools/capture.ts t=10 t=15 t=18.6
+// --shots takes n screenshots of each page, `every` ms apart (default 1), named <query>-<k>.png past the first.
 // Starts the Vite dev server, opens one page per query, waits for a second and a half of frames, writes
 // captures/<query>.png.
 // The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
@@ -7,7 +8,9 @@
 import { mkdirSync } from 'node:fs';
 import { launch } from './launch.ts';
 
-const queries = process.argv.slice(2);
+const flag = (name: string, fallback: number) => Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
+const shots = flag('shots', 1), every = flag('every', 500);
+const queries = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (queries.length === 0) queries.push('');
 
 const { browser, url, close } = await launch();
@@ -23,9 +26,12 @@ try {
     // the meter's first reading: a second of frames has run (the ground's bake comes first)
     await page.waitForFunction(() => document.getElementById('meter')?.textContent, null, { timeout: 60000 });
     await page.waitForTimeout(1500);
-    const file = `captures/${q.replace(/[^\w.=-]+/g, '_') || 'default'}.png`;
-    await page.screenshot({ path: file });
-    console.log(file, await page.textContent('#meter'));
+    for (let k = 0; k < shots; k++) {
+      if (k > 0) await page.waitForTimeout(every);
+      const file = `captures/${q.replace(/[^\w.=-]+/g, '_') || 'default'}${k > 0 ? `-${k}` : ''}.png`;
+      await page.screenshot({ path: file });
+      console.log(file, await page.textContent('#meter'));
+    }
     await page.close();
   }
 } finally {
