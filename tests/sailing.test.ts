@@ -77,7 +77,7 @@ test('over the pole: still on her great circle, her heading still a unit tangent
     assert.ok(Math.abs(dot(s.at, plane)) < 1e-9);
   });
   assert.ok(most > Math.cos(0.1 * deg), 'she passes over the pole');
-  assert.ok(Math.abs(travelled - 300) < 1e-6, `${travelled}`);
+  assert.ok(Math.abs(travelled - 30 * SHIP.top) < 1e-6, `${travelled}`);
   // and from the pole itself she comes round onto a course and holds it
   const away: Vec3 = [0, 0, -1];
   const pole = run({ ...shipAt([0, 1, 0], [1, 0, 0]), speed: 5 }, () => ({ course: away, throttle: 1 }), 20);

@@ -10,7 +10,7 @@ import type { ShipPose } from '../world/pose';
 import { add, along, cross, dot, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
 
 /** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
-const BACK = 30, UP = 10, PIVOT = 2;
+const BACK = 44, UP = 19, PIVOT = 2;
 /** It looks at a point AIM_UP metres over the sea, AIM_AHEAD ahead of her. */
 const AIM_UP = 3, AIM_AHEAD = 8;
 /** How fast it swings round after her heading; how fast it eases back once the look has been let go EASE_AFTER s. */
