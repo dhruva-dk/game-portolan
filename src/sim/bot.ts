@@ -21,17 +21,20 @@
 //   nearer turn, end on where a blow does least; a sharp captain sees it nearly always, a green one often not;
 // - and working off a bank she is stuck against, toward the open side or the deepest water.
 //
-// Seams: a gun (0117's aimAndFire and fightCourse, holding a weapon's range rather than ramming) goes in the fight's
-// course and in what think returns; the Storm (0117's first option, weight 6, and roam goals kept `margin` inside its
-// edge) goes in OPTIONS and roamGoal; mending (0117's heal, 3.5) in OPTIONS once health.ts gives a hull.
+// Armed, she fights with her gun instead (gunner.ts, 0117's aimAndFire and fightCourse): she holds its range round her
+// foe rather than ramming, and lays and fires it, a gun reaching a ship however fast she sails.
+// Seams: the Storm (0117's first option, weight 6, and roam goals kept `margin` inside its
+// edge) goes in OPTIONS and roamGoal; mending (0117's heal, 3.5) in OPTIONS once there is something to mend with.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { add, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { random } from '../world/random.ts';
+import type { Order } from './battle.ts';
 import { gap } from './contact.ts';
 import { STEP } from './fixed.ts';
 import { RAM, SHIP } from './handling.ts';
+import { aimAndFire, gunner, reactTime, ring, type Gunner } from './gunner.ts';
 import { offCourse, turned, type Helm, type ShipState } from './ship.ts';
 import { course as routed, type Chart, type Route } from './route.ts';
 import type { Depth } from './shoal.ts';
@@ -88,14 +91,14 @@ export const BOT = {
   threat: 90, aimed: 0.6, closing: 0.8, warn: 5, miss: 0.75 * SHIP.length,
 } as const;
 
-/** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, and (a seam for health.ts) her
- *  hull, 0–100, taken as whole when not given. */
-export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number }
+/** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
+ *  whole and none when not given), and whether she carries a gun. */
+export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean }
 
 export type Mode = 'roam' | 'fight' | 'flee';
 
-/** What a bot carries from one step to the next. */
-export interface Memory {
+/** What a bot carries from one step to the next, her gunnery's with it. */
+export interface Memory extends Gunner {
   /** Her random draws' state; seconds she has been afloat; steps to her next think. */
   rand: number;
   clock: number;
@@ -128,6 +131,7 @@ export interface Memory {
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
   foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at, route: null,
+  ...gunner(),
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */
@@ -162,11 +166,11 @@ const roll = (m: Memory) => {
 const between = (m: Memory, lo: number, hi: number) => lo + (hi - lo) * roll(m);
 
 /**
- * One step of dt seconds of a bot's mind: what she orders her helm, and her memory after. `own` is her own ship,
- * `others` every other ship afloat (she sees only those in her sight), `seed` hers for good; `chart` the sea's
+ * One step of dt seconds of a bot's mind: what she orders her helm and her gun, and her memory after. `own` is her own
+ * ship, `others` every other ship afloat (she sees only those in her sight), `seed` hers for good; `chart` the sea's
  * (route.ts), without which she finds no routes round land, only feels her way along it.
  */
-export function think(own: Seen, others: readonly Seen[], depth: Depth, memory: Memory, seed: number, dt = STEP, chart: Chart | null = null): { helm: Helm; memory: Memory } {
+export function think(own: Seen, others: readonly Seen[], depth: Depth, memory: Memory, seed: number, dt = STEP, chart: Chart | null = null): { helm: Helm; order: Order; memory: Memory } {
   const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1 };
   const c: Ctx = { own, others, depth, m, t: temper(seed), foe: null, foeD: Infinity, seed, chart };
   if (m.think <= 0) {
@@ -177,8 +181,9 @@ export function think(own: Seen, others: readonly Seen[], depth: Depth, memory: 
   c.foe = m.foe >= 0 ? others.find((o) => o.id === m.foe) ?? null : null;
   c.foeD = c.foe ? distance(own.ship.at, c.foe.ship.at) : Infinity;
   const helm = steer(c, dt);
+  const order: Order = own.armed ? aimAndFire(m, own.ship, inSight(c) ? c.foe : null, m.clock, c.t.skill, () => roll(m), dt) : { aim: null, fire: false };
   m.was = own.ship.at;
-  return { helm, memory: m };
+  return { helm, order, memory: m };
 }
 
 // ---------------------------------------------------------------- seeing
@@ -202,6 +207,7 @@ function perceive(c: Ctx): void {
     if (score >= bd || hidden(c, own.ship.at, o.ship.at)) continue;
     [bd, best] = [score, o];
   }
+  if (best && best.id !== m.foe) m.react = m.clock + reactTime(c.t.skill);
   if (best) [m.foe, m.seen, m.last] = [best.id, m.clock, best.ship.at];
   else if (m.foe >= 0 && (m.clock - m.seen > BOT.forget || !c.others.some((o) => o.id === m.foe))) m.foe = -1;
 }
@@ -217,7 +223,8 @@ function fightUrge(c: Ctx): number {
   if (!foe) return 0;
   const d = c.foeD;
   let will = t.fight * (0.6 + 0.4 * t.aggro);
-  will += ((0.1 + 0.5 * t.skill) * ((own.hull ?? 100) - (foe.hull ?? 100))) / 100;
+  const strength = (s: Seen) => (s.hull ?? 100) + (s.shield ?? 0);
+  will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id) will += BOT.roused * ramp(m.clock - m.hitT, BOT.grudge + BOT.cool, BOT.cool);
   for (const o of c.others) if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < BOT.crowd) will -= BOT.crowding * t.skill;
   const close = ramp(d, BOT.closeFrom, BOT.closeAt);
@@ -227,7 +234,7 @@ function fightUrge(c: Ctx): number {
   // reaches a ship however fast she sails; a ram must catch her)
   const from = toward(foe.ship.at, own.ship.at);
   const flying = (from ? -dot(foe.ship.heading, from) : 0) * foe.ship.speed;
-  const go = 1 - ramp(d, BOT.letGo - 10, BOT.letGo + 15) * ramp(flying, ...(m.mode === 'fight' ? BOT.outrun : BOT.outran));
+  const go = own.armed ? 1 : 1 - ramp(d, BOT.letGo - 10, BOT.letGo + 15) * ramp(flying, ...(m.mode === 'fight' ? BOT.outrun : BOT.outran));
   return Math.max(close, utility(logistic(will, BOT.will, BOT.willWidth), go));
 }
 
@@ -347,11 +354,12 @@ function steer(c: Ctx, dt: number): Helm {
     const at = toward(ship.at, foe.ship.at);
     want = at && scale(at, -1);
   } else {
-    // land in the way: by a route round it (route.ts), as far along it as the water is clear
-    const r = c.chart && routed(c.chart, ship.at, foe ? foe.ship.at : m.goal, m.route, dt);
+    // armed, she makes for a mark on the ring round her foe (gunner.ts); land in the way, by a route round it (route.ts)
+    const mark = foe && own.armed ? ring(m, ship.at, foe, c.t.standoff, c.t.skill, () => roll(m), dt) : null;
+    const r = c.chart && routed(c.chart, ship.at, mark ?? (foe ? foe.ship.at : m.goal), m.route, dt);
     m.route = r ? r.route : null;
     if (r && r.to) [want, toD] = [toward(ship.at, r.to), distance(ship.at, r.to)];
-    else want = foe ? ramCourse(c, foe) : toward(ship.at, m.goal);
+    else want = mark ? toward(ship.at, mark) : foe ? ramCourse(c, foe) : toward(ship.at, m.goal);
   }
   let turn = want ? offCourse(ship, want) : 0;
   const course = turn;
