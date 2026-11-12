@@ -8,7 +8,8 @@
 // camera looks at it, as fast as it is pushed. Let go, she coasts.
 //
 // She sails among others as one fleet (sim/contact.ts): hulls that meet shove apart, and a ram knocks the struck ship
-// over a little (sim/ride.ts knocked).
+// over a little (sim/ride.ts knocked). The others are bots (sim/bot.ts), each seeded by her place in the fleet, unless
+// main.ts sets them a way to make (?way=), when they hold a straight course as scripted ships for captures.
 //
 // Debug: a drive, `legs` as "bearing,throttle,seconds;…" (bearings in degrees clockwise from north where she is),
 // is sailed before the first frame; she holds its last order until a hand takes the helm.
@@ -16,6 +17,7 @@
 import type { Environment } from '../environment';
 import type { createFrame } from '../frame';
 import type { Look } from '../ship/fleet';
+import { mind, rammed, think, type Memory } from '../sim/bot';
 import { afloat, stepFleet, type Vessel } from '../sim/contact';
 import { STEP, blendPose, fixedClock } from '../sim/fixed';
 import { SHIP } from '../sim/handling';
@@ -40,8 +42,8 @@ const bearing = (at: Vec3, b: number): Vec3 => {
   return add(scale(f.north, Math.cos(b)), f.east, Math.sin(b));
 };
 
-/** SCAFFOLDING (main.ts ?ships=, until there are bots): a ship lying on the sea for the player to ram, in her own
- * colours, making `way` m/s on a straight course, her rudder amidships. */
+/** SCAFFOLDING (main.ts ?ships=, until ships are placed for real): a ship on the sea in her own colours, sailed by a
+ * bot; or, given a `way` (m/s), on a straight course at that speed, her rudder amidships. */
 export interface Other { at: Vec3; heading: Vec3; look: Look; way: number }
 
 /** start: where she lies and the bearing she heads (radians); legs: a debug drive, or ''; others: the others afloat. */
@@ -64,12 +66,22 @@ export function createGame(
   ];
   const looks = [LOOK, ...others.map((o) => o.look)];
   const steady: Helm[] = others.map((o) => ({ course: null, throttle: o.way / SHIP.top }));
+  let minds: (Memory | null)[] = fleet.map((v, i) => (i > 0 && others[i - 1].way <= 0 ? mind(i, v.ship.at) : null));
+  /** Each other ship's orders: her bot's, or her straight course. */
+  const theirs = () => fleet.slice(1).map((v, k) => {
+    const m = minds[k + 1];
+    if (!m) return steady[k];
+    const r = think(v, fleet.filter((o) => o.id !== v.id), depth, m, v.id);
+    minds[k + 1] = r.memory;
+    return r.helm;
+  });
   let tick = 0;
   let motions = fleet.map((v) => settled(v.ship, sea, 0));
   let before = fleet.map((v, i) => pose(v.ship, motions[i])), after = before;
   const advance = (helm: Helm) => {
-    const met = stepFleet(fleet, [helm, ...steady], STEP, depth);
+    const met = stepFleet(fleet, [helm, ...theirs()], STEP, depth);
     fleet = met.fleet;
+    for (const b of met.blows) minds = minds.map((m, i) => (m && fleet[i].id === b.struck.id ? rammed(m, b.striker.id) : m));
     tick++;
     motions = motions.map((m, i) => ride(knocked(m, fleet[i].ship, met.jolts[i]), fleet[i].ship, sea, tick * STEP, STEP));
     before = after;
