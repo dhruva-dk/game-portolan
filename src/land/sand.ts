@@ -26,9 +26,13 @@ const SAND_TILE = 4, BROAD = 4.3;
  * sand reflects 0.4–0.5, less toward the blue). */
 const SAND_MEAN = [0.345, 0.315, 0.221];
 const SAND_ALBEDO = [0.45, 0.4, 0.3];
-/** Wet sand reflects less: water fills the gaps between the grains. It is damp to this height, metres,
- * and glistens below SWASH, where the waves wash up. */
-const WET = 0.65, DAMP = 0.6, SWASH = 0.3;
+/**
+ * Wet sand reflects less: the water between and over the grains sends back WET of the light that would leave it
+ * (the diffuse reflectance of water's surface from below, total internal reflection past 49°), to the sand again
+ * (Lekner & Dorf 1988). It is damp to this height, metres, about as far up as the swash runs, and glistens below
+ * SWASH, where it runs most often.
+ */
+const WET = 0.6, DAMP = 0.6, SWASH = 0.3;
 /** The wet sand's sheen: the water film's reflectance face on, and the share of the sand it films. */
 const FILM = 0.02, FILMED = 0.5;
 /** Sea grass's albedo, and the most it covers the sand: thin, with the sand between its blades. */
@@ -77,7 +81,8 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     albedo = albedo.mul(cover.z.sub(0.5).mul(0.3).add(1));
     // the damp band ends raggedly, higher on the hollows
     const wet = smoothstep(DAMP, DAMP - 0.25, height.add(cover.z.sub(0.5).mul(0.4)));
-    albedo = albedo.mul(mix(float(1), float(WET), wet));
+    // wetted, an albedo a becomes (1 − WET)·a / (1 − WET·a): darker, the darker colours more, so a deeper beige
+    albedo = mix(albedo, albedo.mul(1 - WET).div(float(1).sub(albedo.mul(WET))), wet);
     // rubble, mottled by the sand's pattern and its own
     const coral = smoothstep(0.25, 0.8, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2))).mul(0.85);
     albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.6).add(0.7)), coral);

@@ -19,12 +19,15 @@
 // distance settles to its mean rather than flickering. A third, broad read, also along the wind, thins old foam into
 // windrows, as it gathers into lines downwind.
 //
-// Air: a breaking wave drives a cloud of bubbles a metre or so under the surface that outlasts the foam on it, and
+// Air: a breaking wave drives a cloud of bubbles a metre or so under the surface that outlasts the foam on it (less
+// where the water is shallower than that: none in the swash, which stays clear over the sand), and
 // scatters the light back up (optics.ts, as a wake's air does): round and after every whitecap the water shows a
 // pale turquoise, and the foam lies in it rather than on blue water.
 //
-// Swash: where the water over the sand is thinner than SWASH, it runs up the beach and back aerated, a white line
-// that follows the waterline as each wave lifts it.
+// Swash: each wave's bore runs up the beach and drains back (water.ts), its front a thin line of foam that follows
+// the waterline up and down the sand, the water behind it clearing to the sand under it but for a little lace; and at
+// its very edge, over the last centimetre of water, the foam thins away to nothing, so the water meets the sand with
+// no line drawn between them.
 
 import { NoColorSpace, RepeatWrapping, TextureLoader } from 'three/webgpu';
 import { float, max, mix, saturate, smoothstep, texture, vec2 } from 'three/tsl';
@@ -49,8 +52,9 @@ const TRAILS = [24, 3];
 const TRAIL = 10;
 /** The noise that rags the whitecaps' edges: about this many metres across. */
 const RAGGED = 6;
-/** Water thinner than this over the sand runs as swash, metres. */
-const SWASH = 0.4;
+/** The swash's front: water thinner than LINE over the sand (metres) is its foam, fading to nothing over the last
+ * EDGE at its very edge; behind it, up to FILM deep, it leaves LEFT of that. */
+const LINE = 0.08, EDGE = 0.012, FILM = 0.3, LEFT = 0.3;
 /**
  * The two reads' mix is mostly dark: its brightness spread evenly over 0…1 is (mix − LEVELS[0]) / LEVELS[1] (its
  * 10th to 90th percentiles measured, 0.077 to 0.414: near enough linear between).
@@ -66,8 +70,9 @@ const BLUR = 3;
 const VEIL = 0.4;
 /** At its whitest foam covers this much of the pixel. */
 const DENSE = 0.92;
-/** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts). */
-const AIR = 0.7;
+/** The air under a whitecap, at most, as a share of a wake's thickest (optics.ts); the depth its cloud reaches down,
+ * metres: in thinner water there is less of it. */
+const AIR = 0.7, PLUME = 1;
 
 export function createFoam(waves: Waves) {
   const pattern = new TextureLoader().load(`${import.meta.env.BASE_URL}tex/foam.png`);
@@ -100,22 +105,27 @@ export function createFoam(waves: Waves) {
     };
     const here = whitecaps(vec2(ragged, ragged.negate()));
     const trailed = whitecaps(vec2(lane.mul(TRAIL).add(ragged), ragged));
-    const cover = saturate(max(here, trailed.mul(float(1).sub(lane.mul(0.5)))).add(other));
+    const whitecap = saturate(max(here, trailed.mul(float(1).sub(lane.mul(0.5)))));
+    const cover = saturate(whitecap.add(other));
+    // the swash's front, a line of foam that fades out over the last centimetre or so of water at its very edge, and
+    // the thin water behind it, clearing
+    const swash = smoothstep(0, EDGE, thickness)
+      .mul(max(smoothstep(LINE, LINE * 0.3, thickness), smoothstep(FILM, LINE, thickness).mul(LEFT)));
 
     const crests = read([TILE / STRETCH, TILE]).mul(0.6).add(read([(2.7 * TILE) / STRETCH, 2.7 * TILE]).mul(0.4));
     const streaks = read([STREAKS[0], STREAKS[1]]).mul(0.6).add(read([2.3 * STREAKS[0], 2.3 * STREAKS[1]]).mul(0.4));
-    // fresh foam in the crests' pattern, old in the wind's
-    const lace = mix(streaks, crests, smoothstep(0.3, 0.9, cover)).sub(LEVELS[0]).div(LEVELS[1]);
+    // fresh foam in the crests' pattern, old in the wind's; the surf's and the swash's are always fresh
+    const fresh = max(smoothstep(0.3, 0.9, whitecap), smoothstep(0, 0.3, other.add(swash)));
+    const lace = mix(streaks, crests, fresh).sub(LEVELS[0]).div(LEVELS[1]);
     // the windrows thin old foam, not fresh: a fading whitecap lasts longer within one
     const rows = smoothstep(0.15, 0.6, read([LANES[0], LANES[1]]));
     const old = mix(cover, cover.mul(rows.mul(0.7).add(0.5)), smoothstep(0.9, 0.3, cover));
-    const swash = smoothstep(SWASH, 0, thickness).mul(smoothstep(-0.05, 0.02, thickness));
     const all = saturate(max(old, swash));
     // soft as the threads blur together: from a few centimetres of footprint to half a metre
     const soft = mix(float(0.3), float(0.5), smoothstep(0.03, 0.5, footprint));
     const edge = float(1).sub(all.mul(OPEN));
     const threads = smoothstep(edge.sub(soft), edge.add(soft), lace).mul(smoothstep(0, 0.05, all));
     // between the threads, a thin veil of bubbles under the surface; and the cloud of them below, which outlasts it
-    return { foam: max(threads, all.mul(VEIL)).mul(DENSE), air: cover.mul(AIR) };
+    return { foam: max(threads, all.mul(VEIL)).mul(DENSE), air: cover.mul(AIR).mul(saturate(thickness.div(PLUME))) };
   };
 }

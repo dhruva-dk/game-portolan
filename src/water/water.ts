@@ -66,6 +66,12 @@ const LIKENESS_WINDS = [5, 10, 15, 20];
 const GATHER = 0.8;
 /** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
 const SMOOTHEST = 1e-4;
+/**
+ * The swash: each wave's bore runs on up the beach after it breaks, RUNUP of its crest's height offshore above the
+ * still water, and drains back BACKWASH of its trough's below it, on ground from SWASH_FROM metres down up the beach.
+ * (Stockdon et al. 2006 give about 0.3 m of swash for 1.2 m waves on a 1:20 beach: half a crest's height.)
+ */
+const RUNUP = 0.5, BACKWASH = 0.3, SWASH_FROM = 0.5;
 
 /**
  * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
@@ -117,10 +123,13 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     });
     return vec4(moved, swell);
   })();
+  // Where the waves come ashore their height is cut to nothing, and the swash runs up the sand and back in their
+  // place, with the waves' height offshore.
+  const swash = mix(wave.w.mul(BACKWASH), wave.w.mul(RUNUP), step(0, wave.w)).mul(smoothstep(-SWASH_FROM, 0, ground.height(grid.up)));
   // the wakes' waves over the sea's
-  material.positionNode = view.place(grid.up, 0).add(wave.xyz).add(grid.up.mul(wake.height(grid.up)));
+  material.positionNode = view.place(grid.up, 0).add(wave.xyz).add(grid.up.mul(wake.height(grid.up).add(swash)));
 
-  const height: N = varying(dot(wave.xyz, grid.up));
+  const height: N = varying(dot(wave.xyz, grid.up).add(swash));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
   const phase: N = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
   const foamOn = createFoam(waves);
