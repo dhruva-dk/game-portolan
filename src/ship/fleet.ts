@@ -53,6 +53,8 @@ function drawOf(p: Packed, instances: InstancedInterleavedBuffer, material: Mate
   const mesh = new Mesh(g as BufferGeometry, material);
   mesh.frustumCulled = false;
   mesh.visible = false;
+  // the blended ropes after the sea, which reads what is behind it from what was drawn before it
+  mesh.renderOrder = material.transparent ? 1 : 0;
   return mesh;
 }
 

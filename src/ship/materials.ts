@@ -14,8 +14,9 @@
 // The body: ambientCG/Poly Haven planking (Weathered Brown Planks) on the hull and spars, Wooden Planks on the decks,
 // each scaled to its mean; strakes in the captain's colour; darker and greener where the sea wets her.
 // The cloth: filled by the wind (sails.ts's belly scaled by it), shivering when it lies along them; lit on both sides
-// with light through the canvas. The pennants stream down the wind. The ropes: widened to about half a pixel far off
-// so the rigging stays a line rather than breaking into dots.
+// with light through the canvas. The pennants stream down the wind. The ropes: widened to a pixel and a half across far
+// off so the rigging stays a line rather than breaking into dashes, and blended over what is behind them by how much
+// of that width the rope itself would cover — so a distant ship's rigging is the faint web it is, not a black one.
 
 import { DoubleSide, MeshBasicNodeMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
 import {
@@ -30,12 +31,12 @@ type N = any;
 
 /** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to. */
 const PLANK_MEAN = [0.118, 0.073, 0.042], DECK_MEAN = [0.209, 0.132, 0.083];
-const HULL = [0.11, 0.075, 0.05], DECK = [0.3, 0.22, 0.15], SPAR = [0.09, 0.065, 0.045];
-const DARK = [0.035, 0.028, 0.022], GILT = [0.42, 0.28, 0.1], IRON = [0.025, 0.025, 0.025];
+const HULL = [0.19, 0.12, 0.075], DECK = [0.3, 0.22, 0.15], SPAR = [0.2, 0.14, 0.09];
+const DARK = [0.06, 0.045, 0.035], GILT = [0.42, 0.28, 0.1], IRON = [0.025, 0.025, 0.025];
 /** The hull below and just above the waterline, wet: darker and greener. */
 const WET = [0.45, 0.5, 0.42];
-/** Tarred hemp. */
-const ROPE = [0.05, 0.04, 0.03];
+/** Tarred hemp, weathered. */
+const ROPE = [0.1, 0.08, 0.06];
 /** How much of the light on a sail's far side comes through the canvas. */
 const THROUGH = 0.3;
 /** A square sail's cloths: how many across it (each about 0.4 m), shown as faint seams. */
@@ -44,8 +45,9 @@ const CLOTHS = 26;
 const ABACK = 0.3;
 /** A pennant flaps this many times a second in a fresh breeze, its waves this many to its length. */
 const FLAP = 2.2, WAVES = 1.6;
-/** A rope is widened to at least this share of a pixel. */
-const ROPE_PIXELS = 0.6;
+/** A rope is widened to at least this many pixels in radius (below about a pixel and a half across, a line at a slant
+ * breaks into dashes without multisampling), and drawn as faint as the rope it stands for is thin. */
+const ROPE_PIXELS = 0.75;
 
 export interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
 
@@ -149,14 +151,16 @@ export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
     return albedo.mul(leafLight(light, positionWorld, normalize(clothNormal).mul(faceDirection), THROUGH));
   })();
 
-  // ---- the ropes
-  const ropes = new MeshBasicNodeMaterial();
+  // ---- the ropes: blended, so drawn after the sea (fleet.ts)
+  const ropes = new MeshBasicNodeMaterial({ transparent: true });
   const ropeNormal: N = turn(brace(nrm.xyz, false));
   const ropeAt: N = at.xyz.add(turn(brace(local, true)));
-  const want: N = cameraPosition.distance(ropeAt).mul(pixel).mul(ROPE_PIXELS);
-  ropes.positionNode = ropeAt.add(ropeNormal.mul(max(want.sub(nrm.w.mul(RADIUS_UNIT)), 0)));
-  const ropeN: N = varying(ropeNormal);
+  const radius: N = nrm.w.mul(RADIUS_UNIT);
+  const wide: N = max(cameraPosition.distance(ropeAt).mul(pixel).mul(ROPE_PIXELS), radius);
+  ropes.positionNode = ropeAt.add(ropeNormal.mul(wide.sub(radius)));
+  const ropeN: N = varying(ropeNormal), cover: N = varying(radius.div(wide));
   ropes.colorNode = Fn(() => vec3(...ROPE).mul(light(positionWorld, normalize(ropeN))))();
+  ropes.opacityNode = cover;
 
   return { body, cloth: clothMaterial, ropes };
 }
