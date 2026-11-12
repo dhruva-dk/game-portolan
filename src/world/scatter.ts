@@ -17,7 +17,7 @@
 
 import { createNoise3 } from './noise3.ts';
 import type { IslandSite } from './planet-islands.ts';
-import { random } from './random.ts';
+import { hash, random } from './random.ts';
 import { fromChart, type Vec3 } from './sphere.ts';
 
 /** An island and its ground on its chart: metres above the sea at (x, z). */
@@ -82,7 +82,7 @@ const seat = (isle: Isle, x: number, z: number, size: number, sunk: number) => {
 /** bigShapes, boulderShapes: how many shapes each kind of rock comes in. */
 export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: number, seed = 1): Rock[] {
   const { site } = isle;
-  const rand = random(seed * 7919 + 17);
+  const rand = random(hash(seed, 0x726f636b)); // "rock": a stream of its own
   const rocks: Rock[] = [];
   const clear = (x: number, z: number, size: number, big: boolean) =>
     rocks.every((r) => Math.hypot(r.x - x, r.z - z) > (r.size + size) * (r.big && big ? HEAPED : 0.85));

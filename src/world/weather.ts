@@ -7,7 +7,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { random } from './random.ts';
+import { hash, random } from './random.ts';
 
 /** What drifts: the wind's speed over the sea (m/s), the cloud cover (0–1), the aerosol (a multiple of a clear day's). */
 export interface Weather { wind: number; cloud: number; haze: number }
@@ -25,7 +25,7 @@ const TERMS = 3, SHORTEST = 360, LONGEST = 1200;
 
 /** A seeded sum of slow sines in −1…1 for each quantity. */
 function swells(seed: number) {
-  const rand = random(seed * 7919 + 17);
+  const rand = random(hash(seed, 0x77656174)); // "weat": a stream of its own
   const draw = () => {
     const weights = Array.from({ length: TERMS }, () => 0.5 + rand());
     const sum = weights.reduce((a, b) => a + b, 0);
