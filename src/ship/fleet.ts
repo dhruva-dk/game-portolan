@@ -70,7 +70,9 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   });
   const draws = instances.map((buffer, k) => {
     const ship = buildShip(k);
-    return [drawOf(ship.body, buffer, materials.body), drawOf(ship.cloth, buffer, materials.cloth), drawOf(ship.ropes, buffer, materials.ropes)];
+    // (the farthest level has no ropes, and so no rope draw)
+    return ([[ship.body, materials.body], [ship.cloth, materials.cloth], [ship.ropes, materials.ropes]] as const)
+      .filter(([p]) => p.triangles > 0).map(([p, material]) => drawOf(p, buffer, material));
   });
   const meshes = draws.flat();
 
