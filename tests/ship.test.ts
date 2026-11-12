@@ -57,15 +57,18 @@ test('she is a galleon at 0.6×: about 26 m from beak to taffrail, the mainmast 
   }
 });
 
-test('every sail is a whole grid of the cloth, in order, ready for a cloth simulation to move', () => {
+test('every sail and pennant is a whole grid of the cloth, in order, the whole of it, its grid marked on each vertex', () => {
   ships.forEach((s, k) => {
     let next = 0;
-    for (const g of s.sails) {
+    s.sails.forEach((g, n) => {
       assert.equal(g.first, next, `L${k} ${g.name}`);
       next += (g.columns + 1) * (g.rows + 1);
-    }
-    assert.ok(next <= s.cloth.vertices);
-    assert.equal(s.sails.length, 5);
+      for (let i = g.first; i < next; i++) assert.equal(s.cloth.normal[i * 4 + 3], n, `L${k} ${g.name}: vertex ${i}'s grid`);
+    });
+    assert.equal(next, s.cloth.vertices);
+    // the four square sails and the lateen at every level, in the same order; a pennant at each masthead but the farthest
+    assert.deepEqual(s.sails.map((g) => g.name).slice(0, 5), ships[0].sails.map((g) => g.name).slice(0, 5));
+    assert.equal(s.sails.length, k < 3 ? 8 : 5);
   });
   const course = ships[0].sails.find((g) => g.name === 'main course')!;
   assert.deepEqual([course.columns, course.rows], [14, 9]);

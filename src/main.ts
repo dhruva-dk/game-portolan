@@ -65,21 +65,23 @@ if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.pos
 // ---- SCAFFOLDING (ships demo, until ships are placed for real): ?ships=N sets N galleons on the sea ahead of the
 // default camera (south of the largest island, looking north) — 30, 60, 100, 150 m out and on past — at rest on the
 // mean sea, each on her own heading and in her own colours (after the player's ship, in the game view); ?lod=0…3 draws
-// them all at one level of detail.
+// them all at one level of detail; ?heading=deg turns them all that much further (clockwise seen from above); ?cloth=0
+// draws every ship's canvas as the wind fills it, simulating none.
 {
-  const ships = Math.min(number('ships', 0), flying ? 16 : 15), first = flying ? 0 : 1, { up, north } = frameAt(south);
+  const ships = Math.min(number('ships', 0), flying ? 32 : 31), first = flying ? 0 : 1, { up, north } = frameAt(south);
   const paints: Vec3[] = [[0.3, 0.03, 0.02], [0.03, 0.06, 0.2], [0.42, 0.28, 0.05], [0.03, 0.14, 0.06], [0.02, 0.02, 0.02]];
   const sails: Vec3[] = [[0.62, 0.57, 0.46], [0.7, 0.68, 0.6], [0.5, 0.38, 0.25]];
   for (let i = 0; i < ships; i++) {
     const out = [30, 60, 100, 150][i] ?? 150 + (i - 3) * 40, side = i < 4 ? [0, -12, 25, -40][i] : (i % 2 ? 1 : -1) * 30 * i;
     const p = along(along(up, north, out).p, cross(north, up), side).p, u = normalize(p);
-    const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i;
+    const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
     frame.fleet.set(first + i, { position: scale(u, R), forward, up: u }, {
-      paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1, brace: ((i % 5) - 2) * 0.2,
+      paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1,
     });
   }
   if (params.has('lod')) frame.fleet.pin(number('lod', 0));
+  if (params.get('cloth') === '0') frame.fleet.simulate(false);
 }
 // ---- end SCAFFOLDING
 

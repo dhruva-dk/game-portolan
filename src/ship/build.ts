@@ -5,10 +5,12 @@
 //
 // Vertex formats (bytes a vertex):
 //   body   position f32×3, normal snorm8×4 (w: ao), uv snorm16×2, part unorm8×4 (kind, pivot, swing, —)     24
-//   cloth  position f32×3, normal snorm8×4,         uv snorm16×2, part unorm8×4 (kind, pivot, swing, belly) 24
+//   cloth  position f32×3, normal snorm8×4 (w: grid), uv snorm16×2, part unorm8×4 (kind, pivot, swing, belly) 24
 //   ropes  position f32×3, normal snorm8×4 (w: radius),          part unorm8×4 (—, pivot, swing, —)       20
 // (uv as a fraction of UV_RANGE: half floats would be the natural choice, but three widens 16-bit attributes that
 // aren't normalized to 32 bits for WebGPU.)
+// A cloth vertex's grid is which sail or pennant it lies on (its index in `sails`, as a fraction of 127), for the
+// cloth simulation's particles to be found from it (cloth.ts).
 //
 // Pure: no renderer, runs in node for the tests.
 
@@ -45,7 +47,7 @@ export interface ShipMesh {
   body: Packed;
   cloth: Packed;
   ropes: Packed;
-  /** Where each sail's grid lies in the cloth's vertices. */
+  /** Where each sail's and pennant's grid lies in the cloth's vertices. */
   sails: SailGrid[];
   triangles: number;
   /** The ship's extent in her own frame, metres: [min, max] per axis. */
@@ -55,8 +57,8 @@ export interface ShipMesh {
 const snorm = (v: number) => Math.max(-127, Math.min(127, Math.round(v * 127)));
 const unorm = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
 
-/** One accumulator packed; `w` says what the normal's fourth byte carries. */
-function pack(acc: Acc, w: 'ao' | 'radius' | 'none', uv: boolean): Packed {
+/** One accumulator packed; `w` says what the normal's fourth byte carries (for 'grid', each vertex's grid in `grids`). */
+function pack(acc: Acc, w: 'ao' | 'radius' | 'grid', uv: boolean, grids: readonly SailGrid[] = []): Packed {
   const n = acc.count;
   const position = new Float32Array(n * 3), normal = new Int8Array(n * 4), part = new Uint8Array(n * 4);
   const uvs = uv ? new Int16Array(n * 2) : null;
@@ -66,7 +68,8 @@ function pack(acc: Acc, w: 'ao' | 'radius' | 'none', uv: boolean): Packed {
       position[i * 3 + c] = acc.p[i * 3 + c] * SCALE;
       normal[i * 4 + c] = snorm(acc.n[i * 3 + c]);
     }
-    normal[i * 4 + 3] = w === 'ao' ? snorm(ao) : w === 'radius' ? snorm((radius * SCALE) / RADIUS_UNIT) : 0;
+    normal[i * 4 + 3] = w === 'ao' ? snorm(ao) : w === 'radius' ? snorm((radius * SCALE) / RADIUS_UNIT)
+      : grids.findIndex((g) => i >= g.first && i < g.first + (g.columns + 1) * (g.rows + 1));
     part.set([kind, pivot, unorm(swing), unorm((belly * SCALE) / BELLY_UNIT)], i * 4);
     if (uvs) for (let c = 0; c < 2; c++) uvs[i * 2 + c] = Math.max(-32767, Math.min(32767, Math.round((acc.uv[i * 2 + c] / UV_RANGE) * 32767)));
   }
@@ -85,7 +88,7 @@ export function buildShip(k: number): ShipMesh {
   buildHull(body, D);
   buildRig(body, ropes, D);
   const sails = buildSails(cloth, D);
-  const packed = { body: pack(body, 'ao', true), cloth: pack(cloth, 'none', true), ropes: pack(ropes, 'radius', false) };
+  const packed = { body: pack(body, 'ao', true), cloth: pack(cloth, 'grid', true, sails), ropes: pack(ropes, 'radius', false) };
   const min: [number, number, number] = [Infinity, Infinity, Infinity], max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
   for (const p of [packed.body, packed.cloth, packed.ropes]) for (let i = 0; i < p.position.length; i++) {
     min[i % 3] = Math.min(min[i % 3], p.position[i]);

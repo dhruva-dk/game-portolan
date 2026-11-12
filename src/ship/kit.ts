@@ -80,9 +80,10 @@ export function trs(at: Vector3, rx = 0, ry = 0, rz = 0, s: Vector3 | number = 1
 
 /**
  * A surface through a grid of points (rows × columns), normals from its own slopes, wound so the middle normal
- * points along `facing`. `belly`, if given, is each point's belly (sails).
+ * points along `facing`. `belly`, if given, is each point's belly (sails). Returns whether it was wound against the
+ * grid's own order (its normal the negative of (down the rows) × (along them)).
  */
-export function sheet(acc: Acc, grid: Vector3[][], uvs: [number, number][][], facing: Vector3 | null, belly?: number[][]): void {
+export function sheet(acc: Acc, grid: Vector3[][], uvs: [number, number][][], facing: Vector3 | null, belly?: number[][]): boolean {
   const nr = grid.length, nc = grid[0].length;
   const nrm: Vector3[][] = grid.map((row, i) => row.map((_, j) => {
     const a = grid[Math.min(nr - 1, i + 1)][j].clone().sub(grid[Math.max(0, i - 1)][j]);
@@ -109,6 +110,7 @@ export function sheet(acc: Acc, grid: Vector3[][], uvs: [number, number][][], fa
     const a = base + i * nc + j, b = a + 1, c = a + nc, d = c + 1;
     if (flip) acc.quad(a, b, d, c); else acc.quad(a, c, d, b);
   }
+  return flip;
 }
 
 // ---------------------------------------------------------------- tubes

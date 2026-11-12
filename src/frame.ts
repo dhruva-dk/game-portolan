@@ -26,7 +26,7 @@ import { createWind } from './world/wind';
  */
 const EXPOSURE = 3.5;
 /** The most ships the sea carries. */
-const SHIPS = 16;
+const SHIPS = 32;
 /** The camera's far plane, metres: past the far side of the planet from as high as it goes. */
 const FAR = 2000;
 
@@ -34,7 +34,8 @@ const FAR = 2000;
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
  *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam); the nearest island's shadow map from
  *                 the sun, redrawn only when the sun has moved or another island has become the nearest; the ships'
- *                 marks on the sea round the eye (water/wake.ts: their wakes, foam and shadows), one small map
+ *                 marks on the sea round the eye (water/wake.ts: their wakes, foam and shadows), one small map; the
+ *                 near ships' sails as cloth (ship/cloth.ts), a few small steps of it
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, later the ships); then the sea,
  *                 which reads what was drawn before it behind itself (the floor through the water)
  *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping; then FXAA, on the
@@ -68,7 +69,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(planet, seed, view, light, sand);
   shadow.cast(...islands.casters);
-  const fleet = createFleet(light, wind, SHIPS);
+  const fleet = createFleet(renderer, light, wind, SHIPS);
   scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
@@ -104,7 +105,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     water.update(env, dt, fleet.ships);
     seabed.update();
     shadow.update(env.sunDirection, islands.update(view.eye));
-    fleet.update(camera, env.windSpeed, size.y);
+    fleet.update(camera, env.windSpeed, size.y, dt);
     pipeline.render();
   }
 

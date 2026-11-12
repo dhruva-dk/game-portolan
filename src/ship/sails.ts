@@ -2,8 +2,10 @@
 // pennant at each masthead. Ported from the galleon branch's rig.ts (the bonaventure's and the spritsail's dropped).
 //
 // Each sail is one grid of `columns × rows` cells, its vertices row by row from the head (v = 0) to the foot (v = 1),
-// left to right (u = 0 … 1): the layout a cloth simulation can later take over, writing these vertices' positions
-// for the near ships (build.ts records where each sail's grid starts). Each point is laid where the wind has blown it
+// left to right (u = 0 … 1), the pennants' too: the finest level's grids are the cloth simulation's particles
+// (canvas.ts cuts them, cloth.ts moves them for the near ships), and every level's vertex finds its place on its grid
+// by (u, v) (build.ts records each vertex's grid; each grid records the mast it hangs before, for the cloth to wrap
+// round rather than pass through, and which way its normal faces). Each point is laid where the wind has blown it
 // out of the sail's flat, and carries how far (belly): the shader scales that by the wind it is given, so the sails
 // fill, slacken or go aback without new geometry. A square sail bellies along +z (forward) before its yard is
 // braced, the lateen along +x (to port). Yards are built square across her (unbraced); the shader braces them.
@@ -16,7 +18,7 @@
 import { Vector3 } from 'three/webgpu';
 import type { Detail } from './detail.ts';
 import { Acc, CLOTH, PIVOT, V, lerp, range, sheet } from './kit.ts';
-import { MASTS, deckAt, mastZ, truck, zAt, type MastName } from './lines.ts';
+import { MASTS, deckAt, mastZ, topmastZ, truck, zAt, type MastName } from './lines.ts';
 
 /** Where each square yard hangs, how long it is, and the sail it sets. */
 export interface Yard {
@@ -79,32 +81,44 @@ export function lateenAt(a: number, b: number): SailPoint {
 /** The pennants: each this long and this broad at the truck (design metres), tapering to a point. */
 export const PENNANT = { length: 4.5, width: 0.45 };
 
-/** Where each sail's grid lies among the cloth's vertices, for a cloth simulation to take over. */
-export interface SailGrid { name: string; first: number; columns: number; rows: number }
+/**
+ * Where each grid of the cloth lies among its vertices — every sail's and every pennant's — and what a cloth simulation
+ * needs to know of it: its kind (CLOTH), whether sheet() wound it against the grid's order, and the mast it hangs
+ * before, which the canvas can't pass through (on the centreline, `z` forward, radius `r`; design metres).
+ */
+export interface SailGrid {
+  name: string; first: number; columns: number; rows: number;
+  kind: number; flip: boolean; mast: { z: number; r: number } | null;
+}
 
-function grid(acc: Acc, name: string, columns: number, rows: number, at: (u: number, v: number) => SailPoint, facing: Vector3, grids: SailGrid[]): void {
+function grid(acc: Acc, name: string, columns: number, rows: number, at: (u: number, v: number) => SailPoint, facing: Vector3, mast: SailGrid['mast']): SailGrid {
   const first = acc.count;
   const pts = range(0, 1, rows).map((v) => range(0, 1, columns).map((u) => at(u, v)));
   const dir = facing.clone().normalize();
-  sheet(acc, pts.map((r) => r.map((p) => p.flat.clone().addScaledVector(dir, p.belly))),
+  const flip = sheet(acc, pts.map((r) => r.map((p) => p.flat.clone().addScaledVector(dir, p.belly))),
     range(0, 1, rows).map((v) => range(0, 1, columns).map((u): [number, number] => [u, v])), facing, pts.map((r) => r.map((p) => p.belly)));
-  grids.push({ name, first, columns, rows });
+  return { name, first, columns, rows, kind: acc.kind, flip, mast };
 }
 
-/** Every sail and pennant into `cloth`; returns where each sail's grid lies. */
+/** Every sail and pennant into `cloth`; returns where each one's grid lies: the square sails, the lateen, the pennants. */
 export function buildSails(cloth: Acc, D: Detail): SailGrid[] {
   const grids: SailGrid[] = [];
   cloth.with({ kind: CLOTH.square, swing: 1 }, () => {
-    for (const Y of YARDS) cloth.with({ pivot: PIVOT[Y.mast] }, () =>
-      grid(cloth, `${Y.mast} ${Y.y > MASTS[Y.mast].top ? 'topsail' : 'course'}`, D.square[0], D.square[1], (u, v) => squareAt(Y, u, v), V(0, 0, 1), grids));
+    for (const Y of YARDS) cloth.with({ pivot: PIVOT[Y.mast] }, () => {
+      // a course hangs before its lower mast, a topsail before the topmast
+      const top = Y.y > MASTS[Y.mast].top, r = MASTS[Y.mast].r;
+      grids.push(grid(cloth, `${Y.mast} ${top ? 'topsail' : 'course'}`, D.square[0], D.square[1], (u, v) => squareAt(Y, u, v), V(0, 0, 1),
+        top ? { z: topmastZ(Y.mast), r: r * 0.55 } : { z: mastZ(Y.mast), r }));
+    });
   });
-  cloth.with({ kind: CLOTH.lateen }, () => grid(cloth, 'mizzen lateen', D.lateen[0], D.lateen[1], lateenAt, V(1, 0, 0), grids));
+  cloth.with({ kind: CLOTH.lateen }, () =>
+    grids.push(grid(cloth, 'mizzen lateen', D.lateen[0], D.lateen[1], lateenAt, V(1, 0, 0), { z: mastZ('mizzen'), r: MASTS.mizzen.r })));
   if (D.pennant) cloth.with({ kind: CLOTH.pennant }, () => {
     for (const name of Object.keys(MASTS) as MastName[]) {
       const root = truck(name).add(V(0, 0.05, 0));
-      const strip = range(0, 1, 1).map((j) => range(0, 1, D.pennant).map((t) =>
-        root.clone().add(V(0, -PENNANT.width * (1 - t) * j, -PENNANT.length * t))));
-      sheet(cloth, strip, range(0, 1, 1).map((j) => range(0, 1, D.pennant).map((t): [number, number] => [t, j])), V(1, 0, 0));
+      // along it (u) from the truck to its tip, across it (v) down from its upper edge
+      grids.push(grid(cloth, `${name} pennant`, D.pennant, 1, (t, j) => ({ flat: root.clone().add(V(0, -PENNANT.width * (1 - t) * j, -PENNANT.length * t)), belly: 0 }),
+        V(1, 0, 0), null));
     }
   });
   return grids;

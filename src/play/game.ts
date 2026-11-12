@@ -25,7 +25,7 @@ import { createStickView } from './stick';
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
 /** The player's colours (ship/fleet.ts): a red hull under weathered canvas. */
-const LOOK: Look = { paint: [0.3, 0.03, 0.02], sail: [0.62, 0.57, 0.46], band: false, brace: 0 };
+const LOOK: Look = { paint: [0.3, 0.03, 0.02], sail: [0.62, 0.57, 0.46], band: false };
 
 type Frame = ReturnType<typeof createFrame>;
 

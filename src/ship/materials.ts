@@ -10,9 +10,14 @@
 //   shipUp    up (unit), … and along its z: the wind she feels, scaled to 0…1 by how hard it blows
 //   shipPaint the strakes' and pennants' colour (linear), and 1 for a band of it across the sails
 //   shipCloth the sails' colour (linear), and a phase that keeps her canvas from flapping in step with others'
+//   shipBerth her berth in the cloth simulation (cloth.ts) and how much of her canvas it shapes (0…1)
 //
-// The body: wood.ts. The cloth: filled by the wind (sails.ts's belly scaled by it), shivering when it lies along them;
-// lit on both sides with light through the canvas. The pennants stream down the wind. The ropes: widened to a pixel and a half across far off so the rigging stays a line rather than
+// The body: wood.ts. The cloth, two ways blended by her berth's share, so a ship's canvas never pops between them:
+// drawn, filled by the wind (sails.ts's belly scaled by it, breathing with its gusts), with a ripple and, as the wind
+// slackens or comes along the sail, a luff travelling across it to leeward, its normal tilted to match; and simulated,
+// each vertex at its place on its sail's grid read from the particles (bilinearly, so every level samples the same
+// sheet) with the particles' own normal. Lit on both sides with light through the canvas. The pennants stream down the
+// wind, drawn or simulated alike. The ropes: widened to a pixel and a half across far off so the rigging stays a line rather than
 // breaking into dashes, and blended over what is behind them by how much of that width the rope itself would cover —
 // so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as a round rope's are where
 // it turns away from the eye.
@@ -20,10 +25,11 @@
 import { DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, fract, fwidth, max, min, mix, normalize, positionWorld,
-  faceDirection, select, sign, sin, smoothstep, time, varying, vec2, vec3,
+  faceDirection, int, select, sign, sin, smoothstep, storage, varying, vec2, vec3,
 } from 'three/tsl';
 import { type Light, leafLight } from '../land/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
+import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';
 import { createWood } from './wood';
 
@@ -45,9 +51,11 @@ const ROPE_PIXELS = 0.75;
 
 export interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
 
-/** pixel: the angle a pixel spans, radians — a uniform the fleet keeps. */
-export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
+/** pixel: the angle a pixel spans, radians — a uniform the fleet keeps; canvas: the near ships' cloth. */
+export function createShipMaterials(light: Light, pixel: N, canvas: Cloth): ShipMaterials {
   const wood = createWood(light);
+  const particles: N = storage(canvas.positions, 'vec4', canvas.positions.count).toReadOnly();
+  const particleNormals: N = storage(canvas.normals, 'vec4', canvas.normals.count).toReadOnly();
 
   // ---- her frame, per instance
   const at: N = attribute('shipAt', 'vec4'), fwd: N = attribute('shipFwd', 'vec4'), up: N = attribute('shipUp', 'vec4');
@@ -84,27 +92,62 @@ export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
   const isPennant: N = kind.greaterThan(CLOTH.pennant - 0.5);
   const isLateen: N = kind.greaterThan(CLOTH.lateen - 0.5).and(isPennant.not());
   const uvCloth: N = attribute('uv', 'vec2').mul(UV_RANGE);
-  // which way a sail bellies, before bracing; and how hard the wind fills it, along that (aback is negative)
+  const phase: N = cloth.w;
+  // which way a sail bellies, before bracing; and how hard the wind fills it, along that (aback is negative), as it
+  // breathes with the gusts
   const out: N = select(isLateen, vec3(1, 0, 0), vec3(0, 0, 1));
   const square: N = wind.x.mul(sin(at.w)).add(wind.y.mul(cos(at.w)));
-  const fill: N = select(isLateen, clamp(wind.x, -1, 1), clamp(square, -ABACK, 1));
+  const strength: N = max(abs(wind.x), abs(wind.y)).mul(breath(canvas.clock, phase));
+  const through: N = select(isLateen, wind.x, square).mul(breath(canvas.clock, phase));
+  const fill: N = select(isLateen, clamp(through, -1, 1), clamp(through, -ABACK, 1));
   const belly: N = part.w.mul(BELLY_UNIT);
-  // where the wind lies along the sail, the canvas shivers
-  const strength: N = max(abs(wind.x), abs(wind.y));
-  const shiver: N = sin(time.mul(9).add(uvCloth.x.mul(11)).add(uvCloth.y.mul(5)).add(cloth.w)).mul(part.w).mul(strength.sub(abs(fill)).max(0)).mul(0.05);
-  const sail: N = local.add(out.mul(belly.mul(fill.sub(1)).add(shiver)));
+  // Across the sail's plane (metres: along its yard, and up), the canvas ripples: a little where it is full, the
+  // wind's eddies running over it; and where the wind lies along it rather than through it, it lifts and shakes, the
+  // shiver running off its weather edge to leeward, hardest along its free edges and foot and none at its lashings.
+  const a: N = select(isLateen, local.z, local.x), b: N = local.y;
+  const lee: N = select(isLateen, sign(wind.y).negate(), sign(wind.x).negate());
+  const clew: N = smoothstep(0.7, 1, uvCloth.y).mul(smoothstep(0.25, 0, min(uvCloth.x, float(1).sub(uvCloth.x))));
+  const free: N = smoothstep(0, 0.5, uvCloth.y).mul(select(isLateen, smoothstep(1, 0.75, uvCloth.y), float(1).sub(clew)));
+  const luff: N = strength.sub(abs(fill)).max(0).mul(free);
+  const ripple: N = belly.mul(abs(fill)).mul(0.045);
+  const k1 = 2 * Math.PI / 2.6, k2 = 2 * Math.PI / 1.7;
+  const w1: N = a.mul(lee).mul(k1).add(b.mul(0.8)).sub(canvas.clock.mul(strength.mul(9).add(4))).add(phase);
+  const w2: N = a.mul(lee).mul(k2).sub(b.mul(1.3)).sub(canvas.clock.mul(strength.mul(13).add(5))).add(phase.mul(1.7));
+  const shake: N = luff.mul(0.22).add(ripple);
+  const lift: N = sin(w1).mul(shake).add(sin(w2).mul(shake).mul(0.45));
+  // its slope across the plane, for the normal
+  const liftA: N = cos(w1).mul(k1).add(cos(w2).mul(k2 * 0.45)).mul(shake).mul(lee);
+  const liftB: N = cos(w1).mul(0.8).sub(cos(w2).mul(1.3 * 0.45)).mul(shake);
+  const sail: N = local.add(out.mul(belly.mul(fill.sub(1)).add(lift)));
   // the pennant: from its root down the wind (hanging when there is none), flapping across it
   const along: N = uvCloth.x.mul(PENNANT_LENGTH);
   const blow: N = normalize(vec3(wind.x, float(-0.15).sub(float(1).sub(strength.mul(1.4)).max(0).mul(1.2)), wind.y));
   const across: N = normalize(cross(vec3(0, 1, 0), blow).add(vec3(1e-4, 0, 0)));
-  const flap: N = sin(time.mul(FLAP * 2 * Math.PI).mul(strength.add(0.4)).sub(uvCloth.x.mul(WAVES * 2 * Math.PI)).add(cloth.w))
+  const flap: N = sin(canvas.clock.mul(FLAP * 2 * Math.PI).mul(strength.add(0.4)).sub(uvCloth.x.mul(WAVES * 2 * Math.PI)).add(phase))
     .mul(uvCloth.x).mul(0.12 * PENNANT_LENGTH);
   const pennant: N = local.add(vec3(0, 0, along)).add(blow.mul(along)).add(across.mul(flap));
-  clothMaterial.positionNode = at.xyz.add(turn(brace(select(isPennant, pennant, sail), true)));
-  // the filled sail's normal: its slope across the flat scaled with the belly
+  // the filled sail's normal: its slope across the flat scaled with the belly, tilted by the ripples
   const n0: N = nrm.xyz, lean: N = dot(n0, out);
-  const filled: N = n0.sub(out.mul(lean)).mul(fill).add(out.mul(sign(lean).mul(max(abs(lean), 0.05))));
-  const clothNormal: N = varying(turn(brace(select(isPennant, across, filled), false)));
+  const plane: N = select(isLateen, vec3(0, 0, 1), vec3(1, 0, 0));
+  const filled: N = n0.sub(out.mul(lean)).mul(fill).add(out.mul(sign(lean).mul(max(abs(lean), 0.05))))
+    .sub(plane.mul(liftA).add(vec3(0, 1, 0).mul(liftB)).mul(sign(lean)));
+  // A ship in a berth: her canvas as the cloth has it, at this vertex's place on its grid (the finest level's
+  // vertices are the particles themselves), drawn as much as the berth's share says.
+  const shipBerth: N = attribute('shipBerth', 'vec4'), share: N = shipBerth.y;
+  const g: N = canvas.grids.element(int(nrm.w.mul(127).round()));
+  const fu: N = clamp(uvCloth.x, 0, 1).mul(g.y), fv: N = clamp(uvCloth.y, 0, 1).mul(g.z);
+  const i0: N = min(fu.floor(), g.y.sub(1)), j0: N = min(fv.floor(), g.z.sub(1));
+  const fx: N = fu.sub(i0), fy: N = fv.sub(j0);
+  const row: N = int(g.y.add(1));
+  const first: N = int(shipBerth.x.mul(canvas.count).add(g.x).add(i0).add(j0.mul(g.y.add(1))));
+  const bilinear = (B: N): N => mix(
+    mix(B.element(first).xyz, B.element(first.add(1)).xyz, fx),
+    mix(B.element(first.add(row)).xyz, B.element(first.add(row).add(1)).xyz, fx), fy);
+  const simulated: N = bilinear(particles), simulatedNormal: N = bilinear(particleNormals);
+  const shaped: N = mix(select(isPennant, pennant, sail), simulated, share);
+  clothMaterial.positionNode = at.xyz.add(turn(brace(shaped, true)));
+  const drawn: N = select(isPennant, across, filled), drawnNormal: N = normalize(drawn);
+  const clothNormal: N = varying(turn(brace(mix(drawnNormal, simulatedNormal, share), false)));
   const clothKind: N = varying(kind);
   clothMaterial.colorNode = Fn(() => {
     const uvs = attribute('uv', 'vec2').mul(UV_RANGE);
