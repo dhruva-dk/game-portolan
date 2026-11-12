@@ -16,7 +16,7 @@
 //
 // The eye's frame is worked out once a frame from the camera (update), on the CPU and into uniforms.
 
-import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera } from 'three/webgpu';
+import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera, type PerspectiveCamera } from 'three/webgpu';
 import {
   asin, atan, clamp, cos, cross, dot, float, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
@@ -33,6 +33,9 @@ export interface Eye {
   /** How far below the level the sea's horizon lies, radians. */
   dip: number;
 }
+
+/** How wide a pixel is at the middle of the camera's view, per metre away (height: the drawing buffer's, pixels). */
+export const pixelSize = (camera: PerspectiveCamera, height: number) => (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
 
 /** A point's place on a chart (metres), the chart's x and z axes carried to it, up there, and its arc from the centre (radians). */
 export interface Charted { q: N; e1: N; e2: N; up: N; theta: N }

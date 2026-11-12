@@ -27,6 +27,7 @@ import {
 import { uniform } from 'three/tsl';
 import type { Compute } from '../gpu';
 import type { Light } from '../sky/light';
+import { pixelSize } from '../view/view';
 import type { ShipPose } from '../world/pose';
 import { add, length, scale, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
@@ -150,7 +151,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
    * the seconds since the last. Returns what is due: the near ships' canvas as cloth.
    */
   function update(camera: PerspectiveCamera, windSpeed: number, height: number, dt: number): { cloth: Compute[] } {
-    pixel.value = (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
+    pixel.value = pixelSize(camera, height);
     frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const eye = camera.getWorldPosition(new Vector3());
     const canvas = sail(eye, windSpeed, dt);

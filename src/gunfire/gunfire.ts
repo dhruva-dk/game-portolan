@@ -23,6 +23,7 @@ import {
   Fn, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import type { Light } from '../sky/light';
+import { pixelSize } from '../view/view';
 import { random } from '../world/random';
 import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 
@@ -201,7 +202,7 @@ export function createGunfire(light: Light) {
     },
     /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */
     update(camera: PerspectiveCamera, height: number) {
-      pixel.value = (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
+      pixel.value = pixelSize(camera, height);
     },
   };
 }
