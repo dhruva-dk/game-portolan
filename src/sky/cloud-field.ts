@@ -44,6 +44,8 @@ export const BASE = 1.2, TOP = 2.0;
 const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 /** Extinction of the densest cloud, per km (cumulus: 50–100). */
 export const SIGMA = 60;
+/** The shaped noise's density past which the cloud is at its densest. */
+const FULL = 0.35;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
@@ -202,15 +204,16 @@ export function createCloudField() {
         If(c.dense.greaterThan(0.001), () => {
           const rho = c.dense.toVar();
           if (detail) If(t.lessThan(DETAIL_DISTANCE), () => { rho.assign(erode(c.dense, q, c.h)); });
+          rho.assign(clamp(rho.div(FULL), 0, 1));
           If(rho.greaterThan(0.001), () => {
             // the nearest tap sees the eroded cloud, so the small billows shade one another
             const q1 = q.add(sunDir.mul(TAPS[0]));
             const c1 = coarse(q1);
             const first = c1.dense.toVar();
             if (detail) If(t.lessThan(DETAIL_DISTANCE).and(first.greaterThan(0)), () => { first.assign(erode(c1.dense, q1, c1.h)); });
-            let tau: N = first.mul(SIGMA * TAPS[0]);
+            let tau: N = clamp(first.div(FULL), 0, 1).mul(SIGMA * TAPS[0]);
             for (let k = 1; k < TAPS.length; k++) {
-              tau = tau.add(coarse(q.add(sunDir.mul(TAPS[k]))).dense.mul(SIGMA * (TAPS[k] - TAPS[k - 1])));
+              tau = tau.add(clamp(coarse(q.add(sunDir.mul(TAPS[k]))).dense.div(FULL), 0, 1).mul(SIGMA * (TAPS[k] - TAPS[k - 1])));
             }
             // multiple scattering: octaves near the surface, each weaker, reaching deeper and less forward (a = b = c),
             // and deep inside the diffused light of a slab of that depth; built up only past the first mean free paths
