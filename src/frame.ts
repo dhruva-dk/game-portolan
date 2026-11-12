@@ -1,7 +1,6 @@
 import { ACESFilmicToneMapping, Color, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraProjectionMatrixInverse, cameraWorldMatrix, getViewPosition, length, normalize, pass, renderOutput, screenUV,
-  select, vec4,
+  Fn, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { Environment } from './environment';
@@ -89,11 +88,13 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
+  // the scene's camera, as uniforms of its own matrices: in the post pass three's camera nodes are the screen quad's
+  const projectionInverse = uniform(camera.projectionMatrixInverse), cameraWorld = uniform(camera.matrixWorld);
   const post = Fn(() => {
     const color = scenePass.getTextureNode();
     const depth = scenePass.getTextureNode('depth').x;
-    const position = getViewPosition(screenUV, depth, cameraProjectionMatrixInverse);
-    const dir = normalize(cameraWorldMatrix.mul(vec4(position, 0)).xyz);
+    const position = getViewPosition(screenUV, depth, projectionInverse);
+    const dir = normalize(cameraWorld.mul(vec4(position, 0)).xyz);
     const metres = length(position);
     // the backdrop is the sky itself, already seen through all the air
     const hazed = select(depth.greaterThanEqual(1), color.rgb, sky.fog(color.rgb, dir, metres));
