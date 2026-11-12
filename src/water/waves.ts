@@ -37,8 +37,8 @@ type N = any;
 
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
 export const CURVED = [1, 2];
-/** Cascades whose waves break. */
-const FOAMING = 2;
+/** Cascades whose waves break: the first this many. */
+export const FOAMING = 2;
 /** The ripples' mean square slope is never taken below this, however much the cascades hold. */
 const RIPPLE_FLOOR = 4e-4;
 

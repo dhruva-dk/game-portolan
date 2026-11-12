@@ -116,7 +116,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   const height: N = varying(dot(wave.xyz, grid.up));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
   const phase: N = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
-  const foamOn = createFoam();
+  const foamOn = createFoam(waves);
   const rest: N = varying(grid.up);
   material.colorNode = Fn(() => {
     // no water inside a hull
@@ -142,31 +142,31 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     // Per chart: the slopes, filtered over the pixel's footprint by the mips; what the filtering averages away (the
     // slopes' variance within the footprint) becomes roughness, as do the ripples too small for any cascade. The
     // slopes, as a tangent vector, sum with the charts' weights; the variances, independent, with their squares.
-    // The foam's cover from the breaking cascades (averaged over the footprint by their mips), drawn by foam.ts.
-    // Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1. Weighted by w²
+    // The foam from the breaking cascades' cover (averaged over the footprint by their mips), and the air under it,
+    // drawn by foam.ts. Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1. Weighted by w²
     // (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one sea's, and no
-    // pixel is whiter than a whitecap.
-    const slope = marks.slope.toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
+    // pixel is whiter than a whitecap; so too the air.
+    const slope = marks.slope.toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
     const q = vec2(0).toVar();
     charts.each(p, (c, slot) => {
       if (slot === 0) q.assign(c.q);
       const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
-      let s2: N = vec2(0), v: N = float(0), cover: N = surf, h: N = float(0);
+      let s2: N = vec2(0), v: N = float(0), h: N = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
         v = v.add(max(s.z.sub(s.x.mul(s.x)), 0).add(max(s.w.sub(s.y.mul(s.y)), 0)).mul(m.mul(m)));
         if (k < 2) {
-          const d = read(waves.displacement[k], float(1 / L));
-          cover = cover.add(d.w);
-          h = h.add(d.y.mul(m));
+          h = h.add(read(waves.displacement[k], float(1 / L)).y.mul(m));
         }
       });
       // the sea is Σ w·h, so its slope is Σ w·∇h + h·∇w: across the band, where the weights change, the second
       // tilts it too (the long cascades' height; the shortest's is too small to matter)
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
       variance.addAssign(v.mul(c.w.mul(c.w)));
-      foam.addAssign(foamOn(c, saturate(cover.add(wakeFoam)), thickness, footprint).mul(c.w.mul(c.w)));
+      const froth = foamOn(c, surf.add(wakeFoam), thickness, footprint);
+      foam.addAssign(froth.foam.mul(c.w.mul(c.w)));
+      bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
     }, dp);
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
@@ -198,7 +198,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
 
     const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
-    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air };
+    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(air, bubbles) };
     // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it
     return optics.seaRadiance(positionWorld, n, v, sqrt(variance.mul(float(1).sub(air.mul(0.6)))), crest, foam, behind, path, sparkle, near);
   })();
