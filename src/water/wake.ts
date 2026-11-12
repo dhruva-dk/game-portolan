@@ -367,6 +367,8 @@ export function createWake(view: View, sky: Sky, capacity: number) {
         near++;
       });
       trailGeometry.setDrawRange(0, triangle * 3);
+      // (a ship at rest lays no ribbon: then there is no trail to draw)
+      trails.visible = triangle > 0;
       patchGeometry.setDrawRange(0, near * 6);
       shadowGeometry.instanceCount = near;
       for (const a of [trailAt, trailMark, trailLaid, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
