@@ -233,6 +233,13 @@ Checked read-only in the worktrees named below. No commit message anywhere recor
 5. *Port the visibility rule* (lantern-only past 150 m at night, `sim/visibility.ts`). Only if night exists and other captains' ships do.
 Trade-off: night costs a moon and stars (art and sky work) and playability on a 6-inch screen; with 0117 there was no recorded complaint, and the exposure and grade work for it exists only in 0117.
 
+**Decided and done (11-12): option 2, no night.** The "Current game" bullets above describe the game before this.
+- `src/world/sun.ts` (pure, `tests/sun.test.ts`): the time of day is the same everywhere. Over every place the sun stands as high as the hour says (the hour's sun at lat 10 deg on the solstice), so its elevation never changes as a ship sails. Its bearing is set by the compass at the start island's centre, carried to an origin, and from there to every place along the great circle between them (parallel transport). A constant-elevation field on a sphere must have a zero (Poincare-Hopf), so it has exactly one, the origin's antipode. It is placed at the centre of the largest island at least 90 deg from the start (land; on seed 3 the 59 m island at 42.5, -167.9). Along great circles from the origin the sun turns only with the sea's own curve. Across them it turns tan(theta/2) more, and round that island 2/r rad per metre (0.8 deg/m at its apron's edge).
+- It depends only on the place and the match, so all players agree. `?t=` sets the hour everywhere (default 15:00). The clock does not advance.
+- Every surface is lit by the sun over itself (`sky.sun(p)`, the same rotation in TSL), and sun illuminance is one value. The island shadow map is drawn along the sun over the island's centre, so it never redraws as the eye moves. The sky and clouds use the sun over the eye, whose sky elevation is constant, so the sky-view table rebakes only as the camera's height changes the horizon's dip (under 2 a second).
+- Checked: a 320 s drive at 12 m/s (more than a lap) and views over both geographic poles all show the same afternoon.
+- Not done: the eye's frame (`frameAt`) is singular at the geographic poles, so the clouds' map (slid along the eye's east and south) and the cloud reprojection jump when the eye crosses one. The sun is unaffected.
+
 ## 10. Weather
 
 **Iterations**
@@ -263,6 +270,12 @@ Trade-off: night costs a moon and stars (art and sky work) and playability on a 
 4. *Local weather systems* (0117 `sim/weather.ts`): about 250 lines of sim that is pure and portable apart from `harm.ts`, `parts.ts` and `nav.ts` couplings (hull damage, mast strikes, shore clearance), which can be dropped for fog/rain/calm only. The render (volume cloud per system, fall, lightning, froxel fog) is TSL tied to 0117's `P` uniforms and its froxel fog and temporal upscaler: redo. The cost of the old cloud pass was 17 to 22 ms with a covering system on a desktop (above); the current clouds are a different design and unmeasured with local systems.
 5. *Visibility-only weather* (fog shortens sight and rain gusts the wind, no damage). Cheapest local gameplay from the old rules: `skyAt` and `windAt` in the sim. Fog needs a fog volume in the atmosphere (current `sky/` has haze only; `simplify-renderer` is the precedent for dropping the froxel fog for cost).
 Trade-off: a fixed `windSpeed` keeps waves, sails and clouds consistent and cheap; each thing that varies (speed, direction, local systems) multiplies what the swell, the sails and the clouds must track, and local systems add gameplay rules the current game does not have yet.
+
+**Decided and done (11-12): option 2, slow global drift.**
+- `src/world/weather.ts` (pure, `tests/weather.test.ts`): wind speed, cloud cover and haze, each its mean plus a seeded sum of three sines with 6-20 min periods. Ranges: wind 7.6 +- 1.6 m/s, cover 0.37 +- 0.12, haze 1.6 +- 25%. There are no events and nothing depends on where players are. `?wind=`, `?cloud=` and `?haze=` pin one quantity.
+- The sea's waves keep the match's mean wind (`Environment.seaWind`), because a sea takes hours to develop and the CPU swell the sim reads must stay fixed. Regenerating the spectrum costs about 80 ms of CPU on the Mac. The whitecaps, ripples, foam fade, sails, wakes and cloud drift follow the drifting wind.
+- The air's tables take the haze in 1% steps, one table a frame. That is about 1.1 ms of Mac compute for three frames, at most every few seconds (2.3 ms at once before).
+- Default haze 1.6 (an aerosol column of 0.13, a hazy trade-wind day). Above about 2 the whole sky greys before the horizon band grows, because the band's height and the zenith's whitening come from the same column. The north star's thick pale band therefore cannot come from `haze` alone; see the report for the optical-scale option.
 
 ## Uncertainties
 
