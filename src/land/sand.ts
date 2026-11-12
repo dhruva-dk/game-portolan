@@ -9,8 +9,8 @@
 //
 // Lit like everything else (sky/light.ts).
 
-import { NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
 import { If, abs, cameraPosition, float, mix, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
+import { loadTexture } from '../textures';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
@@ -50,15 +50,7 @@ const SHARP = 8;
 export type Sand = (p: N, n: N, litter: N | null) => N;
 
 export function createSand(view: View, ground: Ground, light: Light): Sand {
-  const loader = new TextureLoader();
-  const load = (file: string, srgb: boolean) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = srgb ? SRGBColorSpace : NoColorSpace;
-    return t;
-  };
-  const sand = load('sand.jpg', true), sandNormal = load('sand-normal.jpg', false), leaves = load('litter.jpg', true);
+  const sand = loadTexture('sand.jpg', true), sandNormal = loadTexture('sand-normal.jpg', false), leaves = loadTexture('litter.jpg', true);
   const strewn = createStrewn();
 
   /**

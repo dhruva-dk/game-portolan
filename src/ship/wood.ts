@@ -10,11 +10,11 @@
 // in plain view. Wet near the waterline: darker, greener and glossier where the sea washes her.
 // The deck: Poly Haven's Wooden Planks (Dario Barresi, Charlotte Baglioni; CC0), pale and dry and matte.
 
-import { NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
 import {
   abs, clamp, cross, dFdx, dFdy, dot, float, floor, fract, fwidth, hash, inverseSqrt, max, min, mix, normalize, positionWorld,
   select, smoothstep, sqrt, texture, vec3,
 } from 'three/tsl';
+import { loadTexture } from '../textures';
 import type { Light } from '../sky/light';
 import { KIND } from './kit';
 
@@ -45,17 +45,9 @@ const RELIEF = 1;
 /** Body colour (radiance) for a vertex of kind `kind` at texture coordinates uv, `height` metres over her waterline,
  * facing world normal n (unit), open to the sky by ao, in the captain's paint. */
 export function createWood(light: Light) {
-  const loader = new TextureLoader();
-  const load = (file: string, colour: boolean) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = colour ? SRGBColorSpace : NoColorSpace;
-    return t;
-  };
-  const planks = load('planks.jpg', true), deck = load('deck.jpg', true);
+  const planks = loadTexture('planks.jpg', true), deck = loadTexture('deck.jpg', true);
   // (Poly Haven's packing: occlusion, roughness and metalness in r, g and b; the normal map in OpenGL's convention)
-  const arm = load('planks-arm.jpg', false), bumps = load('planks-normal.jpg', false);
+  const arm = loadTexture('planks-arm.jpg', false), bumps = loadTexture('planks-normal.jpg', false);
 
   return (kind: N, uv: N, height: N, n0: N, ao: N, paint: N): N => {
     const p = positionWorld;

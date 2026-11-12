@@ -8,10 +8,9 @@
 //
 // Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder.
 
-import {
-  Euler, Matrix4, MeshBasicNodeMaterial, NoColorSpace, Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
-} from 'three/webgpu';
+import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, abs, attribute, dot, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
+import { loadTexture } from '../textures';
 import type { View } from '../view/view';
 import type { Rock } from '../world/scatter';
 import type { Chart } from '../world/sphere';
@@ -38,15 +37,7 @@ const ALGAE = [0.06, 0.07, 0.04];
 
 /** rocks[i]: those on island i, whose chart is charts[i]. */
 export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
-  const loader = new TextureLoader();
-  const load = (file: string, srgb: boolean) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = srgb ? SRGBColorSpace : NoColorSpace;
-    return t;
-  };
-  const colour = load('rock.jpg', true), bumps = load('rock-normal.jpg', false);
+  const colour = loadTexture('rock.jpg', true), bumps = loadTexture('rock-normal.jpg', false);
 
   const material = new MeshBasicNodeMaterial();
   material.colorNode = Fn(() => {

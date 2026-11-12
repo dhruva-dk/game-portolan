@@ -10,11 +10,9 @@
 // triangles, so the leaves need no cut-out texture (an alpha test would cost the phone's GPU its hidden-surface
 // removal). Lit on both sides, and glowing through from behind as leaves do.
 
-import {
-  BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, NoColorSpace,
-  Quaternion, RepeatWrapping, SRGBColorSpace, TextureLoader, Vector3,
-} from 'three/webgpu';
+import { BufferGeometry, DoubleSide, Float32BufferAttribute, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize, positionWorld, smoothstep, texture, uv, vec3 } from 'three/tsl';
+import { loadTexture } from '../textures';
 import { random } from '../world/random';
 import type { Palm } from '../world/scatter';
 import type { Chart } from '../world/sphere';
@@ -162,15 +160,7 @@ function shape(lean: number, seed: number): Shape {
 
 /** palms[i]: those on island i, whose chart is charts[i]. */
 export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
-  const loader = new TextureLoader();
-  const load = (file: string, srgb: boolean) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = srgb ? SRGBColorSpace : NoColorSpace;
-    return t;
-  };
-  const bark = load('bark.jpg', true);
+  const bark = loadTexture('bark.jpg', true);
 
   const trunkMaterial = new MeshBasicNodeMaterial();
   trunkMaterial.colorNode = Fn(() => {

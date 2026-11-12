@@ -29,8 +29,8 @@
 // its very edge, over the last centimetre of water, the foam thins away to nothing, so the water meets the sand with
 // no line drawn between them.
 
-import { NoColorSpace, RepeatWrapping, TextureLoader } from 'three/webgpu';
 import { float, max, mix, saturate, smoothstep, texture, vec2 } from 'three/tsl';
+import { loadTexture } from '../textures';
 import type { Read } from '../view/charts';
 import { CASCADES } from './cascades';
 import { FOAMING, type Waves } from './waves';
@@ -75,10 +75,7 @@ const DENSE = 0.92;
 const AIR = 0.7, PLUME = 1;
 
 export function createFoam(waves: Waves) {
-  const pattern = new TextureLoader().load(`${import.meta.env.BASE_URL}tex/foam.png`);
-  pattern.wrapS = pattern.wrapT = RepeatWrapping;
-  pattern.anisotropy = 4;
-  pattern.colorSpace = NoColorSpace;
+  const pattern = loadTexture('foam.png', false, 4);
 
   /**
    * The foam at a point through one chart c, and the air under it: other, any cover (0…1) laid on the whitecaps'
