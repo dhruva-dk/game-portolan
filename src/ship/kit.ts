@@ -89,6 +89,17 @@ export function sheet(acc: Acc, grid: Vector3[][], uvs: [number, number][][], fa
     const b = grid[i][Math.min(nc - 1, j + 1)].clone().sub(grid[i][Math.max(0, j - 1)]);
     return new Vector3().crossVectors(a, b).normalize();
   }));
+  // where an edge closes to a point (a lateen's peak, a pennant's tip) the cross product vanishes: borrow the nearest
+  // good normal
+  const good = (n: Vector3) => n.lengthSq() > 0.5;
+  nrm.forEach((row, i) => row.forEach((n, j) => {
+    if (good(n)) return;
+    let best = Infinity;
+    nrm.forEach((r, ii) => r.forEach((m, jj) => {
+      const d = Math.abs(ii - i) + Math.abs(jj - j);
+      if (good(m) && d < best) { best = d; n.copy(m); }
+    }));
+  }));
   const flip = facing ? nrm[nr >> 1][nc >> 1].dot(facing) < 0 : false;
   const base = acc.count;
   for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) {
