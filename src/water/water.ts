@@ -64,6 +64,8 @@ const LIKENESS_WINDS = [5, 10, 15, 20];
  * the ripples' mean square slope is (1 − GATHER·tanh(s/σ)) of its mean, s the slope along the wind and σ its rms.
  */
 const GATHER = 0.8;
+/** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
+const SMOOTHEST = 1e-4;
 
 /**
  * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
@@ -213,8 +215,11 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(air, bubbles) };
-    // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it
-    return optics.seaRadiance(positionWorld, n, v, sqrt(variance.mul(float(1).sub(air.mul(0.6)))), crest, foam, behind, path, sparkle, near);
+    // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it. Never quite a
+    // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
+    // drawn black along every beach.
+    const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
+    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
