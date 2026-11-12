@@ -139,13 +139,13 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const islandSun = new Vector3();
 
   function render(env: Environment, dt: number) {
-    // the CPU's work, each system's after what it reads: the view first
+    // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
     camera.updateMatrixWorld();
     view.update(camera);
     renderer.getDrawingBufferSize(size);
     const air = sky.update(env, camera, dt, size.x, size.y);
-    const sea = water.update(env, dt, fleet.ships);
     const ships = fleet.update(camera, env.windSpeed, size.y, dt);
+    const sea = water.update(env, dt, fleet.ships);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
     const island = islands.update(view.eye);
