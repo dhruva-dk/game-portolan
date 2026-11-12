@@ -1,5 +1,6 @@
 // Judge our render against the north-star screenshots by eye.
-//   node tools/reference.ts [name ...]     names from PAIRS; default all
+//   node tools/reference.ts [name ...] [key=value ...]     names from PAIRS, default all; key=value added to each
+//   query (`haze=2`), the composite then named for them (captures/reference/sea&haze=2.png)
 // For each pair: crops the north star to its UI-free scene region, captures the game at the matching camera
 // and composes captures/reference/<name>.png with the north star left, ours right.
 
@@ -17,8 +18,10 @@ const PAIRS = [
   { name: 'island', star: 'docs/north-star/island.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 'lat=17.3&lon=-4.2&alt=15&look=-20&yaw=222' },
 ];
 
-const only = process.argv.slice(2);
-const pairs = PAIRS.filter((p) => only.length === 0 || only.includes(p.name));
+const args = process.argv.slice(2);
+const only = args.filter((a) => !a.includes('=')), extra = args.filter((a) => a.includes('='));
+const pairs = PAIRS.filter((p) => only.length === 0 || only.includes(p.name))
+  .map((p) => ({ ...p, query: [p.query, ...extra].join('&'), file: [p.name, ...extra].join('&') }));
 const H = 1000; // height of each half in the composite, CSS pixels
 mkdirSync('captures/reference', { recursive: true });
 const { browser, url, close } = await launch();
@@ -45,7 +48,7 @@ try {
         style="position:absolute;left:${-x * k}px;top:${-y * k}px;width:${2602 * k}px;height:${2394 * k}px"></div>
       <img src="data:image/png;base64,${ours}" style="width:${w}px;height:${H}px"></body>`);
     await page.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
-    const file = `captures/reference/${p.name}.png`;
+    const file = `captures/reference/${p.file}.png`;
     writeFileSync(file, await page.screenshot());
     console.log(file);
     await page.close();

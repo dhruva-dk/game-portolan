@@ -12,8 +12,12 @@ import { random } from './random.ts';
 /** What drifts: the wind's speed over the sea (m/s), the cloud cover (0–1), the aerosol (a multiple of a clear day's). */
 export interface Weather { wind: number; cloud: number; haze: number }
 
-/** The means a match's weather drifts about. */
-export const MEAN: Weather = { wind: 7.6, cloud: 0.37, haze: 1 };
+/**
+ * The means a match's weather drifts about. The haze is a hazy trade-wind day's: an aerosol column of 0.13 (clear
+ * maritime air is 0.05–0.1, a tropical marine one up to 0.2), enough to pale the horizon while the zenith stays blue;
+ * past twice a clear day's the whole sky greys before the band at the horizon grows (both are the one column).
+ */
+export const MEAN: Weather = { wind: 7.6, cloud: 0.37, haze: 1.6 };
 /** How far each strays from its mean at most: the wind and the cover by so much, the haze by so much of itself. */
 export const SWING: Weather = { wind: 1.6, cloud: 0.12, haze: 0.25 };
 /** The swells in each, and the shortest and longest of their periods, seconds. */
