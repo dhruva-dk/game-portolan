@@ -1,7 +1,7 @@
 // How anything standing on the island is lit: the sky's sun (through the clouds' shadow, and the shadows of what
 // stands on the island) and its ambient light; below the water, only what of them the water lets down to that depth.
 // A glossy surface (a ship's oiled timber, her paint, her gilding) also reflects them toward the eye: the sun as a
-// GGX highlight, the sky as its PMREM-filtered reflection (sky/reflection.ts), both at the same exposure as the rest.
+// GGX highlight, the sky as its GGX-filtered reflection (sky/reflection.ts), both at the same exposure as the rest.
 
 import { cameraPosition, dot, float, max, min, normalize, pow, reflect, saturate, vec2, vec3, vec4 } from 'three/tsl';
 import type { Sky } from '../sky/sky';

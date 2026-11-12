@@ -147,10 +147,10 @@ function seaRadiance(
   const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
   const body = deep(ships.air).mul(irradiance).mul(ships.glow);
 
-  // The sky, along the reflected ray, blurred to the roughness (three's PMREM takes √α). A ray reflected down
-  // (below the horizon here, by the up here) from a facet turned away from the eye meets the next wave instead, at
-  // about the angle it points down: glancing, that wave mirrors the sky at its horizon; steeper, the light comes
-  // through it, the sea's own colour. Fresnel weighs the two.
+  // The sky, along the reflected ray, blurred to the roughness (sky/reflection.ts takes √α, as three's PMREM did). A
+  // ray reflected down (below the horizon here, by the up here) from a facet turned away from the eye meets the next
+  // wave instead, at about the angle it points down: glancing, that wave mirrors the sky at its horizon; steeper, the
+  // light comes through it, the sea's own colour. Fresnel weighs the two.
   const r = v.negate().reflect(n);
   const below = dot(r, up);
   const above = sky.reflect(normalize(r.sub(up.mul(min(below, 0)))), sqrt(alpha));
