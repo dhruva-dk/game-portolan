@@ -1,4 +1,4 @@
-import { WebGPURenderer } from 'three/webgpu';
+import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
 import { createEnvironment, updateEnvironment } from './environment';
 import { createFly } from './fly';
 import { createFrame } from './frame';
@@ -20,6 +20,12 @@ if (!navigator.gpu) {
 const renderer = new WebGPURenderer({ antialias: false, trackTimestamp: true });
 document.body.appendChild(renderer.domElement);
 await renderer.init();
+// three's WebGPURenderer always installs a WebGL 2 fallback and takes it, with only a warning, when WebGPU gives it no
+// adapter or device (no option turns that off); this game is WebGPU's alone, so that is a failure
+if (renderer.coordinateSystem !== WebGPUCoordinateSystem) {
+  meterEl.textContent = 'no WebGPU';
+  throw new Error('WebGPU unavailable: three fell back to WebGL');
+}
 
 // Debug: ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the
 // air's aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the planet's (world/planet.ts; SEED by default); ?lat=&lon= degrees put the camera over a point of the
