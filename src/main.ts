@@ -6,7 +6,8 @@ import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { traceCoasts } from './ui/coasts';
-import { createHud } from './ui/hud';
+import { createGlobe } from './ui/globe';
+import { createHud, type HudState } from './ui/hud';
 import { uiLayer } from './ui/ui';
 import { sunPlaces } from './world/sun';
 import { createWeather } from './world/weather';
@@ -54,10 +55,13 @@ probe(frame);
 const placeholder = createPlaceholder(frame.planet.islands);
 const layer = uiLayer();
 safeArea(layer);
-const hud = game && createHud(layer, traceCoasts(frame.planet.islands), {
+const coasts = traceCoasts(frame.planet.islands);
+const globe = createGlobe(coasts);
+let shown: HudState | null = null, opening = switches.screen === 'map';
+const hud = game && createHud(layer, coasts, {
   slot: (i) => placeholder.choose(i),
   gust: () => {},
-  map: () => {},
+  map: () => shown && globe.show(shown),
 });
 
 console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
@@ -71,7 +75,13 @@ renderer.setAnimationLoop(() => {
   last = start;
 
   move(dt);
-  if (game && hud) hud.update(placeholder.state(game.status(), dt));
+  if (game && hud) {
+    shown = placeholder.state(game.status(), dt);
+    hud.update(shown);
+    globe.update(shown);
+    if (opening) globe.show(shown);
+    opening = false;
+  }
   const { x, y, z } = frame.camera.position;
   updateEnvironment(env, dt, [x, y, z], frame.wind);
   frame.render(env, dt);
