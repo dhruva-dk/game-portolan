@@ -177,13 +177,22 @@ export function blend(distances: number[], width: number): number[] {
   return w.map((x) => x / size);
 }
 
-/** The anchors that weigh in at p and their weights (the GPU's choice, charts.ts): a function of p alone. */
+/**
+ * The anchors that weigh in at p and their weights (the GPU's choice, charts.ts: the three nearest, by their dot
+ * products with p, no sorting): a function of p alone.
+ */
 export function weigh(all: Anchor[], p: Vec3, width: number): { index: number[]; weight: number[] } {
-  const order = near(all, p, Math.PI * R);
-  const d = order.map((i) => distance(all[i].at, p));
-  const w = blend(d, width);
-  const keep = order.map((_, k) => k).filter((k) => w[k] > 0);
-  return { index: keep.map((k) => order[k]), weight: keep.map((k) => w[k]) };
+  const u = normalize(p);
+  const best = [-1, -1, -1], c = [-2, -2, -2];
+  for (let k = 0; k < all.length; k++) {
+    const d = dot(u, all[k].at);
+    if (d > c[0]) [c[2], best[2], c[1], best[1], c[0], best[0]] = [c[1], best[1], c[0], best[0], d, k];
+    else if (d > c[1]) [c[2], best[2], c[1], best[1]] = [c[1], best[1], d, k];
+    else if (d > c[2]) [c[2], best[2]] = [d, k];
+  }
+  const w = blend(c.map((x) => R * Math.acos(Math.min(Math.max(x, -1), 1))), width);
+  const keep = [0, 1, 2].filter((k) => w[k] > 0);
+  return { index: keep.map((k) => best[k]), weight: keep.map((k) => w[k]) };
 }
 
 /** θ / sin θ: how much a chart stretches across its bearing at `metres` from its centre. */
