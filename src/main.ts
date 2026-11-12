@@ -3,7 +3,7 @@ import { createEnvironment, updateEnvironment } from './environment';
 import { createFly } from './fly';
 import { createFrame } from './frame';
 import { createMeter } from './meter';
-import { createGame } from './play/game';
+import { createGame, type Other } from './play/game';
 import { addProbe } from './probe';
 import { SEED } from './world/planet';
 import { sunPlaces } from './world/sun';
@@ -58,18 +58,15 @@ function flyer() {
     env.clock += dt;
   };
 }
-const move = flying ? flyer() : createGame(frame, env, renderer.domElement, { at: south, bearing: 0 }, params.get('drive') ?? '');
-move(0);
-frame.camera.updateMatrixWorld();
-if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.position);
-
 // ---- SCAFFOLDING (ships demo, until ships are placed for real): ?ships=N sets N galleons on the sea ahead of the
-// default camera (south of the largest island, looking north) — 30, 60, 100, 150 m out and on past — at rest on the
-// mean sea, each on her own heading and in her own colours (after the player's ship, in the game view), set as if
-// making ?way= m/s (0 by default) though she stays where she is; ?lod=0…3 draws them all at one level of detail; ?heading=deg turns them all that much further (clockwise seen from above); ?cloth=0
-// draws every ship's canvas as the wind fills it, simulating none.
+// default camera (south of the largest island, looking north) — 30, 60, 100, 150 m out and on past — on the mean sea,
+// each on her own heading and in her own colours. Sailing, they are the player's fleet-mates (play/game.ts), for her
+// to ram: each makes ?way= m/s (0 by default) on a straight course, her rudder amidships. Flying, they lie still,
+// drawn as if making ?way=. ?lod=0…3 draws them all at one level of detail; ?heading=deg turns them all that much
+// further (clockwise seen from above); ?cloth=0 draws every ship's canvas as the wind fills it, simulating none.
+const others: Other[] = [];
 {
-  const ships = Math.min(number('ships', 0), flying ? 32 : 31), first = flying ? 0 : 1, { up, north } = frameAt(south);
+  const ships = Math.min(number('ships', 0), flying ? 32 : 31), { up, north } = frameAt(south);
   const paints: Vec3[] = [[0.3, 0.03, 0.02], [0.03, 0.06, 0.2], [0.42, 0.28, 0.05], [0.03, 0.14, 0.06], [0.02, 0.02, 0.02]];
   const sails: Vec3[] = [[0.62, 0.57, 0.46], [0.7, 0.68, 0.6], [0.5, 0.38, 0.25]];
   for (let i = 0; i < ships; i++) {
@@ -77,14 +74,18 @@ if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.pos
     const p = along(along(up, north, out).p, cross(north, up), side).p, u = normalize(p);
     const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
-    frame.fleet.set(first + i, { position: scale(u, R), forward, up: u }, {
-      paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1,
-    }, scale(forward, number('way', 0)));
+    others.push({ at: u, heading: forward, look: { paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1 }, way: number('way', 0) });
   }
+  if (flying) others.forEach((o, i) => frame.fleet.set(i, { position: scale(o.at, R), forward: o.heading, up: o.at }, o.look, scale(o.heading, o.way)));
   if (params.has('lod')) frame.fleet.pin(number('lod', 0));
   if (params.get('cloth') === '0') frame.fleet.simulate(false);
 }
 // ---- end SCAFFOLDING
+
+const move = flying ? flyer() : createGame(frame, env, renderer.domElement, { at: south, bearing: 0 }, params.get('drive') ?? '', others);
+move(0);
+frame.camera.updateMatrixWorld();
+if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.position);
 
 console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
 frame.resize(innerWidth, innerHeight);

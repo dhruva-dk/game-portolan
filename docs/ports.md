@@ -277,6 +277,43 @@ Trade-off: a fixed `windSpeed` keeps waves, sails and clouds consistent and chea
 - The air's tables take the haze in 1% steps, one table a frame. That is about 1.1 ms of Mac compute for three frames, at most every few seconds (2.3 ms at once before).
 - Default haze 1.6 (an aerosol column of 0.13, a hazy trade-wind day). Above about 2 the whole sky greys before the horizon band grows, because the band's height and the zenith's whitening come from the same column. The north star's thick pale band therefore cannot come from `haze` alone; see the report for the optical-scale option.
 
+## 11. Ship collisions and ramming
+
+**Best source:** 0117, `src/sim/sailing.ts:320-369` (`collide`, `contact`), called once a tick from `match.ts:140` after every ship has sailed. Tuning in `tables.ts:23-35` (`SHIP`) and `:316` (`POWERS.ram`). Damage goes through `harm.ts:37` (`hurt`: shield first, then hull). No test in 0117 covers it.
+
+**What 0117 did**
+- **Hull:** a circle. Two ships closer than `SHIP.touch = 10` m, centre to centre, touch. With `half = 8.6` m, two bows meeting head-on overlapped by 7 m before they touched, and ships lying alongside never touched.
+- **Contact:** each was pushed half the overlap apart along the line between centres. This was a single pass over the pairs `i < j` in index order, so the result depended on the list order. Nothing checked the shallows. If they were closing, each got a shove of `0.6 * closing` apart, decaying at 1.5/s (`sailing.ts:171-175`), and **both lost 30% of their speed** (`speed *= 0.7`), whatever the angle. There was no sliding, no turn and no grip.
+- **Ram:** closing faster than `SHIP.ram = 7` m/s, with top speed 14.5. The damage was `dmg = (closing - 5) * 2.2`. Each ship took `dmg * (0.3 + 0.7 * other's share of the closing)`, so the one driving in took less, capped at `ramCap = 45` a collision. A ship had 100 hull behind 100 shield. It raised `EVENT.ram` (`state.ts:308`) and `CAUSE.ram` (`:25`).
+- **Re-arm:** none. Ships pushed apart each tick, and a ship holding throttle could close faster than 7 m/s again after the bounce, so repeated rams were possible.
+- **Ram ability** (`POWERS.ram`: +12 m/s for 1.5 s, a flat 40 damage on contact, `abilities.ts:23`) and the bots' use of it (`captains/brain.ts:1235, 1461`): out of scope, since there are no abilities or bots yet.
+
+**What I took:** the rule's numbers, scaled to this game's top speed (12/14.5 = 0.83), so the same share of top speed does the same damage:
+- threshold 7 became 5.8 m/s;
+- offset 5 became 4.1;
+- 2.2 per m/s became 2.65;
+- the cap of 45 and the `0.3 + 0.7 * share` split are kept as they were;
+- the shove decay is kept at 1.5/s, and its effective 0.2 bounce became `RAM.bounce`.
+
+A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its full speed (tested). All of these live in `RAM` in `src/sim/handling.ts`.
+
+**What I wrote new** (`src/sim/contact.ts`, `tests/contact.test.ts`)
+- **Hull:** a capsule, 26 m by 6.5 m (radius 3.25 m, keel segment ±9.75 m), not a circle.
+- **Contact:** found on a chart about the midpoint of the pair. The response is one rigid-body impulse at the contact point. The two hulls have equal mass ahead and twice the mass broadside (`RAM.sway`), turn about a 7.8 m radius of gyration, part at 0.2 of the closing, and grip at 0.2 (Coulomb). So a glancing blow slides, an off-centre blow turns her, and the rammer loses her way while the struck ship is shoved sideways. This replaces 0117's flat 30% loss of speed for both.
+- **Shove:** what an impulse does across her or astern is a shove (`Vessel.shove`), carried along her path through the shoal check.
+- **Overlap:** removed by up to 8 Gauss-Seidel passes, split by how much each ship yields. A push that would ground a ship isn't made, and the other ship takes all of it. Any overlap left is put back to the start of the step. Pairs are taken in id order.
+- **Damage:** also multiplied by where the blow lands: bow 0.5, side 1, stern 0.75. Bow means within 50° of dead ahead. So bow into side is 6.7:1, against 0117's 3.3:1.
+- **Re-arm:** a pair that has rammed can't ram again until they are 3 m clear.
+
+**What I left:**
+- 0117's circle and its order-dependent single pass;
+- the flat 30% loss of speed;
+- the Ram ability and its 40 flat damage;
+- `spar` (the bots' damage scaling, `harm.ts:20`);
+- shield and hull: no health exists here yet, so a blow reports the damage each ship takes and nothing subtracts it.
+
+**Verdict:** port the rules and numbers, rewrite the code. 0117's code is 50 lines tied to `MatchState`, `hurt` and `emit`. It is order-dependent, uses circle hulls and has no shoal check. The numbers are the part worth keeping.
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.

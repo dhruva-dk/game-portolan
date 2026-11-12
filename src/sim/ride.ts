@@ -5,12 +5,13 @@
 // damped spring, as a hull of her weight does. Heave and pitch are damped against the water's own motion, which
 // carries her with it: she rides a long swell without lagging it (tests/swell.test.ts), and only its quick changes
 // are smoothed away. Roll is damped against nothing: her rails are only a beam apart, so the short chop tilts the
-// water under them back and forth, and she answers it slowly. Her lean into a turn follows the turn.
+// water under them back and forth, and she answers it slowly. Her lean into a turn follows the turn; a blow from
+// another hull (contact.ts) sets her rolling.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 import type { ShipPose } from '../world/pose.ts';
-import { R, add, along, cross, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, dot, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
@@ -31,6 +32,9 @@ export const RIDE = {
   /** Her lean into a turn at top speed, radians per rad/s of turn; and how fast she takes it up. */
   heel: 0.35,
   lean: 2.5,
+  /** A blow sets her rolling at this many rad/s for each m/s it shoves her across her deck: some 7° over at its most
+   * for a ram square into her side at full speed, the rammer pressing on. */
+  knock: 0.07,
 } as const;
 
 /** Her motion on the sea: metres above sea level, radians (bow up; starboard down), and how fast each changes. */
@@ -83,6 +87,12 @@ export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number):
   const [roll, rollRate] = spring(r.roll, r.rollRate, w.roll, r.water.roll, RIDE.roll);
   const heel = r.heel + (lean(s) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
   return { heave, heaveRate, pitch, pitchRate, roll, rollRate, heel, water: w };
+}
+
+/** Her ride as a blow leaves it: `jolt` (m/s, a tangent at her place), the change of velocity another hull gave her,
+ * sets her rolling away from it, as a push above her keel does. */
+export function knocked(r: Ride, s: ShipState, jolt: Vec3): Ride {
+  return { ...r, rollRate: r.rollRate - RIDE.knock * dot(jolt, cross(s.at, s.heading)) };
 }
 
 /** Where she lies: on her ride's level over where she is, pitched, then rolled and heeled. */

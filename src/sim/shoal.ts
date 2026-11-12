@@ -94,7 +94,7 @@ function swing(s: ShipState, angle: number, depth: Depth): Vec3 {
 }
 
 /** From `at`, the place `move` (a tangent there) takes her, her heading carried along. */
-function moved(at: Vec3, heading: Vec3, move: Vec3): { at: Vec3; heading: Vec3 } {
+export function moved(at: Vec3, heading: Vec3, move: Vec3): { at: Vec3; heading: Vec3 } {
   const metres = length(move);
   if (metres === 0) return { at, heading };
   const to = along(at, scale(move, 1 / metres), metres).p;
