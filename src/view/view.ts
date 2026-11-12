@@ -18,7 +18,7 @@
 
 import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera } from 'three/webgpu';
 import {
-  asin, atan, clamp, cos, cross, dot, float, length, max, normalize, positionGeometry, select, sin, uniform, vec2, vec3,
+  asin, atan, clamp, cos, cross, dot, float, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
 import { R, cross as crossV, frameAt, horizonDip, type Chart, type Frame, type Vec3 } from '../world/sphere';
 
@@ -149,6 +149,11 @@ export function createView() {
     /** The eye's position (world, metres) and height, as nodes. */
     position,
     height,
+    /** How many of the first `metres` along world direction dir from the eye lie under `top` metres over the sea. */
+    under: (dir: N, metres: N, top: number): N => {
+      const od = dot(position, dir), h = od.mul(od).sub(dot(position, position).sub((R + top) * (R + top)));
+      return max(metres.sub(max(od.negate().sub(sqrt(max(h, 0))), 0)), 0);
+    },
     local: (p: N): N => eyeChart(p).q,
     onEye: (p: N): Charted => eyeChart(p),
     chart: (c: Chart) => chartNodes(v3(c.at), v3(c.axis), v3(crossV(c.axis, c.at))),

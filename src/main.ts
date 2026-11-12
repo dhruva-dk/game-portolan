@@ -99,7 +99,9 @@ renderer.setAnimationLoop(() => {
   }
   const { x, y, z } = frame.camera.position;
   updateEnvironment(env, dt, [x, y, z], frame.wind);
-  frame.render(env, dt, game?.storm() ?? storm(switches.storm ?? env.clock));
+  // the world from the game's camera, or, while the full map is open, from its eye out in space
+  const cap = game?.storm() ?? storm(switches.storm ?? env.clock);
+  frame.render(env, dt, cap, globe.step(dt, cap));
 
   meter?.sample(performance.now() - start);
 });

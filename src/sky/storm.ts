@@ -13,6 +13,7 @@
 //   depth(p)           0…1, how deep in the storm world position p lies: 0 in the cap, 1 SOFT metres past its edge
 //   veil(c, dir, m)    colour c seen m metres away along world direction dir from the eye, through the storm
 //   dim(c, dir)        the same for the sky beyond it, without the curtains: for what a mirror shows (sky.reflect)
+//   deck(c, dir, m)    the same seen from high over its top (the full map's eye, in space): its billowed cloud top
 
 import { Vector3 } from 'three/webgpu';
 import { Fn, abs, acos, clamp, dot, exp, float, max, min, mix, mx_noise_float, normalize, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
@@ -110,10 +111,25 @@ export function createStormLook(view: View) {
       return c.mul(T).add(shade(light, dot(q, normalize(q)).sub(R)).mul(float(1).sub(T)));
     })();
 
+  /**
+   * Colour c seen m metres along world direction dir from an eye high over the storm (the full map's, from space):
+   * its cloud's top, billowed and lit unevenly, over everything under it; no curtains, which only show from beside.
+   */
+  const deck = (c: N, dir: N, metres: N, light: N): N =>
+    Fn(() => {
+      const { length, q } = path(dir, metres);
+      const up: N = normalize(q), altitude: N = dot(q, up).sub(R);
+      const billow = mx_noise_float(up.mul(R / BILLOW).add(vec3(clock.mul(0.02), 0, 0))).mul(0.6)
+        .add(mx_noise_float(up.mul((R / BILLOW) * 3.1).add(vec3(0, clock.mul(0.05), 7))).mul(0.4));
+      const T = exp(length.mul(-SIGMA * (1 - CURTAIN / 2)));
+      return c.mul(T).add(shade(light, altitude).mul(billow.mul(0.45).add(1)).mul(float(1).sub(T)));
+    })();
+
   return {
     depth,
     veil,
     dim,
+    deck,
     /** The storm now (sim/storm.ts); clock: the match's seconds, for the rain's fall. */
     update(cap: Cap, seconds: number) {
       centre.value.set(...cap.centre);

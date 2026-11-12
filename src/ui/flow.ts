@@ -91,6 +91,8 @@ export function createFlow(hud: ReturnType<typeof createHud>, globe: ReturnType<
       }
       if (screen === 'drop' || screen === 'match') {
         afloat += dt;
+        // the full map's window would show the HUD under it
+        hud.root.style.visibility = globe.open ? 'hidden' : '';
         hud.update(s);
         globe.update(s);
       }

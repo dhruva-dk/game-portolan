@@ -1,6 +1,6 @@
 import { ACESFilmicToneMapping, Color, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, float, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec4,
+  Fn, float, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import type { Environment } from './environment';
@@ -20,6 +20,7 @@ import { createGunfire } from './gunfire/gunfire';
 import { createPlanet } from './world/planet';
 import { sunAt } from './world/sun';
 import { createWind } from './world/wind';
+import type { Vec3 } from './world/sphere';
 
 /**
  * Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. A camera in full sun is
@@ -34,6 +35,14 @@ const EXPOSURE = 4.4;
 const SHIPS = 32;
 /** The camera's far plane, metres: past the far side of the planet from as high as it goes. */
 const FAR = 2000;
+/** The full map's view from space: the colour past the planet's limb (linear, before exposure), and how high over
+ *  the sea the air it sees the planet through reaches, metres. */
+const SPACE = [0.0015, 0.002, 0.004] as const;
+const AIR = 400;
+
+/** The full map's eye: out in space at `eye` (world metres), looking at the planet's centre, `up` up the screen; its
+ *  vertical field of view, degrees. */
+export interface Orbit { eye: Vec3; up: Vec3; fov: number }
 
 /**
  * The frame. Every pass the game runs is dispatched here and nowhere else (render below), in this order:
@@ -60,6 +69,10 @@ const FAR = 2000;
  * Each frame every system first does its CPU work, in the order one reads another, and says what of its GPU work is
  * due (gpu.ts); then the frame runs it. Systems hand this file meshes, shader nodes, kernels and offscreen draws; they
  * never hold the renderer. The renderer's settings are all here too.
+ *
+ * While the full map is open (ui/globe.ts) the same frame is drawn from its eye out in space instead of the game's
+ * camera: every system works from that eye, the same scene is drawn, and its own post pass (globePost) shows space
+ * past the limb, no clouds, and the storm as the top of its cloud.
  *
  * The world is the planet's (world/sphere.ts): its centre at the origin, up away from it. The view (view/view.ts)
  * says how it looks from the eye, worked out first each frame, and every system that draws is handed it.
@@ -113,6 +126,25 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const pipeline = new RenderPipeline(renderer, fxaa(renderOutput(post)));
   pipeline.outputColorTransform = false;
 
+  // The full map's view: the same scene from the globe's camera, out in space (see render). The sky's tables, its
+  // clouds and the backdrop are all worked out for an eye in the air, so from out here they would be wrong: past the
+  // planet's limb is the dark of space, the clouds are left out, and the haze is only that of the air the ray
+  // crosses under AIR metres (from up here, the whole of its path would be through air as thick as the sea's).
+  const globeCamera = new PerspectiveCamera(40, 1, 50, 4000);
+  const globePass = pass(scene, globeCamera);
+  const globeInverse = uniform(globeCamera.projectionMatrixInverse), globeWorld = uniform(globeCamera.matrixWorld);
+  const globePost = Fn(() => {
+    const color = globePass.getTextureNode();
+    const depth = globePass.getTextureNode('depth').x;
+    const position = getViewPosition(screenUV, depth, globeInverse);
+    const dir = normalize(globeWorld.mul(vec4(position, 0)).xyz);
+    const metres = length(position);
+    const seen = sky.deck(sky.fog(color.rgb, dir, view.under(dir, metres, AIR)), dir, metres);
+    return vec4(select(depth.greaterThanEqual(1), vec3(...SPACE), seen), 1);
+  })();
+  const globePipeline = new RenderPipeline(renderer, fxaa(renderOutput(globePost)));
+  globePipeline.outputColorTransform = false;
+
   /** Runs compute passes, in order. */
   const compute = (passes: readonly Compute[]) => {
     for (const p of passes) renderer.compute(p);
@@ -146,15 +178,27 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const size = new Vector2();
   const islandSun = new Vector3();
 
-  /** storm: the safe cap now (sim/storm.ts); outside it the weather is foul. */
-  function render(env: Environment, dt: number, storm: Cap) {
+  /** storm: the safe cap now (sim/storm.ts); outside it the weather is foul. orbit: the full map's eye while it is
+   *  open (ui/globe.ts): the world is then seen from it, not from the game's camera. */
+  function render(env: Environment, dt: number, storm: Cap, orbit: Orbit | null = null) {
+    // the eye: the game's camera, or the full map's out in space, looking at the planet's centre with `up` up the screen
+    const eye = orbit ? globeCamera : camera;
+    if (orbit) {
+      renderer.getDrawingBufferSize(size);
+      globeCamera.aspect = size.x / size.y;
+      globeCamera.fov = orbit.fov;
+      globeCamera.position.set(...orbit.eye);
+      globeCamera.up.set(...orbit.up);
+      globeCamera.lookAt(0, 0, 0);
+      globeCamera.updateProjectionMatrix();
+    }
     // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
-    camera.updateMatrixWorld();
-    view.update(camera);
+    eye.updateMatrixWorld();
+    view.update(eye);
     renderer.getDrawingBufferSize(size);
-    const air = sky.update(env, storm, camera, dt, size.x, size.y);
-    const ships = fleet.update(camera, env.windSpeed, size.y, dt);
-    gunfire.update(camera, size.y);
+    const air = sky.update(env, storm, eye, dt, size.x, size.y);
+    const ships = fleet.update(eye, env.windSpeed, size.y, dt);
+    gunfire.update(eye, size.y);
     const sea = water.update(env, dt, fleet.ships);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
@@ -170,8 +214,8 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     draw(sea.wake);
     draw(islandShadow);
     compute(ships.cloth);
-    // 2, 3. the scene and its post
-    pipeline.render();
+    // 2, 3. the scene and its post: the game's, or the full map's
+    (orbit ? globePipeline : pipeline).render();
   }
 
   return { scene, camera, sky, view, planet, wind, fleet, gunfire, anchors: water.anchors, resize, render, ready: ground.ready };

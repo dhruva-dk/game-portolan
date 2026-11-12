@@ -16,6 +16,7 @@
 // and the frame's post pass:
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
 //   veil(c, dir, m)  the same through the storm's rain and cloud: last, over everything, the sky and clouds too
+//   deck(c, dir, m)  the storm seen from high over it instead (the full map's view from space): its cloud's top
 
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
 import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
@@ -140,6 +141,7 @@ export function createSky(view: View) {
     light,
     fog,
     veil: (color: N, dir: N, metres: N): N => storm.veil(color, dir, metres, stormLight),
+    deck: (color: N, dir: N, metres: N): N => storm.deck(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
     /** Readies the sky for this frame, and returns the passes due from each part of it. */
