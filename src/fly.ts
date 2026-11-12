@@ -1,4 +1,4 @@
-// A free camera for reviewing the world, until there is a ship to sail: drag to look, WASD to move, E/Q (or space
+// A free camera for reviewing the world (debug.ts: ?fly): drag to look, WASD to move, E/Q (or space
 // and C) up and down, shift to go faster. It flies over the planet: along the level at where it is, its up always
 // away from the planet's centre, its heading carried along with it. It stays above the water.
 

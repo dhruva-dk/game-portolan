@@ -130,7 +130,7 @@ export function createStormLook(view: View) {
     veil,
     dim,
     deck,
-    /** The storm now (sim/storm.ts); clock: the match's seconds, for the rain's fall. */
+    /** The storm now (sim/storm.ts); seconds: the world's clock (Environment.clock), which its rain and billows run on. */
     update(cap: Cap, seconds: number) {
       centre.value.set(...cap.centre);
       radius.value = cap.radius;

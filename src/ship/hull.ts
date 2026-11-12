@@ -360,7 +360,7 @@ function anchor(acc: Acc, top: Vector3, side: number): void {
 
 // ---------------------------------------------------------------- the gun's plinth and the gratings
 
-/** The gun's mount: a turned plinth on the waist's centreline, its flat top the mount point (build.ts: GUN_MOUNT). */
+/** The gun's mount: a turned plinth on the waist's centreline, its flat top the mount point (mount.ts: GUN_MOUNT). */
 function plinth(acc: Acc, D: Detail): void {
   const y = levelDeck(LEVELS[2], MOUNT_S), z = zAt(MOUNT_S), { height: h, radius: r } = PLINTH;
   if (D.topSides === 0) return;
