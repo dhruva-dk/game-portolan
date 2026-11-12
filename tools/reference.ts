@@ -14,7 +14,7 @@ import { launch } from './launch.ts';
 // ahead; island: 40 m up, 120 m south of the island's near shore, looking 20° down north at it.
 const PAIRS = [
   { name: 'sea', star: 'docs/north-star/sea.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 'wind=10&lat=25&lon=-14.6&alt=28&look=-27&yaw=150' },
-  { name: 'island', star: 'docs/north-star/island.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 'wind=10&lat=16.9&lon=-4.6&alt=15&look=-25&yaw=225' },
+  { name: 'island', star: 'docs/north-star/island.png', crop: { x: 400, y: 0, w: 1590, h: 2394 }, query: 'lat=17.3&lon=-4.2&alt=15&look=-20&yaw=222' },
 ];
 
 const only = process.argv.slice(2);
