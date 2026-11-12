@@ -14,6 +14,7 @@ import { createSeabed } from './land/seabed';
 import { createShadow } from './land/shadow';
 import { createView } from './view/view';
 import { createWater } from './water/water';
+import { createFleet } from './ship/fleet';
 import { createPlanet } from './world/planet';
 import { createWind } from './world/wind';
 
@@ -24,6 +25,8 @@ import { createWind } from './world/wind';
  * ACES (input × exposure / 0.6) takes to 0.18 at an exposure of 3.5. Dry coral sand (0.45) then shows a warm beige.
  */
 const EXPOSURE = 3.5;
+/** The most ships the sea carries. */
+const SHIPS = 16;
 /** The camera's far plane, metres: past the far side of the planet from as high as it goes. */
 const FAR = 2000;
 
@@ -64,7 +67,8 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(planet, seed, view, light, sand);
   shadow.cast(...islands.casters);
-  scene.add(seabed.mesh, ...islands.meshes, water.mesh);
+  const fleet = createFleet(light, wind, SHIPS);
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh);
 
   const scenePass = pass(scene, camera);
   const post = Fn(() => {
@@ -99,8 +103,9 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     water.update(env, dt);
     seabed.update();
     shadow.update(env.sunDirection, islands.update(view.eye));
+    fleet.update(camera, env.windSpeed, size.y);
     pipeline.render();
   }
 
-  return { scene, camera, sky, view, planet, wind, resize, render, ready: ground.ready };
+  return { scene, camera, sky, view, planet, wind, fleet, resize, render, ready: ground.ready };
 }
