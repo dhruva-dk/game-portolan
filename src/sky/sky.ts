@@ -1,11 +1,12 @@
 // The sky: the atmosphere's tables, the backdrop drawn from them, and the light and haze every other material reads.
 //
 // The air is Earth's, seen from the eye (view.toSky): its tables are worked out for an eye at the sea under a sun at
-// the elevation the eye's sky shows it. Light on a surface is the sun's at that surface's own elevation (dot(up, sun)),
-// so the planet has a lit side and a dark one; the sky's own glow (ambient) is the eye's.
+// the elevation the eye's sky shows it. The sun is the same time of day everywhere (world/sun.ts): over every place it
+// stands as high, its bearing carried from place to place, so a surface is lit by the sun over it (sun(p)), which is
+// the same wherever the eye is; the sky's own glow (ambient) is the eye's.
 //
 // What materials use (Sky):
-//   sun              unit vector toward the sun, world space
+//   sun(p)           unit vector toward the sun over world position p, world space
 //   sunIlluminance(p) the sun's light at world position p, after the air (per unit sun at the top of the air)
 //   cloudShadow(p)   the fraction of it the clouds let through to p
 //   ambient(p, n)    the sky's light on a surface at p facing n, as radiance (multiply by albedo)
@@ -14,10 +15,11 @@
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
 
 import { Vector3, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
-import { Fn, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
+import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO, SUN_ANGULAR_RADIUS } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
@@ -39,7 +41,7 @@ const PEAK_SHARE = 0.25, PEAK_G = 0.95;
 
 /** The light the sky gives everything else. */
 export interface Sky {
-  sun: N;
+  sun(p: N): N;
   sunIlluminance(p: N): N;
   cloudShadow(p: N): N;
   ambient(p: N, n: N): N;
@@ -51,17 +53,29 @@ export function createSky(renderer: WebGPURenderer, view: View) {
   const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   /** Extinction of the air at sea level, per km. */
   const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
-  /** Toward the sun: in the world, and as the eye's sky shows it. */
+  /** Toward the sun over the eye: in the world, and as the eye's sky shows it. */
   const sun = uniform(new Vector3(0, 1, 0));
   const skySun = uniform(new Vector3(0, 1, 0));
+  /** The sun's field (world/sun.ts): its origin, the sun over that, and the sine of its height over every place. */
+  const origin = uniform(new Vector3(0, 1, 0));
+  const there = uniform(new Vector3(0, 1, 0));
+  const rise = uniform(1);
   const clouds = createClouds(renderer, view, tables);
   const reflection = createReflection(renderer, view, skyRadiance, skySun, clouds.along);
 
-  const sunIlluminance = (p: N): N => sunTransmittance(VIEW_RADIUS, dot(view.up(p), sun));
+  /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
+  const sunOver = (p: N): N => {
+    const u: N = normalize(p), c: N = dot(origin, u), w: N = cross(origin, u);
+    // Rodrigues: v·c + w × v + w (w·v)/(1 + c); at the origin's antipode (under an island) it is undefined
+    return normalize(there.mul(c).add(cross(w, there)).add(w.mul(dot(w, there).div(max(c.add(1), 1e-6)))));
+  };
+
+  /** The same everywhere: the sun stands as high over every place. */
+  const sunIlluminance = (_p: N): N => sunTransmittance(VIEW_RADIUS, rise);
 
   const ambient = (p: N, n: N): N => {
     const up = view.up(p);
-    const bounce = sunIlluminance(p).mul(max(dot(up, sun), 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
+    const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
     return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5));
   };
 
@@ -91,7 +105,7 @@ export function createSky(renderer: WebGPURenderer, view: View) {
     return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();
 
-  const light: Sky = { sun, sunIlluminance, cloudShadow: clouds.shadow, ambient, reflect: reflection.reflect };
+  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow: clouds.shadow, ambient, reflect: reflection.reflect };
 
   return {
     background,
@@ -100,6 +114,9 @@ export function createSky(renderer: WebGPURenderer, view: View) {
     fog,
     update(env: Environment, camera: PerspectiveCamera, dt: number, width: number, height: number) {
       sun.value.copy(env.sunDirection);
+      origin.value.set(...env.sunPlaces.origin);
+      there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
+      rise.value = sunInSky(env.timeOfDay)[1];
       const s = toSky(view.eye.frame, view.eye.dip, [env.sunDirection.x, env.sunDirection.y, env.sunDirection.z]);
       skySun.value.set(s[0], s[1], s[2]);
       tables.update(s[1], env.haze);

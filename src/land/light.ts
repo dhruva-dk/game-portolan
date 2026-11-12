@@ -41,13 +41,14 @@ const envBRDF = (f0: N, r: N, nv: N): N => {
 export function createLighting(sky: Sky, below: Below, visible: (p: N, n: N) => N): Light {
   const sunAt = (p: N, n: N): N => sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
   const ambient = (p: N, n: N): N => sky.ambient(p, n).mul(below.sky(p));
-  const light = (p: N, n: N): N => sunAt(p, n).mul(saturate(n.dot(sky.sun))).div(Math.PI).add(ambient(p, n));
+  const light = (p: N, n: N): N => sunAt(p, n).mul(saturate(n.dot(sky.sun(p)))).div(Math.PI).add(ambient(p, n));
   light.glossy = (p: N, n: N, r: N, f0: N): Gloss => {
-    const sun = sunAt(p, n).toVar(), nl = saturate(n.dot(sky.sun));
+    const l = sky.sun(p).toVar();
+    const sun = sunAt(p, n).toVar(), nl = saturate(n.dot(l));
     const v = normalize(cameraPosition.sub(p)), nv = max(dot(n, v), 1e-4);
     // the sun: GGX, Smith's height-correlated visibility (Hammon's fit), Schlick's Fresnel
     const rough = max(r, SMOOTHEST), a = rough.mul(rough), a2 = a.mul(a);
-    const h = normalize(v.add(sky.sun)), nh = saturate(dot(n, h)), vh = saturate(dot(v, h));
+    const h = normalize(v.add(l)), nh = saturate(dot(n, h)), vh = saturate(dot(v, h));
     const d = nh.mul(nh).mul(a2.sub(1)).add(1);
     const D = a2.div(d.mul(d).mul(Math.PI));
     const V = float(0.5).div(nl.mul(nv).mul(2).mul(float(1).sub(a)).add(nl.add(nv).mul(a)).add(1e-5));

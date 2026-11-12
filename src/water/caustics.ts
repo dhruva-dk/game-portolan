@@ -38,7 +38,7 @@ export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Chart
     const up = view.up(p);
     const depth = max(view.altitude(p).negate(), 0);
     const { long, short } = shallows(p);
-    const l = sky.sun, ly = dot(l, up), flat = l.sub(up.mul(ly));
+    const l = sky.sun(p), ly = dot(l, up), flat = l.sub(up.mul(ly));
     const sin = sqrt(float(1).sub(ly.mul(ly))).div(N_WATER);
     const across = flat.div(max(length(flat), 1e-4)).mul(depth.mul(sin).div(sqrt(float(1).sub(sin.mul(sin)))));
     // the width each cascade is averaged over, metres (worked out before the charts' branches: derivatives)

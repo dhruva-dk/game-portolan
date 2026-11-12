@@ -80,7 +80,7 @@ export function createOptics(sky: Sky, view: View) {
    */
   const sunBelow = (p: N): N => {
     const depth = max(view.altitude(p).negate(), 0);
-    const ly = dot(view.up(p), sky.sun);
+    const ly = dot(view.up(p), sky.sun(p));
     const cos = sqrt(float(1).sub(float(1).sub(ly.mul(ly)).div(N_WATER * N_WATER)));
     const through = exp(absorption.mul(depth.div(cos)).negate()).mul(float(1).sub(fresnel(max(ly, 0))));
     return mix(vec3(1), through, wet(p));
@@ -138,7 +138,7 @@ function facets(nh: N, nl: N, nv: N, alpha: N): { D: N; V: N } {
 function seaRadiance(
   sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle, ships: Ships,
 ): N {
-  const l = sky.sun, up = view.up(p);
+  const l = sky.sun(p), up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
   const F = fresnel(nv);
   const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(ships.lit);

@@ -6,6 +6,7 @@ import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { addProbe } from './probe';
 import { SEED } from './world/planet';
+import { sunPlaces } from './world/sun';
 import { R, add, along, cross, dot, frameAt, normalize, scale, toChart, type Vec3 } from './world/sphere';
 
 const meterEl = document.getElementById('meter')!;
@@ -20,8 +21,7 @@ renderer.setPixelRatio(1);
 document.body.appendChild(renderer.domElement);
 await renderer.init();
 
-const env = createEnvironment();
-// Debug: ?t=hours sets the time of day (at longitude 0); ?wind=m/s the wind's speed; ?haze= the air's aerosol;
+// Debug: ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed; ?haze= the air's aerosol;
 // ?cloud= the cloud cover (0–1); ?seed= the planet's (world/planet.ts; SEED by default); ?lat=&lon= degrees put the camera over a point of the
 // planet and ?alt= metres above the sea; ?yaw=deg turns it (clockwise from north: 90 east) and ?look=deg pitches it.
 // The planet is 554 m in radius, so a degree is 9.67 m. By default the player's ship lies on the water south of the
@@ -31,12 +31,13 @@ const env = createEnvironment();
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 const params = new URLSearchParams(location.search);
 const number = (name: string, fallback: number) => (params.has(name) ? Number(params.get(name)) : fallback);
+// ?debug=charts colours the sea by its charts' weights; ?debug=wake shows the ships' marks on it (water/wake.ts)
+const frame = createFrame(renderer, number('seed', SEED), params.get('debug') ?? '');
+const env = createEnvironment(sunPlaces(frame.planet.islands));
 if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
 if (params.has('wind')) env.windSpeed = Number(params.get('wind'));
 if (params.has('cloud')) env.cloudCoverage = Number(params.get('cloud'));
-// ?debug=charts colours the sea by its charts' weights; ?debug=wake shows the ships' marks on it (water/wake.ts)
-const frame = createFrame(renderer, number('seed', SEED), params.get('debug') ?? '');
 const meter = createMeter(renderer, meterEl);
 const degrees = Math.PI / 180;
 const START = 80;

@@ -1,4 +1,4 @@
-import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, type WebGPURenderer } from 'three/webgpu';
+import { ACESFilmicToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, cameraProjectionMatrixInverse, cameraWorldMatrix, getViewPosition, length, normalize, pass, renderOutput, screenUV,
   select, vec4,
@@ -16,6 +16,7 @@ import { createView } from './view/view';
 import { createWater } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createPlanet } from './world/planet';
+import { sunAt } from './world/sun';
 import { createWind } from './world/wind';
 
 /**
@@ -33,7 +34,7 @@ const FAR = 2000;
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
  *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam); the nearest island's shadow map from
- *                 the sun, redrawn only when the sun has moved or another island has become the nearest; the ships'
+ *                 the sun over it, redrawn only when the hour has changed or another island has become the nearest; the ships'
  *                 marks on the sea round the eye (water/wake.ts: their wakes, foam and shadows), one small map; the
  *                 near ships' sails as cloth (ship/cloth.ts), a few small steps of it
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, later the ships); then the sea,
@@ -96,6 +97,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   }
 
   const size = new Vector2();
+  const islandSun = new Vector3();
 
   function render(env: Environment, dt: number) {
     camera.updateMatrixWorld();
@@ -104,7 +106,10 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     sky.update(env, camera, dt, size.x, size.y);
     water.update(env, dt, fleet.ships);
     seabed.update();
-    shadow.update(env.sunDirection, islands.update(view.eye));
+    // the island's shadows fall along the sun over it, which stays put however the eye moves
+    const island = islands.update(view.eye);
+    if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
+    shadow.update(islandSun, island);
     fleet.update(camera, env.windSpeed, size.y, dt);
     pipeline.render();
   }

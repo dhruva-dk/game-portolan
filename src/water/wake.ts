@@ -235,9 +235,9 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
     const braced = vec3(local.x.mul(c).add(z.mul(s)), local.y, local.x.negate().mul(s).add(z.mul(c)).add(pz));
     const p = at.xyz.add(cross(up, fwd).mul(braced.x)).add(up.mul(braced.y)).add(fwd.mul(braced.z));
     // along the sun's ray down to the sea's level at her
-    const n = normalize(at.xyz);
-    const drop = dot(p.sub(n.mul(R)), n).div(max(dot(sky.sun, n), LOW_SUN));
-    return view.local(p.sub(sky.sun.mul(drop)));
+    const n = normalize(at.xyz), sun = sky.sun(at.xyz);
+    const drop = dot(p.sub(n.mul(R)), n).div(max(dot(sun, n), LOW_SUN));
+    return view.local(p.sub(sun.mul(drop)));
   })();
   const shadowMarker = marker(shadowOn, vec4(0, 0, 0, attribute('dark', 'float')));
   // the darkest shadow over each texel, not their sum (the other marks leave the shadows' channel as it is)
@@ -313,8 +313,8 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
      * fragment stage. */
     shade(p: N): N {
       // down the sun's ray to the sea's level, as the shadows were cast
-      const up = normalize(p);
-      const { uv, fade } = place(p.sub(sky.sun.mul(lengthN(p).sub(R).div(max(dot(sky.sun, up), LOW_SUN)))));
+      const up = normalize(p), sun = sky.sun(p);
+      const { uv, fade } = place(p.sub(sun.mul(lengthN(p).sub(R).div(max(dot(sun, up), LOW_SUN)))));
       let sum: N = float(0);
       for (let i = 0; i < SOFT; i++) for (let j = 0; j < SOFT; j++) {
         sum = sum.add(texture(target.texture, uv.add(vec2(i - (SOFT - 1) / 2, j - (SOFT - 1) / 2).div(SIZE))).w);
