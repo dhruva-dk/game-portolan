@@ -23,9 +23,11 @@ import { createWind } from './world/wind';
  * Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. A camera in full sun is
  * exposed by the sunny-16 rule, which puts an 18% grey card lit by the high sun at middle grey: with the sun 60° up,
  * through the air (0.8 of it, at sin 60°) and the sky give the card a radiance of 0.18·0.25 = 0.045, which three's
- * ACES (input × exposure / 0.6) takes to 0.18 at an exposure of 3.5. Dry coral sand (0.45) then shows a warm beige.
+ * ACES (input × exposure / 0.6) takes to 0.18 at an exposure of 3.5. The game's afternoon, its sun lower, read a
+ * little dark at that, so it is a third of a stop over: 4.4. Dry coral sand (0.45) then shows a warm beige, the foam
+ * and the cloud tops stay short of white, and the sea keeps its colour (at half a stop over it pales to cyan).
  */
-const EXPOSURE = 3.5;
+const EXPOSURE = 4.4;
 /** The most ships the sea carries. */
 const SHIPS = 32;
 /** The camera's far plane, metres: past the far side of the planet from as high as it goes. */
