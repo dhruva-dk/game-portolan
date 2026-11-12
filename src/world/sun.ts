@@ -11,11 +11,12 @@
 // centre) by the compass there and carried (parallel transport, sphere.ts) along the great circle to the origin;
 // from there to every place along the great circle between them. Along every great circle through the origin it
 // keeps its bearing to the circle, so the sun moves over the sea no more than the sea's own curve turns it (a
-// degree for every 9.7 m sailed). The one point it is undefined is the origin's antipode, put at the centre of the
-// island farthest from the anchor: land, so no ship ever reaches it. Sailing across the great circles rather than
-// along them, the sun turns a little more than the curve, by tan(θ/2) of it θ radians from the origin: no more than
-// twice the curve's own but in the fifth of the planet nearest that island, and right round the island 2/r radians a
-// metre r metres from its centre (twice round in a lap; about 0.8° a metre at the edge of its apron, 145 m out).
+// degree for every 9.7 m sailed). The one point it is undefined is the origin's antipode, put at the centre of a
+// large island far from the anchor (sunPlaces): land, so no ship ever reaches it. Sailing across the great circles
+// rather than along them, the sun turns a little more than the curve, by tan(θ/2) of it θ radians from the origin: no
+// more than twice the curve's own but in the fifth of the planet nearest that island, and right round the island 2/r
+// radians a metre r metres from its centre (twice round in a lap; for the default planet's, 59 m in radius, about 2°
+// a metre on its beach and 0.8° at the edge of its apron, 145 m out).
 //
 // The hour is the sun's at LATITUDE on the solstice (DECLINATION): its height and its bearing at the anchor.
 //
@@ -34,13 +35,20 @@ export const DECLINATION = (23.44 * Math.PI) / 180;
  */
 export interface SunPlaces { anchor: Vec3; origin: Vec3 }
 
-/** The places for a planet's islands (their centres, the first where the game starts). */
-export function sunPlaces(islands: readonly { chart: { at: Vec3 } }[]): SunPlaces {
+/**
+ * The places for a planet's islands (their centres and coasts' radii, metres; the first where the game starts): the
+ * undefined point at the centre of the largest island a quarter of the way round the planet or more from the start
+ * (the bearing turns round it as 2/r, so the broader the better), else of the farthest.
+ */
+export function sunPlaces(islands: readonly { chart: { at: Vec3 }; radius: number }[]): SunPlaces {
   if (islands.length === 0) return { anchor: [0, 1, 0], origin: [0, 1, 0] };
   const anchor = islands[0].chart.at;
-  const far = islands.length > 1
-    ? islands.reduce((a, b) => (dot(b.chart.at, anchor) < dot(a.chart.at, anchor) ? b : a)).chart.at
-    : scale(anchor, -1);
+  const away = islands.slice(1).filter((s) => dot(normalize(s.chart.at), normalize(anchor)) <= 0);
+  const far = away.length > 0
+    ? away.reduce((a, b) => (b.radius > a.radius ? b : a)).chart.at
+    : islands.length > 1
+      ? islands.reduce((a, b) => (dot(b.chart.at, anchor) < dot(a.chart.at, anchor) ? b : a)).chart.at
+      : scale(anchor, -1);
   return { anchor, origin: scale(far, -1) };
 }
 

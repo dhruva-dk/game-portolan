@@ -53,13 +53,17 @@ test('the sun depends on the match (its islands, the hour) and the place alone',
   }
 });
 
-test('the one place the bearing is undefined is on land, far from the start', () => {
+test('the one place the bearing is undefined is on land, at the centre of a broad island far from the start', () => {
   for (const seed of SEEDS) {
     const planet = planets.get(seed)!, places = sunPlaces(planet.islands), pole = sunPole(places);
     const island = planet.islands.find((s) => distance(s.chart.at, pole) < 1e-6);
     assert.ok(island, `seed ${seed}: an island's centre`);
     assert.ok(planet.height(pole) > 2, `seed ${seed}: ${planet.height(pole)} m`);
-    assert.ok(distance(pole, places.anchor) > 1000, `seed ${seed}: ${distance(pole, places.anchor)} m from the start`);
+    const away = angle(pole, places.anchor);
+    assert.ok(away >= Math.PI / 2 - 1e-9, `seed ${seed}: ${away / degrees}° from the start`);
+    for (const other of planet.islands.slice(1)) {
+      if (angle(other.chart.at, places.anchor) >= Math.PI / 2) assert.ok(other.radius <= island.radius, `seed ${seed}`);
+    }
   }
 });
 
