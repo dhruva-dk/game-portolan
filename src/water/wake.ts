@@ -10,9 +10,14 @@
 // Drawn into it, in one pass of three draws:
 //   - each ship's wake, a ribbon along the path her bow has cut (sim/wake.ts), wide enough to hold her Kelvin wedge,
 //     carrying across it how far out each point lies, and along it how long ago she passed and how fast she went.
-//     Behind her stern the water churns, spreading slowly and fading over tens of seconds. The wedge's arms leave her
-//     stem at 19.5° to her path (the Kelvin angle, tan 19.5° = 0.354): water she passed t seconds ago at speed v has
-//     its arm v·t·0.354 out from her track, so the wedge bends round her turns as the real one does;
+//     Behind her stern the water churns, spreading slowly and fading over tens of seconds, its edges ragged and the
+//     foam on it breaking into patches as it ages. The wedge's arms leave her stem at 19.5° to her path (the Kelvin
+//     angle, tan 19.5° = 0.354): water she passed t seconds ago at speed v has its arm v·t·0.354 out from her track,
+//     so the wedge bends round her turns as the real one does. Each arm is a band of short crests in echelon, slanted
+//     across it (as the divergent waves are near the cusp), which stand still in her frame; it widens as it spreads
+//     and fades, and the foam its crests leave lies still in the water — a solid line where the bow wave breaks,
+//     feathered into dashes along the crests behind, then breaking up into patches and gone. A rough sea (the wind)
+//     breaks the arms up sooner and takes them sooner;
 //   - a patch round each hull for what hugs her: foam along her waterline (ship/waterline.ts), thin at rest, heaped
 //     at the bow with speed, the water piled against her bow and boiling up under her transom;
 //   - each ship's third level of detail (her hull, spars and bellied sails), pressed flat onto the sea along the sun:
@@ -41,8 +46,8 @@ import {
   OneFactor, OrthographicCamera, RGBAFormat, RenderTarget, Scene, type WebGPURenderer,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, normalize, saturate, select, sin, smoothstep, texture, uniform,
-  vec2, vec3, vec4,
+  Fn, abs, attribute, cos, cross, dot, exp, float, length as lengthN, max, mx_noise_float, normalize, saturate, select, sin, smoothstep,
+  texture, uniform, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import { PIVOT_Z, buildShip } from '../ship/build';
@@ -69,10 +74,17 @@ const LENGTH = WATERLINE.stem - WATERLINE.stern;
 
 /** The churned water astern: its half-width under her transom, and how fast it spreads, metres a second. */
 const CHURN = 1.6, SPREAD = 0.3;
-/** The wedge's arms: their crests' height at full speed, metres, and how long they last, seconds (fading by e each FADE). */
-const ARM = 0.18, ARM_LIFE = 14, ARM_FADE = 7;
-/** The ribbon reaches this far past an arm's crest, metres, and at least this many of the churn's half-widths. */
-const ARM_ROOM = 4, CHURN_ROOM = 2.6;
+/** The wedge's arms: their crests' height at full speed, metres, and how long they last in a calm, seconds (fading by
+ * e each FADE); the share of that a rough sea takes. */
+const ARM = 0.18, ARM_LIFE = 22, ARM_FADE = 10, ROUGH = 0.45;
+/** An arm's half-width as it leaves her stem, metres, and how fast it widens, metres a second per metre a second of
+ * her speed then. */
+const ARM_WIDTH = 0.6, WIDEN = 0.03;
+/** The ribbon reaches this many of an arm's half-widths past its crest (and at least ARM_ROOM metres), and at least
+ * this many of the churn's half-widths. */
+const ARM_REACH = 4, ARM_ROOM = 4, CHURN_ROOM = 2.6;
+/** The wind at which the sea is at its roughest for the wakes, metres a second (calm below a quarter of it). */
+const ROUGHEST = 14;
 /** On the inside of a turn, the ribbon reaches this share of the way to its centre. */
 const INSIDE = 0.8;
 /** Foam round a waterline at rest, and the bow wave's height at full speed, metres. */
@@ -119,30 +131,49 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
   const clear = new Color();
   /** 1 while the map holds this frame's marks, 0 while no ship is near enough to draw any. */
   const live = uniform(0);
+  /** How rough the sea is, 0…1, by the wind. */
+  const rough = uniform(0);
 
   // ---- the wakes: ribbons along the bows' paths
   const trailGeometry = new BufferGeometry();
   const trailAt = dynamic(capacity * vertices * 2, 2), trailMark = dynamic(capacity * vertices * 2, 4);
+  const trailLaid = dynamic(capacity * vertices * 2, 1);
   trailGeometry.setAttribute('at', trailAt);
   trailGeometry.setAttribute('mark', trailMark);
+  trailGeometry.setAttribute('laid', trailLaid);
   trailGeometry.setIndex(new BufferAttribute(new Uint16Array(capacity * (vertices - 1) * 6), 1).setUsage(DynamicDrawUsage));
   const trails = new Mesh(trailGeometry, marker(attribute('at', 'vec2'), Fn(() => {
     // across: metres out from her track (+ to port); age: seconds since she passed; v: her speed then; run: metres
-    // along the path from her stem now
-    const m = attribute('mark', 'vec4'), across = m.x, age = m.y, v = m.z, run = m.w;
-    const pace = saturate(v.div(FULL));
-    const churned = exp(sq(across.div(age.mul(SPREAD).add(CHURN))).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
-    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25))).toVar();
+    // along the path from her stem now; laid: metres along the path from where she began it (fixed in the water)
+    const m = attribute('mark', 'vec4'), across = m.x, age = m.y, v = m.z, run = m.w, laid = attribute('laid', 'float');
+    const pace = saturate(v.div(FULL)), calm = float(1).sub(rough.mul(ROUGH));
+    // patches some metres across, fixed in the water: what is left of the foam breaks up along them
+    const patchy = (size: number, salt: number): N => mx_noise_float(vec3(laid.div(size), across.div(size), salt));
+    // the churned water astern, its edges ragged, its foam breaking up as it ages
+    const spread = age.mul(SPREAD).add(CHURN).mul(patchy(5, 0.5).mul(0.3).add(1));
+    const churned: N = exp(sq(across.div(spread)).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
+    const worn = age.div(24).add(rough.mul(0.2));
+    const churnLeft = smoothstep(worn.sub(0.45), worn.sub(0.1), patchy(3, 1.5));
+    const foam: N = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
     const air = churned.mul(exp(age.div(-10)));
-    // the arms: crests in echelon just inside each, as the bow wave spreads from her stem
+    // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
-    const width = v.mul(age).mul(0.05).add(0.6);
-    const life = exp(age.div(-ARM_FADE)).mul(smoothstep(ARM_LIFE, ARM_LIFE * 0.6, age)).mul(pace);
-    const wave = exp(sq(off.div(width.mul(2))).negate()).mul(cos(off.mul(2 * Math.PI).div(v.mul(0.6).add(3))));
-    const height = wave.mul(life).mul(ARM).div(v.mul(age).mul(0.06).add(1).sqrt());
-    // the bow wave breaks white along the arms near her, and leaves a thin line of foam behind
-    foam.addAssign(exp(sq(off.div(0.8)).negate()).mul(pace.mul(pace)).mul(exp(age.div(-1.5)).mul(0.9)));
-    foam.addAssign(exp(sq(off.div(1.2)).negate()).mul(life).mul(0.15));
+    const width = v.mul(age).mul(WIDEN).add(ARM_WIDTH);
+    const life = exp(age.div(calm.mul(-ARM_FADE))).mul(smoothstep(calm.mul(ARM_LIFE), calm.mul(ARM_LIFE * 0.5), age)).mul(pace);
+    // its crests in echelon, slanted 35° across it, a wavelength apart that grows with her speed: standing in her
+    // frame for the waves (by run), lying in the water for the foam they leave (by laid)
+    const wavelength = v.mul(0.6).add(3);
+    const slant = (along: N): N => cos(off.mul(0.82).add(along.mul(0.57)).mul(2 * Math.PI).div(wavelength));
+    const band = exp(sq(off.div(width.mul(select(off.greaterThan(0), float(1), float(2))))).negate());
+    const groups: N = mx_noise_float(vec2(run.div(14), 0.3)).mul(0.35).add(0.8);
+    const height: N = band.mul(slant(run)).mul(groups).mul(life).mul(ARM).div(v.mul(age).mul(0.06).add(1).sqrt());
+    // the bow wave breaks white along the arms near her, feathered along its crests; the foam it leaves widens, and
+    // breaks up into patches the farther back it lies, and the rougher the sea
+    const feathers = smoothstep(-0.2, 0.8, slant(laid));
+    foam.addAssign(exp(sq(off.div(0.8)).negate()).mul(pace.mul(pace)).mul(exp(age.div(-1.5)).mul(0.9)).mul(feathers.mul(0.4).add(0.6)));
+    const streak = width.mul(0.5).add(0.6), gone = age.div(calm.mul(ARM_LIFE)).add(rough.mul(0.2));
+    const left = smoothstep(gone.sub(0.55), gone.sub(0.15), patchy(4, 2.5).mul(0.7).add(patchy(1.5, 3.5).mul(0.3)));
+    foam.addAssign(exp(sq(off.div(streak)).negate()).mul(float(1.2).div(streak).sqrt()).mul(life).mul(feathers).mul(left).mul(0.3));
     return vec4(foam, height, air, 0);
   })()));
 
@@ -231,11 +262,14 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
 
   // ---- the CPU's half: each ship's wake laid as she goes, and the map's geometry from it
   const wakes: WakePoint[][] = [];
+  /** How far each ship's bow has gone since her wake began, metres; and where it was last frame. */
+  const sailed: number[] = [], stems: (Vec3 | null)[] = [];
   const index = trailGeometry.index!.array as Uint16Array;
 
-  /** One ship's ribbon from her stem now along her wake, from vertex `v0`; returns the vertices it took. */
-  function ribbon(chart: Chart, points: readonly WakePoint[], now: number, v0: number): number {
-    const at = trailAt.array as Float32Array, mark = trailMark.array as Float32Array;
+  /** One ship's ribbon from her stem now along her wake (`gone`: how far she has sailed it), from vertex `v0`;
+   * returns the vertices it took. */
+  function ribbon(chart: Chart, points: readonly WakePoint[], now: number, gone: number, v0: number): number {
+    const at = trailAt.array as Float32Array, mark = trailMark.array as Float32Array, laid = trailLaid.array as Float32Array;
     let run = 0;
     points.forEach((p, k) => {
       if (k > 0) run += distance(points[k - 1].at, p.at);
@@ -243,7 +277,8 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
       const ahead = points[Math.max(k - 1, 0)].at, behind = points[Math.min(k + 1, points.length - 1)].at;
       const t = add(ahead, behind, -1), side = normalizeV(crossV(p.at, add(t, p.at, -dotV(t, p.at))));
       const age = now - p.time, reach = p.speed * age * KELVIN;
-      const half = Math.max(age < ARM_LIFE ? reach + ARM_ROOM : 0, (CHURN + SPREAD * age) * CHURN_ROOM);
+      const room = Math.max(ARM_ROOM, ARM_REACH * (ARM_WIDTH + WIDEN * p.speed * age));
+      const half = Math.max(age < ARM_LIFE ? reach + room : 0, (CHURN + SPREAD * age) * CHURN_ROOM);
       // On the inside of a turn the ribbon reaches no further than most of the way to the turn's centre, past which
       // it would fold back over itself. The turn here: how far the path bends between the stretches either side,
       // over their length (+ to port).
@@ -254,6 +289,7 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
         const reaches = s * bend > 0 ? Math.min(half, INSIDE / Math.abs(bend)) : half;
         at.set(toChart(chart, along(p.at, side, s * reaches).p), i * 2);
         mark.set([s * reaches, age, p.speed, run], i * 4);
+        laid[i] = gone - run;
       }
     });
     return 2 * points.length;
@@ -294,17 +330,24 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
     update(env: Environment, ships: readonly Afloat[]) {
       const eye = view.eye, chart: Chart = { at: eye.frame.up, axis: eye.frame.east };
       const now = env.clock;
+      rough.value = Math.min(Math.max((env.windSpeed - ROUGHEST / 4) / (ROUGHEST * 0.75), 0), 1);
       const patch = patchAt.array as Float32Array, patchM = patchMark.array as Float32Array;
       const shadow = poses.array as Float32Array;
       let vertex = 0, triangle = 0, near = 0;
       ships.forEach(({ pose, velocity, look }, i) => {
         const speed = length(velocity);
         const stem = normalizeV(add(pose.position, pose.forward, WATERLINE.stem));
-        wakes[i] = laid(wakes[i] ?? [], stem, now, speed);
+        const was = wakes[i];
+        wakes[i] = laid(was ?? [], stem, now, speed);
+        // a fresh wake starts the count again (and it goes round every 4 km, to keep its precision; the seam is
+        // a jump in the patches' pattern, once in a long while)
+        const fresh = !was?.length || !wakes[i].includes(was[0]) || !stems[i];
+        sailed[i] = fresh ? 0 : (sailed[i] + distance(stems[i]!, stem)) % 4096;
+        stems[i] = stem;
         // too far off the map for any of her marks to reach it
         if (distance(stem, eye.frame.up) > REACH * 1.5 + WAKE.most * 3) return;
         const points = [{ at: stem, time: now, speed }, ...wakes[i].filter((p, k) => k > 0 || distance(p.at, stem) > 0.05)];
-        const took = ribbon(chart, points, now, vertex);
+        const took = ribbon(chart, points, now, sailed[i], vertex);
         for (let k = 0; k + 1 < took / 2; k++) {
           const a = vertex + 2 * k;
           index.set([a, a + 1, a + 2, a + 1, a + 3, a + 2], triangle * 3);
@@ -325,7 +368,7 @@ export function createWake(renderer: WebGPURenderer, view: View, sky: Sky, capac
       trailGeometry.setDrawRange(0, triangle * 3);
       patchGeometry.setDrawRange(0, near * 6);
       shadowGeometry.instanceCount = near;
-      for (const a of [trailAt, trailMark, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
+      for (const a of [trailAt, trailMark, trailLaid, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
       poses.needsUpdate = true;
       live.value = near > 0 ? 1 : 0;
       if (near === 0) return;
