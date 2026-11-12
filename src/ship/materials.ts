@@ -10,33 +10,31 @@
 //   shipUp    up (unit), … and along its z: the wind she feels, scaled to 0…1 by how hard it blows
 //   shipPaint the strakes' and pennants' colour (linear), and 1 for a band of it across the sails
 //   shipCloth the sails' colour (linear), and a phase that keeps her canvas from flapping in step with others'
+//   shipClear 1 for the player's own ship, whose sails thin out round the aim point; 0 for every other
 //
-// The body: ambientCG/Poly Haven planking (Weathered Brown Planks) on the hull and spars, Wooden Planks on the decks,
-// each scaled to its mean; strakes in the captain's colour; darker and greener where the sea wets her.
-// The cloth: filled by the wind (sails.ts's belly scaled by it), shivering when it lies along them; lit on both sides
-// with light through the canvas. The pennants stream down the wind. The ropes: widened to a pixel and a half across far
-// off so the rigging stays a line rather than breaking into dashes, and blended over what is behind them by how much
-// of that width the rope itself would cover — so a distant ship's rigging is the faint web it is, not a black one.
+// The body: wood.ts. The cloth: filled by the wind (sails.ts's belly scaled by it), shivering when it lies along them;
+// lit on both sides with light through the canvas. On the player's own ship it is cut away in a fine screen-door
+// pattern round the aim point on the screen (the fleet's `aim`), most at its middle and less and less out to
+// CLEAR_OUTER, so her canvas never hides what she is aiming at (from the old game, 0117's caravel). The pennants stream
+// down the wind. The ropes: widened to a pixel and a half across far off so the rigging stays a line rather than
+// breaking into dashes, and blended over what is behind them by how much of that width the rope itself would cover —
+// so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as a round rope's are where
+// it turns away from the eye.
 
-import { DoubleSide, MeshBasicNodeMaterial, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
+import { DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, fract, fwidth, max, min, mix, normalize, positionWorld,
-  faceDirection, select, sign, sin, smoothstep, texture, time, varying, vec2, vec3,
+  faceDirection, screenCoordinate, screenSize, screenUV, select, sign, sin, smoothstep, time, varying, vec2, vec3,
 } from 'three/tsl';
 import { type Light, leafLight } from '../land/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
-import { CLOTH, KIND } from './kit';
+import { CLOTH } from './kit';
+import { createWood } from './wood';
 
 type N = any;
 
-/** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to. */
-const PLANK_MEAN = [0.118, 0.073, 0.042], DECK_MEAN = [0.209, 0.132, 0.083];
-const HULL = [0.19, 0.12, 0.075], DECK = [0.3, 0.22, 0.15], SPAR = [0.2, 0.14, 0.09];
-const DARK = [0.06, 0.045, 0.035], GILT = [0.42, 0.28, 0.1], IRON = [0.025, 0.025, 0.025];
-/** The hull below and just above the waterline, wet: darker and greener. */
-const WET = [0.45, 0.5, 0.42];
-/** Tarred hemp, weathered. */
-const ROPE = [0.1, 0.08, 0.06];
+/** Tarred hemp, weathered grey. */
+const ROPE = [0.13, 0.11, 0.085];
 /** How much of the light on a sail's far side comes through the canvas. */
 const THROUGH = 0.3;
 /** A square sail's cloths: how many across it (each about 0.4 m), shown as faint seams. */
@@ -48,24 +46,20 @@ const FLAP = 2.2, WAVES = 1.6;
 /** A rope is widened to at least this many pixels in radius (below about a pixel and a half across, a line at a slant
  * breaks into dashes without multisampling), and drawn as faint as the rope it stands for is thin. */
 const ROPE_PIXELS = 0.75;
+/** The player's sails are cut away the most, CLEAR of each pixel, within CLEAR_INNER of the aim point, and not at all
+ * past CLEAR_OUTER (as shares of the screen's height): enough left that the canvas is still seen to be there. */
+const CLEAR = 0.8, CLEAR_INNER = 0.05, CLEAR_OUTER = 0.2;
 
 export interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
 
-/** pixel: the angle a pixel spans, radians (a uniform the fleet keeps up to date). */
-export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
-  const loader = new TextureLoader();
-  const load = (file: string) => {
-    const t = loader.load(`${import.meta.env.BASE_URL}tex/${file}`);
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.anisotropy = 8;
-    t.colorSpace = SRGBColorSpace;
-    return t;
-  };
-  const planks = load('planks.jpg'), deck = load('deck.jpg');
+/** pixel: the angle a pixel spans, radians, and aim: the aim point on the screen (screenUV: 0…1 across and down) —
+ * uniforms the fleet keeps. */
+export function createShipMaterials(light: Light, pixel: N, aim: N): ShipMaterials {
+  const wood = createWood(light);
 
   // ---- her frame, per instance
   const at: N = attribute('shipAt', 'vec4'), fwd: N = attribute('shipFwd', 'vec4'), up: N = attribute('shipUp', 'vec4');
-  const paint: N = attribute('shipPaint', 'vec4'), cloth: N = attribute('shipCloth', 'vec4');
+  const paint: N = attribute('shipPaint', 'vec4'), cloth: N = attribute('shipCloth', 'vec4'), clear: N = attribute('shipClear', 'float');
   const port: N = cross(up.xyz, fwd.xyz);
   const turn = (v: N): N => port.mul(v.x).add(up.xyz.mul(v.y)).add(fwd.xyz.mul(v.z));
   const wind: N = vec2(fwd.w, up.w);
@@ -90,22 +84,8 @@ export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
   body.positionNode = at.xyz.add(turn(brace(local, true)));
   const bodyNormal: N = varying(turn(brace(nrm.xyz, false)));
   const height: N = varying(local.y);
-  body.colorNode = Fn(() => {
-    const k: N = varying(kind), uvs = attribute('uv', 'vec2').mul(UV_RANGE);
-    const tone: N = texture(planks, uvs).rgb.div(vec3(...PLANK_MEAN));
-    const grey: N = dot(tone, vec3(0.3, 0.59, 0.11));
-    const pick = (i: number, a: N, b: N) => select(k.lessThan(i + 0.5), a, b);
-    let albedo: N = pick(KIND.planks, tone.mul(vec3(...HULL)),
-      pick(KIND.paint, paint.rgb.mul(grey),
-        pick(KIND.dark, tone.mul(vec3(...DARK)),
-          pick(KIND.deck, texture(deck, uvs).rgb.div(vec3(...DECK_MEAN)).mul(vec3(...DECK)),
-            pick(KIND.spar, tone.mul(vec3(...SPAR)),
-              pick(KIND.gilt, grey.mul(vec3(...GILT)), vec3(...IRON)))))));
-    // wet below the waterline and where the waves wash, a little above it
-    albedo = albedo.mul(mix(vec3(1), vec3(...WET), smoothstep(0.6, -0.2, height)));
-    const n = normalize(bodyNormal);
-    return albedo.mul(nrm.w).mul(light(positionWorld, n));
-  })();
+  const bodyKind: N = varying(kind);
+  body.colorNode = Fn(() => wood(bodyKind, attribute('uv', 'vec2').mul(UV_RANGE), height, normalize(bodyNormal), nrm.w, paint.rgb))();
 
   // ---- the cloth
   const clothMaterial = new MeshBasicNodeMaterial({ side: DoubleSide });
@@ -150,6 +130,12 @@ export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
     albedo = select(clothKind.greaterThan(CLOTH.pennant - 0.5), paint.rgb, albedo.mul(float(1).sub(seams).sub(edge)));
     return albedo.mul(leafLight(light, positionWorld, normalize(clothNormal).mul(faceDirection), THROUGH));
   })();
+  // the player's sails thinned round the aim point: a pixel is cut where interleaved gradient noise (Jimenez, 2014)
+  // falls under how thin the canvas is there
+  const fromAim: N = screenUV.sub(aim).mul(screenSize).div(screenSize.y).length();
+  const thin: N = clear.mul(smoothstep(CLEAR_OUTER, CLEAR_INNER, fromAim)).mul(CLEAR);
+  const noise: N = fract(fract(dot(screenCoordinate.xy, vec2(0.06711056, 0.00583715))).mul(52.9829189));
+  clothMaterial.maskNode = noise.greaterThanEqual(thin);
 
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });
@@ -160,7 +146,9 @@ export function createShipMaterials(light: Light, pixel: N): ShipMaterials {
   ropes.positionNode = ropeAt.add(ropeNormal.mul(wide.sub(radius)));
   const ropeN: N = varying(ropeNormal), cover: N = varying(radius.div(wide));
   ropes.colorNode = Fn(() => vec3(...ROPE).mul(light(positionWorld, normalize(ropeN))))();
-  ropes.opacityNode = cover;
+  // across the rope, how squarely its surface faces the eye: the edges, seen edge on, cover less of their pixels
+  const facing: N = abs(dot(normalize(ropeN), normalize(cameraPosition.sub(positionWorld))));
+  ropes.opacityNode = cover.mul(smoothstep(0, 0.6, facing));
 
   return { body, cloth: clothMaterial, ropes };
 }
