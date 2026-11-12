@@ -348,6 +348,15 @@ A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its f
 
 **Left:** the fight option's "wait at the edge" for a player who lingers in the Storm (needs `learning.ts`), hunting, sheltering from weather, and the Storm-edge checks of loot, home and hunt.
 
+**Early restraint, ported** (`brain.ts:75-82` `restraint` and `lastFew`, `holdBack` `:596`, `fightUrge` `:451-463`, the fire hold in `aimAndFire` `:1291-1294`)
+- Will to fight falls by `[0.5, 0.5, 0.45, 0.35, 0.25, 0.1, 0, 0]` by Storm phase, and by 0.4 more with three ships or fewer afloat.
+- "Close aboard" shrinks by 50 m × restraint.
+- Armed, she lets a ship heading away go past 90 m (by heading, `ramp(off, 0, 0.35)` in a fight, `ramp(off, −0.45, −0.15)` out of one).
+- She holds her fire outside a fight she chose, except at a ship within 90 m that shot her in the last 5 s.
+- The bots' memory learns of shots through `shot(memory, by)` (`captain.ts`), as it learns of rams through `rammed`.
+- Unchanged: ramming bots keep their speed-based let-go at all times.
+- **Effect** (19 armed bots and a slow ship among them, 5 seeds, scratch run): time to sink her goes from 27 to 74 s with no restraint to 44 s to over 120 s in phase 0. Bots still often fight, because 0117's restraint worked with the loot (1.8) and claim (0.7) options outscoring a weak fight, and here only roam (0.15) competes.
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.

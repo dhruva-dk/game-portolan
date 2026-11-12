@@ -82,10 +82,10 @@ export function ring(g: Gunner, at: Vec3, foe: Mark, standoff: number, skill: nu
 
 /**
  * Her gun's orders this step (0117's aimAndFire): laid on where `foe` will be when the ball comes down, with her
- * wandering error, and fired when she is in range, has got over first seeing her and is in a burst. With no foe in
- * sight she lays it along her heading and holds her fire. `clock` is hers (s). Updates `g`.
+ * wandering error, and fired when she is in range, has got over first seeing her, is in a burst, and isn't told to
+ * `hold` it. With no foe in sight she lays it along her heading and holds her fire. `clock` is hers (s). Updates `g`.
  */
-export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: number, skill: number, draw: () => number, dt: number): Order {
+export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: number, skill: number, draw: () => number, dt: number, hold = false): Order {
   if (!foe) return { aim: own.heading, fire: false };
   const d = distance(own.at, foe.ship.at);
   // where she will be: sailing on as she sails now, over the ball's flight there
@@ -102,7 +102,7 @@ export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: n
   const miss = GUNNER.error * (1 - 0.85 * skill) * d;
   const mark = normalize(add(lead, g.err, miss / R));
   const aim = toward(own.at, mark) ?? own.heading;
-  if (d > GUN.range * GUNNER.reach || clock < g.react) return { aim, fire: false };
+  if (d > GUN.range * GUNNER.reach || clock < g.react || hold) return { aim, fire: false };
   // bursts: firing whenever loaded through one, holding fire through the pause after it
   if (g.burst > 0) {
     g.burst -= dt;

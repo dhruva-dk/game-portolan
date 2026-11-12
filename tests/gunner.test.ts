@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
-import { mind, think, type Memory } from '../src/sim/bot.ts';
+import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf } from '../src/sim/gun.ts';
@@ -11,6 +11,8 @@ import { shipAt, type Helm } from '../src/sim/ship.ts';
 import { add, along, distance, frameAt, fromLatLon, scale, type Vec3 } from '../src/world/sphere.ts';
 import { temper } from '../src/sim/temper.ts';
 import { sunk } from '../src/sim/health.ts';
+import type { Storm } from '../src/sim/storm.ts';
+import { R } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
 const start = fromLatLon(0.2, 0.3);
@@ -29,8 +31,9 @@ const bold = (() => {
   return out;
 })();
 
-/** Bots `seeds` (null: a ship holding `held`) sailing and fighting `seconds`; armed as `guns` (rarity, or null). */
-function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }) {
+/** Bots `seeds` (null: a ship holding `held`, firing along her heading if `fire`) sailing and fighting `seconds`;
+ *  armed as `guns` (rarity, or null); in `storm` if given; bots told of the balls that strike them. */
+function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }, { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}) {
   const minds: (Memory | null)[] = fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
   let b: Battle = battleOf(fleet.map((v, i) => crewOf(v.id, guns[i] === null ? null : gunOf(guns[i]!))), 7);
   const fired: { t: number; id: number }[] = [], ranges: number[] = [];
@@ -43,8 +46,8 @@ function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)
     const helms: Helm[] = [], orders: Order[] = [];
     fleet.forEach((v, i) => {
       const m = minds[i];
-      if (!m) { helms.push(held); orders.push({ aim: null, fire: false }); return; }
-      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep }, m, seeds[i]!);
+      if (!m) { helms.push(held); orders.push({ aim: null, fire }); return; }
+      const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth: deep, storm }, m, seeds[i]!);
       minds[i] = r.memory;
       helms.push(r.helm);
       orders.push(r.order);
@@ -56,6 +59,10 @@ function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)
     b = f.battle;
     for (const s of f.shots) fired.push({ t: n * STEP, id: s.shooter });
     strikes += f.strikes.filter((s) => !s.ram).length;
+    for (const s of f.strikes) {
+      const k = fleet.findIndex((v) => v.id === s.struck);
+      if (!s.ram && minds[k]) minds[k] = shot(minds[k]!, s.shooter);
+    }
     if (fleet.length > 1) ranges.push(distance(fleet[0].ship.at, fleet[1].ship.at));
   }
   return { fleet, battle: b, minds, fired, strikes, blows, ranges };
@@ -93,4 +100,34 @@ test('two armed bots fight it out, the same every time, till one is sunk', () =>
 test('an unarmed bot never orders her gun fired', () => {
   const r = battle([placed(0, 0, 0, 0), placed(1, 0, 100, 90 * deg)], [bold[0], null], [null, null], 20);
   assert.equal(r.fired.length, 0);
+});
+
+/** The storm in its first phase (her restraint at its most), or once its last cap has closed (none left). */
+const stormIn = (phase: number): Storm => ({
+  centre: start, radius: Math.PI, next: { centre: start, radius: Math.PI }, closing: false, secondsToNext: phase < 7 ? 60 : Infinity, phase, damage: 0,
+});
+const mild = (() => {
+  const out: number[] = [];
+  for (let s = 1; out.length < 3; s++) if (temper(s).fight < 0.35) out.push(s);
+  return out;
+})();
+
+test('early in a match a mild armed bot keeps out of a fight she would take up late in it', () => {
+  for (const seed of mild) {
+    const fights = (phase: number) => battle([placed(0, 0, 0, 0), placed(1, 0, 110, 90 * deg)], [seed, null], [1, null], 30, undefined, { storm: stormIn(phase) });
+    const early = fights(0), late = fights(7);
+    console.log(`# seed ${seed}: ${early.fired.length} shots early, ${late.fired.length} late`);
+    assert.equal(early.fired.length, 0, `${seed}: fired early`);
+    assert.ok(late.fired.length > 0, `${seed}: never fired late`);
+  }
+});
+
+test('holding back, she still fires back at a ship close by that is shooting her', () => {
+  for (const seed of mild) {
+    // a ship 70 m off, bow on to her, firing along her heading
+    const r = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 70, 180 * deg)], [seed, null], [1, 1], 30, undefined, { storm: stormIn(0), fire: true });
+    const back = r.fired.filter((f) => f.id === 0).length;
+    console.log(`# seed ${seed}: ${back} shots back`);
+    assert.ok(back > 0, `${seed}: never fired back`);
+  }
 });

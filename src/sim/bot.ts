@@ -34,7 +34,7 @@ import { choose, logistic, momentum, ramp, utility, type Option } from './utilit
 import { BOT, between, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 
-export { BOT, mind, rammed, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
+export { BOT, mind, rammed, shot, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 
 /**
  * One step of dt seconds of a bot's mind: what she orders her helm and her gun, and her memory after. `own` is her own
@@ -52,7 +52,7 @@ export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memo
   c.foe = m.foe >= 0 ? others.find((o) => o.id === m.foe) ?? null : null;
   c.foeD = c.foe ? distance(own.ship.at, c.foe.ship.at) : Infinity;
   const helm = steer(c, dt);
-  const order: Order = own.armed ? aimAndFire(m, own.ship, inSight(c) ? c.foe : null, m.clock, c.t.skill, () => roll(m), dt) : { aim: null, fire: false };
+  const order: Order = own.armed ? aimAndFire(m, own.ship, inSight(c) ? c.foe : null, m.clock, c.t.skill, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
   m.was = own.ship.at;
   return { helm, order, memory: m };
 }
@@ -150,16 +150,33 @@ function fightUrge(c: Ctx): number {
   will += ((0.1 + 0.5 * t.skill) * (strength(own) - strength(foe))) / 100;
   if (m.hitBy === foe.id) will += BOT.roused * ramp(m.clock - m.hitT, BOT.grudge + BOT.cool, BOT.cool);
   for (const o of c.others) if (o.id !== foe.id && distance(own.ship.at, o.ship.at) < BOT.crowd) will -= BOT.crowding * t.skill;
-  const close = ramp(d, BOT.closeFrom, BOT.closeAt);
+  const restraint = holdBack(c);
+  will -= restraint;
+  // close aboard she fights whatever her will, from nearer while she holds back
+  const close = ramp(d, BOT.closeFrom - 50 * restraint, BOT.closeAt - 50 * restraint);
   if (close >= 1) return 1;
-  // past reach, a ship sailing away too fast to catch is let go: in a fight, once she is clearly away; out of one, she
-  // is not taken up while she nearly is, so it doesn't flicker as she weaves (0117 went by her heading alone, as a gun
-  // reaches a ship however fast she sails; a ram must catch her)
-  const from = toward(foe.ship.at, own.ship.at);
-  const flying = (from ? -dot(foe.ship.heading, from) : 0) * foe.ship.speed;
-  const go = own.armed ? 1 : 1 - ramp(d, BOT.letGo - 10, BOT.letGo + 15) * ramp(flying, ...(m.mode === 'fight' ? BOT.outrun : BOT.outran));
+  // past reach, a ship sailing away is let go: in a fight, once she is clearly away; out of one, she is not taken up
+  // while she nearly is, so it doesn't flicker as she weaves. Armed, while she holds back, by her heading alone, as a
+  // gun reaches a ship however fast she sails (0117's); ramming, always, by her speed away, as a ram must catch her
+  const from = toward(foe.ship.at, own.ship.at), off = from ? -dot(foe.ship.heading, from) : 0, past = ramp(d, BOT.letGo - 10, BOT.letGo + 15);
+  const go = !own.armed ? 1 - past * ramp(off * foe.ship.speed, ...(m.mode === 'fight' ? BOT.outrun : BOT.outran))
+    : restraint > 0 ? 1 - past * (m.mode === 'fight' ? ramp(off, 0, 0.35) : ramp(off, -0.45, -0.15)) : 1;
   return Math.max(close, utility(logistic(will, BOT.will, BOT.willWidth), go));
 }
+
+/** How much she holds back from a fight now (0117's holdBack): by the storm's phase, and more among the last few
+ *  afloat (her and the others she is given). None without a storm. */
+function holdBack(c: Ctx): number {
+  const s = c.sea.storm;
+  const by = s ? BOT.restraint[Math.min(s.phase, BOT.restraint.length - 1)] : 0;
+  if (by <= 0) return 0;
+  return c.others.length + 1 <= BOT.lastFew ? by + BOT.more : by;
+}
+
+/** Whether she holds her fire (0117's): while she holds back, outside a fight she chose, but at a ship close by that
+ *  has just shot her. */
+const holdsFire = (c: Ctx) =>
+  c.m.mode !== 'fight' && holdBack(c) > 0 && !(c.foe && c.m.shotBy === c.foe.id && c.m.clock - c.m.shotT < BOT.shotFresh && c.foeD < BOT.letGo);
 
 /** Losing a fight: her hull down past where her temperament runs, with the foe close (0117's; a seam for health.ts). */
 const losing = (c: Ctx) => (c.foe ? utility(ramp(c.own.hull ?? 100, c.t.run + 8, c.t.run - 4), ramp(c.foeD, 160, 130)) : 0);

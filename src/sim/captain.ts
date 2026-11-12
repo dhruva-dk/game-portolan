@@ -73,6 +73,13 @@ export const BOT = {
    * drawn `drawn` of the way in toward its centre (a chord's share, as 0117 drew it).
    */
   late: 25, ease: [0.55, 0.3] as const, inNext: 0.5, nearEdge: 0.4, inward: 0.6, shore: 136, ring: 6.8, drift: 600, drawn: 0.4,
+  /**
+   * Early in a match she would sooner keep out of a fight (0117's restraint): her will to fight falls by this much in
+   * each of the storm's phases (the last once it has closed), and more by `more` with `lastFew` ships or fewer afloat.
+   * While it does, she lets a ship sailing away go past `letGo` m with a gun too, and holds her fire outside a fight
+   * she chose, but at a ship within `letGo` m that shot her within `shotFresh` s (0117: 150 ticks).
+   */
+  restraint: [0.5, 0.5, 0.45, 0.35, 0.25, 0.1, 0, 0] as const, lastFew: 3, more: 0.4, shotFresh: 5,
 } as const;
 
 /** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
@@ -99,9 +106,11 @@ export interface Memory extends Gunner {
   foe: number;
   seen: number;
   last: Vec3;
-  /** Who last rammed her (-1: none) and when. */
+  /** Who last rammed her (-1: none) and when; who last shot her and when. */
   hitBy: number;
   hitT: number;
+  shotBy: number;
+  shotT: number;
   /** Seconds and way (sign, + to port) she holds a turn off land; seconds left backing off a bank (below 0: working
    *  off a bar), seconds crawling, and the way she backs off; seconds left bearing away from a ram. */
   avoid: number;
@@ -118,12 +127,15 @@ export interface Memory extends Gunner {
 /** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
-  foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at, route: null,
-  ...gunner(),
+  foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, shotBy: -1, shotT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at,
+  route: null, ...gunner(),
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */
 export const rammed = (m: Memory, by: number): Memory => ({ ...m, hitBy: by, hitT: m.clock });
+
+/** Her memory once a ball of `by`'s has struck her (the game tells her, from battle.ts's strikes that aren't rams). */
+export const shot = (m: Memory, by: number): Memory => ({ ...m, shotBy: by, shotT: m.clock });
 
 /** What a think and a step weigh: her, the others afloat, the sea, her memory (written to), her temperament, her foe
  *  as she sees her now and how far off, and her seed. */
