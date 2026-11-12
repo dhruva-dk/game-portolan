@@ -7,6 +7,7 @@ import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { traceCoasts } from './ui/coasts';
 import { createGlobe } from './ui/globe';
+import { createFlow, isScreen, type Screen } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
 import { uiLayer } from './ui/ui';
 import { sunPlaces } from './world/sun';
@@ -57,14 +58,23 @@ const layer = uiLayer();
 safeArea(layer);
 const coasts = traceCoasts(frame.planet.islands);
 const globe = createGlobe(coasts);
-let shown: HudState | null = null, opening = switches.screen === 'map';
-const hud = game && createHud(layer, coasts, {
+let shown: HudState | null = null;
+const hud = createHud(layer, coasts, {
   slot: (i) => placeholder.choose(i),
   gust: () => {},
   map: () => shown && globe.show(shown),
 });
+// a release build opens at the title; the dev server at sea, unless ?screen= says otherwise (also map, rank, settings)
+const start = switches.screen ?? (DEBUG ? 'match' : 'title');
+const opens: Record<string, Screen | undefined> = { map: 'match', rank: 'lobby', settings: 'lobby' };
+const flow = game ? createFlow(hud, globe, placeholder.career, isScreen(start) ? start : opens[start] ?? 'match') : null;
+if (!game) hud.root.style.display = 'none';
+if (start === 'rank' || start === 'settings') flow?.open(start);
+if (start === 'result') flow?.end(4);
+let opening = start === 'map';
 
 console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
+flow?.ready();
 frame.resize(innerWidth, innerHeight);
 addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
 
@@ -75,10 +85,9 @@ renderer.setAnimationLoop(() => {
   last = start;
 
   move(dt);
-  if (game && hud) {
+  if (game && flow) {
     shown = placeholder.state(game.status(), dt);
-    hud.update(shown);
-    globe.update(shown);
+    flow.update(dt, shown);
     if (opening) globe.show(shown);
     opening = false;
   }

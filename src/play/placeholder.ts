@@ -1,5 +1,5 @@
 // PLACEHOLDER: what the HUD shows that the sim has no value for yet, held here and nowhere else. Each line becomes one
-// line reading the sim's value once it has it (health, the Storm, items, Gust); the game already supplies where she
+// line reading the sim's value once it has it (health, the Storm, items, Gust, her career); the game already supplies where she
 // is, her heading and the ships afloat (play/game.ts status).
 
 import type { HudState } from '../ui/hud';
@@ -21,6 +21,8 @@ export function createPlaceholder(islands: readonly IslandSite[]) {
   } satisfies Partial<HudState>;
 
   return {
+    /** Her career: her level, how far toward the next, and her rank's tier. */
+    career: () => ({ level: 7, progress: 0.35, tier: 2 }),
     /** A slot tapped: it is in hand. */
     choose(i: number) {
       chosen = i;
