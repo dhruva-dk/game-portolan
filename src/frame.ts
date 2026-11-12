@@ -107,5 +107,5 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     pipeline.render();
   }
 
-  return { scene, camera, sky, view, planet, wind, fleet, resize, render, ready: ground.ready };
+  return { scene, camera, sky, view, planet, wind, fleet, anchors: water.anchors, resize, render, ready: ground.ready };
 }

@@ -17,7 +17,7 @@
 
 import { Vector4 } from 'three/webgpu';
 import { If, Loop, acos, clamp, cross, dot, float, fract, int, length, max, normalize, sin, smoothstep, sqrt, uniform, uniformArray, vec2, vec3 } from 'three/tsl';
-import { FREQUENCY, anchors, band, cover, icosphere, near, type Likeness } from '../world/lattice';
+import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Likeness } from '../world/lattice';
 import { R, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { chartNodes } from './view';
@@ -119,6 +119,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   }
 
   return {
+    /** Every anchor, as world/lattice.ts placed them: for the CPU's copy of the waves (water/swell.ts). */
+    anchors: all as readonly Anchor[],
     each,
     debug,
     /** Lists the anchors that can weigh in on the sea drawn out to `reach` metres round the point under the eye. */

@@ -14,7 +14,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { weigh, type Anchor } from '../world/lattice.ts';
+import { FREQUENCY, band, weigh, type Anchor } from '../world/lattice.ts';
 import { R, add, chartBasis, normalize, scale, toChart, type Vec3 } from '../world/sphere.ts';
 import { BANDS, BREAKER, CASCADES, CHOP, FETCH, LONG, PERIOD, SIZE } from './cascades.ts';
 import { G, initialSpectrum, seaState } from './spectrum.ts';
@@ -62,10 +62,11 @@ const STRIDE = 8;
 
 /**
  * The surface for a wind speed (m/s): read through the sea's anchors (lattice.ts: their charts and offsets, as
- * view/charts.ts uploads them) blended over `width` metres; `ground` gives the height of the floor (planet.ts), for
- * the depth's cut of the long waves.
+ * view/charts.ts uploads them); `ground` gives the height of the floor (planet.ts), for the depth's cut of the long
+ * waves.
  */
-export function createSwell(anchors: Anchor[], width: number, ground: (p: Vec3) => number, wind: number, count = MODES): Surface {
+export function createSwell(anchors: readonly Anchor[], ground: (p: Vec3) => number, wind: number, count = MODES): Surface {
+  const width = band(FREQUENCY);
   const modes = longModes(wind, count);
   const n = modes.length / STRIDE;
   // each mode's k̂

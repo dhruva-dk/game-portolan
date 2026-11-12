@@ -181,7 +181,7 @@ export function blend(distances: number[], width: number): number[] {
  * The anchors that weigh in at p and their weights (the GPU's choice, charts.ts: the three nearest, by their dot
  * products with p, no sorting): a function of p alone.
  */
-export function weigh(all: Anchor[], p: Vec3, width: number): { index: number[]; weight: number[] } {
+export function weigh(all: readonly Anchor[], p: Vec3, width: number): { index: number[]; weight: number[] } {
   const u = normalize(p);
   const best = [-1, -1, -1], c = [-2, -2, -2];
   for (let k = 0; k < all.length; k++) {

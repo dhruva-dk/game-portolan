@@ -6,12 +6,11 @@ import { createSwell, longModes } from '../src/water/swell.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { pose, ride, settled, RIDE } from '../src/sim/ride.ts';
 import { shipAt } from '../src/sim/ship.ts';
-import { FREQUENCY, anchors, band, icosphere } from '../src/world/lattice.ts';
+import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
 import { R, along, cross, dot, frameAt, fromLatLon, length } from '../src/world/sphere.ts';
 import { createWind } from '../src/world/wind.ts';
 
 const all = anchors(icosphere(FREQUENCY), createWind(3), CASCADES[0]);
-const width = band(FREQUENCY);
 const open = () => -40;
 const rms = (xs: number[]) => Math.sqrt(xs.reduce((s, x) => s + x * x, 0) / xs.length);
 /** Spread points over the sphere, and times. */
@@ -30,7 +29,7 @@ test('the modes kept hold nearly all the long waves', () => {
 });
 
 test('under a hull the kept modes read as all of them do, to a few centimetres', () => {
-  const every = createSwell(all, width, open, 10, Infinity), kept = createSwell(all, width, open, 10);
+  const every = createSwell(all, open, 10, Infinity), kept = createSwell(all, open, 10);
   const err: number[] = [], height: number[] = [];
   for (const { p, t } of places(150)) {
     const f = frameAt(p);
@@ -44,18 +43,18 @@ test('under a hull the kept modes read as all of them do, to a few centimetres',
 });
 
 test('the swell is as high as the sea state, repeats every PERIOD, and is cut by the depth', () => {
-  const swell = createSwell(all, width, open, 10);
+  const swell = createSwell(all, open, 10);
   const h = places(300).map(({ p, t }) => swell(p, t));
   // σ = Hs/4, less the little the short cascade and the modes left out hold, and less a little where three charts meet
   assert.ok(Math.abs(rms(h) / (seaState(10, FETCH).hs / 4) - 0.95) < 0.12, `${rms(h)}`);
   for (const { p, t } of places(20)) assert.ok(Math.abs(swell(p, t) - swell(p, t + PERIOD)) < 1e-6);
-  const shallow = createSwell(all, width, () => -0.5, 10);
+  const shallow = createSwell(all, () => -0.5, 10);
   for (const { p, t } of places(20)) assert.ok(Math.abs(shallow(p, t)) <= Math.abs(swell(p, t)) * (0.5 * 0.78 / seaState(10, FETCH).hs) + 0.05);
 });
 
 test('the hull rides the swell: her level follows the water under her, her pitch and roll its slope', () => {
   for (const wind of [10, 15]) {
-    const swell = createSwell(all, width, open, wind);
+    const swell = createSwell(all, open, wind);
     const s = shipAt(fromLatLon(0.3, 1.1), frameAt(fromLatLon(0.3, 1.1)).north);
     let r = settled(s, swell, 0);
     const level: number[] = [], miss: number[] = [], pitch: number[] = [], pitchMiss: number[] = [], roll: number[] = [], rolled: number[] = [];

@@ -194,6 +194,8 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
 
   return {
     mesh,
+    /** The sea's charts (world/lattice.ts), for its CPU copy (swell.ts). */
+    anchors: charts.anchors,
     /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
     below: {
       sun: (p: N): N => optics.sunBelow(p).mul(caustics(p)),
