@@ -64,8 +64,8 @@ if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.pos
 
 // ---- SCAFFOLDING (ships demo, until ships are placed for real): ?ships=N sets N galleons on the sea ahead of the
 // default camera (south of the largest island, looking north) — 30, 60, 100, 150 m out and on past — at rest on the
-// mean sea, each on her own heading and in her own colours (after the player's ship, in the game view); ?lod=0…3 draws
-// them all at one level of detail; ?heading=deg turns them all that much further (clockwise seen from above); ?cloth=0
+// mean sea, each on her own heading and in her own colours (after the player's ship, in the game view), set as if
+// making ?way= m/s (0 by default) though she stays where she is; ?lod=0…3 draws them all at one level of detail; ?heading=deg turns them all that much further (clockwise seen from above); ?cloth=0
 // draws every ship's canvas as the wind fills it, simulating none.
 {
   const ships = Math.min(number('ships', 0), flying ? 32 : 31), first = flying ? 0 : 1, { up, north } = frameAt(south);
@@ -78,7 +78,7 @@ if (params.has('probe')) addProbe(frame.scene, frame.sky.light, frame.camera.pos
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
     frame.fleet.set(first + i, { position: scale(u, R), forward, up: u }, {
       paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1,
-    });
+    }, scale(forward, number('way', 0)));
   }
   if (params.has('lod')) frame.fleet.pin(number('lod', 0));
   if (params.get('cloth') === '0') frame.fleet.simulate(false);

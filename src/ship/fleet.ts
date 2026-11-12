@@ -4,14 +4,17 @@
 // (with some slack, so she doesn't flicker between two), and her pose and look are packed into her level's instance
 // buffer, which its three meshes share.
 //
-// A ship's pose is world/pose.ts's; her look the captain's colours. The wind she feels is the planet's at her less her
-// own motion (the apparent wind), in her own frame: sails and pennants lean with it in the shader, and her crew haul
-// her square yards round to meet it (motion.ts).
+// A ship's pose is world/pose.ts's; her look the captain's colours. Her canvas is filled by her sails' wind (motion.ts's
+// filling(): at rest the planet's at her, weakened; under way, from her quarter whatever her heading, so it always
+// draws), in her own frame: her crew haul her square yards round to it, and sails and pennants lean with it, drawn in
+// the shader or simulated. (Not the wind she feels through her own motion, which would lay her sails aback as she
+// sails into it: her speed doesn't come from the wind. Pennants streaming aft over sails filled from astern would tell
+// two stories.)
 //
 // One ship may be the player's own (`own`): she is always drawn at the finest level.
 //
 // Her canvas and pennants are simulated as cloth while she is among the few nearest the eye (berths.ts, cloth.ts),
-// the player's own always: each frame the berths are handed out, and each berthed ship's apparent wind and motion
+// the player's own always: each frame the berths are handed out, and each berthed ship's sails' wind and motion
 // (motion.ts) handed to the cloth, before it is moved on. Every other ship's are the drawn shape the shader fills.
 
 import {
@@ -21,14 +24,14 @@ import {
 import { uniform } from 'three/tsl';
 import type { Light } from '../land/light';
 import type { ShipPose } from '../world/pose';
-import { add, cross, dot, length, scale, type Vec3 } from '../world/sphere';
+import { add, length, scale, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { BERTHS, moor, type Berth } from './berths';
 import { buildShip, type Packed } from './build';
 import { createCloth } from './cloth';
 import { DETAILS, chooseDetail } from './detail';
 import { createShipMaterials } from './materials';
-import { feeling, hauled, inFrame, moved, trim, type Motion } from './motion';
+import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion';
 
 /** A captain's colours (linear rgb, 0…1). */
 export interface Look {
@@ -46,6 +49,9 @@ const MIDDLE = 9, RADIUS = 18;
 const FULL = 8;
 
 const levels = DETAILS.length;
+
+/** A wind (metres a second) as a share of FULL, at most 1. */
+const share = (w: Vec3): Vec3 => { const size = length(w); return size > 0 ? scale(w, Math.min(size / FULL, 1) / size) : [0, 0, 0]; };
 
 /** Ship i's own phase, radians, so no two ships' canvas moves in step. */
 const phaseOf = (i: number) => (i * 2.399) % (2 * Math.PI);
@@ -89,8 +95,9 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
   const meshes = draws.flat();
 
   const poses: ShipPose[] = [], looks: Look[] = [], velocities: Vec3[] = [], was: number[] = [];
-  /** How each ship's square yards are braced, radians (+ turns the port arm aft). */
-  const braces: number[] = [];
+  /** How each ship's square yards are braced, radians (+ turns the port arm aft); and, this frame, her sails' wind, her
+   * frame, metres a second. */
+  const braces: number[] = [], sails: Vec3[] = [];
   let count = 0, pinned = -1, own = -1;
   let berths: (Berth | null)[] = new Array(BERTHS).fill(null), simulating = true;
   const motions: (Motion | null)[] = new Array(BERTHS).fill(null);
@@ -108,14 +115,14 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
     count = Math.max(count, i + 1);
   }
 
-  /** The wind ship i feels, metres a second, in the world: the planet's at her less her own motion. */
-  const apparent = (i: number, windSpeed: number) => add(scale(wind(poses[i].position), windSpeed), velocities[i], -1);
-
-  /** The berths handed out, and each berthed ship's canvas moved on dt seconds. */
+  /** Each ship's yards hauled round dt seconds on, her sails' wind found, the berths handed out, and each berthed ship's
+   * canvas moved on dt seconds. */
   function sail(eye: Vector3, windSpeed: number, dt: number) {
     for (let i = 0; i < count; i++) {
-      const w = inFrame(poses[i], apparent(i, windSpeed));
-      braces[i] = Number.isNaN(braces[i]) ? trim(w, 0) : hauled(braces[i], w, dt);
+      const pose = poses[i], speed = length(velocities[i]);
+      const blowing = inFrame(pose, scale(wind(pose.position), windSpeed));
+      braces[i] = Number.isNaN(braces[i]) ? trim(blowing, speed, 0) : hauled(braces[i], blowing, speed, dt);
+      sails[i] = filling(blowing, speed, braces[i]);
     }
     const metres = poses.slice(0, count).map((p) => eye.distanceTo(new Vector3(...add(p.position, p.up, MIDDLE))));
     const before = berths;
@@ -124,8 +131,7 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
       if (!b) { motions[k] = null; cloth.set(k, null); return; }
       const motion = moved(b.fresh || before[k]?.ship !== b.ship ? null : motions[k], poses[b.ship], dt);
       motions[k] = motion;
-      const wind = inFrame(poses[b.ship], apparent(b.ship, windSpeed));
-      cloth.set(k, { brace: braces[b.ship], phase: phaseOf(b.ship), wind, ...feeling(motion) }, b.fresh);
+      cloth.set(k, { brace: braces[b.ship], phase: phaseOf(b.ship), wind: sails[b.ship], ...feeling(motion) }, b.fresh);
     });
     cloth.update(dt);
   }
@@ -139,7 +145,7 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
     frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const eye = camera.getWorldPosition(new Vector3());
     sail(eye, windSpeed, dt);
-    const share = new Map(berths.flatMap((b, k) => (b ? [[b.ship, [k, b.share]] as const] : [])));
+    const shares = new Map(berths.flatMap((b, k) => (b ? [[b.ship, [k, b.share]] as const] : [])));
     const filled = new Array<number>(levels).fill(0);
     for (let i = 0; i < count; i++) {
       const pose = poses[i], look = looks[i];
@@ -149,12 +155,11 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
       // (the player's own ship always whole: the chase camera holds her at the finest level's edge)
       const k = pinned >= 0 ? pinned : i === own ? 0 : chooseDetail(was[i], eye.distanceTo(sphere.center), pixel.value);
       was[i] = k;
-      // the apparent wind, as a share of FULL (at most 1) along her own axes
-      const w = apparent(i, windSpeed), size = length(w);
-      const strength = size > 0 ? Math.min(size / FULL, 1) / size : 0, port = cross(pose.up, pose.forward);
+      // her sails' wind, as a share of FULL across her and along her
+      const w = share(sails[i]);
       const a = instances[k].array as Float32Array, o = filled[k]++ * STRIDE;
-      a.set([...pose.position, braces[i], ...pose.forward, dot(w, port) * strength, ...pose.up, dot(w, pose.forward) * strength,
-        ...look.paint, look.band ? 1 : 0, ...look.sail, phaseOf(i), ...(share.get(i) ?? [0, 0]), 0, 0], o);
+      a.set([...pose.position, braces[i], ...pose.forward, w[0], ...pose.up, w[2],
+        ...look.paint, look.band ? 1 : 0, ...look.sail, phaseOf(i), ...(shares.get(i) ?? [0, 0]), 0, 0], o);
     }
     draws.forEach((three, k) => {
       instances[k].needsUpdate = true;
@@ -171,7 +176,7 @@ export function createFleet(renderer: WebGPURenderer, light: Light, wind: Wind, 
     update,
     /** Ship i is the player's own (or none, for null): she is always drawn at the finest level. */
     own(i: number | null) { own = i ?? -1; },
-    /** Simulate the near ships' canvas as cloth, or (false: a debug view) draw every ship's as the wind fills it. */
+    /** Simulate the near ships' canvas as cloth, or (false: a debug view) draw every ship's as its wind fills it. */
     simulate(on: boolean) { simulating = on; },
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },

@@ -7,10 +7,10 @@
 // Each berth (berths.ts) holds one ship's canvas (canvas.ts: the finest level's grids, a particle a vertex), in her own
 // frame — a square sail's in its yard's, before the yard is braced — so her way over the sea moves nothing, and only
 // what she feels reaches it, each frame from the fleet:
-//   - the apparent wind (metres a second), gusting slowly and swirling along the canvas, so a sail breathes as it
-//     fills, a slack one shivers and a pennant flutters. It presses on the cloth along its normal as the square of the
-//     wind through it, and drags along it: a sail fills on whichever side the wind comes from, and lifts and shakes
-//     where the wind runs along it;
+//   - her sails' wind (motion.ts's filling(), metres a second), gusting slowly and swirling along the canvas, so a
+//     sail breathes as it fills, a slack one shivers and a pennant flutters. It presses on the cloth along its normal
+//     as the square of the wind through it, and drags along it: a sail fills on whichever side the wind comes from,
+//     and lifts and shakes where the wind runs along it;
 //   - gravity, less her own acceleration (a turn, gathering way, the heave), as she tilts it;
 //   - her roll and pitch: each particle is swung with her rig about her waterline, which throws the canvas aloft and
 //     moves it through the air (a masthead goes metres a second as she rolls).
@@ -82,7 +82,7 @@ export interface Felt {
   brace: number;
   /** A phase of her own, radians, so no two ships' canvas moves in step. */
   phase: number;
-  /** The apparent wind, metres a second. */
+  /** Her sails' wind (motion.ts's filling()), metres a second. */
   wind: Vec3;
   /** Gravity less her acceleration, m/s². */
   weight: Vec3;

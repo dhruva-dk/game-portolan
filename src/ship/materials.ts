@@ -7,20 +7,20 @@
 //   shipAt    position (world, metres), brace (radians: the square yards turned about their masts, the port
 //             yardarm aft for positive)
 //   shipFwd   forward (unit), and the wind across her frame's x …
-//   shipUp    up (unit), … and along its z: the wind she feels, scaled to 0…1 by how hard it blows
+//   shipUp    up (unit), … and along its z: her sails' wind (motion.ts), scaled to 0…1 by how hard it blows
 //   shipPaint the strakes' and pennants' colour (linear), and 1 for a band of it across the sails
 //   shipCloth the sails' colour (linear), and a phase that keeps her canvas from flapping in step with others'
 //   shipBerth her berth in the cloth simulation (cloth.ts) and how much of her canvas it shapes (0…1)
 //
 // The body: wood.ts. The cloth, two ways blended by her berth's share, so a ship's canvas never pops between them:
-// drawn, filled by the wind (sails.ts's belly scaled by it, breathing with its gusts), with a ripple and, as the wind
-// slackens or comes along the sail, a luff travelling across it to leeward, its normal tilted to match; and simulated,
-// each vertex at its place on its sail's grid read from the particles (bilinearly, so every level samples the same
-// sheet) with the particles' own normal. Lit on both sides with light through the canvas. The pennants stream down the
-// wind, drawn or simulated alike. The ropes: widened to a pixel and a half across far off so the rigging stays a line rather than
-// breaking into dashes, and blended over what is behind them by how much of that width the rope itself would cover —
-// so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as a round rope's are where
-// it turns away from the eye.
+// drawn, filled by her sails' wind (sails.ts's belly scaled by it, breathing with its gusts), with a ripple and, as the
+// wind slackens or comes along the sail, a luff travelling across it to leeward, its normal tilted to match; and
+// simulated, each vertex at its place on its sail's grid read from the particles (bilinearly, so every level samples
+// the same sheet) with the particles' own normal. Lit on both sides with light through the canvas. The pennants stream
+// down the same wind, drawn or simulated alike. The ropes: widened to a pixel and a half across far off so the rigging
+// stays a line rather than breaking into dashes, and blended over what is behind them by how much of that width the
+// rope itself would cover — so a distant ship's rigging is the faint web it is, not a black one — their edges soft, as
+// a round rope's are where it turns away from the eye.
 
 import { DoubleSide, MeshBasicNodeMaterial } from 'three/webgpu';
 import {
