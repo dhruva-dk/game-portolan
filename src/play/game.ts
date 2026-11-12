@@ -46,6 +46,9 @@ const bearing = (at: Vec3, b: number): Vec3 => {
  * bot; or, given a `way` (m/s), on a straight course at that speed, her rudder amidships. */
 export interface Other { at: Vec3; heading: Vec3; look: Look; way: number }
 
+/** The match as the HUD reads it (ui/hud.ts). */
+export interface Status { at: Vec3; heading: Vec3; afloat: number }
+
 /** start: where she lies and the bearing she heads (radians); legs: a debug drive, or ''; others: the others afloat. */
 export function createGame(
   frame: Frame, env: Environment, element: HTMLElement, start: { at: Vec3; bearing: number }, legs: string, others: readonly Other[] = [],
@@ -105,7 +108,10 @@ export function createGame(
     return { course: add(scale(ahead, stick.y), right, stick.x), throttle: Math.min(1, (push - DEAD) / (1 - DEAD)) };
   };
 
-  return (dt: number) => {
+  /** What the HUD reads of the match: where she is, the way she heads, and how many ships are afloat. */
+  const status = (): Status => ({ at: fleet[0].ship.at, heading: fleet[0].ship.heading, afloat: fleet.length });
+
+  return Object.assign((dt: number) => {
     const hands = input.read();
     drawStick(hands.stick);
     if (hands.stick || hands.look.held) held = null;
@@ -117,5 +123,5 @@ export function createGame(
       frame.fleet.set(i, blendPose(before[i], after[i], between), looks[i], add(scale(ship.heading, ship.speed), shove));
     });
     chase.update(blendPose(before[0], after[0], between), hands.look, dt, tick * STEP);
-  };
+  }, { status });
 }
