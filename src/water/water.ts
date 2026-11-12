@@ -29,7 +29,7 @@ import { DoubleSide, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'th
 import {
   Discard, Fn, If, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
-  screenUV, select, smoothstep, sqrt, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
+  screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Ground } from '../land/ground';
@@ -59,6 +59,11 @@ const FACING = 0.05;
 const MAX_REFRACT_DEPTH = 20;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
 const LIKENESS_WINDS = [5, 10, 15, 20];
+/**
+ * How much the waves the cascades hold gather the ripples onto their faces downwind and strip them from their backs:
+ * the ripples' mean square slope is (1 − GATHER·tanh(s/σ)) of its mean, s the slope along the wind and σ its rms.
+ */
+const GATHER = 0.8;
 
 /**
  * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
@@ -143,10 +148,17 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     // slopes' variance within the footprint) becomes roughness, as do the ripples too small for any cascade. The
     // slopes, as a tangent vector, sum with the charts' weights; the variances, independent, with their squares.
     // The foam from the breaking cascades' cover (averaged over the footprint by their mips), and the air under it,
-    // drawn by foam.ts. Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1. Weighted by w²
-    // (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one sea's, and no
-    // pixel is whiter than a whitecap; so too the air.
-    const slope = marks.slope.toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
+    // drawn by foam.ts. Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1.
+    // Weighted by w² (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one
+    // sea's, and no pixel is whiter than a whitecap; so too the air.
+    // The ripples are not spread evenly: the wind raises them most on the faces of the longer waves that lie downwind
+    // of a crest, where the surface converges, and the waves' orbital currents sweep them off the backs (the
+    // hydrodynamic and aerodynamic modulation of short waves by long: Keller & Wright 1975, whose measured modulation is
+    // tens of percent per percent of slope). So the ripples' roughness follows the slope along the wind, as filtered
+    // over the pixel (where the waves are too small to see it averages out, and the ripples with it): the backs mirror
+    // the sky sharply, the faces blur it, about the same mean.
+    const slope = marks.slope.toVar(), variance = float(0).toVar(), foam = float(0).toVar(), bubbles = float(0).toVar();
+    const lean = float(0).toVar();
     const q = vec2(0).toVar();
     charts.each(p, (c, slot) => {
       if (slot === 0) q.assign(c.q);
@@ -164,10 +176,12 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       // tilts it too (the long cascades' height; the shortest's is too small to matter)
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
       variance.addAssign(v.mul(c.w.mul(c.w)));
+      lean.addAssign(s2.x.mul(c.w));
       const froth = foamOn(c, surf.add(wakeFoam), thickness, footprint);
       foam.addAssign(froth.foam.mul(c.w.mul(c.w)));
       bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
     }, dp);
+    variance.addAssign(waves.ripples.mul(short).mul(float(1).sub(tanh(lean.div(waves.steepness)).mul(GATHER))));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back

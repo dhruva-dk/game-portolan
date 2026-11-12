@@ -72,6 +72,8 @@ export function createWaves(renderer: WebGPURenderer) {
   const amplitude = uniform(1);
   /** The mean square slope of the ripples no cascade holds, for the surface's roughness. */
   const ripples = uniform(0.01);
+  /** The rms slope along one axis of the waves the cascades hold. */
+  const steepness = uniform(0.1);
   // the eight fields' spectra for every cascade, then (in place) their surfaces
   const fieldsA = instancedArray(AREA * COUNT, 'vec4');
   const fieldsB = instancedArray(AREA * COUNT, 'vec4');
@@ -194,6 +196,7 @@ export function createWaves(renderer: WebGPURenderer) {
     curvature,
     amplitude,
     ripples,
+    steepness,
     /** clock: the world's, seconds; dt: since the last update, for the foam's fading. */
     update(sea: Sea, clock: number, dt: number) {
       // a new sea only when the wind changes; the same seeds keep the waves where they are
@@ -214,6 +217,7 @@ export function createWaves(renderer: WebGPURenderer) {
         initial.needsUpdate = true;
         amplitude.value = seaState(sea.wind, sea.fetch).hs / 2;
         ripples.value = Math.max(coxMunk(sea.wind) - held, RIPPLE_FLOOR);
+        steepness.value = Math.sqrt(held / 2);
       }
       // foam lasts longer the harder the wind blows: τ from a second to five (the residual foam a whitecap leaves,
       // Monahan's stage B, a few seconds)
