@@ -48,7 +48,7 @@ const FLAP = 2.2, WAVES = 1.6;
 const ROPE_PIXELS = 0.75;
 /** The player's sails are cut away the most, CLEAR of each pixel, within CLEAR_INNER of the aim point, and not at all
  * past CLEAR_OUTER (as shares of the screen's height): enough left that the canvas is still seen to be there. */
-const CLEAR = 0.8, CLEAR_INNER = 0.05, CLEAR_OUTER = 0.2;
+const CLEAR = 0.65, CLEAR_INNER = 0.05, CLEAR_OUTER = 0.2;
 
 export interface ShipMaterials { body: MeshBasicNodeMaterial; cloth: MeshBasicNodeMaterial; ropes: MeshBasicNodeMaterial }
 
