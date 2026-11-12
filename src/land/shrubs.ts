@@ -14,7 +14,7 @@ import { Fn, attribute, faceDirection, mix, normalWorld, normalize, positionWorl
 import { random } from '../world/random';
 import type { Shrub } from '../world/scatter';
 import type { Chart } from '../world/sphere';
-import { type Light, leafLight } from './light';
+import { type Light, leafLight } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
 
 type N = any;

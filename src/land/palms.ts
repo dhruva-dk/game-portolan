@@ -18,7 +18,7 @@ import { Fn, attribute, faceDirection, float, fract, mix, normalWorld, normalize
 import { random } from '../world/random';
 import type { Palm } from '../world/scatter';
 import type { Chart } from '../world/sphere';
-import { type Light, leafLight } from './light';
+import { type Light, leafLight } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
 
 type N = any;

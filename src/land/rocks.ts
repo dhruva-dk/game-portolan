@@ -4,7 +4,7 @@
 // Textured by projecting ambientCG Rock030 along the world's three axes and blending by the surface's facing (no
 // seams, no UVs to unwrap: any three axes do, so the world's serve), scaled to a warm red-brown, paler on the tops
 // the sun and rain bleach, dark in the cracks and under the ledges; darker where wet, filmed with algae below the
-// waterline; lit like everything else (light.ts).
+// waterline; lit like everything else (sky/light.ts).
 //
 // Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder.
 
@@ -15,7 +15,7 @@ import { Fn, abs, attribute, dot, float, mix, normalWorld, normalize, positionWo
 import type { View } from '../view/view';
 import type { Rock } from '../world/scatter';
 import type { Chart } from '../world/sphere';
-import type { Light } from './light';
+import type { Light } from '../sky/light';
 import { rockShape } from './rock-shape';
 import { createInstances, standing, type Placed } from './site';
 

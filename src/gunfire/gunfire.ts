@@ -12,7 +12,7 @@
 //   a ball in sea  a column of spray thrown up and falling back, and mist off it; on land, dust
 //   a ball home    a flash, splinters thrown out of her side and falling, and dark smoke
 //   a ram          splinters
-// Lit by the sun and the sky as everything else is (land/light.ts), and blended premultiplied: a flash is all added
+// Lit by the sun and the sky as everything else is (sky/light.ts), and blended premultiplied: a flash is all added
 // light, smoke and spray cover what is behind them.
 
 import {
@@ -22,7 +22,7 @@ import {
 import {
   Fn, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
-import type { Light } from '../land/light';
+import type { Light } from '../sky/light';
 import { random } from '../world/random';
 import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 
@@ -119,7 +119,7 @@ function puffMesh(light: Light, now: N) {
   return { mesh, buffer, geometry: g };
 }
 
-/** light: how the world is lit (land/light.ts). */
+/** light: how the world is lit (sky/light.ts). */
 export function createGunfire(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
   const balls = ballMesh(light, pixel);

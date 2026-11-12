@@ -7,13 +7,13 @@
 // textures are laid on the world's three axes and blended by which way up faces there (sharply, so nearly
 // everywhere one of them shows alone; any three axes do, so the world's serve), the cover read from the ground.
 //
-// Lit like everything else (light.ts).
+// Lit like everything else (sky/light.ts).
 
 import { NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader } from 'three/webgpu';
 import { If, abs, cameraPosition, float, mix, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
-import type { Light } from './light';
+import type { Light } from '../sky/light';
 import { SHALLOWEST } from './seabed';
 import { createStrewn } from './strewn';
 

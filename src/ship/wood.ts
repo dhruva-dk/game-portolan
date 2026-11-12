@@ -1,6 +1,6 @@
 // What the galleon's body is made of, and how it takes the light: oiled timber on the hull and spars, a deck left bare
 // to weather, tarred wales, the captain's paint, gilded mouldings and black iron — each a glossy surface lit as
-// everything else is (land/light.ts), its sheen the sun's highlight and the sky's reflection in a coat of oil or
+// everything else is (sky/light.ts), its sheen the sun's highlight and the sky's reflection in a coat of oil or
 // paint (reflectance 0.04 face on, as any oil, varnish or paint), the gilding a metal.
 //
 // The planking: Poly Haven's Weathered Brown Planks (Dimitrios Savva, Rico Cilliers; CC0) — its colour scaled to the
@@ -15,7 +15,7 @@ import {
   abs, clamp, cross, dFdx, dFdy, dot, float, floor, fract, fwidth, hash, inverseSqrt, max, min, mix, normalize, positionWorld,
   select, smoothstep, sqrt, texture, vec3,
 } from 'three/tsl';
-import type { Light } from '../land/light';
+import type { Light } from '../sky/light';
 import { KIND } from './kit';
 
 type N = any;

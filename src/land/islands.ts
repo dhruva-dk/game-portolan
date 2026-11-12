@@ -10,7 +10,7 @@ import type { IslandSite, Planet } from '../world/planet';
 import { isle, litter, scatterPalms, scatterRocks, scatterShrubs } from '../world/scatter';
 import { distance, horizonDistance } from '../world/sphere';
 import { createLand } from './land';
-import type { Light } from './light';
+import type { Light } from '../sky/light';
 import { createPalms } from './palms';
 import { KINDS, createRocks } from './rocks';
 import type { Sand } from './sand';

@@ -26,7 +26,7 @@ import {
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import type { Compute } from '../gpu';
-import type { Light } from '../land/light';
+import type { Light } from '../sky/light';
 import type { ShipPose } from '../world/pose';
 import { add, length, scale, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';

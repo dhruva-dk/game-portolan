@@ -9,7 +9,7 @@ import type { Cap } from './sim/storm';
 import { createSky } from './sky/sky';
 import { createGround } from './land/ground';
 import { createIslands } from './land/islands';
-import { createLighting } from './land/light';
+import { createLighting } from './sky/light';
 import { createSand } from './land/sand';
 import { createSeabed } from './land/seabed';
 import { createShadow } from './land/shadow';

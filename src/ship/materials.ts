@@ -1,4 +1,4 @@
-// The galleon's three materials — the body, the cloth and the ropes — lit like everything else (land/light.ts: the
+// The galleon's three materials — the body, the cloth and the ropes — lit like everything else (sky/light.ts: the
 // sun through the air, the clouds' and the nearest island's shadows, the sky).
 //
 // Every ship is an instance (fleet.ts): its pose and look ride along as per-instance attributes, and each vertex is
@@ -27,7 +27,7 @@ import {
   Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, fract, fwidth, max, min, mix, normalize, positionWorld,
   faceDirection, int, select, sign, sin, smoothstep, storage, varying, vec2, vec3,
 } from 'three/tsl';
-import type { Light } from '../land/light';
+import type { Light } from '../sky/light';
 import { BELLY_UNIT, PENNANT_LENGTH, PIVOT_Z, RADIUS_UNIT, UV_RANGE } from './build';
 import { breath, type Cloth } from './cloth';
 import { CLOTH } from './kit';

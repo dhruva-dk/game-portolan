@@ -4,7 +4,7 @@
 // GGX highlight, the sky as its GGX-filtered reflection (sky/reflection.ts), both at the same exposure as the rest.
 
 import { cameraPosition, dot, float, max, min, normalize, pow, reflect, saturate, vec2, vec3, vec4 } from 'three/tsl';
-import type { Sky } from '../sky/sky';
+import type { Sky } from './sky';
 
 type N = any;
 
