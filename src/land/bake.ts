@@ -16,5 +16,6 @@ self.onmessage = (e: MessageEvent<{ seed: number; n: number }>) => {
   });
   faces.cover.forEach((c, f) => cover.set(c, f * n * n * 4));
   const ms = performance.now() - t;
-  (self as unknown as Worker).postMessage({ height, cover, ms }, [height.buffer, cover.buffer]);
+  // (the options form, which a worker's postMessage and the window's that the DOM types give `self` both take)
+  self.postMessage({ height, cover, ms }, { transfer: [height.buffer, cover.buffer] });
 };

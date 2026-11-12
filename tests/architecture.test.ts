@@ -77,7 +77,10 @@ test('c. passes live in src/frame.ts only', () => {
 });
 
 test('d. no three.js hacks', () => {
-  none(hits(/\bonBeforeCompile\b/), 'onBeforeCompile');
+  none(hits(/\bon(Before|After)(Compile|Render|Shadow)\b/), 'onBeforeCompile / onBeforeRender / onAfterRender hooks');
+  none(hits(/\bas\s+unknown\s+as\b/), 'as unknown as (a cast past the types)');
+  none(hits(/['"]three\/src\//), "deep import from 'three/src/' (only three's public entry points)");
+  none(hits(/\.prototype\b/), '.prototype (patching classes)');
   // Private members of three objects: an underscore-led member access (`x._foo`, `x['_foo']`) or the renderer's `.backend`.
   // Our own underscore names are never accessed this way, so on current code this matches nothing.
   none(hits(/[\w)\]]\s*\.\s*_[A-Za-z]|\[\s*['"]_[A-Za-z]|\.backend\b/), 'underscore-private member or .backend access');
@@ -89,4 +92,23 @@ test('d. no three.js hacks', () => {
 test('e. no exported let/var (module state others could write)', () => {
   // Only `export let|var` is detectable reliably by text; mutable exported objects/arrays are indistinguishable from constants.
   none(hits(/^\s*export\s+(let|var)\b/), 'exported mutable binding');
+});
+
+test('f. the frame owns every GPU pass and the renderer', () => {
+  // Systems say what is due (gpu.ts); only src/frame.ts dispatches it, and only it sets the renderer up.
+  // src/main.ts may construct and initialise the renderer, src/meter.ts read its timings.
+  const notFrame = (rel: string) => rel !== 'frame.ts';
+  none(hits(/\brenderer\s*\.\s*(render|renderAsync|compute|computeAsync)\b|\.computeAsync\s*\(/, notFrame), 'renderer.render / renderer.compute outside src/frame.ts');
+  // (main.ts calls the frame's own render)
+  none(hits(/(?<!\bframe)\.render(Async)?\s*\(/, notFrame), '.render( outside src/frame.ts');
+  none(hits(/\.(setRenderTarget|setClearColor|setClearAlpha|setPixelRatio)\s*\(|\.toneMapping\w*\s*=(?!=)/, notFrame), 'renderer configuration outside src/frame.ts');
+  // no system is handed the renderer: its type is named only where it is made, set up and read
+  none(hits(/\b(WebGPURenderer|Renderer)\b/, (rel) => !['frame.ts', 'main.ts', 'meter.ts'].includes(rel)), 'the renderer type outside src/frame.ts, src/main.ts and src/meter.ts');
+});
+
+test('g. src/world and src/sim are deterministic and headless', () => {
+  none(
+    hits(/\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location)\b/, (rel) => rel.startsWith('world/') || rel.startsWith('sim/')),
+    'Math.random, Date, performance or a browser global in src/world or src/sim',
+  );
 });
