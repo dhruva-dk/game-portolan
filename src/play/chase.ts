@@ -4,10 +4,14 @@
 // It looks along a boom from a point over her deck. It never goes under the waves or into an island: where land
 // stands between it and her deck, the boom is raised until it sees over (quickly), and lowered again only slowly
 // once clear (as the old full game did, 0117 src/render/camera.ts); if raising it won't do, it is shortened.
+//
+// The match's other shots are this camera given another boom (a Shot): riding the Gale high behind the fleet, and
+// coming down with her (game.ts); drawn back and circling her on a win. Moving to another ship it flies there over
+// `flight` seconds, round the planet rather than through it and lifting on a long way (0117 camera.ts's flight).
 
-import type { PerspectiveCamera } from 'three/webgpu';
+import { Quaternion, Vector3, type PerspectiveCamera } from 'three/webgpu';
 import type { ShipPose } from '../world/pose';
-import { add, along, cross, dot, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
+import { R, add, along, cross, dot, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
 
 /** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
 const BACK = 44, UP = 19, PIVOT = 2;
@@ -24,10 +28,18 @@ const SHORTEST = 6, CLEAR = 1.5;
 /** Points along the sight line tested for land. */
 const SIGHT = 10;
 
-const BOOM = Math.hypot(BACK, UP), ELEVATION = Math.atan2(UP, BACK);
+/** The chase's own boom: its length, metres, and how steeply it rises behind her, radians. */
+export const BOOM = Math.hypot(BACK, UP), ELEVATION = Math.atan2(UP, BACK);
+
+/** Another boom for a moment of the match: the pivot `height` metres higher (over her deck, or the fleet's on the
+ *  Gale), the boom this long and this steep in place of the chase's, and turned `spin` radians to port about her. */
+export interface Shot { height?: number; boom?: number; elevation?: number; spin?: number }
 
 /** t turned `angle` radians to port about `up`. */
 const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
+
+/** Smoother step (0117 camera.ts). */
+const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 
 /** ground: metres above the sea at a point (negative under water); sea: the waves' height there at a time. */
 export function createChase(camera: PerspectiveCamera, ground: (p: Vec3) => number, sea: (p: Vec3, time: number) => number) {
@@ -37,6 +49,10 @@ export function createChase(camera: PerspectiveCamera, ground: (p: Vec3) => numb
   let turn = 0, tilt = 0, idle = Infinity;
   /** How far the boom is raised to see over the land. */
   let raised = 0;
+  /** A flight under way: where the camera was when it began, its length (s) and how far through it is (0…1). */
+  let flight: { from: Vector3; look: Quaternion; span: number; done: number } | null = null;
+  /** The boom's turn for the shot under way (radians to port). */
+  let spin = 0;
 
   /** Where she is, and her heading along the surface there. */
   const level = (pose: ShipPose) => {
@@ -45,44 +61,71 @@ export function createChase(camera: PerspectiveCamera, ground: (p: Vec3) => numb
   };
 
   /** The way the camera looks along the surface at her. */
-  const view = () => turned(facing, at, turn);
+  const view = () => turned(facing, at, turn + spin);
 
-  /** Whether land stands within ROOM of the sight line from over her deck, along `back`, to a boom this long and steep. */
-  const blocked = (back: Vec3, boom: number, elevation: number) => {
+  /** Whether land stands within ROOM of the sight line from `pivot` metres over her, along `back`, to a boom this long
+   *  and steep. */
+  const blocked = (back: Vec3, boom: number, elevation: number, pivot: number) => {
     for (let i = 1; i <= SIGHT; i++) {
       const f = i / SIGHT;
-      if (ground(along(at, back, f * boom * Math.cos(elevation)).p) + ROOM > PIVOT + f * boom * Math.sin(elevation)) return true;
+      if (ground(along(at, back, f * boom * Math.cos(elevation)).p) + ROOM > pivot + f * boom * Math.sin(elevation)) return true;
     }
     return false;
   };
 
   /** Places the camera: its boom raised toward what the land asks at `rate` per second (instantly if Infinity). */
-  function put(pose: ShipPose, time: number, dt: number, rate: (rising: boolean) => number) {
-    const back = scale(view(), -1), elevation = ELEVATION + tilt;
+  function put(pose: ShipPose, time: number, dt: number, rate: (rising: boolean) => number, shot: Shot) {
+    const back = scale(view(), -1), elevation = shot.elevation ?? ELEVATION + tilt, length = shot.boom ?? BOOM;
+    const pivot = PIVOT + (shot.height ?? 0);
     let need = 0;
-    while (need < RAISED && blocked(back, BOOM, elevation + need)) need += RAISE;
+    while (need < RAISED && blocked(back, length, elevation + need, pivot)) need += RAISE;
     raised += (need - raised) * (1 - Math.exp(-rate(need > raised) * dt));
-    let boom = BOOM;
-    while (boom > SHORTEST && blocked(back, boom, elevation + raised)) boom *= 0.85;
+    let boom = length;
+    while (boom > SHORTEST && blocked(back, boom, elevation + raised, pivot)) boom *= 0.85;
     const steep = Math.min(elevation + raised, TOP);
     const under = along(at, back, boom * Math.cos(steep)).p;
     const floor = Math.max(ground(under), sea(under, time)) + CLEAR;
-    const eye = place(under, Math.max(PIVOT + boom * Math.sin(steep), floor));
+    const eye = place(under, Math.max(pivot + boom * Math.sin(steep), floor));
     camera.position.set(...eye);
     camera.up.set(...normalize(eye));
-    camera.lookAt(...place(along(at, level(pose).ahead, AIM_AHEAD).p, AIM_UP));
+    camera.lookAt(...place(along(at, level(pose).ahead, AIM_AHEAD).p, AIM_UP + (shot.height ?? 0)));
+    if (flight) fly(dt);
+  }
+
+  /** The flight from where the camera was toward where it now is placed: round the planet, climbing on a long way. */
+  function fly(dt: number) {
+    const f = flight!;
+    f.done = Math.min(1, f.done + dt / f.span);
+    const s = smoother(f.done), to = camera.position.clone(), r0 = f.from.length(), r1 = to.length();
+    const d0 = f.from.clone().divideScalar(r0), d1 = to.clone().divideScalar(r1);
+    const angle = Math.acos(Math.min(1, Math.max(-1, d0.dot(d1))));
+    const dir = angle < 1e-4 ? d1 : d0.clone().multiplyScalar(Math.sin((1 - s) * angle)).addScaledVector(d1, Math.sin(s * angle)).divideScalar(Math.sin(angle));
+    const lift = Math.sin(s * Math.PI) * Math.min(angle * R * 0.5, 600);
+    camera.position.copy(dir.multiplyScalar(Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift));
+    camera.quaternion.slerpQuaternions(f.look, camera.quaternion.clone(), s);
+    if (f.done >= 1) flight = null;
   }
 
   return {
     /** Puts it straight behind her, the look let go. */
-    reset(pose: ShipPose, time: number) {
+    reset(pose: ShipPose, time: number, shot: Shot = {}) {
       ({ up: at, ahead: facing } = level(pose));
       turn = tilt = raised = 0;
       idle = Infinity;
-      put(pose, time, 1, () => Infinity);
+      flight = null;
+      spin = shot.spin ?? 0;
+      put(pose, time, 1, () => Infinity, shot);
     },
-    /** After a frame of dt seconds: her pose now, the look's drag (pixels, right and down), the world's clock. */
-    update(pose: ShipPose, look: { x: number; y: number; held: boolean }, dt: number, time: number) {
+    /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
+     *  camera.ts glide: 1.6 s from one ship to another). */
+    fly(seconds = 1.6) {
+      flight = { from: camera.position.clone(), look: camera.quaternion.clone(), span: seconds, done: 0 };
+    },
+    /**
+     * After a frame of dt seconds: her pose now (the ship it follows), the look's drag (pixels, right and down), the
+     * world's clock, and the boom for the moment (the chase's own, unless given).
+     */
+    update(pose: ShipPose, look: { x: number; y: number; held: boolean }, dt: number, time: number, shot: Shot = {}) {
       const her = level(pose);
       facing = normalize(transport(facing, at, her.up));
       at = her.up;
@@ -98,12 +141,23 @@ export function createChase(camera: PerspectiveCamera, ground: (p: Vec3) => numb
         turn *= k;
         tilt *= k;
       }
-      put(pose, time, dt, (rising) => (rising ? RISE : FALL));
+      spin = shot.spin ?? 0;
+      put(pose, time, dt, (rising) => (rising ? RISE : FALL), shot);
     },
     /** The way the camera looks along the surface at her, and its right there: what the stick's up and right mean. */
     axes(): { ahead: Vec3; right: Vec3 } {
       const ahead = view();
       return { ahead, right: cross(ahead, at) };
     },
+    /** Where a point on the sea (a unit vector) falls in a view `width` × `height` px, or null behind the camera or
+     *  past the horizon. */
+    onScreen(p: Vec3, width: number, height: number): { x: number; y: number } | null {
+      const e = camera.position;
+      if (e.x * p[0] + e.y * p[1] + e.z * p[2] <= R) return null;
+      const v = new Vector3(...scale(p, R)).project(camera);
+      return v.z > 1 ? null : { x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height };
+    },
   };
 }
+
+export type Chase = ReturnType<typeof createChase>;

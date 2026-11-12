@@ -12,7 +12,9 @@
 // lie by default (for seed 3 the largest island's centre is at lat 8.7, lon −11.6, its coast about 69 m out).
 // ?drive= sails a debug drive first (play/game.ts); ?gun=0…4 arms every ship with a gun of that rarity (sim/gun.ts). ?probe stands grey blocks and mirrors ahead (probe.ts). The meter
 // (meter.ts) shows the frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets
-// (iPhone 16 Pro Max in landscape: ?safe=0,62,21,62). ?screen= opens the UI at a screen (title, lobby, drop, match, result; ui/flow.ts).
+// (iPhone 16 Pro Max in landscape: ?safe=0,62,21,62). ?screen= opens the UI at a screen (title, lobby, drop, match,
+// spectate, won, result; ui/flow.ts): drop starts a match in the Gale (with ?dive, ?mark=lat,lon and ?ahead=seconds to
+// see the glide); spectate sinks her by the first other ship (?ships=n), won sinks every other by her.
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
 import type { Environment } from './environment';
@@ -48,6 +50,11 @@ export const switches = (() => {
     probe: params.has('probe'),
     meter: DEBUG,
     screen: params.get('screen'),
+    /** ?ahead=seconds: the game run on that long before the first frame (a drop's glide, say); ?dive: she leaves the
+     *  Gale as soon as it allows; ?mark=lat,lon (degrees): her mark for the glide. */
+    ahead: number('ahead', 0),
+    dive: params.has('dive'),
+    mark: params.get('mark')?.split(',').map(Number) as [number, number] | undefined,
     /** ?gun=0…4: every ship armed with a gun of that rarity (until there is loot to find one in). */
     gun: params.has('gun') ? number('gun', 0) : null,
   };

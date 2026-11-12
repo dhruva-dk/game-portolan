@@ -6,11 +6,11 @@
 //           banner with her galleon on it. No tabs.
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
 //   settings a small folio: sound and look speed, each a bar set by a tap along it
-//   drop    the gale's countdown over the HUD
+// (The drop's own screen is gale.ts.)
 //   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, her plate
 // No words anywhere; numerals only.
 
-import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, slip, svg } from './ink';
+import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, svg } from './ink';
 import { TIERS, laurel, levelRing, plate, rhumbs, rose, seal } from './marks';
 import { onTap, uiLayer } from './ui';
 
@@ -159,23 +159,6 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
         f?.root.remove();
         f = null;
       }
-    },
-  };
-}
-
-/** The gale's countdown, a numeral on a slip at the top centre. */
-export function createDrop() {
-  const root = document.createElement('div');
-  root.className = 'piece top centre';
-  root.style.top = 'calc(var(--safe-top, env(safe-area-inset-top)) + 48px)';
-  uiLayer().appendChild(root);
-  let shown = '';
-  return {
-    show(seconds: number | null) {
-      const key = seconds === null ? '' : String(Math.ceil(seconds));
-      if (key === shown) return;
-      shown = key;
-      root.innerHTML = key ? svg(64, 56, slip(2, 2, 60, 52, { bold: true }) + figure(32, 28, key, 40)) : '';
     },
   };
 }
