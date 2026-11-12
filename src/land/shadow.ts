@@ -10,7 +10,7 @@
 
 import {
   DepthTexture, DoubleSide, FloatType, InstancedMesh, LessEqualCompare, Matrix4, MeshBasicNodeMaterial,
-  OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, type CoordinateSystem,
+  OrthographicCamera, RedFormat, RenderTarget, Scene, Vector3, WebGPUCoordinateSystem,
 } from 'three/webgpu';
 import { float, select, texture, uniform, vec2, vec3, vec4 } from 'three/tsl';
 import type { Draw } from '../gpu';
@@ -43,12 +43,13 @@ export interface Shadow {
   update(sun: Vector3, island: IslandSite | null): Draw | null;
 }
 
-/** coordinateSystem: the renderer's, which the map's projection is worked out in. */
-export function createShadow(coordinateSystem: CoordinateSystem): Shadow {
+export function createShadow(): Shadow {
   const target = new RenderTarget(SIZE, SIZE, { format: RedFormat });
   target.depthTexture = new DepthTexture(SIZE, SIZE, FloatType);
   target.depthTexture.compareFunction = LessEqualCompare;
   const camera = new OrthographicCamera(-1, 1, 1, -1, 1, 2 * SPAN);
+  // the map's projection is worked out in the renderer's coordinates, which are WebGPU's (main.ts takes no other)
+  camera.coordinateSystem = WebGPUCoordinateSystem;
   const scene = new Scene();
   const draw: Draw = { scene, camera, target };
   const black = new MeshBasicNodeMaterial({ side: DoubleSide });
@@ -100,7 +101,6 @@ export function createShadow(coordinateSystem: CoordinateSystem): Shadow {
       camera.up.copy(Math.abs(sun.dot(up)) > 0.99 ? north : up);
       camera.lookAt(centre);
       camera.updateMatrixWorld();
-      camera.coordinateSystem = coordinateSystem;
       camera.updateProjectionMatrix();
       matrix.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       return draw;
