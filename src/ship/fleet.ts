@@ -5,8 +5,8 @@
 // buffer, which its three meshes share.
 //
 // A ship's pose is world/pose.ts's; her look the captain's colours and how her yards are braced. The wind she feels
-// is the planet's at her, in her own frame (sails and pennants lean with it in the shader); it is the true wind for
-// now — the apparent wind, once ships move, is the motion's to supply.
+// is the planet's at her less her own motion (the apparent wind), in her own frame: sails and pennants lean with it in
+// the shader.
 
 import {
   BufferAttribute, BufferGeometry, DynamicDrawUsage, Frustum, InstancedBufferGeometry, InstancedInterleavedBuffer, InterleavedBufferAttribute,
@@ -15,7 +15,7 @@ import {
 import { uniform } from 'three/tsl';
 import type { Light } from '../land/light';
 import type { ShipPose } from '../world/pose';
-import { add, cross, dot, type Vec3 } from '../world/sphere';
+import { add, cross, dot, length, scale, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { buildShip, type Packed } from './build';
 import { DETAILS, chooseDetail } from './detail';
@@ -76,15 +76,16 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   });
   const meshes = draws.flat();
 
-  const poses: ShipPose[] = [], looks: Look[] = [], was: number[] = [];
+  const poses: ShipPose[] = [], looks: Look[] = [], velocities: Vec3[] = [], was: number[] = [];
   let count = 0, pinned = -1;
   const frustum = new Frustum(), sphere = new Sphere(), m = new Matrix4();
 
-  /** The ship i's pose and look; ships 0…count−1 are drawn. */
-  function set(i: number, pose: ShipPose, look: Look) {
+  /** The ship i's pose, look and velocity (metres per second, world space); ships 0…count−1 are drawn. */
+  function set(i: number, pose: ShipPose, look: Look, velocity: Vec3 = [0, 0, 0]) {
     if (i >= capacity) throw new Error(`fleet: ship ${i} past capacity ${capacity}`);
     poses[i] = pose;
     looks[i] = look;
+    velocities[i] = velocity;
     was[i] ??= -1;
     count = Math.max(count, i + 1);
   }
@@ -95,7 +96,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     frustum.setFromProjectionMatrix(m.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const eye = camera.getWorldPosition(new Vector3());
     const filled = new Array<number>(levels).fill(0);
-    const strength = Math.min(windSpeed / FULL, 1);
     for (let i = 0; i < count; i++) {
       const pose = poses[i], look = looks[i];
       const middle = add(pose.position, pose.up, MIDDLE);
@@ -103,7 +103,9 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       if (!frustum.intersectsSphere(sphere)) { was[i] = -1; continue; }
       const k = pinned >= 0 ? pinned : chooseDetail(was[i], eye.distanceTo(sphere.center), pixel.value);
       was[i] = k;
-      const w = wind(pose.position), port = cross(pose.up, pose.forward);
+      // the apparent wind, as a share of FULL (at most 1) along her own axes
+      const w = add(scale(wind(pose.position), windSpeed), velocities[i], -1), size = length(w);
+      const strength = size > 0 ? Math.min(size / FULL, 1) / size : 0, port = cross(pose.up, pose.forward);
       const a = instances[k].array as Float32Array, o = filled[k]++ * STRIDE;
       a.set([...pose.position, look.brace, ...pose.forward, dot(w, port) * strength, ...pose.up, dot(w, pose.forward) * strength,
         ...look.paint, look.band ? 1 : 0, ...look.sail, (i * 2.399) % (2 * Math.PI)], o);
