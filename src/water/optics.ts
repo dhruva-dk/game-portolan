@@ -44,11 +44,24 @@ const CREST_SCATTER = 0.06;
 
 /** Foam's albedo: bubbles scatter almost everything back (whitecaps reflect ~50–60%; fresh foam more). */
 const FOAM_ALBEDO = 0.8;
+/**
+ * Backscatter per metre of the air a ship's wake works into the water, at its thickest, all colours alike (bubbles
+ * are far larger than the light's wavelength): with it the deep blue goes a pale turquoise.
+ */
+const AIR_BACKSCATTER = 0.2;
+/** How much a wake at its thickest veils what lies under it: as an optical depth. */
+const AIR_VEIL = 2;
 
-/** Irradiance reflectance just below the surface for u = b_b/(a + b_b) (Gordon et al. 1975, sun-lit). */
-const reflectance = (u: number) => 0.0001 + 0.3244 * u + 0.1425 * u * u + 0.1308 * u * u * u;
-/** What comes back out of deep water per unit irradiance on it: R·(1 − F)²/n², with F ≈ F0 for light near normal. */
-const BODY = vec3(...ABSORPTION.map((a, i) => (reflectance(BACKSCATTER[i] / (a + BACKSCATTER[i])) * (1 - F0) ** 2) / (N_WATER * N_WATER)));
+/**
+ * What comes back out of deep water per unit irradiance on it, with `air` (0…1) worked into it by a wake: R·(1 − F)²/n²
+ * (F ≈ F0 for light near normal), R the irradiance reflectance just below the surface for u = b_b/(a + b_b) (Gordon
+ * et al. 1975's cubic, sun-lit).
+ */
+const deep = (air: N): N => {
+  const bb = vec3(...BACKSCATTER).add(air.mul(AIR_BACKSCATTER));
+  const u = bb.div(vec3(...ABSORPTION).add(bb));
+  return u.mul(u.mul(u.mul(0.1308).add(0.1425)).add(0.3244)).add(0.0001).mul((1 - F0) ** 2 / (N_WATER * N_WATER));
+};
 /** The water's colour after the light's path through a crest. */
 const CREST = vec3(...ABSORPTION.map((a) => Math.exp(-a * CREST_PATH) * CREST_SCATTER));
 
@@ -83,13 +96,19 @@ export function createOptics(sky: Sky, view: View) {
     sunBelow,
     skyBelow,
     /** The light leaving the sea toward the eye (seaRadiance, below). */
-    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle): N =>
-      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle),
+    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle, ships: Ships): N =>
+      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle, ships),
   };
 }
 
 /** How the glint off the unresolved ripples gathers into flashes (glitter.ts), given D, n·h and h·l: its multiplier. */
 export type Sparkle = (D: N, nh: N, hl: N) => N;
+
+/**
+ * What the ships do to the light here (water/wake.ts, water/hulls.ts), each 0…1: the share of the sun their shadows
+ * leave, the share of the water's glow a hull beside it leaves, and the air a wake has worked into it.
+ */
+export interface Ships { lit: N; glow: N; air: N }
 
 /**
  * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
@@ -114,18 +133,19 @@ function facets(nh: N, nl: N, nv: N, alpha: N): { D: N; V: N } {
  *   behind the radiance of whatever lies behind the surface (the sea floor; the sky's if nothing)
  *   path   metres from the surface to it through the water (Infinity for open sea)
  *   sparkle how the sun's glint gathers into flashes
+ *   ships  what the ships do to the light here
  */
 function seaRadiance(
-  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle,
+  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle, ships: Ships,
 ): N {
   const l = sky.sun, up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
   const F = fresnel(nv);
-  const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p));
+  const sun = sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(ships.lit);
 
   // radiance off a reflectance R under irradiance E is R·E/π; ambient() is the sky's radiance, so its E/π is itself
   const irradiance = sun.mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(p, up));
-  const body = BODY.mul(irradiance);
+  const body = deep(ships.air).mul(irradiance).mul(ships.glow);
 
   // The sky, along the reflected ray, blurred to the roughness (three's PMREM takes √α). A ray reflected down
   // (below the horizon here, by the up here) from a facet turned away from the eye meets the next wave instead, at
@@ -144,9 +164,11 @@ function seaRadiance(
   const into = saturate(v.negate().dot(normalize(l.sub(up.mul(dot(l, up))))));
   const crests = CREST.mul(sun).mul(mix(float(0.3), float(1), crest)).mul(mix(float(0.15), float(1), pow(into, 4)));
   // what lies behind, seen through `path` metres of water: dimmed by it, while the water's own glow (and the
-  // crests') builds toward the deep's — over the path there and back, so twice the absorption
-  const through = behind.mul(exp(absorption.mul(path).negate())).div(N_WATER * N_WATER);
-  const glow = body.add(crests).mul(float(1).sub(exp(absorption.mul(path).mul(-2))));
+  // crests') builds toward the deep's — over the path there and back, so twice the absorption. A wake's bubbles
+  // veil it further, as so much more water would.
+  const dim = exp(absorption.mul(path).add(ships.air.mul(AIR_VEIL)).negate());
+  const through = behind.mul(dim).div(N_WATER * N_WATER);
+  const glow = body.add(crests).mul(float(1).sub(dim.mul(dim)));
   const water = reflected.add(through.add(glow).mul(float(1).sub(F)));
   const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
   return mix(water, froth, foam);

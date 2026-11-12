@@ -136,5 +136,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },
     get count() { return count; },
+    /** Ships 0…count−1 as last set: each one's pose, look and velocity (for the marks she leaves on the sea). */
+    get ships() { return poses.slice(0, count).map((pose, i) => ({ pose, look: looks[i], velocity: velocities[i] })); },
   };
 }

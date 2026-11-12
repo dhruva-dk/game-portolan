@@ -33,7 +33,8 @@ const FAR = 2000;
 /**
  * The frame, in order. Every pass the game draws is listed here and nowhere else:
  *   1. compute  — per-system simulation (sky tables, clouds, ocean FFT, foam); the nearest island's shadow map from
- *                 the sun, redrawn only when the sun has moved or another island has become the nearest
+ *                 the sun, redrawn only when the sun has moved or another island has become the nearest; the ships'
+ *                 marks on the sea round the eye (water/wake.ts: their wakes, foam and shadows), one small map
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, later the ships); then the sea,
  *                 which reads what was drawn before it behind itself (the floor through the water)
  *   3. post     — haze by distance, clouds over whatever they stand in front of, tone mapping; then FXAA, on the
@@ -60,7 +61,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
   const ground = createGround(seed);
   const planet = createPlanet(seed);
   const wind = createWind(seed);
-  const water = createWater(renderer, view, sky.light, ground, wind, debug);
+  const water = createWater(renderer, view, sky.light, ground, wind, SHIPS, debug);
   const shadow = createShadow(renderer);
   const light = createLighting(sky.light, water.below, shadow.visible);
   const sand = createSand(view, ground, light);
@@ -100,7 +101,7 @@ export function createFrame(renderer: WebGPURenderer, seed: number, debug = '') 
     view.update(camera);
     renderer.getDrawingBufferSize(size);
     sky.update(env, camera, dt, size.x, size.y);
-    water.update(env, dt);
+    water.update(env, dt, fleet.ships);
     seabed.update();
     shadow.update(env.sunDirection, islands.update(view.eye));
     fleet.update(camera, env.windSpeed, size.y);

@@ -18,11 +18,15 @@
 // the floor's depth, then looked up where that lands on the screen — the one screen-space approximation here (what
 // lies off the screen, or behind something nearer, can't be seen through the water).
 //
+// The ships' marks on it — foam round their hulls and down their wakes, the wakes' waves, the air worked into the
+// water astern, their shadows — are wake.ts's map, read once a pixel (and once a vertex, for the waves' height). The
+// hulls of the few nearest the eye cut the surface away inside them and shade the water against them (hulls.ts).
+//
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
+  Discard, Fn, If, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
@@ -37,8 +41,10 @@ import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from './cascades';
 import { createCaustics } from './caustics';
 import { createFoam } from './foam';
 import { glitter } from './glitter';
+import { createHulls } from './hulls';
 import { N_WATER, createOptics } from './optics';
 import { likeness } from './spectrum';
+import { createWake, type Afloat } from './wake';
 import { createWaves } from './waves';
 
 type N = any;
@@ -53,9 +59,14 @@ const MAX_REFRACT_DEPTH = 20;
 /** The winds (m/s) at which neighbouring charts' seas are kept unlike: from a breeze to a gale. */
 const LIKENESS_WINDS = [5, 10, 15, 20];
 
-/** wind: the planet's prevailing wind; debug: 'charts' colours the sea by its charts' weights (red, green, blue: nearest first). */
-export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, wind: Wind, debug = '') {
+/**
+ * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
+ * weights (red, green, blue: nearest first); 'wake' shows the ships' marks (wake.ts).
+ */
+export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, debug = '') {
   const waves = createWaves(renderer);
+  const wake = createWake(renderer, view, sky, ships);
+  const hulls = createHulls();
   const optics = createOptics(sky, view);
   // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
   const each = LIKENESS_WINDS.flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
@@ -98,7 +109,8 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     });
     return vec4(moved, swell);
   })();
-  material.positionNode = view.place(grid.up, 0).add(wave.xyz);
+  // the wakes' waves over the sea's
+  material.positionNode = view.place(grid.up, 0).add(wave.xyz).add(grid.up.mul(wake.height(grid.up)));
 
   const height: N = varying(dot(wave.xyz, grid.up));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
@@ -106,6 +118,11 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
   const foamOn = createFoam();
   const rest: N = varying(grid.up);
   material.colorNode = Fn(() => {
+    // no water inside a hull
+    const hull = hulls.at(positionWorld);
+    If(hull.inside, () => {
+      Discard();
+    });
     const { long, short, breaking } = shallows(rest);
     const up = view.up(positionWorld);
     const scale = (c: number): N => (c < LONG ? long : short);
@@ -113,6 +130,8 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const p = normalize(rest).mul(R);
     const dp: [N, N] = [dFdx(p), dFdy(p)];
     const footprint = max(length(dp[0]), length(dp[1]));
+    const marks = wake.read(p);
+    const wakeFoam = marks.marks.x, air = saturate(marks.marks.z);
     // the water over the ground here, as the waves lift it and let it fall: the swash's
     const thickness = ground.height(rest).negate().add(height);
     // surf: the breaking waves' fronts white, from the crest down the face; the troughs between keep what the
@@ -126,7 +145,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     // Cover is no Gaussian height: summed with weights w it could pass one sea's, or a whitecap's 1. Weighted by w²
     // (Σw² = 1), each chart's foam fades across the band as its waves do, the mean cover stays one sea's, and no
     // pixel is whiter than a whitecap.
-    const slope = vec3(0).toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
+    const slope = marks.slope.toVar(), variance = waves.ripples.mul(short).toVar(), foam = float(0).toVar();
     const q = vec2(0).toVar();
     charts.each(p, (c, slot) => {
       if (slot === 0) q.assign(c.q);
@@ -146,7 +165,7 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       // tilts it too (the long cascades' height; the shortest's is too small to matter)
       slope.addAssign(c.e1.mul(s2.x).add(c.e2.mul(s2.y)).mul(c.w).add(c.dw.mul(h)));
       variance.addAssign(v.mul(c.w.mul(c.w)));
-      foam.addAssign(foamOn(c, saturate(cover), thickness, footprint).mul(c.w.mul(c.w)));
+      foam.addAssign(foamOn(c, saturate(cover.add(wakeFoam)), thickness, footprint).mul(c.w.mul(c.w)));
     }, dp);
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
@@ -177,11 +196,20 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
     const behind = viewportSharedTexture(uv).rgb;
 
     const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
-    // the facets' α² is the mean square slope over both axes
-    return optics.seaRadiance(positionWorld, n, v, sqrt(variance), crest, foam, behind, path, sparkle);
+    // the ships' shadows, the hulls' shade and the wakes' air
+    const near = { lit: float(1).sub(saturate(marks.marks.w)), glow: hull.glow, air };
+    // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it
+    return optics.seaRadiance(positionWorld, n, v, sqrt(variance.mul(float(1).sub(air.mul(0.6)))), crest, foam, behind, path, sparkle, near);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
+  // the ships' marks: foam red, the wake's crests green (troughs dark), air blue, shadow grey
+  if (debug === 'wake') {
+    material.colorNode = Fn(() => {
+      const m = wake.read(normalize(rest).mul(R)).marks;
+      return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(saturate(m.w).mul(0.7))).mul(0.1);
+    })();
+  }
 
   // drawn after everything solid, which it reads behind itself; and both sides of it, since near the horizon the eye
   // looks so low across the waves that it sees the backs of their faces past the crests
@@ -201,8 +229,11 @@ export function createWater(renderer: WebGPURenderer, view: View, sky: Sky, grou
       sun: (p: N): N => optics.sunBelow(p).mul(caustics(p)),
       sky: (p: N): N => optics.skyBelow(p),
     },
-    update(env: Environment, dt: number) {
+    /** Each frame: the world, and the ships on the sea. */
+    update(env: Environment, dt: number, ships: readonly Afloat[]) {
       waves.update({ wind: env.windSpeed, fetch: FETCH }, env.clock, dt);
+      wake.update(env, ships);
+      hulls.update(ships.map((s) => s.pose), view.eye.position);
       // past the horizon, as far as a crest could still show over it; the charts that can weigh in out to there
       charts.update(view.eye.position, grid.update(waves.amplitude.value * 2));
     },

@@ -10,6 +10,7 @@
 //                (world/sphere.ts, skyElevation)
 //   fromSky(d)   the inverse: a sky direction back to the world, for the frame given
 //   local(p)     where p lies on the eye's chart, metres east (x) and south (z) of the point under the eye
+//   onEye(p)     the same, with the eye's chart's axes carried to p
 //   chart(c)     a reader for a fixed chart: where p lies on it, and its axes carried to p
 //   rings(...)   a grid of rings round the point under the eye, laid on the sphere out to the horizon
 //
@@ -149,6 +150,7 @@ export function createView() {
     position,
     height,
     local: (p: N): N => eyeChart(p).q,
+    onEye: (p: N): Charted => eyeChart(p),
     chart: (c: Chart) => chartNodes(v3(c.at), v3(c.axis), v3(crossV(c.axis, c.at))),
     rings,
     /** The eye on the CPU, as of the last update. */

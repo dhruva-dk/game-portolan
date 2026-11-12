@@ -35,7 +35,7 @@ if (params.has('t')) env.timeOfDay = Number(params.get('t'));
 if (params.has('haze')) env.haze = Number(params.get('haze'));
 if (params.has('wind')) env.windSpeed = Number(params.get('wind'));
 if (params.has('cloud')) env.cloudCoverage = Number(params.get('cloud'));
-// ?debug=charts colours the sea by its charts' weights
+// ?debug=charts colours the sea by its charts' weights; ?debug=wake shows the ships' marks on it (water/wake.ts)
 const frame = createFrame(renderer, number('seed', SEED), params.get('debug') ?? '');
 const meter = createMeter(renderer, meterEl);
 const degrees = Math.PI / 180;
