@@ -23,7 +23,7 @@
 // (0.003–0.04, Dierssen et al. 2009), where the trade wind keeps the ooid silt in suspension. It is what turns their
 // deep water a bright, saturated blue and their shallows turquoise, where the open ocean's clearest water is navy.
 
-import { dot, exp, float, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
+import { dot, exp, float, length, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
 import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
@@ -118,6 +118,23 @@ export interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
  */
 export interface Held { dye: Vec4Node; shine: Vec3Node }
 
+/** How much colour a wash gives the water, as a share of its brightness. */
+const WASH_CHROMA = 0.8;
+const luminance = (c: Vec3Node) => dot(c, vec3(0.2126, 0.7152, 0.0722));
+/**
+ * Light c with its hue turned a share a toward colour's, its luminance kept: its colour apart from its brightness (its
+ * chroma) is swung toward the holder's, kept as strong as the two's mix, so turning teal toward scarlet never passes
+ * through grey and never darkens.
+ */
+function washed(c: Vec3Node, colour: Vec3Node, a: FloatNode): Vec3Node {
+  const L = luminance(c), C = c.sub(L);
+  const t = colour.sub(luminance(colour));
+  // never paler than the water was, so a hue near the sea's own still shows
+  const T = t.div(max(length(t), 1e-4)).mul(max(L.mul(WASH_CHROMA), length(C).mul(1.2)));
+  const m = mix(C, T, a), want = mix(length(C), length(T), a);
+  return max(m.mul(min(want.div(max(length(m), 1e-5)), 4)).add(L), 0);
+}
+
 /**
  * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
  * axes. The slopes are Gaussian (Cox & Munk 1954), so D is Beckmann's; V is the height-correlated Smith term in
@@ -179,13 +196,14 @@ function seaRadiance(
   const dim = exp(absorption.mul(path).add(ships.air.mul(AIR_VEIL)).negate());
   const through = behind.mul(dim).div(N_WATER * N_WATER);
   const glow = body.add(crests).mul(float(1).sub(dim.mul(dim)));
-  // the light up out of the water turned toward the holder's colour, as bright as it was (the first game's)
+  // the light up out of the water, and half as much the sky in it, turned toward the holder's hue at their own brightness
   let under = through.add(glow);
+  let mirrored = reflected;
   if (held) {
-    const luminance = (c: Vec3Node) => dot(c, vec3(0.2126, 0.7152, 0.0722));
-    under = mix(under, held.dye.xyz.div(max(luminance(held.dye.xyz), 1e-3)).mul(luminance(under)), held.dye.w);
+    under = washed(under, held.dye.xyz, held.dye.w);
+    mirrored = washed(seen, held.dye.xyz, held.dye.w.mul(0.5)).add(glint).mul(F);
   }
-  let water = reflected.add(under.mul(float(1).sub(F)));
+  let water = mirrored.add(under.mul(float(1).sub(F)));
   if (held) water = water.add(held.shine.mul(irradiance));
   const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
   return mix(water, froth, foam);

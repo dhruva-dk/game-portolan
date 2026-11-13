@@ -12,8 +12,9 @@
 // reached each: the new holder's colour sweeps in behind a thin bright crest (a flood from the loop closed, a home
 // laid), or the old drains away from the edge in, the water churned white behind it.
 //
-// What the water does with it (water.ts, optics.ts): the water's body dyed toward the holder's colour, its brightness
-// kept; a fine luminous line along every border, with a faint halo, and the crest, glowing in the holder's colour, each
+// What the water does with it (water.ts, optics.ts): a sixteenth-century chart's wash along a coast, the water's hue
+// turned to the holder's in a band some 10 m inside the border, fading to a breath of it beyond, its brightness and its
+// own depth's colour kept; a fine luminous line along every border, with a faint halo, and the crest, glowing in the holder's colour, each
 // colour raised to the same brightness; a thin line of broken foam on the border's sea side.
 //
 // Cost: one read of two words (the cell and its moment) per pixel over settled water; nine of each within a few cells
@@ -21,7 +22,7 @@
 
 import { StorageBufferAttribute, Vector4 } from 'three/webgpu';
 import {
-  If, abs, atan, clamp, dot, exp, float, floor, int, length, max, min, mix, mx_noise_float, select, smoothstep, storage,
+  If, abs, atan, clamp, dot, exp, float, floor, int, length, max, min, mix, mx_noise_float, pow, select, smoothstep, storage,
   uniform, uniformArray, vec2, vec3, vec4,
 } from 'three/tsl';
 import { CELLS, N, cellOf } from '../world/cells';
@@ -29,9 +30,10 @@ import type { Sea } from '../snapshot';
 import { type BoolNode, type FloatNode, type IntNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 
-/** How strongly the water is dyed its holder's colour (0…1 of the way, its brightness kept): the others', and hers. */
-const DYE = 0.2, OWN_DYE = 0.26;
-/** Seen from afar, the water is dyed this far toward its holder's colour. */
+/** How far the water's hue is turned to its holder's (0…1, its brightness kept), as a chart's wash along a coast: in a
+ *  band just inside the border (the field's own rise, some 10 m), and over the rest of the water; hers a notch more. */
+const BAND = 0.62, INNER = 0.07, OWN_BAND = 0.78, OWN_INNER = 0.11;
+/** Seen from afar, the water is turned this far toward its holder's colour. */
 const FAR_DYE = 0.6;
 /** Her own border's line and crest, this many times as bright as the others'. */
 const OWN_LINE = 1.7;
@@ -103,7 +105,10 @@ export function createClaims(ships: number) {
       const w0 = cellBuf.element(base), r0 = revBuf.element(base);
       const own = float(w0.bitAnd(255)), flat = w0.shiftRight(16).bitAnd(255).equal(255).and(r0.lessThanEqual(settled));
       const c = colourOf(own);
-      dye.assign(vec4(c.xyz, select(own.greaterThan(0), dyed(mix(float(DYE), float(OWN_DYE), c.w.sub(1).div(OWN_LINE - 1))), float(0))));
+      // her emphasis, 0 for others and 1 for hers
+      const hers = (w: FloatNode) => clamp(w.sub(1).div(OWN_LINE - 1), 0, 1);
+      const wash = (w: FloatNode, band: FloatNode) => dyed(mix(mix(float(INNER), float(OWN_INNER), hers(w)), mix(float(BAND), float(OWN_BAND), hers(w)), band));
+      dye.assign(vec4(c.xyz, select(own.greaterThan(0), wash(c.w, float(0)), float(0))));
 
       If(flat.not(), () => {
         // the 3 × 3 cells' weights and their gradients, the quadratic B-spline's, per axis
@@ -191,14 +196,16 @@ export function createClaims(ships: number) {
         const lineB = line(aB, LINE, fB.px).mul(LINE_GAIN).add(line(aB, HALO, fB.px).mul(HALO_GAIN).mul(sB.tint.w)).mul(fade);
         const n = mx_noise_float(p.mul(0.55).add(vec3(clock.mul(0.5), 0, clock.mul(0.2)))).mul(0.5).add(0.5);
         const edge = mix(lineB, lineN, tf).mul(select(ec.w.greaterThan(0), float(1), float(0))).mul(float(0.8).add(n.mul(0.4)));
-        const strength = mix(float(DYE), float(OWN_DYE), max(ec.w.sub(1), 0).div(OWN_LINE - 1));
+        // the wash: strongest at the border, softly gone some four cells in (12 m), where the field has risen to its full
+        const band = pow(clamp(float(1).sub(mix(aB, aN, tf)), 0, 1), 0.6);
+        const strength = wash(ec.w, band);
         const white = mix(line(aB, FOAM, fB.px).mul(fade), line(aN, FOAM, fN.px), tf).mul(float(1).sub(tc.w.mul(0.75)));
         foam.assign(white.mul(float(1).sub(far)).mul(smoothstep(0.2, 0.75, n).mul(0.65).add(0.35)));
         // the flood's crest, running over the water; the drained water churned behind the front drawing back
         const changing = select(length(sN.tint.sub(sB.tint)).greaterThan(1e-3), float(1), float(0));
         const crest = line(since, CREST, pxT).mul(CREST_GAIN).mul(sN.tint.w).mul(changing);
         drain.assign(float(1).sub(sN.tint.w).mul(sB.tint.w).mul(select(since.lessThan(0), float(1).sub(fade), exp(since.mul(-3)))));
-        dye.assign(vec4(colour, tc.w.mul(dyed(strength))));
+        dye.assign(vec4(colour, tc.w.mul(strength)));
         // each colour raised to a luminance of 1, so every holder's line glows alike
         const lum = max(dot(ec.xyz, vec3(0.2126, 0.7152, 0.0722)), 0.02);
         shine.assign(ec.xyz.div(lum).mul(edge.add(crest)).mul(max(ec.w, 1)).mul(GLOW));

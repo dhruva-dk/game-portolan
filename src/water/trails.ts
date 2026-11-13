@@ -1,7 +1,7 @@
 // The open trails (snapshot.ts Sea trails): a glowing ribbon in her colour along each trail near the eye, laid on the
 // water as the waves move it, and run on from its last point to her stern. The first game's (agent-initial
 // src/territory.ts TRAIL_VERT, TRAIL_FRAG), in TSL: a thin hot core in a soft sheen of the colour, pulses running
-// back along it, flicker on it, and only a breath of dye, so it reads as light on the water and not as paint. A trail
+// back along it, flicker on it, broken by the swell into stretches of light and flecks of foam, and only a breath of dye, so it reads as light on the water and not as paint. A trail
 // ended by a loop closed sinks into the new border (ABSORB s); one cut, or its ship sunk, dies away and breaks up
 // into foam (DISSOLVE s).
 //
@@ -26,7 +26,7 @@ import type { FloatNode, Vec3Node } from '../tsl';
 /** The most points drawn at once, over every ribbon. */
 const POINTS = 16384;
 /** Its half width, m; lifted this high over the water, and drawn this much nearer the eye. */
-const HALF = 0.7, LIFT = 0.05, BIAS = 0.3;
+const HALF = 0.6, LIFT = 0.05, BIAS = 0.3;
 /** Trails are drawn within this many metres of the point under the eye. */
 const REACH = 450;
 /** Seconds a closed loop's ribbon takes to sink into its border; a cut one's to break up into foam. */
@@ -34,7 +34,7 @@ const ABSORB = 0.7, DISSOLVE = 1.8;
 /** The modes: open, sinking into a border, breaking up. */
 const OPEN = 0, ABSORBED = 1, DISSOLVING = 2;
 /** The glow, as a share of what the sun and sky give a white surface, once the colour is raised to a luminance of 1. */
-const GLOW = 0.5;
+const GLOW = 0.32;
 /** The ribbon's stern end lies this far behind her middle (half her length, less a little under her counter). */
 const ASTERN = 11;
 
@@ -76,15 +76,19 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
     const glow = team.div(lum).mul(0.3);
     // the newest part rises out of her wake, the oldest leaves the border cleanly
     const ends = smoothstep(0, 2, head.sub(s)).mul(smoothstep(0, 1, s));
-    const core = exp(a.mul(a).mul(-150));
+    const core = exp(a.mul(a).mul(-60)).mul(0.5);
     const body = exp(a.mul(a).mul(-3.5)).mul(float(1).sub(smoothstep(0.75, 1, a)));
     const pulse = pow(sin(s.mul(0.7).add(t.mul(8))).mul(0.5).add(0.5), 8);
     const flick = mx_noise_float(vec3(s.mul(0.9).add(t.mul(4)), a.mul(3), t.mul(1.7))).mul(0.5).add(0.5);
     const beat = sin(t.mul(6.5)).mul(0.15).add(0.85);
+    // broken by the swell: the light gathers on some stretches and all but goes on others, and foam flecks it
+    const broken = smoothstep(0.25, 0.75, mx_noise_float(place.mul(0.3).add(vec3(t.mul(0.35), 0, t.mul(-0.2))))
+      .mul(0.5).add(0.5)).mul(0.75).add(0.25);
+    const fleck = smoothstep(0.6, 0.8, mx_noise_float(place.mul(1.7).add(vec3(0, t.mul(0.6), 0))).mul(0.5).add(0.5)).mul(body);
     const emit = glow.mul(body).mul(flick.mul(0.4).add(0.4).add(pulse)).add(mix(glow, vec3(1), 0.2).mul(core).mul(pulse.mul(1.4).add(1.4)))
-      .mul(beat).mul(white).mul(GLOW).toVar();
-    const alpha = body.mul(0.12).toVar();
-    const dye = team.mul(white).mul(0.3).toVar();
+      .mul(beat).mul(broken).mul(white).mul(GLOW).toVar();
+    const alpha = body.mul(0.1).add(fleck.mul(0.45)).toVar();
+    const dye = mix(team.mul(0.3), vec3(0.9), fleck.div(max(alpha.mul(2.2), 1e-3)).min(1)).mul(white).toVar();
     const k = select(modeV.equal(ABSORBED), min(ageV.div(ABSORB), 1), min(ageV.div(DISSOLVE), 1));
     const absorbed = modeV.equal(ABSORBED), dissolving = modeV.equal(DISSOLVING);
     // sinking into the border: it fades as it narrows
