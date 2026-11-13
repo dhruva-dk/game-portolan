@@ -8,7 +8,7 @@
 
 import { Vector2, Vector3, type PerspectiveCamera, type TextureNode } from 'three/webgpu';
 import { Fn, dot, exp, float, int, interleavedGradientNoise, max, min, rtt, screenCoordinate, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
-import { loop, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import { loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 
 /** Taps along a ray in each of the two passes. */
 const TAPS = 16;
@@ -20,6 +20,9 @@ const FLOOR = 0.12, CLAMP = 0.5;
 const AROUND = 9, THIN = 2.2;
 /** Each tap's weight falls by this from the last, along the ray. */
 const DECAY = 0.93;
+/** With the sun off the screen by `off` (in half-screens past its edge), AROUND and THIN are loosened by
+ *  (1 + LOOSEN·off)², and the shafts fade as exp(−OFF_FADE·off). */
+const LOOSEN = 1.5, OFF_FADE = 0.8;
 
 /**
  * Shafts from `scene` (linear light, full size) where `depth` (the scene's, 1 for the sky) says nothing stands. The
@@ -29,15 +32,17 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
   const sun = uniform(new Vector2(0.5, 0.5));
   const aspect = uniform(1);
   const strength = uniform(0);
+  /** How tightly round the sun the light is taken, and the shafts thin, now: looser as the sun leaves the screen. */
+  const around = uniform(AROUND), thinning = uniform(THIN);
 
   const offset = (p: Vec2Node) => p.sub(sun).mul(vec2(aspect, 1));
   const mask = Fn(() => {
     const sky = depth.sample(uv()).x.greaterThanEqual(1).select(float(1), float(0));
     const d = offset(uv());
-    return vec4(min(max(scene.sample(uv()).rgb.sub(FLOOR), vec3(0)), vec3(CLAMP)).mul(sky).mul(exp(dot(d, d).mul(-AROUND))), 1);
+    return vec4(min(max(scene.sample(uv()).rgb.sub(FLOOR), vec3(0)), vec3(CLAMP)).mul(sky).mul(exp(dot(d, d).mul(around.negate()))), 1);
   })();
   const q = (n: Vec4Node) => rtt(n, null, null, { resolutionScale: 1 / 4, depthBuffer: false });
-  const blur = (source: TextureNode, span: number, thin: number) => Fn(() => {
+  const blur = (source: TextureNode, span: number, thin: FloatNode) => Fn(() => {
     const step = sun.sub(uv()).mul(span / TAPS);
     const at = uv().add(step.mul(interleavedGradientNoise(screenCoordinate))).toVar();
     const sum = vec3(0).toVar(), w = float(1).toVar(), total = float(0).toVar();
@@ -48,11 +53,11 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
       at.addAssign(step);
     });
     const d = offset(uv());
-    return vec4(sum.div(total).mul(exp(dot(d, d).mul(-thin))), 1);
+    return vec4(sum.div(total).mul(exp(dot(d, d).mul(thin.negate()))), 1);
   })();
   const first = q(mask);
-  const second = q(blur(first, 1, 0));
-  const shafts = q(blur(second, 1 / TAPS, THIN));
+  const second = q(blur(first, 1, float(0)));
+  const shafts = q(blur(second, 1 / TAPS, thinning));
 
   const ahead = new Vector3(), toward = new Vector3();
   return {
@@ -69,8 +74,12 @@ export function createShafts(scene: TextureNode, depth: TextureNode) {
       const p = toward.clone().multiplyScalar(1000).add(camera.position).project(camera);
       sun.value.set((p.x + 1) / 2, (1 - p.y) / 2);
       aspect.value = camera.aspect;
-      const off = Math.max(Math.abs(p.x) - 1, Math.abs(p.y) - 1, 0);
-      strength.value = facing <= 0 ? 0 : amount * Math.min(1, facing * 3) * Math.exp(-off * 1.5);
+      // past the screen's edge the light is taken from further round it, so the sky along the edge nearest the sun
+      // still streams into the frame
+      const off = Math.max(Math.abs(p.x) - 1, Math.abs(p.y) - 1, 0), loose = (1 + off * LOOSEN) ** 2;
+      around.value = AROUND / loose;
+      thinning.value = THIN / loose;
+      strength.value = facing <= 0 ? 0 : amount * Math.min(1, facing * 3) * Math.exp(-off * OFF_FADE);
     },
   };
 }
