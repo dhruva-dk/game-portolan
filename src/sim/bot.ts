@@ -1,6 +1,6 @@
 // A bot: a captain's mind for a ship, as a pure function from what she can see to her helm's and her gun's orders.
 // 0117's captains (src/sim/captains/brain.ts, temperaments.ts, utility.ts) ported to this sea, with what needs loot,
-// mending, territory, hearing or wind left out until those are here; every value is 0117's (the same planet and the
+// mending, hearing or wind left out until those are here (territory is claimer.ts's); every value is 0117's (the same planet and the
 // same tick, so the same metres and seconds) unless a comment says why not.
 //
 // Every BOT.every steps she thinks, as 0117's captains did:
@@ -34,6 +34,7 @@ import { choose, logistic, momentum, ramp, utility, type Option } from './utilit
 import { BOT, between, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
 import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
+import { claimAct, claimUrge, cutAct, cutUrge, homeAct, homeUrge, sound } from './claimer.ts';
 import { NOTHING, type Ask } from './stores.ts';
 
 export { BOT, mind, rammed, shot, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
@@ -46,6 +47,7 @@ export { BOT, mind, rammed, shot, type Memory, type Mode, type Sea, type Seen } 
 export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, seed: number, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
   const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1, lootT: memory.mode === 'loot' ? memory.lootT + dt : memory.lootT };
   const c: Ctx = { own, others, sea, m, t: temper(seed), foe: null, foeD: Infinity, seed };
+  sound(c);
   if (m.think <= 0) {
     m.think = BOT.every;
     perceive(c);
@@ -196,7 +198,7 @@ function evading(c: Ctx): number {
 interface Choice extends Option<Ctx> { readonly mode: Mode; act(c: Ctx): void }
 
 // (0117's shelter, 5.2, from weather, came after the storm; its hunt (to the sound of guns), raid and claiming water
-// belong to things this sea hasn't got.)
+// belong to things this sea hasn't got; claiming is claimer.ts's.)
 const ROAM: Choice = {
   name: 'roam', weight: 1, mode: 'roam', score: () => 0.15, act: (c) => {
     const { m } = c;
@@ -213,6 +215,10 @@ const OPTIONS: readonly Choice[] = [
   { name: 'flee', weight: 3.3, mode: 'flee', score: (c) => Math.max(losing(c), evading(c)), act: (c) => { c.m.goal = keptInside(c, away(c, c.m.last, BOT.run)); } },
   { name: 'fight', weight: 2.6, mode: 'fight', score: fightUrge, act: (c) => { c.m.goal = c.m.last; } },
   { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
+  // her water (claimer.ts): home to get her shield back, across another's trail, a loop to claim more
+  { name: 'home', weight: 2, mode: 'home', score: homeUrge, act: homeAct },
+  { name: 'cut', weight: 2, mode: 'cut', score: cutUrge, act: cutAct },
+  { name: 'claim', weight: 1.5, mode: 'claim', score: claimUrge, act: claimAct },
   ROAM,
 ];
 

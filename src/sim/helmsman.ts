@@ -100,7 +100,7 @@ export function steer(c: Ctx, dt: number): Helm {
   const answered = answer(c);
   if (answered !== null) turn = answered;
   // going for loot or mending, she eases up near where she makes for (0117's)
-  const easy = (m.mode === 'loot' || m.mode === 'heal') && toD < PURSER.near ? PURSER.slow : 1;
+  const easy = (m.mode === 'loot' || m.mode === 'heal' || m.mode === 'home') && toD < PURSER.near ? PURSER.slow : 1;
   // a mark (not a ship) inside the circle she turns at her speed she would only sail round: slowed to turn to it, the
   // circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
   const off = Math.abs(course), r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off))));

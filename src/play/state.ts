@@ -107,6 +107,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   /** Who holds the sea (sim/territory.ts), in a match; and the shield each ship's own water has given back. */
   let territory: Territory | null = null;
   const regained = new Map<number, number>();
+  /** The match's loops: closed (and the square metres they took), cut by another, cut by herself or given up. */
+  const loops = { closed: 0, metres: 0, cut: 0, own: 0 };
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
@@ -129,6 +131,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
     territory = loot ? createTerritory(Math.max(...ids) + 1) : null;
     regained.clear();
+    Object.assign(loops, { closed: 0, metres: 0, cut: 0, own: 0 });
     begun = tick;
     quiet = false;
   };
@@ -172,7 +175,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
           asks.set(v.id, ask);
         } else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
         else {
-          const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm, loot: flotsam.pieces }, a.mind, seedOf(v.id));
+          const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm, loot: flotsam.pieces, holdings: territory }, a.mind, seedOf(v.id));
           [a.mind, helms[i], orders[i]] = [r.memory, r.helm, r.order];
           if (r.ask !== NOTHING) asks.set(v.id, r.ask);
         }
@@ -204,7 +207,12 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       tick++;
       // her trail laid and her loops closed; then, in her own water, her shield coming back
       if (territory) {
-        territory.step(fleet.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
+        const did = territory.step(fleet.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
+        for (const k of did.claimed) [loops.closed, loops.metres] = [loops.closed + 1, loops.metres + k.metres];
+        for (const k of did.cut) {
+          if (k.by !== null && k.by !== k.id) loops.cut++;
+          else loops.own++;
+        }
         const home = new Set(fleet.filter((v) => territory?.ownerAt(v.ship.at) === v.id).map((v) => v.id));
         battle = {
           ...battle,
@@ -285,6 +293,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     territory: (): Territory | null => territory,
     /** The shield each ship's own water has given back this match, hit points. */
     regained: (): ReadonlyMap<number, number> => regained,
+    /** The match's loops so far: closed (and the square metres they took), cut by another, cut by herself or given up. */
+    loops: (): Readonly<typeof loops> => loops,
 
     /** The ships on the sea, as the sim has them. */
     vessels: (): readonly Vessel[] => fleet,

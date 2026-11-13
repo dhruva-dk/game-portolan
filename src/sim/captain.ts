@@ -16,6 +16,7 @@ import type { Storm } from './storm.ts';
 import type { Temper } from './temper.ts';
 import type { Crew } from './battle.ts';
 import type { Loot } from './loot.ts';
+import type { Holdings } from './claimer.ts';
 
 /** Everything a bot is tuned by. Seconds and metres; 0117's values unless said. */
 export const BOT = {
@@ -94,10 +95,10 @@ export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number
 
 /** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
  *  no routes round land, only feels her way along it; the storm now (storm.ts), without which she pays it no heed; and
- *  the loot on the water (loot.ts). */
-export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[] }
+ *  the loot on the water (loot.ts); and who holds it (territory.ts), without which she claims none. */
+export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[]; holdings?: Holdings | null }
 
-export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot';
+export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot' | 'claim' | 'home' | 'cut';
 
 /** What a bot carries from one step to the next, her gunnery's with it. */
 export interface Memory extends Gunner {
@@ -135,13 +136,19 @@ export interface Memory extends Gunner {
   target: number;
   lootT: number;
   shun: number;
+  /** Her water (claimer.ts): where she last lay in it; the bite she sails (its marks), the one she makes for, and when
+   *  she may set out on the next. */
+  haven: Vec3;
+  bite: Vec3[] | null;
+  leg: number;
+  rested: number;
 }
 
 /** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
   foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, shotBy: -1, shotT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at,
-  route: null, loot: -1, target: -1, lootT: 0, shun: -1, ...gunner(),
+  route: null, loot: -1, target: -1, lootT: 0, shun: -1, haven: at, bite: null, leg: 0, rested: 0, ...gunner(),
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */

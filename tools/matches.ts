@@ -5,7 +5,9 @@
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
 // sunk, how and when it ended, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
 // speed over it: aground (under AGROUND m/s), or sailing round in circles (fighting round a foe, going for a piece
-// near her, or roaming as 0117's bots did, a new mark every few seconds on any bearing).
+// near her, or roaming as 0117's bots did, a new mark every few seconds on any bearing). And who holds the sea
+// (sim/territory.ts): the share of the planet held at 30, 60, 120, 240 s and at the end (all ships', and the most
+// any one holds), the loops closed and cut, and the shield their own water gave back.
 
 import { STEP } from '../src/sim/fixed.ts';
 import { SHIP } from '../src/sim/handling.ts';
@@ -38,6 +40,12 @@ for (let g = 0; g < games; g++) {
   const marks: string[] = [], track = new Map<number, { at: Vec3; speed: number }[]>();
   const stuck = new Map<number, { from: number; seconds: number; speed: number }>();
   let steps = 0;
+  const held: string[] = [];
+  /** The share of the planet held, all ships' and the most of one, per cent. */
+  const holding = () => {
+    const t = state.territory()!, shares = state.ships().map((k) => t.share(k.id));
+    return `${(100 * shares.reduce((a, b) => a + b, 0)).toFixed(2)}% (most ${(100 * Math.max(...shares)).toFixed(2)}%)`;
+  };
   const t1 = performance.now();
   while (state.alive().length > 1 && state.time() < end) {
     state.advance(idle, still);
@@ -55,6 +63,7 @@ for (let g = 0; g < games; g++) {
           stuck.set(v.id, k ? { ...k, seconds: k.seconds + 1, speed: Math.min(k.speed, speed) } : { from: s - WINDOW, seconds: WINDOW, speed });
         }
       }
+      if ([30, 60, 120, 240].includes(s)) held.push(`${s} s ${holding()}`);
       if ([30, 60, 120].includes(s)) {
         const up = state.ships().filter((k) => k.afloat), armed = up.filter((k) => k.armed).length;
         const stocked = up.filter((k) => k.shield > 0 || state.crew(k.id).hold.items.some((x) => x)).length;
@@ -73,6 +82,10 @@ for (let g = 0; g < games; g++) {
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
   console.log(`  loot: ${loot.length} pieces at the start, ${shallow} in water too shoal to reach`);
   for (const k of marks) console.log(`  ${k}`);
+  const l = state.loops(), back = [...state.regained().values()];
+  console.log(`  held: ${held.join(', ')}, end ${holding()}`);
+  console.log(`  loops: ${l.closed} closed (${l.metres.toFixed(0)} m²), ${l.cut} cut by another, ${l.own} cut by herself or given up;`
+    + ` shield from her water ${back.reduce((a, b) => a + b, 0).toFixed(0)} hp over ${back.filter((k) => k > 0).length} ships`);
   const all = [...stuck.values()], aground = all.filter((k) => k.speed < AGROUND);
   const seconds = all.map((k) => k.seconds).sort((a, b) => a - b);
   console.log(`  stuck (<${STUCK} m in ${WINDOW} s): ${all.length} ships, ${aground.length} of them aground;`
