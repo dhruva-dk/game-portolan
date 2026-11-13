@@ -31,9 +31,10 @@ import type { Depth } from './shoal.ts';
 export const LOOT = {
   /** Spots strewn over the planet, and the share with a second piece: some 280 pieces (it was 400 spots, some 570). */
   spots: 200, second: 0.4,
-  /** The share of pieces that are guns, their kinds' weights (in handling.ts KINDS' order: cannon, scatter, repeater,
+  /** The share of pieces that are guns (0117's 0.62 brought down so the first is a scramble, most ships armed by
+   *  20–30 s: tools/matches.ts), their kinds' weights (in handling.ts KINDS' order: cannon, scatter, repeater,
    *  harpoon, mortar), and their rarities' weights, common to legendary. */
-  gun: 0.62, kinds: [36, 22, 22, 10, 10], weights: [42, 30, 17, 8, 3],
+  gun: 0.5, kinds: [36, 22, 22, 10, 10], weights: [42, 30, 17, 8, 3],
   /** The share of the rest of each consumable (0117's rollItem: 0.36, 0.22, 0.28, 0.14), how many come together, and
    *  the rarity each reads as. */
   shares: { smallShield: 0.36, repairKit: 0.22, bigShield: 0.28, fullRepair: 0.14 } as Record<Use, number>,

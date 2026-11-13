@@ -10,7 +10,7 @@
 // any one holds), the loops closed and cut, and the shield their own water gave back.
 
 import { STEP } from '../src/sim/fixed.ts';
-import { SHIP } from '../src/sim/handling.ts';
+import { GUNS, KINDS, SHIP } from '../src/sim/handling.ts';
 import { LOOT } from '../src/sim/loot.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
@@ -51,6 +51,11 @@ for (let g = 0; g < games; g++) {
    *  each ship's own water gave back, from what each step did. */
   const loops = { closed: 0, metres: 0, cut: 0, own: 0 }, back = new Map<number, number>();
   const balls = { fired: 0, struck: 0 };
+  /** By kind: shots fired, balls fired (a scatter's pellets each), and balls come down short of a ship. */
+  const kinds = new Map(KINDS.map((k) => [k, { shots: 0, balls: 0, fell: 0 }]));
+  /** Each ship's first second with a gun, and with two of different kinds; the quiet longest after the first 30 s. */
+  const first = new Map<number, number>(), second = new Map<number, number>();
+  let lastShot = 0, quiet = 0;
   let seen = -Infinity;
   const t1 = performance.now();
   while (state.alive().length > 1 && state.time() < end) {
@@ -64,8 +69,16 @@ for (let g = 0; g < games; g++) {
     // the balls fired and struck home this step (what the guns did, kept for the frame: those newer than the last seen)
     for (const b of state.blasts()) {
       if (b.time <= seen) continue;
-      if (b.kind === 'shot') balls.fired++;
-      else if (b.kind === 'strike' && !b.ram) balls.struck++;
+      if (b.kind === 'shot') {
+        balls.fired++;
+        const k = kinds.get(b.gun)!;
+        k.shots++;
+        k.balls += GUNS[b.gun].pellets;
+        const now = state.time();
+        if (now > 30) quiet = Math.max(quiet, now - Math.max(30, lastShot));
+        lastShot = now;
+      } else if (b.kind === 'strike' && !b.ram) balls.struck++;
+      else if (b.kind === 'splash') kinds.get(b.gun)!.fell++;
     }
     seen = Math.max(seen, ...state.blasts().map((b) => b.time));
     steps++;
@@ -73,6 +86,12 @@ for (let g = 0; g < games; g++) {
     if (t % Math.round(1 / STEP) === 0) {
       // once a second: where each ship afloat is, and whether she has moved STUCK m in the last WINDOW s
       const s = Math.round(t * STEP);
+      for (const k of state.ships()) {
+        if (!k.afloat) continue;
+        const guns = state.crew(k.id).guns.filter((x) => x !== null);
+        if (guns.length > 0 && !first.has(k.id)) first.set(k.id, s);
+        if (new Set(guns.map((x) => x.kind)).size > 1 && !second.has(k.id)) second.set(k.id, s);
+      }
       for (const v of state.vessels()) {
         const path = track.get(v.id) ?? [];
         path.push({ at: v.ship.at, speed: v.ship.speed });
@@ -100,6 +119,11 @@ for (let g = 0; g < games; g++) {
   console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length === 1 ? ` (ship ${left[0]} wins)` : ''};`
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
   console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
+  console.log(`  by kind: ${[...kinds].map(([k, n]) => `${k} ${n.shots} shots ${n.balls ? (100 * (1 - n.fell / n.balls)).toFixed(0) : '-'}% home`).join(', ')}`);
+  const median = (xs: number[]) => xs.sort((a, b) => a - b)[xs.length >> 1] ?? NaN, ships = state.ships().length;
+  const firsts = [...first.values()], seconds2 = [...second.values()];
+  console.log(`  armed: ${firsts.length}/${ships} found a gun, median ${median(firsts)} s, 90% by ${firsts.sort((a, b) => a - b)[Math.floor(0.9 * firsts.length)] ?? NaN} s;`
+    + ` ${seconds2.length} a second kind, median ${median(seconds2)} s; the longest quiet after 30 s, ${quiet.toFixed(0)} s with no shot`);
   console.log(`  loot: ${loot.length} pieces at the start, ${shallow} in water too shoal to reach`);
   for (const k of marks) console.log(`  ${k}`);
   const l = loops, regained = [...back.values()];
