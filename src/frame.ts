@@ -17,7 +17,7 @@ import { createView } from './view/view';
 import { createWater, type SeaShows } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
-import { createArms } from './ship/arms';
+import { createArms, muzzle } from './ship/arms';
 import { createLoot } from './loot/loot';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
@@ -293,7 +293,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     drawn = now;
     for (const b of s.blasts) {
       if (b.time <= laid) continue;
-      if (b.kind === 'shot') gunfire.shot(b.time, b.from, b.dir, b.gun);
+      // the flash at the drawn gun's mouth
+      if (b.kind === 'shot') gunfire.shot(b.time, muzzle(b.from, b.dir, b.gun), b.dir, b.gun);
       else if (b.kind === 'splash') gunfire.splash(b.time, b.at, b.land, b.gun);
       else if (b.kind === 'strike') gunfire.strike(b.time, b.at, b.ram, b.shield, b.broke);
       else gunfire.sink(b.time, b.at);

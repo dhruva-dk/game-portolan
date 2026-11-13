@@ -188,11 +188,14 @@ export const GUN = {
   assist: [0.06, 0.07, 0.08, 0.09, 0.1],
   /** In choosing among those in the cone, the share of range that counts as much as the cone's whole width. */
   nearer: 0.5,
-  /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth, whose top is 2.97 m ahead and
-   *  1.99 m up (src/ship/mount.ts GUN_MOUNT), its bore 0.6 m above that. (tests/battle.test.ts holds the two together;
-   *  the drawn plinth should come to read these.) */
-  ahead: 3,
-  up: 2.6,
+  /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth in the waist abaft the
+   *  mainmast (where the chase's eye, astern, sees it under her courses), whose top is 1.44 m astern and 2.32 m up
+   *  (src/ship/mount.ts GUN_MOUNT), its bore 0.3 m above that on its post (GUN_DRAWN). (tests/battle.test.ts holds the
+   *  two together.) No higher: a ball comes down to the muzzle's height where it is laid, and the nearer that is to
+   *  the top of her freeboard the more of a gun's spread flies over her (at 3.3 m a common gun struck a crossing ship
+   *  82 balls in 100 at 100 m, against 96 at 2.6 m: tests/gunnery.test.ts). */
+  ahead: -1.44,
+  up: 2.63,
   /** Her hull, for a ball: the hull's capsule (contact.ts) standing from the waterline to this many metres up. */
   freeboard: 4,
   /** A ball's path is looked along every this many metres for a hull or the ground; and gone after this many seconds. */

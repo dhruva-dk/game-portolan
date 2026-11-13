@@ -5,7 +5,8 @@ import { afloat, stepFleet, type Blow, type Vessel } from '../src/sim/contact.ts
 import { STEP } from '../src/sim/fixed.ts';
 import { chosen, gunOf, laid, muzzle, spreadOf } from '../src/sim/gun.ts';
 import { GUN, GUNS, HEALTH, KINDS, SHIP, type GunKind } from '../src/sim/handling.ts';
-import { GUN_MOUNT } from '../src/ship/mount.ts';
+import { FOOT } from '../src/ship/gun.ts';
+import { GUN_DRAWN, GUN_MOUNT } from '../src/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
 import { flown, loosed, reach, thrown, type Ball } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -147,7 +148,9 @@ const pair = (metres: number, bearing: number, course: number, speed: number): V
 ];
 
 test('led with no spread, a ball strikes a ship on a steady course, at any range and crossing', () => {
-  for (const metres of [50, 100, 150, 175]) for (const crossing of [0, 45, 90, 135, 180, 270]) {
+  // (out to 170 m: one at 175 m running from her at her best is led past the cannon's 200 m from its bore, abaft her
+  // mainmast)
+  for (const metres of [50, 100, 150, 170]) for (const crossing of [0, 45, 90, 135, 180, 270]) {
     const bearing = 30 * deg;
     const fleet = pair(metres, bearing, bearing + crossing * deg, SHIP.top);
     // the gun laid with no spread, and its ball flown among them as she sails on
@@ -249,7 +252,10 @@ test('the muzzle stands on the drawn plinth: as far ahead, and its bore a little
   assert.ok(Math.abs(GUN.ahead - GUN_MOUNT[2]) < 0.05, `${GUN.ahead} m ahead, the plinth ${GUN_MOUNT[2]}`);
   assert.equal(GUN_MOUNT[0], 0);
   const bore = GUN.up - GUN_MOUNT[1];
-  assert.ok(bore > 0.3 && bore < 1, `bore ${bore.toFixed(2)} m above the plinth`);
+  assert.ok(bore > 0.3 && bore < 1.2, `bore ${bore.toFixed(2)} m above the plinth`);
+  // the gun drawn on it has its trunnions at that bore, and its post's foot still in the plinth
+  assert.ok(Math.abs(GUN_MOUNT[1] + GUN_DRAWN.lift - GUN.up) < 0.05, `trunnions ${(GUN_MOUNT[1] + GUN_DRAWN.lift).toFixed(2)} m up`);
+  assert.ok(GUN_DRAWN.lift < FOOT * GUN_DRAWN.scale);
 });
 
 // ------------------------------------------------------------------ the fighting

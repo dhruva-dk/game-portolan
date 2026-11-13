@@ -109,7 +109,8 @@ export const truck = (name: MastName): Vector3 => V(0, MASTS[name].tip + 0.16, M
 export const BOWSPRIT = { heel: V(0, deckAt(0.93) + 0.35, zAt(0.93)), dir: V(0, Math.sin(0.5), Math.cos(0.5)), len: 15.5 };
 export const sprit = (t: number): Vector3 => BOWSPRIT.heel.clone().addScaledVector(BOWSPRIT.dir, t * BOWSPRIT.len);
 
-/** The gun's mount: on the weather deck's centreline in the waist, between the main and fore masts. */
-export const MOUNT_S = 0.665;
+/** The gun's mount: on the weather deck's centreline in the waist, abaft the mainmast, just forward of the quarterdeck:
+ *  seen from astern under her courses (between the main and fore masts, as it stood, they hid it from the chase). */
+export const MOUNT_S = 0.42;
 /** The mount's plinth: its height over the deck and its radius (design metres). */
-export const PLINTH = { height: 0.85, radius: 0.75 };
+export const PLINTH = { height: 1.4, radius: 0.75 };
