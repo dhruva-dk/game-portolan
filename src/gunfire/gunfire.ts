@@ -160,7 +160,8 @@ export function createGunfire(light: Light) {
   let drawn = -Infinity;
   const puffs = puffMesh(light, now);
   const array = puffs.buffer.array as Float32Array;
-  let head = 0, laid = 0, dirty = false;
+  /** The ring's next slot, how many hold a puff, and how many were laid since the last were sent (only those go up). */
+  let head = 0, laid = 0, fresh = 0;
   const draw = random(0x6a11);
   const u = (lo: number, hi: number) => lo + (hi - lo) * draw();
   /** A random unit vector. */
@@ -175,7 +176,20 @@ export function createGunfire(light: Light) {
     array.set([...p.at, born, ...p.way, p.life, p.size, p.grow, p.drag, p.pull, ...p.ink, p.glow, p.opacity, draw(), p.soft, p.fadeIn], head * STRIDE);
     head = (head + 1) % PUFFS;
     laid = Math.min(PUFFS, laid + 1);
-    dirty = true;
+    fresh++;
+  }
+  /** The puffs laid since the last were sent, as the ring's ranges to send (one, or two where it wraps). */
+  function send() {
+    if (fresh === 0) return;
+    const b = puffs.buffer, n = Math.min(fresh, PUFFS), from = (head - n + PUFFS) % PUFFS;
+    fresh = 0;
+    b.clearUpdateRanges();
+    if (from + n <= PUFFS) b.addUpdateRange(from * STRIDE, n * STRIDE);
+    else {
+      b.addUpdateRange(from * STRIDE, (PUFFS - from) * STRIDE);
+      b.addUpdateRange(0, (from + n - PUFFS) * STRIDE);
+    }
+    b.needsUpdate = true;
   }
 
   const smoke = (at: Vec3, way: Vec3, ink: Vec3, opacity: number, life: number, size = 0.8): Puff =>
@@ -242,8 +256,7 @@ export function createGunfire(light: Light) {
       balls.mesh.visible = balls.tracer.visible = n > 0;
       puffs.geometry.instanceCount = laid;
       puffs.mesh.visible = laid > 0;
-      if (dirty) puffs.buffer.needsUpdate = true;
-      dirty = false;
+      send();
     },
     /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */
     update(camera: PerspectiveCamera, height: number) {
