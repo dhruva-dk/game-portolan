@@ -210,7 +210,7 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
       chosen: t >= select ? HOTBAR.guns : 0, using: mending ? (t - mend[0]) / (mend[1] - mend[0]) : null, offer: null,
       gust: 2, gusts: 2, blowing: t >= gust[0] && t < gust[1],
     };
-    const hearing: Hearing = { scene, status, screen: 'match', map: false };
+    const hearing: Hearing = { scene, status, screen: 'match', map: false, covered: 0 };
     engine.update(hearing, level, t, dt);
   }
   return rendered(name, ctx);

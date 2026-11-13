@@ -163,7 +163,7 @@ const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
 });
 
-const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false): Hearing => ({ scene: s, status: st, screen, map });
+const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false, covered = 0): Hearing => ({ scene: s, status: st, screen, map, covered });
 
 test('listen: a ball passing near whistles once; a slot of her stores taken in hand, not a gun; the screens; her water', () => {
   const l = createListen(() => -20), out: Call[] = [];
@@ -197,6 +197,9 @@ test('listen: a ball passing near whistles once; a slot of her stores taken in h
   assert.deepEqual(cues(hearing(scene(3.2, [], [], [], sea(1, false, [{ seq: 1, time: 3.2, kind: 'claim', ship: 0, cells: [], loop: 0 }])), status())), ['claim']);
   assert.deepEqual(cues(hearing(scene(3.3, [], [], [], sea(1, true)), status())), ['leave']);
   assert.deepEqual(cues(hearing(scene(3.4, [], [], [], sea(1, false)), status())), ['enter']);
+  // the way home's parchment: the bed follows how much of the world it covers
+  assert.equal(l.listen(hearing(scene(3.5), status(), 'result', false, 0.4), dt, out).covered, 0.4);
+  assert.equal(l.listen(hearing(scene(3.6), status(), 'lobby', false, 0), dt, out).covered, 0);
 });
 
 test('the bed: the storm heard from afar and all about her inside; surf only near a coast; levels bounded', () => {
@@ -204,8 +207,12 @@ test('the bed: the storm heard from afar and all about her inside; surf only nea
   for (let w = 400; w > -100; w -= 10) assert.ok(galeOf(w - 10) >= galeOf(w), `the gale rises toward and into the storm at ${w}`);
   assert.equal(galeOf(-100), 1);
   for (let t = 0; t < 60; t += 0.1) assert.ok(breakers(t) >= 0 && breakers(t) <= 1);
-  const bed = { speed: 1, wind: 1, heave: -1, roll: 0.1, coast: Infinity, wall: 5000, hull: 1, presence: 1, muffle: 0, clock: 3 };
+  const bed = { speed: 1, wind: 1, heave: -1, roll: 0.1, coast: Infinity, wall: 5000, hull: 1, presence: 1, muffle: 0, covered: 0, clock: 3 };
   assert.equal(levelsOf(bed, levels()).surf, 0);
+  // the sea goes as the screens cover the world, and comes back as they lift
+  assert.equal(levelsOf(bed, levels()).uncovered, 1);
+  assert.equal(levelsOf({ ...bed, covered: 1 }, levels()).uncovered, 0);
+  assert.equal(levelsOf({ ...bed, covered: 0.25 }, levels()).uncovered, 0.75);
   assert.ok(levelsOf({ ...bed, coast: 25 }, levels()).surf > 0);
   assert.equal(levelsOf(bed, levels()).strain, 0, 'her hull whole, no strain');
   assert.ok(levelsOf({ ...bed, hull: 0.1 }, levels()).strain > 0);

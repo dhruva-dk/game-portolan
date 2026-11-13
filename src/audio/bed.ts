@@ -7,7 +7,9 @@
 //   surf    breakers on a shore, by the nearest coast, in sets that come and go on the world's clock
 //   gale    the storm's wall of wind, heard from afar as a low roar, loud and open inside it; rain with it inside
 //   strain  her hull working under her when it is low: a groan in the timbers, moving with her roll
-// The bed as a whole is as present as the sea is (none from space) and muffled under the full map and at her end.
+// The bed as a whole is as present as the sea is (none from space) and muffled under the full map and at her end; and
+// it goes as the screens cover the world (the way home from a match), following the cover closely, and comes back as
+// it lifts.
 //
 // The levels are pure (levels: a Bed in, numbers out); the nodes (createBed) are made once and only set after.
 
@@ -17,12 +19,17 @@ import type { Bed } from './listen.ts';
 export interface Levels {
   swell: number; swellHz: number; wash: number; washHz: number; hiss: number; wind: number; windHz: number; rig: number; rigHz: number;
   surf: number; surfHz: number; gale: number; galeHz: number; rain: number; strain: number; presence: number; open: number;
+  uncovered: number;
 }
 
 export const levels = (): Levels => ({
   swell: 0, swellHz: 0, wash: 0, washHz: 0, hiss: 0, wind: 0, windHz: 0, rig: 0, rigHz: 0, surf: 0, surfHz: 0, gale: 0, galeHz: 0,
-  rain: 0, strain: 0, presence: 0, open: 0,
+  rain: 0, strain: 0, presence: 0, open: 0, uncovered: 1,
 });
+
+/** Seconds the bed's gain under the screens' cover takes to follow it: well inside the cover's own fade, so the sea is
+ *  all but gone once the world is covered. */
+const COVER = 0.04;
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 
@@ -61,6 +68,7 @@ export function levelsOf(b: Bed, out: Levels): Levels {
   out.presence = clamp(b.presence);
   // the whole muffled: open to 18 kHz, down to 450 Hz under the full map
   out.open = 18000 * (450 / 18000) ** clamp(b.muffle);
+  out.uncovered = 1 - clamp(b.covered);
   return out;
 }
 
@@ -72,8 +80,8 @@ export function createBed(ctx: BaseAudioContext, noise: AudioBuffer, out: AudioN
   // the sea's highs fall away as a real sea's do (a tilt down over 3 kHz), and the whole is muffled as it is asked
   const open = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 18000, Q: 0.5 });
   const tilt = new BiquadFilterNode(ctx, { type: 'highshelf', frequency: 3000, gain: -8 });
-  const presence = new GainNode(ctx, { gain: 0 });
-  open.connect(tilt).connect(presence).connect(out);
+  const presence = new GainNode(ctx, { gain: 0 }), uncovered = new GainNode(ctx, { gain: 1 });
+  open.connect(tilt).connect(presence).connect(uncovered).connect(out);
   /** Three loops of the one noise, each at its own rate and from its own point, so no two layers share it. */
   const loops = [1, 0.83, 1.13].map((rate, i) => {
     const src = new AudioBufferSourceNode(ctx, { buffer: noise, loop: true, playbackRate: rate });
@@ -128,6 +136,7 @@ export function createBed(ctx: BaseAudioContext, noise: AudioBuffer, out: AudioN
       set(strain, v.strain, null, at, 0.6);
       glide(presence.gain, v.presence, at, 0.5);
       glide(open.frequency, v.open, at, 0.25);
+      glide(uncovered.gain, v.uncovered, at, COVER);
     },
   };
 }

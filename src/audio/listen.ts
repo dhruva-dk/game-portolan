@@ -2,7 +2,8 @@
 // moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
 // water left and entered), the storm beginning to close, her rigging at an end of her roll, and the
 // screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,
-// her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all.
+// her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all (and how
+// much the screens cover it).
 //
 // Pure: plain data in, cues and the bed out; what it keeps between frames is its own. The coast is found by sounding the
 // ground in a ring round her, a few points a frame.
@@ -12,9 +13,9 @@ import type { ShipDraw, Snapshot } from '../snapshot.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
 import type { Cue } from './cues.ts';
 
-/** What the sound is given each frame: the world drawn, what the HUD reads, the screen shown, and whether the full map
- *  is open. */
-export interface Hearing { scene: Snapshot; status: Status & Kit; screen: Screen; map: boolean }
+/** What the sound is given each frame: the world drawn, what the HUD reads, the screen shown, whether the full map
+ *  is open, and how much of the world the screens cover, 0…1 (the parchment on the way home from a match). */
+export interface Hearing { scene: Snapshot; status: Status & Kit; screen: Screen; map: boolean; covered: number }
 
 /** A cue to play: placed at `at` (world metres) or hers (null), `gain` a factor on its level; `gun` the kind of gun
  *  it is of, if it is a gun's (its report is that kind's). */
@@ -31,9 +32,13 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number; gun?: GunKind }
  *   hull      her hull left, 0…1
  *   presence  how much of the sea is heard, 0…1 (none from space; less over the title)
  *   muffle    how muffled, 0…1 (the full map open; her end)
+ *   covered   how much of the world the screens cover, 0…1: the sea goes with it, and comes back as it lifts
  *   clock     the world's clock, s
  */
-export interface Bed { speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number; muffle: number; clock: number }
+export interface Bed {
+  speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number; muffle: number;
+  covered: number; clock: number;
+}
 
 /** Her top speed, m/s: sim/handling.ts SHIP.top, which the sound may not import (tests/audio.test.ts holds them
  *  equal). */
@@ -59,7 +64,7 @@ function screenCue(from: Screen, to: Screen): Cue | null {
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 export function createListen(ground: (p: Vec3) => number) {
-  const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, clock: 0 };
+  const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, covered: 0, clock: 0 };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
   let chosen = 0;
   let lift = NaN, roll = 0, rolling = 0, turned = 0, side = 1, whistled = -Infinity;
@@ -92,7 +97,7 @@ export function createListen(ground: (p: Vec3) => number) {
 
   return {
     /** A frame of `dt` s: the cues heard, appended to `out`; the bed, as it now is. */
-    listen({ scene, status: s, screen: shown, map: open }: Hearing, dt: number, out: Call[]): Bed {
+    listen({ scene, status: s, screen: shown, map: open, covered }: Hearing, dt: number, out: Call[]): Bed {
       const call = (cue: Cue, at: Vec3 | null = null, gain = 1) => out.push({ cue, at, gain });
       // the screens, and the full map
       if (screen !== null && shown !== screen) {
@@ -179,6 +184,7 @@ export function createListen(ground: (p: Vec3) => number) {
       bed.hull = s.hullMax > 0 ? s.hull / s.hullMax : 1;
       bed.presence = (1 - s.arriving) * (shown === 'title' ? 0.6 : 1);
       bed.muffle = open ? 1 : shown === 'sinking' || shown === 'sunk' ? 0.45 : 0;
+      bed.covered = Math.max(0, Math.min(1, covered));
       bed.clock = scene.clock;
       return bed;
     },

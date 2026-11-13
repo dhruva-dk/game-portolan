@@ -121,7 +121,8 @@ async function play(s: Stage): Promise<Played> {
 
   return {
     game, referee, flow, play: deal, map,
-    // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn
+    // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn; the way home
+    // counts the lobby's frames
     drawn: (canvas) => flow.drawn(canvas),
     next(dt: number): Snapshot {
       const hands = input.read();
@@ -132,8 +133,8 @@ async function play(s: Stage): Promise<Played> {
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot(), status = hudState();
       flow.update(dt, status, scene.sea, scene.own);
-      // heard from the game's eye, even with the full map open over it
-      audio.update({ scene, status, screen: flow.screen, map: globe.open }, flow.settings.sound, dt);
+      // heard from the game's eye, even with the full map open over it; the sea going as the screens cover it
+      audio.update({ scene, status, screen: flow.screen, map: globe.open, covered: flow.covered }, flow.settings.sound, dt);
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
     },
   };
