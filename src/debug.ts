@@ -12,7 +12,8 @@
 // ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea; ?yaw=deg turns it
 // (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
 // ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
-// lie by default (for seed 3 the largest island's centre is at lat 52.8, lon −170.1, its coast about 54 m out).
+// lie by default (for seed 3 the largest island's centre is at lat 52.8, lon −170.1, its coast about 54 m out); there
+// ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each ship the next kind).
 // ?wall=m flies it m metres inside the storm's edge (with ?storm=, the cap held then; negative: outside it), on the
 // line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from that).
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
@@ -323,8 +324,11 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
     bearing: number('yaw', 0) * degrees + (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
     pitch: number('look', -6) * degrees,
   });
+  // ?kind arms each with a gun of that kind (?kind=all: each the next kind), laid over her starboard bow
+  const kind = params.get('kind'), armed = (i: number, o: Berth): ShipDraw['gun'] => kind === null ? null
+    : { kind: kind === 'all' ? KINDS[i % KINDS.length] : kindOf(kind), aim: normalize(add(o.heading, cross(o.heading, o.at), 0.6)) };
   const ships: ShipDraw[] = others.map((o, i) => ({
-    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, number('way', 0)), afloat: true, gun: null,
+    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, number('way', 0)), afloat: true, gun: armed(i, o),
   }));
   let clock = 0;
   return (dt: number): Snapshot => {

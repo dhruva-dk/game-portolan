@@ -234,7 +234,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
             + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>` : '')
             + (slot.ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${css(slot.ink)}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
             + glyph(slot.glyph, SLOT / 2 - 3, SLOT / 2 - (slot.ink !== undefined ? 3 : 0), 31)
-            + (slot.count != null ? figure(SLOT / 2 + 18, SLOT / 2 + 12, slot.count, 17, { fill: slot.low ? INK.rubric : INK.iron }) : '')
+            + (slot.count != null ? figure(SLOT - 4, SLOT / 2 + 12, slot.count, 17, { fill: slot.low ? INK.rubric : INK.iron, anchor: 'end' }) : '')
             + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, slot.reload !== undefined && !(chosen && s.using !== null) ? INK.rubric : WASH.gold, 3.5) : '')
             + bob);
         });
