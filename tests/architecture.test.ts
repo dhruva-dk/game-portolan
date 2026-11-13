@@ -57,7 +57,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'player.ts': ['world/'],
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', ...NEUTRAL],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts'],
   // the game runs the sim and says what to draw and show, as plain data
   'play/': ['play/', 'sim/', 'world/', ...NEUTRAL],
   // what draws the world; each sideways import named
