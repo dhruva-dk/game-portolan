@@ -168,7 +168,11 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
         ...look.paint, look.band ? 1 : 0, ...look.sail, phaseOf(i), ...(shares.get(i) ?? [0, 0]), 0, 0], o);
     }
     draws.forEach((three, k) => {
-      instances[k].needsUpdate = true;
+      // (only the ships written go up: the buffer holds the most ships' worth)
+      if (filled[k] > 0) {
+        instances[k].addUpdateRange(0, filled[k] * STRIDE);
+        instances[k].needsUpdate = true;
+      }
       for (const mesh of three) {
         (mesh.geometry as InstancedBufferGeometry).instanceCount = filled[k];
         mesh.visible = filled[k] > 0;

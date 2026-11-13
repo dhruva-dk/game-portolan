@@ -118,6 +118,14 @@ function marker(at: Vec2Node, mark: Vec4Node): MeshBasicNodeMaterial {
 /** A dynamic float attribute of `n` items of `size`. */
 const dynamic = (n: number, size: number) => new BufferAttribute(new Float32Array(n * size), size).setUsage(DynamicDrawUsage);
 
+/** The first `items` items of a buffer marked to go up to the GPU, and no more (none: nothing goes up). */
+function sent(a: BufferAttribute | InstancedInterleavedBuffer, items: number) {
+  const size = a instanceof BufferAttribute ? a.itemSize : a.stride;
+  if (items <= 0) return;
+  a.addUpdateRange(0, items * size);
+  a.needsUpdate = true;
+}
+
 export type Wake = ReturnType<typeof createWake>;
 
 /** capacity: the most ships. */
@@ -371,8 +379,9 @@ export function createWake(view: View, sky: Sky, capacity: number) {
       trails.visible = triangle > 0;
       patchGeometry.setDrawRange(0, near * 6);
       shadowGeometry.instanceCount = near;
-      for (const a of [trailAt, trailMark, trailLaid, trailGeometry.index!, patchAt, patchMark]) a.needsUpdate = true;
-      poses.needsUpdate = true;
+      // only what was written goes up: the buffers hold the most ships' worth
+      ([[trailAt, vertex], [trailMark, vertex], [trailLaid, vertex], [trailGeometry.index!, triangle * 3], [patchAt, near * 4], [patchMark, near * 4], [poses, near]] as const)
+        .forEach(([a, items]) => sent(a, items));
       live.value = near > 0 ? 1 : 0;
       return near > 0 ? draw : null;
     },
