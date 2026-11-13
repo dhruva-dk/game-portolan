@@ -32,7 +32,7 @@
 import { float, max, mix, saturate, smoothstep, texture, vec2 } from 'three/tsl';
 import { loadTexture } from '../textures';
 import type { Read } from '../view/charts';
-import { CASCADES } from './cascades';
+import { CASCADES } from '../world/cascades';
 import { FOAMING, type Waves } from './waves';
 import type { FloatNode, Vec2Node } from '../tsl';
 

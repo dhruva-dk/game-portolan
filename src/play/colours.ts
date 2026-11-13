@@ -1,6 +1,6 @@
 // The ships' colours (ship/fleet.ts Look), by id: hers, then the others' from a small palette.
 
-import type { Look } from '../ship/fleet';
+import type { Look } from '../snapshot';
 import type { Vec3 } from '../world/sphere';
 
 /** The player's colours: a red hull under weathered canvas. */

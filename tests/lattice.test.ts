@@ -6,8 +6,8 @@ import {
 } from '../src/world/lattice.ts';
 import { R, along, cross, distance, dot, length, normalize, type Vec3 } from '../src/world/sphere.ts';
 import { createWind } from '../src/world/wind.ts';
-import { likeness } from '../src/water/spectrum.ts';
-import { BANDS, CASCADES, SIZE } from '../src/water/cascades.ts';
+import { likeness } from '../src/world/spectrum.ts';
+import { BANDS, CASCADES, SIZE } from '../src/world/cascades.ts';
 
 /** A deterministic spread of points over the sphere (Fibonacci). */
 const points = (n: number): Vec3[] => Array.from({ length: n }, (_, i) => {

@@ -1,5 +1,5 @@
 // The sea's long waves on the CPU, for what floats on them: the height of the surface the GPU draws, at any point and
-// moment, from the same random sea (spectrum.ts's initialSpectrum, the same seeds as waves.ts) read through the same
+// moment, from the same random sea (spectrum.ts's initialSpectrum, the same seeds as water/waves.ts) read through the same
 // charts (world/lattice.ts's weigh, the GPU's choice) at the same offsets, with the same depth cut.
 //
 // The GPU sums every mode of every cascade by FFT; this sums, mode by mode, only the few hundred that carry nearly all
@@ -14,8 +14,8 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { FREQUENCY, band, weigh, type Anchor } from '../world/lattice.ts';
-import { R, add, chartBasis, normalize, scale, toChart, type Vec3 } from '../world/sphere.ts';
+import { FREQUENCY, band, weigh, type Anchor } from './lattice.ts';
+import { R, add, chartBasis, normalize, scale, toChart, type Vec3 } from './sphere.ts';
 import { BANDS, BREAKER, CASCADES, CHOP, FETCH, LONG, PERIOD, SIZE } from './cascades.ts';
 import { G, initialSpectrum, seaState } from './spectrum.ts';
 

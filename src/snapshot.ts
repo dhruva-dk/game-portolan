@@ -2,14 +2,13 @@
 // draws it (frame.ts). Each frame the one hands the other a Snapshot; nothing else passes between them, and nothing
 // outside the frame touches what it draws with.
 
-import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
-import type { Look } from './ship/fleet';
 import type { Cap } from './sim/storm';
 import type { ShipPose } from './world/pose';
 import type { Vec3 } from './world/sphere';
+import { lookAt, type Turn } from './world/turn';
 
 /** A unit quaternion (x, y, z, w). */
-export type Orientation = readonly [number, number, number, number];
+export type Orientation = Turn;
 
 /**
  * Where the world is seen from. In the air (the game's camera, the debug flyer) the eye is among the clouds and under
@@ -28,6 +27,10 @@ export interface Eye {
 
 /** The vertical field of view of an eye in the air, degrees. */
 export const AIR_FOV = 60;
+
+/** A captain's colours (linear rgb, 0…1): her hull's paint, her sails' canvas, and whether a band of the paint
+ *  crosses her sails. */
+export interface Look { paint: Vec3; sail: Vec3; band: boolean }
 
 /** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), and
  *  whether she floats (one going down or in the air neither fits the sea round her nor marks it). */
@@ -62,10 +65,5 @@ export interface Snapshot {
   blasts: readonly Blast[];
 }
 
-const m = new Matrix4(), q = new Quaternion();
-
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */
-export function lookingAt(eye: Vec3, at: Vec3, up: Vec3): Orientation {
-  q.setFromRotationMatrix(m.lookAt(new Vector3(...eye), new Vector3(...at), new Vector3(...up)));
-  return [q.x, q.y, q.z, q.w];
-}
+export const lookingAt = (eye: Vec3, at: Vec3, up: Vec3): Orientation => lookAt(eye, at, up);

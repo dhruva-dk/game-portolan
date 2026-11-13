@@ -39,13 +39,13 @@ import { createCharts } from '../view/charts';
 import type { View } from '../view/view';
 import { R } from '../world/sphere';
 import type { Wind } from '../world/wind';
-import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from './cascades';
+import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades';
 import { createCaustics } from './caustics';
 import { createFoam } from './foam';
 import { glitter } from './glitter';
 import { createHulls } from './hulls';
 import { N_WATER, createOptics } from './optics';
-import { likeness } from './spectrum';
+import { likeness } from '../world/spectrum';
 import { createWake, type Afloat } from './wake';
 import { createWaves } from './waves';
 import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
@@ -260,7 +260,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
   return {
     mesh,
-    /** The sea's charts (world/lattice.ts), for its CPU copy (swell.ts). */
+    /** The sea's charts (world/lattice.ts), for its CPU copy (world/swell.ts). */
     anchors: charts.anchors,
     /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
     below: {

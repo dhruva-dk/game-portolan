@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BANDS, CASCADES, FETCH, PERIOD, SIZE } from '../src/water/cascades.ts';
-import { initialSpectrum, seaState } from '../src/water/spectrum.ts';
-import { createSwell, longModes } from '../src/water/swell.ts';
+import { BANDS, CASCADES, FETCH, PERIOD, SIZE } from '../src/world/cascades.ts';
+import { initialSpectrum, seaState } from '../src/world/spectrum.ts';
+import { createSwell, longModes } from '../src/world/swell.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { pose, ride, settled, RIDE } from '../src/sim/ride.ts';
 import { shipAt } from '../src/sim/ship.ts';

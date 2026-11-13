@@ -1,5 +1,6 @@
-// The sea's waves on the GPU: random seas drawn from the spectrum (spectrum.ts) for each cascade (cascades.ts), moved
-// on in time and turned into surfaces by an inverse FFT each frame (Tessendorf, "Simulating Ocean Water", 2001).
+// The sea's waves on the GPU: random seas drawn from the spectrum (world/spectrum.ts) for each cascade
+// (world/cascades.ts), moved on in time and turned into surfaces by an inverse FFT each frame (Tessendorf, "Simulating
+// Ocean Water", 2001).
 //
 // Each frame, for all the cascades' N×N patches at once:
 //   1. spectrum   h̃(k, t) = h₀(k)·e^{−iωt} + conj h₀(−k)·e^{iωt}, and from it the spectra of seven more fields: the
@@ -19,8 +20,8 @@
 //                                 the slopes' mean and mean square, and so their variance, over any footprint
 //
 // ω is rounded to multiples of 2π/PERIOD, so the sea repeats every PERIOD seconds and time can wrap without a jump.
-// The waves run on the world's clock (Environment.clock), so the CPU's copy of the long waves (swell.ts) can be read
-// at the same moment.
+// The waves run on the world's clock (Environment.clock), so the CPU's copy of the long waves (world/swell.ts) can be
+// read at the same moment.
 
 import {
   DataTexture, FloatType, HalfFloatType, LinearFilter, LinearMipmapLinearFilter, RGBAFormat, RepeatWrapping, StorageTexture,
@@ -31,8 +32,8 @@ import {
   uint, uniform, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import type { Compute } from '../gpu';
-import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from './cascades';
-import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from './spectrum';
+import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from '../world/cascades';
+import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from '../world/spectrum';
 import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
 
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */

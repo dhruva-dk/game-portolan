@@ -26,6 +26,7 @@ import {
 } from 'three/webgpu';
 import { uniform } from 'three/tsl';
 import type { Compute } from '../gpu';
+import type { Look } from '../snapshot';
 import type { Light } from '../sky/light';
 import { pixelSize } from '../view/view';
 import type { ShipPose } from '../world/pose';
@@ -37,14 +38,6 @@ import { createCloth } from './cloth';
 import { DETAILS, chooseDetail } from './detail';
 import { createShipMaterials } from './materials';
 import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './motion';
-
-/** A captain's colours (linear rgb, 0…1). */
-export interface Look {
-  paint: Vec3;
-  sail: Vec3;
-  /** A band of the paint across her sails. */
-  band: boolean;
-}
 
 /** Floats an instance: at, fwd, up, paint, cloth and berth, each a vec4 (materials.ts). */
 const STRIDE = 24;

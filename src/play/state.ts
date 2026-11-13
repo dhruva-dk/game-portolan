@@ -14,7 +14,6 @@
 // leaves it by dive(), the bots when they choose, and each glides down and puts to sea where she touches the water.
 // The match's clock (the storm's) starts once the last ship is down.
 
-import type { Look } from '../ship/fleet';
 import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from '../sim/battle';
 import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot';
 import { afloat, stepFleet, type Vessel } from '../sim/contact';
@@ -28,8 +27,8 @@ import { knocked, pose, ride, settled, type Ride } from '../sim/ride';
 import type { Chart } from '../sim/route';
 import { shipAt, type Helm, type ShipState } from '../sim/ship';
 import type { Cap, Storm } from '../sim/storm';
-import type { Blast, ShipDraw } from '../snapshot';
-import type { Surface } from '../water/swell';
+import type { Blast, Look, ShipDraw } from '../snapshot';
+import type { Surface } from '../world/swell';
 import type { Planet } from '../world/planet';
 import type { ShipPose } from '../world/pose';
 import { hash } from '../world/random';

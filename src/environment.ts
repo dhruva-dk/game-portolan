@@ -14,7 +14,7 @@ export interface Climate {
   weather: (seconds: number) => Weather;
   /**
    * The wind the sea's waves were raised by, metres per second: its mean over the match, since a sea takes hours to
-   * grow (the CPU's sea, water/swell.ts, is built with it).
+   * grow (the CPU's sea, world/swell.ts, is built with it).
    */
   seaWind: number;
 }
@@ -35,7 +35,7 @@ export function createWorld(seed: number, mean: Weather, swing: Weather, hours: 
 /** The air and the sea as the eye finds them at a moment: plain data, made fresh each frame (by the frame, from the eye
  *  it draws from) and read by every system. */
 export interface Environment {
-  /** Seconds on the world's clock: what the sea's waves run on (the CPU's copy of them, water/swell.ts, too). */
+  /** Seconds on the world's clock: what the sea's waves run on (the CPU's copy of them, world/swell.ts, too). */
   clock: number;
   timeOfDay: number;
   sunPlaces: SunPlaces;

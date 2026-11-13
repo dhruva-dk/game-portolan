@@ -119,7 +119,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   }
 
   return {
-    /** Every anchor, as world/lattice.ts placed them: for the CPU's copy of the waves (water/swell.ts). */
+    /** Every anchor, as world/lattice.ts placed them: for the CPU's copy of the waves (world/swell.ts). */
     anchors: all as readonly Anchor[],
     each,
     debug,

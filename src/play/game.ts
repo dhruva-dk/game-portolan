@@ -26,7 +26,7 @@ import { PLAYER, SHIPS } from '../sim/match';
 import type { Chart } from '../sim/route';
 import type { Helm, ShipState } from '../sim/ship';
 import type { Snapshot } from '../snapshot';
-import { createSwell } from '../water/swell';
+import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
 import { R, add, normalize, scale, type Vec3 } from '../world/sphere';

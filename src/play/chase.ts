@@ -9,10 +9,10 @@
 // coming down with her (game.ts); drawn back and circling her on a win. Moving to another ship it flies there over
 // `flight` seconds, round the planet rather than through it and lifting on a long way (0117 camera.ts's flight).
 
-import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import { AIR_FOV, type Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
-import { R, add, along, cross, dot, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
+import { R, add, along, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
+import { inverse, lookAt, rotate, slerp, type Turn } from '../world/turn';
 
 /** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
 const BACK = 44, UP = 19, PIVOT = 2;
@@ -45,7 +45,7 @@ const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 /** ground: metres above the sea at a point (negative under water); sea: the waves' height there at a time. */
 export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: number) => number) {
   /** The camera: where it stands (world metres) and how it is turned (it looks down its −z). */
-  const position = new Vector3(), orientation = new Quaternion(), looking = new Matrix4();
+  let position: Vec3 = [0, 0, 0], orientation: Turn = [0, 0, 0, 1];
   /** Where she is, and the way the camera faces along the surface there before the look turns it (lagging her). */
   let at: Vec3 = [0, 1, 0], facing: Vec3 = [0, 0, -1];
   /** The look's turn about her (radians, to port) and tilt (steeper), and how long since it was last moved. */
@@ -53,7 +53,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   /** How far the boom is raised to see over the land. */
   let raised = 0;
   /** A flight under way: where the camera was when it began, its length (s) and how far through it is (0…1). */
-  let flight: { from: Vector3; look: Quaternion; span: number; done: number } | null = null;
+  let flight: { from: Vec3; look: Turn; span: number; done: number } | null = null;
   /** The boom's turn for the shot under way (radians to port). */
   let spin = 0;
 
@@ -89,9 +89,9 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     const under = along(at, back, boom * Math.cos(steep)).p;
     const floor = Math.max(ground(under), sea(under, time)) + CLEAR;
     const eye = place(under, Math.max(pivot + boom * Math.sin(steep), floor));
-    position.set(...eye);
+    position = eye;
     const aim = place(along(at, level(pose).ahead, AIM_AHEAD).p, AIM_UP + (shot.height ?? 0));
-    orientation.setFromRotationMatrix(looking.lookAt(position, new Vector3(...aim), new Vector3(...normalize(eye))));
+    orientation = lookAt(eye, aim, normalize(eye));
     if (flight) fly(dt);
   }
 
@@ -99,13 +99,13 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   function fly(dt: number) {
     const f = flight!;
     f.done = Math.min(1, f.done + dt / f.span);
-    const s = smoother(f.done), to = position.clone(), r0 = f.from.length(), r1 = to.length();
-    const d0 = f.from.clone().divideScalar(r0), d1 = to.clone().divideScalar(r1);
-    const angle = Math.acos(Math.min(1, Math.max(-1, d0.dot(d1))));
-    const dir = angle < 1e-4 ? d1 : d0.clone().multiplyScalar(Math.sin((1 - s) * angle)).addScaledVector(d1, Math.sin(s * angle)).divideScalar(Math.sin(angle));
+    const s = smoother(f.done), to = position, r0 = length(f.from), r1 = length(to);
+    const d0 = scale(f.from, 1 / r0), d1 = scale(to, 1 / r1);
+    const angle = Math.acos(Math.min(1, Math.max(-1, dot(d0, d1))));
+    const dir = angle < 1e-4 ? d1 : scale(add(scale(d0, Math.sin((1 - s) * angle)), d1, Math.sin(s * angle)), 1 / Math.sin(angle));
     const lift = Math.sin(s * Math.PI) * Math.min(angle * R * 0.5, 600);
-    position.copy(dir.multiplyScalar(Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift));
-    orientation.slerpQuaternions(f.look, orientation.clone(), s);
+    position = scale(dir, Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift);
+    orientation = slerp(f.look, orientation, s);
     if (f.done >= 1) flight = null;
   }
 
@@ -122,7 +122,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
      *  camera.ts glide: 1.6 s from one ship to another). */
     fly(seconds = 1.6) {
-      flight = { from: position.clone(), look: orientation.clone(), span: seconds, done: 0 };
+      flight = { from: position, look: orientation, span: seconds, done: 0 };
     },
     /**
      * After a frame of dt seconds: her pose now (the ship it follows), the look's drag (pixels, right and down), the
@@ -154,17 +154,16 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     },
     /** The eye the camera is now: where it stands and how it is turned. */
     eye(): Eye {
-      return { kind: 'air', position: [position.x, position.y, position.z], orientation: [orientation.x, orientation.y, orientation.z, orientation.w], fov: AIR_FOV };
+      return { kind: 'air', position, orientation, fov: AIR_FOV };
     },
     /** Where a point on the sea (a unit vector) falls in a view `width` × `height` px, or null behind the camera or
      *  past the horizon. */
     onScreen(p: Vec3, width: number, height: number): { x: number; y: number } | null {
-      const e = position;
-      if (e.x * p[0] + e.y * p[1] + e.z * p[2] <= R) return null;
+      if (dot(position, p) <= R) return null;
       // in the camera's own frame (it looks down its −z), then through its lens
-      const v = new Vector3(...scale(p, R)).sub(position).applyQuaternion(orientation.clone().invert());
-      if (v.z >= 0) return null;
-      const t = Math.tan((AIR_FOV * Math.PI) / 360), x = v.x / -v.z / (t * (width / height)), y = v.y / -v.z / t;
+      const [vx, vy, vz] = rotate(add(scale(p, R), position, -1), inverse(orientation));
+      if (vz >= 0) return null;
+      const t = Math.tan((AIR_FOV * Math.PI) / 360), x = vx / -vz / (t * (width / height)), y = vy / -vz / t;
       return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
     },
   };

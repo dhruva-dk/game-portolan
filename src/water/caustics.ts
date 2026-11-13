@@ -18,7 +18,7 @@ import { Fn, dFdx, dFdy, dot, float, length, log2, max, mix, smoothstep, sqrt, t
 import type { Sky } from '../sky/sky';
 import type { Charts } from '../view/charts';
 import type { View } from '../view/view';
-import { CASCADES, SIZE } from './cascades';
+import { CASCADES, SIZE } from '../world/cascades';
 import { N_WATER } from './optics';
 import { CURVED, type Waves } from './waves';
 import type { FloatNode, Vec3Node } from '../tsl';

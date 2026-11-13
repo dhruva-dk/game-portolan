@@ -259,7 +259,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     render,
     ready: ground.ready,
     /** The sea's anchors (world/lattice.ts), as the frame's sea is laid on them: the CPU's copy of the long waves
-     *  (water/swell.ts) must read the very charts the GPU's do. */
+     *  (world/swell.ts) must read the very charts the GPU's do. */
     anchors: water.anchors,
   };
 }

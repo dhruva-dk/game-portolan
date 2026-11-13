@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, spectrum, spread, whitecaps } from '../src/water/spectrum.ts';
-import { BANDS, CASCADES, SIZE } from '../src/water/cascades.ts';
+import { coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, spectrum, spread, whitecaps } from '../src/world/spectrum.ts';
+import { BANDS, CASCADES, SIZE } from '../src/world/cascades.ts';
 
 const near = (a: number, b: number, tol: number) => assert.ok(Math.abs(a - b) <= tol, `${a} not within ${tol} of ${b}`);
 

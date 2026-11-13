@@ -39,32 +39,74 @@ const hits = (pattern: RegExp, keep: (rel: string) => boolean = () => true) =>
 
 const none = (found: string[], rule: string) => assert.deepEqual(found, [], `${rule}:\n  ${found.join('\n  ')}`);
 
-test('a. src/world is pure: no three, nothing outside src/world', () => {
-  const found: string[] = [];
-  for (const f of files.filter((f) => f.rel.startsWith('world/'))) {
-    code(f.text).forEach((line, i) => {
-      const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/.exec(line)?.[1];
-      if (spec === undefined) return;
-      const bad = spec === 'three' || spec.startsWith('three/') || (spec.startsWith('.') && !(resolve(dirname(f.path), spec) + sep).startsWith(join(SRC, 'world') + sep)) || spec.startsWith('/');
-      if (bad) found.push(`src/${f.rel}:${i + 1}: imports '${spec}'`);
-    });
-  }
-  none(found, 'src/world may import only from src/world');
-});
+/**
+ * The layers: for every part of src (a top-level folder, or a top-level file), what it may import. An entry is a
+ * folder ('world/'), a file ('sky/light.ts'), 'three' (three and its addons) or '*' (anything). A part's own folder
+ * is listed like any other. Any import not in its part's row fails, and so does a part with no row.
+ */
+const NEUTRAL = ['snapshot.ts', 'player.ts', 'environment.ts'];
+/** What every render folder may draw on: three, the world, the GPU's plumbing, the plain seams, and the shared light. */
+const RENDER = ['three', 'world/', 'gpu.ts', 'tsl.ts', 'textures.ts', 'snapshot.ts', 'environment.ts', 'sky/light.ts'];
+const LAYERS: Record<string, readonly string[]> = {
+  // the world and the simulation: pure, headless, deterministic (test g)
+  'world/': ['world/'],
+  'sim/': ['sim/', 'world/'],
+  // the plain-data seams: what the frame draws (snapshot.ts), what passes between the player and the game (player.ts),
+  // and the world as built for a match (environment.ts)
+  'snapshot.ts': ['world/', 'sim/storm.ts'],
+  'player.ts': ['world/'],
+  'environment.ts': ['world/'],
+  // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', ...NEUTRAL],
+  // the game runs the sim and says what to draw and show, as plain data
+  'play/': ['play/', 'sim/', 'world/', ...NEUTRAL],
+  // what draws the world; each sideways import named
+  'view/': ['view/', ...RENDER],
+  'sky/': ['sky/', ...RENDER, 'view/view.ts', 'sim/storm.ts'],
+  'land/': ['land/', ...RENDER, 'view/view.ts', 'view/cube.ts'],
+  'ship/': ['ship/', ...RENDER, 'view/view.ts'],
+  'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts'],
+  'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
+  'gpu.ts': ['three'],
+  'tsl.ts': ['three'],
+  'textures.ts': ['three'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/'],
+  'meter.ts': ['three'],
+  // the debug tools, and the switches that drive the game through what it offers anyone
+  'fly.ts': ['three', 'world/', 'snapshot.ts'],
+  'probe.ts': ['three', 'world/', 'sky/sky.ts'],
+  'debug.ts': [
+    'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', ...NEUTRAL, 'frame.ts', 'world/',
+    'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts',
+  ],
+  'main.ts': ['*'],
+};
 
-test('a2. src/sim is pure: no three, nothing outside src/sim and src/world', () => {
+/** The part of src a src-relative path belongs to. */
+const partOf = (rel: string) => (rel.includes('/') ? `${rel.split('/')[0]}/` : rel);
+
+test('a. the layers: every import is one its part of src may make (LAYERS), and every part has a row', () => {
   const found: string[] = [];
-  const within = (path: string, dir: string) => (path + sep).startsWith(join(SRC, dir) + sep);
-  for (const f of files.filter((f) => f.rel.startsWith('sim/'))) {
+  for (const f of files) {
+    const part = partOf(f.rel), row = LAYERS[part];
+    if (!row) {
+      found.push(`src/${f.rel}: no row for '${part}'`);
+      continue;
+    }
     code(f.text).forEach((line, i) => {
-      const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/.exec(line)?.[1];
-      if (spec === undefined) return;
-      const to = resolve(dirname(f.path), spec);
-      const bad = !spec.startsWith('.') || !(within(to, 'sim') || within(to, 'world'));
-      if (bad) found.push(`src/${f.rel}:${i + 1}: imports '${spec}'`);
+      for (const m of line.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*|\bnew\s+URL\s*\(\s*)['"]([^'"]+)['"]/g)) {
+        const spec = m[1];
+        const to = spec.startsWith('.')
+          ? relative(SRC, resolve(dirname(f.path), spec)).split(sep).join('/').replace(/(\.ts)?$/, '.ts')
+          : spec === 'three' || spec.startsWith('three/') ? 'three' : spec;
+        const ok = row.some((e) => e === '*' || e === to || (e.endsWith('/') && to.startsWith(e)));
+        if (!ok) found.push(`src/${f.rel}:${i + 1}: '${part}' imports '${spec}'`);
+      }
     });
   }
-  none(found, 'src/sim may import only from src/sim and src/world');
+  const parts = new Set(files.map((f) => partOf(f.rel)));
+  for (const part of Object.keys(LAYERS)) if (!parts.has(part)) found.push(`LAYERS has a row for '${part}', which is not in src`);
+  none(found, 'imports outside the layers');
 });
 
 test('b. no file in src is over 450 lines', () => {

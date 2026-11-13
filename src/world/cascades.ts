@@ -1,7 +1,7 @@
 // The sea is drawn as three patches of waves, each tiling the sea at its own size and holding its own band of
 // wavelengths, so together they hold the whole spectrum once, from swells of hundreds of metres to ripples of a
-// few centimetres, and no pattern repeats at a scale the eye can find. Pure numbers, shared by the GPU (waves.ts,
-// water.ts), the CPU's copy of the long waves (swell.ts) and the tests.
+// few centimetres, and no pattern repeats at a scale the eye can find. Pure numbers, shared by the GPU (water/waves.ts,
+// water/water.ts), the CPU's copy of the long waves (swell.ts) and the tests.
 
 /** Texels across each patch. */
 export const SIZE = 256;
