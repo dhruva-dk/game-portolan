@@ -21,6 +21,9 @@ const NN = N * N, LOG = 8;
 /** Cells on the planet. */
 export const CELLS = 6 * NN;
 
+/** Cells as a reader has them, a number a cell (who holds each; the cells a change took), with no way to write them. */
+export type ReadCells = ArrayLike<number>;
+
 /** The face, column and row of a cell. */
 export const faceOf = (c: number) => c >> (2 * LOG);
 export const columnOf = (c: number) => c & (N - 1);

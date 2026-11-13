@@ -13,7 +13,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; the same moves give the same grid, to the bit.
 
-import { CELLS, PLANET_QUANTA, areaQuanta, cellOf, cosTo, neighbor, trace } from '../world/cells.ts';
+import { CELLS, PLANET_QUANTA, areaQuanta, cellOf, cosTo, neighbor, trace, type ReadCells } from '../world/cells.ts';
 import { R, distance, normalize, type Vec3 } from '../world/sphere.ts';
 import { enclose } from './enclose.ts';
 import type { Cap } from './storm.ts';
@@ -154,11 +154,12 @@ export function createTerritory(count: number) {
     if (lost.length) log({ kind: 'drain', time, ship: null, cells: Int32Array.from(lost) });
   };
 
+  const held: ReadCells = owner, trailed: ReadCells = laid;
   return {
-    /** Who holds each cell (0 open sea, else her id + 1): read it, never write it. */
-    owner: owner as Readonly<Uint8Array>,
+    /** Who holds each cell (0 open sea, else her id + 1): every change logged so far, applied in order. */
+    owner: held,
     /** Whose open trail runs through each cell (0 none, else her id + 1). */
-    laid: laid as Readonly<Uint8Array>,
+    laid: trailed,
 
     /** Lays every ship her home patch round her berth, at the match's start. */
     begin(berths: readonly Vec3[], time: number) {
@@ -253,8 +254,10 @@ export function createTerritory(count: number) {
     trail: (id: number): Readonly<Trail> => trails[id],
     /** Every open trail, by ship id. */
     trails: (): readonly Readonly<Trail>[] => trails,
-    /** What changed in the last `kept` seconds, oldest first. */
+    /** What changed in the last `kept` seconds, oldest first, numbered from 1 with none left out. */
     changes: (): readonly Change[] => changes,
+    /** The number of the last change made (0: none yet), kept or not. */
+    last: () => seq,
 
     /** The grid's fingerprint (FNV-1a over who holds each cell and whose trail runs through it). */
     hash(): string {

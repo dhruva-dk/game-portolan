@@ -114,10 +114,12 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
   mesh.renderOrder = 1;
   mesh.visible = false;
 
-  /** Ribbons ended and still fading, and the open trails as last seen (by ship). */
+  /** Ribbons ended and still fading; the open trails as last seen, by ship, each a copy of its own (kept up by adding
+   *  the points new since: a trail's points only grow while its serial holds), and the frame each was last seen in. */
   let fading: Ribbon[] = [];
-  let open = new Map<number, { serial: number; points: readonly Vec3[] }>();
-  const cursor = createCursor();
+  const open = new Map<number, { serial: number; points: Vec3[]; seen: number }>();
+  const cursor = createCursor(), claimed = new Set<number>();
+  let frame = 0;
 
   return {
     mesh,
@@ -126,26 +128,40 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
     update(sea: Sea | undefined, ships: readonly ShipDraw[], eye: Vec3, own: number | null) {
       // a new match's sea (or none): nothing of the last one's left to fade
       const { fresh, from } = cursor.read(sea);
-      if (fresh) [fading, open] = [[], new Map()];
+      if (fresh) {
+        fading = [];
+        open.clear();
+      }
       if (!sea) {
         geometry.setDrawRange(0, 0);
         mesh.visible = false;
         return;
       }
       time.value = sea.clock;
-      // a trail gone: sunk into the border if she closed a loop, else broken up
-      const now = new Map(sea.trails.map((t) => [t.id, t]));
-      const claimed = new Set<number>();
+      // a trail gone, or begun anew: sunk into the border if she closed a loop, else broken up
+      claimed.clear();
       for (let i = from; i < sea.changes.length; i++) {
         const k = sea.changes[i];
         if (k.kind === 'claim') claimed.add(k.ship);
       }
-      for (const [id, t] of open) {
-        const n = now.get(id);
-        if (n && n.serial === t.serial) continue;
+      const end = (id: number, t: { serial: number; points: Vec3[] }) =>
         fading.push({ id, serial: t.serial, points: t.points, mode: claimed.has(id) ? ABSORBED : DISSOLVING, since: sea.clock });
+      frame++;
+      for (const t of sea.trails) {
+        const o = open.get(t.id);
+        if (o && o.serial === t.serial && o.points.length <= t.points.length) {
+          for (let k = o.points.length; k < t.points.length; k++) o.points.push(t.points[k]);
+          o.seen = frame;
+          continue;
+        }
+        if (o) end(t.id, o);
+        open.set(t.id, { serial: t.serial, points: t.points.slice(), seen: frame });
       }
-      open = new Map(sea.trails.map((t) => [t.id, { serial: t.serial, points: t.points }]));
+      for (const [id, o] of open) {
+        if (o.seen === frame) continue;
+        end(id, o);
+        open.delete(id);
+      }
       fading = fading.filter((f) => sea.clock - f.since < (f.mode === ABSORBED ? ABSORB : DISSOLVE));
       sea.colours.forEach((c, id) => {
         if (id < values.length) values[id].set(c[0], c[1], c[2], id === own ? 1 : 0);
@@ -178,7 +194,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
           }
         });
       };
-      for (const t of sea.trails) lay({ id: t.id, serial: t.serial, points: t.points, mode: OPEN, since: sea.clock }, stern.get(t.id) ?? null);
+      for (const [id, t] of open) lay({ id, serial: t.serial, points: t.points, mode: OPEN, since: sea.clock }, stern.get(id) ?? null);
       for (const f of fading) lay(f, null);
       for (const b of [at, across, rib]) {
         b.clearUpdateRanges();

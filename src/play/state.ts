@@ -290,7 +290,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     sea(between: number): Sea | undefined {
       if (!territory) return undefined;
       const trails = territory.trails().flatMap((t, id) => (t.points.length ? [{ id, serial: t.serial, points: t.points }] : []));
-      return { generation, owner: territory.owner, changes: territory.changes(), trails, colours: colours(territory.trails().length), clock: clock(between) };
+      return { generation, owner: territory.owner, seq: territory.last(), changes: territory.changes(), trails, colours: colours(territory.trails().length), clock: clock(between) };
     },
     /** Who holds the sea (sim/territory.ts), in a match. */
     territory: (): Territory | null => territory,

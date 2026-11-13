@@ -3,6 +3,7 @@
 // outside the frame touches what it draws with.
 
 import type { Cap } from './sim/storm';
+import type { ReadCells } from './world/cells';
 import type { ShipPose } from './world/pose';
 import type { Vec3 } from './world/sphere';
 import { lookAt, type Turn } from './world/turn.ts';
@@ -60,25 +61,34 @@ export const RARITY = [0x969aa0, 0x3a683e, 0x264c8c, 0xb8301a, 0xbe8a2c] as cons
  * drained back to open sea (a sunk ship's, or the storm's: ship null), or an open trail cut.
  */
 export type SeaChange =
-  | { seq: number; time: number; kind: 'claim'; ship: number; cells: Int32Array; loop: number }
-  | { seq: number; time: number; kind: 'home'; ship: number; cells: Int32Array; at: Vec3 }
-  | { seq: number; time: number; kind: 'drain'; ship: number | null; cells: Int32Array }
+  | { seq: number; time: number; kind: 'claim'; ship: number; cells: ReadCells; loop: number }
+  | { seq: number; time: number; kind: 'home'; ship: number; cells: ReadCells; at: Vec3 }
+  | { seq: number; time: number; kind: 'drain'; ship: number | null; cells: ReadCells }
   | { seq: number; time: number; kind: 'cut'; ship: number; by: number | null };
 
 /** An open trail drawn: whose, which one (a new number each time she leaves her water), its points (unit vectors, a
- *  couple of metres apart, oldest first; the ribbon runs on from the last to her stern). */
+ *  couple of metres apart, oldest first; the ribbon runs on from the last to her stern). While its serial holds, its
+ *  points only ever grow at the end: a reader keeping a copy need only add the new ones. */
 export interface TrailDraw { id: number; serial: number; points: readonly Vec3[] }
 
 /**
- * Who holds the sea (sim/territory.ts): which match's sea it is (a new number each match: whoever follows its changes
- * starts over with a new one, its changes numbered afresh from 1); the cells (world/cells.ts), each its holder (0 open
- * sea, else her id + 1), read by reference and never written; what changed in the last few seconds, oldest first (each
- * drawn once, from the first snapshot it is in); the open trails; each ship's colour on the sea, by id (linear rgb);
- * and the moment, on the changes' clock (the world's), at which they are drawn.
+ * Who holds the sea (sim/territory.ts), as the frame follows it:
+ *   generation  which match's sea it is, a new number each match: a reader seeing a new one starts over
+ *   owner       the cells (world/cells.ts), each its holder (0 open sea, else her id + 1): the sim's own, read by
+ *               reference (copied whole only when a reader starts over), never written
+ *   seq         the number of the last change made, kept in `changes` or not
+ *   changes     what changed in the last few seconds, oldest first, numbered 1, 2, … within the match with none left
+ *               out: `owner` is every change applied in order. A reader whose first change not yet read is past the
+ *               one after its last (or, none kept, whose last is short of `seq`) has missed some: it starts over from
+ *               `owner` (water/cursor.ts)
+ *   trails      the open trails
+ *   colours     each ship's colour on the sea, by id (linear rgb)
+ *   clock       the moment, on the changes' clock (the world's), at which they are drawn
  */
 export interface Sea {
   generation: number;
-  owner: Readonly<Uint8Array>;
+  owner: ReadCells;
+  seq: number;
   changes: readonly SeaChange[];
   trails: readonly TrailDraw[];
   colours: readonly Vec3[];

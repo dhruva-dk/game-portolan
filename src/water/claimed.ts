@@ -13,7 +13,9 @@
 // face's cells within an apron one cell wide holding the next faces' cells along its edges (cells.ts wrapped), so the
 // shader's 3 × 3 reads never leave a face's tile. What changed is sent as a range of words a face, never the whole.
 
-import { CELLS, N, beyond, columnOf, faceOf, rowOf, wrapped } from '../world/cells';
+import type { Sea } from '../snapshot';
+import { CELLS, N, beyond, cellOf, columnOf, faceOf, rowOf, wrapped, type ReadCells } from '../world/cells.ts';
+import { createCursor } from './cursor.ts';
 
 /** Seconds a changed cell keeps who held it before, for the front; then it settles. */
 export const HOLD = 8;
@@ -66,7 +68,10 @@ for (let f = 0; f < 6; f++) {
 
 /** A change to draw (snapshot.ts SeaChange, less the cut): its cells, its holder after (0 open sea, else id + 1),
  *  when (world clock, s) and the cells its front spreads from (null: in from the changed water's edge). */
-export interface Shift { cells: Int32Array; owner: number; time: number; from: Int32Array | null }
+export interface Shift { cells: ReadCells; owner: number; time: number; from: ReadCells | null }
+
+/** The cells outside a match: all open sea. */
+const EMPTY = new Uint8Array(CELLS);
 
 export function createClaimed() {
   const cells = new Uint8Array(CELLS * 4); // holder, before, share, share before
@@ -120,7 +125,7 @@ export function createClaimed() {
   };
 
   /** The whole grid at once (a match's start), with no fronts. */
-  function load(owner: Readonly<Uint8Array>) {
+  function load(owner: ReadCells) {
     let n = 0;
     settling.length = 0;
     for (let k = 0; k < dirtyCount; k++) isDirty[dirty[k]] = 0;
@@ -145,15 +150,17 @@ export function createClaimed() {
     if (!changed.length) return;
     let t0 = time;
     const e = ++epoch * 3;
-    for (const c of changed) mark[c] = e;
+    for (let k = 0; k < changed.length; k++) mark[changed[k]] = e;
     // the changed water's edge (a drain's sources too), and every cell within FLAT of it, either side
     let nbCount = 0, nl = 0;
-    for (const c of changed) {
+    for (let k = 0; k < changed.length; k++) {
+      const c = changed[k];
       if (!boundary(c, e)) continue;
       queue[nbCount++] = c;
       nl = listWindow(c, e, nl, list);
     }
-    for (const c of changed) {
+    for (let k = 0; k < changed.length; k++) {
+      const c = changed[k];
       cells[c * 4 + 1] = cells[c * 4];
       cells[c * 4 + 3] = cells[c * 4 + 2];
       cells[c * 4] = owner;
@@ -174,7 +181,8 @@ export function createClaimed() {
     const inside = (x: number) => mark[x] === e || mark[x] === e + 1;
     let head = 0, tail = 0;
     if (from) {
-      for (const c of from) {
+      for (let k = 0; k < from.length; k++) {
+        const c = from[k];
         if (!inside(c) || seen[c] === e) continue;
         seen[c] = e;
         reveal[c] = 0;
@@ -219,7 +227,10 @@ export function createClaimed() {
     // a flood races in from the loop; a sunk ship's water drains from its edge a beat after she goes down
     const span = owner ? Math.min(3.2, 0.7 + far * 0.022) : Math.min(2.8, 1.6 + far * 0.015);
     if (!owner) t0 += 0.3;
-    for (const c of changed) reveal[c] = t0 + (span * (seen[c] === e ? reveal[c] : far)) / far;
+    for (let k = 0; k < changed.length; k++) {
+      const c = changed[k];
+      reveal[c] = t0 + (span * (seen[c] === e ? reveal[c] : far)) / far;
+    }
     const all = new Int32Array(changed.length + nl);
     all.set(changed);
     all.set(list.subarray(0, nl), changed.length);
@@ -260,8 +271,27 @@ export function createClaimed() {
     return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
   }
 
+  const cursor = createCursor();
+  /** Keeps the cells as `sea` has them (none: open sea): taken whole for a new match's sea or when changes were missed,
+   *  else each change not yet read drawn as a front. Returns whether they were taken whole. */
+  function follow(sea: Sea | undefined): boolean {
+    const { fresh, missed, from } = cursor.read(sea);
+    if (fresh || missed) {
+      load(sea?.owner ?? EMPTY);
+      return true;
+    }
+    if (!sea) return false;
+    for (let i = from; i < sea.changes.length; i++) {
+      const k = sea.changes[i];
+      if (k.kind === 'claim') change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.from({ length: k.loop }, (_, j) => k.cells[j]) });
+      else if (k.kind === 'home') change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
+      else if (k.kind === 'drain') change({ cells: k.cells, owner: 0, time: k.time, from: null });
+    }
+    return false;
+  }
+
   return {
-    gpuCells, gpuReveal, load, change, settle, flush,
+    gpuCells, gpuReveal, load, change, settle, flush, follow,
     /** Who holds cell c now (0 open sea, else id + 1). */
     ownerOf: (c: number) => cells[c * 4],
   };
