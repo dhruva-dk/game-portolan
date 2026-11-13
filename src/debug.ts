@@ -18,11 +18,13 @@
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, drop, match, spectate, won, result; ui/flow.ts; also map, rank and
-// settings), at sea among ?ships=n others by default: drop starts a match in the Gale (with ?dive, ?mark=lat,lon and
-// ?ahead=seconds to see the glide); spectate sinks her by the first other ship (?by=storm: by the storm), won sinks every other by her. ?ships=
-// sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight course at that speed, their helms
-// lashed, and ?heading=deg turns them all.
+// ?screen= opens the UI at a screen (title, lobby, match, spectate, won, result; ui/flow.ts; also map, rank and
+// settings), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the
+// eye coming down from space: play/arrival.ts); spectate sinks her by the first other ship (?by=storm: by the storm),
+// won sinks every other by her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
+// course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
+// long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
+// The ships in a match are sim/match.ts SHIPS; the frame has room for that many.
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
 import type { Anchor } from './world/lattice';
@@ -38,13 +40,13 @@ import { IDLE } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
 import { SHIP } from './sim/handling';
-import { PLAYER } from './sim/match';
+import { PLAYER, SHIPS } from './sim/match';
 import type { Cap } from './sim/storm';
-import { FLEET, type ShipDraw, type Snapshot } from './snapshot';
+import type { ShipDraw, Snapshot } from './snapshot';
 import type { Flow } from './ui/flow';
 import { uiLayer } from './ui/ui';
 import type { Weather } from './world/weather';
-import { R, add, cross, dot, frameAt, along, fromLatLon, normalize, scale, type Vec3 } from './world/sphere';
+import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
  *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter shows the frame's cost;
@@ -93,6 +95,7 @@ function setupOf(release: Setup): Setup {
     seed: number('seed', release.seed), mean, swing, hours: number('t', release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
+      fleet: release.drawing.fleet,
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       extras: params.has('probe') ? (light, world) => probeMeshes(light, startOf(world.planet).at) : release.drawing.extras,
@@ -115,11 +118,12 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     return s.draw(p.next, p.drawn);
   }
   const s = await stage(setupOf(release));
-  if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, FLEET), s.matches.storm));
+  if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, SHIPS), s.matches.storm));
   const p = await play(s);
   safeArea(uiLayer());
-  open(p, demoShips(s.start.at, FLEET - 1));
-  return s.draw(p.next, p.drawn);
+  open(p, demoShips(s.start.at, SHIPS - 1));
+  const paused = params.has('pause');
+  return s.draw((dt) => p.next(paused ? 0 : dt), p.drawn);
 }
 
 /** Opens the game where ?screen= says, among `others` at sea; then sails it on ?ahead= seconds. */
@@ -130,18 +134,15 @@ function open(p: Played, others: readonly Berth[]) {
   else if (screen === 'rank' || screen === 'settings') {
     flow.go('lobby');
     flow.open(screen);
-  } else if (screen === 'drop') {
+  } else if (screen === 'play') {
     p.play();
-    flow.go('drop');
-    if (params.has('dive')) game.dive();
-    const mark = params.get('mark')?.split(',').map((d) => Number(d) * degrees);
-    if (mark) game.mark(fromLatLon(mark[0], mark[1]));
+    flow.go('match');
   } else {
     game.atSea(others);
     drive(game, params.get('drive') ?? '');
     if (screen === 'result') flow.end(4);
     else {
-      referee.begin(false);
+      referee.begin();
       if (screen === 'spectate') game.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);
       if (screen === 'won') others.forEach((_, i) => game.sink(i + 1, PLAYER));
       flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');

@@ -10,10 +10,10 @@ import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
-import { chartOf, createMatches, startOf } from './play/setup';
+import { createMatches, startOf, watersOf } from './play/setup';
+import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
 import { traceCoasts } from './ui/coasts';
-import { createGale } from './ui/gale';
 import { createGlobe } from './ui/globe';
 import { createFlow, IN_MATCH } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
@@ -26,7 +26,7 @@ import { MEAN, SWING } from './world/weather';
 /** The release's setup. */
 const RELEASE: Setup = {
   seed: SEED, mean: MEAN, swing: SWING, hours: 15,
-  drawing: { sea: 'water', lod: null, cloth: true },
+  drawing: { sea: 'water', fleet: SHIPS, lod: null, cloth: true },
   meter: false, hold: null, gun: null,
 };
 
@@ -74,15 +74,15 @@ async function stage(setup: Setup): Promise<Stage> {
 }
 
 /** The match's screens follow its course (sim/match.ts); its end shows her place. */
-const SHOWS = { dropping: 'drop', fighting: 'match', spectating: 'spectate', won: 'won' } as const;
+const SHOWS = { fighting: 'match', spectating: 'spectate', won: 'won' } as const;
 
 /** The game on the stage, opening on the lobby's quiet sea, and its UI over the world, at the title. */
 async function play(s: Stage): Promise<Played> {
-  // the bots' chart of open water, for routes round land (sim/route.ts): sounded in a worker while the ground's bakes
-  // in another (frame.ready), in about a fifth of its time
-  const { chart, ms } = await chartOf(s.world.seed);
-  console.info(`chart sounded in ${ms.toFixed(0)} ms`);
-  const game = createGame(s.world, s.anchors, chart, s.start, s.matches.first);
+  // the water sounded, for the bots' routes round land (sim/route.ts) and the ships' berths (sim/spawn.ts): in a
+  // worker while the ground's bakes in another (frame.ready), in a fraction of its time
+  const { waters, ms } = await watersOf(s.world.seed);
+  console.info(`water sounded in ${ms.toFixed(0)} ms`);
+  const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
   const referee = createReferee(game);
 
   // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game and, where
@@ -96,12 +96,11 @@ async function play(s: Stage): Promise<Played> {
   const hudState = (): HudState => ({ ...game.status(), ...pending.kit() });
   const map = () => globe.show(hudState());
   const hud = createHud(layer, coasts, { slot: pending.choose, gust: pending.gust, fire: input.fire, map });
-  const gale = createGale(coasts, { dive: () => game.dive(), map });
   const deal = () => {
-    game.drop(s.matches.deal());
-    referee.begin(true);
+    game.start(s.matches.deal());
+    referee.begin();
   };
-  const flow = createFlow(hud, globe, gale, pending.career, 'title', {
+  const flow = createFlow(hud, globe, pending.career, 'title', {
     play: deal,
     home() {
       referee.end();
@@ -128,9 +127,7 @@ async function play(s: Stage): Promise<Played> {
         // sunk, by a ball, a ram or the storm alike: where she placed, over the ship she now watches
         if (m.phase === 'spectating' && m.place !== null) flow.sunk(m.place);
       }
-      const shown = hudState();
-      const d = game.dropping(s.canvas.clientWidth, s.canvas.clientHeight);
-      flow.update(dt, shown, d && { ...d, at: shown.at, heading: shown.heading });
+      flow.update(dt, hudState());
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot();
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };

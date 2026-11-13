@@ -12,8 +12,8 @@ export type Orientation = Turn;
 
 /**
  * Where the world is seen from. In the air (the game's camera, the debug flyer) the eye is among the clouds and under
- * the sky; from space (the full map, ui/globe.ts) it is past the air, looking at the planet: the sky and its clouds are
- * then not seen from inside, and the frame draws it as such.
+ * the sky; from space (the full map, ui/globe.ts; the start of a match, play/arrival.ts) it is past the air, looking
+ * at the planet: the sky and its clouds are then not seen from inside, and the frame draws it as such.
  */
 export interface Eye {
   kind: 'air' | 'space';
@@ -33,7 +33,7 @@ export const AIR_FOV = 60;
 export interface Look { paint: Vec3; sail: Vec3; band: boolean }
 
 /** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), and
- *  whether she floats (one going down or in the air neither fits the sea round her nor marks it). */
+ *  whether she floats (one going down neither fits the sea round her nor marks it). */
 export interface ShipDraw { id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean }
 
 /** What the guns did, at a moment on the world's clock (s): a gun fired from `from` along `dir`; a ball come down at
@@ -43,19 +43,17 @@ export type Blast =
   | { kind: 'splash'; time: number; at: Vec3; land: boolean }
   | { kind: 'strike'; time: number; at: Vec3; ram: boolean };
 
-/** The most ships the frame draws at once: the sea's room for them. */
-export const FLEET = 32;
-
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
   /** Seconds on the world's clock at the moment drawn: what the weather, the sea's waves, the gunfire's smoke and the
    *  storm's rain and billows run on. */
   clock: number;
-  /** The storm's safe cap at the moment drawn (sim/storm.ts), worked out on the match's own clock (which stands still
-   *  through the drop): the frame never works it out from `clock`. */
+  /** The storm's safe cap at the moment drawn (sim/storm.ts), worked out on the match's own clock: the frame never
+   *  works it out from `clock`. */
   storm: Cap;
-  /** Every ship drawn (at most FLEET, each id below it); a ship not listed is not drawn. */
+  /** Every ship drawn (at most the frame's fleet, frame.ts FrameOptions, each id below it); a ship not listed is not
+   *  drawn. */
   ships: readonly ShipDraw[];
   /** The ship always drawn whole (the player's, which the chase camera holds close), or null. */
   own: number | null;

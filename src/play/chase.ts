@@ -5,14 +5,14 @@
 // stands between it and her deck, the boom is raised until it sees over (quickly), and lowered again only slowly
 // once clear (as the old full game did, 0117 src/render/camera.ts); if raising it won't do, it is shortened.
 //
-// The match's other shots are this camera given another boom (a Shot): riding the Gale high behind the fleet, and
-// coming down with her (game.ts); drawn back and circling her on a win. Moving to another ship it flies there over
-// `flight` seconds, round the planet rather than through it and lifting on a long way (0117 camera.ts's flight).
+// The match's other shot is this camera given another boom (a Shot): drawn back and circling her on a win (shots.ts).
+// Moving to another ship it flies there over `flight` seconds, round the planet rather than through it and lifting on
+// a long way (0117 camera.ts's flight).
 
 import { AIR_FOV, type Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
 import { R, add, along, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
-import { inverse, lookAt, rotate, slerp, type Turn } from '../world/turn';
+import { lookAt, slerp, type Turn } from '../world/turn';
 
 /** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
 const BACK = 44, UP = 19, PIVOT = 2;
@@ -32,8 +32,8 @@ const SIGHT = 10;
 /** The chase's own boom: its length, metres, and how steeply it rises behind her, radians. */
 export const BOOM = Math.hypot(BACK, UP), ELEVATION = Math.atan2(UP, BACK);
 
-/** Another boom for a moment of the match: the pivot `height` metres higher (over her deck, or the fleet's on the
- *  Gale), the boom this long and this steep in place of the chase's, and turned `spin` radians to port about her. */
+/** Another boom for a moment of the match: the pivot `height` metres higher, the boom this long and this steep in
+ *  place of the chase's, and turned `spin` radians to port about her. */
 export interface Shot { height?: number; boom?: number; elevation?: number; spin?: number }
 
 /** t turned `angle` radians to port about `up`. */
@@ -155,16 +155,6 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     /** The eye the camera is now: where it stands and how it is turned. */
     eye(): Eye {
       return { kind: 'air', position, orientation, fov: AIR_FOV };
-    },
-    /** Where a point on the sea (a unit vector) falls in a view `width` × `height` px, or null behind the camera or
-     *  past the horizon. */
-    onScreen(p: Vec3, width: number, height: number): { x: number; y: number } | null {
-      if (dot(position, p) <= R) return null;
-      // in the camera's own frame (it looks down its −z), then through its lens
-      const [vx, vy, vz] = rotate(add(scale(p, R), position, -1), inverse(orientation));
-      if (vz >= 0) return null;
-      const t = Math.tan((AIR_FOV * Math.PI) / 360), x = vx / -vz / (t * (width / height)), y = vy / -vz / t;
-      return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
     },
   };
 }

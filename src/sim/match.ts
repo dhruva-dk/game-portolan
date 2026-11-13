@@ -1,14 +1,12 @@
 // The match's course for the player, as 0117 ran it (app.ts follow, session.ts spectate/rewatch):
-//   dropping   on the Gale and gliding down, until she touches the water
-//   fighting   at sea
+//   fighting   at sea, from the start (every ship begins afloat: spawn.ts)
 //   spectating she has sunk: the camera watches the ship that sank her, or else the one afloat with the most sinkings
 //              to her name; when that one sinks, the one that sank her, and so on. A tap moves on (to the result), or
 //              the match ending does, SPECTATE seconds after
 //   won        she is the last afloat: a tap moves on, or VICTORY seconds do
-// Her place: 1 + the ships still afloat as she sank (a ship still in the drop is afloat). Pure: a value stepped by what
-// the game reports.
+// Her place: 1 + the ships still afloat as she sank. Pure: a value stepped by what the game reports.
 
-export type Phase = 'dropping' | 'fighting' | 'spectating' | 'won';
+export type Phase = 'fighting' | 'spectating' | 'won';
 
 /** Seconds the end holds before moving on by itself (0117 app.ts HOLD): watching the last ship left, and the win. */
 export const HOLD = { spectating: 3, won: 6 } as const;
@@ -16,8 +14,9 @@ export const HOLD = { spectating: 3, won: 6 } as const;
 /** The player's ship's id. */
 export const PLAYER = 0;
 
-/** The ships in a match with a drop, hers among them (0117's tables.ts MATCH.ships). */
-export const SHIPS = 20;
+/** The ships in a match, hers among them: the one number everything that counts them follows (0117's tables.ts
+ *  MATCH.ships was 20). */
+export const SHIPS = 80;
 
 /** A ship sunk: who, and who sank her (null: the storm, or none). */
 export interface Sunk { id: number; by: number | null }
@@ -38,12 +37,11 @@ export interface MatchState {
   read: number;
 }
 
-/** What the game reports each frame: whether she is down on the sea, every sinking so far in order, and the ids of
- *  every ship not sunk (in the drop or afloat). */
-export interface Report { landed: boolean; sinkings: readonly Sunk[]; alive: readonly number[] }
+/** What the game reports each frame: every sinking so far in order, and the ids of every ship not sunk. */
+export interface Report { sinkings: readonly Sunk[]; alive: readonly number[] }
 
-export const startMatch = (dropping: boolean): MatchState => ({
-  phase: dropping ? 'dropping' : 'fighting', place: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0,
+export const startMatch = (): MatchState => ({
+  phase: 'fighting', place: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0,
 });
 
 /** Who to watch after `gone` sank, at the hand of `by`: her, if afloat, or the ship afloat with the most sinkings to
@@ -63,9 +61,8 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   if (m.done) return m;
   let s: MatchState = { ...m, read: r.sinkings.length };
   const fresh = r.sinkings.slice(m.read);
-  if (s.phase === 'dropping' && r.landed) s.phase = 'fighting';
   const mine = fresh.find((k) => k.id === PLAYER);
-  if (mine && (s.phase === 'fighting' || s.phase === 'dropping')) {
+  if (mine && s.phase === 'fighting') {
     const watch = next(mine.by, r);
     s = { ...s, phase: 'spectating', place: 1 + r.alive.length, watch: watch < 0 ? PLAYER : watch, move: 'cut' };
   } else if (s.phase === 'spectating') {

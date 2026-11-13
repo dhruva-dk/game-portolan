@@ -29,7 +29,7 @@ export interface Status {
   /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities), how far loaded (0…1, 1 ready), and whether its assist
    * has a ship to lay on where she is aimed (sim/gun.ts); null with none. */
   gun: { rarity: number; ready: number; locked: boolean } | null;
-  /** Ships still afloat (in the drop or on the sea), hers among them; whether hers is sunk. */
+  /** Ships still afloat, hers among them; whether hers is sunk. */
   afloat: number; sunk: boolean;
   /** Seconds till the storm next holds or closes (0 once it has closed for good), and its calm (radius in metres). */
   storm: number; eye: { centre: Vec3; radius: number };

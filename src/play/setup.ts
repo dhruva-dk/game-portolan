@@ -1,12 +1,12 @@
-// How a match is set up on the world: where her ship lies when there is no drop (the lobby's quiet sea, and a match
-// at sea), the bots' chart of the planet's water, and the matches dealt one after another, each with its storm and its
-// bots' minds.
+// How a match is set up on the world: where her ship lies in the lobby's quiet sea (and a match at sea about her, for
+// debugging), the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
+// another, each with its storm, its berths and its bots' minds.
 
-import { charted, type Chart } from '../sim/route';
+import { charted } from '../sim/route';
 import { createStorm, type Storm } from '../sim/storm';
 import type { Planet } from '../world/planet';
 import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere';
-import type { Match } from './state';
+import type { Match, Waters } from './state';
 
 /** Metres off the coast she lies at the start. */
 const START = 80;
@@ -19,14 +19,15 @@ export function startOf(planet: Planet): { at: Vec3; bearing: number } {
   return { at: along(largest.chart.at, southward, largest.coast(Math.atan2(cz, cx)) + START).p, bearing: 0 };
 }
 
-/** The bots' chart of the water of a planet of this seed (sim/route.ts), sounded in a worker (sounding.ts) while the
- *  ground's bakes in its own (land/bake.ts); and the milliseconds the sounding took. */
-export function chartOf(seed: number): Promise<{ chart: Chart; ms: number }> {
+/** The water of a planet of this seed as the match reads it (state.ts Waters), sounded in a worker (sounding.ts)
+ *  while the ground's bakes in its own (land/bake.ts); and the milliseconds the sounding took. */
+export function watersOf(seed: number): Promise<{ waters: Waters; ms: number }> {
   const worker = new Worker(new URL('./sounding.ts', import.meta.url), { type: 'module' });
   return new Promise((resolve, reject) => {
-    worker.onmessage = (e: MessageEvent<{ open: Uint8Array; clear: Uint8Array; ms: number }>) => {
+    worker.onmessage = (e: MessageEvent<{ open: Uint8Array; clear: Uint8Array; berths: Float64Array; ms: number }>) => {
       worker.terminate();
-      resolve({ chart: charted(e.data), ms: e.data.ms });
+      const b = e.data.berths, points = Array.from({ length: b.length / 3 }, (_, i): Vec3 => [b[3 * i], b[3 * i + 1], b[3 * i + 2]]);
+      resolve({ waters: { chart: charted(e.data), water: { points } }, ms: e.data.ms });
     };
     worker.onerror = (e) => reject(new Error(e.message));
     worker.postMessage({ seed });

@@ -6,7 +6,6 @@
 //           banner with her galleon on it. No tabs. Elsewhere a drag reaches the world: it turns the camera round her.
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
 //   settings a small folio: sound and look speed, each a bar set by a tap along it
-// (The drop's own screen is gale.ts.)
 //   sunk    over the match she watches once she has sunk: her galleon going down and her place in its laurel
 //   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, her plate
 // No words anywhere; numerals only.

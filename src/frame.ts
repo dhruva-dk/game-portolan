@@ -5,7 +5,7 @@ import {
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import { environmentAt, type World } from './environment';
 import type { Compute, Draw } from './gpu';
-import { FLEET, type Eye, type Snapshot } from './snapshot';
+import type { Eye, Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
 import { createGround } from './land/ground';
 import { createIslands } from './land/islands';
@@ -36,10 +36,12 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
 const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
 
-/** How the frame draws: what the sea is drawn as (water/water.ts); every ship at one level of detail (ship/fleet.ts
- *  pin) or null; whether the near ships' canvas is simulated; and anything more to stand in the world, lit by the sky. */
+/** How the frame draws: what the sea is drawn as (water/water.ts); the most ships it draws at once (the room the
+ *  fleet and the sea keep for them: the match's ship count); every ship at one level of detail (ship/fleet.ts pin) or
+ *  null; whether the near ships' canvas is simulated; and anything more to stand in the world, lit by the sky. */
 export interface FrameOptions {
   sea: SeaShows;
+  fleet: number;
   lod: number | null;
   cloth: boolean;
   extras?: (light: Sky, world: World) => readonly Object3D[];
@@ -95,14 +97,14 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here
   const ground = createGround(world.seed);
-  const water = createWater(view, sky.light, ground, world.wind, FLEET, options.sea);
+  const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
   const sand = createSand(view, ground, light);
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
-  const fleet = createFleet(light, world.wind, FLEET);
+  const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
   const gunfire = createGunfire(light);

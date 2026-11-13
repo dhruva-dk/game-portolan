@@ -1,25 +1,23 @@
 // The screens' order, as a small state machine:
-//   title → (tap, once the world is ready) → lobby → (PLAY) → drop → (she touches the water) → match → (she sinks)
+//   title → (tap, once the world is ready) → lobby → (PLAY) → match → (she sinks)
 //   → spectate, or (she is the last afloat) → won → (a tap, or the match's own hold) → result → (tap) → lobby
-// with the rank folio and settings opened over the lobby, and the full map over the drop or the match. The drop has
-// its own lean screen (gale.ts); the HUD shows in the match, and, watching another ship, in spectate (only its clock
-// and disc); the win has no UI at all: the HUD dries away (0117: 0.3 s) and a tap anywhere moves on. Which screen of
+// with the rank folio and settings opened over the lobby, and the full map over the match. The HUD shows in the
+// match, and, watching another ship, in spectate (only its clock and disc); the win has no UI at all: the HUD dries away (0117: 0.3 s) and a tap anywhere moves on. Which screen of
 // the match shows is the match's own course (sim/match.ts, run by main.ts); nothing happens by script: every step is
 // a tap, or the match's own clock or end. Spectating, a slip at the foot of the screen says she has sunk and where
 // she placed (sunk), however she went down.
 
-import type { DropState, createGale } from './gale';
 import type { createGlobe } from './globe';
 import { clock, type HudState, type createHud } from './hud';
 import type { Career } from '../player';
 import { createLobby, createRank, createResult, createSettings, createSunk, createTitle, type Settings } from './screens';
 import { onTap, uiLayer } from './ui';
 
-export const SCREENS = ['title', 'lobby', 'drop', 'match', 'spectate', 'won', 'result'] as const;
+export const SCREENS = ['title', 'lobby', 'match', 'spectate', 'won', 'result'] as const;
 export type Screen = (typeof SCREENS)[number];
 export const isScreen = (s: string): s is Screen => (SCREENS as readonly string[]).includes(s);
 /** The screens over a match under way. */
-export const IN_MATCH: readonly Screen[] = ['drop', 'match', 'spectate', 'won'];
+export const IN_MATCH: readonly Screen[] = ['match', 'spectate', 'won'];
 
 /** Seconds the HUD takes to dry away on a win (0117 AT.dry). */
 const DRY = 0.3;
@@ -45,7 +43,7 @@ function saveSettings(s: Settings) {
 export interface FlowActions { play(): void; home(): void; skip(): void }
 
 export function createFlow(
-  hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, gale: ReturnType<typeof createGale>, career: () => Career,
+  hud: ReturnType<typeof createHud>, globe: ReturnType<typeof createGlobe>, career: () => Career,
   start: Screen, act: FlowActions,
 ) {
   let screen: Screen = start, settings = loadSettings(), afloat = 0;
@@ -64,7 +62,8 @@ export function createFlow(
   const lobby = createLobby({
     play: () => {
       act.play();
-      go('drop');
+      afloat = 0;
+      go('match');
     },
     rank: openRank, settings: () => settingsFolio.show(true),
   });
@@ -94,13 +93,11 @@ export function createFlow(
     // (on a win it dries away, and is back for the next match)
     hud.root.style.opacity = next === 'won' ? '0' : '1';
     hud.watch(next === 'spectate');
-    gale.show(next === 'drop');
     if (next !== 'spectate') struck = null;
     sunk.show(next === 'spectate' && struck !== null, struck ?? undefined);
     skip.style.display = next === 'spectate' || next === 'won' ? 'block' : 'none';
-    if (next !== 'drop' && next !== 'match') globe.close();
+    if (next !== 'match') globe.close();
     result.show(next === 'result', { place, afloat: clock(afloat), career: career() });
-    if (next === 'drop') afloat = 0;
   }
   go(start);
 
@@ -127,14 +124,13 @@ export function createFlow(
       if (folio === 'rank') openRank();
       else settingsFolio.show(true);
     },
-    /** A frame of dt seconds: what the HUD reads, and the drop's screen while she is in it. */
-    update(dt: number, s: HudState, drop: DropState | null) {
-      if (screen === 'drop' || screen === 'match') afloat += dt;
-      if (screen === 'drop' && drop) gale.update(drop, dt);
+    /** A frame of dt seconds: what the HUD reads. */
+    update(dt: number, s: HudState) {
+      if (screen === 'match') afloat += dt;
       if (IN_MATCH.includes(screen)) {
-        // the full map's window would show the HUD and the drop's screen under it
-        hud.root.style.visibility = gale.root.style.visibility = globe.open ? 'hidden' : '';
-        if (screen !== 'drop') hud.update(s);
+        // the full map's window would show the HUD under it
+        hud.root.style.visibility = globe.open ? 'hidden' : '';
+        hud.update(s);
         globe.update(s);
       }
     },
