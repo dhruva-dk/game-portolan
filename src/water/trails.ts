@@ -1,21 +1,21 @@
-// The open trails (snapshot.ts Sea trails): a glowing ribbon in her colour along each trail near the eye, laid on the
-// water as the waves move it, and run on from its last point to her stern. The first game's (agent-initial
-// src/territory.ts TRAIL_VERT, TRAIL_FRAG), in TSL: a thin hot core in a soft sheen of the colour, pulses running
-// back along it, flicker on it, broken by the swell into stretches of light and flecks of foam, and only a breath of dye, so it reads as light on the water and not as paint. A trail
-// ended by a loop closed sinks into the new border (ABSORB s); one cut, or its ship sunk, dies away and breaks up
-// into foam (DISSOLVE s).
+// The open trails (snapshot.ts Sea trails): each a line in her colour along her trail near the eye, laid on the water as
+// the waves move it and run on from its last point to her stern: drawn as the border is (claims.ts), a hard line its
+// width in metres near and never under a pixel far, edges smoothed over a pixel, with a narrow glow, but broken into
+// dashes that march along it toward her, so it reads as a border still being drawn. A trail ended by a loop closed
+// joins up into a solid line and sinks into the new border as her colour floods in behind its front (ABSORB s); one
+// cut, or its ship sunk, breaks up, its dashes shrinking away (DISSOLVE s).
 //
 // The ribbons are rebuilt each frame on the CPU from the trails within REACH m of the eye (a few thousand points at
 // most), and only the part written is sent. Each vertex is lifted a hair over the water and drawn BIAS m nearer the
 // eye along its own line of sight (the same pixel, nearer in depth), so the chop and wakes the waves' own read
-// can't hide it while a real crest in front still does.
+// can't hide it while a real crest in front still does. Far off the ribbon is widened to keep a few pixels across.
 
 import {
   AddEquation, BufferAttribute, BufferGeometry, CustomBlending, DoubleSide, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor,
   Vector4,
 } from 'three/webgpu';
 import {
-  Fn, attribute, cameraPosition, dot, exp, float, int, max, min, mix, mx_noise_float, normalize, pow, select, sin, smoothstep, uniform,
+  Fn, attribute, cameraPosition, clamp, dot, exp, float, fract, fwidth, int, max, min, mix, normalize, select, smoothstep, sqrt, uniform,
   uniformArray, varying, vec3, vec4,
 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
@@ -26,16 +26,26 @@ import type { FloatNode, Vec3Node } from '../tsl';
 
 /** The most points drawn at once, over every ribbon. */
 const POINTS = 16384;
-/** Its half width, m; lifted this high over the water, and drawn this much nearer the eye. */
+/** The ribbon's half width near, m; lifted this high over the water, and drawn this much nearer the eye. */
 const HALF = 0.6, LIFT = 0.05, BIAS = 0.3;
+/** Radians a pixel spans, about (the chase camera's field over the phone's 440 pixels), and the pixels the ribbon keeps
+ *  each side of its middle far off, however foreshortened. */
+const PIXEL = 0.0026, KEEP_PX = 4;
+/** The line, as the border's (claims.ts): its half width, m (hers OWN_WIDE times it), the least it is drawn at, pixels,
+ *  and the least share of its light kept when thinner; its glow's reach, m, and least, pixels; their light, as a share
+ *  of what the sun and sky give a white surface once the colour is raised to a luminance of 1. */
+const LINE = 0.2, OWN_WIDE = 1.4, THINNEST = 0.6, FAINTEST = 0.45, GLOW_REACH = 1.2, GLOW_PX = 2, INK = 0.45, GLOW = 0.1;
+/** Her own line this many times as bright as the others'. */
+const OWN_LINE = 1.7;
+/** The dashes: a dash and its gap every DASH m, the dash DUTY of it, marching toward her at MARCH m/s. */
+const DASH = 5, DUTY = 0.65, MARCH = 3;
 /** Trails are drawn within this many metres of the point under the eye. */
 const REACH = 450;
-/** Seconds a closed loop's ribbon takes to sink into its border; a cut one's to break up into foam. */
-const ABSORB = 0.7, DISSOLVE = 1.8;
+/** Seconds a closed loop's line takes to sink into its border (its dashes joined in the first JOIN s); a cut one's to
+ *  break up. */
+const ABSORB = 0.9, JOIN = 0.15, DISSOLVE = 1.2;
 /** The modes: open, sinking into a border, breaking up. */
 const OPEN = 0, ABSORBED = 1, DISSOLVING = 2;
-/** The glow, as a share of what the sun and sky give a white surface, once the colour is raised to a luminance of 1. */
-const GLOW = 0.32;
 /** The ribbon's stern end lies this far forward of her stern, m: a little under her counter. */
 const COUNTER = 2;
 
@@ -63,48 +73,43 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
   const a4 = attribute('position', 'vec4'), x4 = attribute('trailAcross', 'vec4'), r4 = attribute('trailRib', 'vec4');
   // r4: arc (m), the arc at her stern, her colour's slot, mode; x4.w: seconds since it closed
   const mode = r4.w, age = x4.w;
-  const width = float(HALF).mul(select(mode.equal(ABSORBED), float(1).sub(min(age.div(ABSORB), 1).mul(0.6)), select(mode.equal(DISSOLVING), min(age.div(DISSOLVE), 1).mul(0.6).add(1), float(1))));
+  // a few pixels each side however far or foreshortened (the eye's ray along the ribbon's width shrinks it)
+  const rest = a4.xyz.mul(R), ray = cameraPosition.sub(rest);
+  const seen = ray.length(), side = sqrt(float(1).sub(dot(x4.xyz, ray.div(seen)).pow(2)));
+  const width = max(float(HALF), seen.mul(PIXEL * KEEP_PX).div(max(side, 0.15)));
   const dir = normalize(a4.xyz.add(x4.xyz.mul(a4.w.mul(width).div(R))));
   const water = surface(dir, float(1)).add(dir.mul(LIFT));
   m.positionNode = water.add(normalize(cameraPosition.sub(water)).mul(BIAS));
-  const side = varying(a4.w), arc = varying(r4.x), head = varying(r4.y), slot = varying(r4.z), modeV = varying(mode), ageV = varying(age);
-  const place = varying(water), up = varying(dir);
+  const sideV = varying(a4.w), wide = varying(width), arc = varying(r4.x), head = varying(r4.y), slot = varying(r4.z), modeV = varying(mode);
+  const ageV = varying(age), place = varying(water), up = varying(dir);
   m.colorNode = Fn(() => {
-    const a = side.abs(), s = arc, t = time;
-    const team = colours.element(int(slot.add(0.5))).xyz;
-    const lum = max(dot(team, vec3(0.2126, 0.7152, 0.0722)), 0.02);
-    // what the sun and sky give a white surface here: the glow is set against it
+    const t = time, s = arc;
+    const team = colours.element(int(slot.add(0.5)));
+    const mine = team.w;
+    const lum = max(dot(team.xyz, vec3(0.2126, 0.7152, 0.0722)), 0.02);
+    // what the sun and sky give a white surface here: the line's light is set against it
     const l = sky.sun(place);
     const white = sky.sunIlluminance(place).mul(max(dot(l, up), 0)).div(Math.PI).add(sky.ambient(place, up));
-    const glow = team.div(lum).mul(0.3);
-    // the newest part rises out of her wake, the oldest leaves the border cleanly
-    const ends = smoothstep(0, 2, head.sub(s)).mul(smoothstep(0, 1, s));
-    const core = exp(a.mul(a).mul(-60)).mul(0.5);
-    const body = exp(a.mul(a).mul(-3.5)).mul(float(1).sub(smoothstep(0.75, 1, a)));
-    const pulse = pow(sin(s.mul(0.7).add(t.mul(8))).mul(0.5).add(0.5), 8);
-    const flick = mx_noise_float(vec3(s.mul(0.9).add(t.mul(4)), a.mul(3), t.mul(1.7))).mul(0.5).add(0.5);
-    const beat = sin(t.mul(6.5)).mul(0.15).add(0.85);
-    // broken by the swell: the light gathers on some stretches and all but goes on others, and foam flecks it
-    const broken = smoothstep(0.25, 0.75, mx_noise_float(place.mul(0.3).add(vec3(t.mul(0.35), 0, t.mul(-0.2))))
-      .mul(0.5).add(0.5)).mul(0.75).add(0.25);
-    const fleck = smoothstep(0.6, 0.8, mx_noise_float(place.mul(1.7).add(vec3(0, t.mul(0.6), 0))).mul(0.5).add(0.5)).mul(body);
-    const emit = glow.mul(body).mul(flick.mul(0.4).add(0.4).add(pulse)).add(mix(glow, vec3(1), 0.2).mul(core).mul(pulse.mul(1.4).add(1.4)))
-      .mul(beat).mul(broken).mul(white).mul(GLOW).toVar();
-    const alpha = body.mul(0.1).add(fleck.mul(0.45)).toVar();
-    const dye = mix(team.mul(0.3), vec3(0.9), fleck.div(max(alpha.mul(2.2), 1e-3)).min(1)).mul(white).toVar();
-    const k = select(modeV.equal(ABSORBED), min(ageV.div(ABSORB), 1), min(ageV.div(DISSOLVE), 1));
+    const light = team.xyz.div(lum).mul(mix(float(1), float(OWN_LINE), mine)).mul(white);
+    // across: metres from the middle, and a pixel's worth of them
+    const off = sideV.abs().mul(wide), px = max(fwidth(sideV).mul(wide), 1e-4);
+    const half = float(LINE).mul(mix(float(1), float(OWN_WIDE), mine));
+    const cover = clamp(max(half, px.mul(THINNEST)).sub(off).div(px).add(0.5), 0, 1).mul(max(min(half.div(px.mul(THINNEST)), 1), FAINTEST));
+    const reach = float(GLOW_REACH).div(px);
+    const glow = exp(off.div(px).div(max(reach, GLOW_PX)).pow(2).negate()).mul(min(reach.div(GLOW_PX), 1));
+    // along: the dashes marching toward her, joined once the loop closes, shrinking away once cut; seen from so far
+    // that a dash is under a pixel or so, their mean
     const absorbed = modeV.equal(ABSORBED), dissolving = modeV.equal(DISSOLVING);
-    // sinking into the border: it fades as it narrows
-    emit.mulAssign(select(absorbed, float(1).sub(k), float(1)));
-    alpha.mulAssign(select(absorbed, float(1).sub(k), float(1)));
-    // breaking up: the glow dies away and the ribbon turns to lacy foam that thins out
-    const n = mx_noise_float(place.mul(1.6).add(vec3(0, 0, t.mul(0.3)))).mul(0.5).add(0.5).add(float(1).sub(a).mul(0.2));
-    const froth = smoothstep(k.mul(0.5).add(0.45), k.mul(0.5).add(0.6), n);
-    const turn = smoothstep(0, 0.25, k);
-    emit.mulAssign(select(dissolving, exp(k.mul(-3.5)), float(1)));
-    dye.assign(select(dissolving, mix(dye, white.mul(0.9), turn), dye));
-    alpha.assign(select(dissolving, mix(alpha, froth.mul(float(1).sub(smoothstep(0.7, 1, a))).mul(0.6), turn).mul(float(1).sub(k.mul(k))), alpha));
-    return vec4(dye.mul(alpha).add(emit).mul(ends), alpha.mul(ends));
+    const k = select(absorbed, min(ageV.div(ABSORB), 1), min(ageV.div(DISSOLVE), 1));
+    const duty = select(absorbed, mix(float(DUTY), float(1.05), smoothstep(0, JOIN, ageV)), select(dissolving, float(DUTY).mul(float(1).sub(k)), float(DUTY)));
+    const f = fract(s.sub(t.mul(MARCH)).div(DASH));
+    const inside = select(f.lessThan(duty), min(f, duty.sub(f)), min(f.sub(duty), float(1).sub(f)).negate()).mul(DASH);
+    const ps = max(fwidth(s), 1e-4);
+    const dash = mix(clamp(inside.div(ps).add(0.5), 0, 1), min(duty, 1), smoothstep(DASH * 0.2, DASH * 0.6, ps));
+    // the newest part rises out of her wake, the oldest leaves the border cleanly; sinking into the border, it fades
+    const ends = smoothstep(0, 2, head.sub(s)).mul(smoothstep(0, 1, s)).mul(select(absorbed, float(1).sub(smoothstep(JOIN, 1, k)), float(1)));
+    const a = cover.mul(dash).mul(ends);
+    return vec4(light.mul(cover.mul(INK).add(glow.mul(GLOW))).mul(dash).mul(ends), a);
   })();
   m.blending = CustomBlending;
   m.blendEquation = AddEquation;

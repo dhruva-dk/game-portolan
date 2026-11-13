@@ -2,9 +2,8 @@
 // planet's 393 216 cells), taken afresh only when the sea's holders have changed or she has sailed a sample's width,
 // at most a few times a second; between samplings the grid is laid onto the disc where she now is (disc.ts laid).
 //
-// Each holder's water a wash in her colour, hers the deeper, the pigment pooled where the wash dried at its edge and a
-// faint bleed past it, granulated by the cell under it so the grain stays on the sea as she sails (0117's
-// screens/wash.ts, the first Portolan's chart wash).
+// Each holder's water as the sea shows it (water/claims.ts): a flat tint in her colour, hers the deeper, inside a hard
+// line of it along its edge.
 
 import type { Sea } from '../snapshot';
 import { cellOf } from '../world/cells';
@@ -19,8 +18,8 @@ const OFFSETS = Array.from({ length: DIRS }, (_, i) => {
   const a = (i * Math.PI * 2) / DIRS + 0.4;
   return [Math.round(Math.cos(a) * REACH), Math.round(Math.sin(a) * REACH)] as const;
 });
-/** The wash's strength for hers and another's, how much the edge deepens it, and how far the bleed reaches. */
-const STRENGTH = { mine: 0.6, theirs: 0.36, pooled: 1.4, bleed: 0.3 } as const;
+/** The tint's strength for hers and another's, and the line's. */
+const STRENGTH = { mine: 0.5, theirs: 0.32, line: 1 } as const;
 const BLACK = [0, 0, 0];
 /** Least seconds between samplings. */
 const EVERY = 0.25;
@@ -28,19 +27,13 @@ const EVERY = 0.25;
 /** A linear colour channel as sRGB, 0…255. */
 const srgb = (v: number) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
 
-/** A steady grain, 0.82…1.18, for a cell. */
-const grainOf = (c: number) => {
-  const s = Math.sin(c * 12.9898) * 43758.5453;
-  return 0.82 + 0.36 * (s - Math.floor(s));
-};
-
 /** The held water's plate, `span` metres from her to its edge. */
 export function createHeld(span: number) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = SIDE;
   const g = canvas.getContext('2d')!;
   const image = g.createImageData(SIDE, SIDE);
-  const ids = new Uint8Array(SIDE * SIDE), cells = new Int32Array(SIDE * SIDE);
+  const ids = new Uint8Array(SIDE * SIDE);
   let at: Vec3 | null = null, e: Vec3 = [1, 0, 0], n: Vec3 = [0, 1, 0], seq = -1, since = Infinity, any = false;
   const stats = { samplings: 0, ms: 0 };
 
@@ -66,9 +59,7 @@ export function createHeld(span: number) {
         // x metres along e and y along n, the surface's way (disc.ts out), unrolled
         const dd = Math.sqrt(rr) || 1e-9, cs = Math.cos(dd / R), sn = Math.sin(dd / R) / dd;
         for (let m = 0; m < 3; m++) q[m] = at[m] * cs + (e[m] * x + n[m] * y) * sn;
-        const c = cellOf(q);
-        cells[k] = c;
-        ids[k] = owner[c];
+        ids[k] = owner[cellOf(q)];
         any ||= ids[k] !== 0;
       }
     }
@@ -77,32 +68,25 @@ export function createHeld(span: number) {
     stats.ms += performance.now() - t0;
   }
 
-  /** The wash from the holders sampled. */
+  /** The tint and lines from the holders sampled: a sample is on the line if any round it is another's. */
   function paint(me: number) {
     const d = image.data;
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const k = j * SIDE + i, a = k * 4, id = ids[k];
-        let same = 0, near = 0, r = 0, gr = 0, b = 0;
-        for (let o = 0; o < DIRS; o++) {
+        if (id === 0) {
+          d[a + 3] = 0;
+          continue;
+        }
+        let edge = false;
+        for (let o = 0; o < DIRS && !edge; o++) {
           const u = i + OFFSETS[o][0], v = j + OFFSETS[o][1];
           // past the grid's edge counts as more of the same, or its rim would read as a border
-          const w = u < 0 || v < 0 || u >= SIDE || v >= SIDE ? id : ids[v * SIDE + u];
-          if (w === id) same++;
-          else if (id === 0) {
-            const ink = inks[w - 1] ?? BLACK;
-            r += ink[0]; gr += ink[1]; b += ink[2];
-            near++;
-          }
+          edge = u >= 0 && v >= 0 && u < SIDE && v < SIDE && ids[v * SIDE + u] !== id;
         }
-        if (id !== 0) {
-          const ink = inks[id - 1] ?? BLACK, edge = Math.pow(1 - same / DIRS, 1.4);
-          d[a] = ink[0]; d[a + 1] = ink[1]; d[a + 2] = ink[2];
-          d[a + 3] = 255 * Math.min(1, (id === me ? STRENGTH.mine : STRENGTH.theirs) * (1 + STRENGTH.pooled * edge) * grainOf(cells[k]));
-        } else if (near > 0) {
-          d[a] = r / near; d[a + 1] = gr / near; d[a + 2] = b / near;
-          d[a + 3] = 255 * Math.min(1, ((STRENGTH.bleed * near) / DIRS) * grainOf(cells[k]));
-        } else d[a + 3] = 0;
+        const ink = inks[id - 1] ?? BLACK;
+        d[a] = ink[0]; d[a + 1] = ink[1]; d[a + 2] = ink[2];
+        d[a + 3] = 255 * (edge ? STRENGTH.line : id === me ? STRENGTH.mine : STRENGTH.theirs);
       }
     }
     g.putImageData(image, 0, 0);

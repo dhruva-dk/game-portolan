@@ -35,7 +35,8 @@
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
 // her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
-// middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?map opens
+// middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?homeward, after the legs,
+// steers her back to where she began in the frames drawn, her loop closing in view. ?map opens
 // the full map once ?ahead= has run (with screen=play, the whole match's water from space).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
@@ -230,6 +231,8 @@ function drive(game: Game, legs: string) {
     for (let i = 0; i < Math.round(number('inward', 0) / STEP); i++) game.step(STEP, IDLE);
     game.debug.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
+  // ?homeward: back toward where she began in the frames drawn, so her loop closes and floods in view
+  if (params.has('homeward')) game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
   if (!params.has('flood')) return;
   game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
   const closed = () => game.snapshot().sea?.changes.some((k) => k.kind === 'claim' && k.ship === PLAYER);

@@ -56,9 +56,9 @@ const CREST = 0.03, CREST_GAIN = 1.2;
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /** What the sea is at a point: its tint (rgb the holder's colour, a how far the water gives up its own for it), the
- *  line over it (rgb its light per unit of a white surface's, premultiplied; a its cover) and a drained change's churn
- *  (0…1). */
-export interface Claim { dye: Vec4Node; ink: Vec4Node; drain: FloatNode }
+ *  line over it (rgb its light per unit of a white surface's, premultiplied; a its cover), a drained change's churn
+ *  (0…1) and how far off it is seen (0…1: 1 a cell under a pixel or two). */
+export interface Claim { dye: Vec4Node; ink: Vec4Node; drain: FloatNode; far: FloatNode }
 
 /** A line of width w at distance d, widened to the pixel's footprint px with its energy kept (the first game's). */
 const line = (d: FloatNode, w: number, px: FloatNode): FloatNode => {
@@ -213,7 +213,7 @@ export function createClaims(ships: number) {
         ink.assign(lines.add(vec4(sN.light.mul(crest.mul(INK)), crest).mul(float(1).sub(lines.w))));
         dye.assign(vec4(colour, max(strength, glow)));
       });
-      return { dye, ink, drain };
+      return { dye, ink, drain, far };
     },
 
     /** Each frame: who holds the sea (none outside a match) at the world's clock `now` (s), and whose ship is hers (her

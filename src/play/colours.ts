@@ -16,6 +16,10 @@ const SAILS: Vec3[] = [
 export const lookOf = (id: number): Look =>
   (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], band: id % 4 === 3 });
 
+/** The others' colours on the sea, by their sails: each sail's dye, but madder's, a red too near her scarlet to tell
+ *  apart on the water, which holds it in a lime instead. */
+const SEAS: Vec3[] = SAILS.map((c, i) => (i === 3 ? [0.3, 0.52, 0.03] : c));
+
 /** A ship's colour on the sea she holds (snapshot.ts Sea), by her id: hers the scarlet of her hull, the others' their
- *  sails' dye. */
-export const seaColourOf = (id: number): Vec3 => (id === 0 ? LOOK.paint : lookOf(id).sail);
+ *  sails' dye (SEAS). */
+export const seaColourOf = (id: number): Vec3 => (id === 0 ? LOOK.paint : SEAS[(id - 1) % SEAS.length]);
