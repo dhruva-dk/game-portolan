@@ -142,7 +142,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
   }
 
   /**
-   * Each frame, after the camera has moved: windSpeed in metres per second; height the drawing buffer's, pixels; dt
+   * Each frame, after the camera has moved: windSpeed in metres per second; height the screen's, CSS pixels (frame.ts); dt
    * the seconds since the last. Returns what is due: the near ships' canvas as cloth.
    */
   function update(camera: PerspectiveCamera, windSpeed: number, height: number, dt: number): { cloth: Compute[] } {

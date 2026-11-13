@@ -32,6 +32,11 @@ import type { Vec4Node } from './tsl';
  * curve and the look are the grade's (post/grade.ts), set by the sun's height.
  */
 const BLOOM = 0.22;
+/**
+ * The frame's pixels per CSS pixel, whatever the screen's own: the phone's is 3, and the browser scales the frame up to
+ * it. At 1 its 956×440 smeared her hull and rigging; 1.5 (1434×660) is what the phone's GPU affords at 30–40 FPS.
+ */
+const SCALE = 1.5;
 const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
@@ -82,9 +87,10 @@ export interface FrameOptions {
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
  *                 storm's rain and cloud over all of it (sky/storm.ts: no march, the ray against its cone), drawn
- *                 once to a full-size texture of light; then, at the phone's 956×440:
- *        bloom        7 passes, the largest a quarter size (239×110), 4–5 taps each: ~0.2 M taps (post/bloom.ts)
- *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~0.9 M taps (post/shafts.ts)
+ *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1434×660, the
+ *                 browser scaling the frame up to the screen):
+ *        bloom        7 passes, the largest a quarter size (359×165), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
+ *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~2 M taps (post/shafts.ts)
  *        grade        exposure, vignette, AgX, two reads of 33³ looks (the day's, the storm's), sRGB; grain and dither
  *                     (post/grade.ts, post/film.ts) — one full-size pass with the bloom's and shafts' reads
  *        FXAA         on the graded image (its edge test wants the screen's values), for the edges of the sea's
@@ -108,7 +114,7 @@ export interface FrameOptions {
  * worker meanwhile); it resolves to how long that took, ms.
  */
 export function createFrame(renderer: WebGPURenderer, world: World, options: FrameOptions) {
-  renderer.setPixelRatio(1);
+  renderer.setPixelRatio(SCALE);
   // the grade tone maps (post/grade.ts); the output only encodes for the display
   renderer.toneMapping = NoToneMapping;
   const rise = sunInSky(world.climate.timeOfDay)[1];
@@ -314,7 +320,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     stage(s);
     // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
     view.update(eye);
-    renderer.getDrawingBufferSize(size);
+    // the systems are handed the screen's size in CSS pixels, not the frame's (SCALE): the ships' and the guns' detail
+    // and the clouds' march are the screen's, so the frame's scale costs only the passes drawn at it
+    renderer.getSize(size);
     const air = sky.update(env, s.storm, eye, seen.kind, dt, size.x, size.y);
     const ships = fleet.update(eye, env.windSpeed, size.y, dt);
     gunfire.update(eye, size.y);
