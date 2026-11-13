@@ -36,7 +36,7 @@ import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import { random } from '../world/random';
-import { R, add, distance, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
+import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec2Node } from '../tsl';
 
 /** The most balls in flight, fall marks, and puffs alive, at once. */
@@ -68,8 +68,13 @@ const STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.
 const TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
 /** Its trail (0117's smoke ribbon): its puffs' growth (m/s), life (s), ink and opacity. */
 const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
-/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS; tests/guns.test.ts holds them equal), the fewest pixels its line is wide, and its
- *  glow (radiance per unit sun). */
+/** Each kind's firing: its flashes, their size, its puffs of smoke, how wide they spread, and how dense. */
+const FIRING: Record<GunKind, readonly [number, number, number, number, number]> = {
+  cannon: [3, 0.9, 12, 1.2, 0.5], scatter: [4, 1.2, 14, 3, 0.5], repeater: [1, 0.55, 2, 0.6, 0.35],
+  harpoon: [0, 0, 5, 1.5, 0.22], mortar: [3, 1.3, 18, 2, 0.6],
+};
+/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS; tests/guns.test.ts holds them equal), the
+ *  fewest pixels its line is wide, and its glow (radiance per unit sun). */
 const MARK = 11, MARK_PIXELS = 2, MARK_GLOW: Vec3 = [3.2, 0.9, 0.35];
 /** Seconds of a shell's flight its mark counts down over (about its longest lob). */
 const FLIGHT = 5;
@@ -276,10 +281,7 @@ export function createGunfire(light: Light) {
      *  the cannon's flash and bank of smoke; the scatter's wide burst; the repeater's small quick flash and a wisp; the
      *  harpoon's no fire, a kick of dust off its stock; the mortar's flash and a great bank thrown up. */
     shot(time: number, from: Vec3, dir: Vec3, gun: GunKind) {
-      const [flashes, size, puffs, spread, ink] = {
-        cannon: [3, 0.9, 12, 1.2, 0.5], scatter: [4, 1.2, 14, 3, 0.5], repeater: [1, 0.55, 2, 0.6, 0.35],
-        harpoon: [0, 0, 5, 1.5, 0.22], mortar: [3, 1.3, 18, 2, 0.6],
-      }[gun];
+      const [flashes, size, puffs, spread, ink] = FIRING[gun];
       for (let i = 0; i < flashes; i++) lay(time, flash(add(add(from, dir, 0.6 + 0.5 * i), any(), gun === 'scatter' ? 0.5 : 0), scale(dir, u(3, 9)), size + 0.3 * i));
       for (let i = 0; i < puffs; i++) {
         lay(time, smoke(add(from, dir, 0.8), add(scale(dir, u(2, 16)), any(), spread), [0.8, 0.79, 0.76], ink, u(2.5, 4.5), gun === 'mortar' ? 1.2 : 0.8));
@@ -341,10 +343,20 @@ export function createGunfire(light: Light) {
       const m = marks.buffer.array as Float32Array;
       let k = 0;
       for (let i = 0; i < n; i++) {
-        const { at, way, gun, to } = flying[i], speed = Math.max(1e-3, Math.hypot(...way)), shot = SHOT[gun];
-        a.set([...at, gunOrder(gun), ...way, 0], i * 8);
+        const { at, way, gun, to } = flying[i], speed = Math.max(1e-3, Math.hypot(way[0], way[1], way[2])), shot = SHOT[gun];
+        const o = i * 8;
+        for (let j = 0; j < 3; j++) {
+          a[o + j] = at[j];
+          a[o + 4 + j] = way[j];
+        }
+        a[o + 3] = gunOrder(gun);
+        a[o + 7] = 0;
         // a shell's fall marked: nearer as the seconds it has left to fly (about its distance from it over its speed) run out
-        if (gun === 'mortar' && k < MARKS) m.set([...scale(to, R + 0.15), 1 - Math.min(1, distance(at, scale(to, R)) / speed / FLIGHT)], 4 * k++);
+        if (gun === 'mortar' && k < MARKS) {
+          const q = 4 * k++, rx = at[0] - to[0] * R, ry = at[1] - to[1] * R, rz = at[2] - to[2] * R;
+          for (let j = 0; j < 3; j++) m[q + j] = to[j] * (R + 0.15);
+          m[q + 3] = 1 - Math.min(1, Math.hypot(rx, ry, rz) / speed / FLIGHT);
+        }
         if (!shot.trail) continue;
         for (let d = (time * 997) % shot.trail; d < speed * since; d += shot.trail) {
           const ago = d / speed;

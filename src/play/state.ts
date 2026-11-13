@@ -16,7 +16,7 @@
 // A match begun with start() opens with every ship already afloat at her berth (sim/spawn.ts), spread over the whole
 // planet, hers the first; the match's clock (the storm's) starts then.
 
-import { armed, battleOf, crewOf, inHand, stepBattle, weathered, type Battle, type Order } from '../sim/battle.ts';
+import { armed, battleOf, crewOf, inHand, stepBattle, weathered, type Battle, type Crew, type Order } from '../sim/battle.ts';
 import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
@@ -118,6 +118,14 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   let wrecks: Wreck[] = [], blasts: Blast[] = [];
   /** The line of sight each ship's gun was last laid along (a unit vector; null: her heading), for it to be drawn so. */
   const aims = new Map<number, Vec3 | null>();
+  /** Crews by id, what each ship asks of her stores in the step under way and where she lay before it: refilled in
+   *  place, not made anew each time. */
+  const crewsById = new Map<number, Crew>(), asks = new Map<number, Ask>(), from = new Map<number, Vec3>();
+  const byId = (crews: readonly Crew[]) => {
+    crewsById.clear();
+    for (const c of crews) crewsById.set(c.id, c);
+    return crewsById;
+  };
   /** What happened in the last second or so (moments.ts), and the last one's number (never reset: a reader keeps its
    *  place across matches); when each piece put on the water since the match began came onto it (the world's clock). */
   let deeds: Deed[] = [], seq = 0;
@@ -192,12 +200,13 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   /** Each ship's orders for a step: the player's from her hands, a lashed ship's the helm she holds, a bot's from her
    *  mind; and what each asks of her stores. */
   const command = (helm: Helm, gun: Order, ask: Ask, storm: Storm) => {
-    const crews = new Map(battle.crews.map((c) => [c.id, c]));
+    const crews = byId(battle.crews);
     const seen: Seen[] = fleet.map((v) => {
       const c = crews.get(v.id)!;
       return { ...v, hull: c.health.hull, shield: c.health.shield, armed: armed(c), crew: c };
     });
-    const helms: Helm[] = [], orders: Order[] = [], asks = new Map<number, Ask>();
+    const helms: Helm[] = [], orders: Order[] = [];
+    asks.clear();
     // every ship but the one thinking, in one list refilled for each (a bot reads it only while she thinks)
     const others: Seen[] = [];
     fleet.forEach((v, i) => {
@@ -222,9 +231,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   const sail = (helms: Helm[], asks: ReadonlyMap<number, Ask>) => {
     const wants = asked(battle.crews, fleet, flotsam, asks);
     battle = { ...battle, crews: wants.crews };
-    const manned = new Map(wants.crews.map((c) => [c.id, c]));
+    const manned = byId(wants.crews);
     fleet.forEach((v, i) => { helms[i] = homed(crewed(helms[i], manned.get(v.id)), territory, v); });
-    const from = new Map(fleet.map((v) => [v.id, v.ship.at]));
+    from.clear();
+    for (const v of fleet) from.set(v.id, v.ship.at);
     const met = stepFleet(fleet, helms, STEP, depth);
     fleet = met.fleet;
     for (const b of met.blows) {
@@ -329,7 +339,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     },
     /** Every ship drawn at the moment `between` of the way through the last step: afloat, or going down. */
     drawn(between: number): ShipDraw[] {
-      const now = clock(between), still: Vec3 = [0, 0, 0], crews = new Map(battle.crews.map((c) => [c.id, c]));
+      const now = clock(between), still: Vec3 = [0, 0, 0], crews = byId(battle.crews);
       const ships: ShipDraw[] = fleet.map(({ id, ship, shove }) => {
         const a = aboard.get(id)!, c = crews.get(id), g = c && inHand(c);
         const gun = g ? { kind: g.kind, aim: aims.get(id) ?? ship.heading } : null;

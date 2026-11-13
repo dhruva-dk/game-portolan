@@ -15,7 +15,7 @@ import { KINDS, gunOrder, type GunKind } from '../kinds';
 import type { Light } from '../sky/light';
 import type { ShipDraw } from '../snapshot';
 import type { Vec3Node } from '../tsl';
-import { add, dot, length, normalize as unit, scale, type Vec3 } from '../world/sphere';
+import { add, dot, length, normalize as unit, type Vec3 } from '../world/sphere';
 import { MUZZLE, gunShape, gunSurface } from './gun';
 import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount';
 
@@ -57,25 +57,30 @@ export function createArms(light: Light, capacity: number) {
     mesh.name = `gun ${kind}`;
     return { kind, mesh, geometry: g, buffer };
   });
+  /** How many of each kind (gunOrder) are drawn this frame. */
+  const filled = new Uint32Array(KINDS.length);
 
   return {
     meshes: drawn.map((d) => d.mesh),
     /** Each frame: the ships drawn, and where the eye is. */
     update(ships: readonly ShipDraw[], eye: Vec3) {
-      const filled = new Map<GunKind, number>();
+      filled.fill(0);
       for (const sh of ships) {
         if (!sh.afloat || !sh.gun) continue;
         const pose = sh.pose, mount = toWorld(pose, GUN_MOUNT);
         if (length(add(mount, eye, -1)) > NEAR) continue;
-        const d = drawn[gunOrder(sh.gun.kind)];
+        const k = gunOrder(sh.gun.kind), a = drawn[k].buffer.array as Float32Array, o = filled[k]++ * STRIDE;
         // her aim laid flat on her deck; straight up or down, her bow
         const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up)), toward = length(flat) > 1e-3 ? unit(flat) : pose.forward;
-        const n = filled.get(d.kind) ?? 0;
-        (d.buffer.array as Float32Array).set([...mount, 0, ...toward, 0, ...scale(pose.up, 1), 0], n * STRIDE);
-        filled.set(d.kind, n + 1);
+        for (let j = 0; j < 3; j++) {
+          a[o + j] = mount[j];
+          a[o + 4 + j] = toward[j];
+          a[o + 8 + j] = pose.up[j];
+        }
+        a[o + 3] = a[o + 7] = a[o + 11] = 0;
       }
-      for (const d of drawn) {
-        const n = filled.get(d.kind) ?? 0;
+      for (let k = 0; k < drawn.length; k++) {
+        const d = drawn[k], n = filled[k];
         if (n > 0) {
           d.buffer.clearUpdateRanges();
           d.buffer.addUpdateRange(0, n * STRIDE);

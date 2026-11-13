@@ -65,6 +65,8 @@ const DEAD = 0.15;
 const DRAWN = 700, RIDES = 320;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
+/** How far a gun is through reloading (0…1), or null when it isn't. */
+const reloading = (g: Gun): number | null => (g.reload > 0 ? 1 - g.reload / reloadOf(g) : null);
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
  * and look; and her end's shot, held on her ship (finale.ts), or none. */
@@ -201,7 +203,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const c = state.crew(PLAYER), v = state.mine(), h = c.hold, item = HOTBAR.guns - 1;
       const items = h.items.map((k): Slot | null => k && { item: `item.${k.kind}`, count: k.count });
       const guns = c.guns.map((g): GunSlot | null => g && {
-        kind: g.kind, rarity: g.rarity, rounds: g.rounds, mag: GUNS[g.kind].mag, reload: g.reload > 0 ? 1 - g.reload / reloadOf(g) : null,
+        kind: g.kind, rarity: g.rarity, rounds: g.rounds, mag: GUNS[g.kind].mag, reload: reloading(g),
       });
       const o = v ? offered(c, v.ship.at, state.loot()) : { gun: null, item: null };
       return {
@@ -222,14 +224,16 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const radius = Math.round(s.radius * R);
       if (radius !== calm.radius || s.centre.some((x, i) => Math.abs(x - calm.centre[i]) * R > 1)) calm = { centre: s.centre, radius };
       // once she has sunk, the disc is the watched ship's (ui/hud.ts watch)
-      const watched = view.watch !== PLAYER || sunk(c.health) ? state.ships().find((k) => k.id === view.watch) : undefined;
+      const watched = view.watch !== PLAYER || sunk(c.health)
+        ? state.vessels().find((k) => k.id === view.watch)?.ship ?? state.sinkings().find((k) => k.id === view.watch)
+        : undefined;
       const at = watched?.at ?? v?.ship.at ?? normalize(last.position);
       return {
         at, heading: watched?.heading ?? v?.ship.heading ?? last.forward, facing: chase.axes().ahead,
         arriving: arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds),
         hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
         gun: g && {
-          kind: g.kind, rarity: g.rarity, rounds: g.rounds, ready: g.reload > 0 ? 1 - g.reload / reloadOf(g) : 1,
+          kind: g.kind, rarity: g.rarity, rounds: g.rounds, ready: reloading(g) ?? 1,
           charge: g.windup > 0 ? 1 - g.windup / GUNS[g.kind].windup : null, swapping: c.equip / EQUIP, locked: lay?.target != null,
         },
         afloat: state.alive().length, sunk: sunk(c.health),
