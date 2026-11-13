@@ -34,7 +34,7 @@
 // At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
 // a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
 // drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
-// of her, 25 m out to 420 m; ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
+// of her, 25 m out to 420 m (?loot=m: every kind, and a gun of every rarity, in a row across her bow m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
 // her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
@@ -229,7 +229,18 @@ function stock(game: Game) {
     game.debug.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
     step();
   }
-  if (params.has('loot')) {
+  const row = params.has('loot') ? number('loot', 0) : 0;
+  if (row > 0) {
+    // a row across her bow: the guns worst to best, then the stores, a few degrees apart
+    const all: Goods[] = [
+      ...[0, 1, 2, 3, 4].map((rarity): Goods => ({ kind: 'gun', rarity })),
+      { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 }, { kind: 'fullRepair', count: 1 },
+    ];
+    all.forEach((g, i) => {
+      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180), turned = normalize(add(heading, cross(at, heading), side));
+      game.debug.strew(along(at, turned, row).p, [g]);
+    });
+  } else if (params.has('loot')) {
     // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
