@@ -1,17 +1,27 @@
-// Architecture rules, checked by plain text scanning of src/**/*.ts. Failures name file:line.
+// Architecture rules, checked by plain text scanning of src/**/*.ts (and, for the rules against casting past the types,
+// any and silencing the checker, of tests/ and tools/ too). Failures name file:line.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
-const SRC = resolve(import.meta.dirname, '../src');
+const ROOT = resolve(import.meta.dirname, '..');
+const SRC = resolve(ROOT, 'src');
 
 const walk = (dir: string): string[] =>
   !existsSync(dir)
     ? []
     : readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : []));
 
-const files = walk(SRC).map((path) => ({ path, rel: relative(SRC, path).split(sep).join('/'), text: readFileSync(path, 'utf8') }));
+/** A folder's files: `rel` from that folder (src's rules name src-relative paths), `at` from the repo's root. */
+const read = (dir: string) => walk(resolve(ROOT, dir)).map((path) => ({
+  path, rel: relative(resolve(ROOT, dir), path).split(sep).join('/'), at: relative(ROOT, path).split(sep).join('/'), text: readFileSync(path, 'utf8'),
+}));
+type Scanned = ReturnType<typeof read>[number];
+
+const files = read('src');
+/** src, the tests and the tools: what the rules on the types hold for. */
+const everywhere = [...files, ...read('tests'), ...read('tools')];
 
 /** Lines with // comments removed (whole-line and trailing), so prose never trips a rule. Block-comment lines are blanked. */
 const code = (text: string) => {
@@ -33,9 +43,11 @@ const code = (text: string) => {
   });
 };
 
-/** Every line of src matching `pattern`, as "file:line: text"; `only`/`except` filter by src-relative path. */
-const hits = (pattern: RegExp, keep: (rel: string) => boolean = () => true) =>
-  files.filter((f) => keep(f.rel)).flatMap((f) => code(f.text).flatMap((line, i) => (pattern.test(line) ? [`src/${f.rel}:${i + 1}: ${line.trim()}`] : [])));
+/** Every line of src (or of `among`) matching `pattern`, as "file:line: text"; `keep` filters by src-relative path. */
+const hits = (pattern: RegExp, keep: (rel: string) => boolean = () => true, among: readonly Scanned[] = files) =>
+  among.filter((f) => keep(f.rel)).flatMap((f) => code(f.text).flatMap((line, i) => (pattern.test(line) ? [`${f.at}:${i + 1}: ${line.trim()}`] : [])));
+/** The same, in src, the tests and the tools. */
+const anywhere = (pattern: RegExp) => hits(pattern, undefined, everywhere);
 
 const none = (found: string[], rule: string) => assert.deepEqual(found, [], `${rule}:\n  ${found.join('\n  ')}`);
 
@@ -130,19 +142,20 @@ test('c. passes live in src/frame.ts only', () => {
 
 test('d. no three.js hacks', () => {
   none(hits(/\bon(Before|After)(Compile|Render|Shadow)\b/), 'onBeforeCompile / onBeforeRender / onAfterRender hooks');
-  none(hits(/\bas\s+unknown\s+as\b/), 'as unknown as (a cast past the types)');
+  none(anywhere(/\bas\s+unknown\s+as\b/), 'a cast through unknown, past the types (in src, tests or tools)');
   none(hits(/['"]three\/src\//), "deep import from 'three/src/' (only three's public entry points)");
   none(hits(/\.prototype\b/), '.prototype (patching classes)');
   // Private members of three objects: an underscore-led member access (`x._foo`, `x['_foo']`) or the renderer's `.backend`.
   // Our own underscore names are never accessed this way, so on current code this matches nothing.
   none(hits(/[\w)\]]\s*\.\s*_[A-Za-z]|\[\s*['"]_[A-Za-z]|\.backend\b/), 'underscore-private member or .backend access');
-  // Raw text, not comment-stripped: the directives live in comments.
-  const found = files.flatMap((f) => f.text.split('\n').flatMap((line, i) => (/@ts-(ignore|expect-error|nocheck)/.test(line) ? [`src/${f.rel}:${i + 1}: ${line.trim()}`] : [])));
-  none(found, '@ts-ignore / @ts-expect-error / @ts-nocheck');
+  // Raw text, not comment-stripped: the directives live in comments. (This file names them only as a pattern, which the
+  // pattern does not match, so it holds itself to the rule.)
+  const found = everywhere.flatMap((f) => f.text.split('\n').flatMap((line, i) => (/@ts-(ignore|expect-error|nocheck)\b/.test(line) ? [`${f.at}:${i + 1}: ${line.trim()}`] : [])));
+  none(found, 'a directive silencing the type checker (ts-ignore, ts-expect-error, ts-nocheck) in src, tests or tools');
 });
 
-test('d2. no any in src: shader values are typed nodes (src/tsl.ts)', () => {
-  none(hits(/:\s*any\b|=\s*any\b|\bas\s+any\b|<any>|\bany\[\]/), 'any (name the node type: src/tsl.ts)');
+test('d2. no any in src, tests or tools: shader values are typed nodes (src/tsl.ts)', () => {
+  none(anywhere(/:\s*any\b|=\s*any\b|\bas\s+any\b|<\s*any\s*>|\bany\[\]/), 'any (name the type; for a node, src/tsl.ts)');
 });
 
 test('e. no exported let/var (module state others could write)', () => {
