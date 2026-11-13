@@ -20,6 +20,7 @@ import {
 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { Sea, ShipDraw } from '../snapshot';
+import { createCursor } from './cursor';
 import { R, add, cross, distance, dot as dotV, normalize as normalizeV, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec3Node } from '../tsl';
 
@@ -116,15 +117,17 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
   /** Ribbons ended and still fading, and the open trails as last seen (by ship). */
   let fading: Ribbon[] = [];
   let open = new Map<number, { serial: number; points: readonly Vec3[] }>();
-  let seq = -1;
+  const cursor = createCursor();
 
   return {
     mesh,
     /** Each frame: who holds the sea, the ships drawn (for each trail's run on to her stern), the eye (world, m), and
      *  whose ship is hers. */
     update(sea: Sea | undefined, ships: readonly ShipDraw[], eye: Vec3, own: number | null) {
+      // a new match's sea (or none): nothing of the last one's left to fade
+      const { fresh, from } = cursor.read(sea);
+      if (fresh) [fading, open] = [[], new Map()];
       if (!sea) {
-        [fading, open] = [[], new Map()];
         geometry.setDrawRange(0, 0);
         mesh.visible = false;
         return;
@@ -133,8 +136,10 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
       // a trail gone: sunk into the border if she closed a loop, else broken up
       const now = new Map(sea.trails.map((t) => [t.id, t]));
       const claimed = new Set<number>();
-      for (const k of sea.changes) if (k.seq > seq && k.kind === 'claim') claimed.add(k.ship);
-      seq = Math.max(seq, ...sea.changes.map((k) => k.seq));
+      for (let i = from; i < sea.changes.length; i++) {
+        const k = sea.changes[i];
+        if (k.kind === 'claim') claimed.add(k.ship);
+      }
       for (const [id, t] of open) {
         const n = now.get(id);
         if (n && n.serial === t.serial) continue;

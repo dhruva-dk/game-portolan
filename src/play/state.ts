@@ -106,6 +106,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   let quiet = false;
   /** Who holds the sea (sim/territory.ts), in a match; and the shield each ship's own water has given back. */
   let territory: Territory | null = null;
+  /** Which match's sea it is (snapshot.ts Sea generation): one more for each sea cleared. */
+  let generation = 0;
   const regained = new Map<number, number>();
   /** The match's loops: closed (and the square metres they took), cut by another, cut by herself or given up. */
   const loops = { closed: 0, metres: 0, cut: 0, own: 0 };
@@ -130,6 +132,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     struck.clear();
     battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
     territory = loot ? createTerritory(Math.max(...ids) + 1) : null;
+    generation++;
     regained.clear();
     Object.assign(loops, { closed: 0, metres: 0, cut: 0, own: 0 });
     begun = tick;
@@ -287,7 +290,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     sea(between: number): Sea | undefined {
       if (!territory) return undefined;
       const trails = territory.trails().flatMap((t, id) => (t.points.length ? [{ id, serial: t.serial, points: t.points }] : []));
-      return { owner: territory.owner, changes: territory.changes(), trails, colours: colours(territory.trails().length), clock: clock(between) };
+      return { generation, owner: territory.owner, changes: territory.changes(), trails, colours: colours(territory.trails().length), clock: clock(between) };
     },
     /** Who holds the sea (sim/territory.ts), in a match. */
     territory: (): Territory | null => territory,

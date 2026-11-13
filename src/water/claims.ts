@@ -29,6 +29,7 @@ import { CELLS, N, cellOf } from '../world/cells';
 import type { Sea } from '../snapshot';
 import { type BoolNode, type FloatNode, type IntNode, type UintNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
+import { createCursor } from './cursor';
 
 /** How far the water's hue is turned to its holder's (0…1, its brightness kept), as a chart's wash along a coast: in a
  *  band just inside the border (the field's own rise, some 10 m), and over the rest of the water; hers a notch more. */
@@ -77,7 +78,7 @@ export function createClaims(ships: number) {
   const colours = uniformArray<'vec4'>(values, 'vec4');
   const clock = uniform(0);
   const EMPTY = new Uint8Array(CELLS);
-  let source: Readonly<Uint8Array> | null = null, seq = -1;
+  const cursor = createCursor();
 
   /** The holder's colour (rgb) and her emphasis (w: 1, hers OWN_LINE). */
   const colourOf = (id: FloatNode): Vec4Node => colours.element(int(id));
@@ -224,17 +225,15 @@ export function createClaims(ships: number) {
 
     /** Each frame: who holds the sea (none outside a match), and whose ship is hers (her water stands out). */
     update(sea: Sea | undefined, own: number | null) {
-      const owner = sea?.owner ?? EMPTY;
-      if (owner !== source) {
-        claimed.load(owner);
-        source = owner;
-        seq = Math.max(-1, ...(sea?.changes ?? []).map((k) => k.seq));
+      // a new match's sea (or none) is read whole: its changes so far are in its cells already
+      const { fresh, from } = cursor.read(sea);
+      if (fresh) {
+        claimed.load(sea?.owner ?? EMPTY);
         cellsAttr.needsUpdate = revealAttr.needsUpdate = true;
       }
       if (!sea) return;
-      for (const k of sea.changes) {
-        if (k.seq <= seq) continue;
-        seq = k.seq;
+      for (let i = fresh ? sea.changes.length : from; i < sea.changes.length; i++) {
+        const k = sea.changes[i];
         if (k.kind === 'claim') claimed.change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: k.cells.subarray(0, k.loop) });
         else if (k.kind === 'home') claimed.change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
         else if (k.kind === 'drain') claimed.change({ cells: k.cells, owner: 0, time: k.time, from: null });

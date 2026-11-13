@@ -70,12 +70,14 @@ export type SeaChange =
 export interface TrailDraw { id: number; serial: number; points: readonly Vec3[] }
 
 /**
- * Who holds the sea (sim/territory.ts): the cells (world/cells.ts), each its holder (0 open sea, else her id + 1), read
- * by reference and never written; what changed in the last few seconds, oldest first (each drawn once, from the first
- * snapshot it is in); the open trails; each ship's colour on the sea, by id (linear rgb); and the moment, on the
- * changes' clock (the world's), at which they are drawn.
+ * Who holds the sea (sim/territory.ts): which match's sea it is (a new number each match: whoever follows its changes
+ * starts over with a new one, its changes numbered afresh from 1); the cells (world/cells.ts), each its holder (0 open
+ * sea, else her id + 1), read by reference and never written; what changed in the last few seconds, oldest first (each
+ * drawn once, from the first snapshot it is in); the open trails; each ship's colour on the sea, by id (linear rgb);
+ * and the moment, on the changes' clock (the world's), at which they are drawn.
  */
 export interface Sea {
+  generation: number;
   owner: Readonly<Uint8Array>;
   changes: readonly SeaChange[];
   trails: readonly TrailDraw[];
