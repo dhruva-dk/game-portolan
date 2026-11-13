@@ -1,8 +1,8 @@
 // The screens' order, as ways.ts tables it: the title, the lobby with its folios, the match, and her end over the live
 // world (the camera's beat on it, then her result with its ways on: watch the match on, or home). Every way is her tap
 // on something drawn for it, or the match's own course as the game reports it (player.ts End); nothing moves on by a
-// clock of its own. Every screen fades in and out; where the world itself changes at once (PLAY, home to the lobby)
-// it cross-fades (veil.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
+// clock of its own. Every screen fades in and out; where the world itself changes at once it cross-fades (PLAY:
+// veil.ts), or (home to the lobby) the match fades under parchment, held until the lobby is drawn (passage.ts). The HUD shows in the match (fading in at the end of the arrival: hud.ts), fades out as
 // her end begins, and comes back, only its clock, count and disc, while she watches another ship.
 
 import type { createGlobe } from './globe';
@@ -12,8 +12,9 @@ import type { Sea } from '../snapshot';
 import { createResult, createWatching } from './ends';
 import { createLobby, createRank, createSettings, createTitle, type Settings } from './screens';
 import { fade } from './ui';
+import { createPassage } from './passage';
 import { createVeil } from './veil';
-import { IN_MATCH, course, events, way, type Screen, type Tap } from './ways';
+import { HOME, IN_MATCH, course, events, way, type Screen, type Tap } from './ways';
 
 export { isScreen, type Screen } from './ways';
 
@@ -62,13 +63,15 @@ export function createFlow(
   }, () => tap('close'));
   const result = createResult({ watch: () => tap('watch'), leave: () => tap('leave') });
   const watching = createWatching({ leave: () => tap('leave'), switch: (by) => tap('switch', by) });
+  const passage = createPassage();
   hud.root.style.display = 'none';
 
   /** Her tap on something drawn for a way on: taken if the screen has that way. Where the world changes at once, the
-   *  change waits on the next frame drawn, held over it and cross-fading (veil.ts). */
+   *  change waits: PLAY's on the next frame drawn, held over it and cross-fading (veil.ts); home's under the parchment,
+   *  the match's pieces fading with the match as it comes over (passage.ts). */
   function tap(t: Tap, by = 0) {
     const next = way(screen, t);
-    if (!next || veil.waiting) return;
+    if (!next || veil.waiting || passage.going) return;
     if (t === 'play') {
       veil.cover(() => {
         act.play();
@@ -76,7 +79,10 @@ export function createFlow(
         go(next);
       });
     } else if (t === 'leave') {
-      veil.cover(() => {
+      result.hide(HOME.cover);
+      watching.show(false, HOME.cover);
+      fade(hud.root, false, HOME.cover);
+      passage.cover(() => {
         act.home();
         end = gain = null;
         go(next);
@@ -121,12 +127,19 @@ export function createFlow(
     /** Her end as the game reports it each frame (null while she fights or with no match): the screens follow it. */
     end(now: End | null) {
       end = now;
-      if (!IN_MATCH.includes(screen)) return;
+      // (on the way home, the match's course shows nothing more)
+      if (!IN_MATCH.includes(screen) || passage.going) return;
       const next = course(screen, events(now));
       if (next !== screen) go(next);
     },
+    /** How much of the world the screens cover, 0…1: the way home's parchment (its sound fades with it). */
+    get covered() {
+      return passage.covered;
+    },
     /** Opens the UI at `next` (the debug switches' way in: src/debug.ts). */
     go,
+    /** Her tap on a way on, as if on what is drawn for it (the debug switches': src/debug.ts). */
+    tap,
     /** A frame of dt seconds: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
     update(dt: number, s: HudState, sea?: Sea, own?: number | null) {
       if (IN_MATCH.includes(screen)) {
@@ -137,10 +150,12 @@ export function createFlow(
       }
       result.update(dt);
     },
-    /** The frame just drawn (the world's canvas), for what holds it: the full map just opened, a cross-fade waiting. */
+    /** The frame just drawn (the world's canvas), for what holds it: the full map just opened, a cross-fade waiting;
+     *  and the way home, which waits on the lobby's frames drawn. */
     drawn(canvas: HTMLCanvasElement) {
       if (globe.waiting) globe.hold(canvas);
       if (veil.waiting) veil.hold(canvas);
+      passage.drawn();
     },
   };
 }

@@ -145,6 +145,11 @@ export function createResult(act: { watch(): void; leave(): void }) {
       shown = on;
       s.show(on);
     },
+    /** Hides it over `ms`. */
+    hide(ms: number) {
+      shown = false;
+      s.show(false, ms);
+    },
     /** A frame of dt seconds: the plate's ring fills toward what the match added. */
     update(dt: number) {
       if (gain.at >= gain.to || s.root.style.display === 'none') return;
@@ -173,5 +178,5 @@ export function createWatching(act: { leave(): void; switch(by: number): void })
     arrow.innerHTML = svg(56, 56, paperDisc(28, 28, 25) + chevron(28 + by * 2, 28, by));
     onTap(arrow, () => act.switch(by));
   }
-  return { root, show: (on: boolean) => fade(root, on) };
+  return { root, show: (on: boolean, ms?: number) => fade(root, on, ms) };
 }

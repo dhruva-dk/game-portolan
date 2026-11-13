@@ -36,7 +36,7 @@ export function sheet(opaque: boolean, press = true) {
     el.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     return el;
   };
-  return { root, set, show: (on: boolean) => fade(root, on) };
+  return { root, set, show: (on: boolean, ms?: number) => fade(root, on, ms) };
 }
 
 /** A press-able region of a sheet, by its id: taken by a touch that comes down on it and lifts on it. */

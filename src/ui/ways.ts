@@ -1,6 +1,7 @@
 // The screens and every way between them, as data: the table the flow (flow.ts) follows and nothing else. A way is
 // taken by her tap on something drawn for it, or by the match's own course (the game's), never by a clock of the
-// UI's own. Each screen fades or cross-fades into the next (FADE); none is cut to.
+// UI's own. Each screen fades or cross-fades into the next (FADE); none is cut to. Home from a match, the parchment
+// comes over it and lifts off the lobby once it is drawn (HOME, wayHome).
 //   title     the chart over the world loading; once ready, a tap anywhere          → lobby
 //   lobby     over her ship at anchor: PLAY → match (the world cross-fades to the eye coming down from space); her
 //             plate → rank; the wheel → settings
@@ -8,7 +9,8 @@
 //   match     the arrival, then her hands on her ship; she sinks → sinking; she is the last afloat → won
 //   sinking   the camera held on her ship going down, the HUD gone; the beat done → sunk, or → result if the match
 //             is over
-//   sunk      her result over the live world, with WATCH → spectate and LEAVE → lobby; the match over → result
+//   sunk      her result over the live world, with WATCH → spectate and LEAVE → lobby (by the parchment: HOME); the
+//             match over → result
 //   spectate  watching another ship: turn to the next or the one before; LEAVE → lobby; the match over → result
 //   won       the camera circling her, the HUD gone; the beat done → result
 //   result    her result over the live world, one way on: LEAVE → lobby
@@ -43,8 +45,47 @@ export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
 export const IN_MATCH: readonly Screen[] = ['match', 'sinking', 'sunk', 'spectate', 'won', 'result'];
 export const OVER_LOBBY: readonly Screen[] = ['lobby', 'rank', 'settings'];
 
-/** Milliseconds a screen takes to fade in or out, or the world to cross-fade from one sea to another. */
+/** Milliseconds a screen takes to fade in or out, or the world to cross-fade from one sea to another (PLAY). */
 export const FADE = 320;
+
+/** The way home from a match (LEAVE), in milliseconds: the parchment coming over the match (cover); held, once the
+ *  match is put away and the lobby made under it, at least so long (hold) and until the lobby's first frames are drawn
+ *  (frames, counted from the first drawn after the change); and lifted off the lobby (lift). */
+export const HOME = { cover: 250, hold: 500, frames: 3, lift: 350 } as const;
+
+/** Where the way home stands: the parchment coming over the match, held while the lobby is made and drawn under it,
+ *  lifting off it, or home. */
+export type Leg = 'cover' | 'hold' | 'lift' | 'home';
+
+/** The way home, begun at `start` ms (its parchment set coming over the match then), moved on by the frames drawn:
+ *  covered, the change is made under it; held until the lobby is ready (HOME.frames of its frames drawn) and at least
+ *  HOME.hold; then lifted. Nothing lifts it on a clock alone. */
+export function wayHome(start: number) {
+  let leg: Leg = 'cover', since = start, frames = 0;
+  const into = (next: Leg, now: number) => {
+    leg = next;
+    since = now;
+    return next;
+  };
+  return {
+    get leg() {
+      return leg;
+    },
+    /** A frame drawn at `now` ms: the leg the way has just come to, or null. At 'hold' the change is to be made, under
+     *  the parchment and after this frame; every frame drawn after it is the lobby's. */
+    drawn(now: number): Leg | null {
+      if (leg === 'cover') return now - since >= HOME.cover ? into('hold', now) : null;
+      if (leg === 'hold') return ++frames >= HOME.frames && now - since >= HOME.hold ? into('lift', now) : null;
+      if (leg === 'lift') return now - since >= HOME.lift ? into('home', now) : null;
+      return null;
+    },
+    /** How much of the world the parchment covers at `now` ms, 0…1. */
+    covered(now: number): number {
+      const t = Math.max(0, now - since);
+      return leg === 'cover' ? Math.min(1, t / HOME.cover) : leg === 'hold' ? 1 : leg === 'lift' ? Math.max(0, 1 - t / HOME.lift) : 0;
+    },
+  };
+}
 
 /** Where `trigger` takes `screen`, or null if it does not move it. */
 export const way = (screen: Screen, trigger: Trigger): Screen | null => WAYS[screen][trigger] ?? null;
