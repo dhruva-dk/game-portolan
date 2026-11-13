@@ -1,6 +1,6 @@
 // The player's hands: a stick under the left thumb, a look under the right, both at once; the keyboard at a desk.
 //
-// A finger put down anywhere on the left of the screen holds the stick there, its centre where it landed (kept its
+// While she steers, a finger put down anywhere on the left of the screen holds the stick there, its centre where it landed (kept its
 // own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
 // pushed that way. Any other finger drags the look.
 // WASD or the arrows push the stick all the way while no finger holds it. The gun is ordered fired by the HUD's Fire
@@ -15,14 +15,16 @@ const LEFT = 0.45;
 
 interface Finger { stick: boolean; x: number; y: number; cx: number; cy: number }
 
-export function createInput(element: HTMLElement) {
+/** element: what the fingers are read on; steers: whether a finger on the left takes the stick (off, as in the lobby,
+ *  every finger drags the look). */
+export function createInput(element: HTMLElement, steers: () => boolean) {
   const fingers = new Map<number, Finger>();
   const keys = new Set<string>();
   let lookX = 0, lookY = 0, fired = false;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
-    const stick = e.clientX < innerWidth * LEFT && ![...fingers.values()].some((f) => f.stick);
+    const stick = steers() && e.clientX < innerWidth * LEFT && ![...fingers.values()].some((f) => f.stick);
     const within = (v: number, size: number) => Math.min(Math.max(v, STICK), size - STICK);
     const cx = stick ? within(e.clientX, innerWidth) : e.clientX, cy = stick ? within(e.clientY, innerHeight) : e.clientY;
     fingers.set(e.pointerId, { stick, x: e.clientX, y: e.clientY, cx, cy });

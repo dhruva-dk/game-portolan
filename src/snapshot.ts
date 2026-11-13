@@ -5,7 +5,7 @@
 import type { Cap } from './sim/storm';
 import type { ShipPose } from './world/pose';
 import type { Vec3 } from './world/sphere';
-import { lookAt, type Turn } from './world/turn';
+import { lookAt, type Turn } from './world/turn.ts';
 
 /** A unit quaternion (x, y, z, w). */
 export type Orientation = Turn;

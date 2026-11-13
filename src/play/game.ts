@@ -14,7 +14,8 @@
 // The camera follows the ship the match's flow sets (view): hers, or after she sinks the one she watches, cut to or
 // flown to; its shots on the Gale, coming down and on a win are shots.ts's.
 //
-// It opens on the lobby's quiet sea (anchor); a match then opens with the Gale (drop), or at sea among others (atSea).
+// It opens on the lobby's quiet sea (anchor), where the camera stands off her bow and a drag turns it round her
+// (anchorage.ts) and her hands do not sail her; a match then opens with the Gale (drop), or at sea among others (atSea).
 // Her helm may be lashed (lash): she holds it until a hand takes the helm.
 
 import type { World } from '../environment';
@@ -25,12 +26,13 @@ import { sunk } from '../sim/health';
 import { PLAYER, SHIPS } from '../sim/match';
 import type { Chart } from '../sim/route';
 import type { Helm, ShipState } from '../sim/ship';
-import type { Snapshot } from '../snapshot';
+import type { Eye, Snapshot } from '../snapshot';
 import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
 import { R, add, normalize, scale, type Vec3 } from '../world/sphere';
 import { IDLE, type Hands, type Status } from '../player';
+import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
 import { createChase } from './chase';
 import { createShots, flown } from './shots';
 import { bearing, createState, type Berth, type Dropping, type Match } from './state';
@@ -64,6 +66,8 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
   let last: ShipPose = flown({ id: PLAYER, seat: 0, stage: 'sea', at: start.at, heading: bearing(start.at, start.bearing), height: 0, speed: 0, climb: 0 });
   /** Her helm while lashed, until a hand takes it. */
   let held: ((s: ShipState) => Helm) | null = null;
+  /** Whether she lies at anchor in the lobby, where the camera has been dragged round her, and its eye as last placed. */
+  let anchored = false, orbit: Orbit = REST, berth: Eye | null = null;
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -89,22 +93,25 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
     shots.take({ pose, drop: state.gale(), flyer: view.watch === PLAYER ? state.herFlyer() : null, circle: view.circle, ships: SHIPS }, dt);
 
   /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
-  const restart = (her: ShipPose, shot = false) => {
+  const restart = (her: ShipPose, shot = false, anchor = false) => {
     view = { watch: PLAYER, move: 'cut', hands: true, circle: false };
+    anchored = anchor;
+    orbit = REST;
+    berth = null;
     shots.reset();
     held = null;
     last = her;
     chase.reset(last, state.clock(1), shot ? shoot(last, 0).shot : undefined);
   };
-  restart(state.anchor(start));
+  restart(state.anchor(start), false, true);
 
   return {
-    /** Whether her hands are on her ship (steering and looking), or the match's flow has taken them. */
-    steering: () => view.hands,
+    /** Whether her hands are on her ship (steering and looking), or the match's flow or the lobby has taken them. */
+    steering: () => view.hands && !anchored,
     /** A frame of dt seconds, her hands as read for it (none while the match's flow takes them: view): the match
      *  stepped on, the camera moved after the ship it follows. */
     step(dt: number, read: Hands) {
-      const hands = view.hands ? read : IDLE;
+      const hands = view.hands && !anchored ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
       pulled ||= hands.fire;
       const time = clock(dt);
@@ -116,6 +123,14 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
       }
       between = time.between;
       last = state.drawn(between).find((s) => s.id === PLAYER)?.pose ?? last;
+      if (anchored) {
+        // at anchor, the look's drag turns the camera round her; let go, it eases home
+        orbit = dragged(orbit, read.look);
+        if (!read.look.held) orbit = relaxed(orbit, dt);
+        const now = state.clock(between);
+        berth = anchorageEye(last, orbit, now, (p) => Math.max(ground(p), sea(p, now)));
+        return;
+      }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
       const { pose: at, shot } = shoot(followed, dt);
       chase.update(at, hands.look, dt, state.clock(1), shot);
@@ -123,7 +138,7 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
     /** What is drawn now (snapshot.ts). */
     snapshot(): Snapshot {
       return {
-        eye: chase.eye(), clock: state.clock(between), storm: state.storm(between),
+        eye: anchored ? berth ?? anchorageEye(last, orbit, state.clock(between), ground) : chase.eye(), clock: state.clock(between), storm: state.storm(between),
         ships: state.drawn(between), own: PLAYER, balls: state.balls(between), blasts: state.blasts(),
       };
     },
@@ -153,7 +168,7 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
     },
     /** A quiet sea for the lobby: her ship alone where she lies at the start. */
     anchor() {
-      restart(state.anchor(start));
+      restart(state.anchor(start), false, true);
     },
     /** A match at sea with no drop: her ship where she lies at the start, the others about her. */
     atSea(others: readonly Berth[]) {

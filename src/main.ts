@@ -86,7 +86,7 @@ async function play(s: Stage): Promise<Played> {
 
   // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game and, where
   // the game has nothing yet, by what stands in for it (play/placeholder.ts: pending).
-  const input = createInput(s.canvas);
+  const input = createInput(s.canvas, () => game.steering());
   const layer = uiLayer();
   const stick = createStick(layer);
   const pending = createPlaceholder();

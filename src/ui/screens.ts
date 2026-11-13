@@ -3,7 +3,7 @@
 //   title   an opaque sheet: rhumb lines, the rose whose needle swings while the world loads and settles north when it
 //           is ready, her galleon gilt below; a tap, once ready, goes on
 //   lobby   over her ship at anchor: the career plate (tap: the rank folio), the wheel (tap: settings), the PLAY
-//           banner with her galleon on it. No tabs.
+//           banner with her galleon on it. No tabs. Elsewhere a drag reaches the world: it turns the camera round her.
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
 //   settings a small folio: sound and look speed, each a bar set by a tap along it
 // (The drop's own screen is gale.ts.)
@@ -19,10 +19,11 @@ const W = 956, H = 440;
 
 export interface Settings { sound: number; look: number }
 
-/** A full-screen sheet: an <svg> of the phone's page scaled to the screen. `opaque` lays parchment under it. */
-function sheet(opaque: boolean) {
+/** A full-screen sheet: an <svg> of the phone's page scaled to the screen. `opaque` lays parchment under it; `press`
+ *  makes the whole sheet take touches (else only its regions do, and the rest reach the world under it). */
+function sheet(opaque: boolean, press = true) {
   const root = document.createElement('div');
-  root.className = 'screen press';
+  root.className = press ? 'screen press' : 'screen';
   root.style.display = 'none';
   if (opaque) root.style.background = 'radial-gradient(ellipse at 50% 45%, #f7eedb 0%, #f0e2c4 60%, #d8bf90 100%)';
   uiLayer().appendChild(root);
@@ -78,7 +79,8 @@ export function createTitle(go: () => void) {
 }
 
 export function createLobby(act: { play(): void; rank(): void; settings(): void }) {
-  const s = sheet(false);
+  // a drag anywhere off its controls turns the camera round her (play/anchorage.ts)
+  const s = sheet(false, false);
   return {
     show(on: boolean, career?: Career) {
       if (on && career) {
