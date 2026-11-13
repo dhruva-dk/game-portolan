@@ -188,12 +188,14 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       // the assist has a ship, faint when the ball falls short of what it is on; reloading or winding, its sweep round it
       const lock = g && s.reticle ? (g.locked ? 'locked' : s.reticle.reach ? 'free' : 'short') : 'none';
       const spread = s.reticle ? Math.round(Math.min(48, s.reticle.spread)) : 0;
-      const busy = lock === 'none' ? '' : wound >= 0 ? `w${wound >> 2}` : loaded >= 0 && loaded < 48 ? `r${loaded >> 2}` : '';
-      draw(reticle, `${lock} ${spread} ${busy}`, () => {
+      // its sweep: winding or reloading, and how far, in steps of a 12th
+      const busy: { wound: boolean; twelfths: number } | null = lock === 'none' ? null
+        : wound >= 0 ? { wound: true, twelfths: wound >> 2 } : loaded >= 0 && loaded < 48 ? { wound: false, twelfths: loaded >> 2 } : null;
+      draw(reticle, `${lock} ${spread} ${busy ? `${busy.wound} ${busy.twelfths}` : ''}`, () => {
         if (lock === 'none') return '';
         const out = Math.max(RETICLE, spread), h = out + 7, r = lock === 'locked' ? out * LOCKED : out, gap = Math.max(r * 0.32, r - RETICLE * 0.7);
         const arms = `M${h - r} ${h}H${h - gap}M${h + gap} ${h}H${h + r}M${h} ${h - r}V${h - gap}M${h} ${h + gap}V${h + r}`;
-        const run = busy ? sweep(h, h, Math.min(r, RETICLE) * 0.5 + 2, (parseInt(busy.slice(1)) * 4) / 48, busy[0] === 'w' ? WASH.gold : INK.rubric, 2.2) : '';
+        const run = busy ? sweep(h, h, Math.min(r, RETICLE) * 0.5 + 2, busy.twelfths / 12, busy.wound ? WASH.gold : INK.rubric, 2.2) : '';
         return svg(2 * h, 2 * h, `<g opacity="${lock === 'short' ? 0.45 : 1}"><path d="${arms}" stroke="${INK.iron}" stroke-width="2.6" opacity=".6" transform="translate(.6 .8)"/>`
           + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>${run}</g>`);
       });

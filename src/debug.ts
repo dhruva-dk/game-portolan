@@ -230,13 +230,13 @@ function sinkHer(game: Game) {
   game.debug.sink(PLAYER, by !== undefined && params.get('by') !== 'storm' ? by : null);
 }
 
-/** Sinks every other ship afloat, the last by her, so she wins. */
 /** The first other ship afloat, sunk by her. */
 function downOne(game: Game) {
   const one = game.alive().find((id) => id !== PLAYER);
   if (one !== undefined) game.debug.sink(one, PLAYER);
 }
 
+/** Sinks every other ship afloat, the last by her, so she wins. */
 function winHer(game: Game) {
   const others = game.alive().filter((id) => id !== PLAYER);
   others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
