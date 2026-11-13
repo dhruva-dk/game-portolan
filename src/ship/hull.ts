@@ -298,12 +298,13 @@ function beakhead(acc: Acc, D: Detail): void {
   const stem = (y: number) => V(0, y, zOf(1, y) + 0.1);
   const tip = V(0, 3.75, zOf(1, 3.5) + 4.8);
   const n = D.fittings ? 10 : 5;
-  // the knee of the head: a deep timber from the cutwater sweeping forward and up to the beak's tip
+  // the knee of the head: a deep timber from the cutwater sweeping forward and up to the beak's tip, planked and oiled
+  // as the hull is (in pitch it stood off her bow as a black boat of its own)
   const bez = (t: number) => {
     const p0 = stem(1.9), p1 = V(0, 2.5, tip.z - 1.4), p2 = tip.clone().add(V(0, -0.25, 0));
     return p0.clone().multiplyScalar((1 - t) ** 2).addScaledVector(p1, 2 * t * (1 - t)).addScaledVector(p2, t * t);
   };
-  acc.with({ kind: KIND.dark }, () => {
+  acc.with({ kind: KIND.planks }, () => {
     for (const side of [1, -1]) {
       const grid = range(0, 1, n).map((t) => {
         const o = bez(t), i = stem(lerp(1.9, 3.5, t)), th = lerp(0.18, 0.09, t);
@@ -318,7 +319,7 @@ function beakhead(acc: Acc, D: Detail): void {
   const plat = [V(-1.15, yb, z0), V(1.15, yb, z0), V(0.25, tip.y, tip.z - 0.3), V(-0.25, tip.y, tip.z - 0.3)];
   acc.with({ kind: KIND.deck }, () => fan(acc, plat, V(0, 1, 0), 1.5));
   if (!D.fittings) return;
-  acc.with({ kind: KIND.dark }, () => {
+  acc.with({ kind: KIND.spar }, () => {
     for (let k = 0; k < 7; k++) {
       const t = (k + 0.5) / 7;
       beam(acc, plat[0].clone().lerp(plat[3], t).add(V(0, 0.04, 0)), plat[1].clone().lerp(plat[2], t).add(V(0, 0.04, 0)), 0.06, 0.06, V(0, 1, 0));
