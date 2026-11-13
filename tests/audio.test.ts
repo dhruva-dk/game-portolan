@@ -118,7 +118,7 @@ test('voices: never more than VOICES at once; a new sound takes a free slot, els
 
 /** A plain scene: her ship (id 0) at `at`, others where given, the eye behind her. */
 function scene(t: number, blasts: Blast[] = [], ships: ShipDraw[] = [], balls: Snapshot['balls'] = [], sea?: Snapshot['sea']): Snapshot {
-  const her: ShipDraw = { id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], band: false }, velocity: [6, 0, 0], afloat: true };
+  const her: ShipDraw = { id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' }, velocity: [6, 0, 0], afloat: true };
   return { eye: { kind: 'air', position: [-20, 0, R + 8], orientation: [0, 0, 0, 1], fov: 50 }, clock: t, storm: { centre: at, radius: 1 }, ships: [her, ...ships], own: 0, balls, loot: [], blasts, sea };
 }
 const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({

@@ -41,6 +41,8 @@ import { feeling, filling, hauled, inFrame, moved, trim, type Motion } from './m
 
 /** Floats an instance: at, fwd, up, paint, cloth and berth, each a vec4 (materials.ts). */
 const STRIDE = 24;
+/** A sails' pattern as the instance carries it (materials.ts shipPaint's w). */
+const PATTERNS: Record<Look['pattern'], number> = { plain: 0, band: 1, stripes: 2 };
 /** Her middle, above the waterline, metres, and a sphere round her whole rig from there. */
 const MIDDLE = 9, RADIUS = 18;
 /** The wind at which the sails are full and the pennants stream straight, metres per second. */
@@ -165,7 +167,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
       const w = share(sails[i]);
       const a = instances[k].array as Float32Array, o = filled[k]++ * STRIDE;
       a.set([...pose.position, braces[i], ...pose.forward, w[0], ...pose.up, w[2],
-        ...look.paint, look.band ? 1 : 0, ...look.sail, phaseOf(i), ...(shares.get(i) ?? [0, 0]), 0, 0], o);
+        ...look.paint, PATTERNS[look.pattern], ...look.sail, phaseOf(i), ...(shares.get(i) ?? [0, 0]), 0, 0], o);
     }
     draws.forEach((three, k) => {
       // (only the ships written go up: the buffer holds the most ships' worth)

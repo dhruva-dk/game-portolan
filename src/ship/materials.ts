@@ -47,6 +47,11 @@ export const THROUGH = 0.55;
 const ARM = 0.13, FLARE = 0.34, REACH = 0.66, PAINTED = 0.35;
 /** A square sail's cloths: how many across it (each about 0.4 m), shown as faint seams. */
 const CLOTHS = 26;
+/** A striped sail's stripes across it, odd so its two edges match; and the canvas border round the cross on it (of
+ *  REACH, as ARM and FLARE are). */
+const STRIPES = 5, FRINGE = 0.2;
+/** A mark whose paint is within this much of its canvas's luminance is drawn in CREAM (linear). */
+const UNSEEN = 0.06, CREAM = [0.9, 0.84, 0.66];
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
 const ABACK = 0.3;
 /** Inside a sail's bag, the most of the light on it that its own canvas takes, and how deep the bag is then, metres. */
@@ -171,14 +176,26 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     };
     const seams = select(clothKind.lessThan(CLOTH.lateen + 0.5), line(uvs.x, CLOTHS).mul(0.12), float(0));
     const edge = max(smoothstep(0.02, 0, min(uvs.x, float(1).sub(uvs.x))), smoothstep(0.03, 0, min(uvs.y, float(1).sub(uvs.y)))).mul(0.25);
-    const band = paint.w.mul(smoothstep(0.36, 0.37, uvs.y)).mul(smoothstep(0.64, 0.63, uvs.y));
-    // the cross, on the square sails: in the sail's own half-widths from its middle, inside a flaring arm either way
+    const banded = select(abs(paint.w.sub(1)).lessThan(0.5), float(1), float(0));
+    const band = banded.mul(smoothstep(0.36, 0.37, uvs.y)).mul(smoothstep(0.64, 0.63, uvs.y));
+    // upright stripes, one a cloth's width apart in STRIPES, the middle one paint; smoothed over a pixel
+    const s = uvs.x.sub(0.5).mul(STRIPES), wave = abs(fract(s.mul(0.5).add(0.5)).sub(0.5)).mul(2), ws = max(fwidth(s), 1e-4);
+    const square = clothKind.lessThan(CLOTH.lateen - 0.5);
+    const stripe = select(paint.w.greaterThan(1.5).and(square), smoothstep(ws.negate(), ws, float(0.5).sub(wave)), float(0));
+    // the cross, on the square sails: in the sail's own half-widths from its middle, inside a flaring arm either way;
+    // and a border of canvas FRINGE wide round it, which parts it from the stripes
     const c = abs(uvs.sub(0.5)).mul(2).div(REACH);
-    const armX = c.y.lessThan(mix(float(ARM), float(FLARE), c.x)).and(c.x.lessThan(1));
-    const armY = c.x.lessThan(mix(float(ARM), float(FLARE), c.y)).and(c.y.lessThan(1));
-    const mark = select(clothKind.lessThan(CLOTH.lateen - 0.5).and(armX.or(armY)), float(1), float(0));
-    const marked = max(band, mark);
-    let albedo = mix(cloth.rgb, paint.rgb, marked);
+    const cross = (d: number) => {
+      const armX = c.y.lessThan(mix(float(ARM + d), float(FLARE + d), c.x)).and(c.x.lessThan(1 + d));
+      const armY = c.x.lessThan(mix(float(ARM + d), float(FLARE + d), c.y)).and(c.y.lessThan(1 + d));
+      return select(square.and(armX.or(armY)), float(1), float(0));
+    };
+    const mark = cross(0);
+    const marked = max(band, max(mark, stripe.mul(float(1).sub(cross(FRINGE)))));
+    // a mark as dark or as light as its canvas would not show: it is drawn in cream instead
+    const luma = vec3(0.2126, 0.7152, 0.0722);
+    const ink = select(abs(dot(paint.rgb, luma).sub(dot(cloth.rgb, luma))).lessThan(UNSEEN), vec3(...CREAM), paint.rgb);
+    let albedo = mix(cloth.rgb, ink, marked);
     albedo = select(clothKind.greaterThan(CLOTH.pennant - 0.5), paint.rgb, albedo.mul(float(1).sub(seams).sub(edge)));
     // Seen from inside its bag, a sail's own canvas hides some of the sky and the sun from it, the more the deeper
     // the bag; what comes through the canvas comes through all the same.

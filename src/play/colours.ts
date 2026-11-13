@@ -3,18 +3,19 @@
 import type { Look } from '../snapshot.ts';
 import type { Vec3 } from '../world/sphere.ts';
 
-/** The player's colours: a scarlet hull and the scarlet cross on bright, unbleached canvas, the brightest sails at sea. */
-export const LOOK: Look = { paint: [0.6, 0.015, 0.03], sail: [0.95, 0.88, 0.7], band: false };
-/** The others' hulls (and the marks on their sails), and their sails, each dyed a strong colour of its own (linear):
- *  woad, saffron, verdigris, madder, charcoal, murrey, ochre. */
+/** The player's colours: a scarlet hull, and her canvas striped scarlet and unbleached cream, the cross counterchanged
+ *  over the stripes: the boldest sails at sea. */
+export const LOOK: Look = { paint: [0.6, 0.015, 0.03], sail: [0.95, 0.88, 0.7], pattern: 'stripes' };
+/** The others' hulls (and the marks on their sails), and their sails, each dyed a strong, clear colour of its own
+ *  (linear): woad, saffron, verdigris, madder, charcoal, murrey, ochre. */
 const PAINTS: Vec3[] = [[0.6, 0.5, 0.3], [0.03, 0.06, 0.2], [0.02, 0.02, 0.02], [0.55, 0.42, 0.18], [0.3, 0.03, 0.02], [0.04, 0.12, 0.06]];
 const SAILS: Vec3[] = [
-  [0.1, 0.2, 0.5], [0.72, 0.42, 0.06], [0.08, 0.36, 0.26], [0.5, 0.11, 0.05], [0.1, 0.09, 0.09], [0.3, 0.08, 0.24], [0.55, 0.36, 0.12],
+  [0.06, 0.2, 0.68], [0.85, 0.45, 0.03], [0.04, 0.45, 0.3], [0.62, 0.1, 0.035], [0.1, 0.09, 0.09], [0.4, 0.06, 0.32], [0.7, 0.42, 0.1],
 ];
 
 /** A ship's colours by her id (0: the player's). */
 export const lookOf = (id: number): Look =>
-  (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], band: id % 4 === 3 });
+  (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], pattern: id % 4 === 3 ? 'band' : 'plain' });
 
 /** The others' colours on the sea, by their sails: each sail's dye, but madder's, a red too near her scarlet to tell
  *  apart on the water, which holds it in a lime instead. */

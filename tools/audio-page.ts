@@ -142,7 +142,7 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
     const position = scale(radial, R + heave);
     const her: ShipDraw = {
       id: 0, pose: { position, forward, up: normalize(add(scale(radial, Math.cos(roll)), side, Math.sin(roll))) },
-      look: { paint: [1, 0, 0], sail: [1, 1, 1], band: false }, velocity: scale(forward, speedAt(t)), afloat: true,
+      look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' }, velocity: scale(forward, speedAt(t)), afloat: true,
     };
     const place = (x: number, z: number): Vec3 => scale(normalize(add(add(radial, side, x / R), forward, z / R)), R + 2);
     const ships: ShipDraw[] = [her, ...SCRIPT.others.map((o): ShipDraw => ({

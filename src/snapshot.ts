@@ -29,9 +29,9 @@ export interface Eye {
 /** The vertical field of view of an eye in the air, degrees. */
 export const AIR_FOV = 50;
 
-/** A captain's colours (linear rgb, 0…1): her hull's paint, her sails' canvas, and whether a band of the paint
- *  crosses her sails. */
-export interface Look { paint: Vec3; sail: Vec3; band: boolean }
+/** A captain's colours (linear rgb, 0…1): her hull's paint, her sails' canvas, and what of the paint is on her sails
+ *  besides the cross: nothing more, a band across them, or upright stripes of it (the cross counterchanged over them). */
+export interface Look { paint: Vec3; sail: Vec3; pattern: 'plain' | 'band' | 'stripes' }
 
 /** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), and
  *  whether she floats (one going down neither fits the sea round her nor marks it). */
