@@ -5,10 +5,10 @@
 //
 // A deed (Happening) is the match's own report of what happened (player.ts Deed, read from status.moments): numbered in
 // order (seq), at a moment on the world's clock (time), where (at, a unit vector), and the ship it befell (ship).
-// The rest are heard from what she sees and holds as it changes (listen.ts): her gun come ready, a slot taken in hand,
-// a ball passing near, her water, the storm, her timbers on the roll, and the screens.
+// The rest are heard from what she sees and holds as it changes (listen.ts): a slot of her stores taken in hand, a
+// ball passing near, her water, the storm, her timbers on the roll, and the screens.
 
-import type { Deed, Piece } from '../player.ts';
+import { isGun, type Deed, type GunKind, type Piece } from '../player.ts';
 import type { SoundName } from './bank.ts';
 
 /** A deed on the sea: player.ts Deed (see the header). */
@@ -16,13 +16,13 @@ export type Happening = Deed;
 export type { Piece };
 
 /** Every kind of deed. */
-export const DEEDS = ['fired', 'fell', 'struck', 'sank', 'took', 'mended', 'gust'] as const satisfies readonly Happening['kind'][];
+export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'fell', 'struck', 'sank', 'took', 'mended', 'gust'] as const satisfies readonly Happening['kind'][];
 
 /** What is heard. */
 export const CUE_NAMES = [
-  'fire', 'fired', 'splash', 'thud', 'strike', 'hurt', 'ring', 'shatter', 'sank', 'sunk', 'took', 'swap', 'mendWard',
-  'mendHull', 'gust', 'ready', 'select', 'whistle', 'claim', 'cut', 'enter', 'leave', 'closing', 'creak', 'rope',
-  'tap', 'open', 'close', 'launch', 'lost', 'salute',
+  'fire', 'fired', 'wind', 'wound', 'reload', 'splash', 'thud', 'strike', 'hurt', 'ring', 'shatter', 'sank', 'sunk',
+  'took', 'swap', 'mendWard', 'mendHull', 'gust', 'ready', 'select', 'whistle', 'claim', 'cut', 'enter', 'leave',
+  'closing', 'creak', 'rope', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
 ] as const;
 export type Cue = (typeof CUE_NAMES)[number];
 
@@ -30,13 +30,21 @@ export type Cue = (typeof CUE_NAMES)[number];
  *  the UI's. The bed has its own (bed.ts). */
 export type Bus = 'world' | 'own' | 'ui';
 
-/** A cue: its sound, its level against the sound's own (dB), and where it plays. */
-export interface CueSound { sound: SoundName; level: number; bus: Bus }
+/** A cue: its sound (`report`: the report of the gun that fired, by its kind: bank.ts REPORTS), its level against the
+ *  sound's own (dB), and where it plays. */
+export interface CueSound { sound: SoundName | 'report'; level: number; bus: Bus }
+
+/** The sound a cue plays, for a gun of kind `gun` (a cannon's, if none is said). */
+export const soundOf = (c: CueSound, gun: GunKind | null): SoundName => (c.sound === 'report' ? (gun ?? 'cannon') : c.sound);
 
 export const CUES: Record<Cue, CueSound> = {
-  // her gun, and everyone else's from where it fired
-  fire: { sound: 'cannon', level: 0, bus: 'own' },
-  fired: { sound: 'cannon', level: 0, bus: 'world' },
+  // her gun, and everyone else's from where it fired, by its kind; wound up (heard from others too: a warning), and
+  // her reload begun
+  fire: { sound: 'report', level: 0, bus: 'own' },
+  fired: { sound: 'report', level: 0, bus: 'world' },
+  wind: { sound: 'wind', level: 0, bus: 'own' },
+  wound: { sound: 'wind', level: 0, bus: 'world' },
+  reload: { sound: 'reload', level: 0, bus: 'own' },
   // balls come down, or home
   splash: { sound: 'splash', level: 0, bus: 'world' },
   thud: { sound: 'thud', level: 0, bus: 'world' },
@@ -48,7 +56,7 @@ export const CUES: Record<Cue, CueSound> = {
   // a ship going down from where she lies; hers, close
   sank: { sound: 'sink', level: 0, bus: 'world' },
   sunk: { sound: 'sink', level: 2, bus: 'own' },
-  // her stores
+  // her stores: a gun taken up or swapped in hand onto her plinth
   took: { sound: 'took', level: 0, bus: 'own' },
   swap: { sound: 'swap', level: 0, bus: 'own' },
   mendWard: { sound: 'mendWard', level: 0, bus: 'own' },
@@ -81,10 +89,14 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
   const hers = h.ship === own;
   switch (h.kind) {
     case 'fired': return hers ? 'fire' : 'fired';
+    case 'winding': return hers ? 'wind' : 'wound';
+    case 'reloading': return hers ? 'reload' : null;
+    case 'reloaded': return hers ? 'ready' : null;
+    case 'swapped': return hers ? 'swap' : null;
     case 'fell': return h.land ? 'thud' : 'splash';
     case 'struck': return !hers ? 'strike' : h.broke ? 'shatter' : h.hull > 0 ? 'hurt' : 'ring';
     case 'sank': return hers ? 'sunk' : 'sank';
-    case 'took': return !hers ? null : h.piece === 'gun' ? 'swap' : 'took';
+    case 'took': return !hers ? null : isGun(h.piece) ? 'swap' : 'took';
     case 'mended': return !hers ? null : h.piece === 'smallShield' || h.piece === 'bigShield' ? 'mendWard' : 'mendHull';
     case 'gust': return hers ? 'gust' : null;
   }

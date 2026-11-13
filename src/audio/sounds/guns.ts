@@ -1,15 +1,18 @@
 // The guns' sounds: a report for each kind of gun (GUNS, a row each), the reload's clunk as the gun comes ready, the
-// THUNK of a gun swapped onto her plinth, and the light knock of a slot of the hotbar taken in hand.
+// THUNK of a gun swapped onto her plinth, the light knock of a slot of the hotbar taken in hand, the ratchet of a gun
+// wound up, and the reload begun.
 //
 // A report is built as a real one is heard: the muzzle's crack (a few milliseconds, bright), the blast's body (noise
 // through a lowpass falling from the bright to the dull in some 30 ms), the thump (a falling sine for headphones and,
 // for a phone's small speaker that hears little under 150 Hz, a band of noise in the low mids), the carriage's
-// wooden kick, and the tail: a rumble, rolled on by the sea's and the air's slap back.
+// wooden kick, and the tail: a rumble, rolled on by the sea's and the air's slap back. Each kind tells by its own: the
+// cannon's full boom; the scatter's rattle of shot; the repeater's short dry snap (it fires ten a second); the
+// harpoon's thrum of a loosed cable over a soft cough; the mortar's hollow tube note and its long low tail.
 
-import { ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, take, tone, type Samples, type Take } from '../dsp.ts';
+import type { GunKind } from '../../player.ts';
+import { ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, slips, take, tone, type Samples, type Take } from '../dsp.ts';
 
-/** The kinds of gun there are (sim/gun.ts has one kind, the cannon; a new kind is a row of GUNS). */
-export type GunKind = 'cannon';
+export type { GunKind };
 
 /**
  * A gun's report:
@@ -20,11 +23,17 @@ export type GunKind = 'cannon';
  *   tail    seconds of rumble after
  *   rattle  grains of a scattered charge (0 for one ball)
  *   drive   how hard the whole is saturated (density)
+ *   ring    a note it rings with, Hz, and the seconds it rings (the harpoon's cable, the mortar's tube; 0 none)
+ *   bend    how far the ring's note falls as it rings, a share of it
  */
-export interface Report { crack: number; thump: number; body: number; blast: number; tail: number; rattle: number; drive: number }
+export interface Report { crack: number; thump: number; body: number; blast: number; tail: number; rattle: number; drive: number; ring: number; ringT: number; bend: number }
 
 export const GUNS: Record<GunKind, Report> = {
-  cannon: { crack: 1, thump: 105, body: 210, blast: 0.06, tail: 2.2, rattle: 0, drive: 1.6 },
+  cannon: { crack: 1, thump: 105, body: 210, blast: 0.06, tail: 2.2, rattle: 0, drive: 1.6, ring: 0, ringT: 0, bend: 0 },
+  scatter: { crack: 0.9, thump: 125, body: 280, blast: 0.04, tail: 1.3, rattle: 46, drive: 1.9, ring: 0, ringT: 0, bend: 0 },
+  repeater: { crack: 1.3, thump: 170, body: 460, blast: 0.018, tail: 0.45, rattle: 0, drive: 1.3, ring: 0, ringT: 0, bend: 0 },
+  harpoon: { crack: 0.25, thump: 80, body: 190, blast: 0.025, tail: 0.9, rattle: 0, drive: 1.2, ring: 118, ringT: 0.5, bend: 0.12 },
+  mortar: { crack: 0.35, thump: 58, body: 150, blast: 0.09, tail: 3, rattle: 0, drive: 1.9, ring: 92, ringT: 0.45, bend: 0.04 },
 };
 
 /** The report of a gun of kind `g`. */
@@ -34,6 +43,16 @@ export const report = (g: Report) => (rate: number, seed: number): Samples => {
   noise(crack, fall(0.0022));
   filter(crack, 'highpass', 900);
   mix(t, crack, 0, 1.3 * g.crack);
+  if (g.ring) {
+    // its note: a fundamental and its overtones, falling a little as it rings, a buzz of the cable or the tube on it
+    for (const [k, a] of [[1, 0.9], [2, 0.45], [3, 0.3], [5, 0.12]] as const) {
+      tone(t, (s) => k * g.ring * (1 - g.bend * (1 - Math.exp(-s / 0.08))), (s) => a * ar(0.004, g.ringT / (0.6 + 0.4 * k))(s), 0, g.ringT * 2.5);
+    }
+    const buzz = layer(t, g.ringT * 1.5);
+    noise(buzz, ar(0.003, g.ringT * 0.4));
+    filter(buzz, 'bandpass', g.ring * 7, 2);
+    mix(t, buzz, 0, 0.5);
+  }
   // the blast: noise through a lowpass falling from bright to dull
   const blast = layer(t, 0.8);
   noise(blast, ar(0.0015, g.blast));
@@ -113,6 +132,31 @@ export function swap(rate: number, seed: number): Samples {
   mix(t, chain, at + 0.05, 0.4);
   filter(t, 'lowshelf', 120, 0.7, -6);
   saturate(t, 1.8);
+  return normal(finish(t)).x;
+}
+
+/** A gun wound up to fire (the harpoon's cable drawn, the mortar's charge rammed): a ratchet's pawl clicking quicker
+ *  over some 0.6 s, iron on iron, ending in a catch. */
+export function wind(rate: number, seed: number): Samples {
+  const t = take(0.8, rate, seed);
+  const pawl = layer(t, 0.7);
+  slips(pawl, (s) => 14 + 30 * s, (s) => 0.6 + 0.6 * s, 0, 0.6, 0.12);
+  filter(pawl, 'bandpass', 2300, 3);
+  filter(pawl, 'peak', 5100, 4, 6);
+  mix(t, pawl, 0, 1);
+  modes(t, [[1900, 0.06, 0.4], [3300, 0.04, 0.25]], 0.62, 0.02);
+  latch(t, 0.62, 0.5);
+  return normal(finish(t)).x;
+}
+
+/** A reload begun: the spent breech knocked open, and the shot rolled in. */
+export function reload(rate: number, seed: number): Samples {
+  const t = take(0.5, rate, seed);
+  latch(t, 0, 0.6);
+  const roll = layer(t, 0.3);
+  slips(roll, () => 60, (s) => Math.sin(Math.PI * Math.min(1, s / 0.22)), 0, 0.22, 0.4);
+  filter(roll, 'bandpass', 900, 1.5);
+  mix(t, roll, 0.12, 0.5);
   return normal(finish(t)).x;
 }
 

@@ -1,5 +1,5 @@
-// What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's moments: status.moments): her
-// gun come ready, a slot taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
+// What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's
+// moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
 // water left and entered), the storm beginning to close, her timbers and rigging at each end of her roll, and the
 // screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,
 // her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all.
@@ -7,7 +7,7 @@
 // Pure: plain data in, cues and the bed out; what it keeps between frames is its own. The coast is found by sounding the
 // ground in a ring round her, a few points a frame.
 
-import type { Kit, Status } from '../player.ts';
+import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
 import type { ShipDraw, Snapshot } from '../snapshot.ts';
 import type { Screen } from '../ui/ways.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
@@ -17,8 +17,9 @@ import type { Cue } from './cues.ts';
  *  is open. */
 export interface Hearing { scene: Snapshot; status: Status & Kit; screen: Screen; map: boolean }
 
-/** A cue to play: placed at `at` (world metres) or hers (null), `gain` a factor on its level. */
-export interface Call { cue: Cue; at: Vec3 | null; gain: number }
+/** A cue to play: placed at `at` (world metres) or hers (null), `gain` a factor on its level; `gun` the kind of gun
+ *  it is of, if it is a gun's (its report is that kind's). */
+export interface Call { cue: Cue; at: Vec3 | null; gain: number; gun?: GunKind }
 
 /**
  * What the bed follows (bed.ts):
@@ -36,7 +37,7 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number }
 export interface Bed { speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number; muffle: number; clock: number }
 
 /** Her top speed, m/s (sim/handling.ts SHIP). */
-const TOP = 12;
+const TOP = 13.5;
 /** The ring the coast is sounded on: metres out, and how many ways round. */
 const RING = [25, 60, 110, 200] as const, WAYS = 8;
 /** A ball passing within this many metres of the eye is heard, its whistle at its closest WHISTLE s into it; one
@@ -59,7 +60,7 @@ const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 export function createListen(ground: (p: Vec3) => number) {
   const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, clock: 0 };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
-  let ready = 1, rarity: number | null = null, chosen = 0;
+  let chosen = 0;
   let lift = NaN, roll = 0, rolling = 0, creaked = 0, side = 1, whistled = -Infinity;
   /** Land found on the ring (1) or not (0), each way and distance; the next to sound. */
   const land = new Uint8Array(RING.length * WAYS);
@@ -112,12 +113,8 @@ export function createListen(ground: (p: Vec3) => number) {
         lift = NaN;
       }
 
-      // her gun come ready, a slot taken in hand
-      const now = s.gun ? s.gun.ready : 1;
-      if (!fresh && s.gun && rarity === s.gun.rarity && ready < 1 && now >= 1) call('ready');
-      if (!fresh && s.chosen !== chosen) call('select');
-      ready = now;
-      rarity = s.gun?.rarity ?? null;
+      // a slot of her stores taken in hand (a gun taken in hand is her deed: swapped)
+      if (!fresh && s.chosen !== chosen && s.chosen >= HOTBAR.guns) call('select');
       chosen = s.chosen;
 
       // her water: a loop closed, her trail cut; her open trail begun (she left her water) or ended (back in it)

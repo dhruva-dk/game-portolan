@@ -13,7 +13,7 @@ import { R } from '../world/sphere.ts';
 import { NAMES, SOUNDS, type SoundName } from './bank.ts';
 import type { Ask, Made } from './maker.ts';
 import { createBed, levels, levelsOf } from './bed.ts';
-import { CUES, cueOf, type Happening } from './cues.ts';
+import { CUES, cueOf, soundOf, type Happening } from './cues.ts';
 import { db, rng } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
@@ -21,7 +21,7 @@ import { close, hear, heard } from './space.ts';
 import type { Screen } from '../ui/ways.ts';
 
 /** Metres over the sea a deed is heard from: a gun at her muzzle, a blow on a hull at her side, the rest at the water. */
-const LIFT: Record<Happening['kind'], number> = { fired: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
+const LIFT: Record<Happening['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
 /** Seconds of the bed's noise loop. */
 const LOOP = 6;
 
@@ -50,7 +50,7 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
 
   /** Plays `call` as heard from `eye` at `at` (s on the context's clock). */
   const play = (call: Call, eye: Hearing['scene']['eye'], at: number) => {
-    const c = CUES[call.cue], sound = SOUNDS[c.sound], takes = bank.get(c.sound);
+    const c = CUES[call.cue], name = soundOf(c, call.gun ?? null), sound = SOUNDS[name], takes = bank.get(name);
     if (!takes?.length) return;
     if (c.bus === 'world' && call.at) {
       if (!hear(eye, call.at, sound.reach, h).audible) return;
@@ -92,7 +92,8 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
       }
       for (const d of deeds) {
         const cue = cueOf(d, scene.own);
-        if (cue) calls.push({ cue, at: [d.at[0] * (R + LIFT[d.kind]), d.at[1] * (R + LIFT[d.kind]), d.at[2] * (R + LIFT[d.kind])], gain: 1 });
+        const lift = R + LIFT[d.kind], gun = 'gun' in d ? d.gun : undefined;
+        if (cue) calls.push({ cue, at: [d.at[0] * lift, d.at[1] * lift, d.at[2] * lift], gain: 1, gun });
       }
       const b = listen.listen(hearing, dt, calls);
       if (!sounding) return;

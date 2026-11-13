@@ -1,40 +1,46 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NAMES, SOUNDS } from '../src/audio/bank.ts';
-import { CUES, CUE_NAMES, DEEDS, cueOf, type Happening } from '../src/audio/cues.ts';
+import { CUES, CUE_NAMES, DEEDS, cueOf, soundOf, type Happening } from '../src/audio/cues.ts';
 import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
 import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
-import type { Kit, Status } from '../src/player.ts';
-import type { Blast, Eye, ShipDraw, Snapshot } from '../src/snapshot.ts';
+import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
+import type { BallDraw, Blast, Eye, ShipDraw, Snapshot } from '../src/snapshot.ts';
 import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { inverse, lookAt, rotate } from '../src/world/turn.ts';
 
 const at: Vec3 = [0, 0, 1];
 /** A deed of each kind, befalling `ship`. */
-const each = (ship: number): Happening[] => DEEDS.map((kind): Happening => {
+const each = (ship: number, gun: GunKind = 'cannon'): Happening[] => DEEDS.map((kind): Happening => {
   const base = { seq: 1, time: 0, at, ship };
   switch (kind) {
-    case 'fired': return { ...base, kind };
+    case 'fired': case 'winding': case 'reloading': case 'reloaded': case 'swapped': return { ...base, kind, gun };
     case 'fell': return { ...base, kind, land: false };
     case 'struck': return { ...base, kind, by: 1, shield: 0, hull: 10, broke: false, ram: false };
     case 'sank': return { ...base, kind, by: null };
-    case 'took': return { ...base, kind, piece: 'gun', rarity: 0, slot: 0 };
+    case 'took': return { ...base, kind, piece: gun, rarity: 0, slot: 0 };
     case 'mended': return { ...base, kind, piece: 'repairKit' };
     case 'gust': return { ...base, kind };
   }
 });
+const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
 
 test('the table: every kind of deed, hers, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
   for (const h of each(0)) assert.ok(cueOf(h, 0), `her ${h.kind} has a cue`);
   for (const h of [...each(0), ...each(5)]) {
     const c = cueOf(h, 0);
-    if (c) assert.ok(SOUNDS[CUES[c].sound], `${h.kind} → ${c} → a sound`);
+    if (c) assert.ok(SOUNDS[soundOf(CUES[c], null)], `${h.kind} → ${c} → a sound`);
   }
-  for (const c of CUE_NAMES) assert.ok(SOUNDS[CUES[c].sound], `${c} plays ${CUES[c].sound}`);
-  const played = new Set(CUE_NAMES.map((c) => CUES[c].sound));
+  for (const c of CUE_NAMES) assert.ok(SOUNDS[soundOf(CUES[c], null)], `${c} plays ${CUES[c].sound}`);
+  const played = new Set([...CUE_NAMES.map((c) => soundOf(CUES[c], null)), ...KINDS.flatMap((k) => CUE_NAMES.map((c) => soundOf(CUES[c], k)))]);
   for (const n of NAMES) assert.ok(played.has(n), `${n} is played by a cue`);
+  // a gun's report is its own kind's
+  for (const k of KINDS) assert.equal(soundOf(CUES[cueOf(each(5, k)[0], 0)!], k), k);
+  // another's wind-up is heard from where she lies, a warning; her reloads are hers alone
+  assert.equal(cueOf(each(5)[DEEDS.indexOf('winding')], 0), 'wound');
+  assert.equal(cueOf(each(5)[DEEDS.indexOf('reloading')], 0), null);
   // others' deeds are placed in the world; hers are heard close
   for (const h of each(5)) {
     const c = cueOf(h, 0);
@@ -48,7 +54,7 @@ test('her blows: her ward taking all of one rings, its last breaks it, the rest 
   assert.equal(cueOf(blow(10, 10, true), 0), 'shatter');
   assert.equal(cueOf(blow(0, 20, false), 0), 'hurt');
   assert.equal(cueOf(blow(0, 20, false), 3), 'strike');
-  assert.equal(cueOf({ seq: 1, time: 0, at, ship: 0, kind: 'took', piece: 'gun', rarity: 2, slot: 0 }, 0), 'swap');
+  assert.equal(cueOf({ seq: 1, time: 0, at, ship: 0, kind: 'took', piece: 'harpoon', rarity: 2, slot: 0 }, 0), 'swap');
   assert.equal(cueOf({ seq: 1, time: 0, at, ship: 0, kind: 'took', piece: 'smallShield', rarity: 0, slot: 1 }, 0), 'took');
   assert.equal(cueOf({ seq: 1, time: 0, at, ship: 0, kind: 'mended', piece: 'bigShield' }, 0), 'mendWard');
 });
@@ -67,6 +73,32 @@ test('every sound is made: samples within full scale, finite, starting and endin
     assert.ok(Math.abs(x[0]) < 0.05 && Math.abs(x[x.length - 1]) < 1e-3, `${n} ends at rest`);
     // (the mean of a click a tenth of a second long is its low partials', not a standing offset: −50 dB is none)
     assert.ok(Math.abs(sum / x.length) < 3e-3, `${n} DC`);
+  }
+});
+
+test('each kind\'s report is its own: unlike the others in length and in where its weight lies', () => {
+  const rate = 24000;
+  const made = KINDS.map((k) => SOUNDS[k].make(rate, 1));
+  /** Seconds till it has fallen 40 dB under its peak for good; the share of its energy over 1.5 kHz (one-pole split). */
+  const length = (x: Float32Array) => {
+    let last = 0;
+    for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > 0.009) last = i;
+    return last / rate;
+  };
+  const bright = (x: Float32Array) => {
+    const a = Math.exp((-2 * Math.PI * 1500) / rate);
+    let low = 0, hi = 0, all = 0;
+    for (const v of x) { low = a * low + (1 - a) * v; hi += (v - low) ** 2; all += v * v; }
+    return hi / all;
+  };
+  const rows = made.map((x, i) => ({ kind: KINDS[i], length: length(x), bright: bright(x) }));
+  console.log(`# ${rows.map((r) => `${r.kind} ${r.length.toFixed(2)} s, ${(100 * r.bright).toFixed(0)}% bright`).join('; ')}`);
+  const by = Object.fromEntries(rows.map((r) => [r.kind, r]));
+  assert.ok(by.repeater.length < 0.5 * by.cannon.length, 'the repeater short');
+  assert.ok(by.mortar.length > by.cannon.length, 'the mortar longest');
+  for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+    const a = rows[i], b = rows[j];
+    assert.ok(Math.abs(a.length - b.length) > 0.1 || Math.abs(a.bright - b.bright) > 0.03, `${a.kind} and ${b.kind} alike`);
   }
 });
 
@@ -118,25 +150,26 @@ test('voices: never more than VOICES at once; a new sound takes a free slot, els
 
 /** A plain scene: her ship (id 0) at `at`, others where given, the eye behind her. */
 function scene(t: number, blasts: Blast[] = [], ships: ShipDraw[] = [], balls: Snapshot['balls'] = [], sea?: Snapshot['sea']): Snapshot {
-  const her: ShipDraw = { id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' }, velocity: [6, 0, 0], afloat: true };
+  const her: ShipDraw = { id: 0, pose: { position: scale(at, R), forward: [1, 0, 0], up: at }, look: { paint: [1, 0, 0], sail: [1, 1, 1], pattern: 'plain' }, velocity: [6, 0, 0], afloat: true, gun: null };
   return { eye: { kind: 'air', position: [-20, 0, R + 8], orientation: [0, 0, 0, 1], fov: 50 }, clock: t, storm: { centre: at, radius: 1 }, ships: [her, ...ships], own: 0, balls, loot: [], blasts, sea };
 }
 const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   at, heading: [1, 0, 0], facing: [1, 0, 0], arriving: 0, hull: 100, hullMax: 100, shield: 30, shieldMax: 50,
-  gun: { rarity: 0, ready: 1, locked: false }, afloat: 2, sunk: false, storm: 30, closing: false, eye: { centre: at, radius: 2000 }, next: null,
-  outside: 0, reticle: null, moments: [], items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
+  gun: { kind: 'cannon', rarity: 0, rounds: 8, ready: 1, charge: null, swapping: 0, locked: false }, afloat: 2, sunk: false, storm: 30, closing: false,
+  eye: { centre: at, radius: 2000 }, next: null, outside: 0, reticle: null, moments: [], guns: [{ kind: 'cannon', rarity: 0, rounds: 8, mag: 8, reload: null }, null],
+  items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
 });
 
 const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false): Hearing => ({ scene: s, status: st, screen, map });
 
-test('listen: a ball passing near whistles once; her gun come ready; the screens; her water', () => {
+test('listen: a ball passing near whistles once; a slot of her stores taken in hand, not a gun; the screens; her water', () => {
   const l = createListen(() => -20), out: Call[] = [];
   const dt = 1 / 30, eye = scene(0).eye.position, way: Vec3 = [0, 136, 0];
   let whistles = 0;
   for (let t = 0; t < 1.5; t += dt) {
     out.length = 0;
     // closest to the eye, 5 m off, at t = 1
-    const ball: { at: Vec3; way: Vec3 } = { at: [eye[0] + 5, eye[1] + 136 * (t - 1), eye[2]], way };
+    const ball: BallDraw = { at: [eye[0] + 5, eye[1] + 136 * (t - 1), eye[2]], way, gun: 'cannon', to: at };
     l.listen(hearing(scene(t, [], [], [ball]), status()), dt, out);
     whistles += out.filter((c) => c.cue === 'whistle').length;
   }
@@ -146,8 +179,9 @@ test('listen: a ball passing near whistles once; her gun come ready; the screens
     l.listen(h, dt, out);
     return out.map((c) => c.cue);
   };
-  assert.deepEqual(cues(hearing(scene(2), status({ gun: { rarity: 0, ready: 0.5, locked: false } }))), []);
-  assert.deepEqual(cues(hearing(scene(2.1), status())), ['ready']);
+  assert.deepEqual(cues(hearing(scene(2), status({ chosen: 1 }))), [], 'her other gun taken in hand: her deed\'s (swapped)');
+  assert.deepEqual(cues(hearing(scene(2.1), status({ chosen: HOTBAR.guns }))), ['select']);
+  cues(hearing(scene(2.15), status()));
   assert.deepEqual(cues(hearing(scene(2.2), status(), 'won')), ['salute']);
   assert.deepEqual(cues(hearing(scene(2.3), status(), 'lobby')), []);
   assert.deepEqual(cues(hearing(scene(2.4), status(), 'settings')), ['open']);

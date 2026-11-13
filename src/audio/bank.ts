@@ -4,7 +4,7 @@
 // frame (fill), never on the frame a sound is wanted.
 
 import type { Samples } from './dsp.ts';
-import { GUNS, ready, report, select, swap, type GunKind } from './sounds/guns.ts';
+import { GUNS, ready, reload, report, select, swap, wind, type GunKind } from './sounds/guns.ts';
 import { hurt, ring, shatter, sink, splash, strike, thud, whistle } from './sounds/blows.ts';
 import { claim, closing, creak, cut, enter, gust, leave, mendHull, mendWard, rope, took } from './sounds/sea.ts';
 import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
@@ -19,13 +19,20 @@ import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
  */
 export interface Sound { make: (rate: number, seed: number) => Samples; takes: number; level: number; priority: number; reach: number }
 
-/** Each gun's report, by kind (sounds/guns.ts GUNS). */
+/** Each gun's report, by kind (sounds/guns.ts GUNS): the repeater's quieter and with more takes, as it fires ten a
+ *  second; the mortar's carrying furthest. */
 export const REPORTS: Record<GunKind, Sound> = {
   cannon: { make: report(GUNS.cannon), takes: 3, level: -1, priority: 8, reach: 1400 },
+  scatter: { make: report(GUNS.scatter), takes: 3, level: -1, priority: 8, reach: 1100 },
+  repeater: { make: report(GUNS.repeater), takes: 5, level: -7, priority: 7, reach: 900 },
+  harpoon: { make: report(GUNS.harpoon), takes: 2, level: -3, priority: 8, reach: 900 },
+  mortar: { make: report(GUNS.mortar), takes: 2, level: 0, priority: 8, reach: 1600 },
 };
 
 const SOUND = {
   ready: { make: ready, takes: 2, level: -12, priority: 6, reach: 0 },
+  wind: { make: wind, takes: 2, level: -10, priority: 6, reach: 160 },
+  reload: { make: reload, takes: 2, level: -13, priority: 5, reach: 0 },
   swap: { make: swap, takes: 2, level: -7, priority: 7, reach: 0 },
   select: { make: select, takes: 2, level: -14, priority: 3, reach: 0 },
   whistle: { make: whistle, takes: 3, level: -12, priority: 6, reach: 60 },
