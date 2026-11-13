@@ -63,16 +63,14 @@ at 956×440. Each rule below can be checked against `node tools/hero.ts <dir>` (
 - Murky brown-grey water.
 - Quality settings, fallbacks, and any pass outside `frame.ts`.
 
-## Cost (phone, 956×440 CSS pixels, the frame drawn at 1.5×: 1434×660)
+## Cost (phone, 956×440)
 | Pass | Size | Taps |
 |---|---|---|
-| Light to texture | 1434×660 | 1 |
-| Bloom (7 passes) | 359×165 down to 45×21 | ~0.4 M |
-| Shafts (3 passes) | 359×165 | ~2 M |
-| Grade, film, composite | 1434×660 | bloom + shafts + 2 LUT reads |
-| FXAA | 1434×660 | as before |
-
-The clouds' march, and the ships' levels of detail, go by the screen's CSS pixels, not the frame's.
+| Light to texture | 956×440 | 1 |
+| Bloom (7 passes) | 239×110 down to 30×14 | ~0.2 M |
+| Shafts (3 passes) | 239×110 | ~0.9 M |
+| Grade, film, composite | 956×440 | bloom + shafts + 2 LUT reads |
+| FXAA | 956×440 | as before |
 
 Budget a displayed frame, every pass summed: under 100 draw calls, 900k triangles, 20 render passes in the standard
 views (`npm run budget` checks four, headless, from the meter's counts; the chase views run about 40-50 draws, 15
