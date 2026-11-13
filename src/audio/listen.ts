@@ -1,6 +1,6 @@
 // What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's
 // moments: status.moments, her guns' among them): a slot of her stores taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
-// water left and entered), the storm beginning to close, her timbers and rigging at each end of her roll, and the
+// water left and entered), the storm beginning to close, her rigging at an end of her roll, and the
 // screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,
 // her heave and roll, the nearest coast, the storm's wall, her hull, and how much of the sea is heard at all.
 //
@@ -43,8 +43,9 @@ const RING = [25, 60, 110, 200] as const, WAYS = 8;
 /** A ball passing within this many metres of the eye is heard, its whistle at its closest WHISTLE s into it; one
  *  whistle stands for all within APART s of it. */
 const PASS = 30, WHISTLE = 0.3, APART = 0.12;
-/** Her roll at its end, radians, under which no creak is heard; and the fewest seconds between creaks. */
-const CREAK = 0.02, CREAKS = 0.8;
+/** Her roll at its end, radians, under which her rigging is not heard; and the fewest seconds between the ends of her
+ *  roll it is heard at (one end in two). */
+const ROPE = 0.02, TURNS = 0.8;
 /** What a screen shown says, by the screen it came from: a folio opened, closed; PLAY; her end. */
 function screenCue(from: Screen, to: Screen): Cue | null {
   if (to === 'rank' || to === 'settings') return 'open';
@@ -61,7 +62,7 @@ export function createListen(ground: (p: Vec3) => number) {
   const bed: Bed = { speed: 0, wind: 0, heave: 0, roll: 0, coast: Infinity, wall: Infinity, hull: 1, presence: 0, muffle: 0, clock: 0 };
   let screen: Screen | null = null, map = false, generation = -1, seq = 0, trail = false, closing = false;
   let chosen = 0;
-  let lift = NaN, roll = 0, rolling = 0, creaked = 0, side = 1, whistled = -Infinity;
+  let lift = NaN, roll = 0, rolling = 0, turned = 0, side = 1, whistled = -Infinity;
   /** Land found on the ring (1) or not (0), each way and distance; the next to sound. */
   const land = new Uint8Array(RING.length * WAYS);
   let sounding = 0;
@@ -147,17 +148,17 @@ export function createListen(ground: (p: Vec3) => number) {
         whistled = scene.clock;
       }
 
-      // her heave and roll; her timbers creaking at an end of her roll, her rigging at the next
+      // her heave and roll; her rigging at one end of her roll in two
       if (own) {
         const p = own.pose.position, r = Math.sqrt(dot(p, p)), f = own.pose.forward;
         const sx = (f[1] * p[2] - f[2] * p[1]) / r, sy = (f[2] * p[0] - f[0] * p[2]) / r, sz = (f[0] * p[1] - f[1] * p[0]) / r;
         const sl = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1, u = own.pose.up;
         const now = Math.asin(Math.max(-1, Math.min(1, (u[0] * sx + u[1] * sy + u[2] * sz) / sl)));
         const rate = dt > 0 ? (now - roll) / dt : 0;
-        if (dt > 0 && Math.sign(rate) !== Math.sign(rolling) && Math.abs(now) > CREAK && scene.clock - creaked > CREAKS) {
-          call(side > 0 ? 'creak' : 'rope', null, Math.min(1, Math.abs(now) / 0.07));
+        if (dt > 0 && Math.sign(rate) !== Math.sign(rolling) && Math.abs(now) > ROPE && scene.clock - turned > TURNS) {
+          if (side < 0) call('rope', null, Math.min(1, Math.abs(now) / 0.07));
           side = -side;
-          creaked = scene.clock;
+          turned = scene.clock;
         }
         if (dt > 0) rolling = rate;
         roll = now;

@@ -6,7 +6,7 @@
 // A deed (Happening) is the match's own report of what happened (player.ts Deed, read from status.moments): numbered in
 // order (seq), at a moment on the world's clock (time), where (at, a unit vector), and the ship it befell (ship).
 // The rest are heard from what she sees and holds as it changes (listen.ts): a slot of her stores taken in hand, a
-// ball passing near, her water, the storm, her timbers on the roll, and the screens.
+// ball passing near, her water, the storm, her rigging on the roll, and the screens.
 
 import { blowOf, isGun, type Blow, type Deed, type GunKind } from '../player.ts';
 import type { SoundName } from './bank.ts';
@@ -21,7 +21,7 @@ export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'f
 export const CUE_NAMES = [
   'fire', 'fired', 'wind', 'wound', 'reload', 'splash', 'thud', 'strike', 'hurt', 'ring', 'shatter', 'sank', 'sunk',
   'took', 'swap', 'mendWard', 'mendHull', 'gust', 'ready', 'select', 'whistle', 'claim', 'cut', 'enter', 'leave',
-  'closing', 'creak', 'rope', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
+  'closing', 'rope', 'tap', 'open', 'close', 'launch', 'lost', 'salute',
 ] as const;
 export type Cue = (typeof CUE_NAMES)[number];
 
@@ -70,8 +70,7 @@ export const CUES: Record<Cue, CueSound> = {
   enter: { sound: 'enter', level: 0, bus: 'own' },
   leave: { sound: 'leave', level: 0, bus: 'own' },
   closing: { sound: 'closing', level: 0, bus: 'own' },
-  // her timbers and her rigging on the roll
-  creak: { sound: 'creak', level: 0, bus: 'own' },
+  // her rigging on the roll
   rope: { sound: 'rope', level: 0, bus: 'own' },
   // the screens
   tap: { sound: 'tap', level: 0, bus: 'ui' },
