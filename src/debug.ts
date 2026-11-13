@@ -68,7 +68,7 @@ export interface Stage {
 }
 
 /** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
- *  (a match dealt and dropped into); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
+ *  (a match dealt, every ship at her berth); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
 export interface Played {
   game: Game; referee: Referee; flow: Flow;
   play(): void;
