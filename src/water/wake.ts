@@ -335,6 +335,8 @@ export function createWake(view: View, sky: Sky, capacity: number) {
       const { uv, fade } = place(p);
       return texture(target.texture, uv).level(float(0)).y.mul(fade);
     },
+    /** The map's draw, due or not. */
+    draw,
     /** Each frame, before the sea is drawn: the ships. Returns the map's draw, or null when no ship is near. */
     update(env: Environment, ships: readonly Afloat[]): Draw | null {
       const eye = view.eye, chart: Chart = { at: eye.frame.up, axis: eye.frame.east };

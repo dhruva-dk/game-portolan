@@ -281,6 +281,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
       sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
     },
+    /** The ships' marks' draw, due or not (update gives it only when due): for the frame to build its shaders before
+     *  any ship is near. */
+    marks: wake.draw,
     /** Each frame: the world, the ships on the sea, who holds it and whose ship is hers (at the snapshot's clock).
      *  Returns what is due: the waves' passes, the marks' draw. */
     update(env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships' | 'clock'>): { waves: Compute[]; wake: Draw | null } {

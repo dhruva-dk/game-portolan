@@ -40,6 +40,14 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
  *  air it sees the planet through reaches, metres. */
 const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
+/**
+ * The eyes the frame warms its shaders from (render): each kind's, looking at the planet's centre from where the whole
+ * planet is inside its lens and its far plane, so every mesh on it is in view.
+ */
+const WARM: readonly Eye[] = [
+  { kind: 'air', position: [0, 0, 1300], orientation: [0, 0, 0, 1], fov: 60 },
+  { kind: 'space', position: [0, 0, 2000], orientation: [0, 0, 0, 1], fov: 40 },
+];
 
 /** How the frame draws: what the sea is drawn as (water/water.ts); the most ships it draws at once (the room the
  *  fleet and the sea keep for them: the match's ship count), and a ship's length overall, m (the sim's: her trail runs
@@ -199,10 +207,23 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const compute = (passes: readonly Compute[]) => {
     for (const p of passes) renderer.compute(p);
   };
+  /** Whether the frame is warming its shaders (render): everything hidden in what it draws is shown. */
+  let warming = false;
+  /** Shows everything hidden under `root`; returns what puts each back. */
+  const reveal = (root: Object3D) => {
+    const hidden: Object3D[] = [];
+    root.traverse((o) => {
+      if (o.visible) return;
+      hidden.push(o);
+      o.visible = true;
+    });
+    return () => hidden.forEach((o) => (o.visible = false));
+  };
   const clearColor = new Color();
   /** Draws an offscreen scene into its target, if it is due. */
   const draw = (d: Draw | null) => {
     if (!d) return;
+    const back = warming ? reveal(d.scene) : null;
     renderer.setRenderTarget(d.target);
     if (d.clear) {
       renderer.getClearColor(clearColor);
@@ -214,6 +235,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       renderer.render(d.scene, d.camera);
     }
     renderer.setRenderTarget(null);
+    back?.();
   };
 
   // 0. once
@@ -262,15 +284,37 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     loot.draw(s.clock, s.loot);
   }
 
-  /** Draws the world as the snapshot has it, dt seconds after the last frame. */
+  /**
+   * Draws the world as the snapshot has it, dt seconds after the last frame.
+   *
+   * The first two frames are first drawn from each kind of eye (WARM), still, with everything hidden in what is drawn
+   * shown (those with nothing to draw draw nothing), and the ships' marks drawn though none is near, so every shader the frame can draw with is built and its pipeline
+   * made then, as the world loads: the view from space, the other ships, the loot, the trails, the guns' work and the
+   * ships' marks are first seen only once a match is under way, and a shader first built then costs that frame tens of
+   * milliseconds (more on the phone).
+   */
+  let cold = 2;
   function render(s: Snapshot, dt: number) {
-    const eye = cameraFor(s.eye);
-    const env = environmentAt(world, s.clock, s.eye.position);
+    if (cold > 0) {
+      // at the first two frames: a post's pass inside another is set up again as the outer is built, which remakes
+      // its draw at the next frame's
+      cold--;
+      warming = true;
+      for (const eye of WARM) drawFrom(s, eye, 0);
+      warming = false;
+    }
+    drawFrom(s, s.eye, dt);
+  }
+
+  /** The world as the snapshot has it, seen from `seen`, dt seconds after the last frame. */
+  function drawFrom(s: Snapshot, seen: Eye, dt: number) {
+    const eye = cameraFor(seen);
+    const env = environmentAt(world, s.clock, seen.position);
     stage(s);
     // the CPU's work, each system's after what it reads: the view first; the ships' yards before the marks they cast
     view.update(eye);
     renderer.getDrawingBufferSize(size);
-    const air = sky.update(env, s.storm, eye, s.eye.kind, dt, size.x, size.y);
+    const air = sky.update(env, s.storm, eye, seen.kind, dt, size.x, size.y);
     const ships = fleet.update(eye, env.windSpeed, size.y, dt);
     gunfire.update(eye, size.y);
     loot.update(eye, size.y);
@@ -281,17 +325,20 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
     const islandShadow = shadow.update(islandSun, island);
 
+    const back = warming ? reveal(scene) : null;
+
     // 1. offscreen, what is due
     compute(air.tables);
     compute(air.clouds);
     compute(air.reflection);
     compute(sea.waves);
-    draw(sea.wake);
+    draw(warming ? water.marks : sea.wake);
     draw(islandShadow);
     compute(ships.cloth);
     // 2, 3. the scene and its post, from the eye; the light shafts only in the air
-    eyes[s.eye.kind].shafts.update(eye, env.sunDirection, s.eye.kind === 'air' ? shaftsFor(rise) : 0);
-    eyes[s.eye.kind].pipeline.render();
+    eyes[seen.kind].shafts.update(eye, env.sunDirection, seen.kind === 'air' ? shaftsFor(rise) : 0);
+    eyes[seen.kind].pipeline.render();
+    back?.();
   }
 
   return {
