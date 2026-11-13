@@ -1,18 +1,20 @@
-// The planet's islands: low sand islands rising from the banks, each worked out flat on its own chart (sphere.ts) and
-// laid into the sea floor by planet.ts. Three kinds, all low (no cliffs anywhere), every one standing out of the sea:
-//   island  18–55 m round, a ridge to 3–7 m, palms and shrubs and outcrops of rock; now and then a lagoon or an
-//           offshore rock or two
-//   islet   7–15 m round, 1.5–3 m high, a palm or two
+// The planet's islands: sand islands rising from the banks into rounded hills, each worked out flat on its own chart
+// (sphere.ts) and laid into the sea floor by planet.ts. Three kinds, every one standing out of the sea, no cliffs
+// anywhere (no slope steeper than a palm stands on):
+//   island  18–55 m round, a hill 7–22 m high by its size, palms and shrubs and outcrops of rock; now and then a
+//           lagoon or an offshore rock or two
+//   islet   7–15 m round, a hump 2.5–6 m high, a palm or two
 //   rocks   a knoll 4–7 m round and a metre or so high, heaped with rock (world/scatter.ts)
 // Nothing lies hidden under open-looking water: the only water too shallow for a ship is the last few metres off a
 // beach (WADE), and the banks between are all deeper than her draught.
 //
 // Each is shaped by island-shape.ts (a lobed, worn coast; its lagoon and offshore rocks) and its ground laid by
-// distance from the water's edge: a beach at about 1:8 at the waterline, easing inland into a berm and a low ridge
-// (one or two lesser mounds, fine dune relief), and seaward to a ledge a couple of metres down, which steps down into
-// a wide clear apron 3.6–7.5 m deep, deepening outward, where a ship sails over pale sand; past the apron's edge
-// (wandering in lobes and bays) its flank falls gently to the depth of the banks, then steeply on past the deepest
-// floor, so by its reach it is below every floor and the sea floor there is the bank's alone. A lagoon is shallow.
+// distance from the water's edge: a beach at about 1:8 at the waterline, easing inland into a berm and a hill (a dome,
+// a ridge, two hills and a saddle, or a peak off the middle; fine dune relief over it), and seaward to a ledge a couple
+// of metres down, which steps down into a wide clear apron 4.2–7.5 m deep, deepening outward, where a ship sails over
+// pale sand; past the apron's edge (wandering in lobes and bays) its flank falls gently to the depth of the banks, then
+// steeply on past the deepest floor, so by its reach it is below every floor and the sea floor there is the bank's
+// alone. A lagoon is shallow.
 //
 // Where they lie: spread evenly over the whole planet, as many of each kind as its area holds at its density, the
 // largest first, each where the most water is left between its apron and every other's (the farthest point, a
