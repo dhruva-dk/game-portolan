@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DURATION, STORM, createStorm, outside, planStorm, toEdge, type Cap } from '../src/sim/storm.ts';
+import { STORM, createStorm, outside, planStorm, toEdge, type Cap } from '../src/sim/storm.ts';
 import { createPlanet } from '../src/world/planet.ts';
 import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 const SEEDS = [1, 2, 3, 4, 5, 6];
+/** Seconds from the match's start until the last cap has closed. */
+const DURATION = STORM.phases.reduce((s, p) => s + p.wait + p.close, 0);
 const planets = new Map(SEEDS.map((s) => [s, createPlanet(s)]));
 const depthOf = (seed: number) => (p: Vec3) => -planets.get(seed)!.height(p);
 const between = (a: Vec3, b: Vec3) => Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));

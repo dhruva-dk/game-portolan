@@ -7,8 +7,11 @@ import { chosen, gunOf, laid, muzzle } from '../src/sim/gun.ts';
 import { GUN, HEALTH, SHIP } from '../src/sim/handling.ts';
 import { GUN_MOUNT } from '../src/ship/mount.ts';
 import { harmed, healed, sunk, whole } from '../src/sim/health.ts';
-import { BEST, elevationFor, flightTime, flown, loosed, reach, type Ball } from '../src/sim/shot.ts';
+import { elevationFor, flightTime, flown, loosed, reach, type Ball } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
+
+/** The best elevation, radians: the furthest carry on a sphere of radius R (a quarter turn less a quarter of the arc). */
+const BEST = Math.PI / 4 - GUN.range / R / 4;
 import { shipAt, turned, type Helm, type ShipState } from '../src/sim/ship.ts';
 import { R, add, along, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 

@@ -44,7 +44,7 @@ const N = ROUTE.n, LOG = 31 - Math.clz32(N), CELLS = 6 * N * N;
 // ---------------------------------------------------------------- the grid (0117's sphere.ts cubeGrid, at 128)
 
 /** The cell direction p lies in. */
-export function cellOf(p: Vec3): number {
+function cellOf(p: Vec3): number {
   const f = faceUV(p);
   const i = Math.min(N - 1, Math.max(0, Math.floor((f.u + 1) * 0.5 * N)));
   const j = Math.min(N - 1, Math.max(0, Math.floor((f.v + 1) * 0.5 * N)));
@@ -114,7 +114,7 @@ export function chart(depth: Depth): Chart {
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
 
 /** Open water all along the chord from a to b, looked at every `step` m. */
-export function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
+function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
   const k = Math.max(1, Math.ceil(distance(a, b) / step));
   for (let s = 1; s <= k; s++) if (!openAt(ch, normalize(add(scale(a, 1 - s / k), b, s / k)))) return false;
   return true;

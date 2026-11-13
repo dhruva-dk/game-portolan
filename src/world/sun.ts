@@ -81,6 +81,3 @@ function carry(s: Vec3, from: Vec3, to: Vec3): Vec3 {
 export function sunAt(places: SunPlaces, hours: number, p: Vec3): Vec3 {
   return carry(sunAtOrigin(places, hours), places.origin, p);
 }
-
-/** The point where the sun's bearing is undefined: the origin's antipode. */
-export const sunPole = (places: SunPlaces): Vec3 => scale(normalize(places.origin), -1);

@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import { R, add, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 import { createPlanet } from '../src/world/planet.ts';
 import { random } from '../src/world/random.ts';
-import { sunAt, sunAtOrigin, sunInSky, sunPlaces, sunPole } from '../src/world/sun.ts';
+import { sunAt, sunAtOrigin, sunInSky, sunPlaces, type SunPlaces } from '../src/world/sun.ts';
 
 const SEEDS = [1, 2, 3, 4, 5];
 const planets = new Map(SEEDS.map((s) => [s, createPlanet(s)]));
 const angle = (a: Vec3, b: Vec3) => Math.atan2(length(cross(a, b)), dot(a, b));
 const degrees = Math.PI / 180;
+/** The point where the sun's bearing is undefined: the origin's antipode. */
+const sunPole = (places: SunPlaces): Vec3 => scale(normalize(places.origin), -1);
 
 /** Points spread evenly over the sphere (a Fibonacci lattice), and both poles. */
 const points = (n: number): Vec3[] => [

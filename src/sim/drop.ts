@@ -48,7 +48,7 @@ export const PICKING = {
 } as const;
 
 /** The Gale's speed along its course, m/s (50). */
-export const GALE_SPEED = (GALE.arc * R) / GALE.time;
+const GALE_SPEED = (GALE.arc * R) / GALE.time;
 
 /** The Gale's course: where it starts (a unit vector) and the way it blows there. */
 export interface Gale { from: Vec3; dir: Vec3 }
@@ -93,7 +93,7 @@ const turned = (a: Vec3, p: Vec3, angle: number): Vec3 => normalize(add(scale(a,
 const level = (a: Vec3, p: Vec3): Vec3 => normalize(add(a, p, -dot(a, p)));
 
 /** The match's Gale, from its seed. */
-export function planGale(seed: number): Gale {
+function planGale(seed: number): Gale {
   const rand = random(seed * 69069 + 11);
   const z = 2 * rand() - 1, a = 2 * Math.PI * rand(), s = Math.sqrt(1 - z * z);
   const from: Vec3 = [s * Math.cos(a), z, s * Math.sin(a)];
@@ -102,12 +102,6 @@ export function planGale(seed: number): Gale {
 
 /** Metres from the course's start its head has come at `t` seconds. */
 const carried = (t: number) => GALE_SPEED * Math.min(Math.max(t, 0), GALE.time);
-
-/** Where the Gale's head is at `t`, and the way it blows there. */
-export function galeAt(g: Gale, t: number): { at: Vec3; heading: Vec3 } {
-  const { p, t: heading } = along(g.from, g.dir, carried(t));
-  return { at: p, heading };
-}
 
 /** How many ranks a fleet of n rides in. */
 const ranks = (n: number) => Math.ceil(n / GALE.lanes);
@@ -170,7 +164,7 @@ export function startDrop(seed: number, ids: readonly number[], bots: readonly n
  * none taking more than a quarter of the picks (a full one sends her to the least picked inside it), and a point
  * 60–180 m off its middle, moved to the nearest open water.
  */
-export function choosePlans(seed: number, bots: readonly number[], sites: readonly Vec3[], first: Cap, depth: Depth): Map<number, Plan> {
+function choosePlans(seed: number, bots: readonly number[], sites: readonly Vec3[], first: Cap, depth: Depth): Map<number, Plan> {
   const rand = random(seed * 16807 + 5), plans = new Map<number, Plan>();
   const inFirst = (s: Vec3) => distance(s, first.centre) <= first.radius * R - PICKING.inside;
   const picks = sites.map(() => 0), most = Math.max(1, Math.floor(bots.length * PICKING.share));

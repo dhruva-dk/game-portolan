@@ -56,9 +56,6 @@ export function reach(elevation: number): number {
   return 2 * R * Math.atan2(NU * Math.sin(elevation) * c, 1 - NU * c * c);
 }
 
-/** The best elevation, radians: the furthest carry. */
-export const BEST = Math.PI / 4 - GUN.range / R / 4;
-
 /** The low elevation that carries a ball `metres` along the sea back to the muzzle's height, or null beyond range. */
 export function elevationFor(metres: number): number | null {
   if (metres > GUN.range) return null;
@@ -100,7 +97,7 @@ export function flown(b: Ball, dt: number): Ball {
 
 /** Whether the point q (metres, from the centre) is inside her hull: within the capsule along her keel, from the
  * waterline up to her freeboard. On her own flat chart: a few millimetres off the sphere along her length. */
-export function inHull(s: ShipState, q: Vec3): boolean {
+function inHull(s: ShipState, q: Vec3): boolean {
   const r = length(q), height = r - R;
   if (height < 0 || height > GUN.freeboard) return false;
   const d = add(scale(q, R / r), s.at, -R);

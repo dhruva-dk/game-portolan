@@ -69,9 +69,6 @@ export interface Storm extends Cap {
 const WHOLE = Math.PI;
 const angle = (metres: number) => metres / R;
 
-/** Seconds from the match's start until the last cap has closed. */
-export const DURATION = STORM.phases.reduce((s, p) => s + p.wait + p.close, 0);
-
 /** Radians between two unit vectors. */
 const between = (a: Vec3, b: Vec3) => Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
 

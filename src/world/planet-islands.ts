@@ -87,7 +87,7 @@ const wave = (h: Harmonic[], t: number) => {
 };
 
 /** One island on `chart`, its coast `radius` metres out on average; no sea floor is deeper than `deepest` metres. */
-export function createIslandSite(chart: Chart, radius: number, noise: Noise3, seed: number, deepest: number): IslandSite {
+function createIslandSite(chart: Chart, radius: number, noise: Noise3, seed: number, deepest: number): IslandSite {
   const rand = random(seed * 7919 + 101);
   const I = ISLANDS;
   const size = (radius - I.radius[0]) / (I.radius[1] - I.radius[0]);
