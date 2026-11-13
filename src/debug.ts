@@ -113,6 +113,7 @@ function setupOf(release: Setup): Setup {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
       // (room for ?ships= past a match's, for judging the frame with more)
       fleet: Math.max(release.drawing.fleet, number('ships', 0) + 1),
+      length: release.drawing.length,
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       extras: params.has('probe') ? (light, world) => probeMeshes(light, startOf(world.planet).at) : release.drawing.extras,

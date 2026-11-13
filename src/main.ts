@@ -11,6 +11,7 @@ import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
 import { createMatches, startOf, watersOf } from './play/setup';
+import { SHIP } from './sim/handling';
 import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
 import { traceCoasts } from './ui/coasts';
@@ -26,7 +27,7 @@ import { MEAN, SWING } from './world/weather';
 /** The release's setup. */
 const RELEASE: Setup = {
   seed: SEED, mean: MEAN, swing: SWING, hours: 16.3,
-  drawing: { sea: 'water', fleet: SHIPS, lod: null, cloth: true },
+  drawing: { sea: 'water', fleet: SHIPS, length: SHIP.length, lod: null, cloth: true },
   meter: false, hold: null, gun: null,
 };
 
@@ -95,7 +96,7 @@ async function play(s: Stage): Promise<Played> {
   const pending = createPlaceholder();
   const coasts = traceCoasts(s.world.planet.islands);
   const globe = createGlobe(coasts);
-  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
+  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight, hud.top()), ...game.kit() });
   const map = () => globe.show(hudState());
   const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
   const deal = () => {

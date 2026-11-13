@@ -12,7 +12,7 @@
 import { AIR_FOV, type Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
 import { R, add, along, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
-import { inverse, lookAt, rotate, slerp, type Turn } from '../world/turn';
+import { lookAt, slerp, type Turn } from '../world/turn';
 
 /** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
 const BACK = 44, UP = 19, PIVOT = 2;
@@ -158,16 +158,6 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     },
     /** How steeply the boom looks down on her, radians (its own, with the look's tilt). */
     pitch: () => ELEVATION + tilt,
-    /** Where a point on the sea (a unit vector), or `up` metres over it, falls in a view `width` × `height` px, or null
-     *  behind the camera or past the horizon. */
-    onScreen(p: Vec3, width: number, height: number, up = 0): { x: number; y: number } | null {
-      if (dot(position, p) <= R) return null;
-      // in the camera's own frame (it looks down its −z), then through its lens
-      const [vx, vy, vz] = rotate(add(scale(p, R + up), position, -1), inverse(orientation));
-      if (vz >= 0) return null;
-      const t = Math.tan((AIR_FOV * Math.PI) / 360), x = vx / -vz / (t * (width / height)), y = vy / -vz / t;
-      return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
-    },
   };
 }
 

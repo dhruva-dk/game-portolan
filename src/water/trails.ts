@@ -36,14 +36,16 @@ const ABSORB = 0.7, DISSOLVE = 1.8;
 const OPEN = 0, ABSORBED = 1, DISSOLVING = 2;
 /** The glow, as a share of what the sun and sky give a white surface, once the colour is raised to a luminance of 1. */
 const GLOW = 0.32;
-/** The ribbon's stern end lies this far behind her middle (half her length, less a little under her counter). */
-const ASTERN = 11;
+/** The ribbon's stern end lies this far forward of her stern, m: a little under her counter. */
+const COUNTER = 2;
 
 interface Ribbon { id: number; serial: number; points: readonly Vec3[]; mode: number; since: number }
 
 /** sky: the light on the water; surface(up, cell): where the water lies over rest point `up` (world, m), its waves
- *  read as for a cell `cell` m across. */
-export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) => Vec3Node) {
+ *  read as for a cell `cell` m across; length: a ship's overall, m. */
+export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) => Vec3Node, length: number) {
+  /** The ribbon's stern end lies this far behind her middle. */
+  const astern = length / 2 - COUNTER;
   const at = new BufferAttribute(new Float32Array(POINTS * 2 * 4), 4), across = new BufferAttribute(new Float32Array(POINTS * 2 * 4), 4);
   const rib = new BufferAttribute(new Float32Array(POINTS * 2 * 4), 4);
   const index = new BufferAttribute(new Uint32Array(POINTS * 6), 1);
@@ -168,7 +170,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
       });
 
       const under = normalizeV(eye), near = Math.cos(REACH / R);
-      const stern = new Map(ships.filter((k) => k.afloat).map((k) => [k.id, normalizeV(add(k.pose.position, k.pose.forward, -ASTERN))]));
+      const stern = new Map(ships.filter((k) => k.afloat).map((k) => [k.id, normalizeV(add(k.pose.position, k.pose.forward, -astern))]));
       const A = at.array, X = across.array, B = rib.array, I = index.array;
       let v = 0, n = 0;
       const lay = (r: Ribbon, tail: Vec3 | null) => {

@@ -61,10 +61,10 @@ export interface Slot { item: Item; count?: number }
 /** What she carries besides her gun: the hotbar's three item slots (null: empty), the slot in hand (0 the gun's, then
  *  the items'), how far through using it she is (0…1; null when she isn't), the slot a tap would swap for what lies
  *  within reach (null: none offered); and Gust: its charges ready with the next one's share come back (1.4: one ready,
- *  the next 40% back), and whether one blows now. */
+ *  the next 40% back), the most she carries, and whether one blows now. */
 export interface Kit {
   items: readonly [Slot | null, Slot | null, Slot | null]; chosen: number; using: number | null; offer: number | null;
-  gust: number; blowing: boolean;
+  gust: number; gusts: number; blowing: boolean;
 }
 
 /** Her career, as the lobby and the result show it: her level, how far toward the next (0…1), and her rank's tier. */

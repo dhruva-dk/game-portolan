@@ -88,8 +88,9 @@ const RUNUP = 0.5, BACKWASH = 0.3, SWASH_FROM = 0.5;
  *  the ships' marks on it (wake.ts). */
 export type SeaShows = 'water' | 'charts' | 'wake';
 
-/** wind: the planet's prevailing wind; ships: the most there will be; shows: what the sea is drawn as. */
-export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, shows: SeaShows = 'water') {
+/** wind: the planet's prevailing wind; ships: the most there will be, and shipLength a ship's overall, m; shows: what the
+ *  sea is drawn as. */
+export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, shipLength: number, shows: SeaShows = 'water') {
   const waves = createWaves();
   const wake = createWake(view, sky, ships);
   const hulls = createHulls();
@@ -269,7 +270,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
   const caustics = createCaustics(view, sky, waves, charts, shallows);
   // the open trails, riding the waves (and the wakes' waves) as the water does
-  const trails = createTrails(sky, (up, c) => view.place(up, 0).add(waveAt(up, c).xyz).add(up.mul(wake.height(up))));
+  const trails = createTrails(sky, (up, c) => view.place(up, 0).add(waveAt(up, c).xyz).add(up.mul(wake.height(up))), shipLength);
 
   return {
     mesh,

@@ -42,11 +42,13 @@ const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
 
 /** How the frame draws: what the sea is drawn as (water/water.ts); the most ships it draws at once (the room the
- *  fleet and the sea keep for them: the match's ship count); every ship at one level of detail (ship/fleet.ts pin) or
- *  null; whether the near ships' canvas is simulated; and anything more to stand in the world, lit by the sky. */
+ *  fleet and the sea keep for them: the match's ship count), and a ship's length overall, m (the sim's: her trail runs
+ *  from her stern); every ship at one level of detail (ship/fleet.ts pin) or null; whether the near ships' canvas is
+ *  simulated; and anything more to stand in the world, lit by the sky. */
 export interface FrameOptions {
   sea: SeaShows;
   fleet: number;
+  length: number;
   lod: number | null;
   cloth: boolean;
   extras?: (light: Sky, world: World) => readonly Object3D[];
@@ -109,7 +111,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here
   const ground = createGround(world.seed);
-  const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.sea);
+  const water = createWater(view, sky.light, ground, world.wind, options.fleet, options.length, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
   const sand = createSand(view, ground, light);

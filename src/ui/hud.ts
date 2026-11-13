@@ -34,7 +34,6 @@ export type HudState = Status & Kit;
 
 export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(): void }
 
-const GUSTS = 2;
 const SLOT = 50, GAP = 6;
 const MINIMAP = 132;
 /** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
@@ -67,6 +66,11 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
   const vitals = piece(body, 'top left');
   const readings = piece(body, 'top centre');
+  /** How far down the screen the slips at its top centre reach, px (the reticle is kept below: play/game.ts status). */
+  let top = 0;
+  const measure = () => (top = readings.getBoundingClientRect().bottom);
+  new ResizeObserver(measure).observe(readings);
+  addEventListener('resize', measure);
   const map = piece(body, 'top right', true);
   // (each piece stands 4 px in from the safe area's edge: ui.ts)
   const gust = piece(body, 'right bottom', true);
@@ -117,6 +121,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
   return {
     root,
+    top: () => top,
     watch(on: boolean) {
       watching = on;
       for (const el of [vitals, gust, fire, reticle, hotbar, rim]) el.style.display = on ? 'none' : '';
@@ -141,10 +146,10 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
       // each charge a pip; the one coming back filling round, in steps of a 24th
       const charge = Math.floor(s.gust), back = Math.floor((s.gust - charge) * 24);
-      draw(gust, `${charge} ${back} ${s.blowing}`, () => {
+      draw(gust, `${charge} ${back} ${s.gusts} ${s.blowing}`, () => {
         let pips = '';
-        for (let i = 0; i < GUSTS; i++) {
-          const x = 30 + (i - (GUSTS - 1) / 2) * 10;
+        for (let i = 0; i < s.gusts; i++) {
+          const x = 30 + (i - (s.gusts - 1) / 2) * 10;
           pips += `<circle cx="${x}" cy="44" r="2.8" fill="${i < charge ? INK.iron : PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
           if (i === charge && back > 0) pips += sweep(x, 44, 2.8, back / 24, INK.iron, 1.6);
         }

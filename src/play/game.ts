@@ -25,7 +25,7 @@ import type { World } from '../environment';
 import { fixedClock } from '../sim/fixed';
 import { chosen, lead, muzzle } from '../sim/gun';
 import { charging } from '../sim/gust';
-import { GUN, HEALTH } from '../sim/handling';
+import { GUN, GUST, HEALTH, SHIP } from '../sim/handling';
 import { progress } from '../sim/hold';
 import { offered, rarityOf } from '../sim/loot';
 import { BOT, toward } from '../sim/captain';
@@ -44,6 +44,7 @@ import { AIM, aimDistance, clear } from './aim';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
 import { ARRIVAL, arriving } from './arrival';
 import { createChase } from './chase';
+import { onScreen } from './lens';
 import { createShots } from './shots';
 import { bearing, createState, type Berth, type Match, type Waters } from './state';
 
@@ -53,12 +54,14 @@ const DEAD = 0.15;
  *  CHARTED m. */
 const DRAWN = 700, RIDES = 320, CHARTED = 260;
 /** Her outline for the reticle (aim.ts): metres along her from amidships, up from the waterline, and out to a side:
- *  her ends, her mainmast's truck (src/ship/lines.ts at 0.6), and her main yard's arms. */
+ *  her ends (sim/handling.ts SHIP, her length overall and beam) at the water and her castles' height, her mainmast's
+ *  truck and her main yard's arms (the drawn rig's, src/ship/lines.ts at 0.6). */
+const ENDS = SHIP.length / 2, SIDE = SHIP.beam / 2, CASTLES = 6, TRUCK = 21.5, YARD = 14, ARM = 8;
 const OUTLINE: readonly (readonly [number, number, number])[] = [
-  [13, 0, 0], [-13, 0, 0], [13, 6, 0], [-13, 6, 0], [0, 0, 3.3], [0, 0, -3.3], [0, 21.5, 0], [0, 14, 8], [0, 14, -8],
+  [ENDS, 0, 0], [-ENDS, 0, 0], [ENDS, CASTLES, 0], [-ENDS, CASTLES, 0], [0, 0, SIDE], [0, 0, -SIDE], [0, TRUCK, 0], [0, YARD, ARM], [0, YARD, -ARM],
 ];
-/** How far the reticle is kept clear of her outline, px, and of the screen's top, where the HUD's slips are. */
-const CLEAR = 16, TOP = 56;
+/** How far the reticle is kept clear of her outline and of the HUD's slips along the screen's top, px. */
+const CLEAR = 16;
 
 /** What the camera does, as the match's flow sets it (sim/match.ts): the ship it follows, and whether it cut or flew
  * to her; whether the hands steer and look; whether it circles her (the win). */
@@ -107,9 +110,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     return !!mark && lead(from, mark) !== null;
   };
 
-  /** Where her gun's aim falls on a view `width` × `height` px, kept off her own ship (aim.ts): on the ship its assist
-   *  has, else along the look as far as the camera's pitch sets. */
-  const reticle = (v: Vessel, rarity: number, width: number, height: number) => {
+  /** Where her gun's aim falls on a view `width` × `height` px, kept off her own ship and below the `top` px the HUD's
+   *  slips take (aim.ts): on the ship its assist has, else along the look as far as the camera's pitch sets. */
+  const reticle = (v: Vessel, rarity: number, width: number, height: number, top: number) => {
     const fleet = state.vessels(), from = muzzle(v), ahead = chase.axes().ahead;
     const mark = chosen(from, ahead, GUN.assist[rarity], fleet.filter((o) => o.id !== v.id));
     // a point the look falls on past the sea's horizon (from the eye, which stands back from her) is hidden by it:
@@ -117,12 +120,12 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     const eye = chase.eye().position, far = Math.sqrt(dot(eye, eye));
     const horizon = R * Math.acos(Math.min(1, R / far)), back = R * Math.acos(Math.min(1, dot(eye, v.ship.at) / far));
     const at = mark ? mark.ship.at : along(v.ship.at, ahead, Math.max(AIM.near / 2, Math.min(aimDistance(chase.pitch()), 0.85 * horizon - back))).p;
-    const p = chase.onScreen(at, width, height, mark ? 4 : GUN.up);
+    const lens = chase.eye(), p = onScreen(lens, at, width, height, mark ? 4 : GUN.up);
     if (!p) return null;
     const f = last.forward, side = cross(f, normalize(last.position));
-    const outline = OUTLINE.map(([a, h, b]) => chase.onScreen(normalize(add(add(last.position, f, a), side, b)), width, height, h))
+    const outline = OUTLINE.map(([a, h, b]) => onScreen(lens, normalize(add(add(last.position, f, a), side, b)), width, height, h))
       .filter((q): q is { x: number; y: number } => q !== null);
-    return clear(p, outline, CLEAR, height, TOP);
+    return clear(p, outline, CLEAR, height, top + CLEAR);
   };
 
   /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
@@ -205,11 +208,12 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const o = v ? offered(c, v.ship.at, state.loot()) : { gun: null, item: null };
       return {
         items: [items[0], items[1], items[2]], chosen: h.chosen, using: progress(h), offer: o.gun ? 0 : o.item ? Math.max(1, h.chosen) : null,
-        gust: c.gust.charges + (charging(c.gust) < 1 ? charging(c.gust) : 0), blowing: c.gust.blowing > 0,
+        gust: c.gust.charges + (charging(c.gust) < 1 ? charging(c.gust) : 0), gusts: GUST.charges, blowing: c.gust.blowing > 0,
       };
     },
-    /** What the HUD reads of the match, on a view `width` × `height` CSS px (where the reticle falls). */
-    status(width = 0, height = 0): Status {
+    /** What the HUD reads of the match, on a view `width` × `height` CSS px whose top `top` px its slips take (where
+     *  the reticle falls). */
+    status(width = 0, height = 0, top = 0): Status {
       const c = state.crew(PLAYER), v = state.mine(), s = state.storm(between);
       const radius = Math.round(s.radius * R);
       if (radius !== calm.radius || s.centre.some((x, i) => Math.abs(x - calm.centre[i]) * R > 1)) calm = { centre: s.centre, radius };
@@ -228,7 +232,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         next: s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? { centre: s.next.centre, radius: Math.round(s.next.radius * R) } : null,
         outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
         loot: v ? state.loot().pieces.filter((l) => dot(v.ship.at, l.at) > Math.cos(CHARTED / R)).map((l) => l.at) : [],
-        reticle: c.gun && v && width > 0 && steering() ? reticle(v, c.gun.rarity, width, height) : null,
+        reticle: c.gun && v && width > 0 && steering() ? reticle(v, c.gun.rarity, width, height, top) : null,
       };
     },
     sinkings: state.sinkings,
