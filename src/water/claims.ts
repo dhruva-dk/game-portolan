@@ -98,7 +98,7 @@ export function createClaims(ships: number) {
       const base: IntNode = face.mul(SIDE * SIDE).add(int(c0.y).add(1).mul(SIDE)).add(int(c0.x).add(1));
       const settled = clock.sub(HOLD);
       // seen from afar (a cell under a pixel or two: the full map's), the water is dyed more, so the holders read
-      const far = smoothstep(0.25, 1.5, max(length(jx), length(jy)));
+      const far = smoothstep(0.6, 2, max(length(jx), length(jy)));
       const dyed = (d: FloatNode): FloatNode => mix(d, float(FAR_DYE), far);
 
       const dye = vec4(0).toVar(), shine = vec3(0).toVar(), foam = float(0).toVar(), drain = float(0).toVar();
@@ -206,7 +206,7 @@ export function createClaims(ships: number) {
         const n = mx_noise_float(p.mul(0.55).add(vec3(clock.mul(0.5), 0, clock.mul(0.2)))).mul(0.5).add(0.5);
         const edge = mix(lineB, lineN, tf).mul(select(ec.w.greaterThan(0), float(1), float(0))).mul(float(0.8).add(n.mul(0.4)));
         // the wash: strongest at the border, softly gone some four cells in (12 m), where the field has risen to its full
-        const band = pow(clamp(float(1).sub(mix(aB, aN, tf)), 0, 1), 0.6);
+        const band = pow(clamp(float(1).sub(mix(aB, aN, tf)), 0, 1), 1.1);
         const strength = wash(ec.w, band);
         const white = mix(line(aB, FOAM, fB.px).mul(fade), line(aN, FOAM, fN.px), tf).mul(float(1).sub(tc.w.mul(0.75)));
         foam.assign(white.mul(float(1).sub(far)).mul(smoothstep(0.2, 0.75, n).mul(0.65).add(0.35)));
