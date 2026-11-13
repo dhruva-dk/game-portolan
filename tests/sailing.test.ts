@@ -4,7 +4,7 @@ import { SHIP } from '../src/sim/handling.ts';
 import { clearance, hullAt, type Depth } from '../src/sim/shoal.ts';
 import { offCourse, shipAt, step, turned, type Helm, type ShipState } from '../src/sim/ship.ts';
 import { STEP, fixedClock } from '../src/sim/fixed.ts';
-import { R, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
 const run = (s: ShipState, helm: (s: ShipState) => Helm, seconds: number, depth = deep, each?: (s: ShipState) => void) => {
@@ -113,7 +113,7 @@ test('she never sails into water shallower than her draught, at any angle, and s
   for (const angle of [0, 20, 45, 70]) {
     // from 80 m off the contour, her course `angle` off straight at the shore
     const from = along(coast, seaward, DRY + 80).p;
-    const s0 = shipAt(from, frameAt(from).east.map((x) => -x) as unknown as Vec3);
+    const s0 = shipAt(from, scale(frameAt(from).east, -1));
     const course = turned(s0, angle * deg);
     let least = Infinity;
     const helm = () => ({ course, throttle: 1 });
@@ -168,7 +168,7 @@ test('however she meets the shore, steered away she gets off it, her whole hull 
   for (const angle of [0, 30, 60, 89]) for (const side of [-1, 1]) {
     // into the shore `angle` off square to it, until she lies against it
     const from = along(coast, seaward, DRY + 40).p;
-    const s0 = shipAt(from, frameAt(from).east.map((x) => -x) as unknown as Vec3);
+    const s0 = shipAt(from, scale(frameAt(from).east, -1));
     const course = turned(s0, side * angle * deg);
     let least = Infinity;
     const watch = (s: ShipState) => { least = Math.min(least, underHull(s, shoal)); };

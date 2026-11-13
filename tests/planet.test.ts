@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { R, along, distance, faceDir, frameAt, fromChart, normalize, toChart, type Vec3 } from '../src/world/sphere.ts';
+import { R, add, along, distance, faceDir, frameAt, fromChart, normalize, scale, toChart, type Vec3 } from '../src/world/sphere.ts';
 import { bakeFaces, createPlanet, remembered, risesOf } from '../src/world/planet.ts';
 import { ISLANDS, KINDS, ORDER, WADE } from '../src/world/planet-islands.ts';
 import { SHIP } from '../src/sim/handling.ts';
@@ -53,7 +53,7 @@ test('the ground is continuous: no steps anywhere, and steep only on a channel\'
     const slopes: number[] = [];
     const pair = (p: Vec3) => {
       const f = frameAt(p), a = rand() * 2 * Math.PI;
-      const t: Vec3 = [0, 1, 2].map((i) => f.east[i] * Math.cos(a) + f.north[i] * Math.sin(a)) as unknown as Vec3;
+      const t = add(scale(f.east, Math.cos(a)), f.north, Math.sin(a));
       slopes.push(Math.abs(pl.height(along(p, t, step).p) - pl.height(p)) / step);
     };
     // all over the sphere, along the cube faces' edges and corners, and round each island out past its reach
