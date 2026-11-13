@@ -190,7 +190,7 @@ export function weigh(all: readonly Anchor[], p: Vec3, width: number): { index: 
 /** weigh's choice at the point (x, y, z), written into `index` and `weight` (three each) with nothing made, the
  *  nearest first: returns how many weigh in. */
 export function weighInto(all: readonly Anchor[], x: number, y: number, z: number, width: number, index: Int32Array, weight: Float64Array): number {
-  const k = 1 / Math.hypot(x, y, z), ux = x * k, uy = y * k, uz = z * k;
+  const k = 1 / Math.sqrt(x * x + y * y + z * z), ux = x * k, uy = y * k, uz = z * k;
   let b0 = -1, b1 = -1, b2 = -1, c0 = -2, c1 = -2, c2 = -2;
   for (let i = 0; i < all.length; i++) {
     const a = all[i].at, d = ux * a[0] + uy * a[1] + uz * a[2];

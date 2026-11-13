@@ -26,7 +26,7 @@ export const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2
 export const scale = (a: Vec3, k: number): Vec3 => [a[0] * k, a[1] * k, a[2] * k];
 /** a + b·k. */
 export const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
-export const length = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
+export const length = (a: Vec3) => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
 export const normalize = (a: Vec3): Vec3 => scale(a, 1 / length(a));
 
 /** The point at a latitude and longitude, radians: the north pole is +y, longitude 0 is +x, and east runs toward −z there. */
@@ -60,11 +60,11 @@ const scratch = new Float64Array(8);
  */
 export function chartAt(c: Chart, x: number, y: number, z: number, out: Float64Array, axes = false) {
   const [ax, ay, az] = c.at, [bx, by, bz] = c.axis;
-  const k = 1 / Math.hypot(x, y, z), ux = x * k, uy = y * k, uz = z * k;
+  const k = 1 / Math.sqrt(x * x + y * y + z * z), ux = x * k, uy = y * k, uz = z * k;
   // the direction from `at` toward the point in `at`'s tangent plane, and the arc between them
   const cosT = ux * ax + uy * ay + uz * az;
   let dx = ux + ax * -cosT, dy = uy + ay * -cosT, dz = uz + az * -cosT;
-  const s = Math.hypot(dx, dy, dz);
+  const s = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (s > 1e-12) {
     const i = 1 / s;
     dx *= i;

@@ -22,7 +22,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests.
 
 import { FREQUENCY, band, weighInto, type Anchor } from './lattice.ts';
-import { R, chartAt, type Vec3 } from './sphere.ts';
+import { R, chartAt, length, type Vec3 } from './sphere.ts';
 import { BANDS, BREAKER, CASCADES, FETCH, LONG, PERIOD, SIZE } from './cascades.ts';
 import { G, initialSpectrum, seaState } from './spectrum.ts';
 import { STRIDE, createSums } from './sum.ts';
@@ -96,8 +96,8 @@ export function createSwell(anchors: readonly Anchor[], ground: (p: Vec3) => num
   const width = band(FREQUENCY);
   const table = longModes(wind, count);
   const all = Array.from({ length: table.length / STRIDE }, (_, m) => m);
-  const length = (m: number) => CASCADES[table[m * STRIDE]] / Math.hypot(table[m * STRIDE + 1], table[m * STRIDE + 2]);
-  const sums = createSums(table, [all, all.slice(0, MOVE_MODES), all.filter((m) => length(m) >= shortest)]);
+  const wavelength = (m: number) => CASCADES[table[m * STRIDE]] / Math.hypot(table[m * STRIDE + 1], table[m * STRIDE + 2]);
+  const sums = createSums(table, [all, all.slice(0, MOVE_MODES), all.filter((m) => wavelength(m) >= shortest)]);
   const hs = seaState(wind, FETCH).hs;
   const place = new Float64Array(8), index = new Int32Array(3), weight = new Float64Array(3);
 
@@ -125,7 +125,7 @@ export function createSwell(anchors: readonly Anchor[], ground: (p: Vec3) => num
   /** The surface over a point: the water whose moved place is here rests about one move back. */
   const surface: Surface = (p, time) => {
     sums.at(time);
-    const l = 1 / Math.hypot(p[0], p[1], p[2]), ux = p[0] * l, uy = p[1] * l, uz = p[2] * l;
+    const l = 1 / length(p), ux = p[0] * l, uy = p[1] * l, uz = p[2] * l;
     const cut = cutAt(ux, uy, uz);
     moveAt(ux, uy, uz);
     const rx = ux * R - shift[0] * cut, ry = uy * R - shift[1] * cut, rz = uz * R - shift[2] * cut;
@@ -157,7 +157,7 @@ export function createSwell(anchors: readonly Anchor[], ground: (p: Vec3) => num
       const metres = i === 0 ? reach : i === 1 ? -reach : i === 2 ? rail : -rail, ahead = i < 2;
       const a = metres / R, c = Math.cos(a), s = Math.sin(a);
       const x = ax * c + (ahead ? hx : px) * s, y = ay * c + (ahead ? hy : py) * s, z = az * c + (ahead ? hz : pz) * s;
-      const l = 1 / Math.hypot(x, y, z), cut = (cuts[i] = cutAt(x * l, y * l, z * l));
+      const l = 1 / Math.sqrt(x * x + y * y + z * z), cut = (cuts[i] = cutAt(x * l, y * l, z * l));
       const rx = x * l * R - shift[0] * cut, ry = y * l * R - shift[1] * cut, rz = z * l * R - shift[2] * cut;
       rest[i * 3] = rx;
       rest[i * 3 + 1] = ry;
