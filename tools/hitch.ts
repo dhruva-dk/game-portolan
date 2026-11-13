@@ -32,6 +32,29 @@ interface TraceEvent {
   args?: { name?: string; data?: { startTime?: number; cpuProfile?: { nodes?: ProfileNode[]; samples?: number[] }; timeDeltas?: number[] } };
 }
 
+/** The trace's events, each read from the buffer by itself: the whole trace, as frames come quicker, outgrows the
+ *  longest string node can make. */
+function traceEvents(trace: Buffer): TraceEvent[] {
+  const events: TraceEvent[] = [];
+  const QUOTE = 0x22, SLASH = 0x5c, OPEN = 0x7b, CLOSE = 0x7d, END = 0x5d;
+  let i = trace.indexOf('"traceEvents"');
+  if (i < 0) throw new Error('the trace has no traceEvents');
+  i = trace.indexOf('[', i) + 1;
+  // each event an object at the list's top: from its opening brace to the brace that closes it, strings skipped
+  let depth = 0, start = 0, quoted = false;
+  for (; i < trace.length; i++) {
+    const b = trace[i];
+    if (quoted) {
+      if (b === SLASH) i++;
+      else if (b === QUOTE) quoted = false;
+    } else if (b === QUOTE) quoted = true;
+    else if (b === OPEN && depth++ === 0) start = i;
+    else if (b === CLOSE && --depth === 0) events.push(JSON.parse(trace.toString('utf8', start, i + 1)));
+    else if (b === END && depth === 0) break;
+  }
+  return events;
+}
+
 const { browser, url, close } = await launch();
 let failed = false;
 try {
@@ -68,7 +91,7 @@ try {
   await page.close();
   if (traceTo) writeFileSync(traceTo, trace);
 
-  const { traceEvents: events }: { traceEvents: TraceEvent[] } = JSON.parse(trace.toString());
+  const events = traceEvents(trace);
   const mark = events.find((e) => e.name === 'hitch:begin');
   if (!mark) throw new Error('the trace has no hitch:begin mark');
   /** Trace time (µs) of a moment by the page's clock (ms). */
