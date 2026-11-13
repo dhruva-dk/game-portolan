@@ -115,14 +115,22 @@ export function stored(
     return { ...c, hold: u.hold, health: u.health, gust: stepGust(c.gust, dt) };
   });
   const s = swept(f, stepped, fleet, takes, seed);
-  f = s.flotsam;
+  return { ...spilled(s.crews, s.flotsam, fleet, sunkNow, seed), took: s.took, mended };
+}
+
+/** The ships `sunkNow` (in `fleet` as they went down) put their guns and slots over the side where each lay, and
+ *  carry them no more. */
+export function spilled(
+  crews: readonly Crew[], flotsam: Flotsam, fleet: readonly Vessel[], sunkNow: readonly number[], seed: number,
+): { crews: Crew[]; flotsam: Flotsam } {
+  let f = flotsam;
   for (const id of sunkNow) {
-    const c = s.crews.find((k) => k.id === id), v = fleet.find((k) => k.id === id);
+    const c = crews.find((k) => k.id === id), v = fleet.find((k) => k.id === id);
     if (!c || !v) continue;
     const goods = cargo(c);
     if (goods.length) f = overboard(f, v.ship.at, goods, id, seed);
   }
   // what she spilled is gone from her
   const gone = new Set(sunkNow);
-  return { crews: s.crews.map((c) => (gone.has(c.id) ? { ...c, guns: c.guns.map(() => null), hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } } : c)), flotsam: f, took: s.took, mended };
+  return { crews: crews.map((c) => (gone.has(c.id) ? { ...c, guns: c.guns.map(() => null), hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } } : c)), flotsam: f };
 }

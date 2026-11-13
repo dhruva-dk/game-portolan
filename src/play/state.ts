@@ -28,7 +28,7 @@ import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
 import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
 import { berthed, overboard, strewn, type Arms, type Flotsam, type Goods } from '../sim/loot.ts';
-import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores.ts';
+import { asked, crewed, NOTHING, spilled, stored, type Ask } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
@@ -431,10 +431,13 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
         const f = overboard(flotsam, at, goods, -1, match.seed);
         flotsam = { ...f, pieces: f.pieces.map((l, i): typeof l => (i < n ? l : { ...l, way: [0, 0, 0], age: 10 })) };
       },
-      /** Sends a ship afloat to the bottom at once, the last blow `by`'s (null: the storm's). */
+      /** Sends a ship afloat to the bottom at once, the last blow `by`'s (null: the storm's), spilling what she carries. */
       sink(id: number, by: number | null) {
         if (!aboard.has(id)) return;
-        battle = { ...battle, crews: battle.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
+        const before = flotsam.next, s = spilled(battle.crews, flotsam, fleet, [id], match.seed);
+        for (let n = before; n < s.flotsam.next; n++) born.set(n, tick * STEP);
+        flotsam = s.flotsam;
+        battle = { ...battle, crews: s.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
         founder(id, by, by === null ? 'storm' : 'shot');
         record({ shots: [], splashes: [], strikes: [], cues: [], sunk: lostNow, took: [], mended: [], blew: [], her: null });
       },
