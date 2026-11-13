@@ -6,7 +6,8 @@
 // the sun and rain bleach, dark in the cracks and under the ledges; darker where wet, filmed with algae below the
 // waterline; lit like everything else (sky/light.ts).
 //
-// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder.
+// Triangles: 20 × (detail + 1)² a shape: 2880 for a mass, 500 for a boulder; on the islands far from the eye (FAR:
+// islands.ts), where a mass is a few pixels across, each shape at a coarser level of the same lumps: 720 and 180.
 
 import { Euler, Matrix4, MeshBasicNodeMaterial, Quaternion, Vector3 } from 'three/webgpu';
 import { Fn, abs, attribute, dot, float, mix, normalWorld, normalize, positionWorld, smoothstep, texture, vec3 } from 'three/tsl';
@@ -19,8 +20,8 @@ import { rockShape } from './rock-shape';
 import { createInstances, standing, type Placed } from './site';
 import type { Vec2Node, Vec3Node } from '../tsl';
 
-/** How many shapes of each kind, and how finely each is made. */
-export const KINDS = { big: { shapes: 4, detail: 11 }, boulder: { shapes: 4, detail: 4 } };
+/** How many shapes of each kind, and how finely each is made, near and far. */
+export const KINDS = { big: { shapes: 4, detail: 11, far: 5 }, boulder: { shapes: 4, detail: 4, far: 2 } };
 /** The texture repeats every this many metres. */
 const ROCK_TILE = 2.5;
 /** Its mean colour, linear (measured), and the weathered rock's mean albedo it is scaled to: a warm red-brown. */
@@ -34,7 +35,7 @@ const CAVITY = 0.3;
 const WET = 0.5;
 const ALGAE = [0.06, 0.07, 0.04];
 
-/** rocks[i]: those on island i, whose chart is charts[i]. */
+/** rocks[i]: those on island i, whose chart is charts[i]: each shape's instances near and far. */
 export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light: Light) {
   const colour = loadTexture('rock.jpg', true), bumps = loadTexture('rock-normal.jpg', false);
 
@@ -67,8 +68,10 @@ export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light:
     m.compose(zero, q.setFromEuler(e), s.setScalar(r.size));
     return { matrix: standing(chart, r.x, r.y, r.z, m, new Matrix4()) };
   };
-  const kind = (big: boolean) => Array.from({ length: big ? KINDS.big.shapes : KINDS.boulder.shapes }, (_, k) =>
-    createInstances(rockShape(k + (big ? 1 : 51), big ? KINDS.big.detail : KINDS.boulder.detail, big), material,
-      rocks.map((on, i) => on.filter((r) => r.big === big && r.shape === k).map((r) => place(r, charts[i])))));
-  return [...kind(true), ...kind(false)];
+  const placed = (big: boolean, k: number) => rocks.map((on, i) => on.filter((r) => r.big === big && r.shape === k).map((r) => place(r, charts[i])));
+  const kind = (big: boolean, far: boolean) => Array.from({ length: big ? KINDS.big.shapes : KINDS.boulder.shapes }, (_, k) => {
+    const { detail, far: coarse } = big ? KINDS.big : KINDS.boulder;
+    return createInstances(rockShape(k + (big ? 1 : 51), far ? coarse : detail, big), material, placed(big, k));
+  });
+  return { near: [...kind(true, false), ...kind(false, false)], far: [...kind(true, true), ...kind(false, true)] };
 }
