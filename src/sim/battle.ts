@@ -30,15 +30,14 @@ import type { Sight } from './sight.ts';
 import type { Depth } from './shoal.ts';
 
 /** A ship's crew: who she is (her Vessel's id), her hit points, the guns she carries (CARRIED slots, null empty) and
- * the slot in hand, seconds till the gun in hand may fire after she took it up (EQUIP), the line of sight she last laid
- * it along (a unit vector; null: along her heading), her hold (hold.ts) and her gust (gust.ts). */
+ * the slot in hand, seconds till the gun in hand may fire after she took it up (EQUIP), her hold (hold.ts) and her
+ * gust (gust.ts). */
 export interface Crew {
   id: number;
   health: Health;
   guns: readonly (Gun | null)[];
   hand: number;
   equip: number;
-  aim: Vec3 | null;
   hold: Hold;
   gust: Gust;
 }
@@ -98,7 +97,7 @@ export interface Cue { ship: number; at: Vec3; kind: 'winding' | 'reloading' | '
 /** A crew as she puts to sea: whole, an empty hold, every gust ready, and with the guns given (none by default), the
  * first in hand. */
 export const crewOf = (id: number, ...guns: Gun[]): Crew => ({
-  id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0, aim: null, hold: emptyHold(), gust: gustOf(),
+  id, health: whole(), guns: Array.from({ length: CARRIED }, (_, i) => guns[i] ?? null), hand: 0, equip: 0, hold: emptyHold(), gust: gustOf(),
 });
 
 /** The gun in her hand, or null. */
@@ -201,7 +200,6 @@ export function stepBattle(
     const c = crews.get(v.id)!;
     if (sunk(c.health)) return;
     c.equip = Math.max(0, c.equip - dt);
-    c.aim = order?.aim?.dir ?? null;
     const g = inHand(c);
     if (!g) return;
     const loose = (gun: Gun) => {

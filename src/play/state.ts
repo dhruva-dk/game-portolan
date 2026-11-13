@@ -116,6 +116,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   const aboard = new Map<number, Aboard>();
   let battle: Battle = battleOf([], match.seed);
   let wrecks: Wreck[] = [], blasts: Blast[] = [];
+  /** The line of sight each ship's gun was last laid along (a unit vector; null: her heading), for it to be drawn so. */
+  const aims = new Map<number, Vec3 | null>();
   /** What happened in the last second or so (moments.ts), and the last one's number (never reset: a reader keeps its
    *  place across matches); when each piece put on the water since the match began came onto it (the world's clock). */
   let deeds: Deed[] = [], seq = 0;
@@ -150,6 +152,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     flotsam = loot ? strewn(m.seed, depth) : { pieces: [], next: 0 };
     fleet = [];
     aboard.clear();
+    aims.clear();
     wrecks = [];
     blasts = [];
     born.clear();
@@ -298,6 +301,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     advance(helm: Helm, gun: Order, ask: Ask = NOTHING, lap?: (part: Part) => void): Stepped {
       const storm = stormAt(time());
       const { helms, orders, asks } = command(helm, gun, ask, storm);
+      fleet.forEach((v, i) => aims.set(v.id, orders[i]?.aim?.dir ?? null));
       lap?.('command');
       const { wants, met, from } = sail(helms, asks);
       lap?.('sail');
@@ -328,7 +332,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       const now = clock(between), still: Vec3 = [0, 0, 0], crews = new Map(battle.crews.map((c) => [c.id, c]));
       const ships: ShipDraw[] = fleet.map(({ id, ship, shove }) => {
         const a = aboard.get(id)!, c = crews.get(id), g = c && inHand(c);
-        const gun = g ? { kind: g.kind, aim: c.aim ?? ship.heading } : null;
+        const gun = g ? { kind: g.kind, aim: aims.get(id) ?? ship.heading } : null;
         return { id, pose: blendPose(a.before, a.after, between), look: a.look, velocity: add(scale(ship.heading, ship.speed), shove), afloat: true, gun };
       });
       for (const w of wrecks) {
