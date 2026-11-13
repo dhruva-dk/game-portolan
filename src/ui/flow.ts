@@ -5,13 +5,14 @@
 // its own lean screen (gale.ts); the HUD shows in the match, and, watching another ship, in spectate (only its clock
 // and disc); the win has no UI at all: the HUD dries away (0117: 0.3 s) and a tap anywhere moves on. Which screen of
 // the match shows is the match's own course (sim/match.ts, run by main.ts); nothing happens by script: every step is
-// a tap, or the match's own clock or end.
+// a tap, or the match's own clock or end. Spectating, a slip at the foot of the screen says she has sunk and where
+// she placed (sunk), however she went down.
 
 import type { DropState, createGale } from './gale';
 import type { createGlobe } from './globe';
 import { clock, type HudState, type createHud } from './hud';
 import type { Career } from '../player';
-import { createLobby, createRank, createResult, createSettings, createTitle, type Settings } from './screens';
+import { createLobby, createRank, createResult, createSettings, createSunk, createTitle, type Settings } from './screens';
 import { onTap, uiLayer } from './ui';
 
 export const SCREENS = ['title', 'lobby', 'drop', 'match', 'spectate', 'won', 'result'] as const;
@@ -48,6 +49,8 @@ export function createFlow(
   start: Screen, act: FlowActions,
 ) {
   let screen: Screen = start, settings = loadSettings(), afloat = 0;
+  /** Her place once she has sunk, while spectating (null till the match reports it). */
+  let struck: number | null = null;
   let rank: ReturnType<typeof createRank> | null = null;
 
   const title = createTitle(() => go('lobby'));
@@ -69,6 +72,7 @@ export function createFlow(
     settings = s;
     saveSettings(s);
   }, () => settingsFolio.show(false));
+  const sunk = createSunk();
   const result = createResult(() => {
     act.home();
     go('lobby');
@@ -91,6 +95,8 @@ export function createFlow(
     hud.root.style.opacity = next === 'won' ? '0' : '1';
     hud.watch(next === 'spectate');
     gale.show(next === 'drop');
+    if (next !== 'spectate') struck = null;
+    sunk.show(next === 'spectate' && struck !== null, struck ?? undefined);
     skip.style.display = next === 'spectate' || next === 'won' ? 'block' : 'none';
     if (next !== 'drop' && next !== 'match') globe.close();
     result.show(next === 'result', { place, afloat: clock(afloat), career: career() });
@@ -109,6 +115,12 @@ export function createFlow(
     ready: () => title.ready(),
     /** The match has ended for her, in `place`. */
     end: (place: number) => go('result', place),
+    /** She has sunk, in `place`: said over the match she watches (each frame while she spectates). */
+    sunk(place: number) {
+      if (screen !== 'spectate' || struck === place) return;
+      struck = place;
+      sunk.show(true, place);
+    },
     go,
     /** Opens a folio over the lobby. */
     open(folio: 'rank' | 'settings') {

@@ -20,7 +20,7 @@
 // as the wind fills it, none simulated (ship/fleet.ts).
 // ?screen= opens the UI at a screen (title, lobby, drop, match, spectate, won, result; ui/flow.ts; also map, rank and
 // settings), at sea among ?ships=n others by default: drop starts a match in the Gale (with ?dive, ?mark=lat,lon and
-// ?ahead=seconds to see the glide); spectate sinks her by the first other ship, won sinks every other by her. ?ships=
+// ?ahead=seconds to see the glide); spectate sinks her by the first other ship (?by=storm: by the storm), won sinks every other by her. ?ships=
 // sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight course at that speed, their helms
 // lashed, and ?heading=deg turns them all.
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
@@ -142,7 +142,7 @@ function open(p: Played, others: readonly Berth[]) {
     if (screen === 'result') flow.end(4);
     else {
       referee.begin(false);
-      if (screen === 'spectate') game.sink(PLAYER, others.length ? 1 : null);
+      if (screen === 'spectate') game.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);
       if (screen === 'won') others.forEach((_, i) => game.sink(i + 1, PLAYER));
       flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');
     }

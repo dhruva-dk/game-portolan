@@ -7,11 +7,12 @@
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
 //   settings a small folio: sound and look speed, each a bar set by a tap along it
 // (The drop's own screen is gale.ts.)
+//   sunk    over the match she watches once she has sunk: her galleon going down and her place in its laurel
 //   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, her plate
 // No words anywhere; numerals only.
 
 import type { Career } from '../player';
-import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, svg } from './ink';
+import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, slip, svg } from './ink';
 import { TIERS, laurel, levelRing, plate, rhumbs, rose, seal } from './marks';
 import { onTap, uiLayer } from './ui';
 
@@ -164,6 +165,34 @@ export function createSettings(get: () => Settings, set: (s: Settings) => void, 
   };
 }
 
+/** A place's laurel and numeral: gold for the first, silver for the top five, red for the top ten, ink below. */
+const placed = (place: number) =>
+  place === 1 ? [WASH.gold, WASH.gold] : place <= 5 ? ['#b4b8c2', '#7f848b'] : place <= 10 ? [WASH.vermilion, INK.rubric] : ['#6b5a4a', INK.iron];
+
+/** She has sunk: over the match she now watches, a slip at the foot of the screen with her galleon going down in a
+ *  paper disc and her place in its laurel. It takes no touch: a tap goes on as spectating's does (flow.ts). */
+export function createSunk() {
+  const s = sheet(false, false);
+  const x = 478, y = 352, cx = x - 72, r = 44;
+  return {
+    show(on: boolean, place?: number) {
+      if (on && place !== undefined) {
+        const [wreath, numeral] = placed(place);
+        const swell = `M${cx - r} ${y + 14}q11 -7 22 0t22 0t22 0t22 0V${y + r}H${cx - r}Z`;
+        s.set(slip(x - 150, y - 58, 300, 116, { bold: true })
+          + `<clipPath id="sunk-c"><circle cx="${cx}" cy="${y}" r="${r}"/></clipPath>`
+          + `<circle cx="${cx}" cy="${y}" r="${r}" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.6"/>`
+          + `<g clip-path="url(#sunk-c)"><g transform="rotate(-26 ${cx} ${y + 8})">${galleon(cx, y + 8, 74, { sail: CUT })}</g>`
+          + `<path d="${swell}" fill="${WASH.sea}" stroke="${INK.iron}" stroke-width="1.2"/>`
+          + `<path d="M${cx - 30} ${y + 26}q7 -5 14 0t14 0M${cx + 2} ${y + 34}q7 -5 14 0t14 0" fill="none" stroke="${INK.blue}" stroke-width="1"/></g>`
+          + `<circle cx="${cx}" cy="${y}" r="${r - 5}" fill="none" stroke="${INK.iron}" stroke-width=".6"/>`
+          + laurel(x + 68, y, 46, wreath) + figure(x + 68, y, place, 62, { fill: numeral }));
+      }
+      s.show(on);
+    },
+  };
+}
+
 /** The result: an opaque sheet with her place, her ship, how long she lasted and her plate; a tap goes on. */
 export function createResult(go: () => void) {
   const s = sheet(true);
@@ -171,7 +200,7 @@ export function createResult(go: () => void) {
   return {
     show(on: boolean, r?: { place: number; afloat: string; career: Career }) {
       if (on && r) {
-        const [wreath, numeral] = r.place === 1 ? [WASH.gold, WASH.gold] : r.place <= 5 ? ['#b4b8c2', '#7f848b'] : r.place <= 10 ? [WASH.vermilion, INK.rubric] : ['#6b5a4a', INK.iron];
+        const [wreath, numeral] = placed(r.place);
         s.set(`<circle cx="271" cy="150" r="78" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.6"/><circle cx="271" cy="150" r="72" fill="none" stroke="${INK.iron}" stroke-width=".6"/>`
           + galleon(271, 150, 120, { sail: CUT, hull: r.place === 1 ? WASH.gold : 'url(#h-iron)', waves: true })
           + laurel(560, 150, 82, wreath) + figure(560, 150, r.place, 108, { fill: numeral })

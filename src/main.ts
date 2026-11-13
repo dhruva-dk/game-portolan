@@ -123,7 +123,11 @@ async function play(s: Stage): Promise<Played> {
       if (m?.done) {
         referee.end();
         flow.end(m.place ?? 1);
-      } else if (m && IN_MATCH.includes(flow.screen) && flow.screen !== SHOWS[m.phase]) flow.go(SHOWS[m.phase]);
+      } else if (m) {
+        if (IN_MATCH.includes(flow.screen) && flow.screen !== SHOWS[m.phase]) flow.go(SHOWS[m.phase]);
+        // sunk, by a ball, a ram or the storm alike: where she placed, over the ship she now watches
+        if (m.phase === 'spectating' && m.place !== null) flow.sunk(m.place);
+      }
       const shown = hudState();
       const d = game.dropping(s.canvas.clientWidth, s.canvas.clientHeight);
       flow.update(dt, shown, d && { ...d, at: shown.at, heading: shown.heading });
