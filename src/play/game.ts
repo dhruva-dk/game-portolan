@@ -219,6 +219,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       };
     },
     sinkings: state.sinkings,
+    /** Her share of the planet's water now, 0…1. */
+    share: () => state.territory()?.share(PLAYER) ?? 0,
     ships: state.ships,
     alive: state.alive,
     /** A new match: every ship afloat at her berth, hers the first, and the eye coming down onto her from space. */

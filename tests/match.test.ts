@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { CREDIT, HOLD, PLAYER, credited, startMatch, stepMatch, tapped, type MatchState, type Sunk } from '../src/sim/match.ts';
 
 /** Steps a match through frames of `dt`, each with what the game reports then. */
-const run = (m: MatchState, frames: { sinkings: Sunk[]; alive: number[] }[], dt = 1 / 30) =>
+const run = (m: MatchState, frames: { sinkings: Sunk[]; alive: number[]; share?: number }[], dt = 1 / 30) =>
   frames.reduce((s, f) => stepMatch(s, f, dt), m);
 
 test('sunk, she places one behind the ships still afloat, and watches the one that sank her', () => {
@@ -83,6 +83,15 @@ test('sunk in the same step as others, the sinkings count one by one in the orde
   // sinking first of the two, she is second
   const first = run(startMatch(), [{ sinkings: [both[1], both[0]], alive: [] }]);
   assert.deepEqual([first.phase, first.place], ['spectating', 2]);
+});
+
+test('her share of the water is what she held afloat, kept once she has sunk and her water drains', () => {
+  let m = run(startMatch(), [{ sinkings: [], alive: [0, 1, 2], share: 0.012 }]);
+  assert.equal(m.share, 0.012);
+  m = run(m, [{ sinkings: [{ id: PLAYER, by: 1, cause: 'shot' }], alive: [1, 2], share: 0 }]);
+  assert.deepEqual([m.place, m.share], [3, 0.012]);
+  m = run(m, [{ sinkings: [{ id: PLAYER, by: 1, cause: 'shot' }], alive: [1, 2], share: 0 }]);
+  assert.equal(m.share, 0.012);
 });
 
 test("the Storm's sinking goes to the ship that last struck her, within CREDIT seconds; a ball's or a ram's always", () => {

@@ -28,7 +28,7 @@ export function createReferee(game: Game) {
     update(dt: number): MatchState | null {
       if (!m) return null;
       const was = m;
-      m = stepMatch(m, { sinkings: game.sinkings(), alive: game.alive() }, dt);
+      m = stepMatch(m, { sinkings: game.sinkings(), alive: game.alive(), share: game.share() }, dt);
       if (m.watch !== was.watch || m.phase !== was.phase) aim(m);
       return m;
     },

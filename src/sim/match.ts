@@ -52,13 +52,17 @@ export interface MatchState {
   done: boolean;
   /** How many of the game's sinkings this has read. */
   read: number;
+  /** Her share of the planet's water (0…1) as she last held it afloat: kept once her place is settled, as a sunk
+   *  ship's water drains (for the result, beside her place). */
+  share: number;
 }
 
-/** What the game reports each frame: every sinking so far in order, and the ids of every ship not sunk. */
-export interface Report { sinkings: readonly Sunk[]; alive: readonly number[] }
+/** What the game reports each frame: every sinking so far in order, the ids of every ship not sunk, and her share of
+ *  the planet's water now (0…1). */
+export interface Report { sinkings: readonly Sunk[]; alive: readonly number[]; share?: number }
 
 export const startMatch = (): MatchState => ({
-  phase: 'fighting', place: null, sunk: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0,
+  phase: 'fighting', place: null, sunk: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0, share: 0,
 });
 
 /** Who to watch after `gone` sank, at the hand of `by`: her, if afloat, or the ship afloat with the most sinkings to
@@ -79,6 +83,8 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   let s: MatchState = { ...m, read: r.sinkings.length };
   const fresh = r.sinkings.slice(m.read);
   const mine = fresh.find((k) => k.id === PLAYER);
+  // (the step she sinks, her water is already draining: what she held is the step before's)
+  if (s.phase === 'fighting' && !mine) s.share = r.share ?? s.share;
   if (mine && s.phase === 'fighting') {
     const place = r.alive.length + r.sinkings.length - r.sinkings.indexOf(mine);
     const watch = next(mine.by, r);
