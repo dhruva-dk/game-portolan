@@ -144,7 +144,8 @@ function open(p: Played, others: readonly Berth[]) {
       flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');
     }
   }
-  if (params.has('fire')) game.fire();
+  // ordered now, fired at her first step
+  if (params.has('fire')) game.step(0, { ...IDLE, fire: true });
   for (let t = 0; t < number('ahead', 0); t += 0.1) {
     game.step(0.1, IDLE);
     referee.update(0.1);

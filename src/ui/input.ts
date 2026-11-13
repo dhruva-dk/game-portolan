@@ -3,8 +3,8 @@
 // A finger put down anywhere on the left of the screen holds the stick there, its centre where it landed (kept its
 // own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
 // pushed that way. Any other finger drags the look.
-// WASD or the arrows push the stick all the way while no finger holds it. What the stick and look mean is the
-// game's business (play/game.ts step); this only reports them.
+// WASD or the arrows push the stick all the way while no finger holds it. The gun is ordered fired by the HUD's Fire
+// (fire), with a finger or a click. What they mean is the game's business (play/game.ts step); this only reports them.
 
 import type { Hands } from '../player';
 
@@ -18,7 +18,7 @@ interface Finger { stick: boolean; x: number; y: number; cx: number; cy: number 
 export function createInput(element: HTMLElement) {
   const fingers = new Map<number, Finger>();
   const keys = new Set<string>();
-  let lookX = 0, lookY = 0;
+  let lookX = 0, lookY = 0, fired = false;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
@@ -66,7 +66,13 @@ export function createInput(element: HTMLElement) {
       }
       const look = { x: lookX, y: lookY, held: held.some((f) => !f.stick) };
       lookX = lookY = 0;
-      return { stick, look, fire: keys.has('Space') };
+      const fire = fired;
+      fired = false;
+      return { stick, look, fire };
+    },
+    /** Fire pressed: her gun ordered fired, read once. */
+    fire() {
+      fired = true;
     },
   };
 }

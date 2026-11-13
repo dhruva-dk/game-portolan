@@ -8,8 +8,8 @@
 //
 // The stick steers by the screen: pushed toward a direction on the screen, she heads that way across the sea as the
 // camera looks at it, as fast as it is pushed. Let go, she coasts. Her gun is aimed where the camera looks along the
-// sea (the gun's assist lays it on a ship near that bearing: sim/gun.ts), and fired by fire() (the HUD's button) or,
-// for now, Space. In the drop, the stick steers her glide (state.ts leap).
+// sea (the gun's assist lays it on a ship near that bearing: sim/gun.ts), and fired at the next step once her hands
+// order it (the HUD's button). In the drop, the stick steers her glide (state.ts leap).
 //
 // The camera follows the ship the match's flow sets (view): hers, or after she sinks the one she watches, cut to or
 // flown to; its shots on the Gale, coming down and on a win are shots.ts's.
@@ -55,7 +55,7 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
   const state = createState(world.planet, sea, chart, first);
   const chase = createChase(ground, sea);
   const clock = fixedClock();
-  /** Whether Fire was pressed since the last step; how far the moment drawn is through the last step. */
+  /** Whether her gun was ordered fired since the last step; how far the moment drawn is through the last step. */
   let pulled = false, between = 0;
   /** The camera: what the flow sets, and its shots. */
   let view: View = { watch: PLAYER, move: 'cut', hands: true, circle: false };
@@ -106,11 +106,12 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
     step(dt: number, read: Hands) {
       const hands = view.hands ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
+      pulled ||= hands.fire;
       const time = clock(dt);
       for (let i = 0; i < time.steps; i++) {
         const v = state.mine();
         const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
-        state.advance(helm, { aim: chase.axes().ahead, fire: !!v && (pulled || hands.fire) }, state.leap(orders(hands.stick).course));
+        state.advance(helm, { aim: chase.axes().ahead, fire: !!v && pulled }, state.leap(orders(hands.stick).course));
         pulled = false;
       }
       between = time.between;
@@ -146,8 +147,6 @@ export function createGame(world: World, anchors: readonly Anchor[], chart: Char
     ships: state.ships,
     landed: state.landed,
     alive: state.alive,
-    /** Fire her gun at the next step, if it is loaded then (the HUD's button). */
-    fire() { pulled = true; },
     /** A new match opening with the Gale: every ship in the air, hers the first. */
     drop(m: Match) {
       restart(state.drop(m), true);

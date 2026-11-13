@@ -94,12 +94,7 @@ async function play(s: Stage): Promise<Played> {
   const globe = createGlobe(coasts);
   const hudState = (): HudState => ({ ...game.status(), ...placeholder.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, {
-    slot: (i) => placeholder.choose(i),
-    gust: () => {},
-    fire: () => game.fire(),
-    map,
-  });
+  const hud = createHud(layer, coasts, { slot: placeholder.choose, gust: placeholder.gust, fire: input.fire, map });
   const gale = createGale(coasts, { dive: () => game.dive(), map });
   const deal = () => {
     game.drop(s.matches.deal());

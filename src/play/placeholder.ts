@@ -1,6 +1,9 @@
-// PLACEHOLDER: what the HUD shows that the sim has no value for yet, held here and nowhere else. Each line becomes one
-// line reading the sim's value once it has it (items, Gust, her career); the game already supplies where she is, her
-// heading, her hull, shield and gun, the ships afloat and the Storm (play/game.ts status).
+// PLACEHOLDER: what the HUD shows and does that nothing in the game has yet, held here and nowhere else: the hotbar's
+// items and the slot in hand (no items yet), Gust's charges and its button (no Gust yet), and her career (none kept
+// yet), which the lobby, the rank folio and the result show. Only main.ts reads it, to fill the HUD's state (kit) and
+// actions (choose, gust) and the flow's career. Each becomes the game's own once it has it; all else the HUD shows is
+// the game's already (play/game.ts status: where she is and heads, her hull, shield and gun, the ships afloat, the
+// Storm's clock and its calm on the minimap and the full map).
 
 import type { Career, Kit } from '../player';
 
@@ -18,6 +21,8 @@ export function createPlaceholder() {
     choose(i: number) {
       chosen = i;
     },
+    /** Gust pressed: there is no Gust to raise yet, so nothing happens. */
+    gust() {},
     /** What she carries. */
     kit: (): Kit => ({ ...fixed, chosen }),
   };
