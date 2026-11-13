@@ -12,7 +12,7 @@
 // ?lat=&lon= degrees put the camera over a point of the planet and ?alt= metres above the sea; ?yaw=deg turns it
 // (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
 // ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
-// lie by default (for seed 3 the largest island's centre is at lat 8.7, lon −11.6, its coast about 69 m out).
+// lie by default (for seed 3 the largest island's centre is at lat 52.8, lon −170.1, its coast about 54 m out).
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
 // north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
 // ship with a gun of that rarity (sim/gun.ts); ?fire fires hers at the first step, ?fire=seconds so many seconds into the

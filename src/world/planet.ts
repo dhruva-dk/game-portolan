@@ -4,8 +4,8 @@
 // by long sand waves, and everywhere by small ripples. Deep channels wind between the banks and open here and
 // there into basins, 30–60 m down: the channels follow the zero line of a noise field (so they join up into a
 // network rather than lying about as specks), their width measured in metres by the field's own gradient, wider
-// where they are deeper; their sides fall over tens of metres. Islands (planet-islands.ts) stand on the shallowest
-// banks, clear of the deeps.
+// where they are deeper; their sides fall over tens of metres. Islands (planet-islands.ts) are spread evenly over the
+// banks, clear of the deeps, each on its own clear apron; nowhere else is the water too shallow to sail.
 //
 // Every field reads 3D noise at the point's position in metres (direction × R), so there are no seams or poles,
 // and sizes are metres whatever R is; how many islands there are follows the planet's area.
