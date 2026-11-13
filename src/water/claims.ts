@@ -39,17 +39,20 @@ import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 const CELL = ((Math.PI / 2) * R) / N;
 /** The tint: how far the water's colour is given up for its holder's (0…1), the others' and hers; seen from afar (a
  *  cell under a pixel or two: the full map's), more, so the holders read from space. */
-const TINT = 0.6, OWN_TINT = 0.75, FAR_TINT = 0.9;
+const TINT = 0.1, OWN_TINT = 0.12, FAR_TINT = 0.9;
+/** Along the inside of every border a band of the holder's colour, as a chartmaker washes a coast: the tint raised to
+ *  BAND at the line, falling off over BAND_M metres in (inside the few cells from a border, where it is known). */
+const BAND = 0.68, BAND_M = 4.2;
 /** Her own border's line and glow, this many times as bright as the others' (the emphasis each colour's w carries). */
 const OWN_LINE = 1.7;
 /** The line's half width, m (hers OWN_WIDE times it), and the least, in pixels, it is drawn at far off: there its
  *  light falls with the width it should have, to no less than FAINTEST of it. */
-const HALF = 0.22, OWN_WIDE = 1.4, THINNEST = 0.6, FAINTEST = 0.45;
+const HALF = 0.14, OWN_WIDE = 1.3, THINNEST = 0.6, FAINTEST = 0.5;
 /** The glow round the line: its reach, m (and the least, pixels), and how far it tints the water there. */
-const GLOW_REACH = 1.6, GLOW_PX = 2, GLOW_TINT = 0.55;
+const GLOW_REACH = 1.1, GLOW_PX = 2, GLOW_TINT = 0.4;
 /** The line's light and its glow's, as a share of what the sun and sky give a white surface, once the colour is raised
  *  to a luminance of 1. */
-const INK = 0.7, GLOW = 0.12;
+const INK = 0.85, GLOW = 0.07;
 /** The flood's front: its width, seconds of its sweep, and its light. */
 const CREST = 0.03, CREST_GAIN = 1.2;
 /** Luminance's weights (linear Rec. 709). */
@@ -184,11 +187,13 @@ export function createClaims(ships: number) {
           const lo = colourOf(f.lo), hi = colourOf(f.hi);
           const aLo = select(f.lo.greaterThan(0), float(1), float(0)), aHi = select(f.hi.greaterThan(0), float(1), float(0));
           const tint = vec4(mix(hi.xyz.mul(aHi), lo.xyz.mul(aLo), t), mix(aHi, aLo, t));
-          const strength = mix(aHi.mul(tintOf(hi.w)), aLo.mul(tintOf(lo.w)), t);
           // the line's colour each side its own holder's (on open sea's side, the holder's)
           const side = select(f.lo.greaterThan(0), mix(hi, lo, t), hi);
           // distance to the border in pixels, and metres a pixel across it
           const d = abs(f.v).div(f.px), mpp = f.px.div(f.cell).mul(CELL);
+          // the wash along the border, each side its holder's (less from afar, where the whole is tinted more)
+          const band = exp(d.mul(mpp).div(-BAND_M)).mul(float(1).sub(far));
+          const strength = mix(aHi.mul(max(tintOf(hi.w), band.mul(BAND))), aLo.mul(max(tintOf(lo.w), band.mul(BAND))), t);
           const wide = float(HALF).mul(mix(float(1), float(OWN_WIDE), hers(max(hi.w, lo.w.mul(aLo))))).div(mpp);
           const cover = clamp(max(wide, THINNEST).sub(d).add(0.5), 0, 1).mul(max(min(wide.div(THINNEST), 1), FAINTEST)).mul(aHi);
           const reach = float(GLOW_REACH).div(mpp);

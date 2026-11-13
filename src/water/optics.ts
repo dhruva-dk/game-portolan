@@ -146,15 +146,16 @@ const linear = (lab: Vec3Node): Vec3Node => {
  * colour, rich in its body and pale where it mirrors a cloud, still shows, turned to her hue), less for a paler colour;
  * from afar (`far`, 0…1) as rich as hers. Its lightness is scaled a little by hers against a middling colour's (a saffron
  * over deep water would otherwise be olive), scaled and not moved, so the waves keep their play. The water's own hue is
- * let go faster than hers comes in ((1 − a)³ of it kept against a of hers), not mixed half and half: blue water and
- * scarlet so mixed would be magenta, and this way scarlet holds its hue over turquoise and deep blue alike.
+ * let go faster than hers comes in ((1 − a)² of it kept against a of hers; (1 − a)³ from afar), not mixed half and
+ * half: blue water and scarlet so mixed would be magenta, and this way scarlet holds its hue over turquoise and deep
+ * blue alike where the tint is strong (along a border, and from afar), while a light wash leaves the sea its own.
  */
 function tinted(c: Vec3Node, colour: Vec3Node, a: FloatNode, far: FloatNode): Vec3Node {
   const lab = oklab(c), hers = oklab(colour), chroma = length(hers.yz), ratio = chroma.div(max(hers.x, 1e-3));
   const light = lab.x.mul(mix(float(1), hers.x.div(MIDDLE), a.mul(TINT_LIGHT)));
   const strength = mix(length(lab.yz).mul(min(ratio.div(TINT_RICH), 1).mul(TINT_CHROMA)), light.mul(ratio).mul(FAR_RICH), far);
   const keep = float(1).sub(a);
-  return linear(vec3(light, lab.yz.mul(keep.mul(keep).mul(keep)).add(hers.yz.div(max(chroma, 1e-4)).mul(strength.mul(a)))));
+  return linear(vec3(light, lab.yz.mul(keep.mul(keep).mul(mix(float(1), keep, far))).add(hers.yz.div(max(chroma, 1e-4)).mul(strength.mul(a)))));
 }
 
 /**
