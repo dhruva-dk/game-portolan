@@ -71,7 +71,11 @@ export function createShadow(): Shadow {
       const lit = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
         .map(([x, y]): FloatNode => map.sample(uv.add(vec2(x * texel * 0.75, y * texel * 0.75))).compare(ref))
         .reduce((a, b) => a.add(b)).mul(0.25);
-      const inside = uv.x.greaterThan(0).and(uv.x.lessThan(1)).and(uv.y.greaterThan(0)).and(uv.y.lessThan(1));
+      // in the map's box: its square across, and its depth along the sun's rays. The square alone is a column through
+      // the whole planet, and where it came out again, far past the map's depth, every point read as shadowed: a
+      // dark band with straight sides across the sea seen from high up
+      const inside = uv.x.greaterThan(0).and(uv.x.lessThan(1)).and(uv.y.greaterThan(0)).and(uv.y.lessThan(1))
+        .and(clip.z.greaterThan(0)).and(clip.z.lessThan(1));
       return select(inside, lit, float(1));
     },
     cast(...casters) {
