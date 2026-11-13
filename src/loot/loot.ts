@@ -227,12 +227,14 @@ export function createLoot(light: Light) {
 
   return {
     meshes: [gunMesh.mesh, crystalMesh.mesh, caskMesh.mesh, beamMesh],
-    /** Each frame: the world's clock now (s), and the pieces near the eye. */
-    draw(time: number, pieces: readonly LootDraw[]) {
+    /** Each frame: the world's clock now (s), the pieces near the eye, and where the eye is (those past SHAPE m of it
+     *  sent as beams alone). */
+    draw(time: number, pieces: readonly LootDraw[], eye: readonly [number, number, number]) {
       now.value = time;
-      fill(guns, gunMesh, pieces, (l) => l.kind === 'gun');
-      fill(crystals, crystalMesh, pieces, shields);
-      fill(casks, caskMesh, pieces, (l) => l.kind === 'repairKit' || l.kind === 'fullRepair');
+      const near = (l: LootDraw) => (l.at[0] - eye[0]) ** 2 + (l.at[1] - eye[1]) ** 2 + (l.at[2] - eye[2]) ** 2 < SHAPE * SHAPE;
+      fill(guns, gunMesh, pieces, (l) => l.kind === 'gun' && near(l));
+      fill(crystals, crystalMesh, pieces, (l) => shields(l) && near(l));
+      fill(casks, caskMesh, pieces, (l) => (l.kind === 'repairKit' || l.kind === 'fullRepair') && near(l));
       fill(beams, { mesh: beamMesh, geometry: beamGeometry }, pieces, () => true);
     },
     /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */

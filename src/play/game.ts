@@ -58,8 +58,8 @@ import { bearing, createState, type Berth, type Match, type Waters } from './sta
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
-/** Loot is drawn within DRAWN m of the eye's ship, floating on the waves within RIDES m; shown on the disc within
- *  CHARTED m. */
+/** Loot is drawn within DRAWN m of the eye (so none from space), floating on the waves within RIDES m of the eye's
+ *  ship; shown on the disc within CHARTED m. */
 const DRAWN = 700, RIDES = 320, CHARTED = 260;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
@@ -184,15 +184,15 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     /** What is drawn now (snapshot.ts). */
     snapshot(): Snapshot {
       const eye = chase.eye(), time = state.clock(between), near = normalize(last.position);
+      const seen = anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye);
       const loot: LootDraw[] = [];
       for (const l of state.loot().pieces) {
-        const d = dot(near, l.at);
-        if (d < Math.cos(DRAWN / R)) continue;
-        const up = d > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0;
+        if (distance(seen.position, scale(l.at, R)) > DRAWN) continue;
+        const up = dot(near, l.at) > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0;
         loot.push({ id: l.id, at: scale(l.at, R + up), kind: l.goods.kind, rarity: rarityOf(l.goods), born: state.born(l.id) ?? -LONG_AGO });
       }
       return {
-        eye: anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye),
+        eye: seen,
         clock: time, storm: state.storm(between),
         ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
         sea: state.sea(between),

@@ -282,7 +282,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     }
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);
-    loot.draw(s.clock, s.loot);
+    loot.draw(s.clock, s.loot, s.eye.position);
   }
 
   /**
