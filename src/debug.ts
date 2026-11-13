@@ -31,9 +31,9 @@
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
 // The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
-// At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
+// At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
 // a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
-// drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
+// drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each rarity in a fan ahead
 // of her, 25 m out to 420 m (?loot=m: every kind, and a gun of every rarity, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
@@ -155,10 +155,12 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     ...(params.get('fire') ? [{ at: number('fire', 0), hands: { fire: true } }] : []),
     ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
-  // ?sink and ?win: her end, so many seconds into the frames drawn
+  // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn
   const ends = [
     ...(params.has('sink') ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }] : []),
     ...(params.has('win') ? [{ at: number('win', 0), act: () => winHer(p.game) }] : []),
+    ...(params.has('down') ? [{ at: number('down', 0), act: () => downOne(p.game) }] : []),
+    ...(params.get('kit') ? [{ at: number('kit', 0), act: () => kit(p.game) }] : []),
   ];
   let drawn = 0;
   return s.draw((real) => {
@@ -210,25 +212,35 @@ function sinkHer(game: Game) {
 }
 
 /** Sinks every other ship afloat, the last by her, so she wins. */
+/** The first other ship afloat, sunk by her. */
+function downOne(game: Game) {
+  const one = game.alive().find((id) => id !== PLAYER);
+  if (one !== undefined) game.debug.sink(one, PLAYER);
+}
+
 function winHer(game: Game) {
   const others = game.alive().filter((id) => id !== PLAYER);
   others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
+}
+
+/** ?kit: her stores strewn under her, a better gun beside them, and her first steps to sweep them up. */
+function kit(game: Game) {
+  type Goods = Parameters<Game['debug']['strew']>[1][number];
+  const { at, heading } = game.status(), step = () => game.step(STEP, IDLE);
+  const under: Goods[] = [
+    { kind: 'gun', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
+  ];
+  game.debug.strew(at, under);
+  step();
+  game.debug.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
+  step();
 }
 
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
 function stock(game: Game) {
   type Goods = Parameters<Game['debug']['strew']>[1][number];
   const { at, heading, facing } = game.status();
-  const step = () => game.step(STEP, IDLE);
-  if (params.has('kit')) {
-    const under: Goods[] = [
-      { kind: 'gun', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
-    ];
-    game.debug.strew(at, under);
-    step();
-    game.debug.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
-    step();
-  }
+  if (params.get('kit') === '') kit(game);
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
     // a row across her bow: the guns worst to best, then the stores, a few degrees apart
