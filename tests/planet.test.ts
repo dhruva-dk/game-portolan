@@ -136,18 +136,35 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
     let off = 0, checked = 0;
     for (let i = 0; i < 48; i++) {
       const t = (i / 48) * 2 * Math.PI, c = s.coast(t), x = Math.cos(t) * c, z = Math.sin(t) * c;
-      assert.ok(Math.abs(at(x, z)) < 0.06, `seed ${seed}: waterline ${at(x, z)}`);
+      // the ground is read from its distance to the coast sampled on a grid (1 m; 0.5 m for rocks) and blended between
+      // (planet-islands.ts, island-shape.ts): its zero lies within some 0.25 m of the coast drawn, at the beach's slope
+      // a few centimetres of height (0.031 m the most, over these planets)
+      assert.ok(Math.abs(at(x, z)) < 0.3 * ISLANDS.beach, `seed ${seed}: waterline ${at(x, z)}`);
       // the beach's fall, whichever way the coast runs there (on the small ones the dome comes nearer: steeper, no cliff)
       const e = 0.3, k = Math.hypot(at(x + e, z) - at(x - e, z), at(x, z + e) - at(x, z - e)) / (2 * e);
       checked++;
-      if (k < 0.09 || k > (s.kind === 'island' ? 0.17 : 0.27)) off++;
+      // never steeper; gentler only at a sharp headland or spit, where the blend flattens the distance's fold (some
+      // 1 in 700 of these, down to 0.074)
+      assert.ok(k <= (s.kind === 'island' ? 0.17 : 0.27) && k > 0.07, `seed ${seed}: ${s.kind} beach ${k.toFixed(3)}`);
+      if (k < 0.09) off++;
     }
-    assert.ok(off <= checked * 0.05, `seed ${seed}: ${s.kind} beach off its slope at ${off} of ${checked}`);
+    assert.ok(off <= checked * 0.05, `seed ${seed}: ${s.kind} beach gentler than 1:11 at ${off} of ${checked}`);
     let top = 0;
     for (let i = 0; i < 3000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 3000) * s.radius)));
-    // (brought lower than its kind's range where the land is too narrow for so high a hill at a palm's slope)
+    // within its kind's range, unless the land is too narrow for so high a hill at a palm's slope: then brought lower
+    // until its steepest (all but the steepest hundredth) is at that slope
     const [low, high] = KINDS[s.kind].summit;
-    assert.ok(s.summit >= low * 0.55 && top >= s.summit - 0.15, `seed ${seed}: ${s.kind} summit ${s.summit}, sampled ${top}`);
+    assert.ok(top >= s.summit - 0.15, `seed ${seed}: ${s.kind} summit ${s.summit}, sampled ${top}`);
+    if (s.summit < low - 0.05) {
+      const slopes: number[] = [], e = 0.5;
+      for (let x = -s.radius * 1.5; x <= s.radius * 1.5; x += 1) for (let z = -s.radius * 1.5; z <= s.radius * 1.5; z += 1) {
+        if (Math.hypot(x, z) >= s.coast(Math.atan2(z, x))) continue;
+        slopes.push(Math.hypot(s.mound(x + e, z) - s.mound(x - e, z), s.mound(x, z + e) - s.mound(x, z - e)) / (2 * e));
+      }
+      slopes.sort((p, q) => p - q);
+      const steep = slopes[Math.floor(slopes.length * 0.99)];
+      assert.ok(steep > 0.9 * ISLANDS.steepest[s.kind], `seed ${seed}: ${s.kind} summit ${s.summit} under ${low}, its slope ${steep.toFixed(2)}`);
+    }
     assert.ok(s.summit <= high * 1.15, `seed ${seed}: ${s.kind} summit ${s.summit}`);
   }
   // the largest a hill to hide behind, the islets a clear hump; the larger the higher

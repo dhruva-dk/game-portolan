@@ -24,10 +24,10 @@ const deadly = (at: number): Match => ({
   storm: (t): Storm => (t < at ? calm(start.at) : { ...calm(start.at), radius: 1e-6, next: { centre: start.at, radius: 1e-6 }, damage: 1e6 }),
 });
 
-/** Her loop sailed alone from her berth in a match at sea: south, east, and home; each step's helm, until it closes.
- *  Returns the match's clock at the start of the step that closed it (null: it never did), and the state. */
-function loop(m: Match) {
-  const state = createState(planet, () => 0, waters, m);
+/** Her loop sailed alone from her berth in a match at sea (a new one on `state`, if given): south, east, and home;
+ *  each step's helm, until it closes. Returns the match's clock at the start of the step that closed it (null: it
+ *  never did), and the state. */
+function loop(m: Match, state = createState(planet, () => 0, waters, m)) {
   state.debug.atSea(start, []);
   const legs: [number, number][] = [[180, 5], [90, 4]];
   const helm = (k: number): Helm => {
@@ -60,3 +60,24 @@ test('a ship sunk in a step lays, closes and cuts nothing in it: her water only 
   assert.equal(sunk.state.share(PLAYER), 0);
 });
 
+
+test('a second match on the same state starts clean: its sea as a new state\'s, her loop closing as it did', () => {
+  const alone = loop(deadly(Infinity)), first = loop(deadly(Infinity));
+  // the first match sailed on a while past its loop, her trail open again, then the second begun on its state
+  for (let k = 0; k < 240; k++) first.state.advance({ course: bearing(first.state.mine()!.ship.at, 180 * degrees), throttle: 1 }, still);
+  const was = first.state.sea(1)!;
+  assert.ok(was.trails.length > 0, 'her trail open at the first match\'s end');
+  const second = loop(deadly(Infinity), first.state);
+  assert.equal(second.closed, alone.closed, 'her loop closes at the same moment of its match');
+  // nothing of the first: the same changes in the same order (on the world's clock, later by as long as it ran
+  // before), the same water held, no trail but what a new state has
+  const a = alone.state.sea(1)!, b = second.state.sea(1)!, later = b.changes[0].time - a.changes[0].time;
+  const timed = (cs: typeof a.changes, by: number) => cs.map((c) => ({ ...c, time: Math.round((c.time - by) * 1e6) }));
+  assert.equal(b.generation, was.generation + 1);
+  assert.equal(b.seq, a.seq);
+  assert.ok(later > 0);
+  assert.deepEqual(timed(b.changes, later), timed(a.changes, 0));
+  assert.deepEqual(b.owner, a.owner);
+  assert.deepEqual(b.trails, a.trails);
+  assert.equal(second.state.share(PLAYER), alone.state.share(PLAYER));
+});
