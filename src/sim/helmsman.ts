@@ -101,7 +101,11 @@ export function steer(c: Ctx, dt: number): Helm {
   if (answered !== null) turn = answered;
   // going for loot or mending, she eases up near where she makes for (0117's)
   const easy = (m.mode === 'loot' || m.mode === 'heal') && toD < PURSER.near ? PURSER.slow : 1;
-  return stuck(c, dt, course) ?? order(turn, easy);
+  // a mark (not a ship) inside the circle she turns at her speed she would only sail round: slowed to turn to it, the
+  // circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
+  const off = Math.abs(course), r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off))));
+  const tight = foe ? 1 : Math.max(BOT.leastWay, Math.min(1, (BOT.tighten * r * SHIP.turn) / SHIP.top));
+  return stuck(c, dt, course) ?? order(turn, Math.min(easy, tight));
 }
 
 /** A ram coming at her: the turn that lays her bow or her stern to it, whichever is the nearer, or null if none she

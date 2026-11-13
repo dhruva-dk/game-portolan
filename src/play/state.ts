@@ -16,29 +16,29 @@
 // A match begun with start() opens with every ship already afloat at her berth (sim/spawn.ts), spread over the whole
 // planet, hers the first; the match's clock (the storm's) starts then.
 
-import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from '../sim/battle';
-import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot';
-import { afloat, stepFleet, type Vessel } from '../sim/contact';
-import { STEP, blendPose } from '../sim/fixed';
-import { gunOf } from '../sim/gun';
-import { SHIP } from '../sim/handling';
-import { sunk } from '../sim/health';
-import { PLAYER, SHIPS, credited, type Cause } from '../sim/match';
-import { berths, type Berthing } from '../sim/spawn';
-import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride';
-import { overboard, strewn, type Flotsam, type Goods } from '../sim/loot';
-import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores';
-import type { Chart } from '../sim/route';
-import { shipAt, type Helm, type ShipState } from '../sim/ship';
-import { calm, type Storm } from '../sim/storm';
-import type { BallDraw, Blast, Look, ShipDraw } from '../snapshot';
-import type { Surface } from '../world/swell';
-import type { Planet } from '../world/planet';
-import type { ShipPose } from '../world/pose';
-import { hash } from '../world/random';
-import { add, frameAt, scale, type Vec3 } from '../world/sphere';
-import { LOOK, lookOf } from './colours';
-import { sinking } from './sinking';
+import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from '../sim/battle.ts';
+import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot.ts';
+import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
+import { STEP, blendPose } from '../sim/fixed.ts';
+import { gunOf } from '../sim/gun.ts';
+import { SHIP } from '../sim/handling.ts';
+import { sunk } from '../sim/health.ts';
+import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
+import { berths, type Berthing } from '../sim/spawn.ts';
+import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
+import { berthed, overboard, strewn, type Flotsam, type Goods } from '../sim/loot.ts';
+import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores.ts';
+import type { Chart } from '../sim/route.ts';
+import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
+import { calm, type Storm } from '../sim/storm.ts';
+import type { BallDraw, Blast, Look, ShipDraw } from '../snapshot.ts';
+import type { Surface } from '../world/swell.ts';
+import type { Planet } from '../world/planet.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { hash } from '../world/random.ts';
+import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
+import { LOOK, lookOf } from './colours.ts';
+import { sinking } from './sinking.ts';
 
 /** How long what the guns did is kept for the frame, seconds: past the last of its smoke (gunfire/gunfire.ts). */
 const KEPT = 5;
@@ -96,11 +96,11 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   /** Whether the sea is the lobby's, no match running: no storm then, however long she lies there. */
   let quiet = false;
 
-  /** Puts a ship to sea: a bot's unless she is the player's or her helm is lashed. */
-  const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null) => {
+  /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
+  const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
     fleet.push(afloat(id, ship));
     const r = settled(ship, sea, tick * STEP), p = pose(ship, r);
-    const bot = id !== PLAYER && !lashed;
+    const bot = (id !== PLAYER || !manned) && !lashed;
     aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };
 
@@ -152,7 +152,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       const helms: Helm[] = [], orders: Order[] = [], storm = stormAt(time()), asks = new Map<number, Ask>();
       fleet.forEach((v, i) => {
         const a = aboard.get(v.id)!;
-        if (v.id === PLAYER) {
+        if (v.id === PLAYER && !a.mind) {
           [helms[i], orders[i]] = [helm, gun];
           asks.set(v.id, ask);
         } else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
@@ -270,12 +270,15 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       others.forEach((o, i) => launch(i + 1, { ...shipAt(o.at, o.heading), speed: (o.lashed?.throttle ?? 0) * SHIP.top }, o.look, o.lashed));
       return aboard.get(PLAYER)!.after;
     },
-    /** A new match: SHIPS ships, hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts). Returns
-     *  her pose. */
-    start(m: Match): ShipPose {
+    /** A new match: SHIPS ships, hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts) with a
+     *  gun in reach of it (sim/loot.ts berthed). Returns her pose. manned: false puts a bot at her helm too (for
+     *  tools/matches.ts, whole matches of bots). */
+    start(m: Match, manned = true): ShipPose {
       const ids = Array.from({ length: SHIPS }, (_, i) => i);
       clear(m, ids);
-      berths(water, m.seed, SHIPS, depth).forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id)));
+      const at = berths(water, m.seed, SHIPS, depth);
+      flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
+      at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned));
       return aboard.get(PLAYER)!.after;
     },
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */

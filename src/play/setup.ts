@@ -2,11 +2,11 @@
 // debugging), the planet's water sounded for the bots' chart and the ships' berths, and the matches dealt one after
 // another, each with its storm, its berths and its bots' minds.
 
-import { charted } from '../sim/route';
-import { createStorm, type Storm } from '../sim/storm';
-import type { Planet } from '../world/planet';
-import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere';
-import type { Match, Waters } from './state';
+import { charted } from '../sim/route.ts';
+import { createStorm, type Storm } from '../sim/storm.ts';
+import type { Planet } from '../world/planet.ts';
+import { along, frameAt, scale, toChart, type Vec3 } from '../world/sphere.ts';
+import type { Match, Waters } from './state.ts';
 
 /** Metres off the coast she lies at the start. */
 const START = 80;

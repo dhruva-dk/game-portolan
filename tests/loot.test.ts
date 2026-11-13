@@ -7,7 +7,7 @@ import { gunOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
 import { GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import { begun, emptyHold, progress, roomFor, stepUse, stowed, tapped, useful, USES } from '../src/sim/hold.ts';
-import { cargo, drifted, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
+import { berthed, cargo, drifted, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
 import { shipAt, step } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { random } from '../src/world/random.ts';
@@ -174,6 +174,18 @@ test('the loot is strewn evenly over the planet, on open water only, the same fo
     const near = Math.min(...f.pieces.map((l) => distance(p, l.at)));
     assert.ok(near < 1.2 * cell, `${near}`);
   }
+});
+
+test('every berth has a gun within reach of it at the start, on open water; one laid only where there was none', () => {
+  // a shoal bank to the east of the berths: no gun is laid on it
+  const depth: Depth = (p) => (dot(p, east) > 0 && distance(p, c0) < 60 ? 1 : 20);
+  const berths = [c0, at(400), at(-300)];
+  const f = berthed(lying(piece(0, at(410), { kind: 'gun', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth);
+  assert.equal(f.pieces.length, 4);
+  assert.equal(f.next, 102);
+  for (const b of berths) assert.ok(f.pieces.some((l) => l.goods.kind === 'gun' && distance(l.at, b) < LOOT.berth));
+  for (const l of f.pieces.slice(2)) assert.ok(depth(l.at) >= SHIP.draught + LOOT.open);
+  assert.deepEqual(f, berthed(lying(piece(0, at(410), { kind: 'gun', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth));
 });
 
 test('she takes what fits within reach: a gun with none, stacks into her slots; what does not fit lies', () => {

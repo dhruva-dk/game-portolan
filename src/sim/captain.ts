@@ -61,6 +61,9 @@ export const BOT = {
    *  (cosine) ahead or astern of is come at by way of a point off her beam, half the way out, `offMin`–`offMax` m; once
    *  her hull touches her foe's, she bears away for `recoil` s (a ram's blow lands once until they are RAM.rearm clear). */
   lead: 8, commit: 25, abeam: 0.5, offMin: 15, offMax: 50, recoil: 3,
+  /** Making for a mark inside the circle she turns at her speed (new: else she sails round it for good), she slows to
+   *  `tighten` of the speed whose circle passes through it, down to `least` throttle (enough for the rudder to bite). */
+  tighten: 0.8, leastWay: 0.35,
   /** Answering a ram (adapted from 0117's answer to a gun): a ship within `threat` m, her bow within `aimed` rad of
    *  her, closing faster than `closing` of a ram's least, due within `warn` s and passing within `miss` m. Whether she
    *  sees it is decided once each `warn` s, with a chance of 0.2 + 0.75 × skill. */

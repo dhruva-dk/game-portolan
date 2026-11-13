@@ -2,8 +2,8 @@
 // fills and then faster, until her trucks are under and she is gone. Only her drawn pose: the sim has already taken
 // her off the sea.
 
-import type { ShipPose } from '../world/pose';
-import { add, cross, normalize, scale, type Vec3 } from '../world/sphere';
+import type { ShipPose } from '../world/pose.ts';
+import { add, cross, normalize, scale, type Vec3 } from '../world/sphere.ts';
 
 export const SINKING = {
   /** Seconds from sunk to gone. */

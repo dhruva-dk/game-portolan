@@ -1,7 +1,7 @@
 // The ships' colours (snapshot.ts Look), by id: hers, then the others' from a small palette.
 
-import type { Look } from '../snapshot';
-import type { Vec3 } from '../world/sphere';
+import type { Look } from '../snapshot.ts';
+import type { Vec3 } from '../world/sphere.ts';
 
 /** The player's colours: a scarlet hull and the scarlet cross on bright, unbleached canvas, the brightest sails at sea. */
 export const LOOK: Look = { paint: [0.6, 0.015, 0.03], sail: [0.95, 0.88, 0.7], band: false };

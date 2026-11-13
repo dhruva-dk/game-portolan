@@ -3,8 +3,9 @@
 // its numbers, for one gun and three item slots:
 // - strewn: LOOT.spots spots over the planet (0117 had about five a ship, by its regions; here five a ship for a
 //   match of 80, laid evenly, each moved off land and shallows to the nearest open water, which gathers some round
-//   every island's coast), each with a piece and LOOT.second of them a second 4 m off. A piece is a gun LOOT.gun of
-//   the time, its rarity drawn by LOOT.weights (0117's rollItem), else a consumable by 0117's shares, in its counts;
+//   every island's coast), each with a piece and LOOT.second of them a second 4 m off; and a gun laid near any berth
+//   with none in reach (berthed). A piece is a gun LOOT.gun of the time, its rarity drawn by LOOT.weights (0117's
+//   rollItem), else a consumable by 0117's shares, in its counts;
 // - picked up: a ship takes every piece within LOOT.reach that fits: a gun if she has none, things to mend with that
 //   go on a stack or into an empty slot. What doesn't fit is offered: the nearest gun while she has one, the nearest
 //   other piece with her slots full. Asked to (a take: her gun's slot, or a slot of items), she swaps it for what she
@@ -42,6 +43,8 @@ export const LOOT = {
   /** A spot lies over this much water past her draught; one on land or the shallows is moved to the nearest such water
    *  in rings `ring` m apart, out to `shore` m. */
   open: 1, ring: 8, shore: 240,
+  /** Every berth has a gun within `berth` m at the start: one is laid `near` m to `far` m off any that has none. */
+  berth: 60, near: 18, far: 40,
 } as const;
 
 /** A piece: a gun of a rarity, or a count of one consumable. */
@@ -60,14 +63,16 @@ const KINDS = Object.keys(LOOT.shares) as Use[];
 /** The rarity a piece reads as (its colour): a gun's own, a consumable's by kind. */
 export const rarityOf = (g: Goods) => (g.kind === 'gun' ? g.rarity : LOOT.rarity[g.kind]);
 
+/** A gun of the rarity LOOT.weights give a uniform draw `u`. */
+function gunned(u: number): Goods {
+  let r = u * LOOT.weights.reduce((a, b) => a + b, 0), k = 0;
+  while (k < LOOT.weights.length - 1 && r >= LOOT.weights[k]) r -= LOOT.weights[k++];
+  return { kind: 'gun', rarity: Math.min(k, GUN.rarities.length - 1) };
+}
+
 /** A piece drawn at random (0117's rollItem). */
 export function rolled(draw: () => number): Goods {
-  if (draw() < LOOT.gun) {
-    const total = LOOT.weights.reduce((a, b) => a + b, 0);
-    let r = draw() * total, k = 0;
-    while (k < LOOT.weights.length - 1 && r >= LOOT.weights[k]) r -= LOOT.weights[k++];
-    return { kind: 'gun', rarity: Math.min(k, GUN.rarities.length - 1) };
-  }
+  if (draw() < LOOT.gun) return gunned(draw());
   let r = draw();
   for (const kind of KINDS) {
     if (r < LOOT.shares[kind]) return { kind, count: LOOT.counts[kind] };
@@ -121,6 +126,23 @@ export function strewn(seed: number, depth: Depth, spots: number = LOOT.spots): 
     }
   }
   return { pieces, next: pieces.length };
+}
+
+/** The loot `f` with a gun within LOOT.berth of each of `berths` (where the ships lie at the start): for a berth with
+ *  none, one of a rarity drawn by LOOT.weights laid LOOT.near to LOOT.far m off on open water, its bearing drawn from
+ *  `seed`. So no ship opens the match with no gun in reach. */
+export function berthed(f: Flotsam, berths: readonly Vec3[], seed: number, depth: Depth): Flotsam {
+  const draw = random(hash(seed, 0xbe27)), within = Math.cos(LOOT.berth / R);
+  const pieces = [...f.pieces];
+  for (const b of berths) {
+    const a = draw() * 2 * Math.PI, d = LOOT.near + draw() * (LOOT.far - LOOT.near), r = draw();
+    if (pieces.some((l) => l.goods.kind === 'gun' && dot(l.at, b) > within)) continue;
+    // the first of eight bearings round from the one drawn that lies on open water, else the open water nearest it
+    const round = Array.from({ length: 8 }, (_, k) => along(b, tangent(b, a + (k * Math.PI) / 4), d).p);
+    const at = round.find((q) => open(depth, q)) ?? opened(depth, round[0]) ?? b;
+    pieces.push({ id: f.next + pieces.length - f.pieces.length, at, goods: gunned(r), from: -1, age: 0, way: STILL });
+  }
+  return { pieces, next: f.next + pieces.length - f.pieces.length };
 }
 
 /** Pieces put over the side at `at` by ship `from`, the k-th kicked out at LOOT.kick + k m/s on a bearing drawn from

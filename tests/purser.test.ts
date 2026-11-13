@@ -101,6 +101,14 @@ test('an unarmed bot sails to a gun she sees and takes it; armed, she swaps for 
   }
 });
 
+test('a gun abeam, inside the circle she turns at her top speed, she slows to come round to it, not sail round it', () => {
+  // she heads north at c0 at her top; the gun lies 28 m off her beam, about the circle she turns at her top
+  for (const seed of seeds((s) => temper(s).lootReach >= 110, 4)) {
+    const r = sail([c0], [seed], [crewOf(0)], { pieces: [piece(1, out(28, 0), { kind: 'gun', rarity: 1 })], next: 2 }, 15);
+    assert.equal(r.crews[0].gun?.rarity, 1, `${seed}: ${r.modes[0]}`);
+  }
+});
+
 test('a hurt bot with something to mend with uses it', () => {
   for (const seed of seeds(() => true, 4)) {
     const hold = stowed(stowed(emptyHold(), 'repairKit', 2).hold, 'smallShield', 2).hold;
