@@ -54,6 +54,35 @@ export interface LootDraw { id: number; at: Vec3; gun: boolean; rarity: number }
  *  and the world's alike. */
 export const RARITY = [0x969aa0, 0x3a683e, 0x264c8c, 0xb8301a, 0xbe8a2c] as const;
 
+/**
+ * A change in who holds the sea (sim/territory.ts Change), numbered in order (seq), at a moment on the world's clock (s):
+ * a loop closed (its first `loop` cells the trail's, the flood coming from them), a home patch laid round `at`, water
+ * drained back to open sea (a sunk ship's, or the storm's: ship null), or an open trail cut.
+ */
+export type SeaChange =
+  | { seq: number; time: number; kind: 'claim'; ship: number; cells: Int32Array; loop: number }
+  | { seq: number; time: number; kind: 'home'; ship: number; cells: Int32Array; at: Vec3 }
+  | { seq: number; time: number; kind: 'drain'; ship: number | null; cells: Int32Array }
+  | { seq: number; time: number; kind: 'cut'; ship: number; by: number | null };
+
+/** An open trail drawn: whose, which one (a new number each time she leaves her water), its points (unit vectors, a
+ *  couple of metres apart, oldest first; the ribbon runs on from the last to her stern). */
+export interface TrailDraw { id: number; serial: number; points: readonly Vec3[] }
+
+/**
+ * Who holds the sea (sim/territory.ts): the cells (world/cells.ts), each its holder (0 open sea, else her id + 1), read
+ * by reference and never written; what changed in the last few seconds, oldest first (each drawn once, from the first
+ * snapshot it is in); the open trails; each ship's colour on the sea, by id (linear rgb); and the moment, on the
+ * changes' clock (the world's), at which they are drawn.
+ */
+export interface Sea {
+  owner: Readonly<Uint8Array>;
+  changes: readonly SeaChange[];
+  trails: readonly TrailDraw[];
+  colours: readonly Vec3[];
+  clock: number;
+}
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -74,6 +103,8 @@ export interface Snapshot {
   loot: readonly LootDraw[];
   /** What the guns did in the last few seconds, oldest first: each is drawn once, from the first snapshot it is in. */
   blasts: readonly Blast[];
+  /** Who holds the sea, if anyone does (none before a match). */
+  sea?: Sea;
 }
 
 /** The orientation of an eye at `eye` looking at `at`, `up` up the screen (as three turns a camera to look at a point). */
