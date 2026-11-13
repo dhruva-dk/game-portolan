@@ -5,9 +5,10 @@ import { PALMS, SHRUBS, isle, litter, scatterPalms, scatterRocks, scatterShrubs 
 
 const planet = createPlanet(1);
 const isles = planet.islands.map((s) => isle(s, planet.height));
-const big = isles[0], above = isles.filter((i) => i.site.kind !== 'shoal');
+const big = isles[0], above = isles;
 const small = isles.filter((i) => i.site.kind === 'island').at(-1)!;
-const fromCoast = (i: (typeof isles)[number], x: number, z: number) => Math.hypot(x, z) - i.site.coast(Math.atan2(z, x));
+/** Metres from the nearest waterline: the coast's, a lagoon's or an offshore rock's (negative on land). */
+const fromCoast = (i: (typeof isles)[number], x: number, z: number) => i.site.shore(x, z);
 
 test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and at the waterline, boulders round them', () => {
   for (const [k, i] of above.entries()) {
@@ -30,11 +31,8 @@ test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and 
     // a rock knoll is a heap of them on its crown
     if (i.site.kind === 'rocks') assert.ok(masses.every((r) => fromCoast(i, r.x, r.z) < 2), `knoll ${k}: a mass off the knoll`);
   }
-  // nothing stands on a shoal, nor palm or shrub on a rock knoll
-  for (const [k, i] of isles.entries()) {
-    if (i.site.kind === 'shoal') assert.equal(scatterRocks(i, 4, 4, k + 1).length, 0);
-    if (i.site.kind === 'shoal' || i.site.kind === 'rocks') assert.equal(scatterPalms(i, []).length + scatterShrubs(i, [], 4).length, 0);
-  }
+  // no palm or shrub on a rock knoll
+  for (const i of isles) if (i.site.kind === 'rocks') assert.equal(scatterPalms(i, []).length + scatterShrubs(i, [], 4).length, 0);
   // the largest island has more outcrops than the smallest
   assert.ok(scatterRocks(big, 4, 4).filter((r) => r.big).length > scatterRocks(small, 4, 4).filter((r) => r.big).length);
   // some of the waterline's stand out in the water

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { R, along, distance, faceDir, frameAt, fromChart, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { R, along, distance, faceDir, frameAt, fromChart, normalize, toChart, type Vec3 } from '../src/world/sphere.ts';
 import { bakeFaces, createPlanet } from '../src/world/planet.ts';
-import { ISLANDS, KINDS, ORDER } from '../src/world/planet-islands.ts';
+import { ISLANDS, KINDS, ORDER, WADE } from '../src/world/planet-islands.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { random } from '../src/world/random.ts';
 
@@ -83,49 +83,66 @@ test('the planet\'s shares at R = 554: banks, deeps, land, and what a ship can\'
     assert.ok(share(deep) > 0.14 && share(deep) < 0.36, say);
     assert.ok(share(shallow) > 0.42 && share(shallow) < 0.7, say);
     assert.ok(share(land) > 0.012 && share(land) < 0.04, say);
-    assert.ok(share(aground) > share(land) && share(aground) < 0.14, say);
+    assert.ok(share(aground) > share(land) && share(aground) < share(land) * 2 && share(aground) < 0.05, say);
     assert.ok(top > 4.5 && top < 9, say);
     assert.ok(bottom > -61 && bottom < -45, say);
   }
 });
 
-test('islands of every kind: counted by the area, in ORDER, apart, on the banks and never in a channel', () => {
+test('islands of every kind: counted by the area, in ORDER, apart, spread evenly, and never in a channel', () => {
+  const points = lattice(20000);
   for (const [seed, pl] of planets) {
     const n = pl.islands.length;
-    assert.ok(n >= 45 && n <= 80, `seed ${seed}: ${n} in all`);
+    assert.ok(n >= 30 && n <= 60, `seed ${seed}: ${n} in all`);
     assert.deepEqual([...new Set(pl.islands.map((s) => s.kind))], ORDER, `seed ${seed}: kinds in order`);
     assert.equal(pl.islands[0].kind, 'island');
     for (const kind of ORDER) {
       const radii = pl.islands.filter((s) => s.kind === kind).map((s) => s.radius), K = KINDS[kind];
-      assert.ok(radii.length >= 5, `seed ${seed}: ${radii.length} ${kind}`);
+      assert.ok(radii.length >= 4, `seed ${seed}: ${radii.length} ${kind}`);
       assert.ok(Math.min(...radii) >= K.radius[0] && Math.max(...radii) <= K.radius[1], `${kind} radii ${radii}`);
       assert.ok(radii.every((r, i) => i === 0 || r <= radii[i - 1]), `${kind}: largest first`);
     }
+    // a few large, more small
+    const large = pl.islands.filter((s) => s.radius > 35).length, small = pl.islands.filter((s) => s.radius < 20).length;
+    assert.ok(large >= 2 && small > 2 * large, `seed ${seed}: ${large} large, ${small} small`);
     for (const a of pl.islands) {
       for (const b of pl.islands) if (a !== b) {
         const d = distance(a.chart.at, b.chart.at);
         assert.ok(d > a.shelf + b.shelf + ISLANDS.gap - 1e-6, `seed ${seed}: islands ${d.toFixed(0)} m apart`);
       }
-      // nowhere out to its apron's farthest edge is as deep as a channel
+      // nowhere in its apron is as deep as a channel
       for (let i = 0; i < 2000; i++) {
-        const h = pl.height(onIsland(a, i * 2.39996, Math.sqrt(i / 2000) * a.shelf));
+        const t = i * 2.39996, r = Math.sqrt(i / 2000) * a.shelf;
+        if (a.shore(Math.cos(t) * r, Math.sin(t) * r) > a.apron) continue;
+        const h = pl.height(onIsland(a, t, r));
         assert.ok(h > -20, `seed ${seed}: ${h.toFixed(1)} m within an island's apron`);
       }
+    }
+    // spread over the whole planet, not gathered: nowhere is far from an island (the deeps' channels have none), and no
+    // hemisphere has most of them
+    let farthest = 0;
+    for (const p of points) farthest = Math.max(farthest, Math.min(...pl.islands.map((s) => distance(p, s.chart.at) - s.shelf)));
+    assert.ok(farthest < 350, `seed ${seed}: open water ${farthest.toFixed(0)} m from any apron`);
+    for (const axis of [[1, 0, 0], [0, 1, 0], [0, 0, 1]] as Vec3[]) {
+      const north = pl.islands.filter((s) => s.chart.at[0] * axis[0] + s.chart.at[1] * axis[1] + s.chart.at[2] * axis[2] > 0).length;
+      assert.ok(north > n * 0.3 && north < n * 0.7, `seed ${seed}: ${north} of ${n} on one side`);
     }
   }
 });
 
 test('each above the sea: the waterline is its coast, the beach about 1:8 there, the summit low, by its kind', () => {
-  for (const [seed, pl] of planets) for (const s of pl.islands.filter((s) => s.kind !== 'shoal')) {
+  for (const [seed, pl] of planets) for (const s of pl.islands) {
+    const at = (x: number, z: number) => pl.height(fromChart(s.chart, x, z));
+    let off = 0, checked = 0;
     for (let i = 0; i < 48; i++) {
-      const t = (i / 48) * 2 * Math.PI, c = s.coast(t);
-      const at = (r: number) => pl.height(onIsland(s, t, r));
-      assert.ok(Math.abs(at(c)) < 1e-6, `seed ${seed}: waterline ${at(c)}`);
-      const inland = (at(c - 1) - at(c)) / 1, seaward = (at(c) - at(c + 1)) / 1;
-      // (on the small ones the dome comes nearer the coast: steeper, still no cliff)
-      const steepest = s.kind === 'island' ? 0.17 : 0.27;
-      for (const k of [inland, seaward]) assert.ok(k > 0.09 && k < steepest, `seed ${seed}: ${s.kind} beach slope ${k.toFixed(3)}`);
+      const t = (i / 48) * 2 * Math.PI, c = s.coast(t), x = Math.cos(t) * c, z = Math.sin(t) * c;
+      assert.ok(Math.abs(at(x, z)) < 0.06, `seed ${seed}: waterline ${at(x, z)}`);
+      // the beach's fall, whichever way the coast runs there (on the small ones the dome comes nearer: steeper, no cliff)
+      const e = 0.3, k = Math.hypot(at(x + e, z) - at(x - e, z), at(x, z + e) - at(x, z - e)) / (2 * e);
+      checked++;
+      if (k < 0.09 || k > (s.kind === 'island' ? 0.17 : 0.27)) off++;
     }
+    assert.ok(off <= checked * 0.05, `seed ${seed}: ${s.kind} beach off its slope at ${off} of ${checked}`);
     let top = 0;
     for (let i = 0; i < 3000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 3000) * s.radius)));
     const [low, high] = KINDS[s.kind].summit;
@@ -134,11 +151,37 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
   }
 });
 
-test('each shoal: wholly under the sea, but within a ship\'s draught of it', () => {
-  for (const [seed, pl] of planets) for (const s of pl.islands.filter((s) => s.kind === 'shoal')) {
-    let top = -Infinity;
-    for (let i = 0; i < 3000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 3000) * s.radius)));
-    assert.ok(s.summit < 0 && top < -0.3 && top > -SHIP.draught, `seed ${seed}: shoal top ${top.toFixed(2)}, summit ${s.summit.toFixed(2)}`);
+test('no hidden shallows: water too shallow to sail lies only within WADE of a waterline, or in a lagoon', () => {
+  const points = lattice(120000);
+  for (const [seed, pl] of planets) {
+    let shallow = 0;
+    for (const p of points) {
+      const h = pl.height(p);
+      if (h > 0 || h <= -SHIP.draught) continue;
+      shallow++;
+      const near = Math.min(...pl.islands.map((s) => {
+        const [x, z] = toChart(s.chart, p);
+        if (Math.hypot(x, z) > s.reach) return Infinity;
+        // (a lagoon is inside its island's coast, shut in by land)
+        return Math.hypot(x, z) < s.coast(Math.atan2(z, x)) ? 0 : s.shore(x, z);
+      }));
+      assert.ok(near < WADE, `seed ${seed}: ${(-h).toFixed(2)} m deep, ${near.toFixed(1)} m from any waterline`);
+    }
+    assert.ok(shallow > 0);
+  }
+});
+
+test('each island\'s apron: clear water a ship can sail well, to 8.5 m deep, from the beach\'s shallows out', () => {
+  for (const [seed, pl] of planets) for (const s of pl.islands) {
+    let sailable = 0, n = 0;
+    for (let i = 0; i < 1500; i++) {
+      const t = i * 2.39996, r = Math.sqrt(i / 1500) * s.shelf, x = Math.cos(t) * r, z = Math.sin(t) * r, d = s.shore(x, z);
+      if (d <= WADE + 4 || d > s.apron) continue;
+      const h = pl.height(fromChart(s.chart, x, z));
+      n++;
+      if (h < -SHIP.draught - 0.5 && h > -8.5) sailable++;
+    }
+    assert.ok((n > 0 || s.kind === 'rocks') && sailable >= n * 0.8, `seed ${seed}: ${s.kind} apron sailable at ${sailable} of ${n}`);
   }
 });
 

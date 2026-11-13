@@ -61,7 +61,7 @@ export const ISLANDS = {
   /** How high the berm behind the beach rises, metres (it rises at `beach` and levels at this). */
   berm: [1, 1.8],
   /** The apron's depth, metres: by the ledge, and at its outer edge. */
-  apron: { inner: [3.6, 4.4], outer: [5.5, 7.5] },
+  apron: { inner: [4.2, 5], outer: [5.5, 7.5] },
   /** How far the apron's edge wanders in lobes and bays, as a share of its width; the lobes' size, metres. */
   lobes: { depth: 0.35, size: 30 },
   /** The share of the larger islands (over `from` metres) with a lagoon, how deep it is, and how broad (a share of the radius). */
@@ -96,6 +96,8 @@ export interface IslandSite {
   radius: number;
   /** How far from the centre the apron reaches at most, metres. */
   shelf: number;
+  /** Metres of clear apron round it, from the waterline. */
+  apron: number;
   /** How far from the centre the island touches the sea floor at all, metres. */
   reach: number;
   /** Its highest point, metres. */
@@ -241,7 +243,7 @@ function createIslandSite(kind: Kind, chart: Chart, radius: number, noise: Noise
   const reach = most + I.flankEase + (I.floor - outer) / K.flank + (deepest - I.floor) / I.steep;
   // past the farthest apron, the water's edge is at least r − far away and the flank at least r − most beyond it
   const ceiling = (r: number) => (r <= most ? Infinity : -flankDepth(0, r - most));
-  return { kind, chart, radius, shelf: most, reach, summit, offshore, coast, shore: field.at, mound, ceiling };
+  return { kind, chart, radius, shelf: most, apron: width, reach, summit, offshore, coast, shore: field.at, mound, ceiling };
 }
 
 /** The sea floor at unit direction p before any island: how far from the deep water's edge (negative inside it), metres. */
