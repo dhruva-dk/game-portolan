@@ -363,6 +363,20 @@ A full-speed square ram into a still ship does 20.9 to her, as 0117 did at its f
 - Note: the gun's own spread here (0.05 to 0.014 rad) is new and much wider than 0117's 0.008, so the factor bites harder than it did there.
 - **Effect** (same scratch run, with restraint): 80 s to over 120 s in phase 0, and 37 to 61 s with no storm.
 
+**Routes: diagonal steps, new** (`src/sim/route.ts`)
+- 0117's `nav.ts findPath` stepped to four neighbours a cell and was called with 4000 cells of work (`brain.ts:1130`).
+- Here a route also steps diagonally, only where both cells beside the diagonal are open, so it never cuts a corner of land.
+- Measured over 3000 blocked open-water pairs on 5 planets (scratch run), with the same 4000 cells:
+
+  | distance | found (4 neighbours) | found (8 neighbours) | mean time | route ÷ straight line |
+  |---|---|---|---|---|
+  | 50–150 m | 100% | 100% | 0.12 → 0.07 ms | 1.41 → 1.15 |
+  | 150–250 m | 91.4% | 99.2% | 0.45 → 0.18 ms | 1.38 → 1.14 |
+  | 250–400 m | 50.0% | 90.8% | 1.02 → 0.54 ms | 1.32 → 1.11 |
+
+- Raising the budget to 16000 cells instead would have reached 81.8% at 250–400 m, at 2.4 ms a query.
+- Bots kept dropping their roam mark while routing, unchanged.
+
 ## Uncertainties
 
 1. The 1 am motion could mean the sea lab or the full game's controls.

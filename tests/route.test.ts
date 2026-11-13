@@ -8,7 +8,8 @@ import { cellCentre, chart, findPath, openAt, type Chart } from '../src/sim/rout
 import { clearance, type Depth } from '../src/sim/shoal.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { createPlanet, SEED } from '../src/world/planet.ts';
-import { add, along, distance, frameAt, fromLatLon, scale, type Vec3 } from '../src/world/sphere.ts';
+import { add, along, distance, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { random } from '../src/world/random.ts';
 
 const deg = Math.PI / 180;
 const start = fromLatLon(0.2, 0.3);
@@ -21,6 +22,12 @@ const sea = (...parts: ((p: Vec3) => number)[]): Depth => (p) => Math.min(30, ..
 
 const length = (cells: readonly number[]) => cells.slice(1).reduce((s, c, i) => s + distance(cellCentre(cells[i]), cellCentre(c)), 0);
 const allOpen = (ch: Chart, cells: readonly number[]) => cells.every((c) => ch.open[c] === 1);
+/** Every step of a route is to a cell beside the last (a diagonal at most, ~9.6 m), over open water all the way: the
+ *  middle of each step, a diagonal's corner, lies in an open cell. */
+const stepsOpen = (ch: Chart, cells: readonly number[]) => cells.slice(1).every((c, i) => {
+  const a = cellCentre(cells[i]), b = cellCentre(c);
+  return distance(a, b) < 12 && openAt(ch, normalize(add(a, b)));
+});
 
 const round = sea(island(start, 70));
 const roundChart = chart(round);
@@ -28,14 +35,14 @@ const roundChart = chart(round);
 test('a route is found round a round island, all open water, not much longer than the way round', () => {
   const a = at(-110, 0), b = at(110, 0);
   const r = findPath(roundChart, a, b);
-  assert.ok(r.found && allOpen(roundChart, r.cells));
+  assert.ok(r.found && allOpen(roundChart, r.cells) && stepsOpen(roundChart, r.cells));
   // the shortest way round keeps off the draught's contour (77.5 m): straight to its tangent, round, and out
   const rc = 77.5, tangent = Math.sqrt(110 * 110 - rc * rc), arc = rc * (Math.PI - 2 * Math.acos(rc / 110));
   const least = 2 * tangent + arc, got = length(r.cells);
   console.log(`# round the island: ${got.toFixed(0)} m by the route, ${least.toFixed(0)} m at the least`);
-  // (a route of cells, each to one of its four neighbours, runs up to √2 as far as a straight line; the helm cuts its
-  // corners, looking along it as far as the water is clear)
-  assert.ok(got < 1.45 * least, `${got} m`);
+  // (a route of cells, each to one of the eight round it, runs up to 1.08 times as far as a straight line, 0117's of
+  // four up to √2; the helm cuts its corners, looking along it as far as the water is clear)
+  assert.ok(got < 1.15 * least, `${got} m`);
   assert.ok(Math.min(...r.cells.map((c) => distance(cellCentre(c), start))) > 77.5);
 });
 
@@ -43,7 +50,7 @@ test('a route goes through a strait rather than round', () => {
   // two islands 140 m across, their dry land 60 m apart (about 45 m of open water between their draught contours)
   const depth = sea(island(at(-100, 0), 70), island(at(100, 0), 70)), ch = chart(depth);
   const r = findPath(ch, at(0, -120), at(0, 120));
-  assert.ok(r.found && allOpen(ch, r.cells));
+  assert.ok(r.found && allOpen(ch, r.cells) && stepsOpen(ch, r.cells));
   const through = Math.min(...r.cells.map((c) => distance(cellCentre(c), start)));
   console.log(`# through the strait: ${length(r.cells).toFixed(0)} m, ${through.toFixed(1)} m off its middle at the nearest`);
   assert.ok(through < 10 && length(r.cells) < 1.2 * 240);
@@ -95,9 +102,9 @@ test('a bot reaches a mark behind an island in near the least time, which withou
   const ch = chart(depth), ship = afloat(1, shipAt(at(-160, 0), east));
   const routed = voyage(depth, ch, ship, at(160, 0), 3), felt = voyage(depth, null, ship, at(160, 0), 3);
   console.log(`# behind a bay: ${routed.seconds.toFixed(1)} s by routes, ${felt.seconds.toFixed(1)} s feeling her way`);
-  // (her first route gives out, as 0117's did, at ROUTE.work cells, short of the way round: she follows it into the
-  // bay's mouth until her next, 2 s on, finds the whole way)
-  assert.ok(routed.least >= 0 && routed.seconds < 50 && felt.seconds > 2 * routed.seconds);
+  // (should her route give out at ROUTE.work cells, short of the way round, she follows it on until her next, 2 s on,
+  // finds the whole way)
+  assert.ok(routed.least >= 0 && routed.seconds < 40 && felt.seconds > 2 * routed.seconds);
 });
 
 test('routed bots sail the same voyage from the same places, to the bit', () => {
@@ -125,10 +132,26 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
     found += +r.found;
     // given out short of the way, a route still runs nearer (the next, from further on, goes on)
     assert.ok(distance(cellCentre(r.cells.at(-1)!), b) < distance(a, b));
+    assert.ok(stepsOpen(ch, r.cells));
   }
   const mean = times.reduce((s, x) => s + x, 0) / times.length;
   console.log(`# chart: ${bake.toFixed(0)} ms to bake, ${open} cells of ${ch.open.length} open; a route across the island ${mean.toFixed(2)} ms (the most ${Math.max(...times).toFixed(2)}), ${found} of 24 found`);
-  assert.ok(found >= 10 && mean < 2.5);
+  assert.ok(found >= 20 && mean < 2);
+
+  // open water to open water 150–400 m off, with land between, all over the planet: found within ROUTE.work cells
+  // (0117's four neighbours a cell found 91% of those 150–250 m off and 50% of those 250–400 m)
+  const rand = random(17), tally = { near: [0, 0], far: [0, 0] };
+  while (tally.near[0] + tally.far[0] < 300) {
+    const z = 2 * rand() - 1, a = 2 * Math.PI * rand(), s = Math.sqrt(1 - z * z), p: Vec3 = [s * Math.cos(a), z, s * Math.sin(a)];
+    const g = frameAt(p), bearing = 2 * Math.PI * rand(), d = 150 + 250 * rand();
+    const q = along(p, add(scale(g.north, Math.cos(bearing)), g.east, Math.sin(bearing)), d).p;
+    if (!openAt(ch, p) || !openAt(ch, q) || Array.from({ length: Math.ceil(d / 6) }, (_, k) => normalize(add(scale(p, 1 - k / Math.ceil(d / 6)), q, k / Math.ceil(d / 6)))).every((x) => openAt(ch, x))) continue;
+    const t = d < 250 ? tally.near : tally.far;
+    t[0]++;
+    t[1] += +findPath(ch, p, q).found;
+  }
+  console.log(`# blocked routes found: ${tally.near[1]} of ${tally.near[0]} 150–250 m off, ${tally.far[1]} of ${tally.far[0]} 250–400 m off`);
+  assert.ok(tally.near[1] >= 0.9 * tally.near[0] && tally.far[1] >= 0.85 * tally.far[0]);
 
   // 16 bots round the island for 20 s
   let fleet: Vessel[] = [];
