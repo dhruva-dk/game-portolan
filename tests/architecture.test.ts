@@ -110,6 +110,18 @@ test('f. the frame owns every GPU pass and the renderer', () => {
   none(hits(/\b(WebGPURenderer|Renderer)\b/, (rel) => !['frame.ts', 'main.ts', 'meter.ts'].includes(rel)), 'the renderer type outside src/frame.ts, src/main.ts and src/meter.ts');
 });
 
+test('f2. the frame draws a snapshot: it alone makes the camera, works out the environment and touches its systems', () => {
+  const notFrame = (rel: string) => rel !== 'frame.ts';
+  none(hits(/\bnew\s+PerspectiveCamera\b/, notFrame), 'a camera made outside src/frame.ts (hand it an Eye: src/snapshot.ts)');
+  none(hits(/\benvironmentAt\s*\(/, (rel) => !['frame.ts', 'environment.ts'].includes(rel)), 'environmentAt outside src/frame.ts (it alone works out the environment)');
+  none(hits(/\btypeof\s+createFrame\b/, notFrame), 'the frame\'s type named outside src/frame.ts');
+  // what the rest of the game may ask of the frame: no camera, scene, sky, fleet or gunfire of its to reach into
+  const caller = (rel: string) => rel === 'main.ts' || rel === 'debug.ts' || rel.startsWith('play/') || rel.startsWith('ui/');
+  none(hits(/\bframe\s*\??\.\s*(?!(resize|render|ready|anchors)\b)\w/, caller), 'frame.<x> other than resize, render, ready and anchors');
+  // the environment is plain data built each frame, written by nobody
+  none(hits(/\benv\s*\.\s*\w+\s*(\+|-|\*|\/)?=(?!=)/), 'a write to the environment');
+});
+
 test('g. src/world and src/sim are deterministic and headless', () => {
   none(
     hits(/\bMath\.random\b|\bDate\b|\bperformance\b|\b(document|window|self|globalThis|navigator|location)\b/, (rel) => rel.startsWith('world/') || rel.startsWith('sim/')),
