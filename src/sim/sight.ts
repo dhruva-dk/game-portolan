@@ -7,6 +7,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
+import type { Rise } from '../world/planet.ts';
 import { R, add, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
@@ -33,24 +34,58 @@ export function seaAlong(s: Sight): number | null {
   return t > 0 ? t : null;
 }
 
+/** The spans along a sight, metres, it is looked for land along: where it passes within reach of a rise (or all of it,
+ *  from an eye under the sea or with no rises given), in order, overlapping ones joined. */
+const spans: [number, number][] = [];
+function lookAlong(s: Sight, end: number, rises: readonly Rise[] | undefined): number {
+  spans.length = 0;
+  if (!rises || length(s.from) <= R) {
+    spans.push([0, end]);
+    return 1;
+  }
+  // land at a point stands no higher than the top of a rise in whose reach it lies, and the sight is over the sea
+  // until it meets it: so where it meets land it is within top + reach of the rise's foot (its height there over the
+  // sea, and the chord on to the rise's middle)
+  const [fx, fy, fz] = s.from, [dx, dy, dz] = s.dir;
+  for (const r of rises) {
+    const ox = fx - r.at[0] * R, oy = fy - r.at[1] * R, oz = fz - r.at[2] * R, round = r.reach + r.top;
+    const b = ox * dx + oy * dy + oz * dz, disc = b * b - (ox * ox + oy * oy + oz * oz - round * round);
+    if (disc < 0) continue;
+    const q = Math.sqrt(disc), a = Math.max(0, -b - q), z = Math.min(end, -b + q);
+    if (a < z) spans.push([a, z]);
+  }
+  spans.sort((x, y) => x[0] - y[0]);
+  let n = 0;
+  for (const sp of spans) {
+    if (n > 0 && sp[0] <= spans[n - 1][1]) spans[n - 1][1] = Math.max(spans[n - 1][1], sp[1]);
+    else spans[n++] = sp;
+  }
+  return n;
+}
+
 /** Metres along the sight to where it first meets the sea or the land (`depth`, negative on land), within FAR; null if
- *  it meets neither (it looks over the horizon or into the sky). */
-export function meets(s: Sight, depth: Depth): number | null {
+ *  it meets neither (it looks over the horizon or into the sky). The land is looked for every STEP m; given the land's
+ *  `rises` (world/planet.ts risesOf), only where it passes near one, the same steps (so the same answer) and fewer. */
+export function meets(s: Sight, depth: Depth, rises?: readonly Rise[]): number | null {
   const sea = seaAlong(s), end = Math.min(sea ?? FAR, FAR);
   const under = (t: number) => {
     const p = pointOn(s, t);
     return length(p) - R <= -depth(normalize(p));
   };
-  for (let t = STEP; t < end; t += STEP) {
-    if (!under(t)) continue;
-    // the land met between the last step and this one: closed in on by halves
-    let lo = t - STEP, hi = t;
-    for (let i = 0; i < 12; i++) {
-      const mid = (lo + hi) / 2;
-      if (under(mid)) hi = mid;
-      else lo = mid;
+  const n = lookAlong(s, end, rises);
+  for (let i = 0; i < n; i++) {
+    const [a, z] = spans[i];
+    for (let t = Math.max(STEP, Math.ceil(a / STEP) * STEP); t < end && t <= z; t += STEP) {
+      if (!under(t)) continue;
+      // the land met between the last step and this one: closed in on by halves
+      let lo = t - STEP, hi = t;
+      for (let k = 0; k < 12; k++) {
+        const mid = (lo + hi) / 2;
+        if (under(mid)) hi = mid;
+        else lo = mid;
+      }
+      return hi;
     }
-    return hi;
   }
   return sea !== null && sea <= FAR ? sea : null;
 }

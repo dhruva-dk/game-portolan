@@ -17,6 +17,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
+import type { Rise } from '../world/planet.ts';
 import { random } from '../world/random.ts';
 import { R, add, along, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import type { Vessel } from './contact.ts';
@@ -127,13 +128,16 @@ const BEYOND = 1000;
 
 /**
  * How `gun` aboard `shooter` is laid, aimed along `sight`, among `others` (the ships it may be laid on, not sunk), over
- * water `depth` deep, its balls spread over `spread` radians (half-angle) by the gun's seeded numbers from `seed`. With
- * no sight, along her heading at full range.
+ * water `depth` deep (the land looked for only near its `rises`, if given: sight.ts meets), its balls spread over
+ * `spread` radians (half-angle) by the gun's seeded numbers from `seed`. With no sight, along her heading at full range.
  */
-export function laid(shooter: Vessel, gun: Gun, sight: Sight | null, others: readonly Vessel[], seed: number, depth: Depth, spread: number = spreadOf(gun)): Laying {
+export function laid(
+  shooter: Vessel, gun: Gun, sight: Sight | null, others: readonly Vessel[], seed: number, depth: Depth, spread: number = spreadOf(gun),
+  rises?: readonly Rise[],
+): Laying {
   const g = GUNS[gun.kind], from = muzzle(shooter), up = normalize(from);
   const s = sight ?? { from, dir: shooter.ship.heading };
-  const meet = meets(s, depth), land = meet !== null && length(pointOn(s, meet)) - R > 0.01;
+  const meet = meets(s, depth, rises), land = meet !== null && length(pointOn(s, meet)) - R > 0.01;
   const mark = chosen(s, from, GUN.assist[gun.rarity], others.filter((o) => o.id !== shooter.id), g.range, land ? meet! : Infinity);
   const at = mark && lead(gun.kind, from, mark);
   // with no ship: the point the sight meets, or one far along it

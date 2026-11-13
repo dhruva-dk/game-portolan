@@ -15,6 +15,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs. Crews are kept in
 // order of their ships' ids, so it makes no difference in which order the fleet is listed.
 
+import type { Rise } from '../world/planet.ts';
 import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
 import type { GunKind } from '../kinds.ts';
@@ -145,11 +146,12 @@ function worked(c: Crew, g: Gun, trigger: boolean, dt: number, loose: (g: Gun) =
 
 /**
  * One step of dt seconds of the fighting, after the fleet's step: `fleet` as that left it, `orders[i]` for fleet[i],
- * `blows` the rams it reported, over water `depth` deep. A ship with no crew is given one, whole and unarmed. The
- * battle after it, and what happened: the shots, the strikes, the splashes, the guns' cues, and the ships sunk this step.
+ * `blows` the rams it reported, over water `depth` deep (its land's `rises`, if given, where a gun's sight looks for
+ * it: gun.ts laid). A ship with no crew is given one, whole and unarmed. The battle after it, and what happened: the
+ * shots, the strikes, the splashes, the guns' cues, and the ships sunk this step.
  */
 export function stepBattle(
-  b: Battle, fleet: readonly Vessel[], orders: readonly Order[], blows: readonly Blow[], dt: number, depth: Depth,
+  b: Battle, fleet: readonly Vessel[], orders: readonly Order[], blows: readonly Blow[], dt: number, depth: Depth, rises?: readonly Rise[],
 ): { battle: Battle; shots: Shot[]; strikes: Strike[]; splashes: Splash[]; cues: Cue[]; sunk: number[] } {
   const crews = new Map(b.crews.map((c) => [c.id, { ...c }]));
   for (const v of fleet) if (!crews.has(v.id)) crews.set(v.id, crewOf(v.id));
@@ -203,7 +205,7 @@ export function stepBattle(
     const g = inHand(c);
     if (!g) return;
     const loose = (gun: Gun) => {
-      const lay = laid(v, gun, order?.aim ?? null, targets, b.seed, depth, spreadOf(gun) * (order?.spread ?? 1) * (c.gust.blowing > 0 ? GUST.spread : 1));
+      const lay = laid(v, gun, order?.aim ?? null, targets, b.seed, depth, spreadOf(gun) * (order?.spread ?? 1) * (c.gust.blowing > 0 ? GUST.spread : 1), rises);
       for (const dir of lay.dirs) balls.push(loosed(v.id, gun.kind, lay.from, dir, lay.speed, damageOf(gun), lay.fall));
       shots.push({ shooter: v.id, gun: gun.kind, from: lay.from, dirs: lay.dirs, target: lay.target });
     };

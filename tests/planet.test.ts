@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { R, along, distance, faceDir, frameAt, fromChart, normalize, toChart, type Vec3 } from '../src/world/sphere.ts';
-import { bakeFaces, createPlanet, remembered } from '../src/world/planet.ts';
+import { bakeFaces, createPlanet, remembered, risesOf } from '../src/world/planet.ts';
 import { ISLANDS, KINDS, ORDER, WADE } from '../src/world/planet-islands.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { random } from '../src/world/random.ts';
@@ -17,6 +17,25 @@ const lattice = (count: number): Vec3[] =>
     return [Math.cos(a) * s, y, Math.sin(a) * s] as Vec3;
   });
 const onIsland = (s: (typeof planet.islands)[number], t: number, r: number) => fromChart(s.chart, Math.cos(t) * r, Math.sin(t) * r);
+
+test('the land stands only within its rises: under the top of every rise whose reach it is in, and under the sea past them all', () => {
+  for (const [seed, p] of planets) {
+    const rises = risesOf(p.islands), draw = random(seed * 31 + 7);
+    const topAt = (q: Vec3) => Math.max(-Infinity, ...rises.filter((r) => distance(q, r.at) < r.reach).map((r) => r.top));
+    let worst = -Infinity;
+    // over each island's whole reach (its flank down to the deeps): under the top of the rises it is in, and under the
+    // sea where it is in none
+    for (const s of p.islands) {
+      for (let k = 0; k < 1500; k++) {
+        const q = onIsland(s, draw() * 2 * Math.PI, Math.sqrt(draw()) * s.reach), top = topAt(q);
+        worst = Math.max(worst, p.height(q) - Math.max(top, 0));
+      }
+    }
+    assert.ok(worst < 0, `seed ${seed}: the ground ${worst.toFixed(3)} m over the top of its rises, or the sea past them`);
+    // past every reach, under the sea
+    for (const q of lattice(20000)) if (topAt(q) === -Infinity) assert.ok(p.height(q) < 0, `seed ${seed}: land past every rise at ${q}`);
+  }
+});
 
 test('the same for a seed, different across seeds', () => {
   const again = createPlanet(1), other = createPlanet(2);

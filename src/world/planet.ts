@@ -221,6 +221,20 @@ export function createPlanet(seed: number): Planet {
   };
 }
 
+/** How far the ground may stand over the highest summit of the islands whose shelf it is within, metres: a summit is
+ *  the highest of its island's nodes, and between them, or where its mound meets the floor or another's, the ground
+ *  rises a few centimetres more (tests/planet.test.ts). */
+const OVER_SUMMIT = 1;
+
+/** Where the land can stand above the sea: within `reach` m of `at` (a unit vector), no higher than `top` m. Past every
+ *  island's shelf (the farthest its apron reaches) its flank and the floor lie under the sea, some 2 m down at the
+ *  shallowest (SEA). */
+export interface Rise { at: Vec3; reach: number; top: number }
+
+/** The rises of the land, an island's each. */
+export const risesOf = (islands: readonly IslandSite[]): Rise[] =>
+  islands.map((s) => ({ at: s.chart.at, reach: s.shelf, top: s.summit + OVER_SUMMIT }));
+
 /**
  * The planet baked onto the six cube faces (sphere.ts faceDir), n × n nodes each from corner to corner (so
  * neighbouring faces share their edge nodes), row j at v = 2j/(n−1) − 1, column i at u likewise: heights in
