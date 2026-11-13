@@ -10,7 +10,8 @@
 import type { DropState, createGale } from './gale';
 import type { createGlobe } from './globe';
 import { clock, type HudState, type createHud } from './hud';
-import { createLobby, createRank, createResult, createSettings, createTitle, type Career, type Settings } from './screens';
+import type { Career } from '../player';
+import { createLobby, createRank, createResult, createSettings, createTitle, type Settings } from './screens';
 import { onTap, uiLayer } from './ui';
 
 export const SCREENS = ['title', 'lobby', 'drop', 'match', 'spectate', 'won', 'result'] as const;

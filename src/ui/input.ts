@@ -4,21 +4,14 @@
 // own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
 // pushed that way. Any other finger drags the look.
 // WASD or the arrows push the stick all the way while no finger holds it. What the stick and look mean is the
-// game's business; this only reports them.
+// game's business (play/game.ts step); this only reports them.
+
+import type { Hands } from '../player';
 
 /** The stick's reach from its centre, CSS pixels. */
 export const STICK = 56;
 /** The share of the screen's width, from the left, where a finger takes the stick. */
 const LEFT = 0.45;
-
-export interface Hands {
-  /** The stick, while held: how far it is pushed right and up the screen (within the unit disc), and its centre (px; none for the keys). */
-  stick: { x: number; y: number; centre: [number, number] | null } | null;
-  /** The look: pixels dragged right and down since the last read, and whether a finger is on it. */
-  look: { x: number; y: number; held: boolean };
-  /** TEMPORARY (until the HUD's fire button is the only way): the gun ordered fired, Space held at a desk. */
-  fire: boolean;
-}
 
 interface Finger { stick: boolean; x: number; y: number; cx: number; cy: number }
 

@@ -33,6 +33,7 @@ import type { Game } from './play/game';
 import type { Referee } from './play/referee';
 import { startOf, type Matches } from './play/setup';
 import { bearing, type Berth } from './play/state';
+import { IDLE } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
 import { SHIP } from './sim/handling';
@@ -145,7 +146,7 @@ function open(p: Played, others: readonly Berth[]) {
   }
   if (params.has('fire')) game.fire();
   for (let t = 0; t < number('ahead', 0); t += 0.1) {
-    game.step(0.1);
+    game.step(0.1, IDLE);
     referee.update(0.1);
   }
   if (screen === 'map') p.map();
@@ -156,7 +157,7 @@ function drive(game: Game, legs: string) {
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
     game.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
-    for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP);
+    for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
 }
 

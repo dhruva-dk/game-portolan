@@ -6,7 +6,7 @@
 //   right thumb  DIVE, in Fire's place (0117 layout: 128 × 102 at 802, 317): her ship stooping down a gust over a
 //                little sea, faint while the Gale takes her up and inked in once she may go; gone once she has
 //   on the sea   her mark, if she has set one, an inked vermilion pennant on a staff standing where it is
-// The stick comes up under the thumb for the glide (play/stick.ts, the game's). No words.
+// The stick comes up under the thumb for the glide (stick.ts). No words.
 
 import { R, type Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';

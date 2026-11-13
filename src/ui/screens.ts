@@ -10,14 +10,13 @@
 //   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, her plate
 // No words anywhere; numerals only.
 
+import type { Career } from '../player';
 import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, svg } from './ink';
 import { TIERS, laurel, levelRing, plate, rhumbs, rose, seal } from './marks';
 import { onTap, uiLayer } from './ui';
 
 const W = 956, H = 440;
 
-/** What the lobby and the result show of her career. */
-export interface Career { level: number; progress: number; tier: number }
 export interface Settings { sound: number; look: number }
 
 /** A full-screen sheet: an <svg> of the phone's page scaled to the screen. `opaque` lays parchment under it. */

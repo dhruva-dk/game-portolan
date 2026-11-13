@@ -138,3 +138,26 @@ test('h. the debug switches live in src/debug.ts alone, set going by one call fr
   assert.deepEqual(taken, ['scenario'], 'src/main.ts takes only scenario (and types) from src/debug.ts');
   assert.equal(main.match(/\bscenario\s*\(/g)?.length, 1, 'src/main.ts calls scenario once');
 });
+
+test('i. the game touches no page: src/play neither reads nor makes the DOM (ui/ does, and main.ts wires them)', () => {
+  none(
+    hits(/\b(document|window|HTMLElement|HTMLDivElement|Element|innerWidth|innerHeight|addEventListener|localStorage|requestAnimationFrame|getComputedStyle)\b|\.(createElement|appendChild|style|clientWidth|clientHeight)\b/, (rel) => rel.startsWith('play/')),
+    'the DOM in src/play',
+  );
+});
+
+test('i2. the UI draws plain data: src/ui imports nothing from play/, three or what draws the world', () => {
+  const found: string[] = [];
+  const RENDER = ['sky', 'water', 'land', 'ship', 'gunfire', 'view'], FILES = ['frame.ts', 'gpu.ts', 'tsl.ts', 'textures.ts'];
+  for (const f of files.filter((f) => f.rel.startsWith('ui/'))) {
+    code(f.text).forEach((line, i) => {
+      const spec = /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/.exec(line)?.[1];
+      if (spec === undefined) return;
+      const to = relative(SRC, resolve(dirname(f.path), spec)).split(sep).join('/');
+      const top = to.split('/')[0];
+      const bad = spec === 'three' || spec.startsWith('three/') || top === 'play' || RENDER.includes(top) || FILES.includes(to) || FILES.includes(`${to}.ts`);
+      if (bad) found.push(`src/${f.rel}:${i + 1}: imports '${spec}'`);
+    });
+  }
+  none(found, 'src/ui importing play/, three or a render module');
+});

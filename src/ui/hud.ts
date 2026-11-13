@@ -8,11 +8,12 @@
 //   centre      the old game's reticle, four arms round a gap, gilt and drawn in while the aim assist has a ship
 //               (sim/gun.ts); none with no gun
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot, then three more
-// No words. The stick (play/stick.ts) is drawn by the game; look drags take the rest of the screen.
+// No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
 // Once she has sunk it watches another ship (watch): only the Storm's clock and the disc stay, her arrow gilt.
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
+import type { Kit, Status } from '../player';
 import type { Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
@@ -20,29 +21,8 @@ import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, s
 import { createMinimap, stormRing, type Storm } from './minimap';
 import { onTap, piece } from './ui';
 
-export interface Slot { glyph: Glyph; count?: number }
-
-export interface HudState {
-  hull: number; hullMax: number;
-  shield: number; shieldMax: number;
-  /** Seconds until the Storm closes in again. */
-  storm: number;
-  /** Where the Storm's calm lies, or none. */
-  eye: Storm | null;
-  /** Ships still afloat, hers among them. */
-  afloat: number;
-  /** The hotbar: the gun's slot first, then three; null for an empty slot. */
-  slots: readonly [Slot | null, Slot | null, Slot | null, Slot | null];
-  /** The slot in hand. */
-  chosen: number;
-  /** Gust's charges ready, of GUSTS. */
-  gust: number;
-  /** Her gun: its rarity (0–4), how far loaded (0…1, 1 ready), and whether the assist has a ship to lay on; null
-   * with none. */
-  gun: { rarity: number; ready: number; locked: boolean } | null;
-  /** Where she is (unit sphere) and the way she heads (unit tangent). */
-  at: Vec3; heading: Vec3;
-}
+/** What the HUD shows: the match as the game reports it, and what she carries. */
+export type HudState = Status & Kit;
 
 export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(): void }
 
@@ -155,7 +135,9 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
           + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>`);
       });
 
-      s.slots.forEach((slot, i) => draw(slots[i], `${slot?.glyph} ${slot?.count} ${s.chosen === i}`, () => {
+      // the gun's slot holds her gun, if she has one; then her items
+      const held: ({ glyph: Glyph; count?: number } | null)[] = [s.gun && { glyph: 'weapon.cannon' }, ...s.items.map((k) => k && { glyph: k.item, count: k.count })];
+      held.forEach((slot, i) => draw(slots[i], `${slot?.glyph} ${slot?.count} ${s.chosen === i}`, () => {
         const chosen = s.chosen === i;
         if (!slot) {
           // lead white over an iron halo, to hold on bright water

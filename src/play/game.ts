@@ -1,9 +1,9 @@
 // The game view: the player's ship on the sea, sailed by the stick, watched by the chase camera, among the others
 // she fights (the match itself, its ships, bots and fighting, is state.ts's).
 //
-// Each frame (step): the hands are read and turned into the helm's and the gun's orders, the match takes as many
-// fixed steps as the frame has time for (sim/fixed.ts), and the camera follows the ship drawn blended between the
-// last two. What is drawn (snapshot) is that moment: the ships, the balls, the camera's eye, and the world's clock (the
+// Each frame (step): her hands, as read for it (player.ts Hands), are turned into the helm's and the gun's orders, the
+// match takes as many fixed steps as the frame has time for (sim/fixed.ts), and the camera follows the ship drawn
+// blended between the last two. What is drawn (snapshot) is that moment: the ships, the balls, the camera's eye, and the world's clock (the
 // sea's) set to it, so the hulls and the waves under them are the same instant.
 //
 // The stick steers by the screen: pushed toward a direction on the screen, she heads that way across the sea as the
@@ -30,30 +30,13 @@ import { createSwell } from '../water/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
 import { R, add, normalize, scale, type Vec3 } from '../world/sphere';
+import { IDLE, type Hands, type Status } from '../player';
 import { createChase } from './chase';
-import { createInput, type Hands } from './input';
 import { createShots, flown } from './shots';
 import { bearing, createState, type Berth, type Dropping, type Match } from './state';
-import { createStickView } from './stick';
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
-
-/** The match as the HUD reads it (ui/hud.ts HudState): a plain snapshot, made fresh each time it is asked for. */
-export interface Status {
-  /** Where the ship the camera follows is (unit sphere) and the way she heads (unit tangent): hers, or once she has
-   *  sunk the one she watches. */
-  at: Vec3; heading: Vec3;
-  /** Her hit points, and their most. */
-  hull: number; hullMax: number; shield: number; shieldMax: number;
-  /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities), how far loaded (0…1, 1 ready), and whether its assist
-   * has a ship to lay on where she is aimed (sim/gun.ts); null with none. */
-  gun: { rarity: number; ready: number; locked: boolean } | null;
-  /** Ships still afloat (in the drop or on the sea), hers among them; whether hers is sunk. */
-  afloat: number; sunk: boolean;
-  /** Seconds till the storm next holds or closes (0 once it has closed for good), and its calm (radius in metres). */
-  storm: number; eye: { centre: Vec3; radius: number };
-}
 
 /** The drop as its screen reads it (ui/gale.ts): state.ts's Dropping, and where her mark stands on the screen (CSS px)
  *  if in sight. */
@@ -63,19 +46,13 @@ export interface DropView extends Dropping { pennant: { x: number; y: number } |
  * to her; whether the hands steer and look; whether it circles her (the win). */
 export interface View { watch: number; move: 'cut' | 'fly'; hands: boolean; circle: boolean }
 
-const idleLook = { x: 0, y: 0, held: false };
-
 /** world: the planet and its climate; anchors: the sea's (frame.ts), for the waves' CPU copy; chart: the bots' chart
  *  of open water (sim/route.ts); start: where she lies and the bearing she heads (radians); first: the match in hand
  *  until another is dealt. */
-export function createGame(
-  world: World, anchors: readonly Anchor[], chart: Chart, element: HTMLElement, start: { at: Vec3; bearing: number }, first: Match,
-) {
+export function createGame(world: World, anchors: readonly Anchor[], chart: Chart, start: { at: Vec3; bearing: number }, first: Match) {
   const ground = world.planet.height;
   const sea = createSwell(anchors, ground, world.climate.seaWind);
   const state = createState(world.planet, sea, chart, first);
-  const input = createInput(element);
-  const drawStick = createStickView();
   const chase = createChase(ground, sea);
   const clock = fixedClock();
   /** Whether Fire was pressed since the last step; how far the moment drawn is through the last step. */
@@ -122,10 +99,12 @@ export function createGame(
   restart(state.anchor(start));
 
   return {
-    /** A frame of dt seconds: the hands read, the match stepped on, the camera moved after the ship it follows. */
-    step(dt: number) {
-      const read = input.read(), hands = view.hands ? read : { stick: null, look: idleLook, fire: false };
-      drawStick(hands.stick);
+    /** Whether her hands are on her ship (steering and looking), or the match's flow has taken them. */
+    steering: () => view.hands,
+    /** A frame of dt seconds, her hands as read for it (none while the match's flow takes them: view): the match
+     *  stepped on, the camera moved after the ship it follows. */
+    step(dt: number, read: Hands) {
+      const hands = view.hands ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
       const time = clock(dt);
       for (let i = 0; i < time.steps; i++) {
@@ -188,10 +167,10 @@ export function createGame(
     },
     dive: state.dive,
     mark: state.mark,
-    /** What the drop's screen shows, or null once she is down. */
-    dropping(): DropView | null {
+    /** What the drop's screen shows, on a view `width` × `height` CSS px, or null once she is down. */
+    dropping(width: number, height: number): DropView | null {
       const d = state.dropping();
-      return d && { ...d, pennant: d.mark ? chase.onScreen(d.mark, element.clientWidth, element.clientHeight) : null };
+      return d && { ...d, pennant: d.mark ? chase.onScreen(d.mark, width, height) : null };
     },
     /** The camera's orders from the match's flow: a new ship to follow is cut or flown to. */
     view(next: View) {

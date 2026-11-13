@@ -17,6 +17,8 @@ import { createGale } from './ui/gale';
 import { createGlobe } from './ui/globe';
 import { createFlow, IN_MATCH } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
+import { createInput } from './ui/input';
+import { createStick } from './ui/stick';
 import { uiLayer } from './ui/ui';
 import { SEED } from './world/planet';
 import { MEAN, SWING } from './world/weather';
@@ -79,15 +81,18 @@ async function play(s: Stage): Promise<Played> {
   // in another (frame.ready), in about a fifth of its time
   const { chart, ms } = await chartOf(s.world.seed);
   console.info(`chart sounded in ${ms.toFixed(0)} ms`);
-  const game = createGame(s.world, s.anchors, chart, s.canvas, s.start, s.matches.first);
+  const game = createGame(s.world, s.anchors, chart, s.start, s.matches.first);
   const referee = createReferee(game);
 
-  // The match's HUD over the world, fed by the game and, where the sim has nothing yet, the placeholder.
-  const placeholder = createPlaceholder();
+  // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game and, where
+  // the sim has nothing yet, the placeholder.
+  const input = createInput(s.canvas);
   const layer = uiLayer();
+  const stick = createStick(layer);
+  const placeholder = createPlaceholder();
   const coasts = traceCoasts(s.world.planet.islands);
   const globe = createGlobe(coasts);
-  const hudState = (): HudState => placeholder.state(game.status());
+  const hudState = (): HudState => ({ ...game.status(), ...placeholder.kit() });
   const map = () => globe.show(hudState());
   const hud = createHud(layer, coasts, {
     slot: (i) => placeholder.choose(i),
@@ -113,14 +118,16 @@ async function play(s: Stage): Promise<Played> {
   return {
     game, referee, flow, play: deal, map,
     next(dt: number): Snapshot {
-      game.step(dt);
+      const hands = input.read();
+      stick(game.steering() ? hands.stick : null);
+      game.step(dt, hands);
       const m = referee.update(dt);
       if (m?.done) {
         referee.end();
         flow.end(m.place ?? 1);
       } else if (m && IN_MATCH.includes(flow.screen) && flow.screen !== SHOWS[m.phase]) flow.go(SHOWS[m.phase]);
       const shown = hudState();
-      const d = game.dropping();
+      const d = game.dropping(s.canvas.clientWidth, s.canvas.clientHeight);
       flow.update(dt, shown, d && { ...d, at: shown.at, heading: shown.heading });
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot();

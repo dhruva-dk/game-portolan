@@ -2,7 +2,7 @@
 // the ink's shared defs set into the page once, and the rules that place pieces inside the safe area.
 //
 // Hit regions are explicit: the layer and every piece let touches through (pointer-events: none) to the canvas, where
-// play/input.ts reads the stick and the look; only an element marked `.press` takes a touch, and a touch it takes
+// input.ts reads the stick and the look; only an element marked `.press` takes a touch, and a touch it takes
 // never reaches the canvas, so it can neither move the stick nor drag the look. A finger already on the stick or the
 // look keeps it (the canvas captures its pointer) even when it slides over a control.
 
