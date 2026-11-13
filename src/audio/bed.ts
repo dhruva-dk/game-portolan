@@ -35,7 +35,7 @@ export const GALE_HEARD = 380, GALE_INSIDE = 45;
 
 /** The gale's share for `wall` m to the storm's wall (+ inside the calm), 0…1: a low roar rising as she nears it, all
  *  about her once in it. And the share of it that is about her (rain, the highs), 0…1. */
-export const galeOf = (wall: number) => (wall >= GALE_HEARD ? 0 : wall > 0 ? 0.6 * (1 - wall / GALE_HEARD) ** 1.5 : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE));
+export const galeOf = (wall: number) => (wall >= GALE_HEARD ? 0 : wall > 0 ? 0.6 * (1 - wall / GALE_HEARD) : 0.6 + 0.4 * clamp(-wall / GALE_INSIDE));
 export const insideOf = (wall: number) => clamp(-wall / GALE_INSIDE + 0.15);
 
 /** The bed's levels for `b`, written into `out`. */
@@ -54,8 +54,8 @@ export function levelsOf(b: Bed, out: Levels): Levels {
   out.surf = near * (0.07 + 0.25 * surf);
   out.surfHz = 420 + 2200 * surf;
   const gale = galeOf(b.wall), inside = insideOf(b.wall);
-  out.gale = 0.4 * gale;
-  out.galeHz = 260 + 1600 * inside;
+  out.gale = 0.32 * gale;
+  out.galeHz = 450 + 1400 * inside;
   out.rain = 0.14 * inside * gale;
   out.strain = 0.5 * clamp((0.45 - b.hull) / 0.45) * (0.5 + 0.5 * clamp(Math.abs(b.roll) / 0.06));
   out.presence = clamp(b.presence);
@@ -95,12 +95,20 @@ export function createBed(ctx: BaseAudioContext, noise: AudioBuffer, out: AudioN
   const wind = layer(1, [{ type: 'bandpass', frequency: 400, Q: 0.8 }], true);
   const rig = layer(1, [{ type: 'bandpass', frequency: 1100, Q: 3 }], true);
   const surf = layer(2, [{ type: 'lowpass', frequency: 600, Q: 0.6 }, { type: 'highpass', frequency: 70 }], true);
-  const gale = layer(1, [{ type: 'lowpass', frequency: 400, Q: 0.6 }, { type: 'peaking', frequency: 220, Q: 0.9, gain: 6 }, { type: 'highpass', frequency: 55 }], true);
+  const gale = layer(1, [{ type: 'lowpass', frequency: 400, Q: 0.6 }, { type: 'peaking', frequency: 300, Q: 0.9, gain: 6 }, { type: 'highpass', frequency: 70 }], true);
   const rain = layer(2, [{ type: 'bandpass', frequency: 5200, Q: 0.5 }, { type: 'peaking', frequency: 2400, Q: 1, gain: 3 }], false);
   const strain = layer(2, [{ type: 'bandpass', frequency: 270, Q: 6 }, { type: 'peaking', frequency: 540, Q: 4, gain: 6 }], false);
 
+  /** Each param as last asked for: a param is asked again only once what it is to be has moved by more than a part in
+   *  a hundred (or from nothing), so a steady bed adds nothing to the params' timelines frame after frame. */
+  const asked = new Map<AudioParam, number>();
   /** Glides a param to `v` from `at` (s on the context's clock), over about `tau` s. */
-  const glide = (p: AudioParam, v: number, at: number, tau: number) => p.setTargetAtTime(v, at, tau);
+  const glide = (p: AudioParam, v: number, at: number, tau: number) => {
+    const was = asked.get(p);
+    if (was !== undefined && Math.abs(v - was) <= 0.01 * Math.abs(was) && (v === 0) === (was === 0)) return;
+    asked.set(p, v);
+    p.setTargetAtTime(v, at, tau);
+  };
   const set = (l: Layer, g: number, hz: number | null, at: number, tau: number) => {
     glide(l.gain.gain, g, at, tau);
     if (l.moving && hz !== null) glide(l.moving.frequency, hz, at, tau);

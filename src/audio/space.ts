@@ -9,8 +9,9 @@ import type { Vec3 } from '../world/sphere.ts';
 
 /** Metres a second. */
 export const SPEED = 340;
-/** Within this many metres a sound is heard whole. */
-export const NEAR = 14;
+/** Within this many metres a sound is heard whole; past it, it falls as (NEAR/d)^FALL: a little gentler than the air's
+ *  own inverse distance, so a gun a few hundred metres off is still heard over the sea about her. */
+export const NEAR = 14, FALL = 0.8;
 /** Quieter than this (a factor; −46 dB) a sound is not played. */
 export const QUIET = 0.005;
 /** The air's lowpass: OPEN Hz at hand, coming down as the distance grows (half at DULL m), never under FLOOR. */
@@ -21,12 +22,12 @@ export interface Heard { audible: boolean; delay: number; gain: number; cutoff: 
 
 export const heard = (): Heard => ({ audible: false, delay: 0, gain: 0, cutoff: OPEN, pan: 0 });
 
-/** The gain for `metres` off, for a sound that carries `reach` m: whole within NEAR, then NEAR/d, faded to nothing over
- *  the last fifth of its reach. */
+/** The gain for `metres` off, for a sound that carries `reach` m: whole within NEAR, then (NEAR/d)^FALL, faded to
+ *  nothing over the last fifth of its reach. */
 export function rolloff(metres: number, reach: number): number {
   if (metres >= reach) return 0;
   const edge = Math.min(1, (reach - metres) / (reach * 0.2));
-  return Math.min(1, NEAR / Math.max(NEAR, metres)) * edge * edge * (3 - 2 * edge);
+  return Math.min(1, NEAR / Math.max(NEAR, metres)) ** FALL * edge * edge * (3 - 2 * edge);
 }
 
 /** The air's lowpass for `metres` off, Hz. */

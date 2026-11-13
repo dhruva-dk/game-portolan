@@ -4,7 +4,7 @@ import { NAMES, SOUNDS } from '../src/audio/bank.ts';
 import { CUES, CUE_NAMES, DEEDS, cueOf, type Happening } from '../src/audio/cues.ts';
 import { createDerive } from '../src/audio/derive.ts';
 import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
-import { NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
+import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
 import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
 import type { Kit, Status } from '../src/player.ts';
@@ -74,7 +74,7 @@ test('every sound is made: samples within full scale, finite, starting and endin
 test('distance: the speed of sound, heard whole near, falling as the distance after, nothing past its reach; duller further', () => {
   assert.equal(rolloff(5, 500), 1);
   assert.equal(rolloff(NEAR, 500), 1);
-  assert.ok(Math.abs(rolloff(2 * NEAR, 500) - 0.5) < 1e-9);
+  assert.ok(Math.abs(rolloff(2 * NEAR, 500) - 0.5 ** FALL) < 1e-9);
   assert.equal(rolloff(500, 500), 0);
   assert.equal(rolloff(900, 500), 0);
   for (let d = 1; d < 600; d += 7) {

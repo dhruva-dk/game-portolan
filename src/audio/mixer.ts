@@ -45,13 +45,18 @@ export function createMixer(ctx: BaseAudioContext) {
     return { air, pan, gain, bus: null, src: null };
   });
   const voices = pool();
+  /** The level as last set. */
+  let was = 1;
 
   return {
     /** Where the bed plays into. */
     bed: buses.bed,
     /** The player's sound level (0…1, as the settings hold it), from `at`: a square law, near what is heard as half. */
     level(v: number, at: number) {
-      level.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) ** 2 * db(GAIN), at, 0.05);
+      const g = Math.max(0, Math.min(1, v)) ** 2 * db(GAIN);
+      if (g === was) return;
+      was = g;
+      level.gain.setTargetAtTime(g, at, 0.05);
     },
     /**
      * Plays `buffer` on `bus` as `heard` (when, how loud, how dull, which side) from `at`, at `rate`, with `priority`:

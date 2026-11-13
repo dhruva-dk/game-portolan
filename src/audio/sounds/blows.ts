@@ -165,8 +165,9 @@ export function thud(rate: number, seed: number): Samples {
   noise(blow, ar(0.002, 0.06));
   filter(blow, 'lowpass', 650);
   mix(t, blow, 0, 1.4);
-  tone(t, (s) => 125 * (0.55 + 0.45 * Math.exp(-s / 0.05)), (s) => 0.4 * ar(0.002, 0.07)(s), 0, 0.3);
+  tone(t, (s) => 125 * (0.55 + 0.45 * Math.exp(-s / 0.05)), (s) => 0.15 * ar(0.002, 0.07)(s), 0, 0.3);
   filter(t, 'peak', 320, 1, 6);
+  filter(t, 'lowshelf', 130, 0.7, -6);
   const earth = layer(t);
   crackle(earth, 60, 0.02, 0.55, 0.7, 0.005);
   filter(earth, 'bandpass', 2100, 0.7);

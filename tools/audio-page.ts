@@ -49,6 +49,7 @@ async function one(name: string, cue: Cue, at: Vec3 | null): Promise<Rendered> {
   const ctx = new OfflineAudioContext(2, RATE * 7, RATE);
   const engine = createEngine(ctx, seaFloor);
   engine.fill(Infinity);
+  engine.level(1, 0);
   engine.cue({ cue, at, gain: 1 }, EYE, 0.05);
   return rendered(name, ctx);
 }

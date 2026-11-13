@@ -172,11 +172,11 @@ function spectrogram(mono: Float32Array): Buffer {
   return png(W, H, rgb);
 }
 
-interface Measure { name: string; peak: number; rms: number; lufs: number; max: number; centroid: number; low: number; seconds: number; dc: number; clipped: number }
+interface Measure { name: string; start: number; peak: number; rms: number; lufs: number; max: number; centroid: number; low: number; seconds: number; dc: number; clipped: number }
 
 function measure(name: string, channels: Float32Array[]): Measure {
   const n = channels[0].length, mono = new Float32Array(n);
-  let peak = 0, dc = 0, clipped = 0, last = 0;
+  let peak = 0, dc = 0, clipped = 0, last = 0, first = -1;
   for (let i = 0; i < n; i++) {
     for (const c of channels) {
       const v = c[i];
@@ -184,6 +184,7 @@ function measure(name: string, channels: Float32Array[]): Measure {
       dc += v;
       if (Math.abs(v) >= 1) clipped++;
       if (Math.abs(v) > 0.001) last = i;
+      if (first < 0 && Math.abs(v) > 0.01) first = i;
     }
     mono[i] = channels.reduce((a, c) => a + c[i], 0) / channels.length;
   }
@@ -202,13 +203,13 @@ function measure(name: string, channels: Float32Array[]): Measure {
   }
   const l = loudness(channels.map((c) => c.subarray(0, active)));
   return {
-    name, peak: 20 * Math.log10(peak + 1e-12), rms: 10 * Math.log10(rms / (active * channels.length) + 1e-12), lufs: l.integrated, max: l.momentary,
+    name, start: Math.max(0, first) / RATE, peak: 20 * Math.log10(peak + 1e-12), rms: 10 * Math.log10(rms / (active * channels.length) + 1e-12), lufs: l.integrated, max: l.momentary,
     centroid: centre / Math.max(1e-12, weight), low: under / Math.max(1e-12, weight), seconds: active / RATE, dc: dc / (n * channels.length), clipped,
   };
 }
 
 const row = (m: Measure) =>
-  `${m.name.padEnd(12)} ${m.peak.toFixed(1).padStart(6)} ${m.rms.toFixed(1).padStart(6)} ${m.lufs.toFixed(1).padStart(6)} ${m.max.toFixed(1).padStart(6)}` +
+  `${m.name.padEnd(13)} ${m.start.toFixed(2).padStart(5)} ${m.peak.toFixed(1).padStart(6)} ${m.rms.toFixed(1).padStart(6)} ${m.lufs.toFixed(1).padStart(6)} ${m.max.toFixed(1).padStart(6)}` +
   ` ${Math.round(m.centroid).toString().padStart(6)} ${(m.low * 100).toFixed(0).padStart(4)}% ${m.seconds.toFixed(2).padStart(6)} ${m.dc.toExponential(1).padStart(9)} ${m.clipped ? `CLIPPED ${m.clipped}` : 'ok'}`;
 
 mkdirSync(OUT, { recursive: true });
@@ -223,7 +224,7 @@ try {
     return [...(await m.sounds()), ...(await m.beds()), await m.passage()];
   }, '/tools/audio-page.ts');
   await page.close();
-  const lines = [`${'sound'.padEnd(12)}   peak    rms   LUFS  max400  centroid <150  secs        dc`];
+  const lines = [`${'sound'.padEnd(13)} start   peak    rms   LUFS  max400  centroid <150  secs        dc`];
   for (const r of all) {
     const channels = r.channels.map(decode), m = measure(r.name, channels);
     writeFileSync(resolve(OUT, `${r.name}.wav`), wav(channels));

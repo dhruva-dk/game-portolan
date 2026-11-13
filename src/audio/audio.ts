@@ -66,6 +66,8 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
     },
     /** Plays one cue as heard from `eye` at `at` (s on the context's clock). */
     cue: play,
+    /** The sound's level (0…1, the settings') from `at`. */
+    level: mixer.level,
     /** A frame of `dt` s heard at `at` on the context's clock, the sound's level `level` (0…1); `sounding` false keeps
      *  track of what changes without playing it (the context asleep). */
     update(hearing: Hearing, level: number, at: number, dt: number, sounding = true) {
