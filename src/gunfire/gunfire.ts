@@ -1,11 +1,18 @@
-// The guns' work as it is seen: the balls in flight, and the puffs where they go off and come down. Two draws for all
-// of it, each a single instanced mesh; no targets of their own, nothing to compute.
+// The guns' work as it is seen: the balls in flight, the marks where the mortars' shells will fall, and the puffs where
+// they go off and come down. Four draws for all of it, each a single instanced mesh; no targets of their own, nothing
+// to compute.
 //
 // Balls: 0117's (render/actors/projectiles.ts), one instance each, placed each frame where the battle has them and
 // drawn out along its flight, at least a few pixels across so it is seen at the far end of its range: a dark iron core
 // with a hot rim, so it reads dark against the bright sky and bright against the sea; behind it a warm tracer, glowing
-// (the bloom takes it) and tapering back over TRACER s of its flight; and behind that a ribbon of thin grey smoke
-// (puffs laid along the way it came since the frame before), thickening and fading over a second and a half.
+// (the bloom takes it) and tapering back over its kind's share of its flight; and behind that a ribbon of thin grey
+// smoke (puffs laid along the way it came since the frame before), thickening and fading over a second and a half.
+// Each kind's its own (SHOT): the cannon's ball; the scatter's pellets, small and many, short-tailed; the repeater's
+// slim rounds with long hot tracers, no smoke; the harpoon's bolt, a long dark shaft and no fire behind it; the
+// mortar's shell, big, smoking heavily as it lobs.
+//
+// Fall marks: where each mortar shell will come down, a ring of its splash's size laid on the water, tightening and
+// brightening as the shell nears it, for her to steer out of (and to see her own will land).
 //
 // Puffs: soft round sprites facing the eye, each written once into a ring of instances when the battle reports what
 // made it, and moved from then on wholly in the vertex stage: carried off at its velocity with its drag (exponential)
@@ -25,26 +32,52 @@ import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import type { Light } from '../sky/light';
-import type { BallDraw } from '../snapshot';
+import type { BallDraw, GunKind } from '../snapshot';
 import { pixelSize } from '../view/view';
 import { random } from '../world/random';
-import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
+import { R, add, distance, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec2Node } from '../tsl';
 
-/** The most balls in flight, and puffs alive, at once. */
-const BALLS = 128, PUFFS = 4096;
+/** The most balls in flight, fall marks, and puffs alive, at once. */
+const BALLS = 512, MARKS = 64, PUFFS = 4096;
 /** Floats a puff: at+born, way+life, size+grow+drag+pull, ink+glow, opacity+seed+softness+fade-in; each a vec4. */
 const STRIDE = 20;
-/** A ball: its radius, metres (0117's), the fewest pixels it is drawn across, and how many seconds of its flight it is
- *  drawn out along; its core's iron and its rim's glow (radiance per unit sun), the rim from where the surface turns
- *  this far from the eye (the cosine). */
-const BALL = 0.16, BALL_PIXELS = 6, STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.9], RIM = 0.55;
-/** Its tracer: how many seconds of its flight it trails over, its width at the ball (m, and the fewest pixels), and its
- *  glow (radiance per unit sun) there, dying to nothing at its tail. */
-const TRACER = 0.09, TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
-/** Its trail (0117's smoke ribbon): a puff every TRAIL m along its way, its size and growth (m, m/s), life (s), ink and
- *  opacity. */
-const TRAIL = 3, TRAIL_SIZE = 0.3, TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
+/** The kinds, by the index a ball carries to its shader. */
+const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
+/**
+ * Each kind's ball:
+ *   size    its radius, m (the cannon's 0117's)
+ *   pixels  the fewest pixels it is drawn across
+ *   long    its least half-length along its flight, m (the harpoon's bolt a shaft)
+ *   hot     how much its rim glows (0: none, a dark shape)
+ *   tracer  seconds of its flight its tracer trails over (0: none), and its glow
+ *   trail   metres between its smoke's puffs (0: none), and their size
+ */
+interface Shot { size: number; pixels: number; long: number; hot: number; tracer: number; glow: number; trail: number; puff: number }
+const SHOT: Record<GunKind, Shot> = {
+  cannon: { size: 0.16, pixels: 6, long: 0, hot: 1, tracer: 0.09, glow: 1, trail: 3, puff: 0.3 },
+  scatter: { size: 0.07, pixels: 3, long: 0, hot: 1.3, tracer: 0.035, glow: 0.8, trail: 0, puff: 0 },
+  repeater: { size: 0.07, pixels: 3, long: 0, hot: 1.5, tracer: 0.2, glow: 1.8, trail: 0, puff: 0 },
+  harpoon: { size: 0.05, pixels: 3, long: 0.8, hot: 0, tracer: 0, glow: 0, trail: 0, puff: 0 },
+  mortar: { size: 0.26, pixels: 8, long: 0, hot: 0.7, tracer: 0.06, glow: 0.7, trail: 2, puff: 0.55 },
+};
+/** A ball's streak (seconds of its flight it is drawn out along); its core's iron and its rim's glow (radiance per unit
+ *  sun), the rim from where the surface turns this far from the eye (the cosine). */
+const STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.9], RIM = 0.55;
+/** Its tracer: its width at the ball (m, and the fewest pixels), and its glow (radiance per unit sun) there, dying to
+ *  nothing at its tail. */
+const TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
+/** Its trail (0117's smoke ribbon): its puffs' growth (m/s), life (s), ink and opacity. */
+const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
+/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS), the fewest pixels its line is wide, and its
+ *  glow (radiance per unit sun). */
+const MARK = 11, MARK_PIXELS = 2, MARK_GLOW: Vec3 = [3.2, 0.9, 0.35];
+/** Seconds of a shell's flight its mark counts down over (about its longest lob). */
+const FLIGHT = 5;
+
+/** A node taking each kind's value of `f`, by the kind's index `k`. */
+const byKind = (k: FloatNode, f: (s: Shot) => number): FloatNode =>
+  KINDS.slice(0, -1).reduceRight<FloatNode>((rest, kind, i) => select(k.lessThan(i + 0.5), float(f(SHOT[kind])), rest), float(f(SHOT[KINDS[KINDS.length - 1]])));
 
 /** One puff as it is laid: where it starts (metres) and its velocity (m/s), its size (m, radius) and how fast it grows
  * (m/s), its drag (per second) and pull (m/s² down; negative rises), life (s), colour (linear; a glow's is radiance
@@ -64,15 +97,16 @@ function ballMesh(pixel: FloatNode) {
   g.setAttribute('ballWay', new InterleavedBufferAttribute(buffer, 4, 4));
   g.instanceCount = 0;
   const m = new MeshBasicNodeMaterial();
-  const at = attribute('ballAt', 'vec4').xyz, way = attribute('ballWay', 'vec4').xyz, local = attribute('position', 'vec3');
-  const far = cameraPosition.sub(at).length(), radius = max(float(BALL), far.mul(pixel).mul(BALL_PIXELS / 2));
-  // drawn out along its flight: its half-length the streak's or its radius, whichever the more
+  const ballAt = attribute('ballAt', 'vec4'), at = ballAt.xyz, kind = ballAt.w;
+  const way = attribute('ballWay', 'vec4').xyz, local = attribute('position', 'vec3');
+  const far = cameraPosition.sub(at).length(), radius = max(byKind(kind, (s) => s.size), far.mul(pixel).mul(byKind(kind, (s) => s.pixels / 2)));
+  // drawn out along its flight: its half-length the streak's, its kind's least, or its radius, whichever the most
   const speed = way.length().max(1e-3), along = way.div(speed);
-  const stretch = max(radius, speed.mul(STREAK / 2)).div(radius);
+  const stretch = max(max(radius, speed.mul(STREAK / 2)), byKind(kind, (s) => s.long)).div(radius);
   m.positionNode = at.add(local.add(along.mul(local.dot(along).mul(stretch.sub(1)))).mul(radius));
-  // the iron where it faces the eye, the rim's glow where it turns away
-  const facing = varying(abs(normalize(local).dot(normalize(cameraPosition.sub(at)))));
-  m.colorNode = mix(vec3(...SPARK), vec3(...CORE), smoothstep(RIM - 0.12, RIM + 0.12, facing));
+  // the iron where it faces the eye, the rim's glow where it turns away (none on the harpoon's bolt)
+  const facing = varying(abs(normalize(local).dot(normalize(cameraPosition.sub(at))))), hot = varying(byKind(kind, (s) => s.hot));
+  m.colorNode = mix(vec3(...SPARK).mul(hot), vec3(...CORE), smoothstep(RIM - 0.12, RIM + 0.12, facing).max(float(1).sub(hot.min(1))));
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
   mesh.visible = false;
@@ -91,15 +125,48 @@ function ballMesh(pixel: FloatNode) {
   tm.blendDst = OneFactor;
   const wide = max(float(TRACER_WIDE), far.mul(pixel).mul(TRACER_PIXELS)).mul(0.5);
   const across = normalize(cross(along, cameraPosition.sub(at)));
-  const back = local.y, taper = float(1).sub(back.mul(0.75));
-  tm.positionNode = at.sub(along.mul(back.mul(speed).mul(TRACER))).add(across.mul(local.x.mul(wide).mul(taper)));
-  const y = varying(back), x = varying(local.x);
-  tm.colorNode = vec3(...TRACER_GLOW).mul(pow(float(1).sub(y), 2)).mul(smoothstep(1, 0.4, abs(x)));
+  const back = local.y, taper = float(1).sub(back.mul(0.75)), trails = byKind(kind, (s) => s.tracer);
+  tm.positionNode = at.sub(along.mul(back.mul(speed).mul(trails))).add(across.mul(local.x.mul(wide).mul(taper))).mul(select(trails.greaterThan(0), float(1), float(0)));
+  const y = varying(back), x = varying(local.x), glow = varying(byKind(kind, (s) => s.glow));
+  tm.colorNode = vec3(...TRACER_GLOW).mul(glow).mul(pow(float(1).sub(y), 2)).mul(smoothstep(1, 0.4, abs(x)));
   const tracer = new Mesh(t, tm);
   tracer.frustumCulled = false;
   tracer.renderOrder = 3;
   tracer.visible = false;
   return { mesh, tracer, buffer, geometry: g, trail: t };
+}
+
+/** The fall marks: a square on the water about each (−1…1 across), a ring drawn at its edge and a second closing in
+ *  on its middle as the shell nears, brighter the nearer. */
+function markMesh(pixel: FloatNode, now: FloatNode) {
+  const g = new InstancedBufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  // where it falls (world metres, on the water) and how near the shell is to it (0 just fired … 1 falling)
+  const buffer = new InstancedInterleavedBuffer(new Float32Array(MARKS * 4), 4).setUsage(DynamicDrawUsage);
+  g.setAttribute('markAt', new InterleavedBufferAttribute(buffer, 4, 0));
+  g.instanceCount = 0;
+  const mark = attribute('markAt', 'vec4'), at = mark.xyz, up = normalize(at), local = attribute('position', 'vec3');
+  const ref = select(abs(up.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0)), e1 = normalize(cross(ref, up)), e2 = cross(up, e1);
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
+  m.blending = CustomBlending;
+  m.blendEquation = AddEquation;
+  m.blendSrc = OneFactor;
+  m.blendDst = OneFactor;
+  m.positionNode = at.add(e1.mul(local.x.mul(MARK))).add(e2.mul(local.y.mul(MARK)));
+  const far = cameraPosition.sub(at).length(), line = varying(max(float(0.35), far.mul(pixel).mul(MARK_PIXELS)).div(MARK));
+  const uv = varying(local.xy), near = varying(mark.w);
+  m.colorNode = Fn(() => {
+    const r = uv.length(), ring = (at: FloatNode) => smoothstep(line, line.mul(0.4), abs(r.sub(at)));
+    const pulse = sin(now.mul(9)).mul(0.2).add(0.8);
+    const inner = float(1).sub(near).mul(0.92).add(0.04);
+    return vec3(...MARK_GLOW).mul(ring(float(0.97)).add(ring(inner).mul(0.7))).mul(near.mul(0.7).add(0.3)).mul(pulse);
+  })();
+  const mesh = new Mesh(g, m);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  mesh.visible = false;
+  return { mesh, buffer, geometry: g };
 }
 
 function puffMesh(light: Light, now: FloatNode) {
@@ -158,7 +225,7 @@ const FIRE: Vec3 = [1, 0.55, 0.2], AZURE: Vec3 = [0.31, 0.76, 1];
 
 export function createGunfire(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
-  const balls = ballMesh(pixel);
+  const balls = ballMesh(pixel), marks = markMesh(pixel, now);
   /** The world's clock when the balls were last drawn. */
   let drawn = -Infinity;
   const puffs = puffMesh(light, now);
@@ -208,29 +275,37 @@ export function createGunfire(light: Light) {
   };
 
   return {
-    meshes: [balls.mesh, balls.tracer, puffs.mesh],
-    /** A gun fired at `time` (the world's clock, s) from `from` (metres, from the centre) along `dir` (unit). */
-    shot(time: number, from: Vec3, dir: Vec3) {
-      for (let i = 0; i < 3; i++) lay(time, flash(add(from, dir, 0.6 + 0.5 * i), scale(dir, u(3, 9)), 0.9 + 0.3 * i));
-      for (let i = 0; i < 12; i++) {
-        lay(time, smoke(add(from, dir, 0.8), add(scale(dir, u(2, 16)), any(), 1.2), [0.8, 0.79, 0.76], 0.5, u(2.5, 4.5)));
+    meshes: [balls.mesh, balls.tracer, marks.mesh, puffs.mesh],
+    /** A gun of `gun` fired at `time` (the world's clock, s) from `from` (metres, from the centre) along `dir` (unit):
+     *  the cannon's flash and bank of smoke; the scatter's wide burst; the repeater's small quick flash and a wisp; the
+     *  harpoon's no fire, a kick of dust off its stock; the mortar's flash and a great bank thrown up. */
+    shot(time: number, from: Vec3, dir: Vec3, gun: GunKind) {
+      const [flashes, size, puffs, spread, ink] = {
+        cannon: [3, 0.9, 12, 1.2, 0.5], scatter: [4, 1.2, 14, 3, 0.5], repeater: [1, 0.55, 2, 0.6, 0.35],
+        harpoon: [0, 0, 5, 1.5, 0.22], mortar: [3, 1.3, 18, 2, 0.6],
+      }[gun];
+      for (let i = 0; i < flashes; i++) lay(time, flash(add(add(from, dir, 0.6 + 0.5 * i), any(), gun === 'scatter' ? 0.5 : 0), scale(dir, u(3, 9)), size + 0.3 * i));
+      for (let i = 0; i < puffs; i++) {
+        lay(time, smoke(add(from, dir, 0.8), add(scale(dir, u(2, 16)), any(), spread), [0.8, 0.79, 0.76], ink, u(2.5, 4.5), gun === 'mortar' ? 1.2 : 0.8));
       }
     },
-    /** A ball come down at `at` (a unit vector), in the sea or on the land. */
-    splash(time: number, at: Vec3, land: boolean) {
-      const p = scale(at, R);
+    /** A ball of `gun` come down at `at` (a unit vector), in the sea or on the land: a scatter's pellet or a repeater's
+     *  round a small spout; a mortar's shell bursting, its flash, its spray over its splash's breadth. */
+    splash(time: number, at: Vec3, land: boolean, gun: GunKind) {
+      const p = scale(at, R), [k, wide] = gun === 'mortar' ? [2.5, MARK / 2] : gun === 'scatter' || gun === 'repeater' ? [0.25, 0.3] : [1, 0.8];
+      if (gun === 'mortar') for (let i = 0; i < 3; i++) lay(time, flash(add(p, at, 1), scale(any(), 4), 5));
       if (land) {
-        for (let i = 0; i < 10; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), across(at), u(0.5, 2.5)), [0.42, 0.36, 0.27], 0.55, u(1.5, 3), 0.6));
+        for (let i = 0; i < 10 * k; i++) lay(time, smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 5)), across(at), u(0.5, 2.5)), [0.42, 0.36, 0.27], 0.55, u(1.5, 3), 0.6));
         return;
       }
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 40 * k; i++) {
         lay(time, {
-          at: add(p, across(at), u(0, 0.8)), way: add(scale(at, u(6, 16)), across(at), u(0.3, 3)), size: u(0.4, 0.8), grow: 0.5,
+          at: add(p, across(at), u(0, wide)), way: add(scale(at, u(6, 16)), across(at), u(0.3, 3)), size: u(0.4, 0.8), grow: 0.5,
           drag: 0.15, pull: 9.8, life: u(1.4, 2.6), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
         });
       }
-      for (let i = 0; i < 12; i++) {
-        lay(time, { ...smoke(p, add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), [0.95, 0.96, 0.97], 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
+      for (let i = 0; i < 12 * k; i++) {
+        lay(time, { ...smoke(add(p, across(at), u(0, wide)), add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), [0.95, 0.96, 0.97], 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
       }
     },
     /** A ball home in a hull at `at` (a unit vector), or a ram; whether her shield took all of it (a glint of azure
@@ -267,18 +342,26 @@ export function createGunfire(light: Light) {
       // each ball's trail along the way it came since the last frame (none on the first, or after a pause), its puffs
       // laid when the ball passed, from a start that slides with the clock so they don't stand in step frame to frame
       const since = time - drawn > 0 && time - drawn < 0.25 ? time - drawn : 0;
+      const m = marks.buffer.array as Float32Array;
+      let k = 0;
       for (let i = 0; i < n; i++) {
-        const { at, way } = flying[i], speed = Math.max(1e-3, Math.hypot(...way));
-        a.set([...at, 0, ...way, 0], i * 8);
-        for (let d = (time * 997) % TRAIL; d < speed * since; d += TRAIL) {
+        const { at, way, gun, to } = flying[i], speed = Math.max(1e-3, Math.hypot(...way)), shot = SHOT[gun];
+        a.set([...at, KINDS.indexOf(gun), ...way, 0], i * 8);
+        // a shell's fall marked: nearer as the seconds it has left to fly (about its distance from it over its speed) run out
+        if (gun === 'mortar' && k < MARKS) m.set([...scale(to, R + 0.15), 1 - Math.min(1, distance(at, scale(to, R)) / speed / FLIGHT)], 4 * k++);
+        if (!shot.trail) continue;
+        for (let d = (time * 997) % shot.trail; d < speed * since; d += shot.trail) {
           const ago = d / speed;
-          lay(time - ago, { ...smoke(add(at, way, -ago), [0, 0, 0], TRAIL_INK, TRAIL_OPACITY, TRAIL_LIFE, TRAIL_SIZE), grow: TRAIL_GROW, drag: 1, pull: -0.2, fadeIn: 0.02 });
+          lay(time - ago, { ...smoke(add(at, way, -ago), [0, 0, 0], TRAIL_INK, TRAIL_OPACITY, TRAIL_LIFE, shot.puff), grow: TRAIL_GROW, drag: 1, pull: -0.2, fadeIn: 0.02 });
         }
       }
       drawn = time;
       balls.buffer.needsUpdate = n > 0;
       balls.geometry.instanceCount = balls.trail.instanceCount = n;
       balls.mesh.visible = balls.tracer.visible = n > 0;
+      marks.buffer.needsUpdate = k > 0;
+      marks.geometry.instanceCount = k;
+      marks.mesh.visible = k > 0;
       puffs.geometry.instanceCount = laid;
       puffs.mesh.visible = laid > 0;
       send();

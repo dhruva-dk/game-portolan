@@ -22,7 +22,7 @@ export const KEEP = 1;
  *  ships sunk (where, and by whom), what was taken up and mended with, the ships that spent a gust, and where hers lies
  *  (null: sunk). */
 export interface Done {
-  shots: readonly Pick<Shot, 'shooter' | 'from' | 'gun'>[];
+  shots: readonly Pick<Shot, 'shooter' | 'gun' | 'from'>[];
   cues: readonly Cue[];
   splashes: readonly Splash[];
   strikes: readonly Strike[];

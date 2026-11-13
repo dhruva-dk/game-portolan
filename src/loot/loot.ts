@@ -1,6 +1,6 @@
 // Loot on the water as it is seen: 0117's before its crates (render/actors/loot.ts and tsl/loot.ts at c79ef49^). Each
 // piece is the thing itself, hanging RIDE m over the waves where the snapshot has it, bobbing, slowly turning and
-// rocking: a gun the gun a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
+// rocking: a gun the gun of its kind a ship carries (ship/gun.ts), its muzzle cocked up; a shield a crystal of ice, the big one
 // taller; a repair a cask, the full one bigger. Each is lit as everything is (sky/light.ts) and glows round its
 // outline in its rarity's light (rarity.ts GLOW), the more where it turns from the eye, so the bloom catches it. A
 // piece put on the water during the match rises up out of it as it comes (born).
@@ -12,9 +12,10 @@
 // SHAPE_PIXELS across, so they read to the haze's edge (about 250 m), where the haze takes them as everything else
 // (frame.ts).
 //
-// Four draws for all of it, each a single instanced mesh placed wholly in the vertex stage, from four buffers of a
-// piece's place, id, light, rarity, birth and size, written in place each frame and sent only as far as they hold
-// pieces, and only when they changed.
+// A draw for each kind of gun, one for the shields, one for the casks and one for the beams: eight at most, each a
+// single instanced mesh placed wholly in the vertex stage, from a buffer of a piece's place, id, light, rarity, birth
+// and size, written in place each frame and sent only as far as it holds pieces, and only when it changed; a kind of
+// gun with none near isn't drawn at all.
 
 import {
   AddEquation, BufferAttribute, BufferGeometry, CustomBlending, CylinderGeometry, DoubleSide, DynamicDrawUsage,
@@ -24,8 +25,8 @@ import {
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
-import { gunShape } from '../ship/gun';
-import type { LootDraw, LootKind } from '../snapshot';
+import { KINDS, METAL, gunShape } from '../ship/gun';
+import type { GunKind, LootDraw, LootKind } from '../snapshot';
 import { pixelSize } from '../view/view';
 import type { FloatNode, Vec3Node } from '../tsl';
 
@@ -42,8 +43,10 @@ const SHAPE_PIXELS = 22, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 const TALL = 14, TALLER = 7, FOOT = 0.8, HEAD = 0.5;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface. */
 const EMIT = 3.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
-/** Each kind's size: the shields' and repairs' small and big, the gun's. */
-const SIZE: Record<LootKind, number> = { gun: 2.3, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1 };
+/** Each kind's size: the guns', the shields' and repairs' small and big. */
+const SIZE: Record<LootKind, number> = {
+  cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
+};
 /** Surfaces (linear albedo): bronze, ice, weathered wood and the iron of its hoops. */
 const BRONZE: [number, number, number] = [0.32, 0.2, 0.08], ICE: [number, number, number] = [0.33, 0.78, 0.95];
 const WOOD: [number, number, number] = [0.26, 0.15, 0.08], HOOP: [number, number, number] = [0.05, 0.045, 0.04];
@@ -63,7 +66,7 @@ const STRIDE = 12;
 function instanced(shape: BufferGeometry, buffer: InstancedInterleavedBuffer): InstancedBufferGeometry {
   const g = new InstancedBufferGeometry();
   if (shape.getIndex()) g.setIndex(shape.getIndex());
-  for (const name of ['position', 'normal', 'uv', 'part']) if (shape.getAttribute(name)) g.setAttribute(name, shape.getAttribute(name));
+  for (const name of ['position', 'normal', 'uv', 'part', 'metal']) if (shape.getAttribute(name)) g.setAttribute(name, shape.getAttribute(name));
   g.setAttribute('lootAt', new InterleavedBufferAttribute(buffer, 4, 0));
   g.setAttribute('lootGlow', new InterleavedBufferAttribute(buffer, 4, 4));
   g.setAttribute('lootLife', new InterleavedBufferAttribute(buffer, 4, 8));
@@ -71,13 +74,14 @@ function instanced(shape: BufferGeometry, buffer: InstancedInterleavedBuffer): I
   return g;
 }
 
-/** The gun, its muzzle cocked up 0.4 rad and its middle at the origin. */
-function gun(): BufferGeometry {
-  const s = gunShape(), g = new BufferGeometry();
+/** The gun of `kind`, its muzzle cocked up 0.4 rad (the mortar's, already steep, less) and its middle at the origin. */
+function gun(kind: GunKind): BufferGeometry {
+  const s = gunShape(kind), g = new BufferGeometry();
   g.setAttribute('position', new BufferAttribute(s.position, 3));
   g.setAttribute('normal', new BufferAttribute(s.normal, 3));
+  g.setAttribute('metal', new BufferAttribute(s.metal, 1));
   g.setIndex(new BufferAttribute(s.index, 1));
-  g.applyMatrix4(new Matrix4().makeRotationX(-0.4));
+  g.applyMatrix4(new Matrix4().makeRotationX(kind === 'mortar' ? -0.1 : -0.4));
   g.computeBoundingBox();
   const box = g.boundingBox!, mid = box.min.clone().add(box.max).multiplyScalar(0.5);
   return g.translate(-mid.x, -mid.y, -mid.z);
@@ -113,7 +117,7 @@ function beamAndRing(): BufferGeometry {
 export function createLoot(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
   const buffer = () => new InstancedInterleavedBuffer(new Float32Array(PIECES * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
-  const guns = buffer(), crystals = buffer(), casks = buffer(), beams = buffer();
+  const guns = KINDS.map(buffer), crystals = buffer(), casks = buffer(), beams = buffer();
 
   // a piece's frame: up from the planet's centre; turned about it by its own spin, rocked about its across
   const at = attribute('lootAt', 'vec4'), glow = attribute('lootGlow', 'vec4'), life = attribute('lootLife', 'vec4');
@@ -149,10 +153,14 @@ export function createLoot(light: Light) {
     return { mesh, geometry };
   };
 
-  const gunMesh = piece(instanced(gun(), guns), (p, n) => {
-    const g = light.glossy(p, n, float(0.45), vec3(...BRONZE).mul(2.2));
-    return vec3(...BRONZE).mul(g.diffuse).add(g.specular);
-  });
+  // each gun bronze, its stock and bed oak, its bands and barrels iron (ship/gun.ts METAL)
+  const metal = attribute('metal', 'float'), made = varying(metal);
+  const gunMeshes = KINDS.map((kind, i) => piece(instanced(gun(kind), guns[i]), (p, n) => {
+    const iron = made.greaterThan(METAL.iron - 0.5), oak = made.greaterThan(METAL.oak - 0.5).and(iron.not());
+    const albedo = select(iron, vec3(...HOOP), vec3(...BRONZE));
+    const g = light.glossy(p, n, float(0.45), select(iron, vec3(0.18, 0.18, 0.18), albedo.mul(2.2)));
+    return select(oak, vec3(...WOOD).mul(light(p, n)), albedo.mul(g.diffuse).add(g.specular));
+  }));
   const crystalMesh = piece(instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals), (p, n) => {
     const g = light.glossy(p, n, float(0.12), vec3(0.06, 0.06, 0.06));
     return vec3(...ICE).mul(g.diffuse).add(g.specular.mul(2));
@@ -226,13 +234,13 @@ export function createLoot(light: Light) {
   const shields = (l: LootDraw) => l.kind === 'smallShield' || l.kind === 'bigShield';
 
   return {
-    meshes: [gunMesh.mesh, crystalMesh.mesh, caskMesh.mesh, beamMesh],
+    meshes: [...gunMeshes.map((g) => g.mesh), crystalMesh.mesh, caskMesh.mesh, beamMesh],
     /** Each frame: the world's clock now (s), the pieces near the eye, and where the eye is (those past SHAPE m of it
      *  sent as beams alone). */
     draw(time: number, pieces: readonly LootDraw[], eye: readonly [number, number, number]) {
       now.value = time;
       const near = (l: LootDraw) => (l.at[0] - eye[0]) ** 2 + (l.at[1] - eye[1]) ** 2 + (l.at[2] - eye[2]) ** 2 < SHAPE * SHAPE;
-      fill(guns, gunMesh, pieces, (l) => l.kind === 'gun' && near(l));
+      KINDS.forEach((kind, i) => fill(guns[i], gunMeshes[i], pieces, (l) => l.kind === kind && near(l)));
       fill(crystals, crystalMesh, pieces, (l) => shields(l) && near(l));
       fill(casks, caskMesh, pieces, (l) => (l.kind === 'repairKit' || l.kind === 'fullRepair') && near(l));
       fill(beams, { mesh: beamMesh, geometry: beamGeometry }, pieces, () => true);

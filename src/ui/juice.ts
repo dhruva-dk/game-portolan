@@ -14,7 +14,7 @@
 //   her hull low        the heartbeat at the rim (flash.ts)
 // No words; numerals only.
 
-import { HER, type Moment, type Status } from '../player';
+import { HER, isGun, type Moment, type Status } from '../player';
 import { createFlash, PICKUP, SCREEN } from './flash';
 import { createHits } from './hits';
 import { glyph, svg } from './ink';
@@ -97,7 +97,7 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       case 'took': {
         if (m.ship !== HER) return;
         const slot = parts.slots[m.slot];
-        if (slot) fly(m.piece === 'gun' ? 'weapon.cannon' : `item.${m.piece}`, m.seen, slot);
+        if (slot) fly(isGun(m.piece) ? `weapon.${m.piece}` : `item.${m.piece}`, m.seen, slot);
         const r = Math.max(0, Math.min(4, m.rarity));
         if (PICKUP.flash[r] > 0) flash.flash({ colour: '#fff3d0', alpha: PICKUP.flash[r], decay: PICKUP.decay[r] });
         if (PICKUP.vignette[r] > 0) flash.vignette({ colour: '#ffd36a', alpha: PICKUP.vignette[r], reach: 0.45, decay: PICKUP.fades[r] });

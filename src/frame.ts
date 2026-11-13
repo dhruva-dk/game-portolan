@@ -17,6 +17,7 @@ import { createView } from './view/view';
 import { createWater, type SeaShows } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
+import { createArms } from './ship/arms';
 import { createLoot } from './loot/loot';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
@@ -136,9 +137,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const fleet = createFleet(light, world.wind, options.fleet);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
+  const arms = createArms(light, options.fleet);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, ...arms.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
   [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
@@ -282,14 +284,15 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     drawn = now;
     for (const b of s.blasts) {
       if (b.time <= laid) continue;
-      if (b.kind === 'shot') gunfire.shot(b.time, b.from, b.dir);
-      else if (b.kind === 'splash') gunfire.splash(b.time, b.at, b.land);
+      if (b.kind === 'shot') gunfire.shot(b.time, b.from, b.dir, b.gun);
+      else if (b.kind === 'splash') gunfire.splash(b.time, b.at, b.land, b.gun);
       else if (b.kind === 'strike') gunfire.strike(b.time, b.at, b.ram, b.shield, b.broke);
       else gunfire.sink(b.time, b.at);
     }
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);
     loot.draw(s.clock, s.loot, s.eye.position);
+    arms.update(s.ships, s.eye.position);
   }
 
   /**

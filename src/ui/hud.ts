@@ -3,17 +3,21 @@
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts), north up: who holds the sea, the islands, the Storm's calm and the next, the
 //               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
-//   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
-//               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
-//               above it, with a pip for each charge, the next filling as it comes back, faint with none, gilt
-//               while one blows
+//   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the mark of the gun in hand on a
+//               paper disc, its rounds left under it; while reloading or taking it up a rubric ring running round its
+//               border, while winding up a gold one; faint and struck through with no gun (she is unarmed); held, it
+//               fires at the gun's interval. Gust above it, with a pip for each charge, the next filling as it comes
+//               back, faint with none, gilt while one blows
 //   reticle     the old game's, four arms round a gap, fixed in the middle of the screen where her gun is aimed
-//               (play/chase.ts); gilt and drawn in while the aim assist has a ship (sim/gun.ts), faint when the ball
-//               falls short of what it is on; a small ring where the ball will come down, if clear of it; none with
-//               no gun
-//   bottom      the hotbar right of centre, out of the stick's side: the gun's slot (its rarity's ink under it), then
-//               three of stores; the one in hand gilt, a gold ring running round it while it is used, and a gold
-//               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
+//               (play/chase.ts), set out to the spread its balls go off within; gilt and drawn in while the aim
+//               assist has a ship (sim/gun.ts), faint when the ball falls short of what it is on; a rubric ring while
+//               reloading and a gold one winding up, running round it; a small ring where the ball will come down, if
+//               clear of it, and for a lobbed gun a cross in a wide ring, the mark to lay on its target; none with no gun
+//   bottom      the hotbar right of centre, out of the stick's side: the two guns' slots (each its kind's mark, its
+//               rarity's ink under it, its rounds; a rubric ring running round it while it reloads), a gap, then
+//               three of stores; the one in hand gilt and raised, a gold ring running round it while it is used, and a
+//               gold mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar). A tap on
+//               the other gun takes it in hand; on the one in hand, reloads it
 //   rim         washed the Storm's violet while she is outside its calm, the deeper the further out (0117's)
 //   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
 //               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
@@ -25,7 +29,7 @@
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
-import type { Kit, Status } from '../player';
+import { HOTBAR, type GunKind, type Kit, type Status } from '../player';
 import type { Sea } from '../snapshot';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
@@ -38,9 +42,14 @@ import { onTap, piece } from './ui';
 /** What the HUD shows: the match as the game reports it, and what she carries. */
 export type HudState = Status & Kit;
 
-export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(): void }
+export interface HudActions { slot(i: number): void; gust(): void; map(): void; fire(down: boolean): void }
 
-const SLOT = 50, GAP = 6;
+/** A slot's side, the gap between slots and between the guns' and the stores', px. */
+const SLOT = 50, GAP = 6, APART = 16;
+/** Slots on the hotbar: each one's left, px. */
+const SLOTS = HOTBAR.guns + HOTBAR.items, LEFT = (i: number) => i * (SLOT + GAP) + (i >= HOTBAR.guns ? APART - GAP : 0);
+/** A gun's mark. */
+const mark = (k: GunKind): Glyph => `weapon.${k}`;
 const MINIMAP = 132;
 /** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
  * game's, chart/layout.ts: 802, 317 on the phone's 956 × 440). */
@@ -87,28 +96,30 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   const rim = document.createElement('div');
   rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px 18px rgba(62,24,96,.6);opacity:0`;
   body.prepend(rim);
-  // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
+  // fired as the thumb comes down, as the old game's was, and held till it lifts; the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
-    act.fire();
+    fire.setPointerCapture(e.pointerId);
+    act.fire(true);
   });
+  for (const lift of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) fire.addEventListener(lift, () => act.fire(false));
   const hotbar = piece(body, 'bottom');
-  hotbar.style.left = 'calc(50% + 14px)';
+  hotbar.style.left = 'calc(50% - 12px)';
 
   const drawMap = createMinimap(map, MINIMAP, coasts);
   onTap(map, () => act.map());
   onTap(gust, () => act.gust());
 
   // the hotbar's slots, each its own target
-  const slots = [0, 1, 2, 3].map((i) => {
+  const slots = Array.from({ length: SLOTS }, (_, i) => {
     const el = document.createElement('div');
     el.className = 'press';
-    el.style.cssText = `position:absolute;left:${i * (SLOT + GAP)}px;top:0;width:${SLOT}px;height:${SLOT}px`;
+    el.style.cssText = `position:absolute;left:${LEFT(i)}px;top:0;width:${SLOT}px;height:${SLOT}px`;
     hotbar.appendChild(el);
     onTap(el, () => act.slot(i));
     return el;
   });
-  hotbar.style.width = `${4 * SLOT + 3 * GAP}px`;
+  hotbar.style.width = `${LEFT(SLOTS - 1) + SLOT}px`;
   hotbar.style.height = `${SLOT}px`;
   const juice = createJuice(body, { vitals, fire, gust, slots });
 
@@ -162,54 +173,73 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
           + `${glyph('hud.gust', 30, 26, 32)}${pips}</g>`);
       });
 
-      // the reload's sweep in steps of a 48th, so it is redrawn a few times a second at most
-      const loaded = s.gun ? Math.floor(Math.min(1, s.gun.ready) * 48) : -1, c = FIRE + 2;
-      draw(fire, `${loaded}`, () => svg(2 * c, 2 * c, `<g opacity="${loaded < 0 ? 0.5 : 1}">${paperDisc(c, c, FIRE - 2)}${glyph('weapon.cannon', c, c, 1.2 * FIRE)}`
-        + (loaded < 0 ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
-        + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
+      // Fire: the gun in hand's mark and rounds; its reload, or its taking up, a rubric sweep and its winding a gold
+      // one, each in steps of a 48th, so it is redrawn a few times a second at most
+      const g = s.gun, c = FIRE + 2, step = (v: number) => Math.floor(Math.min(1, Math.max(0, v)) * 48);
+      const loaded = g ? (g.swapping > 0 ? step(1 - g.swapping) : step(g.ready)) : -1, wound = g && g.charge !== null ? step(g.charge) : -1;
+      draw(fire, `${g?.kind} ${g?.rounds} ${loaded} ${wound}`, () => svg(2 * c, 2 * c, `<g opacity="${g ? 1 : 0.5}">${paperDisc(c, c, FIRE - 2)}`
+        + glyph(g ? mark(g.kind) : 'weapon.cannon', c, g ? c - 5 : c, (g ? 1 : 1.2) * FIRE, { ink: g ? 'iron' : 'sepia' })
+        + (g ? figure(c, c + FIRE - 15, g.rounds, 15, { fill: g.rounds > 0 ? INK.iron : INK.rubric }) : '')
+        + (!g ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
+        + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5) : '')
+        + (wound >= 0 ? sweep(c, c, FIRE - 1, wound / 48, WASH.gold, 4.5) : '') + '</g>'));
 
-      // the reticle, in the middle where the gun is aimed: iron under lead white, or gilt while the assist has a ship,
-      // faint when the ball falls short of what it is on; and where the ball will come down, a small ring, if that is
-      // clear of it
-      const lock = s.gun && s.reticle ? (s.gun.locked ? 'locked' : s.reticle.reach ? 'free' : 'short') : 'none';
-      draw(reticle, lock, () => {
+      // the reticle, in the middle where the gun is aimed, set out to its spread: iron under lead white, or gilt while
+      // the assist has a ship, faint when the ball falls short of what it is on; reloading or winding, its sweep round it
+      const lock = g && s.reticle ? (g.locked ? 'locked' : s.reticle.reach ? 'free' : 'short') : 'none';
+      const spread = s.reticle ? Math.round(Math.min(48, s.reticle.spread)) : 0;
+      const busy = lock === 'none' ? '' : wound >= 0 ? `w${wound >> 2}` : loaded >= 0 && loaded < 48 ? `r${loaded >> 2}` : '';
+      draw(reticle, `${lock} ${spread} ${busy}`, () => {
         if (lock === 'none') return '';
-        const h = RETICLE + 3, r = lock === 'locked' ? RETICLE * LOCKED : RETICLE, gap = r * 0.32;
+        const out = Math.max(RETICLE, spread), h = out + 7, r = lock === 'locked' ? out * LOCKED : out, gap = Math.max(r * 0.32, r - RETICLE * 0.7);
         const arms = `M${h - r} ${h}H${h - gap}M${h + gap} ${h}H${h + r}M${h} ${h - r}V${h - gap}M${h} ${h + gap}V${h + r}`;
+        const run = busy ? sweep(h, h, Math.min(r, RETICLE) * 0.5 + 2, (parseInt(busy.slice(1)) * 4) / 48, busy[0] === 'w' ? WASH.gold : INK.rubric, 2.2) : '';
         return svg(2 * h, 2 * h, `<g opacity="${lock === 'short' ? 0.45 : 1}"><path d="${arms}" stroke="${INK.iron}" stroke-width="2.6" opacity=".6" transform="translate(.6 .8)"/>`
-          + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/></g>`);
+          + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>${run}</g>`);
       });
-      const f = s.reticle?.fall, away = f ? Math.hypot(f.x - body.clientWidth / 2, f.y - body.clientHeight / 2) > RETICLE * 1.5 : false;
+      // where it will come down, if clear of the reticle: a small ring; for a lobbed gun, a cross in a wide ring
+      const f = s.reticle?.fall, lob = !!s.reticle?.lob;
+      const away = f ? lob || Math.hypot(f.x - body.clientWidth / 2, f.y - body.clientHeight / 2) > RETICLE * 1.5 : false;
       if (f && away) [fall.style.left, fall.style.top] = [`${f.x.toFixed(1)}px`, `${f.y.toFixed(1)}px`];
-      draw(fall, away ? lock : 'none', () => {
+      draw(fall, away ? `${lock} ${lob}` : 'none', () => {
         if (!away || lock === 'none') return '';
-        const h = FALL + 3;
-        return svg(2 * h, 2 * h, `<circle cx="${h}" cy="${h}" r="${FALL}" fill="none" stroke="${INK.iron}" stroke-width="2.4" opacity=".6" transform="translate(.6 .8)"/>`
-          + `<circle cx="${h}" cy="${h}" r="${FALL}" fill="none" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.4" opacity=".92"/>`);
+        const r = lob ? 3 * FALL : FALL, h = r + 3, ink = lock === 'locked' ? INK.gold : lob ? WASH.gold : INK.white;
+        const cross = lob ? `<path d="M${h - r / 2} ${h}H${h + r / 2}M${h} ${h - r / 2}V${h + r / 2}" stroke="${ink}" stroke-width="1.4"/>` : '';
+        return svg(2 * h, 2 * h, `<circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="2.4" opacity=".6" transform="translate(.6 .8)"/>`
+          + `<circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="${ink}" stroke-width="1.4" opacity=".92"${lob ? ' stroke-dasharray="3 2"' : ''}/>${cross}`);
       });
 
-      // the gun's slot holds her gun, if she has one, its rarity's ink under it; then her items. The one being used
-      // has a gold ring running round it, in steps of a 32nd; the one a tap would swap for loot a gold mark bobbing
-      const held: ({ glyph: Glyph; count?: number; ink?: number } | null)[] = [
-        s.gun && { glyph: 'weapon.cannon', ink: RARITY[s.gun.rarity] }, ...s.items.map((k) => k && { glyph: k.item, count: k.count }),
+      // the guns' slots hold her guns, each its rarity's ink under it and its rounds, reloading its rubric sweep; then
+      // her items. The one being used has a gold ring running round it, in steps of a 32nd; the one a tap would swap
+      // for loot a gold mark bobbing
+      const held: ({ glyph: Glyph; count?: number; ink?: number; low?: boolean; reload?: number } | null)[] = [
+        ...s.guns.map((k) => k && {
+          glyph: mark(k.kind), count: k.rounds, ink: RARITY[k.rarity], low: k.rounds === 0, reload: k.reload === null ? undefined : Math.floor(k.reload * 32),
+        }),
+        ...s.items.map((k) => k && { glyph: k.item, count: k.count }),
       ];
       held.forEach((slot, i) => {
-        const chosen = s.chosen === i, used = chosen && s.using !== null ? Math.floor(s.using * 32) : -1, offer = s.offer === i;
+        const chosen = s.chosen === i, offer = s.offer === i;
+        const used = chosen && s.using !== null ? Math.floor(s.using * 32) : slot?.reload ?? -1, gun = i < HOTBAR.guns;
         draw(slots[i], `${slot?.glyph} ${slot?.count} ${slot?.ink} ${chosen} ${used} ${offer}`, () => {
-          const mark = offer ? `<g><path d="M${SLOT / 2 - 7} -15h14l-7 9z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="1"/>`
+          const bob = offer ? `<g><path d="M${SLOT / 2 - 7} -15h14l-7 9z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="1"/>`
             + `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>` : '';
           if (!slot) {
-            // lead white over an iron halo, to hold on bright water
+            // lead white over an iron halo, to hold on bright water; an empty gun slot shows a faint gun's ghost
             return svg(SLOT, SLOT, `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="rgba(38,25,16,.12)" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>`
-              + `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>` + mark);
+              + `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>`
+              + (gun ? `<g opacity=".5">${glyph('weapon.cannon', SLOT / 2, SLOT / 2, 28, { ink: 'white' })}</g>` : '') + bob);
           }
           return svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? '#f3dfa8' : 'url(#pg)', bold: chosen })
-            + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="1.6"/>` : '')
+            + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="${gun ? 2.6 : 1.6}"/>` : '')
             + (slot.ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${css(slot.ink)}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
             + glyph(slot.glyph, SLOT / 2 - 3, SLOT / 2 - (slot.ink !== undefined ? 3 : 0), 31)
-            + (slot.count != null ? figure(SLOT / 2 + 18, SLOT / 2 + 12, slot.count, 17) : '')
-            + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, WASH.gold, 3.5) : '') + mark);
+            + (slot.count != null ? figure(SLOT / 2 + 18, SLOT / 2 + 12, slot.count, 17, { fill: slot.low ? INK.rubric : INK.iron }) : '')
+            + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, slot.reload !== undefined && !(chosen && s.using !== null) ? INK.rubric : WASH.gold, 3.5) : '')
+            + bob);
         });
+        // the gun in hand raised
+        slots[i].style.transform = chosen && gun && slot ? 'translateY(-6px)' : '';
       });
 
       juice.update(s, !watching && s.arriving <= 0);
