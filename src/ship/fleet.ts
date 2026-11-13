@@ -88,7 +88,7 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     const ship = buildShip(k);
     // (the farthest level has no ropes, and so no rope draw)
     return ([[ship.body, materials.body], [ship.cloth, materials.cloth], [ship.ropes, materials.ropes]] as const)
-      .filter(([p]) => p.triangles > 0).map(([p, material]) => drawOf(p, buffer, material));
+      .filter(([p]) => p.triangles > 0).map(([p, material], j) => Object.assign(drawOf(p, buffer, material), { name: `ship ${['body', 'cloth', 'ropes'][j]} ${k}` }));
   });
   const meshes = draws.flat();
 

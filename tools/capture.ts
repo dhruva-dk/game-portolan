@@ -6,6 +6,7 @@
 // Starts the Vite dev server, opens one page per query, waits for a second and a half of frames, writes
 // captures/<query>.png.
 // The frame rate is uncapped, so the FPS printed is a cost measure; GPU timestamps read 0 when uncapped.
+// --passes prints the meter's split of a frame's draw calls by pass and by what is drawn (src/meter.ts).
 
 import { mkdirSync } from 'node:fs';
 import { launch } from './launch.ts';
@@ -13,6 +14,7 @@ import { launch } from './launch.ts';
 const flag = (name: string, fallback: number) => Number(process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback);
 const shots = flag('shots', 1), every = flag('every', 500), dpr = flag('dpr', 1);
 const out = process.argv.find((a) => a.startsWith('--out='))?.slice(6) ?? 'captures';
+const split = process.argv.includes('--passes');
 const queries = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (queries.length === 0) queries.push('');
 
@@ -34,6 +36,7 @@ try {
       const file = `${out}/${q.replace(/[^\w.=-]+/g, '_') || 'default'}${k > 0 ? `-${k}` : ''}.png`;
       await page.screenshot({ path: file });
       console.log(file, await page.textContent('#meter'));
+      if (split) console.log(await page.$eval('#meter', (m) => `${(m as HTMLElement).dataset.passes}\n--\n${(m as HTMLElement).dataset.objects}\n`));
     }
     await page.close();
   }

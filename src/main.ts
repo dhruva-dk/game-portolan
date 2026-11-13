@@ -65,9 +65,11 @@ async function stage(setup: Setup): Promise<Stage> {
         const now = performance.now();
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
-        frame.render(next(dt), dt);
+        const snapshot = next(dt), begun = performance.now();
+        frame.render(snapshot, dt);
+        const rendered = performance.now() - begun;
         drawn?.(renderer.domElement);
-        meter?.sample(performance.now() - now);
+        meter?.sample(performance.now() - now, rendered);
       });
     },
   };

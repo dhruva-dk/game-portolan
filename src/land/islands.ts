@@ -27,7 +27,11 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
   const palms = isles.map((i, k) => scatterPalms(i, rocks[k], own(k)));
   const shrubs = isles.map((i, k) => scatterShrubs(i, rocks[k], SHAPES, own(k)));
   const lands = createLand(isles, isles.map((_, k) => litter(palms[k], shrubs[k])), sand);
-  const casters = [...createRocks(rocks, charts, view, light), ...createPalms(palms, charts, light), ...createShrubs(shrubs, charts, light)];
+  const kinds = { rocks: createRocks(rocks, charts, view, light), palms: createPalms(palms, charts, light), shrubs: createShrubs(shrubs, charts, light) };
+  const casters = Object.values(kinds).flat();
+  // (named for the meter's split: meter.ts)
+  lands.forEach((m) => (m.name = 'land'));
+  for (const [name, list] of Object.entries(kinds)) list.forEach((c, k) => (c.mesh.name = `${name} ${k}`));
   let shown: string | null = null;
 
   return {

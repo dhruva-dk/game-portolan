@@ -122,6 +122,11 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
   scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  // (named for the meter's split: meter.ts)
+  scene.name = 'world';
+  [seabed.mesh.name, water.mesh.name] = ['seabed', 'sea'];
+  gunfire.meshes.forEach((m) => (m.name ||= 'gunfire'));
+  loot.meshes.forEach((m, k) => (m.name ||= `loot ${k}`));
 
   /** The scene from a camera, and what it saw at each pixel: its colour and depth, and the ray to it from the camera
    *  (world direction, metres). In a post pass three's camera nodes are the screen quad's, so the camera's own
