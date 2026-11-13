@@ -47,8 +47,9 @@ function sheet(opaque: boolean, press = true) {
 const region = (el: SVGSVGElement, id: string, act: () => void) => {
   const r = el.querySelector<SVGGElement>(`#${id}`);
   if (!r) return;
-  r.style.pointerEvents = 'auto';
-  r.style.cursor = 'pointer';
+  // the class, not a style on the group: a touch lands on the shapes inside it, which the layer's rule would
+  // otherwise leave untouchable (ui.ts)
+  r.classList.add('press');
   r.addEventListener('pointerdown', (e) => e.stopPropagation());
   r.addEventListener('pointerup', (e) => {
     e.stopPropagation();
