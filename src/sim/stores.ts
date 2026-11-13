@@ -16,14 +16,17 @@ import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { spent, stepGust } from './gust.ts';
 import { sunk } from './health.ts';
-import { stepUse, tapped, USING } from './hold.ts';
-import { cargo, drifted, offered, overboard, swept, type Flotsam } from './loot.ts';
+import { stepUse, tapped, USING, type Use } from './hold.ts';
+import { cargo, drifted, offered, overboard, swept, type Flotsam, type Taken } from './loot.ts';
 import type { Helm } from './ship.ts';
 import type { Depth } from './shoal.ts';
 
 /** What a ship asks of her stores this step: a slot tapped (0 her gun's, 1–3 the items'; null none), whether to spend
  *  a gust, and a swap asked for outright (a bot's: the slot to swap into; null none). */
 export interface Ask { tap: number | null; gust: boolean; take: number | null }
+
+/** A ship's mending done this step: whose, and what she mended with. */
+export interface Mended { ship: number; use: Use }
 
 /** Nothing asked. */
 export const NOTHING: Ask = { tap: null, gust: false, take: null };
@@ -69,16 +72,18 @@ export function crewed(h: Helm, c: Crew | undefined): Helm {
 /**
  * After the fighting: dt seconds of every crew's mending and gust, the loot drifting and swept up by `fleet` (the
  * swaps `takes` asks for made), and the ships of `sunkNow` (still in `fleet`) spilling all they had where they lie.
- * Over water `depth` deep; `seed` the match's, for the spill's kicks.
+ * Over water `depth` deep; `seed` the match's, for the spill's kicks. Also what was taken up, and the mending done.
  */
 export function stored(
   crews: readonly Crew[], flotsam: Flotsam, fleet: readonly Vessel[], takes: ReadonlyMap<number, number>,
   sunkNow: readonly number[], dt: number, depth: Depth, seed: number,
-): { crews: Crew[]; flotsam: Flotsam } {
+): { crews: Crew[]; flotsam: Flotsam; took: Taken[]; mended: Mended[] } {
   let f = drifted(flotsam, dt, depth);
+  const mended: Mended[] = [];
   const stepped = crews.map((c): Crew => {
     if (sunk(c.health)) return c;
     const u = stepUse(c.hold, c.health, dt);
+    if (u.done) mended.push({ ship: c.id, use: u.done });
     return { ...c, hold: u.hold, health: u.health, gust: stepGust(c.gust, dt) };
   });
   const s = swept(f, stepped, fleet, takes, seed);
@@ -91,5 +96,5 @@ export function stored(
   }
   // what she spilled is gone from her
   const gone = new Set(sunkNow);
-  return { crews: s.crews.map((c) => (gone.has(c.id) ? { ...c, gun: null, hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } } : c)), flotsam: f };
+  return { crews: s.crews.map((c) => (gone.has(c.id) ? { ...c, gun: null, hold: { ...c.hold, items: c.hold.items.map(() => null), using: null } } : c)), flotsam: f, took: s.took, mended };
 }

@@ -21,6 +21,10 @@
 // eye coming down from space onto her (arrival.ts), her hands on her ship once it is there. What only the debug
 // switches ask of it (src/debug.ts: a match at sea among others, her helm lashed, ships sunk, loot strewn) is its
 // `debug`, apart from what the game offers anyone.
+//
+// What happens on the sea (moments.ts) the camera answers (shake.ts: a shake, a knock, a punch of the field of view,
+// laid over the chase camera's eye) and the match's time with it (stops.ts: a blow's moment held a few hundredths of
+// a second); the HUD reads the same moments in her status.
 
 import type { World } from '../environment';
 import { fixedClock } from '../sim/fixed';
@@ -47,6 +51,9 @@ import { ARRIVAL, arriving } from './arrival';
 import { createChase } from './chase';
 import { onScreen } from './lens';
 import { finale, type Ending } from './finale';
+import { seenOf } from './moments';
+import { answerTo, createShake } from './shake';
+import { createStops, stopFor } from './stops';
 import { bearing, createState, type Berth, type Match, type Waters } from './state';
 
 /** How little of the stick's push counts as none. */
@@ -54,6 +61,8 @@ const DEAD = 0.15;
 /** Loot is drawn within DRAWN m of the eye's ship, floating on the waves within RIDES m; shown on the disc within
  *  CHARTED m. */
 const DRAWN = 700, RIDES = 320, CHARTED = 260;
+/** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
+const LONG_AGO = 1e3;
 
 /** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
  * and look; and her end's shot, held on her ship (finale.ts), or none. */
@@ -81,6 +90,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   let held: ((s: ShipState) => Helm) | null = null;
   /** Whether she lies at anchor in the lobby, where the camera has been dragged round her, and its eye as last placed. */
   let anchored = false, orbit: Orbit = REST, berth: Eye | null = null;
+  /** The camera's answer to what happens, the match's time held on a blow, and the last moment they answered. */
+  const shake = createShake(), stops = createStops();
+  let answered = 0;
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -103,6 +115,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     anchored = anchor;
     orbit = REST;
     berth = null;
+    shake.clear();
+    stops.clear();
+    answered = state.deeds().at(-1)?.seq ?? answered;
     held = null;
     arrival = null;
     last = her;
@@ -131,7 +146,20 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       pulled ||= hands.fire;
       gusted ||= hands.gust;
       if (hands.tap !== null) tapped = hands.tap;
-      const time = clock(dt);
+      // what happened since the last frame, answered from where the camera now looks
+      const me = view.watch, lens = chase.eye();
+      for (const d of state.deeds()) {
+        if (d.seq <= answered) continue;
+        answered = d.seq;
+        const a = anchored || arrival !== null ? null : answerTo(d, me);
+        if (!a) continue;
+        const seen = seenOf(d, lens, 0, 0);
+        shake.play(a.answer, a.strength, d.ship === me ? undefined : seen.bearing, seen.metres);
+        const stop = stopFor(d, me);
+        if (stop) stops.request(stop.stop, stop.strength);
+      }
+      shake.update(dt);
+      const time = clock(stops.update(dt));
       for (let i = 0; i < time.steps; i++) {
         const v = state.mine();
         const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
@@ -161,10 +189,10 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         const d = dot(near, l.at);
         if (d < Math.cos(DRAWN / R)) continue;
         const up = d > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0;
-        loot.push({ id: l.id, at: scale(l.at, R + up), gun: l.goods.kind === 'gun', rarity: rarityOf(l.goods) });
+        loot.push({ id: l.id, at: scale(l.at, R + up), kind: l.goods.kind, rarity: rarityOf(l.goods), born: state.born(l.id) ?? -LONG_AGO });
       }
       return {
-        eye: anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || eye,
+        eye: anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || shake.on(eye),
         clock: time, storm: state.storm(between),
         ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
         sea: state.sea(between),
@@ -201,8 +229,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, closing: s.closing, eye: calm,
         next: s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? { centre: s.next.centre, radius: Math.round(s.next.radius * R) } : null,
         outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
-        loot: v ? state.loot().pieces.filter((l) => dot(v.ship.at, l.at) > Math.cos(CHARTED / R)).map((l) => l.at) : [],
+        loot: v ? state.loot().pieces.filter((l) => dot(v.ship.at, l.at) > Math.cos(CHARTED / R)).map((l) => ({ at: l.at, gun: l.goods.kind === 'gun', rarity: rarityOf(l.goods) })) : [],
         reticle: lay && { fall, reach: lay.reached },
+        moments: state.deeds().map((d) => seenOf(d, chase.eye(), width, height)),
       };
     },
     sinkings: state.sinkings,

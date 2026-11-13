@@ -58,11 +58,15 @@ export interface Shot {
 }
 
 /** A ball or a ram striking home: who dealt it (for a ram, the other ship), who took it, the hit points it took off her
- * shield and her hull together, and where (a unit vector). */
+ * shield and her hull together, and of those off each; whether it broke her shield (took the last of it); and where (a
+ * unit vector). */
 export interface Strike {
   shooter: number;
   struck: number;
   damage: number;
+  shield: number;
+  hull: number;
+  broke: boolean;
   at: Vec3;
   ram: boolean;
 }
@@ -98,7 +102,7 @@ export function stepBattle(
     const harm = harmed(c.health, damage);
     c.health = harm.health;
     c.hold = broken(c.hold);
-    strikes.push({ shooter: by, struck: id, damage: harm.shield + harm.hull, at, ram });
+    strikes.push({ shooter: by, struck: id, damage: harm.shield + harm.hull, shield: harm.shield, hull: harm.hull, broke: harm.shield > 0 && c.health.shield <= 0, at, ram });
     if (sunk(c.health)) sunkNow.push(id);
   };
 

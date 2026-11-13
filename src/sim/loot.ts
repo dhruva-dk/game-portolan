@@ -193,14 +193,19 @@ export function offered(c: Crew, at: Vec3, f: Flotsam): { gun: Loot | null; item
   return { gun, item };
 }
 
+/** A piece taken up: by which ship, what of it (a stack taken only in part, the part), where it lay, and the slot it
+ *  went to (0 her gun's, 1–3 an item slot's). */
+export interface Taken { ship: number; goods: Goods; at: Vec3; slot: number }
+
 /**
  * The fleet sweeping up loot, in order of their ids: every ship afloat takes what fits within her reach; one asked to
  * take (`takes`: her id to the slot she offers, 0 her gun's or 1–3 an item slot's) swaps what is offered there for what
  * she has in it, which goes over the side. A piece put over the side lies under its ship until she has sailed clear.
- * The flotsam and the crews after.
+ * The flotsam and the crews after, and what was taken.
  */
-export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel[], takes: ReadonlyMap<number, number>, seed: number): { flotsam: Flotsam; crews: Crew[] } {
+export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel[], takes: ReadonlyMap<number, number>, seed: number): { flotsam: Flotsam; crews: Crew[]; took: Taken[] } {
   let pieces = f.pieces.map((l) => l), next = f.next;
+  const took: Taken[] = [];
   const by = new Map(crews.map((c) => [c.id, c]));
   for (const v of [...fleet].sort((a, b) => a.id - b.id)) {
     let c = by.get(v.id);
@@ -224,11 +229,15 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
         const g = l.goods;
         if (g.kind === 'gun') {
           if (c.gun) kept.push(l);
-          else c = { ...c, gun: gunOf(g.rarity) };
+          else {
+            c = { ...c, gun: gunOf(g.rarity) };
+            took.push({ ship: v.id, goods: g, at: l.at, slot: 0 });
+          }
           continue;
         }
         const s = stowed(c.hold, g.kind, g.count);
         c = { ...c, hold: s.hold };
+        if (s.left < g.count) took.push({ ship: v.id, goods: { kind: g.kind, count: g.count - s.left }, at: l.at, slot: 1 + s.hold.items.findIndex((k) => k?.kind === g.kind) });
         if (s.left > 0) kept.push(s.left === g.count ? l : { ...l, goods: { kind: g.kind, count: s.left } });
       }
       pieces = kept;
@@ -242,6 +251,7 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
         const goods = swap.goods, old: Goods | null = slot === 0 ? (c.gun && { kind: 'gun', rarity: c.gun.rarity })
           : (c.hold.items[slot - 1] && { kind: c.hold.items[slot - 1]!.kind, count: c.hold.items[slot - 1]!.count });
         pieces = pieces.filter((l) => l.id !== swap.id);
+        took.push({ ship: v.id, goods, at: swap.at, slot });
         if (goods.kind === 'gun') c = { ...c, gun: gunOf(goods.rarity) };
         else if (slot >= 1 && slot <= c.hold.items.length) {
           const items = [...c.hold.items];
@@ -256,7 +266,7 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
     }
     by.set(v.id, c);
   }
-  return { flotsam: { pieces, next }, crews: crews.map((c) => by.get(c.id)!) };
+  return { flotsam: { pieces, next }, crews: crews.map((c) => by.get(c.id)!), took };
 }
 
 /** What a ship sinking puts over the side: her gun and every stack in her slots. */

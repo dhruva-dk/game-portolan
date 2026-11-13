@@ -153,6 +153,9 @@ function puffMesh(light: Light, now: FloatNode) {
 }
 
 /** light: how the world is lit (sky/light.ts): the puffs; the sparks glow of themselves. */
+/** A gun's fire, and a shield's light (0117's shield azure, #4fc3ff). */
+const FIRE: Vec3 = [1, 0.55, 0.2], AZURE: Vec3 = [0.31, 0.76, 1];
+
 export function createGunfire(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
   const balls = ballMesh(pixel);
@@ -194,8 +197,11 @@ export function createGunfire(light: Light) {
 
   const smoke = (at: Vec3, way: Vec3, ink: Vec3, opacity: number, life: number, size = 0.8): Puff =>
     ({ at, way, size, grow: 1.6, drag: 2.2, pull: -0.5, life, ink, glow: 0, opacity, soft: 1, fadeIn: 0.05 });
-  const flash = (at: Vec3, way: Vec3, size: number): Puff =>
-    ({ at, way, size, grow: 12, drag: 8, pull: 0, life: u(0.08, 0.14), ink: [1, 0.55, 0.2], glow: 6, opacity: 0, soft: 1, fadeIn: 0 });
+  const flash = (at: Vec3, way: Vec3, size: number, ink: Vec3 = FIRE): Puff =>
+    ({ at, way, size, grow: 12, drag: 8, pull: 0, life: u(0.08, 0.14), ink, glow: 6, opacity: 0, soft: 1, fadeIn: 0 });
+  /** A mote of a shield's light thrown off it: a small hard azure spark, falling slowly. */
+  const shard = (at: Vec3, speed: number): Puff =>
+    ({ at, way: scale(any(), u(speed / 2, speed)), size: u(0.18, 0.34), grow: 0, drag: 1.6, pull: 2, life: u(0.35, 0.7), ink: AZURE, glow: 4, opacity: 0, soft: 0.2, fadeIn: 0 });
   const splinter = (at: Vec3, up: Vec3): Puff => {
     const d = vnormalize(add(any(), up, 1.2));
     return { at, way: scale(d, u(4, 13)), size: u(0.12, 0.22), grow: 0, drag: 0.4, pull: 9.8, life: u(1, 1.8), ink: [0.16, 0.1, 0.06], glow: 0, opacity: 1, soft: 0, fadeIn: 0 };
@@ -227,13 +233,32 @@ export function createGunfire(light: Light) {
         lay(time, { ...smoke(p, add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), [0.95, 0.96, 0.97], 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
       }
     },
-    /** A ball home in a hull at `at` (a unit vector), or a ram. */
-    strike(time: number, at: Vec3, ram: boolean) {
+    /** A ball home in a hull at `at` (a unit vector), or a ram; whether her shield took all of it (a glint of azure
+     *  and no splinters), and whether it broke (a burst of shards: 0117's shield break). */
+    strike(time: number, at: Vec3, ram: boolean, shield: boolean, broke: boolean) {
       const p = scale(at, R + (ram ? 1.2 : 1.8));
+      if (shield || broke) {
+        for (let i = 0; i < (broke ? 3 : 2); i++) lay(time, flash(p, scale(any(), 2), broke ? 3.4 : 2, AZURE));
+        for (let i = 0; i < (broke ? 26 : 8); i++) lay(time, shard(add(p, any(), broke ? 1.5 : 0.6), broke ? 9 : 4));
+        if (shield) return;
+      }
       for (let i = 0; i < (ram ? 10 : 24); i++) lay(time, splinter(p, at));
       if (ram) return;
       for (let i = 0; i < 3; i++) lay(time, flash(p, scale(any(), 2), 2.4));
       for (let i = 0; i < 14; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), any(), 2), [0.24, 0.22, 0.2], 0.7, u(2.5, 4), 1));
+    },
+    /** A ship gone down at `at` (a unit vector): her timbers thrown, the sea heaved white over her, a pall of smoke. */
+    sink(time: number, at: Vec3) {
+      const p = scale(at, R + 1);
+      for (let i = 0; i < 30; i++) lay(time, splinter(add(p, across(at), u(0, 4)), at));
+      for (let i = 0; i < 3; i++) lay(time, flash(add(p, at, 1.5), scale(any(), 3), 4.5));
+      for (let i = 0; i < 40; i++) {
+        lay(time, {
+          at: add(scale(at, R), across(at), u(0, 6)), way: add(scale(at, u(4, 12)), across(at), u(1, 5)), size: u(0.6, 1.1), grow: 0.6,
+          drag: 0.2, pull: 9.8, life: u(1.6, 2.8), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
+        });
+      }
+      for (let i = 0; i < 16; i++) lay(time, smoke(add(p, across(at), u(0, 4)), add(scale(at, u(2, 7)), any(), 2), [0.2, 0.19, 0.18], 0.75, u(4, 7), 2));
     },
     /** Each frame: the world's clock now (s), and every ball in flight. */
     draw(time: number, flying: readonly BallDraw[]) {

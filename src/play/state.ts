@@ -34,12 +34,14 @@ import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
 import { createTerritory, type Move, type Outcome, type Territory } from '../sim/territory.ts';
 import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
+import type { Deed } from '../player.ts';
 import type { Hull } from '../world/swell.ts';
 import { remembered, type Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookOf, seaColourOf } from './colours.ts';
+import { deedsOf, kept as keptDeeds } from './moments.ts';
 import { sinking } from './sinking.ts';
 
 /** How long what the guns did is kept for the frame, seconds: past the last of its smoke (gunfire/gunfire.ts). */
@@ -116,6 +118,12 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
   const aboard = new Map<number, Aboard>();
   let battle: Battle = battleOf([], match.seed);
   let wrecks: Wreck[] = [], blasts: Blast[] = [];
+  /** What happened in the last second or so (moments.ts), and the last one's number (never reset: a reader keeps its
+   *  place across matches); when each piece put on the water since the match began came onto it (the world's clock). */
+  let deeds: Deed[] = [], seq = 0;
+  const born = new Map<number, number>();
+  /** The ships sunk in the step under way, for its deeds. */
+  const lostNow: { id: number; by: number | null; at: Vec3 }[] = [];
   /** The loot on the water. */
   let flotsam: Flotsam = { pieces: [], next: 0 };
   const sinkings: Sinking[] = [];
@@ -146,6 +154,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     aboard.clear();
     wrecks = [];
     blasts = [];
+    born.clear();
     sinkings.length = 0;
     struck.clear();
     battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
@@ -165,6 +174,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     const a = aboard.get(id), v = fleet.find((o) => o.id === id);
     if (!a || !v) return;
     sinkings.push({ id, by, cause, time: time(), at: v.ship.at, heading: v.ship.heading });
+    lostNow.push({ id, by, at: v.ship.at });
+    blasts.push({ kind: 'sink', time: tick * STEP, at: v.ship.at });
     territory?.sink(id, tick * STEP);
     wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
     aboard.delete(id);
@@ -234,10 +245,12 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     }
     const worn = weathered(fought.battle, fleet, storm, STEP);
     const lost = [...fought.sunk, ...worn.sunk];
+    const before = flotsam.next;
     const kept = stored(worn.battle.crews, flotsam, fleet, wants.takes, lost, STEP, depth, match.seed);
     battle = { ...worn.battle, crews: kept.crews };
     flotsam = kept.flotsam;
-    return { fought, lost };
+    for (let id = before; id < flotsam.next; id++) born.set(id, tick * STEP);
+    return { fought, lost, kept };
   };
 
   /** Who holds the sea after the step (each trail laid, each loop closed), and in her own water her shield coming
@@ -268,7 +281,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       ...blasts.filter((b) => b.time > t - KEPT),
       ...fought.shots.map((s): Blast => ({ kind: 'shot', time: t, from: s.from, dir: s.dir })),
       ...fought.splashes.map((s): Blast => ({ kind: 'splash', time: t, at: s.at, land: s.land })),
-      ...fought.strikes.map((s): Blast => ({ kind: 'strike', time: t, at: s.at, ram: s.ram })),
+      ...fought.strikes.map((s): Blast => ({ kind: 'strike', time: t, at: s.at, ram: s.ram, shield: s.hull <= 0 && s.shield > 0, broke: s.broke })),
     ];
   };
 
@@ -283,6 +296,12 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     wrecks = wrecks.filter((w) => wreckAt(w, clock(0)));
   };
 
+  /** The step's deeds kept, numbered on (moments.ts), with any ship sunk in it. */
+  const record = (done: Parameters<typeof deedsOf>[0]) => {
+    deeds = keptDeeds(deeds, deedsOf(done, PLAYER, () => ++seq, tick * STEP), tick * STEP);
+    lostNow.length = 0;
+  };
+
   return {
     /** One step: the player's helm, gun and stores, everyone else's from her bot or her lashed helm; then the fleet's
      *  step and the fighting's, who holds the sea, and what it all did kept to be drawn. Returns what it did to who
@@ -293,7 +312,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       lap?.('command');
       const { wants, met, from } = sail(helms, asks);
       lap?.('sail');
-      const { fought, lost } = fight(orders, met, storm, wants);
+      const { fought, lost, kept } = fight(orders, met, storm, wants);
       lap?.('fight');
       tick++;
       const did = hold(from, storm, lost);
@@ -303,6 +322,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       keep(fought);
       lap?.('keep');
       founderAll(lost, fought);
+      record({ ...fought, sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
       lap?.('founder');
       return did;
     },
@@ -343,6 +363,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     blasts: (): readonly Blast[] => blasts,
     /** The loot on the water. */
     loot: (): Flotsam => flotsam,
+    /** When a piece came onto the water (the world's clock, s), if it did after the match began. */
+    born: (id: number): number | undefined => born.get(id),
+    /** What happened in about the last second, oldest first (moments.ts). */
+    deeds: (): readonly Deed[] => deeds,
     /** Who holds the sea, as drawn at the moment `between` of the way through the last step; none outside a match. */
     sea(between: number): Sea | undefined {
       if (!territory) return undefined;
@@ -410,6 +434,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
         if (!aboard.has(id)) return;
         battle = { ...battle, crews: battle.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
         founder(id, by, by === null ? 'storm' : 'shot');
+        record({ shots: [], splashes: [], strikes: [], sunk: lostNow, took: [], mended: [], blew: [], her: null });
       },
     },
   };

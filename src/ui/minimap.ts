@@ -6,7 +6,7 @@
 // On the plain sea, from the bottom up: who holds the water, a wash in each holder's colour, hers the deeper (held.ts);
 // the islands, their aprons a pale wash, their land parchment going ochre up the hills, their coasts inked (isles.ts);
 // her open trail, a line in her colour; the Storm's side of its edge washed in its own violet and the edge a violet
-// line; the circle it next closes to, a white dotted line; the loot, gold dots; the ships she can see, iron dots.
+// line; the circle it next closes to, a white dotted line; the loot, marks in its rarity's ink (a lozenge a gun, a roundel stores), the better the bigger; the ships she can see, iron dots.
 // Outside the next circle a white line runs from her to its nearest point, ending in an arrowhead (on the rim when the
 // circle is off the disc). Her mark at the centre is a small arrowhead turned to her heading. Drawn in canvas 2D when
 // what it shows has changed; tapped, it opens the full map.
@@ -17,6 +17,7 @@ import type { Coast } from './coasts';
 import { laid, layOf, metres, place } from './disc';
 import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
+import { RARITY } from '../rarity';
 import { bakeIsle, zOf, type Isle } from './isles';
 
 /** Metres from her to the disc's rim: at her 12 m/s some 22 s of sailing, past a gun's 200 m reach, as far as the loot
@@ -42,7 +43,7 @@ export function stormRing(storm: Storm, n = 96): Vec3[] {
  *  next closes to (radius in metres); the loot on the water; the ships she sees; who holds the sea, and her number in
  *  it (her id). */
 export interface More {
-  gilt?: boolean; calm?: Storm; next?: Storm | null; loot?: readonly Vec3[]; ships?: readonly Vec3[]; sea?: Sea; own?: number | null;
+  gilt?: boolean; calm?: Storm; next?: Storm | null; loot?: readonly { at: Vec3; gun: boolean; rarity: number }[]; ships?: readonly Vec3[]; sea?: Sea; own?: number | null;
 }
 
 /** An arrowhead's path, its tip `l` up from (0, 0). */
@@ -184,7 +185,21 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
       ctx.stroke();
       ctx.fill();
     };
-    dots(more.loot, 1.5, WASH.gold, INK.iron, 0.8);
+    // the loot, worst first so the best lies on top: a lozenge for a gun, a roundel for stores, ruled in iron
+    const loot = [...(more.loot ?? [])].filter((p) => near(p.at, SPAN * 1.05)).sort((a, b) => a.rarity - b.rarity);
+    ctx.lineWidth = 0.9 * dpr;
+    ctx.strokeStyle = INK.iron;
+    for (const p of loot) {
+      const [x, y] = place(l, p.at), size = (1.9 + 0.3 * p.rarity) * dpr;
+      ctx.beginPath();
+      if (p.gun) {
+        const h = size * 1.3;
+        ctx.moveTo(x, y - h), ctx.lineTo(x + h * 0.8, y), ctx.lineTo(x, y + h), ctx.lineTo(x - h * 0.8, y), ctx.closePath();
+      } else ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fillStyle = `#${RARITY[p.rarity].toString(16).padStart(6, '0')}`;
+      ctx.fill();
+      ctx.stroke();
+    }
     dots(more.ships, 2.1, INK.iron, INK.white, 1.6);
     // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
     const goal = next ?? calm;

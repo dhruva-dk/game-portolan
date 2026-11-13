@@ -277,7 +277,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
       if (b.time <= laid) continue;
       if (b.kind === 'shot') gunfire.shot(b.time, b.from, b.dir);
       else if (b.kind === 'splash') gunfire.splash(b.time, b.at, b.land);
-      else gunfire.strike(b.time, b.at, b.ram);
+      else if (b.kind === 'strike') gunfire.strike(b.time, b.at, b.ram, b.shield, b.broke);
+      else gunfire.sink(b.time, b.at);
     }
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);

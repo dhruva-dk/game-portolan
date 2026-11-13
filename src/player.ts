@@ -46,14 +46,50 @@ export interface Status {
    *  (radius in metres) and the calm it next closes to (null once it has closed for good); how far outside the calm
    *  she is, metres (0 inside). */
   storm: number; closing: boolean; eye: { centre: Vec3; radius: number }; next: { centre: Vec3; radius: number } | null; outside: number;
-  /** The loot on the water near her (unit vectors), for the disc. */
-  loot: readonly Vec3[];
+  /** The loot on the water near her, for the disc: where each piece lies (a unit vector), whether it is a gun (else
+   *  stores to mend with), and the rarity it reads as (0–4: rarity.ts). */
+  loot: readonly { at: Vec3; gun: boolean; rarity: number }[];
   /** Her gun's aim, while her hands are on her ship and she has a gun (else null). The reticle stands in the middle of
    *  the screen, where the gun is aimed (play/chase.ts); `fall` is where the ball will come down, or pass through the
    *  ship it is laid on (CSS px from the top left; null off the screen or hidden by the sea's curve), and `reach`
    *  whether it reaches what the reticle is on (false: past range, or the sky). */
   reticle: { fall: { x: number; y: number } | null; reach: boolean } | null;
+  /** What happened in about the last second, oldest first (Moment): what the HUD answers her with, and what sound
+   *  will play. A reader keeps the last seq it took and takes those past it. */
+  moments: readonly Moment[];
 }
+
+/** What a piece taken up or mended with is. */
+export type Piece = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
+
+/**
+ * What happened on the sea, as the match reports it (play/moments.ts), numbered in order (seq, from 1 within a game)
+ * at a moment on the world's clock (time, s), where it happened (at, a unit vector), and the ship it befell (ship; 0
+ * hers, sim/match.ts PLAYER):
+ *   fired    a gun went off: ship's
+ *   fell     a ball came down in the sea, or on the land: a miss (ship: who fired it)
+ *   struck   a ball or a ram home in ship, dealt by `by`: the hit points it took off her shield and off her hull,
+ *            whether it took the last of her shield, and whether it was a ram
+ *   sank     ship went down, sunk by `by` (null: the storm)
+ *   took     ship took up a piece of loot (only hers is reported): what, its rarity (0–4) and the slot it went to (0
+ *            the gun's, 1–3 the items')
+ *   mended   ship finished mending with what she used (only hers)
+ *   gust     ship spent a gust (only hers)
+ */
+export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
+  | { kind: 'fired' }
+  | { kind: 'fell'; land: boolean }
+  | { kind: 'struck'; by: number; shield: number; hull: number; broke: boolean; ram: boolean }
+  | { kind: 'sank'; by: number | null }
+  | { kind: 'took'; piece: Piece; rarity: number; slot: number }
+  | { kind: 'mended'; piece: Piece }
+  | { kind: 'gust' }
+);
+
+/** A Deed as she sees it: where it falls on her screen (CSS px from the top left; null off it, or behind her), its
+ *  bearing from the way the camera looks (radians clockwise: 0 ahead, π/2 to the right, ±π behind), and how far it is
+ *  from the eye, metres. */
+export type Moment = Deed & { seen: { x: number; y: number } | null; bearing: number; metres: number };
 
 /** An item a slot of the hotbar holds. */
 export type Item = 'item.smallShield' | 'item.bigShield' | 'item.repairKit' | 'item.fullRepair';

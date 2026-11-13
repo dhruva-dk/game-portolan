@@ -38,18 +38,24 @@ export interface Look { paint: Vec3; sail: Vec3; band: boolean }
 export interface ShipDraw { id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean }
 
 /** What the guns did, at a moment on the world's clock (s): a gun fired from `from` along `dir`; a ball come down at
- *  `at` (unit vector) in the sea or on land; a ball home in a hull at `at`, or a ram. */
+ *  `at` (unit vector) in the sea or on land; a ball home in a hull at `at`, or a ram, whether her shield took all of it
+ *  and whether it broke her shield; a ship sunk where she lay, at `at`. */
 export type Blast =
   | { kind: 'shot'; time: number; from: Vec3; dir: Vec3 }
   | { kind: 'splash'; time: number; at: Vec3; land: boolean }
-  | { kind: 'strike'; time: number; at: Vec3; ram: boolean };
+  | { kind: 'strike'; time: number; at: Vec3; ram: boolean; shield: boolean; broke: boolean }
+  | { kind: 'sink'; time: number; at: Vec3 };
 
 /** A ball in flight: where it is (world metres) and its velocity (m/s). */
 export interface BallDraw { at: Vec3; way: Vec3 }
 
+/** What a piece of loot is: a gun, or stores to mend with. */
+export type LootKind = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
+
 /** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
- *  sea's surface), whether it is a gun (a crate; else a cask of stores), and the rarity it reads as (0–4: rarity.ts). */
-export interface LootDraw { id: number; at: Vec3; gun: boolean; rarity: number }
+ *  sea's surface), what it is, the rarity it reads as (0–4: rarity.ts), and when it came onto the water (the world's
+ *  clock, s; long before the match for what was strewn at its start), for it to bob up. */
+export interface LootDraw { id: number; at: Vec3; kind: LootKind; rarity: number; born: number }
 
 
 /**
