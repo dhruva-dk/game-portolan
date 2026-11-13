@@ -17,7 +17,7 @@ const SHOTS = [
   'screen=match&drive=150,1,14',
   'screen=match&drive=291,1,14',
   'screen=match',
-  'screen=match&ships=40&drive=0,0.3,2',
+  'screen=match&ships=80&drive=0,0.3,2',
   'screen=match&storm=100',
   'screen=lobby',
   'screen=map',

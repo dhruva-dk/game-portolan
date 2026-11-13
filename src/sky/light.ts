@@ -29,7 +29,7 @@ export interface Light {
 
 /** The rim's strength (of the sun's light at p, as a white surface square to it would give), how fast it narrows to
  *  the outline, how much of it a surface lit from the front keeps, and its warmth. */
-const RIM = 0.9, RIM_POWER = 3, FRONT = 0.3, RIM_TINT = [1.1, 0.95, 0.75] as const;
+const RIM = 1.2, RIM_POWER = 3, FRONT = 0.3, RIM_TINT = [1.1, 0.95, 0.75] as const;
 
 /** The smoothest a surface is taken to be for the sun: a smoother one's highlight would be smaller than the disc. */
 const SMOOTHEST = 0.06;

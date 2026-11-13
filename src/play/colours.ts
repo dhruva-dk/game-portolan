@@ -3,8 +3,8 @@
 import type { Look } from '../snapshot';
 import type { Vec3 } from '../world/sphere';
 
-/** The player's colours: a crimson hull and the crimson cross on bright, unbleached canvas, the brightest sails at sea. */
-export const LOOK: Look = { paint: [0.5, 0.03, 0.025], sail: [0.8, 0.74, 0.6], band: false };
+/** The player's colours: a scarlet hull and the scarlet cross on bright, unbleached canvas, the brightest sails at sea. */
+export const LOOK: Look = { paint: [0.6, 0.015, 0.03], sail: [0.95, 0.88, 0.7], band: false };
 /** The others' hulls (and the marks on their sails), and their sails, each dyed a strong colour of its own (linear):
  *  woad, saffron, verdigris, madder, charcoal, murrey, ochre. */
 const PAINTS: Vec3[] = [[0.6, 0.5, 0.3], [0.03, 0.06, 0.2], [0.02, 0.02, 0.02], [0.55, 0.42, 0.18], [0.3, 0.03, 0.02], [0.04, 0.12, 0.06]];

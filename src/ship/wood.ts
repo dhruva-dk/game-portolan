@@ -23,7 +23,7 @@ import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 /** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to: oiled
  * oak, a deep saturated brown; the deck bleached by sun and salt; spars a shade lighter than the hull; timber blackened with pitch. */
 const PLANK_MEAN = [0.118, 0.073, 0.042], DECK_MEAN = [0.209, 0.132, 0.083];
-const HULL = [0.2, 0.1, 0.045], DECK = [0.32, 0.25, 0.18], SPAR = [0.24, 0.15, 0.08];
+const HULL = [0.27, 0.14, 0.06], DECK = [0.36, 0.28, 0.2], SPAR = [0.28, 0.17, 0.09];
 const DARK = [0.045, 0.032, 0.022], IRON = [0.03, 0.03, 0.03];
 /** How much further from grey oil takes the planks' colours. */
 const SOAKED = 1.6;

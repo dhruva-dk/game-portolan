@@ -38,13 +38,14 @@ export interface Look {
 /** The day's looks, by the sine of the sun's height they are set for. */
 const DAY: readonly (readonly [number, Look])[] = [
   // the golden hour: amber lights against teal shadows, the sea deep
-  [0.17, { exposure: 2.3, temp: 0.62, tint: 0.03, contrast: 1.1, saturation: 1.16, warm: 1.25, sea: 1.12, sky: 0.95,
-    shadows: [-0.01, 0.004, 0.014], highlights: [0.04, 0.012, -0.014], fade: 0.02, fadeTo: [0.05, 0.035, 0.06], vignette: 0.32 }],
-  // the trade-wind afternoon: warm, rich, the shadows a clear blue-green, never black
-  [0.47, { exposure: 2.3, temp: 0.36, tint: 0.01, contrast: 1.08, saturation: 1.18, warm: 1.2, sea: 1.12, sky: 1.02,
-    shadows: [-0.006, 0.003, 0.012], highlights: [0.022, 0.008, -0.01], fade: 0.018, fadeTo: [0.04, 0.05, 0.07], vignette: 0.26 }],
+  [0.17, { exposure: 2.3, temp: 0.4, tint: 0.03, contrast: 1.1, saturation: 1.26, warm: 1.25, sea: 1.3, sky: 1.12,
+    shadows: [-0.01, 0.004, 0.014], highlights: [0.04, 0.012, -0.014], fade: 0.012, fadeTo: [0.02, 0.05, 0.07], vignette: 0.32 }],
+  // the trade-wind afternoon: rich and saturated, the sea turquoise and the sky clean blue (the white balance only
+  // a touch warm: warming it further greys the teal), the shadows a clear blue-green, never black
+  [0.47, { exposure: 2.4, temp: 0.12, tint: 0.01, contrast: 1.1, saturation: 1.32, warm: 1.22, sea: 1.38, sky: 1.22,
+    shadows: [-0.008, 0.003, 0.01], highlights: [0.022, 0.008, -0.01], fade: 0.01, fadeTo: [0.01, 0.05, 0.07], vignette: 0.26 }],
   // noon in the tropics: bright and punchy, the sea at its most turquoise
-  [0.97, { exposure: 1.95, temp: 0.12, tint: 0, contrast: 1.1, saturation: 1.22, warm: 1.08, sea: 1.25, sky: 1.08,
+  [0.97, { exposure: 2.05, temp: 0.04, tint: 0, contrast: 1.1, saturation: 1.32, warm: 1.1, sea: 1.4, sky: 1.2,
     shadows: [-0.004, 0.002, 0.01], highlights: [0.006, 0.004, 0], fade: 0.012, fadeTo: [0.03, 0.05, 0.07], vignette: 0.2 }],
 ];
 /** In the storm: cold and flat, its colour mostly gone, its blacks lifted to a slate grey; opened a little. */
