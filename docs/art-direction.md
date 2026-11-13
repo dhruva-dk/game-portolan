@@ -19,8 +19,10 @@ at 956×440. Each rule below can be checked against `node tools/hero.ts <dir>` (
 - Nothing is blown flat. AgX rolls highlights toward white. The bloom only spills light past its knee.
 
 ## Palette
-- The player sails cream canvas with a red cross pattée (`play/colours.ts` LOOK). The red shows through the backlit
-  canvas.
+- The player sails bright cream canvas with a scarlet cross pattée over a scarlet-strake hull (`play/colours.ts`
+  LOOK). The red shows through the backlit canvas.
+- The sea is turquoise over shallows and rich blue-teal in the deep, never grey. The sky is a clean blue. The grade's
+  white balance stays only a touch warm, because warming it further greys both.
 - Every enemy has its own strong dye (woad, saffron, verdigris, madder, charcoal, murrey, ochre) and a painted hull.
   The dyes cycle by ship, so seven in a row never repeat.
 - Islands are warm sand, red-brown rock, and clear green palms and shrubs. They read green at 30 px, not as a dark
