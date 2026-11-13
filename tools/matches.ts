@@ -87,7 +87,9 @@ for (let g = 0; g < games; g++) {
   console.log(`  loops: ${l.closed} closed (${l.metres.toFixed(0)} m²), ${l.cut} cut by another, ${l.own} cut by herself or given up;`
     + ` shield from her water ${back.reduce((a, b) => a + b, 0).toFixed(0)} hp over ${back.filter((k) => k > 0).length} ships`);
   const all = [...stuck.values()], aground = all.filter((k) => k.speed < AGROUND);
-  const seconds = all.map((k) => k.seconds).sort((a, b) => a - b);
+  const seconds = all.map((k) => k.seconds).sort((a, b) => a - b), speeds = all.map((k) => k.speed).sort((a, b) => a - b);
+  // (a ship circling in her own water, way on, moves little over WINDOW s: her speed tells her from one lying still)
   console.log(`  stuck (<${STUCK} m in ${WINDOW} s): ${all.length} ships, ${aground.length} of them aground;`
-    + ` ${all.filter((k) => k.from < 30).length} from the first 30 s; seconds stuck, median ${seconds[seconds.length >> 1] ?? 0}, most ${seconds.at(-1) ?? 0}`);
+    + ` ${all.filter((k) => k.from < 30).length} from the first 30 s; seconds stuck, median ${seconds[seconds.length >> 1] ?? 0}, most ${seconds.at(-1) ?? 0};`
+    + ` their slowest mean speed, median ${(speeds[speeds.length >> 1] ?? 0).toFixed(1)} m/s`);
 }

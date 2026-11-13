@@ -7,7 +7,8 @@
 //   a ship near her sends her straight home to close it. A cut or a closed loop ends the bite, and she rests a while;
 //   cut, she goes back in before she sets out again.
 // - home: her shield down from a fight (shot within `fresh` s, or her hull hurt) and her water in reach, she goes back
-//   in and lies there while it comes back (handling.ts HOLDING). Not at the start, when no ship has a shield yet.
+//   in and circles there, way kept on, while it comes back (handling.ts HOLDING); not with the storm on her water, nor
+//   at the start, when no ship has a shield yet.
 // - cut: another's open trail near her, at a point she would reach before its ship could be back in her own water
 //   (the trail's first point, where she left it), she sails across it.
 //
@@ -33,6 +34,8 @@ export const CLAIMER = {
   out: 0.75, setOut: 0.45,
   /** Home: her shield under `low` wants it wholly, over `full` not at all; her water out of reach past `far` m. */
   low: 30, full: 90, far: 260, near: 120, need: 0.7, fresh: [40, 15] as const, hurt: [85, 50] as const,
+  /** In her water she circles on a mark this far ahead, turned to her side. */
+  round: 22,
   /** Cut: a trail point within `reach` m, looked at every `stride` points, she must reach `lead` s before its ship could
    *  be home; she aims `past` m beyond it, to be sure of crossing. A trail of fewer than `least` points is left be. */
   reach: 130, stride: 3, lead: 2, past: 10, least: 6, cut: 0.6,
@@ -110,7 +113,7 @@ export function claimAct(c: Ctx): void {
     m.leg = 0;
     if (!m.bite) {
       m.rested = m.clock + CLAIMER.rest[1];
-      m.goal = p;
+      m.goal = circle(c);
       return;
     }
   }
@@ -121,17 +124,28 @@ export function claimAct(c: Ctx): void {
 
 // ---------------------------------------------------------------- home
 
-/** How much she wants to go home to get her shield back. */
+/** How much she wants to go home to get her shield back: none with the storm on her water. */
 export function homeUrge(c: Ctx): number {
-  if (!c.sea.holdings) return 0;
+  if (!c.sea.holdings || (c.sea.storm && toEdge(c.m.haven, c.sea.storm) < c.t.margin)) return 0;
   const shield = c.own.shield ?? 0, d = inOwn(c) ? 0 : distance(c.own.ship.at, c.m.haven);
   const fought = Math.max(ramp(c.m.clock - c.m.shotT, ...CLAIMER.fresh), ramp(c.own.hull ?? 100, ...CLAIMER.hurt));
   return CLAIMER.need * utility(ramp(shield, CLAIMER.full, CLAIMER.low), fought, ramp(d, CLAIMER.far, CLAIMER.near), ramp(c.foeD, 40, 120));
 }
 
-/** Goes home, and lies there. */
+/** Goes home, and circles there while her shield comes back. */
 export function homeAct(c: Ctx): void {
-  c.m.goal = c.m.haven;
+  c.m.goal = inOwn(c) ? circle(c) : c.m.haven;
+}
+
+/** A mark `round` m ahead and turned to her side, in her own water and open: she keeps way on in it, no sitting target
+ *  (the other side, else straight on, if none to her side is). */
+function circle(c: Ctx): Vec3 {
+  const p = c.own.ship.at, f = c.own.ship.heading, side = c.m.rand & 1 ? 1 : -1, h = c.sea.holdings!;
+  for (const a of [0.6, 1.1, 1.7, -0.6, -1.1, -1.7, 2.4, -2.4]) {
+    const q = along(p, rotate(p, f, side * a), CLAIMER.round).p;
+    if (h.ownerAt(q) === c.own.id && open(c, q)) return q;
+  }
+  return along(p, f, CLAIMER.round).p;
 }
 
 // ---------------------------------------------------------------- cutting
