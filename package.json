@@ -13,6 +13,7 @@
     "capture": "node tools/capture.ts",
     "hero": "node tools/hero.ts",
     "budget": "node tools/budget.ts",
+    "hitch": "node tools/hitch.ts",
     "shot": "xcrun devicectl device capture screenshot --device 00008140-000268A80140801C --destination captures/phone.png"
   },
   "dependencies": {

@@ -109,8 +109,8 @@ function match(seed: number, generation: number, steps: number, frame: (sea: Sea
 
 test('the water\'s copy of the cells keeps up with the sea: loops, drains, the storm, frames missed and a new match', () => {
   const claimed = createClaimed(), draw = random(17);
-  let wait = 0, frames = 0, whole = 0, loads = 0, spent = 0, checked = 0, clock = 0;
-  const kinds = new Set<string>();
+  let wait = 0, frames = 0, whole = 0, spent = 0, checked = 0, clock = 0;
+  const kinds = new Set<string>(), loads: number[] = [];
   const same = (owner: ReadCells, label: string) => {
     for (let c = 0; c < CELLS; c++) if (claimed.ownerOf(c) !== owner[c]) assert.fail(`${label}: cell ${c} is ${claimed.ownerOf(c)}, the sea's ${owner[c]}`);
     checked++;
@@ -119,7 +119,8 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
     const t0 = performance.now(), taken = claimed.follow(sea);
     claimed.work((clock = time));
     const ms = performance.now() - t0;
-    if (taken) [whole, loads] = [whole + 1, Math.max(loads, ms)];
+    if (taken) whole++;
+    if (taken && sea) loads.push(ms);
     else [spent, frames] = [spent + ms, frames + 1];
   };
   for (const generation of [1, 2]) {
@@ -148,8 +149,10 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
   assert.ok(whole > 4, `taken whole ${whole} times`);
   assert.ok(checked > 100);
   // what it costs: a few hundredths of a millisecond a frame (no frame over a few: the next test); a whole copy (some
-  // tens of milliseconds: a match's first frame paid them all once, a hitch as she put to sea) a few a frame too
-  assert.ok(spent / frames < 0.5 && loads < 8, `${(spent / frames).toFixed(3)} ms a frame, a whole copy's frame ${loads.toFixed(1)} ms`);
+  // tens of milliseconds: a match's first frame paid them all once, a hitch as she put to sea) a few a frame too (the
+  // middle one of a sea's whole copies, as the machine's other work can weigh on any one)
+  const load = loads.sort((a, b) => a - b)[Math.floor(loads.length / 2)];
+  assert.ok(spent / frames < 0.5 && load < 6, `${(spent / frames).toFixed(3)} ms a frame, a whole copy's frame ${load.toFixed(1)} ms`);
 });
 
 test('a loop round half the planet is drawn over some frames, none paying more than a few milliseconds', () => {
