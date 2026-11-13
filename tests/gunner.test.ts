@@ -150,7 +150,8 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
   const green = by((k) => k < 0.5), sharp = by((k) => k > 0.8);
   assert.ok(spreadBy(temper(green[0]).skill) > 2 * spreadBy(1) && spreadBy(1) === 1);
   // the share of her balls that strike home in her first 15 s on him (before either could sink him), over eight
-  // captains of each (four told them apart by a hair: 29% against 12%)
+  // captains of each (four, since the bore moved aft and up with the drawn plinth, tell them apart by less than the
+  // margin: 27% against 13%)
   const share = (seeds: number[]) => {
     const rs = seeds.map((seed) => battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 15, { course: null, throttle: 0.4 }));
     return rs.reduce((n, r) => n + r.strikes, 0) / Math.max(1, rs.reduce((n, r) => n + r.fired.length, 0));

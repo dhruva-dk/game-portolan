@@ -122,9 +122,11 @@ function landing(kind: GunKind, e: number, speed: number): { metres: number; sec
 }
 
 test("a ball's carry and flight time on the sphere match the orbit's, to a few centimetres", () => {
-  for (const e of [3 * deg, 10 * deg, 20 * deg, BEST]) {
+  for (const e of [3 * deg, 10 * deg, 20 * deg, BEST, 55 * deg]) {
     const l = landing('cannon', e, GUNS.cannon.speed), t = thrown('cannon', reach('cannon', e))!;
     assert.ok(Math.abs(l.metres - reach('cannon', e)) < 0.05, `${(e / deg).toFixed(1)}°: carried ${l.metres.toFixed(3)}, the orbit says ${reach('cannon', e).toFixed(3)}`);
+    // (over the best elevation a cannon is thrown low to the same carry, only a lobbed gun high: that one's carry alone)
+    if (e > BEST) continue;
     assert.ok(Math.abs(t.elevation - e) < 1e-5, `${(e / deg).toFixed(1)}°: thrown at ${t.elevation / deg}°`);
     assert.ok(Math.abs(l.seconds - t.time) < 0.002, `${(e / deg).toFixed(1)}°: flew ${l.seconds}, the orbit says ${t.time}`);
   }
@@ -149,8 +151,8 @@ const pair = (metres: number, bearing: number, course: number, speed: number): V
 ];
 
 test('led with no spread, a ball strikes a ship on a steady course, at any range and crossing', () => {
-  // (out to 170 m: one at 175 m running from her at her best is led past the cannon's 200 m from its bore, abaft her
-  // mainmast)
+  // (out to 170 m, not 175: since the bore moved abaft her mainmast with the drawn plinth, one at 175 m running from
+  // her at her best is led past the cannon's 200 m from it)
   for (const metres of [50, 100, 150, 170]) for (const crossing of [0, 45, 90, 135, 180, 270]) {
     const bearing = 30 * deg;
     const fleet = pair(metres, bearing, bearing + crossing * deg, SHIP.top);
@@ -230,7 +232,7 @@ test('the spread closes up with rarity, and is the same for the same seed', () =
     }
     return sum / 300;
   });
-  for (let i = 1; i < misses.length; i++) assert.ok(misses[i] < misses[i - 1] * 0.95, `rarity ${i}: ${misses.join(', ')}`);
+  for (let i = 1; i < misses.length; i++) assert.ok(misses[i] < misses[i - 1] * 0.9, `rarity ${i}: ${misses.join(', ')}`);
   // (and so fewer of its balls miss: tests/gunnery.test.ts)
 });
 
@@ -240,9 +242,9 @@ test("an order's spread widens the gun's by that many times: the same draw, furt
     const r = fight(fleet, battleOf([crewOf(1, cannon(2)), { ...crewOf(2), health: { hull: 1e6, shield: 0 } }], 5), (f) => f.map((_, i) => ({ aim: on(fleet[0].ship, fleet[0].ship.heading, 150), fire: i === 0, spread })), 60, [0, 0]);
     return r.strikes.length / r.shots;
   };
-  const plain = shots(), as1 = shots(1), wide = shots(4);
+  const plain = shots(), as1 = shots(1), wide = shots(2.5);
   assert.equal(plain, as1);
-  assert.ok(wide < plain - 0.1, `hits ${plain} plain, ${wide} at 4 times the spread`);
+  assert.ok(wide < plain - 0.1, `hits ${plain} plain, ${wide} at 2.5 times the spread`);
   // laid by the battle as by laid() with the gun's spread times the order's
   const gun = cannon(2), sight = on(fleet[0].ship, fleet[0].ship.heading, 150), clean = laid(fleet[0], gun, sight, fleet, 5, deep, 0).dirs[0];
   const off = (k: number) => Math.acos(Math.min(1, dot(laid(fleet[0], gun, sight, fleet, 5, deep, spreadOf(gun) * k).dirs[0], clean)));
@@ -253,7 +255,7 @@ test('the muzzle stands on the drawn plinth: as far ahead, and its bore a little
   assert.ok(Math.abs(GUN.ahead - GUN_MOUNT[2]) < 0.05, `${GUN.ahead} m ahead, the plinth ${GUN_MOUNT[2]}`);
   assert.equal(GUN_MOUNT[0], 0);
   const bore = GUN.up - GUN_MOUNT[1];
-  assert.ok(bore > 0.3 && bore < 1.2, `bore ${bore.toFixed(2)} m above the plinth`);
+  assert.ok(bore > 0.3 && bore < 1, `bore ${bore.toFixed(2)} m above the plinth`);
   // the gun drawn on it has its trunnions at that bore, and its post's foot still in the plinth
   assert.ok(Math.abs(GUN_MOUNT[1] + GUN_DRAWN.lift - GUN.up) < 0.05, `trunnions ${(GUN_MOUNT[1] + GUN_DRAWN.lift).toFixed(2)} m up`);
   assert.ok(GUN_DRAWN.lift < FOOT * GUN_DRAWN.scale);
