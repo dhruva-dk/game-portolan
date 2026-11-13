@@ -11,7 +11,7 @@ import { launch } from './launch.ts';
 import { png } from './png.ts';
 
 /** The icon the app wears. */
-const INSTALLED = 'parchment';
+const INSTALLED = 'card';
 const SET = resolve(import.meta.dirname, '../ios/App/App/Assets.xcassets/AppIcon.appiconset');
 const FILE = 'AppIcon-1024.png';
 const OUT = resolve(import.meta.dirname, '../captures/icon');
