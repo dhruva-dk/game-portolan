@@ -11,7 +11,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { add, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { add, apart, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
 import { gap } from './contact.ts';
 import { RAM, SHIP } from './handling.ts';
 import { ring } from './gunner.ts';
@@ -113,6 +113,7 @@ export function steer(c: Ctx, dt: number): Helm {
 function answer(c: Ctx): number | null {
   const { m, own } = c, p = own.ship.at, mine = velocity(own);
   for (const o of c.others) {
+    if (apart(p, o.ship.at, BOT.threat)) continue;
     const d = distance(p, o.ship.at), t = toward(p, o.ship.at);
     if (d > BOT.threat || !t) continue;
     const r = scale(t, d), rel = add(transport(velocity(o), o.ship.at, p), mine, -1), closing = -dot(t, rel);

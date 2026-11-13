@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FACES, R, add, along, chartBasis, cross, distance, dot, faceDir, faceUV, frameAt, fromChart, fromLatLon, horizonDip, length,
+  FACES, R, add, along, apart, chartBasis, cross, distance, dot, faceDir, faceUV, frameAt, fromChart, fromLatLon, horizonDip, length,
   normalize, scale, skyElevation, toChart, toSky, transport, type Axis, type Chart, type Vec3,
 } from '../src/world/sphere.ts';
 import { CELLS, N, centreOf, columnOf, faceOf, rowOf } from '../src/world/cells.ts';
@@ -167,4 +167,21 @@ test('the cube\'s faces are FACES\'s (the table the shaders\' view/cube.ts is bu
     near(((t.u + 1) / 2) * N - 0.5, columnOf(c), 1e-9, 'column');
     near(((t.v + 1) / 2) * N - 0.5, rowOf(c), 1e-9, 'row');
   }
+});
+
+test('apart never says so of points within the distance, and says so of nearly all those well beyond it', () => {
+  let missed = 0, beyond = 0;
+  for (let i = 0; i < 4000; i++) {
+    const a = scale(fromLatLon(Math.asin(2 * ((i * 0.618) % 1) - 1), i * 2.4), 1 + (i % 3));
+    const b = fromLatLon(Math.asin(2 * ((i * 0.377) % 1) - 1), i * 1.7);
+    for (const metres of [5, 90, 370, 700]) {
+      const d = distance(a, b);
+      if (d <= metres) assert.ok(!apart(a, b, metres), `${d} m within ${metres}`);
+      else if (d > metres * 1.01 + 1) {
+        beyond++;
+        if (!apart(a, b, metres)) missed++;
+      }
+    }
+  }
+  assert.ok(missed < 0.02 * beyond, `${missed} of ${beyond}`);
 });

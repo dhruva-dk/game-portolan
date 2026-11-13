@@ -14,7 +14,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { distance, along, type Vec3 } from '../world/sphere.ts';
+import { apart, distance, along, type Vec3 } from '../world/sphere.ts';
 import { SHIP } from './handling.ts';
 import { STORM, toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
@@ -157,11 +157,12 @@ function prey(c: Ctx): { at: Vec3; score: number } | null {
   const p = c.own.ship.at;
   let best: { at: Vec3; score: number } | null = null;
   for (const o of c.others) {
-    if (distance(p, o.ship.at) > BOT.sightMax + CLAIMER.reach) continue;
+    if (apart(p, o.ship.at, BOT.sightMax + CLAIMER.reach) || distance(p, o.ship.at) > BOT.sightMax + CLAIMER.reach) continue;
     const pts = h.trail(o.id).points;
     if (pts.length < CLAIMER.least) continue;
     const back = distance(o.ship.at, pts[0]) / (SHIP.top * 1.1);
     for (let k = 0; k < pts.length - 4; k += CLAIMER.stride) {
+      if (apart(p, pts[k], CLAIMER.reach)) continue;
       const d = distance(p, pts[k]);
       if (d > CLAIMER.reach || d / SHIP.top + CLAIMER.lead > back) continue;
       const score = ramp(d, CLAIMER.reach, 20) * ramp(pts.length, CLAIMER.least, 40);

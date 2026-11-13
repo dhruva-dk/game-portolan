@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { R, along, distance, faceDir, frameAt, fromChart, normalize, toChart, type Vec3 } from '../src/world/sphere.ts';
-import { bakeFaces, createPlanet } from '../src/world/planet.ts';
+import { bakeFaces, createPlanet, remembered } from '../src/world/planet.ts';
 import { ISLANDS, KINDS, ORDER, WADE } from '../src/world/planet-islands.ts';
 import { SHIP } from '../src/sim/handling.ts';
 import { random } from '../src/world/random.ts';
@@ -267,4 +267,14 @@ test('bakeFaces at 768 takes a couple of seconds at most', () => {
     best = Math.min(best, performance.now() - t);
   }
   assert.ok(best < 4000, `${best.toFixed(0)} ms`);
+});
+
+test('a height remembered is the height to the bit, read again or after its place in the table was taken', () => {
+  const read = remembered(planet.height, 4);
+  const points = lattice(200);
+  for (let pass = 0; pass < 3; pass++) for (const p of points) assert.equal(Object.is(read(p), planet.height(p)), true);
+  // the same point by another array, and points a bit apart, are told apart
+  const p = points[7], q: Vec3 = [p[0], p[1], p[2] + 1e-16];
+  assert.equal(read([p[0], p[1], p[2]]), planet.height(p));
+  assert.equal(Object.is(read(q), planet.height(q)), true);
 });

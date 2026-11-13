@@ -139,8 +139,22 @@ export function transport(t: Vec3, from: Vec3, to: Vec3): Vec3 {
 
 /** Metres along the surface between two points. */
 export function distance(a: Vec3, b: Vec3): number {
-  const u = normalize(a), v = normalize(b);
-  return R * Math.atan2(length(cross(u, v)), dot(u, v));
+  // (normalize, cross, length and dot as above, written out: nothing made, the same arithmetic)
+  const k = 1 / length(a), l = 1 / length(b);
+  const ux = a[0] * k, uy = a[1] * k, uz = a[2] * k, vx = b[0] * l, vy = b[1] * l, vz = b[2] * l;
+  const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+  return R * Math.atan2(Math.sqrt(cx * cx + cy * cy + cz * cz), ux * vx + uy * vy + uz * vz);
+}
+
+/**
+ * Whether a and b surely lie more than `metres` apart along the surface, by their dot product alone (no root, no
+ * trig): it may answer no for points a little beyond, never yes for points within. For the loops that pass over the
+ * far before measuring the near with distance.
+ */
+export function apart(a: Vec3, b: Vec3, metres: number): boolean {
+  // the arc's cosine against 1 − t²/2, which never exceeds cos t
+  const t = metres / R, k = 1 - (t * t) / 2, c = dot(a, b), c2 = c * c, l2 = dot(a, a) * dot(b, b);
+  return k >= 0 ? c < 0 || c2 < k * k * l2 : c < 0 && c2 > k * k * l2;
 }
 
 /** How far below the level the sea's horizon lies, radians, for an eye `height` metres up. */

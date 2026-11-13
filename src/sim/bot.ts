@@ -23,7 +23,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
-import { R, add, along, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
+import { R, add, apart, along, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
 import type { Order } from './battle.ts';
 import { STEP } from './fixed.ts';
 import { aimAndFire, reactTime } from './gunner.ts';
@@ -78,6 +78,7 @@ function perceive(c: Ctx): void {
   const { m, own } = c;
   let best: Seen | null = null, bd = c.t.notice * (0.8 + 0.4 * c.t.skill);
   for (const o of c.others) {
+    if (apart(own.ship.at, o.ship.at, BOT.sightMax)) continue;
     const d = distance(own.ship.at, o.ship.at);
     if (d > BOT.sightMax) continue;
     const score = o.id === m.hitBy && m.clock - m.hitT < BOT.grudge ? d * BOT.nearer : d;
