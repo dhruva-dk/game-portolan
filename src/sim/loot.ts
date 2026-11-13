@@ -206,28 +206,33 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
     let c = by.get(v.id);
     if (!c || c.health.hull <= 0) continue;
     const p = v.ship.at;
-    const kept: Loot[] = [];
-    for (const l of pieces) {
-      // a piece she put over the side is hers to leave until it has settled and she is clear of it
-      if (l.from === v.id) {
-        kept.push(l.age >= LOOT.settle && dot(p, l.at) <= REACH ? { ...l, from: -1 } : l);
-        continue;
+    // (most ships, most steps, are near no piece and have none of their own lying about: the pieces stand as they are)
+    let near = false;
+    for (let i = 0; i < pieces.length && !near; i++) near = pieces[i].from === v.id || dot(p, pieces[i].at) > REACH;
+    if (near) {
+      const kept: Loot[] = [];
+      for (const l of pieces) {
+        // a piece she put over the side is hers to leave until it has settled and she is clear of it
+        if (l.from === v.id) {
+          kept.push(l.age >= LOOT.settle && dot(p, l.at) <= REACH ? { ...l, from: -1 } : l);
+          continue;
+        }
+        if (!reachable(v.id, p, l)) {
+          kept.push(l);
+          continue;
+        }
+        const g = l.goods;
+        if (g.kind === 'gun') {
+          if (c.gun) kept.push(l);
+          else c = { ...c, gun: gunOf(g.rarity) };
+          continue;
+        }
+        const s = stowed(c.hold, g.kind, g.count);
+        c = { ...c, hold: s.hold };
+        if (s.left > 0) kept.push(s.left === g.count ? l : { ...l, goods: { kind: g.kind, count: s.left } });
       }
-      if (!reachable(v.id, p, l)) {
-        kept.push(l);
-        continue;
-      }
-      const g = l.goods;
-      if (g.kind === 'gun') {
-        if (c.gun) kept.push(l);
-        else c = { ...c, gun: gunOf(g.rarity) };
-        continue;
-      }
-      const s = stowed(c.hold, g.kind, g.count);
-      c = { ...c, hold: s.hold };
-      if (s.left > 0) kept.push(s.left === g.count ? l : { ...l, goods: { kind: g.kind, count: s.left } });
+      pieces = kept;
     }
-    pieces = kept;
     // a swap asked for: what is offered there for what she has in it, which goes over the side where she is
     const slot = takes.get(v.id);
     if (slot !== undefined) {
