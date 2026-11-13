@@ -71,3 +71,7 @@ at 956×440. Each rule below can be checked against `node tools/hero.ts <dir>` (
 | Shafts (3 passes) | 239×110 | ~0.9 M |
 | Grade, film, composite | 956×440 | bloom + shafts + 2 LUT reads |
 | FXAA | 956×440 | as before |
+
+Budget a displayed frame, every pass summed: under 100 draw calls, 900k triangles, 20 render passes in the standard
+views (`npm run budget` checks four, headless, from the meter's counts; the chase views run about 40-50 draws, 15
+passes, 400-550k triangles).
