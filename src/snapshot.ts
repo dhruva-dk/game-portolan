@@ -43,6 +43,17 @@ export type Blast =
   | { kind: 'splash'; time: number; at: Vec3; land: boolean }
   | { kind: 'strike'; time: number; at: Vec3; ram: boolean };
 
+/** A ball in flight: where it is (world metres) and its velocity (m/s). */
+export interface BallDraw { at: Vec3; way: Vec3 }
+
+/** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
+ *  sea's surface), whether it is a gun (a crate; else a cask of stores), and the rarity it reads as (0–4: RARITY). */
+export interface LootDraw { id: number; at: Vec3; gun: boolean; rarity: number }
+
+/** The rarities' inks, worst to best (0117's LOOT_INKS: silver, verdigris, azurite, rubric, gold), 0xrrggbb: the HUD's
+ *  and the world's alike. */
+export const RARITY = [0x969aa0, 0x3a683e, 0x264c8c, 0xb8301a, 0xbe8a2c] as const;
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -57,8 +68,10 @@ export interface Snapshot {
   ships: readonly ShipDraw[];
   /** The ship always drawn whole (the player's, which the chase camera holds close), or null. */
   own: number | null;
-  /** Every ball in flight (world metres). */
-  balls: readonly Vec3[];
+  /** Every ball in flight. */
+  balls: readonly BallDraw[];
+  /** The loot on the water near the eye. */
+  loot: readonly LootDraw[];
   /** What the guns did in the last few seconds, oldest first: each is drawn once, from the first snapshot it is in. */
   blasts: readonly Blast[];
 }

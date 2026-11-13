@@ -17,6 +17,7 @@ import { RAM, SHIP } from './handling.ts';
 import { ring } from './gunner.ts';
 import { offCourse, turned, type Helm } from './ship.ts';
 import { course as routed } from './route.ts';
+import { PURSER } from './purser.ts';
 import { BOT, between, inSight, open, roll, rotate, toward, unitHash, velocity, type Ctx, type Seen } from './captain.ts';
 
 /** Where to steer to ram `foe` on her side: led for where she will be, by way of her beam when she is end on. A tangent
@@ -98,7 +99,9 @@ export function steer(c: Ctx, dt: number): Helm {
   }
   const answered = answer(c);
   if (answered !== null) turn = answered;
-  return stuck(c, dt, course) ?? order(turn, 1);
+  // going for loot or mending, she eases up near where she makes for (0117's)
+  const easy = (m.mode === 'loot' || m.mode === 'heal') && toD < PURSER.near ? PURSER.slow : 1;
+  return stuck(c, dt, course) ?? order(turn, easy);
 }
 
 /** A ram coming at her: the turn that lays her bow or her stern to it, whichever is the nearer, or null if none she

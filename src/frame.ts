@@ -17,6 +17,7 @@ import { createView } from './view/view';
 import { createWater, type SeaShows } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
+import { createLoot } from './loot/loot';
 import { sunAt, sunInSky } from './world/sun';
 import { BLOOM_LEVELS, bloom } from './post/bloom';
 import { film } from './post/film';
@@ -119,7 +120,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
   const gunfire = createGunfire(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  const loot = createLoot(light);
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
 
   /** The scene from a camera, and what it saw at each pixel: its colour and depth, and the ray to it from the camera
    *  (world direction, metres). In a post pass three's camera nodes are the screen quad's, so the camera's own
@@ -232,7 +234,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     return camera;
   }
 
-  /** The ships and the guns' work, as the snapshot has them. */
+  /** The ships, the guns' work and the loot, as the snapshot has them. */
   function stage(s: Snapshot) {
     fleet.own(s.own);
     const now = new Set<number>();
@@ -250,6 +252,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     }
     laid = Math.max(laid, ...s.blasts.map((b) => b.time));
     gunfire.draw(s.clock, s.balls);
+    loot.draw(s.clock, s.loot);
   }
 
   /** Draws the world as the snapshot has it, dt seconds after the last frame. */
@@ -263,6 +266,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     const air = sky.update(env, s.storm, eye, s.eye.kind, dt, size.x, size.y);
     const ships = fleet.update(eye, env.windSpeed, size.y, dt);
     gunfire.update(eye, size.y);
+    loot.update(eye, size.y);
     const sea = water.update(env, dt, fleet.ships);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves

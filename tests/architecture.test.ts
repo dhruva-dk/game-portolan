@@ -68,11 +68,13 @@ const LAYERS: Record<string, readonly string[]> = {
   'gunfire/': ['gunfire/', ...RENDER, 'view/view.ts'],
   // the post chain's steps (grade, bloom, light shafts, film): nodes over the frame's light, composed by the frame
   'post/': ['post/', 'three', 'tsl.ts'],
+  // the loot on the water, its pieces and their beacons
+  'loot/': ['loot/', ...RENDER, 'view/view.ts'],
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],
   'textures.ts': ['three'],
-  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'post/'],
+  'frame.ts': ['three', 'gpu.ts', 'tsl.ts', 'snapshot.ts', 'environment.ts', 'world/', 'view/', 'sky/', 'land/', 'water/', 'ship/', 'gunfire/', 'loot/', 'post/'],
   'meter.ts': ['three'],
   // the debug tools, and the switches that drive the game through what it offers anyone
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
@@ -207,7 +209,7 @@ test('i2. the UI draws plain data: src/ui imports nothing from play/, three or w
 
 /** The files that may say they stand in for something, and why. */
 const STAND_INS: Record<string, string> = {
-  'play/placeholder.ts': 'what the HUD shows and does that nothing in the game has yet (items, Gust, her career), held in one place',
+  'play/placeholder.ts': 'what the game shows that nothing in it keeps yet (her career), held in one place',
 };
 
 test('j. nothing in src says it is temporary or a hack, comments included, but the stand-ins (STAND_INS)', () => {

@@ -9,7 +9,8 @@
 // The stick steers by the screen: pushed toward a direction on the screen, she heads that way across the sea as the
 // camera looks at it, as fast as it is pushed. Let go, she coasts. Her gun is aimed where the camera looks along the
 // sea (the gun's assist lays it on a ship near that bearing: sim/gun.ts), and fired at the next step once her hands
-// order it (the HUD's button).
+// order it (the HUD's button). Her taps on the hotbar and on Gust are asked of her stores at the next step
+// (sim/stores.ts); what she carries is reported as her kit, and where her aim falls as the reticle (aim.ts).
 //
 // The camera follows the ship the match's flow sets (view): hers, or after she sinks the one she watches, cut to or
 // flown to; its shot on a win is shots.ts's.
@@ -22,16 +23,22 @@
 import type { World } from '../environment';
 import { fixedClock } from '../sim/fixed';
 import { chosen, lead, muzzle } from '../sim/gun';
+import { charging } from '../sim/gust';
 import { GUN, HEALTH } from '../sim/handling';
+import { progress } from '../sim/hold';
+import { offered, rarityOf } from '../sim/loot';
+import { STORM, toEdge } from '../sim/storm';
 import { sunk } from '../sim/health';
 import { PLAYER } from '../sim/match';
+import type { Vessel } from '../sim/contact';
 import type { Helm, ShipState } from '../sim/ship';
-import type { Eye, Snapshot } from '../snapshot';
+import type { Eye, LootDraw, Snapshot } from '../snapshot';
 import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
-import { R, add, normalize, scale, type Vec3 } from '../world/sphere';
-import { IDLE, type Hands, type Status } from '../player';
+import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world/sphere';
+import { IDLE, type Hands, type Kit, type Slot, type Status } from '../player';
+import { AIM, aimDistance, clear } from './aim';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
 import { arriving } from './arrival';
 import { createChase } from './chase';
@@ -40,6 +47,16 @@ import { bearing, createState, type Berth, type Match, type Waters } from './sta
 
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
+/** Loot is drawn within DRAWN m of the eye's ship, floating on the waves within RIDES m; shown on the disc within
+ *  CHARTED m. */
+const DRAWN = 700, RIDES = 320, CHARTED = 260;
+/** Her outline for the reticle (aim.ts): metres along her from amidships, up from the waterline, and out to a side:
+ *  her ends, her mainmast's truck (src/ship/lines.ts at 0.6), and her main yard's arms. */
+const OUTLINE: readonly (readonly [number, number, number])[] = [
+  [13, 0, 0], [-13, 0, 0], [13, 6, 0], [-13, 6, 0], [0, 0, 3.3], [0, 0, -3.3], [0, 21.5, 0], [0, 14, 8], [0, 14, -8],
+];
+/** How far the reticle is kept clear of her outline, px, and of the screen's top, where the HUD's slips are. */
+const CLEAR = 16, TOP = 56;
 
 /** What the camera does, as the match's flow sets it (sim/match.ts): the ship it follows, and whether it cut or flew
  * to her; whether the hands steer and look; whether it circles her (the win). */
@@ -54,8 +71,9 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   const state = createState(world.planet, sea, waters, first);
   const chase = createChase(ground, sea);
   const clock = fixedClock();
-  /** Whether her gun was ordered fired since the last step; how far the moment drawn is through the last step. */
-  let pulled = false, between = 0;
+  /** Whether her gun was ordered fired since the last step, the slot last tapped and whether Gust was pressed; how
+   *  far the moment drawn is through the last step. */
+  let pulled = false, tapped: number | null = null, gusted = false, between = 0;
   /** The camera: what the flow sets, and its shots. */
   let view: View = { watch: PLAYER, move: 'cut', hands: true, circle: false };
   const shots = createShots();
@@ -87,6 +105,24 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     return !!mark && lead(from, mark) !== null;
   };
 
+  /** Where her gun's aim falls on a view `width` × `height` px, kept off her own ship (aim.ts): on the ship its assist
+   *  has, else along the look as far as the camera's pitch sets. */
+  const reticle = (v: Vessel, rarity: number, width: number, height: number) => {
+    const fleet = state.vessels(), from = muzzle(v), ahead = chase.axes().ahead;
+    const mark = chosen(from, ahead, GUN.assist[rarity], fleet.filter((o) => o.id !== v.id));
+    // a point the look falls on past the sea's horizon (from the eye, which stands back from her) is hidden by it:
+    // brought in to within it, on the same bearing
+    const eye = chase.eye().position, far = Math.sqrt(dot(eye, eye));
+    const horizon = R * Math.acos(Math.min(1, R / far)), back = R * Math.acos(Math.min(1, dot(eye, v.ship.at) / far));
+    const at = mark ? mark.ship.at : along(v.ship.at, ahead, Math.max(AIM.near / 2, Math.min(aimDistance(chase.pitch()), 0.85 * horizon - back))).p;
+    const p = chase.onScreen(at, width, height, mark ? 4 : GUN.up);
+    if (!p) return null;
+    const f = last.forward, side = cross(f, normalize(last.position));
+    const outline = OUTLINE.map(([a, h, b]) => chase.onScreen(normalize(add(add(last.position, f, a), side, b)), width, height, h))
+      .filter((q): q is { x: number; y: number } => q !== null);
+    return clear(p, outline, CLEAR, height, TOP);
+  };
+
   /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
   const restart = (her: ShipPose, anchor = false) => {
     view = { watch: PLAYER, move: 'cut', hands: true, circle: false };
@@ -112,12 +148,14 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const hands = steering() ? read : IDLE;
       if (hands.stick || hands.look.held) held = null;
       pulled ||= hands.fire;
+      gusted ||= hands.gust;
+      if (hands.tap !== null) tapped = hands.tap;
       const time = clock(dt);
       for (let i = 0; i < time.steps; i++) {
         const v = state.mine();
         const helm = !v ? { course: null, throttle: 0 } : held ? held(v.ship) : orders(hands.stick);
-        state.advance(helm, { aim: chase.axes().ahead, fire: !!v && pulled });
-        pulled = false;
+        state.advance(helm, { aim: chase.axes().ahead, fire: !!v && pulled }, { tap: tapped, gust: gusted, take: null });
+        [pulled, tapped, gusted] = [false, null, false];
       }
       between = time.between;
       last = state.drawn(between).find((s) => s.id === PLAYER)?.pose ?? last;
@@ -135,15 +173,32 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     },
     /** What is drawn now (snapshot.ts). */
     snapshot(): Snapshot {
-      const eye = chase.eye();
+      const eye = chase.eye(), time = state.clock(between), near = normalize(last.position);
+      const loot: LootDraw[] = [];
+      for (const l of state.loot().pieces) {
+        const d = dot(near, l.at);
+        if (d < Math.cos(DRAWN / R)) continue;
+        const up = d > Math.cos(RIDES / R) ? sea(l.at, time) : 0;
+        loot.push({ id: l.id, at: scale(l.at, R + up), gun: l.goods.kind === 'gun', rarity: rarityOf(l.goods) });
+      }
       return {
-        eye: anchored ? berth ?? anchorageEye(last, orbit, state.clock(between), ground) : (arrival !== null && arriving(arrival, last, eye)) || eye,
-        clock: state.clock(between), storm: state.storm(between),
-        ships: state.drawn(between), own: PLAYER, balls: state.balls(between), blasts: state.blasts(),
+        eye: anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || eye,
+        clock: time, storm: state.storm(between),
+        ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
       };
     },
-    /** What the HUD reads of the match. */
-    status(): Status {
+    /** What she carries, as the hotbar shows it. */
+    kit(): Kit {
+      const c = state.crew(PLAYER), v = state.mine(), h = c.hold;
+      const items = h.items.map((k): Slot | null => k && { item: `item.${k.kind}`, count: k.count });
+      const o = v ? offered(c, v.ship.at, state.loot()) : { gun: null, item: null };
+      return {
+        items: [items[0], items[1], items[2]], chosen: h.chosen, using: progress(h), offer: o.gun ? 0 : o.item ? Math.max(1, h.chosen) : null,
+        gust: c.gust.charges + (charging(c.gust) < 1 ? charging(c.gust) : 0), blowing: c.gust.blowing > 0,
+      };
+    },
+    /** What the HUD reads of the match, on a view `width` × `height` CSS px (where the reticle falls). */
+    status(width = 0, height = 0): Status {
       const c = state.crew(PLAYER), v = state.mine(), s = state.storm(between);
       const radius = Math.round(s.radius * R);
       if (radius !== calm.radius || s.centre.some((x, i) => Math.abs(x - calm.centre[i]) * R > 1)) calm = { centre: s.centre, radius };
@@ -155,7 +210,11 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
         gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full, locked: locked(c.gun.rarity) } : null,
         afloat: state.alive().length, sunk: sunk(c.health),
-        storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, eye: calm,
+        storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, closing: s.closing, eye: calm,
+        next: s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? { centre: s.next.centre, radius: Math.round(s.next.radius * R) } : null,
+        outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
+        loot: v ? state.loot().pieces.filter((l) => dot(v.ship.at, l.at) > Math.cos(CHARTED / R)).map((l) => l.at) : [],
+        reticle: c.gun && v && width > 0 && steering() ? reticle(v, c.gun.rarity, width, height) : null,
       };
     },
     sinkings: state.sinkings,
@@ -191,6 +250,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       view = next;
     },
     sink: state.sink,
+    strew: state.strew,
   };
 }
 

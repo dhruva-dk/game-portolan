@@ -2,7 +2,8 @@
 // crew keeps her hit points (health.ts) and her gun, if she has one (gun.ts). The step takes the rams the fleet's step
 // reported off both ships, brings every ball in flight on (shot.ts) and takes those that strike off the ship struck,
 // reloads the guns, and fires those ordered to that are loaded. A ship sunk takes no more, fires no more, and is no
-// longer laid on or struck; her crew is kept, sunk, for the game to take her off the sea.
+// longer laid on or struck; her crew is kept, sunk, for the game to take her off the sea. A blow that strikes breaks
+// off whatever she was mending with (hold.ts); a gun fired in a gust goes off wider (gust.ts).
 //
 // The storm (storm.ts) wears at every ship outside its cap, a share of a full hull a second, past the shield as the old
 // game's did (weathered, after the step).
@@ -12,18 +13,23 @@
 
 import type { Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
-import { GUN, HEALTH } from './handling.ts';
+import { GUN, GUST, HEALTH } from './handling.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import { laid, type Gun } from './gun.ts';
 import { fly, loosed, type Ball } from './shot.ts';
+import { broken, emptyHold, type Hold } from './hold.ts';
+import { gustOf, type Gust } from './gust.ts';
 import type { Depth } from './shoal.ts';
 
-/** A ship's crew: who she is (her Vessel's id), her hit points, and her gun, or null. */
+/** A ship's crew: who she is (her Vessel's id), her hit points, her gun or null, her hold (hold.ts) and her gust
+ * (gust.ts). */
 export interface Crew {
   id: number;
   health: Health;
   gun: Gun | null;
+  hold: Hold;
+  gust: Gust;
 }
 
 /** The fighting as it stands: every ship's crew, the balls in flight, and the seed the guns' spread is drawn from. */
@@ -67,8 +73,8 @@ export interface Splash {
   land: boolean;
 }
 
-/** A crew as she puts to sea: whole, and with no gun. */
-export const crewOf = (id: number, gun: Gun | null = null): Crew => ({ id, health: whole(), gun });
+/** A crew as she puts to sea: whole, an empty hold, every gust ready, and with no gun. */
+export const crewOf = (id: number, gun: Gun | null = null): Crew => ({ id, health: whole(), gun, hold: emptyHold(), gust: gustOf() });
 
 /** The fighting before it starts: these crews, no balls, drawing from `seed`. */
 export const battleOf = (crews: readonly Crew[], seed: number): Battle => ({ crews: [...crews].sort((a, b) => a.id - b.id), balls: [], seed });
@@ -90,6 +96,7 @@ export function stepBattle(
     if (!c || sunk(c.health)) return;
     const harm = harmed(c.health, damage);
     c.health = harm.health;
+    c.hold = broken(c.hold);
     strikes.push({ shooter: by, struck: id, damage: harm.shield + harm.hull, at, ram });
     if (sunk(c.health)) sunkNow.push(id);
   };
@@ -117,7 +124,7 @@ export function stepBattle(
     if (!c.gun || sunk(c.health)) return;
     let gun = { ...c.gun, loading: Math.max(0, c.gun.loading - dt) };
     if (order?.fire && gun.loading < 1e-9) {
-      const lay = laid(v, gun, order.aim ?? v.ship.heading, targets, b.seed, GUN.spread[gun.rarity] * (order.spread ?? 1));
+      const lay = laid(v, gun, order.aim ?? v.ship.heading, targets, b.seed, GUN.spread[gun.rarity] * (order.spread ?? 1) * (c.gust.blowing > 0 ? GUST.spread : 1));
       balls.push(loosed(v.id, lay.from, lay.dir, GUN.damage * GUN.damageBy[gun.rarity]));
       shots.push({ shooter: v.id, ...lay });
       gun = { ...gun, loading: GUN.reload * GUN.reloadBy[gun.rarity], fired: gun.fired + 1 };

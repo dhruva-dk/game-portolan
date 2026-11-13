@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { HEALTH } from '../src/sim/handling.ts';
 import { battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
 import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
@@ -35,7 +36,8 @@ const bold = (() => {
  *  armed as `guns` (rarity, or null); in `storm` if given; bots told of the balls that strike them. */
 function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }, { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}) {
   const minds: (Memory | null)[] = fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
-  let b: Battle = battleOf(fleet.map((v, i) => crewOf(v.id, guns[i] === null ? null : gunOf(guns[i]!))), 7);
+  // every ship put to sea with a full shield, as she would be with a few fights' loot in her, so a test runs its length
+  let b: Battle = battleOf(fleet.map((v, i) => ({ ...crewOf(v.id, guns[i] === null ? null : gunOf(guns[i]!)), health: { hull: HEALTH.hull, shield: HEALTH.shield } })), 7);
   const fired: { t: number; id: number }[] = [], ranges: number[] = [];
   let strikes = 0, blows = 0;
   for (let n = 0; n < Math.round(seconds / STEP); n++) {

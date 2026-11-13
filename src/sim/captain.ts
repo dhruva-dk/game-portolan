@@ -14,6 +14,8 @@ import type { Chart, Route } from './route.ts';
 import type { Depth } from './shoal.ts';
 import type { Storm } from './storm.ts';
 import type { Temper } from './temper.ts';
+import type { Crew } from './battle.ts';
+import type { Loot } from './loot.ts';
 
 /** Everything a bot is tuned by. Seconds and metres; 0117's values unless said. */
 export const BOT = {
@@ -83,14 +85,16 @@ export const BOT = {
 } as const;
 
 /** A ship as a bot sees her: who she is, how she sails, the shove she is carried on by, her hull and shield (health.ts;
- *  whole and none when not given), and whether she carries a gun. */
-export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean }
+ *  whole and none when not given), and whether she carries a gun; and her own, what she carries (battle.ts Crew: her
+ *  hold and gust), without which she pays her stores no heed. */
+export interface Seen { id: number; ship: ShipState; shove?: Vec3; hull?: number; shield?: number; armed?: boolean; crew?: Crew }
 
 /** What a bot knows of the sea besides the ships on it: how deep it is; its chart (route.ts), without which she finds
- *  no routes round land, only feels her way along it; and the storm now (storm.ts), without which she pays it no heed. */
-export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null }
+ *  no routes round land, only feels her way along it; the storm now (storm.ts), without which she pays it no heed; and
+ *  the loot on the water (loot.ts). */
+export interface Sea { depth: Depth; chart?: Chart | null; storm?: Storm | null; loot?: readonly Loot[] }
 
-export type Mode = 'roam' | 'fight' | 'flee' | 'storm';
+export type Mode = 'roam' | 'fight' | 'flee' | 'storm' | 'heal' | 'loot';
 
 /** What a bot carries from one step to the next, her gunnery's with it. */
 export interface Memory extends Gunner {
@@ -122,13 +126,19 @@ export interface Memory extends Gunner {
   was: Vec3;
   /** The route round land she follows (route.ts), if any. */
   route: Route | null;
+  /** Loot (purser.ts): the piece she would go for as she last weighed it, the one she is going for and for how many
+   *  seconds, and the one she gave up (ids; -1 none). */
+  loot: number;
+  target: number;
+  lootT: number;
+  shun: number;
 }
 
 /** A new mind for a ship at `at`, by her seed. Bots think on different steps, by their seeds. */
 export const mind = (seed: number, at: Vec3): Memory => ({
   rand: (seed * 0x9e3779b1) >>> 0, clock: 0, think: 1 + (seed >>> 0) % BOT.every, mode: 'roam', since: 0, goal: at,
   foe: -1, seen: -Infinity, last: at, hitBy: -1, hitT: -Infinity, shotBy: -1, shotT: -Infinity, avoid: 0, backT: 0, stuckT: 0, strafe: 1, recoil: 0, was: at,
-  route: null, ...gunner(),
+  route: null, loot: -1, target: -1, lootT: 0, shun: -1, ...gunner(),
 });
 
 /** Her memory once `by` has rammed her (the game tells her, from contact.ts's blows). */

@@ -19,7 +19,7 @@
 // Every step she steers (helmsman.ts) for what she is about, and, armed, fights with her gun instead of ramming
 // (gunner.ts, 0117's aimAndFire and fightCourse): she holds its range round her foe, and lays and fires it, a gun
 // reaching a ship however fast she sails.
-// Seam: mending (0117's heal, 3.5) goes in OPTIONS once there is something to mend with.
+// Mending (0117's heal, 3.5) and loot (1.8) are purser.ts's, with what she asks of her hold and her gust each step.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
@@ -33,16 +33,18 @@ import { temper } from './temper.ts';
 import { choose, logistic, momentum, ramp, utility, type Option } from './utility.ts';
 import { BOT, between, inSight, open, roll, rotate, toward, type Ctx, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 import { deepest, steer } from './helmsman.ts';
+import { healUrge, lootAct, lootUrge, purse, PURSER } from './purser.ts';
+import { NOTHING, type Ask } from './stores.ts';
 
 export { BOT, mind, rammed, shot, type Memory, type Mode, type Sea, type Seen } from './captain.ts';
 
 /**
- * One step of dt seconds of a bot's mind: what she orders her helm and her gun, and her memory after. `own` is her own
- * ship, `others` every other ship afloat (she sees only those in her sight), `sea` what she knows of the water and the
- * storm, `seed` hers for good.
+ * One step of dt seconds of a bot's mind: what she orders her helm and her gun, what she asks of her stores, and her
+ * memory after. `own` is her own ship, `others` every other ship afloat (she sees only those in her sight), `sea` what
+ * she knows of the water, the storm and the loot, `seed` hers for good.
  */
-export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, seed: number, dt = STEP): { helm: Helm; order: Order; memory: Memory } {
-  const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1 };
+export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memory, seed: number, dt = STEP): { helm: Helm; order: Order; ask: Ask; memory: Memory } {
+  const m: Memory = { ...memory, clock: memory.clock + dt, since: memory.since + dt, think: memory.think - 1, lootT: memory.mode === 'loot' ? memory.lootT + dt : memory.lootT };
   const c: Ctx = { own, others, sea, m, t: temper(seed), foe: null, foeD: Infinity, seed };
   if (m.think <= 0) {
     m.think = BOT.every;
@@ -54,7 +56,9 @@ export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memo
   const helm = steer(c, dt);
   const order: Order = own.armed ? aimAndFire(m, own.ship, inSight(c) ? c.foe : null, m.clock, c.t.skill, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
   m.was = own.ship.at;
-  return { helm, order, memory: m };
+  // her stores asked on the steps she thinks (0117's)
+  const ask = m.think === BOT.every ? purse(c) : NOTHING;
+  return { helm, order, ask, memory: m };
 }
 
 // ---------------------------------------------------------------- seeing
@@ -191,8 +195,8 @@ function evading(c: Ctx): number {
 
 interface Choice extends Option<Ctx> { readonly mode: Mode; act(c: Ctx): void }
 
-// (0117's shelter, 5.2, from weather, comes after the storm; heal, 3.5, next: a seam for health.ts. Its hunt (to the
-// sound of guns), loot, raid and claiming water belong to things this sea hasn't got.)
+// (0117's shelter, 5.2, from weather, came after the storm; its hunt (to the sound of guns), raid and claiming water
+// belong to things this sea hasn't got.)
 const ROAM: Choice = {
   name: 'roam', weight: 1, mode: 'roam', score: () => 0.15, act: (c) => {
     const { m } = c;
@@ -204,8 +208,11 @@ const ROAM: Choice = {
 };
 const OPTIONS: readonly Choice[] = [
   { name: 'storm', weight: 6, mode: 'storm', score: stormUrge, act: (c) => { c.m.goal = stormGoal(c); } },
+  // mending where she is, or clear of a foe about (0117's heal)
+  { name: 'heal', weight: 3.5, mode: 'heal', score: healUrge, act: (c) => { c.m.goal = c.foe ? keptInside(c, away(c, c.m.last, PURSER.clear)) : c.own.ship.at; } },
   { name: 'flee', weight: 3.3, mode: 'flee', score: (c) => Math.max(losing(c), evading(c)), act: (c) => { c.m.goal = keptInside(c, away(c, c.m.last, BOT.run)); } },
   { name: 'fight', weight: 2.6, mode: 'fight', score: fightUrge, act: (c) => { c.m.goal = c.m.last; } },
+  { name: 'loot', weight: 1.8, mode: 'loot', score: lootUrge, act: lootAct },
   ROAM,
 ];
 

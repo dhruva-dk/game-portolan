@@ -12,7 +12,7 @@
 
 import type { ShipPose } from '../world/pose.ts';
 import { R, add, along, cross, dot, scale, type Vec3 } from '../world/sphere.ts';
-import { SHIP } from './handling.ts';
+import { GUST, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
 /** The sea's surface over a point (a vector from the centre), metres above sea level, at a time on the world's clock. */
@@ -94,6 +94,9 @@ export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number):
 export function knocked(r: Ride, s: ShipState, jolt: Vec3): Ride {
   return { ...r, rollRate: r.rollRate - RIDE.knock * dot(jolt, cross(s.at, s.heading)) };
 }
+
+/** Her ride as a gust lifts her off the water (gust.ts; 0117's hop): heaving up at GUST.hop m/s. */
+export const hopped = (r: Ride): Ride => ({ ...r, heaveRate: r.heaveRate + GUST.hop });
 
 /** Where she lies: on her ride's level over where she is, pitched, then rolled and heeled. */
 export function pose(s: ShipState, r: Ride): ShipPose {

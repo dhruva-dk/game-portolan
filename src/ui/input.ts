@@ -4,7 +4,8 @@
 // own reach inside the screen's edges) and staying there until it is let go: pushed past the rim it reads as fully
 // pushed that way. Any other finger drags the look.
 // WASD or the arrows push the stick all the way while no finger holds it. The gun is ordered fired by the HUD's Fire
-// (fire), with a finger or a click. What they mean is the game's business (play/game.ts step); this only reports them.
+// (fire), a slot of the hotbar tapped (tap) and Gust pressed (gust), with a finger or a click. What they mean is the
+// game's business (play/game.ts step); this only reports them.
 
 import type { Hands } from '../player';
 
@@ -20,7 +21,7 @@ interface Finger { stick: boolean; x: number; y: number; cx: number; cy: number 
 export function createInput(element: HTMLElement, steers: () => boolean) {
   const fingers = new Map<number, Finger>();
   const keys = new Set<string>();
-  let lookX = 0, lookY = 0, fired = false;
+  let lookX = 0, lookY = 0, fired = false, tapped: number | null = null, gusted = false;
 
   element.addEventListener('pointerdown', (e) => {
     element.setPointerCapture(e.pointerId);
@@ -68,13 +69,21 @@ export function createInput(element: HTMLElement, steers: () => boolean) {
       }
       const look = { x: lookX, y: lookY, held: held.some((f) => !f.stick) };
       lookX = lookY = 0;
-      const fire = fired;
-      fired = false;
-      return { stick, look, fire };
+      const fire = fired, tap = tapped, gust = gusted;
+      [fired, tapped, gusted] = [false, null, false];
+      return { stick, look, fire, tap, gust };
     },
     /** Fire pressed: her gun ordered fired, read once. */
     fire() {
       fired = true;
+    },
+    /** A slot of the hotbar tapped, read once. */
+    tap(i: number) {
+      tapped = i;
+    },
+    /** Gust pressed, read once. */
+    gust() {
+      gusted = true;
     },
   };
 }

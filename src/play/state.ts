@@ -8,7 +8,10 @@
 // cap, and a ship sunk is taken off the sea and drawn going down (sinking.ts) until she is gone. What the fighting did
 // is kept a few seconds as Blasts, for the frame to draw (gunfire/gunfire.ts). The others are bots (sim/bot.ts), each
 // seeded by the match and her slot, unless put to sea with her helm lashed, when she holds it and nobody steers her.
-// Ships put to sea gunless, unless the match arms them all.
+// Ships put to sea gunless, unless the match arms them all, and with no shield; loot is strewn over the sea for them
+// (sim/loot.ts), and what each carries, her hold and her gust, is stepped round the fleet's step and the fighting's
+// (sim/stores.ts): what she asks of them first (the player's from her hands, a bot's from her mind), then her helm as
+// they sail her, then her mending, the loot swept up and the sunk's spilled.
 //
 // A match begun with start() opens with every ship already afloat at her berth (sim/spawn.ts), spread over the whole
 // planet, hers the first; the match's clock (the storm's) starts then.
@@ -20,13 +23,15 @@ import { STEP, blendPose } from '../sim/fixed';
 import { gunOf } from '../sim/gun';
 import { SHIP } from '../sim/handling';
 import { sunk } from '../sim/health';
-import { PLAYER, SHIPS } from '../sim/match';
+import { PLAYER, SHIPS, credited, type Cause } from '../sim/match';
 import { berths, type Berthing } from '../sim/spawn';
-import { knocked, pose, ride, settled, type Ride } from '../sim/ride';
+import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride';
+import { overboard, strewn, type Flotsam, type Goods } from '../sim/loot';
+import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores';
 import type { Chart } from '../sim/route';
 import { shipAt, type Helm, type ShipState } from '../sim/ship';
 import { calm, type Storm } from '../sim/storm';
-import type { Blast, Look, ShipDraw } from '../snapshot';
+import type { BallDraw, Blast, Look, ShipDraw } from '../snapshot';
 import type { Surface } from '../world/swell';
 import type { Planet } from '../world/planet';
 import type { ShipPose } from '../world/pose';
@@ -56,7 +61,7 @@ export interface Match { seed: number; storm: (seconds: number) => Storm; gun: n
 
 /** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
  * when, on the match's clock (s), and where she went down and the way she headed. */
-export interface Sinking { id: number; by: number | null; cause: 'shot' | 'ram' | 'storm'; time: number; at: Vec3; heading: Vec3 }
+export interface Sinking { id: number; by: number | null; cause: Cause; time: number; at: Vec3; heading: Vec3 }
 
 /** A ship as the match's flow reads her: who she is (0 the player's), where she is and heads, her hit points, whether
  * she carries a gun, and whether she is still afloat. */
@@ -81,7 +86,11 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   const aboard = new Map<number, Aboard>();
   let battle: Battle = battleOf([], match.seed);
   let wrecks: Wreck[] = [], blasts: Blast[] = [];
+  /** The loot on the water. */
+  let flotsam: Flotsam = { pieces: [], next: 0 };
   const sinkings: Sinking[] = [];
+  /** Each ship's last blow taken: its striker, and the step it landed on (for the Storm's sinkings, sim/match.ts credited). */
+  const struck = new Map<number, { by: number; tick: number }>();
   /** The world's steps (the sea's clock), and the step the match's clock started at. */
   let tick = 0, begun = 0;
   /** Whether the sea is the lobby's, no match running: no storm then, however long she lies there. */
@@ -95,14 +104,16 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };
 
-  /** Clears the sea for a new match. */
-  const clear = (m: Match, ids: readonly number[]) => {
+  /** Clears the sea for a new match, strewing its loot (none on the lobby's sea). */
+  const clear = (m: Match, ids: readonly number[], loot = true) => {
     match = m;
+    flotsam = loot ? strewn(m.seed, depth) : { pieces: [], next: 0 };
     fleet = [];
     aboard.clear();
     wrecks = [];
     blasts = [];
     sinkings.length = 0;
+    struck.clear();
     battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
     begun = tick;
     quiet = false;
@@ -130,24 +141,32 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   const wreckAt = (w: Wreck, now: number) => sinking(w.pose, now - w.tick * STEP, w.side);
 
   return {
-    /** One step: the player's helm and gun, everyone else's from her bot or her lashed helm; then the fleet's step and
-     *  the fighting's, and what it did kept to be drawn. */
-    advance(helm: Helm, gun: Order) {
+    /** One step: the player's helm, gun and stores, everyone else's from her bot or her lashed helm; then the fleet's
+     *  step and the fighting's, and what it did kept to be drawn. */
+    advance(helm: Helm, gun: Order, ask: Ask = NOTHING) {
       const crews = new Map(battle.crews.map((c) => [c.id, c]));
       const seen: Seen[] = fleet.map((v) => {
         const c = crews.get(v.id)!;
-        return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun };
+        return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun, crew: c };
       });
-      const helms: Helm[] = [], orders: Order[] = [], storm = stormAt(time());
+      const helms: Helm[] = [], orders: Order[] = [], storm = stormAt(time()), asks = new Map<number, Ask>();
       fleet.forEach((v, i) => {
         const a = aboard.get(v.id)!;
-        if (v.id === PLAYER) [helms[i], orders[i]] = [helm, gun];
-        else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
+        if (v.id === PLAYER) {
+          [helms[i], orders[i]] = [helm, gun];
+          asks.set(v.id, ask);
+        } else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
         else {
-          const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm }, a.mind, seedOf(v.id));
+          const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm, loot: flotsam.pieces }, a.mind, seedOf(v.id));
           [a.mind, helms[i], orders[i]] = [r.memory, r.helm, r.order];
+          if (r.ask !== NOTHING) asks.set(v.id, r.ask);
         }
       });
+      // what each asks of her stores, and her helm as they sail her
+      const wants = asked(battle.crews, fleet, flotsam, asks);
+      battle = { ...battle, crews: wants.crews };
+      const manned = new Map(wants.crews.map((c) => [c.id, c]));
+      fleet.forEach((v, i) => { helms[i] = crewed(helms[i], manned.get(v.id)); });
       const met = stepFleet(fleet, helms, STEP, depth);
       fleet = met.fleet;
       for (const b of met.blows) {
@@ -157,14 +176,18 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       const fought = stepBattle(battle, fleet, orders, met.blows, STEP, depth);
       // a bot struck by a ball knows who shot her (and fires back, though she holds her fire otherwise)
       for (const s of fought.strikes) {
+        struck.set(s.struck, { by: s.shooter, tick });
         const a = aboard.get(s.struck);
         if (a?.mind && !s.ram) a.mind = shot(a.mind, s.shooter);
       }
       const worn = weathered(fought.battle, fleet, storm, STEP);
-      battle = worn.battle;
+      const kept = stored(worn.battle.crews, flotsam, fleet, wants.takes, [...fought.sunk, ...worn.sunk], STEP, depth, match.seed);
+      battle = { ...worn.battle, crews: kept.crews };
+      flotsam = kept.flotsam;
       tick++;
       fleet.forEach((v, i) => {
         const a = aboard.get(v.id)!;
+        if (wants.blew.includes(v.id)) a.ride = hopped(a.ride);
         a.ride = ride(knocked(a.ride, v.ship, met.jolts[i]), v.ship, sea, tick * STEP, STEP);
         [a.before, a.after] = [a.after, pose(v.ship, a.ride)];
       });
@@ -179,7 +202,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       // the sunk taken off the sea, to go down; those gone down by the step before last no longer drawn
       for (const id of [...fought.sunk, ...worn.sunk]) {
         const blow = fought.sunk.includes(id) ? fought.strikes.findLast((s) => s.struck === id) : undefined;
-        founder(id, blow?.shooter ?? null, blow ? (blow.ram ? 'ram' : 'shot') : 'storm');
+        const cause: Cause = blow ? (blow.ram ? 'ram' : 'shot') : 'storm', last = struck.get(id);
+        founder(id, credited(cause, last ? { by: last.by, ago: (tick - last.tick) * STEP } : null), cause);
       }
       wrecks = wrecks.filter((w) => wreckAt(w, clock(0)));
     },
@@ -214,10 +238,12 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     },
     /** A ship's pose after the last step, if she is afloat. */
     after: (id: number): ShipPose | null => aboard.get(id)?.after ?? null,
-    /** Every ball in flight at the moment `between` of the way through the last step (world metres). */
-    balls: (between: number): Vec3[] => battle.balls.map((b) => add(b.p, b.v, (between - 1) * STEP)),
+    /** Every ball in flight at the moment `between` of the way through the last step (world metres), and its way. */
+    balls: (between: number): BallDraw[] => battle.balls.map((b) => ({ at: add(b.p, b.v, (between - 1) * STEP), way: b.v })),
     /** What the guns did in the last KEPT seconds, oldest first. */
     blasts: (): readonly Blast[] => blasts,
+    /** The loot on the water. */
+    loot: (): Flotsam => flotsam,
 
     /** The ships on the sea, as the sim has them. */
     vessels: (): readonly Vessel[] => fleet,
@@ -254,10 +280,16 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     },
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
-      clear(match, [PLAYER]);
+      clear(match, [PLAYER], false);
       quiet = true;
       launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
       return aboard.get(PLAYER)!.after;
+    },
+    /** Puts goods on the water at `at` (a unit vector), lying still and no ship's, as if long spilt. */
+    strew(at: Vec3, goods: readonly Goods[]) {
+      const n = flotsam.pieces.length;
+      const f = overboard(flotsam, at, goods, -1, match.seed);
+      flotsam = { ...f, pieces: f.pieces.map((l, i): typeof l => (i < n ? l : { ...l, way: [0, 0, 0], age: 10 })) };
     },
     /** Sends a ship afloat to the bottom at once, the last blow `by`'s (null: the storm's). */
     sink(id: number, by: number | null) {

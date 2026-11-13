@@ -85,17 +85,17 @@ async function play(s: Stage): Promise<Played> {
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
   const referee = createReferee(game);
 
-  // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game and, where
-  // the game has nothing yet, by what stands in for it (play/placeholder.ts: pending).
+  // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game; her career
+  // by what stands in for it (play/placeholder.ts: pending).
   const input = createInput(s.canvas, () => game.steering());
   const layer = uiLayer();
   const stick = createStick(layer);
   const pending = createPlaceholder();
   const coasts = traceCoasts(s.world.planet.islands);
   const globe = createGlobe(coasts);
-  const hudState = (): HudState => ({ ...game.status(), ...pending.kit() });
+  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, { slot: pending.choose, gust: pending.gust, fire: input.fire, map });
+  const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
   const deal = () => {
     game.start(s.matches.deal());
     referee.begin();

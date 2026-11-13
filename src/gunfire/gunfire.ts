@@ -1,9 +1,10 @@
 // The guns' work as it is seen: the balls in flight, and the puffs where they go off and come down. Two draws for all
 // of it, each a single instanced mesh; no targets of their own, nothing to compute.
 //
-// Balls: small dark iron spheres, one instance each, placed each frame where the battle has them (filled in by the
-// game: the only CPU work there is). A ball is a few centimetres across and would vanish at a hundred metres, so it is
-// drawn at least a pixel and a half across, as the ropes are (ship/materials.ts).
+// Balls: 0117's (render/actors/projectiles.ts): a glowing spark, one instance each, placed each frame where the battle
+// has them and drawn out along its flight, at least a few pixels across so it is seen at the far end of its range; and
+// behind it a ribbon of thin grey smoke (puffs laid along the way it came since the frame before), thickening and
+// fading over a second and a half.
 //
 // Puffs: soft round sprites facing the eye, each written once into a ring of instances when the battle reports what
 // made it, and moved from then on wholly in the vertex stage: carried off at its velocity with its drag (exponential)
@@ -16,26 +17,29 @@
 // light, smoke and spray cover what is behind them.
 
 import {
-  AddEquation, BufferAttribute, CustomBlending, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferAttribute, InstancedBufferGeometry,
+  AddEquation, BufferAttribute, CustomBlending, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry,
   InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor, type PerspectiveCamera,
 } from 'three/webgpu';
 import {
   Fn, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import type { Light } from '../sky/light';
+import type { BallDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import { random } from '../world/random';
 import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec2Node } from '../tsl';
 
 /** The most balls in flight, and puffs alive, at once. */
-const BALLS = 128, PUFFS = 1024;
+const BALLS = 128, PUFFS = 4096;
 /** Floats a puff: at+born, way+life, size+grow+drag+pull, ink+glow, opacity+seed+softness+fade-in; each a vec4. */
 const STRIDE = 20;
-/** A ball's radius, metres (a 9-pounder's), and the fewest pixels it is drawn across. */
-const BALL = 0.06, BALL_PIXELS = 1.5;
-/** Cast iron, sooty. */
-const IRON = 0.04;
+/** A ball's spark: its radius, metres (0117's), the fewest pixels it is drawn across, and how many seconds of its
+ *  flight it is drawn out along; its glow (0117's, radiance). */
+const BALL = 0.16, BALL_PIXELS = 4, STREAK = 0.02, SPARK: Vec3 = [4, 2.3, 0.8];
+/** Its trail (0117's smoke ribbon): a puff every TRAIL m along its way, its size and growth (m, m/s), life (s), ink and
+ *  opacity. */
+const TRAIL = 3, TRAIL_SIZE = 0.3, TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
 
 /** One puff as it is laid: where it starts (metres) and its velocity (m/s), its size (m, radius) and how fast it grows
  * (m/s), its drag (per second) and pull (m/s² down; negative rises), life (s), colour (linear; a glow's is radiance
@@ -45,28 +49,27 @@ interface Puff {
   ink: Vec3; glow: number; opacity: number; soft: number; fadeIn: number;
 }
 
-function ballMesh(light: Light, pixel: FloatNode) {
+function ballMesh(pixel: FloatNode) {
   const ico = new IcosahedronGeometry(1, 1);
   const g = new InstancedBufferGeometry();
   g.setAttribute('position', ico.getAttribute('position'));
-  g.setAttribute('normal', ico.getAttribute('normal'));
-  const places = new InstancedBufferAttribute(new Float32Array(BALLS * 4), 4).setUsage(DynamicDrawUsage);
-  g.setAttribute('ballAt', places);
+  // where each is, and its velocity
+  const buffer = new InstancedInterleavedBuffer(new Float32Array(BALLS * 8), 8).setUsage(DynamicDrawUsage);
+  g.setAttribute('ballAt', new InterleavedBufferAttribute(buffer, 4, 0));
+  g.setAttribute('ballWay', new InterleavedBufferAttribute(buffer, 4, 4));
   g.instanceCount = 0;
   const m = new MeshBasicNodeMaterial();
-  const at = attribute('ballAt', 'vec4').xyz, local = attribute('position', 'vec3');
+  const at = attribute('ballAt', 'vec4').xyz, way = attribute('ballWay', 'vec4').xyz, local = attribute('position', 'vec3');
   const radius = max(float(BALL), cameraPosition.sub(at).length().mul(pixel).mul(BALL_PIXELS / 2));
-  m.positionNode = at.add(local.mul(radius));
-  const n = varying(attribute('normal', 'vec3'));
-  m.colorNode = Fn(() => {
-    const p = at, nn = normalize(n);
-    const lit = light.glossy(p, nn, float(0.45), vec3(IRON));
-    return lit.diffuse.mul(IRON).add(lit.specular);
-  })();
+  // drawn out along its flight: its half-length the streak's or its radius, whichever the more
+  const speed = way.length().max(1e-3), along = way.div(speed);
+  const stretch = max(radius, speed.mul(STREAK / 2)).div(radius);
+  m.positionNode = at.add(local.add(along.mul(local.dot(along).mul(stretch.sub(1)))).mul(radius));
+  m.colorNode = vec3(...SPARK);
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
   mesh.visible = false;
-  return { mesh, places, geometry: g };
+  return { mesh, buffer, geometry: g };
 }
 
 function puffMesh(light: Light, now: FloatNode) {
@@ -119,10 +122,12 @@ function puffMesh(light: Light, now: FloatNode) {
   return { mesh, buffer, geometry: g };
 }
 
-/** light: how the world is lit (sky/light.ts). */
+/** light: how the world is lit (sky/light.ts): the puffs; the sparks glow of themselves. */
 export function createGunfire(light: Light) {
   const now = uniform(0), pixel = uniform(0.0026);
-  const balls = ballMesh(light, pixel);
+  const balls = ballMesh(pixel);
+  /** The world's clock when the balls were last drawn. */
+  let drawn = -Infinity;
   const puffs = puffMesh(light, now);
   const array = puffs.buffer.array as Float32Array;
   let head = 0, laid = 0, dirty = false;
@@ -168,30 +173,41 @@ export function createGunfire(light: Light) {
         for (let i = 0; i < 10; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), across(at), u(0.5, 2.5)), [0.42, 0.36, 0.27], 0.55, u(1.5, 3), 0.6));
         return;
       }
-      for (let i = 0; i < 26; i++) {
+      for (let i = 0; i < 40; i++) {
         lay(time, {
-          at: add(p, across(at), u(0, 0.6)), way: add(scale(at, u(5, 13)), across(at), u(0.3, 2.5)), size: u(0.3, 0.6), grow: 0.4,
-          drag: 0.15, pull: 9.8, life: u(1.2, 2.4), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.85, soft: 0.3, fadeIn: 0,
+          at: add(p, across(at), u(0, 0.8)), way: add(scale(at, u(6, 16)), across(at), u(0.3, 3)), size: u(0.4, 0.8), grow: 0.5,
+          drag: 0.15, pull: 9.8, life: u(1.4, 2.6), ink: [0.9, 0.92, 0.93], glow: 0, opacity: 0.9, soft: 0.3, fadeIn: 0,
         });
       }
-      for (let i = 0; i < 8; i++) {
-        lay(time, { ...smoke(p, add(scale(at, u(1, 5)), across(at), u(0.5, 2)), [0.95, 0.96, 0.97], 0.3, u(1.5, 2.5), 1), grow: 2.2, pull: -0.1, drag: 1.2 });
+      for (let i = 0; i < 12; i++) {
+        lay(time, { ...smoke(p, add(scale(at, u(1, 6)), across(at), u(0.5, 2.5)), [0.95, 0.96, 0.97], 0.35, u(1.8, 3), 1.4), grow: 2.6, pull: -0.1, drag: 1.2 });
       }
     },
     /** A ball home in a hull at `at` (a unit vector), or a ram. */
     strike(time: number, at: Vec3, ram: boolean) {
       const p = scale(at, R + (ram ? 1.2 : 1.8));
-      for (let i = 0; i < (ram ? 10 : 16); i++) lay(time, splinter(p, at));
+      for (let i = 0; i < (ram ? 10 : 24); i++) lay(time, splinter(p, at));
       if (ram) return;
-      for (let i = 0; i < 2; i++) lay(time, flash(p, [0, 0, 0], 1.6));
-      for (let i = 0; i < 8; i++) lay(time, smoke(p, add(scale(at, u(1, 4)), any(), 1.5), [0.3, 0.28, 0.26], 0.6, u(2, 3.5), 0.7));
+      for (let i = 0; i < 3; i++) lay(time, flash(p, scale(any(), 2), 2.4));
+      for (let i = 0; i < 14; i++) lay(time, smoke(p, add(scale(at, u(1, 5)), any(), 2), [0.24, 0.22, 0.2], 0.7, u(2.5, 4), 1));
     },
-    /** Each frame: the world's clock now (s), and every ball in flight (metres, from the centre). */
-    draw(time: number, at: readonly Vec3[]) {
+    /** Each frame: the world's clock now (s), and every ball in flight. */
+    draw(time: number, flying: readonly BallDraw[]) {
       now.value = time;
-      const n = Math.min(at.length, BALLS), a = balls.places.array as Float32Array;
-      for (let i = 0; i < n; i++) a.set(at[i], i * 4);
-      balls.places.needsUpdate = n > 0;
+      const n = Math.min(flying.length, BALLS), a = balls.buffer.array as Float32Array;
+      // each ball's trail along the way it came since the last frame (none on the first, or after a pause), its puffs
+      // laid when the ball passed, from a start that slides with the clock so they don't stand in step frame to frame
+      const since = time - drawn > 0 && time - drawn < 0.25 ? time - drawn : 0;
+      for (let i = 0; i < n; i++) {
+        const { at, way } = flying[i], speed = Math.max(1e-3, Math.hypot(...way));
+        a.set([...at, 0, ...way, 0], i * 8);
+        for (let d = (time * 997) % TRAIL; d < speed * since; d += TRAIL) {
+          const ago = d / speed;
+          lay(time - ago, { ...smoke(add(at, way, -ago), [0, 0, 0], TRAIL_INK, TRAIL_OPACITY, TRAIL_LIFE, TRAIL_SIZE), grow: TRAIL_GROW, drag: 1, pull: -0.2, fadeIn: 0.02 });
+        }
+      }
+      drawn = time;
+      balls.buffer.needsUpdate = n > 0;
       balls.geometry.instanceCount = n;
       balls.mesh.visible = n > 0;
       puffs.geometry.instanceCount = laid;

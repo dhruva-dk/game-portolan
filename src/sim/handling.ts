@@ -78,8 +78,22 @@ export const HEALTH = {
   /** The most hull and shield she can have. */
   hull: 100,
   shield: 100,
-  /** The shield she puts to sea with (0117: none, filled from loot; full here until there is loot). */
-  start: 100,
+  /** The shield she puts to sea with (0117's: none, filled from loot). */
+  start: 0,
+} as const;
+
+/**
+ * Gust, her one ability (gust.ts): 0117's (tables.ts GUST, sailing.ts gust), a burst of wind in her canvas and a hop
+ * off the water. Two charges, each coming back `recharge` s after the last came back; spent, for `time` s her speed
+ * asked rises by `speed` and is reached at `accel` m/s², and her turn by `turn`; her balls go off `spread` times as
+ * wide. Its speeds brought down by her top speed's share as RAM's are (14.5 → 12: 13 → 10.8 m/s, 28 → 23 m/s²); after
+ * it, speed over her top is shed at 0117's deceleration, likewise (4.5 → 3.7 m/s²). The hop: up at `hop` m/s under
+ * 0117's gravity (9.8), some 2 m and 1.3 s.
+ */
+export const GUST = {
+  charges: 2, recharge: 6.5, time: 1.15,
+  speed: 10.8, accel: 23, shed: 3.7, turn: 1.35, spread: 1.6,
+  hop: 6.3, gravity: 9.8,
 } as const;
 
 /**

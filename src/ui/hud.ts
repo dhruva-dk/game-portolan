@@ -1,24 +1,28 @@
 // The match's HUD, laid on the world as the chartmaker's slips (docs/ui-sheet, as the owner reworked it):
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in rubric under 30 s) and the ships afloat (a ship, a count)
-//   top right   the minimap (minimap.ts); a tap opens the full map
+//   top right   the minimap (minimap.ts): the Storm's calm and the next, the loot about her; a tap opens the full map
 //   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
 //               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
-//               above it, with a pip for each charge
-//   centre      the old game's reticle, four arms round a gap, gilt and drawn in while the aim assist has a ship
-//               (sim/gun.ts); none with no gun
-//   bottom      the hotbar right of centre, out of the stick's side: the gun's slot, then three more
+//               above it, with a pip for each charge, the next filling as it comes back, faint with none, gilt
+//               while one blows
+//   reticle     the old game's, four arms round a gap, gilt and drawn in while the aim assist has a ship
+//               (sim/gun.ts), where her aim falls, kept off her own ship (play/aim.ts); none with no gun
+//   bottom      the hotbar right of centre, out of the stick's side: the gun's slot (its rarity's ink under it), then
+//               three of stores; the one in hand gilt, a gold ring running round it while it is used, and a gold
+//               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
+//   rim         washed rubric while she is outside the Storm's calm, the deeper the further out (0117's)
 // No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
 // Once she has sunk it watches another ship (watch): only the Storm's clock and the disc stay, her arrow gilt.
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
 import type { Kit, Status } from '../player';
-import type { Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
 import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
-import { createMinimap, stormRing, type Storm } from './minimap';
+import { createMinimap } from './minimap';
+import { RARITY } from '../snapshot';
 import { onTap, piece } from './ui';
 
 /** What the HUD shows: the match as the game reports it, and what she carries. */
@@ -34,6 +38,11 @@ const MINIMAP = 132;
 const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102, GUST_RIGHT = 6, GUST_UP = 86;
 /** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship. */
 const RETICLE = 10, LOCKED = 0.75;
+/** The rim's wash outside the calm: its least and most strength, and the metres out it deepens over (0117's 0.35 +
+ *  0.65 × how deep). */
+const RIM = [0.35, 1] as const, RIM_DEEP = 80;
+/** 0xrrggbb as css. */
+const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
 
 /** m:ss */
 export const clock = (s: number) => {
@@ -56,6 +65,10 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
   const reticle = piece(root, '');
   reticle.style.cssText = `left:50%;top:50%;transform:translate(-50%,-50%)`;
+  // the rim's wash outside the calm, under everything else
+  const rim = document.createElement('div');
+  rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 24px rgba(184,48,26,.75);opacity:0`;
+  root.prepend(rim);
   // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
@@ -88,7 +101,6 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
     el.innerHTML = html();
   };
 
-  let eye: Storm | null = null, ring: Vec3[] | null = null;
   /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock and the disc stay,
    *  her arrow on it gilt, and the disc takes no touch. */
   let watching = false;
@@ -97,7 +109,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
     root,
     watch(on: boolean) {
       watching = on;
-      for (const el of [vitals, gust, fire, reticle, hotbar]) el.style.display = on ? 'none' : '';
+      for (const el of [vitals, gust, fire, reticle, hotbar, rim]) el.style.display = on ? 'none' : '';
       map.classList.toggle('press', !on);
     },
     update(s: HudState) {
@@ -107,16 +119,24 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         + bar(11, 20, 158, 15, shield / s.shieldMax, WASH.azure) + figure(176, 20, shield, 17, { anchor: 'start' })
         + bar(11, 41, 158, 15, hull / s.hullMax, WASH.hull) + figure(176, 41, hull, 17, { anchor: 'start' })));
 
-      const time = clock(s.storm), closing = s.storm < 30;
+      const time = clock(s.storm), closing = s.closing || s.storm < 30;
       draw(readings, `${time} ${watching ? '' : s.afloat}`, () => svg(184, 38,
         slip(1, 2, 88, 34) + glyph('hud.spiral', 20, 19, 22, { ink: closing ? 'rubric' : 'iron' })
         + figure(60, 19, time, 23, { fill: closing ? INK.rubric : INK.iron })
         + (watching ? '' : slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23))));
 
-      draw(gust, `${s.gust}`, () => {
+      // each charge a pip; the one coming back filling round, in steps of a 24th
+      const charge = Math.floor(s.gust), back = Math.floor((s.gust - charge) * 24);
+      draw(gust, `${charge} ${back} ${s.blowing}`, () => {
         let pips = '';
-        for (let i = 0; i < GUSTS; i++) pips += `<circle cx="${30 + (i - (GUSTS - 1) / 2) * 10}" cy="44" r="2.8" fill="${i < s.gust ? INK.iron : PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
-        return svg(60, 60, `<g opacity="${s.gust > 0 ? 1 : 0.55}">${paperDisc(30, 30, 28)}${glyph('hud.gust', 30, 26, 32)}${pips}</g>`);
+        for (let i = 0; i < GUSTS; i++) {
+          const x = 30 + (i - (GUSTS - 1) / 2) * 10;
+          pips += `<circle cx="${x}" cy="44" r="2.8" fill="${i < charge ? INK.iron : PAPER}" stroke="${INK.iron}" stroke-width=".8"/>`;
+          if (i === charge && back > 0) pips += sweep(x, 44, 2.8, back / 24, INK.iron, 1.6);
+        }
+        return svg(60, 60, `<g opacity="${charge > 0 ? 1 : 0.55}">${paperDisc(30, 30, 28, s.blowing ? WASH.gold : INK.iron)}`
+          + (s.blowing ? `<circle cx="30" cy="30" r="25" fill="none" stroke="${WASH.gold}" stroke-width="2.4"/>` : '')
+          + `${glyph('hud.gust', 30, 26, 32)}${pips}</g>`);
       });
 
       // the reload's sweep in steps of a 48th, so it is redrawn a few times a second at most
@@ -125,8 +145,12 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         + (loaded < 0 ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
         + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
 
-      // the reticle: iron under lead white, or gilt while the assist has a ship
-      const lock = s.gun ? (s.gun.locked ? 'locked' : 'free') : 'none';
+      // the reticle: iron under lead white, or gilt while the assist has a ship; where her aim falls
+      const lock = s.gun && s.reticle ? (s.gun.locked ? 'locked' : 'free') : 'none';
+      if (s.reticle) {
+        reticle.style.left = `${s.reticle.x.toFixed(1)}px`;
+        reticle.style.top = `${s.reticle.y.toFixed(1)}px`;
+      }
       draw(reticle, lock, () => {
         if (lock === 'none') return '';
         const h = RETICLE + 3, r = lock === 'locked' ? RETICLE * LOCKED : RETICLE, gap = r * 0.32;
@@ -135,26 +159,34 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
           + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>`);
       });
 
-      // the gun's slot holds her gun, if she has one; then her items
-      const held: ({ glyph: Glyph; count?: number } | null)[] = [s.gun && { glyph: 'weapon.cannon' }, ...s.items.map((k) => k && { glyph: k.item, count: k.count })];
-      held.forEach((slot, i) => draw(slots[i], `${slot?.glyph} ${slot?.count} ${s.chosen === i}`, () => {
-        const chosen = s.chosen === i;
-        if (!slot) {
-          // lead white over an iron halo, to hold on bright water
-          return svg(SLOT, SLOT, `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="rgba(38,25,16,.12)" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>`
-            + `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>`);
-        }
-        return svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? '#f3dfa8' : 'url(#pg)', bold: chosen })
-          + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="1.6"/>` : '')
-          + glyph(slot.glyph, SLOT / 2 - 3, SLOT / 2, 31)
-          + (slot.count != null ? figure(SLOT / 2 + 18, SLOT / 2 + 12, slot.count, 17) : ''));
-      }));
+      // the gun's slot holds her gun, if she has one, its rarity's ink under it; then her items. The one being used
+      // has a gold ring running round it, in steps of a 32nd; the one a tap would swap for loot a gold mark bobbing
+      const held: ({ glyph: Glyph; count?: number; ink?: number } | null)[] = [
+        s.gun && { glyph: 'weapon.cannon', ink: RARITY[s.gun.rarity] }, ...s.items.map((k) => k && { glyph: k.item, count: k.count }),
+      ];
+      held.forEach((slot, i) => {
+        const chosen = s.chosen === i, used = chosen && s.using !== null ? Math.floor(s.using * 32) : -1, offer = s.offer === i;
+        draw(slots[i], `${slot?.glyph} ${slot?.count} ${slot?.ink} ${chosen} ${used} ${offer}`, () => {
+          const mark = offer ? `<g><path d="M${SLOT / 2 - 7} -15h14l-7 9z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width="1"/>`
+            + `<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="0.9s" repeatCount="indefinite"/></g>` : '';
+          if (!slot) {
+            // lead white over an iron halo, to hold on bright water
+            return svg(SLOT, SLOT, `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="rgba(38,25,16,.12)" stroke="${INK.iron}" stroke-width="3" opacity=".45"/>`
+              + `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${INK.white}" stroke-width="1.2" opacity=".85"/>` + mark);
+          }
+          return svg(SLOT, SLOT, slip(0, 0, SLOT, SLOT, { fill: chosen ? '#f3dfa8' : 'url(#pg)', bold: chosen })
+            + (chosen ? `<rect x="2" y="2" width="${SLOT - 4}" height="${SLOT - 4}" fill="none" stroke="${WASH.gold}" stroke-width="1.6"/>` : '')
+            + (slot.ink !== undefined ? `<rect x="9" y="${SLOT - 9}" width="${SLOT - 18}" height="4" fill="${css(slot.ink)}" stroke="${INK.iron}" stroke-width=".6"/>` : '')
+            + glyph(slot.glyph, SLOT / 2 - 3, SLOT / 2 - (slot.ink !== undefined ? 3 : 0), 31)
+            + (slot.count != null ? figure(SLOT / 2 + 18, SLOT / 2 + 12, slot.count, 17) : '')
+            + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, WASH.gold, 3.5) : '') + mark);
+        });
+      });
 
-      if (s.eye !== eye) {
-        eye = s.eye;
-        ring = eye ? stormRing(eye) : null;
-      }
-      drawMap(s.at, s.heading, ring, { gilt: watching });
+      // the rim's wash, outside the calm
+      rim.style.opacity = s.outside > 0 && !watching ? (RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)).toFixed(2) : '0';
+
+      drawMap(s.at, s.heading, null, { gilt: watching, calm: s.eye, next: s.next, loot: watching ? undefined : s.loot });
     },
   };
 }

@@ -15,7 +15,8 @@
 // lie by default (for seed 3 the largest island's centre is at lat 8.7, lon −11.6, its coast about 69 m out).
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
 // north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
-// ship with a gun of that rarity (sim/gun.ts); ?fire fires hers at the first step; ?storm=seconds holds the storm at
+// ship with a gun of that rarity (sim/gun.ts); ?fire fires hers at the first step, ?fire=seconds so many seconds into the
+// frames drawn; ?storm=seconds holds the storm at
 // that moment of its clock. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
@@ -27,6 +28,11 @@
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
 // The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
+// At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
+// a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
+// drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity ahead of
+// her, 12 m out to 600 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
+// stays where it is put); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
 import type { Anchor } from './world/lattice';
@@ -38,7 +44,7 @@ import type { Referee } from './play/referee';
 import { lookOf } from './play/colours';
 import { startOf, type Matches } from './play/setup';
 import { bearing, type Berth } from './play/state';
-import { IDLE } from './player';
+import { IDLE, type Hands } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
 import { SHIP } from './sim/handling';
@@ -130,8 +136,25 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   const p = await play(s);
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, room - 1));
-  const paused = params.has('pause');
-  return s.draw((dt) => p.next(paused ? 0 : dt), p.drawn);
+  const paused = params.has('pause'), slow = number('slow', 1);
+  // ?swing: a finger held on the look after each frame, so it never eases back
+  const swing = params.get('swing')?.split(',').map(Number);
+  if (swing) p.game.step(0, { ...IDLE, look: { x: swing[0] || 0, y: swing[1] || 0, held: true } });
+  // ?use: the slot tapped twice (chosen, then used); ?gust and ?fire pressed; so many seconds in
+  const [slot, use] = (params.get('use') ?? '').split(',').map(Number);
+  const timed: { at: number; hands: Partial<Hands> }[] = [
+    ...(slot > 0 ? [{ at: use || 0, hands: { tap: slot } }, { at: use || 0, hands: { tap: slot } }] : []),
+    ...(params.has('gust') ? [{ at: number('gust', 0), hands: { gust: true } }] : []),
+    ...(params.get('fire') ? [{ at: number('fire', 0), hands: { fire: true } }] : []),
+  ];
+  let drawn = 0;
+  return s.draw((real) => {
+    const dt = paused ? 0 : real * slow, frame = p.next(dt);
+    for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
+    drawn += dt;
+    if (swing) p.game.step(0, { ...IDLE, look: { x: 0, y: 0, held: true } });
+    return frame;
+  }, p.drawn);
 }
 
 /** Opens the game where ?screen= says, among `others` at sea; then sails it on ?ahead= seconds. */
@@ -156,13 +179,37 @@ function open(p: Played, others: readonly Berth[]) {
       flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');
     }
   }
+  if (screen === 'match') stock(game);
   // ordered now, fired at her first step
-  if (params.has('fire')) game.step(0, { ...IDLE, fire: true });
+  if (params.get('fire') === '') game.step(0, { ...IDLE, fire: true });
   for (let t = 0; t < number('ahead', 0); t += 0.1) {
     game.step(0.1, IDLE);
     referee.update(0.1);
   }
   if (screen === 'map') p.map();
+}
+
+/** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
+function stock(game: Game) {
+  type Goods = Parameters<Game['strew']>[1][number];
+  const { at, heading } = game.status();
+  const step = () => game.step(STEP, IDLE);
+  if (params.has('kit')) {
+    const under: Goods[] = [
+      { kind: 'gun', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
+    ];
+    game.strew(at, under);
+    step();
+    game.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
+    step();
+  }
+  if (params.has('loot')) {
+    [12, 30, 60, 120, 250, 400, 600].forEach((m, i) => {
+      const out = along(at, heading, m);
+      const p = along(out.p, cross(out.p, out.t), (i % 2 ? 1 : -1) * 6).p;
+      game.strew(p, [i % 2 ? { kind: 'gun', rarity: i % 5 } : { kind: (['smallShield', 'bigShield', 'repairKit', 'fullRepair'] as const)[i % 4], count: 1 }]);
+    });
+  }
 }
 
 /** ?drive's legs ("bearing,throttle,seconds;…"), each sailed with her helm lashed to it. */
@@ -197,7 +244,7 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
   return (dt: number): Snapshot => {
     const eye = fly(dt);
     clock += dt;
-    return { eye, clock, storm: storm(clock), ships, own: null, balls: [], blasts: [] };
+    return { eye, clock, storm: storm(clock), ships, own: null, balls: [], loot: [], blasts: [] };
   };
 }
 

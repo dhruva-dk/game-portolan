@@ -51,13 +51,13 @@ const once = (aim: Vec3 | null) => (f: readonly Vessel[], t: number): Order[] =>
 // ------------------------------------------------------------------ health
 
 test('the shield takes a blow first, the hull the rest; past the shield, the hull alone; sunk at 0 hull', () => {
-  const h = whole();
-  assert.deepEqual(h, { hull: HEALTH.hull, shield: HEALTH.start });
+  assert.deepEqual(whole(), { hull: HEALTH.hull, shield: HEALTH.start });
+  const h = { hull: HEALTH.hull, shield: HEALTH.shield };
   const a = harmed(h, 30);
   assert.deepEqual([a.health, a.shield, a.hull], [{ hull: 100, shield: 70 }, 30, 0]);
   const b = harmed(a.health, 90);
   assert.deepEqual([b.health, b.shield, b.hull], [{ hull: 80, shield: 0 }, 70, 20]);
-  const c = harmed(whole(), 25, true);
+  const c = harmed(h, 25, true);
   assert.deepEqual(c.health, { hull: 75, shield: 100 });
   const d = harmed(b.health, 500);
   assert.equal(d.hull, 80);
@@ -66,7 +66,7 @@ test('the shield takes a blow first, the hull the rest; past the shield, the hul
 });
 
 test('healing mends hull or shield up to its cap, never past it, and nothing once sunk', () => {
-  const h = harmed(whole(), 150).health;
+  const h = harmed({ hull: 100, shield: 100 }, 150).health;
   assert.deepEqual(h, { hull: 50, shield: 0 });
   assert.deepEqual(healed(h, 25, 'shield'), { hull: 50, shield: 25 });
   assert.deepEqual(healed(h, 25, 'shield', 20), { hull: 50, shield: 20 });
@@ -74,7 +74,7 @@ test('healing mends hull or shield up to its cap, never past it, and nothing onc
   assert.equal(healed({ hull: 0, shield: 0 }, 50, 'hull').hull, 0);
 });
 
-test('a ram takes off each ship what contact.ts reported, through her shield', () => {
+test('a ram takes off each ship what contact.ts reported, through her shield (none, putting to sea) into her hull', () => {
   const target = lying(centre, 0);
   const from = along(target.at, turned(target, Math.PI / 2), -45 - SHIP.length / 2);
   const fleet = [afloat(1, { ...shipAt(from.p, from.t), speed: SHIP.top }), afloat(2, target)];
@@ -82,8 +82,8 @@ test('a ram takes off each ship what contact.ts reported, through her shield', (
   assert.equal(r.blows.length, 1, 'one ram');
   const blow = r.blows[0], by = new Map(r.battle.crews.map((c) => [c.id, c.health]));
   assert.ok(blow.struck.damage > 10, `the struck ship took ${blow.struck.damage}`);
-  assert.equal(by.get(blow.struck.id)!.shield, HEALTH.start - blow.struck.damage);
-  assert.equal(by.get(blow.striker.id)!.shield, HEALTH.start - blow.striker.damage);
+  assert.equal(by.get(blow.struck.id)!.hull, HEALTH.hull + HEALTH.start - blow.struck.damage);
+  assert.equal(by.get(blow.striker.id)!.hull, HEALTH.hull + HEALTH.start - blow.striker.damage);
   assert.deepEqual(r.strikes.map((s) => [s.struck, s.shooter, s.ram]), [[blow.striker.id, blow.struck.id, true], [blow.struck.id, blow.striker.id, true]]);
 });
 

@@ -4,7 +4,11 @@
 //              to her name; when that one sinks, the one that sank her, and so on. A tap moves on (to the result), or
 //              the match ending does, SPECTATE seconds after
 //   won        she is the last afloat: a tap moves on, or VICTORY seconds do
-// Her place: 1 + the ships still afloat as she sank. Pure: a value stepped by what the game reports.
+// Her place, as 0117 settled it (sim/end.ts sink): the ships not yet sunk as she sank, herself among them, the
+// sinkings of one step counted one by one in the order the game reports them; so, the last ships all sunk at once,
+// the last of them to sink is first and wins. With her place, how she sank and at whose hand: the Storm's sinking goes
+// to the ship that last struck her if it did so within CREDIT seconds (credited). The defeat slip and the result show
+// this place (ui/flow.ts). Pure: a value stepped by what the game reports.
 
 export type Phase = 'fighting' | 'spectating' | 'won';
 
@@ -18,13 +22,26 @@ export const PLAYER = 0;
  *  MATCH.ships was 20). */
 export const SHIPS = 80;
 
-/** A ship sunk: who, and who sank her (null: the storm, or none). */
-export interface Sunk { id: number; by: number | null }
+/** How a ship sank: by a ball, a ram, or the Storm. */
+export type Cause = 'shot' | 'ram' | 'storm';
+
+/** A ship sunk: who, who sank her (null: the storm, or none), and how. */
+export interface Sunk { id: number; by: number | null; cause: Cause }
+
+/** Seconds a blow is credited with a sinking by the Storm after it (0117 end.ts settle). */
+export const CREDIT = 8;
+
+/** Who is credited with a sinking by `cause`, the last blow to her `last` (its striker, and seconds since; null: none):
+ *  a ball's or a ram's striker always; the Storm's, the last striker within CREDIT seconds, else none. */
+export const credited = (cause: Cause, last: { by: number; ago: number } | null): number | null =>
+  last && (cause !== 'storm' || last.ago < CREDIT) ? last.by : null;
 
 export interface MatchState {
   phase: Phase;
   /** Her place once it is settled (sunk or won), else null. */
   place: number | null;
+  /** Her sinking, once she has sunk: how and at whose hand. */
+  sunk: Sunk | null;
   /** The ship the camera follows. */
   watch: number;
   /** How the camera came to her: 'cut' to her at once, 'fly' over to her. Changes with `watch`. */
@@ -41,7 +58,7 @@ export interface MatchState {
 export interface Report { sinkings: readonly Sunk[]; alive: readonly number[] }
 
 export const startMatch = (): MatchState => ({
-  phase: 'fighting', place: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0,
+  phase: 'fighting', place: null, sunk: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0,
 });
 
 /** Who to watch after `gone` sank, at the hand of `by`: her, if afloat, or the ship afloat with the most sinkings to
@@ -63,8 +80,11 @@ export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
   const fresh = r.sinkings.slice(m.read);
   const mine = fresh.find((k) => k.id === PLAYER);
   if (mine && s.phase === 'fighting') {
+    const place = r.alive.length + r.sinkings.length - r.sinkings.indexOf(mine);
     const watch = next(mine.by, r);
-    s = { ...s, phase: 'spectating', place: 1 + r.alive.length, watch: watch < 0 ? PLAYER : watch, move: 'cut' };
+    s = place === 1 && r.alive.length === 0
+      ? { ...s, phase: 'won', place, sunk: mine, held: 0 }
+      : { ...s, phase: 'spectating', place, sunk: mine, watch: watch < 0 ? PLAYER : watch, move: 'cut' };
   } else if (s.phase === 'spectating') {
     // the ship watched has sunk: on to the one that sank her
     const gone = fresh.find((k) => k.id === s.watch);

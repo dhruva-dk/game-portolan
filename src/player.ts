@@ -1,7 +1,7 @@
 // What passes between the player and the game, as plain data: the seam between play/ (the game) and ui/ (what she
 // sees and touches), as snapshot.ts is the seam between the game and the frame. Her hands' orders go in each frame
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match reports comes out (Status, read by
-// ui/hud.ts), with what she carries (Kit) and her career, which nothing in the game keeps yet (play/placeholder.ts).
+// ui/hud.ts), with what she carries (Kit), and her career, which nothing in the game keeps yet (play/placeholder.ts).
 
 import type { Vec3 } from './world/sphere';
 
@@ -14,10 +14,14 @@ export interface Hands {
   look: { x: number; y: number; held: boolean };
   /** Whether her gun has been ordered fired since the last read. */
   fire: boolean;
+  /** The hotbar's slot last tapped since the last read (0 the gun's, 1–3 the items'), or null. */
+  tap: number | null;
+  /** Whether Gust has been pressed since the last read. */
+  gust: boolean;
 }
 
 /** No hand on anything. */
-export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fire: false };
+export const IDLE: Hands = { stick: null, look: { x: 0, y: 0, held: false }, fire: false, tap: null, gust: false };
 
 /** The match as the HUD reads it: a plain snapshot, made fresh each time it is asked for. */
 export interface Status {
@@ -31,19 +35,30 @@ export interface Status {
   gun: { rarity: number; ready: number; locked: boolean } | null;
   /** Ships still afloat, hers among them; whether hers is sunk. */
   afloat: number; sunk: boolean;
-  /** Seconds till the storm next holds or closes (0 once it has closed for good), and its calm (radius in metres). */
-  storm: number; eye: { centre: Vec3; radius: number };
+  /** Seconds till the storm next holds or closes (0 once it has closed for good), whether it is closing now, its calm
+   *  (radius in metres) and the calm it next closes to (null once it has closed for good); how far outside the calm
+   *  she is, metres (0 inside). */
+  storm: number; closing: boolean; eye: { centre: Vec3; radius: number }; next: { centre: Vec3; radius: number } | null; outside: number;
+  /** The loot on the water near her (unit vectors), for the disc. */
+  loot: readonly Vec3[];
+  /** Where her gun is aimed on the screen (CSS px from the top left), or null with none to show. */
+  reticle: { x: number; y: number } | null;
 }
 
 /** An item a slot of the hotbar holds. */
-export type Item = 'item.smallShield' | 'item.bigShield' | 'item.repairKit';
+export type Item = 'item.smallShield' | 'item.bigShield' | 'item.repairKit' | 'item.fullRepair';
 
 /** A slot of the hotbar holding an item, and how many of it if more than one may be held. */
 export interface Slot { item: Item; count?: number }
 
 /** What she carries besides her gun: the hotbar's three item slots (null: empty), the slot in hand (0 the gun's, then
- *  the items'), and Gust's charges ready. */
-export interface Kit { items: readonly [Slot | null, Slot | null, Slot | null]; chosen: number; gust: number }
+ *  the items'), how far through using it she is (0…1; null when she isn't), the slot a tap would swap for what lies
+ *  within reach (null: none offered); and Gust: its charges ready with the next one's share come back (1.4: one ready,
+ *  the next 40% back), and whether one blows now. */
+export interface Kit {
+  items: readonly [Slot | null, Slot | null, Slot | null]; chosen: number; using: number | null; offer: number | null;
+  gust: number; blowing: boolean;
+}
 
 /** Her career, as the lobby and the result show it: her level, how far toward the next (0…1), and her rank's tier. */
 export interface Career { level: number; progress: number; tier: number }
