@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HEALTH } from '../src/sim/handling.ts';
-import { battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
+import { HEALTH, type GunKind } from '../src/sim/handling.ts';
+import { armed, battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
 import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf } from '../src/sim/gun.ts';
+import { gunOf, type Gun } from '../src/sim/gun.ts';
+import { asked, type Ask } from '../src/sim/stores.ts';
 import { reactTime, spreadBy } from '../src/sim/gunner.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, type Helm } from '../src/sim/ship.ts';
@@ -33,19 +34,21 @@ const bold = (() => {
 })();
 
 /** Bots `seeds` (null: a ship holding `held`, firing along her heading if `fire`) sailing and fighting `seconds`;
- *  armed as `guns` (rarity, or null); in `storm` if given; bots told of the balls that strike them. */
-function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }, { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}) {
+ *  armed as `guns` (a cannon's rarity, the guns she carries, or null); in `storm` if given; bots told of the balls that
+ *  strike them, and the guns they ask for taken in hand. */
+function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | Gun[] | null)[], seconds: number, held: Helm = { course: null, throttle: 0 }, { storm, fire = false }: { storm?: Storm; fire?: boolean } = {}) {
   const minds: (Memory | null)[] = fleet.map((v, i) => (seeds[i] === null ? null : mind(seeds[i]!, v.ship.at)));
   // every ship put to sea with a full shield, as she would be with a few fights' loot in her, so a test runs its length
-  let b: Battle = battleOf(fleet.map((v, i) => ({ ...crewOf(v.id, guns[i] === null ? null : gunOf(guns[i]!)), health: { hull: HEALTH.hull, shield: HEALTH.shield } })), 7);
-  const fired: { t: number; id: number }[] = [], ranges: number[] = [];
+  const carried = (g: number | Gun[] | null): Gun[] => (g === null ? [] : typeof g === 'number' ? [gunOf('cannon', g)] : g);
+  let b: Battle = battleOf(fleet.map((v, i) => ({ ...crewOf(v.id, ...carried(guns[i])), health: { hull: HEALTH.hull, shield: HEALTH.shield } })), 7);
+  const fired: { t: number; id: number; gun: GunKind }[] = [], ranges: number[] = [];
   let strikes = 0, blows = 0;
   for (let n = 0; n < Math.round(seconds / STEP); n++) {
     const seen = fleet.map((v) => {
       const c = b.crews.find((k) => k.id === v.id)!;
-      return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun };
+      return { ...v, hull: c.health.hull, shield: c.health.shield, armed: armed(c), crew: c };
     });
-    const helms: Helm[] = [], orders: Order[] = [];
+    const helms: Helm[] = [], orders: Order[] = [], asks = new Map<number, Ask>();
     fleet.forEach((v, i) => {
       const m = minds[i];
       if (!m) { helms.push(held); orders.push({ aim: null, fire }); return; }
@@ -53,13 +56,16 @@ function battle(fleet: Vessel[], seeds: (number | null)[], guns: (number | null)
       minds[i] = r.memory;
       helms.push(r.helm);
       orders.push(r.order);
+      asks.set(v.id, r.ask);
     });
+    // the guns she asks for taken in hand
+    b = { ...b, crews: asked(b.crews, fleet, { pieces: [], next: 0 }, asks).crews };
     const met = stepFleet(fleet, helms, STEP, deep);
     fleet = met.fleet;
     blows += met.blows.length;
     const f = stepBattle(b, fleet, orders, met.blows, STEP, deep);
     b = f.battle;
-    for (const s of f.shots) fired.push({ t: n * STEP, id: s.shooter });
+    for (const s of f.shots) fired.push({ t: n * STEP, id: s.shooter, gun: s.gun });
     strikes += f.strikes.filter((s) => !s.ram).length;
     for (const s of f.strikes) {
       const k = fleet.findIndex((v) => v.id === s.struck);
@@ -150,4 +156,16 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
   const g = share(green), s = share(sharp);
   console.log(`# balls striking a steady ship 150 m off in 15 s: green ${(100 * g).toFixed(0)}%, sharp ${(100 * s).toFixed(0)}%`);
   assert.ok(g < s - 0.15, `green ${g}, sharp ${s}`);
+});
+
+test('a bot with two guns takes in hand the one for the range: a scatter close, a harpoon far off', () => {
+  for (const seed of bold) {
+    // the scatter in hand to begin with, her foe far off; then the harpoon in hand, her foe close
+    const far = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 200, 0)], [seed, null], [[gunOf('scatter', 0), gunOf('harpoon', 0)], null], 12);
+    const near = battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 30, 0)], [seed, null], [[gunOf('harpoon', 0), gunOf('scatter', 0)], null], 6);
+    const kinds = (r: ReturnType<typeof battle>) => [...new Set(r.fired.filter((f) => f.id === 0).map((f) => f.gun))];
+    console.log(`# seed ${seed}: far ${kinds(far)}, near ${kinds(near)}`);
+    assert.deepEqual(kinds(far), ['harpoon'], `${seed}: far off`);
+    assert.ok(kinds(near).includes('scatter'), `${seed}: close`);
+  }
 });

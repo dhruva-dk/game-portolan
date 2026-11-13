@@ -1,5 +1,5 @@
-// The gun as the player lays it: along the chase camera's look (play/chase.ts sight), on a ship crossing her bow at top
-// speed, N balls at each range, every one flown among the ships as they sail. How many strike her, by the gun's rarity,
+// The cannon as the player lays it: along the chase camera's look (play/chase.ts sight), on a ship crossing her bow at
+// top speed, N balls at each range, every one flown among the ships as they sail. How many strike her, by its rarity,
 // with the reticle on her and with it off her by a thumb's slip; and with a bot's unsteady hand (gunner.ts spreadBy).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { createChase } from '../src/play/chase.ts';
 import { battleOf, crewOf, stepBattle } from '../src/sim/battle.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
-import { gunOf, laid } from '../src/sim/gun.ts';
+import { gunOf, laid, spreadOf } from '../src/sim/gun.ts';
 import { spreadBy } from '../src/sim/gunner.ts';
 import { GUN, SHIP } from '../src/sim/handling.ts';
 import { loosed } from '../src/sim/shot.ts';
@@ -41,8 +41,9 @@ function rate(rarity: number, metres: number, off = 0, k = 1): number {
     const a = shipAt(centre, frameAt(centre).east), toward = turned(a, bearing);
     const p = along(centre, toward, metres).p, b = shipAt(p, frameAt(p).east);
     let fleet: Vessel[] = [afloat(1, a), afloat(2, { ...b, heading: turned(b, bearing + (side * Math.PI) / 2), speed: SHIP.top })];
-    const lay = laid(fleet[0], { ...gunOf(rarity), fired: n }, sightOn(fleet[0], fleet[1], off * side), fleet, 11, deep, GUN.spread[rarity] * k);
-    let battle = { ...battleOf([crewOf(1), crewOf(2)], 0), balls: [loosed(1, lay.from, lay.dir, 1)] }, struck = false;
+    const gun = { ...gunOf('cannon', rarity), fired: n };
+    const lay = laid(fleet[0], gun, sightOn(fleet[0], fleet[1], off * side), fleet, 11, deep, spreadOf(gun) * k);
+    let battle = { ...battleOf([crewOf(1), crewOf(2)], 0), balls: [loosed(1, 'cannon', lay.from, lay.dirs[0], lay.speed, 1)] }, struck = false;
     for (let i = 0; i < 300 && battle.balls.length && !struck; i++) {
       fleet = stepFleet(fleet, [{ course: null, throttle: 0 }, { course: null, throttle: 1 }], STEP, deep).fleet;
       const r = stepBattle(battle, fleet, fleet.map(() => ({ aim: null, fire: false })), [], STEP, deep);

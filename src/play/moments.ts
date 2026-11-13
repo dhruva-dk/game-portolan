@@ -6,11 +6,11 @@
 //
 // Pure: no three, no page; deterministic for the same inputs.
 
-import type { Splash, Strike } from '../sim/battle.ts';
-import { rarityOf, type Taken } from '../sim/loot.ts';
+import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
+import { isGun, rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import type { Eye } from '../snapshot.ts';
-import type { Deed, Moment } from '../player.ts';
+import { HOTBAR, type Deed, type Moment } from '../player.ts';
 import { R, add, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
 import { onScreen } from './lens.ts';
@@ -18,10 +18,12 @@ import { onScreen } from './lens.ts';
 /** Seconds of deeds the match keeps, on the world's clock. */
 export const KEEP = 1;
 
-/** What a step did, as the sim reports it: the guns fired, the balls come down and home, the ships sunk (where, and by
- *  whom), what was taken up and mended with, the ships that spent a gust, and where hers lies (null: sunk). */
+/** What a step did, as the sim reports it: the guns fired and what else they did, the balls come down and home, the
+ *  ships sunk (where, and by whom), what was taken up and mended with, the ships that spent a gust, and where hers lies
+ *  (null: sunk). */
 export interface Done {
-  shots: readonly { shooter: number; from: Vec3 }[];
+  shots: readonly Pick<Shot, 'shooter' | 'from' | 'gun'>[];
+  cues: readonly Cue[];
   splashes: readonly Splash[];
   strikes: readonly Strike[];
   sunk: readonly { id: number; by: number | null; at: Vec3 }[];
@@ -31,11 +33,19 @@ export interface Done {
   her: Vec3 | null;
 }
 
-/** The deeds of a step at `time` (the world's clock, s), numbered by `next`: every ship's fighting, and `me`'s stores
- *  alone. In the order they happened within the step: fired, fell, struck, sank, then her stores. */
+/** The deeds of a step at `time` (the world's clock, s), numbered by `next`: every ship's fighting and wind-ups, and
+ *  `me`'s other guns' cues and stores alone. In the order they happened within the step:
+ *  her taking a gun up, fired, wound, reloading and reloaded, fell, struck, sank, then her stores. */
 export function deedsOf(done: Done, me: number, next: () => number, time: number): Deed[] {
   const out: Deed[] = [];
-  for (const s of done.shots) out.push({ seq: next(), time, at: normalize(s.from), ship: s.shooter, kind: 'fired' });
+  const cued = (kinds: readonly Cue['kind'][]) => {
+    for (const c of done.cues) {
+      if (kinds.includes(c.kind) && (c.kind === 'winding' || c.ship === me)) out.push({ seq: next(), time, at: c.at, ship: c.ship, kind: c.kind, gun: c.gun });
+    }
+  };
+  cued(['swapped']);
+  for (const s of done.shots) out.push({ seq: next(), time, at: normalize(s.from), ship: s.shooter, kind: 'fired', gun: s.gun });
+  cued(['winding', 'reloading', 'reloaded']);
   for (const s of done.splashes) out.push({ seq: next(), time, at: s.at, ship: s.shooter, kind: 'fell', land: s.land });
   for (const s of done.strikes) {
     out.push({ seq: next(), time, at: s.at, ship: s.struck, kind: 'struck', by: s.shooter, shield: s.shield, hull: s.hull, broke: s.broke, ram: s.ram });
@@ -43,7 +53,7 @@ export function deedsOf(done: Done, me: number, next: () => number, time: number
   for (const s of done.sunk) out.push({ seq: next(), time, at: s.at, ship: s.id, kind: 'sank', by: s.by });
   for (const t of done.took) {
     if (t.ship !== me) continue;
-    out.push({ seq: next(), time, at: t.at, ship: me, kind: 'took', piece: t.goods.kind, rarity: rarityOf(t.goods), slot: t.slot });
+    out.push({ seq: next(), time, at: t.at, ship: me, kind: 'took', piece: t.goods.kind, rarity: rarityOf(t.goods), slot: isGun(t.goods) ? t.slot : HOTBAR.guns - 1 + t.slot });
   }
   const her = done.her;
   if (!her) return out;
@@ -57,7 +67,7 @@ export const kept = (deeds: readonly Deed[], fresh: readonly Deed[], time: numbe
   fresh.length || deeds.some((d) => d.time <= time - KEEP) ? [...deeds.filter((d) => d.time > time - KEEP), ...fresh] : [...deeds];
 
 /** Metres over the sea a deed is seen at: a blow on a hull at her side, a gun at her muzzle, the rest at the water. */
-const LIFT: Record<Deed['kind'], number> = { fired: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
+const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
 
 /** The bearing of world point `p` (metres) from the way `eye` looks: radians clockwise, 0 ahead, ±π behind. */
 export function bearingFrom(eye: Eye, p: Vec3): number {

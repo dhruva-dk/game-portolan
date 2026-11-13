@@ -16,17 +16,17 @@
 //   and the crowd round her where a third ship would finish whoever won; close aboard she fights whatever her will;
 //   and she lets a ship sailing away from her go once it is past reach, as a ram can't catch a ship as fast as she is.
 //   She runs from a fight she is losing, or from a ship that rams her that she won't fight.
-// Every step she steers (helmsman.ts) for what she is about, and, armed, fights with her gun instead of ramming
-// (gunner.ts, 0117's aimAndFire and fightCourse): she holds its range round her foe, and lays and fires it, a gun
-// reaching a ship however fast she sails.
+// Every step she steers (helmsman.ts) for what she is about, and, armed, fights with her guns instead of ramming
+// (gunner.ts, 0117's aimAndFire and fightCourse): she takes in hand the one for the range, holds its range round her
+// foe, and lays and fires it, a gun reaching a ship however fast she sails.
 // Mending (0117's heal, 3.5) and loot (1.8) are purser.ts's, with what she asks of her hold and her gust each step.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { R, add, apart, along, distance, dot, normalize, type Vec3 } from '../world/sphere.ts';
-import type { Order } from './battle.ts';
+import { inHand, type Order } from './battle.ts';
 import { STEP } from './fixed.ts';
-import { aimAndFire, reactTime } from './gunner.ts';
+import { aimAndFire, armFor, reactTime } from './gunner.ts';
 import type { Helm } from './ship.ts';
 import { STORM, toEdge, type Cap } from './storm.ts';
 import { temper } from './temper.ts';
@@ -56,11 +56,13 @@ export function think(own: Seen, others: readonly Seen[], sea: Sea, memory: Memo
   c.foe = m.foe >= 0 ? others.find((o) => o.id === m.foe) ?? null : null;
   c.foeD = c.foe ? distance(own.ship.at, c.foe.ship.at) : Infinity;
   const helm = steer(c, dt);
-  const order: Order = own.armed ? aimAndFire(m, own.ship, inSight(c) ? c.foe : null, m.clock, c.t.skill, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
+  const held = own.crew ? inHand(own.crew) : null, seen = inSight(c) ? c.foe : null;
+  const order: Order = held ? aimAndFire(m, own.ship, seen, held.kind, m.clock, c.t.skill, () => roll(m), dt, holdsFire(c)) : { aim: null, fire: false };
   m.was = own.ship.at;
-  // her stores asked on the steps she thinks (0117's)
+  // her stores asked on the steps she thinks (0117's); the gun for the range taken in hand whenever it changes
   const ask = m.think === BOT.every ? purse(c) : NOTHING;
-  return { helm, order, ask, memory: m };
+  const arm = own.crew && ask.take === null && ask.tap === null && !own.crew.hold.using ? armFor(own.crew, seen ? c.foeD : null) : null;
+  return { helm, order, ask: arm === null ? ask : { ...ask, arm }, memory: m };
 }
 
 // ---------------------------------------------------------------- seeing

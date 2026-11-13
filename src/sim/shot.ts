@@ -1,11 +1,15 @@
-// A cannonball in flight: one fixed step of it, and where it ends, in a hull, in the sea or on the land.
+// A ball in flight: one fixed step of it, and where it ends, in a hull, in the sea or on the land.
 //
-// It flies a true orbit about the planet's centre, pulled by MU / r², from the muzzle at GUN.speed. On a planet this
-// small a ball fired flat at that speed would go round it, so the pull is the one that makes GUN.range its furthest
-// carry (some 11 g at the sea). Its flight is stepped by velocity Verlet on the fixed step; how far it carries and how
-// long it takes are also had in closed form, from the orbit itself, for laying the gun (gun.ts): a ball fired at an
-// elevation comes back down to the muzzle's height at the same angle, the range angle ψ across the centre given by
-// tan(ψ/2) = ν sin φ cos φ / (1 − ν cos² φ), ν its speed squared against the speed of a circular orbit there.
+// It flies a true orbit about the planet's centre, pulled by MU / r², from the muzzle. On a planet this small a ball
+// fired flat at these speeds would go round it, so each kind of gun (handling.ts GUNS) has its own pull, the one that
+// makes its `carry` the furthest its ball goes at the best elevation (0117 gave each kind its own gravity): the
+// cannon's some 14 g at the sea, its carry its range; the harpoon's far less for its speed, so its bolt flies flat. Its
+// flight is stepped by velocity Verlet on the fixed step; how far it carries and how long it takes are also had in
+// closed form, from the orbit itself, for laying the gun (gun.ts): a ball fired at an elevation comes back down to the
+// muzzle's height at the same angle, the range angle ψ across the centre given by
+// tan(ψ/2) = ν sin φ cos φ / (1 − ν cos² φ), ν its speed squared against the speed of a circular orbit there. A gun
+// laid low takes the low elevation for the distance at its muzzle speed; a lobbed one (the mortar) its fixed elevation,
+// with the charge (ν, so the muzzle speed) the distance needs.
 // The balls take nothing of the ship's own way: laid on a point, a ball goes to it, whatever she is making.
 //
 // Each step its path is looked along every GUN.probe metres: a hull there (the capsule of contact.ts standing to
@@ -16,17 +20,21 @@
 
 import { R, add, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { KEEL, RADIUS } from './contact.ts';
-import { GUN, SHIP } from './handling.ts';
+import { GUN, GUNS, KINDS, SHIP, type GunKind } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import type { Depth } from './shoal.ts';
 
-/** A ball in flight: who fired it, where it is (metres, from the planet's centre), its velocity (m/s), the hit points
- * it takes off, and how long it has flown (s). */
+/** A ball in flight: who fired it and from what kind of gun, where it is (metres, from the planet's centre), its
+ * velocity (m/s), the hit points it takes off (before its fall-off), where it was fired from and where it was laid to
+ * come down (unit vectors), and how long it has flown (s). */
 export interface Ball {
   shooter: number;
+  kind: GunKind;
   p: Vec3;
   v: Vec3;
   damage: number;
+  from: Vec3;
+  to: Vec3;
   age: number;
 }
 
@@ -40,59 +48,86 @@ export interface Fall {
 
 /** The muzzle's distance from the centre. */
 const MUZZLE = R + GUN.up;
-/** The ball's speed squared against a circular orbit's at the muzzle, for the pull that makes GUN.range its furthest
- * carry: sin(ψ/2) = ν / (2 − ν) at the best elevation. */
-const NU = (() => {
-  const s = Math.sin(GUN.range / R / 2);
+/** ν for a carry of `metres` at the best elevation: sin(ψ/2) = ν / (2 − ν) there. */
+const nuFor = (metres: number) => {
+  const s = Math.sin(metres / R / 2);
   return (2 * s) / (1 + s);
-})();
-/** The planet's pull, m³/s²: MU / r² at r. */
-export const MU = (GUN.speed * GUN.speed * MUZZLE) / NU;
+};
+/** Each kind's ν at its muzzle speed, and its pull, m³/s² (MU / r² at r). */
+const PULL = Object.fromEntries(KINDS.map((k) => {
+  const nu = nuFor(GUNS[k].carry);
+  return [k, { nu, mu: (GUNS[k].speed * GUNS[k].speed * MUZZLE) / nu }];
+})) as Record<GunKind, { nu: number; mu: number }>;
 
-/** Metres along the sea at which a ball fired at `elevation` (radians above the level) comes back to the muzzle's
- * height; GUN.range at the best elevation. */
-export function reach(elevation: number): number {
+/** A kind's pull, m³/s². */
+export const pullOf = (kind: GunKind) => PULL[kind].mu;
+
+/** Metres along the sea at which a ball with speed ratio ν fired at `elevation` comes back to the muzzle's height. */
+const carried = (nu: number, elevation: number) => {
   const c = Math.cos(elevation);
-  return 2 * R * Math.atan2(NU * Math.sin(elevation) * c, 1 - NU * c * c);
-}
+  return 2 * R * Math.atan2(nu * Math.sin(elevation) * c, 1 - nu * c * c);
+};
 
-/** The low elevation that carries a ball `metres` along the sea back to the muzzle's height, or null beyond range. */
-export function elevationFor(metres: number): number | null {
-  if (metres > GUN.range) return null;
-  if (metres <= 0) return 0;
-  const t = Math.tan(metres / R / 2);
-  const root = NU * NU - 4 * t * t * (1 - NU);
-  return Math.atan((NU - Math.sqrt(Math.max(0, root))) / (2 * t));
-}
+/** Metres along the sea at which a ball of `kind`, at its muzzle speed, fired at `elevation` (radians above the level),
+ * comes back to the muzzle's height; its carry at the best elevation. */
+export const reach = (kind: GunKind, elevation: number) => carried(PULL[kind].nu, elevation);
 
-/** Seconds a ball fired at `elevation` flies before it is back at the muzzle's height: twice the time from the muzzle
- * to the top of its orbit, by Kepler's equation. */
-export function flightTime(elevation: number): number {
+/** Seconds a ball with speed ratio ν fired at `elevation` flies before it is back at the muzzle's height: twice the time
+ * from the muzzle to the top of its orbit, by Kepler's equation. */
+function flight(nu: number, mu: number, elevation: number): number {
   const c = Math.cos(elevation);
-  const e = Math.sqrt(1 + NU * (NU - 2) * c * c);
-  const theta = Math.acos(Math.max(-1, Math.min(1, (NU * c * c - 1) / e)));
+  const e = Math.sqrt(1 + nu * (nu - 2) * c * c);
+  const theta = Math.acos(Math.max(-1, Math.min(1, (nu * c * c - 1) / e)));
   const big = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(theta / 2), Math.sqrt(1 + e) * Math.cos(theta / 2));
   const mean = big - e * Math.sin(big);
-  const a = MUZZLE / (2 - NU);
-  return (2 * (Math.PI - mean)) / Math.sqrt(MU / (a * a * a));
+  const a = MUZZLE / (2 - nu);
+  return (2 * (Math.PI - mean)) / Math.sqrt(mu / (a * a * a));
 }
 
-/** A ball fired from `from` (metres, from the centre) along `dir` (a unit vector) at the muzzle speed. */
-export const loosed = (shooter: number, from: Vec3, dir: Vec3, damage: number): Ball => ({
-  shooter, p: from, v: scale(dir, GUN.speed), damage, age: 0,
+/** How a ball is thrown to come back down to the muzzle's height `metres` along the sea: its elevation (radians), its
+ * muzzle speed (m/s) and its time in the air (s). */
+export interface Throw { elevation: number; speed: number; time: number }
+
+/** How a gun of `kind` throws a ball `metres` along the sea: low at its muzzle speed, or lobbed at its elevation with
+ * the charge the distance needs; null past its range (or, lobbed, nearer than its least). */
+export function thrown(kind: GunKind, metres: number): Throw | null {
+  const g = GUNS[kind], { nu, mu } = PULL[kind];
+  if (metres > g.range + 1e-9 || metres < g.least - 1e-9) return null;
+  const t = Math.tan(Math.max(metres, 1e-3) / R / 2);
+  if (g.lob > 0) {
+    const c = Math.cos(g.lob), n = t / (c * (Math.sin(g.lob) + t * c));
+    return { elevation: g.lob, speed: Math.sqrt((n * mu) / MUZZLE), time: flight(n, mu, g.lob) };
+  }
+  const root = nu * nu - 4 * t * t * (1 - nu);
+  const elevation = metres <= 0 ? 0 : Math.atan((nu - Math.sqrt(Math.max(0, root))) / (2 * t));
+  return { elevation, speed: g.speed, time: flight(nu, mu, elevation) };
+}
+
+/** A ball of `kind` fired from `from` (metres, from the centre) along `dir` (a unit vector) at `speed`, laid to come
+ * down at `to` (a unit vector; where it was fired from if not given). */
+export const loosed = (shooter: number, kind: GunKind, from: Vec3, dir: Vec3, speed: number, damage: number, to?: Vec3): Ball => ({
+  shooter, kind, p: from, v: scale(dir, speed), damage, from: normalize(from), to: to ?? normalize(from), age: 0,
 });
 
-const pull = (p: Vec3): Vec3 => {
+const pull = (p: Vec3, mu: number): Vec3 => {
   const r = length(p);
-  return scale(p, -MU / (r * r * r));
+  return scale(p, -mu / (r * r * r));
 };
 
 /** A ball's flight dt seconds on, nothing in its way (velocity Verlet). */
 export function flown(b: Ball, dt: number): Ball {
-  const a0 = pull(b.p);
+  const mu = PULL[b.kind].mu, a0 = pull(b.p, mu);
   const p = add(add(b.p, b.v, dt), a0, 0.5 * dt * dt);
-  const v = add(b.v, add(a0, pull(p)), 0.5 * dt);
+  const v = add(b.v, add(a0, pull(p, mu)), 0.5 * dt);
   return { ...b, p, v, age: b.age + dt };
+}
+
+/** How far the point q (a unit vector) lies outside her hull's capsule along the sea, metres (0 inside its plan). */
+export function offHull(s: ShipState, q: Vec3): number {
+  const d = add(scale(q, R), s.at, -R);
+  const ahead = dot(d, s.heading), across = length(add(d, s.heading, -ahead));
+  const off = Math.max(0, Math.abs(ahead) - KEEL);
+  return Math.max(0, Math.hypot(off, across) - RADIUS);
 }
 
 /** Whether the point q (metres, from the centre) is inside her hull: within the capsule along her keel, from the
@@ -100,10 +135,7 @@ export function flown(b: Ball, dt: number): Ball {
 function inHull(s: ShipState, q: Vec3): boolean {
   const r = length(q), height = r - R;
   if (height < 0 || height > GUN.freeboard) return false;
-  const d = add(scale(q, R / r), s.at, -R);
-  const ahead = dot(d, s.heading), across = length(add(d, s.heading, -ahead));
-  const off = Math.max(0, Math.abs(ahead) - KEEL);
-  return off * off + across * across <= RADIUS * RADIUS;
+  return offHull(s, scale(q, 1 / r)) <= 0;
 }
 
 /** A ship a ball may strike: who she is and how she lies. */

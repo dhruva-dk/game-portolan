@@ -16,7 +16,7 @@
 // A match begun with start() opens with every ship already afloat at her berth (sim/spawn.ts), spread over the whole
 // planet, hers the first; the match's clock (the storm's) starts then.
 
-import { battleOf, crewOf, stepBattle, weathered, type Battle, type Order } from '../sim/battle.ts';
+import { armed, battleOf, crewOf, inHand, stepBattle, weathered, type Battle, type Order } from '../sim/battle.ts';
 import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
@@ -27,7 +27,7 @@ import { homed, regain, type Regained } from '../sim/holding.ts';
 import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
 import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
-import { berthed, overboard, strewn, type Flotsam, type Goods } from '../sim/loot.ts';
+import { berthed, overboard, strewn, type Arms, type Flotsam, type Goods } from '../sim/loot.ts';
 import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
@@ -62,9 +62,9 @@ export const bearing = (at: Vec3, b: number): Vec3 => {
 export interface Berth { at: Vec3; heading: Vec3; look: Look; lashed: Helm | null }
 
 /** The match: its seed (each bot's mind comes from it and her slot), its storm by the match's clock (s), and the
- * rarity of gun every ship is armed with, or null for none. */
+ * gun every ship is armed with, or null for none (as every ship puts to sea in a match: 0117's). */
 export interface Match {
-  seed: number; storm: (seconds: number) => Storm; gun: number | null;
+  seed: number; storm: (seconds: number) => Storm; gun: Arms | null;
   /** Its ships' berths (sim/spawn.ts berths, SHIPS of them), when worked out ahead of its start (play/setup.ts). */
   berths?: readonly Spawn[];
 }
@@ -157,7 +157,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     born.clear();
     sinkings.length = 0;
     struck.clear();
-    battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
+    const gun = match.gun;
+    battle = battleOf(ids.map((id) => (gun ? crewOf(id, gunOf(gun.kind, gun.rarity)) : crewOf(id))), match.seed);
     territory = held ? createTerritory(Math.max(...ids) + 1) : null;
     generation++;
     begun = tick;
@@ -194,7 +195,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     const crews = new Map(battle.crews.map((c) => [c.id, c]));
     const seen: Seen[] = fleet.map((v) => {
       const c = crews.get(v.id)!;
-      return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun, crew: c };
+      return { ...v, hull: c.health.hull, shield: c.health.shield, armed: armed(c), crew: c };
     });
     const helms: Helm[] = [], orders: Order[] = [], asks = new Map<number, Ask>();
     // every ship but the one thinking, in one list refilled for each (a bot reads it only while she thinks)
@@ -279,8 +280,8 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     const t = tick * STEP;
     blasts = [
       ...blasts.filter((b) => b.time > t - KEPT),
-      ...fought.shots.map((s): Blast => ({ kind: 'shot', time: t, from: s.from, dir: s.dir })),
-      ...fought.splashes.map((s): Blast => ({ kind: 'splash', time: t, at: s.at, land: s.land })),
+      ...fought.shots.map((s): Blast => ({ kind: 'shot', time: t, from: s.from, dir: s.dirs[0], gun: s.gun })),
+      ...fought.splashes.map((s): Blast => ({ kind: 'splash', time: t, at: s.at, land: s.land, gun: s.gun })),
       ...fought.strikes.map((s): Blast => ({ kind: 'strike', time: t, at: s.at, ram: s.ram, shield: s.hull <= 0 && s.shield > 0, broke: s.broke })),
     ];
   };
@@ -322,7 +323,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       keep(fought);
       lap?.('keep');
       founderAll(lost, fought);
-      record({ ...fought, sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
+      record({ ...fought, cues: [...wants.cues, ...fought.cues], sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
       lap?.('founder');
       return did;
     },
@@ -337,14 +338,15 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     },
     /** Every ship drawn at the moment `between` of the way through the last step: afloat, or going down. */
     drawn(between: number): ShipDraw[] {
-      const now = clock(between), still: Vec3 = [0, 0, 0];
+      const now = clock(between), still: Vec3 = [0, 0, 0], crews = new Map(battle.crews.map((c) => [c.id, c]));
       const ships: ShipDraw[] = fleet.map(({ id, ship, shove }) => {
-        const a = aboard.get(id)!;
-        return { id, pose: blendPose(a.before, a.after, between), look: a.look, velocity: add(scale(ship.heading, ship.speed), shove), afloat: true };
+        const a = aboard.get(id)!, c = crews.get(id), g = c && inHand(c);
+        const gun = g ? { kind: g.kind, aim: c.aim ?? ship.heading } : null;
+        return { id, pose: blendPose(a.before, a.after, between), look: a.look, velocity: add(scale(ship.heading, ship.speed), shove), afloat: true, gun };
       });
       for (const w of wrecks) {
         const p = wreckAt(w, now);
-        if (p) ships.push({ id: w.id, pose: p, look: w.look, velocity: still, afloat: false });
+        if (p) ships.push({ id: w.id, pose: p, look: w.look, velocity: still, afloat: false, gun: null });
       }
       return ships;
     },
@@ -358,7 +360,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     /** A ship's pose after the last step, if she is afloat. */
     after: (id: number): ShipPose | null => aboard.get(id)?.after ?? null,
     /** Every ball in flight at the moment `between` of the way through the last step (world metres), and its way. */
-    balls: (between: number): BallDraw[] => battle.balls.map((b) => ({ at: add(b.p, b.v, (between - 1) * STEP), way: b.v })),
+    balls: (between: number): BallDraw[] => battle.balls.map((b) => ({ at: add(b.p, b.v, (between - 1) * STEP), way: b.v, gun: b.kind, to: b.to })),
     /** What the guns did in the last KEPT seconds, oldest first. */
     blasts: (): readonly Blast[] => blasts,
     /** The loot on the water. */
@@ -391,7 +393,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       const afloatNow = new Map(fleet.map((v) => [v.id, v.ship]));
       return battle.crews.map((c) => {
         const s = afloatNow.get(c.id) ?? sinkings.find((k) => k.id === c.id)!;
-        return { id: c.id, at: s.at, heading: s.heading, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun, afloat: !sunk(c.health) };
+        return { id: c.id, at: s.at, heading: s.heading, hull: c.health.hull, shield: c.health.shield, armed: armed(c), afloat: !sunk(c.health) };
       });
     },
     /** A new match: SHIPS ships, hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts) with a
@@ -434,7 +436,7 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
         if (!aboard.has(id)) return;
         battle = { ...battle, crews: battle.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
         founder(id, by, by === null ? 'storm' : 'shot');
-        record({ shots: [], splashes: [], strikes: [], sunk: lostNow, took: [], mended: [], blew: [], her: null });
+        record({ shots: [], splashes: [], strikes: [], cues: [], sunk: lostNow, took: [], mended: [], blew: [], her: null });
       },
     },
   };

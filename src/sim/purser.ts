@@ -1,11 +1,11 @@
 // A bot's stores: what loot she goes for, when she mends, and what she asks of her hold and her gust. 0117's captains'
 // (src/sim/captains/brain.ts: the heal and loot options, mendNeed, healSlot, bestLoot, weaponWorth, useWhatItCarries)
-// for one gun and three item slots, with its numbers:
+// for two guns and three item slots, with its numbers:
 // - mending (heal, 3.5): with something in her slots that would mend her as she is, and her hull or shield under what
 //   her temperament (and, sharper, sooner) tops up at, while no foe is close; she uses the slot worth most;
-// - loot (1.8): the piece within her temperament's reach worth most to her, falling off with distance; a gun better
-//   than hers (more than any if she has none), things to mend with that go in her slots. A gun better than hers that
-//   she reaches she swaps hers for;
+// - loot (1.8): the piece within her temperament's reach worth most to her, falling off with distance; a gun that
+//   betters what she carries (a first gun most, then a second of another kind, then a better of either), things to
+//   mend with that go in her slots. With both gun slots full, a gun she reaches she swaps the one it betters most for;
 // - gust: running, or making in from the storm, with both charges or her hull low; fighting, to close a foe far off.
 // New, as 80 ships share the sea (0117 had 20 on a sea twice the size): a piece a ship she can see lies well nearer
 // is left to her, and one gone for longer than PURSER.patience s without reaching it is given up and left be, so ships
@@ -14,11 +14,12 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { R, distance, dot } from '../world/sphere.ts';
-import type { Crew } from './battle.ts';
+import { armed, type Crew } from './battle.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
+import type { GunKind } from './handling.ts';
 import { roomFor, useful, type Use } from './hold.ts';
-import type { Loot } from './loot.ts';
+import { isGun, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
@@ -39,6 +40,8 @@ export const PURSER = {
   /** New: a piece a ship she sees lies nearer than this share of her distance to it is left to her; one gone for this
    *  many s is given up; unarmed, a gun is worth this many times as much. */
   ceded: 0.7, patience: 30, bare: 2,
+  /** New: a second gun of another kind is worth this share of a first (one for each range). */
+  other: 0.7,
 } as const;
 
 /** What each consumable is worth spending now (0117's healSlot): a full repair on a hull under 45, a kit under 75, a
@@ -73,16 +76,30 @@ export const healUrge = (c: Ctx) => {
   return !crew || healSlot(crew) < 0 ? 0 : utility(mendNeed(c, crew), ramp(c.foeD, 55, 90));
 };
 
-/** How much a gun of `rarity` would better hers: 0 if it wouldn't. With one gun, the better is swapped for. */
-export function weaponWorth(gun: Gun | null, rarity: number): number {
-  if (!gun) return 1 + 0.2 * rarity;
-  return rarity > gun.rarity ? 0.4 + 0.2 * (rarity - gun.rarity) : 0;
+/** What a pair of guns is worth to her: the better, and PURSER.other of the other if it is of another kind (one for
+ *  each range; 0.1 if not), each 1 and 0.2 a tier (0117's weaponWorth, for two). */
+function pairWorth(guns: readonly (Pick<Gun, 'kind' | 'rarity'> | null)[]): number {
+  const [a, b] = guns.filter((g) => g !== null).map((g) => ({ kind: g.kind, v: 1 + 0.2 * g.rarity })).sort((x, y) => y.v - x.v);
+  return !a ? 0 : a.v + (b ? (b.kind === a.kind ? 0.1 : PURSER.other) * b.v : 0);
 }
 
-/** What a piece is worth to her: a gun by weaponWorth, things to mend with that go in her slots 0.5. */
+/** How much a gun of `kind` and `rarity` would better what she carries, and the gun slot it would go in (an empty one,
+ *  else the one it betters most): worth 0 if it wouldn't. */
+export function weaponWorth(guns: readonly (Gun | null)[], kind: GunKind, rarity: number): { worth: number; slot: number } {
+  const now = pairWorth(guns);
+  let best = { worth: 0, slot: -1 };
+  guns.forEach((_, i) => {
+    const w = pairWorth(guns.map((g, k) => (k === i ? { kind, rarity } : g))) - now;
+    if (w > best.worth + 1e-9 && (guns[i] === null || guns.every((g) => g !== null))) best = { worth: w, slot: i };
+  });
+  return best;
+}
+
+/** What a piece is worth to her: a gun by weaponWorth (unarmed, PURSER.bare times as much), things to mend with that
+ *  go in her slots 0.5. */
 function worth(crew: Crew, l: Loot): number {
   const g = l.goods;
-  if (g.kind === 'gun') return weaponWorth(crew.gun, g.rarity) * (crew.gun ? 1 : PURSER.bare);
+  if (isGun(g)) return weaponWorth(crew.guns, g.kind, g.rarity).worth * (armed(crew) ? 1 : PURSER.bare);
   return roomFor(crew.hold, g.kind) >= 0 ? 0.5 : 0;
 }
 
@@ -139,18 +156,19 @@ export function lootAct(c: Ctx): void {
 export function purse(c: Ctx): Ask {
   const { m } = c, crew = c.own.crew;
   if (!crew) return NOTHING;
-  let tap: number | null = null, take: number | null = null, gust = false;
+  let tap: number | null = null, take: number | null = null, arm: number | null = null, gust = false;
   if (m.mode === 'heal' && !crew.hold.using) {
     const s = healSlot(crew);
     if (s >= 0) tap = s;
   }
-  if (m.mode === 'loot' && m.target >= 0 && crew.gun) {
-    const l = c.sea.loot?.find((k) => k.id === m.target);
-    if (l && l.goods.kind === 'gun' && weaponWorth(crew.gun, l.goods.rarity) > 0 && distance(c.own.ship.at, l.at) < PURSER.take) take = 0;
+  if (m.mode === 'loot' && m.target >= 0 && crew.guns.every((g) => g !== null)) {
+    // both slots full: the gun it betters most taken in hand, and swapped for it
+    const l = c.sea.loot?.find((k) => k.id === m.target), w = l && isGun(l.goods) ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity) : null;
+    if (l && w && w.worth > 0 && distance(c.own.ship.at, l.at) < PURSER.take) [take, arm] = [0, w.slot === crew.hand ? null : w.slot];
   }
   if (ready(crew.gust) && !crew.hold.using) {
     const fleeing = m.mode === 'flee' || m.mode === 'storm';
     if ((fleeing && (crew.gust.charges >= 2 || crew.health.hull < PURSER.low)) || (m.mode === 'fight' && distance(c.own.ship.at, m.goal) > PURSER.far)) gust = true;
   }
-  return tap === null && take === null && !gust ? NOTHING : { tap, take, gust };
+  return tap === null && take === null && !gust ? NOTHING : { tap, arm, take, gust };
 }

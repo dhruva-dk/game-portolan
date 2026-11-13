@@ -33,24 +33,29 @@ export const AIR_FOV = 50;
  *  besides the cross: nothing more, a band across them, or upright stripes of it (the cross counterchanged over them). */
 export interface Look { paint: Vec3; sail: Vec3; pattern: 'plain' | 'band' | 'stripes' }
 
-/** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), and
- *  whether she floats (one going down neither fits the sea round her nor marks it). */
-export interface ShipDraw { id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean }
+/** The kinds of gun (sim/handling.ts KINDS), each drawn its own way: on the water, on a ship's plinth, and its balls. */
+export type GunKind = 'cannon' | 'scatter' | 'repeater' | 'harpoon' | 'mortar';
 
-/** What the guns did, at a moment on the world's clock (s): a gun fired from `from` along `dir`; a ball come down at
- *  `at` (unit vector) in the sea or on land; a ball home in a hull at `at`, or a ram, whether her shield took all of it
- *  and whether it broke her shield; a ship sunk where she lay, at `at`. */
+/** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), whether
+ *  she floats (one going down neither fits the sea round her nor marks it), and the gun in her hand, mounted on her
+ *  plinth, with the way it is laid (a unit vector, world; it trains round to it), or null with none. */
+export interface ShipDraw { id: number; pose: ShipPose; look: Look; velocity: Vec3; afloat: boolean; gun: { kind: GunKind; aim: Vec3 } | null }
+
+/** What the guns did, at a moment on the world's clock (s): a gun of a kind fired from `from` along `dir`; a ball of a
+ *  kind come down at `at` (unit vector) in the sea or on land; a ball home in a hull at `at`, or a ram, whether her
+ *  shield took all of it and whether it broke her shield; a ship sunk where she lay, at `at`. */
 export type Blast =
-  | { kind: 'shot'; time: number; from: Vec3; dir: Vec3 }
-  | { kind: 'splash'; time: number; at: Vec3; land: boolean }
+  | { kind: 'shot'; time: number; from: Vec3; dir: Vec3; gun: GunKind }
+  | { kind: 'splash'; time: number; at: Vec3; land: boolean; gun: GunKind }
   | { kind: 'strike'; time: number; at: Vec3; ram: boolean; shield: boolean; broke: boolean }
   | { kind: 'sink'; time: number; at: Vec3 };
 
-/** A ball in flight: where it is (world metres) and its velocity (m/s). */
-export interface BallDraw { at: Vec3; way: Vec3 }
+/** A ball in flight: where it is (world metres), its velocity (m/s), its gun's kind, and where it was laid to come down
+ *  (a unit vector: a mortar's shell is marked there on the sea). */
+export interface BallDraw { at: Vec3; way: Vec3; gun: GunKind; to: Vec3 }
 
-/** What a piece of loot is: a gun, or stores to mend with. */
-export type LootKind = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
+/** What a piece of loot is: a gun of a kind, or stores to mend with. */
+export type LootKind = GunKind | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
 /** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
  *  sea's surface), what it is, the rarity it reads as (0–4: rarity.ts), and when it came onto the water (the world's

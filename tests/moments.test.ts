@@ -2,7 +2,7 @@
 // match's held time (play/shake.ts, play/stops.ts), and the screen's flashes and heartbeat (ui/flash.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HER, type Deed } from '../src/player.ts';
+import { HER, HOTBAR, type Deed } from '../src/player.ts';
 import { KEEP, bearingFrom, deedsOf, kept, seenOf, type Done } from '../src/play/moments.ts';
 import { CAMERA, answerTo, createShake, envelope, noise } from '../src/play/shake.ts';
 import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
@@ -20,7 +20,7 @@ import { flat } from '../src/world/swell.ts';
 import { lookAt } from '../src/world/turn.ts';
 
 const at: Vec3 = [0, 0, 1];
-const none: Done = { shots: [], splashes: [], strikes: [], sunk: [], took: [], mended: [], blew: [], her: at };
+const none: Done = { shots: [], splashes: [], strikes: [], sunk: [], took: [], mended: [], blew: [], cues: [], her: at };
 const counter = () => {
   let n = 0;
   return () => ++n;
@@ -30,30 +30,40 @@ test('her id in the deeds is the match\'s player', () => {
   assert.equal(HER, PLAYER);
 });
 
-test('a step\'s deeds: numbered in order, fired then fell then struck then sank, then her stores; others\' stores unreported', () => {
+test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then her stores; others\' stores and reloads unreported', () => {
   const done: Done = {
     ...none,
-    shots: [{ shooter: 2, from: scale(at, R + 3) }],
-    splashes: [{ shooter: 2, at, land: false }],
+    shots: [{ shooter: 2, from: scale(at, R + 3), gun: 'scatter' }],
+    splashes: [{ shooter: 2, at, land: false, gun: 'scatter' }],
     strikes: [{ shooter: 0, struck: 2, damage: 30, shield: 10, hull: 20, broke: true, at, ram: false }],
     sunk: [{ id: 2, by: 0, at }],
-    took: [{ ship: 0, goods: { kind: 'gun', rarity: 3 }, at, slot: 0 }, { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 }],
+    took: [{ ship: 0, goods: { kind: 'harpoon', rarity: 3 }, at, slot: 1 }, { ship: 0, goods: { kind: 'smallShield', count: 3 }, at, slot: 2 }, { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 }],
     mended: [{ ship: 0, use: 'bigShield' }, { ship: 5, use: 'repairKit' }],
     blew: [0, 5],
+    cues: [
+      { ship: 0, at, kind: 'reloaded', gun: 'cannon' }, { ship: 5, at, kind: 'reloading', gun: 'cannon' },
+      { ship: 5, at, kind: 'winding', gun: 'mortar' }, { ship: 0, at, kind: 'swapped', gun: 'harpoon' },
+    ],
   };
   const d = deedsOf(done, 0, counter(), 12);
-  assert.deepEqual(d.map((x) => [x.seq, x.kind, x.ship]), [[1, 'fired', 2], [2, 'fell', 2], [3, 'struck', 2], [4, 'sank', 2], [5, 'took', 0], [6, 'mended', 0], [7, 'gust', 0]]);
+  assert.deepEqual(d.map((x) => [x.seq, x.kind, x.ship]), [
+    [1, 'swapped', 0], [2, 'fired', 2], [3, 'reloaded', 0], [4, 'winding', 5], [5, 'fell', 2], [6, 'struck', 2], [7, 'sank', 2],
+    [8, 'took', 0], [9, 'took', 0], [10, 'mended', 0], [11, 'gust', 0],
+  ]);
   assert.ok(d.every((x) => x.time === 12));
-  const struck = d[2];
+  assert.ok(d[1].kind === 'fired' && d[1].gun === 'scatter' && d[3].kind === 'winding' && d[3].gun === 'mortar');
+  const struck = d[5];
   assert.ok(struck.kind === 'struck' && struck.by === 0 && struck.shield === 10 && struck.hull === 20 && struck.broke);
-  const took = d[4];
-  assert.ok(took.kind === 'took' && took.piece === 'gun' && took.rarity === 3 && took.slot === 0);
+  // a gun to its gun slot, stores to theirs on the hotbar after the guns
+  const [gun, stores] = [d[7], d[8]];
+  assert.ok(gun.kind === 'took' && gun.piece === 'harpoon' && gun.rarity === 3 && gun.slot === 1);
+  assert.ok(stores.kind === 'took' && stores.piece === 'smallShield' && stores.slot === HOTBAR.guns + 1);
   // sunk, she mends nothing and spends no gust
-  assert.deepEqual(deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind), ['fired', 'fell', 'struck', 'sank', 'took']);
+  assert.deepEqual(deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind), ['swapped', 'fired', 'reloaded', 'winding', 'fell', 'struck', 'sank', 'took', 'took']);
 });
 
 test('kept: the last KEEP seconds, then the fresh; nothing new and nothing stale keeps the same list', () => {
-  const deed = (seq: number, time: number): Deed => ({ seq, time, at, ship: 1, kind: 'fired' });
+  const deed = (seq: number, time: number): Deed => ({ seq, time, at, ship: 1, kind: 'fired', gun: 'cannon' });
   const old = [deed(1, 0), deed(2, 0.5)];
   assert.deepEqual(kept(old, [deed(3, 1.2)], 1.2).map((d) => d.seq), [2, 3]);
   assert.deepEqual(kept(old, [], 0.9).map((d) => d.seq), [1, 2]);
@@ -101,7 +111,7 @@ test('the camera answers: her blows, the blows on her, her sinking of one; other
   assert.equal(answerTo(struck(2, 0, 10, 10, true), 0)?.answer, CAMERA.shieldLost);
   assert.equal(answerTo(struck(2, 3, 0, 20), 0), null);
   assert.equal(answerTo({ seq: 1, time: 0, at, ship: 2, kind: 'sank', by: 0 }, 0)?.answer, CAMERA.sink);
-  assert.equal(answerTo({ seq: 1, time: 0, at, ship: 2, kind: 'fired' }, 0), null);
+  assert.equal(answerTo({ seq: 1, time: 0, at, ship: 2, kind: 'fired', gun: 'cannon' }, 0), null);
   assert.equal(stopFor(struck(0, 2, 0, 30), 0)?.stop, STOPS.hit);
   assert.equal(stopFor(struck(2, 3, 0, 30), 0), null);
 });

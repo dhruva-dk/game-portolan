@@ -17,8 +17,10 @@
 // line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from that).
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
 // north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
-// ship with a gun of that rarity (sim/gun.ts); ?fire fires hers at the first step, ?fire=seconds so many seconds into the
-// frames drawn; ?storm=seconds holds the storm at
+// ship with a gun of that rarity, ?kind= (cannon, scatter, repeater, harpoon, mortar) of that kind (sim/gun.ts; a common
+// cannon by default with either); ?fire fires hers at the first step, ?fire=seconds so many seconds into the frames
+// drawn, ?fire=seconds,held holds its trigger that long; ?tap=slot,seconds taps that slot of the hotbar then (0–1 her
+// guns', 2–4 her items': a swap, or a reload); ?storm=seconds holds the storm at
 // that moment of its clock. ?probe stands grey blocks and mirrors ahead (probe.ts). The meter (meter.ts) shows the
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
@@ -33,10 +35,11 @@
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
 // The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
-// At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
-// a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
-// drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each rarity in a fan ahead
-// of her, 25 m out to 420 m (?loot=m: every kind, and a gun of every rarity, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
+// At sea, ?kit (?kit=seconds: then) puts stores under her for her to sweep up (two guns, a cannon and a scatter, unless
+// ?gun arms her, and three slots of stores), with a better gun beside them, a mortar, offered; ?use=1…3,seconds sets
+// her mending from that slot so many seconds into the frames
+// drawn, ?gust=seconds spends a gust then, ?fire=seconds fires then and ?down=seconds sinks one by her then; ?loot strews a piece of each kind and rarity in a fan ahead
+// of her, 25 m out to 420 m (?loot=m: every kind of gun, each of another rarity, and the stores, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
 // her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
@@ -54,10 +57,10 @@ import type { Referee } from './play/referee';
 import { lookOf } from './play/colours';
 import { startOf, type Matches } from './play/setup';
 import { bearing, type Berth } from './play/state';
-import { IDLE, type Hands } from './player';
+import { HOTBAR, IDLE, type Hands } from './player';
 import { probeMeshes } from './probe';
 import { STEP } from './sim/fixed';
-import { SHIP } from './sim/handling';
+import { KINDS, SHIP, type GunKind } from './sim/handling';
 import { PLAYER, SHIPS } from './sim/match';
 import type { Cap } from './sim/storm';
 import type { ShipDraw, Snapshot } from './snapshot';
@@ -68,13 +71,16 @@ import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from 
 
 /** How the page is set up (main.ts RELEASE, or as the switches change it): the planet's seed, the weather's mean and
  *  swing (world/weather.ts) and the time of day (hours); how the frame draws; whether the meter shows the frame's cost;
- *  the seconds the storm is held at (null: it runs) and the rarity of gun every ship is armed with (null: none). */
+ *  the seconds the storm is held at (null: it runs) and the gun every ship is armed with (null: none). */
 export interface Setup {
   seed: number; mean: Weather; swing: Weather; hours: number;
   drawing: FrameOptions;
   meter: boolean;
-  hold: number | null; gun: number | null;
+  hold: number | null; gun: { kind: GunKind; rarity: number } | null;
 }
+
+/** ?kind's gun kind, a cannon by default. */
+const kindOf = (name: string | null): GunKind => KINDS.find((k) => k === name) ?? 'cannon';
 
 /** The world on a setup, as main.ts builds it: the world, where she lies at the start, the canvas the world is drawn
  *  on, the sea's anchors and the ground's bake (frame.ts), the matches dealt; and the drawing begun, each frame from
@@ -128,7 +134,7 @@ function setupOf(release: Setup): Setup {
     },
     meter: true,
     hold: params.has('storm') ? number('storm', 0) : release.hold,
-    gun: params.has('gun') ? number('gun', 0) : release.gun,
+    gun: params.has('gun') || params.has('kind') ? { kind: kindOf(params.get('kind')), rarity: number('gun', 0) } : release.gun,
   };
 }
 
@@ -150,13 +156,16 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, room - 1));
   const paused = params.has('pause'), slow = number('slow', 1);
-  // ?use: the slot tapped twice (chosen, then used); ?gust and ?fire pressed; ?swing's drag; so many seconds in
-  const swing = params.get('swing')?.split(',').map(Number);
-  const [slot, use] = (params.get('use') ?? '').split(',').map(Number);
+  // ?use: the item's slot tapped twice (chosen, then used); ?tap's slot tapped; ?gust and ?fire pressed; ?swing's
+  // drag; so many seconds in
+  const swing = params.get('swing')?.split(',').map(Number), item = HOTBAR.guns - 1;
+  const [slot, use] = (params.get('use') ?? '').split(',').map(Number), tap = params.get('tap')?.split(',').map(Number);
+  const [fireAt, held] = (params.get('fire') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Hands> }[] = [
-    ...(slot > 0 ? [{ at: use || 0, hands: { tap: slot } }, { at: use || 0, hands: { tap: slot } }] : []),
+    ...(slot > 0 ? [{ at: use || 0, hands: { tap: item + slot } }, { at: use || 0, hands: { tap: item + slot } }] : []),
+    ...(tap ? [{ at: tap[1] || 0, hands: { tap: tap[0] || 0 } }] : []),
     ...(params.has('gust') ? [{ at: number('gust', 0), hands: { gust: true } }] : []),
-    ...(params.get('fire') ? [{ at: number('fire', 0), hands: { fire: true } }] : []),
+    ...(params.get('fire') ? [{ at: fireAt || 0, hands: { fire: true } }] : []),
     ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
   // ?sink and ?win: her end, and ?down: one sunk by her, so many seconds into the frames drawn
@@ -170,6 +179,8 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   return s.draw((real) => {
     const dt = paused ? 0 : real * slow, frame = p.next(dt);
     for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
+    // ?fire's trigger held: pressed for the frames' next steps
+    if (held > 0 && drawn > fireAt && drawn <= fireAt + held) p.game.step(0, { ...IDLE, fire: true });
     for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
     drawn += dt;
     return frame;
@@ -227,16 +238,19 @@ function winHer(game: Game) {
   others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
 }
 
-/** ?kit: her stores strewn under her, a better gun beside them, and her first steps to sweep them up. */
+/** ?kit: her stores strewn under her (two guns and three slots of stores), a better gun beside them, and her first
+ *  steps to sweep them up. */
 function kit(game: Game) {
   type Goods = Parameters<Game['debug']['strew']>[1][number];
   const { at, heading } = game.status(), step = () => game.step(STEP, IDLE);
   const under: Goods[] = [
-    { kind: 'gun', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
+    { kind: 'cannon', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
   ];
   game.debug.strew(at, under);
   step();
-  game.debug.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
+  game.debug.strew(at, [{ kind: 'scatter', rarity: 1 }]);
+  step();
+  game.debug.strew(along(at, heading, 3).p, [{ kind: 'mortar', rarity: 4 }]);
   step();
 }
 
@@ -247,9 +261,9 @@ function stock(game: Game) {
   if (params.get('kit') === '') kit(game);
   const row = params.has('loot') ? number('loot', 0) : 0;
   if (row > 0) {
-    // a row across her bow: the guns worst to best, then the stores, a few degrees apart
+    // a row across her bow: the guns, each kind of another rarity, worst to best, then the stores, a few degrees apart
     const all: Goods[] = [
-      ...[0, 1, 2, 3, 4].map((rarity): Goods => ({ kind: 'gun', rarity })),
+      ...KINDS.map((kind, rarity): Goods => ({ kind, rarity })),
       { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 }, { kind: 'fullRepair', count: 1 },
     ];
     all.forEach((g, i) => {
@@ -260,7 +274,7 @@ function stock(game: Game) {
     // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
-      game.debug.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: 'gun', rarity: i % 5 }]);
+      game.debug.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: KINDS[i % 5], rarity: i % 5 }]);
     });
   }
 }
@@ -310,7 +324,7 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
     pitch: number('look', -6) * degrees,
   });
   const ships: ShipDraw[] = others.map((o, i) => ({
-    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, number('way', 0)), afloat: true,
+    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, number('way', 0)), afloat: true, gun: null,
   }));
   let clock = 0;
   return (dt: number): Snapshot => {

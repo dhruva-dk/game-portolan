@@ -12,6 +12,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs, to the bit.
 
 import { add, apart, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { inHand } from './battle.ts';
 import { gap } from './contact.ts';
 import { RAM, SHIP } from './handling.ts';
 import { ring } from './gunner.ts';
@@ -68,13 +69,15 @@ export function steer(c: Ctx, dt: number): Helm {
   const foe = m.mode === 'fight' && inSight(c) ? c.foe : null;
   if (foe && gap(ship, foe.ship) < 1) m.recoil = BOT.recoil;
   m.recoil = Math.max(0, m.recoil - dt);
-  let want: Vec3 | null, toD = foe ? c.foeD : distance(ship.at, m.goal);
+  let want: Vec3 | null, toD = foe ? c.foeD : distance(ship.at, m.goal), mark: Vec3 | null = null;
   if (foe && m.recoil > 0) {
     const at = toward(ship.at, foe.ship.at);
     want = at && scale(at, -1);
   } else {
     // armed, she makes for a mark on the ring round her foe (gunner.ts); land in the way, by a route round it (route.ts)
-    const mark = foe && own.armed ? ring(m, ship.at, foe, c.t.standoff, c.t.skill, () => roll(m), dt) : null;
+    const held = own.crew ? inHand(own.crew) : null;
+    mark = foe && held ? ring(m, ship.at, foe, held.kind, c.t.standoff, c.t.skill, () => roll(m), dt) : null;
+    if (mark) toD = distance(ship.at, mark);
     const r = c.sea.chart && routed(c.sea.chart, ship.at, mark ?? (foe ? foe.ship.at : m.goal), m.route, dt);
     m.route = r ? r.route : null;
     if (r && r.to) [want, toD] = [toward(ship.at, r.to), distance(ship.at, r.to)];
@@ -101,10 +104,10 @@ export function steer(c: Ctx, dt: number): Helm {
   if (answered !== null) turn = answered;
   // going for loot or mending, she eases up near where she makes for (0117's)
   const easy = (m.mode === 'loot' || m.mode === 'heal' || m.mode === 'home') && toD < PURSER.near ? PURSER.slow : 1;
-  // a mark (not a ship) inside the circle she turns at her speed she would only sail round: slowed to turn to it, the
-  // circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
+  // a mark (not a ship; the ring's round a foe is one) inside the circle she turns at her speed she would only sail
+  // round: slowed to turn to it, the circle through it r = d / (2 sin off), the speed that turns it r × SHIP.turn
   const off = Math.abs(course), r = toD / (2 * (off > Math.PI / 2 ? 1 : Math.max(0.05, Math.sin(off))));
-  const tight = foe ? 1 : Math.max(BOT.leastWay, Math.min(1, (BOT.tighten * r * SHIP.turn) / SHIP.top));
+  const tight = foe && !mark ? 1 : Math.max(BOT.leastWay, Math.min(1, (BOT.tighten * r * SHIP.turn) / SHIP.top));
   return stuck(c, dt, course) ?? order(turn, Math.min(easy, tight));
 }
 

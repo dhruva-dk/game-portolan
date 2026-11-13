@@ -53,10 +53,10 @@ export function watersOf(seed: number): Promise<{ waters: Waters; ms: number; be
 
 /**
  * The matches on a planet of this seed: the first on the planet's own seed, each next one dealt a seed of its own (its
- * storm and its bots' minds come from it). hold: seconds the storm is held at, or null to let it run; gun: the rarity
+ * storm and its bots' minds come from it). hold: seconds the storm is held at, or null to let it run; gun: the gun
  * every ship is armed with, or null for none.
  */
-export function createMatches(seed: number, planet: Planet, hold: number | null, gun: number | null) {
+export function createMatches(seed: number, planet: Planet, hold: number | null, gun: Match['gun']) {
   const depth = (p: Vec3) => -planet.height(p);
   const match = (s: number): Match => {
     const closing = createStorm(s, depth);

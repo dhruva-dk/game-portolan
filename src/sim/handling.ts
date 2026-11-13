@@ -112,32 +112,76 @@ export const GUST = {
   hop: 6.3, gravity: 9.8,
 } as const;
 
+/** The guns' kinds (GUNS), in the order they are told everywhere. */
+export const KINDS = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'] as const;
+export type GunKind = (typeof KINDS)[number];
+
+/** One kind of gun (GUNS). */
+export interface Bore {
+  /** Hit points a ball takes off (each pellet's), and the balls (pellets) a shot throws. */
+  damage: number; pellets: number;
+  /** Seconds between shots, held on the trigger; balls a magazine holds; seconds to reload it, once empty. */
+  interval: number; mag: number; reload: number;
+  /** Seconds from the trigger to the shot (the gun wound up, seen and heard: 0117's telegraph), 0 for none. */
+  windup: number;
+  /** Muzzle speed, m/s (a lobbed gun's at full range); the furthest a ball laid at its best elevation carries, m, which
+   *  sets the pull it flies under (shot.ts: 0117 gave each kind its own gravity), and the furthest it is laid, m. */
+  speed: number; carry: number; range: number;
+  /** A lobbed gun's fixed elevation, radians (its charge, the muzzle speed, is had for the distance), and the nearest it
+   *  is laid, m; 0 for a gun laid low. */
+  lob: number; least: number;
+  /** The spread, a common gun's: each ball goes off within this cone (half-angle, radians) of where it is laid. */
+  spread: number;
+  /** Metres round where a shell comes down that it bursts over (0117's burst), 0 for none; whether its damage falls
+   *  off with the distance flown (FALLOFF). */
+  splash: number; falls: boolean;
+}
+
 /**
- * Her gun (gun.ts) and its balls (shot.ts): one at most, on the plinth in her waist, firing one ball at a time.
- * 0117's cannon (tables.ts WEAPONS) with its muzzle speed brought down by the same share as her top speed (165 m/s at
- * 14.5, so 136 at 12) and its 200 m reach kept, on the same 554 m planet. The balls fly true orbits round the
- * planet's centre, under a pull chosen so that 136 m/s carries a ball no further than `range` at its best elevation
- * (shot.ts MU): some 11 g at the sea, for this tiny world; a flat shot's ball would otherwise go round it.
- * Rarity is 0117's five tiers: damage and reload ease, the spread closes up a little and the assist widens.
+ * The five guns (gun.ts, shot.ts), on a plinth in her waist, two carried and one in hand: 0117's (tables.ts WEAPONS),
+ * their numbers kept, but the muzzle speeds brought down by her top speed's share (14.5 → 13.5 m/s) and each kind's
+ * pull chosen by its `carry`, on the same 554 m planet (a flat shot at these speeds would go round it):
+ * - cannon, the all-rounder: 20 a ball, 8 in the magazine 0.42 s apart, 1.9 s to reload; 165 → 154 m/s. Its carry is
+ *   its range, 200 m, as the one gun this sea had before (its pull some 14 g at the sea, its arcs as they were);
+ * - scatter, the shotgun: 8 pellets of 8 in a wide cone, 1 s apart, 4 to a magazine, 70 m (165 → 126 m/s), the pellets
+ *   dropping into the sea not far past it;
+ * - repeater, the rifle: 7 a ball, 0.1 s apart, 30 to a magazine, 150 m (185 → 172 m/s), flat (12° at full range);
+ * - harpoon, the long gun: one 80 bolt, wound up 0.75 s, none of the spread, 240 m (300 → 279 m/s), flattest of all (8°
+ *   at full range); its bite does not fall off with range (new: 0117's fell to half, its sail-head crits making up);
+ * - mortar, the lob: a 60 shell over 11 m, two to a magazine, wound up 0.6 s, out to 220 m: laid at 60°, its charge
+ *   for the distance, 1.3 s in the air at 50 m and 2.8 s at 220 (0117's LOB, 0.9–2.8 s), never nearer than 30 m.
+ * 0117's crits (a hit on the sail's head) are left: this sea has no parts to a ship. Rarity scales them all as before.
+ */
+export const GUNS: Readonly<Record<GunKind, Bore>> = {
+  cannon: { damage: 20, pellets: 1, interval: 0.42, mag: 8, reload: 1.9, windup: 0, speed: 154, carry: 200, range: 200, lob: 0, least: 0, spread: 0.03, splash: 0, falls: true },
+  scatter: { damage: 8, pellets: 8, interval: 1, mag: 4, reload: 2.3, windup: 0, speed: 126, carry: 110, range: 70, lob: 0, least: 0, spread: 0.09, splash: 0, falls: true },
+  repeater: { damage: 7, pellets: 1, interval: 0.1, mag: 30, reload: 2, windup: 0, speed: 172, carry: 360, range: 150, lob: 0, least: 0, spread: 0.05, splash: 0, falls: true },
+  harpoon: { damage: 80, pellets: 1, interval: 1.4, mag: 1, reload: 2.1, windup: 0.75, speed: 279, carry: 900, range: 240, lob: 0, least: 0, spread: 0, splash: 0, falls: false },
+  mortar: { damage: 60, pellets: 1, interval: 1.3, mag: 2, reload: 2.8, windup: 0.6, speed: 157, carry: 254, range: 220, lob: Math.PI / 3, least: 30, spread: 0.02, splash: 11, falls: false },
+};
+
+/** A ball's damage holds to `hold` of its gun's range, then falls to `floor` of it at full range (0117's FALLOFF). A
+ *  shell's burst takes off its damage less `edge` of it at its splash's rim (0117's burst). */
+export const FALLOFF = { hold: 0.6, floor: 0.5, edge: 0.6 } as const;
+
+/** Seconds from taking a gun in hand to its first shot (0117's EQUIP); the guns she carries. */
+export const EQUIP = 0.22, CARRIED = 2;
+
+/**
+ * What every gun shares: the rarity tiers (0117's five), each easing the damage and the reload, closing the spread up
+ * a little and widening the assist; the muzzle's place; how a ball meets a hull.
  */
 export const GUN = {
   /** The tiers, worst to best (0117's). */
   rarities: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
-  /** Muzzle speed, m/s; and the furthest a ball carries, m along the sea, before it is back down to the muzzle's height. */
-  speed: 136,
-  range: 200,
-  /** Hit points a ball takes off, and seconds to reload: 0117's cannon's 20, and between its 0.42 s a shot from the
-   * magazine and its 1.9 s reload, for a gun that fires one ball at a time; each scaled by 0117's rarity table. */
-  damage: 20,
-  reload: 2,
+  /** By rarity: the damage and the reload, by 0117's table. */
   damageBy: [1, 1.08, 1.16, 1.24, 1.32],
   reloadBy: [1, 0.95, 0.9, 0.85, 0.8],
-  /** The spread: each ball goes off within this cone (half-angle, radians) of where it is laid: across, 4.5 m off at
-   * 150 m at most for a common gun; along, it changes the ball's carry most, up to 10 m at 100 m. Laid on a ship
-   * crossing at her top speed (tests/gunnery.test.ts), a common gun strikes some 19 balls in 20 at 100–150 m, a
-   * legendary every one. (It was 0.05 for a common gun, 2 in 3 at 100–150 m.) 0117 laid its guns on the touched
-   * point, 0.008 rad. */
-  spread: [0.03, 0.026, 0.022, 0.018, 0.014],
+  /** The spread, by rarity, times the kind's common one: a common cannon's 0.03 rad goes, across, 4.5 m off at 150 m at
+   * most; along, it changes the ball's carry most, up to 10 m at 100 m. Laid on a ship crossing at her top speed
+   * (tests/gunnery.test.ts), a common cannon strikes some 19 balls in 20 at 100–150 m, a legendary every one. 0117 laid
+   * its guns on the touched point, 0.008 rad for its cannon; each kind's here is that one's share of it. */
+  spreadBy: [1, 0.867, 0.733, 0.6, 0.467],
   /** The assist: the ship whose body (sight.ts) stands nearest the line of sight she is aimed along, within this cone
    * (half-angle, radians, seen from the eye) and in range, is laid on, led for her course: 3.4° for a common gun, some
    * 30 px about her on the phone. New: 0117 had none, but aimed at a touched point. */
