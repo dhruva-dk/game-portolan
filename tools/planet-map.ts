@@ -1,11 +1,13 @@
 // A look at the planet's ground, no browser needed.
 //   node tools/planet-map.ts [seed]      (the game's, SEED, by default)
-// Writes captures/planet-<seed>.ppm (equirectangular, coloured by depth band: land, 0–3, 3–8, 8–15, 15–30, 30+ m,
-// hill-shaded) and captures/planet-<seed>-island.ppm (the largest island on its own chart, 0.5 m a pixel), and
-// prints the area shares (with the water too shallow for a ship: SHIP.draught), the islands of each kind, and each. Convert with: sips -s format png captures/planet-1.ppm --out captures/planet-1.png
+// Writes captures/planet-<seed>.ppm (equirectangular, coloured by depth band: land, too shallow for a ship (SHIP.draught),
+// to 4, 8, 15, 30 and deeper, hill-shaded) and captures/planet-<seed>-island.ppm (the largest island on its own chart,
+// 0.5 m a pixel), and prints the area shares (with the water too shallow for a ship, and the clear water over the
+// islands' aprons: sailable, 8 m deep at most), the islands of each kind, and each. Convert with:
+// sips -s format png captures/planet-1.ppm --out captures/planet-1.png
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { R, fromChart, fromLatLon } from '../src/world/sphere.ts';
+import { R, distance, fromChart, fromLatLon } from '../src/world/sphere.ts';
 import { SEED, bakeFaces, createPlanet } from '../src/world/planet.ts';
 import { SHIP } from '../src/sim/handling.ts';
 
@@ -15,7 +17,7 @@ const planet = createPlanet(seed);
 console.log(`created in ${(performance.now() - t0).toFixed(0)} ms`);
 
 type RGB = [number, number, number];
-const BANDS: [number, RGB][] = [[3, [150, 230, 220]], [8, [80, 200, 205]], [15, [40, 160, 190]], [30, [25, 100, 150]], [Infinity, [15, 45, 95]]];
+const BANDS: [number, RGB][] = [[SHIP.draught, [235, 245, 225]], [4, [150, 230, 220]], [8, [80, 200, 205]], [15, [40, 160, 190]], [30, [25, 100, 150]], [Infinity, [15, 45, 95]]];
 const colour = (h: number): RGB => {
   if (h > 0) { const k = Math.min(h / 12, 1); return [235 - 60 * k, 215 - 70 * k, 165 - 70 * k]; }
   return BANDS.find(([d]) => -h < d)![1];
@@ -44,10 +46,12 @@ write(`captures/planet-${seed}.ppm`, W, H, (i, j) => planet.height(fromLatLon(la
 console.log(`map in ${(performance.now() - t1).toFixed(0)} ms`);
 
 // area shares, weighted by each row's true area
-let total = 0, deep = 0, shallow = 0, land = 0, aground = 0, top = -Infinity;
+let total = 0, deep = 0, shallow = 0, land = 0, aground = 0, apron = 0, sea = 0, top = -Infinity;
 for (let j = 0; j < H; j += 2) for (let i = 0; i < W; i += 2) {
-  const a = Math.cos(lat(j)), h = planet.height(fromLatLon(lat(j), lon(i)));
+  const p = fromLatLon(lat(j), lon(i)), a = Math.cos(lat(j)), h = planet.height(p);
   total += a;
+  if (h <= 0) sea += a;
+  if (h <= -SHIP.draught && h > -8 && planet.islands.some((s) => distance(s.chart.at, p) < s.shelf)) apron += a;
   if (h < -30) deep += a;
   if (h > -15 && h <= 0) shallow += a;
   if (h > 0) land += a;
@@ -56,12 +60,13 @@ for (let j = 0; j < H; j += 2) for (let i = 0; i < W; i += 2) {
 }
 const pc = (x: number) => `${((100 * x) / total).toFixed(1)}%`;
 console.log(`deeper than 30 m ${pc(deep)}, water shallower than 15 m ${pc(shallow)}, land ${pc(land)}, too shallow to sail (land too) ${pc(aground)}, highest ${top.toFixed(1)} m`);
+console.log(`the clear water over the aprons (sailable, 8 m deep at most): ${((100 * apron) / sea).toFixed(1)}% of the sea`);
 const kinds = new Map<string, number>();
 for (const s of planet.islands) kinds.set(s.kind, (kinds.get(s.kind) ?? 0) + 1);
 console.log(`${planet.islands.length} in all: ${[...kinds].map(([k, n]) => `${n} ${k}`).join(', ')}`);
 for (const s of planet.islands) {
   const [x, y, z] = s.chart.at;
-  console.log(`${s.kind} lat ${((Math.asin(y) * 180) / Math.PI).toFixed(1)} lon ${((Math.atan2(-z, x) * 180) / Math.PI).toFixed(1)}: radius ${s.radius.toFixed(0)} m, apron to ${s.shelf.toFixed(0)} m, reach ${s.reach.toFixed(0)} m, summit ${s.summit.toFixed(1)} m`);
+  console.log(`${s.kind} lat ${((Math.asin(y) * 180) / Math.PI).toFixed(1)} lon ${((Math.atan2(-z, x) * 180) / Math.PI).toFixed(1)}: radius ${s.radius.toFixed(0)} m, apron to ${s.shelf.toFixed(0)} m, reach ${s.reach.toFixed(0)} m, summit ${s.summit.toFixed(1)} m${s.offshore.length ? `, ${s.offshore.length} offshore` : ''}`);
 }
 
 // the largest island on its own chart

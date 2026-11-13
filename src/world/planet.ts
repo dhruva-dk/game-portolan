@@ -191,7 +191,7 @@ export function createPlanet(seed: number): Planet {
       charts[i](p, xzr);
       const x = xzr[0], z = xzr[1], r = xzr[2];
       if (!below) h += (smax(h, s.mound(x, z), SEA.meet) - h) * smoothstep(s.reach, s.reach * 0.8, r);
-      if (cover && r < s.shelf + FOOT[1]) shore = Math.min(shore, r - s.coast(Math.atan2(z, x)));
+      if (cover && r < s.shelf + FOOT[1]) shore = Math.min(shore, s.shore(x, z));
     }
     const depth = -h;
     if (depth > 0.5) h += SEA.ripples.height * read(SEA.ripples.size, at.ripple) * smoothstep(0.5, 3, depth);

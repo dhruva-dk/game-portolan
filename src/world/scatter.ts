@@ -13,10 +13,12 @@
 //
 // Rocks: outcrops of weathered rock: big masses, 5–12 m across, heaped against each other into piles 10–25 m long, on
 // the island's shoulders above the beach and at the waterline, where the sand has been washed off the rock beneath —
-// some of the waterline's out in the shallows — sunk in the sand; and smaller boulders round them. None stand in a palm's or a shrub's place.
+// some of the waterline's out in the shallows, but never past the water too shallow for a ship (planet-islands.ts
+// WADE), so no rock stands where a ship could sail through it — and heaped on its offshore rocks; sunk in the sand;
+// and smaller boulders round them. None stand in a palm's or a shrub's place.
 
 import { createNoise3 } from './noise3.ts';
-import type { IslandSite } from './planet-islands.ts';
+import { WADE, type IslandSite } from './planet-islands.ts';
 import { hash, random } from './random.ts';
 import { fromChart, type Vec3 } from './sphere.ts';
 
@@ -59,7 +61,9 @@ const HEAPED = 0.6;
 const BOULDER = [0.3, 1.6] as const, BOULDERS = [6, 14] as const;
 /** Where outcrops lie, metres from the waterline (negative inland): on the shoulders, or at the waterline reaching
  * out into the shallows. */
-const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 7] as const, KNOLL = [-4, -1] as const;
+const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 3] as const, KNOLL = [-4, -1] as const;
+/** How far a rock's foot reaches out past its centre, as a share of its radius. */
+const FOOT = 0.8;
 /** How deep a rock is sunk below the lowest ground under it, as a share of its radius. */
 const SUNK = { big: 0.15, boulder: 0.3 };
 
@@ -82,32 +86,38 @@ const seat = (isle: Isle, x: number, z: number, size: number, sunk: number) => {
 /** bigShapes, boulderShapes: how many shapes each kind of rock comes in. */
 export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: number, seed = 1): Rock[] {
   const { site } = isle;
-  if (site.kind === 'shoal') return [];
   const rand = random(hash(seed, 0x726f636b)); // "rock": a stream of its own
   const rocks: Rock[] = [];
   const clear = (x: number, z: number, size: number, big: boolean) =>
     rocks.every((r) => Math.hypot(r.x - x, r.z - z) > (r.size + size) * (r.big && big ? HEAPED : 0.85));
+  /** Whether a rock there reaches no farther out than the water too shallow for a ship. */
+  const ashore = (x: number, z: number, size: number) => site.shore(x, z) + FOOT * size < WADE - 1;
   const outcrops = Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
-  for (let o = 0; o < outcrops; o++) {
-    const centre = ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI;
-    // (a rock knoll is all outcrop: heaped on its crown, out no farther than its waterline's shallows)
+  // the coast's outcrops, then one heaped on each offshore rock (centre, smallest and largest mass)
+  const heaps = [
+    ...Array.from({ length: outcrops }, (_, o) => ({ centre: ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI, at: null as [number, number] | null, most: BIG[1] })),
+    ...site.offshore.map((o) => ({ centre: 0, at: [o.x, o.z] as [number, number], most: Math.max(BIG[0], Math.min(BIG[1], o.radius)) })),
+  ];
+  for (const heap of heaps) {
+    // (a rock knoll and an offshore rock are all outcrop: heaped on the crown, out no farther than the waterline's shallows)
     // (on an islet the shoulder comes no farther in than a third of the way to its middle)
-    const kind = site.kind === 'rocks' ? KNOLL : rand() < 0.5 ? SHOULDER : WATERLINE;
+    const knoll = site.kind === 'rocks' || heap.at !== null;
+    const kind = knoll ? KNOLL : rand() < 0.5 ? SHOULDER : WATERLINE;
     const band = [Math.max(kind[0], -site.radius / 3), Math.max(kind[1], -site.radius / 3 + 1)] as const;
     const masses: Rock[] = [];
-    const count = BIG_COUNT[0] + Math.floor(rand() * (BIG_COUNT[1] - BIG_COUNT[0] + 1));
+    const count = heap.at ? 2 + Math.floor(rand() * 2) : BIG_COUNT[0] + Math.floor(rand() * (BIG_COUNT[1] - BIG_COUNT[0] + 1));
     for (let i = 0, tries = 0; i < count && tries < 60; tries++) {
       // the largest first, at the outcrop's middle; each of the rest heaped against one already there
-      const size = BIG[0] + (BIG[1] - BIG[0]) * (i === 0 ? 0.6 + 0.4 * rand() : rand() ** 0.8);
+      const size = BIG[0] + (heap.most - BIG[0]) * (i === 0 ? 0.6 + 0.4 * rand() : rand() ** 0.8);
       let x: number, z: number;
-      if (i === 0) [x, z] = onCoast(site, centre, band[0] + rand() * (band[1] - band[0]));
+      if (i === 0) [x, z] = heap.at ?? onCoast(site, heap.centre, band[0] + rand() * (band[1] - band[0]));
       else {
         const m = masses[Math.floor(rand() * masses.length)], a = rand() * 2 * Math.PI, out = (m.size + size) * (HEAPED + 0.02 + 0.15 * rand());
         x = m.x + Math.cos(a) * out;
         z = m.z + Math.sin(a) * out;
-        const d = Math.hypot(x, z) - site.coast(Math.atan2(z, x));
-        if (d < SHOULDER[0] - 2 || d > (site.kind === 'rocks' ? KNOLL[1] + 3 : WATERLINE[1] + 2)) continue;
       }
+      const d = site.shore(x, z);
+      if (d < SHOULDER[0] - 2 || d > (knoll ? KNOLL[1] + 3 : WATERLINE[1] + 2) || !ashore(x, z, size)) continue;
       if ((i > 0 && Math.hypot(x, z) < size) || !clear(x, z, size, true)) continue;
       const r: Rock = { x, z, y: seat(isle, x, z, size, SUNK.big), size, yaw: rand() * 2 * Math.PI, big: true, shape: Math.floor(rand() * bigShapes) };
       rocks.push(r);
@@ -121,7 +131,7 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
       const size = BOULDER[0] + (BOULDER[1] - BOULDER[0]) * rand() ** 2.5;
       const a = rand() * 2 * Math.PI, out = m.size * (0.9 + 0.5 * rand()) + size + rand() * 4;
       const x = m.x + Math.cos(a) * out, z = m.z + Math.sin(a) * out;
-      if (!clear(x, z, size, false)) continue;
+      if (!clear(x, z, size, false) || !ashore(x, z, size)) continue;
       rocks.push({ x, z, y: seat(isle, x, z, size, SUNK.boulder), size, yaw: rand() * 2 * Math.PI, big: false, shape: Math.floor(rand() * boulderShapes) });
       i++;
     }
@@ -158,13 +168,12 @@ const field = (noise: ReturnType<typeof createNoise3>, x: number, z: number, siz
 
 export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
   const { site } = isle;
-  if (site.kind === 'shoal' || site.kind === 'rocks') return [];
+  if (site.kind === 'rocks') return [];
   const rand = random(seed * 104729 + 3), noise = createNoise3(seed + 71);
   const palms: Palm[] = [], count = perArea(site, PALMS);
   for (let tries = 0; palms.length < count && tries < count * 200; tries++) {
-    const t = rand() * 2 * Math.PI, d = BEACH_TOP + rand() * (INNERMOST - BEACH_TOP);
-    const [x, z] = onCoast(site, t, d);
-    if (Math.hypot(x, z) < 5) continue;
+    const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, BEACH_TOP + rand() * (INNERMOST - BEACH_TOP)), d = site.shore(x, z);
+    if (Math.hypot(x, z) < 5 || d > BEACH_TOP) continue;
     // groves, and the beach's top more than inland
     const grove = Math.min(Math.max((field(noise, x, z, 16, 0.5) - 0.2) / 0.3, 0), 1) ** 2;
     const coastal = Math.exp(d / 15);
@@ -201,13 +210,12 @@ const HEDGE = [-14, -5], INMOST_SHRUB = -45;
 
 export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 1): Shrub[] {
   const { site } = isle;
-  if (site.kind === 'shoal' || site.kind === 'rocks') return [];
+  if (site.kind === 'rocks') return [];
   const rand = random(seed * 15485863 + 5), noise = createNoise3(seed + 83);
   const shrubs: Shrub[] = [], count = perArea(site, SHRUBS);
   for (let tries = 0; shrubs.length < count && tries < count * 200; tries++) {
-    const t = rand() * 2 * Math.PI, d = HEDGE[1] + rand() * (INMOST_SHRUB - HEDGE[1]);
-    const [x, z] = onCoast(site, t, d);
-    if (Math.hypot(x, z) < 3) continue;
+    const t = rand() * 2 * Math.PI, [x, z] = onCoast(site, t, HEDGE[1] + rand() * (INMOST_SHRUB - HEDGE[1])), d = site.shore(x, z);
+    if (Math.hypot(x, z) < 3 || d > HEDGE[1]) continue;
     // the hedge, broken into stretches; inland, clumps where the noise says
     const hedge = d > HEDGE[0] ? Math.min(Math.max((field(noise, x, z, 14, 0.5) + 0.2) / 0.3, 0), 1) : 0;
     const clump = Math.min(Math.max((field(noise, x, z, 10, 5.5) - 0.05) / 0.25, 0), 1) * 0.6;
