@@ -62,16 +62,17 @@ export interface Setup {
 export interface Stage {
   world: World; start: { at: Vec3; bearing: number }; canvas: HTMLElement;
   anchors: readonly Anchor[]; ready: Promise<number>; matches: Matches;
-  draw(next: (dt: number) => Snapshot): Promise<void>;
+  draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void): Promise<void>;
 }
 
 /** The game on a stage with its UI over it, as main.ts builds it: the game, its referee and the screens' flow; PLAY
- *  (a match dealt and dropped into); the full map opened (the HUD's tap); and a frame of it. */
+ *  (a match dealt and dropped into); the full map opened (the HUD's tap); a frame of it, and what follows once it is drawn (the canvas then holds it). */
 export interface Played {
   game: Game; referee: Referee; flow: Flow;
   play(): void;
   map(): void;
   next(dt: number): Snapshot;
+  drawn(canvas: HTMLCanvasElement): void;
 }
 
 /** Whether debugging is on: the dev server, or ?debug in the query. */
@@ -110,14 +111,15 @@ function setupOf(release: Setup): Setup {
 export async function scenario(release: Setup, stage: (setup: Setup) => Promise<Stage>, play: (s: Stage) => Promise<Played>) {
   if (!DEBUG) {
     const s = await stage(release);
-    return s.draw((await play(s)).next);
+    const p = await play(s);
+    return s.draw(p.next, p.drawn);
   }
   const s = await stage(setupOf(release));
   if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, FLEET), s.matches.storm));
   const p = await play(s);
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, FLEET - 1));
-  return s.draw(p.next);
+  return s.draw(p.next, p.drawn);
 }
 
 /** Opens the game where ?screen= says, among `others` at sea; then sails it on ?ahead= seconds. */

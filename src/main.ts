@@ -56,7 +56,7 @@ async function stage(setup: Setup): Promise<Stage> {
   return {
     world, start: startOf(world.planet), canvas: renderer.domElement, anchors: frame.anchors, ready: frame.ready,
     matches: createMatches(setup.seed, world.planet, setup.hold, setup.gun),
-    async draw(next: (dt: number) => Snapshot) {
+    async draw(next: (dt: number) => Snapshot, drawn?: (canvas: HTMLCanvasElement) => void) {
       console.info(`ground baked in ${(await frame.ready).toFixed(0)} ms`);
       frame.resize(innerWidth, innerHeight);
       addEventListener('resize', () => frame.resize(innerWidth, innerHeight));
@@ -66,6 +66,7 @@ async function stage(setup: Setup): Promise<Stage> {
         const dt = Math.min((now - last) / 1000, 0.1);
         last = now;
         frame.render(next(dt), dt);
+        drawn?.(renderer.domElement);
         meter?.sample(performance.now() - now);
       });
     },
@@ -112,6 +113,8 @@ async function play(s: Stage): Promise<Played> {
 
   return {
     game, referee, flow, play: deal, map,
+    // the full map, just opened, holds the game's frame the moment it is drawn, to show round its panel
+    drawn: (canvas) => globe.waiting && globe.hold(canvas),
     next(dt: number): Snapshot {
       const hands = input.read();
       stick(game.steering() ? hands.stick : null);
