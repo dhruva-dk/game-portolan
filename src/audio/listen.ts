@@ -1,4 +1,4 @@
-// What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are derive.ts's): her
+// What is heard from what she sees and holds as it changes, frame to frame (the deeds on the sea are the match's moments: status.moments): her
 // gun come ready, a slot taken in hand, a ball passing near the eye, her water (a loop closed, her trail cut, her own
 // water left and entered), the storm beginning to close, her timbers and rigging at each end of her roll, and the
 // screens (a folio opened and closed, PLAY, her end); and what the bed follows (Bed): her speed, the wind in her rig,

@@ -7,7 +7,7 @@
 import { createEngine } from '../src/audio/audio';
 import { CUES, CUE_NAMES, type Cue } from '../src/audio/cues';
 import type { Hearing } from '../src/audio/listen';
-import type { Kit, Status } from '../src/player';
+import type { Deed, Kit, Moment, Status } from '../src/player';
 import { lookingAt, type Blast, type BallDraw, type Eye, type SeaChange, type ShipDraw, type Snapshot } from '../src/snapshot';
 import { R, add, cross, normalize, scale, type Vec3 } from '../src/world/sphere';
 
@@ -102,6 +102,31 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
   const engine = createEngine(ctx, ground);
   engine.fill(Infinity);
 
+  // what happens on the sea, as the match reports it (player.ts Deed), each told once its moment has come
+  type Told = { time: number; deed: (at: Vec3) => Deed };
+  const told: Told[] = [];
+  const tell = (time: number, deed: (at: Vec3) => Deed) => told.push({ time, deed });
+  const [a, b, c] = SCRIPT.strikes;
+  for (const s of SCRIPT.ownShots) {
+    tell(s, (at) => ({ seq: 0, time: s, at, ship: 0, kind: 'fired' }));
+    // her ball home in the ship she was laid on, its flight later
+    tell(s + 0.7, () => ({ seq: 0, time: s + 0.7, at: [0, 0, 1], ship: 1, kind: 'struck', by: 0, shield: 0, hull: 12, broke: false, ram: false }));
+  }
+  for (const [id, s] of SCRIPT.otherShots) {
+    tell(s, () => ({ seq: 0, time: s, at: [0, 0, 1], ship: id, kind: 'fired' }));
+    tell(s + 0.6, () => ({ seq: 0, time: s + 0.6, at: [0, 0, 1], ship: id, kind: 'fell', land: false }));
+  }
+  // the blows on her (harm): her ward rings, then breaks with her hull hit, then her hull again
+  tell(a, (at) => ({ seq: 0, time: a, at, ship: 0, kind: 'struck', by: 1, shield: 20, hull: 0, broke: false, ram: false }));
+  tell(b, (at) => ({ seq: 0, time: b, at, ship: 0, kind: 'struck', by: 1, shield: 10, hull: 15, broke: true, ram: false }));
+  tell(c, (at) => ({ seq: 0, time: c, at, ship: 0, kind: 'struck', by: 1, shield: 0, hull: 21, broke: false, ram: false }));
+  tell(SCRIPT.sinks[1], () => ({ seq: 0, time: SCRIPT.sinks[1], at: [0, 0, 1], ship: SCRIPT.sinks[0], kind: 'sank', by: 0 }));
+  tell(SCRIPT.pickup, (at) => ({ seq: 0, time: SCRIPT.pickup, at, ship: 0, kind: 'took', piece: 'smallShield', rarity: 1, slot: 1 }));
+  tell(SCRIPT.mend[1], (at) => ({ seq: 0, time: SCRIPT.mend[1], at, ship: 0, kind: 'mended', piece: 'smallShield' }));
+  tell(SCRIPT.gust[0], (at) => ({ seq: 0, time: SCRIPT.gust[0], at, ship: 0, kind: 'gust' }));
+  told.sort((x, y) => x.time - y.time);
+  let moments: Moment[] = [], seq = 0;
+
   const speedAt = (t: number) => (t >= SCRIPT.gust[0] && t < SCRIPT.gust[1] ? 16 : SCRIPT.speed(t));
   let run = 0;
   const blasts: Blast[] = [];
@@ -127,17 +152,21 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
     const eyeAt = add(add(position, forward, -22), radial, 9);
     const eye: Eye = { kind: 'air', position: eyeAt, orientation: lookingAt(eyeAt, add(position, forward, 10), radial), fov: 50 };
     const happened = (when: number) => when <= t && when > t - dt;
-    for (const s of SCRIPT.ownShots) if (happened(s)) {
-      blasts.push({ kind: 'shot', time: t, from: add(add(position, forward, 3), radial, 2), dir: forward });
-      // her ball home in the ship she was laid on, its flight later
-      blasts.push({ kind: 'strike', time: t + 0.7, at: normalize(place(90, 40)), ram: false });
+    // where each deed happened: hers at her, another's at that ship, her ball home in ship 1, a miss short of her
+    const where = (d: Deed): Vec3 => {
+      if (d.kind === 'fell') return normalize(place(25, 30));
+      const o = SCRIPT.others.find((k) => k.id === d.ship);
+      return o ? normalize(place(o.at[0], o.at[1])) : radial;
+    };
+    for (const k of told) if (happened(k.time)) {
+      const d = k.deed(radial), m: Moment = { ...d, seq: ++seq, at: where(d), seen: null, bearing: 0, metres: 0 };
+      moments = [...moments.filter((x) => x.time > t - 1), m];
     }
+    for (const s of SCRIPT.ownShots) if (happened(s)) blasts.push({ kind: 'shot', time: t, from: add(add(position, forward, 3), radial, 2), dir: forward });
     for (const [id, s] of SCRIPT.otherShots) if (happened(s)) {
       const o = SCRIPT.others.find((k) => k.id === id)!;
       blasts.push({ kind: 'shot', time: t, from: place(o.at[0], o.at[1]), dir: forward });
-      blasts.push({ kind: 'splash', time: t + 0.6, at: normalize(place(25, 30)), land: false });
     }
-    for (const s of SCRIPT.strikes) if (happened(s)) blasts.push({ kind: 'strike', time: t, at: radial, ram: false });
     // a ball passing the eye some 6 m off, at its closest at SCRIPT.whistle
     const balls: BallDraw[] = [];
     if (t > SCRIPT.whistle - 1 && t < SCRIPT.whistle + 0.5) {
@@ -161,7 +190,7 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
       at: radial, heading: forward, facing: forward, arriving: 0, ships: [], ...harm(t, SCRIPT.strikes), hullMax: 100, shieldMax: 50,
       gun: { rarity: 0, ready: Math.min(1, (t - lastShot) / 2), locked: false }, afloat: 4, sunk: false,
       storm: 30, closing: t >= storm.closing, eye: { centre: radial, radius: wall }, next: null, outside: Math.max(0, -wall),
-      loot: [], reticle: null,
+      loot: [], reticle: null, moments,
       items: [t >= pickup && t < mend[1] ? { item: 'item.smallShield', count: 1 } : null, null, null],
       chosen: t >= select ? 1 : 0, using: mending ? (t - mend[0]) / (mend[1] - mend[0]) : null, offer: null,
       gust: 2, gusts: 2, blowing: t >= gust[0] && t < gust[1],

@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NAMES, SOUNDS } from '../src/audio/bank.ts';
 import { CUES, CUE_NAMES, DEEDS, cueOf, type Happening } from '../src/audio/cues.ts';
-import { createDerive } from '../src/audio/derive.ts';
 import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
 import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
@@ -125,30 +124,7 @@ function scene(t: number, blasts: Blast[] = [], ships: ShipDraw[] = [], balls: S
 const status = (over: Partial<Status & Kit> = {}): Status & Kit => ({
   at, heading: [1, 0, 0], facing: [1, 0, 0], arriving: 0, ships: [], hull: 100, hullMax: 100, shield: 30, shieldMax: 50,
   gun: { rarity: 0, ready: 1, locked: false }, afloat: 2, sunk: false, storm: 30, closing: false, eye: { centre: at, radius: 2000 }, next: null,
-  outside: 0, loot: [], reticle: null, items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
-});
-
-test('derive: each blast heard once; hers told from others by where; her blow by her ward and hull; a ship going down; her stores', () => {
-  const d = createDerive(), out: Happening[] = [];
-  d.derive(scene(0), status(), out);
-  assert.equal(out.length, 0, 'the first frame takes in what is, telling nothing');
-  const other: ShipDraw = { ...scene(0).ships[0], id: 3, pose: { position: scale(normalize([0.1, 0, 1]), R), forward: [1, 0, 0], up: at } };
-  const shots: Blast[] = [
-    { kind: 'shot', time: 1, from: scale(at, R + 3), dir: [1, 0, 0] },
-    { kind: 'shot', time: 1, from: scale(normalize([0.1, 0, 1]), R + 3), dir: [-1, 0, 0] },
-  ];
-  d.derive(scene(1, shots, [other]), status(), out);
-  assert.deepEqual(out.map((h) => [h.kind, h.ship]), [['fired', 0], ['fired', -1]]);
-  out.length = 0;
-  d.derive(scene(1.1, shots, [other]), status(), out);
-  assert.equal(out.length, 0, 'a blast is heard once');
-  const blow: Blast = { kind: 'strike', time: 2, at, ram: false };
-  d.derive(scene(2, [...shots, blow], [other]), status({ shield: 0, hull: 90 }), out);
-  assert.equal(out.length, 1);
-  assert.equal(cueOf(out[0], 0), 'shatter');
-  out.length = 0;
-  d.derive(scene(3, [], [{ ...other, afloat: false }]), status({ shield: 0, hull: 90, items: [{ item: 'item.repairKit', count: 1 }, null, null], blowing: true }), out);
-  assert.deepEqual(out.map((h) => h.kind), ['sank', 'took', 'gust']);
+  outside: 0, loot: [], reticle: null, moments: [], items: [null, null, null], chosen: 0, using: null, offer: null, gust: 2, gusts: 2, blowing: false, ...over,
 });
 
 const hearing = (s: Snapshot, st: Status & Kit, screen: Hearing['screen'] = 'match', map = false): Hearing => ({ scene: s, status: st, screen, map });

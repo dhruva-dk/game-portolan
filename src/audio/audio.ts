@@ -2,7 +2,7 @@
 // else. Every sound is made in code (sounds/*.ts: neither ambientCG nor Poly Haven offers recordings); no music.
 //
 // The engine (createEngine) runs on any context, the page's or an offline one (tools/audio.ts renders through it):
-// each frame the deeds on the sea (derive.ts) and the rest of what is heard (listen.ts) become cues (cues.ts CUES, the
+// each frame the deeds on the sea (the match's own: status.moments) and the rest of what is heard (listen.ts) become cues (cues.ts CUES, the
 // one table), each played as heard from the eye (space.ts) in a voice (mixer.ts), and the bed follows her (bed.ts).
 // The page's sound (createAudio) has one AudioContext, made with the page and started on the first touch (WebKit plays
 // nothing before one), put to sleep while the app is away and woken when it is back; its sounds are made in a worker
@@ -14,7 +14,6 @@ import { NAMES, SOUNDS, type SoundName } from './bank.ts';
 import type { Ask, Made } from './maker.ts';
 import { createBed, levels, levelsOf } from './bed.ts';
 import { CUES, cueOf, type Happening } from './cues.ts';
-import { createDerive } from './derive.ts';
 import { db, rng } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
@@ -35,7 +34,9 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
     for (let i = 0; i < x.length; i++) x[i] = r() * 2 - 1;
   }
   const bed = createBed(ctx, noise, mixer.bed);
-  const listen = createListen(ground), derive = createDerive();
+  const listen = createListen(ground);
+  /** The last of the match's moments heard (their seq runs on across matches). */
+  let heardTo = 0;
   /** Each sound's takes, as they are made; and those still to make. */
   const bank = new Map<SoundName, AudioBuffer[]>();
   const queue = NAMES.flatMap((name) => Array.from({ length: SOUNDS[name].takes }, (_, i) => ({ name, seed: 1 + i * 7919 })));
@@ -85,7 +86,10 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
       const { scene, status } = hearing;
       deeds.length = 0;
       calls.length = 0;
-      derive.derive(scene, status, deeds);
+      for (const m of status.moments) if (m.seq > heardTo) {
+        deeds.push(m);
+        heardTo = m.seq;
+      }
       for (const d of deeds) {
         const cue = cueOf(d, scene.own);
         if (cue) calls.push({ cue, at: [d.at[0] * (R + LIFT[d.kind]), d.at[1] * (R + LIFT[d.kind]), d.at[2] * (R + LIFT[d.kind])], gain: 1 });

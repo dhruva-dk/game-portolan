@@ -3,28 +3,17 @@
 // in the world (heard from where it happened, carried, delayed, dulled and panned: space.ts), hers (heard close), or
 // the UI's.
 //
-// A deed (Happening) has the shape of the match's own report of what happened (player.ts Deed, the moments, once
-// they come): numbered in order (seq), at a moment on the world's clock (time), where (at, a unit vector), and the ship
-// it befell (ship). Until then they are read from what the Snapshot and the Status already show (derive.ts).
+// A deed (Happening) is the match's own report of what happened (player.ts Deed, read from status.moments): numbered in
+// order (seq), at a moment on the world's clock (time), where (at, a unit vector), and the ship it befell (ship).
 // The rest are heard from what she sees and holds as it changes (listen.ts): her gun come ready, a slot taken in hand,
 // a ball passing near, her water, the storm, her timbers on the roll, and the screens.
 
-import type { Vec3 } from '../world/sphere.ts';
+import type { Deed, Piece } from '../player.ts';
 import type { SoundName } from './bank.ts';
 
-/** What a piece taken up or mended with is (player.ts Piece, once the moments come). */
-export type Piece = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
-
-/** A deed on the sea: player.ts Deed's shape, field for field (see the header). */
-export type Happening = { seq: number; time: number; at: Vec3; ship: number } & (
-  | { kind: 'fired' }
-  | { kind: 'fell'; land: boolean }
-  | { kind: 'struck'; by: number; shield: number; hull: number; broke: boolean; ram: boolean }
-  | { kind: 'sank'; by: number | null }
-  | { kind: 'took'; piece: Piece; rarity: number; slot: number }
-  | { kind: 'mended'; piece: Piece }
-  | { kind: 'gust' }
-);
+/** A deed on the sea: player.ts Deed (see the header). */
+export type Happening = Deed;
+export type { Piece };
 
 /** Every kind of deed. */
 export const DEEDS = ['fired', 'fell', 'struck', 'sank', 'took', 'mended', 'gust'] as const satisfies readonly Happening['kind'][];
