@@ -97,12 +97,23 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
   const marchKernel = Fn(() => {
     const x = instanceIndex.mod(MW), y = instanceIndex.div(MW);
     const px = vec2(x, y).mul(2).add(cell.xy);
-    const d = rayAt(px.add(0.5).div(vec2(HW, HH)));
+    // each visit's ray through its own point of the pixel (an R2 sequence), so the history gathers how much of the
+    // pixel a cloud's edge covers, not one hard step a pixel wide
+    const f = float(cam.frameIndex.div(4).mod(4096));
+    const d = rayAt(px.add(fract(vec2(f.mul(0.7548777), f.mul(0.5698403)).add(0.5))).div(vec2(HW, HH)));
     const distance = float(0).toVar();
     const result = field.march(d, MAX_STEPS, fract(ign(px).add(float(cam.frameIndex).mul(0.618034))), distance, true);
     textureStore(marched, uvec2(x, y), result);
     textureStore(marchedDistance, uvec2(x, y), vec4(distance, 0, 0, 1));
   })().compute(MW * MH, [64]);
+
+  /** This frame's march at the half-resolution pixel p, between the four samples round it (each taken near
+   *  2m + cell + ½): for a pixel with no history, so a cloud just come into view is soft, not in blocks of four. */
+  const spread = (p: Vec2Node): Vec4Node => {
+    const q = p.sub(cell.xy).mul(0.5), base = floor(q), t = q.sub(base), b = ivec2(base);
+    const at = (i: number, j: number) => textureLoad(marched, clampInts(b.add(ivec2(i, j)), ivec2(0, 0), ivec2(MW - 1, MH - 1)));
+    return mix(mix(at(0, 0), at(1, 0), t.x), mix(at(0, 1), at(1, 1), t.x), t.y);
+  };
 
   // two resolves, one per direction of the history ping-pong
   const resolveKernels = [0, 1].map((write) => {
@@ -112,7 +123,7 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
       const m = ivec2(int(x).div(2), int(y).div(2));
       const fresh = int(x).mod(2).equal(int(cell.x)).and(int(y).mod(2).equal(int(cell.y)));
       const current = textureLoad(marched, m).toVar();
-      const out = current.toVar();
+      const out = spread(vec2(x, y)).toVar();
       const outDistance = textureLoad(marchedDistance, m).x.toVar();
       // where this pixel's cloud was last frame, found by its distance now: seen from where the eye was over the
       // map then, the wind's carry undone, and turned from that frame's sky back into the world, where last frame's
