@@ -44,6 +44,12 @@ const SHAPE_SCALE = 1.0, DETAIL_SCALE = 0.4;
 export const SIGMA = 60;
 /** The shaped noise's density past which the cloud is at its densest. */
 const FULL = 0.35;
+/**
+ * The weather map drawn this many times larger than its tile (cloud-noise.ts), its potential with it: the same share
+ * of sky in cloud, but gathered into a few big masses, as tall as they are broad, rather than a field of small puffs.
+ * At this size they read as shapes at the phone's resolution, and their sunlit sides as broad blocks of light.
+ */
+const MASS = 2.2;
 /** How far the large-scale field moves the threshold either way at middling cover, km of potential. */
 const FIELD_SHIFT = 0.3;
 /** How far below zero the threshold sinks at full cover, km: a little over BILLOW, so overcast is unbroken. */
@@ -124,11 +130,11 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
   /** The cloud's density (0–1) at q before erosion, its height in the shell and its dome's top there (fractions). */
   const coarse = (q: Vec3Node) => {
     const { p, h } = locate(q);
-    const w = texture(noise.weather).sample(p.xz.div(WEATHER_TILE)).level(float(0));
+    const w = texture(noise.weather).sample(p.xz.div(WEATHER_TILE * MASS)).level(float(0));
     // how far inside its cloud's edge the point lies, km: the fields of cloud lower the threshold, the clear skies
     // between raise it
     const shift = w.g.sub(0.5).mul(fieldShift).sub(threshold);
-    const inside = w.r.add(shift);
+    const inside = w.r.add(shift).mul(MASS);
     // each cloud as tall as it lies deep inside its edge here, so its top follows the map's ragged potential: the
     // broad ones towering, the small and the fringes staying low; its base lifts toward its margins, which are thin;
     // within BILLOW of its surface, top, side or base, the billows decide whether a point is cloud, so they carve the

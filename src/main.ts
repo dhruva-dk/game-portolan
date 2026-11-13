@@ -25,7 +25,7 @@ import { MEAN, SWING } from './world/weather';
 
 /** The release's setup. */
 const RELEASE: Setup = {
-  seed: SEED, mean: MEAN, swing: SWING, hours: 15,
+  seed: SEED, mean: MEAN, swing: SWING, hours: 16.3,
   drawing: { sea: 'water', fleet: SHIPS, lod: null, cloth: true },
   meter: false, hold: null, gun: null,
 };

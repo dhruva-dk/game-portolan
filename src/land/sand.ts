@@ -25,7 +25,7 @@ const SAND_TILE = 4, BROAD = 4.3;
 /** Its mean colour, linear (measured), and the coral sand's mean albedo it is scaled to: a warm beige (dry carbonate
  * sand reflects 0.4–0.5, less toward the blue). */
 const SAND_MEAN = [0.345, 0.315, 0.221];
-const SAND_ALBEDO = [0.45, 0.4, 0.3];
+const SAND_ALBEDO = [0.56, 0.48, 0.34];
 /**
  * Wet sand reflects less: the water between and over the grains sends back WET of the light that would leave it
  * (the diffuse reflectance of water's surface from below, total internal reflection past 49°), to the sand again

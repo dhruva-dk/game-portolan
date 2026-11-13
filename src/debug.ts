@@ -3,7 +3,9 @@
 // as released and opens at the title. The scenario drives the game, its referee and the screens' flow only through
 // what they offer anyone (main.ts builds them; this only sets them going).
 //
-// ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
+// ?mood= puts the whole look on one of the art direction's alternates (docs/art-direction.md): warm, a low evening sun
+// over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade, light shafts and
+// haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
 // aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the
 // planet's (world/planet.ts; SEED by default). ?debug=charts colours the sea by its charts' weights, ?debug=wake shows
 // the ships' marks on it (water/water.ts).
@@ -86,13 +88,17 @@ const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
 const flying = params.has('fly') || ['lat', 'lon', 'alt'].some((k) => params.has(k));
 
+/** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
+const MOODS: Record<string, { hours: number; haze: number }> = { warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.8 } };
+
 /** The release's setup as the switches change it. */
 function setupOf(release: Setup): Setup {
-  const mean = { ...release.mean }, swing = { ...release.swing };
+  const mood = MOODS[params.get('mood') ?? ''];
+  const mean = { ...release.mean, haze: release.mean.haze * (mood?.haze ?? 1) }, swing = { ...release.swing };
   for (const k of ['wind', 'cloud', 'haze'] as const) if (params.has(k)) [mean[k], swing[k]] = [number(k, 0), 0];
   const sea = params.get('debug');
   return {
-    seed: number('seed', release.seed), mean, swing, hours: number('t', release.hours),
+    seed: number('seed', release.seed), mean, swing, hours: number('t', mood?.hours ?? release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
       // (room for ?ships= past a match's, for judging the frame with more)
@@ -208,7 +214,7 @@ function demoShips(south: Vec3, most: number): Berth[] {
     const p = along(along(up, north, out).p, cross(north, up), side).p, u = normalize(p);
     const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
-    others.push({ at: u, heading: forward, look: lookOf(i), lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null });
+    others.push({ at: u, heading: forward, look: lookOf(i + 1), lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null });
   }
   return others;
 }

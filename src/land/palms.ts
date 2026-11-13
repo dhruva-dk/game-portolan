@@ -31,12 +31,13 @@ const BARK_MEAN = [0.271, 0.206, 0.094];
 const BARK_ALBEDO = [0.3, 0.27, 0.22];
 /** Leaf scars ring the trunk every this many metres. */
 const RING = 0.09;
-/** Leaves' albedo: young fronds' olive green, old ones' yellowing, and the nuts'. */
-const LEAF = [0.04, 0.06, 0.018];
-const OLD_LEAF = [0.12, 0.1, 0.035];
+/** Leaves' albedo: young fronds' green, old ones' yellowing, and the nuts'. Brighter and greener than a measured
+ * frond's: at the phone's resolution a crown is a few dozen pixels, and it must read as green, not as a dark blot. */
+const LEAF = [0.06, 0.15, 0.03];
+const OLD_LEAF = [0.22, 0.19, 0.05];
 const NUT = [0.16, 0.14, 0.04];
 /** How much of the light falling on a leaf's far side comes through it. */
-const THROUGH = 0.3;
+const THROUGH = 0.45;
 /** Of the sky's light, the share that reaches a leaflet at a frond's base, in the crown's heart (all reaches its tip). */
 const HEART = 0.4;
 

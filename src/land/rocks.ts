@@ -25,9 +25,9 @@ export const KINDS = { big: { shapes: 4, detail: 11 }, boulder: { shapes: 4, det
 const ROCK_TILE = 2.5;
 /** Its mean colour, linear (measured), and the weathered rock's mean albedo it is scaled to: a warm red-brown. */
 const ROCK_MEAN = [0.084, 0.079, 0.066];
-const ROCK_ALBEDO = [0.2, 0.105, 0.06];
+const ROCK_ALBEDO = [0.27, 0.15, 0.085];
 /** The bleached tops' albedo. */
-const BLEACHED = [0.3, 0.2, 0.13];
+const BLEACHED = [0.44, 0.32, 0.21];
 /** Deep in a crack or under a ledge, the share of the albedo left: it stands for the light that doesn't reach in. */
 const CAVITY = 0.3;
 /** Wet rock reflects about half as much; below the waterline it is filmed with algae. */

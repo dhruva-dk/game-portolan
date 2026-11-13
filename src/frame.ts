@@ -1,6 +1,6 @@
-import { ACESFilmicToneMapping, Color, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, float, getViewPosition, length, normalize, pass, renderOutput, screenUV, select, uniform, vec3, vec4,
+  Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import { environmentAt, type World } from './environment';
@@ -17,17 +17,21 @@ import { createView } from './view/view';
 import { createWater, type SeaShows } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
-import { sunAt } from './world/sun';
+import { sunAt, sunInSky } from './world/sun';
+import { BLOOM_LEVELS, bloom } from './post/bloom';
+import { film } from './post/film';
+import { createGrade, encode } from './post/grade';
+import { createShafts, type Shafts } from './post/shafts';
+import { SKY_METRES } from './sky/sky';
+import type { Vec4Node } from './tsl';
 
 /**
- * Scene radiance is per unit of sun illuminance; this one exposure brings it to the screen. A camera in full sun is
- * exposed by the sunny-16 rule, which puts an 18% grey card lit by the high sun at middle grey: with the sun 60° up,
- * through the air (0.8 of it, at sin 60°) and the sky give the card a radiance of 0.18·0.25 = 0.045, which three's
- * ACES (input × exposure / 0.6) takes to 0.18 at an exposure of 3.5. The game's afternoon, its sun lower, read a
- * little dark at that, so it is a third of a stop over: 4.4. Dry coral sand (0.45) then shows a warm beige, the foam
- * and the cloud tops stay short of white, and the sea keeps its colour (at half a stop over it pales to cyan).
+ * How strongly the bloom (post/bloom.ts: the light over its knee, spread) is added to the frame's light; and the
+ * light shafts' (post/shafts.ts), by the sun's height: strongest low, and still there high. The exposure, the tone
+ * curve and the look are the grade's (post/grade.ts), set by the sun's height.
  */
-const EXPOSURE = 4.4;
+const BLOOM = 0.22;
+const shaftsFor = (rise: number) => 0.6 * (1 - 0.5 * Math.min(1, Math.max(0, (rise - 0.2) / 0.6)));
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
 const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
@@ -89,8 +93,10 @@ export interface FrameOptions {
  */
 export function createFrame(renderer: WebGPURenderer, world: World, options: FrameOptions) {
   renderer.setPixelRatio(1);
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = EXPOSURE;
+  // the grade tone maps (post/grade.ts); the output only encodes for the display
+  renderer.toneMapping = NoToneMapping;
+  const rise = sunInSky(world.climate.timeOfDay)[1];
+  const { grade, gain } = createGrade(rise);
   const view = createView();
   const sky = createSky(view);
   const scene = new Scene();
@@ -116,32 +122,47 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const look = (camera: PerspectiveCamera) => {
     const scenePass = pass(scene, camera);
     const projectionInverse = uniform(camera.projectionMatrixInverse), world = uniform(camera.matrixWorld);
-    return () => {
+    const seen = () => {
       const color = scenePass.getTextureNode();
       const depth = scenePass.getTextureNode('depth').x;
       const position = getViewPosition(screenUV, depth, projectionInverse);
       return { color, depth, dir: normalize(world.mul(vec4(position, 0)).xyz), metres: length(position) };
     };
+    return { seen, depth: scenePass.getTextureNode('depth') };
   };
-  const pipelineOf = (post: Parameters<typeof renderOutput>[0]) => {
-    const p = new RenderPipeline(renderer, fxaa(renderOutput(post)));
+  /**
+   * The post chain over a view's light (linear, per unit sun) and the depth it was seen at: drawn once to a texture,
+   * its bloom and light shafts added, graded, encoded for the display, anti-aliased, grained.
+   */
+  const pipelineOf = (post: Vec4Node, depth: ReturnType<typeof look>['depth']): { pipeline: RenderPipeline; shafts: Shafts } => {
+    const light = rtt(post, null, null, { depthBuffer: false });
+    const glow = bloom(light, gain);
+    const shafts = createShafts(light, depth);
+    const storm = sky.light.storm(view.position);
+    const graded = Fn(() => {
+      const c = light.sample(screenUV).rgb.add(glow.sample(screenUV).rgb.mul(BLOOM / BLOOM_LEVELS)).add(shafts.light());
+      return film(encode(grade(c, storm)));
+    })();
+    // the grade encodes for the display itself, grained before the anti-aliasing so its dither reaches the screen
+    const p = new RenderPipeline(renderer, fxaa(graded));
     p.outputColorTransform = false;
-    return p;
+    return { pipeline: p, shafts };
   };
 
   // In the air: haze by distance, the clouds over whatever they stand in front of, the storm over all of it.
   const airCamera = new PerspectiveCamera(60, 1, ...PLANES.air);
   const airSeen = look(airCamera);
   const airPost = Fn(() => {
-    const { color, depth, dir, metres } = airSeen();
-    // the backdrop is the sky itself, already seen through all the air
-    const hazed = select(depth.greaterThanEqual(1), color.rgb, sky.fog(color.rgb, dir, metres));
+    const { color, depth, dir, metres } = airSeen.seen();
+    const open = depth.greaterThanEqual(1);
     // clouds in front of whatever the pixel shows
     const cloud = sky.clouds.color.sample(screenUV);
-    const inFront = depth.greaterThanEqual(1).or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
-    const seen = select(inFront, hazed.mul(cloud.a).add(cloud.rgb), hazed);
+    const inFront = open.or(sky.clouds.distance.sample(screenUV).x.mul(1000).lessThan(metres));
+    const clouded = select(inFront, color.rgb.mul(cloud.a).add(cloud.rgb), color.rgb);
+    // then the haze, by distance; over the sky and its clouds, its band along the horizon
+    const hazed = sky.fog(clouded, dir, select(open, float(SKY_METRES * 2), metres));
     // and the storm's rain over all of it, the clouds above it too: its wall stands nearer than they
-    return vec4(sky.veil(seen, dir, select(depth.greaterThanEqual(1), float(1e5), metres)), 1);
+    return vec4(sky.veil(hazed, dir, select(open, float(1e5), metres)), 1);
   })();
 
   // From space: the sky's backdrop and its clouds are the air's, seen from inside it, so past the planet's limb is the
@@ -150,14 +171,14 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const spaceCamera = new PerspectiveCamera(40, 1, ...PLANES.space);
   const spaceSeen = look(spaceCamera);
   const spacePost = Fn(() => {
-    const { color, depth, dir, metres } = spaceSeen();
-    const seen = sky.deck(sky.fog(color.rgb, dir, view.under(dir, metres, AIR)), dir, metres);
+    const { color, depth, dir, metres } = spaceSeen.seen();
+    const seen = sky.deck(sky.aerial(color.rgb, dir, view.under(dir, metres, AIR)), dir, metres);
     return vec4(select(depth.greaterThanEqual(1), vec3(...SPACE), seen), 1);
   })();
 
   const eyes = {
-    air: { camera: airCamera, pipeline: pipelineOf(airPost) },
-    space: { camera: spaceCamera, pipeline: pipelineOf(spacePost) },
+    air: { camera: airCamera, ...pipelineOf(airPost, airSeen.depth) },
+    space: { camera: spaceCamera, ...pipelineOf(spacePost, spaceSeen.depth) },
   };
 
   /** Runs compute passes, in order. */
@@ -252,7 +273,8 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     draw(sea.wake);
     draw(islandShadow);
     compute(ships.cloth);
-    // 2, 3. the scene and its post, from the eye
+    // 2, 3. the scene and its post, from the eye; the light shafts only in the air
+    eyes[s.eye.kind].shafts.update(eye, env.sunDirection, s.eye.kind === 'air' ? shaftsFor(rise) : 0);
     eyes[s.eye.kind].pipeline.render();
   }
 

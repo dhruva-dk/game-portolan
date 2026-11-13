@@ -23,7 +23,7 @@ import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 /** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to: oiled
  * oak, a deep saturated brown; the deck bleached by sun and salt; spars a shade lighter than the hull; timber blackened with pitch. */
 const PLANK_MEAN = [0.118, 0.073, 0.042], DECK_MEAN = [0.209, 0.132, 0.083];
-const HULL = [0.14, 0.07, 0.032], DECK = [0.28, 0.22, 0.16], SPAR = [0.19, 0.115, 0.06];
+const HULL = [0.2, 0.1, 0.045], DECK = [0.32, 0.25, 0.18], SPAR = [0.24, 0.15, 0.08];
 const DARK = [0.045, 0.032, 0.022], IRON = [0.03, 0.03, 0.03];
 /** How much further from grey oil takes the planks' colours. */
 const SOAKED = 1.6;
@@ -104,6 +104,7 @@ export function createWood(light: Light) {
     const seams = select(planked, packed.r, float(1));
     const shade = ao.mul(seams);
     const lit = light.glossy(p, n, rough, f0);
-    return albedo.mul(lit.diffuse).add(lit.specular).mul(shade);
+    // the rim lights the outline whatever the wood: on the dark planking as on the paint
+    return albedo.mul(lit.diffuse).add(lit.specular).add(light.rim(p, n0).mul(albedo.add(0.12))).mul(shade);
   };
 }

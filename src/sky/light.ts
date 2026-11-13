@@ -19,7 +19,17 @@ export interface Light {
   (p: Vec3Node, n: Vec3Node): Vec3Node;
   /** The same for a surface of roughness r (perceptual, 0…1) and reflectance f0 face on (rgb: a metal's colour). */
   glossy(p: Vec3Node, n: Vec3Node, r: FloatNode, f0: Vec3Node): Gloss;
+  /**
+   * The rim: the sun's light caught along an outline, where the surface at p facing n turns away from the eye, the
+   * more as the sun stands behind it; radiance per unit albedo. A painter's light rather than a physical one: at the
+   * phone's resolution a lit edge reads where a thin dark one is lost, so the ships are cut out of the sea by it.
+   */
+  rim(p: Vec3Node, n: Vec3Node): Vec3Node;
 }
+
+/** The rim's strength (of the sun's light at p, as a white surface square to it would give), how fast it narrows to
+ *  the outline, how much of it a surface lit from the front keeps, and its warmth. */
+const RIM = 0.9, RIM_POWER = 3, FRONT = 0.3, RIM_TINT = [1.1, 0.95, 0.75] as const;
 
 /** The smoothest a surface is taken to be for the sun: a smoother one's highlight would be smaller than the disc. */
 const SMOOTHEST = 0.06;
@@ -56,6 +66,14 @@ export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n:
     // the sky, reflected
     const mirrored = sky.reflect(reflect(v.negate(), n), rough).mul(envBRDF(f0, rough, nv)).mul(below.sky(p));
     return { diffuse: sun.mul(nl).div(Math.PI).add(ambient(p, n)), specular: glint.add(mirrored) };
+  };
+  light.rim = (p: Vec3Node, n: Vec3Node): Vec3Node => {
+    const v = normalize(cameraPosition.sub(p)), l = sky.sun(p);
+    const edge = pow(float(1).sub(saturate(dot(n, v))), RIM_POWER);
+    const behind = saturate(dot(v.negate(), l)).mul(1 - FRONT).add(FRONT);
+    // only where the sky's sun reaches (its shadows, and none under water), and on the side of the outline toward it
+    const facing = saturate(dot(n, l).mul(0.5).add(0.6));
+    return sunAt(p, n).mul(edge.mul(behind).mul(facing).mul(RIM / Math.PI)).mul(vec3(...RIM_TINT));
   };
   return light;
 }

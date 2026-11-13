@@ -36,8 +36,15 @@ import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Tarred hemp, weathered grey. */
 const ROPE = [0.13, 0.11, 0.085];
-/** How much of the light on a sail's far side comes through the canvas. */
-export const THROUGH = 0.3;
+/** How much of the light on a sail's far side comes through the canvas: a sail with the sun behind it glows, in its
+ *  dye's colour deepened by the cloth it passed through (the albedo twice over, renormalised by its brightness). */
+export const THROUGH = 0.55;
+/**
+ * Every ship's mark on her square sails, in her paint: a cross pattée, its arms flaring from ARM at the middle to
+ * FLARE at their ends, REACH of the sail's half-width and half-height from its middle. Paint lets through PAINTED of
+ * what the canvas does, so against the sun the cross stands dark on the glowing cloth.
+ */
+const ARM = 0.13, FLARE = 0.34, REACH = 0.66, PAINTED = 0.35;
 /** A square sail's cloths: how many across it (each about 0.4 m), shown as faint seams. */
 const CLOTHS = 26;
 /** How far a sail may be blown aback (of its full belly), so it doesn't fold through its mast. */
@@ -165,15 +172,22 @@ export function createShipMaterials(light: Light, pixel: FloatNode, canvas: Clot
     const seams = select(clothKind.lessThan(CLOTH.lateen + 0.5), line(uvs.x, CLOTHS).mul(0.12), float(0));
     const edge = max(smoothstep(0.02, 0, min(uvs.x, float(1).sub(uvs.x))), smoothstep(0.03, 0, min(uvs.y, float(1).sub(uvs.y)))).mul(0.25);
     const band = paint.w.mul(smoothstep(0.36, 0.37, uvs.y)).mul(smoothstep(0.64, 0.63, uvs.y));
-    let albedo = mix(cloth.rgb, paint.rgb, band);
+    // the cross, on the square sails: in the sail's own half-widths from its middle, inside a flaring arm either way
+    const c = abs(uvs.sub(0.5)).mul(2).div(REACH);
+    const armX = c.y.lessThan(mix(float(ARM), float(FLARE), c.x)).and(c.x.lessThan(1));
+    const armY = c.x.lessThan(mix(float(ARM), float(FLARE), c.y)).and(c.y.lessThan(1));
+    const mark = select(clothKind.lessThan(CLOTH.lateen - 0.5).and(armX.or(armY)), float(1), float(0));
+    const marked = max(band, mark);
+    let albedo = mix(cloth.rgb, paint.rgb, marked);
     albedo = select(clothKind.greaterThan(CLOTH.pennant - 0.5), paint.rgb, albedo.mul(float(1).sub(seams).sub(edge)));
     // Seen from inside its bag, a sail's own canvas hides some of the sky and the sun from it, the more the deeper
     // the bag; what comes through the canvas comes through all the same.
     const n = normalize(clothNormal).mul(faceDirection);
     const inside = dot(n, outward).mul(standOff).lessThan(0);
     const hollow = select(inside, smoothstep(0.1, DEEP, abs(standOff)).mul(HOLLOW), float(0));
-    const lit = light(positionWorld, n).mul(float(1).sub(hollow)).add(light(positionWorld, n.negate()).mul(THROUGH));
-    return albedo.mul(lit);
+    const dyed = albedo.mul(albedo).div(max(dot(albedo, vec3(0.2126, 0.7152, 0.0722)), 0.05));
+    const through = light(positionWorld, n.negate()).mul(dyed).mul(mix(float(THROUGH), float(THROUGH * PAINTED), marked));
+    return albedo.mul(light(positionWorld, n)).mul(float(1).sub(hollow)).add(through);
   })();
   // ---- the ropes: blended, so drawn after the sea (fleet.ts)
   const ropes = new MeshBasicNodeMaterial({ transparent: true });

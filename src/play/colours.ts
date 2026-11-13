@@ -3,11 +3,15 @@
 import type { Look } from '../snapshot';
 import type { Vec3 } from '../world/sphere';
 
-/** The player's colours: a red hull under weathered canvas. */
-export const LOOK: Look = { paint: [0.3, 0.03, 0.02], sail: [0.62, 0.57, 0.46], band: false };
-const PAINTS: Vec3[] = [[0.03, 0.06, 0.2], [0.42, 0.28, 0.05], [0.03, 0.14, 0.06], [0.02, 0.02, 0.02], [0.3, 0.03, 0.02]];
-const SAILS: Vec3[] = [[0.62, 0.57, 0.46], [0.7, 0.68, 0.6], [0.5, 0.38, 0.25]];
+/** The player's colours: a crimson hull and the crimson cross on bright, unbleached canvas, the brightest sails at sea. */
+export const LOOK: Look = { paint: [0.5, 0.03, 0.025], sail: [0.8, 0.74, 0.6], band: false };
+/** The others' hulls (and the marks on their sails), and their sails, each dyed a strong colour of its own (linear):
+ *  woad, saffron, verdigris, madder, charcoal, murrey, ochre. */
+const PAINTS: Vec3[] = [[0.6, 0.5, 0.3], [0.03, 0.06, 0.2], [0.02, 0.02, 0.02], [0.55, 0.42, 0.18], [0.3, 0.03, 0.02], [0.04, 0.12, 0.06]];
+const SAILS: Vec3[] = [
+  [0.1, 0.2, 0.5], [0.72, 0.42, 0.06], [0.08, 0.36, 0.26], [0.5, 0.11, 0.05], [0.1, 0.09, 0.09], [0.3, 0.08, 0.24], [0.55, 0.36, 0.12],
+];
 
 /** A ship's colours by her id (0: the player's). */
 export const lookOf = (id: number): Look =>
-  (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[id % SAILS.length], band: id % 3 === 1 });
+  (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], band: id % 4 === 3 });

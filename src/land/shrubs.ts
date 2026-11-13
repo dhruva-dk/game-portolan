@@ -24,11 +24,11 @@ const LEAVES = 450;
 /** A leaf's length, as a share of the shrub's size. */
 const LEAF = 0.095;
 /** Leaves' albedo: the shrubs' fleshy green, and the paler, yellower and the darker ends of their range. */
-const GREEN = [0.045, 0.07, 0.022];
-const PALE = [0.08, 0.095, 0.035];
-const DARK = [0.03, 0.05, 0.018];
+const GREEN = [0.055, 0.14, 0.03];
+const PALE = [0.14, 0.19, 0.045];
+const DARK = [0.03, 0.085, 0.03];
 /** How much of the light on a leaf's far side comes through it: fleshy leaves pass less than a palm's. */
-const THROUGH = 0.25;
+const THROUGH = 0.4;
 
 /** One shrub, 1 across at its widest, standing on y = 0. */
 function shape(seed: number): BufferGeometry {

@@ -26,7 +26,7 @@ export interface Eye {
 }
 
 /** The vertical field of view of an eye in the air, degrees. */
-export const AIR_FOV = 60;
+export const AIR_FOV = 50;
 
 /** A captain's colours (linear rgb, 0…1): her hull's paint, her sails' canvas, and whether a band of the paint
  *  crosses her sails. */

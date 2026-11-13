@@ -14,18 +14,19 @@
 //   storm(p)         0…1, how deep in the storm (storm.ts) world position p lies; the sun and the sky's glow there are
 //                    already dimmed by it
 // and the frame's post pass:
-//   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the air
+//   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the haze (the sky: m past SKY_METRES)
+//   aerial(c, dir, m) the same through Earth's air at the eye's scale, for the view from space
 //   veil(c, dir, m)  the same through the storm's rain and cloud: last, over everything, the sky and clouds too
 //   deck(c, dir, m)  the storm seen from high over it instead (the full map's view from space): its cloud's top
 
 import { Vector3, type PerspectiveCamera } from 'three/webgpu';
-import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, pow, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
+import { Fn, abs, cross, dot, exp, float, length, max, mix, normalWorldGeometry, normalize, pow, select, smoothstep, sqrt, uniform, vec3 } from 'three/tsl';
 import type { Environment } from '../environment';
 import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';
 import type { Eye } from '../snapshot';
 import type { View } from '../view/view';
-import { toSky } from '../world/sphere';
+import { R, toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
 import { createClouds } from './clouds';
@@ -61,6 +62,24 @@ const PEAK_SHARE = 0.05, PEAK_G = 0.95;
  * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted cold.
  */
 const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.85, 0.92, 1] as const;
+/**
+ * The haze, drawn to the planet's scale rather than Earth's: on a sea whose horizon is 150 m off, Earth's air would
+ * leave it as clear as a room, so the far field is swallowed by a haze of its own. Its optical depth is HAZE_DEPTH a
+ * unit of the air's aerosol (Environment.haze: about 1.3 on a mean day) at HAZE_DISTANCE metres along the sea from the
+ * chase camera's height, growing as the distance to the power HAZE_SHAPE, so the near water stays clear and the far
+ * dissolves; it lies in a layer HAZE_HEIGHT metres deep, so a ship's canvas stands out of it over her hull, and the
+ * sky gets it as a band HAZE_BAND (the sine of its height) deep along the horizon. Red goes through a little further
+ * than blue (HAZE_SPECTRUM). Its glow is the horizon's (tinted HAZE_TINT) and the sun's light scattered forward
+ * (HAZE_SUN of it, Henyey-Greenstein HAZE_G). An eye higher than HAZE_ABOVE (from, to) metres leaves it below.
+ */
+const HAZE_DEPTH = 0.7, HAZE_DISTANCE = 150, HAZE_SHAPE = 2.6, HAZE_HEIGHT = 8, HAZE_BAND = 0.06, REFERENCE_EYE = 20;
+const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1, 0.9, 0.78] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
+const HAZE_ABOVE = [80, 300] as const;
+/** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
+export const SKY_METRES = 1e4;
+
+const hg = (c: FloatNode, g: number): FloatNode =>
+  float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 
 /** The light the sky gives everything else. */
 export interface Sky {
@@ -107,12 +126,45 @@ export function createSky(view: View) {
   };
   const stormLight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0)).mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT));
 
-  const fog = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
+  /** The air as Earth's is at the eye's scale, for the view from space: its extinction over the metres, toward the
+   *  glow a long path through it has along dir (for things below the horizon, the horizon's). */
+  const aerial = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
     const T = exp(seaLevelExtinction.mul(metres).mul(-0.001));
-    // what a long path through the air along dir glows with; for things below the horizon, the horizon's glow
     const d = view.toSky(dir);
     const glow = skyRadiance(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun);
     return color.mul(T).add(glow.mul(float(1).sub(T)));
+  };
+
+  /** What the haze glows with along world direction dir: the sky's glow at the horizon under it, and the sun's light
+   *  scattered forward by the droplets, warm round the sun and cool away from it. */
+  const hazeColor = (dir: Vec3Node): Vec3Node => {
+    const d = view.toSky(dir);
+    const horizon = skyRadiance(normalize(vec3(d.x, 0.02, d.z)), skySun);
+    const forward = hg(dot(normalize(vec3(d.x, max(d.y, 0), d.z)), skySun), HAZE_G);
+    const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0.05));
+    return horizon.mul(vec3(...HAZE_TINT)).add(sunlight.mul(forward).mul(HAZE_SUN));
+  };
+  /** The low air's mean density between two heights over the sea (metres), as a share of the sea's. */
+  const meanDensity = (a: FloatNode, b: FloatNode): FloatNode => {
+    const ea = exp(max(a, 0).div(-HAZE_HEIGHT)), eb = exp(max(b, 0).div(-HAZE_HEIGHT));
+    return select(abs(a.sub(b)).lessThan(0.05), ea, ea.sub(eb).mul(HAZE_HEIGHT).div(b.sub(a)));
+  };
+  const reference = (HAZE_HEIGHT * (1 - Math.exp(-REFERENCE_EYE / HAZE_HEIGHT))) / REFERENCE_EYE;
+  /** The haze's optical depth at HAZE_DISTANCE along the sea, for the air's aerosol now. */
+  const hazeDepth = haze.mul(HAZE_DEPTH);
+
+  /**
+   * Colour c seen m metres away along world direction dir from the eye, through the haze; a ray that meets nothing
+   * (m past SKY_METRES: the sky and the clouds) through the band of it along the horizon.
+   */
+  const fog = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
+    const end = view.position.add(dir.mul(metres));
+    const density = meanDensity(view.height, length(end).sub(R)).div(reference);
+    const near = hazeDepth.mul(pow(metres.div(HAZE_DISTANCE), HAZE_SHAPE)).mul(density);
+    const band = hazeDepth.mul(exp(max(view.toSky(dir).y, 0).div(-HAZE_BAND)));
+    const tau = select(metres.greaterThan(SKY_METRES), band, near).mul(float(1).sub(smoothstep(HAZE_ABOVE[0], HAZE_ABOVE[1], view.height)));
+    const T = exp(vec3(...HAZE_SPECTRUM).mul(tau).negate());
+    return color.mul(T).add(hazeColor(dir).mul(vec3(1).sub(T)));
   };
 
   const background = Fn(() => {
@@ -142,6 +194,9 @@ export function createSky(view: View) {
     clouds,
     light,
     fog,
+    aerial,
+    /** What the haze glows with along a world direction (the light shafts' colour too). */
+    hazeColor,
     veil: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.veil(color, dir, metres, stormLight),
     deck: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.deck(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
