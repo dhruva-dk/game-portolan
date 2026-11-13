@@ -41,7 +41,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 2 * W + 3 * GAP, height: rows * H + (rows + 1) * GAP } });
   await page.setContent(`<body style="margin:0;padding:${GAP}px;background:#1d1a16;display:grid;
     grid-template-columns:${W}px ${W}px;gap:${GAP}px">${cells}</body>`);
-  await page.evaluate(() => Promise.all([...document.images].map((i) => i.decode())));
+  await page.evaluate(() => Promise.all(Array.from(document.images).map((i) => i.decode())));
   writeFileSync(`${dir}/sheet.png`, await page.screenshot({ fullPage: true }));
   console.log(`${dir}/sheet.png`);
 } finally {

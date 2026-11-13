@@ -8,7 +8,7 @@ import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
 import { GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import { begun, emptyHold, progress, roomFor, stepUse, stowed, tapped, useful, USES } from '../src/sim/hold.ts';
 import { berthed, cargo, drifted, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
-import { shipAt, step } from '../src/sim/ship.ts';
+import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { random } from '../src/world/random.ts';
 import { R, along, distance, dot, frameAt, fromLatLon, type Vec3 } from '../src/world/sphere.ts';
@@ -45,7 +45,7 @@ test('a gust spends a charge, blows its time, and the charges come back one at a
 });
 
 test('in a gust she runs well past her top and turns quicker; after it she sheds the speed back to her top', () => {
-  let s = { ...shipAt(c0, east), speed: SHIP.top };
+  let s: ShipState = { ...shipAt(c0, east), speed: SHIP.top };
   const plain = step(s, { course: frameAt(c0).north, throttle: 1 }, STEP, deep);
   for (let t = 0; t < GUST.time; t += STEP) s = step(s, { course: null, throttle: 1, gust: true }, STEP, deep);
   assert.ok(s.speed > SHIP.top + 0.9 * GUST.speed, `${s.speed}`);

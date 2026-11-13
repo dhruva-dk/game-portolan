@@ -40,7 +40,7 @@ test('she gathers way to her top speed and no further, and turns no faster than 
 });
 
 test('let go, she coasts and slows by her drag alone', () => {
-  const s0 = { ...shipAt(start, north), speed: SHIP.top };
+  const s0: ShipState = { ...shipAt(start, north), speed: SHIP.top };
   let last = s0.speed;
   const s = run(s0, () => ({ course: null, throttle: 0 }), 5, deep, (s) => {
     assert.ok(s.speed < last);
