@@ -59,7 +59,7 @@ const HEAPED = 0.6;
 const BOULDER = [0.3, 1.6] as const, BOULDERS = [6, 14] as const;
 /** Where outcrops lie, metres from the waterline (negative inland): on the shoulders, or at the waterline reaching
  * out into the shallows. */
-const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 7] as const;
+const SHOULDER = [-14, -5] as const, WATERLINE = [-3, 7] as const, KNOLL = [-4, -1] as const;
 /** How deep a rock is sunk below the lowest ground under it, as a share of its radius. */
 const SUNK = { big: 0.15, boulder: 0.3 };
 
@@ -82,6 +82,7 @@ const seat = (isle: Isle, x: number, z: number, size: number, sunk: number) => {
 /** bigShapes, boulderShapes: how many shapes each kind of rock comes in. */
 export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: number, seed = 1): Rock[] {
   const { site } = isle;
+  if (site.kind === 'shoal') return [];
   const rand = random(hash(seed, 0x726f636b)); // "rock": a stream of its own
   const rocks: Rock[] = [];
   const clear = (x: number, z: number, size: number, big: boolean) =>
@@ -89,7 +90,10 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
   const outcrops = Math.max(1, Math.round((2 * Math.PI * site.radius) / COAST_PER_OUTCROP));
   for (let o = 0; o < outcrops; o++) {
     const centre = ((o + 0.3 + rand() * 0.4) / outcrops) * 2 * Math.PI;
-    const band = rand() < 0.5 ? SHOULDER : WATERLINE;
+    // (a rock knoll is all outcrop: heaped on its crown, out no farther than its waterline's shallows)
+    // (on an islet the shoulder comes no farther in than a third of the way to its middle)
+    const kind = site.kind === 'rocks' ? KNOLL : rand() < 0.5 ? SHOULDER : WATERLINE;
+    const band = [Math.max(kind[0], -site.radius / 3), Math.max(kind[1], -site.radius / 3 + 1)] as const;
     const masses: Rock[] = [];
     const count = BIG_COUNT[0] + Math.floor(rand() * (BIG_COUNT[1] - BIG_COUNT[0] + 1));
     for (let i = 0, tries = 0; i < count && tries < 60; tries++) {
@@ -102,9 +106,9 @@ export function scatterRocks(isle: Isle, bigShapes: number, boulderShapes: numbe
         x = m.x + Math.cos(a) * out;
         z = m.z + Math.sin(a) * out;
         const d = Math.hypot(x, z) - site.coast(Math.atan2(z, x));
-        if (d < SHOULDER[0] - 2 || d > WATERLINE[1] + 2) continue;
+        if (d < SHOULDER[0] - 2 || d > (site.kind === 'rocks' ? KNOLL[1] + 3 : WATERLINE[1] + 2)) continue;
       }
-      if (Math.hypot(x, z) < size || !clear(x, z, size, true)) continue;
+      if ((i > 0 && Math.hypot(x, z) < size) || !clear(x, z, size, true)) continue;
       const r: Rock = { x, z, y: seat(isle, x, z, size, SUNK.big), size, yaw: rand() * 2 * Math.PI, big: true, shape: Math.floor(rand() * bigShapes) };
       rocks.push(r);
       masses.push(r);
@@ -154,6 +158,7 @@ const field = (noise: ReturnType<typeof createNoise3>, x: number, z: number, siz
 
 export function scatterPalms(isle: Isle, rocks: Rock[], seed = 1): Palm[] {
   const { site } = isle;
+  if (site.kind === 'shoal' || site.kind === 'rocks') return [];
   const rand = random(seed * 104729 + 3), noise = createNoise3(seed + 71);
   const palms: Palm[] = [], count = perArea(site, PALMS);
   for (let tries = 0; palms.length < count && tries < count * 200; tries++) {
@@ -196,6 +201,7 @@ const HEDGE = [-14, -5], INMOST_SHRUB = -45;
 
 export function scatterShrubs(isle: Isle, rocks: Rock[], shapes: number, seed = 1): Shrub[] {
   const { site } = isle;
+  if (site.kind === 'shoal' || site.kind === 'rocks') return [];
   const rand = random(seed * 15485863 + 5), noise = createNoise3(seed + 83);
   const shrubs: Shrub[] = [], count = perArea(site, SHRUBS);
   for (let tries = 0; shrubs.length < count && tries < count * 200; tries++) {

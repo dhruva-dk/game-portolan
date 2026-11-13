@@ -34,7 +34,7 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
     meshes: [...lands, ...casters.map((c) => c.mesh)],
     /** What casts shadows: each kind's instances. */
     casters,
-    /** Draws the islands the eye can see; returns the nearest of them (null if none). */
+    /** Draws the islands the eye can see; returns the nearest of them above the sea (null if none). */
     update(eye: Eye): IslandSite | null {
       const horizon = horizonDistance(eye.height);
       const order = sites
@@ -48,7 +48,9 @@ export function createIslands(planet: Planet, seed: number, view: View, light: L
         lands.forEach((m, i) => (m.visible = order.includes(i)));
         for (const c of casters) c.show(order);
       }
-      return order.length ? sites[order[0]] : null;
+      // (the nearest that stands out of the sea: nothing on a shoal casts a shadow)
+      const nearest = order.find((i) => sites[i].summit > 0);
+      return nearest === undefined ? null : sites[nearest];
     },
   };
 }

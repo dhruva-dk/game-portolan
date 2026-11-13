@@ -12,7 +12,7 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
-import { R, type Vec3 } from './sphere.ts';
+import { R, distance, type Vec3 } from './sphere.ts';
 import { createNoise3 } from './noise3.ts';
 import { charter, placeIslands, type IslandSite } from './planet-islands.ts';
 import { random } from './random.ts';
@@ -88,6 +88,24 @@ const CLUMP = 2.6;
 /** Rubble round an island's foot thins out between these distances from its coast, metres. */
 const FOOT = [15, 35] as const;
 
+/** Cells along each cube face's edge, for finding the islands near a point. */
+const CELLS = 32;
+
+/** The unit vector at gnomonic (gu, gv), −1…1, on a cube face (sphere.ts faceDir's faces, without the angles). */
+const gnomonic = (face: number, gu: number, gv: number): Vec3 =>
+  unit(([[1, gv, -gu], [-1, gv, gu], [gu, 1, -gv], [gu, -1, gv], [gu, gv, 1], [-gu, gv, -1]] as Vec3[])[face]);
+
+/** The cell (of CELLS a side on each cube face, gnomonic) unit direction (x, y, z) lies in. */
+function cellOf(x: number, y: number, z: number): number {
+  const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
+  let face: number, gu: number, gv: number;
+  if (ax >= ay && ax >= az) [face, gu, gv] = [x >= 0 ? 0 : 1, (x >= 0 ? -z : z) / ax, y / ax];
+  else if (ay >= az) [face, gu, gv] = [y >= 0 ? 2 : 3, x / ay, (y >= 0 ? -z : z) / ay];
+  else [face, gu, gv] = [z >= 0 ? 4 : 5, (z >= 0 ? x : -x) / az, y / az];
+  const at = (g: number) => Math.min(CELLS - 1, Math.max(0, Math.floor(((g + 1) / 2) * CELLS)));
+  return (face * CELLS + at(gv)) * CELLS + at(gu);
+}
+
 /** What the sea floor's fields give at a point before any island. */
 interface Floor { height: number; depth: number; deep: number; clearance: number }
 
@@ -147,19 +165,32 @@ export function createPlanet(seed: number): Planet {
 
   const islands = placeIslands((p) => floor(unit(p)), noise, seed, SEA.deep.depth[1] + SEA.meet);
   const near = islands.map((s) => Math.cos(s.reach / R)), charts = islands.map((s) => charter(s.chart));
+  /** Within this of an island's centre (as a dot product), the rubble round its foot. */
+  const feet = islands.map((s) => Math.cos((s.shelf + FOOT[1]) / R));
+  /** For each cell of the cube's faces, the islands whose reach comes into it. */
+  const nearby = Array.from({ length: 6 * CELLS * CELLS }, (_, c) => {
+    const face = Math.floor(c / (CELLS * CELLS)), j = Math.floor(c / CELLS) % CELLS, i = c % CELLS;
+    const g = (k: number) => (2 * k) / CELLS - 1;
+    const centre = gnomonic(face, g(i + 0.5), g(j + 0.5));
+    const corner = Math.max(...[[0, 0], [1, 0], [0, 1], [1, 1]].map(([a, b]) => distance(centre, gnomonic(face, g(i + a), g(j + b)))));
+    return islands.flatMap((s, k) => (distance(centre, s.chart.at) < s.reach + corner ? [k] : []));
+  });
   const xzr = new Float64Array(3);
 
   /** The ground at unit direction p, and (if `cover`) what lies on it. */
   const ground = (p: Vec3, cover: Cover | null): number => {
     floor(p);
     let h = f.height, shore = Infinity;
-    for (let i = 0; i < islands.length; i++) {
+    for (const i of nearby[cellOf(px, py, pz)]) {
       const s = islands[i], c = s.chart.at;
-      if (px * c[0] + py * c[1] + pz * c[2] < near[i]) continue;
+      const d = px * c[0] + py * c[1] + pz * c[2];
+      if (d < near[i]) continue;
+      // (where the mound is surely below the floor, the floor is the ground: known from how far out, before the chart)
+      const below = s.ceiling(Math.acos(Math.min(d, 1)) * R) < h - SEA.meet;
+      if (below && !(cover && d > feet[i])) continue;
       charts[i](p, xzr);
       const x = xzr[0], z = xzr[1], r = xzr[2];
-      // (where the mound is surely below the floor, the floor is the ground)
-      if (s.ceiling(r) >= h - SEA.meet) h += (smax(h, s.mound(x, z), SEA.meet) - h) * smoothstep(s.reach, s.reach * 0.8, r);
+      if (!below) h += (smax(h, s.mound(x, z), SEA.meet) - h) * smoothstep(s.reach, s.reach * 0.8, r);
       if (cover && r < s.shelf + FOOT[1]) shore = Math.min(shore, r - s.coast(Math.atan2(z, x)));
     }
     const depth = -h;

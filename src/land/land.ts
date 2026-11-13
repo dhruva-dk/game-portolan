@@ -36,7 +36,7 @@ function rings(radius: number, out: number): number[] {
 
 function geometry(isle: Isle, litter: (x: number, z: number) => number): BufferGeometry {
   const { site, height } = isle;
-  const spokes = Math.max(96, Math.round((2 * Math.PI * site.radius) / SPOKE));
+  const spokes = Math.max(48, Math.round((2 * Math.PI * site.radius) / SPOKE));
   const angle = (s: number) => (s / spokes) * 2 * Math.PI;
   // how far past the coast each spoke must reach: the farthest the ground is still shallower than DEEPEST
   const raw = Array.from({ length: spokes }, (_, s) => {

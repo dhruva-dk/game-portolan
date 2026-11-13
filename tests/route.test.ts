@@ -117,15 +117,15 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   let t = performance.now();
   const ch = chart(depth);
   const bake = performance.now() - t, open = ch.open.reduce((s, o) => s + o, 0);
-  // round the largest island (seed 3's: its coast about 69 m out from here)
-  const isle = fromLatLon(8.7 * deg, -11.6 * deg), f = frameAt(isle);
+  // round the largest island (its coast `out` metres from its middle, give or take; the rings below were for 69 m)
+  const largest = planet.islands[0], isle = largest.chart.at, f = frameAt(isle), out = largest.radius / 69;
   const ring = (bearing: number, metres: number) => along(isle, add(scale(f.north, Math.cos(bearing)), f.east, Math.sin(bearing)), metres).p;
   // across the island from all round it (the first warms the code)
-  findPath(ch, ring(0, 150), ring(Math.PI, 150));
+  findPath(ch, ring(0, 150 * out), ring(Math.PI, 150 * out));
   const times: number[] = [];
   let found = 0;
   for (let k = 0; k < 24; k++) {
-    const a = ring(k * 0.26, 120 + 4 * k), b = ring(k * 0.26 + Math.PI, 160);
+    const a = ring(k * 0.26, (120 + 4 * k) * out), b = ring(k * 0.26 + Math.PI, 160 * out);
     t = performance.now();
     const r = findPath(ch, a, b);
     times.push(performance.now() - t);
@@ -156,7 +156,7 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   // 16 bots round the island for 20 s
   let fleet: Vessel[] = [];
   for (let k = 0; fleet.length < 16; k++) {
-    const p = ring(k * 0.7, 110 + 9 * k);
+    const p = ring(k * 0.7, (110 + 9 * k) * out);
     if (openAt(ch, p) && depth(p) > 6) fleet.push(afloat(fleet.length, shipAt(p, frameAt(p).east)));
   }
   const minds = fleet.map((v) => mind(v.id + 1, v.ship.at));

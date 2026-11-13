@@ -36,11 +36,13 @@ export const DECLINATION = (23.44 * Math.PI) / 180;
 export interface SunPlaces { anchor: Vec3; origin: Vec3 }
 
 /**
- * The places for a planet's islands (their centres and coasts' radii, metres; the first where the game starts): the
- * undefined point at the centre of the largest island a quarter of the way round the planet or more from the start
- * (the bearing turns round it as 2/r, so the broader the better), else of the farthest.
+ * The places for a planet's islands (their centres, coasts' radii and summits, metres; the first where the game
+ * starts): the undefined point at the centre of the largest island a quarter of the way round the planet or more from
+ * the start (the bearing turns round it as 2/r, so the broader the better), else of the farthest. Only those that
+ * stand out of the sea: a shoal's top is water a ship can cross.
  */
-export function sunPlaces(islands: readonly { chart: { at: Vec3 }; radius: number }[]): SunPlaces {
+export function sunPlaces(all: readonly { chart: { at: Vec3 }; radius: number; summit: number }[]): SunPlaces {
+  const islands = all.filter((s) => s.summit > 0);
   if (islands.length === 0) return { anchor: [0, 1, 0], origin: [0, 1, 0] };
   const anchor = islands[0].chart.at;
   const away = islands.slice(1).filter((s) => dot(normalize(s.chart.at), normalize(anchor)) <= 0);

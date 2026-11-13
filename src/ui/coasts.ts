@@ -6,9 +6,9 @@ import { fromChart, type Vec3 } from '../world/sphere';
 
 export interface Coast { centre: Vec3; radius: number; ring: Vec3[] }
 
-/** Each island's coast as `n` points round it. */
+/** Each island's coast as `n` points round it: those that stand out of the sea (a shoal has no coast). */
 export function traceCoasts(islands: readonly IslandSite[], n = 72): Coast[] {
-  return islands.map((s) => ({
+  return islands.filter((s) => s.summit > 0).map((s) => ({
     centre: s.chart.at,
     radius: s.radius,
     ring: Array.from({ length: n }, (_, i) => {

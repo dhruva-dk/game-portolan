@@ -5,15 +5,16 @@ import { PALMS, SHRUBS, isle, litter, scatterPalms, scatterRocks, scatterShrubs 
 
 const planet = createPlanet(1);
 const isles = planet.islands.map((s) => isle(s, planet.height));
-const big = isles[0], small = isles[isles.length - 1];
+const big = isles[0], above = isles.filter((i) => i.site.kind !== 'shoal');
+const small = isles.filter((i) => i.site.kind === 'island').at(-1)!;
 const fromCoast = (i: (typeof isles)[number], x: number, z: number) => Math.hypot(x, z) - i.site.coast(Math.atan2(z, x));
 
 test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and at the waterline, boulders round them', () => {
-  for (const [k, i] of isles.entries()) {
+  for (const [k, i] of above.entries()) {
     const rocks = scatterRocks(i, 4, 4, k + 1);
     const masses = rocks.filter((r) => r.big), boulders = rocks.filter((r) => !r.big);
     assert.ok(masses.length >= 2, `island ${k}: ${masses.length} masses`);
-    assert.ok(boulders.length >= masses.length, `island ${k}: ${boulders.length} boulders`);
+    assert.ok(boulders.length >= (i.site.kind === 'island' ? masses.length : masses.length / 2), `island ${k}: ${boulders.length} boulders`);
     for (const r of masses) {
       assert.ok(r.size * 2 >= 5 && r.size * 2 <= 12, `across ${r.size * 2}`);
       const d = fromCoast(i, r.x, r.z);
@@ -26,11 +27,18 @@ test('rocks: big masses 5–12 m across heaped in outcrops on the shoulders and 
       for (const o of rocks) if (o !== r) assert.ok(Math.hypot(o.x - r.x, o.z - r.z) > (o.size + r.size) * (o.big && r.big ? 0.59 : 0.74), 'apart');
     }
     assert.deepEqual(scatterRocks(i, 4, 4, k + 1), rocks, 'the same every time');
+    // a rock knoll is a heap of them on its crown
+    if (i.site.kind === 'rocks') assert.ok(masses.every((r) => fromCoast(i, r.x, r.z) < 2), `knoll ${k}: a mass off the knoll`);
+  }
+  // nothing stands on a shoal, nor palm or shrub on a rock knoll
+  for (const [k, i] of isles.entries()) {
+    if (i.site.kind === 'shoal') assert.equal(scatterRocks(i, 4, 4, k + 1).length, 0);
+    if (i.site.kind === 'shoal' || i.site.kind === 'rocks') assert.equal(scatterPalms(i, []).length + scatterShrubs(i, [], 4).length, 0);
   }
   // the largest island has more outcrops than the smallest
   assert.ok(scatterRocks(big, 4, 4).filter((r) => r.big).length > scatterRocks(small, 4, 4).filter((r) => r.big).length);
   // some of the waterline's stand out in the water
-  const wet = isles.flatMap((i, k) => scatterRocks(i, 4, 4, k + 1).filter((r) => r.big && i.height(r.x, r.z) < -0.3));
+  const wet = above.flatMap((i, k) => scatterRocks(i, 4, 4, k + 1).filter((r) => r.big && i.height(r.x, r.z) < -0.3));
   assert.ok(wet.length > 0, 'masses in the shallows');
 });
 
