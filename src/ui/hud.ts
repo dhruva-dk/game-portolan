@@ -1,7 +1,8 @@
 // The match's HUD, laid on the world as the chartmaker's slips (docs/ui-sheet, as the owner reworked it):
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in rubric under 30 s) and the ships afloat (a ship, a count)
-//   top right   the minimap (minimap.ts): the Storm's calm and the next, the loot about her; a tap opens the full map
+//   top right   the minimap (minimap.ts): who holds the sea, the islands, the Storm's calm and the next, the way in
+//               from outside it, the loot and ships about her; a tap opens the full map
 //   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
 //               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
 //               above it, with a pip for each charge, the next filling as it comes back, faint with none, gilt
@@ -14,10 +15,13 @@
 //   rim         washed rubric while she is outside the Storm's calm, the deeper the further out (0117's)
 // No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
 // Once she has sunk it watches another ship (watch): only the Storm's clock and the disc stay, her arrow gilt.
+// While the eye comes down from space at a match's start (play/arrival.ts) none of it shows; it fades in over the last
+// of the way down (FADE), as the game reports it (Status.arriving).
 //
 // It reads a plain HudState each frame and redraws a piece only when what it shows has changed.
 
 import type { Kit, Status } from '../player';
+import type { Sea } from '../snapshot';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
 import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
@@ -41,6 +45,8 @@ const RETICLE = 10, LOCKED = 0.75;
 /** The rim's wash outside the calm: its least and most strength, and the metres out it deepens over (0117's 0.35 +
  *  0.65 × how deep). */
 const RIM = [0.35, 1] as const, RIM_DEEP = 80;
+/** The share of the arrival (play/arrival.ts ARRIVAL.seconds, 2.8 s) over whose last the HUD fades in. */
+const FADE = 0.25;
 /** 0xrrggbb as css. */
 const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
 
@@ -54,27 +60,31 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   const root = document.createElement('div');
   root.className = 'screen';
   layer.appendChild(root);
+  // what fades in at the end of the arrival (the flow fades the root itself on a win)
+  const body = document.createElement('div');
+  body.className = 'screen';
+  root.appendChild(body);
 
-  const vitals = piece(root, 'top left');
-  const readings = piece(root, 'top centre');
-  const map = piece(root, 'top right', true);
+  const vitals = piece(body, 'top left');
+  const readings = piece(body, 'top centre');
+  const map = piece(body, 'top right', true);
   // (each piece stands 4 px in from the safe area's edge: ui.ts)
-  const gust = piece(root, 'right bottom', true);
+  const gust = piece(body, 'right bottom', true);
   gust.style.margin = `0 ${FIRE_RIGHT - GUST_RIGHT - 30 - 4}px ${FIRE_BOTTOM + GUST_UP - 30 - 4}px 0`;
-  const fire = piece(root, 'right bottom', true);
+  const fire = piece(body, 'right bottom', true);
   fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
-  const reticle = piece(root, '');
+  const reticle = piece(body, '');
   reticle.style.cssText = `left:50%;top:50%;transform:translate(-50%,-50%)`;
   // the rim's wash outside the calm, under everything else
   const rim = document.createElement('div');
   rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 24px rgba(184,48,26,.75);opacity:0`;
-  root.prepend(rim);
+  body.prepend(rim);
   // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     act.fire();
   });
-  const hotbar = piece(root, 'bottom');
+  const hotbar = piece(body, 'bottom');
   hotbar.style.left = 'calc(50% + 14px)';
 
   const drawMap = createMinimap(map, MINIMAP, coasts);
@@ -112,7 +122,11 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       for (const el of [vitals, gust, fire, reticle, hotbar, rim]) el.style.display = on ? 'none' : '';
       map.classList.toggle('press', !on);
     },
-    update(s: HudState) {
+    /** A frame: the match as reported, and who holds the sea (and her id in it) as the frame draws it. */
+    update(s: HudState, sea?: Sea, own?: number | null) {
+      const shown = Math.min(1, Math.max(0, 1 - s.arriving / FADE));
+      body.style.opacity = shown.toFixed(2);
+      body.style.visibility = shown > 0 ? '' : 'hidden';
       const shield = Math.round(s.shield), hull = Math.round(s.hull);
       draw(vitals, `${shield}/${s.shieldMax} ${hull}/${s.hullMax}`, () => svg(214, 60,
         slip(1, 1, 212, 58)
@@ -186,7 +200,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       // the rim's wash, outside the calm
       rim.style.opacity = s.outside > 0 && !watching ? (RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)).toFixed(2) : '0';
 
-      drawMap(s.at, s.heading, null, { gilt: watching, calm: s.eye, next: s.next, loot: watching ? undefined : s.loot });
+      drawMap(s.at, s.heading, s.facing, { gilt: watching, calm: s.eye, next: s.next, loot: watching ? undefined : s.loot, ships: s.ships, sea, own });
     },
   };
 }

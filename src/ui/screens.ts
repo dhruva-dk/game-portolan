@@ -7,11 +7,11 @@
 //   rank    a folio: her rank's seal and her level's ring, drawn large, and the ladder of ranks
 //   settings a small folio: sound and look speed, each a bar set by a tap along it
 //   sunk    over the match she watches once she has sunk: her galleon going down and her place in its laurel
-//   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, her plate
+//   result  an opaque sheet: her place in a laurel, her ship, how long she lasted, the sea she held, her plate
 // No words anywhere; numerals only.
 
 import type { Career } from '../player';
-import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughRect, slip, svg } from './ink';
+import { CUT, INK, PAPER, WASH, bar, figure, galleon, glyph, roughCircle, roughRect, slip, svg } from './ink';
 import { TIERS, laurel, levelRing, plate, rhumbs, rose, seal } from './marks';
 import { onTap, uiLayer } from './ui';
 
@@ -192,18 +192,33 @@ export function createSunk() {
   };
 }
 
-/** The result: an opaque sheet with her place, her ship, how long she lasted and her plate; a tap goes on. */
+/** The sea held's mark: a disc of the chart's sea with a patch of her water washed on it in her scarlet, its border
+ *  inked (the territory's own look on the sea), `r` across its half. */
+const held = (x: number, y: number, r: number) => `<clipPath id="held-c"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath>`
+  + `<circle cx="${x}" cy="${y}" r="${r}" fill="#c3d8cf"/>`
+  + `<path d="${roughCircle(x + r * 0.22, y + r * 0.12, r * 0.62, 7, r * 0.18)}" fill="rgba(196,40,46,.42)" stroke="rgb(176,28,36)" stroke-width="1.8" clip-path="url(#held-c)"/>`
+  + `<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${INK.iron}" stroke-width="1.4"/>`;
+
+/** A share of the planet as per cent: to a tenth under ten. */
+const percent = (share: number) => {
+  const p = Math.max(0, share) * 100;
+  return `${p > 0 && p < 10 ? p.toFixed(1) : Math.round(p)}%`;
+};
+
+/** The result: an opaque sheet with her place, her ship, how long she lasted, the sea she held (her share of the
+ *  planet's water) and her plate; a tap goes on. */
 export function createResult(go: () => void) {
   const s = sheet(true);
   onTap(s.root, go);
   return {
-    show(on: boolean, r?: { place: number; afloat: string; career: Career }) {
+    show(on: boolean, r?: { place: number; share: number; afloat: string; career: Career }) {
       if (on && r) {
         const [wreath, numeral] = placed(r.place);
         s.set(`<circle cx="271" cy="150" r="78" fill="${PAPER}" stroke="${INK.iron}" stroke-width="1.6"/><circle cx="271" cy="150" r="72" fill="none" stroke="${INK.iron}" stroke-width=".6"/>`
           + galleon(271, 150, 120, { sail: CUT, hull: r.place === 1 ? WASH.gold : 'url(#h-iron)', waves: true })
           + laurel(560, 150, 82, wreath) + figure(560, 150, r.place, 108, { fill: numeral })
-          + glyph('hud.shipsLeft', 690, 150, 34) + figure(716, 150, r.afloat, 32, { anchor: 'start' })
+          + glyph('hud.shipsLeft', 690, 118, 34) + figure(716, 118, r.afloat, 32, { anchor: 'start' })
+          + held(690, 182, 15) + figure(716, 182, percent(r.share), 32, { anchor: 'start' })
           + `<g transform="translate(406 300)">${plate(0, 0, 144, r.career.level, r.career.progress, r.career.tier)}</g>`);
       }
       s.show(on);

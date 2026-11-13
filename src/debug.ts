@@ -21,8 +21,8 @@
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, match, spectate, won, result; ui/flow.ts; also map, rank and
-// settings), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the
+// ?screen= opens the UI at a screen (title, lobby, match, spectate, won, result (?share=0…1 the sea she held); ui/flow.ts;
+// also map, rank and settings), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the
 // eye coming down from space: play/arrival.ts); spectate sinks her by the first other ship (?by=storm: by the storm),
 // won sinks every other by her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
@@ -174,7 +174,7 @@ function open(p: Played, others: readonly Berth[]) {
   } else {
     game.atSea(others);
     drive(game, params.get('drive') ?? '');
-    if (screen === 'result') flow.end(4);
+    if (screen === 'result') flow.end(4, number('share', 0.137));
     else {
       referee.begin();
       if (screen === 'spectate') game.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);

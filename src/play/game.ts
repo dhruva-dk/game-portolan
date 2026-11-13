@@ -27,6 +27,7 @@ import { charging } from '../sim/gust';
 import { GUN, HEALTH } from '../sim/handling';
 import { progress } from '../sim/hold';
 import { offered, rarityOf } from '../sim/loot';
+import { BOT, toward } from '../sim/captain';
 import { STORM, toEdge } from '../sim/storm';
 import { sunk } from '../sim/health';
 import { PLAYER } from '../sim/match';
@@ -36,11 +37,11 @@ import type { Eye, LootDraw, Snapshot } from '../snapshot';
 import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
-import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world/sphere';
+import { R, add, along, cross, distance, dot, normalize, scale, type Vec3 } from '../world/sphere';
 import { IDLE, type Hands, type Kit, type Slot, type Status } from '../player';
 import { AIM, aimDistance, clear } from './aim';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
-import { arriving } from './arrival';
+import { ARRIVAL, arriving } from './arrival';
 import { createChase } from './chase';
 import { createShots } from './shots';
 import { bearing, createState, type Berth, type Match, type Waters } from './state';
@@ -137,6 +138,14 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   };
   /** Whether her hands are on her ship: the flow gives them (view), she is not at anchor, and the eye is down with her. */
   const steering = () => view.hands && !anchored && arrival === null;
+  /** Whether a ship at b is in sight from a: as near as a bot looks, and no land high enough between to hide her (the
+   *  bots' own rule: sim/bot.ts hidden). */
+  const sighted = (a: Vec3, b: Vec3) => {
+    const d = distance(a, b), t = toward(a, b);
+    if (d > BOT.sightMax || !t) return d <= BOT.sightMax;
+    for (let s = BOT.sightStep; s < d; s += BOT.sightStep) if (ground(along(a, t, s).p) > BOT.sightLine) return false;
+    return true;
+  };
   restart(state.anchor(start), true);
 
   return {
@@ -206,8 +215,11 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const full = c.gun ? GUN.reload * GUN.reloadBy[c.gun.rarity] : 1;
       // once she has sunk, the disc is the watched ship's (ui/hud.ts watch)
       const watched = view.watch !== PLAYER || sunk(c.health) ? state.ships().find((k) => k.id === view.watch) : undefined;
+      const at = watched?.at ?? v?.ship.at ?? normalize(last.position), followed = watched?.id ?? PLAYER;
       return {
-        at: watched?.at ?? v?.ship.at ?? normalize(last.position), heading: watched?.heading ?? v?.ship.heading ?? last.forward,
+        at, heading: watched?.heading ?? v?.ship.heading ?? last.forward, facing: chase.axes().ahead,
+        arriving: arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds),
+        ships: state.vessels().filter((k) => k.id !== followed && sighted(at, k.ship.at)).map((k) => k.ship.at),
         hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
         gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full, locked: locked(c.gun.rarity) } : null,
         afloat: state.alive().length, sunk: sunk(c.health),

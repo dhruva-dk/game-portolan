@@ -10,6 +10,7 @@
 import type { createGlobe } from './globe';
 import { clock, type HudState, type createHud } from './hud';
 import type { Career } from '../player';
+import type { Sea } from '../snapshot';
 import { createLobby, createRank, createResult, createSettings, createSunk, createTitle, type Settings } from './screens';
 import { onTap, uiLayer } from './ui';
 
@@ -84,7 +85,7 @@ export function createFlow(
   onTap(skip, () => act.skip());
   hud.root.style.transition = `opacity ${DRY}s`;
 
-  function go(next: Screen, place = 1) {
+  function go(next: Screen, place = 1, share = 0) {
     screen = next;
     title.show(next === 'title');
     lobby.show(next === 'lobby', career());
@@ -97,7 +98,7 @@ export function createFlow(
     sunk.show(next === 'spectate' && struck !== null, struck ?? undefined);
     skip.style.display = next === 'spectate' || next === 'won' ? 'block' : 'none';
     if (next !== 'match') globe.close();
-    result.show(next === 'result', { place, afloat: clock(afloat), career: career() });
+    result.show(next === 'result', { place, share, afloat: clock(afloat), career: career() });
   }
   go(start);
 
@@ -110,8 +111,8 @@ export function createFlow(
     },
     /** The world is ready to be shown. */
     ready: () => title.ready(),
-    /** The match has ended for her, in `place`. */
-    end: (place: number) => go('result', place),
+    /** The match has ended for her, in `place`, holding `share` of the planet's water (0…1). */
+    end: (place: number, share = 0) => go('result', place, share),
     /** She has sunk, in `place`: said over the match she watches (each frame while she spectates). */
     sunk(place: number) {
       if (screen !== 'spectate' || struck === place) return;
@@ -124,13 +125,13 @@ export function createFlow(
       if (folio === 'rank') openRank();
       else settingsFolio.show(true);
     },
-    /** A frame of dt seconds: what the HUD reads. */
-    update(dt: number, s: HudState) {
+    /** A frame of dt seconds: what the HUD reads, and who holds the sea (her id in it) as the frame draws it. */
+    update(dt: number, s: HudState, sea?: Sea, own?: number | null) {
       if (screen === 'match') afloat += dt;
       if (IN_MATCH.includes(screen)) {
         // the full map's window would show the HUD under it
         hud.root.style.visibility = globe.open ? 'hidden' : '';
-        hud.update(s);
+        hud.update(s, sea, own);
         globe.update(s);
       }
     },

@@ -123,15 +123,15 @@ async function play(s: Stage): Promise<Played> {
       const m = referee.update(dt);
       if (m?.done) {
         referee.end();
-        flow.end(m.place ?? 1);
+        flow.end(m.place ?? 1, m.share);
       } else if (m) {
         if (IN_MATCH.includes(flow.screen) && flow.screen !== SHOWS[m.phase]) flow.go(SHOWS[m.phase]);
         // sunk, by a ball, a ram or the storm alike: where she placed, over the ship she now watches
         if (m.phase === 'spectating' && m.place !== null) flow.sunk(m.place);
       }
-      flow.update(dt, hudState());
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot();
+      flow.update(dt, hudState(), scene.sea, scene.own);
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
     },
   };

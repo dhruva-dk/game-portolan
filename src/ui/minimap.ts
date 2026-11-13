@@ -1,17 +1,29 @@
-// The minimap: a disc of the sea round her, north up, SPAN metres to its rim; the islands' coasts in sand on the sea's
-// wash, the loot on the water in gold dots, the Storm's side of its edge washed and the edge in rubric, the circle it
-// next closes to a dotted line of iron, and her arrow at the centre turned to her heading (0117's minimap.ts). Outside
-// the calm, a rubric mark on the rim points the way back in. Its rim is a graduated brass ring (the sheet's). Drawn in
-// canvas 2D each frame she has moved; tapped, it opens the full map.
+// The minimap: a disc of the sea round her, SPAN metres to its rim, read at a glance as Fortnite's is, in the chart's
+// hand. Turned as the camera looks (her way up the screen is up the disc): the stick steers by the screen, so the way
+// to safety on the disc is the way to push the stick, and on a planet this small north swings hard near the poles.
+// The rim's vermilion mark is north.
+//
+// On the plain sea, from the bottom up: who holds the water, a wash in each holder's colour, hers the deeper (held.ts);
+// the islands, their aprons a pale wash, their land parchment going ochre up the hills, their coasts inked (isles.ts);
+// her open trail, a line in her colour; the Storm's side of its edge washed in its own violet and the edge a violet
+// line; the circle it next closes to, a white dotted line; the loot, gold dots; the ships she can see, iron dots.
+// Outside the next circle a white line runs from her to its nearest point, ending in an arrowhead (on the rim when the
+// circle is off the disc). Her mark at the centre is a small arrowhead turned to her heading. Drawn in canvas 2D when
+// what it shows has changed; tapped, it opens the full map.
 
+import type { Sea } from '../snapshot';
 import { R, add, along, distance, dot, frameAt, normalize, scale, type Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
+import { laid, layOf, metres, place } from './disc';
+import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
+import { bakeIsle, zOf, type Isle } from './isles';
 
-/** Metres from her to the disc's rim. */
-const SPAN = 170;
-/** The Storm's wash is worked out on a grid this many cells across, and smoothed as it is drawn. */
-const WASHED = 48;
+/** Metres from her to the disc's rim: at her 12 m/s some 22 s of sailing, past a gun's 200 m reach, as far as the loot
+ *  is charted (play/game.ts CHARTED) and a little past what she can see (240 m). */
+export const SPAN = 260;
+/** The sea, the Storm's wash and its edge, the next circle's line and the way's. */
+const SEA = '#c3d8cf', STORM = 'rgba(96,58,120,.5)', EDGE = '#4b2763';
 
 export interface Storm { centre: Vec3; radius: number }
 
@@ -24,174 +36,214 @@ export function stormRing(storm: Storm, n = 96): Vec3[] {
   });
 }
 
+/** What else the disc may show: her arrow gilt, for a ship watched after a sinking; the Storm's calm and the calm it
+ *  next closes to (radius in metres); the loot on the water; the ships she sees; who holds the sea, and her number in
+ *  it (her id). */
+export interface More {
+  gilt?: boolean; calm?: Storm; next?: Storm | null; loot?: readonly Vec3[]; ships?: readonly Vec3[]; sea?: Sea; own?: number | null;
+}
+
+/** An arrowhead's path, its tip `l` up from (0, 0). */
+const head = (l: number) => `M0 ${-l}L${l * 0.62} ${l * 0.7}L0 ${l * 0.32}L${-l * 0.62} ${l * 0.7}Z`;
+
 /** size: the disc's diameter, CSS px. */
 export function createMinimap(host: HTMLElement, size: number, coasts: readonly Coast[]) {
-  const r = size / 2, inner = r * 0.86;
+  const r = size / 2, inner = r - 8;
   host.style.width = host.style.height = `${size}px`;
+  // the brass rim, graduated, and the paper under the sea
   host.innerHTML = svg(size, size,
     `<circle cx="${r}" cy="${r}" r="${r}" fill="#5b3a1e" filter="url(#sh)"/>`
-    + `<circle cx="${r}" cy="${r}" r="${r * 0.93}" fill="none" stroke="${PAPER}" stroke-width="${r * 0.1}" stroke-dasharray="${r * 0.06} ${r * 0.06}"/>`
-    + `<circle cx="${r}" cy="${r}" r="${inner}" fill="${WASH.sea}"/>`);
-  const svgEl = host.firstElementChild as SVGSVGElement;
-  svgEl.style.position = 'absolute';
+    + `<circle cx="${r}" cy="${r}" r="${r - 4}" fill="none" stroke="${PAPER}" stroke-width="5" stroke-dasharray="2.2 2.2"/>`
+    + `<circle cx="${r}" cy="${r}" r="${inner + 0.5}" fill="${SEA}" stroke="${INK.iron}" stroke-width="1"/>`);
+  (host.firstElementChild as SVGSVGElement).style.position = 'absolute';
   const canvas = document.createElement('canvas');
   const dpr = Math.min(devicePixelRatio, 3);
   canvas.width = canvas.height = Math.round(inner * 2 * dpr);
   canvas.style.cssText = `position:absolute;left:${r - inner}px;top:${r - inner}px;width:${inner * 2}px;height:${inner * 2}px;border-radius:50%`;
   host.appendChild(canvas);
-  // her arrow and the north tick, over the canvas
+  // north on the rim, and her arrowhead, over the canvas
   const over = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   over.setAttribute('viewBox', `0 0 ${size} ${size}`);
   over.setAttribute('width', `${size}`);
   over.setAttribute('height', `${size}`);
   over.style.position = 'absolute';
-  over.innerHTML = `<path d="M${r} ${r * 0.07 - 1}l-4 -1l4 9l4 -9z" fill="${WASH.vermilion}" stroke="${INK.iron}" stroke-width=".7"/>`
-    + `<g id="her"><path d="M0 -8L5 6L0 3L-5 6Z" fill="${INK.iron}" stroke="${INK.white}" stroke-width="1.2" paint-order="stroke"/></g>`;
+  over.innerHTML = `<g id="north"><path d="M0 ${-r + 1}l-4.5 -0.5l4.5 9l4.5 -9z" fill="${WASH.vermilion}" stroke="${INK.iron}" stroke-width=".8"/></g>`
+    + `<g id="her"></g>`;
   host.appendChild(over);
-  const her = over.querySelector('#her')!;
-  // the way back into the calm, on the rim
-  const back = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  back.innerHTML = `<path d="M0 ${-r * 0.97}l-6 9h12z" fill="${INK.rubric}" stroke="${INK.white}" stroke-width="1" paint-order="stroke"/>`;
-  over.appendChild(back);
+  const north = over.querySelector('#north')!, her = over.querySelector('#her')!;
   const ctx = canvas.getContext('2d')!;
-  const grid = document.createElement('canvas');
-  grid.width = grid.height = WASHED;
-  const gctx = grid.getContext('2d')!;
-  const cells = gctx.createImageData(WASHED, WASHED);
+  const held = createHeld(SPAN * 1.15);
+  const isles = new Map<Coast, Isle>();
+  // every island baked one at a time while the page is idle, so none is baked mid-match as she nears it
+  const bake = (i: number) => {
+    const coast = coasts[i];
+    if (!coast) return;
+    if (!isles.has(coast)) isles.set(coast, bakeIsle(coast.site));
+    setTimeout(() => bake(i + 1), 0);
+  };
+  bake(0);
+  const rings = new Map<string, Vec3[]>();
+  const ringOf = (s: Storm) => {
+    const key = `${s.centre.join()}|${s.radius}`;
+    let ring = rings.get(key);
+    if (!ring) {
+      if (rings.size > 8) rings.clear();
+      rings.set(key, (ring = stormRing(s, 180)));
+    }
+    return ring;
+  };
+  const stats = { draws: 0, ms: 0, since: performance.now() };
 
-  let last = '', gilt = false;
-  return (at: Vec3, heading: Vec3, storm: Vec3[] | null, more: More = {}) => {
-    const { north, east } = frameAt(at);
-    const bearing = Math.atan2(dot(heading, east), dot(heading, north)), span = SPAN, k = (inner * dpr) / span;
-    const key = `${at.map((v) => v.toFixed(5))}${bearing.toFixed(2)}${storm?.length}${!!more.gilt}`
-      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${more.loot?.length}`;
+  let last = '', gilt: boolean | null = null, then = performance.now();
+  return (at: Vec3, heading: Vec3, facing: Vec3, more: More = {}) => {
+    const now = performance.now(), dt = (now - then) / 1000;
+    then = now;
+    const c = canvas.width / 2, k = (inner * dpr) / SPAN, l = layOf(at, facing, c, k);
+    const bearing = (t: Vec3) => (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
+    const sea = more.sea, seq = sea?.changes.at(-1)?.seq, trail = sea?.trails.find((t) => t.id === more.own);
+    const key = `${at.map((v) => v.toFixed(6))}${bearing(heading).toFixed(1)}${bearing(frameAt(at).north).toFixed(1)}${!!more.gilt}`
+      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${more.loot?.length}${more.ships?.map((s) => s[0].toFixed(5)).join()}`
+      + `${seq}${trail?.points.length}`;
     if (key === last) return;
     last = key;
-    her.setAttribute('transform', `translate(${r} ${r}) rotate(${(bearing * 180) / Math.PI})`);
+    her.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(heading).toFixed(1)})`);
+    north.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(frameAt(at).north).toFixed(1)})`);
     if (!!more.gilt !== gilt) {
-      // watching another ship after a sinking: her arrow gilt, a star at its heart (0117 minimap.ts mapFace)
+      // watching another ship after a sinking: her arrowhead gilt (0117 minimap.ts mapFace)
       gilt = !!more.gilt;
-      her.innerHTML = gilt
-        ? `<path d="M0 -9L5.5 6.5L0 3.5L-5.5 6.5Z" fill="${WASH.gold}" stroke="${INK.iron}" stroke-width=".9"/><path d="${star(0, 0.5, 2.6)}" fill="${INK.white}"/>`
-        : `<path d="M0 -8L5 6L0 3L-5 6Z" fill="${INK.iron}" stroke="${INK.white}" stroke-width="1.2" paint-order="stroke"/>`;
+      her.innerHTML = `<path d="${head(6)}" fill="${gilt ? WASH.gold : INK.white}" stroke="${INK.iron}" stroke-width="1.3" stroke-linejoin="round"/>`;
     }
-    const c = canvas.width / 2;
-    const toDisc = (q: Vec3): [number, number] => [c + dot(q, east) * R * k, c - dot(q, north) * R * k];
-    const near = (q: Vec3, reach: number) => dot(q, at) > Math.cos(reach / R);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const trace = (ring: readonly Vec3[]) => {
+    const lay = (o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number) => ctx.setTransform(...laid(l, o, e, n, w, h, m));
+    const near = (q: Vec3, reach: number) => dot(q, at) > Math.cos(reach / R);
+    const trace = (ring: readonly Vec3[], closed: boolean) => {
       ctx.beginPath();
-      ring.forEach((q, i) => (i ? ctx.lineTo(...toDisc(q)) : ctx.moveTo(...toDisc(q))));
-      ctx.closePath();
+      ring.forEach((q, i) => (i ? ctx.lineTo(...place(l, q)) : ctx.moveTo(...place(l, q))));
+      if (closed) ctx.closePath();
     };
-    // the sea's rhumb lines: north–south and east–west through her
-    ctx.strokeStyle = 'rgba(38,25,16,.18)';
-    ctx.lineWidth = dpr * 0.6;
-    ctx.beginPath();
-    ctx.moveTo(c, 0);
-    ctx.lineTo(c, 2 * c);
-    ctx.moveTo(0, c);
-    ctx.lineTo(2 * c, c);
-    ctx.stroke();
-    for (const coast of coasts) {
-      if (!near(coast.centre, SPAN * 1.6 + coast.radius * 2)) continue;
-      trace(coast.ring);
-      ctx.fillStyle = WASH.sand;
-      ctx.fill();
-      ctx.strokeStyle = WASH.shore;
-      ctx.lineWidth = dpr;
+
+    if (sea && more.own != null) held.draw(ctx, l, sea, more.own + 1, dt, lay);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    islands(lay, trace, near);
+    if (trail && trail.points.length) {
+      // her open trail, on to her stern
+      trace([...trail.points, at], false);
+      ctx.lineCap = ctx.lineJoin = 'round';
+      ctx.strokeStyle = INK.white;
+      ctx.lineWidth = 3.2 * dpr;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgb(176,28,36)';
+      ctx.lineWidth = 1.8 * dpr;
       ctx.stroke();
     }
-    /** A line through the points, in the runs on her side of the planet. */
-    const runs = (line: readonly Vec3[], closed: boolean) => {
-      ctx.beginPath();
-      let on = false;
-      for (const q of closed ? [...line, line[0]] : line) {
-        if (dot(q, at) <= 0) on = false;
-        else if (on) ctx.lineTo(...toDisc(q));
-        else {
-          ctx.moveTo(...toDisc(q));
-          on = true;
-        }
-      }
-    };
     const calm = more.calm && more.calm.radius < R * Math.PI * 0.99 ? more.calm : null;
     if (calm) {
-      // the Storm's side of its edge washed, cell by cell over the disc (true however large the calm), and smoothed;
-      // its edge in rubric
-      const cap = Math.cos(calm.radius / R), d = cells.data;
-      for (let j = 0; j < WASHED; j++) for (let i = 0; i < WASHED; i++) {
-        const x = ((i + 0.5) / WASHED - 0.5) * 2 * span / R, y = (0.5 - (j + 0.5) / WASHED) * 2 * span / R;
-        const q = add(add(scale(at, Math.sqrt(Math.max(0, 1 - x * x - y * y))), east, x), north, y);
-        d.set(dot(q, calm.centre) < cap ? [106, 74, 122, 92] : [0, 0, 0, 0], (j * WASHED + i) * 4);
-      }
-      gctx.putImageData(cells, 0, 0);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(grid, 0, 0, 2 * c, 2 * c);
-      runs(stormRing(calm, 180), true);
-      ctx.strokeStyle = INK.rubric;
+      // the Storm's side of its edge: outside the ring as laid if the far side of the planet is the Storm's, else inside
+      const ring = ringOf(calm);
+      trace(ring, true);
+      const farOut = dot(scale(at, -1), calm.centre) < Math.cos(calm.radius / R);
+      if (farOut) ctx.rect(canvas.width, 0, -canvas.width, canvas.height);
+      ctx.fillStyle = STORM;
+      ctx.fill('evenodd');
+      trace(ring, true);
+      ctx.strokeStyle = EDGE;
       ctx.lineWidth = 2 * dpr;
       ctx.stroke();
     }
-    if (more.next && more.next.radius < R * Math.PI * 0.99) {
-      // the circle it next closes to, dotted iron
-      runs(stormRing(more.next, 180), true);
-      ctx.strokeStyle = INK.iron;
-      ctx.setLineDash([2 * dpr, 3 * dpr]);
-      ctx.lineWidth = 1.4 * dpr;
+    const next = more.next && more.next.radius < R * Math.PI * 0.99 ? more.next : null;
+    if (next) {
+      // the circle it next closes to: white, dotted, over a faint iron halo
+      trace(ringOf(next), true);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(38,25,16,.45)';
+      ctx.lineWidth = 3 * dpr;
+      ctx.setLineDash([0.1 * dpr, 4.4 * dpr]);
+      ctx.stroke();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2 * dpr;
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    // outside the calm, the way back in on the rim
-    const out = calm && distance(at, calm.centre) > calm.radius;
-    back.style.display = out ? '' : 'none';
-    if (out) {
-      const to = normalize(add(calm.centre, at, -dot(calm.centre, at)));
-      back.setAttribute('transform', `translate(${r} ${r}) rotate(${(Math.atan2(dot(to, east), dot(to, north)) * 180) / Math.PI})`);
-    }
-    if (more.loot) {
-      // the loot on the water, gold dots (0117's)
+    const dots = (list: readonly Vec3[] | undefined, radius: number, fill: string, ring: string, width: number) => {
+      if (!list?.length) return;
       ctx.beginPath();
-      for (const q of more.loot) {
-        if (!near(q, span * 1.05)) continue;
-        const [x, y] = toDisc(q);
-        ctx.moveTo(x + 2.4 * dpr, y);
-        ctx.arc(x, y, 2.4 * dpr, 0, Math.PI * 2);
+      for (const q of list) {
+        if (!near(q, SPAN * 1.05)) continue;
+        const [x, y] = place(l, q);
+        ctx.moveTo(x + radius * dpr, y);
+        ctx.arc(x, y, radius * dpr, 0, Math.PI * 2);
       }
-      ctx.fillStyle = WASH.gold;
-      ctx.strokeStyle = INK.iron;
-      ctx.lineWidth = 0.6 * dpr;
-      ctx.fill();
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = ring;
+      ctx.lineWidth = width * dpr;
       ctx.stroke();
-    }
-    if (storm) {
-      // the Storm's side of its edge washed, the edge in rubric
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, 2 * c, 2 * c);
-      const visible = storm.filter((q) => dot(q, at) > 0);
-      if (visible.length === storm.length) {
-        storm.forEach((q, i) => (i ? ctx.lineTo(...toDisc(q)) : ctx.moveTo(...toDisc(q))));
+      ctx.fill();
+    };
+    dots(more.loot, 1.9, WASH.gold, INK.iron, 1);
+    dots(more.ships, 2.1, INK.iron, INK.white, 1.6);
+    // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
+    const goal = next ?? calm;
+    const d = goal ? distance(at, goal.centre) : 0;
+    if (goal && d > goal.radius) {
+      const to = normalize(add(goal.centre, at, -dot(goal.centre, at)));
+      const [ex, ey] = metres(l, along(at, to, 1).p), len = Math.hypot(ex, ey);
+      const ux = ex / len, uy = -ey / len, rim = (inner - 4) * dpr;
+      const reach = Math.min((d - goal.radius) * k, rim), from = 8 * dpr;
+      if (reach > from + 4 * dpr) {
+        const [x1, y1] = [c + ux * from, c + uy * from], [x2, y2] = [c + ux * reach, c + uy * reach];
+        ctx.lineCap = 'round';
+        for (const [ink, w] of [[INK.iron, 4.2], ['#fff', 2.2]] as const) {
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2 - ux * 4 * dpr, y2 - uy * 4 * dpr);
+          ctx.strokeStyle = ink;
+          ctx.lineWidth = w * dpr;
+          ctx.stroke();
+        }
+        // its arrowhead, at the circle or on the rim
+        const a = 6 * dpr, b = 4.2 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(x2 + ux * 2 * dpr, y2 + uy * 2 * dpr);
+        ctx.lineTo(x2 - ux * a - uy * b, y2 - uy * a + ux * b);
+        ctx.lineTo(x2 - ux * a + uy * b, y2 - uy * a - ux * b);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(106,74,122,.35)';
-        ctx.fill('evenodd');
-        ctx.restore();
-        trace(storm);
-        ctx.strokeStyle = INK.rubric;
-        ctx.lineWidth = 2 * dpr;
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = INK.iron;
+        ctx.lineWidth = 1.2 * dpr;
+        ctx.lineJoin = 'round';
         ctx.stroke();
-      } else ctx.restore();
+        ctx.fill();
+      }
+    }
+    stats.draws++;
+    stats.ms += performance.now() - now;
+    if (now - stats.since > 2000) {
+      // the disc's cost, for tools/capture.ts and the meter's readers: ms a redraw and redraws a second; the held
+      // water's ms a sampling and samplings a second
+      const s = (now - stats.since) / 1000;
+      host.dataset.cost = `${(stats.ms / stats.draws).toFixed(2)} ${(stats.draws / s).toFixed(1)} `
+        + `${(held.stats.ms / Math.max(1, held.stats.samplings)).toFixed(2)} ${(held.stats.samplings / s).toFixed(1)}`;
+      [stats.draws, stats.ms, stats.since, held.stats.ms, held.stats.samplings] = [0, 0, now, 0, 0];
     }
   };
+
+  /** The islands near her: each baked the first time it comes near, laid on its own chart, its coast inked. */
+  function islands(lay: (o: Vec3, e: Vec3, n: Vec3, w: number, h: number, m: number) => void,
+    trace: (ring: readonly Vec3[], closed: boolean) => void, near: (q: Vec3, reach: number) => boolean) {
+    for (const coast of coasts) {
+      if (!near(coast.centre, SPAN * 1.45 + coast.site.shelf)) continue;
+      let isle = isles.get(coast);
+      if (!isle) isles.set(coast, (isle = bakeIsle(coast.site)));
+      lay(coast.centre, coast.site.chart.axis, zOf(coast.site), isle.w, isle.h, isle.m);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'medium';
+      ctx.drawImage(isle.canvas, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      trace(coast.ring, true);
+      ctx.strokeStyle = WASH.shore;
+      ctx.lineWidth = 1.1 * dpr;
+      ctx.stroke();
+    }
+  }
 }
-
-/** What else the disc may show: her arrow gilt, for a ship watched after a sinking; the Storm's calm and the calm it
- *  next closes to (radius in metres); and the loot on the water. */
-export interface More { gilt?: boolean; calm?: Storm; next?: Storm | null; loot?: readonly Vec3[] }
-
-/** A small five-pointed star's path at (x, y). */
-const star = (x: number, y: number, r: number) => Array.from({ length: 10 }, (_, i) => {
-  const a = (i * Math.PI) / 5 - Math.PI / 2, d = i % 2 ? r * 0.45 : r;
-  return `${i ? 'L' : 'M'}${(x + d * Math.cos(a)).toFixed(2)} ${(y + d * Math.sin(a)).toFixed(2)}`;
-}).join('') + 'Z';
-
