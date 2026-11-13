@@ -6,7 +6,7 @@
 // for a phone's small speaker that hears little under 150 Hz, a band of noise in the low mids), the carriage's
 // wooden kick, and the tail: a rumble, rolled on by the sea's and the air's slap back.
 
-import { ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, take, tone, type Samples, type Take } from '../dsp';
+import { ar, brown, crackle, echoes, fall, filter, finish, layer, mix, modes, noise, normal, saturate, take, tone, type Samples, type Take } from '../dsp.ts';
 
 /** The kinds of gun there are (sim/gun.ts has one kind, the cannon; a new kind is a row of GUNS). */
 export type GunKind = 'cannon';
@@ -40,12 +40,12 @@ export const report = (g: Report) => (rate: number, seed: number): Samples => {
   filter(blast, 'lowpass', (s) => 260 + 5200 * Math.exp(-s / 0.028), 0.9);
   mix(t, blast, 0, 1.5);
   // weight: the falling sine, and the low mids a phone can carry
-  tone(t, (s) => g.thump * (0.45 + 0.55 * Math.exp(-s / 0.06)), ar(0.003, 0.12), 0, 0.7);
+  tone(t, (s) => g.thump * (0.45 + 0.55 * Math.exp(-s / 0.06)), (s) => 0.45 * ar(0.003, 0.12)(s), 0, 0.7);
   const body = layer(t, 0.7);
   noise(body, ar(0.002, 0.1));
   filter(body, 'bandpass', g.body, 1.1);
-  filter(body, 'peak', g.body * 1.9, 1.5, 4);
-  mix(t, body, 0, 2.6);
+  filter(body, 'peak', g.body * 1.9, 1.5, 5);
+  mix(t, body, 0, 3.4);
   // the carriage's kick
   modes(t, [[180, 0.12, 0.25], [410, 0.08, 0.18], [760, 0.05, 0.1]], 0.012);
   if (g.rattle) {
@@ -57,15 +57,16 @@ export const report = (g: Report) => (rate: number, seed: number): Samples => {
   // the tail: a rumble, and the slap back off the sea and the air rolling it on
   const tail = layer(t);
   brown(tail, (s) => ar(0.05, g.tail * 0.32)(s));
-  filter(tail, 'lowpass', 520);
-  filter(tail, 'highpass', 55);
-  mix(t, tail, 0, 0.55);
+  filter(tail, 'lowpass', 700);
+  filter(tail, 'highpass', 90);
+  filter(tail, 'peak', 260, 1, 5);
+  mix(t, tail, 0, 0.5);
   const roll = layer(t);
   mix(roll, blast);
   mix(roll, body, 0, 1.2);
   filter(roll, 'lowpass', 1100);
   mix(t, echoes(roll, [[0.13, 0.32], [0.29, 0.2], [0.47, 0.14], [0.78, 0.09], [1.2, 0.05]]), 0, 1);
-  filter(t, 'highpass', 38);
+  filter(t, 'lowshelf', 120, 0.7, -6);
   saturate(t, g.drive);
   return normal(finish(t, 0.0005, 0.3)).x;
 };
@@ -97,8 +98,8 @@ export function swap(rate: number, seed: number): Samples {
   mix(t, drag, 0, 0.25);
   const at = 0.11;
   // the mass of it: oak's low modes, a falling thump, and the low mids weighted for a phone
-  modes(t, [[92, 0.4, 1], [151, 0.32, 0.85], [236, 0.24, 0.75], [362, 0.16, 0.5], [548, 0.1, 0.3]], at, 0.02);
-  tone(t, (s) => 120 * (0.5 + 0.5 * Math.exp(-s / 0.04)), ar(0.002, 0.08), at, 0.4);
+  modes(t, [[92, 0.4, 0.45], [151, 0.32, 0.6], [236, 0.24, 0.95], [362, 0.16, 0.75], [548, 0.1, 0.4]], at, 0.02);
+  tone(t, (s) => 120 * (0.5 + 0.5 * Math.exp(-s / 0.04)), (s) => 0.4 * ar(0.002, 0.08)(s), at, 0.4);
   const hit = layer(t, 0.3);
   noise(hit, ar(0.001, 0.025));
   filter(hit, 'lowpass', 1600);
@@ -110,7 +111,7 @@ export function swap(rate: number, seed: number): Samples {
   crackle(chain, 14, 0, 0.28, 0.6, 0.003);
   filter(chain, 'bandpass', 3400, 1.2);
   mix(t, chain, at + 0.05, 0.4);
-  filter(t, 'highpass', 45);
+  filter(t, 'lowshelf', 120, 0.7, -6);
   saturate(t, 1.8);
   return normal(finish(t)).x;
 }

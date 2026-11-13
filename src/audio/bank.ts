@@ -3,11 +3,11 @@
 // voice (voices.ts) and how far off it carries. The takes are made once the sound has begun (audio.ts), a few each
 // frame (fill), never on the frame a sound is wanted.
 
-import type { Samples } from './dsp';
-import { GUNS, ready, report, select, swap, type GunKind } from './sounds/guns';
-import { hurt, ring, shatter, sink, splash, strike, thud, whistle } from './sounds/blows';
-import { claim, closing, creak, cut, enter, gust, leave, mendHull, mendWard, rope, took } from './sounds/sea';
-import { close, launch, lost, open, salute, tap } from './sounds/ui';
+import type { Samples } from './dsp.ts';
+import { GUNS, ready, report, select, swap, type GunKind } from './sounds/guns.ts';
+import { hurt, ring, shatter, sink, splash, strike, thud, whistle } from './sounds/blows.ts';
+import { claim, closing, creak, cut, enter, gust, leave, mendHull, mendWard, rope, took } from './sounds/sea.ts';
+import { close, launch, lost, open, salute, tap } from './sounds/ui.ts';
 
 /**
  * A sound:
@@ -25,31 +25,31 @@ export const REPORTS: Record<GunKind, Sound> = {
 };
 
 const SOUND = {
-  ready: { make: ready, takes: 2, level: -16, priority: 6, reach: 0 },
+  ready: { make: ready, takes: 2, level: -12, priority: 6, reach: 0 },
   swap: { make: swap, takes: 2, level: -7, priority: 7, reach: 0 },
-  select: { make: select, takes: 2, level: -20, priority: 3, reach: 0 },
+  select: { make: select, takes: 2, level: -14, priority: 3, reach: 0 },
   whistle: { make: whistle, takes: 3, level: -12, priority: 6, reach: 60 },
   splash: { make: splash, takes: 3, level: -8, priority: 4, reach: 700 },
   thud: { make: thud, takes: 2, level: -9, priority: 4, reach: 700 },
   strike: { make: strike, takes: 3, level: -5, priority: 6, reach: 900 },
   hurt: { make: hurt, takes: 2, level: -3, priority: 9, reach: 0 },
-  ring: { make: ring, takes: 2, level: -9, priority: 8, reach: 0 },
+  ring: { make: ring, takes: 2, level: -4, priority: 8, reach: 0 },
   shatter: { make: shatter, takes: 1, level: -5, priority: 9, reach: 0 },
   sink: { make: sink, takes: 2, level: -4, priority: 7, reach: 1400 },
-  creak: { make: creak, takes: 4, level: -22, priority: 1, reach: 0 },
-  rope: { make: rope, takes: 3, level: -26, priority: 1, reach: 0 },
+  creak: { make: creak, takes: 4, level: -17, priority: 1, reach: 0 },
+  rope: { make: rope, takes: 3, level: -21, priority: 1, reach: 0 },
   gust: { make: gust, takes: 2, level: -7, priority: 6, reach: 0 },
-  took: { make: took, takes: 2, level: -10, priority: 6, reach: 0 },
+  took: { make: took, takes: 2, level: -5, priority: 6, reach: 0 },
   mendWard: { make: mendWard, takes: 1, level: -11, priority: 6, reach: 0 },
-  mendHull: { make: mendHull, takes: 1, level: -10, priority: 6, reach: 0 },
+  mendHull: { make: mendHull, takes: 1, level: -6, priority: 6, reach: 0 },
   claim: { make: claim, takes: 1, level: -6, priority: 7, reach: 0 },
-  cut: { make: cut, takes: 2, level: -8, priority: 7, reach: 0 },
+  cut: { make: cut, takes: 2, level: -4, priority: 7, reach: 0 },
   enter: { make: enter, takes: 1, level: -20, priority: 3, reach: 0 },
   leave: { make: leave, takes: 1, level: -24, priority: 3, reach: 0 },
   closing: { make: closing, takes: 1, level: -10, priority: 5, reach: 0 },
-  tap: { make: tap, takes: 2, level: -22, priority: 5, reach: 0 },
+  tap: { make: tap, takes: 2, level: -16, priority: 5, reach: 0 },
   open: { make: open, takes: 1, level: -16, priority: 5, reach: 0 },
-  close: { make: close, takes: 1, level: -16, priority: 5, reach: 0 },
+  close: { make: close, takes: 1, level: -12, priority: 5, reach: 0 },
   launch: { make: launch, takes: 1, level: -7, priority: 9, reach: 0 },
   lost: { make: lost, takes: 1, level: -6, priority: 9, reach: 0 },
   salute: { make: salute, takes: 1, level: -5, priority: 9, reach: 0 },

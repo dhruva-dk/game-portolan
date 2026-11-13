@@ -4,13 +4,16 @@
 // Each one-shot sound plays in one of VOICES slots kept wired (a lowpass for the air, a pan, a gain), routed to its bus
 // as it is taken; a new source node is all a sound makes.
 
-import { db } from './dsp';
-import type { Bus } from './cues';
-import type { Heard } from './space';
-import { claim, clear, pool, VOICES } from './voices';
+import { db } from './dsp.ts';
+import type { Bus } from './cues.ts';
+import type { Heard } from './space.ts';
+import { claim, clear, pool, VOICES } from './voices.ts';
 
 /** The ceiling the limiter holds the output under (−1 dBFS). */
 export const CEILING = db(-1);
+/** The mix's gain into the master's dynamics, dB: the whole set so the passage of play (tools/audio.ts) sits near
+ *  −22 LUFS at the settings' default level, her gun's peaks taken by the limiter. */
+const GAIN = 4;
 /** Each bus's level, dB. */
 const BUS: Record<Bus | 'bed', number> = { bed: -4, world: -2, own: 0, ui: -3 };
 
@@ -20,8 +23,8 @@ interface Slot { air: BiquadFilterNode; pan: StereoPannerNode; gain: GainNode; b
 export function createMixer(ctx: BaseAudioContext) {
   const level = new GainNode(ctx, { gain: 1 });
   const floor = new BiquadFilterNode(ctx, { type: 'highpass', frequency: 40, Q: 0.6 });
-  const glue = new DynamicsCompressorNode(ctx, { threshold: -20, knee: 10, ratio: 2.5, attack: 0.012, release: 0.28 });
-  const limit = new DynamicsCompressorNode(ctx, { threshold: -6, knee: 0, ratio: 20, attack: 0.001, release: 0.1 });
+  const glue = new DynamicsCompressorNode(ctx, { threshold: -14, knee: 8, ratio: 2, attack: 0.012, release: 0.28 });
+  const limit = new DynamicsCompressorNode(ctx, { threshold: -4, knee: 0, ratio: 20, attack: 0.001, release: 0.1 });
   const ceiling = new GainNode(ctx, { gain: CEILING * db(-1) });
   level.connect(floor).connect(glue).connect(limit).connect(ceiling).connect(ctx.destination);
 
@@ -48,7 +51,7 @@ export function createMixer(ctx: BaseAudioContext) {
     bed: buses.bed,
     /** The player's sound level (0…1, as the settings hold it), from `at`: a square law, near what is heard as half. */
     level(v: number, at: number) {
-      level.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) ** 2, at, 0.05);
+      level.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) ** 2 * db(GAIN), at, 0.05);
     },
     /**
      * Plays `buffer` on `bus` as `heard` (when, how loud, how dull, which side) from `at`, at `rate`, with `priority`:

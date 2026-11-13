@@ -9,8 +9,8 @@
 // The rest are heard from what she sees and holds as it changes (listen.ts): her gun come ready, a slot taken in hand,
 // a ball passing near, her water, the storm, her timbers on the roll, and the screens.
 
-import type { Vec3 } from '../world/sphere';
-import type { SoundName } from './bank';
+import type { Vec3 } from '../world/sphere.ts';
+import type { SoundName } from './bank.ts';
 
 /** What a piece taken up or mended with is (player.ts Piece, once the moments come). */
 export type Piece = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';

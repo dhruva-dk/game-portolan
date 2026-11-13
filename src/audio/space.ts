@@ -4,8 +4,8 @@
 // distance), and from which side (its bearing from the way the eye looks, as a stereo pan, a little duller behind).
 // Pure: plain numbers in, plain numbers out, written into one object kept for it (no allocation a frame).
 
-import type { Eye } from '../snapshot';
-import type { Vec3 } from '../world/sphere';
+import type { Eye } from '../snapshot.ts';
+import type { Vec3 } from '../world/sphere.ts';
 
 /** Metres a second. */
 export const SPEED = 340;

@@ -2,8 +2,8 @@
 // folded shut; PLAY her canvas filling and the sea taking her; her end, sunk, the sea closing over; her win, a great
 // swell and a salute of guns far off.
 
-import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, swell, take, tone, type Samples, type Take } from '../dsp';
-import { timber } from './blows';
+import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, swell, take, tone, type Samples, type Take } from '../dsp.ts';
+import { timber } from './blows.ts';
 
 /** A tap: a quill's tick on parchment. */
 export function tap(rate: number, seed: number): Samples {
@@ -38,7 +38,7 @@ export function open(rate: number, seed: number): Samples {
 export function close(rate: number, seed: number): Samples {
   const t = take(0.4, rate, seed);
   parchment(t, 0, 0.14, 25);
-  modes(t, [[140, 0.12, 0.6], [262, 0.08, 0.35]], 0.13, 0.05);
+  modes(t, [[190, 0.1, 0.6], [340, 0.07, 0.4]], 0.13, 0.05);
   const puff = layer(t, 0.2);
   noise(puff, ar(0.002, 0.03));
   filter(puff, 'lowpass', 800);
@@ -74,7 +74,7 @@ export function lost(rate: number, seed: number): Samples {
   mix(t, under, 0, 1.6);
   timber(t, (s) => 24 - 4 * s, swell(0.4, 2.4, 1.2), 0.2, 2.4, 170, 0.6);
   bubbles(t, 24, 0.3, 2.4, 120, 420, 0.12);
-  filter(t, 'highpass', 45);
+  filter(t, 'lowshelf', 130, 0.7, -7);
   return normal(finish(t, 0.03, 0.8)).x;
 }
 
@@ -98,6 +98,6 @@ export function salute(rate: number, seed: number): Samples {
     filter(gun, 'lowpass', 900);
     mix(t, gun, at, 1.4 - 0.12 * i);
   });
-  filter(t, 'highpass', 45);
+  filter(t, 'lowshelf', 130, 0.7, -8);
   return normal(finish(t, 0.05, 1)).x;
 }

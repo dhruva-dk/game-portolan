@@ -2,8 +2,8 @@
 // she takes up and the stores she mends with, and her water: a loop closed (the sea rushing as her colour floods it),
 // her trail cut, her own water entered and left, the storm beginning to close.
 
-import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, slips, swell, take, tone, type Samples, type Take } from '../dsp';
-import { timber } from './blows';
+import { ar, brown, bubbles, crackle, fall, filter, finish, layer, mix, modes, noise, normal, slips, swell, take, tone, type Samples, type Take } from '../dsp.ts';
+import { timber } from './blows.ts';
 
 /** Her timbers working on the roll: a slow creak, rising and easing. */
 export function creak(rate: number, seed: number): Samples {
@@ -69,7 +69,7 @@ export function claim(rate: number, seed: number): Samples {
   filter(spray, 'highpass', 3200);
   mix(t, spray, 0, 0.18);
   bubbles(t, 22, 1, 1.8, 300, 900, 0.06);
-  filter(t, 'highpass', 50);
+  filter(t, 'lowshelf', 130, 0.7, -8);
   return normal(finish(t, 0.05, 0.4)).x;
 }
 
@@ -127,7 +127,7 @@ export function closing(rate: number, seed: number): Samples {
   noise(wind, env);
   filter(wind, 'bandpass', (s) => 450 + 250 * Math.sin(s * 1.3), 0.8);
   mix(t, wind, 0, 0.5);
-  filter(t, 'highpass', 50);
+  filter(t, 'lowshelf', 130, 0.7, -8);
   return normal(finish(t, 0.1, 0.6)).x;
 }
 

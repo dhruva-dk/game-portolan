@@ -166,16 +166,17 @@ export function saturate(t: Take, drive: number) {
   return t;
 }
 
-/** Fades over the first and last `seconds` (no click at either end), and takes out any DC. */
+/** Takes out any DC (a blocker, a one-pole highpass at some 5 Hz), then fades over the first `attack` and last
+ *  `release` seconds (no click at either end). */
 export function finish(t: Take, attack = 0.0015, release = 0.02) {
-  const x = t.x, n = x.length;
-  let mean = 0;
-  for (let i = 0; i < n; i++) mean += x[i];
-  mean /= n || 1;
+  const x = t.x, n = x.length, k = 1 - (2 * Math.PI * 5) / t.rate;
   const a = Math.max(1, Math.round(attack * t.rate)), r = Math.max(1, Math.round(release * t.rate));
+  let x1 = 0, y1 = 0;
   for (let i = 0; i < n; i++) {
-    const g = Math.min(1, i / a, (n - 1 - i) / r);
-    x[i] = (x[i] - mean) * g;
+    const y = x[i] - x1 + k * y1;
+    x1 = x[i];
+    y1 = y;
+    x[i] = y * Math.min(1, i / a, (n - 1 - i) / r);
   }
   return t;
 }

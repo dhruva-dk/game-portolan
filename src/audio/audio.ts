@@ -7,17 +7,17 @@
 // The page's sound (createAudio) has one AudioContext, made and started on the first touch (WebKit plays nothing
 // before one), put to sleep while the app is away and woken when it is back, its sounds made a few each frame.
 
-import type { Vec3 } from '../world/sphere';
-import { R } from '../world/sphere';
-import { NAMES, SOUNDS, type SoundName } from './bank';
-import { createBed, levels, levelsOf } from './bed';
-import { CUES, cueOf, type Happening } from './cues';
-import { createDerive } from './derive';
-import { db, rng } from './dsp';
-import { createListen, type Call, type Hearing } from './listen';
-import { createMixer } from './mixer';
-import { close, hear, heard } from './space';
-import type { Screen } from '../ui/ways';
+import type { Vec3 } from '../world/sphere.ts';
+import { R } from '../world/sphere.ts';
+import { NAMES, SOUNDS, type SoundName } from './bank.ts';
+import { createBed, levels, levelsOf } from './bed.ts';
+import { CUES, cueOf, type Happening } from './cues.ts';
+import { createDerive } from './derive.ts';
+import { db, rng } from './dsp.ts';
+import { createListen, type Call, type Hearing } from './listen.ts';
+import { createMixer } from './mixer.ts';
+import { close, hear, heard } from './space.ts';
+import type { Screen } from '../ui/ways.ts';
 
 /** Metres over the sea a deed is heard from: a gun at her muzzle, a blow on a hull at her side, the rest at the water. */
 const LIFT: Record<Happening['kind'], number> = { fired: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
@@ -39,7 +39,7 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
   const queue = NAMES.flatMap((name) => Array.from({ length: SOUNDS[name].takes }, (_, i) => ({ name, seed: 1 + i * 7919 })));
   const deeds: Happening[] = [], calls: Call[] = [], lv = levels(), h = heard();
 
-  /** Plays `call` as heard from `eye` (world metres) at `at`. */
+  /** Plays `call` as heard from `eye` at `at` (s on the context's clock). */
   const play = (call: Call, eye: Hearing['scene']['eye'], at: number) => {
     const c = CUES[call.cue], sound = SOUNDS[c.sound], takes = bank.get(c.sound);
     if (!takes?.length) return;
@@ -64,6 +64,8 @@ export function createEngine(ctx: BaseAudioContext, ground: (p: Vec3) => number)
       }
       return queue.length === 0;
     },
+    /** Plays one cue as heard from `eye` at `at` (s on the context's clock). */
+    cue: play,
     /** A frame of `dt` s heard at `at` on the context's clock, the sound's level `level` (0…1); `sounding` false keeps
      *  track of what changes without playing it (the context asleep). */
     update(hearing: Hearing, level: number, at: number, dt: number, sounding = true) {
@@ -97,6 +99,8 @@ export function createAudio(ground: (p: Vec3) => number) {
     if (!ctx) {
       ctx = new AudioContext({ latencyHint: 'interactive' });
       engine = createEngine(ctx, ground);
+      const rate = ctx.sampleRate;
+      ctx.addEventListener('statechange', () => console.info(`sound ${ctx?.state} at ${rate} Hz`));
       // (a moment of silence played inside the touch, which older WebKit needs to let the context sound at all)
       const hush = new AudioBufferSourceNode(ctx, { buffer: ctx.createBuffer(1, 1, ctx.sampleRate) });
       hush.connect(ctx.destination);

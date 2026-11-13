@@ -6,10 +6,10 @@
 //
 // Pure: plain data in, deeds out; what it keeps between frames is its own.
 
-import type { Kit, Item, Status } from '../player';
-import type { Snapshot } from '../snapshot';
-import { R, type Vec3 } from '../world/sphere';
-import type { Happening, Piece } from './cues';
+import type { Kit, Item, Status } from '../player.ts';
+import type { Snapshot } from '../snapshot.ts';
+import { R, type Vec3 } from '../world/sphere.ts';
+import type { Happening, Piece } from './cues.ts';
 
 /** Within this many metres of her hull, a ball home is a blow on her; a gun fired, hers. */
 const HERS = 16;
