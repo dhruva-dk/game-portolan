@@ -18,7 +18,7 @@
 // colour raised to the same brightness; a thin line of broken foam on the border's sea side.
 //
 // Cost: one read of two words (the cell and its moment) per pixel over settled water; nine of each within a few cells
-// of a border or a change. The cells are 2 × 1.6 MB of storage, sent a face's changed range at a time.
+// of a border or a change, and the cells' state before worked out only where one changed in the last HOLD s. The cells are 2 × 1.6 MB of storage, sent a face's changed range at a time.
 
 import { StorageBufferAttribute, Vector4 } from 'three/webgpu';
 import {
@@ -27,7 +27,7 @@ import {
 } from 'three/tsl';
 import { CELLS, N, cellOf } from '../world/cells';
 import type { Sea } from '../snapshot';
-import { type BoolNode, type FloatNode, type IntNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import { type BoolNode, type FloatNode, type IntNode, type UintNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 
 /** How far the water's hue is turned to its holder's (0…1, its brightness kept), as a chart's wash along a coast: in a
@@ -142,22 +142,31 @@ export function createClaims(ships: number) {
           s.eC.addAssign(select(isC, w.mul(k2), float(0)));
           s.gC.addAssign(select(isC, dw.mul(k2), vec2(0)));
         };
-        const rev = float(0).toVar(), gRev = vec2(0).toVar();
+        const rev = float(0).toVar(), gRev = vec2(0).toVar(), stirred = float(0).toVar();
+        const taps: { word: UintNode; r: FloatNode; w: FloatNode; dw: Vec2Node }[] = [];
         for (let j = 0; j < 3; j++) {
           for (let i = 0; i < 3; i++) {
             const idx = base.add((j - 1) * SIDE + (i - 1));
-            const word = i === 1 && j === 1 ? w0 : cellBuf.element(idx), r = i === 1 && j === 1 ? r0 : revBuf.element(idx);
+            const word = i === 1 && j === 1 ? w0 : cellBuf.element(idx).toVar(), r = i === 1 && j === 1 ? r0 : revBuf.element(idx).toVar();
             const w = ax[i].w.mul(ay[j].w), dw = vec2(ax[i].d.mul(ay[j].w), ax[i].w.mul(ay[j].d));
-            const id = float(word.bitAnd(255)), pid = float(word.shiftRight(8).bitAnd(255));
-            const b = float(word.shiftRight(16).bitAnd(255)).div(255), pb = float(word.shiftRight(24)).div(255);
-            const moving = r.greaterThan(settled);
-            add(now, id, b, w, dw);
-            add(before, select(moving, pid, id), select(moving, pb, b), w, dw);
+            taps.push({ word, r, w, dw });
+            add(now, float(word.bitAnd(255)), float(word.shiftRight(16).bitAnd(255)).div(255), w, dw);
+            stirred.assign(max(stirred, select(r.greaterThan(settled), float(1), float(0))));
             const m = max(r, settled);
             rev.addAssign(w.mul(m));
             gRev.addAssign(dw.mul(m));
           }
         }
+        // the cells as they were, only where one of them changed in the last HOLD s (settled, they are as they are)
+        If(stirred.greaterThan(0), () => {
+          for (const { word, r, w, dw } of taps) {
+            const moving = r.greaterThan(settled);
+            const id = float(word.bitAnd(255)), b = float(word.shiftRight(16).bitAnd(255)).div(255);
+            add(before, select(moving, float(word.shiftRight(8).bitAnd(255)), id), select(moving, float(word.shiftRight(24)).div(255), b), w, dw);
+          }
+        }).Else(() => {
+          for (const k of ['b', 'c', 'base', 'gBase', 'eA', 'gA', 'eB', 'gB', 'eC', 'gC'] as const) before[k].assign(now[k]);
+        });
         // the field between the two holders, or of a lone holder against everyone; its gradient on the screen
         // (at a meeting of three, the two strongest: the weaker of the first two gives way to the third if it is stronger)
         const field = (s: Acc) => {
