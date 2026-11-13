@@ -23,6 +23,7 @@ import { Fn, cross, dot, exp, float, max, mix, normalWorldGeometry, normalize, p
 import type { Environment } from '../environment';
 import type { Cap } from '../sim/storm';
 import type { Compute } from '../gpu';
+import type { Eye } from '../snapshot';
 import type { View } from '../view/view';
 import { toSky } from '../world/sphere';
 import { sunAtOrigin, sunInSky } from '../world/sun';
@@ -83,6 +84,8 @@ export function createSky(view: View) {
   const origin = uniform(new Vector3(0, 1, 0));
   const there = uniform(new Vector3(0, 1, 0));
   const rise = uniform(1);
+  /** 1 while the eye is in the air, under the clouds; 0 from space, where they are not drawn and cast no shadow. */
+  const under = uniform(1);
   const clouds = createClouds(view, tables);
   const reflection = createReflection(view, skyRadiance, skySun, clouds.along);
   const storm = createStormLook(view);
@@ -129,7 +132,7 @@ export function createSky(view: View) {
     return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();
 
-  const cloudShadow = (p: Vec3Node): FloatNode => clouds.shadow(p).mul(mix(1, STORM_SUN, storm.depth(p)));
+  const cloudShadow = (p: Vec3Node): FloatNode => mix(1, clouds.shadow(p), under).mul(mix(1, STORM_SUN, storm.depth(p)));
   // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
   const reflect = (dir: Vec3Node, roughness: FloatNode): Vec3Node => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
   const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, ambient, reflect, storm: storm.depth };
@@ -143,20 +146,26 @@ export function createSky(view: View) {
     deck: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.deck(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
-    /** Readies the sky for this frame, and returns the passes due from each part of it. */
-    update(env: Environment, cap: Cap, camera: PerspectiveCamera, dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
+    /**
+     * Readies the sky for this frame, seen from `camera`, and returns the passes due from each part of it. An eye in
+     * space sees the clouds from outside: they are neither marched nor moved on (their history stays the air's), they
+     * cast no shadow, and the sea mirrors the sky alone.
+     */
+    update(env: Environment, cap: Cap, camera: PerspectiveCamera, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
       storm.update(cap, env.clock);
-      sun.value.copy(env.sunDirection);
+      sun.value.set(...env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));
       rise.value = sunInSky(env.timeOfDay)[1];
-      const s = toSky(view.eye.frame, view.eye.dip, [env.sunDirection.x, env.sunDirection.y, env.sunDirection.z]);
+      const s = toSky(view.eye.frame, view.eye.dip, env.sunDirection);
       skySun.value.set(s[0], s[1], s[2]);
       const air = tables.update(s[1], env.haze);
+      under.value = kind === 'air' ? 1 : 0;
+      if (kind === 'space') return { tables: air, clouds: [], reflection: reflection.update(true) };
       // the clouds drift over the eye with the prevailing wind there (Environment.windDirection), on the eye's east and south
-      const w = env.windDirection, f = view.eye.frame, along = (a: readonly number[]) => env.windSpeed * (w.x * a[0] + w.y * a[1] + w.z * a[2]);
+      const w = env.windDirection, f = view.eye.frame, along = (a: readonly number[]) => env.windSpeed * (w[0] * a[0] + w[1] * a[1] + w[2] * a[2]);
       const cover = clouds.update({ coverage: env.cloudCoverage, wind: { x: along(f.east), y: -along(f.north) }, sunDirection: skySun.value }, camera, dt, width, height);
-      return { tables: air, clouds: cover, reflection: reflection.update() };
+      return { tables: air, clouds: cover, reflection: reflection.update(false) };
     },
   };
 }

@@ -1,62 +1,71 @@
-import { Vector3 } from 'three/webgpu';
+import { createPlanet, type Planet } from './world/planet';
 import type { Vec3 } from './world/sphere';
-import { sunAt, type SunPlaces } from './world/sun';
-import type { Weather } from './world/weather';
-import type { Wind } from './world/wind';
+import { sunAt, sunPlaces, type SunPlaces } from './world/sun';
+import { createWeather, type Weather } from './world/weather';
+import { createWind, type Wind } from './world/wind';
 
-/** The one shared world state. Systems read it every frame; only the game loop writes it. */
-export interface Environment {
-  /** Seconds on the world's clock: what the sea's waves run on (the CPU's copy of them, water/swell.ts, too). */
-  clock: number;
+/** The match's sky and sea, fixed for it. */
+export interface Climate {
   /** Hours, 0–24: the time of day, the same everywhere (world/sun.ts). */
   timeOfDay: number;
   /** Where the match's sun is set (world/sun.ts): over every place it stands as high as the hour says. */
   sunPlaces: SunPlaces;
-  /**
-   * Unit vector toward the sun over the eye, in the planet's frame (world space: the north pole is +y;
-   * world/sphere.ts). Derived from timeOfDay and the eye's position; elsewhere the sun is world/sun.ts's sunAt.
-   */
-  sunDirection: Vector3;
   /** The match's weather at a time on its clock (world/weather.ts). */
   weather: (seconds: number) => Weather;
   /**
    * The wind the sea's waves were raised by, metres per second: its mean over the match, since a sea takes hours to
-   * grow. Fixed for the match (the CPU's sea, water/swell.ts, is built with it).
+   * grow (the CPU's sea, water/swell.ts, is built with it).
    */
   seaWind: number;
-  /** The wind's speed over the sea now, metres per second: the same everywhere. Derived from the clock. */
-  windSpeed: number;
-  /**
-   * Unit vector the wind blows toward at the eye, in the planet's frame (a tangent there): the prevailing wind's
-   * (world/wind.ts), which varies over the planet. Derived from the eye's position.
-   */
-  windDirection: Vector3;
-  /** 0–1. Derived from the clock. */
-  cloudCoverage: number;
-  /** Aerosol in the air as a multiple of a clear day's (1). Thickens the haze and whitens the sky. Derived from the clock. */
-  haze: number;
 }
 
-/** sunPlaces: the match's (world/sun.ts, from its planet's islands); weather: its weather, about seaWind's mean wind. */
-export function createEnvironment(sunPlaces: SunPlaces, weather: (seconds: number) => Weather, seaWind: number): Environment {
-  const now = weather(0);
+/** The world a match is set in: its planet, the planet's prevailing wind and the climate, from one seed. Built once
+ *  (main.ts) and handed to both the game and the frame. */
+export interface World { seed: number; planet: Planet; wind: Wind; climate: Climate }
+
+/** seed: the planet's (world/planet.ts); mean, swing: the weather's (world/weather.ts); hours: the time of day. */
+export function createWorld(seed: number, mean: Weather, swing: Weather, hours: number): World {
+  const planet = createPlanet(seed);
   return {
-    clock: 0,
-    timeOfDay: 15,
-    sunPlaces,
-    sunDirection: new Vector3(0, 1, 0),
-    weather,
-    seaWind,
-    windSpeed: now.wind,
-    windDirection: new Vector3(1, 0, 0),
-    cloudCoverage: now.cloud,
-    haze: now.haze,
+    seed, planet, wind: createWind(seed),
+    climate: { timeOfDay: hours, sunPlaces: sunPlaces(planet.islands), weather: createWeather(seed, mean, swing), seaWind: mean.wind },
   };
 }
 
-/** eye: where the eye is (world, metres); wind: the planet's prevailing wind. */
-export function updateEnvironment(env: Environment, _dt: number, eye: Vec3, wind: Wind): void {
-  ({ wind: env.windSpeed, cloud: env.cloudCoverage, haze: env.haze } = env.weather(env.clock));
-  env.windDirection.set(...wind(eye));
-  env.sunDirection.set(...sunAt(env.sunPlaces, env.timeOfDay, eye));
+/** The air and the sea as the eye finds them at a moment: plain data, made fresh each frame (by the frame, from the eye
+ *  it draws from) and read by every system. */
+export interface Environment {
+  /** Seconds on the world's clock: what the sea's waves run on (the CPU's copy of them, water/swell.ts, too). */
+  clock: number;
+  timeOfDay: number;
+  sunPlaces: SunPlaces;
+  /**
+   * Unit vector toward the sun over the eye, in the planet's frame (world space: the north pole is +y;
+   * world/sphere.ts). Elsewhere the sun is world/sun.ts's sunAt.
+   */
+  sunDirection: Vec3;
+  seaWind: number;
+  /** The wind's speed over the sea now, metres per second: the same everywhere. */
+  windSpeed: number;
+  /** Unit vector the wind blows toward at the eye, in the planet's frame (a tangent there): the prevailing wind's
+   *  (world/wind.ts), which varies over the planet. */
+  windDirection: Vec3;
+  /** 0–1. */
+  cloudCoverage: number;
+  /** Aerosol in the air as a multiple of a clear day's (1). Thickens the haze and whitens the sky. */
+  haze: number;
+}
+
+/** The environment at `clock` (s) seen from `eye` (world metres). */
+export function environmentAt(world: World, clock: number, eye: Vec3): Environment {
+  const { timeOfDay, sunPlaces, weather, seaWind } = world.climate;
+  const now = weather(clock);
+  return {
+    clock, timeOfDay, sunPlaces, seaWind,
+    sunDirection: sunAt(sunPlaces, timeOfDay, eye),
+    windSpeed: now.wind,
+    windDirection: world.wind(eye),
+    cloudCoverage: now.cloud,
+    haze: now.haze,
+  };
 }

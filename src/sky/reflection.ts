@@ -126,11 +126,13 @@ export function createReflection(
   reflection.generateMipmaps = true;
   reflection.mipmapsAutoUpdate = false;
 
-  const bake = Fn(() => {
+  /** The panorama: the sky, and the clouds in it unless they are left out (seen from space). */
+  const bakeOf = (cloudy: boolean) => Fn(() => {
     const x = instanceIndex.mod(W), y = instanceIndex.div(W);
     const d = texelDirection(x, y, W, H);
-    const clouds = cloudsAlong(d, 24);
-    const sky = vec4(skyRadiance(d, sunDirection).mul(clouds.a).add(clouds.rgb), 1).toVar();
+    const air = skyRadiance(d, sunDirection);
+    const clouds = cloudy ? cloudsAlong(d, 24) : null;
+    const sky = vec4(clouds ? air.mul(clouds.a).add(clouds.rgb) : air, 1).toVar();
     textureStore(panorama, uvec2(x, y), sky);
     textureStore(storageTexture(reflection).setMipLevel(0), uvec2(x, y), sky);
   })().compute(W * H, [64]);
@@ -144,9 +146,10 @@ export function createReflection(
     textureStore(reduced, uvec2(x, y), vec4(sum.div(16), 1));
   })().compute(RW * RH, [64]);
 
-  const passes = [bake, reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1, panorama, reflection) : rough(i + 1, reduced, reflection)))];
+  const levels = [reduce, ...Array.from({ length: LEVELS }, (_, i) => (i + 1 < ROUGH ? sharp(i + 1, panorama, reflection) : rough(i + 1, reduced, reflection)))];
+  const passes = { cloudy: [bakeOf(true), ...levels], clear: [bakeOf(false), ...levels] };
 
-  let frame = 0;
+  let frame = 0, wasClear = false;
   return {
     /**
      * The sky's light reflected toward world direction dir off a surface of the given roughness (0–1). Only the sky
@@ -156,9 +159,12 @@ export function createReflection(
       const d = view.toSky(dir);
       return texture(reflection, equirectUV(normalize(vec3(d.x, max(d.y, 0), d.z)))).level(level(roughness)).rgb;
     },
-    /** The passes due this frame: all of them, one after another in one pass, every EVERY frames. */
-    update(): Compute[] {
-      return frame++ % EVERY === 0 ? [passes] : [];
+    /** The passes due this frame: all of them, one after another in one pass, every EVERY frames, and at once when the
+     *  clouds are left out or put back (clear: the sky alone, for an eye in space). */
+    update(clear: boolean): Compute[] {
+      if (clear !== wasClear) frame = 0;
+      wasClear = clear;
+      return frame++ % EVERY === 0 ? [clear ? passes.clear : passes.cloudy] : [];
     },
   };
 }

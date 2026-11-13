@@ -2,7 +2,8 @@
 // and C) up and down, shift to go faster. It flies over the planet: along the level at where it is, its up always
 // away from the planet's centre, its heading carried along with it. It stays above the water.
 
-import { Matrix4, Quaternion, Vector3, type Camera } from 'three/webgpu';
+import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
+import { AIR_FOV, type Eye } from './snapshot';
 import { add, along, cross, frameAt, fromLatLon, normalize, place, scale, transport } from './world/sphere';
 
 /** Metres a second; shift multiplies it. */
@@ -24,7 +25,7 @@ export interface Start {
   pitch: number;
 }
 
-export function createFly(camera: Camera, element: HTMLElement, start: Start) {
+export function createFly(element: HTMLElement, start: Start) {
   let at = fromLatLon(start.lat, start.lon);
   let height = Math.max(start.height, LOWEST);
   const f = frameAt(at);
@@ -47,10 +48,11 @@ export function createFly(camera: Camera, element: HTMLElement, start: Start) {
     pitch = Math.max(-1.55, Math.min(1.55, pitch - e.movementY * TURN));
   });
 
-  const basis = new Matrix4(), turn = new Quaternion(), x = new Vector3(), y = new Vector3(), z = new Vector3();
+  const basis = new Matrix4(), turn = new Quaternion(), orientation = new Quaternion(), x = new Vector3(), y = new Vector3(), z = new Vector3();
   const axis = new Vector3(1, 0, 0);
 
-  return (dt: number) => {
+  /** The eye after dt seconds of flying. */
+  return (dt: number): Eye => {
     const key = (plus: string[], minus: string[]) =>
       (plus.some((k) => held.has(k)) ? 1 : 0) - (minus.some((k) => held.has(k)) ? 1 : 0);
     const right = key(['KeyD', 'ArrowRight'], ['KeyA', 'ArrowLeft']), forward = key(['KeyW', 'ArrowUp'], ['KeyS', 'ArrowDown']);
@@ -69,9 +71,9 @@ export function createFly(camera: Camera, element: HTMLElement, start: Start) {
     }
 
     const up = normalize(at);
-    camera.position.set(...place(up, height));
     // the camera looks down its −z, its x to the right, y up; then pitched about its x
     basis.makeBasis(x.set(...cross(heading, up)), y.set(...up), z.set(...scale(heading, -1)));
-    camera.quaternion.setFromRotationMatrix(basis).multiply(turn.setFromAxisAngle(axis, pitch));
+    orientation.setFromRotationMatrix(basis).multiply(turn.setFromAxisAngle(axis, pitch));
+    return { kind: 'air', position: place(up, height), orientation: [orientation.x, orientation.y, orientation.z, orientation.w], fov: AIR_FOV };
   };
 }

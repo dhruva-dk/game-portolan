@@ -17,16 +17,16 @@
 // see the glide); spectate sinks her by the first other ship (?ships=n), won sinks every other by her.
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
-import type { Environment } from './environment';
+import type { Mesh } from 'three/webgpu';
 import { createFly } from './fly';
-import type { createFrame } from './frame';
-import type { Other } from './play/game';
-import { addProbe } from './probe';
+import type { Other } from './play/state';
+import { probeMeshes } from './probe';
+import type { Cap } from './sim/storm';
+import type { Sky } from './sky/sky';
+import type { ShipDraw, Snapshot } from './snapshot';
 import { SEED } from './world/planet';
 import { MEAN, SWING } from './world/weather';
 import { R, add, cross, dot, frameAt, along, normalize, scale, type Vec3 } from './world/sphere';
-
-type Frame = ReturnType<typeof createFrame>;
 
 /** Whether debugging is on: the dev server, or ?debug in the query. */
 export const DEBUG = import.meta.env.DEV || new URLSearchParams(location.search).has('debug');
@@ -57,6 +57,10 @@ export const switches = (() => {
     mark: params.get('mark')?.split(',').map(Number) as [number, number] | undefined,
     /** ?gun=0…4: every ship armed with a gun of that rarity (until there is loot to find one in). */
     gun: params.has('gun') ? number('gun', 0) : null,
+    /** ?lod=0…3: every ship drawn at that level of detail; ?cloth=0: every ship's canvas drawn as the wind fills it,
+     *  none simulated (ship/fleet.ts). */
+    lod: params.has('lod') ? number('lod', 0) : null,
+    cloth: params.get('cloth') !== '0',
   };
 })();
 
@@ -66,33 +70,42 @@ export function safeArea(layer: HTMLElement) {
   if (insets) ['top', 'right', 'bottom', 'left'].forEach((side, i) => layer.style.setProperty(`--safe-${side}`, `${insets[i] ?? 0}px`));
 }
 
-/** The debug camera, flown from over `start` (or ?lat/?lon), advancing the world's clock itself. */
-export function flyer(frame: Frame, element: HTMLElement, env: Environment, start: Vec3) {
-  const fly = createFly(frame.camera, element, {
-    lat: params.has('lat') ? number('lat', 0) * degrees : Math.asin(start[1]),
-    lon: params.has('lon') ? number('lon', 0) * degrees : Math.atan2(-start[2], start[0]),
-    height: number('alt', 10),
-    bearing: number('yaw', 0) * degrees,
-    pitch: number('look', -6) * degrees,
-  });
-  return (dt: number) => {
-    fly(dt);
-    env.clock += dt;
+/** Where the debug camera starts: over `start`, or ?lat/?lon. */
+const flyStart = (start: Vec3) => ({
+  lat: params.has('lat') ? number('lat', 0) * degrees : Math.asin(start[1]),
+  lon: params.has('lon') ? number('lon', 0) * degrees : Math.atan2(-start[2], start[0]),
+  height: number('alt', 10),
+  bearing: number('yaw', 0) * degrees,
+  pitch: number('look', -6) * degrees,
+});
+
+/** The debug camera, flown from over `start` (or ?lat/?lon), keeping the world's clock itself, over `others` lying
+ *  still (drawn as if making their way) and the storm as it stands by that clock. */
+export function flyer(element: HTMLElement, start: Vec3, others: readonly Other[], storm: (seconds: number) => Cap) {
+  const fly = createFly(element, flyStart(start));
+  const ships: ShipDraw[] = others.map((o, i) => ({
+    id: i, pose: { position: scale(o.at, R), forward: o.heading, up: o.at }, look: o.look, velocity: scale(o.heading, o.way), afloat: true,
+  }));
+  let clock = 0, eye = fly(0);
+  return {
+    step(dt: number) {
+      eye = fly(dt);
+      clock += dt;
+    },
+    snapshot: (): Snapshot => ({ eye, clock, storm: storm(clock), ships, own: null, balls: [], blasts: [] }),
   };
 }
 
 /**
  * SCAFFOLDING (ships demo, until ships are placed for real): ?ships=N sets N galleons on the sea ahead of `south`
  * (looking north) — 30, 60, 100, 150 m out and on past — on the mean sea, each on her own heading and in her own
- * colours. Sailing, they are the player's fleet-mates (play/game.ts), for her to ram: each makes ?way= m/s (0 by
- * default) on a straight course, her rudder amidships. Flying, they lie still, drawn as if making ?way=. ?lod=0…3
- * draws them all at one level of detail; ?heading=deg turns them all that much further (clockwise seen from above);
- * ?cloth=0 draws every ship's canvas as the wind fills it, simulating none.
+ * colours. Sailing, they are the player's fleet-mates (play/state.ts), for her to ram: each makes ?way= m/s (0 by
+ * default) on a straight course, her rudder amidships. Flying, they lie still, drawn as if making ?way= (flyer).
+ * ?heading=deg turns them all that much further (clockwise seen from above).
  */
-export function demoShips(frame: Frame, south: Vec3): Other[] {
+export function demoShips(south: Vec3): Other[] {
   const others: Other[] = [];
-  const flying = switches.flying;
-  const ships = Math.min(number('ships', 0), flying ? 32 : 31), { up, north } = frameAt(south);
+  const ships = Math.min(number('ships', 0), switches.flying ? 32 : 31), { up, north } = frameAt(south);
   const paints: Vec3[] = [[0.3, 0.03, 0.02], [0.03, 0.06, 0.2], [0.42, 0.28, 0.05], [0.03, 0.14, 0.06], [0.02, 0.02, 0.02]];
   const sails: Vec3[] = [[0.62, 0.57, 0.46], [0.7, 0.68, 0.6], [0.5, 0.38, 0.25]];
   for (let i = 0; i < ships; i++) {
@@ -102,13 +115,10 @@ export function demoShips(frame: Frame, south: Vec3): Other[] {
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
     others.push({ at: u, heading: forward, look: { paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1 }, way: number('way', 0) });
   }
-  if (flying) others.forEach((o, i) => frame.fleet.set(i, { position: scale(o.at, R), forward: o.heading, up: o.at }, o.look, scale(o.heading, o.way)));
-  if (params.has('lod')) frame.fleet.pin(number('lod', 0));
-  if (params.get('cloth') === '0') frame.fleet.simulate(false);
   return others;
 }
 
-/** ?probe's blocks and mirrors, ahead of where the camera starts. */
-export function probe(frame: Frame) {
-  if (switches.probe) addProbe(frame.scene, frame.sky.light, frame.camera.position);
+/** ?probe's blocks and mirrors, north of `start` (world metres), for the frame to stand in its scene; or none. */
+export function probe(start: Vec3): ((light: Sky) => Mesh[]) | undefined {
+  return switches.probe ? (light) => probeMeshes(light, start) : undefined;
 }

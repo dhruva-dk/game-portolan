@@ -1,6 +1,6 @@
 // The full map: the live planet itself, seen from space through a round window in a parchment sheet over the whole
 // screen, opened from the minimap (the old game's, screens/fullmap.ts and planet.ts there). The frame draws the world
-// from the eye this hands it (frame.ts, Orbit); this draws only the paper and what is inked over the window.
+// from the eye this hands it (snapshot.ts Eye, in space); this draws only the paper and what is inked over the window.
 //
 // The eye is on an orbit about the planet's centre, looking at it, north up; it opens over her ship. One finger spins
 // the planet and it runs on when let go; two pinch it, from the whole planet down to its coasts; a wheel does the
@@ -13,6 +13,7 @@
 // that matter: ships afloat and the Storm's clock.
 
 import type { Cap } from '../sim/storm';
+import { lookingAt, type Eye as Seen } from '../snapshot';
 import { R, cross, dot, normalize, scale, type Vec3 } from '../world/sphere';
 import type { Coast } from './coasts';
 import { GLYPHS, type Prim } from './glyphs';
@@ -312,7 +313,7 @@ export function createGlobe(coasts: readonly Coast[]) {
      * Each frame, with the Storm's safe cap now: while open, turns the planet on by its spin, inks the window over it
      * and returns the eye the frame is to draw the world from; shut, null.
      */
-    step(dt: number, cap: Cap): { eye: Vec3; up: Vec3; fov: number } | null {
+    step(dt: number, cap: Cap): Seen | null {
       if (!state) return null;
       const w = innerWidth, h = innerHeight;
       if (laid !== `${w}x${h}`) {
@@ -329,7 +330,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       d += (want - d) * (1 - Math.exp(-FLY * dt));
       const e = eyeFor(turn, d, w, h);
       ink(e, cap, w, h);
-      return { eye: e.at, up: e.up, fov: FOV };
+      return { kind: 'space', position: e.at, orientation: lookingAt(e.at, [0, 0, 0], e.up), fov: FOV };
     },
   };
 }
