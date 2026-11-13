@@ -1,7 +1,8 @@
 // What the galleon's body is made of, and how it takes the light: oiled timber on the hull and spars, a deck left bare
 // to weather, tarred wales, the captain's paint, gilded mouldings and black iron — each a glossy surface lit as
 // everything else is (sky/light.ts), its sheen the sun's highlight and the sky's reflection in a coat of oil or
-// paint (reflectance 0.04 face on, as any oil, varnish or paint), the gilding a metal.
+// paint (reflectance 0.04 face on, as any oil, varnish or paint), the gilding a metal. Over the timber, the spars and
+// the paint lies a coat of varnish: a second, smoother sheen on the hull's own curve, above the grain's.
 //
 // The planking: Poly Haven's Weathered Brown Planks (Dimitrios Savva, Rico Cilliers; CC0) — its colour scaled to the
 // hull's albedo, its roughness under the oil, its normal map for the grain and the seams, its occlusion in the seams.
@@ -23,10 +24,10 @@ import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 /** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to: oiled
  * oak, a deep saturated brown; the deck bleached by sun and salt; spars a shade lighter than the hull; timber blackened with pitch. */
 const PLANK_MEAN = [0.118, 0.073, 0.042], DECK_MEAN = [0.209, 0.132, 0.083];
-const HULL = [0.27, 0.14, 0.06], DECK = [0.36, 0.28, 0.2], SPAR = [0.28, 0.17, 0.09];
+const HULL = [0.34, 0.15, 0.05], DECK = [0.36, 0.28, 0.2], SPAR = [0.34, 0.18, 0.07];
 const DARK = [0.045, 0.032, 0.022], IRON = [0.03, 0.03, 0.03];
 /** How much further from grey oil takes the planks' colours. */
-const SOAKED = 1.6;
+const SOAKED = 2;
 /** Gold's reflectance face on (linear), dulled by the weather. */
 const GOLD = [0.7, 0.45, 0.15];
 /** Roughness: the oil fills the weathered grain to this share of the bare wood's; paint; pitch; the gilding; iron;
@@ -34,10 +35,16 @@ const GOLD = [0.7, 0.45, 0.15];
 const OILED = 0.4, PAINT = 0.38, PITCH = 0.45, GILT = 0.3, FORGED = 0.55, BARE = 0.8;
 /** The hull below and just above the waterline, wet: darker and greener, and smoother by this share. */
 const WET = [0.45, 0.5, 0.42], WET_SMOOTH = 0.5;
+/** The varnish's roughness, and how much of a coat each kind has: the planking and spars a full one, the paint and
+ *  the pitch less; the wet wood near the waterline half again as much. */
+const VARNISH = 0.16, COAT_PAINT = 0.8, COAT_PITCH = 0.5, COAT_WET = 1.5;
+/** The varnish's sheen, amber: the light it gives back has passed in and out of the coat's own warm tint (so the sky
+ *  in it warms rather than greys the timber). */
+const AMBER = [1, 0.78, 0.5];
 /** The planks' tile holds this many strakes; a plank runs this many tiles before it is butted to the next. */
 const STRAKES = 13, LENGTH = 2.5;
 /** How much one plank's timber differs from the next: in brightness, and between red and yellow. */
-const TIMBER = 0.36, HUE = 0.12;
+const TIMBER = 0.42, HUE = 0.16;
 /** How strongly the normal map tilts the planking (on the skin, the bulwarks, the transom and the paint over them;
  * not on the wales and spars, whose round sections would take its seams for ridges). */
 const RELIEF = 1;
@@ -104,7 +111,13 @@ export function createWood(light: Light) {
     const seams = select(planked, packed.r, float(1));
     const shade = ao.mul(seams);
     const lit = light.glossy(p, n, rough, f0);
+    // the varnish over the timber and the paint: a smooth coat on the hull's own curve, not the grain's, so the sun
+    // and the sky lie on it as long clean streaks; wetter, and so glossier, where the sea washes her
+    const coat = pick(KIND.planks, float(1), pick(KIND.paint, float(COAT_PAINT), pick(KIND.dark, float(COAT_PITCH),
+      pick(KIND.deck, float(0), pick(KIND.spar, float(1), float(0)))))).mul(mix(float(1), float(COAT_WET), wet));
+    const varnish = light.glossy(p, n0, mix(float(VARNISH), float(VARNISH * WET_SMOOTH), wet), vec3(0.04)).specular;
     // the rim lights the outline whatever the wood: on the dark planking as on the paint
-    return albedo.mul(lit.diffuse).add(lit.specular).add(light.rim(p, n0).mul(albedo.add(0.12))).mul(shade);
+    return albedo.mul(lit.diffuse).mul(float(1).sub(coat.mul(0.04))).add(lit.specular).add(varnish.mul(coat).mul(vec3(...AMBER)))
+      .add(light.rim(p, n0).mul(albedo.add(0.12))).mul(shade);
   };
 }
