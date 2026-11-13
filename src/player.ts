@@ -94,6 +94,14 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'gust' }
 );
 
+/** Metres over the sea a deed is placed, by its kind: a blow on a hull at her side, a gun at her muzzle, the rest at
+ *  the water. Where it is seen (play/moments.ts) and heard from (audio/audio.ts). */
+export const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
+
+/** The screens (ui/ways.ts, the ways between them): named here for the sound too, which hears which is shown. */
+export const SCREENS = ['title', 'lobby', 'rank', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
+export type Screen = (typeof SCREENS)[number];
+
 /** What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop and the sound each answer it: broke a
  *  shield, struck the hull, or struck a shield only. */
 export type Blow = 'broke' | 'hull' | 'shield';

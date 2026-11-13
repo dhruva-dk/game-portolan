@@ -13,8 +13,9 @@
 //   won       the camera circling her, the HUD gone; the beat done → result
 //   result    her result over the live world, one way on: LEAVE → lobby
 
-export const SCREENS = ['title', 'lobby', 'rank', 'settings', 'match', 'sinking', 'sunk', 'spectate', 'won', 'result'] as const;
-export type Screen = (typeof SCREENS)[number];
+import { SCREENS, type Screen } from '../player.ts';
+
+export { SCREENS, type Screen };
 export const isScreen = (s: string): s is Screen => (SCREENS as readonly string[]).includes(s);
 
 /** What moves a screen on: her taps, and the match's own course. */

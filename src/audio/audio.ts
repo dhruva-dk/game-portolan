@@ -18,10 +18,8 @@ import { db, rng } from './dsp.ts';
 import { createListen, type Call, type Hearing } from './listen.ts';
 import { createMixer } from './mixer.ts';
 import { close, hear, heard } from './space.ts';
-import type { Screen } from '../ui/ways.ts';
+import { LIFT, type Screen } from '../player.ts';
 
-/** Metres over the sea a deed is heard from: a gun at her muzzle, a blow on a hull at her side, the rest at the water. */
-const LIFT: Record<Happening['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
 /** Seconds of the bed's noise loop. */
 const LOOP = 6;
 

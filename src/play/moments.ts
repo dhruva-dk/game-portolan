@@ -10,7 +10,7 @@ import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
 import { isArms, rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import type { Eye } from '../snapshot.ts';
-import { HOTBAR, type Deed, type Moment } from '../player.ts';
+import { HOTBAR, LIFT, type Deed, type Moment } from '../player.ts';
 import { R, add, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
 import { onScreen } from './lens.ts';
@@ -65,9 +65,6 @@ export function deedsOf(done: Done, me: number, next: () => number, time: number
 /** The deeds kept at `time`: those of the last KEEP seconds, then `fresh`. */
 export const kept = (deeds: readonly Deed[], fresh: readonly Deed[], time: number): Deed[] =>
   fresh.length || deeds.some((d) => d.time <= time - KEEP) ? [...deeds.filter((d) => d.time > time - KEEP), ...fresh] : [...deeds];
-
-/** Metres over the sea a deed is seen at: a blow on a hull at her side, a gun at her muzzle, the rest at the water. */
-const LIFT: Record<Deed['kind'], number> = { fired: 3, winding: 3, reloading: 3, reloaded: 3, swapped: 3, fell: 0, struck: 2, sank: 2, took: 0.5, mended: 2, gust: 2 };
 
 /** The bearing of world point `p` (metres) from the way `eye` looks: radians clockwise, 0 ahead, ±π behind. */
 export function bearingFrom(eye: Eye, p: Vec3): number {

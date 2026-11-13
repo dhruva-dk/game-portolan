@@ -7,9 +7,8 @@
 // Pure: plain data in, cues and the bed out; what it keeps between frames is its own. The coast is found by sounding the
 // ground in a ring round her, a few points a frame.
 
-import { HOTBAR, type GunKind, type Kit, type Status } from '../player.ts';
+import { HOTBAR, type GunKind, type Kit, type Screen, type Status } from '../player.ts';
 import type { ShipDraw, Snapshot } from '../snapshot.ts';
-import type { Screen } from '../ui/ways.ts';
 import { R, type Vec3 } from '../world/sphere.ts';
 import type { Cue } from './cues.ts';
 
@@ -36,8 +35,9 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number; gun?: GunKind }
  */
 export interface Bed { speed: number; wind: number; heave: number; roll: number; coast: number; wall: number; hull: number; presence: number; muffle: number; clock: number }
 
-/** Her top speed, m/s (sim/handling.ts SHIP). */
-const TOP = 13.5;
+/** Her top speed, m/s: sim/handling.ts SHIP.top, which the sound may not import (tests/audio.test.ts holds them
+ *  equal). */
+export const TOP = 13.5;
 /** The ring the coast is sounded on: metres out, and how many ways round. */
 const RING = [25, 60, 110, 200] as const, WAYS = 8;
 /** A ball passing within this many metres of the eye is heard, its whistle at its closest WHISTLE s into it; one
@@ -132,7 +132,7 @@ export function createListen(ground: (p: Vec3) => number) {
         if (!fresh && !open && trail && !claimed && own) call('enter');
         trail = open;
       }
-      if (s.closing && !closing && IN_MATCH(shown)) call('closing');
+      if (s.closing && !closing && FOUGHT(shown)) call('closing');
       closing = s.closing;
 
       // a ball passing near the eye: its whistle begun WHISTLE s before its closest
@@ -184,5 +184,6 @@ export function createListen(ground: (p: Vec3) => number) {
   };
 }
 
-/** The screens over a match under way (ui/ways.ts IN_MATCH), where the storm is heard closing. */
-const IN_MATCH = (s: Screen) => s === 'match' || s === 'spectate' || s === 'sinking' || s === 'sunk';
+/** The screens where the storm is heard closing: a match still being fought. Not ui/ways.ts IN_MATCH, which holds
+ *  won and result too: once the match is won or over its storm is no news. */
+const FOUGHT = (s: Screen) => s === 'match' || s === 'spectate' || s === 'sinking' || s === 'sunk';

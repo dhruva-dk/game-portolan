@@ -68,7 +68,7 @@ const STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.
 const TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
 /** Its trail (0117's smoke ribbon): its puffs' growth (m/s), life (s), ink and opacity. */
 const TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
-/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS), the fewest pixels its line is wide, and its
+/** A fall mark: its radius (the mortar's splash, sim/handling.ts GUNS; tests/guns.test.ts holds them equal), the fewest pixels its line is wide, and its
  *  glow (radiance per unit sun). */
 const MARK = 11, MARK_PIXELS = 2, MARK_GLOW: Vec3 = [3.2, 0.9, 0.35];
 /** Seconds of a shell's flight its mark counts down over (about its longest lob). */

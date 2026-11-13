@@ -4,6 +4,7 @@
 // gunner.test.ts.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { battleOf, crewOf, stepBattle, type Battle, type Cue, type Crew, type Order } from '../src/sim/battle.ts';
 import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
@@ -107,6 +108,11 @@ test('a ball\'s bite holds to 60% of its range, then falls to half at full range
     assert.ok(Math.abs(falloff(k, 2 * r) - FALLOFF.floor) < 1e-9, 'never less');
   }
   for (const k of ['harpoon', 'mortar'] as const) assert.equal(falloff(k, GUNS[k].range), 1);
+});
+
+test('a mortar\'s fall mark is drawn its splash\'s size (gunfire.ts MARK, which may not import the sim)', () => {
+  const text = readFileSync(new URL('../src/gunfire/gunfire.ts', import.meta.url), 'utf8');
+  assert.equal(Number(/\bMARK = (\d+(?:\.\d+)?)/.exec(text)?.[1]), GUNS.mortar.splash);
 });
 
 test('a mortar\'s shell bursts over its splash: the ship struck takes all of it, one beside her less, the shooter none', () => {

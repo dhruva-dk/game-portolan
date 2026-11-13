@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NAMES, SOUNDS } from '../src/audio/bank.ts';
 import { CUES, CUE_NAMES, DEEDS, cueOf, soundOf, type Happening } from '../src/audio/cues.ts';
-import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
+import { TOP, createListen, type Call, type Hearing } from '../src/audio/listen.ts';
+import { SHIP } from '../src/sim/handling.ts';
 import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
 import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
@@ -26,6 +27,8 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] => DEEDS.map((
     case 'gust': return { ...base, kind };
   }
 });
+
+test('the bed hears her speed as a share of her top: the sim\'s', () => assert.equal(TOP, SHIP.top));
 
 test('the table: every kind of deed, hers, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
   for (const h of each(0)) assert.ok(cueOf(h, 0), `her ${h.kind} has a cue`);

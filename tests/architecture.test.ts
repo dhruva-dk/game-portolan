@@ -62,8 +62,8 @@ const LAYERS: Record<string, readonly string[]> = {
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
   'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts', 'kinds.ts'],
-  // the sound: hears what the frame draws and the HUD reads, and the screen shown (of the UI only its screens' names)
-  'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'ui/ways.ts', 'kinds.ts'],
+  // the sound: hears what the frame draws and the HUD reads, and the screen shown (player.ts Screen)
+  'audio/': ['audio/', 'world/', 'snapshot.ts', 'player.ts', 'kinds.ts'],
   // the game runs the sim and says what to draw and show, as plain data
   'play/': ['play/', 'sim/', 'world/', ...NEUTRAL],
   // what draws the world; each sideways import named
