@@ -72,8 +72,8 @@ const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT
  * than blue (HAZE_SPECTRUM). Its glow is the horizon's (tinted HAZE_TINT) and the sun's light scattered forward
  * (HAZE_SUN of it, Henyey-Greenstein HAZE_G). An eye higher than HAZE_ABOVE (from, to) metres leaves it below.
  */
-const HAZE_DEPTH = 0.7, HAZE_DISTANCE = 150, HAZE_SHAPE = 2.6, HAZE_HEIGHT = 8, HAZE_BAND = 0.06, REFERENCE_EYE = 20;
-const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1, 0.9, 0.78] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
+const HAZE_DEPTH = 0.6, HAZE_DISTANCE = 150, HAZE_SHAPE = 3.2, HAZE_HEIGHT = 8, HAZE_BAND = 0.06, REFERENCE_EYE = 20;
+const HAZE_SPECTRUM = [0.85, 1, 1.12] as const, HAZE_TINT = [1.08, 0.9, 0.7] as const, HAZE_SUN = 0.22, HAZE_G = 0.72;
 const HAZE_ABOVE = [80, 300] as const;
 /** Past this many metres a ray has met nothing: the frame hands the sky's pixels this far or further. */
 export const SKY_METRES = 1e4;

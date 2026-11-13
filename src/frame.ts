@@ -69,10 +69,15 @@ export interface FrameOptions {
  *   2. scene    — sky backdrop; then the solid things (the sea floor, the islands, the ships, the balls in flight);
  *                 then the sea, which reads what was drawn before it behind itself (the floor through the water); then
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
- *   3. post     — haze by distance, clouds over whatever they stand in front of, the storm's rain and cloud over
- *                 all of it (sky/storm.ts: no march, the ray against its cone), tone mapping; then FXAA, on the
- *                 tone-mapped image (its edge test wants the screen's values), for the edges of the sea's crests and
- *                 the islands against the sky
+ *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
+ *                 storm's rain and cloud over all of it (sky/storm.ts: no march, the ray against its cone), drawn
+ *                 once to a full-size texture of light; then, at the phone's 956×440:
+ *        bloom        7 passes, the largest a quarter size (239×110), 4–5 taps each: ~0.2 M taps (post/bloom.ts)
+ *        shafts       3 passes at a quarter size, 2 + 16 + 16 taps: ~0.9 M taps (post/shafts.ts)
+ *        grade        exposure, vignette, AgX, two reads of 33³ looks (the day's, the storm's), sRGB; grain and dither
+ *                     (post/grade.ts, post/film.ts) — one full-size pass with the bloom's and shafts' reads
+ *        FXAA         on the graded image (its edge test wants the screen's values), for the edges of the sea's
+ *                     crests and the islands against the sky
  * Each frame every system first does its CPU work, in the order one reads another, and says what of its GPU work is
  * due (gpu.ts); then the frame runs it. Systems hand this file meshes, shader nodes, kernels and offscreen draws; they
  * never hold the renderer. The renderer's settings are all here too.
