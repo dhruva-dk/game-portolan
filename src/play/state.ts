@@ -228,11 +228,12 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   };
 
   /** Who holds the sea after the step (each trail laid, each loop closed), and in her own water her shield coming
-   *  back. */
-  const hold = (from: ReadonlyMap<number, Vec3>, storm: Storm): Stepped => {
+   *  back: of the ships still afloat, those sunk in the step (`lost`) laying, closing and cutting nothing in it. */
+  const hold = (from: ReadonlyMap<number, Vec3>, storm: Storm, lost: readonly number[]): Stepped => {
     if (!territory) return { held: null, regained: [] };
-    const held = territory.step(fleet.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
-    const back = regain(battle.crews, fleet, territory, STEP);
+    const sailing = lost.length ? fleet.filter((v) => !lost.includes(v.id)) : fleet;
+    const held = territory.step(sailing.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
+    const back = regain(battle.crews, sailing, territory, STEP);
     battle = { ...battle, crews: back.crews };
     return { held, regained: back.regained };
   };
@@ -279,7 +280,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       const { wants, met, from } = sail(helms, asks);
       const { fought, lost } = fight(orders, met, storm, wants);
       tick++;
-      const did = hold(from, storm);
+      const did = hold(from, storm, lost);
       rideOn(met, wants.blew);
       keep(fought);
       founderAll(lost, fought);
