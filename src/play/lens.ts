@@ -4,15 +4,21 @@
 import type { Eye } from '../snapshot';
 import { R, add, dot, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
-import type { Point } from './aim';
+
+/** A point on the screen, CSS px from its top left. */
+export interface Point { x: number; y: number }
 
 /** Where a point on the sea (a unit vector), or `up` metres over it, falls through `eye` in a view `width` × `height`
- *  px; null behind the eye or past the sea's horizon from it. */
+ *  px; null behind the eye or hidden from it by the sea's curve. */
 export function onScreen(eye: Eye, p: Vec3, width: number, height: number, up = 0): Point | null {
-  if (dot(eye.position, p) <= R) return null;
+  const d = add(scale(p, R + up), eye.position, -1);
+  // where the line from the eye to it comes nearest the planet's centre: if that is between them and under the sea,
+  // the sea hides it
+  const t = -dot(eye.position, d) / dot(d, d), near = add(eye.position, d, t);
+  if (t > 0 && t < 1 && dot(near, near) < R * R) return null;
   // in the eye's own frame (it looks down its −z), then through its lens
-  const [vx, vy, vz] = rotate(add(scale(p, R + up), eye.position, -1), inverse(eye.orientation));
+  const [vx, vy, vz] = rotate(d, inverse(eye.orientation));
   if (vz >= 0) return null;
-  const t = Math.tan((eye.fov * Math.PI) / 360), x = vx / -vz / (t * (width / height)), y = vy / -vz / t;
+  const k = Math.tan((eye.fov * Math.PI) / 360), x = vx / -vz / (k * (width / height)), y = vy / -vz / k;
   return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
 }

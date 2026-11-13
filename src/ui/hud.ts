@@ -7,8 +7,10 @@
 //               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
 //               above it, with a pip for each charge, the next filling as it comes back, faint with none, gilt
 //               while one blows
-//   reticle     the old game's, four arms round a gap, gilt and drawn in while the aim assist has a ship
-//               (sim/gun.ts), where her aim falls, kept off her own ship (play/aim.ts); none with no gun
+//   reticle     the old game's, four arms round a gap, fixed in the middle of the screen where her gun is aimed
+//               (play/chase.ts); gilt and drawn in while the aim assist has a ship (sim/gun.ts), faint when the ball
+//               falls short of what it is on; a small ring where the ball will come down, if clear of it; none with
+//               no gun
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot (its rarity's ink under it), then
 //               three of stores; the one in hand gilt, a gold ring running round it while it is used, and a gold
 //               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
@@ -39,8 +41,9 @@ const MINIMAP = 132;
 /** Fire's radius, px, and its centre from the safe area's right and bottom edges; Gust's centre from Fire's (the old
  * game's, chart/layout.ts: 802, 317 on the phone's 956 × 440). */
 const FIRE = 40, FIRE_RIGHT = 92, FIRE_BOTTOM = 102, GUST_RIGHT = 6, GUST_UP = 86;
-/** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship. */
-const RETICLE = 10, LOCKED = 0.75;
+/** The reticle's radius, px (the old game's), and drawn in to this share of it with the assist on a ship; the radius
+ *  of the ring where the ball will come down. */
+const RETICLE = 10, LOCKED = 0.75, FALL = 4;
 /** The rim's wash outside the calm: its least and most strength, and the metres out it deepens over (0117's 0.35 +
  *  0.65 × how deep). */
 const RIM = [0.35, 1] as const, RIM_DEEP = 80;
@@ -66,11 +69,6 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
   const vitals = piece(body, 'top left');
   const readings = piece(body, 'top centre');
-  /** How far down the screen the slips at its top centre reach, px (the reticle is kept below: play/game.ts status). */
-  let top = 0;
-  const measure = () => (top = readings.getBoundingClientRect().bottom);
-  new ResizeObserver(measure).observe(readings);
-  addEventListener('resize', measure);
   const map = piece(body, 'top right', true);
   // (each piece stands 4 px in from the safe area's edge: ui.ts)
   const gust = piece(body, 'right bottom', true);
@@ -79,6 +77,8 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   fire.style.cssText = `margin:0 ${FIRE_RIGHT - FIRE - 6}px ${FIRE_BOTTOM - FIRE - 6}px 0;width:${2 * FIRE + 4}px;height:${2 * FIRE + 4}px`;
   const reticle = piece(body, '');
   reticle.style.cssText = `left:50%;top:50%;transform:translate(-50%,-50%)`;
+  const fall = piece(body, '');
+  fall.style.transform = 'translate(-50%,-50%)';
   // the rim's wash outside the calm, under everything else
   const rim = document.createElement('div');
   rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 24px rgba(184,48,26,.75);opacity:0`;
@@ -121,10 +121,9 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
   return {
     root,
-    top: () => top,
     watch(on: boolean) {
       watching = on;
-      for (const el of [vitals, gust, fire, reticle, hotbar, rim]) el.style.display = on ? 'none' : '';
+      for (const el of [vitals, gust, fire, reticle, fall, hotbar, rim]) el.style.display = on ? 'none' : '';
       map.classList.toggle('press', !on);
     },
     /** A frame: the match as reported, and who holds the sea (and her id in it) as the frame draws it. */
@@ -164,18 +163,24 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         + (loaded < 0 ? `<path d="M${c - 24} ${c + 24}L${c + 24} ${c - 24}" stroke="${INK.rubric}" stroke-width="3" stroke-linecap="round"/>` : '')
         + (loaded >= 0 && loaded < 48 ? sweep(c, c, FIRE - 1, loaded / 48, INK.rubric, 3.5) : '') + '</g>'));
 
-      // the reticle: iron under lead white, or gilt while the assist has a ship; where her aim falls
-      const lock = s.gun && s.reticle ? (s.gun.locked ? 'locked' : 'free') : 'none';
-      if (s.reticle) {
-        reticle.style.left = `${s.reticle.x.toFixed(1)}px`;
-        reticle.style.top = `${s.reticle.y.toFixed(1)}px`;
-      }
+      // the reticle, in the middle where the gun is aimed: iron under lead white, or gilt while the assist has a ship,
+      // faint when the ball falls short of what it is on; and where the ball will come down, a small ring, if that is
+      // clear of it
+      const lock = s.gun && s.reticle ? (s.gun.locked ? 'locked' : s.reticle.reach ? 'free' : 'short') : 'none';
       draw(reticle, lock, () => {
         if (lock === 'none') return '';
         const h = RETICLE + 3, r = lock === 'locked' ? RETICLE * LOCKED : RETICLE, gap = r * 0.32;
         const arms = `M${h - r} ${h}H${h - gap}M${h + gap} ${h}H${h + r}M${h} ${h - r}V${h - gap}M${h} ${h + gap}V${h + r}`;
-        return svg(2 * h, 2 * h, `<path d="${arms}" stroke="${INK.iron}" stroke-width="2.6" opacity=".6" transform="translate(.6 .8)"/>`
-          + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/>`);
+        return svg(2 * h, 2 * h, `<g opacity="${lock === 'short' ? 0.45 : 1}"><path d="${arms}" stroke="${INK.iron}" stroke-width="2.6" opacity=".6" transform="translate(.6 .8)"/>`
+          + `<path d="${arms}" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.6" opacity=".92"/></g>`);
+      });
+      const f = s.reticle?.fall, away = f ? Math.hypot(f.x - body.clientWidth / 2, f.y - body.clientHeight / 2) > RETICLE * 1.5 : false;
+      if (f && away) [fall.style.left, fall.style.top] = [`${f.x.toFixed(1)}px`, `${f.y.toFixed(1)}px`];
+      draw(fall, away ? lock : 'none', () => {
+        if (!away || lock === 'none') return '';
+        const h = FALL + 3;
+        return svg(2 * h, 2 * h, `<circle cx="${h}" cy="${h}" r="${FALL}" fill="none" stroke="${INK.iron}" stroke-width="2.4" opacity=".6" transform="translate(.6 .8)"/>`
+          + `<circle cx="${h}" cy="${h}" r="${FALL}" fill="none" stroke="${lock === 'locked' ? INK.gold : INK.white}" stroke-width="1.4" opacity=".92"/>`);
       });
 
       // the gun's slot holds her gun, if she has one, its rarity's ink under it; then her items. The one being used

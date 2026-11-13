@@ -29,6 +29,9 @@ export const SHIP = {
   draught: 2.2,
   length: 26,
   beam: 6.5,
+  /** Her rig's top over the water, metres: the mainmast's truck (src/ship/lines.ts MASTS at 0.6). A line of sight
+   *  through her canvas is on her (sight.ts). */
+  rig: 21.5,
 } as const;
 
 /**
@@ -112,7 +115,7 @@ export const GUST = {
  * 14.5, so 136 at 12) and its 200 m reach kept, on the same 554 m planet. The balls fly true orbits round the
  * planet's centre, under a pull chosen so that 136 m/s carries a ball no further than `range` at its best elevation
  * (shot.ts MU): some 11 g at the sea, for this tiny world; a flat shot's ball would otherwise go round it.
- * Rarity is 0117's five tiers: it mostly closes up the spread and widens the assist; damage and reload ease a little.
+ * Rarity is 0117's five tiers: damage and reload ease, the spread closes up a little and the assist widens.
  */
 export const GUN = {
   /** The tiers, worst to best (0117's). */
@@ -126,12 +129,16 @@ export const GUN = {
   reload: 2,
   damageBy: [1, 1.08, 1.16, 1.24, 1.32],
   reloadBy: [1, 0.95, 0.9, 0.85, 0.8],
-  /** The spread: each ball goes off within this cone (half-angle, radians) of where it is laid; about 7 m off at
-   * 150 m for a common gun and 2 m for a legendary one. New: 0117 laid its guns on the touched point, 0.008 rad. */
-  spread: [0.05, 0.038, 0.028, 0.02, 0.014],
-  /** The assist: the ship nearest the bearing she is aimed on, within this cone (half-angle, radians) of it and in
-   * range, is laid on, led for her course. New: 0117 had none, but aimed at a touched point. */
-  assist: [0.2, 0.25, 0.3, 0.36, 0.42],
+  /** The spread: each ball goes off within this cone (half-angle, radians) of where it is laid: across, 4.5 m off at
+   * 150 m at most for a common gun; along, it changes the ball's carry most, up to 10 m at 100 m. Laid on a ship
+   * crossing at her top speed (tests/gunnery.test.ts), a common gun strikes some 19 balls in 20 at 100–150 m, a
+   * legendary every one. (It was 0.05 for a common gun, 2 in 3 at 100–150 m.) 0117 laid its guns on the touched
+   * point, 0.008 rad. */
+  spread: [0.03, 0.026, 0.022, 0.018, 0.014],
+  /** The assist: the ship whose body (sight.ts) stands nearest the line of sight she is aimed along, within this cone
+   * (half-angle, radians, seen from the eye) and in range, is laid on, led for her course: 3.4° for a common gun, some
+   * 30 px about her on the phone. New: 0117 had none, but aimed at a touched point. */
+  assist: [0.06, 0.07, 0.08, 0.09, 0.1],
   /** In choosing among those in the cone, the share of range that counts as much as the cone's whole width. */
   nearer: 0.5,
   /** The muzzle, metres ahead of amidships and above the waterline: the gun on its plinth, whose top is 2.97 m ahead and

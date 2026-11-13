@@ -31,8 +31,8 @@
 // At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
 // a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
 // drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
-// of her, 25 m out to 420 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
-// stays where it is put); ?slow=k runs the game at k of its speed (for catching a ball in flight).
+// of her, 25 m out to 420 m; ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
+// seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
 // her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
 // middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?map opens
@@ -142,22 +142,20 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
   safeArea(uiLayer());
   open(p, demoShips(s.start.at, room - 1));
   const paused = params.has('pause'), slow = number('slow', 1);
-  // ?swing: a finger held on the look after each frame, so it never eases back
+  // ?use: the slot tapped twice (chosen, then used); ?gust and ?fire pressed; ?swing's drag; so many seconds in
   const swing = params.get('swing')?.split(',').map(Number);
-  if (swing) p.game.step(0, { ...IDLE, look: { x: swing[0] || 0, y: swing[1] || 0, held: true } });
-  // ?use: the slot tapped twice (chosen, then used); ?gust and ?fire pressed; so many seconds in
   const [slot, use] = (params.get('use') ?? '').split(',').map(Number);
   const timed: { at: number; hands: Partial<Hands> }[] = [
     ...(slot > 0 ? [{ at: use || 0, hands: { tap: slot } }, { at: use || 0, hands: { tap: slot } }] : []),
     ...(params.has('gust') ? [{ at: number('gust', 0), hands: { gust: true } }] : []),
     ...(params.get('fire') ? [{ at: number('fire', 0), hands: { fire: true } }] : []),
+    ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
   let drawn = 0;
   return s.draw((real) => {
     const dt = paused ? 0 : real * slow, frame = p.next(dt);
     for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
     drawn += dt;
-    if (swing) p.game.step(0, { ...IDLE, look: { x: 0, y: 0, held: true } });
     return frame;
   }, p.drawn);
 }

@@ -142,8 +142,12 @@ test('a green bot\'s balls spread wider than a sharp one\'s, and hit less', () =
   };
   const green = by((k) => k < 0.5), sharp = by((k) => k > 0.8);
   assert.ok(spreadBy(temper(green[0]).skill) > 2 * spreadBy(1) && spreadBy(1) === 1);
-  const hits = (seeds: number[]) => seeds.reduce((n, seed) => n + battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 40, { course: null, throttle: 0.4 }).strikes, 0);
-  const g = hits(green), s = hits(sharp);
-  console.log(`# hits in 40 s on a steady ship: green ${g}, sharp ${s}`);
-  assert.ok(g < s, `green ${g}, sharp ${s}`);
+  // the share of her balls that strike home in her first 15 s on him (before either could sink him)
+  const share = (seeds: number[]) => {
+    const rs = seeds.map((seed) => battle([placed(0, 0, 0, 90 * deg), placed(1, 0, 150, 0)], [seed, null], [0, null], 15, { course: null, throttle: 0.4 }));
+    return rs.reduce((n, r) => n + r.strikes, 0) / Math.max(1, rs.reduce((n, r) => n + r.fired.length, 0));
+  };
+  const g = share(green), s = share(sharp);
+  console.log(`# balls striking a steady ship 150 m off in 15 s: green ${(100 * g).toFixed(0)}%, sharp ${(100 * s).toFixed(0)}%`);
+  assert.ok(g < s - 0.15, `green ${g}, sharp ${s}`);
 });

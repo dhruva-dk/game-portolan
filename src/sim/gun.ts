@@ -1,13 +1,17 @@
 // Her gun: one at most, on the plinth in her waist, firing one ball at a time, then reloading. A ship puts to sea
-// without one.
+// without one. It turns on its plinth all the way round: it fires on any bearing, whatever her heading.
 //
-// Laying it is made easy for a thumb. She is aimed roughly, on a bearing; of the ships within range and within the
-// assist cone of that bearing, the gun takes the one nearest the bearing (the nearer of two counting a little), and
+// It is aimed along a line of sight (sight.ts): the player's camera, through the middle of the screen, or a bot's eye
+// aloft. Laying it is made easy for a thumb: of the ships within range whose body stands within the assist cone of
+// that line (seen from the eye), the gun takes the one nearest the line (the nearer of two counting a little), and
 // leads her: where she will be when the ball comes down, sailing on as she sails now, the ball's flight being had in
-// closed form (shot.ts), and that found again from there until it settles. It is laid at the low elevation that
-// carries a ball there. With no ship in the cone it is laid along the bearing at its full range. Then the ball goes
-// off somewhere within the spread cone of where it was laid, drawn from the gun's own seeded numbers: the same seed
-// and the same shot give the same ball, every time. Rarity mostly closes up the spread and widens the cone.
+// closed form (shot.ts), and that found again from there until it settles. A ship behind the land the line meets is
+// not taken. With no ship in the cone it is laid on the point the line meets the sea or the land, or at full range on
+// that bearing if the point is out of range or the line meets neither (over the horizon, into the sky). Either way it
+// is laid at the low elevation that carries a ball there: the ball comes down through what the line looks at.
+// Then the ball goes off somewhere within the spread cone of where it was laid, drawn from the gun's own seeded
+// numbers: the same seed and the same shot give the same ball, every time. Rarity closes up the spread a little and
+// widens the cone.
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
@@ -15,8 +19,9 @@ import { random } from '../world/random.ts';
 import { R, add, along, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import type { Vessel } from './contact.ts';
 import { GUN } from './handling.ts';
-import { hullAt } from './shoal.ts';
+import { hullAt, type Depth } from './shoal.ts';
 import { elevationFor, flightTime } from './shot.ts';
+import { meets, offSight, pointOn, type Sight } from './sight.ts';
 
 /** A gun: its rarity (0, common, to 4, legendary; GUN.rarities), seconds till it is loaded, and balls fired so far. */
 export interface Gun {
@@ -28,12 +33,15 @@ export interface Gun {
 /** A gun as it is found: loaded. */
 export const gunOf = (rarity: number): Gun => ({ rarity: Math.max(0, Math.min(GUN.rarities.length - 1, Math.round(rarity))), loading: 0, fired: 0 });
 
-/** How a gun is laid: the muzzle's place (metres, from the centre), the way the ball goes off (a unit vector), and
- * the ship it is laid on, if any. */
+/** How a gun is laid: the muzzle's place (metres, from the centre), the way the ball goes off (a unit vector), the
+ * ship it is laid on, if any, where it is laid to come down (a unit vector; at the muzzle's height there), and whether
+ * that is what the sight is on (false: past range, or the sight meets nothing). */
 export interface Laying {
   from: Vec3;
   dir: Vec3;
   target: number | null;
+  fall: Vec3;
+  reached: boolean;
 }
 
 /** The muzzle's place on a ship (metres, from the centre). */
@@ -57,17 +65,18 @@ export function ahead(v: Vessel, seconds: number): Vec3 {
   return speed > 1e-9 ? along(v.ship.at, scale(w, 1 / speed), speed * seconds).p : v.ship.at;
 }
 
-/** The ship in the assist cone of `bearing` from `from` (the muzzle), and in range: the one nearest the bearing, the
- * nearer counting by GUN.nearer; null if none. */
-export function chosen(from: Vec3, bearing: Vec3, cone: number, others: readonly Vessel[]): Vessel | null {
+/** The ship whose body stands within `cone` radians of `sight` and in range of the muzzle at `from`, and nearer along
+ * the sight than `hidden` metres (the land it meets): the one nearest the line, the nearer counting by GUN.nearer;
+ * null if none. */
+export function chosen(sight: Sight, from: Vec3, cone: number, others: readonly Vessel[], hidden = Infinity): Vessel | null {
   const up = normalize(from);
   let best: Vessel | null = null, score = Infinity;
   for (const o of [...others].sort((a, b) => a.id - b.id)) {
-    const metres = distance(up, o.ship.at), t = toward(up, o.ship.at);
-    if (metres > GUN.range || !t) continue;
-    const angle = Math.acos(Math.max(-1, Math.min(1, dot(t, bearing))));
-    if (angle > cone) continue;
-    const s = angle / cone + (GUN.nearer * metres) / GUN.range;
+    const metres = distance(up, o.ship.at);
+    if (metres > GUN.range) continue;
+    const seen = offSight(sight, o.ship);
+    if (!seen || seen.angle > cone || seen.along > hidden) continue;
+    const s = seen.angle / cone + (GUN.nearer * metres) / GUN.range;
     if (s < score) [best, score] = [o, s];
   }
   return best;
@@ -86,22 +95,30 @@ export function lead(from: Vec3, target: Vessel): Vec3 | null {
   return elevationFor(distance(up, at)) === null ? null : at;
 }
 
+/** How far along a sight that meets nothing its point is taken, metres: past any range. */
+const BEYOND = 1000;
+
 /**
- * How `gun` aboard `shooter` is laid, aimed on `bearing` (any vector; its part along the surface counts), among
- * `others` (the ships it may be laid on, not sunk), with its balls spread over `spread` radians (half-angle) by the
- * gun's seeded numbers from `seed`. Without a bearing along the surface, along her heading.
+ * How `gun` aboard `shooter` is laid, aimed along `sight`, among `others` (the ships it may be laid on, not sunk), over
+ * water `depth` deep, with its balls spread over `spread` radians (half-angle) by the gun's seeded numbers from `seed`.
+ * With no sight, along her heading at full range.
  */
-export function laid(shooter: Vessel, gun: Gun, bearing: Vec3, others: readonly Vessel[], seed: number, spread: number = GUN.spread[gun.rarity]): Laying {
+export function laid(shooter: Vessel, gun: Gun, sight: Sight | null, others: readonly Vessel[], seed: number, depth: Depth, spread: number = GUN.spread[gun.rarity]): Laying {
   const from = muzzle(shooter), up = normalize(from);
-  const b = toward(up, bearing) ?? toward(up, shooter.ship.heading)!;
-  const mark = chosen(from, b, GUN.assist[gun.rarity], others.filter((o) => o.id !== shooter.id));
+  const s = sight ?? { from, dir: shooter.ship.heading };
+  const meet = meets(s, depth), land = meet !== null && length(pointOn(s, meet)) - R > 0.01;
+  const mark = chosen(s, from, GUN.assist[gun.rarity], others.filter((o) => o.id !== shooter.id), land ? meet! : Infinity);
   const at = mark && lead(from, mark);
-  const t = (at && toward(up, at)) ?? b;
-  const dir = off(up, t, at ? elevationFor(distance(up, at))! : elevationFor(GUN.range)!);
+  // with no ship: the point the sight meets, or one far along it
+  const point = at ?? normalize(pointOn(s, meet ?? BEYOND));
+  const t = toward(up, point) ?? toward(up, s.dir) ?? shooter.ship.heading;
+  const metres = Math.min(distance(up, point), GUN.range), reached = !!at || (meet !== null && distance(up, point) <= GUN.range);
+  const fall = along(up, t, metres).p;
+  const dir = off(up, t, elevationFor(metres)!);
   // the spread: a point in the disc of the cone, uniform over it
   const draw = random((seed ^ Math.imul(shooter.id + 1, 0x9e3779b1) ^ Math.imul(gun.fired + 1, 0x85ebca77)) >>> 0);
   const r = spread * Math.sqrt(draw()), a = 2 * Math.PI * draw();
   const side = normalize(cross(up, t)), lift = cross(dir, side);
   const spreadDir = normalize(add(add(dir, side, r * Math.cos(a)), lift, r * Math.sin(a)));
-  return { from, dir: spreadDir, target: at && mark ? mark.id : null };
+  return { from, dir: spreadDir, target: at && mark ? mark.id : null, fall, reached };
 }

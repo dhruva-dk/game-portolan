@@ -6,17 +6,19 @@
 //
 // She lays her gun on where her foe will be when the ball comes down, with a wandering error that a sharp captain
 // keeps to a sixth of a green one's, and fires when her foe is in range, past the moment's surprise of first seeing
-// her, and in a burst, not in the pause between two. The gun's aim assist (gun.ts) takes what she lays on as a player's
-// thumb, so her error mostly shows past the edge of its cone; and her hand is unsteadier than she thinks, a green
-// captain's balls spreading wider than a sharp one's (0117's combat.ts fire).
+// her, and in a burst, not in the pause between two. She sights it from aloft (her eye `aloft` m up her mast) on the
+// sea at that mark, and the gun's aim assist (gun.ts) takes her line of sight as it takes a player's, so her error
+// mostly shows past the edge of its cone; and her hand is unsteadier than she thinks, a green captain's balls
+// spreading wider than a sharp one's (0117's combat.ts fire).
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
-import { R, add, along, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
+import { R, add, along, cross, distance, dot, length, normalize, place, scale, type Vec3 } from '../world/sphere.ts';
 import type { Order } from './battle.ts';
 import { GUN } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import { flightTime, elevationFor } from './shot.ts';
+import type { Sight } from './sight.ts';
 
 /** Everything a bot's gunnery is tuned by: 0117's (BRAIN), seconds and metres. */
 export const GUNNER = {
@@ -33,8 +35,11 @@ export const GUNNER = {
   /** She fires within this share of the gun's range, in bursts of `burst` s with pauses of `pause` s. */
   reach: 0.95, burst: [1.5, 4] as const, pause: [0.8, 2.2] as const,
   /** Her hand is less steady than she thinks (0117's combat.ts fire): her balls spread 1 + `unsteady` × (1 − skill)
-   *  times the gun's own. */
-  unsteady: 2.5,
+   *  times the gun's own. (2.5 when a common gun spread 0.05; with it 0.03, 4.5 keeps the bots' balls striking home
+   *  as often over a match, some 85 in 100, tools/matches.ts.) */
+  unsteady: 4.5,
+  /** Her eye aloft, metres over the sea, from which she sights the gun on her mark. */
+  aloft: 20,
 } as const;
 
 /** What her gunnery carries from one step to the next. */
@@ -88,12 +93,15 @@ export function ring(g: Gunner, at: Vec3, foe: Mark, standoff: number, skill: nu
 }
 
 /**
- * Her gun's orders this step (0117's aimAndFire): laid on where `foe` will be when the ball comes down, with her
+ * Her gun's orders this step (0117's aimAndFire): sighted on where `foe` will be when the ball comes down, with her
  * wandering error, and fired when she is in range, has got over first seeing her, is in a burst, and isn't told to
- * `hold` it; her balls spread by her skill. With no foe in sight she lays it along her heading and holds her fire. `clock` is hers (s). Updates `g`.
+ * `hold` it; her balls spread by her skill. With no foe in sight she looks along her heading and holds her fire. `clock` is hers (s). Updates `g`.
  */
 export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: number, skill: number, draw: () => number, dt: number, hold = false): Order {
-  if (!foe) return { aim: own.heading, fire: false };
+  const eye = place(own.at, GUNNER.aloft);
+  /** Her line of sight from aloft onto the sea at `p`. */
+  const sight = (p: Vec3): Sight => ({ from: eye, dir: normalize(add(scale(p, R), eye, -1)) });
+  if (!foe) return { aim: { from: eye, dir: own.heading }, fire: false };
   const d = distance(own.at, foe.ship.at);
   // where she will be: sailing on as she sails now, over the ball's flight there
   const e = elevationFor(Math.min(d, GUN.range)) ?? 0;
@@ -108,7 +116,7 @@ export function aimAndFire(g: Gunner, own: ShipState, foe: Mark | null, clock: n
   g.err = add(g.err, add(g.errTo, g.err, -1), Math.min(1, 2 * dt));
   const miss = GUNNER.error * (1 - 0.85 * skill) * d;
   const mark = normalize(add(lead, g.err, miss / R));
-  const aim = toward(own.at, mark) ?? own.heading;
+  const aim = sight(mark);
   if (d > GUN.range * GUNNER.reach || clock < g.react || hold) return { aim, fire: false };
   // bursts: firing whenever loaded through one, holding fire through the pause after it
   if (g.burst > 0) {

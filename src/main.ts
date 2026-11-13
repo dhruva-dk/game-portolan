@@ -96,7 +96,7 @@ async function play(s: Stage): Promise<Played> {
   const pending = createPlaceholder();
   const coasts = traceCoasts(s.world.planet.islands);
   const globe = createGlobe(coasts);
-  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight, hud.top()), ...game.kit() });
+  const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
   const map = () => globe.show(hudState());
   const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
   const deal = () => {

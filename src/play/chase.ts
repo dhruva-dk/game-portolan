@@ -1,40 +1,49 @@
-// The chase camera: behind the ship and above her, swinging round after her heading with a lag; a drag of the right
-// thumb turns it about her to look round, and when the thumb lifts it eases back behind her.
+// The chase camera: over her shoulder, looking where the player last left it. A drag of the right thumb turns the look
+// about her and tilts it; let go, it stays: the look holds its bearing against the world (carried along with her over
+// the sphere), not against her heading, however she turns under it. Nothing swings it back behind her, ever. The stick
+// steers by the screen (game.ts), so a look that followed her heading would turn the stick's meaning under the thumb
+// while she turned; held to the world, pushing the stick up sails her where the camera looks, and a gun laid along the
+// look stays laid while she comes round.
 //
-// It looks along a boom from a point over her deck. It never goes under the waves or into an island: where land
-// stands between it and her deck, the boom is raised until it sees over (quickly), and lowered again only slowly
-// once clear (as the old full game did, 0117 src/render/camera.ts); if raising it won't do, it is shortened.
+// The look is the gun's line of sight (sim/sight.ts): the middle of the screen, where the reticle stands. So the eye
+// stands back along the look from a point over her (FOCUS m up) and out to her starboard as the look goes (SHOULDER
+// m), and her hull and rig stand left of the middle, clear of the line: a third-person shooter's over-the-shoulder
+// view. The look tilts from a little above the level to steeply down onto the sea about her.
+//
+// It never goes under the waves or into an island: where land stands between her and the eye, or the eye would be
+// under the land or within CLEAR of the water, the boom and the shoulder are drawn in together toward her (quickly),
+// and let out again only slowly once clear (as the old full game did, 0117 src/render/camera.ts), the look's way kept.
 //
 // The match's other shot is this camera given another boom (a Shot): drawn back and circling her on a win (shots.ts).
 // Moving to another ship it flies there over `flight` seconds, round the planet rather than through it and lifting on
 // a long way (0117 camera.ts's flight).
 
-import { AIR_FOV, type Eye } from '../snapshot';
-import type { ShipPose } from '../world/pose';
-import { R, add, along, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere';
-import { lookAt, slerp, type Turn } from '../world/turn';
+import { AIR_FOV, type Eye } from '../snapshot.ts';
+import type { ShipPose } from '../world/pose.ts';
+import { R, add, cross, dot, length, normalize, place, scale, transport, type Vec3 } from '../world/sphere.ts';
+import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
-/** The boom: metres back and up from the point it turns on, which stands PIVOT metres over the sea at her. */
-const BACK = 44, UP = 19, PIVOT = 2;
-/** It looks at a point AIM_UP metres over the sea, AIM_AHEAD ahead of her. */
-const AIM_UP = 3, AIM_AHEAD = 8;
-/** How fast it swings round after her heading; how fast it eases back once the look has been let go EASE_AFTER s. */
-const FOLLOW = 2.2, EASE = 1.5, EASE_AFTER = 0.4;
-/** Radians a pixel of the look's drag, across and up; the boom's steepest and lowest as the look tilts it, and with the raise. */
-const TURN = 0.0056, TILT = 0.0046, STEEPEST = 1.2, LOWEST = -0.3, TOP = 1.45;
-/** Clear of the land: metres over it along the sight line; the raise's steps and most; how fast it rises and falls. */
-const ROOM = 1.5, RAISE = 0.1, RAISED = 1.2, RISE = 6, FALL = 0.8;
-/** The boom is never shortened below SHORTEST; the camera never comes closer than CLEAR to the water or the land. */
-const SHORTEST = 6, CLEAR = 1.5;
-/** Points along the sight line tested for land. */
-const SIGHT = 10;
+/** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
+ *  starboard of her as the look goes. */
+export const BOOM = 40;
+const FOCUS = 12, SHOULDER = 15;
+/** The look's tilt below the level, radians: where it starts (the ships about her, 60–150 m off, across the middle of
+ *  the screen; the sea's horizon a little below it), and its highest and steepest. */
+export const PITCH = 0.17;
+const HIGHEST = -0.12, STEEPEST = 1.0;
+/** Radians a pixel of the look's drag, across and down. */
+const TURN = 0.0056, TILT = 0.0046;
+/** Clear of the land: metres over it along the boom; the boom's least share, the steps it is drawn in by, and how fast
+ *  it is drawn in and let out (share a second). */
+const ROOM = 1.5, LEAST = 0.15, STEPS = 0.05, IN = 6, OUT = 0.8;
+/** The camera never comes closer than CLEAR to the water or the land. */
+const CLEAR = 1.5;
+/** Points along each leg of the boom tested for land. */
+const SIGHT = 8;
 
-/** The chase's own boom: its length, metres, and how steeply it rises behind her, radians. */
-export const BOOM = Math.hypot(BACK, UP), ELEVATION = Math.atan2(UP, BACK);
-
-/** Another boom for a moment of the match: the pivot `height` metres higher, the boom this long and this steep in
- *  place of the chase's, and turned `spin` radians to port about her. */
-export interface Shot { height?: number; boom?: number; elevation?: number; spin?: number }
+/** Another boom for a moment of the match: this long in place of the chase's, and turned `spin` radians to port about
+ *  her. */
+export interface Shot { boom?: number; spin?: number }
 
 /** t turned `angle` radians to port about `up`. */
 const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
@@ -46,52 +55,47 @@ const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: number) => number) {
   /** The camera: where it stands (world metres) and how it is turned (it looks down its −z). */
   let position: Vec3 = [0, 0, 0], orientation: Turn = [0, 0, 0, 1];
-  /** Where she is, and the way the camera faces along the surface there before the look turns it (lagging her). */
+  /** Where she is, and the way the look faces along the surface there (held against the world). */
   let at: Vec3 = [0, 1, 0], facing: Vec3 = [0, 0, -1];
-  /** The look's turn about her (radians, to port) and tilt (steeper), and how long since it was last moved. */
-  let turn = 0, tilt = 0, idle = Infinity;
-  /** How far the boom is raised to see over the land. */
-  let raised = 0;
+  /** The look's tilt below the level, radians. */
+  let pitch = PITCH;
+  /** How far out the boom and shoulder stand (1: all the way; less, drawn in clear of the land). */
+  let out = 1;
   /** A flight under way: where the camera was when it began, its length (s) and how far through it is (0…1). */
   let flight: { from: Vec3; look: Turn; span: number; done: number } | null = null;
   /** The boom's turn for the shot under way (radians to port). */
   let spin = 0;
 
-  /** Where she is, and her heading along the surface there. */
-  const level = (pose: ShipPose) => {
-    const up = normalize(pose.position);
-    return { up, ahead: normalize(add(pose.forward, up, -dot(pose.forward, up))) };
-  };
+  /** The way the look faces along the surface at her. */
+  const view = () => turned(facing, at, spin);
 
-  /** The way the camera looks along the surface at her. */
-  const view = () => turned(facing, at, turn + spin);
-
-  /** Whether land stands within ROOM of the sight line from `pivot` metres over her, along `back`, to a boom this long
-   *  and steep. */
-  const blocked = (back: Vec3, boom: number, elevation: number, pivot: number) => {
+  /** Whether the land stands within ROOM of the straight line from a to b (metres, from the centre). */
+  const blocked = (a: Vec3, b: Vec3) => {
     for (let i = 1; i <= SIGHT; i++) {
-      const f = i / SIGHT;
-      if (ground(along(at, back, f * boom * Math.cos(elevation)).p) + ROOM > pivot + f * boom * Math.sin(elevation)) return true;
+      const p = add(a, add(b, a, -1), i / SIGHT);
+      if (ground(normalize(p)) + ROOM > length(p) - R) return true;
     }
     return false;
   };
 
-  /** Places the camera: its boom raised toward what the land asks at `rate` per second (instantly if Infinity). */
-  function put(pose: ShipPose, time: number, dt: number, rate: (rising: boolean) => number, shot: Shot) {
-    const back = scale(view(), -1), elevation = shot.elevation ?? ELEVATION + tilt, length = shot.boom ?? BOOM;
-    const pivot = PIVOT + (shot.height ?? 0);
-    let need = 0;
-    while (need < RAISED && blocked(back, length, elevation + need, pivot)) need += RAISE;
-    raised += (need - raised) * (1 - Math.exp(-rate(need > raised) * dt));
-    let boom = length;
-    while (boom > SHORTEST && blocked(back, boom, elevation + raised, pivot)) boom *= 0.85;
-    const steep = Math.min(elevation + raised, TOP);
-    const under = along(at, back, boom * Math.cos(steep)).p;
-    const floor = Math.max(ground(under), sea(under, time)) + CLEAR;
-    const eye = place(under, Math.max(pivot + boom * Math.sin(steep), floor));
-    position = eye;
-    const aim = place(along(at, level(pose).ahead, AIM_AHEAD).p, AIM_UP + (shot.height ?? 0));
-    orientation = lookAt(eye, aim, normalize(eye));
+  /** Places the camera: its boom drawn in toward what the land and the sea ask, at `rate` per second (instantly if
+   *  Infinity). */
+  function put(time: number, dt: number, rate: (drawing: boolean) => number, shot: Shot) {
+    const ahead = view(), right = cross(ahead, at);
+    const dir = normalize(add(scale(ahead, Math.cos(pitch)), at, -Math.sin(pitch)));
+    const deck = place(at, FOCUS), boom = shot.boom ?? BOOM;
+    /** The eye with the boom and shoulder `k` of the way out. */
+    const eyeAt = (k: number) => add(add(deck, right, SHOULDER * k), dir, -boom * k);
+    const clear = (k: number) => {
+      const eye = eyeAt(k), under = normalize(eye);
+      return length(eye) - R > Math.max(ground(under), sea(under, time)) + CLEAR
+        && !blocked(deck, add(deck, right, SHOULDER * k)) && !blocked(add(deck, right, SHOULDER * k), eye);
+    };
+    let need = 1;
+    while (need > LEAST && !clear(need)) need -= STEPS;
+    out += (need - out) * (1 - Math.exp(-rate(need < out) * dt));
+    position = eyeAt(out);
+    orientation = lookAt(position, add(position, dir), normalize(position));
     if (flight) fly(dt);
   }
 
@@ -109,15 +113,19 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     if (f.done >= 1) flight = null;
   }
 
+  /** Her place on the sea. */
+  const level = (pose: ShipPose) => normalize(pose.position);
+
   return {
-    /** Puts it straight behind her, the look let go. */
+    /** Puts it over her shoulder looking along her heading, at the look's first tilt. */
     reset(pose: ShipPose, time: number, shot: Shot = {}) {
-      ({ up: at, ahead: facing } = level(pose));
-      turn = tilt = raised = 0;
-      idle = Infinity;
+      at = level(pose);
+      facing = normalize(add(pose.forward, at, -dot(pose.forward, at)));
+      pitch = PITCH;
+      out = 1;
       flight = null;
       spin = shot.spin ?? 0;
-      put(pose, time, 1, () => Infinity, shot);
+      put(time, 1, () => Infinity, shot);
     },
     /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
      *  camera.ts glide: 1.6 s from one ship to another). */
@@ -128,24 +136,17 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
      * After a frame of dt seconds: her pose now (the ship it follows), the look's drag (pixels, right and down), the
      * world's clock, and the boom for the moment (the chase's own, unless given).
      */
-    update(pose: ShipPose, look: { x: number; y: number; held: boolean }, dt: number, time: number, shot: Shot = {}) {
-      const her = level(pose);
-      facing = normalize(transport(facing, at, her.up));
-      at = her.up;
-      // swing round after her heading, by a share of the angle between each frame
-      const angle = Math.atan2(dot(cross(facing, her.ahead), at), dot(facing, her.ahead));
-      facing = turned(facing, at, angle * (1 - Math.exp(-FOLLOW * dt)));
-      // dragged right, the view turns right; dragged down, it looks down onto her
-      idle = look.held || look.x !== 0 || look.y !== 0 ? 0 : idle + dt;
-      turn = Math.atan2(Math.sin(turn - look.x * TURN), Math.cos(turn - look.x * TURN));
-      tilt = Math.min(STEEPEST - ELEVATION, Math.max(LOWEST - ELEVATION, tilt + look.y * TILT));
-      if (idle > EASE_AFTER) {
-        const k = Math.exp(-EASE * dt);
-        turn *= k;
-        tilt *= k;
-      }
+    update(pose: ShipPose, look: { x: number; y: number }, dt: number, time: number, shot: Shot = {}) {
+      // the look carried along with her over the sphere, its bearing against the world kept
+      const up = level(pose);
+      facing = transport(facing, at, up);
+      at = up;
+      facing = normalize(add(facing, at, -dot(facing, at)));
+      // dragged right, the look turns right; dragged down, it looks down
+      facing = turned(facing, at, -look.x * TURN);
+      pitch = Math.min(STEEPEST, Math.max(HIGHEST, pitch + look.y * TILT));
       spin = shot.spin ?? 0;
-      put(pose, time, dt, (rising) => (rising ? RISE : FALL), shot);
+      put(time, dt, (drawing) => (drawing ? IN : OUT), shot);
     },
     /** The way the camera looks along the surface at her, and its right there: what the stick's up and right mean. */
     axes(): { ahead: Vec3; right: Vec3 } {
@@ -156,8 +157,8 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     eye(): Eye {
       return { kind: 'air', position, orientation, fov: AIR_FOV };
     },
-    /** How steeply the boom looks down on her, radians (its own, with the look's tilt). */
-    pitch: () => ELEVATION + tilt,
+    /** The line through the middle of the screen: where the eye stands and the way it looks (sim/sight.ts). */
+    sight: () => ({ from: position, dir: rotate([0, 0, -1], orientation) }),
   };
 }
 

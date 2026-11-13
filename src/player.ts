@@ -48,8 +48,11 @@ export interface Status {
   storm: number; closing: boolean; eye: { centre: Vec3; radius: number }; next: { centre: Vec3; radius: number } | null; outside: number;
   /** The loot on the water near her (unit vectors), for the disc. */
   loot: readonly Vec3[];
-  /** Where her gun is aimed on the screen (CSS px from the top left), or null with none to show. */
-  reticle: { x: number; y: number } | null;
+  /** Her gun's aim, while her hands are on her ship and she has a gun (else null). The reticle stands in the middle of
+   *  the screen, where the gun is aimed (play/chase.ts); `fall` is where the ball will come down, or pass through the
+   *  ship it is laid on (CSS px from the top left; null off the screen or hidden by the sea's curve), and `reach`
+   *  whether it reaches what the reticle is on (false: past range, or the sky). */
+  reticle: { fall: { x: number; y: number } | null; reach: boolean } | null;
 }
 
 /** An item a slot of the hotbar holds. */

@@ -11,7 +11,7 @@ import { berthed, cargo, drifted, LOOT, offered, overboard, rolled, strewn, swep
 import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { random } from '../src/world/random.ts';
-import { R, along, distance, dot, frameAt, fromLatLon, type Vec3 } from '../src/world/sphere.ts';
+import { R, add, along, distance, dot, frameAt, fromLatLon, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
 const deep: Depth = () => 30;
 const c0 = fromLatLon(0.1, 0.2);
@@ -63,7 +63,7 @@ test('a ball fired in a gust goes off wider', () => {
     let worst = 0;
     for (let seed = 0; seed < 40; seed++) {
       const b = battleOf([{ ...crewOf(1, gunOf(0)), gust: { charges: 1, recharge: 0, blowing } }, crewOf(2)], seed);
-      const r = stepBattle(b, fleet, [{ aim: frameAt(c0).north, fire: true }, { aim: null, fire: false }], [], STEP, deep);
+      const r = stepBattle(b, fleet, [{ aim: { from: scale(c0, R + 20), dir: frameAt(c0).north }, fire: true }, { aim: null, fire: false }], [], STEP, deep);
       worst = Math.max(worst, Math.acos(Math.min(1, dot(r.shots[0].dir, r.shots[0].dir))) + Math.abs(dot(r.shots[0].dir, east)));
     }
     return worst;
@@ -128,7 +128,7 @@ test('a blow breaks off what she is mending with; the storm does not', () => {
   const fleet = [vessel(1, p), vessel(2, q)];
   const h = begun(stowed(emptyHold(), 'bigShield', 1).hold, 1, { hull: 100, shield: 0 });
   let b = battleOf([{ ...crewOf(1, gunOf(4)), health: { hull: 100, shield: 0 } }, { ...crewOf(2), hold: h }], 1);
-  const aim = frameAt(p).east;
+  const aim = { from: scale(p, R + 20), dir: normalize(add(scale(q, R), scale(p, R + 20), -1)) };
   let broke = false;
   for (let i = 0; i < 60 && !broke; i++) {
     const r = stepBattle(b, fleet, [{ aim, fire: i === 0 }, { aim: null, fire: false }], [], STEP, deep);
