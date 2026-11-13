@@ -30,8 +30,8 @@
 // The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
 // At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
 // a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
-// drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity ahead of
-// her, 12 m out to 600 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
+// drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
+// of her, 25 m out to 420 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
 // stays where it is put); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
@@ -204,10 +204,10 @@ function stock(game: Game) {
     step();
   }
   if (params.has('loot')) {
-    [12, 30, 60, 120, 250, 400, 600].forEach((m, i) => {
-      const out = along(at, heading, m);
-      const p = along(out.p, cross(out.p, out.t), (i % 2 ? 1 : -1) * 6).p;
-      game.strew(p, [i % 2 ? { kind: 'gun', rarity: i % 5 } : { kind: (['smallShield', 'bigShield', 'repairKit', 'fullRepair'] as const)[i % 4], count: 1 }]);
+    // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
+    [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
+      const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
+      game.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: 'gun', rarity: i % 5 }]);
     });
   }
 }

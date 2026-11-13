@@ -1,10 +1,11 @@
 // The guns' work as it is seen: the balls in flight, and the puffs where they go off and come down. Two draws for all
 // of it, each a single instanced mesh; no targets of their own, nothing to compute.
 //
-// Balls: 0117's (render/actors/projectiles.ts): a glowing spark, one instance each, placed each frame where the battle
-// has them and drawn out along its flight, at least a few pixels across so it is seen at the far end of its range; and
-// behind it a ribbon of thin grey smoke (puffs laid along the way it came since the frame before), thickening and
-// fading over a second and a half.
+// Balls: 0117's (render/actors/projectiles.ts), one instance each, placed each frame where the battle has them and
+// drawn out along its flight, at least a few pixels across so it is seen at the far end of its range: a dark iron core
+// with a hot rim, so it reads dark against the bright sky and bright against the sea; behind it a warm tracer, glowing
+// (the bloom takes it) and tapering back over TRACER s of its flight; and behind that a ribbon of thin grey smoke
+// (puffs laid along the way it came since the frame before), thickening and fading over a second and a half.
 //
 // Puffs: soft round sprites facing the eye, each written once into a ring of instances when the battle reports what
 // made it, and moved from then on wholly in the vertex stage: carried off at its velocity with its drag (exponential)
@@ -17,11 +18,11 @@
 // light, smoke and spray cover what is behind them.
 
 import {
-  AddEquation, BufferAttribute, CustomBlending, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry,
+  AddEquation, BufferAttribute, CustomBlending, DoubleSide, DynamicDrawUsage, IcosahedronGeometry, InstancedBufferGeometry,
   InstancedInterleavedBuffer, InterleavedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor, type PerspectiveCamera,
 } from 'three/webgpu';
 import {
-  Fn, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
+  Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
 import type { Light } from '../sky/light';
 import type { BallDraw } from '../snapshot';
@@ -34,9 +35,13 @@ import type { FloatNode, Vec2Node } from '../tsl';
 const BALLS = 128, PUFFS = 4096;
 /** Floats a puff: at+born, way+life, size+grow+drag+pull, ink+glow, opacity+seed+softness+fade-in; each a vec4. */
 const STRIDE = 20;
-/** A ball's spark: its radius, metres (0117's), the fewest pixels it is drawn across, and how many seconds of its
- *  flight it is drawn out along; its glow (0117's, radiance). */
-const BALL = 0.16, BALL_PIXELS = 4, STREAK = 0.02, SPARK: Vec3 = [4, 2.3, 0.8];
+/** A ball: its radius, metres (0117's), the fewest pixels it is drawn across, and how many seconds of its flight it is
+ *  drawn out along; its core's iron and its rim's glow (radiance per unit sun), the rim from where the surface turns
+ *  this far from the eye (the cosine). */
+const BALL = 0.16, BALL_PIXELS = 6, STREAK = 0.02, CORE: Vec3 = [0.015, 0.013, 0.012], SPARK: Vec3 = [6, 3, 0.9], RIM = 0.55;
+/** Its tracer: how many seconds of its flight it trails over, its width at the ball (m, and the fewest pixels), and its
+ *  glow (radiance per unit sun) there, dying to nothing at its tail. */
+const TRACER = 0.09, TRACER_WIDE = 0.22, TRACER_PIXELS = 3, TRACER_GLOW: Vec3 = [5, 2.2, 0.6];
 /** Its trail (0117's smoke ribbon): a puff every TRAIL m along its way, its size and growth (m, m/s), life (s), ink and
  *  opacity. */
 const TRAIL = 3, TRAIL_SIZE = 0.3, TRAIL_GROW = 1.4, TRAIL_LIFE = 1.6, TRAIL_INK: Vec3 = [0.78, 0.77, 0.75], TRAIL_OPACITY = 0.26;
@@ -60,16 +65,41 @@ function ballMesh(pixel: FloatNode) {
   g.instanceCount = 0;
   const m = new MeshBasicNodeMaterial();
   const at = attribute('ballAt', 'vec4').xyz, way = attribute('ballWay', 'vec4').xyz, local = attribute('position', 'vec3');
-  const radius = max(float(BALL), cameraPosition.sub(at).length().mul(pixel).mul(BALL_PIXELS / 2));
+  const far = cameraPosition.sub(at).length(), radius = max(float(BALL), far.mul(pixel).mul(BALL_PIXELS / 2));
   // drawn out along its flight: its half-length the streak's or its radius, whichever the more
   const speed = way.length().max(1e-3), along = way.div(speed);
   const stretch = max(radius, speed.mul(STREAK / 2)).div(radius);
   m.positionNode = at.add(local.add(along.mul(local.dot(along).mul(stretch.sub(1)))).mul(radius));
-  m.colorNode = vec3(...SPARK);
+  // the iron where it faces the eye, the rim's glow where it turns away
+  const facing = varying(abs(normalize(local).dot(normalize(cameraPosition.sub(at)))));
+  m.colorNode = mix(vec3(...SPARK), vec3(...CORE), smoothstep(RIM - 0.12, RIM + 0.12, facing));
   const mesh = new Mesh(g, m);
   mesh.frustumCulled = false;
   mesh.visible = false;
-  return { mesh, buffer, geometry: g };
+
+  // the tracer: a ribbon facing the eye, from the ball back along its way, x across it (−1…1) and y back (0…1)
+  const t = new InstancedBufferGeometry();
+  t.setAttribute('position', new BufferAttribute(new Float32Array([-1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1, 0]), 3));
+  t.setIndex([0, 1, 2, 0, 2, 3]);
+  t.setAttribute('ballAt', new InterleavedBufferAttribute(buffer, 4, 0));
+  t.setAttribute('ballWay', new InterleavedBufferAttribute(buffer, 4, 4));
+  t.instanceCount = 0;
+  const tm = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
+  tm.blending = CustomBlending;
+  tm.blendEquation = AddEquation;
+  tm.blendSrc = OneFactor;
+  tm.blendDst = OneFactor;
+  const wide = max(float(TRACER_WIDE), far.mul(pixel).mul(TRACER_PIXELS)).mul(0.5);
+  const across = normalize(cross(along, cameraPosition.sub(at)));
+  const back = local.y, taper = float(1).sub(back.mul(0.75));
+  tm.positionNode = at.sub(along.mul(back.mul(speed).mul(TRACER))).add(across.mul(local.x.mul(wide).mul(taper)));
+  const y = varying(back), x = varying(local.x);
+  tm.colorNode = vec3(...TRACER_GLOW).mul(pow(float(1).sub(y), 2)).mul(smoothstep(1, 0.4, abs(x)));
+  const tracer = new Mesh(t, tm);
+  tracer.frustumCulled = false;
+  tracer.renderOrder = 3;
+  tracer.visible = false;
+  return { mesh, tracer, buffer, geometry: g, trail: t };
 }
 
 function puffMesh(light: Light, now: FloatNode) {
@@ -158,7 +188,7 @@ export function createGunfire(light: Light) {
   };
 
   return {
-    meshes: [balls.mesh, puffs.mesh],
+    meshes: [balls.mesh, balls.tracer, puffs.mesh],
     /** A gun fired at `time` (the world's clock, s) from `from` (metres, from the centre) along `dir` (unit). */
     shot(time: number, from: Vec3, dir: Vec3) {
       for (let i = 0; i < 3; i++) lay(time, flash(add(from, dir, 0.6 + 0.5 * i), scale(dir, u(3, 9)), 0.9 + 0.3 * i));
@@ -208,8 +238,8 @@ export function createGunfire(light: Light) {
       }
       drawn = time;
       balls.buffer.needsUpdate = n > 0;
-      balls.geometry.instanceCount = n;
-      balls.mesh.visible = n > 0;
+      balls.geometry.instanceCount = balls.trail.instanceCount = n;
+      balls.mesh.visible = balls.tracer.visible = n > 0;
       puffs.geometry.instanceCount = laid;
       puffs.mesh.visible = laid > 0;
       if (dirty) puffs.buffer.needsUpdate = true;
