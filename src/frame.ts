@@ -275,7 +275,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     const sea = water.update(env, dt, fleet.ships);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
-    const island = islands.update(view.eye);
+    const island = islands.update(view.eye, eye);
     if (island) islandSun.set(...sunAt(env.sunPlaces, env.timeOfDay, island.chart.at));
     const islandShadow = shadow.update(islandSun, island);
 
