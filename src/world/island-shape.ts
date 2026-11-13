@@ -214,41 +214,44 @@ export function distanceField(loops: readonly Loop[], dry: (x: number, z: number
       land.push(node(i), node(j));
     } else s[m] = d;
   }
+  /** The farthest any outline reaches from the chart's centre, metres. */
+  let outmost = 0;
+  for (let g = 0; g < count; g++) outmost = Math.max(outmost, Math.hypot(sx[g], sz[g]));
   // blurred: three box passes each way, about a Gaussian
   const soft = s.slice(), line = new Float32Array(n), r = Math.max(1, Math.round(soften / cell / 1.7));
   for (let pass = 0; pass < 6; pass++) {
     const across = pass % 2 === 0, stride = across ? 1 : n;
     for (let a = 0; a < n; a++) {
       const first = across ? a * n : a;
+      // (past the ends, carried on at the slope there: a field rising evenly blurs to itself, with no band at the edge)
+      const head = soft[first + stride] - soft[first], tail = soft[first + (n - 1) * stride] - soft[first + (n - 2) * stride];
+      const at = (k: number) => (k < 0 ? soft[first] + k * head : k > n - 1 ? soft[first + (n - 1) * stride] + (k - n + 1) * tail : soft[first + k * stride]);
       let sum = 0;
-      for (let k = -r; k <= r; k++) sum += soft[first + Math.min(Math.max(k, 0), n - 1) * stride];
+      for (let k = -r; k <= r; k++) sum += at(k);
       for (let k = 0; k < n; k++) {
         line[k] = sum / (2 * r + 1);
-        sum += soft[first + Math.min(k + r + 1, n - 1) * stride] - soft[first + Math.max(k - r, 0) * stride];
+        sum += at(k + r + 1) - at(k - r);
       }
       for (let k = 0; k < n; k++) soft[first + k * stride] = line[k];
     }
   }
-  /** Bilinear between the nodes of `g` at (x, z): its value, and how far off the grid (x, z) lies, metres. */
-  const read = (g: Float32Array, x: number, z: number): [number, number] => {
+  /** Bilinear between the nodes of `g` at (x, z); off the grid, carried on from its edge at the slope there (so the
+   *  distance has no kink where the grid ends). */
+  const read = (g: Float32Array, x: number, z: number): number => {
     const gx = (x + half) / cell, gz = (z + half) / cell;
     const cx = Math.min(Math.max(gx, 0), n - 1), cz = Math.min(Math.max(gz, 0), n - 1);
     const i = Math.min(Math.floor(cx), n - 2), j = Math.min(Math.floor(cz), n - 2), fx = cx - i, fz = cz - j, m = j * n + i;
     const v = (g[m] * (1 - fx) + g[m + 1] * fx) * (1 - fz) + (g[m + n] * (1 - fx) + g[m + n + 1] * fx) * fz;
-    return [v, gx === cx && gz === cz ? 0 : Math.hypot(gx - cx, gz - cz) * cell];
+    if (gx === cx && gz === cz) return v;
+    const sx = (g[m + 1] - g[m]) * (1 - fz) + (g[m + n + 1] - g[m + n]) * fz, sz = (g[m + n] - g[m]) * (1 - fx) + (g[m + n + 1] - g[m + 1]) * fx;
+    return v + sx * (gx - cx) + sz * (gz - cz);
   };
   return {
     deepest,
     land: Float64Array.from(land),
-    // off the grid: on from its nearest node
-    at: (x, z) => {
-      const [v, off] = read(s, x, z);
-      return v + off;
-    },
-    soft: (x, z) => {
-      const [v, off] = read(soft, x, z);
-      return v + off;
-    },
+    // (never nearer than the farthest point of any outline allows)
+    at: (x, z) => Math.max(read(s, x, z), Math.hypot(x, z) - outmost),
+    soft: (x, z) => Math.max(read(soft, x, z), Math.hypot(x, z) - outmost),
     inmost: -soft.reduce((a, b) => Math.min(a, b), 0),
   };
 }

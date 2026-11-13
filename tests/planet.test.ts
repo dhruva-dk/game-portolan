@@ -84,7 +84,7 @@ test('the planet\'s shares at R = 554: banks, deeps, land, and what a ship can\'
     assert.ok(share(shallow) > 0.42 && share(shallow) < 0.7, say);
     assert.ok(share(land) > 0.012 && share(land) < 0.04, say);
     assert.ok(share(aground) > share(land) && share(aground) < share(land) * 2 && share(aground) < 0.05, say);
-    assert.ok(top > 4.5 && top < 9, say);
+    assert.ok(top > 14 && top < 26, say);
     assert.ok(bottom > -61 && bottom < -45, say);
   }
 });
@@ -130,7 +130,7 @@ test('islands of every kind: counted by the area, in ORDER, apart, spread evenly
   }
 });
 
-test('each above the sea: the waterline is its coast, the beach about 1:8 there, the summit low, by its kind', () => {
+test('each above the sea: the waterline is its coast, the beach about 1:8 there, a hill by its kind and size', () => {
   for (const [seed, pl] of planets) for (const s of pl.islands) {
     const at = (x: number, z: number) => pl.height(fromChart(s.chart, x, z));
     let off = 0, checked = 0;
@@ -145,9 +145,34 @@ test('each above the sea: the waterline is its coast, the beach about 1:8 there,
     assert.ok(off <= checked * 0.05, `seed ${seed}: ${s.kind} beach off its slope at ${off} of ${checked}`);
     let top = 0;
     for (let i = 0; i < 3000; i++) top = Math.max(top, pl.height(onIsland(s, i * 2.39996, Math.sqrt(i / 3000) * s.radius)));
+    // (brought lower than its kind's range where the land is too narrow for so high a hill at a palm's slope)
     const [low, high] = KINDS[s.kind].summit;
-    assert.ok(s.summit >= low - 0.05 && top >= low - 0.15, `seed ${seed}: ${s.kind} summit ${s.summit}, sampled ${top}`);
+    assert.ok(s.summit >= low * 0.55 && top >= s.summit - 0.15, `seed ${seed}: ${s.kind} summit ${s.summit}, sampled ${top}`);
     assert.ok(s.summit <= high * 1.15, `seed ${seed}: ${s.kind} summit ${s.summit}`);
+  }
+  // the largest a hill to hide behind, the islets a clear hump; the larger the higher
+  for (const [seed, pl] of planets) {
+    const summits = (kind: string) => pl.islands.filter((s) => s.kind === kind).map((s) => s.summit);
+    assert.ok(Math.max(...summits('island')) > 15, `seed ${seed}: highest ${Math.max(...summits('island'))}`);
+    assert.ok(Math.min(...summits('islet')) > 2, `seed ${seed}: islets ${summits('islet')}`);
+    const big = pl.islands.filter((s) => s.radius > 35), small = pl.islands.filter((s) => s.kind === 'island' && s.radius < 22);
+    const mean = (l: typeof big) => l.reduce((a, s) => a + s.summit, 0) / l.length;
+    assert.ok(mean(big) > mean(small) + 4, `seed ${seed}: large ${mean(big)}, small ${mean(small)}`);
+  }
+});
+
+test('the hills: no cliffs, slopes a palm stands on', () => {
+  for (const [seed, pl] of planets) for (const s of pl.islands) {
+    const slopes: number[] = [];
+    for (let i = 0; i < 4000; i++) {
+      const t = i * 2.39996, r = Math.sqrt(i / 4000) * s.radius * 1.6, x = Math.cos(t) * r, z = Math.sin(t) * r;
+      if (s.shore(x, z) > -0.5) continue;
+      const e = 0.4, at = (a: number, b: number) => pl.height(fromChart(s.chart, a, b));
+      slopes.push(Math.hypot(at(x + e, z) - at(x - e, z), at(x, z + e) - at(x, z - e)) / (2 * e));
+    }
+    slopes.sort((a, b) => a - b);
+    const p99 = slopes[Math.floor(slopes.length * 0.99)], worst = slopes.at(-1)!;
+    assert.ok(p99 < ISLANDS.steepest[s.kind] + 0.08 && worst < 1.1, `seed ${seed}: ${s.kind} ${s.radius.toFixed(0)} m slopes p99 ${p99.toFixed(2)}, worst ${worst.toFixed(2)}`);
   }
 });
 
