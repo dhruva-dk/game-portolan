@@ -28,6 +28,7 @@ import {
 import { N } from '../world/cells';
 import type { Sea } from '../snapshot';
 import { type BoolNode, type FloatNode, type IntNode, type UintNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
+import { gnomonic } from '../view/cube';
 import { HOLD, SIDE, WORDS, createClaimed } from './claimed';
 
 /** How far the water's hue is turned to its holder's (0…1, its brightness kept), as a chart's wash along a coast: in a
@@ -53,20 +54,6 @@ const line = (d: FloatNode, w: number, px: FloatNode): FloatNode => {
   const we = max(px, w);
   return exp(d.mul(d).div(we.mul(we)).negate()).mul(float(w).div(we));
 };
-
-/** The face p lies on (view/cube.ts's choice), and the gnomonic coordinates of q there (q = p, or its derivative: the
- *  numerator and denominator are linear in q, the face fixed by p). */
-function gnomonic(p: Vec3Node) {
-  const a = abs(p);
-  const onX = a.x.greaterThanEqual(a.y).and(a.x.greaterThanEqual(a.z)), onY = a.y.greaterThanEqual(a.z);
-  const px = p.x.greaterThanEqual(0), py = p.y.greaterThanEqual(0), pz = p.z.greaterThanEqual(0);
-  const face: IntNode = select(onX, select(px, int(0), int(1)), select(onY, select(py, int(2), int(3)), select(pz, int(4), int(5))));
-  const top = (q: Vec3Node): Vec2Node =>
-    select(onX, vec2(select(px, q.z.negate(), q.z), q.y), select(onY, vec2(q.x, select(py, q.z.negate(), q.z)), vec2(select(pz, q.x, q.x.negate()), q.y)));
-  const bottom = (q: Vec3Node): FloatNode =>
-    select(onX, select(px, q.x, q.x.negate()), select(onY, select(py, q.y, q.y.negate()), select(pz, q.z, q.z.negate())));
-  return { face, top, bottom };
-}
 
 /** ships: the most there will be. */
 export function createClaims(ships: number) {

@@ -143,6 +143,24 @@ export function toSky(f: Frame, dip: number, dir: Vec3): Vec3 {
 
 // ------------------------------------------------------------------ the cube
 
+/** An axis (0 x, 1 y, 2 z) and a sign. */
+export type Axis = readonly [0 | 1 | 2, 1 | -1];
+
+/**
+ * The cube's six faces, written once (faceUV and faceDir here, cells.ts, and the shaders' view/cube.ts all keep to it;
+ * tests/sphere.test.ts holds them to it): the axis each lies across (with its sign), and the signed axes its u and v run
+ * along. A direction q on face f has the gnomonic coordinates (u's axis, v's axis) of q over f's axis, each signed. A
+ * direction lies on the face of its largest component; ties go to x before y before z.
+ */
+export const FACES: readonly { across: Axis; u: Axis; v: Axis }[] = [
+  { across: [0, 1], u: [2, -1], v: [1, 1] },
+  { across: [0, -1], u: [2, 1], v: [1, 1] },
+  { across: [1, 1], u: [0, 1], v: [2, -1] },
+  { across: [1, -1], u: [0, 1], v: [2, 1] },
+  { across: [2, 1], u: [0, 1], v: [1, 1] },
+  { across: [2, -1], u: [0, -1], v: [1, 1] },
+];
+
 export interface FaceUV { face: number; u: number; v: number }
 
 /** The cube face p lies on, and where on it, u and v in −1…1, spaced evenly in angle (an equi-angular cube). */

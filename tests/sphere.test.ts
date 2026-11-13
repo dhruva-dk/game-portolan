@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  R, add, along, chartBasis, cross, distance, dot, faceDir, faceUV, frameAt, fromChart, fromLatLon, horizonDip, length,
-  normalize, scale, skyElevation, toChart, toSky, transport, type Chart, type Vec3,
+  FACES, R, add, along, chartBasis, cross, distance, dot, faceDir, faceUV, frameAt, fromChart, fromLatLon, horizonDip, length,
+  normalize, scale, skyElevation, toChart, toSky, transport, type Axis, type Chart, type Vec3,
 } from '../src/world/sphere.ts';
+import { CELLS, N, centreOf, columnOf, faceOf, rowOf } from '../src/world/cells.ts';
 
 const near = (a: number, b: number, eps: number, what = '') => assert.ok(Math.abs(a - b) <= eps, `${what} ${a} vs ${b}`);
 const nearV = (a: Vec3, b: Vec3, eps: number, what = '') => near(length(add(a, b, -1)), 0, eps, what);
@@ -137,4 +138,33 @@ test('the sky puts its horizon on the sea\'s and keeps the zenith', () => {
   nearV(toSky(f, dip, ray), [0, 0, -1], 1e-12);
   nearV(toSky(f, dip, f.up), [0, 1, 0], 1e-6);
   nearV(toSky(f, 0, f.east), [1, 0, 0], 1e-12);
+});
+
+test('the cube\'s faces are FACES\'s (the table the shaders\' view/cube.ts is built from): faceUV\'s, faceDir\'s and the cells\'', () => {
+  const signed = (q: Vec3, [axis, sign]: Axis) => sign * q[axis];
+  /** The face FACES gives p (its largest component, ties to x before y before z), and p's u and v there. */
+  const table = (p: Vec3) => {
+    const a = p.map(Math.abs), axis = a[0] >= a[1] && a[0] >= a[2] ? 0 : a[1] >= a[2] ? 1 : 2;
+    const face = FACES.findIndex((f) => f.across[0] === axis && f.across[1] === (p[axis] >= 0 ? 1 : -1));
+    const g = (k: Axis) => (Math.atan(signed(p, k) / signed(p, FACES[face].across)) * 4) / Math.PI;
+    return { face, u: g(FACES[face].u), v: g(FACES[face].v) };
+  };
+  const ties: Vec3[] = [[1, 1, 0], [-1, 1, 1], [0, -1, 1], [1, 0, -1], [0, 0, -1], [-1, -1, -1]];
+  for (const p of [...points(2000), ...ties]) {
+    const t = table(p), f = faceUV(p);
+    assert.equal(f.face, t.face, `${p}`);
+    near(f.u, t.u, 1e-15, 'u');
+    near(f.v, t.v, 1e-15, 'v');
+    // faceDir: across its face's axis, and its u and v the table's
+    const d = faceDir(t.face, t.u, t.v);
+    assert.ok(signed(d, FACES[t.face].across) > 0);
+    nearV(d, normalize(p), 1e-12, 'faceDir');
+  }
+  // every face's cells' centres lie on it, at their column and row
+  for (let c = 0; c < CELLS; c += 997) {
+    const t = table(centreOf(c));
+    assert.equal(t.face, faceOf(c));
+    near(((t.u + 1) / 2) * N - 0.5, columnOf(c), 1e-9, 'column');
+    near(((t.v + 1) / 2) * N - 0.5, rowOf(c), 1e-9, 'row');
+  }
 });
