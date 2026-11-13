@@ -189,7 +189,6 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
     simulate(on: boolean) { simulating = on; },
     /** Draw every ship at level k, or by her size again for null (a debug view). */
     pin(k: number | null) { pinned = k ?? -1; },
-    get count() { return count; },
     /** The ships afloat as last set: each one's pose, look (and her yards' brace) and velocity (for the marks she leaves
      * on the sea). */
     get ships() {

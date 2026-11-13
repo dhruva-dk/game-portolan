@@ -111,7 +111,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     });
   }
 
-  /** For ?debug=charts: the three weights as red, green and blue, each cell a little lighter or darker than the next. */
+  /** For the sea's look 'charts' (water.ts SeaShows): the three weights as red, green and blue, each cell a little
+   *  lighter or darker than the next. */
   function debug(p: Vec3Node): Vec3Node {
     const { index, weight } = pick(normalize(p));
     const shade = fract(sin(float(index[0]).mul(12.9898)).mul(43758.5453)).mul(0.5).add(0.5);

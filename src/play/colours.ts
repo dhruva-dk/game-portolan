@@ -1,4 +1,4 @@
-// The ships' colours (ship/fleet.ts Look), by id: hers, then the others' from a small palette.
+// The ships' colours (snapshot.ts Look), by id: hers, then the others' from a small palette.
 
 import type { Look } from '../snapshot';
 import type { Vec3 } from '../world/sphere';

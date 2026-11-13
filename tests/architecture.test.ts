@@ -76,7 +76,7 @@ const LAYERS: Record<string, readonly string[]> = {
   'fly.ts': ['three', 'world/', 'snapshot.ts'],
   'probe.ts': ['three', 'world/', 'sky/sky.ts'],
   'debug.ts': [
-    'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', ...NEUTRAL, 'frame.ts', 'world/',
+    'play/colours.ts', 'play/game.ts', 'play/referee.ts', 'play/setup.ts', 'play/state.ts', 'ui/flow.ts', 'ui/ui.ts', ...NEUTRAL, 'frame.ts', 'world/',
     'sim/fixed.ts', 'sim/handling.ts', 'sim/match.ts', 'sim/storm.ts', 'fly.ts', 'probe.ts',
   ],
   'main.ts': ['*'],

@@ -31,6 +31,7 @@ import type { FrameOptions } from './frame';
 import { createFly } from './fly';
 import type { Game } from './play/game';
 import type { Referee } from './play/referee';
+import { lookOf } from './play/colours';
 import { startOf, type Matches } from './play/setup';
 import { bearing, type Berth } from './play/state';
 import { IDLE } from './player';
@@ -191,21 +192,18 @@ function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], stor
 
 /**
  * ?ships=n (at most `most`) galleons on the sea ahead of `south` (looking north) — 30, 60, 100, 150 m out and on
- * past — on the mean sea, each on her own heading and in her own colours: bots, or with ?way= m/s their helms lashed
- * to a straight course at that speed. ?heading=deg turns them all that much further (clockwise seen from above).
+ * past — on the mean sea, each on her own heading and in her own colours (play/colours.ts): bots, or with ?way= m/s
+ * their helms lashed to a straight course at that speed. ?heading=deg turns them all that much further (clockwise seen from above).
  */
 function demoShips(south: Vec3, most: number): Berth[] {
   const others: Berth[] = [];
   const ships = Math.min(number('ships', 0), most), { up, north } = frameAt(south), way = number('way', 0);
-  const paints: Vec3[] = [[0.3, 0.03, 0.02], [0.03, 0.06, 0.2], [0.42, 0.28, 0.05], [0.03, 0.14, 0.06], [0.02, 0.02, 0.02]];
-  const sails: Vec3[] = [[0.62, 0.57, 0.46], [0.7, 0.68, 0.6], [0.5, 0.38, 0.25]];
   for (let i = 0; i < ships; i++) {
     const out = [30, 60, 100, 150][i] ?? 150 + (i - 3) * 40, side = i < 4 ? [0, -12, 25, -40][i] : (i % 2 ? 1 : -1) * 30 * i;
     const p = along(along(up, north, out).p, cross(north, up), side).p, u = normalize(p);
     const t = normalize(add(north, u, -dot(north, u))), heading = [1.9, -0.6, 2.8, 0.9][i % 4] + i - number('heading', 0) * degrees;
     const forward = add(scale(t, Math.cos(heading)), cross(u, t), Math.sin(heading));
-    const look = { paint: paints[i % paints.length], sail: sails[i % sails.length], band: i % 3 === 1 };
-    others.push({ at: u, heading: forward, look, lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null });
+    others.push({ at: u, heading: forward, look: lookOf(i), lashed: way > 0 ? { course: null, throttle: way / SHIP.top } : null });
   }
   return others;
 }
