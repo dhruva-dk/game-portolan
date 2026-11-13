@@ -97,7 +97,8 @@ test('bearing and pan: ahead 0, right +π/2, behind ±π, as the eye is turned; 
   assert.ok(panOf(Math.PI / 2) > 0 && panOf(-Math.PI / 2) < 0);
   // as world/turn.ts turns: any eye, any point
   const turned = look([3, -2, 5], [-4, 1, 9]);
-  for (const p of [[10, 4, -3], [-7, 2, 8], [1, 1, 1]] as Vec3[]) {
+  const points: Vec3[] = [[10, 4, -3], [-7, 2, 8], [1, 1, 1]];
+  for (const p of points) {
     const [x, , z] = rotate([p[0] - 3, p[1] + 2, p[2] - 5], inverse(turned.orientation));
     assert.ok(Math.abs(bearingFrom(turned, p) - Math.atan2(x, -z)) < 1e-9);
   }
@@ -159,7 +160,7 @@ test('listen: a ball passing near whistles once; her gun come ready; the screens
   for (let t = 0; t < 1.5; t += dt) {
     out.length = 0;
     // closest to the eye, 5 m off, at t = 1
-    const ball = { at: [eye[0] + 5, eye[1] + 136 * (t - 1), eye[2]] as Vec3, way };
+    const ball: { at: Vec3; way: Vec3 } = { at: [eye[0] + 5, eye[1] + 136 * (t - 1), eye[2]], way };
     l.listen(hearing(scene(t, [], [], [ball]), status()), dt, out);
     whistles += out.filter((c) => c.cue === 'whistle').length;
   }
