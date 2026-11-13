@@ -117,7 +117,7 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
   };
   const frame = (sea: Sea | undefined, time = clock) => {
     const t0 = performance.now(), taken = claimed.follow(sea);
-    if (sea) claimed.work((clock = time));
+    claimed.work((clock = time));
     const ms = performance.now() - t0;
     if (taken) [whole, loads] = [whole + 1, Math.max(loads, ms)];
     else [spent, frames] = [spent + ms, frames + 1];
@@ -138,17 +138,18 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
     frame(last);
     for (let f = 0; f < 600 && !claimed.idle(); f++) claimed.work(clock + f / 60);
     same(last!.owner, `match ${generation}'s end`);
-    // the lobby between: no sea, all open
+    // the lobby between: no sea, all open (once taken, over some frames)
     frame(undefined);
+    for (let f = 0; f < 600 && !claimed.idle(); f++) frame(undefined);
     same(new Uint8Array(CELLS), 'the lobby');
   }
   assert.deepEqual([...kinds].sort(), ['claim', 'cut', 'drain', 'home']);
   // whole for each match's first frame and each lobby's, and again after frames missed
   assert.ok(whole > 4, `taken whole ${whole} times`);
   assert.ok(checked > 100);
-  // what it costs: a few hundredths of a millisecond a frame (no frame over a few: the next test);
-  // a whole copy some tens
-  assert.ok(spent / frames < 0.5 && loads < 60, `${(spent / frames).toFixed(3)} ms a frame, a whole copy ${loads.toFixed(1)} ms`);
+  // what it costs: a few hundredths of a millisecond a frame (no frame over a few: the next test); a whole copy (some
+  // tens of milliseconds: a match's first frame paid them all once, a hitch as she put to sea) a few a frame too
+  assert.ok(spent / frames < 0.5 && loads < 8, `${(spent / frames).toFixed(3)} ms a frame, a whole copy's frame ${loads.toFixed(1)} ms`);
 });
 
 test('a loop round half the planet is drawn over some frames, none paying more than a few milliseconds', () => {

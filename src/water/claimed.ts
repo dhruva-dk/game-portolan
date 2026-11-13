@@ -141,25 +141,50 @@ export function createClaimed() {
     return false;
   };
 
-  /** The whole grid at once (a match's start, or changes missed), with no fronts: what was under way is dropped. */
-  function load(owner: ReadCells) {
+  /** Spends n units of the work between yields; true when a SLICE is spent (time to yield). */
+  let spent = 0;
+  const tick = (n: number) => {
+    if ((spent += n) < SLICE) return false;
+    spent = 0;
+    return true;
+  };
+  /** Each face's whole tile, as the changed ranges, once the grid is taken whole. */
+  let whole = false;
+
+  /**
+   * The whole grid (a match's start, or changes missed), with no fronts: what was under way is dropped. Yields every
+   * SLICE cells, like a change (some 50 ms of work for a match's first homes, too much for one frame); the GPU's words
+   * are all sent when it is done.
+   */
+  function* loading(owner: ReadCells): Generator<void, void, void> {
     let n = 0;
-    [settling.length, settled, pending.length, job] = [0, 0, 0, null];
-    for (let k = 0; k < dirtyCount; k++) isDirty[dirty[k]] = 0;
-    dirtyCount = 0;
-    reveal.fill(-1e6);
     for (let c = 0; c < CELLS; c++) {
       cells[c * 4] = cells[c * 4 + 1] = owner[c];
       cells[c * 4 + 2] = cells[c * 4 + 3] = 255;
+      reveal[c] = -1e6;
       if (owner[c]) list[n++] = c;
+      if (tick(1 / 16)) yield;
     }
     const e = ++epoch * 3;
     let m = 0;
-    for (let k = 0; k < n; k++) m = listWindow(list[k], e, m, queue);
-    for (let k = 0; k < m; k++) cells[queue[k] * 4 + 2] = cells[queue[k] * 4 + 3] = share(queue[k]);
+    for (let k = 0; k < n; k++) {
+      m = listWindow(list[k], e, m, queue);
+      if (tick(4)) yield;
+    }
+    for (let k = 0; k < m; k++) {
+      cells[queue[k] * 4 + 2] = cells[queue[k] * 4 + 3] = share(queue[k]);
+      if (tick(8)) yield;
+    }
     gpuReveal.fill(-1e6);
     for (let c = 0; c < CELLS; c++) gpuCells[slotOf(c)] = words[c];
     for (const [c, slots] of APRON) for (const s of slots) gpuCells[s] = words[c];
+    whole = true;
+  }
+  function load(owner: ReadCells) {
+    [settling.length, settled, pending.length] = [0, 0, 0];
+    for (let k = 0; k < dirtyCount; k++) isDirty[dirty[k]] = 0;
+    dirtyCount = 0;
+    job = loading(owner);
   }
 
   /**
@@ -169,12 +194,6 @@ export function createClaimed() {
    */
   function* changing({ cells: changed, owner, time, from }: Shift): Generator<void, void, void> {
     if (!changed.length) return;
-    let spent = 0;
-    const tick = (n: number) => {
-      if ((spent += n) < SLICE) return false;
-      spent = 0;
-      return true;
-    };
     const e = ++epoch * 3;
     for (let k = 0; k < changed.length; k++) mark[changed[k]] = e;
     // the changed water's edge (a drain's sources too), and every cell within FLAT of it, either side
@@ -318,8 +337,8 @@ export function createClaimed() {
   const cursor = createCursor();
   return {
     gpuCells, gpuReveal,
-    /** Takes `sea`'s cells (none: open sea) whole for a new match's sea or when changes were missed, else queues each
-     *  change not yet read to be drawn as a front (work). Returns whether they were taken whole. */
+    /** Takes `sea`'s cells (none: open sea) whole for a new match's sea or when changes were missed (over some frames'
+     *  work), else queues each change not yet read to be drawn as a front (work). Returns whether they are taken whole. */
     follow(sea: Sea | undefined): boolean {
       const { fresh, missed, from } = cursor.read(sea);
       if (fresh || missed) {
@@ -355,6 +374,10 @@ export function createClaimed() {
         if (done) job = null;
       }
       if (!job) while (more() && settle(SLICE) === SLICE);
+      if (whole) {
+        whole = false;
+        return lo.map((_, f): [number, number] => [f * TILE, (f + 1) * TILE]);
+      }
       return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
     },
     /** Whether every change read is drawn and on its way to the GPU. */
