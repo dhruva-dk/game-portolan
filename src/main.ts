@@ -6,9 +6,8 @@ import { createMeter } from './meter';
 import { createGame } from './play/game';
 import { createPlaceholder } from './play/placeholder';
 import { createReferee } from './play/referee';
-import { createMatches, startOf } from './play/setup';
+import { chartOf, createMatches, startOf } from './play/setup';
 import { PLAYER } from './sim/match';
-import { chart as bakeChart } from './sim/route';
 import { traceCoasts } from './ui/coasts';
 import { createGale } from './ui/gale';
 import { createGlobe } from './ui/globe';
@@ -43,10 +42,10 @@ const meter = switches.meter ? createMeter(renderer, meterEl) : null;
 
 const others = demoShips(start.at);
 const matches = createMatches(switches.seed, world.planet, switches.storm, switches.gun);
-// the bots' chart of open water, for routes round land (sim/route.ts): baked while the ground's worker bakes
-// (frame.ready), in about a fifth of its time, so it holds back no frame
-const charted = performance.now(), chart = bakeChart((p) => -world.planet.height(p));
-console.info(`chart baked in ${(performance.now() - charted).toFixed(0)} ms`);
+// the bots' chart of open water, for routes round land (sim/route.ts): sounded in a worker while the ground's bakes
+// in another (frame.ready), in about a fifth of its time
+const { chart, ms } = await chartOf(switches.seed);
+console.info(`chart sounded in ${ms.toFixed(0)} ms`);
 const game = switches.flying ? null : createGame(world, frame.anchors, chart, renderer.domElement, start, switches.drive, others, matches.first);
 const referee = game ? createReferee(game) : null;
 const source = game ?? flyer(renderer.domElement, start.at, others, matches.storm);

@@ -98,7 +98,14 @@ function neighbour(c: number, k: number): number {
 const SOUNDINGS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]] as const;
 
 /** Bakes the chart of the water `depth` gives. */
-export function chart(depth: Depth): Chart {
+export const chart = (depth: Depth): Chart => charted(sound(depth));
+
+/** The soundings a chart is made of: which cells are open water, and how many cells each lies from the shore (up to
+ *  4). Plain arrays, so a worker can hand them over (play/sounding.ts). */
+export interface Soundings { readonly open: Uint8Array; readonly clear: Uint8Array }
+
+/** Sounds the water `depth` gives, cell by cell. */
+export function sound(depth: Depth): Soundings {
   const open = new Uint8Array(CELLS), clear = new Uint8Array(CELLS), deep = SHIP.draught + ROUTE.open, s = ROUTE.sounding / R;
   for (let c = 0; c < CELLS; c++) {
     const p = cellCentre(c);
@@ -117,9 +124,12 @@ export function chart(depth: Depth): Chart {
       for (let k = 0; k < 4; k++) if (clear[neighbour(c, k)] === round) { clear[c] = round + 1; break; }
     }
   }
-  // (the pathfinder's working space too, now rather than at the first route, which it would hold up some tens of ms)
-  return { open, clear, space: space() };
+  return { open, clear };
 }
+
+/** The chart of these soundings, with the pathfinder's working space made now rather than at the first route, which
+ *  it would hold up some tens of ms. */
+export const charted = (s: Soundings): Chart => ({ open: s.open, clear: s.clear, space: space() });
 
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
 
