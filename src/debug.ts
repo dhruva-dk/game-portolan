@@ -33,6 +33,9 @@
 // drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
 // of her, 25 m out to 420 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
 // stays where it is put); ?slow=k runs the game at k of its speed (for catching a ball in flight).
+// ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
+// her own water), then sails on that many seconds more: with ?pause, the flood stopped mid-sweep. ?map opens
+// the full map once ?ahead= has run (with screen=play, the whole match's water from space).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
 import type { Anchor } from './world/lattice';
@@ -186,7 +189,7 @@ function open(p: Played, others: readonly Berth[]) {
     game.step(0.1, IDLE);
     referee.update(0.1);
   }
-  if (screen === 'map') p.map();
+  if (screen === 'map' || params.has('map')) p.map();
 }
 
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
@@ -214,11 +217,17 @@ function stock(game: Game) {
 
 /** ?drive's legs ("bearing,throttle,seconds;…"), each sailed with her helm lashed to it. */
 function drive(game: Game, legs: string) {
+  const began = game.status().at;
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
     game.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
+  if (!params.has('flood')) return;
+  game.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
+  const closed = () => game.snapshot().sea?.changes.some((k) => k.kind === 'claim' && k.ship === PLAYER);
+  for (let i = 0; i < 30 / STEP && !closed(); i++) game.step(STEP, IDLE);
+  for (let i = 0; i < Math.round(number('flood', 0) / STEP); i++) game.step(STEP, IDLE);
 }
 
 /** ?safe's insets, set on the UI's layer (ui/ui.ts). */

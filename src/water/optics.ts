@@ -26,7 +26,7 @@
 import { dot, exp, float, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
-import type { FloatNode, Vec3Node } from '../tsl';
+import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
 
 /** Absorption per metre, red/green/blue (680, 550, 440 nm). */
 const ABSORPTION = [0.45, 0.068, 0.025];
@@ -97,9 +97,9 @@ export function createOptics(sky: Sky, view: View) {
     /** The light leaving the sea toward the eye (seaRadiance, below). */
     seaRadiance: (
       p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
-      sparkle: Sparkle, ships: Ships,
+      sparkle: Sparkle, ships: Ships, held?: Held,
     ): Vec3Node =>
-      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle, ships),
+      seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle, ships, held),
   };
 }
 
@@ -111,6 +111,12 @@ export type Sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => FloatNode;
  * leave, the share of the water's glow a hull beside it leaves, and the air a wake has worked into it.
  */
 export interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
+
+/**
+ * Who holds the water here (water/claims.ts): its dye (rgb the holder's colour, a how far the water's body is turned
+ * toward it, its brightness kept) and the light its border's line gives off, per unit of what a white surface gets.
+ */
+export interface Held { dye: Vec4Node; shine: Vec3Node }
 
 /**
  * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
@@ -136,10 +142,11 @@ function facets(nh: FloatNode, nl: FloatNode, nv: FloatNode, alpha: FloatNode): 
  *   path   metres from the surface to it through the water (Infinity for open sea)
  *   sparkle how the sun's glint gathers into flashes
  *   ships  what the ships do to the light here
+ *   held   who holds the water here: what comes up out of it is dyed her colour, and her border glows
  */
 function seaRadiance(
   sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
-  path: FloatNode, sparkle: Sparkle, ships: Ships,
+  path: FloatNode, sparkle: Sparkle, ships: Ships, held?: Held,
 ): Vec3Node {
   const l = sky.sun(p), up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
@@ -172,7 +179,14 @@ function seaRadiance(
   const dim = exp(absorption.mul(path).add(ships.air.mul(AIR_VEIL)).negate());
   const through = behind.mul(dim).div(N_WATER * N_WATER);
   const glow = body.add(crests).mul(float(1).sub(dim.mul(dim)));
-  const water = reflected.add(through.add(glow).mul(float(1).sub(F)));
+  // the light up out of the water turned toward the holder's colour, as bright as it was (the first game's)
+  let under = through.add(glow);
+  if (held) {
+    const luminance = (c: Vec3Node) => dot(c, vec3(0.2126, 0.7152, 0.0722));
+    under = mix(under, held.dye.xyz.div(max(luminance(held.dye.xyz), 1e-3)).mul(luminance(under)), held.dye.w);
+  }
+  let water = reflected.add(under.mul(float(1).sub(F)));
+  if (held) water = water.add(held.shine.mul(irradiance));
   const froth = sun.mul(nl).div(Math.PI).add(sky.ambient(p, n)).mul(FOAM_ALBEDO);
   return mix(water, froth, foam);
 }

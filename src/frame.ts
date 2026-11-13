@@ -121,10 +121,10 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   fleet.simulate(options.cloth);
   const gunfire = createGunfire(light);
   const loot = createLoot(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, water.ribbons, ...gunfire.meshes, ...loot.meshes, ...(options.extras?.(sky.light, world) ?? []));
   // (named for the meter's split: meter.ts)
   scene.name = 'world';
-  [seabed.mesh.name, water.mesh.name] = ['seabed', 'sea'];
+  [seabed.mesh.name, water.mesh.name, water.ribbons.name] = ['seabed', 'sea', 'trails'];
   gunfire.meshes.forEach((m) => (m.name ||= 'gunfire'));
   loot.meshes.forEach((m, k) => (m.name ||= `loot ${k}`));
 
@@ -272,7 +272,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
     const ships = fleet.update(eye, env.windSpeed, size.y, dt);
     gunfire.update(eye, size.y);
     loot.update(eye, size.y);
-    const sea = water.update(env, dt, fleet.ships);
+    const sea = water.update(env, dt, fleet.ships, s);
     seabed.update();
     // the island's shadows fall along the sun over it, which stays put however the eye moves
     const island = islands.update(view.eye, eye);

@@ -105,6 +105,13 @@ export function wrapped(f: number, i: number, j: number): number {
   return Math.min(own, across(own, di, 0), across(own, 0, dj));
 }
 
+/** The cell at column i, row j of face f, however far past its edges: where that point of the face's plane, carried
+ *  on past the edge, lands on the sphere (a few cells past, the next face's cell there). */
+export function beyond(f: number, i: number, j: number): number {
+  if (i >= 0 && i < N && j >= 0 && j < N) return f * NN + j * N + i;
+  return cellOf(atUV(f, ((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1));
+}
+
 // Every cell's exact area on the sphere, one table for all six faces. A gnomonic rectangle [x0, x1] × [y0, y1] on the
 // cube's face subtends F(x1, y1) − F(x0, y1) − F(x1, y0) + F(x0, y0) steradians, F = atan(xy / √(1 + x² + y²)). Areas
 // are whole numbers of AREA_Q quanta, so sums of them are exact in any order of adding and taking away.

@@ -23,6 +23,9 @@
 // shadows where the sun's ray through the water meets the sea's level, softened). The
 // hulls of the few nearest the eye cut the surface away inside them and shade the water against them (hulls.ts).
 //
+// Who holds the sea is drawn in it (claims.ts): the water dyed its holder's colour, her border a fine glowing line over
+// a line of foam, and the changes sweeping over it.
+//
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
@@ -32,6 +35,7 @@ import {
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
 import type { Environment } from '../environment';
+import type { Snapshot } from '../snapshot';
 import type { Compute, Draw } from '../gpu';
 import type { Ground } from '../land/ground';
 import type { Sky } from '../sky/sky';
@@ -41,6 +45,8 @@ import { R } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { BANDS, BREAKER, CASCADES, FETCH, LONG, SIZE } from '../world/cascades';
 import { createCaustics } from './caustics';
+import { createClaims } from './claims';
+import { createTrails } from './trails';
 import { createFoam } from './foam';
 import { glitter } from './glitter';
 import { createHulls } from './hulls';
@@ -88,6 +94,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   const wake = createWake(view, sky, ships);
   const hulls = createHulls();
   const optics = createOptics(sky, view);
+  const claims = createClaims(ships);
   // neighbouring charts' seas as unlike as can be at every wind, each cascade on its own
   const each = LIKENESS_WINDS.flatMap((wind) => CASCADES.map((L, c) => likeness(SIZE, L, { wind, fetch: FETCH }, BANDS[c])));
   const charts = createCharts(CASCADES[0], (x, z) => Math.max(...each.map((f) => Math.abs(f(x, z)))), wind);
@@ -111,12 +118,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       breaking: saturate(hs.div(max(depth.mul(BREAKER), 0.01)).sub(1).mul(0.4)).mul(smoothstep(0, 0.05, depth)),
     };
   };
-  const { long, short } = shallows(grid.up);
-
-  // The water's move, along each chart's axes and up (xyz), and the waves' height here unscaled by the depth (w).
-  const wave = Fn(() => {
+  // The water's move at rest point `up`, along each chart's axes and up (xyz), and the waves' height there unscaled by
+  // the depth (w); its cascades read as for a grid's cell `cell` m across.
+  const waveAt = (up: Vec3Node, cell: FloatNode) => Fn(() => {
+    const { long, short } = shallows(up);
     const moved = vec3(0).toVar(), swell = float(0).toVar();
-    charts.each(grid.up, (c) => {
+    charts.each(up, (c) => {
       let d: Vec3Node = vec3(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const lod = log2(max(cell.div(L / SIZE), 1));
@@ -124,11 +131,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
         d = d.add(r.mul(k < LONG ? long : short));
         h = h.add(r.y);
       });
-      moved.addAssign(c.e1.mul(d.x).add(c.e2.mul(d.z)).add(grid.up.mul(d.y)).mul(c.w));
+      moved.addAssign(c.e1.mul(d.x).add(c.e2.mul(d.z)).add(up.mul(d.y)).mul(c.w));
       swell.addAssign(h.mul(c.w));
     });
     return vec4(moved, swell);
   })();
+  const wave = waveAt(grid.up, cell);
   // Where the waves come ashore their height is cut to nothing, and the swash runs up the sand and back in their
   // place, with the waves' height offshore.
   const swash = mix(wave.w.mul(BACKWASH), wave.w.mul(RUNUP), step(0, wave.w)).mul(smoothstep(-SWASH_FROM, 0, ground.height(grid.up)));
@@ -154,6 +162,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const dp: [Vec3Node, Vec3Node] = [dFdx(p), dFdy(p)];
     const footprint = max(length(dp[0]), length(dp[1]));
     const marks = wake.read(p);
+    const held = claims.at(p, dp[0], dp[1]);
     const wakeFoam = marks.marks.x, air = saturate(marks.marks.z);
     // the water over the ground here, as the waves lift it and let it fall: the swash's
     const thickness = ground.height(rest).negate().add(height);
@@ -202,6 +211,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const storm = sky.storm(p);
     variance.addAssign(storm.mul(STORM_ROUGH));
     foam.assign(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)));
+    // the border's line of foam
+    foam.assign(max(foam, held.foam.mul(0.8)));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
@@ -232,12 +243,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
 
     const sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
-    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(air, bubbles) };
+    const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(max(air, bubbles), held.drain.mul(0.6)) };
     // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it. Never quite a
     // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near).mul(float(1).sub(storm.mul(STORM_DARK)));
+    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
@@ -257,9 +268,13 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   mesh.frustumCulled = false;
 
   const caustics = createCaustics(view, sky, waves, charts, shallows);
+  // the open trails, riding the waves (and the wakes' waves) as the water does
+  const trails = createTrails(sky, (up, c) => view.place(up, 0).add(waveAt(up, c).xyz).add(up.mul(wake.height(up))));
 
   return {
     mesh,
+    /** The open trails' ribbons, drawn after the sea. */
+    ribbons: trails.mesh,
     /** The sea's charts (world/lattice.ts), for its CPU copy (world/swell.ts). */
     anchors: charts.anchors,
     /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
@@ -267,8 +282,11 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
       sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
     },
-    /** Each frame: the world, and the ships on the sea. Returns what is due: the waves' passes, the marks' draw. */
-    update(env: Environment, dt: number, ships: readonly Afloat[]): { waves: Compute[]; wake: Draw | null } {
+    /** Each frame: the world, the ships on the sea, who holds it and whose ship is hers. Returns what is due: the
+     *  waves' passes, the marks' draw. */
+    update(env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships'>): { waves: Compute[]; wake: Draw | null } {
+      claims.update(drawn?.sea, drawn?.own ?? null);
+      trails.update(drawn?.sea, drawn?.ships ?? [], view.eye.position, drawn?.own ?? null);
       const swell = waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
       const marks = wake.update(env, ships);
       hulls.update(ships.map((s) => s.pose), view.eye.position);
