@@ -22,7 +22,7 @@ export interface Call { cue: Cue; at: Vec3 | null; gain: number }
 
 /**
  * What the bed follows (bed.ts):
- *   speed     her speed, a share of her top (1 at 12 m/s)
+ *   speed     her speed, a share of her top (1 at 13.5 m/s)
  *   wind      the wind in her rig, 0…1 (her way through the air, and a gust)
  *   heave     her rise and fall, m/s (up +)
  *   roll      her roll, radians

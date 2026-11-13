@@ -27,7 +27,7 @@ export const STORM = {
   /**
    * The phases in order. The first cap is the whole planet (π·R, 1740 m), so the first wait is only a warning: it
    * shows where the storm is headed. The first close is the long one (the far side of the planet is 940 m outside
-   * its next cap: 130 s at a ship's best 12 m/s, eighty at an ordinary 7); after it the edge moves at 3–7 m/s, a
+   * its next cap: 70 s at a ship's best 13.5 m/s, 134 at an ordinary 7); after it the edge moves at 3–7 m/s, a
    * ship's easy pace, as the old game's did. The last cap, 25 m, holds two or three ships' lengths: a fight.
    */
   phases: [

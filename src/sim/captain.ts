@@ -51,13 +51,13 @@ export const BOT = {
    *  the way clears. */
   feel: 14, feelSide: 16, side: 0.6, firm: 0.9, hard: 1.2, avoid: 0.8,
   /**
-   * Backing off a bank: making less than `crawl` m/s she is stuck (0117: 1, by top speed 14.5 → 12). With shoal water
+   * Backing off a bank: making less than `crawl` m/s she is stuck (0117: 1, by top speed 14.5 → 13.5). With shoal water
    * `bow` m past her forefoot (0117: 4 m past a shorter hull's centre), she waits `wade` s, then makes for the deepest
    * water `sound` m round her for up to `most` s. Else stuck `stuck` s, she turns hard (steer `full`) toward the open
-   * side at about `rate` rad/s (0117: 0.65 at her turn of 0.55; here SHIP.turn 0.42), for `least`–2.2×`least` s, at most
+   * side at about `rate` rad/s (0117: 0.65 at her turn of 0.55; here SHIP.turn 0.47), for `least`–2.2×`least` s, at most
    * `most`, until her course lies within `slack` of half a turn ahead; at `slow` throttle.
    */
-  crawl: 0.83, bow: 4, wade: 1, sound: 14, stuck: 2.5, full: 2.4, rate: 0.5, least: 1, most: 4.5, slack: 0.6, slow: 0.6,
+  crawl: 0.93, bow: 4, wade: 1, sound: 14, stuck: 2.5, full: 2.4, rate: 0.56, least: 1, most: 4.5, slack: 0.6, slow: 0.6,
   /** Ramming (new): the lead is at most `lead` s; from further than `commit` m, a ship she lies more than `abeam`
    *  (cosine) ahead or astern of is come at by way of a point off her beam, half the way out, `offMin`–`offMax` m; once
    *  her hull touches her foe's, she bears away for `recoil` s (a ram's blow lands once until they are RAM.rearm clear). */
