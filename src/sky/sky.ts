@@ -31,8 +31,7 @@ import { createClouds } from './clouds';
 import { createReflection } from './reflection';
 import { createStormLook } from './storm';
 import { VIEW_RADIUS, createTables } from './tables';
-
-type N = any;
+import type { FloatNode, Vec3Node } from '../tsl';
 
 /**
  * The sun's disc as the sky draws it, its angular radius: 3° across, where the true sun is 0.53°, a few pixels on the
@@ -64,19 +63,19 @@ const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT
 
 /** The light the sky gives everything else. */
 export interface Sky {
-  sun(p: N): N;
-  sunIlluminance(p: N): N;
-  cloudShadow(p: N): N;
-  ambient(p: N, n: N): N;
-  reflect(dir: N, roughness: N): N;
-  storm(p: N): N;
+  sun(p: Vec3Node): Vec3Node;
+  sunIlluminance(p: Vec3Node): Vec3Node;
+  cloudShadow(p: Vec3Node): FloatNode;
+  ambient(p: Vec3Node, n: Vec3Node): Vec3Node;
+  reflect(dir: Vec3Node, roughness: FloatNode): Vec3Node;
+  storm(p: Vec3Node): FloatNode;
 }
 
 export function createSky(view: View) {
   const tables = createTables();
   const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   /** Extinction of the air at sea level, per km. */
-  const seaLevelExtinction: N = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
+  const seaLevelExtinction = vec3(...RAYLEIGH_SCATTERING).add(haze.mul(MIE_EXTINCTION));
   /** Toward the sun over the eye: in the world, and as the eye's sky shows it. */
   const sun = uniform(new Vector3(0, 1, 0));
   const skySun = uniform(new Vector3(0, 1, 0));
@@ -89,23 +88,23 @@ export function createSky(view: View) {
   const storm = createStormLook(view);
 
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
-  const sunOver = (p: N): N => {
-    const u: N = normalize(p), c: N = dot(origin, u), w: N = cross(origin, u);
+  const sunOver = (p: Vec3Node): Vec3Node => {
+    const u = normalize(p), c = dot(origin, u), w = cross(origin, u);
     // Rodrigues: v·c + w × v + w (w·v)/(1 + c); at the origin's antipode (under an island) it is undefined
     return normalize(there.mul(c).add(cross(w, there)).add(w.mul(dot(w, there).div(max(c.add(1), 1e-6)))));
   };
 
   /** The same everywhere: the sun stands as high over every place. */
-  const sunIlluminance = (_p: N): N => sunTransmittance(VIEW_RADIUS, rise);
+  const sunIlluminance = (_p: Vec3Node): Vec3Node => sunTransmittance(VIEW_RADIUS, rise);
 
-  const ambient = (p: N, n: N): N => {
+  const ambient = (p: Vec3Node, n: Vec3Node): Vec3Node => {
     const up = view.up(p);
     const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
     return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5)).mul(mix(1, STORM_SKY, storm.depth(p)));
   };
-  const stormLight: N = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0)).mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT));
+  const stormLight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0)).mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT));
 
-  const fog = (color: N, dir: N, metres: N): N => {
+  const fog = (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => {
     const T = exp(seaLevelExtinction.mul(metres).mul(-0.001));
     // what a long path through the air along dir glows with; for things below the horizon, the horizon's glow
     const d = view.toSky(dir);
@@ -130,9 +129,9 @@ export function createSky(view: View) {
     return sky.add(T.mul(disc.add(peak.mul(mieDepth))));
   })();
 
-  const cloudShadow = (p: N): N => clouds.shadow(p).mul(mix(1, STORM_SUN, storm.depth(p)));
+  const cloudShadow = (p: Vec3Node): FloatNode => clouds.shadow(p).mul(mix(1, STORM_SUN, storm.depth(p)));
   // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
-  const reflect = (dir: N, roughness: N): N => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
+  const reflect = (dir: Vec3Node, roughness: FloatNode): Vec3Node => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
   const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, ambient, reflect, storm: storm.depth };
 
   return {
@@ -140,8 +139,8 @@ export function createSky(view: View) {
     clouds,
     light,
     fog,
-    veil: (color: N, dir: N, metres: N): N => storm.veil(color, dir, metres, stormLight),
-    deck: (color: N, dir: N, metres: N): N => storm.deck(color, dir, metres, stormLight),
+    veil: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.veil(color, dir, metres, stormLight),
+    deck: (color: Vec3Node, dir: Vec3Node, metres: FloatNode): Vec3Node => storm.deck(color, dir, metres, stormLight),
     /** The clouds' patterns' passes, to be run once before the first frame. */
     bake: clouds.bake,
     /** Readies the sky for this frame, and returns the passes due from each part of it. */

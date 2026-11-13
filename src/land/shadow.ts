@@ -17,8 +17,7 @@ import type { Draw } from '../gpu';
 import type { IslandSite } from '../world/planet';
 import { place } from '../world/sphere';
 import type { Instances } from './site';
-
-type N = any;
+import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Texels across the map. */
 const SIZE = 2048;
@@ -35,7 +34,7 @@ const MOVED = 0.002;
 
 export interface Shadow {
   /** 0…1: how much of the sun reaches world position p on a surface facing n. */
-  visible(p: N, n: N): N;
+  visible(p: Vec3Node, n: Vec3Node): FloatNode;
   /** Adds things that cast shadows. */
   cast(...casters: Instances[]): void;
   /** The map's draw if it is due: if the sun has moved or the island has changed (sun: unit vector toward it; island:
@@ -56,7 +55,8 @@ export function createShadow(): Shadow {
   black.colorNode = vec3(0);
 
   const matrix = uniform(new Matrix4());
-  const map = texture(target.depthTexture);
+  // a depth texture reads as a float (NodeUtils getTextureType), as does its comparison
+  const map = texture<'float'>(target.depthTexture);
   const stands: { stand: InstancedMesh; caster: Instances }[] = [];
   const centre = new Vector3(), up = new Vector3(), north = new Vector3(), last = new Vector3();
   let covered: IslandSite | null = null;
@@ -69,8 +69,8 @@ export function createShadow(): Shadow {
       // four filtered look-ups a texel apart: soft-edged over about four texels
       const texel = 1 / SIZE;
       const lit = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
-        .map(([x, y]) => map.sample(uv.add(vec2(x * texel * 0.75, y * texel * 0.75))).compare(ref))
-        .reduce((a: N, b: N) => a.add(b)).mul(0.25);
+        .map(([x, y]): FloatNode => map.sample(uv.add(vec2(x * texel * 0.75, y * texel * 0.75))).compare(ref))
+        .reduce((a, b) => a.add(b)).mul(0.25);
       const inside = uv.x.greaterThan(0).and(uv.x.lessThan(1)).and(uv.y.greaterThan(0)).and(uv.y.lessThan(1));
       return select(inside, lit, float(1));
     },

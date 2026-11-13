@@ -20,8 +20,7 @@ import { Fn, abs, acos, clamp, dot, exp, float, max, min, mix, mx_noise_float, n
 import type { Cap } from '../sim/storm';
 import type { View } from '../view/view';
 import { R } from '../world/sphere';
-
-type N = any;
+import type { FloatNode, Vec3Node } from '../tsl';
 
 /** The storm's air reaches this high over the sea, metres: over the horizon from 650 m away. */
 const TOP = 320;
@@ -50,15 +49,15 @@ export function createStormLook(view: View) {
   const clock = uniform(0);
 
   /** 0…1 how deep in the storm world position p lies. */
-  const depth = (p: N): N => smoothstep(0, SOFT, acos(clamp(dot(normalize(p), centre), -1, 1)).sub(radius).mul(R));
+  const depth = (p: Vec3Node): FloatNode => smoothstep(0, SOFT, acos(clamp(dot(normalize(p), centre), -1, 1)).sub(radius).mul(R));
 
   /**
    * The eye's ray along world direction dir, up to `metres`, through the storm: how far it runs in it (weighed by
    * depth), and a point a mean free path in from where it enters (or its end, if it runs less), whose rain is what
    * the eye sees most of.
    */
-  const path = (dir: N, metres: N): { length: N; q: N } => {
-    const o: N = view.position, d: N = dir;
+  const path = (dir: Vec3Node, metres: FloatNode): { length: FloatNode; q: Vec3Node } => {
+    const o = view.position, d = dir;
     const a = dot(o, centre), b = dot(d, centre), oo = dot(o, o), od = dot(o, d), k2 = cosine.mul(cosine);
     // the storm's shell: where the ray is below TOP, and in front of what the pixel shows
     const h = od.mul(od).sub(oo.sub((R + TOP) * (R + TOP)));
@@ -72,7 +71,7 @@ export function createStormLook(view: View) {
     const r1 = B.negate().sub(root).div(A2), r2 = B.negate().add(root).div(A2);
     const t1 = select(disc.lessThan(0), hi, clamp(min(r1, r2), lo, hi));
     const t2 = select(disc.lessThan(0), hi, clamp(max(r1, r2), lo, hi));
-    const at = (t: N): N => o.add(d.mul(t));
+    const at = (t: FloatNode): Vec3Node => o.add(d.mul(t));
     const w0 = depth(at(lo.add(t1).mul(0.5))), w1 = depth(at(t1.add(t2).mul(0.5))), w2 = depth(at(t2.add(hi).mul(0.5)));
     const length = t1.sub(lo).mul(w0).add(t2.sub(t1).mul(w1)).add(hi.sub(t2).mul(w2));
     const enter = select(w0.greaterThan(0), lo, select(w1.greaterThan(0), t1, t2));
@@ -80,17 +79,17 @@ export function createStormLook(view: View) {
   };
 
   /** The storm's light at altitude: dark at its foot, where the rain falls out of it, paler up in the cloud. */
-  const shade = (light: N, altitude: N): N => light.mul(mix(FOOT, CROWN, smoothstep(0, TOP, altitude)));
+  const shade = (light: Vec3Node, altitude: FloatNode): Vec3Node => light.mul(mix(FOOT, CROWN, smoothstep(0, TOP, altitude)));
 
   /** Colour c seen m metres along world direction dir from the eye, through the storm lit by `light`. */
-  const veil = (c: N, dir: N, metres: N, light: N): N =>
+  const veil = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: Vec3Node): Vec3Node =>
     Fn(() => {
       const { length, q } = path(dir, metres);
-      const up: N = normalize(q), altitude: N = dot(q, up).sub(R);
+      const up = normalize(q), altitude = dot(q, up).sub(R);
       // Below the cloud's base, curtains of rain: streaks up and down, leaning with the wind, falling, a finer set
       // in the coarser. Above it, the cloud's billows, which fray its top.
-      const across: N = up.mul(R / ACROSS).add(vec3(altitude.mul(LEAN / ACROSS), 0, 0));
-      const streak = (k: number): N => mx_noise_float(across.mul(k).add(vec3(0, altitude.add(clock.mul(FALL)).div(ALONG), k * 7)));
+      const across = up.mul(R / ACROSS).add(vec3(altitude.mul(LEAN / ACROSS), 0, 0));
+      const streak = (k: number): FloatNode => mx_noise_float(across.mul(k).add(vec3(0, altitude.add(clock.mul(FALL)).div(ALONG), k * 7)));
       const shafts = streak(1).mul(0.7).add(streak(3).mul(0.3)).mul(0.5).add(0.5);
       const billow = mx_noise_float(up.mul(R / BILLOW).add(vec3(clock.mul(0.02), altitude.div(BILLOW), 0)));
       const cloud = smoothstep(BASE * 0.7, BASE * 1.3, altitude.add(billow.mul(BASE * 0.3)));
@@ -104,7 +103,7 @@ export function createStormLook(view: View) {
     })();
 
   /** The same, with no curtains and to the top of the storm: what a mirror (the sea) shows of it, cheaply. */
-  const dim = (c: N, dir: N, light: N): N =>
+  const dim = (c: Vec3Node, dir: Vec3Node, light: Vec3Node): Vec3Node =>
     Fn(() => {
       const { length, q } = path(dir, float(1e5));
       const T = exp(length.mul(-SIGMA * (1 - CURTAIN / 2)));
@@ -115,10 +114,10 @@ export function createStormLook(view: View) {
    * Colour c seen m metres along world direction dir from an eye high over the storm (the full map's, from space):
    * its cloud's top, billowed and lit unevenly, over everything under it; no curtains, which only show from beside.
    */
-  const deck = (c: N, dir: N, metres: N, light: N): N =>
+  const deck = (c: Vec3Node, dir: Vec3Node, metres: FloatNode, light: Vec3Node): Vec3Node =>
     Fn(() => {
       const { length, q } = path(dir, metres);
-      const up: N = normalize(q), altitude: N = dot(q, up).sub(R);
+      const up = normalize(q), altitude = dot(q, up).sub(R);
       const billow = mx_noise_float(up.mul(R / BILLOW).add(vec3(clock.mul(0.02), 0, 0))).mul(0.6)
         .add(mx_noise_float(up.mul((R / BILLOW) * 3.1).add(vec3(0, clock.mul(0.05), 7))).mul(0.4));
       const T = exp(length.mul(-SIGMA * (1 - CURTAIN / 2)));

@@ -10,8 +10,7 @@ import {
   textureStore, uvec2, uvec3, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Compute } from '../gpu';
-
-type N = any;
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 const SHAPE_N = 64, DETAIL_N = 64, WEATHER_N = 1024;
 
@@ -22,13 +21,13 @@ function volume(n: number): Storage3DTexture {
   t.generateMipmaps = false;
   return t;
 }
-const hash33 = (c: N): N =>
+const hash33 = (c: Vec3Node): Vec3Node =>
   fract(sin(vec3(dot(c, vec3(127.1, 311.7, 74.7)), dot(c, vec3(269.5, 183.3, 246.1)), dot(c, vec3(113.5, 271.9, 124.6)))).mul(43758.5453));
 
 /** Tiling Worley noise of the given period, inverted: 1 at feature points. */
-const worley = Fn(([p, period]: [N, N]) => {
+const worley = Fn(([p, period]: [Vec3Node, FloatNode]) => {
   const cell = floor(p), f = fract(p);
-  let near: N = float(4);
+  let near: FloatNode = float(4);
   for (let z = -1; z <= 1; z++) for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
     const o = vec3(x, y, z);
     near = min(near, length(o.add(hash33(mod(cell.add(o), period))).sub(f)));
@@ -37,10 +36,10 @@ const worley = Fn(([p, period]: [N, N]) => {
 }).setLayout({ name: 'worley', type: 'float', inputs: [{ name: 'p', type: 'vec3' }, { name: 'period', type: 'float' }] });
 
 /** Tiling gradient noise in [-1, 1]. */
-const perlin = Fn(([p, period]: [N, N]) => {
-  const i: N = floor(p), f: N = fract(p);
-  const u: N = f.mul(f).mul(f).mul(f.mul(f.mul(6).sub(15)).add(10));
-  const g = (x: number, y: number, z: number): N => {
+const perlin = Fn(([p, period]: [Vec3Node, FloatNode]) => {
+  const i = floor(p), f = fract(p);
+  const u = f.mul(f).mul(f).mul(f.mul(f.mul(6).sub(15)).add(10));
+  const g = (x: number, y: number, z: number): FloatNode => {
     const o = vec3(x, y, z);
     return dot(normalize(hash33(mod(i.add(o), period)).mul(2).sub(1)), f.sub(o));
   };
@@ -54,7 +53,7 @@ const perlin = Fn(([p, period]: [N, N]) => {
  * cells) and random height v = 0.1 + 0.9u², most cells weak and a few strong; the highest cone wins. Returns its
  * value here and its peak.
  */
-const cells = Fn(([p, period]: [N, N]) => {
+const cells = Fn(([p, period]: [Vec2Node, FloatNode]) => {
   const cell = floor(p), f = fract(p);
   const best = vec2(0, 0).toVar();
   for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) {
@@ -67,14 +66,14 @@ const cells = Fn(([p, period]: [N, N]) => {
   return best;
 }).setLayout({ name: 'cells', type: 'vec2', inputs: [{ name: 'p', type: 'vec2' }, { name: 'period', type: 'float' }] });
 
-const perlinFbm = (p: N, f: number, octaves: number): N => {
-  let sum: N = float(0);
+const perlinFbm = (p: Vec3Node, f: number, octaves: number): FloatNode => {
+  let sum: FloatNode = float(0);
   let amp = 0.5;
   for (let o = 0; o < octaves; o++, f *= 2, amp *= 0.5) sum = sum.add(perlin(p.mul(f), float(f)).mul(amp));
   return sum;
 };
 
-export const remap = (x: N, a: N, b: N, c: N, d: N): N => c.add(x.sub(a).div(max(b.sub(a), 1e-4)).mul(d.sub(c)));
+export const remap = (x: FloatNode, a: FloatNode, b: FloatNode, c: FloatNode, d: FloatNode): FloatNode => c.add(x.sub(a).div(max(b.sub(a), 1e-4)).mul(d.sub(c)));
 
 function texel3(n: number) {
   const x = instanceIndex.mod(n), y = instanceIndex.div(n).mod(n), z = instanceIndex.div(n * n);

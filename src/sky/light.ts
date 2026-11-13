@@ -4,22 +4,21 @@
 // GGX highlight, the sky as its GGX-filtered reflection (sky/reflection.ts), both at the same exposure as the rest.
 
 import { cameraPosition, dot, float, max, min, normalize, pow, reflect, saturate, vec2, vec3, vec4 } from 'three/tsl';
+import type { FloatNode, Vec3Node } from '../tsl';
 import type { Sky } from './sky';
 
-type N = any;
-
 /** The light under the water at a point, as a share of what is above it (water.below). */
-export interface Below { sun(p: N): N; sky(p: N): N }
+export interface Below { sun(p: Vec3Node): Vec3Node; sky(p: Vec3Node): Vec3Node }
 
 /** A glossy surface's light: what reaches it per unit albedo (for its diffuse part), and the radiance it reflects
  * toward the eye. */
-export interface Gloss { diffuse: N; specular: N }
+export interface Gloss { diffuse: Vec3Node; specular: Vec3Node }
 
 /** Light reaching a matte surface at world position p facing n, as radiance per unit albedo. */
 export interface Light {
-  (p: N, n: N): N;
+  (p: Vec3Node, n: Vec3Node): Vec3Node;
   /** The same for a surface of roughness r (perceptual, 0…1) and reflectance f0 face on (rgb: a metal's colour). */
-  glossy(p: N, n: N, r: N, f0: N): Gloss;
+  glossy(p: Vec3Node, n: Vec3Node, r: FloatNode, f0: Vec3Node): Gloss;
 }
 
 /** The smoothest a surface is taken to be for the sun: a smoother one's highlight would be smaller than the disc. */
@@ -29,7 +28,7 @@ const SMOOTHEST = 0.06;
  * The environment's share of a glossy reflection, integrated over the hemisphere: Karis's fit for mobile ("Physically
  * Based Shading on Mobile", 2014), f0 scaled and biased by roughness and the angle of view.
  */
-const envBRDF = (f0: N, r: N, nv: N): N => {
+const envBRDF = (f0: Vec3Node, r: FloatNode, nv: FloatNode): Vec3Node => {
   const c0 = vec4(-1, -0.0275, -0.572, 0.022), c1 = vec4(1, 0.0425, 1.04, -0.04);
   const q = c0.mul(r).add(c1);
   const a004 = min(q.x.mul(q.x), pow(float(2), nv.mul(-9.28))).mul(q.x).add(q.y);
@@ -38,11 +37,11 @@ const envBRDF = (f0: N, r: N, nv: N): N => {
 };
 
 /** visible(p, n): 0…1, how much of the sun reaches p past what stands on the island (shadow.visible). */
-export function createLighting(sky: Sky, below: Below, visible: (p: N, n: N) => N): Light {
-  const sunAt = (p: N, n: N): N => sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
-  const ambient = (p: N, n: N): N => sky.ambient(p, n).mul(below.sky(p));
-  const light = (p: N, n: N): N => sunAt(p, n).mul(saturate(n.dot(sky.sun(p)))).div(Math.PI).add(ambient(p, n));
-  light.glossy = (p: N, n: N, r: N, f0: N): Gloss => {
+export function createLighting(sky: Sky, below: Below, visible: (p: Vec3Node, n: Vec3Node) => FloatNode): Light {
+  const sunAt = (p: Vec3Node, n: Vec3Node): Vec3Node => sky.sunIlluminance(p).mul(sky.cloudShadow(p)).mul(visible(p, n)).mul(below.sun(p));
+  const ambient = (p: Vec3Node, n: Vec3Node): Vec3Node => sky.ambient(p, n).mul(below.sky(p));
+  const light = (p: Vec3Node, n: Vec3Node): Vec3Node => sunAt(p, n).mul(saturate(n.dot(sky.sun(p)))).div(Math.PI).add(ambient(p, n));
+  light.glossy = (p: Vec3Node, n: Vec3Node, r: FloatNode, f0: Vec3Node): Gloss => {
     const l = sky.sun(p).toVar();
     const sun = sunAt(p, n).toVar(), nl = saturate(n.dot(l));
     const v = normalize(cameraPosition.sub(p)), nv = max(dot(n, v), 1e-4);
@@ -62,4 +61,4 @@ export function createLighting(sky: Sky, below: Below, visible: (p: N, n: N) => 
 }
 
 /** A leaf facing n (the side toward the eye): lit on that side, and by the share `through` of what falls on the other. */
-export const leafLight = (light: Light, p: N, n: N, through: number): N => light(p, n).add(light(p, n.negate()).mul(through));
+export const leafLight = (light: Light, p: Vec3Node, n: Vec3Node, through: number): Vec3Node => light(p, n).add(light(p, n.negate()).mul(through));

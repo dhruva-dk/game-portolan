@@ -22,7 +22,7 @@
 // normals: 17 dispatches of 3132 threads, nothing when no berth is held. Nothing is read back: the cloth's material
 // reads the particles straight from their buffers in the vertex stage (materials.ts).
 
-import { Vector4 } from 'three/webgpu';
+import { Vector4, type StorageBufferNode } from 'three/webgpu';
 import {
   Fn, If, Return, abs, cos, cross, dot, float, instanceIndex, int, length, max, min, normalize, select, sin, uniform, uniformArray,
   vec3, vec4, instancedArray,
@@ -32,8 +32,7 @@ import type { Vec3 } from '../world/sphere';
 import { BERTHS } from './berths';
 import { cutCanvas } from './canvas';
 import { CLOTH } from './kit';
-
-type N = any;
+import { maxInt, minInt, type FloatNode, type IntNode, type Vec3Node } from '../tsl';
 
 /** Steps a frame, each a prediction and one Jacobi pass; and the longest frame they cover, seconds. */
 const SUBSTEPS = 8, LONGEST = 1 / 20;
@@ -66,16 +65,16 @@ const PARAMS = 5;
  * The wind's slow breath at a time (seconds) for a ship's phase: its strength as a share of its mean. The fleet's far
  * ships' sails breathe with it too (materials.ts), so a ship's canvas does the same before and after it is simulated.
  */
-export const breath = (clock: N, phase: N): N =>
+export const breath = (clock: FloatNode, phase: FloatNode): FloatNode =>
   float(1).add(sin(clock.mul(0.83).add(phase)).mul(0.12)).add(sin(clock.mul(2.1).add(phase.mul(2.3))).mul(0.07));
 
 /** A direction turned about the vertical by `angle` (as a square yard is braced: the port arm aft for positive). */
-const turn = (v: N, angle: N): N => {
+const turn = (v: Vec3Node, angle: FloatNode): Vec3Node => {
   const c = cos(angle), s = sin(angle);
   return vec3(v.x.mul(c).add(v.z.mul(s)), v.y, v.x.negate().mul(s).add(v.z.mul(c)));
 };
 /** A point turned so about the vertical through z = pivot. */
-const turnAbout = (p: N, angle: N, pivot: N): N => turn(p.sub(vec3(0, 0, pivot)), angle).add(vec3(0, 0, pivot));
+const turnAbout = (p: Vec3Node, angle: FloatNode, pivot: FloatNode | number): Vec3Node => turn(p.sub(vec3(0, 0, pivot)), angle).add(vec3(0, 0, pivot));
 
 /** What a berth's ship feels this frame, in her own frame (x to port, y up, z forward). */
 export interface Felt {
@@ -96,26 +95,26 @@ export type Cloth = ReturnType<typeof createCloth>;
 
 export function createCloth() {
   const canvas = cutCanvas(), n = canvas.count, total = BERTHS * n;
-  const X: N = instancedArray(total, 'vec4'), Vel: N = instancedArray(total, 'vec4'), P: N = instancedArray(total, 'vec4');
-  const Nrm: N = instancedArray(total, 'vec4');
-  const [tRest, tGrid, tCell, tMast]: N[] = [canvas.rest, canvas.grid, canvas.cell, canvas.mast].map((a) => instancedArray(a, 'vec4').toReadOnly());
+  const X = instancedArray(total, 'vec4'), Vel = instancedArray(total, 'vec4'), P = instancedArray(total, 'vec4');
+  const Nrm = instancedArray(total, 'vec4');
+  const [tRest, tGrid, tCell, tMast] = [canvas.rest, canvas.grid, canvas.cell, canvas.mast].map((a) => instancedArray(a, 'vec4').toReadOnly());
   const values = Array.from({ length: BERTHS * PARAMS }, () => new Vector4());
-  const params: N = uniformArray(values, 'vec4');
+  const params = uniformArray<'vec4'>(values, 'vec4');
   const h = uniform(1 / 240);
   /** Seconds, the cloth's own clock (the far ships' sails breathe on it too). */
   const clock = uniform(0);
   /** Each grid's first particle and last column and row, for the vertex stage to find its particles. */
-  const grids: N = uniformArray(canvas.grids.map((g) => new Vector4(g.first, g.columns, g.rows, g.kind)), 'vec4');
+  const grids = uniformArray<'vec4'>(canvas.grids.map((g) => new Vector4(g.first, g.columns, g.rows, g.kind)), 'vec4');
 
   /** Which berth and which particle of the canvas a thread is. */
   const where = () => {
-    const id: N = int(instanceIndex);
+    const id = int(instanceIndex);
     const slot = id.div(n);
     const t = id.sub(slot.mul(n));
     return { id, slot, t, base: slot.mul(n), p0: params.element(slot.mul(PARAMS)) };
   };
   /** The particle at column i, row j of the grid at `g0`, in the berth from `base`, in buffer B. */
-  const at = (B: N, base: N, g0: N, row: N, i: N, j: N): N => B.element(base.add(g0).add(i).add(j.mul(row))).xyz;
+  const at = (B: StorageBufferNode<'vec4'>, base: IntNode, g0: IntNode, row: IntNode, i: IntNode, j: IntNode): Vec3Node => B.element(base.add(g0).add(i).add(j.mul(row))).xyz;
 
   const predict = Fn(() => {
     const { id, slot, t, base, p0 } = where();
@@ -132,12 +131,12 @@ export function createCloth() {
       Return();
     });
     const g = tGrid.element(t), c = tCell.element(t), m = tMast.element(t);
-    const g0: N = int(g.x), nu: N = int(g.y), nv: N = int(g.z), row: N = nu.add(1), kind = g.w;
-    const i: N = int(c.x), j: N = int(c.y);
+    const g0 = int(g.x), nu = int(g.y), nv = int(g.z), row = nu.add(1), kind = g.w;
+    const i = int(c.x), j = int(c.y);
     const x = X.element(id).xyz, v = Vel.element(id).xyz;
     // the cloth's normal here, across its neighbours (either way round: the wind presses on whichever side it meets)
-    const tu = at(X, base, g0, row, min(i.add(1), nu), j).sub(at(X, base, g0, row, max(i.sub(1), 0), j));
-    const tv = at(X, base, g0, row, i, min(j.add(1), nv)).sub(at(X, base, g0, row, i, max(j.sub(1), 0)));
+    const tu = at(X, base, g0, row, minInt(i.add(1), nu), j).sub(at(X, base, g0, row, maxInt(i.sub(1), 0), j));
+    const tv = at(X, base, g0, row, i, minInt(j.add(1), nv)).sub(at(X, base, g0, row, i, maxInt(j.sub(1), 0)));
     const nn = cross(tu, tv);
     const normal = nn.div(max(length(nn), 1e-6));
     // what she feels, from her frame to the sail's: a square sail's yard is braced
@@ -182,8 +181,8 @@ export function createCloth() {
       Return();
     });
     const g = tGrid.element(t), c = tCell.element(t), m = tMast.element(t);
-    const g0: N = int(g.x), nu: N = int(g.y), nv: N = int(g.z), row: N = nu.add(1);
-    const i: N = int(c.x), j: N = int(c.y);
+    const g0 = int(g.x), nu = int(g.y), nv = int(g.z), row = nu.add(1);
+    const i = int(c.x), j = int(c.y);
     const sum = vec3(0).toVar(), count = float(0).toVar();
     const h2 = h.mul(h);
     for (const [di, dj, alpha, counts] of STENCIL) {
@@ -228,12 +227,12 @@ export function createCloth() {
     const { id, t, base, p0 } = where();
     If(p0.x.lessThan(0.5), () => { Return(); });
     const g = tGrid.element(t), c = tCell.element(t), m = tMast.element(t);
-    const g0: N = int(g.x), nu: N = int(g.y), nv: N = int(g.z), row: N = nu.add(1), kind = g.w;
-    const i: N = int(c.x), j: N = int(c.y);
+    const g0 = int(g.x), nu = int(g.y), nv = int(g.z), row = nu.add(1), kind = g.w;
+    const i = int(c.x), j = int(c.y);
     const ju = select(kind.greaterThan(CLOTH.lateen - 0.5).and(kind.lessThan(CLOTH.lateen + 0.5)).and(j.equal(nv)), nv.sub(1), j);
     const iv = select(kind.greaterThan(CLOTH.pennant - 0.5).and(i.equal(nu)), nu.sub(1), i);
-    const du = at(X, base, g0, row, min(i.add(1), nu), ju).sub(at(X, base, g0, row, max(i.sub(1), 0), ju));
-    const dv = at(X, base, g0, row, iv, min(j.add(1), nv)).sub(at(X, base, g0, row, iv, max(j.sub(1), 0)));
+    const du = at(X, base, g0, row, minInt(i.add(1), nu), ju).sub(at(X, base, g0, row, maxInt(i.sub(1), 0), ju));
+    const dv = at(X, base, g0, row, iv, minInt(j.add(1), nv)).sub(at(X, base, g0, row, iv, maxInt(j.sub(1), 0)));
     Nrm.element(id).assign(vec4(normalize(cross(dv, du)).mul(m.w), 0));
   })().compute(total, [64]);
 

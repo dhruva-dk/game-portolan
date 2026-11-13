@@ -22,20 +22,17 @@
 
 import { Vector3 } from 'three/webgpu';
 import {
-  Break, If, Loop, ceil, clamp, dot, exp, float, int, length, max, min, mix, normalize, pow, select, smoothstep, sqrt,
+  Break, If, ceil, clamp, dot, exp, float, int, length, max, min, mix, normalize, pow, select, smoothstep, sqrt,
   texture, texture3D, uniform, vec3, vec4,
 } from 'three/tsl';
 import {
   BOTTOM, MIE_EXTINCTION, MIE_SCALE_HEIGHT, RAYLEIGH_SCALE_HEIGHT, RAYLEIGH_SCATTERING, SEA_ALBEDO,
 } from './atmosphere';
 import { POTENTIAL_DECILES, WEATHER_TILE, remap, type CloudNoise } from './cloud-noise';
+import { loop, type FloatNode, type Vec3Node, type Vec4Node } from '../tsl';
 import type { Tables } from './tables';
 
-type N = any;
-
-const loop = (name: string, end: N, body: (i: N) => void) =>
-  (Loop as N)({ start: int(0), end, type: 'int', condition: '<', name }, (v: N) => body(v[name]));
-const fall = (a: number | N, b: number | N, x: N): N => float(1).sub(smoothstep(a, b, x));
+const fall = (a: number, b: number, x: FloatNode): FloatNode => float(1).sub(smoothstep(a, b, x));
 
 // ------------------------------------------------------------------ constants
 
@@ -76,10 +73,10 @@ export const DIFFUSION = 0.75 * (1 - 0.85);
 /** Taps toward the sun, km, spaced wider as they go. */
 const TAPS = [0.05, 0.15, 0.35, 0.8];
 
-const hg = (c: N, g: number): N =>
+const hg = (c: FloatNode, g: number): FloatNode =>
   float((1 - g * g) / (4 * Math.PI)).div(pow(float(1 + g * g).sub(c.mul(2 * g)), 1.5));
 /** Cloud's phase: a strong forward lobe and a weak back one (Hillaire 2016). */
-const phase = (c: N, k: number): N => mix(hg(c, -0.3 * k), hg(c, 0.8 * k), 0.7);
+const phase = (c: FloatNode, k: number): FloatNode => mix(hg(c, -0.3 * k), hg(c, 0.8 * k), 0.7);
 
 export type CloudField = ReturnType<typeof createCloudField>;
 
@@ -118,14 +115,14 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
   const eye = uniform(new Vector3());
 
   /** Where q (km from the eye) lies on the map, and its height in the shell (0 at the base, 1 at the top). */
-  const locate = (q: N) => {
+  const locate = (q: Vec3Node) => {
     const altitude = length(vec3(q.x, q.y.add(eye.y).add(BOTTOM), q.z)).sub(BOTTOM);
     // the patterns are carried by the wind: what the map shows at a place now came from upwind
     return { p: vec3(eye.x, 0, eye.z).add(q).sub(drift), h: clamp(altitude.sub(BASE).div(TOP - BASE), 0, 1) };
   };
 
   /** The cloud's density (0–1) at q before erosion, its height in the shell and its dome's top there (fractions). */
-  const coarse = (q: N) => {
+  const coarse = (q: Vec3Node) => {
     const { p, h } = locate(q);
     const w = texture(noise.weather).sample(p.xz.div(WEATHER_TILE)).level(float(0));
     // how far inside its cloud's edge the point lies, km: the fields of cloud lower the threshold, the clear skies
@@ -152,7 +149,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
   };
 
   /** Erodes a density at q: wisps toward the base, billows higher up. */
-  const erode = (dense: N, q: N, h: N): N => {
+  const erode = (dense: FloatNode, q: Vec3Node, h: FloatNode): FloatNode => {
     const { p } = locate(q);
     const d = texture3D(noise.detail, p.div(DETAIL_SCALE)).level(float(0));
     const df = d.r.mul(0.625).add(d.g.mul(0.25)).add(d.b.mul(0.125));
@@ -161,23 +158,23 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
   };
 
   /** The cloud's density at q (0–1, of SIGMA), eroded, as the march sees it. */
-  const density = (q: N): N => {
+  const density = (q: Vec3Node): FloatNode => {
     const c = coarse(q);
     return select(c.dense.greaterThan(0), clamp(erode(c.dense, q, c.h).div(FULL), 0, 1), float(0));
   };
 
   /** Distance along unit d from the eye to the sphere of altitude a (km); the eye is below it. */
-  const toAltitude = (d: N, a: number): N => {
-    const r0: N = float(BOTTOM).add(eye.y);
-    const b: N = r0.mul(d.y);
+  const toAltitude = (d: Vec3Node, a: number): FloatNode => {
+    const r0 = float(BOTTOM).add(eye.y);
+    const b = r0.mul(d.y);
     // c = r0² − r², written so it doesn't cancel
     const c = eye.y.sub(a).mul(r0.add(BOTTOM + a));
-    const s: N = sqrt(max(b.mul(b).sub(c), 0));
-    return (select as N)(b.greaterThan(0), c.negate().div(b.add(s)), b.negate().add(s));
+    const s = sqrt(max(b.mul(b).sub(c), 0));
+    return select(b.greaterThan(0), c.negate().div(b.add(s)), b.negate().add(s));
   };
 
   /** Fraction of light surviving the air from the eye to `dist` km along d, per colour (closed form, flat air). */
-  const airTransmittance = (d: N, dist: N): N => {
+  const airTransmittance = (d: Vec3Node, dist: FloatNode): Vec3Node => {
     const z = max(eye.y.add(d.y.mul(dist)).add(dist.mul(dist).div(2 * BOTTOM)), 0.01);
     // mean density over a straight climb from the sea to z: H(1 − e^(−z/H)) / z
     const mean = (H: number) => float(H).mul(float(1).sub(exp(z.negate().div(H)))).div(z);
@@ -190,7 +187,7 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
    * sun) seen through the air, and the fraction of what lies behind that survives (a); through `distance` the
    * transmittance-weighted distance of the cloud (km). `detail` erodes the near cloud.
    */
-  const march = (d: N, maxSteps: number, jitter: N, distance: N, detail: boolean): N => {
+  const march = (d: Vec3Node, maxSteps: number, jitter: FloatNode, distance: FloatNode, detail: boolean): Vec4Node => {
     const L = vec3(0).toVar(), T = float(1).toVar();
     const near = toAltitude(d, BASE).toVar(), far = min(toAltitude(d, TOP), MAX_DISTANCE).toVar();
     const span = max(far.sub(near), 0);
@@ -217,13 +214,13 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
             const c1 = coarse(q1);
             const first = c1.dense.toVar();
             if (detail) If(t.lessThan(DETAIL_DISTANCE).and(first.greaterThan(0)), () => { first.assign(erode(c1.dense, q1, c1.h)); });
-            let tau: N = clamp(first.div(FULL), 0, 1).mul(SIGMA * TAPS[0]);
+            let tau: FloatNode = clamp(first.div(FULL), 0, 1).mul(SIGMA * TAPS[0]);
             for (let k = 1; k < TAPS.length; k++) {
               tau = tau.add(clamp(coarse(q.add(sunDir.mul(TAPS[k]))).dense.div(FULL), 0, 1).mul(SIGMA * (TAPS[k] - TAPS[k - 1])));
             }
             // multiple scattering: octaves near the surface, each weaker, reaching deeper and less forward (a = b = c),
             // and deep inside the diffused light of a slab of that depth; built up only past the first mean free paths
-            let ms: N = float(0);
+            let ms: FloatNode = float(0);
             for (let k = 1; k < 4; k++) {
               const a = 0.6 ** k;
               ms = ms.add(exp(tau.mul(-a)).mul(phase(cosSun, a)).mul(a));
@@ -275,6 +272,6 @@ export function createCloudField(tables: Tables, noise: CloudNoise) {
     toAltitude,
     march,
     /** The clouds along unit sky direction d from the eye, coarser (no erosion): light (rgb) and transmittance (a). */
-    along: (d: N, steps: number): N => march(d, steps, float(0.5), float(0).toVar(), false),
+    along: (d: Vec3Node, steps: number): Vec4Node => march(d, steps, float(0.5), float(0).toVar(), false),
   };
 }

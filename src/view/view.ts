@@ -16,13 +16,12 @@
 //
 // The eye's frame is worked out once a frame from the camera (update), on the CPU and into uniforms.
 
-import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera, type PerspectiveCamera } from 'three/webgpu';
+import { BufferGeometry, Float32BufferAttribute, Vector3, type Camera, type PerspectiveCamera, type UniformNode } from 'three/webgpu';
 import {
-  asin, atan, clamp, cos, cross, dot, float, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
+  asin, atan, clamp, cos, cross, dot, length, max, normalize, positionGeometry, select, sin, sqrt, uniform, vec2, vec3,
 } from 'three/tsl';
 import { R, cross as crossV, frameAt, horizonDip, type Chart, type Frame, type Vec3 } from '../world/sphere';
-
-type N = any;
+import { toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 
 /** The eye, as the CPU sees it. */
 export interface Eye {
@@ -38,19 +37,19 @@ export interface Eye {
 export const pixelSize = (camera: PerspectiveCamera, height: number) => (2 * Math.tan(((camera.fov / camera.zoom) * Math.PI) / 360)) / height;
 
 /** A point's place on a chart (metres), the chart's x and z axes carried to it, up there, and its arc from the centre (radians). */
-export interface Charted { q: N; e1: N; e2: N; up: N; theta: N }
+export interface Charted { q: Vec2Node; e1: Vec3Node; e2: Vec3Node; up: Vec3Node; theta: FloatNode }
 
 /**
  * A chart given by its centre `A` and axes `a1`, `a2` = a1 × A, as nodes (constants, uniforms or a uniform array's
  * elements): the one place the shaders work out where a point lies on a chart.
  */
-export function chartNodes(A: N, a1: N, a2: N) {
-  return (p: N): Charted => {
+export function chartNodes(A: Vec3Node, a1: Vec3Node, a2: Vec3Node) {
+  return (p: Vec3Node): Charted => {
     const u = normalize(p);
     const c = dot(u, A);
     const d = u.sub(A.mul(c));
     const s = length(d);
-    const dir: N = select(s.greaterThan(1e-7), d.div(max(s, 1e-7)), a1);
+    const dir = select(s.greaterThan(1e-7), d.div(max(s, 1e-7)), a1);
     const theta = atan(s, c);
     const cp = dot(dir, a1), sp = dot(dir, a2);
     // the radial direction carried to p, and the one across it, which the carrying leaves as it is
@@ -61,7 +60,7 @@ export function chartNodes(A: N, a1: N, a2: N) {
 }
 
 const v3 = (v: Vec3) => vec3(v[0], v[1], v[2]);
-const set = (u: N, v: Vec3) => (u.value as Vector3).set(v[0], v[1], v[2]);
+const set = (u: UniformNode<'vec3'>, v: Vec3) => u.value.set(v[0], v[1], v[2]);
 
 export type View = ReturnType<typeof createView>;
 
@@ -74,11 +73,11 @@ export function createView() {
   const dip = uniform(0);
   const eye: Eye = { position: [0, R + 10, 0], frame: frameAt([0, 1, 0]), height: 10, dip: 0 };
 
-  const up = (p: N): N => normalize(p);
-  const altitude = (p: N): N => length(p).sub(R);
-  const place = (u: N, h: N): N => u.mul(float(h).add(R));
+  const up = (p: Vec3Node): Vec3Node => normalize(p);
+  const altitude = (p: Vec3Node): FloatNode => length(p).sub(R);
+  const place = (u: Vec3Node, h: FloatNode | number): Vec3Node => u.mul(toFloat(h).add(R));
 
-  const toSky = (dir: N): N => {
+  const toSky = (dir: Vec3Node): Vec3Node => {
     const d = normalize(dir);
     const x = dot(d, east), y = dot(d, up0), z = dot(d, south);
     const e = asin(clamp(y, -1, 1)).add(dip).div(dip.mul(2 / Math.PI).add(1));
@@ -88,7 +87,7 @@ export function createView() {
   };
 
   /** A sky direction back to a world direction, for a frame (east, up, south nodes) and its dip. */
-  const fromSky = (d: N, frame: { east: N; up: N; south: N; dip: N }): N => {
+  const fromSky = (d: Vec3Node, frame: { east: Vec3Node; up: Vec3Node; south: Vec3Node; dip: FloatNode }): Vec3Node => {
     const e = asin(clamp(d.y, -1, 1)).mul(frame.dip.mul(2 / Math.PI).add(1)).sub(frame.dip);
     const h = vec2(d.x, d.z);
     const flat = h.div(max(length(h), 1e-6)).mul(cos(e));
@@ -122,14 +121,14 @@ export function createView() {
     geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
     geometry.setIndex(index);
 
-    const arc: N = positionGeometry.x;
-    const bearing: N = positionGeometry.z;
+    const arc = positionGeometry.x;
+    const bearing = positionGeometry.z;
     const theta = arc.div(R);
     const out = east.mul(cos(bearing)).add(south.mul(sin(bearing)));
     return {
       geometry,
       arc,
-      up: up0.mul(cos(theta)).add(out.mul(sin(theta))) as N,
+      up: up0.mul(cos(theta)).add(out.mul(sin(theta))),
       /** Draws only the rings that can be seen; returns how far out the last drawn ring lies, metres. */
       update(crest: number): number {
         const reach = Math.min(R * (horizonDip(eye.height) + horizonDip(crest)), Math.PI * R);
@@ -153,12 +152,12 @@ export function createView() {
     position,
     height,
     /** How many of the first `metres` along world direction dir from the eye lie under `top` metres over the sea. */
-    under: (dir: N, metres: N, top: number): N => {
+    under: (dir: Vec3Node, metres: FloatNode, top: number): FloatNode => {
       const od = dot(position, dir), h = od.mul(od).sub(dot(position, position).sub((R + top) * (R + top)));
       return max(metres.sub(max(od.negate().sub(sqrt(max(h, 0))), 0)), 0);
     },
-    local: (p: N): N => eyeChart(p).q,
-    onEye: (p: N): Charted => eyeChart(p),
+    local: (p: Vec3Node): Vec2Node => eyeChart(p).q,
+    onEye: (p: Vec3Node): Charted => eyeChart(p),
     chart: (c: Chart) => chartNodes(v3(c.at), v3(c.axis), v3(crossV(c.axis, c.at))),
     rings,
     /** The eye on the CPU, as of the last update. */

@@ -26,8 +26,7 @@
 import { dot, exp, float, max, min, mix, normalize, pow, saturate, smoothstep, sqrt, vec3 } from 'three/tsl';
 import type { Sky } from '../sky/sky';
 import type { View } from '../view/view';
-
-type N = any;
+import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Absorption per metre, red/green/blue (680, 550, 440 nm). */
 const ABSORPTION = [0.45, 0.068, 0.025];
@@ -57,7 +56,7 @@ const AIR_VEIL = 2;
  * (F ≈ F0 for light near normal), R the irradiance reflectance just below the surface for u = b_b/(a + b_b) (Gordon
  * et al. 1975's cubic, sun-lit).
  */
-const deep = (air: N): N => {
+const deep = (air: FloatNode): Vec3Node => {
   const bb = vec3(...BACKSCATTER).add(air.mul(AIR_BACKSCATTER));
   const u = bb.div(vec3(...ABSORPTION).add(bb));
   return u.mul(u.mul(u.mul(0.1308).add(0.1425)).add(0.3244)).add(0.0001).mul((1 - F0) ** 2 / (N_WATER * N_WATER));
@@ -68,17 +67,17 @@ const CREST = vec3(...ABSORPTION.map((a) => Math.exp(-a * CREST_PATH) * CREST_SC
 const absorption = vec3(...ABSORPTION);
 
 /** Schlick's Fresnel for water. */
-export const fresnel = (cos: N): N => float(F0).add(pow(float(1).sub(saturate(cos)), 5).mul(1 - F0));
+export const fresnel = (cos: FloatNode): FloatNode => float(F0).add(pow(float(1).sub(saturate(cos)), 5).mul(1 - F0));
 
 export function createOptics(sky: Sky, view: View) {
   /** 1 below the sea's mean level, 0 above, over a few centimetres. */
-  const wet = (p: N): N => smoothstep(0.03, -0.03, view.altitude(p));
+  const wet = (p: Vec3Node): FloatNode => smoothstep(0.03, -0.03, view.altitude(p));
 
   /**
    * The share of the sun's light (as it is above the water) that reaches world position p below the surface: through
    * the surface (Fresnel), then down the refracted ray to p's depth, absorbed on the way. 1 above the water.
    */
-  const sunBelow = (p: N): N => {
+  const sunBelow = (p: Vec3Node): Vec3Node => {
     const depth = max(view.altitude(p).negate(), 0);
     const ly = dot(view.up(p), sky.sun(p));
     const cos = sqrt(float(1).sub(float(1).sub(ly.mul(ly)).div(N_WATER * N_WATER)));
@@ -87,7 +86,7 @@ export function createOptics(sky: Sky, view: View) {
   };
 
   /** The same for the sky's light, which comes down from every direction: on average a path about 1.2 times the depth. */
-  const skyBelow = (p: N): N => {
+  const skyBelow = (p: Vec3Node): Vec3Node => {
     const through = exp(absorption.mul(max(view.altitude(p).negate(), 0).mul(1.2)).negate()).mul(1 - 0.066);
     return mix(vec3(1), through, wet(p));
   };
@@ -96,19 +95,22 @@ export function createOptics(sky: Sky, view: View) {
     sunBelow,
     skyBelow,
     /** The light leaving the sea toward the eye (seaRadiance, below). */
-    seaRadiance: (p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle, ships: Ships): N =>
+    seaRadiance: (
+      p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node, path: FloatNode,
+      sparkle: Sparkle, ships: Ships,
+    ): Vec3Node =>
       seaRadiance(sky, view, p, n, v, alpha, crest, foam, behind, path, sparkle, ships),
   };
 }
 
 /** How the glint off the unresolved ripples gathers into flashes (glitter.ts), given D, n·h and h·l: its multiplier. */
-export type Sparkle = (D: N, nh: N, hl: N) => N;
+export type Sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => FloatNode;
 
 /**
  * What the ships do to the light here (water/wake.ts, water/hulls.ts), each 0…1: the share of the sun their shadows
  * leave, the share of the water's glow a hull beside it leaves, and the air a wake has worked into it.
  */
-export interface Ships { lit: N; glow: N; air: N }
+export interface Ships { lit: FloatNode; glow: FloatNode; air: FloatNode }
 
 /**
  * The sea's facets' distribution D and visibility V, for roughness α, the root of the mean square slope over both
@@ -116,7 +118,7 @@ export interface Ships { lit: N; glow: N; air: N }
  * GGX's closed form, which differs from Beckmann's by little at these slopes. (GGX's long tails would spread the
  * sun's glint far off its path.)
  */
-function facets(nh: N, nl: N, nv: N, alpha: N): { D: N; V: N } {
+function facets(nh: FloatNode, nl: FloatNode, nv: FloatNode, alpha: FloatNode): { D: FloatNode; V: FloatNode } {
   const a2 = alpha.mul(alpha), c2 = max(nh.mul(nh), 1e-4);
   const D = exp(float(1).sub(c2).div(c2.mul(a2)).negate()).div(a2.mul(c2.mul(c2)).mul(Math.PI));
   const vl = nv.mul(sqrt(nl.mul(nl).mul(float(1).sub(a2)).add(a2)));
@@ -136,8 +138,9 @@ function facets(nh: N, nl: N, nv: N, alpha: N): { D: N; V: N } {
  *   ships  what the ships do to the light here
  */
 function seaRadiance(
-  sky: Sky, view: View, p: N, n: N, v: N, alpha: N, crest: N, foam: N, behind: N, path: N, sparkle: Sparkle, ships: Ships,
-): N {
+  sky: Sky, view: View, p: Vec3Node, n: Vec3Node, v: Vec3Node, alpha: FloatNode, crest: FloatNode, foam: FloatNode, behind: Vec3Node,
+  path: FloatNode, sparkle: Sparkle, ships: Ships,
+): Vec3Node {
   const l = sky.sun(p), up = view.up(p);
   const nv = max(n.dot(v), 1e-4), nl = saturate(n.dot(l));
   const F = fresnel(nv);

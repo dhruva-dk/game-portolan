@@ -18,8 +18,7 @@ import type { Palm } from '../world/scatter';
 import type { Chart } from '../world/sphere';
 import { type Light, leafLight } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
-
-type N = any;
+import type { Vec3Node } from '../tsl';
 
 /** The shapes' leans at the foot, radians: each palm is drawn as the nearest. */
 const LEANS = [0.08, 0.2, 0.32, 0.46];
@@ -166,7 +165,7 @@ export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
   trunkMaterial.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld);
     const grain = texture(bark, uv()).rgb;
-    let albedo: N = grain.div(vec3(...BARK_MEAN)).mul(vec3(...BARK_ALBEDO));
+    let albedo: Vec3Node = grain.div(vec3(...BARK_MEAN)).mul(vec3(...BARK_ALBEDO));
     // the scars of fallen fronds: a narrow dark ring every RING metres up the trunk
     const scar = smoothstep(0.75, 0.95, fract(uv().y.div(RING)));
     albedo = albedo.mul(float(1).sub(scar.mul(0.35)));
@@ -176,7 +175,7 @@ export function createPalms(palms: Palm[][], charts: Chart[], light: Light) {
 
   const crownMaterial = new MeshBasicNodeMaterial({ side: DoubleSide });
   crownMaterial.colorNode = Fn(() => {
-    const p = positionWorld, leaf: N = attribute('leaf', 'vec2');
+    const p = positionWorld, leaf = attribute('leaf', 'vec2');
     // the side facing the eye
     const n = normalize(normalWorld).mul(faceDirection);
     const albedo = mix(vec3(...LEAF), vec3(...OLD_LEAF), smoothstep(0.55, 1, leaf.x)).mul(leaf.y);

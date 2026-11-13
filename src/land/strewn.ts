@@ -8,8 +8,7 @@
 // mean of the pattern they make (so the floor's tone doesn't change), and are not worked out at all past FAR.
 
 import { Fn, If, cameraPosition, float, floor, fract, length, mix, mx_cell_noise_float, select, smoothstep, vec3, vec4 } from 'three/tsl';
-
-type N = any;
+import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
 
 /** Cells of each, metres; the share of cells that hold one; its radius's range, as a share of the cell. */
 const STONE = { cell: 0.6, share: 0.55, radius: [0.12, 0.32] };
@@ -26,9 +25,9 @@ const SHALLOWEST = 0.3;
  * 0…1 how much of the ball in p's cell (p in cells) the floor cuts there, 1 at its middle, and whether the cell holds
  * one; k keeps each lattice's hashes apart.
  */
-const ball = (p: N, share: number, radius: number[], k: number): N => {
+const ball = (p: Vec3Node, share: number, radius: number[], k: number): FloatNode => {
   const cell = floor(p), f = fract(p);
-  const h = (o: number): N => mx_cell_noise_float(cell.add(k + o * 7.31));
+  const h = (o: number): FloatNode => mx_cell_noise_float(cell.add(k + o * 7.31));
   const r = mix(float(radius[0]), float(radius[1]), h(0));
   // the centre kept a radius from the cell's walls
   const centre = vec3(h(1), h(2), h(3)).mul(float(1).sub(r.mul(2))).add(r);
@@ -40,7 +39,7 @@ const ball = (p: N, share: number, radius: number[], k: number): N => {
 export function createStrewn() {
   // their cover's mean: a ball cut at random heights covers 2/3 of its disc on average, less its softened rim
   const mean = (s: typeof STONE) => s.share * Math.PI * ((s.radius[0] + s.radius[1]) / 2) ** 2 * 0.55;
-  return Fn(([p, height, cover]: [N, N, N]) => {
+  return Fn(([p, height, cover]: [Vec3Node, FloatNode, Vec4Node]) => {
     const deep = smoothstep(-SHALLOWEST, -SHALLOWEST - 0.5, height);
     const stones = deep.mul(cover.y.mul(0.85).add(0.15)), tufts = deep.mul(smoothstep(0.02, 0.4, cover.x).mul(0.8).add(0.2));
     const s = float(mean(STONE)).toVar(), t = float(mean(TUFT)).toVar();
@@ -50,7 +49,7 @@ export function createStrewn() {
       s.assign(mix(smoothstep(0, 0.35, ball(p.div(STONE.cell), STONE.share, STONE.radius, 0)), s, fade));
       t.assign(mix(smoothstep(0, 0.6, ball(p.div(TUFT.cell), TUFT.share, TUFT.radius, 101)), t, fade));
     });
-    const a: N = s.mul(stones), b: N = t.mul(tufts), stone: N = vec3(...STONE_ALBEDO);
+    const a = s.mul(stones), b = t.mul(tufts), stone = vec3(...STONE_ALBEDO);
     return vec4(mix(stone, vec3(...TUFT_ALBEDO), b.div(a.add(b).max(1e-4))), a.max(b));
   });
 }

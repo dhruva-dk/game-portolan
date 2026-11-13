@@ -21,8 +21,7 @@ import type { View } from '../view/view';
 import { CASCADES, SIZE } from './cascades';
 import { N_WATER } from './optics';
 import { CURVED, type Waves } from './waves';
-
-type N = any;
+import type { FloatNode, Vec3Node } from '../tsl';
 
 /** Caustics focus as if the floor were no deeper than about this, metres. */
 const FOCUS = 2.5;
@@ -33,8 +32,8 @@ const PIXELS = 4;
 const BLUR = 0.05;
 
 /** shallows(p): how much of the long (k < 2) and short waves the depth at p lets through. */
-export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Charts, shallows: (p: N) => { long: N; short: N }) {
-  return (p: N): N => Fn(() => {
+export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Charts, shallows: (p: Vec3Node) => { long: FloatNode; short: FloatNode }) {
+  return (p: Vec3Node): FloatNode => Fn(() => {
     const up = view.up(p);
     const depth = max(view.altitude(p).negate(), 0);
     const { long, short } = shallows(p);
@@ -51,7 +50,7 @@ export function createCaustics(view: View, sky: Sky, waves: Waves, charts: Chart
         E2.assign(c.e2);
       }
       const entry = c.q.add(vec2(dot(across, c.e1), dot(across, c.e2)));
-      let h: N = vec3(0);
+      let h: Vec3Node = vec3(0);
       CURVED.forEach((k, i) => {
         const L = CASCADES[k];
         const lod = log2(max(width.div(L / SIZE), 1));

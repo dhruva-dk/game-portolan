@@ -2,12 +2,11 @@
 // ties). Where on the six faces of an equi-angular cube a direction lies, for reading what has been baked onto them.
 
 import { abs, atan, int, select, vec2 } from 'three/tsl';
-
-type N = any;
+import type { IntNode, Vec2Node, Vec3Node } from '../tsl';
 
 /** The face (an int, 0…5) the direction p lies on, and where on it: uv in −1…1, spaced evenly in angle. */
-export function faceUV(p: N): { face: N; uv: N } {
-  const a: N = abs(p);
+export function faceUV(p: Vec3Node): { face: IntNode; uv: Vec2Node } {
+  const a = abs(p);
   const onX = a.x.greaterThanEqual(a.y).and(a.x.greaterThanEqual(a.z));
   const onY = a.y.greaterThanEqual(a.z);
   const px = p.x.greaterThanEqual(0), py = p.y.greaterThanEqual(0), pz = p.z.greaterThanEqual(0);

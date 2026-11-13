@@ -60,8 +60,7 @@ import type { View } from '../view/view';
 import type { ShipPose } from '../world/pose';
 import { R, add, along, cross as crossV, distance, dot as dotV, length, normalize as normalizeV, toChart, type Chart, type Vec3 } from '../world/sphere';
 import { outside } from './hulls';
-
-type N = any;
+import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
 
 /** Texels across the map, and how far it reaches from the point under the eye, metres. */
 const SIZE = 512, REACH = 128;
@@ -100,13 +99,13 @@ const SOFT = 3;
 
 const vertices = WAKE.most + 1;
 
-const sq = (x: N): N => x.mul(x);
+const sq = (x: FloatNode): FloatNode => x.mul(x);
 
 /** A ship as her marks need her: her pose, her velocity (world, metres a second) and her yards' brace (radians). */
 export interface Afloat { pose: ShipPose; velocity: Vec3; look: { brace: number } }
 
 /** A material that draws straight onto the map (the chart's metres in `at`) and adds what it draws to what is there. */
-function marker(at: N, mark: N): MeshBasicNodeMaterial {
+function marker(at: Vec2Node, mark: Vec4Node): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ side: DoubleSide, depthTest: false, depthWrite: false });
   m.vertexNode = vec4(at.x.div(REACH), at.y.div(REACH), 0.5, 1);
   m.fragmentNode = mark;
@@ -150,13 +149,13 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     const m = attribute('mark', 'vec4'), across = m.x, age = m.y, v = m.z, run = m.w, laid = attribute('laid', 'float');
     const pace = saturate(v.div(FULL)), calm = float(1).sub(rough.mul(ROUGH));
     // patches some metres across, fixed in the water: what is left of the foam breaks up along them
-    const patchy = (size: number, salt: number): N => mx_noise_float(vec3(laid.div(size), across.div(size), salt));
+    const patchy = (size: number, salt: number): FloatNode => mx_noise_float(vec3(laid.div(size), across.div(size), salt));
     // the churned water astern, its edges ragged, its foam breaking up as it ages
     const spread = age.mul(SPREAD).add(CHURN).mul(patchy(5, 0.5).mul(0.3).add(1));
-    const churned: N = exp(sq(across.div(spread)).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
+    const churned = exp(sq(across.div(spread)).negate()).mul(smoothstep(LENGTH - 1, LENGTH + 3, run)).mul(pace);
     const worn = age.div(24).add(rough.mul(0.2));
     const churnLeft = smoothstep(worn.sub(0.45), worn.sub(0.1), patchy(3, 1.5));
-    const foam: N = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
+    const foam = churned.mul(exp(age.div(-3)).mul(0.55).add(exp(age.div(-12)).mul(0.25).mul(churnLeft))).toVar();
     const air = churned.mul(exp(age.div(-10)));
     // the arms: metres outside each's line, its half-width, and what is left of it
     const off = abs(across).sub(v.mul(age).mul(KELVIN));
@@ -165,10 +164,10 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     // its crests in echelon, slanted 35° across it, a wavelength apart that grows with her speed: standing in her
     // frame for the waves (by run), lying in the water for the foam they leave (by laid)
     const wavelength = v.mul(0.6).add(3);
-    const slant = (along: N): N => cos(off.mul(0.82).add(along.mul(0.57)).mul(2 * Math.PI).div(wavelength));
+    const slant = (along: FloatNode): FloatNode => cos(off.mul(0.82).add(along.mul(0.57)).mul(2 * Math.PI).div(wavelength));
     const band = exp(sq(off.div(width.mul(select(off.greaterThan(0), float(1), float(2))))).negate());
-    const groups: N = mx_noise_float(vec2(run.div(14), 0.3)).mul(0.35).add(0.8);
-    const height: N = band.mul(slant(run)).mul(groups).mul(life).mul(ARM).div(v.mul(age).mul(0.06).add(1).sqrt());
+    const groups = mx_noise_float(vec2(run.div(14), 0.3)).mul(0.35).add(0.8);
+    const height = band.mul(slant(run)).mul(groups).mul(life).mul(ARM).div(v.mul(age).mul(0.06).add(1).sqrt());
     // the bow wave breaks white along the arms near her, feathered along its crests; the foam it leaves widens, and
     // breaks up into patches the farther back it lies, and the rougher the sea
     const feathers = smoothstep(-0.2, 0.8, slant(laid));
@@ -252,7 +251,7 @@ export function createWake(view: View, sky: Sky, capacity: number) {
   }
 
   /** Where world position p lies on the map, how much of its marks are left there, and the chart's axes at p. */
-  const place = (p: N) => {
+  const place = (p: Vec3Node) => {
     const c = view.onEye(p);
     return {
       uv: vec2(c.q.x.div(2 * REACH).add(0.5), c.q.y.div(-2 * REACH).add(0.5)),
@@ -302,9 +301,9 @@ export function createWake(view: View, sky: Sky, capacity: number) {
      * The marks at world position p on the sea at rest, faded out toward the map's edges: foam, height and air
      * (vec3), and the height's slope there as a world vector (its gradient along the sea). For the fragment stage.
      */
-    read(p: N): { marks: N; slope: N } {
+    read(p: Vec3Node): { marks: Vec3Node; slope: Vec3Node } {
       const { uv, fade, e1, e2 } = place(p);
-      const look = (o: N) => texture(target.texture, o).mul(fade);
+      const look = (o: Vec2Node) => texture(target.texture, o).mul(fade);
       const here = look(uv), east = look(uv.add(vec2(1 / SIZE, 0))), south = look(uv.sub(vec2(0, 1 / SIZE)));
       return {
         marks: here.xyz,
@@ -313,18 +312,18 @@ export function createWake(view: View, sky: Sky, capacity: number) {
     },
     /** The share of the sun the ships' shadows take from world position p on the waves, 0…1, softened. For the
      * fragment stage. */
-    shade(p: N): N {
+    shade(p: Vec3Node): FloatNode {
       // down the sun's ray to the sea's level, as the shadows were cast
       const up = normalize(p), sun = sky.sun(p);
       const { uv, fade } = place(p.sub(sun.mul(lengthN(p).sub(R).div(max(dot(sun, up), LOW_SUN)))));
-      let sum: N = float(0);
+      let sum: FloatNode = float(0);
       for (let i = 0; i < SOFT; i++) for (let j = 0; j < SOFT; j++) {
         sum = sum.add(texture(target.texture, uv.add(vec2(i - (SOFT - 1) / 2, j - (SOFT - 1) / 2).div(SIZE))).w);
       }
       return sum.mul(fade).div(SOFT * SOFT);
     },
     /** The wakes' height at world position p on the sea at rest, metres: for the vertex stage. */
-    height: (p: N): N => {
+    height: (p: Vec3Node): FloatNode => {
       const { uv, fade } = place(p);
       return texture(target.texture, uv).level(float(0)).y.mul(fade);
     },

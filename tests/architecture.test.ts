@@ -89,6 +89,10 @@ test('d. no three.js hacks', () => {
   none(found, '@ts-ignore / @ts-expect-error / @ts-nocheck');
 });
 
+test('d2. no any in src: shader values are typed nodes (src/tsl.ts)', () => {
+  none(hits(/:\s*any\b|=\s*any\b|\bas\s+any\b|<any>|\bany\[\]/), 'any (name the node type: src/tsl.ts)');
+});
+
 test('e. no exported let/var (module state others could write)', () => {
   // Only `export let|var` is detectable reliably by text; mutable exported objects/arrays are indistinguishable from constants.
   none(hits(/^\s*export\s+(let|var)\b/), 'exported mutable binding');

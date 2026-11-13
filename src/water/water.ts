@@ -25,7 +25,7 @@
 //
 // The light off the water is optics.ts's. Fog and clouds come from the frame's post pass, as for anything solid.
 
-import { DoubleSide, Mesh, MeshBasicNodeMaterial } from 'three/webgpu';
+import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
   Discard, Fn, If, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
@@ -48,8 +48,7 @@ import { N_WATER, createOptics } from './optics';
 import { likeness } from './spectrum';
 import { createWake, type Afloat } from './wake';
 import { createWaves } from './waves';
-
-type N = any;
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 const SPOKES = 128;
 const FIRST = 1;
@@ -102,7 +101,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   // the ripples only in the last few centimetres. Where waves are higher than the depth holds, they break.
   // Worked out per vertex for moving the water, and again per pixel for its look: far off the grid's cells are wider
   // than a beach.
-  const shallows = (p: N) => {
+  const shallows = (p: Vec3Node) => {
     const depth = max(ground.height(p).negate(), 0);
     const hs = waves.amplitude.mul(2);
     return {
@@ -114,10 +113,10 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   const { long, short } = shallows(grid.up);
 
   // The water's move, along each chart's axes and up (xyz), and the waves' height here unscaled by the depth (w).
-  const wave: N = Fn(() => {
+  const wave = Fn(() => {
     const moved = vec3(0).toVar(), swell = float(0).toVar();
     charts.each(grid.up, (c) => {
-      let d: N = vec3(0), h: N = float(0);
+      let d: Vec3Node = vec3(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const lod = log2(max(cell.div(L / SIZE), 1));
         const r = texture(waves.displacement[k], c.q.div(L)).level(lod).xyz;
@@ -135,11 +134,11 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
   // the wakes' waves over the sea's
   material.positionNode = view.place(grid.up, 0).add(wave.xyz).add(grid.up.mul(wake.height(grid.up).add(swash)));
 
-  const height: N = varying(dot(wave.xyz, grid.up).add(swash));
+  const height = varying(dot(wave.xyz, grid.up).add(swash));
   /** Where in its wave this water is, unscaled by the depth: 0 in the troughs … 1 on the crests. */
-  const phase: N = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
+  const phase = varying(saturate(wave.w.div(waves.amplitude).mul(0.5).add(0.5)));
   const foamOn = createFoam(waves);
-  const rest: N = varying(grid.up);
+  const rest = varying(grid.up);
   material.colorNode = Fn(() => {
     // no water inside a hull
     const hull = hulls.at(positionWorld);
@@ -148,10 +147,10 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     });
     const { long, short, breaking } = shallows(rest);
     const up = view.up(positionWorld);
-    const scale = (c: number): N => (c < LONG ? long : short);
+    const scale = (c: number): FloatNode => (c < LONG ? long : short);
     // the water at rest under this pixel, and its change across the pixel, for the charts' reads
     const p = normalize(rest).mul(R);
-    const dp: [N, N] = [dFdx(p), dFdy(p)];
+    const dp: [Vec3Node, Vec3Node] = [dFdx(p), dFdy(p)];
     const footprint = max(length(dp[0]), length(dp[1]));
     const marks = wake.read(p);
     const wakeFoam = marks.marks.x, air = saturate(marks.marks.z);
@@ -179,8 +178,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const q = vec2(0).toVar();
     charts.each(p, (c, slot) => {
       if (slot === 0) q.assign(c.q);
-      const read = (t: N, k: N) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
-      let s2: N = vec2(0), v: N = float(0), h: N = float(0);
+      const read = (t: Texture, k: FloatNode) => texture(t, c.q.mul(k)).grad(c.dx.mul(k), c.dy.mul(k));
+      let s2: Vec2Node = vec2(0), v: FloatNode = float(0), h: FloatNode = float(0);
       CASCADES.forEach((L, k) => {
         const s = read(waves.slopes[k], float(1 / L)), m = scale(k);
         s2 = s2.add(s.xy.mul(m));
@@ -207,7 +206,7 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
     // until the eye just sees them.
     const tilted = normalize(up.sub(slope));
-    const n: N = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
+    const n = normalize(tilted.add(v.mul(max(float(FACING).sub(dot(tilted, v)), 0))));
     const crest = saturate(height.div(waves.amplitude));
 
     // What lies behind the surface, where the eye's ray goes once refracted (Snell): followed down through the water
@@ -223,14 +222,14 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     const off = landed.sub(screenUV);
     const room = mix(screenUV, vec2(1).sub(screenUV), step(0, off));
     const shifted = screenUV.add(off.mul(min(room.div(max(off.abs().mul(2), 1e-6)), 1)));
-    const behindAt = (uv: N) => getViewPosition(uv, viewportDepthTexture(uv).x, cameraProjectionMatrixInverse);
+    const behindAt = (uv: Vec2Node) => getViewPosition(uv, viewportDepthTexture(uv).x, cameraProjectionMatrixInverse);
     const inFront = behindAt(shifted).z.greaterThan(positionView.z);
     const uv = select(inFront, screenUV, shifted);
     const depthBehind = viewportDepthTexture(uv).x;
     const path = select(depthBehind.greaterThanEqual(1), float(1e4), length(behindAt(uv).sub(positionView)));
     const behind = viewportSharedTexture(uv).rgb;
 
-    const sparkle = (D: N, nh: N, hl: N) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
+    const sparkle = (D: FloatNode, nh: FloatNode, hl: FloatNode) => glitter(q, length(cross(dp[0], dp[1])), footprint, D, nh, hl);
     // the ships' shadows, the hulls' shade and the wakes' air
     const near = { lit: float(1).sub(wake.shade(positionWorld)), glow: hull.glow, air: max(air, bubbles) };
     // the facets' α² is the mean square slope over both axes; a wake's air calms the ripples over it. Never quite a
@@ -264,8 +263,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     anchors: charts.anchors,
     /** The light under the water at world position p, as a share of what is above it: the sun's and the sky's. */
     below: {
-      sun: (p: N): N => optics.sunBelow(p).mul(caustics(p)),
-      sky: (p: N): N => optics.skyBelow(p),
+      sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
+      sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
     },
     /** Each frame: the world, and the ships on the sea. Returns what is due: the waves' passes, the marks' draw. */
     update(env: Environment, dt: number, ships: readonly Afloat[]): { waves: Compute[]; wake: Draw | null } {

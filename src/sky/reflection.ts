@@ -10,7 +10,7 @@
 
 import {
   ClampToEdgeWrapping, HalfFloatType, LinearFilter, LinearMipmapLinearFilter,
-  RepeatWrapping, StorageTexture, Vector4,
+  RepeatWrapping, StorageTexture, Vector4, type ComputeNode,
 } from 'three/webgpu';
 import {
   Fn, Loop, abs, cos, cross, dot, equirectUV, float, instanceIndex, max, normalize, select, sin, storageTexture,
@@ -18,9 +18,8 @@ import {
 } from 'three/tsl';
 import type { Compute } from '../gpu';
 import type { View } from '../view/view';
+import type { FloatNode, UintNode, Vec3Node, Vec4Node } from '../tsl';
 import type { Tables } from './tables';
-
-type N = any;
 
 const W = 256, H = 128;
 /** Frames between bakes: the clouds and the sun move slowly. */
@@ -37,7 +36,7 @@ const SAMPLES = 64;
 /** The roughness a level holds (three's PMREMGenerator.lodToRoughness); read back by `level` below. */
 const roughnessAt = (k: number) => 1 - Math.sqrt(1 - k / LEVELS);
 /** The level to read for a roughness: between two levels, the hardware blends them. */
-const level = (roughness: N): N => {
+const level = (roughness: FloatNode): FloatNode => {
   const r = float(roughness).clamp();
   return r.mul(float(2).sub(r)).mul(LEVELS);
 };
@@ -51,7 +50,7 @@ function storage(width: number, height: number) {
 }
 
 /** The direction at the centre of texel (x, y) of a w×h panorama: the inverse of three's equirectUV. */
-function texelDirection(x: N, y: N, w: number, h: number): N {
+function texelDirection(x: UintNode, y: UintNode, w: number, h: number): Vec3Node {
   const phi = float(x).add(0.5).div(w).sub(0.5).mul(2 * Math.PI);
   const theta = float(y).add(0.5).div(h).sub(0.5).mul(Math.PI);
   return vec3(cos(theta).mul(cos(phi)), sin(theta), cos(theta).mul(sin(phi)));
@@ -61,7 +60,7 @@ function texelDirection(x: N, y: N, w: number, h: number): N {
  * A sharp level: the GGX lobe of its roughness round each texel's direction, in SAMPLES directions drawn from it
  * (Hammersley; three's VNDF sampling with the view along the normal) as (x, y, z) in the lobe's frame and n·l.
  */
-function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture): N {
+function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture): ComputeNode {
   const w = W >> k, h = H >> k, a = roughnessAt(k) ** 2, a2 = a * a;
   const samples: number[][] = [];
   for (let i = 0; i < SAMPLES; i++) {
@@ -72,7 +71,7 @@ function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture):
     const s = 2 * a * Math.sqrt(u * (1 - u)) * q, phi = 2 * Math.PI * inverse;
     samples.push([s * Math.cos(phi), s * Math.sin(phi), nl]);
   }
-  const lobe: N = uniformArray(samples.map(([x, y, z]) => new Vector4(x, y, z, 0)), 'vec4');
+  const lobe = uniformArray<'vec4'>(samples.map(([x, y, z]) => new Vector4(x, y, z, 0)), 'vec4');
   const total = samples.reduce((sum, s) => sum + s[2], 0);
   return Fn(() => {
     const x = instanceIndex.mod(w), y = instanceIndex.div(w);
@@ -80,7 +79,7 @@ function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture):
     const t = normalize(cross(select(abs(n.y).lessThan(0.999), vec3(0, 1, 0), vec3(1, 0, 0)), n)).toVar();
     const b = cross(n, t).toVar();
     const sum = vec3(0).toVar();
-    Loop(samples.length, ({ i }: { i: N }) => {
+    Loop(samples.length, ({ i }) => {
       const s = lobe.element(i);
       const l = t.mul(s.x).add(b.mul(s.y)).add(n.mul(s.z));
       sum.addAssign(texture(panorama, equirectUV(l)).level(float(0)).rgb.mul(s.z));
@@ -90,13 +89,13 @@ function sharp(k: number, panorama: StorageTexture, reflection: StorageTexture):
 }
 
 /** A rough level: every texel of the reduced panorama, weighted by the GGX lobe, n·l and its solid angle. */
-function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): N {
+function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): ComputeNode {
   const w = W >> k, h = H >> k, a = roughnessAt(k) ** 2, a2 = a * a;
   return Fn(() => {
     const x = instanceIndex.mod(w), y = instanceIndex.div(w);
     const n = texelDirection(x, y, w, h).toVar();
     const sum = vec3(0).toVar(), total = float(0).toVar();
-    Loop({ start: 0, end: RH, type: 'uint' }, { start: 0, end: RW, type: 'uint' }, ({ i, j }: { i: N; j: N }) => {
+    Loop({ start: 0, end: RH, type: 'uint' }, { start: 0, end: RW, type: 'uint' }, ({ i, j }) => {
       const l = texelDirection(j, i, RW, RH);
       const nl = max(dot(n, l), 0);
       // with the view along the normal, (n·h)² = (1 + n·l)/2; the cosine of the latitude is the texel's solid angle
@@ -114,7 +113,7 @@ function rough(k: number, reduced: StorageTexture, reflection: StorageTexture): 
  * clouds' light (rgb) and transmittance (a) along a sky direction, marched in at most so many steps.
  */
 export function createReflection(
-  view: View, skyRadiance: Tables['skyRadiance'], sunDirection: N, cloudsAlong: (d: N, steps: number) => N,
+  view: View, skyRadiance: Tables['skyRadiance'], sunDirection: Vec3Node, cloudsAlong: (d: Vec3Node, steps: number) => Vec4Node,
 ) {
   const panorama = storage(W, H);
   const reduced = storage(RW, RH);
@@ -139,7 +138,7 @@ export function createReflection(
   const reduce = Fn(() => {
     const x = instanceIndex.mod(RW), y = instanceIndex.div(RW);
     const sum = vec3(0).toVar();
-    Loop({ start: 0, end: 4, type: 'uint' }, { start: 0, end: 4, type: 'uint' }, ({ i, j }: { i: N; j: N }) => {
+    Loop({ start: 0, end: 4, type: 'uint' }, { start: 0, end: 4, type: 'uint' }, ({ i, j }) => {
       sum.addAssign(textureLoad(panorama, uvec2(x.mul(4).add(j), y.mul(4).add(i))).rgb);
     });
     textureStore(reduced, uvec2(x, y), vec4(sum.div(16), 1));
@@ -153,7 +152,7 @@ export function createReflection(
      * The sky's light reflected toward world direction dir off a surface of the given roughness (0–1). Only the sky
      * above its horizon: a ray from the sea past the horizon's edge still meets the sky's horizon.
      */
-    reflect: (dir: N, roughness: N): N => {
+    reflect: (dir: Vec3Node, roughness: FloatNode): Vec3Node => {
       const d = view.toSky(dir);
       return texture(reflection, equirectUV(normalize(vec3(d.x, max(d.y, 0), d.z)))).level(level(roughness)).rgb;
     },

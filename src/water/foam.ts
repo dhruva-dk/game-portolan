@@ -34,8 +34,7 @@ import { loadTexture } from '../textures';
 import type { Read } from '../view/charts';
 import { CASCADES } from './cascades';
 import { FOAMING, type Waves } from './waves';
-
-type N = any;
+import type { FloatNode, Vec2Node } from '../tsl';
 
 /** The pattern repeats every this many metres along the crests. */
 const TILE = 5;
@@ -82,7 +81,7 @@ export function createFoam(waves: Waves) {
    * (the surf's, the ships'); thickness, the water's over
    * the ground there (metres, ∞ offshore); footprint, the pixel's size on the water (metres).
    */
-  return (c: Read, other: N, thickness: N, footprint: N): { foam: N; air: N } => {
+  return (c: Read, other: FloatNode, thickness: FloatNode, footprint: FloatNode): { foam: FloatNode; air: FloatNode } => {
     const read = (k: [number, number], blur = BLUR) => {
       const s = vec2(1 / k[0], 1 / k[1]);
       return texture(pattern, c.q.mul(s)).grad(c.dx.mul(s).mul(blur), c.dy.mul(s).mul(blur)).r;
@@ -92,8 +91,8 @@ export function createFoam(waves: Waves) {
     // trail runs out.
     const lane = saturate(read([TRAILS[0], TRAILS[1]], 2).sub(SINGLE[0]).div(SINGLE[1]));
     const ragged = saturate(read([RAGGED, RAGGED], 2).sub(SINGLE[0]).div(SINGLE[1])).sub(0.5).mul(2 * RAGGED / 5);
-    const whitecaps = (shift: N) => {
-      let sum: N = float(0);
+    const whitecaps = (shift: Vec2Node) => {
+      let sum: FloatNode = float(0);
       CASCADES.slice(0, FOAMING).forEach((L, k) => {
         const s = 1 / L;
         sum = sum.add(texture(waves.displacement[k], c.q.add(shift).mul(s)).grad(c.dx.mul(s), c.dy.mul(s)).w);

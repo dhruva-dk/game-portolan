@@ -17,8 +17,8 @@ import {
 import { loadTexture } from '../textures';
 import type { Light } from '../sky/light';
 import { KIND } from './kit';
-
-type N = any;
+import type { Node } from 'three/webgpu';
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 /** The planks' and the deck's textures' mean colours, linear (measured), and the albedos they are scaled to: oiled
  * oak, a deep saturated brown; the deck bleached by sun and salt; spars a shade lighter than the hull; timber blackened with pitch. */
@@ -49,15 +49,15 @@ export function createWood(light: Light) {
   // (Poly Haven's packing: occlusion, roughness and metalness in r, g and b; the normal map in OpenGL's convention)
   const arm = loadTexture('planks-arm.jpg', false), bumps = loadTexture('planks-normal.jpg', false);
 
-  return (kind: N, uv: N, height: N, n0: N, ao: N, paint: N): N => {
+  return (kind: FloatNode, uv: Vec2Node, height: FloatNode, n0: Vec3Node, ao: FloatNode, paint: Vec3Node): Vec3Node => {
     const p = positionWorld;
     const is = (k: number) => abs(kind.sub(k)).lessThan(0.5);
-    const pick = (i: number, a: N, b: N) => select(kind.lessThan(i + 0.5), a, b);
+    const pick = <T>(i: number, a: Node<T>, b: Node<T>) => select(kind.lessThan(i + 0.5), a, b);
     const tex = texture(planks, uv).rgb, packed = texture(arm, uv), dk = texture(deck, uv).rgb;
-    const tone: N = tex.div(vec3(...PLANK_MEAN));
-    const grey: N = dot(tone, vec3(0.3, 0.59, 0.11));
+    const tone = tex.div(vec3(...PLANK_MEAN));
+    const grey = dot(tone, vec3(0.3, 0.59, 0.11));
     // oil soaks the weathered grey out of the grain: its colours further from grey
-    const soaked: N = mix(vec3(grey), tone, SOAKED).max(0);
+    const soaked = mix(vec3(grey), tone, SOAKED).max(0);
 
     // one plank's timber, and the joint where it is butted to the next
     const strake = floor(uv.y.mul(STRAKES).add(0.5));
@@ -72,31 +72,31 @@ export function createWood(light: Light) {
 
     // the normal map through a tangent frame from the screen's derivatives (Schüler, "Normal Mapping Without
     // Precomputed Tangents", 2013), on the planked kinds only
-    const planked: N = kind.lessThan(KIND.paint + 0.5);
+    const planked = kind.lessThan(KIND.paint + 0.5);
     const bump = texture(bumps, uv).xy.mul(2).sub(1).mul(select(planked, float(RELIEF), float(0)));
-    const dp1: N = dFdx(p), dp2: N = dFdy(p), duv1: N = dFdx(uv), duv2: N = dFdy(uv);
+    const dp1 = dFdx(p), dp2 = dFdy(p), duv1 = dFdx(uv), duv2 = dFdy(uv);
     const t1 = cross(dp2, n0), t2 = cross(n0, dp1);
     const T = t1.mul(duv1.x).add(t2.mul(duv2.x)), B = t1.mul(duv1.y).add(t2.mul(duv2.y));
     const scale = inverseSqrt(max(max(dot(T, T), dot(B, B)), 1e-20));
-    const n: N = normalize(n0.add(T.mul(scale.mul(bump.x))).add(B.mul(scale.mul(bump.y)))).toVar();
+    const n = normalize(n0.add(T.mul(scale.mul(bump.x))).add(B.mul(scale.mul(bump.y)))).toVar();
 
     // what each kind is: its albedo, roughness and reflectance face on
     const wet = smoothstep(0.6, -0.2, height);
     const oiled = packed.g.mul(OILED);
-    let albedo: N = pick(KIND.planks, timbered.mul(vec3(...HULL)),
+    let albedo = pick(KIND.planks, timbered.mul(vec3(...HULL)),
       pick(KIND.paint, paint.mul(grey).mul(joint),
         pick(KIND.dark, tone.mul(vec3(...DARK)),
           pick(KIND.deck, dk.div(vec3(...DECK_MEAN)).mul(vec3(...DECK)),
             pick(KIND.spar, soaked.mul(vec3(...SPAR)),
               pick(KIND.gilt, vec3(0), vec3(...IRON)))))));
     albedo = albedo.mul(mix(vec3(1), vec3(...WET), wet));
-    let rough: N = pick(KIND.planks, oiled, pick(KIND.paint, float(PAINT), pick(KIND.dark, float(PITCH),
+    let rough = pick(KIND.planks, oiled, pick(KIND.paint, float(PAINT), pick(KIND.dark, float(PITCH),
       pick(KIND.deck, float(BARE), pick(KIND.spar, oiled, pick(KIND.gilt, float(GILT), float(FORGED)))))));
     rough = rough.mul(mix(float(1), float(WET_SMOOTH), wet));
-    const f0: N = select(is(KIND.gilt), vec3(...GOLD).mul(grey.mul(0.4).add(0.6)), vec3(0.04));
+    const f0 = select(is(KIND.gilt), vec3(...GOLD).mul(grey.mul(0.4).add(0.6)), vec3(0.04));
     // the highlight widened by how much the normal turns across the pixel, so a fine bump doesn't sparkle
     // (Kaplanyan, Hill, Patney and Lefohn, "Filtering Distributions of Normals for Shading Antialiasing", 2016)
-    const dn1: N = dFdx(n), dn2: N = dFdy(n);
+    const dn1 = dFdx(n), dn2 = dFdy(n);
     const spread = min(dot(dn1, dn1).add(dot(dn2, dn2)).mul(0.5), 0.18);
     rough = sqrt(sqrt(rough.mul(rough).mul(rough.mul(rough)).add(spread)));
 

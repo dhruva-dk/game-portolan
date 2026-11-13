@@ -17,8 +17,7 @@ import type { Chart } from '../world/sphere';
 import type { Light } from '../sky/light';
 import { rockShape } from './rock-shape';
 import { createInstances, standing, type Placed } from './site';
-
-type N = any;
+import type { Vec2Node, Vec3Node } from '../tsl';
 
 /** How many shapes of each kind, and how finely each is made. */
 export const KINDS = { big: { shapes: 4, detail: 11 }, boulder: { shapes: 4, detail: 4 } };
@@ -43,18 +42,18 @@ export function createRocks(rocks: Rock[][], charts: Chart[], view: View, light:
   material.colorNode = Fn(() => {
     const p = positionWorld, g = normalize(normalWorld), height = view.altitude(p);
     // the texture along each axis, weighed by how squarely the surface faces it
-    let w: N = abs(g).pow(4);
+    let w: Vec3Node = abs(g).pow(4);
     w = w.div(w.x.add(w.y).add(w.z));
     const ux = p.zy.div(ROCK_TILE), uy = p.xz.div(ROCK_TILE), uz = p.xy.div(ROCK_TILE);
     const grain = texture(colour, ux).rgb.mul(w.x).add(texture(colour, uy).rgb.mul(w.y)).add(texture(colour, uz).rgb.mul(w.z));
     // each projection's normal map tilts the surface along that projection's two axes
-    const t = (uv: N) => texture(bumps, uv).xy.mul(2).sub(1);
+    const t = (uv: Vec2Node) => texture(bumps, uv).xy.mul(2).sub(1);
     const tx = t(ux), ty = t(uy), tz = t(uz);
     const tilt = vec3(0, tx.y, tx.x).mul(w.x).add(vec3(ty.x, 0, ty.y).mul(w.y)).add(vec3(tz.x, tz.y, 0).mul(w.z));
     const n = normalize(g.add(tilt));
 
     const tone = grain.div(vec3(...ROCK_MEAN));
-    let albedo: N = mix(vec3(...ROCK_ALBEDO), vec3(...BLEACHED), smoothstep(0.55, 0.95, dot(g, view.up(p)))).mul(tone);
+    let albedo: Vec3Node = mix(vec3(...ROCK_ALBEDO), vec3(...BLEACHED), smoothstep(0.55, 0.95, dot(g, view.up(p)))).mul(tone);
     albedo = albedo.mul(mix(float(1), float(CAVITY), attribute('cavity', 'float')));
     albedo = albedo.mul(mix(float(1), float(WET), smoothstep(0.5, 0.1, height)));
     albedo = mix(albedo, vec3(...ALGAE).mul(tone), smoothstep(-0.1, -0.6, height).mul(0.6));

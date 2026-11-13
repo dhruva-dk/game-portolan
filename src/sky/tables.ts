@@ -12,14 +12,8 @@ import {
   sin, sqrt, texture, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Compute } from '../gpu';
+import { loop, toFloat, type FloatNode, type Vec2Node, type Vec3Node } from '../tsl';
 import * as A from './atmosphere';
-
-// TSL nodes are dynamically typed; the tables are small enough that a loose alias reads better than casts.
-type N = any;
-
-/** A loop whose counter has its own name, so nested loops never read each other's counter. */
-const loop = (name: string, count: number, body: (i: N) => void) =>
-  (Loop as N)({ start: 0, end: count, type: 'int', condition: '<', name }, (v: N) => body(v[name]));
 
 const H = Math.sqrt(A.TOP * A.TOP - A.BOTTOM * A.BOTTOM);
 const RAYLEIGH = vec3(...A.RAYLEIGH_SCATTERING);
@@ -39,7 +33,7 @@ function table(w: number, h: number): StorageTexture {
 }
 
 /** Nearest and farthest hits of a ray from o along unit d with a sphere of radius r at the origin; (-1,-1) if none. */
-const raySphere = Fn(([o, d, r]: [N, N, N]) => {
+const raySphere = Fn(([o, d, r]: [Vec3Node, Vec3Node, FloatNode]) => {
   const b = dot(o, d), c = dot(o, o).sub(r.mul(r));
   const disc = b.mul(b).sub(c);
   const out = vec2(-1, -1).toVar();
@@ -50,19 +44,19 @@ const raySphere = Fn(([o, d, r]: [N, N, N]) => {
   return out;
 });
 
-const extinctionOf = (dens: N): N =>
+const extinctionOf = (dens: Vec3Node): Vec3Node =>
   RAYLEIGH.mul(dens.x).add(float(A.MIE_EXTINCTION).mul(dens.y)).add(OZONE.mul(dens.z));
 
-const rayleighPhase = (c: N): N => float(3 / (16 * Math.PI)).mul(c.mul(c).add(1));
+const rayleighPhase = (c: FloatNode): FloatNode => float(3 / (16 * Math.PI)).mul(c.mul(c).add(1));
 
 /** Cornette-Shanks. */
-const miePhase = (c: N): N => {
+const miePhase = (c: FloatNode): FloatNode => {
   const g = A.MIE_G, g2 = g * g;
   const k = (3 / (8 * Math.PI)) * (1 - g2) / (2 + g2);
   return float(k).mul(c.mul(c).add(1)).div(pow(float(1 + g2).sub(c.mul(2 * g)), 1.5));
 };
 
-const transmittanceUV = (r: N, mu: N): N => {
+const transmittanceUV = (r: FloatNode, mu: FloatNode): Vec2Node => {
   const rho = sqrt(max(r.mul(r).sub(A.BOTTOM * A.BOTTOM), 0));
   const d = max(r.negate().mul(mu).add(sqrt(max(r.mul(r).mul(mu.mul(mu).sub(1)).add(A.TOP * A.TOP), 0))), 0);
   const dMin = float(A.TOP).sub(r), dMax = rho.add(H);
@@ -93,7 +87,7 @@ export function createTables() {
   const sunCosZenith = uniform(1);
 
   /** Rayleigh, Mie and ozone densities at height h. */
-  const densities = (h: N): N =>
+  const densities = (h: FloatNode): Vec3Node =>
     vec3(
       exp(h.negate().div(A.RAYLEIGH_SCALE_HEIGHT)),
       exp(h.negate().div(A.MIE_SCALE_HEIGHT)).mul(haze),
@@ -101,14 +95,14 @@ export function createTables() {
     );
 
   /** Sunlight reaching radius r from a sun at cosine mu off the zenith; zero once the planet hides it. */
-  const sunTransmittance = (radius: N, mu: N): N => {
-    const r = float(radius);
+  const sunTransmittance = (radius: FloatNode | number, mu: FloatNode): Vec3Node => {
+    const r = toFloat(radius);
     const horizon = sqrt(max(float(1).sub(float(A.BOTTOM * A.BOTTOM).div(r.mul(r))), 0)).negate();
     const t = texture(transmittanceTable).sample(transmittanceUV(r, mu)).level(float(0)).rgb;
     return select(mu.lessThan(horizon), vec3(0), t);
   };
 
-  const multipleScattering = (r: N, muS: N): N =>
+  const multipleScattering = (r: FloatNode, muS: FloatNode): Vec3Node =>
     texture(multipleTable)
       .sample(vec2(muS.mul(0.5).add(0.5), r.sub(A.BOTTOM).div(A.TOP - A.BOTTOM)))
       .level(float(0)).rgb;
@@ -123,7 +117,7 @@ export function createTables() {
     const STEPS = 40;
     const dt = d.div(STEPS);
     const depth = vec3(0).toVar();
-    Loop(STEPS, ({ i }: { i: N }) => {
+    Loop(STEPS, ({ i }) => {
       const p = o.add(dir.mul(float(i).add(0.5).mul(dt)));
       depth.addAssign(extinctionOf(densities(length(p).sub(A.BOTTOM))).mul(dt));
     });
@@ -196,7 +190,7 @@ export function createTables() {
     const pR = rayleighPhase(c), pM = miePhase(c);
     const L = vec3(0).toVar(), T = vec3(1).toVar();
     const STEPS = 30;
-    Loop(STEPS, ({ i }: { i: N }) => {
+    Loop(STEPS, ({ i }) => {
       // quadratic spacing: fine near the eye, coarse far away
       const t0 = float(i).div(STEPS), t1 = float(i).add(1).div(STEPS);
       const dt = t1.mul(t1).sub(t0.mul(t0)).mul(tMax);
@@ -217,7 +211,7 @@ export function createTables() {
   })().compute(V_W * V_H, [64]);
 
   /** The sky's radiance toward sky direction dir (unit, y up) for a sun at sunDir, per unit sun illuminance. */
-  const skyRadiance = (dir: N, sunDir: N): N => {
+  const skyRadiance = (dir: Vec3Node, sunDir: Vec3Node): Vec3Node => {
     const cosZenith = clamp(dir.y, -1, 1);
     const zenithAngle = acos(cosZenith);
     const v = float(0).toVar();
@@ -227,7 +221,7 @@ export function createTables() {
     }).Else(() => {
       v.assign(sqrt(clamp(zenithAngle.sub(ZENITH_HORIZON).div(BETA), 0, 1)).mul(0.5).add(0.5));
     });
-    const flat = (w: N) => w.xz.div(max(length(w.xz), 1e-4));
+    const flat = (w: Vec3Node) => w.xz.div(max(length(w.xz), 1e-4));
     const cosLight = dot(flat(dir), flat(sunDir));
     const u = sqrt(cosLight.mul(-0.5).add(0.5));
     // keep half a texel off each edge so the bilinear lookup never reads across the wrap
@@ -259,7 +253,7 @@ export function createTables() {
     textureStore(ambientTable, uvec2(2, 0), vec4(skyRadiance(vec3(0, 1, 0), sun), 1));
   })().compute(1, [1]);
 
-  const ambientAt = (i: number): N => texture(ambientTable).sample(vec2((i + 0.5) / 3, 0.5)).level(float(0)).rgb;
+  const ambientAt = (i: number): Vec3Node => texture(ambientTable).sample(vec2((i + 0.5) / 3, 0.5)).level(float(0)).rgb;
 
   let lastCos = NaN, lastHaze = NaN;
   /** The air's tables, in the order they are integrated (each reads the one before), and the next due, if any. */

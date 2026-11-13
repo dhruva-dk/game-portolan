@@ -15,8 +15,7 @@ import { ClampToEdgeWrapping, DataArrayTexture, HalfFloatType, LinearFilter, RGB
 import { abs, cross, float, normalize, select, texture, vec3 } from 'three/tsl';
 import { faceUV } from '../view/cube';
 import { R } from '../world/sphere';
-
-type N = any;
+import type { FloatNode, Vec3Node, Vec4Node } from '../tsl';
 
 /** Nodes along a face's edge: texels of about (π/2)·R / (n − 1), 1.1 m at R = 554. */
 const NODES = 768;
@@ -25,11 +24,11 @@ const TEXEL = ((Math.PI / 2) * R) / (NODES - 1);
 
 export interface Ground {
   /** Metres above the sea at world position (or direction) p. */
-  height(p: N): N;
+  height(p: Vec3Node): FloatNode;
   /** What lies on the ground at p: sea grass, rubble, mottling, clumps (each 0…1). */
-  cover(p: N): N;
+  cover(p: Vec3Node): Vec4Node;
   /** The ground's normal at p (world), from its heights a texel either side. */
-  normal(p: N): N;
+  normal(p: Vec3Node): Vec3Node;
   /** Resolves once the faces are baked and uploaded; how long the bake took, ms. */
   ready: Promise<number>;
 }
@@ -61,22 +60,22 @@ export function createGround(seed: number): Ground {
   worker.postMessage({ seed, n: NODES });
 
   /** The texel coordinates on its face of direction p, and the face. */
-  const at = (p: N) => {
+  const at = (p: Vec3Node) => {
     const { face, uv } = faceUV(normalize(p));
     return { face, st: uv.mul(0.5 * (NODES - 1) / NODES).add(0.5) };
   };
-  const read = (t: DataArrayTexture, p: N): N => {
+  const read = (t: DataArrayTexture, p: Vec3Node): Vec4Node => {
     const { face, st } = at(p);
     return texture(t, st).depth(face).level(float(0));
   };
-  const height = (p: N): N => read(heights, p).x;
+  const height = (p: Vec3Node): FloatNode => read(heights, p).x;
   return {
     height,
     cover: (p) => read(covers, p),
     normal: (p) => {
       // central differences a texel apart, along two tangents
-      const u: N = normalize(p);
-      const side: N = select(abs(u.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
+      const u = normalize(p);
+      const side = select(abs(u.y).lessThan(0.9), vec3(0, 1, 0), vec3(1, 0, 0));
       const t1 = normalize(cross(side, u)), t2 = cross(u, t1);
       const e = TEXEL / R;
       const d1 = height(u.add(t1.mul(e))).sub(height(u.sub(t1.mul(e)))).div(2 * TEXEL);

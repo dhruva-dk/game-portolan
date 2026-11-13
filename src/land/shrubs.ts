@@ -16,8 +16,7 @@ import type { Shrub } from '../world/scatter';
 import type { Chart } from '../world/sphere';
 import { type Light, leafLight } from '../sky/light';
 import { createInstances, standing, type Placed } from './site';
-
-type N = any;
+import type { Vec3Node } from '../tsl';
 
 /** How many shapes the shrubs come in. */
 export const SHAPES = 4;
@@ -77,8 +76,8 @@ export function createShrubs(shrubs: Shrub[][], charts: Chart[], light: Light) {
   const material = new MeshBasicNodeMaterial({ side: DoubleSide });
   material.colorNode = Fn(() => {
     const p = positionWorld, n = normalize(normalWorld).mul(faceDirection);
-    const tint: N = attribute('tint', 'float');
-    let albedo: N = mix(mix(vec3(...DARK), vec3(...GREEN), tint.mul(2).clamp(0, 1)), vec3(...PALE), tint.mul(2).sub(1).clamp(0, 1));
+    const tint = attribute('tint', 'float');
+    let albedo: Vec3Node = mix(mix(vec3(...DARK), vec3(...GREEN), tint.mul(2).clamp(0, 1)), vec3(...PALE), tint.mul(2).sub(1).clamp(0, 1));
     // deeper in, less of the sky
     albedo = albedo.mul(attribute('depth', 'float').sub(0.7).mul(1.6).add(0.45));
     return albedo.mul(leafLight(light, p, n, THROUGH));

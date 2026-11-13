@@ -21,16 +21,15 @@ import { FREQUENCY, anchors, band, cover, icosphere, near, type Anchor, type Lik
 import { R, type Vec3 } from '../world/sphere';
 import type { Wind } from '../world/wind';
 import { chartNodes } from './view';
-
-type N = any;
+import type { FloatNode, Vec2Node, Vec3Node } from '../tsl';
 
 /** One chart's read at a point: where on the patches (metres, offset included), its axes there, and its weight. */
 export interface Read {
-  q: N; e1: N; e2: N; w: N;
+  q: Vec2Node; e1: Vec3Node; e2: Vec3Node; w: FloatNode;
   /** q's change across the pixel, right and down (fragment stage only, when asked for). */
-  dx: N; dy: N;
+  dx: Vec2Node; dy: Vec2Node;
   /** w's gradient over the sphere, per metre (a world vector; with dx, dy only). */
-  dw: N;
+  dw: Vec3Node;
 }
 
 export type Charts = ReturnType<typeof createCharts>;
@@ -45,8 +44,9 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   const width = band(FREQUENCY);
   /** Past the drawn sea, the furthest an anchor can lie and still weigh in somewhere on it. */
   const margin = cover(FREQUENCY) + width;
-  const centres: N = uniformArray(all.map(() => new Vector4()), 'vec4');
-  const axes: N = uniformArray(all.map(() => new Vector4()), 'vec4');
+  const centreValues = all.map(() => new Vector4()), axisValues = all.map(() => new Vector4());
+  const centres = uniformArray<'vec4'>(centreValues, 'vec4');
+  const axes = uniformArray<'vec4'>(axisValues, 'vec4');
   const count = uniform(3, 'int');
   let listed = '';
 
@@ -55,10 +55,10 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
    * the weights' gradients over the sphere, per metre. Each weight is s/|s| with s = smoothstep(width, 0, arc − arc₀)
    * of the arcs to the anchors, and an arc's gradient is the unit tangent pointing away from its anchor.
    */
-  const pick = (u: N, gradients = false) => {
+  const pick = (u: Vec3Node, gradients = false) => {
     const c = [float(-2).toVar(), float(-2).toVar(), float(-2).toVar()];
     const i = [int(0).toVar(), int(0).toVar(), int(0).toVar()];
-    Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: k }: { i: N }) => {
+    Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: k }) => {
       const d = dot(u, centres.element(k).xyz).toVar();
       If(d.greaterThan(c[0]), () => {
         c[2].assign(c[1]); i[2].assign(i[1]);
@@ -75,7 +75,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
     const s = [float(1), smoothstep(width, 0, arc[1].sub(arc[0])), smoothstep(width, 0, arc[2].sub(arc[0]))];
     const size = sqrt(s[0].add(s[1].mul(s[1])).add(s[2].mul(s[2])));
     const weight = s.map((x) => x.div(size).toVar());
-    if (!gradients) return { index: i, weight, slope: [] as N[] };
+    if (!gradients) return { index: i, weight, slope: [] as Vec3Node[] };
     const away = i.map((k, j) => {
       const t = u.mul(c[j]).sub(centres.element(k).xyz);
       return t.div(max(length(t), 1e-6));
@@ -95,7 +95,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
    * on its weight for the second and third. Must be called inside an Fn. dp: p's change across the pixel, right and
    * down, for the reads' gradients (fragment stage); worked out before any branch.
    */
-  function each(p: N, read: (r: Read, slot: number) => void, dp?: [N, N]) {
+  function each(p: Vec3Node, read: (r: Read, slot: number) => void, dp?: [Vec3Node, Vec3Node]) {
     const u = normalize(p);
     const { index, weight, slope } = pick(u, dp !== undefined);
     index.forEach((k, slot) => {
@@ -103,7 +103,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
         const C = centres.element(k), X = axes.element(k);
         const at = C.xyz, axis = X.xyz;
         const c = chartNodes(at, axis, cross(axis, at))(u);
-        const grad = (d: N) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
+        const grad = (d: Vec3Node | undefined) => (d ? vec2(dot(d, c.e1), dot(d, c.e2)) : vec2(0));
         read({ q: c.q.add(vec2(C.w, X.w)), e1: c.e1, e2: c.e2, w: weight[slot], dx: grad(dp?.[0]), dy: grad(dp?.[1]), dw: slope[slot] ?? vec3(0) }, slot);
       };
       if (slot === 0) run();
@@ -112,7 +112,7 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
   }
 
   /** For ?debug=charts: the three weights as red, green and blue, each cell a little lighter or darker than the next. */
-  function debug(p: N): N {
+  function debug(p: Vec3Node): Vec3Node {
     const { index, weight } = pick(normalize(p));
     const shade = fract(sin(float(index[0]).mul(12.9898)).mul(43758.5453)).mul(0.5).add(0.5);
     return vec3(weight[0], weight[1], weight[2]).mul(shade);
@@ -132,8 +132,8 @@ export function createCharts(span: number, alike: Likeness, wind: Wind) {
       listed = key;
       order.slice(0, n).forEach((a, k) => {
         const { at, axis, offset } = all[a];
-        (centres.array[k] as Vector4).set(at[0], at[1], at[2], offset[0]);
-        (axes.array[k] as Vector4).set(axis[0], axis[1], axis[2], offset[1]);
+        centreValues[k].set(at[0], at[1], at[2], offset[0]);
+        axisValues[k].set(axis[0], axis[1], axis[2], offset[1]);
       });
       count.value = n;
     },

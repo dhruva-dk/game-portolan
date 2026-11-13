@@ -17,8 +17,7 @@ import { abs, clamp, cross, dot, exp, float, floor, int, length, max, min, mix, 
 import { WATERLINE } from '../ship/waterline';
 import type { ShipPose } from '../world/pose';
 import { dot as dotV, type Vec3 } from '../world/sphere';
-
-type N = any;
+import { minInt, type BoolNode, type FloatNode, type Vec3Node } from '../tsl';
 
 /** The ships nearest the eye whose hulls the sea fits round. */
 export const NEAREST = 4;
@@ -28,15 +27,15 @@ const INSET = 0.12;
 const SHADE = 0.55, SHADE_REACH = 1.6;
 
 const last = WATERLINE.half.length - 1;
-const halves: N = uniformArray(WATERLINE.half, 'float');
+const halves = uniformArray<'float'>(WATERLINE.half, 'float');
 
 /**
  * How far outside her waterline a point lies in her frame (across: metres to port, along: metres forward of her
  * middle): the distance to the outline, negative inside it (then the distance in from her side, near enough).
  */
-export function outside(across: N, along: N): N {
+export function outside(across: FloatNode, along: FloatNode): FloatNode {
   const t = clamp(along.sub(WATERLINE.stern).div(WATERLINE.stem - WATERLINE.stern), 0, 1).mul(last);
-  const i: N = int(floor(t)), j: N = i.add(1).min(last);
+  const i = int(floor(t)), j = minInt(i.add(1), last);
   const half = mix(halves.element(i), halves.element(j), t.sub(floor(t)));
   const side = abs(across).sub(half);
   const beyond = max(float(WATERLINE.stern).sub(along), along.sub(WATERLINE.stem));
@@ -44,13 +43,13 @@ export function outside(across: N, along: N): N {
 }
 
 export function createHulls() {
-  const at: N = uniformArray(Array.from({ length: NEAREST }, () => new Vector4()), 'vec4');
-  const fwd: N = uniformArray(Array.from({ length: NEAREST }, () => new Vector4()), 'vec4');
-  const up: N = uniformArray(Array.from({ length: NEAREST }, () => new Vector4()), 'vec4');
+  const slots = () => Array.from({ length: NEAREST }, () => new Vector4());
+  const values = { at: slots(), fwd: slots(), up: slots() };
+  const at = uniformArray<'vec4'>(values.at, 'vec4'), fwd = uniformArray<'vec4'>(values.fwd, 'vec4'), up = uniformArray<'vec4'>(values.up, 'vec4');
 
   /** The least of each hull's `outside` at world position p, metres. */
-  const nearest = (p: N): N => {
-    let d: N = float(1e4);
+  const nearest = (p: Vec3Node): FloatNode => {
+    let d: FloatNode = float(1e4);
     for (let k = 0; k < NEAREST; k++) {
       const o = p.sub(at.element(k).xyz), f = fwd.element(k).xyz, u = up.element(k).xyz;
       d = min(d, outside(dot(o, cross(u, f)), dot(o, f)));
@@ -60,7 +59,7 @@ export function createHulls() {
 
   return {
     /** Whether world position p lies inside a hull (cut it away), and how much of the sea's glow is left there, 0…1. */
-    at(p: N): { inside: N; glow: N } {
+    at(p: Vec3Node): { inside: BoolNode; glow: FloatNode } {
       const d = nearest(p);
       return { inside: d.lessThan(-INSET), glow: float(1).sub(exp(max(d, 0).div(-SHADE_REACH)).mul(SHADE)) };
     },
@@ -69,11 +68,11 @@ export function createHulls() {
       const order = poses.map((p, i) => ({ i, d: -dotV(p.position, eye) })).sort((a, b) => a.d - b.d);
       for (let k = 0; k < NEAREST; k++) {
         const pose = order[k] ? poses[order[k].i] : null;
-        const set = (a: N, v: Vec3) => (a.array[k] as Vector4).set(v[0], v[1], v[2], 0);
+        const set = (a: Vector4[], v: Vec3) => a[k].set(v[0], v[1], v[2], 0);
         // the empty slots parked far off, square, so nothing lies inside them
-        set(at, pose ? pose.position : [1e6, 0, 0]);
-        set(fwd, pose ? pose.forward : [1, 0, 0]);
-        set(up, pose ? pose.up : [0, 1, 0]);
+        set(values.at, pose ? pose.position : [1e6, 0, 0]);
+        set(values.fwd, pose ? pose.forward : [1, 0, 0]);
+        set(values.up, pose ? pose.up : [0, 1, 0]);
       }
     },
   };

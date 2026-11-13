@@ -12,7 +12,7 @@ import {
   type PerspectiveCamera,
 } from 'three/webgpu';
 import {
-  Fn, If, Loop, abs, clamp, dot, exp, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
+  Fn, If, abs, clamp, dot, exp, float, floor, fract, instanceIndex, int, ivec2, max, min, mix, normalize, select,
   smoothstep, texture, textureLoad, textureStore, uniform, uvec2, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Compute } from '../gpu';
@@ -20,11 +20,7 @@ import type { View } from '../view/view';
 import { createCloudNoise } from './cloud-noise';
 import { BASE, DIFFUSION, SIGMA, TOP, createCloudField, type CloudField } from './cloud-field';
 import type { Tables } from './tables';
-
-type N = any;
-
-const loop = (name: string, count: number, body: (i: N) => void) =>
-  (Loop as N)({ start: 0, end: count, type: 'int', condition: '<', name }, (v: N) => body(v[name]));
+import { clampInts, loop, type FloatNode, type Vec2Node, type Vec3Node, type Vec4Node } from '../tsl';
 
 function target(w: number, h: number, filter: typeof LinearFilter | typeof NearestFilter = LinearFilter): StorageTexture {
   const t = new StorageTexture(w, h);
@@ -43,20 +39,20 @@ const BLEND = 0.25;
 const LATTICE = [[0, 0], [1, 1], [1, 0], [0, 1]];
 
 /** Interleaved gradient noise (Jimenez 2014), for the march's start. */
-const ign = (p: N): N => fract(float(52.9829189).mul(fract(dot(p, vec2(0.06711056, 0.00583715)))));
+const ign = (p: Vec2Node): FloatNode => fract(float(52.9829189).mul(fract(dot(p, vec2(0.06711056, 0.00583715)))));
 
 /** A texture read at uv with a Catmull-Rom filter, from five bilinear reads (Jimenez 2016); size in texels. */
-function catmullRom(tex: N, uv: N, size: N): N {
-  const s: N = uv.mul(size);
-  const t1: N = floor(s.sub(0.5)).add(0.5);
-  const f: N = s.sub(t1);
-  const w0: N = f.mul(f.mul(f.mul(-0.5).add(1)).sub(0.5));
-  const w1: N = f.mul(f).mul(f.mul(1.5).sub(2.5)).add(1);
-  const w2: N = f.mul(f.mul(f.mul(-1.5).add(2)).add(0.5));
-  const w3: N = f.mul(f).mul(f.mul(0.5).sub(0.5));
-  const w12: N = w1.add(w2);
+function catmullRom(tex: StorageTexture, uv: Vec2Node, size: Vec2Node): Vec4Node {
+  const s = uv.mul(size);
+  const t1 = floor(s.sub(0.5)).add(0.5);
+  const f = s.sub(t1);
+  const w0 = f.mul(f.mul(f.mul(-0.5).add(1)).sub(0.5));
+  const w1 = f.mul(f).mul(f.mul(1.5).sub(2.5)).add(1);
+  const w2 = f.mul(f.mul(f.mul(-1.5).add(2)).add(0.5));
+  const w3 = f.mul(f).mul(f.mul(0.5).sub(0.5));
+  const w12 = w1.add(w2);
   const t0 = t1.sub(1).div(size), t3 = t1.add(2).div(size), t12 = t1.add(w2.div(w12)).div(size);
-  const at = (x: N, y: N) => texture(tex).sample(vec2(x, y)).level(float(0));
+  const at = (x: FloatNode, y: FloatNode) => texture(tex).sample(vec2(x, y)).level(float(0));
   const sum = at(t12.x, t0.y).mul(w12.x.mul(w0.y))
     .add(at(t0.x, t12.y).mul(w0.x.mul(w12.y)))
     .add(at(t12.x, t12.y).mul(w12.x.mul(w12.y)))
@@ -84,7 +80,7 @@ function cameraInputs() {
 
 function createPasses(width: number, height: number, view: View, field: CloudField, cam: ReturnType<typeof cameraInputs>) {
   /** The sky's direction through the screen at uv. */
-  const rayAt = (uv: N): N => {
+  const rayAt = (uv: Vec2Node): Vec3Node => {
     const ndc = vec4(uv.x.mul(2).sub(1), float(1).sub(uv.y.mul(2)), 1, 1);
     const camera = cam.projectionInverse.mul(ndc);
     return view.toSky(cam.cameraWorld.mul(vec4(camera.xyz.div(camera.w), 0)).xyz);
@@ -133,7 +129,7 @@ function createPasses(width: number, height: number, view: View, field: CloudFie
         // themselves are noisy), which rejects cloud that has moved or changed without pulling settled cloud about
         const lo = vec4(1e4).toVar(), hi = vec4(-1e4).toVar();
         for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
-          const s = textureLoad(marched, (clamp as N)(m.add(ivec2(i, j)), ivec2(0, 0), ivec2(MW - 1, MH - 1)));
+          const s = textureLoad(marched, clampInts(m.add(ivec2(i, j)), ivec2(0, 0), ivec2(MW - 1, MH - 1)));
           lo.assign(min(lo, s));
           hi.assign(max(hi, s));
         }
@@ -192,7 +188,7 @@ function createShadow(view: View, field: CloudField) {
     kernel,
     centre,
     /** Fraction of the sun's light the clouds let through to world position p (metres), read where p lies on the eye's chart. */
-    at: (p: N): N => {
+    at: (p: Vec3Node): FloatNode => {
       const uv = view.local(p).mul(0.001).add(eye.xz).sub(centre.xz).div(SHADOW_EXTENT).add(0.5);
       const edge = smoothstep(0.5, 0.4, max(abs(uv.x.sub(0.5)), abs(uv.y.sub(0.5))));
       return mix(float(1), texture(map).sample(uv).level(float(0)).r, edge);

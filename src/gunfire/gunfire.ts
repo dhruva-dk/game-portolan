@@ -26,8 +26,7 @@ import type { Light } from '../sky/light';
 import { pixelSize } from '../view/view';
 import { random } from '../world/random';
 import { R, add, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
-
-type N = any;
+import type { FloatNode, Vec2Node } from '../tsl';
 
 /** The most balls in flight, and puffs alive, at once. */
 const BALLS = 128, PUFFS = 1024;
@@ -46,7 +45,7 @@ interface Puff {
   ink: Vec3; glow: number; opacity: number; soft: number; fadeIn: number;
 }
 
-function ballMesh(light: Light, pixel: N) {
+function ballMesh(light: Light, pixel: FloatNode) {
   const ico = new IcosahedronGeometry(1, 1);
   const g = new InstancedBufferGeometry();
   g.setAttribute('position', ico.getAttribute('position'));
@@ -55,12 +54,12 @@ function ballMesh(light: Light, pixel: N) {
   g.setAttribute('ballAt', places);
   g.instanceCount = 0;
   const m = new MeshBasicNodeMaterial();
-  const at: N = attribute('ballAt', 'vec4').xyz, local: N = attribute('position', 'vec3');
-  const radius: N = max(float(BALL), cameraPosition.sub(at).length().mul(pixel).mul(BALL_PIXELS / 2));
+  const at = attribute('ballAt', 'vec4').xyz, local = attribute('position', 'vec3');
+  const radius = max(float(BALL), cameraPosition.sub(at).length().mul(pixel).mul(BALL_PIXELS / 2));
   m.positionNode = at.add(local.mul(radius));
-  const n: N = varying(attribute('normal', 'vec3'));
+  const n = varying(attribute('normal', 'vec3'));
   m.colorNode = Fn(() => {
-    const p: N = at, nn: N = normalize(n);
+    const p = at, nn = normalize(n);
     const lit = light.glossy(p, nn, float(0.45), vec3(IRON));
     return lit.diffuse.mul(IRON).add(lit.specular);
   })();
@@ -70,7 +69,7 @@ function ballMesh(light: Light, pixel: N) {
   return { mesh, places, geometry: g };
 }
 
-function puffMesh(light: Light, now: N) {
+function puffMesh(light: Light, now: FloatNode) {
   const g = new InstancedBufferGeometry();
   g.setAttribute('position', new BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
   g.setIndex([0, 1, 2, 0, 2, 3]);
@@ -78,32 +77,32 @@ function puffMesh(light: Light, now: N) {
   ['puffAt', 'puffWay', 'puffForm', 'puffInk', 'puffLook'].forEach((name, i) => g.setAttribute(name, new InterleavedBufferAttribute(buffer, 4, i * 4)));
   g.instanceCount = 0;
 
-  const o: N = attribute('puffAt', 'vec4'), w: N = attribute('puffWay', 'vec4'), f: N = attribute('puffForm', 'vec4');
-  const ink: N = attribute('puffInk', 'vec4'), look: N = attribute('puffLook', 'vec4');
-  const age: N = now.sub(o.w), t: N = age.div(w.w);
-  const alive: N = age.greaterThanEqual(0).and(t.lessThan(1));
-  const up: N = normalize(o.xyz), k: N = max(f.z, 1e-3);
+  const o = attribute('puffAt', 'vec4'), w = attribute('puffWay', 'vec4'), f = attribute('puffForm', 'vec4');
+  const ink = attribute('puffInk', 'vec4'), look = attribute('puffLook', 'vec4');
+  const age = now.sub(o.w), t = age.div(w.w);
+  const alive = age.greaterThanEqual(0).and(t.lessThan(1));
+  const up = normalize(o.xyz), k = max(f.z, 1e-3);
   // carried off against its drag, and pulled down (or lifted)
-  const centre: N = o.xyz.add(w.xyz.mul(float(1).sub(exp(k.negate().mul(age))).div(k))).sub(up.mul(f.w.mul(0.5).mul(age).mul(age)));
-  const size: N = select(alive, f.x.add(f.y.mul(age)), float(0));
-  const eye: N = normalize(cameraPosition.sub(centre));
-  const right: N = normalize(cross(up, eye)), upward: N = cross(eye, right);
-  const local: N = attribute('position', 'vec3');
+  const centre = o.xyz.add(w.xyz.mul(float(1).sub(exp(k.negate().mul(age))).div(k))).sub(up.mul(f.w.mul(0.5).mul(age).mul(age)));
+  const size = select(alive, f.x.add(f.y.mul(age)), float(0));
+  const eye = normalize(cameraPosition.sub(centre));
+  const right = normalize(cross(up, eye)), upward = cross(eye, right);
+  const local = attribute('position', 'vec3');
   // each turned its own way, so a bank of them doesn't read as a grid
-  const a: N = look.y.mul(6.283), c: N = cos(a), s: N = sin(a);
-  const turned: N = vec3(local.x.mul(c).sub(local.y.mul(s)), local.x.mul(s).add(local.y.mul(c)), 0);
+  const a = look.y.mul(6.283), c = cos(a), s = sin(a);
+  const turned = vec3(local.x.mul(c).sub(local.y.mul(s)), local.x.mul(s).add(local.y.mul(c)), 0);
   const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
   m.positionNode = centre.add(right.mul(turned.x).add(upward.mul(turned.y)).mul(size));
-  const uv: N = varying(local.xy), mid: N = varying(centre), facing: N = varying(normalize(up.add(eye.mul(0.6))));
-  const tv: N = varying(t);
+  const uv = varying(local.xy), mid = varying(centre), facing = varying(normalize(up.add(eye.mul(0.6))));
+  const tv = varying(t);
   // a drop's hard disc, or a cloud's soft one billowed round its edge by a few lobes (its own, by its seed)
-  const lobes: N = (uvv: N) => sin(atan(uvv.y, uvv.x).mul(5).add(look.y.mul(40))).mul(0.5).add(sin(atan(uvv.y, uvv.x).mul(3).sub(look.y.mul(17))).mul(0.5));
-  const shapeOf = (r: N): N => mix(smoothstep(1, 0.55, r), exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r.mul(float(1).sub(lobes(uv).mul(0.18))))), look.z);
-  const fade: N = (tt: N) => smoothstep(0, max(look.w, 1e-3), tt).mul(pow(float(1).sub(tt).max(0), 1.5));
-  const alpha: N = Fn(() => look.x.mul(shapeOf(uv.length())).mul(fade(tv)))();
+  const lobes = (uvv: Vec2Node) => sin(atan(uvv.y, uvv.x).mul(5).add(look.y.mul(40))).mul(0.5).add(sin(atan(uvv.y, uvv.x).mul(3).sub(look.y.mul(17))).mul(0.5));
+  const shapeOf = (r: FloatNode): FloatNode => mix(smoothstep(1, 0.55, r), exp(r.mul(r).mul(-2.5)).mul(smoothstep(1, 0.55, r.mul(float(1).sub(lobes(uv).mul(0.18))))), look.z);
+  const fade = (tt: FloatNode) => smoothstep(0, max(look.w, 1e-3), tt).mul(pow(float(1).sub(tt).max(0), 1.5));
+  const alpha = Fn(() => look.x.mul(shapeOf(uv.length())).mul(fade(tv)))();
   m.colorNode = Fn(() => {
-    const r: N = uv.length();
-    const lit: N = light(mid, normalize(facing));
+    const r = uv.length();
+    const lit = light(mid, normalize(facing));
     return ink.rgb.mul(lit).mul(alpha).add(ink.rgb.mul(ink.w).mul(shapeOf(r)).mul(fade(tv)));
   })();
   m.opacityNode = alpha;

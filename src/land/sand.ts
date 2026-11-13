@@ -10,14 +10,14 @@
 // Lit like everything else (sky/light.ts).
 
 import { If, abs, cameraPosition, float, mix, normalize, reflect, smoothstep, texture, vec2, vec3 } from 'three/tsl';
+import type { Texture } from 'three/webgpu';
 import { loadTexture } from '../textures';
 import type { View } from '../view/view';
 import type { Ground } from './ground';
 import type { Light } from '../sky/light';
 import { SHALLOWEST } from './seabed';
 import { createStrewn } from './strewn';
-
-type N = any;
+import type { FloatNode, Vec2Node, Vec3Node, Vec4Node } from '../tsl';
 
 /** The sand texture (ambientCG Ground055S) repeats every this many metres; its ripples are laid again this many
  * times larger (twice, crossing), the wind's broader ripples that show from afar. */
@@ -47,7 +47,7 @@ const LITTER_ALBEDO = [0.13, 0.095, 0.06];
 /** How sharply the three projections hand over to each other. */
 const SHARP = 8;
 
-export type Sand = (p: N, n: N, litter: N | null) => N;
+export type Sand = (p: Vec3Node, n: Vec3Node, litter: FloatNode | null) => Vec3Node;
 
 export function createSand(view: View, ground: Ground, light: Light): Sand {
   const sand = loadTexture('sand.jpg', true), sandNormal = loadTexture('sand-normal.jpg', false), leaves = loadTexture('litter.jpg', true);
@@ -59,16 +59,16 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
    */
   return (p, n, litter) => {
     const up = view.up(p), height = view.altitude(p);
-    let w: N = abs(up).pow(SHARP);
+    let w: Vec3Node = abs(up).pow(SHARP);
     w = w.div(w.x.add(w.y).add(w.z));
     // each axis's projection of a texture, blended
-    const tri = (t: N, tile: number, shift = 0): N => {
+    const tri = (t: Texture, tile: number, shift = 0): Vec4Node => {
       const q = p.div(tile).add(shift);
       return texture(t, q.zy).mul(w.x).add(texture(t, q.xz).mul(w.y)).add(texture(t, q.xy).mul(w.z));
     };
     const grain = tri(sand, SAND_TILE).rgb;
-    let albedo: N = grain.div(vec3(...SAND_MEAN)).mul(vec3(...SAND_ALBEDO));
-    const cover: N = ground.cover(p);
+    let albedo: Vec3Node = grain.div(vec3(...SAND_MEAN)).mul(vec3(...SAND_ALBEDO));
+    const cover = ground.cover(p);
     // mottled: damper hollows and drier, paler rises
     albedo = albedo.mul(cover.z.sub(0.5).mul(0.3).add(1));
     // the damp band ends raggedly, higher on the hollows
@@ -79,7 +79,7 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     const coral = smoothstep(0.25, 0.8, cover.y.add(grain.r.sub(SAND_MEAN[0]).mul(2))).mul(0.85);
     albedo = mix(albedo, vec3(...CORAL).mul(grain.div(vec3(...SAND_MEAN))).mul(cover.z.mul(0.6).add(0.7)), coral);
     // sea grass in soft-edged clumps, thin enough to show the sand between
-    const lumpy: N = cover.w.sub(0.5).mul(1.1);
+    const lumpy = cover.w.sub(0.5).mul(1.1);
     const clumps = smoothstep(-0.3, 0.45, lumpy.add(grain.g.sub(SAND_MEAN[1]).mul(2)));
     const grass = smoothstep(0.1, 0.8, cover.x).mul(clumps).mul(GRASS_COVER);
     albedo = mix(albedo, vec3(...GRASS).mul(grain.g.div(SAND_MEAN[1])), grass);
@@ -87,10 +87,10 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
     const stones = strewn(p, height, cover);
     albedo = mix(albedo, stones.rgb, stones.a);
 
-    let bare: N = float(1);
+    let bare: FloatNode = float(1);
     if (litter) {
       // litter on the dry sand, thinning out raggedly at its edges
-      const fallen: N = tri(leaves, LITTER_TILE).rgb;
+      const fallen = tri(leaves, LITTER_TILE).rgb;
       const lying = smoothstep(0.15, 0.85, litter.add(cover.z.sub(0.5).mul(0.6)).add(fallen.r.sub(LITTER_MEAN[0]).mul(2)))
         .mul(smoothstep(0.3, 1, height)).mul(0.85);
       // its own pattern's contrast halved: dead fronds and leaves, not pale gravel
@@ -100,16 +100,16 @@ export function createSand(view: View, ground: Ground, light: Light): Sand {
 
     // the ripples' normal map, each projection's tilting the surface along its own two axes, the map turned by `turn`
     // radians on each (and its tilt turned back); none under the litter, the grass nor the stones
-    const ripples = (tile: number, warp: N, turn: number): N => {
+    const ripples = (tile: number, warp: FloatNode, turn: number): Vec3Node => {
       const c = Math.cos(turn), s = Math.sin(turn);
-      const b = (q: N): N => {
-        const t: N = texture(sandNormal, vec2(q.x.mul(c).sub(q.y.mul(s)), q.x.mul(s).add(q.y.mul(c)))).xy.mul(2).sub(1);
+      const b = (q: Vec2Node): Vec2Node => {
+        const t = texture(sandNormal, vec2(q.x.mul(c).sub(q.y.mul(s)), q.x.mul(s).add(q.y.mul(c)))).xy.mul(2).sub(1);
         return vec2(t.x.mul(c).add(t.y.mul(s)), t.y.mul(c).sub(t.x.mul(s)));
       };
       const q = p.div(tile).add(warp), bx = b(q.zy), by = b(q.xz), bz = b(q.xy);
       return vec3(0, bx.y, bx.x).mul(w.x).add(vec3(by.x, 0, by.y).mul(w.y)).add(vec3(bz.x, bz.y, 0).mul(w.z));
     };
-    let tilt: N = ripples(SAND_TILE, float(0), 0).mul(1.2);
+    let tilt = ripples(SAND_TILE, float(0), 0).mul(1.2);
     if (litter) {
       // on the islands' ground the broad ones too, two sets crossing, bent about by the lumpy noise: dimpled, their
       // crests wandering. They fade out before the sea floor's mesh begins (they don't show through that much water),

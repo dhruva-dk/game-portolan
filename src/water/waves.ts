@@ -28,13 +28,12 @@ import {
 } from 'three/webgpu';
 import {
   Fn, cos, float, floor, instanceIndex, instancedArray, length, localId, max, select, sin, smoothstep, sqrt, textureLoad, textureStore,
-  uint, uniform, uvec2, vec2, vec4, workgroupArray, workgroupBarrier, workgroupId,
+  uint, uniform, uvec2, vec2, vec4, workgroupBarrier, workgroupId,
 } from 'three/tsl';
 import type { Compute } from '../gpu';
 import { BANDS, CASCADES, CHOP, PERIOD, SIZE } from './cascades';
 import { G, coxMunk, initialSpectrum, meanSquareSlope, normalQuantile, seaState, whitecaps, type Sea } from './spectrum';
-
-type N = any;
+import { workgroupArrayOf, type FloatNode, type UintNode, type Vec2Node, type Vec4Node } from '../tsl';
 
 /** Cascades whose curvature focuses caustics: the shorter waves, a few metres and less. */
 export const CURVED = [1, 2];
@@ -58,7 +57,7 @@ function surface(): StorageTexture {
 }
 
 /** Two complex numbers in a vec4 (xy, zw), each times the complex w. */
-const twice = (a: N, w: N): N => vec4(
+const twice = (a: Vec4Node, w: Vec2Node): Vec4Node => vec4(
   a.x.mul(w.x).sub(a.y.mul(w.y)), a.x.mul(w.y).add(a.y.mul(w.x)),
   a.z.mul(w.x).sub(a.w.mul(w.y)), a.z.mul(w.y).add(a.w.mul(w.x)),
 );
@@ -90,7 +89,7 @@ export function createWaves() {
   const spectrumKernel = Fn(() => {
     const c = instanceIndex.div(AREA), i = instanceIndex.mod(AREA);
     const x = i.mod(SIZE), y = i.div(SIZE);
-    const width = (select as N)(c.equal(0), CASCADES[0], select(c.equal(1), CASCADES[1], CASCADES[2]));
+    const width = select(c.equal(0), CASCADES[0], select(c.equal(1), CASCADES[1], CASCADES[2]));
     const h0 = textureLoad(initial, uvec2(x, y.add(c.mul(SIZE))));
     const k = vec2(float(x).sub(HALF), float(y).sub(HALF)).mul(float(2 * Math.PI).div(width));
     const kl = length(k);
@@ -103,8 +102,8 @@ export function createWaves() {
       h0.y.mul(cw).sub(h0.x.mul(sw)).add(h0.z.mul(sw)).add(h0.w.mul(cw)),
     ).toVar();
     const some = kl.greaterThan(1e-6);
-    const unit = select(some, k.div(kl), vec2(0)) as N;
-    const inverse = select(some, float(1).div(kl), float(0)) as N;
+    const unit = select(some, k.div(kl), vec2(0));
+    const inverse = select(some, float(1).div(kl), float(0));
     const ih = vec2(h.y.negate(), h.x); // i·h̃
     // D = IFFT(i k/|k| h̃) moves water toward the crests; its derivatives ∂Dx/∂x = IFFT(−kx²/|k| h̃) and so on
     const dx = ih.mul(unit.x), dz = ih.mul(unit.y);
@@ -113,7 +112,7 @@ export function createWaves() {
     const jzz = h.mul(k.y.mul(k.y).mul(inverse).negate());
     const jxz = h.mul(k.x.mul(k.y).mul(inverse).negate());
     // two real surfaces in one complex FFT: A + iB
-    const pack = (a: N, b: N) => vec2(a.x.sub(b.y), a.y.add(b.x));
+    const pack = (a: Vec2Node, b: Vec2Node) => vec2(a.x.sub(b.y), a.y.add(b.x));
     fieldsA.element(instanceIndex).assign(vec4(pack(h, dx), pack(dz, sx)));
     fieldsB.element(instanceIndex).assign(vec4(pack(sz, jxx), pack(jzz, jxz)));
   })().compute(AREA * COUNT, [64]);
@@ -122,10 +121,10 @@ export function createWaves() {
   const fft = (rows: boolean) => Fn(() => {
     const line = workgroupId.x, i = localId.x;
     // rows of all the cascades follow one another; a column is a line within one cascade
-    const at = (j: N) => (rows
+    const at = (j: UintNode) => (rows
       ? line.mul(SIZE).add(j)
       : line.div(SIZE).mul(AREA).add(j.mul(SIZE)).add(line.mod(SIZE)));
-    const a = workgroupArray('vec4', SIZE) as N, b = workgroupArray('vec4', SIZE) as N;
+    const a = workgroupArrayOf('vec4', SIZE), b = workgroupArrayOf('vec4', SIZE);
     a.element(i).assign(fieldsA.element(at(i)));
     a.element(i.add(HALF)).assign(fieldsA.element(at(i.add(HALF))));
     b.element(i).assign(fieldsB.element(at(i)));
@@ -158,7 +157,7 @@ export function createWaves() {
     const sign = float(1).sub(float(x.add(y).bitAnd(uint(1))).mul(2));
     const a = fieldsA.element(at).mul(sign), b = fieldsB.element(at).mul(sign);
     // a = (height, Dx, Dz, slope x), b = (slope z, ∂Dx/∂x, ∂Dz/∂z, ∂Dx/∂z)
-    let froth: N = float(0);
+    let froth: FloatNode = float(0);
     if (c < FOAMING) {
       const jacobian = float(1).add(b.y.mul(CHOP)).mul(float(1).add(b.z.mul(CHOP))).sub(b.w.mul(b.w).mul(CHOP * CHOP));
       const kept = foam.element(instanceIndex.add(c * AREA));

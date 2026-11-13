@@ -17,8 +17,7 @@
 // the ripples run on and the flashes twinkle.
 
 import { clamp, exp, float, floor, fract, hash, log2, max, min, mix, select, sqrt, time, uint, vec2 } from 'three/tsl';
-
-type N = any;
+import type { FloatNode, Vec2Node } from '../tsl';
 
 /** About how wide a ripple facet is, metres: a capillary ripple's flank. */
 const FACET = 0.01;
@@ -30,14 +29,14 @@ const RATE = 8;
 const FINEST = 0.005;
 
 /** A uniform 0…1 for cell (x, y) at level, in time slot `slot`, salted. */
-const draw = (x: N, y: N, level: N, slot: N, salt: number): N => hash(
+const draw = (x: FloatNode, y: FloatNode, level: FloatNode, slot: FloatNode, salt: number): FloatNode => hash(
   x.toUint().mul(uint(73856093)).bitXor(y.toUint().mul(uint(19349663))).bitXor(level.toUint().mul(uint(83492791)))
     .bitXor(slot.toUint().mul(uint(2654435761))).add(uint(salt)),
 );
 
 /** Poisson's k for mean λ, by inverse CDF from the uniform u, as k/λ: up to 8 terms, past which it is near enough normal. */
-function poisson(lambda: N, u: N, g: N): N {
-  let p: N = exp(lambda.negate()), cdf: N = p, k: N = float(0);
+function poisson(lambda: FloatNode, u: FloatNode, g: FloatNode): FloatNode {
+  let p = exp(lambda.negate()), cdf = p, k: FloatNode = float(0);
   for (let i = 1; i <= 8; i++) {
     k = k.add(select(u.greaterThan(cdf), float(1), float(0)));
     p = p.mul(lambda).div(i);
@@ -50,11 +49,11 @@ function poisson(lambda: N, u: N, g: N): N {
  * The glint's multiplier at chart position q (metres), for a pixel whose footprint on the sea is `area` (m²) and
  * `width` (its longer side, m), where the lobe's density at the half vector is D, n·h is nh and h·l is hl.
  */
-export function glitter(q: N, area: N, width: N, D: N, nh: N, hl: N): N {
+export function glitter(q: Vec2Node, area: FloatNode, width: FloatNode, D: FloatNode, nh: FloatNode, hl: FloatNode): FloatNode {
   const P = min(D.mul(nh).mul(OMEGA).div(max(hl.mul(4), 1e-3)), 1);
   const lambda = max(area.div(FACET * FACET).mul(P), 1e-4);
   const level = max(log2(width.div(FINEST)), 0);
-  const at = (l: N): N => {
+  const at = (l: FloatNode): FloatNode => {
     const size = float(2).pow(l).mul(FINEST);
     // (offset so the cells' indices are positive)
     const cell = floor(q.div(size)).add(vec2(1 << 22));
