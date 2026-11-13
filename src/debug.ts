@@ -34,7 +34,7 @@
 // At sea, ?kit puts stores under her for her to sweep up (a gun, unless ?gun arms her, and three slots of stores), with
 // a better gun beside them, offered; ?use=1…3,seconds sets her mending from that slot so many seconds into the frames
 // drawn, ?gust=seconds spends a gust then and ?fire=seconds fires then; ?loot strews a piece of each rarity in a fan ahead
-// of her, 25 m out to 420 m (?loot=m: every kind, and a gun of every rarity, in a row across her bow m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
+// of her, 25 m out to 420 m (?loot=m: every kind, and a gun of every rarity, in a row across the look m metres out); ?swing=px,px,seconds drags the look that far right and down and lets it go, so many
 // seconds into the frames drawn (0 by default; the look stays where it is put: play/chase.ts); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
 // her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
@@ -218,7 +218,7 @@ function winHer(game: Game) {
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
 function stock(game: Game) {
   type Goods = Parameters<Game['debug']['strew']>[1][number];
-  const { at, heading } = game.status();
+  const { at, heading, facing } = game.status();
   const step = () => game.step(STEP, IDLE);
   if (params.has('kit')) {
     const under: Goods[] = [
@@ -237,7 +237,7 @@ function stock(game: Game) {
       { kind: 'smallShield', count: 1 }, { kind: 'bigShield', count: 1 }, { kind: 'repairKit', count: 1 }, { kind: 'fullRepair', count: 1 },
     ];
     all.forEach((g, i) => {
-      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180), turned = normalize(add(heading, cross(at, heading), side));
+      const side = Math.tan(((i - (all.length - 1) / 2) * 7 * Math.PI) / 180), turned = normalize(add(facing, cross(at, facing), side));
       game.debug.strew(along(at, turned, row).p, [g]);
     });
   } else if (params.has('loot')) {

@@ -35,15 +35,15 @@ const PIECES = 512;
 const BEAM = 520, SHAPE = 320, HALO = 140;
 /** A piece hangs this high over the water at its mean, bobbing this much at this rate (rad/s); turns at this rate
  *  (rad/s) and rocks this far (rad); rises this far up out of the water as it comes, over 1/RISE s. */
-const RIDE = 1.5, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
+const RIDE = 2.2, BOB = 0.25, BOB_RATE = 2, SPIN = 1.4, ROCK = 0.15, SINK = 2, RISE = 2.5;
 /** The fewest pixels across a piece and a beam are drawn; a piece's size, m, it grows from. */
-const SHAPE_PIXELS = 12, BEAM_PIXELS = 3, SHAPE_ACROSS = 1.8;
+const SHAPE_PIXELS = 22, BEAM_PIXELS = 3, SHAPE_ACROSS = 3.5;
 /** The beam: its height for the commonest and more for each rarity up, m; its radius at the foot and the head. */
 const TALL = 14, TALLER = 7, FOOT = 0.8, HEAD = 0.5;
 /** How bright a piece's rim, a beam and its ring glow, of what the sun and the sky give a white surface. */
-const EMIT = 2.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
+const EMIT = 3.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
 /** Each kind's size: the shields' and repairs' small and big, the gun's. */
-const SIZE: Record<LootKind, number> = { gun: 1.25, smallShield: 1, bigShield: 1.35, repairKit: 1, fullRepair: 1.35 };
+const SIZE: Record<LootKind, number> = { gun: 2.3, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1 };
 /** Surfaces (linear albedo): bronze, ice, weathered wood and the iron of its hoops. */
 const BRONZE: [number, number, number] = [0.32, 0.2, 0.08], ICE: [number, number, number] = [0.33, 0.78, 0.95];
 const WOOD: [number, number, number] = [0.26, 0.15, 0.08], HOOP: [number, number, number] = [0.05, 0.045, 0.04];
