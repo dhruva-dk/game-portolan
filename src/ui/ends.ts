@@ -91,34 +91,40 @@ const GAIN = { wait: 0.5, rate: 0.8 } as const;
  *  career it shows filling. */
 export function createResult(act: { watch(): void; leave(): void }) {
   const s = sheet(false, false);
-  s.root.style.background = 'radial-gradient(ellipse at 50% 42%, rgba(20,12,6,.08) 30%, rgba(20,12,6,.5) 100%)';
+  // shade at the top and the foot, under the band and the ways on; the middle, where her ship is, left clear
+  s.root.style.background = 'linear-gradient(to bottom, rgba(20,12,6,.42), rgba(20,12,6,0) 40%, rgba(20,12,6,0) 66%, rgba(20,12,6,.42))';
   /** The career as it fills: where it ends and how far it has come (levels and their share, as one number), the
    *  seconds yet to wait, her rank's tier; where the plate stands. */
-  let gain = { to: 0, at: 0, wait: 0, tier: 0 }, plateAt = { x: 0, y: 0 };
+  let gain = { to: 0, at: 0, wait: 0, tier: 0 }, plateAt = { x: 0, y: 0, w: 0 };
   /** Whether it is shown, and with its way to watch. */
   let shown = false, watching = false;
   const drawPlate = () => {
     const level = Math.floor(gain.at), g = s.root.querySelector<SVGGElement>('#plate');
-    if (g) g.innerHTML = plate(plateAt.x, plateAt.y, 136, level, gain.at - level, gain.tier);
+    if (g) g.innerHTML = plate(plateAt.x, plateAt.y, plateAt.w, level, gain.at - level, gain.tier);
   };
-  /** Draws her end afresh. */
+  /** Her place over how many began, in its laurel, `r` across, at (x, y). */
+  const place = (x: number, y: number, r: number, end: End) => {
+    const [wreath, numeral] = placed(end.place), k = r / 48;
+    return laurel(x, y, r, wreath) + figure(x, y - 8 * k, end.place, 50 * k, { fill: numeral })
+      + `<path d="M${x - 15 * k} ${y + 16 * k}H${x + 15 * k}" stroke="${INK.iron}" stroke-width="1.4"/>` + figure(x, y + 29 * k, end.of, 17 * k);
+  };
+  /** Draws her end afresh: sunk, a band across the top of the screen, so the world under it, her ship going down,
+   *  shows whole; won, her place gilt in its sunburst over the sea she held and her plate. Her ways on at the foot. */
   const draw = (end: End, career: { from: Career; to: Career }) => {
-    const won = end.how === 'won', [wreath, numeral] = placed(end.place), cx = 368, cy = 160, x = 500;
+    const won = end.how === 'won', y = 72;
     watching = !end.over;
     gain = { to: career.to.level + career.to.progress, at: career.from.level + career.from.progress, wait: GAIN.wait, tier: career.to.tier };
-    // the right column: what sank her, the sea she held, her plate
-    let y = won ? 92 : 80, column = '';
-    if (!won) [column, y] = [cause(x + 22, y, end.how), y + 58];
-    column += held(x + 22, y, 17) + figure(x + 50, y, percent(end.share), 30, { anchor: 'start' });
-    plateAt = { x, y: y + 30 };
+    const body = won
+      ? sunburst(478, 100, 56) + place(478, 100, 66, end)
+        + slip(214, 74, 158, 56) + held(244, 102, 16) + figure(266, 102, percent(end.share), 26, { anchor: 'start' })
+      : slip(262, 14, 432, 116, { bold: true }) + place(330, y, 46, end)
+        + `<path d="M392 30V114" stroke="${INK.iron}" stroke-width=".8" opacity=".6"/>`
+        + cause(428, y, end.how) + held(482, y, 16) + figure(504, y, percent(end.share), 26, { anchor: 'start' });
+    plateAt = won ? { x: 586, y: 66, w: 116 } : { x: 576, y: y - 34, w: 108 };
     const ways = watching
-      ? `<g id="watch">${banner(374, 362, 190, spyglass(370, 358, 74))}</g><g id="leave">${banner(582, 362, 190, anchor(578, 358, 56))}</g>`
-      : `<g id="leave">${banner(478, 362, 210, anchor(474, 358, 60), won)}</g>`;
-    const el = s.set(slip(236, 40, 484, 248, { bold: true })
-      + (won ? sunburst(cx, cy, 70) : '')
-      + laurel(cx, cy, 82, wreath) + figure(cx, cy - 12, end.place, won ? 92 : 76, { fill: numeral })
-      + `<path d="M${cx - 26} ${cy + 30}H${cx + 26}" stroke="${INK.iron}" stroke-width="1.6"/>`
-      + figure(cx, cy + 50, end.of, 26) + column + '<g id="plate"></g>' + ways);
+      ? `<g id="watch">${banner(380, 370, 176, spyglass(376, 366, 68))}</g><g id="leave">${banner(576, 370, 176, anchor(572, 366, 52))}</g>`
+      : `<g id="leave">${banner(478, 370, 196, anchor(474, 366, 56), won)}</g>`;
+    const el = s.set(body + '<g id="plate"></g>' + ways);
     drawPlate();
     region(el, 'leave', act.leave);
     if (watching) region(el, 'watch', act.watch);
