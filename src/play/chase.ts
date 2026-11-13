@@ -27,9 +27,11 @@ import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
  *  starboard of her as the look goes. */
 export const BOOM = 40;
 const FOCUS = 12, SHOULDER = 15;
-/** The look's tilt below the level, radians: where it starts (the ships about her, 60–150 m off, across the middle of
- *  the screen; the sea's horizon a little below it), and its highest and steepest. */
-export const PITCH = 0.17;
+/** The look's tilt below the level, radians: where it starts, and its highest and steepest. It starts on the sea about
+ *  50 m ahead (the horizon, 140 m off from the eye's 25 m, a little above the middle), so a gun laid as it starts,
+ *  a lobbed one above all, comes down where she sees it: at 0.17, the old start, the look passed over the horizon into
+ *  the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
+export const PITCH = 0.3;
 const HIGHEST = -0.12, STEEPEST = 1.0;
 /** Radians a pixel of the look's drag, across and down. */
 const TURN = 0.0056, TILT = 0.0046;

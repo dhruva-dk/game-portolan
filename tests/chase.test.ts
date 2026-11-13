@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createChase, PITCH } from '../src/play/chase.ts';
 import { onScreen } from '../src/play/lens.ts';
+import { GUNS } from '../src/sim/handling.ts';
 import { offSight } from '../src/sim/sight.ts';
 import { shipAt } from '../src/sim/ship.ts';
 import { R, add, along, cross, distance, dot, length, normalize, scale, transport, type Vec3 } from '../src/world/sphere.ts';
@@ -59,7 +60,18 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
     // her own body (hull and rig) is never on the line
     assert.ok(offSight(s, shipAt(up, heading))!.angle > 0, `her heading ${off}° off the look: the line on her`);
   }
-  assert.ok(PITCH > 0.1 && PITCH < 0.3);
+  assert.ok(PITCH > 0.1 && PITCH < 0.35);
+});
+
+test('as it starts, the look meets the sea within a lobbed gun\'s reach, and where it meets it is on the screen', () => {
+  const chase = createChase(flat, calm);
+  chase.reset(pose(up, north), 0);
+  const s = chase.sight(), b = dot(s.from, s.dir), c = dot(s.from, s.from) - R * R;
+  assert.ok(b * b - c > 0, 'the look meets the sea, not the sky');
+  const hit = add(s.from, s.dir, -b - Math.sqrt(b * b - c)), off = R * angle(hit, up);
+  assert.ok(off > GUNS.mortar.least + 10 && off < 90, `the sea met ${off.toFixed(0)} m from her`);
+  const q = onScreen(chase.eye(), normalize(hit), 956, 440, 0);
+  assert.ok(q && q.y > 0 && q.y < 440, 'on the screen');
 });
 
 test('looked as high or as low as it goes, the eye stays over the sea; by a hill it is drawn in clear of it', () => {
