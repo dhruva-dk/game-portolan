@@ -85,22 +85,22 @@ async function play(s: Stage): Promise<Played> {
   const referee = createReferee(game);
 
   // Her hands on the canvas, the stick drawn under the UI; the match's HUD over the world, fed by the game and, where
-  // the sim has nothing yet, the placeholder.
+  // the game has nothing yet, by what stands in for it (play/placeholder.ts: pending).
   const input = createInput(s.canvas);
   const layer = uiLayer();
   const stick = createStick(layer);
-  const placeholder = createPlaceholder();
+  const pending = createPlaceholder();
   const coasts = traceCoasts(s.world.planet.islands);
   const globe = createGlobe(coasts);
-  const hudState = (): HudState => ({ ...game.status(), ...placeholder.kit() });
+  const hudState = (): HudState => ({ ...game.status(), ...pending.kit() });
   const map = () => globe.show(hudState());
-  const hud = createHud(layer, coasts, { slot: placeholder.choose, gust: placeholder.gust, fire: input.fire, map });
+  const hud = createHud(layer, coasts, { slot: pending.choose, gust: pending.gust, fire: input.fire, map });
   const gale = createGale(coasts, { dive: () => game.dive(), map });
   const deal = () => {
     game.drop(s.matches.deal());
     referee.begin(true);
   };
-  const flow = createFlow(hud, globe, gale, placeholder.career, 'title', {
+  const flow = createFlow(hud, globe, gale, pending.career, 'title', {
     play: deal,
     home() {
       referee.end();

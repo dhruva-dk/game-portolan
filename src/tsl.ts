@@ -30,8 +30,8 @@ export const clampInts = (value: Node, low: Node, high: Node): MathNode => new M
 /**
  * min() and max() of integers: the node three's min() and max() make (MathNode.js: `nodeProxyAssignable(MathNode,
  * MathNode.MIN)`, its arguments through nodeObject, the node made assignable), WGSL's min and max, of any numeric
- * type; made here with the public constructor because their types (@types/three 0.187, MathNode.d.ts MinMax, marked
- * "TODO Allow int/uint") take floats and float vectors only. The overload states what MathNode's getInputType makes
+ * type; made here with the public constructor because their types (@types/three 0.187, MathNode.d.ts MinMax, its
+ * own note asking for int and uint) take floats and float vectors only. The overload states what MathNode's getInputType makes
  * of it: an int, the inputs' own type.
  */
 export function minInt(a: IntNode, b: IntNode | number): IntNode;

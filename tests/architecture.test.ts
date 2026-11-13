@@ -173,8 +173,7 @@ test('g. src/world and src/sim are deterministic and headless', () => {
 
 test('h. the debug switches live in src/debug.ts alone, set going by one call from src/main.ts', () => {
   none(hits(/\blocation\b|\bURLSearchParams\b|\bswitches\s*\./, (rel) => rel !== 'debug.ts'), "the page's query read outside src/debug.ts");
-  none(hits(/['"]\.{1,2}\/(\.\.\/)*debug(\.ts)?['"]/, (rel) => rel !== 'main.ts'), 'src/debug.ts imported other than by src/main.ts');
-  const main = code(files.find((f) => f.rel === 'main.ts')!.text).join('\n');
+  none(hits(/['"]\.{1,2}\/(\.\.\/)*debug(\.ts)?['"]/, (rel) => rel !== 'main.ts'), 'src/debug.ts imported other than by src/main.ts');  const main = code(files.find((f) => f.rel === 'main.ts')!.text).join('\n');
   const taken = [...main.matchAll(/import\s*{([^}]*)}\s*from\s*['"]\.\/debug['"]/g)]
     .flatMap((m) => m[1].split(',').map((n) => n.trim()).filter((n) => n && !n.startsWith('type ')));
   assert.deepEqual(taken, ['scenario'], 'src/main.ts takes only scenario (and types) from src/debug.ts');
@@ -202,4 +201,17 @@ test('i2. the UI draws plain data: src/ui imports nothing from play/, three or w
     });
   }
   none(found, 'src/ui importing play/, three or a render module');
+});
+
+/** The files that may say they stand in for something, and why. */
+const STAND_INS: Record<string, string> = {
+  'play/placeholder.ts': 'what the HUD shows and does that nothing in the game has yet (items, Gust, her career), held in one place',
+};
+
+test('j. nothing in src says it is temporary or a hack, comments included, but the stand-ins (STAND_INS)', () => {
+  // raw text, comments and all; a stand-in named by its path (an import, a reference) is not the word
+  const named = (line: string) => Object.keys(STAND_INS).reduce((l, p) => l.replaceAll(p.replace(/\.ts$/, ''), ''), line);
+  const found = files.filter((f) => !(f.rel in STAND_INS)).flatMap((f) => f.text.split('\n').flatMap((line, i) =>
+    /\b(temporary|for now|placeholders?|hacks?|hacky|workarounds?|fixme|todo)\b/i.test(named(line)) ? [`src/${f.rel}:${i + 1}: ${line.trim()}`] : []));
+  none(found, 'words of temporary work (TEMPORARY, for now, placeholder, hack, workaround, FIXME, TODO)');
 });
