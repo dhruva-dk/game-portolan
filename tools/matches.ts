@@ -3,7 +3,7 @@
 // Each match is the game's own (play/state.ts start and advance, the matches dealt as play/setup.ts deals them), every
 // ship a bot, hers too, on a flat sea (the waves only lift the drawn ships). Prints, per match, the share of ships
 // afloat that are armed at 30, 60 and 120 s and the share with a shield or something to mend with, how the ships were
-// sunk, how and when it ended, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
+// sunk, how and when it ended, the balls fired and how many struck home, and the bots stuck: any that moved less than STUCK m in WINDOW s, told apart by her
 // speed over it: aground (under AGROUND m/s), or sailing round in circles (fighting round a foe, going for a piece
 // near her, or roaming as 0117's bots did, a new mark every few seconds on any bearing). And who holds the sea
 // (sim/territory.ts): the share of the planet held at 30, 60, 120, 240 s and at the end (all ships', and the most
@@ -49,6 +49,8 @@ for (let g = 0; g < games; g++) {
   /** The match's loops (closed, the square metres they took, cut by another, cut by herself or given up) and the shield
    *  each ship's own water gave back, from what each step did. */
   const loops = { closed: 0, metres: 0, cut: 0, own: 0 }, back = new Map<number, number>();
+  const balls = { fired: 0, struck: 0 };
+  let seen = -Infinity;
   const t1 = performance.now();
   while (state.alive().length > 1 && state.time() < end) {
     const did = state.advance(idle, still);
@@ -58,6 +60,13 @@ for (let g = 0; g < games; g++) {
       else loops.own++;
     }
     for (const k of did.regained) back.set(k.id, (back.get(k.id) ?? 0) + k.shield);
+    // the balls fired and struck home this step (what the guns did, kept for the frame: those newer than the last seen)
+    for (const b of state.blasts()) {
+      if (b.time <= seen) continue;
+      if (b.kind === 'shot') balls.fired++;
+      else if (b.kind === 'strike' && !b.ram) balls.struck++;
+    }
+    seen = Math.max(seen, ...state.blasts().map((b) => b.time));
     steps++;
     const t = Math.round(state.time() / STEP);
     if (t % Math.round(1 / STEP) === 0) {
@@ -89,6 +98,7 @@ for (let g = 0; g < games; g++) {
   const left = state.alive();
   console.log(`match ${g + 1} (seed ${m.seed}): ${left.length} left at ${state.time().toFixed(0)} s${left.length === 1 ? ` (ship ${left[0]} wins)` : ''};`
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
+  console.log(`  balls: ${balls.fired} fired, ${balls.struck} struck home (${((100 * balls.struck) / Math.max(1, balls.fired)).toFixed(0)}%)`);
   console.log(`  loot: ${loot.length} pieces at the start, ${shallow} in water too shoal to reach`);
   for (const k of marks) console.log(`  ${k}`);
   const l = loops, regained = [...back.values()];
