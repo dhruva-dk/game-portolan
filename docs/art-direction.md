@@ -1,6 +1,6 @@
 # Art direction
 
-A late trade-wind afternoon on a toy ocean planet: warm sun, a deep teal sea, a few big sunlit clouds, and the
+A late trade-wind afternoon on a rich, cinematic ocean planet: warm sun, a deep teal sea, a few big sunlit clouds, and the
 player's galleon as the brightest, most colourful thing in the frame. Painterly, saturated and readable on a phone
 at 956×440. Each rule below can be checked against `node tools/hero.ts <dir>` (seven hero shots and a numbered sheet).
 

@@ -1,5 +1,7 @@
 # Decisions
 
+If something you want to do "violates" a decision here. note it so we can make the necessary correction.
+
 What the owner has decided, one line each with its reason. These are not open for a port, an agent or a critic to
 change; bring a change to the owner first. `CLAUDE.md` holds the platform rules, `docs/art-direction.md` the look,
 `tests/architecture.test.ts` the code rules. This file holds the rest.
