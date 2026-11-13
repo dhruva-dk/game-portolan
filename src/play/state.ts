@@ -79,6 +79,11 @@ export interface Afloat { id: number; at: Vec3; heading: Vec3; hull: number; shi
  *  the shield each ship's own water gave back (sim/holding.ts). */
 export interface Stepped { held: Outcome | null; regained: readonly Regained[] }
 
+/** A step's parts, in the order they run: the orders (the bots' thinking), the fleet sailed, the fighting, who holds
+ *  the sea, the ships riding the swell, what the guns did kept, and the sunk taken off (advance's `lap`). */
+export const PARTS = ['command', 'sail', 'fight', 'hold', 'ride', 'keep', 'founder'] as const;
+export type Part = (typeof PARTS)[number];
+
 /** What the fleet's step, the stores' and the fighting's hand on within a step. */
 type Met = ReturnType<typeof stepFleet>;
 type Wants = ReturnType<typeof asked>;
@@ -281,17 +286,24 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   return {
     /** One step: the player's helm, gun and stores, everyone else's from her bot or her lashed helm; then the fleet's
      *  step and the fighting's, who holds the sea, and what it all did kept to be drawn. Returns what it did to who
-     *  holds the sea. */
-    advance(helm: Helm, gun: Order, ask: Ask = NOTHING): Stepped {
+     *  holds the sea. `lap`, if given, is told as each of its parts is done (tools/steps.ts times them). */
+    advance(helm: Helm, gun: Order, ask: Ask = NOTHING, lap?: (part: Part) => void): Stepped {
       const storm = stormAt(time());
       const { helms, orders, asks } = command(helm, gun, ask, storm);
+      lap?.('command');
       const { wants, met, from } = sail(helms, asks);
+      lap?.('sail');
       const { fought, lost } = fight(orders, met, storm, wants);
+      lap?.('fight');
       tick++;
       const did = hold(from, storm, lost);
+      lap?.('hold');
       rideOn(met, wants.blew);
+      lap?.('ride');
       keep(fought);
+      lap?.('keep');
       founderAll(lost, fought);
+      lap?.('founder');
       return did;
     },
 
