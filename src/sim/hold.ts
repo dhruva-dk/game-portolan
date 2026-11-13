@@ -28,9 +28,6 @@ export const USES: Readonly<Record<Use, { shield: number; hull: number; cap: num
   fullRepair: { shield: 0, hull: 100, cap: 100, time: 5, stack: 2 },
 };
 
-/** The kinds, in 0117's order. */
-export const KINDS: readonly Use[] = ['smallShield', 'bigShield', 'repairKit', 'fullRepair'];
-
 /** Her speed while she mends, as a share of what she asks (0117's SHIP.using). */
 export const USING = 0.6;
 

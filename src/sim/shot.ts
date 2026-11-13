@@ -60,9 +60,6 @@ const PULL = Object.fromEntries(KINDS.map((k) => {
   return [k, { nu, mu: (GUNS[k].speed * GUNS[k].speed * MUZZLE) / nu }];
 })) as Record<GunKind, { nu: number; mu: number }>;
 
-/** A kind's pull, m³/s². */
-export const pullOf = (kind: GunKind) => PULL[kind].mu;
-
 /** Metres along the sea at which a ball with speed ratio ν fired at `elevation` comes back to the muzzle's height. */
 const carried = (nu: number, elevation: number) => {
   const c = Math.cos(elevation);

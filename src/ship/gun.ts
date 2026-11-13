@@ -18,8 +18,8 @@ import type { Light } from '../sky/light.ts';
 import type { FloatNode, Vec3Node } from '../tsl.ts';
 import { Acc, V, beam, box, lathe, rod, trs } from './kit.ts';
 
-/** How far below the trunnions the post's foot stands, m; how long the cannon's barrel is, breech knob to muzzle. */
-export const FOOT = 0.62, LENGTH = 1.62;
+/** How far below the trunnions the post's foot stands, m. */
+export const FOOT = 0.62;
 
 /** How far along its bore from the trunnions each kind's mouth stands, m (the bolt's point, the mortar's lip): where
  *  its flash is drawn. */

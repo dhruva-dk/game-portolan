@@ -16,8 +16,6 @@ import { createPassage } from './passage';
 import { createVeil } from './veil';
 import { HOME, IN_MATCH, course, events, way, type Screen, type Tap } from './ways';
 
-export { isScreen, type Screen } from './ways';
-
 const KEY = 'portolan.settings';
 /** Milliseconds the HUD takes to fade out as her end begins (0117 AT.dry: 0.3 s, a little slower over a sinking). */
 const DRY = 600;

@@ -135,8 +135,6 @@ let total = 0;
 export const areaQuanta = (c: number) => AREA[c & (NN - 1)];
 /** The planet's area in quanta: the sum of every cell's (≈ 4πR² m²). */
 export const PLANET_QUANTA = total;
-/** Square metres a quantum. */
-export const QUANTUM = 1 / AREA_Q;
 
 /**
  * The cells crossed going straight from p0 (in c0) to p1 (in c1), c0 left out, as a chain each sharing a side with the

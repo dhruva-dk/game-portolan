@@ -18,7 +18,6 @@
 import { SCREENS, type Screen } from '../player.ts';
 
 export { SCREENS, type Screen };
-export const isScreen = (s: string): s is Screen => (SCREENS as readonly string[]).includes(s);
 
 /** What moves a screen on: her taps, and the match's own course. */
 export const TAPS = ['begin', 'play', 'rank', 'settings', 'close', 'watch', 'switch', 'leave'] as const;
@@ -41,9 +40,8 @@ export const WAYS: Record<Screen, Partial<Record<Trigger, Screen>>> = {
   result: { leave: 'lobby' },
 };
 
-/** The screens over a match under way, and those laid over the lobby. */
+/** The screens over a match under way. */
 export const IN_MATCH: readonly Screen[] = ['match', 'sinking', 'sunk', 'spectate', 'won', 'result'];
-export const OVER_LOBBY: readonly Screen[] = ['lobby', 'rank', 'settings'];
 
 /** Milliseconds a screen takes to fade in or out, or the world to cross-fade from one sea to another (PLAY). */
 export const FADE = 320;
