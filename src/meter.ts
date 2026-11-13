@@ -4,8 +4,8 @@ import {
 
 /**
  * Frame cost on the device: frames per second, CPU ms (the whole frame's, and the frame's render call's), GPU ms for
- * render and compute work, each a second's mean; and the draw calls, triangles (thousands), render passes and compute
- * dispatches of a displayed frame, a second's mean.
+ * render and compute work, each a second's mean; and the draw calls, triangles (thousands) and render passes of a
+ * displayed frame, a second's mean.
  * GPU times need the WebGPU 'timestamp-query' feature; without it they read '–'. They are three's: the durations of a
  * frame's passes, summed. One readback is in flight at a time and gives the frame it was asked for in; the GPU means
  * are over the frames read.
@@ -80,7 +80,7 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
   const passes = new Passes(info);
   renderer.inspector = passes;
   let frames = 0;
-  let cpu = 0, inRender = 0, draws = 0, tris = 0, renders = 0, dispatches = 0;
+  let cpu = 0, inRender = 0, draws = 0, tris = 0, renders = 0;
   let last = performance.now();
   let reading = false;
   let read = 0, render = 0;
@@ -112,7 +112,6 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
       draws += info.render.drawCalls;
       tris += info.render.triangles;
       renders += info.render.frameCalls;
-      dispatches += info.compute.frameCalls;
       // three repeats the last duration when nothing ran, so compute counts only for a frame that had some
       if (gpu && !reading) readGPU(info.compute.frameCalls > 0);
       const now = performance.now();
@@ -121,12 +120,12 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
       el.textContent =
         `${Math.round((frames * 1000) / (now - last))}  cpu ${f(cpu, frames)} (${f(inRender, frames)})` +
         (gpu ? `  gpu ${f(render, read)} + ${f(compute, computed)}` : '  gpu –') +
-        `  ${Math.round(draws / frames)} draws ${Math.round(tris / frames / 1000)}k tri ${f(renders, frames)} passes ${f(dispatches, frames)} cs`;
+        `  ${Math.round(draws / frames)} draws ${Math.round(tris / frames / 1000)}k tri ${Math.round(renders / frames)} passes`;
       el.dataset.passes = lines(passes.passes, frames);
       el.dataset.objects = lines(passes.objects, frames);
       passes.passes.clear();
       passes.objects.clear();
-      frames = cpu = inRender = draws = tris = renders = dispatches = read = render = computed = compute = 0;
+      frames = cpu = inRender = draws = tris = renders = read = render = computed = compute = 0;
       last = now;
     },
   };

@@ -30,7 +30,7 @@ try {
     await page.waitForFunction((t) => document.getElementById('meter')?.textContent !== t, first, { timeout: 10000 });
     const text = (await page.textContent('#meter')) ?? '';
     await page.close();
-    const m = /(\d+) draws (\d+)k tri ([\d.]+) passes/.exec(text);
+    const m = /(\d+) draws (\d+)k tri (\d+) passes/.exec(text);
     if (!m) throw new Error(`[${name}] the meter reads '${text}'`);
     const seen = { draws: Number(m[1]), triangles: Number(m[2]) * 1000, passes: Number(m[3]) };
     const breaches = (Object.keys(BUDGET) as (keyof typeof BUDGET)[]).filter((k) => seen[k] > BUDGET[k]);
