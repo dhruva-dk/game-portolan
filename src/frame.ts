@@ -117,8 +117,9 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   renderer.setPixelRatio(SCALE);
   // the grade tone maps (post/grade.ts); the output only encodes for the display
   renderer.toneMapping = NoToneMapping;
-  const rise = sunInSky(world.climate.timeOfDay)[1];
-  const { grade, gain } = createGrade(rise);
+  // the sun's height, and whether it rises (east of the meridian: a morning)
+  const [east, rise] = sunInSky(world.climate.timeOfDay);
+  const { grade, gain } = createGrade(rise, east > 0);
   const view = createView();
   const sky = createSky(view);
   const scene = new Scene();

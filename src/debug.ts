@@ -3,8 +3,8 @@
 // as released and opens at the title. The scenario drives the game, its referee and the screens' flow only through
 // what they offer anyone (main.ts builds them; this only sets them going).
 //
-// ?mood= puts the whole look on one of the art direction's alternates (docs/art-direction.md): warm, a low evening sun
-// over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade, light shafts and
+// ?mood= puts the whole look on one of the art direction's alternates (docs/art-direction.md): dawn, a low morning sun
+// in a rose mist; warm, a low evening sun over a deeper sea; noon, a high sun, bright and saturated (MOODS: the hour and the haze; the grade, light shafts and
 // haze follow the sun's height). ?t=hours sets the time of day (the same everywhere: world/sun.ts); ?wind=m/s the wind's speed, ?haze= the air's
 // aerosol and ?cloud= the cloud cover (0–1) each hold at that instead of drifting (world/weather.ts); ?seed= the
 // planet's (world/planet.ts; SEED by default). ?debug=charts colours the sea by its charts' weights, ?debug=wake shows
@@ -105,7 +105,9 @@ const degrees = Math.PI / 180;
 const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
 /** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
-const MOODS: Record<string, { hours: number; haze: number }> = { warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.8 } };
+const MOODS: Record<string, { hours: number; haze: number }> = {
+  dawn: { hours: 6.8, haze: 1.6 }, warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.7 },
+};
 
 /** The release's setup as the switches change it. */
 function setupOf(release: Setup): Setup {

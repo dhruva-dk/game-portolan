@@ -37,17 +37,23 @@ export interface Look {
 
 /** The day's looks, by the sine of the sun's height they are set for. */
 const DAY: readonly (readonly [number, Look])[] = [
-  // the golden hour: amber lights against teal shadows, the sea deep
-  [0.17, { exposure: 2.3, temp: 0.4, tint: 0.03, contrast: 1.1, saturation: 1.26, warm: 1.25, sea: 1.3, sky: 1.12,
-    shadows: [-0.01, 0.004, 0.014], highlights: [0.04, 0.012, -0.014], fade: 0.012, fadeTo: [0.02, 0.05, 0.07], vignette: 0.32 }],
+  // the golden hour: amber lights against teal shadows, the sea deep, the corners dark
+  [0.17, { exposure: 2.2, temp: 0.6, tint: 0.03, contrast: 1.15, saturation: 1.3, warm: 1.38, sea: 1.3, sky: 1.1,
+    shadows: [-0.012, 0.004, 0.018], highlights: [0.055, 0.016, -0.02], fade: 0.012, fadeTo: [0.02, 0.05, 0.08], vignette: 0.38 }],
   // the trade-wind afternoon: rich and saturated, the sea turquoise and the sky clean blue (the white balance only
   // a touch warm: warming it further greys the teal), the shadows a clear blue-green, never black
   [0.47, { exposure: 2.4, temp: 0.12, tint: 0.01, contrast: 1.1, saturation: 1.32, warm: 1.22, sea: 1.38, sky: 1.22,
     shadows: [-0.008, 0.003, 0.01], highlights: [0.022, 0.008, -0.01], fade: 0.01, fadeTo: [0.01, 0.05, 0.07], vignette: 0.26 }],
-  // noon in the tropics: bright and punchy, the sea at its most turquoise
-  [0.97, { exposure: 2.05, temp: 0.04, tint: 0, contrast: 1.1, saturation: 1.32, warm: 1.1, sea: 1.4, sky: 1.2,
-    shadows: [-0.004, 0.002, 0.01], highlights: [0.006, 0.004, 0], fade: 0.012, fadeTo: [0.03, 0.05, 0.07], vignette: 0.2 }],
+  // noon in the tropics: high-key and punchy, white light, the sea at its most turquoise, hard clean shadows
+  [0.97, { exposure: 2.15, temp: -0.02, tint: 0, contrast: 1.16, saturation: 1.38, warm: 1.1, sea: 1.5, sky: 1.3,
+    shadows: [-0.006, 0.004, 0.012], highlights: [0, 0.002, 0.004], fade: 0.006, fadeTo: [0.02, 0.05, 0.07], vignette: 0.14 }],
 ];
+/** A morning's low sun, against the evening's amber: rose lights over violet-blue shadows, the blacks lifted to a
+ *  lavender mist, softer. Mixed in under a rising sun, most at the golden hour's height, gone by the afternoon's. */
+const DAWN: Look = {
+  exposure: 2.35, temp: -0.04, tint: -0.07, contrast: 1.04, saturation: 1.16, warm: 1.32, sea: 1.15, sky: 1.08,
+  shadows: [0.006, -0.002, 0.018], highlights: [0.04, 0.01, 0.016], fade: 0.035, fadeTo: [0.12, 0.1, 0.15], vignette: 0.28,
+};
 /** In the storm: cold and a little flat, pushed toward violet (magenta in the tint, violet shadows), its blacks
  *  lifted to a slate violet, the corners darker; opened a little. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
@@ -58,18 +64,25 @@ const STORM: Look = {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerp3 = (a: RGB, b: RGB, t: number): RGB => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 
-/** The day's look for a sun whose height has this sine: between the looks on either side of it. */
-export function dayLook(rise: number): Look {
-  let i = 0;
-  while (i < DAY.length - 2 && rise > DAY[i + 1][0]) i++;
-  const [e0, a] = DAY[i], [e1, b] = DAY[i + 1];
-  const x = Math.min(1, Math.max(0, (rise - e0) / (e1 - e0))), t = x * x * (3 - 2 * x);
+/** Look a and b mixed, t of b. */
+function between(a: Look, b: Look, t: number): Look {
   const out = { ...a };
   for (const k of Object.keys(a) as (keyof Look)[]) {
     const u = a[k], v = b[k];
     if (typeof u === 'number' && typeof v === 'number') (out[k] as number) = lerp(u, v, t);
   }
   return { ...out, shadows: lerp3(a.shadows, b.shadows, t), highlights: lerp3(a.highlights, b.highlights, t), fadeTo: lerp3(a.fadeTo, b.fadeTo, t) };
+}
+
+/** The day's look for a sun whose height has this sine, rising (the morning's) or not: between the looks on either
+ *  side of it. */
+export function dayLook(rise: number, rising = false): Look {
+  let i = 0;
+  while (i < DAY.length - 2 && rise > DAY[i + 1][0]) i++;
+  const [e0, a] = DAY[i], [e1, b] = DAY[i + 1];
+  const x = Math.min(1, Math.max(0, (rise - e0) / (e1 - e0))), t = x * x * (3 - 2 * x);
+  const day = between(a, b, t);
+  return rising ? between(day, DAWN, 1 - smooth(DAY[0][0], DAY[1][0], rise)) : day;
 }
 
 /** A 3×3 matrix by its columns, applied to c. */
@@ -143,12 +156,12 @@ function table(l: Look): Data3DTexture {
 }
 
 /**
- * The grade for a match whose sun stands at a height of this sine: grade(c, storm) takes the scene's light at a pixel
- * (per unit sun) and how deep in the storm the eye is (0…1), and gives display-linear colour; gain is the day's
- * exposure, as a factor on that light.
+ * The grade for a match whose sun stands at a height of this sine, rising or not: grade(c, storm) takes the scene's
+ * light at a pixel (per unit sun) and how deep in the storm the eye is (0…1), and gives display-linear colour; gain is
+ * the day's exposure, as a factor on that light.
  */
-export function createGrade(rise: number) {
-  const day = dayLook(rise);
+export function createGrade(rise: number, rising: boolean) {
+  const day = dayLook(rise, rising);
   const days = texture3D(table(day)), storms = texture3D(table(STORM));
   const exposure = uniform(2 ** day.exposure), stormExposure = 2 ** STORM.exposure;
   const vignette = uniform(day.vignette);
