@@ -115,8 +115,8 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
     el.innerHTML = html();
   };
 
-  /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock, the count and the disc stay,
-   *  her arrow on it gilt, and the disc takes no touch. */
+  /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock, the count and the
+   *  disc stay, her arrow on it gilt, and the disc takes no touch. */
   let watching = false;
 
   return {

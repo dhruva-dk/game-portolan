@@ -1,8 +1,9 @@
 // Her match's end, laid over the world as it goes on (never an opaque sheet), after the camera's beat on it:
-//   result   a cartouche: her place in its laurel over how many began (17 over 80), on a win gilt in a sunburst; what
-//            sank her (a ball, a ram, the Storm) in a paper disc; the sea she held (her share of the planet's water);
-//            her plate, its ring filling with what the match added. Under it the ways on, each a banner: the
-//            spyglass (watch the match on: spectate) while ships still fight, and the anchor (home to the lobby)
+//   result   sunk, a band across the top: her place in its laurel over how many began (17 over 80), what sank her (a
+//            ball, a ram, the Storm) in a paper disc, the sea she held (her share of the planet's water), her plate,
+//            its ring filling with what the match added; the middle of the screen, her ship going down, left clear.
+//            Won, her place gilt in a sunburst between the sea she held and her plate. At the foot her ways on, each
+//            a banner: the spyglass (watch the match on: spectate) while ships still fight, and the anchor (home)
 //   watching small marks at the edges while she watches another ship: the anchor's disc at the top left (home), and
 //            at the foot the spyglass between the arrows that turn her to the next ship or the one before
 // No words; numerals only.
@@ -99,7 +100,7 @@ export function createResult(act: { watch(): void; leave(): void }) {
   /** Whether it is shown, and with its way to watch. */
   let shown = false, watching = false;
   const drawPlate = () => {
-    const level = Math.floor(gain.at), g = s.root.querySelector<SVGGElement>('#plate');
+    const level = Math.floor(gain.at), g = s.root.querySelector<SVGGElement>('#gain');
     if (g) g.innerHTML = plate(plateAt.x, plateAt.y, plateAt.w, level, gain.at - level, gain.tier);
   };
   /** Her place over how many began, in its laurel, `r` across, at (x, y). */
@@ -124,7 +125,7 @@ export function createResult(act: { watch(): void; leave(): void }) {
     const ways = watching
       ? `<g id="watch">${banner(380, 370, 176, spyglass(376, 366, 68))}</g><g id="leave">${banner(576, 370, 176, anchor(572, 366, 52))}</g>`
       : `<g id="leave">${banner(478, 370, 196, anchor(474, 366, 56), won)}</g>`;
-    const el = s.set(body + '<g id="plate"></g>' + ways);
+    const el = s.set(body + '<g id="gain"></g>' + ways);
     drawPlate();
     region(el, 'leave', act.leave);
     if (watching) region(el, 'watch', act.watch);

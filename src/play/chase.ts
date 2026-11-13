@@ -61,8 +61,9 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   let pitch = PITCH;
   /** How far out the boom and shoulder stand (1: all the way; less, drawn in clear of the land). */
   let out = 1;
-  /** A flight under way: where the camera was when it began, its length (s) and how far through it is (0…1). */
-  let flight: { from: Vec3; look: Turn; span: number; done: number } | null = null;
+  /** A flight under way: where the camera was when it began, how it looked and at what (the deck it followed), its
+   *  length (s) and how far through it is (0…1). */
+  let flight: { from: Vec3; look: Turn; aim: Vec3; span: number; done: number } | null = null;
   /** The boom's turn for the shot under way (radians to port). */
   let spin = 0;
 
@@ -109,7 +110,13 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     const dir = angle < 1e-4 ? d1 : scale(add(scale(d0, Math.sin((1 - s) * angle)), d1, Math.sin(s * angle)), 1 / Math.sin(angle));
     const lift = Math.sin(s * Math.PI) * Math.min(angle * R * 0.5, 600);
     position = scale(dir, Math.exp(Math.log(r0) * (1 - s) + Math.log(r1) * s) + lift);
-    orientation = slerp(f.look, orientation, s);
+    // turning from the look it left with to the one it arrives at, and on the way looking down at the sea between the
+    // ship it left and the one it flies to, never up at the sky (its up its own up and forward together, which a
+    // look down along the sky's up never runs along)
+    const base = slerp(f.look, orientation, s), deck = place(at, FOCUS), r = length(f.aim);
+    const between = scale(normalize(add(scale(f.aim, (1 - s) / r), deck, s / length(deck))), r + (length(deck) - r) * s);
+    const up = normalize(add(rotate([0, 1, 0], base), rotate([0, 0, -1], base)));
+    orientation = slerp(base, lookAt(position, between, up), Math.sin(Math.PI * s));
     if (f.done >= 1) flight = null;
   }
 
@@ -130,7 +137,7 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
     /** From the next update, flies over `seconds` from where the camera is now to wherever it is then placed (0117
      *  camera.ts glide: 1.6 s from one ship to another). */
     fly(seconds = 1.6) {
-      flight = { from: position, look: orientation, span: seconds, done: 0 };
+      flight = { from: position, look: orientation, aim: place(at, FOCUS), span: seconds, done: 0 };
     },
     /**
      * After a frame of dt seconds: her pose now (the ship it follows), the look's drag (pixels, right and down), the
