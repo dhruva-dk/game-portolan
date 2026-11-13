@@ -1,0 +1,162 @@
+// What happened on the sea, as the match reports it (play/moments.ts), and what answers it: the camera's shake and the
+// match's held time (play/shake.ts, play/stops.ts), and the screen's flashes and heartbeat (ui/flash.ts).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { HER, type Deed } from '../src/player.ts';
+import { KEEP, bearingFrom, deedsOf, kept, seenOf, type Done } from '../src/play/moments.ts';
+import { CAMERA, answerTo, createShake, envelope, noise } from '../src/play/shake.ts';
+import { STOPS, createStops, stopFor } from '../src/play/stops.ts';
+import { startOf } from '../src/play/setup.ts';
+import { bearing, createState, type Match } from '../src/play/state.ts';
+import { LOOK } from '../src/play/colours.ts';
+import { PLAYER } from '../src/sim/match.ts';
+import { chart } from '../src/sim/route.ts';
+import { berthing } from '../src/sim/spawn.ts';
+import { calm } from '../src/sim/storm.ts';
+import { BIG, SAFE, capped, heartbeat, lowHull } from '../src/ui/flash.ts';
+import { SEED, createPlanet } from '../src/world/planet.ts';
+import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
+import { flat } from '../src/world/swell.ts';
+import { lookAt } from '../src/world/turn.ts';
+
+const at: Vec3 = [0, 0, 1];
+const none: Done = { shots: [], splashes: [], strikes: [], sunk: [], took: [], mended: [], blew: [], her: at };
+const counter = () => {
+  let n = 0;
+  return () => ++n;
+};
+
+test('her id in the deeds is the match\'s player', () => {
+  assert.equal(HER, PLAYER);
+});
+
+test('a step\'s deeds: numbered in order, fired then fell then struck then sank, then her stores; others\' stores unreported', () => {
+  const done: Done = {
+    ...none,
+    shots: [{ shooter: 2, from: scale(at, R + 3) }],
+    splashes: [{ shooter: 2, at, land: false }],
+    strikes: [{ shooter: 0, struck: 2, damage: 30, shield: 10, hull: 20, broke: true, at, ram: false }],
+    sunk: [{ id: 2, by: 0, at }],
+    took: [{ ship: 0, goods: { kind: 'gun', rarity: 3 }, at, slot: 0 }, { ship: 5, goods: { kind: 'repairKit', count: 1 }, at, slot: 1 }],
+    mended: [{ ship: 0, use: 'bigShield' }, { ship: 5, use: 'repairKit' }],
+    blew: [0, 5],
+  };
+  const d = deedsOf(done, 0, counter(), 12);
+  assert.deepEqual(d.map((x) => [x.seq, x.kind, x.ship]), [[1, 'fired', 2], [2, 'fell', 2], [3, 'struck', 2], [4, 'sank', 2], [5, 'took', 0], [6, 'mended', 0], [7, 'gust', 0]]);
+  assert.ok(d.every((x) => x.time === 12));
+  const struck = d[2];
+  assert.ok(struck.kind === 'struck' && struck.by === 0 && struck.shield === 10 && struck.hull === 20 && struck.broke);
+  const took = d[4];
+  assert.ok(took.kind === 'took' && took.piece === 'gun' && took.rarity === 3 && took.slot === 0);
+  // sunk, she mends nothing and spends no gust
+  assert.deepEqual(deedsOf({ ...done, her: null }, 0, counter(), 12).map((x) => x.kind), ['fired', 'fell', 'struck', 'sank', 'took']);
+});
+
+test('kept: the last KEEP seconds, then the fresh; nothing new and nothing stale keeps the same list', () => {
+  const deed = (seq: number, time: number): Deed => ({ seq, time, at, ship: 1, kind: 'fired' });
+  const old = [deed(1, 0), deed(2, 0.5)];
+  assert.deepEqual(kept(old, [deed(3, 1.2)], 1.2).map((d) => d.seq), [2, 3]);
+  assert.deepEqual(kept(old, [], 0.9).map((d) => d.seq), [1, 2]);
+  assert.deepEqual(kept(old, [], 0.5 + KEEP).map((d) => d.seq), []);
+});
+
+test('as she sees it: the bearing clockwise from the look, its distance, and on her screen when ahead', () => {
+  const position = scale(at, R + 10), north: Vec3 = [0, 1, 0];
+  const eye = { kind: 'air' as const, position, orientation: lookAt(position, scale(normalize([0, 0.1, 1]), R), at), fov: 50 };
+  const ahead = normalize([0, 0.1, 1]), right = normalize([0.1, 0, 1]), behind = normalize([0, -0.1, 1]);
+  assert.ok(Math.abs(bearingFrom(eye, scale(ahead, R))) < 0.2);
+  assert.ok(Math.abs(bearingFrom(eye, scale(right, R)) - Math.PI / 2) < 0.3, `${bearingFrom(eye, scale(right, R))}`);
+  assert.ok(Math.abs(Math.abs(bearingFrom(eye, scale(behind, R))) - Math.PI) < 0.2);
+  const d: Deed = { seq: 1, time: 0, at: ahead, ship: 3, kind: 'fell', land: false };
+  const seen = seenOf(d, eye, 956, 440);
+  assert.ok(seen.seen && seen.seen.x > 400 && seen.seen.x < 556, JSON.stringify(seen.seen));
+  assert.ok(Math.abs(seen.metres - Math.hypot(...[0, 1, 2].map((i) => scale(ahead, R)[i] - position[i]))) < 1e-6);
+  assert.equal(seenOf({ ...d, at: behind }, eye, 956, 440).seen, null);
+  void north;
+});
+
+test('the match records its deeds: a ship sunk is told once, with a sink blast to draw', () => {
+  const planet = createPlanet(SEED), depth = (p: Vec3) => -planet.height(p), start = startOf(planet);
+  const match: Match = { seed: 1, gun: null, storm: () => calm(start.at) };
+  const state = createState(planet, flat, { chart: chart(depth), water: berthing(depth) }, match);
+  const before = state.deeds().at(-1)?.seq ?? 0;
+  const there = normalize([start.at[0] + 0.05, start.at[1], start.at[2]]);
+  state.debug.atSea(start, [{ at: there, heading: bearing(there, 0), look: LOOK, lashed: null }]);
+  const other = state.vessels().find((v) => v.id !== PLAYER)!.id;
+  state.debug.sink(other, PLAYER);
+  const sank = state.deeds().filter((d) => d.seq > before && d.kind === 'sank');
+  assert.equal(sank.length, 1);
+  assert.ok(sank[0].kind === 'sank' && sank[0].ship === other && sank[0].by === PLAYER);
+  assert.ok(state.blasts().some((b) => b.kind === 'sink'));
+  state.advance({ course: null, throttle: 0 }, { aim: null, fire: false });
+  assert.equal(state.deeds().filter((d) => d.kind === 'sank').length, 1, 'told once');
+});
+
+test('the camera answers: her blows, the blows on her, her sinking of one; others\' blows on others not at all', () => {
+  const struck = (by: number, ship: number, shield: number, hull: number, broke = false): Deed => ({ seq: 1, time: 0, at, ship, kind: 'struck', by, shield, hull, broke, ram: false });
+  assert.equal(answerTo(struck(0, 2, 0, 20), 0)?.answer, CAMERA.hit);
+  assert.equal(answerTo(struck(0, 2, 20, 0), 0)?.answer, CAMERA.shieldHit);
+  assert.equal(answerTo(struck(0, 2, 10, 10, true), 0)?.answer, CAMERA.shieldBreak);
+  assert.equal(answerTo(struck(2, 0, 0, 20), 0)?.answer, CAMERA.hurt);
+  assert.equal(answerTo(struck(2, 0, 10, 10, true), 0)?.answer, CAMERA.shieldLost);
+  assert.equal(answerTo(struck(2, 3, 0, 20), 0), null);
+  assert.equal(answerTo({ seq: 1, time: 0, at, ship: 2, kind: 'sank', by: 0 }, 0)?.answer, CAMERA.sink);
+  assert.equal(answerTo({ seq: 1, time: 0, at, ship: 2, kind: 'fired' }, 0), null);
+  assert.equal(stopFor(struck(0, 2, 0, 30), 0)?.stop, STOPS.hit);
+  assert.equal(stopFor(struck(2, 3, 0, 30), 0), null);
+});
+
+test('shake: trauma drains, the shake is bounded and at rest after; a pulse rises, holds and falls to nothing', () => {
+  const s = createShake(7);
+  s.play(CAMERA.sink, 1);
+  let most = 0;
+  for (let i = 0; i < 120; i++) {
+    s.update(1 / 60);
+    const o = s.offset();
+    most = Math.max(most, Math.abs(o.roll), Math.abs(o.pitch));
+    assert.ok(o.fov <= 0 && o.fov >= -6.0001, `${o.fov}`);
+  }
+  assert.ok(most > 0.05 && most < 5, `${most}`);
+  for (let i = 0; i < 120; i++) s.update(1 / 60);
+  const o = s.offset();
+  assert.equal(s.trauma().hit, 0);
+  assert.ok(Math.abs(o.roll) < 0.01 && Math.abs(o.fov) < 1e-9, JSON.stringify(o));
+  const p = { deg: -2, attack: 0.05, hold: 0.1, release: 0.3 };
+  assert.equal(envelope(p, 0), 0);
+  assert.equal(envelope(p, 0.1), 1);
+  assert.ok(envelope(p, 0.3) > 0 && envelope(p, 0.3) < 1);
+  assert.equal(envelope(p, 0.5), 0);
+  for (let x = 0; x < 20; x += 0.37) assert.ok(Math.abs(noise(x, 3)) <= 1.01);
+  // far off, a rumble fades to nothing
+  const far = createShake(1);
+  far.play(CAMERA.near, 1, 0, 400);
+  assert.equal(far.trauma().rumble, 0);
+});
+
+test('hit-stop: held, then eased back; a sinking\'s outlasts a hit\'s; a run of hits is budgeted', () => {
+  const s = createStops();
+  s.request(STOPS.hit);
+  assert.ok(s.update(1 / 60) < 0.1 / 60);
+  let t = 0;
+  for (let i = 0; i < 30; i++) t += s.update(1 / 60);
+  assert.ok(Math.abs(s.update(1 / 60) - 1 / 60) < 1e-9, 'back to full speed');
+  const k = createStops();
+  let frozen = 0;
+  for (let i = 0; i < 60; i++) {
+    if (i % 3 === 0) k.request(STOPS.shieldBreak);
+    frozen += 1 / 60 - k.update(1 / 60);
+  }
+  assert.ok(frozen < 0.35, `${frozen}`);
+  void t;
+});
+
+test('flashes: no more than BIG strong ones a second; the heartbeat from 30% of her hull, quicker the lower', () => {
+  assert.equal(capped(0.28, BIG - 1), 0.28);
+  assert.equal(capped(0.28, BIG), SAFE);
+  assert.equal(capped(0.08, BIG), 0.08);
+  assert.equal(lowHull(0.5).k, 0);
+  assert.ok(lowHull(0.2).k > 0 && lowHull(0.06).bpm > lowHull(0.2).bpm);
+  assert.equal(lowHull(0).k, 0, 'sunk, none');
+  const beats = Array.from({ length: 120 }, (_, i) => heartbeat(i / 60, 72, 0.15));
+  assert.ok(Math.max(...beats) > 0.9 && Math.min(...beats) === 0);
+});

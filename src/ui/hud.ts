@@ -15,6 +15,9 @@
 //               three of stores; the one in hand gilt, a gold ring running round it while it is used, and a gold
 //               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
 //   rim         washed rubric while she is outside the Storm's calm, the deeper the further out (0117's)
+//   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
+//               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
+//               to its slot
 // No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
 // Once she has sunk it watches another ship (watch): only the Storm's clock, the ships afloat and the disc stay, her arrow gilt.
 // While the eye comes down from space at a match's start (play/arrival.ts) none of it shows; it fades in over the last
@@ -27,6 +30,7 @@ import type { Sea } from '../snapshot';
 import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
 import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
+import { createJuice } from './juice';
 import { createMinimap } from './minimap';
 import { RARITY } from '../rarity';
 import { onTap, piece } from './ui';
@@ -106,6 +110,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   });
   hotbar.style.width = `${4 * SLOT + 3 * GAP}px`;
   hotbar.style.height = `${SLOT}px`;
+  const juice = createJuice(body, { vitals, fire, gust, slots });
 
   const keys = new Map<HTMLElement, string>();
   /** Sets `el`'s markup when `key` (what it shows) has changed. */
@@ -206,6 +211,8 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
             + (used >= 0 ? sweep(SLOT / 2, SLOT / 2, SLOT / 2 - 6, used / 32, WASH.gold, 3.5) : '') + mark);
         });
       });
+
+      juice.update(s, !watching && s.arriving <= 0);
 
       // the rim's wash, outside the calm
       rim.style.opacity = s.outside > 0 && !watching ? (RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)).toFixed(2) : '0';

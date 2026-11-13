@@ -59,6 +59,9 @@ export interface Status {
   moments: readonly Moment[];
 }
 
+/** Her ship's id in what the match reports (Deed: sim/match.ts PLAYER). */
+export const HER = 0;
+
 /** What a piece taken up or mended with is. */
 export type Piece = 'gun' | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
