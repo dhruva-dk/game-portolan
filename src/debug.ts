@@ -227,9 +227,9 @@ function drive(game: Game, legs: string) {
   if (params.has('inward')) {
     // toward the middle of the circle the storm next closes to (or its calm)
     const { next, eye } = game.status(), goal = (next ?? eye).centre;
-    game.lash((s) => ({ course: add(goal, s.at, -dot(goal, s.at)), throttle: 1 }));
+    game.debug.lash((s) => ({ course: add(goal, s.at, -dot(goal, s.at)), throttle: 1 }));
     for (let i = 0; i < Math.round(number('inward', 0) / STEP); i++) game.step(STEP, IDLE);
-    game.lash((s) => ({ course: s.heading, throttle: 0 }));
+    game.debug.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
   if (!params.has('flood')) return;
   game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
