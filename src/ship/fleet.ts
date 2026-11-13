@@ -129,6 +129,8 @@ export function createFleet(light: Light, wind: Wind, capacity: number) {
    * that move each berthed ship's canvas on dt seconds. */
   function sail(eye: Vector3, windSpeed: number, dt: number): Compute[] {
     for (let i = 0; i < count; i++) {
+      // (a ship not drawn, or never set, has no canvas to fill)
+      if (!shown[i]) continue;
       const pose = poses[i], speed = length(velocities[i]);
       const blowing = inFrame(pose, scale(wind(pose.position), windSpeed));
       braces[i] = Number.isNaN(braces[i]) ? trim(blowing, speed, 0) : hauled(braces[i], blowing, speed, dt);
