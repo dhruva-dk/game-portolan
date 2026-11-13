@@ -26,7 +26,7 @@ import { PLAYER, SHIPS } from '../sim/match';
 import { knocked, pose, ride, settled, type Ride } from '../sim/ride';
 import type { Chart } from '../sim/route';
 import { shipAt, type Helm, type ShipState } from '../sim/ship';
-import type { Cap, Storm } from '../sim/storm';
+import { calm, type Cap, type Storm } from '../sim/storm';
 import type { Blast, Look, ShipDraw } from '../snapshot';
 import type { Surface } from '../world/swell';
 import type { Planet } from '../world/planet';
@@ -92,6 +92,8 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
   const sinkings: Sinking[] = [];
   /** The world's steps (the sea's clock), and the step the match's clock started at (null: in the drop). */
   let tick = 0, begun: number | null = 0;
+  /** Whether the sea is the lobby's, no match running: no storm then, however long she lies there. */
+  let quiet = false;
   /** The drop while a ship is still in it, whether she has pressed DIVE, her mark, the Gale's course; each flying
    *  ship's last two poses. */
   let drop: Drop | null = null, dived = false, mark: Vec3 | null = null, lane: Vec3[] = [];
@@ -119,10 +121,13 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
     dived = false;
     mark = null;
     begun = tick;
+    quiet = false;
   };
 
   /** The match's clock: seconds since the last ship came down (0 till then). */
   const time = () => (begun === null ? 0 : (tick - begun) * STEP);
+  /** The storm at `seconds` on the match's clock: none on the lobby's sea. */
+  const stormAt = (seconds: number): Storm => (quiet ? calm(match.storm(0).centre) : match.storm(seconds));
 
   /** A ship sinks now, at the hand of `by` (null: the storm). */
   const founder = (id: number, by: number | null, cause: Sinking['cause']) => {
@@ -166,7 +171,7 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
         const c = crews.get(v.id)!;
         return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun };
       });
-      const helms: Helm[] = [], orders: Order[] = [], storm = match.storm(time());
+      const helms: Helm[] = [], orders: Order[] = [], storm = stormAt(time());
       fleet.forEach((v, i) => {
         const a = aboard.get(v.id)!;
         if (v.id === PLAYER) [helms[i], orders[i]] = [helm, gun];
@@ -218,7 +223,7 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
     clock,
     /** The storm at the moment drawn: on the match's clock, which stands at 0 through the drop. */
     storm(between: number): Storm {
-      return match.storm(begun === null ? 0 : Math.max(0, clock(between) - begun * STEP));
+      return stormAt(begun === null ? 0 : Math.max(0, clock(between) - begun * STEP));
     },
     /** Every ship drawn at the moment `between` of the way through the last step: afloat, in the drop, or going down. */
     drawn(between: number): ShipDraw[] {
@@ -312,6 +317,7 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
       clear(match, [PLAYER]);
+      quiet = true;
       launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
       return aboard.get(PLAYER)!.after;
     },

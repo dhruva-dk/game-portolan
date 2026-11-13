@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STORM, createStorm, outside, planStorm, toEdge, type Cap } from '../src/sim/storm.ts';
+import { STORM, calm, createStorm, outside, planStorm, toEdge, type Cap } from '../src/sim/storm.ts';
 import { createPlanet } from '../src/world/planet.ts';
 import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
 
@@ -82,4 +82,13 @@ test('outside is past the edge and inside short of it', () => {
   assert.ok(!outside(at(edge - 0.05), storm) && outside(at(edge + 0.05), storm));
   assert.ok(Math.abs(toEdge(at(edge - 10), storm) - 10) < 1e-6);
   assert.ok(!outside(scale(c, R), storm));
+});
+
+test('the calm (the lobby\'s sea) is the whole planet, held for ever, harming no one anywhere', () => {
+  const c = calm([0, 1, 0]);
+  assert.equal(c.radius, Math.PI);
+  assert.equal(c.next.radius, Math.PI);
+  assert.equal(c.damage, 0);
+  assert.equal(c.secondsToNext, Infinity);
+  for (const p of [[0, 1, 0], [1, 0, 0], [0, -1, 0], normalize([1, -1, 2])] as Vec3[]) assert.ok(!outside(p, c));
 });

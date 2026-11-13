@@ -69,6 +69,11 @@ export interface Storm extends Cap {
 const WHOLE = Math.PI;
 const angle = (metres: number) => metres / R;
 
+/** No storm: the whole planet's cap, held for ever and harming no one (the lobby's sea, with no match running). */
+export const calm = (centre: Vec3): Storm => ({
+  centre, radius: WHOLE, next: { centre, radius: WHOLE }, closing: false, secondsToNext: Infinity, phase: 0, damage: 0,
+});
+
 /** Radians between two unit vectors. */
 const between = (a: Vec3, b: Vec3) => Math.atan2(Math.hypot(...cross(a, b)), dot(a, b));
 
