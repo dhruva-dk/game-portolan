@@ -58,13 +58,15 @@ const WARM: readonly Eye[] = [
 /** How the frame draws: what the sea is drawn as (water/water.ts); the most ships it draws at once (the room the
  *  fleet and the sea keep for them: the match's ship count), and a ship's length overall, m (the sim's: her trail runs
  *  from her stern); every ship at one level of detail (ship/fleet.ts pin) or null; whether the near ships' canvas is
- *  simulated; and anything more to stand in the world, lit by the sky. */
+ *  simulated; whether the storm's lightning is held lit (sky/storm-bolt.ts), for a still of it; and anything more to
+ *  stand in the world, lit by the sky. */
 export interface FrameOptions {
   sea: SeaShows;
   fleet: number;
   length: number;
   lod: number | null;
   cloth: boolean;
+  bolt: boolean;
   extras?: (light: Sky, world: World) => readonly Object3D[];
 }
 
@@ -87,7 +89,7 @@ export interface FrameOptions {
  *                 then the sea, which reads what was drawn before it behind itself (the floor through the water); then
  *                 the guns' smoke, flashes and spray (gunfire/gunfire.ts), blended over it
  *   3. post     — clouds over whatever they stand in front of, the haze by distance over both (sky.ts fog), the
- *                 storm's rain and cloud over all of it (sky/storm.ts: no march, the ray against its cone), drawn
+ *                 storm's rain and cloud over all of it (sky/storm.ts: a short march, from where the ray meets its cone), drawn
  *                 once to a full-size texture of light; then, at the phone's 956×440 drawn at SCALE (1434×660, the
  *                 browser scaling the frame up to the screen):
  *        bloom        7 passes, the largest a quarter size (359×165), 4–5 taps each: ~0.4 M taps (post/bloom.ts)
@@ -122,7 +124,7 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   const [east, rise] = sunInSky(world.climate.timeOfDay);
   const { grade, gain } = createGrade(rise, east > 0);
   const view = createView();
-  const sky = createSky(view);
+  const sky = createSky(view, options.bolt);
   const scene = new Scene();
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here

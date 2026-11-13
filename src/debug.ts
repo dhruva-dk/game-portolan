@@ -14,8 +14,9 @@
 // ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
 // lie by default (for seed 3 the largest island's centre is at lat 52.8, lon −170.1, its coast about 54 m out); there
 // ?kind= puts a gun of that kind on every ship's plinth (?kind=all: each ship the next kind).
-// ?wall=m flies it m metres inside the storm's edge (with ?storm=, the cap held then; negative: outside it), on the
-// line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from that).
+// ?wall=m flies it m metres short of the storm's edge, in the calm (with ?storm=, the cap held then; negative: in the
+// storm), on the line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from
+// that). ?bolt holds the storm's lightning lit (sky/storm-bolt.ts), for a still of it.
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
 // north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
 // ship with a gun of that rarity, ?kind= (cannon, scatter, repeater, harpoon, mortar) of that kind (sim/gun.ts; a common
@@ -131,6 +132,7 @@ function setupOf(release: Setup): Setup {
       length: release.drawing.length,
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
+      bolt: params.has('bolt') || release.drawing.bolt,
       extras: params.has('probe') ? (light, world) => probeMeshes(light, startOf(world.planet).at) : release.drawing.extras,
     },
     meter: true,

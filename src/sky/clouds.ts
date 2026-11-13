@@ -244,6 +244,8 @@ export function createClouds(view: View, tables: Tables) {
     along: field.along,
     /** The passes that fill the clouds' patterns, to be run once before the first frame. */
     bake: noise.bake,
+    /** Their Perlin-Worley volume (cloud-noise.ts), which the storm's cloud and rain are drawn from too. */
+    shape: noise.shape,
 
     /** Readies this frame's march, and returns the passes due: the march, its resolve, and every fourth frame the
      * shadow map. */

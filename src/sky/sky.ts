@@ -32,7 +32,7 @@ import { sunAtOrigin, sunInSky } from '../world/sun';
 import { MIE_EXTINCTION, MIE_SCALE_HEIGHT, MIE_SCATTERING, RAYLEIGH_SCATTERING, SEA_ALBEDO } from './atmosphere';
 import { createClouds } from './clouds';
 import { createReflection } from './reflection';
-import { createStormLook } from './storm';
+import { createStormLook, type StormLight } from './storm';
 import { VIEW_RADIUS, createTables } from './tables';
 import type { FloatNode, Vec3Node } from '../tsl';
 
@@ -63,6 +63,8 @@ const PEAK_SHARE = 0.05, PEAK_G = 0.95;
  * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted a dark violet.
  */
 const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.56, 0.38, 0.86] as const;
+/** The sun on the storm's cloud: its luminance, in a pale violet, so the crown is lit whatever the hour, never red. */
+const STORM_SUNLIT = [0.86, 0.8, 1.08] as const;
 /**
  * The haze, drawn to the planet's scale rather than Earth's: on a sea whose horizon is 150 m off, Earth's air would
  * leave it as clear as a room, so the far field is swallowed by a haze of its own. Its optical depth is HAZE_DEPTH a
@@ -95,7 +97,8 @@ export interface Sky {
   stormEdge(p: Vec3Node): FloatNode;
 }
 
-export function createSky(view: View) {
+/** bolt: the storm's lightning held lit (debug.ts ?bolt). */
+export function createSky(view: View, bolt: boolean) {
   const tables = createTables();
   const { haze, skyAmbientUp, skyRadiance, sunTransmittance } = tables;
   /** Extinction of the air at sea level, per km. */
@@ -111,7 +114,7 @@ export function createSky(view: View) {
   const under = uniform(1);
   const clouds = createClouds(view, tables);
   const reflection = createReflection(view, skyRadiance, skySun, clouds.along);
-  const storm = createStormLook(view);
+  const storm = createStormLook(view, clouds.shape, bolt);
 
   /** The sun over p: the sun over the origin turned with the rotation that takes the origin to p (sun.ts's carry). */
   const sunOver = (p: Vec3Node): Vec3Node => {
@@ -128,7 +131,12 @@ export function createSky(view: View) {
     const bounce = sunIlluminance(p).mul(max(rise, 0)).add(skyAmbientUp).mul(SEA_ALBEDO);
     return mix(bounce, skyAmbientUp, dot(n, up).mul(0.5).add(0.5)).mul(mix(1, STORM_SKY, storm.depth(p)));
   };
-  const stormLight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0)).mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT));
+  const sunlight = sunTransmittance(VIEW_RADIUS, rise).mul(max(rise, 0));
+  const stormLight: StormLight = {
+    air: sunlight.mul(SUN_IN / (4 * Math.PI)).add(skyAmbientUp.mul(AIR_IN)).mul(vec3(...STORM_TINT)),
+    sun: vec3(dot(sunlight, vec3(0.2126, 0.7152, 0.0722))).mul(vec3(...STORM_SUNLIT)),
+    toward: sun,
+  };
 
   /** The air as Earth's is at the eye's scale, for the view from space: its extinction over the metres, toward the
    *  glow a long path through it has along dir (for things below the horizon, the horizon's). */
