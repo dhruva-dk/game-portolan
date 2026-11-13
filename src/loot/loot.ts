@@ -7,8 +7,10 @@
 // it reads to the haze's edge (about 250 m), where the haze takes it (drawn solid, it is hazed by its own distance like
 // everything else: frame.ts). The beacons are drawn to BEACON m, the pieces themselves to SHAPE m.
 //
-// Four draws for all of it, each a single instanced mesh placed wholly in the vertex stage from one buffer written
-// each frame (a piece's place, id and rarity). Lit by the sun and the sky as everything else is (sky/light.ts).
+// Four draws for all of it, each a single instanced mesh placed wholly in the vertex stage, from three buffers (the
+// crates', the casks' and the beacons', staff and pennant reading the same) of a piece's place, id and rarity, written
+// in place each frame and sent only as far as they hold pieces, and only when they changed. Lit by the sun and the sky
+// as everything else is (sky/light.ts).
 
 import {
   BoxGeometry, CylinderGeometry, DoubleSide, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer,
@@ -110,17 +112,16 @@ export function createLoot(light: Light) {
     mesh.visible = false;
     return { mesh, geometry: mesh.geometry, m };
   };
-  const staves = new InstancedInterleavedBuffer(new Float32Array(PIECES * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
-  const pennants = new InstancedInterleavedBuffer(new Float32Array(PIECES * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
+  const beacons = new InstancedInterleavedBuffer(new Float32Array(PIECES * STRIDE), STRIDE).setUsage(DynamicDrawUsage);
 
   // the staff: x across (−½…½), y up (0…1), its foot in the water
-  const staff = beacon(new PlaneGeometry(1, 1).translate(0, 0.5, 0), staves);
+  const staff = beacon(new PlaneGeometry(1, 1).translate(0, 0.5, 0), beacons);
   const thick = max(float(STAFF), far.mul(pixel).mul(STAFF_PIXELS));
   staff.m.positionNode = at.xyz.add(side.mul(local.x.mul(thick)).add(up.mul(local.y.mul(tall).sub(1)))).mul(drawn);
   staff.m.colorNode = vec3(...INK);
 
   // the pennant: u along it from the hoist (0…1), v down it (0…1); its tail notched, its edge ruled, rippling
-  const pennant = beacon(new PlaneGeometry(1, 1, 12, 1).translate(0.5, -0.5, 0), pennants);
+  const pennant = beacon(new PlaneGeometry(1, 1, 12, 1).translate(0.5, -0.5, 0), beacons);
   const grow = max(float(1), far.mul(pixel).mul(PENNANT_PIXELS / LONG));
   const u = local.x, v = local.y.negate();
   const ripple = sin(u.mul(5).sub(now.mul(RIPPLE_RATE)).add(seed)).mul(u).mul(RIPPLE).mul(grow);
@@ -139,17 +140,37 @@ export function createLoot(light: Light) {
     return mix(vec3(...INK), glow, smoothstep(0.7, 1, edge));
   })();
 
-  /** Fills a buffer from the pieces that pass `keep`, and shows its mesh's instances. */
-  const fill = (buffer: InstancedInterleavedBuffer, { mesh, geometry }: { mesh: Mesh; geometry: InstancedBufferGeometry }, pieces: readonly LootDraw[], keep: (l: LootDraw) => boolean) => {
+  /** Fills a buffer in place from the pieces that pass `keep` and shows its meshes' instances; sends it, as far as it
+   *  holds pieces, if anything in it changed. */
+  const counts = new Map<InstancedInterleavedBuffer, number>();
+  const fill = (buffer: InstancedInterleavedBuffer, drawn: readonly { mesh: Mesh; geometry: InstancedBufferGeometry }[], pieces: readonly LootDraw[], keep: (l: LootDraw) => boolean) => {
     const a = buffer.array as Float32Array;
-    let n = 0;
+    let n = 0, changed = false, o = 0;
+    const put = (k: number, v: number) => {
+      const f = Math.fround(v);
+      if (a[o + k] === f) return;
+      a[o + k] = f;
+      changed = true;
+    };
     for (const l of pieces) {
-      if (n >= PIECES || !keep(l)) continue;
-      a.set([...l.at, l.id, ...INKS[l.rarity], l.rarity], n++ * STRIDE);
+      if (n >= PIECES) break;
+      if (!keep(l)) continue;
+      const ink = INKS[l.rarity];
+      o = n++ * STRIDE;
+      put(0, l.at[0]), put(1, l.at[1]), put(2, l.at[2]), put(3, l.id);
+      put(4, ink[0]), put(5, ink[1]), put(6, ink[2]), put(7, l.rarity);
     }
-    buffer.needsUpdate = n > 0;
-    geometry.instanceCount = n;
-    mesh.visible = n > 0;
+    if (changed) {
+      buffer.clearUpdateRanges();
+      buffer.addUpdateRange(0, n * STRIDE);
+      buffer.needsUpdate = true;
+    }
+    if (counts.get(buffer) === n) return;
+    counts.set(buffer, n);
+    for (const { mesh, geometry } of drawn) {
+      geometry.instanceCount = n;
+      mesh.visible = n > 0;
+    }
   };
 
   return {
@@ -157,10 +178,9 @@ export function createLoot(light: Light) {
     /** Each frame: the world's clock now (s), and the pieces near the eye. */
     draw(time: number, pieces: readonly LootDraw[]) {
       now.value = time;
-      fill(crates, crate, pieces, (l) => l.gun);
-      fill(casks, cask, pieces, (l) => !l.gun);
-      fill(staves, staff, pieces, () => true);
-      fill(pennants, pennant, pieces, () => true);
+      fill(crates, [crate], pieces, (l) => l.gun);
+      fill(casks, [cask], pieces, (l) => !l.gun);
+      fill(beacons, [staff, pennant], pieces, () => true);
     },
     /** Each frame, after the camera has moved: the drawing buffer's height, pixels. */
     update(camera: PerspectiveCamera, height: number) {

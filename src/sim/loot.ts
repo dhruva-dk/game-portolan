@@ -51,7 +51,8 @@ export const LOOT = {
 export type Goods = { kind: 'gun'; rarity: number } | { kind: Use; count: number };
 
 /** A piece on the water: its id, where it lies (a unit vector), what it is, the ship that put it over the side (-1:
- *  none), seconds it has lain, and its way (m/s, a tangent), dying away. */
+ *  none), seconds it has lain while hers to leave (counted only then: swept reads it for nothing else), and its way
+ *  (m/s, a tangent), dying away. */
 export interface Loot { id: number; at: Vec3; goods: Goods; from: number; age: number; way: Vec3 }
 
 /** All the loot on the water, and the next piece's id. */
@@ -153,11 +154,12 @@ export function overboard(f: Flotsam, at: Vec3, goods: readonly Goods[], from: n
   return { pieces: [...f.pieces, ...thrown], next: f.next + goods.length };
 }
 
-/** dt seconds of the pieces lying: older, and those with way on carried along it as it dies, stopped by shoal water
- *  (0117's driftLoot). */
+/** dt seconds of the pieces lying: older (while some ship's to leave), and those with way on carried along it as it
+ *  dies, stopped by shoal water (0117's driftLoot). A piece lying still and no ship's is left as it is. */
 export function drifted(f: Flotsam, dt: number, depth: Depth): Flotsam {
   const k = Math.max(0, 1 - dt * LOOT.drift);
   const pieces = f.pieces.map((l): Loot => {
+    if (l.way === STILL && l.from < 0) return l;
     const speed = Math.hypot(...l.way);
     if (speed < 1e-3) return { ...l, age: l.age + dt, way: STILL };
     const moved = along(l.at, scale(l.way, 1 / speed), speed * dt);

@@ -171,7 +171,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         [pulled, tapped, gusted] = [false, null, false];
       }
       between = time.between;
-      last = state.drawn(between).find((s) => s.id === PLAYER)?.pose ?? last;
+      last = state.poseOf(PLAYER, between) ?? last;
       if (anchored) {
         // at anchor, the look's drag turns the camera round her; let go, it eases home
         orbit = dragged(orbit, read.look);

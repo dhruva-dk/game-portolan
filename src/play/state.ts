@@ -177,6 +177,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       return { ...v, hull: c.health.hull, shield: c.health.shield, armed: !!c.gun, crew: c };
     });
     const helms: Helm[] = [], orders: Order[] = [], asks = new Map<number, Ask>();
+    // every ship but the one thinking, in one list refilled for each (a bot reads it only while she thinks)
+    const others: Seen[] = [];
     fleet.forEach((v, i) => {
       const a = aboard.get(v.id)!;
       if (v.id === PLAYER && !a.mind) {
@@ -184,7 +186,9 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
         asks.set(v.id, ask);
       } else if (!a.mind) [helms[i], orders[i]] = [a.steady, { aim: null, fire: false }];
       else {
-        const r = think(seen[i], seen.filter((o) => o.id !== v.id), { depth, chart, storm, loot: flotsam.pieces, holdings: territory }, a.mind, seedOf(v.id));
+        others.length = 0;
+        for (const o of seen) if (o.id !== v.id) others.push(o);
+        const r = think(seen[i], others, { depth, chart, storm, loot: flotsam.pieces, holdings: territory }, a.mind, seedOf(v.id));
         [a.mind, helms[i], orders[i]] = [r.memory, r.helm, r.order];
         if (r.ask !== NOTHING) asks.set(v.id, r.ask);
       }

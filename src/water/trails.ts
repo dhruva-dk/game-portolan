@@ -21,7 +21,7 @@ import {
 import type { Sky } from '../sky/sky';
 import type { Sea, ShipDraw } from '../snapshot';
 import { createCursor } from './cursor';
-import { R, add, cross, distance, dot as dotV, normalize as normalizeV, type Vec3 } from '../world/sphere';
+import { R, add, distance, dot as dotV, normalize as normalizeV, type Vec3 } from '../world/sphere';
 import type { FloatNode, Vec3Node } from '../tsl';
 
 /** The most points drawn at once, over every ribbon. */
@@ -120,7 +120,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
    *  the points new since: a trail's points only grow while its serial holds), and the frame each was last seen in. */
   let fading: Ribbon[] = [];
   const open = new Map<number, { serial: number; points: Vec3[]; seen: number }>();
-  const cursor = createCursor(), claimed = new Set<number>();
+  const cursor = createCursor(), claimed = new Set<number>(), sterns = new Map<number, Vec3>();
   let frame = 0;
 
   return {
@@ -170,34 +170,43 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
       });
 
       const under = normalizeV(eye), near = Math.cos(REACH / R);
-      const stern = new Map(ships.filter((k) => k.afloat).map((k) => [k.id, normalizeV(add(k.pose.position, k.pose.forward, -astern))]));
+      sterns.clear();
+      for (const k of ships) if (k.afloat) sterns.set(k.id, normalizeV(add(k.pose.position, k.pose.forward, -astern)));
       const A = at.array, X = across.array, B = rib.array, I = index.array;
       let v = 0, n = 0;
-      const lay = (r: Ribbon, tail: Vec3 | null) => {
-        const pts = tail ? [...r.points, tail] : r.points;
-        if (pts.length < 2 || !pts.some((p) => dotV(p, under) > near)) return;
-        if (v + pts.length * 2 > POINTS * 2) return;
+      /** A ribbon laid along `points` and on to `tail` (her stern, if afloat), written straight into the buffers. */
+      const lay = (id: number, points: readonly Vec3[], tail: Vec3 | undefined, mode: number, since: number) => {
+        const count = points.length + (tail ? 1 : 0), pt = (k: number) => (k < points.length ? points[k] : tail!);
+        if (count < 2 || v + count * 2 > POINTS * 2) return;
+        let seen = false, total = 0;
+        for (let k = 0; k < count; k++) {
+          seen ||= dotV(pt(k), under) > near;
+          if (k) total += distance(pt(k - 1), pt(k));
+        }
+        if (!seen) return;
         let s = 0;
-        const total = pts.reduce((sum, p, k) => sum + (k ? distance(pts[k - 1], p) : 0), 0);
-        pts.forEach((p, k) => {
-          if (k) s += distance(pts[k - 1], p);
-          const ahead = pts[Math.min(k + 1, pts.length - 1)], behind = pts[Math.max(k - 1, 0)];
-          const c = normalizeV(cross(p, add(ahead, behind, -1)));
-          for (const side of [-1, 1]) {
-            A.set([p[0], p[1], p[2], side], v * 4);
-            X.set([c[0], c[1], c[2], sea.clock - r.since], v * 4);
-            B.set([s, total, r.id, r.mode], v * 4);
-            v++;
+        for (let k = 0; k < count; k++) {
+          const p = pt(k);
+          if (k) s += distance(pt(k - 1), p);
+          // across the ribbon: the way along it (ahead less behind) crossed with up
+          const ahead = pt(Math.min(k + 1, count - 1)), behind = pt(Math.max(k - 1, 0));
+          const dx = ahead[0] - behind[0], dy = ahead[1] - behind[1], dz = ahead[2] - behind[2];
+          const cx = p[1] * dz - p[2] * dy, cy = p[2] * dx - p[0] * dz, cz = p[0] * dy - p[1] * dx, l = Math.hypot(cx, cy, cz) || 1;
+          for (let side = -1; side <= 1; side += 2, v++) {
+            const o = v * 4;
+            A[o] = p[0], A[o + 1] = p[1], A[o + 2] = p[2], A[o + 3] = side;
+            X[o] = cx / l, X[o + 1] = cy / l, X[o + 2] = cz / l, X[o + 3] = sea.clock - since;
+            B[o] = s, B[o + 1] = total, B[o + 2] = id, B[o + 3] = mode;
           }
           if (k) {
             const b = v - 4;
-            I.set([b, b + 1, b + 2, b + 1, b + 3, b + 2], n);
+            I[n] = b, I[n + 1] = b + 1, I[n + 2] = b + 2, I[n + 3] = b + 1, I[n + 4] = b + 3, I[n + 5] = b + 2;
             n += 6;
           }
-        });
+        }
       };
-      for (const [id, t] of open) lay({ id, serial: t.serial, points: t.points, mode: OPEN, since: sea.clock }, stern.get(id) ?? null);
-      for (const f of fading) lay(f, null);
+      for (const [id, t] of open) lay(id, t.points, sterns.get(id), OPEN, sea.clock);
+      for (const f of fading) lay(f.id, f.points, undefined, f.mode, f.since);
       for (const b of [at, across, rib]) {
         b.clearUpdateRanges();
         b.addUpdateRange(0, v * 4);
