@@ -283,11 +283,12 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       sun: (p: Vec3Node): Vec3Node => optics.sunBelow(p).mul(caustics(p)),
       sky: (p: Vec3Node): Vec3Node => optics.skyBelow(p),
     },
-    /** Each frame: the world, the ships on the sea, who holds it and whose ship is hers. Returns what is due: the
-     *  waves' passes, the marks' draw. */
-    update(env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships'>): { waves: Compute[]; wake: Draw | null } {
-      claims.update(drawn?.sea, drawn?.own ?? null);
-      trails.update(drawn?.sea, drawn?.ships ?? [], view.eye.position, drawn?.own ?? null);
+    /** Each frame: the world, the ships on the sea, who holds it and whose ship is hers (at the snapshot's clock).
+     *  Returns what is due: the waves' passes, the marks' draw. */
+    update(env: Environment, dt: number, ships: readonly Afloat[], drawn?: Pick<Snapshot, 'sea' | 'own' | 'ships' | 'clock'>): { waves: Compute[]; wake: Draw | null } {
+      const clock = drawn?.clock ?? env.clock;
+      claims.update(drawn?.sea, clock, drawn?.own ?? null);
+      trails.update(drawn?.sea, clock, drawn?.ships ?? [], view.eye.position, drawn?.own ?? null);
       const swell = waves.update({ wind: env.seaWind, fetch: FETCH }, env.windSpeed, env.clock, dt);
       const marks = wake.update(env, ships);
       hulls.update(ships.map((s) => s.pose), view.eye.position);

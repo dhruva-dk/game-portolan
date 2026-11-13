@@ -48,12 +48,9 @@ export type Blast =
 export interface BallDraw { at: Vec3; way: Vec3 }
 
 /** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
- *  sea's surface), whether it is a gun (a crate; else a cask of stores), and the rarity it reads as (0–4: RARITY). */
+ *  sea's surface), whether it is a gun (a crate; else a cask of stores), and the rarity it reads as (0–4: rarity.ts). */
 export interface LootDraw { id: number; at: Vec3; gun: boolean; rarity: number }
 
-/** The rarities' inks, worst to best (0117's LOOT_INKS: silver, verdigris, azurite, rubric, gold), 0xrrggbb: the HUD's
- *  and the world's alike. */
-export const RARITY = [0x969aa0, 0x3a683e, 0x264c8c, 0xb8301a, 0xbe8a2c] as const;
 
 /**
  * A change in who holds the sea (sim/territory.ts Change), numbered in order (seq), at a moment on the world's clock (s):
@@ -83,7 +80,7 @@ export interface TrailDraw { id: number; serial: number; points: readonly Vec3[]
  *               `owner` (water/cursor.ts)
  *   trails      the open trails
  *   colours     each ship's colour on the sea, by id (linear rgb)
- *   clock       the moment, on the changes' clock (the world's), at which they are drawn
+ * Its changes' times are on the world's clock, the snapshot's own (Snapshot.clock: the moment they are drawn at).
  */
 export interface Sea {
   generation: number;
@@ -92,7 +89,6 @@ export interface Sea {
   changes: readonly SeaChange[];
   trails: readonly TrailDraw[];
   colours: readonly Vec3[];
-  clock: number;
 }
 
 /** Everything the frame draws, for one frame. */

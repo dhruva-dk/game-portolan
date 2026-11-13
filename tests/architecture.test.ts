@@ -55,9 +55,11 @@ const LAYERS: Record<string, readonly string[]> = {
   // and the world as built for a match (environment.ts)
   'snapshot.ts': ['world/', 'sim/storm.ts'],
   'player.ts': ['world/'],
+  // the rarities' inks, for the two that draw them
+  'rarity.ts': [],
   'environment.ts': ['world/'],
   // the UI draws plain data: of the sim only the storm's Cap (the full map inks it)
-  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts'],
+  'ui/': ['ui/', 'world/', 'sim/storm.ts', 'snapshot.ts', 'player.ts', 'rarity.ts'],
   // the game runs the sim and says what to draw and show, as plain data
   'play/': ['play/', 'sim/', 'world/', ...NEUTRAL],
   // what draws the world; each sideways import named
@@ -69,7 +71,7 @@ const LAYERS: Record<string, readonly string[]> = {
   // the post chain's steps (grade, bloom, light shafts, film): nodes over the frame's light, composed by the frame
   'post/': ['post/', 'three', 'tsl.ts'],
   // the loot on the water, its pieces and their beacons
-  'loot/': ['loot/', ...RENDER, 'view/view.ts'],
+  'loot/': ['loot/', ...RENDER, 'view/view.ts', 'rarity.ts'],
   'water/': ['water/', ...RENDER, 'view/', 'sky/sky.ts', 'land/ground.ts', 'ship/build.ts', 'ship/materials.ts', 'ship/waterline.ts', 'sim/wake.ts'],
   'gpu.ts': ['three'],
   'tsl.ts': ['three'],

@@ -207,8 +207,9 @@ export function createClaims(ships: number) {
       return { dye, shine, foam, drain };
     },
 
-    /** Each frame: who holds the sea (none outside a match), and whose ship is hers (her water stands out). */
-    update(sea: Sea | undefined, own: number | null) {
+    /** Each frame: who holds the sea (none outside a match) at the world's clock `now` (s), and whose ship is hers (her
+     *  water stands out). */
+    update(sea: Sea | undefined, now: number, own: number | null) {
       // a new match's sea (or none), or one whose changes were missed, is sent whole
       if (claimed.follow(sea)) {
         for (const a of [cellsAttr, revealAttr]) {
@@ -217,13 +218,13 @@ export function createClaims(ships: number) {
         }
       }
       if (!sea) return;
-      for (const [a, b] of claimed.work(sea.clock)) {
+      for (const [a, b] of claimed.work(now)) {
         if (b <= a) continue;
         cellsAttr.addUpdateRange(a, b - a);
         revealAttr.addUpdateRange(a, b - a);
         cellsAttr.needsUpdate = revealAttr.needsUpdate = true;
       }
-      clock.value = sea.clock;
+      clock.value = now;
       sea.colours.forEach((c, id) => {
         if (id + 1 < values.length) values[id + 1].set(c[0], c[1], c[2], id === own ? OWN_LINE : 1);
       });

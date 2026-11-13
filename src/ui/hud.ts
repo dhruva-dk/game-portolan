@@ -26,7 +26,7 @@ import type { Coast } from './coasts';
 import type { Glyph } from './glyphs';
 import { INK, PAPER, WASH, bar, figure, glyph, paperDisc, ring as sweep, slip, svg } from './ink';
 import { createMinimap } from './minimap';
-import { RARITY } from '../snapshot';
+import { RARITY } from '../rarity';
 import { onTap, piece } from './ui';
 
 /** What the HUD shows: the match as the game reports it, and what she carries. */

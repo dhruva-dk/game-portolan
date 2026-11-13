@@ -125,9 +125,9 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
 
   return {
     mesh,
-    /** Each frame: who holds the sea, the ships drawn (for each trail's run on to her stern), the eye (world, m), and
-     *  whose ship is hers. */
-    update(sea: Sea | undefined, ships: readonly ShipDraw[], eye: Vec3, own: number | null) {
+    /** Each frame: who holds the sea at the world's clock `now` (s), the ships drawn (for each trail's run on to her
+     *  stern), the eye (world, m), and whose ship is hers. */
+    update(sea: Sea | undefined, now: number, ships: readonly ShipDraw[], eye: Vec3, own: number | null) {
       // a new match's sea (or none): nothing of the last one's left to fade
       const { fresh, from } = cursor.read(sea);
       if (fresh) {
@@ -139,7 +139,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
         mesh.visible = false;
         return;
       }
-      time.value = sea.clock;
+      time.value = now;
       // a trail gone, or begun anew: sunk into the border if she closed a loop, else broken up
       claimed.clear();
       for (let i = from; i < sea.changes.length; i++) {
@@ -147,7 +147,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
         if (k.kind === 'claim') claimed.add(k.ship);
       }
       const end = (id: number, t: { serial: number; points: Vec3[] }) =>
-        fading.push({ id, serial: t.serial, points: t.points, mode: claimed.has(id) ? ABSORBED : DISSOLVING, since: sea.clock });
+        fading.push({ id, serial: t.serial, points: t.points, mode: claimed.has(id) ? ABSORBED : DISSOLVING, since: now });
       frame++;
       for (const t of sea.trails) {
         const o = open.get(t.id);
@@ -164,7 +164,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
         end(id, o);
         open.delete(id);
       }
-      fading = fading.filter((f) => sea.clock - f.since < (f.mode === ABSORBED ? ABSORB : DISSOLVE));
+      fading = fading.filter((f) => now - f.since < (f.mode === ABSORBED ? ABSORB : DISSOLVE));
       sea.colours.forEach((c, id) => {
         if (id < values.length) values[id].set(c[0], c[1], c[2], id === own ? 1 : 0);
       });
@@ -195,7 +195,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
           for (let side = -1; side <= 1; side += 2, v++) {
             const o = v * 4;
             A[o] = p[0], A[o + 1] = p[1], A[o + 2] = p[2], A[o + 3] = side;
-            X[o] = cx / l, X[o + 1] = cy / l, X[o + 2] = cz / l, X[o + 3] = sea.clock - since;
+            X[o] = cx / l, X[o + 1] = cy / l, X[o + 2] = cz / l, X[o + 3] = now - since;
             B[o] = s, B[o + 1] = total, B[o + 2] = id, B[o + 3] = mode;
           }
           if (k) {
@@ -205,7 +205,7 @@ export function createTrails(sky: Sky, surface: (up: Vec3Node, cell: FloatNode) 
           }
         }
       };
-      for (const [id, t] of open) lay(id, t.points, sterns.get(id), OPEN, sea.clock);
+      for (const [id, t] of open) lay(id, t.points, sterns.get(id), OPEN, now);
       for (const f of fading) lay(f.id, f.points, undefined, f.mode, f.since);
       for (const b of [at, across, rib]) {
         b.clearUpdateRanges();

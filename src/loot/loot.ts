@@ -1,6 +1,6 @@
 // Loot on the water as it is seen: 0117's (render/actors/loot.ts). Each piece floats where the snapshot has it, on the
 // waves, bobbing and slowly turning on its own: a crate for a gun, a cask for stores, each bound with a band of its
-// rarity's ink (snapshot.ts RARITY). Over it stands its beacon, as a chart flags a mark: a staff of dark ink
+// rarity's ink (rarity.ts). Over it stands its beacon, as a chart flags a mark: a staff of dark ink
 // (12 + 3 × rarity) m tall, and from its head a swallow-tailed pennant, a solid block of the rarity's ink ruled round in
 // dark ink, flying out to the side the eye sees it from and rippling. The pennant glows (the ink raised to its full
 // brightness, EMIT times what the sun and the sky give a white surface), so the bloom catches it; it is never smaller on the screen than PENNANT_PIXELS across, so
@@ -18,7 +18,8 @@ import {
 } from 'three/webgpu';
 import { Fn, abs, attribute, cameraPosition, cos, cross, float, max, min, mix, normalize, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import type { Light } from '../sky/light';
-import { RARITY, type LootDraw } from '../snapshot';
+import { RARITY } from '../rarity';
+import type { LootDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import type { FloatNode, Vec3Node } from '../tsl';
 

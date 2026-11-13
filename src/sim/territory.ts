@@ -39,7 +39,8 @@ export const TERRITORY = {
 export interface Trail { serial: number; points: Vec3[]; cells: number[] }
 
 /**
- * What changed, numbered in order (seq), at a moment on the match's clock (s):
+ * What changed, numbered in order (seq), at a moment on the clock the game steps it by (s: play/state.ts gives the
+ * world's, the frame's own):
  *   claim  a loop closed: `cells` became `ship`'s, the first `loop` of them the trail's own (the flood comes from there)
  *   home   a home patch laid: `cells` became `ship`'s, from `at` outward
  *   drain  `cells` went back to open sea: `ship`'s as she sank, or (ship null) the storm's
@@ -76,7 +77,7 @@ export function createTerritory(count: number) {
 
   const log = (c: Logged) => {
     changes = changes.filter((k) => k.time > c.time - TERRITORY.kept);
-    changes.push({ ...c, seq: ++seq } as Change);
+    changes.push({ ...c, seq: ++seq });
   };
   const set = (c: number, to: number) => {
     const from = owner[c], a = areaQuanta(c);
@@ -170,7 +171,7 @@ export function createTerritory(count: number) {
     },
 
     /**
-     * One step: each ship's move (those afloat), at `time` on the match's clock, under the storm's cap. Trails are
+     * One step: each ship's move (those afloat), at `time` (that clock), under the storm's cap. Trails are
      * judged as they stood before the step, so two ships crossing each other's in one step both lose theirs, whatever
      * the order.
      */
