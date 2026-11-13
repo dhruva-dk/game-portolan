@@ -80,8 +80,10 @@ async function stage(setup: Setup): Promise<Stage> {
 async function play(s: Stage): Promise<Played> {
   // the water sounded, for the bots' routes round land (sim/route.ts) and the ships' berths (sim/spawn.ts): in a
   // worker while the ground's bakes in another (frame.ready), in a fraction of its time
-  const { waters, ms } = await watersOf(s.world.seed);
+  const { waters, ms, berth } = await watersOf(s.world.seed);
   console.info(`water sounded in ${ms.toFixed(0)} ms`);
+  // (each match's berths worked out in that worker ahead of PLAY)
+  s.matches.berthBy(berth);
   const game = createGame(s.world, s.anchors, waters, s.start, s.matches.first);
   const referee = createReferee(game);
 

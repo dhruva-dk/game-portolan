@@ -25,7 +25,7 @@ import { SHIP } from '../sim/handling.ts';
 import { sunk } from '../sim/health.ts';
 import { homed, regain, type Regained } from '../sim/holding.ts';
 import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
-import { berths, type Berthing } from '../sim/spawn.ts';
+import { berths, type Berthing, type Spawn } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
 import { berthed, overboard, strewn, type Flotsam, type Goods } from '../sim/loot.ts';
 import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores.ts';
@@ -61,7 +61,11 @@ export interface Berth { at: Vec3; heading: Vec3; look: Look; lashed: Helm | nul
 
 /** The match: its seed (each bot's mind comes from it and her slot), its storm by the match's clock (s), and the
  * rarity of gun every ship is armed with, or null for none. */
-export interface Match { seed: number; storm: (seconds: number) => Storm; gun: number | null }
+export interface Match {
+  seed: number; storm: (seconds: number) => Storm; gun: number | null;
+  /** Its ships' berths (sim/spawn.ts berths, SHIPS of them), when worked out ahead of its start (play/setup.ts). */
+  berths?: readonly Spawn[];
+}
 
 /** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
  * when, on the match's clock (s), and where she went down and the way she headed. */
@@ -360,7 +364,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     start(m: Match, manned = true): ShipPose {
       const ids = Array.from({ length: SHIPS }, (_, i) => i);
       clear(m, ids, MATCH);
-      const at = berths(water, m.seed, SHIPS, depth);
+      const at = m.berths ?? berths(water, m.seed, SHIPS, depth);
       flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
       at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned));
       territory?.begin(at.map((b) => b.at), tick * STEP);
