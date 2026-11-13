@@ -60,7 +60,23 @@ test('the middle of the screen is the line of sight, and it passes clear of her 
     // her own body (hull and rig) is never on the line
     assert.ok(offSight(s, shipAt(up, heading))!.angle > 0, `her heading ${off}° off the look: the line on her`);
   }
-  assert.ok(PITCH > 0.1 && PITCH < 0.35);
+  assert.ok(PITCH > 0.1 && PITCH < 0.5);
+});
+
+test('as it starts, she is seen whole, low and left in the frame, her trucks under the reticle and her stern above the foot', () => {
+  const chase = createChase(flat, calm);
+  chase.reset(pose(up, north), 0);
+  const right = cross(north, up);
+  /** Where a point of her stands on the 956×440 screen: `fwd` m ahead of her middle, `high` m up, `side` m to starboard. */
+  const seen = (fwd: number, high: number, side = 0) => {
+    const p = add(add(scale(up, R + high), north, fwd), right, side);
+    return onScreen(chase.eye(), normalize(p), 956, 440, length(p) - R)!;
+  };
+  const truck = seen(0, 21.5), stern = seen(-9.5, 4), bow = seen(12, 4);
+  assert.ok(truck.y > 220, `her mainmast's truck at ${truck.y.toFixed(0)}, over the reticle`);
+  assert.ok(stern.y < 380,`her stern at ${stern.y.toFixed(0)}, cut by the foot`);
+  assert.ok(stern.y - truck.y < 0.4 * 440, `she stands ${(stern.y - truck.y).toFixed(0)} px tall`);
+  for (const q of [truck, stern, bow]) assert.ok(q.x > 100 && q.x < 478 - 40, `${q.x.toFixed(0)}: left of the reticle, on the screen`);
 });
 
 test('as it starts, the look meets the sea within a lobbed gun\'s reach, and where it meets it is on the screen', () => {

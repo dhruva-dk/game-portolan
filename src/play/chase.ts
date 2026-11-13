@@ -24,14 +24,17 @@ import { R, add, cross, dot, length, normalize, place, scale, transport, type Ve
 import { lookAt, rotate, slerp, type Turn } from '../world/turn.ts';
 
 /** The boom: metres back along the look from its focus, which stands FOCUS metres over the sea and SHOULDER metres to
- *  starboard of her as the look goes. */
-export const BOOM = 40;
-const FOCUS = 12, SHOULDER = 15;
+ *  starboard of her as the look goes. Long and high (the eye some 55 m up and 64 m astern of her), so she is seen
+ *  whole, small and low in the frame, left of the middle with her trucks under the reticle, and the look runs over
+ *  her rig to what she fights and on to the round of the horizon (at 40 m and 12 m up, the old boom, her rig stood
+ *  over the middle of the screen and her stern was cut by its foot). */
+export const BOOM = 70;
+const FOCUS = 22, SHOULDER = 14;
 /** The look's tilt below the level, radians: where it starts, and its highest and steepest. It starts on the sea about
- *  50 m ahead (the horizon, 140 m off from the eye's 25 m, a little above the middle), so a gun laid as it starts,
- *  a lobbed one above all, comes down where she sees it: at 0.17, the old start, the look passed over the horizon into
- *  the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
-export const PITCH = 0.3;
+ *  55 m ahead (the horizon, some 250 m off from the eye, an eighth of the screen above the middle), so a gun laid as it
+ *  starts, a lobbed one above all, comes down where she sees it: at 0.17, an older start, the look passed over the
+ *  horizon into the sky and a gun's fall was laid at its range, out of sight over the sea's curve. */
+export const PITCH = 0.43;
 const HIGHEST = -0.12, STEEPEST = 1.0;
 /** Radians a pixel of the look's drag, across and down. */
 const TURN = 0.0056, TILT = 0.0046;
