@@ -21,8 +21,8 @@ import { mind, rammed, shot, think, type Memory, type Seen } from '../sim/bot.ts
 import { afloat, stepFleet, type Vessel } from '../sim/contact.ts';
 import { STEP, blendPose } from '../sim/fixed.ts';
 import { gunOf } from '../sim/gun.ts';
-import { SHIP } from '../sim/handling.ts';
-import { sunk } from '../sim/health.ts';
+import { HOLDING, SHIP } from '../sim/handling.ts';
+import { healed, sunk } from '../sim/health.ts';
 import { PLAYER, SHIPS, credited, type Cause } from '../sim/match.ts';
 import { berths, type Berthing } from '../sim/spawn.ts';
 import { hopped, knocked, pose, ride, settled, type Ride } from '../sim/ride.ts';
@@ -31,13 +31,14 @@ import { asked, crewed, NOTHING, stored, type Ask } from '../sim/stores.ts';
 import type { Chart } from '../sim/route.ts';
 import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
-import type { BallDraw, Blast, Look, ShipDraw } from '../snapshot.ts';
+import { createTerritory, type Move, type Territory } from '../sim/territory.ts';
+import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
 import type { Surface } from '../world/swell.ts';
 import type { Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
-import { LOOK, lookOf } from './colours.ts';
+import { LOOK, lookOf, seaColourOf } from './colours.ts';
 import { sinking } from './sinking.ts';
 
 /** How long what the guns did is kept for the frame, seconds: past the last of its smoke (gunfire/gunfire.ts). */
@@ -73,6 +74,14 @@ interface Aboard { look: Look; mind: Memory | null; steady: Helm; ride: Ride; be
 /** A ship going down: her pose when she sank and the step she sank at, listing to `side`. */
 interface Wreck { id: number; look: Look; pose: ShipPose; tick: number; side: number }
 
+/** Each ship's colour on the sea, by id, for `count` ships (made once for each count). */
+const colourTables = new Map<number, Vec3[]>();
+const colours = (count: number): Vec3[] => {
+  const t = colourTables.get(count) ?? Array.from({ length: count }, (_, id) => seaColourOf(id));
+  colourTables.set(count, t);
+  return t;
+};
+
 /** The planet's water as the match reads it, sounded once (play/sounding.ts): the bots' chart of open water for their
  *  routes (sim/route.ts), and the open water ships are berthed in at a match's start (sim/spawn.ts). */
 export interface Waters { chart: Chart; water: Berthing }
@@ -95,6 +104,9 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   let tick = 0, begun = 0;
   /** Whether the sea is the lobby's, no match running: no storm then, however long she lies there. */
   let quiet = false;
+  /** Who holds the sea (sim/territory.ts), in a match; and the shield each ship's own water has given back. */
+  let territory: Territory | null = null;
+  const regained = new Map<number, number>();
 
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
@@ -115,6 +127,8 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     sinkings.length = 0;
     struck.clear();
     battle = battleOf(ids.map((id) => crewOf(id, match.gun === null ? null : gunOf(match.gun))), match.seed);
+    territory = loot ? createTerritory(Math.max(...ids) + 1) : null;
+    regained.clear();
     begun = tick;
     quiet = false;
   };
@@ -129,6 +143,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     const a = aboard.get(id), v = fleet.find((o) => o.id === id);
     if (!a || !v) return;
     sinkings.push({ id, by, cause, time: time(), at: v.ship.at, heading: v.ship.heading });
+    territory?.sink(id, tick * STEP);
     wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
     aboard.delete(id);
     fleet = fleet.filter((o) => o.id !== id);
@@ -166,7 +181,9 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       const wants = asked(battle.crews, fleet, flotsam, asks);
       battle = { ...battle, crews: wants.crews };
       const manned = new Map(wants.crews.map((c) => [c.id, c]));
-      fleet.forEach((v, i) => { helms[i] = crewed(helms[i], manned.get(v.id)); });
+      // in her own water she sails faster
+      fleet.forEach((v, i) => { helms[i] = { ...crewed(helms[i], manned.get(v.id)), home: territory?.ownerAt(v.ship.at) === v.id }; });
+      const from = new Map(fleet.map((v) => [v.id, v.ship.at]));
       const met = stepFleet(fleet, helms, STEP, depth);
       fleet = met.fleet;
       for (const b of met.blows) {
@@ -185,6 +202,20 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       battle = { ...worn.battle, crews: kept.crews };
       flotsam = kept.flotsam;
       tick++;
+      // her trail laid and her loops closed; then, in her own water, her shield coming back
+      if (territory) {
+        territory.step(fleet.map((v): Move => ({ id: v.id, from: from.get(v.id) ?? v.ship.at, to: v.ship.at })), tick * STEP, storm);
+        const home = new Set(fleet.filter((v) => territory?.ownerAt(v.ship.at) === v.id).map((v) => v.id));
+        battle = {
+          ...battle,
+          crews: battle.crews.map((c) => {
+            if (!home.has(c.id)) return c;
+            const health = healed(c.health, HOLDING.shield * STEP, 'shield');
+            regained.set(c.id, (regained.get(c.id) ?? 0) + health.shield - c.health.shield);
+            return health === c.health ? c : { ...c, health };
+          }),
+        };
+      }
       fleet.forEach((v, i) => {
         const a = aboard.get(v.id)!;
         if (wants.blew.includes(v.id)) a.ride = hopped(a.ride);
@@ -244,6 +275,16 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
     blasts: (): readonly Blast[] => blasts,
     /** The loot on the water. */
     loot: (): Flotsam => flotsam,
+    /** Who holds the sea, as drawn at the moment `between` of the way through the last step; none outside a match. */
+    sea(between: number): Sea | undefined {
+      if (!territory) return undefined;
+      const trails = territory.trails().flatMap((t, id) => (t.points.length ? [{ id, serial: t.serial, points: t.points }] : []));
+      return { owner: territory.owner, changes: territory.changes(), trails, colours: colours(territory.trails().length), clock: clock(between) };
+    },
+    /** Who holds the sea (sim/territory.ts), in a match. */
+    territory: (): Territory | null => territory,
+    /** The shield each ship's own water has given back this match, hit points. */
+    regained: (): ReadonlyMap<number, number> => regained,
 
     /** The ships on the sea, as the sim has them. */
     vessels: (): readonly Vessel[] => fleet,
@@ -268,6 +309,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       clear(match, [PLAYER, ...others.map((_, i) => i + 1)]);
       launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
       others.forEach((o, i) => launch(i + 1, { ...shipAt(o.at, o.heading), speed: (o.lashed?.throttle ?? 0) * SHIP.top }, o.look, o.lashed));
+      territory?.begin(fleet.map((v) => v.ship.at), tick * STEP);
       return aboard.get(PLAYER)!.after;
     },
     /** A new match: SHIPS ships, hers the first, the rest bots, every one afloat at her berth (sim/spawn.ts) with a
@@ -279,6 +321,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
       const at = berths(water, m.seed, SHIPS, depth);
       flotsam = berthed(flotsam, at.map((b) => b.at), m.seed, depth);
       at.forEach((b, id) => launch(id, shipAt(b.at, b.heading), lookOf(id), null, manned));
+      territory?.begin(at.map((b) => b.at), tick * STEP);
       return aboard.get(PLAYER)!.after;
     },
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */

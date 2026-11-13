@@ -185,6 +185,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         eye: anchored ? berth ?? anchorageEye(last, orbit, time, ground) : (arrival !== null && arriving(arrival, last, eye)) || eye,
         clock: time, storm: state.storm(between),
         ships: state.drawn(between), own: PLAYER, balls: state.balls(between), loot, blasts: state.blasts(),
+        sea: state.sea(between),
       };
     },
     /** What she carries, as the hotbar shows it. */

@@ -15,3 +15,7 @@ const SAILS: Vec3[] = [
 /** A ship's colours by her id (0: the player's). */
 export const lookOf = (id: number): Look =>
   (id === 0 ? LOOK : { paint: PAINTS[(id - 1) % PAINTS.length], sail: SAILS[(id - 1) % SAILS.length], band: id % 4 === 3 });
+
+/** A ship's colour on the sea she holds (snapshot.ts Sea), by her id: hers the scarlet of her hull, the others' their
+ *  sails' dye. */
+export const seaColourOf = (id: number): Vec3 => (id === 0 ? LOOK.paint : lookOf(id).sail);

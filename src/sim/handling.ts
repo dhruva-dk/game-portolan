@@ -83,6 +83,16 @@ export const HEALTH = {
 } as const;
 
 /**
+ * Her own water (territory.ts): inside it her shield comes back `shield` hit points a second, a third of what one
+ * common gun takes off a second (GUN: 20 every 2 s), so a fight can't be won by sitting at home, but 20–30 s there
+ * after one puts back 60–90 of it; and she sails `speed` times her top speed (+9%, 13.1 m/s).
+ */
+export const HOLDING = {
+  shield: 3,
+  speed: 1.09,
+} as const;
+
+/**
  * Gust, her one ability (gust.ts): 0117's (tables.ts GUST, sailing.ts gust), a burst of wind in her canvas and a hop
  * off the water. Two charges, each coming back `recharge` s after the last came back; spent, for `time` s her speed
  * asked rises by `speed` and is reached at `accel` m/s², and her turn by `turn`; her balls go off `spread` times as

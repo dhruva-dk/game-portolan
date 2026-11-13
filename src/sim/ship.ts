@@ -12,7 +12,7 @@
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
 import { add, cross, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
-import { GUST, SHIP } from './handling.ts';
+import { GUST, HOLDING, SHIP } from './handling.ts';
 import { navigate, type Depth } from './shoal.ts';
 
 /** One ship's state. */
@@ -35,6 +35,8 @@ export interface Helm {
   throttle: number;
   /** Whether a gust fills her canvas this step (gust.ts; handling.ts GUST). */
   gust?: boolean;
+  /** Whether she is in her own water this step (territory.ts; handling.ts HOLDING): her top speed is higher there. */
+  home?: boolean;
 }
 
 /** A ship lying still at `at`, her bow along `heading` (made a unit tangent there). */
@@ -65,11 +67,12 @@ export function turned(s: ShipState, angle: number): Vec3 {
 export function step(s: ShipState, helm: Helm, dt: number, depth: Depth): ShipState {
   const rudder = helm.course && length(helm.course) > 0 ? Math.max(-1, Math.min(1, SHIP.steer * offCourse(s, helm.course))) : 0;
   const turn = s.turn + (rudder * SHIP.turn * (helm.gust ? GUST.turn : 1) * bite(s.speed) - s.turn) * close(SHIP.answer, dt);
-  const want = Math.max(0, Math.min(1, helm.throttle)) * SHIP.top;
+  const top = SHIP.top * (helm.home ? HOLDING.speed : 1);
+  const want = Math.max(0, Math.min(1, helm.throttle)) * top;
   let speed: number;
   // a gust drives her on hard toward its speed over what she asks; after it, what she has over her top is shed at a rate
   if (helm.gust) speed = s.speed + Math.max(-GUST.accel * dt, Math.min(GUST.accel * dt, want + GUST.speed - s.speed));
-  else if (s.speed > SHIP.top) speed = Math.max(SHIP.top, s.speed - GUST.shed * dt);
+  else if (s.speed > top) speed = Math.max(top, s.speed - GUST.shed * dt);
   else speed = s.speed + (want - s.speed) * close(want > s.speed ? SHIP.gather : SHIP.drag, dt);
   return navigate({ ...s, speed, turn }, turned(s, turn * dt), dt, depth);
 }
