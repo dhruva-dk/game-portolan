@@ -36,8 +36,17 @@ export const ROUTE = {
   far: 12, repath: 2, moved: 30, reached: 10, ahead: 6, step: 6,
 } as const;
 
-/** The chart: whether each cell is open water, and how many cells it lies from the shore (0: not open; up to 4). */
-export interface Chart { readonly open: Uint8Array; readonly clear: Uint8Array }
+/** The chart: whether each cell is open water, how many cells it lies from the shore (0: not open; up to 4), and its
+ *  pathfinder's working space (findPath's alone). */
+export interface Chart { readonly open: Uint8Array; readonly clear: Uint8Array; readonly space: Space }
+
+/** A pathfinder's working space, kept with its chart between queries (a query leaves nothing in it that the next
+ *  reads: each is stamped). Cell centres, and for each cell its cost so far, the cell it was reached from and the
+ *  stamps of the queries that saw and marked it; the open heap. */
+interface Space {
+  readonly g: Float64Array; readonly from: Int32Array; readonly seen: Int32Array; readonly marks: Int32Array; readonly centre: Float64Array;
+  readonly heap: Int32Array; readonly key: Float64Array; stamp: number;
+}
 
 const N = ROUTE.n, LOG = 31 - Math.clz32(N), CELLS = 6 * N * N;
 
@@ -105,10 +114,8 @@ export function chart(depth: Depth): Chart {
       for (let k = 0; k < 4; k++) if (clear[neighbour(c, k)] === round) { clear[c] = round + 1; break; }
     }
   }
-  const ch = { open, clear };
   // (the pathfinder's working space too, now rather than at the first route, which it would hold up some tens of ms)
-  scratch(ch);
-  return ch;
+  return { open, clear, space: space() };
 }
 
 export const openAt = (ch: Chart, p: Vec3): boolean => ch.open[cellOf(p)] === 1;
@@ -122,29 +129,18 @@ function clearLine(ch: Chart, a: Vec3, b: Vec3, step = 4): boolean {
 
 // ---------------------------------------------------------------- finding a route
 
-/** A pathfinder's working space, one for each chart, kept between queries (a query leaves nothing in it that the next
- *  reads: each is stamped). */
-interface Scratch {
-  g: Float64Array; from: Int32Array; seen: Int32Array; marks: Int32Array; centre: Float64Array;
-  heap: Int32Array; key: Float64Array; stamp: number;
-}
-const SCRATCH = new WeakMap<Chart, Scratch>();
 /** (0117 sized its heap for every cell four times over; a query pushes at most four for each cell it looks through.) */
 const HEAP = 4 * ROUTE.work * 4 + 1;
 
-function scratch(ch: Chart): Scratch {
-  let s = SCRATCH.get(ch);
-  if (!s) {
-    const centre = new Float64Array(CELLS * 3);
-    for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
-    s = { g: new Float64Array(CELLS), from: new Int32Array(CELLS), seen: new Int32Array(CELLS), marks: new Int32Array(CELLS), centre, heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0 };
-    SCRATCH.set(ch, s);
-  }
-  return s;
+/** A fresh working space. */
+function space(): Space {
+  const centre = new Float64Array(CELLS * 3);
+  for (let c = 0; c < CELLS; c++) centre.set(cellCentre(c), 3 * c);
+  return { g: new Float64Array(CELLS), from: new Int32Array(CELLS), seen: new Int32Array(CELLS), marks: new Int32Array(CELLS), centre, heap: new Int32Array(HEAP), key: new Float64Array(HEAP), stamp: 0 };
 }
 
 /** The nearest open cell to p within `reach` cells, by rings of neighbours: the nearest of the first ring to hold one. */
-function nearestOpen(ch: Chart, s: Scratch, p: Vec3, reach: number): number {
+function nearestOpen(ch: Chart, s: Space, p: Vec3, reach: number): number {
   const start = cellOf(p), mark = ++s.stamp, queue = [start];
   if (ch.open[start]) return start;
   s.marks[start] = mark;
@@ -172,7 +168,7 @@ function nearestOpen(ch: Chart, s: Scratch, p: Vec3, reach: number): number {
 }
 
 /** Metres between cell a's centre and cell b's, or the point p (a unit vector). */
-function gap(s: Scratch, a: number, b: number | Vec3): number {
+function gap(s: Space, a: number, b: number | Vec3): number {
   const C = s.centre, [x, y, z] = typeof b === 'number' ? [C[3 * b], C[3 * b + 1], C[3 * b + 2]] : b;
   return R * Math.hypot(C[3 * a] - x, C[3 * a + 1] - y, C[3 * a + 2] - z);
 }
@@ -183,7 +179,7 @@ function gap(s: Scratch, a: number, b: number | Vec3): number {
  * when p is on land with no open water near.
  */
 export function findPath(ch: Chart, p: Vec3, q: Vec3, work: number = ROUTE.work): { cells: number[]; found: boolean } {
-  const s = scratch(ch), { g, from: FROM, seen, heap, key } = s, to = cellOf(q), budget = Math.min(work, ROUTE.work * 4);
+  const s = ch.space, { g, from: FROM, seen, heap, key } = s, to = cellOf(q), budget = Math.min(work, ROUTE.work * 4);
   const start = nearestOpen(ch, s, p, ROUTE.wade);
   if (start < 0) return { cells: [], found: false };
   const stamp = ++s.stamp;
