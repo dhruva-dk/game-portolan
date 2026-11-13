@@ -1,19 +1,17 @@
 // The match's course for the player, as 0117 ran it (app.ts follow, session.ts spectate/rewatch):
 //   fighting   at sea, from the start (every ship begins afloat: spawn.ts)
-//   spectating she has sunk: the camera watches the ship that sank her, or else the one afloat with the most sinkings
-//              to her name; when that one sinks, the one that sank her, and so on. A tap moves on (to the result), or
-//              the match ending does, SPECTATE seconds after
-//   won        she is the last afloat: a tap moves on, or VICTORY seconds do
-// Her place, as 0117 settled it (sim/end.ts sink): the ships not yet sunk as she sank, herself among them, the
-// sinkings of one step counted one by one in the order the game reports them; so, the last ships all sunk at once,
-// the last of them to sink is first and wins. With her place, how she sank and at whose hand: the Storm's sinking goes
-// to the ship that last struck her if it did so within CREDIT seconds (credited). The defeat slip and the result show
-// this place (ui/flow.ts). Pure: a value stepped by what the game reports.
+//   spectating she has sunk: who she would watch is the ship that sank her, or else the one afloat with the most
+//              sinkings to her name; when that one sinks, the one that sank her, and so on; she may turn to another
+//              afloat (switched)
+//   won        she is the last afloat
+// Nothing moves on by itself: the match is over (over) once she has won or, she sunk, one ship or none is afloat, and
+// what follows is hers to choose (ui/flow.ts). Her place, as 0117 settled it (sim/end.ts sink): the ships not yet sunk
+// as she sank, herself among them, the sinkings of one step counted one by one in the order the game reports them; so,
+// the last ships all sunk at once, the last of them to sink is first and wins. With her place, how she sank and at
+// whose hand: the Storm's sinking goes to the ship that last struck her if it did so within CREDIT seconds
+// (credited). Pure: a value stepped by what the game reports.
 
 export type Phase = 'fighting' | 'spectating' | 'won';
-
-/** Seconds the end holds before moving on by itself (0117 app.ts HOLD): watching the last ship left, and the win. */
-export const HOLD = { spectating: 3, won: 6 } as const;
 
 /** The player's ship's id. */
 export const PLAYER = 0;
@@ -42,14 +40,12 @@ export interface MatchState {
   place: number | null;
   /** Her sinking, once she has sunk: how and at whose hand. */
   sunk: Sunk | null;
-  /** The ship the camera follows. */
+  /** The ship she would watch once sunk (hers while she fights, and on a win). */
   watch: number;
-  /** How the camera came to her: 'cut' to her at once, 'fly' over to her. Changes with `watch`. */
-  move: 'cut' | 'fly';
-  /** Seconds the end has been held (the match over, spectating; or won). */
-  held: number;
-  /** Time to move on, to the result. */
-  done: boolean;
+  /** Seconds since her end (sunk or won); 0 while she fights. */
+  since: number;
+  /** The match is over: she has won, or she has sunk and one ship or none is afloat. */
+  over: boolean;
   /** How many of the game's sinkings this has read. */
   read: number;
   /** Her share of the planet's water (0…1) as she last held it afloat: kept once her place is settled, as a sunk
@@ -62,7 +58,7 @@ export interface MatchState {
 export interface Report { sinkings: readonly Sunk[]; alive: readonly number[]; share?: number }
 
 export const startMatch = (): MatchState => ({
-  phase: 'fighting', place: null, sunk: null, watch: PLAYER, move: 'cut', held: 0, done: false, read: 0, share: 0,
+  phase: 'fighting', place: null, sunk: null, watch: PLAYER, since: 0, over: false, read: 0, share: 0,
 });
 
 /** Who to watch after `gone` sank, at the hand of `by`: her, if afloat, or the ship afloat with the most sinkings to
@@ -79,34 +75,39 @@ function next(by: number | null, r: Report): number {
 
 /** The match after a frame of dt seconds and what the game reports. */
 export function stepMatch(m: MatchState, r: Report, dt: number): MatchState {
-  if (m.done) return m;
   let s: MatchState = { ...m, read: r.sinkings.length };
   const fresh = r.sinkings.slice(m.read);
   const mine = fresh.find((k) => k.id === PLAYER);
   // (the step she sinks, her water is already draining: what she held is the step before's)
   if (s.phase === 'fighting' && !mine) s.share = r.share ?? s.share;
+  if (s.phase !== 'fighting') s.since += dt;
   if (mine && s.phase === 'fighting') {
     const place = r.alive.length + r.sinkings.length - r.sinkings.indexOf(mine);
     const watch = next(mine.by, r);
     s = place === 1 && r.alive.length === 0
-      ? { ...s, phase: 'won', place, sunk: mine, held: 0 }
-      : { ...s, phase: 'spectating', place, sunk: mine, watch: watch < 0 ? PLAYER : watch, move: 'cut' };
+      ? { ...s, phase: 'won', place, sunk: mine }
+      : { ...s, phase: 'spectating', place, sunk: mine, watch: watch < 0 ? PLAYER : watch };
   } else if (s.phase === 'spectating') {
     // the ship watched has sunk: on to the one that sank her
     const gone = fresh.find((k) => k.id === s.watch);
     if (gone) {
       const watch = next(gone.by, r);
-      if (watch >= 0) s = { ...s, watch, move: 'fly' };
+      if (watch >= 0) s = { ...s, watch };
     }
   } else if (s.phase === 'fighting' && fresh.length > 0 && r.alive.length === 1 && r.alive[0] === PLAYER) {
-    s = { ...s, phase: 'won', place: 1, held: 0 };
+    s = { ...s, phase: 'won', place: 1 };
   }
-  if (s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1)) {
-    s.held += dt;
-    if (s.held >= HOLD[s.phase]) s.done = true;
-  }
+  s.over = s.phase === 'won' || (s.phase === 'spectating' && r.alive.length <= 1);
   return s;
 }
 
-/** A tap while the end is shown moves on; at any other time it does nothing. */
-export const tapped = (m: MatchState): MatchState => (m.phase === 'spectating' || m.phase === 'won' ? { ...m, done: true } : m);
+/** Spectating, the ship afloat `by` places on from the one watched (+1 the next, −1 the one before) in the order of
+ *  their ids, round and round; at any other time, or with none afloat but her, the match unchanged. */
+export function switched(m: MatchState, alive: readonly number[], by: number): MatchState {
+  const others = alive.filter((id) => id !== PLAYER);
+  if (m.phase !== 'spectating' || others.length === 0) return m;
+  // (from a ship no longer afloat, the next on is the first after it)
+  const at = others.findIndex((id) => id >= m.watch), from = at < 0 ? others.length : at;
+  const step = others[from] === m.watch || by < 0 ? by : by - 1, n = others.length;
+  return { ...m, watch: others[(((from + step) % n) + n) % n] };
+}

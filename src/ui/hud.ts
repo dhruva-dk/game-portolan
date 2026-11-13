@@ -16,7 +16,7 @@
 //               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
 //   rim         washed rubric while she is outside the Storm's calm, the deeper the further out (0117's)
 // No words. The stick is drawn under it (stick.ts); look drags take the rest of the screen.
-// Once she has sunk it watches another ship (watch): only the Storm's clock and the disc stay, her arrow gilt.
+// Once she has sunk it watches another ship (watch): only the Storm's clock, the ships afloat and the disc stay, her arrow gilt.
 // While the eye comes down from space at a match's start (play/arrival.ts) none of it shows; it fades in over the last
 // of the way down (FADE), as the game reports it (Status.arriving).
 //
@@ -115,7 +115,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
     el.innerHTML = html();
   };
 
-  /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock and the disc stay,
+  /** She has sunk and the HUD watches another ship (0117 hud.ts spectate): only the Storm's clock, the count and the disc stay,
    *  her arrow on it gilt, and the disc takes no touch. */
   let watching = false;
 
@@ -138,10 +138,10 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
         + bar(11, 41, 158, 15, hull / s.hullMax, WASH.hull) + figure(176, 41, hull, 17, { anchor: 'start' })));
 
       const time = clock(s.storm), closing = s.closing || s.storm < 30;
-      draw(readings, `${time} ${watching ? '' : s.afloat}`, () => svg(184, 38,
+      draw(readings, `${time} ${s.afloat}`, () => svg(184, 38,
         slip(1, 2, 88, 34) + glyph('hud.spiral', 20, 19, 22, { ink: closing ? 'rubric' : 'iron' })
         + figure(60, 19, time, 23, { fill: closing ? INK.rubric : INK.iron })
-        + (watching ? '' : slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23))));
+        + slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23)));
 
       // each charge a pip; the one coming back filling round, in steps of a 24th
       const charge = Math.floor(s.gust), back = Math.floor((s.gust - charge) * 24);

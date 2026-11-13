@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CREDIT, HOLD, PLAYER, credited, startMatch, stepMatch, tapped, type MatchState, type Sunk } from '../src/sim/match.ts';
+import { CREDIT, PLAYER, credited, startMatch, stepMatch, switched, type MatchState, type Sunk } from '../src/sim/match.ts';
 
 /** Steps a match through frames of `dt`, each with what the game reports then. */
 const run = (m: MatchState, frames: { sinkings: Sunk[]; alive: number[]; share?: number }[], dt = 1 / 30) =>
@@ -12,7 +12,7 @@ test('sunk, she places one behind the ships still afloat, and watches the one th
   assert.equal(m.phase, 'fighting');
   sinkings.push({ id: PLAYER, by: 3, cause: 'shot' });
   m = run(m, [{ sinkings, alive: [1, 2, 3] }]);
-  assert.deepEqual([m.phase, m.place, m.watch, m.move], ['spectating', 4, 3, 'cut']);
+  assert.deepEqual([m.phase, m.place, m.watch, m.over], ['spectating', 4, 3, false]);
 });
 
 test('sunk by the storm, or by a ship since sunk, she watches the ship afloat that has sunk the most', () => {
@@ -26,41 +26,52 @@ test('when the ship watched sinks, the camera flies to the one that sank her', (
   let m = run(startMatch(), [{ sinkings, alive: [1, 2, 3] }]);
   assert.equal(m.watch, 2);
   m = run(m, [{ sinkings: [...sinkings, { id: 2, by: 3, cause: 'shot' }], alive: [1, 3] }]);
-  assert.deepEqual([m.watch, m.move, m.place], [3, 'fly', 4]);
+  assert.deepEqual([m.watch, m.place], [3, 4]);
   // another's sinking leaves the camera where it is
   m = run(m, [{ sinkings: [...sinkings, { id: 2, by: 3, cause: 'shot' }, { id: 1, by: 3, cause: 'shot' }], alive: [3] }]);
   assert.equal(m.watch, 3);
 });
 
-test('spectating, the match over holds a moment, then moves on; a tap moves on at once', () => {
-  const sinkings: Sunk[] = [{ id: PLAYER, by: 1, cause: 'shot' }, { id: 2, by: 1, cause: 'shot' }];
-  let m = run(startMatch(), [{ sinkings, alive: [1] }]);
-  assert.equal(m.done, false);
-  m = run(m, Array.from({ length: Math.ceil(HOLD.spectating * 30) + 1 }, () => ({ sinkings, alive: [1] })));
-  assert.equal(m.done, true);
-  // while ships still fight, only a tap ends it
-  const open = run(startMatch(), Array.from({ length: 600 }, () => ({ sinkings: [{ id: PLAYER, by: 1, cause: 'shot' }], alive: [1, 2] })));
-  assert.equal(open.done, false);
-  assert.equal(tapped(open).done, true);
+test('nothing moves on by itself: her end counts its seconds, and the match is over only at its own end', () => {
+  const sinkings: Sunk[] = [{ id: PLAYER, by: 1, cause: 'shot' }];
+  // while ships still fight, however long she watches, it is not over
+  const open = run(startMatch(), Array.from({ length: 600 }, () => ({ sinkings, alive: [1, 2] })));
+  assert.deepEqual([open.over, open.phase], [false, 'spectating']);
+  assert.ok(Math.abs(open.since - 599 / 30) < 1e-9, `${open.since}`);
+  // the last but one sunk: over, and it stays so
+  const over = run(open, Array.from({ length: 300 }, () => ({ sinkings: [...sinkings, { id: 2, by: 1, cause: 'shot' }], alive: [1] })));
+  assert.deepEqual([over.over, over.phase, over.place], [true, 'spectating', 3]);
 });
 
-test('the last afloat, she wins: first place, a tap or VICTORY seconds move on', () => {
+test('the last afloat, she wins: first place, and the match is over', () => {
   const sinkings: Sunk[] = [{ id: 1, by: PLAYER, cause: 'shot' }, { id: 2, by: 1, cause: 'shot' }];
   let m = run(startMatch(), [{ sinkings: sinkings.slice(0, 1), alive: [0, 2] }]);
   assert.equal(m.phase, 'fighting');
   m = run(m, [{ sinkings, alive: [0] }]);
-  assert.deepEqual([m.phase, m.place, m.watch], ['won', 1, PLAYER]);
-  assert.equal(tapped(m).done, true);
-  m = run(m, Array.from({ length: HOLD.won * 30 - 2 }, () => ({ sinkings, alive: [0] })));
-  assert.equal(m.done, false);
-  m = run(m, Array.from({ length: 4 }, () => ({ sinkings, alive: [0] })));
-  assert.equal(m.done, true);
+  assert.deepEqual([m.phase, m.place, m.watch, m.over, m.since], ['won', 1, PLAYER, true, 0]);
+  m = run(m, Array.from({ length: 300 }, () => ({ sinkings, alive: [0] })));
+  assert.deepEqual([m.phase, m.over], ['won', true]);
 });
 
-test('alone on the sea from the start is no win, and a tap in the fight does nothing', () => {
+test('alone on the sea from the start is no win', () => {
   const m = run(startMatch(), Array.from({ length: 90 }, () => ({ sinkings: [], alive: [0] })));
-  assert.equal(m.phase, 'fighting');
-  assert.equal(tapped(m), m);
+  assert.deepEqual([m.phase, m.over], ['fighting', false]);
+});
+
+test('spectating, she turns to the next ship afloat or the one before, round and round; fighting, not at all', () => {
+  const alive = [2, 5, 9];
+  const m = run(startMatch(), [{ sinkings: [{ id: PLAYER, by: 5, cause: 'shot' }], alive }]);
+  assert.equal(m.watch, 5);
+  assert.equal(switched(m, alive, 1).watch, 9);
+  assert.equal(switched(switched(m, alive, 1), alive, 1).watch, 2);
+  assert.equal(switched(m, alive, -1).watch, 2);
+  assert.equal(switched(switched(m, alive, -1), alive, -1).watch, 9);
+  // from a ship since sunk (7): the next is the first after it, the one before the last before it
+  const gone = { ...m, watch: 7 };
+  assert.equal(switched(gone, alive, 1).watch, 9);
+  assert.equal(switched(gone, alive, -1).watch, 5);
+  const fighting = startMatch();
+  assert.equal(switched(fighting, alive, 1), fighting);
 });
 
 test('her place and how she sank: by a ball, a ram, or the Storm, one behind every ship afloat', () => {

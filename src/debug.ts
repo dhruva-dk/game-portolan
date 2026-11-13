@@ -21,10 +21,13 @@
 // frame's cost. ?safe=top,right,bottom,left px stands in for the phone's safe-area insets (iPhone 16 Pro Max in
 // landscape: ?safe=0,62,21,62). ?lod=0…3 draws every ship at that level of detail; ?cloth=0 draws every ship's canvas
 // as the wind fills it, none simulated (ship/fleet.ts).
-// ?screen= opens the UI at a screen (title, lobby, match, spectate, won, result (?share=0…1 the sea she held); ui/flow.ts;
-// also map, rank and settings), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the
-// eye coming down from space: play/arrival.ts); spectate sinks her by the first other ship (?by=storm: by the storm),
-// won sinks every other by her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
+// ?screen= opens the UI at a screen (title, lobby, rank, settings, match, sunk, spectate, won, result; ui/ways.ts; also
+// map), at sea among ?ships=n others by default: play starts a match as PLAY does (every ship at her berth, the eye
+// coming down from space: play/arrival.ts); sunk sinks her by the first other ship (?by=storm: by the storm) and the
+// screens follow her end as the match would bring it (the camera's beat, then her result); spectate sinks her and
+// watches; won sinks every other, the last by her; result sinks her and all but one other, so the match is over.
+// ?sink=seconds sinks her so many seconds into the frames drawn, ?win=seconds every other ship then, so she wins.
+// ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
 // The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
@@ -152,10 +155,16 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     ...(params.get('fire') ? [{ at: number('fire', 0), hands: { fire: true } }] : []),
     ...(swing ? [{ at: swing[2] || 0, hands: { look: { x: swing[0] || 0, y: swing[1] || 0, held: false } } }] : []),
   ];
+  // ?sink and ?win: her end, so many seconds into the frames drawn
+  const ends = [
+    ...(params.has('sink') ? [{ at: number('sink', 0), act: () => sinkHer(p.game) }] : []),
+    ...(params.has('win') ? [{ at: number('win', 0), act: () => winHer(p.game) }] : []),
+  ];
   let drawn = 0;
   return s.draw((real) => {
     const dt = paused ? 0 : real * slow, frame = p.next(dt);
     for (const t of timed) if (drawn <= t.at && drawn + dt > t.at) p.game.step(STEP, { ...IDLE, ...t.hands });
+    for (const e of ends) if (drawn <= e.at && drawn + dt > e.at) e.act();
     drawn += dt;
     return frame;
   }, p.drawn);
@@ -165,22 +174,23 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
 function open(p: Played, others: readonly Berth[]) {
   const { game, referee, flow } = p;
   const screen = params.get('screen') ?? 'match';
-  if (screen === 'title' || screen === 'lobby') flow.go(screen);
-  else if (screen === 'rank' || screen === 'settings') {
-    flow.go('lobby');
-    flow.open(screen);
-  } else if (screen === 'play') {
+  if (screen === 'title' || screen === 'lobby' || screen === 'rank' || screen === 'settings') flow.go(screen);
+  else if (screen === 'play') {
     p.play();
     flow.go('match');
   } else {
     game.debug.atSea(others);
     drive(game, params.get('drive') ?? '');
-    if (screen === 'result') flow.end(4, number('share', 0.137));
-    else {
-      referee.begin();
-      if (screen === 'spectate') game.debug.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);
-      if (screen === 'won') others.forEach((_, i) => game.debug.sink(i + 1, PLAYER));
-      flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');
+    referee.begin();
+    // her end, as the match's own course would bring it: the screens follow it from the match (ui/ways.ts)
+    if (screen === 'sunk' || screen === 'spectate' || screen === 'result') sinkHer(game);
+    if (screen === 'result') others.forEach((_, i) => i > 0 && game.debug.sink(i + 1, 1));
+    if (screen === 'won') winHer(game);
+    flow.go('match');
+    if (screen === 'spectate') {
+      referee.update(0);
+      referee.watch();
+      flow.go('spectate');
     }
   }
   if (screen === 'match') stock(game);
@@ -191,6 +201,18 @@ function open(p: Played, others: readonly Berth[]) {
     referee.update(0.1);
   }
   if (screen === 'map' || params.has('map')) p.map();
+}
+
+/** Sinks her by the first other ship afloat (?by=storm: by the Storm). */
+function sinkHer(game: Game) {
+  const by = game.alive().find((id) => id !== PLAYER);
+  game.debug.sink(PLAYER, by !== undefined && params.get('by') !== 'storm' ? by : null);
+}
+
+/** Sinks every other ship afloat, the last by her, so she wins. */
+function winHer(game: Game) {
+  const others = game.alive().filter((id) => id !== PLAYER);
+  others.forEach((id, i) => game.debug.sink(id, i === others.length - 1 ? PLAYER : others[others.length - 1]));
 }
 
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */

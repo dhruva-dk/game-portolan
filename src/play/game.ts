@@ -13,8 +13,8 @@
 // stores at the next step (sim/stores.ts); what she carries is reported as her kit, and her aim as the reticle: where
 // the ball will come down, and whether it reaches.
 //
-// The camera follows the ship the match's flow sets (view): hers, or after she sinks the one she watches, cut to or
-// flown to; its shot on a win is shots.ts's.
+// The camera follows the ship the match's flow sets (view): hers, or once she has sunk and chosen to watch, the one she
+// watches, always flown to, never cut; at her end, sunk or won, it holds on her ship in finale.ts's shot.
 //
 // It opens on the lobby's quiet sea (anchor), where the camera stands off her bow and a drag turns it round her
 // (anchorage.ts) and her hands do not sail her; a match then opens with every ship afloat at her berth (start), the
@@ -45,7 +45,7 @@ import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
 import { ARRIVAL, arriving } from './arrival';
 import { createChase } from './chase';
 import { onScreen } from './lens';
-import { createShots } from './shots';
+import { finale, type Ending } from './finale';
 import { bearing, createState, type Berth, type Match, type Waters } from './state';
 
 /** How little of the stick's push counts as none. */
@@ -54,9 +54,9 @@ const DEAD = 0.15;
  *  CHARTED m. */
 const DRAWN = 700, RIDES = 320, CHARTED = 260;
 
-/** What the camera does, as the match's flow sets it (sim/match.ts): the ship it follows, and whether it cut or flew
- * to her; whether the hands steer and look; whether it circles her (the win). */
-export interface View { watch: number; move: 'cut' | 'fly'; hands: boolean; circle: boolean }
+/** What the camera does, as the match's flow sets it (play/referee.ts): the ship it follows; whether the hands steer
+ * and look; and her end's shot, held on her ship (finale.ts), or none. */
+export interface View { watch: number; hands: boolean; end: Ending | null }
 
 /** world: the planet and its climate; anchors: the sea's (frame.ts), for the waves' CPU copy; waters: the planet's
  *  water sounded (state.ts); start: where she lies in the lobby and the bearing she heads (radians); first: the match
@@ -70,9 +70,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   /** Whether her gun was ordered fired since the last step, the slot last tapped and whether Gust was pressed; how
    *  far the moment drawn is through the last step. */
   let pulled = false, tapped: number | null = null, gusted = false, between = 0;
-  /** The camera: what the flow sets, and its shots. */
-  let view: View = { watch: PLAYER, move: 'cut', hands: true, circle: false };
-  const shots = createShots();
+  /** The camera: what the flow sets, and seconds since her end's shot began. */
+  let view: View = { watch: PLAYER, hands: true, end: null }, ended = 0;
   /** Her pose as last drawn. */
   let last: ShipPose = { position: scale(start.at, R), forward: bearing(start.at, start.bearing), up: start.at };
   /** Seconds since the match began while the eye is still coming down onto her (arrival.ts), else null. */
@@ -98,11 +97,11 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
 
   /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
   const restart = (her: ShipPose, anchor = false) => {
-    view = { watch: PLAYER, move: 'cut', hands: true, circle: false };
+    view = { watch: PLAYER, hands: true, end: null };
+    ended = 0;
     anchored = anchor;
     orbit = REST;
     berth = null;
-    shots.reset();
     held = null;
     arrival = null;
     last = her;
@@ -149,7 +148,8 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         return;
       }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
-      chase.update(followed, hands.look, dt, state.clock(1), shots.take(view.circle, dt));
+      ended += dt;
+      chase.update(followed, hands.look, dt, state.clock(1), finale(view.end, ended));
       if (arrival !== null && !arriving((arrival += dt), last, chase.eye())) arrival = null;
     },
     /** What is drawn now (snapshot.ts). */
@@ -218,15 +218,10 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     anchor() {
       restart(state.anchor(start), true);
     },
-    /** The camera's orders from the match's flow: a new ship to follow is cut or flown to. */
+    /** The camera's orders from the match's flow: a new ship to follow is flown to; her end's shot begins. */
     view(next: View) {
-      if (next.watch !== view.watch) {
-        if (next.move === 'fly') chase.fly();
-        else {
-          const p = state.poseOf(next.watch, 1);
-          if (p) chase.reset(p, state.clock(1));
-        }
-      }
+      if (next.watch !== view.watch) chase.fly();
+      if (next.end !== view.end) ended = 0;
       view = next;
     },
     /** What only the debug switches (src/debug.ts) ask of the game. */

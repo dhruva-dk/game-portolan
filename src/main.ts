@@ -16,7 +16,7 @@ import { SHIPS } from './sim/match';
 import type { Snapshot } from './snapshot';
 import { traceCoasts } from './ui/coasts';
 import { createGlobe } from './ui/globe';
-import { createFlow, IN_MATCH } from './ui/flow';
+import { createFlow } from './ui/flow';
 import { createHud, type HudState } from './ui/hud';
 import { createInput } from './ui/input';
 import { createStick } from './ui/stick';
@@ -76,9 +76,6 @@ async function stage(setup: Setup): Promise<Stage> {
   };
 }
 
-/** The match's screens follow its course (sim/match.ts); its end shows her place. */
-const SHOWS = { fighting: 'match', spectating: 'spectate', won: 'won' } as const;
-
 /** The game on the stage, opening on the lobby's quiet sea, and its UI over the world, at the title. */
 async function play(s: Stage): Promise<Played> {
   // the water sounded, for the bots' routes round land (sim/route.ts) and the ships' berths (sim/spawn.ts): in a
@@ -103,33 +100,27 @@ async function play(s: Stage): Promise<Played> {
     game.start(s.matches.deal());
     referee.begin();
   };
-  const flow = createFlow(hud, globe, pending.career, 'title', {
+  const flow = createFlow(hud, globe, { now: pending.career, credit: pending.credit }, 'title', {
     play: deal,
     home() {
       referee.end();
       game.anchor();
     },
-    skip: () => referee.tap(),
+    watch: () => referee.watch(),
+    switch: (by) => referee.switch(by),
   });
   void s.ready.then(() => flow.ready());
 
   return {
     game, referee, flow, play: deal, map,
-    // the full map, just opened, holds the game's frame the moment it is drawn, to show round its panel
-    drawn: (canvas) => globe.waiting && globe.hold(canvas),
+    // the full map just opened, or a cross-fade waiting, holds the game's frame the moment it is drawn
+    drawn: (canvas) => flow.drawn(canvas),
     next(dt: number): Snapshot {
       const hands = input.read();
       stick(game.steering() ? hands.stick : null);
       game.step(dt, hands);
-      const m = referee.update(dt);
-      if (m?.done) {
-        referee.end();
-        flow.end(m.place ?? 1, m.share);
-      } else if (m) {
-        if (IN_MATCH.includes(flow.screen) && flow.screen !== SHOWS[m.phase]) flow.go(SHOWS[m.phase]);
-        // sunk, by a ball, a ram or the storm alike: where she placed, over the ship she now watches
-        if (m.phase === 'spectating' && m.place !== null) flow.sunk(m.place);
-      }
+      // her end, sunk or won, as the screens follow it
+      flow.end(referee.update(dt));
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
       const scene = game.snapshot();
       flow.update(dt, hudState(), scene.sea, scene.own);

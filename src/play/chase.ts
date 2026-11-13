@@ -14,7 +14,7 @@
 // under the land or within CLEAR of the water, the boom and the shoulder are drawn in together toward her (quickly),
 // and let out again only slowly once clear (as the old full game did, 0117 src/render/camera.ts), the look's way kept.
 //
-// The match's other shot is this camera given another boom (a Shot): drawn back and circling her on a win (shots.ts).
+// The match's other shots are this camera given another boom (a Shot): at her end, sunk or won (finale.ts).
 // Moving to another ship it flies there over `flight` seconds, round the planet rather than through it and lifting on
 // a long way (0117 camera.ts's flight).
 
@@ -41,9 +41,9 @@ const CLEAR = 1.5;
 /** Points along each leg of the boom tested for land. */
 const SIGHT = 8;
 
-/** Another boom for a moment of the match: this long in place of the chase's, and turned `spin` radians to port about
- *  her. */
-export interface Shot { boom?: number; spin?: number }
+/** Another boom for a moment of the match: this long in place of the chase's, turned `spin` radians to port about
+ *  her, and the look tilted `tilt` radians further down (within its steepest). */
+export interface Shot { boom?: number; spin?: number; tilt?: number }
 
 /** t turned `angle` radians to port about `up`. */
 const turned = (t: Vec3, up: Vec3, angle: number) => normalize(add(scale(t, Math.cos(angle)), cross(up, t), Math.sin(angle)));
@@ -81,8 +81,8 @@ export function createChase(ground: (p: Vec3) => number, sea: (p: Vec3, time: nu
   /** Places the camera: its boom drawn in toward what the land and the sea ask, at `rate` per second (instantly if
    *  Infinity). */
   function put(time: number, dt: number, rate: (drawing: boolean) => number, shot: Shot) {
-    const ahead = view(), right = cross(ahead, at);
-    const dir = normalize(add(scale(ahead, Math.cos(pitch)), at, -Math.sin(pitch)));
+    const ahead = view(), right = cross(ahead, at), tilt = Math.min(STEEPEST, pitch + (shot.tilt ?? 0));
+    const dir = normalize(add(scale(ahead, Math.cos(tilt)), at, -Math.sin(tilt)));
     const deck = place(at, FOCUS), boom = shot.boom ?? BOOM;
     /** The eye with the boom and shoulder `k` of the way out. */
     const eyeAt = (k: number) => add(add(deck, right, SHOULDER * k), dir, -boom * k);
