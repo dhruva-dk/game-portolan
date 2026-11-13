@@ -34,7 +34,8 @@
 // of her, 25 m out to 420 m; ?swing=px,px holds a finger on the look, dragged that far right and down (the look then
 // stays where it is put); ?slow=k runs the game at k of its speed (for catching a ball in flight).
 // ?flood=seconds, after ?drive='s legs, steers her back to where she began until her loop closes (her trail back into
-// her own water), then sails on that many seconds more: with ?pause, the flood stopped mid-sweep. ?map opens
+// her own water), then sails on that many seconds more (?inward=seconds, after the legs, sails her that long toward the
+// middle of the storm's next circle, then lies to): with ?pause, the flood stopped mid-sweep. ?map opens
 // the full map once ?ahead= has run (with screen=play, the whole match's water from space).
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
@@ -222,6 +223,13 @@ function drive(game: Game, legs: string) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
     game.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
+  }
+  if (params.has('inward')) {
+    // toward the middle of the circle the storm next closes to (or its calm)
+    const { next, eye } = game.status(), goal = (next ?? eye).centre;
+    game.lash((s) => ({ course: add(goal, s.at, -dot(goal, s.at)), throttle: 1 }));
+    for (let i = 0; i < Math.round(number('inward', 0) / STEP); i++) game.step(STEP, IDLE);
+    game.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
   if (!params.has('flood')) return;
   game.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));

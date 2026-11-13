@@ -9,7 +9,7 @@
 import type { Sea } from '../snapshot';
 import { cellOf } from '../world/cells';
 import { R, type Vec3 } from '../world/sphere';
-import { out, type Lay } from './disc';
+import type { Lay } from './disc';
 
 /** Samples across the grid. */
 const SIDE = 112;
@@ -21,6 +21,7 @@ const OFFSETS = Array.from({ length: DIRS }, (_, i) => {
 });
 /** The wash's strength for hers and another's, how much the edge deepens it, and how far the bleed reaches. */
 const STRENGTH = { mine: 0.6, theirs: 0.36, pooled: 1.4, bleed: 0.3 } as const;
+const BLACK = [0, 0, 0];
 /** Least seconds between samplings. */
 const EVERY = 0.25;
 
@@ -43,50 +44,68 @@ export function createHeld(span: number) {
   let at: Vec3 | null = null, e: Vec3 = [1, 0, 0], n: Vec3 = [0, 1, 0], seq = -1, since = Infinity, any = false;
   const stats = { samplings: 0, ms: 0 };
 
+  /** The holders' inks as sRGB, for the colours they were made from. */
+  let inks: number[][] = [], from: Sea['colours'] | null = null;
+  const q: [number, number, number] = [0, 0, 0];
+
   function sample(l: Lay, sea: Sea, me: number) {
     const t0 = performance.now();
     [at, e, n] = [l.at, l.right, l.ahead];
-    const owner = sea.owner, inks = sea.colours.map((c) => c.map(srgb));
+    if (sea.colours !== from) [inks, from] = [sea.colours.map((c) => c.map(srgb)), sea.colours];
+    const owner = sea.owner, reach = span * span;
     any = false;
     for (let j = 0; j < SIDE; j++) {
       const y = (1 - ((j + 0.5) / SIDE) * 2) * span;
       for (let i = 0; i < SIDE; i++) {
-        const x = (((i + 0.5) / SIDE) * 2 - 1) * span, k = j * SIDE + i;
-        const c = cellOf(out(at, e, n, x, y));
+        const x = (((i + 0.5) / SIDE) * 2 - 1) * span, k = j * SIDE + i, rr = x * x + y * y;
+        // the corners past the disc's reach are never shown
+        if (rr > reach) {
+          ids[k] = 0;
+          continue;
+        }
+        // x metres along e and y along n, the surface's way (disc.ts out), unrolled
+        const dd = Math.sqrt(rr) || 1e-9, cs = Math.cos(dd / R), sn = Math.sin(dd / R) / dd;
+        for (let m = 0; m < 3; m++) q[m] = at[m] * cs + (e[m] * x + n[m] * y) * sn;
+        const c = cellOf(q);
         cells[k] = c;
         ids[k] = owner[c];
         any ||= ids[k] !== 0;
       }
     }
+    if (any) paint(me);
+    stats.samplings++;
+    stats.ms += performance.now() - t0;
+  }
+
+  /** The wash from the holders sampled. */
+  function paint(me: number) {
     const d = image.data;
     for (let j = 0; j < SIDE; j++) {
       for (let i = 0; i < SIDE; i++) {
         const k = j * SIDE + i, a = k * 4, id = ids[k];
         let same = 0, near = 0, r = 0, gr = 0, b = 0;
-        for (const [dx, dy] of OFFSETS) {
-          const u = i + dx, v = j + dy;
+        for (let o = 0; o < DIRS; o++) {
+          const u = i + OFFSETS[o][0], v = j + OFFSETS[o][1];
           // past the grid's edge counts as more of the same, or its rim would read as a border
-          const o = u < 0 || v < 0 || u >= SIDE || v >= SIDE ? id : ids[v * SIDE + u];
-          if (o === id) same++;
-          if (o !== 0 && id === 0) {
-            const ink = inks[o - 1] ?? [0, 0, 0];
+          const w = u < 0 || v < 0 || u >= SIDE || v >= SIDE ? id : ids[v * SIDE + u];
+          if (w === id) same++;
+          else if (id === 0) {
+            const ink = inks[w - 1] ?? BLACK;
             r += ink[0]; gr += ink[1]; b += ink[2];
             near++;
           }
         }
         if (id !== 0) {
-          const ink = inks[id - 1] ?? [0, 0, 0], edge = Math.pow(1 - same / DIRS, 1.4);
-          [d[a], d[a + 1], d[a + 2]] = ink;
+          const ink = inks[id - 1] ?? BLACK, edge = Math.pow(1 - same / DIRS, 1.4);
+          d[a] = ink[0]; d[a + 1] = ink[1]; d[a + 2] = ink[2];
           d[a + 3] = 255 * Math.min(1, (id === me ? STRENGTH.mine : STRENGTH.theirs) * (1 + STRENGTH.pooled * edge) * grainOf(cells[k]));
         } else if (near > 0) {
-          [d[a], d[a + 1], d[a + 2]] = [r / near, gr / near, b / near];
+          d[a] = r / near; d[a + 1] = gr / near; d[a + 2] = b / near;
           d[a + 3] = 255 * Math.min(1, ((STRENGTH.bleed * near) / DIRS) * grainOf(cells[k]));
         } else d[a + 3] = 0;
       }
     }
     g.putImageData(image, 0, 0);
-    stats.samplings++;
-    stats.ms += performance.now() - t0;
   }
 
   return {

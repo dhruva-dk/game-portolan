@@ -1,5 +1,5 @@
 // The islands as the minimap draws them, each baked once to a small image on its own chart the first time it comes near
-// her: its apron a pale wash on the sea, its land parchment deepening to ochre up its hills with a faint sepia
+// her: its apron an even pale wash on the sea, its land parchment deepening to ochre up its hills with a faint sepia
 // contour every few metres, its coast inked over it as a line by the minimap.
 
 import type { IslandSite } from '../world/planet';
@@ -39,9 +39,9 @@ export function bakeIsle(site: IslandSite): Isle {
         continue;
       }
       if (v <= 0) {
-        // the apron: palest by the beach, fading out at its edge
+        // the apron: an even pale wash, a touch paler by the beach
         [d[a], d[a + 1], d[a + 2]] = PALE;
-        d[a + 3] = 255 * (0.85 - 0.45 * (-v / APRON));
+        d[a + 3] = 255 * (0.72 - 0.12 * (-v / APRON));
         continue;
       }
       // a contour where a step of CONTOUR is crossed between this texel and the one right or below

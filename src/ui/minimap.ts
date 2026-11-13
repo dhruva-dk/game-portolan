@@ -22,8 +22,10 @@ import { bakeIsle, zOf, type Isle } from './isles';
 /** Metres from her to the disc's rim: at her 12 m/s some 22 s of sailing, past a gun's 200 m reach, as far as the loot
  *  is charted (play/game.ts CHARTED) and a little past what she can see (240 m). */
 export const SPAN = 260;
+/** The most redraws a second. */
+const RATE = 30;
 /** The sea, the Storm's wash and its edge, the next circle's line and the way's. */
-const SEA = '#c3d8cf', STORM = 'rgba(96,58,120,.5)', EDGE = '#4b2763';
+const SEA = '#c3d8cf', STORM = 'rgba(96,58,120,.4)', EDGE = '#4b2763';
 
 export interface Storm { centre: Vec3; radius: number }
 
@@ -96,8 +98,9 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
 
   let last = '', gilt: boolean | null = null, then = performance.now();
   return (at: Vec3, heading: Vec3, facing: Vec3, more: More = {}) => {
+    // at most RATE times a second
     const now = performance.now(), dt = (now - then) / 1000;
-    then = now;
+    if (dt < 1 / RATE - 0.002) return;
     const c = canvas.width / 2, k = (inner * dpr) / SPAN, l = layOf(at, facing, c, k);
     const bearing = (t: Vec3) => (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
     const sea = more.sea, seq = sea?.changes.at(-1)?.seq, trail = sea?.trails.find((t) => t.id === more.own);
@@ -106,6 +109,7 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
       + `${seq}${trail?.points.length}`;
     if (key === last) return;
     last = key;
+    then = now;
     her.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(heading).toFixed(1)})`);
     north.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(frameAt(at).north).toFixed(1)})`);
     if (!!more.gilt !== gilt) {
@@ -180,7 +184,7 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
       ctx.stroke();
       ctx.fill();
     };
-    dots(more.loot, 1.9, WASH.gold, INK.iron, 1);
+    dots(more.loot, 1.5, WASH.gold, INK.iron, 0.8);
     dots(more.ships, 2.1, INK.iron, INK.white, 1.6);
     // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
     const goal = next ?? calm;
@@ -189,20 +193,19 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
       const to = normalize(add(goal.centre, at, -dot(goal.centre, at)));
       const [ex, ey] = metres(l, along(at, to, 1).p), len = Math.hypot(ex, ey);
       const ux = ex / len, uy = -ey / len, rim = (inner - 4) * dpr;
-      const reach = Math.min((d - goal.radius) * k, rim), from = 8 * dpr;
-      if (reach > from + 4 * dpr) {
+      const reach = Math.min((d - goal.radius) * k, rim), from = 11 * dpr, a = 5.5 * dpr, b = 3.8 * dpr;
+      if (reach > from + a * 1.1) {
         const [x1, y1] = [c + ux * from, c + uy * from], [x2, y2] = [c + ux * reach, c + uy * reach];
         ctx.lineCap = 'round';
-        for (const [ink, w] of [[INK.iron, 4.2], ['#fff', 2.2]] as const) {
+        for (const [ink, w] of [[INK.iron, 3.6], ['#fff', 1.8]] as const) {
           ctx.beginPath();
           ctx.moveTo(x1, y1);
-          ctx.lineTo(x2 - ux * 4 * dpr, y2 - uy * 4 * dpr);
+          ctx.lineTo(x2 - ux * a * 0.6, y2 - uy * a * 0.6);
           ctx.strokeStyle = ink;
           ctx.lineWidth = w * dpr;
           ctx.stroke();
         }
         // its arrowhead, at the circle or on the rim
-        const a = 6 * dpr, b = 4.2 * dpr;
         ctx.beginPath();
         ctx.moveTo(x2 + ux * 2 * dpr, y2 + uy * 2 * dpr);
         ctx.lineTo(x2 - ux * a - uy * b, y2 - uy * a + ux * b);
