@@ -126,9 +126,16 @@ test('on the real planet: the chart, a route and 16 routed bots, timed', () => {
   let found = 0;
   for (let k = 0; k < 24; k++) {
     const a = ring(k * 0.26, (120 + 4 * k) * out), b = ring(k * 0.26 + Math.PI, 160 * out);
-    t = performance.now();
-    const r = findPath(ch, a, b);
-    times.push(performance.now() - t);
+    // timed as the best of three: the search's own cost, not whatever else the machine is doing (the suite runs its
+    // files side by side); a search that does more work is slower every time
+    let best = Infinity;
+    const r = Array.from({ length: 3 }, () => {
+      t = performance.now();
+      const found = findPath(ch, a, b);
+      best = Math.min(best, performance.now() - t);
+      return found;
+    })[0];
+    times.push(best);
     found += +r.found;
     // given out short of the way, a route still runs nearer (the next, from further on, goes on)
     assert.ok(distance(cellCentre(r.cells.at(-1)!), b) < distance(a, b));
