@@ -8,7 +8,7 @@
 // clock: when the change front reached it. A change keeps the cells' state before it for HOLD s, the shader drawing the
 // old against the new as a front sweeps over (from the loop's own cells, a breadth-first spread alternately four- and
 // eight-way for a near round front, smoothed twice), then the cells settle and forget it. The changes read are drawn in
-// order within a few milliseconds a frame (work), a large one over some frames: the GPU's words wait until it is done
+// order within a few milliseconds' work a frame (work, SLICES), a large one over some frames: the GPU's words wait until it is done
 // and its front starts then, each cell still drawn as it was until the front reaches it.
 //
 // The cells go to the GPU as two storage buffers, one word a cell, laid out a face at a time in (N + 2)² words: each
@@ -72,16 +72,19 @@ for (let f = 0; f < 6; f++) {
  *  when (world clock, s) and the cells its front spreads from (null: in from the changed water's edge). */
 export interface Shift { cells: ReadCells; owner: number; time: number; from: ReadCells | null }
 
-/** Milliseconds a frame's work may take (a change drawn, the GPU's words copied, fronts settled): a large change is
- *  spread over a few frames, so none pays more than a few milliseconds for it. */
-const BUDGET = 3;
-/** Cells gone through between looks at the clock (a fraction of a millisecond's work). */
+/** Units of work in a slice (a cell gone through is a quarter of one to 32 of them, by what is done with it): some
+ *  0.1 ms of work. */
 const SLICE = 1 << 11;
+/** Slices a frame's work may take (a change drawn, the GPU's words copied, fronts settled): a large change is spread
+ *  over a few frames, so none pays more than a few milliseconds for it. Counted, not timed, so a frame does the same
+ *  work on any machine: some 3 ms on the phone's cores, about as quick as the desktop's (npm run steps times it). */
+export const SLICES = 30;
 
 /** The cells outside a match: all open sea. */
 const EMPTY = new Uint8Array(CELLS);
 
-export function createClaimed() {
+/** slices: how many a frame's work may take (SLICES). */
+export function createClaimed(slices = SLICES) {
   const cells = new Uint8Array(CELLS * 4); // holder, before, share, share before
   const words = new Uint32Array(cells.buffer);
   const reveal = new Float32Array(CELLS).fill(-1e6);
@@ -97,6 +100,8 @@ export function createClaimed() {
    *  and the world's clock now. */
   const pending: Shift[] = [];
   let job: Generator<void, void, void> | null = null, now = 0;
+  /** The slices the last frame's work took. */
+  let used = 0;
   const win = new Int32Array(WIN * WIN), nb = new Int32Array(8);
 
   const touch = (c: number) => {
@@ -153,8 +158,8 @@ export function createClaimed() {
 
   /**
    * The whole grid (a match's start, or changes missed), with no fronts: what was under way is dropped. Yields every
-   * SLICE cells, like a change (some 50 ms of work for a match's first homes, too much for one frame); the GPU's words
-   * are all sent when it is done.
+   * slice of work, like a change (some hundred slices of it, too much for one frame); the GPU's words are all sent when
+   * it is done.
    */
   function* loading(owner: ReadCells): Generator<void, void, void> {
     let n = 0;
@@ -163,20 +168,23 @@ export function createClaimed() {
       cells[c * 4 + 2] = cells[c * 4 + 3] = 255;
       reveal[c] = -1e6;
       if (owner[c]) list[n++] = c;
-      if (tick(1 / 16)) yield;
+      if (tick(1 / 4)) yield;
     }
     const e = ++epoch * 3;
     let m = 0;
     for (let k = 0; k < n; k++) {
       m = listWindow(list[k], e, m, queue);
-      if (tick(4)) yield;
+      if (tick(16)) yield;
     }
     for (let k = 0; k < m; k++) {
       cells[queue[k] * 4 + 2] = cells[queue[k] * 4 + 3] = share(queue[k]);
-      if (tick(8)) yield;
+      if (tick(32)) yield;
     }
     gpuReveal.fill(-1e6);
-    for (let c = 0; c < CELLS; c++) gpuCells[slotOf(c)] = words[c];
+    for (let c = 0; c < CELLS; c++) {
+      gpuCells[slotOf(c)] = words[c];
+      if (tick(1 / 4)) yield;
+    }
     for (const [c, slots] of APRON) for (const s of slots) gpuCells[s] = words[c];
     whole = true;
   }
@@ -189,7 +197,7 @@ export function createClaimed() {
 
   /**
    * A change drawn: its cells go to `owner`, the front spreading from `from` (or in from the changed water's edge),
-   * starting when the change is done (its time, or now if later: the flood is seen whole). Yields every SLICE cells, so
+   * starting when the change is done (its time, or now if later: the flood is seen whole). Yields every slice of work, so
    * the frame can spread a large one over a few.
    */
   function* changing({ cells: changed, owner, time, from }: Shift): Generator<void, void, void> {
@@ -355,7 +363,7 @@ export function createClaimed() {
       return false;
     },
     /**
-     * A frame's work at `clock` (the world's, s), within the frame's budget of time: the GPU's words brought up to the
+     * A frame's work at `clock` (the world's, s), within the frame's budget of slices: the GPU's words brought up to the
      * changes drawn, then the next changes drawn, then fronts long passed settled. A change under way holds the GPU's
      * words where they are until it is done (no frame draws half of one: a cell sent is drawn as before until its front
      * comes). Returns each face's range of words changed ([start, end), or empty).
@@ -364,22 +372,32 @@ export function createClaimed() {
       now = clock;
       lo.fill(WORDS);
       hi.fill(-1);
-      const end = performance.now() + BUDGET, more = () => performance.now() < end;
+      let left = slices;
+      /** Runs `slice` while slices are left and it does a whole one's work, each that did any work spent. */
+      const spend = (slice: (most: number) => number) => {
+        for (let n = SLICE; n === SLICE && left > 0;) if ((n = slice(SLICE)) > 0) left--;
+      };
       for (;;) {
-        if (!job) while (flush(SLICE) === SLICE && more());
-        if (!more() || (!job && !pending.length)) break;
+        if (!job) spend(flush);
+        if (left <= 0 || (!job && !pending.length)) break;
         job ??= changing(pending.shift()!);
         let done = false;
-        while (!done && more()) done = !!job.next().done;
+        while (!done && left > 0) {
+          left--;
+          done = !!job.next().done;
+        }
         if (done) job = null;
       }
-      if (!job) while (more() && settle(SLICE) === SLICE);
+      if (!job) spend(settle);
+      used = slices - left;
       if (whole) {
         whole = false;
         return lo.map((_, f): [number, number] => [f * TILE, (f + 1) * TILE]);
       }
       return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
     },
+    /** The slices the last frame's work took (at most its budget). */
+    used: () => used,
     /** Whether every change read is drawn and on its way to the GPU. */
     idle: () => !job && !pending.length && dirtyCount === 0,
     /** Who holds cell c now, as drawn (0 open sea, else id + 1). */
