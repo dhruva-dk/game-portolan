@@ -11,7 +11,7 @@
 // through the origin, the post's foot at y = −FOOT. Each vertex says what it is made of (METAL: bronze, oak or iron),
 // for the shaders. Built with the ship's kit (kit.ts), so it runs in node.
 
-import type { GunKind } from '../snapshot.ts';
+import type { GunKind } from '../kinds.ts';
 import { Acc, V, beam, box, lathe, rod, trs } from './kit.ts';
 
 /** How far below the trunnions the post's foot stands, m; how long the cannon's barrel is, breech knob to muzzle. */
@@ -23,9 +23,6 @@ export const MUZZLE: Record<GunKind, number> = { cannon: 0.98, scatter: 0.535, r
 
 /** What a gun's part is made of. */
 export const METAL = { bronze: 0, oak: 1, iron: 2 } as const;
-
-/** The kinds, in sim/handling.ts KINDS's order. */
-export const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
 
 /** The cannon's barrel: [radius, distance along it from the trunnions], breech to muzzle, m. */
 const BARREL: [number, number][] = [

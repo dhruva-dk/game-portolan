@@ -20,7 +20,8 @@
 import { random } from '../world/random.ts';
 import { R, add, along, cross, distance, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import type { Vessel } from './contact.ts';
-import { FALLOFF, GUN, GUNS, type GunKind } from './handling.ts';
+import type { GunKind } from '../kinds.ts';
+import { FALLOFF, GUN, GUNS } from './handling.ts';
 import { hullAt, type Depth } from './shoal.ts';
 import { thrown } from './shot.ts';
 import { meets, offSight, pointOn, type Sight } from './sight.ts';

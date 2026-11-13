@@ -2,6 +2,7 @@
 // draws it (frame.ts). Each frame the one hands the other a Snapshot; nothing else passes between them, and nothing
 // outside the frame touches what it draws with.
 
+import type { GunKind, LootKind } from './kinds';
 import type { Cap } from './sim/storm';
 import type { ReadCells } from './world/cells';
 import type { ShipPose } from './world/pose';
@@ -33,8 +34,9 @@ export const AIR_FOV = 50;
  *  besides the cross: nothing more, a band across them, or upright stripes of it (the cross counterchanged over them). */
 export interface Look { paint: Vec3; sail: Vec3; pattern: 'plain' | 'band' | 'stripes' }
 
-/** The kinds of gun (sim/handling.ts KINDS), each drawn its own way: on the water, on a ship's plinth, and its balls. */
-export type GunKind = 'cannon' | 'scatter' | 'repeater' | 'harpoon' | 'mortar';
+/** The kinds of gun, each drawn its own way (on the water, on a ship's plinth, and its balls), and of a piece of loot (a
+ *  gun of a kind, or stores to mend with): kinds.ts. */
+export type { GunKind, LootKind } from './kinds';
 
 /** A ship drawn: her slot, her pose and colours, her velocity (m/s, world: for the marks she leaves on the sea), whether
  *  she floats (one going down neither fits the sea round her nor marks it), and the gun in her hand, mounted on her
@@ -53,9 +55,6 @@ export type Blast =
 /** A ball in flight: where it is (world metres), its velocity (m/s), its gun's kind, and where it was laid to come down
  *  (a unit vector: a mortar's shell is marked there on the sea). */
 export interface BallDraw { at: Vec3; way: Vec3; gun: GunKind; to: Vec3 }
-
-/** What a piece of loot is: a gun of a kind, or stores to mend with. */
-export type LootKind = GunKind | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
 
 /** A piece of loot on the water (sim/loot.ts): its id (for its own bob and turn), where it floats (world metres, on the
  *  sea's surface), what it is, the rarity it reads as (0–4: rarity.ts), and when it came onto the water (the world's

@@ -17,9 +17,9 @@ import { R, distance, dot } from '../world/sphere.ts';
 import { armed, type Crew } from './battle.ts';
 import { ready } from './gust.ts';
 import type { Gun } from './gun.ts';
-import type { GunKind } from './handling.ts';
+import type { GunKind } from '../kinds.ts';
 import { roomFor, useful, type Use } from './hold.ts';
-import { isGun, type Loot } from './loot.ts';
+import { isArms, type Loot } from './loot.ts';
 import { NOTHING, type Ask } from './stores.ts';
 import { toEdge } from './storm.ts';
 import { ramp, utility } from './utility.ts';
@@ -99,7 +99,7 @@ export function weaponWorth(guns: readonly (Gun | null)[], kind: GunKind, rarity
  *  go in her slots 0.5. */
 function worth(crew: Crew, l: Loot): number {
   const g = l.goods;
-  if (isGun(g)) return weaponWorth(crew.guns, g.kind, g.rarity).worth * (armed(crew) ? 1 : PURSER.bare);
+  if (isArms(g)) return weaponWorth(crew.guns, g.kind, g.rarity).worth * (armed(crew) ? 1 : PURSER.bare);
   return roomFor(crew.hold, g.kind) >= 0 ? 0.5 : 0;
 }
 
@@ -163,7 +163,7 @@ export function purse(c: Ctx): Ask {
   }
   if (m.mode === 'loot' && m.target >= 0 && crew.guns.every((g) => g !== null)) {
     // both slots full: the gun it betters most taken in hand, and swapped for it
-    const l = c.sea.loot?.find((k) => k.id === m.target), w = l && isGun(l.goods) ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity) : null;
+    const l = c.sea.loot?.find((k) => k.id === m.target), w = l && isArms(l.goods) ? weaponWorth(crew.guns, l.goods.kind, l.goods.rarity) : null;
     if (l && w && w.worth > 0 && distance(c.own.ship.at, l.at) < PURSER.take) [take, arm] = [0, w.slot === crew.hand ? null : w.slot];
   }
   if (ready(crew.gust) && !crew.hold.using) {

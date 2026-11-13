@@ -6,6 +6,8 @@
 // Whatever was brought down from 0117's top of 14.5 m/s by her top's share (RAM, GUST, the guns' muzzle speeds) is now
 // brought down by 13.5 / 14.5. What her hull does when she meets another's is beside it.
 
+import type { GunKind } from '../kinds.ts';
+
 /** Everything her handling is tuned by. Rates are per second. */
 export const SHIP = {
   /** Top speed, m/s. */
@@ -112,9 +114,6 @@ export const GUST = {
   hop: 6.3, gravity: 9.8,
 } as const;
 
-/** The guns' kinds (GUNS), in the order they are told everywhere. */
-export const KINDS = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'] as const;
-export type GunKind = (typeof KINDS)[number];
 
 /** One kind of gun (GUNS). */
 export interface Bore {

@@ -13,10 +13,11 @@
 //
 // Pure arithmetic: no three, so it runs in node for the tests; deterministic for the same inputs.
 
+import type { Use } from '../kinds.ts';
 import { healed, sunk, type Health } from './health.ts';
 
-/** What mends: 0117's four consumables. */
-export type Use = 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
+/** What mends: 0117's four consumables (kinds.ts). */
+export type { Use };
 
 /** 0117's consumables (tables.ts USES): the shield or hull each gives, the cap it gives up to, its time (s), and the
  *  most of it a slot holds. */

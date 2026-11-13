@@ -22,7 +22,8 @@
 import { R, add, along, cross, distance, dot, length, normalize, place, scale, type Vec3 } from '../world/sphere.ts';
 import type { Crew, Order } from './battle.ts';
 import { damageOf, falloff, reloadOf, spreadOf } from './gun.ts';
-import { GUNS, SHIP, type GunKind } from './handling.ts';
+import type { GunKind } from '../kinds.ts';
+import { GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import { thrown } from './shot.ts';
 import type { Sight } from './sight.ts';

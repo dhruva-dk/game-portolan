@@ -31,8 +31,9 @@ import {
 import {
   Fn, abs, atan, attribute, cameraPosition, cos, cross, exp, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3,
 } from 'three/tsl';
+import { KINDS, gunOrder, type GunKind } from '../kinds';
 import type { Light } from '../sky/light';
-import type { BallDraw, GunKind } from '../snapshot';
+import type { BallDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import { random } from '../world/random';
 import { R, add, distance, dot as vdot, normalize as vnormalize, scale, type Vec3 } from '../world/sphere';
@@ -42,8 +43,6 @@ import type { FloatNode, Vec2Node } from '../tsl';
 const BALLS = 512, MARKS = 64, PUFFS = 4096;
 /** Floats a puff: at+born, way+life, size+grow+drag+pull, ink+glow, opacity+seed+softness+fade-in; each a vec4. */
 const STRIDE = 20;
-/** The kinds, by the index a ball carries to its shader. */
-const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
 /**
  * Each kind's ball:
  *   size    its radius, m (the cannon's 0117's)
@@ -75,7 +74,8 @@ const MARK = 11, MARK_PIXELS = 2, MARK_GLOW: Vec3 = [3.2, 0.9, 0.35];
 /** Seconds of a shell's flight its mark counts down over (about its longest lob). */
 const FLIGHT = 5;
 
-/** A node taking each kind's value of `f`, by the kind's index `k`. */
+/** A node taking each kind's value of `f`, by the kind's index `k` (its place in KINDS: gunOrder, as a ball carries
+ *  it to its shader). */
 const byKind = (k: FloatNode, f: (s: Shot) => number): FloatNode =>
   KINDS.slice(0, -1).reduceRight<FloatNode>((rest, kind, i) => select(k.lessThan(i + 0.5), float(f(SHOT[kind])), rest), float(f(SHOT[KINDS[KINDS.length - 1]])));
 
@@ -346,7 +346,7 @@ export function createGunfire(light: Light) {
       let k = 0;
       for (let i = 0; i < n; i++) {
         const { at, way, gun, to } = flying[i], speed = Math.max(1e-3, Math.hypot(...way)), shot = SHOT[gun];
-        a.set([...at, KINDS.indexOf(gun), ...way, 0], i * 8);
+        a.set([...at, gunOrder(gun), ...way, 0], i * 8);
         // a shell's fall marked: nearer as the seconds it has left to fly (about its distance from it over its speed) run out
         if (gun === 'mortar' && k < MARKS) m.set([...scale(to, R + 0.15), 1 - Math.min(1, distance(at, scale(to, R)) / speed / FLIGHT)], 4 * k++);
         if (!shot.trail) continue;

@@ -10,7 +10,8 @@
 // any one holds), the loops closed and cut, and the shield their own water gave back.
 
 import { STEP } from '../src/sim/fixed.ts';
-import { GUNS, KINDS, SHIP } from '../src/sim/handling.ts';
+import { KINDS } from '../src/kinds.ts';
+import { GUNS, SHIP } from '../src/sim/handling.ts';
 import { LOOT } from '../src/sim/loot.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';

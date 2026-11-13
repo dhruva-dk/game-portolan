@@ -17,7 +17,8 @@
 
 import { distance, type Vec3 } from '../world/sphere.ts';
 import type { Blow, Vessel } from './contact.ts';
-import { CARRIED, FALLOFF, GUNS, GUST, HEALTH, type GunKind } from './handling.ts';
+import type { GunKind } from '../kinds.ts';
+import { CARRIED, FALLOFF, GUNS, GUST, HEALTH } from './handling.ts';
 import { harmed, sunk, whole, type Health } from './health.ts';
 import { outside, type Storm } from './storm.ts';
 import { damageOf, falloff, laid, reloadOf, spreadOf, type Gun } from './gun.ts';

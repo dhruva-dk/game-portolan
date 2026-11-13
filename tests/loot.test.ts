@@ -5,9 +5,10 @@ import type { Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { gunOf, reloadOf } from '../src/sim/gun.ts';
 import { charging, gustOf, ready, spent, stepGust } from '../src/sim/gust.ts';
-import { EQUIP, GUNS, GUST, HEALTH, KINDS, SHIP } from '../src/sim/handling.ts';
+import { KINDS } from '../src/kinds.ts';
+import { EQUIP, GUNS, GUST, HEALTH, SHIP } from '../src/sim/handling.ts';
 import { begun, emptyHold, progress, roomFor, stepUse, stowed, tapped, useful, USES } from '../src/sim/hold.ts';
-import { berthed, cargo, drifted, isGun, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
+import { berthed, cargo, drifted, isArms, LOOT, offered, overboard, rolled, strewn, swept, type Flotsam, type Loot } from '../src/sim/loot.ts';
 import { asked, NOTHING, stored } from '../src/sim/stores.ts';
 import { shipAt, step, type ShipState } from '../src/sim/ship.ts';
 import type { Depth } from '../src/sim/shoal.ts';
@@ -147,7 +148,7 @@ test('a blow breaks off what she is mending with; the storm does not', () => {
 test('the pieces drawn come in their shares: half of them guns (0117: three in five), mostly common, the cannon commonest', () => {
   const draw = random(7), n = 20000;
   const g = Array.from({ length: n }, () => rolled(draw));
-  const guns = g.filter(isGun);
+  const guns = g.filter(isArms);
   assert.ok(Math.abs(guns.length / n - LOOT.gun) < 0.02);
   const common = guns.filter((x) => x.rarity === 0).length / guns.length;
   const legendary = guns.filter((x) => x.rarity === 4).length / guns.length;
@@ -190,7 +191,7 @@ test('every berth has a gun within reach of it at the start, on open water; one 
   const f = berthed(lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth);
   assert.equal(f.pieces.length, 4);
   assert.equal(f.next, 102);
-  for (const b of berths) assert.ok(f.pieces.some((l) => isGun(l.goods) && distance(l.at, b) < LOOT.berth));
+  for (const b of berths) assert.ok(f.pieces.some((l) => isArms(l.goods) && distance(l.at, b) < LOOT.berth));
   for (const l of f.pieces.slice(2)) assert.ok(depth(l.at) >= SHIP.draught + LOOT.open);
   assert.deepEqual(f, berthed(lying(piece(0, at(410), { kind: 'cannon', rarity: 1 }), piece(1, at(-300), { kind: 'repairKit', count: 4 })), berths, 9, depth));
 });

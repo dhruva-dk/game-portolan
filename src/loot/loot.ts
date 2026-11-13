@@ -25,8 +25,9 @@ import {
 import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max, mix, normalize, pow, select, sin, smoothstep, uniform, varying, vec3 } from 'three/tsl';
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
-import { KINDS, METAL, gunShape } from '../ship/gun';
-import type { GunKind, LootDraw, LootKind } from '../snapshot';
+import { KINDS, type GunKind, type LootKind } from '../kinds';
+import { METAL, gunShape } from '../ship/gun';
+import type { LootDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import type { FloatNode, Vec3Node } from '../tsl';
 

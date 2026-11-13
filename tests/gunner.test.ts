@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HEALTH, type GunKind } from '../src/sim/handling.ts';
+import type { GunKind } from '../src/kinds.ts';
+import { HEALTH } from '../src/sim/handling.ts';
 import { armed, battleOf, crewOf, stepBattle, type Battle, type Order } from '../src/sim/battle.ts';
 import { mind, shot, think, type Memory } from '../src/sim/bot.ts';
 import { afloat, stepFleet, type Vessel } from '../src/sim/contact.ts';

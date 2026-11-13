@@ -12,11 +12,12 @@ import {
   MeshBasicNodeMaterial,
 } from 'three/webgpu';
 import { Fn, attribute, cross, float, mix, normalize, select, varying, vec3 } from 'three/tsl';
+import { KINDS, gunOrder, type GunKind } from '../kinds';
 import type { Light } from '../sky/light';
-import type { GunKind, ShipDraw } from '../snapshot';
+import type { ShipDraw } from '../snapshot';
 import type { Vec3Node } from '../tsl';
 import { add, dot, length, normalize as unit, scale, type Vec3 } from '../world/sphere';
-import { KINDS, METAL, MUZZLE, gunShape } from './gun';
+import { METAL, MUZZLE, gunShape } from './gun';
 import { GUN_DRAWN, GUN_MOUNT, toWorld } from './mount';
 
 /** Where a shot of `kind` fired from `from` (the bore, at the trunnions) along `dir` leaves the drawn gun's mouth. */
@@ -76,7 +77,7 @@ export function createArms(light: Light, capacity: number) {
         if (!sh.afloat || !sh.gun) continue;
         const pose = sh.pose, mount = toWorld(pose, GUN_MOUNT);
         if (length(add(mount, eye, -1)) > NEAR) continue;
-        const d = drawn[KINDS.indexOf(sh.gun.kind)];
+        const d = drawn[gunOrder(sh.gun.kind)];
         // her aim laid flat on her deck; straight up or down, her bow
         const flat = add(sh.gun.aim, pose.up, -dot(sh.gun.aim, pose.up)), toward = length(flat) > 1e-3 ? unit(flat) : pose.forward;
         const n = filled.get(d.kind) ?? 0;

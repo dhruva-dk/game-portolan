@@ -23,7 +23,8 @@ import { R, add, along, cross, dot, normalize, scale, type Vec3 } from '../world
 import type { Crew } from './battle.ts';
 import type { Vessel } from './contact.ts';
 import { gunOf } from './gun.ts';
-import { EQUIP, GUN, KINDS as GUN_KINDS, SHIP, type GunKind } from './handling.ts';
+import { KINDS as GUN_KINDS, isGun, type GunKind } from '../kinds.ts';
+import { EQUIP, GUN, SHIP } from './handling.ts';
 import { roomFor, stowed, USES, type Use } from './hold.ts';
 import type { Depth } from './shoal.ts';
 
@@ -32,7 +33,7 @@ export const LOOT = {
   /** Spots strewn over the planet, and the share with a second piece: some 280 pieces (it was 400 spots, some 570). */
   spots: 200, second: 0.4,
   /** The share of pieces that are guns (0117's 0.62 brought down so the first is a scramble, most ships armed by
-   *  20–30 s: tools/matches.ts), their kinds' weights (in handling.ts KINDS' order: cannon, scatter, repeater,
+   *  20–30 s: tools/matches.ts), their kinds' weights (in kinds.ts KINDS' order: cannon, scatter, repeater,
    *  harpoon, mortar), and their rarities' weights, common to legendary. */
   gun: 0.5, kinds: [36, 22, 22, 10, 10], weights: [42, 30, 17, 8, 3],
   /** The share of the rest of each consumable (0117's rollItem: 0.36, 0.22, 0.28, 0.14), how many come together, and
@@ -58,7 +59,7 @@ export type Goods = { kind: GunKind; rarity: number } | { kind: Use; count: numb
 export type Arms = Extract<Goods, { rarity: number }>;
 
 /** Whether a piece is a gun. */
-export const isGun = (g: Goods): g is Arms => 'rarity' in g;
+export const isArms = (g: Goods): g is Arms => isGun(g.kind);
 
 /** A piece on the water: its id, where it lies (a unit vector), what it is, the ship that put it over the side (-1:
  *  none), seconds it has lain while hers to leave (counted only then: swept reads it for nothing else), and its way
@@ -72,7 +73,7 @@ const STILL: Vec3 = [0, 0, 0];
 const KINDS = Object.keys(LOOT.shares) as Use[];
 
 /** The rarity a piece reads as (its colour): a gun's own, a consumable's by kind. */
-export const rarityOf = (g: Goods) => (isGun(g) ? g.rarity : LOOT.rarity[g.kind]);
+export const rarityOf = (g: Goods) => (isArms(g) ? g.rarity : LOOT.rarity[g.kind]);
 
 /** The index `weights` give a uniform draw `u`. */
 function weighed(weights: readonly number[], u: number): number {
@@ -150,7 +151,7 @@ export function berthed(f: Flotsam, berths: readonly Vec3[], seed: number, depth
   const pieces = [...f.pieces];
   for (const b of berths) {
     const a = draw() * 2 * Math.PI, d = LOOT.near + draw() * (LOOT.far - LOOT.near), r = draw(), k = draw();
-    if (pieces.some((l) => isGun(l.goods) && dot(l.at, b) > within)) continue;
+    if (pieces.some((l) => isArms(l.goods) && dot(l.at, b) > within)) continue;
     // the first of eight bearings round from the one drawn that lies on open water, else the open water nearest it
     const round = Array.from({ length: 8 }, (_, k) => along(b, tangent(b, a + (k * Math.PI) / 4), d).p);
     const at = round.find((q) => open(depth, q)) ?? opened(depth, round[0]) ?? b;
@@ -196,7 +197,7 @@ const armedWith = (c: Crew, slot: number, g: Arms): Crew => ({
 
 /** What she would take now from where she is: whether `l` fits her (a gun into an empty gun slot, things that go in
  *  her item slots). */
-const fits = (c: Crew, g: Goods) => (isGun(g) ? emptySlot(c) >= 0 : roomFor(c.hold, g.kind) >= 0);
+const fits = (c: Crew, g: Goods) => (isArms(g) ? emptySlot(c) >= 0 : roomFor(c.hold, g.kind) >= 0);
 
 /** Whether ship `id` at p may pick `l` up: it lies within reach, and she didn't put it over the side (until it has
  *  settled and she has sailed clear of it: swept). */
@@ -209,8 +210,8 @@ export function offered(c: Crew, at: Vec3, f: Flotsam): { gun: Loot | null; item
   for (const l of f.pieces) {
     if (!reachable(c.id, at, l) || fits(c, l.goods)) continue;
     const d = dot(at, l.at);
-    if (isGun(l.goods) && d > gd) [gun, gd] = [l, d];
-    else if (!isGun(l.goods) && d > id) [item, id] = [l, d];
+    if (isArms(l.goods) && d > gd) [gun, gd] = [l, d];
+    else if (!isArms(l.goods) && d > id) [item, id] = [l, d];
   }
   return { gun, item };
 }
@@ -249,7 +250,7 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
           continue;
         }
         const g = l.goods;
-        if (isGun(g)) {
+        if (isArms(g)) {
           const slot = emptySlot(c);
           if (slot < 0) kept.push(l);
           else {
@@ -274,8 +275,8 @@ export function swept(f: Flotsam, crews: readonly Crew[], fleet: readonly Vessel
         const goods = swap.goods, old: Goods | null = slot === 0 ? (held && { kind: held.kind, rarity: held.rarity })
           : (c.hold.items[slot - 1] && { kind: c.hold.items[slot - 1]!.kind, count: c.hold.items[slot - 1]!.count });
         pieces = pieces.filter((l) => l.id !== swap.id);
-        took.push({ ship: v.id, goods, at: swap.at, slot: isGun(goods) ? c.hand : slot });
-        if (isGun(goods)) c = armedWith(c, c.hand, goods);
+        took.push({ ship: v.id, goods, at: swap.at, slot: isArms(goods) ? c.hand : slot });
+        if (isArms(goods)) c = armedWith(c, c.hand, goods);
         else if (slot >= 1 && slot <= c.hold.items.length) {
           const items = [...c.hold.items];
           items[slot - 1] = { kind: goods.kind, count: Math.min(goods.count, USES[goods.kind].stack) };

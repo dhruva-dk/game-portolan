@@ -20,7 +20,8 @@
 
 import { R, add, dot, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { KEEL, RADIUS } from './contact.ts';
-import { GUN, GUNS, KINDS, SHIP, type GunKind } from './handling.ts';
+import { KINDS, type GunKind } from '../kinds.ts';
+import { GUN, GUNS, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 import type { Depth } from './shoal.ts';
 

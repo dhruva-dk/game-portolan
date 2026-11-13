@@ -8,12 +8,11 @@
 // The rest are heard from what she sees and holds as it changes (listen.ts): a slot of her stores taken in hand, a
 // ball passing near, her water, the storm, her timbers on the roll, and the screens.
 
-import { isGun, type Deed, type GunKind, type Piece } from '../player.ts';
+import { isGun, type Deed, type GunKind } from '../player.ts';
 import type { SoundName } from './bank.ts';
 
 /** A deed on the sea: player.ts Deed (see the header). */
 export type Happening = Deed;
-export type { Piece };
 
 /** Every kind of deed. */
 export const DEEDS = ['fired', 'winding', 'reloading', 'reloaded', 'swapped', 'fell', 'struck', 'sank', 'took', 'mended', 'gust'] as const satisfies readonly Happening['kind'][];

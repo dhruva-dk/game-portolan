@@ -8,8 +8,9 @@ import { battleOf, crewOf, stepBattle, type Battle, type Cue, type Crew, type Or
 import { afloat, type Vessel } from '../src/sim/contact.ts';
 import { STEP } from '../src/sim/fixed.ts';
 import { falloff, gunOf } from '../src/sim/gun.ts';
-import { EQUIP, FALLOFF, GUNS, KINDS, type GunKind } from '../src/sim/handling.ts';
-import { LOOT, isGun, strewn } from '../src/sim/loot.ts';
+import { KINDS, type GunKind } from '../src/kinds.ts';
+import { EQUIP, FALLOFF, GUNS } from '../src/sim/handling.ts';
+import { LOOT, isArms, strewn } from '../src/sim/loot.ts';
 import { loosed } from '../src/sim/shot.ts';
 import type { Depth } from '../src/sim/shoal.ts';
 import { shipAt, turned, type ShipState } from '../src/sim/ship.ts';
@@ -138,7 +139,7 @@ test('the same guns fight the same way, to the bit', () => {
 });
 
 test('the sea is strewn with about half 0117\'s pieces, half of them guns, the cannon the commonest, the harpoon and the mortar the rarest', () => {
-  const f = strewn(5, deep), guns = f.pieces.map((p) => p.goods).filter(isGun);
+  const f = strewn(5, deep), guns = f.pieces.map((p) => p.goods).filter(isArms);
   // 0117 strewed some 570, from 400 spots
   assert.ok(f.pieces.length > 0.4 * 570 && f.pieces.length < 0.6 * 570 && f.pieces.length < (1 + LOOT.second + 0.1) * LOOT.spots, `${f.pieces.length}`);
   const count = (k: GunKind) => guns.filter((g) => g.kind === k).length;

@@ -7,7 +7,7 @@
 // Pure: no three, no page; deterministic for the same inputs.
 
 import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
-import { isGun, rarityOf, type Taken } from '../sim/loot.ts';
+import { isArms, rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
 import type { Eye } from '../snapshot.ts';
 import { HOTBAR, type Deed, type Moment } from '../player.ts';
@@ -53,7 +53,7 @@ export function deedsOf(done: Done, me: number, next: () => number, time: number
   for (const s of done.sunk) out.push({ seq: next(), time, at: s.at, ship: s.id, kind: 'sank', by: s.by });
   for (const t of done.took) {
     if (t.ship !== me) continue;
-    out.push({ seq: next(), time, at: t.at, ship: me, kind: 'took', piece: t.goods.kind, rarity: rarityOf(t.goods), slot: isGun(t.goods) ? t.slot : HOTBAR.guns - 1 + t.slot });
+    out.push({ seq: next(), time, at: t.at, ship: me, kind: 'took', piece: t.goods.kind, rarity: rarityOf(t.goods), slot: isArms(t.goods) ? t.slot : HOTBAR.guns - 1 + t.slot });
   }
   const her = done.her;
   if (!her) return out;

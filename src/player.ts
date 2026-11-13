@@ -3,6 +3,7 @@
 // (Hands: read by ui/input.ts, given to play/game.ts step); what the match reports comes out (Status, read by
 // ui/hud.ts), with what she carries (Kit), and her career, which nothing in the game keeps yet (play/placeholder.ts).
 
+import type { GunKind, LootKind } from './kinds';
 import type { Vec3 } from './world/sphere';
 
 /** Her hands, as read for a frame. */
@@ -59,13 +60,8 @@ export interface Status {
 /** Her ship's id in what the match reports (Deed: sim/match.ts PLAYER). */
 export const HER = 0;
 
-/** The kinds of gun (sim/handling.ts KINDS). */
-export type GunKind = 'cannon' | 'scatter' | 'repeater' | 'harpoon' | 'mortar';
-/** Whether a piece is a gun. */
-export const isGun = (p: Piece): p is GunKind => p === 'cannon' || p === 'scatter' || p === 'repeater' || p === 'harpoon' || p === 'mortar';
-
-/** What a piece taken up or mended with is: a gun of a kind, or stores. */
-export type Piece = GunKind | 'smallShield' | 'bigShield' | 'repairKit' | 'fullRepair';
+/** The kinds of gun, and of a piece taken up or mended with (a gun of a kind, or stores): kinds.ts. */
+export { isGun, type GunKind, type LootKind } from './kinds.ts';
 
 /** The hotbar's slots: the guns' first, then the items'. */
 export const HOTBAR = { guns: 2, items: 3 } as const;
@@ -93,8 +89,8 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'fell'; land: boolean }
   | { kind: 'struck'; by: number; shield: number; hull: number; broke: boolean; ram: boolean }
   | { kind: 'sank'; by: number | null }
-  | { kind: 'took'; piece: Piece; rarity: number; slot: number }
-  | { kind: 'mended'; piece: Piece }
+  | { kind: 'took'; piece: LootKind; rarity: number; slot: number }
+  | { kind: 'mended'; piece: LootKind }
   | { kind: 'gust' }
 );
 

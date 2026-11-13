@@ -6,6 +6,7 @@ import { createListen, type Call, type Hearing } from '../src/audio/listen.ts';
 import { FALL, NEAR, SPEED, bearingFrom, cutoffAt, hear, heard, panOf, rolloff } from '../src/audio/space.ts';
 import { VOICES, claim, playing, pool } from '../src/audio/voices.ts';
 import { breakers, galeOf, levels, levelsOf } from '../src/audio/bed.ts';
+import { KINDS } from '../src/kinds.ts';
 import { HOTBAR, type GunKind, type Kit, type Status } from '../src/player.ts';
 import type { BallDraw, Blast, Eye, ShipDraw, Snapshot } from '../src/snapshot.ts';
 import { R, normalize, scale, type Vec3 } from '../src/world/sphere.ts';
@@ -25,7 +26,6 @@ const each = (ship: number, gun: GunKind = 'cannon'): Happening[] => DEEDS.map((
     case 'gust': return { ...base, kind };
   }
 });
-const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
 
 test('the table: every kind of deed, hers, is heard; every cue plays a sound there is; every sound is played by some cue', () => {
   for (const h of each(0)) assert.ok(cueOf(h, 0), `her ${h.kind} has a cue`);

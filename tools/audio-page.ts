@@ -7,6 +7,7 @@
 import { createEngine } from '../src/audio/audio';
 import { CUES, CUE_NAMES, soundOf, type Cue } from '../src/audio/cues';
 import type { Hearing } from '../src/audio/listen';
+import { KINDS } from '../src/kinds';
 import { HOTBAR, type Deed, type GunKind, type Kit, type Moment, type Status } from '../src/player';
 import { lookingAt, type Blast, type BallDraw, type Eye, type SeaChange, type ShipDraw, type Snapshot } from '../src/snapshot';
 import { R, add, cross, normalize, scale, type Vec3 } from '../src/world/sphere';
@@ -58,7 +59,6 @@ async function one(name: string, cue: Cue, at: Vec3 | null, gun?: GunKind): Prom
 }
 
 /** The kinds of gun, each heard; her three shots in the passage by kind, and the others' in turn. */
-const KINDS: readonly GunKind[] = ['cannon', 'scatter', 'repeater', 'harpoon', 'mortar'];
 const HERS: readonly GunKind[] = ['cannon', 'harpoon', 'mortar'];
 
 /** A passage of play: what happens when (seconds), as the game would show it. */
