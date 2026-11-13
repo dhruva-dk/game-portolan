@@ -4,12 +4,15 @@
 // its bearing from the camera's look, how far off), for the HUD's answer to each (ui/juice.ts), the camera's
 // (shake.ts) and the sound's. 0117's moments (app/events.ts), as far as this game has them.
 //
+// The same step's fighting kept longer for the frame to draw (Blast: gunfire/gunfire.ts): the shots, the balls come
+// down and home, the ships sunk.
+//
 // Pure: no three, no page; deterministic for the same inputs.
 
 import type { Cue, Shot, Splash, Strike } from '../sim/battle.ts';
 import { isArms, rarityOf, type Taken } from '../sim/loot.ts';
 import type { Mended } from '../sim/stores.ts';
-import type { Eye } from '../snapshot.ts';
+import type { Blast, Eye } from '../snapshot.ts';
 import { HOTBAR, LIFT, type Deed, type Moment } from '../player.ts';
 import { R, add, length, normalize, scale, type Vec3 } from '../world/sphere.ts';
 import { inverse, rotate } from '../world/turn.ts';
@@ -22,7 +25,7 @@ export const KEEP = 1;
  *  ships sunk (where, and by whom), what was taken up and mended with, the ships that spent a gust, and where hers lies
  *  (null: sunk). */
 export interface Done {
-  shots: readonly Pick<Shot, 'shooter' | 'gun' | 'from'>[];
+  shots: readonly Pick<Shot, 'shooter' | 'gun' | 'dirs' | 'from'>[];
   cues: readonly Cue[];
   splashes: readonly Splash[];
   strikes: readonly Strike[];
@@ -61,6 +64,19 @@ export function deedsOf(done: Done, me: number, next: () => number, time: number
   if (done.blew.includes(me)) out.push({ seq: next(), time, at: her, ship: me, kind: 'gust' });
   return out;
 }
+
+/** Seconds what the guns did is kept for the frame: past the last of its smoke (gunfire/gunfire.ts). */
+const KEPT = 5;
+
+/** What the guns did kept at `time` (the world's clock, s): `blasts` of the last KEPT seconds, then the step's shots,
+ *  balls come down, blows home and ships sunk. */
+export const blastsOf = (blasts: readonly Blast[], done: Pick<Done, 'shots' | 'splashes' | 'strikes' | 'sunk'>, time: number): Blast[] => [
+  ...blasts.filter((b) => b.time > time - KEPT),
+  ...done.shots.map((s): Blast => ({ kind: 'shot', time, from: s.from, dir: s.dirs[0], gun: s.gun })),
+  ...done.splashes.map((s): Blast => ({ kind: 'splash', time, at: s.at, land: s.land, gun: s.gun })),
+  ...done.strikes.map((s): Blast => ({ kind: 'strike', time, at: s.at, ram: s.ram, shield: s.hull <= 0 && s.shield > 0, broke: s.broke })),
+  ...done.sunk.map((s): Blast => ({ kind: 'sink', time, at: s.at })),
+];
 
 /** The deeds kept at `time`: those of the last KEEP seconds, then `fresh`. */
 export const kept = (deeds: readonly Deed[], fresh: readonly Deed[], time: number): Deed[] =>

@@ -33,7 +33,7 @@ test('her id in the deeds is the match\'s player', () => {
 test('a step\'s deeds: numbered in order, swapped, fired (by kind), wound and reloaded, fell, struck, sank, then her stores; others\' stores and reloads unreported', () => {
   const done: Done = {
     ...none,
-    shots: [{ shooter: 2, from: scale(at, R + 3), gun: 'scatter' }],
+    shots: [{ shooter: 2, from: scale(at, R + 3), dirs: [[1, 0, 0]], gun: 'scatter' }],
     splashes: [{ shooter: 2, at, land: false, gun: 'scatter' }],
     strikes: [{ shooter: 0, struck: 2, damage: 30, shield: 10, hull: 20, broke: true, at, ram: false }],
     sunk: [{ id: 2, by: 0, at }],

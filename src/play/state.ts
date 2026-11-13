@@ -6,7 +6,7 @@
 // over a little (sim/ride.ts knocked). After the fleet's step comes the fighting's (sim/battle.ts): rams and balls
 // take off hit points, the storm (sim/storm.ts, on the match's clock: the steps sailed) wears at ships outside its
 // cap, and a ship sunk is taken off the sea and drawn going down (sinking.ts) until she is gone. What the fighting did
-// is kept a few seconds as Blasts, for the frame to draw (gunfire/gunfire.ts). The others are bots (sim/bot.ts), each
+// is kept a few seconds as Blasts, for the frame to draw (moments.ts, gunfire/gunfire.ts). The others are bots (sim/bot.ts), each
 // seeded by the match and her slot, unless put to sea with her helm lashed, when she holds it and nobody steers her.
 // Ships put to sea gunless, unless the match arms them all, and with no shield; loot is strewn over the sea for them
 // (sim/loot.ts), and what each carries, her hold and her gust, is stepped round the fleet's step and the fighting's
@@ -41,11 +41,9 @@ import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
 import { add, frameAt, scale, type Vec3 } from '../world/sphere.ts';
 import { LOOK, lookOf, seaColourOf } from './colours.ts';
-import { deedsOf, kept as keptDeeds } from './moments.ts';
+import { blastsOf, deedsOf, kept as keptDeeds } from './moments.ts';
 import { sinking } from './sinking.ts';
 
-/** How long what the guns did is kept for the frame, seconds: past the last of its smoke (gunfire/gunfire.ts). */
-const KEPT = 5;
 /** No way on and the rudder amidships. */
 const AMIDSHIPS: Helm = { course: null, throttle: 0 };
 /** What a sea is cleared for: a match's, with loot strewn over it and who holds it kept; the lobby's, neither. */
@@ -82,8 +80,8 @@ export interface Afloat { id: number; at: Vec3; heading: Vec3; hull: number; shi
 export interface Stepped { held: Outcome | null; regained: readonly Regained[] }
 
 /** A step's parts, in the order they run: the orders (the bots' thinking), the fleet sailed, the fighting, who holds
- *  the sea, the ships riding the swell, what the guns did kept, and the sunk taken off (advance's `lap`). */
-export const PARTS = ['command', 'sail', 'fight', 'hold', 'ride', 'keep', 'founder'] as const;
+ *  the sea, the ships riding the swell, the sunk taken off, and what it all did kept (advance's `lap`). */
+export const PARTS = ['command', 'sail', 'fight', 'hold', 'ride', 'founder', 'keep'] as const;
 export type Part = (typeof PARTS)[number];
 
 /** What the fleet's step, the stores' and the fighting's hand on within a step. */
@@ -176,7 +174,6 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     if (!a || !v) return;
     sinkings.push({ id, by, cause, time: time(), at: v.ship.at, heading: v.ship.heading });
     lostNow.push({ id, by, at: v.ship.at });
-    blasts.push({ kind: 'sink', time: tick * STEP, at: v.ship.at });
     territory?.sink(id, tick * STEP);
     wrecks.push({ id, look: a.look, pose: a.after, tick, side: seedOf(id) & 1 ? 1 : -1 });
     aboard.delete(id);
@@ -275,17 +272,6 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     });
   };
 
-  /** What the guns did, kept to be drawn from this step on. */
-  const keep = (fought: Fought) => {
-    const t = tick * STEP;
-    blasts = [
-      ...blasts.filter((b) => b.time > t - KEPT),
-      ...fought.shots.map((s): Blast => ({ kind: 'shot', time: t, from: s.from, dir: s.dirs[0], gun: s.gun })),
-      ...fought.splashes.map((s): Blast => ({ kind: 'splash', time: t, at: s.at, land: s.land, gun: s.gun })),
-      ...fought.strikes.map((s): Blast => ({ kind: 'strike', time: t, at: s.at, ram: s.ram, shield: s.hull <= 0 && s.shield > 0, broke: s.broke })),
-    ];
-  };
-
   /** The sunk taken off the sea, to go down, each credited to who sank her; those gone down by the step before last
    *  no longer drawn. */
   const founderAll = (lost: readonly number[], fought: Fought) => {
@@ -297,9 +283,11 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
     wrecks = wrecks.filter((w) => wreckAt(w, clock(0)));
   };
 
-  /** The step's deeds kept, numbered on (moments.ts), with any ship sunk in it. */
+  /** What the step did kept (moments.ts), with any ship sunk in it: its deeds, numbered on, and what the guns did, to
+   *  be drawn from this step on. */
   const record = (done: Parameters<typeof deedsOf>[0]) => {
     deeds = keptDeeds(deeds, deedsOf(done, PLAYER, () => ++seq, tick * STEP), tick * STEP);
+    blasts = blastsOf(blasts, done, tick * STEP);
     lostNow.length = 0;
   };
 
@@ -320,11 +308,10 @@ export function createState(planet: Planet, sea: Hull, { chart, water }: Waters,
       lap?.('hold');
       rideOn(met, wants.blew);
       lap?.('ride');
-      keep(fought);
-      lap?.('keep');
       founderAll(lost, fought);
-      record({ ...fought, cues: [...wants.cues, ...fought.cues], sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
       lap?.('founder');
+      record({ ...fought, cues: [...wants.cues, ...fought.cues], sunk: lostNow, took: kept.took, mended: kept.mended, blew: wants.blew, her: fleet.find((v) => v.id === PLAYER)?.ship.at ?? null });
+      lap?.('keep');
       return did;
     },
 
