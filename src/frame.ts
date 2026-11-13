@@ -1,4 +1,4 @@
-import { Color, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { Color, Mesh, NoToneMapping, PerspectiveCamera, RenderPipeline, Scene, Vector2, Vector3, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, float, getViewPosition, length, normalize, pass, rtt, screenUV, select, uniform, vec3, vec4,
 } from 'three/tsl';
@@ -218,15 +218,24 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   };
   /** Whether the frame is warming its shaders (render): everything hidden in what it draws is shown. */
   let warming = false;
-  /** Shows everything hidden under `root`; returns what puts each back. */
+  /** Shows everything hidden under `root`; returns what puts each back. A mesh with an empty draw range is shown with
+   *  a count of none, so its pipeline is built but nothing drawn (three skips a draw of no instances; one of no
+   *  indices it makes, and WebGPU warns of it). */
   const reveal = (root: Object3D) => {
-    const hidden: Object3D[] = [];
+    const hidden: Object3D[] = [], empty: [Mesh, number][] = [];
     root.traverse((o) => {
+      if (o instanceof Mesh && o.geometry.drawRange.count === 0) {
+        empty.push([o, o.count]);
+        o.count = 0;
+      }
       if (o.visible) return;
       hidden.push(o);
       o.visible = true;
     });
-    return () => hidden.forEach((o) => (o.visible = false));
+    return () => {
+      hidden.forEach((o) => (o.visible = false));
+      empty.forEach(([o, count]) => (o.count = count));
+    };
   };
   const clearColor = new Color();
   /** Draws an offscreen scene into its target, if it is due. */
