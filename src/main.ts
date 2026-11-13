@@ -3,6 +3,7 @@
 // title; only the page's debug switches change either (debug.ts scenario, the one way in).
 
 import { WebGPUCoordinateSystem, WebGPURenderer } from 'three/webgpu';
+import { createAudio } from './audio/audio';
 import { scenario, type Played, type Setup, type Stage } from './debug';
 import { createWorld } from './environment';
 import { createFrame } from './frame';
@@ -98,6 +99,11 @@ async function play(s: Stage): Promise<Played> {
   const hudState = (): HudState => ({ ...game.status(s.canvas.clientWidth, s.canvas.clientHeight), ...game.kit() });
   const map = () => globe.show(hudState());
   const hud = createHud(layer, coasts, { slot: input.tap, gust: input.gust, fire: input.fire, map });
+  // the sound, begun on her first touch; a tick for each tap on something of the UI's
+  const audio = createAudio(s.world.planet.height);
+  layer.addEventListener('pointerdown', (e) => {
+    if (e.target instanceof Element && e.target.closest('.press')) audio.tap(flow.screen);
+  }, true);
   const deal = () => {
     game.start(s.matches.deal());
     referee.begin();
@@ -124,8 +130,10 @@ async function play(s: Stage): Promise<Played> {
       // her end, sunk or won, as the screens follow it
       flow.end(referee.update(dt));
       // the world as the game has it, seen from its eye or, while the full map is open, from the map's
-      const scene = game.snapshot();
-      flow.update(dt, hudState(), scene.sea, scene.own);
+      const scene = game.snapshot(), status = hudState();
+      flow.update(dt, status, scene.sea, scene.own);
+      // heard from the game's eye, even with the full map open over it
+      audio.update({ scene, status, screen: flow.screen, map: globe.open }, flow.settings.sound, dt);
       return { ...scene, eye: globe.step(dt, scene.storm) ?? scene.eye };
     },
   };
