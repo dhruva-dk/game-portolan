@@ -94,6 +94,16 @@ export type Deed = { seq: number; time: number; at: Vec3; ship: number } & (
   | { kind: 'gust' }
 );
 
+/** What a blow (a Deed 'struck') did, as the screen, the camera, the hit-stop and the sound each answer it: broke a
+ *  shield, struck the hull, or struck a shield only. */
+export type Blow = 'broke' | 'hull' | 'shield';
+export const blowOf = (d: { broke: boolean; hull: number }): Blow => (d.broke ? 'broke' : d.hull > 0 ? 'hull' : 'shield');
+/** How strongly a blow of `points` hit points is felt (0117's app/juice.ts): one she dealt, and one she took. */
+export const felt = {
+  dealt: (points: number) => Math.min(1.3, 0.6 + points / 40),
+  taken: (points: number) => Math.min(1.3, 0.4 + points / 40),
+};
+
 /** A Deed as she sees it: where it falls on her screen (CSS px from the top left; null off it, or behind her), its
  *  bearing from the way the camera looks (radians clockwise: 0 ahead, π/2 to the right, ±π behind), and how far it is
  *  from the eye, metres. */

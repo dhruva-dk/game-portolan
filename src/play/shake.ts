@@ -12,7 +12,7 @@
 //
 // Pure: no three, no page.
 
-import type { Deed } from '../player.ts';
+import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 import type { Eye } from '../snapshot.ts';
 import { add, type Vec3 } from '../world/sphere.ts';
 import { rotate, type Turn } from '../world/turn.ts';
@@ -58,8 +58,8 @@ export const CAMERA = {
   ],
 } as const satisfies Record<string, Answer | readonly Answer[]>;
 
-/** How strongly a blow of `points` hit points is felt: 0117's app/juice.ts (dealt, and taken). */
-const dealt = (points: number) => Math.min(1.3, 0.6 + points / 40), taken = (points: number) => Math.min(1.3, 0.4 + points / 40);
+/** The camera's answer to a blow she dealt. */
+const DEALT: Record<Blow, Answer> = { broke: CAMERA.shieldBreak, hull: CAMERA.hit, shield: CAMERA.shieldHit };
 
 /** The camera's answer to a deed seen from `me` (her id; −1 watching another's ship: only the world's rumbles reach
  *  her), and how strongly; null for none. 0117's app/juice.ts react. */
@@ -69,8 +69,8 @@ export function answerTo(d: Deed, me: number): { answer: Answer; strength: numbe
     case 'fired': return d.ship === me ? { answer: CAMERA.fire, strength: 1 } : null;
     case 'struck': {
       const points = d.shield + d.hull;
-      if (by === me && d.ship !== me) return { answer: d.broke ? CAMERA.shieldBreak : d.hull > 0 ? CAMERA.hit : CAMERA.shieldHit, strength: d.broke ? 1 : dealt(points) };
-      if (d.ship === me && points > 0) return { answer: d.broke ? CAMERA.shieldLost : CAMERA.hurt, strength: d.broke ? 1 : taken(points) };
+      if (by === me && d.ship !== me) return { answer: DEALT[blowOf(d)], strength: d.broke ? 1 : felt.dealt(points) };
+      if (d.ship === me && points > 0) return { answer: d.broke ? CAMERA.shieldLost : CAMERA.hurt, strength: d.broke ? 1 : felt.taken(points) };
       return null;
     }
     case 'sank': return by === me && d.ship !== me ? { answer: CAMERA.sink, strength: 1 } : d.ship === me ? { answer: CAMERA.sunk, strength: 1 } : { answer: CAMERA.near, strength: 1 };

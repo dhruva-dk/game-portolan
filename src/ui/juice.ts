@@ -14,7 +14,7 @@
 //   her hull low        the heartbeat at the rim (flash.ts)
 // No words; numerals only.
 
-import { HER, isGun, type Moment, type Status } from '../player';
+import { HER, blowOf, felt, isGun, type Moment, type Status } from '../player';
 import { createFlash, PICKUP, SCREEN } from './flash';
 import { createHits } from './hits';
 import { glyph, svg } from './ink';
@@ -26,8 +26,12 @@ export interface Parts { vitals: HTMLElement; fire: HTMLElement; gust: HTMLEleme
 /** A piece's flight to its slot (0117's FLY): its burst out, its flight, and its size along the way. */
 export const FLY = { burst: 0.24, flight: 0.56, scale: [0.35, 1.15, 0.7] } as const;
 
-/** How strongly a blow of `points` is felt (0117's: dealt, and taken). */
-const dealt = (points: number) => Math.min(1.3, 0.6 + points / 40), taken = (points: number) => Math.min(1.3, 0.4 + points / 40);
+/** A blow she dealt: its cross over the reticle (hits.ts), and its look (flash.ts). */
+const DEALT = {
+  broke: { cross: 'break', look: SCREEN.shieldBreak },
+  hull: { cross: 'hit', look: SCREEN.hit },
+  shield: { cross: 'shield', look: SCREEN.shieldHit },
+} as const;
 
 export function createJuice(body: HTMLElement, parts: Parts) {
   const flash = createFlash(body), hits = createHits(body);
@@ -72,17 +76,17 @@ export function createJuice(body: HTMLElement, parts: Parts) {
       case 'struck': {
         const points = m.shield + m.hull;
         if (m.by === HER && m.ship !== HER) {
-          hits.cross(m.broke ? 'break' : m.hull > 0 ? 'hit' : 'shield', middle.x, middle.y);
+          const { cross, look: r } = DEALT[blowOf(m)];
+          hits.cross(cross, middle.x, middle.y);
           if (m.seen) hits.figure(m.ship, points, m.hull <= 0, false, m.seen.x, m.seen.y - 18);
-          const r = m.broke ? SCREEN.shieldBreak : m.hull > 0 ? SCREEN.hit : SCREEN.shieldHit;
-          flash.flash(r.flash, m.broke ? 1 : dealt(points));
+          flash.flash(r.flash, m.broke ? 1 : felt.dealt(points));
           if ('vignette' in r) flash.vignette(r.vignette);
         } else if (m.ship === HER && points > 0) {
-          const r = m.broke ? SCREEN.shieldLost : m.hull > 0 ? SCREEN.hurt : null;
+          const r = { broke: SCREEN.shieldLost, hull: SCREEN.hurt, shield: null }[blowOf(m)];
           hits.arc(m.bearing, w, h, m.hull <= 0);
           if (r) {
-            flash.flash(r.flash, m.broke ? 1 : taken(points));
-            flash.vignette(r.vignette, m.broke ? 1 : taken(points), m.bearing);
+            flash.flash(r.flash, m.broke ? 1 : felt.taken(points));
+            flash.vignette(r.vignette, m.broke ? 1 : felt.taken(points), m.bearing);
           }
           shake(parts.vitals);
         }

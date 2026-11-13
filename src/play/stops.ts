@@ -8,7 +8,7 @@
 //
 // Pure: no three, no page.
 
-import type { Deed } from '../player.ts';
+import { blowOf, felt, type Blow, type Deed } from '../player.ts';
 
 export const PRIORITY = { hurt: 0, hit: 1, break: 2, kill: 3 } as const;
 export type Priority = keyof typeof PRIORITY;
@@ -25,6 +25,8 @@ export const STOPS = {
   hurt: { scale: 0.35, hold: 0.04, release: 0.08, priority: 'hurt' },
   sink: { scale: 0.2, hold: 0.32, release: 0.35, priority: 'kill' },
 } as const satisfies Record<string, Stop>;
+/** The stop for a blow she dealt. */
+const DEALT: Record<Blow, Stop> = { broke: STOPS.shieldBreak, hull: STOPS.hit, shield: STOPS.shieldHit };
 
 /** Frozen seconds a rolling second allows below a sinking; the longest hold; a frame. */
 const BUDGET = 0.2, WINDOW = 1, MAX_HOLD = 0.6, FRAME = 1 / 60;
@@ -35,8 +37,8 @@ export function stopFor(d: Deed, me: number): { stop: Stop; strength: number } |
   if (d.kind === 'sank') return d.by === me && d.ship !== me ? { stop: STOPS.sink, strength: 1 } : null;
   if (d.kind !== 'struck') return null;
   const points = d.shield + d.hull;
-  if (d.by === me && d.ship !== me) return { stop: d.broke ? STOPS.shieldBreak : d.hull > 0 ? STOPS.hit : STOPS.shieldHit, strength: Math.min(1, 0.6 + points / 40) };
-  if (d.ship === me && points > 0) return { stop: d.broke ? STOPS.shieldLost : STOPS.hurt, strength: Math.min(1, 0.4 + points / 40) };
+  if (d.by === me && d.ship !== me) return { stop: DEALT[blowOf(d)], strength: Math.min(1, felt.dealt(points)) };
+  if (d.ship === me && points > 0) return { stop: d.broke ? STOPS.shieldLost : STOPS.hurt, strength: Math.min(1, felt.taken(points)) };
   return null;
 }
 

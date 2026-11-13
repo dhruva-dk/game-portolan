@@ -8,7 +8,7 @@
 // The rest are heard from what she sees and holds as it changes (listen.ts): a slot of her stores taken in hand, a
 // ball passing near, her water, the storm, her timbers on the roll, and the screens.
 
-import { isGun, type Deed, type GunKind } from '../player.ts';
+import { blowOf, isGun, type Blow, type Deed, type GunKind } from '../player.ts';
 import type { SoundName } from './bank.ts';
 
 /** A deed on the sea: player.ts Deed (see the header). */
@@ -82,6 +82,9 @@ export const CUES: Record<Cue, CueSound> = {
   salute: { sound: 'salute', level: 0, bus: 'ui' },
 };
 
+/** The cue for a blow on her. */
+const TAKEN = { broke: 'shatter', hull: 'hurt', shield: 'ring' } as const satisfies Record<Blow, Cue>;
+
 /** The cue for a deed, `own` her ship's id; null for one not heard. Her ward taking all of a blow rings; taking its
  *  last breaks it; the rest of a blow on her is on her hull. */
 export function cueOf(h: Happening, own: number | null): Cue | null {
@@ -93,7 +96,7 @@ export function cueOf(h: Happening, own: number | null): Cue | null {
     case 'reloaded': return hers ? 'ready' : null;
     case 'swapped': return hers ? 'swap' : null;
     case 'fell': return h.land ? 'thud' : 'splash';
-    case 'struck': return !hers ? 'strike' : h.broke ? 'shatter' : h.hull > 0 ? 'hurt' : 'ring';
+    case 'struck': return !hers ? 'strike' : TAKEN[blowOf(h)];
     case 'sank': return hers ? 'sunk' : 'sank';
     case 'took': return !hers ? null : isGun(h.piece) ? 'swap' : 'took';
     case 'mended': return !hers ? null : h.piece === 'smallShield' || h.piece === 'bigShield' ? 'mendWard' : 'mendHull';
