@@ -10,6 +10,7 @@ import { calm, type Storm } from '../src/sim/storm.ts';
 import type { Helm } from '../src/sim/ship.ts';
 import { SEED, createPlanet } from '../src/world/planet.ts';
 import { add, type Vec3 } from '../src/world/sphere.ts';
+import { flat } from '../src/world/swell.ts';
 
 const planet = createPlanet(SEED);
 const depth = (p: Vec3) => -planet.height(p);
@@ -27,7 +28,7 @@ const deadly = (at: number): Match => ({
 /** Her loop sailed alone from her berth in a match at sea (a new one on `state`, if given): south, east, and home;
  *  each step's helm, until it closes. Returns the match's clock at the start of the step that closed it (null: it
  *  never did), and the state. */
-function loop(m: Match, state = createState(planet, () => 0, waters, m)) {
+function loop(m: Match, state = createState(planet, flat, waters, m)) {
   state.debug.atSea(start, []);
   const legs: [number, number][] = [[180, 5], [90, 4]];
   const helm = (k: number): Helm => {

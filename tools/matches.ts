@@ -19,6 +19,7 @@ import { createMatches } from '../src/play/setup.ts';
 import { createState } from '../src/play/state.ts';
 import { SEED, createPlanet } from '../src/world/planet.ts';
 import { distance, type Vec3 } from '../src/world/sphere.ts';
+import { flat } from '../src/world/swell.ts';
 
 /** A bot is stuck if she moves less than STUCK m in WINDOW s. */
 const STUCK = 15, WINDOW = 30, AGROUND = 2;
@@ -28,7 +29,7 @@ const planet = createPlanet(seed);
 const depth = (p: Vec3) => -planet.height(p);
 const waters = { chart: chart(depth), water: berthing(depth) };
 const matches = createMatches(seed, planet, null, null);
-const state = createState(planet, () => 0, waters, matches.first);
+const state = createState(planet, flat, waters, matches.first);
 console.log(`planet, chart and berths in ${(performance.now() - t0).toFixed(0)} ms`);
 const end = STORM.phases.reduce((t, p) => t + p.wait + p.close, 0) + 120;
 const idle = { course: null, throttle: 0 }, still = { aim: null, fire: false };

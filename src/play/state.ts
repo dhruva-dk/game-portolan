@@ -34,7 +34,7 @@ import { shipAt, type Helm, type ShipState } from '../sim/ship.ts';
 import { calm, type Storm } from '../sim/storm.ts';
 import { createTerritory, type Move, type Outcome, type Territory } from '../sim/territory.ts';
 import type { BallDraw, Blast, Look, Sea, ShipDraw } from '../snapshot.ts';
-import type { Surface } from '../world/swell.ts';
+import type { Hull } from '../world/swell.ts';
 import type { Planet } from '../world/planet.ts';
 import type { ShipPose } from '../world/pose.ts';
 import { hash } from '../world/random.ts';
@@ -108,7 +108,7 @@ const colours = (count: number): Vec3[] => {
 export interface Waters { chart: Chart; water: Berthing }
 
 /** planet: the world's; sea: its waves, which the ships ride; waters: its water, sounded. */
-export function createState(planet: Planet, sea: Surface, { chart, water }: Waters, first: Match) {
+export function createState(planet: Planet, sea: Hull, { chart, water }: Waters, first: Match) {
   const depth = (p: Vec3) => -planet.height(p);
   let match = first;
   const seedOf = (id: number) => hash(match.seed, id);
@@ -133,7 +133,7 @@ export function createState(planet: Planet, sea: Surface, { chart, water }: Wate
   /** Puts a ship to sea: a bot's unless she is the player's (and `manned`) or her helm is lashed. */
   const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null, manned = true) => {
     fleet.push(afloat(id, ship));
-    const r = settled(ship, sea, tick * STEP), p = pose(ship, r);
+    const r = settled(ship, sea, tick * STEP, id), p = pose(ship, r);
     const bot = (id !== PLAYER || !manned) && !lashed;
     aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };

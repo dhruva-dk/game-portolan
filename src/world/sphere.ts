@@ -50,19 +50,50 @@ export function frameAt(p: Vec3): Frame {
 /** The chart's second axis, z: axis × at. */
 const zAxis = (c: Chart): Vec3 => cross(c.axis, c.at);
 
-/** The direction from `at` toward p in `at`'s tangent plane, and the arc between them, radians. */
-function bearing(c: Chart, p: Vec3): { dir: Vec3; theta: number } {
-  const u = normalize(p);
-  const cosT = dot(u, c.at);
-  const d = add(u, c.at, -cosT);
-  const s = length(d);
-  return { dir: s > 1e-12 ? scale(d, 1 / s) : c.axis, theta: Math.atan2(s, cosT) };
+/** chartAt's answer for the one-off reads (toChart, chartBasis). */
+const scratch = new Float64Array(8);
+
+/**
+ * Where the point (x, y, z) (a vector from the centre, any length) lies on the chart, metres, written into out[0] and
+ * out[1]; and if `axes`, the chart's x and z axes carried there (chartBasis's) into out[2…4] and out[5…7]. Nothing is
+ * made: for the loops that read many points (world/swell.ts).
+ */
+export function chartAt(c: Chart, x: number, y: number, z: number, out: Float64Array, axes = false) {
+  const [ax, ay, az] = c.at, [bx, by, bz] = c.axis;
+  const k = 1 / Math.hypot(x, y, z), ux = x * k, uy = y * k, uz = z * k;
+  // the direction from `at` toward the point in `at`'s tangent plane, and the arc between them
+  const cosT = ux * ax + uy * ay + uz * az;
+  let dx = ux + ax * -cosT, dy = uy + ay * -cosT, dz = uz + az * -cosT;
+  const s = Math.hypot(dx, dy, dz);
+  if (s > 1e-12) {
+    const i = 1 / s;
+    dx *= i;
+    dy *= i;
+    dz *= i;
+  } else [dx, dy, dz] = [bx, by, bz];
+  const theta = Math.atan2(s, cosT);
+  // the chart's z axis: axis × at
+  const zx = by * az - bz * ay, zy = bz * ax - bx * az, zz = bx * ay - by * ax;
+  const cp = dx * bx + dy * by + dz * bz, sp = dx * zx + dy * zy + dz * zz;
+  out[0] = cp * theta * R;
+  out[1] = sp * theta * R;
+  if (!axes) return;
+  // the radial direction carried to the point, and the one across it (dir × at), which the carrying leaves as it is
+  const ct = Math.cos(theta), st = Math.sin(theta);
+  const gx = dx * ct + ax * -st, gy = dy * ct + ay * -st, gz = dz * ct + az * -st;
+  const tx = dy * az - dz * ay, ty = dz * ax - dx * az, tz = dx * ay - dy * ax;
+  out[2] = gx * cp + tx * -sp;
+  out[3] = gy * cp + ty * -sp;
+  out[4] = gz * cp + tz * -sp;
+  out[5] = gx * sp + tx * cp;
+  out[6] = gy * sp + ty * cp;
+  out[7] = gz * sp + tz * cp;
 }
 
 /** Where p lies on the chart, metres. */
 export function toChart(c: Chart, p: Vec3): [x: number, z: number] {
-  const { dir, theta } = bearing(c, p);
-  return [dot(dir, c.axis) * theta * R, dot(dir, zAxis(c)) * theta * R];
+  chartAt(c, p[0], p[1], p[2], scratch);
+  return [scratch[0], scratch[1]];
 }
 
 /** The point at chart position (x, z). */
@@ -79,12 +110,8 @@ export function fromChart(c: Chart, x: number, z: number): Vec3 {
  * the chart's own directions exactly along that circle and across it; elsewhere the chart's stretch bends them a little.
  */
 export function chartBasis(c: Chart, p: Vec3): [e1: Vec3, e2: Vec3] {
-  const { dir, theta } = bearing(c, p);
-  const cp = dot(dir, c.axis), sp = dot(dir, zAxis(c));
-  // the radial direction carried to p, and the one across it, which the carrying leaves as it is
-  const g = add(scale(dir, Math.cos(theta)), c.at, -Math.sin(theta));
-  const t = cross(dir, c.at);
-  return [add(scale(g, cp), t, -sp), add(scale(g, sp), t, cp)];
+  chartAt(c, p[0], p[1], p[2], scratch, true);
+  return [[scratch[2], scratch[3], scratch[4]], [scratch[5], scratch[6], scratch[7]]];
 }
 
 /** From p, `metres` along the surface in the direction of tangent t: the point reached and the tangent there. */

@@ -5,6 +5,7 @@
 //   node tools/steps.ts [seconds=60] [seed]      (npm run steps)
 
 import { STEP } from '../src/sim/fixed.ts';
+import { RIDE } from '../src/sim/ride.ts';
 import { chart } from '../src/sim/route.ts';
 import { berthing } from '../src/sim/spawn.ts';
 import { createMatches } from '../src/play/setup.ts';
@@ -13,7 +14,7 @@ import { CASCADES } from '../src/world/cascades.ts';
 import { FREQUENCY, anchors, icosphere } from '../src/world/lattice.ts';
 import { SEED, createPlanet } from '../src/world/planet.ts';
 import type { Vec3 } from '../src/world/sphere.ts';
-import { createSwell } from '../src/world/swell.ts';
+import { createSwell, type Hull } from '../src/world/swell.ts';
 import { MEAN } from '../src/world/weather.ts';
 import { createWind } from '../src/world/wind.ts';
 
@@ -38,13 +39,13 @@ export function world(seed = SEED) {
 
 /** The first `seconds` of a match of bots on the world, each step timed by its parts. */
 export function steps(w: ReturnType<typeof world>, seconds = 60): Steps {
-  const swell = createSwell(w.sea, w.planet.height, MEAN.wind);
+  const swell = createSwell(w.sea, w.planet.height, MEAN.wind, { shortest: RIDE.shortest }).hull;
   let reads = 0, reading = 0;
-  const sea = (p: Vec3, time: number) => {
-    const t = performance.now(), h = swell(p, time);
+  const sea: Hull = (at, heading, reach, rail, time) => {
+    const t = performance.now(), under = swell(at, heading, reach, rail, time);
     reading += performance.now() - t;
     reads++;
-    return h;
+    return under;
   };
   const matches = createMatches(w.seed, w.planet, null, null);
   const state = createState(w.planet, sea, w.waters, matches.first);
@@ -73,7 +74,7 @@ if (import.meta.main) {
   const t0 = performance.now(), w = world(seed);
   console.log(`world in ${(performance.now() - t0).toFixed(0)} ms`);
   const r = steps(w, seconds);
-  console.log(`${r.steps} steps (${seconds} s); the swell read ${r.reads.toFixed(0)} times a step, ${r.read.toFixed(1)} µs a read`);
+  console.log(`${r.steps} steps (${seconds} s); the swell read under ${r.reads.toFixed(0)} hulls a step, ${r.read.toFixed(1)} µs a hull`);
   console.log('part        median     p95   worst  (ms a step)');
   for (const [k, c] of r.parts) console.log(`${k.padEnd(10)} ${c.median.toFixed(3).padStart(7)} ${c.p95.toFixed(3).padStart(7)} ${c.worst.toFixed(3).padStart(7)}`);
 }

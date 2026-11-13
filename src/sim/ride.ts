@@ -1,7 +1,10 @@
 // A hull riding the sea: heaved, pitched and rolled by the water under her, and leaning into her turns.
 //
 // The sea is read at four points under her, bow and stern, port and starboard rails: their mean is the level she
-// floats at, their differences the slope she lies along. Each of heave, pitch and roll follows its own with a
+// floats at, their differences the slope she lies along. It is read five times a second, each read for the moment of
+// the next and where her way will have brought her by then, and taken as running evenly between reads: the swell she
+// feels (the waves at least a quarter of her length) changes over seconds, and her springs smooth anything quicker.
+// Each ship's reads fall on steps of their own (her id's), so a fleet's are spread evenly over the steps. Each of heave, pitch and roll follows its own with a
 // damped spring, as a hull of her weight does. Heave and pitch are damped against the water's own motion, which
 // carries her with it: she rides a long swell without lagging it (tests/swell.test.ts), and only its quick changes
 // are smoothed away. Roll is damped against nothing: her rails are only a beam apart, so the short chop tilts the
@@ -12,11 +15,13 @@
 
 import type { ShipPose } from '../world/pose.ts';
 import { R, add, along, cross, dot, scale, type Vec3 } from '../world/sphere.ts';
+import type { Hull } from '../world/swell.ts';
+import { STEP } from './fixed.ts';
 import { GUST, SHIP } from './handling.ts';
 import type { ShipState } from './ship.ts';
 
-/** The sea's surface over a point (a vector from the centre), metres above sea level, at a time on the world's clock. */
-export type Sea = (p: Vec3, time: number) => number;
+/** The water under a hull (world/swell.ts): under her bow and stern and her rails, at a time on the world's clock. */
+export type Sea = Hull;
 
 /**
  * Each motion's spring: its natural frequency (rad/s), its damping (1 is critical), and whether it is damped against
@@ -29,6 +34,12 @@ export const RIDE = {
   /** Where the sea is read: metres ahead of and behind amidships, and out to either rail. */
   reach: 0.4 * SHIP.length,
   rail: 0.45 * SHIP.beam,
+  /** The shortest wave she feels, metres: shorter ones (under 1% of the sea's height at its mean wind) run under her
+   *  without lifting her; her pose moves by under a centimetre and a tenth of a degree without them (tests/swell.test.ts). */
+  shortest: 0.25 * SHIP.length,
+  /** Steps between her reads of the water (a fifth of a second's): between them she takes it as running evenly from one
+   *  read to the next. The water she feels changes over seconds, and her springs smooth what changes faster. */
+  every: Math.round(0.2 / STEP),
   /** Her lean into a turn at top speed, radians per rad/s of turn; and how fast she takes it up. */
   heel: 0.35,
   lean: 2.5,
@@ -46,35 +57,50 @@ export interface Ride {
   heel: number;
   /** What the water under her asked of each at the last step. */
   water: Water;
+  /** Her reads of the water, `every` steps apart: the last (`from`), and the next (`to`), read ahead for `span` steps
+   *  after it where her way was taking her, `left` steps from now. */
+  read: { from: Water; to: Water; left: number; span: number; every: number };
 }
 
 interface Water { heave: number; pitch: number; roll: number }
 
-/** What the water under her asks of each motion. */
-function water(s: ShipState, sea: Sea, time: number): Water {
-  const port = cross(s.at, s.heading);
-  const at = (t: Vec3, metres: number) => sea(along(s.at, t, metres).p, time);
-  const bow = at(s.heading, RIDE.reach), stern = at(s.heading, -RIDE.reach);
-  const left = at(port, RIDE.rail), right = at(port, -RIDE.rail);
+/** What the water under her asks of each motion, lying at `at` heading `heading`. */
+function water(at: Vec3, heading: Vec3, sea: Sea, time: number): Water {
+  const { bow, stern, port, starboard } = sea(at, heading, RIDE.reach, RIDE.rail, time);
   return {
-    heave: (bow + stern + left + right) / 4,
+    heave: (bow + stern + port + starboard) / 4,
     pitch: Math.atan2(bow - stern, 2 * RIDE.reach),
-    roll: Math.atan2(left - right, 2 * RIDE.rail),
+    roll: Math.atan2(port - starboard, 2 * RIDE.rail),
   };
 }
 
 /** The lean a turn asks for, starboard down: into the turn, more the faster she goes. */
 const lean = (s: ShipState) => -RIDE.heel * s.turn * Math.min(1, s.speed / SHIP.top);
 
-/** At rest on the water as it is: each motion where the water puts it. */
-export function settled(s: ShipState, sea: Sea, time: number): Ride {
-  const w = water(s, sea, time);
-  return { heave: w.heave, heaveRate: 0, pitch: w.pitch, pitchRate: 0, roll: w.roll, rollRate: 0, heel: lean(s), water: w };
+/** At rest on the water as it is: each motion where the water puts it. She reads the water `every` steps from now on;
+ *  `slot` (her id) sets which, so a fleet's reads are spread over the steps. */
+export function settled(s: ShipState, sea: Sea, time: number, slot = 0, every: number = RIDE.every, dt = STEP): Ride {
+  const w = water(s.at, s.heading, sea, time), left = slot % every;
+  return {
+    heave: w.heave, heaveRate: 0, pitch: w.pitch, pitchRate: 0, roll: w.roll, rollRate: 0, heel: lean(s), water: w,
+    read: { from: w, to: left ? ahead(s, sea, time, left, dt) : w, left, span: left, every },
+  };
+}
+
+/** What the water will ask `steps` steps of dt on, where her way will have brought her by then. */
+function ahead(s: ShipState, sea: Sea, time: number, steps: number, dt: number): Water {
+  const on = along(s.at, s.heading, s.speed * steps * dt);
+  return water(on.p, on.t, sea, time + steps * dt);
 }
 
 /** One step of dt seconds for the ship as she now is, on the sea at `time`. */
 export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number): Ride {
-  const w = water(s, sea, time);
+  let { from, to, left, span } = r.read;
+  const every = r.read.every;
+  if (left <= 0) [from, to, left, span] = [to, ahead(s, sea, time, every, dt), every, every];
+  // between reads, the water runs evenly from one to the next
+  const f = 1 - left / span;
+  const w = { heave: from.heave + (to.heave - from.heave) * f, pitch: from.pitch + (to.pitch - from.pitch) * f, roll: from.roll + (to.roll - from.roll) * f };
   // semi-implicit Euler: stable for these springs at any step under a tenth of a second
   type Spring = { frequency: number; damping: number; carried: boolean };
   const spring = (x: number, v: number, to: number, from: number, { frequency: f, damping: z, carried }: Spring) => {
@@ -86,7 +112,7 @@ export function ride(r: Ride, s: ShipState, sea: Sea, time: number, dt: number):
   const [pitch, pitchRate] = spring(r.pitch, r.pitchRate, w.pitch, r.water.pitch, RIDE.pitch);
   const [roll, rollRate] = spring(r.roll, r.rollRate, w.roll, r.water.roll, RIDE.roll);
   const heel = r.heel + (lean(s) - r.heel) * (1 - Math.exp(-RIDE.lean * dt));
-  return { heave, heaveRate, pitch, pitchRate, roll, rollRate, heel, water: w };
+  return { heave, heaveRate, pitch, pitchRate, roll, rollRate, heel, water: w, read: { from, to, left: left - 1, span, every } };
 }
 
 /** Her ride as a blow leaves it: `jolt` (m/s, a tangent at her place), the change of velocity another hull gave her,

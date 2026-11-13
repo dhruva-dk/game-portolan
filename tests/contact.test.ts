@@ -7,6 +7,7 @@ import { knocked, ride, settled } from '../src/sim/ride.ts';
 import { clearance, hullAt, type Depth } from '../src/sim/shoal.ts';
 import { shipAt, turned, type Helm, type ShipState } from '../src/sim/ship.ts';
 import { R, along, cross, distance, dot, frameAt, fromLatLon, length, normalize, type Vec3 } from '../src/world/sphere.ts';
+import { flat } from '../src/world/swell.ts';
 
 const deep: Depth = () => 30;
 const deg = Math.PI / 180;
@@ -278,7 +279,6 @@ test('the ram scaled from 0117: a full-speed ram square into a still ship does w
 });
 
 test('rammed square in her side, she heels away from the blow, a few degrees, and the rammer not at all', () => {
-  const flat = () => 0;
   let fleet = approach(90 * deg, SHIP.top);
   let rides = fleet.map((v) => settled(v.ship, flat, 0));
   let most = [0, 0];

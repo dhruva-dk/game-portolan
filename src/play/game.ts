@@ -32,6 +32,7 @@ import { offered, rarityOf } from '../sim/loot';
 import { BOT, toward } from '../sim/captain';
 import { STORM, toEdge } from '../sim/storm';
 import { sunk } from '../sim/health';
+import { RIDE } from '../sim/ride';
 import { PLAYER } from '../sim/match';
 import type { Vessel } from '../sim/contact';
 import type { Helm, ShipState } from '../sim/ship';
@@ -63,9 +64,9 @@ export interface View { watch: number; hands: boolean; end: Ending | null }
  *  in hand until another is dealt. */
 export function createGame(world: World, anchors: readonly Anchor[], waters: Waters, start: { at: Vec3; bearing: number }, first: Match) {
   const ground = world.planet.height, depth = (p: Vec3) => -ground(p);
-  const sea = createSwell(anchors, ground, world.climate.seaWind);
-  const state = createState(world.planet, sea, waters, first);
-  const chase = createChase(ground, sea);
+  const sea = createSwell(anchors, ground, world.climate.seaWind, { shortest: RIDE.shortest });
+  const state = createState(world.planet, sea.hull, waters, first);
+  const chase = createChase(ground, sea.at);
   const clock = fixedClock();
   /** Whether her gun was ordered fired since the last step, the slot last tapped and whether Gust was pressed; how
    *  far the moment drawn is through the last step. */
@@ -144,7 +145,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
         orbit = dragged(orbit, read.look);
         if (!read.look.held) orbit = relaxed(orbit, dt);
         const now = state.clock(between);
-        berth = anchorageEye(last, orbit, now, (p) => Math.max(ground(p), sea(p, now)));
+        berth = anchorageEye(last, orbit, now, (p) => Math.max(ground(p), sea.at(p, now)));
         return;
       }
       const followed = view.watch === PLAYER ? last : state.poseOf(view.watch, between) ?? last;
@@ -159,7 +160,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       for (const l of state.loot().pieces) {
         const d = dot(near, l.at);
         if (d < Math.cos(DRAWN / R)) continue;
-        const up = d > Math.cos(RIDES / R) ? sea(l.at, time) : 0;
+        const up = d > Math.cos(RIDES / R) ? sea.at(l.at, time) : 0;
         loot.push({ id: l.id, at: scale(l.at, R + up), gun: l.goods.kind === 'gun', rarity: rarityOf(l.goods) });
       }
       return {

@@ -182,18 +182,45 @@ export function blend(distances: number[], width: number): number[] {
  * products with p, no sorting): a function of p alone.
  */
 export function weigh(all: readonly Anchor[], p: Vec3, width: number): { index: number[]; weight: number[] } {
-  const u = normalize(p);
-  const best = [-1, -1, -1], c = [-2, -2, -2];
-  for (let k = 0; k < all.length; k++) {
-    const d = dot(u, all[k].at);
-    if (d > c[0]) [c[2], best[2], c[1], best[1], c[0], best[0]] = [c[1], best[1], c[0], best[0], d, k];
-    else if (d > c[1]) [c[2], best[2], c[1], best[1]] = [c[1], best[1], d, k];
-    else if (d > c[2]) [c[2], best[2]] = [d, k];
-  }
-  const w = blend(c.map((x) => R * Math.acos(Math.min(Math.max(x, -1), 1))), width);
-  const keep = [0, 1, 2].filter((k) => w[k] > 0);
-  return { index: keep.map((k) => best[k]), weight: keep.map((k) => w[k]) };
+  const index = new Int32Array(3), weight = new Float64Array(3);
+  const n = weighInto(all, p[0], p[1], p[2], width, index, weight);
+  return { index: Array.from(index.subarray(0, n)), weight: Array.from(weight.subarray(0, n)) };
 }
+
+/** weigh's choice at the point (x, y, z), written into `index` and `weight` (three each) with nothing made, the
+ *  nearest first: returns how many weigh in. */
+export function weighInto(all: readonly Anchor[], x: number, y: number, z: number, width: number, index: Int32Array, weight: Float64Array): number {
+  const k = 1 / Math.hypot(x, y, z), ux = x * k, uy = y * k, uz = z * k;
+  let b0 = -1, b1 = -1, b2 = -1, c0 = -2, c1 = -2, c2 = -2;
+  for (let i = 0; i < all.length; i++) {
+    const a = all[i].at, d = ux * a[0] + uy * a[1] + uz * a[2];
+    if (d > c0) {
+      c2 = c1; b2 = b1; c1 = c0; b1 = b0; c0 = d; b0 = i;
+    } else if (d > c1) {
+      c2 = c1; b2 = b1; c1 = d; b1 = i;
+    } else if (d > c2) {
+      c2 = d; b2 = i;
+    }
+  }
+  // blend's weights: the nearest counts in full, the others by how much further they lie, scaled so Σw² = 1
+  const a0 = arc(c0), w1 = smoothstep(width, 0, arc(c1) - a0), w2 = smoothstep(width, 0, arc(c2) - a0);
+  const size = Math.sqrt(1 + w1 * w1 + w2 * w2);
+  index[0] = b0;
+  weight[0] = 1 / size;
+  let n = 1;
+  if (w1 > 0) {
+    index[n] = b1;
+    weight[n++] = w1 / size;
+  }
+  if (w2 > 0) {
+    index[n] = b2;
+    weight[n++] = w2 / size;
+  }
+  return n;
+}
+
+/** The arc to an anchor whose dot product with the point is c, metres. */
+const arc = (c: number) => R * Math.acos(Math.min(Math.max(c, -1), 1));
 
 /** θ / sin θ: how much a chart stretches across its bearing at `metres` from its centre. */
 export const stretch = (metres: number) => (metres === 0 ? 1 : metres / R / Math.sin(metres / R));
