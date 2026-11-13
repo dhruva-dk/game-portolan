@@ -128,3 +128,13 @@ test('g. src/world and src/sim are deterministic and headless', () => {
     'Math.random, Date, performance or a browser global in src/world or src/sim',
   );
 });
+
+test('h. the debug switches live in src/debug.ts alone, set going by one call from src/main.ts', () => {
+  none(hits(/\blocation\b|\bURLSearchParams\b|\bswitches\s*\./, (rel) => rel !== 'debug.ts'), "the page's query read outside src/debug.ts");
+  none(hits(/['"]\.{1,2}\/(\.\.\/)*debug(\.ts)?['"]/, (rel) => rel !== 'main.ts'), 'src/debug.ts imported other than by src/main.ts');
+  const main = code(files.find((f) => f.rel === 'main.ts')!.text).join('\n');
+  const taken = [...main.matchAll(/import\s*{([^}]*)}\s*from\s*['"]\.\/debug['"]/g)]
+    .flatMap((m) => m[1].split(',').map((n) => n.trim()).filter((n) => n && !n.startsWith('type ')));
+  assert.deepEqual(taken, ['scenario'], 'src/main.ts takes only scenario (and types) from src/debug.ts');
+  assert.equal(main.match(/\bscenario\s*\(/g)?.length, 1, 'src/main.ts calls scenario once');
+});

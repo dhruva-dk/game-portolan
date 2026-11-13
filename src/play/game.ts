@@ -14,13 +14,11 @@
 // The camera follows the ship the match's flow sets (view): hers, or after she sinks the one she watches, cut to or
 // flown to; its shots on the Gale, coming down and on a win are shots.ts's.
 //
-// Debug: a drive, `legs` as "bearing,throttle,seconds;…" (bearings in degrees clockwise from north where she is),
-// is sailed before the first frame; she holds its last order until a hand takes the helm.
+// It opens on the lobby's quiet sea (anchor); a match then opens with the Gale (drop), or at sea among others (atSea).
+// Her helm may be lashed (lash): she holds it until a hand takes the helm.
 
 import type { World } from '../environment';
-import type { Order } from '../sim/battle';
-import { HOLD } from '../sim/drop';
-import { STEP, fixedClock } from '../sim/fixed';
+import { fixedClock } from '../sim/fixed';
 import { chosen, lead, muzzle } from '../sim/gun';
 import { GUN, HEALTH } from '../sim/handling';
 import { sunk } from '../sim/health';
@@ -35,7 +33,7 @@ import { R, add, normalize, scale, type Vec3 } from '../world/sphere';
 import { createChase } from './chase';
 import { createInput, type Hands } from './input';
 import { createShots, flown } from './shots';
-import { bearing, createState, type Dropping, type Match, type Other } from './state';
+import { bearing, createState, type Berth, type Dropping, type Match } from './state';
 import { createStickView } from './stick';
 
 /** How little of the stick's push counts as none. */
@@ -68,11 +66,10 @@ export interface View { watch: number; move: 'cut' | 'fly'; hands: boolean; circ
 const idleLook = { x: 0, y: 0, held: false };
 
 /** world: the planet and its climate; anchors: the sea's (frame.ts), for the waves' CPU copy; chart: the bots' chart
- *  of open water (sim/route.ts); start: where she lies and the bearing she heads (radians); legs: a debug drive, or
- *  ''; others: the others afloat. */
+ *  of open water (sim/route.ts); start: where she lies and the bearing she heads (radians); first: the match in hand
+ *  until another is dealt. */
 export function createGame(
-  world: World, anchors: readonly Anchor[], chart: Chart, element: HTMLElement, start: { at: Vec3; bearing: number }, legs: string,
-  others: readonly Other[], first: Match,
+  world: World, anchors: readonly Anchor[], chart: Chart, element: HTMLElement, start: { at: Vec3; bearing: number }, first: Match,
 ) {
   const ground = world.planet.height;
   const sea = createSwell(anchors, ground, world.climate.seaWind);
@@ -88,18 +85,8 @@ export function createGame(
   const shots = createShots();
   /** Her pose as last drawn. */
   let last: ShipPose = flown({ id: PLAYER, seat: 0, stage: 'sea', at: start.at, heading: bearing(start.at, start.bearing), height: 0, speed: 0, climb: 0 });
-
-  // the ships she starts among, and the drive, sailed now
-  last = state.begin(start, others);
+  /** Her helm while lashed, until a hand takes it. */
   let held: ((s: ShipState) => Helm) | null = null;
-  const still: Order = { aim: null, fire: false };
-  for (const leg of legs.split(';').filter(Boolean)) {
-    const [b, throttle, seconds] = leg.split(',').map(Number);
-    held = (s) => ({ course: bearing(s.at, (b * Math.PI) / 180), throttle });
-    for (let i = 0; i < Math.round(seconds / STEP) && state.mine(); i++) state.advance(held(state.mine()!.ship), still, HOLD);
-  }
-  last = state.after(PLAYER) ?? last;
-  chase.reset(last, state.clock(1));
 
   /** The hands' orders: the stick's push as a heading across the sea as the camera sees it. */
   const orders = (stick: Hands['stick']): Helm => {
@@ -124,13 +111,15 @@ export function createGame(
   const shoot = (pose: ShipPose, dt: number) =>
     shots.take({ pose, drop: state.gale(), flyer: view.watch === PLAYER ? state.herFlyer() : null, circle: view.circle, ships: SHIPS }, dt);
 
-  /** A new match or sea: the camera behind her, its shots and orders as at the start. */
+  /** A new match or sea: the camera behind her, its shots and orders as at the start, her helm free. */
   const restart = (her: ShipPose, shot = false) => {
     view = { watch: PLAYER, move: 'cut', hands: true, circle: false };
     shots.reset();
+    held = null;
     last = her;
     chase.reset(last, state.clock(1), shot ? shoot(last, 0).shot : undefined);
   };
+  restart(state.anchor(start));
 
   return {
     /** A frame of dt seconds: the hands read, the match stepped on, the camera moved after the ship it follows. */
@@ -176,7 +165,6 @@ export function createGame(
     },
     sinkings: state.sinkings,
     ships: state.ships,
-    time: state.time,
     landed: state.landed,
     alive: state.alive,
     /** Fire her gun at the next step, if it is loaded then (the HUD's button). */
@@ -188,6 +176,15 @@ export function createGame(
     /** A quiet sea for the lobby: her ship alone where she lies at the start. */
     anchor() {
       restart(state.anchor(start));
+    },
+    /** A match at sea with no drop: her ship where she lies at the start, the others about her. */
+    atSea(others: readonly Berth[]) {
+      restart(state.begin(start, others));
+    },
+    /** Lashes her helm: from the next step she sails by `helm` (given her ship as she lies) until a hand takes the
+     *  helm (the stick pushed or the look dragged). */
+    lash(helm: (s: ShipState) => Helm) {
+      held = helm;
     },
     dive: state.dive,
     mark: state.mark,
@@ -207,7 +204,7 @@ export function createGame(
       }
       view = next;
     },
-    scuttle: state.scuttle,
+    sink: state.sink,
   };
 }
 

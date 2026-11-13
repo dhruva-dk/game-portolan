@@ -1,6 +1,6 @@
-// How a match is set up on the world: where her ship lies when there is no drop (the lobby's quiet sea, and the dev
-// server's match at sea), the bots' chart of the planet's water, and the matches dealt one after another, each with
-// its storm and its bots' minds.
+// How a match is set up on the world: where her ship lies when there is no drop (the lobby's quiet sea, and a match
+// at sea), the bots' chart of the planet's water, and the matches dealt one after another, each with its storm and its
+// bots' minds.
 
 import { charted, type Chart } from '../sim/route';
 import { createStorm, type Storm } from '../sim/storm';
@@ -35,8 +35,8 @@ export function chartOf(seed: number): Promise<{ chart: Chart; ms: number }> {
 
 /**
  * The matches on a planet of this seed: the first on the planet's own seed, each next one dealt a seed of its own (its
- * storm and its bots' minds come from it). hold: seconds the storm is held at (?storm=), or null to let it run; gun:
- * the rarity every ship is armed with (?gun=), or null for none.
+ * storm and its bots' minds come from it). hold: seconds the storm is held at, or null to let it run; gun: the rarity
+ * every ship is armed with, or null for none.
  */
 export function createMatches(seed: number, planet: Planet, hold: number | null, gun: number | null) {
   const depth = (p: Vec3) => -planet.height(p);
@@ -54,3 +54,5 @@ export function createMatches(seed: number, planet: Planet, hold: number | null,
     deal: (): Match => match(seed + 7919 * ++played),
   };
 }
+
+export type Matches = ReturnType<typeof createMatches>;

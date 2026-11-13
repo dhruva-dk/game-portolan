@@ -7,8 +7,8 @@
 // take off hit points, the storm (sim/storm.ts, on the match's clock: the steps sailed) wears at ships outside its
 // cap, and a ship sunk is taken off the sea and drawn going down (sinking.ts) until she is gone. What the fighting did
 // is kept a few seconds as Blasts, for the frame to draw (gunfire/gunfire.ts). The others are bots (sim/bot.ts), each
-// seeded by the match and her slot, unless given a way to make (?way=), when they hold a straight course as scripted
-// ships for captures. Ships put to sea gunless, unless ?gun= arms them all (debug.ts).
+// seeded by the match and her slot, unless put to sea with her helm lashed, when she holds it and nobody steers her.
+// Ships put to sea gunless, unless the match arms them all.
 //
 // A match begun with drop() opens with the Gale (sim/drop.ts): the whole fleet carried high over the planet; she
 // leaves it by dive(), the bots when they choose, and each glides down and puts to sea where she touches the water.
@@ -40,6 +40,8 @@ import { sinking } from './sinking';
 
 /** How long what the guns did is kept for the frame, seconds: past the last of its smoke (gunfire/gunfire.ts). */
 const KEPT = 5;
+/** No way on and the rudder amidships. */
+const AMIDSHIPS: Helm = { course: null, throttle: 0 };
 
 /** A bearing (radians clockwise from north at a point) as a direction there. */
 export const bearing = (at: Vec3, b: number): Vec3 => {
@@ -47,12 +49,12 @@ export const bearing = (at: Vec3, b: number): Vec3 => {
   return add(scale(f.north, Math.cos(b)), f.east, Math.sin(b));
 };
 
-/** SCAFFOLDING (debug.ts ?ships=, until ships are placed for real): a ship on the sea in her own colours, sailed by a
- * bot; or, given a `way` (m/s), on a straight course at that speed, her rudder amidships. */
-export interface Other { at: Vec3; heading: Vec3; look: Look; way: number }
+/** A ship put to sea about her in a match at sea: where she lies and heads, her colours, and her helm lashed (she holds
+ * it from the start, making the way its throttle asks, and nobody steers her), or null for a bot at it. */
+export interface Berth { at: Vec3; heading: Vec3; look: Look; lashed: Helm | null }
 
 /** The match: its seed (each bot's mind comes from it and her slot), its storm by the match's clock (s), and the
- * rarity of gun every ship is armed with (?gun=), or null for none. */
+ * rarity of gun every ship is armed with, or null for none. */
 export interface Match { seed: number; storm: (seconds: number) => Storm; gun: number | null }
 
 /** A ship sunk: who she was, who sank her (the ship whose ball or ram dealt the last blow; null for the storm), how,
@@ -71,8 +73,8 @@ export interface Dropping {
   course: readonly Vec3[]; fleet: readonly Vec3[]; first: Cap; mark: Vec3 | null;
 }
 
-/** What is kept of a ship afloat beside her Vessel: her colours, her bot (null: the player's, or a scripted ship's),
- * the orders a scripted ship holds, how she rides the sea, and her last two poses. */
+/** What is kept of a ship afloat beside her Vessel: her colours, her bot (null: the player's, or a lashed ship's),
+ * the helm a lashed ship holds, how she rides the sea, and her last two poses. */
 interface Aboard { look: Look; mind: Memory | null; steady: Helm; ride: Ride; before: ShipPose; after: ShipPose }
 /** A ship going down: her pose when she sank and the step she sank at, listing to `side`. */
 interface Wreck { id: number; look: Look; pose: ShipPose; tick: number; side: number }
@@ -96,11 +98,12 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
   let drop: Drop | null = null, dived = false, mark: Vec3 | null = null, lane: Vec3[] = [];
   const flying = new Map<number, { before: ShipPose; after: ShipPose }>();
 
-  /** Puts a ship to sea: a bot unless she is the player's or holds a straight course (`way`). */
-  const launch = (id: number, ship: ShipState, look: Look, bot: boolean, way = 0) => {
+  /** Puts a ship to sea: a bot's unless she is the player's or her helm is lashed. */
+  const launch = (id: number, ship: ShipState, look: Look, lashed: Helm | null = null) => {
     fleet.push(afloat(id, ship));
     const r = settled(ship, sea, tick * STEP), p = pose(ship, r);
-    aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: { course: null, throttle: way / SHIP.top }, ride: r, before: p, after: p });
+    const bot = id !== PLAYER && !lashed;
+    aboard.set(id, { look, mind: bot ? mind(seedOf(id), ship.at) : null, steady: lashed ?? AMIDSHIPS, ride: r, before: p, after: p });
   };
 
   /** Clears the sea and the drop for a new match. */
@@ -141,7 +144,7 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
   const wreckAt = (w: Wreck, now: number) => sinking(w.pose, now - w.tick * STEP, w.side);
 
   return {
-    /** One step: the drop's, then the player's helm and gun, everyone else's from her bot or her script; then the
+    /** One step: the drop's, then the player's helm and gun, everyone else's from her bot or her lashed helm; then the
      *  fleet's step and the fighting's, and what it did kept to be drawn. */
     advance(helm: Helm, gun: Order, leap: Leap) {
       if (drop) {
@@ -149,7 +152,7 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
         bots.leaps.set(PLAYER, leap);
         const r = stepDrop(bots.drop, bots.leaps, STEP, depth, fleet.map((v) => v.ship.at));
         for (const f of r.landed) {
-          launch(f.id, { ...shipAt(f.at, f.heading), speed: f.speed }, lookOf(f.id), f.id !== PLAYER);
+          launch(f.id, { ...shipAt(f.at, f.heading), speed: f.speed }, lookOf(f.id));
           flying.delete(f.id);
         }
         drop = r.drop.flyers.length ? r.drop : null;
@@ -289,11 +292,11 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
       return mark ? markLeap(f, mark) : HOLD;
     },
 
-    /** A match at sea: hers at `start`, heading `bearing` (radians), and the others. Returns her pose. */
-    begin(start: { at: Vec3; bearing: number }, others: readonly Other[]): ShipPose {
+    /** A match at sea, with no drop: hers at `start`, heading `bearing` (radians), and the others. Returns her pose. */
+    begin(start: { at: Vec3; bearing: number }, others: readonly Berth[]): ShipPose {
       clear(match, [PLAYER, ...others.map((_, i) => i + 1)]);
-      launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK, false);
-      others.forEach((o, i) => launch(i + 1, { ...shipAt(o.at, o.heading), speed: o.way }, o.look, o.way <= 0, o.way));
+      launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
+      others.forEach((o, i) => launch(i + 1, { ...shipAt(o.at, o.heading), speed: (o.lashed?.throttle ?? 0) * SHIP.top }, o.look, o.lashed));
       return aboard.get(PLAYER)!.after;
     },
     /** A new match opening with the Gale: SHIPS ships, hers the first, the rest bots, every one in the air. Returns
@@ -310,15 +313,15 @@ export function createState(planet: Planet, sea: Surface, chart: Chart, first: M
     /** A quiet sea for the lobby: her ship alone at `start`. Returns her pose. */
     anchor(start: { at: Vec3; bearing: number }): ShipPose {
       clear(match, [PLAYER]);
-      launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK, false);
+      launch(PLAYER, shipAt(start.at, bearing(start.at, start.bearing)), LOOK);
       return aboard.get(PLAYER)!.after;
     },
     /** She leaves the Gale (DIVE), as soon as it allows. */
     dive() { dived = true; },
     /** Marks where she means to come down (a unit vector), or clears it. */
     mark(p: Vec3 | null) { mark = p; },
-    /** DEBUG (?screen=spectate, ?screen=won): sinks a ship at once, as if by `by`. */
-    scuttle(id: number, by: number | null) {
+    /** Sends a ship afloat to the bottom at once, the last blow `by`'s (null: the storm's). */
+    sink(id: number, by: number | null) {
       if (!aboard.has(id)) return;
       battle = { ...battle, crews: battle.crews.map((c) => (c.id === id ? { ...c, health: { ...c.health, hull: 0, shield: 0 } } : c)) };
       founder(id, by, by === null ? 'storm' : 'shot');

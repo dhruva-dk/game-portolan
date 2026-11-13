@@ -5,7 +5,7 @@ import {
 import { fxaa } from 'three/examples/jsm/tsl/display/FXAANode.js';
 import { environmentAt, type World } from './environment';
 import type { Compute, Draw } from './gpu';
-import type { Eye, Snapshot } from './snapshot';
+import { FLEET, type Eye, type Snapshot } from './snapshot';
 import { createSky, type Sky } from './sky/sky';
 import { createGround } from './land/ground';
 import { createIslands } from './land/islands';
@@ -14,7 +14,7 @@ import { createSand } from './land/sand';
 import { createSeabed } from './land/seabed';
 import { createShadow } from './land/shadow';
 import { createView } from './view/view';
-import { createWater } from './water/water';
+import { createWater, type SeaShows } from './water/water';
 import { createFleet } from './ship/fleet';
 import { createGunfire } from './gunfire/gunfire';
 import { sunAt } from './world/sun';
@@ -28,8 +28,6 @@ import { sunAt } from './world/sun';
  * and the cloud tops stay short of white, and the sea keeps its colour (at half a stop over it pales to cyan).
  */
 const EXPOSURE = 4.4;
-/** The most ships the sea carries. */
-const SHIPS = 32;
 /** The eye's near and far planes, metres: in the air, past the far side of the planet from as high as it goes; from
  *  space, round the whole planet from as far out as the full map goes. */
 const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
@@ -38,13 +36,13 @@ const PLANES = { air: [0.5, 2000], space: [50, 4000] } as const;
 const SPACE = [0.0015, 0.002, 0.004] as const;
 const AIR = 400;
 
-/** How the frame draws: a debug view's name (water.ts) or ''; every ship at one level of detail (ship/fleet.ts pin)
- *  or null; whether the near ships' canvas is simulated; and anything more to stand in the scene, lit by the sky. */
+/** How the frame draws: what the sea is drawn as (water/water.ts); every ship at one level of detail (ship/fleet.ts
+ *  pin) or null; whether the near ships' canvas is simulated; and anything more to stand in the world, lit by the sky. */
 export interface FrameOptions {
-  view: string;
+  sea: SeaShows;
   lod: number | null;
   cloth: boolean;
-  extras?: (light: Sky) => readonly Object3D[];
+  extras?: (light: Sky, world: World) => readonly Object3D[];
 }
 
 /**
@@ -97,18 +95,18 @@ export function createFrame(renderer: WebGPURenderer, world: World, options: Fra
   scene.backgroundNode = sky.background;
   // the ground baked for the shaders in a worker, while the islands are built here
   const ground = createGround(world.seed);
-  const water = createWater(view, sky.light, ground, world.wind, SHIPS, options.view);
+  const water = createWater(view, sky.light, ground, world.wind, FLEET, options.sea);
   const shadow = createShadow();
   const light = createLighting(sky.light, water.below, shadow.visible);
   const sand = createSand(view, ground, light);
   const seabed = createSeabed(view, ground, sand);
   const islands = createIslands(world.planet, world.seed, view, light, sand);
   shadow.cast(...islands.casters);
-  const fleet = createFleet(light, world.wind, SHIPS);
+  const fleet = createFleet(light, world.wind, FLEET);
   fleet.pin(options.lod);
   fleet.simulate(options.cloth);
   const gunfire = createGunfire(light);
-  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...(options.extras?.(sky.light) ?? []));
+  scene.add(seabed.mesh, ...islands.meshes, ...fleet.meshes, water.mesh, ...gunfire.meshes, ...(options.extras?.(sky.light, world) ?? []));
 
   /** The scene from a camera, and what it saw at each pixel: its colour and depth, and the ray to it from the camera
    *  (world direction, metres). In a post pass three's camera nodes are the screen quad's, so the camera's own

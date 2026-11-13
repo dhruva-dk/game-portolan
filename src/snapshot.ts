@@ -40,6 +40,9 @@ export type Blast =
   | { kind: 'splash'; time: number; at: Vec3; land: boolean }
   | { kind: 'strike'; time: number; at: Vec3; ram: boolean };
 
+/** The most ships the frame draws at once: the sea's room for them. */
+export const FLEET = 32;
+
 /** Everything the frame draws, for one frame. */
 export interface Snapshot {
   eye: Eye;
@@ -49,7 +52,7 @@ export interface Snapshot {
   /** The storm's safe cap at the moment drawn (sim/storm.ts), worked out on the match's own clock (which stands still
    *  through the drop): the frame never works it out from `clock`. */
   storm: Cap;
-  /** Every ship drawn; a ship not listed is not drawn. */
+  /** Every ship drawn (at most FLEET, each id below it); a ship not listed is not drawn. */
   ships: readonly ShipDraw[];
   /** The ship always drawn whole (the player's, which the chase camera holds close), or null. */
   own: number | null;

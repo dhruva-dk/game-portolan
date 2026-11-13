@@ -34,3 +34,5 @@ export function createReferee(game: Game) {
     },
   };
 }
+
+export type Referee = ReturnType<typeof createReferee>;

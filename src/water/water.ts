@@ -78,11 +78,12 @@ const SMOOTHEST = 1e-4;
  */
 const RUNUP = 0.5, BACKWASH = 0.3, SWASH_FROM = 0.5;
 
-/**
- * wind: the planet's prevailing wind; ships: the most there will be; debug: 'charts' colours the sea by its charts'
- * weights (red, green, blue: nearest first); 'wake' shows the ships' marks (wake.ts).
- */
-export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, debug = '') {
+/** What the sea is drawn as: its water; or, to judge them, its charts' weights (red, green, blue: nearest first) or
+ *  the ships' marks on it (wake.ts). */
+export type SeaShows = 'water' | 'charts' | 'wake';
+
+/** wind: the planet's prevailing wind; ships: the most there will be; shows: what the sea is drawn as. */
+export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, ships: number, shows: SeaShows = 'water') {
   const waves = createWaves();
   const wake = createWake(view, sky, ships);
   const hulls = createHulls();
@@ -239,9 +240,9 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near).mul(float(1).sub(storm.mul(STORM_DARK)));
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
-  if (debug === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
+  if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();
   // the ships' marks: foam red, the wake's crests green (troughs dark), air blue, shadow grey
-  if (debug === 'wake') {
+  if (shows === 'wake') {
     material.colorNode = Fn(() => {
       const m = wake.read(normalize(rest).mul(R)).marks;
       return vec3(saturate(m.x), saturate(m.y.mul(2).add(0.5)), saturate(m.z)).mul(float(1).sub(wake.shade(positionWorld).mul(0.7))).mul(0.1);

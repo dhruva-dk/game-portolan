@@ -127,3 +127,5 @@ export function createFlow(
     },
   };
 }
+
+export type Flow = ReturnType<typeof createFlow>;
