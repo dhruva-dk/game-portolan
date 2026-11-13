@@ -1,6 +1,6 @@
 // The match's HUD, laid on the world as the chartmaker's slips (docs/ui-sheet, as the owner reworked it):
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
-//   top centre  the Storm's clock (its spiral, m:ss; in rubric under 30 s) and the ships afloat (a ship, a count)
+//   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
 //   top right   the minimap (minimap.ts): who holds the sea, the islands, the Storm's calm and the next, the way in
 //               from outside it, the loot and ships about her; a tap opens the full map
 //   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
@@ -14,7 +14,7 @@
 //   bottom      the hotbar right of centre, out of the stick's side: the gun's slot (its rarity's ink under it), then
 //               three of stores; the one in hand gilt, a gold ring running round it while it is used, and a gold
 //               mark bobbing over the slot a tap would swap for what lies within reach (0117's hotbar)
-//   rim         washed rubric while she is outside the Storm's calm, the deeper the further out (0117's)
+//   rim         washed the Storm's violet while she is outside its calm, the deeper the further out (0117's)
 //   blows       what happens answered (juice.ts): the hit cross round the reticle, the figures off a struck ship, the
 //               arcs toward a blow on her, the screen's flashes and rims, the pieces knocked, a piece taken up flown
 //               to its slot
@@ -85,7 +85,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
   fall.style.transform = 'translate(-50%,-50%)';
   // the rim's wash outside the calm, under everything else
   const rim = document.createElement('div');
-  rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 24px rgba(184,48,26,.75);opacity:0`;
+  rim.style.cssText = `position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 80px 18px rgba(62,24,96,.6);opacity:0`;
   body.prepend(rim);
   // fired as the thumb comes down, as the old game's was, and the touch kept from the canvas
   fire.addEventListener('pointerdown', (e) => {
@@ -144,8 +144,8 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
 
       const time = clock(s.storm), closing = s.closing || s.storm < 30;
       draw(readings, `${time} ${s.afloat}`, () => svg(184, 38,
-        slip(1, 2, 88, 34) + glyph('hud.spiral', 20, 19, 22, { ink: closing ? 'rubric' : 'iron' })
-        + figure(60, 19, time, 23, { fill: closing ? INK.rubric : INK.iron })
+        slip(1, 2, 88, 34) + glyph('hud.spiral', 20, 19, 22, { ink: closing ? 'storm' : 'iron' })
+        + figure(60, 19, time, 23, { fill: closing ? INK.storm : INK.iron })
         + slip(95, 2, 88, 34) + glyph('hud.shipsLeft', 116, 19, 22) + figure(154, 19, s.afloat, 23)));
 
       // each charge a pip; the one coming back filling round, in steps of a 24th

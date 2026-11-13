@@ -30,7 +30,7 @@
 
 import { DoubleSide, Mesh, MeshBasicNodeMaterial, type Texture } from 'three/webgpu';
 import {
-  Discard, Fn, If, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
+  Discard, Fn, If, abs, cameraPosition, cross, cameraProjectionMatrix, cameraProjectionMatrixInverse, cameraViewMatrix, dFdx, dFdy, dot, float,
   getScreenPosition, getViewPosition, length, log2, max, min, mix, normalize, positionView, positionWorld, saturate,
   screenUV, select, smoothstep, sqrt, step, tanh, texture, varying, vec2, vec3, vec4, viewportDepthTexture, viewportSharedTexture,
 } from 'three/tsl';
@@ -74,7 +74,12 @@ const GATHER = 0.8;
  * In the storm (sky/storm.ts) the wind's gusts roughen the sea by STORM_ROUGH more mean square slope, its whitecaps
  * cover STORM_FOAM of it, and the rain on it and the dark over it take STORM_DARK of its light.
  */
-const STORM_ROUGH = 0.03, STORM_FOAM = 0.35, STORM_DARK = 0.35;
+const STORM_ROUGH = 0.03, STORM_FOAM = 0.45, STORM_DARK = 0.3;
+/**
+ * The storm's foot: the sea churned white from its edge out to FOOT (fading over the second) metres; and its edge's
+ * line, EDGE_LINE m to each side (or most of a pixel), glowing a pale violet (light per unit sun, so the bloom takes it).
+ */
+const FOOT = [6, 26] as const, EDGE_LINE = 0.3, EDGE_LIGHT = [0.11, 0.06, 0.2] as const;
 /** The least mean square slope the surface is shaded with: a film of water on sand is still rippled. */
 const SMOOTHEST = 1e-4;
 /**
@@ -209,9 +214,13 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
       bubbles.addAssign(froth.air.mul(c.w.mul(c.w)));
     }, dp);
     variance.addAssign(waves.ripples.mul(short).mul(float(1).sub(tanh(lean.div(waves.steepness)).mul(GATHER))));
-    const storm = sky.storm(p);
+    const storm = sky.storm(p), past = sky.stormEdge(p);
     variance.addAssign(storm.mul(STORM_ROUGH));
-    foam.assign(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)));
+    // the storm's foot churned white along its edge, over the crests
+    const foot = smoothstep(-2, 2, past).mul(float(1).sub(smoothstep(FOOT[0], FOOT[1], past)));
+    foam.assign(max(mix(foam, max(foam, smoothstep(0.55, 1, phase)), storm.mul(STORM_FOAM)), foot.mul(smoothstep(0.2, 0.8, phase)).mul(0.8)));
+    // and its line on the water: so wide in metres near, never under a pixel and a half far off
+    const edgeLine = float(1).sub(smoothstep(0, max(footprint, 0.05), abs(past).sub(max(float(EDGE_LINE), footprint.mul(0.75)))));
     const v = normalize(cameraPosition.sub(positionWorld));
     // Toward the horizon the eye looks along the sea, and the filtered slopes turn some of it away from the eye. The
     // eye can't see a face turned away (only the faces of those waves toward it), so such normals are bent back
@@ -247,7 +256,8 @@ export function createWater(view: View, sky: Sky, ground: Ground, wind: Wind, sh
     // mirror: at the waterline the depth cuts every wave away, and with α² = 0 the facets' D is 0/0, a line of NaN
     // drawn black along every beach.
     const alpha = sqrt(max(variance.mul(float(1).sub(air.mul(0.6))), SMOOTHEST));
-    return optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    const sea = optics.seaRadiance(positionWorld, n, v, alpha, crest, foam, behind, path, sparkle, near, held).mul(float(1).sub(storm.mul(STORM_DARK)));
+    return mix(sea, vec3(...EDGE_LIGHT), edgeLine);
   })();
   // the charts' weights as red, green and blue, about as bright on the screen as they are after the frame's exposure
   if (shows === 'charts') material.colorNode = Fn(() => charts.debug(rest).mul(0.1))();

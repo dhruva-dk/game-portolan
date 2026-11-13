@@ -61,11 +61,11 @@ const chevron = (x: number, y: number, side: number) =>
 const cause = (x: number, y: number, how: End['how']) => {
   const r = 22;
   const mark = how === 'shot' ? glyph('weapon.cannon', x, y, 32)
-    : how === 'storm' ? glyph('hud.storm', x, y, 32, { ink: 'rubric' })
+    : how === 'storm' ? glyph('hud.storm', x, y, 32, { ink: 'storm' })
       : `<g transform="translate(${x} ${y})" stroke="${INK.iron}" stroke-width="1.4" stroke-linejoin="round">`
         + `<path d="M-17 -2L-3 -2L1 2L-3 7L-15 7Z" fill="url(#h-iron)"/><path d="M17 -2L3 -2L-1 2L3 7L15 7Z" fill="url(#h-iron)" transform="scale(1 -1) translate(0 -5)"/>`
         + `<path d="M0 -12l2 6l5 -4l-2 6l6 1l-6 2l3 5" fill="none" stroke="${INK.rubric}" stroke-width="1.6"/></g>`;
-  return paperDisc(x, y, r, how === 'storm' ? INK.rubric : INK.iron) + mark;
+  return paperDisc(x, y, r, how === 'storm' ? INK.storm : INK.iron) + mark;
 };
 
 /** The sunburst behind a win's laurel: straight rays and flames by turns, gilt, turning slowly. */

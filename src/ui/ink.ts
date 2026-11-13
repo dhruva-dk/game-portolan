@@ -7,11 +7,11 @@
 
 import { GLYPHS, type Glyph, type Prim } from './glyphs';
 
-/** Inks: iron for outlines and figures, rubric for harm and the Storm, gold for the chosen and the won. Lead white
- * only ever over an iron halo, so it holds on bright water. */
+/** Inks: iron for outlines and figures, rubric for harm, the Storm's violet for the Storm alone, gold for the chosen and
+ * the won. Lead white only ever over an iron halo, so it holds on bright water. */
 export const INK = {
-  iron: 'rgb(38,25,16)', rubric: 'rgb(184,48,26)', green: 'rgb(58,104,62)', blue: 'rgb(38,76,140)', gold: 'rgb(190,138,44)',
-  sepia: 'rgb(128,94,62)', white: 'rgb(252,246,230)',
+  iron: 'rgb(38,25,16)', rubric: 'rgb(184,48,26)', storm: 'rgb(98,46,140)', green: 'rgb(58,104,62)', blue: 'rgb(38,76,140)',
+  gold: 'rgb(190,138,44)', sepia: 'rgb(128,94,62)', white: 'rgb(252,246,230)',
 } as const;
 export type Ink = keyof typeof INK;
 /** Washes laid over the paper. */

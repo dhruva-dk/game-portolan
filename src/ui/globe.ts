@@ -13,7 +13,7 @@
 // whole planet seen from the farthest the eye goes (the eye's field of view set to fit), and a pinch zooms within it.
 //
 // Over the window, placed each frame by projecting world points with the eye's numbers: the islands' coasts, inked
-// lightly over their real ground; the Storm's edge in rubric (the Storm itself is the world's own, its cloud seen from
+// lightly over their real ground; the Storm's edge in its violet (the Storm itself is the world's own, its cloud seen from
 // above); her galleon, gilt. Whatever is on the planet's far side is not shown. Beside the window, the two readings
 // that matter: ships afloat and the Storm's clock.
 
@@ -129,7 +129,7 @@ export function createGlobe(coasts: readonly Coast[]) {
   const ctx = canvas.getContext('2d')!;
   // her mark
   const mark = layer('left:0;top:0;pointer-events:none');
-  mark.innerHTML = svg(64, 64, `<circle cx="32" cy="32" r="27" fill="${WASH.gold}" fill-opacity=".45" stroke="${INK.iron}" stroke-width="1.2"/>`
+  mark.innerHTML = svg(64, 64, `<circle cx="32" cy="32" r="27" fill="${WASH.vermilion}" fill-opacity=".9" stroke="${INK.iron}" stroke-width="1.2"/>`
     + `<circle cx="32" cy="32" r="30" fill="none" stroke="${INK.white}" stroke-opacity=".7" stroke-width="1.5"/>` + galleon(32, 28, 50, { hull: WASH.gold }));
   // the readings, each side of the window: ships afloat, and the Storm's clock
   const afloat = layer('transform:translate(-50%,-50%)'), storm = layer('transform:translate(-50%,-50%)');
@@ -242,7 +242,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
-    // the Storm: swirls over its cloud, foreshortened toward the limb; its edge, a pale halo then rubric (none while
+    // the Storm: swirls over its cloud, foreshortened toward the limb; its edge, a pale halo then its violet (none while
     // its calm is still the whole planet)
     if (cap.radius < Math.PI - 0.01) {
       const calm = Math.cos(cap.radius + 40 / R), s = Math.min(1.4, perRadian() / 250);
@@ -266,7 +266,7 @@ export function createGlobe(coasts: readonly Coast[]) {
       ctx.strokeStyle = 'rgba(252,246,230,.75)';
       ctx.lineWidth = 6;
       ctx.stroke();
-      ctx.strokeStyle = INK.rubric;
+      ctx.strokeStyle = INK.storm;
       ctx.lineWidth = 3;
       ctx.stroke();
     }
@@ -289,8 +289,8 @@ export function createGlobe(coasts: readonly Coast[]) {
     read = key;
     const closing = state.storm < 30;
     afloat.innerHTML = svg(80, 96, slip(1, 1, 78, 94, { flat: true }) + glyph('hud.shipsLeft', 40, 30, 30) + figure(40, 70, state.afloat, 28));
-    storm.innerHTML = svg(80, 96, slip(1, 1, 78, 94, { flat: true }) + glyph('hud.spiral', 40, 30, 30, { ink: closing ? 'rubric' : 'iron' })
-      + figure(40, 70, clock(state.storm), 24, { fill: closing ? INK.rubric : INK.iron }));
+    storm.innerHTML = svg(80, 96, slip(1, 1, 78, 94, { flat: true }) + glyph('hud.spiral', 40, 30, 30, { ink: closing ? 'storm' : 'iron' })
+      + figure(40, 70, clock(state.storm), 24, { fill: closing ? INK.storm : INK.iron }));
   }
 
   // ── the fingers: one spins, two pinch; a press off the panel that did neither shuts the map ──

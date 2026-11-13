@@ -13,6 +13,7 @@
 //   reflect(d, r)    the sky and clouds seen along world direction d off a surface of roughness r
 //   storm(p)         0…1, how deep in the storm (storm.ts) world position p lies; the sun and the sky's glow there are
 //                    already dimmed by it
+//   stormEdge(p)     metres world position p lies past the storm's edge (negative in its calm)
 // and the frame's post pass:
 //   fog(c, dir, m)   colour c seen m metres away along world direction dir, through the haze (the sky: m past SKY_METRES)
 //   aerial(c, dir, m) the same through Earth's air at the eye's scale, for the view from space
@@ -59,9 +60,9 @@ const SUN_RADIANCE = 8, EDGE = 0.3, HALO = 0.04, WIDTH = 0.6;
 const PEAK_SHARE = 0.05, PEAK_G = 0.95;
 /**
  * In the storm, the share of the sun its cloud lets through, and of the sky's glow; and the light in the storm's
- * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted cold.
+ * own air: SUN_IN of the sun's light (scattered every way, over 4π) and AIR_IN of the sky's glow, tinted a dark violet.
  */
-const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.85, 0.92, 1] as const;
+const STORM_SUN = 0.08, STORM_SKY = 0.35, SUN_IN = 0.6, AIR_IN = 0.3, STORM_TINT = [0.56, 0.38, 0.86] as const;
 /**
  * The haze, drawn to the planet's scale rather than Earth's: on a sea whose horizon is 150 m off, Earth's air would
  * leave it as clear as a room, so the far field is swallowed by a haze of its own. Its optical depth is HAZE_DEPTH a
@@ -91,6 +92,7 @@ export interface Sky {
   ambient(p: Vec3Node, n: Vec3Node): Vec3Node;
   reflect(dir: Vec3Node, roughness: FloatNode): Vec3Node;
   storm(p: Vec3Node): FloatNode;
+  stormEdge(p: Vec3Node): FloatNode;
 }
 
 export function createSky(view: View) {
@@ -189,7 +191,7 @@ export function createSky(view: View) {
   const cloudShadow = (p: Vec3Node): FloatNode => mix(1, clouds.shadow(p), under).mul(mix(1, STORM_SUN, storm.depth(p)));
   // what a surface mirrors is the sky beyond the storm: seen from the eye, which is near enough the mirror
   const reflect = (dir: Vec3Node, roughness: FloatNode): Vec3Node => storm.dim(reflection.reflect(dir, roughness), dir, stormLight);
-  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, ambient, reflect, storm: storm.depth };
+  const light: Sky = { sun: sunOver, sunIlluminance, cloudShadow, ambient, reflect, storm: storm.depth, stormEdge: storm.edge };
 
   return {
     background,
@@ -209,7 +211,7 @@ export function createSky(view: View) {
      * cast no shadow, and the sea mirrors the sky alone.
      */
     update(env: Environment, cap: Cap, camera: PerspectiveCamera, kind: Eye['kind'], dt: number, width: number, height: number): { tables: Compute[]; clouds: Compute[]; reflection: Compute[] } {
-      storm.update(cap, env.clock);
+      storm.update(cap, env.clock, [camera.position.x, camera.position.y, camera.position.z]);
       sun.value.set(...env.sunDirection);
       origin.value.set(...env.sunPlaces.origin);
       there.value.set(...sunAtOrigin(env.sunPlaces, env.timeOfDay));

@@ -13,6 +13,8 @@
 // (clockwise from north: 90 east) and ?look=deg pitches it. The planet is 554 m in radius, so a degree is 9.67 m.
 // ?fly, or any of lat, lon and alt, flies the debug camera (fly.ts) instead of sailing, starting over where she would
 // lie by default (for seed 3 the largest island's centre is at lat 52.8, lon −170.1, its coast about 54 m out).
+// ?wall=m flies it m metres inside the storm's edge (with ?storm=, the cap held then; negative: outside it), on the
+// line from the cap's centre toward where she would lie, looking out across the edge (?yaw= turns from that).
 // ?drive=bearing,throttle,seconds;… sails her, her helm lashed to each leg in turn (bearings in degrees clockwise from
 // north where she is), before the first frame; she holds the last until a hand takes the helm. ?gun=0…4 arms every
 // ship with a gun of that rarity (sim/gun.ts); ?fire fires hers at the first step, ?fire=seconds so many seconds into the
@@ -100,7 +102,7 @@ const params = new URLSearchParams(location.search);
 const number = (name: string, fallback: number) => (params.has(name) ? Number(params.get(name)) : fallback);
 const degrees = Math.PI / 180;
 /** The debug camera flies instead of the game. */
-const flying = params.has('fly') || ['lat', 'lon', 'alt'].some((k) => params.has(k));
+const flying = params.has('fly') || ['lat', 'lon', 'alt', 'wall'].some((k) => params.has(k));
 
 /** The art direction's alternates (?mood=): the hour, and the haze's mean as a share of the release's. */
 const MOODS: Record<string, { hours: number; haze: number }> = { warm: { hours: 17.4, haze: 1.2 }, noon: { hours: 12.6, haze: 0.8 } };
@@ -294,11 +296,15 @@ function safeArea(layer: HTMLElement) {
 /** The debug camera, flown from over `start` (or ?lat/?lon), keeping the world's clock itself, over `others` lying
  *  still (drawn as if making ?way=) and the storm as it stands by that clock. */
 function flyer(element: HTMLElement, start: Vec3, others: readonly Berth[], storm: (seconds: number) => Cap) {
+  // ?wall: over the storm's edge, looking out across it
+  const cap = storm(0), c = cap.centre, out = normalize(add(start, c, -dot(start, c))), a = cap.radius - number('wall', 0) / R;
+  const over = params.has('wall') ? add(scale(c, Math.cos(a)), out, Math.sin(a)) : start;
+  const away = add(scale(out, Math.cos(a)), c, -Math.sin(a)), { north, east } = frameAt(over);
   const fly = createFly(element, {
-    lat: params.has('lat') ? number('lat', 0) * degrees : Math.asin(start[1]),
-    lon: params.has('lon') ? number('lon', 0) * degrees : Math.atan2(-start[2], start[0]),
+    lat: params.has('lat') ? number('lat', 0) * degrees : Math.asin(over[1]),
+    lon: params.has('lon') ? number('lon', 0) * degrees : Math.atan2(-over[2], over[0]),
     height: number('alt', 10),
-    bearing: number('yaw', 0) * degrees,
+    bearing: number('yaw', 0) * degrees + (params.has('wall') ? Math.atan2(dot(away, east), dot(away, north)) : 0),
     pitch: number('look', -6) * degrees,
   });
   const ships: ShipDraw[] = others.map((o, i) => ({

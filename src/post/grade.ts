@@ -48,10 +48,11 @@ const DAY: readonly (readonly [number, Look])[] = [
   [0.97, { exposure: 2.05, temp: 0.04, tint: 0, contrast: 1.1, saturation: 1.32, warm: 1.1, sea: 1.4, sky: 1.2,
     shadows: [-0.004, 0.002, 0.01], highlights: [0.006, 0.004, 0], fade: 0.012, fadeTo: [0.03, 0.05, 0.07], vignette: 0.2 }],
 ];
-/** In the storm: cold and flat, its colour mostly gone, its blacks lifted to a slate grey; opened a little. */
+/** In the storm: cold and a little flat, pushed toward violet (magenta in the tint, violet shadows), its blacks
+ *  lifted to a slate violet, the corners darker; opened a little. Its colour is kept: the ships' dyes still read. */
 const STORM: Look = {
-  exposure: 2.6, temp: -0.25, tint: 0.02, contrast: 1.04, saturation: 0.7, warm: 0.85, sea: 0.9, sky: 0.85,
-  shadows: [-0.004, 0, 0.01], highlights: [-0.004, 0.002, 0.008], fade: 0.03, fadeTo: [0.12, 0.14, 0.17], vignette: 0.35,
+  exposure: 2.75, temp: -0.2, tint: -0.12, contrast: 1.08, saturation: 0.95, warm: 1, sea: 0.85, sky: 0.9,
+  shadows: [0.004, -0.004, 0.012], highlights: [0.004, 0, 0.008], fade: 0.035, fadeTo: [0.13, 0.1, 0.19], vignette: 0.45,
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
