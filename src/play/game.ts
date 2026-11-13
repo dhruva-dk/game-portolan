@@ -33,7 +33,6 @@ import { charging } from '../sim/gust';
 import { GUN, GUST, HEALTH } from '../sim/handling';
 import { progress } from '../sim/hold';
 import { offered, rarityOf } from '../sim/loot';
-import { BOT, toward } from '../sim/captain';
 import { STORM, toEdge } from '../sim/storm';
 import { sunk } from '../sim/health';
 import { RIDE } from '../sim/ride';
@@ -44,7 +43,7 @@ import type { Eye, LootDraw, Snapshot } from '../snapshot';
 import { createSwell } from '../world/swell';
 import type { Anchor } from '../world/lattice';
 import type { ShipPose } from '../world/pose';
-import { R, add, along, distance, dot, normalize, scale, type Vec3 } from '../world/sphere';
+import { R, add, distance, dot, normalize, scale, type Vec3 } from '../world/sphere';
 import { IDLE, type Hands, type Kit, type Slot, type Status } from '../player';
 import { REST, anchorageEye, dragged, relaxed, type Orbit } from './anchorage';
 import { ARRIVAL, arriving } from './arrival';
@@ -59,8 +58,8 @@ import { bearing, createState, type Berth, type Match, type Waters } from './sta
 /** How little of the stick's push counts as none. */
 const DEAD = 0.15;
 /** Loot is drawn within DRAWN m of the eye (so none from space), floating on the waves within RIDES m of the eye's
- *  ship; shown on the disc within CHARTED m. */
-const DRAWN = 700, RIDES = 320, CHARTED = 260;
+ *  ship. (Never on the disc: as in Fortnite, the sea is searched by eye.) */
+const DRAWN = 700, RIDES = 320;
 /** Seconds before the match a piece strewn at its start is taken to have come onto the water: long since bobbed up. */
 const LONG_AGO = 1e3;
 
@@ -125,14 +124,6 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
   };
   /** Whether her hands are on her ship: the flow gives them (view), she is not at anchor, and the eye is down with her. */
   const steering = () => view.hands && !anchored && arrival === null;
-  /** Whether a ship at b is in sight from a: as near as a bot looks, and no land high enough between to hide her (the
-   *  bots' own rule: sim/bot.ts hidden). */
-  const sighted = (a: Vec3, b: Vec3) => {
-    const d = distance(a, b), t = toward(a, b);
-    if (d > BOT.sightMax || !t) return d <= BOT.sightMax;
-    for (let s = BOT.sightStep; s < d; s += BOT.sightStep) if (ground(along(a, t, s).p) > BOT.sightLine) return false;
-    return true;
-  };
   restart(state.anchor(start), true);
 
   return {
@@ -218,18 +209,16 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       const full = c.gun ? GUN.reload * GUN.reloadBy[c.gun.rarity] : 1;
       // once she has sunk, the disc is the watched ship's (ui/hud.ts watch)
       const watched = view.watch !== PLAYER || sunk(c.health) ? state.ships().find((k) => k.id === view.watch) : undefined;
-      const at = watched?.at ?? v?.ship.at ?? normalize(last.position), followed = watched?.id ?? PLAYER;
+      const at = watched?.at ?? v?.ship.at ?? normalize(last.position);
       return {
         at, heading: watched?.heading ?? v?.ship.heading ?? last.forward, facing: chase.axes().ahead,
         arriving: arrival === null ? 0 : Math.max(0, 1 - arrival / ARRIVAL.seconds),
-        ships: state.vessels().filter((k) => k.id !== followed && sighted(at, k.ship.at)).map((k) => k.ship.at),
         hull: c.health.hull, hullMax: HEALTH.hull, shield: c.health.shield, shieldMax: HEALTH.shield,
         gun: c.gun ? { rarity: c.gun.rarity, ready: 1 - c.gun.loading / full, locked: lay?.target != null } : null,
         afloat: state.alive().length, sunk: sunk(c.health),
         storm: Number.isFinite(s.secondsToNext) ? s.secondsToNext : 0, closing: s.closing, eye: calm,
         next: s.phase < STORM.phases.length && (s.closing || s.next.radius < s.radius) ? { centre: s.next.centre, radius: Math.round(s.next.radius * R) } : null,
         outside: v ? Math.max(0, -toEdge(v.ship.at, s)) : 0,
-        loot: v ? state.loot().pieces.filter((l) => dot(v.ship.at, l.at) > Math.cos(CHARTED / R)).map((l) => ({ at: l.at, gun: l.goods.kind === 'gun', rarity: rarityOf(l.goods) })) : [],
         reticle: lay && { fall, reach: lay.reached },
         moments: state.deeds().map((d) => seenOf(d, chase.eye(), width, height)),
       };

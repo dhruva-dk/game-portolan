@@ -187,10 +187,10 @@ export async function passage(level = 0.8, name = 'passage', SCRIPT: Script = PA
     const lastShot = Math.max(-10, ...SCRIPT.ownShots.filter((s) => s <= t));
     const mending = t >= mend[0] && t < mend[1];
     const status: Status & Kit = {
-      at: radial, heading: forward, facing: forward, arriving: 0, ships: [], ...harm(t, SCRIPT.strikes), hullMax: 100, shieldMax: 50,
+      at: radial, heading: forward, facing: forward, arriving: 0, ...harm(t, SCRIPT.strikes), hullMax: 100, shieldMax: 50,
       gun: { rarity: 0, ready: Math.min(1, (t - lastShot) / 2), locked: false }, afloat: 4, sunk: false,
       storm: 30, closing: t >= storm.closing, eye: { centre: radial, radius: wall }, next: null, outside: Math.max(0, -wall),
-      loot: [], reticle: null, moments,
+      reticle: null, moments,
       items: [t >= pickup && t < mend[1] ? { item: 'item.smallShield', count: 1 } : null, null, null],
       chosen: t >= select ? 1 : 0, using: mending ? (t - mend[0]) / (mend[1] - mend[0]) : null, offer: null,
       gust: 2, gusts: 2, blowing: t >= gust[0] && t < gust[1],

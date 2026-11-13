@@ -28,13 +28,10 @@ export interface Status {
   /** Where the ship the camera follows is (unit sphere) and the way she heads (unit tangent): hers, or once she has
    *  sunk the one she watches. */
   at: Vec3; heading: Vec3;
-  /** The way the camera looks along the sea there (unit tangent): what the stick's up means, and the minimap's up. */
+  /** The way the camera looks along the sea there (unit tangent): what the stick's up means. */
   facing: Vec3;
   /** How much of the eye's arrival from space is still to come (1 as a match begins, 0 once it is down with her). */
   arriving: number;
-  /** The other ships afloat she can see (unit vectors): as far as a bot looks, with no land high enough between to
-   *  hide them (sim/captain.ts BOT.sightMax, sightLine). */
-  ships: readonly Vec3[];
   /** Her hit points, and their most. */
   hull: number; hullMax: number; shield: number; shieldMax: number;
   /** Her gun: its rarity (0–4, sim/handling.ts GUN.rarities), how far loaded (0…1, 1 ready), and whether its assist
@@ -46,9 +43,6 @@ export interface Status {
    *  (radius in metres) and the calm it next closes to (null once it has closed for good); how far outside the calm
    *  she is, metres (0 inside). */
   storm: number; closing: boolean; eye: { centre: Vec3; radius: number }; next: { centre: Vec3; radius: number } | null; outside: number;
-  /** The loot on the water near her, for the disc: where each piece lies (a unit vector), whether it is a gun (else
-   *  stores to mend with), and the rarity it reads as (0–4: rarity.ts). */
-  loot: readonly { at: Vec3; gun: boolean; rarity: number }[];
   /** Her gun's aim, while her hands are on her ship and she has a gun (else null). The reticle stands in the middle of
    *  the screen, where the gun is aimed (play/chase.ts); `fall` is where the ball will come down, or pass through the
    *  ship it is laid on (CSS px from the top left; null off the screen or hidden by the sea's curve), and `reach`

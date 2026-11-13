@@ -1,15 +1,13 @@
 // The minimap: a disc of the sea round her, SPAN metres to its rim, read at a glance as Fortnite's is, in the chart's
-// hand. Turned as the camera looks (her way up the screen is up the disc): the stick steers by the screen, so the way
-// to safety on the disc is the way to push the stick, and on a planet this small north swings hard near the poles.
-// The rim's vermilion mark is north.
+// hand. North is always up (the rim's vermilion mark, fixed): the disc never turns, her arrow turns on it.
 //
 // On the plain sea, from the bottom up: who holds the water, a wash in each holder's colour, hers the deeper (held.ts);
 // the islands, their aprons a pale wash, their land parchment going ochre up the hills, their coasts inked (isles.ts);
 // her open trail, a line in her colour; the Storm's side of its edge washed in its own violet and the edge a violet
-// line; the circle it next closes to, a white dotted line; the loot, marks in its rarity's ink (a lozenge a gun, a roundel stores), the better the bigger; the ships she can see, iron dots.
-// Outside the next circle a white line runs from her to its nearest point, ending in an arrowhead (on the rim when the
-// circle is off the disc). Her mark at the centre is a small arrowhead turned to her heading. Drawn in canvas 2D when
-// what it shows has changed; tapped, it opens the full map.
+// line; the circle it next closes to, a white dotted line. Nothing else: no other ship and no loot (as in Fortnite,
+// those are found by eye). Outside the next circle a white line runs from her to its nearest point, ending in an
+// arrowhead (on the rim when the circle is off the disc). Her mark at the centre is a small arrowhead turned to her
+// heading. Drawn in canvas 2D when what it shows has changed; tapped, it opens the full map.
 
 import type { Sea } from '../snapshot';
 import { R, add, along, distance, dot, frameAt, normalize, scale, type Vec3 } from '../world/sphere';
@@ -17,11 +15,9 @@ import type { Coast } from './coasts';
 import { laid, layOf, metres, place } from './disc';
 import { createHeld } from './held';
 import { INK, PAPER, WASH, svg } from './ink';
-import { RARITY } from '../rarity';
 import { bakeIsle, zOf, type Isle } from './isles';
 
-/** Metres from her to the disc's rim: at her 12 m/s some 22 s of sailing, past a gun's 200 m reach, as far as the loot
- *  is charted (play/game.ts CHARTED) and a little past what she can see (240 m). */
+/** Metres from her to the disc's rim: at her 13.5 m/s some 19 s of sailing, past a cannon's 200 m reach. */
 export const SPAN = 260;
 /** The most redraws a second. */
 const RATE = 30;
@@ -40,10 +36,9 @@ export function stormRing(storm: Storm, n = 96): Vec3[] {
 }
 
 /** What else the disc may show: her arrow gilt, for a ship watched after a sinking; the Storm's calm and the calm it
- *  next closes to (radius in metres); the loot on the water; the ships she sees; who holds the sea, and her number in
- *  it (her id). */
+ *  next closes to (radius in metres); who holds the sea, and her number in it (her id). */
 export interface More {
-  gilt?: boolean; calm?: Storm; next?: Storm | null; loot?: readonly { at: Vec3; gun: boolean; rarity: number }[]; ships?: readonly Vec3[]; sea?: Sea; own?: number | null;
+  gilt?: boolean; calm?: Storm; next?: Storm | null; sea?: Sea; own?: number | null;
 }
 
 /** An arrowhead's path, its tip `l` up from (0, 0). */
@@ -73,7 +68,8 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
   over.innerHTML = `<g id="north"><path d="M0 ${-r + 1}l-4.5 -0.5l4.5 9l4.5 -9z" fill="${WASH.vermilion}" stroke="${INK.iron}" stroke-width=".8"/></g>`
     + `<g id="her"></g>`;
   host.appendChild(over);
-  const north = over.querySelector('#north')!, her = over.querySelector('#her')!;
+  over.querySelector('#north')!.setAttribute('transform', `translate(${r} ${r})`);
+  const her = over.querySelector('#her')!;
   const ctx = canvas.getContext('2d')!;
   const held = createHeld(SPAN * 1.15);
   const isles = new Map<Coast, Isle>();
@@ -98,21 +94,19 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
   const stats = { draws: 0, ms: 0, since: performance.now() };
 
   let last = '', gilt: boolean | null = null, then = performance.now();
-  return (at: Vec3, heading: Vec3, facing: Vec3, more: More = {}) => {
+  return (at: Vec3, heading: Vec3, more: More = {}) => {
     // at most RATE times a second
     const now = performance.now(), dt = (now - then) / 1000;
     if (dt < 1 / RATE - 0.002) return;
-    const c = canvas.width / 2, k = (inner * dpr) / SPAN, l = layOf(at, facing, c, k);
+    const c = canvas.width / 2, k = (inner * dpr) / SPAN, l = layOf(at, frameAt(at).north, c, k);
     const bearing = (t: Vec3) => (Math.atan2(dot(t, l.right), dot(t, l.ahead)) * 180) / Math.PI;
     const sea = more.sea, seq = sea?.changes.at(-1)?.seq, trail = sea?.trails.find((t) => t.id === more.own);
-    const key = `${at.map((v) => v.toFixed(6))}${bearing(heading).toFixed(1)}${bearing(frameAt(at).north).toFixed(1)}${!!more.gilt}`
-      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${more.loot?.length}${more.ships?.map((s) => s[0].toFixed(5)).join()}`
-      + `${seq}${trail?.points.length}`;
+    const key = `${at.map((v) => v.toFixed(6))}${bearing(heading).toFixed(1)}${!!more.gilt}`
+      + `${more.calm?.radius}${more.calm?.centre[0]}${more.next?.radius}${seq}${trail?.points.length}`;
     if (key === last) return;
     last = key;
     then = now;
     her.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(heading).toFixed(1)})`);
-    north.setAttribute('transform', `translate(${r} ${r}) rotate(${bearing(frameAt(at).north).toFixed(1)})`);
     if (!!more.gilt !== gilt) {
       // watching another ship after a sinking: her arrowhead gilt (0117 minimap.ts mapFace)
       gilt = !!more.gilt;
@@ -170,37 +164,6 @@ export function createMinimap(host: HTMLElement, size: number, coasts: readonly 
       ctx.stroke();
       ctx.setLineDash([]);
     }
-    const dots = (list: readonly Vec3[] | undefined, radius: number, fill: string, ring: string, width: number) => {
-      if (!list?.length) return;
-      ctx.beginPath();
-      for (const q of list) {
-        if (!near(q, SPAN * 1.05)) continue;
-        const [x, y] = place(l, q);
-        ctx.moveTo(x + radius * dpr, y);
-        ctx.arc(x, y, radius * dpr, 0, Math.PI * 2);
-      }
-      ctx.fillStyle = fill;
-      ctx.strokeStyle = ring;
-      ctx.lineWidth = width * dpr;
-      ctx.stroke();
-      ctx.fill();
-    };
-    // the loot, worst first so the best lies on top: a lozenge for a gun, a roundel for stores, ruled in iron
-    const loot = [...(more.loot ?? [])].filter((p) => near(p.at, SPAN * 1.05)).sort((a, b) => a.rarity - b.rarity);
-    ctx.lineWidth = 0.9 * dpr;
-    ctx.strokeStyle = INK.iron;
-    for (const p of loot) {
-      const [x, y] = place(l, p.at), size = (1.9 + 0.3 * p.rarity) * dpr;
-      ctx.beginPath();
-      if (p.gun) {
-        const h = size * 1.3;
-        ctx.moveTo(x, y - h), ctx.lineTo(x + h * 0.8, y), ctx.lineTo(x, y + h), ctx.lineTo(x - h * 0.8, y), ctx.closePath();
-      } else ctx.arc(x, y, size, 0, Math.PI * 2);
-      ctx.fillStyle = `#${RARITY[p.rarity].toString(16).padStart(6, '0')}`;
-      ctx.fill();
-      ctx.stroke();
-    }
-    dots(more.ships, 2.1, INK.iron, INK.white, 1.6);
     // outside the next circle (or the calm, with none to come), the way in: a line to its nearest point
     const goal = next ?? calm;
     const d = goal ? distance(at, goal.centre) : 0;

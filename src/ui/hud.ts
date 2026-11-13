@@ -1,8 +1,8 @@
 // The match's HUD, laid on the world as the chartmaker's slips (docs/ui-sheet, as the owner reworked it):
 //   top left    the vitals slip: shield (azure) over hull, each with its numeral
 //   top centre  the Storm's clock (its spiral, m:ss; in the Storm's violet under 30 s) and the ships afloat (a ship, a count)
-//   top right   the minimap (minimap.ts): who holds the sea, the islands, the Storm's calm and the next, the way in
-//               from outside it, the loot and ships about her; a tap opens the full map
+//   top right   the minimap (minimap.ts), north up: who holds the sea, the islands, the Storm's calm and the next, the
+//               way in from outside it, her arrow (no other ship, no loot); a tap opens the full map
 //   right       under the right thumb, Fire (the old game's place, chart/layout.ts): the gun's mark on a paper disc,
 //               while reloading a rubric ring running round its border, faint and struck through with no gun; Gust
 //               above it, with a pip for each charge, the next filling as it comes back, faint with none, gilt
@@ -217,7 +217,7 @@ export function createHud(layer: HTMLElement, coasts: readonly Coast[], act: Hud
       // the rim's wash, outside the calm
       rim.style.opacity = s.outside > 0 && !watching ? (RIM[0] + (RIM[1] - RIM[0]) * Math.min(1, s.outside / RIM_DEEP)).toFixed(2) : '0';
 
-      drawMap(s.at, s.heading, s.facing, { gilt: watching, calm: s.eye, next: s.next, loot: watching ? undefined : s.loot, ships: s.ships, sea, own });
+      drawMap(s.at, s.heading, { gilt: watching, calm: s.eye, next: s.next, sea, own });
     },
   };
 }
