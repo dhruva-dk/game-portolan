@@ -6,8 +6,9 @@
 // straight down at her, her bow up the screen, with the space eye's narrow lens. Only once it is down to `air` metres
 // does it become an eye in the air: there, looking straight down, the planet's limb is out of the picture (so the dark
 // past it never turns to sky), the clouds are a kilometre and more over it (so none appear), and all the air it looks
-// through is the low air the space eye hazes too. Then, the rest of the way, it turns from looking down at her to the
-// chase eye's own turn and widens to its lens, ending on the chase eye exactly.
+// through is the low air the space eye hazes too. Then, the rest of the way, still looking at her, it comes round from
+// her bow up the screen to the sky's up and widens to the chase eye's lens, and at the last turns onto the chase eye's
+// own turn, ending on the chase eye exactly.
 
 import type { Eye } from '../snapshot';
 import type { ShipPose } from '../world/pose';
@@ -21,6 +22,8 @@ export const ARRIVAL = {
   height: 1250, fov: 40,
   /** Below this height over the sea, metres, it is an eye in the air (see above). */
   air: 200,
+  /** How far through the rest of the way down (by its ratio of distances) it begins to turn onto the chase eye's own. */
+  onto: 0.6,
 } as const;
 
 /** Smoother step (chase.ts's). */
@@ -39,16 +42,18 @@ function arc(a: Vec3, b: Vec3, f: number): Vec3 {
 export function arriving(t: number, her: ShipPose, chase: Eye): Eye | null {
   if (t >= ARRIVAL.seconds) return null;
   const s = smoother(clamp(t / ARRIVAL.seconds));
-  const up = normalize(her.position), to = normalize(chase.position);
+  const from = normalize(her.position), to = normalize(chase.position);
   const r0 = Math.log(R + ARRIVAL.height), r1 = Math.log(length(chase.position)), r = r0 + (r1 - r0) * s;
-  const position = scale(arc(up, to, s), Math.exp(r));
-  // looking straight down at her until it is in the air; from there turning to the chase eye's turn
-  const turn = smoother(clamp((Math.log(R + ARRIVAL.air) - r) / (Math.log(R + ARRIVAL.air) - r1)));
-  const down = lookAt(position, her.position, her.forward);
+  const position = scale(arc(from, to, s), Math.exp(r));
+  // looking at her all the way, her bow up the screen until it is in the air, then the sky's up; the last of the way
+  // onto the chase eye's own turn (which looks a little past her)
+  const air = clamp((Math.log(R + ARRIVAL.air) - r) / (Math.log(R + ARRIVAL.air) - r1)), turn = smoother(air);
+  const up = normalize(add(scale(her.forward, 1 - turn), normalize(position), turn));
+  const onto = smoother(clamp((air - ARRIVAL.onto) / (1 - ARRIVAL.onto)));
   return {
     kind: Math.exp(r) - R > ARRIVAL.air ? 'space' : 'air',
     position,
-    orientation: slerp(down, chase.orientation, turn),
+    orientation: slerp(lookAt(position, her.position, up), chase.orientation, onto),
     fov: ARRIVAL.fov + (chase.fov - ARRIVAL.fov) * turn,
   };
 }
