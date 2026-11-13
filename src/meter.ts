@@ -1,7 +1,8 @@
 import type { WebGPURenderer } from 'three/webgpu';
 
 /**
- * Frame cost on the device: frames per second, CPU ms, and GPU ms for render and compute work, each a second's mean.
+ * Frame cost on the device: frames per second, CPU ms, and GPU ms for render and compute work, each a second's mean;
+ * and the last frame's draw calls and triangles (thousands).
  * GPU times need the WebGPU 'timestamp-query' feature; without it they read '–'. They are three's: the durations of a
  * frame's passes, summed. One readback is in flight at a time and gives the frame it was asked for in; the GPU means
  * are over the frames read.
@@ -44,7 +45,8 @@ export function createMeter(renderer: WebGPURenderer, el: HTMLElement) {
       const f = (n: number, of: number) => (of > 0 ? (n / of).toFixed(1) : '–');
       el.textContent =
         `${Math.round((frames * 1000) / (now - last))}  cpu ${f(cpu, frames)}` +
-        (gpu ? `  gpu ${f(render, read)} + ${f(compute, computed)}` : '  gpu –');
+        (gpu ? `  gpu ${f(render, read)} + ${f(compute, computed)}` : '  gpu –') +
+        `  ${renderer.info.render.calls} calls ${Math.round(renderer.info.render.triangles / 1000)}k tri`;
       frames = cpu = read = render = computed = compute = 0;
       last = now;
     },

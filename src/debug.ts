@@ -24,7 +24,7 @@
 // won sinks every other by her. ?ships= sets them on the sea ahead of her (demoShips), ?way=m/s gives them a straight
 // course at that speed, their helms lashed, and ?heading=deg turns them all. ?ahead=seconds sails the game on that
 // long before the first frame, and ?pause holds it there from then on (the frame still draws: the arrival's stills).
-// The ships in a match are sim/match.ts SHIPS; the frame has room for that many.
+// The ships in a match are sim/match.ts SHIPS; the frame has room for that many, or for ?ships= more.
 // `node tools/planet-map.ts <seed>` charts a planet and lists its islands.
 
 import type { Anchor } from './world/lattice';
@@ -95,7 +95,8 @@ function setupOf(release: Setup): Setup {
     seed: number('seed', release.seed), mean, swing, hours: number('t', release.hours),
     drawing: {
       sea: sea === 'charts' || sea === 'wake' ? sea : release.drawing.sea,
-      fleet: release.drawing.fleet,
+      // (room for ?ships= past a match's, for judging the frame with more)
+      fleet: Math.max(release.drawing.fleet, number('ships', 0) + 1),
       lod: params.has('lod') ? number('lod', 0) : release.drawing.lod,
       cloth: params.get('cloth') !== '0' && release.drawing.cloth,
       extras: params.has('probe') ? (light, world) => probeMeshes(light, startOf(world.planet).at) : release.drawing.extras,
@@ -118,10 +119,11 @@ export async function scenario(release: Setup, stage: (setup: Setup) => Promise<
     return s.draw(p.next, p.drawn);
   }
   const s = await stage(setupOf(release));
-  if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, SHIPS), s.matches.storm));
+  const room = Math.max(SHIPS, number('ships', 0) + 1);
+  if (flying) return s.draw(flyer(s.canvas, s.start.at, demoShips(s.start.at, room), s.matches.storm));
   const p = await play(s);
   safeArea(uiLayer());
-  open(p, demoShips(s.start.at, SHIPS - 1));
+  open(p, demoShips(s.start.at, room - 1));
   const paused = params.has('pause');
   return s.draw((dt) => p.next(paused ? 0 : dt), p.drawn);
 }

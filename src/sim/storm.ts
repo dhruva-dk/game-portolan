@@ -9,7 +9,9 @@
 //
 // Tuning is the old game's (game-portolan-0117, sim/tables.ts STORM: seven phases of wait then shrink, damage
 // rising 1 → 12 of a 100-point hull a second), on the same 554 m planet, but started from the whole planet in place of
-// half of it and quickened to a match of about seven and a half minutes (its was thirteen).
+// half of it and quickened to a match of about seven and a half minutes (its was thirteen). It holds for any fleet
+// from 20 to 100 (SHIPS is 80): whole matches of bots, armed or not, ran 6.5–7.5 minutes, no more than five ships
+// outside the cap as each phase began, the storm sinking a few at most.
 //
 // Pure arithmetic: no three, so it runs in node for the tests.
 
