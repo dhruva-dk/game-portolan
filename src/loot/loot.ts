@@ -26,7 +26,7 @@ import { Fn, abs, attribute, cameraPosition, clamp, cos, cross, dot, float, max,
 import type { Light } from '../sky/light';
 import { GLOW } from '../rarity';
 import { KINDS, type GunKind, type LootKind } from '../kinds';
-import { METAL, gunShape } from '../ship/gun';
+import { gunShape, gunSurface } from '../ship/gun';
 import type { LootDraw } from '../snapshot';
 import { pixelSize } from '../view/view';
 import type { FloatNode, Vec3Node } from '../tsl';
@@ -48,8 +48,8 @@ const EMIT = 3.2, BEAM_EMIT = 1.6, HALO_EMIT = 1.2;
 const SIZE: Record<LootKind, number> = {
   cannon: 2.3, scatter: 2.1, repeater: 2.2, harpoon: 2.4, mortar: 2.1, smallShield: 1.7, bigShield: 2.25, repairKit: 1.6, fullRepair: 2.1,
 };
-/** Surfaces (linear albedo): bronze, ice, weathered wood and the iron of its hoops. */
-const BRONZE: [number, number, number] = [0.32, 0.2, 0.08], ICE: [number, number, number] = [0.33, 0.78, 0.95];
+/** Surfaces (linear albedo): ice, and a cask's weathered wood and the iron of its hoops (a gun's: ship/gun.ts). */
+const ICE: [number, number, number] = [0.33, 0.78, 0.95];
 const WOOD: [number, number, number] = [0.26, 0.15, 0.08], HOOP: [number, number, number] = [0.05, 0.045, 0.04];
 
 /** Linear rgb of 0xrrggbb. */
@@ -153,14 +153,9 @@ export function createLoot(light: Light) {
     return { mesh, geometry };
   };
 
-  // each gun bronze, its stock and bed oak, its bands and barrels iron (ship/gun.ts METAL)
-  const metal = attribute('metal', 'float'), made = varying(metal);
-  const gunMeshes = KINDS.map((kind, i) => piece(instanced(gun(kind), guns[i]), (p, n) => {
-    const iron = made.greaterThan(METAL.iron - 0.5), oak = made.greaterThan(METAL.oak - 0.5).and(iron.not());
-    const albedo = select(iron, vec3(...HOOP), vec3(...BRONZE));
-    const g = light.glossy(p, n, float(0.45), select(iron, vec3(0.18, 0.18, 0.18), albedo.mul(2.2)));
-    return select(oak, vec3(...WOOD).mul(light(p, n)), albedo.mul(g.diffuse).add(g.specular));
-  }));
+  // each gun as a ship carries it: bronze, oak and iron (ship/gun.ts gunSurface)
+  const made = varying(attribute('metal', 'float'));
+  const gunMeshes = KINDS.map((kind, i) => piece(instanced(gun(kind), guns[i]), (p, n) => gunSurface(light, p, n, made)));
   const crystalMesh = piece(instanced(new OctahedronGeometry(0.6).scale(0.8, 1.3, 0.8), crystals), (p, n) => {
     const g = light.glossy(p, n, float(0.12), vec3(0.06, 0.06, 0.06));
     return vec3(...ICE).mul(g.diffuse).add(g.specular.mul(2));
