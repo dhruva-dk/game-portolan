@@ -230,8 +230,7 @@ export function createClaims(ships: number) {
         }
       }
       if (!sea) return;
-      claimed.settle(sea.clock);
-      for (const [a, b] of claimed.flush()) {
+      for (const [a, b] of claimed.work(sea.clock)) {
         if (b <= a) continue;
         cellsAttr.addUpdateRange(a, b - a);
         revealAttr.addUpdateRange(a, b - a);

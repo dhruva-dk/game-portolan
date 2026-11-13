@@ -260,15 +260,20 @@ test('determinism: the same moves give the same grid, to the bit; 80 ships cost 
 
 test('the worst loop to close (half the planet) costs tens of milliseconds, not hundreds', () => {
   const pole: Vec3 = [0, 0, 1], theta = Math.PI / 2 - 0.01, path = circlePath(pole, theta, 0, 1.02);
-  const t = createTerritory(80);
-  t.begin([path[0]], 0);
-  let worst = 0;
-  for (let k = 1; k < path.length; k++) {
-    const t0 = performance.now();
-    t.step([{ id: 0, from: path[k - 1], to: path[k] }], k, WHOLE);
-    worst = Math.max(worst, performance.now() - t0);
+  // the best of three (one alone: 30 to 55 ms; the others' tests running beside can double it)
+  let best = Infinity;
+  for (let run = 0; run < 3; run++) {
+    const t = createTerritory(80);
+    t.begin([path[0]], 0);
+    let worst = 0;
+    for (let k = 1; k < path.length; k++) {
+      const t0 = performance.now();
+      t.step([{ id: 0, from: path[k - 1], to: path[k] }], k, WHOLE);
+      worst = Math.max(worst, performance.now() - t0);
+    }
+    assert.ok(t.share(0) > 0.45 && t.share(0) < 0.55);
+    best = Math.min(best, worst);
   }
-  console.log(`a hemisphere's loop: ${(t.share(0) * 100).toFixed(1)}% of the planet, its step ${worst.toFixed(1)} ms`);
-  assert.ok(t.share(0) > 0.45 && t.share(0) < 0.55);
-  assert.ok(worst < 150, `${worst} ms`);
+  console.log(`a hemisphere's loop: its step ${best.toFixed(1)} ms`);
+  assert.ok(best < 80, `${best} ms`);
 });

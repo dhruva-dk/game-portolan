@@ -7,7 +7,9 @@
 // whole window is one holder's: the shader can stop at one read there), now and before. And a moment, on the world's
 // clock: when the change front reached it. A change keeps the cells' state before it for HOLD s, the shader drawing the
 // old against the new as a front sweeps over (from the loop's own cells, a breadth-first spread alternately four- and
-// eight-way for a near round front, smoothed twice), then the cells settle and forget it.
+// eight-way for a near round front, smoothed twice), then the cells settle and forget it. The changes read are drawn in
+// order within a few milliseconds a frame (work), a large one over some frames: the GPU's words wait until it is done
+// and its front starts then, each cell still drawn as it was until the front reaches it.
 //
 // The cells go to the GPU as two storage buffers, one word a cell, laid out a face at a time in (N + 2)² words: each
 // face's cells within an apron one cell wide holding the next faces' cells along its edges (cells.ts wrapped), so the
@@ -70,6 +72,12 @@ for (let f = 0; f < 6; f++) {
  *  when (world clock, s) and the cells its front spreads from (null: in from the changed water's edge). */
 export interface Shift { cells: ReadCells; owner: number; time: number; from: ReadCells | null }
 
+/** Milliseconds a frame's work may take (a change drawn, the GPU's words copied, fronts settled): a large change is
+ *  spread over a few frames, so none pays more than a few milliseconds for it. */
+const BUDGET = 3;
+/** Cells gone through between looks at the clock (a fraction of a millisecond's work). */
+const SLICE = 1 << 11;
+
 /** The cells outside a match: all open sea. */
 const EMPTY = new Uint8Array(CELLS);
 
@@ -82,7 +90,13 @@ export function createClaimed() {
   const mark = new Int32Array(CELLS), seen = new Int32Array(CELLS), list = new Int32Array(CELLS), queue = new Int32Array(CELLS);
   const dirty = new Int32Array(CELLS), isDirty = new Uint8Array(CELLS);
   let dirtyCount = 0, epoch = 0;
+  /** Changes whose fronts have passed, oldest first, to settle once `until`; and how far into the first's cells. */
   const settling: { until: number; cells: Int32Array }[] = [];
+  let settled = 0;
+  /** Changes read and not yet drawn, oldest first; the one being drawn (null: none under way);
+   *  and the world's clock now. */
+  const pending: Shift[] = [];
+  let job: Generator<void, void, void> | null = null, now = 0;
   const win = new Int32Array(WIN * WIN), nb = new Int32Array(8);
 
   const touch = (c: number) => {
@@ -90,8 +104,11 @@ export function createClaimed() {
     isDirty[c] = 1;
     dirty[dirtyCount++] = c;
   };
+  /** The eight cells round c (its four sides' first), straight across the face away from its edges. */
   const around = (c: number) => {
-    for (let s = 0; s < 8; s++) nb[s] = offset(c, NBI[s], NBJ[s]);
+    const i = columnOf(c), j = rowOf(c);
+    if (i > 0 && j > 0 && i < N - 1 && j < N - 1) for (let s = 0; s < 8; s++) nb[s] = c + NBJ[s] * N + NBI[s];
+    else for (let s = 0; s < 8; s++) nb[s] = offset(c, NBI[s], NBJ[s]);
     return nb;
   };
   const windowOf = (c: number) => {
@@ -124,10 +141,10 @@ export function createClaimed() {
     return false;
   };
 
-  /** The whole grid at once (a match's start), with no fronts. */
+  /** The whole grid at once (a match's start, or changes missed), with no fronts: what was under way is dropped. */
   function load(owner: ReadCells) {
     let n = 0;
-    settling.length = 0;
+    [settling.length, settled, pending.length, job] = [0, 0, 0, null];
     for (let k = 0; k < dirtyCount; k++) isDirty[dirty[k]] = 0;
     dirtyCount = 0;
     reveal.fill(-1e6);
@@ -145,19 +162,30 @@ export function createClaimed() {
     for (const [c, slots] of APRON) for (const s of slots) gpuCells[s] = words[c];
   }
 
-  /** Cells go to `owner` at `t0`, the front spreading from `from` (or in from the changed water's edge). */
-  function change({ cells: changed, owner, time, from }: Shift) {
+  /**
+   * A change drawn: its cells go to `owner`, the front spreading from `from` (or in from the changed water's edge),
+   * starting when the change is done (its time, or now if later: the flood is seen whole). Yields every SLICE cells, so
+   * the frame can spread a large one over a few.
+   */
+  function* changing({ cells: changed, owner, time, from }: Shift): Generator<void, void, void> {
     if (!changed.length) return;
-    let t0 = time;
+    let spent = 0;
+    const tick = (n: number) => {
+      if ((spent += n) < SLICE) return false;
+      spent = 0;
+      return true;
+    };
     const e = ++epoch * 3;
     for (let k = 0; k < changed.length; k++) mark[changed[k]] = e;
     // the changed water's edge (a drain's sources too), and every cell within FLAT of it, either side
     let nbCount = 0, nl = 0;
     for (let k = 0; k < changed.length; k++) {
       const c = changed[k];
-      if (!boundary(c, e)) continue;
-      queue[nbCount++] = c;
-      nl = listWindow(c, e, nl, list);
+      if (boundary(c, e)) {
+        queue[nbCount++] = c;
+        nl = listWindow(c, e, nl, list);
+      }
+      if (tick(1)) yield;
     }
     for (let k = 0; k < changed.length; k++) {
       const c = changed[k];
@@ -166,16 +194,19 @@ export function createClaimed() {
       cells[c * 4] = owner;
       cells[c * 4 + 2] = 255;
       touch(c);
+      if (tick(1)) yield;
     }
     for (let k = 0; k < nl; k++) {
       const c = list[k];
       if (mark[c] !== e + 2) continue;
       cells[c * 4 + 1] = cells[c * 4];
       cells[c * 4 + 3] = cells[c * 4 + 2];
-      reveal[c] = Math.max(reveal[c], t0);
       touch(c);
     }
-    for (let k = 0; k < nl; k++) cells[list[k] * 4 + 2] = share(list[k]);
+    for (let k = 0; k < nl; k++) {
+      cells[list[k] * 4 + 2] = share(list[k]);
+      if (tick(8)) yield;
+    }
 
     // the front: breadth first through the changed water, four- and eight-way by turns
     const inside = (x: number) => mark[x] === e || mark[x] === e + 1;
@@ -208,6 +239,7 @@ export function createClaimed() {
           reveal[x] = layer;
           queue[tail++] = x;
         }
+        if (tick(2)) yield;
       }
     }
     // twice a 3 × 3 average, to round off the spread's octagonal facets
@@ -221,15 +253,19 @@ export function createClaimed() {
           n++;
         }
         reveal[c] = sum / n;
+        if (tick(1)) yield;
       }
     }
-    const far = Math.max(1, layer - 1);
     // a flood races in from the loop; a sunk ship's water drains from its edge a beat after she goes down
+    let t0 = Math.max(time, now);
+    const far = Math.max(1, layer - 1);
     const span = owner ? Math.min(3.2, 0.7 + far * 0.022) : Math.min(2.8, 1.6 + far * 0.015);
     if (!owner) t0 += 0.3;
+    for (let k = 0; k < nl; k++) if (mark[list[k]] === e + 2) reveal[list[k]] = Math.max(reveal[list[k]], t0);
     for (let k = 0; k < changed.length; k++) {
       const c = changed[k];
       reveal[c] = t0 + (span * (seen[c] === e ? reveal[c] : far)) / far;
+      if (tick(1)) yield;
     }
     const all = new Int32Array(changed.length + nl);
     all.set(changed);
@@ -237,62 +273,93 @@ export function createClaimed() {
     settling.push({ until: t0 + span + HOLD, cells: all });
   }
 
-  /** Cells whose fronts have long passed forget who held them before: one read settles them again. */
-  function settle(now: number) {
-    while (settling.length && settling[0].until <= now) {
-      for (const c of settling.shift()!.cells) {
+  /** Cells whose fronts have long passed forget who held them before (one read settles them again), at most `most`
+   *  of them; returns how many it looked at. */
+  function settle(most: number): number {
+    let n = 0;
+    while (settling.length && settling[0].until <= now && n < most) {
+      const s = settling[0].cells;
+      for (; settled < s.length && n < most; settled++, n++) {
+        const c = s[settled];
         if (reveal[c] > now - HOLD) continue;
         cells[c * 4 + 1] = cells[c * 4];
         cells[c * 4 + 3] = cells[c * 4 + 2];
         touch(c);
       }
+      if (settled < s.length) break;
+      settling.shift();
+      settled = 0;
     }
+    return n;
   }
 
-  /** Copies the cells touched into the GPU's words; returns each face's range of words changed ([start, end) or
-   *  empty), apron copies included. */
-  function flush(): [number, number][] {
-    const lo = new Array<number>(6).fill(WORDS), hi = new Array<number>(6).fill(-1);
-    const put = (s: number, c: number) => {
-      gpuCells[s] = words[c];
-      gpuReveal[s] = reveal[c];
-      const f = Math.floor(s / TILE);
-      lo[f] = Math.min(lo[f], s);
-      hi[f] = Math.max(hi[f], s);
-    };
-    for (let k = 0; k < dirtyCount; k++) {
-      const c = dirty[k];
+  /** Copies at most `most` of the cells touched into the GPU's words (apron copies too), each face's range of words
+   *  changed widened into `lo`/`hi`; returns how many it copied. */
+  const lo = new Array<number>(6), hi = new Array<number>(6);
+  const put = (s: number, c: number) => {
+    gpuCells[s] = words[c];
+    gpuReveal[s] = reveal[c];
+    const f = Math.floor(s / TILE);
+    lo[f] = Math.min(lo[f], s);
+    hi[f] = Math.max(hi[f], s);
+  };
+  function flush(most: number): number {
+    let n = 0;
+    for (; dirtyCount > 0 && n < most; n++) {
+      const c = dirty[--dirtyCount];
       isDirty[c] = 0;
       put(slotOf(c), c);
-      const extra = APRON.get(c);
-      if (extra) for (const s of extra) put(s, c);
+      const i = columnOf(c), j = rowOf(c);
+      if (i === 0 || j === 0 || i === N - 1 || j === N - 1) for (const s of APRON.get(c) ?? []) put(s, c);
     }
-    dirtyCount = 0;
-    return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
+    return n;
   }
 
   const cursor = createCursor();
-  /** Keeps the cells as `sea` has them (none: open sea): taken whole for a new match's sea or when changes were missed,
-   *  else each change not yet read drawn as a front. Returns whether they were taken whole. */
-  function follow(sea: Sea | undefined): boolean {
-    const { fresh, missed, from } = cursor.read(sea);
-    if (fresh || missed) {
-      load(sea?.owner ?? EMPTY);
-      return true;
-    }
-    if (!sea) return false;
-    for (let i = from; i < sea.changes.length; i++) {
-      const k = sea.changes[i];
-      if (k.kind === 'claim') change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.from({ length: k.loop }, (_, j) => k.cells[j]) });
-      else if (k.kind === 'home') change({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
-      else if (k.kind === 'drain') change({ cells: k.cells, owner: 0, time: k.time, from: null });
-    }
-    return false;
-  }
-
   return {
-    gpuCells, gpuReveal, load, change, settle, flush, follow,
-    /** Who holds cell c now (0 open sea, else id + 1). */
+    gpuCells, gpuReveal,
+    /** Takes `sea`'s cells (none: open sea) whole for a new match's sea or when changes were missed, else queues each
+     *  change not yet read to be drawn as a front (work). Returns whether they were taken whole. */
+    follow(sea: Sea | undefined): boolean {
+      const { fresh, missed, from } = cursor.read(sea);
+      if (fresh || missed) {
+        load(sea?.owner ?? EMPTY);
+        return true;
+      }
+      if (!sea) return false;
+      for (let i = from; i < sea.changes.length; i++) {
+        const k = sea.changes[i];
+        if (k.kind === 'claim') pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.from({ length: k.loop }, (_, j) => k.cells[j]) });
+        else if (k.kind === 'home') pending.push({ cells: k.cells, owner: k.ship + 1, time: k.time, from: Int32Array.of(cellOf(k.at)) });
+        else if (k.kind === 'drain') pending.push({ cells: k.cells, owner: 0, time: k.time, from: null });
+      }
+      return false;
+    },
+    /**
+     * A frame's work at `clock` (the world's, s), within the frame's budget of time: the GPU's words brought up to the
+     * changes drawn, then the next changes drawn, then fronts long passed settled. A change under way holds the GPU's
+     * words where they are until it is done (no frame draws half of one: a cell sent is drawn as before until its front
+     * comes). Returns each face's range of words changed ([start, end), or empty).
+     */
+    work(clock: number): [number, number][] {
+      now = clock;
+      lo.fill(WORDS);
+      hi.fill(-1);
+      const end = performance.now() + BUDGET, more = () => performance.now() < end;
+      for (;;) {
+        if (!job) while (flush(SLICE) === SLICE && more());
+        if (!more() || (!job && !pending.length)) break;
+        job ??= changing(pending.shift()!);
+        let done = false;
+        while (!done && more()) done = !!job.next().done;
+        if (done) job = null;
+      }
+      if (!job) while (more() && settle(SLICE) === SLICE);
+      return lo.map((l, f): [number, number] => (hi[f] < 0 ? [0, 0] : [l, hi[f] + 1]));
+    },
+    /** Whether every change read is drawn and on its way to the GPU. */
+    idle: () => !job && !pending.length && dirtyCount === 0,
+    /** Who holds cell c now, as drawn (0 open sea, else id + 1). */
     ownerOf: (c: number) => cells[c * 4],
   };
 }

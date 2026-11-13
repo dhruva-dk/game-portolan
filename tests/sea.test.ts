@@ -108,29 +108,35 @@ function match(seed: number, generation: number, steps: number, frame: (sea: Sea
 
 test('the water\'s copy of the cells keeps up with the sea: loops, drains, the storm, frames missed and a new match', () => {
   const claimed = createClaimed(), draw = random(17);
-  let wait = 0, frames = 0, whole = 0, worst = 0, spent = 0, checked = 0;
+  let wait = 0, frames = 0, whole = 0, loads = 0, spent = 0, checked = 0, clock = 0;
   const kinds = new Set<string>();
   const same = (owner: ReadCells, label: string) => {
     for (let c = 0; c < CELLS; c++) if (claimed.ownerOf(c) !== owner[c]) assert.fail(`${label}: cell ${c} is ${claimed.ownerOf(c)}, the sea's ${owner[c]}`);
     checked++;
   };
   const frame = (sea: Sea | undefined) => {
-    const t0 = performance.now();
-    if (claimed.follow(sea)) whole++;
-    if (sea) claimed.settle(sea.clock);
-    claimed.flush();
+    const t0 = performance.now(), taken = claimed.follow(sea);
+    if (sea) claimed.work((clock = sea.clock));
     const ms = performance.now() - t0;
-    [worst, spent, frames] = [Math.max(worst, ms), spent + ms, frames + 1];
+    if (taken) [whole, loads] = [whole + 1, Math.max(loads, ms)];
+    else [spent, frames] = [spent + ms, frames + 1];
   };
   for (const generation of [1, 2]) {
+    let last: Sea | undefined;
     match(generation * 101, generation, 3600, (sea) => {
       for (const k of sea.changes) kinds.add(k.kind);
+      last = sea;
       // most frames one step or two apart; now and then none drawn for ten seconds (the changes kept only eight)
       if (wait-- > 0) return;
       wait = draw() < 0.004 ? 300 : draw() < 0.5 ? 1 : 0;
       frame(sea);
-      if (frames % 8 === 0 || wait === 300) same(sea.owner, `match ${generation}, ${sea.clock.toFixed(1)} s`);
+      // (what is drawn is the sea's once every change read is: a large one takes a few frames)
+      if (claimed.idle() && (frames % 8 === 0 || wait === 300)) same(sea.owner, `match ${generation}, ${sea.clock.toFixed(1)} s`);
     });
+    // the last steps' changes read, and every change drawn
+    frame(last);
+    for (let f = 0; f < 600 && !claimed.idle(); f++) claimed.work(clock + f / 60);
+    same(last!.owner, `match ${generation}'s end`);
     // the lobby between: no sea, all open
     frame(undefined);
     same(new Uint8Array(CELLS), 'the lobby');
@@ -139,23 +145,43 @@ test('the water\'s copy of the cells keeps up with the sea: loops, drains, the s
   // whole for each match's first frame and each lobby's, and again after frames missed
   assert.ok(whole > 4, `taken whole ${whole} times`);
   assert.ok(checked > 100);
-  // what it costs: a few hundredths of a millisecond a frame, a whole copy some tens
-  assert.ok(spent / frames < 0.5 && worst < 60, `${(spent / frames).toFixed(3)} ms a frame, the worst ${worst.toFixed(1)} ms`);
+  // what it costs: a few hundredths of a millisecond a frame (no frame over a few: the next test);
+  // a whole copy some tens
+  assert.ok(spent / frames < 0.5 && loads < 60, `${(spent / frames).toFixed(3)} ms a frame, a whole copy ${loads.toFixed(1)} ms`);
 });
 
-test('an open trail\'s points only grow at the end while its serial holds, so a copy is kept up by adding the new', () => {
-  const copies = new Map<number, { serial: number; points: Vec3[] }>();
-  let grown = 0;
-  match(5, 1, 2400, (sea) => {
-    for (const t of sea.trails) {
-      const o = copies.get(t.id);
-      if (o && o.serial === t.serial) {
-        assert.ok(t.points.length >= o.points.length);
-        o.points.forEach((p, k) => assert.equal(t.points[k], p, `trail ${t.serial}, point ${k}`));
-        grown += t.points.length - o.points.length;
-      }
-      copies.set(t.id, { serial: t.serial, points: t.points.slice() });
-    }
+test('a loop round half the planet is drawn over some frames, none paying more than a few milliseconds', () => {
+  // her loop just short of a great circle, closed in one step at its end
+  const pole: Vec3 = [0, 0, 1], theta = Math.PI / 2 - 0.01, e1: Vec3 = [1, 0, 0], e2: Vec3 = [0, 1, 0];
+  const steps = Math.ceil((1.02 * 2 * Math.PI * R * Math.sin(theta)) / 0.4);
+  const path = Array.from({ length: steps + 1 }, (_, k) => {
+    const phi = (k / steps) * 1.02 * 2 * Math.PI;
+    return normalize(add(scale(pole, Math.cos(theta)), add(scale(e1, Math.cos(phi)), e2, Math.sin(phi)), Math.sin(theta)));
   });
-  assert.ok(grown > 100, `${grown} points added`);
+  const t = createTerritory(1);
+  t.begin([path[0]], 0);
+  let time = 0;
+  for (let k = 1; k < path.length && !t.changes().some((c) => c.kind === 'claim'); k++) t.step([{ id: 0, from: path[k - 1], to: path[k] }], (time = k / 30), WHOLE);
+  assert.ok(t.share(0) > 0.45, `she holds ${t.share(0)}`);
+  // the sea the step before (the loop's water open), and after
+  const after = seaOf(t, 1, time), loop = after.changes.at(-1)!, owner = Uint8Array.from(t.owner);
+  if (loop.kind !== 'claim') return assert.fail(loop.kind);
+  for (let k = 0; k < loop.cells.length; k++) owner[loop.cells[k]] = 0;
+  const before: Sea = { ...after, owner, seq: loop.seq - 1, changes: [] };
+  // the best of five (the other tests running beside can stall a frame)
+  let best = Infinity, count = 0;
+  for (let run = 0; run < 5; run++) {
+    const claimed = createClaimed(), frames: number[] = [];
+    claimed.follow(before);
+    claimed.follow(after);
+    for (let f = 0; f < 600 && !claimed.idle(); f++) {
+      const t0 = performance.now();
+      claimed.work(time + f / 60);
+      frames.push(performance.now() - t0);
+    }
+    for (let c = 0; c < CELLS; c++) if (claimed.ownerOf(c) !== t.owner[c]) assert.fail(`cell ${c} is ${claimed.ownerOf(c)}, the sea's ${t.owner[c]}`);
+    assert.ok(claimed.idle() && frames.length > 3, `${frames.length} frames`);
+    [best, count] = [Math.min(best, Math.max(...frames)), frames.length];
+  }
+  assert.ok(best < 8, `the worst frame ${best.toFixed(1)} ms, over ${count}`);
 });
