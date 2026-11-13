@@ -182,6 +182,8 @@ test('h. the debug switches live in src/debug.ts alone, set going by one call fr
     .flatMap((m) => m[1].split(',').map((n) => n.trim()).filter((n) => n && !n.startsWith('type ')));
   assert.deepEqual(taken, ['scenario'], 'src/main.ts takes only scenario (and types) from src/debug.ts');
   assert.equal(main.match(/\bscenario\s*\(/g)?.length, 1, 'src/main.ts calls scenario once');
+  // what only the switches ask of the game is its `debug`, reached from src/debug.ts (and the game's own, from its state)
+  none(hits(/\.\s*debug\s*\./, (rel) => rel !== 'debug.ts' && rel !== 'play/game.ts'), "the game's debug surface reached outside src/debug.ts");
 });
 
 test('i. the game touches no page: src/play neither reads nor makes the DOM (ui/ does, and main.ts wires them)', () => {

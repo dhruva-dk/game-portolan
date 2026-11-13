@@ -17,8 +17,9 @@
 //
 // It opens on the lobby's quiet sea (anchor), where the camera stands off her bow and a drag turns it round her
 // (anchorage.ts) and her hands do not sail her; a match then opens with every ship afloat at her berth (start), the
-// eye coming down from space onto her (arrival.ts), her hands on her ship once it is there; or, debugging, at sea
-// among others (atSea). Her helm may be lashed (lash): she holds it until a hand takes the helm.
+// eye coming down from space onto her (arrival.ts), her hands on her ship once it is there. What only the debug
+// switches ask of it (src/debug.ts: a match at sea among others, her helm lashed, ships sunk, loot strewn) is its
+// `debug`, apart from what the game offers anyone.
 
 import type { World } from '../environment';
 import { fixedClock } from '../sim/fixed';
@@ -232,7 +233,7 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     },
     sinkings: state.sinkings,
     /** Her share of the planet's water now, 0…1. */
-    share: () => state.territory()?.share(PLAYER) ?? 0,
+    share: () => state.share(PLAYER),
     ships: state.ships,
     alive: state.alive,
     /** A new match: every ship afloat at her berth, hers the first, and the eye coming down onto her from space. */
@@ -243,15 +244,6 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
     /** A quiet sea for the lobby: her ship alone where she lies at the start. */
     anchor() {
       restart(state.anchor(start), true);
-    },
-    /** A match at sea about her: her ship where she lies in the lobby, the others about her. */
-    atSea(others: readonly Berth[]) {
-      restart(state.begin(start, others));
-    },
-    /** Lashes her helm: from the next step she sails by `helm` (given her ship as she lies) until a hand takes the
-     *  helm (the stick pushed or the look dragged). */
-    lash(helm: (s: ShipState) => Helm) {
-      held = helm;
     },
     /** The camera's orders from the match's flow: a new ship to follow is cut or flown to. */
     view(next: View) {
@@ -264,8 +256,20 @@ export function createGame(world: World, anchors: readonly Anchor[], waters: Wat
       }
       view = next;
     },
-    sink: state.sink,
-    strew: state.strew,
+    /** What only the debug switches (src/debug.ts) ask of the game. */
+    debug: {
+      /** A match at sea about her: her ship where she lies in the lobby, the others about her. */
+      atSea(others: readonly Berth[]) {
+        restart(state.debug.atSea(start, others));
+      },
+      /** Lashes her helm: from the next step she sails by `helm` (given her ship as she lies) until a hand takes the
+       *  helm (the stick pushed or the look dragged). */
+      lash(helm: (s: ShipState) => Helm) {
+        held = helm;
+      },
+      sink: state.debug.sink,
+      strew: state.debug.strew,
+    },
   };
 }
 

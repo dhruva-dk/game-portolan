@@ -173,13 +173,13 @@ function open(p: Played, others: readonly Berth[]) {
     p.play();
     flow.go('match');
   } else {
-    game.atSea(others);
+    game.debug.atSea(others);
     drive(game, params.get('drive') ?? '');
     if (screen === 'result') flow.end(4, number('share', 0.137));
     else {
       referee.begin();
-      if (screen === 'spectate') game.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);
-      if (screen === 'won') others.forEach((_, i) => game.sink(i + 1, PLAYER));
+      if (screen === 'spectate') game.debug.sink(PLAYER, others.length && params.get('by') !== 'storm' ? 1 : null);
+      if (screen === 'won') others.forEach((_, i) => game.debug.sink(i + 1, PLAYER));
       flow.go(screen === 'spectate' || screen === 'won' ? screen : 'match');
     }
   }
@@ -195,23 +195,23 @@ function open(p: Played, others: readonly Berth[]) {
 
 /** ?kit and ?loot: her stores and the loot about her, through what the game offers anyone. */
 function stock(game: Game) {
-  type Goods = Parameters<Game['strew']>[1][number];
+  type Goods = Parameters<Game['debug']['strew']>[1][number];
   const { at, heading } = game.status();
   const step = () => game.step(STEP, IDLE);
   if (params.has('kit')) {
     const under: Goods[] = [
       { kind: 'gun', rarity: 2 }, { kind: 'smallShield', count: 3 }, { kind: 'bigShield', count: 2 }, { kind: 'repairKit', count: 2 },
     ];
-    game.strew(at, under);
+    game.debug.strew(at, under);
     step();
-    game.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
+    game.debug.strew(along(at, heading, 3).p, [{ kind: 'gun', rarity: 4 }]);
     step();
   }
   if (params.has('loot')) {
     // a fan ahead of her, clear of her own hull: the rarities worst to best near to far, then again further out
     [25, 50, 90, 140, 200, 250, 300, 350, 420].forEach((m, i) => {
       const side = (i % 2 ? 1 : -1) * (0.45 - 0.035 * i), turned = normalize(add(heading, cross(at, heading), side));
-      game.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: 'gun', rarity: i % 5 }]);
+      game.debug.strew(along(at, turned, m).p, [i === 1 ? { kind: 'smallShield', count: 1 } : { kind: 'gun', rarity: i % 5 }]);
     });
   }
 }
@@ -221,7 +221,7 @@ function drive(game: Game, legs: string) {
   const began = game.status().at;
   for (const leg of legs.split(';').filter(Boolean)) {
     const [b, throttle, seconds] = leg.split(',').map(Number);
-    game.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
+    game.debug.lash((s) => ({ course: bearing(s.at, b * degrees), throttle }));
     for (let i = 0; i < Math.round(seconds / STEP); i++) game.step(STEP, IDLE);
   }
   if (params.has('inward')) {
@@ -232,7 +232,7 @@ function drive(game: Game, legs: string) {
     game.lash((s) => ({ course: s.heading, throttle: 0 }));
   }
   if (!params.has('flood')) return;
-  game.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
+  game.debug.lash((s) => ({ course: add(began, s.at, -1), throttle: 1 }));
   const closed = () => game.snapshot().sea?.changes.some((k) => k.kind === 'claim' && k.ship === PLAYER);
   for (let i = 0; i < 30 / STEP && !closed(); i++) game.step(STEP, IDLE);
   for (let i = 0; i < Math.round(number('flood', 0) / STEP); i++) game.step(STEP, IDLE);

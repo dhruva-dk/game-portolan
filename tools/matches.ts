@@ -43,12 +43,21 @@ for (let g = 0; g < games; g++) {
   const held: string[] = [];
   /** The share of the planet held, all ships' and the most of one, per cent. */
   const holding = () => {
-    const t = state.territory()!, shares = state.ships().map((k) => t.share(k.id));
+    const shares = state.ships().map((k) => state.share(k.id));
     return `${(100 * shares.reduce((a, b) => a + b, 0)).toFixed(2)}% (most ${(100 * Math.max(...shares)).toFixed(2)}%)`;
   };
+  /** The match's loops (closed, the square metres they took, cut by another, cut by herself or given up) and the shield
+   *  each ship's own water gave back, from what each step did. */
+  const loops = { closed: 0, metres: 0, cut: 0, own: 0 }, back = new Map<number, number>();
   const t1 = performance.now();
   while (state.alive().length > 1 && state.time() < end) {
-    state.advance(idle, still);
+    const did = state.advance(idle, still);
+    for (const k of did.held?.claimed ?? []) [loops.closed, loops.metres] = [loops.closed + 1, loops.metres + k.metres];
+    for (const k of did.held?.cut ?? []) {
+      if (k.by !== null && k.by !== k.id) loops.cut++;
+      else loops.own++;
+    }
+    for (const k of did.regained) back.set(k.id, (back.get(k.id) ?? 0) + k.shield);
     steps++;
     const t = Math.round(state.time() / STEP);
     if (t % Math.round(1 / STEP) === 0) {
@@ -82,10 +91,10 @@ for (let g = 0; g < games; g++) {
     + ` sunk by shot ${causes.shot}, ram ${causes.ram}, storm ${causes.storm} (${credited} credited); ${(ms / steps).toFixed(2)} ms a step`);
   console.log(`  loot: ${loot.length} pieces at the start, ${shallow} in water too shoal to reach`);
   for (const k of marks) console.log(`  ${k}`);
-  const l = state.loops(), back = [...state.regained().values()];
+  const l = loops, regained = [...back.values()];
   console.log(`  held: ${held.join(', ')}, end ${holding()}`);
   console.log(`  loops: ${l.closed} closed (${l.metres.toFixed(0)} m²), ${l.cut} cut by another, ${l.own} cut by herself or given up;`
-    + ` shield from her water ${back.reduce((a, b) => a + b, 0).toFixed(0)} hp over ${back.filter((k) => k > 0).length} ships`);
+    + ` shield from her water ${regained.reduce((a, b) => a + b, 0).toFixed(0)} hp over ${regained.filter((k) => k > 0).length} ships`);
   const all = [...stuck.values()], aground = all.filter((k) => k.speed < AGROUND);
   const seconds = all.map((k) => k.seconds).sort((a, b) => a - b), speeds = all.map((k) => k.speed).sort((a, b) => a - b);
   // (a ship circling in her own water, way on, moves little over WINDOW s: her speed tells her from one lying still)
